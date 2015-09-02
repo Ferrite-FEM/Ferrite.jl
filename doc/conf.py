@@ -37,7 +37,8 @@ extensions = [
     'sphinx.ext.viewcode',
     'juliadoc.julia',
     'juliadoc.jldoctest',
-    'juliadoc.jlhelp'
+    'juliadoc.jlhelp',
+     'sphinxcontrib.napoleon'
 ]
 
 # Add any paths that contain templates here, relative to this directory.

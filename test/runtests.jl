@@ -1,4 +1,5 @@
 using JuaFEM
+using JuaFEM.Elements
 using FactCheck
 
 
