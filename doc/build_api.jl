@@ -1,4 +1,4 @@
-using Docile, Lexicon, JuaFEM
+using Docile, Lexicon, JuAFEM
 
 const api_directory = "api"
 
@@ -28,7 +28,7 @@ function search_modules!(module_::Module, append_list::Array{Module, 1})
 end
 
 append_list = Array(Module, 0)
-search_modules!(JuaFEM, append_list)
+search_modules!(JuAFEM, append_list)
 
 const modules = append_list
 

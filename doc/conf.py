@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# JuaFEM.jl documentation build configuration file, created by
+# JuAFEM.jl documentation build configuration file, created by
 # sphinx-quickstart on Wed Sep  2 09:03:02 2015.
 #
 # This file is execfile()d with the current directory set to its
@@ -54,7 +54,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'JuaFEM.jl'
+project = u'JuAFEM.jl'
 copyright = u'2015, Kristoffer Carlsson, Jim Brouzoulis'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -192,7 +192,7 @@ html_static_path = ['_static']
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'JuaFEMjldoc'
+htmlhelp_basename = 'JuAFEMjldoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -212,7 +212,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  ('index', 'JuaFEMjl.tex', u'JuaFEM.jl Documentation',
+  ('index', 'JuAFEMjl.tex', u'JuAFEM.jl Documentation',
    u'Kristoffer Carlsson, Jim Brouzoulis', 'manual'),
 ]
 
@@ -242,7 +242,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'juafemjl', u'JuaFEM.jl Documentation',
+    ('index', 'juafemjl', u'JuAFEM.jl Documentation',
      [u'Kristoffer Carlsson, Jim Brouzoulis'], 1)
 ]
 
@@ -256,8 +256,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'JuaFEMjl', u'JuaFEM.jl Documentation',
-   u'Kristoffer Carlsson, Jim Brouzoulis', 'JuaFEMjl', 'One line description of project.',
+  ('index', 'JuAFEMjl', u'JuAFEM.jl Documentation',
+   u'Kristoffer Carlsson, Jim Brouzoulis', 'JuAFEMjl', 'One line description of project.',
    'Miscellaneous'),
 ]
 

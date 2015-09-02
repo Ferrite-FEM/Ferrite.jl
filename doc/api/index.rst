@@ -9,4 +9,4 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-   JuaFEM.Elements
+   JuAFEM.Elements

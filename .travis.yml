@@ -12,4 +12,4 @@ notifications:
 script:
     - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
     - julia -e 'Pkg.add("FactCheck");'
-    - julia -e 'Pkg.clone(pwd()); Pkg.test("JuaFEM"; coverage=true)'
+    - julia -e 'Pkg.clone(pwd()); Pkg.test("JuAFEM"; coverage=true)'

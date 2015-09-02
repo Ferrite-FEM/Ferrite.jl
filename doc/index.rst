@@ -1,4 +1,4 @@
-Welcome to JuaFEM.jl's documentation!
+Welcome to JuAFEM.jl's documentation!
 =====================================
 
 Contents:

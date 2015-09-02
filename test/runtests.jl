@@ -1,5 +1,5 @@
-using JuaFEM
-using JuaFEM.Elements
+using JuAFEM
+using JuAFEM.Elements
 using FactCheck
 
 

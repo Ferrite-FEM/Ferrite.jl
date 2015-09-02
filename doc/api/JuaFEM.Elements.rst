@@ -1,4 +1,4 @@
-JuaFEM.Elements
+JuAFEM.Elements
 ===============
 
 Exported
@@ -12,7 +12,7 @@ Exported
     :param k :  spring stiffness
 
 **source**
-[JuaFEM/src/elements/spring.jl:12]
+[JuAFEM/src/elements/spring.jl:12]
 
  .. function:: spring1s(k::Float64,  u::Array{Float64, 1})
 
@@ -22,5 +22,5 @@ Exported
     :param u :  displacements
 
 **source**
-[JuaFEM/src/elements/spring.jl:27]
+[JuAFEM/src/elements/spring.jl:27]
 
