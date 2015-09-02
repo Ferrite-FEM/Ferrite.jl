@@ -10,6 +10,7 @@ Exported
     spring element.
 
     :param k :  spring stiffness
+
 **source**
 [JuaFEM/src/elements/spring.jl:12]
 
@@ -19,6 +20,7 @@ Exported
 
     :param k :  spring stiffness
     :param u :  displacements
+
 **source**
 [JuaFEM/src/elements/spring.jl:27]
 

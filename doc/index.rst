@@ -4,6 +4,6 @@ Welcome to JuaFEM.jl's documentation!
 Contents:
 
 .. toctree::
-   :hidden:
+   :maxdepth: 2
 
    api/index
