@@ -10,4 +10,6 @@ Welcome to JuAFEM.jl's documentation!
 .. toctree::
     :maxdepth: 1
 
+    api/materials
     api/springs
+    api/quadrature
