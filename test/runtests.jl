@@ -1,5 +1,6 @@
 using JuAFEM
 using FactCheck
+using FastGaussQuadrature
 
 
 # write your own tests here
