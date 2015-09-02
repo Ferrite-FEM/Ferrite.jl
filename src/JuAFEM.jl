@@ -1,9 +1,7 @@
 module JuAFEM
 
-using Reexport
+export spring1e, spring1s
 
 include("elements/elements.jl")
-
-@reexport using .Elements
 
 end # module

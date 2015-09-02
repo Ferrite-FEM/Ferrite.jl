@@ -1,13 +1,6 @@
-# Routines for springs
-
-
 """
-Computes the element stiffness matrix Ke for a
+Computes the element stiffness matrix *Ke* for a
 spring element.
-
-Parameters
-----------
-k : spring stiffness
 """
 function spring1e(k::Float64)
     Ke = [k -k;
@@ -17,12 +10,7 @@ spring1e(k::Number) = spring1e(convert(Float64, k))
 
 
 """
-Computes the force fe for a spring element
-
-Parameters
-----------
-k : spring stiffness
-u : displacements
+Computes the force *fe* for a spring element
 """
 function spring1s(k::Float64, u::Vector{Float64})
     if length(u) != 2
