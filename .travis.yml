@@ -12,7 +12,7 @@ notifications:
 script:
     - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
     - julia -e 'Pkg.add("FactCheck");'
-    - julia -e 'Pkg.clone("https://github.com/ajt60gaibb/FastGaussQuadrature.jl");'
+    - julia -e 'Pkg.clone("https://github.com/KristofferC/FastGaussQuadrature.jl");'
     - julia -e 'Pkg.clone(pwd()); Pkg.test("JuAFEM"; coverage=true)'
 after_success:
 - julia -e 'cd(Pkg.dir("JuAFEM")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
