@@ -46,8 +46,3 @@ function plani4e(ex::Vector, ey::Vector, ep, D, eq=[0.0,0.0])
 
     return Ke, fe
 end
-
-
-
-
-
