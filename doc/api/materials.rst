@@ -6,9 +6,6 @@
 Materials
 ********
 
-Basic functions
----------------
-
 .. function:: hooke(ptype, E, v)
 
    .. Docstring generated from Julia source

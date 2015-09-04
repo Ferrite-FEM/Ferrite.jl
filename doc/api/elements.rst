@@ -21,3 +21,12 @@ Springs
 
    Computes the force *fe* for a spring element
 
+4 node isoparametric quadraterial
+---------------------------------
+
+.. function:: plani4e(ex::Vector, ey::Vector, ep, D, eq=[0.0,0.0])
+
+   .. Docstring generated from Julia source
+
+   Computes the stiffness matrix for a four node isoparametric quadraterial element
+
