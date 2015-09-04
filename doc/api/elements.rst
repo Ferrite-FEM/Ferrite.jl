@@ -1,13 +1,13 @@
 .. currentmodule:: JuAFEM
 
-.. _api-strings:
+.. _api-elements:
 
 ********
+Elements
+********
+
 Springs
-********
-
-Basic functions
----------------
+-------
 
 .. function:: spring1e(k) -> Matrix{Float64}
 

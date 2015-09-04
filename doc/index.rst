@@ -8,8 +8,8 @@ Welcome to JuAFEM.jl's documentation!
 #####
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
+    api/elements
     api/materials
-    api/springs
-    api/quadrature
+    api/utilities

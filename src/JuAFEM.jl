@@ -12,6 +12,6 @@ include("materials/hooke.jl")
 include("utilities/quadrature.jl")
 include("utilities/shape_functions.jl")
 include("utilities/linalg.jl")
-
+include("utilities/assembler.jl")
 
 end # module
