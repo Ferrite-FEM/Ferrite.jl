@@ -1,6 +1,6 @@
 """
 Computes the stiffness matrix for a four node isoparametric
-element
+quadraterial element
 """
 function plani4e(ex::Vector, ey::Vector, ep, D, eq=[0.0,0.0])
     ptype = convert(Int, ep[1])

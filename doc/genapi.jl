@@ -33,6 +33,7 @@ end
 torst(md) = isrst(md) ? flatten(md).content[1].code : tryrst(md)
 
 function translate(file)
+    println(file)
     @assert isfile(file)
     ls = split(readall(file), "\n")[1:end-1]
     doccing = false

@@ -1,13 +1,13 @@
 .. currentmodule:: JuAFEM
 
-.. _api-strings:
+.. _api-elements:
 
 ********
+Elements
+********
+
 Springs
-********
-
-Basic functions
----------------
+-------
 
 .. function:: spring1e(k) -> Matrix{Float64}
 
@@ -20,4 +20,13 @@ Basic functions
    .. Docstring generated from Julia source
 
    Computes the force *fe* for a spring element
+
+4 node isoparametric quadraterial
+---------------------------------
+
+.. function:: plani4e(ex::Vector, ey::Vector, ep, D, eq=[0.0,0.0])
+
+   .. Docstring generated from Julia source
+
+   Computes the stiffness matrix for a four node isoparametric quadraterial element
 
