@@ -5,9 +5,9 @@ function solve_eq_sys(K::AbstractMatrix, f::Array, bc::Matrix )
 
     (nr, nc) = size(K);
     if nr != nc
-        DimensionMismatch(@sprintf("Stiffness matrix is not square (#rows=%d #cols=%d)", nr, nc))
+        throw(DimensionMismatch("Stiffness matrix is not square (#rows=%nr #cols=$nc)"))
     elseif nr != length(f)
-      DimensionMismatch(@sprintf("Mismatch between number of rows in the stiffness matrix and load vector (#rowsK=%d #rowsf=%d)", nr,length(f)))
+        throw(DimensionMismatch("Mismatch between number of rows in the stiffness matrix and load vector (#rowsK=$nr #rowsf=$length(f))"))
     end
 
     _Ke = convert(Matrix{Float64}, Ke)
@@ -34,4 +34,4 @@ function solve_eq_sys(K::AbstractMatrix, f::Array, bc::Matrix )
 
 end
 
-solveq = solve_eq_sys # for CALFEM API compatability
+const solveq = solve_eq_sys # for CALFEM API compatability

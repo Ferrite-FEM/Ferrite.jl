@@ -9,6 +9,6 @@ function assemble(edof::Array, K::AbstractMatrix, Ke::Matrix)
     return K
 end
 
-assem = assemble # for CALFEM API compatability
+const assem = assemble # for CALFEM API compatability
 
 
