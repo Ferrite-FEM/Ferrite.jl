@@ -1,5 +1,7 @@
 module JuAFEM
 
+import Base.LinAlg.chksquare
+
 export spring1e, spring1s
 export plani4e
 
