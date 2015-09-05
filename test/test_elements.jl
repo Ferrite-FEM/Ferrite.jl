@@ -39,68 +39,68 @@ facts("plani4e testing") do
     #  7,8-----5,6-----11,12
     #   |       |        |
     #  1,2-----3,4------9,10
-    # Set dirichlet boundary conditions such that u_x = 0.1x and u_y = 0.05y
+    # Set dirichlet boundary conditions such that u_x = u_y = 0.1x + 0.05y
     # Solve and see that middle node is at correct position
     function patch_test()
-      Coord = [0 0
-               1 0
-               1 1
-               0 1
-               2 0
-               2 1
-               2 2
-               1 2
-               0 2]
+        Coord = [0 0
+                 1 0
+                 1 1
+                 0 1
+                 2 0
+                 2 1
+                 2 2
+                 1 2
+                 0 2]
 
-      Dof = [1 2
-             3 4
-             5 6
-             7 8
-             9 10
-             11 12
-             13 14
-             15 16
-             17 18]
+        Dof = [1 2
+               3 4
+               5 6
+               7 8
+               9 10
+               11 12
+               13 14
+               15 16
+               17 18]
 
-      Edof = [1 1 2 3 4 5 6 7 8;
-              2 3 4 9 10 11 12 5 6;
-              3 5 6 11 12 13 14 15 16;
-              4 7 8 5 6 15 16 17 18]
+        Edof = [1 1 2 3 4 5 6 7 8;
+                2 3 4 9 10 11 12 5 6;
+                3 5 6 11 12 13 14 15 16;
+                4 7 8 5 6 15 16 17 18]
 
-      function get_coord(dof)
-        node = div(dof+1, 2)
-        if dof % 2 == 0
-            return Coord[node, 2]
-        else
-            return Coord[node, 1]
+        function get_coord(dof)
+          node = div(dof+1, 2)
+          if dof % 2 == 0
+              return Coord[node, 2]
+          else
+              return Coord[node, 1]
+          end
         end
-      end
 
-      ux = 0.1
-      uy = 0.05
+        ux = 0.1
+        uy = 0.05
 
-      bc_dofs = [1, 2, 3, 4, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 7, 8]
-      bc = zeros(length(bc_dofs), 2)
-      for i in 1:size(bc, 1)
-        dof = bc_dofs[i]
-        node = div(dof+1, 2)
-        coord = Coord[node, :]
-        bc[i, 1] = dof
-        bc[i, 2] = ux * coord[1] + uy * coord[2]
-      end
-
-        a = start_assemble()
-        D = hooke(2, 250e9, 0.3)
-        for e in 1:size(Edof, 1)
-          ex = [get_coord(i) for i in Edof[e, 2:2:end]]
-          ey = [get_coord(i) for i in Edof[e, 3:2:end]]
-          Ke, _ = plani4e(ex, ey, [2, 1, 2], D)
-          assemble(Edof[e, :], a, Ke)
+        bc_dofs = [1, 2, 3, 4, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 7, 8]
+        bc = zeros(length(bc_dofs), 2)
+        for i in 1:size(bc, 1)
+          dof = bc_dofs[i]
+          node = div(dof+1, 2)
+          coord = Coord[node, :]
+          bc[i, 1] = dof
+          bc[i, 2] = ux * coord[1] + uy * coord[2]
         end
-        K = end_assemble(a)
-        bcs = convert(Vector{Int}, bc[:,1])
-        free = setdiff(collect(1:18), bcs)
-        @fact -K[free,free] \ (K[free, bcs]*bc[:,2]) --> roughly([ux + uy, ux + uy])
+
+          a = start_assemble()
+          D = hooke(2, 250e9, 0.3)
+          for e in 1:size(Edof, 1)
+            ex = [get_coord(i) for i in Edof[e, 2:2:end]]
+            ey = [get_coord(i) for i in Edof[e, 3:2:end]]
+            Ke, _ = plani4e(ex, ey, [2, 1, 2], D)
+            assemble(Edof[e, :], a, Ke)
+          end
+          K = end_assemble(a)
+          a, _ = solve_eq_sys(K, zeros(18), bc)
+          d_free = setdiff(collect(1:18), convert(Vector{Int}, bc[:,1]))
+          @fact a[d_free] --> roughly([ux + uy, ux + uy])
       end
       patch_test()
 
