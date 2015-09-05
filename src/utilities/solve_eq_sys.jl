@@ -2,15 +2,15 @@
 Solves the equation system Ka = f taking into account the Dirichlet boundary conditions in the matrix bc
 """
 function solve_eq_sys(K::AbstractMatrix, f::Array, bc::Matrix )
-
     (nr, nc) = size(K);
+    nrf = length(f)
     if nr != nc
-        throw(DimensionMismatch("Stiffness matrix is not square (#rows=%nr #cols=$nc)"))
-    elseif nr != length(f)
-        throw(DimensionMismatch("Mismatch between number of rows in the stiffness matrix and load vector (#rowsK=$nr #rowsf=$length(f))"))
+        throw(DimensionMismatch("Stiffness matrix is not square (#rows=$nr #cols=$nc)"))
+    elseif nr != nrf
+        throw(DimensionMismatch("Mismatch between number of rows in the stiffness matrix and load vector (#rowsK=$nr #rowsf=$nrf)"))
     end
 
-    _Ke = convert(Matrix{Float64}, Ke)
+    _K = convert(Matrix{Float64}, K)
     d_pres = bc[:,1]   # prescribed dofs
     a_pres = bc[:,2]   # corresponding prescribed dof values
 
