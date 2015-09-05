@@ -7,6 +7,8 @@ export hooke
 export assemble
 export solve_eq_sys
 
+export start_assemble, assemble, end_assemble
+
 include("elements/elements.jl")
 include("materials/hooke.jl")
 

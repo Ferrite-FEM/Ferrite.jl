@@ -18,7 +18,7 @@ end
 """
 Assembles the element matrix `Ke` into `assembler`
 """
-function assemble(edof, assembler::Assembler, Ke)
+function assemble(edof, a::Assembler, Ke)
     for ele in size(edof, 1)
         append!(a.V, Ke[:])
         for dof1 in edof[2:end], dof2 in edof[2:end]

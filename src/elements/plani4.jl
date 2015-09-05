@@ -2,7 +2,15 @@
 Computes the stiffness matrix for a four node isoparametric
 quadraterial element
 """
-function plani4e(ex::Vector, ey::Vector, ep, D, eq=[0.0,0.0])
+function plani4e{P, Q}(ex::Vector{P}, ey::Vector{Q},
+                       ep, D::Matrix{Float64}, eq=[0.0,0.0])
+    plani4e(convert(Vector{Float64}, ex),
+            convert(Vector{Float64}, ey),
+            ep, D, eq)
+end
+
+function plani4e(ex::Vector{Float64}, ey::Vector{Float64},
+                 ep, D::Matrix{Float64}, eq=[0.0,0.0])
     ptype = convert(Int, ep[1])
     if !(ptype in (1,2,3))
         throw(ArgumentError("ptype must be 1, 2, 3"))
