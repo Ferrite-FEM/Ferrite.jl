@@ -106,3 +106,20 @@ facts("plani4e testing") do
 
 end
 
+
+facts("bar test") do
+    # From example 3.2 in the book Strukturmekanik
+    ex = [0.  1.6]; ey = [0. -1.2]
+    elem_prop = [200.e9 1.0e-3]
+    Ke = bar2e(ex, ey, elem_prop)
+    ed = [0. 0. -0.3979 -1.1523]*1e-3
+    N = bar2s(ex, ey, elem_prop, ed)
+    Ke_ref = [ 64  -48. -64  48
+              -48   36   48 -36
+              -64   48   64 -48
+               48  -36  -48  36]*1e6
+    N_ref = 37.306e3
+    @fact norm(Ke - Ke_ref) / norm(Ke_ref) --> roughly(0.0, atol=1e-15)
+    @fact abs(N - N_ref) / N_ref --> roughly(0.0, atol=1e-15)
+
+end
