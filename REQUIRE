@@ -1,3 +1,6 @@
 julia 0.3
 FastGaussQuadrature
 InplaceOps
+Requires
+Winston
+Compat

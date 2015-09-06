@@ -78,7 +78,6 @@ facts("plani4e testing") do
 
         ux = 0.1
         uy = 0.05
-
         bc_dofs = [1, 2, 3, 4, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 7, 8]
         bc = zeros(length(bc_dofs), 2)
         for i in 1:size(bc, 1)
@@ -121,5 +120,4 @@ facts("bar test") do
     N_ref = 37.306e3
     @fact norm(Ke - Ke_ref) / norm(Ke_ref) --> roughly(0.0, atol=1e-15)
     @fact abs(N - N_ref) / N_ref --> roughly(0.0, atol=1e-15)
-
 end
