@@ -2,10 +2,15 @@ module JuAFEM
 
 import Base.LinAlg.chksquare
 
+# Elements
 export spring1e, spring1s
 export plani4e
+export bar2e, bar2s
 
+# Materials
 export hooke
+
+# Utilities
 export assemble
 export solve_eq_sys, solveq
 export extract_eldisp, extract
