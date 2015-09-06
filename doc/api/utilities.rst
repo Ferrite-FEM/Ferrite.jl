@@ -2,9 +2,9 @@
 
 .. _api-utilities:
 
-********
+*********
 Utilities
-********
+*********
 
 Assembler
 ---------
