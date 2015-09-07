@@ -32,7 +32,7 @@ build_script:
       Pkg.clone(\"InPlaceOps\");
       Pkg.clone(pwd(), \"JuAFEM\")
       Pkg.add(\"Winston\");
-      kg.add(\"FactCheck\");
+      Pkg.add(\"FactCheck\");
       Pkg.add(\"Requires\")"
 
 test_script:
