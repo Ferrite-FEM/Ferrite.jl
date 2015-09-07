@@ -3,10 +3,22 @@ module JuAFEM
 using FastGaussQuadrature
 using InplaceOps
 
+import Base.LinAlg.chksquare
+
+# Elements
 export spring1e, spring1s
 export plani4e, plani4s
+export bar2e, bar2s
 
+# Materials
 export hooke
+
+# Utilities
+export assemble
+export solve_eq_sys, solveq
+export extract_eldisp, extract
+export start_assemble, assemble, end_assemble
+export inv2x2
 
 include("elements/elements.jl")
 include("materials/hooke.jl")
@@ -16,5 +28,8 @@ include("utilities/quadrature.jl")
 include("utilities/shape_functions.jl")
 include("utilities/linalg.jl")
 include("utilities/assembler.jl")
+include("utilities/assemble.jl")
+include("utilities/solve_eq_sys.jl")
+include("utilities/extract_eldisp.jl")
 
 end # module

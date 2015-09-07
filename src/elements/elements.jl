@@ -1,2 +1,7 @@
+# Classic structural elements
 include("spring.jl")
-include("plani4e.jl")
+include("bar.jl")
+
+# Continuum elements
+include("plani4.jl")
+

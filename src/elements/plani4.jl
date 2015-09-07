@@ -4,13 +4,15 @@
 Computes the stiffness matrix for a four node isoparametric
 quadraterial element
 """
-function error_check_plan4(ex, ey, ptype, t, int_order, D)
-    (ptype in (1,2)) || throw(ArgumentError("ptype must be 1, 2, 3, 4"))
-    int_order <= 0 && throw(ArgumentError("integration order must be > 0"))
-    t <= 0.0 && throw(ArgumentError("thickness must be > 0.0"))
+
+
+
+function plani4e{P, Q}(ex::Vector{P}, ey::Vector{Q},
+                       ep, D::Matrix{Float64}, eq=[0.0,0.0])
+    plani4e(convert(Vector{Float64}, ex),
+            convert(Vector{Float64}, ey),
+            ep, D, eq)
 end
-
-
 
 function plani4e(ex::Vector, ey::Vector, ep::Vector, D::Matrix, eq::Vector=[0.0,0.0])
     ptype = convert(Int, ep[1])
@@ -50,6 +52,12 @@ function plani4e(ex::Vector, ey::Vector, ep::Vector, D::Matrix, eq::Vector=[0.0,
     end
 
     return Ke, fe
+end
+
+function error_check_plan4(ex, ey, ptype, t, int_order, D)
+    (ptype in (1,2,3)) || throw(ArgumentError("ptype must be 1, 2, 3"))
+    int_order <= 0 && throw(ArgumentError("integration order must be > 0"))
+    t <= 0.0 && throw(ArgumentError("thickness must be > 0.0"))
 end
 
 #=
