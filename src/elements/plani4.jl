@@ -38,11 +38,13 @@ function plani4e(ex::Matrix{Float64}, ey::Matrix{Float64},
     N2 = @static zeros(8,2)
     Nb = @static zeros(8,1)
 
+    compute_force = false
+    if eq != zeros(2)
+        compute_force = true
+    end
+
     qr = get_quadrule(int_order)
     for (ξ, w) in zip(qr.points, qr.weights)
-        N = N_Q_2!(N, ξ)
-        N2[1:2:end, 1] = N
-        N2[2:2:end, 2] = N
 
         dNdξ = dN_Q_2!(dNdξ, ξ)
         @into! J = dNdξ * x
@@ -60,10 +62,14 @@ function plani4e(ex::Matrix{Float64}, ey::Matrix{Float64},
         @into! BDB = B' * DB
         @devec Ke[:, :] += BDB .* dV
 
-        @into! Nb = N2 * eq
-        Nbvec = vec(Nb)
-
-        @devec fe += Nbvec .* dV
+        if compute_force
+            N = N_Q_2!(N, ξ)
+            N2[1:2:end, 1] = N
+            N2[2:2:end, 2] = N
+            @into! Nb = N2 * eq
+            Nbvec = vec(Nb)
+            @devec fe += Nbvec .* dV
+        end
     end
 
     return Ke, fe
