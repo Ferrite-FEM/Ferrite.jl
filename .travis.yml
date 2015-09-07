@@ -1,5 +1,6 @@
 # Documentation: http://docs.travis-ci.com/user/languages/julia/
 language: julia
+sudo: required
 os:
   - linux
   - osx
@@ -13,6 +14,8 @@ script:
     - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
     - julia -e 'Pkg.add("FactCheck");'
     - julia -e 'Pkg.add("InplaceOps");'
+    - julia -e 'Pkg.add("Winston");'
+    - julia -e 'Pkg.add("Requires");'
     - julia -e 'Pkg.clone("https://github.com/KristofferC/FastGaussQuadrature.jl");'
     - julia -e 'Pkg.clone(pwd()); Pkg.test("JuAFEM"; coverage=true)'
 after_success:

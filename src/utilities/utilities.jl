@@ -1,0 +1,8 @@
+include("quadrature.jl")
+include("shape_functions.jl")
+include("linalg.jl")
+include("assembler.jl")
+include("assemble.jl")
+include("solve_eq_sys.jl")
+include("extract_eldisp.jl")
+include("plotting.jl")

@@ -1,5 +1,3 @@
-using FastGaussQuadrature
-
 """
 A type that perform Gauss integration
 """

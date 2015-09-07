@@ -1,7 +1,10 @@
 module JuAFEM
 
-using FastGaussQuadrature
 using InplaceOps
+using FastGaussQuadrature
+using Requires
+@lazymod Winston
+using Compat
 
 import Base.LinAlg.chksquare
 
@@ -14,22 +17,12 @@ export bar2e, bar2s
 export hooke
 
 # Utilities
-export assemble
 export solve_eq_sys, solveq
 export extract_eldisp, extract
-export start_assemble, assemble, end_assemble
-export inv2x2
+export start_assemble, assemble, end_assemble, eldraw2, eldisp2
 
 include("elements/elements.jl")
 include("materials/hooke.jl")
-
-# Utilities
-include("utilities/quadrature.jl")
-include("utilities/shape_functions.jl")
-include("utilities/linalg.jl")
-include("utilities/assembler.jl")
-include("utilities/assemble.jl")
-include("utilities/solve_eq_sys.jl")
-include("utilities/extract_eldisp.jl")
+include("utilities/utilities.jl")
 
 end # module

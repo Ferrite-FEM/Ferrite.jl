@@ -38,9 +38,8 @@ facts("extract_eldisp test") do
     @fact extract_eldisp(edof, a) --> [5.0 9.0; 7.0 11.0]
 end
 
-
 facts("inv2x2 test") do
     J = [4. 2.; 3. 8.]
     J_inv = [0.3076923076923077 -0.07692307692307693; -0.11538461538461539 0.15384615384615385]
-    @fact norm(inv2x2(J) - J_inv) / norm(J_inv) --> roughly(0.0, atol=1e-15)
+    @fact norm(JuAFEM.inv2x2(J) - J_inv) / norm(J_inv) --> roughly(0.0, atol=1e-15)
 end

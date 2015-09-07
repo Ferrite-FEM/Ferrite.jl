@@ -31,6 +31,9 @@ build_script:
       Pkg.clone(\"https://github.com/KristofferC/FastGaussQuadrature.jl\");
       Pkg.clone(\"InPlaceOps\");
       Pkg.clone(pwd(), \"JuAFEM\")
+      Pkg.add(\"Winston\");
+      kg.add(\"FactCheck\");
+      Pkg.add(\"Requires\")"
 
 test_script:
   - C:\projects\julia\bin\julia --check-bounds=yes -e "Pkg.test(\"JuAFEM\")"
