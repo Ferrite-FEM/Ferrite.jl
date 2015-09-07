@@ -9,9 +9,9 @@ function eldraw2(ex::AbstractVecOrMat, ey::AbstractVecOrMat,
     # TODO, Make it nice for elements with curved boundaries
     error_check_plotting(plotpar)
 
-    ltype =  Int(plotpar[1])
-    lcolor = Int(plotpar[2])
-    lmark =  Int(plotpar[3])
+    ltype  = @compat Int(plotpar[1])
+    lcolor = @compat Int(plotpar[2])
+    lmark  = @compat Int(plotpar[3])
     lmark += 1
 
     plot_string = LTYPES[ltype] * LCOLORS[lcolor] * LMARKS[lmark]
@@ -38,9 +38,9 @@ function eldisp2(ex::AbstractVecOrMat, ey::AbstractVecOrMat, ed::AbstractVecOrMa
     # TODO, Make it nice for elements with curved boundaries
     error_check_plotting(plotpar)
 
-    ltype =  Int(plotpar[1])
-    lcolor = Int(plotpar[2])
-    lmark =  Int(plotpar[3])
+    ltype =  @compat Int(plotpar[1])
+    lcolor = @compat Int(plotpar[2])
+    lmark =  @compat Int(plotpar[3])
     lmark += 1
 
     plot_string = LTYPES[ltype] * LCOLORS[lcolor] * LMARKS[lmark]
@@ -55,7 +55,7 @@ function eldisp2(ex::AbstractVecOrMat, ey::AbstractVecOrMat, ed::AbstractVecOrMa
 end
 
 function error_check_plotting(plotpars)
-    Int(plotpars[1]) in (1,2,3)   || throw(ArgumentError("linetype must be 1,2,3"))
-    Int(plotpars[2]) in (1,2,3,4) || throw(ArgumentError("linecolor must be 1,2,3,4"))
-    Int(plotpars[3]) in (1,2,0)   || throw(ArgumentError("linemark must be 1,2,0"))
+    (@compat Int(plotpars[1])) in (1,2,3)   || throw(ArgumentError("linetype must be 1,2,3"))
+    (@compat Int(plotpars[2])) in (1,2,3,4) || throw(ArgumentError("linecolor must be 1,2,3,4"))
+    (@compat Int(plotpars[3])) in (1,2,0)   || throw(ArgumentError("linemark must be 1,2,0"))
 end
