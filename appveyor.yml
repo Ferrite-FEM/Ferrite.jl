@@ -30,7 +30,7 @@ build_script:
   - C:\projects\julia\bin\julia -e "versioninfo();
       Pkg.clone(\"https://github.com/KristofferC/FastGaussQuadrature.jl\");
       Pkg.clone(\"InPlaceOps\");
-      Pkg.clone(pwd(), \"JuAFEM\")
+      Pkg.clone(pwd(), \"JuAFEM\");
       Pkg.add(\"Winston\");
       Pkg.add(\"FactCheck\");
       Pkg.add(\"Requires\")"
