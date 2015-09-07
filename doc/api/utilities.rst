@@ -6,6 +6,30 @@
 Utilities
 *********
 
+Plotting
+--------
+
+.. function:: eldraw2(ex::AbstractVecOrMat, ey::AbstractVecOrMat, plotpar = [1, 1, 0], elnum::AbstractVector=zeros(0))
+
+   .. Docstring generated from Julia source
+
+   Draws the 2D mesh defined by ex, ey.
+
+.. function:: eldisp2(ex::AbstractVecOrMat, ey::AbstractVecOrMat, ed::AbstractVecOrMat, plotpar = [1, 1, 0], sfac = 1.0)
+
+   .. Docstring generated from Julia source
+
+   Draws the displaced 2D mesh defined by ex, ey and the displacements given in ed
+
+Coordinate extraction
+----------------------
+
+.. function:: extract_eldisp(edof::Array{Int}, a::Array{Float64})
+
+   .. Docstring generated from Julia source
+
+   Extracts the element displacements from the global solution vector given an edof matrix. This assumes all elements to have the same number of dofs.
+
 Assembler
 ---------
 
@@ -20,6 +44,8 @@ Assembler
 .. function:: assemble(edof, assembler::Assembler, Ke)
 
    .. Docstring generated from Julia source
+
+   Assembles the the element stiffness matrix Ke to the global stiffness matrix K.
 
    Assembles the element matrix ``Ke`` into ``assembler``
 
@@ -43,6 +69,8 @@ Quadrature
 .. function:: assemble(edof, assembler::Assembler, Ke)
 
    .. Docstring generated from Julia source
+
+   Assembles the the element stiffness matrix Ke to the global stiffness matrix K.
 
    Assembles the element matrix ``Ke`` into ``assembler``
 
