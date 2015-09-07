@@ -1,7 +1,10 @@
 module JuAFEM
 
+using FastGaussQuadrature
+using InplaceOps
+
 export spring1e, spring1s
-export plani4e
+export plani4e, plani4s
 
 export hooke
 
