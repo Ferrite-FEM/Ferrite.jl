@@ -2,9 +2,12 @@
 
 .. _api-materials:
 
-********
+*********
 Materials
-********
+*********
+
+Linear elastic
+--------------
 
 .. function:: hooke(ptype, E, v)
 
