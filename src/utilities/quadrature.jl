@@ -40,3 +40,13 @@ function make_quadrule(order::Int)
     end
     GaussQuadratureRule(weights, points)
 end
+
+
+const quadrules = [make_quadrule(i) for i = 1:5]
+function get_quadrule(order::Int)
+    if order <= 5
+        return quadrules[order]
+    else
+        return make_quadrule(order)
+    end
+end
