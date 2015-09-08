@@ -4,7 +4,7 @@
 Computes the stiffness matrix for a four node isoparametric
 quadraterial element
 """
-function plani4e{P, Q}(ex::AbstractVecOrMat{P}, ey::AbstractVecOrMat{Q},
+function plani4e{P, Q}(ex::Array{P}, ey::Array{Q},
                        ep, D::Matrix{Float64}, eq=[0.0,0.0])
     # Ugly but doing this now to deal with row/column ḿajor order
     # difference in Matlab and Julia // KC

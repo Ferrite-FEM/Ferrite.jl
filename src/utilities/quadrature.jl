@@ -41,12 +41,38 @@ function make_quadrule(order::Int)
     GaussQuadratureRule(weights, points)
 end
 
-
 const quadrules = [make_quadrule(i) for i = 1:5]
 function get_quadrule(order::Int)
     if order <= 5
         return quadrules[order]
     else
         return make_quadrule(order)
+    end
+end
+
+
+include("gaussquad_tri_table.jl")
+
+function make_trirule(order::Int)
+    data = _get_gauss_tridata(order)
+    n_points = size(data,1)
+    weights = Array(Float64, n_points)
+    points = Array(Vector{Float64}, n_points)
+
+    for p in 1:size(data, 1)
+        points[p] = [data[p, 1], data[p, 2]]
+    end
+
+    weights = 0.5 * data[:, 3]
+
+    GaussQuadratureRule(weights, points)
+end
+
+const trirules = GaussQuadratureRule[make_trirule(i) for i = 1:5]
+function get_trirule(order::Int)
+    if order <= 5
+        return trirules[order]
+    else
+        return make_trirule(order)
     end
 end
