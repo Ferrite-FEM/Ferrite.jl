@@ -12,6 +12,7 @@ import Base.LinAlg.chksquare
 # Elements
 export spring1e, spring1s
 export plani4e, plani4s
+export plante
 export bar2e, bar2s
 
 # Materials

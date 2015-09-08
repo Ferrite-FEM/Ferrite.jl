@@ -36,10 +36,19 @@ Bars
 
    Computes the sectional force (normal force) *N* for a 2D bar element.
 
+3 node isoparametric triangle
+------------------------------
+
+.. function:: plante{P, Q}(ex::Array{P}, ey::Array{Q}, ep, D::Matrix{Float64}, eq=[0.0,0.0])
+
+   .. Docstring generated from Julia source
+
+   Computes the stiffness matrix for a three node isoparametric triangular element
+
 4 node isoparametric quadraterial
 ---------------------------------
 
-.. function:: plani4e(ex::Vector, ey::Vector, ep, D, eq=[0.0,0.0])
+.. function:: plani4e{P, Q}(ex::Array{P}, ey::Array{Q}, ep, D::Matrix{Float64}, eq=[0.0,0.0])
 
    .. Docstring generated from Julia source
 
