@@ -29,7 +29,7 @@ build_script:
   - IF EXIST .git\shallow (git fetch --unshallow)
   - C:\projects\julia\bin\julia -e "versioninfo();
       Pkg.clone(\"https://github.com/KristofferC/FastGaussQuadrature.jl\");
-      Pkg.clone(\"InPlaceOps\");
+      Pkg.add(\"InPlaceOps\");
       Pkg.clone(pwd(), \"JuAFEM\");
       Pkg.add(\"Winston\");
       Pkg.add(\"FactCheck\");
