@@ -4,18 +4,8 @@
 Computes the stiffness matrix for a four node isoparametric
 quadraterial element
 """
-function plani4e{P, Q}(ex::Array{P}, ey::Array{Q},
-                       ep, D::Matrix{Float64}, eq=[0.0,0.0])
-    # Ugly but doing this now to deal with row/column ḿajor order
-    # difference in Matlab and Julia // KC
-    ex_mat = reshape(ex, (size(ex, 1), size(ex, 2)))
-    ey_mat = reshape(ey, (size(ex, 1), size(ex, 2)))
-    plani4e((@compat map(Float64, ex_mat)),
-            (@compat map(Float64, ey_mat)), ep, D, eq)
-end
-
-function plani4e(ex::Matrix{Float64}, ey::Matrix{Float64},
-                 ep::Array, D::Matrix{Float64}, eq::Vector=[0.0,0.0])
+function plani4e(ex::VecOrMat, ey::VecOrMat,
+                 ep::Array, D::Matrix, eq::VecOrMat=[0.0,0.0])
     ptype = convert(Int, ep[1])
     t = ep[2]
     int_order = convert(Int, ep[3])

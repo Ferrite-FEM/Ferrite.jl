@@ -4,8 +4,7 @@
 Computes the stiffness matrix for a three node isoparametric
 triangular element
 """
-function plante{P, Q}(ex::Array{P}, ey::Array{Q},
-                       ep, D::Matrix{Float64}, eq=[0.0,0.0])
+function plante(ex::VecOrMat, ey::VecOrMat, ep, D::Matrix, eq::VecOrMat=[0.0,0.0])
     # Ugly but doing this now to deal with row/column ḿajor order
     # difference in Matlab and Julia // KC
     ex_mat = reshape(ex, (size(ex, 1), size(ex, 2)))

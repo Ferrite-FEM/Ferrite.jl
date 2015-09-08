@@ -1,7 +1,7 @@
 """
 Computes the element stiffness matrix *Ke* for a 2D bar element.
 """
-function bar2e(ex::Array{Float64}, ey::Array{Float64}, elem_prop::Array{Float64})
+function bar2e(ex::VecOrMat, ey::VecOrMat, elem_prop::VecOrMat)
 
     # Local element stiffness
     E = elem_prop[1];  A = elem_prop[2]
@@ -29,7 +29,7 @@ end
 """
 Computes the sectional force (normal force) *N* for a 2D bar element.
 """
-function bar2s(ex::Array{Float64}, ey::Array{Float64}, elem_prop::Array{Float64}, el_disp::Array{Float64})
+function bar2s(ex::VecOrMat, ey::VecOrMat, elem_prop::VecOrMat, el_disp::VecOrMat)
 
     E = elem_prop[1];  A = elem_prop[2]
 
