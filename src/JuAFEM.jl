@@ -19,7 +19,7 @@ export hooke
 # Utilities
 export solve_eq_sys, solveq
 export extract_eldisp, extract
-export start_assemble, assemble, end_assemble, eldraw2, eldisp2
+export start_assemble, assemble, assem, end_assemble, eldraw2, eldisp2
 
 include("elements/elements.jl")
 include("materials/hooke.jl")

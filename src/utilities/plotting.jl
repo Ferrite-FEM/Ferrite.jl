@@ -56,8 +56,8 @@ function eldisp2(ex::AbstractVecOrMat, ey::AbstractVecOrMat, ed::AbstractVecOrMa
     # TODO can't we make this a bit nicer /JB
     npoints = size(ex,2)
     if npoints == 2
-      xs = ex + sfac * ed[1, 1:2:end]
-      ys = ey + sfac * ed[1, 2:2:end]
+      xs = ex + sfac * ed[:, 1:2:end]
+      ys = ey + sfac * ed[:, 2:2:end]
     else
       xs = [ex + sfac * ed[:, 1:2:end]; ex[1,:] + sfac * ed[1, 1:2:end]]
       ys = [ey + sfac * ed[:, 1:2:end]; ey[1,:] + sfac * ed[1, 2:2:end]]
