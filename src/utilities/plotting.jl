@@ -3,7 +3,7 @@ const LCOLORS = ["k", "b", "m", "r"]
 const LMARKS = ["o", "*", ""]
 
 "Draws the 2D mesh defined by ex, ey."
-function eldraw2(ex::AbstractVecOrMat, ey::AbstractVecOrMat,
+function eldraw2(ex::VecOrMat, ey::VecOrMat,
                 plotpar = [1, 1, 0], elnum::AbstractVector=zeros(0))
 
     # TODO, Make it nice for elements with curved boundaries
@@ -32,7 +32,7 @@ end
 
 "Draws the displaced 2D mesh defined by ex, ey and the displacements
 given in ed"
-function eldisp2(ex::AbstractVecOrMat, ey::AbstractVecOrMat, ed::AbstractVecOrMat,
+function eldisp2(ex::VecOrMat, ey::VecOrMat, ed::VecOrMat,
                 plotpar = [1, 1, 0], sfac = 1.0)
 
     # TODO, Make it nice for elements with curved boundaries

@@ -2,7 +2,7 @@
 Extracts the element displacements from the global solution vector given an edof matrix.
 This assumes all elements to have the same number of dofs.
 """
-function extract_eldisp(edof::Array{Int}, a::Array{Float64})
+function extract_eldisp(edof::VecOrMat, a::VecOrMat)
 
     (nel, temp) = size(edof);
     neldofs = temp - 1
