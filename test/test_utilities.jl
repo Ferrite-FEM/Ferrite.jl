@@ -51,7 +51,7 @@ facts("gen_quad_mesh test") do
     nelx = 2
     nely = 3
     ndofs = 2
-    (Edof, Ex, Ey, B1, B2, B3, B4) = gen_quad_mesh(p1, p2, nelx, nely, ndofs)
+    Edof, Ex, Ey, B1, B2, B3, B4, _ = gen_quad_mesh(p1, p2, nelx, nely, ndofs)
 
     # Reference values
     Edof_r =
