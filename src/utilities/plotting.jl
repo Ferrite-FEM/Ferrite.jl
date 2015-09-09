@@ -18,9 +18,17 @@ function eldraw2(ex::VecOrMat, ey::VecOrMat,
 
     nnodes = size(ex, 1)
     center = [sum(ex, 1) / nnodes; sum(ey, 1) / nnodes]
-    xs = [ex; ex[1,:]]
-    ys = [ey; ex[1,:]]
+    # TODO can't we make this a bit nicer /JB
+    npoints = size(ex,2)
 
+    print (npoints)
+    if npoints == 2
+      xs = ex
+      ys = ey
+    else
+      xs = [ex; ex[1,:]]
+      ys = [ey; ex[1,:]]
+    end
     p = winston().plot(xs, ys, plot_string)
     for el in elnum
          winston().text(center[1, el], center[2, el], string(el))
@@ -45,10 +53,15 @@ function eldisp2(ex::VecOrMat, ey::VecOrMat, ed::VecOrMat,
 
     plot_string = LTYPES[ltype] * LCOLORS[lcolor] * LMARKS[lmark]
 
-
-    xs = [ex + sfac * ed[:, 1:2:end]; ex[1,:] + sfac * ed[1, 1:2:end]]
-    ys = [ey + sfac * ed[:, 1:2:end]; ey[1,:] + sfac * ed[1, 2:2:end]]
-
+    # TODO can't we make this a bit nicer /JB
+    npoints = size(ex,2)
+    if npoints == 2
+      xs = ex + sfac * ed[:, 1:2:end]
+      ys = ey + sfac * ed[:, 2:2:end]
+    else
+      xs = [ex + sfac * ed[:, 1:2:end]; ex[1,:] + sfac * ed[1, 1:2:end]]
+      ys = [ey + sfac * ed[:, 1:2:end]; ey[1,:] + sfac * ed[1, 2:2:end]]
+    end
     p = winston().plot(xs, ys, plot_string)
 
     return p

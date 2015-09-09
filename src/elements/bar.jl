@@ -25,7 +25,6 @@ function bar2e(ex::VecOrMat, ey::VecOrMat, elem_prop::VecOrMat)
 
 end
 
-
 """
 Computes the sectional force (normal force) *N* for a 2D bar element.
 """

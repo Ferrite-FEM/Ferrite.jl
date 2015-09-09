@@ -6,3 +6,5 @@ include("assemble.jl")
 include("solve_eq_sys.jl")
 include("extract_eldisp.jl")
 include("plotting.jl")
+include("gen_quad_mesh.jl")
+
