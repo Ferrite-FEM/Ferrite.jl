@@ -9,13 +9,13 @@ Elements
 Springs
 -------
 
-.. function:: spring1e(k) -> Matrix{Float64}
+.. function:: spring1e(k) -> Matrix
 
    .. Docstring generated from Julia source
 
    Computes the element stiffness matrix *Ke* for a spring element.
 
-.. function:: spring1s(k, u) -> Vector{Float64}
+.. function:: spring1s(k, u) -> Vector
 
    .. Docstring generated from Julia source
 
@@ -24,22 +24,31 @@ Springs
 Bars
 ----
 
-.. function:: bar2e(ex::Array{Float64}, ey::Array{Float64}, elem_prop::Array{Float64})
+.. function:: bar2e(ex::VecOrMat, ey::VecOrMat, elem_prop::VecOrMat)
 
    .. Docstring generated from Julia source
 
    Computes the element stiffness matrix *Ke* for a 2D bar element.
 
-.. function:: bar2s(ex::Array{Float64}, ey::Array{Float64}, elem_prop::Array{Float64}, el_disp::Array{Float64})
+.. function:: bar2s(ex::VecOrMat, ey::VecOrMat, elem_prop::VecOrMat, el_disp::VecOrMat)
 
    .. Docstring generated from Julia source
 
    Computes the sectional force (normal force) *N* for a 2D bar element.
 
+3 node isoparametric triangle
+------------------------------
+
+.. function:: plante(ex::VecOrMat, ey::VecOrMat, ep, D::Matrix, eq::VecOrMat=[0.0,0.0])
+
+   .. Docstring generated from Julia source
+
+   Computes the stiffness matrix for a three node isoparametric triangular element
+
 4 node isoparametric quadraterial
 ---------------------------------
 
-.. function:: plani4e(ex::Vector, ey::Vector, ep, D, eq=[0.0,0.0])
+.. function:: plani4e(ex::VecOrMat, ey::VecOrMat, ep, D::Matrix, eq::VecOrMat=[0.0,0.0])
 
    .. Docstring generated from Julia source
 

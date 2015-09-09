@@ -4,18 +4,8 @@
 Computes the stiffness matrix for a four node isoparametric
 quadraterial element
 """
-function plani4e{P, Q}(ex::AbstractVecOrMat{P}, ey::AbstractVecOrMat{Q},
-                       ep, D::Matrix{Float64}, eq=[0.0,0.0])
-    # Ugly but doing this now to deal with row/column ḿajor order
-    # difference in Matlab and Julia // KC
-    ex_mat = reshape(ex, (size(ex, 1), size(ex, 2)))
-    ey_mat = reshape(ey, (size(ex, 1), size(ex, 2)))
-    plani4e((@compat map(Float64, ex_mat)),
-            (@compat map(Float64, ey_mat)), ep, D, eq)
-end
-
-function plani4e(ex::Matrix{Float64}, ey::Matrix{Float64},
-                 ep::Array, D::Matrix{Float64}, eq::Vector=[0.0,0.0])
+function plani4e(ex::VecOrMat, ey::VecOrMat,
+                 ep::Array, D::Matrix, eq::VecOrMat=[0.0,0.0])
     ptype = convert(Int, ep[1])
     t = ep[2]
     int_order = convert(Int, ep[3])
@@ -27,29 +17,49 @@ function plani4e(ex::Matrix{Float64}, ey::Matrix{Float64},
 
     # Buffers
     Ke = zeros(8,8)
-    fe = zeros(8)
-    B = zeros(4, 8)
-    dNdx = zeros(2, 4)
-    J = zeros(2,2)
+    fe = @static zeros(8)
+    B = @static zeros(4, 8)
+    dNdx = @static zeros(2, 4)
+    dNdξ = @static zeros(2, 4)
+    J = @static zeros(2,2)
+    N = @static zeros(4)
+    DB = @static zeros(4,8)
+    BDB = @static zeros(8,8)
+    N2 = @static zeros(8,2)
+    Nb = @static zeros(8,1)
 
-    qr = make_quadrule(int_order)
+    compute_force = false
+    if eq != zeros(2)
+        compute_force = true
+    end
+
+    qr = get_quadrule(int_order)
     for (ξ, w) in zip(qr.points, qr.weights)
-        N = N_Q_2(ξ)
-        dNdξ = dN_Q_2(ξ)
+
+        dNdξ = dN_Q_2!(dNdξ, ξ)
         @into! J = dNdξ * x
         Jinv = inv2x2(J)
         @into! dNdx = Jinv * dNdξ
 
-        dV = det(J) * w * t
+        dV = det2x2(J) * w * t
 
         for i in 1:4
             B[1, 2*i - 1] = B[4, 2*i] = dNdx[1, i]
             B[4, 2*i - 1] = B[2, 2*i] = dNdx[2, i]
         end
 
-        Ke[:, :] += B' * D * B * dV
-        fe[1:2:end] +=  N * eq[1] * dV
-        fe[2:2:end] +=  N * eq[2] * dV
+        @into! DB = D * B
+        @into! BDB = B' * DB
+        @devec Ke[:, :] += BDB .* dV
+
+        if compute_force
+            N = N_Q_2!(N, ξ)
+            N2[1:2:end, 1] = N
+            N2[2:2:end, 2] = N
+            @into! Nb = N2 * eq
+            Nbvec = vec(Nb)
+            @devec fe += Nbvec .* dV
+        end
     end
 
     return Ke, fe
