@@ -52,6 +52,6 @@ N1 = bar2s(Ex[1,:], Ey[1,:], ep, el_disp[1,:])
 N2 = bar2s(Ex[2,:], Ey[2,:], ep, el_disp[2,:])
 N3 = bar2s(Ex[3,:], Ey[3,:], ep, el_disp[3,:])
 
-import JuAFEM.eldisp2
 eldisp2(Ex, Ey, el_disp, [1, 2, 0], 50.0)
+
 
