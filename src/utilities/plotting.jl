@@ -61,7 +61,7 @@ function eldisp2(ex::VecOrMat, ey::VecOrMat, ed::VecOrMat,
       ys = ey + sfac * ed[:, 2:2:end]
     else
       xs = [ex + sfac * ed[:, 1:2:end] ex[:,1] + sfac * ed[:,1]]
-      ys = [ey + sfac * ed[:, 1:2:end] ey[:,2] + sfac * ed[:,2]]
+      ys = [ey + sfac * ed[:, 2:2:end] ey[:,2] + sfac * ed[:,2]]
     end
     p = winston().plot(xs', ys', plot_string)
 
