@@ -8,13 +8,8 @@ function solve_eq_sys(K::AbstractMatrix, f::Array, bc::Matrix )
         throw(DimensionMismatch("Mismatch between number of rows in the stiffness matrix and load vector (#rowsK=$n #rowsf=$nrf)"))
     end
 
-    if isa(K, SparseMatrixCSC)
-         _K = convert(SparseMatrixCSC{Float64}, K)
-    else
-        _K = convert(Matrix{Float64}, K)
-    end
     d_pres = convert(Vector{Int}, bc[:,1])   # prescribed dofs
-    a_pres = convert(Vector{Float64}, bc[:,2])   # corresponding prescribed dof values
+    a_pres = bc[:,2] # corresponding prescribed dof values
 
     # Construct array holding all the free dofs
     d_free = setdiff(collect(1:n), d_pres)
