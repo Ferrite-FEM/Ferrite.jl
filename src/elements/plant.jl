@@ -26,7 +26,7 @@ function plante(ex::Matrix{Float64}, ey::Matrix{Float64},
 
     # Buffers
     Ke = zeros(6,6)
-    fe = @static zeros(6)
+    fe = zeros(6)
     B = @static zeros(4, 6)
     dNdx = @static zeros(2, 3)
     dNdξ = @static zeros(2, 3)

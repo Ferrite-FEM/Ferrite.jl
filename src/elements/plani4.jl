@@ -16,8 +16,8 @@ function plani4e(ex::VecOrMat, ey::VecOrMat,
     x = [ex ey]
 
     # Buffers
-    Ke = zeros(8,8)
-    fe = @static zeros(8)
+    Ke = zeros(8, 8)
+    fe = zeros(8)
     B = @static zeros(4, 8)
     dNdx = @static zeros(2, 4)
     dNdξ = @static zeros(2, 4)
