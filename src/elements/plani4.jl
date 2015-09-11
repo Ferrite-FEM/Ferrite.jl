@@ -5,19 +5,17 @@ Computes the stiffness matrix for a four node isoparametric
 quadraterial element
 """
 function plani4e(ex::VecOrMat, ey::VecOrMat,
-                 ep::Array, D::Matrix, eq::VecOrMat=[0.0,0.0])
+                 ep::Array, D::Matrix, eq)
     ptype = convert(Int, ep[1])
     t = ep[2]
     int_order = convert(Int, ep[3])
 
-    length(eq) == 2 || throw(ArgumentError("length of eq must be 2"))
+    #length(eq) == 2 || throw(ArgumentError("length of eq must be 2"))
 
-    error_check_plan4(ex, ey, ptype, t, int_order, D)
+    #error_check_plan4(ex, ey, ptype, t, int_order, D)
     x = [ex ey]
 
     # Buffers
-    Ke = zeros(8,8)
-    fe = @static zeros(8)
     B = @static zeros(4, 8)
     dNdx = @static zeros(2, 4)
     dNdξ = @static zeros(2, 4)
@@ -27,6 +25,8 @@ function plani4e(ex::VecOrMat, ey::VecOrMat,
     BDB = @static zeros(8,8)
     N2 = @static zeros(8,2)
     Nb = @static zeros(8,1)
+    fe = zeros(8)
+    Ke = zeros(8,8)
 
     compute_force = false
     if eq != zeros(2)
@@ -34,6 +34,7 @@ function plani4e(ex::VecOrMat, ey::VecOrMat,
     end
 
     qr = get_quadrule(int_order)
+
     for (ξ, w) in zip(qr.points, qr.weights)
 
         dNdξ = dN_Q_2!(dNdξ, ξ)
@@ -56,14 +57,34 @@ function plani4e(ex::VecOrMat, ey::VecOrMat,
             N = N_Q_2!(N, ξ)
             N2[1:2:end, 1] = N
             N2[2:2:end, 2] = N
-            @into! Nb = N2 * eq
-            Nbvec = vec(Nb)
-            @devec fe += Nbvec .* dV
+            xx = dot(N, vec(ex))
+            yy = dot(N, vec(ey))
+            f_x, f_y = get_value(eq, [xx,yy])
+            #@into! Nb = N2 * eq
+            #Nbvec = vec(Nb)
+            #@devec fe += Nbvec .* dV
+            fe[1:2:end] += N * f_x .* dV
+            fe[2:2:end] += N * f_y .* dV
         end
     end
 
     return Ke, fe
 end
+
+
+function get_value{T <: Number}(eq::VecOrMat{T}, x)
+    return eq[1], eq[2]
+end
+
+function get_value(eq::Function, x)
+    return eq(x[1], x[2]), 0.0
+end
+
+
+function get_value(eq, x)
+    return eq[1](x[1], x[2]), eq[2](x[1], x[2])
+end
+
 
 function error_check_plan4(ex, ey, ptype, t, int_order, D)
     (ptype in (1,2,3)) || throw(ArgumentError("ptype must be 1, 2, 3"))
