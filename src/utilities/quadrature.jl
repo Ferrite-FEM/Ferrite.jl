@@ -23,6 +23,8 @@ function integrate(qr::GaussQuadratureRule, f)
     return I
 end
 
+get_gaussrule(::Triangle, order::Int) = get_trirule(order)
+get_gaussrule(::Square, order::Int) = get_quadrule(order)
 
 """
 Creates a `GaussQuadratureRule` that integrates

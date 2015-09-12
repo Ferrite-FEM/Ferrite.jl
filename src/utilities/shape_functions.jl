@@ -4,6 +4,16 @@
 # y: geometry, T = triangle, Q = quadratic
 # z: polynomial order
 
+evaluate_N(  ::Lagrange_S_1, ξ::Vector) = N_Q_1(ξ)
+evaluate_dN( ::Lagrange_S_1, ξ::Vector) = dN_Q_1(ξ)
+evaluate_N!( ::Lagrange_S_1, N::Vector, ξ::Vector) = N_Q_1!(N, ξ)
+evaluate_dN!(::Lagrange_S_1, dN::Matrix, ξ::Vector) = dN_Q_1!(dN, ξ)
+
+evaluate_N(  ::Lagrange_T_1, ξ::Vector) = N_T_1(ξ)
+evaluate_dN( ::Lagrange_T_1, ξ::Vector) = dN_T_1(ξ)
+evaluate_N!( ::Lagrange_T_1, N::Vector, ξ::Vector) = N_T_1!(N, ξ)
+evaluate_dN!(::Lagrange_T_1, dN::Matrix, ξ::Vector) = dN_T_1!(dN, ξ)
+
 """
 Computes the shape functions at a point for
 a bilinear quadratic element
