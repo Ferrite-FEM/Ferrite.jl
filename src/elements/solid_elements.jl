@@ -48,9 +48,9 @@ function get_default_contmech_vars(nnodes, ndim)
     else
         throw(ArgumentError("Invalid dimension, must be 2, 3"))
     end
-    Dict(:DB =>  (nvars,ndofs),
-         :N2 =>  (ndofs,ndim),
-         :B =>   (nvars,ndofs))
+    Dict(:DB => (nvars,ndofs),
+         :N2 => (ndofs,ndim),
+         :B => (nvars,ndofs))
 end
 
 

@@ -1,9 +1,11 @@
-facts("spring testing") do
+facts("Element testing") do
+
+context("spring") do
     @fact spring1e(3.0) --> [3.0 -3.0; -3.0 3.0]
     @fact spring1s(3.0, [3.0, 1.0]) --> 3.0 * (1.0 - 3.0)
 end
 
-facts("plani4e testing") do
+context("plani4e") do
 
     K, f = plani4e([0, 1, 1.5, 0.5], [0.0, 0.2, 0.8, 0.6], [2, 2, 2], hooke(2, 210e9, 0.3), [1.0, 2.5])
 
@@ -104,7 +106,7 @@ facts("plani4e testing") do
 
 end
 
-facts("plant test") do
+context("plante") do
     K, f = plante([0, 1, 1.5], [0.0, 0.2, 0.8], [2, 2, 1], hooke(2, 210e9, 0.3), [1.0, 2.5])
 
     K_calfem = 1e12 * [
@@ -123,7 +125,7 @@ facts("plant test") do
 
 end
 
-facts("soli8 test") do
+context("soli8e") do
 
     K, f = soli8e([0.1, 1.2, 1.3, 0.4, 0.5, 1.7, 1.8, 0.8], [0.7, 0.6, 0.5, 0.4, 1.3, 1.2, 1.1, 1.0],
                   [0.1, 0.2, 1.3, 1.4, 0.5, 0.6, 1.7, 1.8], [2], hooke(4, 210e9, 0.3), [1.0, 2.5, 3.5])
@@ -159,7 +161,7 @@ facts("soli8 test") do
     @fact norm(f- f_calfem) / norm(f_calfem) --> roughly(0.0, atol =1e-13)
 end
 
-facts("plani8 test") do
+context("plani8e") do
 
     K, f = plani8e([0.1, 1.2, 1.3, 0.4, 0.5, 1.7, 1.8, 0.8], [0.7, 0.6, 0.5, 0.4, 1.3, 1.2, 1.1, 1.0], [2,2,2], hooke(2, 210e9, 0.3), [1.0, 2.5])
 
@@ -186,7 +188,23 @@ facts("plani8 test") do
     @fact norm(f- f_calfem) / norm(f_calfem) --> roughly(0.0, atol =1e-13)
 end
 
-facts("bar test") do
+context("flw2i4e") do
+    K, f = flw2i4e([0, 1, 1.5, 0.5], [0.0, 0.2, 0.8, 0.6], [2, 2, 2], [1 2; 3 4], [2.0])
+
+
+    K_calfem = [3.126666666666666   1.713333333333333  -1.193333333333333  -3.646666666666667;
+                2.713333333333332   4.606666666666666  -4.646666666666666  -2.673333333333332;
+               -1.193333333333333  -3.646666666666666   3.126666666666667   1.713333333333332;
+               -4.646666666666667  -2.673333333333332   2.713333333333331   4.606666666666667]
+
+    f_calfem = 0.5 * ones(4)
+
+    @fact norm(K - K_calfem) / norm(K) --> roughly(0.0, atol=1e-13)
+    @fact norm(f - f_calfem) / norm(f) --> roughly(0.0, atol=1e-13)
+end
+
+
+context("bar") do
     # From example 3.2 in the book Strukturmekanik
     ex = [0.  1.6]; ey = [0. -1.2]
     elem_prop = [200.e9 1.0e-3]
@@ -200,4 +218,6 @@ facts("bar test") do
     N_ref = 37.306e3
     @fact norm(Ke - Ke_ref) / norm(Ke_ref) --> roughly(0.0, atol=1e-15)
     @fact abs(N - N_ref) / N_ref --> roughly(0.0, atol=1e-15)
+end
+
 end

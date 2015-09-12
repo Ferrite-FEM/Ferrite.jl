@@ -3,8 +3,8 @@ include("CALFEM_API.jl")
 include("spring.jl")
 include("bar.jl")
 
-# Solid elements
 include("solid_elements.jl")
+include("heat_elements.jl")
 
 create_initial_vars(inits) = Expr(:block, [:($sym = zeros($size)) for (sym, size) in inits]...)
 
@@ -21,7 +21,8 @@ function gen_body(ele)
         nnodes = $(ele.nnodes)
         ndim = $(get_ndim(ele))
 
-        length(eq) == ndim || throw(ArgumentError("length of eq must be $ndim"))
+        # TODO; need to fix the eq size for different problems
+        #length(eq) == ndim || throw(ArgumentError("length of eq must be $ndim"))
         int_order > 0 || throw(ArgumentError("integration order must be > 0"))
 
         # Default buffers
@@ -72,7 +73,8 @@ function gen_body(ele)
     end
 end
 
-for fem in [S_S_1, S_S_2, S_T_1, S_C_1]
+for fem in [S_S_1, S_S_2, S_T_1, S_C_1, # Solid elements
+            H_S_1]
     if get_ndim(fem) == 2
         @eval function $(fem.name)(x::Matrix, D::Matrix, t::Number,
                                   eq::VecOrMat=zeros($(get_ndim(fem))),

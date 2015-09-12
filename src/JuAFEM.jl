@@ -10,6 +10,7 @@ import Base: LinAlg.chksquare, show
 # Elements
 export spring1e, spring1s
 export plani4e, plani8e, soli8e, plante
+export flw2i4e
 export bar2e, bar2s
 
 # Materials
