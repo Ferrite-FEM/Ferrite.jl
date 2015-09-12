@@ -20,10 +20,9 @@ export solve_eq_sys, solveq
 export extract_eldisp, extract
 export start_assemble, assemble, assem, end_assemble, eldraw2, eldisp2, gen_quad_mesh
 
-include("magic.jl")
 include("types.jl")
-include("elements/elements.jl")
 include("materials/hooke.jl")
 include("utilities/utilities.jl")
+include("elements/elements.jl")
 
 end # module

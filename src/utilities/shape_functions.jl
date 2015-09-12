@@ -19,10 +19,10 @@ evaluate_dN( ::Lagrange_S_2, ξ::Vector) = dN_Q_2(ξ)
 evaluate_N!( ::Lagrange_S_2, N::Vector, ξ::Vector) = N_Q_2!(N, ξ)
 evaluate_dN!(::Lagrange_S_2, dN::Matrix, ξ::Vector) = dN_Q_2!(dN, ξ)
 
-evaluate_N(  ::Lagrange_H_1, ξ::Vector) = N_H_1(ξ)
-evaluate_dN( ::Lagrange_H_1, ξ::Vector) = dN_H_1(ξ)
-evaluate_N!( ::Lagrange_H_1, N::Vector, ξ::Vector) = N_H_1!(N, ξ)
-evaluate_dN!(::Lagrange_H_1, dN::Matrix, ξ::Vector) = dN_H_1!(dN, ξ)
+evaluate_N(  ::Lagrange_C_1, ξ::Vector) = N_C_1(ξ)
+evaluate_dN( ::Lagrange_C_1, ξ::Vector) = dN_C_1(ξ)
+evaluate_N!( ::Lagrange_C_1, N::Vector, ξ::Vector) = N_C_1!(N, ξ)
+evaluate_dN!(::Lagrange_C_1, dN::Matrix, ξ::Vector) = dN_C_1!(dN, ξ)
 """
 Computes the shape functions at a point for
 a bilinear quadriterial element
@@ -175,11 +175,11 @@ end
 
 """
 Computes the shape functions at a point for
-a linear hexaedric element
+a linear cubic element
 """
-N_H_1(ξ::Vector) = N_H_1!(zeros(8), ξ)
+N_C_1(ξ::Vector) = N_C_1!(zeros(8), ξ)
 
-function N_H_1!(N::Vector, ξ::Vector)
+function N_C_1!(N::Vector, ξ::Vector)
     length(N) == 8 || throw(ArgumentError("N must have length 8"))
     length(ξ) == 3 || throw(ArgumentError("ξ must have length 3"))
 
@@ -203,9 +203,9 @@ end
 Computes the derivatives of the shape functions at a point for
 a quadratic hexaedric element
 """
-dN_H_1(ξ::Vector) = dN_H_1!(zeros(3, 8), ξ)
+dN_C_1(ξ::Vector) = dN_C_1!(zeros(3, 8), ξ)
 
-function dN_H_1!(dN::Matrix, ξ::Vector)
+function dN_C_1!(dN::Matrix, ξ::Vector)
 
     size(dN) == (3, 8) || throw(ArgumentError("dN must have size (3, 8)"))
     length(ξ) == 3 || throw(ArgumentError("ξ must have length 3"))

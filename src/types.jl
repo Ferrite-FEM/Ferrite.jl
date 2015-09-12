@@ -3,7 +3,7 @@ abstract ShapeFunc
 immutable Lagrange_S_1 <: ShapeFunc end
 immutable Lagrange_T_1 <: ShapeFunc end
 immutable Lagrange_S_2 <: ShapeFunc end
-immutable Lagrange_H_1 <: ShapeFunc end
+immutable Lagrange_C_1 <: ShapeFunc end
 
 abstract GeoShape
 abstract GeoShape_3D <: GeoShape
@@ -30,6 +30,7 @@ immutable FElement
     dofs_per_node::Int
     lhs_kernel::Function
     rhs_kernel::Function
+    default_intorder::Int # Should give a full rank stiffness matrix
 end
 
 get_ndim(fele::FElement) = get_ndim(fele.shape)
