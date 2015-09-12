@@ -1,3 +1,5 @@
+import JuAFEM: det_spec, inv_spec
+
 facts("assemble test") do
     K = zeros(3,3)
     Ke = [1 2 3; 4 5 6; 7 8 9]
@@ -38,10 +40,15 @@ facts("extract_eldisp test") do
     @fact extract_eldisp(edof, a) --> [5.0 9.0; 7.0 11.0]
 end
 
-facts("inv2x2 test") do
+facts("linalg tests") do
     J = [4. 2.; 3. 8.]
     J_inv = [0.3076923076923077 -0.07692307692307693; -0.11538461538461539 0.15384615384615385]
-    @fact norm(JuAFEM.inv2x2(J) - J_inv) / norm(J_inv) --> roughly(0.0, atol=1e-15)
+    @fact norm(inv_spec(J) - J_inv) / norm(J_inv) --> roughly(0.0, atol=1e-15)
+    @fact det_spec(J) --> roughly(det(J))
+    srand(1234)
+    J = rand(3,3)
+    @fact inv_spec(J) --> roughly(inv(J))
+    @fact det_spec(J) --> roughly(det(J))
 end
 
 
