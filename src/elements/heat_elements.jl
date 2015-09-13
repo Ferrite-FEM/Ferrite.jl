@@ -22,7 +22,7 @@ end
 H_S_1 = FElement(
     :heat_square_1,
     Square(),
-    Lagrange_S_1(),
+    Lagrange_Square_1(),
     get_default_heat_vars(4, 2),
     4,
     1,

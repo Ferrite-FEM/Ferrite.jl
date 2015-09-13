@@ -1,9 +1,9 @@
 abstract ShapeFunc
 
-immutable Lagrange_S_1 <: ShapeFunc end
-immutable Lagrange_T_1 <: ShapeFunc end
-immutable Lagrange_S_2 <: ShapeFunc end
-immutable Lagrange_C_1 <: ShapeFunc end
+immutable Lagrange_Square_1 <: ShapeFunc end
+immutable Lagrange_Tri_1 <: ShapeFunc end
+immutable Serend_Square_2 <: ShapeFunc end
+immutable Lagrange_Cube_1 <: ShapeFunc end
 
 abstract GeoShape
 abstract GeoShape_3D <: GeoShape

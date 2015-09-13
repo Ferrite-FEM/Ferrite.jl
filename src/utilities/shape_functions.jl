@@ -4,25 +4,25 @@
 # y: geometry, T = triangle, Q = quadratic
 # z: polynomial order
 
-evaluate_N(  ::Lagrange_S_1, ξ::Vector) = N_Q_1(ξ)
-evaluate_dN( ::Lagrange_S_1, ξ::Vector) = dN_Q_1(ξ)
-evaluate_N!( ::Lagrange_S_1, N::Vector, ξ::Vector) = N_Q_1!(N, ξ)
-evaluate_dN!(::Lagrange_S_1, dN::Matrix, ξ::Vector) = dN_Q_1!(dN, ξ)
+evaluate_N(  ::Lagrange_Square_1, ξ::Vector) = N_Q_1(ξ)
+evaluate_dN( ::Lagrange_Square_1, ξ::Vector) = dN_Q_1(ξ)
+evaluate_N!( ::Lagrange_Square_1, N::Vector, ξ::Vector) = N_Q_1!(N, ξ)
+evaluate_dN!(::Lagrange_Square_1, dN::Matrix, ξ::Vector) = dN_Q_1!(dN, ξ)
 
-evaluate_N(  ::Lagrange_T_1, ξ::Vector) = N_T_1(ξ)
-evaluate_dN( ::Lagrange_T_1, ξ::Vector) = dN_T_1(ξ)
-evaluate_N!( ::Lagrange_T_1, N::Vector, ξ::Vector) = N_T_1!(N, ξ)
-evaluate_dN!(::Lagrange_T_1, dN::Matrix, ξ::Vector) = dN_T_1!(dN, ξ)
+evaluate_N(  ::Lagrange_Tri_1, ξ::Vector) = N_T_1(ξ)
+evaluate_dN( ::Lagrange_Tri_1, ξ::Vector) = dN_T_1(ξ)
+evaluate_N!( ::Lagrange_Tri_1, N::Vector, ξ::Vector) = N_T_1!(N, ξ)
+evaluate_dN!(::Lagrange_Tri_1, dN::Matrix, ξ::Vector) = dN_T_1!(dN, ξ)
 
-evaluate_N(  ::Lagrange_S_2, ξ::Vector) = N_Q_2(ξ)
-evaluate_dN( ::Lagrange_S_2, ξ::Vector) = dN_Q_2(ξ)
-evaluate_N!( ::Lagrange_S_2, N::Vector, ξ::Vector) = N_Q_2!(N, ξ)
-evaluate_dN!(::Lagrange_S_2, dN::Matrix, ξ::Vector) = dN_Q_2!(dN, ξ)
+evaluate_N(  ::Serend_Square_2, ξ::Vector) = N_Q_2(ξ)
+evaluate_dN( ::Serend_Square_2, ξ::Vector) = dN_Q_2(ξ)
+evaluate_N!( ::Serend_Square_2, N::Vector, ξ::Vector) = N_Q_2!(N, ξ)
+evaluate_dN!(::Serend_Square_2, dN::Matrix, ξ::Vector) = dN_Q_2!(dN, ξ)
 
-evaluate_N(  ::Lagrange_C_1, ξ::Vector) = N_C_1(ξ)
-evaluate_dN( ::Lagrange_C_1, ξ::Vector) = dN_C_1(ξ)
-evaluate_N!( ::Lagrange_C_1, N::Vector, ξ::Vector) = N_C_1!(N, ξ)
-evaluate_dN!(::Lagrange_C_1, dN::Matrix, ξ::Vector) = dN_C_1!(dN, ξ)
+evaluate_N(  ::Lagrange_Cube_1, ξ::Vector) = N_C_1(ξ)
+evaluate_dN( ::Lagrange_Cube_1, ξ::Vector) = dN_C_1(ξ)
+evaluate_N!( ::Lagrange_Cube_1, N::Vector, ξ::Vector) = N_C_1!(N, ξ)
+evaluate_dN!(::Lagrange_Cube_1, dN::Matrix, ξ::Vector) = dN_C_1!(dN, ξ)
 """
 Computes the shape functions at a point for
 a bilinear quadriterial element

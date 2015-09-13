@@ -57,7 +57,7 @@ end
 S_S_1 = FElement(
     :solid_square_1,
     Square(),
-    Lagrange_S_1(),
+    Lagrange_Square_1(),
     get_default_contmech_vars(4, 2),
     4,
     2,
@@ -70,7 +70,7 @@ S_S_1 = FElement(
 S_S_2 = FElement(
     :solid_square_2,
     Square(),
-    Lagrange_S_2(),
+    Serend_Square_2(),
     get_default_contmech_vars(8, 2),
     8,
     2,
@@ -83,7 +83,7 @@ S_S_2 = FElement(
 S_T_1 = FElement(
     :solid_tri_1,
     Triangle(),
-    Lagrange_T_1(),
+    Lagrange_Tri_1(),
     get_default_contmech_vars(3, 2),
     3,
     2,
@@ -96,7 +96,7 @@ S_T_1 = FElement(
 S_C_1 = FElement(
     :solid_cube_1,
     Cube(),
-    Lagrange_C_1(),
+    Lagrange_Cube_1(),
     get_default_contmech_vars(8, 3),
     8,
     3,
