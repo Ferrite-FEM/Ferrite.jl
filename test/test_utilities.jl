@@ -98,4 +98,27 @@ context("gen_quad_mesh") do
     @fact B4 --> B4_r
 end
 
+context("static condensation") do
+    K = [1 2 3 4;
+         4 5 6 7;
+         7 8 9 10;
+         11 12 13 14]
+
+    f = [1, 2, 3, 4]
+
+    cd = [1, 2]
+
+    K1, f1 = statcon(K, f, cd)
+
+    K1_calfem = [0.000000000000004  -2.999999999999993;
+                2.666666666666661  -0.333333333333346]
+
+    f1_calfem = [
+       0.000000000000001
+      -0.333333333333334]
+
+    @fact K1 --> roughly(K1_calfem)
+    @fact f1 --> roughly(f1_calfem)
+end
+
 end

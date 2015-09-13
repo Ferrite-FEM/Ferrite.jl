@@ -30,6 +30,15 @@ Coordinate extraction
 
    Extracts the element displacements from the global solution vector given an edof matrix. This assumes all elements to have the same number of dofs.
 
+Static condensation
+-------------------
+
+.. function:: statcon(K::Matrix, f::Vector, cd::Vector)
+
+   .. Docstring generated from Julia source
+
+   Condenses out the dofs given in cd from K and f.
+
 Assembler
 ---------
 
