@@ -1,8 +1,11 @@
 """
-Extracts the element displacements from the global solution vector given an edof matrix.
-This assumes all elements to have the same number of dofs.
+    extract(edof, a)
+
+Extracts the element displacements from the global solution vector `a`
+given an `edof` matrix. This assumes all elements to have the same
+number of dofs.
 """
-function extract_eldisp(edof::VecOrMat, a::VecOrMat)
+function extract(edof::VecOrMat, a::VecOrMat)
 
     (nel, temp) = size(edof);
     neldofs = temp - 1
@@ -14,6 +17,3 @@ function extract_eldisp(edof::VecOrMat, a::VecOrMat)
     end
     return eldisp
 end
-
-const extract = extract_eldisp # for CALFEM API compatability
-

@@ -1,5 +1,6 @@
 """
-Assembles the the element stiffness matrix Ke to the global stiffness matrix K.
+Assembles the the element stiffness matrix `Ke`
+to the global stiffness matrix `K`.
 """
 function assemble(edof::Array, K::AbstractMatrix, Ke::Matrix)
     (nr, nc) = size(Ke)

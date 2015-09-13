@@ -13,7 +13,7 @@ context("assemble") do
     @fact_throws DimensionMismatch assemble([1 2 3], K, Ke)
 end
 
-context("solve_eq_sys") do
+context("solveq") do
     K = [ 1 -1  0  0
          -1  3 -2  0
           0 -2  3 -1
@@ -23,23 +23,23 @@ context("solve_eq_sys") do
 
     bc = [1 0
           4 0]
-    (a, fb) = solve_eq_sys(K, f, bc)
+    (a, fb) = solveq(K, f, bc)
     a_analytic = [0.0, 0.4, 0.6, 0.0]
     fb_analytic = [-0.4, 0.0, 0.0, -0.6]
 
     @fact norm(a - a_analytic) / norm(a_analytic) --> roughly(0.0, atol=1e-15)
     @fact norm(fb - fb_analytic) / norm(fb_analytic) --> roughly(0.0, atol=1e-15)
     # Test wrong size of K
-    @fact_throws DimensionMismatch (a, fb) = solve_eq_sys(K[:,1:2], f, bc)
+    @fact_throws DimensionMismatch (a, fb) = solveq(K[:,1:2], f, bc)
     # Test wrong length of f
-    @fact_throws DimensionMismatch (a, fb) = solve_eq_sys(K, [1, 2], bc)
+    @fact_throws DimensionMismatch (a, fb) = solveq(K, [1, 2], bc)
 end
 
-context("extract_eldisp") do
+context("extract") do
     a = [0.0 5.0 7.0 9.0 11.0]
     edof = [1  2 4
             2  3 5]
-    @fact extract_eldisp(edof, a) --> [5.0 9.0; 7.0 11.0]
+    @fact extract(edof, a) --> [5.0 9.0; 7.0 11.0]
 end
 
 context("linalg") do

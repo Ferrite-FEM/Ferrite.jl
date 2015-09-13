@@ -97,7 +97,7 @@ context("plani4e") do
             assemble(Edof[e, :], a, Ke)
           end
           K = end_assemble(a)
-          a, _ = solve_eq_sys(K, zeros(18), bc)
+          a, _ = solveq(K, zeros(18), bc)
           d_free = setdiff(collect(1:18), convert(Vector{Int}, bc[:,1]))
           @fact a[d_free] --> roughly([ux + uy, ux + uy])
       end
