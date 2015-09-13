@@ -54,3 +54,41 @@ function bar2s(ex::VecOrMat, ey::VecOrMat, elem_prop::VecOrMat, el_disp::VecOrMa
 
 end
 
+
+const __bar2g_c1 = Float64[1  0 -1  0;
+                           0  0  0  0;
+                          -1  0  1  0;
+                           0  0  0  0]
+
+const __bar2g_c2 = Float64[0  0  0  0;
+                           0  1  0 -1;
+                           0  0  0  0;
+                           0 -1  0  1];
+"""
+    bar2g(ex, ey, elem_prop, N) -> Ke
+
+Computes the element stiffness matrix `Ke` for a
+geometrically nonlinear 2D bar element.
+"""
+function bar2g(ex::VecOrMat, ey::VecOrMat, elem_prop::VecOrMat, N::Number)
+
+    E = elem_prop[1];  A = elem_prop[2]
+
+    dx = ex[2]-ex[1]
+    dy = ey[2]-ey[1]
+    L = sqrt(dx^2 + dy^2)
+
+    # Cosines
+    c = dx/L; s = dy/L
+
+    G = [ c   s  0.0 0.0;
+         -s   c  0.0 0.0;
+         0.0 0.0  c   s ;
+         0.0 0.0 -s   c]
+
+    k = E * A / L
+
+    return G' * (k * __bar2g_c1 + N/L * __bar2g_c2) * G
+
+end
+

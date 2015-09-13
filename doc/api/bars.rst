@@ -17,3 +17,9 @@ Bars
 
    Computes the sectional force (normal force) ``N`` for a 2D bar element.
 
+.. function:: bar2g(ex, ey, elem_prop, N) -> Ke
+
+   .. Docstring generated from Julia source
+
+   Computes the element stiffness matrix ``Ke`` for a geometrically nonlinear 2D bar element.
+

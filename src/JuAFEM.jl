@@ -11,7 +11,7 @@ import Base: LinAlg.chksquare, show
 export spring1e, spring1s
 export plani4e, plani8e, soli8e, plante
 export flw2i4e, flw2i8e, flw2te, flw3i8e
-export bar2e, bar2s
+export bar2e, bar2s, bar2g
 
 # Materials
 export hooke
