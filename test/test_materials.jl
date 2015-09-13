@@ -1,4 +1,6 @@
-facts("Hooke testing") do
+facts("Material testing") do
+
+context("Hooke") do
     # Tested with CALFEM
     D_pstress =    [2.197802197802198   0.659340659340659                   0;
                    0.659340659340659    2.197802197802198                    0;
@@ -22,4 +24,4 @@ facts("Hooke testing") do
     @fact hooke(4, 2, 0.3) --> roughly(D_3d)
 end
 
-
+end

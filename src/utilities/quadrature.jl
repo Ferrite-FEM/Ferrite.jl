@@ -23,6 +23,35 @@ function integrate(qr::GaussQuadratureRule, f)
     return I
 end
 
+get_gaussrule(::Triangle, order::Int) = get_trirule(order)
+get_gaussrule(::Square, order::Int) = get_quadrule(order)
+get_gaussrule(::Cube, order::Int) = get_cuberule(order)
+
+"""
+Creates a `GaussQuadratureRule` that integrates
+functions on a cube to the given order.
+"""
+function make_cuberule(order::Int)
+    p, w = gausslegendre(order)
+    weights = Array(Float64, order^3)
+    points = Array(Vector{Float64}, order^3)
+    count = 1
+    for i = 1:order, j = 1:order, k = 1:order
+        points[count] = [p[i], p[j], p[k]]
+        weights[count] = w[i] * w[j] * w[k]
+        count += 1
+    end
+    GaussQuadratureRule(weights, points)
+end
+
+const cuberules = [make_cuberule(i) for i = 1:5]
+function get_cuberule(order::Int)
+    if order <= 5
+        return cuberules[order]
+    else
+        return make_cuberule(order)
+    end
+end
 
 """
 Creates a `GaussQuadratureRule` that integrates

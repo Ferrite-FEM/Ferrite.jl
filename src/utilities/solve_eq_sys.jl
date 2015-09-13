@@ -1,7 +1,8 @@
 """
-Solves the equation system Ka = f taking into account the Dirichlet boundary conditions in the matrix bc
+Solves the equation system Ka = f taking into account the Dirichlet boundary conditions in the matrix bc.
+If symnmetric is set to true, the matrix will be factorized with Cholesky factorization.
 """
-function solve_eq_sys(K::AbstractMatrix, f::Array, bc::Matrix )
+function solve_eq_sys(K::AbstractMatrix, f::Array, bc::Matrix, symmetric=false)
     n = chksquare(K)
     nrf = length(f)
     if n != nrf
@@ -15,7 +16,12 @@ function solve_eq_sys(K::AbstractMatrix, f::Array, bc::Matrix )
     d_free = setdiff(collect(1:n), d_pres)
 
     # Solve equation system and create full solution vector a
-    a_free = K[d_free, d_free] \ (f[d_free] - K[d_free, d_pres] * a_pres)
+    if symmetric
+        K_fact = cholfact(Symmetric(K[d_free, d_free], :U))
+        a_free = K_fact \ (f[d_free] - K[d_free, d_pres] * a_pres)
+    else
+        a_free = K[d_free, d_free] \ (f[d_free] - K[d_free, d_pres] * a_pres)
+    end
     a = zeros(n)
     a[d_free] = a_free
     a[d_pres] = a_pres
