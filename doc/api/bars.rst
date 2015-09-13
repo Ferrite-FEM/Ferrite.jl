@@ -9,11 +9,11 @@ Bars
 
    .. Docstring generated from Julia source
 
-   Computes the element stiffness matrix *Ke* for a 2D bar element.
+   Computes the element stiffness matrix ``Ke`` for a 2D bar element.
 
 .. function:: bar2s(ex, ey, elem_prop, el_disp) -> N
 
    .. Docstring generated from Julia source
 
-   Computes the sectional force (normal force) *N* for a 2D bar element.
+   Computes the sectional force (normal force) ``N`` for a 2D bar element.
 

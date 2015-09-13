@@ -1,8 +1,9 @@
 """
-    hooke(ptype, E, v)
+    hooke(ptype, E, v) -> D
 
 Computes the material stiffness matrix for a
-linear elastic and isotropic material.
+linear elastic and isotropic material with elastic
+modulus `E` and poissons ratio `v`.
 
 **ptype**:
 

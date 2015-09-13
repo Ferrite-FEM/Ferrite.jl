@@ -5,7 +5,7 @@ const LMARKS = ["o", "*", ""]
 """
     eldraw2(ex, ey, [plotpar=[1,1,0], elnum=zeros(0)])
 
-Draws the 2D mesh defined by ex, ey.
+Draws the 2D mesh defined by `ex`, `ey`.
 """
 function eldraw2(ex::VecOrMat, ey::VecOrMat,
                 plotpar = [1, 1, 0], elnum=zeros(0))
@@ -46,8 +46,8 @@ end
 """
     eldisp2(ex, ey, ed, [plotpar=[1,1,0], sfac=1.0])
 
-Draws the displaced 2D mesh defined by ex, ey and the displacements
-given in ed.
+Draws the displaced 2D mesh defined by `ex`, `ey` and the displacements
+given in `ed`.
 """
 function eldisp2(ex::VecOrMat, ey::VecOrMat, ed::VecOrMat,
                 plotpar = [1, 1, 0], sfac = 1.0)

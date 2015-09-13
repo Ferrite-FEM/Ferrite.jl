@@ -1,8 +1,12 @@
 """
-Solves the equation system Ka = f taking into account the Dirichlet boundary conditions in the matrix bc.
-If symnmetric is set to true, the matrix will be factorized with Cholesky factorization.
+    solveq(K, f, bc, [symmetric=false]) -> a, fb
+
+Solves the equation system Ka = f taking into account the
+Dirichlet boundary conditions in the matrix `bc`. Returns the solution vector `a`
+and reaction forces `fb`
+If `symmetric` is set to `true`, the matrix will be factorized with Cholesky factorization.
 """
-function solve_eq_sys(K::AbstractMatrix, f::Array, bc::Matrix, symmetric=false)
+function solveq(K::AbstractMatrix, f::Array, bc::Matrix, symmetric=false)
     n = chksquare(K)
     nrf = length(f)
     if n != nrf
@@ -30,7 +34,4 @@ function solve_eq_sys(K::AbstractMatrix, f::Array, bc::Matrix, symmetric=false)
     f_b = K*a - f;
 
     return a, f_b
-
 end
-
-const solveq = solve_eq_sys # for CALFEM API compatability
