@@ -29,3 +29,36 @@ H_S_1 = FElement(
     heat_lhs_kernel,
     heat_rhs_kernel,
     2)
+
+H_S_2 = FElement(
+    :heat_square_2,
+    Square(),
+    Serend_Square_2(),
+    get_default_heat_vars(8, 2),
+    8,
+    1,
+    heat_lhs_kernel,
+    heat_rhs_kernel,
+    3)
+
+H_T_1 = FElement(
+    :heat_tri_1,
+    Triangle(),
+    Lagrange_Tri_1(),
+    get_default_heat_vars(3, 2),
+    3,
+    1,
+    heat_lhs_kernel,
+    heat_rhs_kernel,
+    1)
+
+H_C_1 = FElement(
+    :heat_cube_1,
+    Cube(),
+    Lagrange_Cube_1(),
+    get_default_heat_vars(8, 3),
+    8,
+    1,
+    heat_lhs_kernel,
+    heat_rhs_kernel,
+    2)

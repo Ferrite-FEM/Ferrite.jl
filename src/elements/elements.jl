@@ -74,7 +74,7 @@ function gen_body(ele)
 end
 
 for fem in [S_S_1, S_S_2, S_T_1, S_C_1, # Solid elements
-            H_S_1]
+            H_S_1, H_S_2, H_T_1, H_C_1]
     if get_ndim(fem) == 2
         @eval function $(fem.name)(x::Matrix, D::Matrix, t::Number,
                                   eq::VecOrMat=zeros($(get_ndim(fem))),
