@@ -2,9 +2,13 @@ const LTYPES = ["-", "--", ":"]
 const LCOLORS = ["k", "b", "m", "r"]
 const LMARKS = ["o", "*", ""]
 
-"Draws the 2D mesh defined by ex, ey."
+"""
+    eldraw2(ex, ey, [plotpar=[1,1,0], elnum=zeros(0)])
+
+Draws the 2D mesh defined by ex, ey.
+"""
 function eldraw2(ex::VecOrMat, ey::VecOrMat,
-                plotpar = [1, 1, 0], elnum::AbstractVector=zeros(0))
+                plotpar = [1, 1, 0], elnum=zeros(0))
 
     # TODO, Make it nice for elements with curved boundaries
     error_check_plotting(plotpar)
@@ -39,8 +43,12 @@ function eldraw2(ex::VecOrMat, ey::VecOrMat,
 end
 
 
-"Draws the displaced 2D mesh defined by ex, ey and the displacements
-given in ed"
+"""
+    eldisp2(ex, ey, ed, [plotpar=[1,1,0], sfac=1.0])
+
+Draws the displaced 2D mesh defined by ex, ey and the displacements
+given in ed.
+"""
 function eldisp2(ex::VecOrMat, ey::VecOrMat, ed::VecOrMat,
                 plotpar = [1, 1, 0], sfac = 1.0)
 

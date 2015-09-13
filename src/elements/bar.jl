@@ -1,4 +1,6 @@
 """
+    bar2e(ex, ey, elem_prop) -> Ke
+
 Computes the element stiffness matrix *Ke* for a 2D bar element.
 """
 function bar2e(ex::VecOrMat, ey::VecOrMat, elem_prop::VecOrMat)
@@ -26,6 +28,8 @@ function bar2e(ex::VecOrMat, ey::VecOrMat, elem_prop::VecOrMat)
 end
 
 """
+    bar2s(ex, ey, elem_prop, el_disp) -> N
+
 Computes the sectional force (normal force) *N* for a 2D bar element.
 """
 function bar2s(ex::VecOrMat, ey::VecOrMat, elem_prop::VecOrMat, el_disp::VecOrMat)

@@ -1,62 +1,3 @@
-# Add docstrings
-
-################
-# Solid elements
-################
-"""
-Computes the stiffness matrix and force vector for a
-four node isoparametric quadraterial element
-"""
-function plani4e(ex::VecOrMat, ey::VecOrMat,
-                 ep::Array, D::Matrix, eq::VecOrMat=[0.0,0.0]) end
-"""
-Computes the stiffness matrix and force vector for an eight node isoparametric quadraterial element
-"""
-function plani8e(ex::VecOrMat, ey::VecOrMat, ep,
-                 D::Matrix, eq::VecOrMat=[0.0,0.0]) end
-
-"""
-Computes the stiffness matrix and force vector for a three node isoparametric
-triangular element
-"""
-function plante(ex::VecOrMat, ey::VecOrMat, ep, D::Matrix, eq::VecOrMat=[0.0,0.0]) end
-
-"""
-Computes the stiffness matrix and force vector for a
-eight node isoparametric hexahedron element.
-"""
-function soli8e(ex::VecOrMat, ey::VecOrMat, ez::VecOrMat, ep, D::Matrix, eq::VecOrMat=[0.0,0.0,0.0]) end
-
-
-################
-# Heat elements
-################
-"""
-Computes the stiffness matrix and force vector for a
-four node isoparametric quadraterial heat transfer element
-"""
-function flw2i4e(ex::VecOrMat, ey::VecOrMat,
-                 ep::Array, D::Matrix, eq::VecOrMat=[0.0]) end
-"""
-Computes the stiffness matrix and force vector for an
-eight node isoparametric quadraterial element
-"""
-function flw2i8e(ex::VecOrMat, ey::VecOrMat, ep,
-                 D::Matrix, eq::VecOrMat=[0.0]) end
-
-"""
-Computes the stiffness matrix and force vector for a three node isoparametric
-triangular heat transfer element
-"""
-function flw2te(ex::VecOrMat, ey::VecOrMat, ep, D::Matrix, eq::VecOrMat=[0.0]) end
-
-"""
-Computes the stiffness matrix and force vector for a
-eight node isoparametric hexahedron heat transfer  element.
-"""
-function flw3i8e(ex::VecOrMat, ey::VecOrMat, ez::VecOrMat, ep, D::Matrix, eq::VecOrMat=[0.0]) end
-
-
 # Generate 2D solid elements
 for (f_calfem, f_juafem) in ((:plani4e, :solid_square_1),
                              (:plani8e, :solid_square_2),
@@ -115,6 +56,3 @@ for (f_calfem, f_juafem) in ((:flw3i8e, :heat_cube_1),)
         end
     end
 end
-
-
-

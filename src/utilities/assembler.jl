@@ -7,18 +7,23 @@ end
 Assembler(N) = Assembler(Int[], Int[], Float64[], N)
 
 """
+    start_assemble([N=0]) -> Assembler
+
 Call before starting an assembly.
 
-Returns an `Assembler` type
+Returns an `Assembler` type that is used to hold the intermediate
+data before an assembly is finished.
 """
 function start_assemble(N::Int=0)
     return Assembler(N)
 end
 
 """
-Assembles the element matrix `Ke` into `assembler`
+    assemble(edof, a, Ke)
+
+Assembles the element matrix `Ke` into `a`.
 """
-function assemble(edof, a::Assembler, Ke)
+function assemble(edof, a::Assembler, Ke::Matrix)
     for ele in size(edof, 1)
         append!(a.V, Ke[:])
         for dof1 in edof[2:end], dof2 in edof[2:end]
@@ -29,7 +34,9 @@ function assemble(edof, a::Assembler, Ke)
 end
 
 """
-Finish an assembly. Returns a sparse matrix with the
+    end_assemble(a::Assembler) -> K
+
+Finalizes an assembly. Returns a sparse matrix with the
 assembled values.
 """
 function end_assemble(a::Assembler)

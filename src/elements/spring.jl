@@ -1,4 +1,6 @@
 """
+    spring1e(k) -> Ke
+
 Computes the element stiffness matrix *Ke* for a
 spring element.
 """
@@ -8,6 +10,8 @@ function spring1e(k)
 end
 
 """
+    spring1s(k, u) -> fe
+
 Computes the force *fe* for a spring element
 """
 function spring1s(k, u::VecOrMat)

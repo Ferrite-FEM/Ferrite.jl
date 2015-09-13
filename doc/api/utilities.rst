@@ -9,22 +9,22 @@ Utilities
 Plotting
 --------
 
-.. function:: eldraw2(ex::AbstractVecOrMat, ey::AbstractVecOrMat, plotpar = [1, 1, 0], elnum::AbstractVector=zeros(0))
+.. function:: eldraw2(ex, ey, [plotpar=[1,1,0], elnum=zeros(0)])
 
    .. Docstring generated from Julia source
 
    Draws the 2D mesh defined by ex, ey.
 
-.. function:: eldisp2(ex::AbstractVecOrMat, ey::AbstractVecOrMat, ed::AbstractVecOrMat, plotpar = [1, 1, 0], sfac = 1.0)
+.. function:: eldisp2(ex, ey, ed, [plotpar=[1,1,0], sfac=1.0])
 
    .. Docstring generated from Julia source
 
-   Draws the displaced 2D mesh defined by ex, ey and the displacements given in ed
+   Draws the displaced 2D mesh defined by ex, ey and the displacements given in ed.
 
 Coordinate extraction
 ----------------------
 
-.. function:: extract_eldisp(edof::Array{Int}, a::Array{Float64})
+.. function:: extract_eldisp(edof, a)
 
    .. Docstring generated from Julia source
 
@@ -33,7 +33,7 @@ Coordinate extraction
 Static condensation
 -------------------
 
-.. function:: statcon(K::Matrix, f::Vector, cd::Vector)
+.. function:: statcon(K, f, cd) -> K_cond, f_cond
 
    .. Docstring generated from Julia source
 
@@ -42,25 +42,23 @@ Static condensation
 Assembler
 ---------
 
-.. function:: start_assemble(N::Int=0)
+.. function:: start_assemble([N=0]) -> Assembler
 
    .. Docstring generated from Julia source
 
    Call before starting an assembly.
 
-   Returns an ``Assembler`` type
+   Returns an ``Assembler`` type that is used to hold the intermediate data before an assembly is finished.
 
-.. function:: assemble(edof, assembler::Assembler, Ke)
-
-   .. Docstring generated from Julia source
-
-   Assembles the the element stiffness matrix Ke to the global stiffness matrix K.
-
-   Assembles the element matrix ``Ke`` into ``assembler``
-
-.. function:: end_assemble(a::Assembler)
+.. function:: assemble(edof, a, Ke)
 
    .. Docstring generated from Julia source
 
-   Finish an assembly. Returns a sparse matrix with the assembled values.
+   Assembles the element matrix ``Ke`` into ``a``\ .
+
+.. function:: end_assemble(a::Assembler) -> K
+
+   .. Docstring generated from Julia source
+
+   Finalizes an assembly. Returns a sparse matrix with the assembled values.
 

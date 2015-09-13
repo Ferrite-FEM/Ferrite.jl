@@ -1,4 +1,6 @@
 """
+    extract_eldisp(edof, a)
+
 Extracts the element displacements from the global solution vector given an edof matrix.
 This assumes all elements to have the same number of dofs.
 """

@@ -1,5 +1,7 @@
-""" Condenses out the dofs given in cd
-from K and f."""
+"""
+    statcon(K, f, cd) -> K_cond, f_cond
+
+Condenses out the dofs given in cd from K and f."""
 function statcon(K::Matrix, f::VecOrMat, cd::Vector)
     n = chksquare(K)
     rd = setdiff(collect(1:length(f)), cd)

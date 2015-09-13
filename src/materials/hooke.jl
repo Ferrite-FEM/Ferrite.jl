@@ -1,4 +1,6 @@
 """
+    hooke(ptype, E, v)
+
 Computes the material stiffness matrix for a
 linear elastic and isotropic material.
 

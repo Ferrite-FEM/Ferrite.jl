@@ -1,5 +1,6 @@
 # Classic structural elements
 include("CALFEM_API.jl")
+include("CALFEM_docs.jl")
 include("spring.jl")
 include("bar.jl")
 

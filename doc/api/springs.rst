@@ -5,13 +5,13 @@
 Springs
 -------
 
-.. function:: spring1e(k) -> Matrix
+.. function:: spring1e(k) -> Ke
 
    .. Docstring generated from Julia source
 
    Computes the element stiffness matrix *Ke* for a spring element.
 
-.. function:: spring1s(k, u) -> Vector
+.. function:: spring1s(k, u) -> fe
 
    .. Docstring generated from Julia source
 
