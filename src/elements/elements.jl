@@ -9,13 +9,13 @@ include("heat_elements.jl")
 create_initial_vars(inits) = Expr(:block, [:($sym = zeros($size)) for (sym, size) in inits]...)
 
 """
-This function generates the body expression for a function θ
+This function generates the body expression for a function that
 computes the so called stiffness matrix and force vector
 for a finite element.
 
 The finite element should be an instance of `FElement`.
 """
-function gen_body(ele)
+function gen_ke_fe_body(ele)
     quote
         ndofs = $(ele.nnodes) * $(ele.dofs_per_node)
         nnodes = $(ele.nnodes)
@@ -79,13 +79,13 @@ for fem in [S_S_1, S_S_2, S_T_1, S_C_1, # Solid elements
         @eval function $(fem.name)(x::Matrix, D::Matrix, t::Number,
                                   eq::VecOrMat=zeros($(get_ndim(fem))),
                                   int_order::Int=$(fem.default_intorder))
-            $(gen_body(fem))
+            $(gen_ke_fe_body(fem))
         end
     elseif get_ndim(fem) == 3
         @eval function $(fem.name)(x::Matrix, D::Matrix,
                                   eq::VecOrMat=zeros($(get_ndim(fem))),
                                   int_order::Int=$(fem.default_intorder))
-            $(gen_body(fem))
+            $(gen_ke_fe_body(fem))
         end
     end
 end
