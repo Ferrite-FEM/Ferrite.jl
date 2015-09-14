@@ -1,8 +1,6 @@
 module JuAFEM
 using InplaceOps
 using FastGaussQuadrature
-using Requires
-@lazymod Winston
 using Compat
 using Devectorize
 import Base: LinAlg.chksquare, show
