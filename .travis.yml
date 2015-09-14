@@ -13,7 +13,6 @@ script:
     - julia -e 'Pkg.add("FactCheck");'
     - julia -e 'Pkg.add("InplaceOps");'
     - julia -e 'Pkg.add("Devectorize");'
-    - julia -e 'Pkg.add("Requires");'
     - julia -e 'Pkg.clone("https://github.com/KristofferC/FastGaussQuadrature.jl");'
     - julia -e 'Pkg.clone(pwd()); Pkg.test("JuAFEM"; coverage=true)'
 after_success:

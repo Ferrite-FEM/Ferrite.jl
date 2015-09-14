@@ -9,7 +9,7 @@ Draws the 2D mesh defined by `ex`, `ey`.
 """
 function eldraw2(ex::VecOrMat, ey::VecOrMat,
                 plotpar = [1, 1, 0], elnum=zeros(0))
-
+    @eval import Winston
     # TODO, Make it nice for elements with curved boundaries
     error_check_plotting(plotpar)
 
@@ -34,9 +34,9 @@ function eldraw2(ex::VecOrMat, ey::VecOrMat,
       xs = [ex ex[:, 1]]'
       ys = [ey ey[:, 1]]'
     end
-    p = winston().plot(xs, ys, plot_string)
+    p = Winston.plot(xs, ys, plot_string)
     for el in elnum
-         winston().text(center[el,1], center[el,2], string(el))
+         Winston.text(center[el,1], center[el,2], string(el))
     end
 
     return p
@@ -51,7 +51,7 @@ given in `ed`.
 """
 function eldisp2(ex::VecOrMat, ey::VecOrMat, ed::VecOrMat,
                 plotpar = [1, 1, 0], sfac = 1.0)
-
+    @eval import Winston
     # TODO, Make it nice for elements with curved boundaries
     error_check_plotting(plotpar)
 
@@ -71,7 +71,7 @@ function eldisp2(ex::VecOrMat, ey::VecOrMat, ed::VecOrMat,
       xs = [ex + sfac * ed[:, 1:2:end] ex[:,1] + sfac * ed[:,1]]
       ys = [ey + sfac * ed[:, 2:2:end] ey[:,2] + sfac * ed[:,2]]
     end
-    p = winston().plot(xs', ys', plot_string)
+    p = Winston.plot(xs', ys', plot_string)
 
     return p
 end
