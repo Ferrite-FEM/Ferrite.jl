@@ -1,17 +1,17 @@
-function heat_lhs_kernel()
+function heat_grad_kernel()
     quote
         @into! DB = D * dNdx
-        @into! LHS_KERNEL = dNdx' * DB
-        if ndim == 2 scale!(LHS_KERNEL, t) end
+        @into! GRAD_KERNEL = dNdx' * DB
+        if ndim == 2 scale!(GRAD_KERNEL, t) end
     end
 end
 
 # A RHS kernel should be written such that it sets the variable
-# RHS_KERNEL to the left hand
-function heat_rhs_kernel()
+# SOURCE_KERNEL to the left hand
+function heat_source_kernel()
     quote
-        @into! RHS_KERNEL = N * eq
-        if ndim == 2 scale!(RHS_KERNEL, t) end
+        @into! SOURCE_KERNEL = N * eq
+        if ndim == 2 scale!(SOURCE_KERNEL, t) end
     end
 end
 
@@ -26,8 +26,8 @@ H_S_1 = FElement(
     get_default_heat_vars(4, 2),
     4,
     1,
-    heat_lhs_kernel,
-    heat_rhs_kernel,
+    heat_grad_kernel,
+    heat_source_kernel,
     2)
 
 H_S_2 = FElement(
@@ -37,8 +37,8 @@ H_S_2 = FElement(
     get_default_heat_vars(8, 2),
     8,
     1,
-    heat_lhs_kernel,
-    heat_rhs_kernel,
+    heat_grad_kernel,
+    heat_source_kernel,
     3)
 
 H_T_1 = FElement(
@@ -48,8 +48,8 @@ H_T_1 = FElement(
     get_default_heat_vars(3, 2),
     3,
     1,
-    heat_lhs_kernel,
-    heat_rhs_kernel,
+    heat_grad_kernel,
+    heat_source_kernel,
     1)
 
 H_C_1 = FElement(
@@ -59,6 +59,6 @@ H_C_1 = FElement(
     get_default_heat_vars(8, 3),
     8,
     1,
-    heat_lhs_kernel,
-    heat_rhs_kernel,
+    heat_grad_kernel,
+    heat_source_kernel,
     2)

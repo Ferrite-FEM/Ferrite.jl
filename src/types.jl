@@ -28,8 +28,8 @@ immutable FElement
     inits::Dict{Symbol, NTuple{2, Int}}
     nnodes::Int
     dofs_per_node::Int
-    lhs_kernel::Function
-    rhs_kernel::Function
+    grad_kernel::Function
+    source_kernel::Function
     default_intorder::Int # Should give a full rank stiffness matrix
 end
 

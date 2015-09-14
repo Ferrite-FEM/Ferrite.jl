@@ -1,7 +1,7 @@
-function contmech_lhs_kernel()
+function contmech_grad_kernel()
     quote
         for i in 1:nnodes
-            # Rewrite this with loops instead like for rhs_kernel? /KC
+            # Rewrite this with loops instead like for source_kernel? /KC
             if ndim == 2
                 B[1, 2*i - 1] = dNdx[1, i]
                 B[2, 2*i - 0] = dNdx[2, i]
@@ -20,20 +20,20 @@ function contmech_lhs_kernel()
             end
         end
         @into! DB = D * B
-        @into! LHS_KERNEL = B' * DB
-        if ndim == 2 scale!(LHS_KERNEL, t) end
+        @into! GRAD_KERNEL = B' * DB
+        if ndim == 2 scale!(GRAD_KERNEL, t) end
     end
 end
 
 # A RHS kernel should be written such that it sets the variable
-# RHS_KERNEL to the left hand
-function contmech_rhs_kernel()
+# SOURCE_KERNEL to the left hand
+function contmech_source_kernel()
     quote
         for i = 1:ndim
             N2[i:ndim:end, i] = N
         end
-        @into! RHS_KERNEL = N2 * eq
-        if ndim == 2 scale!(RHS_KERNEL, t) end
+        @into! SOURCE_KERNEL = N2 * eq
+        if ndim == 2 scale!(SOURCE_KERNEL, t) end
     end
 end
 
@@ -61,8 +61,8 @@ S_S_1 = FElement(
     get_default_contmech_vars(4, 2),
     4,
     2,
-    contmech_lhs_kernel,
-    contmech_rhs_kernel,
+    contmech_grad_kernel,
+    contmech_source_kernel,
     2
 )
 
@@ -74,8 +74,8 @@ S_S_2 = FElement(
     get_default_contmech_vars(8, 2),
     8,
     2,
-    contmech_lhs_kernel,
-    contmech_rhs_kernel,
+    contmech_grad_kernel,
+    contmech_source_kernel,
     3
 )
 
@@ -87,8 +87,8 @@ S_T_1 = FElement(
     get_default_contmech_vars(3, 2),
     3,
     2,
-    contmech_lhs_kernel,
-    contmech_rhs_kernel,
+    contmech_grad_kernel,
+    contmech_source_kernel,
     1
 )
 
@@ -100,7 +100,7 @@ S_C_1 = FElement(
     get_default_contmech_vars(8, 3),
     8,
     3,
-    contmech_lhs_kernel,
-    contmech_rhs_kernel,
+    contmech_grad_kernel,
+    contmech_source_kernel,
     2
 )

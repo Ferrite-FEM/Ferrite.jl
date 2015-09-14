@@ -29,8 +29,8 @@ function gen_ke_fe_body(ele)
         # Default buffers
         Ke = zeros(ndofs, ndofs)
         fe = zeros(ndofs)
-        LHS_KERNEL = zeros(ndofs, ndofs)
-        RHS_KERNEL = zeros(ndofs)
+        GRAD_KERNEL = zeros(ndofs, ndofs)
+        SOURCE_KERNEL = zeros(ndofs)
         dNdx = zeros(ndim, nnodes)
         dNdξ = zeros(ndim, nnodes)
         J = zeros(ndim, ndim)
@@ -56,18 +56,18 @@ function gen_ke_fe_body(ele)
 
             ##############################
             # Call the elements LHS kernel
-            $(ele.lhs_kernel())
+            $(ele.grad_kernel())
             ##############################
 
-            @devec Ke[:, :] += LHS_KERNEL .* dV
+            @devec Ke[:, :] += GRAD_KERNEL .* dV
 
             if compute_RHS
                 ##############################
                 # Call the elements RHS kernel
-                $(ele.rhs_kernel())
+                $(ele.source_kernel())
                 ##############################
 
-                @devec fe += RHS_KERNEL .* dV
+                @devec fe += SOURCE_KERNEL .* dV
             end
         end
         return Ke, fe
