@@ -63,15 +63,15 @@ function eldisp2(ex::VecOrMat, ey::VecOrMat, ed::VecOrMat,
     plot_string = LTYPES[ltype] * LCOLORS[lcolor] * LMARKS[lmark]
 
     # TODO can't we make this a bit nicer /JB
-    npoints = size(ex,2)
+    npoints = size(ex,1)
     if npoints == 2
       xs = ex + sfac * ed[:, 1:2:end]
       ys = ey + sfac * ed[:, 2:2:end]
     else
-      xs = [ex + sfac * ed[:, 1:2:end] ex[:,1] + sfac * ed[:,1]]
-      ys = [ey + sfac * ed[:, 2:2:end] ey[:,2] + sfac * ed[:,2]]
+      xs = [ex + sfac * ed[:, 1:2:end] ex[:,1] + sfac * ed[:,1]]'
+      ys = [ey + sfac * ed[:, 2:2:end] ey[:,1] + sfac * ed[:,2]]'
     end
-    p = Winston.plot(xs', ys', plot_string)
+    p = Winston.plot(xs, ys, plot_string)
 
     return p
 end
