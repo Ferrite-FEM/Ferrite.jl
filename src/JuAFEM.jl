@@ -16,7 +16,7 @@ export hooke
 
 # Utilities
 export solve_eq_sys, solveq
-export extract_eldisp, extract
+export extract, coordxtr
 export statcon
 export start_assemble, assemble, assem, end_assemble, eldraw2, eldisp2, gen_quad_mesh
 

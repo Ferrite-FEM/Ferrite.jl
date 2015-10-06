@@ -121,4 +121,29 @@ context("static condensation") do
     @fact f1 --> roughly(f1_calfem)
 end
 
+context("coordxtr") do
+
+    Dof = [1 2;
+           3 4;
+           5 6;
+           7 8]
+
+    Coord = [1.0 3.0;
+             2.0 4.0;
+             5.0 6.0
+             7.0 8.0]
+
+    Edof = [1 1 2 3 4 5 6;
+            2 1 2 3 4 7 8]
+
+    Ex, Ey, Ez = coordxtr(Edof,Coord,Dof, 3)
+
+    @fact Ex --> [1.0 2.0 5.0;
+                  1.0 2.0 7.0]
+
+    @fact Ey --> [3.0 4.0 6.0;
+                  3.0 4.0 8.0]
+end
+
+
 end
