@@ -39,6 +39,14 @@ Coordinate extraction
 
    Extracts the element displacements from the global solution vector ``a`` given an ``edof`` matrix. This assumes all elements to have the same number of dofs.
 
+.. function:: coordxtr(Edof,Coord,Dof,nen) -> Ex, Ey, Ez
+
+   .. Docstring generated from Julia source
+
+   Extracts coordinates of the nodes from the coordinate matrix and the topology ḿatrices.
+
+   This function can be slow for large number of elements.
+
 Static condensation
 -------------------
 
