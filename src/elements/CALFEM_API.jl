@@ -18,6 +18,22 @@ for (f_calfem, f_juafem) in ((:plani4e, :solid_square_1e),
     end
 end
 
+for (f_calfem, f_juafem) in ((:plani4f, :solid_square_1f),
+                             (:plani8f, :solid_square_2f),
+                             (:plantf,  :solid_tri_1f))
+    @eval begin
+        function $f_calfem(ex::VecOrMat, ey::VecOrMat, ep::Array,
+                           es::VecOrMat)
+            # TODO, fix plane stress
+            ptype = convert(Int, ep[1])
+            t = ep[2]
+            int_order = convert(Int, ep[3])
+            x = [ex ey]
+            $f_juafem(x, t, es, int_order)
+        end
+    end
+end
+
 # Generate 3D solid elements
 for (f_calfem, f_juafem) in ((:soli8e, :solid_cube_1e),
                              (:soli8s, :solid_cube_1s))
@@ -27,6 +43,17 @@ for (f_calfem, f_juafem) in ((:soli8e, :solid_cube_1e),
             int_order = convert(Int, ep[1])
             x = [ex ey ez]
             $f_juafem(x, D, eq, int_order)
+        end
+    end
+end
+
+for (f_calfem, f_juafem) in ((:soli8f, :solid_cube_1f),)
+    @eval begin
+        function $f_calfem(ex::VecOrMat, ey::VecOrMat, ez::VecOrMat, ep::Array,
+                           es::VecOrMat)
+            int_order = convert(Int, ep[1])
+            x = [ex ey ez]
+            $f_juafem(x, es, int_order)
         end
     end
 end

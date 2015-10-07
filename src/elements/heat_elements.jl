@@ -48,6 +48,7 @@ H_S_1 = FElement(
     heat_grad_kernel,
     heat_source_kernel,
     heat_flux_kernel,
+    (x) -> x, # Dummy func
     2)
 
 H_S_2 = FElement(
@@ -61,6 +62,7 @@ H_S_2 = FElement(
     heat_grad_kernel,
     heat_source_kernel,
     heat_flux_kernel,
+    (x) -> x, # Dummy func
     3)
 
 H_T_1 = FElement(
@@ -74,6 +76,7 @@ H_T_1 = FElement(
     heat_grad_kernel,
     heat_source_kernel,
     heat_flux_kernel,
+    (x) -> x, # Dummy func
     1)
 
 H_C_1 = FElement(
@@ -87,4 +90,5 @@ H_C_1 = FElement(
     heat_grad_kernel,
     heat_source_kernel,
     heat_flux_kernel,
+    (x) -> x, # Dummy func
     2)
