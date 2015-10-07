@@ -28,12 +28,15 @@ immutable FElement
     inits::Dict{Symbol, NTuple{2, Int}}
     nnodes::Int
     dofs_per_node::Int
+    flux_size::Int
     grad_kernel::Function
     source_kernel::Function
+    flux_kernel::Function
     default_intorder::Int # Should give a full rank stiffness matrix
 end
 
 get_ndim(fele::FElement) = get_ndim(fele.shape)
+get_nflux(fele::FElement) = fele.flux_size
 
 function show(io::IO, fele::FElement)
     print(io, "Name: $(fele.name)\n")

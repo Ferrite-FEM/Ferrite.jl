@@ -17,11 +17,11 @@ Linear elastic
 
    **ptype**:
 
-     * 1: plane stress
+   * 1: plane stress
 
-     * 2: plane strain
+   * 2: plane strain
 
-     * 3: axisymmetry
+   * 3: axisymmetry
 
-     * 4: 3D
+   * 4: 3D
 
