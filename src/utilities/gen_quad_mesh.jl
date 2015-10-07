@@ -18,6 +18,8 @@ Bi    - Matrix containing boundary dofs for segment i (i=1,2,3,4)
         size = (num boundary nodes on segment) x ndofs
         B1 = Bottom side     B2 = Right side
         B3 = Upper side      B4 = Left side
+Coord - coordinate matrix
+Dofs - dof matrix
 
 Written by
 Jim Brouzoulis
@@ -75,6 +77,5 @@ function gen_quad_mesh(p1::Array, p2::Array, nelx::Int, nely::Int, ndofs::Int)
   B4 = dofs[(nelx+1)*(nely:-1:0)+1,:]
 
   return Edof', Ex', Ey', B1', B2', B3', B4', coords', dofs'
-
 end
 

@@ -3,7 +3,11 @@ using InplaceOps
 using FastGaussQuadrature
 using Compat
 using Devectorize
+using Reexport
+@reexport using WriteVTK
+
 import Base: LinAlg.chksquare, show
+import WriteVTK: vtk_grid
 
 # Elements
 export spring1e, spring1s
@@ -17,12 +21,13 @@ export bar2e, bar2s, bar2g
 # Materials
 export hooke
 
+export vtk_grid
+
 # Utilities
 export solve_eq_sys, solveq
 export extract, coordxtr, topologyxtr
 export statcon
 export start_assemble, assemble, assem, end_assemble, eldraw2, eldisp2, gen_quad_mesh
-
 include("types.jl")
 include("materials/hooke.jl")
 include("utilities/utilities.jl")

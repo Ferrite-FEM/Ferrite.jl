@@ -21,6 +21,17 @@ Plotting
 
    Draws the displaced 2D mesh defined by ``ex``\ , ``ey`` and the displacements given in ``ed``\ .
 
+Export to VTK
+-------------
+
+.. function:: vtk_grid(Edof, Coord, Dof, nen, filename::AbstractString) -> vtkgrid
+
+   .. Docstring generated from Julia source
+
+   Creates an unstructured VTK grid. ``nen`` is the number of nodes per element
+
+   To add cell data and point data and write the file see https://github.com/jipolanco/WriteVTK.jl#generating-an-unstructured-vtk-file
+
 Solving system of equations
 ----------------------------
 
