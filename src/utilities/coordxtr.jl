@@ -22,8 +22,12 @@ function coordxtr(Edof,Coord,Dof,nen)
         nodnum = zeros(Int, nen)
         for j = 1:nen
             ele_dof =  Edof[i, (j-1)*nend + 2 : j*nend + 1]
-            for k = 1:nnodes
-                if Dof[k, :] - ele_dof == [0 0]
+             for k = 1:nnodes
+                s = zero(eltype(Edof))
+                for l in 1:size(Dof, 2)
+                    s += abs(Dof[k, l] - ele_dof[l])
+                end
+                if s == 0
                     nodnum[j] = k
                     break
                 end
@@ -64,7 +68,11 @@ function topologyxtr(Edof,Coord,Dof,nen)
         for j = 1:nen
             ele_dof =  Edof[i, (j-1)*nend + 2 : j*nend + 1]
             for k = 1:nnodes
-                if Dof[k, :] - ele_dof == [0 0]
+                s = zero(eltype(Edof))
+                for l in 1:size(Dof, 2)
+                    s += abs(Dof[k, l] - ele_dof[l])
+                end
+                if s == 0
                     nodnum[j] = k
                     break
                 end
