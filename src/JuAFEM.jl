@@ -19,7 +19,7 @@ export hooke
 
 # Utilities
 export solve_eq_sys, solveq
-export extract, coordxtr
+export extract, coordxtr, topologyxtr
 export statcon
 export start_assemble, assemble, assem, end_assemble, eldraw2, eldisp2, gen_quad_mesh
 
