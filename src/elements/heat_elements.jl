@@ -15,6 +15,24 @@ function heat_source_kernel()
     end
 end
 
+# A flux kernel should be written such that it sets the variable
+# FLUX_KERNEL and CONJ_KERNEL
+function heat_flux_kernel()
+    quote
+        @into! CONJ_KERNEL = dNdx * ed
+        @into! FLUX_KERNEL = D * CONJ_KERNEL
+        scale!(FLUX_KERNEL, -1)
+    end
+end
+
+function get_heat_flux_size(ndim)
+    if ndim == 2
+        return 2
+    else
+        return 3
+    end
+end
+
 function get_default_heat_vars(nnodes, ndim)
     Dict(:DB => (ndim ,nnodes))
 end
@@ -26,8 +44,10 @@ H_S_1 = FElement(
     get_default_heat_vars(4, 2),
     4,
     1,
+    get_heat_flux_size(2),
     heat_grad_kernel,
     heat_source_kernel,
+    heat_flux_kernel,
     2)
 
 H_S_2 = FElement(
@@ -37,8 +57,10 @@ H_S_2 = FElement(
     get_default_heat_vars(8, 2),
     8,
     1,
+    get_heat_flux_size(2),
     heat_grad_kernel,
     heat_source_kernel,
+    heat_flux_kernel,
     3)
 
 H_T_1 = FElement(
@@ -48,8 +70,10 @@ H_T_1 = FElement(
     get_default_heat_vars(3, 2),
     3,
     1,
+    get_heat_flux_size(2),
     heat_grad_kernel,
     heat_source_kernel,
+    heat_flux_kernel,
     1)
 
 H_C_1 = FElement(
@@ -59,6 +83,8 @@ H_C_1 = FElement(
     get_default_heat_vars(8, 3),
     8,
     1,
+    get_heat_flux_size(3),
     heat_grad_kernel,
     heat_source_kernel,
+    heat_flux_kernel,
     2)
