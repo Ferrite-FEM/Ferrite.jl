@@ -43,7 +43,15 @@ Coordinate extraction
 
    .. Docstring generated from Julia source
 
-   Extracts coordinates of the nodes from the coordinate matrix and the topology ḿatrices.
+   Extracts the coordinates of the nodes of the elements.
+
+   This function can be slow for large number of elements.
+
+.. function:: topologyxtr(Edof,Coord,Dof,nen) -> topology
+
+   .. Docstring generated from Julia source
+
+   Extracts the connectivity matrix.
 
    This function can be slow for large number of elements.
 

@@ -121,7 +121,7 @@ context("static condensation") do
     @fact f1 --> roughly(f1_calfem)
 end
 
-context("coordxtr") do
+context("coordxtr + topologyxtr") do
 
     Dof = [1 2;
            3 4;
@@ -143,6 +143,11 @@ context("coordxtr") do
 
     @fact Ey --> [3.0 4.0 6.0;
                   3.0 4.0 8.0]
+
+    topo = topologyxtr(Edof,Coord,Dof, 3)
+
+    @fact topo --> [1 2 3;
+                    1 2 4]
 end
 
 
