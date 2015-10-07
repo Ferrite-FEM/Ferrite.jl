@@ -32,6 +32,7 @@ immutable FElement
     grad_kernel::Function
     source_kernel::Function
     flux_kernel::Function
+    intf_kernel::Function
     default_intorder::Int # Should give a full rank stiffness matrix
 end
 

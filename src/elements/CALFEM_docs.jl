@@ -21,6 +21,14 @@ Also returns the global coordinates `points` at the gauss points.
 """
 plani4s(ex, ey, ep, D, ed)
 
+"""
+    plani4f(ex, ey, ep, σ) -> intf
+
+Computes the internal forces from `σ` for a
+four node isoparametric quadraterial element.
+"""
+plani4f(ex, ey, ep, σ)
+
 
 """
     plani8e(ex, ey, ep, D, [eq = zeros(2)]) -> Ke, fe
@@ -41,6 +49,14 @@ Also returns the global coordinates `points` at the gauss points.
 plani8s(ex, ey, ep, D, ed)
 
 """
+    plani8f(ex, ey, ep, σ) -> intf
+
+Computes the internal forces from `σ` for
+ an eight node isoparametric quadraterial element.
+"""
+plani8f(ex, ey, ep, σ)
+
+"""
     plante(ex, ey, ep, D, [eq = zeros(2)]) -> Ke, fe
 
 Computes the stiffness matrix `Ke` and force vector `fe` for a
@@ -57,6 +73,14 @@ integration rule for a three node isoparametric triangular element.
 Also returns the global coordinates `points` at the gauss points.
 """
 plants(ex, ey, ep, D, ed)
+
+"""
+    plantf(ex, ey, ep, σ) -> intf
+
+Computes the internal forces from `σ` for
+a three node isoparametric triangular element.
+"""
+plantf(ex, ey, ep, σ)
 
 """
     soli8e(ex, ey, ez, ep, D, [eq = zeros(3)]) -> Ke, fe
@@ -76,6 +100,14 @@ integration rule for an eight node isoparametric hexahedron element.
 Also returns the global coordinates `points` at the gauss points.
 """
 soli8s(ex, ey, ep, D, ed)
+
+"""
+    soli8f(ex, ey, ep, σ) -> intf
+
+Computes the internal forces from `σ` for
+an eight node isoparametric hexahedron element.
+"""
+soli8f(ex, ey, ez, ep, σ)
 
 
 ################

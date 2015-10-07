@@ -23,6 +23,12 @@ Solid elements
 
    Also returns the global coordinates ``points`` at the gauss points.
 
+.. function:: plantf(ex, ey, ep, σ) -> intf
+
+   .. Docstring generated from Julia source
+
+   Computes the internal forces from ``σ`` for a three node isoparametric triangular element.
+
 4 node isoparametric quadraterial
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -39,6 +45,12 @@ Solid elements
    Computes the stresses and strains in the gauss points given by the integration rule for a four node isoparametric quadraterial element.
 
    Also returns the global coordinates ``points`` at the gauss points.
+
+.. function:: plani4f(ex, ey, ep, σ) -> intf
+
+   .. Docstring generated from Julia source
+
+   Computes the internal forces from ``σ`` for a four node isoparametric quadraterial element.
 
 8 node isoparametric quadraterial
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -57,7 +69,13 @@ Solid elements
 
    Also returns the global coordinates ``points`` at the gauss points.
 
-8 node isoparametric hexahdron
+.. function:: plani8f(ex, ey, ep, σ) -> intf
+
+   .. Docstring generated from Julia source
+
+   Computes the internal forces from ``σ`` for  an eight node isoparametric quadraterial element.
+
+8 node isoparametric hexahedron
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. function:: soli8e(ex, ey, ez, ep, D, [eq = zeros(3)]) -> Ke, fe
@@ -73,4 +91,10 @@ Solid elements
    Computes the stresses and strains in the gauss points given by the integration rule for an eight node isoparametric hexahedron element.
 
    Also returns the global coordinates ``points`` at the gauss points.
+
+.. function:: soli8f(ex, ey, ep, σ) -> intf
+
+   .. Docstring generated from Julia source
+
+   Computes the internal forces from ``σ`` for an eight node isoparametric hexahedron element.
 

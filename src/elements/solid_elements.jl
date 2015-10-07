@@ -51,6 +51,17 @@ function contmech_flux_kernel()
     end
 end
 
+# An intf kernel should be written such that it sets the variable
+# INTF
+function contmech_intf_kernel()
+    quote
+        Bmatrix!(B, nnodes, ndim, dNdx)
+        @into! INTF_KERNEL = B' * σ
+        if ndim == 2 scale!(INTF_KERNEL, t) end
+    end
+end
+
+
 function get_contmech_flux_size(ndim)
     if ndim == 2
         return 4
@@ -88,6 +99,7 @@ S_S_1 = FElement(
     contmech_grad_kernel,
     contmech_source_kernel,
     contmech_flux_kernel,
+    contmech_intf_kernel,
     2
 )
 
@@ -103,6 +115,7 @@ S_S_2 = FElement(
     contmech_grad_kernel,
     contmech_source_kernel,
     contmech_flux_kernel,
+    contmech_intf_kernel,
     3
 )
 
@@ -118,6 +131,7 @@ S_T_1 = FElement(
     contmech_grad_kernel,
     contmech_source_kernel,
     contmech_flux_kernel,
+    contmech_intf_kernel,
     1
 )
 
@@ -133,5 +147,6 @@ S_C_1 = FElement(
     contmech_grad_kernel,
     contmech_source_kernel,
     contmech_flux_kernel,
+    contmech_intf_kernel,
     2
 )

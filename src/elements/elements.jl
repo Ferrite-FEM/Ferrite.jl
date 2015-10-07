@@ -166,3 +166,75 @@ for fem in [S_S_1, S_S_2, S_T_1, S_C_1, # Solid elements
         end
     end
 end
+
+
+"""
+This function generates the body expression for a function that
+computes the internal forces.
+
+The finite element should be an instance of `FElement`.
+"""
+function gen_f_body(ele)
+    quote
+        ndofs = $(ele.nnodes) * $(ele.dofs_per_node)
+        nnodes = $(ele.nnodes)
+        ndim = $(get_ndim(ele))
+        fluxlen = $(get_nflux(ele))
+
+        #length(eq) == ndim || throw(ArgumentError("length of eq must be $ndim"))
+        int_order > 0 || throw(ArgumentError("integration order must be > 0"))
+
+        # Default buffers
+        intf = zeros(ndofs)
+        INTF_KERNEL = zeros(ndofs)
+        dNdx = zeros(ndim, nnodes)
+        dNdξ = zeros(ndim, nnodes)
+        J = zeros(ndim, ndim)
+        N = zeros(nnodes)
+
+        # Create the element requested buffers
+        $(create_initial_vars(ele.inits))
+
+        # Create the gauss rule of the requested order on the
+        # elements reference shape
+        qr = get_gaussrule($(ele.shape), int_order)
+
+        if size(σs, 1) != length(qr.points)
+            throw(ArgumentError("must use same integration rule to compute stresses and internal forces"))
+        end
+
+        for (i, (ξ, w)) in enumerate(zip(qr.points, qr.weights))
+            evaluate_N!($(ele.shape_funcs), N, ξ)
+            evaluate_dN!($(ele.shape_funcs), dNdξ, ξ)
+            @into! J = dNdξ * x
+            Jinv = inv_spec(J)
+            @into! dNdx = Jinv * dNdξ
+            dV = det_spec(J) * w
+            σ = vec(σs[i, :])
+
+            ##############################
+            # Call the elements flux kernel
+            $(ele.intf_kernel())
+            ##############################
+
+            @devec intf[:] += INTF_KERNEL .* dV
+        end
+        return intf
+    end
+end
+
+
+for fem in [S_S_1, S_S_2, S_T_1, S_C_1] # Only for solid elements
+    f_name = Symbol(string(fem.name) * "f")
+    if get_ndim(fem) == 2
+        @eval function $(f_name)(x::Matrix, t::Number, σs::VecOrMat,
+                                 int_order::Int=$(fem.default_intorder))
+            $(gen_f_body(fem))
+        end
+    elseif get_ndim(fem) == 3
+        @eval function $(f_name)(x::Matrix, σs::VecOrMat,
+                                 int_order::Int=$(fem.default_intorder))
+            $(gen_f_body(fem))
+        end
+    end
+end
