@@ -9,23 +9,23 @@ function coordxtr(Edof,Coord,Dof,nen)
 
     # TODO: Input checks
 
-    nel, dofsperele = size(Edof)
+    dofsperele, nel = size(Edof)
     dofsperele -= 1 # Compensate for ele index
-    nnodes, ndim = size(Coord)
+    ndim, nnodes = size(Coord)
     nend = div(dofsperele, nen)
 
-    Ex = zeros(nel, nen)
+    Ex = zeros(nen, nel)
     Ey = zeros(Ex)
     Ez = zeros(Ex);
 
     for i = 1:nel
         nodnum = zeros(Int, nen)
         for j = 1:nen
-            ele_dof =  Edof[i, (j-1)*nend + 2 : j*nend + 1]
+            ele_dof =  Edof[(j-1)*nend + 2 : j*nend + 1, i]
              for k = 1:nnodes
                 s = zero(eltype(Edof))
-                for l in 1:size(Dof, 2)
-                    s += abs(Dof[k, l] - ele_dof[l])
+                for l in 1:size(Dof, 1)
+                    s += abs(Dof[l, k] - ele_dof[l])
                 end
                 if s == 0
                     nodnum[j] = k
@@ -34,12 +34,12 @@ function coordxtr(Edof,Coord,Dof,nen)
             end
         end
 
-        Ex[i, :] = Coord[nodnum, 1]
+        Ex[:, i] = Coord[1, nodnum]
         if ndim > 1
-            Ey[i, :] = Coord[nodnum, 2]
+            Ey[:, i] = Coord[2, nodnum]
         end
         if ndim > 2
-            Ez[i, :] = Coord[nodnum, 3]
+            Ez[:, i] = Coord[3, nodnum]
         end
     end
     return Ex, Ey, Ez
@@ -56,21 +56,21 @@ function topologyxtr(Edof,Coord,Dof,nen)
 
     # TODO: Input checks
 
-    nel, dofsperele = size(Edof)
+    dofsperele, nel = size(Edof)
     dofsperele -= 1 # Compensate for ele index
-    nnodes, ndim = size(Coord)
+    ndim, nnodes = size(Coord)
     nend = div(dofsperele, nen)
 
-    topology = zeros(Int, nel, nen)
+    topology = zeros(Int, nen, nel)
 
     for i = 1:nel
         nodnum = zeros(Int, nen)
         for j = 1:nen
-            ele_dof =  Edof[i, (j-1)*nend + 2 : j*nend + 1]
-            for k = 1:nnodes
+            ele_dof =  Edof[(j-1)*nend + 2 : j*nend + 1, i]
+             for k = 1:nnodes
                 s = zero(eltype(Edof))
-                for l in 1:size(Dof, 2)
-                    s += abs(Dof[k, l] - ele_dof[l])
+                for l in 1:size(Dof, 1)
+                    s += abs(Dof[l, k] - ele_dof[l])
                 end
                 if s == 0
                     nodnum[j] = k
@@ -79,7 +79,7 @@ function topologyxtr(Edof,Coord,Dof,nen)
             end
         end
 
-        topology[i, :] = nodnum
+        topology[:, i] = nodnum
 
     end
     return topology

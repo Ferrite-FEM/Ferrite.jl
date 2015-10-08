@@ -74,6 +74,7 @@ function gen_quad_mesh(p1::Array, p2::Array, nelx::Int, nely::Int, ndofs::Int)
   B3 = dofs[(nelx+1)*(nely+1):-1:(nelx+1)*(nely)+1,:]
   B4 = dofs[(nelx+1)*(nely:-1:0)+1,:]
 
-  return Edof, Ex, Ey, B1, B2, B3, B4, coords
+  return Edof', Ex', Ey', B1', B2', B3', B4', coords', dofs'
+
 end
 

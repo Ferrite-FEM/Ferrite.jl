@@ -4,7 +4,7 @@
 Computes the element stiffness matrix `Ke` for a
 spring element with stiffness `k`.
 """
-function spring1e(k)
+function spring1e(k::Number)
     Ke = [k -k;
           -k k]
 end
@@ -15,7 +15,7 @@ end
 Computes the force `fe` for a spring element with stiffness
 `k` and displacements `u`.
 """
-function spring1s(k, u::VecOrMat)
+function spring1s(k::Number, u::Vector)
     if length(u) != 2
         throw(ArgumentError("displacements for computing the spring force must" *
                             "be a vector of length 2"))

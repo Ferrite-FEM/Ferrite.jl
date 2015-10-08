@@ -50,7 +50,7 @@ context("plani4e") do
                  2 1
                  2 2
                  1 2
-                 0 2]
+                 0 2]'
 
         Dof = [1 2
                3 4
@@ -60,19 +60,19 @@ context("plani4e") do
                11 12
                13 14
                15 16
-               17 18]
+               17 18]'
 
         Edof = [1 1 2 3 4 5 6 7 8;
                 2 3 4 9 10 11 12 5 6;
                 3 5 6 11 12 13 14 15 16;
-                4 7 8 5 6 15 16 17 18]
+                4 7 8 5 6 15 16 17 18]'
 
         function get_coord(dof)
           node = div(dof+1, 2)
           if dof % 2 == 0
-              return Coord[node, 2]
+              return Coord[2, node]
           else
-              return Coord[node, 1]
+              return Coord[1, node]
           end
         end
 
@@ -83,18 +83,18 @@ context("plani4e") do
         for i in 1:size(bc, 1)
           dof = bc_dofs[i]
           node = div(dof+1, 2)
-          coord = Coord[node, :]
+          coord = Coord[:, node]
           bc[i, 1] = dof
           bc[i, 2] = ux * coord[1] + uy * coord[2]
         end
 
           a = start_assemble()
           D = hooke(2, 250e9, 0.3)
-          for e in 1:size(Edof, 1)
-            ex = [get_coord(i) for i in Edof[e, 2:2:end]]
-            ey = [get_coord(i) for i in Edof[e, 3:2:end]]
+          for e in 1:size(Edof, 2)
+            ex = [get_coord(i) for i in Edof[2:2:end, e]]
+            ey = [get_coord(i) for i in Edof[3:2:end, e]]
             Ke, _ = plani4e(ex, ey, [2, 1, 2], D)
-            assemble(Edof[e, :], a, Ke)
+            assemble(Edof[:, e], a, Ke)
           end
           K = end_assemble(a)
           a, _ = solveq(K, zeros(18), bc)
@@ -506,10 +506,10 @@ end
 
 context("bar") do
     # From example 3.2 in the book Strukturmekanik
-    ex = [0.  1.6]; ey = [0. -1.2]
-    elem_prop = [200.e9 1.0e-3]
+    ex = [0.,  1.6]; ey = [0., -1.2]
+    elem_prop = [200.e9, 1.0e-3]
     Ke = bar2e(ex, ey, elem_prop)
-    ed = [0. 0. -0.3979 -1.1523]*1e-3
+    ed = [0., 0., -0.3979 ,-1.1523]*1e-3
     N = bar2s(ex, ey, elem_prop, ed)
     Ke_ref = [ 64  -48. -64  48
               -48   36   48 -36
