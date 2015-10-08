@@ -133,8 +133,8 @@ context("plani4s/f") do
 
 
     # correct for calfems order of gauss points
-    @fact norm(σ - σ_calfem[[4,2,3,1], :]) / norm(σ_calfem) --> roughly(0.0, atol=1e-14)
-    @fact norm(ε - ε_calfem[[4,2,3,1], :]) / norm(ε_calfem) --> roughly(0.0, atol=1e-14)
+    @fact norm(σ - σ_calfem[[4,2,3,1], :]') / norm(σ_calfem) --> roughly(0.0, atol=1e-14)
+    @fact norm(ε - ε_calfem[[4,2,3,1], :]') / norm(ε_calfem) --> roughly(0.0, atol=1e-14)
     @fact norm(intf - intf_calfem) / norm(intf_calfem) --> roughly(0.0, atol=1e-14)
 
 
@@ -175,8 +175,8 @@ context("plants/f") do
       7.010769230769229]
 
 
-    @fact norm(σ - σ_calfem) / norm(σ_calfem) --> roughly(0.0, atol=1e-14)
-    @fact norm(ε - ε_calfem) / norm(ε_calfem) --> roughly(0.0, atol=1e-14)
+    @fact norm(σ - σ_calfem') / norm(σ_calfem') --> roughly(0.0, atol=1e-14)
+    @fact norm(ε - ε_calfem') / norm(ε_calfem') --> roughly(0.0, atol=1e-14)
     @fact norm(intf - intf_calfem) / norm(intf_calfem) --> roughly(0.0, atol=1e-14)
 
 end
@@ -275,8 +275,8 @@ context("soli8s/f") do
   -1.958109485444647;
   -1.639108853140777]
 
-    @fact norm(σ - σ_calfem[[1,5,4,8,2,6,3,7], [1,2,3,6,5,4]]) / norm(σ_calfem) --> roughly(0.0, atol=1e-5)
-    @fact norm(ε - ε_calfem[[1,5,4,8,2,6,3,7], [1,2,3,6,5,4]]) / norm(ε_calfem) --> roughly(0.0, atol=1e-5)
+    @fact norm(σ - σ_calfem[[1,5,4,8,2,6,3,7], [1,2,3,6,5,4]]') / norm(σ_calfem) --> roughly(0.0, atol=1e-5)
+    @fact norm(ε - ε_calfem[[1,5,4,8,2,6,3,7], [1,2,3,6,5,4]]') / norm(ε_calfem) --> roughly(0.0, atol=1e-5)
     @fact norm(intf - intf_calfem) / norm(intf_calfem) --> roughly(0.0, atol=1e-14)
 end
 
@@ -347,8 +347,8 @@ context("plani8s/f") do
           -1.556915325616566]
 
 
-      @fact norm(σ - σ_calfem[[1,3, 2, 4], :]) / norm(σ_calfem) --> roughly(0.0, atol =1e-13)
-      @fact norm(ε - ε_calfem[[1,3, 2, 4], :]) / norm(ε_calfem) --> roughly(0.0, atol=1e-13)
+      @fact norm(σ - σ_calfem[[1,3, 2, 4], :]') / norm(σ_calfem) --> roughly(0.0, atol =1e-13)
+      @fact norm(ε - ε_calfem[[1,3, 2, 4], :]') / norm(ε_calfem) --> roughly(0.0, atol=1e-13)
       @fact norm(intf - intf_calfem) / norm(intf_calfem) --> roughly(0.0, atol=1e-14)
 end
 
@@ -381,8 +381,8 @@ context("flw2i4s") do
      -1.723760430703402   5.732050807568878;
      -1.261880215351701   3.422649730810373]
 
-      @fact norm(es - es_calfem[[4,2, 3, 1], :]) / norm(es_calfem) --> roughly(0.0, atol =1e-13)
-      @fact norm(et - et_calfem[[4,2, 3, 1], :]) / norm(et_calfem) --> roughly(0.0, atol=1e-13)
+      @fact norm(es - es_calfem[[4,2, 3, 1], :]') / norm(es_calfem) --> roughly(0.0, atol =1e-13)
+      @fact norm(et - et_calfem[[4,2, 3, 1], :]') / norm(et_calfem) --> roughly(0.0, atol=1e-13)
 end
 
 context("flw2i8e") do
@@ -421,8 +421,8 @@ context("flw2i8s") do
   -2.187219748188395   6.921119965694889;
    5.855440108225263   4.135429337120202]
 
-    @fact norm(es - es_calfem[[1 ,3, 2, 4], :]) / norm(es_calfem) --> roughly(0.0, atol =1e-13)
-    @fact norm(et - et_calfem[[1 ,3, 2, 4], :]) / norm(et_calfem) --> roughly(0.0, atol=1e-13)
+    @fact norm(es - es_calfem[[1 ,3, 2, 4], :]') / norm(es_calfem) --> roughly(0.0, atol =1e-13)
+    @fact norm(et - et_calfem[[1 ,3, 2, 4], :]') / norm(et_calfem) --> roughly(0.0, atol=1e-13)
 end
 
 
@@ -448,8 +448,8 @@ context("flw2ts") do
     es_calfem = [-2.8 -6.4;]
     et_calfem = [0.8 1.0;]
 
-    @fact norm(es - es_calfem) / norm(es_calfem) --> roughly(0.0, atol =1e-13)
-    @fact norm(et - et_calfem) / norm(et_calfem) --> roughly(0.0, atol=1e-13)
+    @fact norm(es - es_calfem') / norm(es_calfem) --> roughly(0.0, atol =1e-13)
+    @fact norm(et - et_calfem') / norm(et_calfem) --> roughly(0.0, atol=1e-13)
 end
 
 
@@ -498,8 +498,8 @@ context("flw3i8s") do
     -0.781769647374687   5.905082103747760   2.078287062219387;
     -0.666357396405506   4.994845707601153   3.209293306780562]
 
-    @fact norm(es - es_calfem[[1,5,4,8,2,6,3,7], :]) / norm(es_calfem) --> roughly(0.0, atol =1e-13)
-    @fact norm(et - et_calfem[[1,5,4,8,2,6,3,7], :]) / norm(et_calfem) --> roughly(0.0, atol=1e-13)
+    @fact norm(es - es_calfem[[1,5,4,8,2,6,3,7], :]') / norm(es_calfem) --> roughly(0.0, atol =1e-13)
+    @fact norm(et - et_calfem[[1,5,4,8,2,6,3,7], :]') / norm(et_calfem) --> roughly(0.0, atol=1e-13)
 end
 
 

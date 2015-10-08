@@ -125,9 +125,9 @@ function gen_s_body(ele)
         qr = get_gaussrule($(ele.shape), int_order)
 
         n_gps = length(qr.points)
-        FLUXES = zeros(n_gps, fluxlen)
-        CONJS = zeros(n_gps, fluxlen)
-        points = zeros(n_gps, ndim)
+        FLUXES = zeros(fluxlen, n_gps)
+        CONJS = zeros(fluxlen, n_gps)
+        points = zeros(ndim, n_gps)
 
         for (i, ξ) in enumerate(qr.points)
             evaluate_N!($(ele.shape_funcs), N, ξ)
@@ -141,9 +141,9 @@ function gen_s_body(ele)
             $(ele.flux_kernel())
             ##############################
 
-            FLUXES[i, :] = FLUX_KERNEL
-            CONJS[i, :] = CONJ_KERNEL
-            points[i, :] = x' * N
+            FLUXES[:, i] = FLUX_KERNEL
+            CONJS[:, i] = CONJ_KERNEL
+            points[:, i] = x' * N
         end
         return FLUXES, CONJS, points
     end
@@ -199,7 +199,7 @@ function gen_f_body(ele)
         # elements reference shape
         qr = get_gaussrule($(ele.shape), int_order)
 
-        if size(σs, 1) != length(qr.points)
+        if size(σs, 2) != length(qr.points)
             throw(ArgumentError("must use same integration rule to compute stresses and internal forces"))
         end
 
@@ -210,7 +210,7 @@ function gen_f_body(ele)
             Jinv = inv_spec(J)
             @into! dNdx = Jinv * dNdξ
             dV = det_spec(J) * w
-            σ = vec(σs[i, :])
+            σ = vec(σs[:, i])
 
             ##############################
             # Call the elements flux kernel
