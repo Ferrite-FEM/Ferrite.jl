@@ -23,7 +23,7 @@ end
 
 Assembles the element matrix `Ke` into `a`.
 """
-function assemble(edof, a::Assembler, Ke::Matrix)
+function assemble(edof::Vector, a::Assembler, Ke::Matrix)
     for ele in size(edof, 1)
         append!(a.V, Ke[:])
         for dof1 in edof[2:end], dof2 in edof[2:end]

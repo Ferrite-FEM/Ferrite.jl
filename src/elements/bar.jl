@@ -3,7 +3,7 @@
 
 Computes the element stiffness matrix `Ke` for a 2D bar element.
 """
-function bar2e(ex::VecOrMat, ey::VecOrMat, elem_prop::VecOrMat)
+function bar2e(ex::Vector, ey::Vector, elem_prop::Vector)
 
     # Local element stiffness
     E = elem_prop[1];  A = elem_prop[2]
@@ -32,7 +32,7 @@ end
 
 Computes the sectional force (normal force) `N` for a 2D bar element.
 """
-function bar2s(ex::VecOrMat, ey::VecOrMat, elem_prop::VecOrMat, el_disp::VecOrMat)
+function bar2s(ex::Vector, ey::Vector, elem_prop::Vector, el_disp::Vector)
 
     E = elem_prop[1];  A = elem_prop[2]
 
@@ -70,7 +70,7 @@ const __bar2g_c2 = Float64[0  0  0  0;
 Computes the element stiffness matrix `Ke` for a
 geometrically nonlinear 2D bar element.
 """
-function bar2g(ex::VecOrMat, ey::VecOrMat, elem_prop::VecOrMat, N::Number)
+function bar2g(ex::Vector, ey::Vector, elem_prop::Vector, N::Number)
 
     E = elem_prop[1];  A = elem_prop[2]
 

@@ -20,23 +20,24 @@ function eldraw2(ex::VecOrMat, ey::VecOrMat,
 
     plot_string = LTYPES[ltype] * LCOLORS[lcolor] * LMARKS[lmark]
 
-    nx = size(ex, 2)
-    ny = size(ey, 2)
-    center = [sum(ex, 2)/nx sum(ey, 2)/ny]
+    nx = size(ex, 1)
+    ny = size(ey, 1)
+
+    center = [sum(ex, 1)/nx; sum(ey, 1)/ny]
 
     # TODO can't we make this a bit nicer /JB
-    npoints = size(ex , 1)
+    npoints = size(ex , 2)
 
     if npoints == 2
       xs = ex
       ys = ey
     else
-      xs = [ex ex[:, 1]]'
-      ys = [ey ey[:, 1]]'
+      xs = [ex; ex[1, :]]
+      ys = [ey; ey[1, :]]
     end
     p = Winston.plot(xs, ys, plot_string)
     for el in elnum
-         Winston.text(center[el,1], center[el,2], string(el))
+         Winston.text(center[1, el], center[2, el], string(el))
     end
 
     return p
@@ -63,13 +64,13 @@ function eldisp2(ex::VecOrMat, ey::VecOrMat, ed::VecOrMat,
     plot_string = LTYPES[ltype] * LCOLORS[lcolor] * LMARKS[lmark]
 
     # TODO can't we make this a bit nicer /JB
-    npoints = size(ex,1)
+    npoints = size(ex, 2)
     if npoints == 2
-      xs = ex + sfac * ed[:, 1:2:end]
-      ys = ey + sfac * ed[:, 2:2:end]
+      xs = ex + sfac * ed[1:2:end, :]
+      ys = ey + sfac * ed[2:2:end, :]
     else
-      xs = [ex + sfac * ed[:, 1:2:end] ex[:,1] + sfac * ed[:,1]]'
-      ys = [ey + sfac * ed[:, 2:2:end] ey[:,1] + sfac * ed[:,2]]'
+      xs = [ex + sfac * ed[1:2:end, :]; ex[1, :] + sfac * ed[1, :]]
+      ys = [ey + sfac * ed[2:2:end, :]; ey[1, :] + sfac * ed[2, :]]
     end
     p = Winston.plot(xs, ys, plot_string)
 

@@ -50,7 +50,7 @@ context("plani4e") do
                  2 1
                  2 2
                  1 2
-                 0 2]
+                 0 2]'
 
         Dof = [1 2
                3 4
@@ -60,19 +60,19 @@ context("plani4e") do
                11 12
                13 14
                15 16
-               17 18]
+               17 18]'
 
         Edof = [1 1 2 3 4 5 6 7 8;
                 2 3 4 9 10 11 12 5 6;
                 3 5 6 11 12 13 14 15 16;
-                4 7 8 5 6 15 16 17 18]
+                4 7 8 5 6 15 16 17 18]'
 
         function get_coord(dof)
           node = div(dof+1, 2)
           if dof % 2 == 0
-              return Coord[node, 2]
+              return Coord[2, node]
           else
-              return Coord[node, 1]
+              return Coord[1, node]
           end
         end
 
@@ -83,18 +83,18 @@ context("plani4e") do
         for i in 1:size(bc, 1)
           dof = bc_dofs[i]
           node = div(dof+1, 2)
-          coord = Coord[node, :]
+          coord = Coord[:, node]
           bc[i, 1] = dof
           bc[i, 2] = ux * coord[1] + uy * coord[2]
         end
 
           a = start_assemble()
           D = hooke(2, 250e9, 0.3)
-          for e in 1:size(Edof, 1)
-            ex = [get_coord(i) for i in Edof[e, 2:2:end]]
-            ey = [get_coord(i) for i in Edof[e, 3:2:end]]
+          for e in 1:size(Edof, 2)
+            ex = [get_coord(i) for i in Edof[2:2:end, e]]
+            ey = [get_coord(i) for i in Edof[3:2:end, e]]
             Ke, _ = plani4e(ex, ey, [2, 1, 2], D)
-            assemble(Edof[e, :], a, Ke)
+            assemble(Edof[:, e], a, Ke)
           end
           K = end_assemble(a)
           a, _ = solveq(K, zeros(18), bc)
@@ -133,8 +133,8 @@ context("plani4s/f") do
 
 
     # correct for calfems order of gauss points
-    @fact norm(σ - σ_calfem[[4,2,3,1], :]) / norm(σ_calfem) --> roughly(0.0, atol=1e-14)
-    @fact norm(ε - ε_calfem[[4,2,3,1], :]) / norm(ε_calfem) --> roughly(0.0, atol=1e-14)
+    @fact norm(σ - σ_calfem[[4,2,3,1], :]') / norm(σ_calfem) --> roughly(0.0, atol=1e-14)
+    @fact norm(ε - ε_calfem[[4,2,3,1], :]') / norm(ε_calfem) --> roughly(0.0, atol=1e-14)
     @fact norm(intf - intf_calfem) / norm(intf_calfem) --> roughly(0.0, atol=1e-14)
 
 
@@ -175,8 +175,8 @@ context("plants/f") do
       7.010769230769229]
 
 
-    @fact norm(σ - σ_calfem) / norm(σ_calfem) --> roughly(0.0, atol=1e-14)
-    @fact norm(ε - ε_calfem) / norm(ε_calfem) --> roughly(0.0, atol=1e-14)
+    @fact norm(σ - σ_calfem') / norm(σ_calfem') --> roughly(0.0, atol=1e-14)
+    @fact norm(ε - ε_calfem') / norm(ε_calfem') --> roughly(0.0, atol=1e-14)
     @fact norm(intf - intf_calfem) / norm(intf_calfem) --> roughly(0.0, atol=1e-14)
 
 end
@@ -275,8 +275,8 @@ context("soli8s/f") do
   -1.958109485444647;
   -1.639108853140777]
 
-    @fact norm(σ - σ_calfem[[1,5,4,8,2,6,3,7], [1,2,3,6,5,4]]) / norm(σ_calfem) --> roughly(0.0, atol=1e-5)
-    @fact norm(ε - ε_calfem[[1,5,4,8,2,6,3,7], [1,2,3,6,5,4]]) / norm(ε_calfem) --> roughly(0.0, atol=1e-5)
+    @fact norm(σ - σ_calfem[[1,5,4,8,2,6,3,7], [1,2,3,6,5,4]]') / norm(σ_calfem) --> roughly(0.0, atol=1e-5)
+    @fact norm(ε - ε_calfem[[1,5,4,8,2,6,3,7], [1,2,3,6,5,4]]') / norm(ε_calfem) --> roughly(0.0, atol=1e-5)
     @fact norm(intf - intf_calfem) / norm(intf_calfem) --> roughly(0.0, atol=1e-14)
 end
 
@@ -347,8 +347,8 @@ context("plani8s/f") do
           -1.556915325616566]
 
 
-      @fact norm(σ - σ_calfem[[1,3, 2, 4], :]) / norm(σ_calfem) --> roughly(0.0, atol =1e-13)
-      @fact norm(ε - ε_calfem[[1,3, 2, 4], :]) / norm(ε_calfem) --> roughly(0.0, atol=1e-13)
+      @fact norm(σ - σ_calfem[[1,3, 2, 4], :]') / norm(σ_calfem) --> roughly(0.0, atol =1e-13)
+      @fact norm(ε - ε_calfem[[1,3, 2, 4], :]') / norm(ε_calfem) --> roughly(0.0, atol=1e-13)
       @fact norm(intf - intf_calfem) / norm(intf_calfem) --> roughly(0.0, atol=1e-14)
 end
 
@@ -381,8 +381,8 @@ context("flw2i4s") do
      -1.723760430703402   5.732050807568878;
      -1.261880215351701   3.422649730810373]
 
-      @fact norm(es - es_calfem[[4,2, 3, 1], :]) / norm(es_calfem) --> roughly(0.0, atol =1e-13)
-      @fact norm(et - et_calfem[[4,2, 3, 1], :]) / norm(et_calfem) --> roughly(0.0, atol=1e-13)
+      @fact norm(es - es_calfem[[4,2, 3, 1], :]') / norm(es_calfem) --> roughly(0.0, atol =1e-13)
+      @fact norm(et - et_calfem[[4,2, 3, 1], :]') / norm(et_calfem) --> roughly(0.0, atol=1e-13)
 end
 
 context("flw2i8e") do
@@ -421,8 +421,8 @@ context("flw2i8s") do
   -2.187219748188395   6.921119965694889;
    5.855440108225263   4.135429337120202]
 
-    @fact norm(es - es_calfem[[1 ,3, 2, 4], :]) / norm(es_calfem) --> roughly(0.0, atol =1e-13)
-    @fact norm(et - et_calfem[[1 ,3, 2, 4], :]) / norm(et_calfem) --> roughly(0.0, atol=1e-13)
+    @fact norm(es - es_calfem[[1 ,3, 2, 4], :]') / norm(es_calfem) --> roughly(0.0, atol =1e-13)
+    @fact norm(et - et_calfem[[1 ,3, 2, 4], :]') / norm(et_calfem) --> roughly(0.0, atol=1e-13)
 end
 
 
@@ -448,8 +448,8 @@ context("flw2ts") do
     es_calfem = [-2.8 -6.4;]
     et_calfem = [0.8 1.0;]
 
-    @fact norm(es - es_calfem) / norm(es_calfem) --> roughly(0.0, atol =1e-13)
-    @fact norm(et - et_calfem) / norm(et_calfem) --> roughly(0.0, atol=1e-13)
+    @fact norm(es - es_calfem') / norm(es_calfem) --> roughly(0.0, atol =1e-13)
+    @fact norm(et - et_calfem') / norm(et_calfem) --> roughly(0.0, atol=1e-13)
 end
 
 
@@ -498,18 +498,18 @@ context("flw3i8s") do
     -0.781769647374687   5.905082103747760   2.078287062219387;
     -0.666357396405506   4.994845707601153   3.209293306780562]
 
-    @fact norm(es - es_calfem[[1,5,4,8,2,6,3,7], :]) / norm(es_calfem) --> roughly(0.0, atol =1e-13)
-    @fact norm(et - et_calfem[[1,5,4,8,2,6,3,7], :]) / norm(et_calfem) --> roughly(0.0, atol=1e-13)
+    @fact norm(es - es_calfem[[1,5,4,8,2,6,3,7], :]') / norm(es_calfem) --> roughly(0.0, atol =1e-13)
+    @fact norm(et - et_calfem[[1,5,4,8,2,6,3,7], :]') / norm(et_calfem) --> roughly(0.0, atol=1e-13)
 end
 
 
 
 context("bar") do
     # From example 3.2 in the book Strukturmekanik
-    ex = [0.  1.6]; ey = [0. -1.2]
-    elem_prop = [200.e9 1.0e-3]
+    ex = [0.,  1.6]; ey = [0., -1.2]
+    elem_prop = [200.e9, 1.0e-3]
     Ke = bar2e(ex, ey, elem_prop)
-    ed = [0. 0. -0.3979 -1.1523]*1e-3
+    ed = [0., 0., -0.3979 ,-1.1523]*1e-3
     N = bar2s(ex, ey, elem_prop, ed)
     Ke_ref = [ 64  -48. -64  48
               -48   36   48 -36

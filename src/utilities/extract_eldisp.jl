@@ -7,13 +7,13 @@ number of dofs.
 """
 function extract(edof::VecOrMat, a::VecOrMat)
 
-    (nel, temp) = size(edof);
-    neldofs = temp - 1
+    neldofs, nel = size(edof);
+    neldofs -=  1
 
-    eldisp = zeros(nel, neldofs)
+    eldisp = zeros(neldofs, nel)
 
     for el = 1:nel
-        eldisp[el, :] = a[edof[el, 2:end]]
+        eldisp[:, el] = a[edof[2:end, el]]
     end
     return eldisp
 end
