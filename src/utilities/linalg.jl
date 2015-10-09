@@ -6,11 +6,12 @@
 
 # These methods fall back to the normal ones in case the matrix is not 2x2
 # or 3x3.
+inv_spec(J) = inv_spec!(similar(J), J)
 
-function inv_spec(J)
+function inv_spec!(Jinv, J)
     dim = chksquare(J)
+    @assert size(Jinv) == size(J)
     d = det_spec(J)
-    Jinv = zeros(dim, dim)
     if dim == 2
         @inbounds begin
             Jinv[1,1] =  J[2,2] / d
