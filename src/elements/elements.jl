@@ -34,6 +34,7 @@ function gen_ke_fe_body(ele)
         dNdx = zeros(ndim, nnodes)
         dNdξ = zeros(ndim, nnodes)
         J = zeros(ndim, ndim)
+        Jinv = similar(J)
         N = zeros(nnodes)
 
         # Create the element requested buffers
@@ -50,7 +51,7 @@ function gen_ke_fe_body(ele)
             evaluate_N!($(ele.shape_funcs), N, ξ)
             evaluate_dN!($(ele.shape_funcs), dNdξ, ξ)
             @into! J = dNdξ * x
-            Jinv = inv_spec(J)
+            inv_spec!(Jinv, J)
             @into! dNdx = Jinv * dNdξ
             dV = det_spec(J) * w
 
@@ -115,6 +116,7 @@ function gen_s_body(ele)
         dNdx = zeros(ndim, nnodes)
         dNdξ = zeros(ndim, nnodes)
         J = zeros(ndim, ndim)
+        Jinv = similar(J)
         N = zeros(nnodes)
 
         # Create the element requested buffers
@@ -133,7 +135,7 @@ function gen_s_body(ele)
             evaluate_N!($(ele.shape_funcs), N, ξ)
             evaluate_dN!($(ele.shape_funcs), dNdξ, ξ)
             @into! J = dNdξ * x
-            Jinv = inv_spec(J)
+            inv_spec!(Jinv, J)
             @into! dNdx = Jinv * dNdξ
 
             ##############################
@@ -190,6 +192,7 @@ function gen_f_body(ele)
         dNdx = zeros(ndim, nnodes)
         dNdξ = zeros(ndim, nnodes)
         J = zeros(ndim, ndim)
+        Jinv = similar(J)
         N = zeros(nnodes)
 
         # Create the element requested buffers
@@ -207,7 +210,7 @@ function gen_f_body(ele)
             evaluate_N!($(ele.shape_funcs), N, ξ)
             evaluate_dN!($(ele.shape_funcs), dNdξ, ξ)
             @into! J = dNdξ * x
-            Jinv = inv_spec(J)
+            inv_spec!(Jinv, J)
             @into! dNdx = Jinv * dNdξ
             dV = det_spec(J) * w
             σ = vec(σs[:, i])
