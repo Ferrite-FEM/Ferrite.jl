@@ -27,8 +27,8 @@ function assemble(edof::Vector, a::Assembler, Ke::Matrix)
     for ele in size(edof, 1)
         append!(a.V, Ke[:])
         for dof1 in edof[2:end], dof2 in edof[2:end]
-            push!(a.I, dof1)
-            push!(a.J, dof2)
+            push!(a.J, dof1)
+            push!(a.I, dof2)
         end
     end
 end
