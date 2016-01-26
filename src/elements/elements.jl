@@ -20,7 +20,7 @@ function gen_ke_fe_body(ele)
     quote
         ndofs = $(ele.nnodes) * $(ele.dofs_per_node)
         nnodes = $(ele.nnodes)
-        ndim = $(get_ndim(ele))
+        ndim = $(n_dim(ele))
 
         # TODO; need to fix the eq size for different problems
         #length(eq) == ndim || throw(ArgumentError("length of eq must be $ndim"))
@@ -48,8 +48,8 @@ function gen_ke_fe_body(ele)
         qr = get_gaussrule($(ele.shape), int_order)
 
         for (ξ, w) in zip(qr.points, qr.weights)
-            evaluate_N!($(ele.shape_funcs), N, ξ)
-            evaluate_dN!($(ele.shape_funcs), dNdξ, ξ)
+            value!($(ele.function_space), N, ξ)
+            derivative!($(ele.function_space), dNdξ, ξ)
             @into! J = dNdξ * x
             inv_spec!(Jinv, J)
             @into! dNdx = Jinv * dNdξ
@@ -78,15 +78,15 @@ end
 for fem in [S_S_1, S_S_2, S_T_1, S_C_1, # Solid elements
             H_S_1, H_S_2, H_T_1, H_C_1]
     f_name = Symbol(string(fem.name) * "e")
-    if get_ndim(fem) == 2
+    if n_dim(fem) == 2
         @eval function $(f_name)(x::Matrix, D::Matrix, t::Number,
-                                  eq::VecOrMat=zeros($(get_ndim(fem))),
+                                  eq::VecOrMat=zeros($(n_dim(fem))),
                                   int_order::Int=$(fem.default_intorder))
             $(gen_ke_fe_body(fem))
         end
-    elseif get_ndim(fem) == 3
+    elseif n_dim(fem) == 3
         @eval function $(f_name)(x::Matrix, D::Matrix,
-                                  eq::VecOrMat=zeros($(get_ndim(fem))),
+                                  eq::VecOrMat=zeros($(n_dim(fem))),
                                   int_order::Int=$(fem.default_intorder))
             $(gen_ke_fe_body(fem))
         end
@@ -104,8 +104,8 @@ function gen_s_body(ele)
     quote
         ndofs = $(ele.nnodes) * $(ele.dofs_per_node)
         nnodes = $(ele.nnodes)
-        ndim = $(get_ndim(ele))
-        fluxlen = $(get_nflux(ele))
+        ndim = $(n_dim(ele))
+        fluxlen = $(n_flux(ele))
 
         #length(eq) == ndim || throw(ArgumentError("length of eq must be $ndim"))
         int_order > 0 || throw(ArgumentError("integration order must be > 0"))
@@ -132,8 +132,8 @@ function gen_s_body(ele)
         points = zeros(ndim, n_gps)
 
         for (i, ξ) in enumerate(qr.points)
-            evaluate_N!($(ele.shape_funcs), N, ξ)
-            evaluate_dN!($(ele.shape_funcs), dNdξ, ξ)
+            value!($(ele.function_space), N, ξ)
+            derivative!($(ele.function_space), dNdξ, ξ)
             @into! J = dNdξ * x
             inv_spec!(Jinv, J)
             @into! dNdx = Jinv * dNdξ
@@ -154,13 +154,13 @@ end
 for fem in [S_S_1, S_S_2, S_T_1, S_C_1, # Solid elements
             H_S_1, H_S_2, H_T_1, H_C_1]
     f_name = Symbol(string(fem.name) * "s")
-    if get_ndim(fem) == 2
+    if n_dim(fem) == 2
         @eval function $(f_name)(x::Matrix, D::Matrix, t::Number,
                                  ed::VecOrMat,
                                  int_order::Int=$(fem.default_intorder))
             $(gen_s_body(fem))
         end
-    elseif get_ndim(fem) == 3
+    elseif n_dim(fem) == 3
         @eval function $(f_name)(x::Matrix, D::Matrix,
                                  ed::VecOrMat,
                                  int_order::Int=$(fem.default_intorder))
@@ -180,8 +180,8 @@ function gen_f_body(ele)
     quote
         ndofs = $(ele.nnodes) * $(ele.dofs_per_node)
         nnodes = $(ele.nnodes)
-        ndim = $(get_ndim(ele))
-        fluxlen = $(get_nflux(ele))
+        ndim = $(n_dim(ele))
+        fluxlen = $(n_flux(ele))
 
         #length(eq) == ndim || throw(ArgumentError("length of eq must be $ndim"))
         int_order > 0 || throw(ArgumentError("integration order must be > 0"))
@@ -207,8 +207,8 @@ function gen_f_body(ele)
         end
 
         for (i, (ξ, w)) in enumerate(zip(qr.points, qr.weights))
-            evaluate_N!($(ele.shape_funcs), N, ξ)
-            evaluate_dN!($(ele.shape_funcs), dNdξ, ξ)
+            value!($(ele.function_space), N, ξ)
+            derivative!($(ele.function_space), dNdξ, ξ)
             @into! J = dNdξ * x
             inv_spec!(Jinv, J)
             @into! dNdx = Jinv * dNdξ
@@ -229,12 +229,12 @@ end
 
 for fem in [S_S_1, S_S_2, S_T_1, S_C_1] # Only for solid elements
     f_name = Symbol(string(fem.name) * "f")
-    if get_ndim(fem) == 2
+    if n_dim(fem) == 2
         @eval function $(f_name)(x::Matrix, t::Number, σs::VecOrMat,
                                  int_order::Int=$(fem.default_intorder))
             $(gen_f_body(fem))
         end
-    elseif get_ndim(fem) == 3
+    elseif n_dim(fem) == 3
         @eval function $(f_name)(x::Matrix, σs::VecOrMat,
                                  int_order::Int=$(fem.default_intorder))
             $(gen_f_body(fem))

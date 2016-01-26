@@ -28,7 +28,7 @@ export solve_eq_sys, solveq
 export extract, coordxtr, topologyxtr
 export statcon
 export start_assemble, assemble, assem, end_assemble, eldraw2, eldisp2, gen_quad_mesh
-include("types.jl")
+
 include("materials/hooke.jl")
 include("utilities/utilities.jl")
 include("elements/elements.jl")
