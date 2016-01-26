@@ -35,3 +35,22 @@ function solveq(K::AbstractMatrix, f::Array, bc::Matrix, symmetric=false)
 
     return a, f_b
 end
+
+
+function solveq(K::AbstractMatrix, f::Array, symmetric=false)
+    n = chksquare(K)
+    nrf = length(f)
+    if n != nrf
+        throw(DimensionMismatch("Mismatch between number of rows in the stiffness matrix and load vector (#rowsK=$n #rowsf=$nrf)"))
+    end
+
+    # Solve equation system and create full solution vector a
+    if symmetric
+        K_fact = cholfact(Symmetric(K, :U))
+        a = K_fact \ f
+    else
+        a = K \ f
+    end
+
+    return a
+end
