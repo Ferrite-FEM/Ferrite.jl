@@ -15,7 +15,7 @@ type Lagrange{Order, Shape} <: FunctionSpace end
 # Lagrange 1 Square
 ###################
 
-n_nodes(::Lagrange{1, Square}) = 4
+n_basefunctions(::Lagrange{1, Square}) = 4
 
 """
 Computes the shape functions at a point for
@@ -74,7 +74,7 @@ end
 # Lagrange 1 Triangle
 #####################
 
-n_nodes(::Lagrange{1, Triangle}) = 3
+n_basefunctions(::Lagrange{1, Triangle}) = 3
 
 """
 Computes the shape functions at a point for
@@ -126,7 +126,7 @@ end
 # Lagrange 1 Cube
 #################
 
-n_nodes(::Lagrange{1, Cube}) = 8
+n_basefunctions(::Lagrange{1, Cube}) = 8
 
 """
 Computes the shape functions at a point for
@@ -214,7 +214,7 @@ type Serendipity{Order, Shape} <: FunctionSpace end
 @inline ref_shape{Order, Shape}(fs::Serendipity{Order, Shape}) = Shape()
 @inline order{Order, Shape}(fs::Serendipity{Order, Shape}) = Order
 
-n_nodes(::Serendipity{2, Square}) = 8
+n_basefunctions(::Serendipity{2, Square}) = 8
 
 """
 Computes the shape functions at a point for
