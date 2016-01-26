@@ -160,7 +160,7 @@ end
 Computes the derivatives of the shape functions at a point for
 a quadratic hexaedric element
 """
-derivative(fs::Lagrange{1, Cube}, ξ::Vector) = derivative!(fs, zeros(eltype(ξ), 3, 8))
+derivative(fs::Lagrange{1, Cube}, ξ::Vector) = derivative!(fs, zeros(eltype(ξ), 3, 8), ξ)
 
 function derivative!(fs::Lagrange{1, Cube}, dN::Matrix, ξ::Vector)
 

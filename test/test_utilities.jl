@@ -1,4 +1,6 @@
-import JuAFEM: det_spec, inv_spec
+import JuAFEM: det_spec, inv_spec, Square, Triangle, Cube, Serendipity, Lagrange
+
+using ForwardDiff
 
 facts("Utility testing") do
 
@@ -150,5 +152,18 @@ context("coordxtr + topologyxtr") do
                     1 2 4]'
 end
 
+context("function space derivatives") do
+
+    for functionspace in (Lagrange{1, Square}(),
+                          Lagrange{1, Triangle}(),
+                          Lagrange{1, Cube}(),
+                          Serendipity{2, Square}())
+        x = rand(JuAFEM.n_dim(functionspace))
+        f = (x) -> JuAFEM.value(functionspace, x)
+        @fact ForwardDiff.jacobian(f, x)' --> roughly(JuAFEM.derivative(functionspace, x))
+    end
+
+
+end
 
 end
