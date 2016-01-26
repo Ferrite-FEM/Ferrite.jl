@@ -24,11 +24,12 @@ end
 Assembles the element matrix `Ke` into `a`.
 """
 function assemble(edof::Vector, a::Assembler, Ke::Matrix)
+    n_dofs = length(edof) - 1 # -1 for element index
     for ele in size(edof, 1)
         append!(a.V, Ke[:])
-        for dof1 in edof[2:end], dof2 in edof[2:end]
-            push!(a.J, dof1)
-            push!(a.I, dof2)
+        for dof1 in 1:n_dofs, dof2 in 1:n_dofs
+            push!(a.J, edof[dof1 + 1])
+            push!(a.I, edof[dof2 + 1])
         end
     end
 end
