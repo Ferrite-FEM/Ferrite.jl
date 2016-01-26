@@ -1,7 +1,9 @@
+abstract QuadratureRule
+
 """
 A type that perform Gauss integration
 """
-type GaussQuadratureRule
+type GaussQuadratureRule <: QuadratureRule
     weights::Vector{Float64}
     points::Vector{Vector{Float64}}
 end

@@ -1,5 +1,7 @@
+include("geometry_types.jl")
+include("function_spaces.jl")
+include("finite_element.jl")
 include("quadrature.jl")
-include("shape_functions.jl")
 include("linalg.jl")
 include("assembler.jl")
 include("assemble.jl")
