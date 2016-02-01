@@ -156,6 +156,7 @@ context("function space derivatives") do
 
     for functionspace in (Lagrange{1, Square}(),
                           Lagrange{1, Triangle}(),
+                          Lagrange{2, Triangle}(),
                           Lagrange{1, Cube}(),
                           Serendipity{2, Square}())
         x = rand(JuAFEM.n_dim(functionspace))
