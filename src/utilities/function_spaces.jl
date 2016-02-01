@@ -122,6 +122,69 @@ function derivative!(::Lagrange{1, Triangle}, dN::Matrix, ξ::Vector)
     return dN
 end
 
+"""
+Computes the shape functions at a point for
+a quadratic triangle element
+"""
+value(fs::Lagrange{2, Triangle}, ξ::Vector) = value!(fs, zeros(eltype(ξ), 6), ξ)
+
+function value!(::Lagrange{2, Triangle}, N::Vector, ξ::Vector)
+    length(N) == 6 || throw(ArgumentError("N must have length 6"))
+    length(ξ) == 2 || throw(ArgumentError("ξ must have length 2"))
+
+    @inbounds begin
+        ξ_x = ξ[1]
+        ξ_y = ξ[2]
+
+        γ = 1 - ξ_x - ξ_y
+
+        N[1] = ξ_x * (2ξ_x - 1)
+        N[2] = ξ_y * (2ξ_y - 1)
+        N[3] = γ * (2γ - 1)
+        N[4] = 4ξ_x * ξ_y
+        N[5] = 4ξ_y * γ
+        N[6] = 4ξ_x * γ
+    end
+
+    return N
+end
+
+"""
+Computes the derivatives of the shape functions at a point for
+a quadratic triangle element
+"""
+derivative(fs::Lagrange{2, Triangle}, ξ::Vector) = derivative!(fs, zeros(eltype(ξ), 2, 6), ξ)
+
+function derivative!(::Lagrange{2, Triangle}, dN::Matrix, ξ::Vector)
+    size(dN) == (2, 6) || throw(ArgumentError("dN must have size (2, 6)"))
+    length(ξ) == 2 || throw(ArgumentError("ξ must have length 2"))
+
+    @inbounds begin
+
+        ξ_x = ξ[1]
+        ξ_y = ξ[2]
+
+        γ = 1 - ξ_x - ξ_y
+
+        dN[1, 1] = 4ξ_x - 1
+        dN[1, 2] = 0
+        dN[1, 3] = -4γ + 1
+        dN[1, 4] = 4ξ_y
+        dN[1, 5] = -4ξ_y
+        dN[1, 6] = 4(γ - ξ_x)
+
+        dN[2, 1] = 0
+        dN[2, 2] = 4ξ_y - 1
+        dN[2, 3] = -4γ + 1
+        dN[2, 4] = 4ξ_x
+        dN[2, 5] = 4(γ - ξ_y)
+        dN[2, 6] = -4ξ_x
+    end
+
+    return dN
+end
+
+
 #################
 # Lagrange 1 Cube
 #################
