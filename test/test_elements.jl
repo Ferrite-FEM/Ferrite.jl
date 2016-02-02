@@ -62,10 +62,10 @@ context("plani4e") do
                15 16
                17 18]'
 
-        Edof = [1 1 2 3 4 5 6 7 8;
-                2 3 4 9 10 11 12 5 6;
-                3 5 6 11 12 13 14 15 16;
-                4 7 8 5 6 15 16 17 18]'
+        Edof = [1 2 3 4 5 6 7 8;
+                3 4 9 10 11 12 5 6;
+                5 6 11 12 13 14 15 16;
+                7 8 5 6 15 16 17 18]'
 
         function get_coord(dof)
           node = div(dof+1, 2)
@@ -91,8 +91,8 @@ context("plani4e") do
           a = start_assemble()
           D = hooke(2, 250e9, 0.3)
           for e in 1:size(Edof, 2)
-            ex = [get_coord(i) for i in Edof[2:2:end, e]]
-            ey = [get_coord(i) for i in Edof[3:2:end, e]]
+            ex = [get_coord(i) for i in Edof[1:2:end, e]]
+            ey = [get_coord(i) for i in Edof[2:2:end, e]]
             Ke, _ = plani4e(ex, ey, [2, 1, 2], D)
             assemble(Edof[:, e], a, Ke)
           end
