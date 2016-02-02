@@ -50,9 +50,9 @@ function gen_quad_mesh(p1::Array, p2::Array, nelx::Int, nely::Int, ndofs::Int)
   dofs = reshape( collect(1:(nelx+1)*(nely+1)*ndofs), ndofs,(nelx+1)*(nely+1))';
 
   # Element degrees of freedom
-  Edof = zeros(Int, nelx*nely, 1+4*ndofs)
+  Edof = zeros(Int, nelx*nely, 4*ndofs)
   for el = 1:nely*nelx
-    Edof[el,:] = [el dofs[Elcon[el,1],:] dofs[Elcon[el,2],:] dofs[Elcon[el,3],:] dofs[Elcon[el,4],:] ]
+    Edof[el,:] = [dofs[Elcon[el,1],:] dofs[Elcon[el,2],:] dofs[Elcon[el,3],:] dofs[Elcon[el,4],:] ]
   end
 
 

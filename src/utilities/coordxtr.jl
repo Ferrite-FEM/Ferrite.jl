@@ -10,7 +10,6 @@ function coordxtr(Edof,Coord,Dof,nen)
     # TODO: Input checks
 
     dofsperele, nel = size(Edof)
-    dofsperele -= 1 # Compensate for ele index
     ndim, nnodes = size(Coord)
     nend = div(dofsperele, nen)
 
@@ -21,7 +20,7 @@ function coordxtr(Edof,Coord,Dof,nen)
     for i = 1:nel
         nodnum = zeros(Int, nen)
         for j = 1:nen
-            ele_dof =  Edof[(j-1)*nend + 2 : j*nend + 1, i]
+            ele_dof =  Edof[(j-1)*nend + 1 : j*nend, i]
              for k = 1:nnodes
                 s = zero(eltype(Edof))
                 for l in 1:size(Dof, 1)
@@ -57,7 +56,6 @@ function topologyxtr(Edof,Coord,Dof,nen)
     # TODO: Input checks
 
     dofsperele, nel = size(Edof)
-    dofsperele -= 1 # Compensate for ele index
     ndim, nnodes = size(Coord)
     nend = div(dofsperele, nen)
 
@@ -66,7 +64,7 @@ function topologyxtr(Edof,Coord,Dof,nen)
     for i = 1:nel
         nodnum = zeros(Int, nen)
         for j = 1:nen
-            ele_dof =  Edof[(j-1)*nend + 2 : j*nend + 1, i]
+            ele_dof =  Edof[(j-1)*nend + 1 : j*nend, i]
              for k = 1:nnodes
                 s = zero(eltype(Edof))
                 for l in 1:size(Dof, 1)
