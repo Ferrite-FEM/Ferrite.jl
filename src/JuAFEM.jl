@@ -30,6 +30,9 @@ export solve_eq_sys, solveq
 export extract, coordxtr, topologyxtr
 export statcon
 export start_assemble, assemble, assem, end_assemble, eldraw2, eldisp2, gen_quad_mesh
+export FEValues, reinit!, shape_value, shape_derivative, detJdV
+export Lagrange, Serenipity
+export get_gaussrule
 
 include("materials/hooke.jl")
 include("utilities/utilities.jl")

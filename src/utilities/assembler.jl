@@ -2,9 +2,20 @@ type Assembler
     I::Vector{Int}
     J::Vector{Int}
     V::Vector{Float64}
-    n::Int
+    constrained_dofs_added::Set{Int}
 end
-Assembler(N) = Assembler(Int[], Int[], Float64[], N)
+
+
+function Assembler(N)
+    I = Int[]
+    J = Int[]
+    V = Float64[]
+    sizehint!(I, N)
+    sizehint!(J, N)
+    sizehint!(V, N)
+
+    Assembler(I, J, V, Set{Int}())
+end
 
 """
     start_assemble([N=0]) -> Assembler
@@ -41,9 +52,5 @@ Finalizes an assembly. Returns a sparse matrix with the
 assembled values.
 """
 function end_assemble(a::Assembler)
-    if a.n == 0
-        return sparse(a.I, a.J, a.V)
-    else
-        return sparse(a.I, a.J, a.V, a.n, a.n)
-    end
+    return sparse(a.I, a.J, a.V)
 end
