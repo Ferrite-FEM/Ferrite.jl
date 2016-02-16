@@ -41,7 +41,7 @@ end
 Computes the derivatives of the shape functions at a point for
 a linear line element
 """
-derivative(fs::Lagrange{1, Line}, ξ::Vector) = derivative!(fs, zeros(eltype(ξ), 2), ξ)
+derivative(fs::Lagrange{1, Line}, ξ::Vector) = derivative!(fs, zeros(eltype(ξ), 1, 2), ξ)
 
 function derivative!(::Lagrange{1, Line}, dN::Matrix, ξ::Vector)
     size(dN) == (1,2) || throw(ArgumentError("dN must have size (1,2)"))
@@ -50,8 +50,8 @@ function derivative!(::Lagrange{1, Line}, dN::Matrix, ξ::Vector)
     @inbounds begin
         ξ_x = ξ[1]
 
-        dN[1] = -0.5
-        dN[2] =  0.5
+        dN[1,1] = -0.5
+        dN[1,2] =  0.5
     end
 
     return dN
@@ -88,7 +88,7 @@ end
 Computes the derivatives of the shape functions at a point for
 a quadratic line element
 """
-derivative(fs::Lagrange{2, Line}, ξ::Vector) = derivative!(fs, zeros(eltype(ξ), 3), ξ)
+derivative(fs::Lagrange{2, Line}, ξ::Vector) = derivative!(fs, zeros(eltype(ξ), 1, 3), ξ)
 
 function derivative!(::Lagrange{2, Line}, dN::Matrix, ξ::Vector)
     size(dN) == (1,3) || throw(ArgumentError("dN must have size (1,3)"))
@@ -97,9 +97,9 @@ function derivative!(::Lagrange{2, Line}, dN::Matrix, ξ::Vector)
     @inbounds begin
         ξ_x = ξ[1]
 
-        dN[1] = ξ_x - 0.5
-        dN[2] = -2 * ξ_x
-        dN[3] = ξ_x + 0.5
+        dN[1,1] = ξ_x - 0.5
+        dN[1,2] = -2 * ξ_x
+        dN[1,3] = ξ_x + 0.5
     end
 
     return dN
