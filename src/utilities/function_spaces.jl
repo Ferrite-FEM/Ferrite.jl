@@ -42,7 +42,6 @@ derivative(fs::Lagrange{1, Line}, ξ::Real) = derivative!(fs, zeros(eltype(ξ), 
 
 function derivative!(::Lagrange{1, Line}, dN::Matrix, ξ::Real)
     size(dN) == (2,) || throw(ArgumentError("dN must have size (2,)"))
-    #length(ξ) == 2 || throw(ArgumentError("ξ must have length 2"))
 
     @inbounds begin
         dN[1] = -0.5
@@ -84,7 +83,6 @@ derivative(fs::Lagrange{2, Line}, ξ::Real) = derivative!(fs, zeros(eltype(ξ), 
 
 function derivative!(::Lagrange{2, Line}, dN::Matrix, ξ::Real)
     size(dN) == (3,) || throw(ArgumentError("dN must have size (3,)"))
-    #length(ξ) == 2 || throw(ArgumentError("ξ must have length 2"))
 
     @inbounds begin
         dN[1] = ξ - 0.5

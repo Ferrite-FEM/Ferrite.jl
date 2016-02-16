@@ -25,6 +25,7 @@ function integrate(qr::GaussQuadratureRule, f)
     return I
 end
 
+get_gaussrule(::Line, order::Int) = get_linerule(order)
 get_gaussrule(::Triangle, order::Int) = get_trirule(order)
 get_gaussrule(::Square, order::Int) = get_quadrule(order)
 get_gaussrule(::Cube, order::Int) = get_cuberule(order)
@@ -81,6 +82,27 @@ function get_quadrule(order::Int)
     end
 end
 
+"""
+Creates a `GaussQuadratureRule` that integrates
+functions on a line to the given order.
+"""
+function make_linerule(order::Int)
+    p, weights = gausslegendre(order)
+    points = Array(Vector{Float64}, order)
+    for i = 1:order
+        points[i] = [p[i]]
+    end
+    GaussQuadratureRule(weights, points)
+end
+
+const linerules = [make_linerule(i) for i = 1:5]
+function get_linerule(order::Int)
+    if order <= 5
+        return linerules[order]
+    else
+        return make_linerule(order)
+    end
+end
 
 include("gaussquad_tri_table.jl")
 
