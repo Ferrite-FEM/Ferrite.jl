@@ -21,14 +21,17 @@ n_basefunctions(::Lagrange{1, Line}) = 2
 Computes the shape functions at a point for
 a linear line element
 """
-value(fs::Lagrange{1, Line}, ξ::Real) = value!(fs, zeros(eltype(ξ), 2), ξ)
+value(fs::Lagrange{1, Line}, ξ::Vector) = value!(fs, zeros(eltype(ξ), 2), ξ)
 
-function value!(::Lagrange{1, Line}, N::Vector, ξ::Real)
+function value!(::Lagrange{1, Line}, N::Vector, ξ::Vector)
     length(N) == 2 || throw(ArgumentError("N must have length 2"))
+    length(ξ) == 1 || throw(ArgumentError("ξ must have length 1"))
 
     @inbounds begin
-        N[1] = (1 - ξ) * 0.5
-        N[2] = (1 + ξ) * 0.5
+        ξ_x = ξ[1]
+
+        N[1] = (1 - ξ_x) * 0.5
+        N[2] = (1 + ξ_x) * 0.5
     end
 
     return N
@@ -38,12 +41,15 @@ end
 Computes the derivatives of the shape functions at a point for
 a linear line element
 """
-derivative(fs::Lagrange{1, Line}, ξ::Real) = derivative!(fs, zeros(eltype(ξ), 2), ξ)
+derivative(fs::Lagrange{1, Line}, ξ::Vector) = derivative!(fs, zeros(eltype(ξ), 2), ξ)
 
-function derivative!(::Lagrange{1, Line}, dN::Matrix, ξ::Real)
+function derivative!(::Lagrange{1, Line}, dN::Matrix, ξ::Vector)
     size(dN) == (2,) || throw(ArgumentError("dN must have size (2,)"))
+    length(ξ) == 1 || throw(ArgumentError("ξ must have length 1"))
 
     @inbounds begin
+        ξ_x = ξ[1]
+        
         dN[1] = -0.5
         dN[2] =  0.5
     end
@@ -61,12 +67,15 @@ n_basefunctions(::Lagrange{2, Line}) = 3
 Computes the shape functions at a point for
 a quadratic line element
 """
-value(fs::Lagrange{2, Line}, ξ::Real) = value!(fs, zeros(eltype(ξ), 3), ξ)
+value(fs::Lagrange{2, Line}, ξ::Vector) = value!(fs, zeros(eltype(ξ), 3), ξ)
 
-function value!(::Lagrange{2, Line}, N::Vector, ξ::Real)
+function value!(::Lagrange{2, Line}, N::Vector, ξ::Vector)
     length(N) == 3 || throw(ArgumentError("N must have length 3"))
+    length(ξ) == 1 || throw(ArgumentError("ξ must have length 1"))
 
     @inbounds begin
+        ξ_x = ξ[1]
+
         N[1] = ξ * (ξ - 1) * 0.5
         N[2] = 1 - ξ^2
         N[3] = ξ * (ξ + 1) * 0.5
@@ -79,12 +88,15 @@ end
 Computes the derivatives of the shape functions at a point for
 a quadratic line element
 """
-derivative(fs::Lagrange{2, Line}, ξ::Real) = derivative!(fs, zeros(eltype(ξ), 3), ξ)
+derivative(fs::Lagrange{2, Line}, ξ::Vector) = derivative!(fs, zeros(eltype(ξ), 3), ξ)
 
-function derivative!(::Lagrange{2, Line}, dN::Matrix, ξ::Real)
+function derivative!(::Lagrange{2, Line}, dN::Matrix, ξ::Vector)
     size(dN) == (3,) || throw(ArgumentError("dN must have size (3,)"))
+    length(ξ) == 1 || throw(ArgumentError("ξ must have length 1"))
 
     @inbounds begin
+        ξ_x = ξ[1]
+
         dN[1] = ξ - 0.5
         dN[2] = -2 * ξ
         dN[3] = ξ + 0.5
