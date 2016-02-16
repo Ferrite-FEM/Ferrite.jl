@@ -154,7 +154,7 @@ context("coordxtr + topologyxtr") do
                     1 2 4]'
 end
 
-context("function space derivatives") do
+context("function space derivatives and sums") do
 
     for functionspace in (Lagrange{1, Line}(),
                           Lagrange{2, Line}(),
@@ -166,7 +166,7 @@ context("function space derivatives") do
         x = rand(JuAFEM.n_dim(functionspace))
         f = (x) -> JuAFEM.value(functionspace, x)
         @fact ForwardDiff.jacobian(f, x)' --> roughly(JuAFEM.derivative(functionspace, x))
-        @fact sum(JuAFEM.value(functionspace, x)) --> roughly(1)
+        @fact sum(JuAFEM.value(functionspace, x)) --> roughly(1.0)
     end
 
 
