@@ -41,6 +41,15 @@ function reinit!(fe_v::FEValues, x::Matrix)
     end
 end
 
+function reinit!(fe_v::FEValues, x::Matrix, quad_rule::QuadratureRule)
+    for (i, (ξ, w)) in enumerate(zip(quad_rule.points, quad_rule.weights))
+        @into! fe_v.J = fe_v.dNdξ[i] * x'
+        inv_spec!(fe_v.Jinv, fe_v.J)
+        @into! fe_v.dNdx[i] = fe_v.Jinv * fe_v.dNdξ[i]
+        fe_v.detJdV[i] = det_spec(fe_v.J) * w
+    end
+end
+
 """
 Gets the product between the determinant of the Jacobian and the quadrature point weight for a given quadrature point.
 """
