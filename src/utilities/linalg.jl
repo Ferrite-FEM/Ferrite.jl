@@ -34,7 +34,8 @@ function inv_spec!(Jinv, J)
             Jinv[3,3] =  (J[1,1]*J[2,2] - J[1,2]*J[2,1]) / d
         end
     else
-        return inv(J)
+        Jinv[:,:] = inv(J)
+        return Jinv
     end
     return Jinv
 end
