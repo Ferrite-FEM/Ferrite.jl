@@ -44,12 +44,12 @@ a linear line element
 derivative(fs::Lagrange{1, Line}, ξ::Vector) = derivative!(fs, zeros(eltype(ξ), 2), ξ)
 
 function derivative!(::Lagrange{1, Line}, dN::Matrix, ξ::Vector)
-    size(dN) == (2,) || throw(ArgumentError("dN must have size (2,)"))
+    size(dN) == (1,2) || throw(ArgumentError("dN must have size (1,2)"))
     length(ξ) == 1 || throw(ArgumentError("ξ must have length 1"))
 
     @inbounds begin
         ξ_x = ξ[1]
-        
+
         dN[1] = -0.5
         dN[2] =  0.5
     end
@@ -91,7 +91,7 @@ a quadratic line element
 derivative(fs::Lagrange{2, Line}, ξ::Vector) = derivative!(fs, zeros(eltype(ξ), 3), ξ)
 
 function derivative!(::Lagrange{2, Line}, dN::Matrix, ξ::Vector)
-    size(dN) == (3,) || throw(ArgumentError("dN must have size (3,)"))
+    size(dN) == (1,3) || throw(ArgumentError("dN must have size (1,3)"))
     length(ξ) == 1 || throw(ArgumentError("ξ must have length 1"))
 
     @inbounds begin
