@@ -76,9 +76,9 @@ function value!(::Lagrange{2, Line}, N::Vector, ξ::Vector)
     @inbounds begin
         ξ_x = ξ[1]
 
-        N[1] = ξ * (ξ - 1) * 0.5
-        N[2] = 1 - ξ^2
-        N[3] = ξ * (ξ + 1) * 0.5
+        N[1] = ξ_x * (ξ_x - 1) * 0.5
+        N[2] = 1 - ξ_x^2
+        N[3] = ξ_x * (ξ_x + 1) * 0.5
     end
 
     return N
@@ -97,9 +97,9 @@ function derivative!(::Lagrange{2, Line}, dN::Matrix, ξ::Vector)
     @inbounds begin
         ξ_x = ξ[1]
 
-        dN[1] = ξ - 0.5
-        dN[2] = -2 * ξ
-        dN[3] = ξ + 0.5
+        dN[1] = ξ_x - 0.5
+        dN[2] = -2 * ξ_x
+        dN[3] = ξ_x + 0.5
     end
 
     return dN
