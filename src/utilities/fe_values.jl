@@ -41,6 +41,9 @@ function reinit!(fe_v::FEValues, x::Matrix)
     end
 end
 
+get_quadrule(fe_v::FEValues) = fe_v.quad_rule
+get_functionspace(fe_v::FEValues) = fe_v.function_space
+
 """
 Gets the product between the determinant of the Jacobian and the quadrature point weight for a given quadrature point.
 """
@@ -70,9 +73,6 @@ Get the derivatives of the shape functions for a given quadrature point and base
 """
 Get the derivatives of the shape functions for a given quadrature point, base_function and component
 """
-@inline shape_derivative(fe_v::FEValues, base_func::Int, q_point::Int, component::Int) = fe_v.dNdx[q_point][component, base_func]
-
-
-#divergence!(fe_v::FEValues, u::)
+@inline shape_derivative(fe_v::FEValues, q_point::Int, base_func::Int, component::Int) = fe_v.dNdx[q_point][component, base_func]
 
 
