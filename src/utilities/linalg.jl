@@ -8,6 +8,14 @@
 # or 3x3.
 inv_spec(J) = inv_spec!(similar(J), J)
 
+function chksquare(J)
+    if size(J, 1) != size(J, 2)
+        throw(DimensionMismatch("Not a square matrix"))
+    else
+        return size(J,1)
+    end
+end
+
 function inv_spec!(Jinv, J)
     dim = chksquare(J)
     @assert size(Jinv) == size(J)
