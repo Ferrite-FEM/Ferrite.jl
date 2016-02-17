@@ -8,7 +8,7 @@ using Devectorize
 using Reexport
 @reexport using WriteVTK
 
-import Base: LinAlg.chksquare, show
+import Base: show
 import WriteVTK: vtk_grid
 
 # Elements
