@@ -11,6 +11,100 @@ type Lagrange{Order, Shape} <: FunctionSpace end
 @inline ref_shape{Order, Shape}(fs::Lagrange{Order, Shape}) = Shape()
 @inline order{Order, Shape}(fs::Lagrange{Order, Shape}) = Order
 
+#################
+# Lagrange 1 Line
+#################
+
+n_basefunctions(::Lagrange{1, Line}) = 2
+
+"""
+Computes the shape functions at a point for
+a linear line element
+"""
+value(fs::Lagrange{1, Line}, ξ::Vector) = value!(fs, zeros(eltype(ξ), 2), ξ)
+
+function value!(::Lagrange{1, Line}, N::Vector, ξ::Vector)
+    length(N) == 2 || throw(ArgumentError("N must have length 2"))
+    length(ξ) == 1 || throw(ArgumentError("ξ must have length 1"))
+
+    @inbounds begin
+        ξ_x = ξ[1]
+
+        N[1] = (1 - ξ_x) * 0.5
+        N[2] = (1 + ξ_x) * 0.5
+    end
+
+    return N
+end
+
+"""
+Computes the derivatives of the shape functions at a point for
+a linear line element
+"""
+derivative(fs::Lagrange{1, Line}, ξ::Vector) = derivative!(fs, zeros(eltype(ξ), 1, 2), ξ)
+
+function derivative!(::Lagrange{1, Line}, dN::Matrix, ξ::Vector)
+    size(dN) == (1,2) || throw(ArgumentError("dN must have size (1,2)"))
+    length(ξ) == 1 || throw(ArgumentError("ξ must have length 1"))
+
+    @inbounds begin
+        ξ_x = ξ[1]
+
+        dN[1,1] = -0.5
+        dN[1,2] =  0.5
+    end
+
+    return dN
+end
+
+#################
+# Lagrange 2 Line
+#################
+
+n_basefunctions(::Lagrange{2, Line}) = 3
+
+"""
+Computes the shape functions at a point for
+a quadratic line element
+"""
+value(fs::Lagrange{2, Line}, ξ::Vector) = value!(fs, zeros(eltype(ξ), 3), ξ)
+
+function value!(::Lagrange{2, Line}, N::Vector, ξ::Vector)
+    length(N) == 3 || throw(ArgumentError("N must have length 3"))
+    length(ξ) == 1 || throw(ArgumentError("ξ must have length 1"))
+
+    @inbounds begin
+        ξ_x = ξ[1]
+
+        N[1] = ξ_x * (ξ_x - 1) * 0.5
+        N[2] = 1 - ξ_x^2
+        N[3] = ξ_x * (ξ_x + 1) * 0.5
+    end
+
+    return N
+end
+
+"""
+Computes the derivatives of the shape functions at a point for
+a quadratic line element
+"""
+derivative(fs::Lagrange{2, Line}, ξ::Vector) = derivative!(fs, zeros(eltype(ξ), 1, 3), ξ)
+
+function derivative!(::Lagrange{2, Line}, dN::Matrix, ξ::Vector)
+    size(dN) == (1,3) || throw(ArgumentError("dN must have size (1,3)"))
+    length(ξ) == 1 || throw(ArgumentError("ξ must have length 1"))
+
+    @inbounds begin
+        ξ_x = ξ[1]
+
+        dN[1,1] = ξ_x - 0.5
+        dN[1,2] = -2 * ξ_x
+        dN[1,3] = ξ_x + 0.5
+    end
+
+    return dN
+end
+
 ###################
 # Lagrange 1 Square
 ###################

@@ -1,4 +1,4 @@
-import JuAFEM: det_spec, inv_spec, Square, Triangle, Cube, Serendipity, Lagrange
+import JuAFEM: det_spec, inv_spec, Line, Square, Triangle, Cube, Serendipity, Lagrange
 
 using ForwardDiff
 
@@ -154,9 +154,11 @@ context("coordxtr + topologyxtr") do
                     1 2 4]'
 end
 
-context("function space derivatives") do
+context("function space derivatives and sums") do
 
-    for functionspace in (Lagrange{1, Square}(),
+    for functionspace in (Lagrange{1, Line}(),
+                          Lagrange{2, Line}(),
+                          Lagrange{1, Square}(),
                           Lagrange{1, Triangle}(),
                           Lagrange{2, Triangle}(),
                           Lagrange{1, Cube}(),
@@ -164,6 +166,7 @@ context("function space derivatives") do
         x = rand(JuAFEM.n_dim(functionspace))
         f = (x) -> JuAFEM.value(functionspace, x)
         @fact ForwardDiff.jacobian(f, x)' --> roughly(JuAFEM.derivative(functionspace, x))
+        @fact sum(JuAFEM.value(functionspace, x)) --> roughly(1.0)
     end
 
 

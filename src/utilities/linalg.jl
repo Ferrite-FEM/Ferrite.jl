@@ -12,7 +12,11 @@ function inv_spec!(Jinv, J)
     dim = chksquare(J)
     @assert size(Jinv) == size(J)
     d = det_spec(J)
-    if dim == 2
+    if dim == 1
+        @inbounds begin
+            Jinv[1,1] = 1/J[1,1]
+        end
+    elseif dim == 2
         @inbounds begin
             Jinv[1,1] =  J[2,2] / d
             Jinv[1,2] = -J[1,2] / d
@@ -34,7 +38,8 @@ function inv_spec!(Jinv, J)
             Jinv[3,3] =  (J[1,1]*J[2,2] - J[1,2]*J[2,1]) / d
         end
     else
-        return inv(J)
+        Jinv[:,:] = inv(J)
+        return Jinv
     end
     return Jinv
 end
@@ -42,7 +47,9 @@ end
 function det_spec(J)
     dim = chksquare(J)
     d = 0.0
-    if dim == 2
+    if dim == 1
+        @inbounds d = J[1,1]
+    elseif dim == 2
         @inbounds d = J[1,1]*J[2,2] - J[1,2]*J[2,1]
     elseif dim == 3
         @inbounds begin
