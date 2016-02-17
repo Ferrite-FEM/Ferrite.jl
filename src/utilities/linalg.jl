@@ -16,7 +16,7 @@ function inv_spec!(Jinv, J)
         @inbounds begin
             Jinv[1,1] = 1/J[1,1]
         end
-    if dim == 2
+    elseif dim == 2
         @inbounds begin
             Jinv[1,1] =  J[2,2] / d
             Jinv[1,2] = -J[1,2] / d
@@ -49,7 +49,7 @@ function det_spec(J)
     d = 0.0
     if dim == 1
         @inbounds d = J[1,1]
-    if dim == 2
+    elseif dim == 2
         @inbounds d = J[1,1]*J[2,2] - J[1,2]*J[2,1]
     elseif dim == 3
         @inbounds begin

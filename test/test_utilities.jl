@@ -1,4 +1,4 @@
-import JuAFEM: det_spec, inv_spec, Square, Triangle, Cube, Serendipity, Lagrange
+import JuAFEM: det_spec, inv_spec, Line, Square, Triangle, Cube, Serendipity, Lagrange
 
 using ForwardDiff
 
