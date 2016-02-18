@@ -32,7 +32,6 @@ build_script:
       Pkg.add(\"InplaceOps\");
       Pkg.clone(pwd(), \"JuAFEM\");
       Pkg.add(\"Devectorize\");
-      Pkg.add(\"FactCheck\")
 
 test_script:
   - C:\projects\julia\bin\julia --check-bounds=yes -e "Pkg.test(\"JuAFEM\")"

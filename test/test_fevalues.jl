@@ -1,7 +1,7 @@
 using JuAFEM
 import JuAFEM: Square
 
-context("fevalues") do
+@testset "fevalues" begin
 
     x = [0.0 1.0 1.5 0.5;
          0.0 0.2 0.8 0.6]
@@ -69,6 +69,6 @@ context("fevalues") do
 
         Ke_2, _ = plani4e(ex, ey, [2, 2, 2], D)
 
-        @fact norm(Ke - Ke_2) / norm(Ke) --> roughly(0.0)
+        @test norm(Ke - Ke_2) / norm(Ke) ≈ 0.0
     end
 end

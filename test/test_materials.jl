@@ -1,18 +1,18 @@
-facts("Material testing") do
+@testset "Material testing" begin
 
-context("Hooke") do
+@testset "Hooke" begin
     # Tested with CALFEM
     D_pstress =    [2.197802197802198   0.659340659340659                   0;
                    0.659340659340659    2.197802197802198                    0;
                    0                    0                   0.769230769230769]
-    @fact hooke(1, 2, 0.3) --> roughly(D_pstress)
+    @test hooke(1, 2, 0.3) ≈ D_pstress
 
     D_pstrain_axi =    [2.692307692307692   1.153846153846154   1.153846153846154                   0;
                         1.153846153846154   2.692307692307692   1.153846153846154                   0;
                         1.153846153846154   1.153846153846154   2.692307692307692                   0;
                                         0                   0                   0   0.769230769230769]
-    @fact hooke(2, 2, 0.3) --> roughly(D_pstrain_axi)
-    @fact hooke(3, 2, 0.3) --> roughly(D_pstrain_axi)
+    @test hooke(2, 2, 0.3) ≈ D_pstrain_axi
+    @test hooke(3, 2, 0.3) ≈ D_pstrain_axi
 
     D_3d =
   [2.692307692307692   1.153846153846154   1.153846153846154                   0                   0                   0;
@@ -21,7 +21,7 @@ context("Hooke") do
                    0                   0                   0   0.769230769230769                   0                   0;
                    0                   0                   0                   0   0.769230769230769                   0;
                    0                   0                   0                   0                   0   0.769230769230769]
-    @fact hooke(4, 2, 0.3) --> roughly(D_3d)
+    @test hooke(4, 2, 0.3) ≈ D_3d
 end
 
 end
