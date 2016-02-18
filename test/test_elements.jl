@@ -1,11 +1,11 @@
-facts("Element testing") do
+@testset "Element testing" begin
 
-context("spring") do
-    @fact spring1e(3.0) --> [3.0 -3.0; -3.0 3.0]
-    @fact spring1s(3.0, [3.0, 1.0]) --> 3.0 * (1.0 - 3.0)
+@testset "spring" begin
+    @test spring1e(3.0) == [3.0 -3.0; -3.0 3.0]
+    @test spring1s(3.0, [3.0, 1.0]) == 3.0 * (1.0 - 3.0)
 end
 
-context("plani4e") do
+@testset "plani4e" begin
     K, f = plani4e([0, 1, 1.5, 0.5], [0.0, 0.2, 0.8, 0.6], [2, 2, 2], hooke(2, 210e9, 0.3), [1.0, 2.5])
 
     K_calfem =
@@ -28,9 +28,8 @@ context("plani4e") do
    0.250;
    0.625]
 
-    @fact norm(K - K_calfem) / norm(K) --> roughly(0.0, atol=1e-15)
-    @fact norm(f - f_calfem) / norm(f) --> roughly(0.0, atol=1e-15)
-
+    @test norm(K - K_calfem) / norm(K) < 1e-15
+    @test norm(f - f_calfem) / norm(f) < 1e-15
 
     # Patch test the element:
     # Set up a 4 element patch:
@@ -99,13 +98,13 @@ context("plani4e") do
           K = end_assemble(a)
           a, _ = solveq(K, zeros(18), bc)
           d_free = setdiff(collect(1:18), convert(Vector{Int}, bc[:,1]))
-          @fact a[d_free] --> roughly([ux + uy, ux + uy])
+          @test a[d_free] ≈ [ux + uy, ux + uy]
       end
       patch_test()
 
 end
 
-context("plani4s/f") do
+@testset "plani4s/f" begin
     σ, ε, eci = plani4s([0, 1, 1.5, 0.5], [0.0, 0.2, 0.8, 0.6], [2, 2, 2], hooke(2, 210e9, 0.3), collect(1:8))
     intf = plani4f([0, 1, 1.5, 0.5], [0.0, 0.2, 0.8, 0.6], [2, 2, 2], σ)
 
@@ -133,14 +132,12 @@ context("plani4s/f") do
 
 
     # correct for calfems order of gauss points
-    @fact norm(σ - σ_calfem[[4,2,3,1], :]') / norm(σ_calfem) --> roughly(0.0, atol=1e-14)
-    @fact norm(ε - ε_calfem[[4,2,3,1], :]') / norm(ε_calfem) --> roughly(0.0, atol=1e-14)
-    @fact norm(intf - intf_calfem) / norm(intf_calfem) --> roughly(0.0, atol=1e-14)
-
-
+    @test norm(σ - σ_calfem[[4,2,3,1], :]') / norm(σ_calfem) < 1e-14
+    @test norm(ε - ε_calfem[[4,2,3,1], :]') / norm(ε_calfem) < 1e-14
+    @test norm(intf - intf_calfem) / norm(intf_calfem) < 1e-14
 end
 
-context("plante") do
+@testset "plante" begin
     K, f = plante([0, 1, 1.5], [0.0, 0.2, 0.8], [2, 2, 1], hooke(2, 210e9, 0.3), [1.0, 2.5])
 
     K_calfem = 1e12 * [
@@ -154,12 +151,12 @@ context("plante") do
 
     f_calfem = [1/6, 5/12, 1/6, 5/12, 1/6, 5/12]
 
-    @fact norm(K - K_calfem) / norm(K) --> roughly(0.0, atol=1e-13)
-    @fact norm(f - f_calfem) / norm(f) --> roughly(0.0, atol=1e-13)
+    @test norm(K - K_calfem) / norm(K) < 1e-13
+    @test norm(f - f_calfem) / norm(f) < 1e-13
 
 end
 
-context("plants/f") do
+@testset "plants/f" begin
     σ, ε, eci = plants([0, 1, 1.5], [0.0, 0.2, 0.8], [2, 2, 1], hooke(2, 210e9, 0.3), collect(1:6))
     intf = plantf([0, 1, 1.5], [0.0, 0.2, 0.8], [2, 2, 1], σ)
 
@@ -175,13 +172,13 @@ context("plants/f") do
       7.010769230769229]
 
 
-    @fact norm(σ - σ_calfem') / norm(σ_calfem') --> roughly(0.0, atol=1e-14)
-    @fact norm(ε - ε_calfem') / norm(ε_calfem') --> roughly(0.0, atol=1e-14)
-    @fact norm(intf - intf_calfem) / norm(intf_calfem) --> roughly(0.0, atol=1e-14)
+    @test norm(σ - σ_calfem') / norm(σ_calfem') < 1e-14
+    @test norm(ε - ε_calfem') / norm(ε_calfem') < 1e-14
+    @test norm(intf - intf_calfem) / norm(intf_calfem) < 1e-14
 
 end
 
-context("soli8e") do
+@testset "soli8e" begin
     K, f = soli8e([0.1, 1.2, 1.3, 0.4, 0.5, 1.7, 1.8, 0.8], [0.7, 0.6, 0.5, 0.4, 1.3, 1.2, 1.1, 1.0],
                   [0.1, 0.2, 1.3, 1.4, 0.5, 0.6, 1.7, 1.8], [2], hooke(4, 210e9, 0.3), [1.0, 2.5, 3.5])
 
@@ -212,11 +209,11 @@ context("soli8e") do
                   -0.267013888888889,
                   -0.373819444444444]
 
-    @fact trace(K) --> roughly(K_calfem_trace)
-    @fact norm(f- f_calfem) / norm(f_calfem) --> roughly(0.0, atol =1e-13)
+    @test trace(K) ≈ K_calfem_trace
+    @test norm(f - f_calfem) / norm(f_calfem) < 1e-13
 end
 
-context("soli8s/f") do
+@testset "soli8s/f" begin
 
     σ, ε, eci = soli8s([0.1, 1.2, 1.3, 0.4, 0.5, 1.7, 1.8, 0.8],
                   [0.7, 0.6, 0.5, 0.4, 1.3, 1.2, 1.1, 1.0],
@@ -275,12 +272,12 @@ context("soli8s/f") do
   -1.958109485444647;
   -1.639108853140777]
 
-    @fact norm(σ - σ_calfem[[1,5,4,8,2,6,3,7], [1,2,3,6,5,4]]') / norm(σ_calfem) --> roughly(0.0, atol=1e-5)
-    @fact norm(ε - ε_calfem[[1,5,4,8,2,6,3,7], [1,2,3,6,5,4]]') / norm(ε_calfem) --> roughly(0.0, atol=1e-5)
-    @fact norm(intf - intf_calfem) / norm(intf_calfem) --> roughly(0.0, atol=1e-14)
+    @test norm(σ - σ_calfem[[1,5,4,8,2,6,3,7], [1,2,3,6,5,4]]') / norm(σ_calfem) < 1e-5
+    @test norm(ε - ε_calfem[[1,5,4,8,2,6,3,7], [1,2,3,6,5,4]]') / norm(ε_calfem) < 1e-5
+    @test norm(intf - intf_calfem) / norm(intf_calfem) < 1e-14
 end
 
-context("plani8e") do
+@testset "plani8e" begin
     K, f = plani8e([0.1, 1.2, 1.3, 0.4, 0.5, 1.7, 1.8, 0.8],
                    [0.7, 0.6, 0.5, 0.4, 1.3, 1.2, 1.1, 1.0], [2,2,2], hooke(2, 210e9, 0.3), [1.0, 2.5])
 
@@ -303,11 +300,11 @@ context("plani8e") do
                    -1.136296296296297,
                    -2.840740740740743]
 
-    @fact trace(K) --> roughly(K_calfem_trace)
-    @fact norm(f- f_calfem) / norm(f_calfem) --> roughly(0.0, atol =1e-13)
+    @test trace(K) ≈ K_calfem_trace
+    @test norm(f - f_calfem) / norm(f_calfem) <1e-13
 end
 
-context("plani8s/f") do
+@testset "plani8s/f" begin
     σ, ε, eci = plani8s([0.1, 1.2, 1.3, 0.4, 0.5, 1.7, 1.8, 0.8],
                     [0.7, 0.6, 0.5, 0.4, 1.3, 1.2, 1.1, 1.0],
                     [2,2,2], hooke(2, 210e9, 0.3), collect(1:16))
@@ -347,12 +344,12 @@ context("plani8s/f") do
           -1.556915325616566]
 
 
-      @fact norm(σ - σ_calfem[[1,3, 2, 4], :]') / norm(σ_calfem) --> roughly(0.0, atol =1e-13)
-      @fact norm(ε - ε_calfem[[1,3, 2, 4], :]') / norm(ε_calfem) --> roughly(0.0, atol=1e-13)
-      @fact norm(intf - intf_calfem) / norm(intf_calfem) --> roughly(0.0, atol=1e-14)
+      @test norm(σ - σ_calfem[[1,3, 2, 4], :]') / norm(σ_calfem) < 1e-13
+      @test norm(ε - ε_calfem[[1,3, 2, 4], :]') / norm(ε_calfem) < 1e-13
+      @test norm(intf - intf_calfem) / norm(intf_calfem) < 1e-14
 end
 
-context("flw2i4e") do
+@testset "flw2i4e" begin
     K, f = flw2i4e([0, 1, 1.5, 0.5], [0.0, 0.2, 0.8, 0.6], [2, 2, 2], [1 2; 3 4], [2.0])
 
     K_calfem = [3.126666666666666   1.713333333333333  -1.193333333333333  -3.646666666666667;
@@ -362,11 +359,11 @@ context("flw2i4e") do
 
     f_calfem = 0.5 * ones(4)
 
-    @fact norm(K - K_calfem) / norm(K) --> roughly(0.0, atol=1e-13)
-    @fact norm(f - f_calfem) / norm(f) --> roughly(0.0, atol=1e-13)
+    @test norm(K - K_calfem) / norm(K) < 1e-13
+    @test norm(f - f_calfem) / norm(f) < 1e-13
 end
 
-context("flw2i4s") do
+@testset "flw2i4s" begin
     es, et, eci  = flw2i4s([0, 1, 1.5, 0.5], [0.0, 0.2, 0.8, 0.6], [2, 2, 2], [1 2; 3 4], collect(1:4))
 
     es_calfem =
@@ -381,11 +378,11 @@ context("flw2i4s") do
      -1.723760430703402   5.732050807568878;
      -1.261880215351701   3.422649730810373]
 
-      @fact norm(es - es_calfem[[4,2, 3, 1], :]') / norm(es_calfem) --> roughly(0.0, atol =1e-13)
-      @fact norm(et - et_calfem[[4,2, 3, 1], :]') / norm(et_calfem) --> roughly(0.0, atol=1e-13)
+      @test norm(es - es_calfem[[4,2, 3, 1], :]') / norm(es_calfem) < 1e-13
+      @test norm(et - et_calfem[[4,2, 3, 1], :]') / norm(et_calfem) < 1e-13
 end
 
-context("flw2i8e") do
+@testset "flw2i8e" begin
     K, f = flw2i8e([0.1, 1.2, 1.3, 0.4, 0.5, 1.7, 1.8, 0.8],
                    [0.7, 0.6, 0.5, 0.4, 1.3, 1.2, 1.1, 1.0], [2,2], [1 2; 3 4], [3.0])
 
@@ -400,11 +397,11 @@ context("flw2i8e") do
                     -1.457777777777777;
                     -3.408888888888892]
 
-    @fact trace(K) --> roughly(K_calfem_trace)
-    @fact norm(f- f_calfem) / norm(f_calfem) --> roughly(0.0, atol =1e-13)
+    @test trace(K) ≈ K_calfem_trace
+    @test norm(f - f_calfem) / norm(f_calfem) < 1e-13
 end
 
-context("flw2i8s") do
+@testset "flw2i8s" begin
     es, et, eci  = flw2i8s([0.1, 1.2, 1.3, 0.4, 0.5, 1.7, 1.8, 0.8],
                       [0.7, 0.6, 0.5, 0.4, 1.3, 1.2, 1.1, 1.0],
                       [2,2], [1 2; 3 4], collect(1:8))
@@ -421,12 +418,12 @@ context("flw2i8s") do
   -2.187219748188395   6.921119965694889;
    5.855440108225263   4.135429337120202]
 
-    @fact norm(es - es_calfem[[1 ,3, 2, 4], :]') / norm(es_calfem) --> roughly(0.0, atol =1e-13)
-    @fact norm(et - et_calfem[[1 ,3, 2, 4], :]') / norm(et_calfem) --> roughly(0.0, atol=1e-13)
+    @test norm(es - es_calfem[[1 ,3, 2, 4], :]') / norm(es_calfem) < 1e-13
+    @test norm(et - et_calfem[[1 ,3, 2, 4], :]') / norm(et_calfem) < 1e-13
 end
 
 
-context("flw2te") do
+@testset "flw2te" begin
     K, f = flw2te([0, 1, 1.5], [0.0, 0.2, 0.8], [2, 1], [1 2; 3 4], [2.0])
 
     K_calfem =
@@ -438,22 +435,22 @@ context("flw2te") do
                 0.333333333333333;
                 0.333333333333333]
 
-    @fact norm(K - K_calfem) / norm(K) --> roughly(0.0, atol=1e-13)
-    @fact norm(f - f_calfem) / norm(f) --> roughly(0.0, atol=1e-13)
+    @test norm(K - K_calfem) / norm(K) < 1e-13
+    @test norm(f - f_calfem) / norm(f) < 1e-13
 end
 
-context("flw2ts") do
+@testset "flw2ts" begin
     es, et, eci = flw2ts([0, 1, 1.5], [0.0, 0.2, 0.8], [2, 1], [1 2; 3 4], collect(1:3))
 
     es_calfem = [-2.8 -6.4;]
     et_calfem = [0.8 1.0;]
 
-    @fact norm(es - es_calfem') / norm(es_calfem) --> roughly(0.0, atol =1e-13)
-    @fact norm(et - et_calfem') / norm(et_calfem) --> roughly(0.0, atol=1e-13)
+    @test norm(es - es_calfem') / norm(es_calfem) < 1e-13
+    @test norm(et - et_calfem') / norm(et_calfem) < 1e-13
 end
 
 
-context("flw3i8e") do
+@testset "flw3i8e" begin
     K, f = flw3i8e([0.1, 1.2, 1.3, 0.4, 0.5, 1.7, 1.8, 0.8], [0.7, 0.6, 0.5, 0.4, 1.3, 1.2, 1.1, 1.0],
                    [0.1, 0.2, 1.3, 1.4, 0.5, 0.6, 1.7, 1.8], [2], [1 2 3; 4 5 6; 7 8 9], [2.0])
 
@@ -468,11 +465,11 @@ context("flw3i8e") do
                     -0.195555555555556;
                     -0.213611111111111;]
 
-    @fact trace(K) --> roughly(K_calfem_trace)
-    @fact norm(f- f_calfem) / norm(f_calfem) --> roughly(0.0, atol =1e-13)
+    @test trace(K) ≈ K_calfem_trace
+    @test norm(f - f_calfem) / norm(f_calfem) < 1e-13
 end
 
-context("flw3i8s") do
+@testset "flw3i8s" begin
     es, et, eci = flw3i8s([0.1, 1.2, 1.3, 0.4, 0.5, 1.7, 1.8, 0.8],
             [0.7, 0.6, 0.5, 0.4, 1.3, 1.2, 1.1, 1.0],
              [0.1, 0.2, 1.3, 1.4, 0.5, 0.6, 1.7, 1.8],
@@ -498,13 +495,11 @@ context("flw3i8s") do
     -0.781769647374687   5.905082103747760   2.078287062219387;
     -0.666357396405506   4.994845707601153   3.209293306780562]
 
-    @fact norm(es - es_calfem[[1,5,4,8,2,6,3,7], :]') / norm(es_calfem) --> roughly(0.0, atol =1e-13)
-    @fact norm(et - et_calfem[[1,5,4,8,2,6,3,7], :]') / norm(et_calfem) --> roughly(0.0, atol=1e-13)
+    @test norm(es - es_calfem[[1,5,4,8,2,6,3,7], :]') / norm(es_calfem) < 1e-13
+    @test norm(et - et_calfem[[1,5,4,8,2,6,3,7], :]') / norm(et_calfem) < 1e-13
 end
 
-
-
-context("bar") do
+@testset "bar" begin
     # From example 3.2 in the book Strukturmekanik
     ex = [0.,  1.6]; ey = [0., -1.2]
     elem_prop = [200.e9, 1.0e-3]
@@ -516,8 +511,8 @@ context("bar") do
               -64   48   64 -48
                48  -36  -48  36]*1e6
     N_ref = 37.306e3
-    @fact norm(Ke - Ke_ref) / norm(Ke_ref) --> roughly(0.0, atol=1e-15)
-    @fact abs(N - N_ref) / N_ref --> roughly(0.0, atol=1e-15)
+    @test norm(Ke - Ke_ref) / norm(Ke_ref) < 1e-15
+    @test abs(N - N_ref) / N_ref < 1e-15
 
     Ke_g_ref = 1e7 *
     [ 6.400671507999999  -4.799104656000000  -6.400671507999999   4.799104656000000
@@ -527,7 +522,7 @@ context("bar") do
 
     Ke_g = bar2g(ex, ey, elem_prop, N)
 
-    @fact norm(Ke_g - Ke_g_ref) / norm(Ke_ref) --> roughly(0.0, atol=1e-15)
+    @test norm(Ke_g - Ke_g_ref) / norm(Ke_ref) < 1e-15
 
 end
 

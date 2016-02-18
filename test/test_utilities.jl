@@ -1,21 +1,22 @@
-import JuAFEM: det_spec, inv_spec, Line, Square, Triangle, Cube, Serendipity, Lagrange
+import JuAFEM: det_spec, inv_spec, inv_spec!,
+               Line, Square, Triangle, Cube, Serendipity, Lagrange
 
 using ForwardDiff
 
-facts("Utility testing") do
+@testset "Utility testing" begin
 
-context("assemble") do
+@testset "assemble" begin
     K = zeros(3,3)
     Ke = [1 2 3; 4 5 6; 7 8 9]
     edof = [3, 2, 1]
-    @fact assemble(edof, K, Ke) --> [9.0 8.0 7.0; 6.0 5.0 4.0; 3.0 2.0 1.0]
+    @test assemble(edof, K, Ke) == [9.0 8.0 7.0; 6.0 5.0 4.0; 3.0 2.0 1.0]
     # Test non square Ke
-    @fact_throws DimensionMismatch assemble(edof, K, [1 2 3; 4 5 6])
+    @test_throws DimensionMismatch assemble(edof, K, [1 2 3; 4 5 6])
     # Test wrong length of edof
-    @fact_throws DimensionMismatch assemble([1, 2, 3, 4], K, Ke)
+    @test_throws DimensionMismatch assemble([1, 2, 3, 4], K, Ke)
 end
 
-context("solveq") do
+@testset "solveq" begin
     K = [ 1 -1  0  0
          -1  3 -2  0
           0 -2  3 -1
@@ -29,34 +30,39 @@ context("solveq") do
     a_analytic = [0.0, 0.4, 0.6, 0.0]
     fb_analytic = [-0.4, 0.0, 0.0, -0.6]
 
-    @fact norm(a - a_analytic) / norm(a_analytic) --> roughly(0.0, atol=1e-15)
-    @fact norm(fb - fb_analytic) / norm(fb_analytic) --> roughly(0.0, atol=1e-15)
+    @test norm(a - a_analytic) / norm(a_analytic) < 1e-15
+    @test norm(fb - fb_analytic) / norm(fb_analytic) < 1e-15
     # Test wrong size of K
-    @fact_throws DimensionMismatch (a, fb) = solveq(K[:,1:2], f, bc)
+    @test_throws DimensionMismatch (a, fb) = solveq(K[:,1:2], f, bc)
     # Test wrong length of f
-    @fact_throws DimensionMismatch (a, fb) = solveq(K, [1, 2], bc)
+    @test_throws DimensionMismatch (a, fb) = solveq(K, [1, 2], bc)
 end
 
-context("extract") do
+@testset "extract" begin
     a = [0.0 5.0 7.0 9.0 11.0]
     edof = [2 4
             3 5]'
-    @fact extract(edof, a) --> [5.0 9.0; 7.0 11.0]'
+    @test extract(edof, a) == [5.0 9.0; 7.0 11.0]'
 end
 
-context("linalg") do
+@testset "linalg" begin
     J = [4. 2.; 3. 8.]
     J_inv = [0.3076923076923077 -0.07692307692307693; -0.11538461538461539 0.15384615384615385]
-    @fact norm(inv_spec(J) - J_inv) / norm(J_inv) --> roughly(0.0, atol=1e-15)
-    @fact det_spec(J) --> roughly(det(J))
+    @test norm(inv_spec(J) - J_inv) / norm(J_inv) < 1e-15
+
     srand(1234)
-    J = rand(3,3)
-    @fact inv_spec(J) --> roughly(inv(J))
-    @fact det_spec(J) --> roughly(det(J))
+    for dim in (1,2,3)
+        J = rand(dim, dim)
+        @test det_spec(J) ≈ det(J)
+        Jinv = similar(J)
+        @test inv_spec(J) ≈ inv(J)
+        inv_spec!(Jinv, J)
+        @test Jinv ≈ inv(J)
+    end
 end
 
 
-context("gen_quad_mesh") do
+@testset "gen_quad_mesh" begin
     p1 = [0.0, 0.0]
     p2 = [1.0, 1.]
     nelx = 2
@@ -93,16 +99,16 @@ context("gen_quad_mesh") do
     B2_r = [5 6; 11 12; 17 18; 23 24]'
     B3_r = [23 24; 21 22; 19 20]'
     B4_r = [19 20; 13 14; 7 8; 1 2]'
-    @fact Edof --> Edof_r
-    @fact norm(Ex - Ex_r) / norm(Ex_r) --> roughly(0.0, atol=1e-15)
-    @fact norm(Ey - Ey_r) / norm(Ey_r) --> roughly(0.0, atol=1e-15)
-    @fact B1 --> B1_r
-    @fact B2 --> B2_r
-    @fact B3 --> B3_r
-    @fact B4 --> B4_r
+    @test Edof == Edof_r
+    @test norm(Ex - Ex_r) / norm(Ex_r) < 1e-15
+    @test norm(Ey - Ey_r) / norm(Ey_r) < 1e-15
+    @test B1 == B1_r
+    @test B2 == B2_r
+    @test B3 == B3_r
+    @test B4 == B4_r
 end
 
-context("static condensation") do
+@testset "static condensation" begin
     K = [1 2 3 4;
          4 5 6 7;
          7 8 9 10;
@@ -121,11 +127,11 @@ context("static condensation") do
        0.000000000000001
       -0.333333333333334]
 
-    @fact K1 --> roughly(K1_calfem)
-    @fact f1 --> roughly(f1_calfem)
+    @test K1 ≈ K1_calfem
+    @test f1 ≈ f1_calfem
 end
 
-context("coordxtr + topologyxtr") do
+@testset "coordxtr + topologyxtr" begin
 
     Dof = [1 2;
            3 4;
@@ -142,19 +148,19 @@ context("coordxtr + topologyxtr") do
 
     Ex, Ey, Ez = coordxtr(Edof,Coord,Dof, 3)
 
-    @fact Ex --> [1.0 2.0 5.0;
+    @test Ex == [1.0 2.0 5.0;
                   1.0 2.0 7.0]'
 
-    @fact Ey --> [3.0 4.0 6.0;
+    @test Ey == [3.0 4.0 6.0;
                   3.0 4.0 8.0]'
 
     topo = topologyxtr(Edof,Coord,Dof, 3)
 
-    @fact topo --> [1 2 3;
+    @test topo == [1 2 3;
                     1 2 4]'
 end
 
-context("function space derivatives and sums") do
+@testset "function space derivatives and sums" begin
 
     for functionspace in (Lagrange{1, Line}(),
                           Lagrange{2, Line}(),
@@ -165,11 +171,9 @@ context("function space derivatives and sums") do
                           Serendipity{2, Square}())
         x = rand(JuAFEM.n_dim(functionspace))
         f = (x) -> JuAFEM.value(functionspace, x)
-        @fact ForwardDiff.jacobian(f, x)' --> roughly(JuAFEM.derivative(functionspace, x))
-        @fact sum(JuAFEM.value(functionspace, x)) --> roughly(1.0)
+        @test ForwardDiff.jacobian(f, x)' ≈ JuAFEM.derivative(functionspace, x)
+        @test sum(JuAFEM.value(functionspace, x)) ≈ 1.0
     end
-
-
 end
 
 end
