@@ -216,6 +216,9 @@ function derivative!(::Lagrange{1, Triangle}, dN::Matrix, ξ::Vector)
     return dN
 end
 
+
+n_basefunctions(::Lagrange{2, Triangle}) = 6
+
 """
 Computes the shape functions at a point for
 a quadratic triangle element

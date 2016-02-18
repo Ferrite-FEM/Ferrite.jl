@@ -1,7 +1,10 @@
-using JuAFEM
-import JuAFEM: Square
+import JuAFEM: Square, Line, Square, Triangle, Cube,
+               Lagrange, Serendipity
+
 
 @testset "fevalues" begin
+
+@testset "elasticity_example" begin
 
     x = [0.0 1.0 1.5 0.5;
          0.0 0.2 0.8 0.6]
@@ -42,7 +45,7 @@ import JuAFEM: Square
     t = 2.0
 
     function_space = JuAFEM.Lagrange{1, JuAFEM.Square}()
-    q_rule = JuAFEM.get_gaussrule(JuAFEM.Square(), 2)
+    q_rule = JuAFEM.get_gaussrule(Square(), 2)
     fev = FEValues(Float64, q_rule, function_space)
 
 
@@ -56,7 +59,7 @@ import JuAFEM: Square
         for q_point in 1:length(JuAFEM.points(q_rule))
 
             for i in 1:4
-                dNdx = shape_derivative(fev, q_point, i)
+                dNdx = shape_gradient(fev, q_point, i)
                 B[1, 2*i - 1] = dNdx[1]
                 B[2, 2*i - 0] = dNdx[2]
                 B[4, 2*i - 0] = dNdx[1]
@@ -71,4 +74,45 @@ import JuAFEM: Square
 
         @test norm(Ke - Ke_2) / norm(Ke) ≈ 0.0
     end
+end
+
+
+@testset "function interpolations" begin
+
+    for (function_space, quad_rule) in  ((Lagrange{1, Line}(), JuAFEM.get_gaussrule(Line(), 2)),
+                                         (Lagrange{2, Line}(), JuAFEM.get_gaussrule(Line(), 2)),
+                                         (Lagrange{1, Square}(), JuAFEM.get_gaussrule(Square(), 2)),
+                                         (Lagrange{1, Triangle}(), JuAFEM.get_gaussrule(Triangle(), 2)),
+                                         (Lagrange{2, Triangle}(), JuAFEM.get_gaussrule(Triangle(), 2)),
+                                         (Lagrange{1, Cube}(), JuAFEM.get_gaussrule(Cube(), 2)),
+                                         (Serendipity{2, Square}(), JuAFEM.get_gaussrule(Square(), 2)))
+
+
+        fev = FEValues(Float64, quad_rule, function_space)
+        ndim = n_dim(function_space)
+        n_basefuncs = n_basefunctions(function_space)
+        x = rand(ndim, n_basefuncs)
+        reinit!(fev, x)
+
+        # We test this by applying a given deformation gradient on all the nodes.
+        # Since this is a linear deformation we should get back the exact values
+        # from the interpolation.
+        cx = rand()
+        cy = rand()
+        u = zeros(ndim * n_basefuncs)
+        H = rand(ndim, ndim)
+        for i in 1:n_basefuncs
+            a = x[:, i]
+            u[ndim*(i-1) + 1:ndim*(i-1) + ndim] = H * a
+        end
+
+        m = zeros(ndim, ndim)
+        for i in 1:length(JuAFEM.points(quad_rule))
+            @test function_vector_gradient!(m, fev, i, u) ≈ H
+            @test function_vector_symmetric_gradient!(m, fev, i, u) ≈ 0.5(H + H')
+            @test function_vector_divergence(fev, i, u) ≈ trace(H)
+        end
+    end
+
+end
 end

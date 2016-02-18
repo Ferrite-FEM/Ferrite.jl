@@ -61,18 +61,108 @@ Gets the value of the shape function at a given quadrature point and given base 
 @inline shape_value(fe_v::FEValues, q_point::Int, base_func::Int) = fe_v.N[q_point][base_func]
 
 """
-Get the derivatives of the shape functions for a given quadrature point
+Get the gradients of the shape functions for a given quadrature point
 """
-@inline shape_derivative(fe_v::FEValues, q_point::Int) = fe_v.dNdx[q_point]
+@inline shape_gradient(fe_v::FEValues, q_point::Int) = fe_v.dNdx[q_point]
 
 """
-Get the derivatives of the shape functions for a given quadrature point and base function
+Get the gradient of the shape functions for a given quadrature point and base function
 """
-@inline shape_derivative(fe_v::FEValues, q_point::Int, base_func::Int) = fe_v.dNdx[q_point][:, base_func]
+@inline shape_gradient(fe_v::FEValues, q_point::Int, base_func::Int) = fe_v.dNdx[q_point][:, base_func]
 
 """
-Get the derivatives of the shape functions for a given quadrature point, base_function and component
+Get the gradient of the shape functions for a given quadrature point, base function and component
 """
-@inline shape_derivative(fe_v::FEValues, q_point::Int, base_func::Int, component::Int) = fe_v.dNdx[q_point][component, base_func]
+@inline shape_gradient(fe_v::FEValues, q_point::Int, base_func::Int, component::Int) = fe_v.dNdx[q_point][component, base_func]
+
+const shape_derivative = shape_gradient
+
+@inline function function_scalar_value{T}(fe_v::FEValues, q_point::Int, u::Vector{T})
+    func_space = get_functionspace(fe_v)
+    dim = n_dim(func_space)
+    @assert length(u) == n_basefunctions(func_space)
+    N = shape_value(fe_v, q_point)
+    return dot(u, N)
+end
+
+# u should be given as [x, y, z, x, y, z, ...]
+@inline function function_vector_value!{T}(vec::Vector{T}, fe_v::FEValues, q_point::Int, u::Vector{T})
+    func_space = get_functionspace(fe_v)
+    dim = n_dim(func_space)
+    @assert length(u) == dim * n_basefunctions(func_space)
+    @assert length(vec) == dim
+    fill!(vec, 0.0)
+    N = shape_value(fe_v, q_point)
+    for i in 1:base_functions
+        offset = dim*(i-1)
+        for j in 1:dim
+            vec[j] += N[i] * u[offset + j]
+        end
+    end
+end
+
+@inline function function_scalar_gradient!{T}(grad::Matrix{T}, fe_v::FEValues, q_point::Int, u::Vector{T})
+    func_space = get_functionspace(fe_v)
+    dim = n_dim(func_space)
+    @assert length(u) == n_basefunctions(func_space)
+    @assert length(grad) == dim
+    A_mul_B!(grad, dN, u)
+    return grad
+end
+
+# u should be given as [x, y, z, x, y, z, ...]
+@inline function function_vector_gradient!{T}(grad::Matrix{T}, fe_v::FEValues, q_point::Int, u::Vector{T})
+    func_space = get_functionspace(fe_v)
+    n_base_funcs = n_basefunctions(func_space)
+    dim = n_dim(func_space)
+    @assert length(u) == dim * n_base_funcs
+    @assert size(grad) == (dim, dim)
+    dN = shape_gradient(fe_v, q_point)
+    fill!(grad, 0.0)
+    @inbounds for j in 1:dim, k in 1:dim, i in 1:n_base_funcs
+        grad[j, k] += dN[k, i] * u[dim*(i-1) + j]
+    end
+    return grad
+end
+
+# u should be given as [x, y, z, x, y, z, ...]
+@inline function function_vector_symmetric_gradient!{T}(grad::Matrix{T}, fe_v::FEValues, q_point::Int, u::Vector{T})
+    func_space = get_functionspace(fe_v)
+    n_base_funcs = n_basefunctions(func_space)
+    dim = n_dim(func_space)
+    @assert length(u) == dim * n_base_funcs
+    @assert size(grad) == (dim, dim)
+    dN = shape_gradient(fe_v, q_point)
+    fill!(grad, 0.0)
+
+    @inbounds for i in 1:n_base_funcs
+        offset = dim * (i-1)
+        for j in 1:dim
+            grad[j, j] += dN[j, i] * u[offset + j]
+        end
+
+        for j in 1:dim, k in j+1:dim,
+            v = 0.5 * (dN[j, i] * u[offset + k] + dN[k, i] * u[offset + j])
+            grad[j, k] += v
+            grad[k, j] += v
+        end
+    end
+    return grad
+end
+
+# u should be given as [x, y, z, x, y, z, ...]
+@inline function function_vector_divergence{T}(fe_v::FEValues, q_point::Int, u::Vector{T})
+    func_space = get_functionspace(fe_v)
+    n_base_funcs = n_basefunctions(func_space)
+    dim = n_dim(func_space)
+    @assert length(u) == dim * n_base_funcs
+    dN = shape_gradient(fe_v, q_point)
+    div = zero(T)
+    @inbounds for j in 1:dim, i in 1:n_base_funcs
+        div += dN[j, i] *  u[dim*(i-1) + j]
+    end
+    return div
+end
+
 
 
