@@ -97,20 +97,25 @@ end
         # We test this by applying a given deformation gradient on all the nodes.
         # Since this is a linear deformation we should get back the exact values
         # from the interpolation.
-        cx = rand()
-        cy = rand()
         u = zeros(ndim * n_basefuncs)
+        u_scal = zeros(n_basefuncs)
         H = rand(ndim, ndim)
+        V = rand(ndim)
         for i in 1:n_basefuncs
             a = x[:, i]
             u[ndim*(i-1) + 1:ndim*(i-1) + ndim] = H * a
+            u_scal[i] = dot(a, V)
         end
 
         m = zeros(ndim, ndim)
+        grad = zeros(ndim)
         for i in 1:length(JuAFEM.points(quad_rule))
             @test function_vector_gradient!(m, fev, i, u) ≈ H
             @test function_vector_symmetric_gradient!(m, fev, i, u) ≈ 0.5(H + H')
             @test function_vector_divergence(fev, i, u) ≈ trace(H)
+            @test function_scalar_gradient!(grad, fev, i, u_scal) ≈ V
+            function_scalar_value(fev, i, u_scal)
+            function_vector_value!(grad, fev, i, u)
         end
     end
 

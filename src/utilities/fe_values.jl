@@ -79,7 +79,6 @@ const shape_derivative = shape_gradient
 
 @inline function function_scalar_value{T}(fe_v::FEValues, q_point::Int, u::Vector{T})
     func_space = get_functionspace(fe_v)
-    dim = n_dim(func_space)
     @assert length(u) == n_basefunctions(func_space)
     N = shape_value(fe_v, q_point)
     return dot(u, N)
@@ -89,23 +88,25 @@ end
 @inline function function_vector_value!{T}(vec::Vector{T}, fe_v::FEValues, q_point::Int, u::Vector{T})
     func_space = get_functionspace(fe_v)
     dim = n_dim(func_space)
-    @assert length(u) == dim * n_basefunctions(func_space)
+    n_base_funcs = n_basefunctions(func_space)
+    @assert length(u) == dim * n_base_funcs
     @assert length(vec) == dim
     fill!(vec, 0.0)
     N = shape_value(fe_v, q_point)
-    for i in 1:base_functions
+    for i in 1:n_base_funcs
         offset = dim*(i-1)
         for j in 1:dim
             vec[j] += N[i] * u[offset + j]
         end
     end
+    return vec
 end
 
-@inline function function_scalar_gradient!{T}(grad::Matrix{T}, fe_v::FEValues, q_point::Int, u::Vector{T})
+@inline function function_scalar_gradient!{T}(grad::Vector{T}, fe_v::FEValues, q_point::Int, u::Vector{T})
     func_space = get_functionspace(fe_v)
-    dim = n_dim(func_space)
     @assert length(u) == n_basefunctions(func_space)
-    @assert length(grad) == dim
+    @assert length(grad) == n_dim(func_space)
+    dN = shape_gradient(fe_v, q_point)
     A_mul_B!(grad, dN, u)
     return grad
 end
@@ -119,8 +120,11 @@ end
     @assert size(grad) == (dim, dim)
     dN = shape_gradient(fe_v, q_point)
     fill!(grad, 0.0)
-    @inbounds for j in 1:dim, k in 1:dim, i in 1:n_base_funcs
-        grad[j, k] += dN[k, i] * u[dim*(i-1) + j]
+    @inbounds for i in 1:n_base_funcs
+        offset = dim*(i-1)
+        for j in 1:dim, k in 1:dim
+            grad[j, k] += dN[k, i] * u[offset + j]
+        end
     end
     return grad
 end
@@ -158,8 +162,11 @@ end
     @assert length(u) == dim * n_base_funcs
     dN = shape_gradient(fe_v, q_point)
     div = zero(T)
-    @inbounds for j in 1:dim, i in 1:n_base_funcs
-        div += dN[j, i] *  u[dim*(i-1) + j]
+    @inbounds for i in 1:n_base_funcs
+        offset = dim*(i-1)
+        for j in 1:dim
+            div += dN[j, i] *  u[offset + j]
+        end
     end
     return div
 end
