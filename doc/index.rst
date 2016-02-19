@@ -24,5 +24,6 @@ Differences between CALFEM and JuAFEM
     api/elements
     api/materials
     api/utilities
+    api/fe_values
 
 __ https://en.wikipedia.org/wiki/Row-major_order
