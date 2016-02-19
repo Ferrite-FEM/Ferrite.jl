@@ -8,7 +8,7 @@ else
     const Test = BaseTestNext
 end
 
-#include("test_elements.jl")
-#include("test_materials.jl")
-#include("test_utilities.jl")
+include("test_elements.jl")
+include("test_materials.jl")
+include("test_utilities.jl")
 include("test_fevalues.jl")

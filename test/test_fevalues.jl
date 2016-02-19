@@ -88,7 +88,7 @@ end
                                          (Serendipity{2, Square}(), JuAFEM.get_gaussrule(Square(), 2)))
 
 
-        fev = FEValues(Float64, quad_rule, function_space)
+        fev = FEValues(quad_rule, function_space)
         ndim = n_dim(function_space)
         n_basefuncs = n_basefunctions(function_space)
         x = rand(ndim, n_basefuncs)
