@@ -1,5 +1,4 @@
-import JuAFEM: det_spec, inv_spec, inv_spec!,
-               Square, Triangle
+import JuAFEM: Square, Triangle
 
 using ForwardDiff
 
@@ -44,23 +43,6 @@ end
             3 5]'
     @test extract(edof, a) == [5.0 9.0; 7.0 11.0]'
 end
-
-@testset "linalg" begin
-    J = [4. 2.; 3. 8.]
-    J_inv = [0.3076923076923077 -0.07692307692307693; -0.11538461538461539 0.15384615384615385]
-    @test norm(inv_spec(J) - J_inv) / norm(J_inv) < 1e-15
-
-    srand(1234)
-    for dim in (1,2,3)
-        J = rand(dim, dim)
-        @test det_spec(J) ≈ det(J)
-        Jinv = similar(J)
-        @test inv_spec(J) ≈ inv(J)
-        inv_spec!(Jinv, J)
-        @test Jinv ≈ inv(J)
-    end
-end
-
 
 @testset "gen_quad_mesh" begin
     p1 = [0.0, 0.0]
@@ -169,9 +151,12 @@ end
                           Lagrange{2, Triangle, 2}(),
                           Lagrange{3, Square, 1}(),
                           Serendipity{2, Square, 2}())
-        x = rand(JuAFEM.n_dim(functionspace))
-        f = (x) -> JuAFEM.value(functionspace, x)
-        @test ForwardDiff.jacobian(f, x)' ≈ JuAFEM.derivative(functionspace, x)
+        ndim = n_dim(functionspace)
+        n_basefuncs = n_basefunctions(functionspace)
+        x = rand(Tensor{1, ndim})
+        f = (x) -> JuAFEM.value(functionspace, Tensor{1, ndim}(x))
+        @test vec(ForwardDiff.jacobian(f, extract_components(x))') ≈
+               reinterpret(Float64, JuAFEM.derivative(functionspace, x), (ndim * n_basefuncs,))
         @test sum(JuAFEM.value(functionspace, x)) ≈ 1.0
     end
 end

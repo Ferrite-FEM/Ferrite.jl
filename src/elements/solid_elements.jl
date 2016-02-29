@@ -1,21 +1,26 @@
 function Bmatrix!(B, nnodes, ndim, dNdx)
      for i in 1:nnodes
+        dNdXi = dNdx[i]
         # Rewrite this with loops instead like for source_kernel? /KC
         if ndim == 2
-            B[1, 2*i - 1] = dNdx[1, i]
-            B[2, 2*i - 0] = dNdx[2, i]
-            B[4, 2*i - 0] = dNdx[1, i]
-            B[4, 2*i - 1] = dNdx[2, i]
+            @inbounds begin
+                B[1, 2*i - 1] = dNdXi[1]
+                B[2, 2*i - 0] = dNdXi[2]
+                B[4, 2*i - 0] = dNdXi[1]
+                B[4, 2*i - 1] = dNdXi[2]
+            end
         else
-            B[1, i * 3-2] = dNdx[1, i]
-            B[2, i * 3-1] = dNdx[2, i]
-            B[3, i * 3-0] = dNdx[3, i]
-            B[4, 3 * i-1] = dNdx[3, i]
-            B[4, 3 * i-0] = dNdx[2, i]
-            B[5, 3 * i-2] = dNdx[3, i]
-            B[5, 3 * i-0] = dNdx[1, i]
-            B[6, 3 * i-2] = dNdx[2, i]
-            B[6, 3 * i-1] = dNdx[1, i]
+            @inbounds begin
+                B[1, i * 3-2] = dNdXi[1]
+                B[2, i * 3-1] = dNdXi[2]
+                B[3, i * 3-0] = dNdXi[3]
+                B[4, 3 * i-1] = dNdXi[3]
+                B[4, 3 * i-0] = dNdXi[2]
+                B[5, 3 * i-2] = dNdXi[3]
+                B[5, 3 * i-0] = dNdXi[1]
+                B[6, 3 * i-2] = dNdXi[2]
+                B[6, 3 * i-1] = dNdXi[1]
+            end
         end
     end
 end

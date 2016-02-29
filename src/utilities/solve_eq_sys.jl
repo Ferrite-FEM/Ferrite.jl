@@ -7,7 +7,10 @@ and reaction forces `fb`
 If `symmetric` is set to `true`, the matrix will be factorized with Cholesky factorization.
 """
 function solveq(K::AbstractMatrix, f::Array, bc::Matrix, symmetric=false)
-    n = chksquare(K)
+    if size(K, 1) != size(K, 2)
+        throw(DimensionMismatch("matrix need to be square"))
+    end
+    n = size(K, 2)
     nrf = length(f)
     if n != nrf
         throw(DimensionMismatch("Mismatch between number of rows in the stiffness matrix and load vector (#rowsK=$n #rowsf=$nrf)"))

@@ -1,7 +1,17 @@
+function Bmatrix_heat!(B, nnodes, ndim, dNdx)
+    for i in 1:nnodes
+        dNdXi = dNdx[i]
+        for j in 1:ndim
+            B[j, i] = dNdXi[j]
+        end
+    end
+end
+
 function heat_grad_kernel()
     quote
-        @into! DB = D * dNdx
-        @into! GRAD_KERNEL = dNdx' * DB
+        Bmatrix_heat!(B, nnodes, ndim, dNdx)
+        @into! DB = D * B
+        @into! GRAD_KERNEL = B' * DB
         if ndim == 2 scale!(GRAD_KERNEL, t) end
     end
 end
@@ -19,7 +29,8 @@ end
 # FLUX_KERNEL and CONJ_KERNEL
 function heat_flux_kernel()
     quote
-        @into! CONJ_KERNEL = dNdx * ed
+        Bmatrix_heat!(B, nnodes, ndim, dNdx)
+        @into! CONJ_KERNEL = B * ed
         @into! FLUX_KERNEL = D * CONJ_KERNEL
         scale!(FLUX_KERNEL, -1)
     end
@@ -34,7 +45,8 @@ function get_heat_flux_size(ndim)
 end
 
 function get_default_heat_vars(nnodes, ndim)
-    Dict(:DB => (ndim ,nnodes))
+    Dict(:DB => (ndim ,nnodes),
+         :B =>  (ndim, nnodes))
 end
 
 H_S_1 = FElement(

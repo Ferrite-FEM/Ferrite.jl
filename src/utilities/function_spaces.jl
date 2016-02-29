@@ -1,33 +1,31 @@
 abstract FunctionSpace{dim, shape, order}
 
-@inline n_dim{dim, shape, order}(fs::FunctionSpace{dim, shape, order}) = dim
-@inline ref_shape{order, shape, dim}(fs::FunctionSpace{dim, shape, order}) = shape()
+@inline n_dim{dim}(fs::FunctionSpace{dim}) = dim
+@inline ref_shape{dim, shape}(fs::FunctionSpace{dim, shape}) = shape()
 @inline order{dim, shape, order}(fs::FunctionSpace{dim, shape, order}) = order
 
 """
 Computes the value of the shape functions at a point ξ for a given function space
 """
-function value(fs::FunctionSpace, ξ::Vector)
-    value!(fs, zeros(eltype(ξ), n_basefunctions(fs)), ξ)
+function value{dim, T}(fs::FunctionSpace{dim}, ξ::Vec{dim, T})
+    value!(fs, zeros(T, n_basefunctions(fs)), ξ)
 end
 
 """
 Computes the gradients of the shape functions at a point ξ for a given function space
 """
-function derivative(fs::FunctionSpace, ξ::Vector)
-    derivative!(fs, zeros(eltype(ξ), n_dim(fs), n_basefunctions(fs)), ξ)
+function derivative{dim, T}(fs::FunctionSpace{dim}, ξ::Vec{dim, T})
+    derivative!(fs, [zero(Tensor{1, dim, T}) for i in 1:n_basefunctions(fs)], ξ)
 end
 
-@inline function checkdim_value{dim}(fs::FunctionSpace{dim}, N::Vector, ξ::Vector)
+@inline function checkdim_value{dim}(fs::FunctionSpace{dim}, N::Vector, ξ::Vec{dim})
     n_base = n_basefunctions(fs)
     length(N) == n_base || throw(ArgumentError("N must have length $(n_base)"))
-    length(ξ) == dim || throw(ArgumentError("ξ must have length $dim"))
 end
 
-@inline function checkdim_derivative{dim}(fs::FunctionSpace{dim}, dN::Matrix, ξ::Vector)
+@inline function checkdim_derivative{dim, T}(fs::FunctionSpace{dim}, dN::Vector{Vec{dim, T}}, ξ::Vec{dim, T})
     n_base = n_basefunctions(fs)
-    size(dN) == (dim, n_base) || throw(ArgumentError("dN must have size ($dim, $n_base)"))
-    length(ξ) == dim || throw(ArgumentError("ξ must have length $dim"))
+    length(dN) == n_base || throw(ArgumentError("dN must have length $(n_base)"))
 end
 
 ############
@@ -42,7 +40,7 @@ type Lagrange{dim, shape, order} <: FunctionSpace{dim, shape, order} end
 
 n_basefunctions(::Lagrange{1, Square, 1}) = 2
 
-function value!(fs::Lagrange{1, Square, 1}, N::Vector, ξ::Vector)
+function value!(fs::Lagrange{1, Square, 1}, N::Vector, ξ::Vec{1})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -55,14 +53,12 @@ function value!(fs::Lagrange{1, Square, 1}, N::Vector, ξ::Vector)
     return N
 end
 
-function derivative!(fs::Lagrange{1, Square, 1}, dN::Matrix, ξ::Vector)
+function derivative!{T}(fs::Lagrange{1, Square, 1}, dN::Vector{Vec{1, T}}, ξ::Vec{1, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
-        ξ_x = ξ[1]
-
-        dN[1,1] = -0.5
-        dN[1,2] =  0.5
+        dN[1] = Vec{1,T}((-0.5,))
+        dN[2] = Vec{1,T}((0.5,))
     end
 
     return dN
@@ -74,7 +70,7 @@ end
 
 n_basefunctions(::Lagrange{1, Square, 2}) = 3
 
-function value!(fs::Lagrange{1, Square, 2}, N::Vector, ξ::Vector)
+function value!(fs::Lagrange{1, Square, 2}, N::Vector, ξ::Vec{1})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -90,15 +86,15 @@ end
 
 
 
-function derivative!(fs::Lagrange{1, Square, 2}, dN::Matrix, ξ::Vector)
+function derivative!{T}(fs::Lagrange{1, Square, 2}, dN::Vector{Vec{1, T}}, ξ::Vec{1, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
         ξ_x = ξ[1]
 
-        dN[1,1] = ξ_x - 0.5
-        dN[1,2] = -2 * ξ_x
-        dN[1,3] = ξ_x + 0.5
+        dN[1] = Vec{1,T}((ξ_x - 0.5,))
+        dN[2] = Vec{1,T}((-2 * ξ_x,))
+        dN[3] = Vec{1,T}((ξ_x + 0.5,))
     end
 
     return dN
@@ -110,7 +106,7 @@ end
 
 n_basefunctions(::Lagrange{2, Square, 1}) = 4
 
-function value!(fs::Lagrange{2, Square, 1}, N::Vector, ξ::Vector)
+function value!(fs::Lagrange{2, Square, 1}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -126,24 +122,24 @@ function value!(fs::Lagrange{2, Square, 1}, N::Vector, ξ::Vector)
     return N
 end
 
-function derivative!(fs::Lagrange{2, Square, 1}, dN::Matrix, ξ::Vector)
+function derivative!{T}(fs::Lagrange{2, Square, 1}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
         ξ_x = ξ[1]
         ξ_y = ξ[2]
 
-        dN[1,1] =  (1 + ξ_y) * 0.25
-        dN[2,1] =  (1 + ξ_x) * 0.25
+        dN[1] =  Vec{2, T}(( (1 + ξ_y) * 0.25,
+                             (1 + ξ_x) * 0.25))
 
-        dN[1,2] = -(1 + ξ_y) * 0.25
-        dN[2,2] =  (1 - ξ_x) * 0.25
+        dN[2] = Vec{2, T}((-(1 + ξ_y) * 0.25,
+                            (1 - ξ_x) * 0.25))
 
-        dN[1,3] = -(1 - ξ_y) * 0.25
-        dN[2,3] = -(1 - ξ_x) * 0.25
+        dN[3] = Vec{2, T}(( -(1 - ξ_y) * 0.25,
+                            -(1 - ξ_x) * 0.25))
 
-        dN[1,4] =  (1 - ξ_y) * 0.25
-        dN[2,4] = -(1 + ξ_x) * 0.25
+        dN[4] = Vec{2, T}(( (1 - ξ_y) * 0.25,
+                           -(1 + ξ_x) * 0.25))
     end
 
     return dN
@@ -155,7 +151,7 @@ end
 
 n_basefunctions(::Lagrange{2, Triangle, 1}) = 3
 
-function value!(fs::Lagrange{2, Triangle, 1}, N::Vector, ξ::Vector)
+function value!(fs::Lagrange{2, Triangle, 1}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -170,18 +166,13 @@ function value!(fs::Lagrange{2, Triangle, 1}, N::Vector, ξ::Vector)
     return N
 end
 
-function derivative!(fs::Lagrange{2, Triangle, 1}, dN::Matrix, ξ::Vector)
+function derivative!{T}(fs::Lagrange{2, Triangle, 1}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
-        dN[1,1] =  1.0
-        dN[2,1] =  0.0
-
-        dN[1,2] = 0.0
-        dN[2,2] = 1.0
-
-        dN[1,3] = -1.0
-        dN[2,3] = -1.0
+        dN[1] = Vec{2, T}((1.0, 0.0))
+        dN[2] = Vec{2, T}((0.0, 1.0))
+        dN[3] = Vec{2, T}((-1.0, -1.0))
     end
 
     return dN
@@ -193,7 +184,7 @@ end
 
 n_basefunctions(::Lagrange{2, Triangle, 2}) = 6
 
-function value!(fs::Lagrange{2, Triangle, 2}, N::Vector, ξ::Vector)
+function value!(fs::Lagrange{2, Triangle, 2}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -213,7 +204,7 @@ function value!(fs::Lagrange{2, Triangle, 2}, N::Vector, ξ::Vector)
     return N
 end
 
-function derivative!(fs::Lagrange{2, Triangle, 2}, dN::Matrix, ξ::Vector)
+function derivative!{T}(fs::Lagrange{2, Triangle, 2}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -223,19 +214,12 @@ function derivative!(fs::Lagrange{2, Triangle, 2}, dN::Matrix, ξ::Vector)
 
         γ = 1 - ξ_x - ξ_y
 
-        dN[1, 1] = 4ξ_x - 1
-        dN[1, 2] = 0
-        dN[1, 3] = -4γ + 1
-        dN[1, 4] = 4ξ_y
-        dN[1, 5] = -4ξ_y
-        dN[1, 6] = 4(γ - ξ_x)
-
-        dN[2, 1] = 0
-        dN[2, 2] = 4ξ_y - 1
-        dN[2, 3] = -4γ + 1
-        dN[2, 4] = 4ξ_x
-        dN[2, 5] = 4(γ - ξ_y)
-        dN[2, 6] = -4ξ_x
+        dN[1] = Vec{2,T}((4ξ_x - 1, zero(T)))
+        dN[2] = Vec{2,T}((zero(T),  4ξ_y - 1))
+        dN[3] = Vec{2,T}((-4γ + 1,  -4γ + 1))
+        dN[4] = Vec{2,T}((4ξ_y,  4ξ_x))
+        dN[5] = Vec{2,T}((-4ξ_y,  4(γ - ξ_y)))
+        dN[6] = Vec{2,T}((4(γ - ξ_x),  -4ξ_x))
     end
 
     return dN
@@ -248,7 +232,7 @@ end
 
 n_basefunctions(::Lagrange{3, Square, 1}) = 8
 
-function value!(fs::Lagrange{3, Square, 1}, N::Vector, ξ::Vector)
+function value!(fs::Lagrange{3, Square, 1}, N::Vector, ξ::Vec{3})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -269,7 +253,7 @@ function value!(fs::Lagrange{3, Square, 1}, N::Vector, ξ::Vector)
     return N
 end
 
-function derivative!(fs::Lagrange{3, Square, 1}, dN::Matrix, ξ::Vector)
+function derivative!{T}(fs::Lagrange{3, Square, 1}, dN::Vector{Vec{3, T}}, ξ::Vec{3, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -277,32 +261,14 @@ function derivative!(fs::Lagrange{3, Square, 1}, dN::Matrix, ξ::Vector)
         ξ_y = ξ[2]
         ξ_z = ξ[3]
 
-        dN[1, 1] = -0.125(1 - ξ_y) * (1 - ξ_z)
-        dN[1, 2] =  0.125(1 - ξ_y) * (1 - ξ_z)
-        dN[1, 3] =  0.125(1 + ξ_y) * (1 - ξ_z)
-        dN[1, 4] = -0.125(1 + ξ_y) * (1 - ξ_z)
-        dN[1, 5] = -0.125(1 - ξ_y) * (1 + ξ_z)
-        dN[1, 6] =  0.125(1 - ξ_y) * (1 + ξ_z)
-        dN[1, 7] =  0.125(1 + ξ_y) * (1 + ξ_z)
-        dN[1, 8] = -0.125(1 + ξ_y) * (1 + ξ_z)
-
-        dN[2, 1] = -0.125(1 - ξ_x) * (1 - ξ_z)
-        dN[2, 2] = -0.125(1 + ξ_x) * (1 - ξ_z)
-        dN[2, 3] =  0.125(1 + ξ_x) * (1 - ξ_z)
-        dN[2, 4] =  0.125(1 - ξ_x) * (1 - ξ_z)
-        dN[2, 5] = -0.125(1 - ξ_x) * (1 + ξ_z)
-        dN[2, 6] = -0.125(1 + ξ_x) * (1 + ξ_z)
-        dN[2, 7] =  0.125(1 + ξ_x) * (1 + ξ_z)
-        dN[2, 8] =  0.125(1 - ξ_x) * (1 + ξ_z)
-
-        dN[3, 1] = -0.125(1 - ξ_x) * (1 - ξ_y)
-        dN[3, 2] = -0.125(1 + ξ_x) * (1 - ξ_y)
-        dN[3, 3] = -0.125(1 + ξ_x) * (1 + ξ_y)
-        dN[3, 4] = -0.125(1 - ξ_x) * (1 + ξ_y)
-        dN[3, 5] =  0.125(1 - ξ_x) * (1 - ξ_y)
-        dN[3, 6] =  0.125(1 + ξ_x) * (1 - ξ_y)
-        dN[3, 7] =  0.125(1 + ξ_x) * (1 + ξ_y)
-        dN[3, 8] =  0.125(1 - ξ_x) * (1 + ξ_y)
+        dN[1]  = Vec{3,T}(( -0.125(1 - ξ_y) * (1 - ξ_z),   -0.125(1 - ξ_x) * (1 - ξ_z),   -0.125(1 - ξ_x) * (1 - ξ_y)))
+        dN[2]  = Vec{3,T}((  0.125(1 - ξ_y) * (1 - ξ_z),   -0.125(1 + ξ_x) * (1 - ξ_z),   -0.125(1 + ξ_x) * (1 - ξ_y)))
+        dN[3]  = Vec{3,T}((  0.125(1 + ξ_y) * (1 - ξ_z),    0.125(1 + ξ_x) * (1 - ξ_z),   -0.125(1 + ξ_x) * (1 + ξ_y)))
+        dN[4]  = Vec{3,T}(( -0.125(1 + ξ_y) * (1 - ξ_z),    0.125(1 - ξ_x) * (1 - ξ_z),   -0.125(1 - ξ_x) * (1 + ξ_y)))
+        dN[5]  = Vec{3,T}(( -0.125(1 - ξ_y) * (1 + ξ_z),   -0.125(1 - ξ_x) * (1 + ξ_z),    0.125(1 - ξ_x) * (1 - ξ_y)))
+        dN[6]  = Vec{3,T}((  0.125(1 - ξ_y) * (1 + ξ_z),   -0.125(1 + ξ_x) * (1 + ξ_z),    0.125(1 + ξ_x) * (1 - ξ_y)))
+        dN[7]  = Vec{3,T}((  0.125(1 + ξ_y) * (1 + ξ_z),    0.125(1 + ξ_x) * (1 + ξ_z),    0.125(1 + ξ_x) * (1 + ξ_y)))
+        dN[8]  = Vec{3,T}(( -0.125(1 + ξ_y) * (1 + ξ_z),    0.125(1 - ξ_x) * (1 + ξ_z),    0.125(1 - ξ_x) * (1 + ξ_y)))
     end
 
     return dN
@@ -317,7 +283,7 @@ type Serendipity{dim, shape, order} <: FunctionSpace{dim, shape, order} end
 
 n_basefunctions(::Serendipity{2, Square, 2}) = 8
 
-function value!(fs::Serendipity{2, Square, 2}, N::Vector, ξ::Vector)
+function value!(fs::Serendipity{2, Square, 2}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
 
     ξ_x = ξ[1]
@@ -336,30 +302,21 @@ function value!(fs::Serendipity{2, Square, 2}, N::Vector, ξ::Vector)
     return N
 end
 
-function derivative!(fs::Serendipity{2, Square, 2}, dN::Matrix, ξ::Vector)
+function derivative!{T}(fs::Serendipity{2, Square, 2}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
     checkdim_derivative(fs, dN, ξ)
 
     ξ_x = ξ[1]
     ξ_y = ξ[2]
 
     @inbounds begin
-        dN[1, 1] = -0.25(1 - ξ_y) * (-2ξ_x - ξ_y)
-        dN[1, 2] =  0.25(1 - ξ_y) * ( 2ξ_x - ξ_y)
-        dN[1, 3] =  0.25(1 + ξ_y) * ( 2ξ_x + ξ_y)
-        dN[1, 4] = -0.25(1 + ξ_y) * (-2ξ_x + ξ_y)
-        dN[1, 5] = -ξ_x*(1 - ξ_y)
-        dN[1, 6] =  0.5(1 - ξ_y * ξ_y)
-        dN[1, 7] = -ξ_x*(1 + ξ_y)
-        dN[1, 8] = -0.5(1 - ξ_y * ξ_y)
-
-        dN[2, 1] = -0.25(1 - ξ_x) * (-2ξ_y - ξ_x)
-        dN[2, 2] = -0.25(1 + ξ_x) * (-2ξ_y + ξ_x)
-        dN[2, 3] =  0.25(1 + ξ_x) * ( 2ξ_y + ξ_x)
-        dN[2, 4] =  0.25(1 - ξ_x) * ( 2ξ_y - ξ_x)
-        dN[2, 5] = -0.5(1 - ξ_x * ξ_x)
-        dN[2, 6] = -ξ_y*(1 + ξ_x)
-        dN[2, 7] =  0.5(1 - ξ_x * ξ_x)
-        dN[2, 8] = -ξ_y*(1 - ξ_x)
+        dN[1] = Vec{2, T}((-0.25(1 - ξ_y) * (-2ξ_x - ξ_y), -0.25(1 - ξ_x) * (-2ξ_y - ξ_x)))
+        dN[2] = Vec{2, T}(( 0.25(1 - ξ_y) * ( 2ξ_x - ξ_y), -0.25(1 + ξ_x) * (-2ξ_y + ξ_x)))
+        dN[3] = Vec{2, T}(( 0.25(1 + ξ_y) * ( 2ξ_x + ξ_y),  0.25(1 + ξ_x) * ( 2ξ_y + ξ_x)))
+        dN[4] = Vec{2, T}((-0.25(1 + ξ_y) * (-2ξ_x + ξ_y),  0.25(1 - ξ_x) * ( 2ξ_y - ξ_x)))
+        dN[5] = Vec{2, T}(( -ξ_x*(1 - ξ_y),  -0.5(1 - ξ_x * ξ_x)))
+        dN[6] = Vec{2, T}((  0.5(1 - ξ_y * ξ_y),  -ξ_y*(1 + ξ_x)))
+        dN[7] = Vec{2, T}(( -ξ_x*(1 + ξ_y),   0.5(1 - ξ_x * ξ_x)))
+        dN[8] = Vec{2, T}(( -0.5(1 - ξ_y * ξ_y),  -ξ_y*(1 - ξ_x)))
     end
     return dN
 end

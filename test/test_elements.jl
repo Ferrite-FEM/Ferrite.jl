@@ -41,7 +41,7 @@ end
     # Set dirichlet boundary conditions such that u_x = u_y = 0.1x + 0.05y
     # Solve and see that middle node is at correct position
     function patch_test()
-        Coord = [0 0
+        Coord = [0. 0
                  1 0
                  1 1
                  0 1
@@ -90,8 +90,8 @@ end
           a = start_assemble()
           D = hooke(2, 250e9, 0.3)
           for e in 1:size(Edof, 2)
-            ex = [get_coord(i) for i in Edof[1:2:end, e]]
-            ey = [get_coord(i) for i in Edof[2:2:end, e]]
+            ex = Float64[get_coord(i) for i in Edof[1:2:end, e]]
+            ey = Float64[get_coord(i) for i in Edof[2:2:end, e]]
             Ke, _ = plani4e(ex, ey, [2, 1, 2], D)
             assemble(Edof[:, e], a, Ke)
           end

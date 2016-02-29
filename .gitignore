@@ -1,5 +1,7 @@
 *.jl.cov
 *.jl.*.cov
 *.jl.mem
+*.vtu
+*.pvd
 examples/.ipynb_checkpoints/
 /doc/_build/
