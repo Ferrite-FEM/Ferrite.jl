@@ -1,39 +1,49 @@
-abstract FunctionSpace{order, shape}
+abstract FunctionSpace{dim, shape, order}
 
-@inline n_dim(fs::FunctionSpace) = n_dim(ref_shape(fs))
-
-@inline ref_shape{order, shape}(fs::FunctionSpace{order, shape}) = shape()
-@inline order{order, shape}(fs::FunctionSpace{order, shape}) = order
+@inline n_dim{dim, shape, order}(fs::FunctionSpace{dim, shape, order}) = dim
+@inline ref_shape{order, shape, dim}(fs::FunctionSpace{dim, shape, order}) = shape()
+@inline order{dim, shape, order}(fs::FunctionSpace{dim, shape, order}) = order
 
 """
 Computes the value of the shape functions at a point ξ for a given function space
 """
-function value{order, shape}(fs::FunctionSpace{order, shape}, ξ::Vector)
+function value(fs::FunctionSpace, ξ::Vector)
     value!(fs, zeros(eltype(ξ), n_basefunctions(fs)), ξ)
 end
 
 """
 Computes the gradients of the shape functions at a point ξ for a given function space
 """
-function derivative{order, shape}(fs::FunctionSpace{order, shape}, ξ::Vector)
+function derivative(fs::FunctionSpace, ξ::Vector)
     derivative!(fs, zeros(eltype(ξ), n_dim(fs), n_basefunctions(fs)), ξ)
+end
+
+@inline function checkdim_value{dim}(fs::FunctionSpace{dim}, N::Vector, ξ::Vector)
+    n_base = n_basefunctions(fs)
+    length(N) == n_base || throw(ArgumentError("N must have length $(n_base)"))
+    length(ξ) == dim || throw(ArgumentError("ξ must have length $dim"))
+end
+
+@inline function checkdim_derivative{dim}(fs::FunctionSpace{dim}, dN::Matrix, ξ::Vector)
+    n_base = n_basefunctions(fs)
+    size(dN) == (dim, n_base) || throw(ArgumentError("dN must have size ($dim, $n_base)"))
+    length(ξ) == dim || throw(ArgumentError("ξ must have length $dim"))
 end
 
 ############
 # Lagrange
 ############
 
-type Lagrange{order, shape} <: FunctionSpace{order, shape} end
+type Lagrange{dim, shape, order} <: FunctionSpace{dim, shape, order} end
 
-#################
-# Lagrange 1 Line
-#################
+#################################
+# Lagrange dim 1 Square order 1 #
+#################################
 
-n_basefunctions(::Lagrange{1, Line}) = 2
+n_basefunctions(::Lagrange{1, Square, 1}) = 2
 
-function value!(::Lagrange{1, Line}, N::Vector, ξ::Vector)
-    length(N) == 2 || throw(ArgumentError("N must have length 2"))
-    length(ξ) == 1 || throw(ArgumentError("ξ must have length 1"))
+function value!(fs::Lagrange{1, Square, 1}, N::Vector, ξ::Vector)
+    checkdim_value(fs, N, ξ)
 
     @inbounds begin
         ξ_x = ξ[1]
@@ -45,9 +55,8 @@ function value!(::Lagrange{1, Line}, N::Vector, ξ::Vector)
     return N
 end
 
-function derivative!(::Lagrange{1, Line}, dN::Matrix, ξ::Vector)
-    size(dN) == (1,2) || throw(ArgumentError("dN must have size (1,2)"))
-    length(ξ) == 1 || throw(ArgumentError("ξ must have length 1"))
+function derivative!(fs::Lagrange{1, Square, 1}, dN::Matrix, ξ::Vector)
+    checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
         ξ_x = ξ[1]
@@ -59,15 +68,14 @@ function derivative!(::Lagrange{1, Line}, dN::Matrix, ξ::Vector)
     return dN
 end
 
-#################
-# Lagrange 2 Line
-#################
+#################################
+# Lagrange dim 1 Square order 2 #
+#################################
 
-n_basefunctions(::Lagrange{2, Line}) = 3
+n_basefunctions(::Lagrange{1, Square, 2}) = 3
 
-function value!(::Lagrange{2, Line}, N::Vector, ξ::Vector)
-    length(N) == 3 || throw(ArgumentError("N must have length 3"))
-    length(ξ) == 1 || throw(ArgumentError("ξ must have length 1"))
+function value!(fs::Lagrange{1, Square, 2}, N::Vector, ξ::Vector)
+    checkdim_value(fs, N, ξ)
 
     @inbounds begin
         ξ_x = ξ[1]
@@ -82,9 +90,8 @@ end
 
 
 
-function derivative!(::Lagrange{2, Line}, dN::Matrix, ξ::Vector)
-    size(dN) == (1,3) || throw(ArgumentError("dN must have size (1,3)"))
-    length(ξ) == 1 || throw(ArgumentError("ξ must have length 1"))
+function derivative!(fs::Lagrange{1, Square, 2}, dN::Matrix, ξ::Vector)
+    checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
         ξ_x = ξ[1]
@@ -97,15 +104,14 @@ function derivative!(::Lagrange{2, Line}, dN::Matrix, ξ::Vector)
     return dN
 end
 
-###################
-# Lagrange 1 Square
-###################
+#################################
+# Lagrange dim 2 Square order 1 #
+#################################
 
-n_basefunctions(::Lagrange{1, Square}) = 4
+n_basefunctions(::Lagrange{2, Square, 1}) = 4
 
-function value!(::Lagrange{1, Square}, N::Vector, ξ::Vector)
-    length(N) == 4 || throw(ArgumentError("N must have length 4"))
-    length(ξ) == 2 || throw(ArgumentError("ξ must have length 2"))
+function value!(fs::Lagrange{2, Square, 1}, N::Vector, ξ::Vector)
+    checkdim_value(fs, N, ξ)
 
     @inbounds begin
         ξ_x = ξ[1]
@@ -120,9 +126,8 @@ function value!(::Lagrange{1, Square}, N::Vector, ξ::Vector)
     return N
 end
 
-function derivative!(::Lagrange{1, Square}, dN::Matrix, ξ::Vector)
-    size(dN) == (2, 4) || throw(ArgumentError("dN must have size (2, 4)"))
-    length(ξ) == 2 || throw(ArgumentError("ξ must have length 2"))
+function derivative!(fs::Lagrange{2, Square, 1}, dN::Matrix, ξ::Vector)
+    checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
         ξ_x = ξ[1]
@@ -144,15 +149,14 @@ function derivative!(::Lagrange{1, Square}, dN::Matrix, ξ::Vector)
     return dN
 end
 
-#####################
-# Lagrange 1 Triangle
-#####################
+###################################
+# Lagrange dim 2 Triangle order 1 #
+###################################
 
-n_basefunctions(::Lagrange{1, Triangle}) = 3
+n_basefunctions(::Lagrange{2, Triangle, 1}) = 3
 
-function value!(::Lagrange{1, Triangle}, N::Vector, ξ::Vector)
-    length(N) == 3 || throw(ArgumentError("N must have length 3"))
-    length(ξ) == 2 || throw(ArgumentError("ξ must have length 2"))
+function value!(fs::Lagrange{2, Triangle, 1}, N::Vector, ξ::Vector)
+    checkdim_value(fs, N, ξ)
 
     @inbounds begin
         ξ_x = ξ[1]
@@ -166,9 +170,8 @@ function value!(::Lagrange{1, Triangle}, N::Vector, ξ::Vector)
     return N
 end
 
-function derivative!(::Lagrange{1, Triangle}, dN::Matrix, ξ::Vector)
-    size(dN) == (2, 3) || throw(ArgumentError("dN must have size (2, 3)"))
-    length(ξ) == 2 || throw(ArgumentError("ξ must have length 2"))
+function derivative!(fs::Lagrange{2, Triangle, 1}, dN::Matrix, ξ::Vector)
+    checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
         dN[1,1] =  1.0
@@ -184,15 +187,14 @@ function derivative!(::Lagrange{1, Triangle}, dN::Matrix, ξ::Vector)
     return dN
 end
 
-#####################
-# Lagrange 2 Triangle
-#####################
+###################################
+# Lagrange dim 2 Triangle order 2 #
+###################################
 
-n_basefunctions(::Lagrange{2, Triangle}) = 6
+n_basefunctions(::Lagrange{2, Triangle, 2}) = 6
 
-function value!(::Lagrange{2, Triangle}, N::Vector, ξ::Vector)
-    length(N) == 6 || throw(ArgumentError("N must have length 6"))
-    length(ξ) == 2 || throw(ArgumentError("ξ must have length 2"))
+function value!(fs::Lagrange{2, Triangle, 2}, N::Vector, ξ::Vector)
+    checkdim_value(fs, N, ξ)
 
     @inbounds begin
         ξ_x = ξ[1]
@@ -211,9 +213,8 @@ function value!(::Lagrange{2, Triangle}, N::Vector, ξ::Vector)
     return N
 end
 
-function derivative!(::Lagrange{2, Triangle}, dN::Matrix, ξ::Vector)
-    size(dN) == (2, 6) || throw(ArgumentError("dN must have size (2, 6)"))
-    length(ξ) == 2 || throw(ArgumentError("ξ must have length 2"))
+function derivative!(fs::Lagrange{2, Triangle, 2}, dN::Matrix, ξ::Vector)
+    checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
 
@@ -241,15 +242,14 @@ function derivative!(::Lagrange{2, Triangle}, dN::Matrix, ξ::Vector)
 end
 
 
-#################
-# Lagrange 1 Cube
-#################
+###################################
+# Lagrange dim 3 Square order 1 #
+###################################
 
-n_basefunctions(::Lagrange{1, Cube}) = 8
+n_basefunctions(::Lagrange{3, Square, 1}) = 8
 
-function value!(::Lagrange{1, Cube}, N::Vector, ξ::Vector)
-    length(N) == 8 || throw(ArgumentError("N must have length 8"))
-    length(ξ) == 3 || throw(ArgumentError("ξ must have length 3"))
+function value!(fs::Lagrange{3, Square, 1}, N::Vector, ξ::Vector)
+    checkdim_value(fs, N, ξ)
 
     @inbounds begin
         ξ_x = ξ[1]
@@ -269,10 +269,8 @@ function value!(::Lagrange{1, Cube}, N::Vector, ξ::Vector)
     return N
 end
 
-function derivative!(fs::Lagrange{1, Cube}, dN::Matrix, ξ::Vector)
-
-    size(dN) == (3, 8) || throw(ArgumentError("dN must have size (3, 8)"))
-    length(ξ) == 3 || throw(ArgumentError("ξ must have length 3"))
+function derivative!(fs::Lagrange{3, Square, 1}, dN::Matrix, ξ::Vector)
+    checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
         ξ_x = ξ[1]
@@ -311,17 +309,16 @@ function derivative!(fs::Lagrange{1, Cube}, dN::Matrix, ξ::Vector)
 end
 
 
-#################
-# Serendipity Q 2
-#################
+####################################
+# Serendipity dim 2 Square order 2 #
+####################################
 
-type Serendipity{order, shape} <: FunctionSpace{order, shape} end
+type Serendipity{dim, shape, order} <: FunctionSpace{dim, shape, order} end
 
-n_basefunctions(::Serendipity{2, Square}) = 8
+n_basefunctions(::Serendipity{2, Square, 2}) = 8
 
-function value!(::Serendipity{2, Square}, N::Vector, ξ::Vector)
-    length(N) == 8 || throw(ArgumentError("N must have length 3"))
-    length(ξ) == 2 || throw(ArgumentError("ξ must have length 2"))
+function value!(fs::Serendipity{2, Square, 2}, N::Vector, ξ::Vector)
+    checkdim_value(fs, N, ξ)
 
     ξ_x = ξ[1]
     ξ_y = ξ[2]
@@ -339,9 +336,8 @@ function value!(::Serendipity{2, Square}, N::Vector, ξ::Vector)
     return N
 end
 
-function derivative!(::Serendipity{2, Square}, dN::Matrix, ξ::Vector)
-    size(dN) == (2, 8) || throw(ArgumentError("dN must have size (2, 8)"))
-    length(ξ) == 2 || throw(ArgumentError("ξ must have length 2"))
+function derivative!(fs::Serendipity{2, Square, 2}, dN::Matrix, ξ::Vector)
+    checkdim_derivative(fs, dN, ξ)
 
     ξ_x = ξ[1]
     ξ_y = ξ[2]

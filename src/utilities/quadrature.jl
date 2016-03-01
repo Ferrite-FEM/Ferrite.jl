@@ -24,10 +24,39 @@ function integrate(qr::QuadratureRule, f)
     return I
 end
 
-get_gaussrule(::Line, order::Int) = get_linerule(order)
-get_gaussrule(::Triangle, order::Int) = get_trirule(order)
-get_gaussrule(::Square, order::Int) = get_quadrule(order)
-get_gaussrule(::Cube, order::Int) = get_cuberule(order)
+
+function get_gaussrule(::Type{Dim{2}}, ::Triangle, order::Int)
+    if order <= 5
+        return trirules[order]
+    else
+        return make_trirule(order)
+    end
+end
+
+function get_gaussrule(::Type{Dim{1}}, ::Square, order::Int)
+    if order <= 5
+        return linerules[order]
+    else
+        return make_linerule(order)
+    end
+end
+
+function get_gaussrule(::Type{Dim{2}}, ::Square, order::Int)
+    if order <= 5
+        return quadrules[order]
+    else
+        return make_quadrule(order)
+    end
+end
+
+function get_gaussrule(::Type{Dim{3}}, ::Square, order::Int)
+    if order <= 5
+        return cuberules[order]
+    else
+        return make_cuberule(order)
+    end
+end
+
 
 """
 Creates a `GaussQuadratureRule` that integrates
