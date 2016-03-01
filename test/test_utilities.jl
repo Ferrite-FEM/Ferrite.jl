@@ -1,5 +1,5 @@
 import JuAFEM: det_spec, inv_spec, inv_spec!,
-               Line, Square, Triangle, Cube, Serendipity, Lagrange
+               Square, Triangle
 
 using ForwardDiff
 
@@ -162,13 +162,13 @@ end
 
 @testset "function space derivatives and sums" begin
 
-    for functionspace in (Lagrange{1, Line}(),
-                          Lagrange{2, Line}(),
-                          Lagrange{1, Square}(),
-                          Lagrange{1, Triangle}(),
-                          Lagrange{2, Triangle}(),
-                          Lagrange{1, Cube}(),
-                          Serendipity{2, Square}())
+    for functionspace in (Lagrange{1, Square, 1}(),
+                          Lagrange{2, Square, 1}(),
+                          Lagrange{1, Square, 2}(),
+                          Lagrange{1, Triangle, 2}(),
+                          Lagrange{2, Triangle, 2}(),
+                          Lagrange{1, Square, 3}(),
+                          Serendipity{2, Square, 2}())
         x = rand(JuAFEM.n_dim(functionspace))
         f = (x) -> JuAFEM.value(functionspace, x)
         @test ForwardDiff.jacobian(f, x)' ≈ JuAFEM.derivative(functionspace, x)

@@ -1,5 +1,4 @@
-import JuAFEM: Square, Line, Square, Triangle, Cube,
-               Lagrange, Serendipity
+import JuAFEM: Square, Triangle
 
 
 @testset "fevalues" begin
@@ -44,8 +43,8 @@ import JuAFEM: Square, Line, Square, Triangle, Cube,
     D = hooke(2, 200e9, 0.3)
     t = 2.0
 
-    function_space = JuAFEM.Lagrange{1, JuAFEM.Square}()
-    q_rule = JuAFEM.get_gaussrule(Square(), 2)
+    function_space = JuAFEM.Lagrange{1, JuAFEM.Square, 2}()
+    q_rule = JuAFEM.get_gaussrule(Square(), 2, 2)
     fev = FEValues(Float64, q_rule, function_space)
 
 
@@ -79,13 +78,13 @@ end
 
 @testset "function interpolations" begin
 
-    for (function_space, quad_rule) in  ((Lagrange{1, Line}(), JuAFEM.get_gaussrule(Line(), 2)),
-                                         (Lagrange{2, Line}(), JuAFEM.get_gaussrule(Line(), 2)),
-                                         (Lagrange{1, Square}(), JuAFEM.get_gaussrule(Square(), 2)),
-                                         (Lagrange{1, Triangle}(), JuAFEM.get_gaussrule(Triangle(), 2)),
-                                         (Lagrange{2, Triangle}(), JuAFEM.get_gaussrule(Triangle(), 2)),
-                                         (Lagrange{1, Cube}(), JuAFEM.get_gaussrule(Cube(), 2)),
-                                         (Serendipity{2, Square}(), JuAFEM.get_gaussrule(Square(), 2)))
+    for (function_space, quad_rule) in  ((Lagrange{1, Square, 1}(), JuAFEM.get_gaussrule(Square(), 1, 2)),
+                                         (Lagrange{2, Square, 1}(), JuAFEM.get_gaussrule(Square(), 1, 2)),
+                                         (Lagrange{1, Square, 2}(), JuAFEM.get_gaussrule(Square(), 2, 2)),
+                                         (Lagrange{1, Triangle, 2}(), JuAFEM.get_gaussrule(Triangle(), 2, 2)),
+                                         (Lagrange{2, Triangle, 2}(), JuAFEM.get_gaussrule(Triangle(), 2, 2)),
+                                         (Lagrange{1, Square, 3}(), JuAFEM.get_gaussrule(Square(), 3, 2)),
+                                         (Serendipity{2, Square, 2}(), JuAFEM.get_gaussrule(Square(), 2, 2)))
 
 
         fev = FEValues(quad_rule, function_space)
