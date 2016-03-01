@@ -39,7 +39,7 @@ end
 
 H_S_1 = FElement(
     :heat_square_1,
-    Lagrange{1, Square, 2}(),
+    Lagrange{2, Square, 1}(),
     get_default_heat_vars(4, 2),
     4,
     1,
@@ -65,7 +65,7 @@ H_S_2 = FElement(
 
 H_T_1 = FElement(
     :heat_tri_1,
-    Lagrange{1, Triangle, 2}(),
+    Lagrange{2, Triangle, 1}(),
     get_default_heat_vars(3, 2),
     3,
     1,
@@ -78,7 +78,7 @@ H_T_1 = FElement(
 
 H_C_1 = FElement(
     :heat_cube_1,
-    Lagrange{1, Square, 3}(),
+    Lagrange{3, Square, 1}(),
     get_default_heat_vars(8, 3),
     8,
     1,

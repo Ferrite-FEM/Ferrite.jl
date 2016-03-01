@@ -163,11 +163,11 @@ end
 @testset "function space derivatives and sums" begin
 
     for functionspace in (Lagrange{1, Square, 1}(),
-                          Lagrange{2, Square, 1}(),
                           Lagrange{1, Square, 2}(),
-                          Lagrange{1, Triangle, 2}(),
+                          Lagrange{2, Square, 1}(),
+                          Lagrange{2, Triangle, 1}(),
                           Lagrange{2, Triangle, 2}(),
-                          Lagrange{1, Square, 3}(),
+                          Lagrange{3, Square, 1}(),
                           Serendipity{2, Square, 2}())
         x = rand(JuAFEM.n_dim(functionspace))
         f = (x) -> JuAFEM.value(functionspace, x)

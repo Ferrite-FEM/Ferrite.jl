@@ -43,7 +43,7 @@ import JuAFEM: Square, Triangle
     D = hooke(2, 200e9, 0.3)
     t = 2.0
 
-    function_space = JuAFEM.Lagrange{1, JuAFEM.Square, 2}()
+    function_space = JuAFEM.Lagrange{2, JuAFEM.Square, 1}()
     q_rule = JuAFEM.get_gaussrule(Square(), 2, 2)
     fev = FEValues(Float64, q_rule, function_space)
 
@@ -79,11 +79,11 @@ end
 @testset "function interpolations" begin
 
     for (function_space, quad_rule) in  ((Lagrange{1, Square, 1}(), JuAFEM.get_gaussrule(Square(), 1, 2)),
-                                         (Lagrange{2, Square, 1}(), JuAFEM.get_gaussrule(Square(), 1, 2)),
-                                         (Lagrange{1, Square, 2}(), JuAFEM.get_gaussrule(Square(), 2, 2)),
-                                         (Lagrange{1, Triangle, 2}(), JuAFEM.get_gaussrule(Triangle(), 2, 2)),
+                                         (Lagrange{1, Square, 2}(), JuAFEM.get_gaussrule(Square(), 1, 2)),
+                                         (Lagrange{2, Square, 1}(), JuAFEM.get_gaussrule(Square(), 2, 2)),
+                                         (Lagrange{2, Triangle, 1}(), JuAFEM.get_gaussrule(Triangle(), 2, 2)),
                                          (Lagrange{2, Triangle, 2}(), JuAFEM.get_gaussrule(Triangle(), 2, 2)),
-                                         (Lagrange{1, Square, 3}(), JuAFEM.get_gaussrule(Square(), 3, 2)),
+                                         (Lagrange{3, Square, 1}(), JuAFEM.get_gaussrule(Square(), 3, 2)),
                                          (Serendipity{2, Square, 2}(), JuAFEM.get_gaussrule(Square(), 2, 2)))
 
 
