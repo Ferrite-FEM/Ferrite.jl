@@ -1,20 +1,19 @@
-type FEValues{T <: Real, QR <: QuadratureRule, FS <: FunctionSpace}
+type FEValues{dim, T <: Real, FS <: FunctionSpace}
     J::Matrix{T}
     Jinv::Matrix{T}
     N::Vector{Vector{T}}
     dNdx::Vector{Matrix{T}}
     dNdξ::Vector{Matrix{T}}
     detJdV::Vector{T}
-    quad_rule::QR
+    quad_rule::QuadratureRule{dim}
     function_space::FS
 end
 
 """
 Initializes an `FEValues` object from a function space and a quadrature rule.
 """
-function FEValues{T, QR <: QuadratureRule, FS <: FunctionSpace}(::Type{T}, quad_rule::QR, func_space::FS)
+function FEValues{dim, T, FS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim}, func_space::FS)
         n_basefuncs = n_basefunctions(func_space)
-        dim = n_dim(func_space)
 
         n_qpoints = length(points(quad_rule))
 
@@ -29,9 +28,9 @@ function FEValues{T, QR <: QuadratureRule, FS <: FunctionSpace}(::Type{T}, quad_
             derivative!(func_space, dNdξ[i], ξ)
         end
 
-        FEValues{T, QR, FS}(J, Jinv, N, dNdx, dNdξ, zeros(T, n_qpoints), quad_rule, func_space)
+        FEValues{dim, T, FS}(J, Jinv, N, dNdx, dNdξ, zeros(T, n_qpoints), quad_rule, func_space)
 end
-function FEValues{QR <: QuadratureRule, FS <: FunctionSpace}(quad_rule::QR, func_space::FS)
+function FEValues{dim, FS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS)
     FEValues(Float64, quad_rule, func_space)
 end
 
@@ -105,9 +104,8 @@ const shape_derivative = shape_gradient
 
 Computes the value in a quadrature point for a scalar valued function
 """
-@inline function function_scalar_value{T}(fe_v::FEValues, q_point::Int, u::Vector{T})
-    func_space = get_functionspace(fe_v)
-    @assert length(u) == n_basefunctions(func_space)
+@inline function function_scalar_value{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{T})
+    @assert length(u) == n_basefunctions(get_functionspace(fe_v))
     N = shape_value(fe_v, q_point)
     return dot(u, N)
 end
@@ -119,10 +117,8 @@ end
 Computes the value in a quadrature point for a vector valued function. Result is stored
 in `vec`
 """
-@inline function function_vector_value!{T}(vec::Vector{T}, fe_v::FEValues, q_point::Int, u::Vector{T})
-    func_space = get_functionspace(fe_v)
-    dim = n_dim(func_space)
-    n_base_funcs = n_basefunctions(func_space)
+@inline function function_vector_value!{dim, T}(vec::Vector{T}, fe_v::FEValues{dim}, q_point::Int, u::Vector{T})
+    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
     @assert length(u) == dim * n_base_funcs
     @assert length(vec) == dim
     fill!(vec, 0.0)
@@ -142,12 +138,17 @@ end
 Computes the gradient in a quadrature point for a scalar valued function. Result
 is stored in `grad`.
 """
-@inline function function_scalar_gradient!{T}(grad::Vector{T}, fe_v::FEValues, q_point::Int, u::Vector{T})
-    func_space = get_functionspace(fe_v)
-    @assert length(u) == n_basefunctions(func_space)
-    @assert length(grad) == n_dim(func_space)
+@inline function function_scalar_gradient!{dim, T}(grad::Vector{T}, fe_v::FEValues{dim}, q_point::Int, u::Vector{T})
+    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
+    @assert length(u) == n_base_funcs
+    @assert length(grad) == dim
     dN = shape_gradient(fe_v, q_point)
-    A_mul_B!(grad, dN, u)
+    fill!(grad, 0.0)
+    @inbounds for k in 1:dim # Loop order checked
+        @simd for i in 1:n_base_funcs
+            grad[k] += dN[k, i] * u[i]
+        end
+    end
     return grad
 end
 
@@ -158,17 +159,16 @@ end
 Computes the gradient (jacobian) in a quadrature point for a vector valued function. Result
 is stored in `grad`.
 """
-@inline function function_vector_gradient!{T}(grad::Matrix{T}, fe_v::FEValues, q_point::Int, u::Vector{T})
-    func_space = get_functionspace(fe_v)
-    n_base_funcs = n_basefunctions(func_space)
-    dim = n_dim(func_space)
+@inline function function_vector_gradient!{dim, T}(grad::Matrix{T}, fe_v::FEValues{dim}, q_point::Int, u::Vector{T})
+    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
     @assert length(u) == dim * n_base_funcs
     @assert size(grad) == (dim, dim)
     dN = shape_gradient(fe_v, q_point)
     fill!(grad, 0.0)
-    @inbounds for i in 1:n_base_funcs
-        offset = dim*(i-1)
-        for j in 1:dim, k in 1:dim
+
+    @inbounds for j in 1:dim, k in 1:dim
+        for i in 1:n_base_funcs
+            offset = dim*(i-1)
             grad[j, k] += dN[k, i] * u[offset + j]
         end
     end
@@ -182,10 +182,8 @@ end
 Computes the symmetric gradient (jacobian) in a quadrature point for a vector valued function.
 Result is stored in `grad`.
 """
-@inline function function_vector_symmetric_gradient!{T}(grad::Matrix{T}, fe_v::FEValues, q_point::Int, u::Vector{T})
-    func_space = get_functionspace(fe_v)
-    n_base_funcs = n_basefunctions(func_space)
-    dim = n_dim(func_space)
+@inline function function_vector_symmetric_gradient!{dim, T}(grad::Matrix{T}, fe_v::FEValues{dim}, q_point::Int, u::Vector{T})
+    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
     @assert length(u) == dim * n_base_funcs
     @assert size(grad) == (dim, dim)
     dN = shape_gradient(fe_v, q_point)
@@ -212,10 +210,8 @@ end
 
 Computes the divergence in a quadrature point for a vector valued function.
 """
-@inline function function_vector_divergence{T}(fe_v::FEValues, q_point::Int, u::Vector{T})
-    func_space = get_functionspace(fe_v)
-    n_base_funcs = n_basefunctions(func_space)
-    dim = n_dim(func_space)
+@inline function function_vector_divergence{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{T})
+    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
     @assert length(u) == dim * n_base_funcs
     dN = shape_gradient(fe_v, q_point)
     div = zero(T)
@@ -227,6 +223,3 @@ Computes the divergence in a quadrature point for a vector valued function.
     end
     return div
 end
-
-
-

@@ -1,21 +1,20 @@
-abstract QuadratureRule
 
 """
-A type that perform Gauss integration
+A type that perform quadrature points
 """
-type GaussQuadratureRule <: QuadratureRule
+type QuadratureRule{dim}
     weights::Vector{Float64}
     points::Vector{Vector{Float64}}
 end
 
-weights(qr::GaussQuadratureRule) = qr.weights
-points(qr::GaussQuadratureRule) = qr.points
+weights(qr::QuadratureRule) = qr.weights
+points(qr::QuadratureRule) = qr.points
 
 """
 Integrates the function *f* with the given
-`GaussQuadratureRule`
+`QuadratureRule`
 """
-function integrate(qr::GaussQuadratureRule, f)
+function integrate(qr::QuadratureRule, f)
     w = weights(qr)
     p = points(qr)
     I = w[1] * f(p[1])
@@ -44,7 +43,7 @@ function make_cuberule(order::Int)
         weights[count] = w[i] * w[j] * w[k]
         count += 1
     end
-    GaussQuadratureRule(weights, points)
+    QuadratureRule{3}(weights, points)
 end
 
 const cuberules = [make_cuberule(i) for i = 1:5]
@@ -57,7 +56,7 @@ function get_cuberule(order::Int)
 end
 
 """
-Creates a `GaussQuadratureRule` that integrates
+Creates a `QuadratureRule` that integrates
 functions on a square to the given order.
 """
 function make_quadrule(order::Int)
@@ -70,7 +69,7 @@ function make_quadrule(order::Int)
         weights[count] = w[i] * w[j]
         count += 1
     end
-    GaussQuadratureRule(weights, points)
+    QuadratureRule{2}(weights, points)
 end
 
 const quadrules = [make_quadrule(i) for i = 1:5]
@@ -83,7 +82,7 @@ function get_quadrule(order::Int)
 end
 
 """
-Creates a `GaussQuadratureRule` that integrates
+Creates a `QuadratureRule` that integrates
 functions on a line to the given order.
 """
 function make_linerule(order::Int)
@@ -92,7 +91,7 @@ function make_linerule(order::Int)
     for i = 1:order
         points[i] = [p[i]]
     end
-    GaussQuadratureRule(weights, points)
+    QuadratureRule{1}(weights, points)
 end
 
 const linerules = [make_linerule(i) for i = 1:5]
@@ -118,10 +117,10 @@ function make_trirule(order::Int)
 
     weights = 0.5 * data[:, 3]
 
-    GaussQuadratureRule(weights, points)
+    QuadratureRule{2}(weights, points)
 end
 
-const trirules = GaussQuadratureRule[make_trirule(i) for i = 1:5]
+const trirules = [make_trirule(i) for i = 1:5]
 function get_trirule(order::Int)
     if order <= 5
         return trirules[order]
