@@ -25,46 +25,37 @@ function integrate(qr::QuadratureRule, f)
 end
 
 
-function get_gaussrule(dim::Int, ::Triangle, order::Int)
-    if dim == 2
-        if order <= 5
-            return trirules[order]
-        else
-            return make_trirule(order)
-        end
+function get_gaussrule(::Type{Dim{2}}, ::Triangle, order::Int)
+    if order <= 5
+        return trirules[order]
     else
-        throw(ArgumentError("triangle gauss rules only available for 2D"))
+        return make_trirule(order)
     end
 end
 
-function get_gaussrule(dim::Int, ::Square, order::Int)
-    if dim == 1
-        if order <= 5
-            return linerules[order]
-        else
-            return make_linerule(order)
-        end
-    end
-
-    if dim == 2
-        if order <= 5
-            return quadrules[order]
-        else
-            return make_quadrule(order)
-        end
-    end
-
-    if dim == 3
-        if order <= 5
-            return cuberules[order]
-        else
-            return make_cuberule(order)
-        end
+function get_gaussrule(::Type{Dim{1}}, ::Square, order::Int)
+    if order <= 5
+        return linerules[order]
+    else
+        return make_linerule(order)
     end
 end
 
+function get_gaussrule(::Type{Dim{2}}, ::Square, order::Int)
+    if order <= 5
+        return quadrules[order]
+    else
+        return make_quadrule(order)
+    end
+end
 
-
+function get_gaussrule(::Type{Dim{3}}, ::Square, order::Int)
+    if order <= 5
+        return cuberules[order]
+    else
+        return make_cuberule(order)
+    end
+end
 
 
 """

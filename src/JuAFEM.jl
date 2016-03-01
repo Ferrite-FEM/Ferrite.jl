@@ -35,7 +35,7 @@ export FEValues, reinit!, shape_value, shape_gradient, detJdV, get_quadrule, get
                  function_vector_gradient!, function_vector_divergence, function_vector_symmetric_gradient!
 export n_dim, n_basefunctions
 export Lagrange, Serendipity
-export get_gaussrule
+export get_gaussrule, Dim
 
 include("materials/hooke.jl")
 include("utilities/utilities.jl")
