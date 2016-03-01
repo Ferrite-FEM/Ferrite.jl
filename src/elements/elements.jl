@@ -45,7 +45,7 @@ function gen_ke_fe_body(ele)
 
         # Create the gauss rule of the requested order on the
         # elements reference shape
-        qr = get_gaussrule($(ref_shape(ele.function_space)), ndim, int_order)
+        qr = get_gaussrule(ndim, $(ref_shape(ele.function_space)), int_order)
 
         for (ξ, w) in zip(qr.points, qr.weights)
             value!($(ele.function_space), N, ξ)
@@ -124,7 +124,7 @@ function gen_s_body(ele)
 
         # Create the gauss rule of the requested order on the
         # elements reference shape
-        qr = get_gaussrule($(ref_shape(ele.function_space)), ndim, int_order)
+        qr = get_gaussrule(ndim, $(ref_shape(ele.function_space)), int_order)
 
         n_gps = length(qr.points)
         FLUXES = zeros(fluxlen, n_gps)
@@ -200,7 +200,7 @@ function gen_f_body(ele)
 
         # Create the gauss rule of the requested order on the
         # elements reference shape
-        qr = get_gaussrule($(ref_shape(ele.function_space)), ndim, int_order)
+        qr = get_gaussrule(ndim, $(ref_shape(ele.function_space)), int_order)
 
         if size(σs, 2) != length(qr.points)
             throw(ArgumentError("must use same integration rule to compute stresses and internal forces"))

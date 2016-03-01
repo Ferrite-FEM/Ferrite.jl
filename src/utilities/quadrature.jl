@@ -25,7 +25,7 @@ function integrate(qr::QuadratureRule, f)
 end
 
 
-function get_gaussrule(::Triangle, dim::Int, order::Int)
+function get_gaussrule(dim::Int, ::Triangle, order::Int)
     if dim == 2
         if order <= 5
             return trirules[order]
@@ -37,7 +37,7 @@ function get_gaussrule(::Triangle, dim::Int, order::Int)
     end
 end
 
-function get_gaussrule(::Square, dim::Int, order::Int)
+function get_gaussrule(dim::Int, ::Square, order::Int)
     if dim == 1
         if order <= 5
             return linerules[order]
