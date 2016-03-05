@@ -36,15 +36,15 @@ function vtk_grid(Edof, Coord, Dof, nen, filename::AbstractString)
 end
 
 """
-    vtk_grid(top, Coord, filename::AbstractString) -> vtkgrid
+    vtk_grid(topology, Coord, filename::AbstractString) -> vtkgrid
 Creates an unstructured VTK grid. `nen` is the number of nodes per element
 
 Faster version, can be used if the topology is known, i.e. the nodes for each element
 """
-function vtk_grid(top, Coord, filename::AbstractString)
+function vtk_grid(topology::Matrix{Int}, Coord, filename::AbstractString)
 
-    nele = size(top, 2)
-    nen = size(top,1)
+    nele = size(topology, 2)
+    nen = size(topology,1)
     nnodes = size(Coord, 2)
     ndim = size(Coord, 1)
 
@@ -65,7 +65,7 @@ function vtk_grid(top, Coord, filename::AbstractString)
         points = [points; zeros(nnodes)'; zeros(nnodes)']
     end
 
-    cells = MeshCell[MeshCell(cell, top[:,i]) for i = 1:nele]
+    cells = MeshCell[MeshCell(cell, topology[:,i]) for i = 1:nele]
 
     vtk = vtk_grid(filename, points, cells)
     return vtk
