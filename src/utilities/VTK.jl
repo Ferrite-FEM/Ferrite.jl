@@ -36,7 +36,7 @@ function vtk_grid(Edof, Coord, Dof, nen, filename::AbstractString)
 end
 
 """
-    vtk_grid(topology, Coord, filename::AbstractString) -> vtkgrid
+    vtk_grid(topology::Matrix{Int}, Coord, filename::AbstractString) -> vtkgrid
 Creates an unstructured VTK grid. `nen` is the number of nodes per element
 
 Faster version, can be used if the topology is known, i.e. the nodes for each element
