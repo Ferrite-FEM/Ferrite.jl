@@ -81,25 +81,19 @@ Gets the value of the shape function at a given quadrature point and given base 
 @inline shape_value(fe_v::FEValues, q_point::Int, base_func::Int) = fe_v.N[q_point][base_func]
 
 """
-    shape_gradient(fe_v, q_point::Int) -> gradient::Matrix
+    shape_gradient(fe_v, q_point::Int) -> gradients::Vector{Tensor{2}}
 
 Get the gradients of the shape functions for a given quadrature point
 """
 @inline shape_gradient(fe_v::FEValues, q_point::Int) = fe_v.dNdx[q_point]
 
 """
-    shape_gradient(fe_v, q_point::Int, base_func::Int) -> gradient::Vector
+    shape_gradient(fe_v, q_point::Int, base_func::Int) -> gradient::Tensor{2}
 
 Get the gradient of the shape functions for a given quadrature point and base function
 """
 @inline shape_gradient(fe_v::FEValues, q_point::Int, base_func::Int) = fe_v.dNdx[q_point][base_func]
 
-"""
-    shape_gradient(fe_v, q_point::Int, base_func::Int, component::Int) -> gradient_component
-
-Get the gradient of the shape functions for a given quadrature point, base function and component
-"""
-@inline shape_gradient(fe_v::FEValues, q_point::Int, base_func::Int, component::Int) = fe_v.dNdx[q_point][base_func][component]
 
 const shape_derivative = shape_gradient
 
@@ -116,15 +110,13 @@ Computes the value in a quadrature point for a scalar valued function
     @inbounds for i in 1:n_base_funcs
         s += N[i] * u[i]
     end
-    return dot(u, N)
+    return s
 end
 
-# u should be given as [x, y, z, x, y, z, ...]
 """
-     function_vector_value!(vec::Vector, fe_v, q_point::Int, u::Vector) -> value
+    function_vector_value(fe_v, q_point::Int, u::Vector{Tensor{1}}) -> value::Tensor{1}
 
-Computes the value in a quadrature point for a vector valued function. Result is stored
-in `vec`
+Computes the value in a quadrature point for a vector valued function.
 """
 @inline function function_vector_value{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     n_base_funcs = n_basefunctions(get_functionspace(fe_v))
@@ -138,10 +130,9 @@ in `vec`
 end
 
 """
-    function_scalar_gradient!(grad::Vector, fe_v, q_point::Int, u::Vector) -> gradient
+    function_scalar_gradient(fe_v, q_point::Int, u::Vector) -> grad::Tensor{1}
 
-Computes the gradient in a quadrature point for a scalar valued function. Result
-is stored in `grad`.
+Computes the gradient in a quadrature point for a scalar valued function.
 """
 @inline function function_scalar_gradient{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{T})
     n_base_funcs = n_basefunctions(get_functionspace(fe_v))
@@ -154,12 +145,10 @@ is stored in `grad`.
     return grad
 end
 
-# u should be given as [x, y, z, x, y, z, ...]
 """
-    function_vector_gradient!(grad::Matrix, fe_v, q_point::Int, u::Vector) -> gradient
+    function_vector_gradient(fe_v, q_point::Int, u::Vector{Tensor{1}}) -> grad::Tensor{2}
 
-Computes the gradient (jacobian) in a quadrature point for a vector valued function. Result
-is stored in `grad`.
+Computes the gradient (jacobian) in a quadrature point for a vector valued function.
 """
 @inline function function_vector_gradient{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     n_base_funcs = n_basefunctions(get_functionspace(fe_v))
@@ -172,9 +161,8 @@ is stored in `grad`.
     return grad
 end
 
-# u should be given as [x, y, z, x, y, z, ...]
 """
-    function_vector_symmetric_gradient!(grad::Matrix, fe_v, q_point::Int, u::Vector) -> sym_gradient
+    function_vector_symmetric_gradient(fe_v, q_point::Int, u::Vector{Tensor{1}}) -> sym_grad::SymmetricTensor{2}
 
 Computes the symmetric gradient (jacobian) in a quadrature point for a vector valued function.
 Result is stored in `grad`.
@@ -184,9 +172,8 @@ Result is stored in `grad`.
     return convert(SymmetricTensor{2, dim, T}, grad)
 end
 
-# u should be given as [x, y, z, x, y, z, ...]
 """
-    function_vector_divergence(fe_v, q_point::Int, u::Vector) -> divergence
+    function_vector_divergence(fe_v, q_point::Int, u::Vector{Tensor{1}}) -> divergence
 
 Computes the divergence in a quadrature point for a vector valued function.
 """
