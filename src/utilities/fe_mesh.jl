@@ -11,16 +11,15 @@ type FEMesh{dim, T <: Real}
 end
 
 
-function FEMesh(shape)
+function FEMesh(dim)
     # Set up the mesh here
-    println(shape)
+
     # Do some input checks and stuff
 
-    # mesh = set_up_mesh(shape)
+    # Here I was thinking we could call a set_up_mesh function that is overloaded for 1,2 and 3 dimensions somehow
+    coords,topology,boundary = set_up_mesh(dim)
 
-    return 1#mesh
-
-    # return FEMesh(coords,topology,boundary)
+    return FEMesh(coords,topology,boundary)
 end
 
 
@@ -59,6 +58,7 @@ Gets the nodes on a specified boundary
 # Overloada set_up_mesh för olika dimensioner och former typ?
 # 1D
 function set_up_mesh{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
+
     xs_x = xs[1]
     xe_x = xe[1]
     nel_x = nel[1]
@@ -85,7 +85,46 @@ function set_up_mesh{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
 end
 
 
-# # 2D
+
+# 2D
+function set_up_mesh{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
+    xs_x = xs[1]; xs_y = xs[2]
+    xe_x = xe[1]; xe_y = xe[2]
+    nel_x = nel[1]; nel_y = nel[2]
+    nel = nel_x * nel_y
+    n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1
+    n_nodes = n_nodes_x * n_nodes_y
+
+    coords_x = repmat(collect(linspace(xs_x, xe_x, n_nodes_x)), n_nodes_y)
+    coords_y = repmat(collect(linspace(xs_x, xe_x, n_nodes_y))', n_nodes_x)[:]
+    coords = [coords_x';
+              coords_y']
+    tensor_coords = reinterpret(Vec{2, Float64}, coords, (size(coords,2),))
+
+    nodes = reshape(collect(1:n_nodes),(n_nodes_x,n_nodes_y))
+
+
+    cel = 1
+
+    for i = 1:nEly, j = 1:nElx
+        topology[:,cEl] = [(n_nodes_x*(i-1)+j):(n_nodes_x*(i-1)+j+1); flipdim(((n_nodes_x*(i-1)+j):(nxNodes*(i-1)+j+1))+nxNodes,1)]
+        cEl += 1
+    end
+
+    topology = zeros(Int,2,nel_x)
+
+    for i = 1:nel_x
+        topology[:,i] = nodes[i:i+1]
+    end
+
+    b0 = [FEBoundary(0,[1]), FEBoundary(0,[n_nodes])]
+
+    boundary = Vector[b0]
+
+    return FEMesh(tensor_coords,topology,boundary)
+end
+
+# # 3D
 # function set_up_mesh{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
 #     xs_x = xs[1]; xs_y = xs[2]
 #     xe_x = xe[1]; xe_y = xe[2]
