@@ -68,13 +68,15 @@ function set_up_mesh_1D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int}
 
     nodes = collect(1:n_nodes)
 
-    topology = zeros(Int,2,nel_x)
-
-    for i = 1:nel_x
-        topology[:,i] = nodes[i:i+1]
+    topology = Int[]
+    for i in 1:nel_x
+        ctopology = nodes[i:i+1]
+        append!(topology,ctopology)
     end
+    topology = reshape(topology,(2,nel))
 
-    b0 = [FEBoundary(0,[1]), FEBoundary(0,[n_nodes])]
+    b0 = [FEBoundary(0,[1]),
+          FEBoundary(0,[n_nodes])]
 
     boundary = Vector[b0]
 
@@ -124,6 +126,7 @@ function set_up_mesh_2D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int}
            FEBoundary{0}([n_nodes_x]),
            FEBoundary{0}([n_nodes_x*(n_nodes_y-1)+1]),
            FEBoundary{0}([n_nodes])]
+
 
     boundary = Vector[b1D,b0D]
 
