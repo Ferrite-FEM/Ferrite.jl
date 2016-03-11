@@ -20,6 +20,7 @@ function FEMesh(dim)
     coords,topology,boundary = set_up_mesh(dim)
 
     return FEMesh(coords,topology,boundary)
+
 end
 
 
