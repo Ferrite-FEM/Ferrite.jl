@@ -95,6 +95,7 @@ Gets the nodes on a specified boundary
 ################
 # Enhancements #
 ################
+# - Include function to define what nodes should be used for what field. (I.e. pressure in only corner nodes in Taylor Hood element.)
 
 # TODO: Should those be ! functions that update the FEDofs object?
 
