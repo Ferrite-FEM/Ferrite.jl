@@ -51,10 +51,24 @@ Gets the nodes on a specified boundary
 """
 @inline get_boundary_nodes(fe_m::FEMesh, boundaryindex::Int) = fe_m.boundary[boundaryindex]
 
-###
+"""
+    get_number_of_elements(fe_m::FEMesh) -> numel::Int
+    get_number_of_elements(fe_b::FEBoundary) -> numel::Int
+Gets the number of elements in a given FEMesh or FEBoundary
+"""
+@inline get_number_of_elements(fe_m::FEMesh) = size(fe_m.topology,2)
 
-# Overloada set_up_mesh för olika dimensioner och former typ?
-# 1D
+@inline get_number_of_elements{T}(fe_b::FEBoundary{T}) = size(fe_b.topology,2)
+
+
+
+###################################################
+# Mesh generating functions for simple geometries #
+###################################################
+
+################
+# Square dim 1 #
+################
 function set_up_mesh_1D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int}) # This is not quite finished yet I realize
     xs_x = xs[1]
     xe_x = xe[1]
@@ -75,8 +89,8 @@ function set_up_mesh_1D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int}
     end
     topology = reshape(topology,(2,nel))
 
-    b0 = [FEBoundary(0,[1]),
-          FEBoundary(0,[n_nodes])]
+    b0 = [FEBoundary{0}([1]),
+          FEBoundary{0}([n_nodes])]
 
     boundary = Vector[b0]
 
@@ -84,8 +98,9 @@ function set_up_mesh_1D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int}
 end
 
 
-
-# 2D
+################
+# Square dim 2 #
+################
 function set_up_mesh_2D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
     xs_x = xs[1]; xs_y = xs[2]
     xe_x = xe[1]; xe_y = xe[2]
@@ -116,16 +131,26 @@ function set_up_mesh_2D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int}
     topology = reshape(topology,(4,nel))
 
     # Edges
-    b1D = [FEBoundary{1}(collect(1:n_nodes_x)),
-           FEBoundary{1}(collect(n_nodes_x:n_nodes_x:n_nodes)),
-           FEBoundary{1}(collect((n_nodes_x*(n_nodes_y-1)+1):n_nodes)),
-           FEBoundary{1}(collect(1:n_nodes_x:(n_nodes_x*(n_nodes_y-1)+1)))]
+    edge_topology = Vector{Int}[
+                    nodes[:,1][:], nodes[end,:][:], nodes[:,end][:], nodes[1,:][:]]
+
+    b1D = FEBoundary{1}[]
+
+    for edge in 1:length(edge_topology)
+        nel_bound = length(edge_topology[edge])-1
+        b1Dtopology = Int[]
+        for i in 1:nel_bound
+            append!(b1Dtopology,edge_topology[edge][i:i+1])
+        end
+        b1Dtopology = reshape(b1Dtopology,(2,nel_bound))
+        push!(b1D,FEBoundary{1}(b1Dtopology))
+    end
 
     # Corners
-    b0D = [FEBoundary{0}([1]),
-           FEBoundary{0}([n_nodes_x]),
-           FEBoundary{0}([n_nodes_x*(n_nodes_y-1)+1]),
-           FEBoundary{0}([n_nodes])]
+    b0D = [FEBoundary{0}([nodes[1,1]]),
+           FEBoundary{0}([nodes[end,1]]),
+           FEBoundary{0}([nodes[1,end]]),
+           FEBoundary{0}([nodes[end,end]])]
 
 
     boundary = Vector[b1D,b0D]
@@ -133,7 +158,10 @@ function set_up_mesh_2D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int}
     return FEMesh(tensor_coords,topology,boundary)
 end
 
-# 3D
+
+################
+# Square dim 3 #
+################
 function set_up_mesh_3D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
     xs_x = xs[1]; xs_y = xs[2]; xs_z = xs[3]
     xe_x = xe[1]; xe_y = xe[2]; xe_z = xe[3]
@@ -166,20 +194,225 @@ function set_up_mesh_3D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int}
     end
     topology = reshape(topology,(8,nel))
 
-    # TODO: Boundaries
     # Sides
-    b2D = []
+    # REMARK: This looks really ugly, but wont be necessary on Julia 0.5 I think. Same with the vector operators on the edge_topology.
+    side_topology = Matrix{Int}[
+                    nodes[:,:,1],
+                    reshape(nodes[:,1,:],size(nodes[:,1,:])[[1,3]]),
+                    reshape(nodes[end,:,:],size(nodes[end,:,:])[[2,3]]),
+                    reshape(nodes[:,end,:],size(nodes[:,end,:])[[1,3]]),
+                    reshape(nodes[1,:,:],size(nodes[1,:,:])[[2,3]]),
+                    nodes[:,:,end]]
+
+    b2D = FEBoundary{2}[]
+
+    for side in 1:length(side_topology)
+        nel_boundx, nel_boundy = size(side_topology[side])
+        nel_boundx -= 1; nel_boundy -= 1;
+
+        b2Dtopology = Int[]
+        for j in 1:nel_boundy, i in 1:nel_boundx
+            cboundtop = [side_topology[side][i:i+1,j]; side_topology[side][i+1:-1:i,j+1]]
+            append!(b2Dtopology,cboundtop)
+        end
+        b2Dtopology = reshape(b2Dtopology,(4,nel_boundx*nel_boundy))
+        push!(b2D,FEBoundary{2}(b2Dtopology))
+    end
+
     # Edges
-    b1D = [FEBoundary{1}(collect(1:n_nodes_x)),
-           FEBoundary{1}(collect(n_nodes_x:n_nodes_x:n_nodes)),
-           FEBoundary{1}(collect((n_nodes_x*(n_nodes_y-1)+1):n_nodes)),
-           FEBoundary{1}(collect(1:n_nodes_x:(n_nodes_x*(n_nodes_y-1)+1)))]
+    edge_topology = Vector{Int}[
+                    nodes[:,1,1][:], nodes[end,:,1][:], nodes[:,end,1][:], nodes[1,:,1][:],
+                    nodes[1,1,:][:], nodes[end,1,:][:], nodes[end,end,:][:], nodes[1,end,:][:],
+                    nodes[:,1,end][:], nodes[end,:,end][:], nodes[:,end,end][:], nodes[1,:,end][:]]
+    b1D = FEBoundary{1}[]
+
+    for edge in 1:length(edge_topology)
+        nel_bound = length(edge_topology[edge])-1
+        b1Dtopology = Int[]
+        for i in 1:nel_bound
+            append!(b1Dtopology,edge_topology[edge][i:i+1])
+        end
+        b1Dtopology = reshape(b1Dtopology,(2,nel_bound))
+        push!(b1D,FEBoundary{1}(b1Dtopology))
+    end
 
     # Corners
-    b0D = [FEBoundary{0}([1]),
-           FEBoundary{0}([n_nodes_x]),
-           FEBoundary{0}([n_nodes_x*(n_nodes_y-1)+1]),
-           FEBoundary{0}([n_nodes])]
+    b0D = [FEBoundary{0}([nodes[1,1,1]]),
+           FEBoundary{0}([nodes[end,1,1]]),
+           FEBoundary{0}([nodes[end,end,1]]),
+           FEBoundary{0}([nodes[1,end,1]]),
+           FEBoundary{0}([nodes[1,1,end]]),
+           FEBoundary{0}([nodes[end,1,end]]),
+           FEBoundary{0}([nodes[end,end,end]]),
+           FEBoundary{0}([nodes[1,end,end]])]
+
+    boundary = Vector[b1D,b0D]
+
+    return FEMesh(tensor_coords,topology,boundary)
+end
+
+
+##################
+# Triangle dim 2 #
+##################
+function set_up_mesh_2D_triangle{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
+    xs_x = xs[1]; xs_y = xs[2]
+    xe_x = xe[1]; xe_y = xe[2]
+    nel_x = nel[1]; nel_y = nel[2]
+    nel = 2 * nel_x * nel_y
+    n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1
+    n_nodes = n_nodes_x * n_nodes_y
+
+    coords_x = linspace(xs_x, xe_x, n_nodes_x)
+    coords_y = linspace(xs_y, xe_y, n_nodes_y)
+
+    coords = T[]
+    for j in 1:n_nodes_y, i in 1:n_nodes_x
+        ccoords = [coords_x[i], coords_y[j]]
+        append!(coords,ccoords)
+    end
+    coords = reshape(coords,(2,n_nodes))
+
+    tensor_coords = reinterpret(Vec{2, Float64}, coords, (size(coords,2),))
+
+    nodes = reshape(collect(1:n_nodes),(n_nodes_x,n_nodes_y))
+
+    topology = Int[]
+    for j in 1:nel_y, i in 1:nel_x
+        ctopology = [nodes[i:i+1,j]; nodes[i,j+1]]
+        append!(topology,ctopology)
+        ctopology = [nodes[i+1,j]; nodes[i+1:-1:i,j+1]]
+        append!(topology,ctopology)
+    end
+    topology = reshape(topology,(3,nel))
+
+    # Edges
+    edge_topology = Vector{Int}[
+                    nodes[:,1][:], nodes[end,:][:], nodes[:,end][:], nodes[1,:][:]]
+
+    b1D = FEBoundary{1}[]
+
+    for edge in 1:length(edge_topology)
+        nel_bound = length(edge_topology[edge])-1
+        b1Dtopology = Int[]
+        for i in 1:nel_bound
+            append!(b1Dtopology,edge_topology[edge][i:i+1])
+        end
+        b1Dtopology = reshape(b1Dtopology,(2,nel_bound))
+        push!(b1D,FEBoundary{1}(b1Dtopology))
+    end
+
+    # Corners
+    b0D = [FEBoundary{0}([nodes[1,1]]),
+           FEBoundary{0}([nodes[end,1]]),
+           FEBoundary{0}([nodes[1,end]]),
+           FEBoundary{0}([nodes[end,end]])]
+
+    boundary = Vector[b1D,b0D]
+
+    return FEMesh(tensor_coords,topology,boundary)
+end
+
+
+
+##################
+# Triangle dim 3 #
+##################
+function set_up_mesh_3D_triangle{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
+    xs_x = xs[1]; xs_y = xs[2]; xs_z = xs[3]
+    xe_x = xe[1]; xe_y = xe[2]; xe_z = xe[3]
+    nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]
+    nel = 6 * nel_x * nel_y * nel_z
+    n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1; n_nodes_z = nel_z + 1
+    n_nodes = n_nodes_x * n_nodes_y * n_nodes_z
+
+    coords_x = linspace(xs_x, xe_x, n_nodes_x)
+    coords_y = linspace(xs_y, xe_y, n_nodes_y)
+    coords_z = linspace(xs_z, xe_z, n_nodes_z)
+
+    coords = T[]
+    for k in 1:n_nodes_z, j in 1:n_nodes_y, i in 1:n_nodes_x
+        ccoords = [coords_x[i], coords_y[j], coords_z[k]]
+        append!(coords,ccoords)
+    end
+    coords = reshape(coords,(3,n_nodes))
+
+    tensor_coords = reinterpret(Vec{3, Float64}, coords, (size(coords,2),))
+
+    # Set up topology
+    nodes = reshape(collect(1:n_nodes),(n_nodes_x,n_nodes_y,n_nodes_z))
+
+    topology = Int[]
+    # Using # 1 from http://www.baumanneduard.ch/Splitting%20a%20cube%20in%20tetrahedras2.htm
+    for k in 1:nel_z, j in 1:nel_y, i in 1:nel_x # Make sure numbering is ok with func_space
+        ctopology = [nodes[i,j,k], nodes[i+1,j,k], nodes[i,j+1,k], nodes[i,j+1,k+1]]
+        append!(topology,ctopology)
+        ctopology = [nodes[i,j,k], nodes[i+1,j,k], nodes[i,j,k+1], nodes[i,j+1,k+1]]
+        append!(topology,ctopology)
+        ctopology = [nodes[i+1,j,k], nodes[i+1,j+1,k], nodes[i,j+1,k], nodes[i,j+1,k+1]]
+        append!(topology,ctopology)
+        ctopology = [nodes[i+1,j,k], nodes[i+1,j+1,k], nodes[i+1,j+1,k+1], nodes[i,j+1,k+1]]
+        append!(topology,ctopology)
+        ctopology = [nodes[i+1,j,k], nodes[i,j,k+1], nodes[i+1,j,k+1], nodes[i,j+1,k+1]]
+        append!(topology,ctopology)
+        ctopology = [nodes[i+1,j,k], nodes[i+1,j,k+1], nodes[i+1,j+1,k+1], nodes[i,j+1,k+1]]
+        append!(topology,ctopology)
+    end
+    topology = reshape(topology,(4,nel))
+
+    # Sides
+    side_topology = Matrix{Int}[
+                    nodes[:,:,1],
+                    reshape(nodes[:,1,:],size(nodes[:,1,:])[[1,3]]),
+                    reshape(nodes[end,:,:],size(nodes[end,:,:])[[2,3]]),
+                    reshape(nodes[:,end,:],size(nodes[:,end,:])[[1,3]]),
+                    reshape(nodes[1,:,:],size(nodes[1,:,:])[[2,3]]),
+                    nodes[:,:,end]]
+
+
+    b2D = FEBoundary{2}[]
+
+    for side in 1:length(side_topology)
+        nel_boundx, nel_boundy = size(side_topology[side])
+        nel_boundx -= 1; nel_boundy -= 1;
+
+        b2Dtopology = Int[]
+        for j in 1:nel_boundy, i in 1:nel_boundx # This might be a problem if the actual element sides is needed, but should work just fine.
+            cboundtop = [side_topology[side][i:i+1,j]; side_topology[side][i,j+1]]
+            append!(b2Dtopology,cboundtop)
+            cboundtop = [side_topology[side][i+1,j]; side_topology[side][i+1:-1:i,j+1]]
+            append!(b2Dtopology,cboundtop)
+        end
+        b2Dtopology = reshape(b2Dtopology,(3,2*nel_boundx*nel_boundy))
+        push!(b2D,FEBoundary{2}(b2Dtopology))
+    end
+
+    # Edges
+    edge_topology = Vector{Int}[
+                    nodes[:,1,1][:], nodes[end,:,1][:], nodes[:,end,1][:], nodes[1,:,1][:],
+                    nodes[1,1,:][:], nodes[end,1,:][:], nodes[end,end,:][:], nodes[1,end,:][:],
+                    nodes[:,1,end][:], nodes[end,:,end][:], nodes[:,end,end][:], nodes[1,:,end][:]]
+    b1D = FEBoundary{1}[]
+
+    for edge in 1:length(edge_topology)
+        nel_bound = length(edge_topology[edge])-1
+        b1Dtopology = Int[]
+        for i in 1:nel_bound
+            append!(b1Dtopology,edge_topology[edge][i:i+1])
+        end
+        b1Dtopology = reshape(b1Dtopology,(2,nel_bound))
+        push!(b1D,FEBoundary{1}(b1Dtopology))
+    end
+
+    # Corners
+    b0D = [FEBoundary{0}([nodes[1,1,1]]),
+           FEBoundary{0}([nodes[end,1,1]]),
+           FEBoundary{0}([nodes[end,end,1]]),
+           FEBoundary{0}([nodes[1,end,1]]),
+           FEBoundary{0}([nodes[1,1,end]]),
+           FEBoundary{0}([nodes[end,1,end]]),
+           FEBoundary{0}([nodes[end,end,end]]),
+           FEBoundary{0}([nodes[1,end,end]])]
 
     boundary = Vector[b1D,b0D]
 
