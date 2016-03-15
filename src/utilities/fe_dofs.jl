@@ -1,6 +1,7 @@
-type FEField
-    name::UTF8String # Descriptive string
+type FEField # {dim,shape,order}
+    fs::FunctionSpace # {dim, shape, order} # Approximation space
     dim::Int # Number of dimensions for the field
+    name::UTF8String
 end
 
 type FEDofs
@@ -11,9 +12,12 @@ type FEDofs
 end
 
 """
+    FEDofs(fe_m::FEMesh,fe_f::FEField) -> fe_d::FEDofs
     FEDofs(fe_m::FEMesh,fe_f::Vector{FEField}) -> fe_d::FEDofs
 Sets up a dof object with dof numbering for specified fields
 """
+FEDofs(fe_m::FEMesh,fe_f::FEField) = FEDofs(fe_m,[fe_f])
+
 function FEDofs(fe_m::FEMesh,fe_f::Vector{FEField})
 
     n_fields = length(fe_f)
@@ -51,6 +55,15 @@ Gets the dofs for a given element index
         append!(edof,fe_d.dof[fe_d.fieldindex[i],fe_d.mesh.topology[:,elindex]][:])
     end
     return edof
+end
+
+"""
+    get_node_coordinates(fe_d::FEDofs, elindex::Int, field::Int) -> nodeCoord::Vector{Vec{dim,1}}
+Gets nodal coordinates for a given field
+"""
+@inline get_node_coordinates(fe_d::FEDofs, elindex::Int, field::Int)
+    # Calculate the coordinates here
+    return coords
 end
 
 """
@@ -99,18 +112,18 @@ Gets the nodes on a specified boundary
 
 # TODO: Should those be ! functions that update the FEDofs object?
 
-"""
-    add_field(fe_d::FEDofs,fe_f::FEField)
-Adds a new field to fe_d
-"""
-function add_field(fe_d::FEDofs,fe_f::FEField)
-    # Add another field to the FEDofs object
-end
+# """
+#     add_field(fe_d::FEDofs,fe_f::FEField)
+# Adds a new field to fe_d
+# """
+# function add_field(fe_d::FEDofs,fe_f::FEField)
+#     # Add another field to the FEDofs object
+# end
 
-"""
-    remove_field(fe_d::FEDofs,fe_f::FEField)
-Removes a field from fe_d
-"""
-function remove_field(fe_d::FEDofs,fe_f::FEField)
-    # Remove a fiel from the FEDofs object
-end
+# """
+#     remove_field(fe_d::FEDofs,fe_f::FEField)
+# Removes a field from fe_d
+# """
+# function remove_field(fe_d::FEDofs,fe_f::FEField)
+#     # Remove a fiel from the FEDofs object
+# end

@@ -10,14 +10,13 @@ type FEMesh{dim, T <: Real}
 end
 
 
-function FEMesh() # Input should be shape, vectors with start and end-coordinates, and a vector with number of elements in each dir.
-    # Set up the mesh here
-    # Do some input checks and stuff
+function FEMesh{T}(dim,shape::Shape,xs::Vector{T},xe::Vector{T},nel::Vector{Int}) # Input should be shape, vectors with start and end-coordinates, and a vector with number of elements in each dir.
 
-    # Here I was thinking we could call a set_up_mesh function that is overloaded for 1,2 and 3 dimensions somehow
-    # coords,topology,boundary = set_up_mesh(dim)
+    # Do some input checks and stuff here
 
-    return FEMesh(coords,topology,boundary)
+
+    fe_m = generate_mesh(dim,shape,xs,xe,nel)
+
 end
 
 
@@ -69,7 +68,8 @@ Gets the number of elements in a given FEMesh or FEBoundary
 ################
 # Square dim 1 #
 ################
-function set_up_mesh_1D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int}) # This is not quite finished yet I realize
+function generate_mesh{T}(::Type{Dim{1}},::Square, xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
+
     xs_x = xs[1]
     xe_x = xe[1]
     nel_x = nel[1]
@@ -98,10 +98,12 @@ function set_up_mesh_1D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int}
 end
 
 
+
 ################
 # Square dim 2 #
 ################
-function set_up_mesh_2D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
+function generate_mesh{T}(::Type{Dim{2}},::Square, xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
+
     xs_x = xs[1]; xs_y = xs[2]
     xe_x = xe[1]; xe_y = xe[2]
     nel_x = nel[1]; nel_y = nel[2]
@@ -159,10 +161,12 @@ function set_up_mesh_2D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int}
 end
 
 
+
 ################
 # Square dim 3 #
 ################
-function set_up_mesh_3D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
+function generate_mesh{T}(::Type{Dim{3}},::Square, xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
+
     xs_x = xs[1]; xs_y = xs[2]; xs_z = xs[3]
     xe_x = xe[1]; xe_y = xe[2]; xe_z = xe[3]
     nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]
@@ -252,10 +256,12 @@ function set_up_mesh_3D_square{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int}
 end
 
 
+
 ##################
 # Triangle dim 2 #
 ##################
-function set_up_mesh_2D_triangle{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
+function generate_mesh{T}(::Type{Dim{2}},::Triangle, xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
+
     xs_x = xs[1]; xs_y = xs[2]
     xe_x = xe[1]; xe_y = xe[2]
     nel_x = nel[1]; nel_y = nel[2]
@@ -318,7 +324,8 @@ end
 ##################
 # Triangle dim 3 #
 ##################
-function set_up_mesh_3D_triangle{T}(xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
+function generate_mesh{T}(::Type{Dim{3}},::Triangle, xs::Vector{T}, xe::Vector{T}, nel::Vector{Int})
+
     xs_x = xs[1]; xs_y = xs[2]; xs_z = xs[3]
     xe_x = xe[1]; xe_y = xe[2]; xe_z = xe[3]
     nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]
