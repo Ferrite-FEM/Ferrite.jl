@@ -94,6 +94,13 @@ Get the gradient of the shape functions for a given quadrature point and base fu
 """
 @inline shape_gradient(fe_v::FEValues, q_point::Int, base_func::Int) = fe_v.dNdx[q_point][base_func]
 
+"""
+    shape_divergence(fe_v, q_point::Int, base_func::Int) -> divergence
+
+Get the divergence of the shape functions for a given quadrature point and base function
+"""
+@inline shape_divergence(fe_v::FEValues, q_point::Int, base_func::Int) = sum(fe_v.dNdx[q_point][base_func])
+
 
 const shape_derivative = shape_gradient
 
