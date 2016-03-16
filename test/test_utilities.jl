@@ -158,6 +158,18 @@ end
         @test vec(ForwardDiff.jacobian(f, extract_components(x))') ≈
                reinterpret(Float64, JuAFEM.derivative(functionspace, x), (ndim * n_basefuncs,))
         @test sum(JuAFEM.value(functionspace, x)) ≈ 1.0
+
+        coords = JuAFEM.reference_coordinates(functionspace)
+        for node in 1:n_basefuncs
+            N_node = JuAFEM.value(functionspace, coords[node])
+            for k in 1:node
+                if k == node
+                    @test N_node[k] ≈ 1.0
+                else
+                    @test N_node[k] ≈ 0.0
+                end
+            end
+        end
     end
 end
 

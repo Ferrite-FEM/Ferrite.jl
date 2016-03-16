@@ -64,6 +64,11 @@ function derivative!{T}(fs::Lagrange{1, Square, 1}, dN::Vector{Vec{1, T}}, ξ::V
     return dN
 end
 
+function reference_coordinates(fs::Lagrange{1, Square, 1})
+    return (Vec{1, Float64}((-1.0,)),
+            Vec{1, Float64}(( 1.0,)))
+end
+
 #################################
 # Lagrange dim 1 Square order 2 #
 #################################
@@ -100,6 +105,12 @@ function derivative!{T}(fs::Lagrange{1, Square, 2}, dN::Vector{Vec{1, T}}, ξ::V
     return dN
 end
 
+function reference_coordinates(fs::Lagrange{1, Square, 2})
+    return (Vec{1, Float64}((-1.0,)),
+            Vec{1, Float64}(( 0.0,)),
+            Vec{1, Float64}(( 1.0,)))
+end
+
 #################################
 # Lagrange dim 2 Square order 1 #
 #################################
@@ -113,10 +124,10 @@ function value!(fs::Lagrange{2, Square, 1}, N::Vector, ξ::Vec{2})
         ξ_x = ξ[1]
         ξ_y = ξ[2]
 
-        N[1] = (1 + ξ_x) * (1 + ξ_y) * 0.25
-        N[2] = (1 - ξ_x) * (1 + ξ_y) * 0.25
-        N[3] = (1 - ξ_x) * (1 - ξ_y) * 0.25
-        N[4] = (1 + ξ_x) * (1 - ξ_y) * 0.25
+        N[1] = (1 - ξ_x) * (1 - ξ_y) * 0.25
+        N[2] = (1 + ξ_x) * (1 - ξ_y) * 0.25
+        N[3] = (1 + ξ_x) * (1 + ξ_y) * 0.25
+        N[4] = (1 - ξ_x) * (1 + ξ_y) * 0.25
     end
 
     return N
@@ -129,21 +140,29 @@ function derivative!{T}(fs::Lagrange{2, Square, 1}, dN::Vector{Vec{2, T}}, ξ::V
         ξ_x = ξ[1]
         ξ_y = ξ[2]
 
-        dN[1] =  Vec{2, T}(( (1 + ξ_y) * 0.25,
-                             (1 + ξ_x) * 0.25))
+        dN[1] = Vec{2, T}((-(1 - ξ_y) * 0.25,
+                           -(1 - ξ_x) * 0.25))
 
-        dN[2] = Vec{2, T}((-(1 + ξ_y) * 0.25,
-                            (1 - ξ_x) * 0.25))
-
-        dN[3] = Vec{2, T}(( -(1 - ξ_y) * 0.25,
-                            -(1 - ξ_x) * 0.25))
-
-        dN[4] = Vec{2, T}(( (1 - ξ_y) * 0.25,
+        dN[2] = Vec{2, T}(( (1 - ξ_y) * 0.25,
                            -(1 + ξ_x) * 0.25))
+
+        dN[3] =  Vec{2, T}(((1 + ξ_y) * 0.25,
+                            (1 + ξ_x) * 0.25))
+
+        dN[4] = Vec{2, T}((-(1 + ξ_y) * 0.25,
+                            (1 - ξ_x) * 0.25))
     end
 
     return dN
 end
+
+function reference_coordinates(fs::Lagrange{2, Square, 1})
+    return (Vec{2, Float64}((-1.0, -1.0)),
+            Vec{2, Float64}(( 1.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  1.0,)),
+            Vec{2, Float64}((-1.0,  1.0,)))
+end
+
 
 ###################################
 # Lagrange dim 2 Triangle order 1 #
@@ -170,13 +189,20 @@ function derivative!{T}(fs::Lagrange{2, Triangle, 1}, dN::Vector{Vec{2, T}}, ξ:
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
-        dN[1] = Vec{2, T}((1.0, 0.0))
-        dN[2] = Vec{2, T}((0.0, 1.0))
+        dN[1] = Vec{2, T}(( 1.0,  0.0))
+        dN[2] = Vec{2, T}(( 0.0,  1.0))
         dN[3] = Vec{2, T}((-1.0, -1.0))
     end
 
     return dN
 end
+
+function reference_coordinates(fs::Lagrange{2, Triangle, 1})
+    return (Vec{2, Float64}((1.0, 0.0)),
+            Vec{2, Float64}((0.0, 1.0)),
+            Vec{2, Float64}((0.0, 0.0)))
+end
+
 
 ###################################
 # Lagrange dim 2 Triangle order 2 #
@@ -223,6 +249,15 @@ function derivative!{T}(fs::Lagrange{2, Triangle, 2}, dN::Vector{Vec{2, T}}, ξ:
     end
 
     return dN
+end
+
+function reference_coordinates(fs::Lagrange{2, Triangle, 2})
+    return (Vec{2, Float64}((1.0, 0.0)),
+            Vec{2, Float64}((0.0, 1.0)),
+            Vec{2, Float64}((0.0, 0.0)),
+            Vec{2, Float64}((0.5, 0.5)),
+            Vec{2, Float64}((0.0, 0.5)),
+            Vec{2, Float64}((0.5, 0.0)))
 end
 
 
@@ -274,6 +309,17 @@ function derivative!{T}(fs::Lagrange{3, Square, 1}, dN::Vector{Vec{3, T}}, ξ::V
     return dN
 end
 
+function reference_coordinates(fs::Lagrange{3, Square, 1})
+    return (Vec{3, Float64}((-1.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0,  1.0,  1.0)),
+            Vec{3, Float64}((-1.0,  1.0,  1.0)))
+end
+
 
 ####################################
 # Serendipity dim 2 Square order 2 #
@@ -319,4 +365,15 @@ function derivative!{T}(fs::Serendipity{2, Square, 2}, dN::Vector{Vec{2, T}}, ξ
         dN[8] = Vec{2, T}(( -0.5(1 - ξ_y * ξ_y),  -ξ_y*(1 - ξ_x)))
     end
     return dN
+end
+
+function reference_coordinates(fs::Serendipity{2, Square, 2})
+    return (Vec{2, Float64}((-1.0, -1.0)),
+            Vec{2, Float64}(( 1.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  1.0)),
+            Vec{2, Float64}((-1.0,  1.0)),
+            Vec{2, Float64}(( 0.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  0.0)),
+            Vec{2, Float64}(( 0.0,  1.0)),
+            Vec{2, Float64}((-1.0,  0.0)))
 end

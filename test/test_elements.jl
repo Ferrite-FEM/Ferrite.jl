@@ -132,8 +132,8 @@ end
 
 
     # correct for calfems order of gauss points
-    @test norm(σ - σ_calfem[[4,2,3,1], :]') / norm(σ_calfem) < 1e-14
-    @test norm(ε - ε_calfem[[4,2,3,1], :]') / norm(ε_calfem) < 1e-14
+    @test norm(σ - σ_calfem[[1,3,2,4], :]') / norm(σ_calfem) < 1e-14
+    @test norm(ε - ε_calfem[[1,3,2,4], :]') / norm(ε_calfem) < 1e-14
     @test norm(intf - intf_calfem) / norm(intf_calfem) < 1e-14
 end
 
@@ -378,8 +378,8 @@ end
      -1.723760430703402   5.732050807568878;
      -1.261880215351701   3.422649730810373]
 
-      @test norm(es - es_calfem[[4,2, 3, 1], :]') / norm(es_calfem) < 1e-13
-      @test norm(et - et_calfem[[4,2, 3, 1], :]') / norm(et_calfem) < 1e-13
+      @test norm(es - es_calfem[[1,3,2,4], :]') / norm(es_calfem) < 1e-13
+      @test norm(et - et_calfem[[1,3,2,4], :]') / norm(et_calfem) < 1e-13
 end
 
 @testset "flw2i8e" begin
