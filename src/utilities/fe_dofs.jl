@@ -34,7 +34,16 @@ function FEDofs(fe_m::FEMesh,fe_f::Vector{FEField})
 
     fieldindex = Vector{Int}[]
     for i = 1:n_fields
-        push!(fieldindex,collect(1:fe_f[i].dim) + sum([fe_f[j].dim for j = 1:(i-1)]))
+        # fs = fe_f[i].fs
+        # A = n_basefunctions(fs)
+        # thisfielddof = collect(1:fe_f[i].dim) + sum([fe_f[j].dim for j = 1:(i-1)])
+        # Stenhårt kodat LOL FUCK funkar ju inte ändå
+        if i == 1
+            thisfielddof = [1,2,4,5,6,7,9,10,11,12,14,15]
+        elseif i == 2
+            thisfielddof = [3,8,13]
+        end
+        push!(fieldindex,thisfielddof)
     end
 
     return FEDofs(fe_m,dof,fieldindex,fe_f)
@@ -58,50 +67,78 @@ Gets the dofs for a given element index
 end
 
 """
-    get_node_coordinates(fe_d::FEDofs, elindex::Int, field::Int) -> nodeCoord::Vector{Vec{dim,1}}
-Gets nodal coordinates for a given field
+    get_element_field_dofs(fe_d::FEDofs, elindex::Int,field::Int) -> el_field_dofs::Vector
+Gets the dofs for a given element index and field
 """
-@inline get_node_coordinates(fe_d::FEDofs, elindex::Int, field::Int)
-    # Calculate the coordinates here
-    return coords
+@inline get_element_field_dofs(fe_d::FEDofs, elindex::Int, field::Int) = fe_d.dof[fe_d.fieldindex[field],fe_d.mesh.topology[:,elindex]][:]
+
+
+@inline get_corner_coordinates(fe_d::FEDofs,elindex::Int) = fe_d.mesh.coords[fe_d.mesh.topology[:,elindex]]
+
+@inline function calculate_node_coordinates(fs::Lagrange{2, Triangle, 2}, x::Vector)
+    for (i,j) in zip((2,3,1),(1,2,3))
+        xm = (x[i] + x[j]) / 2
+        push!(x,xm)
+    end
+    return x
+end
+
+@inline function calculate_node_coordinates(fs::Lagrange{2, Triangle, 1}, x::Vector)
+    return x
 end
 
 """
-    get_node_dofs(fe_d::FEDofs, nodeindex::Int) -> node_dofs::Vector
-Gets the dofs for a given node index
+    get_node_coordinates(fe_d::FEDofs, elindex::Int, field::Int) -> nodeCoord::Vector{Vec{dim,1}}
+Gets nodal coordinates for a given field
 """
-@inline get_node_dofs(fe_d::FEDofs, nodeindex::Int) = fe_d.dof[:,nodeindex]
+@inline function get_node_coordinates(fe_d::FEDofs, elindex::Int, field::Int)
+    fs = fe_d.fields[field].fs
+    # if dim(fs) == 1
+    #     return get_corner_coordinates(fe_d,elindex)
+    # elseif dim(fs) == 2
+    #     return calculate_node_coordinates(fs, get_corner_coordinates(fe_d,elindex))
+    # end
+    coords = calculate_node_coordinates(fs, get_corner_coordinates(fe_d,elindex))
+    return coords
+end
 
-"""
-    get_field(fe_d::FEDofs,field::Int,u::Vector) -> nodevalues::Matrix
-Extracts the specified field from the solution vector u
-"""
-@inline get_field(fe_d::FEDofs,field::Int,u::Vector) = u[fe_d.dof[fe_d.fieldindex[field],:]]
 
-# Duplicates from FEMesh (maybe these are the only ones needed, but can be nice to access this information from FEMesh too)
-"""
-    get_element_nodes(fe_d::FEDofs, elindex::Int) -> el_nodes::Vector
-Gets the nodes for a given element index
-"""
-@inline get_element_nodes(fe_d::FEDofs, elindex::Int) = fe_d.mesh.topology[:,elindex]
+# """
+#     get_node_dofs(fe_d::FEDofs, nodeindex::Int) -> node_dofs::Vector
+# Gets the dofs for a given node index
+# """
+# @inline get_node_dofs(fe_d::FEDofs, nodeindex::Int) = fe_d.dof[:,nodeindex]
 
-"""
-    get_element_coords(fe_d::FEDofs, elindex::Int) -> elcoord::Vector{Tensor{1,dim}}
-Gets the coordinates of the nodes for a given element index
-"""
-@inline get_element_coords(fe_d::FEDofs, elindex::Int) = fe_d.mesh.coords[fe_d.mesh.topology[:,elindex]]
+# """
+#     get_field(fe_d::FEDofs,field::Int,u::Vector) -> nodevalues::Matrix
+# Extracts the specified field from the solution vector u
+# """
+# @inline get_field(fe_d::FEDofs,field::Int,u::Vector) = u[fe_d.dof[fe_d.fieldindex[field],:]]
 
-"""
-    get_node_coords(fe_d::FEDofs, nodeindex::Int) -> nodecoord::Tensor{1,dim}
-Gets the coordinates of the nodes for a given element index
-"""
-@inline get_node_coords(fe_d::FEDofs, nodeindex::Int) = fe_d.mesh.coords[nodeindex]
+# # Duplicates from FEMesh (maybe these are the only ones needed, but can be nice to access this information from FEMesh too)
+# """
+#     get_element_nodes(fe_d::FEDofs, elindex::Int) -> el_nodes::Vector
+# Gets the nodes for a given element index
+# """
+# @inline get_element_nodes(fe_d::FEDofs, elindex::Int) = fe_d.mesh.topology[:,elindex]
 
-"""
-    get_boundary_nodes(fe_d::FEDofs, boundaryindex::Int) -> boundarynodes::Vector
-Gets the nodes on a specified boundary
-"""
-@inline get_boundary_nodes(fe_d::FEMesh, boundaryindex::Int) = fe_d.mesh.boundary[boundaryindex]
+# """
+#     get_element_coords(fe_d::FEDofs, elindex::Int) -> elcoord::Vector{Tensor{1,dim}}
+# Gets the coordinates of the nodes for a given element index
+# """
+# @inline get_element_coords(fe_d::FEDofs, elindex::Int) = fe_d.mesh.coords[fe_d.mesh.topology[:,elindex]]
+
+# """
+#     get_node_coords(fe_d::FEDofs, nodeindex::Int) -> nodecoord::Tensor{1,dim}
+# Gets the coordinates of the nodes for a given element index
+# """
+# @inline get_node_coords(fe_d::FEDofs, nodeindex::Int) = fe_d.mesh.coords[nodeindex]
+
+# """
+#     get_boundary_nodes(fe_d::FEDofs, boundaryindex::Int) -> boundarynodes::Vector
+# Gets the nodes on a specified boundary
+# """
+# @inline get_boundary_nodes(fe_d::FEMesh, boundaryindex::Int) = fe_d.mesh.boundary[boundaryindex]
 
 
 

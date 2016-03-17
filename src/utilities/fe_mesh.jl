@@ -25,29 +25,29 @@ end
 
 # Should these even exist? Atleast I should add the same accessors for the FEDofs aswell so that contains all information needed
 
-"""
-    get_element_nodes(fe_m::FEMesh, elindex::Int) -> el_nodes::Vector
-Gets the nodes for a given element index
-"""
-@inline get_element_nodes(fe_m::FEMesh, elindex::Int) = fe_m.topology[:,elindex]
+# """
+#     get_element_nodes(fe_m::FEMesh, elindex::Int) -> el_nodes::Vector
+# Gets the nodes for a given element index
+# """
+# @inline get_element_nodes(fe_m::FEMesh, elindex::Int) = fe_m.topology[:,elindex]
 
-"""
-    get_element_coords(fe_m::FEMesh, elindex::Int) -> elcoord::Vector{Tensor{1,dim}}
-Gets the coordinates of the nodes for a given element index
-"""
-@inline get_element_coords(fe_m::FEMesh, elindex::Int) = fe_m.coords[fe_m.topology[:,elindex]]
+# """
+#     get_element_coords(fe_m::FEMesh, elindex::Int) -> elcoord::Vector{Tensor{1,dim}}
+# Gets the coordinates of the nodes for a given element index
+# """
+# @inline get_element_coords(fe_m::FEMesh, elindex::Int) = fe_m.coords[fe_m.topology[:,elindex]]
 
-"""
-    get_node_coords(fe_m::FEMesh, nodeindex::Int) -> nodecoord::Tensor{1,dim}
-Gets the coordinates of the nodes for a given element index
-"""
-@inline get_node_coords(fe_m::FEMesh, nodeindex::Int) = fe_m.coords[nodeindex]
+# """
+#     get_node_coords(fe_m::FEMesh, nodeindex::Int) -> nodecoord::Tensor{1,dim}
+# Gets the coordinates of the nodes for a given element index
+# """
+# @inline get_node_coords(fe_m::FEMesh, nodeindex::Int) = fe_m.coords[nodeindex]
 
-"""
-    get_boundary_nodes(fe_m::FEMesh, boundaryindex::Int) -> boundarynodes::Vector
-Gets the nodes on a specified boundary
-"""
-@inline get_boundary_nodes(fe_m::FEMesh, boundaryindex::Int) = fe_m.boundary[boundaryindex]
+# """
+#     get_boundary_nodes(fe_m::FEMesh, boundaryindex::Int) -> boundarynodes::Vector
+# Gets the nodes on a specified boundary
+# """
+# @inline get_boundary_nodes(fe_m::FEMesh, boundaryindex::Int) = fe_m.boundary[boundaryindex]
 
 """
     get_number_of_elements(fe_m::FEMesh) -> numel::Int
@@ -95,7 +95,6 @@ function generate_mesh{T}(::Type{Dim{1}},::Square, xs::Vector{T}, xe::Vector{T},
 
     return FEMesh(tensor_coords,topology,boundary)
 end
-
 
 
 ################
@@ -157,7 +156,6 @@ function generate_mesh{T}(::Type{Dim{2}},::Square, xs::Vector{T}, xe::Vector{T},
 
     return FEMesh(tensor_coords,topology,boundary)
 end
-
 
 
 ################
@@ -254,7 +252,6 @@ function generate_mesh{T}(::Type{Dim{3}},::Square, xs::Vector{T}, xe::Vector{T},
 end
 
 
-
 ##################
 # Triangle dim 2 #
 ##################
@@ -316,7 +313,6 @@ function generate_mesh{T}(::Type{Dim{2}},::Triangle, xs::Vector{T}, xe::Vector{T
 
     return FEMesh(tensor_coords,topology,boundary)
 end
-
 
 
 ##################
