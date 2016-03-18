@@ -1,3 +1,5 @@
+import WriteVTK.VTKCellType
+
 abstract FunctionSpace{dim, shape, order}
 
 @inline n_dim{dim}(fs::FunctionSpace{dim}) = dim
@@ -34,6 +36,13 @@ end
 
 type Lagrange{dim, shape, order} <: FunctionSpace{dim, shape, order} end
 
+# All first order Lagrange function spaces has dim dofs in each node
+n_dofs{dim, shape}(::MeshNode, fs::Lagrange{dim, shape, 1}) = dim
+n_dofs{dim, shape}(::MeshEdge, fs::Lagrange{dim, shape, 1}) = 0
+n_dofs{dim, shape}(::MeshPolygon, fs::Lagrange{dim, shape, 1}) = 0
+n_dofs{dim, shape}(::MeshSolid, fs::Lagrange{dim, shape, 1}) = 0
+
+
 #################################
 # Lagrange dim 1 Square order 1 #
 #################################
@@ -69,6 +78,9 @@ function reference_coordinates(fs::Lagrange{1, Square, 1})
             Vec{1, Float64}(( 1.0,)))
 end
 
+VTK_type(fs::Lagrange{1, Square, 1}) = VTKCellType.VTK_LINE
+
+
 #################################
 # Lagrange dim 1 Square order 2 #
 #################################
@@ -89,8 +101,6 @@ function value!(fs::Lagrange{1, Square, 2}, N::Vector, ξ::Vec{1})
     return N
 end
 
-
-
 function derivative!{T}(fs::Lagrange{1, Square, 2}, dN::Vector{Vec{1, T}}, ξ::Vec{1, T})
     checkdim_derivative(fs, dN, ξ)
 
@@ -110,6 +120,14 @@ function reference_coordinates(fs::Lagrange{1, Square, 2})
             Vec{1, Float64}(( 0.0,)),
             Vec{1, Float64}(( 1.0,)))
 end
+
+VTK_type(fs::Lagrange{1, Square, 2}) = VTKCellType.VTK_QUADRATIC_WEDGE
+
+n_dofs(::MeshNode, fs::Lagrange{1, Square, 2}) = 1
+n_dofs(::MeshEdge, fs::Lagrange{1, Square, 2}) = 1
+n_dofs(::MeshPolygon, fs::Lagrange{1, Square, 2}) = 0
+n_dofs(::MeshSolid, fs::Lagrange{1, Square, 2}) = 0
+
 
 #################################
 # Lagrange dim 2 Square order 1 #
@@ -163,6 +181,8 @@ function reference_coordinates(fs::Lagrange{2, Square, 1})
             Vec{2, Float64}((-1.0,  1.0,)))
 end
 
+VTK_type(fs::Lagrange{2, Square, 1}) = VTKCellType.VTK_QUAD
+
 
 ###################################
 # Lagrange dim 2 Triangle order 1 #
@@ -203,6 +223,7 @@ function reference_coordinates(fs::Lagrange{2, Triangle, 1})
             Vec{2, Float64}((0.0, 0.0)))
 end
 
+VTK_type(fs::Lagrange{2, Triangle, 1}) = VTKCellType.VTK_TRIANGLE
 
 ###################################
 # Lagrange dim 2 Triangle order 2 #
@@ -260,6 +281,12 @@ function reference_coordinates(fs::Lagrange{2, Triangle, 2})
             Vec{2, Float64}((0.5, 0.0)))
 end
 
+VTK_type(fs::Lagrange{2, Triangle, 2}) = VTKCellType.VTK_QUADRATIC_TRIANGLE
+
+n_dofs(::MeshNode, fs::Lagrange{2, Triangle, 2}) = 2
+n_dofs(::MeshEdge, fs::Lagrange{2, Triangle, 2}) = 2
+n_dofs(::MeshPolygon, fs::Lagrange{2, Triangle, 2}) = 0
+n_dofs(::MeshSolid, fs::Lagrange{2, Triangle, 2}) = 0
 
 ###################################
 # Lagrange dim 3 Square order 1 #
@@ -320,6 +347,8 @@ function reference_coordinates(fs::Lagrange{3, Square, 1})
             Vec{3, Float64}((-1.0,  1.0,  1.0)))
 end
 
+VTK_type(fs::Lagrange{3, Square, 1}) = VTKCellType.VTK_HEXAHEDRON
+
 
 ####################################
 # Serendipity dim 2 Square order 2 #
@@ -377,3 +406,10 @@ function reference_coordinates(fs::Serendipity{2, Square, 2})
             Vec{2, Float64}(( 0.0,  1.0)),
             Vec{2, Float64}((-1.0,  0.0)))
 end
+
+VTK_type(fs::Serendipity{2, Square, 2}) = VTKCellType.VTK_QUADRATIC_QUAD
+
+n_dofs(::MeshNode, fs::Serendipity{2, Square, 2}) = 2
+n_dofs(::MeshEdge, fs::Serendipity{2, Square, 2}) = 2
+n_dofs(::MeshPolygon, fs::Serendipity{2, Square, 2}) = 0
+n_dofs(::MeshSolid, fs::Serendipity{2, Square, 2}) = 0
