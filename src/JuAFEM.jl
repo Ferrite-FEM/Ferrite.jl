@@ -37,6 +37,8 @@ export FEValues, reinit!, shape_value, shape_gradient, shape_divergence, detJdV,
 export n_dim, n_basefunctions
 export Lagrange, Serendipity
 export get_gaussrule, Dim
+export FEMesh, get_number_of_elements
+export FEField, FEDofs, get_node_coordinates, get_element_dofs, get_element_field_dofs
 
 
 include("materials/hooke.jl")
