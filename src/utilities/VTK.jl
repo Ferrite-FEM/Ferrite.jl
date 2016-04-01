@@ -1,3 +1,28 @@
+function get_cell_type(nen, ndim)
+    # TODO: This is a bad way of figuring out the eltype
+    if nen == 3 && ndim == 2
+        cell =  VTKCellType.VTK_TRIANGLE
+    elseif nen == 4 && ndim == 2
+        cell = VTKCellType.VTK_QUAD
+    elseif nen == 4 && ndim == 2
+        cell = VTKCellType.VTK_HEXAHEDRON
+    elseif nen == 4 && ndim == 3
+        cell = VTKCellType.VTK_TETRA
+    end
+    return cell
+end
+
+function pad_zeros(points, ndim, nnodes)
+    if ndim == 3
+        points = points
+    elseif ndim == 2
+        points = [points; zeros(nnodes)']
+    elseif ndim == 1
+        points = [points; zeros(nnodes)'; zeros(nnodes)']
+    end
+    return points
+end
+
 """
     vtk_grid(Edof, Coord, Dof, nen, filename::AbstractString) -> vtkgrid
 Creates an unstructured VTK grid. `nen` is the number of nodes per element
@@ -12,23 +37,11 @@ function vtk_grid(Edof, Coord, Dof, nen, filename::AbstractString)
     nnodes = size(Coord, 2)
     ndim = size(Coord, 1)
 
-    # TODO: This is a bad way of figuring out the eltype
-    if nen == 3 && ndim == 2
-        cell =  VTKCellType.VTK_TRIANGLE
-    elseif nen == 4 && ndim == 2
-        cell = VTKCellType.VTK_QUAD
-    elseif nen == 4 && ndim == 2
-        cell = VTKCellType.VTK_HEXAHEDRON
-    end
+    cell = get_cell_type(nen, ndim)
 
     points = Coord
 
-    if ndim == 2
-        points = [points; zeros(nnodes)']
-    elseif ndim == 1
-        points = [points; zeros(nnodes)'; zeros(nnodes)']
-    end
-
+    points = pad_zeros(points, ndim, nnodes)
     cells = MeshCell[MeshCell(cell, top[:,i]) for i = 1:nele]
 
     vtk = vtk_grid(filename, points, cells)
@@ -48,22 +61,10 @@ function vtk_grid(topology::Matrix{Int}, Coord, filename::AbstractString)
     nnodes = size(Coord, 2)
     ndim = size(Coord, 1)
 
-    # TODO: This is a bad way of figuring out the eltype
-    if nen == 3 && ndim == 2
-        cell =  VTKCellType.VTK_TRIANGLE
-    elseif nen == 4 && ndim == 2
-        cell = VTKCellType.VTK_QUAD
-    elseif nen == 4 && ndim == 2
-        cell = VTKCellType.VTK_HEXAHEDRON
-    end
+    cell = get_cell_type(nen, ndim)
 
     points = Coord
-
-    if ndim == 2
-        points = [points; zeros(nnodes)']
-    elseif ndim == 1
-        points = [points; zeros(nnodes)'; zeros(nnodes)']
-    end
+    points = pad_zeros(points, ndim, nnodes)
 
     cells = MeshCell[MeshCell(cell, topology[:,i]) for i = 1:nele]
 
