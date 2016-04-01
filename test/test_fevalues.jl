@@ -86,7 +86,8 @@ end
                                          (Lagrange{2, Triangle, 1}(), get_gaussrule(Dim{2}, Triangle(), 2)),
                                          (Lagrange{2, Triangle, 2}(), get_gaussrule(Dim{2}, Triangle(), 2)),
                                          (Lagrange{3, Square, 1}(), get_gaussrule(Dim{3}, Square(), 2)),
-                                         (Serendipity{2, Square, 2}(), get_gaussrule(Dim{2}, Square(), 2)))
+                                         (Serendipity{2, Square, 2}(), get_gaussrule(Dim{2}, Square(), 2)),
+                                         (Lagrange{3, Triangle, 1}(), get_gaussrule(Dim{3}, Triangle(), 2)))
 
         fev = FEValues(quad_rule, function_space)
         ndim = n_dim(function_space)

@@ -150,7 +150,8 @@ end
                           Lagrange{2, Triangle, 1}(),
                           Lagrange{2, Triangle, 2}(),
                           Lagrange{3, Square, 1}(),
-                          Serendipity{2, Square, 2}())
+                          Serendipity{2, Square, 2}(),
+                          Lagrange{3, Triangle, 1}())
         ndim = n_dim(functionspace)
         n_basefuncs = n_basefunctions(functionspace)
         x = rand(Tensor{1, ndim})

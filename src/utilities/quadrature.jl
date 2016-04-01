@@ -1,3 +1,6 @@
+include("gaussquad_tri_table.jl")
+include("gaussquad_tet_table.jl")
+
 """
 A type that perform quadrature integration
 """
@@ -33,6 +36,14 @@ function get_gaussrule(::Type{Dim{2}}, ::Square, order::Int)
     end
 end
 
+function get_gaussrule(::Type{Dim{3}}, ::Triangle, order::Int)
+    if order <= 3
+        return tetrules[order]
+    else
+        return make_tetrule(order)
+    end
+end
+
 function get_gaussrule(::Type{Dim{3}}, ::Square, order::Int)
     if order <= 5
         return cuberules[order]
@@ -60,13 +71,7 @@ function make_cuberule(order::Int)
 end
 
 const cuberules = [make_cuberule(i) for i = 1:5]
-function get_cuberule(order::Int)
-    if order <= 5
-        return cuberules[order]
-    else
-        return make_cuberule(order)
-    end
-end
+
 
 """
 Creates a `QuadratureRule` that integrates
@@ -86,13 +91,7 @@ function make_quadrule(order::Int)
 end
 
 const quadrules = [make_quadrule(i) for i = 1:5]
-function get_quadrule(order::Int)
-    if order <= 5
-        return quadrules[order]
-    else
-        return make_quadrule(order)
-    end
-end
+
 
 """
 Creates a `QuadratureRule` that integrates
@@ -108,15 +107,6 @@ function make_linerule(order::Int)
 end
 
 const linerules = [make_linerule(i) for i = 1:5]
-function get_linerule(order::Int)
-    if order <= 5
-        return linerules[order]
-    else
-        return make_linerule(order)
-    end
-end
-
-include("gaussquad_tri_table.jl")
 
 function make_trirule(order::Int)
     data = _get_gauss_tridata(order)
@@ -136,10 +126,22 @@ end
 
 const trirules = [make_trirule(i) for i = 1:5]
 
-function get_trirule(order::Int)
-    if order <= 5
-        return trirules[order]
-    else
-        return make_trirule(order)
+
+function make_tetrule(order::Int)
+    data = _get_gauss_tetdata(order)
+    n_points = size(data,1)
+    weights = Array(Float64, n_points)
+    points = Array(Vec{3, Float64}, n_points)
+
+    for p in 1:size(data, 1)
+        points[p] = Vec{3, Float64}((data[p, 1], data[p, 2], data[p, 3]))
     end
+
+    weights = data[:, 4]
+
+    QuadratureRule(weights, points)
 end
+
+const tetrules = [make_tetrule(i) for i = 1:3]
+
+
