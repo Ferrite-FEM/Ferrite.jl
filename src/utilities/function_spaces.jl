@@ -177,9 +177,11 @@ function value!(fs::Lagrange{2, Triangle, 1}, N::Vector, ξ::Vec{2})
         ξ_x = ξ[1]
         ξ_y = ξ[2]
 
+        γ = 1 - ξ_x - ξ_y
+
         N[1] = ξ_x
         N[2] = ξ_y
-        N[3] = 1.0 - ξ_x - ξ_y
+        N[3] = γ
     end
 
     return N
@@ -260,6 +262,53 @@ function reference_coordinates(fs::Lagrange{2, Triangle, 2})
             Vec{2, Float64}((0.5, 0.0)))
 end
 
+
+###################################
+# Lagrange dim 3 Triangle order 1 #
+###################################
+
+n_basefunctions(::Lagrange{3, Triangle, 1}) = 4
+
+function value!(fs::Lagrange{3, Triangle, 1}, N::Vector, ξ::Vec{3})
+    checkdim_value(fs, N, ξ)
+
+    @inbounds begin
+        ξ_x = ξ[1]
+        ξ_y = ξ[2]
+        ξ_z = ξ[3]
+
+        γ = 1. - ξ_x - ξ_y - ξ_z
+
+        N[1] = ξ_x
+        N[2] = ξ_y
+        N[3] = ξ_z
+        N[4] = γ
+    end
+
+    return N
+end
+
+function derivative!{T}(fs::Lagrange{3, Triangle, 1}, dN::Vector{Vec{3, T}}, ξ::Vec{3, T})
+    checkdim_derivative(fs, dN, ξ)
+
+    @inbounds begin
+        dN[1] = Vec{3, T}(( 1.0,  0.0, 0.0))
+        dN[2] = Vec{3, T}(( 0.0,  1.0, 0.0))
+        dN[3] = Vec{3, T}(( 0.0,  0.0, 1.0))
+        dN[4] = Vec{3, T}((-1.0, -1.0, -1.0))
+    end
+
+    return dN
+end
+
+function reference_coordinates(fs::Lagrange{3, Triangle, 1})
+    return (Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0)),
+            Vec{3, Float64}((0.0, 0.0, 0.0)))
+end
+
+VTK_type(fs::Lagrange{3, Triangle, 1}) = VTKCellType.VTK_TETRA
 
 ###################################
 # Lagrange dim 3 Square order 1 #
