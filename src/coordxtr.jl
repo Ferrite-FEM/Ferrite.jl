@@ -1,8 +1,6 @@
 """
     coordxtr(Edof,Coord,Dof,nen) -> Ex, Ey, Ez
-
 Extracts the coordinates of the nodes of the elements.
-
 This function can be slow for large number of elements.
 """
 function coordxtr(Edof,Coord,Dof,nen)
@@ -46,9 +44,7 @@ end
 
 """
     topologyxtr(Edof,Coord,Dof,nen) -> topology
-
 Extracts the connectivity matrix.
-
 This function can be slow for large number of elements.
 """
 function topologyxtr(Edof,Coord,Dof,nen)

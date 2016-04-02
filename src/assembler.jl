@@ -2,7 +2,6 @@ type Assembler
     I::Vector{Int}
     J::Vector{Int}
     V::Vector{Float64}
-    constrained_dofs_added::Set{Int}
 end
 
 
