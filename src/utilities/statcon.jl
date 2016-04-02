@@ -3,7 +3,10 @@
 
 Condenses out the dofs given in cd from K and f."""
 function statcon(K::Matrix, f::VecOrMat, cd::Vector)
-    n = chksquare(K)
+    if size(K, 1) != size(K, 2)
+        throw(DimensionMismatch("matrix need to be square"))
+    end
+    n = size(K, 2)
     rd = setdiff(collect(1:length(f)), cd)
     K_AA = K[rd, rd]
     K_AB = K[rd, cd]

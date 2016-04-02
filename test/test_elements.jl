@@ -41,7 +41,7 @@ end
     # Set dirichlet boundary conditions such that u_x = u_y = 0.1x + 0.05y
     # Solve and see that middle node is at correct position
     function patch_test()
-        Coord = [0 0
+        Coord = [0. 0
                  1 0
                  1 1
                  0 1
@@ -90,8 +90,8 @@ end
           a = start_assemble()
           D = hooke(2, 250e9, 0.3)
           for e in 1:size(Edof, 2)
-            ex = [get_coord(i) for i in Edof[1:2:end, e]]
-            ey = [get_coord(i) for i in Edof[2:2:end, e]]
+            ex = Float64[get_coord(i) for i in Edof[1:2:end, e]]
+            ey = Float64[get_coord(i) for i in Edof[2:2:end, e]]
             Ke, _ = plani4e(ex, ey, [2, 1, 2], D)
             assemble(Edof[:, e], a, Ke)
           end
@@ -132,8 +132,8 @@ end
 
 
     # correct for calfems order of gauss points
-    @test norm(σ - σ_calfem[[4,2,3,1], :]') / norm(σ_calfem) < 1e-14
-    @test norm(ε - ε_calfem[[4,2,3,1], :]') / norm(ε_calfem) < 1e-14
+    @test norm(σ - σ_calfem[[1,3,2,4], :]') / norm(σ_calfem) < 1e-14
+    @test norm(ε - ε_calfem[[1,3,2,4], :]') / norm(ε_calfem) < 1e-14
     @test norm(intf - intf_calfem) / norm(intf_calfem) < 1e-14
 end
 
@@ -378,8 +378,8 @@ end
      -1.723760430703402   5.732050807568878;
      -1.261880215351701   3.422649730810373]
 
-      @test norm(es - es_calfem[[4,2, 3, 1], :]') / norm(es_calfem) < 1e-13
-      @test norm(et - et_calfem[[4,2, 3, 1], :]') / norm(et_calfem) < 1e-13
+      @test norm(es - es_calfem[[1,3,2,4], :]') / norm(es_calfem) < 1e-13
+      @test norm(et - et_calfem[[1,3,2,4], :]') / norm(et_calfem) < 1e-13
 end
 
 @testset "flw2i8e" begin

@@ -45,6 +45,7 @@ import JuAFEM: Square, Triangle
 
     function_space = Lagrange{2, JuAFEM.Square, 1}()
     q_rule = get_gaussrule(Dim{2}, Square(), 2)
+
     fev = FEValues(Float64, q_rule, function_space)
 
 
@@ -52,7 +53,7 @@ import JuAFEM: Square, Triangle
         fill!(Ke, 0)
         ex = Ex[:, cell]
         ey = Ey[:, cell]
-        x = [ex ey]'
+        x = reinterpret(Vec{2, Float64}, [ex ey]', (4,))
         reinit!(fev, x)
 
         for q_point in 1:length(JuAFEM.points(q_rule))
@@ -78,43 +79,41 @@ end
 
 @testset "function interpolations" begin
 
+
     for (function_space, quad_rule) in  ((Lagrange{1, Square, 1}(), get_gaussrule(Dim{1}, Square(), 2)),
                                          (Lagrange{1, Square, 2}(), get_gaussrule(Dim{1}, Square(), 2)),
                                          (Lagrange{2, Square, 1}(), get_gaussrule(Dim{2}, Square(), 2)),
                                          (Lagrange{2, Triangle, 1}(), get_gaussrule(Dim{2}, Triangle(), 2)),
                                          (Lagrange{2, Triangle, 2}(), get_gaussrule(Dim{2}, Triangle(), 2)),
                                          (Lagrange{3, Square, 1}(), get_gaussrule(Dim{3}, Square(), 2)),
-                                         (Serendipity{2, Square, 2}(), get_gaussrule(Dim{2}, Square(), 2)))
-
+                                         (Serendipity{2, Square, 2}(), get_gaussrule(Dim{2}, Square(), 2)),
+                                         (Lagrange{3, Triangle, 1}(), get_gaussrule(Dim{3}, Triangle(), 2)))
 
         fev = FEValues(quad_rule, function_space)
         ndim = n_dim(function_space)
         n_basefuncs = n_basefunctions(function_space)
-        x = rand(ndim, n_basefuncs)
+        x = Vec{ndim, Float64}[rand(Tensor{1,ndim}) for i in 1:n_basefuncs]
         reinit!(fev, x)
 
         # We test this by applying a given deformation gradient on all the nodes.
         # Since this is a linear deformation we should get back the exact values
         # from the interpolation.
-        u = zeros(ndim * n_basefuncs)
+        u = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1:n_basefuncs]
         u_scal = zeros(n_basefuncs)
-        H = rand(ndim, ndim)
-        V = rand(ndim)
+        H = rand(Tensor{2, ndim})
+        V = rand(Tensor{1, ndim})
         for i in 1:n_basefuncs
-            a = x[:, i]
-            u[ndim*(i-1) + 1:ndim*(i-1) + ndim] = H * a
-            u_scal[i] = dot(a, V)
+            u[i] = H ⋅ x[i]
+            u_scal[i] = V ⋅ x[i]
         end
 
-        m = zeros(ndim, ndim)
-        grad = zeros(ndim)
         for i in 1:length(JuAFEM.points(quad_rule))
-            @test function_vector_gradient!(m, fev, i, u) ≈ H
-            @test function_vector_symmetric_gradient!(m, fev, i, u) ≈ 0.5(H + H')
+            @test function_vector_gradient(fev, i, u) ≈ H
+            @test function_vector_symmetric_gradient(fev, i, u) ≈ 0.5(H + H')
             @test function_vector_divergence(fev, i, u) ≈ trace(H)
-            @test function_scalar_gradient!(grad, fev, i, u_scal) ≈ V
+            @test function_scalar_gradient(fev, i, u_scal) ≈ V
             function_scalar_value(fev, i, u_scal)
-            function_vector_value!(grad, fev, i, u)
+            function_vector_value(fev, i, u)
         end
     end
 
