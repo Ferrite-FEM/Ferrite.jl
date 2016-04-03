@@ -18,15 +18,15 @@ export FEValues, reinit!, shape_value, shape_gradient, shape_divergence, detJdV,
                  function_scalar_value, function_vector_value, function_scalar_gradient,
                  function_vector_gradient, function_vector_divergence, function_vector_symmetric_gradient
 export n_dim, n_basefunctions
-export Lagrange, Serendipity
+export Lagrange, Serendipity, RefTetrahedron, RefCube
 export QuadratureRule, GaussQuadrature, Dim, weights, points
 
 abstract Shape
 
 immutable Dim{T} end
 
-immutable Triangle <: Shape end
-immutable Square <: Shape end
+immutable RefTetrahedron <: Shape end
+immutable RefCube <: Shape end
 
 include("function_spaces.jl")
 include("quadrature.jl")

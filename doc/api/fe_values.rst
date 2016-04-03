@@ -20,12 +20,12 @@ The following function spaces are currently available:
 
 - ``Lagrange{1, JuaFEM.Line}``
 - ``Lagrange{2, JuaFEM.Line}``
-- ``Lagrange{1, JuaFEM.Square}``
-- ``Lagrange{1, JuaFEM.Triangle}``
-- ``Lagrange{1, JuaFEM.Triangle}``
-- ``Lagrange{2, JuaFEM.Triangle}``
+- ``Lagrange{1, JuaFEM.RefCube}``
+- ``Lagrange{1, JuaFEM.RefTetrahedron}``
+- ``Lagrange{1, JuaFEM.RefTetrahedron}``
+- ``Lagrange{2, JuaFEM.RefTetrahedron}``
 - ``Lagrange{1, JuaFEM.Cube}``
-- ``Serendipity{2, JuaFEM.Square}``
+- ``Serendipity{2, JuaFEM.RefCube}``
 
 Quadrature
 ^^^^^^^^^^
@@ -39,8 +39,8 @@ Using FE Values
 An example of creating a ``FEValues`` object is shown below.
 
 .. code-block:: julia
-    quad_rule = get_gaussrule(JuAFEM.Square(), 2)
-    func_space = func_space = Lagrange{1, JuaFEM.Square}()
+    quad_rule = get_gaussrule(JuAFEM.RefCube(), 2)
+    func_space = func_space = Lagrange{1, JuaFEM.RefCube}()
     fe_values = FEValues(func_space, quad_rule)
 
 Upon creation, ``FEValues`` caches the values of the shape functions and derivatives in the quadrature points.
