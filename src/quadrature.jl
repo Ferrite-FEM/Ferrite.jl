@@ -1,5 +1,7 @@
-include("gaussquad_tri_table.jl")
-include("gaussquad_tet_table.jl")
+include("quadrature_tables/gaussquad_tri_table.jl")
+include("quadrature_tables/gaussquad_tet_table.jl")
+
+import Base.Cartesian: @nloops, @nref, @ntuple, @nexprs
 
 """
 A type that perform quadrature integration
@@ -12,136 +14,42 @@ end
 weights(qr::QuadratureRule) = qr.weights
 points(qr::QuadratureRule) = qr.points
 
-function get_gaussrule(::Type{Dim{2}}, ::Triangle, order::Int)
-    if order <= 5
-        return trirules[order]
-    else
-        return make_trirule(order)
+# Generate Gauss quadrature rules on cubes by doing an outer product
+# over all dimensions
+for dim in (1,2,3)
+    @eval begin
+        function GaussQuadrature(::Type{Dim{$dim}}, ::Square, order::Int)
+            p, w = gausslegendre(order)
+            weights = Vector{Float64}(order^($dim))
+            points = Vector{Vec{$dim, Float64}}(order^($dim))
+            count = 1
+            @nloops $dim i j->(1:order) begin
+                t = @ntuple $dim q-> p[$(symbol("i"*"_q"))]
+                points[count] = Vec{$dim, Float64}(t)
+                weight = 1.0
+                @nexprs $dim j->(weight *= w[i_{j}])
+                weights[count] = weight
+                count += 1
+            end
+            return QuadratureRule(weights, points)
+        end
     end
 end
 
-function get_gaussrule(::Type{Dim{1}}, ::Square, order::Int)
-    if order <= 5
-        return linerules[order]
-    else
-        return make_linerule(order)
+for (dim, table_func) in ((2, _get_gauss_tridata),
+                          (3, _get_gauss_tetdata))
+    @eval begin
+        function GaussQuadrature(::Type{Dim{$dim}}, ::Triangle, order::Int)
+            data = $(table_func)(order)
+            n_points = size(data,1)
+            weights = Array(Float64, n_points)
+            points = Array(Vec{$dim, Float64}, n_points)
+
+            for p in 1:size(data, 1)
+                points[p] = Vec{$dim, Float64}(@ntuple $dim i -> data[p, i])
+            end
+            weights = data[:, $dim + 1]
+            QuadratureRule(weights, points)
+        end
     end
 end
-
-function get_gaussrule(::Type{Dim{2}}, ::Square, order::Int)
-    if order <= 5
-        return quadrules[order]
-    else
-        return make_quadrule(order)
-    end
-end
-
-function get_gaussrule(::Type{Dim{3}}, ::Triangle, order::Int)
-    if order <= 3
-        return tetrules[order]
-    else
-        return make_tetrule(order)
-    end
-end
-
-function get_gaussrule(::Type{Dim{3}}, ::Square, order::Int)
-    if order <= 5
-        return cuberules[order]
-    else
-        return make_cuberule(order)
-    end
-end
-
-
-"""
-Creates a `GaussQuadratureRule` that integrates
-functions on a cube to the given order.
-"""
-function make_cuberule(order::Int)
-    p, w = gausslegendre(order)
-    weights = Array(Float64, order^3)
-    points = Array(Vec{3, Float64}, order^3)
-    count = 1
-    for i = 1:order, j = 1:order, k = 1:order
-        points[count] = Vec{3, Float64}((p[i], p[j], p[k]))
-        weights[count] = w[i] * w[j] * w[k]
-        count += 1
-    end
-    QuadratureRule(weights, points)
-end
-
-const cuberules = [make_cuberule(i) for i = 1:5]
-
-
-"""
-Creates a `QuadratureRule` that integrates
-functions on a square to the given order.
-"""
-function make_quadrule(order::Int)
-    p, w = gausslegendre(order)
-    weights = Array(Float64, order^2)
-    points = Array(Vec{2, Float64}, order^2)
-    count = 1
-    for i = 1:order, j = 1:order
-        points[count] = Vec{2, Float64}((p[i], p[j]))
-        weights[count] = w[i] * w[j]
-        count += 1
-    end
-    QuadratureRule(weights, points)
-end
-
-const quadrules = [make_quadrule(i) for i = 1:5]
-
-
-"""
-Creates a `QuadratureRule` that integrates
-functions on a line to the given order.
-"""
-function make_linerule(order::Int)
-    p, weights = gausslegendre(order)
-    points = points = Array(Vec{1, Float64}, order)
-    for i = 1:order
-        points[i] = Vec{1, Float64}((p[i],))
-    end
-    QuadratureRule(weights, points)
-end
-
-const linerules = [make_linerule(i) for i = 1:5]
-
-function make_trirule(order::Int)
-    data = _get_gauss_tridata(order)
-    n_points = size(data,1)
-    weights = Array(Float64, n_points)
-    points = Array(Vec{2, Float64}, n_points)
-
-    for p in 1:size(data, 1)
-        points[p] = Vec{2, Float64}((data[p, 1], data[p, 2]))
-    end
-
-    weights = 0.5 * data[:, 3]
-
-    QuadratureRule(weights, points)
-end
-
-
-const trirules = [make_trirule(i) for i = 1:5]
-
-
-function make_tetrule(order::Int)
-    data = _get_gauss_tetdata(order)
-    n_points = size(data,1)
-    weights = Array(Float64, n_points)
-    points = Array(Vec{3, Float64}, n_points)
-
-    for p in 1:size(data, 1)
-        points[p] = Vec{3, Float64}((data[p, 1], data[p, 2], data[p, 3]))
-    end
-
-    weights = data[:, 4]
-
-    QuadratureRule(weights, points)
-end
-
-const tetrules = [make_tetrule(i) for i = 1:3]
-
-

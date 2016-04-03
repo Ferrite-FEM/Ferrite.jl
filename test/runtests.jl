@@ -11,3 +11,4 @@ end
 
 include("test_utilities.jl")
 include("test_fevalues.jl")
+include("test_quadrules.jl")
