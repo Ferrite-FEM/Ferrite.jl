@@ -8,11 +8,14 @@ julia:
   - nightly
 notifications:
   email: false
-# uncomment the following lines to override the default test script
+before_script:
+  - export PATH=$HOME/.local/bin:$PATH
 script:
-    - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-    - julia -e 'Pkg.clone("https://github.com/KristofferC/ContMechTensors.jl")'
-    - julia -e 'Pkg.clone("https://github.com/KristofferC/FastGaussQuadrature.jl");'
-    - julia -e 'Pkg.clone(pwd()); Pkg.test("JuAFEM"; coverage=true)'
+  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
+  - julia -e 'Pkg.clone("https://github.com/KristofferC/ContMechTensors.jl")'
+  - julia -e 'Pkg.clone("https://github.com/KristofferC/FastGaussQuadrature.jl");'
+  - julia -e 'Pkg.clone(pwd()); Pkg.test("JuAFEM"; coverage=true)'
 after_success:
-- julia -e 'cd(Pkg.dir("JuAFEM")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
+  - julia -e 'cd(Pkg.dir("JuAFEM")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
+  - julia -e 'Pkg.clone("https://github.com/MichaelHatherly/Documenter.jl")'
+  - julia -e 'cd(Pkg.dir("JuAFEM")); include(joinpath("docs", "make.jl"))'

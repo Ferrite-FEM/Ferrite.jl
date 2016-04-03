@@ -4,4 +4,5 @@
 *.vtu
 *.pvd
 examples/.ipynb_checkpoints/
-/doc/_build/
+docs/build/
+docs/site/
