@@ -10,3 +10,4 @@ end
 
 include("test_fevalues.jl")
 include("test_quadrules.jl")
+include("test_assemble.jl")

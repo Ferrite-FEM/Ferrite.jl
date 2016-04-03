@@ -14,7 +14,6 @@
     # Cube
     for dim = (1,2,3)
         for order in (1,2,3,4)
-            print(dim, order)
             f = (x, p) -> sum([x[i]^p for i in 1:length(x)])
             qr = GaussQuadrature(Dim{dim}, RefCube(), order)
             @test integrate(qr, (x) -> f(x, 2*order-1)) < 1e-14
