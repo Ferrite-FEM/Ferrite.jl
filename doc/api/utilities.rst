@@ -10,14 +10,13 @@ Utilities
 Export to VTK
 -------------
 
-.. function:: vtk_grid(Edof, Coord, Dof, nen, filename::AbstractString) -> vtkgrid
+.. function:: vtk_grid(topology::Matrix{Int}, Coord::Matrix, filename::AbstractString) -> vtkgrid
 
    .. Docstring generated from Julia source
 
-   Creates an unstructured VTK grid. ``nen`` is the number of nodes per element
+   Creates an unstructured VTK grid fromt the element topology and coordinates.
 
    To add cell data and point data and write the file see https://github.com/jipolanco/WriteVTK.jl#generating-an-unstructured-vtk-file
-
 
 Assembler
 ---------

@@ -13,7 +13,6 @@ import WriteVTK: vtk_grid
 
 # Utilities
 
-export coordxtr, topologyxtr
 export start_assemble, assemble, end_assemble
 export FEValues, reinit!, shape_value, shape_gradient, shape_divergence, detJdV, get_quadrule, get_functionspace,
                  function_scalar_value, function_vector_value, function_scalar_gradient,
@@ -22,12 +21,17 @@ export n_dim, n_basefunctions
 export Lagrange, Serendipity
 export QuadratureRule, GaussQuadrature, Dim, weights, points
 
-include("geometry_types.jl")
+abstract Shape
+
+immutable Dim{T} end
+
+immutable Triangle <: Shape end
+immutable Square <: Shape end
+
 include("function_spaces.jl")
 include("quadrature.jl")
 include("fe_values.jl")
 include("assembler.jl")
-include("coordxtr.jl")
 include("VTK.jl")
 
 end # module

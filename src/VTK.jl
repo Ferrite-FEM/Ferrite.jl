@@ -24,37 +24,13 @@ function pad_zeros(points, ndim, nnodes)
 end
 
 """
-    vtk_grid(Edof, Coord, Dof, nen, filename::AbstractString) -> vtkgrid
-Creates an unstructured VTK grid. `nen` is the number of nodes per element
+    vtk_grid(topology::Matrix{Int}, Coord::Matrix, filename::AbstractString) -> vtkgrid
 
-To add cell data and point data and write the file see
-https://github.com/jipolanco/WriteVTK.jl#generating-an-unstructured-vtk-file
+Creates an unstructured VTK grid fromt the element topology and coordinates.
+
+To add cell data and point data and write the file see https://github.com/jipolanco/WriteVTK.jl#generating-an-unstructured-vtk-file
 """
-function vtk_grid(Edof, Coord, Dof, nen, filename::AbstractString)
-    top = topologyxtr(Edof,Coord,Dof,nen)
-
-    nele = size(Edof, 2)
-    nnodes = size(Coord, 2)
-    ndim = size(Coord, 1)
-
-    cell = get_cell_type(nen, ndim)
-
-    points = Coord
-
-    points = pad_zeros(points, ndim, nnodes)
-    cells = MeshCell[MeshCell(cell, top[:,i]) for i = 1:nele]
-
-    vtk = vtk_grid(filename, points, cells)
-    return vtk
-end
-
-"""
-    vtk_grid(topology::Matrix{Int}, Coord, filename::AbstractString) -> vtkgrid
-Creates an unstructured VTK grid. `nen` is the number of nodes per element
-
-Faster version, can be used if the topology is known, i.e. the nodes for each element
-"""
-function vtk_grid(topology::Matrix{Int}, Coord, filename::AbstractString)
+function vtk_grid(topology::Matrix{Int}, Coord::Matrix, filename::AbstractString)
 
     nele = size(topology, 2)
     nen = size(topology,1)
