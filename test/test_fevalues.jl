@@ -40,14 +40,14 @@ end
 @testset "function interpolations" begin
 
 
-    for (function_space, quad_rule) in  ((Lagrange{1, Square, 1}(), get_gaussrule(Dim{1}, Square(), 2)),
-                                         (Lagrange{1, Square, 2}(), get_gaussrule(Dim{1}, Square(), 2)),
-                                         (Lagrange{2, Square, 1}(), get_gaussrule(Dim{2}, Square(), 2)),
-                                         (Lagrange{2, Triangle, 1}(), get_gaussrule(Dim{2}, Triangle(), 2)),
-                                         (Lagrange{2, Triangle, 2}(), get_gaussrule(Dim{2}, Triangle(), 2)),
-                                         (Lagrange{3, Square, 1}(), get_gaussrule(Dim{3}, Square(), 2)),
-                                         (Serendipity{2, Square, 2}(), get_gaussrule(Dim{2}, Square(), 2)),
-                                         (Lagrange{3, Triangle, 1}(), get_gaussrule(Dim{3}, Triangle(), 2)))
+    for (function_space, quad_rule) in  ((Lagrange{1, Square, 1}(), GaussQuadrature(Dim{1}, Square(), 2)),
+                                         (Lagrange{1, Square, 2}(), GaussQuadrature(Dim{1}, Square(), 2)),
+                                         (Lagrange{2, Square, 1}(), GaussQuadrature(Dim{2}, Square(), 2)),
+                                         (Lagrange{2, Triangle, 1}(), GaussQuadrature(Dim{2}, Triangle(), 2)),
+                                         (Lagrange{2, Triangle, 2}(), GaussQuadrature(Dim{2}, Triangle(), 2)),
+                                         (Lagrange{3, Square, 1}(), GaussQuadrature(Dim{3}, Square(), 2)),
+                                         (Serendipity{2, Square, 2}(), GaussQuadrature(Dim{2}, Square(), 2)),
+                                         (Lagrange{3, Triangle, 1}(), GaussQuadrature(Dim{3}, Triangle(), 2)))
 
         fev = FEValues(quad_rule, function_space)
         ndim = n_dim(function_space)
