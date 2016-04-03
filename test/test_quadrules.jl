@@ -16,17 +16,17 @@
         for order in (1,2,3,4)
             print(dim, order)
             f = (x, p) -> sum([x[i]^p for i in 1:length(x)])
-            qr = GaussQuadrature(Dim{dim}, Square(), order)
+            qr = GaussQuadrature(Dim{dim}, RefCube(), order)
             @test integrate(qr, (x) -> f(x, 2*order-1)) < 1e-14
             @test sum(qr.weights) ≈ ref_square_vol(dim)
         end
     end
 
-    # Tetraheder
+    # Tetrahedron
     g = (x) -> sqrt(sum(x))
     dim = 2
     for order in (2, 3)
-        qr = GaussQuadrature(Dim{dim}, Triangle(), order)
+        qr = GaussQuadrature(Dim{dim}, RefTetrahedron(), order)
         # http://www.wolframalpha.com/input/?i=integrate+sqrt(x%2By)+from+x+%3D+0+to+1,+y+%3D+0+to+1-x
         @test integrate(qr, g) - 0.4 < 0.01
         @test sum(qr.weights) ≈ ref_tet_vol(dim)
@@ -34,7 +34,7 @@
 
     dim = 3
     for order in (2, 3)
-        qr = GaussQuadrature(Dim{dim}, Triangle(), order)
+        qr = GaussQuadrature(Dim{dim}, RefTetrahedron(), order)
         # Table 1:
         # http://www.m-hikari.com/ijma/ijma-2011/ijma-1-4-2011/venkateshIJMA1-4-2011.pdf
         @test integrate(qr, g) - 0.14 < 0.01

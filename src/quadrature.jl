@@ -18,7 +18,7 @@ points(qr::QuadratureRule) = qr.points
 # over all dimensions
 for dim in (1,2,3)
     @eval begin
-        function GaussQuadrature(::Type{Dim{$dim}}, ::Square, order::Int)
+        function GaussQuadrature(::Type{Dim{$dim}}, ::RefCube, order::Int)
             p, w = gausslegendre(order)
             weights = Vector{Float64}(order^($dim))
             points = Vector{Vec{$dim, Float64}}(order^($dim))
@@ -39,7 +39,7 @@ end
 for (dim, table_func) in ((2, _get_gauss_tridata),
                           (3, _get_gauss_tetdata))
     @eval begin
-        function GaussQuadrature(::Type{Dim{$dim}}, ::Triangle, order::Int)
+        function GaussQuadrature(::Type{Dim{$dim}}, ::RefTetrahedron, order::Int)
             data = $(table_func)(order)
             n_points = size(data,1)
             weights = Array(Float64, n_points)

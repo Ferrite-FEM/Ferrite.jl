@@ -13,7 +13,7 @@ function Assembler(N)
     sizehint!(J, N)
     sizehint!(V, N)
 
-    Assembler(I, J, V, Set{Int}())
+    Assembler(I, J, V)
 end
 
 """

@@ -35,12 +35,12 @@ end
 type Lagrange{dim, shape, order} <: FunctionSpace{dim, shape, order} end
 
 #################################
-# Lagrange dim 1 Square order 1 #
+# Lagrange dim 1 RefCube order 1 #
 #################################
 
-n_basefunctions(::Lagrange{1, Square, 1}) = 2
+n_basefunctions(::Lagrange{1, RefCube, 1}) = 2
 
-function value!(fs::Lagrange{1, Square, 1}, N::Vector, ξ::Vec{1})
+function value!(fs::Lagrange{1, RefCube, 1}, N::Vector, ξ::Vec{1})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -53,7 +53,7 @@ function value!(fs::Lagrange{1, Square, 1}, N::Vector, ξ::Vec{1})
     return N
 end
 
-function derivative!{T}(fs::Lagrange{1, Square, 1}, dN::Vector{Vec{1, T}}, ξ::Vec{1, T})
+function derivative!{T}(fs::Lagrange{1, RefCube, 1}, dN::Vector{Vec{1, T}}, ξ::Vec{1, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -64,18 +64,18 @@ function derivative!{T}(fs::Lagrange{1, Square, 1}, dN::Vector{Vec{1, T}}, ξ::V
     return dN
 end
 
-function reference_coordinates(fs::Lagrange{1, Square, 1})
+function reference_coordinates(fs::Lagrange{1, RefCube, 1})
     return (Vec{1, Float64}((-1.0,)),
             Vec{1, Float64}(( 1.0,)))
 end
 
 #################################
-# Lagrange dim 1 Square order 2 #
+# Lagrange dim 1 RefCube order 2 #
 #################################
 
-n_basefunctions(::Lagrange{1, Square, 2}) = 3
+n_basefunctions(::Lagrange{1, RefCube, 2}) = 3
 
-function value!(fs::Lagrange{1, Square, 2}, N::Vector, ξ::Vec{1})
+function value!(fs::Lagrange{1, RefCube, 2}, N::Vector, ξ::Vec{1})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -91,7 +91,7 @@ end
 
 
 
-function derivative!{T}(fs::Lagrange{1, Square, 2}, dN::Vector{Vec{1, T}}, ξ::Vec{1, T})
+function derivative!{T}(fs::Lagrange{1, RefCube, 2}, dN::Vector{Vec{1, T}}, ξ::Vec{1, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -105,19 +105,19 @@ function derivative!{T}(fs::Lagrange{1, Square, 2}, dN::Vector{Vec{1, T}}, ξ::V
     return dN
 end
 
-function reference_coordinates(fs::Lagrange{1, Square, 2})
+function reference_coordinates(fs::Lagrange{1, RefCube, 2})
     return (Vec{1, Float64}((-1.0,)),
             Vec{1, Float64}(( 0.0,)),
             Vec{1, Float64}(( 1.0,)))
 end
 
 #################################
-# Lagrange dim 2 Square order 1 #
+# Lagrange dim 2 RefCube order 1 #
 #################################
 
-n_basefunctions(::Lagrange{2, Square, 1}) = 4
+n_basefunctions(::Lagrange{2, RefCube, 1}) = 4
 
-function value!(fs::Lagrange{2, Square, 1}, N::Vector, ξ::Vec{2})
+function value!(fs::Lagrange{2, RefCube, 1}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -133,7 +133,7 @@ function value!(fs::Lagrange{2, Square, 1}, N::Vector, ξ::Vec{2})
     return N
 end
 
-function derivative!{T}(fs::Lagrange{2, Square, 1}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
+function derivative!{T}(fs::Lagrange{2, RefCube, 1}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -156,7 +156,7 @@ function derivative!{T}(fs::Lagrange{2, Square, 1}, dN::Vector{Vec{2, T}}, ξ::V
     return dN
 end
 
-function reference_coordinates(fs::Lagrange{2, Square, 1})
+function reference_coordinates(fs::Lagrange{2, RefCube, 1})
     return (Vec{2, Float64}((-1.0, -1.0)),
             Vec{2, Float64}(( 1.0, -1.0)),
             Vec{2, Float64}(( 1.0,  1.0,)),
@@ -165,12 +165,12 @@ end
 
 
 ###################################
-# Lagrange dim 2 Triangle order 1 #
+# Lagrange dim 2 RefTetrahedron order 1 #
 ###################################
 
-n_basefunctions(::Lagrange{2, Triangle, 1}) = 3
+n_basefunctions(::Lagrange{2, RefTetrahedron, 1}) = 3
 
-function value!(fs::Lagrange{2, Triangle, 1}, N::Vector, ξ::Vec{2})
+function value!(fs::Lagrange{2, RefTetrahedron, 1}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -187,7 +187,7 @@ function value!(fs::Lagrange{2, Triangle, 1}, N::Vector, ξ::Vec{2})
     return N
 end
 
-function derivative!{T}(fs::Lagrange{2, Triangle, 1}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
+function derivative!{T}(fs::Lagrange{2, RefTetrahedron, 1}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -199,7 +199,7 @@ function derivative!{T}(fs::Lagrange{2, Triangle, 1}, dN::Vector{Vec{2, T}}, ξ:
     return dN
 end
 
-function reference_coordinates(fs::Lagrange{2, Triangle, 1})
+function reference_coordinates(fs::Lagrange{2, RefTetrahedron, 1})
     return (Vec{2, Float64}((1.0, 0.0)),
             Vec{2, Float64}((0.0, 1.0)),
             Vec{2, Float64}((0.0, 0.0)))
@@ -207,12 +207,12 @@ end
 
 
 ###################################
-# Lagrange dim 2 Triangle order 2 #
+# Lagrange dim 2 RefTetrahedron order 2 #
 ###################################
 
-n_basefunctions(::Lagrange{2, Triangle, 2}) = 6
+n_basefunctions(::Lagrange{2, RefTetrahedron, 2}) = 6
 
-function value!(fs::Lagrange{2, Triangle, 2}, N::Vector, ξ::Vec{2})
+function value!(fs::Lagrange{2, RefTetrahedron, 2}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -232,7 +232,7 @@ function value!(fs::Lagrange{2, Triangle, 2}, N::Vector, ξ::Vec{2})
     return N
 end
 
-function derivative!{T}(fs::Lagrange{2, Triangle, 2}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
+function derivative!{T}(fs::Lagrange{2, RefTetrahedron, 2}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -253,7 +253,7 @@ function derivative!{T}(fs::Lagrange{2, Triangle, 2}, dN::Vector{Vec{2, T}}, ξ:
     return dN
 end
 
-function reference_coordinates(fs::Lagrange{2, Triangle, 2})
+function reference_coordinates(fs::Lagrange{2, RefTetrahedron, 2})
     return (Vec{2, Float64}((1.0, 0.0)),
             Vec{2, Float64}((0.0, 1.0)),
             Vec{2, Float64}((0.0, 0.0)),
@@ -264,12 +264,12 @@ end
 
 
 ###################################
-# Lagrange dim 3 Triangle order 1 #
+# Lagrange dim 3 RefTetrahedron order 1 #
 ###################################
 
-n_basefunctions(::Lagrange{3, Triangle, 1}) = 4
+n_basefunctions(::Lagrange{3, RefTetrahedron, 1}) = 4
 
-function value!(fs::Lagrange{3, Triangle, 1}, N::Vector, ξ::Vec{3})
+function value!(fs::Lagrange{3, RefTetrahedron, 1}, N::Vector, ξ::Vec{3})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -288,7 +288,7 @@ function value!(fs::Lagrange{3, Triangle, 1}, N::Vector, ξ::Vec{3})
     return N
 end
 
-function derivative!{T}(fs::Lagrange{3, Triangle, 1}, dN::Vector{Vec{3, T}}, ξ::Vec{3, T})
+function derivative!{T}(fs::Lagrange{3, RefTetrahedron, 1}, dN::Vector{Vec{3, T}}, ξ::Vec{3, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -301,22 +301,22 @@ function derivative!{T}(fs::Lagrange{3, Triangle, 1}, dN::Vector{Vec{3, T}}, ξ:
     return dN
 end
 
-function reference_coordinates(fs::Lagrange{3, Triangle, 1})
+function reference_coordinates(fs::Lagrange{3, RefTetrahedron, 1})
     return (Vec{3, Float64}((1.0, 0.0, 0.0)),
             Vec{3, Float64}((0.0, 1.0, 0.0)),
             Vec{3, Float64}((0.0, 0.0, 1.0)),
             Vec{3, Float64}((0.0, 0.0, 0.0)))
 end
 
-VTK_type(fs::Lagrange{3, Triangle, 1}) = VTKCellType.VTK_TETRA
+VTK_type(fs::Lagrange{3, RefTetrahedron, 1}) = VTKCellType.VTK_TETRA
 
 ###################################
-# Lagrange dim 3 Square order 1 #
+# Lagrange dim 3 RefCube order 1 #
 ###################################
 
-n_basefunctions(::Lagrange{3, Square, 1}) = 8
+n_basefunctions(::Lagrange{3, RefCube, 1}) = 8
 
-function value!(fs::Lagrange{3, Square, 1}, N::Vector, ξ::Vec{3})
+function value!(fs::Lagrange{3, RefCube, 1}, N::Vector, ξ::Vec{3})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -337,7 +337,7 @@ function value!(fs::Lagrange{3, Square, 1}, N::Vector, ξ::Vec{3})
     return N
 end
 
-function derivative!{T}(fs::Lagrange{3, Square, 1}, dN::Vector{Vec{3, T}}, ξ::Vec{3, T})
+function derivative!{T}(fs::Lagrange{3, RefCube, 1}, dN::Vector{Vec{3, T}}, ξ::Vec{3, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -358,7 +358,7 @@ function derivative!{T}(fs::Lagrange{3, Square, 1}, dN::Vector{Vec{3, T}}, ξ::V
     return dN
 end
 
-function reference_coordinates(fs::Lagrange{3, Square, 1})
+function reference_coordinates(fs::Lagrange{3, RefCube, 1})
     return (Vec{3, Float64}((-1.0, -1.0, -1.0)),
             Vec{3, Float64}(( 1.0, -1.0, -1.0)),
             Vec{3, Float64}(( 1.0,  1.0, -1.0)),
@@ -371,14 +371,14 @@ end
 
 
 ####################################
-# Serendipity dim 2 Square order 2 #
+# Serendipity dim 2 RefCube order 2 #
 ####################################
 
 type Serendipity{dim, shape, order} <: FunctionSpace{dim, shape, order} end
 
-n_basefunctions(::Serendipity{2, Square, 2}) = 8
+n_basefunctions(::Serendipity{2, RefCube, 2}) = 8
 
-function value!(fs::Serendipity{2, Square, 2}, N::Vector, ξ::Vec{2})
+function value!(fs::Serendipity{2, RefCube, 2}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
 
     ξ_x = ξ[1]
@@ -397,7 +397,7 @@ function value!(fs::Serendipity{2, Square, 2}, N::Vector, ξ::Vec{2})
     return N
 end
 
-function derivative!{T}(fs::Serendipity{2, Square, 2}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
+function derivative!{T}(fs::Serendipity{2, RefCube, 2}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
     checkdim_derivative(fs, dN, ξ)
 
     ξ_x = ξ[1]
@@ -416,7 +416,7 @@ function derivative!{T}(fs::Serendipity{2, Square, 2}, dN::Vector{Vec{2, T}}, ξ
     return dN
 end
 
-function reference_coordinates(fs::Serendipity{2, Square, 2})
+function reference_coordinates(fs::Serendipity{2, RefCube, 2})
     return (Vec{2, Float64}((-1.0, -1.0)),
             Vec{2, Float64}(( 1.0, -1.0)),
             Vec{2, Float64}(( 1.0,  1.0)),
