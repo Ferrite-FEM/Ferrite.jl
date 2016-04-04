@@ -73,7 +73,7 @@ function _get_gauss_tridata(n::Int)
     0.26311282963464 0.00839477740996 0.02723031417443 / 2.0
     0.00839477740996 0.72849239295540 0.02723031417443 / 2.0];
     else
-        throw(ArgumentError("Unsupported triangle gauss integration"))
+        throw(ArgumentError("unsupported order for triangle gauss-legendre integration"))
     end
     return xw
 end

@@ -24,7 +24,7 @@ function _get_gauss_tetdata(n::Int)
               b2 b2 a2 w2
               b2 b2 b2 w2]
     else
-        throw(ArgumentError("Unsupported tetraheder gauss integration"))
+        throw(ArgumentError("unsupported order for tetraheder gauss-legendre integration"))
     end
     return xw
 end
