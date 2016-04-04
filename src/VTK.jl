@@ -24,22 +24,63 @@ function pad_zeros(points, ndim, nnodes)
 end
 
 """
-    vtk_grid(topology::Matrix{Int}, Coord::Matrix, filename::AbstractString) -> vtkgrid
+Creates an unstructured VTK grid from the element topology and coordinates.
 
-Creates an unstructured VTK grid fromt the element topology and coordinates.
 
-To add cell data and point data and write the file see https://github.com/jipolanco/WriteVTK.jl#generating-an-unstructured-vtk-file
+    vtk_grid(topology::Matrix{Int}, coord::Matrix, filename::AbstractString)
+
+
+**Arguments**
+
+* `topology` A matrix where each column contains the vertices of the element
+* `coord` A matrix of the coordinates, one column per coordinate
+* `filename`: Name of the file when it is saved to disk
+
+**Results:**
+
+* `::DatasetFile`
+
+**Example:**
+
+```julia
+julia> coords = [0.0 0.0; 1.0 0.0; 0.5 1.0; 1.5 1.0]'
+2x4 Array{Float64,2}:
+ 0.0  1.0  0.5  1.5
+ 0.0  0.0  1.0  1.0
+
+julia> topology = [1 2 3; 2 4 3]'
+3x2 Array{Int64,2}:
+ 1  2
+ 2  4
+ 3  3
+
+julia> vtkobj = vtk_grid(topology, coords, "example");
+
+julia> vtk_save(vtkobj)
+1-element Array{UTF8String,1}:
+ "example.vtu"
+```
+
+**Details**
+
+This is a thin wrapper around the `vtk_grid` function from the [`WriteVTK`](https://github.com/jipolanco/WriteVTK.jl) package.
+
+For infromation how to add cell data and point data to the resulting VTK object as well as how to write it to a file see
+[https://github.com/jipolanco/WriteVTK.jl#generating-an-unstructured-vtk-file](https://github.com/jipolanco/WriteVTK.jl#generating-an-unstructured-vtk-file)
 """
-function vtk_grid(topology::Matrix{Int}, Coord::Matrix, filename::AbstractString)
+function vtk_grid(topology::Matrix{Int}, coord::Matrix, filename::AbstractString)
 
     nele = size(topology, 2)
     nen = size(topology,1)
-    nnodes = size(Coord, 2)
-    ndim = size(Coord, 1)
+    nnodes = size(coord, 2)
+    ndim = size(coord, 1)
+    if ndim > 3
+        throw(ArgumentError("dimension > 3, maybe you transposed the input coord matrix"))
+    end
 
     cell = get_cell_type(nen, ndim)
 
-    points = Coord
+    points = coord
     points = pad_zeros(points, ndim, nnodes)
 
     cells = MeshCell[MeshCell(cell, topology[:,i]) for i = 1:nele]

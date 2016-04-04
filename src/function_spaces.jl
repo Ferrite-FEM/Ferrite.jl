@@ -1,3 +1,26 @@
+"""
+
+**Constructor:**
+
+    FunctionSpace{dim, reference_shape, order}()
+
+**Parameters:**
+
+* `dim` The dimension the function space lives in
+* `shape` A reference shape, see [`AbstractRefShape`]({ref})
+* `order` The highest order term in the polynomial
+
+The following function spaces are implemented:
+
+* `Lagrange{1, RefCube, 1}`
+* `Lagrange{1, RefCube, 2}`
+* `Lagrange{2, RefCube, 1}`
+* `Lagrange{2, RefTetrahedron, 1}`
+* `Lagrange{2, RefTetrahedron, 2}`
+* `Lagrange{3, RefCube, 1}`
+* `Serendipity{2, RefCube, 2}`
+* `Lagrange{3, RefTetrahedron, 1}`
+"""
 abstract FunctionSpace{dim, shape, order}
 
 @inline n_dim{dim}(fs::FunctionSpace{dim}) = dim
