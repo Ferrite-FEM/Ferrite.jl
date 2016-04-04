@@ -16,7 +16,7 @@ points(qr::QuadratureRule) = qr.points
 
 # Generate Gauss quadrature rules on cubes by doing an outer product
 # over all dimensions
-QuadratureRule{dim}(::Type{Dim{dim}}, shape::Shape, order::Int) = QuadratureRule(:legendre, Dim{dim}, shape, order)
+QuadratureRule{dim}(::Type{Dim{dim}}, shape::RefShape, order::Int) = QuadratureRule(:legendre, Dim{dim}, shape, order)
 
 for dim in (1,2,3)
     @eval begin
