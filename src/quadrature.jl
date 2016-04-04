@@ -14,6 +14,9 @@ end
 weights(qr::QuadratureRule) = qr.weights
 points(qr::QuadratureRule) = qr.points
 
+
+QuadratureRule{dim}(::Type{Dim{dim}}, shape::RefShape, order::Int) = QuadratureRule(:legendre, Dim{dim}, shape, order)
+
 # Generate Gauss quadrature rules on cubes by doing an outer product
 # over all dimensions
 QuadratureRule{dim}(::Type{Dim{dim}}, shape::RefShape, order::Int) = QuadratureRule(:legendre, Dim{dim}, shape, order)
