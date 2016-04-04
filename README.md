@@ -8,5 +8,7 @@ A simple finite element toolbox written in Julia.
 
 ## Documentation 
 
+[![][docs-latest-img]][docs-latest-url] 
+
 [docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
 [docs-latest-url]: http://kristofferc.github.io/JuAFEM.jl/latest/
