@@ -39,14 +39,14 @@ end
 @testset "function interpolations" begin
 
 
-    for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), GaussQuadrature(Dim{1}, RefCube(), 2)),
-                                         (Lagrange{1, RefCube, 2}(), GaussQuadrature(Dim{1}, RefCube(), 2)),
-                                         (Lagrange{2, RefCube, 1}(), GaussQuadrature(Dim{2}, RefCube(), 2)),
-                                         (Lagrange{2, RefTetrahedron, 1}(), GaussQuadrature(Dim{2}, RefTetrahedron(), 2)),
-                                         (Lagrange{2, RefTetrahedron, 2}(), GaussQuadrature(Dim{2}, RefTetrahedron(), 2)),
-                                         (Lagrange{3, RefCube, 1}(), GaussQuadrature(Dim{3}, RefCube(), 2)),
-                                         (Serendipity{2, RefCube, 2}(), GaussQuadrature(Dim{2}, RefCube(), 2)),
-                                         (Lagrange{3, RefTetrahedron, 1}(), GaussQuadrature(Dim{3}, RefTetrahedron(), 2)))
+    for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(Dim{1}, RefCube(), 2)),
+                                         (Lagrange{1, RefCube, 2}(), QuadratureRule(Dim{1}, RefCube(), 2)),
+                                         (Lagrange{2, RefCube, 1}(), QuadratureRule(Dim{2}, RefCube(), 2)),
+                                         (Lagrange{2, RefTetrahedron, 1}(), QuadratureRule(Dim{2}, RefTetrahedron(), 2)),
+                                         (Lagrange{2, RefTetrahedron, 2}(), QuadratureRule(Dim{2}, RefTetrahedron(), 2)),
+                                         (Lagrange{3, RefCube, 1}(), QuadratureRule(Dim{3}, RefCube(), 2)),
+                                         (Serendipity{2, RefCube, 2}(), QuadratureRule(Dim{2}, RefCube(), 2)),
+                                         (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule(Dim{3}, RefTetrahedron(), 2)))
 
         fev = FEValues(quad_rule, function_space)
         ndim = n_dim(function_space)

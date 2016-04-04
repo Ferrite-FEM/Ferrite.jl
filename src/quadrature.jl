@@ -16,10 +16,18 @@ points(qr::QuadratureRule) = qr.points
 
 # Generate Gauss quadrature rules on cubes by doing an outer product
 # over all dimensions
+QuadratureRule{dim}(::Type{Dim{dim}}, shape::Shape, order::Int) = QuadratureRule(:legendre, Dim{dim}, shape, order)
+
 for dim in (1,2,3)
     @eval begin
-        function GaussQuadrature(::Type{Dim{$dim}}, ::RefCube, order::Int)
-            p, w = gausslegendre(order)
+        function QuadratureRule(quad_type::Symbol, ::Type{Dim{$dim}}, ::RefCube, order::Int)
+            if quad_type == :legendre
+                p, w = gausslegendre(order)
+            elseif quad_type == :lobatto
+                p, w = gausslobatto(order)
+            else
+                throw(ArgumentError("unsupported quadrature rule"))
+            end
             weights = Vector{Float64}(order^($dim))
             points = Vector{Vec{$dim, Float64}}(order^($dim))
             count = 1
@@ -36,11 +44,16 @@ for dim in (1,2,3)
     end
 end
 
-for (dim, table_func) in ((2, _get_gauss_tridata),
-                          (3, _get_gauss_tetdata))
+for dim in (2, 3)
     @eval begin
-        function GaussQuadrature(::Type{Dim{$dim}}, ::RefTetrahedron, order::Int)
-            data = $(table_func)(order)
+        function QuadratureRule(quad_type::Symbol, ::Type{Dim{$dim}}, ::RefTetrahedron, order::Int)
+            if $dim == 2 && quad_type == :legendre
+                data = _get_gauss_tridata(order)
+            elseif $dim == 3 && quad_type == :legendre
+                data = _get_gauss_tetdata(order)
+            else
+                throw(ArgumentError("unsupported quadrature rule"))
+            end
             n_points = size(data,1)
             weights = Array(Float64, n_points)
             points = Array(Vec{$dim, Float64}, n_points)

@@ -19,7 +19,7 @@ export FEValues, reinit!, shape_value, shape_gradient, shape_divergence, detJdV,
                  function_vector_gradient, function_vector_divergence, function_vector_symmetric_gradient
 export n_dim, n_basefunctions
 export Lagrange, Serendipity, RefTetrahedron, RefCube
-export QuadratureRule, GaussQuadrature, Dim, weights, points
+export QuadratureRule, Dim, weights, points
 
 abstract Shape
 
