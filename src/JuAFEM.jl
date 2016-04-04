@@ -21,12 +21,12 @@ export n_dim, n_basefunctions
 export Lagrange, Serendipity, RefTetrahedron, RefCube
 export QuadratureRule, Dim, weights, points
 
-abstract Shape
+abstract RefShape
 
 immutable Dim{T} end
 
-immutable RefTetrahedron <: Shape end
-immutable RefCube <: Shape end
+immutable RefTetrahedron <: RefShape end
+immutable RefCube <: RefShape end
 
 include("function_spaces.jl")
 include("quadrature.jl")
