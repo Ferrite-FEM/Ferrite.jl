@@ -31,6 +31,8 @@ abstract AbstractRefShape
 immutable RefTetrahedron <: AbstractRefShape end
 immutable RefCube <: AbstractRefShape end
 
+
+
 """
 Singleton type that is similar to `Val` in Base but with a more descriptive name. Used to construct some
 types in a type stable way.
