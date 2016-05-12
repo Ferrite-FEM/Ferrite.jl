@@ -330,7 +330,7 @@ where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
 @inline function function_vector_symmetric_gradient{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     grad = function_vector_gradient(fe_v, q_point, u)
-    return convert(SymmetricTensor{2, dim, T}, grad)
+    return symmetric(grad)
 end
 
 """
