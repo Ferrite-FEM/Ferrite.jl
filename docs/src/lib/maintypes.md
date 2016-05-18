@@ -1,16 +1,17 @@
-    {meta}
-    CurrentModule = JuAFEM
+```@meta
+CurrentModule = JuAFEM
+```
 
 # Main Types
-    {index}
-    Pages = ["maintypes.md"]
 
-...
+```@index
+Pages = ["maintypes.md"]
+```
 
-    {docs}
-    Dim
-    AbstractRefShape
-    QuadratureRule
-    FunctionSpace
-    FEValues
-
+```@docs
+Dim
+AbstractRefShape
+QuadratureRule
+FunctionSpace
+FEValues
+```
