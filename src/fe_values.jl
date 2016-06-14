@@ -10,26 +10,26 @@ values of nodal functions, gradients and divergences of nodal functions etc.
 **Arguments**
 
 * `T` an optional argument to determine the type the internal data is stored as.
-* `quad_rule` an instance of a [`QuadratureRule`]({ref})
-* `function_space` an instance of a [`FunctionSpace`]({ref})
+* `quad_rule` an instance of a [`QuadratureRule`](@ref)
+* `function_space` an instance of a [`FunctionSpace`](@ref)
 
 ** Common methods**
 
-* [`get_quadrule`]({ref})
-* [`get_functionspace`]({ref})
-* [`detJdV`]({ref})
+* [`get_quadrule`](@ref)
+* [`get_functionspace`](@ref)
+* [`detJdV`](@ref)
 
-* [`shape_value`]({ref})
-* [`shape_gradient`]({ref})
-* [`shape_divergence`]({ref})
-* [`shape_derivative`]({ref})
+* [`shape_value`](@ref)
+* [`shape_gradient`](@ref)
+* [`shape_divergence`](@ref)
+* [`shape_derivative`](@ref)
 
-* [`function_scalar_value`]({ref})
-* [`function_vector_value`]({ref})
-* [`function_scalar_gradient`]({ref})
-* [`function_vector_divergence`]({ref})
-* [`function_vector_gradient`]({ref})
-* [`function_vector_symmetric_gradient`]({ref})
+* [`function_scalar_value`](@ref)
+* [`function_vector_value`](@ref)
+* [`function_scalar_gradient`](@ref)
+* [`function_vector_divergence`](@ref)
+* [`function_vector_gradient`](@ref)
+* [`function_vector_symmetric_gradient`](@ref)
 """
 immutable FEValues{dim, T <: Real, FS <: FunctionSpace}
     N::Vector{Vector{T}}

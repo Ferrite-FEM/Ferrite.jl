@@ -12,12 +12,15 @@ These functionalities are:
 
 
 ## Package Manual
-    {contents}
-    Pages = ["man/installation.md", "man/basic_usage.md"]
+
+```@contents
+Pages = ["man/installation.md", "man/basic_usage.md"]
+```
 
 
 ## API
 
-    {contents}
-    Pages = ["lib/maintypes.md", "lib/utility_functions.md"]
-    Depth = 2
+```@contents
+Pages = ["lib/maintypes.md", "lib/utility_functions.md"]
+Depth = 2
+```

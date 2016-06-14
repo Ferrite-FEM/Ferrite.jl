@@ -7,7 +7,7 @@
 **Parameters:**
 
 * `dim` The dimension the function space lives in
-* `shape` A reference shape, see [`AbstractRefShape`]({ref})
+* `shape` A reference shape, see [`AbstractRefShape`](@ref)
 * `order` The highest order term in the polynomial
 
 The following function spaces are implemented:
