@@ -109,7 +109,7 @@ for dim in (1,2,3)
             points = Vector{Vec{$dim, Float64}}(order^($dim))
             count = 1
             @nloops $dim i j->(1:order) begin
-                t = @ntuple $dim q-> p[$(symbol("i"*"_q"))]
+                t = @ntuple $dim q-> p[$(Symbol("i"*"_q"))]
                 points[count] = Vec{$dim, Float64}(t)
                 weight = 1.0
                 @nexprs $dim j->(weight *= w[i_{j}])
