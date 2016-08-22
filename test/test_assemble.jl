@@ -1,4 +1,4 @@
-@testset "fevalues" begin
+@testset "assemble" begin
     a = start_assemble()
     dofs = [1, 3, 5, 7]
     Ke = rand(4, 4)

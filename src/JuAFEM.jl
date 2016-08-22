@@ -1,7 +1,6 @@
 __precompile__()
 
 module JuAFEM
-using InplaceOps
 using FastGaussQuadrature
 using Compat
 using Reexport
