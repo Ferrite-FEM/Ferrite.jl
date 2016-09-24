@@ -1,6 +1,6 @@
 julia 0.4
 FastGaussQuadrature
 Requires
-WriteVTK
+WriteVTK 0.4.0
 Reexport
 ContMechTensors
