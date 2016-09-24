@@ -38,25 +38,33 @@ immutable FEValues{dim, T <: Real, FS <: FunctionSpace}
     detJdV::Vector{T}
     quad_rule::QuadratureRule{dim, T}
     function_space::FS
+    dMdξ::Vector{Vector{Vec{dim, T}}}
+    geom_space::FS
 end
 
-FEValues{dim, FS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS) = FEValues(Float64, quad_rule, func_space)
+FEValues{dim, FS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::FS=func_space) = FEValues(Float64, quad_rule, func_space, geom_space)
 
-function FEValues{dim, T, FS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim}, func_space::FS)
-        n_basefuncs = n_basefunctions(func_space)
+function FEValues{dim, T, FS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::FS=func_space)
+    n_qpoints = length(points(quad_rule))
 
-        n_qpoints = length(points(quad_rule))
+    # Function interpolation
+    n_func_basefuncs = n_basefunctions(func_space)
 
-        N = [zeros(T, n_basefuncs) for i in 1:n_qpoints]
-        dNdx = [[zero(Vec{dim, T}) for i in 1:n_basefuncs] for j in 1:n_qpoints]
-        dNdξ = [[zero(Vec{dim, T}) for i in 1:n_basefuncs] for j in 1:n_qpoints]
+    N = [zeros(T, n_func_basefuncs) for i in 1:n_qpoints]
+    dNdx = [[zero(Vec{dim, T}) for i in 1:n_func_basefuncs] for j in 1:n_qpoints]
+    dNdξ = [[zero(Vec{dim, T}) for i in 1:n_func_basefuncs] for j in 1:n_qpoints]
 
-        for (i, (ξ, w)) in enumerate(zip(quad_rule.points, quad_rule.weights))
-            value!(func_space, N[i], ξ)
-            derivative!(func_space, dNdξ[i], ξ)
-        end
+    # Geometry interpolation
+    n_geom_basefuncs = n_basefunctions(geom_space)
+    dMdξ = [[zero(Vec{dim, T}) for i in 1:n_geom_basefuncs] for j in 1:n_qpoints]
 
-        FEValues(N, dNdx, dNdξ, zeros(T, n_qpoints), quad_rule, func_space)
+    for (i, (ξ, w)) in enumerate(zip(quad_rule.points, quad_rule.weights))
+        value!(func_space, N[i], ξ)
+        derivative!(func_space, dNdξ[i], ξ)
+        derivative!(geom_space, dMdξ[i], ξ)
+    end
+
+    FEValues(N, dNdx, dNdξ, zeros(T, n_qpoints), quad_rule, func_space, dMdξ, geom_space)
 end
 
 
@@ -81,17 +89,18 @@ Updates the `FEValues` object for an element.
 
 """
 function reinit!{dim, T}(fe_v::FEValues{dim}, x::Vector{Vec{dim, T}})
-    n_basefuncs = n_basefunctions(get_functionspace(fe_v))
-    @assert length(x) == n_basefuncs
+    n_geom_basefuncs = n_basefunctions(get_geom_functionspace(fe_v))
+    n_func_basefuncs = n_basefunctions(get_func_functionspace(fe_v))
+    @assert length(x) == n_geom_basefuncs
+
     for i in 1:length(points(fe_v.quad_rule))
-        ξ = points(fe_v.quad_rule)[i]
         w = weights(fe_v.quad_rule)[i]
         fev_J = zero(Tensor{2, dim})
-        for j in 1:n_basefuncs
-            fev_J += fe_v.dNdξ[i][j] ⊗ x[j]
+        for j in 1:n_geom_basefuncs
+            fev_J += fe_v.dMdξ[i][j] ⊗ x[j]
         end
         Jinv = inv(fev_J)
-        for j in 1:n_basefuncs
+        for j in 1:n_func_basefuncs
             fe_v.dNdx[i][j] = Jinv ⋅ fe_v.dNdξ[i][j]
         end
         fe_v.detJdV[i] = det(fev_J) * w
@@ -126,7 +135,21 @@ The function space for the `FEValues` type.
 * `::FunctionSpace`: the function space
 
 """
-get_functionspace(fe_v::FEValues) = fe_v.function_space
+get_func_functionspace(fe_v::FEValues) = fe_v.function_space
+
+"""
+The function space used for geometric interpolation for the `FEValues` type.
+
+**Arguments**
+
+* `fe_values`: the `FEValues` object
+
+**Results**
+
+* `::FunctionSpace`: the geometric interpolation function space
+
+"""
+get_geom_functionspace(fe_v::FEValues) = fe_v.geom_space
 
 
 """
@@ -202,7 +225,7 @@ Computes the value in a quadrature point for a scalar valued function
 The value of a scalar valued function is computed as ``T(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) T_i``
 """
 @inline function function_scalar_value{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{T})
-    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
+    n_base_funcs = n_basefunctions(get_func_functionspace(fe_v))
     @assert length(u) == n_base_funcs
     N = shape_value(fe_v, q_point)
     s = zero(T)
@@ -232,7 +255,7 @@ Computes the value in a quadrature point for a vector valued function.
 The value of a vector valued function is computed as ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i``
 """
 @inline function function_vector_value{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
-    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
+    n_base_funcs = n_basefunctions(get_func_functionspace(fe_v))
     @assert length(u) == n_base_funcs
     vec = zero(Vec{dim, T})
     N = shape_value(fe_v, q_point)
@@ -263,7 +286,7 @@ The gradient of a scalar function is computed as ``\\mathbf{\\nabla} T(\\mathbf{
 where ``T_i`` are the nodal values of the function.
 """
 @inline function function_scalar_gradient{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{T})
-    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
+    n_base_funcs = n_basefunctions(get_func_functionspace(fe_v))
     @assert length(u) == n_base_funcs
     dN = shape_gradient(fe_v, q_point)
     grad = zero(Vec{dim, T})
@@ -295,7 +318,7 @@ The gradient of a scalar function is computed as ``\\mathbf{\\nabla} \\mathbf{u}
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
 @inline function function_vector_gradient{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
-    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
+    n_base_funcs = n_basefunctions(get_func_functionspace(fe_v))
     @assert length(u) == n_base_funcs
     dN = shape_gradient(fe_v, q_point)
     grad = zero(Tensor{2, dim, T})
@@ -359,7 +382,7 @@ where ``\\mathbf{u}_i`` are the nodal values of the function.
 
 """
 @inline function function_vector_divergence{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
-    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
+    n_base_funcs = n_basefunctions(get_func_functionspace(fe_v))
     @assert length(u) == n_base_funcs
     dN = shape_gradient(fe_v, q_point)
     diverg = zero(T)
