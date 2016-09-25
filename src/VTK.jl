@@ -1,5 +1,10 @@
-function get_cell_type(nen, ndim)
-    # TODO: This is a bad way of figuring out the eltype
+# Deprecated function
+function vtk_grid{T}(topology::Matrix{Int}, coord::Matrix{T}, filename::AbstractString)
+    Base.depwarn("vtk_grid(topology::Matrix{Int}, coord::Matrix, filename::AbstractString) is deprecated, use vtk_grid{dim,T}(filename::AbstractString, coords::Vector{Vec{dim,T}}, topology::Matrix{Int}, celltype::VTKCellTypes.VTKCellType) instead", :vtk_grid)
+    nen = size(topology,1)
+    nnodes = size(coord, 2)
+    ndim = size(coord, 1)
+
     if nen == 3 && ndim == 2
         cell =  VTKCellTypes.VTK_TRIANGLE
     elseif nen == 4 && ndim == 2
@@ -9,38 +14,10 @@ function get_cell_type(nen, ndim)
     elseif nen == 4 && ndim == 3
         cell = VTKCellTypes.VTK_TETRA
     end
-    return cell
-end
 
-function pad_zeros(points, ndim, nnodes)
-    if ndim == 3
-        points = points
-    elseif ndim == 2
-        points = [points; zeros(nnodes)']
-    elseif ndim == 1
-        points = [points; zeros(nnodes)'; zeros(nnodes)']
-    end
-    return points
-end
+    coords = reinterpret(Vec{ndim,T},coord,(nnodes,))
 
-function vtk_grid(topology::Matrix{Int}, coord::Matrix, filename::AbstractString)
-    Base.depwarn("vtk_grid(topology::Matrix{Int}, coord::Matrix, filename::AbstractString) is deprecated, use vtk_grid{dim,T}(filename::AbstractString, coords::Vector{Vec{dim,T}}, topology::Matrix{Int}, celltype::VTKCellTypes.VTKCellType) instead", :vtk_grid)
-    nele = size(topology, 2)
-    nen = size(topology,1)
-    nnodes = size(coord, 2)
-    ndim = size(coord, 1)
-    if ndim > 3
-        throw(ArgumentError("dimension > 3, maybe you transposed the input coord matrix"))
-    end
-
-    cell = get_cell_type(nen, ndim)
-
-    points = coord
-    points = pad_zeros(points, ndim, nnodes)
-
-    cells = MeshCell[MeshCell(cell, topology[:,i]) for i = 1:nele]
-
-    vtk = vtk_grid(filename, points, cells)
+    vtk = vtk_grid(filename, coords, topology, cell)
     return vtk
 end
 
