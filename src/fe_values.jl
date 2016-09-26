@@ -39,7 +39,7 @@ immutable FEValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace}
     quad_rule::QuadratureRule{dim, T}
     function_space::FS
     dMdξ::Vector{Vector{Vec{dim, T}}}
-    geom_space::GS
+    geometric_space::GS
 end
 
 FEValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FEValues(Float64, quad_rule, func_space, geom_space)
@@ -89,8 +89,8 @@ Updates the `FEValues` object for an element.
 
 """
 function reinit!{dim, T}(fe_v::FEValues{dim}, x::Vector{Vec{dim, T}})
-    n_geom_basefuncs = n_basefunctions(get_geom_functionspace(fe_v))
-    n_func_basefuncs = n_basefunctions(get_func_functionspace(fe_v))
+    n_geom_basefuncs = n_basefunctions(get_geometricspace(fe_v))
+    n_func_basefuncs = n_basefunctions(get_functionspace(fe_v))
     @assert length(x) == n_geom_basefuncs
 
     for i in 1:length(points(fe_v.quad_rule))
@@ -135,7 +135,7 @@ The function space for the `FEValues` type.
 * `::FunctionSpace`: the function space
 
 """
-get_func_functionspace(fe_v::FEValues) = fe_v.function_space
+get_functionspace(fe_v::FEValues) = fe_v.function_space
 
 """
 The function space used for geometric interpolation for the `FEValues` type.
@@ -149,7 +149,7 @@ The function space used for geometric interpolation for the `FEValues` type.
 * `::FunctionSpace`: the geometric interpolation function space
 
 """
-get_geom_functionspace(fe_v::FEValues) = fe_v.geom_space
+get_geometricspace(fe_v::FEValues) = fe_v.geometric_space
 
 
 """
@@ -225,7 +225,7 @@ Computes the value in a quadrature point for a scalar valued function
 The value of a scalar valued function is computed as ``T(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) T_i``
 """
 @inline function function_scalar_value{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{T})
-    n_base_funcs = n_basefunctions(get_func_functionspace(fe_v))
+    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
     @assert length(u) == n_base_funcs
     N = shape_value(fe_v, q_point)
     s = zero(T)
@@ -255,7 +255,7 @@ Computes the value in a quadrature point for a vector valued function.
 The value of a vector valued function is computed as ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i``
 """
 @inline function function_vector_value{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
-    n_base_funcs = n_basefunctions(get_func_functionspace(fe_v))
+    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
     @assert length(u) == n_base_funcs
     vec = zero(Vec{dim, T})
     N = shape_value(fe_v, q_point)
@@ -286,7 +286,7 @@ The gradient of a scalar function is computed as ``\\mathbf{\\nabla} T(\\mathbf{
 where ``T_i`` are the nodal values of the function.
 """
 @inline function function_scalar_gradient{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{T})
-    n_base_funcs = n_basefunctions(get_func_functionspace(fe_v))
+    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
     @assert length(u) == n_base_funcs
     dN = shape_gradient(fe_v, q_point)
     grad = zero(Vec{dim, T})
@@ -318,7 +318,7 @@ The gradient of a scalar function is computed as ``\\mathbf{\\nabla} \\mathbf{u}
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
 @inline function function_vector_gradient{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
-    n_base_funcs = n_basefunctions(get_func_functionspace(fe_v))
+    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
     @assert length(u) == n_base_funcs
     dN = shape_gradient(fe_v, q_point)
     grad = zero(Tensor{2, dim, T})
@@ -382,7 +382,7 @@ where ``\\mathbf{u}_i`` are the nodal values of the function.
 
 """
 @inline function function_vector_divergence{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
-    n_base_funcs = n_basefunctions(get_func_functionspace(fe_v))
+    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
     @assert length(u) == n_base_funcs
     dN = shape_gradient(fe_v, q_point)
     diverg = zero(T)
