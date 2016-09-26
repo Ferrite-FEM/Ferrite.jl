@@ -73,11 +73,11 @@ For information how to add cell data and point data to the resulting VTK object 
 """
 function vtk_grid{dim,T}(filename::AbstractString, coords::Vector{Vec{dim,T}}, topology::Matrix{Int}, celltype::VTKCellTypes.VTKCellType)
 
-    Nel = size(topology,2)
-    Npts = length(coords)
-    coords = reinterpret(T,coords,(dim,Npts))
+    nel = size(topology,2)
+    npts = length(coords)
+    coords = reinterpret(T,coords,(dim,npts))
     cells = MeshCell[]
-    for el in 1:Nel
+    for el in 1:nel
         push!(cells, MeshCell(celltype, topology[:,el]))
     end
 
