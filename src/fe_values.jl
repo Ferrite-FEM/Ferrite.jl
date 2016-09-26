@@ -31,7 +31,7 @@ values of nodal functions, gradients and divergences of nodal functions etc.
 * [`function_vector_gradient`](@ref)
 * [`function_vector_symmetric_gradient`](@ref)
 """
-immutable FEValues{dim, T <: Real, FS <: FunctionSpace}
+immutable FEValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace}
     N::Vector{Vector{T}}
     dNdx::Vector{Vector{Vec{dim, T}}}
     dNdξ::Vector{Vector{Vec{dim, T}}}
@@ -39,12 +39,12 @@ immutable FEValues{dim, T <: Real, FS <: FunctionSpace}
     quad_rule::QuadratureRule{dim, T}
     function_space::FS
     dMdξ::Vector{Vector{Vec{dim, T}}}
-    geom_space::FS
+    geom_space::GS
 end
 
-FEValues{dim, FS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::FS=func_space) = FEValues(Float64, quad_rule, func_space, geom_space)
+FEValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FEValues(Float64, quad_rule, func_space, geom_space)
 
-function FEValues{dim, T, FS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::FS=func_space)
+function FEValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space)
     n_qpoints = length(points(quad_rule))
 
     # Function interpolation
