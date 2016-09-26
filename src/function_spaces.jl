@@ -15,6 +15,7 @@ The following function spaces are implemented:
 * `Lagrange{1, RefCube, 1}`
 * `Lagrange{1, RefCube, 2}`
 * `Lagrange{2, RefCube, 1}`
+* `Lagrange{2, RefCube, 2}`
 * `Lagrange{2, RefTetrahedron, 1}`
 * `Lagrange{2, RefTetrahedron, 2}`
 * `Lagrange{3, RefCube, 1}`
@@ -52,15 +53,13 @@ end
 end
 
 ############
-# Lagrange
+# Lagrange #
 ############
-
 type Lagrange{dim, shape, order} <: FunctionSpace{dim, shape, order} end
 
-#################################
+##################################
 # Lagrange dim 1 RefCube order 1 #
-#################################
-
+##################################
 n_basefunctions(::Lagrange{1, RefCube, 1}) = 2
 
 function value!(fs::Lagrange{1, RefCube, 1}, N::Vector, ξ::Vec{1})
@@ -92,10 +91,9 @@ function reference_coordinates(fs::Lagrange{1, RefCube, 1})
             Vec{1, Float64}(( 1.0,)))
 end
 
-#################################
+##################################
 # Lagrange dim 1 RefCube order 2 #
-#################################
-
+##################################
 n_basefunctions(::Lagrange{1, RefCube, 2}) = 3
 
 function value!(fs::Lagrange{1, RefCube, 2}, N::Vector, ξ::Vec{1})
@@ -111,8 +109,6 @@ function value!(fs::Lagrange{1, RefCube, 2}, N::Vector, ξ::Vec{1})
 
     return N
 end
-
-
 
 function derivative!{T}(fs::Lagrange{1, RefCube, 2}, dN::Vector{Vec{1, T}}, ξ::Vec{1, T})
     checkdim_derivative(fs, dN, ξ)
@@ -134,10 +130,9 @@ function reference_coordinates(fs::Lagrange{1, RefCube, 2})
             Vec{1, Float64}(( 1.0,)))
 end
 
-#################################
+##################################
 # Lagrange dim 2 RefCube order 1 #
-#################################
-
+##################################
 n_basefunctions(::Lagrange{2, RefCube, 1}) = 4
 
 function value!(fs::Lagrange{2, RefCube, 1}, N::Vector, ξ::Vec{2})
@@ -186,11 +181,85 @@ function reference_coordinates(fs::Lagrange{2, RefCube, 1})
             Vec{2, Float64}((-1.0,  1.0,)))
 end
 
+##################################
+# Lagrange dim 2 RefCube order 2 #
+##################################
+n_basefunctions(::Lagrange{2, RefCube, 2}) = 9
 
-###################################
+function value!(fs::Lagrange{2, RefCube, 2}, N::Vector, ξ::Vec{2})
+    checkdim_value(fs, N, ξ)
+
+    @inbounds begin
+        ξ_x = ξ[1]
+        ξ_y = ξ[2]
+
+        N[1] = (ξ_x^2 - ξ_x) * (ξ_y^2 - ξ_y) * 0.25
+        N[2] = (ξ_x^2 + ξ_x) * (ξ_y^2 - ξ_y) * 0.25
+        N[3] = (ξ_x^2 + ξ_x) * (ξ_y^2 + ξ_y) * 0.25
+        N[4] = (ξ_x^2 - ξ_x) * (ξ_y^2 + ξ_y) * 0.25
+        N[5] = (1 - ξ_x^2) * (ξ_y^2 - ξ_y) * 0.5
+        N[6] = (ξ_x^2 + ξ_x) * (1 - ξ_y^2) * 0.5
+        N[7] = (1 - ξ_x^2) * (ξ_y^2 + ξ_y) * 0.5
+        N[8] = (ξ_x^2 - ξ_x) * (1 - ξ_y^2) * 0.5
+        N[9] = (1 - ξ_x^2) * (1 - ξ_y^2)
+    end
+
+    return N
+end
+
+function derivative!{T}(fs::Lagrange{2, RefCube, 2}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
+    checkdim_derivative(fs, dN, ξ)
+
+    @inbounds begin
+        ξ_x = ξ[1]
+        ξ_y = ξ[2]
+
+        dN[1] = Vec{2, T}((ξ_y * (2 * ξ_x - 1) * (ξ_y - 1) * 0.25,
+                           ξ_x * (2 * ξ_y - 1) * (ξ_x - 1) * 0.25))
+
+        dN[2] = Vec{2, T}((ξ_y * (2 * ξ_x + 1) * (ξ_y - 1) * 0.25,
+                           ξ_x * (2 * ξ_y - 1) * (ξ_x + 1) * 0.25))
+
+        dN[3] = Vec{2, T}((ξ_y * (2 * ξ_x + 1) * (ξ_y + 1) * 0.25,
+                           ξ_x * (2 * ξ_y + 1) * (ξ_x + 1) * 0.25))
+
+        dN[4] = Vec{2, T}((ξ_y * (2 * ξ_x - 1) * (ξ_y + 1) * 0.25,
+                           ξ_x * (2 * ξ_y + 1) * (ξ_x - 1) * 0.25))
+
+        dN[5] = Vec{2, T}((ξ_y * ξ_x * (1 - ξ_y),
+                           (1 - 2 * ξ_y) * (ξ_x^2 - 1) * 0.5))
+
+        dN[6] = Vec{2, T}(((1 - ξ_y^2) * (2 * ξ_x + 1) * 0.5,
+                           - ξ_y * ξ_x * (ξ_x + 1)))
+
+        dN[7] = Vec{2, T}((- ξ_y * ξ_x * (ξ_y + 1),
+                           (2 * ξ_y + 1) * (1 - ξ_x^2) * 0.5))
+
+        dN[8] = Vec{2, T}(((1 - ξ_y^2) * (2 * ξ_x - 1) * 0.5,
+                           ξ_y * ξ_x * (1 - ξ_x)))
+
+        dN[9] = Vec{2, T}((2 * ξ_x * (ξ_y^2 - 1),
+                           2 * ξ_y * (ξ_x^2 - 1)))
+    end
+
+    return dN
+end
+
+function reference_coordinates(fs::Lagrange{2, RefCube, 2})
+    return (Vec{2, Float64}((-1.0, -1.0)),
+            Vec{2, Float64}(( 1.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  1.0)),
+            Vec{2, Float64}((-1.0,  1.0)),
+            Vec{2, Float64}(( 0.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  0.0)),
+            Vec{2, Float64}(( 0.0,  1.0)),
+            Vec{2, Float64}((-1.0,  0.0)),
+            Vec{2, Float64}(( 0.0,  0.0)))
+end
+
+#########################################
 # Lagrange dim 2 RefTetrahedron order 1 #
-###################################
-
+#########################################
 n_basefunctions(::Lagrange{2, RefTetrahedron, 1}) = 3
 
 function value!(fs::Lagrange{2, RefTetrahedron, 1}, N::Vector, ξ::Vec{2})
@@ -228,11 +297,9 @@ function reference_coordinates(fs::Lagrange{2, RefTetrahedron, 1})
             Vec{2, Float64}((0.0, 0.0)))
 end
 
-
-###################################
+#########################################
 # Lagrange dim 2 RefTetrahedron order 2 #
-###################################
-
+#########################################
 n_basefunctions(::Lagrange{2, RefTetrahedron, 2}) = 6
 
 function value!(fs::Lagrange{2, RefTetrahedron, 2}, N::Vector, ξ::Vec{2})
@@ -285,11 +352,9 @@ function reference_coordinates(fs::Lagrange{2, RefTetrahedron, 2})
             Vec{2, Float64}((0.5, 0.0)))
 end
 
-
-###################################
+#########################################
 # Lagrange dim 3 RefTetrahedron order 1 #
-###################################
-
+#########################################
 n_basefunctions(::Lagrange{3, RefTetrahedron, 1}) = 4
 
 function value!(fs::Lagrange{3, RefTetrahedron, 1}, N::Vector, ξ::Vec{3})
@@ -333,10 +398,9 @@ end
 
 VTK_type(fs::Lagrange{3, RefTetrahedron, 1}) = VTKCellType.VTK_TETRA
 
-###################################
+##################################
 # Lagrange dim 3 RefCube order 1 #
-###################################
-
+##################################
 n_basefunctions(::Lagrange{3, RefCube, 1}) = 8
 
 function value!(fs::Lagrange{3, RefCube, 1}, N::Vector, ξ::Vec{3})
@@ -392,13 +456,14 @@ function reference_coordinates(fs::Lagrange{3, RefCube, 1})
             Vec{3, Float64}((-1.0,  1.0,  1.0)))
 end
 
-
-####################################
-# Serendipity dim 2 RefCube order 2 #
-####################################
-
+###############
+# Serendipity #
+###############
 type Serendipity{dim, shape, order} <: FunctionSpace{dim, shape, order} end
 
+#####################################
+# Serendipity dim 2 RefCube order 2 #
+#####################################
 n_basefunctions(::Serendipity{2, RefCube, 2}) = 8
 
 function value!(fs::Serendipity{2, RefCube, 2}, N::Vector, ξ::Vec{2})

@@ -4,19 +4,21 @@ values of nodal functions, gradients and divergences of nodal functions etc.
 
 **Constructor**
 
-    FEValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace)
+    FEValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
 
 
 **Arguments**
 
 * `T` an optional argument to determine the type the internal data is stored as.
 * `quad_rule` an instance of a [`QuadratureRule`](@ref)
-* `function_space` an instance of a [`FunctionSpace`](@ref)
+* `function_space` an instance of a [`FunctionSpace`](@ref) used to interpolate the approximated function
+* `geometric_space` an optional instance of a [`FunctionSpace`](@ref) which is used to interpolate the geometry 
 
 ** Common methods**
 
 * [`get_quadrule`](@ref)
 * [`get_functionspace`](@ref)
+* [`get_geometricspace`](@ref)
 * [`detJdV`](@ref)
 
 * [`shape_value`](@ref)
@@ -31,32 +33,40 @@ values of nodal functions, gradients and divergences of nodal functions etc.
 * [`function_vector_gradient`](@ref)
 * [`function_vector_symmetric_gradient`](@ref)
 """
-immutable FEValues{dim, T <: Real, FS <: FunctionSpace}
+immutable FEValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace}
     N::Vector{Vector{T}}
     dNdx::Vector{Vector{Vec{dim, T}}}
     dNdξ::Vector{Vector{Vec{dim, T}}}
     detJdV::Vector{T}
     quad_rule::QuadratureRule{dim, T}
     function_space::FS
+    dMdξ::Vector{Vector{Vec{dim, T}}}
+    geometric_space::GS
 end
 
-FEValues{dim, FS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS) = FEValues(Float64, quad_rule, func_space)
+FEValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FEValues(Float64, quad_rule, func_space, geom_space)
 
-function FEValues{dim, T, FS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim}, func_space::FS)
-        n_basefuncs = n_basefunctions(func_space)
+function FEValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space)
+    n_qpoints = length(points(quad_rule))
 
-        n_qpoints = length(points(quad_rule))
+    # Function interpolation
+    n_func_basefuncs = n_basefunctions(func_space)
 
-        N = [zeros(T, n_basefuncs) for i in 1:n_qpoints]
-        dNdx = [[zero(Vec{dim, T}) for i in 1:n_basefuncs] for j in 1:n_qpoints]
-        dNdξ = [[zero(Vec{dim, T}) for i in 1:n_basefuncs] for j in 1:n_qpoints]
+    N = [zeros(T, n_func_basefuncs) for i in 1:n_qpoints]
+    dNdx = [[zero(Vec{dim, T}) for i in 1:n_func_basefuncs] for j in 1:n_qpoints]
+    dNdξ = [[zero(Vec{dim, T}) for i in 1:n_func_basefuncs] for j in 1:n_qpoints]
 
-        for (i, (ξ, w)) in enumerate(zip(quad_rule.points, quad_rule.weights))
-            value!(func_space, N[i], ξ)
-            derivative!(func_space, dNdξ[i], ξ)
-        end
+    # Geometry interpolation
+    n_geom_basefuncs = n_basefunctions(geom_space)
+    dMdξ = [[zero(Vec{dim, T}) for i in 1:n_geom_basefuncs] for j in 1:n_qpoints]
 
-        FEValues(N, dNdx, dNdξ, zeros(T, n_qpoints), quad_rule, func_space)
+    for (i, (ξ, w)) in enumerate(zip(quad_rule.points, quad_rule.weights))
+        value!(func_space, N[i], ξ)
+        derivative!(func_space, dNdξ[i], ξ)
+        derivative!(geom_space, dMdξ[i], ξ)
+    end
+
+    FEValues(N, dNdx, dNdξ, zeros(T, n_qpoints), quad_rule, func_space, dMdξ, geom_space)
 end
 
 
@@ -81,17 +91,18 @@ Updates the `FEValues` object for an element.
 
 """
 function reinit!{dim, T}(fe_v::FEValues{dim}, x::Vector{Vec{dim, T}})
-    n_basefuncs = n_basefunctions(get_functionspace(fe_v))
-    @assert length(x) == n_basefuncs
+    n_geom_basefuncs = n_basefunctions(get_geometricspace(fe_v))
+    n_func_basefuncs = n_basefunctions(get_functionspace(fe_v))
+    @assert length(x) == n_geom_basefuncs
+
     for i in 1:length(points(fe_v.quad_rule))
-        ξ = points(fe_v.quad_rule)[i]
         w = weights(fe_v.quad_rule)[i]
         fev_J = zero(Tensor{2, dim})
-        for j in 1:n_basefuncs
-            fev_J += fe_v.dNdξ[i][j] ⊗ x[j]
+        for j in 1:n_geom_basefuncs
+            fev_J += fe_v.dMdξ[i][j] ⊗ x[j]
         end
         Jinv = inv(fev_J)
-        for j in 1:n_basefuncs
+        for j in 1:n_func_basefuncs
             fe_v.dNdx[i][j] = Jinv ⋅ fe_v.dNdξ[i][j]
         end
         fe_v.detJdV[i] = det(fev_J) * w
@@ -127,6 +138,20 @@ The function space for the `FEValues` type.
 
 """
 get_functionspace(fe_v::FEValues) = fe_v.function_space
+
+"""
+The function space used for geometric interpolation for the `FEValues` type.
+
+**Arguments**
+
+* `fe_values`: the `FEValues` object
+
+**Results**
+
+* `::FunctionSpace`: the geometric interpolation function space
+
+"""
+get_geometricspace(fe_v::FEValues) = fe_v.geometric_space
 
 
 """
