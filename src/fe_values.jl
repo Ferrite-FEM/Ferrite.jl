@@ -105,7 +105,9 @@ function reinit!{dim, T}(fe_v::FEValues{dim}, x::Vector{Vec{dim, T}})
         for j in 1:n_func_basefuncs
             fe_v.dNdx[i][j] = Jinv ⋅ fe_v.dNdξ[i][j]
         end
-        fe_v.detJdV[i] = det(fev_J) * w
+        detJ = det(fev_J)
+        detJ <= 0.0 && throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
+        fe_v.detJdV[i] = detJ * w
     end
 end
 
