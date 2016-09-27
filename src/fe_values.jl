@@ -128,6 +128,19 @@ The quadrature rule for the `FEValues` type.
 get_quadrule(fe_v::FEValues) = fe_v.quad_rule
 
 """
+Number of points for the quadrature rule in the `FEValues` object
+"""
+n_quadpoints(fe_v::FEValues) = length(points(fe_v.quad_rule))
+"""
+Get the points for the quadrature rule in the `FEValues` object
+"""
+points(fe_v::FEValues) = points(fe_v.quad_rule)
+"""
+Get the weights for the quadrature rule in the `FEValues` object
+"""
+weights(fe_v::FEValues) = weights(fe_v.quad_rule)
+
+"""
 The function space for the `FEValues` type.
 
 **Arguments**
