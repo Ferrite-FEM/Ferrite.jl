@@ -56,7 +56,7 @@ end
 
         function valid_nodes(fs::JuAFEM.FunctionSpace)
             x = JuAFEM.reference_coordinates(fs)
-            return [x[i] + 0.5 * rand(typeof(x[i])) for i in 1:length(x)]
+            return [x[i] + 0.1 * rand(typeof(x[i])) for i in 1:length(x)]
         end
 
         x = valid_nodes(function_space)
