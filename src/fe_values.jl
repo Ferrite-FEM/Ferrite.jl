@@ -60,7 +60,7 @@ function FEValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Type{T}, q
     n_geom_basefuncs = n_basefunctions(geom_space)
     dMdξ = [[zero(Vec{dim, T}) for i in 1:n_geom_basefuncs] for j in 1:n_qpoints]
 
-    for (i, (ξ, w)) in enumerate(zip(quad_rule.points, quad_rule.weights))
+    for (i, ξ) in enumerate(quad_rule.points)
         value!(func_space, N[i], ξ)
         derivative!(func_space, dNdξ[i], ξ)
         derivative!(geom_space, dMdξ[i], ξ)
