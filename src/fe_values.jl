@@ -47,6 +47,8 @@ end
 FEValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FEValues(Float64, quad_rule, func_space, geom_space)
 
 function FEValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space)
+    @assert n_dim(func_space) == n_dim(geom_space)
+    @assert ref_shape(func_space) == ref_shape(geom_space)
     n_qpoints = length(points(quad_rule))
 
     # Function interpolation
