@@ -43,5 +43,7 @@ include("quadrature.jl")
 include("fe_values.jl")
 include("assembler.jl")
 include("VTK.jl")
+include("fe_face_values.jl")
+include("boundary_info.jl")
 
 end # module
