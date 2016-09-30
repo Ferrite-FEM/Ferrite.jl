@@ -68,7 +68,9 @@ function FEValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Type{T}, q
         derivative!(geom_space, dMdξ[i], ξ)
     end
 
-    FEValues(N, dNdx, dNdξ, zeros(T, n_qpoints), quad_rule, func_space, dMdξ, geom_space)
+    detJdV = zeros(T, n_qpoints)
+
+    FEValues(N, dNdx, dNdξ, detJdV, quad_rule, func_space, dMdξ, geom_space)
 end
 
 
@@ -272,9 +274,9 @@ The value of a vector valued function is computed as ``\\mathbf{u}(\\mathbf{x}) 
 end
 
 """
-    function_scalar_gradien{dim, T}t(fe_v::FEValues{dim}, q_point::Int, u::Vector{T}) -> grad::Tensor{1}
+    function_scalar_gradient{dim, T}(fe_v::FEValues{dim}, q_point::Int, u::Vector{T}) -> grad::Tensor{1}
 
-Computes the gradient for a scalar valued function in a quadrature point .
+Computes the gradient for a scalar valued function in a quadrature point.
 
 **Arguments:**
 
