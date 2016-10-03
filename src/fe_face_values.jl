@@ -2,7 +2,7 @@ immutable FEFaceValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace}
     N::Vector{Vector{Vector{T}}}
     dNdx::Vector{Vector{Vector{Vec{dim, T}}}}
     dNdξ::Vector{Vector{Vector{Vec{dim, T}}}}
-    detJdS::Vector{Vector{T}}
+    detJdV::Vector{Vector{T}}
     quad_rule::Vector{QuadratureRule{dim, T}}
     function_space::FS
     dMdξ::Vector{Vector{Vector{Vec{dim, T}}}}
@@ -36,9 +36,9 @@ function FEFaceValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Typ
         derivative!(geom_space, dMdξ[k][i], ξ)
     end
 
-    detJdS = [zeros(T, n_qpoints) for i in 1:n_bounds]
+    detJdV = [zeros(T, n_qpoints) for i in 1:n_bounds]
 
-    FEFaceValues(N, dNdx, dNdξ, detJdS, boundary_quad_rule, func_space, dMdξ, geom_space, Ref(0))
+    FEFaceValues(N, dNdx, dNdξ, detJdV, boundary_quad_rule, func_space, dMdξ, geom_space, Ref(0))
 end
 
 function reinit!{dim, T}(fe_fv::FEFaceValues{dim}, x::Vector{Vec{dim, T}}, boundary::Int)
@@ -61,7 +61,7 @@ function reinit!{dim, T}(fe_fv::FEFaceValues{dim}, x::Vector{Vec{dim, T}}, bound
         end
         detJ = detJ_boundary(get_geometricspace(fe_fv),fefv_J,cb)
         detJ <= 0.0 && throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
-        fe_fv.detJdS[cb][i] = detJ * w
+        fe_fv.detJdV[cb][i] = detJ * w
     end
 end
 
