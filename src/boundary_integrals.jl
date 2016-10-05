@@ -115,10 +115,10 @@ function create_boundary_quad_rule{T}(::Lagrange{3, RefCube, 1}, quad_rule::Quad
 end
 
 function detJ_boundary(::Lagrange{3, RefCube, 1}, J::Tensor{2, 3}, boundary::Int)
-    boundary == 1 && return norm(J[:,1] × J[:,2])
-    boundary == 2 && return norm(J[:,1] × J[:,3])
-    boundary == 3 && return norm(J[:,2] × J[:,3])
-    boundary == 4 && return norm(J[:,1] × J[:,3])
-    boundary == 5 && return norm(J[:,2] × J[:,2])
-    boundary == 6 && return norm(J[:,1] × J[:,2])
+    boundary == 1 && return norm(J[1,:] × J[2,:])
+    boundary == 2 && return norm(J[1,:] × J[3,:])
+    boundary == 3 && return norm(J[2,:] × J[3,:])
+    boundary == 4 && return norm(J[1,:] × J[3,:])
+    boundary == 5 && return norm(J[2,:] × J[2,:])
+    boundary == 6 && return norm(J[1,:] × J[2,:])
 end
