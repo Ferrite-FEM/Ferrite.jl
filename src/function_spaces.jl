@@ -52,14 +52,26 @@ end
     length(dN) == n_base || throw(ArgumentError("dN must have length $(n_base)"))
 end
 
-# Volume of the reference shapes
-reference_volume{dim}(::FunctionSpace{dim,RefTetrahedron}) = 1 / factorial(dim)
-reference_volume{dim}(::FunctionSpace{dim,RefCube}) = 2^dim
+#####################
+# Utility functions #
+#####################
+reference_volume{dim}(::FunctionSpace{dim, RefCube}) = 2^dim
+reference_volume{dim}(::FunctionSpace{dim, RefTetrahedron}) = 1 / factorial(dim)
+# For boundaries
+reference_volume(fs::FunctionSpace, ::Int) = reference_volume(fs_lower_dim(fs))
+reference_volume(fs::FunctionSpace{2, RefTetrahedron}, boundary::Int) = boundary == 1 ? sqrt(2) : 1.0
+# reference_volume(fs::FunctionSpace{3, RefTetrahedron}, b::Int) = b == 1 ? sqrt(2) : 1.0
+n_boundaries{dim}(::FunctionSpace{dim, RefCube}) = 2*dim
+n_boundaries(::FunctionSpace{2, RefTetrahedron}) = 3
+n_boundaries(::FunctionSpace{3, RefTetrahedron}) = 4
 
 ############
 # Lagrange #
 ############
 type Lagrange{dim, shape, order} <: FunctionSpace{dim, shape, order} end
+
+fs_lower_dim{dim,shape,order}(::Lagrange{dim,shape,order}) = Lagrange{dim-1,shape,order}()
+fs_lower_order{dim,shape,order}(::Lagrange{dim,shape,order}) = Lagrange{dim,shape,order-1}()
 
 ##################################
 # Lagrange dim 1 RefCube order 1 #
@@ -265,6 +277,7 @@ end
 # Lagrange dim 2 RefTetrahedron order 1 #
 #########################################
 n_basefunctions(::Lagrange{2, RefTetrahedron, 1}) = 3
+fs_lower_dim{order}(::Lagrange{2, RefTetrahedron, order}) = Lagrange{1, RefCube, order}()
 
 function value!(fs::Lagrange{2, RefTetrahedron, 1}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
@@ -469,6 +482,8 @@ type Serendipity{dim, shape, order} <: FunctionSpace{dim, shape, order} end
 # Serendipity dim 2 RefCube order 2 #
 #####################################
 n_basefunctions(::Serendipity{2, RefCube, 2}) = 8
+fs_lower_dim(::Serendipity{2, RefCube, 2}) = Lagrange{1, RefCube, 2}()
+fs_lower_order(::Serendipity{2, RefCube, 2}) = Lagrange{2, RefCube, 1}()
 
 function value!(fs::Serendipity{2, RefCube, 2}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)

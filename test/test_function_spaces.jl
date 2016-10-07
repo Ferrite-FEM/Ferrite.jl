@@ -15,6 +15,8 @@ for functionspace in (Lagrange{1, RefCube, 1}(),
     r_shape = typeof(ref_shape(functionspace))
     func_order = fs_order(functionspace)
     @test typeof(functionspace) <: FunctionSpace{ndim,r_shape,func_order}
+    @test typeof(JuAFEM.fs_lower_dim(functionspace)) <: FunctionSpace{ndim-1}
+    @test typeof(JuAFEM.fs_lower_order(functionspace)) <: FunctionSpace{ndim,r_shape,func_order-1}
 
     n_basefuncs = n_basefunctions(functionspace)
     x = rand(Tensor{1, ndim})
