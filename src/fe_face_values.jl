@@ -15,7 +15,7 @@ FEFaceValues{dim_qr, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::Quadra
 function FEFaceValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim_qr}, func_space::FS, geom_space::GS=func_space)
     @assert n_dim(func_space) == n_dim(geom_space)
     @assert ref_shape(func_space) == ref_shape(geom_space)
-    n_qpoints = length(points(quad_rule))
+    n_qpoints = length(weights(quad_rule))
     dim = dim_qr + 1
 
     boundary_quad_rule = create_boundary_quad_rule(func_space,quad_rule)

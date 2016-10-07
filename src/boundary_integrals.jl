@@ -113,6 +113,6 @@ function detJ_boundary(::FunctionSpace{3, RefCube}, J::Tensor{2, 3}, boundary::I
     boundary == 2 && return norm(J[1,:] × J[3,:])
     boundary == 3 && return norm(J[2,:] × J[3,:])
     boundary == 4 && return norm(J[1,:] × J[3,:])
-    boundary == 5 && return norm(J[2,:] × J[2,:])
+    boundary == 5 && return norm(J[2,:] × J[3,:])
     boundary == 6 && return norm(J[1,:] × J[2,:])
 end

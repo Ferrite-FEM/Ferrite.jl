@@ -1,16 +1,4 @@
 @testset "FEValues" begin
-# For testing equality between constructors
-function Base.:(==)(fev1::FEValues, fev2::FEValues)
-    fev1.N == fev2.N &&
-    fev1.dNdx == fev2.dNdx &&
-    fev1.dNdξ == fev2.dNdξ &&
-    fev1.detJdV == fev2.detJdV &&
-    fev1.quad_rule == fev2.quad_rule &&
-    fev1.function_space == fev2.function_space &&
-    fev1.dMdξ == fev2.dMdξ &&
-    fev1.geometric_space == fev2.geometric_space
-end
-
 for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(Dim{1}, RefCube(), 2)),
                                      (Lagrange{1, RefCube, 2}(), QuadratureRule(Dim{1}, RefCube(), 2)),
                                      (Lagrange{2, RefCube, 1}(), QuadratureRule(Dim{2}, RefCube(), 2)),
@@ -22,8 +10,6 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(
                                      (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule(Dim{3}, RefTetrahedron(), 2)))
 
     fev = FEValues(quad_rule, function_space)
-    @test fev == FEValues(Float64, quad_rule, function_space)
-    @test fev == FEValues(quad_rule, function_space, function_space)
     ndim = n_dim(function_space)
     n_basefuncs = n_basefunctions(function_space)
 
@@ -79,4 +65,4 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(
 
 end
 
-end
+end # of testset

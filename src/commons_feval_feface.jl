@@ -70,7 +70,7 @@ This value is typically used when one integrates a function on a finite element 
 
 """
 @inline detJdV(fe_v::FEValues, q_point::Int) = fe_v.detJdV[q_point]
-@inline detJdV(fe_fv::FEFaceValues, q_point::Int) = fe_fv.detJdS[fe_fv.current_boundary[]][q_point]
+@inline detJdV(fe_fv::FEFaceValues, q_point::Int) = fe_fv.detJdV[fe_fv.current_boundary[]][q_point]
 
 """
 Computes the value of the shape function
