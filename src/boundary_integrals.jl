@@ -59,7 +59,7 @@ function create_boundary_quad_rule{T}(::FunctionSpace{2, RefTetrahedron}, quad_r
     boundary_quad_rule = QuadratureRule{2, T}[]
 
     # Boundary 1
-    new_points = [t; one(T)-t] # ξ = t, η = 1-t
+    new_points = [t; ones(t)-t] # ξ = t, η = 1-t
     push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{2, T},new_points,(length(w),))))
     # Boundary 2
     new_points = [zeros(t); t] # ξ = 0, η = t
@@ -115,4 +115,36 @@ function detJ_boundary(::FunctionSpace{3, RefCube}, J::Tensor{2, 3}, boundary::I
     boundary == 4 && return norm(J[1,:] × J[3,:])
     boundary == 5 && return norm(J[2,:] × J[3,:])
     boundary == 6 && return norm(J[1,:] × J[2,:])
+end
+
+#########################
+# All RefTetrahedron 3D #
+#########################
+function create_boundary_quad_rule{T}(::FunctionSpace{3, RefTetrahedron}, quad_rule::QuadratureRule{2, T})
+    w = weights(quad_rule)
+    p = reinterpret(T,points(quad_rule),(2,length(w)))
+    t = p[1,:]'; s = p[2,:]'
+    boundary_quad_rule = QuadratureRule{3, T}[]
+
+    # Boundary 1
+    new_points = [t; s; zeros(t)] # ξ = t, η = s, ζ = 0
+    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{3, T},new_points,(length(w),))))
+    # Boundary 2
+    new_points = [t; zeros(t); s] # ξ = t, η = 0, ζ = s
+    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{3, T},new_points,(length(w),))))
+    # Boundary 3
+    new_points = [t; s; ones(t)-t-s] # ξ = t, η = s, ζ = 1-t-s
+    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{3, T},new_points,(length(w),))))
+    # Boundary 4
+    new_points = [zeros(t); t; s] # ξ = 0, η = t, ζ = s
+    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{3, T},new_points,(length(w),))))
+
+    return boundary_quad_rule
+end
+
+function detJ_boundary(::FunctionSpace{3, RefTetrahedron}, J::Tensor{2, 3}, boundary::Int)
+    boundary == 1 && return norm(J[1,:] × J[2,:])
+    boundary == 2 && return norm(J[1,:] × J[3,:])
+    boundary == 3 && return norm((J[1,:]-J[3,:]) × (J[2,:]-J[3,:]))
+    boundary == 4 && return norm(J[2,:] × J[3,:])
 end

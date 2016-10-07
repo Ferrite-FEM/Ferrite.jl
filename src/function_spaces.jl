@@ -60,7 +60,7 @@ reference_volume{dim}(::FunctionSpace{dim, RefTetrahedron}) = 1 / factorial(dim)
 # For boundaries
 reference_volume(fs::FunctionSpace, ::Int) = reference_volume(fs_lower_dim(fs))
 reference_volume(fs::FunctionSpace{2, RefTetrahedron}, boundary::Int) = boundary == 1 ? sqrt(2) : 1.0
-# reference_volume(fs::FunctionSpace{3, RefTetrahedron}, b::Int) = b == 1 ? sqrt(2) : 1.0
+reference_volume(fs::FunctionSpace{3, RefTetrahedron}, b::Int) = b == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
 n_boundaries{dim}(::FunctionSpace{dim, RefCube}) = 2*dim
 n_boundaries(::FunctionSpace{2, RefTetrahedron}) = 3
 n_boundaries(::FunctionSpace{3, RefTetrahedron}) = 4
@@ -286,11 +286,9 @@ function value!(fs::Lagrange{2, RefTetrahedron, 1}, N::Vector, ξ::Vec{2})
         ξ_x = ξ[1]
         ξ_y = ξ[2]
 
-        γ = 1 - ξ_x - ξ_y
-
         N[1] = ξ_x
         N[2] = ξ_y
-        N[3] = γ
+        N[3] = 1. - ξ_x - ξ_y
     end
 
     return N
@@ -326,7 +324,7 @@ function value!(fs::Lagrange{2, RefTetrahedron, 2}, N::Vector, ξ::Vec{2})
         ξ_x = ξ[1]
         ξ_y = ξ[2]
 
-        γ = 1 - ξ_x - ξ_y
+        γ = 1. - ξ_x - ξ_y
 
         N[1] = ξ_x * (2ξ_x - 1)
         N[2] = ξ_y * (2ξ_y - 1)
@@ -382,12 +380,10 @@ function value!(fs::Lagrange{3, RefTetrahedron, 1}, N::Vector, ξ::Vec{3})
         ξ_y = ξ[2]
         ξ_z = ξ[3]
 
-        γ = 1. - ξ_x - ξ_y - ξ_z
-
         N[1] = ξ_x
         N[2] = ξ_y
         N[3] = ξ_z
-        N[4] = γ
+        N[4] = 1. - ξ_x - ξ_y - ξ_z
     end
 
     return N
