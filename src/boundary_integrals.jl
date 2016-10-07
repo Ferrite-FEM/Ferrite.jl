@@ -1,9 +1,7 @@
 ##################
 # All 1D RefCube #
 ##################
-typealias RefCube1D Union{Lagrange{1, RefCube, 1}, Lagrange{1, RefCube, 2}}
-
-function create_boundary_quad_rule{T}(::RefCube1D, quad_rule::QuadratureRule{0, T})
+function create_boundary_quad_rule{T}(::FunctionSpace{1, RefCube}, quad_rule::QuadratureRule{0, T})
     w = weights(quad_rule)
     boundary_quad_rule = QuadratureRule{1, T}[]
 
@@ -17,14 +15,12 @@ function create_boundary_quad_rule{T}(::RefCube1D, quad_rule::QuadratureRule{0, 
     return boundary_quad_rule
 end
 
-detJ_boundary{T}(::RefCube1D, ::Tensor{2, 1, T}, ::Int) = one(T)
+detJ_boundary{T}(::FunctionSpace{1, RefCube}, ::Tensor{2, 1, T}, ::Int) = one(T)
 
 ##################
 # All 2D RefCube #
 ##################
-typealias RefCube2D Union{Lagrange{2, RefCube, 1}, Lagrange{2, RefCube, 2}, Serendipity{2, RefCube, 2}}
-
-function create_boundary_quad_rule{T}(::RefCube2D, quad_rule::QuadratureRule{1, T})
+function create_boundary_quad_rule{T}(::FunctionSpace{2, RefCube}, quad_rule::QuadratureRule{1, T})
     w = weights(quad_rule)
     p = reinterpret(T,points(quad_rule),(1,length(w)))
     t = p[1,:]'
@@ -46,7 +42,7 @@ function create_boundary_quad_rule{T}(::RefCube2D, quad_rule::QuadratureRule{1, 
     return boundary_quad_rule
 end
 
-function detJ_boundary(::RefCube2D, J::Tensor{2, 2}, boundary::Int)
+function detJ_boundary(::FunctionSpace{2, RefCube}, J::Tensor{2, 2}, boundary::Int)
     boundary == 1 && return sqrt(J[1,1]^2 + J[1,2]^2)
     boundary == 2 && return sqrt(J[2,1]^2 + J[2,2]^2)
     boundary == 3 && return sqrt(J[1,1]^2 + J[1,2]^2)
@@ -56,9 +52,7 @@ end
 #########################
 # All RefTetrahedron 2D #
 #########################
-typealias RefTetrahedron2D Union{Lagrange{2, RefTetrahedron, 1}, Lagrange{2, RefTetrahedron, 2}}
-
-function create_boundary_quad_rule{T}(::RefTetrahedron2D, quad_rule::QuadratureRule{1, T})
+function create_boundary_quad_rule{T}(::FunctionSpace{2, RefTetrahedron}, quad_rule::QuadratureRule{1, T})
     w = weights(quad_rule)
     p = reinterpret(T,points(quad_rule),(1,length(w)))
     t = p[1,:]'
@@ -77,16 +71,16 @@ function create_boundary_quad_rule{T}(::RefTetrahedron2D, quad_rule::QuadratureR
     return boundary_quad_rule
 end
 
-function detJ_boundary(::RefTetrahedron2D, J::Tensor{2, 2}, boundary::Int)
+function detJ_boundary(::FunctionSpace{2, RefTetrahedron}, J::Tensor{2, 2}, boundary::Int)
     boundary == 1 && return sqrt((J[1,1] - J[2,1])^2 + (J[1,2] - J[2,2])^2)
     boundary == 2 && return sqrt(J[2,1]^2 + J[2,2]^2)
     boundary == 3 && return sqrt(J[1,1]^2 + J[1,2]^2)
 end
 
-###########################
-# Lagrange{3, RefCube, 1} #
-###########################
-function create_boundary_quad_rule{T}(::Lagrange{3, RefCube, 1}, quad_rule::QuadratureRule{2, T})
+##################
+# All RefCube 3D #
+##################
+function create_boundary_quad_rule{T}(::FunctionSpace{3, RefCube}, quad_rule::QuadratureRule{2, T})
     w = weights(quad_rule)
     p = reinterpret(T,points(quad_rule),(2,length(w)))
     t = p[1,:]'; s = p[2,:]'
@@ -114,7 +108,7 @@ function create_boundary_quad_rule{T}(::Lagrange{3, RefCube, 1}, quad_rule::Quad
     return boundary_quad_rule
 end
 
-function detJ_boundary(::Lagrange{3, RefCube, 1}, J::Tensor{2, 3}, boundary::Int)
+function detJ_boundary(::FunctionSpace{3, RefCube}, J::Tensor{2, 3}, boundary::Int)
     boundary == 1 && return norm(J[1,:] × J[2,:])
     boundary == 2 && return norm(J[1,:] × J[3,:])
     boundary == 3 && return norm(J[2,:] × J[3,:])
