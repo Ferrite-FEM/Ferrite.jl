@@ -1,4 +1,39 @@
-immutable FEFaceValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace}
+"""
+An `FEBoundaryValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
+values of nodal functions, gradients and divergences of nodal functions etc. on the finite element boundary
+
+**Constructor**
+
+    FEBoundaryValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
+
+
+**Arguments**
+
+* `T` an optional argument to determine the type the internal data is stored as.
+* `quad_rule` an instance of a [`QuadratureRule`](@ref)
+* `function_space` an instance of a [`FunctionSpace`](@ref) used to interpolate the approximated function
+* `geometric_space` an optional instance of a [`FunctionSpace`](@ref) which is used to interpolate the geometry 
+
+** Common methods**
+
+* [`get_quadrule`](@ref)
+* [`get_functionspace`](@ref)
+* [`get_geometricspace`](@ref)
+* [`detJdV`](@ref)
+
+* [`shape_value`](@ref)
+* [`shape_gradient`](@ref)
+* [`shape_divergence`](@ref)
+* [`shape_derivative`](@ref)
+
+* [`function_scalar_value`](@ref)
+* [`function_vector_value`](@ref)
+* [`function_scalar_gradient`](@ref)
+* [`function_vector_divergence`](@ref)
+* [`function_vector_gradient`](@ref)
+* [`function_vector_symmetric_gradient`](@ref)
+"""
+immutable FEBoundaryValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace} <: AbstractFEValues{dim, T, FS, GS}
     N::Vector{Vector{Vector{T}}}
     dNdx::Vector{Vector{Vector{Vec{dim, T}}}}
     dNdξ::Vector{Vector{Vector{Vec{dim, T}}}}
@@ -10,9 +45,9 @@ immutable FEFaceValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace}
     current_boundary::Ref{Int}
 end
 
-FEFaceValues{dim_qr, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim_qr}, func_space::FS, geom_space::GS=func_space) = FEFaceValues(Float64, quad_rule, func_space, geom_space)
+FEBoundaryValues{dim_qr, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim_qr}, func_space::FS, geom_space::GS=func_space) = FEBoundaryValues(Float64, quad_rule, func_space, geom_space)
 
-function FEFaceValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim_qr}, func_space::FS, geom_space::GS=func_space)
+function FEBoundaryValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim_qr}, func_space::FS, geom_space::GS=func_space)
     @assert n_dim(func_space) == n_dim(geom_space)
     @assert ref_shape(func_space) == ref_shape(geom_space)
     n_qpoints = length(weights(quad_rule))
@@ -38,45 +73,65 @@ function FEFaceValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Typ
 
     detJdV = [zeros(T, n_qpoints) for i in 1:n_bounds]
 
-    FEFaceValues(N, dNdx, dNdξ, detJdV, boundary_quad_rule, func_space, dMdξ, geom_space, Ref(0))
+    FEBoundaryValues(N, dNdx, dNdξ, detJdV, boundary_quad_rule, func_space, dMdξ, geom_space, Ref(0))
 end
 
-function reinit!{dim, T}(fe_fv::FEFaceValues{dim}, x::Vector{Vec{dim, T}}, boundary::Int)
-    n_geom_basefuncs = n_basefunctions(get_geometricspace(fe_fv))
-    n_func_basefuncs = n_basefunctions(get_functionspace(fe_fv))
+"""
+Updates the `FEBoundaryValues` object for a given boundary
+
+    reinit!{dim, T}(fe_bv::FEBoundaryValues{dim}, x::Vector{Vec{dim, T}}, boundary::Int)
+
+** Arguments **
+
+* `fe_bv`: the `FEBoundaryValues` object
+* `x`: A `Vector` of `Vec`, one for each nodal position in the element.
+* `boundary`: The boundary number for the element
+
+** Result **
+
+* nothing
+
+
+**Details**
+
+
+"""
+function reinit!{dim, T}(fe_bv::FEBoundaryValues{dim}, x::Vector{Vec{dim, T}}, boundary::Int)
+    n_geom_basefuncs = n_basefunctions(get_geometricspace(fe_bv))
+    n_func_basefuncs = n_basefunctions(get_functionspace(fe_bv))
     @assert length(x) == n_geom_basefuncs
 
-    fe_fv.current_boundary[] = boundary
-    cb = current_boundary(fe_fv)
+    fe_bv.current_boundary[] = boundary
+    cb = current_boundary(fe_bv)
 
-    for i in 1:length(points(fe_fv.quad_rule[cb]))
-        w = weights(fe_fv.quad_rule[cb])[i]
-        fefv_J = zero(Tensor{2, dim})
+    for i in 1:length(points(fe_bv.quad_rule[cb]))
+        w = weights(fe_bv.quad_rule[cb])[i]
+        febv_J = zero(Tensor{2, dim})
         for j in 1:n_geom_basefuncs
-            fefv_J += fe_fv.dMdξ[cb][i][j] ⊗ x[j]
+            febv_J += fe_bv.dMdξ[cb][i][j] ⊗ x[j]
         end
-        Jinv = inv(fefv_J)
+        Jinv = inv(febv_J)
         for j in 1:n_func_basefuncs
-            fe_fv.dNdx[cb][i][j] = Jinv ⋅ fe_fv.dNdξ[cb][i][j]
+            fe_bv.dNdx[cb][i][j] = Jinv ⋅ fe_bv.dNdξ[cb][i][j]
         end
-        detJ = detJ_boundary(get_geometricspace(fe_fv),fefv_J,cb)
+        detJ = detJ_boundary(get_geometricspace(fe_bv),febv_J,cb)
         detJ <= 0.0 && throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
-        fe_fv.detJdV[cb][i] = detJ * w
+        fe_bv.detJdV[cb][i] = detJ * w
     end
 end
 
 """
-The current active boundary of the `FEFaceValues` type.
+The current active boundary of the `FEBoundaryValues` type.
 
-    current_boundary(fe_fv::FEFaceValues)
+    current_boundary(fe_bv::FEBoundaryValues)
 
 ** Arguments **
 
-* `fe_face_values`: the `FEFaceValues` object
+* `fe_boundary_values`: the `FEBoundaryValues` object
 
 ** Results **
 
 * `::Int`: the current active boundary (from last `reinit!`).
 
 """
-current_boundary(fe_fv::FEFaceValues) = fe_fv.current_boundary[]
+current_boundary(fe_bv::FEBoundaryValues) = fe_bv.current_boundary[]

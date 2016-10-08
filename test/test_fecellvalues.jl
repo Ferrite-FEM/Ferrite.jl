@@ -1,4 +1,4 @@
-@testset "FEValues" begin
+@testset "FECellValues" begin
 for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(Dim{1}, RefCube(), 2)),
                                      (Lagrange{1, RefCube, 2}(), QuadratureRule(Dim{1}, RefCube(), 2)),
                                      (Lagrange{2, RefCube, 1}(), QuadratureRule(Dim{2}, RefCube(), 2)),
@@ -9,7 +9,7 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(
                                      (Serendipity{2, RefCube, 2}(), QuadratureRule(Dim{2}, RefCube(), 2)),
                                      (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule(Dim{3}, RefTetrahedron(), 2)))
 
-    fev = FEValues(quad_rule, function_space)
+    fe_cv = FECellValues(quad_rule, function_space)
     ndim = n_dim(function_space)
     n_basefuncs = n_basefunctions(function_space)
 
@@ -19,7 +19,7 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(
     end
 
     x = valid_nodes(function_space)
-    reinit!(fev, x)
+    reinit!(fe_cv, x)
 
     # We test this by applying a given deformation gradient on all the nodes.
     # Since this is a linear deformation we should get back the exact values
@@ -34,32 +34,32 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(
     end
 
     for i in 1:length(points(quad_rule))
-        @test function_vector_gradient(fev, i, u) ≈ H
-        @test function_vector_symmetric_gradient(fev, i, u) ≈ 0.5(H + H')
-        @test function_vector_divergence(fev, i, u) ≈ trace(H)
-        @test function_scalar_gradient(fev, i, u_scal) ≈ V
-        function_scalar_value(fev, i, u_scal)
-        function_vector_value(fev, i, u)
+        @test function_vector_gradient(fe_cv, i, u) ≈ H
+        @test function_vector_symmetric_gradient(fe_cv, i, u) ≈ 0.5(H + H')
+        @test function_vector_divergence(fe_cv, i, u) ≈ trace(H)
+        @test function_scalar_gradient(fe_cv, i, u_scal) ≈ V
+        function_scalar_value(fe_cv, i, u_scal)
+        function_vector_value(fe_cv, i, u)
     end
 
     # Test of volume
     vol = 0.0
     for i in 1:length(points(quad_rule))
-        vol += detJdV(fev,i)
+        vol += detJdV(fe_cv,i)
     end
     # @test vol ≈ JuAFEM.reference_volume(function_space) # TODO: Add function that calculates the volume for an object
 
     # Test of utility functions
-    @test get_functionspace(fev) == function_space
-    @test get_geometricspace(fev) == function_space
-    @test get_quadrule(fev) == quad_rule
+    @test get_functionspace(fe_cv) == function_space
+    @test get_geometricspace(fe_cv) == function_space
+    @test get_quadrule(fe_cv) == quad_rule
 
     # Test quadrature rule after reinit! with ref. coords
     x = JuAFEM.reference_coordinates(function_space)
-    reinit!(fev, x)
+    reinit!(fe_cv, x)
     vol = 0.0
     for i in 1:length(points(quad_rule))
-        vol += detJdV(fev,i)
+        vol += detJdV(fe_cv,i)
     end
     @test vol ≈ JuAFEM.reference_volume(function_space)
 

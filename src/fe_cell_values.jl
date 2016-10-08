@@ -1,10 +1,10 @@
 """
-An `FEValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
-values of nodal functions, gradients and divergences of nodal functions etc.
+An `FECellValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
+values of nodal functions, gradients and divergences of nodal functions etc. in the finite element cell
 
 **Constructor**
 
-    FEValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
+    FECellValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
 
 
 **Arguments**
@@ -33,7 +33,7 @@ values of nodal functions, gradients and divergences of nodal functions etc.
 * [`function_vector_gradient`](@ref)
 * [`function_vector_symmetric_gradient`](@ref)
 """
-immutable FEValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace}
+immutable FECellValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace} <: AbstractFEValues{dim, T, FS, GS}
     N::Vector{Vector{T}}
     dNdx::Vector{Vector{Vec{dim, T}}}
     dNdξ::Vector{Vector{Vec{dim, T}}}
@@ -44,9 +44,9 @@ immutable FEValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace}
     geometric_space::GS
 end
 
-FEValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FEValues(Float64, quad_rule, func_space, geom_space)
+FECellValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FECellValues(Float64, quad_rule, func_space, geom_space)
 
-function FEValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space)
+function FECellValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space)
     @assert n_dim(func_space) == n_dim(geom_space)
     @assert ref_shape(func_space) == ref_shape(geom_space)
     n_qpoints = length(weights(quad_rule))
@@ -69,18 +69,18 @@ function FEValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Type{T}, q
 
     detJdV = zeros(T, n_qpoints)
 
-    FEValues(N, dNdx, dNdξ, detJdV, quad_rule, func_space, dMdξ, geom_space)
+    FECellValues(N, dNdx, dNdξ, detJdV, quad_rule, func_space, dMdξ, geom_space)
 end
 
 
 """
-Updates the `FEValues` object for an element.
+Updates the `FECellValues` object for an element.
 
-    reinit!{dim, T}(fe_v::FEValues{dim}, x::Vector{Vec{dim, T}})
+    reinit!{dim, T}(fe_cv::FECellValues{dim}, x::Vector{Vec{dim, T}})
 
 ** Arguments **
 
-* `fe_values`: the `FEValues` object
+* `fe_cv`: the `FECellValues` object
 * `x`: A `Vector` of `Vec`, one for each nodal position in the element.
 
 ** Result **
@@ -92,23 +92,23 @@ Updates the `FEValues` object for an element.
 
 
 """
-function reinit!{dim, T}(fe_v::FEValues{dim}, x::Vector{Vec{dim, T}})
-    n_geom_basefuncs = n_basefunctions(get_geometricspace(fe_v))
-    n_func_basefuncs = n_basefunctions(get_functionspace(fe_v))
+function reinit!{dim, T}(fe_cv::FECellValues{dim}, x::Vector{Vec{dim, T}})
+    n_geom_basefuncs = n_basefunctions(get_geometricspace(fe_cv))
+    n_func_basefuncs = n_basefunctions(get_functionspace(fe_cv))
     @assert length(x) == n_geom_basefuncs
 
-    for i in 1:length(points(fe_v.quad_rule))
-        w = weights(fe_v.quad_rule)[i]
-        fev_J = zero(Tensor{2, dim})
+    for i in 1:length(points(fe_cv.quad_rule))
+        w = weights(fe_cv.quad_rule)[i]
+        fecv_J = zero(Tensor{2, dim})
         for j in 1:n_geom_basefuncs
-            fev_J += fe_v.dMdξ[i][j] ⊗ x[j]
+            fecv_J += fe_cv.dMdξ[i][j] ⊗ x[j]
         end
-        Jinv = inv(fev_J)
+        Jinv = inv(fecv_J)
         for j in 1:n_func_basefuncs
-            fe_v.dNdx[i][j] = Jinv ⋅ fe_v.dNdξ[i][j]
+            fe_cv.dNdx[i][j] = Jinv ⋅ fe_cv.dNdξ[i][j]
         end
-        detJ = det(fev_J)
+        detJ = det(fecv_J)
         detJ <= 0.0 && throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
-        fe_v.detJdV[i] = detJ * w
+        fe_cv.detJdV[i] = detJ * w
     end
 end
