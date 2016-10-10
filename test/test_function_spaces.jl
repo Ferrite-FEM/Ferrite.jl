@@ -11,12 +11,12 @@ for functionspace in (Lagrange{1, RefCube, 1}(),
                       Lagrange{3, RefTetrahedron, 1}())
 
     # Test of utility functions
-    ndim = n_dim(functionspace)
-    r_shape = typeof(ref_shape(functionspace))
-    func_order = fs_order(functionspace)
+    ndim = functionspace_n_dim(functionspace)
+    r_shape = functionspace_ref_shape(functionspace)
+    func_order = functionspace_order(functionspace)
     @test typeof(functionspace) <: FunctionSpace{ndim,r_shape,func_order}
-    @test typeof(JuAFEM.fs_lower_dim(functionspace)) <: FunctionSpace{ndim-1}
-    @test typeof(JuAFEM.fs_lower_order(functionspace)) <: FunctionSpace{ndim,r_shape,func_order-1}
+    @test typeof(JuAFEM.functionspace_lower_dim(functionspace)) <: FunctionSpace{ndim-1}
+    @test typeof(JuAFEM.functionspace_lower_order(functionspace)) <: FunctionSpace{ndim,r_shape,func_order-1}
 
     n_basefuncs = n_basefunctions(functionspace)
     x = rand(Tensor{1, ndim})

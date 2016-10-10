@@ -48,8 +48,8 @@ end
 FEBoundaryValues{dim_qr, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim_qr}, func_space::FS, geom_space::GS=func_space) = FEBoundaryValues(Float64, quad_rule, func_space, geom_space)
 
 function FEBoundaryValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim_qr}, func_space::FS, geom_space::GS=func_space)
-    @assert n_dim(func_space) == n_dim(geom_space)
-    @assert ref_shape(func_space) == ref_shape(geom_space)
+    @assert functionspace_n_dim(func_space) == functionspace_n_dim(geom_space)
+    @assert functionspace_ref_shape(func_space) == functionspace_ref_shape(geom_space)
     n_qpoints = length(weights(quad_rule))
     dim = dim_qr + 1
 

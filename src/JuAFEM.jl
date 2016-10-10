@@ -18,7 +18,7 @@ export FECellValues, reinit!, shape_value, shape_gradient, shape_divergence, det
                      function_scalar_value, function_vector_value, function_scalar_gradient,
                      function_vector_gradient, function_vector_divergence, function_vector_symmetric_gradient
 export FEBoundaryValues
-export FunctionSpace, n_dim, ref_shape, fs_order, n_basefunctions
+export FunctionSpace, functionspace_n_dim, functionspace_ref_shape, functionspace_order, n_basefunctions
 export Lagrange, Serendipity, RefTetrahedron, RefCube
 export QuadratureRule, Dim, weights, points
 

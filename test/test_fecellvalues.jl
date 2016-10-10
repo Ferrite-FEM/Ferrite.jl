@@ -10,7 +10,7 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(
                                      (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule(Dim{3}, RefTetrahedron(), 2)))
 
     fe_cv = FECellValues(quad_rule, function_space)
-    ndim = n_dim(function_space)
+    ndim = functionspace_n_dim(function_space)
     n_basefuncs = n_basefunctions(function_space)
 
     function valid_nodes(fs::JuAFEM.FunctionSpace)
