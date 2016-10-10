@@ -13,11 +13,6 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(
     ndim = functionspace_n_dim(function_space)
     n_basefuncs = n_basefunctions(function_space)
 
-    function valid_nodes(fs::JuAFEM.FunctionSpace)
-        x = JuAFEM.reference_coordinates(fs)
-        return [x[i] + 0.1 * rand(typeof(x[i])) for i in 1:length(x)]
-    end
-
     x = valid_nodes(function_space)
     for boundary in 1:JuAFEM.n_boundaries(function_space)
         reinit!(fe_bv, x, boundary)
@@ -57,13 +52,13 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(
         @test get_geometricspace(fe_bv) == function_space
 
         # Test quadrature rule after reinit! with ref. coords
-        x = JuAFEM.reference_coordinates(function_space)
+        x = reference_coordinates(function_space)
         reinit!(fe_bv, x, boundary)
         vol = 0.0
         for i in 1:length(points(boundary_quad_rule))
             vol += detJdV(fe_bv, i)
         end
-        @test vol ≈ JuAFEM.reference_volume(function_space, boundary)
+        @test vol ≈ reference_volume(function_space, boundary)
     end
 
 end

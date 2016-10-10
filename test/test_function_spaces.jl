@@ -25,7 +25,7 @@ for functionspace in (Lagrange{1, RefCube, 1}(),
            reinterpret(Float64, JuAFEM.derivative(functionspace, x), (ndim * n_basefuncs,))
     @test sum(JuAFEM.value(functionspace, x)) ≈ 1.0
 
-    coords = JuAFEM.reference_coordinates(functionspace)
+    coords = reference_coordinates(functionspace)
     for node in 1:n_basefuncs
         N_node = JuAFEM.value(functionspace, coords[node])
         for k in 1:node

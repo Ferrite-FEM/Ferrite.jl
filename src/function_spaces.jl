@@ -55,12 +55,6 @@ end
 #####################
 # Utility functions #
 #####################
-reference_volume{dim}(::FunctionSpace{dim, RefCube}) = 2^dim
-reference_volume{dim}(::FunctionSpace{dim, RefTetrahedron}) = 1 / factorial(dim)
-# For boundaries
-reference_volume(fs::FunctionSpace, ::Int) = reference_volume(functionspace_lower_dim(fs))
-reference_volume(fs::FunctionSpace{2, RefTetrahedron}, boundary::Int) = boundary == 1 ? sqrt(2) : 1.0
-reference_volume(fs::FunctionSpace{3, RefTetrahedron}, b::Int) = b == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
 n_boundaries{dim}(::FunctionSpace{dim, RefCube}) = 2*dim
 n_boundaries(::FunctionSpace{2, RefTetrahedron}) = 3
 n_boundaries(::FunctionSpace{3, RefTetrahedron}) = 4
@@ -102,11 +96,6 @@ function derivative!{T}(fs::Lagrange{1, RefCube, 1}, dN::Vector{Vec{1, T}}, ξ::
     return dN
 end
 
-function reference_coordinates(fs::Lagrange{1, RefCube, 1})
-    return [Vec{1, Float64}((-1.0,)),
-            Vec{1, Float64}(( 1.0,))]
-end
-
 ##################################
 # Lagrange dim 1 RefCube order 2 #
 ##################################
@@ -138,12 +127,6 @@ function derivative!{T}(fs::Lagrange{1, RefCube, 2}, dN::Vector{Vec{1, T}}, ξ::
     end
 
     return dN
-end
-
-function reference_coordinates(fs::Lagrange{1, RefCube, 2})
-    return [Vec{1, Float64}((-1.0,)),
-            Vec{1, Float64}(( 0.0,)),
-            Vec{1, Float64}(( 1.0,))]
 end
 
 ##################################
@@ -188,13 +171,6 @@ function derivative!{T}(fs::Lagrange{2, RefCube, 1}, dN::Vector{Vec{2, T}}, ξ::
     end
 
     return dN
-end
-
-function reference_coordinates(fs::Lagrange{2, RefCube, 1})
-    return [Vec{2, Float64}((-1.0, -1.0)),
-            Vec{2, Float64}(( 1.0, -1.0)),
-            Vec{2, Float64}(( 1.0,  1.0,)),
-            Vec{2, Float64}((-1.0,  1.0,))]
 end
 
 ##################################
@@ -261,18 +237,6 @@ function derivative!{T}(fs::Lagrange{2, RefCube, 2}, dN::Vector{Vec{2, T}}, ξ::
     return dN
 end
 
-function reference_coordinates(fs::Lagrange{2, RefCube, 2})
-    return [Vec{2, Float64}((-1.0, -1.0)),
-            Vec{2, Float64}(( 1.0, -1.0)),
-            Vec{2, Float64}(( 1.0,  1.0)),
-            Vec{2, Float64}((-1.0,  1.0)),
-            Vec{2, Float64}(( 0.0, -1.0)),
-            Vec{2, Float64}(( 1.0,  0.0)),
-            Vec{2, Float64}(( 0.0,  1.0)),
-            Vec{2, Float64}((-1.0,  0.0)),
-            Vec{2, Float64}(( 0.0,  0.0))]
-end
-
 #########################################
 # Lagrange dim 2 RefTetrahedron order 1 #
 #########################################
@@ -304,12 +268,6 @@ function derivative!{T}(fs::Lagrange{2, RefTetrahedron, 1}, dN::Vector{Vec{2, T}
     end
 
     return dN
-end
-
-function reference_coordinates(fs::Lagrange{2, RefTetrahedron, 1})
-    return [Vec{2, Float64}((1.0, 0.0)),
-            Vec{2, Float64}((0.0, 1.0)),
-            Vec{2, Float64}((0.0, 0.0))]
 end
 
 #########################################
@@ -358,15 +316,6 @@ function derivative!{T}(fs::Lagrange{2, RefTetrahedron, 2}, dN::Vector{Vec{2, T}
     return dN
 end
 
-function reference_coordinates(fs::Lagrange{2, RefTetrahedron, 2})
-    return [Vec{2, Float64}((1.0, 0.0)),
-            Vec{2, Float64}((0.0, 1.0)),
-            Vec{2, Float64}((0.0, 0.0)),
-            Vec{2, Float64}((0.5, 0.5)),
-            Vec{2, Float64}((0.0, 0.5)),
-            Vec{2, Float64}((0.5, 0.0))]
-end
-
 #########################################
 # Lagrange dim 3 RefTetrahedron order 1 #
 #########################################
@@ -400,13 +349,6 @@ function derivative!{T}(fs::Lagrange{3, RefTetrahedron, 1}, dN::Vector{Vec{3, T}
     end
 
     return dN
-end
-
-function reference_coordinates(fs::Lagrange{3, RefTetrahedron, 1})
-    return [Vec{3, Float64}((1.0, 0.0, 0.0)),
-            Vec{3, Float64}((0.0, 1.0, 0.0)),
-            Vec{3, Float64}((0.0, 0.0, 1.0)),
-            Vec{3, Float64}((0.0, 0.0, 0.0))]
 end
 
 VTK_type(fs::Lagrange{3, RefTetrahedron, 1}) = VTKCellType.VTK_TETRA
@@ -458,17 +400,6 @@ function derivative!{T}(fs::Lagrange{3, RefCube, 1}, dN::Vector{Vec{3, T}}, ξ::
     return dN
 end
 
-function reference_coordinates(fs::Lagrange{3, RefCube, 1})
-    return [Vec{3, Float64}((-1.0, -1.0, -1.0)),
-            Vec{3, Float64}(( 1.0, -1.0, -1.0)),
-            Vec{3, Float64}(( 1.0,  1.0, -1.0)),
-            Vec{3, Float64}((-1.0,  1.0, -1.0)),
-            Vec{3, Float64}((-1.0, -1.0,  1.0)),
-            Vec{3, Float64}(( 1.0, -1.0,  1.0)),
-            Vec{3, Float64}(( 1.0,  1.0,  1.0)),
-            Vec{3, Float64}((-1.0,  1.0,  1.0))]
-end
-
 ###############
 # Serendipity #
 ###############
@@ -517,15 +448,4 @@ function derivative!{T}(fs::Serendipity{2, RefCube, 2}, dN::Vector{Vec{2, T}}, �
         dN[8] = Vec{2, T}(( -0.5(1 - ξ_y * ξ_y),  -ξ_y*(1 - ξ_x)))
     end
     return dN
-end
-
-function reference_coordinates(fs::Serendipity{2, RefCube, 2})
-    return [Vec{2, Float64}((-1.0, -1.0)),
-            Vec{2, Float64}(( 1.0, -1.0)),
-            Vec{2, Float64}(( 1.0,  1.0)),
-            Vec{2, Float64}((-1.0,  1.0)),
-            Vec{2, Float64}(( 0.0, -1.0)),
-            Vec{2, Float64}(( 1.0,  0.0)),
-            Vec{2, Float64}(( 0.0,  1.0)),
-            Vec{2, Float64}((-1.0,  0.0))]
 end
