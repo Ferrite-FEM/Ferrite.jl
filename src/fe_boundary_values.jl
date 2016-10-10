@@ -135,3 +135,39 @@ The current active boundary of the `FEBoundaryValues` type.
 
 """
 current_boundary(fe_bv::FEBoundaryValues) = fe_bv.current_boundary[]
+"""
+The boundary number for a cell, typically used to get the boundary number which is needed
+to `reinit!` a `FEBoundaryValues` object for  boundary integration
+
+    get_boundarynumber(boundary_nodes, cell_nodes, fs::FunctionSpace)
+
+** Arguments **
+
+* `boundary_nodes`: the node numbers of the nodes on the boundary of the cell
+* `cell_nodes`: the node numbers of the cell
+* `fs`: the `FunctionSpace` for the cell
+
+** Results **
+
+* `::Int`: the corresponding boundary
+"""
+function get_boundarynumber(boundary_nodes, cell_nodes, fs::FunctionSpace)
+    @assert length(boundary_nodes) == n_boundarynodes(fs)
+    @assert length(cell_nodes) == n_basefunctions(fs)
+
+    tmp = zeros(boundary_nodes)
+    for i in 1:length(boundary_nodes)
+        tmp[i] = findfirst(j -> j == boundary_nodes[i], cell_nodes)
+    end
+
+    if 0 in tmp
+        throw(ArgumentError("at least one boundary node: $boundary_nodes not in cell nodes: $cell_nodes"))
+    end
+    sort!(tmp)
+    boundary_nodes_sorted = ntuple(i -> tmp[i], Val{n_boundarynodes(fs)})
+    for (i, boundary) in enumerate(boundarylist(fs))
+        boundary_nodes_sorted == boundary && return i
+    end
+
+    throw(ArgumentError("invalid node numbers for boundary"))
+end

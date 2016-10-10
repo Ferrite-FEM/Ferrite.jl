@@ -71,6 +71,8 @@ functionspace_lower_order{dim,shape,order}(::Lagrange{dim,shape,order}) = Lagran
 # Lagrange dim 1 RefCube order 1 #
 ##################################
 n_basefunctions(::Lagrange{1, RefCube, 1}) = 2
+n_boundarynodes(::Lagrange{1, RefCube, 1}) = 1
+boundarylist(::Lagrange{1, RefCube, 1}) = ((1,),(2,))
 
 function value!(fs::Lagrange{1, RefCube, 1}, N::Vector, ξ::Vec{1})
     checkdim_value(fs, N, ξ)
@@ -100,6 +102,8 @@ end
 # Lagrange dim 1 RefCube order 2 #
 ##################################
 n_basefunctions(::Lagrange{1, RefCube, 2}) = 3
+n_boundarynodes(::Lagrange{1, RefCube, 2}) = 1
+boundarylist(::Lagrange{1, RefCube, 2}) = ((1,),(2,))
 
 function value!(fs::Lagrange{1, RefCube, 2}, N::Vector, ξ::Vec{1})
     checkdim_value(fs, N, ξ)
@@ -133,6 +137,8 @@ end
 # Lagrange dim 2 RefCube order 1 #
 ##################################
 n_basefunctions(::Lagrange{2, RefCube, 1}) = 4
+n_boundarynodes(::Lagrange{2, RefCube, 1}) = 2
+boundarylist(::Lagrange{2, RefCube, 1}) = ((1,2),(2,3),(3,4),(1,4))
 
 function value!(fs::Lagrange{2, RefCube, 1}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
@@ -177,6 +183,8 @@ end
 # Lagrange dim 2 RefCube order 2 #
 ##################################
 n_basefunctions(::Lagrange{2, RefCube, 2}) = 9
+n_boundarynodes(::Lagrange{2, RefCube, 2}) = 3
+boundarylist(::Lagrange{2, RefCube, 2}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
 
 function value!(fs::Lagrange{2, RefCube, 2}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
@@ -242,6 +250,8 @@ end
 #########################################
 n_basefunctions(::Lagrange{2, RefTetrahedron, 1}) = 3
 functionspace_lower_dim{order}(::Lagrange{2, RefTetrahedron, order}) = Lagrange{1, RefCube, order}()
+n_boundarynodes(::Lagrange{2, RefTetrahedron, 1}) = 2
+boundarylist(::Lagrange{2, RefTetrahedron, 1}) = ((1,2),(2,3),(1,3))
 
 function value!(fs::Lagrange{2, RefTetrahedron, 1}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
@@ -274,6 +284,8 @@ end
 # Lagrange dim 2 RefTetrahedron order 2 #
 #########################################
 n_basefunctions(::Lagrange{2, RefTetrahedron, 2}) = 6
+n_boundarynodes(::Lagrange{2, RefTetrahedron, 2}) = 3
+boundarylist(::Lagrange{2, RefTetrahedron, 2}) = ((1,2,4),(2,3,5),(1,3,6))
 
 function value!(fs::Lagrange{2, RefTetrahedron, 2}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
@@ -320,6 +332,8 @@ end
 # Lagrange dim 3 RefTetrahedron order 1 #
 #########################################
 n_basefunctions(::Lagrange{3, RefTetrahedron, 1}) = 4
+n_boundarynodes(::Lagrange{3, RefTetrahedron, 1}) = 3
+boundarylist(::Lagrange{3, RefTetrahedron, 1}) = ((1,2,4),(1,3,4),(1,2,3),(2,3,4))
 
 function value!(fs::Lagrange{3, RefTetrahedron, 1}, N::Vector, ξ::Vec{3})
     checkdim_value(fs, N, ξ)
@@ -357,6 +371,8 @@ VTK_type(fs::Lagrange{3, RefTetrahedron, 1}) = VTKCellType.VTK_TETRA
 # Lagrange dim 3 RefCube order 1 #
 ##################################
 n_basefunctions(::Lagrange{3, RefCube, 1}) = 8
+n_boundarynodes(::Lagrange{3, RefCube, 1}) = 4
+boundarylist(::Lagrange{3, RefCube, 1}) = ((1,2,3,4),(1,2,5,6),(2,3,6,7),(3,4,7,8),(1,4,5,8),(5,6,7,8))
 
 function value!(fs::Lagrange{3, RefCube, 1}, N::Vector, ξ::Vec{3})
     checkdim_value(fs, N, ξ)
@@ -411,6 +427,8 @@ type Serendipity{dim, shape, order} <: FunctionSpace{dim, shape, order} end
 n_basefunctions(::Serendipity{2, RefCube, 2}) = 8
 functionspace_lower_dim(::Serendipity{2, RefCube, 2}) = Lagrange{1, RefCube, 2}()
 functionspace_lower_order(::Serendipity{2, RefCube, 2}) = Lagrange{2, RefCube, 1}()
+n_boundarynodes(::Serendipity{2, RefCube, 2}) = 3
+boundarylist(::Serendipity{2, RefCube, 2}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
 
 function value!(fs::Serendipity{2, RefCube, 2}, N::Vector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
