@@ -53,7 +53,7 @@ function FEBoundaryValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpace}(:
     n_qpoints = length(weights(quad_rule))
     dim = dim_qr + 1
 
-    boundary_quad_rule = create_boundary_quad_rule(func_space,quad_rule)
+    boundary_quad_rule = create_boundary_quad_rule(quad_rule, func_space)
     n_bounds = length(boundary_quad_rule)
 
     # Function interpolation
@@ -114,7 +114,7 @@ function reinit!{dim, T}(fe_bv::FEBoundaryValues{dim}, x::Vector{Vec{dim, T}}, b
         for j in 1:n_func_basefuncs
             fe_bv.dNdx[cb][i][j] = Jinv ⋅ fe_bv.dNdξ[cb][i][j]
         end
-        detJ = detJ_boundary(get_geometricspace(fe_bv),febv_J,cb)
+        detJ = detJ_boundary(febv_J, get_geometricspace(fe_bv), cb)
         detJ <= 0.0 && throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
         fe_bv.detJdV[cb][i] = detJ * w
     end

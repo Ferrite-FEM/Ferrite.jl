@@ -1,48 +1,48 @@
 ##################
 # All 1D RefCube #
 ##################
-function create_boundary_quad_rule{T}(::FunctionSpace{1, RefCube}, quad_rule::QuadratureRule{0, T})
+function create_boundary_quad_rule{T}(quad_rule::QuadratureRule{0, T}, ::FunctionSpace{1, RefCube})
     w = weights(quad_rule)
     boundary_quad_rule = QuadratureRule{1, T}[]
 
     # Boundary 1
-    new_points = [-1.0]
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{1, T}, new_points, (length(w),))))
+    new_points = [Vec{1, T}((-one(T),))]
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 2
-    new_points = [1.0]
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{1, T}, new_points,(length(w),))))
+    new_points = [Vec{1, T}((one(T),))]
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
 
     return boundary_quad_rule
 end
 
-detJ_boundary{T}(::FunctionSpace{1, RefCube}, ::Tensor{2, 1, T}, ::Int) = one(T)
+detJ_boundary{T}(::Tensor{2, 1, T}, ::FunctionSpace{1, RefCube}, ::Int) = one(T)
 
 ##################
 # All 2D RefCube #
 ##################
-function create_boundary_quad_rule{T}(::FunctionSpace{2, RefCube}, quad_rule::QuadratureRule{1, T})
+function create_boundary_quad_rule{T}(quad_rule::QuadratureRule{1, T}, ::FunctionSpace{2, RefCube})
     w = weights(quad_rule)
-    p = reinterpret(T,points(quad_rule),(1,length(w)))
-    t = p[1,:]'
+    p = points(quad_rule)
+    n_points = length(w)
     boundary_quad_rule = QuadratureRule{2, T}[]
 
     # Boundary 1
-    new_points = [t; -ones(t)] # ξ = t, η = -1
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{2, T},new_points,(length(w),))))
+    new_points = [Vec{2, T}((p[i][1], -one(T))) for i in 1:n_points] # ξ = t, η = -1
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 2
-    new_points = [ones(t); t] # ξ = 1, η = t
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{2, T},new_points,(length(w),))))
+    new_points = [Vec{2, T}((one(T), p[i][1])) for i in 1:n_points] # ξ = 1, η = t
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 3
-    new_points = [t; ones(t)] # ξ = t, η = 1
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{2, T},new_points,(length(w),))))
+    new_points = [Vec{2, T}((p[i][1], one(T))) for i in 1:n_points] # ξ = t, η = 1
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 4
-    new_points = [-ones(t); t] # ξ = -1, η = t
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{2, T},new_points,(length(w),))))
+    new_points = [Vec{2, T}((-one(T), p[i][1])) for i in 1:n_points] # ξ = -1, η = t
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
 
     return boundary_quad_rule
 end
 
-function detJ_boundary(::FunctionSpace{2, RefCube}, J::Tensor{2, 2}, boundary::Int)
+function detJ_boundary(J::Tensor{2, 2}, ::FunctionSpace{2, RefCube}, boundary::Int)
     boundary == 1 && return sqrt(J[1,1]^2 + J[1,2]^2)
     boundary == 2 && return sqrt(J[2,1]^2 + J[2,2]^2)
     boundary == 3 && return sqrt(J[1,1]^2 + J[1,2]^2)
@@ -52,26 +52,26 @@ end
 #########################
 # All RefTetrahedron 2D #
 #########################
-function create_boundary_quad_rule{T}(::FunctionSpace{2, RefTetrahedron}, quad_rule::QuadratureRule{1, T})
+function create_boundary_quad_rule{T}(quad_rule::QuadratureRule{1, T}, ::FunctionSpace{2, RefTetrahedron})
     w = weights(quad_rule)
-    p = reinterpret(T,points(quad_rule),(1,length(w)))
-    t = p[1,:]'
+    p = points(quad_rule)
+    n_points = length(w)
     boundary_quad_rule = QuadratureRule{2, T}[]
 
     # Boundary 1
-    new_points = [t; ones(t)-t] # ξ = t, η = 1-t
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{2, T},new_points,(length(w),))))
+    new_points = [Vec{2, T}((p[i][1], one(T)-p[i][1])) for i in 1:n_points] # ξ = t, η = 1-t
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 2
-    new_points = [zeros(t); t] # ξ = 0, η = t
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{2, T},new_points,(length(w),))))
+    new_points = [Vec{2, T}((zero(T), p[i][1])) for i in 1:n_points] # ξ = 0, η = t
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 3
-    new_points = [t; zeros(t)] # ξ = t, η = 0
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{2, T},new_points,(length(w),))))
+    new_points = [Vec{2, T}((p[i][1], zero(T))) for i in 1:n_points] # ξ = t, η = 0
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
 
     return boundary_quad_rule
 end
 
-function detJ_boundary(::FunctionSpace{2, RefTetrahedron}, J::Tensor{2, 2}, boundary::Int)
+function detJ_boundary(J::Tensor{2, 2}, ::FunctionSpace{2, RefTetrahedron}, boundary::Int)
     boundary == 1 && return sqrt((J[1,1] - J[2,1])^2 + (J[1,2] - J[2,2])^2)
     boundary == 2 && return sqrt(J[2,1]^2 + J[2,2]^2)
     boundary == 3 && return sqrt(J[1,1]^2 + J[1,2]^2)
@@ -80,35 +80,35 @@ end
 ##################
 # All RefCube 3D #
 ##################
-function create_boundary_quad_rule{T}(::FunctionSpace{3, RefCube}, quad_rule::QuadratureRule{2, T})
+function create_boundary_quad_rule{T}(quad_rule::QuadratureRule{2, T}, ::FunctionSpace{3, RefCube})
     w = weights(quad_rule)
-    p = reinterpret(T,points(quad_rule),(2,length(w)))
-    t = p[1,:]'; s = p[2,:]'
+    p = points(quad_rule)
+    n_points = length(w)
     boundary_quad_rule = QuadratureRule{3, T}[]
 
     # Boundary 1
-    new_points = [t; s; -ones(t)] # ξ = t, η = s, ζ = -1
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{3, T},new_points,(length(w),))))
+    new_points = [Vec{3, T}((p[i][1], p[i][2], -one(T))) for i in 1:n_points] # ξ = t, η = s, ζ = -1
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 2
-    new_points = [t; -ones(t); s] # ξ = t, η = -1, ζ = s
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{3, T},new_points,(length(w),))))
+    new_points = [Vec{3, T}((p[i][1], -one(T), p[i][2])) for i in 1:n_points] # ξ = t, η = -1, ζ = s
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 3
-    new_points = [ones(t); t; s] # ξ = 1, η = t, ζ = s
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{3, T},new_points,(length(w),))))
+    new_points = [Vec{3, T}((one(T), p[i][1], p[i][2])) for i in 1:n_points] # ξ = 1, η = t, ζ = s
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 4
-    new_points = [t; ones(t); s] # ξ = t, η = 1, ζ = s
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{3, T},new_points,(length(w),))))
+    new_points = [Vec{3, T}((p[i][1], one(T), p[i][2])) for i in 1:n_points] # ξ = t, η = 1, ζ = s
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 5
-    new_points = [-ones(t); t; s] # ξ = -1, η = t, ζ = s
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{3, T},new_points,(length(w),))))
+    new_points = [Vec{3, T}((-one(T), p[i][1], p[i][2])) for i in 1:n_points] # ξ = -1, η = t, ζ = s
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 6
-    new_points = [t; s; ones(t)] # ξ = t, η = s, ζ = 1
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{3, T},new_points,(length(w),))))
+    new_points = [Vec{3, T}((p[i][1], p[i][2], one(T))) for i in 1:n_points] # ξ = t, η = s, ζ = 1
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
 
     return boundary_quad_rule
 end
 
-function detJ_boundary(::FunctionSpace{3, RefCube}, J::Tensor{2, 3}, boundary::Int)
+function detJ_boundary(J::Tensor{2, 3}, ::FunctionSpace{3, RefCube}, boundary::Int)
     boundary == 1 && return norm(J[1,:] × J[2,:])
     boundary == 2 && return norm(J[1,:] × J[3,:])
     boundary == 3 && return norm(J[2,:] × J[3,:])
@@ -120,29 +120,29 @@ end
 #########################
 # All RefTetrahedron 3D #
 #########################
-function create_boundary_quad_rule{T}(::FunctionSpace{3, RefTetrahedron}, quad_rule::QuadratureRule{2, T})
+function create_boundary_quad_rule{T}(quad_rule::QuadratureRule{2, T}, ::FunctionSpace{3, RefTetrahedron})
     w = weights(quad_rule)
-    p = reinterpret(T,points(quad_rule),(2,length(w)))
-    t = p[1,:]'; s = p[2,:]'
+    p = points(quad_rule)
+    n_points = length(w)
     boundary_quad_rule = QuadratureRule{3, T}[]
 
     # Boundary 1
-    new_points = [t; s; zeros(t)] # ξ = t, η = s, ζ = 0
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{3, T},new_points,(length(w),))))
+    new_points = [Vec{3, T}((p[i][1], p[i][2], zero(T))) for i in 1:n_points] # ξ = t, η = s, ζ = 0
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 2
-    new_points = [t; zeros(t); s] # ξ = t, η = 0, ζ = s
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{3, T},new_points,(length(w),))))
+    new_points = [Vec{3, T}((p[i][1], zero(T), p[i][2])) for i in 1:n_points] # ξ = t, η = 0, ζ = s
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 3
-    new_points = [t; s; ones(t)-t-s] # ξ = t, η = s, ζ = 1-t-s
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{3, T},new_points,(length(w),))))
+    new_points = [Vec{3, T}((p[i][1], p[i][2], one(T)-p[i][1]-p[i][2])) for i in 1:n_points] # ξ = t, η = s, ζ = 1-t-s
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 4
-    new_points = [zeros(t); t; s] # ξ = 0, η = t, ζ = s
-    push!(boundary_quad_rule, QuadratureRule(w,reinterpret(Vec{3, T},new_points,(length(w),))))
+    new_points = [Vec{3, T}((zero(T), p[i][1], p[i][2])) for i in 1:n_points] # ξ = 0, η = t, ζ = s
+    push!(boundary_quad_rule, QuadratureRule(w, new_points))
 
     return boundary_quad_rule
 end
 
-function detJ_boundary(::FunctionSpace{3, RefTetrahedron}, J::Tensor{2, 3}, boundary::Int)
+function detJ_boundary(J::Tensor{2, 3}, ::FunctionSpace{3, RefTetrahedron}, boundary::Int)
     boundary == 1 && return norm(J[1,:] × J[2,:])
     boundary == 2 && return norm(J[1,:] × J[3,:])
     boundary == 3 && return norm((J[1,:]-J[3,:]) × (J[2,:]-J[3,:]))
