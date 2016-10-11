@@ -112,8 +112,8 @@ function value!(fs::Lagrange{1, RefCube, 2}, N::Vector, ξ::Vec{1})
         ξ_x = ξ[1]
 
         N[1] = ξ_x * (ξ_x - 1) * 0.5
-        N[2] = 1 - ξ_x^2
-        N[3] = ξ_x * (ξ_x + 1) * 0.5
+        N[2] = ξ_x * (ξ_x + 1) * 0.5
+        N[3] = 1 - ξ_x^2
     end
 
     return N
@@ -126,8 +126,8 @@ function derivative!{T}(fs::Lagrange{1, RefCube, 2}, dN::Vector{Vec{1, T}}, ξ::
         ξ_x = ξ[1]
 
         dN[1] = Vec{1,T}((ξ_x - 0.5,))
-        dN[2] = Vec{1,T}((-2 * ξ_x,))
-        dN[3] = Vec{1,T}((ξ_x + 0.5,))
+        dN[2] = Vec{1,T}((ξ_x + 0.5,))
+        dN[3] = Vec{1,T}((-2 * ξ_x,))
     end
 
     return dN
