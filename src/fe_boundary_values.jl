@@ -151,7 +151,7 @@ to `reinit!` a `FEBoundaryValues` object for  boundary integration
 
 * `::Int`: the corresponding boundary
 """
-function get_boundarynumber(boundary_nodes, cell_nodes, fs::FunctionSpace)
+function get_boundarynumber(boundary_nodes::Vector{Int}, cell_nodes::Vector{Int}, fs::FunctionSpace)
     @assert length(boundary_nodes) == n_boundarynodes(fs)
     @assert length(cell_nodes) == n_basefunctions(fs)
 

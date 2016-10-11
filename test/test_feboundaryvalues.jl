@@ -13,7 +13,8 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(
     ndim = functionspace_n_dim(function_space)
     n_basefuncs = n_basefunctions(function_space)
 
-    x = valid_nodes(function_space)
+    x = valid_coordinates(function_space)
+    boundary_nodes, cell_nodes = topology_test_nodes(function_space)
     for boundary in 1:JuAFEM.n_boundaries(function_space)
         reinit!(fe_bv, x, boundary)
         boundary_quad_rule = get_quadrule(fe_bv)
@@ -45,7 +46,8 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(
         for i in 1:length(points(boundary_quad_rule))
             vol += detJdV(fe_bv,i)
         end
-        # @test vol ≈ JuAFEM.reference_volume(function_space, boundary) # TODO: Add function that calculates the volume for an object
+        x_boundary = x[[JuAFEM.boundarylist(function_space)[boundary]...]]
+        @test vol ≈ calculate_volume(JuAFEM.functionspace_lower_dim(function_space), x_boundary)
 
         # Test of utility functions
         @test get_functionspace(fe_bv) == function_space
@@ -59,7 +61,16 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(
             vol += detJdV(fe_bv, i)
         end
         @test vol ≈ reference_volume(function_space, boundary)
+
     end
+
+    # Test boundary number calculation
+    boundary_nodes, cell_nodes = topology_test_nodes(function_space)
+    for boundary in 1:JuAFEM.n_boundaries(function_space)
+        @test get_boundarynumber(boundary_nodes[boundary], cell_nodes, function_space) == boundary
+    end
+    @test_throws ArgumentError get_boundarynumber(boundary_nodes[JuAFEM.n_boundaries(function_space)+1], cell_nodes, function_space)
+
 
 end
 

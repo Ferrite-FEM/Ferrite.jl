@@ -6,10 +6,10 @@ function create_boundary_quad_rule{T}(quad_rule::QuadratureRule{0, T}, ::Functio
     boundary_quad_rule = QuadratureRule{1, T}[]
 
     # Boundary 1
-    new_points = [Vec{1, T}((-one(T),))]
+    new_points = [Vec{1, T}((-one(T),))] # ξ = -1
     push!(boundary_quad_rule, QuadratureRule(w, new_points))
     # Boundary 2
-    new_points = [Vec{1, T}((one(T),))]
+    new_points = [Vec{1, T}((one(T),))] # ξ = 1
     push!(boundary_quad_rule, QuadratureRule(w, new_points))
 
     return boundary_quad_rule

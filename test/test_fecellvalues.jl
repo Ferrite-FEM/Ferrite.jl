@@ -7,13 +7,13 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(
                                      (Lagrange{2, RefTetrahedron, 2}(), QuadratureRule(Dim{2}, RefTetrahedron(), 2)),
                                      (Lagrange{3, RefCube, 1}(), QuadratureRule(Dim{3}, RefCube(), 2)),
                                      (Serendipity{2, RefCube, 2}(), QuadratureRule(Dim{2}, RefCube(), 2)),
-                                     (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule(Dim{3}, RefTetrahedron(), 2)))
+                                     (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule(Dim{3}, RefTetrahedron(), 3)))
 
     fe_cv = FECellValues(quad_rule, function_space)
     ndim = functionspace_n_dim(function_space)
     n_basefuncs = n_basefunctions(function_space)
 
-    x = valid_nodes(function_space)
+    x = valid_coordinates(function_space)
     reinit!(fe_cv, x)
 
     # We test this by applying a given deformation gradient on all the nodes.
@@ -42,7 +42,7 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(
     for i in 1:length(points(quad_rule))
         vol += detJdV(fe_cv,i)
     end
-    # @test vol ≈ JuAFEM.reference_volume(function_space) # TODO: Add function that calculates the volume for an object
+    @test vol ≈ calculate_volume(function_space, x)
 
     # Test of utility functions
     @test get_functionspace(fe_cv) == function_space
