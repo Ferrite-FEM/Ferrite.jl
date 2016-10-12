@@ -40,7 +40,7 @@ julia> QuadratureRule{1, RefCube}(:lobatto, 2)
 JuAFEM.QuadratureRule{1,JuAFEM.RefCube,Float64}([1.0,1.0],ContMechTensors.Tensor{1,1,Float64,1}[[-1.0],[1.0]])
 ```
 """
-type QuadratureRule{dim, shape, T}
+immutable QuadratureRule{dim, shape, T}
     weights::Vector{T}
     points::Vector{Vec{dim, T}}
 end
