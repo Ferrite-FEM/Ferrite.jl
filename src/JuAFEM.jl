@@ -20,7 +20,7 @@ export FECellValues, reinit!, shape_value, shape_gradient, shape_divergence, det
 export FEBoundaryValues, get_boundarynumber
 export FunctionSpace, functionspace_n_dim, functionspace_ref_shape, functionspace_order, n_basefunctions
 export Lagrange, Serendipity, RefTetrahedron, RefCube
-export QuadratureRule, Dim, weights, points
+export QuadratureRule, weights, points
 
 """
 Represents a reference shape which quadrature rules and function spaces are defined on.
@@ -36,12 +36,6 @@ Abstract type which has `FECellValues` and `FEBoundaryValues` as subtypes
 """
 abstract AbstractFEValues{dim, T, FS, GS}
 
-
-"""
-Singleton type that is similar to `Val` in Base but with a more descriptive name. Used to construct some
-types in a type stable way.
-"""
-immutable Dim{T} end
 
 include("function_spaces.jl")
 include("quadrature.jl")

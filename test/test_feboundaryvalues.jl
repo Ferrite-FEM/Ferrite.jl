@@ -1,13 +1,13 @@
 @testset "FEBoundaryValues" begin
-for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule(Dim{0}, RefCube(), 2)),
-                                     (Lagrange{1, RefCube, 2}(), QuadratureRule(Dim{0}, RefCube(), 2)),
-                                     (Lagrange{2, RefCube, 1}(), QuadratureRule(Dim{1}, RefCube(), 2)),
-                                     (Lagrange{2, RefCube, 2}(), QuadratureRule(Dim{1}, RefCube(), 2)),
-                                     (Lagrange{2, RefTetrahedron, 1}(), QuadratureRule(Dim{1}, RefTetrahedron(), 2)),
-                                     (Lagrange{2, RefTetrahedron, 2}(), QuadratureRule(Dim{1}, RefTetrahedron(), 2)),
-                                     (Lagrange{3, RefCube, 1}(), QuadratureRule(Dim{2}, RefCube(), 2)),
-                                     (Serendipity{2, RefCube, 2}(), QuadratureRule(Dim{1}, RefCube(), 2)),
-                                     (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule(Dim{2}, RefTetrahedron(), 2)))
+for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{0, RefCube}(2)),
+                                     (Lagrange{1, RefCube, 2}(), QuadratureRule{0, RefCube}(2)),
+                                     (Lagrange{2, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
+                                     (Lagrange{2, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
+                                     (Lagrange{2, RefTetrahedron, 1}(), QuadratureRule{1, RefTetrahedron}(2)),
+                                     (Lagrange{2, RefTetrahedron, 2}(), QuadratureRule{1, RefTetrahedron}(2)),
+                                     (Lagrange{3, RefCube, 1}(), QuadratureRule{2, RefCube}(2)),
+                                     (Serendipity{2, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
+                                     (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2)))
 
     fe_bv = FEBoundaryValues(quad_rule, function_space)
     ndim = functionspace_n_dim(function_space)
