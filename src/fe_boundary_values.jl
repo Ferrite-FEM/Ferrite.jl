@@ -33,12 +33,12 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 * [`function_vector_gradient`](@ref)
 * [`function_vector_symmetric_gradient`](@ref)
 """
-immutable FEBoundaryValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace} <: AbstractFEValues{dim, T, FS, GS}
+immutable FEBoundaryValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape} <: AbstractFEValues{dim, T, FS, GS}
     N::Vector{Vector{Vector{T}}}
     dNdx::Vector{Vector{Vector{Vec{dim, T}}}}
     dNdξ::Vector{Vector{Vector{Vec{dim, T}}}}
     detJdV::Vector{Vector{T}}
-    quad_rule::Vector{QuadratureRule{dim, T}}
+    quad_rule::Vector{QuadratureRule{dim, shape, T}}
     function_space::FS
     dMdξ::Vector{Vector{Vector{Vec{dim, T}}}}
     geometric_space::GS
@@ -47,9 +47,9 @@ end
 
 FEBoundaryValues{dim_qr, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim_qr}, func_space::FS, geom_space::GS=func_space) = FEBoundaryValues(Float64, quad_rule, func_space, geom_space)
 
-function FEBoundaryValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim_qr}, func_space::FS, geom_space::GS=func_space)
+function FEBoundaryValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim_qr, shape}, func_space::FS, geom_space::GS=func_space)
     @assert functionspace_n_dim(func_space) == functionspace_n_dim(geom_space)
-    @assert functionspace_ref_shape(func_space) == functionspace_ref_shape(geom_space)
+    @assert functionspace_ref_shape(func_space) == functionspace_ref_shape(geom_space) == shape
     n_qpoints = length(weights(quad_rule))
     dim = dim_qr + 1
 

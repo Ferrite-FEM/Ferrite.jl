@@ -33,12 +33,12 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 * [`function_vector_gradient`](@ref)
 * [`function_vector_symmetric_gradient`](@ref)
 """
-immutable FECellValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace} <: AbstractFEValues{dim, T, FS, GS}
+immutable FECellValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape} <: AbstractFEValues{dim, T, FS, GS}
     N::Vector{Vector{T}}
     dNdx::Vector{Vector{Vec{dim, T}}}
     dNdξ::Vector{Vector{Vec{dim, T}}}
     detJdV::Vector{T}
-    quad_rule::QuadratureRule{dim, T}
+    quad_rule::QuadratureRule{dim, shape, T}
     function_space::FS
     dMdξ::Vector{Vector{Vec{dim, T}}}
     geometric_space::GS
@@ -46,9 +46,9 @@ end
 
 FECellValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FECellValues(Float64, quad_rule, func_space, geom_space)
 
-function FECellValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace}(::Type{T}, quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space)
+function FECellValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_space::FS, geom_space::GS=func_space)
     @assert functionspace_n_dim(func_space) == functionspace_n_dim(geom_space)
-    @assert functionspace_ref_shape(func_space) == functionspace_ref_shape(geom_space)
+    @assert functionspace_ref_shape(func_space) == functionspace_ref_shape(geom_space) == shape
     n_qpoints = length(weights(quad_rule))
 
     # Function interpolation
