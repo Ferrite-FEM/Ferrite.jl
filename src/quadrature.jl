@@ -11,18 +11,18 @@ function values at specific points:
 
 The quadrature rule consists of ``n_q`` points in space ``\\mathbf{x}_q`` with corresponding weights ``w_q``.
 
- In `JuaFEM`, the `QuadratureRule` type is mostly used as one of the components to create a [`FEValues`](@ref) object.
+ In `JuAFEM`, the `QuadratureRule` type is mostly used as one of the components to create an [`FECellValues`](@ref) or [`FEBoundaryValues`](@ref) object.
 
 **Constructors:**
 
-    QuadratureRule([quad_rule_type::Symbol], ::Dim{dim}, ref_shape::Shape, order::Int)
+    QuadratureRule{dim, shape}([quad_rule_type::Symbol], order::Int)
 
 **Arguments:**
 
+* `dim`: the space dimension of the reference shape
+* `shape`: an `AbstractRefShape`
 * `quad_rule_type`: The type of the quadrature rule. Currently only `:legendre` or `:lobatto` types are supported where
-`:lobatto` is only supported for `RefCube`. If the quadrature rule type is left out, `:legendre` is used.
-* `::Dim{dim}` the dimension of the reference shape
-* `ref_shape`: the reference shape
+`:lobatto` is only supported for `RefCube`. If the quadrature rule type is left out, `:legendre` is used by default
 * `order`: the order of the quadrature rule
 
 **Common methods:**
@@ -33,14 +33,14 @@ The quadrature rule consists of ``n_q`` points in space ``\\mathbf{x}_q`` with c
 **Example:**
 
 ```julia
-julia> QuadratureRule(Dim{2}, RefTetrahedron(), 1)
-JuAFEM.QuadratureRule{2,Float64}([0.5],[[0.33333333333333,0.33333333333333]])
+julia> QuadratureRule{2, RefTetrahedron}(1)
+JuAFEM.QuadratureRule{2,JuAFEM.RefTetrahedron,Float64}([0.5],ContMechTensors.Tensor{1,2,Float64,2}[[0.333333,0.333333]])
 
-julia> QuadratureRule(:lobatto, Dim{1}, RefCube(), 2)
-JuAFEM.QuadratureRule{1,Float64}([1.0,1.0],[[-1.0],[1.0]])
+julia> QuadratureRule{1, RefCube}(:lobatto, 2)
+JuAFEM.QuadratureRule{1,JuAFEM.RefCube,Float64}([1.0,1.0],ContMechTensors.Tensor{1,1,Float64,1}[[-1.0],[1.0]])
 ```
 """
-type QuadratureRule{dim, T}
+type QuadratureRule{dim, shape, T}
     weights::Vector{T}
     points::Vector{Vec{dim, T}}
 end
@@ -58,7 +58,9 @@ The weights of the quadrature rule.
 **Example:**
 
 ```julia
-julia> weights(QuadratureRule(:legendre, Dim{2}, RefTetrahedron(), 2))
+julia> qr = QuadratureRule{2, RefTetrahedron}(:legendre, 2);
+
+julia> weights(qr)
 3-element Array{Float64,1}:
  0.166667
  0.166667
@@ -81,7 +83,9 @@ The points of the quadrature rule.
 **Example:**
 
 ```julia
-julia> points(QuadratureRule(:legendre, Dim{2}, RefTetrahedron(), 2))
+julia> qr = QuadratureRule{2, RefTetrahedron}(:legendre, 2);
+
+julia> points(qr)
 3-element Array{ContMechTensors.Tensor{1,2,Float64,2},1}:
  [0.166667,0.166667]
  [0.166667,0.666667]
@@ -90,20 +94,20 @@ julia> points(QuadratureRule(:legendre, Dim{2}, RefTetrahedron(), 2))
 """
 points(qr::QuadratureRule) = qr.points
 
-QuadratureRule{dim}(::Type{Dim{dim}}, shape::AbstractRefShape, order::Int) = QuadratureRule(:legendre, Dim{dim}, shape, order)
+(::Type{QuadratureRule{dim, shape}}){dim, shape}(order::Int) = QuadratureRule{dim, shape}(:legendre, order)
 
 # Special case for boundary integration of 1D problems
-function QuadratureRule(quad_type::Symbol, ::Type{Dim{0}}, ::RefCube, order::Int)
+function (::Type{QuadratureRule{0, RefCube}})(quad_type::Symbol, order::Int)
     w = Float64[1.0]
     p = Vec{0,Float64}[]
-    return QuadratureRule(w,p)
+    return QuadratureRule{0, RefCube, Float64}(w,p)
 end
 
 # Generate Gauss quadrature rules on cubes by doing an outer product
 # over all dimensions
 for dim in (1,2,3)
     @eval begin
-        function QuadratureRule(quad_type::Symbol, ::Type{Dim{$dim}}, ::RefCube, order::Int)
+        function (::Type{QuadratureRule{$dim, RefCube}})(quad_type::Symbol, order::Int)
             if quad_type == :legendre
                 p, w = gausslegendre(order)
             elseif quad_type == :lobatto
@@ -122,14 +126,14 @@ for dim in (1,2,3)
                 weights[count] = weight
                 count += 1
             end
-            return QuadratureRule(weights, points)
+            return QuadratureRule{$dim, RefCube, Float64}(weights, points)
         end
     end
 end
 
 for dim in (2, 3)
     @eval begin
-        function QuadratureRule(quad_type::Symbol, ::Type{Dim{$dim}}, ::RefTetrahedron, order::Int)
+        function (::Type{QuadratureRule{$dim, RefTetrahedron}})(quad_type::Symbol, order::Int)
             if $dim == 2 && quad_type == :legendre
                 data = _get_gauss_tridata(order)
             elseif $dim == 3 && quad_type == :legendre
@@ -145,13 +149,13 @@ for dim in (2, 3)
                 points[p] = Vec{$dim, Float64}(@ntuple $dim i -> data[p, i])
             end
             weights = data[:, $dim + 1]
-            QuadratureRule(weights, points)
+            QuadratureRule{$dim, RefTetrahedron, Float64}(weights, points)
         end
     end
 end
 
 # Special version for boundary integration of triangles
-function QuadratureRule(quad_type::Symbol, ::Type{Dim{1}}, ::RefTetrahedron, order::Int)
+function (::Type{QuadratureRule{1, RefTetrahedron}})(quad_type::Symbol, order::Int)
     if quad_type == :legendre
         p, weights = gausslegendre(order)
     elseif quad_type == :lobatto
@@ -167,5 +171,5 @@ function QuadratureRule(quad_type::Symbol, ::Type{Dim{1}}, ::RefTetrahedron, ord
     for i in 1:length(weights)
         points[i] = Vec{1,Float64}((p[i],))
     end
-    return QuadratureRule(weights, points)
+    return QuadratureRule{1, RefTetrahedron, Float64}(weights, points)
 end
