@@ -92,9 +92,15 @@ points(qr::QuadratureRule) = qr.points
 
 QuadratureRule{dim}(::Type{Dim{dim}}, shape::AbstractRefShape, order::Int) = QuadratureRule(:legendre, Dim{dim}, shape, order)
 
+# Special case for boundary integration of 1D problems
+function QuadratureRule(quad_type::Symbol, ::Type{Dim{0}}, ::RefCube, order::Int)
+    w = Float64[1.0]
+    p = Vec{0,Float64}[]
+    return QuadratureRule(w,p)
+end
+
 # Generate Gauss quadrature rules on cubes by doing an outer product
 # over all dimensions
-
 for dim in (1,2,3)
     @eval begin
         function QuadratureRule(quad_type::Symbol, ::Type{Dim{$dim}}, ::RefCube, order::Int)
@@ -142,4 +148,24 @@ for dim in (2, 3)
             QuadratureRule(weights, points)
         end
     end
+end
+
+# Special version for boundary integration of triangles
+function QuadratureRule(quad_type::Symbol, ::Type{Dim{1}}, ::RefTetrahedron, order::Int)
+    if quad_type == :legendre
+        p, weights = gausslegendre(order)
+    elseif quad_type == :lobatto
+        p, weights = gausslobatto(order)
+    else
+        throw(ArgumentError("unsupported quadrature rule"))
+    end
+    points = Vector{Vec{1, Float64}}(order)
+    # Shift interval from (-1,1) to (0,1)
+    weights *= 0.5
+    p += 1.0; p /= 2.0
+
+    for i in 1:length(weights)
+        points[i] = Vec{1,Float64}((p[i],))
+    end
+    return QuadratureRule(weights, points)
 end
