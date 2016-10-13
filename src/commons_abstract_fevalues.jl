@@ -87,6 +87,9 @@ Gets the values of the shape function for a given quadrature point and base_func
 @inline shape_value(fe_bv::FEBoundaryValues, q_point::Int) = fe_bv.N[fe_bv.current_boundary[]][q_point]
 @inline shape_value(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.N[fe_bv.current_boundary[]][q_point][base_func]
 
+@inline geometric_value(fe_cv::FECellValues, q_point::Int) = fe_cv.M[q_point]
+@inline geometric_value(fe_bv::FEBoundaryValues, q_point::Int) = fe_bv.M[fe_bv.current_boundary[]][q_point]
+
 """
 Get the gradients of the shape functions for a given quadrature point
 """
@@ -292,4 +295,34 @@ where ``\\mathbf{u}_i`` are the nodal values of the function.
         diverg += dN[i] ⋅ u[i]
     end
     return diverg
+end
+
+"""
+    spatial_coordinate{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, x::Vector{Vec{dim, T}})
+
+Computes the spatial coordinate in a quadrature point for a vector valued function.
+
+**Arguments:**
+
+* `fe_v`: the `AbstractFEValues` object
+* `q_point`: the quadrature point number
+* `x`: the nodal coordinates of the cell
+
+**Results:**
+
+* `::Vec{dim, T}`: the spatial coordinate
+
+**Details:**
+
+The coordinate is computed, using the geometric interpolation space, as ``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{x}) \\mathbf{\\hat{x}}_i``
+"""
+@inline function spatial_coordinate{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, x::Vector{Vec{dim, T}})
+    n_base_funcs = n_basefunctions(get_geometricspace(fe_v))
+    @assert length(x) == n_base_funcs
+    vec = zero(Vec{dim, T})
+    M = geometric_value(fe_v, q_point)
+    @inbounds for i in 1:n_base_funcs
+        vec += M[i] * x[i]
+    end
+    return vec
 end

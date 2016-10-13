@@ -32,6 +32,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 * [`function_vector_divergence`](@ref)
 * [`function_vector_gradient`](@ref)
 * [`function_vector_symmetric_gradient`](@ref)
+* [`spatial_coordinate`](@ref)
 """
 immutable FEBoundaryValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape} <: AbstractFEValues{dim, T, FS, GS}
     N::Vector{Vector{Vector{T}}}
@@ -40,6 +41,7 @@ immutable FEBoundaryValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSp
     detJdV::Vector{Vector{T}}
     quad_rule::Vector{QuadratureRule{dim, shape, T}}
     function_space::FS
+    M::Vector{Vector{Vector{T}}}
     dMdξ::Vector{Vector{Vector{Vec{dim, T}}}}
     geometric_space::GS
     current_boundary::Ref{Int}
@@ -64,16 +66,19 @@ function FEBoundaryValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpace, s
 
     # Geometry interpolation
     n_geom_basefuncs = n_basefunctions(geom_space)
+    M =    [[zeros(T, n_geom_basefuncs) for i in 1:n_qpoints]                      for k in 1:n_bounds]
     dMdξ = [[[zero(Vec{dim, T}) for i in 1:n_geom_basefuncs] for j in 1:n_qpoints] for k in 1:n_bounds]
+
     for k in 1:n_bounds, (i, ξ) in enumerate(boundary_quad_rule[k].points)
         value!(func_space, N[k][i], ξ)
         derivative!(func_space, dNdξ[k][i], ξ)
+        value!(geom_space, M[k][i], ξ)
         derivative!(geom_space, dMdξ[k][i], ξ)
     end
 
     detJdV = [zeros(T, n_qpoints) for i in 1:n_bounds]
 
-    FEBoundaryValues(N, dNdx, dNdξ, detJdV, boundary_quad_rule, func_space, dMdξ, geom_space, Ref(0))
+    FEBoundaryValues(N, dNdx, dNdξ, detJdV, boundary_quad_rule, func_space, M, dMdξ, geom_space, Ref(0))
 end
 
 """
