@@ -32,6 +32,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 * [`function_vector_divergence`](@ref)
 * [`function_vector_gradient`](@ref)
 * [`function_vector_symmetric_gradient`](@ref)
+* [`spatial_coordinate`](@ref)
 """
 immutable FECellValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape} <: AbstractFEValues{dim, T, FS, GS}
     N::Vector{Vector{T}}
@@ -40,6 +41,7 @@ immutable FECellValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace,
     detJdV::Vector{T}
     quad_rule::QuadratureRule{dim, shape, T}
     function_space::FS
+    M::Vector{Vector{T}}
     dMdξ::Vector{Vector{Vec{dim, T}}}
     geometric_space::GS
 end
@@ -59,17 +61,19 @@ function FECellValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <:
 
     # Geometry interpolation
     n_geom_basefuncs = n_basefunctions(geom_space)
+    M = [zeros(T, n_geom_basefuncs) for i in 1:n_qpoints]
     dMdξ = [[zero(Vec{dim, T}) for i in 1:n_geom_basefuncs] for j in 1:n_qpoints]
 
     for (i, ξ) in enumerate(quad_rule.points)
         value!(func_space, N[i], ξ)
         derivative!(func_space, dNdξ[i], ξ)
+        value!(geom_space, M[i], ξ)
         derivative!(geom_space, dMdξ[i], ξ)
     end
 
     detJdV = zeros(T, n_qpoints)
 
-    FECellValues(N, dNdx, dNdξ, detJdV, quad_rule, func_space, dMdξ, geom_space)
+    FECellValues(N, dNdx, dNdξ, detJdV, quad_rule, func_space, M, dMdξ, geom_space)
 end
 
 

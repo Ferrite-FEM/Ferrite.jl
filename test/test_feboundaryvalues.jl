@@ -62,6 +62,11 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
         end
         @test vol ≈ reference_volume(function_space, boundary)
 
+        # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
+        for (i, qp_x) in enumerate(points(boundary_quad_rule))
+            @test spatial_coordinate(fe_bv, i, x) ≈ qp_x
+        end
+
     end
 
     # Test boundary number calculation
