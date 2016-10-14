@@ -102,14 +102,14 @@ Get the gradient of the shape functions for a given quadrature point and base fu
 @inline shape_gradient(fe_cv::FECellValues, q_point::Int, base_func::Int) = fe_cv.dNdx[q_point][base_func]
 @inline shape_gradient(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.dNdx[fe_bv.current_boundary[]][q_point][base_func]
 
+const shape_derivative = shape_gradient
+
 """
 Get the divergence of the shape functions for a given quadrature point and base function
 """
 @inline shape_divergence(fe_cv::FECellValues, q_point::Int, base_func::Int) = sum(fe_cv.dNdx[q_point][base_func])
 @inline shape_divergence(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = sum(fe_bv.dNdx[fe_bv.current_boundary[]][q_point][base_func])
 
-
-const shape_derivative = shape_gradient
 
 """
 Computes the value in a quadrature point for a scalar or vector valued function
@@ -204,6 +204,8 @@ end
     end
     return grad
 end
+
+const function_derivative = function_gradient
 
 """
 Computes the symmetric gradient for a vector valued function in a quadrature point.
