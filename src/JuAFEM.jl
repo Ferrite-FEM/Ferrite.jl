@@ -15,8 +15,7 @@ import WriteVTK: vtk_grid
 export start_assemble, assemble, end_assemble
 
 export FECellValues, reinit!, shape_value, shape_gradient, shape_divergence, detJdV, get_quadrule, get_functionspace, get_geometricspace,
-                     function_scalar_value, function_vector_value, function_scalar_gradient,
-                     function_vector_gradient, function_vector_divergence, function_vector_symmetric_gradient, spatial_coordinate
+                     function_value, function_gradient, function_symmetric_gradient, function_divergence, spatial_coordinate
 export FEBoundaryValues, get_boundarynumber
 export FunctionSpace, functionspace_n_dim, functionspace_ref_shape, functionspace_order, n_basefunctions
 export Lagrange, Serendipity, RefTetrahedron, RefCube

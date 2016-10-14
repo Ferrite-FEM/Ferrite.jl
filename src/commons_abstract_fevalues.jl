@@ -102,6 +102,8 @@ Get the gradient of the shape functions for a given quadrature point and base fu
 @inline shape_gradient(fe_cv::FECellValues, q_point::Int, base_func::Int) = fe_cv.dNdx[q_point][base_func]
 @inline shape_gradient(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.dNdx[fe_bv.current_boundary[]][q_point][base_func]
 
+const shape_derivative = shape_gradient
+
 """
 Get the divergence of the shape functions for a given quadrature point and base function
 """
@@ -109,12 +111,11 @@ Get the divergence of the shape functions for a given quadrature point and base 
 @inline shape_divergence(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = sum(fe_bv.dNdx[fe_bv.current_boundary[]][q_point][base_func])
 
 
-const shape_derivative = shape_gradient
-
 """
-Computes the value in a quadrature point for a scalar valued function
+Computes the value in a quadrature point for a scalar or vector valued function
 
-    function_scalar_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
+    function_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
+    function_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
 
 **Arguments:**
 
@@ -124,13 +125,17 @@ Computes the value in a quadrature point for a scalar valued function
 
 **Results:**
 
-* `::Number`: the value of the function
+* `::Number`: the value of a scalar valued function
+* `::Vec{dim, T}` the value of a vector valued function
 
 **Details:**
 
-The value of a scalar valued function is computed as ``T(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) T_i``
+The value of a scalar valued function is computed as ``u(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) u_i``
+where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function the value is calculated as
+``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
+nodal values of ``\\mathbf{u}``.
 """
-@inline function function_scalar_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
+@inline function function_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
     n_base_funcs = n_basefunctions(get_functionspace(fe_v))
     @assert length(u) == n_base_funcs
     N = shape_value(fe_v, q_point)
@@ -141,26 +146,7 @@ The value of a scalar valued function is computed as ``T(\\mathbf{x}) = \\sum\\l
     return s
 end
 
-"""
-    function_vector_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
-
-Computes the value in a quadrature point for a vector valued function.
-
-**Arguments:**
-
-* `fe_v`: the `AbstractFEValues` object
-* `q_point`: the quadrature point number
-* `u`: the value of the function in the nodes
-
-**Results:**
-
-* `::Vec{dim, T}`: the value of the function
-
-**Details:**
-
-The value of a vector valued function is computed as ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i``
-"""
-@inline function function_vector_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
+@inline function function_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     n_base_funcs = n_basefunctions(get_functionspace(fe_v))
     @assert length(u) == n_base_funcs
     vec = zero(Vec{dim, T})
@@ -172,39 +158,9 @@ The value of a vector valued function is computed as ``\\mathbf{u}(\\mathbf{x}) 
 end
 
 """
-    function_scalar_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T}) -> grad::Tensor{1}
+Computes the gradient in a quadrature point for a scalar or vector valued function
 
-Computes the gradient for a scalar valued function in a quadrature point.
-
-**Arguments:**
-
-* `fe_v`: the `AbstractFEValues` object
-* `q_point`: the quadrature point number
-* `u`: the value of the function in the nodes
-
-**Results:**
-
-* `::Vec{dim, T}`: the gradient
-
-**Details:**
-
-The gradient of a scalar function is computed as ``\\mathbf{\\nabla} T(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x}) T_i``
-where ``T_i`` are the nodal values of the function.
-"""
-@inline function function_scalar_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
-    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
-    @assert length(u) == n_base_funcs
-    dN = shape_gradient(fe_v, q_point)
-    grad = zero(Vec{dim, T})
-    @inbounds for i in 1:n_base_funcs
-        grad += dN[i] * u[i]
-    end
-    return grad
-end
-
-"""
-Computes the gradient for a vector valued function in a quadrature point.
-
+    function_scalar_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
     function_vector_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
 
 **Arguments:**
@@ -215,14 +171,30 @@ Computes the gradient for a vector valued function in a quadrature point.
 
 **Results:**
 
-* `::Tensor{2, dim, T}`: the gradient
+* `::Vec{dim, T}`: the gradient of a scalar valued function
+* `::Tensor{2, dim, T}`: the gradient of a vector valued function
 
 **Details:**
 
-The gradient of a scalar function is computed as ``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x}) \\otimes \\mathbf{u}_i``
-where ``\\mathbf{u}_i`` are the nodal values of the function.
+The gradient of a scalar function is computed as
+``\\mathbf{\\nabla} u(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x}) u_i``
+where ``u_i`` are the nodal values of the function.
+For a vector valued function the gradient is computed as
+``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x}) \\otimes \\mathbf{u}_i``
+where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
-@inline function function_vector_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
+@inline function function_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
+    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
+    @assert length(u) == n_base_funcs
+    dN = shape_gradient(fe_v, q_point)
+    grad = zero(Vec{dim, T})
+    @inbounds for i in 1:n_base_funcs
+        grad += dN[i] * u[i]
+    end
+    return grad
+end
+
+@inline function function_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     n_base_funcs = n_basefunctions(get_functionspace(fe_v))
     @assert length(u) == n_base_funcs
     dN = shape_gradient(fe_v, q_point)
@@ -233,10 +205,12 @@ where ``\\mathbf{u}_i`` are the nodal values of the function.
     return grad
 end
 
-"""
-Computes the gradient for a vector valued function in a quadrature point.
+const function_derivative = function_gradient
 
-    function_vector_symmetric_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
+"""
+Computes the symmetric gradient for a vector valued function in a quadrature point.
+
+    function_symmetric_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
 
 **Arguments:**
 
@@ -256,15 +230,15 @@ The symmetric gradient of a scalar function is computed as
 
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-@inline function function_vector_symmetric_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
-    grad = function_vector_gradient(fe_v, q_point, u)
+@inline function function_symmetric_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
+    grad = function_gradient(fe_v, q_point, u)
     return symmetric(grad)
 end
 
 """
 Computes the divergence in a quadrature point for a vector valued function.
 
-    function_vector_divergence{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
+    function_divergence{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
 
 **Arguments:**
 
@@ -284,9 +258,8 @@ The divergence of a vector valued functions in the quadrature point ``\\mathbf{x
 
 
 where ``\\mathbf{u}_i`` are the nodal values of the function.
-
 """
-@inline function function_vector_divergence{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
+@inline function function_divergence{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     n_base_funcs = n_basefunctions(get_functionspace(fe_v))
     @assert length(u) == n_base_funcs
     dN = shape_gradient(fe_v, q_point)
@@ -300,7 +273,7 @@ end
 """
     spatial_coordinate{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, x::Vector{Vec{dim, T}})
 
-Computes the spatial coordinate in a quadrature point for a vector valued function.
+Computes the spatial coordinate in a quadrature point.
 
 **Arguments:**
 

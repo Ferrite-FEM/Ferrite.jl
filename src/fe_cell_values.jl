@@ -26,12 +26,10 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 * [`shape_divergence`](@ref)
 * [`shape_derivative`](@ref)
 
-* [`function_scalar_value`](@ref)
-* [`function_vector_value`](@ref)
-* [`function_scalar_gradient`](@ref)
-* [`function_vector_divergence`](@ref)
-* [`function_vector_gradient`](@ref)
-* [`function_vector_symmetric_gradient`](@ref)
+* [`function_value`](@ref)
+* [`function_gradient`](@ref)
+* [`function_symmetric_gradient`](@ref)
+* [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
 """
 immutable FECellValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape} <: AbstractFEValues{dim, T, FS, GS}

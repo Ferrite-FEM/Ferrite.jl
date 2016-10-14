@@ -29,12 +29,12 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
     end
 
     for i in 1:length(points(quad_rule))
-        @test function_vector_gradient(fe_cv, i, u) ≈ H
-        @test function_vector_symmetric_gradient(fe_cv, i, u) ≈ 0.5(H + H')
-        @test function_vector_divergence(fe_cv, i, u) ≈ trace(H)
-        @test function_scalar_gradient(fe_cv, i, u_scal) ≈ V
-        function_scalar_value(fe_cv, i, u_scal)
-        function_vector_value(fe_cv, i, u)
+        @test function_gradient(fe_cv, i, u) ≈ H
+        @test function_symmetric_gradient(fe_cv, i, u) ≈ 0.5(H + H')
+        @test function_divergence(fe_cv, i, u) ≈ trace(H)
+        @test function_gradient(fe_cv, i, u_scal) ≈ V
+        function_value(fe_cv, i, u_scal)
+        function_value(fe_cv, i, u)
     end
 
     # Test of volume
