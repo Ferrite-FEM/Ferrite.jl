@@ -74,4 +74,19 @@ using SHA
     end
 
     OVERWRITE_CHECKSUMS && close(csio)
-end
+
+    # Test VTK_type
+    for functionspace in (Lagrange{1, RefCube, 1}(),
+                          Lagrange{1, RefCube, 2}(),
+                          Lagrange{2, RefCube, 1}(),
+                          Lagrange{2, RefCube, 2}(),
+                          Lagrange{2, RefTetrahedron, 1}(),
+                          Lagrange{2, RefTetrahedron, 2}(),
+                          Lagrange{3, RefCube, 1}(),
+                          Serendipity{2, RefCube, 2}(),
+                          Lagrange{3, RefTetrahedron, 1}())
+
+        @test VTK_type(functionspace).nodes == n_basefunctions(functionspace)
+    end
+
+end # of testset

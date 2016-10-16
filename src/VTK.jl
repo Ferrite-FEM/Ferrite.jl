@@ -60,3 +60,38 @@ function vtk_grid{dim,T}(filename::AbstractString, coords::Vector{Vec{dim,T}}, t
 
     return vtk_grid(filename,coords,cells)
 end
+
+"""
+Returns the VTKCellType corresponding to the input FunctionSpace
+
+    VTK_type(fs::FunctionSpace)
+
+**Arguments**
+
+* `fs`: The function space
+
+**Results:**
+
+* `::VTKCellType`: The cell type, see [https://github.com/jipolanco/WriteVTK.jl#generating-an-unstructured-vtk-file](https://github.com/jipolanco/WriteVTK.jl#generating-an-unstructured-vtk-file)
+
+**Example:**
+
+```julia
+julia> fs = Lagrange{2, RefCube, 1}()
+JuAFEM.Lagrange{2,JuAFEM.RefCube,1}()
+
+julia> VTK_type(fs)
+WriteVTK.VTKCellTypes.VTKCellType("VTK_QUAD",0x09,4)
+```
+"""
+VTK_type(::Lagrange{1, RefCube, 1}) = VTKCellTypes.VTK_LINE
+VTK_type(::Lagrange{1, RefCube, 2}) = VTKCellTypes.VTK_QUADRATIC_EDGE
+
+VTK_type(::Lagrange{2, RefCube, 1}) = VTKCellTypes.VTK_QUAD
+VTK_type(::Lagrange{2, RefCube, 2}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
+VTK_type(::Lagrange{2, RefTetrahedron, 1}) = VTKCellTypes.VTK_TRIANGLE
+VTK_type(::Lagrange{2, RefTetrahedron, 2}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
+VTK_type(::Serendipity{2, RefCube, 2}) = VTKCellTypes.VTK_QUADRATIC_QUAD
+
+VTK_type(::Lagrange{3, RefCube, 1}) = VTKCellTypes.VTK_HEXAHEDRON
+VTK_type(::Lagrange{3, RefTetrahedron, 1}) = VTKCellTypes.VTK_TETRA

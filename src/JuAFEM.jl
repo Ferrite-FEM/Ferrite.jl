@@ -20,6 +20,7 @@ export FEBoundaryValues, get_boundarynumber
 export FunctionSpace, functionspace_n_dim, functionspace_ref_shape, functionspace_order, n_basefunctions
 export Lagrange, Serendipity, RefTetrahedron, RefCube
 export QuadratureRule, weights, points
+export VTK_type
 
 """
 Represents a reference shape which quadrature rules and function spaces are defined on.

@@ -365,8 +365,6 @@ function derivative!{T}(fs::Lagrange{3, RefTetrahedron, 1}, dN::Vector{Vec{3, T}
     return dN
 end
 
-VTK_type(fs::Lagrange{3, RefTetrahedron, 1}) = VTKCellType.VTK_TETRA
-
 ##################################
 # Lagrange dim 3 RefCube order 1 #
 ##################################
