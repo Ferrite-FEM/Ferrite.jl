@@ -1,4 +1,4 @@
-type Assembler{T}
+immutable Assembler{T}
     I::Vector{Int}
     J::Vector{Int}
     V::Vector{T}
@@ -29,11 +29,11 @@ function start_assemble(N::Int=0)
 end
 
 """
-    assemble(edof, a, Ke)
+    assemble!(a, Ke, edof)
 
 Assembles the element matrix `Ke` into `a`.
 """
-function assemble{T}(edof::Vector{Int}, a::Assembler{T}, Ke::Matrix{T})
+function assemble!{T}(a::Assembler{T}, Ke::Matrix{T}, edof::Vector{Int})
     n_dofs = length(edof)
     append!(a.V, Ke[:])
     for dof1 in 1:n_dofs, dof2 in 1:n_dofs

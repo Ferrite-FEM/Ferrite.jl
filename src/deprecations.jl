@@ -38,3 +38,6 @@ export Dim
 @deprecate function_vector_gradient function_gradient
 @deprecate function_vector_symmetric_gradient function_symmetric_gradient
 @deprecate function_vector_divergence function_divergence
+
+# PR #83
+@deprecate assemble(edof::Vector, a::Assembler, Ke::Matrix) assemble!(a, Ke, edof)
