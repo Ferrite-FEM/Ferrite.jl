@@ -62,7 +62,7 @@ n_boundaries(::FunctionSpace{3, RefTetrahedron}) = 4
 ############
 # Lagrange #
 ############
-type Lagrange{dim, shape, order} <: FunctionSpace{dim, shape, order} end
+immutable Lagrange{dim, shape, order} <: FunctionSpace{dim, shape, order} end
 
 functionspace_lower_dim{dim,shape,order}(::Lagrange{dim,shape,order}) = Lagrange{dim-1,shape,order}()
 functionspace_lower_order{dim,shape,order}(::Lagrange{dim,shape,order}) = Lagrange{dim,shape,order-1}()
@@ -417,7 +417,7 @@ end
 ###############
 # Serendipity #
 ###############
-type Serendipity{dim, shape, order} <: FunctionSpace{dim, shape, order} end
+immutable Serendipity{dim, shape, order} <: FunctionSpace{dim, shape, order} end
 
 #####################################
 # Serendipity dim 2 RefCube order 2 #
