@@ -12,7 +12,7 @@ function generate_grid{T}(nel::NTuple{1, Int}, left::Vec{1, T}=Vec{1}((-1.0,)), 
     # Generate nodes
     nodes = Node{1,T}[]
     for i in 1:n_nodes
-        push!(nodes, Node{1,T}(Vec{1, T}((coords_x[i],))))
+        push!(nodes, Node{1,T}((coords_x[i],)))
     end
 
     cells = Cell{1,2}[]
@@ -41,7 +41,7 @@ function generate_grid{T}(nel::NTuple{2, Int}, left::Vec{2, T}=Vec{2}((-1.0,-1.0
     # Generate nodes
     nodes = Node{2,T}[]
     for j in 1:n_nodes_y, i in 1:n_nodes_x
-        push!(nodes, Node{2,T}(Vec{2, T}((coords_x[i],coords_y[j]))))
+        push!(nodes, Node{2,T}((coords_x[i],coords_y[j])))
     end
 
     node_array = reshape(collect(1:n_nodes),(n_nodes_x,n_nodes_y))

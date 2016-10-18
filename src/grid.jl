@@ -18,6 +18,7 @@ A `Node` is a point in space.
 immutable Node{dim, T}
     x::Vec{dim, T}
 end
+Node{dim, T}(x::NTuple{dim, T}) = Node(Vec{dim, T}(x))
 
 """
 A `Cell` is a sub-domain defined by a collection of `Node`s as vertices.
@@ -26,6 +27,7 @@ immutable Cell{dim, N}
     id::Int
     nodes::NTuple{N, Int}
 end
+(::Type{Cell{dim}}){dim,N}(id::Int, nodes::NTuple{N}) = Cell{dim,N}(id, nodes)
 
 """
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain.
@@ -37,10 +39,6 @@ immutable Grid{dim, N, T <: Real}
     # node_sets # Dict?
     # interpolation::FunctionSpace
 end
-
-# Helper functions
-(::Type{Cell{dim}}){dim,N}(id::Int, nodes::NTuple{N}) = Cell{dim,N}(id, nodes)
-
 
 #####################################
 # Typealias for commonly used cells #
@@ -57,7 +55,6 @@ typealias Tetrahedron Cell{3, 4}
 # typealias QuadraticTetrahedron Cell{3, 10} # Doesn't exist in JuAFEM yet
 typealias Hexahedron Cell{3, 8}
 # typealias QuadraticHexahedron Cell{3, 20} # Doesn't exist in JuAFEM yet
-
 
 ##########################
 # Grid utility functions #
