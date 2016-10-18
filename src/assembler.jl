@@ -1,7 +1,7 @@
-type Assembler
+type Assembler{T}
     I::Vector{Int}
     J::Vector{Int}
-    V::Vector{Float64}
+    V::Vector{T}
 end
 
 
@@ -33,14 +33,12 @@ end
 
 Assembles the element matrix `Ke` into `a`.
 """
-function assemble(edof::Vector, a::Assembler, Ke::Matrix)
+function assemble{T}(edof::Vector{Int}, a::Assembler{T}, Ke::Matrix{T})
     n_dofs = length(edof)
-    for ele in size(edof, 1)
-        append!(a.V, Ke[:])
-        for dof1 in 1:n_dofs, dof2 in 1:n_dofs
-            push!(a.J, edof[dof1])
-            push!(a.I, edof[dof2])
-        end
+    append!(a.V, Ke[:])
+    for dof1 in 1:n_dofs, dof2 in 1:n_dofs
+        push!(a.J, edof[dof1])
+        push!(a.I, edof[dof2])
     end
 end
 
