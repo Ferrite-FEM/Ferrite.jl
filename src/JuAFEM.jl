@@ -12,7 +12,7 @@ import WriteVTK: vtk_grid
 
 # Utilities
 
-export start_assemble, assemble, end_assemble
+export start_assemble, assemble!, end_assemble
 
 export FECellValues, reinit!, shape_value, shape_gradient, shape_divergence, detJdV, get_quadrule, get_functionspace, get_geometricspace,
                      function_value, function_gradient, function_symmetric_gradient, function_divergence, spatial_coordinate
