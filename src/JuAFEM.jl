@@ -45,6 +45,8 @@ include("commons_abstract_fevalues.jl")
 include("assembler.jl")
 include("VTK.jl")
 include("boundary_integrals.jl")
+include("grid.jl")
+include("grid_generators.jl")
 include("deprecations.jl")
 
 end # module
