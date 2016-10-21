@@ -43,10 +43,10 @@ include("fe_cell_values.jl")
 include("fe_boundary_values.jl")
 include("commons_abstract_fevalues.jl")
 include("assembler.jl")
-include("VTK.jl")
 include("boundary_integrals.jl")
 include("grid.jl")
 include("grid_generators.jl")
+include("VTK.jl")
 include("deprecations.jl")
 
 end # module
