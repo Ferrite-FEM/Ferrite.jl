@@ -97,11 +97,11 @@ VTK_type(::Lagrange{3, RefCube, 1}) = VTKCellTypes.VTK_HEXAHEDRON
 VTK_type(::Lagrange{3, RefTetrahedron, 1}) = VTKCellTypes.VTK_TETRA
 
 function vtk_grid{dim, N, T}(filename::AbstractString, grid::Grid{dim, N, T})
-    coords = reinterpret(T, nodes(grid), (dim, n_nodes(grid)))
+    coords = reinterpret(T, getnodes(grid), (dim, getnnodes(grid)))
 
-    celltype = VTK_type(cell_type(grid))
+    celltype = VTK_type(getcelltype(grid))
     cls = MeshCell[]
-    for cell in 1:n_cells(grid)
+    for cell in 1:getncells(grid)
         push!(cls, MeshCell(celltype, collect(grid.cells[cell].nodes)))
     end
 
