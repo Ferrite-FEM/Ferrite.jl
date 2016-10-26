@@ -95,3 +95,27 @@ VTK_type(::Serendipity{2, RefCube, 2}) = VTKCellTypes.VTK_QUADRATIC_QUAD
 
 VTK_type(::Lagrange{3, RefCube, 1}) = VTKCellTypes.VTK_HEXAHEDRON
 VTK_type(::Lagrange{3, RefTetrahedron, 1}) = VTKCellTypes.VTK_TETRA
+
+function vtk_grid{dim, N, T}(filename::AbstractString, grid::Grid{dim, N, T})
+    coords = reinterpret(T, getnodes(grid), (dim, getnnodes(grid)))
+
+    celltype = VTK_type(getcelltype(grid))
+    cls = MeshCell[]
+    for cell in 1:getncells(grid)
+        push!(cls, MeshCell(celltype, collect(grid.cells[cell].nodes)))
+    end
+
+    return vtk_grid(filename, coords, cls)
+end
+
+VTK_type(::Type{Cell{1,2}}) = VTKCellTypes.VTK_LINE
+VTK_type(::Type{Cell{1,3}}) = VTKCellTypes.VTK_QUADRATIC_EDGE
+
+VTK_type(::Type{Cell{2,4}}) = VTKCellTypes.VTK_QUAD
+VTK_type(::Type{Cell{2,9}}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
+VTK_type(::Type{Cell{2,3}}) = VTKCellTypes.VTK_TRIANGLE
+VTK_type(::Type{Cell{2,6}}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
+VTK_type(::Type{Cell{2,8}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
+
+VTK_type(::Type{Cell{3,8}}) = VTKCellTypes.VTK_HEXAHEDRON
+VTK_type(::Type{Cell{3,4}}) = VTKCellTypes.VTK_TETRA
