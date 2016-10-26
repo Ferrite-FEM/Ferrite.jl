@@ -16,10 +16,10 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 
 ** Common methods**
 
-* [`get_quadrule`](@ref)
-* [`get_functionspace`](@ref)
-* [`get_geometricspace`](@ref)
-* [`detJdV`](@ref)
+* [`getquadrule`](@ref)
+* [`getfunctionspace`](@ref)
+* [`getgeometricspace`](@ref)
+* [`getdetJdV`](@ref)
 
 * [`shape_value`](@ref)
 * [`shape_gradient`](@ref)
@@ -47,18 +47,18 @@ end
 FECellValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FECellValues(Float64, quad_rule, func_space, geom_space)
 
 function FECellValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_space::FS, geom_space::GS=func_space)
-    @assert functionspace_n_dim(func_space) == functionspace_n_dim(geom_space)
-    @assert functionspace_ref_shape(func_space) == functionspace_ref_shape(geom_space) == shape
-    n_qpoints = length(weights(quad_rule))
+    @assert getdim(func_space) == getdim(geom_space)
+    @assert getrefshape(func_space) == getrefshape(geom_space) == shape
+    n_qpoints = length(getweights(quad_rule))
 
     # Function interpolation
-    n_func_basefuncs = n_basefunctions(func_space)
+    n_func_basefuncs = getnbasefunctions(func_space)
     N = [zeros(T, n_func_basefuncs) for i in 1:n_qpoints]
     dNdx = [[zero(Vec{dim, T}) for i in 1:n_func_basefuncs] for j in 1:n_qpoints]
     dNdξ = [[zero(Vec{dim, T}) for i in 1:n_func_basefuncs] for j in 1:n_qpoints]
 
     # Geometry interpolation
-    n_geom_basefuncs = n_basefunctions(geom_space)
+    n_geom_basefuncs = getnbasefunctions(geom_space)
     M = [zeros(T, n_geom_basefuncs) for i in 1:n_qpoints]
     dMdξ = [[zero(Vec{dim, T}) for i in 1:n_geom_basefuncs] for j in 1:n_qpoints]
 
@@ -95,12 +95,12 @@ Updates the `FECellValues` object for an element.
 
 """
 function reinit!{dim, T}(fe_cv::FECellValues{dim}, x::Vector{Vec{dim, T}})
-    n_geom_basefuncs = n_basefunctions(get_geometricspace(fe_cv))
-    n_func_basefuncs = n_basefunctions(get_functionspace(fe_cv))
+    n_geom_basefuncs = getnbasefunctions(getgeometricspace(fe_cv))
+    n_func_basefuncs = getnbasefunctions(getfunctionspace(fe_cv))
     @assert length(x) == n_geom_basefuncs
 
-    for i in 1:length(points(fe_cv.quad_rule))
-        w = weights(fe_cv.quad_rule)[i]
+    for i in 1:length(getpoints(fe_cv.quad_rule))
+        w = getweights(fe_cv.quad_rule)[i]
         fecv_J = zero(Tensor{2, dim})
         for j in 1:n_geom_basefuncs
             fecv_J += fe_cv.dMdξ[i][j] ⊗ x[j]

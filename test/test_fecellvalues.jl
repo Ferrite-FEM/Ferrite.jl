@@ -10,8 +10,8 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
                                      (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{3, RefTetrahedron}(2)))
 
     fe_cv = FECellValues(quad_rule, function_space)
-    ndim = functionspace_n_dim(function_space)
-    n_basefuncs = n_basefunctions(function_space)
+    ndim = getdim(function_space)
+    n_basefuncs = getnbasefunctions(function_space)
 
     x = valid_coordinates(function_space)
     reinit!(fe_cv, x)
@@ -28,7 +28,7 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
         u_scal[i] = V ⋅ x[i]
     end
 
-    for i in 1:length(points(quad_rule))
+    for i in 1:length(getpoints(quad_rule))
         @test function_gradient(fe_cv, i, u) ≈ H
         @test function_symmetric_gradient(fe_cv, i, u) ≈ 0.5(H + H')
         @test function_divergence(fe_cv, i, u) ≈ trace(H)
@@ -39,27 +39,27 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
 
     # Test of volume
     vol = 0.0
-    for i in 1:length(points(quad_rule))
-        vol += detJdV(fe_cv,i)
+    for i in 1:length(getpoints(quad_rule))
+        vol += getdetJdV(fe_cv,i)
     end
     @test vol ≈ calculate_volume(function_space, x)
 
     # Test of utility functions
-    @test get_functionspace(fe_cv) == function_space
-    @test get_geometricspace(fe_cv) == function_space
-    @test get_quadrule(fe_cv) == quad_rule
+    @test getfunctionspace(fe_cv) == function_space
+    @test getgeometricspace(fe_cv) == function_space
+    @test getquadrule(fe_cv) == quad_rule
 
     # Test quadrature rule after reinit! with ref. coords
     x = reference_coordinates(function_space)
     reinit!(fe_cv, x)
     vol = 0.0
-    for i in 1:length(points(quad_rule))
-        vol += detJdV(fe_cv,i)
+    for i in 1:length(getpoints(quad_rule))
+        vol += getdetJdV(fe_cv,i)
     end
     @test vol ≈ reference_volume(function_space)
 
     # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
-    for (i, qp_x) in enumerate(points(quad_rule))
+    for (i, qp_x) in enumerate(getpoints(quad_rule))
         @test spatial_coordinate(fe_cv, i, x) ≈ qp_x
     end
 

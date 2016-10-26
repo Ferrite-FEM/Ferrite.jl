@@ -4,7 +4,7 @@
 
     function integrate(qr::QuadratureRule, f::Function)
         I = 0.0
-        for (w, x) in zip(weights(qr), points(qr))
+        for (w, x) in zip(getweights(qr), getpoints(qr))
             I += w * f(x)
         end
         return I
@@ -18,13 +18,13 @@
             qr = QuadratureRule{dim, RefCube}(:legendre, order)
             @test integrate(qr, (x) -> f(x, 2*order-1)) < 1e-14
             @test sum(qr.weights) ≈ ref_square_vol(dim)
-            @test sum(weights(qr)) ≈ ref_square_vol(dim)
+            @test sum(getweights(qr)) ≈ ref_square_vol(dim)
             # Lobatto
             if order > 1
                 qr = QuadratureRule{dim, RefCube}(:lobatto, order)
                 @test integrate(qr, (x) -> f(x, 2*order-1)) < 1e-14
                 @test sum(qr.weights) ≈ ref_square_vol(dim)
-                @test sum(weights(qr)) ≈ ref_square_vol(dim)
+                @test sum(getweights(qr)) ≈ ref_square_vol(dim)
             end
         end
     end

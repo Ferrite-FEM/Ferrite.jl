@@ -6,7 +6,7 @@
 reference_volume{dim}(::FunctionSpace{dim, RefCube}) = 2^dim
 reference_volume{dim}(::FunctionSpace{dim, RefTetrahedron}) = 1 / factorial(dim)
 # For boundaries
-reference_volume(fs::FunctionSpace, ::Int) = reference_volume(JuAFEM.functionspace_lower_dim(fs))
+reference_volume(fs::FunctionSpace, ::Int) = reference_volume(JuAFEM.getlowerdim(fs))
 reference_volume(fs::FunctionSpace{2, RefTetrahedron}, boundary::Int) = boundary == 1 ? sqrt(2) : 1.0
 reference_volume(fs::FunctionSpace{3, RefTetrahedron}, boundary::Int) = boundary == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
 
@@ -186,7 +186,7 @@ function calculate_volume{order, T}(::Lagrange{0, RefCube, order}, ::Vector{Vec{
 end
 
 ####################################
-# For testing get_boundarynumber() #
+# For testing getboundarynumber() #
 ####################################
 # Last set of boundary nodes throws error
 function topology_test_nodes(::Lagrange{1, RefCube, 1})

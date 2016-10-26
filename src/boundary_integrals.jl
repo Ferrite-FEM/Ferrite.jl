@@ -2,7 +2,7 @@
 # All 1D RefCube #
 ##################
 function create_boundary_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{0, shape, T}, ::FunctionSpace{1, shape})
-    w = weights(quad_rule)
+    w = getweights(quad_rule)
     boundary_quad_rule = QuadratureRule{1, shape, T}[]
 
     # Boundary 1
@@ -21,8 +21,8 @@ detJ_boundary{T}(::Tensor{2, 1, T}, ::FunctionSpace{1, RefCube}, ::Int) = one(T)
 # All 2D RefCube #
 ##################
 function create_boundary_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{1, shape, T}, ::FunctionSpace{2, shape})
-    w = weights(quad_rule)
-    p = points(quad_rule)
+    w = getweights(quad_rule)
+    p = getpoints(quad_rule)
     n_points = length(w)
     boundary_quad_rule = QuadratureRule{2, shape, T}[]
 
@@ -53,8 +53,8 @@ end
 # All RefTetrahedron 2D #
 #########################
 function create_boundary_quad_rule{T, shape <: RefTetrahedron}(quad_rule::QuadratureRule{1, shape, T}, ::FunctionSpace{2, shape})
-    w = weights(quad_rule)
-    p = points(quad_rule)
+    w = getweights(quad_rule)
+    p = getpoints(quad_rule)
     n_points = length(w)
     boundary_quad_rule = QuadratureRule{2, shape, T}[]
 
@@ -81,8 +81,8 @@ end
 # All RefCube 3D #
 ##################
 function create_boundary_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{2, shape, T}, ::FunctionSpace{3, shape})
-    w = weights(quad_rule)
-    p = points(quad_rule)
+    w = getweights(quad_rule)
+    p = getpoints(quad_rule)
     n_points = length(w)
     boundary_quad_rule = QuadratureRule{3, shape, T}[]
 
@@ -121,8 +121,8 @@ end
 # All RefTetrahedron 3D #
 #########################
 function create_boundary_quad_rule{T, shape <: RefTetrahedron}(quad_rule::QuadratureRule{2, shape, T}, ::FunctionSpace{3, shape})
-    w = weights(quad_rule)
-    p = points(quad_rule)
+    w = getweights(quad_rule)
+    p = getpoints(quad_rule)
     n_points = length(w)
     boundary_quad_rule = QuadratureRule{3, shape, T}[]
 

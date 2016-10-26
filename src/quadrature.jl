@@ -27,8 +27,8 @@ The quadrature rule consists of ``n_q`` points in space ``\\mathbf{x}_q`` with c
 
 **Common methods:**
 
-* [`points`](@ref) : the points of the quadrature rule
-* [`weights`](@ref) : the weights of the quadrature rule
+* [`getpoints`](@ref) : the points of the quadrature rule
+* [`getweights`](@ref) : the weights of the quadrature rule
 
 **Example:**
 
@@ -49,7 +49,7 @@ end
 
 The weights of the quadrature rule.
 
-    weights(qr::QuadratureRule) = qr.weights
+    getweights(qr::QuadratureRule) = qr.weights
 
 **Arguments:**
 
@@ -60,7 +60,7 @@ The weights of the quadrature rule.
 ```julia
 julia> qr = QuadratureRule{2, RefTetrahedron}(:legendre, 2);
 
-julia> weights(qr)
+julia> getweights(qr)
 3-element Array{Float64,1}:
  0.166667
  0.166667
@@ -68,13 +68,13 @@ julia> weights(qr)
 ```
 
 """
-weights(qr::QuadratureRule) = qr.weights
+getweights(qr::QuadratureRule) = qr.weights
 
 
 """
 The points of the quadrature rule.
 
-    points(qr::QuadratureRule)
+    getpoints(qr::QuadratureRule)
 
 **Arguments:**
 
@@ -85,14 +85,14 @@ The points of the quadrature rule.
 ```julia
 julia> qr = QuadratureRule{2, RefTetrahedron}(:legendre, 2);
 
-julia> points(qr)
+julia> getpoints(qr)
 3-element Array{ContMechTensors.Tensor{1,2,Float64,2},1}:
  [0.166667,0.166667]
  [0.166667,0.666667]
  [0.666667,0.166667]
 ```
 """
-points(qr::QuadratureRule) = qr.points
+getpoints(qr::QuadratureRule) = qr.points
 
 (::Type{QuadratureRule{dim, shape}}){dim, shape}(order::Int) = QuadratureRule{dim, shape}(:legendre, order)
 
