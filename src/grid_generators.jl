@@ -1,6 +1,19 @@
 export generate_grid
 """
-`Grid` generator for simple geometries.
+`Grid` generator for a rectangle in 1, 2 and 3 dimensions.
+
+    generate_grid(celltype::Cell{dim, N}, nel::NTuple{dim, Int}, [left::Vec{1, T}=Vec{1}((-1.0,)), right::Vec{1, T}=Vec{1}((1.0,))])
+
+** Arguments **
+
+* `celltype`: a celltype, e.g. `Triangle` or `Hexahedron`
+* `nel`: a tuple with number of elements in each direction.
+* `left`, `right`: optional endpoints of the domain, defaults to `-one(Vec{dim})` and `one(Vec{dim})`
+
+** Results **
+
+* `grid`: a `Grid`.
+
 """
 # Line
 function generate_grid{T}(::Type{Line}, nel::NTuple{1, Int}, left::Vec{1, T}=Vec{1}((-1.0,)), right::Vec{1, T}=Vec{1}((1.0,)))
@@ -29,6 +42,7 @@ function generate_grid{T}(::Type{Line}, nel::NTuple{1, Int}, left::Vec{1, T}=Vec
                          :right => [2])
     return Grid(cells, nodes, cellbounds, cellboundarysets=cellboundsets)
 end
+
 # QuadraticLine
 function generate_grid{T}(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec{1, T}=Vec{1}((-1.0,)), right::Vec{1, T}=Vec{1}((1.0,)))
     nel_x = nel[1]

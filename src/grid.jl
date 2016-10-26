@@ -93,6 +93,15 @@ end
 @inline getnodeset(grid::Grid, set::Symbol) = grid.nodes[grid.nodesets[set]]
 @inline getcellboundaryset(grid::Grid, set::Symbol) = grid.cellboundaries[grid.cellboundarysets[set]]
 
+function addcellset!(grid::Grid, name::Symbol, cellid::Vector{Int})
+    haskey(grid.cellsets, name) && warn("There already exists a cellset with the name: $name")
+    grid.cellsets[name] = cellid
+end
+function addnodeset!(grid::Grid, name::Symbol, nodeid::Vector{Int})
+    haskey(grid.nodesets, name) && warn("There already exists a nodeset with the name: $name")
+    grid.nodesets[name] = nodeid
+end
+
 """
 Returns a vector with the coordinates of the vertices of a cell
 
