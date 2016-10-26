@@ -3,7 +3,7 @@
 """
 The quadrature rule for the `AbstractFEValues` type.
 
-    get_quadrule(fe_v::AbstractFEValues)
+    getquadrule(fe_v::AbstractFEValues)
 
 ** Arguments **
 
@@ -14,13 +14,13 @@ The quadrature rule for the `AbstractFEValues` type.
 * `::QuadratureRule`: the quadrature rule.
 
 """
-get_quadrule(fe_cv::FECellValues) = fe_cv.quad_rule
-get_quadrule(fe_bv::FEBoundaryValues) = fe_bv.quad_rule[fe_bv.current_boundary[]]
+getquadrule(fe_cv::FECellValues) = fe_cv.quad_rule
+getquadrule(fe_bv::FEBoundaryValues) = fe_bv.quad_rule[fe_bv.current_boundary[]]
 
 """
 The function space for the `AbstractFEValues` type.
 
-    get_functionspace(fe_v::AbstractFEValues)
+    getfunctionspace(fe_v::AbstractFEValues)
 
 **Arguments**
 
@@ -31,12 +31,12 @@ The function space for the `AbstractFEValues` type.
 * `::FunctionSpace`: the function space
 
 """
-get_functionspace(fe_v::AbstractFEValues) = fe_v.function_space
+getfunctionspace(fe_v::AbstractFEValues) = fe_v.function_space
 
 """
 The function space used for geometric interpolation for the `AbstractFEValues` type.
 
-    get_geometricspace(fe_v::AbstractFEValues)
+    getgeometricspace(fe_v::AbstractFEValues)
 
 **Arguments**
 
@@ -47,12 +47,12 @@ The function space used for geometric interpolation for the `AbstractFEValues` t
 * `::FunctionSpace`: the geometric interpolation function space
 
 """
-get_geometricspace(fe_v::AbstractFEValues) = fe_v.geometric_space
+getgeometricspace(fe_v::AbstractFEValues) = fe_v.geometric_space
 
 """
 The product between the determinant of the Jacobian and the quadrature point weight for a given quadrature point: ``\\det(J(\\mathbf{x})) w_q``
 
-    detJdV(fe_v::AbstractFEValues, quadrature_point::Int)
+    getdetJdV(fe_v::AbstractFEValues, quadrature_point::Int)
 
 ** Arguments:**
 
@@ -71,8 +71,8 @@ This value is typically used when one integrates a function on a finite element 
 ``\\int\\limits_\\Gamma f(\\mathbf{x}) d \\Gamma \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 
 """
-@inline detJdV(fe_cv::FECellValues, q_point::Int) = fe_cv.detJdV[q_point]
-@inline detJdV(fe_bv::FEBoundaryValues, q_point::Int) = fe_bv.detJdV[fe_bv.current_boundary[]][q_point]
+@inline getdetJdV(fe_cv::FECellValues, q_point::Int) = fe_cv.detJdV[q_point]
+@inline getdetJdV(fe_bv::FEBoundaryValues, q_point::Int) = fe_bv.detJdV[fe_bv.current_boundary[]][q_point]
 
 """
 Computes the value of the shape function
@@ -136,7 +136,7 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 nodal values of ``\\mathbf{u}``.
 """
 @inline function function_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
-    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
+    n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
     N = shape_value(fe_v, q_point)
     s = zero(T)
@@ -147,7 +147,7 @@ nodal values of ``\\mathbf{u}``.
 end
 
 @inline function function_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
-    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
+    n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
     vec = zero(Vec{dim, T})
     N = shape_value(fe_v, q_point)
@@ -184,7 +184,7 @@ For a vector valued function the gradient is computed as
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
 @inline function function_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
-    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
+    n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
     dN = shape_gradient(fe_v, q_point)
     grad = zero(Vec{dim, T})
@@ -195,7 +195,7 @@ where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 end
 
 @inline function function_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
-    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
+    n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
     dN = shape_gradient(fe_v, q_point)
     grad = zero(Tensor{2, dim, T})
@@ -260,7 +260,7 @@ The divergence of a vector valued functions in the quadrature point ``\\mathbf{x
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
 @inline function function_divergence{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
-    n_base_funcs = n_basefunctions(get_functionspace(fe_v))
+    n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
     dN = shape_gradient(fe_v, q_point)
     diverg = zero(T)
@@ -290,7 +290,7 @@ Computes the spatial coordinate in a quadrature point.
 The coordinate is computed, using the geometric interpolation space, as ``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{x}) \\mathbf{\\hat{x}}_i``
 """
 @inline function spatial_coordinate{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, x::Vector{Vec{dim, T}})
-    n_base_funcs = n_basefunctions(get_geometricspace(fe_v))
+    n_base_funcs = getnbasefunctions(getgeometricspace(fe_v))
     @assert length(x) == n_base_funcs
     vec = zero(Vec{dim, T})
     M = geometric_value(fe_v, q_point)

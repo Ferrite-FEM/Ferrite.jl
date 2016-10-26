@@ -64,7 +64,7 @@ end
 """
 Returns the VTKCellType corresponding to the input FunctionSpace
 
-    VTK_type(fs::FunctionSpace)
+    getVTKtype(fs::FunctionSpace)
 
 **Arguments**
 
@@ -80,26 +80,26 @@ Returns the VTKCellType corresponding to the input FunctionSpace
 julia> fs = Lagrange{2, RefCube, 1}()
 JuAFEM.Lagrange{2,JuAFEM.RefCube,1}()
 
-julia> VTK_type(fs)
+julia> getVTKtype(fs)
 WriteVTK.VTKCellTypes.VTKCellType("VTK_QUAD",0x09,4)
 ```
 """
-VTK_type(::Lagrange{1, RefCube, 1}) = VTKCellTypes.VTK_LINE
-VTK_type(::Lagrange{1, RefCube, 2}) = VTKCellTypes.VTK_QUADRATIC_EDGE
+getVTKtype(::Lagrange{1, RefCube, 1}) = VTKCellTypes.VTK_LINE
+getVTKtype(::Lagrange{1, RefCube, 2}) = VTKCellTypes.VTK_QUADRATIC_EDGE
 
-VTK_type(::Lagrange{2, RefCube, 1}) = VTKCellTypes.VTK_QUAD
-VTK_type(::Lagrange{2, RefCube, 2}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
-VTK_type(::Lagrange{2, RefTetrahedron, 1}) = VTKCellTypes.VTK_TRIANGLE
-VTK_type(::Lagrange{2, RefTetrahedron, 2}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
-VTK_type(::Serendipity{2, RefCube, 2}) = VTKCellTypes.VTK_QUADRATIC_QUAD
+getVTKtype(::Lagrange{2, RefCube, 1}) = VTKCellTypes.VTK_QUAD
+getVTKtype(::Lagrange{2, RefCube, 2}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
+getVTKtype(::Lagrange{2, RefTetrahedron, 1}) = VTKCellTypes.VTK_TRIANGLE
+getVTKtype(::Lagrange{2, RefTetrahedron, 2}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
+getVTKtype(::Serendipity{2, RefCube, 2}) = VTKCellTypes.VTK_QUADRATIC_QUAD
 
-VTK_type(::Lagrange{3, RefCube, 1}) = VTKCellTypes.VTK_HEXAHEDRON
-VTK_type(::Lagrange{3, RefTetrahedron, 1}) = VTKCellTypes.VTK_TETRA
+getVTKtype(::Lagrange{3, RefCube, 1}) = VTKCellTypes.VTK_HEXAHEDRON
+getVTKtype(::Lagrange{3, RefTetrahedron, 1}) = VTKCellTypes.VTK_TETRA
 
 function vtk_grid{dim, N, T}(filename::AbstractString, grid::Grid{dim, N, T})
     coords = reinterpret(T, getnodes(grid), (dim, getnnodes(grid)))
 
-    celltype = VTK_type(getcelltype(grid))
+    celltype = getVTKtype(getcelltype(grid))
     cls = MeshCell[]
     for cell in 1:getncells(grid)
         push!(cls, MeshCell(celltype, collect(grid.cells[cell].nodes)))
@@ -108,14 +108,14 @@ function vtk_grid{dim, N, T}(filename::AbstractString, grid::Grid{dim, N, T})
     return vtk_grid(filename, coords, cls)
 end
 
-VTK_type(::Type{Cell{1,2}}) = VTKCellTypes.VTK_LINE
-VTK_type(::Type{Cell{1,3}}) = VTKCellTypes.VTK_QUADRATIC_EDGE
+getVTKtype(::Type{Cell{1,2}}) = VTKCellTypes.VTK_LINE
+getVTKtype(::Type{Cell{1,3}}) = VTKCellTypes.VTK_QUADRATIC_EDGE
 
-VTK_type(::Type{Cell{2,4}}) = VTKCellTypes.VTK_QUAD
-VTK_type(::Type{Cell{2,9}}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
-VTK_type(::Type{Cell{2,3}}) = VTKCellTypes.VTK_TRIANGLE
-VTK_type(::Type{Cell{2,6}}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
-VTK_type(::Type{Cell{2,8}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
+getVTKtype(::Type{Cell{2,4}}) = VTKCellTypes.VTK_QUAD
+getVTKtype(::Type{Cell{2,9}}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
+getVTKtype(::Type{Cell{2,3}}) = VTKCellTypes.VTK_TRIANGLE
+getVTKtype(::Type{Cell{2,6}}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
+getVTKtype(::Type{Cell{2,8}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
 
-VTK_type(::Type{Cell{3,8}}) = VTKCellTypes.VTK_HEXAHEDRON
-VTK_type(::Type{Cell{3,4}}) = VTKCellTypes.VTK_TETRA
+getVTKtype(::Type{Cell{3,8}}) = VTKCellTypes.VTK_HEXAHEDRON
+getVTKtype(::Type{Cell{3,4}}) = VTKCellTypes.VTK_TETRA

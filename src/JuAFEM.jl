@@ -14,13 +14,13 @@ import WriteVTK: vtk_grid
 
 export start_assemble, assemble!, end_assemble
 
-export FECellValues, reinit!, shape_value, shape_gradient, shape_divergence, detJdV, get_quadrule, get_functionspace, get_geometricspace,
+export FECellValues, reinit!, shape_value, shape_gradient, shape_divergence, getdetJdV, getquadrule, getfunctionspace, getgeometricspace,
                      function_value, function_gradient, function_symmetric_gradient, function_divergence, spatial_coordinate
-export FEBoundaryValues, get_boundarynumber
-export FunctionSpace, functionspace_n_dim, functionspace_ref_shape, functionspace_order, n_basefunctions
+export FEBoundaryValues, getboundarynumber
+export FunctionSpace, getdim, getrefshape, getorder, getnbasefunctions
 export Lagrange, Serendipity, RefTetrahedron, RefCube
-export QuadratureRule, weights, points
-export VTK_type
+export QuadratureRule, getweights, getpoints
+export getVTKtype
 
 """
 Represents a reference shape which quadrature rules and function spaces are defined on.
