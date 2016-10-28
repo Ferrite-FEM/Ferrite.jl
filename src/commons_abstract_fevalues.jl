@@ -72,43 +72,36 @@ This value is typically used when one integrates a function on a finite element 
 
 """
 @inline getdetJdV(fe_cv::FECellValues, q_point::Int) = fe_cv.detJdV[q_point]
-@inline getdetJdV(fe_bv::FEBoundaryValues, q_point::Int) = fe_bv.detJdV[fe_bv.current_boundary[]][q_point]
+@inline getdetJdV(fe_bv::FEBoundaryValues, q_point::Int) = fe_bv.detJdV[q_point, fe_bv.current_boundary[]]
 
 """
 Computes the value of the shape function
 
-    shape_value(fe_v::AbstractFEValues, quadrature_point::Int, [base_function::Int])
+    shape_value(fe_v::AbstractFEValues, quadrature_point::Int, base_function::Int)
 
 Gets the values of the shape function for a given quadrature point and base_func
 
 """
-@inline shape_value(fe_cv::FECellValues, q_point::Int) = fe_cv.N[q_point]
-@inline shape_value(fe_cv::FECellValues, q_point::Int, base_func::Int) = fe_cv.N[q_point][base_func]
-@inline shape_value(fe_bv::FEBoundaryValues, q_point::Int) = fe_bv.N[fe_bv.current_boundary[]][q_point]
-@inline shape_value(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.N[fe_bv.current_boundary[]][q_point][base_func]
+@inline shape_value(fe_cv::FECellValues, q_point::Int, base_func::Int) = fe_cv.N[base_func, q_point]
+@inline shape_value(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.N[base_func, q_point, fe_bv.current_boundary[]]
 
-@inline geometric_value(fe_cv::FECellValues, q_point::Int) = fe_cv.M[q_point]
-@inline geometric_value(fe_bv::FEBoundaryValues, q_point::Int) = fe_bv.M[fe_bv.current_boundary[]][q_point]
+@inline geometric_value(fe_cv::FECellValues, q_point::Int, base_func::Int) = fe_cv.M[base_func, q_point]
+@inline geometric_value(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.M[base_func, q_point, fe_bv.current_boundary[]]
 
-"""
-Get the gradients of the shape functions for a given quadrature point
-"""
-@inline shape_gradient(fe_cv::FECellValues, q_point::Int) = fe_cv.dNdx[q_point]
-@inline shape_gradient(fe_bv::FEBoundaryValues, q_point::Int) = fe_bv.dNdx[fe_bv.current_boundary[]][q_point]
 
 """
 Get the gradient of the shape functions for a given quadrature point and base function
 """
-@inline shape_gradient(fe_cv::FECellValues, q_point::Int, base_func::Int) = fe_cv.dNdx[q_point][base_func]
-@inline shape_gradient(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.dNdx[fe_bv.current_boundary[]][q_point][base_func]
+@inline shape_gradient(fe_cv::FECellValues, q_point::Int, base_func::Int)     = fe_cv.dNdx[base_func, q_point]
+@inline shape_gradient(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.dNdx[base_func, q_point, fe_bv.current_boundary[]]
 
 const shape_derivative = shape_gradient
 
 """
 Get the divergence of the shape functions for a given quadrature point and base function
 """
-@inline shape_divergence(fe_cv::FECellValues, q_point::Int, base_func::Int) = sum(fe_cv.dNdx[q_point][base_func])
-@inline shape_divergence(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = sum(fe_bv.dNdx[fe_bv.current_boundary[]][q_point][base_func])
+@inline shape_divergence(fe_cv::FECellValues, q_point::Int, base_func::Int) = sum(fe_cv.dNdx[base_func, q_point])
+@inline shape_divergence(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = sum(fe_bv.dNdx[base_func, q_point, fe_bv.current_boundary[]])
 
 
 """
@@ -138,10 +131,9 @@ nodal values of ``\\mathbf{u}``.
 @inline function function_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
     n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
-    N = shape_value(fe_v, q_point)
     s = zero(T)
     @inbounds for i in 1:n_base_funcs
-        s += N[i] * u[i]
+        s += shape_value(fe_v, q_point, i) * u[i]
     end
     return s
 end
@@ -150,9 +142,8 @@ end
     n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
     vec = zero(Vec{dim, T})
-    N = shape_value(fe_v, q_point)
     @inbounds for i in 1:n_base_funcs
-        vec += N[i] * u[i]
+        vec += shape_value(fe_v, q_point, i) * u[i]
     end
     return vec
 end
@@ -186,10 +177,9 @@ where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 @inline function function_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
     n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
-    dN = shape_gradient(fe_v, q_point)
     grad = zero(Vec{dim, T})
     @inbounds for i in 1:n_base_funcs
-        grad += dN[i] * u[i]
+        grad += shape_gradient(fe_v, q_point, i) * u[i]
     end
     return grad
 end
@@ -197,10 +187,9 @@ end
 @inline function function_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
-    dN = shape_gradient(fe_v, q_point)
     grad = zero(Tensor{2, dim, T})
-    for i in 1:n_base_funcs
-        grad += u[i] ⊗ dN[i]
+    @inbounds for i in 1:n_base_funcs
+        grad += u[i] ⊗ shape_gradient(fe_v, q_point, i)
     end
     return grad
 end
@@ -262,10 +251,9 @@ where ``\\mathbf{u}_i`` are the nodal values of the function.
 @inline function function_divergence{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
-    dN = shape_gradient(fe_v, q_point)
     diverg = zero(T)
     @inbounds for i in 1:n_base_funcs
-        diverg += dN[i] ⋅ u[i]
+        diverg += shape_gradient(fe_v, q_point, i) ⋅ u[i]
     end
     return diverg
 end
@@ -293,9 +281,8 @@ The coordinate is computed, using the geometric interpolation space, as ``\\math
     n_base_funcs = getnbasefunctions(getgeometricspace(fe_v))
     @assert length(x) == n_base_funcs
     vec = zero(Vec{dim, T})
-    M = geometric_value(fe_v, q_point)
     @inbounds for i in 1:n_base_funcs
-        vec += M[i] * x[i]
+        vec += geometric_value(fe_v, q_point, i) * x[i]
     end
     return vec
 end
