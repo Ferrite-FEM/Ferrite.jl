@@ -12,7 +12,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 * `T` an optional argument to determine the type the internal data is stored as.
 * `quad_rule` an instance of a [`QuadratureRule`](@ref)
 * `function_space` an instance of a [`FunctionSpace`](@ref) used to interpolate the approximated function
-* `geometric_space` an optional instance of a [`FunctionSpace`](@ref) which is used to interpolate the geometry 
+* `geometric_space` an optional instance of a [`FunctionSpace`](@ref) which is used to interpolate the geometry
 
 ** Common methods**
 
