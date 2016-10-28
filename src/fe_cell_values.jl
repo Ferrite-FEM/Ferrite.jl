@@ -32,7 +32,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
 """
-immutable FECellValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape} <: AbstractFEValues{dim, T, FS, GS}
+immutable FECellValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape} <: AbstractFECellValues{dim, T, FS, GS}
     N::Matrix{T}
     dNdx::Matrix{Vec{dim, T}}
     dNdξ::Matrix{Vec{dim, T}}
@@ -94,10 +94,11 @@ Updates the `FECellValues` object for an element.
 
 
 """
-function reinit!{dim, T}(fe_cv::FECellValues{dim}, x::Vector{Vec{dim, T}})
+function reinit!{dim, T}(fe_cv::AbstractFECellValues{dim}, x::Vector{Vec{dim, T}})
     n_geom_basefuncs = getnbasefunctions(getgeometricspace(fe_cv))
     n_func_basefuncs = getnbasefunctions(getfunctionspace(fe_cv))
     @assert length(x) == n_geom_basefuncs
+    isa(fe_cv, FEVectorCellValues) && (n_func_basefuncs *= dim)
 
     @inbounds for i in 1:length(getpoints(fe_cv.quad_rule))
         w = getweights(fe_cv.quad_rule)[i]
