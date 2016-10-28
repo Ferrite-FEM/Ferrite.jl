@@ -33,14 +33,14 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 * [`spatial_coordinate`](@ref)
 """
 immutable FEBoundaryValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape} <: AbstractFEValues{dim, T, FS, GS}
-    N::Vector{Vector{Vector{T}}}
-    dNdx::Vector{Vector{Vector{Vec{dim, T}}}}
-    dNdξ::Vector{Vector{Vector{Vec{dim, T}}}}
-    detJdV::Vector{Vector{T}}
+    N::Array{T, 3}
+    dNdx::Array{Vec{dim, T}, 3}
+    dNdξ::Array{Vec{dim, T}, 3}
+    detJdV::Matrix{T}
     quad_rule::Vector{QuadratureRule{dim, shape, T}}
     function_space::FS
-    M::Vector{Vector{Vector{T}}}
-    dMdξ::Vector{Vector{Vector{Vec{dim, T}}}}
+    M::Array{T, 3}
+    dMdξ::Array{Vec{dim, T}, 3}
     geometric_space::GS
     current_boundary::Ref{Int}
 end
@@ -58,23 +58,23 @@ function FEBoundaryValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpace, s
 
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(func_space)
-    N =    [[zeros(T, n_func_basefuncs) for i in 1:n_qpoints]                      for k in 1:n_bounds]
-    dNdx = [[[zero(Vec{dim, T}) for i in 1:n_func_basefuncs] for j in 1:n_qpoints] for k in 1:n_bounds]
-    dNdξ = [[[zero(Vec{dim, T}) for i in 1:n_func_basefuncs] for j in 1:n_qpoints] for k in 1:n_bounds]
+    N =    zeros(T, n_func_basefuncs, n_qpoints, n_bounds)
+    dNdx = zeros(Vec{dim, T}, n_func_basefuncs, n_qpoints, n_bounds)
+    dNdξ = zeros(Vec{dim, T}, n_func_basefuncs, n_qpoints, n_bounds)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geom_space)
-    M =    [[zeros(T, n_geom_basefuncs) for i in 1:n_qpoints]                      for k in 1:n_bounds]
-    dMdξ = [[[zero(Vec{dim, T}) for i in 1:n_geom_basefuncs] for j in 1:n_qpoints] for k in 1:n_bounds]
+    M =    zeros(T, n_geom_basefuncs, n_qpoints, n_bounds)
+    dMdξ = zeros(Vec{dim, T}, n_geom_basefuncs, n_qpoints, n_bounds)
 
     for k in 1:n_bounds, (i, ξ) in enumerate(boundary_quad_rule[k].points)
-        value!(func_space, N[k][i], ξ)
-        derivative!(func_space, dNdξ[k][i], ξ)
-        value!(geom_space, M[k][i], ξ)
-        derivative!(geom_space, dMdξ[k][i], ξ)
+        value!(func_space, view(N, :, i, k), ξ)
+        derivative!(func_space, view(dNdξ, :, i, k), ξ)
+        value!(geom_space, view(M, :, i, k), ξ)
+        derivative!(geom_space, view(dMdξ, :, i, k), ξ)
     end
 
-    detJdV = [zeros(T, n_qpoints) for i in 1:n_bounds]
+    detJdV = zeros(T, n_qpoints, n_bounds)
 
     FEBoundaryValues(N, dNdx, dNdξ, detJdV, boundary_quad_rule, func_space, M, dMdξ, geom_space, Ref(0))
 end
@@ -111,15 +111,15 @@ function reinit!{dim, T}(fe_bv::FEBoundaryValues{dim}, x::Vector{Vec{dim, T}}, b
         w = getweights(fe_bv.quad_rule[cb])[i]
         febv_J = zero(Tensor{2, dim})
         for j in 1:n_geom_basefuncs
-            febv_J += fe_bv.dMdξ[cb][i][j] ⊗ x[j]
+            febv_J += fe_bv.dMdξ[j, i, cb] ⊗ x[j]
         end
         Jinv = inv(febv_J)
         for j in 1:n_func_basefuncs
-            fe_bv.dNdx[cb][i][j] = Jinv ⋅ fe_bv.dNdξ[cb][i][j]
+            fe_bv.dNdx[j, i, cb] = Jinv ⋅ fe_bv.dNdξ[j, i, cb]
         end
         detJ = detJ_boundary(febv_J, getgeometricspace(fe_bv), cb)
         detJ <= 0.0 && throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
-        fe_bv.detJdV[cb][i] = detJ * w
+        fe_bv.detJdV[i, cb] = detJ * w
     end
 end
 

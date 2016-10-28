@@ -42,12 +42,12 @@ function derivative{dim, T}(fs::FunctionSpace{dim}, ξ::Vec{dim, T})
     derivative!(fs, [zero(Tensor{1, dim, T}) for i in 1:getnbasefunctions(fs)], ξ)
 end
 
-@inline function checkdim_value{dim}(fs::FunctionSpace{dim}, N::Vector, ξ::Vec{dim})
+@inline function checkdim_value{dim}(fs::FunctionSpace{dim}, N::AbstractVector, ξ::Vec{dim})
     n_base = getnbasefunctions(fs)
     length(N) == n_base || throw(ArgumentError("N must have length $(n_base)"))
 end
 
-@inline function checkdim_derivative{dim, T}(fs::FunctionSpace{dim}, dN::Vector{Vec{dim, T}}, ξ::Vec{dim, T})
+@inline function checkdim_derivative{dim, T}(fs::FunctionSpace{dim}, dN::AbstractVector{Vec{dim, T}}, ξ::Vec{dim, T})
     n_base = getnbasefunctions(fs)
     length(dN) == n_base || throw(ArgumentError("dN must have length $(n_base)"))
 end
@@ -74,7 +74,7 @@ getnbasefunctions(::Lagrange{1, RefCube, 1}) = 2
 getnboundarynodes(::Lagrange{1, RefCube, 1}) = 1
 getboundarylist(::Lagrange{1, RefCube, 1}) = ((1,),(2,))
 
-function value!(fs::Lagrange{1, RefCube, 1}, N::Vector, ξ::Vec{1})
+function value!(fs::Lagrange{1, RefCube, 1}, N::AbstractVector, ξ::Vec{1})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -87,7 +87,7 @@ function value!(fs::Lagrange{1, RefCube, 1}, N::Vector, ξ::Vec{1})
     return N
 end
 
-function derivative!{T}(fs::Lagrange{1, RefCube, 1}, dN::Vector{Vec{1, T}}, ξ::Vec{1, T})
+function derivative!{T}(fs::Lagrange{1, RefCube, 1}, dN::AbstractVector{Vec{1, T}}, ξ::Vec{1, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -105,7 +105,7 @@ getnbasefunctions(::Lagrange{1, RefCube, 2}) = 3
 getnboundarynodes(::Lagrange{1, RefCube, 2}) = 1
 getboundarylist(::Lagrange{1, RefCube, 2}) = ((1,),(2,))
 
-function value!(fs::Lagrange{1, RefCube, 2}, N::Vector, ξ::Vec{1})
+function value!(fs::Lagrange{1, RefCube, 2}, N::AbstractVector, ξ::Vec{1})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -119,7 +119,7 @@ function value!(fs::Lagrange{1, RefCube, 2}, N::Vector, ξ::Vec{1})
     return N
 end
 
-function derivative!{T}(fs::Lagrange{1, RefCube, 2}, dN::Vector{Vec{1, T}}, ξ::Vec{1, T})
+function derivative!{T}(fs::Lagrange{1, RefCube, 2}, dN::AbstractVector{Vec{1, T}}, ξ::Vec{1, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -140,7 +140,7 @@ getnbasefunctions(::Lagrange{2, RefCube, 1}) = 4
 getnboundarynodes(::Lagrange{2, RefCube, 1}) = 2
 getboundarylist(::Lagrange{2, RefCube, 1}) = ((1,2),(2,3),(3,4),(1,4))
 
-function value!(fs::Lagrange{2, RefCube, 1}, N::Vector, ξ::Vec{2})
+function value!(fs::Lagrange{2, RefCube, 1}, N::AbstractVector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -156,7 +156,7 @@ function value!(fs::Lagrange{2, RefCube, 1}, N::Vector, ξ::Vec{2})
     return N
 end
 
-function derivative!{T}(fs::Lagrange{2, RefCube, 1}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
+function derivative!{T}(fs::Lagrange{2, RefCube, 1}, dN::AbstractVector{Vec{2, T}}, ξ::Vec{2, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -186,7 +186,7 @@ getnbasefunctions(::Lagrange{2, RefCube, 2}) = 9
 getnboundarynodes(::Lagrange{2, RefCube, 2}) = 3
 getboundarylist(::Lagrange{2, RefCube, 2}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
 
-function value!(fs::Lagrange{2, RefCube, 2}, N::Vector, ξ::Vec{2})
+function value!(fs::Lagrange{2, RefCube, 2}, N::AbstractVector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -207,7 +207,7 @@ function value!(fs::Lagrange{2, RefCube, 2}, N::Vector, ξ::Vec{2})
     return N
 end
 
-function derivative!{T}(fs::Lagrange{2, RefCube, 2}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
+function derivative!{T}(fs::Lagrange{2, RefCube, 2}, dN::AbstractVector{Vec{2, T}}, ξ::Vec{2, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -253,7 +253,7 @@ getlowerdim{order}(::Lagrange{2, RefTetrahedron, order}) = Lagrange{1, RefCube, 
 getnboundarynodes(::Lagrange{2, RefTetrahedron, 1}) = 2
 getboundarylist(::Lagrange{2, RefTetrahedron, 1}) = ((1,2),(2,3),(1,3))
 
-function value!(fs::Lagrange{2, RefTetrahedron, 1}, N::Vector, ξ::Vec{2})
+function value!(fs::Lagrange{2, RefTetrahedron, 1}, N::AbstractVector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -268,7 +268,7 @@ function value!(fs::Lagrange{2, RefTetrahedron, 1}, N::Vector, ξ::Vec{2})
     return N
 end
 
-function derivative!{T}(fs::Lagrange{2, RefTetrahedron, 1}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
+function derivative!{T}(fs::Lagrange{2, RefTetrahedron, 1}, dN::AbstractVector{Vec{2, T}}, ξ::Vec{2, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -287,7 +287,7 @@ getnbasefunctions(::Lagrange{2, RefTetrahedron, 2}) = 6
 getnboundarynodes(::Lagrange{2, RefTetrahedron, 2}) = 3
 getboundarylist(::Lagrange{2, RefTetrahedron, 2}) = ((1,2,4),(2,3,5),(1,3,6))
 
-function value!(fs::Lagrange{2, RefTetrahedron, 2}, N::Vector, ξ::Vec{2})
+function value!(fs::Lagrange{2, RefTetrahedron, 2}, N::AbstractVector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -307,7 +307,7 @@ function value!(fs::Lagrange{2, RefTetrahedron, 2}, N::Vector, ξ::Vec{2})
     return N
 end
 
-function derivative!{T}(fs::Lagrange{2, RefTetrahedron, 2}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
+function derivative!{T}(fs::Lagrange{2, RefTetrahedron, 2}, dN::AbstractVector{Vec{2, T}}, ξ::Vec{2, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -335,7 +335,7 @@ getnbasefunctions(::Lagrange{3, RefTetrahedron, 1}) = 4
 getnboundarynodes(::Lagrange{3, RefTetrahedron, 1}) = 3
 getboundarylist(::Lagrange{3, RefTetrahedron, 1}) = ((1,2,4),(1,3,4),(1,2,3),(2,3,4))
 
-function value!(fs::Lagrange{3, RefTetrahedron, 1}, N::Vector, ξ::Vec{3})
+function value!(fs::Lagrange{3, RefTetrahedron, 1}, N::AbstractVector, ξ::Vec{3})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -352,7 +352,7 @@ function value!(fs::Lagrange{3, RefTetrahedron, 1}, N::Vector, ξ::Vec{3})
     return N
 end
 
-function derivative!{T}(fs::Lagrange{3, RefTetrahedron, 1}, dN::Vector{Vec{3, T}}, ξ::Vec{3, T})
+function derivative!{T}(fs::Lagrange{3, RefTetrahedron, 1}, dN::AbstractVector{Vec{3, T}}, ξ::Vec{3, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -372,7 +372,7 @@ getnbasefunctions(::Lagrange{3, RefCube, 1}) = 8
 getnboundarynodes(::Lagrange{3, RefCube, 1}) = 4
 getboundarylist(::Lagrange{3, RefCube, 1}) = ((1,2,3,4),(1,2,5,6),(2,3,6,7),(3,4,7,8),(1,4,5,8),(5,6,7,8))
 
-function value!(fs::Lagrange{3, RefCube, 1}, N::Vector, ξ::Vec{3})
+function value!(fs::Lagrange{3, RefCube, 1}, N::AbstractVector, ξ::Vec{3})
     checkdim_value(fs, N, ξ)
 
     @inbounds begin
@@ -393,7 +393,7 @@ function value!(fs::Lagrange{3, RefCube, 1}, N::Vector, ξ::Vec{3})
     return N
 end
 
-function derivative!{T}(fs::Lagrange{3, RefCube, 1}, dN::Vector{Vec{3, T}}, ξ::Vec{3, T})
+function derivative!{T}(fs::Lagrange{3, RefCube, 1}, dN::AbstractVector{Vec{3, T}}, ξ::Vec{3, T})
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
@@ -428,7 +428,7 @@ getlowerorder(::Serendipity{2, RefCube, 2}) = Lagrange{2, RefCube, 1}()
 getnboundarynodes(::Serendipity{2, RefCube, 2}) = 3
 getboundarylist(::Serendipity{2, RefCube, 2}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
 
-function value!(fs::Serendipity{2, RefCube, 2}, N::Vector, ξ::Vec{2})
+function value!(fs::Serendipity{2, RefCube, 2}, N::AbstractVector, ξ::Vec{2})
     checkdim_value(fs, N, ξ)
 
     ξ_x = ξ[1]
@@ -447,7 +447,7 @@ function value!(fs::Serendipity{2, RefCube, 2}, N::Vector, ξ::Vec{2})
     return N
 end
 
-function derivative!{T}(fs::Serendipity{2, RefCube, 2}, dN::Vector{Vec{2, T}}, ξ::Vec{2, T})
+function derivative!{T}(fs::Serendipity{2, RefCube, 2}, dN::AbstractVector{Vec{2, T}}, ξ::Vec{2, T})
     checkdim_derivative(fs, dN, ξ)
 
     ξ_x = ξ[1]
