@@ -71,14 +71,8 @@ This value is typically used when one integrates a function on a finite element 
 ``\\int\\limits_\\Gamma f(\\mathbf{x}) d \\Gamma \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 
 """
-<<<<<<< HEAD
 @inline getdetJdV(fe_cv::AbstractFECellValues, q_point::Int) = fe_cv.detJdV[q_point]
 @inline getdetJdV(fe_bv::FEBoundaryValues, q_point::Int) = fe_bv.detJdV[q_point, fe_bv.current_boundary[]]
-
-=======
-@inline getdetJdV(fe_cv::FECellValues, q_point::Int) = fe_cv.detJdV[q_point]
-@inline getdetJdV(fe_bv::FEBoundaryValues, q_point::Int) = fe_bv.detJdV[fe_bv.current_boundary[]][q_point]
->>>>>>> add and export symmetric_shape_gradient
 
 """
 Computes the value of the shape function
@@ -94,21 +88,15 @@ Gets the values of the shape function for a given quadrature point and base_func
 @inline geometric_value(fe_cv::AbstractFECellValues, q_point::Int, base_func::Int) = fe_cv.M[base_func, q_point]
 @inline geometric_value(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.M[base_func, q_point, fe_bv.current_boundary[]]
 
-"""
-Get the gradients of the shape functions for a given quadrature point
-"""
-@inline shape_gradient(fe_cv::FECellValues, q_point::Int) = fe_cv.dNdx[q_point]
-@inline shape_gradient(fe_bv::FEBoundaryValues, q_point::Int) = fe_bv.dNdx[fe_bv.current_boundary[]][q_point]
 
 
 """
 Get the gradient of the shape functions for a given quadrature point and base function
 """
-@inline shape_gradient(fe_cv::AbstractFECellValues, q_point::Int, base_func::Int)     = fe_cv.dNdx[q_point][base_func]
-@inline shape_symmetric_gradient(fe_cv::AbstractFECellValues, q_point::Int, base_func::Int)     = symmetric(shape_gradient(fe_cv, q_point, base_func))
-@inline shape_gradient(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.dNdx[fe_bv.current_boundary[]][q_point][base_func]
-@inline shape_symmetric_gradient(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(fe_bv, q_point, base_func))
-
+@inline           shape_gradient(fe_cv::AbstractFECellValues, q_point::Int, base_func::Int)     = fe_cv.dNdx[base_func, q_point]
+@inline symmetric_shape_gradient(fe_cv::AbstractFECellValues, q_point::Int, base_func::Int)     = symmetric(shape_gradient(fe_cv, q_point, base_func))
+@inline           shape_gradient(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.dNdx[base_func, q_point, fe_bv.current_boundary[]]
+@inline symmetric_shape_gradient(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(fe_bv, q_point, base_func))
 const shape_derivative = shape_gradient
 
 """
