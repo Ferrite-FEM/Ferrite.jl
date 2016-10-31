@@ -1,4 +1,4 @@
-immutable FEVectorCellValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape, M} <: AbstractFECellValues{dim, T, FS, GS}
+immutable FECellVectorValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape, M} <: AbstractFECellValues{dim, T, FS, GS}
     N::Matrix{Vec{dim, T}}
     dNdx::Matrix{Tensor{2, dim, T, M}}
     dNdξ::Matrix{Tensor{2, dim, T, M}}
@@ -10,9 +10,9 @@ immutable FEVectorCellValues{dim, T <: Real, FS <: FunctionSpace, GS <: Function
     geometric_space::GS
 end
 
-FEVectorCellValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FEVectorCellValues(Float64, quad_rule, func_space, geom_space)
+FECellVectorValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FECellVectorValues(Float64, quad_rule, func_space, geom_space)
 
-function FEVectorCellValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_space::FS, geom_space::GS=func_space)
+function FECellVectorValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_space::FS, geom_space::GS=func_space)
     @assert getdim(func_space) == getdim(geom_space)
     @assert getrefshape(func_space) == getrefshape(geom_space) == shape
     n_qpoints = length(getweights(quad_rule))
@@ -50,6 +50,6 @@ function FEVectorCellValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, sh
         derivative!(geom_space, view(dMdξ, :, i), ξ)
     end
     detJdV = zeros(T, n_qpoints)
-    FEVectorCellValues(N, dNdx, dNdξ, detJdV, quad_rule, func_space, M, dMdξ, geom_space)
+    FECellVectorValues(N, dNdx, dNdξ, detJdV, quad_rule, func_space, M, dMdξ, geom_space)
 end
 

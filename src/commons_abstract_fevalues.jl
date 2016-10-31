@@ -93,10 +93,9 @@ Gets the values of the shape function for a given quadrature point and base_func
 """
 Get the gradient of the shape functions for a given quadrature point and base function
 """
-@inline           shape_gradient(fe_cv::AbstractFECellValues, q_point::Int, base_func::Int)     = fe_cv.dNdx[base_func, q_point]
-@inline symmetric_shape_gradient(fe_cv::AbstractFECellValues, q_point::Int, base_func::Int)     = symmetric(shape_gradient(fe_cv, q_point, base_func))
-@inline           shape_gradient(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.dNdx[base_func, q_point, fe_bv.current_boundary[]]
-@inline symmetric_shape_gradient(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(fe_bv, q_point, base_func))
+@inline shape_gradient(fe_cv::AbstractFECellValues, q_point::Int, base_func::Int) = fe_cv.dNdx[base_func, q_point]
+@inline shape_gradient(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.dNdx[base_func, q_point, fe_bv.current_boundary[]]
+@inline shape_symmetric_gradient(fe_cv::FECellVectorValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(fe_cv, q_point, base_func))
 const shape_derivative = shape_gradient
 
 """
@@ -130,7 +129,7 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
 nodal values of ``\\mathbf{u}``.
 """
-@inline function function_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
+function function_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
     n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
     s = zero(T)
@@ -140,12 +139,26 @@ nodal values of ``\\mathbf{u}``.
     return s
 end
 
-@inline function function_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
+function function_value{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
     vec = zero(Vec{dim, T})
     @inbounds for i in 1:n_base_funcs
         vec += shape_value(fe_v, q_point, i) * u[i]
+    end
+    return vec
+end
+
+function function_value{dim, T}(fe_v::FECellVectorValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
+    n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
+    @assert length(u) == n_base_funcs
+    vec = zero(Vec{dim, T})
+    basefunc = 1
+    @inbounds for i in 1:n_base_funcs
+        for j in 1:dim
+            vec += shape_value(fe_v, q_point, basefunc) * u[i][j]
+            basefunc += 1
+        end
     end
     return vec
 end
@@ -176,7 +189,7 @@ For a vector valued function the gradient is computed as
 ``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x}) \\otimes \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
-@inline function function_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
+function function_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{T})
     n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
     grad = zero(Vec{dim, T})
@@ -186,7 +199,7 @@ where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
     return grad
 end
 
-@inline function function_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
+function function_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
     grad = zero(Tensor{2, dim, T})
@@ -195,6 +208,21 @@ end
     end
     return grad
 end
+
+function function_gradient{dim, T}(fe_v::FECellVectorValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
+    n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
+    @assert length(u) == n_base_funcs
+    grad = zero(Tensor{2, dim, T})
+    basefunc_count = 1
+    @inbounds for i in 1:n_base_funcs
+        for j in 1:dim
+            grad += u[i][j] * shape_gradient(fe_v, q_point, basefunc_count)
+            basefunc_count += 1
+        end
+    end
+    return grad
+end
+    
 
 const function_derivative = function_gradient
 
@@ -221,7 +249,7 @@ The symmetric gradient of a scalar function is computed as
 
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-@inline function function_symmetric_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
+function function_symmetric_gradient{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     grad = function_gradient(fe_v, q_point, u)
     return symmetric(grad)
 end
@@ -250,7 +278,7 @@ The divergence of a vector valued functions in the quadrature point ``\\mathbf{x
 
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-@inline function function_divergence{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
+function function_divergence{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
     @assert length(u) == n_base_funcs
     diverg = zero(T)
@@ -259,6 +287,7 @@ where ``\\mathbf{u}_i`` are the nodal values of the function.
     end
     return diverg
 end
+
 
 """
     spatial_coordinate{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, x::Vector{Vec{dim, T}})
@@ -279,7 +308,7 @@ Computes the spatial coordinate in a quadrature point.
 
 The coordinate is computed, using the geometric interpolation space, as ``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{x}) \\mathbf{\\hat{x}}_i``
 """
-@inline function spatial_coordinate{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, x::Vector{Vec{dim, T}})
+function spatial_coordinate{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, x::Vector{Vec{dim, T}})
     n_base_funcs = getnbasefunctions(getgeometricspace(fe_v))
     @assert length(x) == n_base_funcs
     vec = zero(Vec{dim, T})

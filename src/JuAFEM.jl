@@ -14,7 +14,7 @@ import WriteVTK: vtk_grid
 
 export start_assemble, assemble!, end_assemble
 
-export FECellValues, FEVectorCellValues
+export FECellValues, FECellVectorValues
 
 export reinit!, shape_value, shape_gradient, symmetric_shape_gradient, shape_divergence, getdetJdV, getquadrule, getfunctionspace, getgeometricspace,
        function_value, function_gradient, function_symmetric_gradient, function_divergence, spatial_coordinate
@@ -43,7 +43,7 @@ abstract AbstractFECellValues{dim, T, FS, GS} <: AbstractFEValues{dim, T, FS, GS
 include("function_spaces.jl")
 include("quadrature.jl")
 include("fe_cell_values.jl")
-include("fe_vector_cell_values.jl")
+include("fe_cell_vector_values.jl")
 include("fe_boundary_values.jl")
 include("commons_abstract_fevalues.jl")
 include("assembler.jl")

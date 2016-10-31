@@ -98,7 +98,7 @@ function reinit!{dim, T}(fe_cv::AbstractFECellValues{dim}, x::Vector{Vec{dim, T}
     n_geom_basefuncs = getnbasefunctions(getgeometricspace(fe_cv))
     n_func_basefuncs = getnbasefunctions(getfunctionspace(fe_cv))
     @assert length(x) == n_geom_basefuncs
-    isa(fe_cv, FEVectorCellValues) && (n_func_basefuncs *= dim)
+    isa(fe_cv, FECellVectorValues) && (n_func_basefuncs *= dim)
 
     @inbounds for i in 1:length(getpoints(fe_cv.quad_rule))
         w = getweights(fe_cv.quad_rule)[i]
