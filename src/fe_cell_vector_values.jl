@@ -41,7 +41,7 @@ function FECellVectorValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, sh
                 N[basefunc_count, i] = Vec{dim, T}((N_comp...))
 
                 dN_comp = zeros(T, dim, dim)
-                dN_comp[:, comp] = dNdξ_temp[basefunc]
+                dN_comp[comp, :] = dNdξ_temp[basefunc]
                 dNdξ[basefunc_count, i] = Tensor{2, dim, T}((dN_comp...))
                 basefunc_count += 1
             end

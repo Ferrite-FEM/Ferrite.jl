@@ -104,11 +104,11 @@ function reinit!{dim, T}(fe_cv::AbstractFECellValues{dim}, x::Vector{Vec{dim, T}
         w = getweights(fe_cv.quad_rule)[i]
         fecv_J = zero(Tensor{2, dim})
         for j in 1:n_geom_basefuncs
-            fecv_J += fe_cv.dMdξ[j, i] ⊗ x[j]
+            fecv_J += x[j] ⊗ fe_cv.dMdξ[j, i]
         end
         Jinv = inv(fecv_J)
         for j in 1:n_func_basefuncs
-            fe_cv.dNdx[j,i] = Jinv ⋅ fe_cv.dNdξ[j, i]
+            fe_cv.dNdx[j,i] = fe_cv.dNdξ[j, i] ⋅ Jinv
         end
         detJ = det(fecv_J)
         detJ <= 0.0 && throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))

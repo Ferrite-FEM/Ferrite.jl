@@ -15,6 +15,7 @@ The quadrature rule for the `AbstractFEValues` type.
 
 """
 getquadrule(fe_cv::FECellValues) = fe_cv.quad_rule
+getquadrule(fe_cv::FECellVectorValues) = fe_cv.quad_rule
 getquadrule(fe_bv::FEBoundaryValues) = fe_bv.quad_rule[fe_bv.current_boundary[]]
 
 """
@@ -222,7 +223,7 @@ function function_gradient{dim, T}(fe_v::FECellVectorValues{dim}, q_point::Int, 
     end
     return grad
 end
-    
+
 
 const function_derivative = function_gradient
 
@@ -284,6 +285,23 @@ function function_divergence{dim, T}(fe_v::AbstractFEValues{dim}, q_point::Int, 
     diverg = zero(T)
     @inbounds for i in 1:n_base_funcs
         diverg += shape_gradient(fe_v, q_point, i) ⋅ u[i]
+    end
+    return diverg
+end
+
+function function_divergence{dim, T}(fe_v::FECellVectorValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
+    n_base_funcs = getnbasefunctions(getfunctionspace(fe_v))
+    @assert length(u) == n_base_funcs
+    diverg = zero(T)
+    basefunc_count = 1
+    @inbounds for i in 1:n_base_funcs
+        for j in 1:dim
+            grad = shape_gradient(fe_v, q_point, basefunc_count)
+            basefunc_count += 1
+            for k in 1:dim
+                diverg += grad[k, k] * u[i][j]
+            end
+        end
     end
     return diverg
 end

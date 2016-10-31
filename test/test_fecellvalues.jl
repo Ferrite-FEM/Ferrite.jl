@@ -9,7 +9,7 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
                                      (Serendipity{2, RefCube, 2}(), QuadratureRule{2, RefCube}(2)),
                                      (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{3, RefTetrahedron}(2)))
 
-    
+
     for fe_valtype in (FECellValues, FECellVectorValues)
         fe_cv = fe_valtype(quad_rule, function_space)
         ndim = getdim(function_space)
