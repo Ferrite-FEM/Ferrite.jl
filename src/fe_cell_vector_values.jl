@@ -11,6 +11,7 @@ immutable FECellVectorValues{dim, T <: Real, FS <: FunctionSpace, GS <: Function
 end
 
 FECellVectorValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FECellVectorValues(Float64, quad_rule, func_space, geom_space)
+getnbasefunctions(fe_cvv::FECellVectorValues) = getnbasefunctions(fe_cvv.function_space) * dim
 
 function FECellVectorValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_space::FS, geom_space::GS=func_space)
     @assert getdim(func_space) == getdim(geom_space)
