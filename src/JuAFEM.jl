@@ -16,7 +16,7 @@ export start_assemble, assemble!, end_assemble
 
 export FECellValues, FECellVectorValues
 
-export reinit!, shape_value, shape_gradient, symmetric_shape_gradient, shape_divergence, getdetJdV, getquadrule, getfunctionspace, getgeometricspace,
+export reinit!, shape_value, shape_gradient, shape_symmetric_gradient, shape_divergence, getdetJdV, getquadrule, getfunctionspace, getgeometricspace,
        function_value, function_gradient, function_symmetric_gradient, function_divergence, spatial_coordinate
 export FEBoundaryValues, getboundarynumber
 export FunctionSpace, getdim, getrefshape, getorder, getnbasefunctions
