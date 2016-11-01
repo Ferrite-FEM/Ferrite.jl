@@ -8,7 +8,8 @@ export Line, QuadraticLine,
 
 # Grid utilities
 export getcells, getncells, getnodes, getnnodes, getcelltype,
-       getcellset, getnodeset, getcellboundaryset, getcoordinates
+       getcellset,  getnodeset, getcellboundaryset, getcoordinates,
+       getcellsets, getnodesets, getcellboundarysets
 
 #########################
 # Main types for meshes #
@@ -102,8 +103,14 @@ end
 @inline getnboundaries(grid::Grid) = length(grid.cellboundaries)
 
 @inline getcellset(grid::Grid, set::String) = grid.cellsets[set]
+@inline getcellsets(grid::Grid) = grid.cellsets
+
 @inline getnodeset(grid::Grid, set::String) = grid.nodesets[set]
+@inline getnodesets(grid::Grid) = grid.nodesets
+
 @inline getcellboundaryset(grid::Grid, set::String) = grid.cellboundarysets[set]
+@inline getcellboundarysets(grid::Grid) = grid.cellboundarysets
+
 
 function addcellset!(grid::Grid, name::String, cellid::Vector{Int})
     haskey(grid.cellsets, name) && throw(ArgumentError("There already exists a cellset with the name: $name"))
