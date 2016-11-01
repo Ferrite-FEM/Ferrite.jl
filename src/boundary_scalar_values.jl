@@ -1,10 +1,10 @@
 """
-An `FEBoundaryValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
+A `BoundaryScalarValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
 values of nodal functions, gradients and divergences of nodal functions etc. on the finite element boundary
 
 **Constructor**
 
-    FEBoundaryValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
+    BoundaryScalarValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
 
 
 **Arguments**
@@ -12,7 +12,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 * `T` an optional argument to determine the type the internal data is stored as.
 * `quad_rule` an instance of a [`QuadratureRule`](@ref)
 * `function_space` an instance of a [`FunctionSpace`](@ref) used to interpolate the approximated function
-* `geometric_space` an optional instance of a [`FunctionSpace`](@ref) which is used to interpolate the geometry 
+* `geometric_space` an optional instance of a [`FunctionSpace`](@ref) which is used to interpolate the geometry
 
 ** Common methods**
 
@@ -32,7 +32,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
 """
-immutable FEBoundaryValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape} <: AbstractFEValues{dim, T, FS, GS}
+immutable BoundaryScalarValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape} <: BoundaryValues{dim, T, FS, GS}
     N::Array{T, 3}
     dNdx::Array{Vec{dim, T}, 3}
     dNdξ::Array{Vec{dim, T}, 3}
@@ -45,9 +45,11 @@ immutable FEBoundaryValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSp
     current_boundary::Ref{Int}
 end
 
-FEBoundaryValues{dim_qr, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim_qr}, func_space::FS, geom_space::GS=func_space) = FEBoundaryValues(Float64, quad_rule, func_space, geom_space)
+BoundaryScalarValues{dim_qr, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim_qr}, func_space::FS, geom_space::GS=func_space) =
+    BoundaryScalarValues(Float64, quad_rule, func_space, geom_space)
 
-function FEBoundaryValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim_qr, shape}, func_space::FS, geom_space::GS=func_space)
+function BoundaryScalarValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape}(
+                        ::Type{T}, quad_rule::QuadratureRule{dim_qr, shape}, func_space::FS, geom_space::GS=func_space)
     @assert getdim(func_space) == getdim(geom_space)
     @assert getrefshape(func_space) == getrefshape(geom_space) == shape
     n_qpoints = length(getweights(quad_rule))
@@ -76,17 +78,17 @@ function FEBoundaryValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpace, s
 
     detJdV = zeros(T, n_qpoints, n_bounds)
 
-    FEBoundaryValues(N, dNdx, dNdξ, detJdV, boundary_quad_rule, func_space, M, dMdξ, geom_space, Ref(0))
+    BoundaryScalarValues(N, dNdx, dNdξ, detJdV, boundary_quad_rule, func_space, M, dMdξ, geom_space, Ref(0))
 end
 
 """
-Updates the `FEBoundaryValues` object for a given boundary
+Updates the `BoundaryScalarValues` object for a given boundary
 
-    reinit!{dim, T}(fe_bv::FEBoundaryValues{dim}, x::Vector{Vec{dim, T}}, boundary::Int)
+    reinit!{dim, T}(bv::BoundaryScalarValues{dim}, x::Vector{Vec{dim, T}}, boundary::Int)
 
 ** Arguments **
 
-* `fe_bv`: the `FEBoundaryValues` object
+* `bv`: the `BoundaryScalarValues` object
 * `x`: A `Vector` of `Vec`, one for each nodal position in the element.
 * `boundary`: The boundary number for the element
 
@@ -99,48 +101,48 @@ Updates the `FEBoundaryValues` object for a given boundary
 
 
 """
-function reinit!{dim, T}(fe_bv::FEBoundaryValues{dim}, x::Vector{Vec{dim, T}}, boundary::Int)
-    n_geom_basefuncs = getnbasefunctions(getgeometricspace(fe_bv))
-    n_func_basefuncs = getnbasefunctions(getfunctionspace(fe_bv))
+function reinit!{dim, T}(bv::BoundaryScalarValues{dim}, x::Vector{Vec{dim, T}}, boundary::Int)
+    n_geom_basefuncs = getnbasefunctions(getgeometricspace(bv))
+    n_func_basefuncs = getnbasefunctions(getfunctionspace(bv))
     @assert length(x) == n_geom_basefuncs
 
-    fe_bv.current_boundary[] = boundary
-    cb = getcurrentboundary(fe_bv)
+    bv.current_boundary[] = boundary
+    cb = getcurrentboundary(bv)
 
-    for i in 1:length(getpoints(fe_bv.quad_rule[cb]))
-        w = getweights(fe_bv.quad_rule[cb])[i]
+    for i in 1:length(getpoints(bv.quad_rule[cb]))
+        w = getweights(bv.quad_rule[cb])[i]
         febv_J = zero(Tensor{2, dim})
         for j in 1:n_geom_basefuncs
-            febv_J += fe_bv.dMdξ[j, i, cb] ⊗ x[j]
+            febv_J += bv.dMdξ[j, i, cb] ⊗ x[j]
         end
         Jinv = inv(febv_J)
         for j in 1:n_func_basefuncs
-            fe_bv.dNdx[j, i, cb] = Jinv ⋅ fe_bv.dNdξ[j, i, cb]
+            bv.dNdx[j, i, cb] = Jinv ⋅ bv.dNdξ[j, i, cb]
         end
-        detJ = detJ_boundary(febv_J, getgeometricspace(fe_bv), cb)
+        detJ = detJ_boundary(febv_J, getgeometricspace(bv), cb)
         detJ <= 0.0 && throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
-        fe_bv.detJdV[i, cb] = detJ * w
+        bv.detJdV[i, cb] = detJ * w
     end
 end
 
 """
-The current active boundary of the `FEBoundaryValues` type.
+The current active boundary of the `BoundaryScalarValues` type.
 
-    getcurrentboundary(fe_bv::FEBoundaryValues)
+    getcurrentboundary(bv::BoundaryScalarValues)
 
 ** Arguments **
 
-* `fe_boundary_values`: the `FEBoundaryValues` object
+* `fe_boundary_values`: the `BoundaryScalarValues` object
 
 ** Results **
 
 * `::Int`: the current active boundary (from last `reinit!`).
 
 """
-getcurrentboundary(fe_bv::FEBoundaryValues) = fe_bv.current_boundary[]
+getcurrentboundary(bv::BoundaryScalarValues) = bv.current_boundary[]
 """
 The boundary number for a cell, typically used to get the boundary number which is needed
-to `reinit!` a `FEBoundaryValues` object for  boundary integration
+to `reinit!` a `BoundaryScalarValues` object for  boundary integration
 
     getboundarynumber(boundary_nodes, cell_nodes, fs::FunctionSpace)
 

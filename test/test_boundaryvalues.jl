@@ -1,4 +1,4 @@
-@testset "FEBoundaryValues" begin
+@testset "BoundaryCellValues" begin
 for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{0, RefCube}(2)),
                                      (Lagrange{1, RefCube, 2}(), QuadratureRule{0, RefCube}(2)),
                                      (Lagrange{2, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
@@ -9,16 +9,16 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
                                      (Serendipity{2, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
                                      (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2)))
 
-    fe_bv = FEBoundaryValues(quad_rule, function_space)
+    bv = BoundaryScalarValues(quad_rule, function_space)
     ndim = getdim(function_space)
     n_basefuncs = getnbasefunctions(function_space)
 
     x = valid_coordinates(function_space)
     boundary_nodes, cell_nodes = topology_test_nodes(function_space)
     for boundary in 1:JuAFEM.getnboundaries(function_space)
-        reinit!(fe_bv, x, boundary)
-        boundary_quad_rule = getquadrule(fe_bv)
-        @test JuAFEM.getcurrentboundary(fe_bv) == boundary
+        reinit!(bv, x, boundary)
+        boundary_quad_rule = getquadrule(bv)
+        @test JuAFEM.getcurrentboundary(bv) == boundary
 
         # We test this by applying a given deformation gradient on all the nodes.
         # Since this is a linear deformation we should get back the exact values
@@ -33,38 +33,38 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
         end
 
         for i in 1:length(getpoints(boundary_quad_rule))
-            @test function_gradient(fe_bv, i, u) ≈ H
-            @test function_symmetric_gradient(fe_bv, i, u) ≈ 0.5(H + H')
-            @test function_divergence(fe_bv, i, u) ≈ trace(H)
-            @test function_gradient(fe_bv, i, u_scal) ≈ V
-            function_value(fe_bv, i, u_scal)
-            function_value(fe_bv, i, u)
+            @test function_gradient(bv, i, u) ≈ H
+            @test function_symmetric_gradient(bv, i, u) ≈ 0.5(H + H')
+            @test function_divergence(bv, i, u) ≈ trace(H)
+            @test function_gradient(bv, i, u_scal) ≈ V
+            function_value(bv, i, u_scal)
+            function_value(bv, i, u)
         end
 
         # Test of volume
         vol = 0.0
-        for i in 1:length(getpoints(boundary_quad_rule))
-            vol += getdetJdV(fe_bv,i)
+        for i in 1:getnquadpoints(bv)
+            vol += getdetJdV(bv,i)
         end
         x_boundary = x[[JuAFEM.getboundarylist(function_space)[boundary]...]]
         @test vol ≈ calculate_volume(JuAFEM.getlowerdim(function_space), x_boundary)
 
         # Test of utility functions
-        @test getfunctionspace(fe_bv) == function_space
-        @test getgeometricspace(fe_bv) == function_space
+        @test getfunctionspace(bv) == function_space
+        @test getgeometricspace(bv) == function_space
 
         # Test quadrature rule after reinit! with ref. coords
         x = reference_coordinates(function_space)
-        reinit!(fe_bv, x, boundary)
+        reinit!(bv, x, boundary)
         vol = 0.0
-        for i in 1:length(getpoints(boundary_quad_rule))
-            vol += getdetJdV(fe_bv, i)
+        for i in 1:getnquadpoints(bv)
+            vol += getdetJdV(bv, i)
         end
         @test vol ≈ reference_volume(function_space, boundary)
 
         # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
         for (i, qp_x) in enumerate(getpoints(boundary_quad_rule))
-            @test spatial_coordinate(fe_bv, i, x) ≈ qp_x
+            @test spatial_coordinate(bv, i, x) ≈ qp_x
         end
 
     end
