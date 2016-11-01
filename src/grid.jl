@@ -8,7 +8,8 @@ export Line, QuadraticLine,
 
 # Grid utilities
 export getcells, getncells, getnodes, getnnodes, getcelltype,
-       getcellset, getnodeset, getcellboundaryset, getcoordinates
+       getcellset,  getnodeset, getcellboundaryset, getcoordinates,
+       getcellsets, getnodesets, getcellboundarysets
 
 #########################
 # Main types for meshes #
@@ -69,15 +70,16 @@ immutable Grid{dim, N, T <: Real}
     cells::Vector{Cell{dim, N}}
     nodes::Vector{Node{dim, T}}
     cellboundaries::Vector{CellBoundary}
-    cellsets::Dict{Symbol, Vector{Int}}
-    nodesets::Dict{Symbol, Vector{Int}}
-    cellboundarysets::Dict{Symbol, Vector{Int}}
+    cellsets::Dict{String, Vector{Int}}
+    nodesets::Dict{String, Vector{Int}}
+    cellboundarysets::Dict{String, Vector{Int}}
 end
 
-function Grid{dim, N, T}(cells::Vector{Cell{dim, N}}, nodes::Vector{Node{dim, T}}, cellboundaries::Vector{CellBoundary};
-                         cellsets::Dict{Symbol, Vector{Int}}=Dict{Symbol, Vector{Int}}(),
-                         nodesets::Dict{Symbol, Vector{Int}}=Dict{Symbol, Vector{Int}}(),
-                         cellboundarysets::Dict{Symbol, Vector{Int}}=Dict{Symbol, Vector{Int}}())
+function Grid{dim, N, T}(cells::Vector{Cell{dim, N}}, nodes::Vector{Node{dim, T}};
+                         cellboundaries::Vector{CellBoundary} = CellBoundary[],
+                         cellsets::Dict{String, Vector{Int}}=Dict{String, Vector{Int}}(),
+                         nodesets::Dict{String, Vector{Int}}=Dict{String, Vector{Int}}(),
+                         cellboundarysets::Dict{String, Vector{Int}}=Dict{String, Vector{Int}}())
     return Grid(cells, nodes, cellboundaries, cellsets, nodesets, cellboundarysets)
 end
 
@@ -85,20 +87,37 @@ end
 # Grid utility functions #
 ##########################
 @inline getcells(grid::Grid) = grid.cells
+@inline getcells(grid::Grid, v::Vector{Int}) = grid.cells[v]
+@inline getcells(grid::Grid, set::String) = grid.cells[grid.cellsets[set]]
 @inline getncells(grid::Grid) = length(grid.cells)
-@inline getnodes(grid::Grid) = grid.nodes
-@inline getnnodes(grid::Grid) = length(grid.nodes)
 @inline getcelltype(grid::Grid) = eltype(grid.cells)
-@inline getcellset(grid::Grid, set::Symbol) = grid.cells[grid.cellsets[set]]
-@inline getnodeset(grid::Grid, set::Symbol) = grid.nodes[grid.nodesets[set]]
-@inline getcellboundaryset(grid::Grid, set::Symbol) = grid.cellboundaries[grid.cellboundarysets[set]]
 
-function addcellset!(grid::Grid, name::Symbol, cellid::Vector{Int})
+@inline getnodes(grid::Grid) = grid.nodes
+@inline getnodes(grid::Grid, v::Vector{Int}) = grid.nodes[v]
+@inline getnodes(grid::Grid, set::String) = grid.nodes[grid.nodesets[set]]
+@inline getnnodes(grid::Grid) = length(grid.nodes)
+
+@inline getboundaries(grid::Grid) = grid.cellboundaries
+@inline getboundaries(grid::Grid, v::Vector{Int}) = grid.cellboundaries[v]
+@inline getboundaries(grid::Grid, set::String) = grid.cellboundaries[grid.cellboundarysets[set]]
+@inline getnboundaries(grid::Grid) = length(grid.cellboundaries)
+
+@inline getcellset(grid::Grid, set::String) = grid.cellsets[set]
+@inline getcellsets(grid::Grid) = grid.cellsets
+
+@inline getnodeset(grid::Grid, set::String) = grid.nodesets[set]
+@inline getnodesets(grid::Grid) = grid.nodesets
+
+@inline getcellboundaryset(grid::Grid, set::String) = grid.cellboundarysets[set]
+@inline getcellboundarysets(grid::Grid) = grid.cellboundarysets
+
+
+function addcellset!(grid::Grid, name::String, cellid::Vector{Int})
     haskey(grid.cellsets, name) && throw(ArgumentError("There already exists a cellset with the name: $name"))
     grid.cellsets[name] = cellid
     nothing
 end
-function addnodeset!(grid::Grid, name::Symbol, nodeid::Vector{Int})
+function addnodeset!(grid::Grid, name::String, nodeid::Vector{Int})
     haskey(grid.nodesets, name) && throw(ArgumentError("There already exists a nodeset with the name: $name"))
     grid.nodesets[name] = nodeid
     nothing
