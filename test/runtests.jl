@@ -5,8 +5,8 @@ using ForwardDiff
 
 include("test_utils.jl")
 include("test_function_spaces.jl")
-include("test_fecellvalues.jl")
-include("test_feboundaryvalues.jl")
+include("test_cellvalues.jl")
+include("test_boundaryvalues.jl")
 include("test_quadrules.jl")
 include("test_assemble.jl")
 include("test_grid.jl")
