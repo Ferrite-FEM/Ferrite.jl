@@ -14,11 +14,11 @@ import WriteVTK: vtk_grid
 
 export start_assemble, assemble!, end_assemble
 
-export FECellScalarValues, FECellVectorValues
+export CellScalarValues, CellVectorValues
 
 export reinit!, shape_value, shape_gradient, shape_symmetric_gradient, shape_divergence, getdetJdV, getquadrule, getfunctionspace, getgeometricspace,
        function_value, function_gradient, function_symmetric_gradient, function_divergence, spatial_coordinate
-export FEBoundaryValues, getboundarynumber
+export BoundaryScalarValues, getboundarynumber
 export FunctionSpace, getdim, getrefshape, getorder, getnbasefunctions, getnquadpoints
 export Lagrange, Serendipity, RefTetrahedron, RefCube
 export QuadratureRule, getweights, getpoints
@@ -34,18 +34,23 @@ immutable RefTetrahedron <: AbstractRefShape end
 immutable RefCube <: AbstractRefShape end
 
 """
-Abstract type which has `FECellScalarValues` and `FEBoundaryValues` as subtypes
+Abstract type which has `CellScalarValues` and `BoundaryScalarValues` as subtypes
 """
-abstract AbstractFEValues{dim, T, FS, GS}
-abstract AbstractFECellScalarValues{dim, T, FS, GS} <: AbstractFEValues{dim, T, FS, GS}
+abstract Values{dim, T, FS, GS}
+abstract CellValues{dim, T, FS, GS}     <: Values{dim, T, FS, GS}
+abstract BoundaryValues{dim, T, FS, GS} <: Values{dim, T, FS, GS}
 
 
 include("function_spaces.jl")
 include("quadrature.jl")
-include("fe_cell_scalar_values.jl")
-include("fe_cell_vector_values.jl")
-include("fe_boundary_values.jl")
-include("commons_abstract_fevalues.jl")
+include("cell_scalar_values.jl")
+include("cell_vector_values.jl")
+include("boundary_scalar_values.jl")
+
+typealias ScalarValues{dim, T, FS, GS} Union{CellScalarValues{dim, T, FS, GS}, BoundaryScalarValues{dim, T, FS, GS}}
+typealias VectorValues{dim, T, FS, GS} Union{CellVectorValues{dim, T, FS, GS} #=,BoundaryVectorValues{dim, T, FS, GS}=# } # TODO
+
+include("common_values.jl")
 include("assembler.jl")
 include("boundary_integrals.jl")
 include("grid.jl")

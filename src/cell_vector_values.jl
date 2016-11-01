@@ -1,4 +1,4 @@
-immutable FECellVectorValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape, M} <: AbstractFECellScalarValues{dim, T, FS, GS}
+immutable CellVectorValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape, M} <: CellValues{dim, T, FS, GS}
     N::Matrix{Vec{dim, T}}
     dNdx::Matrix{Tensor{2, dim, T, M}}
     dNdξ::Matrix{Tensor{2, dim, T, M}}
@@ -10,10 +10,12 @@ immutable FECellVectorValues{dim, T <: Real, FS <: FunctionSpace, GS <: Function
     geometric_space::GS
 end
 
-FECellVectorValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FECellVectorValues(Float64, quad_rule, func_space, geom_space)
-getnbasefunctions{dim}(fe_cvv::FECellVectorValues{dim}) = getnbasefunctions(fe_cvv.function_space) * dim
+CellVectorValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) =
+    CellVectorValues(Float64, quad_rule, func_space, geom_space)
+getnbasefunctions{dim}(cvv::CellVectorValues{dim}) = getnbasefunctions(cvv.function_space) * dim
 
-function FECellVectorValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_space::FS, geom_space::GS=func_space)
+function CellVectorValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape}(
+                            ::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_space::FS, geom_space::GS=func_space)
     @assert getdim(func_space) == getdim(geom_space)
     @assert getrefshape(func_space) == getrefshape(geom_space) == shape
     n_qpoints = length(getweights(quad_rule))
@@ -51,6 +53,6 @@ function FECellVectorValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, sh
         derivative!(geom_space, view(dMdξ, :, i), ξ)
     end
     detJdV = zeros(T, n_qpoints)
-    FECellVectorValues(N, dNdx, dNdξ, detJdV, quad_rule, func_space, M, dMdξ, geom_space)
+    CellVectorValues(N, dNdx, dNdξ, detJdV, quad_rule, func_space, M, dMdξ, geom_space)
 end
 
