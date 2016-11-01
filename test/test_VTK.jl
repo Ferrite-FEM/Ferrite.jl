@@ -1,7 +1,7 @@
 using SHA
 @testset "VTK" begin
     OVERWRITE_CHECKSUMS = false
-    checksums_file = "checksums.sha1"
+    checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")
     checksum_list = readstring(checksums_file)
     if OVERWRITE_CHECKSUMS
         csio = open(checksums_file, "w")
