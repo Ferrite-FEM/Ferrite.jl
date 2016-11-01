@@ -74,7 +74,8 @@ immutable Grid{dim, N, T <: Real}
     cellboundarysets::Dict{Symbol, Vector{Int}}
 end
 
-function Grid{dim, N, T}(cells::Vector{Cell{dim, N}}, nodes::Vector{Node{dim, T}}, cellboundaries::Vector{CellBoundary};
+function Grid{dim, N, T}(cells::Vector{Cell{dim, N}}, nodes::Vector{Node{dim, T}};
+                         cellboundaries::Vector{CellBoundary} = CellBoundary[],
                          cellsets::Dict{Symbol, Vector{Int}}=Dict{Symbol, Vector{Int}}(),
                          nodesets::Dict{Symbol, Vector{Int}}=Dict{Symbol, Vector{Int}}(),
                          cellboundarysets::Dict{Symbol, Vector{Int}}=Dict{Symbol, Vector{Int}}())
