@@ -1,5 +1,5 @@
 """
-An `BoundaryScalarValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
+A `BoundaryScalarValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
 values of nodal functions, gradients and divergences of nodal functions etc. on the finite element boundary
 
 **Constructor**

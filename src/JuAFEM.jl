@@ -34,7 +34,7 @@ immutable RefTetrahedron <: AbstractRefShape end
 immutable RefCube <: AbstractRefShape end
 
 """
-Abstract type which has `CellScalarValues` and `BoundaryScalarValues` as subtypes
+Abstract type which has `CellValues` and `BoundaryValues` as subtypes
 """
 abstract Values{dim, T, FS, GS}
 abstract CellValues{dim, T, FS, GS}     <: Values{dim, T, FS, GS}

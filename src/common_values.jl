@@ -7,7 +7,7 @@ Updates the `CellValues` object for an element.
 
 ** Arguments **
 
-* `cv`: the `CellScalarValues` object
+* `cv`: the `CellValues` object
 * `x`: A `Vector` of `Vec`, one for each nodal position in the element.
 
 ** Result **
