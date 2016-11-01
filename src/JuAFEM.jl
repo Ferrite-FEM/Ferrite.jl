@@ -14,7 +14,7 @@ import WriteVTK: vtk_grid
 
 export start_assemble, assemble!, end_assemble
 
-export CellScalarValues, CellVectorValues
+export CellScalarValues, CellVectorValues, CellValues, BoundaryValues, ScalarValues, VectorValues
 
 export reinit!, shape_value, shape_gradient, shape_symmetric_gradient, shape_divergence, getdetJdV, getquadrule, getfunctionspace, getgeometricspace,
        function_value, function_gradient, function_symmetric_gradient, function_divergence, spatial_coordinate
