@@ -14,12 +14,12 @@ import WriteVTK: vtk_grid
 
 export start_assemble, assemble!, end_assemble
 
-export FECellValues, FECellVectorValues
+export FECellScalarValues, FECellVectorValues
 
 export reinit!, shape_value, shape_gradient, shape_symmetric_gradient, shape_divergence, getdetJdV, getquadrule, getfunctionspace, getgeometricspace,
        function_value, function_gradient, function_symmetric_gradient, function_divergence, spatial_coordinate
 export FEBoundaryValues, getboundarynumber
-export FunctionSpace, getdim, getrefshape, getorder, getnbasefunctions
+export FunctionSpace, getdim, getrefshape, getorder, getnbasefunctions, getnquadpoints
 export Lagrange, Serendipity, RefTetrahedron, RefCube
 export QuadratureRule, getweights, getpoints
 export getVTKtype
@@ -34,15 +34,15 @@ immutable RefTetrahedron <: AbstractRefShape end
 immutable RefCube <: AbstractRefShape end
 
 """
-Abstract type which has `FECellValues` and `FEBoundaryValues` as subtypes
+Abstract type which has `FECellScalarValues` and `FEBoundaryValues` as subtypes
 """
 abstract AbstractFEValues{dim, T, FS, GS}
-abstract AbstractFECellValues{dim, T, FS, GS} <: AbstractFEValues{dim, T, FS, GS}
+abstract AbstractFECellScalarValues{dim, T, FS, GS} <: AbstractFEValues{dim, T, FS, GS}
 
 
 include("function_spaces.jl")
 include("quadrature.jl")
-include("fe_cell_values.jl")
+include("fe_cell_scalar_values.jl")
 include("fe_cell_vector_values.jl")
 include("fe_boundary_values.jl")
 include("commons_abstract_fevalues.jl")

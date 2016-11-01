@@ -43,7 +43,7 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
 
         # Test of volume
         vol = 0.0
-        for i in 1:length(getpoints(boundary_quad_rule))
+        for i in 1:getnquadpoints(fe_bv)
             vol += getdetJdV(fe_bv,i)
         end
         x_boundary = x[[JuAFEM.getboundarylist(function_space)[boundary]...]]
@@ -57,7 +57,7 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
         x = reference_coordinates(function_space)
         reinit!(fe_bv, x, boundary)
         vol = 0.0
-        for i in 1:length(getpoints(boundary_quad_rule))
+        for i in 1:getnquadpoints(fe_bv)
             vol += getdetJdV(fe_bv, i)
         end
         @test vol ≈ reference_volume(function_space, boundary)

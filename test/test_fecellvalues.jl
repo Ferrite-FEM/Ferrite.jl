@@ -1,4 +1,5 @@
 @testset "FECellValues" begin
+
 for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
                                      (Lagrange{1, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
                                      (Lagrange{2, RefCube, 1}(), QuadratureRule{2, RefCube}(2)),
@@ -10,10 +11,13 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
                                      (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{3, RefTetrahedron}(2)))
 
 
-    for fe_valtype in (FECellValues, FECellVectorValues)
+    for fe_valtype in (FECellScalarValues, FECellVectorValues)
         fe_cv = fe_valtype(quad_rule, function_space)
         ndim = getdim(function_space)
         n_basefuncs = getnbasefunctions(function_space)
+
+        fe_valtype == FECellScalarValues && @test getnbasefunctions(fe_cv) == n_basefuncs
+        fe_valtype == FECellVectorValues && @test getnbasefunctions(fe_cv) == n_basefuncs * getdim(function_space)
 
         x = valid_coordinates(function_space)
         reinit!(fe_cv, x)
@@ -34,14 +38,14 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
             @test function_gradient(fe_cv, i, u) ≈ H
             @test function_symmetric_gradient(fe_cv, i, u) ≈ 0.5(H + H')
             @test function_divergence(fe_cv, i, u) ≈ trace(H)
-            fe_valtype == FECellValues && @test function_gradient(fe_cv, i, u_scal) ≈ V
-            fe_valtype == FECellValues && function_value(fe_cv, i, u_scal)
+            fe_valtype == FECellScalarValues && @test function_gradient(fe_cv, i, u_scal) ≈ V
+            fe_valtype == FECellScalarValues && function_value(fe_cv, i, u_scal)
             function_value(fe_cv, i, u)
         end
 
         # Test of volume
         vol = 0.0
-        for i in 1:length(getpoints(quad_rule))
+        for i in 1:getnquadpoints(fe_cv)
             vol += getdetJdV(fe_cv,i)
         end
         @test vol ≈ calculate_volume(function_space, x)
@@ -55,7 +59,7 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
         x = reference_coordinates(function_space)
         reinit!(fe_cv, x)
         vol = 0.0
-        for i in 1:length(getpoints(quad_rule))
+        for i in 1:getnquadpoints(fe_cv)
             vol += getdetJdV(fe_cv,i)
         end
         @test vol ≈ reference_volume(function_space)

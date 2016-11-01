@@ -57,3 +57,4 @@ export Dim
 @deprecate n_boundarynodes getnboundarynodes
 @deprecate points getpoints
 @deprecate weights getweights
+@deprecate FECellValues FECellScalarValues

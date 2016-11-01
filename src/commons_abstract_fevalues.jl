@@ -1,4 +1,4 @@
-# Common methods for both FECellValues and FEBoundaryValues
+# Common methods for both FECellScalarValues and FEBoundaryValues
 
 """
 The quadrature rule for the `AbstractFEValues` type.
@@ -14,9 +14,16 @@ The quadrature rule for the `AbstractFEValues` type.
 * `::QuadratureRule`: the quadrature rule.
 
 """
-getquadrule(fe_cv::FECellValues) = fe_cv.quad_rule
+getquadrule(fe_cv::FECellScalarValues) = fe_cv.quad_rule
 getquadrule(fe_cv::FECellVectorValues) = fe_cv.quad_rule
 getquadrule(fe_bv::FEBoundaryValues) = fe_bv.quad_rule[fe_bv.current_boundary[]]
+
+"""
+The number of quadrature points for  the `AbstractFEValues` type.
+
+    getnquadpoints(fe_v::AbstractFEValues)
+"""
+getnquadpoints(fe::AbstractFEValues) = length(getpoints(getquadrule(fe)))
 
 """
 The function space for the `AbstractFEValues` type.
@@ -72,7 +79,7 @@ This value is typically used when one integrates a function on a finite element 
 ``\\int\\limits_\\Gamma f(\\mathbf{x}) d \\Gamma \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 
 """
-@inline getdetJdV(fe_cv::AbstractFECellValues, q_point::Int) = fe_cv.detJdV[q_point]
+@inline getdetJdV(fe_cv::AbstractFECellScalarValues, q_point::Int) = fe_cv.detJdV[q_point]
 @inline getdetJdV(fe_bv::FEBoundaryValues, q_point::Int) = fe_bv.detJdV[q_point, fe_bv.current_boundary[]]
 
 """
@@ -83,10 +90,10 @@ Computes the value of the shape function
 Gets the values of the shape function for a given quadrature point and base_func
 
 """
-@inline shape_value(fe_cv::AbstractFECellValues, q_point::Int, base_func::Int) = fe_cv.N[base_func, q_point]
+@inline shape_value(fe_cv::AbstractFECellScalarValues, q_point::Int, base_func::Int) = fe_cv.N[base_func, q_point]
 @inline shape_value(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.N[base_func, q_point, fe_bv.current_boundary[]]
 
-@inline geometric_value(fe_cv::AbstractFECellValues, q_point::Int, base_func::Int) = fe_cv.M[base_func, q_point]
+@inline geometric_value(fe_cv::AbstractFECellScalarValues, q_point::Int, base_func::Int) = fe_cv.M[base_func, q_point]
 @inline geometric_value(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.M[base_func, q_point, fe_bv.current_boundary[]]
 
 
@@ -94,7 +101,7 @@ Gets the values of the shape function for a given quadrature point and base_func
 """
 Get the gradient of the shape functions for a given quadrature point and base function
 """
-@inline shape_gradient(fe_cv::AbstractFECellValues, q_point::Int, base_func::Int) = fe_cv.dNdx[base_func, q_point]
+@inline shape_gradient(fe_cv::AbstractFECellScalarValues, q_point::Int, base_func::Int) = fe_cv.dNdx[base_func, q_point]
 @inline shape_gradient(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = fe_bv.dNdx[base_func, q_point, fe_bv.current_boundary[]]
 @inline shape_symmetric_gradient(fe_cv::FECellVectorValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(fe_cv, q_point, base_func))
 const shape_derivative = shape_gradient
@@ -102,7 +109,7 @@ const shape_derivative = shape_gradient
 """
 Get the divergence of the shape functions for a given quadrature point and base function
 """
-@inline shape_divergence(fe_cv::AbstractFECellValues, q_point::Int, base_func::Int) = sum(fe_cv.dNdx[base_func, q_point])
+@inline shape_divergence(fe_cv::AbstractFECellScalarValues, q_point::Int, base_func::Int) = sum(fe_cv.dNdx[base_func, q_point])
 @inline shape_divergence(fe_bv::FEBoundaryValues, q_point::Int, base_func::Int) = sum(fe_bv.dNdx[base_func, q_point, fe_bv.current_boundary[]])
 
 

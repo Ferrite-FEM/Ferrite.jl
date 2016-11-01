@@ -11,7 +11,7 @@ function values at specific points:
 
 The quadrature rule consists of ``n_q`` points in space ``\\mathbf{x}_q`` with corresponding weights ``w_q``.
 
- In `JuAFEM`, the `QuadratureRule` type is mostly used as one of the components to create an [`FECellValues`](@ref) or [`FEBoundaryValues`](@ref) object.
+ In `JuAFEM`, the `QuadratureRule` type is mostly used as one of the components to create an [`FECellScalarValues`](@ref) or [`FEBoundaryValues`](@ref) object.
 
 **Constructors:**
 

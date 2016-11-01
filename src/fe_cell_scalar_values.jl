@@ -1,10 +1,10 @@
 """
-An `FECellValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
+An `FECellScalarValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
 values of nodal functions, gradients and divergences of nodal functions etc. in the finite element cell
 
 **Constructor**
 
-    FECellValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
+    FECellScalarValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
 
 
 **Arguments**
@@ -32,7 +32,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
 """
-immutable FECellValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape} <: AbstractFECellValues{dim, T, FS, GS}
+immutable FECellScalarValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape} <: AbstractFECellScalarValues{dim, T, FS, GS}
     N::Matrix{T}
     dNdx::Matrix{Vec{dim, T}}
     dNdξ::Matrix{Vec{dim, T}}
@@ -44,10 +44,10 @@ immutable FECellValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace,
     geometric_space::GS
 end
 
-FECellValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FECellValues(Float64, quad_rule, func_space, geom_space)
-getnbasefunctions(fe_cv::FECellValues) = getnbasefunctions(fe_cv.function_space)
+FECellScalarValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FECellScalarValues(Float64, quad_rule, func_space, geom_space)
+getnbasefunctions{dim}(fe_cv::FECellScalarValues{dim}) = getnbasefunctions(fe_cv.function_space)
 
-function FECellValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_space::FS, geom_space::GS=func_space)
+function FECellScalarValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_space::FS, geom_space::GS=func_space)
     @assert getdim(func_space) == getdim(geom_space)
     @assert getrefshape(func_space) == getrefshape(geom_space) == shape
     n_qpoints = length(getweights(quad_rule))
@@ -72,18 +72,18 @@ function FECellValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <:
 
     detJdV = zeros(T, n_qpoints)
 
-    FECellValues(N, dNdx, dNdξ, detJdV, quad_rule, func_space, M, dMdξ, geom_space)
+    FECellScalarValues(N, dNdx, dNdξ, detJdV, quad_rule, func_space, M, dMdξ, geom_space)
 end
 
 
 """
-Updates the `FECellValues` object for an element.
+Updates the `FECellScalarValues` object for an element.
 
-    reinit!{dim, T}(fe_cv::FECellValues{dim}, x::Vector{Vec{dim, T}})
+    reinit!{dim, T}(fe_cv::FECellScalarValues{dim}, x::Vector{Vec{dim, T}})
 
 ** Arguments **
 
-* `fe_cv`: the `FECellValues` object
+* `fe_cv`: the `FECellScalarValues` object
 * `x`: A `Vector` of `Vec`, one for each nodal position in the element.
 
 ** Result **
@@ -95,7 +95,7 @@ Updates the `FECellValues` object for an element.
 
 
 """
-function reinit!{dim, T}(fe_cv::AbstractFECellValues{dim}, x::Vector{Vec{dim, T}})
+function reinit!{dim, T}(fe_cv::AbstractFECellScalarValues{dim}, x::Vector{Vec{dim, T}})
     n_geom_basefuncs = getnbasefunctions(getgeometricspace(fe_cv))
     n_func_basefuncs = getnbasefunctions(getfunctionspace(fe_cv))
     @assert length(x) == n_geom_basefuncs

@@ -1,4 +1,4 @@
-immutable FECellVectorValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape, M} <: AbstractFECellValues{dim, T, FS, GS}
+immutable FECellVectorValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape, M} <: AbstractFECellScalarValues{dim, T, FS, GS}
     N::Matrix{Vec{dim, T}}
     dNdx::Matrix{Tensor{2, dim, T, M}}
     dNdξ::Matrix{Tensor{2, dim, T, M}}
@@ -11,7 +11,7 @@ immutable FECellVectorValues{dim, T <: Real, FS <: FunctionSpace, GS <: Function
 end
 
 FECellVectorValues{dim, FS <: FunctionSpace, GS <: FunctionSpace}(quad_rule::QuadratureRule{dim}, func_space::FS, geom_space::GS=func_space) = FECellVectorValues(Float64, quad_rule, func_space, geom_space)
-getnbasefunctions(fe_cvv::FECellVectorValues) = getnbasefunctions(fe_cvv.function_space) * dim
+getnbasefunctions{dim}(fe_cvv::FECellVectorValues{dim}) = getnbasefunctions(fe_cvv.function_space) * dim
 
 function FECellVectorValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_space::FS, geom_space::GS=func_space)
     @assert getdim(func_space) == getdim(geom_space)
