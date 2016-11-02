@@ -21,7 +21,7 @@ for functionspace in (Lagrange{1, RefCube, 1}(),
     n_basefuncs = getnbasefunctions(functionspace)
     x = rand(Tensor{1, ndim})
     f = (x) -> JuAFEM.value(functionspace, Tensor{1, ndim}(x))
-    @test vec(ForwardDiff.jacobian(f, extract_components(x))') ≈
+    @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
            reinterpret(Float64, JuAFEM.derivative(functionspace, x), (ndim * n_basefuncs,))
     @test sum(JuAFEM.value(functionspace, x)) ≈ 1.0
 
