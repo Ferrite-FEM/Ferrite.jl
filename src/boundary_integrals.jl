@@ -43,10 +43,10 @@ function create_boundary_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRul
 end
 
 function detJ_boundary(J::Tensor{2, 2}, ::FunctionSpace{2, RefCube}, boundary::Int)
-    boundary == 1 && return sqrt(J[1,1]^2 + J[1,2]^2)
-    boundary == 2 && return sqrt(J[2,1]^2 + J[2,2]^2)
-    boundary == 3 && return sqrt(J[1,1]^2 + J[1,2]^2)
-    boundary == 4 && return sqrt(J[2,1]^2 + J[2,2]^2)
+    boundary == 1 && return sqrt(J[1,1]^2 + J[2,1]^2)
+    boundary == 2 && return sqrt(J[1,2]^2 + J[2,2]^2)
+    boundary == 3 && return sqrt(J[1,1]^2 + J[2,1]^2)
+    boundary == 4 && return sqrt(J[1,2]^2 + J[2,2]^2)
 end
 
 #########################
@@ -72,9 +72,9 @@ function create_boundary_quad_rule{T, shape <: RefTetrahedron}(quad_rule::Quadra
 end
 
 function detJ_boundary(J::Tensor{2, 2}, ::FunctionSpace{2, RefTetrahedron}, boundary::Int)
-    boundary == 1 && return sqrt((J[1,1] - J[2,1])^2 + (J[1,2] - J[2,2])^2)
-    boundary == 2 && return sqrt(J[2,1]^2 + J[2,2]^2)
-    boundary == 3 && return sqrt(J[1,1]^2 + J[1,2]^2)
+    boundary == 1 && return sqrt((J[1,1] - J[1,2])^2 + (J[2,1] - J[2,2])^2)
+    boundary == 2 && return sqrt(J[1,2]^2 + J[2,2]^2)
+    boundary == 3 && return sqrt(J[1,1]^2 + J[2,1]^2)
 end
 
 ##################
@@ -109,12 +109,12 @@ function create_boundary_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRul
 end
 
 function detJ_boundary(J::Tensor{2, 3}, ::FunctionSpace{3, RefCube}, boundary::Int)
-    boundary == 1 && return norm(J[1,:] × J[2,:])
-    boundary == 2 && return norm(J[1,:] × J[3,:])
-    boundary == 3 && return norm(J[2,:] × J[3,:])
-    boundary == 4 && return norm(J[1,:] × J[3,:])
-    boundary == 5 && return norm(J[2,:] × J[3,:])
-    boundary == 6 && return norm(J[1,:] × J[2,:])
+    boundary == 1 && return norm(J[:,1] × J[:,2])
+    boundary == 2 && return norm(J[:,1] × J[:,3])
+    boundary == 3 && return norm(J[:,2] × J[:,3])
+    boundary == 4 && return norm(J[:,1] × J[:,3])
+    boundary == 5 && return norm(J[:,2] × J[:,3])
+    boundary == 6 && return norm(J[:,1] × J[:,2])
 end
 
 #########################
@@ -143,8 +143,8 @@ function create_boundary_quad_rule{T, shape <: RefTetrahedron}(quad_rule::Quadra
 end
 
 function detJ_boundary(J::Tensor{2, 3}, ::FunctionSpace{3, RefTetrahedron}, boundary::Int)
-    boundary == 1 && return norm(J[1,:] × J[2,:])
-    boundary == 2 && return norm(J[1,:] × J[3,:])
-    boundary == 3 && return norm((J[1,:]-J[3,:]) × (J[2,:]-J[3,:]))
-    boundary == 4 && return norm(J[2,:] × J[3,:])
+    boundary == 1 && return norm(J[:,1] × J[:,2])
+    boundary == 2 && return norm(J[:,1] × J[:,3])
+    boundary == 3 && return norm((J[:,1]-J[:,3]) × (J[:,2]-J[:,3]))
+    boundary == 4 && return norm(J[:,2] × J[:,3])
 end

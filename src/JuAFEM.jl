@@ -14,11 +14,13 @@ import WriteVTK: vtk_grid
 
 export start_assemble, assemble!, end_assemble
 
-export CellScalarValues, CellVectorValues, CellValues, BoundaryValues, ScalarValues, VectorValues
+export CellValues, CellScalarValues, CellVectorValues
+export BoundaryValues, BoundaryScalarValues, BoundaryVectorValues
+export ScalarValues, VectorValues
 
 export reinit!, shape_value, shape_gradient, shape_symmetric_gradient, shape_divergence, getdetJdV, getquadrule, getfunctionspace, getgeometricspace,
        function_value, function_gradient, function_symmetric_gradient, function_divergence, spatial_coordinate
-export BoundaryScalarValues, getboundarynumber
+export getboundarynumber
 export FunctionSpace, getdim, getrefshape, getorder, getnbasefunctions, getnquadpoints
 export Lagrange, Serendipity, RefTetrahedron, RefCube
 export QuadratureRule, getweights, getpoints
@@ -43,12 +45,11 @@ abstract BoundaryValues{dim, T, FS, GS} <: Values{dim, T, FS, GS}
 
 include("function_spaces.jl")
 include("quadrature.jl")
-include("cell_scalar_values.jl")
-include("cell_vector_values.jl")
-include("boundary_scalar_values.jl")
+include("cell_values.jl")
+include("boundary_values.jl")
 
 typealias ScalarValues{dim, T, FS, GS} Union{CellScalarValues{dim, T, FS, GS}, BoundaryScalarValues{dim, T, FS, GS}}
-typealias VectorValues{dim, T, FS, GS} Union{CellVectorValues{dim, T, FS, GS} #=,BoundaryVectorValues{dim, T, FS, GS}=# } # TODO
+typealias VectorValues{dim, T, FS, GS} Union{CellVectorValues{dim, T, FS, GS}, BoundaryVectorValues{dim, T, FS, GS}}
 
 include("common_values.jl")
 include("assembler.jl")

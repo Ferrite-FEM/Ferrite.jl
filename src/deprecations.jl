@@ -22,7 +22,7 @@ function vtk_grid{T}(topology::Matrix{Int}, coord::Matrix{T}, filename::Abstract
 end
 
 # Issue #66, PR #73
-@deprecate FEValues FECellValues
+@deprecate FEValues CellScalarValues
 
 # Issue #74, PR #76
 immutable Dim{T} end
@@ -57,4 +57,6 @@ export Dim
 @deprecate n_boundarynodes getnboundarynodes
 @deprecate points getpoints
 @deprecate weights getweights
+
+# PR #88
 @deprecate FECellValues CellScalarValues
