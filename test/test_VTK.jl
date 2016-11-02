@@ -55,6 +55,7 @@ using SHA
             # Returns 0:-1 if string is not found
             cmp = search(checksum_list, sha)
             @test cmp != 0:-1
+            rm(name*".vtu")
         end
 
         # Test deprecated method, PR #70
@@ -70,6 +71,7 @@ using SHA
             # Returns 0:-1 if string is not found
             cmp = search(checksum_list, sha)
             @test cmp != 0:-1
+            rm(name*"_old.vtu")
         end
     end
 
