@@ -1,46 +1,4 @@
-# Common methods
-
-"""
-Updates the `CellValues` object for an element.
-
-    reinit!{dim, T}(cv::CellValues{dim}, x::Vector{Vec{dim, T}})
-
-** Arguments **
-
-* `cv`: the `CellValues` object
-* `x`: A `Vector` of `Vec`, one for each nodal position in the element.
-
-** Result **
-
-* nothing
-
-
-**Details**
-
-
-"""
-function reinit!{dim, T}(cv::CellValues{dim}, x::Vector{Vec{dim, T}})
-    n_geom_basefuncs = getnbasefunctions(getgeometricspace(cv))
-    n_func_basefuncs = getnbasefunctions(getfunctionspace(cv))
-    @assert length(x) == n_geom_basefuncs
-    isa(cv, CellVectorValues) && (n_func_basefuncs *= dim)
-
-    @inbounds for i in 1:length(getpoints(cv.quad_rule))
-        w = getweights(cv.quad_rule)[i]
-        fecv_J = zero(Tensor{2, dim})
-        for j in 1:n_geom_basefuncs
-            fecv_J += x[j] ⊗ cv.dMdξ[j, i]
-        end
-        Jinv = inv(fecv_J)
-        for j in 1:n_func_basefuncs
-            cv.dNdx[j,i] = cv.dNdξ[j, i] ⋅ Jinv
-        end
-        detJ = det(fecv_J)
-        detJ <= 0.0 && throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
-        cv.detJdV[i] = detJ * w
-    end
-end
-
+# Common methods for all `Values` objects
 """
 The quadrature rule for the `Values` type.
 
