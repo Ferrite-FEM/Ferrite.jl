@@ -143,8 +143,8 @@ Returns a vector with the coordinates of the vertices of a cell
     nodeidx = grid.cells[cell].nodes
     return [grid.nodes[i].x for i in nodeidx]::Vector{Vec{dim, T}}
 end
-@inline getcoordinates(grid::Grid, cell::CellIndex) = coordinates(grid, cell.idx)
-@inline getcoordinates(grid::Grid, boundary::CellBoundaryIndex) = coordinates(grid, boundary.idx[1])
+@inline getcoordinates(grid::Grid, cell::CellIndex) = getcoordinates(grid, cell.idx)
+@inline getcoordinates(grid::Grid, boundary::CellBoundaryIndex) = getcoordinates(grid, boundary.idx[1])
 
 # Iterate over cell vector
 Base.start{dim, N}(c::Vector{Cell{dim, N}}) = 1
