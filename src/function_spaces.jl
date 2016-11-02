@@ -333,7 +333,7 @@ end
 #########################################
 getnbasefunctions(::Lagrange{3, RefTetrahedron, 1}) = 4
 getnboundarynodes(::Lagrange{3, RefTetrahedron, 1}) = 3
-getboundarylist(::Lagrange{3, RefTetrahedron, 1}) = ((1,2,4),(1,3,4),(1,2,3),(2,3,4))
+getboundarylist(::Lagrange{3, RefTetrahedron, 1}) = ((1,2,3),(1,2,4),(2,3,4),(1,3,4))
 
 function value!(fs::Lagrange{3, RefTetrahedron, 1}, N::AbstractVector, ξ::Vec{3})
     checkdim_value(fs, N, ξ)
@@ -343,10 +343,10 @@ function value!(fs::Lagrange{3, RefTetrahedron, 1}, N::AbstractVector, ξ::Vec{3
         ξ_y = ξ[2]
         ξ_z = ξ[3]
 
-        N[1] = ξ_x
-        N[2] = ξ_y
-        N[3] = ξ_z
-        N[4] = 1. - ξ_x - ξ_y - ξ_z
+        N[1] = 1.0 - ξ_x - ξ_y - ξ_z
+        N[2] = ξ_x
+        N[3] = ξ_y
+        N[4] = ξ_z
     end
 
     return N
@@ -356,10 +356,10 @@ function derivative!{T}(fs::Lagrange{3, RefTetrahedron, 1}, dN::AbstractVector{V
     checkdim_derivative(fs, dN, ξ)
 
     @inbounds begin
-        dN[1] = Vec{3, T}(( 1.0,  0.0, 0.0))
-        dN[2] = Vec{3, T}(( 0.0,  1.0, 0.0))
-        dN[3] = Vec{3, T}(( 0.0,  0.0, 1.0))
-        dN[4] = Vec{3, T}((-1.0, -1.0, -1.0))
+        dN[1] = Vec{3, T}((-1.0, -1.0, -1.0))
+        dN[2] = Vec{3, T}(( 1.0,  0.0, 0.0))
+        dN[3] = Vec{3, T}(( 0.0,  1.0, 0.0))
+        dN[4] = Vec{3, T}(( 0.0,  0.0, 1.0))
     end
 
     return dN

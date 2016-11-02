@@ -59,10 +59,10 @@ function reference_coordinates(::Lagrange{2, RefTetrahedron, 2})
 end
 
 function reference_coordinates(::Lagrange{3, RefTetrahedron, 1})
-    return [Vec{3, Float64}((1.0, 0.0, 0.0)),
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
             Vec{3, Float64}((0.0, 1.0, 0.0)),
-            Vec{3, Float64}((0.0, 0.0, 1.0)),
-            Vec{3, Float64}((0.0, 0.0, 0.0))]
+            Vec{3, Float64}((0.0, 0.0, 1.0))]
 end
 
 function reference_coordinates(::Lagrange{3, RefCube, 1})
@@ -157,7 +157,7 @@ function calculate_volume{T, dim}(::Lagrange{2, RefTetrahedron, 2}, x::Vector{Ve
 end
 
 function calculate_volume{T}(::Lagrange{3, RefTetrahedron, 1}, x::Vector{Vec{3, T}})
-    vol = norm((x[1] - x[4]) ⋅ ((x[2] - x[4]) × (x[3] - x[4]))) / 6.0
+    vol = norm((x[2] - x[1]) ⋅ ((x[3] - x[1]) × (x[4] - x[1]))) / 6.0
     return vol
 end
 
@@ -231,6 +231,6 @@ function topology_test_nodes(::Serendipity{2, RefCube, 2})
 end
 function topology_test_nodes(::Lagrange{3, RefTetrahedron, 1})
     cell_nodes = [3,4,8,1]
-    boundary_nodes = [[1,4,3], [1,3,8], [3,4,8], [1,8,4], [1,4,1337]]
+    boundary_nodes = [[3,4,8], [3,4,1], [4,8,1], [3,8,1], [1,4,1337]]
     return boundary_nodes, cell_nodes
 end
