@@ -4,25 +4,31 @@ include("quadrature_tables/gaussquad_tet_table.jl")
 import Base.Cartesian: @nloops, @nref, @ntuple, @nexprs
 
 """
-A `QuadratureRule` is a way to approximate an integral on a domain by a weighted sum of
+A `QuadratureRule` is used to approximate an integral on a domain by a weighted sum of
 function values at specific points:
 
-``\\int\\limits_\\Omega f(\\mathbf{x}) d \\Omega \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) w_q``
+``\\int\\limits_\\Omega f(\\mathbf{x}) \\text{d} \\Omega \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) w_q``
 
 The quadrature rule consists of ``n_q`` points in space ``\\mathbf{x}_q`` with corresponding weights ``w_q``.
 
- In `JuAFEM`, the `QuadratureRule` type is mostly used as one of the components to create an [`CellScalarValues`](@ref) or [`FEBoundaryCellValues`](@ref) object.
+There are different rules to determine the points and weights. In `JuAFEM` two different types are implemented:
+`:legendre` and `:lobatto`, where `:lobatto` is only supported for `RefCube`. If the quadrature rule type is left out,
+`:legendre` is used by default.
 
-**Constructors:**
+In `JuAFEM`, the `QuadratureRule` type is mostly used as one of the components to create a [`CellValues`](@ref)
+or [`BoundaryValues`](@ref) object.
 
-    QuadratureRule{dim, shape}([quad_rule_type::Symbol], order::Int)
+**Constructor:**
+
+```julia
+QuadratureRule{dim, shape}([quad_rule_type::Symbol], order::Int)
+```
 
 **Arguments:**
 
 * `dim`: the space dimension of the reference shape
-* `shape`: an `AbstractRefShape`
-* `quad_rule_type`: The type of the quadrature rule. Currently only `:legendre` or `:lobatto` types are supported where
-`:lobatto` is only supported for `RefCube`. If the quadrature rule type is left out, `:legendre` is used by default
+* `shape`: an [`AbstractRefShape`](@ref)
+* `quad_rule_type`: `:legendre` or `:lobatto`, defaults to `:legendre`.
 * `order`: the order of the quadrature rule
 
 **Common methods:**
@@ -46,7 +52,6 @@ immutable QuadratureRule{dim, shape, T}
 end
 
 """
-
 The weights of the quadrature rule.
 
     getweights(qr::QuadratureRule) = qr.weights

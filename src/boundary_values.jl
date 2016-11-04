@@ -1,22 +1,33 @@
+# Defines BoundaryScalarValues and BoundaryVectorValues and common methods
 """
-A `BoundaryScalarValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
-values of nodal functions, gradients and divergences of nodal functions etc. on the finite element boundary with *scalar*
-shape functions
+A `BoundaryValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
+values of nodal functions, gradients and divergences of nodal functions etc. on the finite element boundary. There are
+two different types of `BoundaryValues`: `BoundaryScalarValues` and `BoundaryVectorValues`. As the names suggest,
+`BoundaryScalarValues` utilizes scalar shape functions and `BoundaryVectorValues` utilizes vectorial shape functions.
+For a scalar field, the `BoundaryScalarValues` type should be used. For vector field, both subtypes can be used.
 
-**Constructor**
+**Constructors:**
 
-    BoundaryScalarValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
+Note: The quadrature rule for the boundary should be given with one dimension lower. I.e. for a 3D case, the quadrature rule
+should be in 2D.
 
+```julia
+BoundaryScalarValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
+BoundaryVectorValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
+```
 
-**Arguments**
+**Arguments:**
 
-* `T` an optional argument to determine the type the internal data is stored as.
-* `quad_rule` an instance of a [`QuadratureRule`](@ref)
-* `function_space` an instance of a [`FunctionSpace`](@ref) used to interpolate the approximated function
-* `geometric_space` an optional instance of a [`FunctionSpace`](@ref) which is used to interpolate the geometry
+* `T`: an optional argument to determine the type the internal data is stored as.
+* `quad_rule`: an instance of a [`QuadratureRule`](@ref)
+* `function_space`: an instance of a [`FunctionSpace`](@ref) used to interpolate the approximated function
+* `geometric_space`: an optional instance of a [`FunctionSpace`](@ref) which is used to interpolate the geometry
 
-** Common methods**
+**Common methods:**
 
+* [`reinit!`](@ref)
+* [`getboundarynumber`](@ref)
+* [`getnquadpoints`](@ref)
 * [`getquadrule`](@ref)
 * [`getfunctionspace`](@ref)
 * [`getgeometricspace`](@ref)
@@ -24,8 +35,8 @@ shape functions
 
 * [`shape_value`](@ref)
 * [`shape_gradient`](@ref)
+* [`shape_symmetric_gradient`](@ref)
 * [`shape_divergence`](@ref)
-* [`shape_derivative`](@ref)
 
 * [`function_value`](@ref)
 * [`function_gradient`](@ref)
@@ -33,6 +44,9 @@ shape functions
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
 """
+BoundaryValues
+
+# BoundaryScalarValues
 immutable BoundaryScalarValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape} <: BoundaryValues{dim, T, FS, GS}
     N::Array{T, 3}
     dNdx::Array{Vec{dim, T}, 3}
@@ -85,41 +99,7 @@ function BoundaryScalarValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpac
     BoundaryScalarValues(N, dNdx, dNdξ, detJdV, boundary_quad_rule, func_space, M, dMdξ, geom_space, Ref(0))
 end
 
-"""
-A `BoundaryVectorValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
-values of nodal functions, gradients and divergences of nodal functions etc. on the finite element boundary with *vectorial*
-shape functions
-
-**Constructor**
-
-    BoundaryVectorValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
-
-
-**Arguments**
-
-* `T` an optional argument to determine the type the internal data is stored as.
-* `quad_rule` an instance of a [`QuadratureRule`](@ref)
-* `function_space` an instance of a [`FunctionSpace`](@ref) used to interpolate the approximated function
-* `geometric_space` an optional instance of a [`FunctionSpace`](@ref) which is used to interpolate the geometry
-
-** Common methods**
-
-* [`getquadrule`](@ref)
-* [`getfunctionspace`](@ref)
-* [`getgeometricspace`](@ref)
-* [`getdetJdV`](@ref)
-
-* [`shape_value`](@ref)
-* [`shape_gradient`](@ref)
-* [`shape_divergence`](@ref)
-* [`shape_derivative`](@ref)
-
-* [`function_value`](@ref)
-* [`function_gradient`](@ref)
-* [`function_symmetric_gradient`](@ref)
-* [`function_divergence`](@ref)
-* [`spatial_coordinate`](@ref)
-"""
+# BoundaryVectorValues
 immutable BoundaryVectorValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape, M} <: BoundaryValues{dim, T, FS, GS}
     N::Array{Vec{dim, T}, 3}
     dNdx::Array{Tensor{2, dim, T, M}, 3}
@@ -189,26 +169,6 @@ function BoundaryVectorValues{dim_qr, T, FS <: FunctionSpace, GS <: FunctionSpac
     BoundaryVectorValues(N, dNdx, dNdξ, detJdV, boundary_quad_rule, func_space, M, dMdξ, geom_space, Ref(0))
 end
 
-"""
-Updates the `BoundaryValues` object for a given boundary
-
-    reinit!{dim, T}(bv::BoundaryValues{dim}, x::Vector{Vec{dim, T}}, boundary::Int)
-
-** Arguments **
-
-* `cv`: the `BoundaryValues` object
-* `x`: A `Vector` of `Vec`, one for each nodal position in the element.
-* `boundary`: The boundary number for the element
-
-** Result **
-
-* nothing
-
-
-**Details**
-
-
-"""
 function reinit!{dim, T}(bv::BoundaryValues{dim}, x::Vector{Vec{dim, T}}, boundary::Int)
     n_geom_basefuncs = getnbasefunctions(getgeometricspace(bv))
     n_func_basefuncs = getnbasefunctions(getfunctionspace(bv))

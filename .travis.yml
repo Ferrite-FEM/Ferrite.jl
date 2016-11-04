@@ -1,21 +1,20 @@
-# Documentation: http://docs.travis-ci.com/user/languages/julia/
 language: julia
+
 os:
   - linux
   - osx
+
 julia:
   - 0.5
   - nightly
+
 notifications:
   email: false
-before_script:
-  - export PATH=$HOME/.local/bin:$PATH
-script:
-  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-  - julia -e 'Pkg.clone("https://github.com/KristofferC/ContMechTensors.jl")'
-  - julia -e 'Pkg.clone("https://github.com/KristofferC/FastGaussQuadrature.jl");'
-  - julia -e 'Pkg.clone(pwd()); Pkg.test("JuAFEM"; coverage=true)'
+
+# https://github.com/travis-ci/travis-ci/issues/4942 workaround
+git:
+  depth: 99999
+
 after_success:
-  - julia -e 'cd(Pkg.dir("JuAFEM")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
-  - julia -e 'Pkg.add("Documenter"); Pkg.checkout("Documenter")'
-  - julia -e 'cd(Pkg.dir("JuAFEM")); include(joinpath("docs", "make.jl"))'
+  - julia -e 'include(Pkg.dir("JuAFEM", "docs", "travis.jl"))'
+  - julia -e 'include(Pkg.dir("JuAFEM", "test", "coverage.jl"))'

@@ -28,7 +28,8 @@ export getVTKtype
 
 """
 Represents a reference shape which quadrature rules and function spaces are defined on.
-Currently, the only concrete types that subtype this type is `RefTetrahedron` and `RefCube`.
+Currently, the only concrete types that subtype this type are `RefCube` in 1,2 and 3 dimensions,
+and `RefTetrahedron` in 2 and 3 dimensions.
 """
 abstract AbstractRefShape
 

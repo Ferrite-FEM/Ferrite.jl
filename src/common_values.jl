@@ -1,5 +1,28 @@
 # Common methods for all `Values` objects
 """
+Updates a `CellValues`/`BoundaryValues` object for a cell or boundary.
+
+```julia
+reinit!{dim, T}(cv::CellValues{dim}, x::Vector{Vec{dim, T}})
+reinit!{dim, T}(bv::BoundaryValues{dim}, x::Vector{Vec{dim, T}}, boundary::Int)
+```
+
+**Arguments:**
+
+* `cv`/`bv`: the `CellValues`/`BoundaryValues` object
+* `x`: a `Vector` of `Vec`, one for each nodal position in the element.
+* `boundary`: an integer to specify which boundary of the cell
+
+**Result**
+
+* nothing
+
+**Details**
+
+"""
+reinit!
+
+"""
 The quadrature rule for the `Values` type.
 
     getquadrule(fe_v::Values)
@@ -94,13 +117,15 @@ Gets the values of the shape function for a given quadrature point and base_func
 @inline geometric_value(cv::CellValues, q_point::Int, base_func::Int) = cv.M[base_func, q_point]
 @inline geometric_value(bv::BoundaryValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_boundary[]]
 
-
-
 """
 Get the gradient of the shape functions for a given quadrature point and base function
 """
 @inline shape_gradient(cv::CellValues, q_point::Int, base_func::Int) = cv.dNdx[base_func, q_point]
 @inline shape_gradient(bv::BoundaryValues, q_point::Int, base_func::Int) = bv.dNdx[base_func, q_point, bv.current_boundary[]]
+
+"""
+Get the symmetric gradient of the shape functions for a given quadrature point and base function
+"""
 @inline shape_symmetric_gradient(cv::CellVectorValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(cv, q_point, base_func))
 const shape_derivative = shape_gradient
 

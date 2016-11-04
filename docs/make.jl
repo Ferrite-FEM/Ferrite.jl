@@ -8,7 +8,8 @@ makedocs(
         "Home" => "index.md",
         "man/fe_intro.md",
         "man/getting_started.md",
-        "lib/maintypes.md", "lib/utility_functions.md"]
+        "Library" => ["lib/maintypes.md",
+                      "lib/utility_functions.md"]]
         )
 
 # Deploy built documentation from Travis.

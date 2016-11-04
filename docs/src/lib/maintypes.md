@@ -9,9 +9,9 @@ Pages = ["maintypes.md"]
 ```
 
 ```@docs
-Dim
 AbstractRefShape
 QuadratureRule
 FunctionSpace
-FEValues
+CellValues
+BoundaryValues
 ```
