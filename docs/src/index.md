@@ -1,3 +1,9 @@
+```@meta
+DocTestSetup = quote
+    using JuAFEM
+end
+```
+
 # JuAFEM.jl
 
 *A simple finite element toolbox written in Julia.*
