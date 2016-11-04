@@ -25,19 +25,19 @@ which a lot of the package is built upon.
 First, create a quadrature rule, for integration in 2D, on a reference cube:
 
 ```jldoctest
-julia> quad_rule = QuadratureRule{2, RefCube}(2)
+julia> quad_rule = QuadratureRule{2, RefCube}(2);
 ```
 
 Next, create a function space
 
 ```jldoctest
-julia> func_space = Lagrange{2, RefCube, 1}()
+julia> func_space = Lagrange{2, RefCube, 1}();
 ```
 
 Use these to create a `CellScalarValues` object.
 
 ```jldoctest
-julia> cell_values = CellScalarValues(quad_rule, func_space)
+julia> cell_values = CellScalarValues(quad_rule, func_space);
 ```
 
 Presume one cell in the grid has the following vertices:
@@ -46,7 +46,7 @@ Presume one cell in the grid has the following vertices:
 julia> x = Vec{2, Float64}[Vec{2}((0.0, 0.0)),
                            Vec{2}((1.5, 0.0)),
                            Vec{2}((2.0, 2.0)),
-                           Vec{2}((0.0, 1.0))]
+                           Vec{2}((0.0, 1.0))];
 ```
 
 To update `cell_values` for the given cell, use `reinit!`:
