@@ -1,7 +1,9 @@
 ```@meta
 CurrentModule = JuAFEM
+DocTestSetup = quote
+    using JuAFEM
+end
 ```
-
 # Main Types
 
 ```@index
@@ -9,9 +11,9 @@ Pages = ["maintypes.md"]
 ```
 
 ```@docs
-Dim
 AbstractRefShape
 QuadratureRule
 FunctionSpace
-FEValues
+CellValues
+BoundaryValues
 ```

@@ -1,16 +1,16 @@
 """
 Creates an unstructured VTK grid from the element topology and coordinates.
 
-
-    vtk_grid{dim,T}(filename::AbstractString, coords::Vector{Vec{dim,T}}, topology::Matrix{Int}, celltype::VTKCellTypes.VTKCellType)
-
+```julia
+vtk_grid{dim,T}(filename::AbstractString, coords::Vector{Vec{dim,T}}, topology::Matrix{Int}, celltype::VTKCellTypes.VTKCellType)
+```
 
 **Arguments**
 
-* `filename` Name (or path) of the file when it is saved to disk, eg `filename = "myfile"`, or `filename = "/results/myfile"` to store it in the folder results
-* `coords` A vector of the node coordinates
-* `topology` A matrix where each column contains the nodes which connects the element
-* `celltype` The definition of the celltype in the grid, see [https://github.com/jipolanco/WriteVTK.jl#defining-cells](https://github.com/jipolanco/WriteVTK.jl#defining-cells)
+* `filename`: name (or path) of the file when it is saved to disk, eg `filename = "myfile"`, or `filename = "/results/myfile"` to store it in the folder results
+* `coords`: a vector of the node coordinates
+* `topology`: a matrix where each column contains the nodes which connects the element
+* `celltype`: the definition of the celltype in the grid, see [https://github.com/jipolanco/WriteVTK.jl#defining-cells](https://github.com/jipolanco/WriteVTK.jl#defining-cells)
 
 **Results:**
 
@@ -18,7 +18,7 @@ Creates an unstructured VTK grid from the element topology and coordinates.
 
 **Example:**
 
-```julia
+```jldoctest
 julia> coords = [Vec{2}((0.0,0.0)), Vec{2}((1.0,0.0)), Vec{2}((1.5,1.5)), Vec{2}((0.0,1.0))]
 4-element Array{ContMechTensors.Tensor{1,2,Float64,2},1}:
  [0.0,0.0]
@@ -64,7 +64,9 @@ end
 """
 Returns the VTKCellType corresponding to the input FunctionSpace
 
-    getVTKtype(fs::FunctionSpace)
+```julia
+getVTKtype(fs::FunctionSpace)
+```
 
 **Arguments**
 
@@ -76,7 +78,7 @@ Returns the VTKCellType corresponding to the input FunctionSpace
 
 **Example:**
 
-```julia
+```jldoctest
 julia> fs = Lagrange{2, RefCube, 1}()
 JuAFEM.Lagrange{2,JuAFEM.RefCube,1}()
 

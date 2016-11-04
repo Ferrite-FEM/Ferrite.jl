@@ -1,23 +1,29 @@
 # Defines CellScalarValues and CellVectorValues and common methods
 """
-An `CellScalarValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
-values of nodal functions, gradients and divergences of nodal functions etc. in the finite element cell with *scalar*
-shape functions
+A `CellValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
+values of nodal functions, gradients and divergences of nodal functions etc. in the finite element cell. There are
+two different types of `CellValues`: `CellScalarValues` and `CellVectorValues`. As the names suggest, `CellScalarValues`
+utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape functions. For a scalar field, the
+`CellScalarValues` type should be used. For vector field, both subtypes can be used.
 
-**Constructor**
+**Constructors:**
 
-    CellScalarValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
+```julia
+CellScalarValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
+CellVectorValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
+```
 
+**Arguments:**
 
-**Arguments**
+* `T`: an optional argument to determine the type the internal data is stored as.
+* `quad_rule`: an instance of a [`QuadratureRule`](@ref)
+* `function_space`: an instance of a [`FunctionSpace`](@ref) used to interpolate the approximated function
+* `geometric_space`: an optional instance of a [`FunctionSpace`](@ref) which is used to interpolate the geometry
 
-* `T` an optional argument to determine the type the internal data is stored as.
-* `quad_rule` an instance of a [`QuadratureRule`](@ref)
-* `function_space` an instance of a [`FunctionSpace`](@ref) used to interpolate the approximated function
-* `geometric_space` an optional instance of a [`FunctionSpace`](@ref) which is used to interpolate the geometry
+**Common methods:**
 
-** Common methods**
-
+* [`reinit!`](@ref)
+* [`getnquadpoints`](@ref)
 * [`getquadrule`](@ref)
 * [`getfunctionspace`](@ref)
 * [`getgeometricspace`](@ref)
@@ -25,8 +31,8 @@ shape functions
 
 * [`shape_value`](@ref)
 * [`shape_gradient`](@ref)
+* [`shape_symmetric_gradient`](@ref)
 * [`shape_divergence`](@ref)
-* [`shape_derivative`](@ref)
 
 * [`function_value`](@ref)
 * [`function_gradient`](@ref)
@@ -34,6 +40,9 @@ shape functions
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
 """
+CellValues
+
+# CellScalarValues
 immutable CellScalarValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape} <: CellValues{dim, T, FS, GS}
     N::Matrix{T}
     dNdx::Matrix{Vec{dim, T}}
@@ -81,41 +90,7 @@ function CellScalarValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, shap
     CellScalarValues(N, dNdx, dNdξ, detJdV, quad_rule, func_space, M, dMdξ, geom_space)
 end
 
-"""
-An `CellVectorValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
-values of nodal functions, gradients and divergences of nodal functions etc. in the finite element cell with *vectorial*
-shape functions
-
-**Constructor**
-
-    CellVectorValues([::Type{T}], quad_rule::QuadratureRule, function_space::FunctionSpace, [geometric_space::FunctionSpace])
-
-
-**Arguments**
-
-* `T` an optional argument to determine the type the internal data is stored as.
-* `quad_rule` an instance of a [`QuadratureRule`](@ref)
-* `function_space` an instance of a [`FunctionSpace`](@ref) used to interpolate the approximated function
-* `geometric_space` an optional instance of a [`FunctionSpace`](@ref) which is used to interpolate the geometry
-
-** Common methods**
-
-* [`getquadrule`](@ref)
-* [`getfunctionspace`](@ref)
-* [`getgeometricspace`](@ref)
-* [`getdetJdV`](@ref)
-
-* [`shape_value`](@ref)
-* [`shape_gradient`](@ref)
-* [`shape_divergence`](@ref)
-* [`shape_derivative`](@ref)
-
-* [`function_value`](@ref)
-* [`function_gradient`](@ref)
-* [`function_symmetric_gradient`](@ref)
-* [`function_divergence`](@ref)
-* [`spatial_coordinate`](@ref)
-"""
+# CellVectorValues
 immutable CellVectorValues{dim, T <: Real, FS <: FunctionSpace, GS <: FunctionSpace, shape <: AbstractRefShape, M} <: CellValues{dim, T, FS, GS}
     N::Matrix{Vec{dim, T}}
     dNdx::Matrix{Tensor{2, dim, T, M}}
@@ -177,25 +152,6 @@ function CellVectorValues{dim, T, FS <: FunctionSpace, GS <: FunctionSpace, shap
     CellVectorValues(N, dNdx, dNdξ, detJdV, quad_rule, func_space, M, dMdξ, geom_space)
 end
 
-"""
-Updates the `CellValues` object for an element.
-
-    reinit!{dim, T}(cv::CellValues{dim}, x::Vector{Vec{dim, T}})
-
-** Arguments **
-
-* `cv`: the `CellValues` object
-* `x`: A `Vector` of `Vec`, one for each nodal position in the element.
-
-** Result **
-
-* nothing
-
-
-**Details**
-
-
-"""
 function reinit!{dim, T}(cv::CellValues{dim}, x::Vector{Vec{dim, T}})
     n_geom_basefuncs = getnbasefunctions(getgeometricspace(cv))
     n_func_basefuncs = getnbasefunctions(getfunctionspace(cv))

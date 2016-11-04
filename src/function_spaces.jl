@@ -1,14 +1,17 @@
 """
+A `FunctionSpace` is used to define shape functions.
 
 **Constructor:**
 
-    FunctionSpace{dim, reference_shape, order}()
+```julia
+FunctionSpace{dim, reference_shape, order}()
+```
 
-**Parameters:**
+**Arguments:**
 
-* `dim` The dimension the function space lives in
-* `shape` A reference shape, see [`AbstractRefShape`](@ref)
-* `order` The highest order term in the polynomial
+* `dim`: the dimension the function space lives in
+* `shape`: a reference shape, see [`AbstractRefShape`](@ref)
+* `order`: the highest order term in the polynomial
 
 The following function spaces are implemented:
 
@@ -21,11 +24,40 @@ The following function spaces are implemented:
 * `Lagrange{3, RefCube, 1}`
 * `Serendipity{2, RefCube, 2}`
 * `Lagrange{3, RefTetrahedron, 1}`
+
+**Common methods:**
+
+* [`getnbasefunctions`](@ref)
+* [`getdim`](@ref)
+* [`getrefshape`](@ref)
+* [`getorder`](@ref)
+
+
+**Example:**
+
+```jldoctest
+julia> fs = Lagrange{2, RefTetrahedron, 2}()
+JuAFEM.Lagrange{2,JuAFEM.RefTetrahedron,2}()
+
+julia> getnbasefunctions(fs)
+6
+```
 """
 abstract FunctionSpace{dim, shape, order}
 
+"""
+Returns the dimension of a `FunctionSpace`
+"""
 @inline getdim{dim}(fs::FunctionSpace{dim}) = dim
+
+"""
+Returns the reference shape of a `FunctionSpace`
+"""
 @inline getrefshape{dim, shape}(fs::FunctionSpace{dim, shape}) = shape
+
+"""
+Returns the polynomial order of the `FunctionSpace`
+"""
 @inline getorder{dim, shape, order}(fs::FunctionSpace{dim, shape, order}) = order
 
 """
@@ -58,6 +90,11 @@ end
 getnboundaries{dim}(::FunctionSpace{dim, RefCube}) = 2*dim
 getnboundaries(::FunctionSpace{2, RefTetrahedron}) = 3
 getnboundaries(::FunctionSpace{3, RefTetrahedron}) = 4
+
+"""
+Returns the number of base functions for a [`FunctionSpace`](@ref) or `Values` object.
+"""
+getnbasefunctions
 
 ############
 # Lagrange #
