@@ -29,7 +29,7 @@ $\int_\Omega \mathbf{\varepsilon}(\mathbf{\delta u}) : \mathbf{\mathsf{C}} : \ma
 \int_\Gamma \mathbf{\delta u} \cdot \mathbf{t}^\text{p} \text{d}\Gamma +
 \int_\Omega \mathbf{\delta u} \cdot \mathbf{f} \text{d}\Omega \qquad \forall \mathbf{\delta u} \in \mathbb{U}^0$
 
-where $\mathbb{U}, \mathbb{U}^0$ are function spaces with sufficiently regular functions. From this equation the unknown displacement field can be calculated.
+where $\mathbb{U}, \mathbb{U}^0$ are function spaces with sufficiently regular functions. The solution to this equation is identical to the one of the strong format.
 
 ## FE-approximation
 
