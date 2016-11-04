@@ -43,11 +43,6 @@ and then run
 to load the package.
 
 
-```@contents
-Pages = ["man/basic_types.md"]
-```
-
-
 ## API
 
 ```@contents

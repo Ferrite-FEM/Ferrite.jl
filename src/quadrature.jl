@@ -38,7 +38,7 @@ QuadratureRule{dim, shape}([quad_rule_type::Symbol], order::Int)
 
 **Example:**
 
-```julia
+```jldoctest
 julia> QuadratureRule{2, RefTetrahedron}(1)
 JuAFEM.QuadratureRule{2,JuAFEM.RefTetrahedron,Float64}([0.5],ContMechTensors.Tensor{1,2,Float64,2}[[0.333333,0.333333]])
 
@@ -62,7 +62,7 @@ The weights of the quadrature rule.
 
 **Example:**
 
-```julia
+```jldoctest
 julia> qr = QuadratureRule{2, RefTetrahedron}(:legendre, 2);
 
 julia> getweights(qr)
@@ -87,7 +87,7 @@ The points of the quadrature rule.
 
 **Example:**
 
-```julia
+```jldoctest
 julia> qr = QuadratureRule{2, RefTetrahedron}(:legendre, 2);
 
 julia> getpoints(qr)

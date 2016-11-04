@@ -35,7 +35,7 @@ The following function spaces are implemented:
 
 **Example:**
 
-```julia
+```jldoctest
 julia> fs = Lagrange{2, RefTetrahedron, 2}()
 JuAFEM.Lagrange{2,JuAFEM.RefTetrahedron,2}()
 
@@ -56,7 +56,7 @@ Returns the reference shape of a `FunctionSpace`
 @inline getrefshape{dim, shape}(fs::FunctionSpace{dim, shape}) = shape
 
 """
-Returns the polynomial order `FunctionSpace`
+Returns the polynomial order of the `FunctionSpace`
 """
 @inline getorder{dim, shape, order}(fs::FunctionSpace{dim, shape, order}) = order
 

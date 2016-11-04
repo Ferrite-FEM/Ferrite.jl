@@ -18,7 +18,7 @@ vtk_grid{dim,T}(filename::AbstractString, coords::Vector{Vec{dim,T}}, topology::
 
 **Example:**
 
-```julia
+```jldoctest
 julia> coords = [Vec{2}((0.0,0.0)), Vec{2}((1.0,0.0)), Vec{2}((1.5,1.5)), Vec{2}((0.0,1.0))]
 4-element Array{ContMechTensors.Tensor{1,2,Float64,2},1}:
  [0.0,0.0]
@@ -78,7 +78,7 @@ getVTKtype(fs::FunctionSpace)
 
 **Example:**
 
-```julia
+```jldoctest
 julia> fs = Lagrange{2, RefCube, 1}()
 JuAFEM.Lagrange{2,JuAFEM.RefCube,1}()
 

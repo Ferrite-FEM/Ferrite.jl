@@ -1,5 +1,8 @@
 ```@meta
 CurrentModule = JuAFEM
+DocTestSetup = quote
+    using JuAFEM
+end
 ```
 
 # Utilities

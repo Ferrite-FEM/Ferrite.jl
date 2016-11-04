@@ -1,7 +1,9 @@
 ```@meta
 CurrentModule = JuAFEM
+DocTestSetup = quote
+    using JuAFEM
+end
 ```
-
 # Main Types
 
 ```@index

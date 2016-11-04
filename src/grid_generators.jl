@@ -4,13 +4,13 @@ export generate_grid
 
     generate_grid(celltype::Cell{dim, N}, nel::NTuple{dim, Int}, [left::Vec{1, T}=Vec{1}((-1.0,)), right::Vec{1, T}=Vec{1}((1.0,))])
 
-** Arguments **
+**Arguments**
 
 * `celltype`: a celltype, e.g. `Triangle` or `Hexahedron`
 * `nel`: a tuple with number of elements in each direction.
 * `left`, `right`: optional endpoints of the domain, defaults to `-one(Vec{dim})` and `one(Vec{dim})`
 
-** Results **
+**Results**
 
 * `grid`: a `Grid`.
 
