@@ -8,7 +8,7 @@ export Line, QuadraticLine,
 
 # Grid utilities
 export getcells, getncells, getnodes, getnnodes, getcelltype,
-       getcellset,  getnodeset, getcellboundaryset, getcoordinates, getcoordinates!,
+       getcellset, getnodeset, getcellboundaryset, getboundaries, getcoordinates, getcoordinates!, getvertices,
        getcellsets, getnodesets, getcellboundarysets
 
 #########################
@@ -87,18 +87,18 @@ end
 # Grid utility functions #
 ##########################
 @inline getcells(grid::Grid) = grid.cells
-@inline getcells(grid::Grid, v::Vector{Int}) = grid.cells[v]
+@inline getcells(grid::Grid, v::Union{Int, Vector{Int}}) = grid.cells[v]
 @inline getcells(grid::Grid, set::String) = grid.cells[grid.cellsets[set]]
 @inline getncells(grid::Grid) = length(grid.cells)
 @inline getcelltype(grid::Grid) = eltype(grid.cells)
 
 @inline getnodes(grid::Grid) = grid.nodes
-@inline getnodes(grid::Grid, v::Vector{Int}) = grid.nodes[v]
+@inline getnodes(grid::Grid, v::Union{Int, Vector{Int}}) = grid.nodes[v]
 @inline getnodes(grid::Grid, set::String) = grid.nodes[grid.nodesets[set]]
 @inline getnnodes(grid::Grid) = length(grid.nodes)
 
 @inline getboundaries(grid::Grid) = grid.cellboundaries
-@inline getboundaries(grid::Grid, v::Vector{Int}) = grid.cellboundaries[v]
+@inline getboundaries(grid::Grid, v::Union{Int, Vector{Int}}) = grid.cellboundaries[v]
 @inline getboundaries(grid::Grid, set::String) = grid.cellboundaries[grid.cellboundarysets[set]]
 @inline getnboundaries(grid::Grid) = length(grid.cellboundaries)
 
@@ -173,6 +173,25 @@ Returns a vector with the coordinates of the vertices of a cell
 end
 @inline getcoordinates(grid::Grid, cell::CellIndex) = getcoordinates(grid, cell.idx)
 @inline getcoordinates(grid::Grid, boundary::CellBoundaryIndex) = getcoordinates(grid, boundary.idx[1])
+
+"""
+Returns a tuple with the node numbers of the vertices of a cell
+
+    getvertices(grid::Grid, cell::CellIndex)
+    getvertices(grid::Grid, cell::BoundaryIndex)
+
+** Arguments **
+
+* `grid`: a `Grid`
+* `cell`: a `CellIndex` corresponding to a `Cell` in the grid in the grid
+
+** Results **
+
+* `x`: A `Vector` of `Vec`s, one for each vertex of the cell.
+
+"""
+@inline getvertices(grid::Grid, cell::BoundaryIndex) = getcells(grid, boundary.idx[1]).nodes
+@inline getvertices(grid::Grid, cell::CellIndex) = getcells(grid, cell.idx).nodes
 
 # Iterate over cell vector
 Base.start{dim, N}(c::Vector{Cell{dim, N}}) = 1
