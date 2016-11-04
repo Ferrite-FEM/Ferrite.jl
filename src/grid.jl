@@ -21,6 +21,7 @@ immutable Node{dim, T}
     x::Vec{dim, T}
 end
 Node{dim, T}(x::NTuple{dim, T}) = Node(Vec{dim, T}(x))
+getcoordinates(n::Node) = n.x
 
 """
 A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
@@ -29,6 +30,7 @@ immutable Cell{dim, N}
     nodes::NTuple{N, Int}
 end
 (::Type{Cell{dim}}){dim,N}(nodes::NTuple{N}) = Cell{dim,N}(nodes)
+getvertices(c::Cell) = c.nodes
 
 # Typealias for commonly used cells
 typealias Line Cell{1, 2}
@@ -43,6 +45,19 @@ typealias Tetrahedron Cell{3, 4}
 typealias QuadraticTetrahedron Cell{3, 10} # Function interpolation for this doesn't exist in JuAFEM yet
 typealias Hexahedron Cell{3, 8}
 typealias QuadraticHexahedron Cell{3, 20} # Function interpolation for this doesn't exist in JuAFEM yet
+
+_getcellinterpolationspace(::Type{Line}) = Lagrange{1, RefCube, 1}
+_getcellinterpolationspace(::Type{QuadraticLine}) = Lagrange{1, RefCube, 2}
+
+_getcellinterpolationspace(::Type{Triangle}) = Lagrange{2, RefTetrahedron, 1}
+_getcellinterpolationspace(::Type{QuadraticTriangle}) = Lagrange{2, RefTetrahedron, 2}
+_getcellinterpolationspace(::Type{Quadrilateral}) = Lagrange{2, RefCube, 1}
+_getcellinterpolationspace(::Type{QuadraticQuadrilateral}) = Lagrange{2, RefCube, 2}
+_getcellinterpolationspace(::Type{Tetrahedron}) = Lagrange{3, RefTetrahedron, 1}
+
+_getcellinterpolationspace(::Type{Hexahedron}) = Lagrange{3, RefCube, 1}
+#_getcellinterpolationspace(::Type{QuadraticHexahedron})
+# _getcellinterpolationspace(::Type{QuadraticTetrahedron})
 
 """
 A `CellIndex` is returned when looping over the cells in a grid.
@@ -83,12 +98,17 @@ function Grid{dim, N, T}(cells::Vector{Cell{dim, N}}, nodes::Vector{Node{dim, T}
     return Grid(cells, nodes, cellboundaries, cellsets, nodesets, cellboundarysets)
 end
 
+# Internal functions
+_getcellinterpolationspace(g::Grid) = _getcellinterpolationspace(getcelltype(g))
+
+
 ##########################
 # Grid utility functions #
 ##########################
 @inline getcells(grid::Grid) = grid.cells
 @inline getcells(grid::Grid, v::Union{Int, Vector{Int}}) = grid.cells[v]
 @inline getcells(grid::Grid, set::String) = grid.cells[grid.cellsets[set]]
+@inline getcells(grid::Grid, v::CellBoundaryIndex) = grid.cells[v.idx[1]]
 @inline getncells(grid::Grid) = length(grid.cells)
 @inline getcelltype(grid::Grid) = eltype(grid.cells)
 
@@ -96,6 +116,7 @@ end
 @inline getnodes(grid::Grid, v::Union{Int, Vector{Int}}) = grid.nodes[v]
 @inline getnodes(grid::Grid, set::String) = grid.nodes[grid.nodesets[set]]
 @inline getnnodes(grid::Grid) = length(grid.nodes)
+
 
 @inline getboundaries(grid::Grid) = grid.cellboundaries
 @inline getboundaries(grid::Grid, v::Union{Int, Vector{Int}}) = grid.cellboundaries[v]
@@ -110,6 +131,16 @@ end
 
 @inline getcellboundaryset(grid::Grid, set::String) = grid.cellboundarysets[set]
 @inline getcellboundarysets(grid::Grid) = grid.cellboundarysets
+
+# This returns a Vector{Int}, not a Vector{Node}, might be confusing?
+@inline function getnodes(grid::Grid, v::CellBoundaryIndex)
+    cell = getcells(grid, v)
+    space = _getcellinterpolationspace(grid)
+    nodenumbers = getboundarylist(space)[v.idx[2]]
+    vertices = getvertices(cell)
+    return [vertices[i] for i in nodenumbers]
+end
+
 
 
 function addcellset!(grid::Grid, name::String, cellid::Vector{Int})
@@ -190,7 +221,8 @@ Returns a tuple with the node numbers of the vertices of a cell
 * `x`: A `Vector` of `Vec`s, one for each vertex of the cell.
 
 """
-@inline getvertices(grid::Grid, cell::BoundaryIndex) = getcells(grid, boundary.idx[1]).nodes
+@inline getvertices(grid::Grid, cell::Int) = getcells(grid, Int).nodes
+@inline getvertices(grid::Grid, cell::CellBoundaryIndex) = getcells(grid, boundary.idx[1]).nodes
 @inline getvertices(grid::Grid, cell::CellIndex) = getcells(grid, cell.idx).nodes
 
 # Iterate over cell vector

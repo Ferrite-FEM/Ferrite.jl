@@ -44,8 +44,9 @@ abstract Values{dim, T, FS, GS}
 abstract CellValues{dim, T, FS, GS}     <: Values{dim, T, FS, GS}
 abstract BoundaryValues{dim, T, FS, GS} <: Values{dim, T, FS, GS}
 
-
 include("interpolations.jl")
+include("grid.jl")
+include("grid_generators.jl")
 include("quadrature.jl")
 include("cell_values.jl")
 include("boundary_values.jl")
@@ -56,8 +57,7 @@ typealias VectorValues{dim, T, FS, GS} Union{CellVectorValues{dim, T, FS, GS}, B
 include("common_values.jl")
 include("assembler.jl")
 include("boundary_integrals.jl")
-include("grid.jl")
-include("grid_generators.jl")
+
 include("VTK.jl")
 include("deprecations.jl")
 
