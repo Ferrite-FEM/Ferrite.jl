@@ -18,10 +18,10 @@ export CellValues, CellScalarValues, CellVectorValues
 export BoundaryValues, BoundaryScalarValues, BoundaryVectorValues
 export ScalarValues, VectorValues
 
-export reinit!, shape_value, shape_gradient, shape_symmetric_gradient, shape_divergence, getdetJdV, getquadrule, getfunctionspace, getgeometricspace,
+export reinit!, shape_value, shape_gradient, shape_symmetric_gradient, shape_divergence, getdetJdV, getquadrule, getfunctioninterpolation, getgeometryinterpolation,
        function_value, function_gradient, function_symmetric_gradient, function_divergence, spatial_coordinate
 export getboundarynumber
-export FunctionSpace, getdim, getrefshape, getorder, getnbasefunctions, getnquadpoints
+export Interpolation, getdim, getrefshape, getorder, getnbasefunctions, getnquadpoints
 export Lagrange, Serendipity, RefTetrahedron, RefCube
 export QuadratureRule, getweights, getpoints
 export getVTKtype
@@ -44,7 +44,7 @@ abstract CellValues{dim, T, FS, GS}     <: Values{dim, T, FS, GS}
 abstract BoundaryValues{dim, T, FS, GS} <: Values{dim, T, FS, GS}
 
 
-include("function_spaces.jl")
+include("interpolations.jl")
 include("quadrature.jl")
 include("cell_values.jl")
 include("boundary_values.jl")

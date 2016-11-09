@@ -1,25 +1,25 @@
 @testset "CellValues" begin
 
-for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
-                                     (Lagrange{1, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
-                                     (Lagrange{2, RefCube, 1}(), QuadratureRule{2, RefCube}(2)),
-                                     (Lagrange{2, RefCube, 2}(), QuadratureRule{2, RefCube}(2)),
-                                     (Lagrange{2, RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2)),
-                                     (Lagrange{2, RefTetrahedron, 2}(), QuadratureRule{2, RefTetrahedron}(2)),
-                                     (Lagrange{3, RefCube, 1}(), QuadratureRule{3, RefCube}(2)),
-                                     (Serendipity{2, RefCube, 2}(), QuadratureRule{2, RefCube}(2)),
-                                     (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{3, RefTetrahedron}(2)))
+for (func_interpol, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
+                                    (Lagrange{1, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
+                                    (Lagrange{2, RefCube, 1}(), QuadratureRule{2, RefCube}(2)),
+                                    (Lagrange{2, RefCube, 2}(), QuadratureRule{2, RefCube}(2)),
+                                    (Lagrange{2, RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2)),
+                                    (Lagrange{2, RefTetrahedron, 2}(), QuadratureRule{2, RefTetrahedron}(2)),
+                                    (Lagrange{3, RefCube, 1}(), QuadratureRule{3, RefCube}(2)),
+                                    (Serendipity{2, RefCube, 2}(), QuadratureRule{2, RefCube}(2)),
+                                    (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{3, RefTetrahedron}(2)))
 
 
     for fe_valtype in (CellScalarValues, CellVectorValues)
-        cv = fe_valtype(quad_rule, function_space)
-        ndim = getdim(function_space)
-        n_basefuncs = getnbasefunctions(function_space)
+        cv = fe_valtype(quad_rule, func_interpol)
+        ndim = getdim(func_interpol)
+        n_basefuncs = getnbasefunctions(func_interpol)
 
         fe_valtype == CellScalarValues && @test getnbasefunctions(cv) == n_basefuncs
-        fe_valtype == CellVectorValues && @test getnbasefunctions(cv) == n_basefuncs * getdim(function_space)
+        fe_valtype == CellVectorValues && @test getnbasefunctions(cv) == n_basefuncs * getdim(func_interpol)
 
-        x = valid_coordinates(function_space)
+        x = valid_coordinates(func_interpol)
         reinit!(cv, x)
 
         # We test this by applying a given deformation gradient on all the nodes.
@@ -48,21 +48,21 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
         for i in 1:getnquadpoints(cv)
             vol += getdetJdV(cv,i)
         end
-        @test vol ≈ calculate_volume(function_space, x)
+        @test vol ≈ calculate_volume(func_interpol, x)
 
         # Test of utility functions
-        @test getfunctionspace(cv) == function_space
-        @test getgeometricspace(cv) == function_space
+        @test getfunctioninterpolation(cv) == func_interpol
+        @test getgeometryinterpolation(cv) == func_interpol
         @test getquadrule(cv) == quad_rule
 
         # Test quadrature rule after reinit! with ref. coords
-        x = reference_coordinates(function_space)
+        x = reference_coordinates(func_interpol)
         reinit!(cv, x)
         vol = 0.0
         for i in 1:getnquadpoints(cv)
             vol += getdetJdV(cv,i)
         end
-        @test vol ≈ reference_volume(function_space)
+        @test vol ≈ reference_volume(func_interpol)
 
         # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
         for (i, qp_x) in enumerate(getpoints(quad_rule))

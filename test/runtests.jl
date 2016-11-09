@@ -4,7 +4,7 @@ using Base.Test
 using ForwardDiff
 
 include("test_utils.jl")
-include("test_function_spaces.jl")
+include("test_interpolations.jl")
 include("test_cellvalues.jl")
 include("test_boundaryvalues.jl")
 include("test_quadrules.jl")

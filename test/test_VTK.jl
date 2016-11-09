@@ -78,7 +78,7 @@ using SHA
     OVERWRITE_CHECKSUMS && close(csio)
 
     # Test getVTKtype
-    for functionspace in (Lagrange{1, RefCube, 1}(),
+    for interpolation in (Lagrange{1, RefCube, 1}(),
                           Lagrange{1, RefCube, 2}(),
                           Lagrange{2, RefCube, 1}(),
                           Lagrange{2, RefCube, 2}(),
@@ -88,7 +88,7 @@ using SHA
                           Serendipity{2, RefCube, 2}(),
                           Lagrange{3, RefTetrahedron, 1}())
 
-        @test getVTKtype(functionspace).nodes == getnbasefunctions(functionspace)
+        @test getVTKtype(interpolation).nodes == getnbasefunctions(interpolation)
     end
 
 end # of testset
