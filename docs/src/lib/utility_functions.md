@@ -18,7 +18,7 @@ getpoints
 getweights
 ```
 
-## FunctionSpace
+## Interpolation
 
 ```@docs
 getnbasefunctions
@@ -33,8 +33,8 @@ getorder
 reinit!
 getnquadpoints
 getquadrule
-getfunctionspace
-getgeometricspace
+getfunctioninterpolation
+getgeometryinterpolation
 getdetJdV
 
 shape_value

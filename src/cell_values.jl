@@ -1,6 +1,6 @@
 # Defines CellScalarValues and CellVectorValues and common methods
 """
-A `CellValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
+A `CellValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
 values of nodal functions, gradients and divergences of nodal functions etc. in the finite element cell. There are
 two different types of `CellValues`: `CellScalarValues` and `CellVectorValues`. As the names suggest, `CellScalarValues`
 utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape functions. For a scalar field, the

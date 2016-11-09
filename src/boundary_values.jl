@@ -1,6 +1,6 @@
 # Defines BoundaryScalarValues and BoundaryVectorValues and common methods
 """
-A `BoundaryValues` object facilitates the process of evaluating values shape functions, gradients of shape functions,
+A `BoundaryValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
 values of nodal functions, gradients and divergences of nodal functions etc. on the finite element boundary. There are
 two different types of `BoundaryValues`: `BoundaryScalarValues` and `BoundaryVectorValues`. As the names suggest,
 `BoundaryScalarValues` utilizes scalar shape functions and `BoundaryVectorValues` utilizes vectorial shape functions.

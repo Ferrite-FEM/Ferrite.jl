@@ -18,7 +18,8 @@ export CellValues, CellScalarValues, CellVectorValues
 export BoundaryValues, BoundaryScalarValues, BoundaryVectorValues
 export ScalarValues, VectorValues
 
-export reinit!, shape_value, shape_gradient, shape_symmetric_gradient, shape_divergence, getdetJdV, getquadrule, getfunctioninterpolation, getgeometryinterpolation,
+export reinit!, shape_value, shape_gradient, shape_symmetric_gradient, shape_divergence, getdetJdV, getquadrule,
+       getfunctioninterpolation, getgeometryinterpolation,
        function_value, function_gradient, function_symmetric_gradient, function_divergence, spatial_coordinate
 export getboundarynumber
 export Interpolation, getdim, getrefshape, getorder, getnbasefunctions, getnquadpoints
@@ -27,7 +28,7 @@ export QuadratureRule, getweights, getpoints
 export getVTKtype
 
 """
-Represents a reference shape which quadrature rules and function spaces are defined on.
+Represents a reference shape which quadrature rules and interpolations are defined on.
 Currently, the only concrete types that subtype this type are `RefCube` in 1,2 and 3 dimensions,
 and `RefTetrahedron` in 2 and 3 dimensions.
 """

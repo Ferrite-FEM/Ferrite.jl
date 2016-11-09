@@ -43,7 +43,7 @@ julia> vtk_save(vtkobj)
 
 **Details**
 
-This is a thin wrapper around the `vtk_grid` function from the [`WriteVTK`](https://github.com/jipolanco/WriteVTK.jl) package.
+This is a thin wrapper around the function `vtk_grid` from the [`WriteVTK`](https://github.com/jipolanco/WriteVTK.jl) package.
 
 For information how to add cell data and point data to the resulting VTK object as well as how to write it to a file see
 [https://github.com/jipolanco/WriteVTK.jl#generating-an-unstructured-vtk-file](https://github.com/jipolanco/WriteVTK.jl#generating-an-unstructured-vtk-file)
