@@ -3,12 +3,12 @@
 #####################################
 # Volume for the reference elements #
 #####################################
-reference_volume{dim}(::FunctionSpace{dim, RefCube}) = 2^dim
-reference_volume{dim}(::FunctionSpace{dim, RefTetrahedron}) = 1 / factorial(dim)
+reference_volume{dim}(::Interpolation{dim, RefCube}) = 2^dim
+reference_volume{dim}(::Interpolation{dim, RefTetrahedron}) = 1 / factorial(dim)
 # For boundaries
-reference_volume(fs::FunctionSpace, ::Int) = reference_volume(JuAFEM.getlowerdim(fs))
-reference_volume(fs::FunctionSpace{2, RefTetrahedron}, boundary::Int) = boundary == 1 ? sqrt(2) : 1.0
-reference_volume(fs::FunctionSpace{3, RefTetrahedron}, boundary::Int) = boundary == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
+reference_volume(fs::Interpolation, ::Int) = reference_volume(JuAFEM.getlowerdim(fs))
+reference_volume(fs::Interpolation{2, RefTetrahedron}, boundary::Int) = boundary == 1 ? sqrt(2) : 1.0
+reference_volume(fs::Interpolation{3, RefTetrahedron}, boundary::Int) = boundary == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
 
 ##########################################
 # Coordinates for the reference elements #
@@ -106,7 +106,7 @@ function rotmat(dim, θ=π/6)
     end
 end
 
-function valid_coordinates{dim, shape, order}(fs::FunctionSpace{dim, shape, order})
+function valid_coordinates{dim, shape, order}(fs::Interpolation{dim, shape, order})
     x = reference_coordinates(fs)
     R = rotmat(dim)
     return [2.0 * (R ⋅ x[i]) for i in 1:length(x)]

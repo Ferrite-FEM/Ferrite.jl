@@ -2,8 +2,8 @@
 DocTestSetup = quote
     using JuAFEM
     quad_rule = QuadratureRule{2, RefCube}(2)
-    func_space = Lagrange{2, RefCube, 1}()
-    cell_values = CellScalarValues(quad_rule, func_space)
+    interpolation = Lagrange{2, RefCube, 1}()
+    cell_values = CellScalarValues(quad_rule, interpolation)
     x = Vec{2, Float64}[Vec{2}((0.0, 0.0)),
                            Vec{2}((1.5, 0.0)),
                            Vec{2}((2.0, 2.0)),
@@ -28,16 +28,16 @@ First, create a quadrature rule, for integration in 2D, on a reference cube:
 julia> quad_rule = QuadratureRule{2, RefCube}(2);
 ```
 
-Next, create a function space
+Next, create an interpolation
 
 ```jldoctest
-julia> func_space = Lagrange{2, RefCube, 1}();
+julia> interpolation = Lagrange{2, RefCube, 1}();
 ```
 
 Use these to create a `CellScalarValues` object.
 
 ```jldoctest
-julia> cell_values = CellScalarValues(quad_rule, func_space);
+julia> cell_values = CellScalarValues(quad_rule, interpolation);
 ```
 
 Presume one cell in the grid has the following vertices:

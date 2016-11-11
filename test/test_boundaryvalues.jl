@@ -1,25 +1,25 @@
 @testset "BoundaryValues" begin
-for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{0, RefCube}(2)),
-                                     (Lagrange{1, RefCube, 2}(), QuadratureRule{0, RefCube}(2)),
-                                     (Lagrange{2, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
-                                     (Lagrange{2, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
-                                     (Lagrange{2, RefTetrahedron, 1}(), QuadratureRule{1, RefTetrahedron}(2)),
-                                     (Lagrange{2, RefTetrahedron, 2}(), QuadratureRule{1, RefTetrahedron}(2)),
-                                     (Lagrange{3, RefCube, 1}(), QuadratureRule{2, RefCube}(2)),
-                                     (Serendipity{2, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
-                                     (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2)))
+for (func_interpol, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{0, RefCube}(2)),
+                                    (Lagrange{1, RefCube, 2}(), QuadratureRule{0, RefCube}(2)),
+                                    (Lagrange{2, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
+                                    (Lagrange{2, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
+                                    (Lagrange{2, RefTetrahedron, 1}(), QuadratureRule{1, RefTetrahedron}(2)),
+                                    (Lagrange{2, RefTetrahedron, 2}(), QuadratureRule{1, RefTetrahedron}(2)),
+                                    (Lagrange{3, RefCube, 1}(), QuadratureRule{2, RefCube}(2)),
+                                    (Serendipity{2, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
+                                    (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2)))
 
     for fe_valtype in (BoundaryScalarValues, BoundaryVectorValues)
-        bv = fe_valtype(quad_rule, function_space)
-        ndim = getdim(function_space)
-        n_basefuncs = getnbasefunctions(function_space)
+        bv = fe_valtype(quad_rule, func_interpol)
+        ndim = getdim(func_interpol)
+        n_basefuncs = getnbasefunctions(func_interpol)
 
         fe_valtype == BoundaryScalarValues && @test getnbasefunctions(bv) == n_basefuncs
-        fe_valtype == BoundaryVectorValues && @test getnbasefunctions(bv) == n_basefuncs * getdim(function_space)
+        fe_valtype == BoundaryVectorValues && @test getnbasefunctions(bv) == n_basefuncs * getdim(func_interpol)
 
-        x = valid_coordinates(function_space)
-        boundary_nodes, cell_nodes = topology_test_nodes(function_space)
-        for boundary in 1:JuAFEM.getnboundaries(function_space)
+        x = valid_coordinates(func_interpol)
+        boundary_nodes, cell_nodes = topology_test_nodes(func_interpol)
+        for boundary in 1:JuAFEM.getnboundaries(func_interpol)
             reinit!(bv, x, boundary)
             boundary_quad_rule = getquadrule(bv)
             @test JuAFEM.getcurrentboundary(bv) == boundary
@@ -50,21 +50,21 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
             for i in 1:getnquadpoints(bv)
                 vol += getdetJdV(bv,i)
             end
-            x_boundary = x[[JuAFEM.getboundarylist(function_space)[boundary]...]]
-            @test vol ≈ calculate_volume(JuAFEM.getlowerdim(function_space), x_boundary)
+            x_boundary = x[[JuAFEM.getboundarylist(func_interpol)[boundary]...]]
+            @test vol ≈ calculate_volume(JuAFEM.getlowerdim(func_interpol), x_boundary)
 
             # Test of utility functions
-            @test getfunctionspace(bv) == function_space
-            @test getgeometricspace(bv) == function_space
+            @test getfunctioninterpolation(bv) == func_interpol
+            @test getgeometryinterpolation(bv) == func_interpol
 
             # Test quadrature rule after reinit! with ref. coords
-            x = reference_coordinates(function_space)
+            x = reference_coordinates(func_interpol)
             reinit!(bv, x, boundary)
             vol = 0.0
             for i in 1:getnquadpoints(bv)
                 vol += getdetJdV(bv, i)
             end
-            @test vol ≈ reference_volume(function_space, boundary)
+            @test vol ≈ reference_volume(func_interpol, boundary)
 
             # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
             for (i, qp_x) in enumerate(getpoints(boundary_quad_rule))
@@ -74,11 +74,11 @@ for (function_space, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{
         end
 
         # Test boundary number calculation
-        boundary_nodes, cell_nodes = topology_test_nodes(function_space)
-        for boundary in 1:JuAFEM.getnboundaries(function_space)
-            @test getboundarynumber(boundary_nodes[boundary], cell_nodes, function_space) == boundary
+        boundary_nodes, cell_nodes = topology_test_nodes(func_interpol)
+        for boundary in 1:JuAFEM.getnboundaries(func_interpol)
+            @test getboundarynumber(boundary_nodes[boundary], cell_nodes, func_interpol) == boundary
         end
-        @test_throws ArgumentError getboundarynumber(boundary_nodes[JuAFEM.getnboundaries(function_space)+1], cell_nodes, function_space)
+        @test_throws ArgumentError getboundarynumber(boundary_nodes[JuAFEM.getnboundaries(func_interpol)+1], cell_nodes, func_interpol)
     end
 end
 

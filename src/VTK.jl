@@ -43,7 +43,7 @@ julia> vtk_save(vtkobj)
 
 **Details**
 
-This is a thin wrapper around the `vtk_grid` function from the [`WriteVTK`](https://github.com/jipolanco/WriteVTK.jl) package.
+This is a thin wrapper around the function `vtk_grid` from the [`WriteVTK`](https://github.com/jipolanco/WriteVTK.jl) package.
 
 For information how to add cell data and point data to the resulting VTK object as well as how to write it to a file see
 [https://github.com/jipolanco/WriteVTK.jl#generating-an-unstructured-vtk-file](https://github.com/jipolanco/WriteVTK.jl#generating-an-unstructured-vtk-file)
@@ -62,15 +62,15 @@ function vtk_grid{dim,T}(filename::AbstractString, coords::Vector{Vec{dim,T}}, t
 end
 
 """
-Returns the VTKCellType corresponding to the input FunctionSpace
+Returns the VTKCellType corresponding to the input `Interpolation`
 
 ```julia
-getVTKtype(fs::FunctionSpace)
+getVTKtype(ip::Interpolation)
 ```
 
 **Arguments**
 
-* `fs`: The function space
+* `ip`: The interpolation
 
 **Results:**
 
@@ -79,10 +79,10 @@ getVTKtype(fs::FunctionSpace)
 **Example:**
 
 ```jldoctest
-julia> fs = Lagrange{2, RefCube, 1}()
+julia> ip = Lagrange{2, RefCube, 1}()
 JuAFEM.Lagrange{2,JuAFEM.RefCube,1}()
 
-julia> getVTKtype(fs)
+julia> getVTKtype(ip)
 WriteVTK.VTKCellTypes.VTKCellType("VTK_QUAD",0x09,4)
 ```
 """

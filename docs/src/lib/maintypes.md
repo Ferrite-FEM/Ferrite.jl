@@ -13,7 +13,7 @@ Pages = ["maintypes.md"]
 ```@docs
 AbstractRefShape
 QuadratureRule
-FunctionSpace
+Interpolation
 CellValues
 BoundaryValues
 ```

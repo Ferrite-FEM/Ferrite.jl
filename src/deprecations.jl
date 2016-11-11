@@ -44,8 +44,8 @@ export Dim
 
 # PR #85
 @deprecate get_quadrule getquadrule
-@deprecate get_functionspace getfunctionspace
-@deprecate get_geometricspace getgeometricspace
+@deprecate get_functionspace getfunctioninterpolation
+@deprecate get_geometricspace getgeometryinterpolation
 @deprecate detJdV getdetJdV
 @deprecate functionspace_n_dim getdim
 @deprecate functionspace_ref_shape getrefshape
@@ -60,3 +60,8 @@ export Dim
 
 # PR #88
 @deprecate FECellValues CellScalarValues
+
+# PR #107
+@deprecate FunctionSpace Interpolation
+@deprecate getfunctionspace getfunctioninterpolation
+@deprecate getgeometricspace getgeometryinterpolation

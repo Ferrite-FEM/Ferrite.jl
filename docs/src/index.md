@@ -13,8 +13,8 @@ JuAFEM is a finite element toolbox that provides functionalities to implement fi
 The main functionalities of the package include:
 
 * Facilitate integration using different quadrature rules.
-* Define different finite element spaces.
-* Evaluate shape functions, derivatives of shape functions etc. for the different finite element spaces and quadrature rules.
+* Define different finite element interpolations.
+* Evaluate shape functions, derivatives of shape functions etc. for the different interpolations and quadrature rules.
 * Evaluate functions and derivatives in the finite element space.
 * Generate simple grids.
 * Export grids and solutions to VTK.

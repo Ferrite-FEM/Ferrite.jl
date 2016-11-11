@@ -1,7 +1,7 @@
 ##################
 # All 1D RefCube #
 ##################
-function create_boundary_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{0, shape, T}, ::FunctionSpace{1, shape})
+function create_boundary_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{0, shape, T}, ::Interpolation{1, shape})
     w = getweights(quad_rule)
     boundary_quad_rule = QuadratureRule{1, shape, T}[]
 
@@ -15,12 +15,12 @@ function create_boundary_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRul
     return boundary_quad_rule
 end
 
-detJ_boundary{T}(::Tensor{2, 1, T}, ::FunctionSpace{1, RefCube}, ::Int) = one(T)
+detJ_boundary{T}(::Tensor{2, 1, T}, ::Interpolation{1, RefCube}, ::Int) = one(T)
 
 ##################
 # All 2D RefCube #
 ##################
-function create_boundary_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{1, shape, T}, ::FunctionSpace{2, shape})
+function create_boundary_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{1, shape, T}, ::Interpolation{2, shape})
     w = getweights(quad_rule)
     p = getpoints(quad_rule)
     n_points = length(w)
@@ -42,7 +42,7 @@ function create_boundary_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRul
     return boundary_quad_rule
 end
 
-function detJ_boundary(J::Tensor{2, 2}, ::FunctionSpace{2, RefCube}, boundary::Int)
+function detJ_boundary(J::Tensor{2, 2}, ::Interpolation{2, RefCube}, boundary::Int)
     boundary == 1 && return sqrt(J[1,1]^2 + J[2,1]^2)
     boundary == 2 && return sqrt(J[1,2]^2 + J[2,2]^2)
     boundary == 3 && return sqrt(J[1,1]^2 + J[2,1]^2)
@@ -52,7 +52,7 @@ end
 #########################
 # All RefTetrahedron 2D #
 #########################
-function create_boundary_quad_rule{T, shape <: RefTetrahedron}(quad_rule::QuadratureRule{1, shape, T}, ::FunctionSpace{2, shape})
+function create_boundary_quad_rule{T, shape <: RefTetrahedron}(quad_rule::QuadratureRule{1, shape, T}, ::Interpolation{2, shape})
     w = getweights(quad_rule)
     p = getpoints(quad_rule)
     n_points = length(w)
@@ -71,7 +71,7 @@ function create_boundary_quad_rule{T, shape <: RefTetrahedron}(quad_rule::Quadra
     return boundary_quad_rule
 end
 
-function detJ_boundary(J::Tensor{2, 2}, ::FunctionSpace{2, RefTetrahedron}, boundary::Int)
+function detJ_boundary(J::Tensor{2, 2}, ::Interpolation{2, RefTetrahedron}, boundary::Int)
     boundary == 1 && return sqrt((J[1,1] - J[1,2])^2 + (J[2,1] - J[2,2])^2)
     boundary == 2 && return sqrt(J[1,2]^2 + J[2,2]^2)
     boundary == 3 && return sqrt(J[1,1]^2 + J[2,1]^2)
@@ -80,7 +80,7 @@ end
 ##################
 # All RefCube 3D #
 ##################
-function create_boundary_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{2, shape, T}, ::FunctionSpace{3, shape})
+function create_boundary_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{2, shape, T}, ::Interpolation{3, shape})
     w = getweights(quad_rule)
     p = getpoints(quad_rule)
     n_points = length(w)
@@ -108,7 +108,7 @@ function create_boundary_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRul
     return boundary_quad_rule
 end
 
-function detJ_boundary(J::Tensor{2, 3}, ::FunctionSpace{3, RefCube}, boundary::Int)
+function detJ_boundary(J::Tensor{2, 3}, ::Interpolation{3, RefCube}, boundary::Int)
     boundary == 1 && return norm(J[:,1] × J[:,2])
     boundary == 2 && return norm(J[:,1] × J[:,3])
     boundary == 3 && return norm(J[:,2] × J[:,3])
@@ -120,7 +120,7 @@ end
 #########################
 # All RefTetrahedron 3D #
 #########################
-function create_boundary_quad_rule{T, shape <: RefTetrahedron}(quad_rule::QuadratureRule{2, shape, T}, ::FunctionSpace{3, shape})
+function create_boundary_quad_rule{T, shape <: RefTetrahedron}(quad_rule::QuadratureRule{2, shape, T}, ::Interpolation{3, shape})
     w = getweights(quad_rule)
     p = getpoints(quad_rule)
     n_points = length(w)
@@ -142,7 +142,7 @@ function create_boundary_quad_rule{T, shape <: RefTetrahedron}(quad_rule::Quadra
     return boundary_quad_rule
 end
 
-function detJ_boundary(J::Tensor{2, 3}, ::FunctionSpace{3, RefTetrahedron}, boundary::Int)
+function detJ_boundary(J::Tensor{2, 3}, ::Interpolation{3, RefTetrahedron}, boundary::Int)
     boundary == 1 && return norm(J[:,1] × J[:,2])
     boundary == 2 && return norm(J[:,1] × J[:,3])
     boundary == 3 && return norm((J[:,1]-J[:,3]) × (J[:,2]-J[:,3]))
