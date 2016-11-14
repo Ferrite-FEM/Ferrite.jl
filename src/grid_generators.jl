@@ -293,7 +293,7 @@ function generate_grid{T}(::Type{Tetrahedron}, nel::NTuple{3, Int}, left::Vec{3,
         push!(nodes, Node((coords_x[i], coords_y[j], coords_z[k])))
     end
 
-    # Generate cells
+    # Generate cells, case 13 from: http://www.baumanneduard.ch/Splitting%20a%20cube%20in%20tetrahedras2.htm
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y, n_nodes_z))
     cells = Tetrahedron[]
     for k in 1:nel_z, j in 1:nel_y, i in 1:nel_x
@@ -308,18 +308,18 @@ function generate_grid{T}(::Type{Tetrahedron}, nel::NTuple{3, Int}, left::Vec{3,
 
     # Cell boundaries
     cell_array = reshape(collect(1:nel_tot),(5, nel_x, nel_y, nel_z))
-    cellbounds = CellBoundary[[CellBoundary((cl, 3)) for cl in cell_array[1,:,:,1][:]];
-                              [CellBoundary((cl, 3)) for cl in cell_array[2,:,:,1][:]];
-                              [CellBoundary((cl, 1)) for cl in cell_array[1,:,1,:][:]];
-                              [CellBoundary((cl, 3)) for cl in cell_array[4,:,1,:][:]];
-                              [CellBoundary((cl, 1)) for cl in cell_array[2,end,:,:][:]];
-                              [CellBoundary((cl, 2)) for cl in cell_array[4,end,:,:][:]];
-                              [CellBoundary((cl, 4)) for cl in cell_array[2,:,end,:][:]];
-                              [CellBoundary((cl, 2)) for cl in cell_array[5,:,end,:][:]];
-                              [CellBoundary((cl, 2)) for cl in cell_array[1,1,:,:][:]];
-                              [CellBoundary((cl, 1)) for cl in cell_array[5,1,:,:][:]];
-                              [CellBoundary((cl, 4)) for cl in cell_array[4,:,:,end][:]];
-                              [CellBoundary((cl, 1)) for cl in cell_array[5,:,:,end][:]]]
+    cellbounds = CellBoundary[[CellBoundary((cl, 1)) for cl in cell_array[1,:,:,1][:]];
+                              [CellBoundary((cl, 1)) for cl in cell_array[2,:,:,1][:]];
+                              [CellBoundary((cl, 2)) for cl in cell_array[1,:,1,:][:]];
+                              [CellBoundary((cl, 1)) for cl in cell_array[4,:,1,:][:]];
+                              [CellBoundary((cl, 2)) for cl in cell_array[2,end,:,:][:]];
+                              [CellBoundary((cl, 4)) for cl in cell_array[4,end,:,:][:]];
+                              [CellBoundary((cl, 3)) for cl in cell_array[2,:,end,:][:]];
+                              [CellBoundary((cl, 4)) for cl in cell_array[5,:,end,:][:]];
+                              [CellBoundary((cl, 4)) for cl in cell_array[1,1,:,:][:]];
+                              [CellBoundary((cl, 2)) for cl in cell_array[5,1,:,:][:]];
+                              [CellBoundary((cl, 3)) for cl in cell_array[4,:,:,end][:]];
+                              [CellBoundary((cl, 3)) for cl in cell_array[5,:,:,end][:]]]
 
     # Cell boundary sets
     offset = 0
