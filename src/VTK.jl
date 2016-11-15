@@ -136,4 +136,3 @@ function vtk_cellset{dim}(vtk, grid::Grid{dim}, cellset::String)
     z[getcellset(grid, cellset)] = 1.0
     vtk_cell_data(vtk, z, cellset)
 end
-
