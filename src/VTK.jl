@@ -1,3 +1,5 @@
+export vtk_nodeset, vtk_cellset
+
 """
 Creates an unstructured VTK grid from the element topology and coordinates.
 
@@ -98,6 +100,19 @@ getVTKtype(::Serendipity{2, RefCube, 2}) = VTKCellTypes.VTK_QUADRATIC_QUAD
 getVTKtype(::Lagrange{3, RefCube, 1}) = VTKCellTypes.VTK_HEXAHEDRON
 getVTKtype(::Lagrange{3, RefTetrahedron, 1}) = VTKCellTypes.VTK_TETRA
 
+getVTKtype(::Type{Cell{1,2}}) = VTKCellTypes.VTK_LINE
+getVTKtype(::Type{Cell{1,3}}) = VTKCellTypes.VTK_QUADRATIC_EDGE
+
+getVTKtype(::Type{Cell{2,4}}) = VTKCellTypes.VTK_QUAD
+getVTKtype(::Type{Cell{2,9}}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
+getVTKtype(::Type{Cell{2,3}}) = VTKCellTypes.VTK_TRIANGLE
+getVTKtype(::Type{Cell{2,6}}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
+getVTKtype(::Type{Cell{2,8}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
+
+getVTKtype(::Type{Cell{3,8}}) = VTKCellTypes.VTK_HEXAHEDRON
+getVTKtype(::Type{Cell{3,4}}) = VTKCellTypes.VTK_TETRA
+
+
 function vtk_grid{dim, N, T}(filename::AbstractString, grid::Grid{dim, N, T})
     coords = reinterpret(T, getnodes(grid), (dim, getnnodes(grid)))
 
@@ -110,14 +125,14 @@ function vtk_grid{dim, N, T}(filename::AbstractString, grid::Grid{dim, N, T})
     return vtk_grid(filename, coords, cls)
 end
 
-getVTKtype(::Type{Cell{1,2}}) = VTKCellTypes.VTK_LINE
-getVTKtype(::Type{Cell{1,3}}) = VTKCellTypes.VTK_QUADRATIC_EDGE
+function vtk_nodeset{dim}(vtk, grid::Grid{dim}, nodeset::String)
+    z = zeros(getnnodes(grid))
+    z[getnodeset(grid, nodeset)] = 1.0
+    vtk_point_data(vtk, z, nodeset)
+end
 
-getVTKtype(::Type{Cell{2,4}}) = VTKCellTypes.VTK_QUAD
-getVTKtype(::Type{Cell{2,9}}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
-getVTKtype(::Type{Cell{2,3}}) = VTKCellTypes.VTK_TRIANGLE
-getVTKtype(::Type{Cell{2,6}}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
-getVTKtype(::Type{Cell{2,8}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
-
-getVTKtype(::Type{Cell{3,8}}) = VTKCellTypes.VTK_HEXAHEDRON
-getVTKtype(::Type{Cell{3,4}}) = VTKCellTypes.VTK_TETRA
+function vtk_cellset{dim}(vtk, grid::Grid{dim}, cellset::String)
+    z = zeros(getncells(grid))
+    z[getcellset(grid, cellset)] = 1.0
+    vtk_cell_data(vtk, z, cellset)
+end
