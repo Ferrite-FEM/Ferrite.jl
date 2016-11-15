@@ -11,6 +11,8 @@ export getcells, getncells, getnodes, getnnodes, getcelltype,
        getcellset,  getnodeset, getcellboundaryset, getcoordinates,
        getcellsets, getnodesets, getcellboundarysets
 
+export addnodeset!, addcellset!
+
 #########################
 # Main types for meshes #
 #########################
@@ -114,12 +116,36 @@ end
 
 function addcellset!(grid::Grid, name::String, cellid::Vector{Int})
     haskey(grid.cellsets, name) && throw(ArgumentError("There already exists a cellset with the name: $name"))
-    grid.cellsets[name] = cellid
+    grid.cellsets[name] = copy(cellid)
     nothing
 end
+
+function addcellset!(grid::Grid, name::String, f::Function)
+    cells = Int[]
+    for (i, cell) in enumerate(getcells(grid))
+        all_true = true
+        for node_idx in cell.nodes
+            node = grid.nodes[node_idx]
+            !f(node.x) && (all_true = false; break)
+        end
+        all_true && push!(cells, i)
+    end
+    grid.cellsets[name] = cells
+    nothing
+end
+
 function addnodeset!(grid::Grid, name::String, nodeid::Vector{Int})
     haskey(grid.nodesets, name) && throw(ArgumentError("There already exists a nodeset with the name: $name"))
-    grid.nodesets[name] = nodeid
+    grid.nodesets[name] = copy(nodeid)
+    nothing
+end
+
+function addnodeset!(grid::Grid, name::String, f::Function)
+    nodes = Int[]
+    for (i, n) in enumerate(getnodes(grid))
+        f(n.x) && push!(nodes, i)
+    end
+    grid.nodesets[name] = nodes
     nothing
 end
 
