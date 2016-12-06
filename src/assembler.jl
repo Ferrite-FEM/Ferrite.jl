@@ -33,7 +33,7 @@ end
 
 Assembles the element matrix `Ke` into `a`.
 """
-function assemble!{T}(a::Assembler{T}, Ke::Matrix{T}, edof::Vector{Int})
+function assemble!{T}(a::Assembler{T}, Ke::AbstractMatrix{T}, edof::AbstractVector{Int})
     n_dofs = length(edof)
     append!(a.V, Ke[:])
     for dof1 in 1:n_dofs, dof2 in 1:n_dofs
