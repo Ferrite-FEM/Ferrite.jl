@@ -1,4 +1,6 @@
 @testset "assemble" begin
+    dofs = [1, 3, 5, 7]
+
     # residual
     ge = rand(4)
     g = zeros(8)
@@ -10,7 +12,6 @@
 
     # stiffness
     a = start_assemble()
-    dofs = [1, 3, 5, 7]
     Ke = rand(4, 4)
     assemble!(a, Ke, dofs)
     K = end_assemble(a)
