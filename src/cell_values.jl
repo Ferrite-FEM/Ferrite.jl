@@ -164,12 +164,12 @@ function reinit!{dim, T}(cv::CellValues{dim}, x::Vector{Vec{dim, T}})
         for j in 1:n_geom_basefuncs
             fecv_J += x[j] ⊗ cv.dMdξ[j, i]
         end
+        detJ = det(fecv_J)
+        detJ > 0.0 || throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
+        cv.detJdV[i] = detJ * w
         Jinv = inv(fecv_J)
         for j in 1:n_func_basefuncs
             cv.dNdx[j,i] = cv.dNdξ[j, i] ⋅ Jinv
         end
-        detJ = det(fecv_J)
-        detJ <= 0.0 && throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
-        cv.detJdV[i] = detJ * w
     end
 end
