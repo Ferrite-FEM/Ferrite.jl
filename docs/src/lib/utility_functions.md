@@ -59,6 +59,14 @@ getboundarynumber
 getcurrentboundary
 ```
 
+## Assembling
+
+```@docs
+start_assemble
+assemble!
+end_assemble
+```
+
 
 ## VTK
 
