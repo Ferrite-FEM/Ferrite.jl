@@ -184,13 +184,13 @@ function reinit!{dim, T}(bv::BoundaryValues{dim}, x::Vector{Vec{dim, T}}, bounda
         for j in 1:n_geom_basefuncs
             febv_J += x[j] ⊗ bv.dMdξ[j, i, cb]
         end
+        detJ = detJ_boundary(febv_J, getgeometryinterpolation(bv), cb)
+        detJ > 0.0 || throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
+        bv.detJdV[i, cb] = detJ * w
         Jinv = inv(febv_J)
         for j in 1:n_func_basefuncs
             bv.dNdx[j, i, cb] = bv.dNdξ[j, i, cb] ⋅ Jinv
         end
-        detJ = detJ_boundary(febv_J, getgeometryinterpolation(bv), cb)
-        detJ <= 0.0 && throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
-        bv.detJdV[i, cb] = detJ * w
     end
 end
 
