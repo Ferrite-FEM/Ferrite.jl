@@ -125,13 +125,19 @@ function vtk_grid{dim, N, T}(filename::AbstractString, grid::Grid{dim, N, T})
     return vtk_grid(filename, coords, cls)
 end
 
-function vtk_nodeset{dim}(vtk, grid::Grid{dim}, nodeset::String)
+function vtk_point_data{dim, T}(vtk::DatasetFile, data::Vector{Vec{dim, T}}, name::AbstractString)
+    npoints = length(data)
+    data = reinterpret(T, data, (dim, npoints))
+    return vtk_point_data(vtk, data, name)
+end
+
+function vtk_nodeset{dim}(vtk::DatasetFile, grid::Grid{dim}, nodeset::String)
     z = zeros(getnnodes(grid))
     z[getnodeset(grid, nodeset)] = 1.0
     vtk_point_data(vtk, z, nodeset)
 end
 
-function vtk_cellset{dim}(vtk, grid::Grid{dim}, cellset::String)
+function vtk_cellset{dim}(vtk::DatasetFile, grid::Grid{dim}, cellset::String)
     z = zeros(getncells(grid))
     z[getcellset(grid, cellset)] = 1.0
     vtk_cell_data(vtk, z, cellset)
