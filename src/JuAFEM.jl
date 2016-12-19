@@ -8,7 +8,7 @@ using Reexport
 @reexport using WriteVTK
 
 import Base: show
-import WriteVTK: vtk_grid
+import WriteVTK: vtk_grid, vtk_point_data, DatasetFile
 
 # Utilities
 
