@@ -1,6 +1,4 @@
 
-export CellIterator
-
 immutable CellIterator{dim, T}
     cellid::Ref{Int}
     nodes::Vector{Int}
@@ -22,8 +20,9 @@ function Base.next{dim, N, T}(grid::Grid{dim, N, T}, ci::CellIterator{dim, T})
     id = ci.cellid[]
 
     @inbounds for i in 1:N
-        ci.nodes[i] = grid.cells[id].nodes[i]
-        ci.coords[i] = grid.nodes[grid.cells[id].nodes[i]].x # this could also use getcoordinates! but this is the same
+        nodeid = grid.cells[id].nodes[i]
+        ci.nodes[i] = nodeid
+        ci.coords[i] = grid.nodes[nodeid].x # this could also use getcoordinates! but this is the same
     end
 
     return ci, ci
