@@ -1,3 +1,6 @@
+# Build the docs
+include("../docs/make.jl")
+
 using JuAFEM
 using FastGaussQuadrature
 using Base.Test
