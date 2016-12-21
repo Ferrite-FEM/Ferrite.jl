@@ -2,7 +2,6 @@ using Documenter, JuAFEM
 
 # Build documentation.
 makedocs(
-    modules = [JuAFEM],
     format = :html,
     sitename = "JuAFEM.jl",
     doctest = true,
