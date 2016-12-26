@@ -1,6 +1,3 @@
-# Build the docs
-include("../docs/make.jl")
-
 using JuAFEM
 using FastGaussQuadrature
 using Base.Test
@@ -15,3 +12,6 @@ include("test_assemble.jl")
 include("test_grid.jl")
 include("test_VTK.jl")
 include("test_notebooks.jl")
+
+# Build the docs
+include("../docs/make.jl")
