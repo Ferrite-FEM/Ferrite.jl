@@ -35,14 +35,21 @@ for (func_interpol, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{0
                 u[i] = H ⋅ x[i]
                 u_scal[i] = V ⋅ x[i]
             end
+            u_vector = reinterpret(Float64, u, (n_basefuncs*ndim,))
 
             for i in 1:length(getpoints(boundary_quad_rule))
                 @test function_gradient(bv, i, u) ≈ H
                 @test function_symmetric_gradient(bv, i, u) ≈ 0.5(H + H')
                 @test function_divergence(bv, i, u) ≈ trace(H)
-                fe_valtype == BoundaryScalarValues && @test function_gradient(bv, i, u_scal) ≈ V
-                fe_valtype == BoundaryScalarValues && function_value(bv, i, u_scal)
                 function_value(bv, i, u)
+                if isa(bv, BoundaryScalarValues)
+                    @test function_gradient(bv, i, u_scal) ≈ V
+                    function_value(bv, i, u_scal)
+                elseif isa(bv, BoundaryVectorValues)
+                    @test function_gradient(bv, i, u_vector) ≈ function_gradient(bv, i, u) ≈ H
+                    @test function_value(bv, i, u_vector) ≈ function_value(bv, i, u)
+                    @test function_divergence(bv, i, u_vector) ≈ function_divergence(bv, i, u) ≈ trace(H)
+                end
             end
 
             # Test of volume
