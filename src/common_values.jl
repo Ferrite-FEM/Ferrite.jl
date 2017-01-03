@@ -160,49 +160,35 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
 nodal values of ``\\mathbf{u}``.
 """
-function function_value{dim, T}(fe_v::ScalarValues{dim}, q_point::Int, u::Vector{T})
+function function_value{dim, T}(fe_v::Values{dim}, q_point::Int, u::Vector{T})
     n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
+    isa(fe_v, VectorValues) && (n_base_funcs *= 3)
     @assert length(u) == n_base_funcs
-    s = zero(T)
+    val = zero(_valuetype(fe_v, u))
     @inbounds for i in 1:n_base_funcs
-        s += shape_value(fe_v, q_point, i) * u[i]
+        val += shape_value(fe_v, q_point, i) * u[i]
     end
-    return s
-end
-
-function function_value{dim, T}(fe_v::ScalarValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
-    n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
-    @assert length(u) == n_base_funcs
-    vec = zero(Vec{dim, T})
-    @inbounds for i in 1:n_base_funcs
-        vec += shape_value(fe_v, q_point, i) * u[i]
-    end
-    return vec
-end
-
-function function_value{dim, T}(fe_v::VectorValues{dim}, q_point::Int, u::Vector{T})
-    n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))*dim
-    @assert length(u) == n_base_funcs
-    vec = zero(Vec{dim, T})
-    @inbounds for i in 1:n_base_funcs
-        vec += shape_value(fe_v, q_point, basefunc) * u[i]
-    end
-    return vec
+    return val
 end
 
 function function_value{dim, T}(fe_v::VectorValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
     @assert length(u) == n_base_funcs
-    vec = zero(Vec{dim, T})
+    val = zero(Vec{dim, T})
     basefunc = 1
     @inbounds for i in 1:n_base_funcs
         for j in 1:dim
-            vec += shape_value(fe_v, q_point, basefunc) * u[i][j]
+            val += shape_value(fe_v, q_point, basefunc) * u[i][j]
             basefunc += 1
         end
     end
-    return vec
+    return val
 end
+
+Base.@pure _valuetype{dim, T}(::ScalarValues{dim}, ::Vector{T}) = T
+Base.@pure _valuetype{dim, T}(::ScalarValues{dim}, ::Vector{Vec{dim, T}}) = Vec{dim, T}
+Base.@pure _valuetype{dim, T}(::VectorValues{dim}, ::Vector{T}) = Vec{dim, T}
+# Base.@pure _valuetype{dim, T}(::VectorValues{dim}, ::Vector{Vec{dim, T}}) = Vec{dim, T}
 
 """
 Computes the gradient in a quadrature point for a scalar or vector valued function
@@ -230,15 +216,21 @@ For a vector valued function the gradient is computed as
 ``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x}) \\otimes \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
-function function_gradient{dim, T}(fe_v::ScalarValues{dim}, q_point::Int, u::Vector{T})
+function function_gradient{dim, T}(fe_v::Values{dim}, q_point::Int, u::Vector{T})
     n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
+    isa(fe_v, VectorValues) && (n_base_funcs *= 3)
     @assert length(u) == n_base_funcs
-    grad = zero(Vec{dim, T})
+    grad = zero(_gradienttype(fe_v, u))
     @inbounds for i in 1:n_base_funcs
         grad += shape_gradient(fe_v, q_point, i) * u[i]
     end
     return grad
 end
+
+Base.@pure _gradienttype{dim, T}(::ScalarValues{dim}, ::Vector{T}) = Vec{dim, T}
+# Base.@pure _gradienttype{dim, T}(::ScalarValues{dim}, ::Vector{Vec{dim, T}}) = Tensor{2, dim, T}
+Base.@pure _gradienttype{dim, T}(::VectorValues{dim}, ::Vector{T}) = Tensor{2, dim, T}
+# Base.@pure _gradienttype{dim, T}(::VectorValues{dim}, ::Vector{Vec{dim, T}}) = Tensor{2, dim, T}
 
 function function_gradient{dim, T}(fe_v::ScalarValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
@@ -246,16 +238,6 @@ function function_gradient{dim, T}(fe_v::ScalarValues{dim}, q_point::Int, u::Vec
     grad = zero(Tensor{2, dim, T})
     @inbounds for i in 1:n_base_funcs
         grad += u[i] ⊗ shape_gradient(fe_v, q_point, i)
-    end
-    return grad
-end
-
-function function_gradient{dim, T}(fe_v::VectorValues{dim}, q_point::Int, u::Vector{T})
-    n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))*dim
-    @assert length(u) == n_base_funcs
-    grad = zero(Tensor{2, dim, T})
-    @inbounds for i in 1:n_base_funcs
-        grad += shape_gradient(fe_v, q_point, i) * u[i]
     end
     return grad
 end
