@@ -180,6 +180,16 @@ function function_value{dim, T}(fe_v::ScalarValues{dim}, q_point::Int, u::Vector
     return vec
 end
 
+function function_value{dim, T}(fe_v::VectorValues{dim}, q_point::Int, u::Vector{T})
+    n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))*dim
+    @assert length(u) == n_base_funcs
+    vec = zero(Vec{dim, T})
+    @inbounds for i in 1:n_base_funcs
+        vec += shape_value(fe_v, q_point, basefunc) * u[i]
+    end
+    return vec
+end
+
 function function_value{dim, T}(fe_v::VectorValues{dim}, q_point::Int, u::Vector{Vec{dim, T}})
     n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
     @assert length(u) == n_base_funcs
@@ -236,6 +246,16 @@ function function_gradient{dim, T}(fe_v::ScalarValues{dim}, q_point::Int, u::Vec
     grad = zero(Tensor{2, dim, T})
     @inbounds for i in 1:n_base_funcs
         grad += u[i] ⊗ shape_gradient(fe_v, q_point, i)
+    end
+    return grad
+end
+
+function function_gradient{dim, T}(fe_v::VectorValues{dim}, q_point::Int, u::Vector{T})
+    n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))*dim
+    @assert length(u) == n_base_funcs
+    grad = zero(Tensor{2, dim, T})
+    @inbounds for i in 1:n_base_funcs
+        grad += shape_gradient(fe_v, q_point, i) * u[i]
     end
     return grad
 end
@@ -315,6 +335,19 @@ function function_divergence{dim, T}(fe_v::ScalarValues{dim}, q_point::Int, u::V
     diverg = zero(T)
     @inbounds for i in 1:n_base_funcs
         diverg += shape_gradient(fe_v, q_point, i) ⋅ u[i]
+    end
+    return diverg
+end
+
+function function_divergence{dim, T}(fe_v::VectorValues{dim}, q_point::Int, u::Vector{T})
+    n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))*dim
+    @assert length(u) == n_base_funcs
+    diverg = zero(T)
+    @inbounds for i in 1:n_base_funcs
+        grad = shape_gradient(fe_v, q_point, i)
+        for k in 1:dim
+            diverg += grad[k, k] * u[i]
+        end
     end
     return diverg
 end
