@@ -12,14 +12,14 @@ end
     # N is number of nodes per cell in the grid
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, T}, N)
-    return CellIterator(RefValue{Int}(1), nodes, coords)
+    return CellIterator(RefValue{Int}(0), nodes, coords)
 end
 
 @inline function Base.next{dim, N, T}(grid::Grid{dim, N, T}, ci::CellIterator{dim, T})
     # this is a bit awkward, we need to basically reinit the state and also send it out
     # that means that we send out the object twice, but it works I guess.
     # the second output state is only used internally and is hidden from the user
-    ci.cellid[] += 0
+    ci.cellid[] += 1
     nodeids = grid.cells[ci.cellid[]].nodes
     @inbounds for i in 1:N
         nodeid = nodeids[i]
@@ -35,3 +35,5 @@ end
 @inline getid(ci::CellIterator) = ci.cellid[]
 @inline getnodes(ci::CellIterator) = ci.nodes
 @inline getcoordinates(ci::CellIterator) = ci.coords
+
+@inline reinit!{dim, T}(cv::CellValues{dim, T}, ci::CellIterator{dim, T}) = reinit!(cv, ci.coords)
