@@ -33,14 +33,21 @@ for (func_interpol, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{1
             u[i] = H ⋅ x[i]
             u_scal[i] = V ⋅ x[i]
         end
+        u_vector = reinterpret(Float64, u, (n_basefuncs*ndim,))
 
         for i in 1:length(getpoints(quad_rule))
             @test function_gradient(cv, i, u) ≈ H
             @test function_symmetric_gradient(cv, i, u) ≈ 0.5(H + H')
             @test function_divergence(cv, i, u) ≈ trace(H)
-            fe_valtype == CellScalarValues && @test function_gradient(cv, i, u_scal) ≈ V
-            fe_valtype == CellScalarValues && function_value(cv, i, u_scal)
             function_value(cv, i, u)
+            if isa(cv, CellScalarValues)
+                @test function_gradient(cv, i, u_scal) ≈ V
+                function_value(cv, i, u_scal)
+            elseif isa(cv, CellVectorValues)
+                @test function_gradient(cv, i, u_vector) ≈ function_gradient(cv, i, u) ≈ H
+                @test function_value(cv, i, u_vector) ≈ function_value(cv, i, u)
+                @test function_divergence(cv, i, u_vector) ≈ function_divergence(cv, i, u) ≈ trace(H)
+            end
         end
 
         # Test of volume
