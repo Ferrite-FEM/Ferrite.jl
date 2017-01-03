@@ -162,7 +162,7 @@ nodal values of ``\\mathbf{u}``.
 """
 function function_value{dim, T}(fe_v::Values{dim}, q_point::Int, u::Vector{T})
     n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
-    isa(fe_v, VectorValues) && (n_base_funcs *= 3)
+    isa(fe_v, VectorValues) && (n_base_funcs *= dim)
     @assert length(u) == n_base_funcs
     val = zero(_valuetype(fe_v, u))
     @inbounds for i in 1:n_base_funcs
@@ -218,7 +218,7 @@ where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
 function function_gradient{dim, T}(fe_v::Values{dim}, q_point::Int, u::Vector{T})
     n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
-    isa(fe_v, VectorValues) && (n_base_funcs *= 3)
+    isa(fe_v, VectorValues) && (n_base_funcs *= dim)
     @assert length(u) == n_base_funcs
     grad = zero(_gradienttype(fe_v, u))
     @inbounds for i in 1:n_base_funcs
