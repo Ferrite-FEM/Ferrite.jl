@@ -2,6 +2,33 @@ using Base: RefValue
 
 export getid
 
+"""
+A `CellIterator` is returned when looping over the cells in a grid. The `CellIterator`
+contains information about the cell which can be queried from the object.
+
+**Example:**
+
+```julia
+for cell in grid                 # cell is now a CellIterator
+
+    id = getid(cell)             # get the cell number
+    coord = getcoordinates(cell) # get the coordinates
+    nodes = getnodes(cell)       # get the node numbers
+
+end
+```
+The `CellIterator` can also be used directly to [`reinit!`](@ref) the [`CellValues`](@ref):
+
+```julia
+for cell in grid
+
+    reinit!(cv, cell)
+
+    # do stuff
+
+end
+```
+"""
 immutable CellIterator{dim, T}
     cellid::RefValue{Int}
     nodes::Vector{Int}
@@ -9,16 +36,12 @@ immutable CellIterator{dim, T}
 end
 
 @inline function Base.start{dim, N, T}(grid::Grid{dim, N, T})
-    # N is number of nodes per cell in the grid
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, T}, N)
     return CellIterator(RefValue{Int}(0), nodes, coords)
 end
 
 @inline function Base.next{dim, N, T}(grid::Grid{dim, N, T}, ci::CellIterator{dim, T})
-    # this is a bit awkward, we need to basically reinit the state and also send it out
-    # that means that we send out the object twice, but it works I guess.
-    # the second output state is only used internally and is hidden from the user
     ci.cellid[] += 1
     nodeids = grid.cells[ci.cellid[]].nodes
     @inbounds for i in 1:N
@@ -27,7 +50,7 @@ end
         ci.coords[i] = grid.nodes[nodeid].x
     end
 
-    return ci, ci # the fact that we return ci twice here is allocating memory?!
+    return ci, ci
 end
 
 @inline Base.done{dim, N, T}(grid::Grid{dim, N, T}, ci::CellIterator{dim, T}) = ci.cellid[] >= getncells(grid)
