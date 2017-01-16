@@ -59,7 +59,7 @@ include("boundary_integrals.jl")
 include("grid.jl")
 include("grid_generators.jl")
 include("VTK.jl")
-include("cell_iterator.jl")
+include("iterators.jl")
 include("deprecations.jl")
 
 end # module
