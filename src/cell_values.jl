@@ -152,7 +152,7 @@ function CellVectorValues{dim, T, FIP <: Interpolation, GIP <: Interpolation, sh
     CellVectorValues(N, dNdx, dNdξ, detJdV, quad_rule, func_interpol, M, dMdξ, geom_interpol)
 end
 
-function reinit!{dim, T}(cv::CellValues{dim}, x::Vector{Vec{dim, T}})
+function reinit!{dim, T}(cv::CellValues{dim}, x::AbstractVector{Vec{dim, T}})
     n_geom_basefuncs = getnbasefunctions(getgeometryinterpolation(cv))
     n_func_basefuncs = getnbasefunctions(getfunctioninterpolation(cv))
     @assert length(x) == n_geom_basefuncs

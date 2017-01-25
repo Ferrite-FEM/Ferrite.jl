@@ -169,7 +169,7 @@ function BoundaryVectorValues{dim_qr, T, FIP <: Interpolation, GIP <: Interpolat
     BoundaryVectorValues(N, dNdx, dNdξ, detJdV, boundary_quad_rule, func_interpol, M, dMdξ, geom_interpol, Ref(0))
 end
 
-function reinit!{dim, T}(bv::BoundaryValues{dim}, x::Vector{Vec{dim, T}}, boundary::Int)
+function reinit!{dim, T}(bv::BoundaryValues{dim}, x::AbstractVector{Vec{dim, T}}, boundary::Int)
     n_geom_basefuncs = getnbasefunctions(getgeometryinterpolation(bv))
     n_func_basefuncs = getnbasefunctions(getfunctioninterpolation(bv))
     @assert length(x) == n_geom_basefuncs
