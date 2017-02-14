@@ -4,7 +4,7 @@ module JuAFEM
 using FastGaussQuadrature
 using Compat
 using Reexport
-@reexport using ContMechTensors
+@reexport using Tensors
 @reexport using WriteVTK
 
 import Base: show

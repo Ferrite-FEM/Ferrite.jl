@@ -22,7 +22,7 @@ vtk_grid{dim,T}(filename::AbstractString, coords::Vector{Vec{dim,T}}, topology::
 
 ```jldoctest
 julia> coords = [Vec{2}((0.0,0.0)), Vec{2}((1.0,0.0)), Vec{2}((1.5,1.5)), Vec{2}((0.0,1.0))]
-4-element Array{ContMechTensors.Tensor{1,2,Float64,2},1}:
+4-element Array{Tensors.Tensor{1,2,Float64,2},1}:
  [0.0,0.0]
  [1.0,0.0]
  [1.5,1.5]

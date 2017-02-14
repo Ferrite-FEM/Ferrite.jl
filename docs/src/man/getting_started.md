@@ -68,7 +68,7 @@ Derivative of the same shape function, in the same quadrature point
 
 ```jldoctest
 julia> shape_gradient(cell_values, 3, 1)
-2-element ContMechTensors.Tensor{1,2,Float64,2}:
+2-element Tensors.Tensor{1,2,Float64,2}:
   0.165523
  -0.665523
 ```
@@ -82,7 +82,7 @@ julia> function_value(cell_values, 3, T) # value of T in 3rd quad point
 1.311004233964073
 
 julia> function_gradient(cell_values, 1, T)  # value of grad(T) in 1st quad point
-2-element ContMechTensors.Tensor{1,2,Float64,2}:
+2-element Tensors.Tensor{1,2,Float64,2}:
  0.410202
  1.1153
 ```
@@ -96,12 +96,12 @@ julia> u = Vec{2, Float64}[Vec{2}((0.0, 0.0)),
                            Vec{2}((2.0, 1.0))]; # nodal vectors
 
 julia> function_value(cell_values, 2, u) # value of u in 2nd quad point
-2-element ContMechTensors.Tensor{1,2,Float64,2}:
+2-element Tensors.Tensor{1,2,Float64,2}:
  2.59968
  1.62201
 
 julia> function_symmetric_gradient(cell_values, 3, u) # sym(grad(u)) in 3rd quad point
-2×2 ContMechTensors.SymmetricTensor{2,2,Float64,3}:
+2×2 Tensors.SymmetricTensor{2,2,Float64,3}:
  -0.0443518  0.713306
   0.713306   0.617741
 ```

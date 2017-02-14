@@ -3,4 +3,4 @@ FastGaussQuadrature
 Requires
 WriteVTK 0.4.0
 Reexport
-ContMechTensors
+Tensors
