@@ -262,7 +262,7 @@ const function_derivative = function_gradient
 """
 Computes the symmetric gradient for a vector valued function in a quadrature point.
 
-    function_symmetric_gradient{dim, T}(fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim, T}})
+    function_symmetric_gradient(fe_v::Values, q_point::Int, u::AbstractVector)
 
 **Arguments:**
 
@@ -282,7 +282,7 @@ The symmetric gradient of a scalar function is computed as
 
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function function_symmetric_gradient{dim, T}(fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim, T}})
+function function_symmetric_gradient(fe_v::Values, q_point::Int, u::AbstractVector)
     grad = function_gradient(fe_v, q_point, u)
     return symmetric(grad)
 end
