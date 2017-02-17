@@ -3,7 +3,11 @@
 export CellIterator
 
 """
-A `CellIterator` contains information about the cell which can be queried from the object.
+```julia
+CellIterator(grid::Grid)
+```
+
+A `CellIterator` is used to conveniently loop over all the cells in a grid.
 
 **Example:**
 
@@ -28,23 +32,22 @@ function CellIterator{dim, N, T}(grid::Grid{dim, N, T})
     return CellIterator(grid, nodes, coords)
 end
 
-@inline Base.start(::CellIterator) = 1
+Base.start(::CellIterator) = 1
+Base.next{dim, N, T}(ci::CellIterator{dim, N, T}, i) = (reinit!(ci, i), i)
+Base.done(ci::CellIterator, i) = i > getncells(ci.grid)
 
-@inline function Base.next{dim, N, T}(ci::CellIterator{dim, N, T}, i)
+# utility
+@inline getnodes(ci::CellIterator) = ci.nodes
+@inline getcoordinates(ci::CellIterator) = ci.coords
+
+function reinit!{dim, N, T}(ci::CellIterator{dim, N, T}, i::Int)
     nodeids = ci.grid.cells[i].nodes
     @inbounds for j in 1:N
         nodeid = nodeids[j]
         ci.nodes[j] = nodeid
         ci.coords[j] = ci.grid.nodes[nodeid].x
     end
-    return (ci, i+1)
+    return ci
 end
-
-@inline Base.done(ci::CellIterator, i) = i > getncells(ci.grid)
-
-# utility
-@inline getnodes(ci::CellIterator) = ci.nodes
-@inline getcoordinates(ci::CellIterator) = ci.coords
-@inline reinit!(ci::CellIterator, i::Int) = next(ci, i) # for manual updating
 
 @inline reinit!{dim, N, T}(cv::CellValues{dim, T}, ci::CellIterator{dim, N, T}) = reinit!(cv, ci.coords)
