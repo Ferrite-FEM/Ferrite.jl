@@ -1,59 +1,59 @@
-# this file defines iterators for looping over a grid
+# this file defines iterators used for looping over a grid
 
-
-using Base: RefValue
-export getid
+export CellIterator
 
 """
-A `CellIterator` is returned when looping over the cells in a grid. The `CellIterator`
-contains information about the cell which can be queried from the object.
+```julia
+CellIterator(grid::Grid)
+```
+
+A `CellIterator` is used to conveniently loop over all the cells in a grid.
 
 **Example:**
 
 ```julia
-for cell in grid                 # cell is now a CellIterator
-    id = getid(cell)             # get the cell number
-    coord = getcoordinates(cell) # get the coordinates
-    nodes = getnodes(cell)       # get the node numbers
-end
-```
-The `CellIterator` can also be used directly to [`reinit!`](@ref) the [`CellValues`](@ref):
+for cell in CellIterator(grid)
+    coords = getcoordinates(cell) # get the coordinates
+    nodes = getnodes(cell)        # get the node numbers
 
-```julia
-for cell in grid
-    reinit!(cv, cell)
-    # do stuff
+    reinit!(cv, cell)             # reinit! the FE-base with a CellIterator
 end
 ```
 """
-immutable CellIterator{dim, T}
-    cellid::RefValue{Int}
+immutable CellIterator{dim, N, T}
+    grid::Grid{dim, N, T}
     nodes::Vector{Int}
     coords::Vector{Vec{dim, T}}
 end
 
-@inline function Base.start{dim, N, T}(grid::Grid{dim, N, T})
+function CellIterator{dim, N, T}(grid::Grid{dim, N, T})
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, T}, N)
-    return CellIterator(RefValue{Int}(0), nodes, coords)
+    return CellIterator(grid, nodes, coords)
 end
 
-@inline function Base.next{dim, N, T}(grid::Grid{dim, N, T}, ci::CellIterator{dim, T})
-    ci.cellid[] += 1
-    nodeids = grid.cells[ci.cellid[]].nodes
-    @inbounds for i in 1:N
-        nodeid = nodeids[i]
-        ci.nodes[i] = nodeid
-        ci.coords[i] = grid.nodes[nodeid].x
-    end
-    return ci, ci
-end
+# iterator interface
+Base.start(::CellIterator) = 1
+Base.next{dim, N, T}(ci::CellIterator{dim, N, T}, i) = (reinit!(ci, i), i+1)
+Base.done(ci::CellIterator, i) = i > getncells(ci.grid)
+Base.length(ci::CellIterator) = getncells(ci.grid)
 
-@inline Base.done{dim, N, T}(grid::Grid{dim, N, T}, ci::CellIterator{dim, T}) = ci.cellid[] >= getncells(grid)
+Base.iteratorsize{dim, N, T}(::Type{CellIterator{dim, N, T}}) = Base.HasLength()   # this is default in Base
+Base.iteratoreltype{dim, N, T}(::Type{CellIterator{dim, N, T}}) = Base.HasEltype() # this is default in Base
+Base.eltype{dim, N, T}(::Type{CellIterator{dim, N, T}}) = CellIterator{dim, N, T}
 
 # utility
-@inline getid(ci::CellIterator) = ci.cellid[]
 @inline getnodes(ci::CellIterator) = ci.nodes
 @inline getcoordinates(ci::CellIterator) = ci.coords
 
-@inline reinit!{dim, T}(cv::CellValues{dim, T}, ci::CellIterator{dim, T}) = reinit!(cv, ci.coords)
+function reinit!{dim, N, T}(ci::CellIterator{dim, N, T}, i::Int)
+    nodeids = ci.grid.cells[i].nodes
+    @inbounds for j in 1:N
+        nodeid = nodeids[j]
+        ci.nodes[j] = nodeid
+        ci.coords[j] = ci.grid.nodes[nodeid].x
+    end
+    return ci
+end
+
+@inline reinit!{dim, N, T}(cv::CellValues{dim, T}, ci::CellIterator{dim, N, T}) = reinit!(cv, ci.coords)
