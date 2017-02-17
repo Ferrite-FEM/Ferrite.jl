@@ -32,10 +32,15 @@ function CellIterator{dim, N, T}(grid::Grid{dim, N, T})
     return CellIterator(grid, nodes, coords)
 end
 
+# iterator interface
 Base.start(::CellIterator) = 1
 Base.next{dim, N, T}(ci::CellIterator{dim, N, T}, i) = (reinit!(ci, i), i+1)
 Base.done(ci::CellIterator, i) = i > getncells(ci.grid)
 Base.length(ci::CellIterator) = getncells(ci.grid)
+
+Base.iteratorsize{dim, N, T}(::Type{CellIterator{dim, N, T}}) = Base.HasLength()   # this is default in Base
+Base.iteratoreltype{dim, N, T}(::Type{CellIterator{dim, N, T}}) = Base.HasEltype() # this is default in Base
+Base.eltype{dim, N, T}(::Type{CellIterator{dim, N, T}}) = CellIterator{dim, N, T}
 
 # utility
 @inline getnodes(ci::CellIterator) = ci.nodes
