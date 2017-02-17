@@ -33,9 +33,9 @@ function CellIterator{dim, N, T}(grid::Grid{dim, N, T})
 end
 
 Base.start(::CellIterator) = 1
-Base.next{dim, N, T}(ci::CellIterator{dim, N, T}, i) = (reinit!(ci, i), i)
+Base.next{dim, N, T}(ci::CellIterator{dim, N, T}, i) = (reinit!(ci, i), i+1)
 Base.done(ci::CellIterator, i) = i > getncells(ci.grid)
-Base.lenth(ci::CellIterator) = getncells(ci.grid)
+Base.length(ci::CellIterator) = getncells(ci.grid)
 
 # utility
 @inline getnodes(ci::CellIterator) = ci.nodes
