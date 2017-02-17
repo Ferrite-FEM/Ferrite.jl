@@ -4,7 +4,6 @@ immutable Assembler{T}
     V::Vector{T}
 end
 
-
 function Assembler(N)
     I = Int[]
     J = Int[]
