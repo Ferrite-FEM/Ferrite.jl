@@ -23,6 +23,7 @@ immutable Node{dim, T}
     x::Vec{dim, T}
 end
 Node{dim, T}(x::NTuple{dim, T}) = Node(Vec{dim, T}(x))
+getcoordinates(n::Node) = n.x
 
 """
 A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
@@ -70,7 +71,7 @@ A `CellFaceIndex` is returned when looping over cell faces of the grid.
 """
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain.
 """
-immutable Grid{dim, N, T <: Real}
+type Grid{dim, N, T <: Real}
     cells::Vector{Cell{dim, N}}
     nodes::Vector{Node{dim, T}}
     boundary::Vector{CellFace}
@@ -91,13 +92,13 @@ end
 # Grid utility functions #
 ##########################
 @inline getcells(grid::Grid) = grid.cells
-@inline getcells(grid::Grid, v::Vector{Int}) = grid.cells[v]
+@inline getcells(grid::Grid, v::Union{Int, Vector{Int}}) = grid.cells[v]
 @inline getcells(grid::Grid, set::String) = grid.cells[grid.cellsets[set]]
 @inline getncells(grid::Grid) = length(grid.cells)
 @inline getcelltype(grid::Grid) = eltype(grid.cells)
 
 @inline getnodes(grid::Grid) = grid.nodes
-@inline getnodes(grid::Grid, v::Vector{Int}) = grid.nodes[v]
+@inline getnodes(grid::Grid, v::Union{Int, Vector{Int}}) = grid.nodes[v]
 @inline getnodes(grid::Grid, set::String) = grid.nodes[grid.nodesets[set]]
 @inline getnnodes(grid::Grid) = length(grid.nodes)
 
