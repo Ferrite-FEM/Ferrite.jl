@@ -147,8 +147,7 @@ for dim in (2, 3)
                 throw(ArgumentError("unsupported quadrature rule"))
             end
             n_points = size(data,1)
-            weights = Array(Float64, n_points)
-            points = Array(Vec{$dim, Float64}, n_points)
+            points = Vector{Vec{$dim, Float64}}(n_points)
 
             for p in 1:size(data, 1)
                 points[p] = Vec{$dim, Float64}(@ntuple $dim i -> data[p, i])
