@@ -40,10 +40,10 @@ QuadratureRule{dim, shape}([quad_rule_type::Symbol], order::Int)
 
 ```jldoctest
 julia> QuadratureRule{2, RefTetrahedron}(1)
-JuAFEM.QuadratureRule{2,JuAFEM.RefTetrahedron,Float64}([0.5],Tensors.Tensor{1,2,Float64,2}[[0.333333,0.333333]])
+JuAFEM.QuadratureRule{2,JuAFEM.RefTetrahedron,Float64}([0.5], Tensors.Tensor{1,2,Float64,2}[[0.333333, 0.333333]])
 
 julia> QuadratureRule{1, RefCube}(:lobatto, 2)
-JuAFEM.QuadratureRule{1,JuAFEM.RefCube,Float64}([1.0,1.0],Tensors.Tensor{1,1,Float64,1}[[-1.0],[1.0]])
+JuAFEM.QuadratureRule{1,JuAFEM.RefCube,Float64}([1.0, 1.0], Tensors.Tensor{1,1,Float64,1}[[-1.0], [1.0]])
 ```
 """
 immutable QuadratureRule{dim, shape, T}
@@ -92,9 +92,9 @@ julia> qr = QuadratureRule{2, RefTetrahedron}(:legendre, 2);
 
 julia> getpoints(qr)
 3-element Array{Tensors.Tensor{1,2,Float64,2},1}:
- [0.166667,0.166667]
- [0.166667,0.666667]
- [0.666667,0.166667]
+ [0.166667, 0.166667]
+ [0.166667, 0.666667]
+ [0.666667, 0.166667]
 ```
 """
 getpoints(qr::QuadratureRule) = qr.points
