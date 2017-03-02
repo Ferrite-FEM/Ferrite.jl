@@ -1,5 +1,7 @@
 using SHA
 @testset "VTK" begin
+    if VERSION.minor < 6 # temporarily skip tests on this until
+                         # JuliaLang/julia#17003 is fixed
     OVERWRITE_CHECKSUMS = false
     checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")
     checksum_list = readstring(checksums_file)
@@ -60,6 +62,7 @@ using SHA
     end
 
     OVERWRITE_CHECKSUMS && close(csio)
+    end
 
     # Test getVTKtype
     for interpolation in (Lagrange{1, RefCube, 1}(),
