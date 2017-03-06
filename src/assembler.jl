@@ -4,7 +4,6 @@ immutable Assembler{T}
     V::Vector{T}
 end
 
-
 function Assembler(N)
     I = Int[]
     J = Int[]
@@ -35,10 +34,12 @@ Assembles the element matrix `Ke` into `a`.
 """
 function assemble!{T}(a::Assembler{T}, Ke::AbstractMatrix{T}, edof::AbstractVector{Int})
     n_dofs = length(edof)
-    append!(a.V, Ke[:])
-    @inbounds for dof1 in 1:n_dofs, dof2 in 1:n_dofs
-        push!(a.J, edof[dof1])
-        push!(a.I, edof[dof2])
+    append!(a.V, Ke)
+    @inbounds for j in 1:n_dofs
+        append!(a.I, edof)
+        for i in 1:n_dofs
+            push!(a.J, edof[j])
+        end
     end
 end
 
