@@ -5,7 +5,7 @@ makedocs(
     format = :html,
     sitename = "JuAFEM.jl",
     doctest = true,
-    strict = true,
+    strict = false, # VERSION.minor == 6, # only strict mode on release bot
     pages = Any[
         "Home" => "index.md",
         "man/fe_intro.md",
@@ -18,7 +18,7 @@ makedocs(
 deploydocs(
     repo = "github.com/KristofferC/JuAFEM.jl.git",
     target = "build",
-    julia = "0.5",
+    julia = "0.6", # deploy from release bot
     deps = nothing,
     make = nothing,
 )

@@ -21,12 +21,7 @@ vtk_grid{dim,T}(filename::AbstractString, coords::Vector{Vec{dim,T}}, topology::
 **Example:**
 
 ```jldoctest
-julia> coords = [Vec{2}((0.0,0.0)), Vec{2}((1.0,0.0)), Vec{2}((1.5,1.5)), Vec{2}((0.0,1.0))]
-4-element Array{Tensors.Tensor{1,2,Float64,2},1}:
- [0.0,0.0]
- [1.0,0.0]
- [1.5,1.5]
- [0.0,1.0]
+julia> coords = [Vec{2}((0.0,0.0)), Vec{2}((1.0,0.0)), Vec{2}((1.5,1.5)), Vec{2}((0.0,1.0))];
 
 julia> topology = [1 2 4; 2 3 4]';
 
@@ -81,7 +76,7 @@ julia> ip = Lagrange{2, RefCube, 1}()
 JuAFEM.Lagrange{2,JuAFEM.RefCube,1}()
 
 julia> getVTKtype(ip)
-WriteVTK.VTKCellTypes.VTKCellType("VTK_QUAD",0x09,4)
+WriteVTK.VTKCellTypes.VTKCellType("VTK_QUAD", 0x09, 4)
 ```
 """
 getVTKtype(::Lagrange{1, RefCube, 1}) = VTKCellTypes.VTK_LINE

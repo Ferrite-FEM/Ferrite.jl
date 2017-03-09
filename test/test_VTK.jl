@@ -1,5 +1,7 @@
 using SHA
 @testset "VTK" begin
+    if VERSION.minor < 6 # temporarily skip tests on this until
+                         # JuliaLang/julia#17003 is fixed
     OVERWRITE_CHECKSUMS = false
     checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")
     checksum_list = readstring(checksums_file)
@@ -57,25 +59,10 @@ using SHA
             @test cmp != 0:-1
             rm(name*".vtu")
         end
-
-        # Test deprecated method, PR #70
-        coordmat = reinterpret(Float64,coord,(size(coord[1],1),length(coord)))
-
-        vtkfile = vtk_grid(edof, coordmat, name*"_old")
-        vtk_save(vtkfile)
-
-        sha = bytes2hex(sha1(name*"_old.vtu"))
-        if OVERWRITE_CHECKSUMS
-            write(csio, sha*" "*name*"_old.vtu\n")
-        else
-            # Returns 0:-1 if string is not found
-            cmp = search(checksum_list, sha)
-            @test cmp != 0:-1
-            rm(name*"_old.vtu")
-        end
     end
 
     OVERWRITE_CHECKSUMS && close(csio)
+    end
 
     # Test getVTKtype
     for interpolation in (Lagrange{1, RefCube, 1}(),

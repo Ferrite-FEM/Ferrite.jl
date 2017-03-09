@@ -33,18 +33,18 @@ end
 (::Type{Cell{dim}}){dim,N}(nodes::NTuple{N}) = Cell{dim,N}(nodes)
 
 # Typealias for commonly used cells
-typealias Line Cell{1, 2}
-typealias QuadraticLine Cell{1, 3}
+@compat const Line = Cell{1, 2}
+@compat const QuadraticLine = Cell{1, 3}
 
-typealias Triangle Cell{2, 3}
-typealias QuadraticTriangle Cell{2, 6}
-typealias Quadrilateral Cell{2, 4}
-typealias QuadraticQuadrilateral Cell{2, 9}
+@compat const Triangle = Cell{2, 3}
+@compat const QuadraticTriangle = Cell{2, 6}
+@compat const Quadrilateral = Cell{2, 4}
+@compat const QuadraticQuadrilateral = Cell{2, 9}
 
-typealias Tetrahedron Cell{3, 4}
-typealias QuadraticTetrahedron Cell{3, 10} # Function interpolation for this doesn't exist in JuAFEM yet
-typealias Hexahedron Cell{3, 8}
-typealias QuadraticHexahedron Cell{3, 20} # Function interpolation for this doesn't exist in JuAFEM yet
+@compat const Tetrahedron = Cell{3, 4}
+@compat const QuadraticTetrahedron = Cell{3, 10} # Function interpolation for this doesn't exist in JuAFEM yet
+@compat const Hexahedron = Cell{3, 8}
+@compat const QuadraticHexahedron = Cell{3, 20} # Function interpolation for this doesn't exist in JuAFEM yet
 
 """
 A `CellIndex` is returned when looping over the cells in a grid.
@@ -63,7 +63,7 @@ end
 """
 A `CellBoundaryIndex` is returned when looping over cell boundaries of the grid.
 """
-typealias CellBoundaryIndex CellBoundary
+@compat const CellBoundaryIndex = CellBoundary
 
 """
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain.

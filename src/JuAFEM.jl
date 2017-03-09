@@ -32,7 +32,7 @@ Represents a reference shape which quadrature rules and interpolations are defin
 Currently, the only concrete types that subtype this type are `RefCube` in 1,2 and 3 dimensions,
 and `RefTetrahedron` in 2 and 3 dimensions.
 """
-abstract AbstractRefShape
+@compat abstract type AbstractRefShape end
 
 immutable RefTetrahedron <: AbstractRefShape end
 immutable RefCube <: AbstractRefShape end
@@ -40,9 +40,9 @@ immutable RefCube <: AbstractRefShape end
 """
 Abstract type which has `CellValues` and `BoundaryValues` as subtypes
 """
-abstract Values{dim, T, FS, GS}
-abstract CellValues{dim, T, FS, GS}     <: Values{dim, T, FS, GS}
-abstract BoundaryValues{dim, T, FS, GS} <: Values{dim, T, FS, GS}
+@compat abstract type Values{dim, T, FS, GS} end
+@compat abstract type CellValues{dim, T, FS, GS}     <: Values{dim, T, FS, GS} end
+@compat abstract type BoundaryValues{dim, T, FS, GS} <: Values{dim, T, FS, GS} end
 
 
 include("interpolations.jl")
@@ -50,8 +50,8 @@ include("quadrature.jl")
 include("cell_values.jl")
 include("boundary_values.jl")
 
-typealias ScalarValues{dim, T, FS, GS} Union{CellScalarValues{dim, T, FS, GS}, BoundaryScalarValues{dim, T, FS, GS}}
-typealias VectorValues{dim, T, FS, GS} Union{CellVectorValues{dim, T, FS, GS}, BoundaryVectorValues{dim, T, FS, GS}}
+@compat const ScalarValues{dim, T, FS, GS} = Union{CellScalarValues{dim, T, FS, GS}, BoundaryScalarValues{dim, T, FS, GS}}
+@compat const VectorValues{dim, T, FS, GS} = Union{CellVectorValues{dim, T, FS, GS}, BoundaryVectorValues{dim, T, FS, GS}}
 
 include("common_values.jl")
 include("assembler.jl")

@@ -44,7 +44,7 @@ julia> getnbasefunctions(ip)
 6
 ```
 """
-abstract Interpolation{dim, shape, order}
+@compat abstract type Interpolation{dim, shape, order} end
 
 """
 Returns the dimension of an `Interpolation`
