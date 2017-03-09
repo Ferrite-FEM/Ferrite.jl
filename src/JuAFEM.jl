@@ -60,6 +60,7 @@ include("grid.jl")
 include("grid_generators.jl")
 include("VTK.jl")
 include("iterators.jl")
+include("threadingtools.jl")
 include("deprecations.jl")
 
 end # module
