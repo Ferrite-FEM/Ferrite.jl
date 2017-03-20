@@ -1,17 +1,17 @@
 # Common methods for all `Values` objects
 """
-Updates a `CellValues`/`BoundaryValues` object for a cell or boundary.
+Updates a `CellValues`/`FaceValues` object for a cell or face.
 
 ```julia
 reinit!{dim, T}(cv::CellValues{dim}, x::Vector{Vec{dim, T}})
-reinit!{dim, T}(bv::BoundaryValues{dim}, x::Vector{Vec{dim, T}}, boundary::Int)
+reinit!{dim, T}(bv::FaceValues{dim}, x::Vector{Vec{dim, T}}, face::Int)
 ```
 
 **Arguments:**
 
-* `cv`/`bv`: the `CellValues`/`BoundaryValues` object
+* `cv`/`bv`: the `CellValues`/`FaceValues` object
 * `x`: a `Vector` of `Vec`, one for each nodal position in the element.
-* `boundary`: an integer to specify which boundary of the cell
+* `face`: an integer to specify which face of the cell
 
 **Result**
 
@@ -37,7 +37,7 @@ The quadrature rule for the `Values` type.
 
 """
 getquadrule(cv::CellValues) = cv.quad_rule
-getquadrule(bv::BoundaryValues) = bv.quad_rule[bv.current_boundary[]]
+getquadrule(bv::FaceValues) = bv.quad_rule[bv.current_face[]]
 
 """
 The number of quadrature points for  the `Values` type.
@@ -94,14 +94,14 @@ The product between the determinant of the Jacobian and the quadrature point wei
 
 **Details:**
 
-This value is typically used when one integrates a function on a finite element cell or boundary as
+This value is typically used when one integrates a function on a finite element cell or face as
 
 ``\\int\\limits_\\Omega f(\\mathbf{x}) d \\Omega \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 ``\\int\\limits_\\Gamma f(\\mathbf{x}) d \\Gamma \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 
 """
 @inline getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
-@inline getdetJdV(bv::BoundaryValues, q_point::Int) = bv.detJdV[q_point, bv.current_boundary[]]
+@inline getdetJdV(bv::FaceValues, q_point::Int) = bv.detJdV[q_point, bv.current_face[]]
 
 """
 Computes the value of the shape function
@@ -112,16 +112,16 @@ Gets the values of the shape function for a given quadrature point and base_func
 
 """
 @inline shape_value(cv::CellValues, q_point::Int, base_func::Int) = cv.N[base_func, q_point]
-@inline shape_value(bv::BoundaryValues, q_point::Int, base_func::Int) = bv.N[base_func, q_point, bv.current_boundary[]]
+@inline shape_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.N[base_func, q_point, bv.current_face[]]
 
 @inline geometric_value(cv::CellValues, q_point::Int, base_func::Int) = cv.M[base_func, q_point]
-@inline geometric_value(bv::BoundaryValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_boundary[]]
+@inline geometric_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_face[]]
 
 """
 Get the gradient of the shape functions for a given quadrature point and base function
 """
 @inline shape_gradient(cv::CellValues, q_point::Int, base_func::Int) = cv.dNdx[base_func, q_point]
-@inline shape_gradient(bv::BoundaryValues, q_point::Int, base_func::Int) = bv.dNdx[base_func, q_point, bv.current_boundary[]]
+@inline shape_gradient(bv::FaceValues, q_point::Int, base_func::Int) = bv.dNdx[base_func, q_point, bv.current_face[]]
 
 """
 Get the symmetric gradient of the shape functions for a given quadrature point and base function
@@ -133,7 +133,7 @@ const shape_derivative = shape_gradient
 Get the divergence of the shape functions for a given quadrature point and base function
 """
 @inline shape_divergence(cv::CellScalarValues, q_point::Int, base_func::Int) = sum(cv.dNdx[base_func, q_point])
-@inline shape_divergence(bv::BoundaryScalarValues, q_point::Int, base_func::Int) = sum(bv.dNdx[base_func, q_point, bv.current_boundary[]])
+@inline shape_divergence(bv::FaceScalarValues, q_point::Int, base_func::Int) = sum(bv.dNdx[base_func, q_point, bv.current_face[]])
 
 
 """

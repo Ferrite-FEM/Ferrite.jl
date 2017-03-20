@@ -15,13 +15,13 @@ import WriteVTK: vtk_grid, vtk_point_data, DatasetFile
 export start_assemble, assemble!, end_assemble
 
 export CellValues, CellScalarValues, CellVectorValues
-export BoundaryValues, BoundaryScalarValues, BoundaryVectorValues
+export FaceValues, FaceScalarValues, FaceVectorValues
 export ScalarValues, VectorValues
 
 export reinit!, shape_value, shape_gradient, shape_symmetric_gradient, shape_divergence, getdetJdV, getquadrule,
        getfunctioninterpolation, getgeometryinterpolation,
        function_value, function_gradient, function_symmetric_gradient, function_divergence, spatial_coordinate
-export getboundarynumber
+export getfacenumber
 export Interpolation, getdim, getrefshape, getorder, getnbasefunctions, getnquadpoints
 export Lagrange, Serendipity, RefTetrahedron, RefCube
 export QuadratureRule, getweights, getpoints
@@ -38,24 +38,24 @@ immutable RefTetrahedron <: AbstractRefShape end
 immutable RefCube <: AbstractRefShape end
 
 """
-Abstract type which has `CellValues` and `BoundaryValues` as subtypes
+Abstract type which has `CellValues` and `FaceValues` as subtypes
 """
 @compat abstract type Values{dim, T, FS, GS} end
 @compat abstract type CellValues{dim, T, FS, GS}     <: Values{dim, T, FS, GS} end
-@compat abstract type BoundaryValues{dim, T, FS, GS} <: Values{dim, T, FS, GS} end
+@compat abstract type FaceValues{dim, T, FS, GS} <: Values{dim, T, FS, GS} end
 
 
 include("interpolations.jl")
 include("quadrature.jl")
 include("cell_values.jl")
-include("boundary_values.jl")
+include("face_values.jl")
 
-@compat const ScalarValues{dim, T, FS, GS} = Union{CellScalarValues{dim, T, FS, GS}, BoundaryScalarValues{dim, T, FS, GS}}
-@compat const VectorValues{dim, T, FS, GS} = Union{CellVectorValues{dim, T, FS, GS}, BoundaryVectorValues{dim, T, FS, GS}}
+@compat const ScalarValues{dim, T, FS, GS} = Union{CellScalarValues{dim, T, FS, GS}, FaceScalarValues{dim, T, FS, GS}}
+@compat const VectorValues{dim, T, FS, GS} = Union{CellVectorValues{dim, T, FS, GS}, FaceVectorValues{dim, T, FS, GS}}
 
 include("common_values.jl")
 include("assembler.jl")
-include("boundary_integrals.jl")
+include("face_integrals.jl")
 include("grid.jl")
 include("grid_generators.jl")
 include("VTK.jl")

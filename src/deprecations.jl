@@ -50,11 +50,11 @@ export Dim
 @deprecate functionspace_n_dim getdim
 @deprecate functionspace_ref_shape getrefshape
 @deprecate functionspace_order getorder
-@deprecate n_boundaries getnboundaries
+@deprecate n_boundaries getnfaces
 @deprecate functionspace_lower_dim getlowerdim
 @deprecate functionspace_lower_order getlowerorder
 @deprecate n_basefunctions getnbasefunctions
-@deprecate n_boundarynodes getnboundarynodes
+@deprecate n_boundarynodes getnfacenodes
 @deprecate points getpoints
 @deprecate weights getweights
 
