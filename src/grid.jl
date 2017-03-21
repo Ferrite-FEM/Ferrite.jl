@@ -8,7 +8,7 @@ export Line, QuadraticLine,
 
 # Grid utilities
 export getcells, getncells, getnodes, getnnodes, getcelltype,
-       getcellset,  getnodeset, getcoordinates, getcoordinates!,
+       getcellset,  getnodeset, getfaceset, getcoordinates, getcoordinates!,
        getcellsets, getnodesets, getfacesets
 
 export addnodeset!, addcellset!
@@ -34,19 +34,38 @@ end
 (::Type{Cell{dim}}){dim,N}(nodes::NTuple{N}) = Cell{dim,N}(nodes)
 
 # Typealias for commonly used cells
+
+to_interpolation(c::Cell) = to_interpolation(typeof(c))
+
+getfacelist(c::Cell)     = getfacelist(typeof(c))
+getfacelist(c::Type{<:Cell}) = getfacelist(to_interpolation(c))
+
+nfaces(c::Cell) = n_faces(typeof(c))
+nfaces(c::Type{<:Cell}) = length(getfacelist(c))
+
 @compat const Line = Cell{1, 2}
+to_interpolation(::Type{Line}) = Lagrange{1, RefCube, 1}
 @compat const QuadraticLine = Cell{1, 3}
+to_interpolation(::Type{QuadraticLine}) = Lagrange{1, RefCube, 2}
+
 
 @compat const Triangle = Cell{2, 3}
+to_interpolation(::Type{Triangle}) = Lagrange{2, RefTetrahedron, 1}
 @compat const QuadraticTriangle = Cell{2, 6}
+to_interpolation(::Type{QuadraticTriangle}) = Lagrange{2, RefTetrahedron, 2}
+
 
 @compat const Quadrilateral = Cell{2, 4}
+to_interpolation(::Type{Quadrilateral}) = Lagrange{2, RefCube, 1}
 @compat const QuadraticQuadrilateral = Cell{2, 9}
+to_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2, RefCube, 2}
 
 @compat const Tetrahedron = Cell{3, 4}
+to_interpolation(::Type{Tetrahedron}) = Lagrange{3, RefTetrahedron, 1}
 @compat const QuadraticTetrahedron = Cell{3, 10} # Function interpolation for this doesn't exist in JuAFEM yet
 
 @compat const Hexahedron = Cell{3, 8}
+to_interpolation(::Type{Hexahedron}) = Lagrange{3, RefCube, 1}
 @compat const QuadraticHexahedron = Cell{3, 20} # Function interpolation for this doesn't exist in JuAFEM yet
 
 """
@@ -74,18 +93,20 @@ A `Grid` is a collection of `Cells` and `Node`s which covers the computational d
 type Grid{dim, N, T <: Real}
     cells::Vector{Cell{dim, N}}
     nodes::Vector{Node{dim, T}}
-    boundary::Vector{CellFace}
-    cellsets::Dict{String, Vector{Int}}
-    nodesets::Dict{String, Vector{Int}}
-    facesets::Dict{String, Vector{Int}}
+    # Want fast lookup so use sets:
+    cellsets::Dict{String, Set{Int}}
+    nodesets::Dict{String, Set{Int}}
+    facesets::Dict{String, Set{Int}}
+    #boundaryfaces::Set{CellFace}
 end
 
-function Grid{dim, N, T}(cells::Vector{Cell{dim, N}}, nodes::Vector{Node{dim, T}};
-                         boundary::Vector{CellFace} = CellFace[],
-                         cellsets::Dict{String, Vector{Int}}=Dict{String, Vector{Int}}(),
-                         nodesets::Dict{String, Vector{Int}}=Dict{String, Vector{Int}}(),
-                         facesets::Dict{String, Vector{Int}}=Dict{String, Vector{Int}}())
-    return Grid(cells, nodes, boundary, cellsets, nodesets, facesets)
+function Grid{dim, N, T}(cells::Vector{Cell{dim, N}},
+                         nodes::Vector{Node{dim, T}};
+                         cellsets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
+                         nodesets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
+                         facesets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
+                        )
+    return Grid(cells, nodes, cellsets, nodesets, facesets)
 end
 
 ##########################
@@ -102,6 +123,8 @@ end
 @inline getnodes(grid::Grid, set::String) = grid.nodes[grid.nodesets[set]]
 @inline getnnodes(grid::Grid) = length(grid.nodes)
 
+@inline getfaces(grid::Grid, set::String) = grid.cellfaces[grid.facesets[set]]
+@inline getnfaces(grid::Grid) = getncells(grid) * n_faces_per_cell(grid)
 @inline getboundary(grid::Grid) = grid.boundary
 @inline getboundary(grid::Grid, v::Vector{Int}) = grid.boundary[v]
 
