@@ -49,14 +49,14 @@ function_divergence
 spatial_coordinate
 ```
 
-## BoundaryValues
+## FaceValues
 
-All of the methods for [`CellValues`](@ref) apply for `BoundaryValues` as well.
-In addition, there are some methods that are unique for `BoundaryValues`:
+All of the methods for [`CellValues`](@ref) apply for `FaceValues` as well.
+In addition, there are some methods that are unique for `FaecValues`:
 
 ```@docs
-getboundarynumber
-getcurrentboundary
+getfacenumber
+getcurrentface
 ```
 
 ## Assembling
