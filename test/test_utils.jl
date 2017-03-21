@@ -5,10 +5,10 @@
 #####################################
 reference_volume{dim}(::Interpolation{dim, RefCube}) = 2^dim
 reference_volume{dim}(::Interpolation{dim, RefTetrahedron}) = 1 / factorial(dim)
-# For boundaries
+# For faces
 reference_volume(fs::Interpolation, ::Int) = reference_volume(JuAFEM.getlowerdim(fs))
-reference_volume(fs::Interpolation{2, RefTetrahedron}, boundary::Int) = boundary == 1 ? sqrt(2) : 1.0
-reference_volume(fs::Interpolation{3, RefTetrahedron}, boundary::Int) = boundary == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
+reference_volume(fs::Interpolation{2, RefTetrahedron}, face::Int) = face == 1 ? sqrt(2) : 1.0
+reference_volume(fs::Interpolation{3, RefTetrahedron}, face::Int) = face == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
 
 ##########################################
 # Coordinates for the reference elements #
@@ -180,57 +180,57 @@ function calculate_volume{T}(::Serendipity{2, RefCube, 2}, x::Vector{Vec{2, T}})
     return vol
 end
 
-# For boundaries
+# For faces
 function calculate_volume{order, T}(::Lagrange{0, RefCube, order}, ::Vector{Vec{1, T}})
     return one(T)
 end
 
 ####################################
-# For testing getboundarynumber() #
+# For testing getfacenumber() #
 ####################################
-# Last set of boundary nodes throws error
+# Last set of face nodes throws error
 function topology_test_nodes(::Lagrange{1, RefCube, 1})
     cell_nodes = [3,4]
-    boundary_nodes = [[3,], [4,], [1337,]]
-    return boundary_nodes, cell_nodes
+    face_nodes = [[3,], [4,], [1337,]]
+    return face_nodes, cell_nodes
 end
 function topology_test_nodes(::Lagrange{1, RefCube, 2})
     cell_nodes = [3,4,8]
-    boundary_nodes = [[3,], [4,], [8,]]
-    return boundary_nodes, cell_nodes
+    face_nodes = [[3,], [4,], [8,]]
+    return face_nodes, cell_nodes
 end
 function topology_test_nodes(::Lagrange{2, RefCube, 1})
     cell_nodes = [3,4,8,1]
-    boundary_nodes = [[3,4], [4,8], [8,1], [1,3], [3,1337]]
-    return boundary_nodes, cell_nodes
+    face_nodes = [[3,4], [4,8], [8,1], [1,3], [3,1337]]
+    return face_nodes, cell_nodes
 end
 function topology_test_nodes(::Lagrange{2, RefCube, 2})
     cell_nodes = [3,4,8,1,2,5,6,7,9]
-    boundary_nodes = [[3,4,2], [4,8,5], [8,1,6], [1,3,7], [3,4,1337]]
-    return boundary_nodes, cell_nodes
+    face_nodes = [[3,4,2], [4,8,5], [8,1,6], [1,3,7], [3,4,1337]]
+    return face_nodes, cell_nodes
 end
 function topology_test_nodes(::Lagrange{2, RefTetrahedron, 1})
     cell_nodes = [3,4,8]
-    boundary_nodes = [[3,4], [4,8], [8,3], [3,1337]]
-    return boundary_nodes, cell_nodes
+    face_nodes = [[3,4], [4,8], [8,3], [3,1337]]
+    return face_nodes, cell_nodes
 end
 function topology_test_nodes(::Lagrange{2, RefTetrahedron, 2})
     cell_nodes = [3,4,8,1,2,5]
-    boundary_nodes = [[3,4,1], [4,8,2], [8,3,5], [3,4,1337]]
-    return boundary_nodes, cell_nodes
+    face_nodes = [[3,4,1], [4,8,2], [8,3,5], [3,4,1337]]
+    return face_nodes, cell_nodes
 end
 function topology_test_nodes(::Lagrange{3, RefCube, 1})
     cell_nodes = [3,4,8,1,2,5,6,7]
-    boundary_nodes = [[3,4,8,1], [3,4,5,2], [4,8,6,5], [8,1,7,6], [1,3,2,7], [2,5,6,7], [3,4,8,1337]]
-    return boundary_nodes, cell_nodes
+    face_nodes = [[3,4,8,1], [3,4,5,2], [4,8,6,5], [8,1,7,6], [1,3,2,7], [2,5,6,7], [3,4,8,1337]]
+    return face_nodes, cell_nodes
 end
 function topology_test_nodes(::Serendipity{2, RefCube, 2})
     cell_nodes = [3,4,8,1,2,5,6,7]
-    boundary_nodes = [[3,4,2], [4,8,5], [8,1,6], [1,3,7], [3,4,1337]]
-    return boundary_nodes, cell_nodes
+    face_nodes = [[3,4,2], [4,8,5], [8,1,6], [1,3,7], [3,4,1337]]
+    return face_nodes, cell_nodes
 end
 function topology_test_nodes(::Lagrange{3, RefTetrahedron, 1})
     cell_nodes = [3,4,8,1]
-    boundary_nodes = [[3,4,8], [3,4,1], [4,8,1], [3,8,1], [1,4,1337]]
-    return boundary_nodes, cell_nodes
+    face_nodes = [[3,4,8], [3,4,1], [4,8,1], [3,8,1], [1,4,1337]]
+    return face_nodes, cell_nodes
 end

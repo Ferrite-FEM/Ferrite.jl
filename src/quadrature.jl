@@ -16,7 +16,7 @@ There are different rules to determine the points and weights. In `JuAFEM` two d
 `:legendre` is used by default.
 
 In `JuAFEM`, the `QuadratureRule` type is mostly used as one of the components to create a [`CellValues`](@ref)
-or [`BoundaryValues`](@ref) object.
+or [`FaceValues`](@ref) object.
 
 **Constructor:**
 
@@ -101,7 +101,7 @@ getpoints(qr::QuadratureRule) = qr.points
 
 (::Type{QuadratureRule{dim, shape}}){dim, shape}(order::Int) = QuadratureRule{dim, shape}(:legendre, order)
 
-# Special case for boundary integration of 1D problems
+# Special case for face integration of 1D problems
 function (::Type{QuadratureRule{0, RefCube}})(quad_type::Symbol, order::Int)
     w = Float64[1.0]
     p = Vec{0,Float64}[]
@@ -158,7 +158,7 @@ for dim in (2, 3)
     end
 end
 
-# Special version for boundary integration of triangles
+# Special version for face integration of triangles
 function (::Type{QuadratureRule{1, RefTetrahedron}})(quad_type::Symbol, order::Int)
     if quad_type == :legendre
         p, weights = gausslegendre(order)

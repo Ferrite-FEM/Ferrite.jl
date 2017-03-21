@@ -1,5 +1,5 @@
 # Grid types
-export Node, Cell, CellIndex, CellBoundary, CellBoundaryIndex, Grid
+export Node, Cell, CellIndex, CellFace, CellFaceIndex, Grid
 
 # Cell type alias
 export Line, QuadraticLine,
@@ -8,8 +8,8 @@ export Line, QuadraticLine,
 
 # Grid utilities
 export getcells, getncells, getnodes, getnnodes, getcelltype,
-       getcellset,  getnodeset, getcellboundaryset, getcoordinates, getcoordinates!,
-       getcellsets, getnodesets, getcellboundarysets
+       getcellset,  getnodeset, getcoordinates, getcoordinates!,
+       getcellsets, getnodesets, getfacesets
 
 export addnodeset!, addcellset!
 
@@ -38,11 +38,13 @@ end
 
 @compat const Triangle = Cell{2, 3}
 @compat const QuadraticTriangle = Cell{2, 6}
+
 @compat const Quadrilateral = Cell{2, 4}
 @compat const QuadraticQuadrilateral = Cell{2, 9}
 
 @compat const Tetrahedron = Cell{3, 4}
 @compat const QuadraticTetrahedron = Cell{3, 10} # Function interpolation for this doesn't exist in JuAFEM yet
+
 @compat const Hexahedron = Cell{3, 8}
 @compat const QuadraticHexahedron = Cell{3, 20} # Function interpolation for this doesn't exist in JuAFEM yet
 
@@ -54,16 +56,16 @@ immutable CellIndex
 end
 
 """
-A `CellBoundary` is a sub-domain of the boundary defined by the cell and the side.
+A `CellFace` is a sub-domain of the face defined by the cell and the side.
 """
-immutable CellBoundary
+immutable CellFace
     idx::Tuple{Int, Int} # cell and side
 end
 
 """
-A `CellBoundaryIndex` is returned when looping over cell boundaries of the grid.
+A `CellFaceIndex` is returned when looping over cell faces of the grid.
 """
-@compat const CellBoundaryIndex = CellBoundary
+@compat const CellFaceIndex = CellFace
 
 """
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain.
@@ -71,18 +73,18 @@ A `Grid` is a collection of `Cells` and `Node`s which covers the computational d
 immutable Grid{dim, N, T <: Real}
     cells::Vector{Cell{dim, N}}
     nodes::Vector{Node{dim, T}}
-    cellboundaries::Vector{CellBoundary}
+    boundary::Vector{CellFace}
     cellsets::Dict{String, Vector{Int}}
     nodesets::Dict{String, Vector{Int}}
-    cellboundarysets::Dict{String, Vector{Int}}
+    facesets::Dict{String, Vector{Int}}
 end
 
 function Grid{dim, N, T}(cells::Vector{Cell{dim, N}}, nodes::Vector{Node{dim, T}};
-                         cellboundaries::Vector{CellBoundary} = CellBoundary[],
+                         boundary::Vector{CellFace} = CellFace[],
                          cellsets::Dict{String, Vector{Int}}=Dict{String, Vector{Int}}(),
                          nodesets::Dict{String, Vector{Int}}=Dict{String, Vector{Int}}(),
-                         cellboundarysets::Dict{String, Vector{Int}}=Dict{String, Vector{Int}}())
-    return Grid(cells, nodes, cellboundaries, cellsets, nodesets, cellboundarysets)
+                         facesets::Dict{String, Vector{Int}}=Dict{String, Vector{Int}}())
+    return Grid(cells, nodes, boundary, cellsets, nodesets, facesets)
 end
 
 ##########################
@@ -99,10 +101,8 @@ end
 @inline getnodes(grid::Grid, set::String) = grid.nodes[grid.nodesets[set]]
 @inline getnnodes(grid::Grid) = length(grid.nodes)
 
-@inline getboundaries(grid::Grid) = grid.cellboundaries
-@inline getboundaries(grid::Grid, v::Vector{Int}) = grid.cellboundaries[v]
-@inline getboundaries(grid::Grid, set::String) = grid.cellboundaries[grid.cellboundarysets[set]]
-@inline getnboundaries(grid::Grid) = length(grid.cellboundaries)
+@inline getboundary(grid::Grid) = grid.boundary
+@inline getboundary(grid::Grid, v::Vector{Int}) = grid.boundary[v]
 
 @inline getcellset(grid::Grid, set::String) = grid.cellsets[set]
 @inline getcellsets(grid::Grid) = grid.cellsets
@@ -110,9 +110,11 @@ end
 @inline getnodeset(grid::Grid, set::String) = grid.nodesets[set]
 @inline getnodesets(grid::Grid) = grid.nodesets
 
-@inline getcellboundaryset(grid::Grid, set::String) = grid.cellboundarysets[set]
-@inline getcellboundarysets(grid::Grid) = grid.cellboundarysets
+@inline getfaceset(grid::Grid, set::String) = grid.facesets[set]
+@inline getfacesets(grid::Grid) = grid.facesets
 
+n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
+getfacelist(grid::Grid) = getfacelist(eltype(grid.cells))
 
 function addcellset!(grid::Grid, name::String, cellid::Vector{Int})
     haskey(grid.cellsets, name) && throw(ArgumentError("There already exists a cellset with the name: $name"))
@@ -154,7 +156,7 @@ Updates the coordinate vector for a cell
 
     getcoordinates!(x::Vector{Vec}, grid::Grid, cell::Int)
     getcoordinates!(x::Vector{Vec}, grid::Grid, cell::CellIndex)
-    getcoordinates!(x::Vector{Vec}, grid::Grid, boundary::CellBoundaryIndex)
+    getcoordinates!(x::Vector{Vec}, grid::Grid, face::CellFaceIndex)
 
 ** Arguments **
 
@@ -174,14 +176,14 @@ Updates the coordinate vector for a cell
     end
 end
 @inline getcoordinates!{dim, T, N}(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, cell::CellIndex) = getcoordinates!(x, grid, cell.idx)
-@inline getcoordinates!{dim, T, N}(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, boundary::CellBoundaryIndex) = getcoordinates!(x, grid, boundary.idx[1])
+@inline getcoordinates!{dim, T, N}(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, face::CellFaceIndex) = getcoordinates!(x, grid, face.idx[1])
 
 """
 Returns a vector with the coordinates of the vertices of a cell
 
     getcoordinates(grid::Grid, cell::Int)
     getcoordinates(grid::Grid, cell::CellIndex)
-    getcoordinates(grid::Grid, boundary::CellBoundaryIndex)
+    getcoordinates(grid::Grid, face::CellFaceIndex)
 
 ** Arguments **
 
@@ -198,7 +200,7 @@ Returns a vector with the coordinates of the vertices of a cell
     return [grid.nodes[i].x for i in nodeidx]::Vector{Vec{dim, T}}
 end
 @inline getcoordinates(grid::Grid, cell::CellIndex) = getcoordinates(grid, cell.idx)
-@inline getcoordinates(grid::Grid, boundary::CellBoundaryIndex) = getcoordinates(grid, boundary.idx[1])
+@inline getcoordinates(grid::Grid, face::CellFaceIndex) = getcoordinates(grid, face.idx[1])
 
 # Iterate over cell vector
 Base.start{dim, N}(c::Vector{Cell{dim, N}}) = 1
