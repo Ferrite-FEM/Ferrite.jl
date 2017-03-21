@@ -33,37 +33,19 @@ end
 (::Type{Cell{dim}}){dim,N}(nodes::NTuple{N}) = Cell{dim,N}(nodes)
 
 # Typealias for commonly used cells
-
-to_interpolation(c::Cell) = to_interpolation(typeof(c))
-
-getfacelist(c::Cell)     = getfacelist(typeof(c))
-getfacelist(c::Type{<:Cell}) = getfacelist(to_interpolation(c))
-
-nfaces(c::Cell) = n_faces(typeof(c))
-nfaces(c::Type{<:Cell}) = length(getfacelist(c))
-
 @compat const Line = Cell{1, 2}
-to_interpolation(::Type{Line}) = Lagrange{1, RefCube, 1}
 @compat const QuadraticLine = Cell{1, 3}
-to_interpolation(::Type{QuadraticLine}) = Lagrange{1, RefCube, 2}
-
 
 @compat const Triangle = Cell{2, 3}
-to_interpolation(::Type{Triangle}) = Lagrange{2, RefTetrahedron, 1}
 @compat const QuadraticTriangle = Cell{2, 6}
-to_interpolation(::Type{QuadraticTriangle}) = Lagrange{2, RefTetrahedron, 2}
 
 @compat const Quadrilateral = Cell{2, 4}
-to_interpolation(::Type{Quadrilateral}) = Lagrange{2, RefCube, 1}
 @compat const QuadraticQuadrilateral = Cell{2, 9}
-to_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2, RefCube, 2}
 
 @compat const Tetrahedron = Cell{3, 4}
-to_interpolation(::Type{Tetrahedron}) = Lagrange{3, RefTetrahedron, 1}
 @compat const QuadraticTetrahedron = Cell{3, 10} # Function interpolation for this doesn't exist in JuAFEM yet
 
 @compat const Hexahedron = Cell{3, 8}
-to_interpolation(::Type{Hexahedron}) = Lagrange{3, RefCube, 1}
 @compat const QuadraticHexahedron = Cell{3, 20} # Function interpolation for this doesn't exist in JuAFEM yet
 
 """
