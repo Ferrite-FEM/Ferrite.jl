@@ -8,7 +8,7 @@ export Line, QuadraticLine,
 
 # Grid utilities
 export getcells, getncells, getnodes, getnnodes, getcelltype,
-       getcellset,  getnodeset, getboundaryet, getcoordinates, getcoordinates!,
+       getcellset,  getnodeset, getcoordinates, getcoordinates!,
        getcellsets, getnodesets, getfacesets
 
 export addnodeset!, addcellset!
@@ -101,10 +101,8 @@ end
 @inline getnodes(grid::Grid, set::String) = grid.nodes[grid.nodesets[set]]
 @inline getnnodes(grid::Grid) = length(grid.nodes)
 
-@inline getfaces(grid::Grid) = grid.boundary
-@inline getfaces(grid::Grid, v::Vector{Int}) = grid.boundary[v]
-@inline getfaces(grid::Grid, set::String) = grid.boundary[grid.facesets[set]]
-@inline getnfaces(grid::Grid) = length(grid.boundary)
+@inline getboundary(grid::Grid) = grid.boundary
+@inline getboundary(grid::Grid, v::Vector{Int}) = grid.boundary[v]
 
 @inline getcellset(grid::Grid, set::String) = grid.cellsets[set]
 @inline getcellsets(grid::Grid) = grid.cellsets
