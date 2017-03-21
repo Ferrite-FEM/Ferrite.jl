@@ -34,13 +34,13 @@ function generate_grid{T}(::Type{Line}, nel::NTuple{1, Int}, left::Vec{1, T}=Vec
     end
 
     # Cell faces
-    cellbounds = CellFace[CellFace((1, 1)),
+    boundary = CellFace[CellFace((1, 1)),
                               CellFace((nel_x, 2))]
 
     # Cell face sets
-    cellboundsets = Dict("left"  => [1],
+    facesets = Dict("left"  => [1],
                          "right" => [2])
-    return Grid(cells, nodes, cellfaces=cellbounds, cellfacesets=cellboundsets)
+    return Grid(cells, nodes, boundary=boundary, facesets=facesets)
 end
 
 # QuadraticLine
@@ -62,13 +62,13 @@ function generate_grid{T}(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec{
     end
 
     # Cell faces
-    cellbounds = CellFace[CellFace((1, 1)),
+    boundary = CellFace[CellFace((1, 1)),
                               CellFace((nel_x, 2))]
 
     # Cell face sets
-    cellboundsets = Dict("left"  => [1],
+    facesets = Dict("left"  => [1],
                          "right" => [2])
-    return Grid(cells, nodes, cellfaces=cellbounds, cellfacesets=cellboundsets)
+    return Grid(cells, nodes, boundary=boundary, facesets=facesets)
 end
 
 # Quadrilateral
@@ -94,20 +94,20 @@ function generate_grid{T}(::Type{Quadrilateral}, nel::NTuple{2, Int}, left::Vec{
 
     # Cell faces
     cell_array = reshape(collect(1:nel_tot),(nel_x, nel_y))
-    cellbounds = CellFace[[CellFace((cl, 1)) for cl in cell_array[:,1]];
+    boundary = CellFace[[CellFace((cl, 1)) for cl in cell_array[:,1]];
                               [CellFace((cl, 2)) for cl in cell_array[end,:]];
                               [CellFace((cl, 3)) for cl in cell_array[:,end]];
                               [CellFace((cl, 4)) for cl in cell_array[1,:]]]
 
     # Cell face sets
     offset = 0
-    cellboundsets = Dict{String, Vector{Int}}()
-    cellboundsets["bottom"] = (1:length(cell_array[:,1]))   + offset; offset += length(cell_array[:,1])
-    cellboundsets["right"]  = (1:length(cell_array[end,:])) + offset; offset += length(cell_array[end,:])
-    cellboundsets["top"]    = (1:length(cell_array[:,end])) + offset; offset += length(cell_array[:,end])
-    cellboundsets["left"]   = (1:length(cell_array[1,:]))   + offset; offset += length(cell_array[1,:])
+    facesets = Dict{String, Vector{Int}}()
+    facesets["bottom"] = (1:length(cell_array[:,1]))   + offset; offset += length(cell_array[:,1])
+    facesets["right"]  = (1:length(cell_array[end,:])) + offset; offset += length(cell_array[end,:])
+    facesets["top"]    = (1:length(cell_array[:,end])) + offset; offset += length(cell_array[:,end])
+    facesets["left"]   = (1:length(cell_array[1,:]))   + offset; offset += length(cell_array[1,:])
 
-    return Grid(cells, nodes, cellfaces=cellbounds, cellfacesets=cellboundsets)
+    return Grid(cells, nodes, boundary=boundary, facesets=facesets)
 end
 
 # QuadraticQuadrilateral
@@ -135,20 +135,20 @@ function generate_grid{T}(::Type{QuadraticQuadrilateral}, nel::NTuple{2, Int}, l
 
     # Cell faces
     cell_array = reshape(collect(1:nel_tot),(nel_x, nel_y))
-    cellbounds = CellFace[[CellFace((cl, 1)) for cl in cell_array[:,1]];
+    boundary = CellFace[[CellFace((cl, 1)) for cl in cell_array[:,1]];
                               [CellFace((cl, 2)) for cl in cell_array[end,:]];
                               [CellFace((cl, 3)) for cl in cell_array[:,end]];
                               [CellFace((cl, 4)) for cl in cell_array[1,:]]]
 
     # Cell face sets
     offset = 0
-    cellboundsets = Dict{String, Vector{Int}}()
-    cellboundsets["bottom"] = (1:length(cell_array[:,1]))   + offset; offset += length(cell_array[:,1])
-    cellboundsets["right"]  = (1:length(cell_array[end,:])) + offset; offset += length(cell_array[end,:])
-    cellboundsets["top"]    = (1:length(cell_array[:,end])) + offset; offset += length(cell_array[:,end])
-    cellboundsets["left"]   = (1:length(cell_array[1,:]))   + offset; offset += length(cell_array[1,:])
+    facesets = Dict{String, Vector{Int}}()
+    facesets["bottom"] = (1:length(cell_array[:,1]))   + offset; offset += length(cell_array[:,1])
+    facesets["right"]  = (1:length(cell_array[end,:])) + offset; offset += length(cell_array[end,:])
+    facesets["top"]    = (1:length(cell_array[:,end])) + offset; offset += length(cell_array[:,end])
+    facesets["left"]   = (1:length(cell_array[1,:]))   + offset; offset += length(cell_array[1,:])
 
-    return Grid(cells, nodes, cellfaces=cellbounds, cellfacesets=cellboundsets)
+    return Grid(cells, nodes, boundary=boundary, facesets=facesets)
 end
 
 # Hexahedron
@@ -176,7 +176,7 @@ function generate_grid{T}(::Type{Hexahedron}, nel::NTuple{3, Int}, left::Vec{3, 
 
     # Cell faces
     cell_array = reshape(collect(1:nel_tot),(nel_x, nel_y, nel_z))
-    cellbounds = CellFace[[CellFace((cl, 1)) for cl in cell_array[:,:,1][:]];
+    boundary = CellFace[[CellFace((cl, 1)) for cl in cell_array[:,:,1][:]];
                               [CellFace((cl, 2)) for cl in cell_array[:,1,:][:]];
                               [CellFace((cl, 3)) for cl in cell_array[end,:,:][:]];
                               [CellFace((cl, 4)) for cl in cell_array[:,end,:][:]];
@@ -185,15 +185,15 @@ function generate_grid{T}(::Type{Hexahedron}, nel::NTuple{3, Int}, left::Vec{3, 
 
     # Cell face sets
     offset = 0
-    cellboundsets = Dict{String, Vector{Int}}()
-    cellboundsets["bottom"] = (1:length(cell_array[:,:,1][:]))   + offset; offset += length(cell_array[:,:,1][:])
-    cellboundsets["front"]  = (1:length(cell_array[:,1,:][:]))   + offset; offset += length(cell_array[:,1,:][:])
-    cellboundsets["right"]  = (1:length(cell_array[end,:,:][:])) + offset; offset += length(cell_array[end,:,:][:])
-    cellboundsets["back"]   = (1:length(cell_array[:,end,:][:])) + offset; offset += length(cell_array[:,end,:][:])
-    cellboundsets["left"]   = (1:length(cell_array[1,:,:][:]))   + offset; offset += length(cell_array[1,:,:][:])
-    cellboundsets["top"]    = (1:length(cell_array[:,:,end][:])) + offset; offset += length(cell_array[:,:,end][:])
+    facesets = Dict{String, Vector{Int}}()
+    facesets["bottom"] = (1:length(cell_array[:,:,1][:]))   + offset; offset += length(cell_array[:,:,1][:])
+    facesets["front"]  = (1:length(cell_array[:,1,:][:]))   + offset; offset += length(cell_array[:,1,:][:])
+    facesets["right"]  = (1:length(cell_array[end,:,:][:])) + offset; offset += length(cell_array[end,:,:][:])
+    facesets["back"]   = (1:length(cell_array[:,end,:][:])) + offset; offset += length(cell_array[:,end,:][:])
+    facesets["left"]   = (1:length(cell_array[1,:,:][:]))   + offset; offset += length(cell_array[1,:,:][:])
+    facesets["top"]    = (1:length(cell_array[:,:,end][:])) + offset; offset += length(cell_array[:,:,end][:])
 
-    return Grid(cells, nodes, cellfaces=cellbounds, cellfacesets=cellboundsets)
+    return Grid(cells, nodes, boundary=boundary, facesets=facesets)
 end
 
 # Triangle
@@ -220,20 +220,20 @@ function generate_grid{T}(::Type{Triangle}, nel::NTuple{2, Int}, left::Vec{2, T}
 
     # Cell faces
     cell_array = reshape(collect(1:nel_tot),(2, nel_x, nel_y))
-    cellbounds = CellFace[[CellFace((cl, 1)) for cl in cell_array[1,:,1]];
+    boundary = CellFace[[CellFace((cl, 1)) for cl in cell_array[1,:,1]];
                               [CellFace((cl, 1)) for cl in cell_array[2,end,:]];
                               [CellFace((cl, 2)) for cl in cell_array[2,:,end]];
                               [CellFace((cl, 3)) for cl in cell_array[1,1,:]]]
 
     # Cell face sets
     offset = 0
-    cellboundsets = Dict{String, Vector{Int}}()
-    cellboundsets["bottom"] = (1:length(cell_array[1,:,1]))   + offset; offset += length(cell_array[1,:,1])
-    cellboundsets["right"]  = (1:length(cell_array[2,end,:])) + offset; offset += length(cell_array[2,end,:])
-    cellboundsets["top"]    = (1:length(cell_array[2,:,end])) + offset; offset += length(cell_array[2,:,end])
-    cellboundsets["left"]   = (1:length(cell_array[1,1,:]))   + offset; offset += length(cell_array[1,1,:])
+    facesets = Dict{String, Vector{Int}}()
+    facesets["bottom"] = (1:length(cell_array[1,:,1]))   + offset; offset += length(cell_array[1,:,1])
+    facesets["right"]  = (1:length(cell_array[2,end,:])) + offset; offset += length(cell_array[2,end,:])
+    facesets["top"]    = (1:length(cell_array[2,:,end])) + offset; offset += length(cell_array[2,:,end])
+    facesets["left"]   = (1:length(cell_array[1,1,:]))   + offset; offset += length(cell_array[1,1,:])
 
-    return Grid(cells, nodes, cellfaces=cellbounds, cellfacesets=cellboundsets)
+    return Grid(cells, nodes, boundary=boundary, facesets=facesets)
 end
 
 # QuadraticTriangle
@@ -262,20 +262,20 @@ function generate_grid{T}(::Type{QuadraticTriangle}, nel::NTuple{2, Int}, left::
 
     # Cell faces
     cell_array = reshape(collect(1:nel_tot),(2, nel_x, nel_y))
-    cellbounds = CellFace[[CellFace((cl, 1)) for cl in cell_array[1,:,1]];
+    boundary = CellFace[[CellFace((cl, 1)) for cl in cell_array[1,:,1]];
                               [CellFace((cl, 1)) for cl in cell_array[2,end,:]];
                               [CellFace((cl, 2)) for cl in cell_array[2,:,end]];
                               [CellFace((cl, 3)) for cl in cell_array[1,1,:]]]
 
     # Cell face sets
     offset = 0
-    cellboundsets = Dict{String, Vector{Int}}()
-    cellboundsets["bottom"] = (1:length(cell_array[1,:,1]))   + offset; offset += length(cell_array[1,:,1])
-    cellboundsets["right"]  = (1:length(cell_array[2,end,:])) + offset; offset += length(cell_array[2,end,:])
-    cellboundsets["top"]    = (1:length(cell_array[2,:,end])) + offset; offset += length(cell_array[2,:,end])
-    cellboundsets["left"]   = (1:length(cell_array[1,1,:]))   + offset; offset += length(cell_array[1,1,:])
+    facesets = Dict{String, Vector{Int}}()
+    facesets["bottom"] = (1:length(cell_array[1,:,1]))   + offset; offset += length(cell_array[1,:,1])
+    facesets["right"]  = (1:length(cell_array[2,end,:])) + offset; offset += length(cell_array[2,end,:])
+    facesets["top"]    = (1:length(cell_array[2,:,end])) + offset; offset += length(cell_array[2,:,end])
+    facesets["left"]   = (1:length(cell_array[1,1,:]))   + offset; offset += length(cell_array[1,1,:])
 
-    return Grid(cells, nodes, cellfaces=cellbounds, cellfacesets=cellboundsets)
+    return Grid(cells, nodes, boundary=boundary, facesets=facesets)
 end
 
 # Tetrahedron
@@ -308,7 +308,7 @@ function generate_grid{T}(::Type{Tetrahedron}, nel::NTuple{3, Int}, left::Vec{3,
 
     # Cell faces
     cell_array = reshape(collect(1:nel_tot),(5, nel_x, nel_y, nel_z))
-    cellbounds = CellFace[[CellFace((cl, 1)) for cl in cell_array[1,:,:,1][:]];
+    boundary = CellFace[[CellFace((cl, 1)) for cl in cell_array[1,:,:,1][:]];
                               [CellFace((cl, 1)) for cl in cell_array[2,:,:,1][:]];
                               [CellFace((cl, 2)) for cl in cell_array[1,:,1,:][:]];
                               [CellFace((cl, 1)) for cl in cell_array[4,:,1,:][:]];
@@ -323,13 +323,13 @@ function generate_grid{T}(::Type{Tetrahedron}, nel::NTuple{3, Int}, left::Vec{3,
 
     # Cell face sets
     offset = 0
-    cellboundsets = Dict{String, Vector{Int}}()
-    cellboundsets["bottom"] = (1:length([cell_array[1,:,:,1][:];   cell_array[2,:,:,1][:]]))   + offset; offset += length([cell_array[1,:,:,1][:];   cell_array[2,:,:,1][:]])
-    cellboundsets["front"]  = (1:length([cell_array[1,:,1,:][:];   cell_array[4,:,1,:][:]]))   + offset; offset += length([cell_array[1,:,1,:][:];   cell_array[4,:,1,:][:]])
-    cellboundsets["right"]  = (1:length([cell_array[2,end,:,:][:]; cell_array[4,end,:,:][:]])) + offset; offset += length([cell_array[2,end,:,:][:]; cell_array[4,end,:,:][:]])
-    cellboundsets["back"]   = (1:length([cell_array[2,:,end,:][:]; cell_array[5,:,end,:][:]])) + offset; offset += length([cell_array[2,:,end,:][:]; cell_array[5,:,end,:][:]])
-    cellboundsets["left"]   = (1:length([cell_array[1,1,:,:][:];   cell_array[5,1,:,:][:]]))   + offset; offset += length([cell_array[1,1,:,:][:];   cell_array[5,1,:,:][:]])
-    cellboundsets["top"]    = (1:length([cell_array[4,:,:,end][:]; cell_array[5,:,:,end][:]])) + offset; offset += length([cell_array[4,:,:,end][:]; cell_array[5,:,:,end][:]])
+    facesets = Dict{String, Vector{Int}}()
+    facesets["bottom"] = (1:length([cell_array[1,:,:,1][:];   cell_array[2,:,:,1][:]]))   + offset; offset += length([cell_array[1,:,:,1][:];   cell_array[2,:,:,1][:]])
+    facesets["front"]  = (1:length([cell_array[1,:,1,:][:];   cell_array[4,:,1,:][:]]))   + offset; offset += length([cell_array[1,:,1,:][:];   cell_array[4,:,1,:][:]])
+    facesets["right"]  = (1:length([cell_array[2,end,:,:][:]; cell_array[4,end,:,:][:]])) + offset; offset += length([cell_array[2,end,:,:][:]; cell_array[4,end,:,:][:]])
+    facesets["back"]   = (1:length([cell_array[2,:,end,:][:]; cell_array[5,:,end,:][:]])) + offset; offset += length([cell_array[2,:,end,:][:]; cell_array[5,:,end,:][:]])
+    facesets["left"]   = (1:length([cell_array[1,1,:,:][:];   cell_array[5,1,:,:][:]]))   + offset; offset += length([cell_array[1,1,:,:][:];   cell_array[5,1,:,:][:]])
+    facesets["top"]    = (1:length([cell_array[4,:,:,end][:]; cell_array[5,:,:,end][:]])) + offset; offset += length([cell_array[4,:,:,end][:]; cell_array[5,:,:,end][:]])
 
-    return Grid(cells, nodes, cellfaces=cellbounds, cellfacesets=cellboundsets)
+    return Grid(cells, nodes, boundary=boundary, facesets=facesets)
 end

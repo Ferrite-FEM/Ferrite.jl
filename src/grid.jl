@@ -8,8 +8,8 @@ export Line, QuadraticLine,
 
 # Grid utilities
 export getcells, getncells, getnodes, getnnodes, getcelltype,
-       getcellset,  getnodeset, getcellfaceset, getcoordinates, getcoordinates!,
-       getcellsets, getnodesets, getcellfacesets
+       getcellset,  getnodeset, getboundaryet, getcoordinates, getcoordinates!,
+       getcellsets, getnodesets, getfacesets
 
 export addnodeset!, addcellset!
 
@@ -91,18 +91,18 @@ A `Grid` is a collection of `Cells` and `Node`s which covers the computational d
 immutable Grid{dim, N, T <: Real}
     cells::Vector{Cell{dim, N}}
     nodes::Vector{Node{dim, T}}
-    cellfaces::Vector{CellFace}
+    boundary::Vector{CellFace}
     cellsets::Dict{String, Vector{Int}}
     nodesets::Dict{String, Vector{Int}}
-    cellfacesets::Dict{String, Vector{Int}}
+    facesets::Dict{String, Vector{Int}}
 end
 
 function Grid{dim, N, T}(cells::Vector{Cell{dim, N}}, nodes::Vector{Node{dim, T}};
-                         cellfaces::Vector{CellFace} = CellFace[],
+                         boundary::Vector{CellFace} = CellFace[],
                          cellsets::Dict{String, Vector{Int}}=Dict{String, Vector{Int}}(),
                          nodesets::Dict{String, Vector{Int}}=Dict{String, Vector{Int}}(),
-                         cellfacesets::Dict{String, Vector{Int}}=Dict{String, Vector{Int}}())
-    return Grid(cells, nodes, cellfaces, cellsets, nodesets, cellfacesets)
+                         facesets::Dict{String, Vector{Int}}=Dict{String, Vector{Int}}())
+    return Grid(cells, nodes, boundary, cellsets, nodesets, facesets)
 end
 
 ##########################
@@ -119,10 +119,10 @@ end
 @inline getnodes(grid::Grid, set::String) = grid.nodes[grid.nodesets[set]]
 @inline getnnodes(grid::Grid) = length(grid.nodes)
 
-@inline getfaces(grid::Grid) = grid.cellfaces
-@inline getfaces(grid::Grid, v::Vector{Int}) = grid.cellfaces[v]
-@inline getfaces(grid::Grid, set::String) = grid.cellfaces[grid.cellfacesets[set]]
-@inline getnfaces(grid::Grid) = length(grid.cellfaces)
+@inline getfaces(grid::Grid) = grid.boundary
+@inline getfaces(grid::Grid, v::Vector{Int}) = grid.boundary[v]
+@inline getfaces(grid::Grid, set::String) = grid.boundary[grid.facesets[set]]
+@inline getnfaces(grid::Grid) = length(grid.boundary)
 
 @inline getcellset(grid::Grid, set::String) = grid.cellsets[set]
 @inline getcellsets(grid::Grid) = grid.cellsets
@@ -130,8 +130,8 @@ end
 @inline getnodeset(grid::Grid, set::String) = grid.nodesets[set]
 @inline getnodesets(grid::Grid) = grid.nodesets
 
-@inline getcellFaceset(grid::Grid, set::String) = grid.cellfacesets[set]
-@inline getcellfacesets(grid::Grid) = grid.cellfacesets
+@inline getcellFaceset(grid::Grid, set::String) = grid.facesets[set]
+@inline getfacesets(grid::Grid) = grid.facesets
 
 n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
 getfacelist(grid::Grid) = getfacelist(eltype(grid.cells))
