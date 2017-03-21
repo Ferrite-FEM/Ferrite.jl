@@ -112,7 +112,7 @@ end
 @inline getnodeset(grid::Grid, set::String) = grid.nodesets[set]
 @inline getnodesets(grid::Grid) = grid.nodesets
 
-@inline getcellFaceset(grid::Grid, set::String) = grid.facesets[set]
+@inline getfaceset(grid::Grid, set::String) = grid.facesets[set]
 @inline getfacesets(grid::Grid) = grid.facesets
 
 n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
