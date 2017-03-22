@@ -20,34 +20,40 @@ for cell in CellIterator(grid)
 end
 ```
 """
-immutable CellIterator{dim, N, T}
-    grid::Grid{dim, N, T}
+immutable CellIterator{dim, N, T, M}
+    grid::Grid{dim, N, T, M}
     nodes::Vector{Int}
     coords::Vector{Vec{dim, T}}
+    current_cell::Ref{Cell{dim, N, M}}
 end
 
-function CellIterator{dim, N, T}(grid::Grid{dim, N, T})
+function CellIterator{dim, N, T, M}(grid::Grid{dim, N, T, M})
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, T}, N)
-    return CellIterator(grid, nodes, coords)
+    cell = Ref{Cell{dim, N, M}}()
+    return CellIterator(grid, nodes, coords, cell)
 end
 
 # iterator interface
-Base.start(::CellIterator) = 1
-Base.next{dim, N, T}(ci::CellIterator{dim, N, T}, i) = (reinit!(ci, i), i+1)
+Base.start(::CellIterator)     = 1
+Base.next(ci::CellIterator, i) = (reinit!(ci, i), i+1)
 Base.done(ci::CellIterator, i) = i > getncells(ci.grid)
-Base.length(ci::CellIterator) = getncells(ci.grid)
+Base.length(ci::CellIterator)  = getncells(ci.grid)
 
-Base.iteratorsize{dim, N, T}(::Type{CellIterator{dim, N, T}}) = Base.HasLength()   # this is default in Base
-Base.iteratoreltype{dim, N, T}(::Type{CellIterator{dim, N, T}}) = Base.HasEltype() # this is default in Base
-Base.eltype{dim, N, T}(::Type{CellIterator{dim, N, T}}) = CellIterator{dim, N, T}
+Base.iteratorsize{T <: CellIterator}(::Type{T})   = Base.HasLength()   # this is default in Base
+Base.iteratoreltype{T <: CellIterator}(::Type{T}) = Base.HasEltype() # this is default in Base
+Base.eltype{T <: CellIterator}(::Type{T})         = T
 
 # utility
 @inline getnodes(ci::CellIterator) = ci.nodes
 @inline getcoordinates(ci::CellIterator) = ci.coords
+@inline nfaces(ci::CellIterator) = nfaces(eltype(ci.grid.cells))
+@inline onboundary(ci::CellIterator, face::Int) = onboundary(ci.current_cell[], face)
 
-function reinit!{dim, N, T}(ci::CellIterator{dim, N, T}, i::Int)
+
+function reinit!{dim, N}(ci::CellIterator{dim, N}, i::Int)
     nodeids = ci.grid.cells[i].nodes
+    ci.current_cell[] = ci.grid.cells[i]
     @inbounds for j in 1:N
         nodeid = nodeids[j]
         ci.nodes[j] = nodeid
@@ -57,7 +63,7 @@ function reinit!{dim, N, T}(ci::CellIterator{dim, N, T}, i::Int)
 end
 
 @inline reinit!{dim, N, T}(cv::CellValues{dim, T}, ci::CellIterator{dim, N, T}) = reinit!(cv, ci.coords)
-
+@inline reinit!{dim, N, T}(fv::FaceValues{dim, T}, ci::CellIterator{dim, N, T}, face::Int) = reinit!(fv, ci.coords, face)
 
 """
 ```julia
@@ -78,6 +84,7 @@ end
 ```
 """
 
+#=
 immutable FaceIterator{dim, N, T}
     grid::Grid{dim, N, T}
     nodes_face::Vector{Int}
@@ -134,5 +141,5 @@ function reinit!{dim, N, T}(fi::FaceIterator{dim, N, T}, cell::Int, face::Int)
     end
     return fi
 end
+=#
 
-@inline reinit!{dim, N, T}(fv::FaceValues{dim, T}, fi::FaceIterator{dim, N, T}) = reinit!(fv, fi.coords_cell, fi.current_face[])
