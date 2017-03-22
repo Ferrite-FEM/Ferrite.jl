@@ -1,4 +1,9 @@
 # Common methods for all `Values` objects
+
+@compat const ScalarValues{dim, T, FS, GS} = Union{CellScalarValues{dim, T, FS, GS}, FaceScalarValues{dim, T, FS, GS}}
+@compat const VectorValues{dim, T, FS, GS} = Union{CellVectorValues{dim, T, FS, GS}, FaceVectorValues{dim, T, FS, GS}}
+
+
 """
 Updates a `CellValues`/`FaceValues` object for a cell or face.
 

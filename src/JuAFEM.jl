@@ -44,22 +44,27 @@ Abstract type which has `CellValues` and `FaceValues` as subtypes
 @compat abstract type CellValues{dim, T, FS, GS}     <: Values{dim, T, FS, GS} end
 @compat abstract type FaceValues{dim, T, FS, GS} <: Values{dim, T, FS, GS} end
 
-
 include("interpolations.jl")
-include("quadrature.jl")
-include("cell_values.jl")
-include("face_values.jl")
 
-@compat const ScalarValues{dim, T, FS, GS} = Union{CellScalarValues{dim, T, FS, GS}, FaceScalarValues{dim, T, FS, GS}}
-@compat const VectorValues{dim, T, FS, GS} = Union{CellVectorValues{dim, T, FS, GS}, FaceVectorValues{dim, T, FS, GS}}
+# Quadrature
+include(joinpath("Quadrature", "quadrature.jl"))
 
-include("common_values.jl")
-include("assembler.jl")
-include("face_integrals.jl")
-include("grid.jl")
-include("grid_generators.jl")
-include("VTK.jl")
+# FEValues
+include(joinpath("FEValues","cell_values.jl"))
+include(joinpath("FEValues","face_values.jl"))
+include(joinpath("FEValues","common_values.jl"))
+include(joinpath("FEValues","face_integrals.jl"))
+
+# Grid
+include(joinpath("Grid", "grid.jl"))
+include(joinpath("Grid", "grid_generators.jl"))
+
+# Export
+include(joinpath("Export", "VTK.jl"))
+
+# Other
 include("iterators.jl")
+include("assembler.jl")
 include("deprecations.jl")
 
 end # module

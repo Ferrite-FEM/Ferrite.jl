@@ -1,5 +1,5 @@
-include("quadrature_tables/gaussquad_tri_table.jl")
-include("quadrature_tables/gaussquad_tet_table.jl")
+include("gaussquad_tri_table.jl")
+include("gaussquad_tet_table.jl")
 
 import Base.Cartesian: @nloops, @nref, @ntuple, @nexprs
 
