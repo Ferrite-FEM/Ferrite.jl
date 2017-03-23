@@ -60,6 +60,8 @@ function assemble{dim}(grid::Grid{dim}, dh::DofHandler, K, cv, fv, mp, u)
 end
 
 function assemble_element!(ke, fe, cell, cv, fv, mp, ue, assemble_tangent = true)
+    b = Vec{3}((0.0, -0.5, 0.0))
+    t = Vec{3}((0.1, 0.0, 0.0))
     ndofs = getnbasefunctions(cv)
     reinit!(cv, cell)
     fill!(ke, 0.0)
@@ -84,7 +86,9 @@ function assemble_element!(ke, fe, cell, cv, fv, mp, ue, assemble_tangent = true
 
         for i in 1:ndofs
             δFi = shape_gradient(cv, qp, i)
+            δu = shape_value(cv, qp, i)
             fe[i] += (δE[i] ⊡ S) * dΩ
+            fe[i] -= (δu ⋅ b) * dΩ
             δE∂S∂E = δE[i] ⊡ ∂S∂E
             S∇δu = S ⋅ δFi'
             for j in 1:ndofs
@@ -94,6 +98,18 @@ function assemble_element!(ke, fe, cell, cv, fv, mp, ue, assemble_tangent = true
         end
     end
 
+    for face in 1:nfaces(cell)
+        if onboundary(cell, face)
+            reinit!(fv, cell, face)
+            for q_point in 1:getnquadpoints(fv)
+                dΓ = getdetJdV(fv, q_point)
+                for i in 1:ndofs
+                    δu = shape_value(fv, q_point, i)
+                    fe[i] -= (δu ⋅ t) * dΓ
+                end
+            end
+        end
+    end
 end
 
 # solve the problem
@@ -164,14 +180,14 @@ function solve()
     newton_itr = -1
     NEWTON_TOL = 1e-8
     prog = ProgressMeter.ProgressThresh(NEWTON_TOL, "Solving:")
-   
+
     while true; newton_itr += 1
         u = un + Δu
         f, K = assemble(grid, dh, K, cv, fv, mp, u)
         normg = norm(f[JuAFEM.free_dofs(dbc)])
         apply_zero!(K, f, dbc)
         ProgressMeter.update!(prog, normg; showvalues = [(:iter, newton_itr)])
-     
+
         if normg < NEWTON_TOL
             break
         end
@@ -183,7 +199,7 @@ function solve()
 
         @timeit "linear solve" ΔΔu, flag, relres, iter, resvec = cg(K, f; maxIter = 1000, tol = min(1e-3, normg))
         @assert flag == 0
-        
+
         apply_zero!(ΔΔu, dbc)
         Δu -= ΔΔu
     end
