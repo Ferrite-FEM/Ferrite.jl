@@ -3,4 +3,5 @@
 module TestStiffness
     using NBInclude
     nbinclude("../examples/stiffness_example.ipynb")
+    nbinclude("../examples/cantilever.ipynb")
 end

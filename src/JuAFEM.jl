@@ -7,7 +7,7 @@ using Reexport
 @reexport using Tensors
 @reexport using WriteVTK
 
-import Base: show
+import Base: show, push!
 import WriteVTK: vtk_grid, vtk_point_data, DatasetFile
 
 # Utilities
@@ -58,6 +58,10 @@ include(joinpath("FEValues","face_integrals.jl"))
 # Grid
 include(joinpath("Grid", "grid.jl"))
 include(joinpath("Grid", "grid_generators.jl"))
+
+# Dofs
+include(joinpath("Dofs", "DofHandler.jl"))
+include(joinpath("Dofs", "DirichletBoundaryConditions.jl"))
 
 # Export
 include(joinpath("Export", "VTK.jl"))

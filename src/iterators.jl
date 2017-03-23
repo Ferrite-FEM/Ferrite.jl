@@ -24,15 +24,26 @@ immutable CellIterator{dim, N, T, M}
     grid::Grid{dim, N, T, M}
     nodes::Vector{Int}
     coords::Vector{Vec{dim, T}}
-    current_cell::Ref{Cell{dim, N, M}}
+    current_cellid::Ref{Int}
+    dh::DofHandler{dim, N, T, M}
+
+    function CellIterator{dim, N, T, M}(dh::DofHandler{dim, N, T, M})
+        nodes = zeros(Int, N)
+        coords = zeros(Vec{dim, T}, N)
+        cell = Ref(0)
+        return new(dh.grid, nodes, coords, Ref(0), dh)
+    end
+
+    function CellIterator{dim, N, T, M}(grid::Grid{dim, N, T, M})
+        nodes = zeros(Int, N)
+        coords = zeros(Vec{dim, T}, N)
+        cell = Ref(0)
+        return new(grid, nodes, coords, cell)
+    end
 end
 
-function CellIterator{dim, N, T, M}(grid::Grid{dim, N, T, M})
-    nodes = zeros(Int, N)
-    coords = zeros(Vec{dim, T}, N)
-    cell = Ref{Cell{dim, N, M}}()
-    return CellIterator(grid, nodes, coords, cell)
-end
+CellIterator{dim, N, T, M}(grid::Grid{dim, N, T, M}) = CellIterator{dim,N,T,M}(grid)
+CellIterator{dim, N, T, M}(dh::DofHandler{dim, N, T, M}) = CellIterator{dim,N,T,M}(dh)
 
 # iterator interface
 Base.start(::CellIterator)     = 1
@@ -48,12 +59,13 @@ Base.eltype{T <: CellIterator}(::Type{T})         = T
 @inline getnodes(ci::CellIterator) = ci.nodes
 @inline getcoordinates(ci::CellIterator) = ci.coords
 @inline nfaces(ci::CellIterator) = nfaces(eltype(ci.grid.cells))
-@inline onboundary(ci::CellIterator, face::Int) = onboundary(ci.current_cell[], face)
-
+@inline onboundary(ci::CellIterator, face::Int) = onboundary(ci.grid.cells[ci.current_cellid[]], face)
+@inline cellid(ci::CellIterator) = ci.current_cellid[]
+@inline celldofs!(v::Vector, ci::CellIterator) = celldofs!(v, ci.dh, ci.current_cellid[])
 
 function reinit!{dim, N}(ci::CellIterator{dim, N}, i::Int)
     nodeids = ci.grid.cells[i].nodes
-    ci.current_cell[] = ci.grid.cells[i]
+    ci.current_cellid[] = i
     @inbounds for j in 1:N
         nodeid = nodeids[j]
         ci.nodes[j] = nodeid
@@ -65,6 +77,8 @@ end
 @inline reinit!{dim, N, T}(cv::CellValues{dim, T}, ci::CellIterator{dim, N, T}) = reinit!(cv, ci.coords)
 @inline reinit!{dim, N, T}(fv::FaceValues{dim, T}, ci::CellIterator{dim, N, T}, face::Int) = reinit!(fv, ci.coords, face)
 
+
+#=
 """
 ```julia
 FaceIterator(grid::Grid)
@@ -84,7 +98,7 @@ end
 ```
 """
 
-#=
+
 immutable FaceIterator{dim, N, T}
     grid::Grid{dim, N, T}
     nodes_face::Vector{Int}

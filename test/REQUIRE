@@ -2,3 +2,5 @@ ForwardDiff
 SHA
 NBInclude
 Documenter
+TimerOutputs
+UnicodePlots
