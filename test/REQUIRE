@@ -5,3 +5,4 @@ Documenter
 TimerOutputs
 UnicodePlots
 KrylovMethods
+ProgressMeter
