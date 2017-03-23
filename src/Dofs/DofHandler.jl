@@ -75,7 +75,7 @@ julia> vtk_point_data(vtkfile
 
 """
 
-# TODO: Make this immutable
+# TODO: Make this immutable?
 type DofHandler{dim, N, T, M}
     dofs_nodes::Matrix{Int}
     dofs_cells::Matrix{Int} # TODO <- Is this needed or just extract from dofs_nodes?
@@ -87,7 +87,7 @@ type DofHandler{dim, N, T, M}
 end
 
 function DofHandler(m::Grid)
-    DofHandler(Matrix{Int}(), Matrix{Int}(), Symbol[], Int[], Ref(false), Int[], m)
+    DofHandler(Matrix{Int}(0, 0), Matrix{Int}(0, 0), Symbol[], Int[], Ref(false), Int[], m)
 end
 
 function show(io::IO, dh::DofHandler)
@@ -109,6 +109,7 @@ ndofs_per_cell(dh::DofHandler) = size(dh.dofs_cells, 1)
 isclosed(dh::DofHandler) = dh.closed[]
 dofs_node(dh::DofHandler, i::Int) = dh.dof_nodes[:, i]
 
+# Stores the dofs for the cell with number `i` into the vector `global_dofs`
 function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh)
@@ -118,6 +119,7 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     return global_dofs
 end
 
+# Add a collection of fields
 function push!(dh::DofHandler, names::Vector{Symbol}, dims)
     @assert length(names) == length(dims)
     for i in 1:length(names)
@@ -125,6 +127,7 @@ function push!(dh::DofHandler, names::Vector{Symbol}, dims)
     end
 end
 
+# Add a field to the dofhandler ex `push!(dh, :u, 3)`
 function push!(dh::DofHandler, name::Symbol, dim::Int)
     @assert !isclosed(dh)
     if name in dh.field_names
@@ -173,6 +176,7 @@ end
 
 getnvertices{dim, N, M}(::Type{JuAFEM.Cell{dim, N, M}}) = N
 
+# Computes the "edof"-matrix
 function add_element_dofs!(dh::DofHandler)
     n_elements = getncells(dh.grid)
     n_vertices = getnvertices(getcelltype(dh.grid))
@@ -192,7 +196,8 @@ function add_element_dofs!(dh::DofHandler)
     dh.dofs_cells = reshape(element_dofs, (ndofs * n_vertices, n_elements))
 end
 
-
+# Creates a sparsity pattern from the dofs in a dofhandler.
+# Returns a sparse matrix with the correct pattern.
 function create_sparsity_pattern(dh::DofHandler)
     grid = dh.grid
     n = ndofs_per_cell(dh)

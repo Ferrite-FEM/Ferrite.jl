@@ -56,10 +56,8 @@ nfaces{dim, N, M}(::Type{Cell{dim, N, M}}) = M
 @compat const Line = Cell{1, 2, 2}
 @compat const QuadraticLine = Cell{1, 3, 2}
 
-
 @compat const Triangle = Cell{2, 3, 3}
 @compat const QuadraticTriangle = Cell{2, 6, 3}
-
 
 @compat const Quadrilateral = Cell{2, 4, 4}
 @compat const QuadraticQuadrilateral = Cell{2, 9, 4}

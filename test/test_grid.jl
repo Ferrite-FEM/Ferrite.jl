@@ -17,8 +17,8 @@
     end
 
     # VTK types of different Cells.
-    for (dim, n) in ((1,2), (1,3), (2,4), (2,9), (3,8), (2,3), (2,6), (3,4), (2,8))
-        @test getVTKtype(Cell{dim, n}).nodes == n
+    for (dim, n, m) in ((1,2,2), (1,3,2), (2,4,4), (2,9,4), (3,8,6), (2,3,3), (2,6,3), (3,4,4), (2,8,4))
+        @test getVTKtype(Cell{dim, n, m}).nodes == n
     end
 
 end # of testset

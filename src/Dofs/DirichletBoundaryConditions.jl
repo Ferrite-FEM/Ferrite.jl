@@ -32,7 +32,7 @@ julia> t = 1.0;
 julia> update!(dbc, t)
 ```
 
-The boundary conditions can be applied to a vector with
+The boundary conditions can be applied to a vector:
 
 ```jldoctest
 julia> u = zeros(ndofs(dh))
@@ -89,6 +89,7 @@ function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
     add!(dbcs, field, nodes, f, [component])
 end
 
+# Adds a boundary condition
 function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
                           nodes::Union{Set{Int}, Vector{Int}}, f::Function, components::Vector{Int})
     @assert field in dbcs.dh.field_names || error("Missing: $field")
@@ -118,6 +119,7 @@ function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
 
 end
 
+# Updates the DBC's to the current time `time`
 function update!(dbcs::DirichletBoundaryConditions, time::Float64 = 0.0)
     @assert dbcs.closed[]
     bc_offset = 0
@@ -144,6 +146,8 @@ function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::
     end
 end
 
+# Saves the dirichlet boundary conditions to a vtkfile.
+# Values will have a 1 where bcs are active and 0 otherwise
 function vtk_point_data(vtkfile, dbcs::DirichletBoundaryConditions)
     unique_fields = []
     for dbc in dbcs.bcs
@@ -174,4 +178,46 @@ function apply!(v::Vector, bc::DirichletBoundaryConditions)
     @assert length(v) == ndofs(bc.dh)
     v[bc.dofs] = bc.values
     return v
+end
+
+function apply!(K::SparseMatrixCSC, bc::DirichletBoundaryConditions)
+    @assert all(iszero, bc.values)
+    _apply(K, eltype(K)[], bc)
+end
+
+function apply!(K::SparseMatrixCSC, f::AbstractVector, bc::DirichletBoundaryConditions)
+    @assert length(f) == size(K, 1)
+    @boundscheck checkbounds(K, bc.dofs, bc.dofs)
+    @boundscheck checkbounds(f, bc.dofs)
+
+    m = meandiag(K) # Use the mean of the diagonal here to not ruin things for iterative solver
+    @inbounds for i in 1:length(bc.values)
+        d = bc.dofs[i]
+        v = bc.values[i]
+
+        if v != 0
+            for j in nzrange(K, d)
+                f[K.rowval[j]] -= v * K.nzval[j]
+            end
+        end
+    end
+    K[:, bc.dofs] = 0
+    K[bc.dofs, :] = 0
+    @inbounds for i in 1:length(bc.values)
+        d = bc.dofs[i]
+        v = bc.values[i]
+        K[d, d] = m
+        # We will only enter here with an empty f vector if we have assured that v == 0 for all dofs
+        if v != 0
+            f[d] = v * m
+        end
+    end
+end
+
+function meandiag(K::AbstractMatrix)
+    z = zero(eltype(K))
+    for i in 1:size(K,1)
+        z += K[i,i]
+    end
+    return z / size(K,1)
 end

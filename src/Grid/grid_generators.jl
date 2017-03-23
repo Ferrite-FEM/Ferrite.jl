@@ -210,7 +210,7 @@ function generate_grid{T}(::Type{Hexahedron}, nel::NTuple{3, Int}, left::Vec{3, 
                               [(cl, 5) for cl in cell_array[1,:,:][:]];
                               [(cl, 6) for cl in cell_array[:,:,end][:]]]
 
-    _apply_onboundary!(QuadraticQuadrilateral, cells, boundary)
+    _apply_onboundary!(Hexahedron, cells, boundary)
 
     # Cell face sets
     offset = 0
