@@ -1,4 +1,4 @@
-export DirichletBoundaryConditions, update!, apply!, add!
+export DirichletBoundaryConditions, update!, apply!, apply_zero!, add!
 
 """
     DirichletBoundaryConditions
@@ -53,6 +53,7 @@ end
 immutable DirichletBoundaryConditions{DH <: DofHandler}
     bcs::Vector{DirichletBoundaryCondition}
     dofs::Vector{Int}
+    free_dofs::Vector{Int}
     values::Vector{Float64}
     dh::DH
     closed::Ref{Bool}
@@ -60,7 +61,7 @@ end
 
 function DirichletBoundaryConditions(dh::DofHandler)
     @assert isclosed(dh)
-    DirichletBoundaryConditions(DirichletBoundaryCondition[], Int[], Float64[], dh, Ref(false))
+    DirichletBoundaryConditions(DirichletBoundaryCondition[], Int[], Int[], Float64[], dh, Ref(false))
 end
 
 function Base.show(io::IO, dbcs::DirichletBoundaryConditions)
@@ -77,10 +78,13 @@ end
 
 isclosed(dbcs::DirichletBoundaryConditions) = dbcs.closed[]
 dirichlet_dofs(dbcs::DirichletBoundaryConditions) = dbcs.dofs
-free_dofs(dbcs::DirichletBoundaryConditions) = setdiff(dbcs.dh.dofs_nodes, dbcs.dofs)
+free_dofs(dbcs::DirichletBoundaryConditions) = dbcs.free_dofs
 function close!(dbcs::DirichletBoundaryConditions)
     fill!(dbcs.values, NaN)
     dbcs.closed[] = true
+    fdofs = Array(setdiff(dbcs.dh.dofs_nodes, dbcs.dofs))
+    resize!(dbcs.free_dofs, length(fdofs))
+    copy!(dbcs.free_dofs, fdofs)
     return dbcs
 end
 
@@ -180,22 +184,31 @@ function apply!(v::Vector, bc::DirichletBoundaryConditions)
     return v
 end
 
-function apply!(K::SparseMatrixCSC, bc::DirichletBoundaryConditions)
-    @assert all(iszero, bc.values)
-    _apply(K, eltype(K)[], bc)
+function apply_zero!(v::Vector, bc::DirichletBoundaryConditions)
+    @assert length(v) == ndofs(bc.dh)
+    v[bc.dofs] = 0
+    return v
 end
 
-function apply!(K::SparseMatrixCSC, f::AbstractVector, bc::DirichletBoundaryConditions)
-    @assert length(f) == size(K, 1)
+function apply!(K::SparseMatrixCSC, bc::DirichletBoundaryConditions)
+    apply!(K, eltype(K)[], bc, true)
+end
+
+function apply_zero!(K::SparseMatrixCSC, f::AbstractVector, bc::DirichletBoundaryConditions)
+    apply!(K, f, bc, true)
+end
+
+function apply!(K::SparseMatrixCSC, f::AbstractVector, bc::DirichletBoundaryConditions, applyzero::Bool=false)
+    @assert length(f) == 0 || length(f) == size(K, 1)
     @boundscheck checkbounds(K, bc.dofs, bc.dofs)
-    @boundscheck checkbounds(f, bc.dofs)
+    @boundscheck length(f) == 0 || checkbounds(f, bc.dofs)
 
     m = meandiag(K) # Use the mean of the diagonal here to not ruin things for iterative solver
     @inbounds for i in 1:length(bc.values)
         d = bc.dofs[i]
         v = bc.values[i]
 
-        if v != 0
+        if !applyzero && v != 0
             for j in nzrange(K, d)
                 f[K.rowval[j]] -= v * K.nzval[j]
             end
@@ -208,8 +221,9 @@ function apply!(K::SparseMatrixCSC, f::AbstractVector, bc::DirichletBoundaryCond
         v = bc.values[i]
         K[d, d] = m
         # We will only enter here with an empty f vector if we have assured that v == 0 for all dofs
-        if v != 0
-            f[d] = v * m
+        if length(f) != 0
+            vz = applyzero ? zero(eltype(f)) : v
+            f[d] = vz * m
         end
     end
 end
