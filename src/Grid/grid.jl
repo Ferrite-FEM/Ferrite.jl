@@ -129,14 +129,19 @@ end
 n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
 getfacelist(grid::Grid) = getfacelist(eltype(grid.cells))
 
-function addcellset!(grid::Grid, name::String, cellid::Vector{Int})
+
+_check_nodesetname(grid, name) = haskey(grid.nodesets, name) && throw(ArgumentError("There already exists a nodeset with the name: $name"))
+_warn_emptyset(set) = length(set) == 0 && warn("no entities added to set")
+
+function addcellset!(grid::Grid, name::String, cellid::Union{Set{Int}, Vector{Int}})
     haskey(grid.cellsets, name) && throw(ArgumentError("There already exists a cellset with the name: $name"))
-    grid.cellsets[name] = copy(cellid)
-    nothing
+    grid.cellsets[name] = Set(cellid)
+    _warn_emptyset(grid.cellsets[name])
+    grid
 end
 
 function addcellset!(grid::Grid, name::String, f::Function)
-    cells = Int[]
+    cells = Set{Int}()
     for (i, cell) in enumerate(getcells(grid))
         all_true = true
         for node_idx in cell.nodes
@@ -146,17 +151,14 @@ function addcellset!(grid::Grid, name::String, f::Function)
         all_true && push!(cells, i)
     end
     grid.cellsets[name] = cells
-    nothing
+    _warn_emptyset(grid.cellsets[name])
+    grid
 end
 
-
-_check_nodesetname(grid, name) = haskey(grid.nodesets, name) && throw(ArgumentError("There already exists a nodeset with the name: $name"))
-
-
-addnodeset!(grid::Grid, name::String, nodeid::Vector{Int}) = addnodeset!(grid, name, Set{Int}(nodeid))
-function addnodeset!(grid::Grid, name::String, nodeid::Set{Int})
+function addnodeset!(grid::Grid, name::String, nodeid::Union{Vector{Int}, Set{Int}})
     _check_nodesetname(grid, name)
-    grid.nodesets[name] = nodeid
+    grid.nodesets[name] = Set(nodeid)
+    _warn_emptyset(grid.nodesets[name])
     grid
 end
 
@@ -167,6 +169,7 @@ function addnodeset!(grid::Grid, name::String, f::Function)
         f(n.x) && push!(nodes, i)
     end
     grid.nodesets[name] = nodes
+    _warn_emptyset(grid.nodesets[name])
     grid
 end
 

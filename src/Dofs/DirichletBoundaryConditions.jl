@@ -50,11 +50,11 @@ immutable DirichletBoundaryCondition
 end
 
 
-immutable DirichletBoundaryConditions{DH <: DofHandler}
+immutable DirichletBoundaryConditions{DH <: DofHandler, T}
     bcs::Vector{DirichletBoundaryCondition}
     dofs::Vector{Int}
     free_dofs::Vector{Int}
-    values::Vector{Float64}
+    values::Vector{T}
     dh::DH
     closed::Ref{Bool}
 end
@@ -96,13 +96,13 @@ end
 # Adds a boundary condition
 function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
                           nodes::Union{Set{Int}, Vector{Int}}, f::Function, components::Vector{Int})
-    @assert field in dbcs.dh.field_names || error("Missing: $field")
+    field in dbcs.dh.field_names || error("Missing: $field")
     for component in components
         @assert 0 < component <= ndim(dbcs.dh, field)
     end
 
     if length(nodes) == 0
-        warn("Added Dirichlet BC to node set containing 9 nodes")
+        warn("Added Dirichlet BC to node set containing 0 nodes")
     end
 
     dofs_bc = Int[]
