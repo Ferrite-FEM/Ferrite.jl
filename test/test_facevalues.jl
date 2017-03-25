@@ -11,7 +11,7 @@ for (func_interpol, quad_rule) in  (
                                     (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2))
                                      )
 
-    for fe_valtype in (FaceScalarValues,)
+    for fe_valtype in (FaceScalarValues, FaceVectorValues)
         fv = fe_valtype(quad_rule, func_interpol)
         ndim = getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
