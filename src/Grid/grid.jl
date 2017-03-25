@@ -11,7 +11,7 @@ export getcells, getncells, getnodes, getnnodes, getcelltype,
        getcellset,  getnodeset, getfaceset, getcoordinates, getcoordinates!,
        getcellsets, getnodesets, getfacesets, onboundary, nfaces
 
-export addnodeset!, addcellset!
+export addnodeset!, addcellset!, transform
 
 #########################
 # Main types for meshes #
@@ -129,6 +129,18 @@ end
 n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
 getfacelist(grid::Grid) = getfacelist(eltype(grid.cells))
 
+# Transformations
+
+function transform!(g::Grid, f::Function)
+    c = similar(g.nodes)
+    for i in 1:length(c)
+        c[i] = Node(f(g.nodes[i].x))
+    end
+    copy!(g.nodes, c)
+    g
+end
+
+# Sets
 
 _check_nodesetname(grid, name) = haskey(grid.nodesets, name) && throw(ArgumentError("There already exists a nodeset with the name: $name"))
 _warn_emptyset(set) = length(set) == 0 && warn("no entities added to set")
