@@ -1,7 +1,9 @@
 ForwardDiff
 SHA
-NBInclude
 Documenter
+Rotations
+# Notebooks
+NBInclude
 TimerOutputs
 UnicodePlots
 KrylovMethods

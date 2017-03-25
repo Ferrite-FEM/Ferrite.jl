@@ -10,9 +10,16 @@ reference_volume(fs::Interpolation, ::Int) = reference_volume(JuAFEM.getlowerdim
 reference_volume(fs::Interpolation{2, RefTetrahedron}, face::Int) = face == 1 ? sqrt(2) : 1.0
 reference_volume(fs::Interpolation{3, RefTetrahedron}, face::Int) = face == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
 
-##########################################
-# Coordinates for the reference elements #
-##########################################
+######################################################
+# Coordinates and normals for the reference elements #
+######################################################
+
+# Lagrange{1, RefCube}
+function reference_normals(::Lagrange{1, RefCube})
+    return [Vec{1, Float64}((-1.0,)),
+            Vec{1, Float64}(( 1.0,))]
+end
+
 function reference_coordinates(::Lagrange{1, RefCube, 1})
     return [Vec{1, Float64}((-1.0,)),
             Vec{1, Float64}(( 1.0,))]
@@ -22,6 +29,14 @@ function reference_coordinates(::Lagrange{1, RefCube, 2})
     return [Vec{1, Float64}((-1.0,)),
             Vec{1, Float64}(( 1.0,)),
             Vec{1, Float64}(( 0.0,))]
+end
+
+# Lagrange{2, RefCube}
+function reference_normals(::Lagrange{2, RefCube})
+    return [Vec{2, Float64}(( 0.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  0.0)),
+            Vec{2, Float64}(( 0.0,  1.0,)),
+            Vec{2, Float64}((-1.0,  0.0,))]
 end
 
 function reference_coordinates(::Lagrange{2, RefCube, 1})
@@ -43,6 +58,14 @@ function reference_coordinates(::Lagrange{2, RefCube, 2})
             Vec{2, Float64}(( 0.0,  0.0))]
 end
 
+
+# Lagrange{2, RefTetrahedron}
+function reference_normals(::Lagrange{2, RefTetrahedron})
+    return [Vec{2, Float64}((1/√2, 1/√2)),
+            Vec{2, Float64}((-1.0, 0.0)),
+            Vec{2, Float64}((0.0, -1.0))]
+end
+
 function reference_coordinates(::Lagrange{2, RefTetrahedron, 1})
     return [Vec{2, Float64}((1.0, 0.0)),
             Vec{2, Float64}((0.0, 1.0)),
@@ -58,11 +81,29 @@ function reference_coordinates(::Lagrange{2, RefTetrahedron, 2})
             Vec{2, Float64}((0.5, 0.0))]
 end
 
+# Lagrange{3, RefTetrahedron}
+function reference_normals(::Lagrange{3, RefTetrahedron, 1})
+    return [Vec{3, Float64}((0.0, 0.0, -1.0)),
+            Vec{3, Float64}((0.0 ,-1.0, 0.0)),
+            Vec{3, Float64}((1/√3, 1/√3, 1/√3)),
+            Vec{3, Float64}((-1.0, 0.0, 0.0))]
+end
+
 function reference_coordinates(::Lagrange{3, RefTetrahedron, 1})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
             Vec{3, Float64}((1.0, 0.0, 0.0)),
             Vec{3, Float64}((0.0, 1.0, 0.0)),
             Vec{3, Float64}((0.0, 0.0, 1.0))]
+end
+
+# Lagrange{3, Cube}
+function reference_normals(::Lagrange{3, RefCube, 1})
+    return [Vec{3, Float64}(( 0.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0, -1.0,  0.0)),
+            Vec{3, Float64}(( 1.0,  0.0,  0.0)),
+            Vec{3, Float64}(( 0.0,  1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  0.0,  0.0)),
+            Vec{3, Float64}(( 0.0,  0.0,  1.0))]
 end
 
 function reference_coordinates(::Lagrange{3, RefCube, 1})
@@ -75,6 +116,9 @@ function reference_coordinates(::Lagrange{3, RefCube, 1})
             Vec{3, Float64}(( 1.0,  1.0,  1.0)),
             Vec{3, Float64}((-1.0,  1.0,  1.0))]
 end
+
+# Serendipity{2, RefCube}
+reference_normals(::Serendipity{2, RefCube, 2}) = reference_normals(Lagrange{2, RefCube,1}())
 
 function reference_coordinates(::Serendipity{2, RefCube, 2})
     return [Vec{2, Float64}((-1.0, -1.0)),
@@ -99,17 +143,18 @@ function rotmat(dim, θ=π/6)
         R = Tensor{2,2}((cos(θ), sin(θ), -sin(θ), cos(θ)))
         return R
     else
-        u = Vec{3}((1.0, 2.0, 3.0)); u *= norm(u)
+        u = Vec{3}((1.0, 2.0, 3.0)); u /= norm(u)
         ux = Tensor{2,3}((0.0, u[3], -u[2], -u[3], 0.0, u[1], u[2], -u[1], 0.0))
         R = cos(θ)*one(Tensor{2,3}) + sin(θ)*ux + (1-cos(θ))*u⊗u
         return R
     end
 end
 
-function valid_coordinates{dim, shape, order}(fs::Interpolation{dim, shape, order})
+function valid_coordinates_and_normals{dim, shape, order}(fs::Interpolation{dim, shape, order})
     x = reference_coordinates(fs)
+    n = reference_normals(fs)
     R = rotmat(dim)
-    return [2.0 * (R ⋅ x[i]) for i in 1:length(x)]
+    return [2.0 * (R ⋅ x[i]) for i in 1:length(x)] , [(R ⋅ n[i]) / norm((R ⋅ n[i])) for i in 1:length(n)]
 end
 
 #######################################

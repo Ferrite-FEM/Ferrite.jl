@@ -19,7 +19,7 @@ for (func_interpol, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{1
         fe_valtype == CellScalarValues && @test getnbasefunctions(cv) == n_basefuncs
         fe_valtype == CellVectorValues && @test getnbasefunctions(cv) == n_basefuncs * getdim(func_interpol)
 
-        x = valid_coordinates(func_interpol)
+        x, n = valid_coordinates_and_normals(func_interpol)
         reinit!(cv, x)
 
         # We test this by applying a given deformation gradient on all the nodes.

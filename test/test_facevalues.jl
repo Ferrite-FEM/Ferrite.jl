@@ -1,5 +1,6 @@
 @testset "FaceValues" begin
-for (func_interpol, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{0, RefCube}(2)),
+for (func_interpol, quad_rule) in  (
+                                    (Lagrange{1, RefCube, 1}(), QuadratureRule{0, RefCube}(2)),
                                     (Lagrange{1, RefCube, 2}(), QuadratureRule{0, RefCube}(2)),
                                     (Lagrange{2, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
                                     (Lagrange{2, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
@@ -7,22 +8,23 @@ for (func_interpol, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{0
                                     (Lagrange{2, RefTetrahedron, 2}(), QuadratureRule{1, RefTetrahedron}(2)),
                                     (Lagrange{3, RefCube, 1}(), QuadratureRule{2, RefCube}(2)),
                                     (Serendipity{2, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
-                                    (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2)))
+                                    (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2))
+                                     )
 
-    for fe_valtype in (FaceScalarValues, FaceVectorValues)
-        bv = fe_valtype(quad_rule, func_interpol)
+    for fe_valtype in (FaceScalarValues,)
+        fv = fe_valtype(quad_rule, func_interpol)
         ndim = getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
-        fe_valtype == FaceScalarValues && @test getnbasefunctions(bv) == n_basefuncs
-        fe_valtype == FaceVectorValues && @test getnbasefunctions(bv) == n_basefuncs * getdim(func_interpol)
+        fe_valtype == FaceScalarValues && @test getnbasefunctions(fv) == n_basefuncs
+        fe_valtype == FaceVectorValues && @test getnbasefunctions(fv) == n_basefuncs * getdim(func_interpol)
 
-        x = valid_coordinates(func_interpol)
+        xs, n = valid_coordinates_and_normals(func_interpol)
         face_nodes, cell_nodes = topology_test_nodes(func_interpol)
         for face in 1:JuAFEM.getnfaces(func_interpol)
-            reinit!(bv, x, face)
-            face_quad_rule = getquadrule(bv)
-            @test JuAFEM.getcurrentface(bv) == face
+            reinit!(fv, xs, face)
+            face_quad_rule = getquadrule(fv)
+            @test JuAFEM.getcurrentface(fv) == face
 
             # We test this by applying a given deformation gradient on all the nodes.
             # Since this is a linear deformation we should get back the exact values
@@ -32,50 +34,51 @@ for (func_interpol, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{0
             H = rand(Tensor{2, ndim})
             V = rand(Tensor{1, ndim})
             for i in 1:n_basefuncs
-                u[i] = H ⋅ x[i]
-                u_scal[i] = V ⋅ x[i]
+                u[i] = H ⋅ xs[i]
+                u_scal[i] = V ⋅ xs[i]
             end
             u_vector = reinterpret(Float64, u, (n_basefuncs*ndim,))
 
             for i in 1:length(getpoints(face_quad_rule))
-                @test function_gradient(bv, i, u) ≈ H
-                @test function_symmetric_gradient(bv, i, u) ≈ 0.5(H + H')
-                @test function_divergence(bv, i, u) ≈ trace(H)
-                function_value(bv, i, u)
-                if isa(bv, FaceScalarValues)
-                    @test function_gradient(bv, i, u_scal) ≈ V
-                    function_value(bv, i, u_scal)
-                elseif isa(bv, FaceVectorValues)
-                    @test function_gradient(bv, i, u_vector) ≈ function_gradient(bv, i, u) ≈ H
-                    @test function_value(bv, i, u_vector) ≈ function_value(bv, i, u)
-                    @test function_divergence(bv, i, u_vector) ≈ function_divergence(bv, i, u) ≈ trace(H)
+                @test getnormal(fv, i) ≈ n[face]
+                @test function_gradient(fv, i, u) ≈ H
+                @test function_symmetric_gradient(fv, i, u) ≈ 0.5(H + H')
+                @test function_divergence(fv, i, u) ≈ trace(H)
+                function_value(fv, i, u)
+                if isa(fv, FaceScalarValues)
+                    @test function_gradient(fv, i, u_scal) ≈ V
+                    function_value(fv, i, u_scal)
+                elseif isa(fv, FaceVectorValues)
+                    @test function_gradient(fv, i, u_vector) ≈ function_gradient(fv, i, u) ≈ H
+                    @test function_value(fv, i, u_vector) ≈ function_value(fv, i, u)
+                    @test function_divergence(fv, i, u_vector) ≈ function_divergence(fv, i, u) ≈ trace(H)
                 end
             end
 
             # Test of volume
             vol = 0.0
-            for i in 1:getnquadpoints(bv)
-                vol += getdetJdV(bv,i)
+            for i in 1:getnquadpoints(fv)
+                vol += getdetJdV(fv,i)
             end
-            x_face = x[[JuAFEM.getfacelist(func_interpol)[face]...]]
+            x_face = xs[[JuAFEM.getfacelist(func_interpol)[face]...]]
             @test vol ≈ calculate_volume(JuAFEM.getlowerdim(func_interpol), x_face)
 
             # Test of utility functions
-            @test getfunctioninterpolation(bv) == func_interpol
-            @test getgeometryinterpolation(bv) == func_interpol
+            @test getfunctioninterpolation(fv) == func_interpol
+            @test getgeometryinterpolation(fv) == func_interpol
 
             # Test quadrature rule after reinit! with ref. coords
             x = reference_coordinates(func_interpol)
-            reinit!(bv, x, face)
+            reinit!(fv, x, face)
             vol = 0.0
-            for i in 1:getnquadpoints(bv)
-                vol += getdetJdV(bv, i)
+            for i in 1:getnquadpoints(fv)
+                vol += getdetJdV(fv, i)
             end
             @test vol ≈ reference_volume(func_interpol, face)
 
             # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
             for (i, qp_x) in enumerate(getpoints(face_quad_rule))
-                @test spatial_coordinate(bv, i, x) ≈ qp_x
+                @test spatial_coordinate(fv, i, x) ≈ qp_x
             end
 
         end

@@ -113,7 +113,6 @@ function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
     end
 end
 
-
 function generate_grid{M, N, T}(C::Type{Cell{2,M,N}}, nel::NTuple{2, Int}, X::Vector{Vec{2, T}})
     @assert length(X) == 4
     generate_grid(C, nel, X[1], X[2], X[3], X[4])

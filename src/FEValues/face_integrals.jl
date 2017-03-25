@@ -15,7 +15,11 @@ function create_face_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{0,
     return face_quad_rule
 end
 
-detJ_face{T}(::Tensor{2, 1, T}, ::Interpolation{1, RefCube}, ::Int) = one(T)
+function weighted_normal{T}(::Tensor{2, 1, T}, ::Interpolation{1, RefCube}, face::Int)
+    face == 1 && return Vec{1,T}((-one(T),))
+    face == 2 && return Vec{1,T}((one(T),))
+    error("unknown face number: $face")
+end
 
 ##################
 # All 2D RefCube #
@@ -42,11 +46,14 @@ function create_face_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{1,
     return face_quad_rule
 end
 
-function detJ_face(J::Tensor{2, 2}, ::Interpolation{2, RefCube}, face::Int)
-    face == 1 && return sqrt(J[1,1]^2 + J[2,1]^2)
-    face == 2 && return sqrt(J[1,2]^2 + J[2,2]^2)
-    face == 3 && return sqrt(J[1,1]^2 + J[2,1]^2)
-    face == 4 && return sqrt(J[1,2]^2 + J[2,2]^2)
+function weighted_normal(J::Tensor{2, 2}, ::Interpolation{2, RefCube}, face::Int)
+    @inbounds begin
+        face == 1 && return Vec{2}(( J[2,1], -J[1,1]))
+        face == 2 && return Vec{2}(( J[2,2], -J[1,2]))
+        face == 3 && return Vec{2}((-J[2,1], J[1,1]))
+        face == 4 && return Vec{2}((-J[2,2], J[1,2]))
+    end
+    error("unknown face number: $face")
 end
 
 #########################
@@ -71,10 +78,13 @@ function create_face_quad_rule{T, shape <: RefTetrahedron}(quad_rule::Quadrature
     return face_quad_rule
 end
 
-function detJ_face(J::Tensor{2, 2}, ::Interpolation{2, RefTetrahedron}, face::Int)
-    face == 1 && return sqrt((J[1,1] - J[1,2])^2 + (J[2,1] - J[2,2])^2)
-    face == 2 && return sqrt(J[1,2]^2 + J[2,2]^2)
-    face == 3 && return sqrt(J[1,1]^2 + J[2,1]^2)
+function weighted_normal(J::Tensor{2, 2}, ::Interpolation{2, RefTetrahedron}, face::Int)
+    @inbounds begin
+        face == 1 && return return Vec{2}((-(J[2,1] - J[2,2]), J[1,1] - J[1,2]))
+        face == 2 && return return Vec{2}((-J[2,2], J[1,2]))
+        face == 3 && return return Vec{2}((J[2,1], -J[1,1]))
+    end
+    error("unknown face number: $face")
 end
 
 ##################
@@ -108,13 +118,16 @@ function create_face_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{2,
     return face_quad_rule
 end
 
-function detJ_face(J::Tensor{2, 3}, ::Interpolation{3, RefCube}, face::Int)
-    face == 1 && return norm(J[:,1] × J[:,2])
-    face == 2 && return norm(J[:,1] × J[:,3])
-    face == 3 && return norm(J[:,2] × J[:,3])
-    face == 4 && return norm(J[:,1] × J[:,3])
-    face == 5 && return norm(J[:,2] × J[:,3])
-    face == 6 && return norm(J[:,1] × J[:,2])
+function weighted_normal(J::Tensor{2, 3}, ::Interpolation{3, RefCube}, face::Int)
+    @inbounds begin
+        face == 1 && return J[:,2] × J[:,1]
+        face == 2 && return J[:,1] × J[:,3]
+        face == 3 && return J[:,2] × J[:,3]
+        face == 4 && return J[:,3] × J[:,1]
+        face == 5 && return J[:,3] × J[:,2]
+        face == 6 && return J[:,1] × J[:,2]
+    end
+    error("unknown face number: $face")
 end
 
 #########################
@@ -142,9 +155,12 @@ function create_face_quad_rule{T, shape <: RefTetrahedron}(quad_rule::Quadrature
     return face_quad_rule
 end
 
-function detJ_face(J::Tensor{2, 3}, ::Interpolation{3, RefTetrahedron}, face::Int)
-    face == 1 && return norm(J[:,1] × J[:,2])
-    face == 2 && return norm(J[:,1] × J[:,3])
-    face == 3 && return norm((J[:,1]-J[:,3]) × (J[:,2]-J[:,3]))
-    face == 4 && return norm(J[:,2] × J[:,3])
+function weighted_normal(J::Tensor{2, 3}, ::Interpolation{3, RefTetrahedron}, face::Int)
+    @inbounds begin
+        face == 1 && return J[:,2] × J[:,1]
+        face == 2 && return J[:,1] × J[:,3]
+        face == 3 && return (J[:,1]-J[:,3]) × (J[:,2]-J[:,3])
+        face == 4 && return J[:,3] × J[:,2]
+    end
+    error("unknown face number: $face")
 end
