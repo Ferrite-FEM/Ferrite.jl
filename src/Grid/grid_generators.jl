@@ -94,19 +94,83 @@ function generate_grid{T}(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec{
     return Grid(cells, nodes, facesets=facesets)
 end
 
+
+function apply_transformation_matrix{T}(x::Vec{2, T}, H::Tensor{2, 3})
+    xn = Vec{3,T}((x[1], x[2], one(T)))
+    Xn = H ⋅ xn 
+    return Vec{2,T}((Xn[1], Xn[2])) / Xn[3]
+end
+
+# https://wp.optics.arizona.edu/visualopticslab/wp-content/uploads/sites/52/2016/08/Lectures6_7.pdf
+function compute_transformation_matrix{T}(x::Vector{Vec{2, T}}, X::Vector{Vec{2, T}})
+    @assert length(x) == length(X) == 4
+
+    Base.Cartesian.@nexprs 4 i -> x_i = x[i][1]
+    Base.Cartesian.@nexprs 4 i -> y_i = x[i][2]
+    Base.Cartesian.@nexprs 4 i -> X_i = X[i][1]
+    Base.Cartesian.@nexprs 4 i -> Y_i = X[i][2]
+
+    A = [x_1 y_1 1 0   0  0 -X_1*x_1 -X_1*y_1
+        0  0  0 x_1  y_1 1  -Y_1*x_1 -Y_1*y_1
+        x_2 y_2 1 0   0  0  -X_2*x_2 -X_2*y_2
+        0  0  0 x_2  y_2 1  -Y_2*x_2 -Y_2*y_2
+        x_3 y_3 1 0   0  0  -X_3*x_3 -X_3*y_3
+        0  0  0 x_3  y_3 1  -Y_3*x_3 -Y_3*y_3
+        x_4 y_4 1 0   0  0  -X_4*x_4 -X_4*y_4
+        0  0  0 x_4  y_4 1  -Y_4*x_4 -Y_4*y_4]
+
+    z = [X_1, Y_1, X_2, Y_2, X_3, Y_3, X_4, Y_4]
+
+    # Use QR here?
+    a = (A' * A) \ (A' * z)
+
+    push!(a, 1)
+    return Tensor{2,3}(Array(transpose(reshape(a, 3, 3))))
+end
+
+
+function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
+      for i in 0:ny-1
+        ratio_bounds = i / (ny-1)
+
+        x0 = LL[1] * (1 - ratio_bounds) + ratio_bounds * UL[1]
+        x1 = LR[1] * (1 - ratio_bounds) + ratio_bounds * UR[1]
+
+        y0 = LL[2] * (1 - ratio_bounds) + ratio_bounds * UL[2]
+        y1 = LR[2] * (1 - ratio_bounds) + ratio_bounds * UR[2]
+
+        for j in 0:nx-1
+            ratio = j / (nx-1)
+            x = x0 * (1 - ratio) + ratio * x1
+            y = y0 * (1 - ratio) + ratio * y1
+            push!(nodes, Node((x, y)))
+        end
+    end
+end
+
+
+function generate_grid{M, N, T}(C::Type{Cell{2,M,N}}, nel::NTuple{2, Int}, X::Vector{Vec{2, T}})
+    @assert length(X) == 4
+    generate_grid(C, nel, X[1], X[2], X[3], X[4])
+end
+
+function generate_grid{M, N, T}(C::Type{Cell{2,M,N}}, nel::NTuple{2, Int}, left::Vec{2, T}=Vec{2}((-1.0,-1.0)), right::Vec{2, T}=Vec{2}((1.0,1.0)))
+    LL = left
+    UR = right
+    LR = Vec{2}((UR[1], LL[2]))
+    UL = Vec{2}((LL[1], UR[2]))
+    generate_grid(C, nel, LL, UR, LR, UL)
+end
+
 # Quadrilateral
-function generate_grid{T}(::Type{Quadrilateral}, nel::NTuple{2, Int}, left::Vec{2, T}=Vec{2}((-1.0,-1.0)), right::Vec{2, T}=Vec{2}((1.0,1.0)))
+function generate_grid{T}(C::Type{Quadrilateral}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR::Vec{2, T}, UR::Vec{2, T}, UL::Vec{2, T})
     nel_x = nel[1]; nel_y = nel[2]; nel_tot = nel_x*nel_y
     n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1
     n_nodes = n_nodes_x * n_nodes_y
 
     # Generate nodes
-    coords_x = linspace(left[1], right[1], n_nodes_x)
-    coords_y = linspace(left[2], right[2], n_nodes_y)
     nodes = Node{2,T}[]
-    for j in 1:n_nodes_y, i in 1:n_nodes_x
-        push!(nodes, Node((coords_x[i], coords_y[j])))
-    end
+    _generate_2d_nodes!(nodes, n_nodes_x, n_nodes_y, LL, LR, UR, UL)
 
     # Generate cells
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y))
@@ -226,18 +290,15 @@ function generate_grid{T}(::Type{Hexahedron}, nel::NTuple{3, Int}, left::Vec{3, 
 end
 
 # Triangle
-function generate_grid{T}(::Type{Triangle}, nel::NTuple{2, Int}, left::Vec{2, T}=Vec{2}((-1.0,-1.0)), right::Vec{2, T}=Vec{2}((1.0,1.0)))
+function generate_grid{T}(::Type{Triangle}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR::Vec{2, T}, UR::Vec{2, T}, UL::Vec{2, T})
     nel_x = nel[1]; nel_y = nel[2]; nel_tot = 2*nel_x*nel_y
     n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1
     n_nodes = n_nodes_x * n_nodes_y
 
     # Generate nodes
-    coords_x = linspace(left[1], right[1], n_nodes_x)
-    coords_y = linspace(left[2], right[2], n_nodes_y)
     nodes = Node{2,T}[]
-    for j in 1:n_nodes_y, i in 1:n_nodes_x
-        push!(nodes, Node((coords_x[i], coords_y[j])))
-    end
+    _generate_2d_nodes!(nodes, n_nodes_x, n_nodes_y, LL, LR, UR, UL)
+
 
     # Generate cells
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y))
