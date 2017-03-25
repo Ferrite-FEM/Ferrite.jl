@@ -24,20 +24,20 @@ immutable CellIterator{dim, N, T, M}
     grid::Grid{dim, N, T, M}
     nodes::Vector{Int}
     coords::Vector{Vec{dim, T}}
-    current_cellid::Ref{Int}
+    current_cellid::ScalarWrapper{Int}
     dh::DofHandler{dim, N, T, M}
 
     function CellIterator{dim, N, T, M}(dh::DofHandler{dim, N, T, M})
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim, T}, N)
-        cell = Ref(0)
-        return new(dh.grid, nodes, coords, Ref(0), dh)
+        cell = ScalarWrapper(0)
+        return new(dh.grid, nodes, coords,ScalarWrapper(0), dh)
     end
 
     function CellIterator{dim, N, T, M}(grid::Grid{dim, N, T, M})
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim, T}, N)
-        cell = Ref(0)
+        cell = ScalarWrapper(0)
         return new(grid, nodes, coords, cell)
     end
 end
@@ -104,7 +104,7 @@ immutable FaceIterator{dim, N, T}
     nodes_face::Vector{Int}
     coords_cell::Vector{Vec{dim, T}}
     coords_face::Vector{Vec{dim, T}}
-    current_face::Ref{Int}
+    current_face::ScalarWrapper{Int}
 end
 
 function FaceIterator{dim, N, T}(grid::Grid{dim, N, T})
@@ -112,7 +112,7 @@ function FaceIterator{dim, N, T}(grid::Grid{dim, N, T})
     n_vertices_face = length(getfacelist(grid)[1])
     nodes_face = zeros(Int, n_vertices_face)
     coords_face = zeros(Vec{dim, T}, n_vertices_face)
-    return FaceIterator(grid, nodes_face, coords_cell, coords_face, Ref(1))
+    return FaceIterator(grid, nodes_face, coords_cell, coords_face, ScalarWrapper(1))
 end
 
 # iterator interface

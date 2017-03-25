@@ -81,13 +81,13 @@ type DofHandler{dim, N, T, M}
     dofs_cells::Matrix{Int} # TODO <- Is this needed or just extract from dofs_nodes?
     field_names::Vector{Symbol}
     dof_dims::Vector{Int}
-    closed::Ref{Bool}
+    closed::ScalarWrapper{Bool}
     dofs_vec::Vector{Int}
     grid::Grid{dim, N, T, M}
 end
 
 function DofHandler(m::Grid)
-    DofHandler(Matrix{Int}(0, 0), Matrix{Int}(0, 0), Symbol[], Int[], Ref(false), Int[], m)
+    DofHandler(Matrix{Int}(0, 0), Matrix{Int}(0, 0), Symbol[], Int[], ScalarWrapper(false), Int[], m)
 end
 
 function show(io::IO, dh::DofHandler)

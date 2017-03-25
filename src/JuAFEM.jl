@@ -44,6 +44,7 @@ Abstract type which has `CellValues` and `FaceValues` as subtypes
 @compat abstract type CellValues{dim, T, FS, GS}     <: Values{dim, T, FS, GS} end
 @compat abstract type FaceValues{dim, T, FS, GS} <: Values{dim, T, FS, GS} end
 
+include("utils.jl")
 include("interpolations.jl")
 
 # Quadrature

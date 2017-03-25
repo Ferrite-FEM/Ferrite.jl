@@ -58,7 +58,7 @@ immutable FaceScalarValues{dim, T <: Real, FIP <: Interpolation, GIP <: Interpol
     M::Array{T, 3}
     dMdξ::Array{Vec{dim, T}, 3}
     geom_interpol::GIP
-    current_face::Ref{Int}
+    current_face::ScalarWrapper{Int}
 end
 
 FaceScalarValues{dim_qr, FIP <: Interpolation, GIP <: Interpolation}(quad_rule::QuadratureRule{dim_qr}, func_interpol::FIP, geom_interpol::GIP=func_interpol) =
@@ -100,7 +100,7 @@ function FaceScalarValues{dim_qr, T, FIP <: Interpolation, GIP <: Interpolation,
 
     detJdV = zeros(T, n_qpoints, n_faces)
 
-    FaceScalarValues(N, dNdx, dNdξ, detJdV, normals, face_quad_rule, func_interpol, M, dMdξ, geom_interpol, Ref(0))
+    FaceScalarValues(N, dNdx, dNdξ, detJdV, normals, face_quad_rule, func_interpol, M, dMdξ, geom_interpol, ScalarWrapper(0))
 end
 
 # FaceVectorValues
@@ -115,7 +115,7 @@ immutable FaceVectorValues{dim, T <: Real, FIP <: Interpolation, GIP <: Interpol
     M::Array{T, 3}
     dMdξ::Array{Vec{dim, T}, 3}
     geom_interpol::GIP
-    current_face::Ref{Int}
+    current_face::ScalarWrapper{Int}
 end
 
 FaceVectorValues{dim_qr, FIP <: Interpolation, GIP <: Interpolation}(quad_rule::QuadratureRule{dim_qr}, func_interpol::FIP, geom_interpol::GIP=func_interpol) =
@@ -174,7 +174,7 @@ function FaceVectorValues{dim_qr, T, FIP <: Interpolation, GIP <: Interpolation,
 
     detJdV = zeros(T, n_qpoints, n_faces)
 
-    FaceVectorValues(N, dNdx, dNdξ, detJdV, normals, face_quad_rule, func_interpol, M, dMdξ, geom_interpol, Ref(0))
+    FaceVectorValues(N, dNdx, dNdξ, detJdV, normals, face_quad_rule, func_interpol, M, dMdξ, geom_interpol, ScalarWrapper(0))
 end
 
 function reinit!{dim, T}(fv::FaceValues{dim}, x::AbstractVector{Vec{dim, T}}, face::Int)

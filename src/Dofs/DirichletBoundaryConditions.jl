@@ -56,12 +56,12 @@ immutable DirichletBoundaryConditions{DH <: DofHandler, T}
     free_dofs::Vector{Int}
     values::Vector{T}
     dh::DH
-    closed::Ref{Bool}
+    closed::ScalarWrapper{Bool}
 end
 
 function DirichletBoundaryConditions(dh::DofHandler)
     @assert isclosed(dh)
-    DirichletBoundaryConditions(DirichletBoundaryCondition[], Int[], Int[], Float64[], dh, Ref(false))
+    DirichletBoundaryConditions(DirichletBoundaryCondition[], Int[], Int[], Float64[], dh, ScalarWrapper(false))
 end
 
 function Base.show(io::IO, dbcs::DirichletBoundaryConditions)
