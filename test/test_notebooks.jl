@@ -21,3 +21,8 @@ module HeatSquare
     nbinclude("../examples/heat_square.ipynb")
 end
 
+module Helmholtz
+    using NBInclude
+    nbinclude("../examples/helmholtz.ipynb")
+end
+
