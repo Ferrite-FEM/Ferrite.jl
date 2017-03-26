@@ -55,13 +55,14 @@ immutable DirichletBoundaryConditions{DH <: DofHandler, T}
     dofs::Vector{Int}
     free_dofs::Vector{Int}
     values::Vector{T}
+    dofmapping::Dict{Int, Int} # global dof -> index into dofs and values
     dh::DH
     closed::ScalarWrapper{Bool}
 end
 
 function DirichletBoundaryConditions(dh::DofHandler)
     @assert isclosed(dh)
-    DirichletBoundaryConditions(DirichletBoundaryCondition[], Int[], Int[], Float64[], dh, ScalarWrapper(false))
+    DirichletBoundaryConditions(DirichletBoundaryCondition[], Int[], Int[], Float64[], Dict{Int,Int}(), dh, ScalarWrapper(false))
 end
 
 function Base.show(io::IO, dbcs::DirichletBoundaryConditions)
@@ -81,10 +82,15 @@ dirichlet_dofs(dbcs::DirichletBoundaryConditions) = dbcs.dofs
 free_dofs(dbcs::DirichletBoundaryConditions) = dbcs.free_dofs
 function close!(dbcs::DirichletBoundaryConditions)
     fill!(dbcs.values, NaN)
-    dbcs.closed[] = true
     fdofs = Array(setdiff(dbcs.dh.dofs_nodes, dbcs.dofs))
     resize!(dbcs.free_dofs, length(fdofs))
     copy!(dbcs.free_dofs, fdofs)
+    for i in 1:length(dbcs.dofs)
+        dbcs.dofmapping[dbcs.dofs[i]] = i
+    end
+
+    dbcs.closed[] = true
+
     return dbcs
 end
 
@@ -96,20 +102,21 @@ end
 # Adds a boundary condition
 function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
                           nodes::Union{Set{Int}, Vector{Int}}, f::Function, components::Vector{Int})
-    field in dbcs.dh.field_names || error("Missing: $field")
+    field in dbcs.dh.field_names || error("field $field did not exist in the dof handler, exisitng fields are $(dh.field_names)")
     for component in components
-        @assert 0 < component <= ndim(dbcs.dh, field)
+        0 < component <= ndim(dbcs.dh, field) || error("component $component is not within the range of field $field which has $(ndim(dbcs.dh, field)) dimensions")
     end
 
     if length(nodes) == 0
-        warn("Added Dirichlet BC to node set containing 0 nodes")
+        warn("added Dirichlet BC to node set containing 0 nodes")
     end
 
     dofs_bc = Int[]
     offset = dof_offset(dbcs.dh, field)
     for node in nodes
         for component in components
-            push!(dofs_bc, dbcs.dh.dofs_nodes[offset + component, node])
+            dofid = dbcs.dh.dofs_nodes[offset + component, node]
+            push!(dofs_bc, dofid)
         end
     end
 
@@ -130,22 +137,24 @@ function update!(dbcs::DirichletBoundaryConditions, time::Float64 = 0.0)
     for dbc in dbcs.bcs
         # Function barrier
         _update!(dbcs.values, dbc.f, dbc.nodes, dbc.field,
-                              dbc.components, dbcs.dh, dbc.idxoffset, time)
+                 dbc.components, dbcs.dh, dbc.idxoffset, dbcs.dofmapping, time)
     end
 end
 
 function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol,
-                              components::Vector{Int}, dh::DofHandler, idx_offset::Int, time::Float64)
+                  components::Vector{Int}, dh::DofHandler, idx_offset::Int, 
+                  dofmapping::Dict{Int,Int}, time::Float64)
     mesh = dh.grid
     offset = dof_offset(dh, field)
-    current_dof = 1
-     for node in nodes
+    for node in nodes
         x = getcoordinates(getnodes(mesh, node))
         bc_value = f(x, time)
         @assert length(bc_value) == length(components)
         for i in 1:length(components)
-            values[current_dof + idx_offset] = bc_value[i]
-            current_dof += 1
+            c = components[i]
+            dof_number = dh.dofs_nodes[offset + c, node]
+            dbc_index = dofmapping[dof_number]
+            values[dbc_index] = bc_value[i]
         end
     end
 end
