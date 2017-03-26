@@ -95,6 +95,9 @@ Get the divergence of the shape functions for a given quadrature point and base 
 """
 @inline shape_divergence(cv::CellScalarValues, q_point::Int, base_func::Int) = sum(cv.dNdx[base_func, q_point])
 @inline shape_divergence(bv::FaceScalarValues, q_point::Int, base_func::Int) = sum(bv.dNdx[base_func, q_point, bv.current_face[]])
+@inline shape_divergence(cv::CellVectorValues, q_point::Int, base_func::Int) = trace(cv.dNdx[base_func, q_point])
+@inline shape_divergence(bv::FaceVectorValues, q_point::Int, base_func::Int) = trace(bv.dNdx[base_func, q_point, bv.current_face[]])
+
 
 
 """

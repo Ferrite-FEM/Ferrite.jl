@@ -26,3 +26,9 @@ module Helmholtz
     nbinclude("../examples/helmholtz.ipynb")
 end
 
+module Cook
+    using NBInclude
+    nbinclude("../examples/cooks_membrane_mixed_up.ipynb")
+end
+
+
