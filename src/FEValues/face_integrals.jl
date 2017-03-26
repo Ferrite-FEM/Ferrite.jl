@@ -15,7 +15,7 @@ function create_face_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{0,
     return face_quad_rule
 end
 
-function weighted_normal{T}(::Tensor{2, 1, T}, ::Interpolation{1, RefCube}, face::Int)
+function weighted_normal{T}(::Tensor{2, 1, T}, ::FaceValues{1, T, RefCube}, face::Int)
     face == 1 && return Vec{1,T}((-one(T),))
     face == 2 && return Vec{1,T}((one(T),))
     error("unknown face number: $face")
@@ -46,7 +46,7 @@ function create_face_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{1,
     return face_quad_rule
 end
 
-function weighted_normal(J::Tensor{2, 2}, ::Interpolation{2, RefCube}, face::Int)
+function weighted_normal{T}(J::Tensor{2, 2}, ::FaceValues{2, T, RefCube}, face::Int)
     @inbounds begin
         face == 1 && return Vec{2}(( J[2,1], -J[1,1]))
         face == 2 && return Vec{2}(( J[2,2], -J[1,2]))
@@ -78,7 +78,7 @@ function create_face_quad_rule{T, shape <: RefTetrahedron}(quad_rule::Quadrature
     return face_quad_rule
 end
 
-function weighted_normal(J::Tensor{2, 2}, ::Interpolation{2, RefTetrahedron}, face::Int)
+function weighted_normal{T}(J::Tensor{2, 2}, ::FaceValues{2, T, RefTetrahedron}, face::Int)
     @inbounds begin
         face == 1 && return return Vec{2}((-(J[2,1] - J[2,2]), J[1,1] - J[1,2]))
         face == 2 && return return Vec{2}((-J[2,2], J[1,2]))
@@ -118,7 +118,7 @@ function create_face_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{2,
     return face_quad_rule
 end
 
-function weighted_normal(J::Tensor{2, 3}, ::Interpolation{3, RefCube}, face::Int)
+function weighted_normal{T}(J::Tensor{2, 3}, ::FaceValues{3, T, RefCube}, face::Int)
     @inbounds begin
         face == 1 && return J[:,2] × J[:,1]
         face == 2 && return J[:,1] × J[:,3]
@@ -155,7 +155,7 @@ function create_face_quad_rule{T, shape <: RefTetrahedron}(quad_rule::Quadrature
     return face_quad_rule
 end
 
-function weighted_normal(J::Tensor{2, 3}, ::Interpolation{3, RefTetrahedron}, face::Int)
+function weighted_normal{T}(J::Tensor{2, 3}, ::FaceValues{3, T, RefTetrahedron}, face::Int)
     @inbounds begin
         face == 1 && return J[:,2] × J[:,1]
         face == 2 && return J[:,1] × J[:,3]

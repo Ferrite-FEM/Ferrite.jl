@@ -1,8 +1,13 @@
 # Common methods for all `Values` objects
 
-@compat const ScalarValues{dim, T, FS, GS} = Union{CellScalarValues{dim, T, FS, GS}, FaceScalarValues{dim, T, FS, GS}}
-@compat const VectorValues{dim, T, FS, GS} = Union{CellVectorValues{dim, T, FS, GS}, FaceVectorValues{dim, T, FS, GS}}
+@compat const ScalarValues{dim, T, shape} = Union{CellScalarValues{dim, T, shape}, FaceScalarValues{dim, T, shape}}
+@compat const VectorValues{dim, T, shape} = Union{CellVectorValues{dim, T, shape}, FaceVectorValues{dim, T, shape}}
 
+getnbasefunctions(cv::Values) = size(cv.N, 1)
+getngeobasefunctions(cv::Values) = size(cv.M, 1)
+
+getn_scalarbasefunctions(cv::ScalarValues) = size(cv.N, 1)
+getn_scalarbasefunctions{dim}(cv::VectorValues{dim}) = size(cv.N, 1) ÷ dim
 
 """
 Updates a `CellValues`/`FaceValues` object for a cell or face.
@@ -28,60 +33,11 @@ reinit!{dim, T}(bv::FaceValues{dim}, x::Vector{Vec{dim, T}}, face::Int)
 reinit!
 
 """
-The quadrature rule for the `Values` type.
-
-    getquadrule(fe_v::Values)
-
-** Arguments **
-
-* `fe_v`: the `Values` object
-
-** Results **
-
-* `::QuadratureRule`: the quadrature rule.
-
-"""
-getquadrule(cv::CellValues) = cv.quad_rule
-getquadrule(bv::FaceValues) = bv.quad_rule[bv.current_face[]]
-
-"""
 The number of quadrature points for  the `Values` type.
 
     getnquadpoints(fe_v::Values)
 """
-getnquadpoints(fe::Values) = length(getpoints(getquadrule(fe)))
-
-"""
-The function interpolation for the `Values` type.
-
-    getfunctioninterpolation(fe_v::Values)
-
-**Arguments**
-
-* `fe_v`: the `Values` object
-
-**Results**
-
-* `::Interpolation`: the function interpolation
-
-"""
-getfunctioninterpolation(fe_v::Values) = fe_v.func_interpol
-
-"""
-The interpolation used for the geometry for the `Values` type.
-
-    getgeometryinterpolation(fe_v::Values)
-
-**Arguments**
-
-* `fe_v`: the `Values` object
-
-**Results**
-
-* `::Interpolation`: the geometry interpolation
-
-"""
-getgeometryinterpolation(fe_v::Values) = fe_v.geom_interpol
+getnquadpoints(fe::Values) = length(fe.qr_weights)
 
 """
 The product between the determinant of the Jacobian and the quadrature point weight for a given quadrature point: ``\\det(J(\\mathbf{x})) w_q``
@@ -166,7 +122,7 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 nodal values of ``\\mathbf{u}``.
 """
 function function_value{dim, T}(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T})
-    n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
+    n_base_funcs = getn_scalarbasefunctions(fe_v)
     isa(fe_v, VectorValues) && (n_base_funcs *= dim)
     @assert length(u) == n_base_funcs
     val = zero(_valuetype(fe_v, u))
@@ -177,7 +133,7 @@ function function_value{dim, T}(fe_v::Values{dim}, q_point::Int, u::AbstractVect
 end
 
 function function_value{dim, T}(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{Vec{dim, T}})
-    n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
+    n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
     val = zero(Vec{dim, T})
     basefunc = 1
@@ -222,7 +178,7 @@ For a vector valued function the gradient is computed as
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
 function function_gradient{dim, T}(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T})
-    n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
+    n_base_funcs = getn_scalarbasefunctions(fe_v)
     isa(fe_v, VectorValues) && (n_base_funcs *= dim)
     @assert length(u) == n_base_funcs
     grad = zero(_gradienttype(fe_v, u))
@@ -238,7 +194,7 @@ Base.@pure _gradienttype{dim, T}(::VectorValues{dim}, ::AbstractVector{T}) = Ten
 # Base.@pure _gradienttype{dim, T}(::VectorValues{dim}, ::AbstractVector{Vec{dim, T}}) = Tensor{2, dim, T}
 
 function function_gradient{dim, T}(fe_v::ScalarValues{dim}, q_point::Int, u::AbstractVector{Vec{dim, T}})
-    n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
+    n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
     grad = zero(Tensor{2, dim, T})
     @inbounds for i in 1:n_base_funcs
@@ -248,7 +204,7 @@ function function_gradient{dim, T}(fe_v::ScalarValues{dim}, q_point::Int, u::Abs
 end
 
 function function_gradient{dim, T}(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{Vec{dim, T}})
-    n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
+    n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
     grad = zero(Tensor{2, dim, T})
     basefunc_count = 1
@@ -317,7 +273,7 @@ The divergence of a vector valued functions in the quadrature point ``\\mathbf{x
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
 function function_divergence{dim, T}(fe_v::ScalarValues{dim}, q_point::Int, u::AbstractVector{Vec{dim, T}})
-    n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
+    n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
     diverg = zero(T)
     @inbounds for i in 1:n_base_funcs
@@ -327,7 +283,7 @@ function function_divergence{dim, T}(fe_v::ScalarValues{dim}, q_point::Int, u::A
 end
 
 function function_divergence{dim, T}(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{T})
-    n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))*dim
+    n_base_funcs = getn_scalarbasefunctions(fe_v)*dim
     @assert length(u) == n_base_funcs
     diverg = zero(T)
     @inbounds for i in 1:n_base_funcs
@@ -340,7 +296,7 @@ function function_divergence{dim, T}(fe_v::VectorValues{dim}, q_point::Int, u::A
 end
 
 function function_divergence{dim, T}(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{Vec{dim, T}})
-    n_base_funcs = getnbasefunctions(getfunctioninterpolation(fe_v))
+    n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
     diverg = zero(T)
     basefunc_count = 1
@@ -377,7 +333,7 @@ Computes the spatial coordinate in a quadrature point.
 The coordinate is computed, using the geometric interpolation, as ``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{x}) \\mathbf{\\hat{x}}_i``
 """
 function spatial_coordinate{dim, T}(fe_v::Values{dim}, q_point::Int, x::AbstractVector{Vec{dim, T}})
-    n_base_funcs = getnbasefunctions(getgeometryinterpolation(fe_v))
+    n_base_funcs = getngeobasefunctions(fe_v)
     @assert length(x) == n_base_funcs
     vec = zero(Vec{dim, T})
     @inbounds for i in 1:n_base_funcs

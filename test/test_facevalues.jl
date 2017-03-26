@@ -23,7 +23,6 @@ for (func_interpol, quad_rule) in  (
         face_nodes, cell_nodes = topology_test_nodes(func_interpol)
         for face in 1:JuAFEM.getnfaces(func_interpol)
             reinit!(fv, xs, face)
-            face_quad_rule = getquadrule(fv)
             @test JuAFEM.getcurrentface(fv) == face
 
             # We test this by applying a given deformation gradient on all the nodes.
@@ -39,7 +38,7 @@ for (func_interpol, quad_rule) in  (
             end
             u_vector = reinterpret(Float64, u, (n_basefuncs*ndim,))
 
-            for i in 1:length(getpoints(face_quad_rule))
+            for i in 1:length(getnquadpoints(fv))
                 @test getnormal(fv, i) ≈ n[face]
                 @test function_gradient(fv, i, u) ≈ H
                 @test function_symmetric_gradient(fv, i, u) ≈ 0.5(H + H')
@@ -63,10 +62,6 @@ for (func_interpol, quad_rule) in  (
             x_face = xs[[JuAFEM.getfacelist(func_interpol)[face]...]]
             @test vol ≈ calculate_volume(JuAFEM.getlowerdim(func_interpol), x_face)
 
-            # Test of utility functions
-            @test getfunctioninterpolation(fv) == func_interpol
-            @test getgeometryinterpolation(fv) == func_interpol
-
             # Test quadrature rule after reinit! with ref. coords
             x = reference_coordinates(func_interpol)
             reinit!(fv, x, face)
@@ -77,9 +72,10 @@ for (func_interpol, quad_rule) in  (
             @test vol ≈ reference_volume(func_interpol, face)
 
             # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
-            for (i, qp_x) in enumerate(getpoints(face_quad_rule))
-                @test spatial_coordinate(fv, i, x) ≈ qp_x
-            end
+            # TODO: Renable somehow after quad rule is no longer stored in FaceValues
+            #for (i, qp_x) in enumerate(getpoints(quad_rule))
+            #    @test spatial_coordinate(fv, i, x) ≈ qp_x
+            #end
 
         end
 

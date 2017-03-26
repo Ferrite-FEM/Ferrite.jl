@@ -40,9 +40,9 @@ immutable RefCube <: AbstractRefShape end
 """
 Abstract type which has `CellValues` and `FaceValues` as subtypes
 """
-@compat abstract type Values{dim, T, FS, GS} end
-@compat abstract type CellValues{dim, T, FS, GS}     <: Values{dim, T, FS, GS} end
-@compat abstract type FaceValues{dim, T, FS, GS} <: Values{dim, T, FS, GS} end
+@compat abstract type Values{dim, T, refshape} end
+@compat abstract type CellValues{dim, T, refshape} <: Values{dim, T, refshape} end
+@compat abstract type FaceValues{dim, T, refshape} <: Values{dim, T, refshape} end
 
 include("utils.jl")
 include("interpolations.jl")

@@ -57,11 +57,6 @@ for (func_interpol, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{1
         end
         @test vol ≈ calculate_volume(func_interpol, x)
 
-        # Test of utility functions
-        @test getfunctioninterpolation(cv) == func_interpol
-        @test getgeometryinterpolation(cv) == func_interpol
-        @test getquadrule(cv) == quad_rule
-
         # Test quadrature rule after reinit! with ref. coords
         x = reference_coordinates(func_interpol)
         reinit!(cv, x)
