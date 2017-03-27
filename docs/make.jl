@@ -5,7 +5,8 @@ using Documenter, JuAFEM
 # Generate examples
 include("generate.jl")
 
-GENERATEDEXAMPLES = [joinpath("examples", "generated", f) for f in ("heat_equation.md", "incompressible_elasticity.md")]
+GENERATEDEXAMPLES = [joinpath("examples", "generated", f) for f in (
+    "heat_equation.md", "incompressible_elasticity.md", "threaded_assembly.md")]
 
 # Build documentation.
 makedocs(

@@ -19,7 +19,11 @@ end
 
 # copy some figures to the build directory
 cp(joinpath(@__DIR__, "../examples/figures/heat_square.png"),
-   joinpath(@__DIR__, "src/examples/generated/heat_equation.png");
+   joinpath(@__DIR__, "src/examples/generated/heat_square.png");
+   remove_destination = true)
+
+cp(joinpath(@__DIR__, "../examples/figures/coloring.png"),
+   joinpath(@__DIR__, "src/examples/generated/coloring.png");
    remove_destination = true)
 
 # remove any .vtu files in the generated dir (should not be deployed)
