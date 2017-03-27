@@ -60,7 +60,7 @@ function create_stiffness()
     return C
 end
 
-immutable ScratchValues{T, CV <: CellValues, FV <: FaceValues, TT <: AbstractTensor, dim}
+immutable ScratchValues{T, CV <: CellValues, FV <: FaceValues, TT <: AbstractTensor, dim, Ti}
     Ke::Matrix{T}
     fe::Vector{T}
     cellvalues::CV
@@ -68,13 +68,14 @@ immutable ScratchValues{T, CV <: CellValues, FV <: FaceValues, TT <: AbstractTen
     global_dofs::Vector{Int}
     ɛ::Vector{TT}
     coordinates::Vector{Vec{dim, T}}
+    assembler::JuAFEM.AssemblerSparsityPattern{T, Ti}
 end
 
 function doassemble{CV <: CellValues, FV <: FaceValues}(cellvalues::Vector{CV}, facevalues::Vector{FV},
                          K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim})
 
     f = zeros(ndofs(dh))
-    assembler = start_assemble(K, f)
+    assemblers = [start_assemble(K, f) for i in 1:Threads.nthreads()]
 
     n_basefuncs = getnbasefunctions(cellvalues[1])
     global_dofs = [zeros(Int, ndofs_per_cell(dh)) for i in 1:Threads.nthreads()]
@@ -86,26 +87,26 @@ function doassemble{CV <: CellValues, FV <: FaceValues}(cellvalues::Vector{CV}, 
 
     coordinates = [[zero(Vec{dim}) for i in 1:length(grid.cells[1].nodes)] for i in 1:Threads.nthreads()]
 
-    scratches = [ScratchValues(Kes[i], fes[i], cellvalues[i], facevalues[i], global_dofs[i], ɛs[i], coordinates[i]) for i in 1:Threads.nthreads()]
+    scratches = [ScratchValues(Kes[i], fes[i], cellvalues[i], facevalues[i], global_dofs[i], ɛs[i], coordinates[i], assemblers[i]) for i in 1:Threads.nthreads()]
 
     t = Vec{3}((0.0, 1e8, 0.0)) # Traction vector
     b = Vec{3}((0.0, 0.0, 0.0)) # Body force
 
     for color in colors
         Threads.@threads for i in 1:length(color)
-            assemble_cell!(scratches[Threads.threadid()], assembler, color[i], K, grid, dh, C, t, b)
+            assemble_cell!(scratches[Threads.threadid()], color[i], K, grid, dh, C, t, b)
         end
     end
 
     return K, f
 end
 
-function assemble_cell!{dim}(scratch::ScratchValues, assembler, cell::Int, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim},
+function assemble_cell!{dim}(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim},
                             t, b)
 
-    Ke, fe, cellvalues, facevalues, global_dofs, ɛ, coordinates = scratch.Ke, scratch.fe,
-                                                                  scratch.cellvalues, scratch.facevalues,
-                                                                  scratch.global_dofs, scratch.ɛ, scratch.coordinates
+    Ke, fe, cellvalues, facevalues, global_dofs, ɛ, coordinates, assembler =
+         scratch.Ke, scratch.fe, scratch.cellvalues, scratch.facevalues,
+         scratch.global_dofs, scratch.ɛ, scratch.coordinates, scratch.assembler
 
     fill!(Ke, 0)
     fill!(fe, 0)
@@ -151,12 +152,12 @@ function assemble_cell!{dim}(scratch::ScratchValues, assembler, cell::Int, K::Sp
 end
 
 """
-grid, colors = create_grid(40)
-dh = create_dofhandler(grid)
-dbc = create_boundary_conditions(dh)
-cellvalues, facevalues = create_values()
+grid, colors = create_grid(40);
+dh = create_dofhandler(grid);
+dbc = create_boundary_conditions(dh);
+cellvalues, facevalues = create_values();
 
 K = create_sparsity_pattern(dh);
-C = create_stiffness()
+C = create_stiffness();
 @time K, f = doassemble(cellvalues, facevalues, K, colors, grid, dh, C);
 """
