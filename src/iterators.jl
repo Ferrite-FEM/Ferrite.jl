@@ -27,18 +27,18 @@ immutable CellIterator{dim, N, T, M}
     current_cellid::ScalarWrapper{Int}
     dh::DofHandler{dim, N, T, M}
 
-    function CellIterator{dim, N, T, M}(dh::DofHandler{dim, N, T, M})
+    function (::Type{CellIterator{dim, N, T, M}}){dim, N, T, M}(dh::DofHandler{dim, N, T, M})
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim, T}, N)
         cell = ScalarWrapper(0)
-        return new(dh.grid, nodes, coords,ScalarWrapper(0), dh)
+        return new{dim, N, T, M}(dh.grid, nodes, coords, ScalarWrapper(0), dh)
     end
 
-    function CellIterator{dim, N, T, M}(grid::Grid{dim, N, T, M})
+    function (::Type{CellIterator{dim, N, T, M}}){dim, N, T, M}(grid::Grid{dim, N, T, M})
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim, T}, N)
         cell = ScalarWrapper(0)
-        return new(grid, nodes, coords, cell)
+        return new{dim, N, T, M}(grid, nodes, coords, cell)
     end
 end
 

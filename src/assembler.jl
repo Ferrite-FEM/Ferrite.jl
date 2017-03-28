@@ -58,7 +58,7 @@ end
 
 Assembles the element residual `ge` into the global residual vector `g`.
 """
-function assemble!{T}(g::AbstractVector{T}, ge::AbstractVector{T}, edof::AbstractVector{Int})
+@Base.propagate_inbounds function assemble!{T}(g::AbstractVector{T}, ge::AbstractVector{T}, edof::AbstractVector{Int})
     @boundscheck checkbounds(g, edof)
     @inbounds for i in 1:length(edof)
         g[edof[i]] += ge[i]
@@ -78,8 +78,9 @@ function start_assemble(K::SparseMatrixCSC, f::Vector=Float64[])
     AssemblerSparsityPattern(K, f, Int[], eltype(K)[])
 end
 
-assemble!(A::AssemblerSparsityPattern, Ke::AbstractMatrix, dofs::AbstractVector{Int}) = assemble!(A, eltype(Ke)[], Ke, dofs)
-function assemble!(A::AssemblerSparsityPattern, fe::AbstractVector, Ke::AbstractMatrix, dofs::AbstractVector{Int})
+@Base.propagate_inbounds assemble!(A::AssemblerSparsityPattern, Ke::AbstractMatrix, dofs::AbstractVector{Int}) = assemble!(A, eltype(Ke)[], Ke, dofs)
+
+@Base.propagate_inbounds function assemble!(A::AssemblerSparsityPattern, fe::AbstractVector, Ke::AbstractMatrix, dofs::AbstractVector{Int})
     if length(fe) != 0
         assemble!(A.f, fe, dofs)
     end
@@ -88,9 +89,9 @@ function assemble!(A::AssemblerSparsityPattern, fe::AbstractVector, Ke::Abstract
     tmpi = A.tmpi
     tmpf = A.tmpf
     @boundscheck checkbounds(K, dofs, dofs)
-    resize!(A.tmpi, length(dofs))
-    resize!(A.tmpf, length(dofs))
-    copy!(A.tmpf, dofs)
+    resize!(tmpi, length(dofs))
+    resize!(tmpf, length(dofs))
+    copy!(tmpf, dofs)
     sortperm2!(tmpf, tmpi)
 
     current_col = 1
@@ -112,9 +113,7 @@ function assemble!(A::AssemblerSparsityPattern, fe::AbstractVector, Ke::Abstract
     end
 end
 
-
 # Sort utilities
-
 
 function sortperm2!(B, ii)
    @inbounds for i = 1:length(B)
