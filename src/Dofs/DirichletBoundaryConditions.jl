@@ -102,7 +102,7 @@ end
 # Adds a boundary condition
 function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
                           nodes::Union{Set{Int}, Vector{Int}}, f::Function, components::Vector{Int})
-    field in dbcs.dh.field_names || error("field $field did not exist in the dof handler, exisitng fields are $(dh.field_names)")
+    field in dbcs.dh.field_names || error("field $field does not exist in the dof handler, existing fields are $(dh.field_names)")
     for component in components
         0 < component <= ndim(dbcs.dh, field) || error("component $component is not within the range of field $field which has $(ndim(dbcs.dh, field)) dimensions")
     end

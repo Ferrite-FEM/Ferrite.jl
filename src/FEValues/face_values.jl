@@ -59,8 +59,8 @@ immutable FaceScalarValues{dim, T <: Real, refshape <: AbstractRefShape} <: Face
     current_face::ScalarWrapper{Int}
 end
 
-function FaceScalarValues{dim_qr}(quad_rule::QuadratureRule{dim_qr}, func_interpol::Interpolation,
-                                  geom_interpol::Interpolation=func_interpol)
+function FaceScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
+                          geom_interpol::Interpolation=func_interpol)
     FaceScalarValues(Float64, quad_rule, func_interpol, geom_interpol)
 end
 
@@ -194,7 +194,7 @@ function reinit!{dim, T}(fv::FaceValues{dim}, x::AbstractVector{Vec{dim, T}}, fa
         fv.normals[i] = weight_norm / norm(weight_norm)
         detJ = norm(weight_norm)
 
-        detJ > 0.0 || throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
+        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
         fv.detJdV[i, cb] = detJ * w
         Jinv = inv(fefv_J)
         for j in 1:n_func_basefuncs

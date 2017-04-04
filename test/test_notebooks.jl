@@ -18,8 +18,7 @@ end
 
 module HeatSquare
     using NBInclude
-    # Requires BlockArrays, only available on 0.6
-    # nbinclude("../examples/heat_square.ipynb")
+    nbinclude("../examples/heat_square.ipynb")
 end
 
 module Helmholtz
@@ -29,7 +28,8 @@ end
 
 module Cook
     using NBInclude
-    nbinclude("../examples/cooks_membrane_mixed_up.ipynb")
+    # Requires BlockArrays, only available on 0.6
+    # nbinclude("../examples/cooks_membrane_mixed_up.ipynb")
 end
 
 

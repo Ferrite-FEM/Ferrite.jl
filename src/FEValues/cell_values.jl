@@ -99,7 +99,7 @@ immutable CellVectorValues{dim, T <: Real, refshape <: AbstractRefShape, M} <: C
     qr_weights::Vector{T}
 end
 
-function CellVectorValues{dim}(quad_rule::QuadratureRule{dim}, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
+function CellVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
     CellVectorValues(Float64, quad_rule, func_interpol, geom_interpol)
 end
 
@@ -163,11 +163,11 @@ function reinit!{dim, T}(cv::CellValues{dim}, x::AbstractVector{Vec{dim, T}})
             fecv_J += x[j] ⊗ cv.dMdξ[j, i]
         end
         detJ = det(fecv_J)
-        detJ > 0.0 || throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
+        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
         cv.detJdV[i] = detJ * w
         Jinv = inv(fecv_J)
         for j in 1:n_func_basefuncs
-            cv.dNdx[j,i] = cv.dNdξ[j, i] ⋅ Jinv
+            cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
         end
     end
 end
