@@ -73,7 +73,8 @@ using SHA
                           Lagrange{2, RefTetrahedron, 2}(),
                           Lagrange{3, RefCube, 1}(),
                           Serendipity{2, RefCube, 2}(),
-                          Lagrange{3, RefTetrahedron, 1}())
+                          Lagrange{3, RefTetrahedron, 1}(),
+                          Lagrange{3, RefTetrahedron, 2}())
 
         @test getVTKtype(interpolation).nodes == getnbasefunctions(interpolation)
     end

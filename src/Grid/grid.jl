@@ -63,7 +63,7 @@ nfaces{dim, N, M}(::Type{Cell{dim, N, M}}) = M
 @compat const QuadraticQuadrilateral = Cell{2, 9, 4}
 
 @compat const Tetrahedron = Cell{3, 4, 4}
-@compat const QuadraticTetrahedron = Cell{3, 10, 4} # Function interpolation for this doesn't exist in JuAFEM yet
+@compat const QuadraticTetrahedron = Cell{3, 10, 4}
 
 @compat const Hexahedron = Cell{3, 8, 6}
 @compat const QuadraticHexahedron = Cell{3, 20, 6} # Function interpolation for this doesn't exist in JuAFEM yet

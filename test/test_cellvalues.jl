@@ -1,6 +1,6 @@
 @testset "CellValues" begin
-
-for (func_interpol, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
+for (func_interpol, quad_rule) in  (
+                                    (Lagrange{1, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
                                     (Lagrange{1, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
                                     (Lagrange{2, RefCube, 1}(), QuadratureRule{2, RefCube}(2)),
                                     (Lagrange{2, RefCube, 2}(), QuadratureRule{2, RefCube}(2)),
@@ -8,8 +8,9 @@ for (func_interpol, quad_rule) in  ((Lagrange{1, RefCube, 1}(), QuadratureRule{1
                                     (Lagrange{2, RefTetrahedron, 2}(), QuadratureRule{2, RefTetrahedron}(2)),
                                     (Lagrange{3, RefCube, 1}(), QuadratureRule{3, RefCube}(2)),
                                     (Serendipity{2, RefCube, 2}(), QuadratureRule{2, RefCube}(2)),
-                                    (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{3, RefTetrahedron}(2)))
-
+                                    (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{3, RefTetrahedron}(2)),
+                                    (Lagrange{3, RefTetrahedron, 2}(), QuadratureRule{3, RefTetrahedron}(2))
+                                   )
 
     for fe_valtype in (CellScalarValues, CellVectorValues)
         cv = fe_valtype(quad_rule, func_interpol)

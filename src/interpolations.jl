@@ -25,6 +25,7 @@ The following interpolations are implemented:
 * `Lagrange{3, RefCube, 1}`
 * `Serendipity{2, RefCube, 2}`
 * `Lagrange{3, RefTetrahedron, 1}`
+* `Lagrange{3, RefTetrahedron, 2}`
 
 **Common methods:**
 
@@ -400,6 +401,61 @@ function derivative!{T}(ip::Lagrange{3, RefTetrahedron, 1}, dN::AbstractVector{V
         dN[2] = Vec{3, T}(( 1.0,  0.0, 0.0))
         dN[3] = Vec{3, T}(( 0.0,  1.0, 0.0))
         dN[4] = Vec{3, T}(( 0.0,  0.0, 1.0))
+    end
+
+    return dN
+end
+
+#########################################
+# Lagrange dim 3 RefTetrahedron order 2 #
+#########################################
+getnbasefunctions(::Lagrange{3, RefTetrahedron, 2}) = 10
+getnfacenodes(::Lagrange{3, RefTetrahedron, 2}) = 6
+getfacelist(::Lagrange{3, RefTetrahedron, 2}) = ((1,2,3,5,6,7),(1,2,4,5,8,9),(2,3,4,6,9,10),(1,3,4,7,8,10))
+
+# http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch09.d/AFEM.Ch09.pdf
+# http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.pdf
+function value!(ip::Lagrange{3, RefTetrahedron, 2}, N::AbstractVector, ξ::Vec{3})
+    checkdim_value(ip, N, ξ)
+
+    @inbounds begin
+        ξ_x = ξ[1]
+        ξ_y = ξ[2]
+        ξ_z = ξ[3]
+
+        N[1]  = (-2 * ξ_x - 2 * ξ_y - 2 * ξ_z + 1) * (-ξ_x - ξ_y - ξ_z + 1)
+        N[2]  = ξ_x * (2 * ξ_x - 1)
+        N[3]  = ξ_y * (2 * ξ_y - 1)
+        N[4]  = ξ_z * (2 * ξ_z - 1)
+        N[5]  = ξ_x * (-4 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4)
+        N[6]  = 4 * ξ_x * ξ_y
+        N[7]  = 4 * ξ_y * (-ξ_x - ξ_y - ξ_z + 1)
+        N[8]  = ξ_z * (-4 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4)
+        N[9]  = 4 * ξ_x * ξ_z
+        N[10] = 4 * ξ_y * ξ_z
+    end
+
+    return N
+end
+
+function derivative!{T}(ip::Lagrange{3, RefTetrahedron, 2}, dN::AbstractVector{Vec{3, T}}, ξ::Vec{3, T})
+    checkdim_derivative(ip, dN, ξ)
+
+    @inbounds begin
+        ξ_x = ξ[1]
+        ξ_y = ξ[2]
+        ξ_z = ξ[3]
+
+        dN[1]  = Vec{3, T}((4 * ξ_x + 4 * ξ_y + 4 * ξ_z - 3, 4 * ξ_x + 4 * ξ_y + 4 * ξ_z - 3, 4 * ξ_x + 4 * ξ_y + 4 * ξ_z - 3))
+        dN[2]  = Vec{3, T}((4 * ξ_x - 1, 0.0, 0.0))
+        dN[3]  = Vec{3, T}((0.0, 4 * ξ_y - 1, 0.0))
+        dN[4]  = Vec{3, T}((0.0, 0.0, 4 * ξ_z - 1))
+        dN[5]  = Vec{3, T}((-8 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4, -4 * ξ_x, -4 * ξ_x))
+        dN[6]  = Vec{3, T}((4 * ξ_y, 4 * ξ_x, 0.0))
+        dN[7]  = Vec{3, T}((-4 * ξ_y, -4 * ξ_x - 8 * ξ_y - 4 * ξ_z + 4, -4 * ξ_y))
+        dN[8]  = Vec{3, T}((-4 * ξ_z, -4 * ξ_z, -4 * ξ_x - 4 * ξ_y - 8 * ξ_z + 4))
+        dN[9]  = Vec{3, T}((4 * ξ_z, 0.0, 4 * ξ_x))
+        dN[10] = Vec{3, T}((0.0, 4 * ξ_z, 4 * ξ_y))
     end
 
     return dN

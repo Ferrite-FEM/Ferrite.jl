@@ -82,7 +82,7 @@ function reference_coordinates(::Lagrange{2, RefTetrahedron, 2})
 end
 
 # Lagrange{3, RefTetrahedron}
-function reference_normals(::Lagrange{3, RefTetrahedron, 1})
+function reference_normals(::Lagrange{3, RefTetrahedron})
     return [Vec{3, Float64}((0.0, 0.0, -1.0)),
             Vec{3, Float64}((0.0 ,-1.0, 0.0)),
             Vec{3, Float64}((1/√3, 1/√3, 1/√3)),
@@ -94,6 +94,19 @@ function reference_coordinates(::Lagrange{3, RefTetrahedron, 1})
             Vec{3, Float64}((1.0, 0.0, 0.0)),
             Vec{3, Float64}((0.0, 1.0, 0.0)),
             Vec{3, Float64}((0.0, 0.0, 1.0))]
+end
+
+function reference_coordinates(::Lagrange{3, RefTetrahedron, 2})
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0)),
+            Vec{3, Float64}((0.5, 0.0, 0.0)),
+            Vec{3, Float64}((0.5, 0.5, 0.0)),
+            Vec{3, Float64}((0.0, 0.5, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 0.5)),
+            Vec{3, Float64}((0.5, 0.0, 0.5)),
+            Vec{3, Float64}((0.0, 0.5, 0.5))]
 end
 
 # Lagrange{3, Cube}
@@ -201,7 +214,7 @@ function calculate_volume{T, dim}(::Lagrange{2, RefTetrahedron, 2}, x::Vector{Ve
     return vol
 end
 
-function calculate_volume{T}(::Lagrange{3, RefTetrahedron, 1}, x::Vector{Vec{3, T}})
+function calculate_volume{T, order}(::Lagrange{3, RefTetrahedron, order}, x::Vector{Vec{3, T}})
     vol = norm((x[2] - x[1]) ⋅ ((x[3] - x[1]) × (x[4] - x[1]))) / 6.0
     return vol
 end
@@ -277,5 +290,11 @@ end
 function topology_test_nodes(::Lagrange{3, RefTetrahedron, 1})
     cell_nodes = [3,4,8,1]
     face_nodes = [[3,4,8], [3,4,1], [4,8,1], [3,8,1], [1,4,1337]]
+    return face_nodes, cell_nodes
+end
+
+function topology_test_nodes(::Lagrange{3, RefTetrahedron, 2})
+    cell_nodes = [3,4,8,1,5,2,6,7,9,10]
+    face_nodes = [[3,4,8,5,2,6], [3,4,1,5,9,7], [4,8,1,2,10,9], [3,8,1,6,10,7], [1,4,1337,2,3,5]]
     return face_nodes, cell_nodes
 end
