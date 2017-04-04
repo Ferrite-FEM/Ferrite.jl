@@ -32,8 +32,9 @@ immutable Cell{dim, N, M}
     nodes::NTuple{N, Int}
 end
 nfaces(c::Cell) = nfaces(typeof(c))
-nfaces{dim, N, M}(::Type{Cell{dim, N, M}}) = M# Typealias for commonly used cells
+nfaces{dim, N, M}(::Type{Cell{dim, N, M}}) = M
 
+# Typealias for commonly used cells
 @compat const Line = Cell{1, 2, 2}
 @compat const QuadraticLine = Cell{1, 3, 2}
 
