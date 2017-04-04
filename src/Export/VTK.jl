@@ -90,6 +90,7 @@ getVTKtype(::Serendipity{2, RefCube, 2}) = VTKCellTypes.VTK_QUADRATIC_QUAD
 
 getVTKtype(::Lagrange{3, RefCube, 1}) = VTKCellTypes.VTK_HEXAHEDRON
 getVTKtype(::Lagrange{3, RefTetrahedron, 1}) = VTKCellTypes.VTK_TETRA
+getVTKtype(::Lagrange{3, RefTetrahedron, 2}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 
 getVTKtype(::Type{Line}) = VTKCellTypes.VTK_LINE
 getVTKtype(::Type{QuadraticLine}) = VTKCellTypes.VTK_QUADRATIC_EDGE
@@ -99,6 +100,7 @@ getVTKtype(::Type{QuadraticTriangle}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
 getVTKtype(::Type{QuadraticQuadrilateral}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
 getVTKtype(::Type{Hexahedron}) = VTKCellTypes.VTK_HEXAHEDRON
 getVTKtype(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
+getVTKtype(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 getVTKtype(::Type{Cell{2,8,4}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
 
 
