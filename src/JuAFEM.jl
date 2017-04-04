@@ -58,6 +58,7 @@ include(joinpath("FEValues","face_integrals.jl"))
 # Grid
 include(joinpath("Grid", "grid.jl"))
 include(joinpath("Grid", "grid_generators.jl"))
+include(joinpath("Grid", "coloring.jl"))
 
 # Dofs
 include(joinpath("Dofs", "DofHandler.jl"))
