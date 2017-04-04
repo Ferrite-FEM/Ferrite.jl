@@ -25,34 +25,16 @@ end
 Node{dim, T}(x::NTuple{dim, T}) = Node(Vec{dim, T}(x))
 getcoordinates(n::Node) = n.x
 
-#=
-#A bit redundant but perhaps we want to put more in here:
-immutable Face
-    onboundary::Bool
-end
-onboundary(f::Face) = f.onboundary
-Face() = Face(false)
-=#
-
 """
 A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
 """
 immutable Cell{dim, N, M}
     nodes::NTuple{N, Int}
-    onboundary::NTuple{M, Bool}
 end
-
-onboundary(c::Cell, face::Int) = c.onboundary[face]
-
-(::Type{Cell{dim, N, M}}){dim, N, M}(nodes::NTuple{N}) = Cell{dim,N,M}(nodes, ntuple(i->false, Val{M}))
-(::Type{Cell{dim, N, M}}){dim, N, M}(nodes::NTuple{N}, arr::AbstractArray{Bool}) = Cell{dim,N,M}(nodes, ntuple(i -> arr[i], Val{M}))
-
-
 nfaces(c::Cell) = nfaces(typeof(c))
 nfaces{dim, N, M}(::Type{Cell{dim, N, M}}) = M
 
 # Typealias for commonly used cells
-
 @compat const Line = Cell{1, 2, 2}
 @compat const QuadraticLine = Cell{1, 3, 2}
 
@@ -92,15 +74,17 @@ type Grid{dim, N, T <: Real, M}
     cellsets::Dict{String, Set{Int}}
     nodesets::Dict{String, Set{Int}}
     facesets::Dict{String, Set{Tuple{Int, Int}}}
+    # Boundary matrix (faces per cell × cell)
+    boundary_matrix::SparseMatrixCSC{Bool, Int}
 end
 
 function Grid{dim, N, M, T}(cells::Vector{Cell{dim, N, M}},
-                         nodes::Vector{Node{dim, T}};
-                         cellsets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
-                         nodesets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
-                         facesets::Dict{String, Set{Tuple{Int, Int}}}=Dict{String, Set{Tuple{Int, Int}}}(),
-                        )
-    return Grid(cells, nodes, cellsets, nodesets, facesets)
+                            nodes::Vector{Node{dim, T}};
+                            cellsets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
+                            nodesets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
+                            facesets::Dict{String, Set{Tuple{Int, Int}}}=Dict{String, Set{Tuple{Int, Int}}}(),
+                            boundary_matrix::SparseMatrixCSC{Bool, Int}=spzeros(Bool, 0, 0))
+    return Grid(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
 end
 
 ##########################

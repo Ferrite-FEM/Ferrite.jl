@@ -1,19 +1,14 @@
 export generate_grid
 
-# Goes through `boundary` and updates the onboundary values for the
-# cells that actually are on the boundary
-function _apply_onboundary!{T}(::Type{T}, cells, boundary)
-    cells_new = T[]
-    isboundary = zeros(Bool, nfaces(T))
+function boundaries_to_sparse(boundary)
+    I, J, V = Int[], Int[], Bool[]
     for faceindex in boundary
-        fill!(isboundary, false)
         cell, face = faceindex
-        c = cells[cell]
-        for i in 1:nfaces(T)
-            isboundary[i] = onboundary(c, i) | (face == i)
-        end
-        cells[cell] = T(c.nodes, isboundary)
+        push!(I, face)
+        push!(J, cell)
+        push!(V, true)
     end
+    return sparse(I, J, V)
 end
 
 """
@@ -56,12 +51,12 @@ function generate_grid{T}(::Type{Line}, nel::NTuple{1, Int}, left::Vec{1, T}=Vec
     boundary = Vector([(1, 1),
                        (nel_x, 2)])
 
-    _apply_onboundary!(Line, cells, boundary)
+    boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
     facesets = Dict("left"  => Set{Tuple{Int, Int}}([boundary[1]]),
                     "right" => Set{Tuple{Int, Int}}([boundary[2]]))
-    return Grid(cells, nodes, facesets=facesets)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # QuadraticLine
@@ -86,12 +81,12 @@ function generate_grid{T}(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec{
     boundary = Tuple{Int, Int}[(1, 1),
                          (nel_x, 2)]
 
-    _apply_onboundary!(QuadraticLine, cells, boundary)
+    boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
     facesets = Dict("left"  => Set{Tuple{Int, Int}}([boundary[1]]),
                     "right" => Set{Tuple{Int, Int}}([boundary[2]]))
-    return Grid(cells, nodes, facesets=facesets)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
@@ -151,7 +146,7 @@ function generate_grid{T}(C::Type{Quadrilateral}, nel::NTuple{2, Int}, LL::Vec{2
                               [(cl, 3) for cl in cell_array[:,end]];
                               [(cl, 4) for cl in cell_array[1,:]]]
 
-    _apply_onboundary!(Quadrilateral, cells, boundary)
+    boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
     offset = 0
@@ -161,7 +156,7 @@ function generate_grid{T}(C::Type{Quadrilateral}, nel::NTuple{2, Int}, LL::Vec{2
     facesets["top"]    = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[:,end])) + offset]); offset += length(cell_array[:,end])
     facesets["left"]   = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[1,:]))   + offset]); offset += length(cell_array[1,:])
 
-    return Grid(cells, nodes, facesets=facesets)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # QuadraticQuadrilateral
@@ -190,7 +185,7 @@ function generate_grid{T}(::Type{QuadraticQuadrilateral}, nel::NTuple{2, Int}, L
                               [(cl, 3) for cl in cell_array[:,end]];
                               [(cl, 4) for cl in cell_array[1,:]]]
 
-    _apply_onboundary!(QuadraticQuadrilateral, cells, boundary)
+    boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
     offset = 0
@@ -200,7 +195,7 @@ function generate_grid{T}(::Type{QuadraticQuadrilateral}, nel::NTuple{2, Int}, L
     facesets["top"]    = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[:,end])) + offset]); offset += length(cell_array[:,end])
     facesets["left"]   = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[1,:]))   + offset]); offset += length(cell_array[1,:])
 
-    return Grid(cells, nodes, facesets=facesets)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # Hexahedron
@@ -235,7 +230,7 @@ function generate_grid{T}(::Type{Hexahedron}, nel::NTuple{3, Int}, left::Vec{3, 
                               [(cl, 5) for cl in cell_array[1,:,:][:]];
                               [(cl, 6) for cl in cell_array[:,:,end][:]]]
 
-    _apply_onboundary!(Hexahedron, cells, boundary)
+    boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
     offset = 0
@@ -247,7 +242,7 @@ function generate_grid{T}(::Type{Hexahedron}, nel::NTuple{3, Int}, left::Vec{3, 
     facesets["left"]   = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[1,:,:][:]))   + offset]); offset += length(cell_array[1,:,:][:])
     facesets["top"]    = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[:,:,end][:])) + offset]); offset += length(cell_array[:,:,end][:])
 
-    return Grid(cells, nodes, facesets=facesets)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # Triangle
@@ -275,7 +270,7 @@ function generate_grid{T}(::Type{Triangle}, nel::NTuple{2, Int}, LL::Vec{2, T}, 
                                [(cl, 2) for cl in cell_array[2,:,end]];
                                [(cl, 3) for cl in cell_array[1,1,:]]]
 
-    _apply_onboundary!(Triangle, cells, boundary)
+    boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
     offset = 0
@@ -285,7 +280,7 @@ function generate_grid{T}(::Type{Triangle}, nel::NTuple{2, Int}, LL::Vec{2, T}, 
     facesets["top"]    = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[2,:,end])) + offset]); offset += length(cell_array[2,:,end])
     facesets["left"]   = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[1,1,:]))   + offset]); offset += length(cell_array[1,1,:])
 
-    return Grid(cells, nodes, facesets=facesets)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # QuadraticTriangle
@@ -315,7 +310,7 @@ function generate_grid{T}(::Type{QuadraticTriangle}, nel::NTuple{2, Int}, LL::Ve
                               [(cl, 2) for cl in cell_array[2,:,end]];
                               [(cl, 3) for cl in cell_array[1,1,:]]]
 
-    _apply_onboundary!(QuadraticTriangle, cells, boundary)
+    boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
     offset = 0
@@ -325,7 +320,7 @@ function generate_grid{T}(::Type{QuadraticTriangle}, nel::NTuple{2, Int}, LL::Ve
     facesets["top"]    = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[2,:,end])) + offset]); offset += length(cell_array[2,:,end])
     facesets["left"]   = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[1,1,:]))   + offset]); offset += length(cell_array[1,1,:])
 
-    return Grid(cells, nodes, facesets=facesets)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # Tetrahedron
@@ -370,7 +365,7 @@ function generate_grid{T}(::Type{Tetrahedron}, nel::NTuple{3, Int}, left::Vec{3,
                         [(cl, 3) for cl in cell_array[4,:,:,end][:]];
                         [(cl, 3) for cl in cell_array[5,:,:,end][:]]]
 
-    _apply_onboundary!(Tetrahedron, cells, boundary)
+    boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
     offset = 0
@@ -382,5 +377,5 @@ function generate_grid{T}(::Type{Tetrahedron}, nel::NTuple{3, Int}, left::Vec{3,
     facesets["left"]   = Set{Tuple{Int, Int}}(boundary[(1:length([cell_array[1,1,:,:][:];   cell_array[5,1,:,:][:]]))   + offset]); offset += length([cell_array[1,1,:,:][:];   cell_array[5,1,:,:][:]])
     facesets["top"]    = Set{Tuple{Int, Int}}(boundary[(1:length([cell_array[4,:,:,end][:]; cell_array[5,:,:,end][:]])) + offset]); offset += length([cell_array[4,:,:,end][:]; cell_array[5,:,:,end][:]])
 
-    return Grid(cells, nodes, facesets=facesets)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
