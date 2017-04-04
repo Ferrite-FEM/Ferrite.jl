@@ -43,7 +43,6 @@ export Dim
 @deprecate assemble(edof::Vector, a::Assembler, Ke::Matrix) assemble!(a, Ke, edof)
 
 # PR #85
-@deprecate get_quadrule getquadrule
 @deprecate get_functionspace getfunctioninterpolation
 @deprecate get_geometricspace getgeometryinterpolation
 @deprecate detJdV getdetJdV

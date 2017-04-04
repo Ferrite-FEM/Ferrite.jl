@@ -32,9 +32,6 @@ getorder
 ```@docs
 reinit!
 getnquadpoints
-getquadrule
-getfunctioninterpolation
-getgeometryinterpolation
 getdetJdV
 
 shape_value

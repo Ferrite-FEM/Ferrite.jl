@@ -24,9 +24,6 @@ CellVectorValues([::Type{T}], quad_rule::QuadratureRule, func_interpol::Interpol
 
 * [`reinit!`](@ref)
 * [`getnquadpoints`](@ref)
-* [`getquadrule`](@ref)
-* [`getfunctioninterpolation`](@ref)
-* [`getgeometryinterpolation`](@ref)
 * [`getdetJdV`](@ref)
 
 * [`shape_value`](@ref)
