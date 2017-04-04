@@ -24,9 +24,6 @@ CellVectorValues([::Type{T}], quad_rule::QuadratureRule, func_interpol::Interpol
 
 * [`reinit!`](@ref)
 * [`getnquadpoints`](@ref)
-* [`getquadrule`](@ref)
-* [`getfunctioninterpolation`](@ref)
-* [`getgeometryinterpolation`](@ref)
 * [`getdetJdV`](@ref)
 
 * [`shape_value`](@ref)
@@ -43,25 +40,23 @@ CellVectorValues([::Type{T}], quad_rule::QuadratureRule, func_interpol::Interpol
 CellValues
 
 # CellScalarValues
-immutable CellScalarValues{dim, T <: Real, FIP <: Interpolation, GIP <: Interpolation, shape <: AbstractRefShape} <: CellValues{dim, T, FIP, GIP}
+immutable CellScalarValues{dim, T <: Real, refshape <: AbstractRefShape} <: CellValues{dim, T, refshape}
     N::Matrix{T}
     dNdx::Matrix{Vec{dim, T}}
     dNdξ::Matrix{Vec{dim, T}}
     detJdV::Vector{T}
-    quad_rule::QuadratureRule{dim, shape, T}
-    func_interpol::FIP
     M::Matrix{T}
     dMdξ::Matrix{Vec{dim, T}}
-    geom_interpol::GIP
+    qr_weights::Vector{T}
 end
 
-CellScalarValues{dim, FIP <: Interpolation, GIP <: Interpolation}(quad_rule::QuadratureRule{dim}, func_interpol::FIP, geom_interpol::GIP=func_interpol) =
+function CellScalarValues{dim}(quad_rule::QuadratureRule{dim}, func_interpol::Interpolation,
+        geom_interpol::Interpolation=func_interpol)
     CellScalarValues(Float64, quad_rule, func_interpol, geom_interpol)
+end
 
-getnbasefunctions(cv::CellScalarValues) = getnbasefunctions(cv.func_interpol)
-
-function CellScalarValues{dim, T, FIP <: Interpolation, GIP <: Interpolation, shape <: AbstractRefShape}(
-    ::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_interpol::FIP, geom_interpol::GIP=func_interpol)
+function CellScalarValues{dim, T, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim, shape},
+        func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
@@ -87,29 +82,27 @@ function CellScalarValues{dim, T, FIP <: Interpolation, GIP <: Interpolation, sh
 
     detJdV = zeros(T, n_qpoints)
 
-    CellScalarValues(N, dNdx, dNdξ, detJdV, quad_rule, func_interpol, M, dMdξ, geom_interpol)
+    CellScalarValues{dim, T, shape}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
 end
 
 # CellVectorValues
-immutable CellVectorValues{dim, T <: Real, FIP <: Interpolation, GIP <: Interpolation, shape <: AbstractRefShape, M} <: CellValues{dim, T, FIP, GIP}
+immutable CellVectorValues{dim, T <: Real, refshape <: AbstractRefShape, M} <: CellValues{dim, T, refshape}
     N::Matrix{Vec{dim, T}}
     dNdx::Matrix{Tensor{2, dim, T, M}}
     dNdξ::Matrix{Tensor{2, dim, T, M}}
     detJdV::Vector{T}
-    quad_rule::QuadratureRule{dim, shape, T}
-    func_interpol::FIP
     M::Matrix{T}
     dMdξ::Matrix{Vec{dim, T}}
-    geom_interpol::GIP
+    qr_weights::Vector{T}
 end
 
-CellVectorValues{dim, FIP <: Interpolation, GIP <: Interpolation}(quad_rule::QuadratureRule{dim}, func_interpol::FIP, geom_interpol::GIP=func_interpol) =
+function CellVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
     CellVectorValues(Float64, quad_rule, func_interpol, geom_interpol)
+end
 
-getnbasefunctions{dim}(cvv::CellVectorValues{dim}) = getnbasefunctions(cvv.func_interpol) * dim
+function CellVectorValues{dim, T, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_interpol::Interpolation,
+        geom_interpol::Interpolation=func_interpol)
 
-function CellVectorValues{dim, T, FIP <: Interpolation, GIP <: Interpolation, shape <: AbstractRefShape}(
-                            ::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_interpol::FIP, geom_interpol::GIP=func_interpol)
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
     n_qpoints = length(getweights(quad_rule))
@@ -148,28 +141,30 @@ function CellVectorValues{dim, T, FIP <: Interpolation, GIP <: Interpolation, sh
     end
 
     detJdV = zeros(T, n_qpoints)
+    MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    CellVectorValues(N, dNdx, dNdξ, detJdV, quad_rule, func_interpol, M, dMdξ, geom_interpol)
+    CellVectorValues{dim, T, shape, MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
 end
 
 function reinit!{dim, T}(cv::CellValues{dim}, x::AbstractVector{Vec{dim, T}})
-    n_geom_basefuncs = getnbasefunctions(getgeometryinterpolation(cv))
-    n_func_basefuncs = getnbasefunctions(getfunctioninterpolation(cv))
+    n_geom_basefuncs = getngeobasefunctions(cv)
+    n_func_basefuncs = getn_scalarbasefunctions(cv)
     @assert length(x) == n_geom_basefuncs
     isa(cv, CellVectorValues) && (n_func_basefuncs *= dim)
 
-    @inbounds for i in 1:length(getpoints(cv.quad_rule))
-        w = getweights(cv.quad_rule)[i]
+
+    @inbounds for i in 1:length(cv.qr_weights)
+        w = cv.qr_weights[i]
         fecv_J = zero(Tensor{2, dim})
         for j in 1:n_geom_basefuncs
             fecv_J += x[j] ⊗ cv.dMdξ[j, i]
         end
         detJ = det(fecv_J)
-        detJ > 0.0 || throw(ArgumentError("detJ is not positive: detJ = $(detJ)"))
+        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
         cv.detJdV[i] = detJ * w
         Jinv = inv(fecv_J)
         for j in 1:n_func_basefuncs
-            cv.dNdx[j,i] = cv.dNdξ[j, i] ⋅ Jinv
+            cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
         end
     end
 end

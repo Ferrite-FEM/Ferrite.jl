@@ -43,18 +43,17 @@ export Dim
 @deprecate assemble(edof::Vector, a::Assembler, Ke::Matrix) assemble!(a, Ke, edof)
 
 # PR #85
-@deprecate get_quadrule getquadrule
 @deprecate get_functionspace getfunctioninterpolation
 @deprecate get_geometricspace getgeometryinterpolation
 @deprecate detJdV getdetJdV
 @deprecate functionspace_n_dim getdim
 @deprecate functionspace_ref_shape getrefshape
 @deprecate functionspace_order getorder
-@deprecate n_boundaries getnboundaries
+@deprecate n_boundaries getnfaces
 @deprecate functionspace_lower_dim getlowerdim
 @deprecate functionspace_lower_order getlowerorder
 @deprecate n_basefunctions getnbasefunctions
-@deprecate n_boundarynodes getnboundarynodes
+@deprecate n_boundarynodes getnfacenodes
 @deprecate points getpoints
 @deprecate weights getweights
 

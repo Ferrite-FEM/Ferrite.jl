@@ -75,9 +75,9 @@ The integrals are evaluated using quadrature. In JuAFEM the stiffness matrix and
 
 for qp in 1:Nqp
     for i in 1:N
-        f[i] += shape_value(i) ⋅ f * dΩ
+        f[i] += (shape_value(i) ⋅ f) * dΩ
         for j in 1:N
-            K[i,j] += shape_symmetric_gradient(i) : C : shape_symmetric_gradient(j) * dΩ
+            K[i,j] += (shape_symmetric_gradient(i) : C : shape_symmetric_gradient(j)) * dΩ
         end
     end
 end

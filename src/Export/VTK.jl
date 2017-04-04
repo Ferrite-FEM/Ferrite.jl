@@ -91,17 +91,15 @@ getVTKtype(::Serendipity{2, RefCube, 2}) = VTKCellTypes.VTK_QUADRATIC_QUAD
 getVTKtype(::Lagrange{3, RefCube, 1}) = VTKCellTypes.VTK_HEXAHEDRON
 getVTKtype(::Lagrange{3, RefTetrahedron, 1}) = VTKCellTypes.VTK_TETRA
 
-getVTKtype(::Type{Cell{1,2}}) = VTKCellTypes.VTK_LINE
-getVTKtype(::Type{Cell{1,3}}) = VTKCellTypes.VTK_QUADRATIC_EDGE
-
-getVTKtype(::Type{Cell{2,4}}) = VTKCellTypes.VTK_QUAD
-getVTKtype(::Type{Cell{2,9}}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
-getVTKtype(::Type{Cell{2,3}}) = VTKCellTypes.VTK_TRIANGLE
-getVTKtype(::Type{Cell{2,6}}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
-getVTKtype(::Type{Cell{2,8}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
-
-getVTKtype(::Type{Cell{3,8}}) = VTKCellTypes.VTK_HEXAHEDRON
-getVTKtype(::Type{Cell{3,4}}) = VTKCellTypes.VTK_TETRA
+getVTKtype(::Type{Line}) = VTKCellTypes.VTK_LINE
+getVTKtype(::Type{QuadraticLine}) = VTKCellTypes.VTK_QUADRATIC_EDGE
+getVTKtype(::Type{Quadrilateral}) = VTKCellTypes.VTK_QUAD
+getVTKtype(::Type{Triangle}) = VTKCellTypes.VTK_TRIANGLE
+getVTKtype(::Type{QuadraticTriangle}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
+getVTKtype(::Type{QuadraticQuadrilateral}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
+getVTKtype(::Type{Hexahedron}) = VTKCellTypes.VTK_HEXAHEDRON
+getVTKtype(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
+getVTKtype(::Type{Cell{2,8,4}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
 
 
 function vtk_grid{dim, N, T}(filename::AbstractString, grid::Grid{dim, N, T})
