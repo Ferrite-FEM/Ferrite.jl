@@ -1,9 +1,9 @@
-export DirichletBoundaryConditions, update!, apply!, apply_zero!, add!
+export DirichletBoundaryConditions, update!, apply!, apply_zero!, add!, free_dofs
 
 """
     DirichletBoundaryConditions
 
-A dirichlet boundary conditions is a a boundary where a dof is fixed to take a certain value.
+A Dirichlet boundary condition is a boundary where the function is fixed to take a certain value.
 The struct `DirichletBoundaryConditions` represents a collection of such boundary conditions.
 
 It is created from a `DofHandler`
@@ -48,7 +48,6 @@ immutable DirichletBoundaryCondition
     components::Vector{Int}
     idxoffset::Int
 end
-
 
 immutable DirichletBoundaryConditions{DH <: DofHandler, T}
     bcs::Vector{DirichletBoundaryCondition}
@@ -142,7 +141,7 @@ function update!(dbcs::DirichletBoundaryConditions, time::Float64 = 0.0)
 end
 
 function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol,
-                  components::Vector{Int}, dh::DofHandler, idx_offset::Int, 
+                  components::Vector{Int}, dh::DofHandler, idx_offset::Int,
                   dofmapping::Dict{Int,Int}, time::Float64)
     mesh = dh.grid
     offset = dof_offset(dh, field)
