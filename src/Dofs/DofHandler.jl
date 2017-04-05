@@ -85,10 +85,11 @@ type DofHandler{dim, N, T, M}
     closed::ScalarWrapper{Bool}
     dofs_vec::Vector{Int}
     grid::Grid{dim, N, T, M}
+    ndofs::Int
 end
 
 function DofHandler(m::Grid)
-    DofHandler(Matrix{Int}(0, 0), Matrix{Int}(0, 0), Symbol[], Int[], ScalarWrapper(false), Int[], m)
+    DofHandler(Matrix{Int}(0, 0), Matrix{Int}(0, 0), Symbol[], Int[], ScalarWrapper(false), Int[], m, 0)
 end
 
 function Base.show(io::IO, dh::DofHandler)
@@ -105,7 +106,7 @@ function Base.show(io::IO, dh::DofHandler)
     end
 end
 
-ndofs(dh::DofHandler) = length(dh.dofs_nodes)
+ndofs(dh::DofHandler) = dh.ndofs
 ndofs_per_cell(dh::DofHandler) = size(dh.dofs_cells, 1)
 isclosed(dh::DofHandler) = dh.closed[]
 dofs_node(dh::DofHandler, i::Int) = dh.dof_nodes[:, i]
@@ -171,6 +172,7 @@ function close!(dh::DofHandler)
     @assert !isclosed(dh)
     dh.dofs_nodes = reshape(dh.dofs_vec, (length(dh.dofs_vec) ÷ getnnodes(dh.grid), getnnodes(dh.grid)))
     add_element_dofs!(dh)
+    dh.ndofs = length(unique(vec(dh.dofs_nodes)))
     dh.closed[] = true
     return dh
 end
