@@ -75,6 +75,7 @@ end
 
 function start_assemble(K::SparseMatrixCSC, f::Vector=Float64[])
     fill!(K.nzval, 0.0)
+    fill!(f, 0.0)
     AssemblerSparsityPattern(K, f, Int[], eltype(K)[])
 end
 
