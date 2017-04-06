@@ -199,49 +199,29 @@ end
 
 # Creates a sparsity pattern from the dofs in a dofhandler.
 # Returns a sparse matrix with the correct pattern.
-function sparsity_pattern(dh::DofHandler)
-    grid = dh.grid
-    n = ndofs_per_cell(dh)
-    N = n^2 * getncells(grid)
-    I = Int[]; sizehint!(I, N)
-    J = Int[]; sizehint!(J, N)
-    global_dofs = zeros(Int, n)
-    for element_id in 1:getncells(grid)
-        celldofs!(global_dofs, dh, element_id)
-        @inbounds for j in 1:n
-            append!(I, global_dofs)
-            for i in 1:n
-                push!(J, global_dofs[j])
-            end
-        end
-    end
-    V = zeros(length(I))
-    K = sparse(I, J, V)
-    return K
-end
+@inline sparsity_pattern(dh::DofHandler) = _sparsity_pattern(dh, false)
+@inline symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_sparsity_pattern(dh, true))
 
-function symmetric_sparsity_pattern(dh::DofHandler)
+function _sparsity_pattern(dh::DofHandler, sym::Bool)
     grid = dh.grid
     n = ndofs_per_cell(dh)
-    N = div(n*(n+1), 2) * getncells(grid)
+    N = sym ? div(n*(n+1), 2) * getncells(grid) : n^2 * getncells(grid)
     I = Int[]; sizehint!(I, N)
     J = Int[]; sizehint!(J, N)
     global_dofs = zeros(Int, n)
     for element_id in 1:getncells(grid)
         celldofs!(global_dofs, dh, element_id)
-        @inbounds for j in 1:n, i in 1:j
+        @inbounds for j in 1:n, i in 1:n
             dofi = global_dofs[i]
             dofj = global_dofs[j]
-            if dofi > dofj
-                dofi, dofj = dofj, dofi
-            end
+            sym && (dofi > dofj && continue)
             push!(I, dofi)
             push!(J, dofj)
         end
     end
     V = zeros(length(I))
     K = sparse(I, J, V)
-    return Symmetric(K)
+    return K
 end
 
 
