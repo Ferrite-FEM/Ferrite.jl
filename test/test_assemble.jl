@@ -4,7 +4,7 @@
     # residual
     ge = rand(4)
     g = zeros(8)
-    assemble!(g, ge, dofs)
+    assemble!(g, dofs, ge)
     @test g[1] == ge[1]
     @test g[3] == ge[2]
     @test g[5] == ge[3]
@@ -13,7 +13,7 @@
     # stiffness
     a = start_assemble()
     Ke = rand(4, 4)
-    assemble!(a, Ke, dofs)
+    assemble!(a, dofs, Ke)
     K = end_assemble(a)
     @test K[1,1] == Ke[1,1]
     @test K[1,5] == Ke[1,3]
