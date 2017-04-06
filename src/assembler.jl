@@ -79,7 +79,43 @@ function start_assemble(K::SparseMatrixCSC, f::Vector=Float64[])
     AssemblerSparsityPattern(K, f, Int[], eltype(K)[])
 end
 
-immutable SymmetricAssemblerSparsityPattern{Tv, Ti}
+@Base.propagate_inbounds assemble!(A::AssemblerSparsityPattern, Ke::AbstractMatrix, dofs::AbstractVector{Int}) = assemble!(A, eltype(Ke)[], Ke, dofs)
+
+@Base.propagate_inbounds function assemble!(A::AssemblerSparsityPattern, fe::AbstractVector, Ke::AbstractMatrix, dofs::AbstractVector{Int})
+    if length(fe) != 0
+        assemble!(A.f, fe, dofs)
+    end
+
+    K = A.K
+    tmpi = A.tmpi
+    tmpf = A.tmpf
+    @boundscheck checkbounds(K, dofs, dofs)
+    resize!(tmpi, length(dofs))
+    resize!(tmpf, length(dofs))
+    copy!(tmpf, dofs)
+    sortperm2!(tmpf, tmpi)
+
+    current_col = 1
+    l = length(dofs)
+    @inbounds for col in dofs
+        current_idx = 1
+        for r in nzrange(K, col)
+            row = tmpi[current_idx]
+            if K.rowval[r] == dofs[row]
+                K.nzval[r] += Ke[row, current_col]
+                current_idx += 1
+            end
+            current_idx > l && break
+        end
+        if current_idx <= l
+            error("some row indices were not found")
+        end
+        current_col += 1
+    end
+end
+
+# symmetric assembly
+immutable AssemblerSymmetricSparsityPattern{Tv, Ti}
     K::Symmetric{Tv, SparseMatrixCSC{Tv, Ti}}
     f::Vector{Tv}
     tmpi::Vector{Int}
@@ -89,17 +125,15 @@ end
 function start_assemble(K::Symmetric, f::Vector=Float64[])
     fill!(K.data.nzval, 0.0)
     fill!(f, 0.0)
-    SymmetricAssemblerSparsityPattern(K, f, Int[], eltype(K)[])
+    AssemblerSymmetricSparsityPattern(K, f, Int[], eltype(K)[])
 end
 
-@Base.propagate_inbounds assemble!(A::AssemblerSparsityPattern, Ke::AbstractMatrix, dofs::AbstractVector{Int}) = assemble!(A, eltype(Ke)[], Ke, dofs)
-
-@Base.propagate_inbounds function assemble!(A::AssemblerSparsityPattern, fe::AbstractVector, Ke::AbstractMatrix, dofs::AbstractVector{Int})
+@Base.propagate_inbounds function assemble!(A::AssemblerSymmetricSparsityPattern, fe::AbstractVector, Ke::AbstractMatrix, dofs::AbstractVector{Int})
     if length(fe) != 0
         assemble!(A.f, fe, dofs)
     end
 
-    K = A.K
+    K = A.K.data
     tmpi = A.tmpi
     tmpf = A.tmpf
     @boundscheck checkbounds(K, dofs, dofs)
@@ -120,9 +154,9 @@ end
             end
             current_idx > l && break
         end
-        if current_idx <= l
-            error("some row indices were not found")
-        end
+        # if current_idx <= l
+        #     error("some row indices were not found")
+        # end
         current_col += 1
     end
 end

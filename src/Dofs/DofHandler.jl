@@ -205,7 +205,7 @@ function sparsity_pattern(dh::DofHandler)
     N = n^2 * getncells(grid)
     I = Int[]; sizehint!(I, N)
     J = Int[]; sizehint!(J, N)
-    global_dofs = zeros(Int, ndofs_per_cell(dh))
+    global_dofs = zeros(Int, n)
     for element_id in 1:getncells(grid)
         celldofs!(global_dofs, dh, element_id)
         @inbounds for j in 1:n
@@ -226,12 +226,17 @@ function symmetric_sparsity_pattern(dh::DofHandler)
     N = div(n*(n+1), 2) * getncells(grid)
     I = Int[]; sizehint!(I, N)
     J = Int[]; sizehint!(J, N)
-    global_dofs = zeros(Int, ndofs_per_cell(dh))
+    global_dofs = zeros(Int, n)
     for element_id in 1:getncells(grid)
         celldofs!(global_dofs, dh, element_id)
         @inbounds for j in 1:n, i in 1:j
-            push!(I, global_dofs[i])
-            push!(J, global_dofs[j])
+            dofi = global_dofs[i]
+            dofj = global_dofs[j]
+            if dofi > dofj
+                dofi, dofj = dofj, dofi
+            end
+            push!(I, dofi)
+            push!(J, dofj)
         end
     end
     V = zeros(length(I))
