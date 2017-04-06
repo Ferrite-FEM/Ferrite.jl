@@ -7,7 +7,7 @@ using Reexport
 @reexport using Tensors
 @reexport using WriteVTK
 
-import Base: show, push!
+import Base: show, push!, @propagate_inbounds
 import WriteVTK: vtk_grid, vtk_point_data, DatasetFile
 
 # Utilities

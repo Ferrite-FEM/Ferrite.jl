@@ -203,13 +203,13 @@ end
 @inline symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_sparsity_pattern(dh, true))
 
 function _sparsity_pattern(dh::DofHandler, sym::Bool)
-    grid = dh.grid
+    ncells = getncells(dh.grid)
     n = ndofs_per_cell(dh)
-    N = sym ? div(n*(n+1), 2) * getncells(grid) : n^2 * getncells(grid)
+    N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
     I = Int[]; sizehint!(I, N)
     J = Int[]; sizehint!(J, N)
     global_dofs = zeros(Int, n)
-    for element_id in 1:getncells(grid)
+    for element_id in 1:ncells
         celldofs!(global_dofs, dh, element_id)
         @inbounds for j in 1:n, i in 1:n
             dofi = global_dofs[i]
@@ -219,7 +219,7 @@ function _sparsity_pattern(dh::DofHandler, sym::Bool)
             push!(J, dofj)
         end
     end
-    V = zeros(length(I))
+    V = ones(length(I))
     K = sparse(I, J, V)
     return K
 end

@@ -32,7 +32,7 @@ end
 
 Assembles the element matrix `Ke` into `a`.
 """
-function assemble!{T}(a::Assembler{T}, Ke::AbstractMatrix{T}, edof::AbstractVector{Int})
+function assemble!{T}(a::Assembler{T}, edof::AbstractVector{Int}, Ke::AbstractMatrix{T})
     n_dofs = length(edof)
     append!(a.V, Ke)
     @inbounds for j in 1:n_dofs
@@ -58,7 +58,7 @@ end
 
 Assembles the element residual `ge` into the global residual vector `g`.
 """
-@Base.propagate_inbounds function assemble!{T}(g::AbstractVector{T}, ge::AbstractVector{T}, edof::AbstractVector{Int})
+@propagate_inbounds function assemble!{T}(g::AbstractVector{T}, edof::AbstractVector{Int}, ge::AbstractVector{T})
     @boundscheck checkbounds(g, edof)
     @inbounds for i in 1:length(edof)
         g[edof[i]] += ge[i]
@@ -83,6 +83,7 @@ end
 @inline getsparsemat(a::AssemblerSparsityPattern) = a.K
 @inline getsparsemat(a::AssemblerSymmetricSparsityPattern) = a.K.data
 
+start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}) = start_assemble(K, f)
 function start_assemble(K::SparseMatrixCSC, f::Vector=Float64[])
     fill!(K.nzval, 0.0)
     fill!(f, 0.0)
@@ -94,19 +95,22 @@ function start_assemble(K::Symmetric, f::Vector=Float64[])
     AssemblerSymmetricSparsityPattern(K, f, Int[], eltype(K)[])
 end
 
-@Base.propagate_inbounds assemble!(A::AbstractSparseAssembler, Ke::AbstractMatrix, dofs::AbstractVector{Int}) = assemble!(A, Ke, eltype(Ke)[], dofs)
-
-@Base.propagate_inbounds function assemble!(A::AssemblerSparsityPattern, Ke::AbstractMatrix, fe::AbstractVector, dofs::AbstractVector{Int})
-    _assemble!(A, Ke, fe, dofs, false)
+@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
+    assemble!(A, dofs, Ke, eltype(Ke)[])
 end
-@Base.propagate_inbounds function assemble!(A::AssemblerSymmetricSparsityPattern, Ke::AbstractMatrix, fe::AbstractVector, dofs::AbstractVector{Int})
-    _assemble!(A, Ke, fe, dofs, true)
+@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, fe::AbstractVector, Ke::AbstractMatrix)
+    assemble!(A, dofs, Ke, fe)
+end
+@propagate_inbounds function assemble!(A::AssemblerSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+    _assemble!(A, dofs, Ke, fe, false)
+end
+@propagate_inbounds function assemble!(A::AssemblerSymmetricSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+    _assemble!(A, dofs, Ke, fe, true)
 end
 
-# @Base.propagate_inbounds function _assemble!(K::SparseMatrixCSC, f::AbstractVector, fe::AbstractVector, Ke::AbstractMatrix, dofs::AbstractVector{Int}, sym::Bool)
-@Base.propagate_inbounds function _assemble!(A::AbstractSparseAssembler, Ke::AbstractMatrix, fe::AbstractVector, dofs::AbstractVector{Int}, sym::Bool)
+@propagate_inbounds function _assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
     if length(fe) != 0
-        assemble!(A.f, fe, dofs)
+        assemble!(A.f, dofs, fe)
     end
 
     K = getsparsemat(A)
