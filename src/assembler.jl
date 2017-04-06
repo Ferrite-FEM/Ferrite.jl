@@ -70,14 +70,14 @@ end
 immutable AssemblerSparsityPattern{Tv, Ti} <: AbstractSparseAssembler
     K::SparseMatrixCSC{Tv, Ti}
     f::Vector{Tv}
-    tmpi::Vector{Int}
-    tmpf::Vector{Tv}
+    permdof::Vector{Int}
+    sorteddofs::Vector{Int}
 end
 immutable AssemblerSymmetricSparsityPattern{Tv, Ti} <: AbstractSparseAssembler
     K::Symmetric{Tv, SparseMatrixCSC{Tv, Ti}}
     f::Vector{Tv}
-    tmpi::Vector{Int}
-    tmpf::Vector{Tv}
+    permdof::Vector{Int}
+    sorteddofs::Vector{Int}
 end
 
 @inline getsparsemat(a::AssemblerSparsityPattern) = a.K
@@ -87,12 +87,12 @@ start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}) = start_assemble
 function start_assemble(K::SparseMatrixCSC, f::Vector=Float64[])
     fill!(K.nzval, 0.0)
     fill!(f, 0.0)
-    AssemblerSparsityPattern(K, f, Int[], eltype(K)[])
+    AssemblerSparsityPattern(K, f, Int[], Int[])
 end
 function start_assemble(K::Symmetric, f::Vector=Float64[])
     fill!(K.data.nzval, 0.0)
     fill!(f, 0.0)
-    AssemblerSymmetricSparsityPattern(K, f, Int[], eltype(K)[])
+    AssemblerSymmetricSparsityPattern(K, f, Int[], Int[])
 end
 
 @propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
@@ -114,29 +114,31 @@ end
     end
 
     K = getsparsemat(A)
-    tmpi = A.tmpi
-    tmpf = A.tmpf
+    permdof = A.permdof
+    sorteddofs = A.sorteddofs
     @boundscheck checkbounds(K, dofs, dofs)
-    resize!(tmpi, length(dofs))
-    resize!(tmpf, length(dofs))
-    copy!(tmpf, dofs)
-    sortperm2!(tmpf, tmpi)
+    resize!(permdof, length(dofs))
+    resize!(sorteddofs, length(dofs))
+    copy!(sorteddofs, dofs)
+    sortperm2!(sorteddofs, permdof)
 
     current_col = 1
-    @inbounds for col in dofs
-        maxlookups = #=sym ? current_col :=# length(dofs)
+    @inbounds for Kcol in sorteddofs
+        maxlookups = sym ? current_col : length(dofs)
         current_idx = 1
-        for r in nzrange(K, col)
-            row = tmpi[current_idx]
-            if K.rowval[r] == dofs[row]
-                K.nzval[r] += Ke[row, current_col]
+        for r in nzrange(K, Kcol)
+            Kerow = permdof[current_idx]
+            if K.rowval[r] == dofs[Kerow]
+                Kecol = permdof[current_col]
+                K.nzval[r] += Ke[Kerow, Kecol]
+                Ke[Kerow, Kecol] = 1337
                 current_idx += 1
             end
             current_idx > maxlookups && break
         end
-        # if current_idx <= maxlookups
-        #     error("some row indices were not found")
-        # end
+        if current_idx <= maxlookups
+            error("some row indices were not found")
+        end
         current_col += 1
     end
 end

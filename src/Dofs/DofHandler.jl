@@ -219,7 +219,7 @@ function _sparsity_pattern(dh::DofHandler, sym::Bool)
             push!(J, dofj)
         end
     end
-    V = ones(length(I))
+    V = zeros(length(I))
     K = sparse(I, J, V)
     return K
 end
