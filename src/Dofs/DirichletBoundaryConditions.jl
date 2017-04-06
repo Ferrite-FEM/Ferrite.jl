@@ -142,7 +142,7 @@ function update!(dbcs::DirichletBoundaryConditions, time::Float64 = 0.0)
 end
 
 function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol,
-                  components::Vector{Int}, dh::DofHandler, idx_offset::Int, 
+                  components::Vector{Int}, dh::DofHandler, idx_offset::Int,
                   dofmapping::Dict{Int,Int}, time::Float64)
     mesh = dh.grid
     offset = dof_offset(dh, field)
@@ -199,15 +199,17 @@ function apply_zero!(v::Vector, bc::DirichletBoundaryConditions)
     return v
 end
 
-function apply!(K::SparseMatrixCSC, bc::DirichletBoundaryConditions)
+function apply!(K::Union{SparseMatrixCSC, Symmetric}, bc::DirichletBoundaryConditions)
     apply!(K, eltype(K)[], bc, true)
 end
 
-function apply_zero!(K::SparseMatrixCSC, f::AbstractVector, bc::DirichletBoundaryConditions)
+function apply_zero!(K::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, bc::DirichletBoundaryConditions)
     apply!(K, f, bc, true)
 end
 
-function apply!(K::SparseMatrixCSC, f::AbstractVector, bc::DirichletBoundaryConditions, applyzero::Bool=false)
+function apply!(KK::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, bc::DirichletBoundaryConditions, applyzero::Bool=false)
+    sym = isa(KK, Symmetric)
+    K = sym ? KK : K.data
     @assert length(f) == 0 || length(f) == size(K, 1)
     @boundscheck checkbounds(K, bc.dofs, bc.dofs)
     @boundscheck length(f) == 0 || checkbounds(f, bc.dofs)
