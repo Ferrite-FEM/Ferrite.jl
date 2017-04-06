@@ -131,7 +131,6 @@ end
             if K.rowval[r] == dofs[Kerow]
                 Kecol = permutation[current_col]
                 K.nzval[r] += Ke[Kerow, Kecol]
-                Ke[Kerow, Kecol] = 1337
                 current_idx += 1
             end
             current_idx > maxlookups && break

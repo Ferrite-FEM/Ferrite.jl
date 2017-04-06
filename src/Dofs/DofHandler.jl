@@ -200,7 +200,7 @@ end
 # Creates a sparsity pattern from the dofs in a dofhandler.
 # Returns a sparse matrix with the correct pattern.
 @inline sparsity_pattern(dh::DofHandler) = _sparsity_pattern(dh, false)
-@inline symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_sparsity_pattern(dh, true))
+@inline symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_sparsity_pattern(dh, true), :U)
 
 function _sparsity_pattern(dh::DofHandler, sym::Bool)
     ncells = getncells(dh.grid)
