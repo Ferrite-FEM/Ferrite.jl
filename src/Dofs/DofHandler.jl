@@ -1,4 +1,5 @@
-export DofHandler, push!, close!, ndofs, ndofs_per_cell, celldofs!, create_sparsity_pattern
+export DofHandler, push!, close!, ndofs, ndofs_per_cell, celldofs!,
+       sparsity_pattern, symmetric_sparsity_pattern
 
 """
     DofHandler

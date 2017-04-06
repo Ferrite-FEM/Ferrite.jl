@@ -79,6 +79,19 @@ function start_assemble(K::SparseMatrixCSC, f::Vector=Float64[])
     AssemblerSparsityPattern(K, f, Int[], eltype(K)[])
 end
 
+immutable SymmetricAssemblerSparsityPattern{Tv, Ti}
+    K::Symmetric{Tv, SparseMatrixCSC{Tv, Ti}}
+    f::Vector{Tv}
+    tmpi::Vector{Int}
+    tmpf::Vector{Tv}
+end
+
+function start_assemble(K::Symmetric, f::Vector=Float64[])
+    fill!(K.data.nzval, 0.0)
+    fill!(f, 0.0)
+    SymmetricAssemblerSparsityPattern(K, f, Int[], eltype(K)[])
+end
+
 @Base.propagate_inbounds assemble!(A::AssemblerSparsityPattern, Ke::AbstractMatrix, dofs::AbstractVector{Int}) = assemble!(A, eltype(Ke)[], Ke, dofs)
 
 @Base.propagate_inbounds function assemble!(A::AssemblerSparsityPattern, fe::AbstractVector, Ke::AbstractMatrix, dofs::AbstractVector{Int})
