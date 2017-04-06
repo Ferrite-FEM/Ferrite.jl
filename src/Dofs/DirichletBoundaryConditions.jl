@@ -209,7 +209,7 @@ end
 
 function apply!(KK::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, bc::DirichletBoundaryConditions, applyzero::Bool=false)
     sym = isa(KK, Symmetric)
-    K = sym ? KK : K.data
+    K = sym ? KK : KK.data
     @assert length(f) == 0 || length(f) == size(K, 1)
     @boundscheck checkbounds(K, bc.dofs, bc.dofs)
     @boundscheck length(f) == 0 || checkbounds(f, bc.dofs)
