@@ -70,13 +70,13 @@ end
 immutable AssemblerSparsityPattern{Tv, Ti} <: AbstractSparseAssembler
     K::SparseMatrixCSC{Tv, Ti}
     f::Vector{Tv}
-    permdof::Vector{Int}
+    permutation::Vector{Int}
     sorteddofs::Vector{Int}
 end
 immutable AssemblerSymmetricSparsityPattern{Tv, Ti} <: AbstractSparseAssembler
     K::Symmetric{Tv, SparseMatrixCSC{Tv, Ti}}
     f::Vector{Tv}
-    permdof::Vector{Int}
+    permutation::Vector{Int}
     sorteddofs::Vector{Int}
 end
 
@@ -114,22 +114,22 @@ end
     end
 
     K = getsparsemat(A)
-    permdof = A.permdof
+    permutation = A.permutation
     sorteddofs = A.sorteddofs
     @boundscheck checkbounds(K, dofs, dofs)
-    resize!(permdof, length(dofs))
+    resize!(permutation, length(dofs))
     resize!(sorteddofs, length(dofs))
     copy!(sorteddofs, dofs)
-    sortperm2!(sorteddofs, permdof)
+    sortperm2!(sorteddofs, permutation)
 
     current_col = 1
     @inbounds for Kcol in sorteddofs
         maxlookups = sym ? current_col : length(dofs)
         current_idx = 1
         for r in nzrange(K, Kcol)
-            Kerow = permdof[current_idx]
+            Kerow = permutation[current_idx]
             if K.rowval[r] == dofs[Kerow]
-                Kecol = permdof[current_col]
+                Kecol = permutation[current_col]
                 K.nzval[r] += Ke[Kerow, Kecol]
                 Ke[Kerow, Kecol] = 1337
                 current_idx += 1
