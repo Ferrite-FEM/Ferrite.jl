@@ -214,7 +214,7 @@ function sparsity_pattern(dh::DofHandler)
             end
         end
     end
-    V = ones(length(I))
+    V = zeros(length(I))
     K = sparse(I, J, V)
     return K
 end
@@ -233,7 +233,7 @@ function symmetric_sparsity_pattern(dh::DofHandler)
             push!(J, global_dofs[j])
         end
     end
-    V = ones(length(I))
+    V = zeros(length(I))
     K = sparse(I, J, V)
     return Symmetric(K)
 end
