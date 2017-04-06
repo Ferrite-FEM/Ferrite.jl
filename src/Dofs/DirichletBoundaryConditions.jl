@@ -3,7 +3,7 @@ export DirichletBoundaryConditions, update!, apply!, apply_zero!, add!, free_dof
 """
     DirichletBoundaryConditions
 
-A Dirichlet boundary condition is a boundary where the function is fixed to take a certain value.
+A Dirichlet boundary condition is a boundary where the solution is fixed to take a certain value.
 The struct `DirichletBoundaryConditions` represents a collection of such boundary conditions.
 
 It is created from a `DofHandler`

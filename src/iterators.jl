@@ -32,7 +32,8 @@ immutable CellIterator{dim, N, T, M}
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim, T}, N)
         cell = ScalarWrapper(0)
-        return new{dim, N, T, M}(dh.grid, nodes, coords, ScalarWrapper(0), dh, Int[])
+        celldofs = zeros(Int, ndofs_per_cell(dh))
+        return new{dim, N, T, M}(dh.grid, nodes, coords, ScalarWrapper(0), dh, celldofs)
     end
 
     function (::Type{CellIterator{dim, N, T, M}}){dim, N, T, M}(grid::Grid{dim, N, T, M})
@@ -74,7 +75,6 @@ function reinit!{dim, N}(ci::CellIterator{dim, N}, i::Int)
         ci.coords[j] = ci.grid.nodes[nodeid].x
     end
     if isdefined(ci, :dh) # update celldofs
-        resize!(ci.celldofs, ndofs_per_cell(ci.dh))
         celldofs!(ci.celldofs, ci)
     end
     return ci
