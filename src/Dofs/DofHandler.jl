@@ -75,27 +75,65 @@ julia> vtk_point_data(vtkfile
 ```
 
 """
-
 # TODO: Make this immutable?
 type DofHandler{dim, N, T, M}
-    dofs_nodes::Matrix{Int}
-    dofs_cells::Matrix{Int} # TODO <- Is this needed or just extract from dofs_nodes?
+    dofs_cells::Matrix{Int}
     field_names::Vector{Symbol}
-    dof_dims::Vector{Int}
+    field_interpolations,::Vector{Interpolation}
+    field_dims::Vector{Int}
     closed::ScalarWrapper{Bool}
-    dofs_vec::Vector{Int}
     grid::Grid{dim, N, T, M}
 end
 
-function DofHandler(m::Grid)
-    DofHandler(Matrix{Int}(0, 0), Matrix{Int}(0, 0), Symbol[], Int[], ScalarWrapper(false), Int[], m)
+function create_dofs!{dim}(dh::DofHandler{dim})
+    dofs_per_element = 0
+    for (space, dim) in zip(dh.field_interpolations, dh.field_dims)
+        dofs_per_element += get_nbasefunctions(space) * dim
+    end
+
+    element_dofs = zeros(Int, dofs_per_element, getncells(dh.grid))
+
+    free_dof_number = 1
+    for space in dh.dof_spaces
+        if dim >= 1
+            free_dof_number = create_vertex_dofs!(dh.grid, space, element_dofs, free_dof_number)
+            free_dof_number = create_edge_dofs!(dh, space, free_dof_number)
+        end
+        if dim >= 2
+            free_dof_number = create_face_dofs!(dh, space, free_dof_number)
+        end
+
+        if dim >= 3
+            free_dof_number = create_cell_dofs!(dh, space, free_dof_number)
+        end
+    end
 end
 
-function Base.show(io::IO, dh::DofHandler)
+function create_vertex_dofs!(grid, space, free_dof_number)
+    # vertex -> dof number
+    vertex_dofs = Dict{Int, Int}()
+    for element in 1:n_elements
+        vertices = getcells(dh.grid, element).nodes
+
+        for vertex in
+            if !haskey(vertex_dofs, vertex)
+                vertex_dofs[vertex] = free_dof_number
+                element_dofs[element, ]
+                free_dof_number += 1
+            end
+        end
+    end
+end
+
+function DofHandler(grid::Grid)
+    DofHandler(Matrix{Int}(0, 0), Matrix{Int}(0, 0), Symbol[], Interpolation[], ScalarWrapper(false), grid)
+end
+
+function show(io::IO, dh::DofHandler)
     println(io, "DofHandler")
     println(io, "  Fields:")
     for i in 1:length(dh.field_names)
-        println(io, "    ", dh.field_names[i], " dim: ", dh.dof_dims[i])
+        println(io, "    ", dh.field_names[i], " interpolation: ", dh.dof_spaces[i])
     end
     if !isclosed(dh)
         println(io, "  Not closed!")
@@ -105,7 +143,6 @@ function Base.show(io::IO, dh::DofHandler)
     end
 end
 
-ndofs(dh::DofHandler) = length(dh.dofs_nodes)
 ndofs_per_cell(dh::DofHandler) = size(dh.dofs_cells, 1)
 isclosed(dh::DofHandler) = dh.closed[]
 dofs_node(dh::DofHandler, i::Int) = dh.dof_nodes[:, i]
@@ -121,7 +158,7 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
 end
 
 # Add a collection of fields
-function Base.push!(dh::DofHandler, names::Vector{Symbol}, dims)
+function push!(dh::DofHandler, names::Vector{Interpolation}, dims)
     @assert length(names) == length(dims)
     for i in 1:length(names)
         push!(dh, names[i], dims[i])
@@ -129,14 +166,13 @@ function Base.push!(dh::DofHandler, names::Vector{Symbol}, dims)
 end
 
 # Add a field to the dofhandler ex `push!(dh, :u, 3)`
-function Base.push!(dh::DofHandler, name::Symbol, dim::Int)
+function push!(dh::DofHandler, name::Symbol, interpolation::Interpolation, dim)
     @assert !isclosed(dh)
     if name in dh.field_names
         error("duplicate field name")
     end
     push!(dh.field_names, name)
-    push!(dh.dof_dims, dim)
-    append!(dh.dofs_vec, length(dh.dofs_vec)+1:length(dh.dofs_vec) +  dim * getnnodes(dh.grid))
+    push!(dh.dof_spaces, interpolation)
     return dh
 end
 
@@ -169,33 +205,11 @@ end
 
 function close!(dh::DofHandler)
     @assert !isclosed(dh)
-    dh.dofs_nodes = reshape(dh.dofs_vec, (length(dh.dofs_vec) ÷ getnnodes(dh.grid), getnnodes(dh.grid)))
-    add_element_dofs!(dh)
+    create_element_dofs!(dh)
     dh.closed[] = true
     return dh
 end
 
-getnvertices{dim, N, M}(::Type{JuAFEM.Cell{dim, N, M}}) = N
-
-# Computes the "edof"-matrix
-function add_element_dofs!(dh::DofHandler)
-    n_elements = getncells(dh.grid)
-    n_vertices = getnvertices(getcelltype(dh.grid))
-    element_dofs = Int[]
-    ndofs = size(dh.dofs_nodes, 1)
-    for element in 1:n_elements
-        offset = 0
-        for dim_doftype in dh.dof_dims
-            for node in getcells(dh.grid, element).nodes
-                for j in 1:dim_doftype
-                    push!(element_dofs, dh.dofs_nodes[offset + j, node])
-                end
-            end
-            offset += dim_doftype
-        end
-    end
-    dh.dofs_cells = reshape(element_dofs, (ndofs * n_vertices, n_elements))
-end
 
 # Creates a sparsity pattern from the dofs in a dofhandler.
 # Returns a sparse matrix with the correct pattern.

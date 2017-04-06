@@ -69,6 +69,12 @@ function value{dim, T}(ip::Interpolation{dim}, ξ::Vec{dim, T})
     value!(ip, zeros(T, getnbasefunctions(ip)), ξ)
 end
 
+
+_get_n_celldofs(::Interpolation) = 0
+_get_n_facedofs(::Interpolation) = 0
+_get_n_edgedofs(::Interpolation) = 0
+_get_n_vertexdofs(::Interpolation) = 0
+
 """
 Computes the gradients of the shape functions at a point ξ for a given interpolation
 """
