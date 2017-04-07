@@ -32,7 +32,7 @@ end
 
 Assembles the element matrix `Ke` into `a`.
 """
-function assemble!{T}(a::Assembler{T}, Ke::AbstractMatrix{T}, edof::AbstractVector{Int})
+function assemble!{T}(a::Assembler{T}, edof::AbstractVector{Int}, Ke::AbstractMatrix{T})
     n_dofs = length(edof)
     append!(a.V, Ke)
     @inbounds for j in 1:n_dofs
@@ -58,61 +58,90 @@ end
 
 Assembles the element residual `ge` into the global residual vector `g`.
 """
-@Base.propagate_inbounds function assemble!{T}(g::AbstractVector{T}, ge::AbstractVector{T}, edof::AbstractVector{Int})
+@propagate_inbounds function assemble!{T}(g::AbstractVector{T}, edof::AbstractVector{Int}, ge::AbstractVector{T})
     @boundscheck checkbounds(g, edof)
     @inbounds for i in 1:length(edof)
         g[edof[i]] += ge[i]
     end
 end
 
-immutable AssemblerSparsityPattern{Tv, Ti}
+@compat abstract type AbstractSparseAssembler end
+
+immutable AssemblerSparsityPattern{Tv, Ti} <: AbstractSparseAssembler
     K::SparseMatrixCSC{Tv, Ti}
     f::Vector{Tv}
-    tmpi::Vector{Int}
-    tmpf::Vector{Tv}
+    permutation::Vector{Int}
+    sorteddofs::Vector{Int}
+end
+immutable AssemblerSymmetricSparsityPattern{Tv, Ti} <: AbstractSparseAssembler
+    K::Symmetric{Tv, SparseMatrixCSC{Tv, Ti}}
+    f::Vector{Tv}
+    permutation::Vector{Int}
+    sorteddofs::Vector{Int}
 end
 
+@inline getsparsemat(a::AssemblerSparsityPattern) = a.K
+@inline getsparsemat(a::AssemblerSymmetricSparsityPattern) = a.K.data
 
+start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}) = start_assemble(K, f)
 function start_assemble(K::SparseMatrixCSC, f::Vector=Float64[])
     fill!(K.nzval, 0.0)
     fill!(f, 0.0)
-    AssemblerSparsityPattern(K, f, Int[], eltype(K)[])
+    AssemblerSparsityPattern(K, f, Int[], Int[])
+end
+function start_assemble(K::Symmetric, f::Vector=Float64[])
+    fill!(K.data.nzval, 0.0)
+    fill!(f, 0.0)
+    AssemblerSymmetricSparsityPattern(K, f, Int[], Int[])
 end
 
-@Base.propagate_inbounds assemble!(A::AssemblerSparsityPattern, Ke::AbstractMatrix, dofs::AbstractVector{Int}) = assemble!(A, eltype(Ke)[], Ke, dofs)
+@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
+    assemble!(A, dofs, Ke, eltype(Ke)[])
+end
+@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, fe::AbstractVector, Ke::AbstractMatrix)
+    assemble!(A, dofs, Ke, fe)
+end
+@propagate_inbounds function assemble!(A::AssemblerSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+    _assemble!(A, dofs, Ke, fe, false)
+end
+@propagate_inbounds function assemble!(A::AssemblerSymmetricSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+    _assemble!(A, dofs, Ke, fe, true)
+end
 
-@Base.propagate_inbounds function assemble!(A::AssemblerSparsityPattern, fe::AbstractVector, Ke::AbstractMatrix, dofs::AbstractVector{Int})
+@propagate_inbounds function _assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
     if length(fe) != 0
-        assemble!(A.f, fe, dofs)
+        assemble!(A.f, dofs, fe)
     end
 
-    K = A.K
-    tmpi = A.tmpi
-    tmpf = A.tmpf
+    K = getsparsemat(A)
+    permutation = A.permutation
+    sorteddofs = A.sorteddofs
     @boundscheck checkbounds(K, dofs, dofs)
-    resize!(tmpi, length(dofs))
-    resize!(tmpf, length(dofs))
-    copy!(tmpf, dofs)
-    sortperm2!(tmpf, tmpi)
+    resize!(permutation, length(dofs))
+    resize!(sorteddofs, length(dofs))
+    copy!(sorteddofs, dofs)
+    sortperm2!(sorteddofs, permutation)
 
     current_col = 1
-    @inbounds for col in dofs
+    @inbounds for Kcol in sorteddofs
+        maxlookups = sym ? current_col : length(dofs)
         current_idx = 1
-        l = length(dofs)
-        for r in nzrange(K, col)
-            row = tmpi[current_idx]
-            if K.rowval[r] == dofs[row]
-                K.nzval[r] += Ke[row, current_col]
+        for r in nzrange(K, Kcol)
+            Kerow = permutation[current_idx]
+            if K.rowval[r] == dofs[Kerow]
+                Kecol = permutation[current_col]
+                K.nzval[r] += Ke[Kerow, Kecol]
                 current_idx += 1
             end
-            current_idx > l && break
+            current_idx > maxlookups && break
         end
-        if current_idx <= l
+        if current_idx <= maxlookups
             error("some row indices were not found")
         end
         current_col += 1
     end
 end
+
 
 # Sort utilities
 
@@ -122,9 +151,7 @@ function sortperm2!(B, ii)
    end
    quicksort!(B, ii)
    return
-end # function mysortperm
-
-#----------------------------------------------------
+end
 
 function quicksort!(A, order, i=1,j=length(A))
     @inbounds if j > i
@@ -157,8 +184,7 @@ function quicksort!(A, order, i=1,j=length(A))
     end  # j > i
 
     return A
-end # function quicksort!
-
+end
 
 function InsertionSort!(A, order, ii=1, jj=length(A))
     @inbounds for i = ii+1 : jj
@@ -182,4 +208,4 @@ function InsertionSort!(A, order, ii=1, jj=length(A))
         order[j+1] = itemp
     end  # i
     return
-end # function InsertionSort!
+end

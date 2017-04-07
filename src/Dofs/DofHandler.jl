@@ -1,4 +1,5 @@
-export DofHandler, close!, ndofs, ndofs_per_cell, celldofs!, celldofs, create_sparsity_pattern
+export DofHandler, close!, ndofs, ndofs_per_cell, celldofs!, celldofs,
+       create_sparsity_pattern, create_symmetric_sparsity_pattern
 
 """
     DofHandler
@@ -198,29 +199,30 @@ end
 
 # Creates a sparsity pattern from the dofs in a dofhandler.
 # Returns a sparse matrix with the correct pattern.
-function create_sparsity_pattern(dh::DofHandler)
-    grid = dh.grid
+@inline create_sparsity_pattern(dh::DofHandler) = _create_sparsity_pattern(dh, false)
+@inline create_symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_create_sparsity_pattern(dh, true), :U)
+
+function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
+    ncells = getncells(dh.grid)
     n = ndofs_per_cell(dh)
-    N = n^2 * getncells(dh.grid)
-    I = Int[]
-    J = Int[]
-    sizehint!(I, N)
-    sizehint!(J, N)
-    global_dofs = zeros(Int, ndofs_per_cell(dh))
-    for element_id in 1:getncells(grid)
+    N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
+    I = Int[]; sizehint!(I, N)
+    J = Int[]; sizehint!(J, N)
+    global_dofs = zeros(Int, n)
+    for element_id in 1:ncells
         celldofs!(global_dofs, dh, element_id)
-        @inbounds for j in 1:n
-            append!(I, global_dofs)
-            for i in 1:n
-                push!(J, global_dofs[j])
-            end
+        @inbounds for j in 1:n, i in 1:n
+            dofi = global_dofs[i]
+            dofj = global_dofs[j]
+            sym && (dofi > dofj && continue)
+            push!(I, dofi)
+            push!(J, dofj)
         end
     end
     V = zeros(length(I))
     K = sparse(I, J, V)
     return K
 end
-
 
 
 vtk_grid(filename::AbstractString, dh::DofHandler) = vtk_grid(filename, dh.grid)
