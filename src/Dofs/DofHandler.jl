@@ -153,7 +153,6 @@ function Base.show(io::IO, dh::DofHandler)
         print(io, "  Dofs per cell: ", ndofs_per_cell(dh))
     end
 end
-
 immutable SortedNTuple{N, T}
   n::NTuple{N, T}
   SortedNTuple(n::NTuple{N, T}) = new{N,T}(swapsort(n))
@@ -256,6 +255,101 @@ function add_node_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, 
   end
   return free_dof
 end
+
+
+function insert_into_celldof_matrix(cell_dofs::Matrix, storage, k, g::Grid, spacedim)
+   l = 0
+    for i in 1:getncells(g)
+        l = k
+        # Vertices
+        for local_vertex in 1:size(storage.cell_vertex_dofs, 2)
+          for dof in 1:size(storage.cell_vertex_dofs, 1)
+            dof = storage.cell_vertex_dofs[dof, local_vertex, i]
+            cell_dofs[l, i] = dof
+            DEBUG && println("For cell $i, adding vertex dof $dof to number $l")
+            l += 1
+          end
+        end
+        if spacedim >= 2
+          # Edges
+          for local_edge in 1:size(storage.cell_edge_dofs, 2)
+            for dof in 1:size(storage.cell_edge_dofs, 1)
+              dof = storage.cell_edge_dofs[dof, local_edge, i]
+              cell_dofs[l, i] = dof
+              DEBUG && println("For cell $i, adding edge dof $dof to number $l")
+              l += 1
+            end
+          end
+        end
+
+        #=
+        if spacedim >= 3
+          # Faces
+          for local_vertex in 1:size(storage.cell_vertex_dofs, 2)
+            for dof in 1:size(storage.cell_vertex_dofs, 1)
+              dof = storage.cell_vertex_dofs[dof, local_vertex, i]
+              cell_dofs[l, i] = dof
+              DEBUG && println("For cell $i, adding dof $dof to number $l")
+              l += 1
+            end
+          end
+          =#
+
+      # Cells
+        for dof in 1:size(storage.cell_cell_dofs, 1)
+          dof = storage.cell_cell_dofs[dof, i]
+          cell_dofs[l, i] = dof
+          DEBUG && println("For cell $i, adding cell dof $dof to number $l")
+          l += 1
+        end
+    end
+    return k + l - 1
+end
+
+
+function close!{dim}(dh::DofHandler{dim})
+  free_dof = 1
+  storages = []
+  for i in 1:length(dh.interpolations)
+    ip = dh.interpolations[i]
+    storage = DofStorage(dh.grid, ip, dh.dof_dims[i])
+    push!(storages, storage)
+
+    free_dof = add_node_dofs(dh.grid, ip, storage, free_dof)
+    if dim >= 2
+      free_dof = add_edge_dofs(dh.grid, ip, storage, free_dof)
+    end
+    free_dof = add_cell_dofs(dh.grid, ip, storage, free_dof)
+  end
+
+  dofs_per_element = 0
+  for i in 1:length(dh.interpolations)
+      dofs_per_element += getnbasefunctions(dh.interpolations[i]) * dh.dof_dims[i]
+  end
+
+  cell_dofs = zeros(Int, dofs_per_element, getncells(dh.grid))
+
+  k = 1
+  for i in 1:length(dh.interpolations)
+      k = insert_into_celldof_matrix(cell_dofs, storages[i], k, dh.grid, dim)
+  end
+
+  # Renumber dofs
+  free_dof = 1
+  dof_renumber = Dict{Int, Int}()
+  for i in eachindex(cell_dofs)
+    dof = cell_dofs[i]
+    if !haskey(dof_renumber, dof)
+      dof_renumber[dof] = free_dof
+      cell_dofs[i] = free_dof
+      free_dof += 1
+    else
+      cell_dofs[i] = dof_renumber[dof]
+    end
+  end
+  dh.dofs_cells = cell_dofs
+end
+
 
 # Creates a sparsity pattern from the dofs in a dofhandler.
 # Returns a sparse matrix with the correct pattern.
