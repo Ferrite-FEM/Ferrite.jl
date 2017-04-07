@@ -1,0 +1,24 @@
+[core]
+attributesfile = .gitattributes
+
+[filter "nbstrip"]
+clean = "jq --indent 1 \
+        '(.cells[] | select(has(\"execution_count\")) | .execution_count) = null \
+        | (.cells[] | select(has(\"outputs\")) | .outputs[] | select(has(\"execution_count\")) | .execution_count) = null \
+        | .metadata = { \
+            \"kernelspec\": { \
+                \"name\": \"julia-0.6\", \
+                \"display_name\": \"Julia 0.6.0\", \
+                \"language\": \"julia\" \
+            }, \
+            \"language_info\": { \
+                \"mimetype\": \"application/julia\", \
+                \"file_extension\": \".jl\", \
+                \"version\": \"0.6.0\", \
+                \"name\": \"julia\" \
+            } \
+        } \
+        | .cells[].metadata = {} \
+        '"
+smudge = cat
+required
