@@ -224,3 +224,18 @@ end
 Base.start{dim, N}(c::Vector{Cell{dim, N}}) = 1
 Base.next{dim, N}(c::Vector{Cell{dim, N}}, state) = (CellIndex(state), state + 1)
 Base.done{dim, N}(c::Vector{Cell{dim, N}}, state) = state > length(c)
+
+function Base.show(io::IO, grid::Grid)
+    println(io, "$(typeof(grid)) with $(getncells(grid)) $(celltypes[eltype(grid.cells)]) cells and $(getnnodes(grid)) nodes")
+end
+
+const celltypes = Dict{DataType, String}(Cell{1, 2, 2}  => "Line",
+                                         Cell{1, 3, 2}  => "QuadraticLine",
+                                         Cell{2, 3, 3}  => "Triangle",
+                                         Cell{2, 6, 3}  => "QuadraticTriangle",
+                                         Cell{2, 4, 4}  => "Quadrilateral",
+                                         Cell{2, 9, 4}  => "QuadraticQuadrilateral",
+                                         Cell{3, 4, 4}  => "Tetrahedron",
+                                         Cell{3, 10, 4} => "QuadraticTetrahedron",
+                                         Cell{3, 8, 6}  => "Hexahedron",
+                                         Cell{3, 20, 6} => "QuadraticHexahedron")
