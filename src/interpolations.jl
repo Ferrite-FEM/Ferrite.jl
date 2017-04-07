@@ -69,6 +69,12 @@ function value{dim, T}(ip::Interpolation{dim}, ξ::Vec{dim, T})
     value!(ip, zeros(T, getnbasefunctions(ip)), ξ)
 end
 
+
+_get_n_celldofs(::Interpolation) = 0
+_get_n_facedofs(::Interpolation) = 0
+_get_n_edgedofs(::Interpolation) = 0
+_get_n_vertexdofs(::Interpolation) = 0
+
 """
 Computes the gradients of the shape functions at a point ξ for a given interpolation
 """
@@ -125,6 +131,10 @@ getlowerorder{dim,shape,order}(::Lagrange{dim,shape,order}) = Lagrange{dim,shape
 # Lagrange dim 1 RefCube order 1 #
 ##################################
 getnbasefunctions(::Lagrange{1, RefCube, 1}) = 2
+
+_get_n_vertexdofs(::Lagrange{1, RefCube, 1}) = 2
+
+
 getnfacenodes(::Lagrange{1, RefCube, 1}) = 1
 getfacelist(::Type{Lagrange{1, RefCube, 1}}) = ((1,),(2,))
 
@@ -145,6 +155,7 @@ end
 # Lagrange dim 1 RefCube order 2 #
 ##################################
 getnbasefunctions(::Lagrange{1, RefCube, 2}) = 3
+
 getnfacenodes(::Lagrange{1, RefCube, 2}) = 1
 getfacelist(::Type{Lagrange{1, RefCube, 2}}) = ((1,),(2,))
 
