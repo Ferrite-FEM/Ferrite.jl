@@ -4,6 +4,7 @@ module JuAFEM
 using Compat
 using ForwardDiff
 using Reexport
+using SortingNetworks
 @reexport using Tensors
 @reexport using WriteVTK
 
