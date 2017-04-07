@@ -206,6 +206,7 @@ function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
     ncells = getncells(dh.grid)
     n = ndofs_per_cell(dh)
     N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
+    N += ndofs(dh) # always add the diagonal elements
     I = Int[]; sizehint!(I, N)
     J = Int[]; sizehint!(J, N)
     global_dofs = zeros(Int, n)
@@ -218,6 +219,10 @@ function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
             push!(I, dofi)
             push!(J, dofj)
         end
+    end
+    for d in 1:ndofs(dh)
+        push!(I, d)
+        push!(J, d)
     end
     V = zeros(length(I))
     K = sparse(I, J, V)
