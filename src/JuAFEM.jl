@@ -1,7 +1,6 @@
 __precompile__()
 
 module JuAFEM
-using FastGaussQuadrature
 using Compat
 using Reexport
 @reexport using Tensors
