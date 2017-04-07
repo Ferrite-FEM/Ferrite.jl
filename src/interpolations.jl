@@ -81,8 +81,6 @@ end
     n_base = getnbasefunctions(ip)
     length(N) == n_base || throw(ArgumentError("N must have length $(n_base)"))
 end
-
-@inline function checkdim_derivative{dim, T}(ip::Interpolation{dim}, dN::AbstractVector{Vec{dim, T}}, ξ::Vec{dim, T})
     n_base = getnbasefunctions(ip)
     length(dN) == n_base || throw(ArgumentError("dN must have length $(n_base)"))
 end
@@ -113,6 +111,11 @@ Returns the number of base functions for an [`Interpolation`](@ref) or `Values` 
 """
 getnbasefunctions
 
+function derivative!{T}(ip::Interpolation{2, RefCube, 2}, dN::AbstractVector{Vec{2, T}}, ξ::Vec{2, T})
+    value!
+    ForwardDiff.jacobian( ξ)
+end
+
 ############
 # Lagrange #
 ############
@@ -121,24 +124,23 @@ immutable Lagrange{dim, shape, order} <: Interpolation{dim, shape, order} end
 getlowerdim{dim,shape,order}(::Lagrange{dim,shape,order}) = Lagrange{dim-1,shape,order}()
 getlowerorder{dim,shape,order}(::Lagrange{dim,shape,order}) = Lagrange{dim,shape,order-1}()
 
-##################################
-# Lagrange dim 1 RefCube order 1 #
-##################################
-getnbasefunctions(::Lagrange{1, RefCube, 1}) = 2
-getnfacenodes(::Lagrange{1, RefCube, 1}) = 1
-getfacelist(::Type{Lagrange{1, RefCube, 1}}) = ((1,),(2,))
+getnbasefunctions{dim, order}(::Lagrange{dim, RefCube, order}) = (order + 1)^dim
+getnfacenodes{order}(::Lagrange{1, RefCube, order}) = (order + 1)^(dim - 1)
+getnfacenodes{dim, order}(::Lagrange{dim, RefCube, order}) = (order + 1)^(dim - 1)
 
 function value!(ip::Lagrange{1, RefCube, 1}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
 
-    @inbounds begin
-        ξ_x = ξ[1]
-
-        N[1] = (1 - ξ_x) * 0.5
-        N[2] = (1 + ξ_x) * 0.5
+# Evaluates the lagrange polynomial number j at point x with xs as basis points
+function lagrange_polynomial2(x::Number, xs::AbstractVector, j::Int)
+    @assert j <= length(xs)
+    num, den = one(x), one(x)
+    @inbounds for i in 1:length(xs)
+        i == j && continue
+        num *= (x - xs[i])
+        den *= (xs[j] - xs[i])
     end
-
-    return N
+    return num / den
 end
 
 ##################################
@@ -158,7 +160,6 @@ function value!(ip::Lagrange{1, RefCube, 2}, N::AbstractVector, ξ::AbstractVect
         N[2] = ξ_x * (ξ_x + 1) * 0.5
         N[3] = 1 - ξ_x^2
     end
-
     return N
 end
 
@@ -181,7 +182,6 @@ function value!(ip::Lagrange{2, RefCube, 1}, N::AbstractVector, ξ::AbstractVect
         N[3] = (1 + ξ_x) * (1 + ξ_y) * 0.25
         N[4] = (1 - ξ_x) * (1 + ξ_y) * 0.25
     end
-
     return N
 end
 
@@ -199,15 +199,9 @@ function value!(ip::Lagrange{2, RefCube, 2}, N::AbstractVector, ξ::AbstractVect
         ξ_x = ξ[1]
         ξ_y = ξ[2]
 
-        N[1] = (ξ_x^2 - ξ_x) * (ξ_y^2 - ξ_y) * 0.25
-        N[2] = (ξ_x^2 + ξ_x) * (ξ_y^2 - ξ_y) * 0.25
-        N[3] = (ξ_x^2 + ξ_x) * (ξ_y^2 + ξ_y) * 0.25
-        N[4] = (ξ_x^2 - ξ_x) * (ξ_y^2 + ξ_y) * 0.25
-        N[5] = (1 - ξ_x^2) * (ξ_y^2 - ξ_y) * 0.5
-        N[6] = (ξ_x^2 + ξ_x) * (1 - ξ_y^2) * 0.5
-        N[7] = (1 - ξ_x^2) * (ξ_y^2 + ξ_y) * 0.5
-        N[8] = (ξ_x^2 - ξ_x) * (1 - ξ_y^2) * 0.5
-        N[9] = (1 - ξ_x^2) * (1 - ξ_y^2)
+        N[1] = ξ_x
+        N[2] = ξ_y
+        N[3] = 1. - ξ_x - ξ_y
     end
 
     return N
