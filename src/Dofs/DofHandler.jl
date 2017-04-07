@@ -1,4 +1,4 @@
-export DofHandler, push!, close!, ndofs, ndofs_per_cell, celldofs!, create_sparsity_pattern
+export DofHandler, close!, ndofs, ndofs_per_cell, celldofs!, celldofs, create_sparsity_pattern
 
 """
     DofHandler
@@ -90,7 +90,7 @@ function DofHandler(m::Grid)
     DofHandler(Matrix{Int}(0, 0), Matrix{Int}(0, 0), Symbol[], Int[], ScalarWrapper(false), Int[], m)
 end
 
-function show(io::IO, dh::DofHandler)
+function Base.show(io::IO, dh::DofHandler)
     println(io, "DofHandler")
     println(io, "  Fields:")
     for i in 1:length(dh.field_names)
@@ -120,7 +120,7 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
 end
 
 # Add a collection of fields
-function push!(dh::DofHandler, names::Vector{Symbol}, dims)
+function Base.push!(dh::DofHandler, names::Vector{Symbol}, dims)
     @assert length(names) == length(dims)
     for i in 1:length(names)
         push!(dh, names[i], dims[i])
@@ -128,7 +128,7 @@ function push!(dh::DofHandler, names::Vector{Symbol}, dims)
 end
 
 # Add a field to the dofhandler ex `push!(dh, :u, 3)`
-function push!(dh::DofHandler, name::Symbol, dim::Int)
+function Base.push!(dh::DofHandler, name::Symbol, dim::Int)
     @assert !isclosed(dh)
     if name in dh.field_names
         error("duplicate field name")
