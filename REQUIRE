@@ -1,5 +1,4 @@
 julia 0.5
-FastGaussQuadrature
 Requires
 WriteVTK 0.4.0
 Reexport

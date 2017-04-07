@@ -1,5 +1,4 @@
 using JuAFEM
-using FastGaussQuadrature
 using Base.Test
 using ForwardDiff
 
