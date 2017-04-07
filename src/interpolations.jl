@@ -132,7 +132,7 @@ function value!(ip::Lagrange{1, RefCube, 1}, N::AbstractVector, ξ::AbstractVect
     checkdim_value(ip, N, ξ)
 
 # Evaluates the lagrange polynomial number j at point x with xs as basis points
-function lagrange_polynomial2(x::Number, xs::AbstractVector, j::Int)
+function lagrange_polynomial(x::Number, xs::AbstractVector, j::Int)
     @assert j <= length(xs)
     num, den = one(x), one(x)
     @inbounds for i in 1:length(xs)
@@ -141,6 +141,19 @@ function lagrange_polynomial2(x::Number, xs::AbstractVector, j::Int)
         den *= (xs[j] - xs[i])
     end
     return num / den
+end
+
+function evaluate_Nmatrix{T, order, dim}(ip::Lagrange{dim, 2, order}, ξ::AbstractVector{T})
+    @assert length(ξ) == dim
+    x = gausslobatto(order + 1)[1]
+    N =  ones(T, ntuple(i -> 1+order, dim)...)
+    for k in 1:dim
+        for i in 1:order+1
+            # taken from the code in slicedim
+            N[( n==k ? i : indices(N, n) for n in 1:ndims(N) )...] .*= lagrange_polynomial(ξ[k], x, i)
+        end
+    end
+    return N
 end
 
 ##################################
