@@ -1,7 +1,7 @@
 julia 0.5
-FastGaussQuadrature
 Requires
 WriteVTK 0.4.0
 Reexport
 Tensors
+ForwardDiff
 Compat 0.19.0

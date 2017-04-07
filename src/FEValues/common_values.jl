@@ -344,3 +344,7 @@ function spatial_coordinate{dim, T}(fe_v::Values{dim}, q_point::Int, x::Abstract
     end
     return vec
 end
+
+function Base.show(io::IO, fe_v::Values)
+    println(io, "$(typeof(fe_v)) with $(getnbasefunctions(fe_v)) shape functions and $(getnquadpoints(fe_v)) quadrature points")
+end

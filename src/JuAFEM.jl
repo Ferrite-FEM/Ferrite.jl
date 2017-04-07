@@ -1,8 +1,8 @@
 __precompile__()
 
 module JuAFEM
-using FastGaussQuadrature
 using Compat
+using ForwardDiff
 using Reexport
 @reexport using Tensors
 @reexport using WriteVTK

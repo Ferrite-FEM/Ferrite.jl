@@ -61,7 +61,7 @@ Value of shape function 1 in quadrature point 3
 
 ```jldoctest
 julia> shape_value(cell_values, 3, 1)
-0.16666666666666663
+0.16666666666666669
 ```
 
 Derivative of the same shape function, in the same quadrature point
@@ -79,7 +79,7 @@ We can also evaluate values and gradients of functions on the finite element bas
 julia> T = [0.0, 1.0, 2.0, 1.5]; # nodal values
 
 julia> function_value(cell_values, 3, T) # value of T in 3rd quad point
-1.311004233964073
+1.3110042339640733
 
 julia> function_gradient(cell_values, 1, T)  # value of grad(T) in 1st quad point
 2-element Tensors.Tensor{1,2,Float64,2}:

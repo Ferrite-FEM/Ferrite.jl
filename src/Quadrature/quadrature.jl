@@ -1,5 +1,6 @@
 include("gaussquad_tri_table.jl")
 include("gaussquad_tet_table.jl")
+include("generate_quadrature.jl")
 
 import Base.Cartesian: @nloops, @nref, @ntuple, @nexprs
 
@@ -114,9 +115,9 @@ for dim in (1,2,3)
     @eval begin
         function (::Type{QuadratureRule{$dim, RefCube}})(quad_type::Symbol, order::Int)
             if quad_type == :legendre
-                p, w = gausslegendre(order)
+                p, w = GaussQuadrature.legendre(Float64, order)
             elseif quad_type == :lobatto
-                p, w = gausslobatto(order)
+                p, w = GaussQuadrature.legendre(Float64, order, GaussQuadrature.both)
             else
                 throw(ArgumentError("unsupported quadrature rule"))
             end
@@ -161,9 +162,9 @@ end
 # Special version for face integration of triangles
 function (::Type{QuadratureRule{1, RefTetrahedron}})(quad_type::Symbol, order::Int)
     if quad_type == :legendre
-        p, weights = gausslegendre(order)
+        p, weights = GaussQuadrature.legendre(Float64, order)
     elseif quad_type == :lobatto
-        p, weights = gausslobatto(order)
+        p, weights = GaussQuadrature.legendre(Float64, order, GaussQuadrature.both)
     else
         throw(ArgumentError("unsupported quadrature rule"))
     end

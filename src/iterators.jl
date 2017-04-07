@@ -26,12 +26,14 @@ immutable CellIterator{dim, N, T, M}
     coords::Vector{Vec{dim, T}}
     current_cellid::ScalarWrapper{Int}
     dh::DofHandler{dim, N, T, M}
+    celldofs::Vector{Int}
 
     function (::Type{CellIterator{dim, N, T, M}}){dim, N, T, M}(dh::DofHandler{dim, N, T, M})
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim, T}, N)
         cell = ScalarWrapper(0)
-        return new{dim, N, T, M}(dh.grid, nodes, coords, ScalarWrapper(0), dh)
+        celldofs = zeros(Int, ndofs_per_cell(dh))
+        return new{dim, N, T, M}(dh.grid, nodes, coords, ScalarWrapper(0), dh, celldofs)
     end
 
     function (::Type{CellIterator{dim, N, T, M}}){dim, N, T, M}(grid::Grid{dim, N, T, M})
@@ -62,6 +64,7 @@ Base.eltype{T <: CellIterator}(::Type{T})         = T
 @inline onboundary(ci::CellIterator, face::Int) = ci.grid.boundary_matrix[face, ci.current_cellid[]]
 @inline cellid(ci::CellIterator) = ci.current_cellid[]
 @inline celldofs!(v::Vector, ci::CellIterator) = celldofs!(v, ci.dh, ci.current_cellid[])
+@inline celldofs(ci::CellIterator) = ci.celldofs
 
 function reinit!{dim, N}(ci::CellIterator{dim, N}, i::Int)
     nodeids = ci.grid.cells[i].nodes
@@ -70,6 +73,9 @@ function reinit!{dim, N}(ci::CellIterator{dim, N}, i::Int)
         nodeid = nodeids[j]
         ci.nodes[j] = nodeid
         ci.coords[j] = ci.grid.nodes[nodeid].x
+    end
+    if isdefined(ci, :dh) # update celldofs
+        celldofs!(ci.celldofs, ci)
     end
     return ci
 end

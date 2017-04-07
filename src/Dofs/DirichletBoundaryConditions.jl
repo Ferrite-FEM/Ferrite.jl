@@ -1,9 +1,9 @@
-export DirichletBoundaryConditions, update!, apply!, apply_zero!, add!
+export DirichletBoundaryConditions, update!, apply!, apply_zero!, add!, free_dofs
 
 """
     DirichletBoundaryConditions
 
-A dirichlet boundary conditions is a a boundary where a dof is fixed to take a certain value.
+A Dirichlet boundary condition is a boundary where the solution is fixed to take a certain value.
 The struct `DirichletBoundaryConditions` represents a collection of such boundary conditions.
 
 It is created from a `DofHandler`
@@ -48,7 +48,6 @@ immutable DirichletBoundaryCondition
     components::Vector{Int}
     idxoffset::Int
 end
-
 
 immutable DirichletBoundaryConditions{DH <: DofHandler, T}
     bcs::Vector{DirichletBoundaryCondition}

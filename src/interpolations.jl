@@ -76,7 +76,8 @@ function derivative{dim, T}(ip::Interpolation{dim}, ξ::Vec{dim, T})
     derivative!(ip, [zero(Tensor{1, dim, T}) for i in 1:getnbasefunctions(ip)], ξ)
 end
 
-@inline function checkdim_value{dim}(ip::Interpolation{dim}, N::AbstractVector, ξ::Vec{dim})
+@inline function checkdim_value{dim}(ip::Interpolation{dim}, N::AbstractVector, ξ::AbstractVector)
+    @assert length(ξ) == dim
     n_base = getnbasefunctions(ip)
     length(N) == n_base || throw(ArgumentError("N must have length $(n_base)"))
 end
@@ -84,6 +85,18 @@ end
 @inline function checkdim_derivative{dim, T}(ip::Interpolation{dim}, dN::AbstractVector{Vec{dim, T}}, ξ::Vec{dim, T})
     n_base = getnbasefunctions(ip)
     length(dN) == n_base || throw(ArgumentError("dN must have length $(n_base)"))
+end
+
+function derivative!{T, order, shape, dim}(ip::Interpolation{dim, shape, order}, dN::AbstractVector{Vec{dim, T}}, ξ::Vec{dim, T})
+    checkdim_derivative(ip, dN, ξ)
+    f!(N, x) = value!(ip, N, x)
+    NArray = zeros(T, getnbasefunctions(ip))
+    dNArray = ForwardDiff.jacobian(f!, NArray, ξ)
+    # Want to use reinterpret but that crashes Julia 0.6, #20847
+    for i in 1:length(dN)
+        dN[i] = Vec{dim, T}((dNArray[i, :]...))
+    end
+    return dN
 end
 
 #####################
@@ -115,7 +128,7 @@ getnbasefunctions(::Lagrange{1, RefCube, 1}) = 2
 getnfacenodes(::Lagrange{1, RefCube, 1}) = 1
 getfacelist(::Type{Lagrange{1, RefCube, 1}}) = ((1,),(2,))
 
-function value!(ip::Lagrange{1, RefCube, 1}, N::AbstractVector, ξ::Vec{1})
+function value!(ip::Lagrange{1, RefCube, 1}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
 
     @inbounds begin
@@ -128,17 +141,6 @@ function value!(ip::Lagrange{1, RefCube, 1}, N::AbstractVector, ξ::Vec{1})
     return N
 end
 
-function derivative!{T}(ip::Lagrange{1, RefCube, 1}, dN::AbstractVector{Vec{1, T}}, ξ::Vec{1, T})
-    checkdim_derivative(ip, dN, ξ)
-
-    @inbounds begin
-        dN[1] = Vec{1,T}((-0.5,))
-        dN[2] = Vec{1,T}((0.5,))
-    end
-
-    return dN
-end
-
 ##################################
 # Lagrange dim 1 RefCube order 2 #
 ##################################
@@ -146,7 +148,7 @@ getnbasefunctions(::Lagrange{1, RefCube, 2}) = 3
 getnfacenodes(::Lagrange{1, RefCube, 2}) = 1
 getfacelist(::Type{Lagrange{1, RefCube, 2}}) = ((1,),(2,))
 
-function value!(ip::Lagrange{1, RefCube, 2}, N::AbstractVector, ξ::Vec{1})
+function value!(ip::Lagrange{1, RefCube, 2}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
 
     @inbounds begin
@@ -160,20 +162,6 @@ function value!(ip::Lagrange{1, RefCube, 2}, N::AbstractVector, ξ::Vec{1})
     return N
 end
 
-function derivative!{T}(ip::Lagrange{1, RefCube, 2}, dN::AbstractVector{Vec{1, T}}, ξ::Vec{1, T})
-    checkdim_derivative(ip, dN, ξ)
-
-    @inbounds begin
-        ξ_x = ξ[1]
-
-        dN[1] = Vec{1,T}((ξ_x - 0.5,))
-        dN[2] = Vec{1,T}((ξ_x + 0.5,))
-        dN[3] = Vec{1,T}((-2 * ξ_x,))
-    end
-
-    return dN
-end
-
 ##################################
 # Lagrange dim 2 RefCube order 1 #
 ##################################
@@ -181,7 +169,7 @@ getnbasefunctions(::Lagrange{2, RefCube, 1}) = 4
 getnfacenodes(::Lagrange{2, RefCube, 1}) = 2
 getfacelist(::Type{Lagrange{2, RefCube, 1}}) = ((1,2),(2,3),(3,4),(1,4))
 
-function value!(ip::Lagrange{2, RefCube, 1}, N::AbstractVector, ξ::Vec{2})
+function value!(ip::Lagrange{2, RefCube, 1}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
 
     @inbounds begin
@@ -197,29 +185,6 @@ function value!(ip::Lagrange{2, RefCube, 1}, N::AbstractVector, ξ::Vec{2})
     return N
 end
 
-function derivative!{T}(ip::Lagrange{2, RefCube, 1}, dN::AbstractVector{Vec{2, T}}, ξ::Vec{2, T})
-    checkdim_derivative(ip, dN, ξ)
-
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-
-        dN[1] = Vec{2, T}((-(1 - ξ_y) * 0.25,
-                           -(1 - ξ_x) * 0.25))
-
-        dN[2] = Vec{2, T}(( (1 - ξ_y) * 0.25,
-                           -(1 + ξ_x) * 0.25))
-
-        dN[3] =  Vec{2, T}(((1 + ξ_y) * 0.25,
-                            (1 + ξ_x) * 0.25))
-
-        dN[4] = Vec{2, T}((-(1 + ξ_y) * 0.25,
-                            (1 - ξ_x) * 0.25))
-    end
-
-    return dN
-end
-
 ##################################
 # Lagrange dim 2 RefCube order 2 #
 ##################################
@@ -227,7 +192,7 @@ getnbasefunctions(::Lagrange{2, RefCube, 2}) = 9
 getnfacenodes(::Lagrange{2, RefCube, 2}) = 3
 getfacelist(::Type{Lagrange{2, RefCube, 2}}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
 
-function value!(ip::Lagrange{2, RefCube, 2}, N::AbstractVector, ξ::Vec{2})
+function value!(ip::Lagrange{2, RefCube, 2}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
 
     @inbounds begin
@@ -248,44 +213,6 @@ function value!(ip::Lagrange{2, RefCube, 2}, N::AbstractVector, ξ::Vec{2})
     return N
 end
 
-function derivative!{T}(ip::Lagrange{2, RefCube, 2}, dN::AbstractVector{Vec{2, T}}, ξ::Vec{2, T})
-    checkdim_derivative(ip, dN, ξ)
-
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-
-        dN[1] = Vec{2, T}((ξ_y * (2 * ξ_x - 1) * (ξ_y - 1) * 0.25,
-                           ξ_x * (2 * ξ_y - 1) * (ξ_x - 1) * 0.25))
-
-        dN[2] = Vec{2, T}((ξ_y * (2 * ξ_x + 1) * (ξ_y - 1) * 0.25,
-                           ξ_x * (2 * ξ_y - 1) * (ξ_x + 1) * 0.25))
-
-        dN[3] = Vec{2, T}((ξ_y * (2 * ξ_x + 1) * (ξ_y + 1) * 0.25,
-                           ξ_x * (2 * ξ_y + 1) * (ξ_x + 1) * 0.25))
-
-        dN[4] = Vec{2, T}((ξ_y * (2 * ξ_x - 1) * (ξ_y + 1) * 0.25,
-                           ξ_x * (2 * ξ_y + 1) * (ξ_x - 1) * 0.25))
-
-        dN[5] = Vec{2, T}((ξ_y * ξ_x * (1 - ξ_y),
-                           (1 - 2 * ξ_y) * (ξ_x^2 - 1) * 0.5))
-
-        dN[6] = Vec{2, T}(((1 - ξ_y^2) * (2 * ξ_x + 1) * 0.5,
-                           - ξ_y * ξ_x * (ξ_x + 1)))
-
-        dN[7] = Vec{2, T}((- ξ_y * ξ_x * (ξ_y + 1),
-                           (2 * ξ_y + 1) * (1 - ξ_x^2) * 0.5))
-
-        dN[8] = Vec{2, T}(((1 - ξ_y^2) * (2 * ξ_x - 1) * 0.5,
-                           ξ_y * ξ_x * (1 - ξ_x)))
-
-        dN[9] = Vec{2, T}((2 * ξ_x * (ξ_y^2 - 1),
-                           2 * ξ_y * (ξ_x^2 - 1)))
-    end
-
-    return dN
-end
-
 #########################################
 # Lagrange dim 2 RefTetrahedron order 1 #
 #########################################
@@ -294,7 +221,7 @@ getlowerdim{order}(::Lagrange{2, RefTetrahedron, order}) = Lagrange{1, RefCube, 
 getnfacenodes(::Lagrange{2, RefTetrahedron, 1}) = 2
 getfacelist(::Type{Lagrange{2, RefTetrahedron, 1}}) = ((1,2),(2,3),(1,3))
 
-function value!(ip::Lagrange{2, RefTetrahedron, 1}, N::AbstractVector, ξ::Vec{2})
+function value!(ip::Lagrange{2, RefTetrahedron, 1}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
 
     @inbounds begin
@@ -309,18 +236,6 @@ function value!(ip::Lagrange{2, RefTetrahedron, 1}, N::AbstractVector, ξ::Vec{2
     return N
 end
 
-function derivative!{T}(ip::Lagrange{2, RefTetrahedron, 1}, dN::AbstractVector{Vec{2, T}}, ξ::Vec{2, T})
-    checkdim_derivative(ip, dN, ξ)
-
-    @inbounds begin
-        dN[1] = Vec{2, T}(( 1.0,  0.0))
-        dN[2] = Vec{2, T}(( 0.0,  1.0))
-        dN[3] = Vec{2, T}((-1.0, -1.0))
-    end
-
-    return dN
-end
-
 #########################################
 # Lagrange dim 2 RefTetrahedron order 2 #
 #########################################
@@ -328,7 +243,7 @@ getnbasefunctions(::Lagrange{2, RefTetrahedron, 2}) = 6
 getnfacenodes(::Lagrange{2, RefTetrahedron, 2}) = 3
 getfacelist(::Type{Lagrange{2, RefTetrahedron, 2}}) = ((1,2,4),(2,3,5),(1,3,6))
 
-function value!(ip::Lagrange{2, RefTetrahedron, 2}, N::AbstractVector, ξ::Vec{2})
+function value!(ip::Lagrange{2, RefTetrahedron, 2}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
 
     @inbounds begin
@@ -348,27 +263,6 @@ function value!(ip::Lagrange{2, RefTetrahedron, 2}, N::AbstractVector, ξ::Vec{2
     return N
 end
 
-function derivative!{T}(ip::Lagrange{2, RefTetrahedron, 2}, dN::AbstractVector{Vec{2, T}}, ξ::Vec{2, T})
-    checkdim_derivative(ip, dN, ξ)
-
-    @inbounds begin
-
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-
-        γ = 1 - ξ_x - ξ_y
-
-        dN[1] = Vec{2,T}((4ξ_x - 1, zero(T)))
-        dN[2] = Vec{2,T}((zero(T),  4ξ_y - 1))
-        dN[3] = Vec{2,T}((-4γ + 1,  -4γ + 1))
-        dN[4] = Vec{2,T}((4ξ_y,  4ξ_x))
-        dN[5] = Vec{2,T}((-4ξ_y,  4(γ - ξ_y)))
-        dN[6] = Vec{2,T}((4(γ - ξ_x),  -4ξ_x))
-    end
-
-    return dN
-end
-
 #########################################
 # Lagrange dim 3 RefTetrahedron order 1 #
 #########################################
@@ -376,7 +270,7 @@ getnbasefunctions(::Lagrange{3, RefTetrahedron, 1}) = 4
 getnfacenodes(::Lagrange{3, RefTetrahedron, 1}) = 3
 getfacelist(::Type{Lagrange{3, RefTetrahedron, 1}}) = ((1,2,3),(1,2,4),(2,3,4),(1,3,4))
 
-function value!(ip::Lagrange{3, RefTetrahedron, 1}, N::AbstractVector, ξ::Vec{3})
+function value!(ip::Lagrange{3, RefTetrahedron, 1}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
 
     @inbounds begin
@@ -393,19 +287,6 @@ function value!(ip::Lagrange{3, RefTetrahedron, 1}, N::AbstractVector, ξ::Vec{3
     return N
 end
 
-function derivative!{T}(ip::Lagrange{3, RefTetrahedron, 1}, dN::AbstractVector{Vec{3, T}}, ξ::Vec{3, T})
-    checkdim_derivative(ip, dN, ξ)
-
-    @inbounds begin
-        dN[1] = Vec{3, T}((-1.0, -1.0, -1.0))
-        dN[2] = Vec{3, T}(( 1.0,  0.0, 0.0))
-        dN[3] = Vec{3, T}(( 0.0,  1.0, 0.0))
-        dN[4] = Vec{3, T}(( 0.0,  0.0, 1.0))
-    end
-
-    return dN
-end
-
 #########################################
 # Lagrange dim 3 RefTetrahedron order 2 #
 #########################################
@@ -415,7 +296,7 @@ getfacelist(::Lagrange{3, RefTetrahedron, 2}) = ((1,2,3,5,6,7),(1,2,4,5,8,9),(2,
 
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch09.d/AFEM.Ch09.pdf
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.pdf
-function value!(ip::Lagrange{3, RefTetrahedron, 2}, N::AbstractVector, ξ::Vec{3})
+function value!(ip::Lagrange{3, RefTetrahedron, 2}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
 
     @inbounds begin
@@ -438,29 +319,6 @@ function value!(ip::Lagrange{3, RefTetrahedron, 2}, N::AbstractVector, ξ::Vec{3
     return N
 end
 
-function derivative!{T}(ip::Lagrange{3, RefTetrahedron, 2}, dN::AbstractVector{Vec{3, T}}, ξ::Vec{3, T})
-    checkdim_derivative(ip, dN, ξ)
-
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-        ξ_z = ξ[3]
-
-        dN[1]  = Vec{3, T}((4 * ξ_x + 4 * ξ_y + 4 * ξ_z - 3, 4 * ξ_x + 4 * ξ_y + 4 * ξ_z - 3, 4 * ξ_x + 4 * ξ_y + 4 * ξ_z - 3))
-        dN[2]  = Vec{3, T}((4 * ξ_x - 1, 0.0, 0.0))
-        dN[3]  = Vec{3, T}((0.0, 4 * ξ_y - 1, 0.0))
-        dN[4]  = Vec{3, T}((0.0, 0.0, 4 * ξ_z - 1))
-        dN[5]  = Vec{3, T}((-8 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4, -4 * ξ_x, -4 * ξ_x))
-        dN[6]  = Vec{3, T}((4 * ξ_y, 4 * ξ_x, 0.0))
-        dN[7]  = Vec{3, T}((-4 * ξ_y, -4 * ξ_x - 8 * ξ_y - 4 * ξ_z + 4, -4 * ξ_y))
-        dN[8]  = Vec{3, T}((-4 * ξ_z, -4 * ξ_z, -4 * ξ_x - 4 * ξ_y - 8 * ξ_z + 4))
-        dN[9]  = Vec{3, T}((4 * ξ_z, 0.0, 4 * ξ_x))
-        dN[10] = Vec{3, T}((0.0, 4 * ξ_z, 4 * ξ_y))
-    end
-
-    return dN
-end
-
 ##################################
 # Lagrange dim 3 RefCube order 1 #
 ##################################
@@ -468,7 +326,7 @@ getnbasefunctions(::Lagrange{3, RefCube, 1}) = 8
 getnfacenodes(::Lagrange{3, RefCube, 1}) = 4
 getfacelist(::Type{Lagrange{3, RefCube, 1}}) = ((1,2,3,4),(1,2,5,6),(2,3,6,7),(3,4,7,8),(1,4,5,8),(5,6,7,8))
 
-function value!(ip::Lagrange{3, RefCube, 1}, N::AbstractVector, ξ::Vec{3})
+function value!(ip::Lagrange{3, RefCube, 1}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
 
     @inbounds begin
@@ -489,27 +347,6 @@ function value!(ip::Lagrange{3, RefCube, 1}, N::AbstractVector, ξ::Vec{3})
     return N
 end
 
-function derivative!{T}(ip::Lagrange{3, RefCube, 1}, dN::AbstractVector{Vec{3, T}}, ξ::Vec{3, T})
-    checkdim_derivative(ip, dN, ξ)
-
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-        ξ_z = ξ[3]
-
-        dN[1]  = Vec{3,T}(( -0.125(1 - ξ_y) * (1 - ξ_z),   -0.125(1 - ξ_x) * (1 - ξ_z),   -0.125(1 - ξ_x) * (1 - ξ_y)))
-        dN[2]  = Vec{3,T}((  0.125(1 - ξ_y) * (1 - ξ_z),   -0.125(1 + ξ_x) * (1 - ξ_z),   -0.125(1 + ξ_x) * (1 - ξ_y)))
-        dN[3]  = Vec{3,T}((  0.125(1 + ξ_y) * (1 - ξ_z),    0.125(1 + ξ_x) * (1 - ξ_z),   -0.125(1 + ξ_x) * (1 + ξ_y)))
-        dN[4]  = Vec{3,T}(( -0.125(1 + ξ_y) * (1 - ξ_z),    0.125(1 - ξ_x) * (1 - ξ_z),   -0.125(1 - ξ_x) * (1 + ξ_y)))
-        dN[5]  = Vec{3,T}(( -0.125(1 - ξ_y) * (1 + ξ_z),   -0.125(1 - ξ_x) * (1 + ξ_z),    0.125(1 - ξ_x) * (1 - ξ_y)))
-        dN[6]  = Vec{3,T}((  0.125(1 - ξ_y) * (1 + ξ_z),   -0.125(1 + ξ_x) * (1 + ξ_z),    0.125(1 + ξ_x) * (1 - ξ_y)))
-        dN[7]  = Vec{3,T}((  0.125(1 + ξ_y) * (1 + ξ_z),    0.125(1 + ξ_x) * (1 + ξ_z),    0.125(1 + ξ_x) * (1 + ξ_y)))
-        dN[8]  = Vec{3,T}(( -0.125(1 + ξ_y) * (1 + ξ_z),    0.125(1 - ξ_x) * (1 + ξ_z),    0.125(1 - ξ_x) * (1 + ξ_y)))
-    end
-
-    return dN
-end
-
 ###############
 # Serendipity #
 ###############
@@ -524,7 +361,7 @@ getlowerorder(::Serendipity{2, RefCube, 2}) = Lagrange{2, RefCube, 1}()
 getnfacenodes(::Serendipity{2, RefCube, 2}) = 3
 getfacelist(::Type{Serendipity{2, RefCube, 2}}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
 
-function value!(ip::Serendipity{2, RefCube, 2}, N::AbstractVector, ξ::Vec{2})
+function value!(ip::Serendipity{2, RefCube, 2}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
 
     ξ_x = ξ[1]
@@ -541,23 +378,4 @@ function value!(ip::Serendipity{2, RefCube, 2}, N::AbstractVector, ξ::Vec{2})
         N[8] = 0.5(1 - ξ_x) * (1 - ξ_y * ξ_y)
     end
     return N
-end
-
-function derivative!{T}(ip::Serendipity{2, RefCube, 2}, dN::AbstractVector{Vec{2, T}}, ξ::Vec{2, T})
-    checkdim_derivative(ip, dN, ξ)
-
-    ξ_x = ξ[1]
-    ξ_y = ξ[2]
-
-    @inbounds begin
-        dN[1] = Vec{2, T}((-0.25(1 - ξ_y) * (-2ξ_x - ξ_y), -0.25(1 - ξ_x) * (-2ξ_y - ξ_x)))
-        dN[2] = Vec{2, T}(( 0.25(1 - ξ_y) * ( 2ξ_x - ξ_y), -0.25(1 + ξ_x) * (-2ξ_y + ξ_x)))
-        dN[3] = Vec{2, T}(( 0.25(1 + ξ_y) * ( 2ξ_x + ξ_y),  0.25(1 + ξ_x) * ( 2ξ_y + ξ_x)))
-        dN[4] = Vec{2, T}((-0.25(1 + ξ_y) * (-2ξ_x + ξ_y),  0.25(1 - ξ_x) * ( 2ξ_y - ξ_x)))
-        dN[5] = Vec{2, T}(( -ξ_x*(1 - ξ_y),  -0.5(1 - ξ_x * ξ_x)))
-        dN[6] = Vec{2, T}((  0.5(1 - ξ_y * ξ_y),  -ξ_y*(1 + ξ_x)))
-        dN[7] = Vec{2, T}(( -ξ_x*(1 + ξ_y),   0.5(1 - ξ_x * ξ_x)))
-        dN[8] = Vec{2, T}(( -0.5(1 - ξ_y * ξ_y),  -ξ_y*(1 - ξ_x)))
-    end
-    return dN
 end
