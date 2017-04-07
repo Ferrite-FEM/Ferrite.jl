@@ -1,5 +1,5 @@
 export DofHandler, close!, ndofs, ndofs_per_cell, celldofs!, celldofs,
-       sparsity_pattern, symmetric_sparsity_pattern
+       create_sparsity_pattern, create_symmetric_sparsity_pattern
 
 """
     DofHandler
@@ -199,10 +199,10 @@ end
 
 # Creates a sparsity pattern from the dofs in a dofhandler.
 # Returns a sparse matrix with the correct pattern.
-@inline sparsity_pattern(dh::DofHandler) = _sparsity_pattern(dh, false)
-@inline symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_sparsity_pattern(dh, true), :U)
+@inline create_sparsity_pattern(dh::DofHandler) = _create_sparsity_pattern(dh, false)
+@inline create_symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_create_sparsity_pattern(dh, true), :U)
 
-function _sparsity_pattern(dh::DofHandler, sym::Bool)
+function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
     ncells = getncells(dh.grid)
     n = ndofs_per_cell(dh)
     N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
