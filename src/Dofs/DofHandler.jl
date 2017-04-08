@@ -82,60 +82,6 @@ const DEBUG = true
 
 DEBUG = true
 
-@pure get_n_cells(::Interpolation) = 1
-
-get_n_faces(ip::Interpolation{1}) = get_n_vertices(ip)
-get_n_faces(ip::Interpolation{2}) = get_n_edges(ip)
-get_n_faces(ip::Interpolation{3}) = get_n_surfaces(ip)
-
-get_facelist(ip::Interpolation{1}) = getvertexlist(ip)
-get_facelist(ip::Interpolation{2}) = getedgelist(ip)
-get_facelist(ip::Interpolation{3}) = getsurfacelist(ip)
-
-# Dim 1 and 2 do not have surfaces
-@pure get_n_edges(::Interpolation{1}) = 0
-@pure get_n_edges(ip::Interpolation) = length(getedgelist(ip))
-
-@pure get_n_surfaces{order, refshape}(::Interpolation{1, refshape, order}) = 0
-@pure get_n_surfaces{order, refshape}(::Interpolation{2, refshape, order}) = 0
-@pure get_n_surfaces(ip::Interpolation) = length(getedgelist(ip))
-
-
-# Dim 1 do not have edges
-@pure get_n_vertices(::Interpolation{1, RefCube}) = 2
-@pure get_n_vertices(::Interpolation{2, RefCube}) = 4
-@pure get_n_vertices(::Interpolation{3, RefCube}) = 8
-
-@pure get_n_vertices(::Interpolation{2, RefTetrahedron}) = 3
-@pure get_n_vertices(::Interpolation{3, RefTetrahedron}) = 4
-
-# Edges
-
-@pure getedgelist(::Interpolation{2, RefCube}) = SVector(SVector(1, 2),
-                                                         SVector(2, 3),
-                                                         SVector(3, 4),
-                                                         SVector(4, 1))
-
-@pure getedgelist(::Interpolation{2, Tetrahedron}) = SVector(SVector(1, 2),
-                                                             SVector(2, 3),
-                                                             SVector(3, 1))
-
-
-#@pure get_n_surfaces(::Interpolation{3, RefCube}) = 6
-#@pure get_n_surfaces(::Interpolation{3, RefTetrahedron}) = 4
-
-
-# These needs to be defined by all interpolation spaces
-@pure get_n_vertexdofs{dim, order}(::Lagrange{dim, RefCube, order}) = 1
-@pure get_n_edgedofs{dim, order}(::Lagrange{dim, RefCube, order}) = (order - 1)
-@pure get_n_surfacedofs{dim, order}(::Lagrange{dim, RefCube, order}) = (order - 1)^(dim - 1)
-@pure get_n_celldofs{dim, order}(::Lagrange{dim, RefCube, order}) = (order - 1)^dim
-
-@pure get_n_vertexdofs{dim, order}(::Lagrange{dim, RefTetrahedron, order}) = 1
-@pure get_n_edgedofs{dim, order}(::Lagrange{dim, RefTetrahedron, order}) = (order - 1)
-@pure get_n_surfacedofs{dim, order}(::Lagrange{dim, RefTetrahedron, order}) = error() # TODO
-@pure get_n_celldofs{dim, order}(ip::Lagrange{dim, RefTetrahedron, order}) = ((order - 1)^dim - get_n_egedofs(ip)) ÷ 2 # TODO: Check
-
 # We use sorted tuples as dictionary keys for edges and surfaces.
 # The tuple contain all the global vertices for that edge / surface
 immutable SortedSVector{N, T}

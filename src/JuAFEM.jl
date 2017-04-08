@@ -46,7 +46,11 @@ Abstract type which has `CellValues` and `FaceValues` as subtypes
 @compat abstract type FaceValues{dim, T, refshape} <: Values{dim, T, refshape} end
 
 include("utils.jl")
-include("interpolations.jl")
+
+
+include(joinpath("Interpolations", "interpolations.jl"))
+include(joinpath("Interpolations", "lagrange.jl"))
+include(joinpath("Interpolations", "serendepity.jl"))
 
 # Quadrature
 include(joinpath("Quadrature", "quadrature.jl"))
