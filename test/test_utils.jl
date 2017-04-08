@@ -1,12 +1,93 @@
 # Some utility functions for testing JuAFEM.jl
 
+"""
+The face number for a cell, typically used to get the face number which is needed
+to `reinit!` a `FaceValues` object for  face integration
+
+    getfacenumber(face_nodes, cell_nodes, ip::Interpolation)
+
+** Arguments **
+
+* `face_nodes`: the node numbers of the nodes on the face of the cell
+* `cell_nodes`: the node numbers of the cell
+* `ip`: the `Interpolation` for the cell
+
+** Results **
+
+* `::Int`: the corresponding face
+"""
+function getfacenumber(face_nodes::Vector{Int}, cell_nodes::Vector{Int}, ip::Interpolation)
+    @assert length(face_nodes) == getnfacenodes(ip)
+    @assert length(cell_nodes) == getnbasefunctions(ip)
+
+    tmp = zeros(face_nodes)
+    for i in 1:length(face_nodes)
+        tmp[i] = findfirst(j -> j == face_nodes[i], cell_nodes)
+    end
+
+    if 0 in tmp
+        throw(ArgumentError("at least one face node: $face_nodes not in cell nodes: $cell_nodes"))
+    end
+    sort!(tmp)
+    face_nodes_sorted = ntuple(i -> tmp[i], Val{getnfacenodes(ip)})
+    for (i, face) in enumerate(getfacelist(ip))
+        face_nodes_sorted == face && return i
+    end
+
+    throw(ArgumentError("invalid node numbers for face"))
+end
+
+
+getnfaces{dim}(::Interpolation{dim, RefCube}) = 2*dim
+getnfaces(::Interpolation{2, RefTetrahedron}) = 3
+getnfaces(::Interpolation{3, RefTetrahedron}) = 4
+
+getfacelist(i::Interpolation) = getfacelist(typeof(i))
+
+getnfacenodes(::Lagrange{1, RefCube, 1}) = 1
+getfacelist(::Type{Lagrange{1, RefCube, 1}}) = ((1,),(2,))
+
+getnfacenodes(::Lagrange{1, RefCube, 2}) = 1
+getfacelist(::Type{Lagrange{1, RefCube, 2}}) = ((1,),(2,))
+
+getnfacenodes(::Lagrange{2, RefCube, 1}) = 2
+getfacelist(::Type{Lagrange{2, RefCube, 1}}) = ((1,2),(2,3),(3,4),(1,4))
+
+getnfacenodes(::Lagrange{2, RefCube, 2}) = 3
+getfacelist(::Type{Lagrange{2, RefCube, 2}}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
+
+getlowerdim{order}(::Lagrange{2, RefTetrahedron, order}) = Lagrange{1, RefCube, order}()
+getnfacenodes(::Lagrange{2, RefTetrahedron, 1}) = 2
+getfacelist(::Type{Lagrange{2, RefTetrahedron, 1}}) = ((1,2),(2,3),(1,3))
+
+getnfacenodes(::Lagrange{2, RefTetrahedron, 2}) = 3
+getfacelist(::Type{Lagrange{2, RefTetrahedron, 2}}) = ((1,2,4),(2,3,5),(1,3,6))
+
+getnfacenodes(::Lagrange{3, RefTetrahedron, 1}) = 3
+getfacelist(::Type{Lagrange{3, RefTetrahedron, 1}}) = ((1,2,3),(1,2,4),(2,3,4),(1,3,4))
+
+getnfacenodes(::Lagrange{3, RefTetrahedron, 2}) = 6
+getfacelist(::Lagrange{3, RefTetrahedron, 2}) = ((1,2,3,5,6,7),(1,2,4,5,8,9),(2,3,4,6,9,10),(1,3,4,7,8,10))
+
+getnfacenodes(::Lagrange{3, RefCube, 1}) = 4
+getfacelist(::Type{Lagrange{3, RefCube, 1}}) = ((1,2,3,4),(1,2,5,6),(2,3,6,7),(3,4,7,8),(1,4,5,8),(5,6,7,8))
+
+getlowerdim{dim,shape,order}(::Lagrange{dim,shape,order}) = Lagrange{dim-1,shape,order}()
+getlowerorder{dim,shape,order}(::Lagrange{dim,shape,order}) = Lagrange{dim,shape,order-1}()
+
+getlowerdim(::Serendipity{2, RefCube, 2}) = Lagrange{1, RefCube, 2}()
+getlowerorder(::Serendipity{2, RefCube, 2}) = Lagrange{2, RefCube, 1}()
+getnfacenodes(::Serendipity{2, RefCube, 2}) = 3
+getfacelist(::Type{Serendipity{2, RefCube, 2}}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
+
+
 #####################################
 # Volume for the reference elements #
 #####################################
 reference_volume{dim}(::Interpolation{dim, RefCube}) = 2^dim
 reference_volume{dim}(::Interpolation{dim, RefTetrahedron}) = 1 / factorial(dim)
 # For faces
-reference_volume(fs::Interpolation, ::Int) = reference_volume(JuAFEM.getlowerdim(fs))
+reference_volume(fs::Interpolation, ::Int) = reference_volume(getlowerdim(fs))
 reference_volume(fs::Interpolation{2, RefTetrahedron}, face::Int) = face == 1 ? sqrt(2) : 1.0
 reference_volume(fs::Interpolation{3, RefTetrahedron}, face::Int) = face == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
 

@@ -20,7 +20,7 @@ export ScalarValues, VectorValues
 
 export reinit!, shape_value, shape_gradient, shape_symmetric_gradient, shape_divergence, getdetJdV,
        function_value, function_gradient, function_symmetric_gradient, function_divergence, spatial_coordinate
-export getfacenumber, getnormal
+export getnormal
 export Interpolation, getdim, getrefshape, getorder, getnbasefunctions, getnquadpoints
 export Lagrange, Serendipity, RefTetrahedron, RefCube
 export QuadratureRule, getweights, getpoints

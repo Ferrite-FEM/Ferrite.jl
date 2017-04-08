@@ -22,7 +22,7 @@ for (func_interpol, quad_rule) in  (
 
         xs, n = valid_coordinates_and_normals(func_interpol)
         face_nodes, cell_nodes = topology_test_nodes(func_interpol)
-        for face in 1:JuAFEM.getnfaces(func_interpol)
+        for face in 1:getnfaces(func_interpol)
             reinit!(fv, xs, face)
             @test JuAFEM.getcurrentface(fv) == face
 
@@ -60,8 +60,8 @@ for (func_interpol, quad_rule) in  (
             for i in 1:getnquadpoints(fv)
                 vol += getdetJdV(fv,i)
             end
-            x_face = xs[[JuAFEM.getfacelist(func_interpol)[face]...]]
-            @test vol ≈ calculate_volume(JuAFEM.getlowerdim(func_interpol), x_face)
+            x_face = xs[[getfacelist(func_interpol)[face]...]]
+            @test vol ≈ calculate_volume(getlowerdim(func_interpol), x_face)
 
             # Test quadrature rule after reinit! with ref. coords
             x = reference_coordinates(func_interpol)
@@ -82,10 +82,10 @@ for (func_interpol, quad_rule) in  (
 
         # Test face number calculation
         face_nodes, cell_nodes = topology_test_nodes(func_interpol)
-        for face in 1:JuAFEM.getnfaces(func_interpol)
+        for face in 1:getnfaces(func_interpol)
             @test getfacenumber(face_nodes[face], cell_nodes, func_interpol) == face
         end
-        @test_throws ArgumentError getfacenumber(face_nodes[JuAFEM.getnfaces(func_interpol)+1], cell_nodes, func_interpol)
+        @test_throws ArgumentError getfacenumber(face_nodes[getnfaces(func_interpol)+1], cell_nodes, func_interpol)
     end
 end
 
