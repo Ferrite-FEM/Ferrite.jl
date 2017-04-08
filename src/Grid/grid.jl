@@ -110,9 +110,6 @@ end
 @inline getfaceset(grid::Grid, set::String) = grid.facesets[set]
 @inline getfacesets(grid::Grid) = grid.facesets
 
-n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
-getfacelist(grid::Grid) = getfacelist(eltype(grid.cells))
-
 # Transformations
 
 function transform!(g::Grid, f::Function)
