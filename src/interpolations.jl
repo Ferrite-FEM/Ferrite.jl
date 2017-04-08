@@ -69,12 +69,6 @@ function value{dim, T}(ip::Interpolation{dim}, ξ::Vec{dim, T})
     value!(ip, zeros(T, getnbasefunctions(ip)), ξ)
 end
 
-
-_get_n_celldofs(::Interpolation) = 0
-_get_n_facedofs(::Interpolation) = 0
-_get_n_edgedofs(::Interpolation) = 0
-_get_n_vertexdofs(::Interpolation) = 0
-
 """
 Computes the gradients of the shape functions at a point ξ for a given interpolation
 """
@@ -103,6 +97,7 @@ function derivative!{T, order, shape, dim}(ip::Interpolation{dim, shape, order},
     return dN
 end
 
+
 """
 Returns the number of base functions for an [`Interpolation`](@ref) or `Values` object.
 """
@@ -123,8 +118,7 @@ getnbasefunctions{dim, order}(::Lagrange{dim, RefCube, order}) = (order + 1)^dim
 getnfacenodes{order}(::Lagrange{1, RefCube, order}) = (order + 1)^(dim - 1)
 getnfacenodes{dim, order}(::Lagrange{dim, RefCube, order}) = (order + 1)^(dim - 1)
 
-function value!(ip::Lagrange{1, RefCube, 1}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
+_get_n_vertexdofs(::Lagrange{1, RefCube, 1}) = 2
 
 # Evaluates the lagrange polynomial number j at point x with xs as basis points
 function lagrange_polynomial(x::Number, xs::AbstractVector, j::Int)
@@ -151,69 +145,12 @@ function evaluate_Nmatrix{T, order, dim}(ip::Lagrange{dim, 2, order}, ξ::Abstra
     return N
 end
 
-##################################
-# Lagrange dim 1 RefCube order 2 #
-##################################
-getnbasefunctions(::Lagrange{1, RefCube, 2}) = 3
-
-function value!(ip::Lagrange{1, RefCube, 2}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-
-    @inbounds begin
-        ξ_x = ξ[1]
-
-        N[1] = ξ_x * (ξ_x - 1) * 0.5
-        N[2] = ξ_x * (ξ_x + 1) * 0.5
-        N[3] = 1 - ξ_x^2
-    end
-    return N
-end
-
-##################################
-# Lagrange dim 2 RefCube order 1 #
-##################################
-getnbasefunctions(::Lagrange{2, RefCube, 1}) = 4
-
-function value!(ip::Lagrange{2, RefCube, 1}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-
-        N[1] = (1 - ξ_x) * (1 - ξ_y) * 0.25
-        N[2] = (1 + ξ_x) * (1 - ξ_y) * 0.25
-        N[3] = (1 + ξ_x) * (1 + ξ_y) * 0.25
-        N[4] = (1 - ξ_x) * (1 + ξ_y) * 0.25
-    end
-    return N
-end
-
-##################################
-# Lagrange dim 2 RefCube order 2 #
-##################################
-getnbasefunctions(::Lagrange{2, RefCube, 2}) = 9
-
-function value!(ip::Lagrange{2, RefCube, 2}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-
-        N[1] = ξ_x
-        N[2] = ξ_y
-        N[3] = 1. - ξ_x - ξ_y
-    end
-
-    return N
-end
-
 #########################################
 # Lagrange dim 2 RefTetrahedron order 1 #
 #########################################
 getnbasefunctions(::Lagrange{2, RefTetrahedron, 1}) = 3
 
+getnfacenodes(::Lagrange{2, RefTetrahedron, 1}) = 2
 function value!(ip::Lagrange{2, RefTetrahedron, 1}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
 
@@ -281,6 +218,7 @@ end
 #########################################
 getnbasefunctions(::Lagrange{3, RefTetrahedron, 2}) = 10
 
+
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch09.d/AFEM.Ch09.pdf
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.pdf
 function value!(ip::Lagrange{3, RefTetrahedron, 2}, N::AbstractVector, ξ::AbstractVector)
@@ -306,32 +244,6 @@ function value!(ip::Lagrange{3, RefTetrahedron, 2}, N::AbstractVector, ξ::Abstr
     return N
 end
 
-##################################
-# Lagrange dim 3 RefCube order 1 #
-##################################
-getnbasefunctions(::Lagrange{3, RefCube, 1}) = 8
-
-function value!(ip::Lagrange{3, RefCube, 1}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-        ξ_z = ξ[3]
-
-        N[1]  = 0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z)
-        N[2]  = 0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z)
-        N[3]  = 0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z)
-        N[4]  = 0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z)
-        N[5]  = 0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z)
-        N[7]  = 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z)
-        N[6]  = 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z)
-        N[8]  = 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z)
-    end
-
-    return N
-end
-
 ###############
 # Serendipity #
 ###############
@@ -341,6 +253,7 @@ immutable Serendipity{dim, shape, order} <: Interpolation{dim, shape, order} end
 # Serendipity dim 2 RefCube order 2 #
 #####################################
 getnbasefunctions(::Serendipity{2, RefCube, 2}) = 8
+
 
 function value!(ip::Serendipity{2, RefCube, 2}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)

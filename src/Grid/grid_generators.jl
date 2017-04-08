@@ -56,7 +56,7 @@ function generate_grid{T}(::Type{Line}, nel::NTuple{1, Int}, left::Vec{1, T}=Vec
     # Cell face sets
     facesets = Dict("left"  => Set{Tuple{Int, Int}}([boundary[1]]),
                     "right" => Set{Tuple{Int, Int}}([boundary[2]]))
-    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
+    return Grid(cells, nodes, Lagrange{1, RefCube, 1}(), facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # QuadraticLine

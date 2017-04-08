@@ -5,6 +5,7 @@ using Compat
 using ForwardDiff
 using Reexport
 using SortingNetworks
+using StaticArrays
 @reexport using Tensors
 @reexport using WriteVTK
 

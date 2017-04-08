@@ -67,9 +67,10 @@ end
 """
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 """
-type Grid{dim, N, T <: Real, M}
+type Grid{dim, N, T <: Real, M, IP <: Interpolation}
     cells::Vector{Cell{dim, N, M}}
     nodes::Vector{Node{dim, T}}
+    ip::IP
     # Sets
     cellsets::Dict{String, Set{Int}}
     nodesets::Dict{String, Set{Int}}
@@ -79,12 +80,13 @@ type Grid{dim, N, T <: Real, M}
 end
 
 function Grid{dim, N, M, T}(cells::Vector{Cell{dim, N, M}},
-                            nodes::Vector{Node{dim, T}};
+                            nodes::Vector{Node{dim, T}},
+                            ip::Interpolation;
                             cellsets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
                             nodesets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
                             facesets::Dict{String, Set{Tuple{Int, Int}}}=Dict{String, Set{Tuple{Int, Int}}}(),
                             boundary_matrix::SparseMatrixCSC{Bool, Int}=spzeros(Bool, 0, 0))
-    return Grid(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
+    return Grid(cells, nodes, ip, cellsets, nodesets, facesets, boundary_matrix)
 end
 
 ##########################

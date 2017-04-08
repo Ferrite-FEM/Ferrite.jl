@@ -80,36 +80,123 @@ julia> vtk_point_data(vtkfile
 
 const DEBUG = true
 
-@pure get_n_edges(ip::Interpolation) = get_n_edges(typeof(ip))
-@pure get_n_edgedofs(ip::Interpolation) = get_n_edgedofs(typeof(ip))
-@pure get_n_vertices(ip::Interpolation) = get_n_vertices(typeof(ip))
-@pure getedgelist(ip::Interpolation) = getedge(typeof(ip))
-@pure get_n_faces{order, refshape}(::Type{Interpolation{1, refshape, order}}) = 0
-@pure get_n_faces{order, refshape}(::Type{Interpolation{2, refshape, order}}) = 0
+DEBUG = true
 
-@pure get_n_edges{order}(::Type{Lagrange{1, RefCube, order}}) = 1
-@pure get_n_edges{order}(::Type{Lagrange{2, RefCube, order}}) = 4
-@pure get_n_edges{order}(::Type{Lagrange{3, RefCube, order}}) = 12
+@pure get_n_cells(::Interpolation) = 1
 
-@pure get_n_vertices{order}(::Type{Lagrange{1, RefCube, order}}) = 2
-@pure get_n_vertices{order}(::Type{Lagrange{2, RefCube, order}}) = 4
-@pure get_n_vertices{order}(::Type{Lagrange{3, RefCube, order}}) = 8
+get_n_faces(ip::Interpolation{1}) = get_n_vertices(ip)
+get_n_faces(ip::Interpolation{2}) = get_n_edges(ip)
+get_n_faces(ip::Interpolation{3}) = get_n_surfaces(ip)
 
-@pure get_n_faces(ip::Interpolation) = get_n_faces(typeof(ip))
+get_facelist(ip::Interpolation{1}) = getvertexlist(ip)
+get_facelist(ip::Interpolation{2}) = getedgelist(ip)
+get_facelist(ip::Interpolation{3}) = getsurfacelist(ip)
 
-@pure get_n_faces{order}(::Type{Lagrange{3, RefCube, order}}) = 6
+# Dim 1 and 2 do not have surfaces
+@pure get_n_edges(::Interpolation{1}) = 0
+@pure get_n_edges(ip::Interpolation) = length(getedgelist(ip))
 
-@pure get_n_cells(ip::Interpolation) = get_n_cells(typeof(ip))
-@pure get_n_cells{dim, order}(::Type{Lagrange{dim, RefCube, order}}) = 1
+@pure get_n_surfaces{order, refshape}(::Interpolation{1, refshape, order}) = 0
+@pure get_n_surfaces{order, refshape}(::Interpolation{2, refshape, order}) = 0
+@pure get_n_surfaces(ip::Interpolation) = length(getedgelist(ip))
 
-@pure getedgelist{order}(::Type{Lagrange{1, RefCube, order}}) = ((1,), (2,))
-@pure getedgelist{order}(::Type{Lagrange{2, RefCube, order}}) = ((1,2), (2, 3), (3,4), (4, 1))
 
-# Computes the number of degrees of freedom that sits in every edge for a SINGLE edge
-@pure get_n_edgedofs{dim, order}(T::Type{Lagrange{dim, RefCube, order}}) = (order - 1)
+# Dim 1 do not have edges
+@pure get_n_vertices(::Interpolation{1, RefCube}) = 2
+@pure get_n_vertices(::Interpolation{2, RefCube}) = 4
+@pure get_n_vertices(::Interpolation{3, RefCube}) = 8
 
-@pure get_n_celldofs(ip::Interpolation) = get_n_celldofs(typeof(ip))
-@pure get_n_celldofs{dim, order}(T::Type{Lagrange{dim, RefCube, order}}) = (order - 1)^dim
+@pure get_n_vertices(::Interpolation{2, RefTetrahedron}) = 3
+@pure get_n_vertices(::Interpolation{3, RefTetrahedron}) = 4
+
+# Edges
+
+@pure getedgelist(::Interpolation{2, RefCube}) = SVector(SVector(1, 2),
+                                                         SVector(2, 3),
+                                                         SVector(3, 4),
+                                                         SVector(4, 1))
+
+@pure getedgelist(::Interpolation{2, Tetrahedron}) = SVector(SVector(1, 2),
+                                                             SVector(2, 3),
+                                                             SVector(3, 1))
+
+
+#@pure get_n_surfaces(::Interpolation{3, RefCube}) = 6
+#@pure get_n_surfaces(::Interpolation{3, RefTetrahedron}) = 4
+
+
+# These needs to be defined by all interpolation spaces
+@pure get_n_vertexdofs{dim, order}(::Lagrange{dim, RefCube, order}) = 1
+@pure get_n_edgedofs{dim, order}(::Lagrange{dim, RefCube, order}) = (order - 1)
+@pure get_n_surfacedofs{dim, order}(::Lagrange{dim, RefCube, order}) = (order - 1)^(dim - 1)
+@pure get_n_celldofs{dim, order}(::Lagrange{dim, RefCube, order}) = (order - 1)^dim
+
+@pure get_n_vertexdofs{dim, order}(::Lagrange{dim, RefTetrahedron, order}) = 1
+@pure get_n_edgedofs{dim, order}(::Lagrange{dim, RefTetrahedron, order}) = (order - 1)
+@pure get_n_surfacedofs{dim, order}(::Lagrange{dim, RefTetrahedron, order}) = error() # TODO
+@pure get_n_celldofs{dim, order}(ip::Lagrange{dim, RefTetrahedron, order}) = ((order - 1)^dim - get_n_egedofs(ip)) ÷ 2 # TODO: Check
+
+# We use sorted tuples as dictionary keys for edges and surfaces.
+# The tuple contain all the global vertices for that edge / surface
+immutable SortedSVector{N, T}
+  n::SVector{N, T}
+  SortedSVector(n::SVector{N, T}) = new{N,T}(SVector(swapsort(n.data)))
+end
+SortedSVector{N,T}(n::SVector{N, T}) = SortedSVector{N,T}(n)
+
+
+immutable GlobalNode{N}
+    dof_numbers::SVector{N, Int} # Dof numbers in the node
+end
+
+immutable GlobalEdge{N}
+    sign::Bool                  # "sign" of the local edge that created dofs for this global edge
+    dof_numbers::SVector{N, Int} # Dof numbers in the edge
+end
+
+immutable GlobalSurface{N}
+    sign::Bool                  # "sign" of the surface
+    offset::Int
+    dof_numbers::SVector{N, Int} # Number of the dofs
+end
+
+immutable DofStorage{N, M, O}
+  # The dicts below are for looking up the object which stores the dofs for
+  # a global vertex / edge / surface
+  global_vertex_dofs::Dict{Int, GlobalNode{N}}
+  global_edge_dofs::Dict{SortedSVector{2}, GlobalEdge{M}}
+  global_surface_dofs::Dict{SortedSVector{3}, GlobalSurface{O}}
+  # Cell dofs are never shared and hence no need for a global lookup
+  # The arrays below are cell, (vertex / edge / surface / cell) -> dofs
+  cell_vertex_dofs::Array{Int, 3}
+  cell_edge_dofs::Array{Int, 3}
+  cell_surface_dofs::Array{Int, 3}
+  # There is only one set of cell dofs for each cell so one rank lower
+  cell_cell_dofs::Array{Int, 2}
+end
+
+
+function DofStorage(grid, ip::Interpolation, n_fieldcomponents)
+  n_vert = get_n_vertexdofs(ip) * n_fieldcomponents
+  n_edge = get_n_edgedofs(ip)   * n_fieldcomponents
+  n_surface = get_n_surfacedofs(ip)   * n_fieldcomponents
+  O = get_n_celldofs(ip)   * n_fieldcomponents
+  cell_vertex_dofs = zeros(Int, n_vert, get_n_vertices(ip), getncells(grid))
+  cell_edge_dofs =   zeros(Int, n_edge, get_n_edges(ip),    getncells(grid))
+  cell_surface_dofs =zeros(Int, n_surface, get_n_edges(ip), getncells(grid))
+  cell_cell_dofs =   zeros(Int, O,                          getncells(grid))
+  DofStorage(Dict{Int, GlobalNode{n_vert}}(),
+             Dict{SortedSVector{2}, GlobalEdge{n_edge}}(),
+             Dict{SortedSVector{3}, GlobalSurface{n_surface}}(),
+             cell_vertex_dofs,
+             cell_edge_dofs,
+             cell_surface_dofs,
+             cell_cell_dofs)
+end
+
+get_global_face_dofs(ip::Interpolation{1}, d::DofStorage) = d.global_vertex_dofs
+get_global_face_dofs(ip::Interpolation{2}, d::DofStorage) = d.global_edge_dofs
+get_global_face_dofs(ip::Interpolation{3}, d::DofStorage) = d.global_surface_dofs
 
 # DofHandler
 type DofHandler{dim, N, T, M}
@@ -118,15 +205,20 @@ type DofHandler{dim, N, T, M}
     interpolations::Vector{Interpolation}
     dof_dims::Vector{Int}
     closed::JuAFEM.ScalarWrapper{Bool}
+    dof_storage::Vector{DofStorage}
     grid::Grid{dim, N, T, M}
 end
 
 function DofHandler(grid::Grid)
-    DofHandler(Matrix{Int}(0, 0), Symbol[], Interpolation[], Int[], JuAFEM.ScalarWrapper(false), grid)
+    DofHandler(Matrix{Int}(0, 0), Symbol[], Interpolation[], Int[], JuAFEM.ScalarWrapper(false), DofStorage[], grid)
 end
 
 isclosed(dh::DofHandler) = dh.closed[]
-
+function find_field(dh::DofHandler, field::Symbol)
+  j = findfirst(i -> i == field, dh.field_names)
+  j == 0 && error("did not find field $field")
+  return j
+end
 
 # Add a field to the dofhandler ex `push!(dh, :u, 3)`
 function Base.push!(dh::DofHandler, name::Symbol, interpolation::Interpolation, dim::Int)
@@ -153,52 +245,16 @@ function Base.show(io::IO, dh::DofHandler)
         print(io, "  Dofs per cell: ", ndofs_per_cell(dh))
     end
 end
-immutable SortedNTuple{N, T}
-  n::NTuple{N, T}
-  SortedNTuple(n::NTuple{N, T}) = new{N,T}(swapsort(n))
-end
-SortedNTuple{N,T}(n::NTuple{N, T}) = SortedNTuple{N,T}(n)
-
-immutable GlobalNode{N}
-    dof_numbers::NTuple{N, Int} # Number of the dofs
-end
-
-immutable GlobalEdge{N}
-    sign::Bool                  # "sign" of the edge
-    dof_numbers::NTuple{N, Int} # Number of the dofs
-end
 
 # Returns the global vertices and the orientation of the edge. The orientation is -1 (false) if the global vertices goes from a higher to a lower vertex
-function get_global_edgevertices_and_orientation{dim}(ip::Interpolation{dim, RefCube}, global_vertices, edge_number::Int)
-  local_edge_numbers = getedgelist(typeof(ip))[edge_number]
-  global_vertices_edge = global_vertices[local_edge_numbers[1]], global_vertices[local_edge_numbers[2]]
-  return SortedNTuple(global_vertices_edge), global_vertices_edge[1] < global_vertices_edge[2]
-end
-
-immutable DofStorage{N, M}
-  global_vertex_dofs::Dict{Int, GlobalNode{N}}
-  global_edge_dofs::Dict{SortedNTuple{2}, GlobalEdge{M}}
-  # Cell dofs are never shared and hence no need for a global lookup
-  #
-  cell_vertex_dofs::Array{Int, 3}
-  cell_edge_dofs::Array{Int, 3}
-  cell_cell_dofs::Array{Int, 2}
-end
-
-function DofStorage(grid, ip::Interpolation, dim)
-  N = dim
-  M = get_n_edgedofs(ip) * dim
-  cell_vertex_dofs = zeros(Int, dim,                  get_n_vertices(ip), JuAFEM.getncells(grid))
-  cell_edge_dofs =   zeros(Int, get_n_edgedofs(ip)*dim, get_n_edges(ip)   , JuAFEM.getncells(grid))
-  cell_cell_dofs =   zeros(Int, get_n_celldofs(ip)*dim, JuAFEM.getncells(grid))
-  DofStorage(Dict{Int, GlobalNode{N}}(),
-             Dict{SortedNTuple{2}, GlobalEdge{M}}(),
-             cell_vertex_dofs,
-             cell_edge_dofs,
-             cell_cell_dofs)
+function get_global_edgevertices_and_orientation(ip::Interpolation, global_vertices, edge_number::Int)
+  local_edge_numbers = getedgelist(ip)[edge_number]
+  global_vertices_edge = SVector(global_vertices[local_edge_numbers[1]], global_vertices[local_edge_numbers[2]])
+  return SortedSVector(global_vertices_edge), global_vertices_edge[1] < global_vertices_edge[2]
 end
 
 function add_cell_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, M}, free_dof::Int)
+  get_n_celldofs(ip) <= 0 && return
   for i in 1:JuAFEM.getncells(grid)
     cell = grid.cells[i]
     new_dofs = free_dof:free_dof + size(dofstorage.cell_cell_dofs, 1) -1
@@ -210,12 +266,13 @@ function add_cell_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, 
 end
 
 function add_edge_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, M}, free_dof::Int)
+  get_n_edgedofs(ip) <= 0 && return
   for i in 1:JuAFEM.getncells(grid)
     cell = grid.cells[i]
-    for local_edge in 1:get_n_edges(typeof(ip))
+    for local_edge in 1:get_n_edges(ip)
       global_edgevertices, orientation = get_global_edgevertices_and_orientation(ip, cell.nodes, local_edge)
       if !haskey(dofstorage.global_edge_dofs, global_edgevertices)
-        new_dofs = ntuple(i -> free_dof + (i-1), Val{M})
+        new_dofs = SVector(ntuple(i -> free_dof + (i-1), Val{M}))
         dofstorage.global_edge_dofs[global_edgevertices] = GlobalEdge{M}(orientation, new_dofs)
         current_dofs, same_orientation = new_dofs, true
         DEBUG && println("Adding edge dofs: $current_dofs, for global edge $(global_edgevertices.n)  local edge: $local_edge, orientation: $orientation")
@@ -236,13 +293,15 @@ function add_edge_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, 
 end
 
 function add_node_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, M}, free_dof::Int)
+  get_n_vertexdofs(ip) <= 0 && return
   for i in 1:JuAFEM.getncells(grid)
     cell = grid.cells[i]
     for (local_vertex, global_vertex) in enumerate(cell.nodes)
       if !haskey(dofstorage.global_vertex_dofs, global_vertex)
         current_dofs = free_dof
-        new_dofs = ntuple(i -> free_dof + (i-1), Val{N})
+        new_dofs = SVector(ntuple(i -> free_dof + (i-1), Val{N}))
         DEBUG && println("Adding node dofs: $new_dofs for global vertex: $global_vertex local vertex: $local_vertex")
+        @show new_dofs
         dofstorage.global_vertex_dofs[global_vertex] = GlobalNode{N}(new_dofs)
         current_dofs = new_dofs
         free_dof += N
@@ -284,7 +343,7 @@ function insert_into_celldof_matrix(cell_dofs::Matrix, storage, k, g::Grid, spac
 
         #=
         if spacedim >= 3
-          # Faces
+          # Surfaces
           for local_vertex in 1:size(storage.cell_vertex_dofs, 2)
             for dof in 1:size(storage.cell_vertex_dofs, 1)
               dof = storage.cell_vertex_dofs[dof, local_vertex, i]
@@ -310,14 +369,18 @@ end
 function close!{dim}(dh::DofHandler{dim})
   free_dof = 1
   storages = []
+  @show free_dof
   for i in 1:length(dh.interpolations)
     ip = dh.interpolations[i]
     storage = DofStorage(dh.grid, ip, dh.dof_dims[i])
     push!(storages, storage)
-
     free_dof = add_node_dofs(dh.grid, ip, storage, free_dof)
     if dim >= 2
       free_dof = add_edge_dofs(dh.grid, ip, storage, free_dof)
+    end
+
+    if dim >= 3
+        # free_dof = add_surface_dofs(dh.grid, ip, storage, free_dof)
     end
     free_dof = add_cell_dofs(dh.grid, ip, storage, free_dof)
   end
@@ -335,6 +398,7 @@ function close!{dim}(dh::DofHandler{dim})
   end
 
   # Renumber dofs
+  #=
   free_dof = 1
   dof_renumber = Dict{Int, Int}()
   for i in eachindex(cell_dofs)
@@ -347,9 +411,12 @@ function close!{dim}(dh::DofHandler{dim})
       cell_dofs[i] = dof_renumber[dof]
     end
   end
-  dh.dofs_cells = cell_dofs
-end
+  =#
 
+  dh.dofs_cells = cell_dofs
+  dh.dof_storage = storages
+  dh.closed[] = true
+end
 
 # Creates a sparsity pattern from the dofs in a dofhandler.
 # Returns a sparse matrix with the correct pattern.

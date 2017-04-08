@@ -41,9 +41,10 @@ julia> apply!(u, dbc)
 ```
 
 """
+
 immutable DirichletBoundaryCondition
     f::Function
-    nodes::Set{Int}
+    faces::Vector{Tuple{Int, Int}}
     field::Symbol
     components::Vector{Int}
     idxoffset::Int
@@ -56,7 +57,7 @@ immutable DirichletBoundaryConditions{DH <: DofHandler, T}
     values::Vector{T}
     dofmapping::Dict{Int, Int} # global dof -> index into dofs and values
     dh::DH
-    closed::ScalarWrapper{Bool}
+    closed::JuAFEM.ScalarWrapper{Bool}
 end
 
 function DirichletBoundaryConditions(dh::DofHandler)
@@ -76,6 +77,62 @@ function Base.show(io::IO, dbcs::DirichletBoundaryConditions)
     end
 end
 
+
+function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
+              faceset::String, f::Function, component::Int=1)
+    add!(dbcs, field, nodes, f, [component])
+end
+
+function _check_constrain(dbcs::DirichletBoundaryConditions, field, components)
+  field in dbcs.dh.field_names || error("field $field does not exist in the dof handler, existing fields are $(dh.field_names)")
+  for component in components
+      0 < component <= ndim(dbcs.dh, field) || error("component $component is not within the range of field $field which has $(ndim(dbcs.dh, field)) dimensions")
+  end
+end
+
+
+
+function get_global_facekey(grid::Grid, ip::Interpolation, face::Tuple{Int, Int})
+    cell, faceidx = face
+    global_cell_vertices = grid.cells[cell].nodes
+    local_face_vertices = get_facelist(ip)[faceidx]
+    global_face_vertices = SVector(global_cell_vertices[local_face_vertices])
+    return SortedSVector(global_face_vertices)
+end
+
+# Adds a boundary condition
+function constrain_faces!(dbcs::DirichletBoundaryConditions, field::Symbol,
+                          faces::Set{Tuple{Int, Int}}, f::Function, components::Vector{Int})
+
+    _check_constrain(dbcs, field, components)
+
+    if length(faces) == 0
+        warn("added Dirichlet BC to node set containing 0 nodes")
+    end
+
+    i = find_field(dh, field)
+    ip = dh.in
+
+    dofs_bc = Int[]
+    for face in faces
+        facekey = get_global_facekey(dbcs.dh.grid, ip, face)
+        facedofs = get_global_facedofs(storage, ip)[facekey]
+        # find edge in global dof edges for the pertinent field
+        for component in components
+            push!(dofs_bc, facedofs.dof_numbers[component])
+        end
+    end
+
+    n_bcdofs = length(dofs_bc)
+
+    append!(dbcs.dofs, dofs_bc)
+    idxoffset = length(dbcs.values)
+    resize!(dbcs.values, length(dbcs.values) + n_bcdofs)
+
+    push!(dbcs.bcs, DirichletBoundaryCondition(f, field, components, idxoffset))
+
+end
+
 isclosed(dbcs::DirichletBoundaryConditions) = dbcs.closed[]
 dirichlet_dofs(dbcs::DirichletBoundaryConditions) = dbcs.dofs
 free_dofs(dbcs::DirichletBoundaryConditions) = dbcs.free_dofs
@@ -93,41 +150,6 @@ function close!(dbcs::DirichletBoundaryConditions)
     return dbcs
 end
 
-function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
-                          nodes::Union{Set{Int}, Vector{Int}}, f::Function, component::Int=1)
-    add!(dbcs, field, nodes, f, [component])
-end
-
-# Adds a boundary condition
-function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
-                          nodes::Union{Set{Int}, Vector{Int}}, f::Function, components::Vector{Int})
-    field in dbcs.dh.field_names || error("field $field does not exist in the dof handler, existing fields are $(dh.field_names)")
-    for component in components
-        0 < component <= ndim(dbcs.dh, field) || error("component $component is not within the range of field $field which has $(ndim(dbcs.dh, field)) dimensions")
-    end
-
-    if length(nodes) == 0
-        warn("added Dirichlet BC to node set containing 0 nodes")
-    end
-
-    dofs_bc = Int[]
-    offset = dof_offset(dbcs.dh, field)
-    for node in nodes
-        for component in components
-            dofid = dbcs.dh.dofs_nodes[offset + component, node]
-            push!(dofs_bc, dofid)
-        end
-    end
-
-    n_bcdofs = length(dofs_bc)
-
-    append!(dbcs.dofs, dofs_bc)
-    idxoffset = length(dbcs.values)
-    resize!(dbcs.values, length(dbcs.values) + n_bcdofs)
-
-    push!(dbcs.bcs, DirichletBoundaryCondition(f, Set(nodes), field, components, idxoffset))
-
-end
 
 # Updates the DBC's to the current time `time`
 function update!(dbcs::DirichletBoundaryConditions, time::Float64 = 0.0)
@@ -156,6 +178,34 @@ function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::
             values[dbc_index] = bc_value[i]
         end
     end
+end
+
+# Saves the dirichlet boundary conditions to a vtkfile.
+# Values will have a 1 where bcs are active and 0 otherwise
+function vtk_point_data(vtkfile, dbcs::DirichletBoundaryConditions)
+    unique_fields = []
+    for dbc in dbcs.bcs
+        push!(unique_fields, dbc.field)
+    end
+    unique_fields = unique(unique_fields)
+
+    for field in unique_fields
+        nd = ndim(dbcs.dh, field)
+        data = zeros(Float64, nd, getnnodes(dbcs.dh.grid))
+        for dbc in dbcs.bcs
+            if dbc.field != field
+                continue
+            end
+
+            for node in dbc.nodes
+                for component in dbc.components
+                    data[component, node] = 1.0
+                end
+            end
+        end
+        vtk_point_data(vtkfile, data, string(field)*"_bc")
+    end
+    return vtkfile
 end
 
 # Saves the dirichlet boundary conditions to a vtkfile.
