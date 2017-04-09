@@ -37,18 +37,36 @@ nfaces{dim, N, M}(::Type{Cell{dim, N, M}}) = M
 # Typealias for commonly used cells
 @compat const Line = Cell{1, 2, 2}
 @compat const QuadraticLine = Cell{1, 3, 2}
-
 @compat const Triangle = Cell{2, 3, 3}
 @compat const QuadraticTriangle = Cell{2, 6, 3}
-
 @compat const Quadrilateral = Cell{2, 4, 4}
 @compat const QuadraticQuadrilateral = Cell{2, 9, 4}
-
 @compat const Tetrahedron = Cell{3, 4, 4}
 @compat const QuadraticTetrahedron = Cell{3, 10, 4}
-
 @compat const Hexahedron = Cell{3, 8, 6}
 @compat const QuadraticHexahedron = Cell{3, 20, 6} # Function interpolation for this doesn't exist in JuAFEM yet
+
+to_interpolation(::Type{Line}) = Lagrange{1, RefCube, 1}
+to_interpolation(::Type{QuadraticLine}) = Lagrange{1, RefCube, 2}
+to_interpolation(::Type{Triangle}) = Lagrange{2, RefTetrahedron, 1}
+to_interpolation(::Type{QuadraticTriangle}) = Lagrange{2, RefTetrahedron, 2}
+to_interpolation(::Type{Quadrilateral}) = Lagrange{2, RefCube, 1}
+to_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2, RefCube, 2}
+to_interpolation(::Type{Tetrahedron}) = Lagrange{3, RefTetrahedron, 1}
+to_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{3, RefTetrahedron, 2}
+to_interpolation(::Type{Hexahedron}) = Lagrange{3, RefCube, 1}
+to_interpolation(::Type{QuadraticHexahedron}) = Lagrange{3, RefCube, 2}
+
+to_shape(::Type{Lagrange{1, RefCube, 1}}) = Line
+to_shape(::Type{Lagrange{1, RefCube, 2}}) = QuadraticLine
+to_shape(::Type{Lagrange{2, RefTetrahedron, 1}}) = Triangle
+to_shape(::Type{Lagrange{2, RefTetrahedron, 2}}) = QuadraticTriangle
+to_shape(::Type{Lagrange{2, RefCube, 1}}) = Quadrilateral
+to_shape(::Type{Lagrange{2, RefCube, 2}}) = QuadraticQuadrilateral
+to_shape(::Type{Lagrange{3, RefTetrahedron, 1}}) = Tetrahedron
+to_shape(::Type{Lagrange{3, RefTetrahedron, 2}}) = QuadraticTetrahedron
+to_shape(::Type{Lagrange{3, RefCube, 1}}) = Hexahedron
+to_shape(::Type{Lagrange{3, RefCube, 2}}) = QuadraticHexahedron
 
 """
 A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh

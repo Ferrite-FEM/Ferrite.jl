@@ -11,6 +11,8 @@ function boundaries_to_sparse(boundary)
     return sparse(I, J, V)
 end
 
+generate_grid{ip <: Interpolation}(::Type{ip}, args...) = generate_grid(to_shape(ip), args...)
+
 """
 `Grid` generator for a rectangle in 1, 2 and 3 dimensions.
 

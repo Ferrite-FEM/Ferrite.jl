@@ -55,7 +55,6 @@ end
 function value!{order}(ip::Lagrange{1, RefCube, order}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
     Nmat = evaluate_Nmatrix(ip, ξ)
-    @show Nmat
     N[1] = Nmat[1]
     N[2] = Nmat[end]
     for i in 2:length(Nmat)-1

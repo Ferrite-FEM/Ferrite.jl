@@ -84,7 +84,7 @@ function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
 end
 
 function _check_constrain(dbcs::DirichletBoundaryConditions, field, components)
-  field in dbcs.dh.field_names || error("field $field does not exist in the dof handler, existing fields are $(dh.field_names)")
+  field in dbcs.dh.field_names || error("field $field does not exist in the dof handler, existing fields are $(dbcs.dh.field_names)")
   for component in components
       0 < component <= ndim(dbcs.dh, field) || error("component $component is not within the range of field $field which has $(ndim(dbcs.dh, field)) dimensions")
   end
@@ -121,7 +121,9 @@ function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
             push!(dofs_bc, facedofs.dof_numbers[component])
         end
     end
+
     append!(dbcs.dofs, dofs_bc)
+    resize!(dbcs.values, length(dbcs.values) + length(dofs_bc))
     push!(dbcs.bcs, DirichletBoundaryCondition(f, faces, dofs_bc, field, components))
 end
 
@@ -137,9 +139,7 @@ function close!(dbcs::DirichletBoundaryConditions)
     for i in 1:length(dbcs.dofs)
         dbcs.dofmapping[dbcs.dofs[i]] = i
     end
-
     dbcs.closed[] = true
-
     return dbcs
 end
 
@@ -150,7 +150,7 @@ function update!(dbcs::DirichletBoundaryConditions, time::Float64 = 0.0)
     bc_offset = 0
     for dbc in dbcs.bcs
         i = find_field(dbcs.dh, dbc.field)
-        facevalues = dbc.dh.facevalues[i]
+        facevalues = dbcs.dh.facevalues[i]
         storage = dbcs.dh.dof_storage[i]
         ip = dbcs.dh.interpolations[i]
         # Function barrier
@@ -159,22 +159,24 @@ function update!(dbcs::DirichletBoundaryConditions, time::Float64 = 0.0)
 end
 
 function _update!(dbcs, dbc, f::Function, facevalues, storage, ip, time)
-    cell_vertex_coordinates = zeros(2) # TODO: Fix
+    cell_vertex_coordinates = zeros(Vec{1, Float64}, 2) # TODO: Fix
+    cell_facedofs = get_cell_facedofs(ip, storage)
     for face in dbc.faces
-        facekey = get_global_facekey(dbcs.dh.grid, ip, face)
-        facedofs = get_global_facedofs(ip, storage)[facekey]
         cell, faceidx = face
-        getcoordinates!(dbcs.dh.grid, cell)
+        getcoordinates!(cell_vertex_coordinates, dbcs.dh.grid, cell)
         reinit!(facevalues, cell_vertex_coordinates, faceidx)
-        for dof_coordinates in 1:getnquadpoints(facevalues)
-            x = spatial_coordinate(facevalues, dof_coordinate)
+        dof_count = 1
+        for dof_number in 1:getnquadpoints(facevalues)
+            # TODO: Need to loop in the same order that dofs were added
+            x = spatial_coordinate(facevalues, dof_number, cell_vertex_coordinates)
             bc_value = f(x, time)
-            @assert length(bc_value) == length(components)
-            for i in 1:length(components)
-              dof_number = facedofs.dof_numbers[component]
-              dbc_index = dofmapping[dof_number]
-              values[dbc_index] = bc_value[i]
+            @assert length(bc_value) == length(dbc.components)
+            for i in 1:length(dbc.components)
+              dof_number = cell_facedofs[dof_number, faceidx, cell] + dbc.components[i] - 1
+              dbc_index = dbcs.dofmapping[dof_number]
+              dbcs.values[dbc_index] = bc_value[i]
             end
+            dof_count += 1 # TODO: Fix
         end
     end
 end
