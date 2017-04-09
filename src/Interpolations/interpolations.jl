@@ -108,7 +108,7 @@ getnbasefunctions
 function create_face_quadrule_for_dofs{dim, refshape}(ip::Interpolation{dim, refshape})
   coords = get_dof_local_coordinates(ip)
   facelist = get_facelist(ip)
-  qrs = JuAFEM.QuadratureRule{dim, refshape}[]
+  qrs = JuAFEM.QuadratureRule{dim, refshape, Float64}[]
   for f in 1:get_n_faces(ip)
     c = Array(coords[facelist[f]])
     # TODO: FLoat64 -> something?

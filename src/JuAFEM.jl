@@ -7,6 +7,7 @@ using Reexport
 using SortingNetworks
 using StaticArrays
 using RecipesBase
+using Plots
 @reexport using Tensors
 @reexport using WriteVTK
 

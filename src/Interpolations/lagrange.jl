@@ -50,12 +50,21 @@ function evaluate_Nmatrix{T, order, dim}(ip::Lagrange{dim, RefCube, order}, ξ::
     return N
 end
 
-
-
 function value!{order}(ip::Lagrange{1, RefCube, order}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
     Nmat = evaluate_Nmatrix(ip, ξ)
     N[1] = Nmat[1]
+    N[2] = Nmat[end]
+    for i in 2:length(Nmat)-1
+      N[i+1] = Nmat[i]
+    end
+    return N
+end
+
+function value!{order}(ip::Lagrange{2, RefCube, order}, N::AbstractVector, ξ::AbstractVector)
+    checkdim_value(ip, N, ξ)
+    Nmat = evaluate_Nmatrix(ip, ξ)
+    N[1] = Nmat[1, 1]
     N[2] = Nmat[end]
     for i in 2:length(Nmat)-1
       N[i+1] = Nmat[i]
