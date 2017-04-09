@@ -66,37 +66,14 @@ Returns the polynomial order of the `Interpolation`
 Computes the value of the shape functions at a point ξ for a given interpolation
 """
 function value{dim, T}(ip::Interpolation{dim}, ξ::Vec{dim, T})
-    value!(ip, zeros(T, getnbasefunctions(ip)), ξ)
+    [value(ip, i, ξ) for i in 1:getnbasefunctions(ip)]
 end
 
 """
 Computes the gradients of the shape functions at a point ξ for a given interpolation
 """
 function derivative{dim, T}(ip::Interpolation{dim}, ξ::Vec{dim, T})
-    derivative!(ip, [zero(Tensor{1, dim, T}) for i in 1:getnbasefunctions(ip)], ξ)
-end
-
-@inline function checkdim_value{dim}(ip::Interpolation{dim}, N::AbstractVector, ξ::AbstractVector)
-    @assert length(ξ) == dim
-    n_base = getnbasefunctions(ip)
-    length(N) == n_base || throw(ArgumentError("N must have length $(n_base)"))
-end
-
-@inline function checkdim_derivative{dim, T}(ip::Interpolation{dim}, dN::AbstractVector{Vec{dim, T}}, ξ::Vec{dim, T})
-    n_base = getnbasefunctions(ip)
-    length(dN) == n_base || throw(ArgumentError("dN must have length $(n_base)"))
-end
-
-function derivative!{T, order, shape, dim}(ip::Interpolation{dim, shape, order}, dN::AbstractVector{Vec{dim, T}}, ξ::Vec{dim, T})
-    checkdim_derivative(ip, dN, ξ)
-    f!(N, x) = value!(ip, N, x)
-    NArray = zeros(T, getnbasefunctions(ip))
-    dNArray = ForwardDiff.jacobian(f!, NArray, ξ)
-    # Want to use reinterpret but that crashes Julia 0.6, #20847
-    for i in 1:length(dN)
-        dN[i] = Vec{dim, T}((dNArray[i, :]...))
-    end
-    return dN
+    [gradient(ξ -> value(ip, i, ξ), ξ) for i in 1:getnbasefunctions(ip)]
 end
 
 #####################
@@ -128,17 +105,13 @@ getnbasefunctions(::Lagrange{1, RefCube, 1}) = 2
 getnfacenodes(::Lagrange{1, RefCube, 1}) = 1
 getfacelist(::Type{Lagrange{1, RefCube, 1}}) = ((1,),(2,))
 
-function value!(ip::Lagrange{1, RefCube, 1}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-
+function value(ip::Lagrange{1, RefCube, 1}, i::Int, ξ::Vec{1})
     @inbounds begin
         ξ_x = ξ[1]
-
-        N[1] = (1 - ξ_x) * 0.5
-        N[2] = (1 + ξ_x) * 0.5
+        i == 1 && return (1 - ξ_x) * 0.5
+        i == 2 && return (1 + ξ_x) * 0.5
     end
-
-    return N
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ##################################
@@ -148,18 +121,14 @@ getnbasefunctions(::Lagrange{1, RefCube, 2}) = 3
 getnfacenodes(::Lagrange{1, RefCube, 2}) = 1
 getfacelist(::Type{Lagrange{1, RefCube, 2}}) = ((1,),(2,))
 
-function value!(ip::Lagrange{1, RefCube, 2}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-
+function value(ip::Lagrange{1, RefCube, 2}, i::Int, ξ::Vec{1})
     @inbounds begin
         ξ_x = ξ[1]
-
-        N[1] = ξ_x * (ξ_x - 1) * 0.5
-        N[2] = ξ_x * (ξ_x + 1) * 0.5
-        N[3] = 1 - ξ_x^2
+        i == 1 && return ξ_x * (ξ_x - 1) * 0.5
+        i == 2 && return ξ_x * (ξ_x + 1) * 0.5
+        i == 3 && return 1 - ξ_x^2
     end
-
-    return N
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ##################################
@@ -169,20 +138,16 @@ getnbasefunctions(::Lagrange{2, RefCube, 1}) = 4
 getnfacenodes(::Lagrange{2, RefCube, 1}) = 2
 getfacelist(::Type{Lagrange{2, RefCube, 1}}) = ((1,2),(2,3),(3,4),(1,4))
 
-function value!(ip::Lagrange{2, RefCube, 1}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-
+function value(ip::Lagrange{2, RefCube, 1}, i::Int, ξ::Vec{2})
     @inbounds begin
         ξ_x = ξ[1]
         ξ_y = ξ[2]
-
-        N[1] = (1 - ξ_x) * (1 - ξ_y) * 0.25
-        N[2] = (1 + ξ_x) * (1 - ξ_y) * 0.25
-        N[3] = (1 + ξ_x) * (1 + ξ_y) * 0.25
-        N[4] = (1 - ξ_x) * (1 + ξ_y) * 0.25
+        i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25
+        i == 2 && return (1 + ξ_x) * (1 - ξ_y) * 0.25
+        i == 3 && return (1 + ξ_x) * (1 + ξ_y) * 0.25
+        i == 4 && return (1 - ξ_x) * (1 + ξ_y) * 0.25
     end
-
-    return N
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ##################################
@@ -192,25 +157,21 @@ getnbasefunctions(::Lagrange{2, RefCube, 2}) = 9
 getnfacenodes(::Lagrange{2, RefCube, 2}) = 3
 getfacelist(::Type{Lagrange{2, RefCube, 2}}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
 
-function value!(ip::Lagrange{2, RefCube, 2}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-
+function value(ip::Lagrange{2, RefCube, 2}, i::Int, ξ::Vec{2})
     @inbounds begin
         ξ_x = ξ[1]
         ξ_y = ξ[2]
-
-        N[1] = (ξ_x^2 - ξ_x) * (ξ_y^2 - ξ_y) * 0.25
-        N[2] = (ξ_x^2 + ξ_x) * (ξ_y^2 - ξ_y) * 0.25
-        N[3] = (ξ_x^2 + ξ_x) * (ξ_y^2 + ξ_y) * 0.25
-        N[4] = (ξ_x^2 - ξ_x) * (ξ_y^2 + ξ_y) * 0.25
-        N[5] = (1 - ξ_x^2) * (ξ_y^2 - ξ_y) * 0.5
-        N[6] = (ξ_x^2 + ξ_x) * (1 - ξ_y^2) * 0.5
-        N[7] = (1 - ξ_x^2) * (ξ_y^2 + ξ_y) * 0.5
-        N[8] = (ξ_x^2 - ξ_x) * (1 - ξ_y^2) * 0.5
-        N[9] = (1 - ξ_x^2) * (1 - ξ_y^2)
+        i == 1 && return (ξ_x^2 - ξ_x) * (ξ_y^2 - ξ_y) * 0.25
+        i == 2 && return (ξ_x^2 + ξ_x) * (ξ_y^2 - ξ_y) * 0.25
+        i == 3 && return (ξ_x^2 + ξ_x) * (ξ_y^2 + ξ_y) * 0.25
+        i == 4 && return (ξ_x^2 - ξ_x) * (ξ_y^2 + ξ_y) * 0.25
+        i == 5 && return (1 - ξ_x^2) * (ξ_y^2 - ξ_y) * 0.5
+        i == 6 && return (ξ_x^2 + ξ_x) * (1 - ξ_y^2) * 0.5
+        i == 7 && return (1 - ξ_x^2) * (ξ_y^2 + ξ_y) * 0.5
+        i == 8 && return (ξ_x^2 - ξ_x) * (1 - ξ_y^2) * 0.5
+        i == 9 && return (1 - ξ_x^2) * (1 - ξ_y^2)
     end
-
-    return N
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 #########################################
@@ -221,19 +182,15 @@ getlowerdim{order}(::Lagrange{2, RefTetrahedron, order}) = Lagrange{1, RefCube, 
 getnfacenodes(::Lagrange{2, RefTetrahedron, 1}) = 2
 getfacelist(::Type{Lagrange{2, RefTetrahedron, 1}}) = ((1,2),(2,3),(1,3))
 
-function value!(ip::Lagrange{2, RefTetrahedron, 1}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-
+function value(ip::Lagrange{2, RefTetrahedron, 1}, i::Int, ξ::Vec{2})
     @inbounds begin
         ξ_x = ξ[1]
         ξ_y = ξ[2]
-
-        N[1] = ξ_x
-        N[2] = ξ_y
-        N[3] = 1. - ξ_x - ξ_y
+        i == 1 && return ξ_x
+        i == 2 && return ξ_y
+        i == 3 && return 1. - ξ_x - ξ_y
     end
-
-    return N
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 #########################################
@@ -243,24 +200,19 @@ getnbasefunctions(::Lagrange{2, RefTetrahedron, 2}) = 6
 getnfacenodes(::Lagrange{2, RefTetrahedron, 2}) = 3
 getfacelist(::Type{Lagrange{2, RefTetrahedron, 2}}) = ((1,2,4),(2,3,5),(1,3,6))
 
-function value!(ip::Lagrange{2, RefTetrahedron, 2}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-
+function value(ip::Lagrange{2, RefTetrahedron, 2}, i::Int, ξ::Vec{2})
     @inbounds begin
         ξ_x = ξ[1]
         ξ_y = ξ[2]
-
         γ = 1. - ξ_x - ξ_y
-
-        N[1] = ξ_x * (2ξ_x - 1)
-        N[2] = ξ_y * (2ξ_y - 1)
-        N[3] = γ * (2γ - 1)
-        N[4] = 4ξ_x * ξ_y
-        N[5] = 4ξ_y * γ
-        N[6] = 4ξ_x * γ
+        i == 1 && return ξ_x * (2ξ_x - 1)
+        i == 2 && return ξ_y * (2ξ_y - 1)
+        i == 3 && return γ * (2γ - 1)
+        i == 4 && return 4ξ_x * ξ_y
+        i == 5 && return 4ξ_y * γ
+        i == 6 && return 4ξ_x * γ
     end
-
-    return N
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 #########################################
@@ -270,21 +222,17 @@ getnbasefunctions(::Lagrange{3, RefTetrahedron, 1}) = 4
 getnfacenodes(::Lagrange{3, RefTetrahedron, 1}) = 3
 getfacelist(::Type{Lagrange{3, RefTetrahedron, 1}}) = ((1,2,3),(1,2,4),(2,3,4),(1,3,4))
 
-function value!(ip::Lagrange{3, RefTetrahedron, 1}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-
+function value(ip::Lagrange{3, RefTetrahedron, 1}, i::Int, ξ::Vec{3})
     @inbounds begin
         ξ_x = ξ[1]
         ξ_y = ξ[2]
         ξ_z = ξ[3]
-
-        N[1] = 1.0 - ξ_x - ξ_y - ξ_z
-        N[2] = ξ_x
-        N[3] = ξ_y
-        N[4] = ξ_z
+        i == 1 && return 1.0 - ξ_x - ξ_y - ξ_z
+        i == 2 && return ξ_x
+        i == 3 && return ξ_y
+        i == 4 && return ξ_z
     end
-
-    return N
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 #########################################
@@ -296,27 +244,23 @@ getfacelist(::Lagrange{3, RefTetrahedron, 2}) = ((1,2,3,5,6,7),(1,2,4,5,8,9),(2,
 
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch09.d/AFEM.Ch09.pdf
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.pdf
-function value!(ip::Lagrange{3, RefTetrahedron, 2}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-
+function value(ip::Lagrange{3, RefTetrahedron, 2}, i::Int, ξ::Vec{3})
     @inbounds begin
         ξ_x = ξ[1]
         ξ_y = ξ[2]
         ξ_z = ξ[3]
-
-        N[1]  = (-2 * ξ_x - 2 * ξ_y - 2 * ξ_z + 1) * (-ξ_x - ξ_y - ξ_z + 1)
-        N[2]  = ξ_x * (2 * ξ_x - 1)
-        N[3]  = ξ_y * (2 * ξ_y - 1)
-        N[4]  = ξ_z * (2 * ξ_z - 1)
-        N[5]  = ξ_x * (-4 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4)
-        N[6]  = 4 * ξ_x * ξ_y
-        N[7]  = 4 * ξ_y * (-ξ_x - ξ_y - ξ_z + 1)
-        N[8]  = ξ_z * (-4 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4)
-        N[9]  = 4 * ξ_x * ξ_z
-        N[10] = 4 * ξ_y * ξ_z
+        i == 1  && return (-2 * ξ_x - 2 * ξ_y - 2 * ξ_z + 1) * (-ξ_x - ξ_y - ξ_z + 1)
+        i == 2  && return ξ_x * (2 * ξ_x - 1)
+        i == 3  && return ξ_y * (2 * ξ_y - 1)
+        i == 4  && return ξ_z * (2 * ξ_z - 1)
+        i == 5  && return ξ_x * (-4 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4)
+        i == 6  && return 4 * ξ_x * ξ_y
+        i == 7  && return 4 * ξ_y * (-ξ_x - ξ_y - ξ_z + 1)
+        i == 8  && return ξ_z * (-4 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4)
+        i == 9  && return 4 * ξ_x * ξ_z
+        i == 10 && return 4 * ξ_y * ξ_z
     end
-
-    return N
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ##################################
@@ -326,25 +270,21 @@ getnbasefunctions(::Lagrange{3, RefCube, 1}) = 8
 getnfacenodes(::Lagrange{3, RefCube, 1}) = 4
 getfacelist(::Type{Lagrange{3, RefCube, 1}}) = ((1,2,3,4),(1,2,5,6),(2,3,6,7),(3,4,7,8),(1,4,5,8),(5,6,7,8))
 
-function value!(ip::Lagrange{3, RefCube, 1}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-
+function value(ip::Lagrange{3, RefCube, 1}, i::Int, ξ::Vec{3})
     @inbounds begin
         ξ_x = ξ[1]
         ξ_y = ξ[2]
         ξ_z = ξ[3]
-
-        N[1]  = 0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z)
-        N[2]  = 0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z)
-        N[3]  = 0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z)
-        N[4]  = 0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z)
-        N[5]  = 0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z)
-        N[7]  = 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z)
-        N[6]  = 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z)
-        N[8]  = 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z)
+        i == 1 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z)
+        i == 2 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z)
+        i == 3 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z)
+        i == 4 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z)
+        i == 5 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z)
+        i == 6 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z)
+        i == 7 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z)
+        i == 8 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z)
     end
-
-    return N
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ###############
@@ -361,21 +301,18 @@ getlowerorder(::Serendipity{2, RefCube, 2}) = Lagrange{2, RefCube, 1}()
 getnfacenodes(::Serendipity{2, RefCube, 2}) = 3
 getfacelist(::Type{Serendipity{2, RefCube, 2}}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
 
-function value!(ip::Serendipity{2, RefCube, 2}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-
-    ξ_x = ξ[1]
-    ξ_y = ξ[2]
-
+function value(ip::Serendipity{2, RefCube, 2}, i::Int, ξ::Vec{2})
     @inbounds begin
-        N[1] = (1 - ξ_x) * (1 - ξ_y) * 0.25(-ξ_x - ξ_y - 1)
-        N[2] = (1 + ξ_x) * (1 - ξ_y) * 0.25( ξ_x - ξ_y - 1)
-        N[3] = (1 + ξ_x) * (1 + ξ_y) * 0.25( ξ_x + ξ_y - 1)
-        N[4] = (1 - ξ_x) * (1 + ξ_y) * 0.25(-ξ_x + ξ_y - 1)
-        N[6] = 0.5(1 + ξ_x) * (1 - ξ_y * ξ_y)
-        N[5] = 0.5(1 - ξ_x * ξ_x) * (1 - ξ_y)
-        N[7] = 0.5(1 - ξ_x * ξ_x) * (1 + ξ_y)
-        N[8] = 0.5(1 - ξ_x) * (1 - ξ_y * ξ_y)
+        ξ_x = ξ[1]
+        ξ_y = ξ[2]
+        i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25(-ξ_x - ξ_y - 1)
+        i == 2 && return (1 + ξ_x) * (1 - ξ_y) * 0.25( ξ_x - ξ_y - 1)
+        i == 3 && return (1 + ξ_x) * (1 + ξ_y) * 0.25( ξ_x + ξ_y - 1)
+        i == 4 && return (1 - ξ_x) * (1 + ξ_y) * 0.25(-ξ_x + ξ_y - 1)
+        i == 5 && return 0.5(1 - ξ_x * ξ_x) * (1 - ξ_y)
+        i == 6 && return 0.5(1 + ξ_x) * (1 - ξ_y * ξ_y)
+        i == 7 && return 0.5(1 - ξ_x * ξ_x) * (1 + ξ_y)
+        i == 8 && return 0.5(1 - ξ_x) * (1 - ξ_y * ξ_y)
     end
-    return N
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end

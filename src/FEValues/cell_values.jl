@@ -73,11 +73,13 @@ function CellScalarValues{dim, T, shape <: AbstractRefShape}(::Type{T}, quad_rul
     M = zeros(T, n_geom_basefuncs, n_qpoints)
     dMdξ = zeros(Vec{dim, T}, n_geom_basefuncs, n_qpoints)
 
-    for (i, ξ) in enumerate(quad_rule.points)
-        value!(func_interpol,  view(N, :, i), ξ)
-        derivative!(func_interpol,  view(dNdξ, :, i), ξ)
-        value!(geom_interpol,  view(M, :, i), ξ)
-        derivative!(geom_interpol,  view(dMdξ, :, i), ξ)
+    for (qp, ξ) in enumerate(quad_rule.points)
+        for i in 1:n_func_basefuncs
+            dNdξ[i, qp], N[i, qp] = gradient(ξ -> value(func_interpol, i, ξ), ξ, :all)
+        end
+        for i in 1:n_geom_basefuncs
+            dMdξ[i, qp], M[i, qp] = gradient(ξ -> value(func_interpol, i, ξ), ξ, :all)
+        end
     end
 
     detJdV = zeros(T, n_qpoints)
@@ -118,26 +120,24 @@ function CellVectorValues{dim, T, shape <: AbstractRefShape}(::Type{T}, quad_rul
     M = zeros(T, n_geom_basefuncs, n_qpoints)
     dMdξ = zeros(Vec{dim, T}, n_geom_basefuncs, n_qpoints)
 
-    N_temp = zeros(getnbasefunctions(func_interpol))
-    dNdξ_temp = zeros(Vec{dim, T}, getnbasefunctions(func_interpol))
-    for (i, ξ) in enumerate(quad_rule.points)
-        value!(func_interpol, N_temp, ξ)
-        derivative!(func_interpol, dNdξ_temp, ξ)
+    for (qp, ξ) in enumerate(quad_rule.points)
         basefunc_count = 1
         for basefunc in 1:getnbasefunctions(func_interpol)
+            dNdξ_temp, N_temp = gradient(ξ -> value(func_interpol, basefunc, ξ), ξ, :all)
             for comp in 1:dim
                 N_comp = zeros(T, dim)
-                N_comp[comp] = N_temp[basefunc]
-                N[basefunc_count, i] = Vec{dim, T}((N_comp...))
+                N_comp[comp] = N_temp
+                N[basefunc_count, qp] = Vec{dim, T}((N_comp...))
 
                 dN_comp = zeros(T, dim, dim)
-                dN_comp[comp, :] = dNdξ_temp[basefunc]
-                dNdξ[basefunc_count, i] = Tensor{2, dim, T}((dN_comp...))
+                dN_comp[comp, :] = dNdξ_temp
+                dNdξ[basefunc_count, qp] = Tensor{2, dim, T}((dN_comp...))
                 basefunc_count += 1
             end
         end
-        value!(geom_interpol, view(M, :, i), ξ)
-        derivative!(geom_interpol, view(dMdξ, :, i), ξ)
+        for basefunc in 1:n_geom_basefuncs
+            dMdξ[basefunc, qp], M[basefunc, qp] = gradient(ξ -> value(geom_interpol, basefunc, ξ), ξ, :all)
+        end
     end
 
     detJdV = zeros(T, n_qpoints)

@@ -86,11 +86,13 @@ function FaceScalarValues{dim_qr, T, shape <: AbstractRefShape}(::Type{T}, quad_
     M =    zeros(T, n_geom_basefuncs, n_qpoints, n_faces)
     dMdξ = zeros(Vec{dim, T}, n_geom_basefuncs, n_qpoints, n_faces)
 
-    for k in 1:n_faces, (i, ξ) in enumerate(face_quad_rule[k].points)
-        value!(func_interpol, view(N, :, i, k), ξ)
-        derivative!(func_interpol, view(dNdξ, :, i, k), ξ)
-        value!(geom_interpol, view(M, :, i, k), ξ)
-        derivative!(geom_interpol, view(dMdξ, :, i, k), ξ)
+    for face in 1:n_faces, (qp, ξ) in enumerate(face_quad_rule[face].points)
+        for i in 1:n_func_basefuncs
+            dNdξ[i, qp, face], N[i, qp, face] = gradient(ξ -> value(func_interpol, i, ξ), ξ, :all)
+        end
+        for i in 1:n_geom_basefuncs
+            dMdξ[i, qp, face], M[i, qp, face] = gradient(ξ -> value(geom_interpol, i, ξ), ξ, :all)
+        end
     end
 
     detJdV = zeros(T, n_qpoints, n_faces)
@@ -140,33 +142,28 @@ function FaceVectorValues{dim_qr, T, shape <: AbstractRefShape}(::Type{T}, quad_
     M = zeros(T, n_geom_basefuncs, n_qpoints, n_faces)
     dMdξ = zeros(Vec{dim, T}, n_geom_basefuncs, n_qpoints, n_faces)
 
-    for k in 1:n_faces
-        N_temp = zeros(getnbasefunctions(func_interpol))
-        dNdξ_temp = zeros(Vec{dim, T}, getnbasefunctions(func_interpol))
-        for (i, ξ) in enumerate(face_quad_rule[k].points)
-            value!(func_interpol, N_temp, ξ)
-            derivative!(func_interpol, dNdξ_temp, ξ)
-            basefunc_count = 1
-            for basefunc in 1:getnbasefunctions(func_interpol)
-                for comp in 1:dim
-                    N_comp = zeros(T, dim)
-                    N_comp[comp] = N_temp[basefunc]
-                    N[basefunc_count, i, k] = Vec{dim, T}((N_comp...))
+    for face in 1:n_faces, (qp, ξ) in enumerate(face_quad_rule[face].points)
+        basefunc_count = 1
+        for basefunc in 1:getnbasefunctions(func_interpol)
+            dNdξ_temp, N_temp = gradient(ξ -> value(func_interpol, basefunc, ξ), ξ, :all)
+            for comp in 1:dim
+                N_comp = zeros(T, dim)
+                N_comp[comp] = N_temp
+                N[basefunc_count, qp, face] = Vec{dim, T}((N_comp...))
 
-                    dN_comp = zeros(T, dim, dim)
-                    dN_comp[comp, :] = dNdξ_temp[basefunc]
-                    dNdξ[basefunc_count, i, k] = Tensor{2, dim, T}((dN_comp...))
-                    basefunc_count += 1
-                end
+                dN_comp = zeros(T, dim, dim)
+                dN_comp[comp, :] = dNdξ_temp
+                dNdξ[basefunc_count, qp, face] = Tensor{2, dim, T}((dN_comp...))
+                basefunc_count += 1
             end
-        value!(geom_interpol, view(M, :, i, k), ξ)
-        derivative!(geom_interpol, view(dMdξ, :, i, k), ξ)
+        end
+        for basefunc in 1:n_geom_basefuncs
+            dMdξ[basefunc, qp, face], M[basefunc, qp, face] = gradient(ξ -> value(geom_interpol, basefunc, ξ), ξ, :all)
         end
     end
 
     detJdV = zeros(T, n_qpoints, n_faces)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
-
 
     FaceVectorValues{dim, T, shape, MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
 end
@@ -176,7 +173,6 @@ function reinit!{dim, T}(fv::FaceValues{dim}, x::AbstractVector{Vec{dim, T}}, fa
     n_func_basefuncs = getn_scalarbasefunctions(fv)
     @assert length(x) == n_geom_basefuncs
     isa(fv, FaceVectorValues) && (n_func_basefuncs *= dim)
-
 
     fv.current_face[] = face
     cb = getcurrentface(fv)
