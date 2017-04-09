@@ -15,16 +15,9 @@ immutable Lagrange{dim, shape, order} <: Interpolation{dim, shape, order} end
 @pure get_n_surfacedofs{dim, order}(::Lagrange{dim, RefTetrahedron, order}) = error() # TODO
 @pure get_n_celldofs{dim, order}(ip::Lagrange{dim, RefTetrahedron, order}) = ((order - 1)^dim - get_n_egedofs(ip)) ÷ 2 # TODO: Check
 
-function get_dof_local_coordinates{order}(ip::Lagrange{1, RefCube, order})
-    x = [Vec{1}((x,)) for x in GaussQuadrature.legendre(Float64, order + 1, GaussQuadrature.both)[1]]
-    x_reorded = similar(x)
-    x_reorded[1] = x[1]
-    x_reorded[2] = x[end]
-    for i in 2:length(x)-1
-      x_reorded[i+1] = x[i]
-    end
-    return x_reorded
-end
+
+
+
 
 function lagrange_polynomial(x::Number, xs::AbstractVector, j::Int)
     @assert j <= length(xs)
@@ -37,6 +30,9 @@ function lagrange_polynomial(x::Number, xs::AbstractVector, j::Int)
     return num / den
 end
 
+# Note: Will have  vertices in the following order:
+# 1   4
+# 2   3
 function evaluate_Nmatrix{T, order, dim}(ip::Lagrange{dim, RefCube, order}, ξ::AbstractVector{T})
     @assert length(ξ) == dim
     x = GaussQuadrature.legendre(Float64, order + 1, GaussQuadrature.both)[1]
@@ -50,26 +46,61 @@ function evaluate_Nmatrix{T, order, dim}(ip::Lagrange{dim, RefCube, order}, ξ::
     return N
 end
 
-function value!{order}(ip::Lagrange{1, RefCube, order}, N::AbstractVector, ξ::AbstractVector)
-    checkdim_value(ip, N, ξ)
-    Nmat = evaluate_Nmatrix(ip, ξ)
-    N[1] = Nmat[1]
-    N[2] = Nmat[end]
-    for i in 2:length(Nmat)-1
-      N[i+1] = Nmat[i]
+# Computes a lookup table from the linear index into the Nmatrix to the dof number
+function linear_to_dof{order}(ip::Lagrange{1, RefCube, order})
+    reordering = zeros(Int, order + 1)
+    reordering[1] = 1
+    reordering[2] = order + 1
+    for i in 2:length(reordering)-1
+      reordering[i+1] = i
     end
-    return N
+    return reordering
 end
 
-function value!{order}(ip::Lagrange{2, RefCube, order}, N::AbstractVector, ξ::AbstractVector)
+
+import Base.CartesianIndex
+
+# Computes a lookup table from the cartesian index in the Nmatrix to the dof number
+function linear_to_dof{order}(ip::Lagrange{2, RefCube, order})
+    reordering = zeros(CartesianIndex{2}, (order + 1)^2)
+    # Vertices
+    reordering[1] = CartesianIndex(1, 1)
+    reordering[2] = CartesianIndex(order+1, 1)
+    reordering[3] = CartesianIndex(order+1, order + 1)
+    reordering[4] = CartesianIndex(1, order + 1)
+
+    # i goes from 2 -> order
+    xf = [i -> i, i -> order + 1, i -> order + 2 - i, i -> 1            ]
+    yf = [i -> 1, i -> i,         i -> order + 1,     i -> order + 2 - i]
+    # Edges
+    start_idx = 4
+    for n_edges in 1:4
+      for i in 2:order
+        reordering[start_idx+=1] = CartesianIndex(xf[n_edges](i), yf[n_edges](i))
+      end
+    end
+
+    # Cells
+    for i in 2:order
+      for j in 2:order
+        reordering[start_idx+=1] = CartesianIndex(j, i)
+      end
+    end
+
+    return reordering
+end
+
+# This is very similar to what the value function have to do.
+# Create a lookup linear index -> dof?
+function get_dof_local_coordinates{order}(ip::Lagrange{1, RefCube, order})
+    x = [Vec{1}((x,)) for x in GaussQuadrature.legendre(Float64, order + 1, GaussQuadrature.both)[1]]
+    return x[linear_to_dof(ip)]
+end
+
+function value!{dim, order}(ip::Lagrange{dim, RefCube, order}, N::AbstractVector, ξ::AbstractVector)
     checkdim_value(ip, N, ξ)
     Nmat = evaluate_Nmatrix(ip, ξ)
-    N[1] = Nmat[1, 1]
-    N[2] = Nmat[end]
-    for i in 2:length(Nmat)-1
-      N[i+1] = Nmat[i]
-    end
-    return N
+    copy!(N, Nmat[linear_to_dof(ip)])
 end
 
 getnbasefunctions(::Lagrange{2, RefTetrahedron, 1}) = 3

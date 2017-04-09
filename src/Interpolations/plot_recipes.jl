@@ -27,17 +27,30 @@
   c_arr, zeros(c_arr)
 end
 
-
 @userplot ShapeFunction
+
+function compute_values(ip::Lagrange{1, RefCube}, shape_func::Int)
+  N_points = 50
+  range = linspace(-1, 1, N_points)
+  Ns = zeros(getnbasefunctions(ip))
+  f(x) = JuAFEM.value!(ip, Ns, Vec{1}((x,)))[shape_func]
+  return range, f
+end
+
+function compute_values(ip::Lagrange{2, RefCube}, shape_func::Int)
+  N_points = 50
+  range = linspace(-1, 1, N_points)
+  Ns = zeros(getnbasefunctions(ip))
+  f(x,y) = JuAFEM.value!(ip, Ns, Vec{2}((x,y)))[shape_func]
+  return range, range, f
+end
 
 @recipe function plot(sf::ShapeFunction)
   ip, shape_func = sf.args[1], sf.args[2]
-  N_points = 50
-  range = linspace(-1, 1, N_points)
-  range_vec = [Vec{1}((x,)) for x in range]
-  Ns = zeros(getnbasefunctions(ip), N_points)
-  for i in 1:length(range_vec)
-      value!(ip, view(Ns, :, i), range_vec[i])
+  if getdim(ip) == 1
+    compute_values(ip, shape_func)
+  elseif getdim(ip) == 2
+    seriestype := :surface
+    compute_values(ip, shape_func)
   end
-  range, Ns[shape_func, :]
 end
