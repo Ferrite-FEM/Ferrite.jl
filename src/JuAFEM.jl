@@ -6,6 +6,7 @@ using ForwardDiff
 using Reexport
 using SortingNetworks
 using StaticArrays
+using RecipesBase
 @reexport using Tensors
 @reexport using WriteVTK
 
@@ -51,6 +52,7 @@ include("utils.jl")
 include(joinpath("Interpolations", "interpolations.jl"))
 include(joinpath("Interpolations", "lagrange.jl"))
 include(joinpath("Interpolations", "serendipity.jl"))
+include(joinpath("Interpolations", "plot_recipes.jl"))
 
 # Quadrature
 include(joinpath("Quadrature", "quadrature.jl"))

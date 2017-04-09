@@ -115,7 +115,6 @@ function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
     dofs_bc = Int[]
     for face in faces
         facekey = get_global_facekey(dbcs.dh.grid, ip, face)
-        @show facekey
         facedofs = get_global_facedofs(ip, storage)[facekey]
         # find edge in global dof edges for the pertinent field
         for component in components
@@ -152,57 +151,32 @@ function update!(dbcs::DirichletBoundaryConditions, time::Float64 = 0.0)
     for dbc in dbcs.bcs
         i = find_field(dbcs.dh, dbc.field)
         facevalues = dbc.dh.facevalues[i]
+        storage = dbcs.dh.dof_storage[i]
+        ip = dbcs.dh.interpolations[i]
         # Function barrier
-        _update!(dbcs, dbc, dbc.f, facevalues, time)
+        _update!(dbcs, dbc, dbc.f, facevalues, storage, ip, time)
     end
 end
 
-function _update!(dbcs, dbc, f::Function, facevalues, time)
+function _update!(dbcs, dbc, f::Function, facevalues, storage, ip, time)
     cell_vertex_coordinates = zeros(2) # TODO: Fix
     for face in dbc.faces
+        facekey = get_global_facekey(dbcs.dh.grid, ip, face)
+        facedofs = get_global_facedofs(ip, storage)[facekey]
         cell, faceidx = face
         getcoordinates!(dbcs.dh.grid, cell)
         reinit!(facevalues, cell_vertex_coordinates, faceidx)
-        for dof_coordinates in face
-            x = spatial_coordinate(facevalues, cell_coords, )
+        for dof_coordinates in 1:getnquadpoints(facevalues)
+            x = spatial_coordinate(facevalues, dof_coordinate)
             bc_value = f(x, time)
             @assert length(bc_value) == length(components)
             for i in 1:length(components)
-              c = components[i]
-              dof_number = dh.dofs_nodes[offset + c, node]
+              dof_number = facedofs.dof_numbers[component]
               dbc_index = dofmapping[dof_number]
               values[dbc_index] = bc_value[i]
             end
         end
     end
-end
-
-# Saves the dirichlet boundary conditions to a vtkfile.
-# Values will have a 1 where bcs are active and 0 otherwise
-function vtk_point_data(vtkfile, dbcs::DirichletBoundaryConditions)
-    unique_fields = []
-    for dbc in dbcs.bcs
-        push!(unique_fields, dbc.field)
-    end
-    unique_fields = unique(unique_fields)
-
-    for field in unique_fields
-        nd = ndim(dbcs.dh, field)
-        data = zeros(Float64, nd, getnnodes(dbcs.dh.grid))
-        for dbc in dbcs.bcs
-            if dbc.field != field
-                continue
-            end
-
-            for node in dbc.nodes
-                for component in dbc.components
-                    data[component, node] = 1.0
-                end
-            end
-        end
-        vtk_point_data(vtkfile, data, string(field)*"_bc")
-    end
-    return vtkfile
 end
 
 # Saves the dirichlet boundary conditions to a vtkfile.

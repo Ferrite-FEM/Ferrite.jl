@@ -7,3 +7,4 @@ ForwardDiff
 Compat 0.19.0
 SortingNetworks
 StaticArrays
+RecipesBase

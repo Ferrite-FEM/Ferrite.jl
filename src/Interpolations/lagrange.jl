@@ -20,9 +20,7 @@ function get_dof_local_coordinates{order}(ip::Lagrange{1, RefCube, order})
     x_reorded = similar(x)
     x_reorded[1] = x[1]
     x_reorded[2] = x[end]
-    @show x
     for i in 2:length(x)-1
-      print("WUUT")
       x_reorded[i+1] = x[i]
     end
     return x_reorded

@@ -124,7 +124,6 @@ end
 
 function FaceVectorValues{T, dim, refshape}(::Type{T}, face_quad_rule::Vector, # TODO: Fix type
         func_interpol::Interpolation{dim, refshape}, geom_interpol::Interpolation=func_interpol)
-      dim = 1
     n_qpoints = length(getweights(face_quad_rule[1]))
 
     n_faces = length(face_quad_rule)
