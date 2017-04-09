@@ -44,10 +44,10 @@ julia> apply!(u, dbc)
 
 immutable DirichletBoundaryCondition
     f::Function
-    faces::Vector{Tuple{Int, Int}}
+    faces::Set{Tuple{Int, Int}}
+    dofs::Vector{Int}
     field::Symbol
     components::Vector{Int}
-    idxoffset::Int
 end
 
 immutable DirichletBoundaryConditions{DH <: DofHandler, T}
@@ -90,8 +90,6 @@ function _check_constrain(dbcs::DirichletBoundaryConditions, field, components)
   end
 end
 
-
-
 function get_global_facekey(grid::Grid, ip::Interpolation, face::Tuple{Int, Int})
     cell, faceidx = face
     global_cell_vertices = grid.cells[cell].nodes
@@ -101,7 +99,7 @@ function get_global_facekey(grid::Grid, ip::Interpolation, face::Tuple{Int, Int}
 end
 
 # Adds a boundary condition
-function constrain_faces!(dbcs::DirichletBoundaryConditions, field::Symbol,
+function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
                           faces::Set{Tuple{Int, Int}}, f::Function, components::Vector{Int})
 
     _check_constrain(dbcs, field, components)
@@ -110,35 +108,31 @@ function constrain_faces!(dbcs::DirichletBoundaryConditions, field::Symbol,
         warn("added Dirichlet BC to node set containing 0 nodes")
     end
 
-    i = find_field(dh, field)
-    ip = dh.in
+    i = find_field(dbcs.dh, field)
+    storage = dbcs.dh.dof_storage[i]
+    ip = dbcs.dh.interpolations[i]
 
     dofs_bc = Int[]
     for face in faces
         facekey = get_global_facekey(dbcs.dh.grid, ip, face)
-        facedofs = get_global_facedofs(storage, ip)[facekey]
+        @show facekey
+        facedofs = get_global_facedofs(ip, storage)[facekey]
         # find edge in global dof edges for the pertinent field
         for component in components
             push!(dofs_bc, facedofs.dof_numbers[component])
         end
     end
-
-    n_bcdofs = length(dofs_bc)
-
     append!(dbcs.dofs, dofs_bc)
-    idxoffset = length(dbcs.values)
-    resize!(dbcs.values, length(dbcs.values) + n_bcdofs)
-
-    push!(dbcs.bcs, DirichletBoundaryCondition(f, field, components, idxoffset))
-
+    push!(dbcs.bcs, DirichletBoundaryCondition(f, faces, dofs_bc, field, components))
 end
 
 isclosed(dbcs::DirichletBoundaryConditions) = dbcs.closed[]
 dirichlet_dofs(dbcs::DirichletBoundaryConditions) = dbcs.dofs
 free_dofs(dbcs::DirichletBoundaryConditions) = dbcs.free_dofs
+
 function close!(dbcs::DirichletBoundaryConditions)
     fill!(dbcs.values, NaN)
-    fdofs = Array(setdiff(dbcs.dh.dofs_nodes, dbcs.dofs))
+    fdofs = Array(setdiff(1:dbcs.dh.total_dofs, dbcs.dofs))
     resize!(dbcs.free_dofs, length(fdofs))
     copy!(dbcs.free_dofs, fdofs)
     for i in 1:length(dbcs.dofs)
@@ -156,26 +150,29 @@ function update!(dbcs::DirichletBoundaryConditions, time::Float64 = 0.0)
     @assert dbcs.closed[]
     bc_offset = 0
     for dbc in dbcs.bcs
+        i = find_field(dbcs.dh, dbc.field)
+        facevalues = dbc.dh.facevalues[i]
         # Function barrier
-        _update!(dbcs.values, dbc.f, dbc.nodes, dbc.field,
-                 dbc.components, dbcs.dh, dbc.idxoffset, dbcs.dofmapping, time)
+        _update!(dbcs, dbc, dbc.f, facevalues, time)
     end
 end
 
-function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol,
-                  components::Vector{Int}, dh::DofHandler, idx_offset::Int,
-                  dofmapping::Dict{Int,Int}, time::Float64)
-    mesh = dh.grid
-    offset = dof_offset(dh, field)
-    for node in nodes
-        x = getcoordinates(getnodes(mesh, node))
-        bc_value = f(x, time)
-        @assert length(bc_value) == length(components)
-        for i in 1:length(components)
-            c = components[i]
-            dof_number = dh.dofs_nodes[offset + c, node]
-            dbc_index = dofmapping[dof_number]
-            values[dbc_index] = bc_value[i]
+function _update!(dbcs, dbc, f::Function, facevalues, time)
+    cell_vertex_coordinates = zeros(2) # TODO: Fix
+    for face in dbc.faces
+        cell, faceidx = face
+        getcoordinates!(dbcs.dh.grid, cell)
+        reinit!(facevalues, cell_vertex_coordinates, faceidx)
+        for dof_coordinates in face
+            x = spatial_coordinate(facevalues, cell_coords, )
+            bc_value = f(x, time)
+            @assert length(bc_value) == length(components)
+            for i in 1:length(components)
+              c = components[i]
+              dof_number = dh.dofs_nodes[offset + c, node]
+              dbc_index = dofmapping[dof_number]
+              values[dbc_index] = bc_value[i]
+            end
         end
     end
 end

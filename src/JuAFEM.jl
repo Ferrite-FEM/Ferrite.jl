@@ -9,7 +9,7 @@ using StaticArrays
 @reexport using Tensors
 @reexport using WriteVTK
 
-import Base: show, push!, @propagate_inbounds
+import Base: show, push!, @propagate_inbounds, @pure
 import WriteVTK: vtk_grid, vtk_point_data, DatasetFile
 
 # Utilities
@@ -50,7 +50,7 @@ include("utils.jl")
 
 include(joinpath("Interpolations", "interpolations.jl"))
 include(joinpath("Interpolations", "lagrange.jl"))
-include(joinpath("Interpolations", "serendepity.jl"))
+include(joinpath("Interpolations", "serendipity.jl"))
 
 # Quadrature
 include(joinpath("Quadrature", "quadrature.jl"))

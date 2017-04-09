@@ -105,6 +105,18 @@ Returns the number of base functions for an [`Interpolation`](@ref) or `Values` 
 """
 getnbasefunctions
 
+function create_face_quadrule_for_dofs{dim, refshape}(ip::Interpolation{dim, refshape})
+  coords = get_dof_local_coordinates(ip)
+  facelist = get_facelist(ip)
+  qrs = JuAFEM.QuadratureRule{dim, refshape}[]
+  for f in 1:get_n_faces(ip)
+    c = Array(coords[facelist[f]])
+    # TODO: FLoat64 -> something?
+    push!(qrs, QuadratureRule{dim, refshape, Float64}(ones(length(c)), c))
+  end
+  return qrs
+end
+
 # General geometrical information
 @pure get_n_cells(::Interpolation) = 1
 
@@ -132,12 +144,16 @@ get_facelist(ip::Interpolation{3}) = getsurfacelist(ip)
 @pure get_n_vertices(::Interpolation{2, RefTetrahedron}) = 3
 @pure get_n_vertices(::Interpolation{3, RefTetrahedron}) = 4
 
+getvertexlist(ip::Interpolation{1, RefCube}) = SVector(SVector(1),
+                                                       SVector(2))
+
+
 # Edges
 @pure getedgelist(::Interpolation{2, RefCube}) = SVector(SVector(1, 2),
                                                          SVector(2, 3),
                                                          SVector(3, 4),
                                                          SVector(4, 1))
 
-@pure getedgelist(::Interpolation{2, Tetrahedron}) = SVector(SVector(1, 2),
+@pure getedgelist(::Interpolation{2, RefTetrahedron}) = SVector(SVector(1, 2),
                                                              SVector(2, 3),
                                                              SVector(3, 1))

@@ -61,13 +61,10 @@ function FaceScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolatio
     FaceScalarValues(Float64, quad_rule, func_interpol, geom_interpol)
 end
 
-function FaceScalarValues{dim_qr, T, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim_qr, shape},
-        func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
+function FaceScalarValues{dim, dim_qr, T, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim_qr, shape},
+        func_interpol::Interpolation{dim, shape}, geom_interpol::Interpolation{dim, shape}=func_interpol)
 
-    @assert getdim(func_interpol) == getdim(geom_interpol)
-    @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
     n_qpoints = length(getweights(quad_rule))
-    dim = dim_qr + 1
 
     face_quad_rule = create_face_quad_rule(quad_rule, func_interpol)
     n_faces = length(face_quad_rule)
@@ -111,19 +108,25 @@ immutable FaceVectorValues{dim, T <: Real, refshape <: AbstractRefShape, M} <: F
     current_face::ScalarWrapper{Int}
 end
 
-function FaceVectorValues{dim_qr}(quad_rule::QuadratureRule{dim_qr}, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
+function FaceVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
     FaceVectorValues(Float64, quad_rule, func_interpol, geom_interpol)
 end
 
-function FaceVectorValues{dim_qr, T, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim_qr, shape},
-        func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
+function FaceVectorValues{QR <: QuadratureRule}(quad_rules::Vector{QR}, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
+    FaceVectorValues(Float64, quad_rules, func_interpol, geom_interpol)
+end
 
-    @assert getdim(func_interpol) == getdim(geom_interpol)
-    @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
-    n_qpoints = length(getweights(quad_rule))
-    dim = dim_qr + 1
 
+function FaceVectorValues{dim_qr}(quad_rule::QuadratureRule{dim_qr}, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
     face_quad_rule = create_face_quad_rule(quad_rule, func_interpol)
+    FaceVectorValues(Float64, face_quad_rule, func_interpol, geom_interpol)
+end
+
+function FaceVectorValues{T, dim, refshape}(::Type{T}, face_quad_rule::Vector, # TODO: Fix type
+        func_interpol::Interpolation{dim, refshape}, geom_interpol::Interpolation=func_interpol)
+      dim = 1
+    n_qpoints = length(getweights(face_quad_rule[1]))
+
     n_faces = length(face_quad_rule)
 
     # Normals
@@ -168,7 +171,7 @@ function FaceVectorValues{dim_qr, T, shape <: AbstractRefShape}(::Type{T}, quad_
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
 
-    FaceVectorValues{dim, T, shape, MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceVectorValues{dim, T, refshape, MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, face_quad_rule[1].weights, ScalarWrapper(0))
 end
 
 function reinit!{dim, T}(fv::FaceValues{dim}, x::AbstractVector{Vec{dim, T}}, face::Int)

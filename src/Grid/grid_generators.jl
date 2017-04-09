@@ -56,7 +56,10 @@ function generate_grid{T}(::Type{Line}, nel::NTuple{1, Int}, left::Vec{1, T}=Vec
     # Cell face sets
     facesets = Dict("left"  => Set{Tuple{Int, Int}}([boundary[1]]),
                     "right" => Set{Tuple{Int, Int}}([boundary[2]]))
-    return Grid(cells, nodes, Lagrange{1, RefCube, 1}(), facesets=facesets, boundary_matrix=boundary_matrix)
+
+    ip = Lagrange{1, RefCube, 1}()
+
+    return Grid(cells, nodes, ip, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # QuadraticLine
@@ -86,7 +89,10 @@ function generate_grid{T}(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec{
     # Cell face sets
     facesets = Dict("left"  => Set{Tuple{Int, Int}}([boundary[1]]),
                     "right" => Set{Tuple{Int, Int}}([boundary[2]]))
-    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
+
+    ip = Lagrange{1, RefCube, 1}()
+
+    return Grid(cells, nodes, ip, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
@@ -156,7 +162,9 @@ function generate_grid{T}(C::Type{Quadrilateral}, nel::NTuple{2, Int}, LL::Vec{2
     facesets["top"]    = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[:,end])) + offset]); offset += length(cell_array[:,end])
     facesets["left"]   = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[1,:]))   + offset]); offset += length(cell_array[1,:])
 
-    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
+    ip = Lagrange{2, RefCube, 1}()
+
+    return Grid(cells, nodes, ip, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # QuadraticQuadrilateral

@@ -109,7 +109,7 @@ end
 immutable DofStorage{N, M, O}
   # The dicts below are for looking up the object which stores the dofs for
   # a global vertex / edge / surface
-  global_vertex_dofs::Dict{Int, GlobalNode{N}}
+  global_vertex_dofs::Dict{SortedSVector{1}, GlobalNode{N}}
   global_edge_dofs::Dict{SortedSVector{2}, GlobalEdge{M}}
   global_surface_dofs::Dict{SortedSVector{3}, GlobalSurface{O}}
   # Cell dofs are never shared and hence no need for a global lookup
@@ -131,7 +131,7 @@ function DofStorage(grid, ip::Interpolation, n_fieldcomponents)
   cell_edge_dofs =   zeros(Int, n_edge, get_n_edges(ip),    getncells(grid))
   cell_surface_dofs =zeros(Int, n_surface, get_n_edges(ip), getncells(grid))
   cell_cell_dofs =   zeros(Int, O,                          getncells(grid))
-  DofStorage(Dict{Int, GlobalNode{n_vert}}(),
+  DofStorage(Dict{SortedSVector{1}, GlobalNode{n_vert}}(),
              Dict{SortedSVector{2}, GlobalEdge{n_edge}}(),
              Dict{SortedSVector{3}, GlobalSurface{n_surface}}(),
              cell_vertex_dofs,
@@ -140,9 +140,9 @@ function DofStorage(grid, ip::Interpolation, n_fieldcomponents)
              cell_cell_dofs)
 end
 
-get_global_face_dofs(ip::Interpolation{1}, d::DofStorage) = d.global_vertex_dofs
-get_global_face_dofs(ip::Interpolation{2}, d::DofStorage) = d.global_edge_dofs
-get_global_face_dofs(ip::Interpolation{3}, d::DofStorage) = d.global_surface_dofs
+get_global_facedofs(ip::Interpolation{1}, d::DofStorage) = d.global_vertex_dofs
+get_global_facedofs(ip::Interpolation{2}, d::DofStorage) = d.global_edge_dofs
+get_global_facedofs(ip::Interpolation{3}, d::DofStorage) = d.global_surface_dofs
 
 # DofHandler
 type DofHandler{dim, N, T, M}
@@ -152,14 +152,17 @@ type DofHandler{dim, N, T, M}
     dof_dims::Vector{Int}
     closed::JuAFEM.ScalarWrapper{Bool}
     dof_storage::Vector{DofStorage}
+    total_dofs::Int
+    facevalues::Vector{FaceValues}
     grid::Grid{dim, N, T, M}
 end
 
 function DofHandler(grid::Grid)
-    DofHandler(Matrix{Int}(0, 0), Symbol[], Interpolation[], Int[], JuAFEM.ScalarWrapper(false), DofStorage[], grid)
+    DofHandler(Matrix{Int}(0, 0), Symbol[], Interpolation[], Int[], JuAFEM.ScalarWrapper(false), DofStorage[], 0, FaceValues[], grid)
 end
 
 isclosed(dh::DofHandler) = dh.closed[]
+ndim(dh, field::Symbol) = dh.dof_dims[find_field(dh, field)]
 function find_field(dh::DofHandler, field::Symbol)
   j = findfirst(i -> i == field, dh.field_names)
   j == 0 && error("did not find field $field")
@@ -172,6 +175,9 @@ function Base.push!(dh::DofHandler, name::Symbol, interpolation::Interpolation, 
     if name in dh.field_names
         error("duplicate field name")
     end
+    qrs = JuAFEM.create_face_quadrule_for_dofs(interpolation)
+    fv = JuAFEM.FaceVectorValues(qrs, interpolation)
+    push!(dh.facevalues, fv)
     push!(dh.field_names, name)
     push!(dh.interpolations, interpolation)
     push!(dh.dof_dims, dim)
@@ -187,7 +193,7 @@ function Base.show(io::IO, dh::DofHandler)
     if !isclosed(dh)
         println(io, "  Not closed!")
     else
-        println(io, "  Total dofs: ", ndofs(dh))
+        println(io, "  Total dofs: ", dh.total_dofs)
         print(io, "  Dofs per cell: ", ndofs_per_cell(dh))
     end
 end
@@ -200,7 +206,7 @@ function get_global_edgevertices_and_orientation(ip::Interpolation, global_verti
 end
 
 function add_cell_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, M}, free_dof::Int)
-  get_n_celldofs(ip) <= 0 && return
+  get_n_celldofs(ip) <= 0 && return free_dof
   for i in 1:JuAFEM.getncells(grid)
     cell = grid.cells[i]
     new_dofs = free_dof:free_dof + size(dofstorage.cell_cell_dofs, 1) -1
@@ -212,7 +218,7 @@ function add_cell_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, 
 end
 
 function add_edge_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, M}, free_dof::Int)
-  get_n_edgedofs(ip) <= 0 && return
+  get_n_edgedofs(ip) <= 0 && return free_dof
   for i in 1:JuAFEM.getncells(grid)
     cell = grid.cells[i]
     for local_edge in 1:get_n_edges(ip)
@@ -239,7 +245,7 @@ function add_edge_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, 
 end
 
 function add_node_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, M}, free_dof::Int)
-  get_n_vertexdofs(ip) <= 0 && return
+  get_n_vertexdofs(ip) <= 0 && return free_dof
   for i in 1:JuAFEM.getncells(grid)
     cell = grid.cells[i]
     for (local_vertex, global_vertex) in enumerate(cell.nodes)
@@ -247,8 +253,7 @@ function add_node_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, 
         current_dofs = free_dof
         new_dofs = SVector(ntuple(i -> free_dof + (i-1), Val{N}))
         DEBUG && println("Adding node dofs: $new_dofs for global vertex: $global_vertex local vertex: $local_vertex")
-        @show new_dofs
-        dofstorage.global_vertex_dofs[global_vertex] = GlobalNode{N}(new_dofs)
+        dofstorage.global_vertex_dofs[SortedSVector(SVector(global_vertex))] = GlobalNode{N}(new_dofs)
         current_dofs = new_dofs
         free_dof += N
       else
@@ -315,7 +320,6 @@ end
 function close!{dim}(dh::DofHandler{dim})
   free_dof = 1
   storages = []
-  @show free_dof
   for i in 1:length(dh.interpolations)
     ip = dh.interpolations[i]
     storage = DofStorage(dh.grid, ip, dh.dof_dims[i])
@@ -343,7 +347,7 @@ function close!{dim}(dh::DofHandler{dim})
       k = insert_into_celldof_matrix(cell_dofs, storages[i], k, dh.grid, dim)
   end
 
-  # Renumber dofs
+  # Renumber dofs (would need to renumber everything in the storages too...)
   #=
   free_dof = 1
   dof_renumber = Dict{Int, Int}()
@@ -361,6 +365,7 @@ function close!{dim}(dh::DofHandler{dim})
 
   dh.dofs_cells = cell_dofs
   dh.dof_storage = storages
+  dh.total_dofs = free_dof - 1
   dh.closed[] = true
 end
 
