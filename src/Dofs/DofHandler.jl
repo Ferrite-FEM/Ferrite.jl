@@ -88,6 +88,11 @@ immutable SortedSVector{N, T}
 end
 SortedSVector{N,T}(n::SVector{N, T}) = SortedSVector{N,T}(n)
 
+# Stores a global dof number and a local dof number
+immutable LocalGlobalDof
+  loc::Int
+  glob::Int
+end
 
 immutable GlobalNode{N}
     dof_numbers::SVector{N, Int} # Dof numbers in the node
@@ -112,11 +117,30 @@ immutable DofStorage{N, M, O}
   global_surface_dofs::Dict{SortedSVector{3}, GlobalSurface{O}}
   # Cell dofs are never shared and hence no need for a global lookup
   # The arrays below are cell, (vertex / edge / surface / cell) -> dofs
-  cell_vertex_dofs::Array{Int, 3}
-  cell_edge_dofs::Array{Int, 3}
-  cell_surface_dofs::Array{Int, 3}
+  cell_vertex_dofs::Array{LocalGlobalDof, 3}
+  cell_edge_dofs::Array{LocalGlobalDof, 3}
+  cell_surface_dofs::Array{LocalGlobalDof, 3}
   # There is only one set of cell dofs for each cell so one rank lower
-  cell_cell_dofs::Array{Int, 2}
+  cell_cell_dofs::Array{LocalGlobalDof, 2}
+end
+
+
+function DofStorage(grid, ip::Interpolation, n_fieldcomponents)
+  n_vert    = get_n_vertices(ip)   != 0 ? get_n_vertexdofs(ip)  * n_fieldcomponents : 0
+  n_edge    = get_n_edges(ip)      != 0 ? get_n_edgedofs(ip)    * n_fieldcomponents : 0
+  n_surface = get_n_surfaces(ip)   != 0 ? get_n_surfacedofs(ip) * n_fieldcomponents : 0
+  n_cells   = get_n_cells(ip)      != 0 ? get_n_celldofs(ip)    * n_fieldcomponents : 0
+  cell_vertex_dofs = Array(LocalGlobalDof, n_vert,    get_n_vertices(ip), getncells(grid))
+  cell_edge_dofs =   Array(LocalGlobalDof, n_edge,    get_n_edges(ip),    getncells(grid))
+  cell_surface_dofs =Array(LocalGlobalDof, n_surface, get_n_edges(ip),     getncells(grid))
+  cell_cell_dofs =   Array(LocalGlobalDof, n_cells,   getncells(grid))
+  DofStorage(Dict{SortedSVector{1}, GlobalNode{n_vert}}(),
+             Dict{SortedSVector{2}, GlobalEdge{n_edge}}(),
+             Dict{SortedSVector{3}, GlobalSurface{n_surface}}(),
+             cell_vertex_dofs,
+             cell_edge_dofs,
+             cell_surface_dofs,
+             cell_cell_dofs)
 end
 
 function ndofs_per_cell(storage::DofStorage)
@@ -130,23 +154,6 @@ end
 
 
 
-function DofStorage(grid, ip::Interpolation, n_fieldcomponents)
-  n_vert    = get_n_vertices(ip)   != 0 ? get_n_vertexdofs(ip)  * n_fieldcomponents : 0
-  n_edge    = get_n_edges(ip)      != 0 ? get_n_edgedofs(ip)    * n_fieldcomponents : 0
-  n_surface = get_n_surfaces(ip)   != 0 ? get_n_surfacedofs(ip) * n_fieldcomponents : 0
-  n_cells   = get_n_cells(ip)      != 0 ? get_n_celldofs(ip)    * n_fieldcomponents : 0
-  cell_vertex_dofs = zeros(Int, n_vert,    get_n_vertices(ip), getncells(grid))
-  cell_edge_dofs =   zeros(Int, n_edge,    get_n_edges(ip),    getncells(grid))
-  cell_surface_dofs =zeros(Int, n_surface, get_n_edges(ip),     getncells(grid))
-  cell_cell_dofs =   zeros(Int, n_cells,   getncells(grid))
-  DofStorage(Dict{SortedSVector{1}, GlobalNode{n_vert}}(),
-             Dict{SortedSVector{2}, GlobalEdge{n_edge}}(),
-             Dict{SortedSVector{3}, GlobalSurface{n_surface}}(),
-             cell_vertex_dofs,
-             cell_edge_dofs,
-             cell_surface_dofs,
-             cell_cell_dofs)
-end
 
 get_global_facedofs(ip::Interpolation{1}, d::DofStorage) = d.global_vertex_dofs
 get_global_facedofs(ip::Interpolation{2}, d::DofStorage) = d.global_edge_dofs
@@ -156,6 +163,7 @@ get_global_facedofs(ip::Interpolation{3}, d::DofStorage) = d.global_surface_dofs
 get_cell_facedofs(ip::Interpolation{1}, d::DofStorage) = d.cell_vertex_dofs
 get_cell_facedofs(ip::Interpolation{2}, d::DofStorage) = d.cell_edge_dofs
 get_cell_facedofs(ip::Interpolation{3}, d::DofStorage) = d.cell_surface_dofs
+
 
 
 # DofHandler
@@ -235,11 +243,17 @@ end
 function add_cell_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, M}, free_dof::Int)
   get_n_celldofs(ip) <= 0 && return free_dof
   for i in 1:JuAFEM.getncells(grid)
+    local_celldofs = get_local_celldofs(ip)
     cell = grid.cells[i]
-    new_dofs = free_dof:free_dof + size(dofstorage.cell_cell_dofs, 1) -1
-    free_dof += length(new_dofs)
-    DEBUG && println("Adding cell dofs: $(collect(new_dofs)), for global cell $i")
-    dofstorage.cell_cell_dofs[:, i] = new_dofs
+    n_field_components = size(dofstorage.cell_cell_dofs, 1)
+    for celldof in 1:get_n_celldofs(ip)
+      local_celldof = local_celldofs[celldof]
+      for j in 1:n_field_components
+        DEBUG && println("Adding global cell dof: $free_dof, local dof: $local_celldof, for cell $i")
+        dofstorage.cell_cell_dofs[j, i] = LocalGlobalDof(local_celldof, free_dof)
+        free_dof += 1
+      end
+    end
   end # cells
   return free_dof
 end
@@ -248,47 +262,55 @@ function add_edge_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, 
   get_n_edgedofs(ip) <= 0 && return free_dof
   for i in 1:JuAFEM.getncells(grid)
     cell = grid.cells[i]
+    local_edges_dofs = get_local_edgedofs(ip)
     for local_edge in 1:get_n_edges(ip)
       global_edgevertices, orientation = get_global_edgevertices_and_orientation(ip, cell.nodes, local_edge)
       if !haskey(dofstorage.global_edge_dofs, global_edgevertices)
         new_dofs = SVector(ntuple(i -> free_dof + (i-1), Val{M}))
         dofstorage.global_edge_dofs[global_edgevertices] = GlobalEdge{M}(orientation, new_dofs)
         current_dofs, same_orientation = new_dofs, true
-        DEBUG && println("Adding edge dofs: $current_dofs, for global edge $(global_edgevertices.n)  local edge: $local_edge, orientation: $orientation")
+        DEBUG && println("Adding edge dofs: $current_dofs, for cell $i, global edge $(global_edgevertices.n)  local edge: $local_edge, orientation: $orientation")
         free_dof += M
       else
         global_edge_dofs = dofstorage.global_edge_dofs[global_edgevertices]
         current_dofs = global_edge_dofs.dof_numbers
         same_orientation = global_edge_dofs.sign == orientation
-        DEBUG && println("Reusing edge dofs: $current_dofs, for global edge $(global_edgevertices.n) local edge: $local_edge, same orientation: $same_orientation")
+        DEBUG && println("Reusing edge dofs: $current_dofs, for cell $i, global edge $(global_edgevertices.n) local edge: $local_edge, same orientation: $same_orientation")
       end
       if !same_orientation
         current_dofs = reverse(current_dofs)
       end
-      dofstorage.cell_edge_dofs[:, local_edge, i] = collect(current_dofs) # TODO: collect = blä
+      local_edge_dofs = local_edges_dofs[local_edge]
+      for j in 1:M
+        dofstorage.cell_edge_dofs[j, local_edge, i] = LocalGlobalDof(local_edge_dofs[j], current_dofs[j])
+      end
     end
   end # cells
   return free_dof
 end
 
-function add_node_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, M}, free_dof::Int)
+function add_vertex_dofs{N, M}(grid, ip::Interpolation, dofstorage::DofStorage{N, M}, free_dof::Int)
   get_n_vertexdofs(ip) <= 0 && return free_dof
   for i in 1:JuAFEM.getncells(grid)
     cell = grid.cells[i]
+    local_vertices_dofs = get_local_vertexdofs(ip)
     for (local_vertex, global_vertex) in enumerate(cell.nodes)
       global_vertex_key = SortedSVector(SVector(global_vertex))
       if !haskey(dofstorage.global_vertex_dofs, global_vertex_key)
         current_dofs = free_dof
         new_dofs = SVector(ntuple(i -> free_dof + (i-1), Val{N}))
-        DEBUG && println("Adding node dofs: $new_dofs for global vertex: $global_vertex local vertex: $local_vertex")
+        DEBUG && println("Adding vertex dofs: $new_dofs for cell $i, global vertex: $global_vertex local vertex: $local_vertex")
         dofstorage.global_vertex_dofs[global_vertex_key] = GlobalNode{N}(new_dofs)
         current_dofs = new_dofs
         free_dof += N
       else
         current_dofs = dofstorage.global_vertex_dofs[global_vertex_key].dof_numbers
-        DEBUG && println("Reusing node dofs $current_dofs for global vertex: $global_vertex local vertex: $local_vertex")
+        DEBUG && println("Reusing vertex dofs $current_dofs for cell $i, global vertex: $global_vertex local vertex: $local_vertex")
       end
-      dofstorage.cell_vertex_dofs[:, local_vertex, i] = collect(current_dofs) # TODO: collect = blä
+      local_vertex_dofs = local_vertices_dofs[local_vertex]
+      for j in 1:N
+        dofstorage.cell_vertex_dofs[j, local_vertex, i] = LocalGlobalDof(local_vertex_dofs[j], current_dofs[j])
+      end
     end
   end
   return free_dof
@@ -303,8 +325,8 @@ function insert_into_celldof_matrix(cell_dofs::Matrix, storage, k, g::Grid, spac
         for local_vertex in 1:size(storage.cell_vertex_dofs, 2)
           for dof in 1:size(storage.cell_vertex_dofs, 1)
             dof = storage.cell_vertex_dofs[dof, local_vertex, i]
-            cell_dofs[l, i] = dof
-            DEBUG && println("For cell $i, adding vertex dof $dof to row $l")
+            cell_dofs[l, i] = dof.glob
+            DEBUG && println("For cell $i, adding vertex dof $(dof.glob) to row $l")
             l += 1
           end
         end
@@ -313,8 +335,8 @@ function insert_into_celldof_matrix(cell_dofs::Matrix, storage, k, g::Grid, spac
           for local_edge in 1:size(storage.cell_edge_dofs, 2)
             for dof in 1:size(storage.cell_edge_dofs, 1)
               dof = storage.cell_edge_dofs[dof, local_edge, i]
-              cell_dofs[l, i] = dof
-              DEBUG && println("For cell $i, adding edge dof $dof to rowr $l")
+              cell_dofs[l, i] = dof.glob
+              DEBUG && println("For cell $i, adding edge dof $(dof.glob) to row $l")
               l += 1
             end
           end
@@ -326,8 +348,8 @@ function insert_into_celldof_matrix(cell_dofs::Matrix, storage, k, g::Grid, spac
           for local_vertex in 1:size(storage.cell_vertex_dofs, 2)
             for dof in 1:size(storage.cell_vertex_dofs, 1)
               dof = storage.cell_vertex_dofs[dof, local_vertex, i]
-              cell_dofs[l, i] = dof
-              DEBUG && println("For cell $i, adding dof $dof to row $l")
+              cell_dofs[l, i] = dof.glob
+              DEBUG && println("For cell $i, adding dof $(dof.glob) to row $l")
               l += 1
             end
           end
@@ -336,8 +358,8 @@ function insert_into_celldof_matrix(cell_dofs::Matrix, storage, k, g::Grid, spac
       # Cells
         for dof in 1:size(storage.cell_cell_dofs, 1)
           dof = storage.cell_cell_dofs[dof, i]
-          cell_dofs[l, i] = dof
-          DEBUG && println("For cell $i, adding cell dof $dof to number $l")
+          cell_dofs[l, i] = dof.glob
+          DEBUG && println("For cell $i, adding cell dof $(dof.glob) to number $l")
           l += 1
         end
     end
@@ -352,7 +374,7 @@ function close!{dim}(dh::DofHandler{dim})
     ip = dh.interpolations[i]
     storage = DofStorage(dh.grid, ip, dh.dof_dims[i])
     push!(storages, storage)
-    free_dof = add_node_dofs(dh.grid, ip, storage, free_dof)
+    free_dof = add_vertex_dofs(dh.grid, ip, storage, free_dof)
     if dim >= 2
       free_dof = add_edge_dofs(dh.grid, ip, storage, free_dof)
     end

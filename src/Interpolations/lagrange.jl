@@ -15,7 +15,26 @@ immutable Lagrange{dim, shape, order} <: Interpolation{dim, shape, order} end
 @pure get_n_surfacedofs{dim, order}(::Lagrange{dim, RefTetrahedron, order}) = error() # TODO
 @pure get_n_celldofs{dim, order}(ip::Lagrange{dim, RefTetrahedron, order}) = ((order - 1)^dim - get_n_egedofs(ip)) ÷ 2 # TODO: Check
 
+get_local_vertexdofs{dim, order}(::Lagrange{dim, RefCube, order}) = 1:2^dim
 
+function get_local_edgedofs{dim, order}(ip::Lagrange{dim, RefCube, order})
+  offset = get_local_vertexdofs(ip)[end]
+  n_edgedofs = get_n_edgedofs(ip) * 4
+  edge_1 = offset+1:offset + n_edgedofs
+  offset += n_edgedofs
+  edge_2 = offset+1:offset + n_edgedofs
+  offset += n_edgedofs
+  edge_3 = offset+1:offset + n_edgedofs
+  offset += n_edgedofs
+  edge_4 = offset+1:offset + n_edgedofs
+  offset += n_edgedofs
+  return (edge_1, edge_2, edge_3, edge_4)
+end
+
+function get_local_celldofs{dim, order}(ip::Lagrange{dim, RefCube, order})
+  offset = get_local_edgedofs(ip)[end][end]
+  return offset+1:offset + get_n_celldofs(ip)
+end
 
 
 
@@ -90,10 +109,15 @@ function linear_to_dof{order}(ip::Lagrange{2, RefCube, order})
     return reordering
 end
 
-# This is very similar to what the value function have to do.
-# Create a lookup linear index -> dof?
+
 function get_dof_local_coordinates{order}(ip::Lagrange{1, RefCube, order})
     x = [Vec{1}((x,)) for x in GaussQuadrature.legendre(Float64, order + 1, GaussQuadrature.both)[1]]
+    return x[linear_to_dof(ip)]
+end
+
+function get_dof_local_coordinates{order}(ip::Lagrange{2, RefCube, order})
+    quad = GaussQuadrature.legendre(Float64, order + 1, GaussQuadrature.both)[1]
+    x = [Vec{2}((x, y)) for x in quad, y in quad]
     return x[linear_to_dof(ip)]
 end
 

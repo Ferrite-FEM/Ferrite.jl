@@ -100,7 +100,7 @@ end
 
 # Adds a boundary condition
 function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
-                          faces::Set{Tuple{Int, Int}}, f::Function, components::Vector{Int})
+              faces::Set{Tuple{Int, Int}}, f::Function, components::Vector{Int})
 
     _check_constrain(dbcs, field, components)
 

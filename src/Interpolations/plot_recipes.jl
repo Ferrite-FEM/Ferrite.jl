@@ -29,7 +29,7 @@ end
 
 @userplot ShapeFunction
 
-function compute_values(ip::Lagrange{1, RefCube}, shape_func::Int)
+function compute_values(ip::Interpolation{1, RefCube}, shape_func::Int)
   N_points = 50
   range = linspace(-1, 1, N_points)
   Ns = zeros(getnbasefunctions(ip))
@@ -37,7 +37,7 @@ function compute_values(ip::Lagrange{1, RefCube}, shape_func::Int)
   return range, f
 end
 
-function compute_values(ip::Lagrange{2, RefCube}, shape_func::Int)
+function compute_values(ip::Interpolation{2, RefCube}, shape_func::Int)
   N_points = 50
   range = linspace(-1, 1, N_points)
   Ns = zeros(getnbasefunctions(ip))
