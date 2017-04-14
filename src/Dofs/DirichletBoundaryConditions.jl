@@ -239,8 +239,8 @@ end
 
 function meandiag(K::AbstractMatrix)
     z = zero(eltype(K))
-    for i in 1:size(K,1)
-        z += K[i,i]
+    for i in 1:size(K, 1)
+        z += abs(K[i, i])
     end
-    return z / size(K,1)
+    return z / size(K, 1)
 end
