@@ -11,7 +11,8 @@ makedocs(
         "man/fe_intro.md",
         "man/getting_started.md",
         "Library" => ["lib/maintypes.md",
-                      "lib/utility_functions.md"]]
+                      "lib/utility_functions.md"],
+        "man/examples.md"]
         )
 
 # Deploy built documentation from Travis.
