@@ -6,12 +6,10 @@ immutable UpdateFlags
     nodes::Bool
     coords::Bool
     celldofs::Bool
-    ge::Bool
-    ke::Bool
 end
 
-UpdateFlags(; nodes::Bool=true, coords::Bool=true, celldofs::Bool=true, ge::Bool=false, ke::Bool=false) =
-    UpdateFlags(nodes, coords, celldofs, ge, ke)
+UpdateFlags(; nodes::Bool=true, coords::Bool=true, celldofs::Bool=true) =
+    UpdateFlags(nodes, coords, celldofs)
 
 """
 ```julia
@@ -39,8 +37,6 @@ immutable CellIterator{dim, N, T, M}
     coords::Vector{Vec{dim, T}}
     dh::DofHandler{dim, N, T, M}
     celldofs::Vector{Int}
-    ge::Vector{T}
-    ke::Matrix{T}
 
     function (::Type{CellIterator{dim, N, T, M}}){dim, N, T, M}(dh::DofHandler{dim, N, T, M}, flags::UpdateFlags)
         cell = ScalarWrapper(0)
@@ -48,9 +44,7 @@ immutable CellIterator{dim, N, T, M}
         coords = zeros(Vec{dim, T}, N)
         n = ndofs_per_cell(dh)
         celldofs = zeros(Int, n)
-        ge = zeros(T, n)
-        ke = zeros(T, n, n)
-        return new{dim, N, T, M}(flags, dh.grid, cell, nodes, coords, dh, celldofs, ge, ke)
+        return new{dim, N, T, M}(flags, dh.grid, cell, nodes, coords, dh, celldofs)
     end
 
     function (::Type{CellIterator{dim, N, T, M}}){dim, N, T, M}(grid::Grid{dim, N, T, M}, flags::UpdateFlags)
@@ -93,10 +87,8 @@ function reinit!{dim, N}(ci::CellIterator{dim, N}, i::Int)
         ci.flags.nodes  && (ci.nodes[j] = nodeid)
         ci.flags.coords && (ci.coords[j] = ci.grid.nodes[nodeid].x)
     end
-    if isdefined(ci, :dh) # update celldofs
-        ci.flags.celldofs && celldofs!(ci.celldofs, ci)
-        ci.flags.ge       && fill!(ci.ge, 0)
-        ci.flags.ke       && fill!(ci.ke, 0)
+    if isdefined(ci, :dh) && ci.flags.celldofs # update celldofs
+        celldofs!(ci.celldofs, ci)
     end
     return ci
 end
