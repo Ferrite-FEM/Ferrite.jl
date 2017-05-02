@@ -1,6 +1,15 @@
 # this file defines iterators used for looping over a grid
 
-export CellIterator, FaceIterator
+export CellIterator, FaceIterator, UpdateFlags
+
+immutable UpdateFlags
+    nodes::Bool
+    coords::Bool
+    celldofs::Bool
+end
+
+UpdateFlags(; nodes::Bool=true, coords::Bool=true, celldofs::Bool=true) =
+    UpdateFlags(nodes, coords, celldofs)
 
 """
 ```julia
@@ -21,31 +30,35 @@ end
 ```
 """
 immutable CellIterator{dim, N, T, M}
+    flags::UpdateFlags
     grid::Grid{dim, N, T, M}
+    current_cellid::ScalarWrapper{Int}
     nodes::Vector{Int}
     coords::Vector{Vec{dim, T}}
-    current_cellid::ScalarWrapper{Int}
     dh::DofHandler{dim, N, T, M}
     celldofs::Vector{Int}
 
-    function (::Type{CellIterator{dim, N, T, M}}){dim, N, T, M}(dh::DofHandler{dim, N, T, M})
+    function (::Type{CellIterator{dim, N, T, M}}){dim, N, T, M}(dh::DofHandler{dim, N, T, M}, flags::UpdateFlags)
+        cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim, T}, N)
-        cell = ScalarWrapper(0)
-        celldofs = zeros(Int, ndofs_per_cell(dh))
-        return new{dim, N, T, M}(dh.grid, nodes, coords, ScalarWrapper(0), dh, celldofs)
+        n = ndofs_per_cell(dh)
+        celldofs = zeros(Int, n)
+        return new{dim, N, T, M}(flags, dh.grid, cell, nodes, coords, dh, celldofs)
     end
 
-    function (::Type{CellIterator{dim, N, T, M}}){dim, N, T, M}(grid::Grid{dim, N, T, M})
+    function (::Type{CellIterator{dim, N, T, M}}){dim, N, T, M}(grid::Grid{dim, N, T, M}, flags::UpdateFlags)
+        cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim, T}, N)
-        cell = ScalarWrapper(0)
-        return new{dim, N, T, M}(grid, nodes, coords, cell)
+        return new{dim, N, T, M}(flags, grid, cell, nodes, coords)
     end
 end
 
-CellIterator{dim, N, T, M}(grid::Grid{dim, N, T, M}) = CellIterator{dim,N,T,M}(grid)
-CellIterator{dim, N, T, M}(dh::DofHandler{dim, N, T, M}) = CellIterator{dim,N,T,M}(dh)
+CellIterator{dim, N, T, M}(grid::Grid{dim, N, T, M},     flags::UpdateFlags=UpdateFlags()) =
+    CellIterator{dim,N,T,M}(grid, flags)
+CellIterator{dim, N, T, M}(dh::DofHandler{dim, N, T, M}, flags::UpdateFlags=UpdateFlags()) =
+    CellIterator{dim,N,T,M}(dh, flags)
 
 # iterator interface
 Base.start(::CellIterator)     = 1
@@ -53,7 +66,7 @@ Base.next(ci::CellIterator, i) = (reinit!(ci, i), i+1)
 Base.done(ci::CellIterator, i) = i > getncells(ci.grid)
 Base.length(ci::CellIterator)  = getncells(ci.grid)
 
-Base.iteratorsize{T <: CellIterator}(::Type{T})   = Base.HasLength()   # this is default in Base
+Base.iteratorsize{T <: CellIterator}(::Type{T})   = Base.HasLength() # this is default in Base
 Base.iteratoreltype{T <: CellIterator}(::Type{T}) = Base.HasEltype() # this is default in Base
 Base.eltype{T <: CellIterator}(::Type{T})         = T
 
@@ -71,10 +84,10 @@ function reinit!{dim, N}(ci::CellIterator{dim, N}, i::Int)
     ci.current_cellid[] = i
     @inbounds for j in 1:N
         nodeid = nodeids[j]
-        ci.nodes[j] = nodeid
-        ci.coords[j] = ci.grid.nodes[nodeid].x
+        ci.flags.nodes  && (ci.nodes[j] = nodeid)
+        ci.flags.coords && (ci.coords[j] = ci.grid.nodes[nodeid].x)
     end
-    if isdefined(ci, :dh) # update celldofs
+    if isdefined(ci, :dh) && ci.flags.celldofs # update celldofs
         celldofs!(ci.celldofs, ci)
     end
     return ci
