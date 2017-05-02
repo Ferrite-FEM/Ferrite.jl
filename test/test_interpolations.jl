@@ -16,8 +16,8 @@ for interpolation in (Lagrange{1, RefCube, 1}(),
     r_shape = getrefshape(interpolation)
     func_order = getorder(interpolation)
     @test typeof(interpolation) <: Interpolation{ndim,r_shape,func_order}
-    @test typeof(JuAFEM.getlowerdim(interpolation)) <: Interpolation{ndim-1}
-    @test typeof(JuAFEM.getlowerorder(interpolation)) <: Interpolation{ndim,r_shape,func_order-1}
+    @test typeof(getlowerdim(interpolation)) <: Interpolation{ndim-1}
+    @test typeof(getlowerorder(interpolation)) <: Interpolation{ndim,r_shape,func_order-1}
 
     n_basefuncs = getnbasefunctions(interpolation)
     x = rand(Tensor{1, ndim})

@@ -52,7 +52,6 @@ All of the methods for [`CellValues`](@ref) apply for `FaceValues` as well.
 In addition, there are some methods that are unique for `FaecValues`:
 
 ```@docs
-getfacenumber
 getcurrentface
 ```
 
