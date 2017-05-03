@@ -74,14 +74,11 @@ immutable AssemblerSparsityPattern{Tv, Ti} <: AbstractSparseAssembler
     sorteddofs::Vector{Int}
 end
 immutable AssemblerSymmetricSparsityPattern{Tv, Ti} <: AbstractSparseAssembler
-    K::Symmetric{Tv, SparseMatrixCSC{Tv, Ti}}
+    K::SparseMatrixCSC{Tv, Ti}
     f::Vector{Tv}
     permutation::Vector{Int}
     sorteddofs::Vector{Int}
 end
-
-@inline getsparsemat(a::AssemblerSparsityPattern) = a.K
-@inline getsparsemat(a::AssemblerSymmetricSparsityPattern) = a.K.data
 
 start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}) = start_assemble(K, f)
 function start_assemble(K::SparseMatrixCSC, f::Vector=Float64[])
@@ -89,10 +86,11 @@ function start_assemble(K::SparseMatrixCSC, f::Vector=Float64[])
     fill!(f, 0.0)
     AssemblerSparsityPattern(K, f, Int[], Int[])
 end
-function start_assemble(K::Symmetric, f::Vector=Float64[])
+function start_assemble{T,CSC<:SparseMatrixCSC}(K::Symmetric{T, CSC}, f::Vector=Float64[])
+    K.uplo == 'U' || throw(ArgumentError("uplo must be 'U', got '$(K.uplo)'"))
     fill!(K.data.nzval, 0.0)
     fill!(f, 0.0)
-    AssemblerSymmetricSparsityPattern(K, f, Int[], Int[])
+    AssemblerSymmetricSparsityPattern(K.data, f, Int[], Int[])
 end
 
 @propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
@@ -113,7 +111,7 @@ end
         assemble!(A.f, dofs, fe)
     end
 
-    K = getsparsemat(A)
+    K = A.K
     permutation = A.permutation
     sorteddofs = A.sorteddofs
     @boundscheck checkbounds(K, dofs, dofs)
@@ -136,7 +134,7 @@ end
             current_idx > maxlookups && break
         end
         if current_idx <= maxlookups
-            error("some row indices were not found")
+            throw(error("some row indices were not found")
         end
         current_col += 1
     end
