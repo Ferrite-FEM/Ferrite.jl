@@ -1,4 +1,5 @@
 using JuAFEM
+using Tensors
 using Base.Test
 using ForwardDiff
 

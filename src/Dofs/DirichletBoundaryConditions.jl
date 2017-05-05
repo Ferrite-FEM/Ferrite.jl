@@ -1,5 +1,3 @@
-export DirichletBoundaryConditions, update!, apply!, apply_zero!, add!, free_dofs
-
 """
     DirichletBoundaryConditions
 
@@ -160,7 +158,7 @@ end
 
 # Saves the dirichlet boundary conditions to a vtkfile.
 # Values will have a 1 where bcs are active and 0 otherwise
-function vtk_point_data(vtkfile, dbcs::DirichletBoundaryConditions)
+function WriteVTK.vtk_point_data(vtkfile, dbcs::DirichletBoundaryConditions)
     unique_fields = []
     for dbc in dbcs.bcs
         push!(unique_fields, dbc.field)

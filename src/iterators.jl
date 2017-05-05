@@ -1,7 +1,4 @@
 # this file defines iterators used for looping over a grid
-
-export CellIterator, FaceIterator, UpdateFlags
-
 immutable UpdateFlags
     nodes::Bool
     coords::Bool

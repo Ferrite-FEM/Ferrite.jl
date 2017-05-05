@@ -1,6 +1,3 @@
-export DofHandler, close!, ndofs, ndofs_per_cell, celldofs!, celldofs,
-       create_sparsity_pattern, create_symmetric_sparsity_pattern
-
 """
     DofHandler
 
@@ -71,7 +68,7 @@ julia> a = rand(ndofs(dh))
 
 julia> vtkfile = vtk_grid(grid)
 
-julia> vtk_point_data(vtkfile
+julia> vtk_point_data(vtkfile)
 ```
 
 """
@@ -230,16 +227,16 @@ function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
 end
 
 
-vtk_grid(filename::AbstractString, dh::DofHandler) = vtk_grid(filename, dh.grid)
+WriteVTK.vtk_grid(filename::AbstractString, dh::DofHandler) = vtk_grid(filename, dh.grid)
 
 # Exports the FE field `u` to `vtkfile`
-function vtk_grid(filename::AbstractString, dh::DofHandler, u::Vector)
+function WriteVTK.vtk_grid(filename::AbstractString, dh::DofHandler, u::Vector)
     vtkfile = vtk_grid(filename, dh)
     vtk_point_data(vtkfile, dh, u)
     return vtkfile
 end
 
-function vtk_point_data(vtkfile, dh::DofHandler, u::Vector)
+function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector)
     offset = 0
     for i in 1:length(dh.field_names)
         ndim_field = dh.dof_dims[i]

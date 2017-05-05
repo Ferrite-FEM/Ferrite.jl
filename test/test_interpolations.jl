@@ -12,9 +12,9 @@ for interpolation in (Lagrange{1, RefCube, 1}(),
                       Lagrange{3, RefTetrahedron, 2}())
 
     # Test of utility functions
-    ndim = getdim(interpolation)
-    r_shape = getrefshape(interpolation)
-    func_order = getorder(interpolation)
+    ndim = JuAFEM.getdim(interpolation)
+    r_shape = JuAFEM.getrefshape(interpolation)
+    func_order = JuAFEM.getorder(interpolation)
     @test typeof(interpolation) <: Interpolation{ndim,r_shape,func_order}
     @test typeof(JuAFEM.getlowerdim(interpolation)) <: Interpolation{ndim-1}
     @test typeof(JuAFEM.getlowerorder(interpolation)) <: Interpolation{ndim,r_shape,func_order-1}

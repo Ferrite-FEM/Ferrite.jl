@@ -69,5 +69,4 @@ end_assemble
 
 ```@docs
 vtk_grid
-getVTKtype
 ```

@@ -1,5 +1,5 @@
 # PR #70
-function vtk_grid{T}(topology::Matrix{Int}, coord::Matrix{T}, filename::AbstractString)
+function WriteVTK.vtk_grid{T}(topology::Matrix{Int}, coord::Matrix{T}, filename::AbstractString)
     Base.depwarn("vtk_grid(topology::Matrix{Int}, coord::Matrix, filename::AbstractString) is deprecated, use vtk_grid{dim,T}(filename::AbstractString, coords::Vector{Vec{dim,T}}, topology::Matrix{Int}, celltype::VTKCellTypes.VTKCellType) instead", :vtk_grid)
     nen = size(topology,1)
     nnodes = size(coord, 2)

@@ -14,11 +14,11 @@ for (func_interpol, quad_rule) in  (
 
     for fe_valtype in (CellScalarValues, CellVectorValues)
         cv = fe_valtype(quad_rule, func_interpol)
-        ndim = getdim(func_interpol)
+        ndim = JuAFEM.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
         fe_valtype == CellScalarValues && @test getnbasefunctions(cv) == n_basefuncs
-        fe_valtype == CellVectorValues && @test getnbasefunctions(cv) == n_basefuncs * getdim(func_interpol)
+        fe_valtype == CellVectorValues && @test getnbasefunctions(cv) == n_basefuncs * JuAFEM.getdim(func_interpol)
 
         x, n = valid_coordinates_and_normals(func_interpol)
         reinit!(cv, x)
