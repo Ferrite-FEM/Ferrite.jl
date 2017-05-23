@@ -71,6 +71,14 @@ for (func_interpol, quad_rule) in  (
         for (i, qp_x) in enumerate(getpoints(quad_rule))
             @test spatial_coordinate(cv, i, x) ≈ qp_x
         end
+
+        # test copy
+        cvc = copy(cv)
+        for fname in fieldnames(cv)
+            @test typeof(cv) == typeof(cvc)
+            @test pointer(getfield(cv, fname)) != pointer(getfield(cvc, fname))
+            @test getfield(cv, fname) == getfield(cvc, fname)
+        end
     end
 end
 

@@ -86,6 +86,16 @@ for (func_interpol, quad_rule) in  (
             @test getfacenumber(face_nodes[face], cell_nodes, func_interpol) == face
         end
         @test_throws ArgumentError getfacenumber(face_nodes[JuAFEM.getnfaces(func_interpol)+1], cell_nodes, func_interpol)
+
+        # test copy
+        fvc = copy(fv)
+        for fname in fieldnames(fv)
+            @test typeof(fv) == typeof(fvc)
+            if !isa(getfield(fv, fname), JuAFEM.ScalarWrapper)
+                @test pointer(getfield(fv, fname)) != pointer(getfield(fvc, fname))
+                @test getfield(fv, fname) == getfield(fvc, fname)
+            end
+        end
     end
 end
 

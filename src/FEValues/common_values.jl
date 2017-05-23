@@ -348,3 +348,13 @@ end
 function Base.show(io::IO, fe_v::Values)
     println(io, "$(typeof(fe_v)) with $(getnbasefunctions(fe_v)) shape functions and $(getnquadpoints(fe_v)) quadrature points")
 end
+
+# copy
+for ValueType in (CellScalarValues, CellVectorValues, FaceScalarValues, FaceVectorValues)
+    args = [:(copy(cv.$fname)) for fname in fieldnames(ValueType)]
+    @eval begin
+        function Base.copy(cv::$ValueType)
+            return typeof(cv)($(args...))
+        end
+    end
+end
