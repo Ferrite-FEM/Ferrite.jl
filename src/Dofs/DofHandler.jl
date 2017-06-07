@@ -230,12 +230,6 @@ end
 WriteVTK.vtk_grid(filename::AbstractString, dh::DofHandler) = vtk_grid(filename, dh.grid)
 
 # Exports the FE field `u` to `vtkfile`
-function WriteVTK.vtk_grid(filename::AbstractString, dh::DofHandler, u::Vector)
-    vtkfile = vtk_grid(filename, dh)
-    vtk_point_data(vtkfile, dh, u)
-    return vtkfile
-end
-
 function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector)
     offset = 0
     for i in 1:length(dh.field_names)

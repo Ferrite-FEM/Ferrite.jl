@@ -37,13 +37,13 @@ end
 
 function vtk_nodeset{dim}(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String)
     z = zeros(getnnodes(grid))
-    z[getnodeset(grid, nodeset)] = 1.0
+    z[collect(getnodeset(grid, nodeset))] = 1.0
     vtk_point_data(vtk, z, nodeset)
 end
 
 function vtk_cellset{dim}(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, cellset::String)
     z = zeros(getncells(grid))
-    z[getcellset(grid, cellset)] = 1.0
+    z[collect(getcellset(grid, cellset))] = 1.0
     vtk_cell_data(vtk, z, cellset)
 end
 
