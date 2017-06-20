@@ -14,11 +14,11 @@ for (func_interpol, quad_rule) in  (
 
     for fe_valtype in (FaceScalarValues, FaceVectorValues)
         fv = fe_valtype(quad_rule, func_interpol)
-        ndim = getdim(func_interpol)
+        ndim = JuAFEM.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
         fe_valtype == FaceScalarValues && @test getnbasefunctions(fv) == n_basefuncs
-        fe_valtype == FaceVectorValues && @test getnbasefunctions(fv) == n_basefuncs * getdim(func_interpol)
+        fe_valtype == FaceVectorValues && @test getnbasefunctions(fv) == n_basefuncs * JuAFEM.getdim(func_interpol)
 
         xs, n = valid_coordinates_and_normals(func_interpol)
         face_nodes, cell_nodes = topology_test_nodes(func_interpol)

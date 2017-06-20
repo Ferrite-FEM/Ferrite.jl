@@ -1,5 +1,3 @@
-export generate_grid
-
 function boundaries_to_sparse(boundary)
     I, J, V = Int[], Int[], Bool[]
     for faceindex in boundary

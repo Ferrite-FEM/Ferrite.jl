@@ -1,18 +1,3 @@
-# Grid types
-export Node, Cell, CellIndex, CellFace, FaceIndex, Grid
-
-# Cell type alias
-export Line, QuadraticLine,
-       Triangle, QuadraticTriangle, Quadrilateral, QuadraticQuadrilateral,
-       Tetrahedron, QuadraticTetrahedron, Hexahedron, QuadraticHexahedron
-
-# Grid utilities
-export getcells, getncells, getnodes, getnnodes, getcelltype,
-       getcellset,  getnodeset, getfaceset, getcoordinates, getcoordinates!,
-       getcellsets, getnodesets, getfacesets, onboundary, nfaces
-
-export addnodeset!, addcellset!, transform
-
 #########################
 # Main types for meshes #
 #########################
