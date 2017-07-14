@@ -26,7 +26,7 @@ end
 
 """
 # Line
-function generate_grid{T}(::Type{Line}, nel::NTuple{1, Int}, left::Vec{1, T}=Vec{1}((-1.0,)), right::Vec{1, T}=Vec{1}((1.0,)))
+function generate_grid(::Type{Line}, nel::NTuple{1, Int}, left::Vec{1, T}=Vec{1}((-1.0,)), right::Vec{1, T}=Vec{1}((1.0,))) where {T}
     nel_x = nel[1]
     n_nodes = nel_x + 1
 
@@ -58,7 +58,7 @@ function generate_grid{T}(::Type{Line}, nel::NTuple{1, Int}, left::Vec{1, T}=Vec
 end
 
 # QuadraticLine
-function generate_grid{T}(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec{1, T}=Vec{1}((-1.0,)), right::Vec{1, T}=Vec{1}((1.0,)))
+function generate_grid(::Type{QuadraticLine}, nel::NTuple{1, Int}, left::Vec{1, T}=Vec{1}((-1.0,)), right::Vec{1, T}=Vec{1}((1.0,))) where {T}
     nel_x = nel[1]
     n_nodes = 2*nel_x + 1
 
@@ -107,12 +107,12 @@ function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
 end
 
 
-function generate_grid{M, N, T}(C::Type{Cell{2,M,N}}, nel::NTuple{2, Int}, X::Vector{Vec{2, T}})
+function generate_grid(C::Type{Cell{2,M,N}}, nel::NTuple{2, Int}, X::Vector{Vec{2, T}}) where {M, N, T}
     @assert length(X) == 4
     generate_grid(C, nel, X[1], X[2], X[3], X[4])
 end
 
-function generate_grid{M, N, T}(C::Type{Cell{2,M,N}}, nel::NTuple{2, Int}, left::Vec{2, T}=Vec{2}((-1.0,-1.0)), right::Vec{2, T}=Vec{2}((1.0,1.0)))
+function generate_grid(C::Type{Cell{2,M,N}}, nel::NTuple{2, Int}, left::Vec{2, T}=Vec{2}((-1.0,-1.0)), right::Vec{2, T}=Vec{2}((1.0,1.0))) where {M, N, T}
     LL = left
     UR = right
     LR = Vec{2}((UR[1], LL[2]))
@@ -121,7 +121,7 @@ function generate_grid{M, N, T}(C::Type{Cell{2,M,N}}, nel::NTuple{2, Int}, left:
 end
 
 # Quadrilateral
-function generate_grid{T}(C::Type{Quadrilateral}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR::Vec{2, T}, UR::Vec{2, T}, UL::Vec{2, T})
+function generate_grid(C::Type{Quadrilateral}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR::Vec{2, T}, UR::Vec{2, T}, UL::Vec{2, T}) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_tot = nel_x*nel_y
     n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1
     n_nodes = n_nodes_x * n_nodes_y
@@ -158,7 +158,7 @@ function generate_grid{T}(C::Type{Quadrilateral}, nel::NTuple{2, Int}, LL::Vec{2
 end
 
 # QuadraticQuadrilateral
-function generate_grid{T}(::Type{QuadraticQuadrilateral}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR::Vec{2, T}, UR::Vec{2, T}, UL::Vec{2, T})
+function generate_grid(::Type{QuadraticQuadrilateral}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR::Vec{2, T}, UR::Vec{2, T}, UL::Vec{2, T}) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_tot = nel_x*nel_y
     n_nodes_x = 2*nel_x + 1; n_nodes_y = 2*nel_y + 1
     n_nodes = n_nodes_x * n_nodes_y
@@ -197,7 +197,7 @@ function generate_grid{T}(::Type{QuadraticQuadrilateral}, nel::NTuple{2, Int}, L
 end
 
 # Hexahedron
-function generate_grid{T}(::Type{Hexahedron}, nel::NTuple{3, Int}, left::Vec{3, T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3, T}=Vec{3}((1.0,1.0,1.0)))
+function generate_grid(::Type{Hexahedron}, nel::NTuple{3, Int}, left::Vec{3, T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3, T}=Vec{3}((1.0,1.0,1.0))) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]; nel_tot = nel_x*nel_y*nel_z
     n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1; n_nodes_z = nel_z + 1
     n_nodes = n_nodes_x * n_nodes_y * n_nodes_z
@@ -244,7 +244,7 @@ function generate_grid{T}(::Type{Hexahedron}, nel::NTuple{3, Int}, left::Vec{3, 
 end
 
 # Triangle
-function generate_grid{T}(::Type{Triangle}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR::Vec{2, T}, UR::Vec{2, T}, UL::Vec{2, T})
+function generate_grid(::Type{Triangle}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR::Vec{2, T}, UR::Vec{2, T}, UL::Vec{2, T}) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_tot = 2*nel_x*nel_y
     n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1
     n_nodes = n_nodes_x * n_nodes_y
@@ -282,7 +282,7 @@ function generate_grid{T}(::Type{Triangle}, nel::NTuple{2, Int}, LL::Vec{2, T}, 
 end
 
 # QuadraticTriangle
-function generate_grid{T}(::Type{QuadraticTriangle}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR::Vec{2, T}, UR::Vec{2, T}, UL::Vec{2, T})
+function generate_grid(::Type{QuadraticTriangle}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR::Vec{2, T}, UR::Vec{2, T}, UL::Vec{2, T}) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_tot = 2*nel_x*nel_y
     n_nodes_x = 2*nel_x + 1; n_nodes_y = 2*nel_y + 1
     n_nodes = n_nodes_x * n_nodes_y
@@ -322,7 +322,7 @@ function generate_grid{T}(::Type{QuadraticTriangle}, nel::NTuple{2, Int}, LL::Ve
 end
 
 # Tetrahedron
-function generate_grid{T}(::Type{Tetrahedron}, nel::NTuple{3, Int}, left::Vec{3, T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3, T}=Vec{3}((1.0,1.0,1.0)))
+function generate_grid(::Type{Tetrahedron}, nel::NTuple{3, Int}, left::Vec{3, T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3, T}=Vec{3}((1.0,1.0,1.0))) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]; nel_tot = 5*nel_x*nel_y*nel_z
     n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1; n_nodes_z = nel_z + 1
     n_nodes = n_nodes_x * n_nodes_y * n_nodes_z

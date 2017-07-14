@@ -19,7 +19,7 @@ end
     [`examples/`](https://github.com/KristofferC/JuAFEM.jl/tree/master/examples) directory.
 
 For the impatient: Here is a quick overview on how the some of the packages
-functionalities can be used. This quickly describes [`CellScalarValues`](../lib/maintypes#JuAFEM.FEValues)
+functionalities can be used. This quickly describes [`CellScalarValues`](@ref CellValues)
 which a lot of the package is built upon.
 
 First, create a quadrature rule, for integration in 2D, on a reference cube:
@@ -106,4 +106,4 @@ julia> function_symmetric_gradient(cell_values, 3, u) # sym(grad(u)) in 3rd quad
   0.713306   0.617741
 ```
 
-For more functions see the documentation for [`CellValues`](../lib/maintypes#JuAFEM.FEValues)
+For more functions see the documentation for [`CellValues`](@ref).

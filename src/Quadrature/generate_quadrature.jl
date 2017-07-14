@@ -75,7 +75,7 @@ Enumeration type used to specify which endpoints of the integration
 interval should be included amongst the quadrature points: neither,
 left, right or both.
 """
-immutable EndPt
+struct EndPt
     label :: Char
 end
 
@@ -95,8 +95,7 @@ for the interval -1 < x < 1 with weight function w(x) = 1.
 Use endpt=left, right, both for the left Radau, right Radau, Lobatto
 rules.
 """
-function legendre{T<:AbstractFloat}(::Type{T},
-                 n::Integer, endpt::EndPt=neither)
+function legendre(::Type{T}, n::Integer, endpt::EndPt=neither) where {T<:AbstractFloat}
     a, b, muzero = legendre_coeff(T, n, endpt)
     return custom_gauss_rule(-one(T), one(T), a, b, muzero, endpt)
 end
@@ -107,8 +106,7 @@ Convenience function with type T = Float64.
 """
 legendre(n, endpt=neither) = legendre(Float64, n, endpt)
 
-function legendre_coeff{T<:AbstractFloat}(::Type{T},
-                       n::Integer, endpt::EndPt)
+function legendre_coeff(::Type{T}, n::Integer, endpt::EndPt) where {T<:AbstractFloat}
     muzero = convert(T, 2.0)
     a = zeros(T, n)
     b = zeros(T, n)
@@ -127,8 +125,7 @@ for the interval -1 < x < 1 with weight function
 Use endpt=left, right, both for the left Radau, right Radau, Lobatto
 rules.
 """
-function chebyshev{T<:AbstractFloat}(::Type{T},
-                  n::Integer, kind::Integer=1, endpt::EndPt=neither)
+function chebyshev(::Type{T}, n::Integer, kind::Integer=1, endpt::EndPt=neither) where {T<:AbstractFloat}
     a, b, muzero = chebyshev_coeff(T, n, kind, endpt)
     return custom_gauss_rule(-one(T), one(T), a, b, muzero, endpt)
 end
@@ -137,11 +134,9 @@ end
 x, w = chebyshev(n, kind=1, endpt=neither)
 Convenience function with type T = Float64.
 """
-chebyshev(n, kind=1, endpt=neither) = chebyshev(Float64, n, kind,
-                                                endpt)
+chebyshev(n, kind=1, endpt=neither) = chebyshev(Float64, n, kind, endpt)
 
-function chebyshev_coeff{T<:AbstractFloat}(::Type{T},
-                        n::Integer, kind::Integer, endpt::EndPt)
+function chebyshev_coeff(::Type{T}, n::Integer, kind::Integer, endpt::EndPt) where {T<:AbstractFloat}
     muzero = convert(T, pi)
     half = convert(T, 0.5)
     a = zeros(T, n)
@@ -157,9 +152,9 @@ function chebyshev_coeff{T<:AbstractFloat}(::Type{T},
 end
 
 
-function custom_gauss_rule{T<:AbstractFloat}(lo::T, hi::T,
+function custom_gauss_rule(lo::T, hi::T,
          a::Array{T,1}, b::Array{T,1}, muzero::T, endpt::EndPt,
-         maxits::Integer=maxiterations[T])
+         maxits::Integer=maxiterations[T]) where {T<:AbstractFloat}
     #
     # On entry:
     #
@@ -214,8 +209,7 @@ function custom_gauss_rule{T<:AbstractFloat}(lo::T, hi::T,
     return a[idx], w[idx]
 end
 
-function solve{T<:AbstractFloat}(n::Integer, shift::T,
-                                 a::Array{T,1}, b::Array{T,1})
+function solve(n::Integer, shift::T, a::Array{T,1}, b::Array{T,1}) where {T<:AbstractFloat}
     #
     # Perform elimination to find the nth component s = delta[n]
     # of the solution to the nxn linear system
@@ -233,8 +227,7 @@ function solve{T<:AbstractFloat}(n::Integer, shift::T,
     return one(t) / t
 end
 
-function steig!{T<:AbstractFloat}(d::Array{T,1}, e::Array{T,1},
-                                  z::Array{T,1}, maxits::Integer)
+function steig!(d::Array{T,1}, e::Array{T,1}, z::Array{T,1}, maxits::Integer) where {T<:AbstractFloat}
     #
     # Finds the eigenvalues and first components of the normalised
     # eigenvectors of a symmetric tridiagonal matrix by the implicit
@@ -326,8 +319,8 @@ function steig!{T<:AbstractFloat}(d::Array{T,1}, e::Array{T,1},
     end # loop over l
 end
 
-function orthonormal_poly{T<:AbstractFloat}(x::Array{T,1},
-                         a::Array{T,1}, b::Array{T,1}, muzero::T)
+function orthonormal_poly(x::Array{T,1},
+                         a::Array{T,1}, b::Array{T,1}, muzero::T) where {T<:AbstractFloat}
     # p[i,j] = value at x[i] of orthonormal polynomial of degree j-1.
     m = length(x)
     n = length(a)

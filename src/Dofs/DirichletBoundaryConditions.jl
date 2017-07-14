@@ -39,7 +39,7 @@ julia> apply!(u, dbc)
 ```
 
 """
-immutable DirichletBoundaryCondition
+struct DirichletBoundaryCondition
     f::Function
     nodes::Set{Int}
     field::Symbol
@@ -47,7 +47,7 @@ immutable DirichletBoundaryCondition
     idxoffset::Int
 end
 
-immutable DirichletBoundaryConditions{DH <: DofHandler, T}
+struct DirichletBoundaryConditions{DH <: DofHandler, T}
     bcs::Vector{DirichletBoundaryCondition}
     dofs::Vector{Int}
     free_dofs::Vector{Int}

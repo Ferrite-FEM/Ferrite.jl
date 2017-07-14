@@ -1,7 +1,7 @@
 ##################
 # All 1D RefCube #
 ##################
-function create_face_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{0, shape, T}, ::Interpolation{1, shape})
+function create_face_quad_rule(quad_rule::QuadratureRule{0, shape, T}, ::Interpolation{1, shape}) where {T, shape <: RefCube}
     w = getweights(quad_rule)
     face_quad_rule = QuadratureRule{1, shape, T}[]
 
@@ -15,7 +15,7 @@ function create_face_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{0,
     return face_quad_rule
 end
 
-function weighted_normal{T}(::Tensor{2, 1, T}, ::FaceValues{1, T, RefCube}, face::Int)
+function weighted_normal(::Tensor{2, 1, T}, ::FaceValues{1, T, RefCube}, face::Int) where {T}
     face == 1 && return Vec{1,T}((-one(T),))
     face == 2 && return Vec{1,T}((one(T),))
     error("unknown face number: $face")
@@ -24,7 +24,7 @@ end
 ##################
 # All 2D RefCube #
 ##################
-function create_face_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{1, shape, T}, ::Interpolation{2, shape})
+function create_face_quad_rule(quad_rule::QuadratureRule{1, shape, T}, ::Interpolation{2, shape}) where {T, shape <: RefCube}
     w = getweights(quad_rule)
     p = getpoints(quad_rule)
     n_points = length(w)
@@ -46,7 +46,7 @@ function create_face_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{1,
     return face_quad_rule
 end
 
-function weighted_normal{T}(J::Tensor{2, 2}, ::FaceValues{2, T, RefCube}, face::Int)
+function weighted_normal(J::Tensor{2, 2}, ::FaceValues{2, T, RefCube}, face::Int) where {T}
     @inbounds begin
         face == 1 && return Vec{2}(( J[2,1], -J[1,1]))
         face == 2 && return Vec{2}(( J[2,2], -J[1,2]))
@@ -59,7 +59,7 @@ end
 #########################
 # All RefTetrahedron 2D #
 #########################
-function create_face_quad_rule{T, shape <: RefTetrahedron}(quad_rule::QuadratureRule{1, shape, T}, ::Interpolation{2, shape})
+function create_face_quad_rule(quad_rule::QuadratureRule{1, shape, T}, ::Interpolation{2, shape}) where {T, shape <: RefTetrahedron}
     w = getweights(quad_rule)
     p = getpoints(quad_rule)
     n_points = length(w)
@@ -78,7 +78,7 @@ function create_face_quad_rule{T, shape <: RefTetrahedron}(quad_rule::Quadrature
     return face_quad_rule
 end
 
-function weighted_normal{T}(J::Tensor{2, 2}, ::FaceValues{2, T, RefTetrahedron}, face::Int)
+function weighted_normal(J::Tensor{2, 2}, ::FaceValues{2, T, RefTetrahedron}, face::Int) where {T}
     @inbounds begin
         face == 1 && return return Vec{2}((-(J[2,1] - J[2,2]), J[1,1] - J[1,2]))
         face == 2 && return return Vec{2}((-J[2,2], J[1,2]))
@@ -90,7 +90,7 @@ end
 ##################
 # All RefCube 3D #
 ##################
-function create_face_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{2, shape, T}, ::Interpolation{3, shape})
+function create_face_quad_rule(quad_rule::QuadratureRule{2, shape, T}, ::Interpolation{3, shape}) where {T, shape <: RefCube}
     w = getweights(quad_rule)
     p = getpoints(quad_rule)
     n_points = length(w)
@@ -118,7 +118,7 @@ function create_face_quad_rule{T, shape <: RefCube}(quad_rule::QuadratureRule{2,
     return face_quad_rule
 end
 
-function weighted_normal{T}(J::Tensor{2, 3}, ::FaceValues{3, T, RefCube}, face::Int)
+function weighted_normal(J::Tensor{2, 3}, ::FaceValues{3, T, RefCube}, face::Int) where {T}
     @inbounds begin
         face == 1 && return J[:,2] × J[:,1]
         face == 2 && return J[:,1] × J[:,3]
@@ -133,7 +133,7 @@ end
 #########################
 # All RefTetrahedron 3D #
 #########################
-function create_face_quad_rule{T, shape <: RefTetrahedron}(quad_rule::QuadratureRule{2, shape, T}, ::Interpolation{3, shape})
+function create_face_quad_rule(quad_rule::QuadratureRule{2, shape, T}, ::Interpolation{3, shape}) where {T, shape <: RefTetrahedron}
     w = getweights(quad_rule)
     p = getpoints(quad_rule)
     n_points = length(w)
@@ -155,7 +155,7 @@ function create_face_quad_rule{T, shape <: RefTetrahedron}(quad_rule::Quadrature
     return face_quad_rule
 end
 
-function weighted_normal{T}(J::Tensor{2, 3}, ::FaceValues{3, T, RefTetrahedron}, face::Int)
+function weighted_normal(J::Tensor{2, 3}, ::FaceValues{3, T, RefTetrahedron}, face::Int) where {T}
     @inbounds begin
         face == 1 && return J[:,2] × J[:,1]
         face == 2 && return J[:,1] × J[:,3]
