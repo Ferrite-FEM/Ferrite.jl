@@ -47,7 +47,7 @@ julia> QuadratureRule{1, RefCube}(:lobatto, 2)
 JuAFEM.QuadratureRule{1,JuAFEM.RefCube,Float64}([1.0, 1.0], Tensors.Tensor{1,1,Float64,1}[[-1.0], [1.0]])
 ```
 """
-immutable QuadratureRule{dim, shape, T}
+struct QuadratureRule{dim, shape, T}
     weights::Vector{T}
     points::Vector{Vec{dim, T}}
 end
@@ -100,7 +100,7 @@ julia> getpoints(qr)
 """
 getpoints(qr::QuadratureRule) = qr.points
 
-(::Type{QuadratureRule{dim, shape}}){dim, shape}(order::Int) = QuadratureRule{dim, shape}(:legendre, order)
+QuadratureRule{dim, shape}(order::Int) where {dim, shape} = QuadratureRule{dim, shape}(:legendre, order)
 
 # Special case for face integration of 1D problems
 function (::Type{QuadratureRule{0, RefCube}})(quad_type::Symbol, order::Int)

@@ -19,7 +19,7 @@ vtk_grid(filename::AbstractString, grid::Grid)
 Create a unstructured VTK grid from a `Grid`. Return a `DatasetFile`
 which data can be appended to, see `vtk_point_data`, `vtk_cell_data`.
 """
-function WriteVTK.vtk_grid{dim, N, T}(filename::AbstractString, grid::Grid{dim, N, T})
+function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim, N, T}) where {dim, N, T}
     celltype = cell_to_vtkcell(getcelltype(grid))
     cls = MeshCell[]
     for cell in CellIterator(grid)
@@ -29,19 +29,19 @@ function WriteVTK.vtk_grid{dim, N, T}(filename::AbstractString, grid::Grid{dim, 
     return vtk_grid(filename, coords, cls)
 end
 
-function WriteVTK.vtk_point_data{dim, T}(vtk::WriteVTK.DatasetFile, data::Vector{Vec{dim, T}}, name::AbstractString)
+function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, data::Vector{Vec{dim, T}}, name::AbstractString) where {dim, T}
     npoints = length(data)
     data = reinterpret(T, data, (dim, npoints))
     return vtk_point_data(vtk, data, name)
 end
 
-function vtk_nodeset{dim}(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String)
+function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String) where {dim}
     z = zeros(getnnodes(grid))
     z[collect(getnodeset(grid, nodeset))] = 1.0
     vtk_point_data(vtk, z, nodeset)
 end
 
-function vtk_cellset{dim}(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, cellset::String)
+function vtk_cellset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, cellset::String) where {dim}
     z = zeros(getncells(grid))
     z[collect(getcellset(grid, cellset))] = 1.0
     vtk_cell_data(vtk, z, cellset)

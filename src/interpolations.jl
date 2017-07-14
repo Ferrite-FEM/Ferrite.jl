@@ -45,41 +45,41 @@ julia> getnbasefunctions(ip)
 6
 ```
 """
-@compat abstract type Interpolation{dim, shape, order} end
+abstract type Interpolation{dim, shape, order} end
 
 """
 Returns the dimension of an `Interpolation`
 """
-@inline getdim{dim}(ip::Interpolation{dim}) = dim
+@inline getdim(ip::Interpolation{dim}) where {dim} = dim
 
 """
 Returns the reference shape of an `Interpolation`
 """
-@inline getrefshape{dim, shape}(ip::Interpolation{dim, shape}) = shape
+@inline getrefshape(ip::Interpolation{dim, shape}) where {dim, shape} = shape
 
 """
 Returns the polynomial order of the `Interpolation`
 """
-@inline getorder{dim, shape, order}(ip::Interpolation{dim, shape, order}) = order
+@inline getorder(ip::Interpolation{dim, shape, order}) where {dim, shape, order} = order
 
 """
 Computes the value of the shape functions at a point ξ for a given interpolation
 """
-function value{dim, T}(ip::Interpolation{dim}, ξ::Vec{dim, T})
+function value(ip::Interpolation{dim}, ξ::Vec{dim, T}) where {dim, T}
     [value(ip, i, ξ) for i in 1:getnbasefunctions(ip)]
 end
 
 """
 Computes the gradients of the shape functions at a point ξ for a given interpolation
 """
-function derivative{dim, T}(ip::Interpolation{dim}, ξ::Vec{dim, T})
+function derivative(ip::Interpolation{dim}, ξ::Vec{dim, T}) where {dim, T}
     [gradient(ξ -> value(ip, i, ξ), ξ) for i in 1:getnbasefunctions(ip)]
 end
 
 #####################
 # Utility functions #
 #####################
-getnfaces{dim}(::Interpolation{dim, RefCube}) = 2*dim
+getnfaces(::Interpolation{dim, RefCube}) where {dim} = 2*dim
 getnfaces(::Interpolation{2, RefTetrahedron}) = 3
 getnfaces(::Interpolation{3, RefTetrahedron}) = 4
 
@@ -93,10 +93,10 @@ getnbasefunctions
 ############
 # Lagrange #
 ############
-immutable Lagrange{dim, shape, order} <: Interpolation{dim, shape, order} end
+struct Lagrange{dim, shape, order} <: Interpolation{dim, shape, order} end
 
-getlowerdim{dim,shape,order}(::Lagrange{dim,shape,order}) = Lagrange{dim-1,shape,order}()
-getlowerorder{dim,shape,order}(::Lagrange{dim,shape,order}) = Lagrange{dim,shape,order-1}()
+getlowerdim(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim-1,shape,order}()
+getlowerorder(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim,shape,order-1}()
 
 ##################################
 # Lagrange dim 1 RefCube order 1 #
@@ -178,7 +178,7 @@ end
 # Lagrange dim 2 RefTetrahedron order 1 #
 #########################################
 getnbasefunctions(::Lagrange{2, RefTetrahedron, 1}) = 3
-getlowerdim{order}(::Lagrange{2, RefTetrahedron, order}) = Lagrange{1, RefCube, order}()
+getlowerdim(::Lagrange{2, RefTetrahedron, order}) where {order} = Lagrange{1, RefCube, order}()
 getnfacenodes(::Lagrange{2, RefTetrahedron, 1}) = 2
 getfacelist(::Type{Lagrange{2, RefTetrahedron, 1}}) = ((1,2),(2,3),(1,3))
 
@@ -290,7 +290,7 @@ end
 ###############
 # Serendipity #
 ###############
-immutable Serendipity{dim, shape, order} <: Interpolation{dim, shape, order} end
+struct Serendipity{dim, shape, order} <: Interpolation{dim, shape, order} end
 
 #####################################
 # Serendipity dim 2 RefCube order 2 #

@@ -4,55 +4,55 @@
 """
 A `Node` is a point in space.
 """
-immutable Node{dim, T}
+struct Node{dim, T}
     x::Vec{dim, T}
 end
-Node{dim, T}(x::NTuple{dim, T}) = Node(Vec{dim, T}(x))
+Node(x::NTuple{dim, T}) where {dim, T} = Node(Vec{dim, T}(x))
 getcoordinates(n::Node) = n.x
 
 """
 A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
 """
-immutable Cell{dim, N, M}
+struct Cell{dim, N, M}
     nodes::NTuple{N, Int}
 end
 nfaces(c::Cell) = nfaces(typeof(c))
-nfaces{dim, N, M}(::Type{Cell{dim, N, M}}) = M
+nfaces(::Type{Cell{dim, N, M}}) where {dim, N, M} = M
 
 # Typealias for commonly used cells
-@compat const Line = Cell{1, 2, 2}
-@compat const QuadraticLine = Cell{1, 3, 2}
+const Line = Cell{1, 2, 2}
+const QuadraticLine = Cell{1, 3, 2}
 
-@compat const Triangle = Cell{2, 3, 3}
-@compat const QuadraticTriangle = Cell{2, 6, 3}
+const Triangle = Cell{2, 3, 3}
+const QuadraticTriangle = Cell{2, 6, 3}
 
-@compat const Quadrilateral = Cell{2, 4, 4}
-@compat const QuadraticQuadrilateral = Cell{2, 9, 4}
+const Quadrilateral = Cell{2, 4, 4}
+const QuadraticQuadrilateral = Cell{2, 9, 4}
 
-@compat const Tetrahedron = Cell{3, 4, 4}
-@compat const QuadraticTetrahedron = Cell{3, 10, 4}
+const Tetrahedron = Cell{3, 4, 4}
+const QuadraticTetrahedron = Cell{3, 10, 4}
 
-@compat const Hexahedron = Cell{3, 8, 6}
-@compat const QuadraticHexahedron = Cell{3, 20, 6} # Function interpolation for this doesn't exist in JuAFEM yet
+const Hexahedron = Cell{3, 8, 6}
+const QuadraticHexahedron = Cell{3, 20, 6} # Function interpolation for this doesn't exist in JuAFEM yet
 
 """
 A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh
 """
-immutable CellIndex
+struct CellIndex
     idx::Int
 end
 
 """
 A `FaceIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, face).
 """
-immutable FaceIndex
+struct FaceIndex
     idx::Tuple{Int, Int} # cell and side
 end
 
 """
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 """
-type Grid{dim, N, T <: Real, M}
+mutable struct Grid{dim, N, T <: Real, M}
     cells::Vector{Cell{dim, N, M}}
     nodes::Vector{Node{dim, T}}
     # Sets
@@ -63,12 +63,12 @@ type Grid{dim, N, T <: Real, M}
     boundary_matrix::SparseMatrixCSC{Bool, Int}
 end
 
-function Grid{dim, N, M, T}(cells::Vector{Cell{dim, N, M}},
-                            nodes::Vector{Node{dim, T}};
-                            cellsets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
-                            nodesets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
-                            facesets::Dict{String, Set{Tuple{Int, Int}}}=Dict{String, Set{Tuple{Int, Int}}}(),
-                            boundary_matrix::SparseMatrixCSC{Bool, Int}=spzeros(Bool, 0, 0))
+function Grid(cells::Vector{Cell{dim, N, M}},
+              nodes::Vector{Node{dim, T}};
+              cellsets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
+              nodesets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
+              facesets::Dict{String, Set{Tuple{Int, Int}}}=Dict{String, Set{Tuple{Int, Int}}}(),
+              boundary_matrix::SparseMatrixCSC{Bool, Int}=spzeros(Bool, 0, 0)) where {dim, N, M, T}
     return Grid(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
 end
 
@@ -172,14 +172,14 @@ Updates the coordinate vector for a cell
 * `x`: the updated vector
 
 """
-@inline function getcoordinates!{dim, T, N}(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, cell::Int)
+@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, cell::Int) where {dim, T, N}
     @assert length(x) == N
     @inbounds for i in 1:N
         x[i] = grid.nodes[grid.cells[cell].nodes[i]].x
     end
 end
-@inline getcoordinates!{dim, T, N}(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, cell::CellIndex) = getcoordinates!(x, grid, cell.idx)
-@inline getcoordinates!{dim, T, N}(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, face::FaceIndex) = getcoordinates!(x, grid, face.idx[1])
+@inline getcoordinates!(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, cell::CellIndex) where {dim, T, N} = getcoordinates!(x, grid, cell.idx)
+@inline getcoordinates!(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, face::FaceIndex) where {dim, T, N} = getcoordinates!(x, grid, face.idx[1])
 
 """
 Returns a vector with the coordinates of the vertices of a cell
@@ -198,7 +198,7 @@ Returns a vector with the coordinates of the vertices of a cell
 * `x`: A `Vector` of `Vec`s, one for each vertex of the cell.
 
 """
-@inline function getcoordinates{dim, N, T}(grid::Grid{dim, N, T}, cell::Int)
+@inline function getcoordinates(grid::Grid{dim, N, T}, cell::Int) where {dim, N, T}
     nodeidx = grid.cells[cell].nodes
     return [grid.nodes[i].x for i in nodeidx]::Vector{Vec{dim, T}}
 end
@@ -206,9 +206,9 @@ end
 @inline getcoordinates(grid::Grid, face::FaceIndex) = getcoordinates(grid, face.idx[1])
 
 # Iterate over cell vector
-Base.start{dim, N}(c::Vector{Cell{dim, N}}) = 1
-Base.next{dim, N}(c::Vector{Cell{dim, N}}, state) = (CellIndex(state), state + 1)
-Base.done{dim, N}(c::Vector{Cell{dim, N}}, state) = state > length(c)
+Base.start(c::Vector{Cell{dim, N}}) where {dim, N} = 1
+Base.next(c::Vector{Cell{dim, N}}, state) where {dim, N} = (CellIndex(state), state + 1)
+Base.done(c::Vector{Cell{dim, N}}, state) where {dim, N} = state > length(c)
 
 function Base.show(io::IO, grid::Grid)
     println(io, "$(typeof(grid)) with $(getncells(grid)) $(celltypes[eltype(grid.cells)]) cells and $(getnnodes(grid)) nodes")

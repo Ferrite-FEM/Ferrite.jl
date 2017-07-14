@@ -40,7 +40,7 @@ CellVectorValues([::Type{T}], quad_rule::QuadratureRule, func_interpol::Interpol
 CellValues
 
 # CellScalarValues
-immutable CellScalarValues{dim, T <: Real, refshape <: AbstractRefShape} <: CellValues{dim, T, refshape}
+struct CellScalarValues{dim, T <: Real, refshape <: AbstractRefShape} <: CellValues{dim, T, refshape}
     N::Matrix{T}
     dNdx::Matrix{Vec{dim, T}}
     dNdξ::Matrix{Vec{dim, T}}
@@ -50,13 +50,13 @@ immutable CellScalarValues{dim, T <: Real, refshape <: AbstractRefShape} <: Cell
     qr_weights::Vector{T}
 end
 
-function CellScalarValues{dim}(quad_rule::QuadratureRule{dim}, func_interpol::Interpolation,
+function CellScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
         geom_interpol::Interpolation=func_interpol)
     CellScalarValues(Float64, quad_rule, func_interpol, geom_interpol)
 end
 
-function CellScalarValues{dim, T, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim, shape},
-        func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
+function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_interpol::Interpolation,
+        geom_interpol::Interpolation=func_interpol) where {dim, T, shape <: AbstractRefShape}
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
@@ -88,7 +88,7 @@ function CellScalarValues{dim, T, shape <: AbstractRefShape}(::Type{T}, quad_rul
 end
 
 # CellVectorValues
-immutable CellVectorValues{dim, T <: Real, refshape <: AbstractRefShape, M} <: CellValues{dim, T, refshape}
+struct CellVectorValues{dim, T <: Real, refshape <: AbstractRefShape, M} <: CellValues{dim, T, refshape}
     N::Matrix{Vec{dim, T}}
     dNdx::Matrix{Tensor{2, dim, T, M}}
     dNdξ::Matrix{Tensor{2, dim, T, M}}
@@ -102,8 +102,8 @@ function CellVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolatio
     CellVectorValues(Float64, quad_rule, func_interpol, geom_interpol)
 end
 
-function CellVectorValues{dim, T, shape <: AbstractRefShape}(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol)
+function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func_interpol::Interpolation,
+        geom_interpol::Interpolation=func_interpol) where {dim, T, shape <: AbstractRefShape}
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
@@ -146,7 +146,7 @@ function CellVectorValues{dim, T, shape <: AbstractRefShape}(::Type{T}, quad_rul
     CellVectorValues{dim, T, shape, MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
 end
 
-function reinit!{dim, T}(cv::CellValues{dim}, x::AbstractVector{Vec{dim, T}})
+function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim, T}}) where {dim, T}
     n_geom_basefuncs = getngeobasefunctions(cv)
     n_func_basefuncs = getn_scalarbasefunctions(cv)
     @assert length(x) == n_geom_basefuncs

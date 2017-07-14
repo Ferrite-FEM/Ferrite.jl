@@ -1,4 +1,4 @@
-immutable Assembler{T}
+struct Assembler{T}
     I::Vector{Int}
     J::Vector{Int}
     V::Vector{T}
@@ -32,7 +32,7 @@ end
 
 Assembles the element matrix `Ke` into `a`.
 """
-function assemble!{T}(a::Assembler{T}, edof::AbstractVector{Int}, Ke::AbstractMatrix{T})
+function assemble!(a::Assembler{T}, edof::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
     n_dofs = length(edof)
     append!(a.V, Ke)
     @inbounds for j in 1:n_dofs
@@ -58,22 +58,22 @@ end
 
 Assembles the element residual `ge` into the global residual vector `g`.
 """
-@propagate_inbounds function assemble!{T}(g::AbstractVector{T}, edof::AbstractVector{Int}, ge::AbstractVector{T})
+@propagate_inbounds function assemble!(g::AbstractVector{T}, edof::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
     @boundscheck checkbounds(g, edof)
     @inbounds for i in 1:length(edof)
         g[edof[i]] += ge[i]
     end
 end
 
-@compat abstract type AbstractSparseAssembler end
+abstract type AbstractSparseAssembler end
 
-immutable AssemblerSparsityPattern{Tv, Ti} <: AbstractSparseAssembler
+struct AssemblerSparsityPattern{Tv, Ti} <: AbstractSparseAssembler
     K::SparseMatrixCSC{Tv, Ti}
     f::Vector{Tv}
     permutation::Vector{Int}
     sorteddofs::Vector{Int}
 end
-immutable AssemblerSymmetricSparsityPattern{Tv, Ti} <: AbstractSparseAssembler
+struct AssemblerSymmetricSparsityPattern{Tv, Ti} <: AbstractSparseAssembler
     K::Symmetric{Tv, SparseMatrixCSC{Tv, Ti}}
     f::Vector{Tv}
     permutation::Vector{Int}

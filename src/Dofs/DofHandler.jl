@@ -74,7 +74,7 @@ julia> vtk_point_data(vtkfile)
 """
 
 # TODO: Make this immutable?
-type DofHandler{dim, N, T, M}
+mutable struct DofHandler{dim, N, T, M}
     dofs_nodes::Matrix{Int}
     dofs_cells::Matrix{Int} # TODO <- Is this needed or just extract from dofs_nodes?
     field_names::Vector{Symbol}
@@ -172,7 +172,7 @@ function close!(dh::DofHandler)
     return dh
 end
 
-getnvertices{dim, N, M}(::Type{JuAFEM.Cell{dim, N, M}}) = N
+getnvertices(::Type{JuAFEM.Cell{dim, N, M}}) where {dim, N, M} = N
 
 # Computes the "edof"-matrix
 function add_element_dofs!(dh::DofHandler)
