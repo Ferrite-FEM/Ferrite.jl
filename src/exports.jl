@@ -95,6 +95,7 @@ export
     CellIterator,
     FaceIterator,
     UpdateFlags,
+    cellid,
 
 # assembly
     start_assemble,
