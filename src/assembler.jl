@@ -267,8 +267,9 @@ function _create_linear_sparsity_pattern(dh::DofHandler, sym::Bool)
     return sparse(I, J, W, maximum(I), maximum(J)), dict
 end
 
-function assemble!(a::LinearAssembler, ke::AbstractMatrix, edof::AbstractVector)
-    for dofj in edof, dofi in edof
-        a.K.nzval[a.d[(dofi, dofj)]] += ke[dofi, dofj]
+function assemble!(a::LinearAssembler, ke::AbstractMatrix, dofs::AbstractVector)
+    _ndofs = length(dofs)
+    @inbounds for dofj in 1:_ndofs, 1:_ndofs
+        a.K.nzval[a.d[(dofs[dofi], dofs[dofj])]] += ke[dofi, dofj]
     end
 end
