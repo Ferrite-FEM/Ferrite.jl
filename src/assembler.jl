@@ -228,7 +228,7 @@ function _create_linear_sparsity_pattern(dh::DofHandler, sym::Bool)
     N += ndofs(dh) # always add the diagonal elements
     I = Int[]; sizehint!(I, N)
     J = Int[]; sizehint!(J, N)
-    V = Tuple{Int,Int}[]; sizehint!(V, N)
+    V = UInt64[]; sizehint!(V, N)
     global_dofs = zeros(Int, n)
     for element_id in 1:ncells
         celldofs!(global_dofs, dh, element_id)
@@ -238,13 +238,13 @@ function _create_linear_sparsity_pattern(dh::DofHandler, sym::Bool)
             sym && (dofi > dofj && continue)
             push!(I, dofi)
             push!(J, dofj)
-            push!(V, (dofi, dofj))
+            push!(V, hash((dofi, dofj)))
         end
     end
     for d in 1:ndofs(dh)
         push!(I, d)
         push!(J, d)
-        push!(V, (d,d))
+        push!(V, hash((d,d)))
     end
     K = sparse(I, J, V, maximum(I), maximum(J), (x,y) -> x)
 
@@ -257,11 +257,11 @@ function _create_linear_sparsity_pattern(dh::DofHandler, sym::Bool)
             dofi = global_dofs[i]
             dofj = global_dofs[j]
             sym && (dofi > dofj && continue)
-            dict[(dofi, dofj)] = findfirst(K.nzval, (dofi, dofj))
+            dict[hash((dofi, dofj))] = findfirst(K.nzval, hash((dofi, dofj)))
         end
     end
     for d in 1:ndofs(dh)
-        dict[(d, d)] = findfirst(K.nzval, (d, d))
+        dict[hash((d, d))] = findfirst(K.nzval, hash((d, d)))
     end
     W = zeros(length(I))
     return sparse(I, J, W, maximum(I), maximum(J)), dict
@@ -269,7 +269,8 @@ end
 
 function assemble!(a::LinearAssembler, ke::AbstractMatrix, dofs::AbstractVector)
     _ndofs = length(dofs)
-    @inbounds for dofj in 1:_ndofs, 1:_ndofs
-        a.K.nzval[a.d[(dofs[dofi], dofs[dofj])]] += ke[dofi, dofj]
+    @inbounds for dofj in 1:_ndofs, dofi in 1:_ndofs
+        h = hash((dofs[dofi], dofs[dofj]))
+        a.K.nzval[a.d[h]] += ke[dofi, dofj]
     end
 end
