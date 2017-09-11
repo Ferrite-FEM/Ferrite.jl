@@ -274,3 +274,13 @@ function assemble!(a::LinearAssembler, ke::AbstractMatrix, dofs::AbstractVector)
         a.K.nzval[a.d[h]] += ke[dofi, dofj]
     end
 end
+
+@propagate_inbounds function getnzvalindex(A::SparseMatrixCSC{T}, i0::Integer, i1::Integer) where T
+    @boundscheck !(1 <= i0 <= A.m && 1 <= i1 <= A.n) && throw(BoundsError())
+    r1 = Int(A.colptr[i1])
+    r2 = Int(A.colptr[i1+1]-1)
+    @boundscheck (r1 > r2) && throw(ArgumentError("invalid index"))
+    r1 = searchsortedfirst(A.rowval, i0, r1, r2, Forward)
+    @boundscheck ((r1 > r2) || (A.rowval[r1] != i0)) && throw(ArgumentError("invalid index"))
+    return r1
+end
