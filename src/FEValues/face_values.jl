@@ -77,14 +77,14 @@ function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr, shape}, f
 
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(func_interpol)
-    N =    zeros(T, n_func_basefuncs, n_qpoints, n_faces)
-    dNdx = zeros(Vec{dim, T}, n_func_basefuncs, n_qpoints, n_faces)
-    dNdξ = zeros(Vec{dim, T}, n_func_basefuncs, n_qpoints, n_faces)
+    N =    fill(zero(T)           * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    dNdx = fill(zero(Vec{dim, T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    dNdξ = fill(zero(Vec{dim, T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M =    zeros(T, n_geom_basefuncs, n_qpoints, n_faces)
-    dMdξ = zeros(Vec{dim, T}, n_geom_basefuncs, n_qpoints, n_faces)
+    M =    fill(zero(T)           * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
+    dMdξ = fill(zero(Vec{dim, T}) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
 
     for face in 1:n_faces, (qp, ξ) in enumerate(face_quad_rule[face].points)
         for i in 1:n_func_basefuncs
@@ -95,7 +95,7 @@ function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr, shape}, f
         end
     end
 
-    detJdV = zeros(T, n_qpoints, n_faces)
+    detJdV = fill(T(NaN), n_qpoints, n_faces)
 
     FaceScalarValues{dim, T, shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
 end
@@ -133,14 +133,14 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr, shape}, f
 
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(func_interpol) * dim
-    N = zeros(Vec{dim, T}, n_func_basefuncs, n_qpoints, n_faces)
-    dNdx = [zero(Tensor{2, dim, T}) for i in 1:n_func_basefuncs, j in 1:n_qpoints, k in 1:n_faces]
-    dNdξ = [zero(Tensor{2, dim, T}) for i in 1:n_func_basefuncs, j in 1:n_qpoints, k in 1:n_faces]
+    N    = fill(zero(Vec{dim, T})       * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    dNdx = fill(zero(Tensor{2, dim, T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    dNdξ = fill(zero(Tensor{2, dim, T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M = zeros(T, n_geom_basefuncs, n_qpoints, n_faces)
-    dMdξ = zeros(Vec{dim, T}, n_geom_basefuncs, n_qpoints, n_faces)
+    M    = fill(zero(T)           * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
+    dMdξ = fill(zero(Vec{dim, T}) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
 
     for face in 1:n_faces, (qp, ξ) in enumerate(face_quad_rule[face].points)
         basefunc_count = 1
@@ -162,7 +162,7 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr, shape}, f
         end
     end
 
-    detJdV = zeros(T, n_qpoints, n_faces)
+    detJdV = fill(T(NaN), n_qpoints, n_faces)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
     FaceVectorValues{dim, T, shape, MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
