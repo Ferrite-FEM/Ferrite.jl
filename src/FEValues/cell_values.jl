@@ -118,7 +118,7 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
     M    = fill(zero(T)            * T(NaN), n_geom_basefuncs, n_qpoints)
-    dMdξ = fill(zero(Vec{dim, T}), * T(NaN), n_geom_basefuncs, n_qpoints)
+    dMdξ = fill(zero(Vec{dim, T})  * T(NaN), n_geom_basefuncs, n_qpoints)
 
     for (qp, ξ) in enumerate(quad_rule.points)
         basefunc_count = 1
