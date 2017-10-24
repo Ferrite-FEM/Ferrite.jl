@@ -64,14 +64,14 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func
 
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(func_interpol)
-    N = zeros(T, n_func_basefuncs, n_qpoints)
-    dNdx = zeros(Vec{dim, T}, n_func_basefuncs, n_qpoints)
-    dNdξ = zeros(Vec{dim, T}, n_func_basefuncs, n_qpoints)
+    N    = fill(zero(T)           * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdx = fill(zero(Vec{dim, T}) * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdξ = fill(zero(Vec{dim, T}) * T(NaN), n_func_basefuncs, n_qpoints)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M = zeros(T, n_geom_basefuncs, n_qpoints)
-    dMdξ = zeros(Vec{dim, T}, n_geom_basefuncs, n_qpoints)
+    M    = fill(zero(T)           * T(NaN), n_geom_basefuncs, n_qpoints)
+    dMdξ = fill(zero(Vec{dim, T}) * T(NaN), n_geom_basefuncs, n_qpoints)
 
     for (qp, ξ) in enumerate(quad_rule.points)
         for i in 1:n_func_basefuncs
@@ -82,7 +82,7 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func
         end
     end
 
-    detJdV = zeros(T, n_qpoints)
+    detJdV = fill(T(NaN), n_qpoints)
 
     CellScalarValues{dim, T, shape}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
 end
@@ -111,14 +111,14 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func
 
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(func_interpol) * dim
-    N = zeros(Vec{dim, T}, n_func_basefuncs, n_qpoints)
-    dNdx = [zero(Tensor{2, dim, T}) for i in 1:n_func_basefuncs, j in 1:n_qpoints]
-    dNdξ = [zero(Tensor{2, dim, T}) for i in 1:n_func_basefuncs, j in 1:n_qpoints]
+    N    = fill(zero(Vec{dim, T})       * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdx = fill(zero(Tensor{2, dim, T}) * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdξ = fill(zero(Tensor{2, dim, T}) * T(NaN), n_func_basefuncs, n_qpoints)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M = zeros(T, n_geom_basefuncs, n_qpoints)
-    dMdξ = zeros(Vec{dim, T}, n_geom_basefuncs, n_qpoints)
+    M    = fill(zero(T)            * T(NaN), n_geom_basefuncs, n_qpoints)
+    dMdξ = fill(zero(Vec{dim, T})  * T(NaN), n_geom_basefuncs, n_qpoints)
 
     for (qp, ξ) in enumerate(quad_rule.points)
         basefunc_count = 1
@@ -140,7 +140,7 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func
         end
     end
 
-    detJdV = zeros(T, n_qpoints)
+    detJdV = fill(T(NaN), n_qpoints)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
     CellVectorValues{dim, T, shape, MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
