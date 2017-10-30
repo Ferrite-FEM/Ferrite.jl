@@ -78,7 +78,7 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim, shape}, func
             dNdξ[i, qp], N[i, qp] = gradient(ξ -> value(func_interpol, i, ξ), ξ, :all)
         end
         for i in 1:n_geom_basefuncs
-            dMdξ[i, qp], M[i, qp] = gradient(ξ -> value(func_interpol, i, ξ), ξ, :all)
+            dMdξ[i, qp], M[i, qp] = gradient(ξ -> value(geom_interpol, i, ξ), ξ, :all)
         end
     end
 
