@@ -3,8 +3,8 @@
 #####################################
 # Volume for the reference elements #
 #####################################
-reference_volume{dim}(::Interpolation{dim, RefCube}) = 2^dim
-reference_volume{dim}(::Interpolation{dim, RefTetrahedron}) = 1 / factorial(dim)
+reference_volume(::Interpolation{dim, RefCube}) where {dim} = 2^dim
+reference_volume(::Interpolation{dim, RefTetrahedron}) where {dim} = 1 / factorial(dim)
 # For faces
 reference_volume(fs::Interpolation, ::Int) = reference_volume(JuAFEM.getlowerdim(fs))
 reference_volume(fs::Interpolation{2, RefTetrahedron}, face::Int) = face == 1 ? sqrt(2) : 1.0
@@ -163,7 +163,7 @@ function rotmat(dim, θ=π/6)
     end
 end
 
-function valid_coordinates_and_normals{dim, shape, order}(fs::Interpolation{dim, shape, order})
+function valid_coordinates_and_normals(fs::Interpolation{dim, shape, order}) where {dim, shape, order}
     x = reference_coordinates(fs)
     n = reference_normals(fs)
     R = rotmat(dim)
@@ -173,23 +173,23 @@ end
 #######################################
 # Volume of cells (with planar edges) #
 #######################################
-function calculate_volume{T, dim}(::Lagrange{1, RefCube, 1}, x::Vector{Vec{dim, T}})
+function calculate_volume(::Lagrange{1, RefCube, 1}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm(x[2] - x[1])
     return vol
 end
 
-function calculate_volume{T, dim}(::Lagrange{1, RefCube, 2}, x::Vector{Vec{dim, T}})
+function calculate_volume(::Lagrange{1, RefCube, 2}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm(x[3] - x[1]) + norm(x[2]-x[3])
     return vol
 end
 
-function calculate_volume{T, dim}(::Lagrange{2, RefCube, 1}, x::Vector{Vec{dim, T}})
+function calculate_volume(::Lagrange{2, RefCube, 1}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm((x[4] - x[1]) × (x[2] - x[1])) * 0.5 +
           norm((x[4] - x[3]) × (x[2] - x[3])) * 0.5
     return vol
 end
 
-function calculate_volume{T, dim}(::Lagrange{2, RefCube, 2}, x::Vector{Vec{dim, T}})
+function calculate_volume(::Lagrange{2, RefCube, 2}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm((x[8] - x[1]) × (x[5] - x[1])) * 0.5 +
           norm((x[8] - x[9]) × (x[5] - x[9])) * 0.5 +
           norm((x[5] - x[2]) × (x[6] - x[2])) * 0.5 +
@@ -201,12 +201,12 @@ function calculate_volume{T, dim}(::Lagrange{2, RefCube, 2}, x::Vector{Vec{dim, 
     return vol
 end
 
-function calculate_volume{T, dim}(::Lagrange{2, RefTetrahedron, 1}, x::Vector{Vec{dim, T}})
+function calculate_volume(::Lagrange{2, RefTetrahedron, 1}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm((x[1] - x[3]) × (x[2] - x[3])) * 0.5
     return vol
 end
 
-function calculate_volume{T, dim}(::Lagrange{2, RefTetrahedron, 2}, x::Vector{Vec{dim, T}})
+function calculate_volume(::Lagrange{2, RefTetrahedron, 2}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm((x[6] - x[3]) × (x[5] - x[3])) * 0.5 +
           norm((x[6] - x[4]) × (x[5] - x[4])) * 0.5 +
           norm((x[1] - x[6]) × (x[4] - x[6])) * 0.5 +
@@ -214,12 +214,12 @@ function calculate_volume{T, dim}(::Lagrange{2, RefTetrahedron, 2}, x::Vector{Ve
     return vol
 end
 
-function calculate_volume{T, order}(::Lagrange{3, RefTetrahedron, order}, x::Vector{Vec{3, T}})
+function calculate_volume(::Lagrange{3, RefTetrahedron, order}, x::Vector{Vec{3, T}}) where {T, order}
     vol = norm((x[2] - x[1]) ⋅ ((x[3] - x[1]) × (x[4] - x[1]))) / 6.0
     return vol
 end
 
-function calculate_volume{T}(::Lagrange{3, RefCube, 1}, x::Vector{Vec{3, T}})
+function calculate_volume(::Lagrange{3, RefCube, 1}, x::Vector{Vec{3, T}}) where T
     vol = norm((x[1] - x[5]) ⋅ ((x[2] - x[5]) × (x[4] - x[5]))) / 6.0 +
           norm((x[2] - x[7]) ⋅ ((x[3] - x[7]) × (x[4] - x[7]))) / 6.0 +
           norm((x[2] - x[7]) ⋅ ((x[4] - x[7]) × (x[5] - x[7]))) / 6.0 +
@@ -228,7 +228,7 @@ function calculate_volume{T}(::Lagrange{3, RefCube, 1}, x::Vector{Vec{3, T}})
     return vol
 end
 
-function calculate_volume{T}(::Serendipity{2, RefCube, 2}, x::Vector{Vec{2, T}})
+function calculate_volume(::Serendipity{2, RefCube, 2}, x::Vector{Vec{2, T}}) where T
     vol = norm((x[5] - x[1]) × (x[8] - x[1])) * 0.5 +
           norm((x[6] - x[2]) × (x[5] - x[2])) * 0.5 +
           norm((x[7] - x[3]) × (x[6] - x[3])) * 0.5 +
@@ -239,7 +239,7 @@ function calculate_volume{T}(::Serendipity{2, RefCube, 2}, x::Vector{Vec{2, T}})
 end
 
 # For faces
-function calculate_volume{order, T}(::Lagrange{0, RefCube, order}, ::Vector{Vec{1, T}})
+function calculate_volume(::Lagrange{0, RefCube, order}, ::Vector{Vec{1, T}}) where {order, T}
     return one(T)
 end
 
