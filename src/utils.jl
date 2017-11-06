@@ -1,4 +1,4 @@
-type ScalarWrapper{T}
+mutable struct ScalarWrapper{T}
     x::T
 end
 
