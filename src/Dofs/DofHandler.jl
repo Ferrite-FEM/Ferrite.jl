@@ -72,20 +72,23 @@ julia> vtk_point_data(vtkfile)
 ```
 
 """
-
-# TODO: Make this immutable?
-mutable struct DofHandler{dim, N, T, M}
-    dofs_nodes::Matrix{Int}
-    dofs_cells::Matrix{Int} # TODO <- Is this needed or just extract from dofs_nodes?
+struct DofHandler{dim, N, T, M}
+    # dofs_nodes::Matrix{Int}
+    dofs_nodes::Vector{Int}
+    dofs_nodes_offsets::Vector{Int}
+    # dofs_cells::Matrix{Int} # TODO <- Is this needed or just extract from dofs_nodes?
+    dofs_cells::Vector{Int}
+    dofs_cells_offsets::Vector{Int}
     field_names::Vector{Symbol}
     dof_dims::Vector{Int}
     closed::ScalarWrapper{Bool}
     dofs_vec::Vector{Int}
-    grid::Grid{dim, N, T, M}
+    grid::Grid{dim, N, T, M} # TODO: Needed?
 end
 
 function DofHandler(m::Grid)
-    DofHandler(Matrix{Int}(0, 0), Matrix{Int}(0, 0), Symbol[], Int[], ScalarWrapper(false), Int[], m)
+    # DofHandler(Matrix{Int}(0, 0), Matrix{Int}(0, 0), Symbol[], Int[], ScalarWrapper(false), Int[], m)
+    DofHandler(Int[], Int[], Int[], Int[], Symbol[], Int[], ScalarWrapper(false), Int[], m)
 end
 
 function Base.show(io::IO, dh::DofHandler)
@@ -103,16 +106,22 @@ function Base.show(io::IO, dh::DofHandler)
 end
 
 ndofs(dh::DofHandler) = length(dh.dofs_nodes)
-ndofs_per_cell(dh::DofHandler) = size(dh.dofs_cells, 1)
+# TODO: This still assumes same in all cells
+ndofs_per_cell(dh::DofHandler) = dh.dofs_cells_offsets[2] - dh.dofs_cells_offsets[1]
 isclosed(dh::DofHandler) = dh.closed[]
-dofs_node(dh::DofHandler, i::Int) = dh.dof_nodes[:, i]
+function dofs_node(dh::DofHandler, i::Int)
+    dh.dofs_nodes[dh.dofs_nodes_offsets[i]:(dh.dofs_nodes_offsets[i+1]-1)] # ?
+end
 
 # Stores the dofs for the cell with number `i` into the vector `global_dofs`
 function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh)
+    # @inbounds for j in 1:ndofs_per_cell(dh)
+    #     global_dofs[j] = dh.dofs_cells[j, i]
+    # end
     @inbounds for j in 1:ndofs_per_cell(dh)
-        global_dofs[j] = dh.dofs_cells[j, i]
+        global_dofs[j] = dh.dofs_cells[dh.dofs_cells_offsets[i]+j]
     end
     return global_dofs
 end
