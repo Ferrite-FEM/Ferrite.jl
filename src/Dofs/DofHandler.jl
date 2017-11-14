@@ -88,7 +88,7 @@ end
 
 function DofHandler(m::Grid)
     # DofHandler(Matrix{Int}(0, 0), Matrix{Int}(0, 0), Symbol[], Int[], ScalarWrapper(false), Int[], m)
-    DofHandler(Int[], Int[], Int[], Int[], Symbol[], Int[], ScalarWrapper(false), Int[], m)
+    DofHandler(Int[], fill(0, getnnodes(m)+1), Int[], Int[], Symbol[], Int[], ScalarWrapper(false), Int[], m)
 end
 
 function Base.show(io::IO, dh::DofHandler)
@@ -110,7 +110,7 @@ ndofs(dh::DofHandler) = length(dh.dofs_nodes)
 ndofs_per_cell(dh::DofHandler) = dh.dofs_cells_offsets[2] - dh.dofs_cells_offsets[1]
 isclosed(dh::DofHandler) = dh.closed[]
 function dofs_node(dh::DofHandler, i::Int)
-    dh.dofs_nodes[dh.dofs_nodes_offsets[i]:(dh.dofs_nodes_offsets[i+1]-1)] # ?
+    dh.dofs_nodes[dh.dofs_nodes_offsets[i]:(dh.dofs_nodes_offsets[i+1]-1)] # TODO: Probably wrong
 end
 
 # Stores the dofs for the cell with number `i` into the vector `global_dofs`
@@ -126,43 +126,39 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     return global_dofs
 end
 
-# Add a collection of fields
-function Base.push!(dh::DofHandler, names::Vector{Symbol}, dims)
-    @assert length(names) == length(dims)
-    for i in 1:length(names)
-        push!(dh, names[i], dims[i])
-    end
-end
-
 # Add a field to the dofhandler ex `push!(dh, :u, 3)`
 function Base.push!(dh::DofHandler, name::Symbol, dim::Int)
     @assert !isclosed(dh)
     if name in dh.field_names
-        error("duplicate field name")
+        throw(ArgumentError("duplicate field name $(name)"))
     end
     push!(dh.field_names, name)
     push!(dh.dof_dims, dim)
-    append!(dh.dofs_vec, length(dh.dofs_vec)+1:length(dh.dofs_vec) +  dim * getnnodes(dh.grid))
+    append!(dh.dofs_vec, length(dh.dofs_vec)+1:length(dh.dofs_vec) + dim * getnnodes(dh.grid))
+    # for i in 1:getnnodes(dh.grid)+1
+    #     dh.dofs_nodes_offsets[i] += dim*(i-1)
+    # end
     return dh
 end
 
 # Computes the number of dofs from which the field starts data
 # For example [ux, uy, uz, T] --> dof_offset(dh, :temperature) = 4
 function dof_offset(dh::DofHandler, field_name::Symbol)
+    @assert field_name ∈ dh.field_names
     offset = 0
     i = 0
     for name in dh.field_names
-        i += 1
         if name == field_name
             return offset
         else
+            i += 1
             offset += dh.dof_dims[i]
         end
     end
-    error("unexisting field name $field_name among $(dh.field_names)")
 end
 
 function ndim(dh::DofHandler, field_name::Symbol)
+    @assert field_name ∈ dh.field_names
     i = 0
     for name in dh.field_names
         i += 1
@@ -170,12 +166,20 @@ function ndim(dh::DofHandler, field_name::Symbol)
             return dh.dof_dims[i]
         end
     end
-    error("unexisting field name $field_name among $(dh.field_names)")
 end
 
 function close!(dh::DofHandler)
     @assert !isclosed(dh)
-    dh.dofs_nodes = reshape(dh.dofs_vec, (length(dh.dofs_vec) ÷ getnnodes(dh.grid), getnnodes(dh.grid)))
+    # dh.dofs_nodes = reshape(dh.dofs_vec, (length(dh.dofs_vec) ÷ getnnodes(dh.grid), getnnodes(dh.grid)))
+    # dh.dofs_nodes = dh.dofs_vec
+    # count = 0
+    s = sum(dh.dof_dims)
+    for i in 1:getnnodes(dh.grid)+1
+        # count += s
+        dh.dofs_nodes_offsets[i] = (i-1)*s + 1
+    end
+
+    copy!(resize!(dh.dofs_nodes, length(dh.dofs_vec)), dh.dofs_vec)
     add_element_dofs!(dh)
     dh.closed[] = true
     return dh
@@ -186,21 +190,27 @@ getnvertices(::Type{JuAFEM.Cell{dim, N, M}}) where {dim, N, M} = N
 # Computes the "edof"-matrix
 function add_element_dofs!(dh::DofHandler)
     n_elements = getncells(dh.grid)
-    n_vertices = getnvertices(getcelltype(dh.grid))
+    # n_vertices = getnvertices(getcelltype(dh.grid))
     element_dofs = Int[]
     ndofs = size(dh.dofs_nodes, 1)
+    push!(dh.dofs_cells_offsets, 1)
     for element in 1:n_elements
         offset = 0
         for dim_doftype in dh.dof_dims
             for node in getcells(dh.grid, element).nodes
                 for j in 1:dim_doftype
-                    push!(element_dofs, dh.dofs_nodes[offset + j, node])
+                    # push!(element_dofs, dh.dofs_nodes[offset + j, node])
+                    o = dh.dofs_nodes_offsets[node]
+                    push!(element_dofs, dh.dofs_nodes[dh.dofs_nodes_offsets[node] - 1 + offset + j])
+                    # push!(dh.dofs_nodes_offsets, length(dh.dofs_nodes_offsets))
                 end
             end
             offset += dim_doftype
         end
+        push!(dh.dofs_cells_offsets, length(element_dofs)+1)
     end
-    dh.dofs_cells = reshape(element_dofs, (ndofs * n_vertices, n_elements))
+    # dh.dofs_cells = reshape(element_dofs, (ndofs * n_vertices, n_elements))
+    copy!(resize!(dh.dofs_cells, length(element_dofs)), element_dofs)
 end
 
 # Creates a sparsity pattern from the dofs in a dofhandler.
