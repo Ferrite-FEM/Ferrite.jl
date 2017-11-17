@@ -33,7 +33,6 @@ export
     spatial_coordinate,
     getnormal,
     getdetJdV,
-    getfacenumber,
     getnquadpoints,
 
 # Grid

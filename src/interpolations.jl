@@ -79,11 +79,6 @@ end
 #####################
 # Utility functions #
 #####################
-getnfaces(::Interpolation{dim, RefCube}) where {dim} = 2*dim
-getnfaces(::Interpolation{2, RefTetrahedron}) = 3
-getnfaces(::Interpolation{3, RefTetrahedron}) = 4
-
-getfacelist(i::Interpolation) = getfacelist(typeof(i))
 
 """
 Returns the number of base functions for an [`Interpolation`](@ref) or `Values` object.
@@ -102,8 +97,6 @@ getlowerorder(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{di
 # Lagrange dim 1 RefCube order 1 #
 ##################################
 getnbasefunctions(::Lagrange{1, RefCube, 1}) = 2
-getnfacenodes(::Lagrange{1, RefCube, 1}) = 1
-getfacelist(::Type{Lagrange{1, RefCube, 1}}) = ((1,),(2,))
 
 function value(ip::Lagrange{1, RefCube, 1}, i::Int, ξ::Vec{1})
     @inbounds begin
@@ -118,8 +111,6 @@ end
 # Lagrange dim 1 RefCube order 2 #
 ##################################
 getnbasefunctions(::Lagrange{1, RefCube, 2}) = 3
-getnfacenodes(::Lagrange{1, RefCube, 2}) = 1
-getfacelist(::Type{Lagrange{1, RefCube, 2}}) = ((1,),(2,))
 
 function value(ip::Lagrange{1, RefCube, 2}, i::Int, ξ::Vec{1})
     @inbounds begin
@@ -135,8 +126,6 @@ end
 # Lagrange dim 2 RefCube order 1 #
 ##################################
 getnbasefunctions(::Lagrange{2, RefCube, 1}) = 4
-getnfacenodes(::Lagrange{2, RefCube, 1}) = 2
-getfacelist(::Type{Lagrange{2, RefCube, 1}}) = ((1,2),(2,3),(3,4),(1,4))
 
 function value(ip::Lagrange{2, RefCube, 1}, i::Int, ξ::Vec{2})
     @inbounds begin
@@ -154,8 +143,6 @@ end
 # Lagrange dim 2 RefCube order 2 #
 ##################################
 getnbasefunctions(::Lagrange{2, RefCube, 2}) = 9
-getnfacenodes(::Lagrange{2, RefCube, 2}) = 3
-getfacelist(::Type{Lagrange{2, RefCube, 2}}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
 
 function value(ip::Lagrange{2, RefCube, 2}, i::Int, ξ::Vec{2})
     @inbounds begin
@@ -179,8 +166,6 @@ end
 #########################################
 getnbasefunctions(::Lagrange{2, RefTetrahedron, 1}) = 3
 getlowerdim(::Lagrange{2, RefTetrahedron, order}) where {order} = Lagrange{1, RefCube, order}()
-getnfacenodes(::Lagrange{2, RefTetrahedron, 1}) = 2
-getfacelist(::Type{Lagrange{2, RefTetrahedron, 1}}) = ((1,2),(2,3),(1,3))
 
 function value(ip::Lagrange{2, RefTetrahedron, 1}, i::Int, ξ::Vec{2})
     @inbounds begin
@@ -197,8 +182,6 @@ end
 # Lagrange dim 2 RefTetrahedron order 2 #
 #########################################
 getnbasefunctions(::Lagrange{2, RefTetrahedron, 2}) = 6
-getnfacenodes(::Lagrange{2, RefTetrahedron, 2}) = 3
-getfacelist(::Type{Lagrange{2, RefTetrahedron, 2}}) = ((1,2,4),(2,3,5),(1,3,6))
 
 function value(ip::Lagrange{2, RefTetrahedron, 2}, i::Int, ξ::Vec{2})
     @inbounds begin
@@ -219,8 +202,6 @@ end
 # Lagrange dim 3 RefTetrahedron order 1 #
 #########################################
 getnbasefunctions(::Lagrange{3, RefTetrahedron, 1}) = 4
-getnfacenodes(::Lagrange{3, RefTetrahedron, 1}) = 3
-getfacelist(::Type{Lagrange{3, RefTetrahedron, 1}}) = ((1,2,3),(1,2,4),(2,3,4),(1,3,4))
 
 function value(ip::Lagrange{3, RefTetrahedron, 1}, i::Int, ξ::Vec{3})
     @inbounds begin
@@ -239,8 +220,6 @@ end
 # Lagrange dim 3 RefTetrahedron order 2 #
 #########################################
 getnbasefunctions(::Lagrange{3, RefTetrahedron, 2}) = 10
-getnfacenodes(::Lagrange{3, RefTetrahedron, 2}) = 6
-getfacelist(::Lagrange{3, RefTetrahedron, 2}) = ((1,2,3,5,6,7),(1,2,4,5,8,9),(2,3,4,6,9,10),(1,3,4,7,8,10))
 
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch09.d/AFEM.Ch09.pdf
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.pdf
@@ -267,8 +246,6 @@ end
 # Lagrange dim 3 RefCube order 1 #
 ##################################
 getnbasefunctions(::Lagrange{3, RefCube, 1}) = 8
-getnfacenodes(::Lagrange{3, RefCube, 1}) = 4
-getfacelist(::Type{Lagrange{3, RefCube, 1}}) = ((1,2,3,4),(1,2,5,6),(2,3,6,7),(3,4,7,8),(1,4,5,8),(5,6,7,8))
 
 function value(ip::Lagrange{3, RefCube, 1}, i::Int, ξ::Vec{3})
     @inbounds begin
@@ -298,8 +275,6 @@ struct Serendipity{dim, shape, order} <: Interpolation{dim, shape, order} end
 getnbasefunctions(::Serendipity{2, RefCube, 2}) = 8
 getlowerdim(::Serendipity{2, RefCube, 2}) = Lagrange{1, RefCube, 2}()
 getlowerorder(::Serendipity{2, RefCube, 2}) = Lagrange{2, RefCube, 1}()
-getnfacenodes(::Serendipity{2, RefCube, 2}) = 3
-getfacelist(::Type{Serendipity{2, RefCube, 2}}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
 
 function value(ip::Serendipity{2, RefCube, 2}, i::Int, ξ::Vec{2})
     @inbounds begin

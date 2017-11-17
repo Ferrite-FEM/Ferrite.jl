@@ -243,58 +243,36 @@ function calculate_volume(::Lagrange{0, RefCube, order}, ::Vector{Vec{1, T}}) wh
     return one(T)
 end
 
-####################################
-# For testing getfacenumber() #
-####################################
-# Last set of face nodes throws error
-function topology_test_nodes(::Lagrange{1, RefCube, 1})
-    cell_nodes = [3,4]
-    face_nodes = [[3,], [4,], [1337,]]
-    return face_nodes, cell_nodes
-end
-function topology_test_nodes(::Lagrange{1, RefCube, 2})
-    cell_nodes = [3,4,8]
-    face_nodes = [[3,], [4,], [8,]]
-    return face_nodes, cell_nodes
-end
-function topology_test_nodes(::Lagrange{2, RefCube, 1})
-    cell_nodes = [3,4,8,1]
-    face_nodes = [[3,4], [4,8], [8,1], [1,3], [3,1337]]
-    return face_nodes, cell_nodes
-end
-function topology_test_nodes(::Lagrange{2, RefCube, 2})
-    cell_nodes = [3,4,8,1,2,5,6,7,9]
-    face_nodes = [[3,4,2], [4,8,5], [8,1,6], [1,3,7], [3,4,1337]]
-    return face_nodes, cell_nodes
-end
-function topology_test_nodes(::Lagrange{2, RefTetrahedron, 1})
-    cell_nodes = [3,4,8]
-    face_nodes = [[3,4], [4,8], [8,3], [3,1337]]
-    return face_nodes, cell_nodes
-end
-function topology_test_nodes(::Lagrange{2, RefTetrahedron, 2})
-    cell_nodes = [3,4,8,1,2,5]
-    face_nodes = [[3,4,1], [4,8,2], [8,3,5], [3,4,1337]]
-    return face_nodes, cell_nodes
-end
-function topology_test_nodes(::Lagrange{3, RefCube, 1})
-    cell_nodes = [3,4,8,1,2,5,6,7]
-    face_nodes = [[3,4,8,1], [3,4,5,2], [4,8,6,5], [8,1,7,6], [1,3,2,7], [2,5,6,7], [3,4,8,1337]]
-    return face_nodes, cell_nodes
-end
-function topology_test_nodes(::Serendipity{2, RefCube, 2})
-    cell_nodes = [3,4,8,1,2,5,6,7]
-    face_nodes = [[3,4,2], [4,8,5], [8,1,6], [1,3,7], [3,4,1337]]
-    return face_nodes, cell_nodes
-end
-function topology_test_nodes(::Lagrange{3, RefTetrahedron, 1})
-    cell_nodes = [3,4,8,1]
-    face_nodes = [[3,4,8], [3,4,1], [4,8,1], [3,8,1], [1,4,1337]]
-    return face_nodes, cell_nodes
-end
+getnfaces(::Interpolation{dim, RefCube}) where {dim} = 2*dim
+getnfaces(::Interpolation{2, RefTetrahedron}) = 3
+getnfaces(::Interpolation{3, RefTetrahedron}) = 4
 
-function topology_test_nodes(::Lagrange{3, RefTetrahedron, 2})
-    cell_nodes = [3,4,8,1,5,2,6,7,9,10]
-    face_nodes = [[3,4,8,5,2,6], [3,4,1,5,9,7], [4,8,1,2,10,9], [3,8,1,6,10,7], [1,4,1337,2,3,5]]
-    return face_nodes, cell_nodes
-end
+getfacelist(::Lagrange{1, RefCube, 1}) = ((1,),(2,))
+getfacelist(::Lagrange{1, RefCube, 2}) = ((1,),(2,))
+getfacelist(::Lagrange{2, RefCube, 1}) = ((1,2),(2,3),(3,4),(1,4))
+getfacelist(::Lagrange{2, RefCube, 2}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
+getfacelist(::Lagrange{2, RefTetrahedron, 1}) = ((1,2),(2,3),(1,3))
+getfacelist(::Lagrange{2, RefTetrahedron, 2}) = ((1,2,4),(2,3,5),(1,3,6))
+getfacelist(::Lagrange{3, RefTetrahedron, 1}) = ((1,2,3),(1,2,4),(2,3,4),(1,3,4))
+getfacelist(::Lagrange{3, RefTetrahedron, 2}) = ((1,2,3,5,6,7),(1,2,4,5,8,9),(2,3,4,6,9,10),(1,3,4,7,8,10))
+getfacelist(::Lagrange{3, RefCube, 1}) = ((1,2,3,4),(1,2,5,6),(2,3,6,7),(3,4,7,8),(1,4,5,8),(5,6,7,8))
+getfacelist(::Serendipity{2, RefCube, 2}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
+
+coords_on_faces(x, ::Lagrange{1, RefCube, 1}) = ([x[1]], [x[2]])
+coords_on_faces(x, ::Lagrange{1, RefCube, 2}) = ([x[1]], [x[2]])
+coords_on_faces(x, ::Lagrange{2, RefCube, 1}) =
+    ([x[1],x[2]], [x[2],x[3]], [x[3],x[4]], [x[1],x[4]])
+coords_on_faces(x, ::Lagrange{2, RefCube, 2}) =
+    ([x[1],x[2],x[5]], [x[2],x[3],x[6]], [x[3],x[4],x[7]], [x[1],x[4],x[8]])
+coords_on_faces(x, ::Lagrange{2, RefTetrahedron, 1}) =
+    ([x[1],x[2]], [x[2],x[3]], [x[1],x[3]])
+coords_on_faces(x, ::Lagrange{2, RefTetrahedron, 2}) =
+    ([x[1],x[2],x[4]], [x[2],x[3],x[5]], [x[1],x[3],x[6]])
+coords_on_faces(x, ::Lagrange{3, RefTetrahedron, 1}) =
+    ([x[1],x[2],x[3]], [x[1],x[2],x[4]], [x[2],x[3],x[4]], [x[1],x[3],x[4]])
+coords_on_faces(x, ::Lagrange{3, RefTetrahedron, 2}) =
+    ([x[1],x[2],x[3],x[5],x[6],x[7]], [x[1],x[2],x[4],x[5],x[8],x[9]], [x[2],x[3],x[4],x[6],x[9],x[10]], [x[1],x[3],x[4],x[7],x[8],x[10]])
+coords_on_faces(x, ::Lagrange{3, RefCube, 1}) =
+    ([x[1],x[2],x[3],x[4]], [x[1],x[2],x[5],x[6]], [x[2],x[3],x[6],x[7]],[x[3],x[4],x[7],x[8]],[x[1],x[4],x[5],x[8]],[x[5],x[6],x[7],x[8]])
+coords_on_faces(x, ::Serendipity{2, RefCube, 2}) =
+    ([x[1],x[2],x[5]], [x[2],x[3],x[6]], [x[3],x[4],x[7]], [x[1],x[4],x[8]])

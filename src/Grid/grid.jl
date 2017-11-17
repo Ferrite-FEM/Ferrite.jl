@@ -96,7 +96,6 @@ end
 @inline getfacesets(grid::Grid) = grid.facesets
 
 n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
-getfacelist(grid::Grid) = getfacelist(eltype(grid.cells))
 
 # Transformations
 
