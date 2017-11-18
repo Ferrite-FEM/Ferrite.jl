@@ -73,126 +73,210 @@ julia> vtk_point_data(vtkfile)
 
 """
 
-# TODO: Make this immutable?
-mutable struct DofHandler{dim, N, T, M}
-    dofs_nodes::Matrix{Int}
-    dofs_cells::Matrix{Int} # TODO <- Is this needed or just extract from dofs_nodes?
-    field_names::Vector{Symbol}
-    dof_dims::Vector{Int}
-    closed::ScalarWrapper{Bool}
-    dofs_vec::Vector{Int}
-    grid::Grid{dim, N, T, M}
+mutable struct DofContainer
+    name::Symbol
+    ndims::Int
 end
 
-function DofHandler(m::Grid)
-    DofHandler(Matrix{Int}(0, 0), Matrix{Int}(0, 0), Symbol[], Int[], ScalarWrapper(false), Int[], m)
+# TODO: Make this immutable?
+mutable struct DofHandler{dim,T}
+    dofs_nodes::Vector{Int}
+    #dofs_cells::Vector{Int} # Alt1
+    dofs_cells::Vector{Vector{Int}} # Alt2 
+
+    nodes_offset::Vector{Int}
+    #cells_offset::Vector{Int} # Alt1
+    cells_offset::Vector{Vector{Int}} #Alt2
+
+    field_names::Vector{Vector{DofContainer}} #cellgroups dofs
+    
+    closed::ScalarWrapper{Bool}
+    grid::Grid{dim, T}
+end
+
+function DofHandler(m::Grid, alt::Int)
+    field_names = Vector{Vector{DofContainer}}()
+    for cellgroup in 1:length(m.cellgroups)
+        push!(field_names, Vector{DofHandler}())
+    end
+    DofHandler(Vector{Int}(0), Vector{Vector{Int}}(0), Vector{Int}(0), Vector{Vector{Int}}(0), field_names, ScalarWrapper(false), m)
 end
 
 function Base.show(io::IO, dh::DofHandler)
     println(io, "DofHandler")
-    println(io, "  Fields:")
-    for i in 1:length(dh.field_names)
-        println(io, "    ", dh.field_names[i], " dim: ", dh.dof_dims[i])
+    for (cellgroup_id, cellgroup_dofs) in enumerate(dh.field_names)
+        println(io, "    Cellgroup ", cellgroup_id, ", nel: ", length(dh.grid.cellgroups[cellgroup_id]))
+        if length(cellgroup_dofs) == 0
+            println(io, "      This cellgroup is empty")
+        end
+        for dof in cellgroup_dofs
+            println(io, "      Name:", dof.name, ", dim: ", dof.ndims)
+        end
     end
     if !isclosed(dh)
         println(io, "  Not closed!")
     else
         println(io, "  Total dofs: ", ndofs(dh))
-        print(io, "  Dofs per cell: ", ndofs_per_cell(dh))
+        println(io, "  Total nels: ", getncells(dh.grid))
     end
 end
 
 ndofs(dh::DofHandler) = length(dh.dofs_nodes)
-ndofs_per_cell(dh::DofHandler) = size(dh.dofs_cells, 1)
 isclosed(dh::DofHandler) = dh.closed[]
 dofs_node(dh::DofHandler, i::Int) = dh.dof_nodes[:, i]
+ncellgroups(dh) = length(dh.grid.cellgroups)
 
 # Stores the dofs for the cell with number `i` into the vector `global_dofs`
-function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
+function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, cellgroup::Int, i::Int)
     @assert isclosed(dh)
-    @assert length(global_dofs) == ndofs_per_cell(dh)
-    @inbounds for j in 1:ndofs_per_cell(dh)
-        global_dofs[j] = dh.dofs_cells[j, i]
+    @assert length(global_dofs) == ndofs_per_cell(dh, cellgroup)
+    celldofs = getcelldofs(dh, cellgroup, i)
+
+    @inbounds for j in 1:ndofs_per_cell(dh, cellgroup)
+        global_dofs[j] = celldofs[j]
     end
     return global_dofs
 end
 
-# Add a collection of fields
-function Base.push!(dh::DofHandler, names::Vector{Symbol}, dims)
-    @assert length(names) == length(dims)
-    for i in 1:length(names)
-        push!(dh, names[i], dims[i])
-    end
-end
+#getcelldofs(dh::DofHandler, cellid::Int) = dh.dofs_cells[(dh.cells_offset[cellid]+1):dh.cells_offset[cellid+1]]
+export getcelldofs
+getcelldofs(dh::DofHandler, cellgroup::Int, cellid::Int) = dh.dofs_cells[cellgroup][(dh.cells_offset[cellgroup][cellid]+1):dh.cells_offset[cellgroup][cellid+1]]
+getnodedofs(dh::DofHandler, nodeid::Int) = dh.dofs_nodes[(dh.nodes_offset[nodeid]+1):dh.nodes_offset[nodeid+1]]
 
-# Add a field to the dofhandler ex `push!(dh, :u, 3)`
+# Add a field to all cellgroups, ex `push!(dh, :u, 3)`
 function Base.push!(dh::DofHandler, name::Symbol, dim::Int)
     @assert !isclosed(dh)
-    if name in dh.field_names
-        error("duplicate field name")
+    for i in 1:ncellgroups(dh)
+        push!(dh.field_names[i], DofContainer(name, dim))
     end
-    push!(dh.field_names, name)
-    push!(dh.dof_dims, dim)
-    append!(dh.dofs_vec, length(dh.dofs_vec)+1:length(dh.dofs_vec) +  dim * getnnodes(dh.grid))
+    return dh
+end
+
+# Add a field to a specific cellgroup, ex `push!(dh, SOLIDS, :u, 3)`
+function Base.push!(dh::DofHandler, cellgroup_id::Int, name::Symbol, dim::Int)
+    @assert !isclosed(dh)
+    #if name in dh.field_names[cellgroup_id]
+    #    error("duplicate field name")
+    #end
+
+    push!(dh.field_names[cellgroup_id], DofContainer(name, dim))
     return dh
 end
 
 # Computes the number of dofs from which the field starts data
 # For example [ux, uy, uz, T] --> dof_offset(dh, :temperature) = 4
-function dof_offset(dh::DofHandler, field_name::Symbol)
+function dof_offset(dh::DofHandler, cellgroupid::Int, field_name::Symbol)
     offset = 0
     i = 0
-    for name in dh.field_names
+    for dof in dh.field_names[cellgroupid]
         i += 1
-        if name == field_name
+        if dof.name == field_name
             return offset
         else
-            offset += dh.dof_dims[i]
+            offset += dof.ndims
         end
     end
     error("unexisting field name $field_name among $(dh.field_names)")
 end
 
-function ndim(dh::DofHandler, field_name::Symbol)
-    i = 0
-    for name in dh.field_names
-        i += 1
-        if name == field_name
-            return dh.dof_dims[i]
+function ndim(dh::DofHandler, cellgroup::Int, field_name::Symbol)
+
+    for dof in dh.field_names[cellgroup]
+        if dof.name == field_name
+            return dof.ndims
         end
     end
     error("unexisting field name $field_name among $(dh.field_names)")
+
+end
+
+#All cell in a cellgroup has the same number of dofs
+function ndofs_per_cell(dh::DofHandler, cellgroup::Int)
+    nnodes_per_cell = nnodes(dh.grid.cellgroups[cellgroup][1])
+    sum = 0
+    for dof in dh.field_names[cellgroup]
+        sum += dof.ndims
+    end
+    return sum*nnodes_per_cell
+    
+end
+
+function ndofs_per_node(dh::DofHandler, nodeid::Int)
+    @assert isclosed(dh) 
+    return length(getnodedofs(dh, nodeid))
+end
+
+function ndims_cellgroup(dh::DofHandler, cellgroup::Int)
+    sum = 0
+    for dof in dh.field_names[cellgroup]
+        sum += dof.ndims
+    end
+    return sum
 end
 
 function close!(dh::DofHandler)
-    @assert !isclosed(dh)
-    dh.dofs_nodes = reshape(dh.dofs_vec, (length(dh.dofs_vec) ÷ getnnodes(dh.grid), getnnodes(dh.grid)))
-    add_element_dofs!(dh)
+    @assert !isclosed(dh)  
+
+    #Get number of dofs per node and cell
+    node_ndims = Vector{Int}(getnnodes(dh.grid))
+    cells_ndims = Vector{Vector{Int}}()
+    for (cellgroup_index, cellgroup) in enumerate(dh.grid.cellgroups)
+        
+        ndofs_per_cell_in_cellgroup = ndofs_per_cell(dh, cellgroup_index)
+        ndofs_per_node = ndims_cellgroup(dh, cellgroup_index)
+        cellgroup_ndims = Vector{Int}()
+        for (cellid, cell) in enumerate(cellgroup)
+            for node_id in cell.nodes
+                node_ndims[node_id] = ndofs_per_node
+            end
+            push!(cellgroup_ndims, ndofs_per_cell_in_cellgroup)
+        end
+        push!(cells_ndims, cellgroup_ndims)
+
+    end 
+
+    #Create the vector nodes_offset and cells_offset
+    for cellgroup_ndim in cells_ndims
+
+        tmp = Vector{Int}()
+        push!(tmp,0)
+        counter = 0
+        for cell_ndim in cellgroup_ndim
+            counter += cell_ndim
+            push!(tmp, counter)
+        end
+        push!(dh.cells_offset, tmp)
+    end
+
+    ndofs_counter = 0;
+    append!(dh.nodes_offset,0)
+    for ndims in node_ndims
+        ndofs_counter += ndims
+        append!(dh.nodes_offset, ndofs_counter)
+    end
+
+    #Create dofs_nodes 
+    dh.dofs_nodes = 1:ndofs_counter
+
+    #Create dofs_cells
+    for cellgroup in dh.grid.cellgroups
+
+        tmp = Vector{Int}()
+        for (cellid, cell) in enumerate(cellgroup)
+            for node_id in cell.nodes
+                nodedofs = getnodedofs(dh, node_id)
+                append!(tmp, nodedofs)
+            end
+        end
+        push!(dh.dofs_cells, tmp)
+    end
+
     dh.closed[] = true
     return dh
 end
 
-getnvertices(::Type{JuAFEM.Cell{dim, N, M}}) where {dim, N, M} = N
 
-# Computes the "edof"-matrix
-function add_element_dofs!(dh::DofHandler)
-    n_elements = getncells(dh.grid)
-    n_vertices = getnvertices(getcelltype(dh.grid))
-    element_dofs = Int[]
-    ndofs = size(dh.dofs_nodes, 1)
-    for element in 1:n_elements
-        offset = 0
-        for dim_doftype in dh.dof_dims
-            for node in getcells(dh.grid, element).nodes
-                for j in 1:dim_doftype
-                    push!(element_dofs, dh.dofs_nodes[offset + j, node])
-                end
-            end
-            offset += dim_doftype
-        end
-    end
-    dh.dofs_cells = reshape(element_dofs, (ndofs * n_vertices, n_elements))
-end
+getnvertices(::Type{JuAFEM.Cell{dim, N, M}}) where {dim, N, M} = N
 
 # Creates a sparsity pattern from the dofs in a dofhandler.
 # Returns a sparse matrix with the correct pattern.
@@ -200,23 +284,23 @@ end
 @inline create_symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_create_sparsity_pattern(dh, true), :U)
 
 function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
-    ncells = getncells(dh.grid)
-    n = ndofs_per_cell(dh)
-    N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
-    N += ndofs(dh) # always add the diagonal elements
-    I = Int[]; sizehint!(I, N)
-    J = Int[]; sizehint!(J, N)
-    global_dofs = zeros(Int, n)
-    for element_id in 1:ncells
-        celldofs!(global_dofs, dh, element_id)
-        @inbounds for j in 1:n, i in 1:n
-            dofi = global_dofs[i]
-            dofj = global_dofs[j]
-            sym && (dofi > dofj && continue)
-            push!(I, dofi)
-            push!(J, dofj)
+    #sym not used...
+    I = Int[];
+    J = Int[];
+    for (cellgroup_id, cellgroup) in enumerate(dh.grid.cellgroups)     
+        n = ndofs_per_cell(dh, cellgroup_id)
+        global_dofs = zeros(Int, n)
+        for element_id in 1:length(cellgroup)
+            celldofs!(global_dofs, dh, cellgroup_id, element_id)
+            @inbounds for j in 1:n, i in 1:n
+                dofi = global_dofs[i]
+                dofj = global_dofs[j]
+                push!(I, dofi)
+                push!(J, dofj)
+            end
         end
     end
+
     for d in 1:ndofs(dh)
         push!(I, d)
         push!(J, d)
@@ -225,7 +309,6 @@ function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
     K = sparse(I, J, V)
     return K
 end
-
 
 WriteVTK.vtk_grid(filename::AbstractString, dh::DofHandler) = vtk_grid(filename, dh.grid)
 
@@ -243,6 +326,28 @@ function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector)
         end
         vtk_point_data(vtkfile, data, string(dh.field_names[i]))
         offset += ndim_field
+    end
+    return vtkfile
+end
+
+# Exports the FE field `u` to `vtkfile`
+function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector)
+    offset = 0
+    for (cellgroupid, cellgroup) in enumerate(dh.grid.cellgroups)
+        offset = 0
+        for dof in dh.field_names[cellgroupid]
+            ndim_field = dof.ndims
+            space_dim = ndim_field == 2 ? 3 : ndim_field #???
+            data = zeros(space_dim, getnnodes(dh.grid))
+            for j in 1:getnnodes(dh.grid)
+                nodedofs = getnodedofs(dh, j)
+                for k in 1:ndim_field
+                    data[k, j] = u[nodedofs[k + offset]]
+                end
+            end
+            vtk_point_data(vtkfile, data, string(dof.name))
+            offset += ndim_field
+        end
     end
     return vtkfile
 end

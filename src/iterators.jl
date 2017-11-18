@@ -26,42 +26,45 @@ for cell in CellIterator(grid)
 end
 ```
 """
-struct CellIterator{dim, N, T, M}
+struct CellIterator{dim, T}
     flags::UpdateFlags
-    grid::Grid{dim, N, T, M}
+    grid::Grid{dim, T}
     current_cellid::ScalarWrapper{Int}
+    cellgroupid::Int
     nodes::Vector{Int}
     coords::Vector{Vec{dim, T}}
-    dh::DofHandler{dim, N, T, M}
+    dh::DofHandler{dim, T}
     celldofs::Vector{Int}
 
-    function CellIterator{dim, N, T, M}(dh::DofHandler{dim, N, T, M}, flags::UpdateFlags) where {dim, N, T, M}
+    function CellIterator{dim, T}(dh::DofHandler{dim, T}, cellgroupid::Int, flags::UpdateFlags) where {dim, T}
         cell = ScalarWrapper(0)
+        N = ndofs_per_cell(dh, cellgroupid)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim, T}, N)
-        n = ndofs_per_cell(dh)
+        n = ndofs_per_cell(dh, cellgroupid)
         celldofs = zeros(Int, n)
-        return new{dim, N, T, M}(flags, dh.grid, cell, nodes, coords, dh, celldofs)
+        return new{dim,T}(flags, dh.grid, cell, cellgroupid, nodes, coords, dh, celldofs)
     end
 
-    function CellIterator{dim, N, T, M}(grid::Grid{dim, N, T, M}, flags::UpdateFlags) where {dim, N, T, M}
+    function CellIterator{dim, T}(grid::Grid{dim, T}, cellgroupid::Int, flags::UpdateFlags) where {dim, T}
         cell = ScalarWrapper(0)
+        N = ndofs_per_cell(dh, cellgroupid)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim, T}, N)
-        return new{dim, N, T, M}(flags, grid, cell, nodes, coords)
+        return new{dim, T}(flags, grid, cell, cellgroupid, nodes, coords)
     end
 end
 
-CellIterator(grid::Grid{dim, N, T, M},     flags::UpdateFlags=UpdateFlags()) where {dim, N, T, M} =
-    CellIterator{dim,N,T,M}(grid, flags)
-CellIterator(dh::DofHandler{dim, N, T, M}, flags::UpdateFlags=UpdateFlags()) where {dim, N, T, M} =
-    CellIterator{dim,N,T,M}(dh, flags)
+CellIterator(grid::Grid{dim, T},     cellgroupid::Int,     flags::UpdateFlags=UpdateFlags()) where {dim, T} =
+    CellIterator{dim,T}(grid, cellgroupid, flags)
+CellIterator(dh::DofHandler{dim, T}, cellgroupid::Int,     flags::UpdateFlags=UpdateFlags()) where {dim, T} =
+    CellIterator{dim,T}(dh, cellgroupid, flags)
 
 # iterator interface
 Base.start(::CellIterator)     = 1
 Base.next(ci::CellIterator, i) = (reinit!(ci, i), i+1)
-Base.done(ci::CellIterator, i) = i > getncells(ci.grid)
-Base.length(ci::CellIterator)  = getncells(ci.grid)
+Base.done(ci::CellIterator, i) = i > getncells(ci.grid, ci.cellgroupid)
+Base.length(ci::CellIterator)  = getncells(ci.grid, ci.cellgroupid)
 
 Base.iteratorsize(::Type{T})   where {T <: CellIterator} = Base.HasLength() # this is default in Base
 Base.iteratoreltype(::Type{T}) where {T <: CellIterator} = Base.HasEltype() # this is default in Base
@@ -73,12 +76,13 @@ Base.eltype(::Type{T})         where {T <: CellIterator} = T
 @inline nfaces(ci::CellIterator) = nfaces(eltype(ci.grid.cells))
 @inline onboundary(ci::CellIterator, face::Int) = ci.grid.boundary_matrix[face, ci.current_cellid[]]
 @inline cellid(ci::CellIterator) = ci.current_cellid[]
-@inline celldofs!(v::Vector, ci::CellIterator) = celldofs!(v, ci.dh, ci.current_cellid[])
+@inline celldofs!(v::Vector, ci::CellIterator) = celldofs!(v, ci.dh, ci.cellgroupid, ci.current_cellid[])
 @inline celldofs(ci::CellIterator) = ci.celldofs
 
-function reinit!(ci::CellIterator{dim, N}, i::Int) where {dim, N}
-    nodeids = ci.grid.cells[i].nodes
+function reinit!(ci::CellIterator{dim}, i::Int) where {dim}
+    nodeids = ci.grid.cellgroups[ci.cellgroupid][i].nodes
     ci.current_cellid[] = i
+    N = ndofs_per_cell(ci.dh, ci.cellgroupid)
     @inbounds for j in 1:N
         nodeid = nodeids[j]
         ci.flags.nodes  && (ci.nodes[j] = nodeid)
@@ -90,8 +94,8 @@ function reinit!(ci::CellIterator{dim, N}, i::Int) where {dim, N}
     return ci
 end
 
-@inline reinit!(cv::CellValues{dim, T}, ci::CellIterator{dim, N, T}) where {dim, N, T} = reinit!(cv, ci.coords)
-@inline reinit!(fv::FaceValues{dim, T}, ci::CellIterator{dim, N, T}, face::Int) where {dim, N, T} = reinit!(fv, ci.coords, face)
+@inline reinit!(cv::CellValues{dim, T}, ci::CellIterator{dim, T}) where {dim, T} = reinit!(cv, ci.coords)
+@inline reinit!(fv::FaceValues{dim, T}, ci::CellIterator{dim, T}, face::Int) where {dim, T} = reinit!(fv, ci.coords, face)
 
 
 #=

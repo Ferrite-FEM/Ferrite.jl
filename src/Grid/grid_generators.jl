@@ -154,7 +154,10 @@ function generate_grid(C::Type{Quadrilateral}, nel::NTuple{2, Int}, LL::Vec{2, T
     facesets["top"]    = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[:,end])) + offset]); offset += length(cell_array[:,end])
     facesets["left"]   = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[1,:]))   + offset]); offset += length(cell_array[1,:])
 
-    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
+    cellgroup = Vector{Vector{Cell}}()
+    push!(cellgroup, cells)
+
+    return Grid(cellgroup, nodes)
 end
 
 # QuadraticQuadrilateral
@@ -278,7 +281,9 @@ function generate_grid(::Type{Triangle}, nel::NTuple{2, Int}, LL::Vec{2, T}, LR:
     facesets["top"]    = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[2,:,end])) + offset]); offset += length(cell_array[2,:,end])
     facesets["left"]   = Set{Tuple{Int, Int}}(boundary[(1:length(cell_array[1,1,:]))   + offset]); offset += length(cell_array[1,1,:])
 
-    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
+    cellgroup = Vector{Vector{Cell}}()
+    push!(cellgroup, cells)
+    return Grid(cellgroup, nodes)# facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # QuadraticTriangle

@@ -19,11 +19,20 @@ vtk_grid(filename::AbstractString, grid::Grid)
 Create a unstructured VTK grid from a `Grid`. Return a `DatasetFile`
 which data can be appended to, see `vtk_point_data`, `vtk_cell_data`.
 """
-function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim, N, T}) where {dim, N, T}
-    celltype = cell_to_vtkcell(getcelltype(grid))
+function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim, T}) where {dim, T}
+    
     cls = MeshCell[]
-    for cell in CellIterator(grid)
-        push!(cls, MeshCell(celltype, getnodes(cell)))
+    for (cellgroupid, cellgroup) in enumerate(grid.cellgroups)#CellIterator(grid)
+        _celltype = getcelltype(grid, cellgroupid)
+        celltype = cell_to_vtkcell(_celltype)
+        for (cellid, cells) in enumerate(cellgroup)
+            nodes_tuple = getcellnodes(grid, cellgroupid, cellid)
+            nodes = Int[]
+            for node in nodes_tuple 
+                push!(nodes, node)
+            end
+            push!(cls, MeshCell(celltype, nodes))
+        end
     end
     coords = reinterpret(T, getnodes(grid), (dim, getnnodes(grid)))
     return vtk_grid(filename, coords, cls)

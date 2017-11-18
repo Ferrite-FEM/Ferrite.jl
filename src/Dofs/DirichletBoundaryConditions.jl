@@ -99,6 +99,7 @@ end
 # Adds a boundary condition
 function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
                           nodes::Union{Set{Int}, Vector{Int}}, f::Function, components::Vector{Int})
+    #=
     field in dbcs.dh.field_names || error("field $field does not exist in the dof handler, existing fields are $(dh.field_names)")
     for component in components
         0 < component <= ndim(dbcs.dh, field) || error("component $component is not within the range of field $field which has $(ndim(dbcs.dh, field)) dimensions")
@@ -107,12 +108,14 @@ function add!(dbcs::DirichletBoundaryConditions, field::Symbol,
     if length(nodes) == 0
         warn("added Dirichlet BC to node set containing 0 nodes")
     end
+    =#
 
     dofs_bc = Int[]
-    offset = dof_offset(dbcs.dh, field)
+    #offset = dof_offset(dbcs.dh, field)
     for node in nodes
+        node_dofs = getnodedofs(dbcs.dh, node)
         for component in components
-            dofid = dbcs.dh.dofs_nodes[offset + component, node]
+            dofid = node_dofs[component] #dbcs.dh.dofs_nodes[offset + component, node]
             push!(dofs_bc, dofid)
         end
     end
@@ -142,14 +145,15 @@ function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::
                   components::Vector{Int}, dh::DofHandler, idx_offset::Int,
                   dofmapping::Dict{Int,Int}, time::Float64)
     mesh = dh.grid
-    offset = dof_offset(dh, field)
+    #offset = dof_offset(dh, field)
     for node in nodes
         x = getcoordinates(getnodes(mesh, node))
         bc_value = f(x, time)
         @assert length(bc_value) == length(components)
+        node_dofs = getnodedofs(dh, node)
         for i in 1:length(components)
             c = components[i]
-            dof_number = dh.dofs_nodes[offset + c, node]
+            dof_number = node_dofs[c] #dh.dofs_nodes[offset + c, node]
             dbc_index = dofmapping[dof_number]
             values[dbc_index] = bc_value[i]
         end

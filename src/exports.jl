@@ -72,6 +72,8 @@ export
     addcellset!,
     transform!,
     generate_grid,
+    addcellgroup!,
+    getcellnodes,
 
 # Dofs
     DofHandler,

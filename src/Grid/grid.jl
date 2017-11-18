@@ -16,6 +16,8 @@ A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
 struct Cell{dim, N, M}
     nodes::NTuple{N, Int}
 end
+nnodes(c::Cell) = nnodes(typeof(c))
+nnodes(::Type{Cell{dim, N, M}}) where {dim, N, M} = N
 nfaces(c::Cell) = nfaces(typeof(c))
 nfaces(::Type{Cell{dim, N, M}}) where {dim, N, M} = M
 
@@ -39,7 +41,11 @@ const QuadraticHexahedron = Cell{3, 20, 6} # Function interpolation for this doe
 A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh
 """
 struct CellIndex
-    idx::Int
+    idx::Tuple{Int, Int} #Cellgroup and cell
+end
+
+struct CellgroupIndex
+    id::Int
 end
 
 """
@@ -52,38 +58,38 @@ end
 """
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 """
-mutable struct Grid{dim, N, T <: Real, M}
-    cells::Vector{Cell{dim, N, M}}
+mutable struct Grid{dim, T <: Real}
+    cellgroups::Vector{Vector{Cell}}
     nodes::Vector{Node{dim, T}}
     # Sets
-    cellsets::Dict{String, Set{Int}}
+    cellsets::Dict{String, Set{CellIndex}}
     nodesets::Dict{String, Set{Int}}
-    facesets::Dict{String, Set{Tuple{Int, Int}}}
+    facesets::Dict{String, Set{Tuple{CellIndex, Int}}}
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool, Int}
 end
 
-function Grid(cells::Vector{Cell{dim, N, M}},
+function Grid(cellgroups::Vector{Vector{Cell}},
               nodes::Vector{Node{dim, T}};
-              cellsets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
+              cellsets::Dict{String, Set{CellIndex}}=Dict{String, Set{CellIndex}}(),
               nodesets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
-              facesets::Dict{String, Set{Tuple{Int, Int}}}=Dict{String, Set{Tuple{Int, Int}}}(),
-              boundary_matrix::SparseMatrixCSC{Bool, Int}=spzeros(Bool, 0, 0)) where {dim, N, M, T}
-    return Grid(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
+              facesets::Dict{String, Set{Tuple{CellIndex, Int}}}=Dict{String, Set{Tuple{CellIndex, Int}}}(),
+              boundary_matrix::SparseMatrixCSC{Bool, Int}=spzeros(Bool, 0, 0)) where {dim, T}
+    return Grid(cellgroups, nodes, cellsets, nodesets, facesets, boundary_matrix)
 end
 
 ##########################
 # Grid utility functions #
 ##########################
-@inline getcells(grid::Grid) = grid.cells
-@inline getcells(grid::Grid, v::Union{Int, Vector{Int}}) = grid.cells[v]
-@inline getcells(grid::Grid, set::String) = grid.cells[grid.cellsets[set]]
-@inline getncells(grid::Grid) = length(grid.cells)
-@inline getcelltype(grid::Grid) = eltype(grid.cells)
+@inline getcellgroups(grid::Grid) = grid.cellgroups
+@inline getcellgroup(grid::Grid, cellgroup_index::Int) = grid.cellgroups[cellgroup_index]
+#@inline getcelltype(grid::Grid, cellgroup_index::Int) = eltype(grid.cellgroups[cellgroup_index]) #not working
+@inline getcelltype(grid::Grid, cellgroup_index::Int) = typeof(grid.cellgroups[cellgroup_index][1])
 
 @inline getnodes(grid::Grid) = grid.nodes
 @inline getnodes(grid::Grid, v::Union{Int, Vector{Int}}) = grid.nodes[v]
 @inline getnodes(grid::Grid, set::String) = grid.nodes[grid.nodesets[set]]
+@inline getcellnodes(grid::Grid, cellgroupid::Int, cellid::Int) = grid.cellgroups[cellgroupid][cellid].nodes
 @inline getnnodes(grid::Grid) = length(grid.nodes)
 
 @inline getcellset(grid::Grid, set::String) = grid.cellsets[set]
@@ -95,18 +101,25 @@ end
 @inline getfaceset(grid::Grid, set::String) = grid.facesets[set]
 @inline getfacesets(grid::Grid) = grid.facesets
 
-n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
-getfacelist(grid::Grid) = getfacelist(eltype(grid.cells))
+n_faces_per_cell(grid::Grid, cellgroup_id::Int) = nfaces(eltype(grid.cellgoup[cellgroup_id]))
+getfacelist(grid::Grid, cellgroup_id::Int) = getfacelist(eltype(grid.cellgoup[cellgroup_id]))
 
-# Transformations
+function getncells(grid::Grid, cellgroupid::Int) 
+    return length(grid.cellgroups[cellgroupid])
+end
 
-function transform!(g::Grid, f::Function)
-    c = similar(g.nodes)
-    for i in 1:length(c)
-        c[i] = Node(f(g.nodes[i].x))
+#Maybe store ncells in Grid
+function getncells(grid::Grid) 
+    ncells = 0;
+    for cells in grid.cellgroups
+        ncells += length(cells)
     end
-    copy!(g.nodes, c)
-    g
+    return ncells
+end
+
+function addcellgroup!(grid::Grid, cellgroup::Vector{Cell}, nodes::Vector{Node{dim, T}}) where {dim, T}
+    push!(grid.cellgroups, cellgroup)
+    append!(grid.nodes, nodes)
 end
 
 # Sets
@@ -114,13 +127,14 @@ end
 _check_nodesetname(grid, name) = haskey(grid.nodesets, name) && throw(ArgumentError("There already exists a nodeset with the name: $name"))
 _warn_emptyset(set) = length(set) == 0 && warn("no entities added to set")
 
-function addcellset!(grid::Grid, name::String, cellid::Union{Set{Int}, Vector{Int}})
+function addcellset!(grid::Grid, name::String, cellid::Union{Set{CellIndex}, Vector{CellIndex}})
     haskey(grid.cellsets, name) && throw(ArgumentError("There already exists a cellset with the name: $name"))
-    grid.cellsets[name] = Set(cellid)
+    grid.cellsets[name] = Set(CellIndex)
     _warn_emptyset(grid.cellsets[name])
     grid
 end
 
+#Not working
 function addcellset!(grid::Grid, name::String, f::Function)
     cells = Set{Int}()
     for (i, cell) in enumerate(getcells(grid))
@@ -172,14 +186,14 @@ Updates the coordinate vector for a cell
 * `x`: the updated vector
 
 """
-@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, cell::Int) where {dim, T, N}
-    @assert length(x) == N
+@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::Grid{dim, T}, cellgroup_id::Int, cell::Int) where {dim, T}
+    #@assert length(x) == nnodes(grid,cellgroup)
     @inbounds for i in 1:N
-        x[i] = grid.nodes[grid.cells[cell].nodes[i]].x
+        x[i] = grid.nodes[grid.cellgroups[cellgroup_id][cell].nodes[i]].x
     end
 end
-@inline getcoordinates!(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, cell::CellIndex) where {dim, T, N} = getcoordinates!(x, grid, cell.idx)
-@inline getcoordinates!(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, face::FaceIndex) where {dim, T, N} = getcoordinates!(x, grid, face.idx[1])
+@inline getcoordinates!(x::Vector{Vec{dim, T}}, grid::Grid{dim, T}, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
+@inline getcoordinates!(x::Vector{Vec{dim, T}}, grid::Grid{dim, T}, face::FaceIndex) where {dim, T} = getcoordinates!(x, grid, face.idx[1])
 
 """
 Returns a vector with the coordinates of the vertices of a cell
@@ -198,7 +212,7 @@ Returns a vector with the coordinates of the vertices of a cell
 * `x`: A `Vector` of `Vec`s, one for each vertex of the cell.
 
 """
-@inline function getcoordinates(grid::Grid{dim, N, T}, cell::Int) where {dim, N, T}
+@inline function getcoordinates(grid::Grid{dim, T}, cell::Int) where {dim, T}
     nodeidx = grid.cells[cell].nodes
     return [grid.nodes[i].x for i in nodeidx]::Vector{Vec{dim, T}}
 end
@@ -211,7 +225,7 @@ Base.next(c::Vector{Cell{dim, N}}, state) where {dim, N} = (CellIndex(state), st
 Base.done(c::Vector{Cell{dim, N}}, state) where {dim, N} = state > length(c)
 
 function Base.show(io::IO, grid::Grid)
-    println(io, "$(typeof(grid)) with $(getncells(grid)) $(celltypes[eltype(grid.cells)]) cells and $(getnnodes(grid)) nodes")
+    println(io, "$(typeof(grid)) with $(getncells(grid)) cells and $(getnnodes(grid)) nodes")
 end
 
 const celltypes = Dict{DataType, String}(Cell{1, 2, 2}  => "Line",
