@@ -105,7 +105,7 @@ end
 ndofs(dh::DofHandler) = length(dh.dofs_nodes)
 ndofs_per_cell(dh::DofHandler) = size(dh.dofs_cells, 1)
 isclosed(dh::DofHandler) = dh.closed[]
-dofs_node(dh::DofHandler, i::Int) = dh.dof_nodes[:, i]
+dofs_node(dh::DofHandler, i::Int) = dh.dofs_nodes[:, i]
 
 # Stores the dofs for the cell with number `i` into the vector `global_dofs`
 function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
