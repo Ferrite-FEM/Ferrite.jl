@@ -298,13 +298,17 @@ function zero_out_rows!(K, dofs::Vector{Int})
             if row == sort_dofs[i]
                 K.nzval[r] = 0.0
                 i += 1
+                i > length(sort_dofs) && break
             elseif row > sort_dofs[i]
                 while row > sort_dofs[i]
                     i += 1
+                    i > length(sort_dofs) && break
                 end
+                i > length(sort_dofs) && break
                 if row == sort_dofs[i]
                     K.nzval[r] = 0.0
                     i += 1
+                    i > length(sort_dofs) && break
                 end
             end
             i > length(sort_dofs) && break
