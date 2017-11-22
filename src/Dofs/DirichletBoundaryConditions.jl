@@ -266,8 +266,8 @@ function apply!(KK::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, dbcs::
             end
         end
     end
-    K[:, dbcs.prescribed_dofs] = 0
-    K[dbcs.prescribed_dofs, :] = 0
+    zero_out_columns!(K, bc.dofs)
+    zero_out_rows!(K, bc.dofs)
     @inbounds for i in 1:length(dbcs.values)
         d = dbcs.prescribed_dofs[i]
         v = dbcs.values[i]
@@ -276,6 +276,38 @@ function apply!(KK::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, dbcs::
         if length(f) != 0
             vz = applyzero ? zero(eltype(f)) : v
             f[d] = vz * m
+        end
+    end
+end
+
+# columns need to be stored entries, this is not checked
+function zero_out_columns!(K, dofs::Vector{Int})
+    sort_dofs = sort(dofs)
+    for col in dofs
+        r = nzrange(K, col)
+        K.nzval[r] = 0.0
+    end
+end
+
+function zero_out_rows!(K, dofs::Vector{Int})
+    sort_dofs = sort(dofs)
+    @inbounds for col in 1:size(K, 2)
+        i = 1
+        for r in nzrange(K, col)
+            row = K.rowval[r]
+            if row == sort_dofs[i]
+                K.nzval[r] = 0.0
+                i += 1
+            elseif row > sort_dofs[i]
+                while row > sort_dofs[i]
+                    i += 1
+                end
+                if row == sort_dofs[i]
+                    K.nzval[r] = 0.0
+                    i += 1
+                end
+            end
+            i > length(sort_dofs) && break
         end
     end
 end
