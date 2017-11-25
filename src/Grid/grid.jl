@@ -53,7 +53,7 @@ end
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 """
 mutable struct Grid{dim, N, T <: Real, M}
-    cells::Vector{Cell{dim, N, M}}
+    cells::Vector{Cell}
     nodes::Vector{Node{dim, T}}
     # Sets
     cellsets::Dict{String, Set{Int}}
@@ -69,7 +69,7 @@ function Grid(cells::Vector{Cell{dim, N, M}},
               nodesets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
               facesets::Dict{String, Set{Tuple{Int, Int}}}=Dict{String, Set{Tuple{Int, Int}}}(),
               boundary_matrix::SparseMatrixCSC{Bool, Int}=spzeros(Bool, 0, 0)) where {dim, N, M, T}
-    return Grid(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
+    return Grid{dim,N,T,M}(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
 end
 
 ##########################
