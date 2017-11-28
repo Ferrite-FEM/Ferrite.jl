@@ -281,8 +281,8 @@ function apply!(KK::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, dbcs::
 end
 
 # columns need to be stored entries, this is not checked
-function zero_out_columns!(K, dofs::Vector{Int})
-    sort_dofs = sort(dofs)
+function zero_out_columns!(K, dofs::Vector{Int}) # can be removed in 0.7 with #24711 merged
+    @debug assert(issorted(dofs))
     for col in dofs
         r = nzrange(K, col)
         K.nzval[r] = 0.0
@@ -290,28 +290,28 @@ function zero_out_columns!(K, dofs::Vector{Int})
 end
 
 function zero_out_rows!(K, dofs::Vector{Int})
-    sort_dofs = sort(dofs)
+    @debug assert(issorted(dofs))
     @inbounds for col in 1:size(K, 2)
         i = 1
         for r in nzrange(K, col)
             row = K.rowval[r]
-            if row == sort_dofs[i]
+            if row == dofs[i]
                 K.nzval[r] = 0.0
                 i += 1
-                i > length(sort_dofs) && break
-            elseif row > sort_dofs[i]
-                while row > sort_dofs[i]
+                i > length(dofs) && break
+            elseif row > dofs[i]
+                while row > dofs[i]
                     i += 1
-                    i > length(sort_dofs) && break
+                    i > length(dofs) && break
                 end
-                i > length(sort_dofs) && break
-                if row == sort_dofs[i]
+                i > length(dofs) && break
+                if row == dofs[i]
                     K.nzval[r] = 0.0
                     i += 1
-                    i > length(sort_dofs) && break
+                    i > length(dofs) && break
                 end
             end
-            i > length(sort_dofs) && break
+            i > length(dofs) && break
         end
     end
 end
