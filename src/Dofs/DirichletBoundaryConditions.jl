@@ -266,8 +266,8 @@ function apply!(KK::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, dbcs::
             end
         end
     end
-    zero_out_columns!(K, bc.dofs)
-    zero_out_rows!(K, bc.dofs)
+    zero_out_columns!(K, dbcs.prescribed_dofs)
+    zero_out_rows!(K, dbcs.prescribed_dofs)
     @inbounds for i in 1:length(dbcs.values)
         d = dbcs.prescribed_dofs[i]
         v = dbcs.values[i]
