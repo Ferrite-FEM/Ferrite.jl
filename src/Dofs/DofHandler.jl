@@ -268,7 +268,9 @@ WriteVTK.vtk_grid(filename::AbstractString, dh::DofHandler) = vtk_grid(filename,
 function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector)
     for f in 1:nfields(dh)
         @debug println("exporting field $(dh.field_names[f])")
-        data = fill(0.0, dh.field_dims[f], getnnodes(dh.grid))
+        field_dim = dh.field_dims[f]
+        space_dim = field_dim == 2 ? 3 : field_dim
+        data = fill(0.0, space_dim, getnnodes(dh.grid))
         offset = field_offset(dh, dh.field_names[f])
         for cell in CellIterator(dh)
             _celldofs = celldofs(cell)
