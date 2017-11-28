@@ -85,6 +85,31 @@ Returns the number of base functions for an [`Interpolation`](@ref) or `Values` 
 """
 getnbasefunctions
 
+# struct that gathers all the information needed to distribute
+# dofs for a given interpolation.
+struct InterpolationInfo
+    # TODO: Can be smaller than `Int` if that matters...
+    nvertexdofs::Int
+    nedgedofs::Int
+    nfacedofs::Int
+    ncelldofs::Int
+    InterpolationInfo(interpolation::Interpolation) =
+        new(nvertexdofs(interpolation), nedgedofs(interpolation),
+            nfacedofs(interpolation), ncelldofs(interpolation))
+end
+
+# The following functions are used to distribute the dofs. Definitions:
+#   vertexdof: dof on a "corner" of the reference shape
+#   facedof: dof in the dim-1 dimension (line in 2D, surface in 3D)
+#   edgedof: dof on a line between 2 vertices (i.e. "corners") (3D only)
+#   celldof: dof that is local to the element
+
+# Fallbacks for the interpolations which are used to distribute the dofs correctly
+nvertexdofs(::Interpolation) = 0
+nedgedofs(::Interpolation)   = 0
+nfacedofs(::Interpolation)   = 0
+ncelldofs(::Interpolation)   = 0
+
 ############
 # Lagrange #
 ############
@@ -97,6 +122,14 @@ getlowerorder(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{di
 # Lagrange dim 1 RefCube order 1 #
 ##################################
 getnbasefunctions(::Lagrange{1, RefCube, 1}) = 2
+nvertexdofs(::Lagrange{1,RefCube,1}) = 1
+
+faces(::Lagrange{1,RefCube,1}) = ((1,), (2,))
+
+function reference_coordinates(::Lagrange{1, RefCube, 1})
+    return [Vec{1, Float64}((-1.0,)),
+            Vec{1, Float64}(( 1.0,))]
+end
 
 function value(ip::Lagrange{1, RefCube, 1}, i::Int, ξ::Vec{1})
     @inbounds begin
@@ -111,6 +144,16 @@ end
 # Lagrange dim 1 RefCube order 2 #
 ##################################
 getnbasefunctions(::Lagrange{1, RefCube, 2}) = 3
+nvertexdofs(::Lagrange{1,RefCube,2}) = 1
+ncelldofs(::Lagrange{1,RefCube,2}) = 1
+
+faces(::Lagrange{1,RefCube,2}) = ((1,), (2,))
+
+function reference_coordinates(::Lagrange{1, RefCube, 2})
+    return [Vec{1, Float64}((-1.0,)),
+            Vec{1, Float64}(( 1.0,)),
+            Vec{1, Float64}(( 0.0,))]
+end
 
 function value(ip::Lagrange{1, RefCube, 2}, i::Int, ξ::Vec{1})
     @inbounds begin
@@ -126,6 +169,16 @@ end
 # Lagrange dim 2 RefCube order 1 #
 ##################################
 getnbasefunctions(::Lagrange{2, RefCube, 1}) = 4
+nvertexdofs(::Lagrange{2,RefCube,1}) = 1
+
+faces(::Lagrange{2,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1))
+
+function reference_coordinates(::Lagrange{2, RefCube, 1})
+    return [Vec{2, Float64}((-1.0, -1.0)),
+            Vec{2, Float64}(( 1.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  1.0,)),
+            Vec{2, Float64}((-1.0,  1.0,))]
+end
 
 function value(ip::Lagrange{2, RefCube, 1}, i::Int, ξ::Vec{2})
     @inbounds begin
@@ -143,6 +196,23 @@ end
 # Lagrange dim 2 RefCube order 2 #
 ##################################
 getnbasefunctions(::Lagrange{2, RefCube, 2}) = 9
+nvertexdofs(::Lagrange{2,RefCube,2}) = 1
+nfacedofs(::Lagrange{2,RefCube,2}) = 1
+ncelldofs(::Lagrange{2,RefCube,2}) = 1
+
+faces(::Lagrange{2,RefCube,2}) = ((1,2,5), (2,3,6), (3,4,7), (4,1,8))
+
+function reference_coordinates(::Lagrange{2, RefCube, 2})
+    return [Vec{2, Float64}((-1.0, -1.0)),
+            Vec{2, Float64}(( 1.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  1.0)),
+            Vec{2, Float64}((-1.0,  1.0)),
+            Vec{2, Float64}(( 0.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  0.0)),
+            Vec{2, Float64}(( 0.0,  1.0)),
+            Vec{2, Float64}((-1.0,  0.0)),
+            Vec{2, Float64}(( 0.0,  0.0))]
+end
 
 function value(ip::Lagrange{2, RefCube, 2}, i::Int, ξ::Vec{2})
     @inbounds begin
@@ -166,6 +236,16 @@ end
 #########################################
 getnbasefunctions(::Lagrange{2, RefTetrahedron, 1}) = 3
 getlowerdim(::Lagrange{2, RefTetrahedron, order}) where {order} = Lagrange{1, RefCube, order}()
+nvertexdofs(::Lagrange{2,RefTetrahedron,1}) = 1
+
+vertices(::Lagrange{2,RefTetrahedron,1}) = (1,2,3)
+faces(::Lagrange{2,RefTetrahedron,1}) = ((1,2), (2,3), (3,1))
+
+function reference_coordinates(::Lagrange{2, RefTetrahedron, 1})
+    return [Vec{2, Float64}((1.0, 0.0)),
+            Vec{2, Float64}((0.0, 1.0)),
+            Vec{2, Float64}((0.0, 0.0))]
+end
 
 function value(ip::Lagrange{2, RefTetrahedron, 1}, i::Int, ξ::Vec{2})
     @inbounds begin
@@ -182,6 +262,20 @@ end
 # Lagrange dim 2 RefTetrahedron order 2 #
 #########################################
 getnbasefunctions(::Lagrange{2, RefTetrahedron, 2}) = 6
+nvertexdofs(::Lagrange{2,RefTetrahedron,2}) = 1
+nfacedofs(::Lagrange{2,RefTetrahedron,2}) = 1
+
+vertices(::Lagrange{2,RefTetrahedron,2}) = (1,2,3)
+faces(::Lagrange{2,RefTetrahedron,2}) = ((1,2,4), (2,3,5), (3,1,6))
+
+function reference_coordinates(::Lagrange{2, RefTetrahedron, 2})
+    return [Vec{2, Float64}((1.0, 0.0)),
+            Vec{2, Float64}((0.0, 1.0)),
+            Vec{2, Float64}((0.0, 0.0)),
+            Vec{2, Float64}((0.5, 0.5)),
+            Vec{2, Float64}((0.0, 0.5)),
+            Vec{2, Float64}((0.5, 0.0))]
+end
 
 function value(ip::Lagrange{2, RefTetrahedron, 2}, i::Int, ξ::Vec{2})
     @inbounds begin
@@ -202,6 +296,16 @@ end
 # Lagrange dim 3 RefTetrahedron order 1 #
 #########################################
 getnbasefunctions(::Lagrange{3, RefTetrahedron, 1}) = 4
+nvertexdofs(::Lagrange{3,RefTetrahedron,1}) = 1
+
+faces(::Lagrange{3,RefTetrahedron,1}) = ((1,2,3), (1,2,4), (2,3,4), (1,4,3))
+
+function reference_coordinates(::Lagrange{3, RefTetrahedron, 1})
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0))]
+end
 
 function value(ip::Lagrange{3, RefTetrahedron, 1}, i::Int, ξ::Vec{3})
     @inbounds begin
@@ -220,6 +324,23 @@ end
 # Lagrange dim 3 RefTetrahedron order 2 #
 #########################################
 getnbasefunctions(::Lagrange{3, RefTetrahedron, 2}) = 10
+nvertexdofs(::Lagrange{3,RefTetrahedron,2}) = 1
+nedgedofs(::Lagrange{3,RefTetrahedron,2}) = 1
+
+faces(::Lagrange{3,RefTetrahedron,2}) = ((1,2,3,5,6,7), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
+
+function reference_coordinates(::Lagrange{3, RefTetrahedron, 2})
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0)),
+            Vec{3, Float64}((0.5, 0.0, 0.0)),
+            Vec{3, Float64}((0.5, 0.5, 0.0)),
+            Vec{3, Float64}((0.0, 0.5, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 0.5)),
+            Vec{3, Float64}((0.5, 0.0, 0.5)),
+            Vec{3, Float64}((0.0, 0.5, 0.5))]
+end
 
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch09.d/AFEM.Ch09.pdf
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.pdf
@@ -246,6 +367,20 @@ end
 # Lagrange dim 3 RefCube order 1 #
 ##################################
 getnbasefunctions(::Lagrange{3, RefCube, 1}) = 8
+nvertexdofs(::Lagrange{3,RefCube,1}) = 1
+
+faces(::Lagrange{3,RefCube,1}) = ((1,4,3,2), (1,2,6,5), (2,3,7,6), (3,4,8,7), (1,5,8,4), (5,6,7,8))
+
+function reference_coordinates(::Lagrange{3, RefCube, 1})
+    return [Vec{3, Float64}((-1.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0,  1.0,  1.0)),
+            Vec{3, Float64}((-1.0,  1.0,  1.0))]
+end
 
 function value(ip::Lagrange{3, RefCube, 1}, i::Int, ξ::Vec{3})
     @inbounds begin
@@ -275,6 +410,21 @@ struct Serendipity{dim, shape, order} <: Interpolation{dim, shape, order} end
 getnbasefunctions(::Serendipity{2, RefCube, 2}) = 8
 getlowerdim(::Serendipity{2, RefCube, 2}) = Lagrange{1, RefCube, 2}()
 getlowerorder(::Serendipity{2, RefCube, 2}) = Lagrange{2, RefCube, 1}()
+nvertexdofs(::Serendipity{2,RefCube,2}) = 1
+nedgedofs(::Serendipity{2,RefCube,2}) = 1
+
+faces(::Serendipity{2,RefCube,2}) = ((1,2,5), (2,3,6), (3,4,7), (4,1,8))
+
+function reference_coordinates(::Serendipity{2, RefCube, 2})
+    return [Vec{2, Float64}((-1.0, -1.0)),
+            Vec{2, Float64}(( 1.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  1.0)),
+            Vec{2, Float64}((-1.0,  1.0)),
+            Vec{2, Float64}(( 0.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  0.0)),
+            Vec{2, Float64}(( 0.0,  1.0)),
+            Vec{2, Float64}((-1.0,  0.0))]
+end
 
 function value(ip::Serendipity{2, RefCube, 2}, i::Int, ξ::Vec{2})
     @inbounds begin

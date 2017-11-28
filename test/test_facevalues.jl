@@ -59,11 +59,11 @@ for (func_interpol, quad_rule) in  (
             for i in 1:getnquadpoints(fv)
                 vol += getdetJdV(fv,i)
             end
-            x_face = coords_on_faces(xs, func_interpol)[face]
+            x_face = xs[[JuAFEM.faces(func_interpol)[face]...]]
             @test vol ≈ calculate_volume(JuAFEM.getlowerdim(func_interpol), x_face)
 
             # Test quadrature rule after reinit! with ref. coords
-            x = reference_coordinates(func_interpol)
+            x = JuAFEM.reference_coordinates(func_interpol)
             reinit!(fv, x, face)
             vol = 0.0
             for i in 1:getnquadpoints(fv)

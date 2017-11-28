@@ -26,7 +26,7 @@ for interpolation in (Lagrange{1, RefCube, 1}(),
            reinterpret(Float64, JuAFEM.derivative(interpolation, x), (ndim * n_basefuncs,))
     @test sum(JuAFEM.value(interpolation, x)) ≈ 1.0
 
-    coords = reference_coordinates(interpolation)
+    coords = JuAFEM.reference_coordinates(interpolation)
     for node in 1:n_basefuncs
         N_node = JuAFEM.value(interpolation, coords[node])
         for k in 1:node

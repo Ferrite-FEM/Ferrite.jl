@@ -227,3 +227,54 @@ The normal at the quadrature point `qp` for the active face of the `FaceValues` 
 
 """
 getnormal(fv::FaceValues, qp::Int) = fv.normals[qp]
+
+# like FaceScalarValues but contains only the parts needed
+# to calculate the x-coordinate for the dof locations.
+struct BCValues{T}
+    M::Array{T,3}
+    current_face::ScalarWrapper{Int}
+end
+
+BCValues(func_interpol::Interpolation, geom_interpol::Interpolation) =
+    BCValues(Float64, func_interpol, geom_interpol)
+
+function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_interpol::Interpolation{dim,refshape}) where {T,dim,refshape}
+    # set up quadrature rules for each face with dof-positions
+    # (determined by func_interpol) as the quadrature points
+    interpolation_coords = reference_coordinates(func_interpol)
+
+    qrs = QuadratureRule{dim,refshape,T}[]
+    for face in faces(func_interpol)
+        dofcoords = Vec{dim,T}[]
+        for facedof in face
+            push!(dofcoords, interpolation_coords[facedof])
+        end
+        qrf = QuadratureRule{dim,refshape,T}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used
+        push!(qrs, qrf)
+    end
+
+    n_qpoints = length(getweights(qrs[1])) # assume same in all
+    n_faces = length(qrs)
+    n_geom_basefuncs = getnbasefunctions(geom_interpol)
+    M =    fill(zero(T)           * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
+
+    for face in 1:n_faces, (qp, ξ) in enumerate(qrs[face].points)
+        for i in 1:n_geom_basefuncs
+            M[i, qp, face] = value(geom_interpol, i, ξ)
+        end
+    end
+
+    BCValues{T}(M, ScalarWrapper(0))
+end
+
+getnquadpoints(bcv::BCValues) = size(bcv.M, 2)
+function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{dim,T}}) where {dim,T}
+    n_base_funcs = size(bcv.M, 1)
+    @assert length(xh) == n_base_funcs
+    x = zero(Vec{dim,T})
+    face = bcv.current_face[]
+    @inbounds for i in 1:n_base_funcs
+        x += bcv.M[i,q_point,face] * xh[i] # geometric_value(fe_v, q_point, i) * xh[i]
+    end
+    return x
+end
