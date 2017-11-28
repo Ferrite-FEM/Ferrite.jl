@@ -29,3 +29,23 @@ copy!!(x, y) = copy!(resize!(x, length(y)), y)
 else
     import Base.ht_keyindex2!
 end
+
+# local backport of JuliaLang/julia/#20619
+@static if VERSION < v"0.7.0-DEV.601"
+    function _groupedunique!(A::AbstractVector)
+        isempty(A) && return A
+        idxs = eachindex(A)
+        y = first(A)
+        state = start(idxs)
+        i, state = next(idxs, state)
+        for x in A
+            if !isequal(x, y)
+                i, state = next(idxs, state)
+                y = A[i] = x
+            end
+        end
+        resize!(A, i - first(idxs) + 1)
+    end
+else
+    import Base._groupedunique!
+end

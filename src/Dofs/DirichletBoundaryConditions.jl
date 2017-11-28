@@ -91,8 +91,7 @@ prescribed_dofs(dbcs::DirichletBoundaryConditions) = dbcs.prescribed_dofs
 function close!(dbcs::DirichletBoundaryConditions)
     fdofs = setdiff(1:ndofs(dbcs.dh), dbcs.prescribed_dofs)
     copy!!(dbcs.free_dofs, fdofs)
-    copy!!(dbcs.prescribed_dofs, unique(dbcs.prescribed_dofs)) # for v0.7: unique!(dbcs.prescribed_dofs)
-    sort!(dbcs.prescribed_dofs) # YOLO
+    _groupedunique!(sort!(dbcs.prescribed_dofs)) # _groupedunique! is a fast path for sorted vectors
     fill!(resize!(dbcs.values, length(dbcs.prescribed_dofs)), NaN)
     for i in 1:length(dbcs.prescribed_dofs)
         dbcs.dofmapping[dbcs.prescribed_dofs[i]] = i
