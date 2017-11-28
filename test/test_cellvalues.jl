@@ -59,7 +59,7 @@ for (func_interpol, quad_rule) in  (
         @test vol ≈ calculate_volume(func_interpol, x)
 
         # Test quadrature rule after reinit! with ref. coords
-        x = reference_coordinates(func_interpol)
+        x = JuAFEM.reference_coordinates(func_interpol)
         reinit!(cv, x)
         vol = 0.0
         for i in 1:getnquadpoints(cv)

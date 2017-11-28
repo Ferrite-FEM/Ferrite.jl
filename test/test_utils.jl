@@ -20,17 +20,6 @@ function reference_normals(::Lagrange{1, RefCube})
             Vec{1, Float64}(( 1.0,))]
 end
 
-function reference_coordinates(::Lagrange{1, RefCube, 1})
-    return [Vec{1, Float64}((-1.0,)),
-            Vec{1, Float64}(( 1.0,))]
-end
-
-function reference_coordinates(::Lagrange{1, RefCube, 2})
-    return [Vec{1, Float64}((-1.0,)),
-            Vec{1, Float64}(( 1.0,)),
-            Vec{1, Float64}(( 0.0,))]
-end
-
 # Lagrange{2, RefCube}
 function reference_normals(::Lagrange{2, RefCube})
     return [Vec{2, Float64}(( 0.0, -1.0)),
@@ -39,46 +28,11 @@ function reference_normals(::Lagrange{2, RefCube})
             Vec{2, Float64}((-1.0,  0.0,))]
 end
 
-function reference_coordinates(::Lagrange{2, RefCube, 1})
-    return [Vec{2, Float64}((-1.0, -1.0)),
-            Vec{2, Float64}(( 1.0, -1.0)),
-            Vec{2, Float64}(( 1.0,  1.0,)),
-            Vec{2, Float64}((-1.0,  1.0,))]
-end
-
-function reference_coordinates(::Lagrange{2, RefCube, 2})
-    return [Vec{2, Float64}((-1.0, -1.0)),
-            Vec{2, Float64}(( 1.0, -1.0)),
-            Vec{2, Float64}(( 1.0,  1.0)),
-            Vec{2, Float64}((-1.0,  1.0)),
-            Vec{2, Float64}(( 0.0, -1.0)),
-            Vec{2, Float64}(( 1.0,  0.0)),
-            Vec{2, Float64}(( 0.0,  1.0)),
-            Vec{2, Float64}((-1.0,  0.0)),
-            Vec{2, Float64}(( 0.0,  0.0))]
-end
-
-
 # Lagrange{2, RefTetrahedron}
 function reference_normals(::Lagrange{2, RefTetrahedron})
     return [Vec{2, Float64}((1/√2, 1/√2)),
             Vec{2, Float64}((-1.0, 0.0)),
             Vec{2, Float64}((0.0, -1.0))]
-end
-
-function reference_coordinates(::Lagrange{2, RefTetrahedron, 1})
-    return [Vec{2, Float64}((1.0, 0.0)),
-            Vec{2, Float64}((0.0, 1.0)),
-            Vec{2, Float64}((0.0, 0.0))]
-end
-
-function reference_coordinates(::Lagrange{2, RefTetrahedron, 2})
-    return [Vec{2, Float64}((1.0, 0.0)),
-            Vec{2, Float64}((0.0, 1.0)),
-            Vec{2, Float64}((0.0, 0.0)),
-            Vec{2, Float64}((0.5, 0.5)),
-            Vec{2, Float64}((0.0, 0.5)),
-            Vec{2, Float64}((0.5, 0.0))]
 end
 
 # Lagrange{3, RefTetrahedron}
@@ -87,26 +41,6 @@ function reference_normals(::Lagrange{3, RefTetrahedron})
             Vec{3, Float64}((0.0 ,-1.0, 0.0)),
             Vec{3, Float64}((1/√3, 1/√3, 1/√3)),
             Vec{3, Float64}((-1.0, 0.0, 0.0))]
-end
-
-function reference_coordinates(::Lagrange{3, RefTetrahedron, 1})
-    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
-            Vec{3, Float64}((1.0, 0.0, 0.0)),
-            Vec{3, Float64}((0.0, 1.0, 0.0)),
-            Vec{3, Float64}((0.0, 0.0, 1.0))]
-end
-
-function reference_coordinates(::Lagrange{3, RefTetrahedron, 2})
-    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
-            Vec{3, Float64}((1.0, 0.0, 0.0)),
-            Vec{3, Float64}((0.0, 1.0, 0.0)),
-            Vec{3, Float64}((0.0, 0.0, 1.0)),
-            Vec{3, Float64}((0.5, 0.0, 0.0)),
-            Vec{3, Float64}((0.5, 0.5, 0.0)),
-            Vec{3, Float64}((0.0, 0.5, 0.0)),
-            Vec{3, Float64}((0.0, 0.0, 0.5)),
-            Vec{3, Float64}((0.5, 0.0, 0.5)),
-            Vec{3, Float64}((0.0, 0.5, 0.5))]
 end
 
 # Lagrange{3, Cube}
@@ -119,30 +53,8 @@ function reference_normals(::Lagrange{3, RefCube, 1})
             Vec{3, Float64}(( 0.0,  0.0,  1.0))]
 end
 
-function reference_coordinates(::Lagrange{3, RefCube, 1})
-    return [Vec{3, Float64}((-1.0, -1.0, -1.0)),
-            Vec{3, Float64}(( 1.0, -1.0, -1.0)),
-            Vec{3, Float64}(( 1.0,  1.0, -1.0)),
-            Vec{3, Float64}((-1.0,  1.0, -1.0)),
-            Vec{3, Float64}((-1.0, -1.0,  1.0)),
-            Vec{3, Float64}(( 1.0, -1.0,  1.0)),
-            Vec{3, Float64}(( 1.0,  1.0,  1.0)),
-            Vec{3, Float64}((-1.0,  1.0,  1.0))]
-end
-
 # Serendipity{2, RefCube}
 reference_normals(::Serendipity{2, RefCube, 2}) = reference_normals(Lagrange{2, RefCube,1}())
-
-function reference_coordinates(::Serendipity{2, RefCube, 2})
-    return [Vec{2, Float64}((-1.0, -1.0)),
-            Vec{2, Float64}(( 1.0, -1.0)),
-            Vec{2, Float64}(( 1.0,  1.0)),
-            Vec{2, Float64}((-1.0,  1.0)),
-            Vec{2, Float64}(( 0.0, -1.0)),
-            Vec{2, Float64}(( 1.0,  0.0)),
-            Vec{2, Float64}(( 0.0,  1.0)),
-            Vec{2, Float64}((-1.0,  0.0))]
-end
 
 ##################################
 # Valid coordinates by expanding #
@@ -164,7 +76,7 @@ function rotmat(dim, θ=π/6)
 end
 
 function valid_coordinates_and_normals(fs::Interpolation{dim, shape, order}) where {dim, shape, order}
-    x = reference_coordinates(fs)
+    x = JuAFEM.reference_coordinates(fs)
     n = reference_normals(fs)
     R = rotmat(dim)
     return [2.0 * (R ⋅ x[i]) for i in 1:length(x)] , [(R ⋅ n[i]) / norm((R ⋅ n[i])) for i in 1:length(n)]
@@ -246,17 +158,6 @@ end
 getnfaces(::Interpolation{dim, RefCube}) where {dim} = 2*dim
 getnfaces(::Interpolation{2, RefTetrahedron}) = 3
 getnfaces(::Interpolation{3, RefTetrahedron}) = 4
-
-getfacelist(::Lagrange{1, RefCube, 1}) = ((1,),(2,))
-getfacelist(::Lagrange{1, RefCube, 2}) = ((1,),(2,))
-getfacelist(::Lagrange{2, RefCube, 1}) = ((1,2),(2,3),(3,4),(1,4))
-getfacelist(::Lagrange{2, RefCube, 2}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
-getfacelist(::Lagrange{2, RefTetrahedron, 1}) = ((1,2),(2,3),(1,3))
-getfacelist(::Lagrange{2, RefTetrahedron, 2}) = ((1,2,4),(2,3,5),(1,3,6))
-getfacelist(::Lagrange{3, RefTetrahedron, 1}) = ((1,2,3),(1,2,4),(2,3,4),(1,3,4))
-getfacelist(::Lagrange{3, RefTetrahedron, 2}) = ((1,2,3,5,6,7),(1,2,4,5,8,9),(2,3,4,6,9,10),(1,3,4,7,8,10))
-getfacelist(::Lagrange{3, RefCube, 1}) = ((1,2,3,4),(1,2,5,6),(2,3,6,7),(3,4,7,8),(1,4,5,8),(5,6,7,8))
-getfacelist(::Serendipity{2, RefCube, 2}) = ((1,2,5),(2,3,6),(3,4,7),(1,4,8))
 
 coords_on_faces(x, ::Lagrange{1, RefCube, 1}) = ([x[1]], [x[2]])
 coords_on_faces(x, ::Lagrange{1, RefCube, 2}) = ([x[1]], [x[2]])

@@ -58,7 +58,7 @@ mutable struct Grid{dim, N, T <: Real, M}
     # Sets
     cellsets::Dict{String, Set{Int}}
     nodesets::Dict{String, Set{Int}}
-    facesets::Dict{String, Set{Tuple{Int, Int}}}
+    facesets::Dict{String, Set{Tuple{Int, Int}}} # TODO: This could be Set{FaceIndex} which could result in nicer use later
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool, Int}
 end
@@ -223,3 +223,34 @@ const celltypes = Dict{DataType, String}(Cell{1, 2, 2}  => "Line",
                                          Cell{3, 10, 4} => "QuadraticTetrahedron",
                                          Cell{3, 8, 6}  => "Hexahedron",
                                          Cell{3, 20, 6} => "QuadraticHexahedron")
+
+# Functions to uniquely identify vertices, edges and faces, used when distributing
+# dofs over a mesh. For this we can ignore the nodes on edged, faces and inside cells,
+# we only need to use the nodes that are vertices.
+# 1D: vertices
+faces(c::Union{Line,QuadraticLine}) = (c.nodes[1], c.nodes[2])
+vertices(c::Union{Line,QuadraticLine}) = (c.nodes[1], c.nodes[2])
+# 2D: vertices, faces
+vertices(c::Union{Triangle,QuadraticTriangle}) = (c.nodes[1], c.nodes[2], c.nodes[3])
+faces(c::Union{Triangle,QuadraticTriangle}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]))
+vertices(c::Union{Quadrilateral,QuadraticQuadrilateral}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
+faces(c::Union{Quadrilateral,QuadraticQuadrilateral}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
+# 3D: vertices, edges, faces
+vertices(c::Union{Tetrahedron,QuadraticTetrahedron}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
+edges(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]), (c.nodes[1],c.nodes[4]), (c.nodes[2],c.nodes[4]), (c.nodes[3],c.nodes[4]))
+faces(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[2],c.nodes[3]), (c.nodes[1],c.nodes[2],c.nodes[4]), (c.nodes[2],c.nodes[3],c.nodes[4]), (c.nodes[1],c.nodes[4],c.nodes[3]))
+vertices(c::Union{Hexahedron,QuadraticHexahedron}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[5], c.nodes[6], c.nodes[7], c.nodes[8])
+edges(c::Union{Hexahedron,QuadraticHexahedron}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]), (c.nodes[1],c.nodes[5]), (c.nodes[2],c.nodes[6]), (c.nodes[3],c.nodes[7]), (c.nodes[4],c.nodes[8]), (c.nodes[5],c.nodes[6]), (c.nodes[6],c.nodes[7]), (c.nodes[7],c.nodes[8]), (c.nodes[8],c.nodes[5]))
+faces(c::Union{Hexahedron,QuadraticHexahedron}) = ((c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))
+
+# random stuff
+default_interpolation(::Type{Line}) = Lagrange{1,RefCube,1}()
+default_interpolation(::Type{QuadraticLine}) = Lagrange{1,RefCube,2}()
+default_interpolation(::Type{Triangle}) = Lagrange{2,RefTetrahedron,1}()
+default_interpolation(::Type{QuadraticTriangle}) = Lagrange{2,RefTetrahedron,2}()
+default_interpolation(::Type{Quadrilateral}) = Lagrange{2,RefCube,1}()
+default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2,RefCube,2}()
+default_interpolation(::Type{Tetrahedron}) = Lagrange{3,RefTetrahedron,1}()
+default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{2,RefTetrahedron,2}()
+default_interpolation(::Type{Hexahedron}) = Lagrange{3,RefCube,1}()
+default_interpolation(::Type{QuadraticHexahedron}) = Lagrange{3,RefCube,2}()
