@@ -67,14 +67,14 @@ end
 
 abstract type AbstractSparseAssembler end
 
-struct AssemblerSparsityPattern{Tv, Ti} <: AbstractSparseAssembler
-    K::SparseMatrixCSC{Tv, Ti}
+struct AssemblerSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
+    K::SparseMatrixCSC{Tv,Ti}
     f::Vector{Tv}
     permutation::Vector{Int}
     sorteddofs::Vector{Int}
 end
-struct AssemblerSymmetricSparsityPattern{Tv, Ti} <: AbstractSparseAssembler
-    K::Symmetric{Tv, SparseMatrixCSC{Tv, Ti}}
+struct AssemblerSymmetricSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
+    K::Symmetric{Tv,SparseMatrixCSC{Tv,Ti}}
     f::Vector{Tv}
     permutation::Vector{Int}
     sorteddofs::Vector{Int}
