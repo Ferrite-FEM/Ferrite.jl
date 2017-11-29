@@ -1,78 +1,69 @@
 """
-An `Interpolation` is used to define shape functions to interpolate
+    Interpolation{dim, ref_shape, order}()
+
+Return an `Interpolation` of given dimension `dim`, reference shape
+(see see [`AbstractRefShape`](@ref)) `ref_shape` and order `order`.
+`order` corresponds to the highest order term in the polynomial.
+The interpolation is used to define shape functions to interpolate
 a function between nodes.
-
-**Constructor:**
-
-```julia
-Interpolation{dim, reference_shape, order}()
-```
-
-**Arguments:**
-
-* `dim`: the dimension the interpolation lives in
-* `shape`: a reference shape, see [`AbstractRefShape`](@ref)
-* `order`: the highest order term in the polynomial
 
 The following interpolations are implemented:
 
-* `Lagrange{1, RefCube, 1}`
-* `Lagrange{1, RefCube, 2}`
-* `Lagrange{2, RefCube, 1}`
-* `Lagrange{2, RefCube, 2}`
-* `Lagrange{2, RefTetrahedron, 1}`
-* `Lagrange{2, RefTetrahedron, 2}`
-* `Lagrange{3, RefCube, 1}`
-* `Serendipity{2, RefCube, 2}`
-* `Lagrange{3, RefTetrahedron, 1}`
-* `Lagrange{3, RefTetrahedron, 2}`
+* `Lagrange{1,RefCube,1}`
+* `Lagrange{1,RefCube,2}`
+* `Lagrange{2,RefCube,1}`
+* `Lagrange{2,RefCube,2}`
+* `Lagrange{2,RefTetrahedron,1}`
+* `Lagrange{2,RefTetrahedron,2}`
+* `Lagrange{3,RefCube,1}`
+* `Serendipity{2,RefCube,2}`
+* `Lagrange{3,RefTetrahedron,1}`
+* `Lagrange{3,RefTetrahedron,2}`
 
 **Common methods:**
-
 * [`getnbasefunctions`](@ref)
 * [`getdim`](@ref)
 * [`getrefshape`](@ref)
 * [`getorder`](@ref)
 
 
-**Example:**
-
+# Examples
 ```jldoctest
-julia> ip = Lagrange{2, RefTetrahedron, 2}()
+julia> ip = Lagrange{2,RefTetrahedron,2}()
 JuAFEM.Lagrange{2,JuAFEM.RefTetrahedron,2}()
 
 julia> getnbasefunctions(ip)
 6
 ```
 """
-abstract type Interpolation{dim, shape, order} end
+abstract type Interpolation{dim,shape,order} end
 
 """
-Returns the dimension of an `Interpolation`
+Return the dimension of an `Interpolation`
 """
 @inline getdim(ip::Interpolation{dim}) where {dim} = dim
 
 """
-Returns the reference shape of an `Interpolation`
+Return the reference shape of an `Interpolation`
 """
-@inline getrefshape(ip::Interpolation{dim, shape}) where {dim, shape} = shape
+@inline getrefshape(ip::Interpolation{dim,shape}) where {dim,shape} = shape
 
 """
-Returns the polynomial order of the `Interpolation`
+Return the polynomial order of the `Interpolation`
 """
-@inline getorder(ip::Interpolation{dim, shape, order}) where {dim, shape, order} = order
+@inline getorder(ip::Interpolation{dim,shape,order}) where {dim,shape,order} = order
 
 """
-Computes the value of the shape functions at a point ξ for a given interpolation
+Compute the value of the shape functions at a point ξ for a given interpolation
 """
-function value(ip::Interpolation{dim}, ξ::Vec{dim, T}) where {dim, T}
+function value(ip::Interpolation{dim}, ξ::Vec{dim,T}) where {dim,T}
     [value(ip, i, ξ) for i in 1:getnbasefunctions(ip)]
 end
 
 """
-Computes the gradients of the shape functions at a point ξ for a given interpolation
+Compute the gradients of the shape functions at a point ξ for a given interpolation
 """
-function derivative(ip::Interpolation{dim}, ξ::Vec{dim, T}) where {dim, T}
+function derivative(ip::Interpolation{dim}, ξ::Vec{dim,T}) where {dim,T}
     [gradient(ξ -> value(ip, i, ξ), ξ) for i in 1:getnbasefunctions(ip)]
 end
 
@@ -81,7 +72,7 @@ end
 #####################
 
 """
-Returns the number of base functions for an [`Interpolation`](@ref) or `Values` object.
+Return the number of base functions for an [`Interpolation`](@ref) or `Values` object.
 """
 getnbasefunctions
 
@@ -113,7 +104,7 @@ ncelldofs(::Interpolation)   = 0
 ############
 # Lagrange #
 ############
-struct Lagrange{dim, shape, order} <: Interpolation{dim, shape, order} end
+struct Lagrange{dim,shape,order} <: Interpolation{dim,shape,order} end
 
 getlowerdim(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim-1,shape,order}()
 getlowerorder(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim,shape,order-1}()
@@ -121,88 +112,82 @@ getlowerorder(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{di
 ##################################
 # Lagrange dim 1 RefCube order 1 #
 ##################################
-getnbasefunctions(::Lagrange{1, RefCube, 1}) = 2
+getnbasefunctions(::Lagrange{1,RefCube,1}) = 2
 nvertexdofs(::Lagrange{1,RefCube,1}) = 1
 
 faces(::Lagrange{1,RefCube,1}) = ((1,), (2,))
 
-function reference_coordinates(::Lagrange{1, RefCube, 1})
+function reference_coordinates(::Lagrange{1,RefCube,1})
     return [Vec{1, Float64}((-1.0,)),
             Vec{1, Float64}(( 1.0,))]
 end
 
-function value(ip::Lagrange{1, RefCube, 1}, i::Int, ξ::Vec{1})
-    @inbounds begin
-        ξ_x = ξ[1]
-        i == 1 && return (1 - ξ_x) * 0.5
-        i == 2 && return (1 + ξ_x) * 0.5
-    end
+function value(ip::Lagrange{1,RefCube,1}, i::Int, ξ::Vec{1})
+    ξ_x = ξ[1]
+    i == 1 && return (1 - ξ_x) * 0.5
+    i == 2 && return (1 + ξ_x) * 0.5
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ##################################
 # Lagrange dim 1 RefCube order 2 #
 ##################################
-getnbasefunctions(::Lagrange{1, RefCube, 2}) = 3
+getnbasefunctions(::Lagrange{1,RefCube,2}) = 3
 nvertexdofs(::Lagrange{1,RefCube,2}) = 1
 ncelldofs(::Lagrange{1,RefCube,2}) = 1
 
 faces(::Lagrange{1,RefCube,2}) = ((1,), (2,))
 
-function reference_coordinates(::Lagrange{1, RefCube, 2})
+function reference_coordinates(::Lagrange{1,RefCube,2})
     return [Vec{1, Float64}((-1.0,)),
             Vec{1, Float64}(( 1.0,)),
             Vec{1, Float64}(( 0.0,))]
 end
 
-function value(ip::Lagrange{1, RefCube, 2}, i::Int, ξ::Vec{1})
-    @inbounds begin
-        ξ_x = ξ[1]
-        i == 1 && return ξ_x * (ξ_x - 1) * 0.5
-        i == 2 && return ξ_x * (ξ_x + 1) * 0.5
-        i == 3 && return 1 - ξ_x^2
-    end
+function value(ip::Lagrange{1,RefCube,2}, i::Int, ξ::Vec{1})
+    ξ_x = ξ[1]
+    i == 1 && return ξ_x * (ξ_x - 1) * 0.5
+    i == 2 && return ξ_x * (ξ_x + 1) * 0.5
+    i == 3 && return 1 - ξ_x^2
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ##################################
 # Lagrange dim 2 RefCube order 1 #
 ##################################
-getnbasefunctions(::Lagrange{2, RefCube, 1}) = 4
+getnbasefunctions(::Lagrange{2,RefCube,1}) = 4
 nvertexdofs(::Lagrange{2,RefCube,1}) = 1
 
 faces(::Lagrange{2,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1))
 
-function reference_coordinates(::Lagrange{2, RefCube, 1})
+function reference_coordinates(::Lagrange{2,RefCube,1})
     return [Vec{2, Float64}((-1.0, -1.0)),
             Vec{2, Float64}(( 1.0, -1.0)),
             Vec{2, Float64}(( 1.0,  1.0,)),
             Vec{2, Float64}((-1.0,  1.0,))]
 end
 
-function value(ip::Lagrange{2, RefCube, 1}, i::Int, ξ::Vec{2})
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-        i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25
-        i == 2 && return (1 + ξ_x) * (1 - ξ_y) * 0.25
-        i == 3 && return (1 + ξ_x) * (1 + ξ_y) * 0.25
-        i == 4 && return (1 - ξ_x) * (1 + ξ_y) * 0.25
-    end
+function value(ip::Lagrange{2,RefCube,1}, i::Int, ξ::Vec{2})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25
+    i == 2 && return (1 + ξ_x) * (1 - ξ_y) * 0.25
+    i == 3 && return (1 + ξ_x) * (1 + ξ_y) * 0.25
+    i == 4 && return (1 - ξ_x) * (1 + ξ_y) * 0.25
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ##################################
 # Lagrange dim 2 RefCube order 2 #
 ##################################
-getnbasefunctions(::Lagrange{2, RefCube, 2}) = 9
+getnbasefunctions(::Lagrange{2,RefCube,2}) = 9
 nvertexdofs(::Lagrange{2,RefCube,2}) = 1
 nfacedofs(::Lagrange{2,RefCube,2}) = 1
 ncelldofs(::Lagrange{2,RefCube,2}) = 1
 
 faces(::Lagrange{2,RefCube,2}) = ((1,2,5), (2,3,6), (3,4,7), (4,1,8))
 
-function reference_coordinates(::Lagrange{2, RefCube, 2})
+function reference_coordinates(::Lagrange{2,RefCube,2})
     return [Vec{2, Float64}((-1.0, -1.0)),
             Vec{2, Float64}(( 1.0, -1.0)),
             Vec{2, Float64}(( 1.0,  1.0)),
@@ -214,61 +199,57 @@ function reference_coordinates(::Lagrange{2, RefCube, 2})
             Vec{2, Float64}(( 0.0,  0.0))]
 end
 
-function value(ip::Lagrange{2, RefCube, 2}, i::Int, ξ::Vec{2})
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-        i == 1 && return (ξ_x^2 - ξ_x) * (ξ_y^2 - ξ_y) * 0.25
-        i == 2 && return (ξ_x^2 + ξ_x) * (ξ_y^2 - ξ_y) * 0.25
-        i == 3 && return (ξ_x^2 + ξ_x) * (ξ_y^2 + ξ_y) * 0.25
-        i == 4 && return (ξ_x^2 - ξ_x) * (ξ_y^2 + ξ_y) * 0.25
-        i == 5 && return (1 - ξ_x^2) * (ξ_y^2 - ξ_y) * 0.5
-        i == 6 && return (ξ_x^2 + ξ_x) * (1 - ξ_y^2) * 0.5
-        i == 7 && return (1 - ξ_x^2) * (ξ_y^2 + ξ_y) * 0.5
-        i == 8 && return (ξ_x^2 - ξ_x) * (1 - ξ_y^2) * 0.5
-        i == 9 && return (1 - ξ_x^2) * (1 - ξ_y^2)
-    end
+function value(ip::Lagrange{2,RefCube,2}, i::Int, ξ::Vec{2})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    i == 1 && return (ξ_x^2 - ξ_x) * (ξ_y^2 - ξ_y) * 0.25
+    i == 2 && return (ξ_x^2 + ξ_x) * (ξ_y^2 - ξ_y) * 0.25
+    i == 3 && return (ξ_x^2 + ξ_x) * (ξ_y^2 + ξ_y) * 0.25
+    i == 4 && return (ξ_x^2 - ξ_x) * (ξ_y^2 + ξ_y) * 0.25
+    i == 5 && return (1 - ξ_x^2) * (ξ_y^2 - ξ_y) * 0.5
+    i == 6 && return (ξ_x^2 + ξ_x) * (1 - ξ_y^2) * 0.5
+    i == 7 && return (1 - ξ_x^2) * (ξ_y^2 + ξ_y) * 0.5
+    i == 8 && return (ξ_x^2 - ξ_x) * (1 - ξ_y^2) * 0.5
+    i == 9 && return (1 - ξ_x^2) * (1 - ξ_y^2)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 #########################################
 # Lagrange dim 2 RefTetrahedron order 1 #
 #########################################
-getnbasefunctions(::Lagrange{2, RefTetrahedron, 1}) = 3
+getnbasefunctions(::Lagrange{2,RefTetrahedron,1}) = 3
 getlowerdim(::Lagrange{2, RefTetrahedron, order}) where {order} = Lagrange{1, RefCube, order}()
 nvertexdofs(::Lagrange{2,RefTetrahedron,1}) = 1
 
 vertices(::Lagrange{2,RefTetrahedron,1}) = (1,2,3)
 faces(::Lagrange{2,RefTetrahedron,1}) = ((1,2), (2,3), (3,1))
 
-function reference_coordinates(::Lagrange{2, RefTetrahedron, 1})
+function reference_coordinates(::Lagrange{2,RefTetrahedron,1})
     return [Vec{2, Float64}((1.0, 0.0)),
             Vec{2, Float64}((0.0, 1.0)),
             Vec{2, Float64}((0.0, 0.0))]
 end
 
-function value(ip::Lagrange{2, RefTetrahedron, 1}, i::Int, ξ::Vec{2})
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-        i == 1 && return ξ_x
-        i == 2 && return ξ_y
-        i == 3 && return 1. - ξ_x - ξ_y
-    end
+function value(ip::Lagrange{2,RefTetrahedron,1}, i::Int, ξ::Vec{2})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    i == 1 && return ξ_x
+    i == 2 && return ξ_y
+    i == 3 && return 1. - ξ_x - ξ_y
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 #########################################
 # Lagrange dim 2 RefTetrahedron order 2 #
 #########################################
-getnbasefunctions(::Lagrange{2, RefTetrahedron, 2}) = 6
+getnbasefunctions(::Lagrange{2,RefTetrahedron,2}) = 6
 nvertexdofs(::Lagrange{2,RefTetrahedron,2}) = 1
 nfacedofs(::Lagrange{2,RefTetrahedron,2}) = 1
 
 vertices(::Lagrange{2,RefTetrahedron,2}) = (1,2,3)
 faces(::Lagrange{2,RefTetrahedron,2}) = ((1,2,4), (2,3,5), (3,1,6))
 
-function reference_coordinates(::Lagrange{2, RefTetrahedron, 2})
+function reference_coordinates(::Lagrange{2,RefTetrahedron,2})
     return [Vec{2, Float64}((1.0, 0.0)),
             Vec{2, Float64}((0.0, 1.0)),
             Vec{2, Float64}((0.0, 0.0)),
@@ -277,59 +258,55 @@ function reference_coordinates(::Lagrange{2, RefTetrahedron, 2})
             Vec{2, Float64}((0.5, 0.0))]
 end
 
-function value(ip::Lagrange{2, RefTetrahedron, 2}, i::Int, ξ::Vec{2})
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-        γ = 1. - ξ_x - ξ_y
-        i == 1 && return ξ_x * (2ξ_x - 1)
-        i == 2 && return ξ_y * (2ξ_y - 1)
-        i == 3 && return γ * (2γ - 1)
-        i == 4 && return 4ξ_x * ξ_y
-        i == 5 && return 4ξ_y * γ
-        i == 6 && return 4ξ_x * γ
-    end
+function value(ip::Lagrange{2,RefTetrahedron,2}, i::Int, ξ::Vec{2})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    γ = 1. - ξ_x - ξ_y
+    i == 1 && return ξ_x * (2ξ_x - 1)
+    i == 2 && return ξ_y * (2ξ_y - 1)
+    i == 3 && return γ * (2γ - 1)
+    i == 4 && return 4ξ_x * ξ_y
+    i == 5 && return 4ξ_y * γ
+    i == 6 && return 4ξ_x * γ
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 #########################################
 # Lagrange dim 3 RefTetrahedron order 1 #
 #########################################
-getnbasefunctions(::Lagrange{3, RefTetrahedron, 1}) = 4
+getnbasefunctions(::Lagrange{3,RefTetrahedron,1}) = 4
 nvertexdofs(::Lagrange{3,RefTetrahedron,1}) = 1
 
 faces(::Lagrange{3,RefTetrahedron,1}) = ((1,2,3), (1,2,4), (2,3,4), (1,4,3))
 
-function reference_coordinates(::Lagrange{3, RefTetrahedron, 1})
+function reference_coordinates(::Lagrange{3,RefTetrahedron,1})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
             Vec{3, Float64}((1.0, 0.0, 0.0)),
             Vec{3, Float64}((0.0, 1.0, 0.0)),
             Vec{3, Float64}((0.0, 0.0, 1.0))]
 end
 
-function value(ip::Lagrange{3, RefTetrahedron, 1}, i::Int, ξ::Vec{3})
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-        ξ_z = ξ[3]
-        i == 1 && return 1.0 - ξ_x - ξ_y - ξ_z
-        i == 2 && return ξ_x
-        i == 3 && return ξ_y
-        i == 4 && return ξ_z
-    end
+function value(ip::Lagrange{3,RefTetrahedron,1}, i::Int, ξ::Vec{3})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    ξ_z = ξ[3]
+    i == 1 && return 1.0 - ξ_x - ξ_y - ξ_z
+    i == 2 && return ξ_x
+    i == 3 && return ξ_y
+    i == 4 && return ξ_z
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 #########################################
 # Lagrange dim 3 RefTetrahedron order 2 #
 #########################################
-getnbasefunctions(::Lagrange{3, RefTetrahedron, 2}) = 10
+getnbasefunctions(::Lagrange{3,RefTetrahedron,2}) = 10
 nvertexdofs(::Lagrange{3,RefTetrahedron,2}) = 1
 nedgedofs(::Lagrange{3,RefTetrahedron,2}) = 1
 
 faces(::Lagrange{3,RefTetrahedron,2}) = ((1,2,3,5,6,7), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
 
-function reference_coordinates(::Lagrange{3, RefTetrahedron, 2})
+function reference_coordinates(::Lagrange{3,RefTetrahedron,2})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
             Vec{3, Float64}((1.0, 0.0, 0.0)),
             Vec{3, Float64}((0.0, 1.0, 0.0)),
@@ -344,34 +321,32 @@ end
 
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch09.d/AFEM.Ch09.pdf
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.pdf
-function value(ip::Lagrange{3, RefTetrahedron, 2}, i::Int, ξ::Vec{3})
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-        ξ_z = ξ[3]
-        i == 1  && return (-2 * ξ_x - 2 * ξ_y - 2 * ξ_z + 1) * (-ξ_x - ξ_y - ξ_z + 1)
-        i == 2  && return ξ_x * (2 * ξ_x - 1)
-        i == 3  && return ξ_y * (2 * ξ_y - 1)
-        i == 4  && return ξ_z * (2 * ξ_z - 1)
-        i == 5  && return ξ_x * (-4 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4)
-        i == 6  && return 4 * ξ_x * ξ_y
-        i == 7  && return 4 * ξ_y * (-ξ_x - ξ_y - ξ_z + 1)
-        i == 8  && return ξ_z * (-4 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4)
-        i == 9  && return 4 * ξ_x * ξ_z
-        i == 10 && return 4 * ξ_y * ξ_z
-    end
+function value(ip::Lagrange{3,RefTetrahedron,2}, i::Int, ξ::Vec{3})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    ξ_z = ξ[3]
+    i == 1  && return (-2 * ξ_x - 2 * ξ_y - 2 * ξ_z + 1) * (-ξ_x - ξ_y - ξ_z + 1)
+    i == 2  && return ξ_x * (2 * ξ_x - 1)
+    i == 3  && return ξ_y * (2 * ξ_y - 1)
+    i == 4  && return ξ_z * (2 * ξ_z - 1)
+    i == 5  && return ξ_x * (-4 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4)
+    i == 6  && return 4 * ξ_x * ξ_y
+    i == 7  && return 4 * ξ_y * (-ξ_x - ξ_y - ξ_z + 1)
+    i == 8  && return ξ_z * (-4 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4)
+    i == 9  && return 4 * ξ_x * ξ_z
+    i == 10 && return 4 * ξ_y * ξ_z
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ##################################
 # Lagrange dim 3 RefCube order 1 #
 ##################################
-getnbasefunctions(::Lagrange{3, RefCube, 1}) = 8
+getnbasefunctions(::Lagrange{3,RefCube,1}) = 8
 nvertexdofs(::Lagrange{3,RefCube,1}) = 1
 
 faces(::Lagrange{3,RefCube,1}) = ((1,4,3,2), (1,2,6,5), (2,3,7,6), (3,4,8,7), (1,5,8,4), (5,6,7,8))
 
-function reference_coordinates(::Lagrange{3, RefCube, 1})
+function reference_coordinates(::Lagrange{3,RefCube,1})
     return [Vec{3, Float64}((-1.0, -1.0, -1.0)),
             Vec{3, Float64}(( 1.0, -1.0, -1.0)),
             Vec{3, Float64}(( 1.0,  1.0, -1.0)),
@@ -382,40 +357,38 @@ function reference_coordinates(::Lagrange{3, RefCube, 1})
             Vec{3, Float64}((-1.0,  1.0,  1.0))]
 end
 
-function value(ip::Lagrange{3, RefCube, 1}, i::Int, ξ::Vec{3})
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-        ξ_z = ξ[3]
-        i == 1 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z)
-        i == 2 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z)
-        i == 3 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z)
-        i == 4 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z)
-        i == 5 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z)
-        i == 6 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z)
-        i == 7 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z)
-        i == 8 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z)
-    end
+function value(ip::Lagrange{3,RefCube,1}, i::Int, ξ::Vec{3})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    ξ_z = ξ[3]
+    i == 1 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z)
+    i == 2 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z)
+    i == 3 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z)
+    i == 4 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z)
+    i == 5 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z)
+    i == 6 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z)
+    i == 7 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z)
+    i == 8 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ###############
 # Serendipity #
 ###############
-struct Serendipity{dim, shape, order} <: Interpolation{dim, shape, order} end
+struct Serendipity{dim,shape,order} <: Interpolation{dim,shape,order} end
 
 #####################################
 # Serendipity dim 2 RefCube order 2 #
 #####################################
-getnbasefunctions(::Serendipity{2, RefCube, 2}) = 8
-getlowerdim(::Serendipity{2, RefCube, 2}) = Lagrange{1, RefCube, 2}()
-getlowerorder(::Serendipity{2, RefCube, 2}) = Lagrange{2, RefCube, 1}()
+getnbasefunctions(::Serendipity{2,RefCube,2}) = 8
+getlowerdim(::Serendipity{2,RefCube,2}) = Lagrange{1,RefCube,2}()
+getlowerorder(::Serendipity{2,RefCube,2}) = Lagrange{2,RefCube,1}()
 nvertexdofs(::Serendipity{2,RefCube,2}) = 1
 nedgedofs(::Serendipity{2,RefCube,2}) = 1
 
 faces(::Serendipity{2,RefCube,2}) = ((1,2,5), (2,3,6), (3,4,7), (4,1,8))
 
-function reference_coordinates(::Serendipity{2, RefCube, 2})
+function reference_coordinates(::Serendipity{2,RefCube,2})
     return [Vec{2, Float64}((-1.0, -1.0)),
             Vec{2, Float64}(( 1.0, -1.0)),
             Vec{2, Float64}(( 1.0,  1.0)),
@@ -426,18 +399,16 @@ function reference_coordinates(::Serendipity{2, RefCube, 2})
             Vec{2, Float64}((-1.0,  0.0))]
 end
 
-function value(ip::Serendipity{2, RefCube, 2}, i::Int, ξ::Vec{2})
-    @inbounds begin
-        ξ_x = ξ[1]
-        ξ_y = ξ[2]
-        i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25(-ξ_x - ξ_y - 1)
-        i == 2 && return (1 + ξ_x) * (1 - ξ_y) * 0.25( ξ_x - ξ_y - 1)
-        i == 3 && return (1 + ξ_x) * (1 + ξ_y) * 0.25( ξ_x + ξ_y - 1)
-        i == 4 && return (1 - ξ_x) * (1 + ξ_y) * 0.25(-ξ_x + ξ_y - 1)
-        i == 5 && return 0.5(1 - ξ_x * ξ_x) * (1 - ξ_y)
-        i == 6 && return 0.5(1 + ξ_x) * (1 - ξ_y * ξ_y)
-        i == 7 && return 0.5(1 - ξ_x * ξ_x) * (1 + ξ_y)
-        i == 8 && return 0.5(1 - ξ_x) * (1 - ξ_y * ξ_y)
-    end
+function value(ip::Serendipity{2,RefCube,2}, i::Int, ξ::Vec{2})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25(-ξ_x - ξ_y - 1)
+    i == 2 && return (1 + ξ_x) * (1 - ξ_y) * 0.25( ξ_x - ξ_y - 1)
+    i == 3 && return (1 + ξ_x) * (1 + ξ_y) * 0.25( ξ_x + ξ_y - 1)
+    i == 4 && return (1 - ξ_x) * (1 + ξ_y) * 0.25(-ξ_x + ξ_y - 1)
+    i == 5 && return 0.5(1 - ξ_x * ξ_x) * (1 - ξ_y)
+    i == 6 && return 0.5(1 + ξ_x) * (1 - ξ_y * ξ_y)
+    i == 7 && return 0.5(1 - ξ_x * ξ_x) * (1 + ξ_y)
+    i == 8 && return 0.5(1 - ξ_x) * (1 - ξ_y * ξ_y)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end

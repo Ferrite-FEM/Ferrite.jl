@@ -12,14 +12,12 @@ cell_to_vtkcell(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
 cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 
 """
-```julia
-vtk_grid(filename::AbstractString, grid::Grid)
-```
+    vtk_grid(filename::AbstractString, grid::Grid)
 
 Create a unstructured VTK grid from a `Grid`. Return a `DatasetFile`
-which data can be appended to, see `vtk_point_data`, `vtk_cell_data`.
+which data can be appended to, see `vtk_point_data` and `vtk_cell_data`.
 """
-function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim, N, T}) where {dim, N, T}
+function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,N,T}) where {dim,N,T}
     celltype = cell_to_vtkcell(getcelltype(grid))
     cls = MeshCell[]
     for cell in CellIterator(grid)
@@ -29,7 +27,7 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim, N, T}) wher
     return vtk_grid(filename, coords, cls)
 end
 
-function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, data::Vector{Vec{dim, T}}, name::AbstractString) where {dim, T}
+function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, data::Vector{Vec{dim,T}}, name::AbstractString) where {dim,T}
     npoints = length(data)
     data = reinterpret(T, data, (dim, npoints))
     return vtk_point_data(vtk, data, name)

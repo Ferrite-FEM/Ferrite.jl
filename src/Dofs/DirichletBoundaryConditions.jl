@@ -241,15 +241,15 @@ function apply_zero!(v::Vector, dbcs::DirichletBoundaryConditions)
     return v
 end
 
-function apply!(K::Union{SparseMatrixCSC, Symmetric}, dbcs::DirichletBoundaryConditions)
+function apply!(K::Union{SparseMatrixCSC,Symmetric}, dbcs::DirichletBoundaryConditions)
     apply!(K, eltype(K)[], dbcs, true)
 end
 
-function apply_zero!(K::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, dbcs::DirichletBoundaryConditions)
+function apply_zero!(K::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, dbcs::DirichletBoundaryConditions)
     apply!(K, f, dbcs, true)
 end
 
-function apply!(KK::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector, dbcs::DirichletBoundaryConditions, applyzero::Bool=false)
+function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, dbcs::DirichletBoundaryConditions, applyzero::Bool=false)
     K = isa(KK, Symmetric) ? KK.data : KK
     @assert length(f) == 0 || length(f) == size(K, 1)
     @boundscheck checkbounds(K, dbcs.prescribed_dofs, dbcs.prescribed_dofs)
