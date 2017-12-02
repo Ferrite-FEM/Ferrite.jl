@@ -209,3 +209,78 @@ function InsertionSort!(A, order, ii=1, jj=length(A))
     end  # i
     return
 end
+
+
+struct LinearAssembler{Tv,Ti}
+    K::SparseMatrixCSC{Tv,Ti}
+    dict::Dict{Tuple{Ti,Ti},Ti}
+end
+
+function LinearAssembler(dh::DofHandler)
+    K, d = _create_linear_sparsity_pattern(dh,false)
+    return LinearAssembler(K,d)
+end
+
+function _create_linear_sparsity_pattern(dh::DofHandler, sym::Bool)
+    ncells = getncells(dh.grid)
+    n = ndofs_per_cell(dh)
+    N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
+    N += ndofs(dh) # always add the diagonal elements
+    I = Int[]; sizehint!(I, N)
+    J = Int[]; sizehint!(J, N)
+    V = UInt64[]; sizehint!(V, N)
+    global_dofs = zeros(Int, n)
+    for element_id in 1:ncells
+        celldofs!(global_dofs, dh, element_id)
+        @inbounds for j in 1:n, i in 1:n
+            dofi = global_dofs[i]
+            dofj = global_dofs[j]
+            sym && (dofi > dofj && continue)
+            push!(I, dofi)
+            push!(J, dofj)
+            push!(V, hash((dofi, dofj)))
+        end
+    end
+    for d in 1:ndofs(dh)
+        push!(I, d)
+        push!(J, d)
+        push!(V, hash((d,d)))
+    end
+    K = sparse(I, J, V, maximum(I), maximum(J), (x,y) -> x)
+
+    # loop again, and construct the map from (dofi, dofj)
+    # to a linear index into K.nzval
+    dict = Dict{Tuple{Int,Int},Int}()
+    for element_id in 1:ncells
+        celldofs!(global_dofs, dh, element_id)
+        @inbounds for j in 1:n, i in 1:n
+            dofi = global_dofs[i]
+            dofj = global_dofs[j]
+            sym && (dofi > dofj && continue)
+            dict[hash((dofi, dofj))] = findfirst(K.nzval, hash((dofi, dofj)))
+        end
+    end
+    for d in 1:ndofs(dh)
+        dict[hash((d, d))] = findfirst(K.nzval, hash((d, d)))
+    end
+    W = zeros(length(I))
+    return sparse(I, J, W, maximum(I), maximum(J)), dict
+end
+
+function assemble!(a::LinearAssembler, ke::AbstractMatrix, dofs::AbstractVector)
+    _ndofs = length(dofs)
+    @inbounds for dofj in 1:_ndofs, dofi in 1:_ndofs
+        h = hash((dofs[dofi], dofs[dofj]))
+        a.K.nzval[a.d[h]] += ke[dofi, dofj]
+    end
+end
+
+@propagate_inbounds function getnzvalindex(A::SparseMatrixCSC{T}, i0::Integer, i1::Integer) where T
+    @boundscheck !(1 <= i0 <= A.m && 1 <= i1 <= A.n) && throw(BoundsError())
+    r1 = Int(A.colptr[i1])
+    r2 = Int(A.colptr[i1+1]-1)
+    @boundscheck (r1 > r2) && throw(ArgumentError("invalid index"))
+    r1 = searchsortedfirst(A.rowval, i0, r1, r2, Forward)
+    @boundscheck ((r1 > r2) || (A.rowval[r1] != i0)) && throw(ArgumentError("invalid index"))
+    return r1
+end
