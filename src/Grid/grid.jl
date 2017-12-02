@@ -4,36 +4,36 @@
 """
 A `Node` is a point in space.
 """
-struct Node{dim, T}
-    x::Vec{dim, T}
+struct Node{dim,T}
+    x::Vec{dim,T}
 end
-Node(x::NTuple{dim, T}) where {dim, T} = Node(Vec{dim, T}(x))
+Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
 getcoordinates(n::Node) = n.x
 
 """
 A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
 """
-struct Cell{dim, N, M}
-    nodes::NTuple{N, Int}
+struct Cell{dim,N,M}
+    nodes::NTuple{N,Int}
 end
 nfaces(c::Cell) = nfaces(typeof(c))
-nfaces(::Type{Cell{dim, N, M}}) where {dim, N, M} = M
+nfaces(::Type{Cell{dim,N,M}}) where {dim,N,M} = M
 
 # Typealias for commonly used cells
-const Line = Cell{1, 2, 2}
-const QuadraticLine = Cell{1, 3, 2}
+const Line = Cell{1,2,2}
+const QuadraticLine = Cell{1,3,2}
 
-const Triangle = Cell{2, 3, 3}
-const QuadraticTriangle = Cell{2, 6, 3}
+const Triangle = Cell{2,3,3}
+const QuadraticTriangle = Cell{2,6,3}
 
-const Quadrilateral = Cell{2, 4, 4}
-const QuadraticQuadrilateral = Cell{2, 9, 4}
+const Quadrilateral = Cell{2,4,4}
+const QuadraticQuadrilateral = Cell{2,9,4}
 
-const Tetrahedron = Cell{3, 4, 4}
-const QuadraticTetrahedron = Cell{3, 10, 4}
+const Tetrahedron = Cell{3,4,4}
+const QuadraticTetrahedron = Cell{3,10,4}
 
-const Hexahedron = Cell{3, 8, 6}
-const QuadraticHexahedron = Cell{3, 20, 6} # Function interpolation for this doesn't exist in JuAFEM yet
+const Hexahedron = Cell{3,8,6}
+const QuadraticHexahedron = Cell{3,20,6} # Function interpolation for this doesn't exist in JuAFEM yet
 
 """
 A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh
@@ -46,30 +46,30 @@ end
 A `FaceIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, face).
 """
 struct FaceIndex
-    idx::Tuple{Int, Int} # cell and side
+    idx::Tuple{Int,Int} # cell and side
 end
 
 """
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 """
-mutable struct Grid{dim, N, T <: Real, M}
-    cells::Vector{Cell{dim, N, M}}
-    nodes::Vector{Node{dim, T}}
+mutable struct Grid{dim,N,T<:Real,M}
+    cells::Vector{Cell{dim,N,M}}
+    nodes::Vector{Node{dim,T}}
     # Sets
-    cellsets::Dict{String, Set{Int}}
-    nodesets::Dict{String, Set{Int}}
-    facesets::Dict{String, Set{Tuple{Int, Int}}}
+    cellsets::Dict{String,Set{Int}}
+    nodesets::Dict{String,Set{Int}}
+    facesets::Dict{String,Set{Tuple{Int,Int}}} # TODO: This could be Set{FaceIndex} which could result in nicer use later
     # Boundary matrix (faces per cell × cell)
-    boundary_matrix::SparseMatrixCSC{Bool, Int}
+    boundary_matrix::SparseMatrixCSC{Bool,Int}
 end
 
-function Grid(cells::Vector{Cell{dim, N, M}},
-              nodes::Vector{Node{dim, T}};
-              cellsets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
-              nodesets::Dict{String, Set{Int}}=Dict{String, Set{Int}}(),
-              facesets::Dict{String, Set{Tuple{Int, Int}}}=Dict{String, Set{Tuple{Int, Int}}}(),
-              boundary_matrix::SparseMatrixCSC{Bool, Int}=spzeros(Bool, 0, 0)) where {dim, N, M, T}
-    return Grid{dim,N,T,M}(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
+function Grid(cells::Vector{Cell{dim,N,M}},
+              nodes::Vector{Node{dim,T}};
+              cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
+              nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
+              facesets::Dict{String,Set{Tuple{Int,Int}}}=Dict{String,Set{Tuple{Int,Int}}}(),
+              boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)) where {dim,N,M,T}
+    return Grid(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
 end
 
 ##########################
@@ -113,7 +113,7 @@ end
 _check_nodesetname(grid, name) = haskey(grid.nodesets, name) && throw(ArgumentError("There already exists a nodeset with the name: $name"))
 _warn_emptyset(set) = length(set) == 0 && warn("no entities added to set")
 
-function addcellset!(grid::Grid, name::String, cellid::Union{Set{Int}, Vector{Int}})
+function addcellset!(grid::Grid, name::String, cellid::Union{Set{Int},Vector{Int}})
     haskey(grid.cellsets, name) && throw(ArgumentError("There already exists a cellset with the name: $name"))
     grid.cellsets[name] = Set(cellid)
     _warn_emptyset(grid.cellsets[name])
@@ -135,7 +135,7 @@ function addcellset!(grid::Grid, name::String, f::Function)
     grid
 end
 
-function addnodeset!(grid::Grid, name::String, nodeid::Union{Vector{Int}, Set{Int}})
+function addnodeset!(grid::Grid, name::String, nodeid::Union{Vector{Int},Set{Int}})
     _check_nodesetname(grid, name)
     grid.nodesets[name] = Set(nodeid)
     _warn_emptyset(grid.nodesets[name])
@@ -154,72 +154,78 @@ function addnodeset!(grid::Grid, name::String, f::Function)
 end
 
 """
-Updates the coordinate vector for a cell
+    getcoordinates!(x::Vector, grid::Grid, cell::Int)
 
-    getcoordinates!(x::Vector{Vec}, grid::Grid, cell::Int)
-    getcoordinates!(x::Vector{Vec}, grid::Grid, cell::CellIndex)
-    getcoordinates!(x::Vector{Vec}, grid::Grid, face::FaceIndex)
-
-** Arguments **
-
-* `x`: a vector of `Vec`s, one for each vertex of the cell.
-* `grid`: a `Grid`
-* `cell`: a `CellIndex` corresponding to a `Cell` in the grid in the grid
-
-** Results **
-
-* `x`: the updated vector
-
+Update the coordinate vector `x` for cell number `cell`.
 """
-@inline function getcoordinates!(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, cell::Int) where {dim, T, N}
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Grid{dim,N,T}, cell::Int) where {dim,T,N}
     @assert length(x) == N
     @inbounds for i in 1:N
         x[i] = grid.nodes[grid.cells[cell].nodes[i]].x
     end
 end
-@inline getcoordinates!(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, cell::CellIndex) where {dim, T, N} = getcoordinates!(x, grid, cell.idx)
-@inline getcoordinates!(x::Vector{Vec{dim, T}}, grid::Grid{dim, N, T}, face::FaceIndex) where {dim, T, N} = getcoordinates!(x, grid, face.idx[1])
+@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::Grid{dim,N,T}, cell::CellIndex) where {dim, T, N} = getcoordinates!(x, grid, cell.idx)
+@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::Grid{dim,N,T}, face::FaceIndex) where {dim, T, N} = getcoordinates!(x, grid, face.idx[1])
 
 """
-Returns a vector with the coordinates of the vertices of a cell
+    getcoordinates(grid::Grid, cell)
 
-    getcoordinates(grid::Grid, cell::Int)
-    getcoordinates(grid::Grid, cell::CellIndex)
-    getcoordinates(grid::Grid, face::FaceIndex)
-
-** Arguments **
-
-* `grid`: a `Grid`
-* `cell`: a `CellIndex` corresponding to a `Cell` in the grid in the grid
-
-** Results **
-
-* `x`: A `Vector` of `Vec`s, one for each vertex of the cell.
-
+Return a vector with the coordinates of the vertices of cell number `cell`.
 """
-@inline function getcoordinates(grid::Grid{dim, N, T}, cell::Int) where {dim, N, T}
+@inline function getcoordinates(grid::Grid{dim,N,T}, cell::Int) where {dim,N,T}
     nodeidx = grid.cells[cell].nodes
-    return [grid.nodes[i].x for i in nodeidx]::Vector{Vec{dim, T}}
+    return [grid.nodes[i].x for i in nodeidx]::Vector{Vec{dim,T}}
 end
 @inline getcoordinates(grid::Grid, cell::CellIndex) = getcoordinates(grid, cell.idx)
 @inline getcoordinates(grid::Grid, face::FaceIndex) = getcoordinates(grid, face.idx[1])
 
 # Iterate over cell vector
-Base.start(c::Vector{Cell{dim, N}}) where {dim, N} = 1
-Base.next(c::Vector{Cell{dim, N}}, state) where {dim, N} = (CellIndex(state), state + 1)
-Base.done(c::Vector{Cell{dim, N}}, state) where {dim, N} = state > length(c)
+Base.start(c::Vector{Cell{dim,N}}) where {dim,N} = 1
+Base.next(c::Vector{Cell{dim,N}}, state) where {dim,N} = (CellIndex(state), state + 1)
+Base.done(c::Vector{Cell{dim,N}}, state) where {dim,N} = state > length(c)
 
 function Base.show(io::IO, grid::Grid)
     println(io, "$(typeof(grid)) with $(getncells(grid)) $(celltypes[eltype(grid.cells)]) cells and $(getnnodes(grid)) nodes")
 end
 
-const celltypes = Dict{DataType, String}(Cell{1, 2, 2}  => "Line",
-                                         Cell{1, 3, 2}  => "QuadraticLine",
-                                         Cell{2, 3, 3}  => "Triangle",
-                                         Cell{2, 6, 3}  => "QuadraticTriangle",
-                                         Cell{2, 4, 4}  => "Quadrilateral",
-                                         Cell{2, 9, 4}  => "QuadraticQuadrilateral",
-                                         Cell{3, 4, 4}  => "Tetrahedron",
-                                         Cell{3, 10, 4} => "QuadraticTetrahedron",
-                                         Cell{3, 8, 6}  => "Hexahedron",
-                                         Cell{3, 20, 6} => "QuadraticHexahedron")
+const celltypes = Dict{DataType, String}(Cell{1,2,2}  => "Line",
+                                         Cell{1,3,2}  => "QuadraticLine",
+                                         Cell{2,3,3}  => "Triangle",
+                                         Cell{2,6,3}  => "QuadraticTriangle",
+                                         Cell{2,4,4}  => "Quadrilateral",
+                                         Cell{2,9,4}  => "QuadraticQuadrilateral",
+                                         Cell{3,4,4}  => "Tetrahedron",
+                                         Cell{3,10,4} => "QuadraticTetrahedron",
+                                         Cell{3,8,6}  => "Hexahedron",
+                                         Cell{3,20,6} => "QuadraticHexahedron")
+
+# Functions to uniquely identify vertices, edges and faces, used when distributing
+# dofs over a mesh. For this we can ignore the nodes on edged, faces and inside cells,
+# we only need to use the nodes that are vertices.
+# 1D: vertices
+faces(c::Union{Line,QuadraticLine}) = (c.nodes[1], c.nodes[2])
+vertices(c::Union{Line,QuadraticLine}) = (c.nodes[1], c.nodes[2])
+# 2D: vertices, faces
+vertices(c::Union{Triangle,QuadraticTriangle}) = (c.nodes[1], c.nodes[2], c.nodes[3])
+faces(c::Union{Triangle,QuadraticTriangle}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]))
+vertices(c::Union{Quadrilateral,QuadraticQuadrilateral}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
+faces(c::Union{Quadrilateral,QuadraticQuadrilateral}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
+# 3D: vertices, edges, faces
+vertices(c::Union{Tetrahedron,QuadraticTetrahedron}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
+edges(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]), (c.nodes[1],c.nodes[4]), (c.nodes[2],c.nodes[4]), (c.nodes[3],c.nodes[4]))
+faces(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[2],c.nodes[3]), (c.nodes[1],c.nodes[2],c.nodes[4]), (c.nodes[2],c.nodes[3],c.nodes[4]), (c.nodes[1],c.nodes[4],c.nodes[3]))
+vertices(c::Union{Hexahedron,QuadraticHexahedron}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[5], c.nodes[6], c.nodes[7], c.nodes[8])
+edges(c::Union{Hexahedron,QuadraticHexahedron}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]), (c.nodes[1],c.nodes[5]), (c.nodes[2],c.nodes[6]), (c.nodes[3],c.nodes[7]), (c.nodes[4],c.nodes[8]), (c.nodes[5],c.nodes[6]), (c.nodes[6],c.nodes[7]), (c.nodes[7],c.nodes[8]), (c.nodes[8],c.nodes[5]))
+faces(c::Union{Hexahedron,QuadraticHexahedron}) = ((c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))
+
+# random stuff
+default_interpolation(::Type{Line}) = Lagrange{1,RefCube,1}()
+default_interpolation(::Type{QuadraticLine}) = Lagrange{1,RefCube,2}()
+default_interpolation(::Type{Triangle}) = Lagrange{2,RefTetrahedron,1}()
+default_interpolation(::Type{QuadraticTriangle}) = Lagrange{2,RefTetrahedron,2}()
+default_interpolation(::Type{Quadrilateral}) = Lagrange{2,RefCube,1}()
+default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2,RefCube,2}()
+default_interpolation(::Type{Tetrahedron}) = Lagrange{3,RefTetrahedron,1}()
+default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{2,RefTetrahedron,2}()
+default_interpolation(::Type{Hexahedron}) = Lagrange{3,RefCube,1}()
+default_interpolation(::Type{QuadraticHexahedron}) = Lagrange{3,RefCube,2}()

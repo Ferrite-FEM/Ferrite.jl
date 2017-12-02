@@ -55,20 +55,22 @@ end
         push!(dofhandler, :temperature, 1)
         push!(dofhandler, :displacement, 3)
         close!(dofhandler)
-        dbc = DirichletBoundaryConditions(dofhandler)
-        add!(dbc, :temperature, getnodeset(grid, "middle-nodes"), (x,t) -> 1)
+        dbcs = DirichletBoundaryConditions(dofhandler)
+        dbc = JuAFEM.DirichletBoundaryCondition(:temperature, union(getfaceset(grid, "left"), getfaceset(grid, "right")), (x,t)->1)
+        add!(dbcs, dbc)
         for d in 1:dim
-            add!(dbc, :displacement, getnodeset(grid, "middle-nodes"), (x,t) -> d, d)
+            dbc = JuAFEM.DirichletBoundaryCondition(:displacement, union(getfaceset(grid, "left")), (x,t) -> d, d)
+            add!(dbcs, dbc)
         end
-        close!(dbc)
-        update!(dbc, 0.0)
+        close!(dbcs)
+        update!(dbcs, 0.0)
         srand(1234)
         u = rand(ndofs(dofhandler))
-        apply!(u, dbc)
+        apply!(u, dbcs)
 
         dofhandlerfilename = "dofhandler-$(JuAFEM.celltypes[celltype])"
         vtk_grid(dofhandlerfilename, dofhandler) do vtk
-            vtk_point_data(vtk, dbc)
+            vtk_point_data(vtk, dbcs)
             vtk_point_data(vtk, dofhandler, u)
         end
 

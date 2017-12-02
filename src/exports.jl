@@ -84,6 +84,7 @@ export
 
 # BoundaryConditions
     DirichletBoundaryConditions,
+    DirichletBoundaryCondition,
     update!,
     apply!,
     apply_zero!,
