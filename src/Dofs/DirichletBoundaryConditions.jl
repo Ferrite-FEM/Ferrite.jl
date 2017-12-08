@@ -103,7 +103,7 @@ end
 
 function dbc_check(dbcs::DirichletBoundaryConditions, dbc::DirichletBoundaryCondition)
     # check input
-    dbc.field_name in dbcs.dh.field_names || throw(ArgumentError("field $field does not exist in DofHandler, existing fields are $(dh.field_names)"))
+    dbc.field_name in (x.name for x in dbcs.dh.fields)|| throw(ArgumentError("field $field does not exist in DofHandler, existing fields are $((x.name for x in dbcs.dh.fields))"))
     for component in dbc.components
         0 < component <= ndim(dbcs.dh, dbc.field_name) || error("component $component is not within the range of field $field which has $(ndim(dbcs.dh, field)) dimensions")
     end
@@ -117,8 +117,8 @@ function add!(dbcs::DirichletBoundaryConditions, dbc::DirichletBoundaryCondition
     dbc_check(dbcs, dbc)
     field_idx = find_field(dbcs.dh, dbc.field_name)
     # Extract stuff for the field
-    interpolation = dbcs.dh.field_interpolations[field_idx]
-    field_dim = dbcs.dh.field_dims[field_idx] # TODO: I think we don't need to extract these here ...
+    interpolation = dbcs.dh.fields[field_idx].interpolation
+    field_dim = dbcs.dh.fields[field_idx].dim # TODO: I think we don't need to extract these here ...
     _add!(dbcs, dbc, interpolation, field_dim, field_offset(dbcs.dh, dbc.field_name))
     return dbcs
 end

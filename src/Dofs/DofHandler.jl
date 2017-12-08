@@ -1,17 +1,15 @@
 
-# # TODO: Maybe nice to add a field like this instead of manually pushing stuff to the dofhandler
-# struct Field
-#     name::Symbol
-#     interpolation::Interpolation
-#     dim::Int
-# end
+
+struct Field
+    name::Symbol
+    interpolation::Interpolation
+    dim::Int
+end
 
 struct DofHandler{dim,N,T,M}
-    field_names::Vector{Symbol}
-    field_dims::Vector{Int}
+    fields::Vector{Field}
     # TODO: field_interpolations can probably be better typed: We should at least require
     #       all the interpolations to have the same dimension and reference shape
-    field_interpolations::Vector{Interpolation}
     bc_values::Vector{BCValues{T}} # for boundary conditions
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
@@ -20,14 +18,14 @@ struct DofHandler{dim,N,T,M}
 end
 
 function DofHandler(grid::Grid)
-    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid)
+    DofHandler(Field[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid)
 end
 
 function Base.show(io::IO, dh::DofHandler)
     println(io, "DofHandler")
     println(io, "  Fields:")
-    for i in 1:nfields(dh)
-        println(io, "    ", repr(dh.field_names[i]), " interpolation: ", dh.field_interpolations[i],", dim: ", dh.field_dims[i])
+    for field in dh.fields
+        println(io, "    ", repr(field.name), " interpolation: ", field.interpolation,", dim: ", field.dim)
     end
     if !isclosed(dh)
         print(io, "  Not closed!")
@@ -42,29 +40,30 @@ end
 ndofs(dh::DofHandler) = maximum(dh.cell_dofs)
 ndofs_per_cell(dh::DofHandler, cell::Int=1) = dh.cell_dofs_offset[cell+1] - dh.cell_dofs_offset[cell]
 isclosed(dh::DofHandler) = dh.closed[]
-nfields(dh::DofHandler) = length(dh.field_names)
-ndim(dh::DofHandler, field_name::Symbol) = dh.field_dims[find_field(dh, field_name)]
+nfields(dh::DofHandler) = length(dh.fields)
+ndim(dh::DofHandler, field_name::Symbol) = dh.fields[find_field(dh, field_name)].dim
 function find_field(dh::DofHandler, field_name::Symbol)
-    j = findfirst(i->i == field_name, dh.field_names)
-    j == 0 && error("did not find field $field_name")
-    return j
+    for i in 1:length(dh.fields)
+        if field_name == dh.fields[i].name
+            return i
+        end
+    end
+    error("did not find field $field_name")
 end
 
 # Calculate the offset to the first local dof of a field
 function field_offset(dh::DofHandler, field_name::Symbol)
     offset = 0
     for i in 1:find_field(dh, field_name)-1
-        offset += getnbasefunctions(dh.field_interpolations[i]) * dh.field_dims[i]
+        offset += getnbasefunctions(f.interpolation) * dh.fields[i].dim
     end
     return offset
 end
 
 function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
     @assert !isclosed(dh)
-    @assert !in(name, dh.field_names)
-    push!(dh.field_names, name)
-    push!(dh.field_dims, dim)
-    push!(dh.field_interpolations, ip)
+    @assert !in(name, (x.name for x in dh.fields))
+    push!(dh.fields, Field(name,ip,dim))
     push!(dh.bc_values, BCValues(ip, default_interpolation(getcelltype(dh.grid))))
     return dh
 end
@@ -112,9 +111,9 @@ function close!(dh::DofHandler{dim}) where {dim}
     # interpolation since that allows having the cell loop as the outermost loop,
     # and the interpolation loop inside without using a function barrier
     interpolation_infos = InterpolationInfo[]
-    for interpolation in dh.field_interpolations
+    for field in dh.fields
         # push!(dh.interpolation_info, InterpolationInfo(interpolation))
-        push!(interpolation_infos, InterpolationInfo(interpolation))
+        push!(interpolation_infos, InterpolationInfo(field.interpolation))
     end
 
     # not implemented yet: more than one facedof per face in 3D
@@ -126,23 +125,23 @@ function close!(dh::DofHandler{dim}) where {dim}
     # loop over all the cells, and distribute dofs for all the fields
     for (ci, cell) in enumerate(getcells(dh.grid))
         @debug println("cell #$ci")
-        for fi in 1:nfields(dh)
-            interpolation_info = interpolation_infos[fi]
-            @debug println("  field: $(dh.field_names[fi])")
+        for (i,fi) in enumerate(dh.fields)
+            interpolation_info = interpolation_infos[i]
+            @debug println("  field: $(fi.name)")
             if interpolation_info.nvertexdofs > 0
                 for vertex in vertices(cell)
                     @debug println("    vertex#$vertex")
-                    token = ht_keyindex2!(vertexdicts[fi], vertex)
-                    if token > 0 # haskey(vertexdicts[fi], vertex) # reuse dofs
-                        reuse_dof = vertexdicts[fi].vals[token] # vertexdicts[fi][vertex]
-                        for d in 1:dh.field_dims[fi]
+                    token = ht_keyindex2!(vertexdicts[i], vertex)
+                    if token > 0 # haskey(vertexdicts[i], vertex) # reuse dofs
+                        reuse_dof = vertexdicts[i].vals[token] # vertexdicts[i][vertex]
+                        for d in 1:fi.dim
                             @debug println("      reusing dof #$(reuse_dof + (d-1))")
                             push!(dh.cell_dofs, reuse_dof + (d-1))
                         end
                     else # token <= 0, distribute new dofs
                         for vertexdof in 1:interpolation_info.nvertexdofs
-                            Base._setindex!(vertexdicts[fi], nextdof, vertex, -token) # vertexdicts[fi][vertex] = nextdof
-                            for d in 1:dh.field_dims[fi]
+                            Base._setindex!(vertexdicts[i], nextdof, vertex, -token) # vertexdicts[i][vertex] = nextdof
+                            for d in 1:fi.dim
                                 @debug println("      adding dof#$nextdof")
                                 push!(dh.cell_dofs, nextdof)
                                 nextdof += 1
@@ -156,20 +155,20 @@ function close!(dh::DofHandler{dim}) where {dim}
                     for edge in edges(cell)
                         sedge, dir = sortedge(edge)
                         @debug println("    edge#$sedge dir: $(dir)")
-                        token = ht_keyindex2!(edgedicts[fi], sedge)
-                        if token > 0 # haskey(edgedicts[fi], sedge), reuse dofs
-                            startdof, olddir = edgedicts[fi].vals[token] # edgedicts[fi][sedge] # first dof for this edge (if dir == true)
+                        token = ht_keyindex2!(edgedicts[i], sedge)
+                        if token > 0 # haskey(edgedicts[i], sedge), reuse dofs
+                            startdof, olddir = edgedicts[i].vals[token] # edgedicts[i][sedge] # first dof for this edge (if dir == true)
                             for edgedof in (dir == olddir ? 1:interpolation_info.nedgedofs : interpolation_info.nedgedofs:-1:1)
-                                for d in 1:dh.field_dims[fi]
-                                    reuse_dof = startdof + (d-1) + (edgedof-1)*dh.field_dims[fi]
+                                for d in 1:fi.dim
+                                    reuse_dof = startdof + (d-1) + (edgedof-1)*fi.dim
                                     @debug println("      reusing dof#$(reuse_dof)")
                                     push!(dh.cell_dofs, reuse_dof)
                                 end
                             end
                         else # token <= 0, distribute new dofs
-                            Base._setindex!(edgedicts[fi], (nextdof, dir), sedge, -token) # edgedicts[fi][sedge] = (nextdof, dir),  store only the first dof for the edge
+                            Base._setindex!(edgedicts[i], (nextdof, dir), sedge, -token) # edgedicts[i][sedge] = (nextdof, dir),  store only the first dof for the edge
                             for edgedof in 1:interpolation_info.nedgedofs
-                                for d in 1:dh.field_dims[fi]
+                                for d in 1:fi.dim
                                     @debug println("      adding dof#$nextdof")
                                     push!(dh.cell_dofs, nextdof)
                                     nextdof += 1
@@ -183,20 +182,20 @@ function close!(dh::DofHandler{dim}) where {dim}
                 for face in faces(cell)
                     sface = sortface(face) # TODO: faces(cell) may as well just return the sorted list
                     @debug println("    face#$sface")
-                    token = ht_keyindex2!(facedicts[fi], sface)
-                    if token > 0 # haskey(facedicts[fi], sface), reuse dofs
-                        startdof = facedicts[fi].vals[token] # facedicts[fi][sface]
+                    token = ht_keyindex2!(facedicts[i], sface)
+                    if token > 0 # haskey(facedicts[i], sface), reuse dofs
+                        startdof = facedicts[i].vals[token] # facedicts[i][sface]
                         for facedof in interpolation_info.nfacedofs:-1:1 # always reverse (YOLO)
-                            for d in 1:dh.field_dims[fi]
-                                reuse_dof = startdof + (d-1) + (facedof-1)*dh.field_dims[fi]
+                            for d in 1:fi.dim
+                                reuse_dof = startdof + (d-1) + (facedof-1)*fi.dim
                                 @debug println("      reusing dof#$(reuse_dof)")
                                 push!(dh.cell_dofs, reuse_dof)
                             end
                         end
                     else # distribute new dofs
-                        Base._setindex!(facedicts[fi], nextdof, sface, -token)# facedicts[fi][sface] = nextdof,  store the first dof for this face
+                        Base._setindex!(facedicts[i], nextdof, sface, -token)# facedicts[i][sface] = nextdof,  store the first dof for this face
                         for facedof in 1:interpolation_info.nfacedofs
-                            for d in 1:dh.field_dims[fi]
+                            for d in 1:fi.dim
                                 @debug println("      adding dof#$nextdof")
                                 push!(dh.cell_dofs, nextdof)
                                 nextdof += 1
@@ -208,7 +207,7 @@ function close!(dh::DofHandler{dim}) where {dim}
             if interpolation_info.ncelldofs > 0 # always distribute new dofs for cell
                 @debug println("    cell#$ci")
                 for celldof in 1:interpolation_info.ncelldofs
-                    for d in 1:dh.field_dims[fi]
+                    for d in 1:fi.dim
                         @debug println("      adding dof#$nextdof")
                         push!(dh.cell_dofs, nextdof)
                         nextdof += 1
@@ -266,24 +265,23 @@ WriteVTK.vtk_grid(filename::AbstractString, dh::DofHandler) = vtk_grid(filename,
 
 # Exports the FE field `u` to `vtkfile`
 function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector)
-    for f in 1:nfields(dh)
-        @debug println("exporting field $(dh.field_names[f])")
-        field_dim = dh.field_dims[f]
-        space_dim = field_dim == 2 ? 3 : field_dim
+    for field in dh.fields
+        @debug println("exporting field $(field.name)")
+        space_dim = field.dim == 2 ? 3 : field.dim
         data = fill(0.0, space_dim, getnnodes(dh.grid))
-        offset = field_offset(dh, dh.field_names[f])
+        offset = field_offset(dh, field.name)
         for cell in CellIterator(dh)
             _celldofs = celldofs(cell)
             counter = 1
             for node in getnodes(cell)
-                for d in 1:dh.field_dims[f]
+                for d in 1:field.dim
                     data[d, node] = u[_celldofs[counter + offset]]
                     @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
                     counter += 1
                 end
             end
         end
-        vtk_point_data(vtkfile, data, string(dh.field_names[f]))
+        vtk_point_data(vtkfile, data, string(field.name))
     end
     return vtkfile
 end
