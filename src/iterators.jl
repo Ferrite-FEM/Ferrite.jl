@@ -31,27 +31,30 @@ struct CellIterator{dim,N,T,M}
     coords::Vector{Vec{dim,T}}
     dh::DofHandler{dim,N,T,M}
     celldofs::Vector{Int}
+    cell_view::SubArray#{?,?,Cell{dim,N,T},?,?}
 
-    function CellIterator{dim,N,T,M}(dh::DofHandler{dim,N,T,M}, flags::UpdateFlags) where {dim,N,T,M}
+    function CellIterator{dim,N,T,M}(dh::DofHandler{dim,N,T,M}, cellset::Set{Int}, flags::UpdateFlags) where {dim,N,T,M}
         cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim,T}, N)
         n = ndofs_per_cell(dh)
         celldofs = zeros(Int, n)
-        return new{dim,N,T,M}(flags, dh.grid, cell, nodes, coords, dh, celldofs)
+        cell_view = view(dh.grid.cells, cellset)
+        return new{dim,N,T,M}(flags, dh.grid, cell, nodes, coords, dh, celldofs, cell_view)
     end
 
-    function CellIterator{dim,N,T,M}(grid::Grid{dim,N,T,M}, flags::UpdateFlags) where {dim,N,T,M}
+    function CellIterator{dim,N,T,M}(grid::Grid{dim,N,T,M}, cellset::Set{Int}, flags::UpdateFlags) where {dim,N,T,M}
         cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim,T}, N)
-        return new{dim,N,T,M}(flags, grid, cell, nodes, coords)
+        cell_view = view(grid.cells, cellset)
+        return new{dim,N,T,M}(flags, grid, cell, nodes, coords, cell_view)
     end
 end
 
-CellIterator(grid::Grid{dim,N,T,M},     flags::UpdateFlags=UpdateFlags()) where {dim,N,T,M} =
+CellIterator(grid::Grid{dim,N,T,M},     cellset::Set{Int} = Set(1:ncells(grid)),    flags::UpdateFlags=UpdateFlags()) where {dim,N,T,M} =
     CellIterator{dim,N,T,M}(grid, flags)
-CellIterator(dh::DofHandler{dim,N,T,M}, flags::UpdateFlags=UpdateFlags()) where {dim,N,T,M} =
+CellIterator(dh::DofHandler{dim,N,T,M}, cellset::Set{Int} = Set(1:ncells(dh.grid)), flags::UpdateFlags=UpdateFlags()) where {dim,N,T,M} =
     CellIterator{dim,N,T,M}(dh, flags)
 
 # iterator interface
@@ -74,7 +77,7 @@ Base.eltype(::Type{T})         where {T<:CellIterator} = T
 @inline celldofs(ci::CellIterator) = ci.celldofs
 
 function reinit!(ci::CellIterator{dim,N}, i::Int) where {dim,N}
-    nodeids = ci.grid.cells[i].nodes
+    nodeids = cell_view[i].nodes
     ci.current_cellid[] = i
     @inbounds for j in 1:N
         nodeid = nodeids[j]
