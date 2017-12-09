@@ -55,7 +55,8 @@ end
 function field_offset(dh::DofHandler, field_name::Symbol)
     offset = 0
     for i in 1:find_field(dh, field_name)-1
-        offset += getnbasefunctions(f.interpolation) * dh.fields[i].dim
+        f = dh.fields[i]
+        offset += getnbasefunctions(f.interpolation) * f.dim
     end
     return offset
 end
