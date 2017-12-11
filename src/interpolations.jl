@@ -84,9 +84,13 @@ struct InterpolationInfo
     nedgedofs::Int
     nfacedofs::Int
     ncelldofs::Int
-    InterpolationInfo(interpolation::Interpolation) =
+    #Not really interpolation info, but needed when 
+    #distributing dofs
+    name::Symbol
+    dim::Int
+    InterpolationInfo(interpolation::Interpolation, name::Symbol, dim::Int) =
         new(nvertexdofs(interpolation), nedgedofs(interpolation),
-            nfacedofs(interpolation), ncelldofs(interpolation))
+            nfacedofs(interpolation), ncelldofs(interpolation), name, Int)
 end
 
 # The following functions are used to distribute the dofs. Definitions:

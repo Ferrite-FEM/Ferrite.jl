@@ -113,8 +113,7 @@ function close!(dh::DofHandler{dim}) where {dim}
     # and the interpolation loop inside without using a function barrier
     interpolation_infos = InterpolationInfo[]
     for field in dh.fields
-        # push!(dh.interpolation_info, InterpolationInfo(interpolation))
-        push!(interpolation_infos, InterpolationInfo(field.interpolation))
+        push!(interpolation_infos, InterpolationInfo(field.interpolation, field.name, field.dim))
     end
 
     # not implemented yet: more than one facedof per face in 3D
@@ -126,23 +125,22 @@ function close!(dh::DofHandler{dim}) where {dim}
     # loop over all the cells, and distribute dofs for all the fields
     for (ci, cell) in enumerate(getcells(dh.grid))
         @debug println("cell #$ci")
-        for (i,fi) in enumerate(dh.fields)
-            interpolation_info = interpolation_infos[i]
-            @debug println("  field: $(fi.name)")
-            if interpolation_info.nvertexdofs > 0
+        for (i,i_info) in enumerate(interpolation_infos)
+            @debug println("  field: $(interpolation_info.name)")
+            if i_info.nvertexdofs > 0
                 for vertex in vertices(cell)
                     @debug println("    vertex#$vertex")
                     token = ht_keyindex2!(vertexdicts[i], vertex)
                     if token > 0 # haskey(vertexdicts[i], vertex) # reuse dofs
                         reuse_dof = vertexdicts[i].vals[token] # vertexdicts[i][vertex]
-                        for d in 1:fi.dim
+                        for d in 1:i_info.dim
                             @debug println("      reusing dof #$(reuse_dof + (d-1))")
                             push!(dh.cell_dofs, reuse_dof + (d-1))
                         end
                     else # token <= 0, distribute new dofs
                         for vertexdof in 1:interpolation_info.nvertexdofs
                             Base._setindex!(vertexdicts[i], nextdof, vertex, -token) # vertexdicts[i][vertex] = nextdof
-                            for d in 1:fi.dim
+                            for d in 1:i_info.dim
                                 @debug println("      adding dof#$nextdof")
                                 push!(dh.cell_dofs, nextdof)
                                 nextdof += 1
@@ -160,8 +158,8 @@ function close!(dh::DofHandler{dim}) where {dim}
                         if token > 0 # haskey(edgedicts[i], sedge), reuse dofs
                             startdof, olddir = edgedicts[i].vals[token] # edgedicts[i][sedge] # first dof for this edge (if dir == true)
                             for edgedof in (dir == olddir ? 1:interpolation_info.nedgedofs : interpolation_info.nedgedofs:-1:1)
-                                for d in 1:fi.dim
-                                    reuse_dof = startdof + (d-1) + (edgedof-1)*fi.dim
+                                for d in 1:i_info.dim
+                                    reuse_dof = startdof + (d-1) + (edgedof-1)*i_info.dim
                                     @debug println("      reusing dof#$(reuse_dof)")
                                     push!(dh.cell_dofs, reuse_dof)
                                 end
@@ -169,7 +167,7 @@ function close!(dh::DofHandler{dim}) where {dim}
                         else # token <= 0, distribute new dofs
                             Base._setindex!(edgedicts[i], (nextdof, dir), sedge, -token) # edgedicts[i][sedge] = (nextdof, dir),  store only the first dof for the edge
                             for edgedof in 1:interpolation_info.nedgedofs
-                                for d in 1:fi.dim
+                                for d in 1:i_info.dim
                                     @debug println("      adding dof#$nextdof")
                                     push!(dh.cell_dofs, nextdof)
                                     nextdof += 1
@@ -187,8 +185,8 @@ function close!(dh::DofHandler{dim}) where {dim}
                     if token > 0 # haskey(facedicts[i], sface), reuse dofs
                         startdof = facedicts[i].vals[token] # facedicts[i][sface]
                         for facedof in interpolation_info.nfacedofs:-1:1 # always reverse (YOLO)
-                            for d in 1:fi.dim
-                                reuse_dof = startdof + (d-1) + (facedof-1)*fi.dim
+                            for d in 1:i_info.dim
+                                reuse_dof = startdof + (d-1) + (facedof-1)*i_info.dim
                                 @debug println("      reusing dof#$(reuse_dof)")
                                 push!(dh.cell_dofs, reuse_dof)
                             end
@@ -196,7 +194,7 @@ function close!(dh::DofHandler{dim}) where {dim}
                     else # distribute new dofs
                         Base._setindex!(facedicts[i], nextdof, sface, -token)# facedicts[i][sface] = nextdof,  store the first dof for this face
                         for facedof in 1:interpolation_info.nfacedofs
-                            for d in 1:fi.dim
+                            for d in 1:i_info.dim
                                 @debug println("      adding dof#$nextdof")
                                 push!(dh.cell_dofs, nextdof)
                                 nextdof += 1
@@ -208,7 +206,7 @@ function close!(dh::DofHandler{dim}) where {dim}
             if interpolation_info.ncelldofs > 0 # always distribute new dofs for cell
                 @debug println("    cell#$ci")
                 for celldof in 1:interpolation_info.ncelldofs
-                    for d in 1:fi.dim
+                    for d in 1:i_info.dim
                         @debug println("      adding dof#$nextdof")
                         push!(dh.cell_dofs, nextdof)
                         nextdof += 1
