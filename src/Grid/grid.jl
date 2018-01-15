@@ -120,7 +120,7 @@ function addcellset!(grid::Grid, name::String, cellid::Union{Set{Int}, Vector{In
     grid
 end
 
-function addcellset!(grid::Grid, name::String, f::Function; all = true)
+function addcellset!(grid::Grid, name::String, f::Function; all::Bool = true)
     cells = Set{Int}()
     for (i, cell) in enumerate(getcells(grid))
         pass = all
