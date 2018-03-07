@@ -21,7 +21,7 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,N,T}) where 
     celltype = cell_to_vtkcell(getcelltype(grid))
     cls = MeshCell[]
     for cell in CellIterator(grid)
-        push!(cls, MeshCell(celltype, getnodes(cell)))
+        push!(cls, MeshCell(celltype, copy(getnodes(cell))))
     end
     coords = reinterpret(T, getnodes(grid), (dim, getnnodes(grid)))
     return vtk_grid(filename, coords, cls)
