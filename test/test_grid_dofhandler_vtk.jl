@@ -41,7 +41,7 @@ end
         end
 
         # test the sha of the file
-        sha = bytes2hex(SHA.sha1(gridfilename*".vtu"))
+        sha = bytes2hex(open(SHA.sha1, gridfilename*".vtu"))
         if OVERWRITE_CHECKSUMS
             write(csio, sha, "\n")
         else
@@ -75,7 +75,7 @@ end
         end
 
         # test the sha of the file
-        sha = bytes2hex(SHA.sha1(dofhandlerfilename*".vtu"))
+        sha = bytes2hex(open(SHA.sha1, dofhandlerfilename*".vtu"))
         if OVERWRITE_CHECKSUMS
             write(csio, sha, "\n")
         else
