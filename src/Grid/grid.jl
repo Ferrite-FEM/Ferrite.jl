@@ -120,15 +120,16 @@ function addcellset!(grid::Grid, name::String, cellid::Union{Set{Int},Vector{Int
     grid
 end
 
-function addcellset!(grid::Grid, name::String, f::Function)
+function addcellset!(grid::Grid, name::String, f::Function; all::Bool=true)
     cells = Set{Int}()
     for (i, cell) in enumerate(getcells(grid))
-        all_true = true
+        pass = all
         for node_idx in cell.nodes
             node = grid.nodes[node_idx]
-            !f(node.x) && (all_true = false; break)
+            v = f(node.x)
+            all ? (!v && (pass = false; break)) : (v && break)
         end
-        all_true && push!(cells, i)
+        pass && push!(cells, i)
     end
     grid.cellsets[name] = cells
     _warn_emptyset(grid.cellsets[name])
