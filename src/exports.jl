@@ -51,7 +51,6 @@ export
     QuadraticHexahedron,
     CellIndex,
     FaceIndex,
-    CellFace,
     getcells,
     getncells,
     getnodes,
@@ -94,7 +93,6 @@ export
 
 # iterators
     CellIterator,
-    FaceIterator,
     UpdateFlags,
     cellid,
 
