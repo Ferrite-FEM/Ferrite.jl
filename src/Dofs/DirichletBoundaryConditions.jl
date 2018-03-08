@@ -77,9 +77,9 @@ function Base.show(io::IO, dbcs::DirichletBoundaryConditions)
     if !isclosed(dbcs)
         print(io, "  Not closed!")
     else
-        println(io, "  BCs:")
+        print(io, "  BCs:")
         for dbc in dbcs.dbcs
-            println(io, "    ", "Field: ", dbc.field_name, ", ", "Components: ", dbc.components)
+            print(io, "\n    ", "Field: ", dbc.field_name, ", ", "Components: ", dbc.components)
         end
     end
 end
