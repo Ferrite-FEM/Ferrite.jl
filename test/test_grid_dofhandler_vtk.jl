@@ -31,6 +31,8 @@ end
         radius = 2*1.5
         addcellset!(grid, "cell-1", [1,])
         addcellset!(grid, "middle-cells", x -> norm(x) < radius)
+        addfaceset!(grid, "middle-faceset", x -> norm(x) < radius)
+        addfaceset!(grid, "right-faceset", getfaceset(grid, "right"))
         addnodeset!(grid, "middle-nodes", x -> norm(x) < radius)
 
         gridfilename = "grid-$(JuAFEM.celltypes[celltype])"
@@ -56,7 +58,9 @@ end
         push!(dofhandler, :displacement, 3)
         close!(dofhandler)
         dbcs = DirichletBoundaryConditions(dofhandler)
-        dbc = JuAFEM.DirichletBoundaryCondition(:temperature, union(getfaceset(grid, "left"), getfaceset(grid, "right")), (x,t)->1)
+        dbc = JuAFEM.DirichletBoundaryCondition(:temperature, union(getfaceset(grid, "left"), getfaceset(grid, "right-faceset")), (x,t)->1)
+        add!(dbcs, dbc)
+        dbc = JuAFEM.DirichletBoundaryCondition(:temperature, getfaceset(grid, "middle-faceset"), (x,t)->4)
         add!(dbcs, dbc)
         for d in 1:dim
             dbc = JuAFEM.DirichletBoundaryCondition(:displacement, union(getfaceset(grid, "left")), (x,t) -> d, d)

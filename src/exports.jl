@@ -68,6 +68,7 @@ export
     onboundary,
     nfaces,
     addnodeset!,
+    addfaceset!,
     addcellset!,
     transform!,
     generate_grid,
