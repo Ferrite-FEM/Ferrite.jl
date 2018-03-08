@@ -51,7 +51,6 @@ export
     QuadraticHexahedron,
     CellIndex,
     FaceIndex,
-    CellFace,
     getcells,
     getncells,
     getnodes,
@@ -68,6 +67,7 @@ export
     onboundary,
     nfaces,
     addnodeset!,
+    addfaceset!,
     addcellset!,
     transform!,
     generate_grid,
@@ -93,7 +93,6 @@ export
 
 # iterators
     CellIterator,
-    FaceIterator,
     UpdateFlags,
     cellid,
 
