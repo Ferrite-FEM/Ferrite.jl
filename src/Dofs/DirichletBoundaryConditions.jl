@@ -249,7 +249,10 @@ function apply_zero!(K::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, dbc
     apply!(K, f, dbcs, true)
 end
 
-function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, dbcs::DirichletBoundaryConditions, applyzero::Bool=false)
+@enum(ApplyStrategy, APPLY_TRANSPOSE, APPLY_INPLACE)
+
+function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, dbcs::DirichletBoundaryConditions, applyzero::Bool=false;
+                strategy::ApplyStrategy=APPLY_TRANSPOSE)
     K = isa(KK, Symmetric) ? KK.data : KK
     @assert length(f) == 0 || length(f) == size(K, 1)
     @boundscheck checkbounds(K, dbcs.prescribed_dofs, dbcs.prescribed_dofs)
@@ -267,7 +270,16 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, dbcs::D
         end
     end
     zero_out_columns!(K, dbcs.prescribed_dofs)
-    zero_out_rows!(K, dbcs.prescribed_dofs)
+    if strategy == APPLY_TRANSPOSE
+        KK = copy(K)
+        transpose!(KK, K)
+        zero_out_columns!(KK, dbcs.prescribed_dofs)
+        transpose!(K, KK)
+    elseif strategy == APPLY_INPLACE
+        K[dbcs.prescribed_dofs, :] = 0
+    else
+        error("Unknown apply strategy")
+    end
     @inbounds for i in 1:length(dbcs.values)
         d = dbcs.prescribed_dofs[i]
         v = dbcs.values[i]
@@ -289,32 +301,6 @@ function zero_out_columns!(K, dofs::Vector{Int}) # can be removed in 0.7 with #2
     end
 end
 
-function zero_out_rows!(K, dofs::Vector{Int})
-    @debug assert(issorted(dofs))
-    @inbounds for col in 1:size(K, 2)
-        i = 1
-        for r in nzrange(K, col)
-            row = K.rowval[r]
-            if row == dofs[i]
-                K.nzval[r] = 0.0
-                i += 1
-                i > length(dofs) && break
-            elseif row > dofs[i]
-                while row > dofs[i]
-                    i += 1
-                    i > length(dofs) && break
-                end
-                i > length(dofs) && break
-                if row == dofs[i]
-                    K.nzval[r] = 0.0
-                    i += 1
-                    i > length(dofs) && break
-                end
-            end
-            i > length(dofs) && break
-        end
-    end
-end
 
 function meandiag(K::AbstractMatrix)
     z = zero(eltype(K))
