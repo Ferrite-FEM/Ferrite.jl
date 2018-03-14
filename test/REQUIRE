@@ -8,3 +8,4 @@ TimerOutputs
 UnicodePlots
 KrylovMethods
 ProgressMeter
+BlockArrays
