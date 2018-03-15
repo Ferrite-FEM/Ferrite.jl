@@ -271,10 +271,10 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, dbcs::D
     end
     zero_out_columns!(K, dbcs.prescribed_dofs)
     if strategy == APPLY_TRANSPOSE
-        KK = copy(K)
-        transpose!(KK, K)
-        zero_out_columns!(KK, dbcs.prescribed_dofs)
-        transpose!(K, KK)
+        K′ = copy(K)
+        transpose!(K′, K)
+        zero_out_columns!(K′, dbcs.prescribed_dofs)
+        transpose!(K, K′)
     elseif strategy == APPLY_INPLACE
         K[dbcs.prescribed_dofs, :] = 0
     else
