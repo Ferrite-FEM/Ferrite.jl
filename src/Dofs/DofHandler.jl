@@ -252,8 +252,8 @@ function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
             sym && (dofi > dofj && continue)
             cnt += 1
             if cnt > length(J)
-                resize!(I, trunc(Int, length(J) * 1.5))
-                resize!(J, trunc(Int, length(I) * 1.5))
+                resize!(I, trunc(Int, length(I) * 1.5))
+                resize!(J, trunc(Int, length(J) * 1.5))
             end
             I[cnt] = dofi
             J[cnt] = dofj
@@ -263,8 +263,8 @@ function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
     @inbounds for d in 1:ndofs(dh)
         cnt += 1
         if cnt > length(J)
-            resize!(I, trunc(Int, length(J) + ndofs(dh)))
-            resize!(J, trunc(Int, length(I) + ndofs(dh)))
+            resize!(I, trunc(Int, length(I) + ndofs(dh)))
+            resize!(J, trunc(Int, length(J) + ndofs(dh)))
         end
         I[cnt] = d
         J[cnt] = d
