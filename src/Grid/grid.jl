@@ -214,7 +214,7 @@ Base.next(c::Vector{Cell{dim,N}}, state) where {dim,N} = (CellIndex(state), stat
 Base.done(c::Vector{Cell{dim,N}}, state) where {dim,N} = state > length(c)
 
 function Base.show(io::IO, grid::Grid)
-    println(io, "$(typeof(grid)) with $(getncells(grid)) $(celltypes[eltype(grid.cells)]) cells and $(getnnodes(grid)) nodes")
+    print(io, "$(typeof(grid)) with $(getncells(grid)) $(celltypes[eltype(grid.cells)]) cells and $(getnnodes(grid)) nodes")
 end
 
 const celltypes = Dict{DataType, String}(Cell{1,2,2}  => "Line",
