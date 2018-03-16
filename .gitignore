@@ -6,3 +6,5 @@
 examples/.ipynb_checkpoints/
 docs/build/
 docs/site/
+docs/src/examples/*.md
+*.DS_Store
