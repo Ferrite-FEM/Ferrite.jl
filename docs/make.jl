@@ -1,5 +1,10 @@
 using Documenter, JuAFEM
 
+include("generate.jl")
+EXAMPLEDIR = joinpath(@__DIR__, "src", "examples")
+EXAMPLES = ["heat_equation.jl",]
+GENERATEDEXAMPLES = generate.(joinpath.(EXAMPLEDIR, EXAMPLES))
+
 # Build documentation.
 makedocs(
     format = :html,
@@ -12,7 +17,8 @@ makedocs(
         "man/getting_started.md",
         "Library" => ["lib/maintypes.md",
                       "lib/utility_functions.md"],
-        "man/examples.md"]
+        "Examples" => GENERATEDEXAMPLES
+        ]
         )
 
 # Deploy built documentation from Travis.

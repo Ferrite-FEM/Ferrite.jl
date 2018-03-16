@@ -13,6 +13,7 @@ include("test_assemble.jl")
 include("test_grid_dofhandler_vtk.jl")
 if VERSION.minor == 6
     include("test_notebooks.jl")
+    include("test_examples.jl")
 end
 
 # Build the docs
