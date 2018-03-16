@@ -1,5 +1,6 @@
 # Run the notebook tests in separate modules
 
+ENV["JUAFEM_TESTING"] = true
 
 module TestStiffness
     using NBInclude
@@ -28,8 +29,7 @@ end
 
 module Cook
     using NBInclude
-    # Requires BlockArrays, only available on 0.6
-    # nbinclude("../examples/cooks_membrane_mixed_up.ipynb")
+    nbinclude("../examples/cooks_membrane_mixed_up.ipynb")
 end
 
 
