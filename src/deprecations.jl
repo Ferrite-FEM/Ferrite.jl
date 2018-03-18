@@ -1,1 +1,2 @@
 Base.@deprecate_binding DirichletBoundaryConditions ConstraintHandler
+Base.@deprecate_binding DirichletBoundaryCondition Dirichlet

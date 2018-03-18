@@ -84,7 +84,7 @@ export
 
 # Constraints
     ConstraintHandler,
-    DirichletBoundaryCondition,
+    Dirichlet,
     update!,
     apply!,
     apply_zero!,

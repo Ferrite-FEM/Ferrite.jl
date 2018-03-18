@@ -1,7 +1,7 @@
 # abstract type Constraint end
 """
-    DirichletBoundaryCondition(u, ∂Ω, f)
-    DirichletBoundaryCondition(u, ∂Ω, f, component)
+    Dirichlet(u, ∂Ω, f)
+    Dirichlet(u, ∂Ω, f, component)
 
 Create a Dirichlet boundary condition on `u` on the `∂Ω` part of
 the boundary. `f` is a function that takes two arguments, `x` and `t`
@@ -11,20 +11,22 @@ Dirichlet condition for the `:u` field, on the faceset called
 `∂Ω` and the value given by the `sin` function:
 
 ```julia
-dbc = DirichletBoundaryCondition(:u, ∂Ω, (x, t) -> sin(t))
+dbc = Dirichlet(:u, ∂Ω, (x, t) -> sin(t))
 ```
 
 If `:u` is a vector field we can specify which component the condition
-should be applied to by specifying `component`, for example the first one:
+should be applied to by specifying `component`. `component` can be given
+either as an integer, or as a vector, for example:
 
 ```julia
-dbc = DirichletBoundaryCondition(:u, ∂Ω, (x, t) -> sin(t), 1)
+dbc = Dirichlet(:u, ∂Ω, (x, t) -> sin(t), 1)      # applied to component 1
+dbc = Dirichlet(:u, ∂Ω, (x, t) -> sin(t), [1, 3]) # applied to component 1 and 3
 ```
 
-`DirichletBoundaryCondition`s are added to the [`ConstraintHandler`](@ref)
+`Dirichlet` boundary conditions are added to a [`ConstraintHandler`](@ref)
 which applies the condition via `apply!`.
 """
-struct DirichletBoundaryCondition # <: Constraint
+struct Dirichlet # <: Constraint
     f::Function # f(x,t) -> value
     faces::Set{Tuple{Int,Int}}
     field_name::Symbol
@@ -32,13 +34,13 @@ struct DirichletBoundaryCondition # <: Constraint
     local_face_dofs::Vector{Int}
     local_face_dofs_offset::Vector{Int}
 end
-function DirichletBoundaryCondition(field_name::Symbol, faces::Set{Tuple{Int,Int}}, f::Function, component::Int=1)
-    DirichletBoundaryCondition(field_name, faces, f, [component])
+function Dirichlet(field_name::Symbol, faces::Set{Tuple{Int,Int}}, f::Function, component::Int=1)
+    Dirichlet(field_name, faces, f, [component])
 end
-function DirichletBoundaryCondition(field_name::Symbol, faces::Set{Tuple{Int,Int}}, f::Function, components::Vector{Int})
+function Dirichlet(field_name::Symbol, faces::Set{Tuple{Int,Int}}, f::Function, components::Vector{Int})
     unique(components) == components || error("components not unique: $components")
     # issorted(components) || error("components not sorted: $components")
-    return DirichletBoundaryCondition(f, faces, field_name, components, Int[], Int[])
+    return Dirichlet(f, faces, field_name, components, Int[], Int[])
 end
 
 """
@@ -47,7 +49,7 @@ end
 Collection of constraints.
 """
 struct ConstraintHandler{DH<:DofHandler,T}
-    dbcs::Vector{DirichletBoundaryCondition}
+    dbcs::Vector{Dirichlet}
     prescribed_dofs::Vector{Int}
     free_dofs::Vector{Int}
     values::Vector{T}
@@ -58,7 +60,7 @@ end
 
 function ConstraintHandler(dh::DofHandler)
     @assert isclosed(dh)
-    ConstraintHandler(DirichletBoundaryCondition[], Int[], Int[], Float64[], Dict{Int,Int}(), dh, ScalarWrapper(false))
+    ConstraintHandler(Dirichlet[], Int[], Int[], Float64[], Dict{Int,Int}(), dh, ScalarWrapper(false))
 end
 
 function Base.show(io::IO, ch::ConstraintHandler)
@@ -90,7 +92,7 @@ function close!(ch::ConstraintHandler)
     return ch
 end
 
-function dbc_check(ch::ConstraintHandler, dbc::DirichletBoundaryCondition)
+function dbc_check(ch::ConstraintHandler, dbc::Dirichlet)
     # check input
     dbc.field_name in ch.dh.field_names || throw(ArgumentError("field $field does not exist in DofHandler, existing fields are $(dh.field_names)"))
     for component in dbc.components
@@ -102,7 +104,7 @@ function dbc_check(ch::ConstraintHandler, dbc::DirichletBoundaryCondition)
 end
 
 # Adds a boundary condition to the ConstraintHandler
-function add!(ch::ConstraintHandler, dbc::DirichletBoundaryCondition)
+function add!(ch::ConstraintHandler, dbc::Dirichlet)
     dbc_check(ch, dbc)
     field_idx = find_field(ch.dh, dbc.field_name)
     # Extract stuff for the field
@@ -112,7 +114,7 @@ function add!(ch::ConstraintHandler, dbc::DirichletBoundaryCondition)
     return ch
 end
 
-function _add!(ch::ConstraintHandler, dbc::DirichletBoundaryCondition, interpolation::Interpolation, field_dim::Int, offset::Int)
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, interpolation::Interpolation, field_dim::Int, offset::Int)
     # calculate which local dof index live on each face
     # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
     local_face_dofs = Int[]
