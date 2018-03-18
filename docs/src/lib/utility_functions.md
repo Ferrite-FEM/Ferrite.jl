@@ -58,9 +58,8 @@ getcurrentface
 ## Assembling
 
 ```@docs
-start_assemble
+Assembler
 assemble!
-end_assemble
 ```
 
 

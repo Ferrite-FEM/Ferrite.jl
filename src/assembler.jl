@@ -1,79 +1,12 @@
-struct Assembler{T}
-    I::Vector{Int}
-    J::Vector{Int}
-    V::Vector{T}
-end
+abstract type Assembler end
 
-function Assembler(N)
-    I = Int[]
-    J = Int[]
-    V = Float64[]
-    sizehint!(I, N)
-    sizehint!(J, N)
-    sizehint!(V, N)
-
-    Assembler(I, J, V)
-end
-
-"""
-    start_assemble([N=0]) -> Assembler
-
-Call before starting an assembly.
-
-Returns an `Assembler` type that is used to hold the intermediate
-data before an assembly is finished.
-"""
-function start_assemble(N::Int=0)
-    return Assembler(N)
-end
-
-"""
-    assemble!(a, Ke, edof)
-
-Assembles the element matrix `Ke` into `a`.
-"""
-function assemble!(a::Assembler{T}, edof::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
-    n_dofs = length(edof)
-    append!(a.V, Ke)
-    @inbounds for j in 1:n_dofs
-        append!(a.I, edof)
-        for i in 1:n_dofs
-            push!(a.J, edof[j])
-        end
-    end
-end
-
-"""
-    end_assemble(a::Assembler) -> K
-
-Finalizes an assembly. Returns a sparse matrix with the
-assembled values.
-"""
-function end_assemble(a::Assembler)
-    return sparse(a.I, a.J, a.V)
-end
-
-"""
-    assemble!(g, ge, edof)
-
-Assembles the element residual `ge` into the global residual vector `g`.
-"""
-@propagate_inbounds function assemble!(g::AbstractVector{T}, edof::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
-    @boundscheck checkbounds(g, edof)
-    @inbounds for i in 1:length(edof)
-        g[edof[i]] += ge[i]
-    end
-end
-
-abstract type AbstractSparseAssembler end
-
-struct AssemblerSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
+struct AssemblerSparsityPattern{Tv,Ti} <: Assembler
     K::SparseMatrixCSC{Tv,Ti}
     f::Vector{Tv}
     permutation::Vector{Int}
     sorteddofs::Vector{Int}
 end
-struct AssemblerSymmetricSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
+struct AssemblerSymmetricSparsityPattern{Tv,Ti} <: Assembler
     K::Symmetric{Tv,SparseMatrixCSC{Tv,Ti}}
     f::Vector{Tv}
     permutation::Vector{Int}
@@ -83,22 +16,32 @@ end
 @inline getsparsemat(a::AssemblerSparsityPattern) = a.K
 @inline getsparsemat(a::AssemblerSymmetricSparsityPattern) = a.K.data
 
-start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}) = start_assemble(K, f)
-function start_assemble(K::SparseMatrixCSC, f::Vector=Float64[])
+"""
+    Assembler(K::SparseMatrixCSC, f=[]) -> AssemblerSparsityPattern
+    Assembler(K::::Symmetric{SparseMatrixCSC}, f=[]) -> AssemblerSymmetricSparsityPattern
+
+Create an appropriate `Assembler`. Return an `AssemblerSparsityPattern`
+object that caches some values needed when assembling into the global
+stiffness matrix and residual vector.
+"""
+Assembler
+
+Assembler(f::Vector, K::Union{SparseMatrixCSC, Symmetric}) = Assembler(K, f)
+function Assembler(K::SparseMatrixCSC, f::Vector=Float64[])
     fill!(K.nzval, 0.0)
     fill!(f, 0.0)
     AssemblerSparsityPattern(K, f, Int[], Int[])
 end
-function start_assemble(K::Symmetric, f::Vector=Float64[])
+function Assembler(K::Symmetric, f::Vector=Float64[])
     fill!(K.data.nzval, 0.0)
     fill!(f, 0.0)
     AssemblerSymmetricSparsityPattern(K, f, Int[], Int[])
 end
 
-@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
+@propagate_inbounds function assemble!(A::Assembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
     assemble!(A, dofs, Ke, eltype(Ke)[])
 end
-@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, fe::AbstractVector, Ke::AbstractMatrix)
+@propagate_inbounds function assemble!(A::Assembler, dofs::AbstractVector{Int}, fe::AbstractVector, Ke::AbstractMatrix)
     assemble!(A, dofs, Ke, fe)
 end
 @propagate_inbounds function assemble!(A::AssemblerSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
@@ -108,7 +51,7 @@ end
     _assemble!(A, dofs, Ke, fe, true)
 end
 
-@propagate_inbounds function _assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
+@propagate_inbounds function _assemble!(A::Assembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
     if length(fe) != 0
         assemble!(A.f, dofs, fe)
     end
