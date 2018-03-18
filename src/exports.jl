@@ -99,7 +99,6 @@ export
 # assembly
     start_assemble,
     assemble!,
-    end_assemble,
 
 # VTK export
     vtk_grid,
