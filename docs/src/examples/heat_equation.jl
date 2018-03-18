@@ -139,7 +139,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
     # is just a thin wrapper around `f` and `K` and some extra storage
     # to make the assembling faster.
     f = zeros(ndofs(dh))
-    assembler = start_assemble(K, f)
+    assembler = Assembler(K, f)
 
     # It is now time to loop over all the cells in our grid. We do this by iterating
     # over a `CellIterator`. The iterator caches some useful things for us, for example

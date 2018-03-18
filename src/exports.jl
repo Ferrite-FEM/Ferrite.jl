@@ -97,7 +97,7 @@ export
     cellid,
 
 # assembly
-    start_assemble,
+    Assembler,
     assemble!,
 
 # VTK export
