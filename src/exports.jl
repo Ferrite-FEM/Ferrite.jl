@@ -82,8 +82,8 @@ export
     create_sparsity_pattern,
     create_symmetric_sparsity_pattern,
 
-# BoundaryConditions
-    DirichletBoundaryConditions,
+# Constraints
+    ConstraintHandler,
     DirichletBoundaryCondition,
     update!,
     apply!,

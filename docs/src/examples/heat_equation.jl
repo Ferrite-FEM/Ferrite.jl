@@ -99,10 +99,10 @@ K = create_sparsity_pattern(dh)
 # ```
 
 # ### Boundary conditions
-# In JuAFEM boundary Dirichlet boundary conditions are handled by
-# `DirichletBoundaryConditions`.
-dbcs = DirichletBoundaryConditions(dh)
-# Next we need to add contraints to `dbcs`. For this problem we define
+# In JuAFEM constraints like Dirichlet boundary conditions
+# are handled by a `ConstraintHandler`.
+ch = ConstraintHandler(dh)
+# Next we need to add constraints to `ch`. For this problem we define
 # homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
 # the `union` of all the face sets on the boundary.
 ∂Ω = union(getfaceset.(grid, ["left", "right", "top", "bottom"])...)
@@ -111,15 +111,15 @@ dbcs = DirichletBoundaryConditions(dh)
 # argument is a function which takes the spatial coordinate $x$ and
 # the current time $t$ and returns the prescribed value. In this case
 # it is trivial -- no matter what $x$ and $t$ we return $0$. When we have
-# specified our contraint we `add!` it to `dbcs`.
+# specified our contraint we `add!` it to `ch`.
 dbc = DirichletBoundaryCondition(:u, ∂Ω, (x, t) -> 0)
-add!(dbcs, dbc)
+add!(ch, dbc)
 # We also need to `close!` and `update!` our boundary conditions. When we call `close!`
 # the dofs which will be constrained by the boundary conditions are calculated and stored
-# in our `dbcs` object. Since the boundary conditions are, in this case,
+# in our `ch` object. Since the boundary conditions are, in this case,
 # independent of time we can `update!` them directly with e.g. $t = 0$.
-close!(dbcs)
-update!(dbcs, 0.0)
+close!(ch)
+update!(ch, 0.0)
 
 # ### Assembling the linear system
 # Now we have all the pieces needed to assemble the linear system, $K u = f$.
@@ -186,7 +186,7 @@ K, f = doassemble(cellvalues, K, dh)
 # To account for the boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f` respectively, such that
 # we can get the correct solution vector `u` by using `\`.
-apply!(K, f, dbcs)
+apply!(K, f, ch)
 u = K \ f
 
 # ### Exporting to VTK
