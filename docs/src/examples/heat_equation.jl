@@ -112,7 +112,7 @@ ch = ConstraintHandler(dh)
 # the current time $t$ and returns the prescribed value. In this case
 # it is trivial -- no matter what $x$ and $t$ we return $0$. When we have
 # specified our contraint we `add!` it to `ch`.
-dbc = DirichletBoundaryCondition(:u, ∂Ω, (x, t) -> 0)
+dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
 add!(ch, dbc)
 # We also need to `close!` and `update!` our boundary conditions. When we call `close!`
 # the dofs which will be constrained by the boundary conditions are calculated and stored

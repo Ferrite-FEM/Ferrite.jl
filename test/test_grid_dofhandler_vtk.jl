@@ -58,12 +58,12 @@ end
         push!(dofhandler, :displacement, 3)
         close!(dofhandler)
         ch = ConstraintHandler(dofhandler)
-        dbc = DirichletBoundaryCondition(:temperature, union(getfaceset(grid, "left"), getfaceset(grid, "right-faceset")), (x,t)->1)
+        dbc = Dirichlet(:temperature, union(getfaceset(grid, "left"), getfaceset(grid, "right-faceset")), (x,t)->1)
         add!(ch, dbc)
-        dbc = DirichletBoundaryCondition(:temperature, getfaceset(grid, "middle-faceset"), (x,t)->4)
+        dbc = Dirichlet(:temperature, getfaceset(grid, "middle-faceset"), (x,t)->4)
         add!(ch, dbc)
         for d in 1:dim
-            dbc = DirichletBoundaryCondition(:displacement, union(getfaceset(grid, "left")), (x,t) -> d, d)
+            dbc = Dirichlet(:displacement, union(getfaceset(grid, "left")), (x,t) -> d, d)
             add!(ch, dbc)
         end
         close!(ch)
