@@ -4,32 +4,56 @@ ENV["JUAFEM_TESTING"] = true
 
 module TestStiffness
     using NBInclude
-    nbinclude("../examples/stiffness_example.ipynb")
+    mktempdir() do dir
+        cd(dir) do
+            nbinclude("../examples/stiffness_example.ipynb")
+        end
+    end
 end
 
 module Cantilever
     using NBInclude
-    nbinclude("../examples/cantilever.ipynb")
+    mktempdir() do dir
+        cd(dir) do
+            nbinclude("../examples/cantilever.ipynb")
+        end
+    end
 end
 
 module HyperElasticity
     using NBInclude
-    nbinclude("../examples/hyperelasticity.ipynb")
+    mktempdir() do dir
+        cd(dir) do
+            nbinclude("../examples/hyperelasticity.ipynb")
+        end
+    end
 end
 
 module HeatSquare
     using NBInclude
-    nbinclude("../examples/heat_square.ipynb")
+    mktempdir() do dir
+        cd(dir) do
+            nbinclude("../examples/heat_square.ipynb")
+        end
+    end
 end
 
 module Helmholtz
     using NBInclude
-    nbinclude("../examples/helmholtz.ipynb")
+    mktempdir() do dir
+        cd(dir) do
+            nbinclude("../examples/helmholtz.ipynb")
+        end
+    end
 end
 
 module Cook
     using NBInclude
-    nbinclude("../examples/cooks_membrane_mixed_up.ipynb")
+    mktempdir() do dir
+        cd(dir) do
+            nbinclude("../examples/cooks_membrane_mixed_up.ipynb")
+        end
+    end
 end
 
 
