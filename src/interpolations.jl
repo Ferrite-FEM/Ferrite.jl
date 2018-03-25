@@ -65,7 +65,7 @@ end
 #####################
 
 """
-Return the number of base functions for an [`Interpolation`](@ref) or `Values` object.
+Return the number of base functions for an [`Interpolation`](@ref) or `FEValues` object.
 """
 getnbasefunctions
 

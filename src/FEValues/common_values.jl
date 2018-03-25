@@ -1,10 +1,10 @@
-# Common methods for all `Values` objects
+# Common methods for all `FEValues` objects
 
 const ScalarValues{dim,T,shape} = Union{CellScalarValues{dim,T,shape},FaceScalarValues{dim,T,shape}}
 const VectorValues{dim,T,shape} = Union{CellVectorValues{dim,T,shape},FaceVectorValues{dim,T,shape}}
 
-getnbasefunctions(cv::Values) = size(cv.N, 1)
-getngeobasefunctions(cv::Values) = size(cv.M, 1)
+getnbasefunctions(cv::FEValues) = size(cv.N, 1)
+getngeobasefunctions(cv::FEValues) = size(cv.M, 1)
 
 getn_scalarbasefunctions(cv::ScalarValues) = size(cv.N, 1)
 getn_scalarbasefunctions(cv::VectorValues{dim}) where {dim} = size(cv.N, 1) ÷ dim
@@ -19,14 +19,14 @@ The derivatives of the shape functions, and the new integration weights are comp
 reinit!
 
 """
-    getnquadpoints(fe_v::Values)
+    getnquadpoints(fe_v::FEValues)
 
 Return the number of quadrature points for the `Values` object.
 """
-getnquadpoints(fe::Values) = length(fe.qr_weights)
+getnquadpoints(fe::FEValues) = length(fe.qr_weights)
 
 """
-    getdetJdV(fe_v::Values, q_point::Int)
+    getdetJdV(fe_v::FEValues, q_point::Int)
 
 Return the product between the determinant of the Jacobian and the quadrature
 point weight for the given quadrature point: ``\\det(J(\\mathbf{x})) w_q``
@@ -42,7 +42,7 @@ finite element cell or face as
 @inline getdetJdV(bv::FaceValues, q_point::Int) = bv.detJdV[q_point, bv.current_face[]]
 
 """
-    shape_value(fe_v::Values, q_point::Int, base_function::Int)
+    shape_value(fe_v::FEValues, q_point::Int, base_function::Int)
 
 Return the value of shape function `base_function` evaluated in
 quadrature point `q_point`.
@@ -54,7 +54,7 @@ quadrature point `q_point`.
 @inline geometric_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_face[]]
 
 """
-    shape_gradient(fe_v::Values, q_point::Int, base_function::Int)
+    shape_gradient(fe_v::FEValues, q_point::Int, base_function::Int)
 
 Return the gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
@@ -63,7 +63,7 @@ quadrature point `q_point`.
 @inline shape_gradient(bv::FaceValues, q_point::Int, base_func::Int) = bv.dNdx[base_func, q_point, bv.current_face[]]
 
 """
-    shape_symmetric_gradient(fe_v::Values, q_point::Int, base_function::Int)
+    shape_symmetric_gradient(fe_v::FEValues, q_point::Int, base_function::Int)
 
 Return the symmetric gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
@@ -72,7 +72,7 @@ quadrature point `q_point`.
 const shape_derivative = shape_gradient
 
 """
-    shape_divergence(fe_v::Values, q_point::Int, base_function::Int)
+    shape_divergence(fe_v::FEValues, q_point::Int, base_function::Int)
 
 Return the divergence of shape function `base_function` evaluated in
 quadrature point `q_point`.
@@ -84,7 +84,7 @@ quadrature point `q_point`.
 
 
 """
-    function_value(fe_v::Values, q_point::Int, u::AbstractVector)
+    function_value(fe_v::FEValues, q_point::Int, u::AbstractVector)
 
 Compute the value of the function in a quadrature point. `u` is a vector with values
 for the degrees of freedom. For a scalar valued function, `u` contains scalars.
@@ -96,7 +96,7 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
 nodal values of ``\\mathbf{u}``.
 """
-function function_value(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
+function function_value(fe_v::FEValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     isa(fe_v, VectorValues) && (n_base_funcs *= dim)
     @assert length(dof_range) == n_base_funcs
@@ -128,7 +128,7 @@ Base.@pure _valuetype(::VectorValues{dim}, ::AbstractVector{T}) where {dim,T} = 
 # Base.@pure _valuetype(::VectorValues{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Vec{dim,T}
 
 """
-    function_scalar_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector)
+    function_scalar_gradient(fe_v::FEValues{dim}, q_point::Int, u::AbstractVector)
 
 Compute the gradient of the function in a quadrature point. `u` is a vector with values
 for the degrees of freedom. For a scalar valued function, `u` contains scalars.
@@ -142,7 +142,7 @@ For a vector valued function the gradient is computed as
 ``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x}) \\otimes \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
-function function_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
+function function_gradient(fe_v::FEValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     isa(fe_v, VectorValues) && (n_base_funcs *= dim)
     @assert length(dof_range) == n_base_funcs
@@ -185,7 +185,7 @@ end
 const function_derivative = function_gradient
 
 """
-    function_symmetric_gradient(fe_v::Values, q_point::Int, u::AbstractVector)
+    function_symmetric_gradient(fe_v::FEValues, q_point::Int, u::AbstractVector)
 
 Compute the symmetric gradient of the function, see [`function_gradient`](@ref).
 Return a `SymmetricTensor`.
@@ -194,18 +194,18 @@ The symmetric gradient of a scalar function is computed as
 ``\\left[ \\mathbf{\\nabla}  \\mathbf{u}(\\mathbf{x_q}) \\right]^\\text{sym} =  \\sum\\limits_{i = 1}^n  \\frac{1}{2} \\left[ \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\otimes \\mathbf{u}_i + \\mathbf{u}_i  \\otimes  \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\right]``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function function_symmetric_gradient(fe_v::Values, q_point::Int, u::AbstractVector, dof_range::UnitRange = 1:length(u))
+function function_symmetric_gradient(fe_v::FEValues, q_point::Int, u::AbstractVector, dof_range::UnitRange = 1:length(u))
     grad = function_gradient(fe_v, q_point, u, dof_range)
     return symmetric(grad)
 end
 
-function function_symmetric_gradient(fe_v::Values, q_point::Int, u::AbstractVector{Vec{dim, T}}) where {dim, T}
+function function_symmetric_gradient(fe_v::FEValues, q_point::Int, u::AbstractVector{Vec{dim, T}}) where {dim, T}
     grad = function_gradient(fe_v, q_point, u)
     return symmetric(grad)
 end
 
 """
-    function_divergence(fe_v::Values, q_point::Int, u::AbstractVector)
+    function_divergence(fe_v::FEValues, q_point::Int, u::AbstractVector)
 
 Compute the divergence of the vector valued function in a quadrature point.
 
@@ -256,7 +256,7 @@ end
 
 
 """
-    spatial_coordinate(fe_v::Values{dim}, q_point::Int, x::AbstractVector)
+    spatial_coordinate(fe_v::FEValues{dim}, q_point::Int, x::AbstractVector)
 
 Compute the spatial coordinate in a quadrature point. `x` contains the nodal
 coordinates of the cell.
@@ -264,7 +264,7 @@ coordinates of the cell.
 The coordinate is computed, using the geometric interpolation, as
 ``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{x}) \\mathbf{\\hat{x}}_i``
 """
-function spatial_coordinate(fe_v::Values{dim}, q_point::Int, x::AbstractVector{Vec{dim,T}}) where {dim,T}
+function spatial_coordinate(fe_v::FEValues{dim}, q_point::Int, x::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getngeobasefunctions(fe_v)
     @assert length(x) == n_base_funcs
     vec = zero(Vec{dim,T})
@@ -274,7 +274,7 @@ function spatial_coordinate(fe_v::Values{dim}, q_point::Int, x::AbstractVector{V
     return vec
 end
 
-function Base.show(io::IO, fe_v::Values)
+function Base.show(io::IO, fe_v::FEValues)
     println(io, "$(typeof(fe_v)) with $(getnbasefunctions(fe_v)) shape functions and $(getnquadpoints(fe_v)) quadrature points")
 end
 
