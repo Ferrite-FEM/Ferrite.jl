@@ -159,7 +159,7 @@ function close!(dh::DofHandler{dim}) where {dim}
                         token = ht_keyindex2!(edgedicts[fi], sedge)
                         if token > 0 # haskey(edgedicts[fi], sedge), reuse dofs
                             startdof, olddir = edgedicts[fi].vals[token] # edgedicts[fi][sedge] # first dof for this edge (if dir == true)
-                            for edgedof in (dir == olddir ? 1:interpolation_info.nedgedofs : interpolation_info.nedgedofs:-1:1)
+                            for edgedof in (dir == olddir ? (1:interpolation_info.nedgedofs) : (interpolation_info.nedgedofs:-1:1))
                                 for d in 1:dh.field_dims[fi]
                                     reuse_dof = startdof + (d-1) + (edgedof-1)*dh.field_dims[fi]
                                     @debug println("      reusing dof#$(reuse_dof)")
