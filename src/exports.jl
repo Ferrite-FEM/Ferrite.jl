@@ -81,6 +81,7 @@ export
     celldofs,
     create_sparsity_pattern,
     create_symmetric_sparsity_pattern,
+    dof_range,
 
 # Constraints
     ConstraintHandler,
