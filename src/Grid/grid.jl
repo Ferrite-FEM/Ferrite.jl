@@ -154,7 +154,7 @@ function addfaceset!(grid::Grid, name::String, f::Function; all::Bool=true)
             pass = all
             for node_idx in face
                 v = f(grid.nodes[node_idx].x)
-                all ? (!v && (pass = false; break)) : (v && break)
+                all ? (!v && (pass = false; break)) : (v && (pass = true; break))
             end
             pass && push!(faceset, (cell_idx, face_idx))
         end
