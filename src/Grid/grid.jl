@@ -129,7 +129,7 @@ function addcellset!(grid::Grid, name::String, f::Function; all::Bool=true)
         for node_idx in cell.nodes
             node = grid.nodes[node_idx]
             v = f(node.x)
-            all ? (!v && (pass = false; break)) : (v && break)
+            all ? (!v && (pass = false; break)) : (v && (pass = true; break))
         end
         pass && push!(cells, i)
     end
