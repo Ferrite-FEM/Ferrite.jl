@@ -10,6 +10,7 @@ UpdateFlags(; nodes::Bool=true, coords::Bool=true, celldofs::Bool=true) =
 
 """
     CellIterator(grid::Grid)
+    CellIterator(grid::DofHandler)
 
 Return a `CellIterator` to conveniently loop over all the cells in a grid.
 
@@ -17,8 +18,7 @@ Return a `CellIterator` to conveniently loop over all the cells in a grid.
 ```julia
 for cell in CellIterator(grid)
     coords = getcoordinates(cell) # get the coordinates
-    nodes = getnodes(cell)        # get the node numbers
-
+    dofs = celldofs(cell)         # get the dofs for this cell
     reinit!(cv, cell)             # reinit! the FE-base with a CellIterator
 end
 ```

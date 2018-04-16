@@ -79,6 +79,11 @@ isclosed(ch::ConstraintHandler) = ch.closed[]
 free_dofs(ch::ConstraintHandler) = ch.free_dofs
 prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
+"""
+    close!(ch::ConstraintHandler)
+
+Close and finalize the `ConstraintHandler`.
+"""
 function close!(ch::ConstraintHandler)
     fdofs = setdiff(1:ndofs(ch.dh), ch.prescribed_dofs)
     copy!!(ch.free_dofs, fdofs)
@@ -103,7 +108,11 @@ function dbc_check(ch::ConstraintHandler, dbc::Dirichlet)
     end
 end
 
-# Adds a boundary condition to the ConstraintHandler
+"""
+    add!(ch::ConstraintHandler, dbc::Dirichlet)
+
+Add a `Dirichlet boundary` condition to the `ConstraintHandler`.
+"""
 function add!(ch::ConstraintHandler, dbc::Dirichlet)
     dbc_check(ch, dbc)
     field_idx = find_field(ch.dh, dbc.field_name)
