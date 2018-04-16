@@ -1,15 +1,12 @@
 ```@meta
-DocTestSetup = quote
-    using JuAFEM
-end
+DocTestSetup = :(using JuAFEM)
 ```
 
 # JuAFEM.jl
-
 *A simple finite element toolbox written in Julia.*
 
 ## Introduction
-JuAFEM is a finite element toolbox that provides functionalities to implement finite element analysis in [Julia](https://github.com/JuliaLang/julia). The aim is to be general and to keep mathematical abstractions.
+`JuAFEM` is a finite element toolbox that provides functionalities to implement finite element analysis in [Julia](https://github.com/JuliaLang/julia). The aim is to be general and to keep mathematical abstractions.
 The main functionalities of the package include:
 
 * Facilitate integration using different quadrature rules.
@@ -19,33 +16,23 @@ The main functionalities of the package include:
 * Generate simple grids.
 * Export grids and solutions to VTK.
 
-The types and functionalities of JuAFEM is described in more detail in the manual, see below.
+The best way to get started with `JuAFEM` is to look at the documented examples.
 
 
-## Feature plans
-JuAFEM is still under heavy development. If you find a bug, or have ideas on how to improve the package, feel free to open an issue or to make a pull request on the [JuAFEM GitHub page](https://github.com/KristofferC/JuAFEM.jl).
+!!! note
 
-The following functionalities are currently in development and will be included in `JuAFEM`:
-
-* Import grids from common file formats.
-* Facilitate degree of freedom numbering and keeping track of different fields.
+    `JuAFEM` is still under development. If you find a bug, or have
+    ideas for improvements, feel free to open an issue or make a
+    pull request on the [`JuAFEM` GitHub page](https://github.com/KristofferC/JuAFEM.jl).
 
 ## Installation
 
 To install, simply run the following in the Julia REPL:
-
-    Pkg.clone("https://github.com/KristofferC/JuAFEM.jl")
-
-and then run
-
-    using JuAFEM
-
-to load the package.
-
-
-## API
-
-```@contents
-Pages = ["lib/maintypes.md", "lib/utility_functions.md"]
-Depth = 2
+```julia
+Pkg.clone("https://github.com/KristofferC/JuAFEM.jl")
 ```
+and then run
+```julia
+using JuAFEM
+```
+to load the package.
