@@ -1,9 +1,11 @@
+Pkg.checkout("Documenter")
+
 using Documenter, JuAFEM
 
+# Generate examples
 include("generate.jl")
-EXAMPLEDIR = joinpath(@__DIR__, "src", "examples")
-EXAMPLES = ["heat_equation.jl",]
-GENERATEDEXAMPLES = generate.(joinpath.(EXAMPLEDIR, EXAMPLES))
+
+GENERATEDEXAMPLES = [joinpath("examples", "generated", f) for f in readdir(GENERATEDDIR) if endswith(f, ".md")]
 
 # Build documentation.
 makedocs(
