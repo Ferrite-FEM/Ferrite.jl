@@ -12,6 +12,10 @@ matrix:
   allow_failures:
     - julia: nightly
 
+branches:
+  only:
+    - master
+
 notifications:
   email: false
 
