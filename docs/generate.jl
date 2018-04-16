@@ -16,3 +16,8 @@ for example in readdir(EXAMPLEDIR)
     Examples.markdown(input, GENERATEDDIR,#= preprocess = rmindent,=# postprocess = mdpost)
     Examples.notebook(input, GENERATEDDIR, execute = true)
 end
+
+# copy some figures to the build directory
+cp(joinpath(@__DIR__, "../examples/figures/heat_square.png"),
+   joinpath(@__DIR__, "src/examples/generated/heat_equation.png");
+   remove_destination = true)

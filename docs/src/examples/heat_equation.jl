@@ -1,10 +1,10 @@
-#' # Heat equation
+#' # Heat Equation
 #'
-#' ![](../../../../examples/figures/heat_square.png)
+#' ![](heat_square.png)
 #-
 #md #' !!! tip
 #md #'     This example is also available as a Jupyter notebook:
-#md #'     [`heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__generated/heat_equation.ipynb)
+#md #'     [`heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__examples/generated/heat_equation.ipynb)
 #-
 #' ## Introduction
 #'
@@ -28,7 +28,7 @@
 #' ```
 #' where $v$ is a suitable test function.
 #-
-#' ## Commented program
+#' ## Commented Program
 #'
 #' Now we solve the problem in JuAFEM. What follows is a program spliced with comments.
 #md #' The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
@@ -182,7 +182,7 @@ end
 #md rm("heat_equation.vtu") # hide
 #md nothing # hide
 
-#md #' ## [Plain program](@id heat_equation-plain-program)
+#md #' ## [Plain Program](@id heat_equation-plain-program)
 #md #'
 #md #' Below follows a version of the program without any comments.
 #md #' The file is also available here: [heat_equation.jl](heat_equation.jl)
