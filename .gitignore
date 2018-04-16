@@ -6,5 +6,5 @@
 examples/.ipynb_checkpoints/
 docs/build/
 docs/site/
-docs/src/examples/*.md
+docs/src/examples/generated/
 *.DS_Store
