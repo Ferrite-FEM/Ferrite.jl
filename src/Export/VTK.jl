@@ -27,6 +27,11 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,N,T}) where 
     return vtk_grid(filename, coords, cls)
 end
 
+"""
+    vtk_point_data(vtk, data::Vector{<:Vec}, name)
+
+Write the vector field data to the vtk file.
+"""
 function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, data::Vector{Vec{dim,T}}, name::AbstractString) where {dim,T}
     npoints = length(data)
     data = reinterpret(T, data, (dim, npoints))

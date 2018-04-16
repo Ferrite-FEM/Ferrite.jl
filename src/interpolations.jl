@@ -20,13 +20,6 @@ The following interpolations are implemented:
 * `Lagrange{3,RefTetrahedron,1}`
 * `Lagrange{3,RefTetrahedron,2}`
 
-**Common methods:**
-* [`getnbasefunctions`](@ref)
-* [`getdim`](@ref)
-* [`getrefshape`](@ref)
-* [`getorder`](@ref)
-
-
 # Examples
 ```jldoctest
 julia> ip = Lagrange{2,RefTetrahedron,2}()
