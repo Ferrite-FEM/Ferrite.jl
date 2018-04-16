@@ -102,9 +102,10 @@ export
     end_assemble,
 
 # VTK export
-    vtk_grid,
-    vtk_point_data,
-    vtk_cell_data,
-    vtk_nodeset,
-    vtk_cellset,
-    vtk_save
+    VTK
+    # vtk_grid,
+    # vtk_point_data,
+    # vtk_cell_data,
+    # vtk_nodeset,
+    # vtk_cellset,
+    # vtk_save

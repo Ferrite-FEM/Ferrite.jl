@@ -300,28 +300,3 @@ function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
     return K
 end
 
-WriteVTK.vtk_grid(filename::AbstractString, dh::DofHandler) = vtk_grid(filename, dh.grid)
-
-# Exports the FE field `u` to `vtkfile`
-function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector)
-    for f in 1:nfields(dh)
-        @debug println("exporting field $(dh.field_names[f])")
-        field_dim = dh.field_dims[f]
-        space_dim = field_dim == 2 ? 3 : field_dim
-        data = fill(0.0, space_dim, getnnodes(dh.grid))
-        offset = field_offset(dh, dh.field_names[f])
-        for cell in CellIterator(dh)
-            _celldofs = celldofs(cell)
-            counter = 1
-            for node in getnodes(cell)
-                for d in 1:dh.field_dims[f]
-                    data[d, node] = u[_celldofs[counter + offset]]
-                    @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
-                    counter += 1
-                end
-            end
-        end
-        vtk_point_data(vtkfile, data, string(dh.field_names[f]))
-    end
-    return vtkfile
-end

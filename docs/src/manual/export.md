@@ -10,45 +10,44 @@ u = rand(ndofs(dh)); σ = rand(getncells(grid))
 When the problem is solved, and the solution vector `u` is known we typically
 want to visualize it. The simplest way to do this is to write the solution to a
 VTK-file, which can be viewed in e.g. [`Paraview`](https://www.paraview.org/).
-To write VTK-files, JuAFEM uses, and extends, functions from the
-[`WriteVTK.jl`](https://github.com/jipolanco/WriteVTK.jl) package to simplify
-the exporting.
+To write VTK-files, JuAFEM wraps, functions from the
+[`WriteVTK.jl`](https://github.com/jipolanco/WriteVTK.jl) in a submodule `VTK`.
 
 First we need to create a file, based on the grid. This is done with the
-`vtk_grid` function:
+[`VTK.grid`](@ref) function:
 
 ```@example export
-vtk = vtk_grid("my-solution", grid)
+vtk = VTK.grid("my-solution", grid)
 # hide
 ```
 
 Next we have to add data to the file. We may add different kinds of data;
-point data using `vtk_point_data` or cell data using
-`vtk_cell_data`. Point data is data for each nodal coordinate in the
+point data using [`VTK.point_data`](@ref) or cell data using
+[`VTK.cell_data`](@ref). Point data is data for each nodal coordinate in the
 grid, for example our solution vector. Point data can be either scalars
 or vectors. Cell data is -- as the name suggests -- data for each cell. This
 can be for example the stress. As an example, lets add a solution vector `u`
 as point data, and a vector with stress for each cell, `σ`, as cell data:
 
 ```@example export
-vtk_point_data(vtk, u, "my-point-data")
-vtk_cell_data(vtk,  σ, "my-cell-data")
+VTK.point_data(vtk, u, "my-point-data")
+VTK.cell_data(vtk,  σ, "my-cell-data")
 # hide
 ```
 
-Finally, we need to save the file to disk, using `vtk_save`
+Finally, we need to save the file to disk, using [`VTK.save`](@ref)
 
 ```@example export
-vtk_save(vtk)
+VTK.save(vtk)
 rm("my-solution.vtu") # hide
 ```
 
 Alternatively, all of the above can be done using a `do` block:
 
 ```@example export
-vtk_grid("my-solution", grid) do vtk
-    vtk_point_data(vtk, u, "my-point-data")
-    vtk_cell_data(vtk, σ, "my-cell-data")
+VTK.grid("my-solution", grid) do vtk
+    VTK.point_data(vtk, u, "my-point-data")
+    VTK.cell_data(vtk, σ, "my-cell-data")
 end
 rm("my-solution.vtu") # hide
 ```
@@ -70,36 +69,36 @@ the grid. For example, lets say we have a `DofHandler` `dh` and a solution
 vector `u`:
 
 ```@example export
-vtk = vtk_grid("my-solution", dh)
-vtk_point_data(vtk, dh, u)
-vtk_save(vtk)
+vtk = VTK.grid("my-solution", dh)
+VTK.point_data(vtk, dh, u)
+VTK.save(vtk)
 rm("my-solution.vtu") # hide
 ```
 
 or with a `do`-block:
 
 ```@example export
-vtk_grid("my-solution", dh) do vtk
-    vtk_point_data(vtk, dh, u)
-    vtk_cell_data(vtk, σ, "my-cell-data")
+VTK.grid("my-solution", dh) do vtk
+    VTK.point_data(vtk, dh, u)
+    VTK.cell_data(vtk, σ, "my-cell-data")
 end
 rm("my-solution.vtu") # hide
 ```
 
-When `vtk_point_data` is used with a `DofHandler` all of the fields will be
+When `VTK.point_data` is used with a `DofHandler` all of the fields will be
 written to the VTK file, and the names will be determined by the fieldname
 symbol that was used when the field was added to the `DofHandler`.
 
 ## Exporting Boundary Conditions
 
-There is also a `vtk_point_data` which accepts a `ConstraintHandler`.
+There is also a `VTK.point_data` which accepts a `ConstraintHandler`.
 This method is useful to verify that the boundary conditions are
 applied where they are supposed to. For a `ConstraintHandler` `ch`
 we can export the boundary conditions as
 
 ```julia
-vtk_grid("boundary-conditions", grid) do vtk
-    vtk_point_data(vtk, ch)
+VTK.grid("boundary-conditions", grid) do vtk
+    VTK.point_data(vtk, ch)
 end
 ```
 

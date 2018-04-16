@@ -202,33 +202,6 @@ function _update!(values::Vector{Float64}, f::Function, faces::Set{Tuple{Int,Int
     end
 end
 
-# Saves the dirichlet boundary conditions to a vtkfile.
-# Values will have a 1 where bcs are active and 0 otherwise
-function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
-    unique_fields = []
-    for dbc in ch.dbcs
-        push!(unique_fields, dbc.field_name)
-    end
-    unique_fields = unique(unique_fields) # TODO v0.7: unique!(unique_fields)
-
-    for field in unique_fields
-        nd = ndim(ch.dh, field)
-        data = zeros(Float64, nd, getnnodes(ch.dh.grid))
-        for dbc in ch.dbcs
-            dbc.field_name != field && continue
-            for (cellidx, faceidx) in dbc.faces
-                for facenode in faces(ch.dh.grid.cells[cellidx])[faceidx]
-                    for component in dbc.components
-                        data[component, facenode] = 1
-                    end
-                end
-            end
-        end
-        vtk_point_data(vtkfile, data, string(field, "_bc"))
-    end
-    return vtkfile
-end
-
 function apply!(v::Vector, ch::ConstraintHandler)
     @assert length(v) == ndofs(ch.dh)
     v[ch.prescribed_dofs] = ch.values # .= ??

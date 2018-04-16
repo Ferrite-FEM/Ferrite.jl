@@ -4,7 +4,6 @@ module JuAFEM
 using ForwardDiff
 using Reexport
 @reexport using Tensors
-@reexport using WriteVTK
 
 import Base: show, push!, @propagate_inbounds
 
@@ -56,6 +55,7 @@ include("assembler.jl")
 
 # Export
 include(joinpath("Export", "VTK.jl"))
+import .VTK
 
 # Other
 include("deprecations.jl")

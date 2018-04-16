@@ -36,10 +36,10 @@ end
         addnodeset!(grid, "middle-nodes", x -> norm(x) < radius)
 
         gridfilename = "grid-$(JuAFEM.celltypes[celltype])"
-        vtk_grid(gridfilename, grid) do vtk
-            vtk_cellset(vtk, grid, "cell-1")
-            vtk_cellset(vtk, grid, "middle-cells")
-            vtk_nodeset(vtk, grid, "middle-nodes")
+        VTK.grid(gridfilename, grid) do vtk
+            VTK.cellset(vtk, grid, "cell-1")
+            VTK.cellset(vtk, grid, "middle-cells")
+            VTK.nodeset(vtk, grid, "middle-nodes")
         end
 
         # test the sha of the file

@@ -176,8 +176,8 @@ u = K \ f;
 #' ### Exporting to VTK
 #' To visualize the result we export the grid and our field `u`
 #' to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
-vtk_grid("heat_equation", dh) do vtk
-    vtk_point_data(vtk, dh, u)
+VTK.grid("heat_equation", dh) do vtk
+    VTK.point_data(vtk, dh, u)
 end
 #md rm("heat_equation.vtu") # hide
 #md nothing # hide
