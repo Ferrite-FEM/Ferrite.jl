@@ -64,6 +64,30 @@ function field_offset(dh::DofHandler, field_name::Symbol)
     return offset
 end
 
+"""
+    dof_range(dh:DofHandler, field_name)
+
+Return the local dof range for `field_name`. Example:
+
+```jldoctest
+julia> grid = generate_grid(Triangle, (3, 3));
+
+julia> dh = DofHandler(grid); push!(dh, :u, 3); push!(dh, :p, 1); close!(dh);
+
+julia> dof_range(dh, :u)
+1:9
+
+julia> dof_range(dh, :p)
+10:12
+```
+"""
+function dof_range(dh::DofHandler, field_name::Symbol)
+    f = find_field(dh, field_name)
+    offset = field_offset(dh, field_name)
+    n_field_dofs = getnbasefunctions(dh.field_interpolations[f]) * dh.field_dims[f]
+    return (offset+1):(offset+n_field_dofs)
+end
+
 function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
     @assert !isclosed(dh)
     @assert !in(name, dh.field_names)

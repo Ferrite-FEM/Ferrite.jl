@@ -96,13 +96,14 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
 nodal values of ``\\mathbf{u}``.
 """
-function function_value(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}) where {dim,T}
+function function_value(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     isa(fe_v, VectorValues) && (n_base_funcs *= dim)
-    @assert length(u) == n_base_funcs
+    @assert length(dof_range) == n_base_funcs
+    @boundscheck checkbounds(u, dof_range)
     val = zero(_valuetype(fe_v, u))
-    @inbounds for i in 1:n_base_funcs
-        val += shape_value(fe_v, q_point, i) * u[i]
+    @inbounds for (i, j) in enumerate(dof_range)
+        val += shape_value(fe_v, q_point, i) * u[j]
     end
     return val
 end
@@ -141,21 +142,20 @@ For a vector valued function the gradient is computed as
 ``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x}) \\otimes \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
-function function_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}) where {dim,T}
+function function_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     isa(fe_v, VectorValues) && (n_base_funcs *= dim)
-    @assert length(u) == n_base_funcs
+    @assert length(dof_range) == n_base_funcs
+    @boundscheck checkbounds(u, dof_range)
     grad = zero(_gradienttype(fe_v, u))
-    @inbounds for i in 1:n_base_funcs
-        grad += shape_gradient(fe_v, q_point, i) * u[i]
+    @inbounds for (i, j) in enumerate(dof_range)
+        grad += shape_gradient(fe_v, q_point, i) * u[j]
     end
     return grad
 end
 
 Base.@pure _gradienttype(::ScalarValues{dim}, ::AbstractVector{T}) where {dim,T} = Vec{dim,T}
-# Base.@pure _gradienttype(::ScalarValues{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Tensor{2,dim,T}
 Base.@pure _gradienttype(::VectorValues{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
-# Base.@pure _gradienttype(::VectorValues{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Tensor{2,dim,T}
 
 function function_gradient(fe_v::ScalarValues{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
@@ -194,7 +194,12 @@ The symmetric gradient of a scalar function is computed as
 ``\\left[ \\mathbf{\\nabla}  \\mathbf{u}(\\mathbf{x_q}) \\right]^\\text{sym} =  \\sum\\limits_{i = 1}^n  \\frac{1}{2} \\left[ \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\otimes \\mathbf{u}_i + \\mathbf{u}_i  \\otimes  \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\right]``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function function_symmetric_gradient(fe_v::Values, q_point::Int, u::AbstractVector)
+function function_symmetric_gradient(fe_v::Values, q_point::Int, u::AbstractVector, dof_range::UnitRange = 1:length(u))
+    grad = function_gradient(fe_v, q_point, u, dof_range)
+    return symmetric(grad)
+end
+
+function function_symmetric_gradient(fe_v::Values, q_point::Int, u::AbstractVector{Vec{dim, T}}) where {dim, T}
     grad = function_gradient(fe_v, q_point, u)
     return symmetric(grad)
 end
@@ -218,14 +223,15 @@ function function_divergence(fe_v::ScalarValues{dim}, q_point::Int, u::AbstractV
     return diverg
 end
 
-function function_divergence(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{T}) where {dim,T}
+function function_divergence(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)*dim
-    @assert length(u) == n_base_funcs
+    @assert length(dof_range) == n_base_funcs
+    @boundscheck checkbounds(u, dof_range)
     diverg = zero(T)
-    @inbounds for i in 1:n_base_funcs
+    @inbounds for (i, j) in enumerate(dof_range)
         grad = shape_gradient(fe_v, q_point, i)
         for k in 1:dim
-            diverg += grad[k, k] * u[i]
+            diverg += grad[k, k] * u[j]
         end
     end
     return diverg
