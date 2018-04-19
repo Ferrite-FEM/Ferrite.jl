@@ -1,7 +1,6 @@
 __precompile__()
 
 module JuAFEM
-using ForwardDiff
 using Reexport
 @reexport using Tensors
 @reexport using WriteVTK
