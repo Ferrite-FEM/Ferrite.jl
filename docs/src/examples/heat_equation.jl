@@ -1,6 +1,6 @@
 #' # Heat Equation
 #'
-#' ![](heat_square.png)
+#' ![](heat_equation.png)
 #-
 #md #' !!! tip
 #md #'     This example is also available as a Jupyter notebook:
@@ -179,8 +179,10 @@ u = K \ f;
 vtk_grid("heat_equation", dh) do vtk
     vtk_point_data(vtk, dh, u)
 end
-#md rm("heat_equation.vtu") # hide
-#md nothing # hide
+
+# test the result                 #jl
+using Base.Test                   #jl
+@test norm(u) ≈ 3.307743912641305 #jl
 
 #md #' ## [Plain Program](@id heat_equation-plain-program)
 #md #'
