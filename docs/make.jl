@@ -5,7 +5,7 @@ using Documenter, JuAFEM
 # Generate examples
 include("generate.jl")
 
-GENERATEDEXAMPLES = [joinpath("examples", "generated", f) for f in ("heat_equation.md", )]
+GENERATEDEXAMPLES = [joinpath("examples", "generated", f) for f in ("heat_equation.md", "incompressible_elasticity.md")]
 
 # Build documentation.
 makedocs(
@@ -38,6 +38,12 @@ makedocs(
             ]
         ]
     )
+
+# make sure there are no *.vtu files left around from the build
+cd(joinpath(@__DIR__, "build", "examples", "generated")) do
+    foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
+end
+
 
 # Deploy built documentation from Travis.
 deploydocs(

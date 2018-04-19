@@ -21,3 +21,8 @@ end
 cp(joinpath(@__DIR__, "../examples/figures/heat_square.png"),
    joinpath(@__DIR__, "src/examples/generated/heat_equation.png");
    remove_destination = true)
+
+# remove any .vtu files in the generated dir (should not be deployed)
+cd(GENERATEDDIR) do
+    foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
+end
