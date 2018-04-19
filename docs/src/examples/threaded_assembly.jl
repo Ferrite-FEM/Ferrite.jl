@@ -1,19 +1,19 @@
-#' # Threaded assembly
+#' # Threaded Assembly
 #-
 #md #' !!! tip
 #md #'     This example is also available as a Jupyter notebook:
 #md #'     [`threaded_assembly.ipynb`](@__NBVIEWER_ROOT_URL__examples/threaded_assembly.ipynb)
 
-
-using JuAFEM
-
-#' # Example of a colored grid
+#' ## Example of a colored grid
 
 #' Creates a simple 2D grid and colors it.
 #' Save the example grid to a VTK file to show the coloring.
 #' No cells with the same color has any shared nodes (dofs).
 #' This means that it is safe to assemble in parallel as long as we only assemble
 #' one color at a time.
+
+using JuAFEM
+
 function create_example_2d_grid()
     grid = generate_grid(Quadrilateral, (10, 10), Vec{2}((0.0, 0.0)), Vec{2}((10.0, 10.0)))
     cell_colors, colors = JuAFEM.create_coloring(grid)
@@ -26,34 +26,23 @@ create_example_2d_grid()
 
 #' ![](coloring.png)
 
-#' ## Cantilevel beam in 3D with threaded assembly
+#' ## Cantilever beam in 3D with threaded assembly
+#' We will now look at an example where we assemble the stiffness matrix using multiple
+#' threads. We set up a simple grid and create a coloring, then create a DofHandler,
+#' and define the material stiffness
 
-#' ### Grid for the beam
+#' #### Grid for the beam
 function create_colored_cantilever_grid(celltype, n)
     grid = generate_grid(celltype, (10*n, n, n), Vec{3}((0.0, 0.0, 0.0)), Vec{3}((10.0, 1.0, 1.0)))
     cell_colors, final_colors = JuAFEM.create_coloring(grid)
     return grid, final_colors
 end;
 
-
 #' #### DofHandler
 function create_dofhandler(grid::Grid{dim}) where {dim}
     dh = DofHandler(grid)
     push!(dh, :u, dim) # Add a displacement field
     close!(dh)
-end;
-
-
-#' ### Boundary conditions
-function create_boundary_conditions(dh::DofHandler{dim}) where {dim}
-    # Boundary Conditions
-    constraints = ConstraintHandler(dh)
-    # Add a homogenoush boundary condition on the "clamped" edge
-    dbc = Dirichlet(:u, getfaceset(dh.grid, "left"), (x,t) -> [0.0, 0.0, 0.0], collect(1:dim))
-    add!(constraints, dbc)
-    close!(constraints)
-    t = 0.0
-    update!(constraints, t)
 end;
 
 #' ### Stiffness tensor for linear elasticity
@@ -68,10 +57,11 @@ function create_stiffness(::Val{dim}) where {dim}
     return C
 end;
 
-#' ## Threaded data structurs
-
-#' ScratchValues is a collection of data that each thread needs to own because it will mutate it
-immutable ScratchValues{T, CV <: CellValues, FV <: FaceValues, TT <: AbstractTensor, dim, Ti}
+#' ## Threaded data structures
+#'
+#' ScratchValues is a thread-local collection of data that each thread needs to own,
+#' since we need to be able to mutate the data in the threads independently
+struct ScratchValues{T, CV <: CellValues, FV <: FaceValues, TT <: AbstractTensor, dim, Ti}
     Ke::Matrix{T}
     fe::Vector{T}
     cellvalues::CV
@@ -82,7 +72,8 @@ immutable ScratchValues{T, CV <: CellValues, FV <: FaceValues, TT <: AbstractTen
     assembler::JuAFEM.AssemblerSparsityPattern{T, Ti}
 end;
 
-#' Each thread need its own CellValues and FaceValues
+#' Each thread need its own CellValues and FaceValues (although, for this example we don't use
+#' the FaceValues)
 function create_values(refshape, dim, order::Int)
     # Interpolations and values
     interpolation_space = Lagrange{dim, refshape, 1}()
@@ -120,21 +111,22 @@ function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::S
 
     f = zeros(ndofs(dh))
     scratches = create_scratchvalues(K, f, dh)
-    t = Vec{3}((0.0, 1e8, 0.0)) # Traction vector
     b = Vec{3}((0.0, 0.0, 0.0)) # Body force
+
     for color in colors
         # Each color is safe to assemble threaded
         Threads.@threads for i in 1:length(color)
-            assemble_cell!(scratches[Threads.threadid()], color[i], K, grid, dh, C, b, t)
+            assemble_cell!(scratches[Threads.threadid()], color[i], K, grid, dh, C, b)
         end
     end
 
     return K, f
 end
 
-#' The cell assembly function is written the same way as if it was a nonthreaded example
+#' The cell assembly function is written the same way as if it was a single threaded example.
+#' The only difference is that we unpack the variables from our `scratch`.
 function assemble_cell!(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC,
-                        grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}, b::Vec{dim}, t::Vec{dim}) where {dim}
+                        grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}, b::Vec{dim}) where {dim}
 
     # Unpack our stuff from the scratch
     Ke, fe, cellvalues, facevalues, global_dofs, ɛ, coordinates, assembler =
@@ -146,7 +138,7 @@ function assemble_cell!(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC,
 
     n_basefuncs = getnbasefunctions(cellvalues)
 
-    # Fill upp the coordinates
+    # Fill up the coordinates
     nodeids = grid.cells[cell].nodes
     for j in 1:length(coordinates)
         coordinates[j] = grid.nodes[nodeids[j]].x
@@ -163,8 +155,8 @@ function assemble_cell!(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC,
             δu = shape_value(cellvalues, q_point, i)
             fe[i] += (δu ⋅ b) * dΩ
             ɛC = ɛ[i] ⊡ C
-            for j in 1:n_basefuncs # assemble only upper half
-                Ke[i, j] += (ɛC ⊡ ɛ[j]) * dΩ # can only assign to parent of the Symmetric wrapper
+            for j in 1:n_basefuncs
+                Ke[i, j] += (ɛC ⊡ ɛ[j]) * dΩ
             end
         end
     end
@@ -180,11 +172,10 @@ function run_assemble()
     n = 20
     grid, colors = create_colored_cantilever_grid(Hexahedron, n);
     dh = create_dofhandler(grid);
-    dbc = create_boundary_conditions(dh);
 
     K = create_sparsity_pattern(dh);
     C = create_stiffness(Val{3}());
-    # Compilation
+    # compilation
     doassemble(K, colors, grid, dh, C);
     b = @elapsed @time K, f = doassemble(K, colors, grid, dh, C);
     return b
