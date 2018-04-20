@@ -16,6 +16,14 @@ branches:
   only:
     - master
 
+jobs:
+  include:
+    - stage: deploy
+      julia: 0.6
+      os: linux
+      script:
+        - julia -e 'Pkg.clone(pwd()); Pkg.build("JuAFEM"); Pkg.add("Documenter"); Pkg.clone("https://github.com/fredrikekre/Literate.jl.git"); cd(Pkg.dir("JuAFEM")); include("docs/make.jl")'
+
 notifications:
   email: false
 
@@ -24,4 +32,4 @@ git:
   depth: 99999
 
 after_success:
-  - julia -e 'include(Pkg.dir("JuAFEM", "test", "coverage.jl"))'
+  - julia -e 'cd(Pkg.dir("JuAFEM")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
