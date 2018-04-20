@@ -24,4 +24,4 @@ git:
   depth: 99999
 
 after_success:
-  - julia -e 'include(Pkg.dir("JuAFEM", "test", "coverage.jl"))'
+  - julia -e 'cd(Pkg.dir("JuAFEM")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
