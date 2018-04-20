@@ -15,6 +15,3 @@ if VERSION.minor == 6
     include("test_notebooks.jl")
     include("test_examples.jl")
 end
-
-# Build the docs
-include("../docs/make.jl")

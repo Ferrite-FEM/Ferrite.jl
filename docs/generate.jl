@@ -1,7 +1,4 @@
 # generate examples
-try
-    Pkg.clone("https://github.com/fredrikekre/Literate.jl.git")
-end
 import Literate
 
 EXAMPLEDIR = joinpath(@__DIR__, "src", "examples")
