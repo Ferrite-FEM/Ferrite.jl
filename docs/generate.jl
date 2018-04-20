@@ -1,8 +1,8 @@
 # generate examples
 try
-    Pkg.clone("https://github.com/fredrikekre/Examples.jl.git")
+    Pkg.clone("https://github.com/fredrikekre/Literate.jl.git")
 end
-import Examples
+import Literate
 
 EXAMPLEDIR = joinpath(@__DIR__, "src", "examples")
 GENERATEDDIR = joinpath(@__DIR__, "src", "examples", "generated")
@@ -10,11 +10,11 @@ for example in readdir(EXAMPLEDIR)
     endswith(example, ".jl") || continue
     input = abspath(joinpath(EXAMPLEDIR, example))
     rmindent(str) = replace(str, r"^\h*(#'.*)$"m => s"\1")
-    script = Examples.script(input, GENERATEDDIR, preprocess = rmindent)
+    script = Literate.script(input, GENERATEDDIR, preprocess = rmindent)
     code = strip(read(script, String))
     mdpost(str) = replace(str, "@__CODE__" => code)
-    Examples.markdown(input, GENERATEDDIR,#= preprocess = rmindent,=# postprocess = mdpost)
-    Examples.notebook(input, GENERATEDDIR, execute = true)
+    Literate.markdown(input, GENERATEDDIR,#= preprocess = rmindent,=# postprocess = mdpost)
+    Literate.notebook(input, GENERATEDDIR, execute = true)
 end
 
 # copy some figures to the build directory
