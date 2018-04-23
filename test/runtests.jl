@@ -17,4 +17,6 @@ if VERSION.minor == 6
 end
 
 # Build the docs
-include("../docs/make.jl")
+if get(ENV, "TRAVIS_OS_NAME", "") == "linux" && get(ENV, "TRAVIS_JULIA_VERSION", "") == "0.6"
+    include("../docs/make.jl")
+end
