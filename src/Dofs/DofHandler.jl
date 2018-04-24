@@ -324,6 +324,26 @@ function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
     return K
 end
 
+# dof renumbering
+"""
+    renumber!(dh::DofHandler, perm)
+
+Renumber the degrees of freedom in the DofHandler according to the
+permuation `perm`.
+
+!!! warning
+    Remember to do renumbering *before* adding boundary conditions,
+    otherwise the mapping for the dofs will be wrong.
+"""
+function renumber!(dh::DofHandler, perm::AbstractVector{<:Integer})
+    @assert isperm(perm) && length(perm) == ndofs(dh)
+    cell_dofs = dh.cell_dofs
+    for i in eachindex(cell_dofs)
+        cell_dofs[i] = perm[cell_dofs[i]]
+    end
+    return dh
+end
+
 WriteVTK.vtk_grid(filename::AbstractString, dh::DofHandler) = vtk_grid(filename, dh.grid)
 
 # Exports the FE field `u` to `vtkfile`
