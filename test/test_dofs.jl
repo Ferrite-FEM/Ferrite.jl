@@ -15,4 +15,9 @@ dofs = copy(dh.cell_dofs)
 JuAFEM.renumber!(JuAFEM.renumber!(dh, perm), iperm)
 @test dofs == dh.cell_dofs
 
+
+# dof_range
+@test (@inferred dof_range(dh, :u)) == 1:12
+@test (@inferred dof_range(dh, :p)) == 13:15
+
 end # testset
