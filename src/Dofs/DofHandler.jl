@@ -20,12 +20,14 @@ struct DofHandler{dim,N,T,M}
     bc_values::Vector{BCValues{T}} # for boundary conditions
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
+    node_dofs::Vector{Int}
+    ndofs_per_node::ScalarWrapper{Int}
     closed::ScalarWrapper{Bool}
     grid::Grid{dim,N,T,M}
 end
 
 function DofHandler(grid::Grid)
-    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid)
+    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], Int[], ScalarWrapper(0), ScalarWrapper(false), grid)
 end
 
 function Base.show(io::IO, dh::DofHandler)
@@ -59,7 +61,7 @@ end
 function field_offset(dh::DofHandler, field_name::Symbol)
     offset = 0
     for i in 1:find_field(dh, field_name)-1
-        offset += getnbasefunctions(dh.field_interpolations[i]) * dh.field_dims[i]
+        offset += getnbasefunctions(dh.field_interpolations[i])::Int * dh.field_dims[i]
     end
     return offset
 end
@@ -84,8 +86,16 @@ julia> dof_range(dh, :p)
 function dof_range(dh::DofHandler, field_name::Symbol)
     f = find_field(dh, field_name)
     offset = field_offset(dh, field_name)
-    n_field_dofs = getnbasefunctions(dh.field_interpolations[f]) * dh.field_dims[f]
+    n_field_dofs = getnbasefunctions(dh.field_interpolations[f])::Int * dh.field_dims[f]
     return (offset+1):(offset+n_field_dofs)
+end
+
+function field_offset_nodes(dh::DofHandler, field_name::Symbol)
+    offset = 0
+    for i in 1:find_field(dh, field_name)-1
+        offset += dh.field_dims[i]
+    end
+    return offset
 end
 
 function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
@@ -152,8 +162,20 @@ function close!(dh::DofHandler{dim}) where {dim}
     nextdof = 1 # next free dof to distribute
     push!(dh.cell_dofs_offset, 1) # dofs for the first cell start at 1
 
+    # Assumes that all nodes have the same number of dofs
+    # Another assumption made below is that the first `nnodes_per_cell(cell)` 
+    # interpolation support points of the `interpolation` have the same local indices
+    # as the corresponding nodes of the cell, and that they are iterated through 
+    # in a consecutive order. I could not find a counter example to the correctness 
+    # of this assumption.
+    fieldoffsets = cumsum([0; dh.field_dims])
+    ndofs_per_node = pop!(fieldoffsets)
+    dh.ndofs_per_node[] = ndofs_per_node
+    _nnodes = getnnodes(dh.grid)
+    node_dofs = reshape(resize!(dh.node_dofs, ndofs_per_node*_nnodes), ndofs_per_node, _nnodes)
     # loop over all the cells, and distribute dofs for all the fields
     for (ci, cell) in enumerate(getcells(dh.grid))
+        currentnodeidx = 1
         @debug println("cell #$ci")
         for fi in 1:nfields(dh)
             interpolation_info = interpolation_infos[fi]
@@ -174,10 +196,15 @@ function close!(dh::DofHandler{dim}) where {dim}
                             for d in 1:dh.field_dims[fi]
                                 @debug println("      adding dof#$nextdof")
                                 push!(dh.cell_dofs, nextdof)
+                                if currentnodeidx <= nnodes(cell)
+                                    currentnode = cell.nodes[currentnodeidx]
+                                    node_dofs[fieldoffsets[fi]+d, currentnode] = nextdof
+                                end
                                 nextdof += 1
                             end
                         end
                     end
+                    currentnodeidx += 1
                 end # vertex loop
             end
             if dim == 3 # edges only in 3D
@@ -195,14 +222,20 @@ function close!(dh::DofHandler{dim}) where {dim}
                                     push!(dh.cell_dofs, reuse_dof)
                                 end
                             end
+                            currentnodeidx += interpolation_info.nedgedofs
                         else # token <= 0, distribute new dofs
                             Base._setindex!(edgedicts[fi], (nextdof, dir), sedge, -token) # edgedicts[fi][sedge] = (nextdof, dir),  store only the first dof for the edge
                             for edgedof in 1:interpolation_info.nedgedofs
                                 for d in 1:dh.field_dims[fi]
                                     @debug println("      adding dof#$nextdof")
                                     push!(dh.cell_dofs, nextdof)
+                                    if currentnodeidx <= nnodes(cell)
+                                        currentnode = cell.nodes[currentnodeidx]
+                                        node_dofs[fieldoffsets[fi]+d, currentnode] = nextdof
+                                    end
                                     nextdof += 1
                                 end
+                                currentnodeidx += 1
                             end
                         end
                     end # edge loop
@@ -222,14 +255,20 @@ function close!(dh::DofHandler{dim}) where {dim}
                                 push!(dh.cell_dofs, reuse_dof)
                             end
                         end
+                        currentnodeidx += interpolation_info.nfacedofs
                     else # distribute new dofs
                         Base._setindex!(facedicts[fi], nextdof, sface, -token)# facedicts[fi][sface] = nextdof,  store the first dof for this face
                         for facedof in 1:interpolation_info.nfacedofs
                             for d in 1:dh.field_dims[fi]
                                 @debug println("      adding dof#$nextdof")
                                 push!(dh.cell_dofs, nextdof)
+                                if currentnodeidx <= nnodes(cell)
+                                    currentnode = cell.nodes[currentnodeidx]
+                                    node_dofs[fieldoffsets[fi]+d, currentnode] = nextdof
+                                end
                                 nextdof += 1
                             end
+                            currentnodeidx += 1
                         end
                     end
                 end # face loop
@@ -240,8 +279,13 @@ function close!(dh::DofHandler{dim}) where {dim}
                     for d in 1:dh.field_dims[fi]
                         @debug println("      adding dof#$nextdof")
                         push!(dh.cell_dofs, nextdof)
+                        if currentnodeidx <= nnodes(cell)
+                            currentnode = cell.nodes[currentnodeidx]
+                            node_dofs[fieldoffsets[fi]+d, currentnode] = nextdof
+                        end
                         nextdof += 1
                     end
+                    currentnodeidx += 1
                 end # cell loop
             end
         end # field loop

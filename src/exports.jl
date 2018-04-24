@@ -65,6 +65,7 @@ export
     getnodesets,
     getfacesets,
     onboundary,
+    nnodes,
     nfaces,
     addnodeset!,
     addfaceset!,
@@ -87,6 +88,8 @@ export
 # Constraints
     ConstraintHandler,
     Dirichlet,
+    NodeDiriclet,
+    FaceDirichlet,
     update!,
     apply!,
     apply_zero!,
