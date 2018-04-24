@@ -145,11 +145,11 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
             for comp in 1:dim
                 N_comp = zeros(T, dim)
                 N_comp[comp] = N_temp
-                N[basefunc_count, qp, face] = Vec{dim,T}((N_comp...))
+                N[basefunc_count, qp, face] = Vec{dim,T}((N_comp..., ))
 
                 dN_comp = zeros(T, dim, dim)
                 dN_comp[comp, :] = dNdξ_temp
-                dNdξ[basefunc_count, qp, face] = Tensor{2,dim,T}((dN_comp...))
+                dNdξ[basefunc_count, qp, face] = Tensor{2,dim,T}((dN_comp..., ))
                 basefunc_count += 1
             end
         end

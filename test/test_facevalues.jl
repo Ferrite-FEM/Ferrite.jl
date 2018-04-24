@@ -81,7 +81,7 @@ for (func_interpol, quad_rule) in  (
 
         # test copy
         fvc = copy(fv)
-        for fname in fieldnames(fv)
+        for fname in fieldnames(typeof(fv))
             @test typeof(fv) == typeof(fvc)
             if !isa(getfield(fv, fname), JuAFEM.ScalarWrapper)
                 @test pointer(getfield(fv, fname)) != pointer(getfield(fvc, fname))

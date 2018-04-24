@@ -5,6 +5,9 @@ using Reexport
 @reexport using Tensors
 @reexport using WriteVTK
 
+# stdlibs
+using LinearAlgebra, SparseArrays
+
 import Base: show, push!, @propagate_inbounds
 
 include("exports.jl")

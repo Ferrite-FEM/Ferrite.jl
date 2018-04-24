@@ -1,12 +1,13 @@
 # to test vtk-files
 OVERWRITE_CHECKSUMS = false
 checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")
-checksum_list = readstring(checksums_file)
+checksum_list = read(checksums_file, String)
 if OVERWRITE_CHECKSUMS
     csio = open(checksums_file, "w")
 else
     csio = open(checksums_file, "r")
 end
+using Random
 
 @testset "Grid, DofHandler, vtk" begin
     for (celltype, dim) in ((Line,                   1),

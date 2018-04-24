@@ -1,6 +1,6 @@
 using JuAFEM
 using Tensors
-using Base.Test
+using Test
 using ForwardDiff
 import SHA
 
