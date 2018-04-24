@@ -12,7 +12,7 @@
 #' Here we solve the equation on a unit square, with a uniform internal source.
 #' The strong form of the (linear) heat equation is given by
 #' ```math
-#' - \nabla \cdot (k \nabla u) = f  \quad x \in \Omega,
+#' -\nabla \cdot (k \nabla u) = f  \quad x \in \Omega,
 #' ```
 #' where $u$ is the unknown temperature field, $k$ the heat conductivity,
 #' $f$ the heat source and $\Omega$ the domain. For simplicity we set $f = 1$
