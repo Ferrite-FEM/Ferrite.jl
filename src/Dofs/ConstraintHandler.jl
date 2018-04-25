@@ -200,8 +200,8 @@ function _add!(ch::ConstraintHandler, dbc::NodeDirichlet, field_dim::Int, field_
     resize!(dofs, length(dbc.nodes) * length(dbc.components))
     count = 1
     for node in dbc.nodes
-        start = ch.dh.ndofs_per_node[] * (node-1) + field_offset 
-        r = start : (start + field_dim)
+        offset = ch.dh.ndofs_per_node[] * (node-1) + field_offset
+        r = offset+1 : (offset + field_dim)
         for c in dbc.components
             dofs[count] = ch.dh.node_dofs[r[c]]
             count += 1
