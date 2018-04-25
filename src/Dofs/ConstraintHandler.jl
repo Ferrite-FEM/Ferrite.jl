@@ -61,7 +61,7 @@ struct NodeDirichlet
     dofs::Vector{Int}
 end
 function Dirichlet(field_name::Symbol, nodes::Union{Set{Int}, Vector{Int}}, f::Function, component::Int=1)
-    Dirichlet(field_name, nodes, f, [component], Int[])
+    Dirichlet(field_name, nodes, f, [component])
 end
 function Dirichlet(field_name::Symbol, nodes::Union{Set{Int}, Vector{Int}}, f::Function, components::Vector{Int})
     unique(components) == components || error("components not unique: $components")
