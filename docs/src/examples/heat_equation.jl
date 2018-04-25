@@ -11,9 +11,11 @@
 #' The heat equation is the "Hello, world!" equation of finite elements.
 #' Here we solve the equation on a unit square, with a uniform internal source.
 #' The strong form of the (linear) heat equation is given by
+#'
 #' ```math
-#' -\nabla \cdot (k \nabla u) = f  \quad x \in \Omega,
+#'  -\nabla \cdot (k \nabla u) = f  \quad x \in \Omega,
 #' ```
+#'
 #' where $u$ is the unknown temperature field, $k$ the heat conductivity,
 #' $f$ the heat source and $\Omega$ the domain. For simplicity we set $f = 1$
 #' and $k = 1$. We will consider homogeneous Dirichlet boundary conditions such that
@@ -180,9 +182,9 @@ vtk_grid("heat_equation", dh) do vtk
     vtk_point_data(vtk, dh, u)
 end
 
-# test the result                 #jl
-using Base.Test                   #jl
-@test norm(u) ≈ 3.307743912641305 #jl
+# test the result                 #src
+using Base.Test                   #src
+@test norm(u) ≈ 3.307743912641305 #src
 
 #md #' ## [Plain Program](@id heat_equation-plain-program)
 #md #'
