@@ -10,7 +10,7 @@ for example in readdir(EXAMPLEDIR)
     script = Literate.script(input, GENERATEDDIR, preprocess = rmindent)
     code = strip(read(script, String))
     mdpost(str) = replace(str, "@__CODE__" => code)
-    Literate.markdown(input, GENERATEDDIR,#= preprocess = rmindent,=# postprocess = mdpost)
+    Literate.markdown(input, GENERATEDDIR, preprocess = rmindent, postprocess = mdpost)
     Literate.notebook(input, GENERATEDDIR, execute = true)
 end
 
