@@ -255,6 +255,6 @@ default_interpolation(::Type{QuadraticTriangle}) = Lagrange{2,RefTetrahedron,2}(
 default_interpolation(::Type{Quadrilateral}) = Lagrange{2,RefCube,1}()
 default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2,RefCube,2}()
 default_interpolation(::Type{Tetrahedron}) = Lagrange{3,RefTetrahedron,1}()
-default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{2,RefTetrahedron,2}()
+default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{3,RefTetrahedron,2}()
 default_interpolation(::Type{Hexahedron}) = Lagrange{3,RefCube,1}()
 default_interpolation(::Type{QuadraticHexahedron}) = Lagrange{3,RefCube,2}()
