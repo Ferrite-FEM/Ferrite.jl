@@ -1,5 +1,3 @@
-Pkg.checkout("Documenter")
-
 using Documenter, JuAFEM
 
 # Generate examples
