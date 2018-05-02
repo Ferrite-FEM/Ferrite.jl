@@ -16,9 +16,6 @@ branches:
   only:
     - master
 
-script:
-  - julia -e 'Pkg.clone(pwd()); Pkg.build("JuAFEM"); Pkg.clone("https://github.com/fredrikekre/Literate.jl.git"); Pkg.test("JuAFEM"; coverage=true)'
-
 notifications:
   email: false
 
