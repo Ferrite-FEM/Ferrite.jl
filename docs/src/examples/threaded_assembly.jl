@@ -1,16 +1,16 @@
-#' # Threaded Assembly
+# # Threaded Assembly
 #-
-#md #' !!! tip
-#md #'     This example is also available as a Jupyter notebook:
-#md #'     [`threaded_assembly.ipynb`](@__NBVIEWER_ROOT_URL__examples/generated/threaded_assembly.ipynb)
+#md # !!! tip
+#md #     This example is also available as a Jupyter notebook:
+#md #     [`threaded_assembly.ipynb`](@__NBVIEWER_ROOT_URL__examples/generated/threaded_assembly.ipynb)
 
-#' ## Example of a colored grid
-
-#' Creates a simple 2D grid and colors it.
-#' Save the example grid to a VTK file to show the coloring.
-#' No cells with the same color has any shared nodes (dofs).
-#' This means that it is safe to assemble in parallel as long as we only assemble
-#' one color at a time.
+# ## Example of a colored grid
+#
+# Creates a simple 2D grid and colors it.
+# Save the example grid to a VTK file to show the coloring.
+# No cells with the same color has any shared nodes (dofs).
+# This means that it is safe to assemble in parallel as long as we only assemble
+# one color at a time.
 
 using JuAFEM
 
@@ -24,28 +24,28 @@ end;
 
 create_example_2d_grid()
 
-#' ![](coloring.png)
+# ![](coloring.png)
 
-#' ## Cantilever beam in 3D with threaded assembly
-#' We will now look at an example where we assemble the stiffness matrix using multiple
-#' threads. We set up a simple grid and create a coloring, then create a DofHandler,
-#' and define the material stiffness
+# ## Cantilever beam in 3D with threaded assembly
+# We will now look at an example where we assemble the stiffness matrix using multiple
+# threads. We set up a simple grid and create a coloring, then create a DofHandler,
+# and define the material stiffness
 
-#' #### Grid for the beam
+# #### Grid for the beam
 function create_colored_cantilever_grid(celltype, n)
     grid = generate_grid(celltype, (10*n, n, n), Vec{3}((0.0, 0.0, 0.0)), Vec{3}((10.0, 1.0, 1.0)))
     cell_colors, final_colors = JuAFEM.create_coloring(grid)
     return grid, final_colors
 end;
 
-#' #### DofHandler
+# #### DofHandler
 function create_dofhandler(grid::Grid{dim}) where {dim}
     dh = DofHandler(grid)
     push!(dh, :u, dim) # Add a displacement field
     close!(dh)
 end;
 
-#' ### Stiffness tensor for linear elasticity
+# ### Stiffness tensor for linear elasticity
 function create_stiffness(::Val{dim}) where {dim}
     E = 200e9
     ν = 0.3
@@ -57,10 +57,10 @@ function create_stiffness(::Val{dim}) where {dim}
     return C
 end;
 
-#' ## Threaded data structures
-#'
-#' ScratchValues is a thread-local collection of data that each thread needs to own,
-#' since we need to be able to mutate the data in the threads independently
+# ## Threaded data structures
+#
+# ScratchValues is a thread-local collection of data that each thread needs to own,
+# since we need to be able to mutate the data in the threads independently
 struct ScratchValues{T, CV <: CellValues, FV <: FaceValues, TT <: AbstractTensor, dim, Ti}
     Ke::Matrix{T}
     fe::Vector{T}
@@ -72,10 +72,10 @@ struct ScratchValues{T, CV <: CellValues, FV <: FaceValues, TT <: AbstractTensor
     assembler::JuAFEM.AssemblerSparsityPattern{T, Ti}
 end;
 
-#' Each thread need its own CellValues and FaceValues (although, for this example we don't use
-#' the FaceValues)
+# Each thread need its own CellValues and FaceValues (although, for this example we don't use
+# the FaceValues)
 function create_values(refshape, dim, order::Int)
-    # Interpolations and values
+    ## Interpolations and values
     interpolation_space = Lagrange{dim, refshape, 1}()
     quadrature_rule = QuadratureRule{dim, refshape}(order)
     face_quadrature_rule = QuadratureRule{dim-1, refshape}(order)
@@ -84,7 +84,7 @@ function create_values(refshape, dim, order::Int)
     return cellvalues, facevalues
 end;
 
-#' Create a `ScratchValues` for each thread with the thread local data
+# Create a `ScratchValues` for each thread with the thread local data
 function create_scratchvalues(K, f, dh::DofHandler{dim}) where {dim}
     nthreads = Threads.nthreads()
     assemblers = [start_assemble(K, f) for i in 1:nthreads]
@@ -104,9 +104,9 @@ function create_scratchvalues(K, f, dh::DofHandler{dim}) where {dim}
                          ɛs[i], coordinates[i], assemblers[i]) for i in 1:nthreads]
 end;
 
-#' ## Threaded assemble
+# ## Threaded assemble
 
-#' The assembly function loops over each color and does a threaded assembly for that color
+# The assembly function loops over each color and does a threaded assembly for that color
 function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}) where {dim}
 
     f = zeros(ndofs(dh))
@@ -114,7 +114,7 @@ function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::S
     b = Vec{3}((0.0, 0.0, 0.0)) # Body force
 
     for color in colors
-        # Each color is safe to assemble threaded
+        ## Each color is safe to assemble threaded
         Threads.@threads for i in 1:length(color)
             assemble_cell!(scratches[Threads.threadid()], color[i], K, grid, dh, C, b)
         end
@@ -123,12 +123,12 @@ function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::S
     return K, f
 end
 
-#' The cell assembly function is written the same way as if it was a single threaded example.
-#' The only difference is that we unpack the variables from our `scratch`.
+# The cell assembly function is written the same way as if it was a single threaded example.
+# The only difference is that we unpack the variables from our `scratch`.
 function assemble_cell!(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC,
                         grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}, b::Vec{dim}) where {dim}
 
-    # Unpack our stuff from the scratch
+    ## Unpack our stuff from the scratch
     Ke, fe, cellvalues, facevalues, global_dofs, ɛ, coordinates, assembler =
          scratch.Ke, scratch.fe, scratch.cellvalues, scratch.facevalues,
          scratch.global_dofs, scratch.ɛ, scratch.coordinates, scratch.assembler
@@ -138,7 +138,7 @@ function assemble_cell!(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC,
 
     n_basefuncs = getnbasefunctions(cellvalues)
 
-    # Fill up the coordinates
+    ## Fill up the coordinates
     nodeids = grid.cells[cell].nodes
     for j in 1:length(coordinates)
         coordinates[j] = grid.nodes[nodeids[j]].x
@@ -175,7 +175,7 @@ function run_assemble()
 
     K = create_sparsity_pattern(dh);
     C = create_stiffness(Val{3}());
-    # compilation
+    ## compilation
     doassemble(K, colors, grid, dh, C);
     b = @elapsed @time K, f = doassemble(K, colors, grid, dh, C);
     return b
@@ -183,17 +183,17 @@ end
 
 run_assemble()
 
-#' Running the code with different number of threads give the following runtimes:
-#' * 1 thread  2.46 seconds
-#' * 2 threads 1.19 seconds
-#' * 3 threads 0.83 seconds
-#' * 4 threads 0.75 seconds
+# Running the code with different number of threads give the following runtimes:
+# * 1 thread  2.46 seconds
+# * 2 threads 1.19 seconds
+# * 3 threads 0.83 seconds
+# * 4 threads 0.75 seconds
 
-#md #' ## [Plain Program](@id threaded_assembly-plain-program)
-#md #'
-#md #' Below follows a version of the program without any comments.
-#md #' The file is also available here: [threaded_assembly.jl](threaded_assembly.jl)
-#md #'
-#md #' ```julia
-#md #' @__CODE__
-#md #' ```
+#md # ## [Plain Program](@id threaded_assembly-plain-program)
+#md #
+#md # Below follows a version of the program without any comments.
+#md # The file is also available here: [threaded_assembly.jl](threaded_assembly.jl)
+#md #
+#md # ```julia
+#md # @__CODE__
+#md # ```
