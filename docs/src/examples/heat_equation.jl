@@ -77,7 +77,7 @@ K = create_sparsity_pattern(dh);
 
 using UnicodePlots
 fill!(K.nzval, 1.0)
-spy(K)
+spy(K; height = 15)
 
 #' ### Boundary conditions
 #' In JuAFEM constraints like Dirichlet boundary conditions
