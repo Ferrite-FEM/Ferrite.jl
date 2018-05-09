@@ -9,4 +9,4 @@ UnicodePlots
 KrylovMethods
 ProgressMeter
 BlockArrays
-Literate
+Literate 0.2.0

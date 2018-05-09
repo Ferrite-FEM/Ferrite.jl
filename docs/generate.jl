@@ -6,11 +6,10 @@ GENERATEDDIR = joinpath(@__DIR__, "src", "examples", "generated")
 for example in readdir(EXAMPLEDIR)
     endswith(example, ".jl") || continue
     input = abspath(joinpath(EXAMPLEDIR, example))
-    rmindent(str) = replace(str, r"^\h*(#'.*)$"m => s"\1")
-    script = Literate.script(input, GENERATEDDIR, preprocess = rmindent)
+    script = Literate.script(input, GENERATEDDIR)
     code = strip(read(script, String))
     mdpost(str) = replace(str, "@__CODE__" => code)
-    Literate.markdown(input, GENERATEDDIR, preprocess = rmindent, postprocess = mdpost)
+    Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
     Literate.notebook(input, GENERATEDDIR, execute = true)
 end
 
