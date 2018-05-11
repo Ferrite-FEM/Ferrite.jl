@@ -1,10 +1,13 @@
 function boundaries_to_sparse(boundary)
-    I, J, V = Int[], Int[], Bool[]
-    for faceindex in boundary
-        cell, face = faceindex
-        push!(I, face)
-        push!(J, cell)
-        push!(V, true)
+    n = length(boundary)
+    I = Vector{Int}(n)
+    J = Vector{Int}(n)
+    V = Vector{Bool}(n)
+    for (idx, el) in enumerate(boundary)
+        cell, face = el
+        I[idx] = face
+        J[idx] = cell
+        V[idx] = true
     end
     return sparse(I, J, V)
 end
