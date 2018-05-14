@@ -26,7 +26,7 @@ dbc = Dirichlet(:u, ∂Ω, (x, t) -> sin(t), [1, 3]) # applied to component 1 an
 `Dirichlet` boundary conditions are added to a [`ConstraintHandler`](@ref)
 which applies the condition via `apply!`.
 """
-struct Dirichlet # <: Constraint
+struct FaceDirichlet # <: Constraint
     f::Function # f(x,t) -> value
     faces::Set{Tuple{Int,Int}}
     field_name::Symbol
@@ -40,7 +40,33 @@ end
 function Dirichlet(field_name::Symbol, faces::Set{Tuple{Int,Int}}, f::Function, components::Vector{Int})
     unique(components) == components || error("components not unique: $components")
     # issorted(components) || error("components not sorted: $components")
-    return Dirichlet(f, faces, field_name, components, Int[], Int[])
+    return FaceDirichlet(f, faces, field_name, components, Int[], Int[])
+end
+
+"""
+    NodeDirichlet
+
+A Dirichlet boundary condition is a boundary where the solution is fixed to take a certain value.
+
+`NodeDirichlet` boundary conditions are added to certain components of a field for a specific nodes of the grid.
+A function is also given that should be of the form `(x,t) -> v` where `x` is the coordinate of the node, `t` is a
+time parameter and `v` should be of the same length as the number of components the bc is applied to.
+
+"""
+struct NodeDirichlet
+    f::Function
+    nodes::Vector{Int}
+    field_name::Symbol
+    components::Vector{Int}
+    dofs::Vector{Int}
+end
+function Dirichlet(field_name::Symbol, nodes::Union{Set{Int}, Vector{Int}}, f::Function, component::Int=1)
+    Dirichlet(field_name, nodes, f, [component])
+end
+function Dirichlet(field_name::Symbol, nodes::Union{Set{Int}, Vector{Int}}, f::Function, components::Vector{Int})
+    unique(components) == components || error("components not unique: $components")
+    # issorted(components) || error("components not sorted: $components")
+    return NodeDirichlet(f, sort!([node for node in nodes]), field_name, components, Int[])
 end
 
 """
@@ -49,7 +75,8 @@ end
 Collection of constraints.
 """
 struct ConstraintHandler{DH<:DofHandler,T}
-    dbcs::Vector{Dirichlet}
+    face_dbcs::Vector{FaceDirichlet}
+    node_dbcs::Vector{NodeDirichlet}
     prescribed_dofs::Vector{Int}
     free_dofs::Vector{Int}
     values::Vector{T}
@@ -60,7 +87,7 @@ end
 
 function ConstraintHandler(dh::DofHandler)
     @assert isclosed(dh)
-    ConstraintHandler(Dirichlet[], Int[], Int[], Float64[], Dict{Int,Int}(), dh, ScalarWrapper(false))
+    ConstraintHandler(FaceDirichlet[], NodeDirichlet[], Int[], Int[], Float64[], Dict{Int,Int}(), dh, ScalarWrapper(false))
 end
 
 function Base.show(io::IO, ch::ConstraintHandler)
@@ -68,8 +95,12 @@ function Base.show(io::IO, ch::ConstraintHandler)
     if !isclosed(ch)
         print(io, "  Not closed!")
     else
-        print(io, "  BCs:")
-        for dbc in ch.dbcs
+        print(io, "  Face BCs:")
+        for dbc in ch.face_dbcs
+            print(io, "\n    ", "Field: ", dbc.field_name, ", ", "Components: ", dbc.components)
+        end
+        print(io, "\n  Node BCs:")
+        for dbc in ch.node_dbcs
             print(io, "\n    ", "Field: ", dbc.field_name, ", ", "Components: ", dbc.components)
         end
     end
@@ -97,33 +128,43 @@ function close!(ch::ConstraintHandler)
     return ch
 end
 
-function dbc_check(ch::ConstraintHandler, dbc::Dirichlet)
+function dbc_check(ch::ConstraintHandler, dbc::Union{NodeDirichlet, FaceDirichlet})
     # check input
     dbc.field_name in ch.dh.field_names || throw(ArgumentError("field $field does not exist in DofHandler, existing fields are $(dh.field_names)"))
     for component in dbc.components
         0 < component <= ndim(ch.dh, dbc.field_name) || error("component $component is not within the range of field $field which has $(ndim(ch.dh, field)) dimensions")
     end
-    if length(dbc.faces) == 0
-        warn("added Dirichlet Boundary Condition to face set containing 0 faces")
-    end
+    if dbc isa FaceDirichlet
+        if length(dbc.faces) == 0
+            warn("added Dirichlet Boundary Condition to face set containing 0 faces")
+        end
+    elseif dbc isa NodeDirichlet
+        if length(dbc.nodes) == 0
+            warn("added Dirichlet Boundary Condition to node set containing 0 nodes")
+        end
+    end                
 end
 
 """
-    add!(ch::ConstraintHandler, dbc::Dirichlet)
+    add!(ch::ConstraintHandler, dbc::Union{NodeDirichlet, FaceDirichlet})
 
 Add a `Dirichlet boundary` condition to the `ConstraintHandler`.
 """
-function add!(ch::ConstraintHandler, dbc::Dirichlet)
+function add!(ch::ConstraintHandler, dbc::Union{NodeDirichlet, FaceDirichlet})
     dbc_check(ch, dbc)
     field_idx = find_field(ch.dh, dbc.field_name)
     # Extract stuff for the field
     interpolation = ch.dh.field_interpolations[field_idx]
     field_dim = ch.dh.field_dims[field_idx] # TODO: I think we don't need to extract these here ...
-    _add!(ch, dbc, interpolation, field_dim, field_offset(ch.dh, dbc.field_name))
+    if dbc isa NodeDirichlet
+        _add!(ch, dbc, field_dim, field_offset_nodes(ch.dh, dbc.field_name))
+    else
+        _add!(ch, dbc, interpolation, field_dim, field_offset(ch.dh, dbc.field_name))
+    end
     return ch
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, interpolation::Interpolation, field_dim::Int, offset::Int)
+function _add!(ch::ConstraintHandler, dbc::FaceDirichlet, interpolation::Interpolation, field_dim::Int, offset::Int)
     # calculate which local dof index live on each face
     # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
     local_face_dofs = Int[]
@@ -150,22 +191,43 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, interpolation::Interpolati
     end
 
     # save it to the ConstraintHandler
-    push!(ch.dbcs, dbc)
+    push!(ch.face_dbcs, dbc)
     append!(ch.prescribed_dofs, constrained_dofs)
+end
+
+function _add!(ch::ConstraintHandler, dbc::NodeDirichlet, field_dim::Int, field_offset::Int)
+    dofs = dbc.dofs
+    resize!(dofs, length(dbc.nodes) * length(dbc.components))
+    count = 1
+    for node in dbc.nodes
+        offset = ch.dh.ndofs_per_node[] * (node-1) + field_offset
+        r = offset+1 : (offset + field_dim)
+        for c in dbc.components
+            dofs[count] = ch.dh.node_dofs[r[c]]
+            count += 1
+        end
+    end
+    push!(ch.node_dbcs, dbc)
+    append!(ch.prescribed_dofs, dofs)
 end
 
 # Updates the DBC's to the current time `time`
 function update!(ch::ConstraintHandler, time::Float64=0.0)
     @assert ch.closed[]
-    for dbc in ch.dbcs
+    for dbc in ch.face_dbcs
         field_idx = find_field(ch.dh, dbc.field_name)
         # Function barrier
-        _update!(ch.values, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
+        _update_face_dbc!(ch.values, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
                  dbc.components, ch.dh, ch.dh.bc_values[field_idx], ch.dofmapping, time)
+    end
+    for dbc in ch.node_dbcs
+        # Function barrier
+        _update_node_dbc!(ch.values, dbc.f, dbc.nodes, dbc.dofs,
+                 dbc.components, ch.dh, ch.dofmapping, time)
     end
 end
 
-function _update!(values::Vector{Float64}, f::Function, faces::Set{Tuple{Int,Int}}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+function _update_face_dbc!(values::Vector{Float64}, f::Function, faces::Set{Tuple{Int,Int}}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::DofHandler{dim,N,T,M}, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::Float64) where {dim,N,T,M}
     grid = dh.grid
@@ -202,11 +264,31 @@ function _update!(values::Vector{Float64}, f::Function, faces::Set{Tuple{Int,Int
     end
 end
 
+function _update_node_dbc!(values::Vector{Float64}, f::Function, nodes::Vector{Int}, 
+    dbc_dofs::Vector{Int}, components::Vector{Int}, dh::DofHandler{dim,N,T,M}, 
+    dofmapping::Dict{Int,Int}, time::Float64) where {dim, N, T, M}
+
+    dbc_node_dofs = reshape(dbc_dofs, length(components), length(nodes))
+    grid = dh.grid
+    for (j, nodeidx) in enumerate(nodes)
+        bc_value = f(grid.nodes[nodeidx], time)
+        @assert length(bc_value) == length(components)
+        for i in 1:length(components)
+            dof = dbc_node_dofs[i,j]
+            dbc_index = dofmapping[dof]
+            values[dbc_index] = bc_value[i]
+        end
+    end
+end
+
 # Saves the dirichlet boundary conditions to a vtkfile.
 # Values will have a 1 where bcs are active and 0 otherwise
 function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
     unique_fields = []
-    for dbc in ch.dbcs
+    for dbc in ch.face_dbcs
+        push!(unique_fields, dbc.field_name)
+    end
+    for dbc in ch.node_dbcs
         push!(unique_fields, dbc.field_name)
     end
     unique_fields = unique(unique_fields) # TODO v0.7: unique!(unique_fields)
@@ -214,13 +296,21 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
     for field in unique_fields
         nd = ndim(ch.dh, field)
         data = zeros(Float64, nd, getnnodes(ch.dh.grid))
-        for dbc in ch.dbcs
-            dbc.field_name != field && continue
-            for (cellidx, faceidx) in dbc.faces
+        for face_dbc in ch.face_dbcs
+            face_dbc.field_name != field && continue
+            for (cellidx, faceidx) in face_dbc.faces
                 for facenode in faces(ch.dh.grid.cells[cellidx])[faceidx]
-                    for component in dbc.components
+                    for component in face_dbc.components
                         data[component, facenode] = 1
                     end
+                end
+            end
+        end
+        for node_dbc in ch.node_dbcs
+            node_dbc.field_name != field && continue
+            for nodeidx in node_dbc.nodes
+                for component in node_dbc.components
+                    data[component, nodeidx] = 1
                 end
             end
         end
