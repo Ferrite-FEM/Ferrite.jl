@@ -69,10 +69,9 @@ end;
 # We specify a homogeneous Dirichlet bc on the displacement field, `:u`.
 function create_bc(dh)
     dbc = ConstraintHandler(dh)
-    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, "clamped"), (x,t) -> zero(Vec{2}), [1,2]))
+    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, "clamped"), (x) -> zero(Vec{2}), [1,2]))
     close!(dbc)
-    t = 0.0
-    update!(dbc, t)
+    update!(dbc)
     return dbc
 end;
 

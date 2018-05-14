@@ -4,14 +4,14 @@
     Dirichlet(u, ∂Ω, f, component)
 
 Create a Dirichlet boundary condition on `u` on the `∂Ω` part of
-the boundary. `f` is a function that takes two arguments, `x` and `t`
-where `x` is the spatial coordinate and `t` is the current time,
-and returns the prescribed value. For example, here we create a
-Dirichlet condition for the `:u` field, on the faceset called
+the boundary. `f` is a function that return the prescribed value.
+`f` will be called by [`update!`](@ref) with the spatial coordinate
+`x` as first argument. For example, here we create a
+Dirichlet condition for the `:u` field, on the face set called
 `∂Ω` and the value given by the `sin` function:
 
 ```julia
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> sin(t))
+dbc = Dirichlet(:u, ∂Ω, (x, t = 1.0) -> sin(t))
 ```
 
 If `:u` is a vector field we can specify which component the condition
@@ -19,8 +19,8 @@ should be applied to by specifying `component`. `component` can be given
 either as an integer, or as a vector, for example:
 
 ```julia
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> sin(t), 1)      # applied to component 1
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> sin(t), [1, 3]) # applied to component 1 and 3
+dbc = Dirichlet(:u, ∂Ω, (x, t = 1.0) -> sin(t), 1) # applied to component 1
+dbc = Dirichlet(:u, ∂Ω, (x, t = 1.0) -> (sin(t), cos(t)), [1, 3]) # applied to component 1 and 3
 ```
 
 `Dirichlet` boundary conditions are added to a [`ConstraintHandler`](@ref)
@@ -155,19 +155,26 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, interpolation::Interpolati
 end
 
 # Updates the DBC's to the current time `time`
-function update!(ch::ConstraintHandler, time::Float64=0.0)
+"""
+    update!(ch::ConstraintHandler; args...; kwargs...)
+
+Update the constraints in the ConstraintHandler.
+`update!` propagates `args` and `kwargs` to the update function specified
+when creating the constraint.
+"""
+function update!(ch::ConstraintHandler, args...; kwargs...)
     @assert ch.closed[]
     for dbc in ch.dbcs
         field_idx = find_field(ch.dh, dbc.field_name)
         # Function barrier
         _update!(ch.values, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
-                 dbc.components, ch.dh, ch.dh.bc_values[field_idx], ch.dofmapping, time)
+                 dbc.components, ch.dh, ch.dh.bc_values[field_idx], ch.dofmapping, args, kwargs)
     end
 end
 
 function _update!(values::Vector{Float64}, f::Function, faces::Set{Tuple{Int,Int}}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::DofHandler{dim,N,T,M}, facevalues::BCValues,
-                  dofmapping::Dict{Int,Int}, time::Float64) where {dim,N,T,M}
+                  dofmapping::Dict{Int,Int}, args, kwargs) where {dim,N,T,M}
     grid = dh.grid
 
     xh = zeros(Vec{dim, T}, N) # pre-allocate
@@ -186,7 +193,7 @@ function _update!(values::Vector{Float64}, f::Function, faces::Set{Tuple{Int,Int
 
         for location in 1:getnquadpoints(facevalues)
             x = spatial_coordinate(facevalues, location, xh)
-            bc_value = f(x, time)
+            bc_value = f(x, args...; kwargs...)
             @assert length(bc_value) == length(components)
 
             for i in 1:length(components)
