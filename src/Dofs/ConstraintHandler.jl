@@ -158,24 +158,40 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     if interpolation !== default_interpolation(getcelltype(ch.dh.grid))
         warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
-    constrained_dofs = Int[]
+
+    ncomps = length(dbc.components)
+    nnodes = getnnodes(ch.dh.grid)
+    interpol_points = ndofs_per_cell(ch.dh)
     _celldofs = fill(0, ndofs_per_cell(ch.dh))
-    added_nodes = Set{Int}() # keep track of the nodes we have added to
+    node_dofs = zeros(Int, ncomps, nnodes)
+    visited = BitVector(nnodes)
+    visited .= false
     for (cellidx, cell) in enumerate(ch.dh.grid.cells)
-        idx = findfirst(x -> in(x, bcnodes) && !in(x, added_nodes), cell.nodes)
-        while idx !== 0
-            push!(added_nodes, cell.nodes[idx]) # add to visited nodes
-            celldofs!(_celldofs, ch.dh, cellidx) # update the dofs for this cell
-            noderange = (offset + (idx-1)*field_dim + 1):(offset + idx*field_dim) # the dofs in this node
-            for d in 1:field_dim
-                if d ∈ dbc.components # skip unless this component should be constrained
-                    push!(constrained_dofs, _celldofs[noderange[d]])
-                    @debug println("adding dof $(_celldofs[noderange[d]]) to dbc")
+        celldofs!(_celldofs, ch.dh, cellidx) # update the dofs for this cell
+        for idx in 1:min(interpol_points, length(cell.nodes))
+            node = cell.nodes[idx]
+            if !visited[node]
+                noderange = (offset + (idx-1)*field_dim + 1):(offset + idx*field_dim) # the dofs in this node
+                for (i,c) in enumerate(dbc.components)
+                    node_dofs[i,node] = _celldofs[noderange[c]]
+                    @debug println("adding dof $(_celldofs[noderange[c]]) to node_dofs")
                 end
+                visited[node] = true
             end
-            push!(dbc.local_face_dofs, cell.nodes[idx]) # use this field to store the node idx for each node
-            idx = findnext(x -> in(x, bcnodes) && !in(x, added_nodes), cell.nodes, idx)
         end
+    end
+
+    constrained_dofs = Int[]
+    sizehint!(constrained_dofs, ncomps*length(bcnodes))
+    sizehint!(dbc.local_face_dofs, length(bcnodes))
+    for node in bcnodes
+        if !visited[node]
+            throw("Unable to add a Dirichlet boundary condition to node $node as there are no degrees of freedom on this node.")
+        end
+        for i in 1:ncomps
+            push!(constrained_dofs, node_dofs[i,node])
+        end
+        push!(dbc.local_face_dofs, node) # use this field to store the node idx for each node
     end
 
     # save it to the ConstraintHandler
@@ -266,12 +282,20 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
         data = zeros(Float64, nd, getnnodes(ch.dh.grid))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
-            for (cellidx, faceidx) in dbc.faces
-                for facenode in faces(ch.dh.grid.cells[cellidx])[faceidx]
-                    for component in dbc.components
-                        data[component, facenode] = 1
+            if eltype(dbc.faces) <: Tuple
+                for (cellidx, faceidx) in dbc.faces
+                    for facenode in faces(ch.dh.grid.cells[cellidx])[faceidx]
+                        for component in dbc.components
+                            data[component, facenode] = 1
+                        end
                     end
                 end
+            else
+                for nodeidx in dbc.faces
+                    for component in dbc.components
+                        data[component, nodeidx] = 1
+                    end
+                end                
             end
         end
         vtk_point_data(vtkfile, data, string(field, "_bc"))
