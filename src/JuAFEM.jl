@@ -54,6 +54,18 @@ include("iterators.jl")
 # Assembly
 include("assembler.jl")
 
+# Import
+include(joinpath("Import", "INP", "FeatureExtractors", "extract_cells.jl"))
+include(joinpath("Import", "INP", "FeatureExtractors", "extract_cload.jl"))
+include(joinpath("Import", "INP","FeatureExtractors", "extract_dbcs.jl"))
+include(joinpath("Import", "INP","FeatureExtractors", "extract_dload.jl"))
+include(joinpath("Import", "INP", "FeatureExtractors", "extract_material.jl"))
+include(joinpath("Import", "INP", "FeatureExtractors", "extract_nodes.jl"))
+include(joinpath("Import", "INP", "FeatureExtractors", "extract_set.jl"))
+
+include(joinpath("Import", "INP", "inp_parser.jl"))
+include(joinpath("Import", "INP", "inp_to_juafem.jl"))
+
 # Export
 include(joinpath("Export", "VTK.jl"))
 
