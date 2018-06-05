@@ -164,8 +164,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     interpol_points = ndofs_per_cell(ch.dh)
     _celldofs = fill(0, ndofs_per_cell(ch.dh))
     node_dofs = zeros(Int, ncomps, nnodes)
-    visited = BitVector(nnodes)
-    visited .= false
+    visited = falses(nnodes)
     for (cellidx, cell) in enumerate(ch.dh.grid.cells)
         celldofs!(_celldofs, ch.dh, cellidx) # update the dofs for this cell
         for idx in 1:min(interpol_points, length(cell.nodes))
@@ -186,7 +185,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     sizehint!(dbc.local_face_dofs, length(bcnodes))
     for node in bcnodes
         if !visited[node]
-            throw("Unable to add a Dirichlet boundary condition to node $node as there are no degrees of freedom on this node.")
+            error("Unable to add a Dirichlet boundary condition to node $node as there are no degrees of freedom on this node.")
         end
         for i in 1:ncomps
             push!(constrained_dofs, node_dofs[i,node])
