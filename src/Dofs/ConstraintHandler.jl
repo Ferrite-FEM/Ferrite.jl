@@ -161,7 +161,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
 
     ncomps = length(dbc.components)
     nnodes = getnnodes(ch.dh.grid)
-    interpol_points = ndofs_per_cell(ch.dh)
+    interpol_points = getnbasefunctions(interpolation)
     _celldofs = fill(0, ndofs_per_cell(ch.dh))
     node_dofs = zeros(Int, ncomps, nnodes)
     visited = falses(nnodes)
