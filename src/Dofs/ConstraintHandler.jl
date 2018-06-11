@@ -119,13 +119,16 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
     # Extract stuff for the field
     interpolation = ch.dh.field_interpolations[field_idx]
     field_dim = ch.dh.field_dims[field_idx] # TODO: I think we don't need to extract these here ...
-    _add!(ch, dbc, interpolation, field_dim, field_offset(ch.dh, dbc.field_name))
+    _add!(ch, ch.dh, dbc, interpolation, ch.dh.bc_values[field_idx], field_dim, field_offset(ch.dh, dbc.field_name))
     return ch
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, interpolation::Interpolation, field_dim::Int, offset::Int)
+function _add!(ch::ConstraintHandler, dh::DofHandler{dim,N,T,M}, dbc::Dirichlet, interpolation::Interpolation, facevalues::BCValues, field_dim::Int, offset::Int) where {dim,N,T,M}
     # calculate which local dof index live on each face
     # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
+    __dofs__ = Int[]
+    __coords__ = Vec{dim,T}[]
+
     local_face_dofs = Int[]
     local_face_dofs_offset = Int[1]
     for (i, face) in enumerate(faces(interpolation))
@@ -140,14 +143,40 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, interpolation::Interpolati
     copy!!(dbc.local_face_dofs_offset, local_face_dofs_offset)
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
-    constrained_dofs = Int[]
-    _celldofs = fill(0, ndofs_per_cell(ch.dh))
+    # constrained_dofs = Int[]
+    xh = zeros(Vec{dim, T}, N) # pre-allocate
+    _celldofs = fill(0, ndofs_per_cell(dh))
+    added = Set{Int}()
     for (cellidx, faceidx) in dbc.faces
-        celldofs!(_celldofs, ch.dh, cellidx) # extract the dofs for this cell
-        r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
-        append!(constrained_dofs, _celldofs[local_face_dofs[r]]) # TODO: for-loop over r and simply push! to ch.prescribed_dofs
-        @debug println("adding dofs $(_celldofs[local_face_dofs[r]]) to dbc")
+
+        # no need to reinit!, enough to update current_face since we only need geometric shape functions M
+        facevalues.current_face[] = faceidx
+
+        getcoordinates!(xh, dh.grid, cellidx)
+        celldofs!(_celldofs, dh, cellidx) # extract the dofs for this cell
+        r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1) # local dof-range for this face
+        @show r
+        nxt = 1
+        ncmp = length(dbc.components)
+        for location in 1:getnquadpoints(facevalues)
+            lr = r[nxt:(nxt+ncmp-1)] # local dof-range for this location
+            nxt += ncmp
+            @show lr
+            dof1 = _celldofs[local_face_dofs[lr[1]]]
+            if !(dof1 in added)
+                push!(added, dof1)
+                x = spatial_coordinate(facevalues, location, xh)
+                push!(__coords__, x)
+                for dof in lr
+                    push!(__dofs__, _celldofs[local_face_dofs[dof]])
+                    @debug println("adding dof $(_celldofs[dof]) to dbc")
+                end
+            end
+        end
     end
+    @show __dofs__
+    @show __coords__
+    error()
 
     # save it to the ConstraintHandler
     push!(ch.dbcs, dbc)
