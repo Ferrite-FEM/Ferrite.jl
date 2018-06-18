@@ -18,6 +18,8 @@ struct Cell{dim,N,M}
 end
 nfaces(c::Cell) = nfaces(typeof(c))
 nfaces(::Type{Cell{dim,N,M}}) where {dim,N,M} = M
+nnodes(c::Cell) = nnodes(typeof(c))
+nnodes(::Type{Cell{dim,N,M}}) where {dim,N,M} = N
 
 # Typealias for commonly used cells
 const Line = Cell{1,2,2}

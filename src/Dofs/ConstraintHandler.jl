@@ -28,16 +28,16 @@ which applies the condition via `apply!`.
 """
 struct Dirichlet # <: Constraint
     f::Function # f(x,t) -> value
-    faces::Set{Tuple{Int,Int}}
+    faces::Union{Set{Int},Set{Tuple{Int,Int}}}
     field_name::Symbol
     components::Vector{Int} # components of the field
     local_face_dofs::Vector{Int}
     local_face_dofs_offset::Vector{Int}
 end
-function Dirichlet(field_name::Symbol, faces::Set{Tuple{Int,Int}}, f::Function, component::Int=1)
+function Dirichlet(field_name::Symbol, faces::Union{Set{Int},Set{Tuple{Int,Int}}}, f::Function, component::Int=1)
     Dirichlet(field_name, faces, f, [component])
 end
-function Dirichlet(field_name::Symbol, faces::Set{Tuple{Int,Int}}, f::Function, components::Vector{Int})
+function Dirichlet(field_name::Symbol, faces::Union{Set{Int},Set{Tuple{Int,Int}}}, f::Function, components::Vector{Int})
     unique(components) == components || error("components not unique: $components")
     # issorted(components) || error("components not sorted: $components")
     return Dirichlet(f, faces, field_name, components, Int[], Int[])
@@ -104,7 +104,7 @@ function dbc_check(ch::ConstraintHandler, dbc::Dirichlet)
         0 < component <= ndim(ch.dh, dbc.field_name) || error("component $component is not within the range of field $field which has $(ndim(ch.dh, field)) dimensions")
     end
     if length(dbc.faces) == 0
-        warn("added Dirichlet Boundary Condition to face set containing 0 faces")
+        warn("added Dirichlet Boundary Condition to set containing 0 entities")
     end
 end
 
@@ -119,11 +119,11 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
     # Extract stuff for the field
     interpolation = ch.dh.field_interpolations[field_idx]
     field_dim = ch.dh.field_dims[field_idx] # TODO: I think we don't need to extract these here ...
-    _add!(ch, dbc, interpolation, field_dim, field_offset(ch.dh, dbc.field_name))
+    _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name))
     return ch
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, interpolation::Interpolation, field_dim::Int, offset::Int)
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int}}, interpolation::Interpolation, field_dim::Int, offset::Int)
     # calculate which local dof index live on each face
     # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
     local_face_dofs = Int[]
@@ -142,7 +142,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, interpolation::Interpolati
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
     _celldofs = fill(0, ndofs_per_cell(ch.dh))
-    for (cellidx, faceidx) in dbc.faces
+    for (cellidx, faceidx) in bcfaces
         celldofs!(_celldofs, ch.dh, cellidx) # extract the dofs for this cell
         r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
         append!(constrained_dofs, _celldofs[local_face_dofs[r]]) # TODO: for-loop over r and simply push! to ch.prescribed_dofs
@@ -150,6 +150,51 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, interpolation::Interpolati
     end
 
     # save it to the ConstraintHandler
+    push!(ch.dbcs, dbc)
+    append!(ch.prescribed_dofs, constrained_dofs)
+end
+
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int)
+    if interpolation !== default_interpolation(getcelltype(ch.dh.grid))
+        warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
+    end
+
+    ncomps = length(dbc.components)
+    nnodes = getnnodes(ch.dh.grid)
+    interpol_points = getnbasefunctions(interpolation)
+    _celldofs = fill(0, ndofs_per_cell(ch.dh))
+    node_dofs = zeros(Int, ncomps, nnodes)
+    visited = falses(nnodes)
+    for (cellidx, cell) in enumerate(ch.dh.grid.cells)
+        celldofs!(_celldofs, ch.dh, cellidx) # update the dofs for this cell
+        for idx in 1:min(interpol_points, length(cell.nodes))
+            node = cell.nodes[idx]
+            if !visited[node]
+                noderange = (offset + (idx-1)*field_dim + 1):(offset + idx*field_dim) # the dofs in this node
+                for (i,c) in enumerate(dbc.components)
+                    node_dofs[i,node] = _celldofs[noderange[c]]
+                    @debug println("adding dof $(_celldofs[noderange[c]]) to node_dofs")
+                end
+                visited[node] = true
+            end
+        end
+    end
+
+    constrained_dofs = Int[]
+    sizehint!(constrained_dofs, ncomps*length(bcnodes))
+    sizehint!(dbc.local_face_dofs, length(bcnodes))
+    for node in bcnodes
+        if !visited[node]
+            error("Unable to add a Dirichlet boundary condition to node $node as there are no degrees of freedom on this node.")
+        end
+        for i in 1:ncomps
+            push!(constrained_dofs, node_dofs[i,node])
+        end
+        push!(dbc.local_face_dofs, node) # use this field to store the node idx for each node
+    end
+
+    # save it to the ConstraintHandler
+    copy!!(dbc.local_face_dofs_offset, constrained_dofs) # use this field to store the global dofs
     push!(ch.dbcs, dbc)
     append!(ch.prescribed_dofs, constrained_dofs)
 end
@@ -165,6 +210,7 @@ function update!(ch::ConstraintHandler, time::Float64=0.0)
     end
 end
 
+# for faces
 function _update!(values::Vector{Float64}, f::Function, faces::Set{Tuple{Int,Int}}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::DofHandler{dim,N,T,M}, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::Float64) where {dim,N,T,M}
@@ -202,6 +248,25 @@ function _update!(values::Vector{Float64}, f::Function, faces::Set{Tuple{Int,Int
     end
 end
 
+# for nodes
+function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+                  components::Vector{Int}, dh::DofHandler{dim,N,T,M}, facevalues::BCValues,
+                  dofmapping::Dict{Int,Int}, time::Float64) where {dim,N,T,M}
+    counter = 1
+    for (idx, nodenumber) in enumerate(nodeidxs)
+        x = dh.grid.nodes[nodenumber].x
+        bc_value = f(x, time)
+        @assert length(bc_value) == length(components)
+        for v in bc_value
+            globaldof = globaldofs[counter]
+            counter += 1
+            dbc_index = dofmapping[globaldof]
+            values[dbc_index] = v
+            @debug println("prescribing value $(v) on global dof $(globaldof)")
+        end
+    end
+end
+
 # Saves the dirichlet boundary conditions to a vtkfile.
 # Values will have a 1 where bcs are active and 0 otherwise
 function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
@@ -216,12 +281,20 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
         data = zeros(Float64, nd, getnnodes(ch.dh.grid))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
-            for (cellidx, faceidx) in dbc.faces
-                for facenode in faces(ch.dh.grid.cells[cellidx])[faceidx]
-                    for component in dbc.components
-                        data[component, facenode] = 1
+            if eltype(dbc.faces) <: Tuple
+                for (cellidx, faceidx) in dbc.faces
+                    for facenode in faces(ch.dh.grid.cells[cellidx])[faceidx]
+                        for component in dbc.components
+                            data[component, facenode] = 1
+                        end
                     end
                 end
+            else
+                for nodeidx in dbc.faces
+                    for component in dbc.components
+                        data[component, nodeidx] = 1
+                    end
+                end                
             end
         end
         vtk_point_data(vtkfile, data, string(field, "_bc"))
