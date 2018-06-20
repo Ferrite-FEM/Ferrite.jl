@@ -23,5 +23,3 @@ end
 Base.copy(s::ScalarWrapper{T}) where {T} = ScalarWrapper{T}(copy(s.x))
 
 copy!!(x, y) = copy!(resize!(x, length(y)), y)
-
-import Base.ht_keyindex2!

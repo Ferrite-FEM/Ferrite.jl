@@ -15,12 +15,10 @@ end
 
 # copy some figures to the build directory
 cp(joinpath(@__DIR__, "../examples/figures/heat_square.png"),
-   joinpath(@__DIR__, "src/examples/generated/heat_equation.png");
-   force = true)
+   joinpath(@__DIR__, "src/examples/generated/heat_equation.png"); force = true)
 
 cp(joinpath(@__DIR__, "../examples/figures/coloring.png"),
-   joinpath(@__DIR__, "src/examples/generated/coloring.png");
-   force = true)
+   joinpath(@__DIR__, "src/examples/generated/coloring.png"); force = true)
 
 # remove any .vtu files in the generated dir (should not be deployed)
 cd(GENERATEDDIR) do
