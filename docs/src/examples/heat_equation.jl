@@ -183,7 +183,7 @@ vtk_grid("heat_equation", dh) do vtk
 end
 
 ## test the result                #src
-using Base.Test                   #src
+using Test                   #src
 @test norm(u) ≈ 3.307743912641305 #src
 
 #md # ## [Plain Program](@id heat_equation-plain-program)

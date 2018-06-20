@@ -283,7 +283,7 @@ for ValueType in (CellScalarValues, CellVectorValues, FaceScalarValues, FaceVect
     args = [:(copy(cv.$fname)) for fname in fieldnames(ValueType)]
     @eval begin
         function Base.copy(cv::$ValueType)
-            return typeof(cv)($(args...))
+            return typeof(cv)($(args...,))
         end
     end
 end
