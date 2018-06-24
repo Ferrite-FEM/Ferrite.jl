@@ -5,7 +5,7 @@ struct InpContent{dim, TF, N, TI}
     nodesets::Dict{String,Vector{TI}}
     cellsets::Dict{String,Vector{TI}}
     E::TF
-    mu::TF
+    ν::TF
     density::TF
     nodedbcs::Dict{String, Vector{Tuple{TI,TF}}}
     cloads::Dict{Int, Vector{TF}}
