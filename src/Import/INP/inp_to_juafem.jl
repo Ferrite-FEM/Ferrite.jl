@@ -1,3 +1,25 @@
+function inpcelltype(::Type{CT}) where CT
+    if CT === Triangle
+        return "CPS3"
+    elseif CT === QuadraticTriangle
+        return "CPS6"
+    elseif CT === Tetrahedron
+        return "C3D4"
+    elseif CT === QuadraticTetrahedron
+        return "C3D10"
+    elseif CT === Quadrilateral
+        return "CPS4"
+    elseif CT === QuadraticQuadrilateral
+        return "CPS8"
+    elseif CT === Hexahedron
+        return "C3D8"
+    elseif CT === QuadraticHexahedron
+        return "C3D20"
+    else
+        return ""
+    end
+end
+
 function import_inp(filepath_with_ext)
     problem = extract_inp(filepath_with_ext)
     return inp_to_juafem(problem)
