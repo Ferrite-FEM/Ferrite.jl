@@ -83,6 +83,11 @@ quadrature point `q_point`.
 @inline shape_divergence(bv::FaceVectorValues, q_point::Int, base_func::Int) = trace(bv.dNdx[base_func, q_point, bv.current_face[]])
 
 
+function shape_curl(cv::VectorValues, q_point::Int, base_func::Int)
+    return curl(shape_gradient(cv, q_point, base_func))
+end
+curl(∇v) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
+
 """
     function_value(fe_v::Values, q_point::Int, u::AbstractVector)
 
@@ -254,6 +259,13 @@ function function_divergence(fe_v::VectorValues{dim}, q_point::Int, u::AbstractV
     return diverg
 end
 
+function function_curl(fe_v::Values, q_point::Int, u::AbstractVector, dof_range::UnitRange = 1:length(u))
+    return curl(function_gradient(fe_v, q_point, u, dof_range))
+end
+
+function function_curl(fe_v::Values, q_point::Int, u::AbstractVector{Vec{3, T}}) where T
+    return curl(function_gradient(fe_v, q_point, u))
+end
 
 """
     spatial_coordinate(fe_v::Values{dim}, q_point::Int, x::AbstractVector)

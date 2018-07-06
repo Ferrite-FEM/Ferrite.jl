@@ -43,6 +43,7 @@ for (func_interpol, quad_rule) in  (
                 @test function_gradient(fv, i, u) ≈ H
                 @test function_symmetric_gradient(fv, i, u) ≈ 0.5(H + H')
                 @test function_divergence(fv, i, u) ≈ trace(H)
+                ndim == 3 && @test function_curl(fv, i, u) ≈ JuAFEM.curl(H)
                 function_value(fv, i, u)
                 if isa(fv, FaceScalarValues)
                     @test function_gradient(fv, i, u_scal) ≈ V
@@ -51,6 +52,7 @@ for (func_interpol, quad_rule) in  (
                     @test function_gradient(fv, i, u_vector) ≈ function_gradient(fv, i, u) ≈ H
                     @test function_value(fv, i, u_vector) ≈ function_value(fv, i, u)
                     @test function_divergence(fv, i, u_vector) ≈ function_divergence(fv, i, u) ≈ trace(H)
+                    ndim == 3 && @test function_curl(fv, i, u_vector) ≈ JuAFEM.curl(H)
                 end
             end
 
