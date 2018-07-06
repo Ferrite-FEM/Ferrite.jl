@@ -27,7 +27,7 @@ function generate_grid(::Type{Line}, nel::NTuple{1,Int}, left::Vec{1,T}=Vec{1}((
     n_nodes = nel_x + 1
 
     # Generate nodes
-    coords_x = collect(linspace(left[1], right[1], n_nodes))
+    coords_x = collect(range(left[1], stop=right[1], length=n_nodes))
     nodes = Node{1,T}[]
     for i in 1:n_nodes
         push!(nodes, Node((coords_x[i],)))
@@ -59,7 +59,7 @@ function generate_grid(::Type{QuadraticLine}, nel::NTuple{1,Int}, left::Vec{1,T}
     n_nodes = 2*nel_x + 1
 
     # Generate nodes
-    coords_x = collect(linspace(left[1], right[1], n_nodes))
+    coords_x = collect(range(left[1], stop=right[1], length=n_nodes))
     nodes = Node{1,T}[]
     for i in 1:n_nodes
         push!(nodes, Node((coords_x[i],)))
@@ -199,9 +199,9 @@ function generate_grid(::Type{Hexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Ve
     n_nodes = n_nodes_x * n_nodes_y * n_nodes_z
 
     # Generate nodes
-    coords_x = linspace(left[1], right[1], n_nodes_x)
-    coords_y = linspace(left[2], right[2], n_nodes_y)
-    coords_z = linspace(left[3], right[3], n_nodes_z)
+    coords_x = range(left[1], stop=right[1], length=n_nodes_x)
+    coords_y = range(left[2], stop=right[2], length=n_nodes_y)
+    coords_z = range(left[3], stop=right[3], length=n_nodes_z)
     nodes = Node{3,T}[]
     for k in 1:n_nodes_z, j in 1:n_nodes_y, i in 1:n_nodes_x
         push!(nodes, Node((coords_x[i], coords_y[j], coords_z[k])))
@@ -329,9 +329,9 @@ function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3,Int}, left::
     n_cells_x, n_cells_y, n_cells_z = cells_per_dim
 
     # Generate nodes
-    coords_x = linspace(left[1], right[1], n_nodes_x)
-    coords_y = linspace(left[2], right[2], n_nodes_y)
-    coords_z = linspace(left[3], right[3], n_nodes_z)
+    coords_x = range(left[1], stop=right[1], length=n_nodes_x)
+    coords_y = range(left[2], stop=right[2], length=n_nodes_y)
+    coords_z = range(left[3], stop=right[3], length=n_nodes_z)
     numbering = reshape(1:total_nodes, nodes_per_dim)
 
     # Pre-allocate the nodes & cells
