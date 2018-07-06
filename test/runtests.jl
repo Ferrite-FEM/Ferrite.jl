@@ -1,8 +1,10 @@
 using JuAFEM
 using Tensors
-using Base.Test
+using Test
 using ForwardDiff
 import SHA
+using Random
+using LinearAlgebra
 
 include("test_utils.jl")
 include("test_interpolations.jl")

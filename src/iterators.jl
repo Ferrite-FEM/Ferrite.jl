@@ -60,8 +60,8 @@ Base.next(ci::CellIterator, i) = (reinit!(ci, i), i+1)
 Base.done(ci::CellIterator, i) = i > getncells(ci.grid)
 Base.length(ci::CellIterator)  = getncells(ci.grid)
 
-Base.iteratorsize(::Type{T})   where {T<:CellIterator} = Base.HasLength() # this is default in Base
-Base.iteratoreltype(::Type{T}) where {T<:CellIterator} = Base.HasEltype() # this is default in Base
+Base.IteratorSize(::Type{T})   where {T<:CellIterator} = Base.HasLength() # this is default in Base
+Base.IteratorEltype(::Type{T}) where {T<:CellIterator} = Base.HasEltype() # this is default in Base
 Base.eltype(::Type{T})         where {T<:CellIterator} = T
 
 # utility

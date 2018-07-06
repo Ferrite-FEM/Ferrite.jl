@@ -294,7 +294,7 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
                     for component in dbc.components
                         data[component, nodeidx] = 1
                     end
-                end                
+                end
             end
         end
         vtk_point_data(vtkfile, data, string(field, "_bc"))
@@ -367,7 +367,7 @@ end
 
 # columns need to be stored entries, this is not checked
 function zero_out_columns!(K, dofs::Vector{Int}) # can be removed in 0.7 with #24711 merged
-    @debug assert(issorted(dofs))
+    @debug @assert issorted(dofs)
     for col in dofs
         r = nzrange(K, col)
         K.nzval[r] = 0.0

@@ -254,7 +254,7 @@ function steig!(d::Array{T,1}, e::Array{T,1}, z::Array{T,1}, maxits::Integer) wh
     #
     n = length(z)
     z[1] = 1
-    z[2:n] = 0
+    z[2:n] .= 0
     e[n] = 0
 
     if n == 1 # Nothing to do for a 1x1 matrix.
@@ -275,7 +275,7 @@ function steig!(d::Array{T,1}, e::Array{T,1}, z::Array{T,1}, maxits::Integer) wh
                 continue
             end
             if j == maxits
-                msg = @sprintf("No convergence after %d iterations", j)
+                msg = "No convergence after $(j) iterations"
                 msg *= " (try increasing maxits)"
                 error(msg)
             end

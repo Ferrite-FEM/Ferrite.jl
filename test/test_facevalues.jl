@@ -36,13 +36,13 @@ for (func_interpol, quad_rule) in  (
                 u[i] = H ⋅ xs[i]
                 u_scal[i] = V ⋅ xs[i]
             end
-            u_vector = reinterpret(Float64, u, (n_basefuncs*ndim,))
+            u_vector = reinterpret(Float64, u)
 
             for i in 1:length(getnquadpoints(fv))
                 @test getnormal(fv, i) ≈ n[face]
                 @test function_gradient(fv, i, u) ≈ H
                 @test function_symmetric_gradient(fv, i, u) ≈ 0.5(H + H')
-                @test function_divergence(fv, i, u) ≈ trace(H)
+                @test function_divergence(fv, i, u) ≈ tr(H)
                 ndim == 3 && @test function_curl(fv, i, u) ≈ JuAFEM.curl(H)
                 function_value(fv, i, u)
                 if isa(fv, FaceScalarValues)
@@ -51,7 +51,7 @@ for (func_interpol, quad_rule) in  (
                 elseif isa(fv, FaceVectorValues)
                     @test function_gradient(fv, i, u_vector) ≈ function_gradient(fv, i, u) ≈ H
                     @test function_value(fv, i, u_vector) ≈ function_value(fv, i, u)
-                    @test function_divergence(fv, i, u_vector) ≈ function_divergence(fv, i, u) ≈ trace(H)
+                    @test function_divergence(fv, i, u_vector) ≈ function_divergence(fv, i, u) ≈ tr(H)
                     ndim == 3 && @test function_curl(fv, i, u_vector) ≈ JuAFEM.curl(H)
                 end
             end
@@ -83,7 +83,7 @@ for (func_interpol, quad_rule) in  (
 
         # test copy
         fvc = copy(fv)
-        for fname in fieldnames(fv)
+        for fname in fieldnames(typeof(fv))
             @test typeof(fv) == typeof(fvc)
             if !isa(getfield(fv, fname), JuAFEM.ScalarWrapper)
                 @test pointer(getfield(fv, fname)) != pointer(getfield(fvc, fname))

@@ -106,7 +106,7 @@ function transform!(g::Grid, f::Function)
     for i in 1:length(c)
         c[i] = Node(f(g.nodes[i].x))
     end
-    copy!(g.nodes, c)
+    copyto!(g.nodes, c)
     g
 end
 

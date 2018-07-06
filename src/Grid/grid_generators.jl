@@ -1,8 +1,8 @@
 function boundaries_to_sparse(boundary)
     n = length(boundary)
-    I = Vector{Int}(n)
-    J = Vector{Int}(n)
-    V = Vector{Bool}(n)
+    I = Vector{Int}(undef, n)
+    J = Vector{Int}(undef, n)
+    V = Vector{Bool}(undef, n)
     for (idx, el) in enumerate(boundary)
         cell, face = el
         I[idx] = face
@@ -27,7 +27,7 @@ function generate_grid(::Type{Line}, nel::NTuple{1,Int}, left::Vec{1,T}=Vec{1}((
     n_nodes = nel_x + 1
 
     # Generate nodes
-    coords_x = collect(linspace(left[1], right[1], n_nodes))
+    coords_x = collect(range(left[1], stop=right[1], length=n_nodes))
     nodes = Node{1,T}[]
     for i in 1:n_nodes
         push!(nodes, Node((coords_x[i],)))
@@ -59,7 +59,7 @@ function generate_grid(::Type{QuadraticLine}, nel::NTuple{1,Int}, left::Vec{1,T}
     n_nodes = 2*nel_x + 1
 
     # Generate nodes
-    coords_x = collect(linspace(left[1], right[1], n_nodes))
+    coords_x = collect(range(left[1], stop=right[1], length=n_nodes))
     nodes = Node{1,T}[]
     for i in 1:n_nodes
         push!(nodes, Node((coords_x[i],)))
@@ -145,10 +145,10 @@ function generate_grid(C::Type{Quadrilateral}, nel::NTuple{2,Int}, LL::Vec{2,T},
     # Cell face sets
     offset = 0
     facesets = Dict{String, Set{Tuple{Int,Int}}}()
-    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,1]))   + offset]); offset += length(cell_array[:,1])
-    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[end,:])) + offset]); offset += length(cell_array[end,:])
-    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,end])) + offset]); offset += length(cell_array[:,end])
-    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:]))   + offset]); offset += length(cell_array[1,:])
+    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,1]))   .+ offset]); offset += length(cell_array[:,1])
+    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[end,:])) .+ offset]); offset += length(cell_array[end,:])
+    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,end])) .+ offset]); offset += length(cell_array[:,end])
+    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:]))   .+ offset]); offset += length(cell_array[1,:])
 
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
@@ -184,10 +184,10 @@ function generate_grid(::Type{QuadraticQuadrilateral}, nel::NTuple{2,Int}, LL::V
     # Cell face sets
     offset = 0
     facesets = Dict{String, Set{Tuple{Int,Int}}}()
-    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,1]))   + offset]); offset += length(cell_array[:,1])
-    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[end,:])) + offset]); offset += length(cell_array[end,:])
-    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,end])) + offset]); offset += length(cell_array[:,end])
-    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:]))   + offset]); offset += length(cell_array[1,:])
+    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,1]))   .+ offset]); offset += length(cell_array[:,1])
+    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[end,:])) .+ offset]); offset += length(cell_array[end,:])
+    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,end])) .+ offset]); offset += length(cell_array[:,end])
+    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:]))   .+ offset]); offset += length(cell_array[1,:])
 
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
@@ -199,9 +199,9 @@ function generate_grid(::Type{Hexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Ve
     n_nodes = n_nodes_x * n_nodes_y * n_nodes_z
 
     # Generate nodes
-    coords_x = linspace(left[1], right[1], n_nodes_x)
-    coords_y = linspace(left[2], right[2], n_nodes_y)
-    coords_z = linspace(left[3], right[3], n_nodes_z)
+    coords_x = range(left[1], stop=right[1], length=n_nodes_x)
+    coords_y = range(left[2], stop=right[2], length=n_nodes_y)
+    coords_z = range(left[3], stop=right[3], length=n_nodes_z)
     nodes = Node{3,T}[]
     for k in 1:n_nodes_z, j in 1:n_nodes_y, i in 1:n_nodes_x
         push!(nodes, Node((coords_x[i], coords_y[j], coords_z[k])))
@@ -229,12 +229,12 @@ function generate_grid(::Type{Hexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Ve
     # Cell face sets
     offset = 0
     facesets = Dict{String,Set{Tuple{Int,Int}}}()
-    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,:,1][:]))   + offset]); offset += length(cell_array[:,:,1][:])
-    facesets["front"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,1,:][:]))   + offset]); offset += length(cell_array[:,1,:][:])
-    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[end,:,:][:])) + offset]); offset += length(cell_array[end,:,:][:])
-    facesets["back"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,end,:][:])) + offset]); offset += length(cell_array[:,end,:][:])
-    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:,:][:]))   + offset]); offset += length(cell_array[1,:,:][:])
-    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,:,end][:])) + offset]); offset += length(cell_array[:,:,end][:])
+    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,:,1][:]))   .+ offset]); offset += length(cell_array[:,:,1][:])
+    facesets["front"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,1,:][:]))   .+ offset]); offset += length(cell_array[:,1,:][:])
+    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[end,:,:][:])) .+ offset]); offset += length(cell_array[end,:,:][:])
+    facesets["back"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,end,:][:])) .+ offset]); offset += length(cell_array[:,end,:][:])
+    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:,:][:]))   .+ offset]); offset += length(cell_array[1,:,:][:])
+    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,:,end][:])) .+ offset]); offset += length(cell_array[:,:,end][:])
 
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
@@ -269,10 +269,10 @@ function generate_grid(::Type{Triangle}, nel::NTuple{2,Int}, LL::Vec{2,T}, LR::V
     # Cell face sets
     offset = 0
     facesets = Dict{String,Set{Tuple{Int,Int}}}()
-    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:,1]))   + offset]); offset += length(cell_array[1,:,1])
-    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[2,end,:])) + offset]); offset += length(cell_array[2,end,:])
-    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[2,:,end])) + offset]); offset += length(cell_array[2,:,end])
-    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,1,:]))   + offset]); offset += length(cell_array[1,1,:])
+    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:,1]))   .+ offset]); offset += length(cell_array[1,:,1])
+    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[2,end,:])) .+ offset]); offset += length(cell_array[2,end,:])
+    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[2,:,end])) .+ offset]); offset += length(cell_array[2,:,end])
+    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,1,:]))   .+ offset]); offset += length(cell_array[1,1,:])
 
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
@@ -309,10 +309,10 @@ function generate_grid(::Type{QuadraticTriangle}, nel::NTuple{2,Int}, LL::Vec{2,
     # Cell face sets
     offset = 0
     facesets = Dict{String,Set{Tuple{Int,Int}}}()
-    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:,1]))   + offset]); offset += length(cell_array[1,:,1])
-    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[2,end,:])) + offset]); offset += length(cell_array[2,end,:])
-    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[2,:,end])) + offset]); offset += length(cell_array[2,:,end])
-    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,1,:]))   + offset]); offset += length(cell_array[1,1,:])
+    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:,1]))   .+ offset]); offset += length(cell_array[1,:,1])
+    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[2,end,:])) .+ offset]); offset += length(cell_array[2,end,:])
+    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[2,:,end])) .+ offset]); offset += length(cell_array[2,:,end])
+    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,1,:]))   .+ offset]); offset += length(cell_array[1,1,:])
 
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
@@ -329,15 +329,15 @@ function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3,Int}, left::
     n_cells_x, n_cells_y, n_cells_z = cells_per_dim
 
     # Generate nodes
-    coords_x = linspace(left[1], right[1], n_nodes_x)
-    coords_y = linspace(left[2], right[2], n_nodes_y)
-    coords_z = linspace(left[3], right[3], n_nodes_z)
+    coords_x = range(left[1], stop=right[1], length=n_nodes_x)
+    coords_y = range(left[2], stop=right[2], length=n_nodes_y)
+    coords_z = range(left[3], stop=right[3], length=n_nodes_z)
     numbering = reshape(1:total_nodes, nodes_per_dim)
 
     # Pre-allocate the nodes & cells
-    nodes = Vector{Node{3,T}}(total_nodes)
-    cells = Vector{Tetrahedron}(total_elements)
-    
+    nodes = Vector{Node{3,T}}(undef, total_nodes)
+    cells = Vector{Tetrahedron}(undef, total_elements)
+
     # Generate nodes
     node_idx = 1
     @inbounds for k in 1:n_nodes_z, j in 1:n_nodes_y, i in 1:n_nodes_x
@@ -354,7 +354,7 @@ function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3,Int}, left::
     @inbounds for k in 1:n_cells_z, j in 1:n_cells_y, i in 1:n_cells_x
         cell = (
             numbering[i  , j  , k],
-            numbering[i+1, j  , k], 
+            numbering[i+1, j  , k],
             numbering[i+1, j+1, k],
             numbering[i  , j+1, k],
             numbering[i  , j  , k+1],
@@ -384,7 +384,7 @@ function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3,Int}, left::
     @views to = [map(x -> (x,3), c_nxyz[5, :, :, end][:]) ; map(x -> (x,3), c_nxyz[6, :, :, end][:])]
 
     boundary_matrix = boundaries_to_sparse([le; ri; bo; to; fr; ba])
-    
+
     facesets = Dict(
         "left" => Set(le),
         "right" => Set(ri),

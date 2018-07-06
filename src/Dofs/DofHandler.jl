@@ -147,7 +147,7 @@ function close!(dh::DofHandler{dim}) where {dim}
     end
 
     # not implemented yet: more than one facedof per face in 3D
-    dim == 3 && assert(!any(x->x.nfacedofs > 1, interpolation_infos))
+    dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
 
     nextdof = 1 # next free dof to distribute
     push!(dh.cell_dofs_offset, 1) # dofs for the first cell start at 1
@@ -161,7 +161,7 @@ function close!(dh::DofHandler{dim}) where {dim}
             if interpolation_info.nvertexdofs > 0
                 for vertex in vertices(cell)
                     @debug println("    vertex#$vertex")
-                    token = ht_keyindex2!(vertexdicts[fi], vertex)
+                    token = Base.ht_keyindex2!(vertexdicts[fi], vertex)
                     if token > 0 # haskey(vertexdicts[fi], vertex) # reuse dofs
                         reuse_dof = vertexdicts[fi].vals[token] # vertexdicts[fi][vertex]
                         for d in 1:dh.field_dims[fi]
@@ -185,7 +185,7 @@ function close!(dh::DofHandler{dim}) where {dim}
                     for edge in edges(cell)
                         sedge, dir = sortedge(edge)
                         @debug println("    edge#$sedge dir: $(dir)")
-                        token = ht_keyindex2!(edgedicts[fi], sedge)
+                        token = Base.ht_keyindex2!(edgedicts[fi], sedge)
                         if token > 0 # haskey(edgedicts[fi], sedge), reuse dofs
                             startdof, olddir = edgedicts[fi].vals[token] # edgedicts[fi][sedge] # first dof for this edge (if dir == true)
                             for edgedof in (dir == olddir ? (1:interpolation_info.nedgedofs) : (interpolation_info.nedgedofs:-1:1))
@@ -212,7 +212,7 @@ function close!(dh::DofHandler{dim}) where {dim}
                 for face in faces(cell)
                     sface = sortface(face) # TODO: faces(cell) may as well just return the sorted list
                     @debug println("    face#$sface")
-                    token = ht_keyindex2!(facedicts[fi], sface)
+                    token = Base.ht_keyindex2!(facedicts[fi], sface)
                     if token > 0 # haskey(facedicts[fi], sface), reuse dofs
                         startdof = facedicts[fi].vals[token] # facedicts[fi][sface]
                         for facedof in interpolation_info.nfacedofs:-1:1 # always reverse (YOLO)
@@ -255,7 +255,7 @@ end
 function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
-    unsafe_copy!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
+    unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
     return global_dofs
 end
 

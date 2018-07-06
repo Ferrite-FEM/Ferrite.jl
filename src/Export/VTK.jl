@@ -23,7 +23,7 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,N,T}) where 
     for cell in CellIterator(grid)
         push!(cls, MeshCell(celltype, copy(getnodes(cell))))
     end
-    coords = reinterpret(T, getnodes(grid), (dim, getnnodes(grid)))
+    coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
     return vtk_grid(filename, coords, cls)
 end
 
@@ -34,19 +34,19 @@ Write the vector field data to the vtk file.
 """
 function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, data::Vector{Vec{dim,T}}, name::AbstractString) where {dim,T}
     npoints = length(data)
-    data = reinterpret(T, data, (dim, npoints))
+    data = reshape(reinterpret(T, data), (dim, npoints))
     return vtk_point_data(vtk, data, name)
 end
 
 function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String) where {dim}
     z = zeros(getnnodes(grid))
-    z[collect(getnodeset(grid, nodeset))] = 1.0
+    z[collect(getnodeset(grid, nodeset))] .= 1.0
     vtk_point_data(vtk, z, nodeset)
 end
 
 function vtk_cellset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, cellset::String) where {dim}
     z = zeros(getncells(grid))
-    z[collect(getcellset(grid, cellset))] = 1.0
+    z[collect(getcellset(grid, cellset))] .= 1.0
     vtk_cell_data(vtk, z, cellset)
 end
 
