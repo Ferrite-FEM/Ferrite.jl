@@ -9,4 +9,5 @@ ConstraintHandler
 Dirichlet
 add!
 close!
+update!
 ```
