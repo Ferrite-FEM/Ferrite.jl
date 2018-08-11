@@ -6,6 +6,7 @@ os:
 
 julia:
   - 0.7
+  - 1.0
   - nightly
 
 # matrix:
@@ -24,4 +25,4 @@ git:
   depth: 99999
 
 after_success:
-  - julia -e 'cd(Pkg.dir("JuAFEM")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+  - julia -e 'Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
