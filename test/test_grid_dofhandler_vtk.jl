@@ -68,7 +68,7 @@ end
         end
         close!(ch)
         update!(ch, 0.0)
-        srand(1234)
+        Random.seed!(1234)
         u = rand(ndofs(dofhandler))
         apply!(u, ch)
 

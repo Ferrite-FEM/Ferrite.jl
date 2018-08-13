@@ -55,9 +55,13 @@ CellIterator(dh::DofHandler{dim,N,T,M}, flags::UpdateFlags=UpdateFlags()) where 
     CellIterator{dim,N,T,M}(dh, flags)
 
 # iterator interface
-Base.start(::CellIterator)     = 1
-Base.next(ci::CellIterator, i) = (reinit!(ci, i), i+1)
-Base.done(ci::CellIterator, i) = i > getncells(ci.grid)
+function Base.iterate(ci::CellIterator, state = 1)
+    if state > getncells(ci.grid)
+        return nothing
+    else
+        return (reinit!(ci, state), state+1)
+    end
+end
 Base.length(ci::CellIterator)  = getncells(ci.grid)
 
 Base.IteratorSize(::Type{T})   where {T<:CellIterator} = Base.HasLength() # this is default in Base

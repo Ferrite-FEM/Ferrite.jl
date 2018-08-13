@@ -211,9 +211,13 @@ end
 @inline getcoordinates(grid::Grid, face::FaceIndex) = getcoordinates(grid, face.idx[1])
 
 # Iterate over cell vector
-Base.start(c::Vector{Cell{dim,N}}) where {dim,N} = 1
-Base.next(c::Vector{Cell{dim,N}}, state) where {dim,N} = (CellIndex(state), state + 1)
-Base.done(c::Vector{Cell{dim,N}}, state) where {dim,N} = state > length(c)
+function Base.iterate(c::Vector{Cell{dim,N}}, state = 1) where {dim, N}
+    if state > length(c)
+        return nothing
+    else
+        return (CellIndex(state), state + 1)
+    end
+end
 
 function Base.show(io::IO, grid::Grid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) $(celltypes[eltype(grid.cells)]) cells and $(getnnodes(grid)) nodes")
