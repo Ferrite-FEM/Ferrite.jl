@@ -1,5 +1,3 @@
-__precompile__()
-
 module JuAFEM
 using Reexport
 @reexport using Tensors

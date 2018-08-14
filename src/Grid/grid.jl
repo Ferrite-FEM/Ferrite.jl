@@ -113,7 +113,7 @@ end
 # Sets
 
 _check_setname(dict, name) = haskey(dict, name) && throw(ArgumentError("there already exists a set with the name: $name"))
-_warn_emptyset(set) = length(set) == 0 && warn("no entities added to set")
+_warn_emptyset(set) = length(set) == 0 && @warn("no entities added to set")
 
 function addcellset!(grid::Grid, name::String, cellid::Union{Set{Int},Vector{Int}})
     _check_setname(grid.cellsets,  name)

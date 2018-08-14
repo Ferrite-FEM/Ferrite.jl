@@ -104,7 +104,7 @@ function dbc_check(ch::ConstraintHandler, dbc::Dirichlet)
         0 < component <= ndim(ch.dh, dbc.field_name) || error("component $component is not within the range of field $field which has $(ndim(ch.dh, field)) dimensions")
     end
     if length(dbc.faces) == 0
-        warn("added Dirichlet Boundary Condition to set containing 0 entities")
+        @warn("added Dirichlet Boundary Condition to set containing 0 entities")
     end
 end
 
@@ -156,7 +156,7 @@ end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int)
     if interpolation !== default_interpolation(getcelltype(ch.dh.grid))
-        warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
+        @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
 
     ncomps = length(dbc.components)
