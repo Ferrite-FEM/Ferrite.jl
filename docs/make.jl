@@ -48,7 +48,7 @@ end
 deploydocs(
     repo = "github.com/KristofferC/JuAFEM.jl.git",
     target = "build",
-    julia = "0.6", # deploy from release bot
+    julia = "1.0", # deploy from release bot
     deps = nothing,
     make = nothing,
 )

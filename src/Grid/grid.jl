@@ -106,14 +106,14 @@ function transform!(g::Grid, f::Function)
     for i in 1:length(c)
         c[i] = Node(f(g.nodes[i].x))
     end
-    copy!(g.nodes, c)
+    copyto!(g.nodes, c)
     g
 end
 
 # Sets
 
 _check_setname(dict, name) = haskey(dict, name) && throw(ArgumentError("there already exists a set with the name: $name"))
-_warn_emptyset(set) = length(set) == 0 && warn("no entities added to set")
+_warn_emptyset(set) = length(set) == 0 && @warn("no entities added to set")
 
 function addcellset!(grid::Grid, name::String, cellid::Union{Set{Int},Vector{Int}})
     _check_setname(grid.cellsets,  name)
@@ -211,9 +211,13 @@ end
 @inline getcoordinates(grid::Grid, face::FaceIndex) = getcoordinates(grid, face.idx[1])
 
 # Iterate over cell vector
-Base.start(c::Vector{Cell{dim,N}}) where {dim,N} = 1
-Base.next(c::Vector{Cell{dim,N}}, state) where {dim,N} = (CellIndex(state), state + 1)
-Base.done(c::Vector{Cell{dim,N}}, state) where {dim,N} = state > length(c)
+function Base.iterate(c::Vector{Cell{dim,N}}, state = 1) where {dim, N}
+    if state > length(c)
+        return nothing
+    else
+        return (CellIndex(state), state + 1)
+    end
+end
 
 function Base.show(io::IO, grid::Grid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) $(celltypes[eltype(grid.cells)]) cells and $(getnnodes(grid)) nodes")

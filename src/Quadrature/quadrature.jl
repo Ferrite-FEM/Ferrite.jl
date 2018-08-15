@@ -98,8 +98,8 @@ for dim in (1,2,3)
             else
                 throw(ArgumentError("unsupported quadrature rule"))
             end
-            weights = Vector{Float64}(order^($dim))
-            points = Vector{Vec{$dim,Float64}}(order^($dim))
+            weights = Vector{Float64}(undef, order^($dim))
+            points = Vector{Vec{$dim,Float64}}(undef, order^($dim))
             count = 1
             @nloops $dim i j->(1:order) begin
                 t = @ntuple $dim q-> p[$(Symbol("i"*"_q"))]
@@ -125,7 +125,7 @@ for dim in (2, 3)
                 throw(ArgumentError("unsupported quadrature rule"))
             end
             n_points = size(data,1)
-            points = Vector{Vec{$dim,Float64}}(n_points)
+            points = Vector{Vec{$dim,Float64}}(undef, n_points)
 
             for p in 1:size(data, 1)
                 points[p] = Vec{$dim,Float64}(@ntuple $dim i -> data[p, i])
@@ -145,10 +145,10 @@ function (::Type{QuadratureRule{1,RefTetrahedron}})(quad_type::Symbol, order::In
     else
         throw(ArgumentError("unsupported quadrature rule"))
     end
-    points = Vector{Vec{1,Float64}}(order)
+    points = Vector{Vec{1,Float64}}(undef, order)
     # Shift interval from (-1,1) to (0,1)
     weights *= 0.5
-    p += 1.0; p /= 2.0
+    p .+= 1.0; p /= 2.0
 
     for i in 1:length(weights)
         points[i] = Vec{1,Float64}((p[i],))

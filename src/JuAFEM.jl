@@ -1,11 +1,12 @@
-__precompile__()
-
 module JuAFEM
 using Reexport
 @reexport using Tensors
 @reexport using WriteVTK
 
-import Base: show, push!, @propagate_inbounds
+using LinearAlgebra
+using SparseArrays
+
+using Base: @propagate_inbounds
 
 include("exports.jl")
 

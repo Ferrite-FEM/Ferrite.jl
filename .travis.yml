@@ -5,12 +5,13 @@ os:
   - osx
 
 julia:
-  - 0.6
+  - 0.7
+  - 1.0
   - nightly
 
-matrix:
-  allow_failures:
-    - julia: nightly
+# matrix:
+#   allow_failures:
+#     - julia: nightly
 
 branches:
   only:
@@ -24,4 +25,4 @@ git:
   depth: 99999
 
 after_success:
-  - julia -e 'cd(Pkg.dir("JuAFEM")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+  - julia -e 'Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'

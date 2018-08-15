@@ -104,7 +104,7 @@ function dbc_check(ch::ConstraintHandler, dbc::Dirichlet)
         0 < component <= ndim(ch.dh, dbc.field_name) || error("component $component is not within the range of field $field which has $(ndim(ch.dh, field)) dimensions")
     end
     if length(dbc.faces) == 0
-        warn("added Dirichlet Boundary Condition to set containing 0 entities")
+        @warn("added Dirichlet Boundary Condition to set containing 0 entities")
     end
 end
 
@@ -156,7 +156,7 @@ end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int)
     if interpolation !== default_interpolation(getcelltype(ch.dh.grid))
-        warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
+        @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
 
     ncomps = length(dbc.components)
@@ -294,7 +294,7 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
                     for component in dbc.components
                         data[component, nodeidx] = 1
                     end
-                end                
+                end
             end
         end
         vtk_point_data(vtkfile, data, string(field, "_bc"))
@@ -367,7 +367,7 @@ end
 
 # columns need to be stored entries, this is not checked
 function zero_out_columns!(K, dofs::Vector{Int}) # can be removed in 0.7 with #24711 merged
-    @debug assert(issorted(dofs))
+    @debug @assert issorted(dofs)
     for col in dofs
         r = nzrange(K, col)
         K.nzval[r] = 0.0

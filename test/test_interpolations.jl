@@ -23,7 +23,7 @@ for interpolation in (Lagrange{1, RefCube, 1}(),
     x = rand(Tensor{1, ndim})
     f = (x) -> JuAFEM.value(interpolation, Tensor{1, ndim}(x))
     @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
-           reinterpret(Float64, JuAFEM.derivative(interpolation, x), (ndim * n_basefuncs,))
+           reinterpret(Float64, JuAFEM.derivative(interpolation, x))
     @test sum(JuAFEM.value(interpolation, x)) ≈ 1.0
 
     coords = JuAFEM.reference_coordinates(interpolation)

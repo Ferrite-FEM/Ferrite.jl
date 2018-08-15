@@ -1,7 +1,7 @@
 # to test vtk-files
 OVERWRITE_CHECKSUMS = false
 checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")
-checksum_list = readstring(checksums_file)
+checksum_list = read(checksums_file, String)
 if OVERWRITE_CHECKSUMS
     csio = open(checksums_file, "w")
 else
@@ -68,7 +68,7 @@ end
         end
         close!(ch)
         update!(ch, 0.0)
-        srand(1234)
+        Random.seed!(1234)
         u = rand(ndofs(dofhandler))
         apply!(u, ch)
 
