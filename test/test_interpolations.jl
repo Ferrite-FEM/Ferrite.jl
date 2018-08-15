@@ -1,4 +1,4 @@
-# @testset "interpolations" begin
+@testset "interpolations" begin
 
 for interpolation in (Lagrange{1, RefCube, 1}(),
                       Lagrange{1, RefCube, 2}(),
@@ -39,4 +39,4 @@ for interpolation in (Lagrange{1, RefCube, 1}(),
     end
 end
 
-# end
+end
