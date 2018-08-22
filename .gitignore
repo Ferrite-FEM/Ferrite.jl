@@ -8,4 +8,5 @@ docs/build/
 docs/site/
 docs/src/examples/generated/
 *.DS_Store
-Manifest.toml
+/Manifest.toml
+/test/coverage/Manifest.toml
