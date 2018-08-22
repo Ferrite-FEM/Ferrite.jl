@@ -24,5 +24,13 @@ notifications:
 git:
   depth: 99999
 
-after_success:
-  - julia -e 'Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+jobs:
+  include:
+    - stage: deploy
+      julia: 1.0
+      os: linux
+      script:
+        - julia --color=yes --project=docs/ -e 'using Pkg; Pkg.instantiate()'
+        - julia --color=yes --project=docs/ docs/make.jl
+        - julia --color=yes --project=test/coverage/ -e 'using Pkg; Pkg.instantiate()'
+        - julia --color=yes --project=test/coverage/ test/coverage/coverage.jl
