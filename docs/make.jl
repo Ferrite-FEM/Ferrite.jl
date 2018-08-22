@@ -1,3 +1,5 @@
+Base.HOME_PROJECT[] = abspath(Base.HOME_PROJECT[]) # JuliaLang/julia/pull/28625
+
 using Documenter, JuAFEM
 
 # Generate examples
