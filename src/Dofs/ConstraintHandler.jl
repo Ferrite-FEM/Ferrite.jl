@@ -370,7 +370,7 @@ function zero_out_columns!(K, dofs::Vector{Int}) # can be removed in 0.7 with #2
     @debug @assert issorted(dofs)
     for col in dofs
         r = nzrange(K, col)
-        K.nzval[r] = 0.0
+        K.nzval[r] .= 0.0
     end
 end
 

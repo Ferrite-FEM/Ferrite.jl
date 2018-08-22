@@ -12,7 +12,7 @@
 # This means that it is safe to assemble in parallel as long as we only assemble
 # one color at a time.
 
-using JuAFEM
+using JuAFEM, SparseArrays
 
 function create_example_2d_grid()
     grid = generate_grid(Quadrilateral, (10, 10), Vec{2}((0.0, 0.0)), Vec{2}((10.0, 10.0)))

@@ -35,8 +35,8 @@
 # Now we solve the problem in JuAFEM. What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
-# First we load the JuAFEM package.
-using JuAFEM
+# First we load JuAFEM, and some other packages we need
+using JuAFEM, SparseArrays
 # We start  generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
@@ -87,7 +87,7 @@ ch = ConstraintHandler(dh);
 # Next we need to add constraints to `ch`. For this problem we define
 # homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
 # the `union` of all the face sets on the boundary.
-∂Ω = union(getfaceset.(grid, ["left", "right", "top", "bottom"])...);
+∂Ω = union(getfaceset.((grid, ), ["left", "right", "top", "bottom"])...);
 
 # Now we are set up to define our constraint. We specify which field
 # the condition is for, and our combined face set `∂Ω`. The last

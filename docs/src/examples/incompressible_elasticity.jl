@@ -20,7 +20,7 @@
 #md # The full program, without comments, can be found in the next
 #md # [section](@ref incompressible_elasticity-plain-program).
 using JuAFEM
-using BlockArrays
+using BlockArrays, SparseArrays, LinearAlgebra
 
 # First we generate a simple grid, specifying the 4 corners of Cooks membrane.
 function create_cook_grid(nx, ny)
