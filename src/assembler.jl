@@ -119,7 +119,7 @@ end
     @boundscheck checkbounds(K, dofs, dofs)
     resize!(permutation, length(dofs))
     resize!(sorteddofs, length(dofs))
-    copy!(sorteddofs, dofs)
+    copyto!(sorteddofs, dofs)
     sortperm2!(sorteddofs, permutation)
 
     current_col = 1
