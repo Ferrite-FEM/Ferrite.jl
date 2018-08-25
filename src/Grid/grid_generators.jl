@@ -396,3 +396,81 @@ function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3,Int}, left::
 
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
+
+function generate_grid(::Type{QuadraticTetrahedron}, cells_per_dim::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
+    nodes_per_dim = (2 .* cells_per_dim) .+ 1
+
+    cells_per_cube = 6
+    total_nodes = prod(nodes_per_dim)
+    total_elements = cells_per_cube * prod(cells_per_dim)
+
+    n_nodes_x, n_nodes_y, n_nodes_z = nodes_per_dim
+    n_cells_x, n_cells_y, n_cells_z = cells_per_dim
+
+    # Generate nodes
+    coords_x = range(left[1], stop=right[1], length=n_nodes_x)
+    coords_y = range(left[2], stop=right[2], length=n_nodes_y)
+    coords_z = range(left[3], stop=right[3], length=n_nodes_z)
+    numbering = reshape(1:total_nodes, nodes_per_dim)
+
+    # Pre-allocate the nodes & cells
+    nodes = Vector{Node{3,T}}(undef,total_nodes)
+    cells = Vector{QuadraticTetrahedron}(undef,total_elements)
+
+    # Generate nodes
+    node_idx = 1
+    @inbounds for k in 1:n_nodes_z, j in 1:n_nodes_y, i in 1:n_nodes_x
+        nodes[node_idx] = Node((coords_x[i], coords_y[j], coords_z[k]))
+        node_idx += 1
+    end
+
+    # Generate cells, case 1 from: http://www.baumanneduard.ch/Splitting%20a%20cube%20in%20tetrahedras2.htm
+    # cube = (1, 2, 3, 4, 5, 6, 7, 8)
+    # left = (1, 4, 5, 8), right = (2, 3, 6, 7)
+    # front = (1, 2, 5, 6), back = (3, 4, 7, 8)
+    # bottom = (1, 2, 3, 4), top = (5, 6, 7, 8)
+    cell_idx = 0
+    @inbounds for k in 1:n_cells_z, j in 1:n_cells_y, i in 1:n_cells_x
+        cube = numbering[(2*(i-1) + 1):(2*i + 1), (2*(j-1)+1): 2*j + 1, (2*(k-1) +1): (2*k +1)]
+
+        localnodes = [  ((1,1,1),(3,1,1),(1,3,1),(1,3,3)),
+                        ((1,1,1),(1,1,3),(3,1,1),(1,3,3)),
+                        ((3,1,1),(3,3,1),(1,3,1),(1,3,3)),
+                        ((3,1,1),(3,3,3),(3,3,1),(1,3,3)),
+                        ((3,1,1),(1,1,3),(3,1,3),(1,3,3)),
+                        ((3,1,1),(3,1,3),(3,3,3),(1,3,3))
+                        ]
+        avg(x,y) = (x == 1 && y == 3) || (x == 3 && y == 1) ? 2 : x
+        indexavg(x,y) = CartesianIndex(avg.(Tuple(x),Tuple(y)))
+        for (idx, p1vertices) in enumerate(localnodes)
+            v1,v2,v3,v4 = map(CartesianIndex,p1vertices)
+            cells[cell_idx + idx] = QuadraticTetrahedron((cube[v1],cube[v2],cube[v3],cube[v4],
+                        cube[indexavg(v1,v2)],cube[indexavg(v2,v3)],cube[indexavg(v1,v3)],cube[indexavg(v1,v4)],
+                        cube[indexavg(v2,v4)],cube[indexavg(v3,v4)]))
+        end
+        cell_idx += cells_per_cube
+    end
+
+    # Order the cells as c_nxyz[n, x, y, z] such that we can look up boundary cells
+    c_nxyz = reshape(1:total_elements, (cells_per_cube, cells_per_dim...))
+
+    @views le = [map(x -> (x,4), c_nxyz[1, 1, :, :][:])   ; map(x -> (x,2), c_nxyz[2, 1, :, :][:])]
+    @views ri = [map(x -> (x,1), c_nxyz[4, end, :, :][:]) ; map(x -> (x,1), c_nxyz[6, end, :, :][:])]
+    @views fr = [map(x -> (x,1), c_nxyz[2, :, 1, :][:])   ; map(x -> (x,1), c_nxyz[5, :, 1, :][:])]
+    @views ba = [map(x -> (x,3), c_nxyz[3, :, end, :][:]) ; map(x -> (x,3), c_nxyz[4, :, end, :][:])]
+    @views bo = [map(x -> (x,1), c_nxyz[1, :, :, 1][:])   ; map(x -> (x,1), c_nxyz[3, :, :, 1][:])]
+    @views to = [map(x -> (x,3), c_nxyz[5, :, :, end][:]) ; map(x -> (x,3), c_nxyz[6, :, :, end][:])]
+
+    boundary_matrix = boundaries_to_sparse([le; ri; bo; to; fr; ba])
+
+    facesets = Dict(
+        "left" => Set(le),
+        "right" => Set(ri),
+        "front" => Set(fr),
+        "back" => Set(ba),
+        "bottom" => Set(bo),
+        "top" => Set(to),
+    )
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
+end
+
