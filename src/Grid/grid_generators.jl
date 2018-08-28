@@ -429,19 +429,21 @@ function generate_grid(::Type{QuadraticTetrahedron}, cells_per_dim::NTuple{3,Int
     # left = (1, 4, 5, 8), right = (2, 3, 6, 7)
     # front = (1, 2, 5, 6), back = (3, 4, 7, 8)
     # bottom = (1, 2, 3, 4), top = (5, 6, 7, 8)
+
+    localnodes = [  ((1,1,1),(3,1,1),(1,3,1),(1,3,3)),
+                    ((1,1,1),(1,1,3),(3,1,1),(1,3,3)),
+                    ((3,1,1),(3,3,1),(1,3,1),(1,3,3)),
+                    ((3,1,1),(3,3,3),(3,3,1),(1,3,3)),
+                    ((3,1,1),(1,1,3),(3,1,3),(1,3,3)),
+                    ((3,1,1),(3,1,3),(3,3,3),(1,3,3))
+                    ]
+    avg(x,y) = (x == 1 && y == 3) || (x == 3 && y == 1) ? 2 : x
+    indexavg(x,y) = CartesianIndex(avg.(Tuple(x),Tuple(y)))
+ 
     cell_idx = 0
     @inbounds for k in 1:n_cells_z, j in 1:n_cells_y, i in 1:n_cells_x
         cube = numbering[(2*(i-1) + 1):(2*i + 1), (2*(j-1)+1): 2*j + 1, (2*(k-1) +1): (2*k +1)]
 
-        localnodes = [  ((1,1,1),(3,1,1),(1,3,1),(1,3,3)),
-                        ((1,1,1),(1,1,3),(3,1,1),(1,3,3)),
-                        ((3,1,1),(3,3,1),(1,3,1),(1,3,3)),
-                        ((3,1,1),(3,3,3),(3,3,1),(1,3,3)),
-                        ((3,1,1),(1,1,3),(3,1,3),(1,3,3)),
-                        ((3,1,1),(3,1,3),(3,3,3),(1,3,3))
-                        ]
-        avg(x,y) = (x == 1 && y == 3) || (x == 3 && y == 1) ? 2 : x
-        indexavg(x,y) = CartesianIndex(avg.(Tuple(x),Tuple(y)))
         for (idx, p1vertices) in enumerate(localnodes)
             v1,v2,v3,v4 = map(CartesianIndex,p1vertices)
             cells[cell_idx + idx] = QuadraticTetrahedron((cube[v1],cube[v2],cube[v3],cube[v4],
