@@ -16,6 +16,7 @@ using ForwardDiff
 import ForwardDiff: GradientConfig, HessianConfig, Chunk
 using JuAFEM
 using Optim, LineSearches
+using SparseArrays
 using Tensors
 using Base.Threads
 # ## Energy terms
@@ -237,11 +238,11 @@ end
 δ(i, j) = i == j ? one(i) : zero(i)
 V2T(p11, p12, p44) = Tensor{4, 3}((i,j,k,l) -> p11 * δ(i,j)*δ(k,l)*δ(i,k) + p12*δ(i,j)*δ(k,l)*(1 - δ(i,k)) + p44*δ(i,k)*δ(j,l)*(1 - δ(i,j)))
 
-const G = V2T(1.0e2, 0.0, 1.0e2)
-const α = Vec{3}((-1.0, 1.0, 1.0))
+G = V2T(1.0e2, 0.0, 1.0e2)
+α = Vec{3}((-1.0, 1.0, 1.0))
 left = Vec{3}((-75.,-25.,-2.))
 right = Vec{3}((75.,25.,2.))
-model = LandauModel(alphatest, Gtest, (10, 10, 2), left, right, element_potential)
+model = LandauModel(α, G, (10, 10, 2), left, right, element_potential)
 
 vtk_save(homedir()*"/landauorig", model)
 minimize!(model)
