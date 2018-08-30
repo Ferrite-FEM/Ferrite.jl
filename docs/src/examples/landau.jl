@@ -56,7 +56,7 @@ end
 # ### ThreadCache
 # This holds the values that each thread will use during the assembly.
 struct ThreadCache{T, DIM, CC <: CellCache, GC <: GradientConfig, HC <: HessianConfig}
-    dofindices       ::Vector{Int}
+    element_indices  ::Vector{Int}
     element_dofs     ::Vector{T}
     element_gradient ::Vector{T}
     element_hessian  ::Matrix{T}
@@ -66,15 +66,15 @@ struct ThreadCache{T, DIM, CC <: CellCache, GC <: GradientConfig, HC <: HessianC
     element_coords   ::Vector{Vec{DIM, T}}
 end
 function ThreadCache(dpc::Int, nodespercell,  args...)
-    dofindices       = zeros(Int, dpc)
+    element_indices  = zeros(Int, dpc)
     element_dofs     = zeros(dpc)
     element_gradient = zeros(dpc)
     element_hessian  = zeros(dpc, dpc)
     cellcache        = CellCache(args...)
-    gradconf         = GradientConfig(nothing, zeros(12), Chunk{12}())
-    hessconf         = HessianConfig(nothing, zeros(12), Chunk{12}())
+    gradconf         = GradientConfig(nothing, zeros(dpc), Chunk{12}())
+    hessconf         = HessianConfig(nothing, zeros(dpc), Chunk{12}())
     coords           = zeros(Vec{3}, nodespercell)
-    return ThreadCache(dofindices, element_dofs, element_gradient, element_hessian, cellcache, gradconf, hessconf, coords )
+    return ThreadCache(element_indices, element_dofs, element_gradient, element_hessian, cellcache, gradconf, hessconf, coords )
 end
 
 # ## The Model
@@ -131,18 +131,18 @@ macro assemble!(innerbody)
         dofhandler = model.dofhandler
         for indices in model.threadindices
             @threads for i in indices
-                cache  = model.threadcaches[threadid()]
+                cache     = model.threadcaches[threadid()]
                 cellcache = cache.cellcache
-                eldofs = cache.element_dofs
-                nodeids = dofhandler.grid.cells[i].nodes
+                eldofs    = cache.element_dofs
+                nodeids   = dofhandler.grid.cells[i].nodes
                 for j=1:length(cache.element_coords)
                     cache.element_coords[j] = dofhandler.grid.nodes[nodeids[j]].x
                 end
                 reinit!(cellcache.cvP, cache.element_coords)
 
-                celldofs!(cache.dofindices, dofhandler, i)
+                celldofs!(cache.element_indices, dofhandler, i)
                 for j=1:length(cache.element_dofs)
-                    eldofs[j] = dofvector[cache.dofindices[j]]
+                    eldofs[j] = dofvector[cache.element_indices[j]]
                 end
                 $innerbody
             end
@@ -154,7 +154,7 @@ end
 function F(dofvector::Vector{T}, model) where T
     outs = fill(zero(T), nthreads())
     @assemble! begin
-        outs[threadid()] += cache.cellcache.elpotential(eldofs)
+        outs[threadid()] += cellcache.elpotential(eldofs)
     end
     return sum(outs)
 end
@@ -164,8 +164,7 @@ function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) whe
     fill!(∇f, zero(T))
     @assemble! begin
         ForwardDiff.gradient!(cache.element_gradient, cellcache.elpotential, eldofs, cache.gradconf)
-
-        @inbounds assemble!(∇f, cache.dofindices, cache.element_gradient)
+        @inbounds assemble!(∇f, cache.element_indices, cache.element_gradient)
     end
 end
 
@@ -174,10 +173,23 @@ function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauMod
     assemblers = [start_assemble(∇²f) for t=1:nthreads()]
     @assemble! begin
         ForwardDiff.hessian!(cache.element_hessian, cellcache.elpotential, eldofs, cache.hessconf)
-        @inbounds assemble!(assemblers[threadid()], cache.dofindices, cache.element_hessian)
+        @inbounds assemble!(assemblers[threadid()], cache.element_indices, cache.element_hessian)
     end
 end
 
+# We can also calculate all things in one go!
+function calcall(∇²f::SparseMatrixCSC, ∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where T
+    outs = fill(zero(T), nthreads())
+    fill!(∇f, zero(T))
+    assemblers = [start_assemble(∇²f, ∇f) for t=1:nthreads()]
+    @assemble! begin
+        outs[threadid()] += cellcache.elpotential(eldofs)
+        ForwardDiff.hessian!(cache.element_hessian, cellcache.elpotential, eldofs, cache.hessconf)
+        ForwardDiff.gradient!(cache.element_gradient, cellcache.elpotential, eldofs, cache.gradconf)
+        @inbounds assemble!(assemblers[threadid()], cache.element_indices, cache.element_gradient, cache.element_hessian)
+    end
+    return sum(outs)
+end
 # ## Minimization
 # Now everything can be combined to minimize the energy, and find the equilibrium
 # configuration.
@@ -198,10 +210,10 @@ function minimize!(model; kwargs...)
 
     od = TwiceDifferentiable(f, g!, h!, model.dofs, 0.0, ∇f, ∇²f)
 
-    #this way of minimizing is kind of beneficial when the initial guess is completely off,
-    #quick couple of ConjuageGradient steps brings us easily closer to the minimum.
-    res = optimize(od, model.dofs, ConjugateGradient(linesearch=BackTracking()), Optim.Options(show_trace=true, show_every=1, g_tol=1e-20, iterations=50))
-    model.dofs .= res.minimizer
+    # this way of minimizing is only beneficial when the initial guess is completely off,
+    # then a quick couple of ConjuageGradient steps brings us easily closer to the minimum.
+    # res = optimize(od, model.dofs, ConjugateGradient(linesearch=BackTracking()), Optim.Options(show_trace=true, show_every=1, g_tol=1e-20, iterations=10))
+    # model.dofs .= res.minimizer
     #to get the final convergence, Newton's method is more ideal since the energy landscape should be almost parabolic
     res = optimize(od, model.dofs, Newton(linesearch=BackTracking()), Optim.Options(show_trace=true, show_every=1, g_tol=1e-20))
     model.dofs .= res.minimizer
@@ -242,10 +254,10 @@ G = V2T(1.0e2, 0.0, 1.0e2)
 α = Vec{3}((-1.0, 1.0, 1.0))
 left = Vec{3}((-75.,-25.,-2.))
 right = Vec{3}((75.,25.,2.))
-model = LandauModel(α, G, (10, 10, 2), left, right, element_potential)
+model = LandauModel(α, G, (50, 50, 2), left, right, element_potential)
 
 vtk_save(homedir()*"/landauorig", model)
-minimize!(model)
+@time minimize!(model)
 vtk_save(homedir()*"/landaufinal", model)
 
 # as we can see this runs very quickly even for relatively large gridsizes.
