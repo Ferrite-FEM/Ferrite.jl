@@ -347,7 +347,7 @@ end
 WriteVTK.vtk_grid(filename::AbstractString, dh::DofHandler) = vtk_grid(filename, dh.grid)
 
 # Exports the FE field `u` to `vtkfile`
-function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector)
+function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector, suffix="")
     for f in 1:nfields(dh)
         @debug println("exporting field $(dh.field_names[f])")
         field_dim = dh.field_dims[f]
@@ -365,7 +365,7 @@ function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector)
                 end
             end
         end
-        vtk_point_data(vtkfile, data, string(dh.field_names[f]))
+        vtk_point_data(vtkfile, data, string(dh.field_names[f], suffix))
     end
     return vtkfile
 end
