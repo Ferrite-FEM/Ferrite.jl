@@ -24,6 +24,10 @@ notifications:
 git:
   depth: 99999
 
+after_success:
+  - julia --color=yes --project=test/coverage/ -e 'using Pkg; Pkg.instantiate()'
+  - julia --color=yes --project=test/coverage/ test/coverage/coverage.jl
+
 jobs:
   include:
     - stage: deploy
@@ -32,5 +36,4 @@ jobs:
       script:
         - julia --color=yes --project=docs/ -e 'using Pkg; Pkg.instantiate()'
         - julia --color=yes --project=docs/ docs/make.jl
-        - julia --color=yes --project=test/coverage/ -e 'using Pkg; Pkg.instantiate()'
-        - julia --color=yes --project=test/coverage/ test/coverage/coverage.jl
+      after_success: skip

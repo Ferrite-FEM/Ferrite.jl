@@ -200,13 +200,13 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
 end
 
 # Updates the DBC's to the current time `time`
-function update!(ch::ConstraintHandler, time::Float64=0.0)
+function update!(ch::ConstraintHandler, time::Real=0.0)
     @assert ch.closed[]
     for dbc in ch.dbcs
         field_idx = find_field(ch.dh, dbc.field_name)
         # Function barrier
         _update!(ch.values, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
-                 dbc.components, ch.dh, ch.dh.bc_values[field_idx], ch.dofmapping, time)
+                 dbc.components, ch.dh, ch.dh.bc_values[field_idx], ch.dofmapping, convert(Float64, time))
     end
 end
 
