@@ -38,43 +38,29 @@ struct ModelParams{V, T}
     G::T
 end
 
-# ## Caches
-# ### Element cache
-# This is mainly done so that it's possible to easily
-# redefine the elpotential for the AutomaticDifferentiation, and circumvent closure-related
-# issues and allocations.
-mutable struct CellCache{CV, MP, F <: Function}
-    cvP::CV
-    params::MP
-    elpotential::F
-    function CellCache(cvP::CV, params::MP, elpotential::Function) where {CV, MP}
-        potfunc = x -> elpotential(x, cvP, params)
-        return new{CV, MP, typeof(potfunc)}(cvP, params, potfunc)
-    end
-end
-
 # ### ThreadCache
 # This holds the values that each thread will use during the assembly.
-struct ThreadCache{T, DIM, CC <: CellCache, GC <: GradientConfig, HC <: HessianConfig}
+struct ThreadCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: HessianConfig}
+    cvP              ::CV
     element_indices  ::Vector{Int}
     element_dofs     ::Vector{T}
     element_gradient ::Vector{T}
     element_hessian  ::Matrix{T}
-    cellcache        ::CC
+    element_coords   ::Vector{Vec{DIM, T}}
+    element_potential::F
     gradconf         ::GC
     hessconf         ::HC
-    element_coords   ::Vector{Vec{DIM, T}}
 end
-function ThreadCache(dpc::Int, nodespercell,  args...)
+function ThreadCache(dpc::Int, nodespercell, cvP::CellValues{DIM, T}, modelparams, elpotential) where {DIM, T}
     element_indices  = zeros(Int, dpc)
     element_dofs     = zeros(dpc)
     element_gradient = zeros(dpc)
     element_hessian  = zeros(dpc, dpc)
-    cellcache        = CellCache(args...)
-    gradconf         = GradientConfig(nothing, zeros(dpc), Chunk{12}())
-    hessconf         = HessianConfig(nothing, zeros(dpc), Chunk{12}())
-    coords           = zeros(Vec{3}, nodespercell)
-    return ThreadCache(element_indices, element_dofs, element_gradient, element_hessian, cellcache, gradconf, hessconf, coords )
+    element_coords   = zeros(Vec{DIM, T}, nodespercell)
+    potfunc          = x -> elpotential(x, cvP, modelparams)
+    gradconf         = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
+    hessconf         = HessianConfig(potfunc, zeros(dpc), Chunk{12}())
+    return ThreadCache(cvP, element_indices, element_dofs, element_gradient, element_hessian, element_coords, potfunc, gradconf, hessconf)
 end
 
 # ## The Model
@@ -132,13 +118,12 @@ macro assemble!(innerbody)
         for indices in model.threadindices
             @threads for i in indices
                 cache     = model.threadcaches[threadid()]
-                cellcache = cache.cellcache
                 eldofs    = cache.element_dofs
                 nodeids   = dofhandler.grid.cells[i].nodes
                 for j=1:length(cache.element_coords)
                     cache.element_coords[j] = dofhandler.grid.nodes[nodeids[j]].x
                 end
-                reinit!(cellcache.cvP, cache.element_coords)
+                reinit!(cache.cvP, cache.element_coords)
 
                 celldofs!(cache.element_indices, dofhandler, i)
                 for j=1:length(cache.element_dofs)
@@ -154,7 +139,7 @@ end
 function F(dofvector::Vector{T}, model) where T
     outs = fill(zero(T), nthreads())
     @assemble! begin
-        outs[threadid()] += cellcache.elpotential(eldofs)
+        outs[threadid()] += cache.element_potential(eldofs)
     end
     return sum(outs)
 end
@@ -163,7 +148,7 @@ end
 function ∇F!(∇f::Vector{T}, dofvector::Vector{T}, model::LandauModel{T}) where T
     fill!(∇f, zero(T))
     @assemble! begin
-        ForwardDiff.gradient!(cache.element_gradient, cellcache.elpotential, eldofs, cache.gradconf)
+        ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
         @inbounds assemble!(∇f, cache.element_indices, cache.element_gradient)
     end
 end
@@ -172,7 +157,7 @@ end
 function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where T
     assemblers = [start_assemble(∇²f) for t=1:nthreads()]
     @assemble! begin
-        ForwardDiff.hessian!(cache.element_hessian, cellcache.elpotential, eldofs, cache.hessconf)
+        ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
         @inbounds assemble!(assemblers[threadid()], cache.element_indices, cache.element_hessian)
     end
 end
@@ -183,9 +168,9 @@ function calcall(∇²f::SparseMatrixCSC, ∇f::Vector{T}, dofvector::Vector{T},
     fill!(∇f, zero(T))
     assemblers = [start_assemble(∇²f, ∇f) for t=1:nthreads()]
     @assemble! begin
-        outs[threadid()] += cellcache.elpotential(eldofs)
-        ForwardDiff.hessian!(cache.element_hessian, cellcache.elpotential, eldofs, cache.hessconf)
-        ForwardDiff.gradient!(cache.element_gradient, cellcache.elpotential, eldofs, cache.gradconf)
+        outs[threadid()] += cache.element_potential(eldofs)
+        ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
+        ForwardDiff.gradient!(cache.element_gradient, cache.element_potential, eldofs, cache.gradconf)
         @inbounds assemble!(assemblers[threadid()], cache.element_indices, cache.element_gradient, cache.element_hessian)
     end
     return sum(outs)
@@ -204,7 +189,7 @@ function minimize!(model; kwargs...)
     end
     function h!(storage, x)
         ∇²F!(storage, x, model)
-        apply!(storage, model.boundaryconds)
+        # apply!(storage, model.boundaryconds)
     end
     f(x) = F(x, model)
 
