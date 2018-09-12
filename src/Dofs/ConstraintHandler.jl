@@ -310,7 +310,7 @@ end
 
 function apply_zero!(v::Vector, ch::ConstraintHandler)
     @assert length(v) == ndofs(ch.dh)
-    v[ch.prescribed_dofs] = 0 # .= ?
+    v[ch.prescribed_dofs] .= 0
     return v
 end
 
