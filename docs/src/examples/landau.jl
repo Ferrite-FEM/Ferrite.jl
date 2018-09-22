@@ -98,7 +98,11 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
     hessian = create_sparsity_pattern(dofhandler)
     dpc = ndofs_per_cell(dofhandler)
     cpc = length(grid.cells[1].nodes)
-    caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for t=1:nthreads()]
+    tc = ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential)
+    caches = Vector{typeof(tc)}(undef, nthreads())
+    @threads for i in 1:nthreads()
+        caches[Threads.threadid()] = ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential)
+    end
     return LandauModel(dofvector, dofhandler, boundaryconds, threadindices, caches)
 end
 
@@ -155,7 +159,12 @@ end
 
 # The Hessian calculation for the whole grid
 function ∇²F!(∇²f::SparseMatrixCSC, dofvector::Vector{T}, model::LandauModel{T}) where T
-    assemblers = [start_assemble(∇²f) for t=1:nthreads()]
+    ass = start_assemble(∇²f)
+    assemblers = Vector{typeof(ass)}(undef, nthreads())
+    @threads for i in 1:Threads.nthreads()
+        assemblers[threadid()] = start_assemble(∇²f)
+    end
+
     @assemble! begin
         ForwardDiff.hessian!(cache.element_hessian, cache.element_potential, eldofs, cache.hessconf)
         @inbounds assemble!(assemblers[threadid()], cache.element_indices, cache.element_hessian)
@@ -239,7 +248,7 @@ G = V2T(1.0e2, 0.0, 1.0e2)
 α = Vec{3}((-1.0, 1.0, 1.0))
 left = Vec{3}((-75.,-25.,-2.))
 right = Vec{3}((75.,25.,2.))
-model = LandauModel(α, G, (50, 50, 2), left, right, element_potential)
+model = LandauModel(α, G, (20, 20, 2), left, right, element_potential)
 
 vtk_save(homedir()*"/landauorig", model)
 @time minimize!(model)
