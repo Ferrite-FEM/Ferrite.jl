@@ -110,7 +110,8 @@ end
 
 @propagate_inbounds function _assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
     if length(fe) != 0
-        assemble!(A.f, dofs, fe)
+        @boundscheck checkbounds(A.f, dofs, fe)
+        @inbounds assemble!(A.f, dofs, fe)
     end
 
     K = getsparsemat(A)
