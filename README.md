@@ -8,7 +8,7 @@ A simple finite element toolbox written in Julia.
 
 ## Documentation
 
-[![][docs-latest-img]][docs-latest-url]
+[![][docs-dev-img]][docs-dev-url]
 
 ## Installation
 In Julia v1.0 (and v0.7) you can install JuAFEM from the Pkg REPL:
@@ -23,5 +23,5 @@ Pkg.clone("https://github.com/KristofferC/JuAFEM.jl.git")
 Pkg.checkout("JuAFEM", "release-0.3")
 ```
 
-[docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
-[docs-latest-url]: http://kristofferc.github.io/JuAFEM.jl/latest/
+[docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
+[docs-dev-url]: http://kristofferc.github.io/JuAFEM.jl/dev/

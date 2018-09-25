@@ -30,7 +30,7 @@ after_success:
 
 jobs:
   include:
-    - stage: deploy
+    - stage: "Documentation"
       julia: 1.0
       os: linux
       script:
