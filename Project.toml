@@ -11,10 +11,7 @@ WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [extras]
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
-Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
-KrylovMethods = "9a2cd570-f05c-5dc1-9209-93ad6f5727f7"
-Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 NBInclude = "0db19996-df87-5ea3-a455-e3a50d440464"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
@@ -23,6 +20,4 @@ TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [targets]
-test = ["BlockArrays", "Documenter", "ForwardDiff",
-    "KrylovMethods", "Literate", "NBInclude", "ProgressMeter",
-    "Random", "SHA", "TimerOutputs", "UnicodePlots"]
+test = ["BlockArrays", "ForwardDiff", "NBInclude", "ProgressMeter", "Random", "SHA", "TimerOutputs", "UnicodePlots"]
