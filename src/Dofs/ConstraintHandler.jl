@@ -37,10 +37,10 @@ end
 function Dirichlet(field_name::Symbol, faces::Union{Set{Int},Set{Tuple{Int,Int}}}, f::Function, component::Int=1)
     Dirichlet(field_name, faces, f, [component])
 end
-function Dirichlet(field_name::Symbol, faces::Union{Set{Int},Set{Tuple{Int,Int}}}, f::Function, components::AbstractVector{Int})
+function Dirichlet(field_name::Symbol, faces::Union{Set{Int},Set{Tuple{Int,Int}}}, f::Function, components::Vector{Int})
     unique(components) == components || error("components not unique: $components")
     # issorted(components) || error("components not sorted: $components")
-    return Dirichlet(f, faces, field_name, Vector(components), Int[], Int[])
+    return Dirichlet(f, faces, field_name, components, Int[], Int[])
 end
 
 """
