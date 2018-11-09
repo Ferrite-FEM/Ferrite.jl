@@ -27,12 +27,30 @@ The best way to get started with `JuAFEM` is to look at the documented examples.
 
 ## Installation
 
-To install, simply run the following in the Julia REPL:
-```julia
-Pkg.clone("https://github.com/KristofferC/JuAFEM.jl")
+In Julia v1.0 (and v0.7) you can install JuAFEM from the Pkg REPL (press `]` in the Julia
+REPL to enter `pkg>` mode):
+
 ```
-and then run
+pkg> add https://github.com/KristofferC/JuAFEM.jl.git
+```
+
+!!! note
+    Alternative installation method:
+    ```julia
+    julia> import Pkg; Pkg.add(PackageSpec(url = "https://github.com/KristofferC/JuAFEM.jl.git"))
+    ```
+
+To load the package, use
+
 ```julia
 using JuAFEM
 ```
+
 to load the package.
+
+!!! note
+    In Julia v0.6 you need to checkout the `release-0.3` branch when installing:
+    ```
+    Pkg.clone("https://github.com/KristofferC/JuAFEM.jl.git")
+    Pkg.checkout("JuAFEM", "release-0.3")
+    ```
