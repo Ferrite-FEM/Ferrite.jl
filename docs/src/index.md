@@ -46,8 +46,6 @@ To load the package, use
 using JuAFEM
 ```
 
-to load the package.
-
 !!! note
     In Julia v0.6 you need to checkout the `release-0.3` branch when installing:
     ```
