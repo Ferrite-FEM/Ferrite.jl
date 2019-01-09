@@ -20,6 +20,7 @@ The following interpolations are implemented:
 * `Lagrange{3,RefTetrahedron,1}`
 * `Lagrange{3,RefTetrahedron,2}`
 
+
 # Examples
 ```jldoctest
 julia> ip = Lagrange{2,RefTetrahedron,2}()
@@ -405,3 +406,37 @@ function value(ip::Serendipity{2,RefCube,2}, i::Int, ξ::Vec{2})
     i == 8 && return 0.5(1 - ξ_x) * (1 - ξ_y * ξ_y)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
+
+######################
+# Piecewise Constant #
+######################
+
+struct PiecewiseConstant{dim,shape,order} <: Interpolation{dim,shape,order} end
+
+getnbasefunctions(::PiecewiseConstant{dim,shape,1}) where {dim,shape} = 1
+ncelldofs(::PiecewiseConstant{dim,shape,1}) where {dim,shape} = 1
+
+getlowerdim(::PiecewiseConstant{dim,shape,1}) where {dim,shape} = PiecewiseConstant{dim-1,shape,1}()
+#TODO: implement this?
+#getlowerorder(::PiecewiseConstant{2,RefCube,2}) = Lagrange{2,RefCube,1}()
+nvertexdofs(::PiecewiseConstant{dim,shape,1}) where {dim,shape} = 0
+nedgedofs(::PiecewiseConstant{dim,shape,1}) where {dim,shape}  = 0
+
+#faces(::Serendipity{2,RefCube,2}) = ((1,2,5), (2,3,6), (3,4,7), (4,1,8))
+
+
+function value(ip::PiecewiseConstant{dim,shape,1}, i::Int, ξ::Vec{dim}) where  {dim,shape}
+    i == 1 && return 1.0
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+function reference_coordinates(::PiecewiseConstant{dim,shape,1}) where {dim,shape}
+    return reference_coordinates(Lagrange{dim,shape,1}())
+end
+
+function faces(::PiecewiseConstant{dim,shape,1}) where {dim,shape}
+    return faces(Lagrange{dim,shape,1}())
+end
+
+
+
