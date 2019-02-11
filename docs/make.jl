@@ -10,6 +10,7 @@ GENERATEDEXAMPLES = [joinpath("examples", "generated", f) for f in (
 
 # Build documentation.
 makedocs(
+    format = Documenter.HTML(prettyurls = haskey(ENV, "HAS_JOSH_K_SEAL_OF_APPROVAL")), # disable for local builds
     sitename = "JuAFEM.jl",
     doctest = false,
     # strict = VERSION.minor == 6 && sizeof(Int) == 8, # only strict mode on 0.6 and Int64
@@ -37,8 +38,7 @@ makedocs(
             "reference/export.md"
             ]
         ],
-    html_prettyurls = haskey(ENV, "HAS_JOSH_K_SEAL_OF_APPROVAL") # disable for local builds
-    )
+)
 
 # make sure there are no *.vtu files left around from the build
 cd(joinpath(@__DIR__, "build", "examples", "generated")) do
