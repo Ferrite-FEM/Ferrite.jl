@@ -28,7 +28,7 @@ function DofHandler(grid::Grid)
     DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid)
 end
 
-function Base.show(io::IO, dh::DofHandler)
+function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
     println(io, "DofHandler")
     println(io, "  Fields:")
     for i in 1:nfields(dh)
