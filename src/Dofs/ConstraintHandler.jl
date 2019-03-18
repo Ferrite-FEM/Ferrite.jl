@@ -63,7 +63,7 @@ function ConstraintHandler(dh::DofHandler)
     ConstraintHandler(Dirichlet[], Int[], Int[], Float64[], Dict{Int,Int}(), dh, ScalarWrapper(false))
 end
 
-function Base.show(io::IO, ch::ConstraintHandler)
+function Base.show(io::IO, ::MIME"text/plain", ch::ConstraintHandler)
     println(io, "ConstraintHandler:")
     if !isclosed(ch)
         print(io, "  Not closed!")

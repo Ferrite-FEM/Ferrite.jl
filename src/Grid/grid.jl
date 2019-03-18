@@ -219,7 +219,7 @@ function Base.iterate(c::Vector{Cell{dim,N}}, state = 1) where {dim, N}
     end
 end
 
-function Base.show(io::IO, grid::Grid)
+function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) $(celltypes[eltype(grid.cells)]) cells and $(getnnodes(grid)) nodes")
 end
 
