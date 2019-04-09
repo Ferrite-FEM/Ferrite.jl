@@ -287,7 +287,7 @@ function spatial_coordinate(fe_v::Values{dim}, q_point::Int, x::AbstractVector{V
 end
 
 function Base.show(io::IO, ::MIME"text/plain", fe_v::Values)
-    println(io, "$(typeof(fe_v)) with $(getnbasefunctions(fe_v)) shape functions and $(getnquadpoints(fe_v)) quadrature points")
+    print(io, "$(typeof(fe_v)) with $(getnbasefunctions(fe_v)) shape functions and $(getnquadpoints(fe_v)) quadrature points")
 end
 
 # copy
