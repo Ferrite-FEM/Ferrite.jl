@@ -44,9 +44,27 @@ function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String
     vtk_point_data(vtk, z, nodeset)
 end
 
-function vtk_cellset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, cellset::String) where {dim}
+"""
+    vtk_cellset(vtk, grid::Grid)
+
+Export all cell sets in the grid. Each cell set is exported with
+`vtk_cell_data` with value 1 if the cell is in the set, and 0 otherwise.
+"""
+function vtk_cellset(vtk::WriteVTK.DatasetFile, grid::Grid, cellsets=keys(grid.cellsets))
     z = zeros(getncells(grid))
-    z[collect(getcellset(grid, cellset))] .= 1.0
-    vtk_cell_data(vtk, z, cellset)
+    for cellset in cellsets
+        z .= 0.0
+        z[collect(getcellset(grid, cellset))] .= 1.0
+        vtk_cell_data(vtk, z, cellset)
+    end
+    return vtk
 end
 
+"""
+    vtk_cellset(vtk, grid::Grid, cellset::String)
+
+Export the cell set specified by `cellset` as cell data with value 1 if
+the cell is in the set and 0 otherwise.
+"""
+vtk_cellset(vtk::WriteVTK.DatasetFile, grid::Grid, cellset::String) =
+    vtk_cellset(vtk, grid, [cellset])
