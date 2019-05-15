@@ -302,13 +302,13 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
     return vtkfile
 end
 
-function apply!(v::Vector, ch::ConstraintHandler)
+function apply!(v::AbstractVector, ch::ConstraintHandler)
     @assert length(v) == ndofs(ch.dh)
     v[ch.prescribed_dofs] = ch.values # .= ??
     return v
 end
 
-function apply_zero!(v::Vector, ch::ConstraintHandler)
+function apply_zero!(v::AbstractVector, ch::ConstraintHandler)
     @assert length(v) == ndofs(ch.dh)
     v[ch.prescribed_dofs] .= 0
     return v
