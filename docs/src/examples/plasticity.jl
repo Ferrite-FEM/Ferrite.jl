@@ -37,12 +37,12 @@ using JuAFEM, SparseArrays, LinearAlgebra, Printf
 
 # We define a J₂-plasticity-material, containing material parameters and the elastic
 # stiffness Dᵉ (since it is constant)
-struct J2Plasticity{T}
+struct J2Plasticity{T, S <: SymmetricTensor{4, 3, T}}
     G::T  # Shear modulus
     K::T  # Bulk modulus
     σ₀::T # Initial yield limit
     H::T  # Hardening modulus
-    Dᵉ::SymmetricTensor{4, 3} # Elastic stiffness tensor
+    Dᵉ::S # Elastic stiffness tensor
 end;
 
 # Next, we define a constructor for the material instance.
@@ -51,7 +51,7 @@ function J2Plasticity(E, ν, σ₀, H)
     G = E / 2(1 + ν)
     K = E / 3(1 - 2ν)
 
-    Isymdev(i,j,k,l)  = 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) - 1.0/3.0*δ(i,j)*δ(k,l)
+    Isymdev(i,j,k,l) = 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) - 1.0/3.0*δ(i,j)*δ(k,l)
     temp(i,j,k,l) = 2.0G *( 0.5*(δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) + ν/(1.0-2.0ν)*δ(i,j)*δ(k,l))
     Dᵉ = SymmetricTensor{4, 3}(temp)
     return J2Plasticity(G, K, σ₀, H, Dᵉ)
@@ -63,16 +63,16 @@ end;
 #md #
 
 # Define a `struct` to store the material state.
-mutable struct MaterialState
+mutable struct MaterialState{T, S <: SecondOrderTensor{3, T}}
     # Store "converged" values
-    ϵᵖ::SymmetricTensor{2, 3} # plastic strain
-    σ::SymmetricTensor{2, 3}  # stress
-    k::Real                   # hardening variable
+    ϵᵖ::S # plastic strain
+    σ::S # stress
+    k::T # hardening variable
 
     # Store temporary values used during equilibrium iterations
-    temp_ϵᵖ::SymmetricTensor{2, 3}
-    temp_σ::SymmetricTensor{2, 3}
-    temp_k::Real
+    temp_ϵᵖ::S
+    temp_σ::S
+    temp_k::T
 end
 
 # Constructor for initializing a material state. Every quantity is set to zero.
@@ -93,7 +93,6 @@ function update_state!(state::MaterialState)
     state.σ = state.temp_σ
     state.k = state.temp_k
 end;
-
 # For later use, during the post-processing step, we define a function to
 # compute the von Mises effective stress.
 function vonMises(σ)
@@ -114,9 +113,9 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
 
     #  We use (•)ᵗ to denote *trial*-values
     σᵗ = material.Dᵉ ⊡ (ϵ - state.ϵᵖ) # trial-stress
-    sᵗ = dev(σᵗ)          # deviatoric part of trial-stress
+    sᵗ = dev(σᵗ)         # deviatoric part of trial-stress
     J₂ = 0.5 * sᵗ ⊡ sᵗ   # second invariant of sᵗ
-    σᵗₑ = sqrt(3.0*J₂)    # effetive trial-stress (von Mises stress)
+    σᵗₑ = sqrt(3.0*J₂)   # effetive trial-stress (von Mises stress)
     σʸ = material.σ₀ + H * state.k # Previous yield limit
 
     φᵗ  = σᵗₑ - σʸ # Trial-value of the yield surface
@@ -124,7 +123,6 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
     if φᵗ < 0.0 # elastic loading
         state.temp_σ = σᵗ
         return state.temp_σ, material.Dᵉ
-
     else # plastic loading
         h = H + 3G
         μ =  φᵗ / h   # plastic multiplier
@@ -147,7 +145,7 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
 
         # Store outputs in the material state
         Δϵᵖ = 3/2 *μ / σₑ*s            # plastic strain
-        state.temp_ϵᵖ = state.ϵᵖ + Δϵᵖ # plastic strain
+        state.temp_ϵᵖ = state.ϵᵖ + Δϵᵖ  # plastic strain
         state.temp_k = state.k + μ     # hardening variable
         state.temp_σ = σ               # updated stress
         return state.temp_σ, D
@@ -187,7 +185,6 @@ function create_bc(dh, grid)
     dofs = [1, 2, 3]
     dbc = Dirichlet(:u, getfaceset(grid, "left"), (x,t) -> [0.0, 0.0, 0.0], dofs)
     add!(dbcs, dbc)
-
     close!(dbcs)
     return dbcs
 end;
@@ -200,7 +197,6 @@ end;
 function doassemble(cellvalues::CellVectorValues{dim},
                     facevalues::FaceVectorValues{dim}, K::SparseMatrixCSC, grid::Grid,
                     dh::DofHandler, material::J2Plasticity, u, states, t) where {dim}
-
     r = zeros(ndofs(dh))
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)
@@ -226,16 +222,14 @@ end
 #md #
 function assemble_cell!(Ke, re, cell, cellvalues, facevalues, grid, material,
                         ue, state, t)
-
     n_basefuncs = getnbasefunctions(cellvalues)
     reinit!(cellvalues, cell)
-
 
     for q_point in 1:getnquadpoints(cellvalues)
         # For each integration point, compute stress and material stiffness
         ∇u = function_gradient(cellvalues, q_point, ue)
         ϵ = symmetric(∇u) # Total strain
-        (σ, D) = compute_stress_tangent(ϵ, material, state[q_point])
+        σ, D = compute_stress_tangent(ϵ, material, state[q_point])
 
         dΩ = getdetJdV(cellvalues, q_point)
         for i in 1:n_basefuncs
@@ -294,8 +288,8 @@ function solve()
     # Create geometry, dofs and boundary conditions
     n = 2
     nels = (10n, n, 2n) # number of elements in each spatial direction
-    P1 = Vec{3}((0.0, 0.0, 0.0))  # start point for geometry
-    P2 = Vec{3}((L, w, h))        # end point for geometry
+    P1 = Vec((0.0, 0.0, 0.0))  # start point for geometry
+    P2 = Vec((L, w, h))        # end point for geometry
     grid = generate_grid(Tetrahedron, nels, P1, P2)
     interpolation = Lagrange{3, RefTetrahedron, 1}() # Linear tet with 3 unknowns/node
 
@@ -316,11 +310,12 @@ function solve()
     nqp = getnquadpoints(cellvalues)
     states = [[MaterialState() for _ in 1:nqp] for _ in 1:getncells(grid)]
 
+   # states = [MaterialState() for _ in 1:nqp for _ in 1:getncells(grid)]
+   # temp_states = [MaterialState() for _ in 1:nqp for _ in 1:getncells(grid)]
     #
     ## Newton-Raphson loop
     NEWTON_TOL = 1 # 1 N
     print("\n Starting Netwon iterations:\n")
-
 
     for timestep in 1:n_timesteps
         t = timestep # actual time (used for evaluating d-bndc)
@@ -352,13 +347,9 @@ function solve()
 
         # Update all the material states after we have reached equilibrium
         for cell_states in states
-            for state in cell_states
-                update_state!(state)
-            end
+            foreach(update_state!, cell_states)
         end
-
         u_max[timestep] = max(abs.(u)...) # maximum displacement in current timestep
-
     end
 
     # ## Postprocessing
@@ -386,7 +377,7 @@ end
 
 # Solve the FE-problem and for each time-step extract maximum displacement and
 # the corresponding traction load. Also compute the limit-traction-load
- (u_max, traction_magnitude) = solve();
+u_max, traction_magnitude = solve();
 
 # Finally we plot the load-displacement curve.
 using Plots
@@ -403,7 +394,7 @@ xlabel!("Maximum deflection [m]")
 
 
 # *Figure 2.* Load-displacement-curve for the beam, showing a clear decrease
-# in stiffness as more material starts to yield. 
+# in stiffness as more material starts to yield.
 
 ## test the result                       #src
 using Test                               #src
