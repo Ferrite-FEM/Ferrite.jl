@@ -6,12 +6,14 @@
 #     dim::Int
 # end
 
+abstract type AbstractDofHandler end
 """
     DofHandler(grid::Grid)
 
 Construct a `DofHandler` based on the grid `grid`.
 """
-struct DofHandler{dim,N,T,M}
+
+struct DofHandler{dim,N,T,M} <: AbstractDofHandler
     field_names::Vector{Symbol}
     field_dims::Vector{Int}
     # TODO: field_interpolations can probably be better typed: We should at least require
@@ -28,7 +30,7 @@ function DofHandler(grid::Grid)
     DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid)
 end
 
-function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
+function Base.show(io::IO, ::MIME"text/plain", dh::AbstractDofHandler)
     println(io, "DofHandler")
     println(io, "  Fields:")
     for i in 1:nfields(dh)
@@ -44,19 +46,19 @@ end
 
 # TODO: This is not very nice, worth storing ndofs explicitly?
 #       How often do you actually call ndofs though...
-ndofs(dh::DofHandler) = maximum(dh.cell_dofs)
-ndofs_per_cell(dh::DofHandler, cell::Int=1) = dh.cell_dofs_offset[cell+1] - dh.cell_dofs_offset[cell]
-isclosed(dh::DofHandler) = dh.closed[]
-nfields(dh::DofHandler) = length(dh.field_names)
-ndim(dh::DofHandler, field_name::Symbol) = dh.field_dims[find_field(dh, field_name)]
-function find_field(dh::DofHandler, field_name::Symbol)
+ndofs(dh::AbstractDofHandler) = maximum(dh.cell_dofs)
+ndofs_per_cell(dh::AbstractDofHandler, cell::Int=1) = dh.cell_dofs_offset[cell+1] - dh.cell_dofs_offset[cell]
+isclosed(dh::AbstractDofHandler) = dh.closed[]
+nfields(dh::AbstractDofHandler) = length(dh.field_names)
+ndim(dh::AbstractDofHandler, field_name::Symbol) = dh.field_dims[find_field(dh, field_name)]
+function find_field(dh::AbstractDofHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, dh.field_names)
     j == 0 && error("did not find field $field_name")
     return j
 end
 
 # Calculate the offset to the first local dof of a field
-function field_offset(dh::DofHandler, field_name::Symbol)
+function field_offset(dh::AbstractDofHandler, field_name::Symbol)
     offset = 0
     for i in 1:find_field(dh, field_name)-1
         offset += getnbasefunctions(dh.field_interpolations[i])::Int * dh.field_dims[i]
@@ -81,7 +83,7 @@ julia> dof_range(dh, :p)
 10:12
 ```
 """
-function dof_range(dh::DofHandler, field_name::Symbol)
+function dof_range(dh::AbstractDofHandler, field_name::Symbol)
     f = find_field(dh, field_name)
     offset = field_offset(dh, field_name)
     n_field_dofs = getnbasefunctions(dh.field_interpolations[f])::Int * dh.field_dims[f]
@@ -252,7 +254,7 @@ function close!(dh::DofHandler{dim}) where {dim}
     return dh
 end
 
-function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
+function celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
     unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
@@ -335,7 +337,7 @@ permuation `perm`.
     Remember to do renumbering *before* adding boundary conditions,
     otherwise the mapping for the dofs will be wrong.
 """
-function renumber!(dh::DofHandler, perm::AbstractVector{<:Integer})
+function renumber!(dh::AbstractDofHandler, perm::AbstractVector{<:Integer})
     @assert isperm(perm) && length(perm) == ndofs(dh)
     cell_dofs = dh.cell_dofs
     for i in eachindex(cell_dofs)

@@ -48,7 +48,8 @@ end
 
 Collection of constraints.
 """
-struct ConstraintHandler{DH<:DofHandler,T}
+#struct ConstraintHandler{DH<:DofHandler,T}
+struct ConstraintHandler{DH<:AbstractDofHandler,T}
     dbcs::Vector{Dirichlet}
     prescribed_dofs::Vector{Int}
     free_dofs::Vector{Int}
@@ -58,7 +59,7 @@ struct ConstraintHandler{DH<:DofHandler,T}
     closed::ScalarWrapper{Bool}
 end
 
-function ConstraintHandler(dh::DofHandler)
+function ConstraintHandler(dh::AbstractDofHandler)
     @assert isclosed(dh)
     ConstraintHandler(Dirichlet[], Int[], Int[], Float64[], Dict{Int,Int}(), dh, ScalarWrapper(false))
 end
@@ -141,8 +142,9 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
-    _celldofs = fill(0, ndofs_per_cell(ch.dh))
+    #_celldofs = fill(0, ndofs_per_cell(ch.dh))
     for (cellidx, faceidx) in bcfaces
+        _celldofs = fill(0, ndofs_per_cell(ch.dh, cellidx))
         celldofs!(_celldofs, ch.dh, cellidx) # extract the dofs for this cell
         r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
         append!(constrained_dofs, _celldofs[local_face_dofs[r]]) # TODO: for-loop over r and simply push! to ch.prescribed_dofs
