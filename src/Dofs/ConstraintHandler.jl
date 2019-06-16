@@ -384,3 +384,43 @@ function meandiag(K::AbstractMatrix)
     end
     return z / size(K, 1)
 end
+
+
+
+# TODO Remove - almost identical to the previous
+function _update!(values::Vector{Float64}, f::Function, faces::Set{Tuple{Int,Int}}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+                  components::Vector{Int}, dh::MixedDofHandler{dim,C,T}, facevalues::BCValues,
+                  dofmapping::Dict{Int,Int}, time::Float64) where {dim,C,T}
+    grid = dh.grid
+    #xh = zeros(Vec{dim, T}, N) # pre-allocate
+    for (cellidx, faceidx) in faces
+        _celldofs = fill(0, ndofs_per_cell(dh, cellidx))
+        xh = getcoordinates(grid, cellidx)
+        # zeros(Vec{dim, T}, N) # pre-allocate
+        #getcoordinates!(xh, grid, cellidx)
+        celldofs!(_celldofs, dh, cellidx) # update global dofs for this cell
+
+        # no need to reinit!, enough to update current_face since we only need geometric shape functions M
+        facevalues.current_face[] = faceidx
+
+        # local dof-range for this face
+        r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
+        counter = 1
+
+        for location in 1:getnquadpoints(facevalues)
+            x = spatial_coordinate(facevalues, location, xh)
+            bc_value = f(x, time)
+            @assert length(bc_value) == length(components)
+
+            for i in 1:length(components)
+                # find the global dof
+                globaldof = _celldofs[local_face_dofs[r[counter]]]
+                counter += 1
+
+                dbc_index = dofmapping[globaldof]
+                values[dbc_index] = bc_value[i]
+                @debug println("prescribing value $(bc_value[i]) on global dof $(globaldof)")
+            end
+        end
+    end
+end

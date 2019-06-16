@@ -43,11 +43,13 @@ include(joinpath("FEValues","face_integrals.jl"))
 
 # Grid
 include(joinpath("Grid", "grid.jl"))
+include(joinpath("Grid", "MixedGrid.jl"))
 include(joinpath("Grid", "grid_generators.jl"))
 include(joinpath("Grid", "coloring.jl"))
 
 # Dofs
 include(joinpath("Dofs", "DofHandler.jl"))
+include(joinpath("Dofs", "MixedDofHandler.jl"))
 include(joinpath("Dofs", "ConstraintHandler.jl"))
 
 include("iterators.jl")
