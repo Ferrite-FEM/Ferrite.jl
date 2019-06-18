@@ -87,6 +87,7 @@ export
     dof_range,
     renumber!,
     MixedDofHandler,
+    FieldHandler,
 
 # Constraints
     ConstraintHandler,

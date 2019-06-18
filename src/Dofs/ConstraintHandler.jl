@@ -100,10 +100,11 @@ end
 
 function dbc_check(ch::ConstraintHandler, dbc::Dirichlet)
     # check input
-    dbc.field_name in ch.dh.field_names || throw(ArgumentError("field $field does not exist in DofHandler, existing fields are $(dh.field_names)"))
-    for component in dbc.components
-        0 < component <= ndim(ch.dh, dbc.field_name) || error("component $component is not within the range of field $field which has $(ndim(ch.dh, field)) dimensions")
-    end
+    dbc.field_name in getfieldnames(ch.dh) || throw(ArgumentError("field $(dbc.field_name) does not exist in DofHandler, existing fields are $(getfieldnames(ch.dh))"))
+    #TODO FIX!!
+    #for component in dbc.components
+    #    0 < component <= ndim(ch.dh, dbc.field_name) || error("component $component is not within the range of field $field which has $(ndim(ch.dh, field)) dimensions")
+    #end
     if length(dbc.faces) == 0
         @warn("added Dirichlet Boundary Condition to set containing 0 entities")
     end
@@ -422,5 +423,33 @@ function _update!(values::Vector{Float64}, f::Function, faces::Set{Tuple{Int,Int
                 @debug println("prescribing value $(bc_value[i]) on global dof $(globaldof)")
             end
         end
+    end
+end
+
+
+
+
+
+import JuAFEM.add!, JuAFEM.update!
+function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
+    #dbc_check(ch, dbc)
+    field_idx = find_field(fh, dbc.field_name)
+    #field_idx = findfirst(i->i == dbc.field_name, fh.field_names)
+    # Extract stuff for the field
+    interpolation = fh.field_interpolations[field_idx]
+    field_dim = fh.field_dims[field_idx] # TODO: I think we don't need to extract these here ...
+    JuAFEM._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name))
+    return ch
+end
+
+# Updates the DBC's to the current time `time`
+function update!(ch::ConstraintHandler, fh::FieldHandler, time::Real=0.0)
+    @assert ch.closed[]
+    for dbc in ch.dbcs
+        field_idx = find_field(fh, dbc.field_name)
+        # Function barrier
+        _update!(ch.values, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs,
+                 dbc.local_face_dofs_offset, dbc.components, ch.dh,
+                 fh.bc_values[field_idx], ch.dofmapping, convert(Float64, time))
     end
 end

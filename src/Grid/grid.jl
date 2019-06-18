@@ -190,20 +190,23 @@ end
     getcoordinates!(x::Vector, grid::Grid, cell::Int)
 Update the coordinate vector `x` for cell number `cell`.
 """
-@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Grid{dim,N,T}, cell::Int) where {dim,T,N}
-    @assert length(x) == N
-    @inbounds for i in 1:N
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::Int) where {dim,T}
+    #@assert length(x) == N
+    @inbounds for i in 1:length(x)
         x[i] = grid.nodes[grid.cells[cell].nodes[i]].x
     end
 end
-@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::Grid{dim,N,T}, cell::CellIndex) where {dim, T, N} = getcoordinates!(x, grid, cell.idx)
-@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::Grid{dim,N,T}, face::FaceIndex) where {dim, T, N} = getcoordinates!(x, grid, face.idx[1])
+@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
+@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, face::FaceIndex) where {dim, T} = getcoordinates!(x, grid, face.idx[1])
 
 """
     getcoordinates(grid::Grid, cell)
 Return a vector with the coordinates of the vertices of cell number `cell`.
 """
-@inline function getcoordinates(grid::Grid{dim,N,T}, cell::Int) where {dim,N,T}
+@inline function getcoordinates(grid::AbstractGrid, cell::Int)
+    # TODO pretty ugly, worth it?
+    dim = typeof(grid.cells[cell]).parameters[1]
+    T = typeof(grid).parameters[3]
     nodeidx = grid.cells[cell].nodes
     return [grid.nodes[i].x for i in nodeidx]::Vector{Vec{dim,T}}
 end

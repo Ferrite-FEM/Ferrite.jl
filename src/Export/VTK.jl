@@ -83,27 +83,62 @@ end
 
 import JuAFEM.field_offset
 function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler, u::Vector, suffix="")
-    for f in 1:length(dh.field_names)  # TODO nfields(dh) funkar inte i Main-scope - kolla upp
-        @debug println("exporting field $(dh.field_names[f])")
-        field_dim = dh.field_dims[f]
-        space_dim = field_dim == 2 ? 3 : field_dim
-        data = fill(0.0, space_dim, getnnodes(dh.grid))
-        offset = field_offset(dh, dh.field_names[f])
-        #for cell in CellIterator(dh)
-        for (cellnum, cell) in enumerate(dh.grid.cells)
-            n = ndofs_per_cell(dh, cellnum)
-            eldofs = zeros(Int, n)
-            _celldofs = celldofs!(eldofs, dh, cellnum)
-            counter = 1
-            for node in cell.nodes
-                for d in 1:dh.field_dims[f]
-                    data[d, node] = u[_celldofs[counter + offset]]
-                    @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
-                    counter += 1
-                end
+
+fh = dh.fieldhandlers[1]
+field_dim = fh.field_dims[1]
+space_dim = field_dim == 2 ? 3 : field_dim
+data = fill(3.0, space_dim, getnnodes(dh.grid))
+
+
+for f in 1:length(fh.field_names)  # TODO nfields(dh) funkar inte i Main-scope - kolla upp
+    @debug println("exporting field $(dh.field_names[f])")
+    offset = field_offset(fh, fh.field_names[f])
+
+    for (cellnum, cell) in enumerate(dh.grid.cells)
+    #for cellnum in fh.cellset
+        n = ndofs_per_cell(dh, cellnum)
+        eldofs = zeros(Int, n)
+        _celldofs = celldofs!(eldofs, dh, cellnum)
+        counter = 1
+        #for node in dh.grid.cells[cellnum].nodes
+        for node in cell.nodes
+            for d in 1:fh.field_dims[f]
+                data[d, node] = u[_celldofs[counter + offset]]
+                @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
+                counter += 1
             end
         end
-        vtk_point_data(vtkfile, data, string(dh.field_names[f], suffix))
     end
+    #vtk_point_data(vtkfile, data, string(fh.field_names[f], suffix))
+end
+vtk_point_data(vtkfile, data, string(fh.field_names[1], suffix))
+#
+# for fh in dh.fieldhandlers
+#     for f in 1:length(fh.field_names)  # TODO nfields(dh) funkar inte i Main-scope - kolla upp
+#         @debug println("exporting field $(dh.field_names[f])")
+#         #field_dim = fh.field_dims[f]
+#         #space_dim = field_dim == 2 ? 3 : field_dim
+#         #data = fill(0.0, space_dim, getnnodes(dh.grid))
+#         offset = field_offset(fh, fh.field_names[f])
+#         #for cell in CellIterator(dh)
+#         #for (cellnum, cell) in enumerate(dh.grid.cells)
+#         for cellnum in fh.cellset
+#             n = ndofs_per_cell(dh, cellnum)
+#             eldofs = zeros(Int, n)
+#             _celldofs = celldofs!(eldofs, dh, cellnum)
+#             counter = 1
+#             for node in dh.grid.cells[cellnum].nodes
+#                 for d in 1:fh.field_dims[f]
+#                     data[d, node] = u[_celldofs[counter + offset]]
+#                     @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
+#                     counter += 1
+#                 end
+#             end
+#         end
+#         #vtk_point_data(vtkfile, data, string(fh.field_names[f], suffix))
+#     end
+#     vtk_point_data(vtkfile, data, string(fh.field_names[1], suffix))
+#     print(data)
+# end
     return vtkfile
 end
