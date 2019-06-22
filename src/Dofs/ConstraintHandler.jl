@@ -48,7 +48,6 @@ end
 
 Collection of constraints.
 """
-#struct ConstraintHandler{DH<:DofHandler,T}
 struct ConstraintHandler{DH<:AbstractDofHandler,T}
     dbcs::Vector{Dirichlet}
     prescribed_dofs::Vector{Int}
@@ -434,20 +433,19 @@ import JuAFEM.add!, JuAFEM.update!
 function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
     #dbc_check(ch, dbc)
     field_idx = find_field(fh, dbc.field_name)
-    #field_idx = findfirst(i->i == dbc.field_name, fh.field_names)
     # Extract stuff for the field
     interpolation = fh.field_interpolations[field_idx]
-    field_dim = fh.field_dims[field_idx] # TODO: I think we don't need to extract these here ...
+    field_dim = fh.field_dims[field_idx]
     JuAFEM._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name))
     return ch
 end
 
 # Updates the DBC's to the current time `time`
-function update!(ch::ConstraintHandler, fh::FieldHandler, time::Real=0.0)
+function update!(ch::ConstraintHandler, dbcmap::Dict, time::Real=0.0)
     @assert ch.closed[]
     for dbc in ch.dbcs
+        fh = dbcmap[dbc]
         field_idx = find_field(fh, dbc.field_name)
-        # Function barrier
         _update!(ch.values, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs,
                  dbc.local_face_dofs_offset, dbc.components, ch.dh,
                  fh.bc_values[field_idx], ch.dofmapping, convert(Float64, time))
