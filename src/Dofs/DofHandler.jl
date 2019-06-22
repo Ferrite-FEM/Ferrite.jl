@@ -50,6 +50,7 @@ ndofs(dh::AbstractDofHandler) = maximum(dh.cell_dofs)
 ndofs_per_cell(dh::AbstractDofHandler, cell::Int=1) = dh.cell_dofs_offset[cell+1] - dh.cell_dofs_offset[cell]
 isclosed(dh::AbstractDofHandler) = dh.closed[]
 nfields(dh::AbstractDofHandler) = length(dh.field_names)
+getfieldnames(dh::AbstractDofHandler) = dh.field_names
 ndim(dh::AbstractDofHandler, field_name::Symbol) = dh.field_dims[find_field(dh, field_name)]
 function find_field(dh::AbstractDofHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, dh.field_names)
