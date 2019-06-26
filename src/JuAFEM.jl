@@ -49,6 +49,7 @@ include("Grid/coloring.jl")
 # Dofs
 include("Dofs/DofHandler.jl")
 include("Dofs/ConstraintHandler.jl")
+include("Dofs/ConstraintHandler2.jl")
 
 include("iterators.jl")
 
