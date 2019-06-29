@@ -434,8 +434,8 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
     #dbc_check(ch, dbc)
     field_idx = find_field(fh, dbc.field_name)
     # Extract stuff for the field
-    interpolation = fh.field_interpolations[field_idx]
-    field_dim = fh.field_dims[field_idx]
+    interpolation = getfieldinterpolations(fh)[field_idx]
+    field_dim = getfielddims(fh)[field_idx]
     JuAFEM._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name))
     return ch
 end

@@ -1,10 +1,8 @@
-
-# # TODO: Maybe nice to add a field like this instead of manually pushing stuff to the dofhandler
-# struct Field
-#     name::Symbol
-#     interpolation::Interpolation
-#     dim::Int
-# end
+struct Field
+    name::Symbol
+    interpolation::Interpolation
+    dim::Int
+end
 
 abstract type AbstractDofHandler end
 """

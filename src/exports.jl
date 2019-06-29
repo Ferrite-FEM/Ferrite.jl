@@ -88,6 +88,7 @@ export
     renumber!,
     MixedDofHandler,
     FieldHandler,
+    Field,
 
 # Constraints
     ConstraintHandler,
