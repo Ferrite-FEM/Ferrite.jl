@@ -377,7 +377,7 @@ getnbasefunctions(::Serendipity{2,RefCube,2}) = 8
 getlowerdim(::Serendipity{2,RefCube,2}) = Lagrange{1,RefCube,2}()
 getlowerorder(::Serendipity{2,RefCube,2}) = Lagrange{2,RefCube,1}()
 nvertexdofs(::Serendipity{2,RefCube,2}) = 1
-nedgedofs(::Serendipity{2,RefCube,2}) = 1
+nfacedofs(::Serendipity{2,RefCube,2}) = 1
 
 faces(::Serendipity{2,RefCube,2}) = ((1,2,5), (2,3,6), (3,4,7), (4,1,8))
 
