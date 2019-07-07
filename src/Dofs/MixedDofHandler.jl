@@ -60,149 +60,156 @@ function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
 end
 
 
+#import JuAFEM.close!
 function close!(dh::MixedDofHandler{dim}) where {dim}
 
-    @assert !isclosed(dh)
-    field_names = getfieldnames(dh)  # all the fields in the problem
-
+    @assert !JuAFEM.isclosed(dh)
+    field_names = JuAFEM.getfieldnames(dh)  # all the fields in the problem
     numfields =  length(field_names)
 
-    vertexdicts = [Dict{Int,Int}() for _ in 1:numfields]
-    edgedicts = [Dict{Tuple{Int,Int}, Tuple{Int,Bool}}() for _ in 1:numfields]
-    facedicts = [Dict{NTuple{dim,Int}, Int}() for _ in 1:numfields]
+    # Create dicts that stores created dofs
+    # Each key should uniquely identify the given type
+    vertexdicts = [Dict{Int, Array{Int}}() for _ in 1:numfields]
+    edgedicts = [Dict{Tuple{Int,Int}, Array{Int}}() for _ in 1:numfields]
+    facedicts = [Dict{Tuple{Int,Int}, Array{Int}}() for _ in 1:numfields]
+    celldicts = [Dict{Int, Array{Int}}() for _ in 1:numfields]
 
-    nextdof = 1 # next free dof to distribute
+    # Set initial values
+    nextdof = 1  # next free dof to distribute
+    push!(dh.cell_dofs_offset, nextdof)
+
+    @debug "\n\nCreating dofs\n"
     for fh in dh.fieldhandlers
-        # sort the cellset since we want to loop through the elements in a fixed order
+        # sort the cellset since we want to loop through the cells in a fixed order
         cellnumbers = sort(collect(fh.cellset))
-        nextdof = JuAFEM._close!(
+        nextdof = _close!(
             dh,
             cellnumbers,
-            getfieldnames(fh),
-            getfielddims(fh),
-            getfieldinterpolations(fh),
+            JuAFEM.getfieldnames(fh),
+            JuAFEM.getfielddims(fh),
+            JuAFEM.getfieldinterpolations(fh),
             nextdof,
             vertexdicts,
             edgedicts,
-            facedicts)
+            facedicts,
+            celldicts)
+    end
+    dh.closed[] = true
+    return dh
+end
+
+function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
+
+    ip_infos = JuAFEM.InterpolationInfo[]
+    for interpolation in field_interpolations
+        ip_info = JuAFEM.InterpolationInfo(interpolation)
+        # these are implemented yet (or have not been tested)
+        @assert(ip_info.nvertexdofs <= 1)
+        @assert(ip_info.nedgedofs <= 1)
+        @assert(ip_info.nfacedofs <= 1)
+        @assert(ip_info.ncelldofs <= 1)  # not tested but probably works
+        push!(ip_infos, ip_info)
+    end
+
+    # loop over all the cells, and distribute dofs for all the fields
+    for ci in cellnumbers
+        cell = dh.grid.cells[ci]
+        cell_dofs = Int[]  # list of global dofs for each cell
+        @debug "Creating dofs for cell #$ci"
+
+        for fi in 1:length(field_names)
+            @debug "\tfield: $(field_names[fi])"
+            ip_info = ip_infos[fi]
+
+            if ip_info.nvertexdofs > 0
+                nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[fi], ip_info.nvertexdofs, nextdof)
+            end
+
+            if ip_info.nfacedofs > 0
+                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[fi], ip_info.nfacedofs, nextdof)
+            end
+
+            if ip_info.nedgedofs > 0
+                nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[fi], ip_info.nedgedofs, nextdof)
+            end
+
+            if ip_info.ncelldofs > 0
+                nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[fi], ip_info.ncelldofs, nextdof)
+            end
+
+        end
+        # after done creating dofs for the cell, push them to the global list
+        push!(dh.cell_dofs, cell_dofs...)
+        # push! the first index of the next cell to the offset vector
+        push!(dh.cell_dofs_offset, length(dh.cell_dofs)+1)
+
+        @debug "Dofs for cell #$ci:\n\t$cell_dofs"
+    end # cell loop
+    return nextdof
+end
+
+"""
+Returns the next global dof number and an array of dofs.
+If dofs have already been created for the object (vertex, face) then simply return those, otherwise create new dofs.
+"""
+function get_or_create_dofs!(nextdof, field_dim; dict, key)
+
+
+    token = Base.ht_keyindex2!(dict, key)
+    if token > 0  # vertex, face etc. visited before
+        # reuse stored dofs (TODO unless field is discontinuous)
+        @debug "\t\tkey: $key dofs: $(dict[key])  (reused dofs)"
+        return nextdof, dict[key]
+
+    else  # create new dofs
+        dofs = collect(nextdof : nextdof + field_dim-1)
+        @debug "\t\tkey: $key dofs: $dofs"
+        Base._setindex!(dict, dofs, key, -token) #
+        nextdof += field_dim
+        return nextdof, dofs
     end
 end
 
-function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts) where {dim}
-
-        interpolation_infos = JuAFEM.InterpolationInfo[]
-        for interpolation in field_interpolations
-            push!(interpolation_infos, JuAFEM.InterpolationInfo(interpolation))
-        end
-        if length(dh.cell_dofs_offset) == 0
-            push!(dh.cell_dofs_offset, nextdof) # if this is the first dof
-        end
-
-        # not implemented yet: more than one facedof per face in 3D
-        dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
-
-        # loop over all the cells, and distribute dofs for all the fields
-        for ci in cellnumbers
-            cell = dh.grid.cells[ci]
-            @debug println("cell #$ci")
-            for fi in 1:length(field_names)
-                interpolation_info = interpolation_infos[fi]
-                @debug println("  field: $(fh.field_names[fi])")
-                if interpolation_info.nvertexdofs > 0
-                    for vertex in vertices(cell)
-                        @debug println("    vertex#$vertex")
-                        token = Base.ht_keyindex2!(vertexdicts[fi], vertex)
-                        if token > 0 # haskey(vertexdicts[fi], vertex) # reuse dofs
-                            reuse_dof = vertexdicts[fi].vals[token] # vertexdicts[fi][vertex]
-                            for d in 1:field_dims[fi]
-                                @debug println("      reusing dof #$(reuse_dof + (d-1))")
-                                push!(dh.cell_dofs, reuse_dof + (d-1))
-                            end
-                        else # token <= 0, distribute new dofs
-                            for vertexdof in 1:interpolation_info.nvertexdofs
-                                Base._setindex!(vertexdicts[fi], nextdof, vertex, -token) # vertexdicts[fi][vertex] = nextdof
-                                for d in 1:field_dims[fi]
-                                    @debug println("      adding dof#$nextdof")
-                                    push!(dh.cell_dofs, nextdof)
-                                    nextdof += 1
-                                end
-                            end
-                        end
-                    end # vertex loop
-                end
-                # TODO Add the following
-                # if dim == 3 # edges only in 3D
-                #     if interpolation_info.nedgedofs > 0
-                #         for edge in edges(cell)
-                #             sedge, dir = sortedge(edge)
-                #             @debug println("    edge#$sedge dir: $(dir)")
-                #             token = Base.ht_keyindex2!(edgedicts[fi], sedge)
-                #             if token > 0 # haskey(edgedicts[fi], sedge), reuse dofs
-                #                 startdof, olddir = edgedicts[fi].vals[token] # edgedicts[fi][sedge] # first dof for this edge (if dir == true)
-                #                 for edgedof in (dir == olddir ? (1:interpolation_info.nedgedofs) : (interpolation_info.nedgedofs:-1:1))
-                #                     for d in 1:field_dims[fi]
-                #                         reuse_dof = startdof + (d-1) + (edgedof-1)*field_dims[fi]
-                #                         @debug println("      reusing dof#$(reuse_dof)")
-                #                         push!(dh.cell_dofs, reuse_dof)
-                #                     end
-                #                 end
-                #             else # token <= 0, distribute new dofs
-                #                 Base._setindex!(edgedicts[fi], (nextdof, dir), sedge, -token) # edgedicts[fi][sedge] = (nextdof, dir),  store only the first dof for the edge
-                #                 for edgedof in 1:interpolation_info.nedgedofs
-                #                     for d in 1:field_dims[fi]
-                #                         @debug println("      adding dof#$nextdof")
-                #                         push!(dh.cell_dofs, nextdof)
-                #                         nextdof += 1
-                #                     end
-                #                 end
-                #             end
-                #         end # edge loop
-                #     end
-                # end
-                # if interpolation_info.nfacedofs > 0 # nfacedofs(interpolation) > 0
-                #     for face in faces(cell)
-                #         sface = sortface(face) # TODO: faces(cell) may as well just return the sorted list
-                #         @debug println("    face#$sface")
-                #         token = Base.ht_keyindex2!(facedicts[fi], sface)
-                #         if token > 0 # haskey(facedicts[fi], sface), reuse dofs
-                #             startdof = facedicts[fi].vals[token] # facedicts[fi][sface]
-                #             for facedof in interpolation_info.nfacedofs:-1:1 # always reverse (YOLO)
-                #                 for d in 1:field_dims[fi]
-                #                     reuse_dof = startdof + (d-1) + (facedof-1)*fh.field_dims[fi]
-                #                     @debug println("      reusing dof#$(reuse_dof)")
-                #                     push!(dh.cell_dofs, reuse_dof)
-                #                 end
-                #             end
-                #         else # distribute new dofs
-                #             Base._setindex!(facedicts[fi], nextdof, sface, -token)# facedicts[fi][sface] = nextdof,  store the first dof for this face
-                #             for facedof in 1:interpolation_info.nfacedofs
-                #                 for d in 1:field_dims[fi]
-                #                     @debug println("      adding dof#$nextdof")
-                #                     push!(dh.cell_dofs, nextdof)
-                #                     nextdof += 1
-                #                 end
-                #             end
-                #         end
-                #     end # face loop
-                # end
-                # if interpolation_info.ncelldofs > 0 # always distribute new dofs for cell
-                #     @debug println("    cell#$ci")
-                #     for celldof in 1:interpolation_info.ncelldofs
-                #         for d in 1:field_dims[fi]
-                #             @debug println("      adding dof#$nextdof")
-                #             push!(dh.cell_dofs, nextdof)
-                #             nextdof += 1
-                #         end
-                #     end # cell loop
-                # end
-
-            # push! the first index of the next cell to the offset vector
-            push!(dh.cell_dofs_offset, length(dh.cell_dofs)+1)
-            end
-        end # cell loop
-        dh.closed[] = true
-        return nextdof
+function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, nextdof)
+    for vertex in JuAFEM.vertices(cell)
+        @debug "\tvertex #$vertex"
+        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=vertexdict, key=vertex)
+        push!(cell_dofs, dofs...)
     end
+    return nextdof
+end
+
+function add_face_dofs(cell_dofs, cell, facedict, field_dim, nfacedofs, nextdof)
+    @assert nfacedofs == 1 "Currently only supports interpolations with nfacedofs = 1"
+
+    for face in JuAFEM.faces(cell)
+        sface = JuAFEM.sortface(face)
+        @debug "\tface #$sface"
+        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=facedict, key=sface)
+        push!(cell_dofs, dofs...)
+    end
+    return nextdof
+end
+
+function add_edge_dofs(cell_dofs, cell, edgedict, field_dim, nedgedofs, nextdof)
+    @assert nedgedofs == 1 "Currently only supports interpolations with nedgedofs = 1"
+    for edge in JuAFEM.edges(cell)
+        sedge, dir = JuAFEM.sortedge(edge)
+        @debug "\tedge #$sedge"
+        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=edgedict, key=sedge)
+        push!(cell_dofs, dofs...)
+    end
+    return nextdof
+end
+
+function add_cell_dofs(cell_dofs, cell, celldict, field_dim, ncelldofs, nextdof)
+    for celldof in 1:ncelldofs
+        @debug "\tcell #$cell"
+        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=celldict, key=cell)
+        push!(cell_dofs, dofs...)
+    end
+    return nextdof
+end
 
 
 # TODO if not too slow it can replace the "Grid-version"

@@ -260,6 +260,14 @@ function celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
     return global_dofs
 end
 
+function celldofs(dh::AbstractDofHandler, i::Int)
+    @assert isclosed(dh)
+    n = ndofs_per_cell(dh, i)
+    global_dofs = zeros(Int, n)
+    unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], n)
+    return global_dofs
+end
+
 # Creates a sparsity pattern from the dofs in a DofHandler.
 # Returns a sparse matrix with the correct storage pattern.
 """
