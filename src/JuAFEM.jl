@@ -33,13 +33,13 @@ include("utils.jl")
 include("interpolations.jl")
 
 # Quadrature
-include(joinpath("Quadrature", "quadrature.jl"))
+include("Quadrature/quadrature.jl")
 
 # FEValues
-include(joinpath("FEValues","cell_values.jl"))
-include(joinpath("FEValues","face_values.jl"))
-include(joinpath("FEValues","common_values.jl"))
-include(joinpath("FEValues","face_integrals.jl"))
+include("FEValues/cell_values.jl")
+include("FEValues/face_values.jl")
+include("FEValues/common_values.jl")
+include("FEValues/face_integrals.jl")
 
 # Grid
 include(joinpath("Grid", "grid.jl"))
@@ -58,7 +58,7 @@ include("iterators.jl")
 include("assembler.jl")
 
 # Export
-include(joinpath("Export", "VTK.jl"))
+include("Export/VTK.jl")
 
 # Other
 include("deprecations.jl")
