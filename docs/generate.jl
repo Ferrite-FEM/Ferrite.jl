@@ -13,16 +13,6 @@ for example in readdir(EXAMPLEDIR)
     Literate.notebook(input, GENERATEDDIR, execute = true)
 end
 
-# copy some figures to the build directory
-cp(joinpath(@__DIR__, "../examples/figures/heat_square.png"),
-   joinpath(@__DIR__, "src/examples/generated/heat_equation.png"); force = true)
-
-cp(joinpath(@__DIR__, "../examples/figures/coloring.png"),
-   joinpath(@__DIR__, "src/examples/generated/coloring.png"); force = true)
-
-cp(joinpath(@__DIR__, "../examples/figures/plasticity.png"),
-   joinpath(@__DIR__, "src/examples/generated/plasticity.png"); force = true)
-
 
 # remove any .vtu files in the generated dir (should not be deployed)
 cd(GENERATEDDIR) do
