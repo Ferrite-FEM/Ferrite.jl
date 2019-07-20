@@ -24,7 +24,7 @@ end;
 
 create_example_2d_grid()
 
-# ![](coloring.png)
+# ![](../coloring.png)
 
 # ## Cantilever beam in 3D with threaded assembly
 # We will now look at an example where we assemble the stiffness matrix using multiple
