@@ -50,7 +50,7 @@ end
 Export all cell sets in the grid. Each cell set is exported with
 `vtk_cell_data` with value 1 if the cell is in the set, and 0 otherwise.
 """
-function vtk_cellset(vtk::WriteVTK.DatasetFile, grid::Grid, cellsets=keys(grid.cellsets))
+function vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellsets=keys(grid.cellsets))
     z = zeros(getncells(grid))
     for cellset in cellsets
         z .= 0.0
@@ -66,7 +66,7 @@ end
 Export the cell set specified by `cellset` as cell data with value 1 if
 the cell is in the set and 0 otherwise.
 """
-vtk_cellset(vtk::WriteVTK.DatasetFile, grid::Grid, cellset::String) =
+vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellset::String) =
     vtk_cellset(vtk, grid, [cellset])
 
 function WriteVTK.vtk_grid(filename::AbstractString, grid::MixedGrid{dim,C,T}) where {dim,C,T}

@@ -374,6 +374,19 @@ function test_2_element_heat_eq()
     # tested against heat_equation.jl (in the examples folder) using 2x1 cells and no
     # dbc on top and bottom boundary
     @test u == [0.0, 0.5, 0.5, 0.0, 0.0, 0.0]
+
+    gridfilename = "mixed_grid"
+    addcellset!(grid, "cell-1", [1,])
+    addcellset!(grid, "cell-2", [2,])
+    vtk_grid(gridfilename, grid) do vtk
+        vtk_cellset(vtk, grid, "cell-1")
+        vtk_cellset(vtk, grid, "cell-2")
+        vtk_point_data(vtk, dh, u)
+        # vtk_point_data(vtk, ch)  #FIXME
+    end
+    sha = bytes2hex(open(SHA.sha1, gridfilename*".vtu"))
+    @test sha == "cf19a5920834dc265889528151a4c8246ad366cb"
+
 end
 
 
@@ -394,3 +407,4 @@ end
     test_3d_mixed_field_mixed_celltypes();
     test_2_element_heat_eq();
 end
+test_2_element_heat_eq()
