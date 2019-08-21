@@ -292,6 +292,89 @@ function test_3d_mixed_field_mixed_celltypes()
     @test celldofs(dh, 2) == [7, 8, 9, 4, 5, 6, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42]
 end
 
+function test_2_element_heat_eq()
+    # Regression test solving the heat equation.
+    # The grid consists of two quad elements treated as two different cell types to test the MixedGrid and all other necessary functions
+
+    temp_grid = generate_grid(Quadrilateral, (2, 1))
+    grid = MixedGrid(temp_grid.cells, temp_grid.nodes)  # regular grid -> mixed grid
+    grid.facesets = temp_grid.facesets;
+
+    # Create two identical fields
+    f1 = create_field(name=:u, spatial_dim=2, field_dim=1, order=1, cellshape=RefCube)
+    f2 = create_field(name=:u, spatial_dim=2, field_dim=1, order=1, cellshape=RefCube)
+
+    dh = MixedDofHandler(grid);
+    push!(dh, FieldHandler([f1], Set(1)));  # first field applies to cell 1
+    push!(dh, FieldHandler([f2], Set(2)));  # second field applies to cell 2
+    close!(dh)
+
+    # Create two Dirichlet boundary conditions - one for each field.
+    ch = ConstraintHandler(dh);
+    ∂Ω1 = getfaceset(grid, "left")
+    ∂Ω2 = getfaceset(grid, "right")
+    dbc1 = Dirichlet(:u, ∂Ω1, (x, t) -> 0)
+    dbc2 = Dirichlet(:u, ∂Ω2, (x, t) -> 0)
+    add!(ch, dh.fieldhandlers[1], dbc1);
+    add!(ch, dh.fieldhandlers[2], dbc2);
+    close!(ch)
+    # TODO pretty ugly way of linking a dbc to a specific field. Needed for update!
+    dbcmap = Dict(
+        dbc1 => dh.fieldhandlers[1],
+        dbc2 => dh.fieldhandlers[2],
+    )
+
+    function doassemble(cellset, cellvalues, assembler, dh)
+
+        n = ndofs_per_cell(dh, first(cellset))
+        n_basefuncs = getnbasefunctions(cellvalues)
+        Ke = zeros(n, n)
+        fe = zeros(n)
+        eldofs = zeros(Int, n)
+
+        for cellnum in cellset
+            celldofs!(eldofs, dh, cellnum)
+            xe = getcoordinates(dh.grid, cellnum)
+            reinit!(cellvalues, xe)
+            fill!(Ke, 0)
+            fill!(fe, 0)
+
+            for q_point in 1:getnquadpoints(cellvalues)
+                dΩ = getdetJdV(cellvalues, q_point)
+
+                for i in 1:n_basefuncs
+                    v  = shape_value(cellvalues, q_point, i)
+                    ∇v = shape_gradient(cellvalues, q_point, i)
+                    fe[i] += v * dΩ
+                    for j in 1:n_basefuncs
+                        ∇u = shape_gradient(cellvalues, q_point, j)
+                        Ke[i, j] += (∇v ⋅ ∇u) * dΩ
+                    end
+                end
+            end
+            assemble!(assembler, eldofs, fe, Ke)
+        end
+    end
+
+    K = create_sparsity_pattern(dh)
+    f = zeros(ndofs(dh));
+    assembler = start_assemble(K, f);
+    # Use the same assemble function since it is the same weak form for both cell-types
+    for fh in dh.fieldhandlers
+        qr = QuadratureRule{2, RefCube}(2)
+        interp = fh.fields[1].interpolation
+        cellvalues = CellScalarValues(qr, interp)
+        doassemble(fh.cellset, cellvalues, assembler, dh)
+    end
+
+    update!(ch, dbcmap, 0.0);
+    apply!(K, f, ch)
+    u = K \ f;
+
+    # tested against heat_equation.jl (in the examples folder) using 2x1 cells and no
+    # dbc on top and bottom boundary
+    @test u == [0.0, 0.5, 0.5, 0.0, 0.0, 0.0]
+end
 
 
 @testset "MixedDofHandler" begin
@@ -309,4 +392,5 @@ end
     test_2d_mixed_field_triangles();
     test_2d_mixed_field_mixed_celltypes();
     test_3d_mixed_field_mixed_celltypes();
+    test_2_element_heat_eq();
 end
