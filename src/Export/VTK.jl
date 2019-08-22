@@ -50,7 +50,7 @@ end
 Export all cell sets in the grid. Each cell set is exported with
 `vtk_cell_data` with value 1 if the cell is in the set, and 0 otherwise.
 """
-function vtk_cellset(vtk::WriteVTK.DatasetFile, grid::Grid, cellsets=keys(grid.cellsets))
+function vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellsets=keys(grid.cellsets))
     z = zeros(getncells(grid))
     for cellset in cellsets
         z .= 0.0
@@ -66,5 +66,56 @@ end
 Export the cell set specified by `cellset` as cell data with value 1 if
 the cell is in the set and 0 otherwise.
 """
-vtk_cellset(vtk::WriteVTK.DatasetFile, grid::Grid, cellset::String) =
+vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellset::String) =
     vtk_cellset(vtk, grid, [cellset])
+
+function WriteVTK.vtk_grid(filename::AbstractString, grid::MixedGrid{dim,C,T}) where {dim,C,T}
+    cls = MeshCell[]
+    for cell in grid.cells
+        celltype = JuAFEM.cell_to_vtkcell(typeof(cell))
+        push!(cls, MeshCell(celltype, collect(cell.nodes)))
+    end
+    coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
+    return vtk_grid(filename, coords, cls)
+end
+
+import JuAFEM.field_offset
+function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler, u::Vector, suffix="")
+
+    fieldnames = JuAFEM.getfieldnames(dh)  # all primary fields
+
+    for name in fieldnames
+        @debug println("exporting field $(name)")
+        field_dim = getfielddim(dh, name)
+        space_dim = field_dim == 2 ? 3 : field_dim
+        data = fill(NaN, space_dim, getnnodes(dh.grid))  # set default value
+
+        for fh in dh.fieldhandlers
+            # check if this fh contains this field, otherwise continue to the next
+            field_pos = findfirst(i->i == name, getfieldnames(fh))
+            if field_pos == 0 && continue end
+
+            cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
+            offset = field_offset(fh, name)
+
+            for cellnum in cellnumbers
+                cell = dh.grid.cells[cellnum]
+                n = ndofs_per_cell(dh, cellnum)
+                eldofs = zeros(Int, n)
+                _celldofs = celldofs!(eldofs, dh, cellnum)
+                counter = 1
+
+                for node in cell.nodes
+                    for d in 1:field_dim
+                        data[d, node] = u[_celldofs[counter + offset]]
+                        @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
+                        counter += 1
+                    end
+                end
+            end
+        end
+    vtk_point_data(vtkfile, data, string(name, suffix))
+    end
+
+    return vtkfile
+end
