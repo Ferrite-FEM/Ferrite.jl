@@ -48,7 +48,7 @@ end
 
 Collection of constraints.
 """
-struct ConstraintHandler{DH<:DofHandler,T}
+struct ConstraintHandler{DH<:AbstractDofHandler,T}
     dbcs::Vector{Dirichlet}
     prescribed_dofs::Vector{Int}
     free_dofs::Vector{Int}
@@ -58,7 +58,7 @@ struct ConstraintHandler{DH<:DofHandler,T}
     closed::ScalarWrapper{Bool}
 end
 
-function ConstraintHandler(dh::DofHandler)
+function ConstraintHandler(dh::AbstractDofHandler)
     @assert isclosed(dh)
     ConstraintHandler(Dirichlet[], Int[], Int[], Float64[], Dict{Int,Int}(), dh, ScalarWrapper(false))
 end
@@ -99,10 +99,11 @@ end
 
 function dbc_check(ch::ConstraintHandler, dbc::Dirichlet)
     # check input
-    dbc.field_name in ch.dh.field_names || throw(ArgumentError("field $field does not exist in DofHandler, existing fields are $(dh.field_names)"))
-    for component in dbc.components
-        0 < component <= ndim(ch.dh, dbc.field_name) || error("component $component is not within the range of field $field which has $(ndim(ch.dh, field)) dimensions")
-    end
+    dbc.field_name in getfieldnames(ch.dh) || throw(ArgumentError("field $(dbc.field_name) does not exist in DofHandler, existing fields are $(getfieldnames(ch.dh))"))
+    #TODO FIX!!
+    #for component in dbc.components
+    #    0 < component <= ndim(ch.dh, dbc.field_name) || error("component $component is not within the range of field $field which has $(ndim(ch.dh, field)) dimensions")
+    #end
     if length(dbc.faces) == 0
         @warn("added Dirichlet Boundary Condition to set containing 0 entities")
     end
@@ -141,8 +142,9 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
-    _celldofs = fill(0, ndofs_per_cell(ch.dh))
+    #_celldofs = fill(0, ndofs_per_cell(ch.dh))
     for (cellidx, faceidx) in bcfaces
+        _celldofs = fill(0, ndofs_per_cell(ch.dh, cellidx))
         celldofs!(_celldofs, ch.dh, cellidx) # extract the dofs for this cell
         r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
         append!(constrained_dofs, _celldofs[local_face_dofs[r]]) # TODO: for-loop over r and simply push! to ch.prescribed_dofs
@@ -381,4 +383,71 @@ function meandiag(K::AbstractMatrix)
         z += abs(K[i, i])
     end
     return z / size(K, 1)
+end
+
+
+
+# TODO Remove - almost identical to the previous
+function _update!(values::Vector{Float64}, f::Function, faces::Set{Tuple{Int,Int}}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+                  components::Vector{Int}, dh::MixedDofHandler{dim,C,T}, facevalues::BCValues,
+                  dofmapping::Dict{Int,Int}, time::Float64) where {dim,C,T}
+    grid = dh.grid
+    #xh = zeros(Vec{dim, T}, N) # pre-allocate
+    for (cellidx, faceidx) in faces
+        _celldofs = fill(0, ndofs_per_cell(dh, cellidx))
+        xh = getcoordinates(grid, cellidx)
+        # zeros(Vec{dim, T}, N) # pre-allocate
+        #getcoordinates!(xh, grid, cellidx)
+        celldofs!(_celldofs, dh, cellidx) # update global dofs for this cell
+
+        # no need to reinit!, enough to update current_face since we only need geometric shape functions M
+        facevalues.current_face[] = faceidx
+
+        # local dof-range for this face
+        r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
+        counter = 1
+
+        for location in 1:getnquadpoints(facevalues)
+            x = spatial_coordinate(facevalues, location, xh)
+            bc_value = f(x, time)
+            @assert length(bc_value) == length(components)
+
+            for i in 1:length(components)
+                # find the global dof
+                globaldof = _celldofs[local_face_dofs[r[counter]]]
+                counter += 1
+
+                dbc_index = dofmapping[globaldof]
+                values[dbc_index] = bc_value[i]
+                @debug println("prescribing value $(bc_value[i]) on global dof $(globaldof)")
+            end
+        end
+    end
+end
+
+
+
+
+
+import JuAFEM.add!, JuAFEM.update!
+function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
+    #dbc_check(ch, dbc)
+    field_idx = find_field(fh, dbc.field_name)
+    # Extract stuff for the field
+    interpolation = getfieldinterpolations(fh)[field_idx]
+    field_dim = getfielddims(fh)[field_idx]
+    JuAFEM._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name))
+    return ch
+end
+
+# Updates the DBC's to the current time `time`
+function update!(ch::ConstraintHandler, dbcmap::Dict, time::Real=0.0)
+    @assert ch.closed[]
+    for dbc in ch.dbcs
+        fh = dbcmap[dbc]
+        field_idx = find_field(fh, dbc.field_name)
+        _update!(ch.values, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs,
+                 dbc.local_face_dofs_offset, dbc.components, ch.dh,
+                 fh.bc_values[field_idx], ch.dofmapping, convert(Float64, time))
+    end
 end
