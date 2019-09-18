@@ -2,7 +2,7 @@
 #
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`incompressible_elasticity.ipynb`](@__NBVIEWER_ROOT_URL__examples/generated/incompressible_elasticity.ipynb)
+#md #     [`incompressible_elasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/generated/incompressible_elasticity.ipynb)
 
 # ## Introduction
 #
@@ -153,9 +153,9 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, gr
 
     symmetrize_lower!(Ke)
 
-    # We integrate the Neumann boundary using the facevalues.
-    # We loop over all the faces in the cell, then check if the face
-    # is in our `"traction"` faceset.
+    ## We integrate the Neumann boundary using the facevalues.
+    ## We loop over all the faces in the cell, then check if the face
+    ## is in our `"traction"` faceset.
     @inbounds for face in 1:nfaces(cell)
         if onboundary(cell, face) && (cellid(cell), face) ∈ getfaceset(grid, "traction")
             reinit!(facevalues_u, cell, face)
