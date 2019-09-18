@@ -4,7 +4,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__examples/generated/heat_equation.ipynb)
+#md #     [`heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/examples/generated/heat_equation.ipynb)
 #-
 # ## Introduction
 #
@@ -114,6 +114,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
     # We allocate the element stiffness matrix and element force vector
     # just once before looping over all the cells instead of allocating
     # them every time in the loop.
+    #+
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
@@ -122,29 +123,35 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
     # the stiffness matrix `K` and create an assembler. The assembler
     # is just a thin wrapper around `f` and `K` and some extra storage
     # to make the assembling faster.
+    #+
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
 
     # It is now time to loop over all the cells in our grid. We do this by iterating
     # over a `CellIterator`. The iterator caches some useful things for us, for example
     # the nodal coordinates for the cell, and the local degrees of freedom.
+    #+
     @inbounds for cell in CellIterator(dh)
         # Always remember to reset the element stiffness matrix and
         # force vector since we reuse them for all elements.
+        #+
         fill!(Ke, 0)
         fill!(fe, 0)
 
         # For each cell we also need to reinitialize the cached values in `cellvalues`.
+        #+
         reinit!(cellvalues, cell)
 
         # It is now time to loop over all the quadrature points in the cell and
         # assemble the contribution to `Ke` and `fe`. The integration weight
         # can be queried from `cellvalues` by `getdetJdV`.
+        #+
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
             # For each quadrature point we loop over all the (local) shape functions.
             # We need the value and gradient of the testfunction `v` and also the gradient
             # of the trial function `u`. We get all of these from `cellvalues`.
+            #+
             for i in 1:n_basefuncs
                 v  = shape_value(cellvalues, q_point, i)
                 ∇v = shape_gradient(cellvalues, q_point, i)
@@ -158,6 +165,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
 
         # The last step in the element loop is to assemble `Ke` and `fe`
         # into the global `K` and `f` with `assemble!`.
+        #+
         assemble!(assembler, celldofs(cell), fe, Ke)
     end
     return K, f
