@@ -15,3 +15,11 @@ module TestIncompressibleElasticity
         end
     end
 end
+
+module TestHyperElasticity
+    mktempdir() do dir
+        cd(dir) do
+            include(joinpath(@__DIR__, "../docs/src/examples/hyperelasticity.jl"))
+        end
+    end
+end
