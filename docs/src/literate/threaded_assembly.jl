@@ -2,7 +2,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`threaded_assembly.ipynb`](@__NBVIEWER_ROOT_URL__/examples/generated/threaded_assembly.ipynb)
+#md #     [`threaded_assembly.ipynb`](@__NBVIEWER_ROOT_URL__/examples/threaded_assembly.ipynb)
 
 # ## Example of a colored grid
 #

@@ -1,8 +1,8 @@
 # generate examples
 import Literate
 
-EXAMPLEDIR = joinpath(@__DIR__, "src", "examples")
-GENERATEDDIR = joinpath(@__DIR__, "src", "examples", "generated")
+EXAMPLEDIR = joinpath(@__DIR__, "src", "literate")
+GENERATEDDIR = joinpath(@__DIR__, "src", "examples")
 for example in readdir(EXAMPLEDIR)
     endswith(example, ".jl") || continue
     input = abspath(joinpath(EXAMPLEDIR, example))
