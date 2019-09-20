@@ -23,7 +23,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`plasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/generated/plasticity.ipynb)
+#md #     [`plasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/plasticity.ipynb)
 #-
 
 # ## Material modeling

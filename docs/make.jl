@@ -1,11 +1,13 @@
-Base.HOME_PROJECT[] = abspath(Base.HOME_PROJECT[]) # JuliaLang/julia/pull/28625
-
 using Documenter, JuAFEM
+
+# Load packages to avoid precompilation output in the docs
+import BlockArrays, IterativeSolvers, KrylovMethods, Literate, Plots, ProgressMeter,
+       Tensors, TimerOutputs, UnicodePlots
 
 # Generate examples
 include("generate.jl")
 
-GENERATEDEXAMPLES = [joinpath("examples", "generated", f) for f in (
+GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "heat_equation.md",
     "incompressible_elasticity.md",
     "hyperelasticity.md",
@@ -46,7 +48,7 @@ makedocs(
 )
 
 # make sure there are no *.vtu files left around from the build
-cd(joinpath(@__DIR__, "build", "examples", "generated")) do
+cd(joinpath(@__DIR__, "build", "examples")) do
     foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
 end
 
