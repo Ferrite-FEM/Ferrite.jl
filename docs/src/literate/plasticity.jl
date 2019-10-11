@@ -1,6 +1,6 @@
 # # von Mises plasticity
 #
-# ![Shows the von Mises stress distribution in a cantilever beam.](../plasticity.png)
+# ![Shows the von Mises stress distribution in a cantilever beam.](plasticity.png)
 # *Figure 1.* A coarse mesh solution of a cantilever beam subjected to a load
 # causing plastic deformations. The initial yield limit is 200 MPa but due to
 # hardening it increases up to approximately 240 MPa.
