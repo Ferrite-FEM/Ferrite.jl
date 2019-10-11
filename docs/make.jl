@@ -26,7 +26,6 @@ makedocs(
         "Home" => "index.md",
         "manual/fe_intro.md",
         "Manual" => [
-            "manual/cell_integration.md",
             "manual/degrees_of_freedom.md",
             "manual/assembly.md",
             "manual/boundary_conditions.md",

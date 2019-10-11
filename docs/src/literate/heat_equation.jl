@@ -1,6 +1,6 @@
 # # Heat Equation
 #
-# ![](../heat_square.png)
+# ![](heat_square.png)
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:

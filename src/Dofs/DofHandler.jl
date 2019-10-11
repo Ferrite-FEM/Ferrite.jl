@@ -5,12 +5,12 @@ struct Field
 end
 
 abstract type AbstractDofHandler end
+
 """
     DofHandler(grid::Grid)
 
 Construct a `DofHandler` based on the grid `grid`.
 """
-
 struct DofHandler{dim,N,T,M} <: AbstractDofHandler
     field_names::Vector{Symbol}
     field_dims::Vector{Int}
