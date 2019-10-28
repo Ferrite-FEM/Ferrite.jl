@@ -34,8 +34,9 @@ Write the vector field data to the vtk file.
 """
 function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, data::Vector{Vec{dim,T}}, name::AbstractString) where {dim,T}
     npoints = length(data)
-    data = reshape(reinterpret(T, data), (dim, npoints))
-    return vtk_point_data(vtk, data, name)
+    out = zeros(T, (dim == 2 ? 3 : dim), npoints)
+    out[1:dim, :] .= reshape(reinterpret(T, data), (dim, npoints))
+    return vtk_point_data(vtk, out, name)
 end
 
 function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String) where {dim}
