@@ -1,7 +1,7 @@
 # # Helmholtz equation
 #
 # In this example, we want to solve a (variant of) of the [Helmholtz equation](https://en.wikipedia.org/wiki/Helmholtz_equation).
-# The example is inspired by an [dealii step_7](https://www.dealii.org/8.4.1/doxygen/deal.II/step_7.html) on the unit square.
+# The example is inspired by an [dealii step_7](https://www.dealii.org/8.4.1/doxygen/deal.II/step_7.html) on the standard square.
 #
 # ```math
 #  - \Delta u + u = f
@@ -16,7 +16,7 @@
 # n \cdot \nabla u = g_2 \quad x \in \Gamma_2
 # ```
 # 
-# Here Γ₁ is the union of the top and the right boundary of the unit square,
+# Here Γ₁ is the union of the top and the right boundary of the square,
 # while Γ₂ is the union of the bottom and the left boundary.
 #
 # ![](helmholtz.png)
@@ -160,10 +160,11 @@ u = Symmetric(K) \ f;
 vtkfile = vtk_grid("helmholtz", dh)
 vtk_point_data(vtkfile, dh, u)
 vtk_save(vtkfile)
-
-using Test
-# TODO where does this number come from?
-Test.@test maximum(u) ≈ 0.05637592090022005
-# TODO would be nice to actually compute e.g. the L2 error between the analytic solution
-# (projected to the fem space) and the numeric solution.
+using Test #src
+#src this test catches unexpected changes in the result over time
+#src it does not certify that the solution is any good
+Test.@test maximum(u) ≈ 0.05637592090022005 #src
+@assert u_ana(Vec{2}((-0.5, -0.5))) >= 1 #src
+@assert u_ana(Vec{2}((0.5, -0.5))) >= 1 #src
+@assert u_ana(Vec{2}((-0.5, 0.5))) >= 1 #src
 println("Helmholtz successful")
