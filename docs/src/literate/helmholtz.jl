@@ -111,7 +111,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
             coords_qp = spatial_coordinate(cellvalues, q_point, coords)
-            f_true = LinearAlgebra.tr(hessian(u_ana, coords_qp)) + u_ana(coords_qp)
+            f_true = -LinearAlgebra.tr(hessian(u_ana, coords_qp)) + u_ana(coords_qp)
             for i in 1:n_basefuncs
                 δu = shape_value(cellvalues, q_point, i)
                 ∇δu = shape_gradient(cellvalues, q_point, i)
@@ -141,7 +141,11 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
                     dΓ = getdetJdV(facevalues, q_point)
                     for i in 1:n_basefuncs
                         δu = shape_value(facevalues, q_point, i)
-                        fe[i] += (δu * g) * dΓ
+                        fe[i] += -(δu * g) * dΓ
+                        for j in 1:n_basefuncs
+                            ∇u = shape_gradient(cellvalues, q_point, j)
+                            Ke[i, j] += (δu * ∇u ⋅ n) * dΓ
+                        end
                     end
                 end
             end
@@ -163,8 +167,8 @@ vtk_save(vtkfile)
 using Test #src
 #src this test catches unexpected changes in the result over time
 #src it does not certify that the solution is any good
-Test.@test maximum(u) ≈ 0.05637592090022005 #src
-@assert u_ana(Vec{2}((-0.5, -0.5))) >= 1 #src
-@assert u_ana(Vec{2}((0.5, -0.5))) >= 1 #src
-@assert u_ana(Vec{2}((-0.5, 0.5))) >= 1 #src
+Test.@test maximum(u) ≈ 0.995280389173959
+@test u_ana(Vec{2}((-0.5, -0.5))) ≈ 1 #src
+@test u_ana(Vec{2}((0.5, -0.5)))  ≈ 1 #src
+@test u_ana(Vec{2}((-0.5, 0.5)))  ≈ 1 #src
 println("Helmholtz successful")
