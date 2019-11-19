@@ -29,12 +29,12 @@ after_success:
   - julia --color=yes --project=test/coverage/ -e 'using Pkg; Pkg.instantiate()'
   - julia --color=yes --project=test/coverage/ test/coverage/coverage.jl
 
-jobs:
-  include:
-    - stage: "Documentation"
-      julia: 1.2
-      os: linux
-      script:
-        - julia --color=yes --project=docs/ -e 'using Pkg; Pkg.instantiate()'
-        - julia --color=yes --project=docs/ docs/make.jl
-      after_success: skip
+# jobs:
+#   include:
+#     - stage: "Documentation"
+#       julia: 1.2
+#       os: linux
+#       script:
+#         - julia --color=yes --project=docs/ -e 'using Pkg; Pkg.instantiate()'
+#         - julia --color=yes --project=docs/ docs/make.jl
+#       after_success: skip
