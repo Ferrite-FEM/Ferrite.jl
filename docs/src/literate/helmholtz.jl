@@ -165,9 +165,9 @@ vtkfile = vtk_grid("helmholtz", dh)
 vtk_point_data(vtkfile, dh, u)
 vtk_save(vtkfile)
 using Test #src
-#src this test catches unexpected changes in the result over time
-#src it does not certify that the solution is any good
-Test.@test maximum(u) ≈ 0.995280389173959
+#src this test catches unexpected changes in the result over time.
+#src the true maximum is slightly bigger then 1.0
+@test maximum(u) ≈ 0.995280389173959 #src
 @test u_ana(Vec{2}((-0.5, -0.5))) ≈ 1 #src
 @test u_ana(Vec{2}((0.5, -0.5)))  ≈ 1 #src
 @test u_ana(Vec{2}((-0.5, 0.5)))  ≈ 1 #src
