@@ -26,17 +26,22 @@
 # \int \nabla δu \cdot \nabla u d\Omega
 # + \int δu \cdot u d\Omega
 # - \int δu \cdot f d\Omega
-# + \int δu \cdot (u - g_1) d\Gamma_1
 # + \int δu \cdot (n \cdot \nabla u - g_2) d\Gamma_2
 # ```
 #
-# where $δu$ is a suitable test function.
-#
+# where $δu$ is a suitable test function that satisfies:
+# ```math
+# δu = 0 \quad x \in \Gamma_1
+# ```
+# and $u$ is a suitable function that satisfies:
+# ```math
+# u = g_1 \quad x \in \Gamma_1
+# ```
 # The example highlights the following interesting features:
 #
 # * There are two kinds of boundary conditions, "Dirichlet" and "Von Neumann"
 # * The example contains boundary integrals
-# * We will implement the von Neumann condition by hand inside the `doassemble` function.
+# * The Dirichlet condition is imposed strongly and the Von Neumann condition is imposed weakly.
 #
 using JuAFEM
 using Tensors
@@ -75,6 +80,7 @@ function u_ana(x::Vec{2, T}) where {T}
 end;
 
 dbcs = ConstraintHandler(dh)
+# The (strong) Dirichlet boundary condition can be handled automatically by the JuAFEM library.
 dbc = Dirichlet(:u, union(getfaceset(grid, "top"), getfaceset(grid, "right")), (x,t) -> u_ana(x))
 add!(dbcs, dbc)
 close!(dbcs)
