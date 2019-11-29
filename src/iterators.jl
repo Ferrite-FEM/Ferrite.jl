@@ -91,5 +91,23 @@ function reinit!(ci::CellIterator{dim,N}, i::Int) where {dim,N}
     return ci
 end
 
-@inline reinit!(cv::CellValues{dim,T}, ci::CellIterator{dim,N,T}) where {dim,N,T} = reinit!(cv, ci.coords)
-@inline reinit!(fv::FaceValues{dim,T}, ci::CellIterator{dim,N,T}, face::Int) where {dim,N,T} = reinit!(fv, ci.coords, face)
+function check_compatible_geointerpolation(cv::Union{CellValues, FaceValues}, ci::CellIterator)
+    if length(getnodes(ci)) != getngeobasefunctions(cv)
+        msg = """
+        The given CellValues and CellIterator are incompatible. Likely
+        an appropriate geometry interpolate must be passed when constructing
+        the CellValues. See also #265.
+        """
+        throw(ArgumentError(msg))
+    end
+end
+
+@inline function reinit!(cv::CellValues{dim,T}, ci::CellIterator{dim,N,T}) where {dim,N,T}
+    check_compatible_geointerpolation(cv, ci)
+    reinit!(cv, ci.coords)
+end
+
+@inline function reinit!(fv::FaceValues{dim,T}, ci::CellIterator{dim,N,T}, face::Int) where {dim,N,T}
+    check_compatible_geointerpolation(fv, ci)
+    reinit!(fv, ci.coords, face)
+end
