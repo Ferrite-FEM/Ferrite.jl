@@ -84,4 +84,23 @@ for (func_interpol, quad_rule) in  (
     end
 end
 
+@testset "#265" begin
+    dim = 1
+    deg = 1
+    grid = generate_grid(Line, (2,))
+    ip_fe = Lagrange{dim, RefCube, deg}()
+    dh = DofHandler(grid)
+    push!(dh, :u, 1, ip_fe)
+    close!(dh);
+    cell = first(CellIterator(dh))
+    ip_geo = Lagrange{dim, RefCube, 2}()
+    qr = QuadratureRule{dim, RefCube}(deg+1)
+    cv = CellScalarValues(qr, ip_fe, ip_geo)
+    res = @test_throws ArgumentError reinit!(cv, cell)
+    @test occursin("#265", res.value.msg)
+    ip_geo = Lagrange{dim, RefCube, 1}()
+    cv = CellScalarValues(qr, ip_fe, ip_geo)
+    reinit!(cv, cell)
+end
+
 end # of testset
