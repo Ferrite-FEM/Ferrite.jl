@@ -8,7 +8,6 @@ function create_field(;name, field_dim, order, spatial_dim, cellshape)
     return Field(name, interpolation, field_dim)
 end
 
-
 function get_2d_grid()
     # GIVEN: two cells, a quad and a triangle sharing one face
     cells = [
@@ -19,7 +18,6 @@ function get_2d_grid()
     return MixedGrid(cells, Node{0, Float64}[])
 end
 
-# Tests
 function test_1d_bar_beam()
     # Something like a truss and a Timoshenko beam.
     # two line-cells with 2 dofs/node -> "bars"

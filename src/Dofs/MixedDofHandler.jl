@@ -15,18 +15,16 @@ function FieldHandler(fields::Vector{Field}, cellset)
     FieldHandler(fields, cellset, bc_values)
 end
 
-
 struct CellDofs
     dofs::Vector{Int}
     offset::Vector{Int}
     length::Vector{Int}
 end
 
-import Base.getindex
-function getindex(eldofs::CellDofs, el::Int64)
-     return eldofs.dofs[eldofs.offset[el]:eldofs.offset[el]+eldofs.length[el]-1]
+function Base.getindex(eldofs::CellDofs, el::Int)
+    offset = eldofs.offset[el]
+    return eldofs.dofs[offset:offset + eldofs.length[el]-1]
  end
-
 
 struct MixedDofHandler{dim,C,T} <: JuAFEM.AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
@@ -42,8 +40,7 @@ end
 getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
 getfielddims(fh::FieldHandler) = [field.dim for field in fh.fields]
 getfieldinterpolations(fh::FieldHandler) = [field.interpolation for field in fh.fields]
-import JuAFEM.ndofs_per_cell, JuAFEM.celldofs, JuAFEM.isclosed, JuAFEM.ndofs
-ndofs_per_cell(dh::MixedDofHandler, cell::Int64) = dh.cell_dofs.length[cell]
+ndofs_per_cell(dh::MixedDofHandler, cell::Int) = dh.cell_dofs.length[cell]
 ndofs(dh::MixedDofHandler) = maximum(dh.cell_dofs.dofs)
 
 function celldofs!(global_dofs::Vector{Int}, dh::MixedDofHandler, i::Int)
@@ -153,7 +150,7 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims,
     ip_infos = JuAFEM.InterpolationInfo[]
     for interpolation in field_interpolations
         ip_info = JuAFEM.InterpolationInfo(interpolation)
-        # these are implemented yet (or have not been tested)
+        # these are not implemented yet (or have not been tested)
         @assert(ip_info.nvertexdofs <= 1)
         @assert(ip_info.nedgedofs <= 1)
         @assert(ip_info.nfacedofs <= 1)
@@ -163,7 +160,6 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims,
 
     # loop over all the cells, and distribute dofs for all the fields
     for ci in cellnumbers
-        #dh.cell_dofs_offset[ci] = nextdof
         dh.cell_dofs.offset[ci] = length(dh.cell_dofs.dofs)+1
 
         cell = dh.grid.cells[ci]
@@ -194,12 +190,6 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims,
         # after done creating dofs for the cell, push them to the global list
         push!(dh.cell_dofs.dofs, cell_dofs...)
         dh.cell_dofs.length[ci] = length(cell_dofs)
-        #push!(dh.cell_dofs, cell_dofs...)
-        # push! the first index of the next cell to the offset vector
-        #dh.cell_dofs_offset[ci] = nextdof
-        #dh.cell_dofs_offset[ci+1] = length(dh.cell_dofs)+1
-        #push!(dh.cell_dofs_offset, length(dh.cell_dofs)+1)
-
 
         @debug "Dofs for cell #$ci:\n\t$cell_dofs"
     end # cell loop
