@@ -1,28 +1,23 @@
 # generate examples
 import Literate
 
-EXAMPLEDIR = joinpath(@__DIR__, "src", "examples")
-GENERATEDDIR = joinpath(@__DIR__, "src", "examples", "generated")
+EXAMPLEDIR = joinpath(@__DIR__, "src", "literate")
+GENERATEDDIR = joinpath(@__DIR__, "src", "examples")
+mkpath(GENERATEDDIR)
 for example in readdir(EXAMPLEDIR)
-    endswith(example, ".jl") || continue
-    input = abspath(joinpath(EXAMPLEDIR, example))
-    script = Literate.script(input, GENERATEDDIR)
-    code = strip(read(script, String))
-    mdpost(str) = replace(str, "@__CODE__" => code)
-    Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
-    Literate.notebook(input, GENERATEDDIR, execute = true)
+    if endswith(example, ".jl")
+        input = abspath(joinpath(EXAMPLEDIR, example))
+        script = Literate.script(input, GENERATEDDIR)
+        code = strip(read(script, String))
+        mdpost(str) = replace(str, "@__CODE__" => code)
+        Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
+        Literate.notebook(input, GENERATEDDIR, execute = true)
+    elseif any(endswith.(example, [".png", ".jpg", ".gif"]))
+        cp(joinpath(EXAMPLEDIR, example), joinpath(GENERATEDDIR, example); force=true)
+    else
+        @warn "ignoring $example"
+    end
 end
-
-# copy some figures to the build directory
-cp(joinpath(@__DIR__, "../examples/figures/heat_square.png"),
-   joinpath(@__DIR__, "src/examples/generated/heat_equation.png"); force = true)
-
-cp(joinpath(@__DIR__, "../examples/figures/coloring.png"),
-   joinpath(@__DIR__, "src/examples/generated/coloring.png"); force = true)
-
-cp(joinpath(@__DIR__, "../examples/figures/plasticity.png"),
-   joinpath(@__DIR__, "src/examples/generated/plasticity.png"); force = true)
-
 
 # remove any .vtu files in the generated dir (should not be deployed)
 cd(GENERATEDDIR) do

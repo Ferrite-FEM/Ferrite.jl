@@ -2,7 +2,7 @@
 #
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`incompressible_elasticity.ipynb`](@__NBVIEWER_ROOT_URL__examples/generated/incompressible_elasticity.ipynb)
+#md #     [`incompressible_elasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/incompressible_elasticity.ipynb)
 
 # ## Introduction
 #
@@ -153,9 +153,9 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, gr
 
     symmetrize_lower!(Ke)
 
-    # We integrate the Neumann boundary using the facevalues.
-    # We loop over all the faces in the cell, then check if the face
-    # is in our `"traction"` faceset.
+    ## We integrate the Neumann boundary using the facevalues.
+    ## We loop over all the faces in the cell, then check if the face
+    ## is in our `"traction"` faceset.
     @inbounds for face in 1:nfaces(cell)
         if onboundary(cell, face) && (cellid(cell), face) ∈ getfaceset(grid, "traction")
             reinit!(facevalues_u, cell, face)
@@ -222,9 +222,9 @@ quadratic = Lagrange{2,RefTetrahedron,2}()
 u1 = solve(0.4999999, linear, linear)
 u2 = solve(0.4999999, quadratic, linear);
 
-## test the result                 #jl
-using Test                         #jl
-@test norm(u2) ≈ 919.2122668839389 #jl
+## test the result                 #src
+using Test                         #src
+@test norm(u2) ≈ 919.2122668839389 #src
 
 #md # ## [Plain Program](@id incompressible_elasticity-plain-program)
 #md #

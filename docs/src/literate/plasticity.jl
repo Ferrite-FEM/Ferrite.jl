@@ -23,7 +23,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`plasticity.ipynb`](@__NBVIEWER_ROOT_URL__examples/generated/plasticity.ipynb)
+#md #     [`plasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/plasticity.ipynb)
 #-
 
 # ## Material modeling
@@ -64,12 +64,12 @@ end;
 
 # Define a `struct` to store the material state.
 mutable struct MaterialState{T, S <: SecondOrderTensor{3, T}}
-    # Store "converged" values
+    ## Store "converged" values
     ϵᵖ::S # plastic strain
     σ::S # stress
     k::T # hardening variable
 
-    # Store temporary values used during equilibrium iterations
+    ## Store temporary values used during equilibrium iterations
     temp_ϵᵖ::S
     temp_σ::S
     temp_k::T
@@ -106,12 +106,12 @@ end;
 # stiffness in a given integration point.
 # Input is the current strain and material state.
 function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticity, state::MaterialState)
-    # unpack some material parameters
+    ## unpack some material parameters
     G = material.G
     K = material.K
     H = material.H
 
-    #  We use (•)ᵗ to denote *trial*-values
+    ## We use (•)ᵗ to denote *trial*-values
     σᵗ = material.Dᵉ ⊡ (ϵ - state.ϵᵖ) # trial-stress
     sᵗ = dev(σᵗ)         # deviatoric part of trial-stress
     J₂ = 0.5 * sᵗ ⊡ sᵗ   # second invariant of sᵗ
@@ -131,7 +131,7 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
         s = c1 * sᵗ           # updated deviatoric stress
         σ = s + vol(σᵗ)       # updated stress
 
-        # Compute algorithmic tangent stiffness ``D = \frac{\Delta \sigma }{\Delta \epsilon}``
+        ## Compute algorithmic tangent stiffness ``D = \frac{\Delta \sigma }{\Delta \epsilon}``
         κ = H * (state.k + μ) # drag stress
         σₑ = material.σ₀ + κ  # updated yield surface
 
@@ -143,7 +143,7 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
         Dtemp(i,j,k,l) = -2G*b * Q(i,j,k,l) - 9G^2 / (h*σₑ^2) * s[i,j]*s[k,l]
         D = material.Dᵉ + SymmetricTensor{4, 3}(Dtemp)
 
-        # Store outputs in the material state
+        ## Store outputs in the material state
         Δϵᵖ = 3/2 *μ / σₑ*s            # plastic strain
         state.temp_ϵᵖ = state.ϵᵖ + Δϵᵖ  # plastic strain
         state.temp_k = state.k + μ     # hardening variable
@@ -155,21 +155,21 @@ end
 # ## FE-problem
 # What follows are methods for assembling and and solving the FE-problem.
 function create_values(interpolation)
-    # setup quadrature rules
+    ## setup quadrature rules
     qr      = QuadratureRule{3,RefTetrahedron}(2)
     face_qr = QuadratureRule{2,RefTetrahedron}(3)
 
-    # create geometric interpolation (use the same as for u)
+    ## create geometric interpolation (use the same as for u)
     interpolation_geom = Lagrange{3,RefTetrahedron,1}()
 
-    # cell and facevalues for u
+    ## cell and facevalues for u
     cellvalues_u = CellVectorValues(qr, interpolation, interpolation_geom)
     facevalues_u = FaceVectorValues(face_qr, interpolation, interpolation_geom)
 
     return cellvalues_u, facevalues_u
 end;
 
-# ## Add degrees of freedom
+# ### Add degrees of freedom
 function create_dofhandler(grid, interpolation)
     dh = DofHandler(grid)
     dim = 3
@@ -181,7 +181,7 @@ end
 # ### Boundary conditions
 function create_bc(dh, grid)
     dbcs = ConstraintHandler(dh)
-    # Clamped on the left side
+    ## Clamped on the left side
     dofs = [1, 2, 3]
     dbc = Dirichlet(:u, getfaceset(grid, "left"), (x,t) -> [0.0, 0.0, 0.0], dofs)
     add!(dbcs, dbc)
@@ -226,7 +226,7 @@ function assemble_cell!(Ke, re, cell, cellvalues, facevalues, grid, material,
     reinit!(cellvalues, cell)
 
     for q_point in 1:getnquadpoints(cellvalues)
-        # For each integration point, compute stress and material stiffness
+        ## For each integration point, compute stress and material stiffness
         ∇u = function_gradient(cellvalues, q_point, ue)
         ϵ = symmetric(∇u) # Total strain
         σ, D = compute_stress_tangent(ϵ, material, state[q_point])
@@ -244,7 +244,7 @@ function assemble_cell!(Ke, re, cell, cellvalues, facevalues, grid, material,
     end
     symmetrize_lower!(Ke)
 
-    # Add traction as a negative contribution to the element residual `re`:
+    ## Add traction as a negative contribution to the element residual `re`:
     for face in 1:nfaces(cell)
         if onboundary(cell, face) && (cellid(cell), face) ∈ getfaceset(grid, "right")
             reinit!(facevalues, cell, face)
@@ -271,7 +271,7 @@ end;
 
 # Define a function which solves the FE-problem.
 function solve()
-    # Define material parameters
+    ## Define material parameters
     E = 200.0e9 # [Pa]
     H = E/20   # [Pa]
     ν = 0.3     # [-]
@@ -285,7 +285,7 @@ function solve()
     u_max = zeros(n_timesteps)
     traction_magnitude = 1.e7 * range(0.5, 1.0, length=n_timesteps)
 
-    # Create geometry, dofs and boundary conditions
+    ## Create geometry, dofs and boundary conditions
     n = 2
     nels = (10n, n, 2n) # number of elements in each spatial direction
     P1 = Vec((0.0, 0.0, 0.0))  # start point for geometry
@@ -298,21 +298,21 @@ function solve()
 
     cellvalues, facevalues = create_values(interpolation)
 
-    # Pre-allocate solution vectors, etc.
+    ## Pre-allocate solution vectors, etc.
     n_dofs = ndofs(dh)  # total number of dofs
     u  = zeros(n_dofs)  # solution vector
     Δu = zeros(n_dofs)  # displacement correction
     r = zeros(n_dofs)   # residual
     K = create_sparsity_pattern(dh); # tangent stiffness matrix
 
-    # Create material states. One array for each cell, where each element is an array of material-
-    # states - one for each integration point
+    ## Create material states. One array for each cell, where each element is an array of material-
+    ## states - one for each integration point
     nqp = getnquadpoints(cellvalues)
     states = [[MaterialState() for _ in 1:nqp] for _ in 1:getncells(grid)]
 
-   # states = [MaterialState() for _ in 1:nqp for _ in 1:getncells(grid)]
-   # temp_states = [MaterialState() for _ in 1:nqp for _ in 1:getncells(grid)]
-    #
+    ## states = [MaterialState() for _ in 1:nqp for _ in 1:getncells(grid)]
+    ## temp_states = [MaterialState() for _ in 1:nqp for _ in 1:getncells(grid)]
+
     ## Newton-Raphson loop
     NEWTON_TOL = 1 # 1 N
     print("\n Starting Netwon iterations:\n")
@@ -345,17 +345,17 @@ function solve()
             u -= Δu
         end
 
-        # Update all the material states after we have reached equilibrium
+        ## Update all the material states after we have reached equilibrium
         for cell_states in states
             foreach(update_state!, cell_states)
         end
         u_max[timestep] = max(abs.(u)...) # maximum displacement in current timestep
     end
 
-    # ## Postprocessing
-    # Only a vtu-file corrsponding to the last time-step is exported.
-    #
-    # The following is a quick (and dirty) way of extracting average cell data for export.
+    ## ## Postprocessing
+    ## Only a vtu-file corrsponding to the last time-step is exported.
+    ##
+    ## The following is a quick (and dirty) way of extracting average cell data for export.
     mises_values = zeros(getncells(grid))
     κ_values = zeros(getncells(grid))
     for (el, cell_states) in enumerate(states)

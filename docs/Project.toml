@@ -1,7 +1,12 @@
 [deps]
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 JuAFEM = "30d91d44-8115-11e8-1d28-c19a5ac16de8"
+KrylovMethods = "9a2cd570-f05c-5dc1-9209-93ad6f5727f7"
 Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
+TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
