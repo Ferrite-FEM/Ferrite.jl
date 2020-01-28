@@ -31,17 +31,17 @@ struct MixedDofHandler{dim,C,T} <: JuAFEM.AbstractDofHandler
     cell_dofs::CellDofs
     closed::ScalarWrapper{Bool}
     grid::MixedGrid{dim,C,T}
+    ndofs::ScalarWrapper{Int}
 end
 
 function MixedDofHandler(grid::MixedGrid)
-    MixedDofHandler(FieldHandler[], CellDofs([],[],[]), JuAFEM.ScalarWrapper(false), grid)
+    MixedDofHandler(FieldHandler[], CellDofs([],[],[]), JuAFEM.ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
 end
 
 getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
 getfielddims(fh::FieldHandler) = [field.dim for field in fh.fields]
 getfieldinterpolations(fh::FieldHandler) = [field.interpolation for field in fh.fields]
 ndofs_per_cell(dh::MixedDofHandler, cell::Int) = dh.cell_dofs.length[cell]
-ndofs(dh::MixedDofHandler) = maximum(dh.cell_dofs.dofs)
 
 function celldofs!(global_dofs::Vector{Int}, dh::MixedDofHandler, i::Int)
     @assert isclosed(dh)
@@ -141,6 +141,7 @@ function close!(dh::MixedDofHandler{dim}) where {dim}
             facedicts,
             celldicts)
     end
+    dh.ndofs[] = maximum(dh.cell_dofs.dofs)
     dh.closed[] = true
     return dh
 end
