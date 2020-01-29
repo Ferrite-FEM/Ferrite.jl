@@ -22,10 +22,11 @@ struct DofHandler{dim,N,T,M} <: AbstractDofHandler
     cell_dofs_offset::Vector{Int}
     closed::ScalarWrapper{Bool}
     grid::Grid{dim,N,T,M}
+    ndofs::ScalarWrapper{Int}
 end
 
 function DofHandler(grid::Grid)
-    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid)
+    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
@@ -42,9 +43,7 @@ function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
     end
 end
 
-# TODO: This is not very nice, worth storing ndofs explicitly?
-#       How often do you actually call ndofs though...
-ndofs(dh::AbstractDofHandler) = maximum(dh.cell_dofs)
+ndofs(dh::AbstractDofHandler) = dh.ndofs[]
 ndofs_per_cell(dh::AbstractDofHandler, cell::Int=1) = dh.cell_dofs_offset[cell+1] - dh.cell_dofs_offset[cell]
 isclosed(dh::AbstractDofHandler) = dh.closed[]
 nfields(dh::AbstractDofHandler) = length(dh.field_names)
@@ -249,6 +248,7 @@ function close!(dh::DofHandler{dim}) where {dim}
         # push! the first index of the next cell to the offset vector
         push!(dh.cell_dofs_offset, length(dh.cell_dofs)+1)
     end # cell loop
+    dh.ndofs[] = maximum(dh.cell_dofs)
     dh.closed[] = true
     return dh
 end

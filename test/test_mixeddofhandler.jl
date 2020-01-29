@@ -8,7 +8,6 @@ function create_field(;name, field_dim, order, spatial_dim, cellshape)
     return Field(name, interpolation, field_dim)
 end
 
-
 function get_2d_grid()
     # GIVEN: two cells, a quad and a triangle sharing one face
     cells = [
@@ -19,7 +18,6 @@ function get_2d_grid()
     return MixedGrid(cells, Node{0, Float64}[])
 end
 
-# Tests
 function test_1d_bar_beam()
     # Something like a truss and a Timoshenko beam.
     # two line-cells with 2 dofs/node -> "bars"
@@ -40,9 +38,9 @@ function test_1d_bar_beam()
     push!(dh, FieldHandler([field1], Set((1, 2))));
     close!(dh)
     @test ndofs(dh) == 8
-    @test celldofs(dh, 1) == collect(1:6)
-    @test celldofs(dh, 2) == [1, 2, 7, 8]
-    @test celldofs(dh, 3) == [7, 8, 3, 4]
+    @test celldofs(dh, 3) == collect(1:6)
+    @test celldofs(dh, 1) == [1, 2, 7, 8]
+    @test celldofs(dh, 2) == [7, 8, 3, 4]
 
     #        7,8
     #       /   \
@@ -64,7 +62,7 @@ function test_2d_scalar()
 
     # THEN: we expect 5 dofs and dof 2 and 3 being shared
     @test ndofs(dh) == 5
-    @test dh.cell_dofs == [1, 2, 3, 4, 3, 2, 5]
+    @test dh.cell_dofs.dofs == [1, 2, 3, 4, 3, 2, 5]
     @test celldofs(dh, 1) == [1, 2, 3, 4]
     @test celldofs(dh, 2) == [3, 2, 5]
 end
@@ -84,7 +82,7 @@ function test_2d_vector()
     @test ndofs(dh) == 10
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8]
     @test celldofs(dh, 2) == [5, 6, 3, 4, 9, 10]
-    @test dh.cell_dofs == [celldofs(dh, 1)..., celldofs(dh, 2)...]
+
 end
 
 function test_2d_mixed_1_el()
@@ -390,6 +388,36 @@ function test_2_element_heat_eq()
 end
 
 
+function test_element_order()
+    # Check that one can have non-contigous ordering of cells in a MixedGrid
+    # Something like this:
+    #        ______
+    #      /|     |\
+    # (1) / | (2) | \ (3)
+    #    /__|_____|__\
+    cells = [
+        Triangle((1, 2, 3)),
+        Quadrilateral((2, 4, 5, 3)),
+        Triangle((4, 6, 5))
+        ]
+
+    grid = MixedGrid(cells, Node{0, Float64}[])
+    field1 = create_field(name=:u, spatial_dim=3, field_dim=2, order=1, cellshape=RefTetrahedron)
+
+    dh = MixedDofHandler(grid);
+    # Note the jump in cell numbers
+    push!(dh, FieldHandler([field1], Set((1, 3))));
+    push!(dh, FieldHandler([field1], Set(2)));
+    # Dofs are first created for cell 1 and 3, thereafter cell 2
+    close!(dh)
+
+    @test ndofs(dh) == 12
+    @test celldofs(dh, 1) == collect(1:6)
+    @test celldofs(dh, 2) == [3, 4, 7, 8, 11, 12, 5, 6]
+    @test celldofs(dh, 3) == [7,8, 9, 10, 11, 12]
+
+end
+
 @testset "MixedDofHandler" begin
 
     test_1d_bar_beam();
@@ -406,5 +434,5 @@ end
     test_2d_mixed_field_mixed_celltypes();
     test_3d_mixed_field_mixed_celltypes();
     test_2_element_heat_eq();
+    test_element_order();
 end
-test_2_element_heat_eq()

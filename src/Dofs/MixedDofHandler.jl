@@ -4,30 +4,60 @@ mutable struct FieldHandler
     cellset::Set{Int}
     bc_values::Vector{BCValues} # for boundary conditions
 end
+"""
+    FieldHandler(fields::Vector{Field}, cellset)
 
+Construct a `FieldHandler` based on an array of `Field`s and assigns it a set of cells.
+"""
 function FieldHandler(fields::Vector{Field}, cellset)
     # TODO for now, only accept isoparamtric mapping
     bc_values = [BCValues(field.interpolation, field.interpolation) for field in fields]
     FieldHandler(fields, cellset, bc_values)
 end
 
+struct CellDofs
+    dofs::Vector{Int}
+    offset::Vector{Int}
+    length::Vector{Int}
+end
+
+function Base.getindex(eldofs::CellDofs, el::Int)
+    offset = eldofs.offset[el]
+    return eldofs.dofs[offset:offset + eldofs.length[el]-1]
+ end
+
 struct MixedDofHandler{dim,C,T} <: JuAFEM.AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
-    cell_dofs::Vector{Int}
-    cell_dofs_offset::Vector{Int}
+    cell_dofs::CellDofs
     closed::ScalarWrapper{Bool}
     grid::MixedGrid{dim,C,T}
+    ndofs::ScalarWrapper{Int}
 end
 
 function MixedDofHandler(grid::MixedGrid)
-    MixedDofHandler(FieldHandler[], Int[], Int[], JuAFEM.ScalarWrapper(false), grid)
+    MixedDofHandler(FieldHandler[], CellDofs([],[],[]), JuAFEM.ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
 end
 
 getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
 getfielddims(fh::FieldHandler) = [field.dim for field in fh.fields]
 getfieldinterpolations(fh::FieldHandler) = [field.interpolation for field in fh.fields]
+ndofs_per_cell(dh::MixedDofHandler, cell::Int) = dh.cell_dofs.length[cell]
+
+function celldofs!(global_dofs::Vector{Int}, dh::MixedDofHandler, i::Int)
+    @assert isclosed(dh)
+    @assert length(global_dofs) == ndofs_per_cell(dh, i)
+    unsafe_copyto!(global_dofs, 1, dh.cell_dofs.dofs, dh.cell_dofs.offset[i], length(global_dofs))
+    return global_dofs
+end
+
+function celldofs(dh::MixedDofHandler, i::Int)
+    @assert isclosed(dh)
+    return dh.cell_dofs[i]
+end
 
 """
+    getfieldnames(dh::MixedDofHandler)
+
 Returns the union of all the fields. Can be used as an iterable over all the fields in the problem.
 """
 function getfieldnames(dh::MixedDofHandler)
@@ -40,6 +70,11 @@ function getfieldnames(dh::MixedDofHandler)
     return unique!(fieldnames)
 end
 
+"""
+    getfielddim(dh::MixedDofHandler, name::Symbol)
+
+Returns the dimension of a specific field, given by name. Note that it will return the dimension of the first field found among the `FieldHandler`s.
+"""
 function getfielddim(dh::MixedDofHandler, name::Symbol)
 
     for fh in dh.fieldhandlers
@@ -51,6 +86,12 @@ function getfielddim(dh::MixedDofHandler, name::Symbol)
     error("did not find field $name")
 end
 
+
+"""
+    nfields(dh::MixedDofHandler)
+
+Returns the number of unique fields defined.
+"""
 nfields(dh::MixedDofHandler) = length(getfieldnames(dh))
 
 function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
@@ -59,8 +100,12 @@ function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
     return dh
 end
 
+"""
+    close!(dh::MixedDofHandler)
 
-#import JuAFEM.close!
+Closes the dofhandler and creates degrees of freedom for each cell.
+Dofs are created in the following order: Go through each FieldHandler in the order they were added. For each field in the FieldHandler, create dofs for the cell. This means that dofs on a particular cell will be numbered according to the fields; first dofs for field 1, then field 2, etc.
+"""
 function close!(dh::MixedDofHandler{dim}) where {dim}
 
     @assert !JuAFEM.isclosed(dh)
@@ -76,7 +121,9 @@ function close!(dh::MixedDofHandler{dim}) where {dim}
 
     # Set initial values
     nextdof = 1  # next free dof to distribute
-    push!(dh.cell_dofs_offset, nextdof)
+
+    append!(dh.cell_dofs.offset, zeros(getncells(dh.grid)))
+    append!(dh.cell_dofs.length, zeros(getncells(dh.grid)))
 
     @debug "\n\nCreating dofs\n"
     for fh in dh.fieldhandlers
@@ -94,6 +141,7 @@ function close!(dh::MixedDofHandler{dim}) where {dim}
             facedicts,
             celldicts)
     end
+    dh.ndofs[] = maximum(dh.cell_dofs.dofs)
     dh.closed[] = true
     return dh
 end
@@ -103,7 +151,7 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims,
     ip_infos = JuAFEM.InterpolationInfo[]
     for interpolation in field_interpolations
         ip_info = JuAFEM.InterpolationInfo(interpolation)
-        # these are implemented yet (or have not been tested)
+        # these are not implemented yet (or have not been tested)
         @assert(ip_info.nvertexdofs <= 1)
         @assert(ip_info.nedgedofs <= 1)
         @assert(ip_info.nfacedofs <= 1)
@@ -113,6 +161,8 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims,
 
     # loop over all the cells, and distribute dofs for all the fields
     for ci in cellnumbers
+        dh.cell_dofs.offset[ci] = length(dh.cell_dofs.dofs)+1
+
         cell = dh.grid.cells[ci]
         cell_dofs = Int[]  # list of global dofs for each cell
         @debug "Creating dofs for cell #$ci"
@@ -139,9 +189,8 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims,
 
         end
         # after done creating dofs for the cell, push them to the global list
-        push!(dh.cell_dofs, cell_dofs...)
-        # push! the first index of the next cell to the offset vector
-        push!(dh.cell_dofs_offset, length(dh.cell_dofs)+1)
+        push!(dh.cell_dofs.dofs, cell_dofs...)
+        dh.cell_dofs.length[ci] = length(cell_dofs)
 
         @debug "Dofs for cell #$ci:\n\t$cell_dofs"
     end # cell loop
@@ -153,7 +202,6 @@ Returns the next global dof number and an array of dofs.
 If dofs have already been created for the object (vertex, face) then simply return those, otherwise create new dofs.
 """
 function get_or_create_dofs!(nextdof, field_dim; dict, key)
-
 
     token = Base.ht_keyindex2!(dict, key)
     if token > 0  # vertex, face etc. visited before
