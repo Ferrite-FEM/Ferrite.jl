@@ -94,3 +94,40 @@ end # of testset
 if OVERWRITE_CHECKSUMS
     close(csio)
 end
+
+
+# right = Vec{2, Float64}(ntuple(x->1.5, dim))
+# left = -right
+
+@testset "Grid utils" begin
+
+    grid = JuAFEM.generate_grid(QuadraticQuadrilateral, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
+
+    addcellset!(grid, "cell_set", [1]);
+    node_set = Set(1:getnnodes(grid))
+    addnodeset!(grid, "node_set", node_set)
+    
+    @test getnodesets(grid) == Dict("node_set" => node_set)
+
+    @test getnodes(grid, [1]) == [getnodes(grid, 1)] # untested
+
+    @test length(getnodes(grid, "node_set")) == 9
+
+    @test collect(getcoordinates(getnodes(grid, 5)).data) ≈ [0.5, 0.5]
+
+
+    @test getcells(grid, "cell_set") == [getcells(grid, 1)]
+
+    f(x) = Tensor{1,1,Float64}((1 + x[1]^2 + 2x[2]^2, ))
+
+    values = compute_vertex_values(grid, f)
+    @test f([0.0, 0.0]) == values[1]
+    @test f([0.5, 0.5]) == values[5]
+    @test f([1.0, 1.0]) == values[9]
+
+    @test compute_vertex_values(grid, collect(1:9), f) == values
+
+    # Can we test this in a better way? The set makes the order random.
+    @test length(compute_vertex_values(grid, "node_set", f)) == 9
+
+end

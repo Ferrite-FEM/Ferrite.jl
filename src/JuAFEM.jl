@@ -57,6 +57,9 @@ include("iterators.jl")
 # Assembly
 include("assembler.jl")
 
+# Projection
+include("L2_projection.jl")
+
 # Export
 include("Export/VTK.jl")
 
