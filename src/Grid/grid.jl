@@ -110,6 +110,14 @@ end
     compute_vertex_values(getnodes(grid), f::Function)
 end
 
+@inline function compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function)
+    compute_vertex_values(getnodes(grid, v), f::Function)
+end
+
+@inline function compute_vertex_values(grid::AbstractGrid, set::String, f::Function)
+    compute_vertex_values(getnodes(grid, set), f::Function)
+end
+
 # Transformations
 
 function transform!(g::AbstractGrid, f::Function)
