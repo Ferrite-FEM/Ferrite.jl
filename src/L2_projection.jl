@@ -6,6 +6,7 @@ struct L2Projector <: AbstractProjector
     M_cholesky # ::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::DofHandler
     set::Vector{Integer}
+    node2dof_map
 end
 
 function L2Projector(fe_values::JuAFEM.Values, interp::Interpolation, grid::JuAFEM.AbstractGrid, set=1:getncells(grid))
@@ -15,11 +16,11 @@ function L2Projector(fe_values::JuAFEM.Values, interp::Interpolation, grid::JuAF
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
     dh = DofHandler(grid)
     push!(dh, :_, 1, interp)
-    close!(dh)
+    _, vertex_dict, _, _ = close!(dh, true)
 
     M = _assemble_L2_matrix(fe_values, set, dh)  # the "mass" matrix
     M_cholesky = cholesky(M)  # TODO maybe have a lazy eval instead of precomputing? / JB
-    return L2Projector(fe_values, M_cholesky, dh, set)
+    return L2Projector(fe_values, M_cholesky, dh, set, vertex_dict[1])
 end
 
 
@@ -43,6 +44,7 @@ function _assemble_L2_matrix(fe_values, set, dh)
     ## Assemble contributions from each cell
     for cellnum in set
         celldofs!(cell_dofs, dh, cellnum)
+
         fill!(Me, 0)
         Xe = getcoordinates(dh.grid, cellnum)
         reinit!(fe_values, Xe)
@@ -66,17 +68,29 @@ end
 
 
 """
-    project(Vector{Vector{<:Tensor}}}, L2Projector)
+    project(Vector{Vector{<:Tensor}}}, L2Projector, project_to_nodes=true)
 
 Makes a L2 projection of tensor values to the nodes of the grid. This is commonly used for turning values, computed at integration points, to nodal values, so they can be visualized easier. It is also useful for error estimation and recovering more accurate estimations of secondary unknowns.
+
+If the parameter `project_to_nodes` is true, then the projection returns the values in the order of the mesh nodes. If false, it returns the values corresponding to the degrees of freedom for a scalar field over the domain, which is useful if one wants to interpolate the projected values.
 """
 function project(
     vars::Array{Array{Tensor{order,dim,T,M},1},1},
-    proj::L2Projector
-    ) where {order,dim,T,M}
+    proj::L2Projector;
+    project_to_nodes=true) where {order,dim,T,M}
 
     projected_vals = _project(vars, proj, M)
-    # convert back to the original tensor type
+    proj.node2dof_map
+    if project_to_nodes
+        # NOTE we may have more projected values than verticies in the mesh => not all values are returned
+        num_nodes = length(proj.node2dof_map)
+        reordered_vals = [projected_vals[proj.node2dof_map[node], :] for node in 1:num_nodes]
+        return Tensor{order,dim,T}.(reordered_vals)
+    else
+        # convert back to the original tensor type
+        return Tensor{order,dim,T}.(eachrow(projected_vals))
+    end
+
     return Tensor{order,dim,T}.(eachrow(projected_vals))
 end
 
