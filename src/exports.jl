@@ -74,6 +74,7 @@ export
     transform!,
     generate_grid,
     MixedGrid,
+    compute_vertex_values,
 
 # Dofs
     DofHandler,
@@ -115,4 +116,8 @@ export
     vtk_cell_data,
     vtk_nodeset,
     vtk_cellset,
-    vtk_save
+    vtk_save,
+
+# L2 Projection
+    project,
+    L2Projector

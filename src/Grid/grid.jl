@@ -81,13 +81,13 @@ end
 ##########################
 @inline getcells(grid::AbstractGrid) = grid.cells
 @inline getcells(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.cells[v]
-@inline getcells(grid::AbstractGrid, set::String) = grid.cells[grid.cellsets[set]]
+@inline getcells(grid::AbstractGrid, set::String) = grid.cells[collect(grid.cellsets[set])]
 @inline getncells(grid::AbstractGrid) = length(grid.cells)
 @inline getcelltype(grid::Grid) = eltype(grid.cells)
 
 @inline getnodes(grid::AbstractGrid) = grid.nodes
 @inline getnodes(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.nodes[v]
-@inline getnodes(grid::AbstractGrid, set::String) = grid.nodes[grid.nodesets[set]]
+@inline getnodes(grid::AbstractGrid, set::String) = grid.nodes[collect(grid.nodesets[set])]
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
 
 @inline getcellset(grid::AbstractGrid, set::String) = grid.cellsets[set]
@@ -100,6 +100,23 @@ end
 @inline getfacesets(grid::AbstractGrid) = grid.facesets
 
 n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
+
+
+@inline function compute_vertex_values(nodes::Vector{Node{dim,T}}, f::Function) where{dim,T}
+    map(n -> f(getcoordinates(n)), nodes)
+end
+
+@inline function compute_vertex_values(grid::AbstractGrid, f::Function)
+    compute_vertex_values(getnodes(grid), f::Function)
+end
+
+@inline function compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function)
+    compute_vertex_values(getnodes(grid, v), f::Function)
+end
+
+@inline function compute_vertex_values(grid::AbstractGrid, set::String, f::Function)
+    compute_vertex_values(getnodes(grid, set), f::Function)
+end
 
 # Transformations
 

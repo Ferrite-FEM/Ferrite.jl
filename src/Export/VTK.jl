@@ -28,6 +28,29 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,N,T}) where 
 end
 
 """
+    vtk_point_data(vtk, data::Vector{<:Tensor}, name)
+
+Write the tensor field data to the vtk file. Only writes the tensor values available in `data`.
+In the vtu-file, ordering of the tensor components is coulumn-wise (just like Julia).
+[1 2
+ 3 4] => 1, 3, 2, 4
+"""
+function WriteVTK.vtk_point_data(
+    vtk::WriteVTK.DatasetFile,
+    data::Union{
+        Vector{Tensor{order,dim,T,M}},
+        Vector{SymmetricTensor{order,dim,T,M}}
+        },
+    name::AbstractString
+    ) where {order,dim,T,M}
+
+    npoints = length(data)
+    out = zeros(T, M, npoints)
+    out[1:M, :] .= reshape(reinterpret(T, data), (M, npoints))
+    return vtk_point_data(vtk, out, name)
+end
+
+"""
     vtk_point_data(vtk, data::Vector{<:Vec}, name)
 
 Write the vector field data to the vtk file.
@@ -44,6 +67,9 @@ function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String
     z[collect(getnodeset(grid, nodeset))] .= 1.0
     vtk_point_data(vtk, z, nodeset)
 end
+
+
+
 
 """
     vtk_cellset(vtk, grid::Grid)
