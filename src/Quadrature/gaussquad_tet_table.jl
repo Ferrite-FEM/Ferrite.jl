@@ -1,4 +1,5 @@
 # Patrick Keast, MODERATE-DEGREE TETRAHEDRAL QUADRATURE FORMULAS
+# http://mech.fsv.cvut.cz/oofem/resources/doc/oofemrefman/gaussintegrationrule_8C_source.html
 function _get_gauss_tetdata(n::Int)
     if n == 1
         a = 1. / 4.
@@ -23,6 +24,29 @@ function _get_gauss_tetdata(n::Int)
               b2 a2 b2 w2
               b2 b2 a2 w2
               b2 b2 b2 w2]
+    elseif n == 4
+        a1 = 1. / 4.;
+        w1 = -74. / 5625.;
+
+        a2 = 5. / 70.;
+        b2 = 11. / 14.;
+        w2 = 343. / 45000.;
+
+        a3 = ( 1. + √(5. / 14.) ) / 4.;
+        b3 = ( 1. - √(5. / 14.) ) / 4.;
+        w3 = 28. / 1125.;
+
+        xw = [a1 a1 a1 w1
+              b2 a2 a2 w2
+              a2 b2 a2 w2
+              a2 a2 b2 w2
+              a2 a2 a2 w2
+              a3 a3 b3 w3
+              a3 b3 a3 w3
+              a3 b3 b3 w3
+              b3 a3 a3 w3
+              b3 a3 b3 w3
+              b3 b3 a3 w3]
     else
         throw(ArgumentError("unsupported order for tetraheder gauss-legendre integration"))
     end

@@ -43,7 +43,7 @@
     @test_throws ArgumentError QuadratureRule{dim, RefTetrahedron}(0)
 
     dim = 3
-    for order in (1, 2, 3)
+    for order in (1, 2, 3, 4)
         qr = QuadratureRule{dim, RefTetrahedron}(:legendre, order)
         # Table 1:
         # http://www.m-hikari.com/ijma/ijma-2011/ijma-1-4-2011/venkateshIJMA1-4-2011.pdf
