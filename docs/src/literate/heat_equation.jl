@@ -41,7 +41,7 @@ using JuAFEM, SparseArrays
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
 grid = generate_grid(Quadrilateral, (20, 20));
-
+grid = MixedGrid(grid.cells, grid.nodes, grid.cellsets, grid.nodesets, grid.facesets, grid.boundary_matrix)
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
 # test and trial functions (among other things). Since the problem
@@ -62,7 +62,7 @@ cellvalues = CellScalarValues(qr, ip);
 # We create the `DofHandler` and then add a single field called `u`.
 # Lastly we `close!` the `DofHandler`, it is now that the dofs are distributed
 # for all the elements.
-dh = DofHandler(grid)
+dh = MixedDofHandler(grid)
 push!(dh, :u, 1)
 close!(dh);
 
@@ -110,7 +110,7 @@ update!(ch, 0.0);
 # We define a function, `doassemble` to do the assembly, which takes our `cellvalues`,
 # the sparse matrix and our DofHandler as input arguments. The function returns the
 # assembled stiffness matrix, and the force vector.
-function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler) where {dim}
+function doassemble(cellvalues::CellScalarValues{dim,T}, K::SparseMatrixCSC, dh::JuAFEM.AbstractDofHandler) where {dim,T}
     # We allocate the element stiffness matrix and element force vector
     # just once before looping over all the cells instead of allocating
     # them every time in the loop.
@@ -127,20 +127,25 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
 
+    celldofs = zeros(Int, ndofs_per_cell(dh))
+    cellcoords = zeros(Vec{dim,T}, JuAFEM.nnodes_per_cell(dh))
+
     # It is now time to loop over all the cells in our grid. We do this by iterating
     # over a `CellIterator`. The iterator caches some useful things for us, for example
     # the nodal coordinates for the cell, and the local degrees of freedom.
     #+
-    @inbounds for cell in CellIterator(dh)
+    @inbounds for cellid in 1:getncells(dh.grid)#CellIterator(dh)
         # Always remember to reset the element stiffness matrix and
         # force vector since we reuse them for all elements.
         #+
         fill!(Ke, 0)
         fill!(fe, 0)
 
+        JuAFEM.cellcoords!(cellcoords, dh, cellid)
+        JuAFEM.celldofs!(celldofs, dh, cellid)
         # For each cell we also need to reinitialize the cached values in `cellvalues`.
         #+
-        reinit!(cellvalues, cell)
+        reinit!(cellvalues, cellcoords)
 
         # It is now time to loop over all the quadrature points in the cell and
         # assemble the contribution to `Ke` and `fe`. The integration weight
@@ -166,7 +171,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
         # The last step in the element loop is to assemble `Ke` and `fe`
         # into the global `K` and `f` with `assemble!`.
         #+
-        assemble!(assembler, celldofs(cell), fe, Ke)
+        assemble!(assembler, celldofs, fe, Ke)
     end
     return K, f
 end
