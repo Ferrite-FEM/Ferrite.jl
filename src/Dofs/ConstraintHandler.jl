@@ -118,8 +118,8 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
     dbc_check(ch, dbc)
     field_idx = find_field(ch.dh, dbc.field_name)
     # Extract stuff for the field
-    interpolation = ch.dh.field_interpolations[field_idx]
-    field_dim = ch.dh.field_dims[field_idx] # TODO: I think we don't need to extract these here ...
+    interpolation = getfieldinterpolation(ch.dh, field_idx)#ch.dh.field_interpolations[field_idx]
+    field_dim = getfielddim(ch.dh, field_idx)#ch.dh.field_dims[field_idx] # TODO: I think we don't need to extract these here ...
     _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name))
     return ch
 end
@@ -208,7 +208,7 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
         field_idx = find_field(ch.dh, dbc.field_name)
         # Function barrier
         _update!(ch.values, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
-                 dbc.components, ch.dh, ch.dh.bc_values[field_idx], ch.dofmapping, convert(Float64, time))
+                 dbc.components, ch.dh, getbcvalue(ch.dh, field_idx), ch.dofmapping, convert(Float64, time))
     end
 end
 

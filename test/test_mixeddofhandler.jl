@@ -14,8 +14,9 @@ function get_2d_grid()
         Quadrilateral((1, 2, 3, 4)),
         Triangle((3, 2, 5))
         ]
-
-    return MixedGrid(cells, Node{0, Float64}[])
+    coords = zeros(Vec{2,Float64}, 5)
+    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 5)]
+    return MixedGrid(cells,nodes)
 end
 
 function test_1d_bar_beam()
@@ -27,7 +28,8 @@ function test_1d_bar_beam()
         Line((2, 3)),
         Line((1, 3)),
         ]
-    grid = MixedGrid(cells, Node{0, Float64}[])
+    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 3)]
+    grid = MixedGrid(cells, nodes)
 
     field1 = create_field(name=:u, spatial_dim=1, field_dim=2, order=1, cellshape=RefCube)
     field2 = create_field(name=:u, spatial_dim=1, field_dim=2, order=1, cellshape=RefCube)
@@ -62,7 +64,7 @@ function test_2d_scalar()
 
     # THEN: we expect 5 dofs and dof 2 and 3 being shared
     @test ndofs(dh) == 5
-    @test dh.cell_dofs.dofs == [1, 2, 3, 4, 3, 2, 5]
+    @test dh.cell_dofs.values == [1, 2, 3, 4, 3, 2, 5]
     @test celldofs(dh, 1) == [1, 2, 3, 4]
     @test celldofs(dh, 2) == [3, 2, 5]
 end
@@ -124,7 +126,8 @@ function test_2d_mixed_2_tri()
         Triangle((1, 2, 3)),
         Triangle((2, 4, 3))
         ]
-    grid = MixedGrid(cells, Node{0, Float64}[])
+    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 4)]
+    grid = MixedGrid(cells, nodes)
     field1 = create_field(name = :u, spatial_dim=2, field_dim = 2, order = 1, cellshape = RefCube)
     field2 = create_field(name = :p, spatial_dim=2, field_dim = 1, order = 1, cellshape = RefTetrahedron)
     dh = MixedDofHandler(grid);
@@ -152,7 +155,8 @@ function test_face_dofs_2_tri()
         Triangle((1, 2, 3)),
         Triangle((2, 4, 3))
         ]
-    grid = MixedGrid(cells, Node{0, Float64}[]);
+    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 4)]
+    grid = MixedGrid(cells, nodes);
     field1 = create_field(name = :u, spatial_dim = 2, field_dim = 2, order = 2, cellshape = RefTetrahedron)
     dh = MixedDofHandler(grid);
     push!(dh, FieldHandler([field1], Set((1, 2))));
@@ -174,8 +178,8 @@ function test_3d_tetrahedrons()
         Tetrahedron((2, 5, 6, 7)),
         Tetrahedron((2, 6, 8, 7)),
         ]
-
-    grid = MixedGrid(cells, Node{0, Float64}[])
+    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 8)]
+    grid = MixedGrid(cells, nodes)
     field = create_field(name = :u, spatial_dim=3,  field_dim = 3, order = 2, cellshape = RefTetrahedron)
     dh = MixedDofHandler(grid);
     push!(dh, FieldHandler([field], Set((1, 2, 3, 4, 5, 6))));
@@ -233,8 +237,8 @@ function test_2d_mixed_field_triangles()
         Triangle((1, 2, 3)),
         Triangle((2, 4, 3))
         ]
-
-    grid = MixedGrid(cells, Node{0, Float64}[])
+    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 4)]
+    grid = MixedGrid(cells, nodes)
     field1 = create_field(name=:u, spatial_dim=2, field_dim=2, order=2, cellshape=RefTetrahedron)
     field2 = create_field(name=:p, spatial_dim=2, field_dim=1, order=1, cellshape=RefTetrahedron)
     dh = MixedDofHandler(grid);
@@ -273,7 +277,8 @@ function test_3d_mixed_field_mixed_celltypes()
         Hexahedron((1, 2, 3, 4, 5, 6, 7, 8)),
         Quadrilateral((3, 2, 9, 10)),
         ]
-    grid = MixedGrid(cells, Node{0, Float64}[])
+    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 10)]
+    grid = MixedGrid(cells, nodes)
 
     # E.g. 3d continuum el -> 3dofs/node
     field1 = create_field(name=:u, spatial_dim=3, field_dim=3, order=1, cellshape=RefCube)
@@ -400,8 +405,8 @@ function test_element_order()
         Quadrilateral((2, 4, 5, 3)),
         Triangle((4, 6, 5))
         ]
-
-    grid = MixedGrid(cells, Node{0, Float64}[])
+    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 6)]
+    grid = MixedGrid(cells, nodes)
     field1 = create_field(name=:u, spatial_dim=3, field_dim=2, order=1, cellshape=RefTetrahedron)
 
     dh = MixedDofHandler(grid);
