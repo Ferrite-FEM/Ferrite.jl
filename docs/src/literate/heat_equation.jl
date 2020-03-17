@@ -41,7 +41,8 @@ using JuAFEM, SparseArrays
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
 grid = generate_grid(Quadrilateral, (20, 20));
-grid = MixedGrid(grid.cells, grid.nodes, grid.cellsets, grid.nodesets, grid.facesets, grid.boundary_matrix)
+#grid = MixedGrid(grid.cells, grid.nodes, grid.cellsets, grid.nodesets, grid.facesets, grid.boundary_matrix)
+
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
 # test and trial functions (among other things). Since the problem
@@ -127,22 +128,25 @@ function doassemble(cellvalues::CellScalarValues{dim,T}, K::SparseMatrixCSC, dh:
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
 
-    celldofs = zeros(Int, ndofs_per_cell(dh))
-    cellcoords = zeros(Vec{dim,T}, JuAFEM.nnodes_per_cell(dh))
+    #celldofs = zeros(Int, ndofs_per_cell(dh))
+    #cellcoords = zeros(Vec{dim,T}, JuAFEM.nnodes_per_cell(dh))
 
     # It is now time to loop over all the cells in our grid. We do this by iterating
     # over a `CellIterator`. The iterator caches some useful things for us, for example
     # the nodal coordinates for the cell, and the local degrees of freedom.
     #+
-    @inbounds for cellid in 1:getncells(dh.grid)#CellIterator(dh)
+    @inbounds for celldata in CellIterator(dh) #1:getncells(dh.grid)
         # Always remember to reset the element stiffness matrix and
         # force vector since we reuse them for all elements.
         #+
         fill!(Ke, 0)
         fill!(fe, 0)
 
-        JuAFEM.cellcoords!(cellcoords, dh, cellid)
-        JuAFEM.celldofs!(celldofs, dh, cellid)
+        #JuAFEM.cellcoords!(cellcoords, dh, cellid)
+        #JuAFEM.celldofs!(celldofs, dh, cellid)
+        _celldofs = celldofs(celldata)
+        cellcoords = getcoordinates(celldata)
+
         # For each cell we also need to reinitialize the cached values in `cellvalues`.
         #+
         reinit!(cellvalues, cellcoords)
@@ -171,7 +175,7 @@ function doassemble(cellvalues::CellScalarValues{dim,T}, K::SparseMatrixCSC, dh:
         # The last step in the element loop is to assemble `Ke` and `fe`
         # into the global `K` and `f` with `assemble!`.
         #+
-        assemble!(assembler, celldofs, fe, Ke)
+        assemble!(assembler, _celldofs, fe, Ke)
     end
     return K, f
 end
