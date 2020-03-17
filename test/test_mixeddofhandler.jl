@@ -16,7 +16,7 @@ function get_2d_grid()
         ]
     coords = zeros(Vec{2,Float64}, 5)
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 5)]
-    return MixedGrid(cells,nodes)
+    return Grid(cells,nodes)
 end
 
 function test_1d_bar_beam()
@@ -29,7 +29,7 @@ function test_1d_bar_beam()
         Line((1, 3)),
         ]
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 3)]
-    grid = MixedGrid(cells, nodes)
+    grid = Grid(cells, nodes)
 
     field1 = create_field(name=:u, spatial_dim=1, field_dim=2, order=1, cellshape=RefCube)
     field2 = create_field(name=:u, spatial_dim=1, field_dim=2, order=1, cellshape=RefCube)
@@ -127,7 +127,7 @@ function test_2d_mixed_2_tri()
         Triangle((2, 4, 3))
         ]
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 4)]
-    grid = MixedGrid(cells, nodes)
+    grid = Grid(cells, nodes)
     field1 = create_field(name = :u, spatial_dim=2, field_dim = 2, order = 1, cellshape = RefCube)
     field2 = create_field(name = :p, spatial_dim=2, field_dim = 1, order = 1, cellshape = RefTetrahedron)
     dh = MixedDofHandler(grid);
@@ -156,7 +156,7 @@ function test_face_dofs_2_tri()
         Triangle((2, 4, 3))
         ]
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 4)]
-    grid = MixedGrid(cells, nodes);
+    grid = Grid(cells, nodes);
     field1 = create_field(name = :u, spatial_dim = 2, field_dim = 2, order = 2, cellshape = RefTetrahedron)
     dh = MixedDofHandler(grid);
     push!(dh, FieldHandler([field1], Set((1, 2))));
@@ -179,7 +179,7 @@ function test_3d_tetrahedrons()
         Tetrahedron((2, 6, 8, 7)),
         ]
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 8)]
-    grid = MixedGrid(cells, nodes)
+    grid = Grid(cells, nodes)
     field = create_field(name = :u, spatial_dim=3,  field_dim = 3, order = 2, cellshape = RefTetrahedron)
     dh = MixedDofHandler(grid);
     push!(dh, FieldHandler([field], Set((1, 2, 3, 4, 5, 6))));
@@ -238,7 +238,7 @@ function test_2d_mixed_field_triangles()
         Triangle((2, 4, 3))
         ]
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 4)]
-    grid = MixedGrid(cells, nodes)
+    grid = Grid(cells, nodes)
     field1 = create_field(name=:u, spatial_dim=2, field_dim=2, order=2, cellshape=RefTetrahedron)
     field2 = create_field(name=:p, spatial_dim=2, field_dim=1, order=1, cellshape=RefTetrahedron)
     dh = MixedDofHandler(grid);
@@ -278,7 +278,7 @@ function test_3d_mixed_field_mixed_celltypes()
         Quadrilateral((3, 2, 9, 10)),
         ]
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 10)]
-    grid = MixedGrid(cells, nodes)
+    grid = Grid(cells, nodes)
 
     # E.g. 3d continuum el -> 3dofs/node
     field1 = create_field(name=:u, spatial_dim=3, field_dim=3, order=1, cellshape=RefCube)
@@ -297,10 +297,10 @@ end
 
 function test_2_element_heat_eq()
     # Regression test solving the heat equation.
-    # The grid consists of two quad elements treated as two different cell types to test the MixedGrid and all other necessary functions
+    # The grid consists of two quad elements treated as two different cell types to test the Grid and all other necessary functions
 
     temp_grid = generate_grid(Quadrilateral, (2, 1))
-    grid = MixedGrid(temp_grid.cells, temp_grid.nodes)  # regular grid -> mixed grid
+    grid = Grid(temp_grid.cells, temp_grid.nodes)  # regular grid -> mixed grid
     grid.facesets = temp_grid.facesets;
 
     # Create two identical fields
@@ -394,7 +394,7 @@ end
 
 
 function test_element_order()
-    # Check that one can have non-contigous ordering of cells in a MixedGrid
+    # Check that one can have non-contigous ordering of cells in a Grid
     # Something like this:
     #        ______
     #      /|     |\
@@ -406,7 +406,7 @@ function test_element_order()
         Triangle((4, 6, 5))
         ]
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 6)]
-    grid = MixedGrid(cells, nodes)
+    grid = Grid(cells, nodes)
     field1 = create_field(name=:u, spatial_dim=3, field_dim=2, order=1, cellshape=RefTetrahedron)
 
     dh = MixedDofHandler(grid);

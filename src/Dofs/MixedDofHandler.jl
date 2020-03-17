@@ -32,11 +32,11 @@ struct MixedDofHandler{dim,C,T} <: JuAFEM.AbstractDofHandler
     cell_nodes::CellVector{Int}
     cell_coords::CellVector{Vec{dim,T}}
     closed::ScalarWrapper{Bool}
-    grid::MixedGrid{dim,C,T}
+    grid::Grid{dim,C,T}
     ndofs::ScalarWrapper{Int}
 end
 
-function MixedDofHandler(grid::MixedGrid{dim,C,T}) where {dim,C,T}
+function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
     MixedDofHandler{dim,C,T}(FieldHandler[], CellVector(Int[],Int[],Int[]), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), JuAFEM.ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
 end
 
@@ -64,6 +64,13 @@ function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::MixedDofHandler, i::
     @assert length(global_coords) == nnodes_per_cell(dh, i)
     unsafe_copyto!(global_coords, 1, dh.cell_coords.values, dh.cell_coords.offset[i], length(global_coords))
     return global_coords
+end
+
+function cellnodes!(global_nodes::Vector{Int}, dh::MixedDofHandler, i::Int) where {dim,T}
+    @assert isclosed(dh)
+    @assert length(global_nodes) == nnodes_per_cell(dh, i)
+    unsafe_copyto!(global_nodes, 1, dh.cell_nodes.values, dh.cell_nodes.offset[i], length(global_nodes))
+    return global_nodes
 end
 
 

@@ -1,5 +1,5 @@
 
-mutable struct MixedGrid{dim,C,T<:Real} <: JuAFEM.AbstractGrid
+#=mutable struct Grid{dim,C,T<:Real} <: JuAFEM.AbstractGrid
     cells::Vector{C}
     nodes::Vector{Node{dim,T}}
     # Sets
@@ -10,12 +10,12 @@ mutable struct MixedGrid{dim,C,T<:Real} <: JuAFEM.AbstractGrid
     boundary_matrix::SparseMatrixCSC{Bool,Int}
 end
 
-function MixedGrid(
+function Grid(
     cells::Vector{C},
     nodes::Vector{Node{dim,T}};
     cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
     nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
     facesets::Dict{String,Set{Tuple{Int,Int}}}=Dict{String,Set{Tuple{Int,Int}}}(),
           boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)) where {dim,C,T}
-    return MixedGrid(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
-end
+    return Grid(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
+end=#

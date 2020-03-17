@@ -11,7 +11,7 @@ abstract type AbstractDofHandler end
 
 Construct a `DofHandler` based on the grid `grid`.
 """
-struct DofHandler{dim,N,T,M} <: AbstractDofHandler
+struct DofHandler{dim,C,T} <: AbstractDofHandler
     field_names::Vector{Symbol}
     field_dims::Vector{Int}
     # TODO: field_interpolations can probably be better typed: We should at least require
@@ -21,7 +21,7 @@ struct DofHandler{dim,N,T,M} <: AbstractDofHandler
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
     closed::ScalarWrapper{Bool}
-    grid::Grid{dim,N,T,M}
+    grid::Grid{dim,C,T}
     ndofs::ScalarWrapper{Int}
 end
 
@@ -266,6 +266,25 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
     unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
     return global_dofs
+end
+
+function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler{dim,C,T}, i::Int) where {dim,C,T}
+    @assert isclosed(dh)
+    @assert length(global_nodes) == nnodes(C)
+    for j in 1:nnodes(C) #Currently assuming that DofHandler only has one celltype
+        global_nodes[j] = dh.grid.cells[i].nodes[j]
+    end
+    return global_nodes
+end
+
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::DofHandler{dim,C,T}, i::Int) where {dim,C,T}
+    @assert isclosed(dh)
+    @assert length(global_coords) == nnodes(C)
+    for j in 1:nnodes(C) #Currently assuming that DofHandler only has one celltype
+        nodeid = dh.grid.cells[i].nodes[j]
+        global_coords[j] = dh.grid.nodes[nodeid].x
+    end
+    return global_coords
 end
 
 function celldofs(dh::DofHandler, i::Int)

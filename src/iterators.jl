@@ -23,36 +23,41 @@ for cell in CellIterator(grid)
 end
 ```
 """
-struct CellIterator{dim,N,T,M}
+struct CellIterator{dim,C,T}
     flags::UpdateFlags
-    grid::Grid{dim,N,T,M}
+    grid::Grid{dim,C,T}
     current_cellid::ScalarWrapper{Int}
     nodes::Vector{Int}
     coords::Vector{Vec{dim,T}}
-    dh::DofHandler{dim,N,T,M}
+    cellset::Vector{Int}
+    dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}} #Futre: remove DofHandler and rename MixedDofHandler->DofHandler
     celldofs::Vector{Int}
 
-    function CellIterator{dim,N,T,M}(dh::DofHandler{dim,N,T,M}, flags::UpdateFlags) where {dim,N,T,M}
+    function CellIterator{dim,C,T}(dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}}, cellset::AbstractVector{Int}, flags::UpdateFlags) where {dim,C,T}
+        isconcretetype(C) || _check_same_celltype(grid, cellset)
+        N = nnodes_per_cell(dh.grid, first(cellset))
         cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim,T}, N)
         n = ndofs_per_cell(dh)
         celldofs = zeros(Int, n)
-        return new{dim,N,T,M}(flags, dh.grid, cell, nodes, coords, dh, celldofs)
+        return new{dim,C,T}(flags, dh.grid, cell, nodes, coords, cellset, dh, celldofs)
     end
 
-    function CellIterator{dim,N,T,M}(grid::Grid{dim,N,T,M}, flags::UpdateFlags) where {dim,N,T,M}
+    function CellIterator{dim,C,T}(grid::Grid{dim,C,T}, cellset::AbstractVector{Int}, flags::UpdateFlags) where {dim,C,T}
+        isconcretetype(C) || _check_same_celltype(grid, cellset)
+        N = nnodes_per_cell(grid, first(cellset))
         cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim,T}, N)
-        return new{dim,N,T,M}(flags, grid, cell, nodes, coords)
+        return new{dim,C,T}(flags, grid, cell, nodes, coords)
     end
 end
 
-CellIterator(grid::Grid{dim,N,T,M},     flags::UpdateFlags=UpdateFlags()) where {dim,N,T,M} =
-    CellIterator{dim,N,T,M}(grid, flags)
-CellIterator(dh::DofHandler{dim,N,T,M}, flags::UpdateFlags=UpdateFlags()) where {dim,N,T,M} =
-    CellIterator{dim,N,T,M}(dh, flags)
+CellIterator(grid::Grid{dim,C,T}, cellset::AbstractVector{Int}=1:getncells(grid), flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
+    CellIterator{dim,C,T}(grid, cellset, flags)
+CellIterator(dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}}, cellset::AbstractVector{Int}=1:getncells(dh.grid), flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
+    CellIterator{dim,C,T}(dh, cellset, flags)
 
 # iterator interface
 function Base.iterate(ci::CellIterator, state = 1)
@@ -74,19 +79,16 @@ Base.eltype(::Type{T})         where {T<:CellIterator} = T
 @inline nfaces(ci::CellIterator) = nfaces(eltype(ci.grid.cells))
 @inline onboundary(ci::CellIterator, face::Int) = ci.grid.boundary_matrix[face, ci.current_cellid[]]
 @inline cellid(ci::CellIterator) = ci.current_cellid[]
-@inline celldofs!(v::Vector, ci::CellIterator) = celldofs!(v, ci.dh, ci.current_cellid[])
 @inline celldofs(ci::CellIterator) = ci.celldofs
 
-function reinit!(ci::CellIterator{dim,N}, i::Int) where {dim,N}
-    nodeids = ci.grid.cells[i].nodes
-    ci.current_cellid[] = i
-    @inbounds for j in 1:N
-        nodeid = nodeids[j]
-        ci.flags.nodes  && (ci.nodes[j] = nodeid)
-        ci.flags.coords && (ci.coords[j] = ci.grid.nodes[nodeid].x)
-    end
+function reinit!(ci::CellIterator{dim,C}, i::Int) where {dim,C}
+    ci.current_cellid[] = ci.cellset[i]
+    
+    ci.flags.nodes  && cellnodes!(ci.nodes, ci.dh, ci.current_cellid[])
+    ci.flags.coords && cellcoords!(ci.coords, ci.dh, ci.current_cellid[])
+    
     if isdefined(ci, :dh) && ci.flags.celldofs # update celldofs
-        celldofs!(ci.celldofs, ci)
+        celldofs!(ci.celldofs, ci.dh, ci.current_cellid[])
     end
     return ci
 end
@@ -108,4 +110,13 @@ end
 @inline function reinit!(fv::FaceValues{dim,T}, ci::CellIterator{dim,N,T}, face::Int) where {dim,N,T}
     check_compatible_geointerpolation(fv, ci)
     reinit!(fv, ci.coords, face)
+end
+
+function _check_same_celltype(grid::AbstractGrid, cellset::AbstractVector{Int})
+    celltype = typeof(grid.cells[first(cellset)])
+    for cellid in cellset
+        if celltype != typeof(grid.cells[cellid])
+            error("Better error mes: You are trying to use CellIterator to loop over a cellset with different types of cells. This doese not work atm.")
+        end
+    end
 end

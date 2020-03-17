@@ -73,7 +73,6 @@ export
     addcellset!,
     transform!,
     generate_grid,
-    MixedGrid,
     compute_vertex_values,
 
 # Dofs

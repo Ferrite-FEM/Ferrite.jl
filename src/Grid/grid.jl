@@ -13,13 +13,14 @@ getcoordinates(n::Node) = n.x
 """
 A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
 """
-struct Cell{dim,N,M}
+abstract type AbstractCell{dim,N,M} end
+struct Cell{dim,N,M} <: AbstractCell{dim,N,M}
     nodes::NTuple{N,Int}
 end
-nfaces(c::Cell) = nfaces(typeof(c))
-nfaces(::Type{Cell{dim,N,M}}) where {dim,N,M} = M
-nnodes(c::Cell) = nnodes(typeof(c))
-nnodes(::Type{Cell{dim,N,M}}) where {dim,N,M} = N
+nfaces(c::C) where {C<:AbstractCell} = nfaces(typeof(c))
+nfaces(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = M
+nnodes(c::C) where {C<:AbstractCell} = nnodes(typeof(c))
+nnodes(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = N
 
 # Typealias for commonly used cells
 const Line = Cell{1,2,2}
@@ -56,8 +57,8 @@ abstract type AbstractGrid end
 """
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 """
-mutable struct Grid{dim,N,T<:Real,M} <: AbstractGrid
-    cells::Vector{Cell{dim,N,M}}
+mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid
+    cells::Vector{C}
     nodes::Vector{Node{dim,T}}
     # Sets
     cellsets::Dict{String,Set{Int}}
@@ -67,12 +68,12 @@ mutable struct Grid{dim,N,T<:Real,M} <: AbstractGrid
     boundary_matrix::SparseMatrixCSC{Bool,Int}
 end
 
-function Grid(cells::Vector{Cell{dim,N,M}},
+function Grid(cells::Vector{C},
               nodes::Vector{Node{dim,T}};
               cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
               nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
               facesets::Dict{String,Set{Tuple{Int,Int}}}=Dict{String,Set{Tuple{Int,Int}}}(),
-              boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)) where {dim,N,M,T}
+              boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)) where {dim,C,T}
     return Grid(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
 end
 
@@ -89,6 +90,7 @@ end
 @inline getnodes(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.nodes[v]
 @inline getnodes(grid::AbstractGrid, set::String) = grid.nodes[collect(grid.nodesets[set])]
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
+@inline nnodes_per_cell(grid::AbstractGrid, i::Int=1) = nnodes(grid.cells[i])
 
 @inline getcellset(grid::AbstractGrid, set::String) = grid.cellsets[set]
 @inline getcellsets(grid::AbstractGrid) = grid.cellsets

@@ -214,10 +214,11 @@ end
 
 # for faces
 function _update!(values::Vector{Float64}, f::Function, faces::Set{Tuple{Int,Int}}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
-                  components::Vector{Int}, dh::DofHandler{dim,N,T,M}, facevalues::BCValues,
-                  dofmapping::Dict{Int,Int}, time::Float64) where {dim,N,T,M}
+                  components::Vector{Int}, dh::DofHandler{dim,C,T}, facevalues::BCValues,
+                  dofmapping::Dict{Int,Int}, time::Float64) where {dim,C,T}
     grid = dh.grid
 
+    N = nnodes(C)
     xh = zeros(Vec{dim, T}, N) # pre-allocate
     _celldofs = fill(0, ndofs_per_cell(dh))
 
@@ -252,8 +253,8 @@ end
 
 # for nodes
 function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
-                  components::Vector{Int}, dh::DofHandler{dim,N,T,M}, facevalues::BCValues,
-                  dofmapping::Dict{Int,Int}, time::Float64) where {dim,N,T,M}
+                  components::Vector{Int}, dh::DofHandler{dim,C,M}, facevalues::BCValues,
+                  dofmapping::Dict{Int,Int}, time::Float64) where {dim,C,M}
     counter = 1
     for (idx, nodenumber) in enumerate(nodeidxs)
         x = dh.grid.nodes[nodenumber].x
