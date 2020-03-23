@@ -41,7 +41,6 @@ using JuAFEM, SparseArrays
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
 grid = generate_grid(Quadrilateral, (20, 20));
-#grid = MixedGrid(grid.cells, grid.nodes, grid.cellsets, grid.nodesets, grid.facesets, grid.boundary_matrix)
 
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
