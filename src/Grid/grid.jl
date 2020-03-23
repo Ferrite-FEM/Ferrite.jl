@@ -80,6 +80,7 @@ end
 ##########################
 # Grid utility functions #
 ##########################
+@inline getdim(grid::Grid{dim}) where {dim} = dim
 @inline getcells(grid::AbstractGrid) = grid.cells
 @inline getcells(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.cells[v]
 @inline getcells(grid::AbstractGrid, set::String) = grid.cells[collect(grid.cellsets[set])]

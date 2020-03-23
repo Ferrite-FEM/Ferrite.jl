@@ -321,11 +321,6 @@ function test_2_element_heat_eq()
     add!(ch, dh.fieldhandlers[1], dbc1);
     add!(ch, dh.fieldhandlers[2], dbc2);
     close!(ch)
-    # TODO pretty ugly way of linking a dbc to a specific field. Needed for update!
-    dbcmap = Dict(
-        dbc1 => dh.fieldhandlers[1],
-        dbc2 => dh.fieldhandlers[2],
-    )
 
     function doassemble(cellset, cellvalues, assembler, dh)
 
@@ -370,7 +365,7 @@ function test_2_element_heat_eq()
         doassemble(fh.cellset, cellvalues, assembler, dh)
     end
 
-    update!(ch, dbcmap, 0.0);
+    update!(ch, 0.0);
     apply!(K, f, ch)
     u = K \ f;
 
