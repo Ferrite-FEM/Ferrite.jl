@@ -30,7 +30,7 @@ struct CellIterator{dim,C,T}
     nodes::Vector{Int}
     coords::Vector{Vec{dim,T}}
     cellset::Vector{Int}
-    dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}} #Futre: remove DofHandler and rename MixedDofHandler->DofHandler
+    dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}} #Future: remove DofHandler and rename MixedDofHandler->DofHandler
     celldofs::Vector{Int}
 
     function CellIterator{dim,C,T}(dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}}, cellset::AbstractVector{Int}, flags::UpdateFlags) where {dim,C,T}
@@ -116,7 +116,7 @@ function _check_same_celltype(grid::AbstractGrid, cellset::AbstractVector{Int})
     celltype = typeof(grid.cells[first(cellset)])
     for cellid in cellset
         if celltype != typeof(grid.cells[cellid])
-            error("Better error mes: You are trying to use CellIterator to loop over a cellset with different types of cells. This doese not work atm.")
+            error("You are trying to use a CellIterator to loop over a cellset with different celltypes.")
         end
     end
 end
