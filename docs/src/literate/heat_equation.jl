@@ -62,7 +62,7 @@ cellvalues = CellScalarValues(qr, ip);
 # We create the `DofHandler` and then add a single field called `u`.
 # Lastly we `close!` the `DofHandler`, it is now that the dofs are distributed
 # for all the elements.
-dh = MixedDofHandler(grid)
+dh = DofHandler(grid)
 push!(dh, :u, 1)
 close!(dh);
 
