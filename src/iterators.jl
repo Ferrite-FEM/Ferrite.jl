@@ -79,6 +79,7 @@ Base.eltype(::Type{T})         where {T<:CellIterator} = T
 @inline nfaces(ci::CellIterator) = nfaces(eltype(ci.grid.cells))
 @inline onboundary(ci::CellIterator, face::Int) = ci.grid.boundary_matrix[face, ci.current_cellid[]]
 @inline cellid(ci::CellIterator) = ci.current_cellid[]
+@inline celldofs!(v::Vector, ci::CellIterator) = celldofs!(v, ci.dh, ci.current_cellid[])
 @inline celldofs(ci::CellIterator) = ci.celldofs
 
 function reinit!(ci::CellIterator{dim,C}, i::Int) where {dim,C}
