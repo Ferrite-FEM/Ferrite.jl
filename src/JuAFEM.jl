@@ -43,7 +43,6 @@ include("FEValues/face_integrals.jl")
 
 # Grid
 include(joinpath("Grid", "grid.jl"))
-include(joinpath("Grid", "MixedGrid.jl"))
 include(joinpath("Grid", "grid_generators.jl"))
 include(joinpath("Grid", "coloring.jl"))
 

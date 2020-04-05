@@ -11,7 +11,7 @@ abstract type AbstractDofHandler end
 
 Construct a `DofHandler` based on the grid `grid`.
 """
-struct DofHandler{dim,N,T,M} <: AbstractDofHandler
+struct DofHandler{dim,C,T} <: AbstractDofHandler
     field_names::Vector{Symbol}
     field_dims::Vector{Int}
     # TODO: field_interpolations can probably be better typed: We should at least require
@@ -21,7 +21,7 @@ struct DofHandler{dim,N,T,M} <: AbstractDofHandler
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
     closed::ScalarWrapper{Bool}
-    grid::Grid{dim,N,T,M}
+    grid::Grid{dim,C,T}
     ndofs::ScalarWrapper{Int}
 end
 
@@ -49,20 +49,24 @@ isclosed(dh::AbstractDofHandler) = dh.closed[]
 nfields(dh::AbstractDofHandler) = length(dh.field_names)
 getfieldnames(dh::AbstractDofHandler) = dh.field_names
 ndim(dh::AbstractDofHandler, field_name::Symbol) = dh.field_dims[find_field(dh, field_name)]
-function find_field(dh::AbstractDofHandler, field_name::Symbol)
+function find_field(dh::DofHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, dh.field_names)
     j == 0 && error("did not find field $field_name")
     return j
 end
 
 # Calculate the offset to the first local dof of a field
-function field_offset(dh::AbstractDofHandler, field_name::Symbol)
+function field_offset(dh::DofHandler, field_name::Symbol)
     offset = 0
     for i in 1:find_field(dh, field_name)-1
         offset += getnbasefunctions(dh.field_interpolations[i])::Int * dh.field_dims[i]
     end
     return offset
 end
+
+getfieldinterpolation(dh::DofHandler, field_idx::Int) = dh.field_interpolations[field_idx]
+getfielddim(dh::DofHandler, field_idx::Int) = dh.field_dims[field_idx]
+getbcvalue(dh::DofHandler, field_idx::Int) = dh.bc_values[field_idx]
 
 """
     dof_range(dh:DofHandler, field_name)
@@ -257,14 +261,33 @@ function close!(dh::DofHandler{dim}, return_dicts=false) where {dim}
     return dh
 end
 
-function celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
+function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
     unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
     return global_dofs
 end
 
-function celldofs(dh::AbstractDofHandler, i::Int)
+function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler{dim,C,T}, i::Int) where {dim,C,T}
+    @assert isclosed(dh)
+    @assert length(global_nodes) == nnodes(C)
+    for j in 1:nnodes(C) #Currently assuming that DofHandler only has one celltype
+        global_nodes[j] = dh.grid.cells[i].nodes[j]
+    end
+    return global_nodes
+end
+
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::DofHandler{dim,C,T}, i::Int) where {dim,C,T}
+    @assert isclosed(dh)
+    @assert length(global_coords) == nnodes(C)
+    for j in 1:nnodes(C) #Currently assuming that DofHandler only has one celltype
+        nodeid = dh.grid.cells[i].nodes[j]
+        global_coords[j] = dh.grid.nodes[nodeid].x
+    end
+    return global_coords
+end
+
+function celldofs(dh::DofHandler, i::Int)
     @assert isclosed(dh)
     n = ndofs_per_cell(dh, i)
     global_dofs = zeros(Int, n)
@@ -357,7 +380,7 @@ function renumber!(dh::AbstractDofHandler, perm::AbstractVector{<:Integer})
     return dh
 end
 
-WriteVTK.vtk_grid(filename::AbstractString, dh::DofHandler) = vtk_grid(filename, dh.grid)
+WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler) = vtk_grid(filename, dh.grid)
 
 # Exports the FE field `u` to `vtkfile`
 function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector, suffix="")
