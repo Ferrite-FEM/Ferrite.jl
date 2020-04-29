@@ -42,6 +42,8 @@ export
     Node,
     Cell,
     Line,
+    Line2,
+    Line3,
     QuadraticLine,
     Triangle,
     QuadraticTriangle,

@@ -23,7 +23,9 @@ nnodes(c::C) where {C<:AbstractCell} = nnodes(typeof(c))
 nnodes(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = N
 
 # Typealias for commonly used cells
-const Line = Cell{1,2,2}
+const Line  = Cell{1,2,2}
+const Line2 = Cell{2,2,2}
+const Line3 = Cell{3,2,2}
 const QuadraticLine = Cell{1,3,2}
 
 const Triangle = Cell{2,3,3}
@@ -247,6 +249,8 @@ function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
 end
 
 const celltypes = Dict{DataType, String}(Cell{1,2,2}  => "Line",
+                                         Cell{2,2,2}  => "2D-Line",
+                                         Cell{3,2,2}  => "3D-Line",
                                          Cell{1,3,2}  => "QuadraticLine",
                                          Cell{2,3,3}  => "Triangle",
                                          Cell{2,6,3}  => "QuadraticTriangle",
@@ -262,8 +266,10 @@ const celltypes = Dict{DataType, String}(Cell{1,2,2}  => "Line",
 # we only need to use the nodes that are vertices.
 # 1D: vertices
 faces(c::Union{Line,QuadraticLine}) = (c.nodes[1], c.nodes[2])
-vertices(c::Union{Line,QuadraticLine}) = (c.nodes[1], c.nodes[2])
+vertices(c::Union{Line,Line2,Line3,QuadraticLine}) = (c.nodes[1], c.nodes[2])
 # 2D: vertices, faces
+edges(c::Union{Line2,Line3}) = ((c.nodes[1],), (c.nodes[2],)) 
+faces(c::Union{Line2,Line3}) = ((c.nodes[1], c.nodes[2]), (c.nodes[2], c.nodes[1])) #Note definition of face for 2d/3d line... Improtant for for example contact.
 vertices(c::Union{Triangle,QuadraticTriangle}) = (c.nodes[1], c.nodes[2], c.nodes[3])
 faces(c::Union{Triangle,QuadraticTriangle}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]))
 vertices(c::Union{Quadrilateral,QuadraticQuadrilateral}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
@@ -277,7 +283,7 @@ edges(c::Union{Hexahedron,QuadraticHexahedron}) = ((c.nodes[1],c.nodes[2]), (c.n
 faces(c::Union{Hexahedron,QuadraticHexahedron}) = ((c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))
 
 # random stuff
-default_interpolation(::Type{Line}) = Lagrange{1,RefCube,1}()
+default_interpolation(::Union{Type{Line},Type{Line2},Type{Line3}}) = Lagrange{1,RefCube,1}()
 default_interpolation(::Type{QuadraticLine}) = Lagrange{1,RefCube,2}()
 default_interpolation(::Type{Triangle}) = Lagrange{2,RefTetrahedron,1}()
 default_interpolation(::Type{QuadraticTriangle}) = Lagrange{2,RefTetrahedron,2}()
