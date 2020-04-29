@@ -77,9 +77,14 @@ julia> getpoints(qr)
 """
 getpoints(qr::QuadratureRule) = qr.points
 
-QuadratureRule{dim,shape}(order::Int) where {dim,shape} = QuadratureRule{dim,shape}(:legendre, order)
+QuadratureRule{dim,RefTetrahedron}(order::Int) where {dim} = QuadratureRule{dim,RefTetrahedron}(:legendre, order)
+
+QuadratureRule{dim,RefCube}(order::Int) where {dim} = QuadratureRule{dim,RefCube}(:legendre, order)
+QuadratureRule{dim,RefCube}(quad_type::Symbol, order::Int) where {dim} = QuadratureRule{dim,RefCube}(quad_type, Tuple(fill(order,dim)))
+QuadratureRule{dim,RefCube}(order::NTuple{dim,Int}) where {dim} = QuadratureRule{dim,RefCube}(:legendre, order)
 
 # Special case for face integration of 1D problems
+QuadratureRule{0,RefCube}(order::Int) = QuadratureRule{0,RefCube}(:legendre, order)
 function (::Type{QuadratureRule{0, RefCube}})(quad_type::Symbol, order::Int)
     w = Float64[1.0]
     p = Vec{0,Float64}[]
@@ -90,22 +95,22 @@ end
 # over all dimensions
 for dim in (1,2,3)
     @eval begin
-        function (::Type{QuadratureRule{$dim,RefCube}})(quad_type::Symbol, order::Int)
+        function (::Type{QuadratureRule{$dim,RefCube}})(quad_type::Symbol, orders::NTuple{$dim,Int})
             if quad_type == :legendre
-                p, w = GaussQuadrature.legendre(Float64, order)
+                pw = GaussQuadrature.legendre.(Float64, orders)
             elseif quad_type == :lobatto
-                p, w = GaussQuadrature.legendre(Float64, order, GaussQuadrature.both)
+                pw = GaussQuadrature.legendre.(Float64, orders, Ref(GaussQuadrature.both))
             else
                 throw(ArgumentError("unsupported quadrature rule"))
             end
-            weights = Vector{Float64}(undef, order^($dim))
-            points = Vector{Vec{$dim,Float64}}(undef, order^($dim))
+            weights = Vector{Float64}(undef, prod(orders)::Int)
+            points = Vector{Vec{$dim,Float64}}(undef, prod(orders)::Int)
             count = 1
-            @nloops $dim i j->(1:order) begin
-                t = @ntuple $dim q-> p[$(Symbol("i"*"_q"))]
+            @nloops $dim i j->(1:orders[j]) begin
+                t = @ntuple $dim j-> pw[j][1][i_j]
                 points[count] = Vec{$dim,Float64}(t)
                 weight = 1.0
-                @nexprs $dim j->(weight *= w[i_{j}])
+                @nexprs $dim j->(weight *= pw[j][2][i_j])
                 weights[count] = weight
                 count += 1
             end
