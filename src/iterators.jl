@@ -67,7 +67,7 @@ function Base.iterate(ci::CellIterator, state = 1)
         return (reinit!(ci, state), state+1)
     end
 end
-Base.length(ci::CellIterator)  = getncells(ci.grid)
+Base.length(ci::CellIterator)  = length(ci.cellset)
 
 Base.IteratorSize(::Type{T})   where {T<:CellIterator} = Base.HasLength() # this is default in Base
 Base.IteratorEltype(::Type{T}) where {T<:CellIterator} = Base.HasEltype() # this is default in Base
