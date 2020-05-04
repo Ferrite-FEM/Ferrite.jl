@@ -34,7 +34,7 @@ struct CellIterator{dim,C,T}
     celldofs::Vector{Int}
 
     function CellIterator{dim,C,T}(dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}}, cellset::AbstractVector{Int}, flags::UpdateFlags) where {dim,C,T}
-        isconcretetype(C) || _check_same_celltype(grid, cellset)
+        isconcretetype(C) || _check_same_celltype(dh.grid, cellset)
         N = nnodes_per_cell(dh.grid, first(cellset))
         cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
