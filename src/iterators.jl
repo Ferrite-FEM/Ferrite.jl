@@ -84,10 +84,10 @@ Base.eltype(::Type{T})         where {T<:CellIterator} = T
 
 function reinit!(ci::CellIterator{dim,C}, i::Int) where {dim,C}
     ci.current_cellid[] = ci.cellset[i]
-    
+
     ci.flags.nodes  && cellnodes!(ci.nodes, ci.dh, ci.current_cellid[])
     ci.flags.coords && cellcoords!(ci.coords, ci.dh, ci.current_cellid[])
-    
+
     if isdefined(ci, :dh) && ci.flags.celldofs # update celldofs
         celldofs!(ci.celldofs, ci.dh, ci.current_cellid[])
     end
