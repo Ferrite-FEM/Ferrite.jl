@@ -61,7 +61,7 @@ CellIterator(dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}}, cellset::
 
 # iterator interface
 function Base.iterate(ci::CellIterator, state = 1)
-    if state > getncells(ci.grid)
+    if state > length(ci.cellset)
         return nothing
     else
         return (reinit!(ci, state), state+1)
