@@ -95,6 +95,7 @@ export
     Dirichlet,
     update!,
     apply!,
+	apply_rhs!,
     apply_zero!,
     add!,
     free_dofs,
