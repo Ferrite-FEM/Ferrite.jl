@@ -120,6 +120,7 @@ end
 @inline getcells(grid::AbstractGrid, set::String) = grid.cells[collect(grid.cellsets[set])]
 @inline getncells(grid::AbstractGrid) = length(grid.cells)
 @inline getcelltype(grid::AbstractGrid) = eltype(grid.cells)
+@inline getcelltype(grid::AbstractGrid, i::Int) = typeof(grid.cells[i])
 
 @inline getnodes(grid::AbstractGrid) = grid.nodes
 @inline getnodes(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.nodes[v]

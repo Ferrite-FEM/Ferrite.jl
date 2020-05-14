@@ -164,18 +164,22 @@ Add a `Dirichlet boundary` condition to the `ConstraintHandler`.
 """
 function add!(ch::ConstraintHandler, dbc::Dirichlet)
     dbc_check(ch, dbc)
+    celltype = getcelltype(ch.dh.grid)
+    @assert isconcretetype(celltype)
+
     field_idx = find_field(ch.dh, dbc.field_name)
     # Extract stuff for the field
     interpolation = getfieldinterpolation(ch.dh, field_idx)#ch.dh.field_interpolations[field_idx]
     field_dim = getfielddim(ch.dh, field_idx)#ch.dh.field_dims[field_idx] # TODO: I think we don't need to extract these here ...
     
-    #Special case when dbc.faces is a nodeset
-    if eltype(dbc.faces)==Int
-        bcvalue = BCValues(interpolation, interpolation, JuAFEM.faces)
+    
+    if eltype(dbc.faces)==Int #Special case when dbc.faces is a nodeset
+        bcvalue = BCValues(interpolation, JuAFEM.default_interpolation(celltype), JuAFEM.faces) #Not used by node bcs, but still have to pass it as an argument
         _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue)
     else
         functype = getgeometryfunction(eltype(dbc.faces))
-        bcvalue = BCValues(interpolation, interpolation, functype)
+        @show functype
+        bcvalue = BCValues(interpolation, JuAFEM.default_interpolation(celltype), functype)
         _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue, functype)
     end
 
@@ -299,7 +303,9 @@ function _update!(values::Vector{Float64}, f::Function, faces::GeomIndexSets, fi
         counter = 1
 
         for location in 1:getnquadpoints(facevalues)
+            @show location
             x = spatial_coordinate(facevalues, location, xh)
+            @show x
             bc_value = f(x, time)
             @assert length(bc_value) == length(components)
 
@@ -456,22 +462,31 @@ end
 
 #Function for adding constraint when using multiple celltypes
 function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
-    dbc.faces isa Set{Tuple{Int}} && error("Can only apply boundary conditions to faces (not nodes).")
+    
+    #Checks:
+    @assert( typeof(ch.dh)<:MixedDofHandler )
+    dbc.faces isa Set{Tuple{Int}} && error("Can only apply boundary conditions to faces,edges and vertices for MixedDofHandler (not nodes).")
     _check_cellset_dirichlet(fh.cellset, dbc.faces)
+
     #dbc_check(ch, dbc)
+
+    celltype = getcelltype(ch.dh.grid, first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
 
     field_idx = find_field(fh, dbc.field_name)
     # Extract stuff for the field
     interpolation = getfieldinterpolations(fh)[field_idx]
     field_dim = getfielddims(fh)[field_idx]
-    bcvalue = fh.bc_values[field_idx]
+    #bcvalue = fh.bc_values[field_idx]
+    functype = getgeometryfunction(eltype(dbc.faces))
+    bcvalue = BCValues(interpolation, JuAFEM.default_interpolation(celltype), functype)
     
-    Ferrite._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue)
+    Ferrite._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue, functype)
     return ch
 end
 
-function _check_cellset_dirichlet(cellset::Set{Int}, faceset::Set{Tuple{Int,Int}})
-    for (cellid,faceid) in faceset
+function _check_cellset_dirichlet(cellset::Set{Int}, faceset::GeomIndexSets)
+    for _face in faceset
+        (cellid,faceid) = _face.idx
         if !(cellid in cellset)
             error("You are trying to add a constraint to a face that is not in the cellset of the fieldhandler.")
         end

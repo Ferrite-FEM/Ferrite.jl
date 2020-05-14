@@ -26,6 +26,7 @@ struct DofHandler{dim,C,T} <: AbstractDofHandler
 end
 
 function DofHandler(grid::Grid)
+    isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. Use MixedDofHandler instead of DofHandler")
     DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end
 

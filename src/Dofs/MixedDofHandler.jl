@@ -2,9 +2,6 @@
 mutable struct FieldHandler
     fields::Vector{Field}
     cellset::Set{Int}
-    face_values::Vector{BCValues} # for boundary conditions
-    edge_values::Vector{BCValues} # for boundary conditions
-    vertex_values::Vector{BCValues} # for boundary conditions
 end
 """
     FieldHandler(fields::Vector{Field}, cellset)
@@ -12,11 +9,7 @@ end
 Construct a `FieldHandler` based on an array of `Field`s and assigns it a set of cells.
 """
 function FieldHandler(fields::Vector{Field}, cellset)
-    # TODO for now, only accept isoparamtric mapping
-    face_values = [BCValues(ip,ip, JuAFEM.faces) for ip in getproperty.(fields,:interpolation)]
-    edge_values = [BCValues(ip,ip, JuAFEM.edges) for ip in getproperty.(fields,:interpolation)]
-    vertex_values = [BCValues(ip,ip, JuAFEM.vertices) for ip in getproperty.(fields,:interpolation)]
-    FieldHandler(fields, cellset, face_values, edge_values, vertex_values)
+    return FieldHandler(fields, cellset)
 end
 
 struct CellVector{T}
@@ -142,23 +135,20 @@ end
 function Base.push!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolation)
     @assert !isclosed(dh)
 
+    celltype = getcelltype(dh.grid)
+    @assert isconcretetype(celltype)
+
     if length(dh.fieldhandlers) == 0
         cellset = Set(1:getncells(dh.grid))
-        push!(dh.fieldhandlers, FieldHandler(Field[],cellset,BCValues[]))
+        push!(dh.fieldhandlers, FieldHandler(Field[], cellset))
     elseif length(dh.fieldhandlers) > 1
         error("If you have more than one FieldHandler, you must specify field")
     end
     fh = first(dh.fieldhandlers)
 
     field = Field(name,ip,dim)
-    face_value = BCValues(field.interpolation, field.interpolation, JuAFEM.faces)
-    edge_value = BCValues(field.interpolation, field.interpolation, JuAFEM.edges)
-    vert_value = BCValues(field.interpolation, field.interpolation, JuAFEM.vertices)
 
     push!(fh.fields, field)
-    push!(fh.face_values, face_value)
-    push!(fh.edge_values, edge_value)
-    push!(fh.vert_values, vertices_value)
 
     return dh
 end
