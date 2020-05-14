@@ -50,7 +50,7 @@ struct CellIterator{dim,C,T}
         cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim,T}, N)
-        return new{dim,C,T}(flags, grid, cell, nodes, coords)
+        return new{dim,C,T}(flags, grid, cell, nodes, coords, cellset)
     end
 end
 
@@ -84,12 +84,19 @@ Base.eltype(::Type{T})         where {T<:CellIterator} = T
 
 function reinit!(ci::CellIterator{dim,C}, i::Int) where {dim,C}
     ci.current_cellid[] = ci.cellset[i]
-
-    ci.flags.nodes  && cellnodes!(ci.nodes, ci.dh, ci.current_cellid[])
-    ci.flags.coords && cellcoords!(ci.coords, ci.dh, ci.current_cellid[])
-
-    if isdefined(ci, :dh) && ci.flags.celldofs # update celldofs
-        celldofs!(ci.celldofs, ci.dh, ci.current_cellid[])
+    
+    if isdefined(ci, :dh) 
+        ci.flags.nodes  && cellnodes!(ci.nodes, ci.dh, ci.current_cellid[])
+        ci.flags.coords && cellcoords!(ci.coords, ci.dh, ci.current_cellid[])
+        ci.flags.celldofs && celldofs!(ci.celldofs, ci.dh, ci.current_cellid[])
+    else     
+        if ci.flags.nodes
+            for j in 1:length(ci.nodes)
+                nodeid = ci.grid.cells[ci.current_cellid[]].nodes[j]
+                ci.nodes[j] = nodeid
+                ci.coords[j] = ci.grid.nodes[nodeid].x
+            end
+        end
     end
     return ci
 end
