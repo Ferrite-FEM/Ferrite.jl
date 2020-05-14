@@ -90,10 +90,12 @@ function reinit!(ci::CellIterator{dim,C}, i::Int) where {dim,C}
         ci.flags.coords && cellcoords!(ci.coords, ci.dh, ci.current_cellid[])
         ci.flags.celldofs && celldofs!(ci.celldofs, ci.dh, ci.current_cellid[])
     else     
-        if ci.flags.nodes
-            for j in 1:length(ci.nodes)
-                nodeid = ci.grid.cells[ci.current_cellid[]].nodes[j]
+        for j in 1:length(ci.nodes)
+            nodeid = ci.grid.cells[ci.current_cellid[]].nodes[j]
+            if ci.flags.nodes 
                 ci.nodes[j] = nodeid
+            end
+            if ci.flags.coords
                 ci.coords[j] = ci.grid.nodes[nodeid].x
             end
         end
