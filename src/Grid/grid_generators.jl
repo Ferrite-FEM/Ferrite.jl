@@ -376,12 +376,12 @@ function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3,Int}, left::
     # Order the cells as c_nxyz[n, x, y, z] such that we can look up boundary cells
     c_nxyz = reshape(1:total_elements, (cells_per_cube, cells_per_dim...))
 
-    @views le = [map(x -> (x,4), c_nxyz[1, 1, :, :][:])   ; map(x -> (x,2), c_nxyz[2, 1, :, :][:])]
-    @views ri = [map(x -> (x,1), c_nxyz[4, end, :, :][:]) ; map(x -> (x,1), c_nxyz[6, end, :, :][:])]
-    @views fr = [map(x -> (x,1), c_nxyz[2, :, 1, :][:])   ; map(x -> (x,1), c_nxyz[5, :, 1, :][:])]
-    @views ba = [map(x -> (x,3), c_nxyz[3, :, end, :][:]) ; map(x -> (x,3), c_nxyz[4, :, end, :][:])]
-    @views bo = [map(x -> (x,1), c_nxyz[1, :, :, 1][:])   ; map(x -> (x,1), c_nxyz[3, :, :, 1][:])]
-    @views to = [map(x -> (x,3), c_nxyz[5, :, :, end][:]) ; map(x -> (x,3), c_nxyz[6, :, :, end][:])]
+    @views le = [map(x -> FaceIndex(x,4), c_nxyz[1, 1, :, :][:])   ; map(x -> FaceIndex(x,2), c_nxyz[2, 1, :, :][:])]
+    @views ri = [map(x -> FaceIndex(x,1), c_nxyz[4, end, :, :][:]) ; map(x -> FaceIndex(x,1), c_nxyz[6, end, :, :][:])]
+    @views fr = [map(x -> FaceIndex(x,1), c_nxyz[2, :, 1, :][:])   ; map(x -> FaceIndex(x,1), c_nxyz[5, :, 1, :][:])]
+    @views ba = [map(x -> FaceIndex(x,3), c_nxyz[3, :, end, :][:]) ; map(x -> FaceIndex(x,3), c_nxyz[4, :, end, :][:])]
+    @views bo = [map(x -> FaceIndex(x,1), c_nxyz[1, :, :, 1][:])   ; map(x -> FaceIndex(x,1), c_nxyz[3, :, :, 1][:])]
+    @views to = [map(x -> FaceIndex(x,3), c_nxyz[5, :, :, end][:]) ; map(x -> FaceIndex(x,3), c_nxyz[6, :, :, end][:])]
 
     boundary_matrix = boundaries_to_sparse([le; ri; bo; to; fr; ba])
 
