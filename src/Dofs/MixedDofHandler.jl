@@ -2,7 +2,9 @@
 mutable struct FieldHandler
     fields::Vector{Field}
     cellset::Set{Int}
-    bc_values::Vector{BCValues} # for boundary conditions
+    face_values::Vector{BCValues} # for boundary conditions
+    edge_values::Vector{BCValues} # for boundary conditions
+    vertex_values::Vector{BCValues} # for boundary conditions
 end
 """
     FieldHandler(fields::Vector{Field}, cellset)
@@ -11,8 +13,10 @@ Construct a `FieldHandler` based on an array of `Field`s and assigns it a set of
 """
 function FieldHandler(fields::Vector{Field}, cellset)
     # TODO for now, only accept isoparamtric mapping
-    bc_values = [BCValues(field.interpolation, field.interpolation) for field in fields]
-    FieldHandler(fields, cellset, bc_values)
+    face_values = [BCValues(ip,ip, JuAFEM.faces) for ip in getproperty.(fields,:interpolation)]
+    edge_values = [BCValues(ip,ip, JuAFEM.edges) for ip in getproperty.(fields,:interpolation)]
+    vertex_values = [BCValues(ip,ip, JuAFEM.vertices) for ip in getproperty.(fields,:interpolation)]
+    FieldHandler(fields, cellset, face_values, edge_values, vertex_values)
 end
 
 struct CellVector{T}
@@ -147,10 +151,14 @@ function Base.push!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolati
     fh = first(dh.fieldhandlers)
 
     field = Field(name,ip,dim)
-    bc_value = BCValues(field.interpolation, field.interpolation)
+    face_value = BCValues(field.interpolation, field.interpolation, JuAFEM.faces)
+    edge_value = BCValues(field.interpolation, field.interpolation, JuAFEM.edges)
+    vert_value = BCValues(field.interpolation, field.interpolation, JuAFEM.vertices)
 
     push!(fh.fields, field)
-    push!(fh.bc_values, bc_value)
+    push!(fh.face_values, face_value)
+    push!(fh.edge_values, edge_value)
+    push!(fh.vert_values, vertices_value)
 
     return dh
 end
@@ -414,4 +422,5 @@ find_field(dh::MixedDofHandler, field_name::Symbol) = find_field(first(dh.fieldh
 field_offset(dh::MixedDofHandler, field_name::Symbol) = field_offset(first(dh.fieldhandlers), field_name)
 getfieldinterpolation(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].interpolation
 getfielddim(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].dim
-getbcvalue(dh::MixedDofHandler, field_idx::Int) =  dh.fieldhandlers[1].bc_values[field_idx]
+getbc_facevalue(dh::MixedDofHandler, field_idx::Int) =  dh.fieldhandlers[1].bc_values[field_idx]
+getbc_edgevalue(dh::MixedDofHandler, field_idx::Int) =  dh.fieldhandlers[1].bc_values[field_idx]

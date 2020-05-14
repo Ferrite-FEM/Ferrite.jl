@@ -215,16 +215,16 @@ struct BCValues{T}
     current_face::ScalarWrapper{Int}
 end
 
-BCValues(func_interpol::Interpolation, geom_interpol::Interpolation) =
-    BCValues(Float64, func_interpol, geom_interpol)
+BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, _face_edge_vertex::Function = JuAFEM.faces) =
+    BCValues(Float64, func_interpol, geom_interpol, _face_edge_vertex)
 
-function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_interpol::Interpolation{dim,refshape}) where {T,dim,refshape}
+function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_interpol::Interpolation{dim,refshape}, _face_edge_vertex::Function = JuAFEM.faces) where {T,dim,refshape}
     # set up quadrature rules for each face with dof-positions
     # (determined by func_interpol) as the quadrature points
     interpolation_coords = reference_coordinates(func_interpol)
 
     qrs = QuadratureRule{dim,refshape,T}[]
-    for face in faces(func_interpol)
+    for face in _face_edge_vertex(func_interpol)
         dofcoords = Vec{dim,T}[]
         for facedof in face
             push!(dofcoords, interpolation_coords[facedof])

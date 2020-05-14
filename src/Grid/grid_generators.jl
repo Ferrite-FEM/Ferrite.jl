@@ -4,7 +4,7 @@ function boundaries_to_sparse(boundary)
     J = Vector{Int}(undef, n)
     V = Vector{Bool}(undef, n)
     for (idx, el) in enumerate(boundary)
-        cell, face = el
+        cell, face = el.idx
         I[idx] = face
         J[idx] = cell
         V[idx] = true
@@ -42,14 +42,14 @@ function generate_grid(::Type{Line}, nel::NTuple{1,Int}, left::Vec{1,T}=Vec{1}((
 
 
     # Cell faces
-    boundary = Vector([(1, 1),
-                       (nel_x, 2)])
+    boundary = Vector([FaceIndex(1, 1),
+                       FaceIndex(nel_x, 2)])
 
     boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
-    facesets = Dict("left"  => Set{Tuple{Int,Int}}([boundary[1]]),
-                    "right" => Set{Tuple{Int,Int}}([boundary[2]]))
+    facesets = Dict("left"  => Set{FaceIndex}([boundary[1]]),
+                    "right" => Set{FaceIndex}([boundary[2]]))
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
@@ -72,14 +72,14 @@ function generate_grid(::Type{QuadraticLine}, nel::NTuple{1,Int}, left::Vec{1,T}
     end
 
     # Cell faces
-    boundary = Tuple{Int,Int}[(1, 1),
-                         (nel_x, 2)]
+    boundary = FaceIndex[FaceIndex(1, 1),
+                         FaceIndex(nel_x, 2)]
 
     boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
-    facesets = Dict("left"  => Set{Tuple{Int,Int}}([boundary[1]]),
-                    "right" => Set{Tuple{Int,Int}}([boundary[2]]))
+    facesets = Dict("left"  => Set{FaceIndex}([boundary[1]]),
+                    "right" => Set{FaceIndex}([boundary[2]]))
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
@@ -135,20 +135,20 @@ function generate_grid(C::Type{Quadrilateral}, nel::NTuple{2,Int}, LL::Vec{2,T},
 
     # Cell faces
     cell_array = reshape(collect(1:nel_tot),(nel_x, nel_y))
-    boundary = Tuple{Int,Int}[[(cl, 1) for cl in cell_array[:,1]];
-                              [(cl, 2) for cl in cell_array[end,:]];
-                              [(cl, 3) for cl in cell_array[:,end]];
-                              [(cl, 4) for cl in cell_array[1,:]]]
+    boundary = FaceIndex[[FaceIndex(cl, 1) for cl in cell_array[:,1]];
+                              [FaceIndex(cl, 2) for cl in cell_array[end,:]];
+                              [FaceIndex(cl, 3) for cl in cell_array[:,end]];
+                              [FaceIndex(cl, 4) for cl in cell_array[1,:]]]
 
     boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
     offset = 0
-    facesets = Dict{String, Set{Tuple{Int,Int}}}()
-    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,1]))   .+ offset]); offset += length(cell_array[:,1])
-    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[end,:])) .+ offset]); offset += length(cell_array[end,:])
-    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,end])) .+ offset]); offset += length(cell_array[:,end])
-    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:]))   .+ offset]); offset += length(cell_array[1,:])
+    facesets = Dict{String, Set{FaceIndex}}()
+    facesets["bottom"] = Set{FaceIndex}(boundary[(1:length(cell_array[:,1]))   .+ offset]); offset += length(cell_array[:,1])
+    facesets["right"]  = Set{FaceIndex}(boundary[(1:length(cell_array[end,:])) .+ offset]); offset += length(cell_array[end,:])
+    facesets["top"]    = Set{FaceIndex}(boundary[(1:length(cell_array[:,end])) .+ offset]); offset += length(cell_array[:,end])
+    facesets["left"]   = Set{FaceIndex}(boundary[(1:length(cell_array[1,:]))   .+ offset]); offset += length(cell_array[1,:])
 
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
@@ -174,20 +174,20 @@ function generate_grid(::Type{QuadraticQuadrilateral}, nel::NTuple{2,Int}, LL::V
 
     # Cell faces
     cell_array = reshape(collect(1:nel_tot),(nel_x, nel_y))
-    boundary = Tuple{Int,Int}[[(cl, 1) for cl in cell_array[:,1]];
-                              [(cl, 2) for cl in cell_array[end,:]];
-                              [(cl, 3) for cl in cell_array[:,end]];
-                              [(cl, 4) for cl in cell_array[1,:]]]
+    boundary = FaceIndex[[FaceIndex(cl, 1) for cl in cell_array[:,1]];
+                              [FaceIndex(cl, 2) for cl in cell_array[end,:]];
+                              [FaceIndex(cl, 3) for cl in cell_array[:,end]];
+                              [FaceIndex(cl, 4) for cl in cell_array[1,:]]]
 
     boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
     offset = 0
-    facesets = Dict{String, Set{Tuple{Int,Int}}}()
-    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,1]))   .+ offset]); offset += length(cell_array[:,1])
-    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[end,:])) .+ offset]); offset += length(cell_array[end,:])
-    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,end])) .+ offset]); offset += length(cell_array[:,end])
-    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:]))   .+ offset]); offset += length(cell_array[1,:])
+    facesets = Dict{String, Set{FaceIndex}}()
+    facesets["bottom"] = Set{FaceIndex}(boundary[(1:length(cell_array[:,1]))   .+ offset]); offset += length(cell_array[:,1])
+    facesets["right"]  = Set{FaceIndex}(boundary[(1:length(cell_array[end,:])) .+ offset]); offset += length(cell_array[end,:])
+    facesets["top"]    = Set{FaceIndex}(boundary[(1:length(cell_array[:,end])) .+ offset]); offset += length(cell_array[:,end])
+    facesets["left"]   = Set{FaceIndex}(boundary[(1:length(cell_array[1,:]))   .+ offset]); offset += length(cell_array[1,:])
 
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
@@ -217,24 +217,24 @@ function generate_grid(::Type{Hexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Ve
 
     # Cell faces
     cell_array = reshape(collect(1:nel_tot),(nel_x, nel_y, nel_z))
-    boundary = Tuple{Int,Int}[[(cl, 1) for cl in cell_array[:,:,1][:]];
-                              [(cl, 2) for cl in cell_array[:,1,:][:]];
-                              [(cl, 3) for cl in cell_array[end,:,:][:]];
-                              [(cl, 4) for cl in cell_array[:,end,:][:]];
-                              [(cl, 5) for cl in cell_array[1,:,:][:]];
-                              [(cl, 6) for cl in cell_array[:,:,end][:]]]
+    boundary = FaceIndex[[FaceIndex(cl, 1) for cl in cell_array[:,:,1][:]];
+                              [FaceIndex(cl, 2) for cl in cell_array[:,1,:][:]];
+                              [FaceIndex(cl, 3) for cl in cell_array[end,:,:][:]];
+                              [FaceIndex(cl, 4) for cl in cell_array[:,end,:][:]];
+                              [FaceIndex(cl, 5) for cl in cell_array[1,:,:][:]];
+                              [FaceIndex(cl, 6) for cl in cell_array[:,:,end][:]]]
 
     boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
     offset = 0
-    facesets = Dict{String,Set{Tuple{Int,Int}}}()
-    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,:,1][:]))   .+ offset]); offset += length(cell_array[:,:,1][:])
-    facesets["front"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,1,:][:]))   .+ offset]); offset += length(cell_array[:,1,:][:])
-    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[end,:,:][:])) .+ offset]); offset += length(cell_array[end,:,:][:])
-    facesets["back"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,end,:][:])) .+ offset]); offset += length(cell_array[:,end,:][:])
-    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:,:][:]))   .+ offset]); offset += length(cell_array[1,:,:][:])
-    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,:,end][:])) .+ offset]); offset += length(cell_array[:,:,end][:])
+    facesets = Dict{String,Set{FaceIndex}}()
+    facesets["bottom"] = Set{FaceIndex}(boundary[(1:length(cell_array[:,:,1][:]))   .+ offset]); offset += length(cell_array[:,:,1][:])
+    facesets["front"]  = Set{FaceIndex}(boundary[(1:length(cell_array[:,1,:][:]))   .+ offset]); offset += length(cell_array[:,1,:][:])
+    facesets["right"]  = Set{FaceIndex}(boundary[(1:length(cell_array[end,:,:][:])) .+ offset]); offset += length(cell_array[end,:,:][:])
+    facesets["back"]   = Set{FaceIndex}(boundary[(1:length(cell_array[:,end,:][:])) .+ offset]); offset += length(cell_array[:,end,:][:])
+    facesets["left"]   = Set{FaceIndex}(boundary[(1:length(cell_array[1,:,:][:]))   .+ offset]); offset += length(cell_array[1,:,:][:])
+    facesets["top"]    = Set{FaceIndex}(boundary[(1:length(cell_array[:,:,end][:])) .+ offset]); offset += length(cell_array[:,:,end][:])
 
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
@@ -259,20 +259,20 @@ function generate_grid(::Type{Triangle}, nel::NTuple{2,Int}, LL::Vec{2,T}, LR::V
 
     # Cell faces
     cell_array = reshape(collect(1:nel_tot),(2, nel_x, nel_y))
-    boundary = Tuple{Int,Int}[[(cl, 1) for cl in cell_array[1,:,1]];
-                               [(cl, 1) for cl in cell_array[2,end,:]];
-                               [(cl, 2) for cl in cell_array[2,:,end]];
-                               [(cl, 3) for cl in cell_array[1,1,:]]]
+    boundary = FaceIndex[[FaceIndex(cl, 1) for cl in cell_array[1,:,1]];
+                               [FaceIndex(cl, 1) for cl in cell_array[2,end,:]];
+                               [FaceIndex(cl, 2) for cl in cell_array[2,:,end]];
+                               [FaceIndex(cl, 3) for cl in cell_array[1,1,:]]]
 
     boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
     offset = 0
-    facesets = Dict{String,Set{Tuple{Int,Int}}}()
-    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:,1]))   .+ offset]); offset += length(cell_array[1,:,1])
-    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[2,end,:])) .+ offset]); offset += length(cell_array[2,end,:])
-    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[2,:,end])) .+ offset]); offset += length(cell_array[2,:,end])
-    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,1,:]))   .+ offset]); offset += length(cell_array[1,1,:])
+    facesets = Dict{String,Set{FaceIndex}}()
+    facesets["bottom"] = Set{FaceIndex}(boundary[(1:length(cell_array[1,:,1]))   .+ offset]); offset += length(cell_array[1,:,1])
+    facesets["right"]  = Set{FaceIndex}(boundary[(1:length(cell_array[2,end,:])) .+ offset]); offset += length(cell_array[2,end,:])
+    facesets["top"]    = Set{FaceIndex}(boundary[(1:length(cell_array[2,:,end])) .+ offset]); offset += length(cell_array[2,:,end])
+    facesets["left"]   = Set{FaceIndex}(boundary[(1:length(cell_array[1,1,:]))   .+ offset]); offset += length(cell_array[1,1,:])
 
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
@@ -299,20 +299,20 @@ function generate_grid(::Type{QuadraticTriangle}, nel::NTuple{2,Int}, LL::Vec{2,
 
     # Cell faces
     cell_array = reshape(collect(1:nel_tot),(2, nel_x, nel_y))
-    boundary = Tuple{Int,Int}[[(cl, 1) for cl in cell_array[1,:,1]];
-                              [(cl, 1) for cl in cell_array[2,end,:]];
-                              [(cl, 2) for cl in cell_array[2,:,end]];
-                              [(cl, 3) for cl in cell_array[1,1,:]]]
+    boundary = FaceIndex[[FaceIndex(cl, 1) for cl in cell_array[1,:,1]];
+                              [FaceIndex(cl, 1) for cl in cell_array[2,end,:]];
+                              [FaceIndex(cl, 2) for cl in cell_array[2,:,end]];
+                              [FaceIndex(cl, 3) for cl in cell_array[1,1,:]]]
 
     boundary_matrix = boundaries_to_sparse(boundary)
 
     # Cell face sets
     offset = 0
-    facesets = Dict{String,Set{Tuple{Int,Int}}}()
-    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:,1]))   .+ offset]); offset += length(cell_array[1,:,1])
-    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[2,end,:])) .+ offset]); offset += length(cell_array[2,end,:])
-    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[2,:,end])) .+ offset]); offset += length(cell_array[2,:,end])
-    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,1,:]))   .+ offset]); offset += length(cell_array[1,1,:])
+    facesets = Dict{String,Set{FaceIndex}}()
+    facesets["bottom"] = Set{FaceIndex}(boundary[(1:length(cell_array[1,:,1]))   .+ offset]); offset += length(cell_array[1,:,1])
+    facesets["right"]  = Set{FaceIndex}(boundary[(1:length(cell_array[2,end,:])) .+ offset]); offset += length(cell_array[2,end,:])
+    facesets["top"]    = Set{FaceIndex}(boundary[(1:length(cell_array[2,:,end])) .+ offset]); offset += length(cell_array[2,:,end])
+    facesets["left"]   = Set{FaceIndex}(boundary[(1:length(cell_array[1,1,:]))   .+ offset]); offset += length(cell_array[1,1,:])
 
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
