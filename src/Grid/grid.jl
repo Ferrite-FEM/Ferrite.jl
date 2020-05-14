@@ -54,6 +54,33 @@ A `FaceIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, fac
 struct FaceIndex
     idx::Tuple{Int,Int} # cell and side
 end
+FaceIndex(a::Int,b::Int) = FaceIndex((a,b))
+Base.getindex(a::FaceIndex, i::Int) = a.idx[i]
+
+"""
+A `EdgeIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, edge).
+"""
+struct EdgeIndex
+    idx::Tuple{Int,Int} # cell and side
+end
+EdgeIndex(a::Int,b::Int) = EdgeIndex((a,b))
+Base.getindex(a::EdgeIndex, i::Int) = a.idx[i]
+
+"""
+A `VertexIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, vert).
+"""
+struct VertexIndex
+    idx::Tuple{Int,Int} # cell and side
+end
+VertexIndex(a::Int,b::Int) = VertexIndex((a,b))
+Base.getindex(a::VertexIndex, i::Int) = a.idx[i]
+
+const GeomIndex = Union{FaceIndex, EdgeIndex, VertexIndex}
+const GeomIndexSets = Union{Set{FaceIndex},Set{EdgeIndex},Set{VertexIndex}}
+
+getgeometryfunction(::Type{FaceIndex}) = JuAFEM.faces
+getgeometryfunction(::Type{EdgeIndex}) = JuAFEM.edges
+getgeometryfunction(::Type{VertexIndex}) = JuAFEM.vertices
 
 abstract type AbstractGrid{dim} end
 
@@ -66,7 +93,9 @@ mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     # Sets
     cellsets::Dict{String,Set{Int}}
     nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{Tuple{Int,Int}}} # TODO: This could be Set{FaceIndex} which could result in nicer use later
+    facesets::Dict{String,Set{FaceIndex}} 
+    edgesets::Dict{String,Set{EdgeIndex}} 
+    vertexsets::Dict{String,Set{VertexIndex}} 
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool,Int}
 end
@@ -75,9 +104,11 @@ function Grid(cells::Vector{C},
               nodes::Vector{Node{dim,T}};
               cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
               nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
-              facesets::Dict{String,Set{Tuple{Int,Int}}}=Dict{String,Set{Tuple{Int,Int}}}(),
+              facesets::Dict{String,Set{FaceIndex}}=Dict{String,Set{FaceIndex}}(),
+              edgesets::Dict{String,Set{EdgeIndex}}=Dict{String,Set{EdgeIndex}}(),
+              vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}(),
               boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)) where {dim,C,T}
-    return Grid(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
+    return Grid(cells, nodes, cellsets, nodesets, facesets, edgesets, vertexsets, boundary_matrix)
 end
 
 ##########################
@@ -165,7 +196,7 @@ function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=tr
     grid
 end
 
-function addfaceset!(grid::AbstractGrid, name::String, faceid::Set{Tuple{Int,Int}})
+function addfaceset!(grid::AbstractGrid, name::String, faceid::Set{FaceIndex})
     _check_setname(grid.facesets, name)
     faceset = Set(faceid)
     _warn_emptyset(faceset)
@@ -173,21 +204,27 @@ function addfaceset!(grid::AbstractGrid, name::String, faceid::Set{Tuple{Int,Int
     grid
 end
 
-function addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true)
-    _check_setname(grid.facesets, name)
-    faceset = Set{Tuple{Int,Int}}()
+addfaceset!(grid::Grid, name::String, f::Function; all::Bool=true) = 
+    _addset!(grid, name, f, JuAFEM.faces, grid.facesets, FaceIndex; all=all)
+addedgeset!(grid::Grid, name::String, f::Function; all::Bool=true) = 
+    _addset!(grid, name, f, JuAFEM.edges, grid.edgesets, EdgeIndex; all=all)
+addvertexset!(grid::Grid, name::String, f::Function; all::Bool=true) = 
+    _addset!(grid, name, f, JuAFEM.vertices, grid.vertexsets, VertexIndex; all=all)
+function _addset!(grid::Grid, name::String, f::Function, _ftype::Function, dict::Dict, _indextype::Type; all::Bool=true)
+    #_check_setname(grid.facesets, name)
+    _set = Set{_indextype}()
     for (cell_idx, cell) in enumerate(getcells(grid))
-        for (face_idx, face) in enumerate(faces(cell))
+        for (face_idx, face) in enumerate(_ftype(cell))
             pass = all
             for node_idx in face
                 v = f(grid.nodes[node_idx].x)
                 all ? (!v && (pass = false; break)) : (v && (pass = true; break))
             end
-            pass && push!(faceset, (cell_idx, face_idx))
+            pass && push!(_set, _indextype(cell_idx, face_idx))
         end
     end
-    _warn_emptyset(faceset)
-    grid.facesets[name] = faceset
+    _warn_emptyset(_set)
+    dict[name] = _set
     grid
 end
 
