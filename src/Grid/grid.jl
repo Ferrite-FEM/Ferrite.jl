@@ -206,14 +206,14 @@ function _addset!(grid::AbstractGrid, name::String, set::Set{FaceIndex}, dict::D
     grid
 end
 
-addfaceset!(grid::Grid, name::String, f::Function; all::Bool=true) = 
+addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
     _addset!(grid, name, f, JuAFEM.faces, grid.facesets, FaceIndex; all=all)
-addedgeset!(grid::Grid, name::String, f::Function; all::Bool=true) = 
+addedgeset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
     _addset!(grid, name, f, JuAFEM.edges, grid.edgesets, EdgeIndex; all=all)
-addvertexset!(grid::Grid, name::String, f::Function; all::Bool=true) = 
+addvertexset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
     _addset!(grid, name, f, JuAFEM.vertices, grid.vertexsets, VertexIndex; all=all)
-function _addset!(grid::Grid, name::String, f::Function, _ftype::Function, dict::Dict, _indextype::Type; all::Bool=true)
-    #_check_setname(grid.facesets, name)
+function _addset!(grid::AbstractGrid, name::String, f::Function, _ftype::Function, dict::Dict, _indextype::Type; all::Bool=true)
+    _check_setname(dict, name)
     _set = Set{_indextype}()
     for (cell_idx, cell) in enumerate(getcells(grid))
         for (face_idx, face) in enumerate(_ftype(cell))
