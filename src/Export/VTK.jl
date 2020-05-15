@@ -128,10 +128,14 @@ function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler, u::Vector, suffix
                         @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
                         counter += 1
                     end
+                    if field_dim == 2
+                        # paraview requires 3D-data so pad with zero
+                        data[3, node] = 0
+                    end
                 end
             end
         end
-    vtk_point_data(vtkfile, data, string(name, suffix))
+        vtk_point_data(vtkfile, data, string(name, suffix))
     end
 
     return vtkfile
