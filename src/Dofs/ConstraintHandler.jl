@@ -178,7 +178,6 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue)
     else
         functype = getgeometryfunction(eltype(dbc.faces))
-        @show functype
         bcvalue = BCValues(interpolation, JuAFEM.default_interpolation(celltype), functype)
         _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue, functype)
     end
@@ -205,8 +204,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Union{Set{FaceInd
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
     #_celldofs = fill(0, ndofs_per_cell(ch.dh))
-    for  _face in bcfaces
-        cellidx, faceidx = _face.idx
+    for  (cellidx, faceidx) in bcfaces
         _celldofs = fill(0, ndofs_per_cell(ch.dh, cellidx))
         celldofs!(_celldofs, ch.dh, cellidx) # extract the dofs for this cell
         r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
@@ -289,8 +287,7 @@ function _update!(values::Vector{Float64}, f::Function, faces::GeomIndexSets, fi
     xh = zeros(Vec{dim, T}, N) # pre-allocate
     _celldofs = fill(0, ndofs_per_cell(dh, _tmp_cellid))
 
-    for _face in faces
-        cellidx, faceidx = _face.idx
+    for (cellidx, faceidx) in faces
 
         cellcoords!(xh, dh, cellidx)
         celldofs!(_celldofs, dh, cellidx) # update global dofs for this cell
@@ -303,9 +300,7 @@ function _update!(values::Vector{Float64}, f::Function, faces::GeomIndexSets, fi
         counter = 1
 
         for location in 1:getnquadpoints(facevalues)
-            @show location
             x = spatial_coordinate(facevalues, location, xh)
-            @show x
             bc_value = f(x, time)
             @assert length(bc_value) == length(components)
 
@@ -357,8 +352,7 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
             dbc.field_name != field && continue
             if eltype(dbc.faces) <: GeomIndex
                 functype = getgeometryfunction(eltype(dbc.faces))
-                for _face in dbc.faces
-                    cellidx, faceidx = _face.idx
+                for (cellidx, faceidx) in dbc.faces
                     for facenode in functype(ch.dh.grid.cells[cellidx])[faceidx]
                         for component in dbc.components
                             data[component, facenode] = 1
@@ -485,8 +479,7 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
 end
 
 function _check_cellset_dirichlet(cellset::Set{Int}, faceset::GeomIndexSets)
-    for _face in faceset
-        (cellid,faceid) = _face.idx
+    for (cellid, faceidx) in faceset
         if !(cellid in cellset)
             error("You are trying to add a constraint to a face that is not in the cellset of the fieldhandler.")
         end

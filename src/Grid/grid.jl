@@ -54,8 +54,6 @@ A `FaceIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, fac
 struct FaceIndex
     idx::Tuple{Int,Int} # cell and side
 end
-FaceIndex(a::Int,b::Int) = FaceIndex((a,b))
-Base.getindex(a::FaceIndex, i::Int) = a.idx[i]
 
 """
 A `EdgeIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, edge).
@@ -63,8 +61,6 @@ A `EdgeIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, edg
 struct EdgeIndex
     idx::Tuple{Int,Int} # cell and side
 end
-EdgeIndex(a::Int,b::Int) = EdgeIndex((a,b))
-Base.getindex(a::EdgeIndex, i::Int) = a.idx[i]
 
 """
 A `VertexIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, vert).
@@ -72,15 +68,9 @@ A `VertexIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, v
 struct VertexIndex
     idx::Tuple{Int,Int} # cell and side
 end
-VertexIndex(a::Int,b::Int) = VertexIndex((a,b))
-Base.getindex(a::VertexIndex, i::Int) = a.idx[i]
 
 const GeomIndex = Union{FaceIndex, EdgeIndex, VertexIndex}
 const GeomIndexSets = Union{Set{FaceIndex},Set{EdgeIndex},Set{VertexIndex}}
-
-getgeometryfunction(::Type{FaceIndex}) = JuAFEM.faces
-getgeometryfunction(::Type{EdgeIndex}) = JuAFEM.edges
-getgeometryfunction(::Type{VertexIndex}) = JuAFEM.vertices
 
 abstract type AbstractGrid{dim} end
 
@@ -136,6 +126,12 @@ end
 
 @inline getfaceset(grid::AbstractGrid, set::String) = grid.facesets[set]
 @inline getfacesets(grid::AbstractGrid) = grid.facesets
+
+@inline getedgeset(grid::AbstractGrid, set::String) = grid.edgesets[set]
+@inline getedgesets(grid::AbstractGrid) = grid.edgesets
+
+@inline getvertexset(grid::AbstractGrid, set::String) = grid.vertexsets[set]
+@inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
 
 n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
 
@@ -197,11 +193,16 @@ function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=tr
     grid
 end
 
-function addfaceset!(grid::AbstractGrid, name::String, faceid::Set{FaceIndex})
-    _check_setname(grid.facesets, name)
-    faceset = Set(faceid)
-    _warn_emptyset(faceset)
-    grid.facesets[name] = faceset
+addfaceset!(grid::Grid, name::String, set::Set{FaceIndex}) = 
+    _addset!(grid, name, set, grid.facesets)
+addedgeset!(grid::Grid, name::String, set::Set{EdgeIndex}) = 
+    _addset!(grid, name, set, grid.edgesets)
+addvertexset!(grid::Grid, name::String, set::Set{VertexIndex}) = 
+    _addset!(grid, name, set, grid.vertexsets)
+function _addset!(grid::AbstractGrid, name::String, set::Set{FaceIndex}, dict::Dict)
+    _check_setname(dict, name)
+    _warn_emptyset(set)
+    dict[name] = set
     grid
 end
 
@@ -338,3 +339,19 @@ default_interpolation(::Type{Tetrahedron}) = Lagrange{3,RefTetrahedron,1}()
 default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{3,RefTetrahedron,2}()
 default_interpolation(::Type{Hexahedron}) = Lagrange{3,RefCube,1}()
 default_interpolation(::Type{QuadraticHexahedron}) = Lagrange{3,RefCube,2}()
+
+getgeometryfunction(::Type{FaceIndex}) = JuAFEM.faces
+getgeometryfunction(::Type{EdgeIndex}) = JuAFEM.edges
+getgeometryfunction(::Type{VertexIndex}) = JuAFEM.vertices
+
+for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
+    @eval begin  
+        #Constructor
+        ($INDEX)(a::Int, b::Int) = ($INDEX)((a,b))
+
+        Base.getindex(I::($INDEX), i::Int) = I.idx[i]
+        
+        #To be able to do a,b = faceidx
+        Base.iterate(I::($INDEX), state::Int=1) = (state==3) ?  nothing : (I[state], state+1)
+    end
+end
