@@ -39,7 +39,7 @@ struct CellIterator{dim,C,T}
         cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim,T}, N)
-        n = ndofs_per_cell(dh)
+        n = ndofs_per_cell(dh, first(cellset))
         celldofs = zeros(Int, n)
         return new{dim,C,T}(flags, dh.grid, cell, nodes, coords, cellset, dh, celldofs)
     end
