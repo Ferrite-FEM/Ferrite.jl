@@ -423,29 +423,6 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
     end
 end
 
-function apply_rhs!(KK::Union{SparseMatrixCSC, Symmetric}, f::AbstractVector,
-					ch::ConstraintHandler, applyzero::Bool=false)	
-	K = isa(KK, Symmetric) ? KK.data : KK
-    @assert length(f) == 0 || length(f) == size(K, 1)
-    @boundscheck checkbounds(K, ch.prescribed_dofs, ch.prescribed_dofs)
-    @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
-
-	m = meandiag(K)
-    @inbounds for i in 1:length(ch.values)
-        d = ch.prescribed_dofs[i]
-        v = ch.values[i]
-        if !applyzero && v != 0
-            for j in nzrange(K, d)
-                f[K.rowval[j]] -= v * K.nzval[j]
-            end
-        end
-        if length(f) != 0
-            vz = applyzero ? zero(eltype(f)) : v
-            f[d] = vz * m
-        end
-	end
-end
-
 # columns need to be stored entries, this is not checked
 function zero_out_columns!(K, dofs::Vector{Int}) # can be removed in 0.7 with #24711 merged
     @debug @assert issorted(dofs)
