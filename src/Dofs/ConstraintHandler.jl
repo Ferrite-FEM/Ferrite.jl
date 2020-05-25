@@ -204,7 +204,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Union{Set{FaceInd
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
     #_celldofs = fill(0, ndofs_per_cell(ch.dh))
-    for  (cellidx, faceidx) in bcfaces
+    for (cellidx, faceidx) in bcfaces
         _celldofs = fill(0, ndofs_per_cell(ch.dh, cellidx))
         celldofs!(_celldofs, ch.dh, cellidx) # extract the dofs for this cell
         r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
@@ -288,7 +288,6 @@ function _update!(values::Vector{Float64}, f::Function, faces::GeomIndexSets, fi
     _celldofs = fill(0, ndofs_per_cell(dh, _tmp_cellid))
 
     for (cellidx, faceidx) in faces
-
         cellcoords!(xh, dh, cellidx)
         celldofs!(_celldofs, dh, cellidx) # update global dofs for this cell
 
@@ -456,7 +455,6 @@ end
 
 #Function for adding constraint when using multiple celltypes
 function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
-    
     #Checks:
     @assert( typeof(ch.dh)<:MixedDofHandler )
     dbc.faces isa Set{Tuple{Int}} && error("Can only apply boundary conditions to faces,edges and vertices for MixedDofHandler (not nodes).")
