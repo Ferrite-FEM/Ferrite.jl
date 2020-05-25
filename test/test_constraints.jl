@@ -70,3 +70,22 @@
    @test ch.prescribed_dofs == [1,3,9,13,14]
    @test ch.values == [1.0, 1.0, 1.0, 2.0, 2.0]
 end
+
+@testset "edge bc" begin
+    grid = generate_grid(Hexahedron, (1, 1, 1))
+    addedgeset!(grid, "edge", x-> x[1] ≈ -1.0 && x[3] ≈ -1.0)
+
+    dh = DofHandler(grid)
+    push!(dh, :u, 3)
+    push!(dh, :p, 1)
+    close!(dh)
+
+    ch = ConstraintHandler(dh)
+    dbc1 = Dirichlet(:u, getedgeset(grid, "edge"), (x,t) -> x, [1, 2, 3])
+    add!(ch, dbc1)
+    close!(ch)
+    update!(ch)
+
+    @test ch.prescribed_dofs == [1,2,3,10,11,12]
+    @test ch.values == [-1.0, -1.0, -1.0, -1.0, 1.0, -1.0]
+end

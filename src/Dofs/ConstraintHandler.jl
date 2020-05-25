@@ -293,7 +293,6 @@ function _update!(values::Vector{Float64}, f::Function, faces::GeomIndexSets, fi
     _celldofs = fill(0, ndofs_per_cell(dh, _tmp_cellid))
 
     for (cellidx, faceidx) in faces
-
         cellcoords!(xh, dh, cellidx)
         celldofs!(_celldofs, dh, cellidx) # update global dofs for this cell
 
