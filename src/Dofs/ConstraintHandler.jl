@@ -62,7 +62,7 @@ end
 """
 	RHSData
 
-Stores the mean and constrained columns of the diagonal of stiffness matrix `A`.
+Stores the constrained columns and mean of the diagonal of stiffness matrix `A`.
 """
 struct RHSData{T}
     m::T
