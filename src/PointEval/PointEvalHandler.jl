@@ -31,33 +31,33 @@ function PointEvalHandler(dh::DofHandler{dim, C, T}, interpolation::Interpolatio
         cell_coords = getcoordinates(grid, cell)
         face_nodes = faces(grid.cells[cell])
         nodes_on_faces = [grid.nodes[fn[1]] for fn in face_nodes]
+        deletions = []
         for (j, ipoint) in enumerate(points_array)
             i, point = ipoint
             if is_point_inside_cell(cell_coords, point, facevalues, nodes_on_faces)
-                deleteat!(points_array, j)
+                push!(deletions, j)
                 local_coordinate = find_local_coordinate(interpolation, cell_coords, point)
                 point_qr = QuadratureRule{2, S, T}([1], [local_coordinate])
                 cells_of_points[i] = cell
-                cellvalues_of_points[i] = CellScalarValues(point_qr, interpolation)
+                # since these are unique for each point to evaluate, we need to create a cellvalue for each point anyway, so we might as well do it all at once
+                cellvalues = CellScalarValues(point_qr, interpolation)
+                reinit!(cellvalues, cell_coords)
+                cellvalues_of_points[i] = cellvalues 
             end
         end
+        deleteat!(points_array, deletions)
     end
     if length(points_array) > 0
+        println(points_array)
         error("Did not find cells for all points")
     end
     return PointEvalHandler(dh, cells_of_points, cellvalues_of_points)
 end
 
-function _compute_point(cellvalue, cell_coords, dof_values)
-    reinit!(cellvalue, cell_coords)
-    function_value(cellvalue, 1, dof_values)
-end
-
 function (peh::PointEvalHandler)(dof_values)
-    [_compute_point(cellvalue, 
-                    getcoordinates(peh.dh.grid, cell), 
+    [function_value(cellvalue, 1, 
                     dof_values[celldofs(peh.dh, cell)]) for (cell, cellvalue) in zip(peh.cells,
-                                                                              peh.cellvalues)]
+                                                                                     peh.cellvalues)]
 end
 
 pointeval(peh::PointEvalHandler, dof_values) = peh(dof_values)
