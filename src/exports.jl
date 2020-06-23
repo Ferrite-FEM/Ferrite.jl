@@ -123,4 +123,5 @@ export
 
 # Point Evaluation
     PointEvalHandler,
-    pointeval
+    point_eval,
+    create_eval_matrix

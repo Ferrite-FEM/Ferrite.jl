@@ -60,7 +60,16 @@ function (peh::PointEvalHandler)(dof_values)
                                                                                      peh.cellvalues)]
 end
 
-pointeval(peh::PointEvalHandler, dof_values) = peh(dof_values)
+function create_eval_matrix(peh::PointEvalHandler)
+    I = reduce(vcat, [[j for i in 1:length(celldofs(peh.dh, cell))] for (j, cell) in enumerate(peh.cells)])
+    J = reduce(vcat, [celldofs(peh.dh, cell) for cell in peh.cells])
+    V = reduce(vcat, [[shape_value(cellvalue, 1, i) for i in 1:length(celldofs(peh.dh, cell))] for (cell, cellvalue) in zip(peh.cells, peh.cellvalues)])
+    m = length(peh.cells)
+    n = peh.dh.ndofs.x
+    return sparse(I,J,V,m,n)
+end
+
+point_eval(peh::PointEvalHandler, dof_values) = peh(dof_values)
 
 function is_point_inside_cell(cell_coords, point, facevalues, nodes_on_faces)
     is_on_wrong_side_of_a_plane = false
