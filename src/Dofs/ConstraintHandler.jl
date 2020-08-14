@@ -404,8 +404,11 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
     interpolation = getfieldinterpolations(fh)[field_idx]
     field_dim = getfielddims(fh)[field_idx]
     bcvalue = fh.bc_values[field_idx]
-    
-    JuAFEM._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue)
+    if isa(dbc.faces, Set{Tuple{Int, Int}})
+        JuAFEM._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue)
+    elseif isa(dbc.faces, Set{Int}) # constraining a nodeset
+        JuAFEM._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue, fh.cellset)
+    end
     return ch
 end
 
@@ -417,3 +420,60 @@ function _check_cellset_dirichlet(cellset::Set{Int}, faceset::Set{Tuple{Int,Int}
     end
 end
 
+# support adding constraints to nodes when using MixedDofHandler
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int})
+    if interpolation !== default_interpolation(getcelltype(ch.dh.grid))
+        @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
+    end
+
+    ncomps = length(dbc.components)
+    nnodes = getnnodes(ch.dh.grid)
+    interpol_points = getnbasefunctions(interpolation)
+    _celldofs = fill(0, ndofs_per_cell(ch.dh, first(cellset)))
+    node_dofs = zeros(Int, ncomps, nnodes)
+    visited = falses(nnodes)
+    for cell in CellIterator(ch.dh, collect(cellset))
+        cellidx = cellid(cell)
+        celldofs!(_celldofs, ch.dh, cellidx) # update the dofs for this cell
+        for idx in 1:min(interpol_points, length(cell.nodes))
+            node = cell.nodes[idx]
+            if !visited[node]
+                noderange = (offset + (idx-1)*field_dim + 1):(offset + idx*field_dim) # the dofs in this node
+                for (i,c) in enumerate(dbc.components)
+                    node_dofs[i,node] = _celldofs[noderange[c]]
+                    @debug println("adding dof $(_celldofs[noderange[c]]) to node_dofs")
+                end
+                visited[node] = true
+            end
+        end
+    end
+
+    constrained_dofs = Int[]
+    sizehint!(constrained_dofs, ncomps*length(bcnodes))
+    sizehint!(dbc.local_face_dofs, length(bcnodes))
+    for node in bcnodes
+        # if !visited[node]
+        #     error("Unable to add a Dirichlet boundary condition to node $node as there are no degrees of freedom on this node.")
+        # end
+        if !visited[node]
+            # either the node belongs to another field handler or it does not have dofs in the constrained field
+            continue
+        end
+        for i in 1:ncomps
+            push!(constrained_dofs, node_dofs[i,node])
+        end
+        push!(dbc.local_face_dofs, node) # use this field to store the node idx for each node
+    end
+
+    # save it to the ConstraintHandler
+    copy!!(dbc.local_face_dofs_offset, constrained_dofs) # use this field to store the global dofs
+    push!(ch.dbcs, dbc)
+    push!(ch.bcvalues, bcvalue)
+    append!(ch.prescribed_dofs, constrained_dofs)
+end
+
+# overcome this check
+# TODO figure out if check makes sense for this case
+function JuAFEM._check_cellset_dirichlet(cellset::Set{Int}, faceset::Set{Int})
+    nothing
+end
