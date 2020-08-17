@@ -422,9 +422,9 @@ end
 
 # support adding constraints to nodes when using MixedDofHandler
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int})
-    if interpolation !== default_interpolation(getcelltype(ch.dh.grid))
-        @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
-    end
+    # if interpolation !== default_interpolation(getcelltype(ch.dh.grid))
+    #     @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
+    # end
 
     ncomps = length(dbc.components)
     nnodes = getnnodes(ch.dh.grid)
@@ -472,8 +472,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     append!(ch.prescribed_dofs, constrained_dofs)
 end
 
-# overcome this check
-# TODO figure out if check makes sense for this case
+# overcome this check for constraining nodes
 function JuAFEM._check_cellset_dirichlet(cellset::Set{Int}, faceset::Set{Int})
     nothing
 end
