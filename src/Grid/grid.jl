@@ -11,7 +11,11 @@ Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
 getcoordinates(n::Node) = n.x
 
 """
+    Cell{dim,N,M}
+
 A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
+`dim` is the node's cooridnate dimension. `N` is the number of nodes in a cell.
+`M` is the number of faces in a cell.
 """
 abstract type AbstractCell{dim,N,M} end
 struct Cell{dim,N,M} <: AbstractCell{dim,N,M}

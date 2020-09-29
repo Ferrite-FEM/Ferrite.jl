@@ -40,9 +40,9 @@ For a scalar field, the `FaceScalarValues` type should be used. For vector field
 FaceValues
 
 # FaceScalarValues
-struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{dim,T,refshape}
+struct FaceScalarValues{dim,ndim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{dim,ndim,T,refshape}
     N::Array{T,3}
-    dNdx::Array{Vec{dim,T},3}
+    dNdx::Array{Vec{ndim,T},3}
     dNdξ::Array{Vec{dim,T},3}
     detJdV::Matrix{T}
     normals::Vector{Vec{dim,T}}
@@ -58,7 +58,7 @@ function FaceScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolatio
 end
 
 function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol) where {dim_qr,T,shape<:AbstractRefShape}
+        geom_interpol::Interpolation=func_interpol;ndim=dim_qr+1) where {dim_qr,T,shape<:AbstractRefShape}
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
@@ -69,12 +69,12 @@ function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
     n_faces = length(face_quad_rule)
 
     # Normals
-    normals = zeros(Vec{dim,T}, n_qpoints)
+    normals = zeros(Vec{ndim,T}, n_qpoints)
 
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(func_interpol)
     N =    fill(zero(T)          * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
-    dNdx = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    dNdx = fill(zero(Vec{ndim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
     dNdξ = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
 
     # Geometry interpolation
@@ -93,13 +93,13 @@ function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
 
     detJdV = fill(T(NaN), n_qpoints, n_faces)
 
-    FaceScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceScalarValues{dim,ndim,T,shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
 end
 
 # FaceVectorValues
-struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: FaceValues{dim,T,refshape}
+struct FaceVectorValues{dim,ndim,T<:Real,refshape<:AbstractRefShape,M} <: FaceValues{dim,ndim,T,refshape}
     N::Array{Vec{dim,T},3}
-    dNdx::Array{Tensor{2,dim,T,M},3}
+    dNdx::Array{Tensor{2,ndim,T,M},3}
     dNdξ::Array{Tensor{2,dim,T,M},3}
     detJdV::Matrix{T}
     normals::Vector{Vec{dim,T}}
@@ -114,7 +114,7 @@ function FaceVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolatio
 end
 
 function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol) where {dim_qr,T,shape<:AbstractRefShape}
+        geom_interpol::Interpolation=func_interpol;ndim=dim_qr+1) where {dim_qr,T,shape<:AbstractRefShape}
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
@@ -161,10 +161,10 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
     detJdV = fill(T(NaN), n_qpoints, n_faces)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    FaceVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceVectorValues{dim,ndim,T,shape,MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
 end
 
-function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) where {dim,T}
+function reinit!(fv::FaceValues{dim,ndim}, x::AbstractVector{Vec{ndim,T}}, face::Int) where {dim,ndim,T}
     n_geom_basefuncs = getngeobasefunctions(fv)
     n_func_basefuncs = getn_scalarbasefunctions(fv)
     @assert length(x) == n_geom_basefuncs
@@ -175,7 +175,7 @@ function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) 
 
     @inbounds for i in 1:length(fv.qr_weights)
         w = fv.qr_weights[i]
-        fefv_J = zero(Tensor{2,dim})
+        fefv_J = zero(Tensor{2,ndim})
         for j in 1:n_geom_basefuncs
             fefv_J += x[j] ⊗ fv.dMdξ[j, i, cb]
         end

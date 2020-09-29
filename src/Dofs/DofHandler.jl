@@ -11,6 +11,7 @@ abstract type AbstractDofHandler end
 
 Construct a `DofHandler` based on the grid `grid`.
 """
+# `dim` : node cooridnate dimension
 struct DofHandler{dim,C,T} <: AbstractDofHandler
     field_names::Vector{Symbol}
     field_dims::Vector{Int}

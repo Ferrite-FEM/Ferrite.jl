@@ -23,6 +23,7 @@ for cell in CellIterator(grid)
 end
 ```
 """
+# `dim`: node coordinate dimension
 struct CellIterator{dim,C,T}
     flags::UpdateFlags
     grid::Grid{dim,C,T}
@@ -103,12 +104,12 @@ function check_compatible_geointerpolation(cv::Union{CellValues, FaceValues}, ci
     end
 end
 
-@inline function reinit!(cv::CellValues{dim,T}, ci::CellIterator{dim,N,T}) where {dim,N,T}
+@inline function reinit!(cv::CellValues{dim,ndim,T}, ci::CellIterator{ndim,N,T}) where {dim,ndim,N,T}
     check_compatible_geointerpolation(cv, ci)
     reinit!(cv, ci.coords)
 end
 
-@inline function reinit!(fv::FaceValues{dim,T}, ci::CellIterator{dim,N,T}, face::Int) where {dim,N,T}
+@inline function reinit!(fv::FaceValues{dim,ndim,T}, ci::CellIterator{ndim,N,T}, face::Int) where {dim,ndim,N,T}
     check_compatible_geointerpolation(fv, ci)
     reinit!(fv, ci.coords, face)
 end

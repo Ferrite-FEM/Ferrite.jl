@@ -34,9 +34,11 @@ utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape 
 CellValues
 
 # CellScalarValues
-struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: CellValues{dim,T,refshape}
+# `dim` : param domain dimension
+# `ndim` : node coordinate dimension
+struct CellScalarValues{dim,ndim,T<:Real,refshape<:AbstractRefShape} <: CellValues{dim,ndim,T,refshape}
     N::Matrix{T}
-    dNdx::Matrix{Vec{dim,T}}
+    dNdx::Matrix{Vec{ndim,T}}
     dNdξ::Matrix{Vec{dim,T}}
     detJdV::Vector{T}
     M::Matrix{T}
@@ -50,7 +52,7 @@ function CellScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolatio
 end
 
 function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol) where {dim,T,shape<:AbstractRefShape}
+        geom_interpol::Interpolation=func_interpol; ndim=dim) where {dim,T,shape<:AbstractRefShape}
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
@@ -59,7 +61,7 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(func_interpol)
     N    = fill(zero(T)          * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdx = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdx = fill(zero(Vec{ndim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
     dNdξ = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
 
     # Geometry interpolation
@@ -78,13 +80,13 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
 
     detJdV = fill(T(NaN), n_qpoints)
 
-    CellScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
+    CellScalarValues{dim,ndim,T,shape}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
 end
 
 # CellVectorValues
-struct CellVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: CellValues{dim,T,refshape}
+struct CellVectorValues{dim,ndim,T<:Real,refshape<:AbstractRefShape,M} <: CellValues{dim,ndim,T,refshape}
     N::Matrix{Vec{dim,T}}
-    dNdx::Matrix{Tensor{2,dim,T,M}}
+    dNdx::Matrix{Tensor{2,ndim,T,M}}
     dNdξ::Matrix{Tensor{2,dim,T,M}}
     detJdV::Vector{T}
     M::Matrix{T}
@@ -97,7 +99,7 @@ function CellVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolatio
 end
 
 function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol) where {dim,T,shape<:AbstractRefShape}
+        geom_interpol::Interpolation=func_interpol; ndim=dim) where {dim,T,shape<:AbstractRefShape}
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
@@ -137,28 +139,47 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
     detJdV = fill(T(NaN), n_qpoints)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    CellVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
+    CellVectorValues{dim,ndim,T,shape,MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
 end
 
-function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,T}
+function reinit!(cv::CellValues{dim,ndim}, x::AbstractVector{Vec{ndim,T}}; A=1.0) where {dim,ndim,T}
     n_geom_basefuncs = getngeobasefunctions(cv)
     n_func_basefuncs = getn_scalarbasefunctions(cv)
     @assert length(x) == n_geom_basefuncs
     isa(cv, CellVectorValues) && (n_func_basefuncs *= dim)
 
-
-    @inbounds for i in 1:length(cv.qr_weights)
-        w = cv.qr_weights[i]
-        fecv_J = zero(Tensor{2,dim})
-        for j in 1:n_geom_basefuncs
-            fecv_J += x[j] ⊗ cv.dMdξ[j, i]
+    if dim == 1 && ndim > dim
+        @inbounds for i in 1:length(cv.qr_weights)
+            w = cv.qr_weights[i]
+            dxdξ = zero(Tensor{1,ndim})
+            for j in 1:n_geom_basefuncs
+                # in a truss element, x_j ∈ R, dMdξ_j ∈ R, ξ ∈ R
+                dxdξ += x[j] * cv.dMdξ[j, i]
+            end
+            # detJ = √(J' J), J = dxdξ ∈ R(n x 1)
+            detJ = norm(dxdξ)
+            detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+            cv.detJdV[i] = detJ * w * A
+            Jinv = pinv(dxdξ)
+            for j in 1:n_func_basefuncs
+                cv.dNdx[j, i] = cv.dNdξ[j, i] * Jinv'
+            end
         end
-        detJ = det(fecv_J)
-        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
-        cv.detJdV[i] = detJ * w
-        Jinv = inv(fecv_J)
-        for j in 1:n_func_basefuncs
-            cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
+    else
+        @inbounds for i in 1:length(cv.qr_weights)
+            w = cv.qr_weights[i]
+            fecv_J = zero(Tensor{2,ndim})
+            for j in 1:n_geom_basefuncs
+                # in solid mechanics, x_j ∈ R^ndim, dMdξ_j ∈ R^ndim, ξ ∈ R^ndim
+                fecv_J += x[j] ⊗ cv.dMdξ[j, i]
+            end
+            detJ = det(fecv_J)
+            detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+            cv.detJdV[i] = detJ * w
+            Jinv = inv(fecv_J)
+            for j in 1:n_func_basefuncs
+                cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
+            end
         end
     end
 end
