@@ -142,44 +142,24 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
     CellVectorValues{dim,ndim,T,shape,MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
 end
 
-function reinit!(cv::CellValues{dim,ndim}, x::AbstractVector{Vec{ndim,T}}; A=1.0) where {dim,ndim,T}
+function reinit!(cv::CellValues{dim,ndim}, x::AbstractVector{Vec{ndim,T}}) where {dim,ndim,T}
     n_geom_basefuncs = getngeobasefunctions(cv)
     n_func_basefuncs = getn_scalarbasefunctions(cv)
     @assert length(x) == n_geom_basefuncs
     isa(cv, CellVectorValues) && (n_func_basefuncs *= dim)
 
-    if dim == 1 && ndim > dim
-        @inbounds for i in 1:length(cv.qr_weights)
-            w = cv.qr_weights[i]
-            dxdξ = zero(Tensor{1,ndim})
-            for j in 1:n_geom_basefuncs
-                # in a truss element, x_j ∈ R, dMdξ_j ∈ R, ξ ∈ R
-                dxdξ += x[j] * cv.dMdξ[j, i]
-            end
-            # detJ = √(J' J), J = dxdξ ∈ R(n x 1)
-            detJ = norm(dxdξ)
-            detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
-            cv.detJdV[i] = detJ * w * A
-            Jinv = pinv(dxdξ)
-            for j in 1:n_func_basefuncs
-                cv.dNdx[j, i] = cv.dNdξ[j, i] * Jinv'
-            end
+    @inbounds for i in 1:length(cv.qr_weights)
+        w = cv.qr_weights[i]
+        fecv_J = zero(Tensor{2,ndim})
+        for j in 1:n_geom_basefuncs
+            fecv_J += x[j] ⊗ cv.dMdξ[j, i]
         end
-    else
-        @inbounds for i in 1:length(cv.qr_weights)
-            w = cv.qr_weights[i]
-            fecv_J = zero(Tensor{2,ndim})
-            for j in 1:n_geom_basefuncs
-                # in solid mechanics, x_j ∈ R^ndim, dMdξ_j ∈ R^ndim, ξ ∈ R^ndim
-                fecv_J += x[j] ⊗ cv.dMdξ[j, i]
-            end
-            detJ = det(fecv_J)
-            detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
-            cv.detJdV[i] = detJ * w
-            Jinv = inv(fecv_J)
-            for j in 1:n_func_basefuncs
-                cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
-            end
+        detJ = det(fecv_J)
+        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+        cv.detJdV[i] = detJ * w
+        Jinv = inv(fecv_J)
+        for j in 1:n_func_basefuncs
+            cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
         end
     end
 end
