@@ -5,9 +5,9 @@ include("generate_quadrature.jl")
 import Base.Cartesian: @nloops, @nref, @ntuple, @nexprs
 
 """
-    QuadratureRule{dim,shape}([quad_rule_type::Symbol], order::Int)
+    QuadratureRule{ξdim,shape}([quad_rule_type::Symbol], order::Int)
 
-Create a `QuadratureRule` used for integration. `dim` is the space dimension,
+Create a `QuadratureRule` used for integration. `ξdim` is the (reference) space dimension,
 `shape` an [`AbstractRefShape`](@ref) and `order` the order of the quadrature rule.
 `quad_rule_type` is an optional argument determining the type of quadrature rule,
 currently the `:legendre` and `:lobatto` rules are implemented.
@@ -15,9 +15,9 @@ currently the `:legendre` and `:lobatto` rules are implemented.
 A `QuadratureRule` is used to approximate an integral on a domain by a weighted sum of
 function values at specific points:
 
-``\\int\\limits_\\Omega f(\\mathbf{x}) \\text{d} \\Omega \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) w_q``
+``\\int\\limits_\\Omega f(\\mathbf{\\xi}) \\text{d} \\Omega \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{\\xi}_q) w_q``
 
-The quadrature rule consists of ``n_q`` points in space ``\\mathbf{x}_q`` with corresponding weights ``w_q``.
+The quadrature rule consists of ``n_q`` points in space ``\\mathbf{\\xi}_q`` with corresponding weights ``w_q``.
 
 In `JuAFEM`, the `QuadratureRule` type is mostly used as one of the components to create a [`CellValues`](@ref)
 or [`FaceValues`](@ref) object.
@@ -35,9 +35,9 @@ julia> QuadratureRule{1, RefCube}(:lobatto, 2)
 JuAFEM.QuadratureRule{1,JuAFEM.RefCube,Float64}([1.0, 1.0], Tensors.Tensor{1,1,Float64,1}[[-1.0], [1.0]])
 ```
 """
-struct QuadratureRule{dim,shape,T}
+struct QuadratureRule{ξdim,shape,T}
     weights::Vector{T}
-    points::Vector{Vec{dim,T}}
+    points::Vector{Vec{ξdim,T}}
 end
 
 """
@@ -77,7 +77,7 @@ julia> getpoints(qr)
 """
 getpoints(qr::QuadratureRule) = qr.points
 
-QuadratureRule{dim,shape}(order::Int) where {dim,shape} = QuadratureRule{dim,shape}(:legendre, order)
+QuadratureRule{ξdim,shape}(order::Int) where {ξdim,shape} = QuadratureRule{ξdim,shape}(:legendre, order)
 
 # Special case for face integration of 1D problems
 function (::Type{QuadratureRule{0, RefCube}})(quad_type::Symbol, order::Int)
@@ -88,9 +88,9 @@ end
 
 # Generate Gauss quadrature rules on cubes by doing an outer product
 # over all dimensions
-for dim in (1,2,3)
+for ξdim in (1,2,3)
     @eval begin
-        function (::Type{QuadratureRule{$dim,RefCube}})(quad_type::Symbol, order::Int)
+        function (::Type{QuadratureRule{$ξdim,RefCube}})(quad_type::Symbol, order::Int)
             if quad_type == :legendre
                 p, w = GaussQuadrature.legendre(Float64, order)
             elseif quad_type == :lobatto
@@ -98,40 +98,40 @@ for dim in (1,2,3)
             else
                 throw(ArgumentError("unsupported quadrature rule"))
             end
-            weights = Vector{Float64}(undef, order^($dim))
-            points = Vector{Vec{$dim,Float64}}(undef, order^($dim))
+            weights = Vector{Float64}(undef, order^($ξdim))
+            points = Vector{Vec{$ξdim,Float64}}(undef, order^($ξdim))
             count = 1
-            @nloops $dim i j->(1:order) begin
-                t = @ntuple $dim q-> p[$(Symbol("i"*"_q"))]
-                points[count] = Vec{$dim,Float64}(t)
+            @nloops $ξdim i j->(1:order) begin
+                t = @ntuple $ξdim q-> p[$(Symbol("i"*"_q"))]
+                points[count] = Vec{$ξdim,Float64}(t)
                 weight = 1.0
-                @nexprs $dim j->(weight *= w[i_{j}])
+                @nexprs $ξdim j->(weight *= w[i_{j}])
                 weights[count] = weight
                 count += 1
             end
-            return QuadratureRule{$dim,RefCube,Float64}(weights, points)
+            return QuadratureRule{$ξdim,RefCube,Float64}(weights, points)
         end
     end
 end
 
-for dim in (2, 3)
+for ξdim in (2, 3)
     @eval begin
-        function (::Type{QuadratureRule{$dim, RefTetrahedron}})(quad_type::Symbol, order::Int)
-            if $dim == 2 && quad_type == :legendre
+        function (::Type{QuadratureRule{$ξdim, RefTetrahedron}})(quad_type::Symbol, order::Int)
+            if $ξdim == 2 && quad_type == :legendre
                 data = _get_gauss_tridata(order)
-            elseif $dim == 3 && quad_type == :legendre
+            elseif $ξdim == 3 && quad_type == :legendre
                 data = _get_gauss_tetdata(order)
             else
                 throw(ArgumentError("unsupported quadrature rule"))
             end
             n_points = size(data,1)
-            points = Vector{Vec{$dim,Float64}}(undef, n_points)
+            points = Vector{Vec{$ξdim,Float64}}(undef, n_points)
 
             for p in 1:size(data, 1)
-                points[p] = Vec{$dim,Float64}(@ntuple $dim i -> data[p, i])
+                points[p] = Vec{$ξdim,Float64}(@ntuple $ξdim i -> data[p, i])
             end
-            weights = data[:, $dim + 1]
-            QuadratureRule{$dim,RefTetrahedron,Float64}(weights, points)
+            weights = data[:, $ξdim + 1]
+            QuadratureRule{$ξdim,RefTetrahedron,Float64}(weights, points)
         end
     end
 end

@@ -17,13 +17,13 @@ cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 Create a unstructured VTK grid from a `Grid`. Return a `DatasetFile`
 which data can be appended to, see `vtk_point_data` and `vtk_cell_data`.
 """
-function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}) where {dim,C,T}
+function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{xdim,C,T}) where {xdim,C,T}
     cls = MeshCell[]
     for cell in grid.cells
         celltype = JuAFEM.cell_to_vtkcell(typeof(cell))
         push!(cls, MeshCell(celltype, collect(cell.nodes)))
     end
-    coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
+    coords = reshape(reinterpret(T, getnodes(grid)), (xdim, getnnodes(grid)))
     return vtk_grid(filename, coords, cls)
 end
 
@@ -62,7 +62,7 @@ function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, data::Vector{Vec{dim
     return vtk_point_data(vtk, out, name)
 end
 
-function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String) where {dim}
+function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::Grid{xdim}, nodeset::String) where {xdim}
     z = zeros(getnnodes(grid))
     z[collect(getnodeset(grid, nodeset))] .= 1.0
     vtk_point_data(vtk, z, nodeset)
