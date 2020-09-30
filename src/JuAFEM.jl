@@ -22,10 +22,14 @@ struct RefCube <: AbstractRefShape end
 
 """
 Abstract type which has `CellValues` and `FaceValues` as subtypes
+
+`ξdim` : reference domain dimension \\
+`xdim` : node coordinate dimension \\
+`refshape` : reference shape, see also [`AbstractRefShape`](@ref).
 """
-abstract type Values{dim,ndim,T,refshape} end
-abstract type CellValues{dim,ndim,T,refshape} <: Values{dim,ndim,T,refshape} end
-abstract type FaceValues{dim,ndim,T,refshape} <: Values{dim,ndim,T,refshape} end
+abstract type Values{ξdim,xdim,T,refshape} end
+abstract type CellValues{ξdim,xdim,T,refshape} <: Values{ξdim,xdim,T,refshape} end
+abstract type FaceValues{ξdim,xdim,T,refshape} <: Values{ξdim,xdim,T,refshape} end
 
 include("utils.jl")
 

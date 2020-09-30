@@ -26,18 +26,18 @@ function Base.getindex(elvec::CellVector, el::Int)
     return elvec.values[offset:offset + elvec.length[el]-1]
  end
 
-struct MixedDofHandler{dim,C,T} <: JuAFEM.AbstractDofHandler
+struct MixedDofHandler{xdim,C,T} <: JuAFEM.AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
     cell_dofs::CellVector{Int}
     cell_nodes::CellVector{Int}
-    cell_coords::CellVector{Vec{dim,T}}
+    cell_coords::CellVector{Vec{xdim,T}}
     closed::ScalarWrapper{Bool}
-    grid::Grid{dim,C,T}
+    grid::Grid{xdim,C,T}
     ndofs::ScalarWrapper{Int}
 end
 
-function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
-    MixedDofHandler{dim,C,T}(FieldHandler[], CellVector(Int[],Int[],Int[]), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), JuAFEM.ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
+function MixedDofHandler(grid::Grid{xdim,C,T}) where {xdim,C,T}
+    MixedDofHandler{xdim,C,T}(FieldHandler[], CellVector(Int[],Int[],Int[]), CellVector(Int[],Int[],Int[]), CellVector(Vec{xdim,T}[],Int[],Int[]), JuAFEM.ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
 end
 
 getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
@@ -59,14 +59,14 @@ function celldofs(dh::MixedDofHandler, i::Int)
     return dh.cell_dofs[i]
 end
 
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::MixedDofHandler, i::Int) where {dim,T}
+function cellcoords!(global_coords::Vector{Vec{xdim,T}}, dh::MixedDofHandler, i::Int) where {xdim,T}
     @assert isclosed(dh)
     @assert length(global_coords) == nnodes_per_cell(dh, i)
     unsafe_copyto!(global_coords, 1, dh.cell_coords.values, dh.cell_coords.offset[i], length(global_coords))
     return global_coords
 end
 
-function cellnodes!(global_nodes::Vector{Int}, dh::MixedDofHandler, i::Int) where {dim,T}
+function cellnodes!(global_nodes::Vector{Int}, dh::MixedDofHandler, i::Int) where {xdim,T}
     @assert isclosed(dh)
     @assert length(global_nodes) == nnodes_per_cell(dh, i)
     unsafe_copyto!(global_nodes, 1, dh.cell_nodes.values, dh.cell_nodes.offset[i], length(global_nodes))
@@ -119,13 +119,13 @@ function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
     return dh
 end
 
-function Base.push!(dh::MixedDofHandler, name::Symbol, dim::Int)
+function Base.push!(dh::MixedDofHandler, name::Symbol, field_dim::Int)
     celltype = getcelltype(dh.grid)
     isconcretetype(celltype) || error("If you have more than one celltype in Grid, you must use push!(dh::MixedDofHandler, fh::FieldHandler)")
-    push!(dh, name, dim, default_interpolation(celltype))
+    push!(dh, name, field_dim, default_interpolation(celltype))
 end
 
-function Base.push!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolation)
+function Base.push!(dh::MixedDofHandler, name::Symbol, field_dim::Int, ip::Interpolation)
     @assert !isclosed(dh)
 
     if length(dh.fieldhandlers) == 0
@@ -136,7 +136,7 @@ function Base.push!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolati
     end
     fh = first(dh.fieldhandlers)
 
-    field = Field(name,ip,dim)
+    field = Field(name,ip,field_dim)
     bc_value = BCValues(field.interpolation, field.interpolation)
 
     push!(fh.fields, field)
@@ -151,7 +151,7 @@ end
 Closes the dofhandler and creates degrees of freedom for each cell.
 Dofs are created in the following order: Go through each FieldHandler in the order they were added. For each field in the FieldHandler, create dofs for the cell. This means that dofs on a particular cell will be numbered according to the fields; first dofs for field 1, then field 2, etc.
 """
-function close!(dh::MixedDofHandler{dim}) where {dim}
+function close!(dh::MixedDofHandler{xdim}) where {xdim}
 
     @assert !JuAFEM.isclosed(dh)
     field_names = JuAFEM.getfieldnames(dh)  # all the fields in the problem
@@ -206,7 +206,7 @@ function close!(dh::MixedDofHandler{dim}) where {dim}
     return dh
 end
 
-function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
+function _close!(dh::MixedDofHandler{xdim}, cellnumbers, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {xdim}
 
     ip_infos = JuAFEM.InterpolationInfo[]
     for interpolation in field_interpolations

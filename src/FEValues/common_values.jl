@@ -1,13 +1,13 @@
 # Common methods for all `Values` objects
 
-const ScalarValues{dim,T,shape} = Union{CellScalarValues{dim,T,shape},FaceScalarValues{dim,T,shape}}
-const VectorValues{dim,T,shape} = Union{CellVectorValues{dim,T,shape},FaceVectorValues{dim,T,shape}}
+const ScalarValues{ξdim,xdim,T,shape} = Union{CellScalarValues{ξdim,xdim,T,shape},FaceScalarValues{ξdim,xdim,T,shape}}
+const VectorValues{ξdim,xdim,T,shape} = Union{CellVectorValues{ξdim,xdim,T,shape},FaceVectorValues{ξdim,xdim,T,shape}}
 
 getnbasefunctions(cv::Values) = size(cv.N, 1)
 getngeobasefunctions(cv::Values) = size(cv.M, 1)
 
 getn_scalarbasefunctions(cv::ScalarValues) = size(cv.N, 1)
-getn_scalarbasefunctions(cv::VectorValues{dim}) where {dim} = size(cv.N, 1) ÷ dim
+getn_scalarbasefunctions(cv::VectorValues{ξdim,xdim}) where {ξdim,xdim} = size(cv.N, 1) ÷ xdim
 
 """
     reinit!(cv::CellValues, x::Vector)
@@ -34,7 +34,8 @@ point weight for the given quadrature point: ``\\det(J(\\mathbf{x})) w_q``
 This value is typically used when one integrates a function on a
 finite element cell or face as
 
-``\\int\\limits_\\Omega f(\\mathbf{x}) d \\Omega \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``,
+``\\int\\limits_\\Omega f(\\mathbf{x}) d \\Omega \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
+
 ``\\int\\limits_\\Gamma f(\\mathbf{x}) d \\Gamma \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 
 """
@@ -101,9 +102,9 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
 nodal values of ``\\mathbf{u}``.
 """
-function function_value(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
+function function_value(fe_v::Values{ξdim,xdim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {ξdim,xdim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
-    isa(fe_v, VectorValues) && (n_base_funcs *= dim)
+    isa(fe_v, VectorValues) && (n_base_funcs *= xdim)
     @assert length(dof_range) == n_base_funcs
     @boundscheck checkbounds(u, dof_range)
     val = zero(_valuetype(fe_v, u))
@@ -113,13 +114,13 @@ function function_value(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, d
     return val
 end
 
-function function_value(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
+function function_value(fe_v::VectorValues{ξdim,xdim}, q_point::Int, u::AbstractVector{Vec{xdim,T}}) where {ξdim,xdim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
-    val = zero(Vec{dim, T})
+    val = zero(Vec{xdim, T})
     basefunc = 1
     @inbounds for i in 1:n_base_funcs
-        for j in 1:dim
+        for j in 1:xdim
             val += shape_value(fe_v, q_point, basefunc) * u[i][j]
             basefunc += 1
         end
@@ -133,7 +134,7 @@ Base.@pure _valuetype(::VectorValues{dim}, ::AbstractVector{T}) where {dim,T} = 
 # Base.@pure _valuetype(::VectorValues{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Vec{dim,T}
 
 """
-    function_scalar_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector)
+    function_scalar_gradient(fe_v::Values{ξdim,xdim}, q_point::Int, u::AbstractVector)
 
 Compute the gradient of the function in a quadrature point. `u` is a vector with values
 for the degrees of freedom. For a scalar valued function, `u` contains scalars.
@@ -147,9 +148,9 @@ For a vector valued function the gradient is computed as
 ``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x}) \\otimes \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
-function function_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
+function function_gradient(fe_v::Values{ξdim,xdim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {ξdim,xdim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
-    isa(fe_v, VectorValues) && (n_base_funcs *= dim)
+    isa(fe_v, VectorValues) && (n_base_funcs *= xdim)
     @assert length(dof_range) == n_base_funcs
     @boundscheck checkbounds(u, dof_range)
     grad = zero(_gradienttype(fe_v, u))
@@ -159,26 +160,26 @@ function function_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}
     return grad
 end
 
-Base.@pure _gradienttype(::ScalarValues{dim}, ::AbstractVector{T}) where {dim,T} = Vec{dim,T}
-Base.@pure _gradienttype(::VectorValues{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
+Base.@pure _gradienttype(::ScalarValues{ξdim,xdim}, ::AbstractVector{T}) where {ξdim,xdim,T} = Vec{xdim,T}
+Base.@pure _gradienttype(::VectorValues{ξdim,xdim}, ::AbstractVector{T}) where {ξdim,xdim,T} = Tensor{2,xdim,T}
 
-function function_gradient(fe_v::ScalarValues{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
+function function_gradient(fe_v::ScalarValues{ξdim,xdim}, q_point::Int, u::AbstractVector{Vec{xdim,T}}) where {ξdim,xdim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
-    grad = zero(Tensor{2,dim,T})
+    grad = zero(Tensor{2,xdim,T})
     @inbounds for i in 1:n_base_funcs
         grad += u[i] ⊗ shape_gradient(fe_v, q_point, i)
     end
     return grad
 end
 
-function function_gradient(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
+function function_gradient(fe_v::VectorValues{ξdim,xdim}, q_point::Int, u::AbstractVector{Vec{xdim,T}}) where {ξdim,xdim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
-    grad = zero(Tensor{2,dim,T})
+    grad = zero(Tensor{2,xdim,T})
     basefunc_count = 1
     @inbounds for i in 1:n_base_funcs
-        for j in 1:dim
+        for j in 1:xdim
             grad += u[i][j] * shape_gradient(fe_v, q_point, basefunc_count)
             basefunc_count += 1
         end
@@ -204,7 +205,7 @@ function function_symmetric_gradient(fe_v::Values, q_point::Int, u::AbstractVect
     return symmetric(grad)
 end
 
-function function_symmetric_gradient(fe_v::Values, q_point::Int, u::AbstractVector{Vec{dim, T}}) where {dim, T}
+function function_symmetric_gradient(fe_v::Values, q_point::Int, u::AbstractVector{Vec{xdim, T}}) where {xdim, T}
     grad = function_gradient(fe_v, q_point, u)
     return symmetric(grad)
 end
@@ -218,7 +219,7 @@ The divergence of a vector valued functions in the quadrature point ``\\mathbf{x
 ``\\mathbf{\\nabla} \\cdot \\mathbf{u}(\\mathbf{x_q}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x_q}) \\cdot \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function function_divergence(fe_v::ScalarValues{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
+function function_divergence(fe_v::ScalarValues{ξdim,xdim}, q_point::Int, u::AbstractVector{Vec{xdim,T}}) where {ξdim,xdim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
     diverg = zero(T)
@@ -228,30 +229,30 @@ function function_divergence(fe_v::ScalarValues{dim}, q_point::Int, u::AbstractV
     return diverg
 end
 
-function function_divergence(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
-    n_base_funcs = getn_scalarbasefunctions(fe_v)*dim
+function function_divergence(fe_v::VectorValues{ξdim,xdim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {ξdim,xdim,T}
+    n_base_funcs = getn_scalarbasefunctions(fe_v)*xdim
     @assert length(dof_range) == n_base_funcs
     @boundscheck checkbounds(u, dof_range)
     diverg = zero(T)
     @inbounds for (i, j) in enumerate(dof_range)
         grad = shape_gradient(fe_v, q_point, i)
-        for k in 1:dim
+        for k in 1:xdim
             diverg += grad[k, k] * u[j]
         end
     end
     return diverg
 end
 
-function function_divergence(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
+function function_divergence(fe_v::VectorValues{ξdim,xdim}, q_point::Int, u::AbstractVector{Vec{xdim,T}}) where {ξdim,xdim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
     diverg = zero(T)
     basefunc_count = 1
     @inbounds for i in 1:n_base_funcs
-        for j in 1:dim
+        for j in 1:xdim
             grad = shape_gradient(fe_v, q_point, basefunc_count)
             basefunc_count += 1
-            for k in 1:dim
+            for k in 1:xdim
                 diverg += grad[k, k] * u[i][j]
             end
         end
@@ -268,7 +269,7 @@ function function_curl(fe_v::Values, q_point::Int, u::AbstractVector{Vec{3, T}})
 end
 
 """
-    spatial_coordinate(fe_v::Values{dim}, q_point::Int, x::AbstractVector)
+    spatial_coordinate(fe_v::Values{ξdim,xdim}, q_point::Int, x::AbstractVector)
 
 Compute the spatial coordinate in a quadrature point. `x` contains the nodal
 coordinates of the cell.
@@ -276,10 +277,10 @@ coordinates of the cell.
 The coordinate is computed, using the geometric interpolation, as
 ``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{x}) \\mathbf{\\hat{x}}_i``
 """
-function spatial_coordinate(fe_v::Values{dim}, q_point::Int, x::AbstractVector{Vec{dim,T}}) where {dim,T}
+function spatial_coordinate(fe_v::Values{ξdim,xdim}, q_point::Int, x::AbstractVector{Vec{xdim,T}}) where {ξdim,xdim,T}
     n_base_funcs = getngeobasefunctions(fe_v)
     @assert length(x) == n_base_funcs
-    vec = zero(Vec{dim,T})
+    vec = zero(Vec{xdim,T})
     @inbounds for i in 1:n_base_funcs
         vec += geometric_value(fe_v, q_point, i) * x[i]
     end

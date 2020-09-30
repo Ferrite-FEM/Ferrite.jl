@@ -221,11 +221,11 @@ function _update!(values::Vector{Float64}, f::Function, faces::Set{Tuple{Int,Int
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::T) where {T}
 
-    dim = getdim(dh.grid)
+    xdim = getdim(dh.grid)
     _tmp_cellid = first(faces)[1]
 
     N = nnodes_per_cell(dh.grid, _tmp_cellid)
-    xh = zeros(Vec{dim, T}, N) # pre-allocate
+    xh = zeros(Vec{xdim, T}, N) # pre-allocate
     _celldofs = fill(0, ndofs_per_cell(dh, _tmp_cellid))
 
     for (cellidx, faceidx) in faces
@@ -259,8 +259,8 @@ end
 
 # for nodes
 function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
-                  components::Vector{Int}, dh::DofHandler{dim,C,M}, facevalues::BCValues,
-                  dofmapping::Dict{Int,Int}, time::Float64) where {dim,C,M}
+                  components::Vector{Int}, dh::DofHandler{xdim,C,M}, facevalues::BCValues,
+                  dofmapping::Dict{Int,Int}, time::Float64) where {xdim,C,M}
     counter = 1
     for (idx, nodenumber) in enumerate(nodeidxs)
         x = dh.grid.nodes[nodenumber].x

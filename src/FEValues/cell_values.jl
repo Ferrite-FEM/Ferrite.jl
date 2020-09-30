@@ -33,16 +33,19 @@ utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape 
 """
 CellValues
 
-# CellScalarValues
-# `dim` : param domain dimension
-# `ndim` : node coordinate dimension
-struct CellScalarValues{dim,ndim,T<:Real,refshape<:AbstractRefShape} <: CellValues{dim,ndim,T,refshape}
+"""
+    CellScalarValues{ξdim,xdim,T<:Real,refshape<:AbstractRefShape} <: CellValues{ξdim,xdim,T,refshape}
+
+`ξdim` : reference domain dimension \\
+`xdim` : node coordinate dimension
+"""
+struct CellScalarValues{ξdim,xdim,T<:Real,refshape<:AbstractRefShape} <: CellValues{ξdim,xdim,T,refshape}
     N::Matrix{T}
-    dNdx::Matrix{Vec{ndim,T}}
-    dNdξ::Matrix{Vec{dim,T}}
+    dNdx::Matrix{Vec{xdim,T}}
+    dNdξ::Matrix{Vec{ξdim,T}}
     detJdV::Vector{T}
     M::Matrix{T}
-    dMdξ::Matrix{Vec{dim,T}}
+    dMdξ::Matrix{Vec{ξdim,T}}
     qr_weights::Vector{T}
 end
 
@@ -51,8 +54,12 @@ function CellScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolatio
     CellScalarValues(Float64, quad_rule, func_interpol, geom_interpol)
 end
 
-function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol; ndim=dim) where {dim,T,shape<:AbstractRefShape}
+function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{ξdim,shape}, func_interpol::Interpolation,
+        geom_interpol::Interpolation=func_interpol; xdim=ξdim) where {ξdim,T,shape<:AbstractRefShape}
+    # There is no way to infer xdim from ξdim
+    # In most solid mechanics cases, xdim = ξdim
+    # But in a truss element (line element with nodes in 2D or 3D), 
+    # xdim = 2 or 3, ξdim = 1. Users should pass in proper xdim value in the call site.
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
@@ -60,14 +67,14 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
 
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(func_interpol)
-    N    = fill(zero(T)          * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdx = fill(zero(Vec{ndim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdξ = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
+    N    = fill(zero(T)           * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdx = fill(zero(Vec{xdim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdξ = fill(zero(Vec{ξdim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M    = fill(zero(T)          * T(NaN), n_geom_basefuncs, n_qpoints)
-    dMdξ = fill(zero(Vec{dim,T}) * T(NaN), n_geom_basefuncs, n_qpoints)
+    M    = fill(zero(T)           * T(NaN), n_geom_basefuncs, n_qpoints)
+    dMdξ = fill(zero(Vec{ξdim,T}) * T(NaN), n_geom_basefuncs, n_qpoints)
 
     for (qp, ξ) in enumerate(quad_rule.points)
         for i in 1:n_func_basefuncs
@@ -80,17 +87,19 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
 
     detJdV = fill(T(NaN), n_qpoints)
 
-    CellScalarValues{dim,ndim,T,shape}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
+    CellScalarValues{ξdim,xdim,T,shape}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
 end
 
 # CellVectorValues
-struct CellVectorValues{dim,ndim,T<:Real,refshape<:AbstractRefShape,M} <: CellValues{dim,ndim,T,refshape}
-    N::Matrix{Vec{dim,T}}
-    dNdx::Matrix{Tensor{2,ndim,T,M}}
-    dNdξ::Matrix{Tensor{2,dim,T,M}}
+# ? Vector dimension is assumed to be xdim ?
+# related: https://github.com/KristofferC/JuAFEM.jl/issues/193#issuecomment-502247133
+struct CellVectorValues{ξdim,xdim,T<:Real,refshape<:AbstractRefShape,M} <: CellValues{ξdim,xdim,T,refshape}
+    N::Matrix{Vec{xdim,T}}
+    dNdx::Matrix{Tensor{2,xdim,T,M}}
+    dNdξ::Matrix{Tensor{2,ξdim,T,M}}
     detJdV::Vector{T}
     M::Matrix{T}
-    dMdξ::Matrix{Vec{dim,T}}
+    dMdξ::Matrix{Vec{ξdim,T}}
     qr_weights::Vector{T}
 end
 
@@ -98,36 +107,41 @@ function CellVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolatio
     CellVectorValues(Float64, quad_rule, func_interpol, geom_interpol)
 end
 
-function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol; ndim=dim) where {dim,T,shape<:AbstractRefShape}
+function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{ξdim,shape}, func_interpol::Interpolation,
+        geom_interpol::Interpolation=func_interpol; xdim=ξdim) where {ξdim,T,shape<:AbstractRefShape}
+    # There is no way to infer xdim from ξdim
+    # In most solid mechanics cases, xdim = ξdim
+    # But in a truss element (line element with nodes in 2D or 3D), 
+    # xdim = 2 or 3, ξdim = 1. Users should pass in proper xdim value in the call site.
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
     n_qpoints = length(getweights(quad_rule))
 
     # Function interpolation
-    n_func_basefuncs = getnbasefunctions(func_interpol) * dim
-    N    = fill(zero(Vec{dim,T})      * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdx = fill(zero(Tensor{2,dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdξ = fill(zero(Tensor{2,dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
+    n_func_basefuncs = getnbasefunctions(func_interpol) * xdim
+    N    = fill(zero(Vec{xdim,T})      * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdx = fill(zero(Tensor{2,xdim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
+    # TODO: each entry should be a second order tensor with shape xdim x ξdim
+    dNdξ = fill(zero(Tensor{2,ξdim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
     M    = fill(zero(T)          * T(NaN), n_geom_basefuncs, n_qpoints)
-    dMdξ = fill(zero(Vec{dim,T}) * T(NaN), n_geom_basefuncs, n_qpoints)
+    dMdξ = fill(zero(Vec{ξdim,T}) * T(NaN), n_geom_basefuncs, n_qpoints)
 
     for (qp, ξ) in enumerate(quad_rule.points)
         basefunc_count = 1
         for basefunc in 1:getnbasefunctions(func_interpol)
             dNdξ_temp, N_temp = gradient(ξ -> value(func_interpol, basefunc, ξ), ξ, :all)
-            for comp in 1:dim
-                N_comp = zeros(T, dim)
+            for comp in 1:xdim
+                N_comp = zeros(T, xdim)
                 N_comp[comp] = N_temp
-                N[basefunc_count, qp] = Vec{dim,T}((N_comp...,))
+                N[basefunc_count, qp] = Vec{xdim,T}((N_comp...,))
 
-                dN_comp = zeros(T, dim, dim)
+                dN_comp = zeros(T, ξdim, ξdim)
                 dN_comp[comp, :] = dNdξ_temp
-                dNdξ[basefunc_count, qp] = Tensor{2,dim,T}((dN_comp...,))
+                dNdξ[basefunc_count, qp] = Tensor{2,ξdim,T}((dN_comp...,))
                 basefunc_count += 1
             end
         end
@@ -139,18 +153,18 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
     detJdV = fill(T(NaN), n_qpoints)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    CellVectorValues{dim,ndim,T,shape,MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
+    CellVectorValues{ξdim,xdim,T,shape,MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
 end
 
-function reinit!(cv::CellValues{dim,ndim}, x::AbstractVector{Vec{ndim,T}}) where {dim,ndim,T}
+function reinit!(cv::CellValues{ξdim,xdim}, x::AbstractVector{Vec{xdim,T}}) where {ξdim,xdim,T}
     n_geom_basefuncs = getngeobasefunctions(cv)
     n_func_basefuncs = getn_scalarbasefunctions(cv)
     @assert length(x) == n_geom_basefuncs
-    isa(cv, CellVectorValues) && (n_func_basefuncs *= dim)
+    isa(cv, CellVectorValues) && (n_func_basefuncs *= xdim)
 
     @inbounds for i in 1:length(cv.qr_weights)
         w = cv.qr_weights[i]
-        fecv_J = zero(Tensor{2,ndim})
+        fecv_J = zero(Tensor{2,xdim})
         for j in 1:n_geom_basefuncs
             fecv_J += x[j] ⊗ cv.dMdξ[j, i]
         end

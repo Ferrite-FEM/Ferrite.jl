@@ -40,14 +40,15 @@ For a scalar field, the `FaceScalarValues` type should be used. For vector field
 FaceValues
 
 # FaceScalarValues
-struct FaceScalarValues{dim,ndim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{dim,ndim,T,refshape}
+# ? why 3 here? what if we have a hex cell?
+struct FaceScalarValues{ξdim,xdim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{ξdim,xdim,T,refshape}
     N::Array{T,3}
-    dNdx::Array{Vec{ndim,T},3}
-    dNdξ::Array{Vec{dim,T},3}
+    dNdx::Array{Vec{xdim,T},3}
+    dNdξ::Array{Vec{ξdim,T},3}
     detJdV::Matrix{T}
-    normals::Vector{Vec{dim,T}}
+    normals::Vector{Vec{xdim,T}}
     M::Array{T,3}
-    dMdξ::Array{Vec{dim,T},3}
+    dMdξ::Array{Vec{ξdim,T},3}
     qr_weights::Vector{T}
     current_face::ScalarWrapper{Int}
 end
@@ -58,29 +59,35 @@ function FaceScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolatio
 end
 
 function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol;ndim=dim_qr+1) where {dim_qr,T,shape<:AbstractRefShape}
+        geom_interpol::Interpolation=func_interpol;xdim=dim_qr+1) where {dim_qr,T,shape<:AbstractRefShape}
+    # ξdim = dim_qr + 1 for face integral, where ξdim is the containing cell's dimension
+    # However, there is no way to infer xdim from ξdim
+    # In most solid mechanics cases, xdim = ξdim
+    # But in a truss element (line element with nodes in 2D or 3D), 
+    # xdim = 2 or 3, ξdim = 1. Users should pass in proper xdim value in the call site.
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
     n_qpoints = length(getweights(quad_rule))
-    dim = dim_qr + 1
+    # cell's reference domain dimension
+    ξdim = dim_qr + 1
 
     face_quad_rule = create_face_quad_rule(quad_rule, func_interpol)
     n_faces = length(face_quad_rule)
 
     # Normals
-    normals = zeros(Vec{ndim,T}, n_qpoints)
+    normals = zeros(Vec{xdim,T}, n_qpoints)
 
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(func_interpol)
     N =    fill(zero(T)          * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
-    dNdx = fill(zero(Vec{ndim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
-    dNdξ = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    dNdx = fill(zero(Vec{xdim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    dNdξ = fill(zero(Vec{ξdim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
     M =    fill(zero(T)          * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
-    dMdξ = fill(zero(Vec{dim,T}) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
+    dMdξ = fill(zero(Vec{ξdim,T}) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
 
     for face in 1:n_faces, (qp, ξ) in enumerate(face_quad_rule[face].points)
         for i in 1:n_func_basefuncs
@@ -93,18 +100,20 @@ function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
 
     detJdV = fill(T(NaN), n_qpoints, n_faces)
 
-    FaceScalarValues{dim,ndim,T,shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceScalarValues{ξdim,xdim,T,shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
 end
 
 # FaceVectorValues
-struct FaceVectorValues{dim,ndim,T<:Real,refshape<:AbstractRefShape,M} <: FaceValues{dim,ndim,T,refshape}
-    N::Array{Vec{dim,T},3}
-    dNdx::Array{Tensor{2,ndim,T,M},3}
-    dNdξ::Array{Tensor{2,dim,T,M},3}
+# ? Vector dimension is assumed to be xdim ?
+# related: https://github.com/KristofferC/JuAFEM.jl/issues/193#issuecomment-502247133
+struct FaceVectorValues{ξdim,xdim,T<:Real,refshape<:AbstractRefShape,M} <: FaceValues{ξdim,xdim,T,refshape}
+    N::Array{Vec{xdim,T},3}
+    dNdx::Array{Tensor{2,xdim,T,M},3}
+    dNdξ::Array{Tensor{2,ξdim,T,M},3}
     detJdV::Matrix{T}
-    normals::Vector{Vec{dim,T}}
+    normals::Vector{Vec{xdim,T}}
     M::Array{T,3}
-    dMdξ::Array{Vec{dim,T},3}
+    dMdξ::Array{Vec{ξdim,T},3}
     qr_weights::Vector{T}
     current_face::ScalarWrapper{Int}
 end
@@ -114,42 +123,49 @@ function FaceVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolatio
 end
 
 function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol;ndim=dim_qr+1) where {dim_qr,T,shape<:AbstractRefShape}
+        geom_interpol::Interpolation=func_interpol;xdim=dim_qr+1) where {dim_qr,T,shape<:AbstractRefShape}
+    # ξdim = dim_qr + 1 for face integral, where ξdim is the containing cell's dimension
+    # However, there is no way to infer xdim from ξdim
+    # In most solid mechanics cases, xdim = ξdim
+    # But in a truss element (line element with nodes in 2D or 3D), 
+    # xdim = 2 or 3, ξdim = 1. Users should pass in proper xdim value in the call site.
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
     n_qpoints = length(getweights(quad_rule))
-    dim = dim_qr + 1
+    # cell's reference domain dimension
+    ξdim = dim_qr + 1
 
     face_quad_rule = create_face_quad_rule(quad_rule, func_interpol)
     n_faces = length(face_quad_rule)
 
     # Normals
-    normals = zeros(Vec{dim,T}, n_qpoints)
+    normals = zeros(Vec{xdim,T}, n_qpoints)
 
     # Function interpolation
-    n_func_basefuncs = getnbasefunctions(func_interpol) * dim
-    N    = fill(zero(Vec{dim,T})      * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
-    dNdx = fill(zero(Tensor{2,dim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
-    dNdξ = fill(zero(Tensor{2,dim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    n_func_basefuncs = getnbasefunctions(func_interpol) * xdim
+    N    = fill(zero(Vec{xdim,T})      * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    dNdx = fill(zero(Tensor{2,xdim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    # TODO: each entry should be a second order tensor with shape xdim x ξdim
+    dNdξ = fill(zero(Tensor{2,ξdim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
     M    = fill(zero(T)          * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
-    dMdξ = fill(zero(Vec{dim,T}) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
+    dMdξ = fill(zero(Vec{ξdim,T}) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
 
     for face in 1:n_faces, (qp, ξ) in enumerate(face_quad_rule[face].points)
         basefunc_count = 1
         for basefunc in 1:getnbasefunctions(func_interpol)
             dNdξ_temp, N_temp = gradient(ξ -> value(func_interpol, basefunc, ξ), ξ, :all)
-            for comp in 1:dim
-                N_comp = zeros(T, dim)
+            for comp in 1:xdim
+                N_comp = zeros(T, xdim)
                 N_comp[comp] = N_temp
-                N[basefunc_count, qp, face] = Vec{dim,T}((N_comp...,))
+                N[basefunc_count, qp, face] = Vec{xdim,T}((N_comp...,))
 
-                dN_comp = zeros(T, dim, dim)
+                dN_comp = zeros(T, ξdim, ξdim)
                 dN_comp[comp, :] = dNdξ_temp
-                dNdξ[basefunc_count, qp, face] = Tensor{2,dim,T}((dN_comp...,))
+                dNdξ[basefunc_count, qp, face] = Tensor{2,ξdim,T}((dN_comp...,))
                 basefunc_count += 1
             end
         end
@@ -161,21 +177,21 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
     detJdV = fill(T(NaN), n_qpoints, n_faces)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    FaceVectorValues{dim,ndim,T,shape,MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceVectorValues{ξdim,xdim,T,shape,MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
 end
 
-function reinit!(fv::FaceValues{dim,ndim}, x::AbstractVector{Vec{ndim,T}}, face::Int) where {dim,ndim,T}
+function reinit!(fv::FaceValues{ξdim,xdim}, x::AbstractVector{Vec{xdim,T}}, face::Int) where {ξdim,xdim,T}
     n_geom_basefuncs = getngeobasefunctions(fv)
     n_func_basefuncs = getn_scalarbasefunctions(fv)
     @assert length(x) == n_geom_basefuncs
-    isa(fv, FaceVectorValues) && (n_func_basefuncs *= dim)
+    isa(fv, FaceVectorValues) && (n_func_basefuncs *= xdim)
 
     fv.current_face[] = face
     cb = getcurrentface(fv)
 
     @inbounds for i in 1:length(fv.qr_weights)
         w = fv.qr_weights[i]
-        fefv_J = zero(Tensor{2,ndim})
+        fefv_J = zero(Tensor{2,xdim})
         for j in 1:n_geom_basefuncs
             fefv_J += x[j] ⊗ fv.dMdξ[j, i, cb]
         end
@@ -218,18 +234,18 @@ end
 BCValues(func_interpol::Interpolation, geom_interpol::Interpolation) =
     BCValues(Float64, func_interpol, geom_interpol)
 
-function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_interpol::Interpolation{dim,refshape}) where {T,dim,refshape}
+function BCValues(::Type{T}, func_interpol::Interpolation{ξdim,refshape}, geom_interpol::Interpolation{ξdim,refshape}) where {T,ξdim,refshape}
     # set up quadrature rules for each face with dof-positions
     # (determined by func_interpol) as the quadrature points
     interpolation_coords = reference_coordinates(func_interpol)
 
-    qrs = QuadratureRule{dim,refshape,T}[]
+    qrs = QuadratureRule{ξdim,refshape,T}[]
     for face in faces(func_interpol)
-        dofcoords = Vec{dim,T}[]
+        dofcoords = Vec{ξdim,T}[]
         for facedof in face
             push!(dofcoords, interpolation_coords[facedof])
         end
-        qrf = QuadratureRule{dim,refshape,T}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used
+        qrf = QuadratureRule{ξdim,refshape,T}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used
         push!(qrs, qrf)
     end
 
@@ -248,10 +264,10 @@ function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_in
 end
 
 getnquadpoints(bcv::BCValues) = size(bcv.M, 2)
-function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{dim,T}}) where {dim,T}
+function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{xdim,T}}) where {xdim,T}
     n_base_funcs = size(bcv.M, 1)
     @assert length(xh) == n_base_funcs
-    x = zero(Vec{dim,T})
+    x = zero(Vec{xdim,T})
     face = bcv.current_face[]
     @inbounds for i in 1:n_base_funcs
         x += bcv.M[i,q_point,face] * xh[i] # geometric_value(fe_v, q_point, i) * xh[i]

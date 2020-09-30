@@ -1,7 +1,7 @@
 struct Field
     name::Symbol
     interpolation::Interpolation
-    dim::Int
+    dim::Int # field value dimension
 end
 
 abstract type AbstractDofHandler end
@@ -11,8 +11,8 @@ abstract type AbstractDofHandler end
 
 Construct a `DofHandler` based on the grid `grid`.
 """
-# `dim` : node cooridnate dimension
-struct DofHandler{dim,C,T} <: AbstractDofHandler
+struct DofHandler{xdim,C,T} <: AbstractDofHandler
+    # `xdim` : node cooridnate dimension
     field_names::Vector{Symbol}
     field_dims::Vector{Int}
     # TODO: field_interpolations can probably be better typed: We should at least require
@@ -22,7 +22,7 @@ struct DofHandler{dim,C,T} <: AbstractDofHandler
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
     closed::ScalarWrapper{Bool}
-    grid::Grid{dim,C,T}
+    grid::Grid{xdim,C,T}
     ndofs::ScalarWrapper{Int}
 end
 
@@ -34,7 +34,7 @@ function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
     println(io, "DofHandler")
     println(io, "  Fields:")
     for i in 1:nfields(dh)
-        println(io, "    ", repr(dh.field_names[i]), ", interpolation: ", dh.field_interpolations[i],", dim: ", dh.field_dims[i])
+        println(io, "    ", repr(dh.field_names[i]), ", interpolation: ", dh.field_interpolations[i],", field dim: ", dh.field_dims[i])
     end
     if !isclosed(dh)
         print(io, "  Not closed!")
@@ -93,11 +93,11 @@ function dof_range(dh::AbstractDofHandler, field_name::Symbol)
     return (offset+1):(offset+n_field_dofs)
 end
 
-function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
+function Base.push!(dh::DofHandler, name::Symbol, field_dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
     @assert !isclosed(dh)
     @assert !in(name, dh.field_names)
     push!(dh.field_names, name)
-    push!(dh.field_dims, dim)
+    push!(dh.field_dims, field_dim)
     push!(dh.field_interpolations, ip)
     push!(dh.bc_values, BCValues(ip, default_interpolation(getcelltype(dh.grid))))
     return dh
@@ -119,7 +119,7 @@ function sortface(face::Tuple{Int,Int,Int})
 end
 
 # close the DofHandler and distribute all the dofs
-function close!(dh::DofHandler{dim}, return_dicts=false) where {dim}
+function close!(dh::DofHandler{xdim}, return_dicts=false) where {xdim}
     @assert !isclosed(dh)
 
     # `vertexdict` keeps track of the visited vertices. We store the global vertex
@@ -137,7 +137,7 @@ function close!(dh::DofHandler{dim}, return_dicts=false) where {dim}
     # added to the face; if we encounter the same face again we *always* reverse the order
     # In 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a
     # face (i.e. a surface) is uniquely determined by 3 vertices.
-    facedicts = [Dict{NTuple{dim,Int},Int}() for _ in 1:nfields(dh)]
+    facedicts = [Dict{NTuple{xdim,Int},Int}() for _ in 1:nfields(dh)]
 
     # celldofs are never shared between different cells so there is no need
     # for a `celldict` to keep track of which cells we have added dofs too.
@@ -152,7 +152,7 @@ function close!(dh::DofHandler{dim}, return_dicts=false) where {dim}
     end
 
     # not implemented yet: more than one facedof per face in 3D
-    dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
+    xdim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
 
     nextdof = 1 # next free dof to distribute
     push!(dh.cell_dofs_offset, 1) # dofs for the first cell start at 1
@@ -185,7 +185,7 @@ function close!(dh::DofHandler{dim}, return_dicts=false) where {dim}
                     end
                 end # vertex loop
             end
-            if dim == 3 # edges only in 3D
+            if xdim == 3 # edges only in 3D
                 if interpolation_info.nedgedofs > 0
                     for edge in edges(cell)
                         sedge, dir = sortedge(edge)
@@ -269,7 +269,7 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     return global_dofs
 end
 
-function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler{dim,C,T}, i::Int) where {dim,C,T}
+function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler{xdim,C,T}, i::Int) where {xdim,C,T}
     @assert isclosed(dh)
     @assert length(global_nodes) == nnodes(C)
     for j in 1:nnodes(C) #Currently assuming that DofHandler only has one celltype
@@ -278,7 +278,7 @@ function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler{dim,C,T}, i::Int) 
     return global_nodes
 end
 
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::DofHandler{dim,C,T}, i::Int) where {dim,C,T}
+function cellcoords!(global_coords::Vector{Vec{xdim,T}}, dh::DofHandler{xdim,C,T}, i::Int) where {xdim,C,T}
     @assert isclosed(dh)
     @assert length(global_coords) == nnodes(C)
     for j in 1:nnodes(C) #Currently assuming that DofHandler only has one celltype

@@ -1,7 +1,7 @@
 """
-    Interpolation{dim, ref_shape, order}()
+    Interpolation{ξdim, ref_shape, order}()
 
-Return an `Interpolation` of given dimension `dim`, reference shape
+Return an `Interpolation` of given dimension `ξdim`, reference shape
 (see see [`AbstractRefShape`](@ref)) `ref_shape` and order `order`.
 `order` corresponds to the highest order term in the polynomial.
 The interpolation is used to define shape functions to interpolate
@@ -29,34 +29,34 @@ julia> getnbasefunctions(ip)
 6
 ```
 """
-abstract type Interpolation{dim,shape,order} end
+abstract type Interpolation{ξdim,shape,order} end
 
 """
 Return the dimension of an `Interpolation`
 """
-@inline getdim(ip::Interpolation{dim}) where {dim} = dim
+@inline getdim(ip::Interpolation{ξdim}) where {ξdim} = ξdim
 
 """
 Return the reference shape of an `Interpolation`
 """
-@inline getrefshape(ip::Interpolation{dim,shape}) where {dim,shape} = shape
+@inline getrefshape(ip::Interpolation{ξdim,shape}) where {ξdim,shape} = shape
 
 """
 Return the polynomial order of the `Interpolation`
 """
-@inline getorder(ip::Interpolation{dim,shape,order}) where {dim,shape,order} = order
+@inline getorder(ip::Interpolation{ξdim,shape,order}) where {ξdim,shape,order} = order
 
 """
 Compute the value of the shape functions at a point ξ for a given interpolation
 """
-function value(ip::Interpolation{dim}, ξ::Vec{dim,T}) where {dim,T}
+function value(ip::Interpolation{ξdim}, ξ::Vec{ξdim,T}) where {ξdim,T}
     [value(ip, i, ξ) for i in 1:getnbasefunctions(ip)]
 end
 
 """
 Compute the gradients of the shape functions at a point ξ for a given interpolation
 """
-function derivative(ip::Interpolation{dim}, ξ::Vec{dim,T}) where {dim,T}
+function derivative(ip::Interpolation{ξdim}, ξ::Vec{ξdim,T}) where {ξdim,T}
     [gradient(ξ -> value(ip, i, ξ), ξ) for i in 1:getnbasefunctions(ip)]
 end
 
@@ -84,7 +84,7 @@ end
 
 # The following functions are used to distribute the dofs. Definitions:
 #   vertexdof: dof on a "corner" of the reference shape
-#   facedof: dof in the dim-1 dimension (line in 2D, surface in 3D)
+#   facedof: dof in the ξdim-1 dimension (line in 2D, surface in 3D)
 #   edgedof: dof on a line between 2 vertices (i.e. "corners") (3D only)
 #   celldof: dof that is local to the element
 
@@ -97,13 +97,13 @@ ncelldofs(::Interpolation)   = 0
 ############
 # Lagrange #
 ############
-struct Lagrange{dim,shape,order} <: Interpolation{dim,shape,order} end
+struct Lagrange{ξdim,shape,order} <: Interpolation{ξdim,shape,order} end
 
-getlowerdim(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim-1,shape,order}()
-getlowerorder(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim,shape,order-1}()
+getlowerdim(::Lagrange{ξdim,shape,order}) where {ξdim,shape,order} = Lagrange{ξdim-1,shape,order}()
+getlowerorder(::Lagrange{ξdim,shape,order}) where {ξdim,shape,order} = Lagrange{ξdim,shape,order-1}()
 
 ##################################
-# Lagrange dim 1 RefCube order 1 #
+# Lagrange ξdim 1 RefCube order 1 #
 ##################################
 getnbasefunctions(::Lagrange{1,RefCube,1}) = 2
 nvertexdofs(::Lagrange{1,RefCube,1}) = 1
@@ -123,7 +123,7 @@ function value(ip::Lagrange{1,RefCube,1}, i::Int, ξ::Vec{1})
 end
 
 ##################################
-# Lagrange dim 1 RefCube order 2 #
+# Lagrange ξdim 1 RefCube order 2 #
 ##################################
 getnbasefunctions(::Lagrange{1,RefCube,2}) = 3
 nvertexdofs(::Lagrange{1,RefCube,2}) = 1
@@ -146,7 +146,7 @@ function value(ip::Lagrange{1,RefCube,2}, i::Int, ξ::Vec{1})
 end
 
 ##################################
-# Lagrange dim 2 RefCube order 1 #
+# Lagrange ξdim 2 RefCube order 1 #
 ##################################
 getnbasefunctions(::Lagrange{2,RefCube,1}) = 4
 nvertexdofs(::Lagrange{2,RefCube,1}) = 1
@@ -171,7 +171,7 @@ function value(ip::Lagrange{2,RefCube,1}, i::Int, ξ::Vec{2})
 end
 
 ##################################
-# Lagrange dim 2 RefCube order 2 #
+# Lagrange ξdim 2 RefCube order 2 #
 ##################################
 getnbasefunctions(::Lagrange{2,RefCube,2}) = 9
 nvertexdofs(::Lagrange{2,RefCube,2}) = 1
@@ -208,7 +208,7 @@ function value(ip::Lagrange{2,RefCube,2}, i::Int, ξ::Vec{2})
 end
 
 #########################################
-# Lagrange dim 2 RefTetrahedron order 1 #
+# Lagrange ξdim 2 RefTetrahedron order 1 #
 #########################################
 getnbasefunctions(::Lagrange{2,RefTetrahedron,1}) = 3
 getlowerdim(::Lagrange{2, RefTetrahedron, order}) where {order} = Lagrange{1, RefCube, order}()
@@ -233,7 +233,7 @@ function value(ip::Lagrange{2,RefTetrahedron,1}, i::Int, ξ::Vec{2})
 end
 
 #########################################
-# Lagrange dim 2 RefTetrahedron order 2 #
+# Lagrange ξdim 2 RefTetrahedron order 2 #
 #########################################
 getnbasefunctions(::Lagrange{2,RefTetrahedron,2}) = 6
 nvertexdofs(::Lagrange{2,RefTetrahedron,2}) = 1
@@ -265,7 +265,7 @@ function value(ip::Lagrange{2,RefTetrahedron,2}, i::Int, ξ::Vec{2})
 end
 
 #########################################
-# Lagrange dim 3 RefTetrahedron order 1 #
+# Lagrange ξdim 3 RefTetrahedron order 1 #
 #########################################
 getnbasefunctions(::Lagrange{3,RefTetrahedron,1}) = 4
 nvertexdofs(::Lagrange{3,RefTetrahedron,1}) = 1
@@ -291,7 +291,7 @@ function value(ip::Lagrange{3,RefTetrahedron,1}, i::Int, ξ::Vec{3})
 end
 
 #########################################
-# Lagrange dim 3 RefTetrahedron order 2 #
+# Lagrange ξdim 3 RefTetrahedron order 2 #
 #########################################
 getnbasefunctions(::Lagrange{3,RefTetrahedron,2}) = 10
 nvertexdofs(::Lagrange{3,RefTetrahedron,2}) = 1
@@ -332,7 +332,7 @@ function value(ip::Lagrange{3,RefTetrahedron,2}, i::Int, ξ::Vec{3})
 end
 
 ##################################
-# Lagrange dim 3 RefCube order 1 #
+# Lagrange ξdim 3 RefCube order 1 #
 ##################################
 getnbasefunctions(::Lagrange{3,RefCube,1}) = 8
 nvertexdofs(::Lagrange{3,RefCube,1}) = 1
@@ -368,7 +368,7 @@ end
 ###############
 # Serendipity #
 ###############
-struct Serendipity{dim,shape,order} <: Interpolation{dim,shape,order} end
+struct Serendipity{ξdim,shape,order} <: Interpolation{ξdim,shape,order} end
 
 #####################################
 # Serendipity dim 2 RefCube order 2 #
