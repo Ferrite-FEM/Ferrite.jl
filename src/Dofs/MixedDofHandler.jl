@@ -234,15 +234,15 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims,
             if ip_info.nvertexdofs > 0
                 nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[fi], ip_info.nvertexdofs, nextdof)
             end
-
-            if ip_info.nfacedofs > 0
-                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[fi], ip_info.nfacedofs, nextdof)
-            end
-
-            if ip_info.nedgedofs > 0
+                   
+            if ip_info.nedgedofs > 0 && dim == 3 #Edges only in 3d
                 nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[fi], ip_info.nedgedofs, nextdof)
             end
 
+            if ip_info.nfacedofs > 0 && (ip_info.dim == dim)
+                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[fi], ip_info.nfacedofs, nextdof)
+            end
+            
             if ip_info.ncelldofs > 0
                 nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[fi], ip_info.ncelldofs, nextdof)
             end

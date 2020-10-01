@@ -77,9 +77,10 @@ struct InterpolationInfo
     nedgedofs::Int
     nfacedofs::Int
     ncelldofs::Int
-    InterpolationInfo(interpolation::Interpolation) =
-        new(nvertexdofs(interpolation), nedgedofs(interpolation),
-            nfacedofs(interpolation), ncelldofs(interpolation))
+    dim::Int
+    InterpolationInfo(interpolation::Interpolation{dim}) where {dim} =
+        new(nvertexdofs(interpolation), nedgedofs(interpolation), 
+            nfacedofs(interpolation),   ncelldofs(interpolation), dim)
 end
 
 # The following functions are used to distribute the dofs. Definitions:
@@ -93,6 +94,16 @@ nvertexdofs(::Interpolation) = 0
 nedgedofs(::Interpolation)   = 0
 nfacedofs(::Interpolation)   = 0
 ncelldofs(::Interpolation)   = 0
+
+# Needed for distrubuting dofs on shells correctly (face in 2d is edge in 3d)
+edges(ip::Interpolation{2}) = faces(ip)
+nedgedofs(ip::Interpolation{2}) = nfacedofs(ip)
+
+# Fallbacks for vertices
+vertices(::Interpolation{2,RefCube}) = (1,2,3,4)
+vertices(::Interpolation{3,RefCube}) = (1,2,3,4,5,6,7,8)
+vertices(::Interpolation{2,RefTetrahedron}) = (1,2,3)
+vertices(::Interpolation{3,RefTetrahedron}) = (1,2,3,4)
 
 ############
 # Lagrange #

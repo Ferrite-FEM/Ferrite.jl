@@ -178,7 +178,7 @@ function test_3d_tetrahedrons()
         Tetrahedron((2, 5, 6, 7)),
         Tetrahedron((2, 6, 8, 7)),
         ]
-    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 8)]
+    nodes = [Node(coord) for coord in zeros(Vec{3,Float64}, 8)]
     grid = Grid(cells, nodes)
     field = create_field(name = :u, spatial_dim=3,  field_dim = 3, order = 2, cellshape = RefTetrahedron)
     dh = MixedDofHandler(grid);
