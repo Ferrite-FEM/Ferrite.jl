@@ -29,7 +29,6 @@ const Line3d = Cell{3,2,0}
 const QuadraticLine = Cell{1,3,2}
 
 const Triangle = Cell{2,3,3}
-const Triangle3d = Cell{3,3,1}
 const QuadraticTriangle = Cell{2,6,3}
 
 const Quadrilateral = Cell{2,4,4}
@@ -257,7 +256,7 @@ const celltypes = Dict{DataType, String}(Cell{1,2,2}  => "Line",
                                          Cell{2,3,3}  => "Triangle",
                                          Cell{2,6,3}  => "QuadraticTriangle",
                                          Cell{2,4,4}  => "Quadrilateral",
-                                         Cell{3,4,4}  => "3D-Quadrilateral",
+                                         Cell{3,4,1}  => "3D-Quadrilateral",
                                          Cell{2,9,4}  => "QuadraticQuadrilateral",
                                          Cell{3,4,4}  => "Tetrahedron",
                                          Cell{3,10,4} => "QuadraticTetrahedron",
@@ -286,13 +285,11 @@ edges(c::Union{Hexahedron,QuadraticHexahedron}) = ((c.nodes[1],c.nodes[2]), (c.n
 faces(c::Union{Hexahedron,QuadraticHexahedron}) = ((c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))
 edges(c::Union{Quadrilateral3d}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
 faces(c::Union{Quadrilateral3d}) = ((c.nodes[1],c.nodes[2],c.nodes[3],c.nodes[4]),)
-edges(c::Union{Triangle3d}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]))
-faces(c::Union{Triangle3d}) = ((c.nodes[1],c.nodes[2],c.nodes[3]),)
 
 # random stuff
 default_interpolation(::Union{Type{Line},Type{Line2d},Type{Line3d}}) = Lagrange{1,RefCube,1}()
 default_interpolation(::Type{QuadraticLine}) = Lagrange{1,RefCube,2}()
-default_interpolation(::Union{Type{Triangle},Type{Triangle3d}}) = Lagrange{2,RefTetrahedron,1}()
+default_interpolation(::Type{Triangle}) = Lagrange{2,RefTetrahedron,1}()
 default_interpolation(::Type{QuadraticTriangle}) = Lagrange{2,RefTetrahedron,2}()
 default_interpolation(::Union{Type{Quadrilateral},Type{Quadrilateral3d}}) = Lagrange{2,RefCube,1}()
 default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2,RefCube,2}()
