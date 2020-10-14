@@ -24,15 +24,15 @@ nnodes(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = N
 
 # Typealias for commonly used cells
 const Line  = Cell{1,2,2}
-const Line2d = Cell{2,2,1}
-const Line3d = Cell{3,2,0}
+const Line2D = Cell{2,2,1}
+const Line3D = Cell{3,2,0}
 const QuadraticLine = Cell{1,3,2}
 
 const Triangle = Cell{2,3,3}
 const QuadraticTriangle = Cell{2,6,3}
 
 const Quadrilateral = Cell{2,4,4}
-const Quadrilateral3d = Cell{3,4,1}
+const Quadrilateral3D = Cell{3,4,1}
 const QuadraticQuadrilateral = Cell{2,9,4}
 
 const Tetrahedron = Cell{3,4,4}
@@ -268,30 +268,30 @@ const celltypes = Dict{DataType, String}(Cell{1,2,2}  => "Line",
 # we only need to use the nodes that are vertices.
 # 1D: vertices
 faces(c::Union{Line,QuadraticLine}) = (c.nodes[1], c.nodes[2])
-vertices(c::Union{Line,Line2d,Line3d,QuadraticLine}) = (c.nodes[1], c.nodes[2])
+vertices(c::Union{Line,Line2D,Line3D,QuadraticLine}) = (c.nodes[1], c.nodes[2])
 # 2D: vertices, faces
-faces(c::Line2d) = ((c.nodes[1],c.nodes[2]),) 
+faces(c::Line2D) = ((c.nodes[1],c.nodes[2]),) 
 vertices(c::Union{Triangle,QuadraticTriangle}) = (c.nodes[1], c.nodes[2], c.nodes[3])
 faces(c::Union{Triangle,QuadraticTriangle}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]))
-vertices(c::Union{Quadrilateral,Quadrilateral3d,QuadraticQuadrilateral}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
+vertices(c::Union{Quadrilateral,Quadrilateral3D,QuadraticQuadrilateral}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
 faces(c::Union{Quadrilateral,QuadraticQuadrilateral}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
 # 3D: vertices, edges, faces
-edges(c::Line3d) = ((c.nodes[1],c.nodes[2]),) 
+edges(c::Line3D) = ((c.nodes[1],c.nodes[2]),) 
 vertices(c::Union{Tetrahedron,QuadraticTetrahedron}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
 edges(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]), (c.nodes[1],c.nodes[4]), (c.nodes[2],c.nodes[4]), (c.nodes[3],c.nodes[4]))
 faces(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[2],c.nodes[3]), (c.nodes[1],c.nodes[2],c.nodes[4]), (c.nodes[2],c.nodes[3],c.nodes[4]), (c.nodes[1],c.nodes[4],c.nodes[3]))
 vertices(c::Union{Hexahedron,QuadraticHexahedron}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[5], c.nodes[6], c.nodes[7], c.nodes[8])
 edges(c::Union{Hexahedron,QuadraticHexahedron}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]), (c.nodes[1],c.nodes[5]), (c.nodes[2],c.nodes[6]), (c.nodes[3],c.nodes[7]), (c.nodes[4],c.nodes[8]), (c.nodes[5],c.nodes[6]), (c.nodes[6],c.nodes[7]), (c.nodes[7],c.nodes[8]), (c.nodes[8],c.nodes[5]))
 faces(c::Union{Hexahedron,QuadraticHexahedron}) = ((c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))
-edges(c::Union{Quadrilateral3d}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
-faces(c::Union{Quadrilateral3d}) = ((c.nodes[1],c.nodes[2],c.nodes[3],c.nodes[4]),)
+edges(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
+faces(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2],c.nodes[3],c.nodes[4]),)
 
 # random stuff
-default_interpolation(::Union{Type{Line},Type{Line2d},Type{Line3d}}) = Lagrange{1,RefCube,1}()
+default_interpolation(::Union{Type{Line},Type{Line2D},Type{Line3D}}) = Lagrange{1,RefCube,1}()
 default_interpolation(::Type{QuadraticLine}) = Lagrange{1,RefCube,2}()
 default_interpolation(::Type{Triangle}) = Lagrange{2,RefTetrahedron,1}()
 default_interpolation(::Type{QuadraticTriangle}) = Lagrange{2,RefTetrahedron,2}()
-default_interpolation(::Union{Type{Quadrilateral},Type{Quadrilateral3d}}) = Lagrange{2,RefCube,1}()
+default_interpolation(::Union{Type{Quadrilateral},Type{Quadrilateral3D}}) = Lagrange{2,RefCube,1}()
 default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2,RefCube,2}()
 default_interpolation(::Type{Tetrahedron}) = Lagrange{3,RefTetrahedron,1}()
 default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{3,RefTetrahedron,2}()
