@@ -25,7 +25,7 @@ end # testset
 @testset "Dofs for Line2" begin
 
 nodes = [Node{2,Float64}(Vec(0.0,0.0)), Node{2,Float64}(Vec(1.0,1.0)), Node{2,Float64}(Vec(2.0,0.0))]
-cells = [Line2d((1,2)), Line2d((2,3))]
+cells = [Line2D((1,2)), Line2D((2,3))]
 grid = Grid(cells,nodes)
 
 #2d line with 1st order 1d interpolation
@@ -61,7 +61,7 @@ nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)),
             Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)),
             Node{3,Float64}(Vec(2.0,0.0,0.0)), Node{3,Float64}(Vec(2.0,2.0,0.0))]
 
-cells = [Quadrilateral3d((1,2,3,4)), Quadrilateral3d((2,5,6,3))]
+cells = [Quadrilateral3D((1,2,3,4)), Quadrilateral3D((2,5,6,3))]
 grid = Grid(cells,nodes)
 
 #3d quad with 1st order 2d interpolation
