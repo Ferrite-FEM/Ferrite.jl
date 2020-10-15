@@ -251,7 +251,7 @@ end
 
 const celltypes = Dict{DataType, String}(Cell{1,2,2}  => "Line",
                                          Cell{2,2,2}  => "2D-Line",
-                                         Cell{3,2,2}  => "3D-Line",
+                                         Cell{3,2,0}  => "3D-Line",
                                          Cell{1,3,2}  => "QuadraticLine",
                                          Cell{2,3,3}  => "Triangle",
                                          Cell{2,6,3}  => "QuadraticTriangle",
