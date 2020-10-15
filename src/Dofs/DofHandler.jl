@@ -380,7 +380,9 @@ function renumber!(dh::AbstractDofHandler, perm::AbstractVector{<:Integer})
     return dh
 end
 
-WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler) = vtk_grid(filename, dh.grid)
+function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
+    vtk_grid(filename, dh.grid; compress=compress)
+end
 
 # Exports the FE field `u` to `vtkfile`
 function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector, suffix="")
