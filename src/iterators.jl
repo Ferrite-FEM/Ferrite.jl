@@ -34,12 +34,12 @@ struct CellIterator{dim,C,T}
     celldofs::Vector{Int}
 
     function CellIterator{dim,C,T}(dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}}, cellset::AbstractVector{Int}, flags::UpdateFlags) where {dim,C,T}
-        isconcretetype(C) || _check_same_celltype(grid, cellset)
+        isconcretetype(C) || _check_same_celltype(dh.grid, cellset)
         N = nnodes_per_cell(dh.grid, first(cellset))
         cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim,T}, N)
-        n = ndofs_per_cell(dh)
+        n = ndofs_per_cell(dh, first(cellset))
         celldofs = zeros(Int, n)
         return new{dim,C,T}(flags, dh.grid, cell, nodes, coords, cellset, dh, celldofs)
     end
@@ -61,13 +61,13 @@ CellIterator(dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}}, cellset::
 
 # iterator interface
 function Base.iterate(ci::CellIterator, state = 1)
-    if state > getncells(ci.grid)
+    if state > length(ci.cellset)
         return nothing
     else
         return (reinit!(ci, state), state+1)
     end
 end
-Base.length(ci::CellIterator)  = getncells(ci.grid)
+Base.length(ci::CellIterator)  = length(ci.cellset)
 
 Base.IteratorSize(::Type{T})   where {T<:CellIterator} = Base.HasLength() # this is default in Base
 Base.IteratorEltype(::Type{T}) where {T<:CellIterator} = Base.HasEltype() # this is default in Base
@@ -84,10 +84,10 @@ Base.eltype(::Type{T})         where {T<:CellIterator} = T
 
 function reinit!(ci::CellIterator{dim,C}, i::Int) where {dim,C}
     ci.current_cellid[] = ci.cellset[i]
-    
+
     ci.flags.nodes  && cellnodes!(ci.nodes, ci.dh, ci.current_cellid[])
     ci.flags.coords && cellcoords!(ci.coords, ci.dh, ci.current_cellid[])
-    
+
     if isdefined(ci, :dh) && ci.flags.celldofs # update celldofs
         celldofs!(ci.celldofs, ci.dh, ci.current_cellid[])
     end

@@ -17,14 +17,14 @@ cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 Create a unstructured VTK grid from a `Grid`. Return a `DatasetFile`
 which data can be appended to, see `vtk_point_data` and `vtk_cell_data`.
 """
-function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}) where {dim,C,T}
+function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compress::Bool=true) where {dim,C,T}
     cls = MeshCell[]
     for cell in grid.cells
         celltype = JuAFEM.cell_to_vtkcell(typeof(cell))
         push!(cls, MeshCell(celltype, collect(cell.nodes)))
     end
     coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
-    return vtk_grid(filename, coords, cls)
+    return vtk_grid(filename, coords, cls; compress=compress)
 end
 
 """
@@ -128,10 +128,14 @@ function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler, u::Vector, suffix
                         @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
                         counter += 1
                     end
+                    if field_dim == 2
+                        # paraview requires 3D-data so pad with zero
+                        data[3, node] = 0
+                    end
                 end
             end
         end
-    vtk_point_data(vtkfile, data, string(name, suffix))
+        vtk_point_data(vtkfile, data, string(name, suffix))
     end
 
     return vtkfile
