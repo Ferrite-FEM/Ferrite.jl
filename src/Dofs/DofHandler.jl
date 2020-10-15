@@ -212,7 +212,7 @@ function close!(dh::DofHandler{dim}, return_dicts=false) where {dim}
                     end # edge loop
                 end
             end
-            if interpolation_info.nfacedofs > 0 # nfacedofs(interpolation) > 0
+            if interpolation_info.nfacedofs > 0 && (interpolation_info.dim == dim)
                 for face in faces(cell)
                     sface = sortface(face) # TODO: faces(cell) may as well just return the sorted list
                     @debug println("    face#$sface")
