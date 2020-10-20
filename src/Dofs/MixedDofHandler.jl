@@ -385,6 +385,15 @@ function field_offset(fh::FieldHandler, field_name::Symbol)
     return offset
 end
 
+function JuAFEM.dof_range(fh::FieldHandler, field_name::Symbol)
+    f = JuAFEM.find_field(fh, field_name)
+    offset = JuAFEM.field_offset(fh, field_name)
+    field_interpolation = fh.fields[f].interpolation
+    field_dim = fh.fields[f].dim
+    n_field_dofs = getnbasefunctions(field_interpolation) * field_dim
+    return (offset+1):(offset+n_field_dofs)
+end
+
 find_field(dh::MixedDofHandler, field_name::Symbol) = find_field(first(dh.fieldhandlers), field_name)
 field_offset(dh::MixedDofHandler, field_name::Symbol) = field_offset(first(dh.fieldhandlers), field_name)
 getfieldinterpolation(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].interpolation

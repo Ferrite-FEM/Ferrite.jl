@@ -85,7 +85,7 @@ julia> dof_range(dh, :p)
 10:12
 ```
 """
-function dof_range(dh::AbstractDofHandler, field_name::Symbol)
+function dof_range(dh::DofHandler, field_name::Symbol)
     f = find_field(dh, field_name)
     offset = field_offset(dh, field_name)
     n_field_dofs = getnbasefunctions(dh.field_interpolations[f])::Int * dh.field_dims[f]

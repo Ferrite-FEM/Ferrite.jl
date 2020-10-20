@@ -19,6 +19,13 @@ JuAFEM.renumber!(JuAFEM.renumber!(dh, perm), iperm)
 # dof_range
 @test (@inferred dof_range(dh, :u)) == 1:12
 @test (@inferred dof_range(dh, :p)) == 13:15
+# dof_range for FieldHandler (use with MixedDofHandler)
+ip = Lagrange{2, RefTetrahedron, 1}()
+field_u = Field(:u, ip, 2)
+field_c = Field(:c, ip, 1)
+fh = FieldHandler([field_u, field_c], Set(1:getncells(grid)))
+@test dof_range(fh, :u) == 1:6
+@test dof_range(fh, :c) == 7:9
 
 end # testset
 
