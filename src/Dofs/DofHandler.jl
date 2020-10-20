@@ -85,7 +85,7 @@ julia> dof_range(dh, :p)
 10:12
 ```
 """
-function dof_range(dh::AbstractDofHandler, field_name::Symbol)
+function dof_range(dh::DofHandler, field_name::Symbol)
     f = find_field(dh, field_name)
     offset = field_offset(dh, field_name)
     n_field_dofs = getnbasefunctions(dh.field_interpolations[f])::Int * dh.field_dims[f]
@@ -212,7 +212,7 @@ function close!(dh::DofHandler{dim}, return_dicts=false) where {dim}
                     end # edge loop
                 end
             end
-            if interpolation_info.nfacedofs > 0 # nfacedofs(interpolation) > 0
+            if interpolation_info.nfacedofs > 0 && (interpolation_info.dim == dim)
                 for face in faces(cell)
                     sface = sortface(face) # TODO: faces(cell) may as well just return the sorted list
                     @debug println("    face#$sface")
@@ -380,7 +380,9 @@ function renumber!(dh::AbstractDofHandler, perm::AbstractVector{<:Integer})
     return dh
 end
 
-WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler) = vtk_grid(filename, dh.grid)
+function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
+    vtk_grid(filename, dh.grid; compress=compress)
+end
 
 # Exports the FE field `u` to `vtkfile`
 function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector, suffix="")

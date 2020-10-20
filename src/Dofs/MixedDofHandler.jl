@@ -234,15 +234,15 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims,
             if ip_info.nvertexdofs > 0
                 nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[fi], ip_info.nvertexdofs, nextdof)
             end
-
-            if ip_info.nfacedofs > 0
-                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[fi], ip_info.nfacedofs, nextdof)
-            end
-
-            if ip_info.nedgedofs > 0
+                   
+            if ip_info.nedgedofs > 0 && dim == 3 #Edges only in 3d
                 nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[fi], ip_info.nedgedofs, nextdof)
             end
 
+            if ip_info.nfacedofs > 0 && (ip_info.dim == dim)
+                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[fi], ip_info.nfacedofs, nextdof)
+            end
+            
             if ip_info.ncelldofs > 0
                 nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[fi], ip_info.ncelldofs, nextdof)
             end
@@ -383,6 +383,15 @@ function field_offset(fh::FieldHandler, field_name::Symbol)
         offset += getnbasefunctions(getfieldinterpolations(fh)[i])::Int * getfielddims(fh)[i]
     end
     return offset
+end
+
+function JuAFEM.dof_range(fh::FieldHandler, field_name::Symbol)
+    f = JuAFEM.find_field(fh, field_name)
+    offset = JuAFEM.field_offset(fh, field_name)
+    field_interpolation = fh.fields[f].interpolation
+    field_dim = fh.fields[f].dim
+    n_field_dofs = getnbasefunctions(field_interpolation) * field_dim
+    return (offset+1):(offset+n_field_dofs)
 end
 
 find_field(dh::MixedDofHandler, field_name::Symbol) = find_field(first(dh.fieldhandlers), field_name)
