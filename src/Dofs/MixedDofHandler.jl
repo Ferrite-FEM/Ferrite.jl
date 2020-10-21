@@ -151,7 +151,7 @@ end
 Closes the dofhandler and creates degrees of freedom for each cell.
 Dofs are created in the following order: Go through each FieldHandler in the order they were added. For each field in the FieldHandler, create dofs for the cell. This means that dofs on a particular cell will be numbered according to the fields; first dofs for field 1, then field 2, etc.
 """
-function close!(dh::MixedDofHandler{dim}) where {dim}
+function close!(dh::MixedDofHandler{dim}, return_dicts=false) where {dim}
 
     @assert !JuAFEM.isclosed(dh)
     field_names = JuAFEM.getfieldnames(dh)  # all the fields in the problem
@@ -203,6 +203,9 @@ function close!(dh::MixedDofHandler{dim}) where {dim}
         push!(dh.cell_coords.length, length(cell.nodes))
     end
 
+    if return_dicts
+        return dh, vertexdicts, edgedicts, facedicts
+    end
     return dh
 end
 
@@ -234,7 +237,7 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims,
             if ip_info.nvertexdofs > 0
                 nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[fi], ip_info.nvertexdofs, nextdof)
             end
-                   
+
             if ip_info.nedgedofs > 0 && dim == 3 #Edges only in 3d
                 nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[fi], ip_info.nedgedofs, nextdof)
             end
@@ -242,7 +245,7 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims,
             if ip_info.nfacedofs > 0 && (ip_info.dim == dim)
                 nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[fi], ip_info.nfacedofs, nextdof)
             end
-            
+
             if ip_info.ncelldofs > 0
                 nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[fi], ip_info.ncelldofs, nextdof)
             end
@@ -368,7 +371,7 @@ function _create_sparsity_pattern(dh::MixedDofHandler, sym::Bool)
 end
 
 @inline create_sparsity_pattern(dh::MixedDofHandler) = _create_sparsity_pattern(dh, false)
-
+@inline create_symmetric_sparsity_pattern(dh::MixedDofHandler) = Symmetric(_create_sparsity_pattern(dh, true), :U)
 
 function find_field(fh::FieldHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, getfieldnames(fh))

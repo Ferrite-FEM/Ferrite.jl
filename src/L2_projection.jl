@@ -4,23 +4,26 @@ abstract type AbstractProjector end
 struct L2Projector <: AbstractProjector
     fe_values::CellValues
     M_cholesky # ::SuiteSparse.CHOLMOD.Factor{Float64}
-    dh::DofHandler
+    dh::MixedDofHandler
     set::Vector{Integer}
     node2dof_map
 end
 
-function L2Projector(fe_values::JuAFEM.Values, interp::Interpolation, grid::JuAFEM.AbstractGrid, set=1:getncells(grid))
+function L2Projector(fe_values::JuAFEM.Values, interp::Interpolation,
+    grid::JuAFEM.AbstractGrid, set=1:getncells(grid), fe_values_mass::JuAFEM.Values=fe_values)
 
     dim, T, shape = typeof(fe_values).parameters
 
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
-    dh = DofHandler(grid)
-    push!(dh, :_, 1, interp)
+    dh = MixedDofHandler(grid)
+    field = Field(:_, interp, 1)
+    fh = FieldHandler([field], Set(set))
+    push!(dh, fh)
     _, vertex_dict, _, _ = close!(dh, true)
 
-    M = _assemble_L2_matrix(fe_values, set, dh)  # the "mass" matrix
+    M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
     M_cholesky = cholesky(M)  # TODO maybe have a lazy eval instead of precomputing? / JB
-    return L2Projector(fe_values, M_cholesky, dh, set, vertex_dict[1])
+    return L2Projector(fe_values, M_cholesky, dh, collect(set), vertex_dict[1])
 end
 
 
