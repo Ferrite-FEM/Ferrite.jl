@@ -147,7 +147,7 @@ function _project(vars, proj::L2Projector, M::Integer)
             qp_vars = cell_vars[q_point]
             for i = 1:n
                 v = shape_value(fe_values, q_point, i)
-                fe[i, :] += v * qp_vars[1:M] * dΩ
+                fe[i, :] += v * [qp_vars.data[i] for i=1:M] * dΩ
             end
         end
 
