@@ -83,28 +83,43 @@ function project(
     project_to_nodes=true) where {order,dim,T,M}
 
     projected_vals = _project(vars, proj, M)
-    proj.node2dof_map
     if project_to_nodes
         # NOTE we may have more projected values than verticies in the mesh => not all values are returned
-        num_nodes = length(proj.node2dof_map)
-        reordered_vals = [projected_vals[proj.node2dof_map[node], :] for node in 1:num_nodes]
-        return Tensor{order,dim,T}.(reordered_vals)
+        nnodes = getnnodes(proj.dh.grid)
+        reordered_vals = fill(NaN, nnodes, size(projected_vals, 2))
+        for node = 1:nnodes
+            if haskey(proj.node2dof_map, node)
+                reordered_vals[node, :] = projected_vals[proj.node2dof_map[node], :]
+            end
+        end
+        return Tensor{order,dim,T}.(eachrow(reordered_vals))
     else
         # convert back to the original tensor type
         return Tensor{order,dim,T}.(eachrow(projected_vals))
     end
-
-    return Tensor{order,dim,T}.(eachrow(projected_vals))
 end
 
 function project(
     vars::Array{Array{SymmetricTensor{order,dim,T,M},1},1},
-    proj::L2Projector
-    ) where {order,dim,T,M}
+    proj::L2Projector, project_to_nodes=true) where {order,dim,T,M}
 
     projected_vals = _project(vars, proj, M)
-    # convert back to the original tensor type
-    return SymmetricTensor{order,dim,T}.(eachrow(projected_vals))
+    if project_to_nodes
+        # NOTE we may have more projected values than verticies in the mesh => not all values are returned
+        # num_nodes = length(proj.node2dof_map)
+        nnodes = getnnodes(proj.dh.grid)
+        reordered_vals = fill(NaN, nnodes, size(projected_vals, 2))
+        for node = 1:nnodes
+            if haskey(proj.node2dof_map, node)
+                reordered_vals[node, :] = projected_vals[proj.node2dof_map[node], :]
+            end
+        end
+        # reordered_vals = [projected_vals[proj.node2dof_map[node], :] for node in 1:num_nodes]
+        return SymmetricTensor{order,dim,T}.(eachrow(reordered_vals))
+    else
+        # convert back to the original tensor type
+        return SymmetricTensor{order,dim,T}.(eachrow(projected_vals))
+    end
 end
 
 function _project(vars, proj::L2Projector, M::Integer)
