@@ -6,7 +6,7 @@ struct L2Projector <: AbstractProjector
     M_cholesky # ::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::MixedDofHandler
     set::Vector{Integer}
-    node2dof_map
+    node2dof_map::Dict{Int64, Array{Int64,N} where N}
 end
 
 function L2Projector(fe_values::JuAFEM.Values, interp::Interpolation,
