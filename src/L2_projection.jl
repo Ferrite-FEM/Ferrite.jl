@@ -78,10 +78,11 @@ Makes a L2 projection of tensor values to the nodes of the grid. This is commonl
 If the parameter `project_to_nodes` is true, then the projection returns the values in the order of the mesh nodes. If false, it returns the values corresponding to the degrees of freedom for a scalar field over the domain, which is useful if one wants to interpolate the projected values.
 """
 function project(
-    vars::Array{Array{Tensor{order,dim,T,M},1},1},
+    vars::Array{Array{T,1},1},
     proj::L2Projector;
-    project_to_nodes=true) where {order,dim,T,M}
+    project_to_nodes=true) where {T<:AbstractTensor}
 
+    M = length(vars[1][1].data)
     projected_vals = _project(vars, proj, M)
     if project_to_nodes
         # NOTE we may have more projected values than verticies in the mesh => not all values are returned
@@ -92,33 +93,10 @@ function project(
                 reordered_vals[node, :] = projected_vals[proj.node2dof_map[node], :]
             end
         end
-        return Tensor{order,dim,T}.(eachrow(reordered_vals))
+        return T.(eachrow(reordered_vals))
     else
         # convert back to the original tensor type
-        return Tensor{order,dim,T}.(eachrow(projected_vals))
-    end
-end
-
-function project(
-    vars::Array{Array{SymmetricTensor{order,dim,T,M},1},1},
-    proj::L2Projector, project_to_nodes=true) where {order,dim,T,M}
-
-    projected_vals = _project(vars, proj, M)
-    if project_to_nodes
-        # NOTE we may have more projected values than verticies in the mesh => not all values are returned
-        # num_nodes = length(proj.node2dof_map)
-        nnodes = getnnodes(proj.dh.grid)
-        reordered_vals = fill(NaN, nnodes, size(projected_vals, 2))
-        for node = 1:nnodes
-            if haskey(proj.node2dof_map, node)
-                reordered_vals[node, :] = projected_vals[proj.node2dof_map[node], :]
-            end
-        end
-        # reordered_vals = [projected_vals[proj.node2dof_map[node], :] for node in 1:num_nodes]
-        return SymmetricTensor{order,dim,T}.(eachrow(reordered_vals))
-    else
-        # convert back to the original tensor type
-        return SymmetricTensor{order,dim,T}.(eachrow(projected_vals))
+        return T.(eachrow(projected_vals))
     end
 end
 
