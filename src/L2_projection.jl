@@ -26,6 +26,27 @@ function L2Projector(fe_values::JuAFEM.Values, interp::Interpolation,
     return L2Projector(fe_values, M_cholesky, dh, collect(set), vertex_dict[1])
 end
 
+function L2Projector(qr::QuadratureRule, func_ip::Interpolation,
+    grid::JuAFEM.AbstractGrid, set=1:getncells(grid), qr_mass::QuadratureRule=qr,
+    geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(set)])))
+
+    _check_same_celltype(grid, collect(set)) # TODO this does the right thing, but gives the wrong error message if it fails
+
+    fe_values = CellScalarValues(qr, func_ip, geom_ip)
+    fe_values_mass = CellScalarValues(qr_mass, func_ip, geom_ip)
+
+    # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
+    dh = MixedDofHandler(grid)
+    field = Field(:_, func_ip, 1) # we need to create the field, but the interpolation is not used here
+    fh = FieldHandler([field], Set(set))
+    push!(dh, fh)
+    _, vertex_dict, _, _ = close!(dh, true)
+
+    M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
+    M_cholesky = cholesky(M)  # TODO maybe have a lazy eval instead of precomputing? / JB
+    return L2Projector(fe_values, M_cholesky, dh, collect(set), vertex_dict[1])
+end
+
 
 function _assemble_L2_matrix(fe_values, set, dh)
 
