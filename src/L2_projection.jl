@@ -114,10 +114,10 @@ function project(
                 reordered_vals[node, :] = projected_vals[proj.node2dof_map[node], :]
             end
         end
-        return T.(eachrow(reordered_vals))
+        return T.(Tuple.(eachrow(reordered_vals)))
     else
         # convert back to the original tensor type
-        return T.(eachrow(projected_vals))
+        return T.(Tuple.(eachrow(projected_vals)))
     end
 end
 
