@@ -19,7 +19,7 @@ function L2Projector(fe_values::JuAFEM.Values, interp::Interpolation,
     field = Field(:_, interp, 1)
     fh = FieldHandler([field], Set(set))
     push!(dh, fh)
-    _, vertex_dict, _, _ = close!(dh, true)
+    _, vertex_dict, _, _ = __close!(dh)
 
     M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
     M_cholesky = cholesky(M)  # TODO maybe have a lazy eval instead of precomputing? / JB
@@ -40,7 +40,7 @@ function L2Projector(qr::QuadratureRule, func_ip::Interpolation,
     field = Field(:_, func_ip, 1) # we need to create the field, but the interpolation is not used here
     fh = FieldHandler([field], Set(set))
     push!(dh, fh)
-    _, vertex_dict, _, _ = close!(dh, true)
+    _, vertex_dict, _, _ = __close!(dh)
 
     M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
     M_cholesky = cholesky(M)  # TODO maybe have a lazy eval instead of precomputing? / JB

@@ -151,7 +151,11 @@ end
 Closes the dofhandler and creates degrees of freedom for each cell.
 Dofs are created in the following order: Go through each FieldHandler in the order they were added. For each field in the FieldHandler, create dofs for the cell. This means that dofs on a particular cell will be numbered according to the fields; first dofs for field 1, then field 2, etc.
 """
-function close!(dh::MixedDofHandler{dim}, return_dicts=false) where {dim}
+function close!(dh::MixedDofHandler)
+    dh, _, _, _ = __close!(dh)
+end
+
+function __close!(dh::MixedDofHandler{dim}) where {dim}
 
     @assert !JuAFEM.isclosed(dh)
     field_names = JuAFEM.getfieldnames(dh)  # all the fields in the problem
@@ -203,10 +207,8 @@ function close!(dh::MixedDofHandler{dim}, return_dicts=false) where {dim}
         push!(dh.cell_coords.length, length(cell.nodes))
     end
 
-    if return_dicts
-        return dh, vertexdicts, edgedicts, facedicts
-    end
-    return dh
+    return dh, vertexdicts, edgedicts, facedicts
+
 end
 
 function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
