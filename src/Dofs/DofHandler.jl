@@ -117,8 +117,13 @@ function sortface(face::Tuple{Int,Int,Int})
     return (a, b, c)
 end
 
+function close!(dh::DofHandler)
+    dh, _, _, _ = __close!(dh)
+    return dh
+end
+
 # close the DofHandler and distribute all the dofs
-function close!(dh::DofHandler{dim}, return_dicts=false) where {dim}
+function __close!(dh::DofHandler{dim}) where {dim}
     @assert !isclosed(dh)
 
     # `vertexdict` keeps track of the visited vertices. We store the global vertex
@@ -255,10 +260,8 @@ function close!(dh::DofHandler{dim}, return_dicts=false) where {dim}
     dh.ndofs[] = maximum(dh.cell_dofs)
     dh.closed[] = true
 
-    if return_dicts
-        return dh, vertexdicts, edgedicts, facedicts
-    end
-    return dh
+    return dh, vertexdicts, edgedicts, facedicts
+
 end
 
 function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
