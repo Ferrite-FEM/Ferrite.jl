@@ -119,6 +119,7 @@ end
 
 function close!(dh::DofHandler)
     dh, _, _, _ = __close!(dh)
+    return dh
 end
 
 # close the DofHandler and distribute all the dofs

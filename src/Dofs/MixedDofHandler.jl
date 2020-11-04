@@ -153,6 +153,7 @@ Dofs are created in the following order: Go through each FieldHandler in the ord
 """
 function close!(dh::MixedDofHandler)
     dh, _, _, _ = __close!(dh)
+    return dh
 end
 
 function __close!(dh::MixedDofHandler{dim}) where {dim}
