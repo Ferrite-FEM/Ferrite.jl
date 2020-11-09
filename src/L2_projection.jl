@@ -1,11 +1,11 @@
 
 abstract type AbstractProjector end
 
-struct L2Projector <: AbstractProjector
-    fe_values::CellValues
+struct L2Projector{CV} <: AbstractProjector
+    fe_values::CV
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::MixedDofHandler
-    set::Vector{Integer}
+    set::Vector{Int}
     node2dof_map::Dict{Int64, Array{Int64,N} where N}
 end
 
