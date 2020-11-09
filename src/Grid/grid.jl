@@ -246,7 +246,10 @@ function Base.iterate(c::Vector{Cell{dim,N}}, state = 1) where {dim, N}
 end
 
 function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
-    print(io, "$(typeof(grid)) with $(getncells(grid)) $(celltypes[eltype(grid.cells)]) cells and $(getnnodes(grid)) nodes")
+    print(io, "$(typeof(grid)) with $(getncells(grid)) ")
+    typestrs = sort!(collect(Set(celltypes[typeof(x)] for x in grid.cells)))
+    str = join(io, typestrs, '/')
+    print(io, " cells and $(getnnodes(grid)) nodes")
 end
 
 const celltypes = Dict{DataType, String}(Cell{1,2,2}  => "Line",
@@ -270,13 +273,13 @@ const celltypes = Dict{DataType, String}(Cell{1,2,2}  => "Line",
 faces(c::Union{Line,QuadraticLine}) = (c.nodes[1], c.nodes[2])
 vertices(c::Union{Line,Line2D,Line3D,QuadraticLine}) = (c.nodes[1], c.nodes[2])
 # 2D: vertices, faces
-faces(c::Line2D) = ((c.nodes[1],c.nodes[2]),) 
+faces(c::Line2D) = ((c.nodes[1],c.nodes[2]),)
 vertices(c::Union{Triangle,QuadraticTriangle}) = (c.nodes[1], c.nodes[2], c.nodes[3])
 faces(c::Union{Triangle,QuadraticTriangle}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]))
 vertices(c::Union{Quadrilateral,Quadrilateral3D,QuadraticQuadrilateral}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
 faces(c::Union{Quadrilateral,QuadraticQuadrilateral}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
 # 3D: vertices, edges, faces
-edges(c::Line3D) = ((c.nodes[1],c.nodes[2]),) 
+edges(c::Line3D) = ((c.nodes[1],c.nodes[2]),)
 vertices(c::Union{Tetrahedron,QuadraticTetrahedron}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
 edges(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]), (c.nodes[1],c.nodes[4]), (c.nodes[2],c.nodes[4]), (c.nodes[3],c.nodes[4]))
 faces(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[2],c.nodes[3]), (c.nodes[1],c.nodes[2],c.nodes[4]), (c.nodes[2],c.nodes[3],c.nodes[4]), (c.nodes[1],c.nodes[4],c.nodes[3]))

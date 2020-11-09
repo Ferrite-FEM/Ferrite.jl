@@ -418,6 +418,12 @@ function test_element_order()
 
 end
 
+function test_mixed_grid_show()
+    grid = get_2d_grid()
+    str = sprint(show, MIME("text/plain"), grid)
+    @test occursin("2 Quadrilateral/Triangle cells", str)
+end
+
 @testset "MixedDofHandler" begin
 
     test_1d_bar_beam();
@@ -435,4 +441,5 @@ end
     test_3d_mixed_field_mixed_celltypes();
     test_2_element_heat_eq();
     test_element_order();
+    test_mixed_grid_show()
 end
