@@ -29,45 +29,45 @@ struct CellIterator{dim,C,T}
     current_cellid::ScalarWrapper{Int}
     nodes::Vector{Int}
     coords::Vector{Vec{dim,T}}
-    cellset::Vector{Int}
+    cellset::Union{Vector{Int},Nothing}
     dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}} #Future: remove DofHandler and rename MixedDofHandler->DofHandler
     celldofs::Vector{Int}
 
-    function CellIterator{dim,C,T}(dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}}, cellset::AbstractVector{Int}, flags::UpdateFlags) where {dim,C,T}
+    function CellIterator{dim,C,T}(dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T}
         isconcretetype(C) || _check_same_celltype(dh.grid, cellset)
-        N = nnodes_per_cell(dh.grid, first(cellset))
+        N = nnodes_per_cell(dh.grid, cellset === nothing ? 1 : first(cellset))
         cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim,T}, N)
-        n = ndofs_per_cell(dh, first(cellset))
+        n = ndofs_per_cell(dh, cellset === nothing ? 1 : first(cellset))
         celldofs = zeros(Int, n)
         return new{dim,C,T}(flags, dh.grid, cell, nodes, coords, cellset, dh, celldofs)
     end
 
-    function CellIterator{dim,C,T}(grid::Grid{dim,C,T}, cellset::AbstractVector{Int}, flags::UpdateFlags) where {dim,C,T}
+    function CellIterator{dim,C,T}(grid::Grid{dim,C,T}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T}
         isconcretetype(C) || _check_same_celltype(grid, cellset)
-        N = nnodes_per_cell(grid, first(cellset))
+        N = nnodes_per_cell(grid, cellset === nothing ? 1 : first(cellset))
         cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim,T}, N)
-        return new{dim,C,T}(flags, grid, cell, nodes, coords)
+        return new{dim,C,T}(flags, grid, cell, nodes, coords, cellset)
     end
 end
 
-CellIterator(grid::Grid{dim,C,T}, cellset::AbstractVector{Int}=1:getncells(grid), flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
+CellIterator(grid::Grid{dim,C,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
     CellIterator{dim,C,T}(grid, cellset, flags)
-CellIterator(dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}}, cellset::AbstractVector{Int}=1:getncells(dh.grid), flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
+CellIterator(dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
     CellIterator{dim,C,T}(dh, cellset, flags)
 
 # iterator interface
 function Base.iterate(ci::CellIterator, state = 1)
-    if state > length(ci.cellset)
+    if state > (ci.cellset === nothing ? getncells(ci.grid) : length(ci.cellset))
         return nothing
     else
         return (reinit!(ci, state), state+1)
     end
 end
-Base.length(ci::CellIterator)  = length(ci.cellset)
+Base.length(ci::CellIterator)  = ci.cellset === nothing ? length(ci.grid.cells) : length(ci.cellset)
 
 Base.IteratorSize(::Type{T})   where {T<:CellIterator} = Base.HasLength() # this is default in Base
 Base.IteratorEltype(::Type{T}) where {T<:CellIterator} = Base.HasEltype() # this is default in Base
@@ -83,10 +83,22 @@ Base.eltype(::Type{T})         where {T<:CellIterator} = T
 @inline celldofs(ci::CellIterator) = ci.celldofs
 
 function reinit!(ci::CellIterator{dim,C}, i::Int) where {dim,C}
-    ci.current_cellid[] = ci.cellset[i]
+    ci.current_cellid[] = ci.cellset === nothing ? i : i.cellset[i]
 
-    ci.flags.nodes  && cellnodes!(ci.nodes, ci.dh, ci.current_cellid[])
-    ci.flags.coords && cellcoords!(ci.coords, ci.dh, ci.current_cellid[])
+    if ci.flags.nodes
+        if isdefined(ci, :dh) && ci.dh isa MixedDofHandler
+            cellnodes!(ci.nodes, ci.dh, ci.current_cellid[])
+        else
+            cellnodes!(ci.nodes, ci.grid, ci.current_cellid[])
+        end
+    end
+    if ci.flags.coords
+        if isdefined(ci, :dh) && ci.dh isa MixedDofHandler
+            cellcoords!(ci.coords, ci.dh, ci.current_cellid[])
+        else
+            cellcoords!(ci.coords, ci.grid, ci.current_cellid[])
+        end
+    end
 
     if isdefined(ci, :dh) && ci.flags.celldofs # update celldofs
         celldofs!(ci.celldofs, ci.dh, ci.current_cellid[])

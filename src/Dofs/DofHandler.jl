@@ -271,24 +271,23 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     return global_dofs
 end
 
-function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler{dim,C,T}, i::Int) where {dim,C,T}
-    @assert isclosed(dh)
+function cellnodes!(global_nodes::Vector{Int}, grid::Grid{dim,C}, i::Int) where {dim,C}
     @assert length(global_nodes) == nnodes(C)
-    for j in 1:nnodes(C) #Currently assuming that DofHandler only has one celltype
-        global_nodes[j] = dh.grid.cells[i].nodes[j]
+    for j in 1:nnodes(C) # Currently assuming that DofHandler only has one celltype
+        global_nodes[j] = grid.cells[i].nodes[j]
     end
     return global_nodes
 end
 
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::DofHandler{dim,C,T}, i::Int) where {dim,C,T}
-    @assert isclosed(dh)
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::Grid{dim,C}, i::Int) where {dim,C,T}
     @assert length(global_coords) == nnodes(C)
-    for j in 1:nnodes(C) #Currently assuming that DofHandler only has one celltype
-        nodeid = dh.grid.cells[i].nodes[j]
-        global_coords[j] = dh.grid.nodes[nodeid].x
+    for j in 1:nnodes(C) # Currently assuming that DofHandler only has one celltype
+        nodeid = grid.cells[i].nodes[j]
+        global_coords[j] = grid.nodes[nodeid].x
     end
     return global_coords
 end
+cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, dh.grid, i)
 
 function celldofs(dh::DofHandler, i::Int)
     @assert isclosed(dh)

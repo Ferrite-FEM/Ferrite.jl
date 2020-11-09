@@ -106,7 +106,7 @@ end
     addcellset!(grid, "cell_set", [1]);
     node_set = Set(1:getnnodes(grid))
     addnodeset!(grid, "node_set", node_set)
-    
+
     @test getnodesets(grid) == Dict("node_set" => node_set)
 
     @test getnodes(grid, [1]) == [getnodes(grid, 1)] # untested
@@ -130,4 +130,15 @@ end
     # Can we test this in a better way? The set makes the order random.
     @test length(compute_vertex_values(grid, "node_set", f)) == 9
 
+    # CellIterator on a grid without DofHandler
+    grid = generate_grid(Triangle, (4,4))
+    n = 0
+    ci = CellIterator(grid)
+    @test length(ci) == getncells(grid)
+    for c in ci
+        getcoordinates(c)
+        getnodes(c)
+        n += cellid(c)
+    end
+    @test n == div(getncells(grid)*(getncells(grid) + 1), 2)
 end
