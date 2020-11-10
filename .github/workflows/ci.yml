@@ -24,5 +24,7 @@ jobs:
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
         if: ${{ matrix.julia-version == '1' && matrix.os == 'ubuntu-latest' }}
+      - uses: codecov/codecov-action@v1
+        if: ${{ matrix.julia-version == '1' && matrix.os == 'ubuntu-latest' }}
         with:
           file: lcov.info
