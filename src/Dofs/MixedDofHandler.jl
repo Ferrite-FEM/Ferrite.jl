@@ -151,7 +151,12 @@ end
 Closes the dofhandler and creates degrees of freedom for each cell.
 Dofs are created in the following order: Go through each FieldHandler in the order they were added. For each field in the FieldHandler, create dofs for the cell. This means that dofs on a particular cell will be numbered according to the fields; first dofs for field 1, then field 2, etc.
 """
-function close!(dh::MixedDofHandler{dim}) where {dim}
+function close!(dh::MixedDofHandler)
+    dh, _, _, _ = __close!(dh)
+    return dh
+end
+
+function __close!(dh::MixedDofHandler{dim}) where {dim}
 
     @assert !JuAFEM.isclosed(dh)
     field_names = JuAFEM.getfieldnames(dh)  # all the fields in the problem
@@ -203,7 +208,8 @@ function close!(dh::MixedDofHandler{dim}) where {dim}
         push!(dh.cell_coords.length, length(cell.nodes))
     end
 
-    return dh
+    return dh, vertexdicts, edgedicts, facedicts
+
 end
 
 function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
@@ -235,12 +241,12 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims,
                 nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[fi], ip_info.nvertexdofs, nextdof)
             end
 
-            if ip_info.nfacedofs > 0
-                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[fi], ip_info.nfacedofs, nextdof)
+            if ip_info.nedgedofs > 0 && dim == 3 #Edges only in 3d
+                nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[fi], ip_info.nedgedofs, nextdof)
             end
 
-            if ip_info.nedgedofs > 0
-                nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[fi], ip_info.nedgedofs, nextdof)
+            if ip_info.nfacedofs > 0 && (ip_info.dim == dim)
+                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[fi], ip_info.nfacedofs, nextdof)
             end
 
             if ip_info.ncelldofs > 0
@@ -368,7 +374,7 @@ function _create_sparsity_pattern(dh::MixedDofHandler, sym::Bool)
 end
 
 @inline create_sparsity_pattern(dh::MixedDofHandler) = _create_sparsity_pattern(dh, false)
-
+@inline create_symmetric_sparsity_pattern(dh::MixedDofHandler) = Symmetric(_create_sparsity_pattern(dh, true), :U)
 
 function find_field(fh::FieldHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, getfieldnames(fh))
@@ -383,6 +389,15 @@ function field_offset(fh::FieldHandler, field_name::Symbol)
         offset += getnbasefunctions(getfieldinterpolations(fh)[i])::Int * getfielddims(fh)[i]
     end
     return offset
+end
+
+function JuAFEM.dof_range(fh::FieldHandler, field_name::Symbol)
+    f = JuAFEM.find_field(fh, field_name)
+    offset = JuAFEM.field_offset(fh, field_name)
+    field_interpolation = fh.fields[f].interpolation
+    field_dim = fh.fields[f].dim
+    n_field_dofs = getnbasefunctions(field_interpolation) * field_dim
+    return (offset+1):(offset+n_field_dofs)
 end
 
 find_field(dh::MixedDofHandler, field_name::Symbol) = find_field(first(dh.fieldhandlers), field_name)

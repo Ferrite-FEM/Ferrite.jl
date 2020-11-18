@@ -178,7 +178,7 @@ function test_3d_tetrahedrons()
         Tetrahedron((2, 5, 6, 7)),
         Tetrahedron((2, 6, 8, 7)),
         ]
-    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 8)]
+    nodes = [Node(coord) for coord in zeros(Vec{3,Float64}, 8)]
     grid = Grid(cells, nodes)
     field = create_field(name = :u, spatial_dim=3,  field_dim = 3, order = 2, cellshape = RefTetrahedron)
     dh = MixedDofHandler(grid);
@@ -383,7 +383,7 @@ function test_2_element_heat_eq()
         # vtk_point_data(vtk, ch)  #FIXME
     end
     sha = bytes2hex(open(SHA.sha1, gridfilename*".vtu"))
-    @test sha == "cf19a5920834dc265889528151a4c8246ad366cb"
+    @test sha == "e96732c000b0b385db7444f002461468b60b3b2c"
 
 end
 
@@ -418,6 +418,12 @@ function test_element_order()
 
 end
 
+function test_mixed_grid_show()
+    grid = get_2d_grid()
+    str = sprint(show, MIME("text/plain"), grid)
+    @test occursin("2 Quadrilateral/Triangle cells", str)
+end
+
 @testset "MixedDofHandler" begin
 
     test_1d_bar_beam();
@@ -435,4 +441,5 @@ end
     test_3d_mixed_field_mixed_celltypes();
     test_2_element_heat_eq();
     test_element_order();
+    test_mixed_grid_show()
 end

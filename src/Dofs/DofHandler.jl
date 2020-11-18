@@ -85,7 +85,7 @@ julia> dof_range(dh, :p)
 10:12
 ```
 """
-function dof_range(dh::AbstractDofHandler, field_name::Symbol)
+function dof_range(dh::DofHandler, field_name::Symbol)
     f = find_field(dh, field_name)
     offset = field_offset(dh, field_name)
     n_field_dofs = getnbasefunctions(dh.field_interpolations[f])::Int * dh.field_dims[f]
@@ -117,8 +117,13 @@ function sortface(face::Tuple{Int,Int,Int})
     return (a, b, c)
 end
 
+function close!(dh::DofHandler)
+    dh, _, _, _ = __close!(dh)
+    return dh
+end
+
 # close the DofHandler and distribute all the dofs
-function close!(dh::DofHandler{dim}, return_dicts=false) where {dim}
+function __close!(dh::DofHandler{dim}) where {dim}
     @assert !isclosed(dh)
 
     # `vertexdict` keeps track of the visited vertices. We store the global vertex
@@ -212,7 +217,7 @@ function close!(dh::DofHandler{dim}, return_dicts=false) where {dim}
                     end # edge loop
                 end
             end
-            if interpolation_info.nfacedofs > 0 # nfacedofs(interpolation) > 0
+            if interpolation_info.nfacedofs > 0 && (interpolation_info.dim == dim)
                 for face in faces(cell)
                     sface = sortface(face) # TODO: faces(cell) may as well just return the sorted list
                     @debug println("    face#$sface")
@@ -255,10 +260,8 @@ function close!(dh::DofHandler{dim}, return_dicts=false) where {dim}
     dh.ndofs[] = maximum(dh.cell_dofs)
     dh.closed[] = true
 
-    if return_dicts
-        return dh, vertexdicts, edgedicts, facedicts
-    end
-    return dh
+    return dh, vertexdicts, edgedicts, facedicts
+
 end
 
 function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
@@ -268,24 +271,23 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     return global_dofs
 end
 
-function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler{dim,C,T}, i::Int) where {dim,C,T}
-    @assert isclosed(dh)
+function cellnodes!(global_nodes::Vector{Int}, grid::Grid{dim,C}, i::Int) where {dim,C}
     @assert length(global_nodes) == nnodes(C)
-    for j in 1:nnodes(C) #Currently assuming that DofHandler only has one celltype
-        global_nodes[j] = dh.grid.cells[i].nodes[j]
+    for j in 1:nnodes(C) # Currently assuming that DofHandler only has one celltype
+        global_nodes[j] = grid.cells[i].nodes[j]
     end
     return global_nodes
 end
 
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::DofHandler{dim,C,T}, i::Int) where {dim,C,T}
-    @assert isclosed(dh)
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::Grid{dim,C}, i::Int) where {dim,C,T}
     @assert length(global_coords) == nnodes(C)
-    for j in 1:nnodes(C) #Currently assuming that DofHandler only has one celltype
-        nodeid = dh.grid.cells[i].nodes[j]
-        global_coords[j] = dh.grid.nodes[nodeid].x
+    for j in 1:nnodes(C) # Currently assuming that DofHandler only has one celltype
+        nodeid = grid.cells[i].nodes[j]
+        global_coords[j] = grid.nodes[nodeid].x
     end
     return global_coords
 end
+cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, dh.grid, i)
 
 function celldofs(dh::DofHandler, i::Int)
     @assert isclosed(dh)
@@ -380,7 +382,9 @@ function renumber!(dh::AbstractDofHandler, perm::AbstractVector{<:Integer})
     return dh
 end
 
-WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler) = vtk_grid(filename, dh.grid)
+function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
+    vtk_grid(filename, dh.grid; compress=compress)
+end
 
 # Exports the FE field `u` to `vtkfile`
 function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector, suffix="")
