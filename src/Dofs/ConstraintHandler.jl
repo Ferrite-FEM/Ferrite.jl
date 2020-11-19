@@ -60,7 +60,7 @@ struct ConstraintHandler{DH<:AbstractDofHandler,T}
 end
 
 """
-	RHSData
+    RHSData
 
 Stores the constrained columns and mean of the diagonal of stiffness matrix `A`.
 """
@@ -70,7 +70,7 @@ struct RHSData{T}
 end
 
 """
-	get_rhs_data
+    get_rhs_data(ch::ConstraintHandler, A::SparseMatrixCSC) -> RHSData
 
 Returns the needed RHSData for apply_rhs!
 """
@@ -81,15 +81,14 @@ function get_rhs_data(ch::ConstraintHandler, A::SparseMatrixCSC)
 end
 
 """
-	apply_rhs!
+    apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)
 
-Applies the boundary condition to the rhs vector without modifying stiffness matrix `A`
+Applies the boundary condition to the rhs vector without modifying stiffness matrix
 """
-function apply_rhs!(data::RHSData, f::AbstractVector,
-					ch::ConstraintHandler, applyzero::Bool=false)	
-	K = data.constrained_columns
+function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)	
+    K = data.constrained_columns
     @assert length(f) == 0 || length(f) == size(K, 1)
-    @boundscheck checkbounds(K, ch.prescribed_dofs, ch.prescribed_dofs)
+    #@boundscheck checkbounds(K, ch.prescribed_dofs, ch.prescribed_dofs)
     @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
 
 	m = data.m
@@ -105,7 +104,7 @@ function apply_rhs!(data::RHSData, f::AbstractVector,
             vz = applyzero ? zero(eltype(f)) : v
             f[d] = vz * m
         end
-	end
+    end
 end
 
 function ConstraintHandler(dh::AbstractDofHandler)
