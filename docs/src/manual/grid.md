@@ -16,7 +16,7 @@ Consider the following 2D mesh:
 
 ![global mesh](./assets/global_mesh.svg)
 
-The grid's cells can be described in the following way
+The cells of the grid can be described in the following way
 
 ```julia
 julia> elements = [
