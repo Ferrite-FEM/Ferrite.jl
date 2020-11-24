@@ -55,8 +55,6 @@ julia> edges = [
            (3,6),
            (6,9)
        ]
-
-julia> interpolation = Lagrange{2, RefTetrahedron, 1}()
 ```
 
 The local ID can be constructed based on elements, corresponding edges and chosen interpolation, since the face ordering is interpolation dependent.
@@ -80,6 +78,8 @@ julia> function compute_faceset(elements, edges, ip::Interpolation{dim}) where {
        
            return faces
        end
+
+julia> interpolation = Lagrange{2, RefTetrahedron, 1}()
 
 julia> compute_faceset(elements, edges, interpolation)
 Set{Tuple{Int64,Int64}} with 2 elements:
