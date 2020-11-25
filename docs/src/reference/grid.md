@@ -17,7 +17,7 @@ getcells
 getncells
 getnodes
 getnnodes
-nnodes_per_cell
+JuAFEM.nnodes_per_cell
 getcellset
 getnodeset
 getfaceset
