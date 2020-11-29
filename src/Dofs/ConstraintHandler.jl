@@ -76,19 +76,18 @@ Returns the needed RHSData for apply_rhs!
 """
 function get_rhs_data(ch::ConstraintHandler, A::SparseMatrixCSC)
     m = meandiag(A)
-    Aa = A[:, ch.prescribed_dofs]
-    return RHSData(m, Aa)
+    constrained_columns = A[:, ch.prescribed_dofs]
+    return RHSData(m, constrained_columns)
 end
 
 """
     apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)
 
-Applies the boundary condition to the rhs vector without modifying stiffness matrix
+Applies the boundary condition to the right-hand-side vector without modifying the stiffness matrix
 """
 function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)	
     K = data.constrained_columns
     @assert length(f) == 0 || length(f) == size(K, 1)
-    #@boundscheck checkbounds(K, ch.prescribed_dofs, ch.prescribed_dofs)
     @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
 
 	m = data.m

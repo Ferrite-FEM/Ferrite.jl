@@ -21,7 +21,7 @@ function test_apply_rhs()
     close!(ch)
     update!(ch, 0.0);
     
-    function doassemble(
+    function doassemble!(
         cellvalues::CellScalarValues{dim},
         K::SparseMatrixCSC,
         dh::DofHandler,
@@ -59,15 +59,16 @@ function test_apply_rhs()
         return K, f
     end
     
-    K, f = doassemble(cellvalues, K, dh)
+    K, f = doassemble!(cellvalues, K, dh)
     A = create_sparsity_pattern(dh)
-    A, g = doassemble(cellvalues, A, dh)
+    A, g = doassemble!(cellvalues, A, dh)
     rhsdata = get_rhs_data(ch, A)
     
     apply!(K, f, ch)
+    apply!(A, ch) # need to apply bcs to A once
     apply_rhs!(rhsdata, g, ch)
     u₁ = K \ f
-    u₂ = K \ g
+    u₂ = A \ g
     return u₁, u₂
 end
     
