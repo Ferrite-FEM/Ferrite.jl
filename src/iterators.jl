@@ -30,10 +30,10 @@ struct CellIterator{dim,C,T}
     nodes::Vector{Int}
     coords::Vector{Vec{dim,T}}
     cellset::Union{Vector{Int},Nothing}
-    dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}} #Future: remove DofHandler and rename MixedDofHandler->DofHandler
+    dh::Union{DofHandler{Grid{dim,C,T},T}, MixedDofHandler{dim,C,T}} #Future: remove DofHandler and rename MixedDofHandler->DofHandler
     celldofs::Vector{Int}
 
-    function CellIterator{dim,C,T}(dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T}
+    function CellIterator{dim,C,T}(dh::Union{DofHandler{Grid{dim,C,T},T}, MixedDofHandler{dim,C,T}}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T}
         isconcretetype(C) || _check_same_celltype(dh.grid, cellset)
         N = nnodes_per_cell(dh.grid, cellset === nothing ? 1 : first(cellset))
         cell = ScalarWrapper(0)
@@ -56,7 +56,7 @@ end
 
 CellIterator(grid::Grid{dim,C,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
     CellIterator{dim,C,T}(grid, cellset, flags)
-CellIterator(dh::Union{DofHandler{dim,C,T}, MixedDofHandler{dim,C,T}}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
+CellIterator(dh::Union{DofHandler{Grid{dim,C,T},T}, MixedDofHandler{dim,C,T}}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
     CellIterator{dim,C,T}(dh, cellset, flags)
 
 # iterator interface
