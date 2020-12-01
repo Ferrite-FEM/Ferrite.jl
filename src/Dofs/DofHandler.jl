@@ -11,7 +11,7 @@ abstract type AbstractDofHandler end
 
 Construct a `DofHandler` based on the grid `grid`.
 """
-struct DofHandler{dim,C,T} <: AbstractDofHandler
+struct DofHandler{dim,C,T,G <: AbstractGrid} <: AbstractDofHandler
     field_names::Vector{Symbol}
     field_dims::Vector{Int}
     # TODO: field_interpolations can probably be better typed: We should at least require
@@ -21,12 +21,12 @@ struct DofHandler{dim,C,T} <: AbstractDofHandler
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
     closed::ScalarWrapper{Bool}
-    grid::Grid{dim,C,T}
+    grid::G
     ndofs::ScalarWrapper{Int}
 end
 
-function DofHandler(grid::Grid)
-    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
+function DofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
+    DofHandler{dim,C,T,Grid}(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
