@@ -374,6 +374,52 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
     end
 end
 
+function apply_multiple_rhs!(KK::Union{SparseMatrixCSC,Symmetric}, F::Vector{<:AbstractVector}, ch::ConstraintHandler, applyzero::Bool=false;
+                strategy::ApplyStrategy=APPLY_TRANSPOSE)
+    K = isa(KK, Symmetric) ? KK.data : KK
+    @boundscheck checkbounds(K, ch.prescribed_dofs, ch.prescribed_dofs)
+    for f in F
+        @assert length(f) == 0 || length(f) == size(K, 1)
+        @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
+    end
+    m = meandiag(K) # Use the mean of the diagonal here to not ruin things for iterative solver
+    @inbounds for i in 1:length(ch.values)
+        d = ch.prescribed_dofs[i]
+        v = ch.values[i]
+
+        if !applyzero && v != 0
+            for j in nzrange(K, d)
+                for f in F
+                    f[K.rowval[j]] -= v * K.nzval[j]
+                end
+            end
+        end
+    end
+    zero_out_columns!(K, ch.prescribed_dofs)
+    if strategy == APPLY_TRANSPOSE
+        K′ = copy(K)
+        transpose!(K′, K)
+        zero_out_columns!(K′, ch.prescribed_dofs)
+        transpose!(K, K′)
+    elseif strategy == APPLY_INPLACE
+        K[ch.prescribed_dofs, :] = 0
+    else
+        error("Unknown apply strategy")
+    end
+    @inbounds for i in 1:length(ch.values)
+        d = ch.prescribed_dofs[i]
+        v = ch.values[i]
+        K[d, d] = m
+        # We will only enter here with an empty f vector if we have assured that v == 0 for all dofs
+        for f in F
+            if length(f) != 0
+                vz = applyzero ? zero(eltype(f)) : v
+                f[d] = vz * m
+            end
+        end
+    end
+end
+
 # columns need to be stored entries, this is not checked
 function zero_out_columns!(K, dofs::Vector{Int}) # can be removed in 0.7 with #24711 merged
     @debug @assert issorted(dofs)

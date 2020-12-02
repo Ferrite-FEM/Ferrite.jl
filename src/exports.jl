@@ -99,6 +99,7 @@ export
     update!,
     apply!,
     apply_zero!,
+    apply_multiple_rhs!,
     add!,
     free_dofs,
 
