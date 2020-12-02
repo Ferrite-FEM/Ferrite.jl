@@ -95,7 +95,7 @@ function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, app
         d = ch.prescribed_dofs[i]
         v = ch.values[i]
         if !applyzero && v != 0
-            for j in nzrange(K, d)
+            for j in nzrange(K, i)
                 f[K.rowval[j]] -= v * K.nzval[j]
             end
         end
