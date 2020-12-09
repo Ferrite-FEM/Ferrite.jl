@@ -26,18 +26,18 @@ function Base.getindex(elvec::CellVector, el::Int)
     return elvec.values[offset:offset + elvec.length[el]-1]
  end
 
-struct MixedDofHandler{dim,C,T} <: JuAFEM.AbstractDofHandler
+struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: JuAFEM.AbstractDofHandler 
     fieldhandlers::Vector{FieldHandler}
     cell_dofs::CellVector{Int}
     cell_nodes::CellVector{Int}
     cell_coords::CellVector{Vec{dim,T}}
     closed::ScalarWrapper{Bool}
-    grid::Grid{dim,C,T}
+    grid::G
     ndofs::ScalarWrapper{Int}
 end
 
 function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
-    MixedDofHandler{dim,C,T}(FieldHandler[], CellVector(Int[],Int[],Int[]), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), JuAFEM.ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
+    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],Int[],Int[]), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), JuAFEM.ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
 end
 
 getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
