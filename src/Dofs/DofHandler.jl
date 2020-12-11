@@ -281,6 +281,18 @@ function cellnodes!(global_nodes::Vector{Int}, grid::Grid{dim,C}, i::Int) where 
     return global_nodes
 end
 
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid, i::Int) where {dim, T}
+    @assert dim == getdim(grid)
+    C = getcelltype(grid)
+    @assert length(global_coords) == nnodes(C)
+    #for j in 1:nnodes(C)
+    #    nodeid = getcells(grid, i).nodes[j]
+    #    global_coords[j] = getnodes(grid, nodeid).x
+    #end
+    global_coords = getcoordinates(grid, i)
+    return global_coords
+end
+
 function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::Grid{dim,C}, i::Int) where {dim,C,T}
     @assert length(global_coords) == nnodes(C)
     for j in 1:nnodes(C) # Currently assuming that DofHandler only has one celltype
