@@ -123,7 +123,9 @@ function close!(dh::DofHandler)
 end
 
 # close the DofHandler and distribute all the dofs
-function __close!(dh::DofHandler{Grid{dim, C, T}, T}) where {dim, C, T}
+function __close!(dh::DofHandler{G, T}) where {G<:AbstractGrid,T}
+    dim = getdim(dh.grid)
+    C = getcelltype(dh.grid)
     @assert !isclosed(dh)
 
     # `vertexdict` keeps track of the visited vertices. We store the global vertex
