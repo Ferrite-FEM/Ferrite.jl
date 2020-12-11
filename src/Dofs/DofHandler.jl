@@ -281,6 +281,16 @@ function cellnodes!(global_nodes::Vector{Int}, grid::Grid{dim,C}, i::Int) where 
     return global_nodes
 end
 
+function cellnodes!(global_nodes::Vector{Int}, grid::G, i::Int) where {G<:AbstractGrid}
+    C = getcelltype(grid)
+    dim = getdim(grid)
+    @assert length(global_nodes) == nnodes(C)
+    for j in 1:nnodes(C)
+        global_nodes[j] = getcells(grid, i).nodes[j] ##TODO getnodes(::AbstractCell)
+    end 
+    return global_nodes
+end
+
 function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid, i::Int) where {dim, T}
     @assert dim == getdim(grid)
     C = getcelltype(grid)
@@ -289,7 +299,7 @@ function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid, i::I
     #    nodeid = getcells(grid, i).nodes[j]
     #    global_coords[j] = getnodes(grid, nodeid).x
     #end
-    global_coords = getcoordinates(grid, i)
+    global_coords .= getcoordinates(grid, i)
     return global_coords
 end
 
