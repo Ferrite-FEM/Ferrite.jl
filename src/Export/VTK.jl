@@ -2,7 +2,8 @@ cell_to_vtkcell(::Type{Line}) = VTKCellTypes.VTK_LINE
 cell_to_vtkcell(::Type{QuadraticLine}) = VTKCellTypes.VTK_QUADRATIC_EDGE
 
 cell_to_vtkcell(::Type{Quadrilateral}) = VTKCellTypes.VTK_QUAD
-cell_to_vtkcell(::Type{QuadraticQuadrilateral}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
+cell_to_vtkcell(::Type{C}) where C<:AbstractCell{2,4,4} = VTKCellTypes.VTK_QUAD
+ cell_to_vtkcell(::Type{QuadraticQuadrilateral}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD 
 cell_to_vtkcell(::Type{Triangle}) = VTKCellTypes.VTK_TRIANGLE
 cell_to_vtkcell(::Type{QuadraticTriangle}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
 cell_to_vtkcell(::Type{Cell{2,8,4}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
@@ -24,6 +25,18 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compre
         push!(cls, MeshCell(celltype, collect(cell.nodes)))
     end
     coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
+    return vtk_grid(filename, coords, cls; compress=compress)
+end
+
+function WriteVTK.vtk_grid(filename::AbstractString, grid::G; compress::Bool=true) where {G <: AbstractGrid}
+    C = getcelltype(grid)
+    dim = getdim(grid)
+    cls = MeshCell[]
+    for idx in 1:getncells(grid)
+        celltype = JuAFEM.cell_to_vtkcell(C)
+        push!(cls, MeshCell(celltype, collect(getcells(grid,idx).nodes))) #TODO getnodes(::AbstractCell)
+    end
+    coords = reshape(reinterpret(Float64, getnodes(grid)), (dim, getnnodes(grid)))
     return vtk_grid(filename, coords, cls; compress=compress)
 end
 
