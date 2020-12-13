@@ -67,7 +67,7 @@ struct CellIterator{dim,C,T,G<:AbstractGrid}
     end
 end
 
-CellIterator(grid::Grid{dim,C,T}; cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
+CellIterator(grid::G; cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {G<:AbstractGrid} =
     CellIterator(grid, cellset, flags)
 CellIterator(dh::Union{DofHandler{Grid{dim,C,T},T}, MixedDofHandler{dim,C,T}}; cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
     CellIterator(dh, cellset, flags)
