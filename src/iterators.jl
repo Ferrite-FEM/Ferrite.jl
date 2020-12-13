@@ -57,6 +57,7 @@ struct CellIterator{dim,C,T,G<:AbstractGrid}
 
     function CellIterator(grid::G, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {G<:AbstractGrid}
         C = getcelltype(grid)
+        T = Float64 ## TODO extract from something else
         dim = getdim(grid)
         isconcretetype(C) || _check_same_celltype(grid, cellset)
         N = nnodes_per_cell(grid, cellset === nothing ? 1 : first(cellset))
