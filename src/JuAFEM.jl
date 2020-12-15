@@ -5,6 +5,7 @@ using Reexport
 
 using LinearAlgebra
 using SparseArrays
+import AbstractPlotting
 
 using Base: @propagate_inbounds
 
@@ -61,6 +62,9 @@ include("L2_projection.jl")
 
 # Export
 include("Export/VTK.jl")
+
+# Plot
+include("visualization.jl")
 
 # Other
 include("deprecations.jl")
