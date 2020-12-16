@@ -10,7 +10,7 @@ end
 function dof_to_node(dh::DofHandler, u::Array{T,1}; field::Int=1, process::Function = postprocess) where T
     fieldnames = JuAFEM.getfieldnames(dh)  
     field_dim = getfielddim(dh, field)
-    data = fill(NaN, field_dim, getnnodes(dh.grid)) 
+    data = fill(NaN, getnnodes(dh.grid), field_dim) 
     offset = field_offset(dh, fieldnames[field])
 
     for cell in CellIterator(dh)
@@ -18,12 +18,12 @@ function dof_to_node(dh::DofHandler, u::Array{T,1}; field::Int=1, process::Funct
         counter = 1
         for node in cell.nodes
             for d in 1:field_dim
-                data[d, node] = u[_celldofs[counter + offset]]
+                data[node, d] = u[_celldofs[counter + offset]]
                 counter += 1
             end
         end
     end
-    return reshape(mapslices(process, data, dims=[1]),getnnodes(dh.grid))
+    return mapslices(process, data, dims=[2])
 end
 
 to_triangle(::Union{Type{Triangle},Type{QuadraticTriangle}}, elements) = elements[:,1:3]
@@ -55,7 +55,7 @@ function AbstractPlotting.convert_arguments(::AbstractPlotting.PointBased, grid:
     return ([AbstractPlotting.Point2f0(coords[i], 0.0) for i in 1:getnnodes(grid)],)
 end
 
-function AbstractPlotting.mesh(dh::DofHandler, u::Array{T,1}, args...; process=postprocess, scale_plot=false, shading=false, kwargs...) where T
+function AbstractPlotting.mesh(dh::DofHandler, u::Array{T,1}, args...; field::Int=1, process::Function=postprocess, scale_plot=false, shading=false, kwargs...) where T
     C = getcelltype(dh.grid)
     nodes = getnodes(dh.grid)
     cells = getcells(dh.grid)
@@ -63,12 +63,12 @@ function AbstractPlotting.mesh(dh::DofHandler, u::Array{T,1}, args...; process=p
     connectivity = getproperty.(cells, :nodes)
     N = length(vertices(cells[1]))
     elements = [element[i] for element in connectivity, i in 1:N]
-    solution = dof_to_node(dh, u; process=process)
+    solution = reshape(dof_to_node(dh, u; field=field, process=process), getnnodes(dh.grid))
     triangle_elements = to_triangle(C, elements) 
     return AbstractPlotting.mesh(coords, triangle_elements, color=solution, args...; scale_plot=scale_plot, shading=shading, kwargs...)
 end
 
-function AbstractPlotting.mesh!(dh::DofHandler, u::Array{T,1}, args...; process=postprocess, scale_plot=false, shading=false, kwargs...) where T
+function AbstractPlotting.mesh!(dh::DofHandler, u::Array{T,1}, args...; field::Int=1, process::Function=postprocess, scale_plot=false, shading=false, kwargs...) where T
     C = getcelltype(dh.grid)
     nodes = getnodes(dh.grid)
     cells = getcells(dh.grid)
@@ -76,12 +76,12 @@ function AbstractPlotting.mesh!(dh::DofHandler, u::Array{T,1}, args...; process=
     connectivity = getproperty.(cells, :nodes)
     N = length(vertices(cells[1]))
     elements = [element[i] for element in connectivity, i in 1:N]
-    solution = dof_to_node(dh, u; process=process)
+    solution = reshape(dof_to_node(dh, u; field=field, process=process), getnnodes(dh.grid))
     triangle_elements = to_triangle(C, elements) 
     return AbstractPlotting.mesh!(coords, triangle_elements, color=solution, args...; scale_plot=scale_plot, shading=shading, kwargs...)
 end
 
-function AbstractPlotting.surface(dh::DofHandler, u::Array{T,1}, args...; scale_plot=false, shading=false, kwargs...) where T
+function AbstractPlotting.surface(dh::DofHandler, u::Array{T,1}, args...; field::Int=1, process::Function=postprocess, scale_plot=false, shading=false, kwargs...) where T
     @assert getdim(dh.grid) == 2 "Only 2D solutions supported!"
     C = getcelltype(dh.grid)
     nodes = getnodes(dh.grid)
@@ -90,13 +90,13 @@ function AbstractPlotting.surface(dh::DofHandler, u::Array{T,1}, args...; scale_
     connectivity = getproperty.(cells, :nodes)
     N = length(vertices(cells[1]))
     elements = [element[i] for element in connectivity, i in 1:N]
-    solution = dof_to_node(dh, u)
+    solution = reshape(dof_to_node(dh, u; field=field, process=postprocess), getnnodes(dh.grid))
     points = [AbstractPlotting.Point3f0(coord[1], coord[2], solution[idx]) for (idx, coord) in enumerate(eachrow(coords))]
     triangle_elements = to_triangle(C, elements)  
     return AbstractPlotting.mesh(points, triangle_elements, color=solution, args...; scale_plot=scale_plot, shading=shading, kwargs...)
 end
 
-function AbstractPlotting.surface!(dh::DofHandler, u::Array{T,1}, args...; scale_plot=false, shading=false, kwargs...) where T
+function AbstractPlotting.surface!(dh::DofHandler, u::Array{T,1}, args...; field::Int=1, process::Function=postprocess, scale_plot=false, shading=false, kwargs...) where T
     @assert getdim(dh.grid) == 2 "Only 2D solutions supported!"
     C = getcelltype(dh.grid)
     nodes = getnodes(dh.grid)
@@ -105,8 +105,56 @@ function AbstractPlotting.surface!(dh::DofHandler, u::Array{T,1}, args...; scale
     connectivity = getproperty.(cells, :nodes)
     N = length(vertices(cells[1]))
     elements = [element[i] for element in connectivity, i in 1:N]
-    solution = dof_to_node(dh, u)
+    solution = reshape(dof_to_node(dh, u; field=field, process=postprocess), getnnodes(dh.grid))
     points = [AbstractPlotting.Point3f0(coord[1], coord[2], solution[idx]) for (idx, coord) in enumerate(eachrow(coords))]
     triangle_elements = to_triangle(C, elements)  
     return AbstractPlotting.mesh!(points, triangle_elements, color=solution, args...; scale_plot=scale_plot, shading=shading, kwargs...)
+end
+
+function AbstractPlotting.arrows(dh::DofHandler, u::Array{T,1}, args...; field::Int=1, arrowsize=0.08, normalize=true, kwargs...) where T
+    C = getcelltype(dh.grid)
+    nodes = getnodes(dh.grid)
+    cells = getcells(dh.grid)
+    coords = [node.x[i] for node in nodes, i in 1:getdim(dh.grid)]
+    connectivity = getproperty.(cells, :nodes)
+    N = length(vertices(cells[1]))
+    elements = [element[i] for element in connectivity, i in 1:N]
+    solution = dof_to_node(dh, u; field=field, process=identity)
+    triangle_elements = to_triangle(C, elements) 
+    if getdim(dh.grid) == 2
+        AbstractPlotting.arrows(coords[:,1], coords[:,2], solution[:,1], solution[:,2], args...; arrowsize=arrowsize, normalize=normalize, kwargs...)
+    elseif getdim(dh.grid) == 3
+        AbstractPlotting.arrows(coords[:,1], coords[:,2], coords[:,3], solution[:,1], solution[:,2], solution[:,3], args...; arrowsize=arrowsize, normalize=normalize, kwargs...)
+    end
+end
+
+function AbstractPlotting.arrows!(dh::DofHandler, u::Array{T,1}, args...; field::Int=1, arrowsize=0.08, normalize=false, kwargs...) where T
+    C = getcelltype(dh.grid)
+    nodes = getnodes(dh.grid)
+    cells = getcells(dh.grid)
+    coords = [node.x[i] for node in nodes, i in 1:getdim(dh.grid)]
+    connectivity = getproperty.(cells, :nodes)
+    N = length(vertices(cells[1]))
+    elements = [element[i] for element in connectivity, i in 1:N]
+    solution = dof_to_node(dh, u; field=field, process=identity)
+    triangle_elements = to_triangle(C, elements) 
+    if getdim(dh.grid) == 2
+        AbstractPlotting.arrows!(coords[:,1], coords[:,2], solution[:,1], solution[:,2], args...; arrowsize=arrowsize, normalize=normalize, kwargs...)
+    elseif getdim(dh.grid) == 3
+        AbstractPlotting.arrows!(coords[:,1], coords[:,2], coords[:,3], solution[:,1], solution[:,2], solution[:,3], args...; arrowsize=arrowsize, normalize=normalize, kwargs...)
+    end
+end
+
+function warp_by_vector(dh::DofHandler, u::Array{T,1}, args...; field::Int=1, scale=1.0, process::Function=postprocess, scale_plot=false, shading=false, kwargs...) where T
+    C = getcelltype(dh.grid)
+    nodes = getnodes(dh.grid)
+    cells = getcells(dh.grid)
+    coords = [node.x[i] for node in nodes, i in 1:getdim(dh.grid)]
+    connectivity = getproperty.(cells, :nodes)
+    N = length(vertices(cells[1]))
+    elements = [element[i] for element in connectivity, i in 1:N]
+    u_matrix = dof_to_node(dh, u; field=field, process=identity)
+    solution = reshape(dof_to_node(dh, u; field=field, process=process), getnnodes(dh.grid))
+    triangle_elements = to_triangle(C, elements) 
+    return AbstractPlotting.mesh(coords.+u_matrix, color=solution, triangle_elements, args...; scale_plot=scale_plot, shading=shading, kwargs...)
 end
