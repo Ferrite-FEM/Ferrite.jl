@@ -1,9 +1,9 @@
-function postprocess(solution)
-   dim = length(solution[:,1]) 
+function postprocess(node_values)
+   dim = length(node_values)
    if dim == 1
-        return reshape(solution, length(solution[1,:]))
+        return node_values
    else 
-        return reshape(sqrt.(sum(solution.^2, dims=1)), length(solution[1,:]))
+        return sqrt(sum(node_values.^2))
     end 
 end
 
@@ -23,7 +23,7 @@ function dof_to_node(dh::DofHandler, u::Array{T,1}; field::Int=1, process::Funct
             end
         end
     end
-    return process(data)
+    return reshape(mapslices(process, data, dims=[1]),getnnodes(dh.grid))
 end
 
 to_triangle(::Union{Type{Triangle},Type{QuadraticTriangle}}, elements) = elements[:,1:3]
@@ -68,6 +68,19 @@ function AbstractPlotting.mesh(dh::DofHandler, u::Array{T,1}, args...; process=p
     return AbstractPlotting.mesh(coords, triangle_elements, color=solution, args...; scale_plot=scale_plot, shading=shading, kwargs...)
 end
 
+function AbstractPlotting.mesh!(dh::DofHandler, u::Array{T,1}, args...; process=postprocess, scale_plot=false, shading=false, kwargs...) where T
+    C = getcelltype(dh.grid)
+    nodes = getnodes(dh.grid)
+    cells = getcells(dh.grid)
+    coords = [node.x[i] for node in nodes, i in 1:getdim(dh.grid)]
+    connectivity = getproperty.(cells, :nodes)
+    N = length(vertices(cells[1]))
+    elements = [element[i] for element in connectivity, i in 1:N]
+    solution = dof_to_node(dh, u; process=process)
+    triangle_elements = to_triangle(C, elements) 
+    return AbstractPlotting.mesh!(coords, triangle_elements, color=solution, args...; scale_plot=scale_plot, shading=shading, kwargs...)
+end
+
 function AbstractPlotting.surface(dh::DofHandler, u::Array{T,1}, args...; scale_plot=false, shading=false, kwargs...) where T
     @assert getdim(dh.grid) == 2 "Only 2D solutions supported!"
     C = getcelltype(dh.grid)
@@ -81,4 +94,19 @@ function AbstractPlotting.surface(dh::DofHandler, u::Array{T,1}, args...; scale_
     points = [AbstractPlotting.Point3f0(coord[1], coord[2], solution[idx]) for (idx, coord) in enumerate(eachrow(coords))]
     triangle_elements = to_triangle(C, elements)  
     return AbstractPlotting.mesh(points, triangle_elements, color=solution, args...; scale_plot=scale_plot, shading=shading, kwargs...)
+end
+
+function AbstractPlotting.surface!(dh::DofHandler, u::Array{T,1}, args...; scale_plot=false, shading=false, kwargs...) where T
+    @assert getdim(dh.grid) == 2 "Only 2D solutions supported!"
+    C = getcelltype(dh.grid)
+    nodes = getnodes(dh.grid)
+    cells = getcells(dh.grid)
+    coords = [node.x[i] for node in nodes, i in 1:2]
+    connectivity = getproperty.(cells, :nodes)
+    N = length(vertices(cells[1]))
+    elements = [element[i] for element in connectivity, i in 1:N]
+    solution = dof_to_node(dh, u)
+    points = [AbstractPlotting.Point3f0(coord[1], coord[2], solution[idx]) for (idx, coord) in enumerate(eachrow(coords))]
+    triangle_elements = to_triangle(C, elements)  
+    return AbstractPlotting.mesh!(points, triangle_elements, color=solution, args...; scale_plot=scale_plot, shading=shading, kwargs...)
 end
