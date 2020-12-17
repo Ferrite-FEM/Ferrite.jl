@@ -259,8 +259,8 @@ end
 
 # for nodes
 function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
-                  components::Vector{Int}, dh::DofHandler{Grid{dim,C,M},M}, facevalues::BCValues,
-                  dofmapping::Dict{Int,Int}, time::Float64) where {dim,C,M}
+                  components::Vector{Int}, dh::DofHandler{dim, M, G}, facevalues::BCValues,
+                  dofmapping::Dict{Int,Int}, time::Float64) where {dim,M,G<:AbstractGrid}
     counter = 1
     for (idx, nodenumber) in enumerate(nodeidxs)
         x = dh.grid.nodes[nodenumber].x
