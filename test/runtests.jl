@@ -22,6 +22,6 @@ include("test_l2_projection.jl")
 # include("test_notebooks.jl")
 include("test_examples.jl")
 
-using GLMakie
-using AbstractPlotting: mesh, mesh!, surface, surface!, arrows, arrows!, scatter, lines, scatterlines, wireframe!, plot
-include("test_plotting.jl")
+#using GLMakie
+#using AbstractPlotting: mesh, mesh!, surface, surface!, arrows, arrows!, scatter, lines, scatterlines, wireframe!, plot
+#include("test_plotting.jl")
