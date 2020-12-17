@@ -34,25 +34,11 @@ to_triangle(::Union{Type{Hexahedron},Type{QuadraticHexahedron}}, elements) = vca
 AbstractPlotting.plottype(::DofHandler{1,C,T}, ::Array{T,1}) where {C,T} = AbstractPlotting.lines
 AbstractPlotting.plottype(::DofHandler{dim,C,T}, ::Array{T,1}) where {dim,C,T} = AbstractPlotting.mesh
 
-function AbstractPlotting.plottype(grid::G) where G <: AbstractGrid
-    if getdim(grid) == 1
-        AbstractPlotting.scatterlines
-    else
-        AbstractPlotting.poly
-    end
-end
-
 function AbstractPlotting.convert_arguments(::AbstractPlotting.PointBased, dh::DofHandler{1,C,T}, u::Array{T,1}) where {C,T}
     nodes = getnodes(dh.grid)
     coords = [node.x[1] for node in nodes]
     solution = dof_to_node(dh, u) 
     return ([AbstractPlotting.Point2f0(coords[i], solution[i]) for i in 1:getnnodes(dh.grid)],)
-end
-
-function AbstractPlotting.convert_arguments(::AbstractPlotting.PointBased, grid::Grid{1,C,T}) where {C,T}
-    nodes = getnodes(grid)
-    coords = [node.x[1] for node in nodes]
-    return ([AbstractPlotting.Point2f0(coords[i], 0.0) for i in 1:getnnodes(grid)],)
 end
 
 function AbstractPlotting.mesh(dh::DofHandler, u::Array{T,1}, args...; field::Int=1, process::Function=postprocess, scale_plot=false, shading=false, kwargs...) where T
