@@ -22,8 +22,6 @@ SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
-GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
-AbstractPlotting = "537997a7-5e4e-5d89-9595-2241ea00577e"
 
 [targets]
-test = ["BlockArrays", "ForwardDiff", "IterativeSolvers", "KrylovMethods", "NBInclude", "ProgressMeter", "Random", "SHA", "Test", "TimerOutputs", "UnicodePlots", "GLMakie", "AbstractPlotting"]
+test = ["BlockArrays", "ForwardDiff", "IterativeSolvers", "KrylovMethods", "NBInclude", "ProgressMeter", "Random", "SHA", "Test", "TimerOutputs", "UnicodePlots"]

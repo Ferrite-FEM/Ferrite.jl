@@ -5,8 +5,6 @@ using ForwardDiff
 import SHA
 using Random
 using LinearAlgebra
-using SparseArrays
-using BlockArrays
 
 include("test_utils.jl")
 include("test_interpolations.jl")
@@ -22,6 +20,8 @@ include("test_l2_projection.jl")
 # include("test_notebooks.jl")
 include("test_examples.jl")
 
-using GLMakie
-using AbstractPlotting: mesh, mesh!, surface, surface!, arrows, arrows!, scatter, lines, scatterlines, wireframe!, plot
-include("test_plotting.jl")
+#using SparseArrays
+#using BlockArrays
+#using GLMakie
+#using AbstractPlotting: mesh, mesh!, surface, surface!, arrows, arrows!, scatter, lines, scatterlines, wireframe!, plot
+#include("test_plotting.jl")
