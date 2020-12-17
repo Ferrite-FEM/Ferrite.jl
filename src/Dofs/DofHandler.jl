@@ -298,10 +298,6 @@ function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid, i::I
     @assert dim == getdim(grid)
     C = getcelltype(grid)
     @assert length(global_coords) == nnodes(C)
-    # for j in 1:nnodes(C)
-    #    nodeid = getcells(grid, i).nodes[j]
-    #    global_coords[j] = getnodes(grid, nodeid).x
-    # end
     global_coords .= getcoordinates(grid, i)
     return global_coords
 end

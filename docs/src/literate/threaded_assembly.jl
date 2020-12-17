@@ -85,7 +85,7 @@ function create_values(refshape, dim, order::Int)
 end;
 
 # Create a `ScratchValues` for each thread with the thread local data
-function create_scratchvalues(K, f, dh::DofHandler{Grid{dim,C,T},T}) where {dim, C, T}
+function create_scratchvalues(K, f, dh::DofHandler{dim, T, Grid{dim, C, T}}) where {dim, C, T}
     nthreads = Threads.nthreads()
     assemblers = [start_assemble(K, f) for i in 1:nthreads]
     cellvalues, facevalues = create_values(RefCube, dim, 2)
