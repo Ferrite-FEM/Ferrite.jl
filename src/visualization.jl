@@ -1,13 +1,13 @@
 function postprocess(node_values)
-   dim = length(node_values)
-   if dim == 1
+    dim = length(node_values)
+    if dim == 1
         return node_values
-   else 
+    else 
         return sqrt(sum(node_values.^2))
     end 
 end
 
-function dof_to_node(dh::DofHandler, u::Array{T,1}; field::Int=1, process::Function = postprocess) where T
+function dof_to_node(dh::DofHandler, u::Array{T,1}; field::Int=1, process::Function=postprocess) where T
     fieldnames = JuAFEM.getfieldnames(dh)  
     field_dim = getfielddim(dh, field)
     data = fill(NaN, getnnodes(dh.grid), field_dim) 
@@ -156,5 +156,5 @@ function warp_by_vector(dh::DofHandler, u::Array{T,1}, args...; field::Int=1, sc
     u_matrix = dof_to_node(dh, u; field=field, process=identity)
     solution = reshape(dof_to_node(dh, u; field=field, process=process), getnnodes(dh.grid))
     triangle_elements = to_triangle(C, elements) 
-    return AbstractPlotting.mesh(coords.+u_matrix, color=solution, triangle_elements, args...; scale_plot=scale_plot, shading=shading, kwargs...)
+    return AbstractPlotting.mesh(coords .+ (scale .* u_matrix), color=solution, triangle_elements, args...; scale_plot=scale_plot, shading=shading, kwargs...)
 end
