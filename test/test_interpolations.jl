@@ -7,6 +7,7 @@ for interpolation in (Lagrange{1, RefCube, 1}(),
                       Lagrange{2, RefTetrahedron, 1}(),
                       Lagrange{2, RefTetrahedron, 2}(),
                       Lagrange{3, RefCube, 1}(),
+                      Lagrange{3, RefCube, 2}(),
                       Serendipity{2, RefCube, 2}(),
                       Lagrange{3, RefTetrahedron, 1}(),
                       Lagrange{3, RefTetrahedron, 2}())
@@ -29,7 +30,7 @@ for interpolation in (Lagrange{1, RefCube, 1}(),
     coords = JuAFEM.reference_coordinates(interpolation)
     for node in 1:n_basefuncs
         N_node = JuAFEM.value(interpolation, coords[node])
-        for k in 1:node
+        for k in 1:n_basefuncs
             if k == node
                 @test N_node[k] ≈ 1.0
             else

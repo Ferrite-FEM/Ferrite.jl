@@ -175,12 +175,17 @@ end;
 function solve()
     reset_timer!()
 
+    celltype = Tetrahedron #or Hexahedron
+    refshape = celltype == Tetrahedron ? RefTetrahedron : RefCube
+    order = 1
+    nqp = 1
+
     ## Generate a grid
     N = 10
     L = 1.0
     left = zero(Vec{3})
     right = L * ones(Vec{3})
-    grid = generate_grid(Tetrahedron, (N, N, N), left, right)
+    grid = generate_grid(celltype, (N, N, N), left, right)
 
     ## Material parameters
     E = 10.0
@@ -190,15 +195,15 @@ function solve()
     mp = NeoHooke(μ, λ)
 
     ## Finite element base
-    ip = Lagrange{3, RefTetrahedron, 1}()
-    qr = QuadratureRule{3, RefTetrahedron}(1)
-    qr_face = QuadratureRule{2, RefTetrahedron}(1)
-    cv = CellVectorValues(qr, ip)
-    fv = FaceVectorValues(qr_face, ip)
+    ip = Lagrange{3, refshape, order}()
+    qr = QuadratureRule{3, refshape}(nqp)
+    qr_face = QuadratureRule{2, refshape}(nqp)
+    cv = CellVectorValues(qr, ip, JuAFEM.default_interpolation(celltype))
+    fv = FaceVectorValues(qr_face, ip, JuAFEM.default_interpolation(celltype))
 
     ## DofHandler
     dh = DofHandler(grid)
-    push!(dh, :u, 3) # Add a displacement field
+    push!(dh, :u, 3, ip) # Add a displacement field
     close!(dh)
 
     function rotation(X, t, θ = deg2rad(60.0))

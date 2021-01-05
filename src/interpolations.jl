@@ -376,6 +376,67 @@ function value(ip::Lagrange{3,RefCube,1}, i::Int, ξ::Vec{3})
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
+#################################################################
+# Lagrange dim 3 RefCube order 2 (20-node Quadratic hexahedron) #
+#################################################################
+getnbasefunctions(::Lagrange{3,RefCube,2}) = 20
+nvertexdofs(::Lagrange{3,RefCube,2}) = 1
+nedgedofs(::Lagrange{3,RefCube,2}) = 1
+
+#faces(::Lagrange{3,RefCube,2}) = ((1,2,6,5,9,18,13,17), (2,3,7,6,10,19,14,18), (3,4,8,7,11,20,15,19), (4,1,5,8,12,17,16,20), (1,2,3,4,9,10,11,12), (5,6,7,8,13,14,15,16))
+faces(::Lagrange{3,RefCube,2}) = ((1,2,3,4,9,10,11,12), (1,2,6,5,9,18,13,17), (2,3,7,6,10,19,14,18), (3,4,8,7,11,20,15,19), (4,1,5,8,12,17,16,20), (5,6,7,8,13,14,15,16))
+
+function reference_coordinates(::Lagrange{3,RefCube,2})
+    return [Vec{3, Float64}((-1.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0,  1.0,  1.0)),
+            Vec{3, Float64}((-1.0,  1.0,  1.0)), #8
+            Vec{3, Float64}(( 0.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0,  0.0, -1.0)), #12
+            Vec{3, Float64}(( 0.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0,  0.0,  1.0)),
+            Vec{3, Float64}(( 0.0,  1.0,  1.0)),
+            Vec{3, Float64}((-1.0,  0.0,  1.0)), #16
+            Vec{3, Float64}((-1.0, -1.0,  0.0)),
+            Vec{3, Float64}(( 1.0, -1.0,  0.0)),
+            Vec{3, Float64}(( 1.0,  1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  1.0,  0.0))]
+end
+
+#https://classes.engineering.wustl.edu/2009/spring/mase5513/abaqus/docs/v6.6/books/stm/default.htm?startat=ch03s02ath62.html
+function value(ip::Lagrange{3,RefCube,2}, i::Int, ξ::Vec{3})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    ξ_z = ξ[3]
+    i == 1  && return -0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z) * (2 + ξ_x + ξ_y + ξ_z)
+    i == 2  && return -0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z) * (2 - ξ_x + ξ_y + ξ_z)
+    i == 3  && return -0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z) * (2 - ξ_x - ξ_y + ξ_z)
+    i == 4  && return -0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z) * (2 + ξ_x - ξ_y + ξ_z)
+    i == 5  && return -0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z) * (2 + ξ_x + ξ_y - ξ_z)
+    i == 6  && return -0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z) * (2 - ξ_x + ξ_y - ξ_z)
+    i == 7  && return -0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z) * (2 - ξ_x - ξ_y - ξ_z)
+    i == 8  && return -0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z) * (2 + ξ_x - ξ_y - ξ_z)
+    i == 9  && return +0.25(1 - ξ_x) * (1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z)
+    i == 10 && return +0.25(1 - ξ_y) * (1 + ξ_y) * (1 + ξ_x) * (1 - ξ_z)
+    i == 11 && return +0.25(1 - ξ_x) * (1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z)
+    i == 12 && return +0.25(1 - ξ_y) * (1 + ξ_y) * (1 - ξ_x) * (1 - ξ_z)
+    i == 13 && return +0.25(1 - ξ_x) * (1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z)
+    i == 14 && return +0.25(1 - ξ_y) * (1 + ξ_y) * (1 + ξ_x) * (1 + ξ_z)
+    i == 15 && return +0.25(1 - ξ_x) * (1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z)
+    i == 16 && return +0.25(1 - ξ_y) * (1 + ξ_y) * (1 - ξ_x) * (1 + ξ_z)
+    i == 17 && return +0.25(1 - ξ_z) * (1 + ξ_z) * (1 - ξ_x) * (1 - ξ_y)
+    i == 18 && return +0.25(1 - ξ_z) * (1 + ξ_z) * (1 + ξ_x) * (1 - ξ_y)
+    i == 19 && return +0.25(1 - ξ_z) * (1 + ξ_z) * (1 + ξ_x) * (1 + ξ_y)
+    i == 20 && return +0.25(1 - ξ_z) * (1 + ξ_z) * (1 - ξ_x) * (1 + ξ_y)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
 ###############
 # Serendipity #
 ###############
