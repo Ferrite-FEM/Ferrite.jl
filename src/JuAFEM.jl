@@ -5,7 +5,6 @@ using Reexport
 
 using LinearAlgebra
 using SparseArrays
-
 using Base: @propagate_inbounds
 
 include("exports.jl")
@@ -61,6 +60,9 @@ include("L2_projection.jl")
 
 # Export
 include("Export/VTK.jl")
+
+# Point Evaluation
+include(joinpath("PointEval", "PointEvalHandler.jl"))
 
 # Other
 include("deprecations.jl")

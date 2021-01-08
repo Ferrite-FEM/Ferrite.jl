@@ -122,4 +122,9 @@ export
 
 # L2 Projection
     project,
-    L2Projector
+    L2Projector,
+
+# Point Evaluation
+    PointEvalHandler,
+    point_eval,
+    create_eval_matrix
