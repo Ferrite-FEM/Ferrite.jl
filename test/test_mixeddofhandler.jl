@@ -424,6 +424,53 @@ function test_mixed_grid_show()
     @test occursin("2 Quadrilateral/Triangle cells", str)
 end
 
+# regression tests for https://github.com/KristofferC/JuAFEM.jl/issues/315 
+function test_subparametric_quad()
+    grid = generate_grid(Quadrilateral, (1,1))
+
+    ip_geom = Lagrange{2,RefCube,1}()
+    ip      = Lagrange{2,RefCube,2}()
+    
+    field = Field(:u, ip, 2)
+    fh = FieldHandler([field], Set(1:getncells(grid)), [ip_geom])
+    
+    dh = MixedDofHandler(grid)
+    push!(dh, fh)
+    close!(dh)
+    
+    ch = ConstraintHandler(dh)
+    dbc1 = Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 2)
+    add!(ch, dbc1)
+    close!(ch)
+    update!(ch, 1.0)
+    @test getnbasefunctions(JuAFEM.getfieldinterpolation(dh,1)) == 9 # algebraic nbasefunctions
+    # TODO clean me up
+    @test size(fh.bc_values[1].M,1) == 4 # geometric nbasefunctions of BCvalues
+end
+
+function test_subparametric_triangle()
+    grid = generate_grid(Triangle, (1,1))
+
+    ip_geom = Lagrange{2,RefTetrahedron,1}()
+    ip      = Lagrange{2,RefTetrahedron,2}()
+    
+    field = Field(:u, ip, 2)
+    fh = FieldHandler([field], Set(1:getncells(grid)), [ip_geom])
+    
+    dh = MixedDofHandler(grid)
+    push!(dh, fh)
+    close!(dh)
+    
+    ch = ConstraintHandler(dh)
+    dbc1 = Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 2)
+    add!(ch, dbc1)
+    close!(ch)
+    update!(ch, 1.0)
+    @test getnbasefunctions(JuAFEM.getfieldinterpolation(dh,1)) == 6 # algebraic nbasefunctions
+    # TODO clean me up
+    @test size(fh.bc_values[1].M,1) == 3 # geometric nbasefunctions of BCvalues
+end
+
 @testset "MixedDofHandler" begin
 
     test_1d_bar_beam();
@@ -441,5 +488,7 @@ end
     test_3d_mixed_field_mixed_celltypes();
     test_2_element_heat_eq();
     test_element_order();
-    test_mixed_grid_show()
+    test_mixed_grid_show();
+    test_subparametric_quad();
+    test_subparametric_triangle();
 end

@@ -9,9 +9,9 @@ end
 
 Construct a `FieldHandler` based on an array of `Field`s and assigns it a set of cells.
 """
-function FieldHandler(fields::Vector{Field}, cellset)
+function FieldHandler(fields::Vector{Field}, cellset, ipgeo::Vector{ip}=getproperty.(fields,:interpolation)) where ip <: Interpolation
     # TODO for now, only accept isoparamtric mapping
-    bc_values = [BCValues(field.interpolation, field.interpolation) for field in fields]
+    bc_values = [BCValues(field.interpolation, ipgeo[fieldidx]) for (fieldidx,field) in enumerate(fields)]
     FieldHandler(fields, cellset, bc_values)
 end
 
