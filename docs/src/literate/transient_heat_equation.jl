@@ -17,14 +17,14 @@
 # $f$ the heat source and $\Omega$ the domain. For simplicity we set $f = 1$
 # and $k = 1$. We define homogeneous Dirichlet boundary conditions along the left and right edge of the domain.
 # ```math
-# u(x) = 0 \quad x \in \partial \Omega_1,
+# u(x,t) = 0 \quad x \in \partial \Omega_1,
 # ```
 # where $\partial \Omega_1$ denotes the left and right boundary of $\Omega$.
 #
 # Further, we define heterogeneous Dirichlet boundary conditions at the top and bottom edge $\partial \Omega_2$.
 # We choose a linearly increasing function $a(t)$ that describes the temperature at this boundary
 # ```math
-# u(x) = a(t)\cdot x \quad x \in \partial \Omega_2.
+# u(x,t) = a(t) \quad x \in \partial \Omega_2.
 # ```
 # The semidiscrete weak form is given by
 # ```math
@@ -33,8 +33,13 @@
 # where $v$ is a suitable test function. Now, we still need to discretize the time derivative. An implicit Euler scheme is applied,
 # which yields:
 # ```math
-# \int_{\Omega}u_{n+1}\cdot v \ d\Omega + \Delta t\int_{\Omega} \nabla v \cdot \nabla u_{n+1} \ d\Omega = \Delta t\int_{\Omega} v \ d\Omega + \int_{\Omega} u_{n}\cdot v \ d\Omega,
+# \int_{\Omega}u_{n+1}\cdot v \ d\Omega + \Delta t\int_{\Omega} \nabla v \cdot \nabla u_{n+1} \ d\Omega = \Delta t\int_{\Omega} v \ d\Omega + \int_{\Omega} u_{n}\cdot v \ d\Omega.
 # ```
+# In this example we apply the boundary conditions to the assembled discrete operators (mass matrix $\mathbf{M}$ and stiffnes matrix $\mathbf{K}$)
+# only once. We utilize the fact that in finite element computations Dirichlet conditions can be applied by 
+# zero out rows and columns that correspond
+# to a prescribed dof in the system matrix ($\mathbf{A} = Δt \mathbf{K} + \mathbf{M}$) and setting the value of the right-hand side vector to the value
+# of the Dirichlet condition. Thus, we only need to apply in every time step the Dirichlet condition to the right-hand side of the problem.
 #-
 # ## Commented Program
 #
@@ -44,7 +49,7 @@
 # First we load JuAFEM, and some other packages we need.
 using JuAFEM, SparseArrays
 # We create the same grid as in the heat equation example.
-grid = generate_grid(Quadrilateral, (20, 20));
+grid = generate_grid(Quadrilateral, (100, 100));
 
 # ### Trial and test functions
 # Again, we define the structs that are responsible for the `shape_value` and `shape_gradient` evaluation.
@@ -67,9 +72,11 @@ close!(dh);
 # where $u_i$ and $v_j$ are trial and test functions, respectively.
 K = create_sparsity_pattern(dh);
 M = create_sparsity_pattern(dh);
+# We also preallocate the right hand side
+f = zeros(ndofs(dh));
 
 # ### Boundary conditions
-# In order to define the time dependent problem, we need some end time `T` and something that described
+# In order to define the time dependent problem, we need some end time `T` and something that describes
 # the linearly increasing Dirichlet boundary condition on $\partial \Omega_2$.
 max_temp = 100
 Δt = 1
@@ -77,25 +84,24 @@ T = 200
 ch = ConstraintHandler(dh);
 
 # Here, we define the boundary condition related to $\partial \Omega_1$.
-∂Ω = union(getfaceset.((grid, ), ["left", "right"])...)
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
+∂Ω₁ = union(getfaceset.((grid, ), ["left", "right"])...)
+dbc = Dirichlet(:u, ∂Ω₁, (x, t) -> 0)
 add!(ch, dbc);
 # While the next code block corresponds to the linearly increasing temperature description on $\partial \Omega_2$.
-∂Ω = union(getfaceset.((grid, ), ["top", "bottom"])...)
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> t*(max_temp/T))
+∂Ω₂ = union(getfaceset.((grid, ), ["top", "bottom"])...)
+dbc = Dirichlet(:u, ∂Ω₂, (x, t) -> t*(max_temp/T))
 add!(ch, dbc)
 close!(ch)
 update!(ch, 0.0);
 
 # ### Assembling the linear system
 # As in the heat equation example we define a `doassemble!` function that assembles the diffusion parts of the equation:
-function doassemble!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler, Δt::Real) where {dim}
+function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellScalarValues{dim}, dh::DofHandler) where {dim}
 
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
 
-    f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
 
     @inbounds for cell in CellIterator(dh)
@@ -125,7 +131,7 @@ function doassemble!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::
 end
 #md nothing # hide
 # In addition to the diffusive part, we also need a function that assembles the mass matrix `M`.
-function doassemble!(cellvalues::CellScalarValues{dim}, M::SparseMatrixCSC, dh::DofHandler) where {dim}
+function doassemble_M!(M::SparseMatrixCSC, cellvalues::CellScalarValues{dim}, dh::DofHandler) where {dim}
 
     n_basefuncs = getnbasefunctions(cellvalues)
     Me = zeros(n_basefuncs, n_basefuncs)
@@ -157,14 +163,14 @@ end
 #md nothing # hide
 # ### Solution of the system
 # We first assemble all parts in the prior allocated `SparseMatrixCSC`.
-K, f = doassemble!(cellvalues, K, dh, Δt)
-M = doassemble!(cellvalues, M, dh)
+K, f = doassemble_K!(K, f, cellvalues, dh)
+M = doassemble_M!(M, cellvalues, dh)
 A = (Δt .* K) + M;
 # Now, we need to save all boundary condition related values of the unaltered system matrix `A`, which is done
 # by `get_rhs_data`. The function returns a `RHSData` struct, which contains all needed informations to apply
 # the boundary conditions solely on the right-hand-side vector of the problem.
 rhsdata = get_rhs_data(ch, A);
-# We initialize the previous time step, denoted by uₙ,  to $\mathbf{0}$.
+# We set the initial time step, denoted by uₙ,  to $\mathbf{0}$.
 uₙ = zeros(length(f));
 # Here, we apply **once** the boundary conditions to the system matrix `A`.
 apply!(A, ch);
