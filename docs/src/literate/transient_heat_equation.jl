@@ -35,6 +35,10 @@
 # ```math
 # \int_{\Omega}u_{n+1}\cdot v \ d\Omega + \Delta t\int_{\Omega} \nabla v \cdot \nabla u_{n+1} \ d\Omega = \Delta t\int_{\Omega} v \ d\Omega + \int_{\Omega} u_{n}\cdot v \ d\Omega.
 # ```
+# If we assemble the discrete operators, we get the following algebraic system:
+# ```math
+# \mathbf{M} \mathbf{u}_{n+1} + Δt \mathbf{K} \mathbf{u}_{n+1} = Δt \mathbf{f} + \mathbf{M} \mathbf{u}_{n}
+# ```
 # In this example we apply the boundary conditions to the assembled discrete operators (mass matrix $\mathbf{M}$ and stiffnes matrix $\mathbf{K}$)
 # only once. We utilize the fact that in finite element computations Dirichlet conditions can be applied by 
 # zero out rows and columns that correspond
