@@ -59,6 +59,53 @@ struct ConstraintHandler{DH<:AbstractDofHandler,T}
     closed::ScalarWrapper{Bool}
 end
 
+"""
+    RHSData
+
+Stores the constrained columns and mean of the diagonal of stiffness matrix `A`.
+"""
+struct RHSData{T}
+    m::T
+    constrained_columns::SparseMatrixCSC{T, Int}
+end
+
+"""
+    get_rhs_data(ch::ConstraintHandler, A::SparseMatrixCSC) -> RHSData
+
+Returns the needed RHSData for apply_rhs!
+"""
+function get_rhs_data(ch::ConstraintHandler, A::SparseMatrixCSC)
+    m = meandiag(A)
+    constrained_columns = A[:, ch.prescribed_dofs]
+    return RHSData(m, constrained_columns)
+end
+
+"""
+    apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)
+
+Applies the boundary condition to the right-hand-side vector without modifying the stiffness matrix
+"""
+function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)	
+    K = data.constrained_columns
+    @assert length(f) == 0 || length(f) == size(K, 1)
+    @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
+
+	m = data.m
+    @inbounds for i in 1:length(ch.values)
+        d = ch.prescribed_dofs[i]
+        v = ch.values[i]
+        if !applyzero && v != 0
+            for j in nzrange(K, i)
+                f[K.rowval[j]] -= v * K.nzval[j]
+            end
+        end
+        if length(f) != 0
+            vz = applyzero ? zero(eltype(f)) : v
+            f[d] = vz * m
+        end
+    end
+end
+
 function ConstraintHandler(dh::AbstractDofHandler)
     @assert isclosed(dh)
     ConstraintHandler(Dirichlet[], Int[], Int[], Float64[], Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false))

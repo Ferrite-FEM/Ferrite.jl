@@ -5,6 +5,7 @@ using ForwardDiff
 import SHA
 using Random
 using LinearAlgebra
+using SparseArrays
 
 include("test_utils.jl")
 include("test_interpolations.jl")
@@ -18,4 +19,5 @@ include("test_grid_dofhandler_vtk.jl")
 include("test_mixeddofhandler.jl")
 include("test_l2_projection.jl")
 # include("test_notebooks.jl")
+include("test_apply_rhs.jl")
 include("test_examples.jl")
