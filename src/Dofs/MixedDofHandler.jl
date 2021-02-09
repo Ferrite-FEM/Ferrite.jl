@@ -26,7 +26,7 @@ function Base.getindex(elvec::CellVector, el::Int)
     return elvec.values[offset:offset + elvec.length[el]-1]
  end
 
-struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: JuAFEM.AbstractDofHandler 
+struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: JuAFEM.AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
     cell_dofs::CellVector{Int}
     cell_nodes::CellVector{Int}
@@ -115,6 +115,16 @@ nfields(dh::MixedDofHandler) = length(getfieldnames(dh))
 
 function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
     @assert !isclosed(dh)
+    _check_same_celltype(dh.grid, collect(fh.cellset))
+    # the field interpolations should have the same refshape as the cells they are applied to
+    refshapes_fh = getrefshape.(getfieldinterpolations(fh))
+    # extract the celltype from the first cell as the celltypes are all equal
+    cell_type = typeof(dh.grid.cells[first(fh.cellset)])
+    refshape_cellset = getrefshape(default_interpolation(cell_type))
+    for refshape in refshapes_fh
+        refshape_cellset == refshape || error("The RefShapes of the fieldhandlers interpolations must correspond to the RefShape of the cells it is applied to.")
+    end
+
     push!(dh.fieldhandlers, fh)
     return dh
 end

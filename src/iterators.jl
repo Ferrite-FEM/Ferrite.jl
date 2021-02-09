@@ -131,7 +131,7 @@ function _check_same_celltype(grid::AbstractGrid, cellset::AbstractVector{Int})
     celltype = typeof(grid.cells[first(cellset)])
     for cellid in cellset
         if celltype != typeof(grid.cells[cellid])
-            error("You are trying to use a CellIterator to loop over a cellset with different celltypes.")
+            error("The cells in your cellset are not all of the same celltype.")
         end
     end
 end
