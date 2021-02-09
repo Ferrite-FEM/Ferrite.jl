@@ -69,6 +69,20 @@ function test_2d_scalar()
     @test celldofs(dh, 2) == [3, 2, 5]
 end
 
+function test_2d_error()
+
+    grid = get_2d_grid()
+    # the refshape of the field must be the same as the refshape of the elements it is added to
+    field1 = create_field(name=:u, spatial_dim=2, field_dim=1, order=1, cellshape=RefTetrahedron)
+    field2 = create_field(name=:u, spatial_dim=2, field_dim=1, order=1, cellshape=RefCube)
+    dh = MixedDofHandler(grid);
+    @test_throws ErrorException push!(dh, FieldHandler([field1], Set(1)));
+    @test_throws ErrorException push!(dh, FieldHandler([field2], Set(2)));
+    # all cells within a FieldHandler should be of the same celltype
+    @test_throws ErrorException push!(dh, FieldHandler([field1], Set([1,2])));
+
+end
+
 function test_2d_vector()
 
     grid = get_2d_grid()
@@ -402,6 +416,7 @@ end
 
     test_1d_bar_beam();
     test_2d_scalar();
+    test_2d_error();
     test_2d_vector();
     test_2d_mixed_1_el();
     test_2d_mixed_2_el();
