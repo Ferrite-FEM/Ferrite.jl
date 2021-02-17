@@ -39,7 +39,7 @@ K = create_sparsity_pattern(dh);
 M = create_sparsity_pattern(dh);
 
 Base.@kwdef struct FHNParameters
-    a::Float64 = 0.0
+    a::Float64 = 0.7
     b::Float64 = 0.8 
     c::Float64 = 1/12.5 
 end
@@ -105,24 +105,24 @@ function doassemble_linear!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCS
             χ_loc = χ(coords_qp)
             dΩ = getdetJdV(cellvalues, q_point)
             for i in 1:n_basefuncs
-                v  = shape_value(cellvalues, q_point, i)
-                ∇v = shape_gradient(cellvalues, q_point, i)
+                Nᵢ = shape_value(cellvalues, q_point, i)
+                ∇Nᵢ = shape_gradient(cellvalues, q_point, i)
                 for j in 1:n_basefuncs
-                    u = shape_value(cellvalues, q_point, j)
-                    ∇u = shape_gradient(cellvalues, q_point, j)
+                    Nⱼ = shape_value(cellvalues, q_point, j)
+                    ∇Nⱼ = shape_gradient(cellvalues, q_point, j)
                     # diffusion parts
-                    Ke[BlockIndex((ϕₘ▄,ϕₘ▄),(i,j))] += ((κᵢ_loc ⋅ ∇v) ⋅ ∇u) * dΩ
-                    Ke[BlockIndex((ϕₘ▄,ϕₑ▄),(i,j))] += ((κᵢ_loc ⋅ ∇v) ⋅ ∇u) * dΩ
-                    Ke[BlockIndex((ϕₑ▄,ϕₘ▄),(i,j))] += ((κᵢ_loc ⋅ ∇v) ⋅ ∇u) * dΩ
-                    Ke[BlockIndex((ϕₑ▄,ϕₑ▄),(i,j))] += (((κₑ_loc + κᵢ_loc) ⋅ ∇v) ⋅ ∇u) * dΩ
+                    Ke[BlockIndex((ϕₘ▄,ϕₘ▄),(i,j))] -= ((κᵢ_loc ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
+                    Ke[BlockIndex((ϕₘ▄,ϕₑ▄),(i,j))] -= ((κᵢ_loc ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
+                    Ke[BlockIndex((ϕₑ▄,ϕₘ▄),(i,j))] -= ((κᵢ_loc ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
+                    Ke[BlockIndex((ϕₑ▄,ϕₑ▄),(i,j))] -= (((κₑ_loc + κᵢ_loc) ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
                     # linear reaction parts
-                    Ke[BlockIndex((ϕₘ▄,ϕₘ▄),(i,j))] += v * u * dΩ 
-                    Ke[BlockIndex((ϕₘ▄,s▄),(i,j))] -= v * u * dΩ 
-                    Ke[BlockIndex((s▄,ϕₘ▄),(i,j))] += params.c * v * u * dΩ 
-                    Ke[BlockIndex((s▄,s▄),(i,j))] -=  params.b * v * u * dΩ 
+                    Ke[BlockIndex((ϕₘ▄,ϕₘ▄),(i,j))] += Nᵢ * Nⱼ * dΩ 
+                    Ke[BlockIndex((ϕₘ▄,s▄),(i,j))] -= Nᵢ * Nⱼ * dΩ 
+                    Ke[BlockIndex((s▄,ϕₘ▄),(i,j))] += params.c * Nᵢ * Nⱼ * dΩ 
+                    Ke[BlockIndex((s▄,s▄),(i,j))] -=  params.b * Nᵢ * Nⱼ * dΩ 
                     # mass matrices
-                    Me[BlockIndex((ϕₘ▄,ϕₘ▄),(i,j))] += Cₘ_loc * χ_loc * v * u * dΩ
-                    Me[BlockIndex((s▄,s▄),(i,j))] += v * u * dΩ
+                    Me[BlockIndex((ϕₘ▄,ϕₘ▄),(i,j))] += Cₘ_loc * χ_loc * Nᵢ * Nⱼ * dΩ
+                    Me[BlockIndex((s▄,s▄),(i,j))] += Nᵢ * Nⱼ * dΩ
                 end
             end
         end
@@ -133,6 +133,38 @@ function doassemble_linear!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCS
     return K, M
 end
 
+# TODO cleanup
+function apply_nonlinear!(du, u, p, t)
+    dh = p[2]
+    ch = p[3]
+    ip = Lagrange{2, RefCube, 1}()
+    qr = QuadratureRule{2, RefCube}(2)
+    cellvalues = CellScalarValues(qr, ip);
+    n_basefuncs = getnquadpoints(cellvalues)
+
+    for cell in CellIterator(dh)
+        reinit!(cellvalues, cell)
+        _celldofs = celldofs(cell)
+        ϕₘ_celldofs = _celldofs[dof_range(dh, :ϕₘ)]
+        s_celldofs = _celldofs[dof_range(dh, :s)]
+        ϕₘe = u[ϕₘ_celldofs]
+        se = u[s_celldofs]
+        coords = getcoordinates(cell)
+        for q_point in 1:getnquadpoints(cellvalues) 
+            x_qp = spatial_coordinate(cellvalues, q_point, coords)
+            χ_loc = χ(x_qp)
+            dΩ = getdetJdV(cellvalues, q_point)
+            nl_contrib = function_value(cellvalues, q_point, ϕₘe)^3
+            for j in 1:n_basefuncs
+                Nⱼ = shape_value(cellvalues, q_point, j)
+                du[ϕₘ_celldofs[j]] -= (1/3 * nl_contrib + χ_loc*Iₛₜᵢₘ(x_qp,t)) * Nⱼ * dΩ
+                du[s_celldofs[j]] -= p[4].a * Nⱼ * dΩ
+            end
+        end
+    end
+    apply_zero!(du, ch)
+end
+
 K, M = doassemble_linear!(cellvalues, K, M, dh);
 
 apply!(K, ch)
@@ -140,10 +172,26 @@ apply!(M, ch)
 
 function bidomain!(du,u,p,t)
     du .= K * u 
+    println("Solving for timestep t=$t")
+    apply_nonlinear!(du, u, p, t)
 end
 
+Δt = 0.01
+T = 5
 f = DifferentialEquations.ODEFunction(bidomain!,mass_matrix=M)
 u₀ = zeros(ndofs(dh))
-prob_mm = DifferentialEquations.ODEProblem(f,u₀,(0.0,2),[K, dh, FHNParameters()])
-sol = DifferentialEquations.solve(prob_mm,DifferentialEquations.ImplicitEuler(),reltol=1e-8,abstol=1e-8, progress=true, progress_steps = 1)
+prob_mm = DifferentialEquations.ODEProblem(f,u₀,(0.0,T),[K, dh, ch, FHNParameters()])
+sol = DifferentialEquations.solve(prob_mm,DifferentialEquations.ImplicitEuler(),reltol=1e-8,abstol=1e-8, adaptive=false, dt=Δt)
 
+pvd = paraview_collection("paraview/bidomain.pvd")
+
+for (solution,t) in zip(sol.u, sol.t)
+    #compress=false flag because otherwise each vtk is stuck in the memory
+    vtk_grid("paraview/bidomain-$t.vtu", dh; compress=false) do vtk
+        vtk_point_data(vtk,dh,solution)
+        vtk_save(vtk)
+        pvd[t] = vtk
+    end
+end
+
+vtk_save(pvd)
