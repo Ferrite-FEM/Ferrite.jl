@@ -39,33 +39,38 @@ K = create_sparsity_pattern(dh);
 M = create_sparsity_pattern(dh);
 
 Base.@kwdef struct FHNParameters
-    a::Float64 = 0.7
-    b::Float64 = 0.8 
-    c::Float64 = 1/12.5 
+    τ::Float64 = 10
+    a::Float64 = 0.7/τ
+    b::Float64 = 1.0/τ
+    c::Float64 = 1.0/τ
 end
 
 function κₑ(x)
-    return SymmetricTensor{2,2,Float64}((0.22, 0, 0.13))    
+    return SymmetricTensor{2,2,Float64}((0.22, 0, 0.13))*0.1
+    #return 0.1*one(SymmetricTensor{2,2})
 end
 
 function κᵢ(x)
-    return SymmetricTensor{2,2,Float64}((0.28, 0, 0.026))
+    return SymmetricTensor{2,2,Float64}((0.28, 0, 0.026))*0.1
+    #return one(SymmetricTensor{2,2})
 end
 
 function Cₘ(x)
-    return 0.01
+    #return 0.01
+    return 1.0
 end
 
 function χ(x)
-    return 250.0
+    #return 250.0
+    return 1.0
 end
 
 function Iₛₜᵢₘ(x, t)
-    #if norm(x) < 0.2 && t < 2
-    #    return 1
-    #else
+    if norm(x) < 0.2 && t < 2
+        return 5
+    else
         return 0
-    #end
+    end
 end
 
 ch = ConstraintHandler(dh);
@@ -117,8 +122,8 @@ function doassemble_linear!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCS
                     Ke[BlockIndex((ϕₑ▄,ϕₑ▄),(i,j))] -= (((κₑ_loc + κᵢ_loc) ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
                     # linear reaction parts
                     Ke[BlockIndex((ϕₘ▄,ϕₘ▄),(i,j))] += Nᵢ * Nⱼ * dΩ 
-                    Ke[BlockIndex((ϕₘ▄,s▄),(i,j))] -= Nᵢ * Nⱼ * dΩ 
-                    Ke[BlockIndex((s▄,ϕₘ▄),(i,j))] += params.c * Nᵢ * Nⱼ * dΩ 
+                    Ke[BlockIndex((ϕₘ▄,s▄),(i,j))] += Nᵢ * Nⱼ * dΩ 
+                    Ke[BlockIndex((s▄,ϕₘ▄),(i,j))] -= params.c * Nᵢ * Nⱼ * dΩ 
                     Ke[BlockIndex((s▄,s▄),(i,j))] -=  params.b * Nᵢ * Nⱼ * dΩ 
                     # mass matrices
                     Me[BlockIndex((ϕₘ▄,ϕₘ▄),(i,j))] += Cₘ_loc * χ_loc * Nᵢ * Nⱼ * dΩ
@@ -158,7 +163,7 @@ function apply_nonlinear!(du, u, p, t)
             for j in 1:n_basefuncs
                 Nⱼ = shape_value(cellvalues, q_point, j)
                 du[ϕₘ_celldofs[j]] -= (1/3 * nl_contrib + χ_loc*Iₛₜᵢₘ(x_qp,t)) * Nⱼ * dΩ
-                du[s_celldofs[j]] -= p[4].a * Nⱼ * dΩ
+                du[s_celldofs[j]] += p[4].a * Nⱼ * dΩ
             end
         end
     end
@@ -177,11 +182,18 @@ function bidomain!(du,u,p,t)
 end
 
 Δt = 0.01
-T = 5
+T = 50
 f = DifferentialEquations.ODEFunction(bidomain!,mass_matrix=M)
 u₀ = zeros(ndofs(dh))
+for cell in CellIterator(dh)
+    _celldofs = celldofs(cell)
+    ϕₘ_celldofs = _celldofs[dof_range(dh, :ϕₘ)]
+    s_celldofs = _celldofs[dof_range(dh, :s)]
+    u₀[ϕₘ_celldofs] .= -1.2056
+    u₀[s_celldofs] .= -0.5085
+end
 prob_mm = DifferentialEquations.ODEProblem(f,u₀,(0.0,T),[K, dh, ch, FHNParameters()])
-sol = DifferentialEquations.solve(prob_mm,DifferentialEquations.ImplicitEuler(),reltol=1e-8,abstol=1e-8, adaptive=false, dt=Δt)
+sol = DifferentialEquations.solve(prob_mm,DifferentialEquations.ImplicitEuler(),reltol=1e-3,abstol=1e-3, adaptive=true, dt=Δt)
 
 pvd = paraview_collection("paraview/bidomain.pvd")
 
