@@ -173,7 +173,7 @@ function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler{dim,T,G}, u::Vecto
             offset = field_offset(fh, name)
 
             for cellnum in cellnumbers
-                cell = getcells(dh.grid.cells, cellnum)
+                cell = getcells(dh.grid, cellnum)
                 n = ndofs_per_cell(dh, cellnum)
                 eldofs = zeros(Int, n)
                 _celldofs = celldofs!(eldofs, dh, cellnum)
