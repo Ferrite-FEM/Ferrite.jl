@@ -1,5 +1,13 @@
 # # Bidomain and DifferentialEquations.jl
 #
+# ![](bidomain.gif)
+#-
+#md # !!! tip
+#md #     This example is also available as a Jupyter notebook:
+#md #     [`bidomain.ipynb`](@__NBVIEWER_ROOT_URL__/examples/bidomain.ipynb)
+#-
+# ## Introduction
+#
 # In this example we will implement the [Bidomain Model](https://en.wikipedia.org/wiki/Bidomain_model).
 # This model is used to simulate the electrical activity of the heart. For more information about the derivation,
 # check out the linked wikipedia article.
@@ -24,6 +32,9 @@
 # ```math
 # g = \varphi_m c - a - b s
 # ```
+#-
+# ## Commented Program
+#
 using JuAFEM, SparseArrays, BlockArrays
 # Instead of using a self written time integrator, 
 # we will use in this example a time integrator of [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl)
@@ -245,3 +256,11 @@ for (solution,t) in zip(sol.u, sol.t)
 end
 # Finally, we save the paraview collection.
 vtk_save(pvd)
+#md # ## [Plain Program](@id bidomain-plain-program)
+#md #
+#md # Below follows a version of the program without any comments.
+#md # The file is also available here: [bidomain.jl](bidomain.jl)
+#md #
+#md # ```julia
+#md # @__CODE__
+#md # ```
