@@ -226,7 +226,7 @@ function bidomain!(du,u,p,t)
 end
 #
 Δt = 0.01
-T = 50
+T = 1
 f = DifferentialEquations.ODEFunction(bidomain!,mass_matrix=M)
 # In the following code block we define the initial condition of the problem. We first
 # initialize a zero vector of length `ndofs(dh)` and fill it afterwards in a for loop over all cells.
