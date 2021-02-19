@@ -244,11 +244,11 @@ prob_mm = DifferentialEquations.ODEProblem(f,u₀,(0.0,T),[K, dh, ch, FHNParamet
 sol = DifferentialEquations.solve(prob_mm,DifferentialEquations.QBDF(),reltol=1e-3,abstol=1e-4, adaptive=true, dt=Δt)
 #
 # We instantiate a paraview collection file.
-pvd = paraview_collection("paraview/bidomain.pvd")
+pvd = paraview_collection("bidomain.pvd")
 # Now, we loop over all timesteps and solution vectors, in order to append them to the paraview collection.
 for (solution,t) in zip(sol.u, sol.t)
     #compress=false flag because otherwise each vtk file will be stored in memory
-    vtk_grid("paraview/bidomain-$t.vtu", dh; compress=false) do vtk
+    vtk_grid("bidomain-$t.vtu", dh; compress=false) do vtk
         vtk_point_data(vtk,dh,solution)
         vtk_save(vtk)
         pvd[t] = vtk
