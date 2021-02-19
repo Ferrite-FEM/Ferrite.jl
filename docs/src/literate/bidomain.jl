@@ -116,30 +116,30 @@ function doassemble_linear!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCS
     n_s = getnbasefunctions(cellvalues)
     ntotal = n_ϕₘ + n_ϕₑ + n_s
     n_basefuncs = getnbasefunctions(cellvalues)
-    # We use PseudoBlockArrays to write into the right places of Ke    
+    #We use PseudoBlockArrays to write into the right places of Ke    
     Ke = PseudoBlockArray(zeros(ntotal, ntotal), [n_ϕₘ, n_ϕₑ, n_s], [n_ϕₘ, n_ϕₑ, n_s])
     Me = PseudoBlockArray(zeros(ntotal, ntotal), [n_ϕₘ, n_ϕₑ, n_s], [n_ϕₘ, n_ϕₑ, n_s])
 
     assembler_K = start_assemble(K)
     assembler_M = start_assemble(M)
 
-    # Here the block indices of the variables are defined.
+    #Here the block indices of the variables are defined.
     ϕₘ▄, ϕₑ▄, s▄ = 1, 2, 3
 
-    # Now we iterate over all cells of the grid
+    #Now we iterate over all cells of the grid
     @inbounds for cell in CellIterator(dh)
         fill!(Ke, 0)
         fill!(Me, 0)
-        # get the coordinates of the current cell
+        #get the coordinates of the current cell
         coords = getcoordinates(cell)
 
         reinit!(cellvalues, cell)
-        # loop over all Gauss points
+        #loop over all Gauss points
         for q_point in 1:getnquadpoints(cellvalues)
-            # get the spatial coordinates of the current gauss point
+            #get the spatial coordinates of the current gauss point
             coords_qp = spatial_coordinate(cellvalues, q_point, coords)
-            # based on the gauss point coordinates, we get the spatial dependent
-            # material parameters
+            #based on the gauss point coordinates, we get the spatial dependent
+            #material parameters
             κₑ_loc = κₑ(coords_qp)
             κᵢ_loc = κᵢ(coords_qp)
             Cₘ_loc = Cₘ(coords_qp)
@@ -151,17 +151,17 @@ function doassemble_linear!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCS
                 for j in 1:n_basefuncs
                     Nⱼ = shape_value(cellvalues, q_point, j)
                     ∇Nⱼ = shape_gradient(cellvalues, q_point, j)
-                    # diffusion parts
+                    #diffusion parts
                     Ke[BlockIndex((ϕₘ▄,ϕₘ▄),(i,j))] -= ((κᵢ_loc ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
                     Ke[BlockIndex((ϕₘ▄,ϕₑ▄),(i,j))] -= ((κᵢ_loc ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
                     Ke[BlockIndex((ϕₑ▄,ϕₘ▄),(i,j))] -= ((κᵢ_loc ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
                     Ke[BlockIndex((ϕₑ▄,ϕₑ▄),(i,j))] -= (((κₑ_loc + κᵢ_loc) ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
-                    # linear reaction parts
+                    #linear reaction parts
                     Ke[BlockIndex((ϕₘ▄,ϕₘ▄),(i,j))] += params.c * Nᵢ * Nⱼ * dΩ 
                     Ke[BlockIndex((ϕₘ▄,s▄),(i,j))]  += params.c * Nᵢ * Nⱼ * dΩ 
                     Ke[BlockIndex((s▄,ϕₘ▄),(i,j))]  -= 1.0/params.c * Nᵢ * Nⱼ * dΩ 
                     Ke[BlockIndex((s▄,s▄),(i,j))]   -=  params.b/params.c * Nᵢ * Nⱼ * dΩ 
-                    # mass matrices
+                    #mass matrices
                     Me[BlockIndex((ϕₘ▄,ϕₘ▄),(i,j))] += Cₘ_loc * χ_loc * Nᵢ * Nⱼ * dΩ
                     Me[BlockIndex((s▄,s▄),(i,j))]   += Nᵢ * Nⱼ * dΩ
                 end
