@@ -106,26 +106,26 @@ Base.@kwdef struct FHNParameters
     a::Float64 = 0.7
     b::Float64 = 0.8
     c::Float64 = 3.0
-end
+end;
 #
 # Within the equations of the model, spatial dependent parameters occur such as κₑ, κᵢ, Cₘ and χ.
 # For the sake of simplicity we kept them constant.
 # Nonetheless, we show how one can model spatial dependent coefficients. Hence, the unused function argument `x`
 function κₑ(x)
     return SymmetricTensor{2,2,Float64}((0.22, 0, 0.13))
-end
+end;
 #
 function κᵢ(x)
     return SymmetricTensor{2,2,Float64}((0.28, 0, 0.026))
-end
+end;
 #
 function Cₘ(x)
     return 1.0
-end
+end;
 #
 function χ(x)
     return 1.0
-end
+end;
 # The function `Iₛₜᵢₘ` models the stimulus and can be interpreted as a source term.
 function Iₛₜᵢₘ(x, t)
     if norm(x) < 0.25 && t < 5
@@ -133,7 +133,7 @@ function Iₛₜᵢₘ(x, t)
     else
         return 0
     end
-end
+end;
 #
 # Boundary conditions are added to the problem in the usual way. 
 # Please check out the other examples for an in depth explanation.
@@ -228,7 +228,7 @@ function doassemble_linear!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCS
         assemble!(assembler_M, celldofs(cell), Me)
     end
     return K, M
-end
+end;
 
 # Regarding the non-linear parts, while the affine term could be cached, for the sake of simplicity we simply recompute it in each call to the right hand side of the system.
 # ```math
@@ -279,7 +279,7 @@ function apply_nonlinear!(du, u, p, t)
         end
     end
     apply_zero!(du, ch)
-end
+end;
 #
 # We assemble the linear parts into `K` and `M`, respectively.
 K, M = doassemble_linear!(cellvalues, K, M, dh);
@@ -294,7 +294,7 @@ function bidomain!(du,u,p,t)
     du .= K * u
     println("Solving for timestep t=$t")
     apply_nonlinear!(du, u, p, t)
-end
+end;
 #
 Δt = 0.01
 T = 1
@@ -316,7 +316,7 @@ prob_mm = DifferentialEquations.ODEProblem(f,u₀,(0.0,T),[K, dh, ch, FHNParamet
 sol = DifferentialEquations.solve(prob_mm,DifferentialEquations.QBDF(),reltol=1e-3,abstol=1e-4, adaptive=true, dt=Δt)
 #
 # We instantiate a paraview collection file.
-pvd = paraview_collection("bidomain.pvd")
+pvd = paraview_collection("bidomain.pvd");
 # Now, we loop over all timesteps and solution vectors, in order to append them to the paraview collection.
 for (solution,t) in zip(sol.u, sol.t)
     #compress=false flag because otherwise each vtk file will be stored in memory
@@ -327,7 +327,7 @@ for (solution,t) in zip(sol.u, sol.t)
     end
 end
 # Finally, we save the paraview collection.
-vtk_save(pvd)
+vtk_save(pvd);
 #md # ## [Plain Program](@id bidomain-plain-program)
 #md #
 #md # Below follows a version of the program without any comments.
