@@ -13,9 +13,6 @@
 # check out the linked wikipedia article.
 #
 # The Bidomain model in parabolic-elliptic form is given as the following system
-# ```math
-# \chi  C_{\textrm{m}} \frac{\partial \varphi_{\textrm{m}}}{\partial t} = \nabla \cdot (\mathbf{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{m}}) + \nabla \cdot (\mathbf{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{e}}) - \chi I_{\textrm{ion}}(\varphi_{\textrm{m}}, \mathbf{s}) - \chi I_{\textrm{stim}}(t) \qquad \textrm{on} : \Omega_{\mathbb{H}} \times (0,T]  
-# ```
 #
 # ```math
 # \begin{aligned}
@@ -68,20 +65,21 @@
 #   \tilde{\varphi}_\textrm{e},
 #   \tilde{s})
 # ```
-#-
+#
 # ## Commented Program
 #
 using JuAFEM, SparseArrays, BlockArrays
-# Instead of using a self written time integrator, 
+# Instead of using a self written time integrator,
 # we will use in this example a time integrator of [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl)
 # [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) is a powerful package, from which we will use
 # adaptive time stepping. Besides this, almost any ODE solver you can imagine is available.
-# In order to use it, we first need to `import` it. 
+# In order to use it, we first need to `import` it.
 import DifferentialEquations
 #
 # Now, we define the computational domain and cellvalues. We exploit the fact that all fields of
 # the Bidomain model are approximated with the same Ansatz. Hence, we use one CellScalarValues struct for all three fields.
-grid = generate_grid(Quadrilateral, (20, 20))
+grid = generate_grid(Quadrilateral, (40, 40), Vec{2}((0.0,0.0)), Vec{2}((2.5,2.5)))
+addnodeset!(grid, "ground", x-> x[2] == -0 && x[1] == -0)
 dim = 2
 ip = Lagrange{dim, RefCube, 1}()
 qr = QuadratureRule{dim, RefCube}(2)
@@ -95,7 +93,7 @@ push!(dh, :ϕₘ, 1)
 push!(dh, :ϕₑ, 1)
 push!(dh, :s, 1)
 close!(dh);
-# 
+#
 # The linear parts of the Bidomain equations contribute to the stiffness and mass matrix, respectively.
 # So, we create a sparsity pattern for those terms.
 K = create_sparsity_pattern(dh)
@@ -103,20 +101,22 @@ M = create_sparsity_pattern(dh);
 #
 # Material related parameters are stored in the struct `FHNParameters`
 Base.@kwdef struct FHNParameters
-    a::Float64 = 0.7
-    b::Float64 = 0.8
-    c::Float64 = 3.0
+    a::Float64 = 0.1
+    b::Float64 = 0.5
+    c::Float64 = 1.0
+    d::Float64 = 0.0
+    e::Float64 = 0.01
 end;
 #
 # Within the equations of the model, spatial dependent parameters occur such as κₑ, κᵢ, Cₘ and χ.
 # For the sake of simplicity we kept them constant.
 # Nonetheless, we show how one can model spatial dependent coefficients. Hence, the unused function argument `x`
 function κₑ(x)
-    return SymmetricTensor{2,2,Float64}((0.22, 0, 0.13))
+    return SymmetricTensor{2,2,Float64}((0.000025, 0, 0.000025))
 end;
 #
 function κᵢ(x)
-    return SymmetricTensor{2,2,Float64}((0.28, 0, 0.026))
+    return SymmetricTensor{2,2,Float64}((0.000025, 0, 0.000025))
 end;
 #
 function Cₘ(x)
@@ -128,17 +128,15 @@ function χ(x)
 end;
 # The function `Iₛₜᵢₘ` models the stimulus and can be interpreted as a source term.
 function Iₛₜᵢₘ(x, t)
-    if norm(x) < 0.25 && t < 5
-        return 1.0
-    else
-        return 0
-    end
+    return 0
 end;
 #
-# Boundary conditions are added to the problem in the usual way. 
+# Boundary conditions are added to the problem in the usual way.
 # Please check out the other examples for an in depth explanation.
+# Here we force the extracellular porential to be zero at the boundary.
 ch = ConstraintHandler(dh)
-∂Ω = getfaceset(grid, "left")
+#∂Ω = union(getfaceset.((grid, ), ["bottom"])...)
+∂Ω = getnodeset(grid, "ground")
 dbc = Dirichlet(:ϕₑ, ∂Ω, (x, t) -> 0)
 add!(ch, dbc)
 close!(ch)
@@ -172,7 +170,7 @@ function doassemble_linear!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCS
     n_s = getnbasefunctions(cellvalues)
     ntotal = n_ϕₘ + n_ϕₑ + n_s
     n_basefuncs = getnbasefunctions(cellvalues)
-    #We use PseudoBlockArrays to write into the right places of Ke    
+    #We use PseudoBlockArrays to write into the right places of Ke
     Ke = PseudoBlockArray(zeros(ntotal, ntotal), [n_ϕₘ, n_ϕₑ, n_s], [n_ϕₘ, n_ϕₑ, n_s])
     Me = PseudoBlockArray(zeros(ntotal, ntotal), [n_ϕₘ, n_ϕₑ, n_s], [n_ϕₘ, n_ϕₑ, n_s])
 
@@ -213,10 +211,10 @@ function doassemble_linear!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCS
                     Ke[BlockIndex((ϕₑ▄,ϕₘ▄),(i,j))] -= ((κᵢ_loc ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
                     Ke[BlockIndex((ϕₑ▄,ϕₑ▄),(i,j))] -= (((κₑ_loc + κᵢ_loc) ⋅ ∇Nᵢ) ⋅ ∇Nⱼ) * dΩ
                     #linear reaction parts
-                    Ke[BlockIndex((ϕₘ▄,ϕₘ▄),(i,j))] += params.c * Nᵢ * Nⱼ * dΩ 
-                    Ke[BlockIndex((ϕₘ▄,s▄),(i,j))]  += params.c * Nᵢ * Nⱼ * dΩ 
-                    Ke[BlockIndex((s▄,ϕₘ▄),(i,j))]  -= 1.0/params.c * Nᵢ * Nⱼ * dΩ 
-                    Ke[BlockIndex((s▄,s▄),(i,j))]   -=  params.b/params.c * Nᵢ * Nⱼ * dΩ 
+                    Ke[BlockIndex((ϕₘ▄,ϕₘ▄),(i,j))] -= params.a * Nᵢ * Nⱼ * dΩ
+                    Ke[BlockIndex((ϕₘ▄,s▄),(i,j))]  -= Nᵢ * Nⱼ * dΩ
+                    Ke[BlockIndex((s▄,ϕₘ▄),(i,j))]  += params.e * params.b * Nᵢ * Nⱼ * dΩ
+                    Ke[BlockIndex((s▄,s▄),(i,j))]   -= params.e * params.c * Nᵢ * Nⱼ * dΩ
                     #mass matrices
                     Me[BlockIndex((ϕₘ▄,ϕₘ▄),(i,j))] += Cₘ_loc * χ_loc * Nᵢ * Nⱼ * dΩ
                     Me[BlockIndex((s▄,s▄),(i,j))]   += Nᵢ * Nⱼ * dΩ
@@ -248,14 +246,15 @@ end;
 # TODO cleanup
 # The function `apply_nonlinear!` describes the nonlinear change of the system.
 # It takes the change vector `du`, the current available solution `u`, the generic storage
-# vector `p` and the current time `t`. The storage vector will be used to pass the `dh::DofHandler`, 
+# vector `p` and the current time `t`. The storage vector will be used to pass the `dh::DofHandler`,
 # `ch::ConstraintHandler`, stiffness matrix `K` and constant material parameters `FHNParameters()`
 function apply_nonlinear!(du, u, p, t)
     dh = p[2]
     ch = p[3]
-    ip = Lagrange{2, RefCube, 1}()
-    qr = QuadratureRule{2, RefCube}(2)
-    cellvalues = CellScalarValues(qr, ip);
+    params = p[4]
+    ip = p[5]
+    qr = p[6]
+    cellvalues = p[7]
     n_basefuncs = getnquadpoints(cellvalues)
 
     for cell in CellIterator(dh)
@@ -270,11 +269,12 @@ function apply_nonlinear!(du, u, p, t)
             x_qp = spatial_coordinate(cellvalues, q_point, coords)
             χ_loc = χ(x_qp)
             dΩ = getdetJdV(cellvalues, q_point)
-            nl_contrib = function_value(cellvalues, q_point, ϕₘe)^3
+            val = function_value(cellvalues, q_point, ϕₘe)
+            nl_contrib = - val^3 + (1+params.a)*val^2
             for j in 1:n_basefuncs
                 Nⱼ = shape_value(cellvalues, q_point, j)
-                du[ϕₘ_celldofs[j]] -= p[4].c * (1/3 * nl_contrib + χ_loc*Iₛₜᵢₘ(x_qp,t)) * Nⱼ * dΩ
-                du[s_celldofs[j]] += p[4].a/p[4].c * Nⱼ * dΩ
+                du[ϕₘ_celldofs[j]] += χ_loc * ( nl_contrib + Iₛₜᵢₘ(x_qp,t)) * Nⱼ * dΩ
+                du[s_celldofs[j]]  -= params.e * params.d * Nⱼ * dΩ
             end
         end
     end
@@ -296,9 +296,8 @@ function bidomain!(du,u,p,t)
     apply_nonlinear!(du, u, p, t)
 end;
 #
-Δt = 0.01
-T = 1
-f = DifferentialEquations.ODEFunction(bidomain!,mass_matrix=M)
+Δt = 0.1
+T = 1000
 # In the following code block we define the initial condition of the problem. We first
 # initialize a zero vector of length `ndofs(dh)` and fill it afterwards in a for loop over all cells.
 u₀ = zeros(ndofs(dh));
@@ -306,14 +305,34 @@ for cell in CellIterator(dh)
     _celldofs = celldofs(cell)
     ϕₘ_celldofs = _celldofs[dof_range(dh, :ϕₘ)]
     s_celldofs = _celldofs[dof_range(dh, :s)]
-    u₀[ϕₘ_celldofs] .= 1.19941300
-    u₀[s_celldofs]  .= -0.6242615997254787
+    for (i, coordinate) in enumerate(getcoordinates(cell))
+        if coordinate[2] >= 1.25
+            u₀[s_celldofs[i]] = 0.1
+        end
+        if coordinate[1] <= 1.25 && coordinate[2] <= 1.25
+            u₀[ϕₘ_celldofs[i]] = 1.0
+        end
+    end
+    #u₀[ϕₘ_celldofs] .= 1.19941300
+    #u₀[s_celldofs]  .= -0.6242615997254787
 end
 
 # We can now state the `ODEProblem`
-prob_mm = DifferentialEquations.ODEProblem(f,u₀,(0.0,T),[K, dh, ch, FHNParameters()])
+p = [K, dh, ch, FHNParameters(), ip, qr, cellvalues]
+
+# BROKEN
+#using SparsityDetection
+#input = u₀
+#output = similar(input)
+#sparsity_pattern = jacobian_sparsity(bidomain!,similar(u₀),similar(u₀),p,0.0;verbose=true)
+#jac_sparsity = Float64.(sparse(sparsity_pattern))
+jac_sparsity = sparse(K)
+
+f = DifferentialEquations.ODEFunction(bidomain!,mass_matrix=M;jac_prototype=jac_sparsity)
+prob_mm = DifferentialEquations.ODEProblem(f,u₀,(0.0,T),p)
 # and solve it.
-sol = DifferentialEquations.solve(prob_mm,DifferentialEquations.QBDF(),reltol=1e-3,abstol=1e-4, adaptive=true, dt=Δt)
+
+sol = DifferentialEquations.solve(prob_mm,DifferentialEquations.QNDF(),reltol=1e-3,abstol=1e-4, adaptive=true, dt=Δt)
 #
 # We instantiate a paraview collection file.
 pvd = paraview_collection("bidomain.pvd");
