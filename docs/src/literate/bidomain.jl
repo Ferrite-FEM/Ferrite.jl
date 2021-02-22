@@ -8,8 +8,8 @@
 #-
 # ## Introduction
 #
-# In this example we will implement the [Bidomain Model](https://en.wikipedia.org/wiki/Bidomain_model).
-# This model is used to simulate the electrical activity of the heart. For more information about the derivation,
+# In this example we will implement the [Bidomain Model](https://en.wikipedia.org/wiki/Bidomain_model) with the help of [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl).
+# This model is used to simulate the excitable media, most commonly cardiac tissue. For more information about the derivation,
 # check out the linked wikipedia article.
 #
 # The Bidomain model in parabolic-elliptic form is given as the following system
@@ -80,11 +80,11 @@ import DifferentialEquations
 #
 # Now, we define the computational domain and cellvalues. We exploit the fact that all fields of
 # the Bidomain model are approximated with the same Ansatz. Hence, we use one CellScalarValues struct for all three fields.
-grid = generate_grid(Quadrilateral, (40, 40), Vec{2}((0.0,0.0)), Vec{2}((2.5,2.5)))
+grid = generate_grid(Quadrilateral, (60, 60), Vec{2}((0.0,0.0)), Vec{2}((2.5,2.5)))
 addnodeset!(grid, "ground", x-> x[2] == -0 && x[1] == -0)
 dim = 2
 Δt = 0.1
-T = 1
+T = 1000
 ip = Lagrange{dim, RefCube, 1}()
 qr = QuadratureRule{dim, RefCube}(2)
 cellvalues = CellScalarValues(qr, ip);
@@ -116,11 +116,11 @@ end;
 # For the sake of simplicity we kept them constant.
 # Nonetheless, we show how one can model spatial dependent coefficients. Hence, the unused function argument `x`
 function κₑ(x)
-    return SymmetricTensor{2,2,Float64}((0.000025, 0, 0.000025))
+    return SymmetricTensor{2,2,Float64}((3.5e-5, 0, 2.5e-5))
 end;
 
 function κᵢ(x)
-    return SymmetricTensor{2,2,Float64}((0.000025, 0, 0.000025))
+    return SymmetricTensor{2,2,Float64}((4.5e-5, 0, 2.0e-6))
 end;
 
 function Cₘ(x)
@@ -186,7 +186,7 @@ function doassemble_linear!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCS
         #get the coordinates of the current cell
         coords = getcoordinates(cell)
 
-        reinit!(cellvalues, cell)
+        JuAFEM.reinit!(cellvalues, cell)
         #loop over all Gauss points
         for q_point in 1:getnquadpoints(cellvalues)
             #get the spatial coordinates of the current gauss point
@@ -257,7 +257,7 @@ function apply_nonlinear!(du, u, p, t)
     n_basefuncs = getnquadpoints(cellvalues)
 
     for cell in CellIterator(dh)
-        reinit!(cellvalues, cell)
+        JuAFEM.reinit!(cellvalues, cell)
         _celldofs = celldofs(cell)
         ϕₘ_celldofs = _celldofs[dof_range(dh, :ϕₘ)]
         s_celldofs = _celldofs[dof_range(dh, :s)]
@@ -317,7 +317,7 @@ f = DifferentialEquations.ODEFunction(bidomain!,mass_matrix=M;jac_prototype=jac_
 p = [K, dh, ch, FHNParameters(), ip, qr, cellvalues]
 prob_mm = DifferentialEquations.ODEProblem(f,u₀,(0.0,T),p)
 
-sol = DifferentialEquations.solve(prob_mm,DifferentialEquations.QNDF(),reltol=1e-3,abstol=1e-4, adaptive=true, dt=Δt);
+sol = DifferentialEquations.solve(prob_mm,DifferentialEquations.QNDF(),reltol=1e-3,abstol=1e-4, progress=true, progress_steps = 1, adaptive=true, dt=Δt);
 #
 # We instantiate a paraview collection file.
 pvd = paraview_collection("bidomain.pvd");
