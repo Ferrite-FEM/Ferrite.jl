@@ -16,7 +16,7 @@
 #
 # ```math
 # \begin{aligned}
-# 	\chi  C_{\textrm{m}} \frac{\partial \varphi_{\textrm{m}}}{\partial t} &= \nabla \cdot (\bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{m}}) + \nabla \cdot (\bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{e}}) - \chi I_{\textrm{ion}}(\varphi_{\textrm{m}}, \mathbf{s}) - \chi I_{\textrm{stim}}(t) & \textrm{on} \: \Omega \times (0,T] \\
+# 	\chi C_{\textrm{m}} \frac{\partial \varphi_{\textrm{m}}}{\partial t} &= \nabla \cdot (\bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{m}}) + \nabla \cdot (\bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{e}}) - \chi I_{\textrm{ion}}(\varphi_{\textrm{m}}, \mathbf{s}) & \textrm{on} \: \Omega \times (0,T] \\
 # 	0 &= \nabla \cdot (\bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{m}}) + \nabla \cdot (\bm{\kappa}_e + \bm{\kappa}_{\textrm{i}}) \nabla \varphi_{\textrm{e}} & \textrm{on} \: \Omega \times (0,T] \\
 # 	\frac{\partial \mathbf{s}}{\partial t} &= \mathbf{g}(\varphi_{\textrm{m}}, \mathbf{s}) & \textrm{on} \: \Omega \times (0,T]
 # \end{aligned}
@@ -26,24 +26,26 @@
 #
 # ```math
 # \begin{aligned}
-# 	I_{\textrm{ion}}(\varphi_{\textrm{m}}, \mathbf{s}) &= -c (\varphi_m - \frac{1}{3} \varphi_m^3 + s) \\
-# 	g(\varphi_{\textrm{m}}, \mathbf{s}) &= -\frac{1}{c}(\varphi_m - a + b s)
+# 	I_{\textrm{ion}}(\varphi_{\textrm{m}}, \mathbf{s}) &= - \varphi_{\textrm{m}}(1 - \varphi_{\textrm{m}})(\varphi_{\textrm{m}} - a) + s \\
+# 	g(\varphi_{\textrm{m}}, \mathbf{s}) &= e(b\varphi_{\textrm{m}} - c s - d)
 # \end{aligned}
 # ```
+#
+# with parameters and initial conditions as stated in: Alfonso Bueno-Orovio, David Kay, and Kevin Burrage. "Fourier spectral methods for fractional-in-space reaction-diffusion equations." BIT Numerical mathematics 54.4 (2014): 937-954.
 #
 # To utilize DifferentialEquations.jl we first have to discretize the system with JuAFEM into a system of ordinary differential equations (ODEs) in mass matrix form. Therefore we have first to transform it into a weak form
 #
 # ```math
 # \begin{aligned}
-# 	\int_\Omega \chi  C_{\textrm{m}} \frac{\partial \varphi_{\textrm{m}}}{\partial t} v_1 \textrm{d}\Omega &= \int_\Omega (\bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{m}} + \bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{e}}) \cdot \nabla v_1 \textrm{d}\Omega - \int_\Omega \chi (I_{\textrm{stim}}(t) -c (\varphi_m - \frac{1}{3} \varphi_m^3 + s)) v_1 \textrm{d}\Omega \\
+# 	\int_\Omega \chi  C_{\textrm{m}} \frac{\partial \varphi_{\textrm{m}}}{\partial t} v_1 \textrm{d}\Omega &= \int_\Omega (\bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{m}} + \bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{e}}) \cdot \nabla v_1 \textrm{d}\Omega + \int_\Omega \chi (\varphi_{\textrm{m}}(1 - \varphi_{\textrm{m}})(\varphi_{\textrm{m}} - a) - s) v_1 \textrm{d}\Omega \\
 # 	0 &= \int_\Omega (\bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{m}} + (\bm{\kappa}_e + \bm{\kappa}_{\textrm{i}}) \nabla \varphi_{\textrm{e}}) \cdot \nabla v_2 \textrm{d}\Omega \\
-# 	\int_\Omega \frac{\partial s}{\partial t} v_3 \textrm{d}\Omega &= -\int_\Omega \frac{1}{c}(\varphi_m - a + b s) v_3 \textrm{d}\Omega
+# 	\int_\Omega \frac{\partial s}{\partial t} v_3 \textrm{d}\Omega &= \int_\Omega e(b\varphi_{\textrm{m}} - c s - d) v_3 \textrm{d}\Omega
 # \end{aligned}
 # ```
 #
-# Please note that technically speaking we obtain a system of differential-algebraic equations (DAEs), so note that we cannot apply all ODE solvers to the resulting system. However, DifferentialEquations.jl expects for some solvers to state the DAE as an ODE in mass matrix form and because this form arises naturally in finite element methods for many common problems, let us stick with it. In this example the required Jacobians for the ODE solver are computed via automatic differentiation, but in optimized implementations they can also be manually provided.
+# Please note that technically speaking we obtain a [differential-algebraic system of equations](https://en.wikipedia.org/wiki/Differential-algebraic_system_of_equations) (DAE), so note that we cannot apply all ODE solvers to the resulting system. However, [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) expects for some solvers to state the DAE as an ODE in mass matrix form and because this form arises naturally in finite element methods for many common problems, let us stick with it. In this example the required Jacobians for the ODE solver are computed via automatic differentiation, but in optimized implementations they can also be manually provided.
 #
-# Discretizing this weak form yields a semi-linear system of ODEs in mass matrix form:
+# Discretizing the provided weak form yields a semi-linear system of ODEs in mass matrix form:
 #
 # ```math
 # \mathcal{M}
@@ -142,7 +144,7 @@ add!(ch, dbc)
 close!(ch)
 update!(ch, 0.0);
 #
-# We first write a helper to assemble the linear parts. Note that we can precompute and cache linear parts.
+# We first write a helper to assemble the linear parts. Note that we can precompute and cache linear parts. In the used notation subscripts indicate dependent coefficients.
 #
 # ```math
 # \mathcal{M}
@@ -156,9 +158,9 @@ update!(ch, 0.0);
 # \mathcal{L}
 # =
 # \begin{bmatrix}
-#   M_{c\chi}-K_{\bm{\kappa}_{\textrm{i}}} & -K_{\bm{\kappa}_{\textrm{i}}} & M_{\chi} \\
+#   -M_{a\chi}-K_{\bm{\kappa}_{\textrm{i}}} & -K_{\bm{\kappa}_{\textrm{i}}} & -M_{\chi} \\
 #   -K_{\bm{\kappa}_{\textrm{i}}} & -K_{\bm{\kappa}_{\textrm{i}}+\bm{\kappa}_{\textrm{e}}} & 0 \\
-#   -M_{1/c} & 0 & -M_{b/c}
+#   M_{be} & 0 & -M_{bc}
 # \end{bmatrix}
 # ```
 #
@@ -236,9 +238,9 @@ end;
 #   \tilde{s})
 # =
 # \begin{bmatrix}
-#   -(\int_\Omega \frac{\chi c}{3} ((\sum_i \tilde{\varphi}_{m,i} u_{1,i})^3 + I_{\textrm{stim}}(t))v_{1,j} \textrm{d}\Omega)_j \\
+#   -(\int_\Omega \chi ((\sum_i -\tilde{\varphi}_{m,i} u_{1,i})^3 + \tilde{\varphi}_{m,i} (1+a) u_{1,i})^2)v_{1,j} \textrm{d}\Omega)_j \\
 #   0 \\
-#   (\int_\Omega \frac{a}{c} v_{3,j} \textrm{d}\Omega)_j
+#   (\int_\Omega de v_{3,j} \textrm{d}\Omega)_j
 # \end{bmatrix}
 # ```
 # It is important to note, that we have to sneak in the boundary conditions into the evaluation of the non-linear term.
@@ -297,7 +299,7 @@ function bidomain!(du,u,p,t)
 end;
 #
 Δt = 0.1
-T = 1000
+T = 1
 # In the following code block we define the initial condition of the problem. We first
 # initialize a zero vector of length `ndofs(dh)` and fill it afterwards in a for loop over all cells.
 u₀ = zeros(ndofs(dh));
