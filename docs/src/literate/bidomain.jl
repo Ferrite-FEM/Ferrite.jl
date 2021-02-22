@@ -33,7 +33,7 @@
 #
 # with parameters and initial conditions as stated in: Alfonso Bueno-Orovio, David Kay, and Kevin Burrage. "Fourier spectral methods for fractional-in-space reaction-diffusion equations." BIT Numerical mathematics 54.4 (2014): 937-954.
 #
-# To utilize DifferentialEquations.jl we first have to discretize the system with JuAFEM into a system of ordinary differential equations (ODEs) in mass matrix form. Therefore we have first to transform it into a weak form
+# To utilize [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) we first have to discretize the system with JuAFEM into a system of ordinary differential equations (ODEs) in mass matrix form. Therefore we have first to transform it into a weak form
 #
 # ```math
 # \begin{aligned}
@@ -83,6 +83,8 @@ import DifferentialEquations
 grid = generate_grid(Quadrilateral, (40, 40), Vec{2}((0.0,0.0)), Vec{2}((2.5,2.5)))
 addnodeset!(grid, "ground", x-> x[2] == -0 && x[1] == -0)
 dim = 2
+Δt = 0.1
+T = 1
 ip = Lagrange{dim, RefCube, 1}()
 qr = QuadratureRule{dim, RefCube}(2)
 cellvalues = CellScalarValues(qr, ip);
@@ -116,28 +118,23 @@ end;
 function κₑ(x)
     return SymmetricTensor{2,2,Float64}((0.000025, 0, 0.000025))
 end;
-#
+
 function κᵢ(x)
     return SymmetricTensor{2,2,Float64}((0.000025, 0, 0.000025))
 end;
-#
+
 function Cₘ(x)
     return 1.0
 end;
-#
+
 function χ(x)
     return 1.0
-end;
-# The function `Iₛₜᵢₘ` models the stimulus and can be interpreted as a source term.
-function Iₛₜᵢₘ(x, t)
-    return 0
 end;
 #
 # Boundary conditions are added to the problem in the usual way.
 # Please check out the other examples for an in depth explanation.
 # Here we force the extracellular porential to be zero at the boundary.
 ch = ConstraintHandler(dh)
-#∂Ω = union(getfaceset.((grid, ), ["bottom"])...)
 ∂Ω = getnodeset(grid, "ground")
 dbc = Dirichlet(:ϕₑ, ∂Ω, (x, t) -> 0)
 add!(ch, dbc)
@@ -275,7 +272,7 @@ function apply_nonlinear!(du, u, p, t)
             nl_contrib = - val^3 + (1+params.a)*val^2
             for j in 1:n_basefuncs
                 Nⱼ = shape_value(cellvalues, q_point, j)
-                du[ϕₘ_celldofs[j]] += χ_loc * ( nl_contrib + Iₛₜᵢₘ(x_qp,t)) * Nⱼ * dΩ
+                du[ϕₘ_celldofs[j]] += χ_loc * nl_contrib * Nⱼ * dΩ
                 du[s_celldofs[j]]  -= params.e * params.d * Nⱼ * dΩ
             end
         end
@@ -291,15 +288,11 @@ apply!(M, ch);
 #
 # In the function `bidomain!` we model the actual time dependent DAE problem. This function takes
 # the same parameters as `apply_nonlinear!`, which is essentially the defined interface by
-# DifferentialEquations.jl
+# [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl)
 function bidomain!(du,u,p,t)
     du .= K * u
-    println("Solving for timestep t=$t")
     apply_nonlinear!(du, u, p, t)
 end;
-#
-Δt = 0.1
-T = 1
 # In the following code block we define the initial condition of the problem. We first
 # initialize a zero vector of length `ndofs(dh)` and fill it afterwards in a for loop over all cells.
 u₀ = zeros(ndofs(dh));
@@ -315,26 +308,16 @@ for cell in CellIterator(dh)
             u₀[ϕₘ_celldofs[i]] = 1.0
         end
     end
-    #u₀[ϕₘ_celldofs] .= 1.19941300
-    #u₀[s_celldofs]  .= -0.6242615997254787
 end
 
-# We can now state the `ODEProblem`
-p = [K, dh, ch, FHNParameters(), ip, qr, cellvalues]
-
-# BROKEN
-#using SparsityDetection
-#input = u₀
-#output = similar(input)
-#sparsity_pattern = jacobian_sparsity(bidomain!,similar(u₀),similar(u₀),p,0.0;verbose=true)
-#jac_sparsity = Float64.(sparse(sparsity_pattern))
+# We can now state and solve the `ODEProblem`. Since the jacobian of our problem is large and sparse it is advantageous to avoid building a dense matrix (with dense solver) where possible. In [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) we can enforce using sparse jacobian matrices by providing a prototype jacobian with proper sparsity pattern, see [here](https://diffeq.sciml.ai/stable/tutorials/advanced_ode_example/#Speeding-Up-Jacobian-Calculations) for details. In our problem it turns out that the K captures this pattern sufficiently, so for the sake if simplicity we simply use it in this example.
 jac_sparsity = sparse(K)
 
 f = DifferentialEquations.ODEFunction(bidomain!,mass_matrix=M;jac_prototype=jac_sparsity)
+p = [K, dh, ch, FHNParameters(), ip, qr, cellvalues]
 prob_mm = DifferentialEquations.ODEProblem(f,u₀,(0.0,T),p)
-# and solve it.
 
-sol = DifferentialEquations.solve(prob_mm,DifferentialEquations.QNDF(),reltol=1e-3,abstol=1e-4, adaptive=true, dt=Δt)
+sol = DifferentialEquations.solve(prob_mm,DifferentialEquations.QNDF(),reltol=1e-3,abstol=1e-4, adaptive=true, dt=Δt);
 #
 # We instantiate a paraview collection file.
 pvd = paraview_collection("bidomain.pvd");
