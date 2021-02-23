@@ -37,8 +37,8 @@
 #
 # ```math
 # \begin{aligned}
-# 	\int_\Omega \chi  C_{\textrm{m}} \frac{\partial \varphi_{\textrm{m}}}{\partial t} v_1 \textrm{d}\Omega &= \int_\Omega (\bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{m}} + \bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{e}}) \cdot \nabla v_1 \textrm{d}\Omega + \int_\Omega \chi (\varphi_{\textrm{m}}(1 - \varphi_{\textrm{m}})(\varphi_{\textrm{m}} - a) - s) v_1 \textrm{d}\Omega \\
-# 	0 &= \int_\Omega (\bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{m}} + (\bm{\kappa}_e + \bm{\kappa}_{\textrm{i}}) \nabla \varphi_{\textrm{e}}) \cdot \nabla v_2 \textrm{d}\Omega \\
+# 	\int_\Omega \chi  C_{\textrm{m}} \frac{\partial \varphi_{\textrm{m}}}{\partial t} v_1 \textrm{d}\Omega &= -\int_\Omega (\bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{m}} + \bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{e}}) \cdot \nabla v_1 \textrm{d}\Omega + \int_\Omega \chi (\varphi_{\textrm{m}}(1 - \varphi_{\textrm{m}})(\varphi_{\textrm{m}} - a) - s) v_1 \textrm{d}\Omega \\
+# 	0 &= -\int_\Omega (\bm{\kappa}_{\textrm{i}} \nabla \varphi_{\textrm{m}} + (\bm{\kappa}_e + \bm{\kappa}_{\textrm{i}}) \nabla \varphi_{\textrm{e}}) \cdot \nabla v_2 \textrm{d}\Omega \\
 # 	\int_\Omega \frac{\partial s}{\partial t} v_3 \textrm{d}\Omega &= \int_\Omega e(b\varphi_{\textrm{m}} - c s - d) v_3 \textrm{d}\Omega
 # \end{aligned}
 # ```
