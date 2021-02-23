@@ -1,5 +1,6 @@
 [deps]
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
+DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 JuAFEM = "30d91d44-8115-11e8-1d28-c19a5ac16de8"
