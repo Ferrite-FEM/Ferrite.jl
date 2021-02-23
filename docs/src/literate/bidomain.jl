@@ -43,6 +43,8 @@
 # \end{aligned}
 # ```
 #
+# where we assume no flux boundary condition for $\varphi_{\textrm{m}}, \varphi_{\textrm{e}}$, except in one point. This models a grounding through a Dirichlet condition of zero in this point. 
+#
 # Please note that technically speaking we obtain a [differential-algebraic system of equations](https://en.wikipedia.org/wiki/Differential-algebraic_system_of_equations) (DAE), so note that we cannot apply all ODE solvers to the resulting system. However, [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) expects for some solvers to state the DAE as an ODE in mass matrix form and because this form arises naturally in finite element methods for many common problems, let us stick with it. In this example the required Jacobians for the ODE solver are computed via automatic differentiation, but in optimized implementations they can also be manually provided.
 #
 # Discretizing the provided weak form yields a semi-linear system of ODEs in mass matrix form:
