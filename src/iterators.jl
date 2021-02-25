@@ -25,7 +25,7 @@ end
 """
 struct CellIterator{dim,C,T,DH<:Union{AbstractDofHandler,Nothing}}
     flags::UpdateFlags
-    grid::Grid{dim,C,T}
+    grid::AbstractGrid
     current_cellid::ScalarWrapper{Int}
     nodes::Vector{Int}
     coords::Vector{Vec{dim,T}}
@@ -33,7 +33,8 @@ struct CellIterator{dim,C,T,DH<:Union{AbstractDofHandler,Nothing}}
     dh::Union{DH,Nothing}
     celldofs::Vector{Int}
 
-    function CellIterator{dim,C,T}(dh::Union{DofHandler{dim,C,T},MixedDofHandler{dim,T,G},Nothing}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T,G}
+    function CellIterator(dh::Union{DofHandler{dim,T,G},MixedDofHandler{dim,T,G}}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,T,G<:AbstractGrid}
+        C = getcelltype(dh.grid)
         isconcretetype(C) || _check_same_celltype(dh.grid, cellset)
         N = nnodes_per_cell(dh.grid, cellset === nothing ? 1 : first(cellset))
         cell = ScalarWrapper(0)
@@ -44,7 +45,19 @@ struct CellIterator{dim,C,T,DH<:Union{AbstractDofHandler,Nothing}}
         return new{dim,C,T,typeof(dh)}(flags, dh.grid, cell, nodes, coords, cellset, dh, celldofs)
     end
 
-    function CellIterator{dim,C,T}(grid::Grid{dim,C,T}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T}
+    function CellIterator(grid::Grid{dim,C,T}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T}
+        isconcretetype(C) || _check_same_celltype(grid, cellset)
+        N = nnodes_per_cell(grid, cellset === nothing ? 1 : first(cellset))
+        cell = ScalarWrapper(0)
+        nodes = zeros(Int, N)
+        coords = zeros(Vec{dim,T}, N)
+        return new{dim,C,T,Nothing}(flags, grid, cell, nodes, coords, cellset)
+    end
+
+    function CellIterator(grid::G, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {G<:AbstractGrid}
+        C = getcelltype(grid)
+        T = Float64 ## TODO extract from something else
+        dim = getdim(grid)
         isconcretetype(C) || _check_same_celltype(grid, cellset)
         N = nnodes_per_cell(grid, cellset === nothing ? 1 : first(cellset))
         cell = ScalarWrapper(0)
@@ -54,12 +67,10 @@ struct CellIterator{dim,C,T,DH<:Union{AbstractDofHandler,Nothing}}
     end
 end
 
-CellIterator(grid::Grid{dim,C,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
-    CellIterator{dim,C,T}(grid, cellset, flags)
-CellIterator(dh::DofHandler{dim,C,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
-    CellIterator{dim,C,T}(dh, cellset, flags)
-CellIterator(dh::MixedDofHandler{dim,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,T} =
-    CellIterator{dim,getcelltype(dh.grid),T}(dh, cellset, flags)
+CellIterator(grid::G; cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {G<:AbstractGrid} =
+    CellIterator(grid, cellset, flags)
+CellIterator(dh::Union{DofHandler{dim, T, G}, MixedDofHandler{dim,T,G}}; cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,T,G<:AbstractGrid} =
+    CellIterator(dh, cellset, flags)
 
 # iterator interface
 function Base.iterate(ci::CellIterator, state = 1)

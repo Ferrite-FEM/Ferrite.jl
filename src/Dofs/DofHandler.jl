@@ -11,7 +11,7 @@ abstract type AbstractDofHandler end
 
 Construct a `DofHandler` based on the grid `grid`.
 """
-struct DofHandler{dim,C,T} <: AbstractDofHandler
+struct DofHandler{dim,T,G <: AbstractGrid{dim}} <: AbstractDofHandler
     field_names::Vector{Symbol}
     field_dims::Vector{Int}
     # TODO: field_interpolations can probably be better typed: We should at least require
@@ -21,19 +21,23 @@ struct DofHandler{dim,C,T} <: AbstractDofHandler
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
     closed::ScalarWrapper{Bool}
-    grid::Grid{dim,C,T}
+    grid::G
     ndofs::ScalarWrapper{Int}
 end
 
-function DofHandler(grid::Grid)
-    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
+function DofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
+    DofHandler{dim,T,Grid{dim,C,T}}(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
+end
+
+function DofHandler(grid::AbstractGrid{dim}) where dim
+    DofHandler{dim,Float64,typeof(grid)}(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
     println(io, "DofHandler")
     println(io, "  Fields:")
     for i in 1:nfields(dh)
-        println(io, "    ", repr(dh.field_names[i]), ", interpolation: ", dh.field_interpolations[i],", dim: ", dh.field_dims[i])
+        println(io, "    ", repr(dh.field_names[i]), ", interpolation: ", dh.field_interpolations[i], ", dim: ", dh.field_dims[i])
     end
     if !isclosed(dh)
         print(io, "  Not closed!")
@@ -44,13 +48,13 @@ function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
 end
 
 ndofs(dh::AbstractDofHandler) = dh.ndofs[]
-ndofs_per_cell(dh::AbstractDofHandler, cell::Int=1) = dh.cell_dofs_offset[cell+1] - dh.cell_dofs_offset[cell]
+ndofs_per_cell(dh::AbstractDofHandler, cell::Int=1) = dh.cell_dofs_offset[cell + 1] - dh.cell_dofs_offset[cell]
 isclosed(dh::AbstractDofHandler) = dh.closed[]
 nfields(dh::AbstractDofHandler) = length(dh.field_names)
 getfieldnames(dh::AbstractDofHandler) = dh.field_names
 ndim(dh::AbstractDofHandler, field_name::Symbol) = dh.field_dims[find_field(dh, field_name)]
 function find_field(dh::DofHandler, field_name::Symbol)
-    j = findfirst(i->i == field_name, dh.field_names)
+    j = findfirst(i -> i == field_name, dh.field_names)
     j == 0 && error("did not find field $field_name")
     return j
 end
@@ -58,7 +62,7 @@ end
 # Calculate the offset to the first local dof of a field
 function field_offset(dh::DofHandler, field_name::Symbol)
     offset = 0
-    for i in 1:find_field(dh, field_name)-1
+    for i in 1:find_field(dh, field_name) - 1
         offset += getnbasefunctions(dh.field_interpolations[i])::Int * dh.field_dims[i]
     end
     return offset
@@ -89,7 +93,7 @@ function dof_range(dh::DofHandler, field_name::Symbol)
     f = find_field(dh, field_name)
     offset = field_offset(dh, field_name)
     n_field_dofs = getnbasefunctions(dh.field_interpolations[f])::Int * dh.field_dims[f]
-    return (offset+1):(offset+n_field_dofs)
+    return (offset + 1):(offset + n_field_dofs)
 end
 
 function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
@@ -123,7 +127,8 @@ function close!(dh::DofHandler)
 end
 
 # close the DofHandler and distribute all the dofs
-function __close!(dh::DofHandler{dim}) where {dim}
+function __close!(dh::DofHandler{dim, T, G}) where {dim,T, G<:AbstractGrid{dim}}
+    C = getcelltype(dh.grid)
     @assert !isclosed(dh)
 
     # `vertexdict` keeps track of the visited vertices. We store the global vertex
@@ -156,7 +161,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     end
 
     # not implemented yet: more than one facedof per face in 3D
-    dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
+    dim == 3 && @assert(!any(x -> x.nfacedofs > 1, interpolation_infos))
 
     nextdof = 1 # next free dof to distribute
     push!(dh.cell_dofs_offset, 1) # dofs for the first cell start at 1
@@ -174,8 +179,8 @@ function __close!(dh::DofHandler{dim}) where {dim}
                     if token > 0 # haskey(vertexdicts[fi], vertex) # reuse dofs
                         reuse_dof = vertexdicts[fi].vals[token] # vertexdicts[fi][vertex]
                         for d in 1:dh.field_dims[fi]
-                            @debug println("      reusing dof #$(reuse_dof + (d-1))")
-                            push!(dh.cell_dofs, reuse_dof + (d-1))
+                            @debug println("      reusing dof #$(reuse_dof + (d - 1))")
+                            push!(dh.cell_dofs, reuse_dof + (d - 1))
                         end
                     else # token <= 0, distribute new dofs
                         for vertexdof in 1:interpolation_info.nvertexdofs
@@ -199,7 +204,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
                             startdof, olddir = edgedicts[fi].vals[token] # edgedicts[fi][sedge] # first dof for this edge (if dir == true)
                             for edgedof in (dir == olddir ? (1:interpolation_info.nedgedofs) : (interpolation_info.nedgedofs:-1:1))
                                 for d in 1:dh.field_dims[fi]
-                                    reuse_dof = startdof + (d-1) + (edgedof-1)*dh.field_dims[fi]
+                                    reuse_dof = startdof + (d - 1) + (edgedof - 1) * dh.field_dims[fi]
                                     @debug println("      reusing dof#$(reuse_dof)")
                                     push!(dh.cell_dofs, reuse_dof)
                                 end
@@ -226,7 +231,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
                         startdof = facedicts[fi].vals[token] # facedicts[fi][sface]
                         for facedof in interpolation_info.nfacedofs:-1:1 # always reverse (YOLO)
                             for d in 1:dh.field_dims[fi]
-                                reuse_dof = startdof + (d-1) + (facedof-1)*dh.field_dims[fi]
+                                reuse_dof = startdof + (d - 1) + (facedof - 1) * dh.field_dims[fi]
                                 @debug println("      reusing dof#$(reuse_dof)")
                                 push!(dh.cell_dofs, reuse_dof)
                             end
@@ -255,7 +260,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
             end
         end # field loop
         # push! the first index of the next cell to the offset vector
-        push!(dh.cell_dofs_offset, length(dh.cell_dofs)+1)
+        push!(dh.cell_dofs_offset, length(dh.cell_dofs) + 1)
     end # cell loop
     dh.ndofs[] = maximum(dh.cell_dofs)
     dh.closed[] = true
@@ -277,6 +282,24 @@ function cellnodes!(global_nodes::Vector{Int}, grid::Grid{dim,C}, i::Int) where 
         global_nodes[j] = grid.cells[i].nodes[j]
     end
     return global_nodes
+end
+
+function cellnodes!(global_nodes::Vector{Int}, grid::G, i::Int) where {G <: AbstractGrid}
+    C = getcelltype(grid)
+    dim = getdim(grid)
+    @assert length(global_nodes) == nnodes(C)
+    for j in 1:nnodes(C)
+        global_nodes[j] = getcells(grid, i).nodes[j] ##TODO getnodes(::AbstractCell)
+    end 
+    return global_nodes
+end
+
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid, i::Int) where {dim,T}
+    @assert dim == getdim(grid)
+    C = getcelltype(grid)
+    @assert length(global_coords) == nnodes(C)
+    global_coords .= getcoordinates(grid, i)
+    return global_coords
 end
 
 function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::Grid{dim,C}, i::Int) where {dim,C,T}
@@ -324,7 +347,7 @@ See the [Sparsity Pattern](@ref) section of the manual.
 function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
     ncells = getncells(dh.grid)
     n = ndofs_per_cell(dh)
-    N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
+    N = sym ? div(n * (n + 1), 2) * ncells : n^2 * ncells
     N += ndofs(dh) # always add the diagonal elements
     I = Int[]; resize!(I, N)
     J = Int[]; resize!(J, N)

@@ -2,7 +2,8 @@ cell_to_vtkcell(::Type{Line}) = VTKCellTypes.VTK_LINE
 cell_to_vtkcell(::Type{QuadraticLine}) = VTKCellTypes.VTK_QUADRATIC_EDGE
 
 cell_to_vtkcell(::Type{Quadrilateral}) = VTKCellTypes.VTK_QUAD
-cell_to_vtkcell(::Type{QuadraticQuadrilateral}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
+cell_to_vtkcell(::Type{C}) where C<:AbstractCell{2,4,4} = VTKCellTypes.VTK_QUAD
+ cell_to_vtkcell(::Type{QuadraticQuadrilateral}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD 
 cell_to_vtkcell(::Type{Triangle}) = VTKCellTypes.VTK_TRIANGLE
 cell_to_vtkcell(::Type{QuadraticTriangle}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
 cell_to_vtkcell(::Type{Cell{2,8,4}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
@@ -24,6 +25,18 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compre
         push!(cls, MeshCell(celltype, collect(cell.nodes)))
     end
     coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
+    return vtk_grid(filename, coords, cls; compress=compress)
+end
+
+function WriteVTK.vtk_grid(filename::AbstractString, grid::G; compress::Bool=true) where {G <: AbstractGrid}
+    C = getcelltype(grid)
+    dim = getdim(grid)
+    cls = MeshCell[]
+    for idx in 1:getncells(grid)
+        celltype = JuAFEM.cell_to_vtkcell(C)
+        push!(cls, MeshCell(celltype, collect(getcells(grid,idx).nodes))) #TODO getnodes(::AbstractCell)
+    end
+    coords = reshape(reinterpret(Float64, getnodes(grid)), (dim, getnnodes(grid)))
     return vtk_grid(filename, coords, cls; compress=compress)
 end
 
@@ -97,7 +110,7 @@ vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellset::String) =
     vtk_cellset(vtk, grid, [cellset])
 
 import JuAFEM.field_offset
-function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler, u::Vector, suffix="")
+function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler{dim, T, Grid}, u::Vector, suffix="") where {dim,T}
 
     fieldnames = JuAFEM.getfieldnames(dh)  # all primary fields
 
@@ -117,6 +130,50 @@ function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler, u::Vector, suffix
 
             for cellnum in cellnumbers
                 cell = dh.grid.cells[cellnum]
+                n = ndofs_per_cell(dh, cellnum)
+                eldofs = zeros(Int, n)
+                _celldofs = celldofs!(eldofs, dh, cellnum)
+                counter = 1
+
+                for node in cell.nodes
+                    for d in 1:field_dim
+                        data[d, node] = u[_celldofs[counter + offset]]
+                        @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
+                        counter += 1
+                    end
+                    if field_dim == 2
+                        # paraview requires 3D-data so pad with zero
+                        data[3, node] = 0
+                    end
+                end
+            end
+        end
+        vtk_point_data(vtkfile, data, string(name, suffix))
+    end
+
+    return vtkfile
+end
+
+function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler{dim,T,G}, u::Vector, suffix="") where {dim, T, G <: AbstractGrid}
+
+    fieldnames = JuAFEM.getfieldnames(dh)  # all primary fields
+
+    for name in fieldnames
+        @debug println("exporting field $(name)")
+        field_dim = getfielddim(dh, name)
+        space_dim = field_dim == 2 ? 3 : field_dim
+        data = fill(NaN, space_dim, getnnodes(dh.grid))  # set default value
+
+        for fh in dh.fieldhandlers
+            # check if this fh contains this field, otherwise continue to the next
+            field_pos = findfirst(i->i == name, getfieldnames(fh))
+            if field_pos == 0 && continue end
+
+            cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
+            offset = field_offset(fh, name)
+
+            for cellnum in cellnumbers
+                cell = getcells(dh.grid, cellnum)
                 n = ndofs_per_cell(dh, cellnum)
                 eldofs = zeros(Int, n)
                 _celldofs = celldofs!(eldofs, dh, cellnum)
