@@ -248,19 +248,19 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims,
             ip_info = ip_infos[fi]
 
             if ip_info.nvertexdofs > 0
-                nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[fi], ip_info.nvertexdofs, nextdof)
+                nextdof = add_vertex_dofs(dh.grid, cell_dofs, cell, vertexdicts[fi], field_dims[fi], ip_info.nvertexdofs, nextdof)
             end
 
             if ip_info.nedgedofs > 0 && dim == 3 #Edges only in 3d
-                nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[fi], ip_info.nedgedofs, nextdof)
+                nextdof = add_edge_dofs(dh.grid, cell_dofs, cell, edgedicts[fi], field_dims[fi], ip_info.nedgedofs, nextdof)
             end
 
             if ip_info.nfacedofs > 0 && (ip_info.dim == dim)
-                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[fi], ip_info.nfacedofs, nextdof)
+                nextdof = add_face_dofs(dh.grid, cell_dofs, cell, facedicts[fi], field_dims[fi], ip_info.nfacedofs, nextdof)
             end
 
             if ip_info.ncelldofs > 0
-                nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[fi], ip_info.ncelldofs, nextdof)
+                nextdof = add_cell_dofs(dh.grid, cell_dofs, ci, celldicts[fi], field_dims[fi], ip_info.ncelldofs, nextdof)
             end
 
         end
@@ -294,8 +294,8 @@ function get_or_create_dofs!(nextdof, field_dim; dict, key)
     end
 end
 
-function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, nextdof)
-    for vertex in JuAFEM.vertices(cell)
+function add_vertex_dofs(grid, cell_dofs, cell, vertexdict, field_dim, nvertexdofs, nextdof)
+    for vertex in JuAFEM.vertices(grid, cell)
         @debug "\tvertex #$vertex"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=vertexdict, key=vertex)
         push!(cell_dofs, dofs...)
@@ -303,10 +303,10 @@ function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, ne
     return nextdof
 end
 
-function add_face_dofs(cell_dofs, cell, facedict, field_dim, nfacedofs, nextdof)
+function add_face_dofs(grid, cell_dofs, cell, facedict, field_dim, nfacedofs, nextdof)
     @assert nfacedofs == 1 "Currently only supports interpolations with nfacedofs = 1"
 
-    for face in JuAFEM.faces(cell)
+    for face in JuAFEM.faces(grid, cell)
         sface = JuAFEM.sortface(face)
         @debug "\tface #$sface"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=facedict, key=sface)
@@ -315,9 +315,9 @@ function add_face_dofs(cell_dofs, cell, facedict, field_dim, nfacedofs, nextdof)
     return nextdof
 end
 
-function add_edge_dofs(cell_dofs, cell, edgedict, field_dim, nedgedofs, nextdof)
+function add_edge_dofs(grid, cell_dofs, cell, edgedict, field_dim, nedgedofs, nextdof)
     @assert nedgedofs == 1 "Currently only supports interpolations with nedgedofs = 1"
-    for edge in JuAFEM.edges(cell)
+    for edge in JuAFEM.edges(grid, cell)
         sedge, dir = JuAFEM.sortedge(edge)
         @debug "\tedge #$sedge"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=edgedict, key=sedge)
@@ -326,7 +326,7 @@ function add_edge_dofs(cell_dofs, cell, edgedict, field_dim, nedgedofs, nextdof)
     return nextdof
 end
 
-function add_cell_dofs(cell_dofs, cell, celldict, field_dim, ncelldofs, nextdof)
+function add_cell_dofs(grid, cell_dofs, cell, celldict, field_dim, ncelldofs, nextdof)
     for celldof in 1:ncelldofs
         @debug "\tcell #$cell"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=celldict, key=cell)

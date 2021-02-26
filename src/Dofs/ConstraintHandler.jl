@@ -85,7 +85,7 @@ end
 
 Applies the boundary condition to the right-hand-side vector without modifying the stiffness matrix
 """
-function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)	
+function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)
     K = data.constrained_columns
     @assert length(f) == 0 || length(f) == size(K, 1)
     @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
@@ -339,7 +339,7 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
             dbc.field_name != field && continue
             if eltype(dbc.faces) <: Tuple
                 for (cellidx, faceidx) in dbc.faces
-                    for facenode in faces(ch.dh.grid.cells[cellidx])[faceidx]
+                    for facenode in faces(ch.dh.grid, ch.dh.grid.cells[cellidx])[faceidx]
                         for component in dbc.components
                             data[component, facenode] = 1
                         end
@@ -451,7 +451,7 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
     interpolation = getfieldinterpolations(fh)[field_idx]
     field_dim = getfielddims(fh)[field_idx]
     bcvalue = fh.bc_values[field_idx]
-    
+
     JuAFEM._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue)
     return ch
 end

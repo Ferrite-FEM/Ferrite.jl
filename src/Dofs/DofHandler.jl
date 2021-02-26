@@ -168,7 +168,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
             interpolation_info = interpolation_infos[fi]
             @debug println("  field: $(dh.field_names[fi])")
             if interpolation_info.nvertexdofs > 0
-                for vertex in vertices(cell)
+                for vertex in vertices(dh.grid, cell)
                     @debug println("    vertex#$vertex")
                     token = Base.ht_keyindex2!(vertexdicts[fi], vertex)
                     if token > 0 # haskey(vertexdicts[fi], vertex) # reuse dofs
@@ -191,7 +191,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
             end
             if dim == 3 # edges only in 3D
                 if interpolation_info.nedgedofs > 0
-                    for edge in edges(cell)
+                    for edge in edges(dh.grid, cell)
                         sedge, dir = sortedge(edge)
                         @debug println("    edge#$sedge dir: $(dir)")
                         token = Base.ht_keyindex2!(edgedicts[fi], sedge)
@@ -218,7 +218,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
                 end
             end
             if interpolation_info.nfacedofs > 0 && (interpolation_info.dim == dim)
-                for face in faces(cell)
+                for face in faces(dh.grid, cell)
                     sface = sortface(face) # TODO: faces(cell) may as well just return the sorted list
                     @debug println("    face#$sface")
                     token = Base.ht_keyindex2!(facedicts[fi], sface)
