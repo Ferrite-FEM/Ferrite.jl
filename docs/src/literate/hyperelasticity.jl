@@ -30,7 +30,7 @@
 # is the traction on the Neumann part of the boundary, and where ``\mathbb{U}`` and ``\mathbb{U}^0`` are
 # suitable trial and test sets.
 
-using JuAFEM, Tensors, TimerOutputs, ProgressMeter
+using Ferrite, Tensors, TimerOutputs, ProgressMeter
 import KrylovMethods, IterativeSolvers
 
 # ## Hyperelastic material model
@@ -218,7 +218,7 @@ function solve()
     add!(dbcs, dbc)
     close!(dbcs)
     t = 0.5
-    JuAFEM.update!(dbcs, t)
+    Ferrite.update!(dbcs, t)
 
     ## Pre-allocation of vectors for the solution and Newton increments
     _ndofs = ndofs(dh)
@@ -241,7 +241,7 @@ function solve()
     while true; newton_itr += 1
         u .= un .+ Δu # Current guess
         assemble_global!(K, g, dh, cv, fv, mp, u)
-        normg = norm(g[JuAFEM.free_dofs(dbcs)])
+        normg = norm(g[Ferrite.free_dofs(dbcs)])
         apply_zero!(K, g, dbcs)
         ProgressMeter.update!(prog, normg; showvalues = [(:iter, newton_itr)])
 

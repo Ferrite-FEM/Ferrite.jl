@@ -23,7 +23,7 @@ The following interpolations are implemented:
 # Examples
 ```jldoctest
 julia> ip = Lagrange{2,RefTetrahedron,2}()
-JuAFEM.Lagrange{2,JuAFEM.RefTetrahedron,2}()
+Ferrite.Lagrange{2,Ferrite.RefTetrahedron,2}()
 
 julia> getnbasefunctions(ip)
 6

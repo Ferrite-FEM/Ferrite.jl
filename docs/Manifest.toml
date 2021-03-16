@@ -174,10 +174,10 @@ git-tree-sha1 = "b34d7cef7b337321e97d22242c3c2b91f476748e"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 version = "0.21.0"
 
-[[JuAFEM]]
+[[Ferrite]]
 deps = ["LinearAlgebra", "Reexport", "SparseArrays", "Tensors", "WriteVTK"]
 path = ".."
-uuid = "30d91d44-8115-11e8-1d28-c19a5ac16de8"
+uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
 version = "0.2.0"
 
 [[KrylovMethods]]

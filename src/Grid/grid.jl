@@ -39,7 +39,7 @@ const Tetrahedron = Cell{3,4,4}
 const QuadraticTetrahedron = Cell{3,10,4}
 
 const Hexahedron = Cell{3,8,6}
-const QuadraticHexahedron = Cell{3,20,6} # Function interpolation for this doesn't exist in JuAFEM yet
+const QuadraticHexahedron = Cell{3,20,6} # Function interpolation for this doesn't exist in Ferrite yet
 
 """
 A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh

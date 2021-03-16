@@ -452,7 +452,7 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
     field_dim = getfielddims(fh)[field_idx]
     bcvalue = fh.bc_values[field_idx]
     
-    JuAFEM._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue)
+    Ferrite._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue)
     return ch
 end
 

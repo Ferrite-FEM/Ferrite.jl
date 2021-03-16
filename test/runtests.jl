@@ -1,4 +1,4 @@
-using JuAFEM
+using Ferrite
 using Tensors
 using Test
 using ForwardDiff

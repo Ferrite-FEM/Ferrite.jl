@@ -26,7 +26,7 @@ function Base.getindex(elvec::CellVector, el::Int)
     return elvec.values[offset:offset + elvec.length[el]-1]
  end
 
-struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: JuAFEM.AbstractDofHandler
+struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: Ferrite.AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
     cell_dofs::CellVector{Int}
     cell_nodes::CellVector{Int}
@@ -37,7 +37,7 @@ struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: JuAFEM.AbstractDofHandler
 end
 
 function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
-    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],Int[],Int[]), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), JuAFEM.ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
+    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],Int[],Int[]), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end
 
 getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
@@ -168,8 +168,8 @@ end
 
 function __close!(dh::MixedDofHandler{dim}) where {dim}
 
-    @assert !JuAFEM.isclosed(dh)
-    field_names = JuAFEM.getfieldnames(dh)  # all the fields in the problem
+    @assert !Ferrite.isclosed(dh)
+    field_names = Ferrite.getfieldnames(dh)  # all the fields in the problem
     numfields =  length(field_names)
 
     # Create dicts that stores created dofs
@@ -192,9 +192,9 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
         nextdof = _close!(
             dh,
             cellnumbers,
-            JuAFEM.getfieldnames(fh),
-            JuAFEM.getfielddims(fh),
-            JuAFEM.getfieldinterpolations(fh),
+            Ferrite.getfieldnames(fh),
+            Ferrite.getfielddims(fh),
+            Ferrite.getfieldinterpolations(fh),
             nextdof,
             vertexdicts,
             edgedicts,
@@ -224,9 +224,9 @@ end
 
 function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
 
-    ip_infos = JuAFEM.InterpolationInfo[]
+    ip_infos = Ferrite.InterpolationInfo[]
     for interpolation in field_interpolations
-        ip_info = JuAFEM.InterpolationInfo(interpolation)
+        ip_info = Ferrite.InterpolationInfo(interpolation)
         # these are not implemented yet (or have not been tested)
         @assert(ip_info.nvertexdofs <= 1)
         @assert(ip_info.nedgedofs <= 1)
@@ -295,7 +295,7 @@ function get_or_create_dofs!(nextdof, field_dim; dict, key)
 end
 
 function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, nextdof)
-    for vertex in JuAFEM.vertices(cell)
+    for vertex in Ferrite.vertices(cell)
         @debug "\tvertex #$vertex"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=vertexdict, key=vertex)
         push!(cell_dofs, dofs...)
@@ -306,8 +306,8 @@ end
 function add_face_dofs(cell_dofs, cell, facedict, field_dim, nfacedofs, nextdof)
     @assert nfacedofs == 1 "Currently only supports interpolations with nfacedofs = 1"
 
-    for face in JuAFEM.faces(cell)
-        sface = JuAFEM.sortface(face)
+    for face in Ferrite.faces(cell)
+        sface = Ferrite.sortface(face)
         @debug "\tface #$sface"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=facedict, key=sface)
         push!(cell_dofs, dofs...)
@@ -317,8 +317,8 @@ end
 
 function add_edge_dofs(cell_dofs, cell, edgedict, field_dim, nedgedofs, nextdof)
     @assert nedgedofs == 1 "Currently only supports interpolations with nedgedofs = 1"
-    for edge in JuAFEM.edges(cell)
-        sedge, dir = JuAFEM.sortedge(edge)
+    for edge in Ferrite.edges(cell)
+        sedge, dir = Ferrite.sortedge(edge)
         @debug "\tedge #$sedge"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=edgedict, key=sedge)
         push!(cell_dofs, dofs...)
@@ -401,9 +401,9 @@ function field_offset(fh::FieldHandler, field_name::Symbol)
     return offset
 end
 
-function JuAFEM.dof_range(fh::FieldHandler, field_name::Symbol)
-    f = JuAFEM.find_field(fh, field_name)
-    offset = JuAFEM.field_offset(fh, field_name)
+function Ferrite.dof_range(fh::FieldHandler, field_name::Symbol)
+    f = Ferrite.find_field(fh, field_name)
+    offset = Ferrite.field_offset(fh, field_name)
     field_interpolation = fh.fields[f].interpolation
     field_dim = fh.fields[f].dim
     n_field_dofs = getnbasefunctions(field_interpolation) * field_dim

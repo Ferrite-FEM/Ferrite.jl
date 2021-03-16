@@ -12,7 +12,7 @@ close!(dh)
 perm = randperm(ndofs(dh))
 iperm = invperm(perm)
 dofs = copy(dh.cell_dofs)
-JuAFEM.renumber!(JuAFEM.renumber!(dh, perm), iperm)
+Ferrite.renumber!(Ferrite.renumber!(dh, perm), iperm)
 @test dofs == dh.cell_dofs
 
 
