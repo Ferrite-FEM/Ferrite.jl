@@ -5,6 +5,8 @@
 
 A simple finite element toolbox written in Julia.
 
+**Note:** This package was originally called JuAFEM.jl, but has now been renamed to Ferrite.jl.
+
 ## Documentation
 
 [![][docs-dev-img]][docs-dev-url]
