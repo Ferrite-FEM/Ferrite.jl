@@ -1,7 +1,7 @@
 # JuAFEM
 
-![Build Status](https://github.com/KristofferC/JuAFEM.jl/workflows/CI/badge.svg?event=push)
-[![codecov.io](http://codecov.io/github/KristofferC/JuAFEM.jl/coverage.svg?branch=master)](http://codecov.io/github/KristofferC/JuAFEM.jl?branch=master)
+![Build Status](https://github.com/Ferrite-FEM/JuAFEM.jl/workflows/CI/badge.svg?event=push)
+[![codecov.io](http://codecov.io/github/Ferrite-FEM/JuAFEM.jl/coverage.svg?branch=master)](http://codecov.io/github/Ferrite-FEM/JuAFEM.jl?branch=master)
 
 A simple finite element toolbox written in Julia.
 
@@ -12,7 +12,7 @@ A simple finite element toolbox written in Julia.
 ## Installation
 You can install JuAFEM from the Pkg REPL:
 ```
-pkg> add https://github.com/KristofferC/JuAFEM.jl.git
+pkg> add https://github.com/Ferrite-FEM/JuAFEM.jl.git
 ```
 which will track the `master` branch of the package.
 

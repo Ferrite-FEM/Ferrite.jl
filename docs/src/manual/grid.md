@@ -45,7 +45,7 @@ The example shows a local face ID ordering, defined as:
 faces(::Lagrange{2,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1))
 ```
 
-Other face ID definitions [can be found in the src files](https://github.com/KristofferC/JuAFEM.jl/blob/8224282ab4d67cb523ef342e4a6ceb1716764ada/src/interpolations.jl#L154) in the corresponding `faces` dispatch.
+Other face ID definitions [can be found in the src files](https://github.com/Ferrite-FEM/JuAFEM.jl/blob/8224282ab4d67cb523ef342e4a6ceb1716764ada/src/interpolations.jl#L154) in the corresponding `faces` dispatch.
 
 
 The highlighted face, i.e. the two lines from node ID 3 to 6 and from 6 to 9, on the right hand side of our test mesh can now be described as
