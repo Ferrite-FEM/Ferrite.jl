@@ -27,7 +27,7 @@ The best way to get started with `Ferrite` is to look at the documented examples
 
 ## Installation
 
-In Julia v1.0 (and v0.7) you can install Ferrite from the Pkg REPL (press `]` in the Julia
+You can install Ferrite from the Pkg REPL (press `]` in the Julia
 REPL to enter `pkg>` mode):
 
 ```
@@ -45,10 +45,3 @@ To load the package, use
 ```julia
 using Ferrite
 ```
-
-!!! note
-    In Julia v0.6 you need to checkout the `release-0.3` branch when installing:
-    ```
-    Pkg.clone("https://github.com/Ferrite-FEM/Ferrite.jl.git")
-    Pkg.checkout("Ferrite", "release-0.3")
-    ```
