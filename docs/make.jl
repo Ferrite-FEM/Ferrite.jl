@@ -57,6 +57,6 @@ end
 
 # Deploy built documentation from Travis.
 deploydocs(
-    repo = "github.com/KristofferC/JuAFEM.jl.git",
+    repo = "github.com/Ferrite-FEM/JuAFEM.jl.git",
     push_preview=true,
 )

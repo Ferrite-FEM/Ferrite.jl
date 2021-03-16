@@ -112,7 +112,7 @@ function check_compatible_geointerpolation(cv::Union{CellValues, FaceValues}, ci
     if length(getnodes(ci)) != getngeobasefunctions(cv)
         msg = """The given CellValues and CellIterator are incompatiblet.
         Likely an appropriate geometry interpolate must be passed when constructing the CellValues.
-        See also issue #265: https://github.com/KristofferC/JuAFEM.jl/issues/265"""
+        See also issue #265: https://github.com/Ferrite-FEM/JuAFEM.jl/issues/265"""
         throw(ArgumentError(msg))
     end
 end
