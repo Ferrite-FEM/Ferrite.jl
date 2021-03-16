@@ -1,5 +1,5 @@
 ```@setup dofs
-using JuAFEM
+using Ferrite
 ```
 
 # Degrees of Freedom

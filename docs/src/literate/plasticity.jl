@@ -8,7 +8,7 @@
 #
 # ## Introduction
 #
-# This example illustrates the use of a nonlinear material model in JuAFEM.
+# This example illustrates the use of a nonlinear material model in Ferrite.
 # The particular model is von Mises plasticity (also know as J₂-plasticity) with
 # isotropic hardening. The model is fully 3D, meaning that no assumptions like *plane stress*
 # or *plane strain* are introduced.
@@ -33,7 +33,7 @@
 # ### Material parameters and state variables
 #
 # Start by loading some necessary packages
-using JuAFEM, SparseArrays, LinearAlgebra, Printf
+using Ferrite, SparseArrays, LinearAlgebra, Printf
 
 # We define a J₂-plasticity-material, containing material parameters and the elastic
 # stiffness Dᵉ (since it is constant)
@@ -333,7 +333,7 @@ function solve()
             end
             K, r = doassemble(cellvalues, facevalues, K, grid, dh, material, u,
                              states, traction);
-            norm_r = norm(r[JuAFEM.free_dofs(dbcs)])
+            norm_r = norm(r[Ferrite.free_dofs(dbcs)])
 
             print("Iteration: $newton_itr \tresidual: $(@sprintf("%.8f", norm_r))\n")
             if norm_r < NEWTON_TOL

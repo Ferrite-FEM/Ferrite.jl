@@ -1,10 +1,10 @@
 ```@meta
-DocTestSetup = :(using JuAFEM)
+DocTestSetup = :(using Ferrite)
 ```
 
 # Grid
 
-In JuAFEM a Grid is a collection of `Node`s and `Cell`s and is parameterized in its physical dimensionality and cell type.
+In Ferrite a Grid is a collection of `Node`s and `Cell`s and is parameterized in its physical dimensionality and cell type.
 `Node`s are points in the physical space and can be initialized by a N-Tuple, where N corresponds to the dimensions.
 
 ```julia
@@ -45,7 +45,7 @@ The example shows a local face ID ordering, defined as:
 faces(::Lagrange{2,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1))
 ```
 
-Other face ID definitions [can be found in the src files](https://github.com/Ferrite-FEM/JuAFEM.jl/blob/8224282ab4d67cb523ef342e4a6ceb1716764ada/src/interpolations.jl#L154) in the corresponding `faces` dispatch.
+Other face ID definitions [can be found in the src files](https://github.com/Ferrite-FEM/Ferrite.jl/blob/8224282ab4d67cb523ef342e4a6ceb1716764ada/src/interpolations.jl#L154) in the corresponding `faces` dispatch.
 
 
 The highlighted face, i.e. the two lines from node ID 3 to 6 and from 6 to 9, on the right hand side of our test mesh can now be described as
@@ -60,7 +60,7 @@ julia> edges = [
 The local ID can be constructed based on elements, corresponding edges and chosen interpolation, since the face ordering is interpolation dependent.
 ```julia
 julia> function compute_faceset(elements, edges, ip::Interpolation{dim}) where {dim}
-           local_faces = JuAFEM.faces(ip)
+           local_faces = Ferrite.faces(ip)
            nodes_per_face = length(local_faces[1])
            d = Dict{NTuple{nodes_per_face, Int}, Tuple{Int, Int}}()
            for (e, element) in enumerate(elements) # e is global element number

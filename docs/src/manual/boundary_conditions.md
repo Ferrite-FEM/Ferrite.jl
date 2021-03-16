@@ -1,12 +1,12 @@
 ```@meta
-DocTestSetup = :(using JuAFEM)
+DocTestSetup = :(using Ferrite)
 ```
 
 # Boundary Conditions
 
 Every PDE is accompanied with boundary conditions. There are different types of boundary
 conditions, and they need to be handled in different ways. Below we discuss how to handle
-the most common ones, Dirichlet and Neumann boundary conditions, and how to do it `JuAFEM`.
+the most common ones, Dirichlet and Neumann boundary conditions, and how to do it `Ferrite`.
 
 ## Dirichlet Boundary Conditions
 

@@ -1,4 +1,4 @@
-using Documenter, JuAFEM
+using Documenter, Ferrite
 
 # Load packages to avoid precompilation output in the docs
 import BlockArrays, IterativeSolvers, KrylovMethods, Literate, Plots, ProgressMeter,
@@ -21,7 +21,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
 # Build documentation.
 makedocs(
     format = Documenter.HTML(prettyurls = haskey(ENV, "GITHUB_ACTIONS")), # disable for local builds
-    sitename = "JuAFEM.jl",
+    sitename = "Ferrite.jl",
     doctest = false,
     # strict = VERSION.minor == 6 && sizeof(Int) == 8, # only strict mode on 0.6 and Int64
     strict = false,
@@ -57,6 +57,6 @@ end
 
 # Deploy built documentation from Travis.
 deploydocs(
-    repo = "github.com/Ferrite-FEM/JuAFEM.jl.git",
+    repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
     push_preview=true,
 )

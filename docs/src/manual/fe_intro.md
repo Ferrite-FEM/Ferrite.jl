@@ -107,5 +107,5 @@ enforcing the correct nodal values $a_i$ to the prescribed values.
 In practice, the shape functions $N$ are only non-zero on parts of the domain $\Omega$.
 Thus, the integrals are evaluated on sub-domains, called *elements* or *cells*. Each cell
 gives a contribution to the global stiffness matrix and force vector. For a solution of the
-heat equation, as implemented in `JuAFEM`, check out
+heat equation, as implemented in `Ferrite`, check out
 [this thoroughly commented example](@ref Heat-Equation).

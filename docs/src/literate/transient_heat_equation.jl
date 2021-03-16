@@ -47,11 +47,11 @@
 #-
 # ## Commented Program
 #
-# Now we solve the problem in JuAFEM. What follows is a program spliced with comments.
+# Now we solve the problem in Ferrite. What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
-# First we load JuAFEM, and some other packages we need.
-using JuAFEM, SparseArrays
+# First we load Ferrite, and some other packages we need.
+using Ferrite, SparseArrays
 # We create the same grid as in the heat equation example.
 grid = generate_grid(Quadrilateral, (100, 100));
 

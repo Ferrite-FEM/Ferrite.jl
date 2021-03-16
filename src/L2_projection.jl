@@ -9,8 +9,8 @@ struct L2Projector{CV<:CellValues} <: AbstractProjector
     node2dof_map::Dict{Int64, Array{Int64,N} where N}
 end
 
-function L2Projector(fe_values::JuAFEM.Values, interp::Interpolation,
-    grid::JuAFEM.AbstractGrid, set=1:getncells(grid), fe_values_mass::JuAFEM.Values=fe_values)
+function L2Projector(fe_values::Ferrite.Values, interp::Interpolation,
+    grid::Ferrite.AbstractGrid, set=1:getncells(grid), fe_values_mass::Ferrite.Values=fe_values)
 
     dim, T, shape = typeof(fe_values).parameters
 
@@ -27,7 +27,7 @@ function L2Projector(fe_values::JuAFEM.Values, interp::Interpolation,
 end
 
 function L2Projector(qr::QuadratureRule, func_ip::Interpolation,
-    grid::JuAFEM.AbstractGrid, set=1:getncells(grid), qr_mass::QuadratureRule=qr,
+    grid::Ferrite.AbstractGrid, set=1:getncells(grid), qr_mass::QuadratureRule=qr,
     geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(set)])))
 
     _check_same_celltype(grid, collect(set)) # TODO this does the right thing, but gives the wrong error message if it fails
@@ -50,7 +50,7 @@ end
 
 function _assemble_L2_matrix(fe_values, set, dh)
 
-    n = JuAFEM.getn_scalarbasefunctions(fe_values)
+    n = Ferrite.getn_scalarbasefunctions(fe_values)
     M = create_symmetric_sparsity_pattern(dh)
     assembler = start_assemble(M)
 

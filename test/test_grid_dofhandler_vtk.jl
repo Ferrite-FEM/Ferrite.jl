@@ -35,7 +35,7 @@ end
         addfaceset!(grid, "right-faceset", getfaceset(grid, "right"))
         addnodeset!(grid, "middle-nodes", x -> norm(x) < radius)
 
-        gridfilename = "grid-$(JuAFEM.celltypes[celltype])"
+        gridfilename = "grid-$(Ferrite.celltypes[celltype])"
         vtk_grid(gridfilename, grid) do vtk
             vtk_cellset(vtk, grid, "cell-1")
             vtk_cellset(vtk, grid, "middle-cells")
@@ -72,7 +72,7 @@ end
         u = rand(ndofs(dofhandler))
         apply!(u, ch)
 
-        dofhandlerfilename = "dofhandler-$(JuAFEM.celltypes[celltype])"
+        dofhandlerfilename = "dofhandler-$(Ferrite.celltypes[celltype])"
         vtk_grid(dofhandlerfilename, dofhandler) do vtk
             vtk_point_data(vtk, ch)
             vtk_point_data(vtk, dofhandler, u)
@@ -101,7 +101,7 @@ end
 
 @testset "Grid utils" begin
 
-    grid = JuAFEM.generate_grid(QuadraticQuadrilateral, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
+    grid = Ferrite.generate_grid(QuadraticQuadrilateral, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
 
     addcellset!(grid, "cell_set", [1]);
     node_set = Set(1:getnnodes(grid))

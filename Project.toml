@@ -1,5 +1,5 @@
-name = "JuAFEM"
-uuid = "30d91d44-8115-11e8-1d28-c19a5ac16de8"
+name = "Ferrite"
+uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
 version = "0.2.0"
 
 [deps]

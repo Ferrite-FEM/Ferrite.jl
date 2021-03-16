@@ -1,4 +1,4 @@
-The JuAFEM.jl package is licensed under the MIT "Expat" License:
+The Ferrite.jl package is licensed under the MIT "Expat" License:
 
 > Copyright (c) 2015-2016: Kristoffer Carlsson.
 >

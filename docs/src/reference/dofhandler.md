@@ -1,5 +1,5 @@
 ```@meta
-DocTestSetup = :(using JuAFEM)
+DocTestSetup = :(using Ferrite)
 ```
 
 # DofHandler

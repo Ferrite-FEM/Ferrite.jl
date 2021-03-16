@@ -32,11 +32,11 @@
 #-
 # ## Commented Program
 #
-# Now we solve the problem in JuAFEM. What follows is a program spliced with comments.
+# Now we solve the problem in Ferrite. What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
-# First we load JuAFEM, and some other packages we need
-using JuAFEM, SparseArrays
+# First we load Ferrite, and some other packages we need
+using Ferrite, SparseArrays
 # We start  generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
@@ -80,7 +80,7 @@ fill!(K.nzval, 1.0)
 spy(K; height = 15)
 
 # ### Boundary conditions
-# In JuAFEM constraints like Dirichlet boundary conditions
+# In Ferrite constraints like Dirichlet boundary conditions
 # are handled by a `ConstraintHandler`.
 ch = ConstraintHandler(dh);
 
