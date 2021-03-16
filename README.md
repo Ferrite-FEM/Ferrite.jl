@@ -20,4 +20,4 @@ which will track the `master` branch of the package.
 
 
 [docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
-[docs-dev-url]: http://kristofferc.github.io/Ferrite.jl/dev/
+[docs-dev-url]: http://ferrite-fem.github.io/Ferrite.jl/dev/
