@@ -360,7 +360,7 @@ end
 
 function apply!(v::AbstractVector, ch::ConstraintHandler)
     @assert length(v) == ndofs(ch.dh)
-    v[ch.prescribed_dofs] = ch.values # .= ??
+    v[ch.prescribed_dofs] = ch.values
     return v
 end
 
@@ -405,7 +405,7 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
         zero_out_columns!(K′, ch.prescribed_dofs)
         transpose!(K, K′)
     elseif strategy == APPLY_INPLACE
-        K[ch.prescribed_dofs, :] = 0
+        K[ch.prescribed_dofs, :] .= 0
     else
         error("Unknown apply strategy")
     end

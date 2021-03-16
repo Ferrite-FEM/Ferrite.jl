@@ -1,8 +1,6 @@
-using Documenter, Ferrite
+using Documenter, Ferrite, Pkg
 
-# Load packages to avoid precompilation output in the docs
-import BlockArrays, IterativeSolvers, KrylovMethods, Literate, Plots, ProgressMeter,
-       Tensors, TimerOutputs, UnicodePlots
+Pkg.precompile()
 
 # Generate examples
 include("generate.jl")
@@ -15,7 +13,8 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "hyperelasticity.md",
     "threaded_assembly.md",
     "plasticity.md",
-    "transient_heat_equation.md"
+    "transient_heat_equation.md",
+    "landau.md"
     )]
 
 # Build documentation.
