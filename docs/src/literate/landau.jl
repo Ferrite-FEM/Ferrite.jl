@@ -1,4 +1,13 @@
 # # Ginzburg-Landau model energy minimization
+
+# ![landau_orig.png](landau_orig.png)
+
+# Original
+
+# ![landau_opt.png](landau_opt.png)
+
+# Optimized
+
 # In this example a basic Ginzburg-Landau model is solved.
 # This example gives an idea of how the API together with ForwardDiff can be leveraged to
 # performantly solve non standard problems on a FEM grid.
@@ -14,7 +23,7 @@
 
 using ForwardDiff
 import ForwardDiff: GradientConfig, HessianConfig, Chunk
-using JuAFEM
+using Ferrite
 using Optim, LineSearches
 using SparseArrays
 using Tensors
@@ -75,7 +84,7 @@ end
 
 function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential) where {DIM, T}
     grid = generate_grid(Tetrahedron, gridsize, left, right)
-    questionmark, threadindices = JuAFEM.create_coloring(grid)
+    questionmark, threadindices = Ferrite.create_coloring(grid)
 
     qr  = QuadratureRule{DIM, RefTetrahedron}(2)
     cvP = CellVectorValues(qr, Lagrange{DIM, RefTetrahedron, 1}())
@@ -103,7 +112,7 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
 end
 
 # utility to quickly save a model
-function JuAFEM.vtk_save(path, model, dofs=model.dofs)
+function Ferrite.vtk_save(path, model, dofs=model.dofs)
     vtkfile = vtk_grid(path, model.dofhandler)
     vtk_point_data(vtkfile, model.dofhandler, dofs)
     vtk_save(vtkfile)
@@ -175,6 +184,7 @@ function calcall(∇²f::SparseMatrixCSC, ∇f::Vector{T}, dofvector::Vector{T},
     end
     return sum(outs)
 end
+
 # ## Minimization
 # Now everything can be combined to minimize the energy, and find the equilibrium
 # configuration.
@@ -189,7 +199,7 @@ function minimize!(model; kwargs...)
     end
     function h!(storage, x)
         ∇²F!(storage, x, model)
-        # apply!(storage, model.boundaryconds)
+        #apply!(storage, model.boundaryconds)
     end
     f(x) = F(x, model)
 
@@ -199,7 +209,8 @@ function minimize!(model; kwargs...)
     # then a quick couple of ConjuageGradient steps brings us easily closer to the minimum.
     # res = optimize(od, model.dofs, ConjugateGradient(linesearch=BackTracking()), Optim.Options(show_trace=true, show_every=1, g_tol=1e-20, iterations=10))
     # model.dofs .= res.minimizer
-    #to get the final convergence, Newton's method is more ideal since the energy landscape should be almost parabolic
+    # to get the final convergence, Newton's method is more ideal since the energy landscape should be almost parabolic
+    #+
     res = optimize(od, model.dofs, Newton(linesearch=BackTracking()), Optim.Options(show_trace=true, show_every=1, g_tol=1e-20))
     model.dofs .= res.minimizer
     return res
@@ -241,9 +252,9 @@ left = Vec{3}((-75.,-25.,-2.))
 right = Vec{3}((75.,25.,2.))
 model = LandauModel(α, G, (50, 50, 2), left, right, element_potential)
 
-vtk_save(homedir()*"/landauorig", model)
+vtk_save("landauorig", model)
 @time minimize!(model)
-vtk_save(homedir()*"/landaufinal", model)
+vtk_save("landaufinal", model)
 
 # as we can see this runs very quickly even for relatively large gridsizes.
 # The key to get high performance like this is to minimize the allocations inside the threaded loops,
