@@ -44,7 +44,25 @@ end
 """
     L2Projector(func_ip::Interpolation, grid::AbstractGrid; kwargs...)
 
-Create an `L2Projector` used for projecting quadrature data.
+Create an `L2Projector` used for projecting quadrature data. `func_ip`
+is the function interpolation used for the projection and `grid` the grid
+over which the projection is applied.
+
+Keyword arguments:
+ - `qr_lhs`: quadrature for the left hand side. Defaults to a quadrature which exactly
+   integrates a mass matrix with `func_ip` as the interpolation.
+ - `set`: element set over which the projection applies. Defaults to all elements in the grid.
+ - `geom_ip`: geometric interpolation. Defaults to the default interpolation for the grid.
+
+
+The `L2Projector` acts as the integrated left hand side of the projection equation:
+Find projection ``u`` such that
+```math
+\\int v u \\ \\mathrm{d}\\Omega = \\int \\delta u f \\ \\mathrm{d}\\Omega \\quad \\forall v \\in L_2(\\Omega),
+```
+where ``f`` is the data to project.
+
+Use [`project`](@ref) to integrate the right hand side and solve for the system.
 """
 function L2Projector(
         func_ip::Interpolation,
@@ -132,11 +150,33 @@ end
 
 
 """
-    project(Vector{Vector{<:Tensor}}}, L2Projector, project_to_nodes=true)
+    project(proj::L2Projector, vals::Vector{Vector{T}}}, qr_rhs::QuadratureRule; project_to_nodes=true)
 
-Makes a L2 projection of tensor values to the nodes of the grid. This is commonly used for turning values, computed at integration points, to nodal values, so they can be visualized easier. It is also useful for error estimation and recovering more accurate estimations of secondary unknowns.
+Makes a L2 projection of data `vals` to the nodes of the grid using the projector `proj`
+(see [`L2Projector`](@ref)).
 
-If the parameter `project_to_nodes` is true, then the projection returns the values in the order of the mesh nodes. If false, it returns the values corresponding to the degrees of freedom for a scalar field over the domain, which is useful if one wants to interpolate the projected values.
+`project` integrates the right hand side, and solves the projection ``u`` from the following projection equation:
+Find projection ``u`` such that
+```math
+\\int v u \\ \\mathrm{d}\\Omega = \\int \\delta u f \\ \\mathrm{d}\\Omega \\quad \\forall v \\in L_2(\\Omega),
+```
+where ``f`` is the data to project, i.e. `vals`.
+
+The data `vals` should be a vector, with length corresponding to number of elements, of vectors,
+with length corresponding to number of quadrature points per element, matching the number of points in `qr_rhs`.
+Example scalar input data:
+```julia
+vals = [
+    [0.44, 0.98, 0.32], # data for quadrature point 1, 2, 3 of element 1
+    [0.29, 0.48, 0.55], # data for quadrature point 1, 2, 3 of element 2
+    # ...
+]
+```
+Supported data types to project are `Number`s and `AbstractTensor`s.
+
+If the parameter `project_to_nodes` is `true`, then the projection returns the values in the order of the mesh nodes
+(suitable format for exporting). If `false`, it returns the values corresponding to the degrees of freedom for a scalar
+field over the domain, which is useful if one wants to interpolate the projected values.
 """
 function project(proj::L2Projector,
                  vars::Vector{Vector{T}},

@@ -7,3 +7,8 @@ DocTestSetup = :(using Ferrite)
 ```@docs
 vtk_grid
 ```
+
+```@docs
+L2Projector
+project
+```
