@@ -56,9 +56,9 @@ Keyword arguments:
 
 
 The `L2Projector` acts as the integrated left hand side of the projection equation:
-Find projection ``u`` such that
+Find projection ``u \\in L_2(\\Omega)`` such that
 ```math
-\\int v u \\ \\mathrm{d}\\Omega = \\int \\delta u f \\ \\mathrm{d}\\Omega \\quad \\forall v \\in L_2(\\Omega),
+\\int v u \\ \\mathrm{d}\\Omega = \\int v f \\ \\mathrm{d}\\Omega \\quad \\forall v \\in L_2(\\Omega),
 ```
 where ``f`` is the data to project.
 
@@ -156,9 +156,9 @@ Makes a L2 projection of data `vals` to the nodes of the grid using the projecto
 (see [`L2Projector`](@ref)).
 
 `project` integrates the right hand side, and solves the projection ``u`` from the following projection equation:
-Find projection ``u`` such that
+Find projection ``u \\in L_2(\\Omega)`` such that
 ```math
-\\int v u \\ \\mathrm{d}\\Omega = \\int \\delta u f \\ \\mathrm{d}\\Omega \\quad \\forall v \\in L_2(\\Omega),
+\\int v u \\ \\mathrm{d}\\Omega = \\int v f \\ \\mathrm{d}\\Omega \\quad \\forall v \\in L_2(\\Omega),
 ```
 where ``f`` is the data to project, i.e. `vals`.
 
