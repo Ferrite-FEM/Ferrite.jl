@@ -85,7 +85,7 @@ Base.eltype(::Type{T})         where {T<:CellIterator} = T
 @inline celldofs(ci::CellIterator) = ci.celldofs
 
 function reinit!(ci::CellIterator{dim,C}, i::Int) where {dim,C}
-    ci.current_cellid[] = ci.cellset === nothing ? i : i.cellset[i]
+    ci.current_cellid[] = ci.cellset === nothing ? i : ci.cellset[i]
 
     if ci.flags.nodes
         if ci.dh !== nothing && ci.dh isa MixedDofHandler
