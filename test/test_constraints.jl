@@ -88,4 +88,28 @@ end
 
     @test ch.prescribed_dofs == [1,2,3,10,11,12]
     @test ch.values == [-1.0, -1.0, -1.0, -1.0, 1.0, -1.0]
+
+
+    #Shell mesh edge bcs
+    nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)), 
+             Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(0.0,1.0,0.0)),
+             Node{3,Float64}(Vec(2.0,0.0,0.0)), Node{3,Float64}(Vec(2.0,2.0,0.0))]
+
+    cells = [Quadrilateral3D((1,2,3,4)), Quadrilateral3D((2,5,6,3))]
+    grid = Grid(cells,nodes)
+
+    #3d quad with 1st order 2d interpolation
+    dh = DofHandler(grid)
+    push!(dh, :u, 1, Lagrange{2,RefCube,2}())
+    push!(dh, :θ, 1, Lagrange{2,RefCube,2}())
+    close!(dh)
+
+    addedgeset!(grid, "edge", x -> x[2] ≈ 0.0) #bottom edge
+    ch = ConstraintHandler(dh)
+    dbc1 = Dirichlet(:θ, getedgeset(grid, "edge"), (x,t) -> (0.0,), [1])
+    add!(ch, dbc1)
+    close!(ch)
+    update!(ch)
+
+    @test ch.prescribed_dofs == [10, 11, 14, 25, 27]
 end
