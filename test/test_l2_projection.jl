@@ -16,7 +16,10 @@ function test_projection(order)
     cv = CellScalarValues(qr, ip, ip_geom)
 
     # Create node values for the cell
-    f(x) = Tensor{1,1,Float64}((1 + x[1]^2 + (2x[2])^2, ))
+    f(x) = 1 + x[1]^2 + (2x[2])^2
+    # Nodal approximations for this simple grid when using linear interpolation
+    f_approx(i) = [0.1666666666666664, 1.166666666666667, 4.166666666666666, 5.166666666666667][i]
+
     xe = getcoordinates(grid, 1)
     # analytical values
     qp_values = [[f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
@@ -25,25 +28,56 @@ function test_projection(order)
     proj = L2Projector(ip, grid; geom_ip=ip_geom)
     point_vars = project(proj, qp_values, qr)
     ## Old API with fe values as first arg
-    proj = @test_deprecated L2Projector(cv, ip, grid)
-    point_vars_2 = @test_deprecated project(qp_values, proj)
+    proj2 = @test_deprecated L2Projector(cv, ip, grid)
+    point_vars_2 = @test_deprecated project(qp_values, proj2)
     ## Old API with qr as first arg
-    proj = @test_deprecated L2Projector(qr, ip, grid)
-    point_vars_3 = @test_deprecated project(qp_values, proj)
+    proj3 = @test_deprecated L2Projector(qr, ip, grid)
+    point_vars_3 = @test_deprecated project(qp_values, proj3)
 
     @test point_vars ≈ point_vars_2 ≈ point_vars_3
 
     if order == 1
         # A linear approximation can not recover a quadratic solution,
         # so projected values will be different from the analytical ones
-        ae = [Vec{1}((0.1666666666666664,)), Vec{1}((1.166666666666667,)),
-              Vec{1}((4.166666666666666,)),  Vec{1}((5.166666666666667,))]
-        @test point_vars[1:4] ≈ ae
+        ae = [f_approx(i) for i in 1:4]
     elseif order == 2
         # For a quadratic approximation the analytical solution is recovered
         ae = compute_vertex_values(grid, f)
-        @test point_vars[1:4] ≈ ae
     end
+    @test point_vars[1:4] ≈ ae
+
+    # Vec
+    f_vector(x) = Vec{1,Float64}((f(x),))
+    qp_values = [[f_vector(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
+    point_vars = project(proj, qp_values, qr)
+    if order == 1
+        ae = [Vec{1,Float64}((f_approx(j),)) for j in 1:4]
+    elseif order == 2
+        ae = compute_vertex_values(grid, f_vector)
+    end
+    @test point_vars[1:4] ≈ ae
+
+    # Tensor
+    f_tensor(x) = Tensor{2,2,Float64}((f(x),2*f(x),3*f(x),4*f(x)))
+    qp_values = [[f_tensor(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
+    point_vars = project(proj, qp_values, qr)
+    if order == 1
+        ae = [Tensor{2,2,Float64}((f_approx(i),2*f_approx(i),3*f_approx(i),4*f_approx(i))) for i in 1:4]
+    elseif order == 2
+        ae = compute_vertex_values(grid, f_tensor)
+    end
+    @test point_vars[1:4] ≈ ae
+
+    # SymmetricTensor
+    f_stensor(x) = SymmetricTensor{2,2,Float64}((f(x),2*f(x),3*f(x)))
+    qp_values = [[f_stensor(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
+    point_vars = project(proj, qp_values, qr)
+    if order == 1
+        ae = [SymmetricTensor{2,2,Float64}((f_approx(i),2*f_approx(i),3*f_approx(i))) for i in 1:4]
+    elseif order == 2
+        ae = compute_vertex_values(grid, f_stensor)
+    end
+    @test point_vars[1:4] ≈ ae
 end
 
 # Test a mixed grid, where only a subset of the cells contains a field

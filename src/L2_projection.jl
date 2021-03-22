@@ -124,7 +124,7 @@ function _assemble_L2_matrix(fe_values, set, dh)
 end
 
 function project(vars::Vector{Vector{T}}, proj::L2Projector;
-                 project_to_nodes=true) where T <: AbstractTensor
+                 project_to_nodes=true) where T <: Union{Number, AbstractTensor}
     Base.depwarn("project(vars, proj::L2Projector) is deprecated, " *
                  "use project(proj, vars, qr) instead.", :project)
     return project(proj, vars; project_to_nodes=project_to_nodes)
