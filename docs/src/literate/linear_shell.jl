@@ -1,120 +1,112 @@
 # # Linear shell
 #
 # ## Introduction
-# 
-# In this example we show how shell elements can be implemented in JuAFEM. 
-# The first part of the tutorial explains how to distribute dofs (displacement and rotational)
-# and how boundary condition can be applied to edges and vertices.
-# In the second part, we give an brief description on the shell element used for this tutorial.
+#
+# In this example we show how shell elements can be analyzed with the help of Ferrite.jl. The shell presented here comes from the book 
+# "The finite elment method - Linear static and dynamic finite element analysis" by Hughes (1987), and a brief description is 
+# given at the end of this tutorial. 
+#
+# The first part of the tutorial explains how to set up the problem, and how boundary condition can be applied to edges and vertices.
 
-# ## Set up of the problem
-
+# ## Commeted program
 using JuAFEM
 using ForwardDiff
 
-# Define a main function which we later call to solve the problem
+# First we generate a flat rectangular mesh. There is currently no built-in function for generating
+# shell meshes in Ferrite, so we have to create our own simple mesh generator (see the function 
+#`generate_shell_grid` further down in this file).
+nels = (10,10)
+size = (10.0, 10.0)
+grid = generate_shell_grid(nels, size)
 
-function main()
+# Here we define the bi-linear interpolation used for the geometrical description of the shell.
+# We also create two quadrature rules for the in-plane and out-of-plane directions. Note that we use 
+# under integration for the inplane integration, to avoid shear locking. 
+ip = Lagrange{2,RefCube,1}()
+qr_inplane = QuadratureRule{2,RefCube}(1)
+qr_ooplane = QuadratureRule{1,RefCube}(2)
+cv = CellScalarValues(qr_inplane, ip)
 
-    # Next we generate a mesh. There is currently no builet-in function for generating 
-    # a shell mesh, so we create one our. See `generate_shell_grid` further down in this file.
-    nels = (10,10)
-    size = (10.0, 5.0)
-    grid = generate_shell_grid(nels, size)
+# Next we distribute displacement dofs,`:u = (x,y,z)` and rotation-dofs, :θ = (θ₁,  θ₂)`.
+dh = DofHandler(grid)
+push!(dh, :u, 3, ip)
+push!(dh, :θ, 2, ip)
+close!(dh)
 
-    # Here we define the interpolation and precompute the shape values/derivatives using `CellScalarValues`. 
-    # Bi-Linear shape functions inplane is used (note how 2d-interpolation and quadrature rule is used).
-    # A quadrature rule for the out-of-plane direction is also defined here. 
-    ip = Lagrange{2,RefCube,1}()
-    qr_inplane = QuadratureRule{2,RefCube}(2)
-    cv = CellScalarValues(qr_inplane, ip)
+# In order to apply our boundary conditions, we first need to create some edge and vertex sets. This 
+# is done with `addedgeset!` and `addvertexset!`(similar to `addfaceset!`)
+addedgeset!(grid, "left",  (x) -> x[1] ≈ 0.0)
+addedgeset!(grid, "right", (x) -> x[1] ≈ size[1])
+addvertexset!(grid, "corner", (x) -> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
 
-    qr_ooplane = QuadratureRule{1,RefCube}(2)
+# Here we define the boundary conditions. On the left edge, we lock the displacements in the x- and z- directions, and all the rotations.
+ch = ConstraintHandler(dh)
+add!(ch,  Dirichlet(:u, getedgeset(grid, "left"), (x, t) -> (0.0,0.0), [1,3])  )
+add!(ch,  Dirichlet(:θ, getedgeset(grid, "left"), (x, t) -> (0.0,0.0), [1,2])  )
 
-    # Distribute displacement dofs, `u = (x,y,z)` and rotation-dofs, `:θ = (θ₁,  θ₂)`.
-    dh = DofHandler(grid)
-    push!(dh, :u, 3, ip)
-    push!(dh, :θ, 2, ip)
-    close!(dh)
+# On the right edge, we also lock the displacements in the x- and z- directions, but apply a precribed roation.
+add!(ch,  Dirichlet(:u, getedgeset(grid, "right"), (x, t) -> (0.0,0.0), [1,3])  )
+add!(ch,  Dirichlet(:θ, getedgeset(grid, "right"), (x, t) -> (0.0,pi/10), [1,2])  )
 
-    # Next we define the boundary conditions. 
-    #
-    # On the left edge, we lock the displacements in the x- and z- directions, and the rotations.
-    ch = ConstraintHandler(dh)
-    dbc = Dirichlet(:u, getedgeset(grid, "left"), (x, t) -> (0.0,0.0), [1,3])
-    add!(ch, dbc)
-    dbc = Dirichlet(:θ, getedgeset(grid, "left"), (x, t) -> (0.0,0.0), [1,2])
-    add!(ch, dbc)
+# In order to not get rigid body motion, we lock the y-displacement in one fo the corners.
+add!(ch,  Dirichlet(:θ, getvertexset(grid, "corner"), (x, t) -> (0.0), [2])  )
 
-    # On the right edge, we also lock the displacements in the x- and z- directions, but apply a 
-    # precribed roation.
-    dbc = Dirichlet(:u, getedgeset(grid, "right"), (x, t) -> (0.0,0.0), [1,3])
-    add!(ch, dbc)
-    dbc = Dirichlet(:θ, getedgeset(grid, "right"), (x, t) -> (pi/10,0.0), [1,2])
-    add!(ch, dbc)
+close!(ch)
+update!(ch, 0.0)
 
-    # In order to not get rigid body motion, we lock the y-displacement in one fo the corners (`getvertexset).
-    dbc = Dirichlet(:θ, getvertexset(grid, "corner"), (x, t) -> (0.0), [2])
-    add!(ch, dbc)
-
-    close!(ch)
-    update!(ch, 0.0)
+# Next we define relevant data for the shell, such as shear correction factor and stiffness matrix for the material. 
+# In this linear shell, plane stress is assumed, ie $\\sigma_{zz} = 0 $. Therefor, the stiffness matrix is 5x5 (opposed to the normal 6x6).
+κ = 5/6 # Shear correction factor
+E = 210.0
+ν = 0.3
+a = (1-ν)/2
+C = E/(1-ν^2) * [1 ν 0   0   0;
+                 ν 1 0   0   0;
+                 0 0 a*κ 0   0;
+                 0 0 0   a*κ 0;
+                 0 0 0   0   a*κ]
 
 
-    # Now we define the sitffness matrix for the material. In this linear shell, plane stress
-    # is assumed, ie $\\sigma_{zz} = 0 $. Thererfor, the stiffness matrix is 5x5 (opposed to the normal 6x6.)
-    
-    E = 210.0
-    ν = 0.3
-    a = (1-ν)/2
-    material = E/(1-ν^2) * [1 ν 0 0 0;
-                            ν 1 0 0 0;
-                            0 0 a 0 0;
-                            0 0 0 a 0;
-                            0 0 0 0 a]
-    
-    # Define the a named tuple with some data related to the shell: thickness, shear_factor, and material.
-    data = (thickness = 1.0, C = material, shear_factor = 5/6)
-    
-    # Main assembly loop
-    nnodes = getnbasefunctions(ip)
-    ndofs_shell = ndofs_per_cell(dh)
+data = (thickness = 1.0, C = C); #Named tuple
 
-    K = create_sparsity_pattern(dh)
-    f = zeros(Float64, ndofs(dh))
-   
-    ke = zeros(ndofs_shell, ndofs_shell)
-    fe = zeros(ndofs_shell) 
+# We now assemble the problem in standard finite element fashion
+nnodes = getnbasefunctions(ip)
+ndofs_shell = ndofs_per_cell(dh)
 
-    celldofs = zeros(Int, ndofs_shell)
-    cellcoords = zeros(Vec{3,Float64}, nnodes)
+K = create_sparsity_pattern(dh)
+f = zeros(Float64, ndofs(dh))
 
-    assembler = start_assemble(K, f)
-    for cellid in 1:getncells(grid)
-        fill!(ke, 0.0)
+ke = zeros(ndofs_shell, ndofs_shell)
+fe = zeros(ndofs_shell)
 
-        celldofs!(celldofs, dh, cellid)
-        getcoordinates!(cellcoords, grid, cellid)
+celldofs = zeros(Int, ndofs_shell)
+cellcoords = zeros(Vec{3,Float64}, nnodes)
 
-        integrate_shell!(ke, cv, qr_ooplane, cellcoords, data)
+assembler = start_assemble(K, f)
+for cellid in 1:getncells(grid)
+    fill!(ke, 0.0)
 
-        assemble!(assembler, celldofs, fe, ke)
-    end
+    celldofs!(celldofs, dh, cellid)
+    getcoordinates!(cellcoords, grid, cellid)
 
-    # Apply BC and solve.
-    apply!(K, f, ch)
-    a = K\f
+    #Call the element routine
+    integrate_shell!(ke, cv, qr_ooplane, cellcoords, data)
 
-    # Output results.
-    vtk_grid("linear_shell", dh) do vtk
-        vtk_point_data(vtk, dh, a)
-    end
+    assemble!(assembler, celldofs, fe, ke)
 end
 
-# Since there is no builed-in function for generating a shell mesh, we have to 
-# create a function here. It simply generates a 2d-quadrature mesh, and appends
-# a third coordinate (z-direction) to the node-positions. It also adds 
-# edge- and vertex-sets.
+# Apply BC and solve.
+apply!(K, f, ch)
+a = K\f
+
+# Output results.
+vtk_grid("linear_shell", dh) do vtk
+    vtk_point_data(vtk, dh, a)
+end
+
+
+# Below is the function that creates the shell mesh. It simply generates a 2d-quadrature mesh, and appends
+# a third coordinate (z-direction) to the node-positions. 
 function generate_shell_grid(nels, size)
 
     _grid = generate_grid(Quadrilateral, nels, Vec((0.0,0.0)), Vec(size))
@@ -123,73 +115,90 @@ function generate_shell_grid(nels, size)
 
     grid = Grid(cells, nodes)
 
-    addedgeset!(grid, "left", (x) -> x[1] ≈ 0.0)
-    addedgeset!(grid, "right", (x) -> x[1] ≈ size[1])
-    addvertexset!(grid, "corner", (x) -> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
     return grid
-end
+end;
 
-JuAFEM.cell_to_vtkcell(::Type{Quadrilateral3D}) = VTKCellTypes.VTK_QUAD
+# ## The shell element.
+#
+# The shell presented here comes from the book "The finite elment method - Linear static and dynamic finite element analysis" by Hughes (1987).
+# The shell is a so called degenerate shell element, meaning it is based on a continuum element.
+# A brief describtion of the shell is given here.
 
-# ## The shell element. 
+#md # !!! note
+#md #     This element might experience various locking phenomenas, and should only be seen as a proof of concept.
 
-function integrate_shell!(ke, cv, qr_ooplane, X, data)
-    
-    nnodes = getnbasefunctions(cv)
-    ndofs = nnodes*5
-    h = data.thickness
+# ##### Fibre coordinate system 
+# The element uses two coordinate systems. The first coordianate system, called the fiber system, is created for each
+# element node, and is used as a reference frame for the rotations. The function below implement an algorthim that return the
+# fiber directions at each node.
+function fiber_coordsys(Ps::Vector{Vec{3,Float64}})
 
-    p = zeros(Vec{3}, nnodes)
-    for i in 1:nnodes
-        a = Vec{3}((0.0, 0.0, 1.0)) 
-        p[i] = a/norm(a)
+    ef1 = Vec{3,Float64}[]
+    ef2 = Vec{3,Float64}[]
+    ef3 = Vec{3,Float64}[]
+    for P in Ps
+        a = abs.(P)
+        j = 1
+        if a[1] > a[3]; a[3] = a[1]; j = 2; end
+        if a[2] > a[3]; j = 3; end
+       
+        e3 = P
+        e2 = Tensors.cross(P, basevec(Vec{3}, j))
+        e2 /= norm(e2)
+        e1 = Tensors.cross(e2, P)
+
+        push!(ef1, e1)
+        push!(ef2, e2)
+        push!(ef3, e3)
+    end
+    return ef1, ef2, ef3
+
+end;
+
+# ##### Lamina coordinate system 
+# The second coordinate system is the so called Lamina Coordinate system. It is
+# created for each integration point, and is defined to be tangent to the
+# mid-surface. It is in this system that we enforce that plane stress assumption,
+# i.e. $\sigma_{zz} = 0$. The function below returns the rotation matrix for this coordinate system.
+function lamina_coordsys(dNdξ, ζ, x, p, h)
+
+    e1 = zero(Vec{3})
+    e2 = zero(Vec{3})
+
+    for i in 1:length(dNdξ)
+        e1 += dNdξ[i][1] * x[i] + 0.5*h*ζ * dNdξ[i][1] * p[i]
+        e2 += dNdξ[i][2] * x[i] + 0.5*h*ζ * dNdξ[i][1] * p[i]
     end
 
-    fibercoord = fiber_coordsys.(p)
-    ef1 = getindex.(fibercoord, 1)
-    ef2 = getindex.(fibercoord, 2)
+    e1 /= norm(e1)
+    e2 /= norm(e2)
 
-    for iqp in 1:getnquadpoints(cv)
+    ez = Tensors.cross(e1,e2)
+    ez /= norm(ez)
 
-        dNdξ = [Vec{3}((cv.dNdξ[i,iqp]..., 0.0)) for i in 1:nnodes]
-        N = cv.N[:,iqp]
+    a = 0.5*(e1 + e2)
+    a /= norm(a)
 
-        for oqp in 1:length(qr_ooplane.weights)
+    b = Tensors.cross(ez,a)
+    b /= norm(b)
 
-            ζ = qr_ooplane.points[oqp][1]
-            
-            q = lamina_coordsys(dNdξ, ζ, X, p, h)
-            J = getjacobian(q, N, dNdξ, ζ, X, p, h)
-            Jinv = inv(J)   
-            
-            dζdx = Vec{3}((0.0, 0.0, 1)) ⋅ Jinv
-            dNdx = [dNdξ[i] ⋅ Jinv for i in 1:nnodes]
+    ex = sqrt(2)/2 * (a - b)
+    ey = sqrt(2)/2 * (a + b)
 
-            B = ForwardDiff.jacobian( (a) -> strain(a, N, dNdx, ζ, dζdx, q, ef1, ef2, h), zeros(Float64, ndofs) )
+    return Tensor{2,3}(hcat(ex,ey,ez))
+end;
 
-            dV = det(J) * cv.qr_weights[iqp] * qr_ooplane.weights[oqp]
-            ke .+= B'*data.C*B * dV
-        end
-    end
-end
-
-function strain(dofvec::Vector{T}, N, dNdx, ζ, dζdx, q, ef1, ef2, h) where T
-
-    u = reinterpret(Vec{3,T}, dofvec[1:12])
-    θ = reinterpret(Vec{2,T}, dofvec[13:20])
-
-    dudx = zeros(T, 3, 3)
-    for a in 1:length(N)
-        for i in 1:3, j in 1:3
-            dudx[i,j] += dNdx[a][j] * u[a][i] + h/2 * (dNdx[a][j]*ζ + N[a]*dζdx[j]) * (θ[a][1]*ef1[a][i] - θ[a][2]*ef2[a][i])
-        end
-    end
-
-    dudx = q'*dudx
-    ε = [dudx[1,1], dudx[2,2], dudx[1,2]+dudx[2,1], dudx[2,3]+dudx[3,2], dudx[1,3]+dudx[3,1]]
-    return ε
-
-end
+# ##### Jacobian matrix
+# The Jacobian-matrix of the shell element is caluclated as 
+# ```math
+# J_{ij} = \frac{\partial x_i}{partial \xi_j}
+# ```
+# The position vector is calculated as
+# ```math
+# \boldsymbol x(\xi, \eta, \zeta) = \sum_{a=1}^{N_{\text{nodes}}} N_a(\xi, \eta) \boldsymbol{\bar{x}}_{a} + ζ \frac{h}{2} \boldsymbol{\bar{p}_a}
+# ``` 
+# where $\boldsymbol{\bar{x}}_{a}$ are nodal positions, and $\boldsymbol{\bar{p}_a}$ is an vector that defines the fibre direction
+# on the reference surface. $N_a$ are standard bi-linear shape functions.
 
 function getjacobian(q, N, dNdξ, ζ, X, p, h)
 
@@ -205,42 +214,81 @@ function getjacobian(q, N, dNdξ, ζ, X, p, h)
     end
 
     return (q' * J) |> Tensor{2,3,Float64}
-end
+end;
 
-function lamina_coordsys(dNdξ, ζ, x, p, h)
+# ##### Strains
+# Linear strains are assumed.
+# ```math
+# \varepsilon_{ij}= \frac{1}{2}(\frac{\partial u_{i}}{\partial x_j} + \frac{\partial u_{j}}{\partial x_i})
+# ```
+# The gradient of the displacement are caluclated using  
+# ```math
+# \frac{\partial u_{i}}{\partial x_j} = \sum_{m=1}^3 q_{im} \sum_{a=1}^{N_{\text{nodes}}} \frac{\partial N_a}{\partial x_j} \bar{u}_{am} + 
+#  \frac{\partial(N_a z_a)}{\partial x_j} (\theta_{a2} e^{f}_{am1} - \theta_{a1} e^{f}_{am2})
+# ```
+# In the above equations subscript $a$ represents a nodal index, $\boldsymbol{e}^{f}_{a1}$ and $\boldsymbol{e}^{f}_{a2}$ are unit vectors 
+# in the fibre system, and $\boldsymbol q$ is the lamina rotaiton matrix.
+function strain(dofvec::Vector{T}, N, dNdx, ζ, dζdx, q, ef1, ef2, h) where T
 
-    e1 = zero(Vec{3})
-    e2 = zero(Vec{3})
+    u = reinterpret(Vec{3,T}, dofvec[1:12])
+    θ = reinterpret(Vec{2,T}, dofvec[13:20])
 
-    for i in 1:length(dNdξ)
-        e1 += dNdξ[i][1] * x[i] + 0.5*h*ζ * dNdξ[i][1] * p[i]
-        e2 += dNdξ[i][2] * x[i] + 0.5*h*ζ * dNdξ[i][1] * p[i]
+    dudx = zeros(T, 3, 3)
+    for m in 1:3, j in 1:3
+        for a in 1:length(N)
+            dudx[m,j] += dNdx[a][j] * u[a][m] + h/2 * (dNdx[a][j]*ζ + N[a]*dζdx[j]) * (θ[a][2]*ef1[a][m] - θ[a][1]*ef2[a][m])
+        end
     end
 
-    ez = Tensors.cross(e1,e2)
-    ez /= norm(ez)
+    dudx = q*dudx
+    ε = [dudx[1,1], dudx[2,2], dudx[1,2]+dudx[2,1], dudx[2,3]+dudx[3,2], dudx[1,3]+dudx[3,1]]
+    return ε
 
-    a = e1/norm(e1) + e2/norm(e2)
-    b = Tensors.cross(ez,a)
+end;
 
-    ex = (a-b)/norm(a-b)
-    ey = (a+b)/norm(a+b)
+# ##### Main element routine
+# Below is the main routine that calculates the stiffness matrix of the shell element. 
+# Since it is a so called degenerate shell element, the code is similar to that for an standard continuum element.
+function integrate_shell!(ke, cv, qr_ooplane, X, data)
+   
+    nnodes = getnbasefunctions(cv)
+    ndofs = nnodes*5
+    h = data.thickness
 
-    return Tensor{2,3}(hcat(ex,ey,ez))
-end
+    #Create the directors in each node.
+    #Note: For a more general case, the directors should
+    #be input parameters for the element routine.
+    p = zeros(Vec{3}, nnodes)
+    for i in 1:nnodes
+        a = Vec{3}((0.0, 0.0, 1.0))
+        p[i] = a/norm(a)
+    end
 
-function fiber_coordsys(P)
+    ef1, ef2, ef3 = fiber_coordsys(p)
 
-    a = collect(P)
-    j = 1
-    if a[1] > a[3]; a[3] = a[1]; j = 2; end
-    if a[2] > a[3]; j = 3; end
-    
-    e3 = P
-    e2 = Tensors.cross(P, basevec(Vec{3}, j))
-    e2 /= norm(e2)
-    e1 = Tensors.cross(P, e2)
+    for iqp in 1:getnquadpoints(cv)
 
-    return e1, e2
+        #Pad 
+        dNdξ = [Vec{3}((cv.dNdξ[i,iqp]..., 0.0)) for i in 1:nnodes]
+        N = cv.N[:,iqp]
 
-end
+        for oqp in 1:length(qr_ooplane.weights)
+
+            ζ = qr_ooplane.points[oqp][1]
+           
+            q = lamina_coordsys(dNdξ, ζ, X, p, h)
+            J = getjacobian(q, N, dNdξ, ζ, X, p, h)
+            Jinv = inv(J)  
+           
+            dζdx = Vec{3}((0.0, 0.0, 1.0)) ⋅ Jinv
+            dNdx = [dNdξ[i] ⋅ Jinv for i in 1:nnodes]
+
+            #For simplicity, use automatic differentiation to construct the B-matrix from the strain.
+            B = ForwardDiff.jacobian(
+                (a) -> strain(a, N, dNdx, ζ, dζdx, q, ef1, ef2, h), zeros(Float64, ndofs) )
+
+            dV = det(J) * cv.qr_weights[iqp] * qr_ooplane.weights[oqp]
+            ke .+= B'*C*B * dV
+        end
+    end
+end;
