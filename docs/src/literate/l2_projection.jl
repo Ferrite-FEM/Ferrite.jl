@@ -41,10 +41,10 @@ end
 q = compute_heat_fluxes(cellvalues, dh, u);
 
 # Next, create an L2-projector using the same interpolation as was used to approximate the temperature field. On instantiation, the projector assembles the coefficient matrix `M` and computes the Cholesky factorization of it. By doing so, the projector can be reused without having to invert `M` every time.
-projector = L2Projector(cellvalues, ip, grid);
+projector = L2Projector(ip, grid);
 
 # Project the integration point values to the nodal values
-q_nodes = project(q, projector);
+q_nodes = project(projector, q, qr);
 
 
 # ## Exporting to VTK

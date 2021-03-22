@@ -1,16 +1,22 @@
 
 abstract type AbstractProjector end
 
-struct L2Projector{CV<:CellValues} <: AbstractProjector
-    fe_values::CV
+struct L2Projector <: AbstractProjector
+    func_ip::Interpolation
+    geom_ip::Interpolation
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::MixedDofHandler
     set::Vector{Int}
     node2dof_map::Dict{Int64, Array{Int64,N} where N}
+    fe_values::Union{CellValues,Nothing} # only used for deprecated constructor
+    qr_rhs::Union{QuadratureRule,Nothing}    # only used for deprecated constructor
 end
 
 function L2Projector(fe_values::Ferrite.Values, interp::Interpolation,
     grid::Ferrite.AbstractGrid, set=1:getncells(grid), fe_values_mass::Ferrite.Values=fe_values)
+
+    Base.depwarn("L2Projector(fe_values, interp, grid) is deprecated, " *
+                 "use L2Projector(qr, interp, grid) instead.", :L2Projector)
 
     dim, T, shape = typeof(fe_values).parameters
 
@@ -23,17 +29,35 @@ function L2Projector(fe_values::Ferrite.Values, interp::Interpolation,
 
     M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
     M_cholesky = cholesky(M)  # TODO maybe have a lazy eval instead of precomputing? / JB
-    return L2Projector(fe_values, M_cholesky, dh, collect(set), vertex_dict[1])
+    dummy = Lagrange{1,RefCube,1}()
+    return L2Projector(dummy, dummy, M_cholesky, dh, collect(set), vertex_dict[1], fe_values, nothing)
 end
 
 function L2Projector(qr::QuadratureRule, func_ip::Interpolation,
-    grid::Ferrite.AbstractGrid, set=1:getncells(grid), qr_mass::QuadratureRule=qr,
+    grid::Ferrite.AbstractGrid, set=1:getncells(grid), qr_mass::QuadratureRule=_mass_qr(func_ip),
     geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(set)])))
+    Base.depwarn("L2Projector(qr, func_ip, grid) is deprecated, " *
+                 "use L2Projector(func_ip, grid) instead.", :L2Projector)
+    return L2Projector(func_ip, grid; qr_lhs=qr_mass, set=set, geom_ip=geom_ip, qr_rhs=qr)
+end
+
+"""
+    L2Projector(func_ip::Interpolation, grid::AbstractGrid; kwargs...)
+
+Create an `L2Projector` used for projecting quadrature data.
+"""
+function L2Projector(
+        func_ip::Interpolation,
+        grid::AbstractGrid;
+        qr_lhs::QuadratureRule = _mass_qr(func_ip),
+        set = 1:getncells(grid),
+        geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(set)])),
+        qr_rhs::Union{QuadratureRule,Nothing}=nothing, # deprecated
+    )
 
     _check_same_celltype(grid, collect(set)) # TODO this does the right thing, but gives the wrong error message if it fails
 
-    fe_values = CellScalarValues(qr, func_ip, geom_ip)
-    fe_values_mass = CellScalarValues(qr_mass, func_ip, geom_ip)
+    fe_values_mass = CellScalarValues(qr_lhs, func_ip, geom_ip)
 
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
     dh = MixedDofHandler(grid)
@@ -44,9 +68,18 @@ function L2Projector(qr::QuadratureRule, func_ip::Interpolation,
 
     M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
     M_cholesky = cholesky(M)  # TODO maybe have a lazy eval instead of precomputing? / JB
-    return L2Projector(fe_values, M_cholesky, dh, collect(set), vertex_dict[1])
+
+    # For deprecated API
+    fe_values = qr_rhs === nothing ? nothing :
+                CellScalarValues(qr_rhs, func_ip, geom_ip)
+
+    return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set), vertex_dict[1], fe_values, qr_rhs)
 end
 
+# Quadrature sufficient for integrating a mass matrix
+function _mass_qr(::Interpolation{dim, shape, order}) where {dim, shape, order}
+    return QuadratureRule{dim,shape}(order + 1)
+end
 
 function _assemble_L2_matrix(fe_values, set, dh)
 
@@ -90,6 +123,13 @@ function _assemble_L2_matrix(fe_values, set, dh)
     return M
 end
 
+function project(vars::Vector{Vector{T}}, proj::L2Projector;
+                 project_to_nodes=true) where T <: AbstractTensor
+    Base.depwarn("project(vars, proj::L2Projector) is deprecated, " *
+                 "use project(proj, vars, qr) instead.", :project)
+    return project(proj, vars; project_to_nodes=project_to_nodes)
+end
+
 
 """
     project(Vector{Vector{<:Tensor}}}, L2Projector, project_to_nodes=true)
@@ -98,13 +138,18 @@ Makes a L2 projection of tensor values to the nodes of the grid. This is commonl
 
 If the parameter `project_to_nodes` is true, then the projection returns the values in the order of the mesh nodes. If false, it returns the values corresponding to the degrees of freedom for a scalar field over the domain, which is useful if one wants to interpolate the projected values.
 """
-function project(
-    vars::Array{Array{T,1},1},
-    proj::L2Projector;
-    project_to_nodes=true) where {T<:AbstractTensor}
+function project(proj::L2Projector,
+                 vars::Vector{Vector{T}},
+                 qr_rhs::Union{QuadratureRule,Nothing}=nothing;
+                 project_to_nodes::Bool=true) where T
+
+    # For using the deprecated API
+    fe_values = qr_rhs === nothing ?
+        proj.fe_values :
+        CellScalarValues(qr_rhs, proj.func_ip, proj.geom_ip)
 
     M = length(vars[1][1].data)
-    projected_vals = _project(vars, proj, M)
+    projected_vals = _project(vars, proj, fe_values, M)
     if project_to_nodes
         # NOTE we may have more projected values than verticies in the mesh => not all values are returned
         nnodes = getnnodes(proj.dh.grid)
@@ -121,13 +166,12 @@ function project(
     end
 end
 
-function _project(vars, proj::L2Projector, M::Integer)
+function _project(vars, proj::L2Projector, fe_values::Values, M::Integer)
     # Assemble the multi-column rhs, f = ∭( v ⋅ x̂ )dΩ
     # The number of columns corresponds to the length of the data-tuple in the tensor x̂.
 
     f = zeros(ndofs(proj.dh), M)
-    fe_values = proj.fe_values
-    n = getnbasefunctions(proj.fe_values)
+    n = getnbasefunctions(fe_values)
     fe = zeros(n, M)
 
     cell_dofs = zeros(Int, n)
