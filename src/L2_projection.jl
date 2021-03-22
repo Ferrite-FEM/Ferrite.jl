@@ -141,14 +141,16 @@ If the parameter `project_to_nodes` is true, then the projection returns the val
 function project(proj::L2Projector,
                  vars::Vector{Vector{T}},
                  qr_rhs::Union{QuadratureRule,Nothing}=nothing;
-                 project_to_nodes::Bool=true) where T
+                 project_to_nodes::Bool=true) where T <: Union{Number, AbstractTensor}
 
     # For using the deprecated API
     fe_values = qr_rhs === nothing ?
         proj.fe_values :
         CellScalarValues(qr_rhs, proj.func_ip, proj.geom_ip)
 
-    M = length(vars[1][1].data)
+    M = T <: AbstractTensor ? length(vars[1][1].data) : 1
+    make_T(vals) = T <: AbstractTensor ? T(Tuple(vals)) : vals[1]
+
     projected_vals = _project(vars, proj, fe_values, M)
     if project_to_nodes
         # NOTE we may have more projected values than verticies in the mesh => not all values are returned
@@ -159,10 +161,10 @@ function project(proj::L2Projector,
                 reordered_vals[node, :] = projected_vals[proj.node2dof_map[node], :]
             end
         end
-        return [T(Tuple(reordered_vals[i,:])) for i=1:size(reordered_vals, 1)]
+        return T[make_T(reordered_vals[i,:]) for i=1:size(reordered_vals, 1)]
     else
         # convert back to the original tensor type
-        return [T(Tuple(reordered_vals[i,:])) for i=1:size(reordered_vals, 1)]
+        return T[make_T(reordered_vals[i,:]) for i=1:size(reordered_vals, 1)]
     end
 end
 
@@ -177,6 +179,9 @@ function _project(vars, proj::L2Projector, fe_values::Values, M::Integer)
     cell_dofs = zeros(Int, n)
     nqp = getnquadpoints(fe_values)
 
+    get_data(x::AbstractTensor, i) = x.data[i]
+    get_data(x::Number, i) = x
+
     ## Assemble contributions from each cell
     for cellnum in proj.set
         celldofs!(cell_dofs, proj.dh, cellnum)
@@ -190,7 +195,9 @@ function _project(vars, proj::L2Projector, fe_values::Values, M::Integer)
             qp_vars = cell_vars[q_point]
             for i = 1:n
                 v = shape_value(fe_values, q_point, i)
-                fe[i, :] += v * [qp_vars.data[i] for i=1:M] * dΩ
+                for j in 1:M
+                    fe[i, j] += v * get_data(qp_vars, j) * dΩ
+                end
             end
         end
 
@@ -201,6 +208,6 @@ function _project(vars, proj::L2Projector, fe_values::Values, M::Integer)
     end
 
     # solve for the projected nodal values
-    return proj.M_cholesky\f
+    return proj.M_cholesky \ f
 
 end
