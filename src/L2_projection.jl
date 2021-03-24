@@ -95,8 +95,11 @@ function L2Projector(
 end
 
 # Quadrature sufficient for integrating a mass matrix
-function _mass_qr(::Interpolation{dim, shape, order}) where {dim, shape, order}
+function _mass_qr(::Lagrange{dim, shape, order}) where {dim, shape, order}
     return QuadratureRule{dim,shape}(order + 1)
+end
+function _mass_qr(::Lagrange{dim, RefTetrahedron, 2}) where {dim}
+    return QuadratureRule{dim,RefTetrahedron}(4)
 end
 
 function _assemble_L2_matrix(fe_values, set, dh)

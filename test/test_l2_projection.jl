@@ -1,28 +1,40 @@
 
 # Tests a L2-projection of integration point values (to nodal values),
 # determined from the function y = 1 + x[1]^2 + (2x[2])^2
-function test_projection(order)
+function test_projection(order, refshape)
+    element = refshape == RefCube ? Quadrilateral : Triangle
     if order == 1
-        grid = generate_grid(Quadrilateral, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
+        grid = generate_grid(element, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
     elseif order == 2
         # grid = generate_grid(QuadraticQuadrilateral, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
-        grid = generate_grid(Quadrilateral, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
+        grid = generate_grid(element, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
     end
 
     dim = 2
-    ip = Lagrange{dim, RefCube, order}()
-    ip_geom = Lagrange{dim, RefCube, 1}()
-    qr = QuadratureRule{dim, RefCube}(order+1)
+    ip = Lagrange{dim, refshape, order}()
+    ip_geom = Lagrange{dim, refshape, 1}()
+    qr = Ferrite._mass_qr(ip)
     cv = CellScalarValues(qr, ip, ip_geom)
 
     # Create node values for the cell
     f(x) = 1 + x[1]^2 + (2x[2])^2
     # Nodal approximations for this simple grid when using linear interpolation
-    f_approx(i) = [0.1666666666666664, 1.166666666666667, 4.166666666666666, 5.166666666666667][i]
+    f_approx(i) = refshape == RefCube ?
+        [0.1666666666666664, 1.166666666666667, 4.166666666666666, 5.166666666666667][i] :
+        [0.444444444444465, 1.0277777777778005, 4.027777777777753, 5.444444444444435][i]
 
-    xe = getcoordinates(grid, 1)
     # analytical values
-    qp_values = [[f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
+    function analytical(f)
+        qp_values = []
+        for cell in CellIterator(grid)
+            reinit!(cv, cell)
+            r = [f(spatial_coordinate(cv, qp, getcoordinates(cell))) for qp in 1:getnquadpoints(cv)]
+            push!(qp_values, r)
+        end
+        return identity.(qp_values) # Tighten the type
+    end
+
+    qp_values = analytical(f)
 
     # Now recover the nodal values using a L2 projection.
     proj = L2Projector(ip, grid; geom_ip=ip_geom)
@@ -48,7 +60,7 @@ function test_projection(order)
 
     # Vec
     f_vector(x) = Vec{1,Float64}((f(x),))
-    qp_values = [[f_vector(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
+    qp_values = analytical(f_vector)
     point_vars = project(proj, qp_values, qr)
     if order == 1
         ae = [Vec{1,Float64}((f_approx(j),)) for j in 1:4]
@@ -59,7 +71,7 @@ function test_projection(order)
 
     # Tensor
     f_tensor(x) = Tensor{2,2,Float64}((f(x),2*f(x),3*f(x),4*f(x)))
-    qp_values = [[f_tensor(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
+    qp_values = analytical(f_tensor)
     point_vars = project(proj, qp_values, qr)
     if order == 1
         ae = [Tensor{2,2,Float64}((f_approx(i),2*f_approx(i),3*f_approx(i),4*f_approx(i))) for i in 1:4]
@@ -70,7 +82,7 @@ function test_projection(order)
 
     # SymmetricTensor
     f_stensor(x) = SymmetricTensor{2,2,Float64}((f(x),2*f(x),3*f(x)))
-    qp_values = [[f_stensor(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
+    qp_values = analytical(f_stensor)
     point_vars = project(proj, qp_values, qr)
     if order == 1
         ae = [SymmetricTensor{2,2,Float64}((f_approx(i),2*f_approx(i),3*f_approx(i))) for i in 1:4]
@@ -78,6 +90,14 @@ function test_projection(order)
         ae = compute_vertex_values(grid, f_stensor)
     end
     @test point_vars[1:4] ≈ ae
+
+    # Test error-path with bad qr
+    if refshape == RefTetrahedron && order == 2
+        bad_order = 2
+    else
+        bad_order = 1
+    end
+    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs=QuadratureRule{dim,refshape}(bad_order), geom_ip=ip_geom)
 end
 
 # Test a mixed grid, where only a subset of the cells contains a field
@@ -142,7 +162,9 @@ function test_projection_mixedgrid()
 end
 
 @testset "Test L2-Projection" begin
-    test_projection(1)
-    test_projection(2)
+    test_projection(1, RefCube)
+    test_projection(1, RefTetrahedron)
+    test_projection(2, RefCube)
+    test_projection(2, RefTetrahedron)
     test_projection_mixedgrid()
 end
