@@ -174,22 +174,23 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
     
     
     if eltype(dbc.faces)==Int #Special case when dbc.faces is a nodeset
-        bcvalue = BCValues(interpolation, JuAFEM.default_interpolation(celltype), JuAFEM.faces) #Not used by node bcs, but still have to pass it as an argument
+        bcvalue = BCValues(interpolation, JuAFEM.default_interpolation(celltype), FaceIndex) #Not used by node bcs, but still have to pass it as an argument
         _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue)
     else
         bcvalue = BCValues(interpolation, JuAFEM.default_interpolation(celltype), eltype(dbc.faces))
-        _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue, functype)
+        _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue)
     end
 
     return ch
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Union{<:BoundaryIndex}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, functype::Function, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{<:BoundaryIndex}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, functype::Function, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
     # calculate which local dof index live on each face
     # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
     local_face_dofs = Int[]
     local_face_dofs_offset = Int[1]
-    for (i, face) in enumerate(functype(interpolation))
+    boundary = boundaryfunction(eltype(bcfaces))
+    for (i, face) in enumerate(boundary(interpolation))
         for fdof in face, d in 1:field_dim
             if d ∈ dbc.components # skip unless this component should be constrained
                 push!(local_face_dofs, (fdof-1)*field_dim + d + offset)
@@ -354,7 +355,7 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
         for dbc in ch.dbcs
             dbc.field_name != field && continue
             if eltype(dbc.faces) <: GeomIndex
-                functype = getgeometryfunction(eltype(dbc.faces))
+                functype = boundaryfunction(eltype(dbc.faces))
                 for (cellidx, faceidx) in dbc.faces
                     for facenode in functype(ch.dh.grid.cells[cellidx])[faceidx]
                         for component in dbc.components

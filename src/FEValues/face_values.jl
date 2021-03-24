@@ -215,8 +215,8 @@ struct BCValues{T}
     current_face::ScalarWrapper{Int}
 end
 
-BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{FaceIndex}, Type{EdgeIndex}, Type{VertexIndex}}) =
-    BCValues(Float64, func_interpol, geom_interpol, getgeometryfunction(boundary_type))
+BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}}) =
+    BCValues(Float64, func_interpol, geom_interpol, boundaryfunction(boundary_type))
 
 function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_interpol::Interpolation{dim,refshape}, _face_edge_vertex::Function) where {T,dim,refshape}
     # set up quadrature rules for each face with dof-positions
