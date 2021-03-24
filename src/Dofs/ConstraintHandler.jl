@@ -177,8 +177,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         bcvalue = BCValues(interpolation, JuAFEM.default_interpolation(celltype), JuAFEM.faces) #Not used by node bcs, but still have to pass it as an argument
         _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue)
     else
-        functype = getgeometryfunction(eltype(dbc.faces))
-        bcvalue = BCValues(interpolation, JuAFEM.default_interpolation(celltype), functype)
+        bcvalue = BCValues(interpolation, JuAFEM.default_interpolation(celltype), eltype(dbc.faces))
         _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue, functype)
     end
 
