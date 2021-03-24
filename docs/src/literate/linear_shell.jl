@@ -131,7 +131,7 @@ function generate_shell_grid(nels, size)
     return grid
 end;
 
-# ## The shell element.
+# ## The shell element
 #
 # The shell presented here comes from the book "The finite elment method - Linear static and dynamic finite element analysis" by Hughes (1987).
 # The shell is a so called degenerate shell element, meaning it is based on a continuum element.
@@ -238,13 +238,13 @@ end;
 # The displacement field is calculated as:
 # ```math
 # \boldsymbol u = \sum_{a=1}^{N_{\text{nodes}}} N_a \bar{\boldsymbol u}_{a} + 
-#  N_a ζ\frac{h}{2}(\boldsymbol \theta_{a2} e^{f}_{a1} - \boldsymbol \theta_{a1} e^{f}_{a2})
+#  N_a ζ\frac{h}{2}(\theta_{a2} \boldsymbol e^{f}_{a1} - \theta_{a1} \boldsymbol e^{f}_{a2})
 #
 # ```
 # The gradient of the displacement (in the lamina coordinate system), then becomes:
 # ```math
 # \frac{\partial u_{i}}{\partial x_j} = \sum_{m=1}^3 q_{im} \sum_{a=1}^{N_{\text{nodes}}} \frac{\partial N_a}{\partial x_j} \bar{u}_{am} + 
-#  \frac{\partial(N_a z_a)}{\partial x_j} (\theta_{a2} e^{f}_{am1} - \theta_{a1} e^{f}_{am2})
+#  \frac{\partial(N_a ζ)}{\partial x_j} \frac{h}{2} (\theta_{a2} e^{f}_{am1} - \theta_{a1} e^{f}_{am2})
 # ```
 function strain(dofvec::Vector{T}, N, dNdx, ζ, dζdx, q, ef1, ef2, h) where T
 

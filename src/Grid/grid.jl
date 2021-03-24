@@ -51,21 +51,21 @@ end
 """
 A `FaceIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, face).
 """
-struct FaceIndex
+struct FaceIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
 """
 A `EdgeIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, edge).
 """
-struct EdgeIndex
+struct EdgeIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
 """
 A `VertexIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, vert).
 """
-struct VertexIndex
+struct VertexIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
@@ -340,9 +340,9 @@ default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{3,RefTetrahedron,
 default_interpolation(::Type{Hexahedron}) = Lagrange{3,RefCube,1}()
 default_interpolation(::Type{QuadraticHexahedron}) = Lagrange{3,RefCube,2}()
 
-getgeometryfunction(::Type{FaceIndex}) = JuAFEM.faces
-getgeometryfunction(::Type{EdgeIndex}) = JuAFEM.edges
-getgeometryfunction(::Type{VertexIndex}) = JuAFEM.vertices
+boundaryfunction(::Type{FaceIndex}) = JuAFEM.faces
+boundaryfunction(::Type{EdgeIndex}) = JuAFEM.edges
+boundaryfunction(::Type{VertexIndex}) = JuAFEM.vertices
 
 for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
     @eval begin  

@@ -99,7 +99,7 @@ function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=de
     push!(dh.field_names, name)
     push!(dh.field_dims, dim)
     push!(dh.field_interpolations, ip)
-    push!(dh.bc_values, BCValues(ip, default_interpolation(getcelltype(dh.grid))))
+    push!(dh.bc_values, BCValues(ip, default_interpolation(getcelltype(dh.grid)), FaceIndex))
     return dh
 end
 
