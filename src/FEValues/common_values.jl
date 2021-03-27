@@ -1,5 +1,7 @@
 # Common methods for all `Values` objects
 
+using Base: @propagate_inbounds
+
 const ScalarValues{dim,T,shape} = Union{CellScalarValues{dim,T,shape},FaceScalarValues{dim,T,shape}}
 const VectorValues{dim,T,shape} = Union{CellVectorValues{dim,T,shape},FaceVectorValues{dim,T,shape}}
 
@@ -38,8 +40,8 @@ finite element cell or face as
 ``\\int\\limits_\\Gamma f(\\mathbf{x}) d \\Gamma \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 
 """
-@inline getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
-@inline getdetJdV(bv::FaceValues, q_point::Int) = bv.detJdV[q_point, bv.current_face[]]
+@propagate_inbounds getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
+@propagate_inbounds getdetJdV(bv::FaceValues, q_point::Int) = bv.detJdV[q_point, bv.current_face[]]
 
 """
     shape_value(fe_v::Values, q_point::Int, base_function::Int)
@@ -47,11 +49,11 @@ finite element cell or face as
 Return the value of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-@inline shape_value(cv::CellValues, q_point::Int, base_func::Int) = cv.N[base_func, q_point]
-@inline shape_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.N[base_func, q_point, bv.current_face[]]
+@propagate_inbounds shape_value(cv::CellValues, q_point::Int, base_func::Int) = cv.N[base_func, q_point]
+@propagate_inbounds shape_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.N[base_func, q_point, bv.current_face[]]
 
-@inline geometric_value(cv::CellValues, q_point::Int, base_func::Int) = cv.M[base_func, q_point]
-@inline geometric_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_face[]]
+@propagate_inbounds geometric_value(cv::CellValues, q_point::Int, base_func::Int) = cv.M[base_func, q_point]
+@propagate_inbounds geometric_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_face[]]
 
 """
     shape_gradient(fe_v::Values, q_point::Int, base_function::Int)
@@ -59,8 +61,8 @@ quadrature point `q_point`.
 Return the gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-@inline shape_gradient(cv::CellValues, q_point::Int, base_func::Int) = cv.dNdx[base_func, q_point]
-@inline shape_gradient(bv::FaceValues, q_point::Int, base_func::Int) = bv.dNdx[base_func, q_point, bv.current_face[]]
+@propagate_inbounds shape_gradient(cv::CellValues, q_point::Int, base_func::Int) = cv.dNdx[base_func, q_point]
+@propagate_inbounds shape_gradient(bv::FaceValues, q_point::Int, base_func::Int) = bv.dNdx[base_func, q_point, bv.current_face[]]
 
 """
     shape_symmetric_gradient(fe_v::Values, q_point::Int, base_function::Int)
@@ -68,7 +70,7 @@ quadrature point `q_point`.
 Return the symmetric gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-@inline shape_symmetric_gradient(cv::CellVectorValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(cv, q_point, base_func))
+@propagate_inbounds shape_symmetric_gradient(cv::CellVectorValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(cv, q_point, base_func))
 const shape_derivative = shape_gradient
 
 """
@@ -77,10 +79,10 @@ const shape_derivative = shape_gradient
 Return the divergence of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-@inline shape_divergence(cv::CellScalarValues, q_point::Int, base_func::Int) = sum(cv.dNdx[base_func, q_point])
-@inline shape_divergence(bv::FaceScalarValues, q_point::Int, base_func::Int) = sum(bv.dNdx[base_func, q_point, bv.current_face[]])
-@inline shape_divergence(cv::CellVectorValues, q_point::Int, base_func::Int) = tr(cv.dNdx[base_func, q_point])
-@inline shape_divergence(bv::FaceVectorValues, q_point::Int, base_func::Int) = tr(bv.dNdx[base_func, q_point, bv.current_face[]])
+@propagate_inbounds shape_divergence(cv::CellScalarValues, q_point::Int, base_func::Int) = sum(cv.dNdx[base_func, q_point])
+@propagate_inbounds shape_divergence(bv::FaceScalarValues, q_point::Int, base_func::Int) = sum(bv.dNdx[base_func, q_point, bv.current_face[]])
+@propagate_inbounds shape_divergence(cv::CellVectorValues, q_point::Int, base_func::Int) = tr(cv.dNdx[base_func, q_point])
+@propagate_inbounds shape_divergence(bv::FaceVectorValues, q_point::Int, base_func::Int) = tr(bv.dNdx[base_func, q_point, bv.current_face[]])
 
 
 function shape_curl(cv::VectorValues, q_point::Int, base_func::Int)
@@ -101,7 +103,7 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
 nodal values of ``\\mathbf{u}``.
 """
-function function_value(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
+function function_value(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     isa(fe_v, VectorValues) && (n_base_funcs *= dim)
     @assert length(dof_range) == n_base_funcs
@@ -147,7 +149,7 @@ For a vector valued function the gradient is computed as
 ``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x}) \\otimes \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
-function function_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
+function function_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     isa(fe_v, VectorValues) && (n_base_funcs *= dim)
     @assert length(dof_range) == n_base_funcs
@@ -228,13 +230,15 @@ function function_divergence(fe_v::ScalarValues{dim}, q_point::Int, u::AbstractV
     return diverg
 end
 
-function function_divergence(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range::UnitRange = 1:length(u)) where {dim,T}
+function function_divergence(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)*dim
     @assert length(dof_range) == n_base_funcs
     @boundscheck checkbounds(u, dof_range)
     diverg = zero(T)
-    @inbounds for (i, j) in enumerate(dof_range)
-        grad = shape_gradient(fe_v, q_point, i)
+    basefunc_count = 1
+    @inbounds for j in dof_range
+        grad = shape_gradient(fe_v, q_point, basefunc_count)
+        basefunc_count += 1
         for k in 1:dim
             diverg += grad[k, k] * u[j]
         end
@@ -259,7 +263,7 @@ function function_divergence(fe_v::VectorValues{dim}, q_point::Int, u::AbstractV
     return diverg
 end
 
-function function_curl(fe_v::Values, q_point::Int, u::AbstractVector, dof_range::UnitRange = 1:length(u))
+function function_curl(fe_v::Values, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
     return curl(function_gradient(fe_v, q_point, u, dof_range))
 end
 
