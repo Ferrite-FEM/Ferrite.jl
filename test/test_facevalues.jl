@@ -1,5 +1,5 @@
 @testset "FaceValues" begin
-for (func_interpol, quad_rule) in  (
+for (func_interp, quad_rule) in  (
                                     (Lagrange{1, RefCube, 1}(), QuadratureRule{0, RefCube}(2)),
                                     (Lagrange{1, RefCube, 2}(), QuadratureRule{0, RefCube}(2)),
                                     (Lagrange{2, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
@@ -13,15 +13,15 @@ for (func_interpol, quad_rule) in  (
                                    )
 
     for fe_valtype in (FaceScalarValues, FaceVectorValues)
-        fv = fe_valtype(quad_rule, func_interpol)
-        ndim = Ferrite.getdim(func_interpol)
-        n_basefuncs = getnbasefunctions(func_interpol)
+        fv = fe_valtype(quad_rule, func_interp)
+        ndim = Ferrite.getdim(func_interp)
+        n_basefuncs = getnbasefunctions(func_interp)
 
         fe_valtype == FaceScalarValues && @test getnbasefunctions(fv) == n_basefuncs
-        fe_valtype == FaceVectorValues && @test getnbasefunctions(fv) == n_basefuncs * Ferrite.getdim(func_interpol)
+        fe_valtype == FaceVectorValues && @test getnbasefunctions(fv) == n_basefuncs * Ferrite.getdim(func_interp)
 
-        xs, n = valid_coordinates_and_normals(func_interpol)
-        for face in 1:getnfaces(func_interpol)
+        xs, n = valid_coordinates_and_normals(func_interp)
+        for face in 1:getnfaces(func_interp)
             reinit!(fv, xs, face)
             @test Ferrite.getcurrentface(fv) == face
 
@@ -61,17 +61,17 @@ for (func_interpol, quad_rule) in  (
             for i in 1:getnquadpoints(fv)
                 vol += getdetJdV(fv,i)
             end
-            x_face = xs[[Ferrite.faces(func_interpol)[face]...]]
-            @test vol ≈ calculate_volume(Ferrite.getlowerdim(func_interpol), x_face)
+            x_face = xs[[Ferrite.faces(func_interp)[face]...]]
+            @test vol ≈ calculate_volume(Ferrite.getlowerdim(func_interp), x_face)
 
             # Test quadrature rule after reinit! with ref. coords
-            x = Ferrite.reference_coordinates(func_interpol)
+            x = Ferrite.reference_coordinates(func_interp)
             reinit!(fv, x, face)
             vol = 0.0
             for i in 1:getnquadpoints(fv)
                 vol += getdetJdV(fv, i)
             end
-            @test vol ≈ reference_volume(func_interpol, face)
+            @test vol ≈ reference_volume(func_interp, face)
 
             # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
             # TODO: Renable somehow after quad rule is no longer stored in FaceValues

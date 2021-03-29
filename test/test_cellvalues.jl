@@ -1,5 +1,5 @@
 @testset "CellValues" begin
-for (func_interpol, quad_rule) in  (
+for (func_interp, quad_rule) in  (
                                     (Lagrange{1, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
                                     (Lagrange{1, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
                                     (Lagrange{2, RefCube, 1}(), QuadratureRule{2, RefCube}(2)),
@@ -13,14 +13,14 @@ for (func_interpol, quad_rule) in  (
                                    )
 
     for fe_valtype in (CellScalarValues, CellVectorValues)
-        cv = fe_valtype(quad_rule, func_interpol)
-        ndim = Ferrite.getdim(func_interpol)
-        n_basefuncs = getnbasefunctions(func_interpol)
+        cv = fe_valtype(quad_rule, func_interp)
+        ndim = Ferrite.getdim(func_interp)
+        n_basefuncs = getnbasefunctions(func_interp)
 
         fe_valtype == CellScalarValues && @test getnbasefunctions(cv) == n_basefuncs
-        fe_valtype == CellVectorValues && @test getnbasefunctions(cv) == n_basefuncs * Ferrite.getdim(func_interpol)
+        fe_valtype == CellVectorValues && @test getnbasefunctions(cv) == n_basefuncs * Ferrite.getdim(func_interp)
 
-        x, n = valid_coordinates_and_normals(func_interpol)
+        x, n = valid_coordinates_and_normals(func_interp)
         reinit!(cv, x)
 
         # We test this by applying a given deformation gradient on all the nodes.
@@ -58,16 +58,16 @@ for (func_interpol, quad_rule) in  (
         for i in 1:getnquadpoints(cv)
             vol += getdetJdV(cv,i)
         end
-        @test vol ≈ calculate_volume(func_interpol, x)
+        @test vol ≈ calculate_volume(func_interp, x)
 
         # Test quadrature rule after reinit! with ref. coords
-        x = Ferrite.reference_coordinates(func_interpol)
+        x = Ferrite.reference_coordinates(func_interp)
         reinit!(cv, x)
         vol = 0.0
         for i in 1:getnquadpoints(cv)
             vol += getdetJdV(cv,i)
         end
-        @test vol ≈ reference_volume(func_interpol)
+        @test vol ≈ reference_volume(func_interp)
 
         # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
         for (i, qp_x) in enumerate(getpoints(quad_rule))
