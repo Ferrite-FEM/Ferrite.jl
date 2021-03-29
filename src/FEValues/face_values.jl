@@ -40,7 +40,7 @@ For a scalar field, the `FaceScalarValues` type should be used. For vector field
 FaceValues
 
 # FaceScalarValues
-struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{dim,T,refshape}
+struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape,func_interp,geo_interp} <: FaceValues{dim,T,refshape,func_interp,geo_interp}
     N::Array{T,3}
     dNdx::Array{Vec{dim,T},3}
     dNdξ::Array{Vec{dim,T},3}
@@ -93,11 +93,11 @@ function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
 
     detJdV = fill(T(NaN), n_qpoints, n_faces)
 
-    FaceScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceScalarValues{dim,T,shape,typeof(func_interpol),typeof(geom_interpol)}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
 end
 
 # FaceVectorValues
-struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: FaceValues{dim,T,refshape}
+struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,func_interp,geo_interp,M} <: FaceValues{dim,T,refshape,func_interp,geo_interp}
     N::Array{Vec{dim,T},3}
     dNdx::Array{Tensor{2,dim,T,M},3}
     dNdξ::Array{Tensor{2,dim,T,M},3}
@@ -161,14 +161,13 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
     detJdV = fill(T(NaN), n_qpoints, n_faces)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    FaceVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceVectorValues{dim,T,shape,typeof(func_interpol),typeof(geom_interpol),MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
 end
 
 function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) where {dim,T}
     n_geom_basefuncs = getngeobasefunctions(fv)
-    n_func_basefuncs = getn_scalarbasefunctions(fv)
+    n_func_basefuncs = getnbasefunctions(fv)
     @assert length(x) == n_geom_basefuncs
-    isa(fv, FaceVectorValues) && (n_func_basefuncs *= dim)
 
     fv.current_face[] = face
     cb = getcurrentface(fv)
@@ -183,7 +182,7 @@ function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) 
         fv.normals[i] = weight_norm / norm(weight_norm)
         detJ = norm(weight_norm)
 
-        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
         fv.detJdV[i, cb] = detJ * w
         Jinv = inv(fefv_J)
         for j in 1:n_func_basefuncs

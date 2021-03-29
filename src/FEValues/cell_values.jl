@@ -34,7 +34,7 @@ utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape 
 CellValues
 
 # CellScalarValues
-struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: CellValues{dim,T,refshape}
+struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape,func_interp,geo_interp} <: CellValues{dim,T,refshape,func_interp,geo_interp}
     N::Matrix{T}
     dNdx::Matrix{Vec{dim,T}}
     dNdξ::Matrix{Vec{dim,T}}
@@ -49,7 +49,7 @@ function CellScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolatio
     CellScalarValues(Float64, quad_rule, func_interpol, geom_interpol)
 end
 
-function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_interpol::Interpolation,
+function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape,}, func_interpol::Interpolation,
         geom_interpol::Interpolation=func_interpol) where {dim,T,shape<:AbstractRefShape}
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
@@ -78,11 +78,11 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
 
     detJdV = fill(T(NaN), n_qpoints)
 
-    CellScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
+    CellScalarValues{dim,T,shape,typeof(func_interpol),typeof(geom_interpol)}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
 end
 
 # CellVectorValues
-struct CellVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: CellValues{dim,T,refshape}
+struct CellVectorValues{dim,T<:Real,refshape<:AbstractRefShape,func_interp,geo_interp,M} <: CellValues{dim,T,refshape,func_interp,geo_interp}
     N::Matrix{Vec{dim,T}}
     dNdx::Matrix{Tensor{2,dim,T,M}}
     dNdξ::Matrix{Tensor{2,dim,T,M}}
@@ -137,7 +137,7 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
     detJdV = fill(T(NaN), n_qpoints)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    CellVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
+    CellVectorValues{dim,T,shape,typeof(func_interpol),typeof(geom_interpol),MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
 end
 
 function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,T}
@@ -154,7 +154,7 @@ function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,
             fecv_J += x[j] ⊗ cv.dMdξ[j, i]
         end
         detJ = det(fecv_J)
-        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
         cv.detJdV[i] = detJ * w
         Jinv = inv(fecv_J)
         for j in 1:n_func_basefuncs

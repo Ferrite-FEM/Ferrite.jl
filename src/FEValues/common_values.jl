@@ -2,14 +2,18 @@
 
 using Base: @propagate_inbounds
 
-const ScalarValues{dim,T,shape} = Union{CellScalarValues{dim,T,shape},FaceScalarValues{dim,T,shape}}
-const VectorValues{dim,T,shape} = Union{CellVectorValues{dim,T,shape},FaceVectorValues{dim,T,shape}}
+@noinline throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
 
-getnbasefunctions(cv::Values) = size(cv.N, 1)
-getngeobasefunctions(cv::Values) = size(cv.M, 1)
+const ScalarValues{dim,T,shape,func_interp,geo_interp} = Union{CellScalarValues{dim,T,shape},FaceScalarValues{dim,T,shape,func_interp,geo_interp}}
+const VectorValues{dim,T,shape,func_interp,geo_interp} = Union{CellVectorValues{dim,T,shape},FaceVectorValues{dim,T,shape,func_interp,geo_interp}}
 
-getn_scalarbasefunctions(cv::ScalarValues) = size(cv.N, 1)
-getn_scalarbasefunctions(cv::VectorValues{dim}) where {dim} = size(cv.N, 1) ÷ dim
+getnbasefunctions(fe::Values{dim, T, shape, func_interp}) where {dim, T, shape, func_interp} =
+    getnbasefunctions(func_interp) * (fe isa VectorValues ? dim : 1)
+getngeobasefunctions(::Values{dim, T, shape, func_interp, geo_interp}) where {dim, T, shape, func_interp, geo_interp} =
+    getnbasefunctions(geo_interp)
+
+getn_scalarbasefunctions(cv::ScalarValues) = getnbasefunctions(cv)
+getn_scalarbasefunctions(cv::VectorValues{dim}) where {dim} = getnbasefunctions(cv) ÷ dim
 
 """
     reinit!(cv::CellValues, x::Vector)
@@ -104,8 +108,7 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 nodal values of ``\\mathbf{u}``.
 """
 function function_value(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
-    n_base_funcs = getn_scalarbasefunctions(fe_v)
-    isa(fe_v, VectorValues) && (n_base_funcs *= dim)
+    n_base_funcs = getnbasefunctions(fe_v)
     @assert length(dof_range) == n_base_funcs
     @boundscheck checkbounds(u, dof_range)
     val = zero(_valuetype(fe_v, u))
@@ -150,8 +153,7 @@ For a vector valued function the gradient is computed as
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
 function function_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
-    n_base_funcs = getn_scalarbasefunctions(fe_v)
-    isa(fe_v, VectorValues) && (n_base_funcs *= dim)
+    n_base_funcs = getnbasefunctions(fe_v)
     @assert length(dof_range) == n_base_funcs
     @boundscheck checkbounds(u, dof_range)
     grad = zero(_gradienttype(fe_v, u))
