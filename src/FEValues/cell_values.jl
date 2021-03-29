@@ -146,7 +146,6 @@ function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,
     @assert length(x) == n_geom_basefuncs
     isa(cv, CellVectorValues) && (n_func_basefuncs *= dim)
 
-
     @inbounds for i in 1:length(cv.qr_weights)
         w = cv.qr_weights[i]
         fecv_J = zero(Tensor{2,dim})
@@ -154,7 +153,7 @@ function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,
             fecv_J += x[j] ⊗ cv.dMdξ[j, i]
         end
         detJ = det(fecv_J)
-        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
         cv.detJdV[i] = detJ * w
         Jinv = inv(fecv_J)
         for j in 1:n_func_basefuncs

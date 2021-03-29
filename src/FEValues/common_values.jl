@@ -2,6 +2,8 @@
 
 using Base: @propagate_inbounds
 
+@noinline throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+
 const ScalarValues{dim,T,shape} = Union{CellScalarValues{dim,T,shape},FaceScalarValues{dim,T,shape}}
 const VectorValues{dim,T,shape} = Union{CellVectorValues{dim,T,shape},FaceVectorValues{dim,T,shape}}
 
@@ -109,8 +111,10 @@ function function_value(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, d
     @assert length(dof_range) == n_base_funcs
     @boundscheck checkbounds(u, dof_range)
     val = zero(_valuetype(fe_v, u))
-    @inbounds for (i, j) in enumerate(dof_range)
-        val += shape_value(fe_v, q_point, i) * u[j]
+    basefunc = 1
+    @inbounds @simd for j in dof_range
+        val += shape_value(fe_v, q_point, basefunc) * u[j]
+        basefunc += 1
     end
     return val
 end
@@ -155,8 +159,10 @@ function function_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}
     @assert length(dof_range) == n_base_funcs
     @boundscheck checkbounds(u, dof_range)
     grad = zero(_gradienttype(fe_v, u))
-    @inbounds for (i, j) in enumerate(dof_range)
-        grad += shape_gradient(fe_v, q_point, i) * u[j]
+    basefunc = 1
+    @inbounds for j in dof_range
+        grad += shape_gradient(fe_v, q_point, basefunc) * u[j]
+        basefunc += 1
     end
     return grad
 end
@@ -224,7 +230,7 @@ function function_divergence(fe_v::ScalarValues{dim}, q_point::Int, u::AbstractV
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
     diverg = zero(T)
-    @inbounds for i in 1:n_base_funcs
+    @inbounds @simd for i in 1:n_base_funcs
         diverg += shape_gradient(fe_v, q_point, i) ⋅ u[i]
     end
     return diverg
@@ -239,7 +245,7 @@ function function_divergence(fe_v::VectorValues{dim}, q_point::Int, u::AbstractV
     @inbounds for j in dof_range
         grad = shape_gradient(fe_v, q_point, basefunc_count)
         basefunc_count += 1
-        for k in 1:dim
+        @simd for k in 1:dim
             diverg += grad[k, k] * u[j]
         end
     end
@@ -255,7 +261,7 @@ function function_divergence(fe_v::VectorValues{dim}, q_point::Int, u::AbstractV
         for j in 1:dim
             grad = shape_gradient(fe_v, q_point, basefunc_count)
             basefunc_count += 1
-            for k in 1:dim
+            @simd for k in 1:dim
                 diverg += grad[k, k] * u[i][j]
             end
         end
