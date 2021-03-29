@@ -23,9 +23,9 @@ struct RefCube <: AbstractRefShape end
 """
 Abstract type which has `CellValues` and `FaceValues` as subtypes
 """
-abstract type Values{dim,T,refshape,func_interp,geo_interp} end
-abstract type CellValues{dim,T,refshape,func_interp,geo_interp} <: Values{dim,T,refshape,func_interp,geo_interp} end
-abstract type FaceValues{dim,T,refshape,func_interp,geo_interp} <: Values{dim,T,refshape,func_interp,geo_interp} end
+abstract type Values{dim,T,refshape,FI,GI} end
+abstract type CellValues{dim,T,refshape,FI,GI} <: Values{dim,T,refshape,FI,GI} end
+abstract type FaceValues{dim,T,refshape,FI,GI} <: Values{dim,T,refshape,FI,GI} end
 
 include("utils.jl")
 

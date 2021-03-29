@@ -34,7 +34,7 @@ utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape 
 CellValues
 
 # CellScalarValues
-struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape,func_interp,geo_interp} <: CellValues{dim,T,refshape,func_interp,geo_interp}
+struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape,FI,GI} <: CellValues{dim,T,refshape,FI,GI}
     N::Matrix{T}
     dNdx::Matrix{Vec{dim,T}}
     dNdξ::Matrix{Vec{dim,T}}
@@ -42,6 +42,8 @@ struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape,func_interp,geo_i
     M::Matrix{T}
     dMdξ::Matrix{Vec{dim,T}}
     qr_weights::Vector{T}
+    func_interp::FI
+    geo_interp::GI
 end
 
 function CellScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
@@ -78,11 +80,11 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape,}, func
 
     detJdV = fill(T(NaN), n_qpoints)
 
-    CellScalarValues{dim,T,shape,typeof(func_interpol),typeof(geom_interpol)}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
+    CellScalarValues{dim,T,shape,typeof(func_interpol),typeof(geom_interpol)}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights, func_interpol, geom_interpol)
 end
 
 # CellVectorValues
-struct CellVectorValues{dim,T<:Real,refshape<:AbstractRefShape,func_interp,geo_interp,M} <: CellValues{dim,T,refshape,func_interp,geo_interp}
+struct CellVectorValues{dim,T<:Real,refshape<:AbstractRefShape,FI,GI,M} <: CellValues{dim,T,refshape,FI,GI}
     N::Matrix{Vec{dim,T}}
     dNdx::Matrix{Tensor{2,dim,T,M}}
     dNdξ::Matrix{Tensor{2,dim,T,M}}
@@ -90,6 +92,8 @@ struct CellVectorValues{dim,T<:Real,refshape<:AbstractRefShape,func_interp,geo_i
     M::Matrix{T}
     dMdξ::Matrix{Vec{dim,T}}
     qr_weights::Vector{T}
+    func_interp::FI
+    geo_interp::GI
 end
 
 function CellVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
@@ -137,7 +141,7 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
     detJdV = fill(T(NaN), n_qpoints)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    CellVectorValues{dim,T,shape,typeof(func_interpol),typeof(geom_interpol),MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
+    CellVectorValues{dim,T,shape,typeof(func_interpol),typeof(geom_interpol),MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights, func_interpol, geom_interpol)
 end
 
 function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,T}

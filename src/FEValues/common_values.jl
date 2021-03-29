@@ -7,10 +7,8 @@ using Base: @propagate_inbounds
 const ScalarValues{dim,T,shape,func_interp,geo_interp} = Union{CellScalarValues{dim,T,shape},FaceScalarValues{dim,T,shape,func_interp,geo_interp}}
 const VectorValues{dim,T,shape,func_interp,geo_interp} = Union{CellVectorValues{dim,T,shape},FaceVectorValues{dim,T,shape,func_interp,geo_interp}}
 
-getnbasefunctions(fe::Values{dim, T, shape, func_interp}) where {dim, T, shape, func_interp} =
-    getnbasefunctions(func_interp) * (fe isa VectorValues ? dim : 1)
-getngeobasefunctions(::Values{dim, T, shape, func_interp, geo_interp}) where {dim, T, shape, func_interp, geo_interp} =
-    getnbasefunctions(geo_interp)
+getnbasefunctions(fe::Values{dim}) where {dim} = getnbasefunctions(fe.func_interp) * (fe isa VectorValues ? dim : 1)
+getngeobasefunctions(fe::Values) = getnbasefunctions(fe.geo_interp)
 
 getn_scalarbasefunctions(cv::ScalarValues) = getnbasefunctions(cv)
 getn_scalarbasefunctions(cv::VectorValues{dim}) where {dim} = getnbasefunctions(cv) ÷ dim

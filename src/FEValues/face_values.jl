@@ -40,7 +40,7 @@ For a scalar field, the `FaceScalarValues` type should be used. For vector field
 FaceValues
 
 # FaceScalarValues
-struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape,func_interp,geo_interp} <: FaceValues{dim,T,refshape,func_interp,geo_interp}
+struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape,FI,GI} <: FaceValues{dim,T,refshape,FI,GI}
     N::Array{T,3}
     dNdx::Array{Vec{dim,T},3}
     dNdξ::Array{Vec{dim,T},3}
@@ -50,6 +50,8 @@ struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape,func_interp,geo_i
     dMdξ::Array{Vec{dim,T},3}
     qr_weights::Vector{T}
     current_face::ScalarWrapper{Int}
+    func_interp::FI
+    geo_interp::GI
 end
 
 function FaceScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
@@ -93,11 +95,11 @@ function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
 
     detJdV = fill(T(NaN), n_qpoints, n_faces)
 
-    FaceScalarValues{dim,T,shape,typeof(func_interpol),typeof(geom_interpol)}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceScalarValues{dim,T,shape,typeof(func_interpol),typeof(geom_interpol)}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0), func_interpol, geom_interpol)
 end
 
 # FaceVectorValues
-struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,func_interp,geo_interp,M} <: FaceValues{dim,T,refshape,func_interp,geo_interp}
+struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,FI,GI,M} <: FaceValues{dim,T,refshape,FI,GI}
     N::Array{Vec{dim,T},3}
     dNdx::Array{Tensor{2,dim,T,M},3}
     dNdξ::Array{Tensor{2,dim,T,M},3}
@@ -107,6 +109,8 @@ struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,func_interp,geo_i
     dMdξ::Array{Vec{dim,T},3}
     qr_weights::Vector{T}
     current_face::ScalarWrapper{Int}
+    func_interp::FI
+    geo_interp::GI
 end
 
 function FaceVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
@@ -161,7 +165,7 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
     detJdV = fill(T(NaN), n_qpoints, n_faces)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    FaceVectorValues{dim,T,shape,typeof(func_interpol),typeof(geom_interpol),MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceVectorValues{dim,T,shape,typeof(func_interpol),typeof(geom_interpol),MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0), func_interpol, geom_interpol)
 end
 
 function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) where {dim,T}
