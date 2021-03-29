@@ -230,46 +230,18 @@ function function_divergence(fe_v::ScalarValues{dim}, q_point::Int, u::AbstractV
     return diverg
 end
 
-function function_divergence(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
-    n_base_funcs = getn_scalarbasefunctions(fe_v)*dim
-    @assert length(dof_range) == n_base_funcs
-    @boundscheck checkbounds(u, dof_range)
-    diverg = zero(T)
-    basefunc_count = 1
-    @inbounds for j in dof_range
-        grad = shape_gradient(fe_v, q_point, basefunc_count)
-        basefunc_count += 1
-        for k in 1:dim
-            diverg += grad[k, k] * u[j]
-        end
-    end
-    return diverg
-end
+# See https://github.com/Ferrite-FEM/Ferrite.jl/issues/336
+function_divergence(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T} =
+    tr(function_gradient(fe_v, q_point, u, dof_range))
 
-function function_divergence(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
-    n_base_funcs = getn_scalarbasefunctions(fe_v)
-    @assert length(u) == n_base_funcs
-    diverg = zero(T)
-    basefunc_count = 1
-    @inbounds for i in 1:n_base_funcs
-        for j in 1:dim
-            grad = shape_gradient(fe_v, q_point, basefunc_count)
-            basefunc_count += 1
-            for k in 1:dim
-                diverg += grad[k, k] * u[i][j]
-            end
-        end
-    end
-    return diverg
-end
+function_divergence(fe_v::VectorValues{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} =
+    tr(function_gradient(fe_v, q_point, u))
 
-function function_curl(fe_v::Values, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
-    return curl(function_gradient(fe_v, q_point, u, dof_range))
-end
+function_curl(fe_v::Values, q_point::Int, u::AbstractVector, dof_range = eachindex(u)) =
+    curl(function_gradient(fe_v, q_point, u, dof_range))
 
-function function_curl(fe_v::Values, q_point::Int, u::AbstractVector{Vec{3, T}}) where T
-    return curl(function_gradient(fe_v, q_point, u))
-end
+function_curl(fe_v::Values, q_point::Int, u::AbstractVector{Vec{3, T}}) where T =
+    curl(function_gradient(fe_v, q_point, u))
 
 """
     spatial_coordinate(fe_v::Values{dim}, q_point::Int, x::AbstractVector)
