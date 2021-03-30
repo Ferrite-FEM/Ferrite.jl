@@ -412,5 +412,3 @@ find_field(dh::MixedDofHandler, field_name::Symbol) = find_field(first(dh.fieldh
 field_offset(dh::MixedDofHandler, field_name::Symbol) = field_offset(first(dh.fieldhandlers), field_name)
 getfieldinterpolation(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].interpolation
 getfielddim(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].dim
-getbc_facevalue(dh::MixedDofHandler, field_idx::Int) =  dh.fieldhandlers[1].bc_values[field_idx]
-getbc_edgevalue(dh::MixedDofHandler, field_idx::Int) =  dh.fieldhandlers[1].bc_values[field_idx]
