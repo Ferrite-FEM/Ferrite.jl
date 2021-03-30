@@ -452,5 +452,6 @@ end
     test_3d_mixed_field_mixed_celltypes();
     test_2_element_heat_eq();
     test_element_order();
+    test_getfielddim();
     test_mixed_grid_show()
 end
