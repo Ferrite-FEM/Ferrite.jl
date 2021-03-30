@@ -218,10 +218,7 @@ This function is equivalent to `ue .= u[dofs]` but without allocating
 the intermediate array.
 """
 @propagate_inbounds function disassemble!(ue::AbstractVector, u::AbstractVector, dofs::AbstractVector{Int})
-    @boundscheck begin
-        length(ue) == length(dofs) || throw(BoundsError())
-        checkbounds(u, dofs)
-    end
+    @boundscheck checkbounds(u, dofs)
     # @inbounds for i in eachindex(ue, dofs) # Slow on Julia 1.6 (JuliaLang/julia#40267)
     @inbounds for i in eachindex(ue)
         ue[i] = u[dofs[i]]
