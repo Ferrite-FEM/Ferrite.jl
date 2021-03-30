@@ -144,15 +144,21 @@ end
 
 @testset "Grid sets" begin
 
-    grid = JuAFEM.generate_grid(Hexahedron, (1, 1, 1), Vec((0.,0., 0.)), Vec((1.,1.,1.)))
+    grid = Ferrite.generate_grid(Hexahedron, (1, 1, 1), Vec((0.,0., 0.)), Vec((1.,1.,1.)))
 
+    #Test manual add
     addcellset!(grid, "cell_set", [1]);
     addnodeset!(grid, "node_set", [1])
+    addfaceset!(grid, "face_set", [FaceIndex(1,1)])
+    addedgeset!(grid, "edge_set", [EdgeIndex(1,1)])
+    addvertexset!(grid, "vert_set", [VertexIndex(1,1)])
+
+    #Test function add
     addfaceset!(grid, "left_face", (x)-> x[1] ≈ 0.0)
     addedgeset!(grid, "left_lower_edge", (x)-> x[1] ≈ 0.0 && x[3] ≈ 0.0)
     addvertexset!(grid, "left_corner", (x)-> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
 
-    @test 1 in JuAFEM.getnodeset(grid, "node_set")
+    @test 1 in Ferrite.getnodeset(grid, "node_set")
     @test FaceIndex(1,5) in getfaceset(grid, "left_face")
     @test EdgeIndex(1,4) in getedgeset(grid, "left_lower_edge")
     @test VertexIndex(1,1) in getvertexset(grid, "left_corner")

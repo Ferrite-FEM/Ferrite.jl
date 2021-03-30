@@ -174,10 +174,10 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
     
     
     if eltype(dbc.faces)==Int #Special case when dbc.faces is a nodeset
-        bcvalue = BCValues(interpolation, JuAFEM.default_interpolation(celltype), FaceIndex) #Not used by node bcs, but still have to pass it as an argument
+        bcvalue = BCValues(interpolation, default_interpolation(celltype), FaceIndex) #Not used by node bcs, but still have to pass it as an argument
         _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue)
     else
-        bcvalue = BCValues(interpolation, JuAFEM.default_interpolation(celltype), eltype(dbc.faces))
+        bcvalue = BCValues(interpolation, default_interpolation(celltype), eltype(dbc.faces))
         _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue)
     end
 

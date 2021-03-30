@@ -193,25 +193,26 @@ function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=tr
     grid
 end
 
-addfaceset!(grid::Grid, name::String, set::Set{FaceIndex}) = 
+addfaceset!(grid::Grid, name::String, set::Union{Set{FaceIndex},Vector{FaceIndex}}) = 
     _addset!(grid, name, set, grid.facesets)
-addedgeset!(grid::Grid, name::String, set::Set{EdgeIndex}) = 
+addedgeset!(grid::Grid, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) = 
     _addset!(grid, name, set, grid.edgesets)
-addvertexset!(grid::Grid, name::String, set::Set{VertexIndex}) = 
+addvertexset!(grid::Grid, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) = 
     _addset!(grid, name, set, grid.vertexsets)
-function _addset!(grid::AbstractGrid, name::String, set::Set{FaceIndex}, dict::Dict)
+function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
     _check_setname(dict, name)
+    set = Set(_set)
     _warn_emptyset(set)
     dict[name] = set
     grid
 end
 
 addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, JuAFEM.faces, grid.facesets, FaceIndex; all=all)
+    _addset!(grid, name, f, Ferrite.faces, grid.facesets, FaceIndex; all=all)
 addedgeset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, JuAFEM.edges, grid.edgesets, EdgeIndex; all=all)
+    _addset!(grid, name, f, Ferrite.edges, grid.edgesets, EdgeIndex; all=all)
 addvertexset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, JuAFEM.vertices, grid.vertexsets, VertexIndex; all=all)
+    _addset!(grid, name, f, Ferrite.vertices, grid.vertexsets, VertexIndex; all=all)
 function _addset!(grid::AbstractGrid, name::String, f::Function, _ftype::Function, dict::Dict, _indextype::Type; all::Bool=true)
     _check_setname(dict, name)
     _set = Set{_indextype}()
@@ -340,9 +341,9 @@ default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{3,RefTetrahedron,
 default_interpolation(::Type{Hexahedron}) = Lagrange{3,RefCube,1}()
 default_interpolation(::Type{QuadraticHexahedron}) = Lagrange{3,RefCube,2}()
 
-boundaryfunction(::Type{FaceIndex}) = JuAFEM.faces
-boundaryfunction(::Type{EdgeIndex}) = JuAFEM.edges
-boundaryfunction(::Type{VertexIndex}) = JuAFEM.vertices
+boundaryfunction(::Type{FaceIndex}) = Ferrite.faces
+boundaryfunction(::Type{EdgeIndex}) = Ferrite.edges
+boundaryfunction(::Type{VertexIndex}) = Ferrite.vertices
 
 for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
     @eval begin  

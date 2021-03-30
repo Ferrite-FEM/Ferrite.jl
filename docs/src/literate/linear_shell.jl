@@ -9,7 +9,7 @@
 # given at the end of this tutorial.  The first part of the tutorial explains how to set up the problem.
 
 # ## Setting up the problem
-using JuAFEM
+using Ferrite
 using ForwardDiff
 
 function main() #wrap everything in a function...
