@@ -406,7 +406,7 @@ function test_element_order()
 
 end
 
-function test_getfielddim()
+function test_field_on_subdomain()
     grid = get_2d_grid() # cell 1: quad, cell2: triangle
     dh = MixedDofHandler(grid)
 
@@ -426,6 +426,12 @@ function test_getfielddim()
     # retrieve field dimensions
     @test Ferrite.getfielddim(dh, :v) == 2
     @test Ferrite.getfielddim(dh, :s) ==1
+
+    # find field in FieldHandler
+    @test Ferrite.find_field(dh.fieldhandlers[1], :v) == 1
+    @test Ferrite.find_field(dh.fieldhandlers[2], :v) == 1
+    @test Ferrite.find_field(dh.fieldhandlers[2], :s) == 2
+    @test_throws ErrorException Ferrite.find_field(dh.fieldhandlers[1], :s)
 end
 
 
@@ -452,6 +458,6 @@ end
     test_3d_mixed_field_mixed_celltypes();
     test_2_element_heat_eq();
     test_element_order();
-    test_getfielddim();
+    test_field_on_subdomain();
     test_mixed_grid_show()
 end

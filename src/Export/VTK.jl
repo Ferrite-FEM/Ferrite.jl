@@ -110,7 +110,7 @@ function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler, u::Vector, suffix
         for fh in dh.fieldhandlers
             # check if this fh contains this field, otherwise continue to the next
             field_pos = findfirst(i->i == name, getfieldnames(fh))
-            if field_pos == 0 && continue end
+            if field_pos == nothing && continue end
 
             cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
             offset = field_offset(fh, name)

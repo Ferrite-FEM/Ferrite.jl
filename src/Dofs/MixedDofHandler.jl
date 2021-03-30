@@ -388,7 +388,7 @@ end
 
 function find_field(fh::FieldHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, getfieldnames(fh))
-    j == 0 && error("did not find field $field_name")
+    j == nothing && error("did not find field $field_name")
     return j
 end
 
