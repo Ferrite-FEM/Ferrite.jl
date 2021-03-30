@@ -113,6 +113,7 @@ export
     start_assemble,
     assemble!,
     end_assemble,
+    disassemble!,
 
 # VTK export
     vtk_grid,

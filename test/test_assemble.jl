@@ -19,3 +19,10 @@
     @test K[1,5] == Ke[1,3]
     @test K[5,1] == Ke[3,1]
 end
+@testset "disassemble" begin
+    ue = zeros(4)
+    u = rand(10)
+    dofs = [1,5,3,6]
+    disassemble!(ue, u, dofs)
+    @test ue == u[dofs]
+end

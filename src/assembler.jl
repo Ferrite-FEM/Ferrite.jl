@@ -208,3 +208,23 @@ function InsertionSort!(A, order, ii=1, jj=length(A))
     end  # i
     return
 end
+
+"""
+    disassemble!(ue, u, dofs)
+
+Fill the element vector `ue` with values from the global vector `u`.
+
+This function is equivalent to `ue .= u[dofs]` but without allocating
+the intermediate array.
+"""
+@propagate_inbounds function disassemble!(ue::AbstractVector, u::AbstractVector, dofs::AbstractVector{Int})
+    @boundscheck begin
+        length(ue) == length(dofs) || throw(BoundsError())
+        checkbounds(u, dofs)
+    end
+    # @inbounds for i in eachindex(ue, dofs) # Slow on Julia 1.6 (JuliaLang/julia#40267)
+    @inbounds for i in eachindex(ue)
+        ue[i] = u[dofs[i]]
+    end
+    return ue
+end
