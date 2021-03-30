@@ -208,23 +208,28 @@ Return the normal at the quadrature point `qp` for the active face of the
 """
 getnormal(fv::FaceValues, qp::Int) = fv.normals[qp]
 
-# like FaceScalarValues but contains only the parts needed
-# to calculate the x-coordinate for the dof locations.
+"""
+    BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}})
+
+`BCValues` stores the shape values at all faces/edges/vertices (depending on `boundary_type`) for the geomatric interpolation (`geom_interpol`), 
+for each dof-position determined by the `func_interpol`. Used mainly by the `ConstrainHandler`.
+"""
 struct BCValues{T}
     M::Array{T,3}
     current_face::ScalarWrapper{Int}
 end
 
-BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}}) =
-    BCValues(Float64, func_interpol, geom_interpol, boundaryfunction(boundary_type))
+BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex} = Ferrite.FaceIndex) =
+    BCValues(Float64, func_interpol, geom_interpol, boundary_type)
 
-function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_interpol::Interpolation{dim,refshape}, _face_edge_vertex::Function) where {T,dim,refshape}
+function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_interpol::Interpolation{dim,refshape}, boundary_type::Type{<:BoundaryIndex} = Ferrite.FaceIndex) where {T,dim,refshape}
     # set up quadrature rules for each face with dof-positions
     # (determined by func_interpol) as the quadrature points
     interpolation_coords = reference_coordinates(func_interpol)
 
     qrs = QuadratureRule{dim,refshape,T}[]
-    for face in _face_edge_vertex(func_interpol)
+    faces = boundaryfunction(boundary_type) # faces, edges or vertices
+    for face in faces(func_interpol)
         dofcoords = Vec{dim,T}[]
         for facedof in face
             push!(dofcoords, interpolation_coords[facedof])
