@@ -10,7 +10,7 @@ jobs:
   test:
     name: Julia ${{ matrix.julia-version }} - ${{ matrix.os }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.version == 'nightly' }}
+    continue-on-error: ${{ matrix.julia-version == 'nightly' }}
     strategy:
       matrix:
         julia-version: ['1.0', '1', 'nightly']
