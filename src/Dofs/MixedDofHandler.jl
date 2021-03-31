@@ -98,7 +98,7 @@ function getfielddim(dh::MixedDofHandler, name::Symbol)
 
     for fh in dh.fieldhandlers
         field_pos = findfirst(i->i == name, getfieldnames(fh))
-        if field_pos > 0
+        if field_pos !== nothing
             return fh.fields[field_pos].dim
         end
     end
@@ -388,7 +388,7 @@ end
 
 function find_field(fh::FieldHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, getfieldnames(fh))
-    j == 0 && error("did not find field $field_name")
+    j === nothing && error("did not find field $field_name")
     return j
 end
 
