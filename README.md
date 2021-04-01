@@ -16,7 +16,6 @@ You can install Ferrite from the Pkg REPL:
 ```
 pkg> add Ferrite
 ```
-which will track the `master` branch of the package.
 
 
 [docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
