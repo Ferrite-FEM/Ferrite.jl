@@ -135,7 +135,7 @@ Base.@pure _valuetype(::VectorValues{dim}, ::AbstractVector{T}) where {dim,T} = 
 # Base.@pure _valuetype(::VectorValues{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Vec{dim,T}
 
 """
-    function_scalar_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector)
+    function_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector)
 
 Compute the gradient of the function in a quadrature point. `u` is a vector with values
 for the degrees of freedom. For a scalar valued function, `u` contains scalars.
