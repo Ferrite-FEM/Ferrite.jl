@@ -14,7 +14,7 @@ A simple finite element toolbox written in Julia.
 ## Installation
 You can install Ferrite from the Pkg REPL:
 ```
-pkg> add https://github.com/Ferrite-FEM/Ferrite.jl.git
+pkg> add Ferrite
 ```
 which will track the `master` branch of the package.
 
