@@ -85,7 +85,7 @@ end
 
 Applies the boundary condition to the right-hand-side vector without modifying the stiffness matrix
 """
-function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)	
+function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)
     K = data.constrained_columns
     @assert length(f) == 0 || length(f) == size(K, 1)
     @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
@@ -173,7 +173,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
     return ch
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int}}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues)
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int}}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
     # calculate which local dof index live on each face
     # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
     local_face_dofs = Int[]
@@ -191,8 +191,8 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
-    #_celldofs = fill(0, ndofs_per_cell(ch.dh))
     for (cellidx, faceidx) in bcfaces
+		cellidx ∈ cellset || continue # skip faces that are not part of the cellset
         _celldofs = fill(0, ndofs_per_cell(ch.dh, cellidx))
         celldofs!(_celldofs, ch.dh, cellidx) # extract the dofs for this cell
         r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
@@ -206,19 +206,19 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int
     append!(ch.prescribed_dofs, constrained_dofs)
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues)
-    if interpolation !== default_interpolation(getcelltype(ch.dh.grid))
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
+    if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
 
     ncomps = length(dbc.components)
     nnodes = getnnodes(ch.dh.grid)
     interpol_points = getnbasefunctions(interpolation)
-    _celldofs = fill(0, ndofs_per_cell(ch.dh))
+    _celldofs = fill(0, ndofs_per_cell(ch.dh, first(cellset)))
     node_dofs = zeros(Int, ncomps, nnodes)
     visited = falses(nnodes)
-    for (cellidx, cell) in enumerate(ch.dh.grid.cells)
-        celldofs!(_celldofs, ch.dh, cellidx) # update the dofs for this cell
+	for cell in CellIterator(ch.dh, collect(cellset)) # only go over cells that belong to current FieldHandler
+        celldofs!(_celldofs, cell) # update the dofs for this cell
         for idx in 1:min(interpol_points, length(cell.nodes))
             node = cell.nodes[idx]
             if !visited[node]
@@ -237,7 +237,8 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     sizehint!(dbc.local_face_dofs, length(bcnodes))
     for node in bcnodes
         if !visited[node]
-            error("Unable to add a Dirichlet boundary condition to node $node as there are no degrees of freedom on this node.")
+			# either the node belongs to another field handler or it does not have dofs in the constrained field
+            continue
         end
         for i in 1:ncomps
             push!(constrained_dofs, node_dofs[i,node])
@@ -306,8 +307,8 @@ end
 
 # for nodes
 function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
-                  components::Vector{Int}, dh::DofHandler{dim,C,M}, facevalues::BCValues,
-                  dofmapping::Dict{Int,Int}, time::Float64) where {dim,C,M}
+                  components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
+                  dofmapping::Dict{Int,Int}, time::Float64)
     counter = 1
     for (idx, nodenumber) in enumerate(nodeidxs)
         x = dh.grid.nodes[nodenumber].x
@@ -442,25 +443,37 @@ end
 
 #Function for adding constraint when using multiple celltypes
 function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
-    dbc.faces isa Set{Tuple{Int}} && error("Can only apply boundary conditions to faces (not nodes).")
-    _check_cellset_dirichlet(fh.cellset, dbc.faces)
-    #dbc_check(ch, dbc)
+    _check_cellset_dirichlet(ch.dh.grid, fh.cellset, dbc.faces)
 
     field_idx = find_field(fh, dbc.field_name)
     # Extract stuff for the field
     interpolation = getfieldinterpolations(fh)[field_idx]
     field_dim = getfielddims(fh)[field_idx]
     bcvalue = fh.bc_values[field_idx]
-    
-    Ferrite._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue)
+
+    Ferrite._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue, fh.cellset)
     return ch
 end
 
-function _check_cellset_dirichlet(cellset::Set{Int}, faceset::Set{Tuple{Int,Int}})
+function _check_cellset_dirichlet(::AbstractGrid, cellset::Set{Int}, faceset::Set{Tuple{Int,Int}})
     for (cellid,faceid) in faceset
         if !(cellid in cellset)
-            error("You are trying to add a constraint to a face that is not in the cellset of the fieldhandler.")
+            @warn("You are trying to add a constraint to a face that is not in the cellset of the fieldhandler. The face will be skipped.")
         end
     end
 end
 
+function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int})
+	nodes = Set{Int}()
+	for cellid in cellset
+		for nodeid in grid.cells[cellid].nodes
+			nodeid ∈ nodes || push!(nodes, nodeid)
+		end
+	end
+
+	for nodeid in nodeset
+		if !(nodeid ∈ nodes)
+			@warn("You are trying to add a constraint to a node that is not in the cellset of the fieldhandler. The node will be skipped.")
+		end
+	end
+end
