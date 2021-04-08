@@ -1,22 +1,10 @@
 struct PointEvalHandler{dim, C, T, U}
-    dh::DofHandler{dim, C, T}
+    dh::Union{MixedDofHandler{dim, C, T}, DofHandler{dim, C, T}}
     cells::Vector{Int}
     cellvalues::Vector{U}
 end
 
-# function PointEvalHandler(grid, interpolation, points)
-#     """
-#     This is what you would call in reality to set up the PointEvalHandler
-#     """
-#     kdtree = KDTree([gn.x for gn in grid.nodes])
-#     """
-#     Assume that we have a conformal mesh for now so that the nearest node will 
-#     be a part of the cell that the point is in
-#     """
-#     nnodes, _ = knn(kdtree, points, 1) 
-#     nnodes = reduce(vcat, nnodes)
-# end
-
+# TODO rewrite this like below
 function PointEvalHandler(dh::DofHandler{dim, C, T}, interpolation::Interpolation{dim, S}, points::AbstractVector{Vec{dim, T}}) where {dim, C, S, T<:Real}
     grid = dh.grid
     dummy_cell_itp_qr = QuadratureRule{dim, S}(1)
@@ -42,7 +30,7 @@ function PointEvalHandler(dh::DofHandler{dim, C, T}, interpolation::Interpolatio
                 # since these are unique for each point to evaluate, we need to create a cellvalue for each point anyway, so we might as well do it all at once
                 cellvalues = CellScalarValues(point_qr, interpolation)
                 reinit!(cellvalues, cell_coords)
-                cellvalues_of_points[i] = cellvalues 
+                cellvalues_of_points[i] = cellvalues
             end
         end
         deleteat!(points_array, deletions)
@@ -54,34 +42,73 @@ function PointEvalHandler(dh::DofHandler{dim, C, T}, interpolation::Interpolatio
     return PointEvalHandler(dh, cells_of_points, cellvalues_of_points)
 end
 
-function (peh::PointEvalHandler)(dof_values)
-    [function_value(cellvalue, 1, 
-                    dof_values[celldofs(peh.dh, cell)]) for (cell, cellvalue) in zip(peh.cells,
-                                                                                     peh.cellvalues)]
-end
+function PointEvalHandler(dh::MixedDofHandler{dim, T}, func_interpolations::Vector{<:Interpolation{dim, S}},
+    points::AbstractVector{Vec{dim, T}}, geom_interpolations::Vector{<:Interpolation{dim, S}}=func_interpolations) where {dim, S, T<:Real}
 
-function create_eval_matrix(peh::PointEvalHandler)
-    I = reduce(vcat, [[j for i in 1:length(celldofs(peh.dh, cell))] for (j, cell) in enumerate(peh.cells)])
-    J = reduce(vcat, [celldofs(peh.dh, cell) for cell in peh.cells])
-    V = reduce(vcat, [[shape_value(cellvalue, 1, i) for i in 1:length(celldofs(peh.dh, cell))] for (cell, cellvalue) in zip(peh.cells, peh.cellvalues)])
-    m = length(peh.cells)
-    n = peh.dh.ndofs.x
-    return sparse(I,J,V,m,n)
-end
+    grid = dh.grid
+    # set up tree structure for finding nearest nodes to points
+    kdtree = KDTree([node.x for node in grid.nodes])
+    nearest_nodes, dists = knn(kdtree, points, 3, true) #TODO 3 is a random value, it shouldn't matter because likely the nearest node is the one we want
 
-point_eval(peh::PointEvalHandler, dof_values) = peh(dof_values)
+    cells = Vector{Int}(undef, length(points))
+    pvs = Vector{PointScalarValues{dim, T}}(undef, length(points))
+    node_cell_dicts = [_get_node_cell_map(grid, fh.cellset) for fh in dh.fieldhandlers]
 
-function is_point_inside_cell(cell_coords, point, facevalues, nodes_on_faces)
-    is_on_wrong_side_of_a_plane = false
+    for point_idx in 1:length(points)
+        cell_found = false
+        for (fh_idx, fh) in enumerate(dh.fieldhandlers)
+            node_cell_dict = node_cell_dicts[fh_idx]
+            func_interpol = func_interpolations[fh_idx]
+            geom_interpol = geom_interpolations[fh_idx]
+            # loop over points
+            for node in nearest_nodes[point_idx], cell in get(node_cell_dict, node, [0])
+                # if node is not part of the fieldhandler, try the next node
+                cell == 0 ? continue : nothing
 
-    for face in 1:length(nodes_on_faces)
-        reinit!(facevalues, cell_coords, face)
-        normal = facevalues.normals[1]
-        face_node = nodes_on_faces[face]
-        test = dot(normal, point-face_node.x) > 0
-        is_on_wrong_side_of_a_plane = is_on_wrong_side_of_a_plane || test
+                cell_coords = getcoordinates(grid, cell)
+                if point_in_cell(geom_interpol, cell_coords, points[point_idx])
+                    cell_found = true
+                    conv, local_coordinate = find_local_coordinate(geom_interpol, cell_coords, points[point_idx])
+                    point_qr = QuadratureRule{dim, S, T}([1], [local_coordinate])
+                    cells[point_idx] = cell
+                    # since these are unique for each point to evaluate, we need to create a cellvalue for each point anyway, so we might as well do it all at once
+                    pv = PointScalarValues(point_qr, func_interpol)
+                    pvs[point_idx] = pv
+                    break
+                end
+            end
+        end
+        cell_found == false && error("No cell found for point $(points[point_idx]), index $point_idx.")
     end
-    return !is_on_wrong_side_of_a_plane
+    return PointEvalHandler(dh, cells, pvs)
+end
+
+# check if point is inside a cell based on physical coordinate
+function point_in_cell(geom_interpol::Interpolation{dim,shape,order}, cell_coordinates, global_coordinate) where {dim, shape, order}
+    converged, x_local = find_local_coordinate(geom_interpol, cell_coordinates, global_coordinate)
+    if converged
+        return _check_isoparametric_boundaries(shape, x_local)
+    else
+        return false
+    end
+end
+
+# check if point is inside a cell based on isoparametric coordinate
+function _check_isoparametric_boundaries(::Type{RefCube}, x_local::Vec{dim}) where {dim}
+    inside = true
+    for x in x_local
+        x >= -1.0 && x<= 1.0 ? nothing : inside = false
+    end
+    return inside
+end
+
+# check if point is inside a cell based on isoparametric coordinate
+function _check_isoparametric_boundaries(::RefTetrahedron, x_local::Vec{dim}) where {dim}
+    inside = true
+    for x in x_local
+        x >= 0.0 && x<= 1.0 ? nothing : inside = false
+    end
+    return inside
 end
 
 function find_local_coordinate(interpolation, cell_coordinates, global_coordinate)
@@ -94,11 +121,9 @@ function find_local_coordinate(interpolation, cell_coordinates, global_coordinat
     n_basefuncs = getnbasefunctions(interpolation)
     max_iters = 10
     tol_norm = 1e-10
+    converged = false
     for iter in 1:10
-        if iter == max_iters
-            error("did not find a local coordinate")
-        end
-        N = JuAFEM.value(interpolation, local_guess)
+        N = Ferrite.value(interpolation, local_guess)
 
         global_guess = zero(Vec{dim})
         for j in 1:n_basefuncs
@@ -106,14 +131,41 @@ function find_local_coordinate(interpolation, cell_coordinates, global_coordinat
         end
         residual = global_guess - global_coordinate
         if norm(residual) <= tol_norm
+            converged = true
             break
         end
-        dNdξ = JuAFEM.derivative(interpolation, local_guess)
+        dNdξ = Ferrite.derivative(interpolation, local_guess)
         J = zero(Tensor{dim, dim})
         for j in 1:n_basefuncs
             J += cell_coordinates[j] ⊗ dNdξ[j]
         end
         local_guess -= inv(J) ⋅ residual
     end
-    return local_guess
+    return converged, local_guess
+end
+
+function _get_node_cell_map(grid::Grid, cellset::Set{Int}=Set{Int64}(1:getncells(grid)))
+    cell_dict = Dict{Int, Vector{Int}}()
+    for cellidx in cellset
+        for node in grid.cells[cellidx].nodes
+            if haskey(cell_dict, node)
+                push!(cell_dict[node], cellidx)
+            else
+                cell_dict[node] = [cellidx]
+            end
+        end
+    end
+    return cell_dict
+end
+
+function get_point_values(ph::PointEvalHandler, dof_values::Vector{T}) where {T<:Union{Real, AbstractTensor}}
+    length(dof_values) == ph.dh.ndofs || error("You must supply nodal values for all nodes of the Grid.")
+
+    npoints = length(ph.cells)
+    vals = Vector{T}(undef, npoints)
+    for i in eachindex(ph.cells)
+        dofs = celldofs(ph.dh, ph.cells[i])
+        vals[i] = function_value(ph.cellvalues, 1, dof_values[dofs])
+    end
+    return vals
 end
