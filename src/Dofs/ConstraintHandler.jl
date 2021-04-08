@@ -191,8 +191,12 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
+	redundant_faces = NTuple{2, Int}[]
     for (cellidx, faceidx) in bcfaces
-		cellidx ∈ cellset || continue # skip faces that are not part of the cellset
+		if cellidx ∉ cellset
+			push!(redundant_faces, (cellidx, faceidx)) # will be removed from dbc
+			continue # skip faces that are not part of the cellset
+		end
         _celldofs = fill(0, ndofs_per_cell(ch.dh, cellidx))
         celldofs!(_celldofs, ch.dh, cellidx) # extract the dofs for this cell
         r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
@@ -200,8 +204,9 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int
         @debug println("adding dofs $(_celldofs[local_face_dofs[r]]) to dbc")
     end
 
+	_dbc = Dirichlet(dbc.f, setdiff(dbc.faces, redundant_faces), dbc.field_name, dbc.components, dbc.local_face_dofs, dbc.local_face_dofs_offset)
     # save it to the ConstraintHandler
-    push!(ch.dbcs, dbc)
+    push!(ch.dbcs, _dbc)
     push!(ch.bcvalues, bcvalue)
     append!(ch.prescribed_dofs, constrained_dofs)
 end

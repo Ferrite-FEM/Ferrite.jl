@@ -44,4 +44,29 @@
 
    @test ch.prescribed_dofs == [1,3,9,19,20,23,27]
    @test ch.values == [1.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0]
+
+   ## MixedDofHandler: let first FieldHandler not have all fields
+   dim = 2
+   mesh = generate_grid(Quadrilateral, (2,1))
+   addcellset!(mesh, "set1", Set(1))
+   addcellset!(mesh, "set2", Set(2))
+
+   ip = Lagrange{dim, RefCube, 1}()
+   field_u = Field(:u, ip, dim)
+   field_c = Field(:c, ip, 1)
+
+   dh = MixedDofHandler(mesh)
+   push!(dh, FieldHandler([field_u], getcellset(mesh, "set1")))
+   push!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set2")))
+   close!(dh)
+
+   ch = ConstraintHandler(dh)
+   add!(ch, dh.fieldhandlers[1], Dirichlet(:u, getfaceset(mesh, "bottom"), (x,t)->1.0, 1))
+   add!(ch, dh.fieldhandlers[2], Dirichlet(:u, getfaceset(mesh, "bottom"), (x,t)->1.0, 1))
+   add!(ch, dh.fieldhandlers[2], Dirichlet(:c, getfaceset(mesh, "bottom"), (x,t)->2.0, 1))
+   close!(ch)
+   update!(ch)
+
+   @test ch.prescribed_dofs == [1,3,9,13,14]
+   @test ch.values == [1.0, 1.0, 1.0, 2.0, 2.0]
 end
