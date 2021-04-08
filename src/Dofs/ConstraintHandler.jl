@@ -90,7 +90,7 @@ function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, app
     @assert length(f) == 0 || length(f) == size(K, 1)
     @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
 
-	m = data.m
+    m = data.m
     @inbounds for i in 1:length(ch.values)
         d = ch.prescribed_dofs[i]
         v = ch.values[i]
@@ -191,12 +191,12 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
-	redundant_faces = NTuple{2, Int}[]
+    redundant_faces = NTuple{2, Int}[]
     for (cellidx, faceidx) in bcfaces
-		if cellidx ∉ cellset
-			push!(redundant_faces, (cellidx, faceidx)) # will be removed from dbc
-			continue # skip faces that are not part of the cellset
-		end
+        if cellidx ∉ cellset
+            push!(redundant_faces, (cellidx, faceidx)) # will be removed from dbc
+            continue # skip faces that are not part of the cellset
+        end
         _celldofs = fill(0, ndofs_per_cell(ch.dh, cellidx))
         celldofs!(_celldofs, ch.dh, cellidx) # extract the dofs for this cell
         r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
@@ -204,7 +204,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int
         @debug println("adding dofs $(_celldofs[local_face_dofs[r]]) to dbc")
     end
 
-	_dbc = Dirichlet(dbc.f, setdiff(dbc.faces, redundant_faces), dbc.field_name, dbc.components, dbc.local_face_dofs, dbc.local_face_dofs_offset)
+    _dbc = Dirichlet(dbc.f, setdiff(dbc.faces, redundant_faces), dbc.field_name, dbc.components, dbc.local_face_dofs, dbc.local_face_dofs_offset)
     # save it to the ConstraintHandler
     push!(ch.dbcs, _dbc)
     push!(ch.bcvalues, bcvalue)
@@ -222,7 +222,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     _celldofs = fill(0, ndofs_per_cell(ch.dh, first(cellset)))
     node_dofs = zeros(Int, ncomps, nnodes)
     visited = falses(nnodes)
-	for cell in CellIterator(ch.dh, collect(cellset)) # only go over cells that belong to current FieldHandler
+    for cell in CellIterator(ch.dh, collect(cellset)) # only go over cells that belong to current FieldHandler
         celldofs!(_celldofs, cell) # update the dofs for this cell
         for idx in 1:min(interpol_points, length(cell.nodes))
             node = cell.nodes[idx]
@@ -242,7 +242,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     sizehint!(dbc.local_face_dofs, length(bcnodes))
     for node in bcnodes
         if !visited[node]
-			# either the node belongs to another field handler or it does not have dofs in the constrained field
+    # either the node belongs to another field handler or it does not have dofs in the constrained field
             continue
         end
         for i in 1:ncomps
@@ -468,16 +468,16 @@ function _check_cellset_dirichlet(::AbstractGrid, cellset::Set{Int}, faceset::Se
 end
 
 function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int})
-	nodes = Set{Int}()
-	for cellid in cellset
-		for nodeid in grid.cells[cellid].nodes
-			nodeid ∈ nodes || push!(nodes, nodeid)
-		end
-	end
+    nodes = Set{Int}()
+    for cellid in cellset
+        for nodeid in grid.cells[cellid].nodes
+            nodeid ∈ nodes || push!(nodes, nodeid)
+        end
+    end
 
-	for nodeid in nodeset
-		if !(nodeid ∈ nodes)
-			@warn("You are trying to add a constraint to a node that is not in the cellset of the fieldhandler. The node will be skipped.")
-		end
-	end
+    for nodeid in nodeset
+        if !(nodeid ∈ nodes)
+            @warn("You are trying to add a constraint to a node that is not in the cellset of the fieldhandler. The node will be skipped.")
+        end
+    end
 end
