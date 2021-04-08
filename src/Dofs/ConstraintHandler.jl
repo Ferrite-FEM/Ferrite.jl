@@ -35,12 +35,12 @@ struct Dirichlet # <: Constraint
     local_face_dofs_offset::Vector{Int}
 end
 function Dirichlet(field_name::Symbol, faces::Union{Set{Int},Set{Tuple{Int,Int}}}, f::Function, component::Int=1)
-    Dirichlet(field_name, faces, f, [component])
+    Dirichlet(field_name, copy(faces), f, [component])
 end
 function Dirichlet(field_name::Symbol, faces::Union{Set{Int},Set{Tuple{Int,Int}}}, f::Function, components::AbstractVector{Int})
     unique(components) == components || error("components not unique: $components")
     # issorted(components) || error("components not sorted: $components")
-    return Dirichlet(f, faces, field_name, Vector(components), Int[], Int[])
+    return Dirichlet(f, copy(faces), field_name, Vector(components), Int[], Int[])
 end
 
 """
@@ -204,9 +204,9 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int
         @debug println("adding dofs $(_celldofs[local_face_dofs[r]]) to dbc")
     end
 
-    _dbc = Dirichlet(dbc.f, setdiff(dbc.faces, redundant_faces), dbc.field_name, dbc.components, dbc.local_face_dofs, dbc.local_face_dofs_offset)
+    setdiff!(dbc.faces, redundant_faces)
     # save it to the ConstraintHandler
-    push!(ch.dbcs, _dbc)
+    push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
     append!(ch.prescribed_dofs, constrained_dofs)
 end
