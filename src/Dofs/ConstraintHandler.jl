@@ -257,7 +257,6 @@ end
 function update!(ch::ConstraintHandler, time::Real=0.0)
     @assert ch.closed[]
     for (i,dbc) in enumerate(ch.dbcs)
-        field_idx = find_field(ch.dh, dbc.field_name)
         # Function barrier
         _update!(ch.values, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
                  dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, convert(Float64, time))
