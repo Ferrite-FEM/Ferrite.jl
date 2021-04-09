@@ -1,7 +1,7 @@
 # Defines FaceScalarValues and FaceVectorValues and common methods
 """
-    FaceScalarValues([::Type{T}], quad_rule::QuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
-    FaceVectorValues([::Type{T}], quad_rule::QuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
+    FaceScalarValues([::Type{T}], quad_rule::QuadratureRule, func_interp::Interpolation, [geo_interp::Interpolation])
+    FaceVectorValues([::Type{T}], quad_rule::QuadratureRule, func_interp::Interpolation, [geo_interp::Interpolation])
 
 A `FaceValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
 values of nodal functions, gradients and divergences of nodal functions etc. on the faces of finite elements. There are
@@ -17,8 +17,8 @@ For a scalar field, the `FaceScalarValues` type should be used. For vector field
 
 * `T`: an optional argument to determine the type the internal data is stored as.
 * `quad_rule`: an instance of a [`QuadratureRule`](@ref)
-* `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
-* `geom_interpol`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry
+* `func_interp`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
+* `geo_interp`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry
 
 **Common methods:**
 
@@ -40,7 +40,7 @@ For a scalar field, the `FaceScalarValues` type should be used. For vector field
 FaceValues
 
 # FaceScalarValues
-struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{dim,T,refshape}
+struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape,FI,GI} <: FaceValues{dim,T,refshape,FI,GI}
     N::Array{T,3}
     dNdx::Array{Vec{dim,T},3}
     dNdξ::Array{Vec{dim,T},3}
@@ -50,54 +50,56 @@ struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{di
     dMdξ::Array{Vec{dim,T},3}
     qr_weights::Vector{T}
     current_face::ScalarWrapper{Int}
+    func_interp::FI
+    geo_interp::GI
 end
 
-function FaceScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
-                          geom_interpol::Interpolation=func_interpol)
-    FaceScalarValues(Float64, quad_rule, func_interpol, geom_interpol)
+function FaceScalarValues(quad_rule::QuadratureRule, func_interp::Interpolation,
+                          geo_interp::Interpolation=func_interp)
+    FaceScalarValues(Float64, quad_rule, func_interp, geo_interp)
 end
 
-function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol) where {dim_qr,T,shape<:AbstractRefShape}
+function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, func_interp::Interpolation,
+        geo_interp::Interpolation=func_interp) where {dim_qr,T,shape<:AbstractRefShape}
 
-    @assert getdim(func_interpol) == getdim(geom_interpol)
-    @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
+    @assert getdim(func_interp) == getdim(geo_interp)
+    @assert getrefshape(func_interp) == getrefshape(geo_interp) == shape
     n_qpoints = length(getweights(quad_rule))
     dim = dim_qr + 1
 
-    face_quad_rule = create_face_quad_rule(quad_rule, func_interpol)
+    face_quad_rule = create_face_quad_rule(quad_rule, func_interp)
     n_faces = length(face_quad_rule)
 
     # Normals
     normals = zeros(Vec{dim,T}, n_qpoints)
 
     # Function interpolation
-    n_func_basefuncs = getnbasefunctions(func_interpol)
+    n_func_basefuncs = getnbasefunctions(func_interp)
     N =    fill(zero(T)          * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
     dNdx = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
     dNdξ = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
 
     # Geometry interpolation
-    n_geom_basefuncs = getnbasefunctions(geom_interpol)
+    n_geom_basefuncs = getnbasefunctions(geo_interp)
     M =    fill(zero(T)          * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
     dMdξ = fill(zero(Vec{dim,T}) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
 
     for face in 1:n_faces, (qp, ξ) in enumerate(face_quad_rule[face].points)
         for i in 1:n_func_basefuncs
-            dNdξ[i, qp, face], N[i, qp, face] = gradient(ξ -> value(func_interpol, i, ξ), ξ, :all)
+            dNdξ[i, qp, face], N[i, qp, face] = gradient(ξ -> value(func_interp, i, ξ), ξ, :all)
         end
         for i in 1:n_geom_basefuncs
-            dMdξ[i, qp, face], M[i, qp, face] = gradient(ξ -> value(geom_interpol, i, ξ), ξ, :all)
+            dMdξ[i, qp, face], M[i, qp, face] = gradient(ξ -> value(geo_interp, i, ξ), ξ, :all)
         end
     end
 
     detJdV = fill(T(NaN), n_qpoints, n_faces)
 
-    FaceScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceScalarValues{dim,T,shape,typeof(func_interp),typeof(geo_interp)}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0), func_interp, geo_interp)
 end
 
 # FaceVectorValues
-struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: FaceValues{dim,T,refshape}
+struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,FI,GI,M} <: FaceValues{dim,T,refshape,FI,GI}
     N::Array{Vec{dim,T},3}
     dNdx::Array{Tensor{2,dim,T,M},3}
     dNdξ::Array{Tensor{2,dim,T,M},3}
@@ -107,41 +109,43 @@ struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: FaceValues{
     dMdξ::Array{Vec{dim,T},3}
     qr_weights::Vector{T}
     current_face::ScalarWrapper{Int}
+    func_interp::FI
+    geo_interp::GI
 end
 
-function FaceVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
-    FaceVectorValues(Float64, quad_rule, func_interpol, geom_interpol)
+function FaceVectorValues(quad_rule::QuadratureRule, func_interp::Interpolation, geo_interp::Interpolation=func_interp)
+    FaceVectorValues(Float64, quad_rule, func_interp, geo_interp)
 end
 
-function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol) where {dim_qr,T,shape<:AbstractRefShape}
+function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, func_interp::Interpolation,
+        geo_interp::Interpolation=func_interp) where {dim_qr,T,shape<:AbstractRefShape}
 
-    @assert getdim(func_interpol) == getdim(geom_interpol)
-    @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
+    @assert getdim(func_interp) == getdim(geo_interp)
+    @assert getrefshape(func_interp) == getrefshape(geo_interp) == shape
     n_qpoints = length(getweights(quad_rule))
     dim = dim_qr + 1
 
-    face_quad_rule = create_face_quad_rule(quad_rule, func_interpol)
+    face_quad_rule = create_face_quad_rule(quad_rule, func_interp)
     n_faces = length(face_quad_rule)
 
     # Normals
     normals = zeros(Vec{dim,T}, n_qpoints)
 
     # Function interpolation
-    n_func_basefuncs = getnbasefunctions(func_interpol) * dim
+    n_func_basefuncs = getnbasefunctions(func_interp) * dim
     N    = fill(zero(Vec{dim,T})      * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
     dNdx = fill(zero(Tensor{2,dim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
     dNdξ = fill(zero(Tensor{2,dim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
 
     # Geometry interpolation
-    n_geom_basefuncs = getnbasefunctions(geom_interpol)
+    n_geom_basefuncs = getnbasefunctions(geo_interp)
     M    = fill(zero(T)          * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
     dMdξ = fill(zero(Vec{dim,T}) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
 
     for face in 1:n_faces, (qp, ξ) in enumerate(face_quad_rule[face].points)
         basefunc_count = 1
-        for basefunc in 1:getnbasefunctions(func_interpol)
-            dNdξ_temp, N_temp = gradient(ξ -> value(func_interpol, basefunc, ξ), ξ, :all)
+        for basefunc in 1:getnbasefunctions(func_interp)
+            dNdξ_temp, N_temp = gradient(ξ -> value(func_interp, basefunc, ξ), ξ, :all)
             for comp in 1:dim
                 N_comp = zeros(T, dim)
                 N_comp[comp] = N_temp
@@ -154,21 +158,20 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
             end
         end
         for basefunc in 1:n_geom_basefuncs
-            dMdξ[basefunc, qp, face], M[basefunc, qp, face] = gradient(ξ -> value(geom_interpol, basefunc, ξ), ξ, :all)
+            dMdξ[basefunc, qp, face], M[basefunc, qp, face] = gradient(ξ -> value(geo_interp, basefunc, ξ), ξ, :all)
         end
     end
 
     detJdV = fill(T(NaN), n_qpoints, n_faces)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    FaceVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceVectorValues{dim,T,shape,typeof(func_interp),typeof(geo_interp),MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0), func_interp, geo_interp)
 end
 
 function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) where {dim,T}
     n_geom_basefuncs = getngeobasefunctions(fv)
-    n_func_basefuncs = getn_scalarbasefunctions(fv)
+    n_func_basefuncs = getnbasefunctions(fv)
     @assert length(x) == n_geom_basefuncs
-    isa(fv, FaceVectorValues) && (n_func_basefuncs *= dim)
 
     fv.current_face[] = face
     cb = getcurrentface(fv)
@@ -183,7 +186,7 @@ function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) 
         fv.normals[i] = weight_norm / norm(weight_norm)
         detJ = norm(weight_norm)
 
-        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
         fv.detJdV[i, cb] = detJ * w
         Jinv = inv(fefv_J)
         for j in 1:n_func_basefuncs
@@ -215,16 +218,16 @@ struct BCValues{T}
     current_face::ScalarWrapper{Int}
 end
 
-BCValues(func_interpol::Interpolation, geom_interpol::Interpolation) =
-    BCValues(Float64, func_interpol, geom_interpol)
+BCValues(func_interp::Interpolation, geo_interp::Interpolation) =
+    BCValues(Float64, func_interp, geo_interp)
 
-function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_interpol::Interpolation{dim,refshape}) where {T,dim,refshape}
+function BCValues(::Type{T}, func_interp::Interpolation{dim,refshape}, geo_interp::Interpolation{dim,refshape}) where {T,dim,refshape}
     # set up quadrature rules for each face with dof-positions
-    # (determined by func_interpol) as the quadrature points
-    interpolation_coords = reference_coordinates(func_interpol)
+    # (determined by func_interp) as the quadrature points
+    interpolation_coords = reference_coordinates(func_interp)
 
     qrs = QuadratureRule{dim,refshape,T}[]
-    for face in faces(func_interpol)
+    for face in faces(func_interp)
         dofcoords = Vec{dim,T}[]
         for facedof in face
             push!(dofcoords, interpolation_coords[facedof])
@@ -235,12 +238,12 @@ function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_in
 
     n_qpoints = length(getweights(qrs[1])) # assume same in all
     n_faces = length(qrs)
-    n_geom_basefuncs = getnbasefunctions(geom_interpol)
+    n_geom_basefuncs = getnbasefunctions(geo_interp)
     M =    fill(zero(T)           * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
 
     for face in 1:n_faces, (qp, ξ) in enumerate(qrs[face].points)
         for i in 1:n_geom_basefuncs
-            M[i, qp, face] = value(geom_interpol, i, ξ)
+            M[i, qp, face] = value(geo_interp, i, ξ)
         end
     end
 

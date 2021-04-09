@@ -34,17 +34,17 @@ abstract type Interpolation{dim,shape,order} end
 """
 Return the dimension of an `Interpolation`
 """
-@inline getdim(ip::Interpolation{dim}) where {dim} = dim
+@inline getdim(::Interpolation{dim}) where {dim} = dim
 
 """
 Return the reference shape of an `Interpolation`
 """
-@inline getrefshape(ip::Interpolation{dim,shape}) where {dim,shape} = shape
+@inline getrefshape(::Interpolation{dim,shape}) where {dim,shape} = shape
 
 """
 Return the polynomial order of the `Interpolation`
 """
-@inline getorder(ip::Interpolation{dim,shape,order}) where {dim,shape,order} = order
+@inline getorder(::Interpolation{dim,shape,order}) where {dim,shape,order} = order
 
 """
 Compute the value of the shape functions at a point ξ for a given interpolation
@@ -59,6 +59,8 @@ Compute the gradients of the shape functions at a point ξ for a given interpola
 function derivative(ip::Interpolation{dim}, ξ::Vec{dim,T}) where {dim,T}
     [gradient(ξ -> value(ip, i, ξ), ξ) for i in 1:getnbasefunctions(ip)]
 end
+
+Base.copy(ip::Interpolation) = ip
 
 #####################
 # Utility functions #
