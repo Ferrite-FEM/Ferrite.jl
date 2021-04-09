@@ -175,16 +175,15 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
     
     if eltype(dbc.faces)==Int #Special case when dbc.faces is a nodeset
         bcvalue = BCValues(interpolation, default_interpolation(celltype), FaceIndex) #Not used by node bcs, but still have to pass it as an argument
-        _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue)
     else
         bcvalue = BCValues(interpolation, default_interpolation(celltype), eltype(dbc.faces))
-        _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue)
     end
+    _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue)
 
     return ch
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{<:BoundaryIndex}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, functype::Function, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where Index<:BoundaryIndex
     # calculate which local dof index live on each face
     # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
     local_face_dofs = Int[]
@@ -203,10 +202,10 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{<:BoundaryInd
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
-    redundant_faces = NTuple{2, Int}[]
+    redundant_faces = Index[]
     for (cellidx, faceidx) in bcfaces
         if cellidx ∉ cellset
-            push!(redundant_faces, (cellidx, faceidx)) # will be removed from dbc
+            push!(redundant_faces, Index(cellidx, faceidx)) # will be removed from dbc
             continue # skip faces that are not part of the cellset
         end
         _celldofs = fill(0, ndofs_per_cell(ch.dh, cellidx))
@@ -254,7 +253,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     sizehint!(dbc.local_face_dofs, length(bcnodes))
     for node in bcnodes
         if !visited[node]
-    # either the node belongs to another field handler or it does not have dofs in the constrained field
+            # either the node belongs to another field handler or it does not have dofs in the constrained field
             continue
         end
         for i in 1:ncomps
@@ -281,7 +280,7 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
 end
 
 # for faces
-function _update!(values::Vector{Float64}, f::Function, faces::GeomIndexSets, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+function _update!(values::Vector{Float64}, f::Function, faces::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::T) where {T}
 
@@ -354,7 +353,7 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
         data = zeros(Float64, nd, getnnodes(ch.dh.grid))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
-            if eltype(dbc.faces) <: GeomIndex
+            if eltype(dbc.faces) <: BoundaryIndex
                 functype = boundaryfunction(eltype(dbc.faces))
                 for (cellidx, faceidx) in dbc.faces
                     for facenode in functype(ch.dh.grid.cells[cellidx])[faceidx]
@@ -469,13 +468,17 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
     interpolation = getfieldinterpolations(fh)[field_idx]
     field_dim = getfielddims(fh)[field_idx]
 
-    functype = getgeometryfunction(eltype(dbc.faces))
-    bcvalue = BCValues(interpolation, JuAFEM.default_interpolation(celltype), functype)
-    Ferrite._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue, functype, fh.cellset)
+    if eltype(dbc.faces)==Int #Special case when dbc.faces is a nodeset
+        bcvalue = BCValues(interpolation, default_interpolation(celltype), FaceIndex) #Not used by node bcs, but still have to pass it as an argument
+    else
+        bcvalue = BCValues(interpolation, default_interpolation(celltype), eltype(dbc.faces))
+    end
+
+    Ferrite._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue, fh.cellset)
     return ch
 end
 
-function _check_cellset_dirichlet(::AbstractGrid, cellset::Set{Int}, faceset::Set{Tuple{Int,Int}})
+function _check_cellset_dirichlet(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex})
     for (cellid,faceid) in faceset
         if !(cellid in cellset)
             @warn("You are trying to add a constraint to a face that is not in the cellset of the fieldhandler. The face will be skipped.")

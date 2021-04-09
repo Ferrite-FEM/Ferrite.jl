@@ -69,9 +69,6 @@ struct VertexIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
-const GeomIndex = Union{FaceIndex, EdgeIndex, VertexIndex}
-const GeomIndexSets = Union{Set{FaceIndex},Set{EdgeIndex},Set{VertexIndex}}
-
 abstract type AbstractGrid{dim} end
 
 """
