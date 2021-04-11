@@ -1,7 +1,10 @@
 cell_to_vtkcell(::Type{Line}) = VTKCellTypes.VTK_LINE
+cell_to_vtkcell(::Type{Line2D}) = VTKCellTypes.VTK_LINE
+cell_to_vtkcell(::Type{Line3D}) = VTKCellTypes.VTK_LINE
 cell_to_vtkcell(::Type{QuadraticLine}) = VTKCellTypes.VTK_QUADRATIC_EDGE
 
 cell_to_vtkcell(::Type{Quadrilateral}) = VTKCellTypes.VTK_QUAD
+cell_to_vtkcell(::Type{Quadrilateral3D}) = VTKCellTypes.VTK_QUAD
 cell_to_vtkcell(::Type{QuadraticQuadrilateral}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
 cell_to_vtkcell(::Type{Triangle}) = VTKCellTypes.VTK_TRIANGLE
 cell_to_vtkcell(::Type{QuadraticTriangle}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE

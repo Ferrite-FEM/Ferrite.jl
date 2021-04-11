@@ -2,7 +2,6 @@
 mutable struct FieldHandler
     fields::Vector{Field}
     cellset::Set{Int}
-    bc_values::Vector{BCValues} # for boundary conditions
 end
 """
     FieldHandler(fields::Vector{Field}, cellset)
@@ -10,9 +9,7 @@ end
 Construct a `FieldHandler` based on an array of `Field`s and assigns it a set of cells.
 """
 function FieldHandler(fields::Vector{Field}, cellset)
-    # TODO for now, only accept isoparamtric mapping
-    bc_values = [BCValues(field.interpolation, field.interpolation) for field in fields]
-    FieldHandler(fields, cellset, bc_values)
+    return FieldHandler(fields, cellset)
 end
 
 struct CellVector{T}
@@ -138,19 +135,20 @@ end
 function Base.push!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolation)
     @assert !isclosed(dh)
 
+    celltype = getcelltype(dh.grid)
+    @assert isconcretetype(celltype)
+
     if length(dh.fieldhandlers) == 0
         cellset = Set(1:getncells(dh.grid))
-        push!(dh.fieldhandlers, FieldHandler(Field[],cellset,BCValues[]))
+        push!(dh.fieldhandlers, FieldHandler(Field[], cellset))
     elseif length(dh.fieldhandlers) > 1
         error("If you have more than one FieldHandler, you must specify field")
     end
     fh = first(dh.fieldhandlers)
 
     field = Field(name,ip,dim)
-    bc_value = BCValues(field.interpolation, field.interpolation)
 
     push!(fh.fields, field)
-    push!(fh.bc_values, bc_value)
 
     return dh
 end
@@ -414,4 +412,3 @@ find_field(dh::MixedDofHandler, field_name::Symbol) = find_field(first(dh.fieldh
 field_offset(dh::MixedDofHandler, field_name::Symbol) = field_offset(first(dh.fieldhandlers), field_name)
 getfieldinterpolation(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].interpolation
 getfielddim(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].dim
-getbcvalue(dh::MixedDofHandler, field_idx::Int) =  dh.fieldhandlers[1].bc_values[field_idx]

@@ -115,7 +115,6 @@ end
 
     @test collect(getcoordinates(getnodes(grid, 5)).data) ≈ [0.5, 0.5]
 
-
     @test getcells(grid, "cell_set") == [getcells(grid, 1)]
 
     f(x) = Tensor{1,1,Float64}((1 + x[1]^2 + 2x[2]^2, ))
@@ -141,4 +140,27 @@ end
         n += cellid(c)
     end
     @test n == div(getncells(grid)*(getncells(grid) + 1), 2)
+end
+
+@testset "Grid sets" begin
+
+    grid = Ferrite.generate_grid(Hexahedron, (1, 1, 1), Vec((0.,0., 0.)), Vec((1.,1.,1.)))
+
+    #Test manual add
+    addcellset!(grid, "cell_set", [1]);
+    addnodeset!(grid, "node_set", [1])
+    addfaceset!(grid, "face_set", [FaceIndex(1,1)])
+    addedgeset!(grid, "edge_set", [EdgeIndex(1,1)])
+    addvertexset!(grid, "vert_set", [VertexIndex(1,1)])
+
+    #Test function add
+    addfaceset!(grid, "left_face", (x)-> x[1] ≈ 0.0)
+    addedgeset!(grid, "left_lower_edge", (x)-> x[1] ≈ 0.0 && x[3] ≈ 0.0)
+    addvertexset!(grid, "left_corner", (x)-> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
+
+    @test 1 in Ferrite.getnodeset(grid, "node_set")
+    @test FaceIndex(1,5) in getfaceset(grid, "left_face")
+    @test EdgeIndex(1,4) in getedgeset(grid, "left_lower_edge")
+    @test VertexIndex(1,1) in getvertexset(grid, "left_corner")
+
 end
