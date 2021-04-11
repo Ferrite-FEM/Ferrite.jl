@@ -119,9 +119,6 @@ end
 
 end; #end main functions
 
-# Run everything:
-main()
-
 # Below is the function that creates the shell mesh. It simply generates a 2d-quadrature mesh, and appends
 # a third coordinate (z-direction) to the node-positions. 
 function generate_shell_grid(nels, size)
@@ -312,3 +309,6 @@ function integrate_shell!(ke, cv, qr_ooplane, X, data)
         end
     end
 end;
+
+# Run everything:
+main()
