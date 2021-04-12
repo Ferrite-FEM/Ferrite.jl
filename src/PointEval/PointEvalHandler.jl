@@ -158,14 +158,62 @@ function _get_node_cell_map(grid::Grid, cellset::Set{Int}=Set{Int64}(1:getncells
     return cell_dict
 end
 
-function get_point_values(ph::PointEvalHandler, dof_values::Vector{T}) where {T<:Union{Real, AbstractTensor}}
-    length(dof_values) == ph.dh.ndofs || error("You must supply nodal values for all nodes of the Grid.")
+# values in nodal order
+# should be used when interpolating a field that lives only on a subdomain
+# shouldn't be used for sub/superparametric approximations
+function get_point_values(ph::PointEvalHandler, nodal_values::Vector{T}) where {T<:Union{Real, AbstractTensor}}
+    # TODO check for sub/superparametric approximations
+    # if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
+    #     @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
+    # end
+    length(nodal_values) == getnnodes(ph.dh.grid) || error("You must supply nodal values for all nodes of the Grid.")
 
     npoints = length(ph.cells)
     vals = Vector{T}(undef, npoints)
     for i in eachindex(ph.cells)
-        dofs = celldofs(ph.dh, ph.cells[i])
-        vals[i] = function_value(ph.cellvalues, 1, dof_values[dofs])
+        node_idxs = getnodes(ph.dh.grid, ph.cells[i])
+        vals[i] = function_value(ph.cellvalues, 1, nodal_values[node_idxs])
     end
     return vals
 end
+
+# can only be used if points are in cells that are part of dh (might be problematic when using L2Projection on a subset of cells)
+function get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, fieldname::Symbol)
+
+    length(dof_values) == dh.ndofs || error("You must supply nodal values for all $(dh.ndofs) dofs in $dh.")
+    _check_cellset_pointevaluation(ph, dh)
+
+    npoints = length(ph.cells)
+    vals = Vector{T}(undef, npoints)
+    for i in eachindex(ph.cells)
+        cell_dofs = celldofs(dh, ph.cells[i])
+        #TODO damn, now we need to find the fieldhandler again. Should be stored!
+        # want to be able to use this no matter if dof_values are coming from L2Projector or from simulation
+        for fh in ph.dh
+            if ph.cells[i] ∈ fh.cellset
+                dofrange = dof_range(fh, fieldname)
+            end
+        end
+        field_dofs = cell_dofs[dofrange]
+        vals[i] = function_value(ph.cellvalues, 1, dof_values[field_dofs])
+    end
+    return vals
+end
+
+get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, ::L2Projector) = get_point_values(ph, dof_values, :_)
+
+
+# probably won't need this. Would error anyways on construction of ph
+function _check_cellset_pointevaluation(ph::PointEvalHandler, dh::MixedDofHandler)
+    cellset = Set{Int}{}
+    for fh in dh.fieldhandlers
+        union!(cellset, fh.cellset)
+    end
+    unique!(cellset)
+    # check that all cells in ph exist in dh
+    all_exist = !any(i->(i ∉ cellset), ph.cells)
+    all_exist && error("All cells in the PointEvalHandler must be part of the MixedDofHandler. If you are working with a field on a subset of the cells, consider interpolating data based on nodal values instead of dof values.")
+    return all_exist
+end
+
+# no need to check for DofHandler. It doesn't allow a field on a subset of its cells
