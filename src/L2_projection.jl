@@ -207,7 +207,7 @@ function project(proj::L2Projector,
         return T[make_T(reordered_vals[i,:]) for i=1:size(reordered_vals, 1)]
     else
         # convert back to the original tensor type
-        return T[make_T(reordered_vals[i,:]) for i=1:size(reordered_vals, 1)]
+        return T[make_T(projected_vals[i,:]) for i=1:size(projected_vals, 1)]
     end
 end
 

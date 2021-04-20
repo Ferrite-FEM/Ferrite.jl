@@ -44,7 +44,7 @@ end
 
 function PointEvalHandler(dh::MixedDofHandler{dim, T}, func_interpolations::Vector{<:Interpolation{dim, S}},
     points::AbstractVector{Vec{dim, T}}, geom_interpolations::Vector{<:Interpolation{dim, S}}=func_interpolations) where {dim, S, T<:Real}
-
+    # TODO: test that geom_interpolation is compatible with grid (use this as a default)
     grid = dh.grid
     # set up tree structure for finding nearest nodes to points
     kdtree = KDTree([node.x for node in grid.nodes])
@@ -66,6 +66,7 @@ function PointEvalHandler(dh::MixedDofHandler{dim, T}, func_interpolations::Vect
                 cell == 0 ? continue : nothing
 
                 cell_coords = getcoordinates(grid, cell)
+                # TODO: let point_incell return Bool and Coordinate, compute one, put if condition only on bool - toss coordinate if false
                 if point_in_cell(geom_interpol, cell_coords, points[point_idx])
                     cell_found = true
                     conv, local_coordinate = find_local_coordinate(geom_interpol, cell_coords, points[point_idx])
@@ -171,48 +172,47 @@ function get_point_values(ph::PointEvalHandler, nodal_values::Vector{T}) where {
     npoints = length(ph.cells)
     vals = Vector{T}(undef, npoints)
     for i in eachindex(ph.cells)
-        node_idxs = getnodes(ph.dh.grid, ph.cells[i])
-        vals[i] = function_value(ph.cellvalues, 1, nodal_values[node_idxs])
+        node_idxs = getcells(ph.dh.grid, ph.cells[i]).nodes
+        vals[i] = function_value(ph.cellvalues[i], 1, [nodal_values[node_idx] for node_idx in node_idxs])
     end
     return vals
 end
 
 # can only be used if points are in cells that are part of dh (might be problematic when using L2Projection on a subset of cells)
-function get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, fieldname::Symbol)
+function get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, fieldname::Symbol) where T
 
-    length(dof_values) == dh.ndofs || error("You must supply nodal values for all $(dh.ndofs) dofs in $dh.")
-    _check_cellset_pointevaluation(ph, dh)
+    length(dof_values) == ndofs(ph.dh) || error("You must supply nodal values for all $(ndofs(ph.dh)) dofs.")
+    _check_cellset_pointevaluation(ph, ph.dh)
 
     npoints = length(ph.cells)
     vals = Vector{T}(undef, npoints)
     for i in eachindex(ph.cells)
-        cell_dofs = celldofs(dh, ph.cells[i])
+        cell_dofs = celldofs(ph.dh, ph.cells[i])
         #TODO damn, now we need to find the fieldhandler again. Should be stored!
         # want to be able to use this no matter if dof_values are coming from L2Projector or from simulation
-        for fh in ph.dh
+        for fh in ph.dh.fieldhandlers
             if ph.cells[i] ∈ fh.cellset
                 dofrange = dof_range(fh, fieldname)
+                field_dofs = cell_dofs[dofrange]
+                vals[i] = function_value(ph.cellvalues[i], 1, dof_values[field_dofs])
             end
         end
-        field_dofs = cell_dofs[dofrange]
-        vals[i] = function_value(ph.cellvalues, 1, dof_values[field_dofs])
     end
     return vals
 end
 
-get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, ::L2Projector) = get_point_values(ph, dof_values, :_)
+get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, ::L2Projector) where T = get_point_values(ph, dof_values, :_)
 
 
 # probably won't need this. Would error anyways on construction of ph
 function _check_cellset_pointevaluation(ph::PointEvalHandler, dh::MixedDofHandler)
-    cellset = Set{Int}{}
+    cellset = Set{Int}()
     for fh in dh.fieldhandlers
         union!(cellset, fh.cellset)
     end
-    unique!(cellset)
     # check that all cells in ph exist in dh
     all_exist = !any(i->(i ∉ cellset), ph.cells)
-    all_exist && error("All cells in the PointEvalHandler must be part of the MixedDofHandler. If you are working with a field on a subset of the cells, consider interpolating data based on nodal values instead of dof values.")
+    all_exist || error("All cells in the PointEvalHandler must be part of the MixedDofHandler. If you are working with a field on a subset of the cells, consider interpolating data based on nodal values instead of dof values.")
     return all_exist
 end
 
