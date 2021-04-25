@@ -8,7 +8,7 @@ function postprocess(node_values)
 end
 
 function dof_to_node(dh::AbstractDofHandler, u::Array{T,1}; field::Int=1, process::Function=postprocess) where T
-    fieldnames = JuAFEM.getfieldnames(dh)  
+    fieldnames = Ferrite.getfieldnames(dh)  
     field_dim = getfielddim(dh, field)
     data = fill(NaN, getnnodes(dh.grid), field_dim) 
     offset = field_offset(dh, fieldnames[field])
