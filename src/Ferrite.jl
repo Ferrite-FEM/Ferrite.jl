@@ -1,4 +1,4 @@
-module JuAFEM
+module Ferrite
 using Reexport
 @reexport using Tensors
 @reexport using WriteVTK

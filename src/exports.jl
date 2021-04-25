@@ -98,6 +98,8 @@ export
     Dirichlet,
     update!,
     apply!,
+    apply_rhs!,
+    get_rhs_data,
     apply_zero!,
     add!,
     free_dofs,

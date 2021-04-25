@@ -1,4 +1,4 @@
-# Some utility functions for testing JuAFEM.jl
+# Some utility functions for testing Ferrite.jl
 
 #####################################
 # Volume for the reference elements #
@@ -6,7 +6,7 @@
 reference_volume(::Interpolation{dim, RefCube}) where {dim} = 2^dim
 reference_volume(::Interpolation{dim, RefTetrahedron}) where {dim} = 1 / factorial(dim)
 # For faces
-reference_volume(fs::Interpolation, ::Int) = reference_volume(JuAFEM.getlowerdim(fs))
+reference_volume(fs::Interpolation, ::Int) = reference_volume(Ferrite.getlowerdim(fs))
 reference_volume(fs::Interpolation{2, RefTetrahedron}, face::Int) = face == 1 ? sqrt(2) : 1.0
 reference_volume(fs::Interpolation{3, RefTetrahedron}, face::Int) = face == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
 
@@ -76,7 +76,7 @@ function rotmat(dim, θ=π/6)
 end
 
 function valid_coordinates_and_normals(fs::Interpolation{dim, shape, order}) where {dim, shape, order}
-    x = JuAFEM.reference_coordinates(fs)
+    x = Ferrite.reference_coordinates(fs)
     n = reference_normals(fs)
     R = rotmat(dim)
     return [2.0 * (R ⋅ x[i]) for i in 1:length(x)] , [(R ⋅ n[i]) / norm((R ⋅ n[i])) for i in 1:length(n)]

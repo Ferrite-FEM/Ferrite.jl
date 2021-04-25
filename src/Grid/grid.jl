@@ -39,7 +39,7 @@ const Tetrahedron = Cell{3,4,4}
 const QuadraticTetrahedron = Cell{3,10,4}
 
 const Hexahedron = Cell{3,8,6}
-const QuadraticHexahedron = Cell{3,20,6} # Function interpolation for this doesn't exist in JuAFEM yet
+const QuadraticHexahedron = Cell{3,20,6} # Function interpolation for this doesn't exist in Ferrite yet
 
 """
 A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh
@@ -55,12 +55,12 @@ struct FaceIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
-abstract type AbstractGrid end
+abstract type AbstractGrid{dim} end
 
 """
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 """
-mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid
+mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     cells::Vector{C}
     nodes::Vector{Node{dim,T}}
     # Sets
@@ -83,7 +83,7 @@ end
 ##########################
 # Grid utility functions #
 ##########################
-@inline getdim(grid::Grid{dim}) where {dim} = dim
+@inline getdim(::AbstractGrid{dim}) where {dim} = dim
 @inline getcells(grid::AbstractGrid) = grid.cells
 @inline getcells(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.cells[v]
 @inline getcells(grid::AbstractGrid, set::String) = grid.cells[collect(grid.cellsets[set])]

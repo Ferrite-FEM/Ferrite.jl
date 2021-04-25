@@ -20,7 +20,7 @@ which data can be appended to, see `vtk_point_data` and `vtk_cell_data`.
 function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compress::Bool=true) where {dim,C,T}
     cls = MeshCell[]
     for cell in grid.cells
-        celltype = JuAFEM.cell_to_vtkcell(typeof(cell))
+        celltype = Ferrite.cell_to_vtkcell(typeof(cell))
         push!(cls, MeshCell(celltype, collect(cell.nodes)))
     end
     coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
@@ -96,10 +96,10 @@ the cell is in the set and 0 otherwise.
 vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellset::String) =
     vtk_cellset(vtk, grid, [cellset])
 
-import JuAFEM.field_offset
+import Ferrite.field_offset
 function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler, u::Vector, suffix="")
 
-    fieldnames = JuAFEM.getfieldnames(dh)  # all primary fields
+    fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
 
     for name in fieldnames
         @debug println("exporting field $(name)")

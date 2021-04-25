@@ -19,7 +19,7 @@
 #
 #md # The full program, without comments, can be found in the next
 #md # [section](@ref incompressible_elasticity-plain-program).
-using JuAFEM
+using Ferrite
 using BlockArrays, SparseArrays, LinearAlgebra
 
 # First we generate a simple grid, specifying the 4 corners of Cooks membrane.
@@ -83,7 +83,7 @@ struct LinearElasticity{T}
 end
 
 # Now to the assembling of the stiffness matrix. This mixed formulation leads to a blocked
-# element matrix. Since JuAFEM does not force us to use any particular matrix type we will
+# element matrix. Since Ferrite does not force us to use any particular matrix type we will
 # use a `PseudoBlockArray` from `BlockArrays.jl`.
 function doassemble(cellvalues_u::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim},
                     facevalues_u::FaceVectorValues{dim}, K::SparseMatrixCSC, grid::Grid,

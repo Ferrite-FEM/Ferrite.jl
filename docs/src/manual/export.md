@@ -1,5 +1,5 @@
 ```@setup export
-using JuAFEM
+using Ferrite
 grid = generate_grid(Triangle, (2, 2))
 dh = DofHandler(grid); push!(dh, :u, 1); close!(dh)
 u = rand(ndofs(dh)); σ = rand(getncells(grid))
@@ -10,7 +10,7 @@ u = rand(ndofs(dh)); σ = rand(getncells(grid))
 When the problem is solved, and the solution vector `u` is known we typically
 want to visualize it. The simplest way to do this is to write the solution to a
 VTK-file, which can be viewed in e.g. [`Paraview`](https://www.paraview.org/).
-To write VTK-files, JuAFEM uses, and extends, functions from the
+To write VTK-files, Ferrite uses, and extends, functions from the
 [`WriteVTK.jl`](https://github.com/jipolanco/WriteVTK.jl) package to simplify
 the exporting.
 
