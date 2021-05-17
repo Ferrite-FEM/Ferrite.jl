@@ -19,7 +19,7 @@ function values at specific points:
 
 The quadrature rule consists of ``n_q`` points in space ``\\mathbf{x}_q`` with corresponding weights ``w_q``.
 
-In `JuAFEM`, the `QuadratureRule` type is mostly used as one of the components to create a [`CellValues`](@ref)
+In `Ferrite`, the `QuadratureRule` type is mostly used as one of the components to create a [`CellValues`](@ref)
 or [`FaceValues`](@ref) object.
 
 **Common methods:**
@@ -29,10 +29,10 @@ or [`FaceValues`](@ref) object.
 **Example:**
 ```jldoctest
 julia> QuadratureRule{2, RefTetrahedron}(1)
-JuAFEM.QuadratureRule{2,JuAFEM.RefTetrahedron,Float64}([0.5], Tensors.Tensor{1,2,Float64,2}[[0.333333, 0.333333]])
+Ferrite.QuadratureRule{2,Ferrite.RefTetrahedron,Float64}([0.5], Tensors.Tensor{1,2,Float64,2}[[0.333333, 0.333333]])
 
 julia> QuadratureRule{1, RefCube}(:lobatto, 2)
-JuAFEM.QuadratureRule{1,JuAFEM.RefCube,Float64}([1.0, 1.0], Tensors.Tensor{1,1,Float64,1}[[-1.0], [1.0]])
+Ferrite.QuadratureRule{1,Ferrite.RefCube,Float64}([1.0, 1.0], Tensors.Tensor{1,1,Float64,1}[[-1.0], [1.0]])
 ```
 """
 struct QuadratureRule{dim,shape,T}

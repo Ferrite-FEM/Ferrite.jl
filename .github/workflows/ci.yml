@@ -8,13 +8,18 @@ on:
 
 jobs:
   test:
-    name: julia ${{ matrix.julia-version }} - ${{ matrix.os }}
+    name: Julia ${{ matrix.julia-version }} - ${{ matrix.os }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.julia-version == 'nightly' }}
     strategy:
-      fail-fast: false
       matrix:
         julia-version: ['1.0', '1', 'nightly']
-        os: ['ubuntu-latest', 'windows-latest', 'macOS-latest']
+        os: ['ubuntu-latest']
+        include:
+          - os: windows-latest
+            julia-version: '1'
+          - os: macOS-latest
+            julia-version: '1'
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
@@ -28,3 +33,18 @@ jobs:
         if: ${{ matrix.julia-version == '1' && matrix.os == 'ubuntu-latest' }}
         with:
           file: lcov.info
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: '1'
+      - name: Install dependencies
+        run: julia --project=docs -e 'using Pkg; Pkg.instantiate()'
+      - name: Build and deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+        run: julia --project=docs --color=yes docs/make.jl

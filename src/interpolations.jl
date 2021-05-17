@@ -23,7 +23,7 @@ The following interpolations are implemented:
 # Examples
 ```jldoctest
 julia> ip = Lagrange{2,RefTetrahedron,2}()
-JuAFEM.Lagrange{2,JuAFEM.RefTetrahedron,2}()
+Ferrite.Lagrange{2,Ferrite.RefTetrahedron,2}()
 
 julia> getnbasefunctions(ip)
 6
@@ -282,6 +282,7 @@ getnbasefunctions(::Lagrange{3,RefTetrahedron,1}) = 4
 nvertexdofs(::Lagrange{3,RefTetrahedron,1}) = 1
 
 faces(::Lagrange{3,RefTetrahedron,1}) = ((1,2,3), (1,2,4), (2,3,4), (1,4,3))
+edges(::Lagrange{3,RefTetrahedron,1}) = ((1,2), (2,3), (3,1), (1,4), (2,4), (3,4))
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,1})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
@@ -309,6 +310,7 @@ nvertexdofs(::Lagrange{3,RefTetrahedron,2}) = 1
 nedgedofs(::Lagrange{3,RefTetrahedron,2}) = 1
 
 faces(::Lagrange{3,RefTetrahedron,2}) = ((1,2,3,5,6,7), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
+edges(::Lagrange{3,RefTetrahedron,2}) = ((1,5,2), (2,6,3), (3,7,1), (1,8,4), (2,9,4), (3,10,4))
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,2})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
@@ -349,6 +351,7 @@ getnbasefunctions(::Lagrange{3,RefCube,1}) = 8
 nvertexdofs(::Lagrange{3,RefCube,1}) = 1
 
 faces(::Lagrange{3,RefCube,1}) = ((1,4,3,2), (1,2,6,5), (2,3,7,6), (3,4,8,7), (1,5,8,4), (5,6,7,8))
+edges(::Lagrange{3,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1), (1,5), (2,6), (3,7), (4,8), (5,6), (6,7), (7,8), (8,5))
 
 function reference_coordinates(::Lagrange{3,RefCube,1})
     return [Vec{3, Float64}((-1.0, -1.0, -1.0)),

@@ -43,7 +43,7 @@
 # * The example contains boundary integrals
 # * The Dirichlet condition is imposed strongly and the Von Neumann condition is imposed weakly.
 #
-using JuAFEM
+using Ferrite
 using Tensors
 using SparseArrays
 using LinearAlgebra
@@ -80,7 +80,7 @@ function u_ana(x::Vec{2, T}) where {T}
 end;
 
 dbcs = ConstraintHandler(dh)
-# The (strong) Dirichlet boundary condition can be handled automatically by the JuAFEM library.
+# The (strong) Dirichlet boundary condition can be handled automatically by the Ferrite library.
 dbc = Dirichlet(:u, union(getfaceset(grid, "top"), getfaceset(grid, "right")), (x,t) -> u_ana(x))
 add!(dbcs, dbc)
 close!(dbcs)

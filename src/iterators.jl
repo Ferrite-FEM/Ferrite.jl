@@ -85,7 +85,7 @@ Base.eltype(::Type{T})         where {T<:CellIterator} = T
 @inline celldofs(ci::CellIterator) = ci.celldofs
 
 function reinit!(ci::CellIterator{dim,C}, i::Int) where {dim,C}
-    ci.current_cellid[] = ci.cellset === nothing ? i : i.cellset[i]
+    ci.current_cellid[] = ci.cellset === nothing ? i : ci.cellset[i]
 
     if ci.flags.nodes
         if ci.dh !== nothing && ci.dh isa MixedDofHandler
@@ -112,7 +112,7 @@ function check_compatible_geointerpolation(cv::Union{CellValues, FaceValues}, ci
     if length(getnodes(ci)) != getngeobasefunctions(cv)
         msg = """The given CellValues and CellIterator are incompatiblet.
         Likely an appropriate geometry interpolate must be passed when constructing the CellValues.
-        See also issue #265: https://github.com/KristofferC/JuAFEM.jl/issues/265"""
+        See also issue #265: https://github.com/Ferrite-FEM/Ferrite.jl/issues/265"""
         throw(ArgumentError(msg))
     end
 end

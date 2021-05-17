@@ -14,11 +14,11 @@ for (func_interpol, quad_rule) in  (
 
     for fe_valtype in (CellScalarValues, CellVectorValues)
         cv = fe_valtype(quad_rule, func_interpol)
-        ndim = JuAFEM.getdim(func_interpol)
+        ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
         fe_valtype == CellScalarValues && @test getnbasefunctions(cv) == n_basefuncs
-        fe_valtype == CellVectorValues && @test getnbasefunctions(cv) == n_basefuncs * JuAFEM.getdim(func_interpol)
+        fe_valtype == CellVectorValues && @test getnbasefunctions(cv) == n_basefuncs * Ferrite.getdim(func_interpol)
 
         x, n = valid_coordinates_and_normals(func_interpol)
         reinit!(cv, x)
@@ -40,7 +40,7 @@ for (func_interpol, quad_rule) in  (
             @test function_gradient(cv, i, u) ≈ H
             @test function_symmetric_gradient(cv, i, u) ≈ 0.5(H + H')
             @test function_divergence(cv, i, u) ≈ tr(H)
-            ndim == 3 && @test function_curl(cv, i, u) ≈ JuAFEM.curl(H)
+            ndim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl(H)
             function_value(cv, i, u)
             if isa(cv, CellScalarValues)
                 @test function_gradient(cv, i, u_scal) ≈ V
@@ -49,7 +49,7 @@ for (func_interpol, quad_rule) in  (
                 @test function_gradient(cv, i, u_vector) ≈ function_gradient(cv, i, u) ≈ H
                 @test function_value(cv, i, u_vector) ≈ function_value(cv, i, u)
                 @test function_divergence(cv, i, u_vector) ≈ function_divergence(cv, i, u) ≈ tr(H)
-                ndim == 3 && @test function_curl(cv, i, u_vector) ≈ JuAFEM.curl(H)
+                ndim == 3 && @test function_curl(cv, i, u_vector) ≈ Ferrite.curl(H)
             end
         end
 
@@ -61,7 +61,7 @@ for (func_interpol, quad_rule) in  (
         @test vol ≈ calculate_volume(func_interpol, x)
 
         # Test quadrature rule after reinit! with ref. coords
-        x = JuAFEM.reference_coordinates(func_interpol)
+        x = Ferrite.reference_coordinates(func_interpol)
         reinit!(cv, x)
         vol = 0.0
         for i in 1:getnquadpoints(cv)

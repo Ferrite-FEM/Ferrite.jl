@@ -1,6 +1,6 @@
 ```@meta
-CurrentModule = JuAFEM
-DocTestSetup = :(using JuAFEM)
+CurrentModule = Ferrite
+DocTestSetup = :(using Ferrite)
 ```
 
 # FEValues
