@@ -1,4 +1,5 @@
 # to test vtk-files
+using StableRNGs
 OVERWRITE_CHECKSUMS = false
 checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")
 checksum_list = read(checksums_file, String)
@@ -68,8 +69,8 @@ end
         end
         close!(ch)
         update!(ch, 0.0)
-        Random.seed!(1234)
-        u = rand(ndofs(dofhandler))
+        rng = StableRNG(1234)
+        u = rand(rng, ndofs(dofhandler))
         apply!(u, ch)
 
         dofhandlerfilename = "dofhandler-$(Ferrite.celltypes[celltype])"
@@ -91,9 +92,7 @@ end
 
 end # of testset
 
-if OVERWRITE_CHECKSUMS
-    close(csio)
-end
+close(csio)
 
 
 # right = Vec{2, Float64}(ntuple(x->1.5, dim))
