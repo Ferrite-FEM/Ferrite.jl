@@ -23,6 +23,8 @@ end
 projector = L2Projector(ip_f, mesh)
 dof_vals = project(projector, qp_vals, qr; project_to_nodes=false)
 
+points = [Vec((x, 0.52)) for x in range(0.0, 1.0, length=100)]
+
 ph = Ferrite.PointEvalHandler(projector.dh, [ip_f], points, [ip_g])
 vals = Ferrite.get_point_values(ph, dof_vals, projector)
 
