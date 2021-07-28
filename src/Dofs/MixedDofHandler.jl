@@ -406,7 +406,7 @@ function Ferrite.dof_range(fh::FieldHandler, field_name::Symbol)
     offset = Ferrite.field_offset(fh, field_name)
     field_interpolation = fh.fields[f].interpolation
     field_dim = fh.fields[f].dim
-    n_field_dofs = getnbasefunctions(field_interpolation) * field_dim
+    n_field_dofs = getnbasefunctions(field_interpolation)::Int * field_dim
     return (offset+1):(offset+n_field_dofs)
 end
 
