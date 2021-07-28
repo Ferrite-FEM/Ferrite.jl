@@ -105,41 +105,49 @@ function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler, u::Vector, suffix
     fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
 
     for name in fieldnames
-        @debug println("exporting field $(name)")
-        field_dim = getfielddim(dh, name)
-        space_dim = field_dim == 2 ? 3 : field_dim
-        data = fill(NaN, space_dim, getnnodes(dh.grid))  # set default value
-
-        for fh in dh.fieldhandlers
-            # check if this fh contains this field, otherwise continue to the next
-            field_pos = findfirst(i->i == name, getfieldnames(fh))
-            field_pos === nothing && continue
-
-            cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
-            offset = field_offset(fh, name)
-
-            for cellnum in cellnumbers
-                cell = dh.grid.cells[cellnum]
-                n = ndofs_per_cell(dh, cellnum)
-                eldofs = zeros(Int, n)
-                _celldofs = celldofs!(eldofs, dh, cellnum)
-                counter = 1
-
-                for node in cell.nodes
-                    for d in 1:field_dim
-                        data[d, node] = u[_celldofs[counter + offset]]
-                        @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
-                        counter += 1
-                    end
-                    if field_dim == 2
-                        # paraview requires 3D-data so pad with zero
-                        data[3, node] = 0
-                    end
-                end
-            end
-        end
+        data = reshape_to_nodes(dh, u, name)
         vtk_point_data(vtkfile, data, string(name, suffix))
     end
 
     return vtkfile
+end
+
+function reshape_to_nodes(dh::MixedDofHandler, u::Vector, fieldname::Symbol)
+
+    # make sure the field exists
+    fieldname ∈ Ferrite.getfieldnames(dh) || error("Field $fieldname not found.")
+
+    field_dim = getfielddim(dh, fieldname)
+    space_dim = field_dim == 2 ? 3 : field_dim
+    data = fill(NaN, space_dim, getnnodes(dh.grid))  # set default value
+
+    for fh in dh.fieldhandlers
+        # check if this fh contains this field, otherwise continue to the next
+        field_pos = findfirst(i->i == fieldname, getfieldnames(fh))
+        field_pos === nothing && continue
+
+        cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
+        offset = field_offset(fh, fieldname)
+
+        for cellnum in cellnumbers
+            cell = dh.grid.cells[cellnum]
+            n = ndofs_per_cell(dh, cellnum)
+            eldofs = zeros(Int, n)
+            _celldofs = celldofs!(eldofs, dh, cellnum)
+            counter = 1
+
+            for node in cell.nodes
+                for d in 1:field_dim
+                    data[d, node] = u[_celldofs[counter + offset]]
+                    @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
+                    counter += 1
+                end
+                if field_dim == 2
+                    # paraview requires 3D-data so pad with zero
+                    data[3, node] = 0
+                end
+            end
+        end
+    end
+    return data
 end
