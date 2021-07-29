@@ -275,24 +275,24 @@ function Ferrite.generate_grid(::Type{QuadraticHexahedron}, nel::NTuple{3,Int}, 
 
     # Cell faces
     cell_array = reshape(collect(1:nel_tot),(nel_x, nel_y, nel_z))
-    boundary = FaceIndex[[FaceIndex(cl, 1) for cl in cell_array[:,:,1][:]];
-                              [FaceIndex(cl, 2) for cl in cell_array[:,1,:][:]];
-                              [FaceIndex(cl, 3) for cl in cell_array[end,:,:][:]];
-                              [FaceIndex(cl, 4) for cl in cell_array[:,end,:][:]];
-                              [FaceIndex(cl, 5) for cl in cell_array[1,:,:][:]];
-                              [FaceIndex(cl, 6) for cl in cell_array[:,:,end][:]]]
+    boundary = Tuple{Int,Int}[[(cl, 1) for cl in cell_array[:,:,1][:]];
+                              [(cl, 2) for cl in cell_array[:,1,:][:]];
+                              [(cl, 3) for cl in cell_array[end,:,:][:]];
+                              [(cl, 4) for cl in cell_array[:,end,:][:]];
+                              [(cl, 5) for cl in cell_array[1,:,:][:]];
+                              [(cl, 6) for cl in cell_array[:,:,end][:]]]
 
     boundary_matrix = Ferrite.boundaries_to_sparse(boundary)
 
     # Cell face sets
     offset = 0
-    facesets = Dict{String,Set{FaceIndex}}()
-    facesets["bottom"] = Set{FaceIndex}(boundary[(1:length(cell_array[:,:,1][:]))   .+ offset]); offset += length(cell_array[:,:,1][:])
-    facesets["front"]  = Set{FaceIndex}(boundary[(1:length(cell_array[:,1,:][:]))   .+ offset]); offset += length(cell_array[:,1,:][:])
-    facesets["right"]  = Set{FaceIndex}(boundary[(1:length(cell_array[end,:,:][:])) .+ offset]); offset += length(cell_array[end,:,:][:])
-    facesets["back"]   = Set{FaceIndex}(boundary[(1:length(cell_array[:,end,:][:])) .+ offset]); offset += length(cell_array[:,end,:][:])
-    facesets["left"]   = Set{FaceIndex}(boundary[(1:length(cell_array[1,:,:][:]))   .+ offset]); offset += length(cell_array[1,:,:][:])
-    facesets["top"]    = Set{FaceIndex}(boundary[(1:length(cell_array[:,:,end][:])) .+ offset]); offset += length(cell_array[:,:,end][:])
+    facesets = Dict{String,Set{Tuple{Int,Int}}}()
+    facesets["bottom"] = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,:,1][:]))   .+ offset]); offset += length(cell_array[:,:,1][:])
+    facesets["front"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,1,:][:]))   .+ offset]); offset += length(cell_array[:,1,:][:])
+    facesets["right"]  = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[end,:,:][:])) .+ offset]); offset += length(cell_array[end,:,:][:])
+    facesets["back"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,end,:][:])) .+ offset]); offset += length(cell_array[:,end,:][:])
+    facesets["left"]   = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[1,:,:][:]))   .+ offset]); offset += length(cell_array[1,:,:][:])
+    facesets["top"]    = Set{Tuple{Int,Int}}(boundary[(1:length(cell_array[:,:,end][:])) .+ offset]); offset += length(cell_array[:,:,end][:])
 
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)   
 end

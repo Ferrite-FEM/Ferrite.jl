@@ -16,6 +16,7 @@ end
                             (Triangle,               2),
                             (QuadraticTriangle,      2),
                             (Hexahedron,             3),
+                            (QuadraticHexahedron,    3),
                             (Tetrahedron,            3))
 
         # create test grid, do some operations on it and then test

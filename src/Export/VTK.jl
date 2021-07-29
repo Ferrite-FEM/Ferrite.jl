@@ -8,6 +8,7 @@ cell_to_vtkcell(::Type{QuadraticTriangle}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
 cell_to_vtkcell(::Type{Cell{2,8,4}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
 
 cell_to_vtkcell(::Type{Hexahedron}) = VTKCellTypes.VTK_HEXAHEDRON
+cell_to_vtkcell(::Type{QuadraticHexahedron}) = VTKCellTypes.VTK_QUADRATIC_HEXAHEDRON
 cell_to_vtkcell(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
 cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 
