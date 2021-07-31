@@ -4,8 +4,8 @@ mesh = generate_grid(QuadraticQuadrilateral, (20, 20))
 f(x) = x[1]^2
 nodal_vals = [f(p.x) for p in mesh.nodes]
 
-ip_f = Lagrange{2,RefCube,2}()
-ip_g = Lagrange{2,RefCube,2}()
+ip_f = Lagrange{2,RefCube,2}() # function interpolation
+ip_g = Lagrange{2,RefCube,2}() # geometry interpolation
 
 # compute values in quadrature points
 qr = QuadratureRule{2, RefCube}(3) # exactly approximate quadratic field
@@ -23,36 +23,43 @@ end
 projector = L2Projector(ip_f, mesh)
 dof_vals = project(projector, qp_vals, qr; project_to_nodes=false)
 
+# points where we want to retrieve field values
 points = [Vec((x, 0.52)) for x in range(0.0, 1.0, length=100)]
 
+# set up PointEvalHandler and retrieve values
 ph = Ferrite.PointEvalHandler(projector.dh, [ip_f], points, [ip_g])
 vals = Ferrite.get_point_values(ph, dof_vals, projector)
 
-f.(points) ≈ vals
+@test f.(points) ≈ vals
 
-nodal_vals = project(projector, qp_vals, qr; project_to_nodes=true)
+
+
 
 # superparametric approximation
 mesh = generate_grid(QuadraticQuadrilateral, (20, 20))
 f(x) = x[1]^2
 nodal_vals = [f(p.x) for p in mesh.nodes]
-ip_f = Lagrange{2,RefCube,2}()
-ip_g = Lagrange{2,RefCube,1}()
+ip_f = Lagrange{2,RefCube,2}() # function interpolation
+ip_g = Lagrange{2,RefCube,1}() # geometry interpolation
 
+# construct MixedDofHandler
 dh = MixedDofHandler(mesh)
 field = Field(:u, ip_f, 2) # the interpolation here is unused
 fh = FieldHandler([field], Set{Int}(1:getncells(mesh)))
 push!(dh, fh)
 close!(dh)
 
+# points where we want to retrieve field values
 points = [Vec((x, 0.52)) for x in range(0.0, 1.0, length=100)]
 
+# set up PointEvalHandler and retrieve values
 ph = Ferrite.PointEvalHandler(dh, [ip_f], points, [ip_g])
-
 vals = Ferrite.get_point_values(ph, nodal_vals)
 
 # can recover a quadratic field by a quadratic approximation
-f.(points) ≈ vals
+@test f.(points) ≈ vals
+
+
 
 
 ## Mixed grid where not all cells have the same fields 
