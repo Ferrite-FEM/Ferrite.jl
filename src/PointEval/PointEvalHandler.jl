@@ -4,6 +4,8 @@ struct PointEvalHandler{DH<:AbstractDofHandler,dim,T<:Real}
     cellvalues::Vector{PointScalarValues{dim,T}}
 end
 
+# TODO write show method for PointEvalHandler
+
 # TODO rewrite this like for MixedDofHandler
 function PointEvalHandler(dh::AbstractDofHandler, func_interpolations::Vector{<:Interpolation{dim}},
     points::AbstractVector{Vec{dim, T}}, geom_interpolations::Vector{<:Interpolation{dim}}=func_interpolations;
@@ -90,7 +92,11 @@ end
 function _check_isoparametric_boundaries(::Type{RefCube}, x_local::Vec{dim}) where {dim}
     inside = true
     for x in x_local
-        x >= -1.0 && x<= 1.0 ? nothing : inside = false
+        if x >= -1.0 && x<= 1.0 || abs(x) ≈ 1.0 # might happen on the boundary of the cell
+             nothing
+        else
+            inside = false
+        end
     end
     return inside
 end
