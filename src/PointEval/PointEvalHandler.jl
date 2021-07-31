@@ -18,7 +18,7 @@ function PointEvalHandler(dh::DH, func_interpolations::Vector{<:Interpolation{di
     pvs = Vector{PointScalarValues{dim, T}}(undef, length(points))
     node_cell_dicts = [_get_node_cell_map(grid) for field_idx in 1:nfields(dh)]
 
-    _setup_pointscalarvalues!(cells, pvs, node_cell_dicts, dh, points, nearest_nodes)
+    _setup_pointscalarvalues!(cells, pvs, node_cell_dicts, dh, points, nearest_nodes, func_interpolations, geom_interpolations)
     return PointEvalHandler(dh, cells, pvs)
 end
 
