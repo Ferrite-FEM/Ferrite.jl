@@ -129,3 +129,13 @@ close!(dh)
 nodal_vals = project(projector, qp_vals_quads, qr)
 peh = PointEvalHandler(dh, [ip_quad, ip_tri], points)
 vals = Ferrite.get_point_values(peh, nodal_vals)
+
+mesh = generate_grid(QuadraticQuadrilateral, (20, 20))
+dh = DofHandler(mesh)
+push!(dh,:u,2)
+close!(dh)
+points = [Vec((x, 0.52)) for x in range(0.0, 1.0, length=100)]
+peh = Ferrite.PointEvalHandler(dh,[ip_f],points)
+f(x) = x[1]^2
+nodal_vals = [f(p.x) for p in mesh.nodes]
+vals = Ferrite.get_point_values(peh, nodal_vals)

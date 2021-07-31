@@ -1,13 +1,13 @@
-struct PointEvalHandler{dim, C, T, U}
-    dh::Union{MixedDofHandler{dim, C, T}, DofHandler{dim, C, T}}
+struct PointEvalHandler{DH<:AbstractDofHandler,dim,T<:Real}
+    dh::DH
     cells::Vector{Union{Missing, Int}}
-    cellvalues::Vector{U}
+    cellvalues::Vector{PointScalarValues{dim,T}}
 end
 
 # TODO rewrite this like for MixedDofHandler
-function PointEvalHandler(dh::DH, func_interpolations::Vector{<:Interpolation{dim}},
+function PointEvalHandler(dh::AbstractDofHandler, func_interpolations::Vector{<:Interpolation{dim}},
     points::AbstractVector{Vec{dim, T}}, geom_interpolations::Vector{<:Interpolation{dim}}=func_interpolations;
-    ) where {dim, T<:Real, DH<:AbstractDofHandler}
+    ) where {dim, T<:Real}
 
     grid = dh.grid
     # set up tree structure for finding nearest nodes to points
