@@ -173,7 +173,7 @@ function get_point_values(ph::PointEvalHandler, nodal_values::Vector{T}) where {
 end
 
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
-function get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, fieldname::Symbol) where T
+function get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, fieldname::Symbol) where {T,DH<:MixedDofHandler}
 
     length(dof_values) == ndofs(ph.dh) || error("You must supply nodal values for all $(ndofs(ph.dh)) dofs.")
 
@@ -194,6 +194,30 @@ function get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, fieldname
                 field_dofs = cell_dofs[dofrange]
                 vals[i] = function_value(ph.cellvalues[i], 1, dof_values[field_dofs])
             end
+        end
+    end
+    return vals
+end
+
+function get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, fieldname::Symbol) where {T,DH<:DofHandler}
+
+    length(dof_values) == ndofs(ph.dh) || error("You must supply nodal values for all $(ndofs(ph.dh)) dofs.")
+
+    npoints = length(ph.cells)
+    vals = Vector{T}(undef, npoints)
+    for i in eachindex(ph.cells)
+        # set NaN values if no cell was found for a point
+        if ismissing(ph.cells[i])
+            vals[i] = first(dof_values)*NaN
+            continue
+        end
+        cell_dofs = celldofs(ph.dh, ph.cells[i])
+        #TODO damn, now we need to find the fieldhandler again --> should be stored
+        # want to be able to use this no matter if dof_values are coming from L2Projector or from simulation
+        for field in getfieldnames(ph.dh)
+            dofrange = dof_range(ph.dh, field)
+            field_dofs = cell_dofs[dofrange]
+            vals[i] = function_value(ph.cellvalues[i], 1, dof_values[field_dofs])
         end
     end
     return vals
