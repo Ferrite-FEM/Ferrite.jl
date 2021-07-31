@@ -71,9 +71,9 @@ function PointEvalHandler(dh::MixedDofHandler{dim, T}, func_interpolations::Vect
 
                 cell_coords = getcoordinates(grid, cell)
                 # TODO: let point_incell return Bool and Coordinate, compute one, put if condition only on bool - toss coordinate if false
-                if point_in_cell(geom_interpol, cell_coords, points[point_idx])
+                found_coord, local_coordinate = point_in_cell(geom_interpol, cell_coords, points[point_idx])
+                if found_coord
                     cell_found = true
-                    conv, local_coordinate = find_local_coordinate(geom_interpol, cell_coords, points[point_idx])
                     # retrieve RefShape for QuadratureRule
                     refshape = getrefshape(func_interpol)
                     point_qr = QuadratureRule{dim, refshape, T}([1], [local_coordinate])
@@ -94,9 +94,9 @@ end
 function point_in_cell(geom_interpol::Interpolation{dim,shape,order}, cell_coordinates, global_coordinate) where {dim, shape, order}
     converged, x_local = find_local_coordinate(geom_interpol, cell_coordinates, global_coordinate)
     if converged
-        return _check_isoparametric_boundaries(shape, x_local)
+        return _check_isoparametric_boundaries(shape, x_local), x_local
     else
-        return false
+        return false, x_local
     end
 end
 
