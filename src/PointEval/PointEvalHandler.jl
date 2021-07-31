@@ -203,8 +203,16 @@ function get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, field
 
     length(dof_values) == ndofs(ph.dh) || error("You must supply nodal values for all $(ndofs(ph.dh)) dofs.")
 
+    fielddim = getfielddim(ph.dh, fieldname)
+
     npoints = length(ph.cells)
-    vals = Vector{T}(undef, npoints)
+    # for a scalar field return a Vector of Scalars, for a vector field return a Vector of Vecs
+    if fielddim == 1
+        vals = Vector{T}(undef, npoints)
+    else
+        vals = Vector{Vec{fielddim, T}}(undef, npoints)
+    end
+    
     for i in eachindex(ph.cells)
         # set NaN values if no cell was found for a point
         if ismissing(ph.cells[i])
@@ -212,13 +220,15 @@ function get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, field
             continue
         end
         cell_dofs = celldofs(ph.dh, ph.cells[i])
-        #TODO damn, now we need to find the fieldhandler again --> should be stored
-        # want to be able to use this no matter if dof_values are coming from L2Projector or from simulation
-        for field in getfieldnames(ph.dh)
-            dofrange = dof_range(ph.dh, field)
-            field_dofs = cell_dofs[dofrange]
-            vals[i] = function_value(ph.cellvalues[i], 1, dof_values[field_dofs])
+        dofrange = dof_range(ph.dh, fieldname)
+        field_dofs = cell_dofs[dofrange]
+        # reshape field_dofs so that they work with ScalarValues
+        if fielddim == 1
+            dof_values_reshaped = dof_values[field_dofs]
+        else
+            dof_values_reshaped = reinterpret(Vec{fielddim, T}, dof_values[field_dofs])
         end
+        vals[i] = function_value(ph.cellvalues[i], 1, dof_values_reshaped)
     end
     return vals
 end
