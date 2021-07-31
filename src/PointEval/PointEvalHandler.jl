@@ -5,42 +5,22 @@ struct PointEvalHandler{dim, C, T, U}
 end
 
 # TODO rewrite this like for MixedDofHandler
-# function PointEvalHandler(dh::DofHandler{dim, C, T}, interpolation::Interpolation{dim, S}, points::AbstractVector{Vec{dim, T}}) where {dim, C, S, T<:Real}
-#     grid = dh.grid
-#     dummy_cell_itp_qr = QuadratureRule{dim, S}(1)
-#     dummy_face_qr = QuadratureRule{dim-1, S}(1)
-#     cellvalues = CellScalarValues(dummy_cell_itp_qr, interpolation)
-#     facevalues = FaceScalarValues(dummy_face_qr, interpolation)
-#     points_array = [(i, p) for (i, p) in enumerate(points)]
-#     cells_of_points = Vector{Int}(undef, length(points))
-#     cellvalues_of_points = Vector{typeof(cellvalues)}(undef, length(points))
+function PointEvalHandler(dh::DH, func_interpolations::Vector{<:Interpolation{dim}},
+    points::AbstractVector{Vec{dim, T}}, geom_interpolations::Vector{<:Interpolation{dim}}=func_interpolations;
+    ) where {dim, T<:Real, DH<:AbstractDofHandler}
 
-#     for cell in 1:length(grid.cells)
-#         cell_coords = getcoordinates(grid, cell)
-#         face_nodes = faces(grid.cells[cell])
-#         nodes_on_faces = [grid.nodes[fn[1]] for fn in face_nodes]
-#         deletions = []
-#         for (j, ipoint) in enumerate(points_array)
-#             i, point = ipoint
-#             if is_point_inside_cell(cell_coords, point, facevalues, nodes_on_faces)
-#                 push!(deletions, j)
-#                 local_coordinate = find_local_coordinate(interpolation, cell_coords, point)
-#                 point_qr = QuadratureRule{2, S, T}([1], [local_coordinate])
-#                 cells_of_points[i] = cell
-#                 # since these are unique for each point to evaluate, we need to create a cellvalue for each point anyway, so we might as well do it all at once
-#                 cellvalues = CellScalarValues(point_qr, interpolation)
-#                 reinit!(cellvalues, cell_coords)
-#                 cellvalues_of_points[i] = cellvalues
-#             end
-#         end
-#         deleteat!(points_array, deletions)
-#     end
-#     if length(points_array) > 0
-#         println(points_array)
-#         error("Did not find cells for all points")
-#     end
-#     return PointEvalHandler(dh, cells_of_points, cellvalues_of_points)
-# end
+    grid = dh.grid
+    # set up tree structure for finding nearest nodes to points
+    kdtree = KDTree([node.x for node in grid.nodes])
+    nearest_nodes, dists = knn(kdtree, points, 3, true) #TODO 3 is a random value, it shouldn't matter because likely the nearest node is the one we want
+
+    cells = Vector{Union{Missing, Int}}(undef, length(points))
+    pvs = Vector{PointScalarValues{dim, T}}(undef, length(points))
+    node_cell_dicts = [_get_node_cell_map(grid) for field_idx in 1:nfields(dh)]
+
+    _setup_pointscalarvalues!(cells, pvs, node_cell_dicts, dh, points, nearest_nodes)
+    return PointEvalHandler(dh, cells, pvs)
+end
 
 # function interpolations need to be explicitely given, because we don't know which field we are looking for.
 # Only one field at a time can be interpolated, so one function interpolation per FieldHandler (= per cellset) is sufficient.
@@ -58,18 +38,25 @@ function PointEvalHandler(dh::MixedDofHandler{dim, T}, func_interpolations::Vect
     pvs = Vector{PointScalarValues{dim, T}}(undef, length(points))
     node_cell_dicts = [_get_node_cell_map(grid, fh.cellset) for fh in dh.fieldhandlers]
 
+    _setup_pointscalarvalues!(cells, pvs, node_cell_dicts, dh, points, nearest_nodes, func_interpolations, geom_interpolations)
+   return PointEvalHandler(dh, cells, pvs)
+end
+
+function _setup_pointscalarvalues!(cells::Vector{Union{Missing,Int}}, pvs::Vector{PointScalarValues{dim,T}},
+     node_cell_dicts::Vector{Dict{Int, Vector{Int}}}, dh, points::AbstractVector{Vec{dim,T}}, nearest_nodes,
+     func_interpolations::Vector{<:Interpolation{dim}}, geom_interpolations::Vector{<:Interpolation{dim}}) where {dim, T<:Real}
     for point_idx in 1:length(points)
         cell_found = false
-        for (fh_idx, fh) in enumerate(dh.fieldhandlers)
-            node_cell_dict = node_cell_dicts[fh_idx]
-            func_interpol = func_interpolations[fh_idx]
-            geom_interpol = geom_interpolations[fh_idx]
+        for field_idx in 1:nfields(dh)
+            node_cell_dict = node_cell_dicts[field_idx]
+            func_interpol = func_interpolations[field_idx]
+            geom_interpol = geom_interpolations[field_idx]
             # loop over points
             for node in nearest_nodes[point_idx], cell in get(node_cell_dict, node, [0])
                 # if node is not part of the fieldhandler, try the next node
                 cell == 0 ? continue : nothing
 
-                cell_coords = getcoordinates(grid, cell)
+                cell_coords = getcoordinates(dh.grid, cell)
                 # TODO: let point_incell return Bool and Coordinate, compute one, put if condition only on bool - toss coordinate if false
                 found_coord, local_coordinate = point_in_cell(geom_interpol, cell_coords, points[point_idx])
                 if found_coord
@@ -87,7 +74,6 @@ function PointEvalHandler(dh::MixedDofHandler{dim, T}, func_interpolations::Vect
         end
         !cell_found && (cells[point_idx] = missing) #error("No cell found for point $(points[point_idx]), index $point_idx.")
     end
-    return PointEvalHandler(dh, cells, pvs)
 end
 
 # check if point is inside a cell based on physical coordinate
