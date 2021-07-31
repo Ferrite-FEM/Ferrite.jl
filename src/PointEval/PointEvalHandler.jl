@@ -119,6 +119,7 @@ function _check_isoparametric_boundaries(::Type{RefTetrahedron}, x_local::Vec{di
     return inside
 end
 
+# TODO: should we make iteration params optional keyword arguments?
 function find_local_coordinate(interpolation, cell_coordinates, global_coordinate)
     """
     currently copied verbatim from https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
@@ -167,9 +168,10 @@ function _get_node_cell_map(grid::Grid, cellset::Set{Int}=Set{Int64}(1:getncells
 end
 
 # values in nodal order
-# shouldn't be used for sub/superparametric approximations
+# can't be used for sub/superparametric approximations
 function get_point_values(ph::PointEvalHandler, nodal_values::Vector{T}) where {T<:Union{Real, AbstractTensor}}
     # TODO check for sub/superparametric approximations
+
     # if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
     #     @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     # end

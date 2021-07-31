@@ -25,3 +25,5 @@ end
 
 # allow to use function_value with any
 Base.@pure _valuetype(::PointScalarValues{dim}, ::Vector{T}) where {dim, T<:AbstractTensor} = T
+
+# TODO: need a show method for PointScalarValues
