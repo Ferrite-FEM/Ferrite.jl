@@ -8,6 +8,7 @@ include("generate.jl")
 GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "heat_equation.md",
     "l2_projection.md",
+    "point_evaluation.md",
     "helmholtz.md",
     "incompressible_elasticity.md",
     "hyperelasticity.md",
