@@ -8,9 +8,9 @@ for interpolation in (Lagrange{1, RefCube, 1}(),
                       Lagrange{2, RefTetrahedron, 2}(),
                       Lagrange{3, RefCube, 1}(),
                       Serendipity{2, RefCube, 2}(),
+                      Serendipity{3, RefCube, 2}(),
                       Lagrange{3, RefTetrahedron, 1}(),
-                      Lagrange{3, RefTetrahedron, 2}(),
-                      Lagrange{3, RefCube, 2}())
+                      Lagrange{3, RefTetrahedron, 2}(),)
 
     # Test of utility functions
     ndim = Ferrite.getdim(interpolation)
