@@ -299,7 +299,8 @@ const celltypes = Dict{DataType, String}(Cell{1,2,2}  => "Line",
                                          Cell{2,9,4}  => "QuadraticQuadrilateral",
                                          Cell{3,4,4}  => "Tetrahedron",
                                          Cell{3,10,4} => "QuadraticTetrahedron",
-                                         Cell{3,8,6}  => "Hexahedron")
+                                         Cell{3,8,6}  => "Hexahedron",
+                                         Cell{3,20,6}  => "Cell{3,20,6}")
 
 # Functions to uniquely identify vertices, edges and faces, used when distributing
 # dofs over a mesh. For this we can ignore the nodes on edged, faces and inside cells,
