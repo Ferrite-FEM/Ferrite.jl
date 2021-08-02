@@ -51,6 +51,9 @@ include(joinpath("Grid", "grid.jl"))
 include(joinpath("Grid", "grid_generators.jl"))
 include(joinpath("Grid", "coloring.jl"))
 
+# Adaptiviy
+include(joinpath("Adaptivity", "AdaptiveCells.jl"))
+
 # Dofs
 include(joinpath("Dofs", "DofHandler.jl"))
 include(joinpath("Dofs", "MixedDofHandler.jl"))

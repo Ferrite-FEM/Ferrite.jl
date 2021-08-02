@@ -6,32 +6,15 @@ struct Octant{dim,N,M} <: AbstractAdaptiveTree{dim,N,M}
 end
 
 # return the two adjacent faces $f_i$ adjacent to edge `edge`
-function _face(edge::Int)
-    #maybe @view?
-    return 𝒮[edge, :]
-end
-
+_face(edge::Int) = 𝒮[edge, :]
 # return the `i`-th adjacent face fᵢ to edge `edge`
-function _face(edge::Int, i::Int)
-    return 𝒮[edge, i]
-end
-
+_face(edge::Int, i::Int) = 𝒮[edge, i]
 # return two face corners ξᵢ of the face `face` along edge `edge`
-function _face_corners(edge::Int, face::Int) 
-    #maybe @view
-    return 𝒯[edge,face] 
-end
-
+_face_edge_corners(edge::Int, face::Int) = 𝒯[edge,face] 
 # return the two `edge` corners cᵢ
-function _edge_corners(edge::Int)
-    #maybe @view
-    return 𝒰[edge,:]
-end
-
+_edge_corners(edge::Int) = 𝒰[edge,:]
 # return the `i`-th edge corner of `edge`
-function _edge_corners(edge::Int,i::Int)
-    return 𝒰[edge,i]
-end
+_edge_corners(edge::Int,i::Int) = 𝒰[edge,i]
 
 # map given `face` and `ξ` to corner `c`. Need to provide dim for different lookup 
 function _face_corners(dim::Int,face::Int,ξ::Int)
@@ -55,10 +38,7 @@ function _face_corners(dim::Int,face::Int)
 end
 
 # finds face corner ξ′ in f′ for two associated faces f,f′ in {1,...,6} and their orientation r in {1,...,4}}
-function _neighbor_corner(f,f′,r,ξ)
-    return 𝒫[𝒬[ℛ[f,f′],r],ξ]
-end
-
+_neighbor_corner(f::Int,f′::Int,r::Int,ξ::Int) = 𝒫[𝒬[ℛ[f,f′],r],ξ]
 
 ##### OCTANT LOOK UP TABLES ######
 const 𝒮 = [3  5
