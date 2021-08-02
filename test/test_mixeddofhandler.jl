@@ -443,9 +443,8 @@ end
 
 # regression tests for https://github.com/KristofferC/JuAFEM.jl/issues/315 
 function test_subparametric_quad()
+    #linear geometry
     grid = generate_grid(Quadrilateral, (1,1))
-
-    ip_geom = Lagrange{2,RefCube,1}()
     ip      = Lagrange{2,RefCube,2}()
     
     field = Field(:u, ip, 2)
@@ -460,14 +459,15 @@ function test_subparametric_quad()
     add!(ch, dbc1)
     close!(ch)
     update!(ch, 1.0)
-    @test getnbasefunctions(JuAFEM.getfieldinterpolation(dh,1)) == 9 # algebraic nbasefunctions
+    @test getnbasefunctions(Ferrite.getfieldinterpolation(dh,1)) == 9 # algebraic nbasefunctions
+    @test celldofs(dh, 1) == [i for i in 1:18]
 end
 
 function test_subparametric_triangle()
+    #linear geometry
     grid = generate_grid(Triangle, (1,1))
 
-    ip_geom = Lagrange{2,RefTetrahedron,1}()
-    ip      = Lagrange{2,RefTetrahedron,2}()
+    ip = Lagrange{2,RefTetrahedron,2}()
     
     field = Field(:u, ip, 2)
     fh = FieldHandler([field], Set(1:getncells(grid)))
@@ -481,7 +481,8 @@ function test_subparametric_triangle()
     add!(ch, dbc1)
     close!(ch)
     update!(ch, 1.0)
-    @test getnbasefunctions(JuAFEM.getfieldinterpolation(dh,1)) == 6 # algebraic nbasefunctions
+    @test getnbasefunctions(Ferrite.getfieldinterpolation(dh,1)) == 6 # algebraic nbasefunctions
+    @test celldofs(dh, 1) == [i for i in 1:12]
 end
 
 @testset "MixedDofHandler" begin
