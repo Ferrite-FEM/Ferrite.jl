@@ -1,7 +1,7 @@
 struct PointEvalHandler{DH<:AbstractDofHandler,dim,T<:Real}
     dh::DH
     cells::Vector{Union{Missing, Int}}
-    cellvalues::Vector{PointScalarValues{dim,T}}
+    cellvalues::Vector{PointScalarValues{dim,T}} # TODO: store local coordinates instead of PointScalarValues (can we toss the PointScalarValues in that case?)
 end
 
 # TODO write show method for PointEvalHandler
