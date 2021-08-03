@@ -23,6 +23,12 @@ function PointScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func
     PointScalarValues{dim,T,shape}(N)
 end
 
+# PointScalarValues only have one quadrature point anyways
+function PointScalarValues(coord::Vec{dim,T}, ip::Interpolation{dim, refshape}) where {dim,refshape,T}
+    qr = QuadratureRule{dim,refshape,T}([one(T)], [coord])
+    return PointScalarValues(qr, ip)
+end
+
 # allow to use function_value with any
 Base.@pure _valuetype(::PointScalarValues{dim}, ::Vector{T}) where {dim, T<:AbstractTensor} = T
 
