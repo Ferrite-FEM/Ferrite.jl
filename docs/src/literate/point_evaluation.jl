@@ -21,7 +21,7 @@ include("l2_projection.jl");
 points = [Vec((x, 0.5)) for x in range(-1.0, 1.0, length=101)];
 
 # First, we need to generate a `PointEvalHandler`
-ph = PointEvalHandler(dh, [ip], points);
+ph = PointEvalHandler(dh, points);
 
 # We can extract the heat fluxes, which after the L2-Projection are stored in `q_nodes` in nodal order, in the given points.
 q_points = Ferrite.get_point_values(ph, q_nodes);
