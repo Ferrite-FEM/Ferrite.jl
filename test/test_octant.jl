@@ -33,6 +33,18 @@
     test_ξs = (1,2,3,4)
     @test Ferrite._neighbor_corner.((1,),(2,),(1,),test_ξs) == test_ξs
     #Test Figure 3b) 
-    @test Ferrite._neighbor_corner.((3,),(5,),(3,),test_ξs) == (Ferrite.𝒫[5,:]...,)
+    @test Ferrite._neighbor_corner.((3,),(5,),(3,),test_ξs) == (Ferrite.𝒫[5,:]...,)    
+end
+
+@testset "Octant Encoding" begin
+    # Tests from Figure 3a) and 3b) of Burstedde et al
+    o = Ferrite.Octant{3,8,6}(2,(1,5,3))
+    b = 3
+    @test Ferrite.child_id(o,b) == 5
+    @test Ferrite.child_id(Ferrite.parent(o,b),b) == 3
+    #@test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.Octant{3,8,6}(0,(1,1,1)) FIXME
+    o = Ferrite.Octant{3,8,6}(2,(3,3,1))
+    #@test Ferrite.child_id(o,b) == 3 or 5? FIXME
+    @test Ferrite.child_id(Ferrite.parent(o,b),b) == 1 
     
 end

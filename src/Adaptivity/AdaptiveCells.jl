@@ -1,8 +1,37 @@
 abstract type AbstractAdaptiveTree{dim,N,M} <: AbstractCell{dim,N,M} end
+abstract type AbstractAdaptiveCell{dim,N,M} <: AbstractCell{dim,N,M} end
+
+struct Octant{dim, N, M}  <: AbstractAdaptiveCell{dim,8,6}
+    #Refinement level
+    l::Int
+    #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)}
+    xyz::NTuple{dim,Int} 
+end
 
 # Follow z order, x before y before z for faces, edges and corners
-struct Octant{dim,N,M} <: AbstractAdaptiveTree{dim,N,M}
-    nodes::Vector{Node} 
+struct Octree{dim,N,M} <: AbstractAdaptiveTree{dim,N,M}
+    leaves::Vector{Octant}
+    #maximum refinement level 
+    b::Int
+end
+
+function child_id(octant::Octant{3},b::Int)
+    i = 0
+    h = 2^(b - octant.l)
+    x = octant.xyz[1]; y = octant.xyz[2]; z = octant.xyz[3]
+    i = i | ((x & h) != 0 ? 1 : 0)
+    i = i | ((y & h) != 0 ? 2 : 0)
+    i = i | ((z & h) != 0 ? 4 : 0)
+    return i+1
+end
+
+function parent(octant::Octant{3,N,M}, b::Int) where {N,M}
+    h = 2^(b - octant.l)
+    l = octant.l - 1
+    px = octant.xyz[1] & ~h
+    py = octant.xyz[2] & ~h
+    pz = octant.xyz[3] & ~h
+    return Octant{3,N,M}(l,(px,py,pz) .+ 1)
 end
 
 # return the two adjacent faces $f_i$ adjacent to edge `edge`
@@ -15,6 +44,8 @@ _face_edge_corners(edge::Int, face::Int) = 𝒯[edge,face]
 _edge_corners(edge::Int) = 𝒰[edge,:]
 # return the `i`-th edge corner of `edge`
 _edge_corners(edge::Int,i::Int) = 𝒰[edge,i]
+# finds face corner ξ′ in f′ for two associated faces f,f′ in {1,...,6} and their orientation r in {1,...,4}}
+_neighbor_corner(f::Int,f′::Int,r::Int,ξ::Int) = 𝒫[𝒬[ℛ[f,f′],r],ξ]
 
 # map given `face` and `ξ` to corner `c`. Need to provide dim for different lookup 
 function _face_corners(dim::Int,face::Int,ξ::Int)
@@ -36,9 +67,6 @@ function _face_corners(dim::Int,face::Int)
         error("No corner-lookup table available")
     end
 end
-
-# finds face corner ξ′ in f′ for two associated faces f,f′ in {1,...,6} and their orientation r in {1,...,4}}
-_neighbor_corner(f::Int,f′::Int,r::Int,ξ::Int) = 𝒫[𝒬[ℛ[f,f′],r],ξ]
 
 ##### OCTANT LOOK UP TABLES ######
 const 𝒮 = [3  5
