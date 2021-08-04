@@ -48,7 +48,7 @@ struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape,FI,GI} <: FaceVal
     normals::Vector{Vec{dim,T}}
     M::Array{T,3}
     dMdξ::Array{Vec{dim,T},3}
-    qr_weights::Vector{T}
+    quad_rule::QuadratureRule
     current_face::ScalarWrapper{Int}
     func_interp::FI
     geo_interp::GI
@@ -95,7 +95,7 @@ function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
 
     detJdV = fill(T(NaN), n_qpoints, n_faces)
 
-    FaceScalarValues{dim,T,shape,typeof(func_interp),typeof(geo_interp)}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0), func_interp, geo_interp)
+    FaceScalarValues{dim,T,shape,typeof(func_interp),typeof(geo_interp)}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule, ScalarWrapper(0), func_interp, geo_interp)
 end
 
 # FaceVectorValues
@@ -107,7 +107,7 @@ struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,FI,GI,M} <: FaceV
     normals::Vector{Vec{dim,T}}
     M::Array{T,3}
     dMdξ::Array{Vec{dim,T},3}
-    qr_weights::Vector{T}
+    quad_rule::QuadratureRule
     current_face::ScalarWrapper{Int}
     func_interp::FI
     geo_interp::GI
@@ -165,7 +165,7 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
     detJdV = fill(T(NaN), n_qpoints, n_faces)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    FaceVectorValues{dim,T,shape,typeof(func_interp),typeof(geo_interp),MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0), func_interp, geo_interp)
+    FaceVectorValues{dim,T,shape,typeof(func_interp),typeof(geo_interp),MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule, ScalarWrapper(0), func_interp, geo_interp)
 end
 
 function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) where {dim,T}
@@ -176,8 +176,8 @@ function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) 
     fv.current_face[] = face
     cb = getcurrentface(fv)
 
-    @inbounds for i in 1:length(fv.qr_weights)
-        w = fv.qr_weights[i]
+    @inbounds for i in 1:length(fv.quad_rule.weights)
+        w = fv.quad_rule.weights[i]
         fefv_J = zero(Tensor{2,dim})
         for j in 1:n_geom_basefuncs
             fefv_J += x[j] ⊗ fv.dMdξ[j, i, cb]
