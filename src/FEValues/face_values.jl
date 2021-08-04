@@ -211,23 +211,28 @@ Return the normal at the quadrature point `qp` for the active face of the
 """
 getnormal(fv::FaceValues, qp::Int) = fv.normals[qp]
 
-# like FaceScalarValues but contains only the parts needed
-# to calculate the x-coordinate for the dof locations.
+"""
+    BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}})
+
+`BCValues` stores the shape values at all faces/edges/vertices (depending on `boundary_type`) for the geomatric interpolation (`geom_interpol`), 
+for each dof-position determined by the `func_interpol`. Used mainly by the `ConstrainHandler`.
+"""
 struct BCValues{T}
     M::Array{T,3}
     current_face::ScalarWrapper{Int}
 end
 
-BCValues(func_interp::Interpolation, geo_interp::Interpolation) =
-    BCValues(Float64, func_interp, geo_interp)
+BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex} = Ferrite.FaceIndex) =
+    BCValues(Float64, func_interpol, geom_interpol, boundary_type)
 
-function BCValues(::Type{T}, func_interp::Interpolation{dim,refshape}, geo_interp::Interpolation{dim,refshape}) where {T,dim,refshape}
+function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_interpol::Interpolation{dim,refshape}, boundary_type::Type{<:BoundaryIndex} = Ferrite.FaceIndex) where {T,dim,refshape}
     # set up quadrature rules for each face with dof-positions
     # (determined by func_interp) as the quadrature points
-    interpolation_coords = reference_coordinates(func_interp)
+    interpolation_coords = reference_coordinates(func_interpol)
 
     qrs = QuadratureRule{dim,refshape,T}[]
-    for face in faces(func_interp)
+    faces = boundaryfunction(boundary_type) # faces, edges or vertices
+    for face in faces(func_interpol)
         dofcoords = Vec{dim,T}[]
         for facedof in face
             push!(dofcoords, interpolation_coords[facedof])
@@ -238,12 +243,12 @@ function BCValues(::Type{T}, func_interp::Interpolation{dim,refshape}, geo_inter
 
     n_qpoints = length(getweights(qrs[1])) # assume same in all
     n_faces = length(qrs)
-    n_geom_basefuncs = getnbasefunctions(geo_interp)
+    n_geom_basefuncs = getnbasefunctions(geom_interpol)
     M =    fill(zero(T)           * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
 
     for face in 1:n_faces, (qp, ξ) in enumerate(qrs[face].points)
         for i in 1:n_geom_basefuncs
-            M[i, qp, face] = value(geo_interp, i, ξ)
+            M[i, qp, face] = value(geom_interpol, i, ξ)
         end
     end
 

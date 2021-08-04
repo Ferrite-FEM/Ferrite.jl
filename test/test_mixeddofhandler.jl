@@ -406,6 +406,35 @@ function test_element_order()
 
 end
 
+function test_field_on_subdomain()
+    grid = get_2d_grid() # cell 1: quad, cell2: triangle
+    dh = MixedDofHandler(grid)
+
+    # assume two fields: a scalar field :s and a vector field :v
+    # :v lives on both cells, :s lives only on the triangle
+    ip_tri = Lagrange{2,RefTetrahedron,1}()
+    ip_quad = Lagrange{2,RefCube,1}()
+    v_tri = Field(:v, ip_tri, 2)
+    v_quad = Field(:v, ip_quad, 2)
+    s = Field(:s, ip_tri, 1)
+
+    push!(dh, FieldHandler([v_quad], Set((1,))))
+    push!(dh, FieldHandler([v_tri, s], Set((2,))))
+
+    close!(dh)
+
+    # retrieve field dimensions
+    @test Ferrite.getfielddim(dh, :v) == 2
+    @test Ferrite.getfielddim(dh, :s) ==1
+
+    # find field in FieldHandler
+    @test Ferrite.find_field(dh.fieldhandlers[1], :v) == 1
+    @test Ferrite.find_field(dh.fieldhandlers[2], :v) == 1
+    @test Ferrite.find_field(dh.fieldhandlers[2], :s) == 2
+    @test_throws ErrorException Ferrite.find_field(dh.fieldhandlers[1], :s)
+end
+
+
 function test_mixed_grid_show()
     grid = get_2d_grid()
     str = sprint(show, MIME("text/plain"), grid)
@@ -429,5 +458,6 @@ end
     test_3d_mixed_field_mixed_celltypes();
     test_2_element_heat_eq();
     test_element_order();
+    test_field_on_subdomain();
     test_mixed_grid_show()
 end
