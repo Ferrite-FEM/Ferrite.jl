@@ -20,7 +20,7 @@ end
 #   children are numbered from 0 for the front lower left child, 
 #   to 1 for the front lower right child, to 2 for the back lower left, and so on, with
 #   4, . . . , 7 being the four children on top of the children 0, . . . , 3.
-# shift by 1 due to julia 1 based indexing 
+# shifted by 1 due to julia 1 based indexing 
 function child_id(octant::Octant{3},b::UInt8)
     i = 0x01
     h = 0x02^(b - octant.l)
