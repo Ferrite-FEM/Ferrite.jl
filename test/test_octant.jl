@@ -39,12 +39,13 @@ end
 @testset "Octant Encoding" begin
     # Tests from Figure 3a) and 3b) of Burstedde et al
     o = Ferrite.Octant{3,8,6}(2,(1,5,3))
-    b = 3
+    b = 0x03
     @test Ferrite.child_id(o,b) == 5
     @test Ferrite.child_id(Ferrite.parent(o,b),b) == 3
-    #@test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.Octant{3,8,6}(0,(1,1,1)) FIXME
+    @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.Octant{3,8,6}(0,(1,1,1))
     o = Ferrite.Octant{3,8,6}(2,(3,3,1))
-    #@test Ferrite.child_id(o,b) == 3 or 5? FIXME
+    @test Ferrite.child_id(o,b) == 3 
     @test Ferrite.child_id(Ferrite.parent(o,b),b) == 1 
+    @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.Octant{3,8,6}(0,(1,1,1))
     
 end

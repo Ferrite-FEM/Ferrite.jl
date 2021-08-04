@@ -10,26 +10,41 @@ end
 
 # Follow z order, x before y before z for faces, edges and corners
 struct Octree{dim,N,M} <: AbstractAdaptiveTree{dim,N,M}
-    leaves::Vector{Octant}
+    leaves::Vector{Octant{dim,N,M}}
     #maximum refinement level 
     b::UInt8
 end
 
 function child_id(octant::Octant{3},b::UInt8)
-    i = 0x00
+    i = 0x01
     h = 0x02^(b - octant.l)
     x,y,z = octant.xyz
     i = i | ((x & h) != 0x00 ? 0x01 : 0x00)
     i = i | ((y & h) != 0x00 ? 0x02 : 0x00)
     i = i | ((z & h) != 0x00 ? 0x04 : 0x00)
-    return i+0x01
+    return i
+end
+
+function child_id(octant::Octant{2},b::UInt8)
+    i = 0x01
+    h = 0x02^(b - octant.l)
+    x,y = octant.xyz
+    i = i | ((x & h) != 0x00 ? 0x01 : 0x00)
+    i = i | ((y & h) != 0x00 ? 0x02 : 0x00)
+    return i
 end
 
 function parent(octant::Octant{3,N,M}, b::UInt8) where {N,M}
     h = 0x02^(b - octant.l)
     l = octant.l - 0x01
-    px,py,pz = octant.xyz .& ~h
-    return Octant{3,N,M}(l,(px,py,pz) .+ 0x01)
+    return Octant{3,N,M}(l,octant.xyz .& ~h)
+end
+
+function Base.show(io::IO, ::MIME"text/plain", o::Octant{dim,N,M}) where {dim,N,M}
+    x,y,z = o.xyz
+    println(io, "Octant{$dim,$N,$M}")
+    println(io, "   l = $(o.l)")
+    println(io, "   xyz = $x,$y,$z")
 end
 
 # return the two adjacent faces $f_i$ adjacent to edge `edge`
