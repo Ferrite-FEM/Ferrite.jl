@@ -99,7 +99,7 @@ the cell is in the set and 0 otherwise.
 vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellset::String) =
     vtk_cellset(vtk, grid, [cellset])
 
-function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler, u::Vector, suffix="")
+function WriteVTK.vtk_point_data(vtkfile, dh::AbstractDofHandler, u::Vector, suffix="")
 
     fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
 
@@ -111,7 +111,7 @@ function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler, u::Vector, suffix
     return vtkfile
 end
 
-function reshape_to_nodes(dh::MixedDofHandler, u::Vector, fieldname::Symbol)
+function reshape_to_nodes(dh::MixedDofHandler, u::Vector{Float64}, fieldname::Symbol)
 
     # make sure the field exists
     fieldname ∈ Ferrite.getfieldnames(dh) || error("Field $fieldname not found.")
@@ -124,29 +124,9 @@ function reshape_to_nodes(dh::MixedDofHandler, u::Vector, fieldname::Symbol)
         # check if this fh contains this field, otherwise continue to the next
         field_pos = findfirst(i->i == fieldname, getfieldnames(fh))
         field_pos === nothing && continue
-
-        cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
         offset = field_offset(fh, fieldname)
 
-        for cellnum in cellnumbers
-            cell = dh.grid.cells[cellnum]
-            n = ndofs_per_cell(dh, cellnum)
-            eldofs = zeros(Int, n)
-            _celldofs = celldofs!(eldofs, dh, cellnum)
-            counter = 1
-
-            for node in cell.nodes
-                for d in 1:field_dim
-                    data[d, node] = u[_celldofs[counter + offset]]
-                    @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
-                    counter += 1
-                end
-                if field_dim == 2
-                    # paraview requires 3D-data so pad with zero
-                    data[3, node] = 0
-                end
-            end
-        end
+        reshape_field_data!(data, dh, u, offset, field_dim, fh.cellset)
     end
     return data
 end
