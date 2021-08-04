@@ -34,10 +34,10 @@ function child_id(octant::Octant{2},b::UInt8)
     return i
 end
 
-function parent(octant::Octant{3,N,M}, b::UInt8) where {N,M}
+function parent(octant::Octant{dim,N,M}, b::UInt8) where {dim,N,M}
     h = 0x02^(b - octant.l)
     l = octant.l - 0x01
-    return Octant{3,N,M}(l,octant.xyz .& ~h)
+    return Octant{dim,N,M}(l,octant.xyz .& ~h)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", o::Octant{dim,N,M}) where {dim,N,M}
