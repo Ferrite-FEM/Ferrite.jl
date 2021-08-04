@@ -35,9 +35,13 @@ function child_id(octant::Octant{2},b::UInt8)
 end
 
 function parent(octant::Octant{dim,N,M}, b::UInt8) where {dim,N,M}
-    h = 0x02^(b - octant.l)
-    l = octant.l - 0x01
-    return Octant{dim,N,M}(l,octant.xyz .& ~h)
+    if octant.l > 0 
+        h = 0x02^(b - octant.l)
+        l = octant.l - 0x01
+        return Octant{dim,N,M}(l,octant.xyz .& ~h)
+    else 
+        error("root has no parent")
+    end
 end
 
 function Base.show(io::IO, ::MIME"text/plain", o::Octant{dim,N,M}) where {dim,N,M}
