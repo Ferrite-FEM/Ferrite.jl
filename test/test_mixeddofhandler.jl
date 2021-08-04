@@ -472,10 +472,10 @@ function test_reshape_to_nodes()
 
     u = collect(1.:16.)
 
-    s_nodes = Ferrite.reshape_to_nodes(dh, u, :s)
+    s_nodes = reshape_to_nodes(dh, u, :s)
     @test s_nodes[1:4] ≈ [13., 14., 16., 15.]
     @test all(isnan.(s_nodes[5:6]))
-    v_nodes = Ferrite.reshape_to_nodes(dh, u, :v)
+    v_nodes = reshape_to_nodes(dh, u, :v)
     @test v_nodes ≈ hcat(   [9., 10., 0.],
                     [11., 12., 0.],
                     [1., 2., 0.],

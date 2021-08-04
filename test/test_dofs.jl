@@ -101,8 +101,8 @@ close!(dh)
 
 u = [1.1, 1.2, 2.1, 2.2, 4.1, 4.2, 3.1, 3.2, 1.3, 2.3, 4.3, 3.3]
 
-s_nodes = Ferrite.reshape_to_nodes(dh, u, :s)
+s_nodes = reshape_to_nodes(dh, u, :s)
 @test s_nodes ≈ [i+0.3 for i=1:4]'
-v_nodes = Ferrite.reshape_to_nodes(dh, u, :v)
+v_nodes = reshape_to_nodes(dh, u, :v)
 @test v_nodes ≈ [i==3 ? 0.0 : j+i/10 for i=1:3, j=1:4]
 end
