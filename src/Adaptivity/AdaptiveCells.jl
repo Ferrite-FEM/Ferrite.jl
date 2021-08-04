@@ -3,35 +3,33 @@ abstract type AbstractAdaptiveCell{dim,N,M} <: AbstractCell{dim,N,M} end
 
 struct Octant{dim, N, M}  <: AbstractAdaptiveCell{dim,8,6}
     #Refinement level
-    l::Int
+    l::UInt8
     #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)}
-    xyz::NTuple{dim,Int} 
+    xyz::NTuple{dim,UInt8} 
 end
 
 # Follow z order, x before y before z for faces, edges and corners
 struct Octree{dim,N,M} <: AbstractAdaptiveTree{dim,N,M}
     leaves::Vector{Octant}
     #maximum refinement level 
-    b::Int
+    b::UInt8
 end
 
-function child_id(octant::Octant{3},b::Int)
-    i = 0
-    h = 2^(b - octant.l)
-    x = octant.xyz[1]; y = octant.xyz[2]; z = octant.xyz[3]
-    i = i | ((x & h) != 0 ? 1 : 0)
-    i = i | ((y & h) != 0 ? 2 : 0)
-    i = i | ((z & h) != 0 ? 4 : 0)
-    return i+1
+function child_id(octant::Octant{3},b::UInt8)
+    i = 0x00
+    h = 0x02^(b - octant.l)
+    x,y,z = octant.xyz
+    i = i | ((x & h) != 0x00 ? 0x01 : 0x00)
+    i = i | ((y & h) != 0x00 ? 0x02 : 0x00)
+    i = i | ((z & h) != 0x00 ? 0x04 : 0x00)
+    return i+0x01
 end
 
-function parent(octant::Octant{3,N,M}, b::Int) where {N,M}
-    h = 2^(b - octant.l)
-    l = octant.l - 1
-    px = octant.xyz[1] & ~h
-    py = octant.xyz[2] & ~h
-    pz = octant.xyz[3] & ~h
-    return Octant{3,N,M}(l,(px,py,pz) .+ 1)
+function parent(octant::Octant{3,N,M}, b::UInt8) where {N,M}
+    h = 0x02^(b - octant.l)
+    l = octant.l - 0x01
+    px,py,pz = octant.xyz .& ~h
+    return Octant{3,N,M}(l,(px,py,pz) .+ 0x01)
 end
 
 # return the two adjacent faces $f_i$ adjacent to edge `edge`
