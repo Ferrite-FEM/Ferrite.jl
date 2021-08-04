@@ -412,3 +412,23 @@ find_field(dh::MixedDofHandler, field_name::Symbol) = find_field(first(dh.fieldh
 field_offset(dh::MixedDofHandler, field_name::Symbol) = field_offset(first(dh.fieldhandlers), field_name)
 getfieldinterpolation(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].interpolation
 getfielddim(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].dim
+
+function reshape_to_nodes(dh::MixedDofHandler, u::Vector{Float64}, fieldname::Symbol)
+
+    # make sure the field exists
+    fieldname ∈ Ferrite.getfieldnames(dh) || error("Field $fieldname not found.")
+
+    field_dim = getfielddim(dh, fieldname)
+    space_dim = field_dim == 2 ? 3 : field_dim
+    data = fill(NaN, space_dim, getnnodes(dh.grid))  # set default value
+
+    for fh in dh.fieldhandlers
+        # check if this fh contains this field, otherwise continue to the next
+        field_pos = findfirst(i->i == fieldname, getfieldnames(fh))
+        field_pos === nothing && continue
+        offset = field_offset(fh, fieldname)
+
+        reshape_field_data!(data, dh, u, offset, field_dim, fh.cellset)
+    end
+    return data
+end
