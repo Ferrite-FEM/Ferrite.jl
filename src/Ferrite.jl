@@ -27,6 +27,11 @@ abstract type Values{dim,T,refshape,FI,GI} end
 abstract type CellValues{dim,T,refshape,FI,GI} <: Values{dim,T,refshape,FI,GI} end
 abstract type FaceValues{dim,T,refshape,FI,GI} <: Values{dim,T,refshape,FI,GI} end
 
+"""
+Abstract type which is used as identifier for faces, edges and verices
+"""
+abstract type BoundaryIndex end
+
 include("utils.jl")
 
 # Interpolations

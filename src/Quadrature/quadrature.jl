@@ -77,6 +77,8 @@ julia> getpoints(qr)
 """
 getpoints(qr::QuadratureRule) = qr.points
 
+Base.copy(qr::QuadratureRule{dim,shape,T}) where {dim,shape,T} = QuadratureRule{dim,shape,T}(qr.weights,qr.points)
+
 QuadratureRule{dim,shape}(order::Int) where {dim,shape} = QuadratureRule{dim,shape}(:legendre, order)
 
 # Special case for face integration of 1D problems

@@ -65,7 +65,7 @@ end
 @testset "Dofs for quad in 3d (shell)" begin
 
 nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)), 
-            Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)),
+            Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(0.0,1.0,0.0)),
             Node{3,Float64}(Vec(2.0,0.0,0.0)), Node{3,Float64}(Vec(2.0,2.0,0.0))]
 
 cells = [Quadrilateral3D((1,2,3,4)), Quadrilateral3D((2,5,6,3))]
@@ -81,12 +81,14 @@ close!(dh)
 @test celldofs(dh,2) == [4,5,6,25,26,27,28,29,30,7,8,9, # u
                          16,17,18,31,32,33,34,35,36,19,20,21]# θ
 
-#3d quad with 2nd order 1d interpolation
+#3d quads with two quadratic interpolations fields
+#Only 1 dim per field for simplicity...
 dh = DofHandler(grid)
-push!(dh, :x, 3, Lagrange{2,RefCube,2}()) 
+push!(dh, :u, 1, Lagrange{2,RefCube,2}())
+push!(dh, :θ, 1, Lagrange{2,RefCube,2}())
 close!(dh)
 
-@test celldofs(dh,1) == [1,2,3,4,5,6,7,8,9,10,11,12, 13,14,15,16,17,18,19,20,21,22,23,24, 25,26,27]
-@test celldofs(dh,2) == [4,5,6,28,29,30,31,32,33,7,8,9, 34,35,36,37,38,39,40,41,42,16,17,18, 43,44,45]
+@test celldofs(dh,1) == collect(1:18)
+@test celldofs(dh,2) == [2, 19, 20, 3, 21, 22, 23, 6, 24, 11, 25, 26, 12, 27, 28, 29, 15, 30]
 
 end

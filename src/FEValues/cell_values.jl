@@ -41,7 +41,7 @@ struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape,FI,GI} <: CellVal
     detJdV::Vector{T}
     M::Matrix{T}
     dMdξ::Matrix{Vec{dim,T}}
-    qr_weights::Vector{T}
+    quad_rule::QuadratureRule{dim,refshape}
     func_interp::FI
     geo_interp::GI
 end
@@ -80,7 +80,7 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape,}, func
 
     detJdV = fill(T(NaN), n_qpoints)
 
-    CellScalarValues{dim,T,shape,typeof(func_interp),typeof(geo_interp)}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights, func_interp, geo_interp)
+    CellScalarValues{dim,T,shape,typeof(func_interp),typeof(geo_interp)}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule, func_interp, geo_interp)
 end
 
 # CellVectorValues
@@ -91,7 +91,7 @@ struct CellVectorValues{dim,T<:Real,refshape<:AbstractRefShape,FI,GI,M} <: CellV
     detJdV::Vector{T}
     M::Matrix{T}
     dMdξ::Matrix{Vec{dim,T}}
-    qr_weights::Vector{T}
+    quad_rule::QuadratureRule{dim,refshape}
     func_interp::FI
     geo_interp::GI
 end
@@ -141,7 +141,7 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
     detJdV = fill(T(NaN), n_qpoints)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    CellVectorValues{dim,T,shape,typeof(func_interp),typeof(geo_interp),MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights, func_interp, geo_interp)
+    CellVectorValues{dim,T,shape,typeof(func_interp),typeof(geo_interp),MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule, func_interp, geo_interp)
 end
 
 function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,T}
@@ -151,8 +151,8 @@ function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,
     isa(cv, CellVectorValues) && (n_func_basefuncs *= dim)
 
 
-    @inbounds for i in 1:length(cv.qr_weights)
-        w = cv.qr_weights[i]
+    @inbounds for i in 1:length(cv.quad_rule.weights)
+        w = cv.quad_rule.weights[i]
         fecv_J = zero(Tensor{2,dim})
         for j in 1:n_geom_basefuncs
             fecv_J += x[j] ⊗ cv.dMdξ[j, i]
