@@ -3,27 +3,44 @@ abstract type AbstractAdaptiveCell{dim,N,M} <: AbstractCell{dim,N,M} end
 
 struct Octant{dim, N, M}  <: AbstractAdaptiveCell{dim,8,6}
     #Refinement level
-    l::UInt8
+    l::UInt
     #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)}
-    xyz::NTuple{dim,UInt8} 
+    xyz::NTuple{dim,Int} 
 end
 
 # Follow z order, x before y before z for faces, edges and corners
 struct Octree{dim,N,M} <: AbstractAdaptiveTree{dim,N,M}
     leaves::Vector{Octant{dim,N,M}}
     #maximum refinement level 
-    b::UInt8
+    b::UInt
 end
 
-# given some Octant `octant` and maximum refinement level `b`, compute the child_id of `octant`
+function Octant(dim::Int, l::Integer, b::Integer, m::Integer)
+    x,y,z = (0,0,0) 
+    h = _compute_size(b,l) 
+    for i in 0:l-1
+        x = x | (h*(m & 2^(dim*i))/2^((dim-1)*i))
+        y = y | (h*(m & 2^(dim*i+1))/2^((dim-1)*i+1))
+        z = z | (h*(m & 2^(dim*i+2))/2^((dim-1)*i+2))
+    end
+    if dim == 2
+        Octant{dim,8,6}(l,(x,y)) 
+    elseif dim == 3
+        Octant{dim,8,6}(l,(x,y,z)) 
+    else
+        error("$dim Dimension not supported")
+    end 
+end
+
+# Given some Octant `octant` and maximum refinement level `b`, compute the child_id of `octant`
 # note the following quote from Burstedde et al:
 #   children are numbered from 0 for the front lower left child, 
 #   to 1 for the front lower right child, to 2 for the back lower left, and so on, with
 #   4, . . . , 7 being the four children on top of the children 0, . . . , 3.
 # shifted by 1 due to julia 1 based indexing 
-function child_id(octant::Octant{3},b::UInt8)
+function child_id(octant::Octant{3},b::Integer)
     i = 0x01
-    h = 0x02^(b - octant.l)
+    h = _compute_size(b,octant.l)
     x,y,z = octant.xyz
     i = i | ((x & h) != 0x00 ? 0x01 : 0x00)
     i = i | ((y & h) != 0x00 ? 0x02 : 0x00)
@@ -31,23 +48,66 @@ function child_id(octant::Octant{3},b::UInt8)
     return i
 end
 
-function child_id(octant::Octant{2},b::UInt8)
+function child_id(octant::Octant{2},b::Integer)
     i = 0x01
-    h = 0x02^(b - octant.l)
+    h = _compute_size(b, octant.l)
     x,y = octant.xyz
     i = i | ((x & h) != 0x00 ? 0x01 : 0x00)
     i = i | ((y & h) != 0x00 ? 0x02 : 0x00)
     return i
 end
 
-function parent(octant::Octant{dim,N,M}, b::UInt8) where {dim,N,M}
+function parent(octant::Octant{dim,N,M}, b::Integer) where {dim,N,M}
     if octant.l > 0 
-        h = 0x02^(b - octant.l)
+        h = _compute_size(b,octant.l)
         l = octant.l - 0x01
         return Octant{dim,N,M}(l,octant.xyz .& ~h)
     else 
         error("root has no parent")
     end
+end
+
+"""
+Given an `octant`, computes the two smallest possible octants that fit into the first and last corners
+of `octant`, respectively. These computed octants are called first and last descendants of `octant`
+since they are connected to `octant` by a path down the octree to the maximum level  `b`
+"""
+function descendants(octant::Octant{dim,N,M}, b::Integer) where {dim,N,M}
+    l1 = b; l2 = b
+    h = _compute_size(b,octant.l)
+    return Octant{dim,N,M}(l1,octant.xyz), Octant{dim,N,M}(l2,octant.xyz .+ (h-1))
+end
+
+function face_neighbor(octant::Octant{dim,N,M}, f::Integer, b::Integer) where {dim,N,M}
+    l = octant.l
+    h = _compute_size(b,octant.l)
+    x,y,z = octant.xyz 
+    x += ((f == 1) ? -h : ((f == 2) ? h : 0))
+    y += ((f == 3) ? -h : ((f == 4) ? h : 0))
+    z += ((f == 5) ? -h : ((f == 6) ? h : 0))
+    return Octant{dim,N,M}(l,(x,y,z))
+end
+
+function edge_neighbor(octant::Octant{3,N,M}, e::Integer, b::Integer) where {N,M}
+    a₀ = e ÷ 4
+    a₁ = (e < 4) ? 1 : 0
+    a₂ = (e < 8) ? 2 : 1
+    l = octant.l
+    h = _compute_size(b,octant.l)
+    x = a₀ 
+    y = a₁ + (2*(e & 1) - 1)*h 
+    z = a₂ + ((e & 2) - 1)*h
+    return Octant{3,N,M}(l,(x,y,z))
+end
+
+function corner_neighbor(octant::Octant{3,N,M}, c::Integer, b::Integer) where {N,M}
+    l = octant.l
+    h = _compute_size(b,octant.l)
+    ox,oy,oz = octant.xyz
+    x = ox + (2*(c & 1) - 1)*h 
+    y = oy + ((c & 2) - 1)*h
+    z = oz + ((c & 4)/2 - 1)*h
+    return Octant{3,N,M}(l,(x,y,z))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", o::Octant{dim,N,M}) where {dim,N,M}
@@ -57,6 +117,7 @@ function Base.show(io::IO, ::MIME"text/plain", o::Octant{dim,N,M}) where {dim,N,
     println(io, "   xyz = $x,$y,$z")
 end
 
+_compute_size(b::Integer,l::Integer) = 2^(b-l)
 # return the two adjacent faces $f_i$ adjacent to edge `edge`
 _face(edge::Int) = 𝒮[edge, :]
 # return the `i`-th adjacent face fᵢ to edge `edge`

@@ -61,5 +61,23 @@ end
     @test Ferrite.child_id(o,b) == 3 
     @test Ferrite.child_id(Ferrite.parent(o,b),b) == 1 
     @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.Octant{3,8,6}(0,(0,0,0) .+ 1)
-    @test_throws ErrorException Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b)    
+    @test_throws ErrorException Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b)
+end
+
+@testset "Octant Operations" begin
+    o = Ferrite.Octant{3,8,6}(1,(2,0,0))
+    @test Ferrite.face_neighbor(o,0x01,0x02) == Ferrite.Octant{3,8,6}(1,(0,0,0)) 
+    @test Ferrite.face_neighbor(o,0x02,0x02) == Ferrite.Octant{3,8,6}(1,(4,0,0)) 
+    @test Ferrite.face_neighbor(o,0x03,0x02) == Ferrite.Octant{3,8,6}(1,(2,-2,0))
+    @test Ferrite.face_neighbor(o,0x04,0x02) == Ferrite.Octant{3,8,6}(1,(2,2,0)) 
+    @test Ferrite.face_neighbor(o,0x05,0x02) == Ferrite.Octant{3,8,6}(1,(2,0,-2))
+    @test Ferrite.face_neighbor(o,0x06,0x02) == Ferrite.Octant{3,8,6}(1,(2,0,2)) 
+
+    o = Ferrite.Octant{3,8,6}(1,(0,0,0))
+    @test Ferrite.face_neighbor(o,1,2) == Ferrite.Octant{3,8,6}(1,(-2,0,0)) 
+    @test Ferrite.face_neighbor(o,2,2) == Ferrite.Octant{3,8,6}(1,(2,0,0)) 
+    @test Ferrite.face_neighbor(o,3,2) == Ferrite.Octant{3,8,6}(1,(0,-2,0))
+    @test Ferrite.face_neighbor(o,4,2) == Ferrite.Octant{3,8,6}(1,(0,2,0)) 
+    @test Ferrite.face_neighbor(o,5,2) == Ferrite.Octant{3,8,6}(1,(0,0,-2))
+    @test Ferrite.face_neighbor(o,6,2) == Ferrite.Octant{3,8,6}(1,(0,0,2))     
 end
