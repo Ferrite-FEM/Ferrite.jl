@@ -62,6 +62,23 @@ end
     @test Ferrite.child_id(Ferrite.parent(o,b),b) == 1 
     @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.Octant{3,8,6}(0,(0,0,0) .+ 1)
     @test_throws ErrorException Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b)
+
+    # coordinate system always on lowest level
+    # dim 3, level 2, number of levels 3, morton id 2
+    @test Ferrite.Octant(3,2,3,2) == Ferrite.Octant{3,8,6}(2,(2,0,0)) 
+    # dim 3, level 1, number of levels 3, morton id 2
+    @test Ferrite.Octant(3,1,3,2) == Ferrite.Octant{3,8,6}(1,(4,0,0)) 
+    # dim 3, level 0, number of levels 3, morton id 2
+    @test Ferrite.Octant(3,0,3,2) == Ferrite.Octant{3,8,6}(0,(0,0,0)) 
+    # dim 3, level 2, number of levels 3, morton id 4
+    @test Ferrite.Octant(3,2,3,4) == Ferrite.Octant{3,8,6}(2,(2,2,0)) 
+    @test Ferrite.Octant(3,1,3,4) == Ferrite.Octant{3,8,6}(1,(4,4,0)) 
+    @test Ferrite.Octant(3,2,3,5) == Ferrite.Octant{3,8,6}(2,(0,0,2)) 
+    @test Ferrite.Octant(3,1,3,5) == Ferrite.Octant{3,8,6}(1,(0,0,4)) 
+    @test Ferrite.Octant(2,1,3,1) == Ferrite.Octant{2,8,6}(1,(0,0))
+    @test Ferrite.Octant(2,1,3,2) == Ferrite.Octant{2,8,6}(1,(4,0))
+    @test Ferrite.Octant(2,1,3,3) == Ferrite.Octant{2,8,6}(1,(0,4))
+    @test Ferrite.Octant(2,1,3,4) == Ferrite.Octant{2,8,6}(1,(4,4))
 end
 
 @testset "Octant Operations" begin

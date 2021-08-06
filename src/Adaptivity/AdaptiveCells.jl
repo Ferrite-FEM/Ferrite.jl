@@ -19,9 +19,9 @@ function Octant(dim::Int, l::Integer, b::Integer, m::Integer)
     x,y,z = (0,0,0) 
     h = _compute_size(b,l) 
     for i in 0:l-1
-        x = x | (h*(m & 2^(dim*i))/2^((dim-1)*i))
-        y = y | (h*(m & 2^(dim*i+1))/2^((dim-1)*i+1))
-        z = z | (h*(m & 2^(dim*i+2))/2^((dim-1)*i+2))
+        x = x | (h*((m-1) & 2^(dim*i))÷2^((dim-1)*i))
+        y = y | (h*((m-1) & 2^(dim*i+1))÷2^((dim-1)*i+1))
+        z = z | (h*((m-1) & 2^(dim*i+2))÷2^((dim-1)*i+2))
     end
     if dim == 2
         Octant{dim,8,6}(l,(x,y)) 
@@ -110,11 +110,18 @@ function corner_neighbor(octant::Octant{3,N,M}, c::Integer, b::Integer) where {N
     return Octant{3,N,M}(l,(x,y,z))
 end
 
-function Base.show(io::IO, ::MIME"text/plain", o::Octant{dim,N,M}) where {dim,N,M}
+function Base.show(io::IO, ::MIME"text/plain", o::Octant{3,N,M}) where {N,M}
     x,y,z = o.xyz
-    println(io, "Octant{$dim,$N,$M}")
+    println(io, "Octant{3,$N,$M}")
     println(io, "   l = $(o.l)")
     println(io, "   xyz = $x,$y,$z")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", o::Octant{2,N,M}) where {N,M}
+    x,y = o.xyz
+    println(io, "Octant{2,$N,$M}")
+    println(io, "   l = $(o.l)")
+    println(io, "   xy = $x,$y")
 end
 
 _compute_size(b::Integer,l::Integer) = 2^(b-l)
