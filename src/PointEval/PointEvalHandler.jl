@@ -17,6 +17,16 @@ function PointEvalHandler(dh::AbstractDofHandler, points::AbstractVector{Vec{dim
     return PointEvalHandler(dh, cells, local_coords, ip_idxs)
 end
 
+function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
+    println(io, typeof(ph))
+    println(io, "  number of points: ", length(ph.local_coords))
+    n_missing = sum(ismissing.(ph.cells))
+    if n_missing == 0
+        println(io, "  Found corresponding cell for all points.")
+    else
+        println(io, "  Could not find corresponding cell for ", n_missing, " points.")
+    end
+end
 # function interpolations need to be explicitely given, because we don't know which field we are looking for.
 # Only one field at a time can be interpolated, so one function interpolation per FieldHandler (= per cellset) is sufficient.
 # If several fields should be interpolated with different function interpolations, several PointEvalHandlers need to be constructed.
