@@ -89,6 +89,8 @@ end
     @test Ferrite.face_neighbor(o,0x04,0x02) == Ferrite.Octant{3,8,6}(1,(2,2,0)) 
     @test Ferrite.face_neighbor(o,0x05,0x02) == Ferrite.Octant{3,8,6}(1,(2,0,-2))
     @test Ferrite.face_neighbor(o,0x06,0x02) == Ferrite.Octant{3,8,6}(1,(2,0,2)) 
+    @test Ferrite.descendants(o,2) == (Ferrite.Octant{3,8,6}(1,(2,0,0)), Ferrite.Octant{3,8,6}(1,(2,0,0)))
+    @test Ferrite.descendants(o,3) == (Ferrite.Octant{3,8,6}(2,(2,0,0)), Ferrite.Octant{3,8,6}(2,(4,2,2)))
 
     o = Ferrite.Octant{3,8,6}(1,(0,0,0))
     @test Ferrite.face_neighbor(o,1,2) == Ferrite.Octant{3,8,6}(1,(-2,0,0)) 
@@ -96,5 +98,8 @@ end
     @test Ferrite.face_neighbor(o,3,2) == Ferrite.Octant{3,8,6}(1,(0,-2,0))
     @test Ferrite.face_neighbor(o,4,2) == Ferrite.Octant{3,8,6}(1,(0,2,0)) 
     @test Ferrite.face_neighbor(o,5,2) == Ferrite.Octant{3,8,6}(1,(0,0,-2))
-    @test Ferrite.face_neighbor(o,6,2) == Ferrite.Octant{3,8,6}(1,(0,0,2))     
+    @test Ferrite.face_neighbor(o,6,2) == Ferrite.Octant{3,8,6}(1,(0,0,2)) 
+    o = Ferrite.Octant{3,8,6}(0,(0,0,0))
+    @test Ferrite.descendants(o,2) == (Ferrite.Octant{3,8,6}(1,(0,0,0)), Ferrite.Octant{3,8,6}(1,(2,2,2)))
+    @test Ferrite.descendants(o,3) == (Ferrite.Octant{3,8,6}(2,(0,0,0)), Ferrite.Octant{3,8,6}(2,(6,6,6)))
 end

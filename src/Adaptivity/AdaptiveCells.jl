@@ -82,9 +82,9 @@ of `octant`, respectively. These computed octants are called first and last desc
 since they are connected to `octant` by a path down the octree to the maximum level  `b`
 """
 function descendants(octant::Octant{dim,N,M}, b::Integer) where {dim,N,M}
-    l1 = b; l2 = b
+    l1 = b-1; l2 = b-1 # not sure 
     h = _compute_size(b,octant.l)
-    return Octant{dim,N,M}(l1,octant.xyz), Octant{dim,N,M}(l2,octant.xyz .+ (h-1))
+    return Octant{dim,N,M}(l1,octant.xyz), Octant{dim,N,M}(l2,octant.xyz .+ (h-2))
 end
 
 function face_neighbor(octant::Octant{dim,N,M}, f::Integer, b::Integer) where {dim,N,M}
