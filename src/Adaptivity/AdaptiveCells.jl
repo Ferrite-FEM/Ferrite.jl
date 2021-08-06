@@ -16,6 +16,7 @@ struct Octree{dim,N,M} <: AbstractAdaptiveTree{dim,N,M}
 end
 
 function Octant(dim::Int, l::Integer, b::Integer, m::Integer)
+    @assert m ≤ 2^(dim*l)
     x,y,z = (0,0,0) 
     h = _compute_size(b,l) 
     for i in 0:l-1
@@ -88,6 +89,7 @@ function face_neighbor(octant::Octant{dim,N,M}, f::Integer, b::Integer) where {d
     return Octant{dim,N,M}(l,(x,y,z))
 end
 
+# TODO I think this needs to be shifted somewhere because of how we count `e`
 function edge_neighbor(octant::Octant{3,N,M}, e::Integer, b::Integer) where {N,M}
     a₀ = e ÷ 4
     a₁ = (e < 4) ? 1 : 0
@@ -100,6 +102,7 @@ function edge_neighbor(octant::Octant{3,N,M}, e::Integer, b::Integer) where {N,M
     return Octant{3,N,M}(l,(x,y,z))
 end
 
+# TODO I think this needs to be shifted somewhere because of how we count `c`
 function corner_neighbor(octant::Octant{3,N,M}, c::Integer, b::Integer) where {N,M}
     l = octant.l
     h = _compute_size(b,octant.l)
