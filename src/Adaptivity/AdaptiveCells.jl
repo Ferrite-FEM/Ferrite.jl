@@ -15,7 +15,11 @@ struct Octree{dim,N,M} <: AbstractAdaptiveTree{dim,N,M}
     b::UInt
 end
 
-function Octant(dim::Int, l::Integer, b::Integer, m::Integer)
+"""
+    Octant(dim::Integer, l::Integer, b::Integer, m::Integer)
+Construct an `octant` based on dimension `dim`, level `l`, amount of levels `b` and morton index `m`
+"""
+function Octant(dim::Integer, l::Integer, b::Integer, m::Integer)
     @assert m ≤ 2^(dim*l)
     x,y,z = (0,0,0) 
     h = _compute_size(b,l) 
@@ -33,12 +37,15 @@ function Octant(dim::Int, l::Integer, b::Integer, m::Integer)
     end 
 end
 
-# Given some Octant `octant` and maximum refinement level `b`, compute the child_id of `octant`
-# note the following quote from Burstedde et al:
-#   children are numbered from 0 for the front lower left child, 
-#   to 1 for the front lower right child, to 2 for the back lower left, and so on, with
-#   4, . . . , 7 being the four children on top of the children 0, . . . , 3.
-# shifted by 1 due to julia 1 based indexing 
+"""
+    child_id(octant::Octant, b::Integer)
+Given some Octant `octant` and maximum refinement level `b`, compute the child_id of `octant`
+note the following quote from Burstedde et al:
+  children are numbered from 0 for the front lower left child, 
+  to 1 for the front lower right child, to 2 for the back lower left, and so on, with
+  4, . . . , 7 being the four children on top of the children 0, . . . , 3.
+shifted by 1 due to julia 1 based indexing 
+"""
 function child_id(octant::Octant{3},b::Integer)
     i = 0x01
     h = _compute_size(b,octant.l)
@@ -69,6 +76,7 @@ function parent(octant::Octant{dim,N,M}, b::Integer) where {dim,N,M}
 end
 
 """
+    descendants(octant::Octant, b::Integer)
 Given an `octant`, computes the two smallest possible octants that fit into the first and last corners
 of `octant`, respectively. These computed octants are called first and last descendants of `octant`
 since they are connected to `octant` by a path down the octree to the maximum level  `b`
