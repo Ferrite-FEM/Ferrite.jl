@@ -97,21 +97,43 @@ function face_neighbor(octant::Octant{dim,N,M}, f::Integer, b::Integer) where {d
     return Octant{dim,N,M}(l,(x,y,z))
 end
 
-# TODO I think this needs to be shifted somewhere because of how we count `e`
+"""
+    edge_neighbor(octant::Octant, e::Integer, b::Integer)
+Computes the edge neighbor octant which is only connected by the edge `e` to `octant`
+"""
 function edge_neighbor(octant::Octant{3,N,M}, e::Integer, b::Integer) where {N,M}
-    a₀ = e ÷ 4
-    a₁ = (e < 4) ? 1 : 0
-    a₂ = (e < 8) ? 2 : 1
+    @assert 1 ≤ e ≤ 12
+    e -= 1
     l = octant.l
     h = _compute_size(b,octant.l)
-    x = a₀ 
-    y = a₁ + (2*(e & 1) - 1)*h 
-    z = a₂ + ((e & 2) - 1)*h
-    return Octant{3,N,M}(l,(x,y,z))
+    ox,oy,oz = octant.xyz
+    case = e ÷ 4
+    if case == 0
+        x = ox 
+        y = oy + (2*(e & 0x01) - 1)*h 
+        z = oz + ((e & 0x02) - 1)*h
+        return Octant{3,N,M}(l,(x,y,z))
+    elseif case == 1
+        x = ox  + (2*(e & 0x01) - 1)*h 
+        y = oy 
+        z = oz + ((e & 0x02) - 1)*h
+        return Octant{3,N,M}(l,(x,y,z))  
+    elseif case == 2
+        x = ox + (2*(e & 0x01) - 1)*h 
+        y = oy + ((e & 0x02) - 1)*h
+        z = oz
+        return Octant{3,N,M}(l,(x,y,z))
+    else
+        error("edge case not found")
+    end
 end
 
-# TODO I think this needs to be shifted somewhere because of how we count `c`
+"""
+    corner_neighbor(octant::Octant, c::Integer, b::Integer)
+Computes the corner neighbor octant which is only connected by the corner `c` to `octant`
+"""
 function corner_neighbor(octant::Octant{3,N,M}, c::Integer, b::Integer) where {N,M}
+    c -= 1
     l = octant.l
     h = _compute_size(b,octant.l)
     ox,oy,oz = octant.xyz
@@ -119,6 +141,16 @@ function corner_neighbor(octant::Octant{3,N,M}, c::Integer, b::Integer) where {N
     y = oy + ((c & 2) - 1)*h
     z = oz + ((c & 4)/2 - 1)*h
     return Octant{3,N,M}(l,(x,y,z))
+end
+
+function corner_neighbor(octant::Octant{2,N,M}, c::Integer, b::Integer) where {N,M}
+    c -= 1
+    l = octant.l
+    h = _compute_size(b,octant.l)
+    ox,oy = octant.xyz
+    x = ox + (2*(c & 1) - 1)*h 
+    y = oy + ((c & 2) - 1)*h
+    return Octant{2,N,M}(l,(x,y))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", o::Octant{3,N,M}) where {N,M}

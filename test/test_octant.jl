@@ -115,4 +115,18 @@ end
     o = Ferrite.Octant{3,8,6}(0,(0,0,0))
     @test Ferrite.descendants(o,2) == (Ferrite.Octant{3,8,6}(1,(0,0,0)), Ferrite.Octant{3,8,6}(1,(2,2,2)))
     @test Ferrite.descendants(o,3) == (Ferrite.Octant{3,8,6}(2,(0,0,0)), Ferrite.Octant{3,8,6}(2,(6,6,6)))
+    
+    @test Ferrite.edge_neighbor(Ferrite.Octant{3,8,6}(2,(2,0,0)),1,3) == Ferrite.Octant{3,8,6}(2,(2,-2,-2))
+    @test Ferrite.edge_neighbor(Ferrite.Octant{3,8,6}(2,(2,0,0)),4,3) == Ferrite.Octant{3,8,6}(2,(2,2,2))
+    @test Ferrite.edge_neighbor(Ferrite.Octant{3,8,6}(2,(2,0,0)),6,3) == Ferrite.Octant{3,8,6}(2,(4,0,-2))
+    @test Ferrite.edge_neighbor(Ferrite.Octant{3,8,6}(2,(2,0,0)),9,3) == Ferrite.Octant{3,8,6}(2,(0,-2,0))
+    @test Ferrite.edge_neighbor(Ferrite.Octant{3,8,6}(2,(2,0,0)),12,3) == Ferrite.Octant{3,8,6}(2,(4,2,0))
+
+    @test Ferrite.corner_neighbor(Ferrite.Octant{3,8,6}(2,(2,0,0)),1,3) == Ferrite.Octant{3,8,6}(2,(0,-2,-2))
+    @test Ferrite.corner_neighbor(Ferrite.Octant{3,8,6}(2,(2,0,0)),4,3) == Ferrite.Octant{3,8,6}(2,(4,2,-2))
+    @test Ferrite.corner_neighbor(Ferrite.Octant{3,8,6}(2,(2,0,0)),8,3) == Ferrite.Octant{3,8,6}(2,(4,2,2))
+
+    @test Ferrite.corner_neighbor(Ferrite.Octant{2,8,6}(2,(2,0)),1,3) == Ferrite.Octant{2,8,6}(2,(0,-2))
+    @test Ferrite.corner_neighbor(Ferrite.Octant{2,8,6}(2,(2,0)),2,3) == Ferrite.Octant{2,8,6}(2,(4,-2))
+    @test Ferrite.corner_neighbor(Ferrite.Octant{2,8,6}(2,(2,0)),4,3) == Ferrite.Octant{2,8,6}(2,(4,2))
 end
