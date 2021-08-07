@@ -79,6 +79,19 @@ end
     @test Ferrite.Octant(2,1,3,2) == Ferrite.Octant{2,8,6}(1,(4,0))
     @test Ferrite.Octant(2,1,3,3) == Ferrite.Octant{2,8,6}(1,(0,4))
     @test Ferrite.Octant(2,1,3,4) == Ferrite.Octant{2,8,6}(1,(4,4))
+    @test Ferrite.child_id(Ferrite.Octant(2,1,3,1),3) == 1
+    @test Ferrite.child_id(Ferrite.Octant(2,1,3,2),3) == 2
+    @test Ferrite.child_id(Ferrite.Octant(2,1,3,3),3) == 3
+    @test Ferrite.child_id(Ferrite.Octant(2,1,3,4),3) == 4
+    @test Ferrite.child_id(Ferrite.Octant(2,2,3,1),3) == 1
+    @test Ferrite.child_id(Ferrite.Octant(3,2,3,1),3) == 1
+    @test Ferrite.child_id(Ferrite.Octant(3,2,3,2),3) == 2
+    @test Ferrite.child_id(Ferrite.Octant(3,2,3,3),3) == 3
+    @test Ferrite.child_id(Ferrite.Octant(3,2,3,4),3) == 4
+    @test Ferrite.child_id(Ferrite.Octant(3,2,3,16),3) == 8
+    @test Ferrite.child_id(Ferrite.Octant(3,2,3,24),3) == 8
+    @test Ferrite.child_id(Ferrite.Octant(3,2,3,64),3) == 8
+    @test Ferrite.child_id(Ferrite.Octant(3,2,3,9),3) == 1
 end
 
 @testset "Octant Operations" begin

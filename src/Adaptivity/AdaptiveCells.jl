@@ -57,12 +57,12 @@ function child_id(octant::Octant{3},b::Integer)
 end
 
 function child_id(octant::Octant{2},b::Integer)
-    i = 0x01
+    i = 0x00
     h = _compute_size(b, octant.l)
     x,y = octant.xyz
     i = i | ((x & h) != 0x00 ? 0x01 : 0x00)
     i = i | ((y & h) != 0x00 ? 0x02 : 0x00)
-    return i
+    return i+0x01
 end
 
 function parent(octant::Octant{dim,N,M}, b::Integer) where {dim,N,M}
