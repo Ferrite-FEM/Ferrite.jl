@@ -45,7 +45,7 @@ end
     @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.Octant{3,8,6}(0,(0,0,0))
     @test_throws ErrorException Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b)
     o = Ferrite.Octant{3,8,6}(2,(2,2,0))
-    @test Ferrite.child_id(o,b) == 3 
+    @test Ferrite.child_id(o,b) == 4 
     @test Ferrite.child_id(Ferrite.parent(o,b),b) == 1 
     @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.Octant{3,8,6}(0,(0,0,0))
     @test_throws ErrorException Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b)    
@@ -58,7 +58,7 @@ end
     @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.Octant{3,8,6}(0,(0,0,0) .+ 1)
     @test_throws ErrorException Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b)
     o = Ferrite.Octant{3,8,6}(2,(2,2,0) .+ 1)
-    @test Ferrite.child_id(o,b) == 3 
+    @test Ferrite.child_id(o,b) == 4 
     @test Ferrite.child_id(Ferrite.parent(o,b),b) == 1 
     @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.Octant{3,8,6}(0,(0,0,0) .+ 1)
     @test_throws ErrorException Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b)

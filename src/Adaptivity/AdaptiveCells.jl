@@ -47,13 +47,13 @@ note the following quote from Burstedde et al:
 shifted by 1 due to julia 1 based indexing 
 """
 function child_id(octant::Octant{3},b::Integer)
-    i = 0x01
+    i = 0x00
     h = _compute_size(b,octant.l)
     x,y,z = octant.xyz
     i = i | ((x & h) != 0x00 ? 0x01 : 0x00)
     i = i | ((y & h) != 0x00 ? 0x02 : 0x00)
     i = i | ((z & h) != 0x00 ? 0x04 : 0x00)
-    return i
+    return i+0x01
 end
 
 function child_id(octant::Octant{2},b::Integer)
