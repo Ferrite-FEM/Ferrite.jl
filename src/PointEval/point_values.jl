@@ -32,4 +32,12 @@ end
 # allow to use function_value with any
 Base.@pure _valuetype(::PointScalarValues{dim}, ::Vector{T}) where {dim, T<:AbstractTensor} = T
 
+# allow on-the-fly updating
+function reinit!(pv::PointScalarValues{dim,T,refshape}, coord::Vec{dim,T}, func_interpol::Interpolation{dim,refshape,order}) where {dim,T,refshape,order}
+    n_func_basefuncs = getnbasefunctions(func_interpol)
+    for i in 1:n_func_basefuncs
+        pv.N[i] = value(func_interpol, i, coord)
+    end
+    return pv
+end
 # TODO: need a show method for PointScalarValues

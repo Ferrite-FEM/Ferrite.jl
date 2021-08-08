@@ -241,6 +241,45 @@ function get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, field
     return vals
 end
 
+# values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
+function get_point_values!(vals::Vector{T2}, ph::PointEvalHandler{DH}, dof_values::Vector{T}, fieldname::Symbol; func_interpolations = get_func_interpolations(ph, fieldname)) where {T2, T,DH<:MixedDofHandler} 
+    length(dof_values) == ndofs(ph.dh) || error("You must supply nodal values for all $(ndofs(ph.dh)) dofs.")
+
+    # TODO: should really check that T2 corresponds to return type for fielddim!
+
+    fielddim = getfielddim(ph.dh, fieldname)
+
+    # preallocate some things that we need many times and that correspond to a given fieldhandler
+    pvs = [PointScalarValues(first(ph.local_coords), ip) for ip in func_interpolations] 
+    cell_dofs_fhs = [celldofs(ph.dh, first(fh.cellset)) for fh in ph.dh.fieldhandlers]
+    dof_ranges = [dof_range(fh, fieldname) for fh in ph.dh.fieldhandlers]
+    for i in eachindex(ph.cells)
+        # set NaN values if no cell was found for a point
+        if ismissing(ph.cells[i])
+            vals[i] = first(dof_values)*NaN
+            continue
+        end
+        
+        for fh in ph.dh.fieldhandlers
+            if ph.cells[i] ∈ fh.cellset
+                cell_dofs = celldofs!(cell_dofs_fhs[ph.ip_idxs[i]], ph.dh, ph.cells[i])
+                dofrange = dof_ranges[ph.ip_idxs[i]]
+                field_dofs = view(cell_dofs, dofrange)
+                pv = reinit!(pvs[ph.ip_idxs[i]], ph.local_coords[i], func_interpolations[ph.ip_idxs[i]]) # !! not known at compile time which type pv will have (refshape)
+                # reshape field_dofs so that they work with ScalarValues
+                # this looks a crappy case for type instability, but in my measurements it wasn't the bad part /Kim
+                if fielddim == 1
+                    @inbounds @views dof_values_reshaped = dof_values[field_dofs]
+                else
+                    dof_values_reshaped = reinterpret(Vec{fielddim, T}, dof_values[field_dofs]) # TODO: should this use inbounds or views?
+                end
+                vals[i] = function_value(pv, 1, dof_values_reshaped)::T2
+            end
+        end
+    end
+    return vals
+end
+
 function get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, fieldname::Symbol; func_interpolations = [getfieldinterpolation(ph.dh, find_field(ph.dh, fieldname))]) where {T,DH<:DofHandler}
 
     length(dof_values) == ndofs(ph.dh) || error("You must supply nodal values for all $(ndofs(ph.dh)) dofs.")
