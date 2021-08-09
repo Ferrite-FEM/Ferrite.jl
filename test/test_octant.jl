@@ -64,34 +64,34 @@ end
     @test_throws ErrorException Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b)
 
     # coordinate system always on lowest level
-    # dim 3, level 2, number of levels 3, morton id 2
-    @test Ferrite.Octant(3,2,3,2) == Ferrite.Octant{3,8,6}(2,(2,0,0)) 
-    # dim 3, level 1, number of levels 3, morton id 2
-    @test Ferrite.Octant(3,1,3,2) == Ferrite.Octant{3,8,6}(1,(4,0,0)) 
-    # dim 3, level 0, number of levels 3, morton id 2
-    @test_throws AssertionError Ferrite.Octant(3,0,3,2)
-    # dim 3, level 2, number of levels 3, morton id 4
-    @test Ferrite.Octant(3,2,3,4) == Ferrite.Octant{3,8,6}(2,(2,2,0)) 
-    @test Ferrite.Octant(3,1,3,4) == Ferrite.Octant{3,8,6}(1,(4,4,0)) 
-    @test Ferrite.Octant(3,2,3,5) == Ferrite.Octant{3,8,6}(2,(0,0,2)) 
-    @test Ferrite.Octant(3,1,3,5) == Ferrite.Octant{3,8,6}(1,(0,0,4)) 
-    @test Ferrite.Octant(2,1,3,1) == Ferrite.Octant{2,8,6}(1,(0,0))
-    @test Ferrite.Octant(2,1,3,2) == Ferrite.Octant{2,8,6}(1,(4,0))
+    # dim 3, level 2, morton id 2, number of levels 3
+    @test Ferrite.Octant(3,2,2,3) == Ferrite.Octant{3,8,6}(2,(2,0,0)) 
+    # dim 3, level 1, morton id 2, number of levels 3
+    @test Ferrite.Octant(3,1,2,3) == Ferrite.Octant{3,8,6}(1,(4,0,0)) 
+    # dim 3, level 0, morton id 2, number of levels 3
+    @test_throws AssertionError Ferrite.Octant(3,0,2,3)
+    # dim 3, level 2, morton id 4, number of levels 3
+    @test Ferrite.Octant(3,2,4,3) == Ferrite.Octant{3,8,6}(2,(2,2,0)) 
+    @test Ferrite.Octant(3,1,4,3) == Ferrite.Octant{3,8,6}(1,(4,4,0)) 
+    @test Ferrite.Octant(3,2,5,3) == Ferrite.Octant{3,8,6}(2,(0,0,2)) 
+    @test Ferrite.Octant(3,1,5,3) == Ferrite.Octant{3,8,6}(1,(0,0,4)) 
+    @test Ferrite.Octant(2,1,1,3) == Ferrite.Octant{2,8,6}(1,(0,0))
+    @test Ferrite.Octant(2,1,2,3) == Ferrite.Octant{2,8,6}(1,(4,0))
     @test Ferrite.Octant(2,1,3,3) == Ferrite.Octant{2,8,6}(1,(0,4))
-    @test Ferrite.Octant(2,1,3,4) == Ferrite.Octant{2,8,6}(1,(4,4))
-    @test Ferrite.child_id(Ferrite.Octant(2,1,3,1),3) == 1
-    @test Ferrite.child_id(Ferrite.Octant(2,1,3,2),3) == 2
+    @test Ferrite.Octant(2,1,4,3) == Ferrite.Octant{2,8,6}(1,(4,4))
+    @test Ferrite.child_id(Ferrite.Octant(2,1,1,3),3) == 1
+    @test Ferrite.child_id(Ferrite.Octant(2,1,2,3),3) == 2
     @test Ferrite.child_id(Ferrite.Octant(2,1,3,3),3) == 3
-    @test Ferrite.child_id(Ferrite.Octant(2,1,3,4),3) == 4
-    @test Ferrite.child_id(Ferrite.Octant(2,2,3,1),3) == 1
-    @test Ferrite.child_id(Ferrite.Octant(3,2,3,1),3) == 1
-    @test Ferrite.child_id(Ferrite.Octant(3,2,3,2),3) == 2
+    @test Ferrite.child_id(Ferrite.Octant(2,1,4,3),3) == 4
+    @test Ferrite.child_id(Ferrite.Octant(2,2,1,3),3) == 1
+    @test Ferrite.child_id(Ferrite.Octant(3,2,1,3),3) == 1
+    @test Ferrite.child_id(Ferrite.Octant(3,2,2,3),3) == 2
     @test Ferrite.child_id(Ferrite.Octant(3,2,3,3),3) == 3
-    @test Ferrite.child_id(Ferrite.Octant(3,2,3,4),3) == 4
-    @test Ferrite.child_id(Ferrite.Octant(3,2,3,16),3) == 8
-    @test Ferrite.child_id(Ferrite.Octant(3,2,3,24),3) == 8
-    @test Ferrite.child_id(Ferrite.Octant(3,2,3,64),3) == 8
-    @test Ferrite.child_id(Ferrite.Octant(3,2,3,9),3) == 1
+    @test Ferrite.child_id(Ferrite.Octant(3,2,4,3),3) == 4
+    @test Ferrite.child_id(Ferrite.Octant(3,2,16,3),3) == 8
+    @test Ferrite.child_id(Ferrite.Octant(3,2,24,3),3) == 8
+    @test Ferrite.child_id(Ferrite.Octant(3,2,64,3),3) == 8
+    @test Ferrite.child_id(Ferrite.Octant(3,2,9,3),3) == 1
 end
 
 @testset "Octant Operations" begin
@@ -121,6 +121,13 @@ end
     @test Ferrite.edge_neighbor(Ferrite.Octant{3,8,6}(2,(2,0,0)),6,3) == Ferrite.Octant{3,8,6}(2,(4,0,-2))
     @test Ferrite.edge_neighbor(Ferrite.Octant{3,8,6}(2,(2,0,0)),9,3) == Ferrite.Octant{3,8,6}(2,(0,-2,0))
     @test Ferrite.edge_neighbor(Ferrite.Octant{3,8,6}(2,(2,0,0)),12,3) == Ferrite.Octant{3,8,6}(2,(4,2,0))
+
+    @test Ferrite.edge_neighbor(Ferrite.Octant{3,8,6}(3,(0,0,0)),1,4)  == Ferrite.Octant{3,8,6}(3,(0,-2,-2))
+    @test Ferrite.edge_neighbor(Ferrite.Octant{3,8,6}(3,(0,0,0)),12,4) == Ferrite.Octant{3,8,6}(3,(2,2,0))
+    @test Ferrite.edge_neighbor(Ferrite.Octant{3,8,6}(2,(0,0,0)),1,4)  == Ferrite.Octant{3,8,6}(2,(0,-4,-4))
+    @test Ferrite.edge_neighbor(Ferrite.Octant{3,8,6}(2,(0,0,0)),12,4) == Ferrite.Octant{3,8,6}(2,(4,4,0))
+    @test Ferrite.edge_neighbor(Ferrite.Octant{3,8,6}(1,(0,0,0)),1,4)  == Ferrite.Octant{3,8,6}(1,(0,-8,-8))
+    @test Ferrite.edge_neighbor(Ferrite.Octant{3,8,6}(1,(0,0,0)),12,4) == Ferrite.Octant{3,8,6}(1,(8,8,0))
 
     @test Ferrite.corner_neighbor(Ferrite.Octant{3,8,6}(2,(2,0,0)),1,3) == Ferrite.Octant{3,8,6}(2,(0,-2,-2))
     @test Ferrite.corner_neighbor(Ferrite.Octant{3,8,6}(2,(2,0,0)),4,3) == Ferrite.Octant{3,8,6}(2,(4,2,-2))

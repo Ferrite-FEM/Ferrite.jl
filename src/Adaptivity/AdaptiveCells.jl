@@ -1,6 +1,8 @@
 abstract type AbstractAdaptiveTree{dim,N,M} <: AbstractCell{dim,N,M} end
 abstract type AbstractAdaptiveCell{dim,N,M} <: AbstractCell{dim,N,M} end
 
+_maxlevel = [30,19]
+
 struct Octant{dim, N, M}  <: AbstractAdaptiveCell{dim,8,6}
     #Refinement level
     l::UInt
@@ -19,7 +21,7 @@ end
     Octant(dim::Integer, l::Integer, b::Integer, m::Integer)
 Construct an `octant` based on dimension `dim`, level `l`, amount of levels `b` and morton index `m`
 """
-function Octant(dim::Integer, l::Integer, b::Integer, m::Integer)
+function Octant(dim::Integer, l::Integer, m::Integer, b::Integer=_maxlevel[dim-1])
     @assert m ≤ 2^(dim*l)
     x,y,z = (0,0,0) 
     h = _compute_size(b,l) 
@@ -46,7 +48,7 @@ note the following quote from Burstedde et al:
   4, . . . , 7 being the four children on top of the children 0, . . . , 3.
 shifted by 1 due to julia 1 based indexing 
 """
-function child_id(octant::Octant{3},b::Integer)
+function child_id(octant::Octant{3},b::Integer=_maxlevel[2])
     i = 0x00
     h = _compute_size(b,octant.l)
     x,y,z = octant.xyz
@@ -56,7 +58,7 @@ function child_id(octant::Octant{3},b::Integer)
     return i+0x01
 end
 
-function child_id(octant::Octant{2},b::Integer)
+function child_id(octant::Octant{2},b::Integer=_maxlevel[1])
     i = 0x00
     h = _compute_size(b, octant.l)
     x,y = octant.xyz
@@ -65,7 +67,7 @@ function child_id(octant::Octant{2},b::Integer)
     return i+0x01
 end
 
-function parent(octant::Octant{dim,N,M}, b::Integer) where {dim,N,M}
+function parent(octant::Octant{dim,N,M}, b::Integer=_maxlevel[dim-1]) where {dim,N,M}
     if octant.l > 0 
         h = _compute_size(b,octant.l)
         l = octant.l - 0x01
@@ -81,13 +83,13 @@ Given an `octant`, computes the two smallest possible octants that fit into the 
 of `octant`, respectively. These computed octants are called first and last descendants of `octant`
 since they are connected to `octant` by a path down the octree to the maximum level  `b`
 """
-function descendants(octant::Octant{dim,N,M}, b::Integer) where {dim,N,M}
+function descendants(octant::Octant{dim,N,M}, b::Integer=_maxlevel[dim-1]) where {dim,N,M}
     l1 = b-1; l2 = b-1 # not sure 
     h = _compute_size(b,octant.l)
     return Octant{dim,N,M}(l1,octant.xyz), Octant{dim,N,M}(l2,octant.xyz .+ (h-2))
 end
 
-function face_neighbor(octant::Octant{dim,N,M}, f::Integer, b::Integer) where {dim,N,M}
+function face_neighbor(octant::Octant{dim,N,M}, f::Integer, b::Integer=_maxlevel[dim-1]) where {dim,N,M}
     l = octant.l
     h = _compute_size(b,octant.l)
     x,y,z = octant.xyz 
@@ -101,7 +103,7 @@ end
     edge_neighbor(octant::Octant, e::Integer, b::Integer)
 Computes the edge neighbor octant which is only connected by the edge `e` to `octant`
 """
-function edge_neighbor(octant::Octant{3,N,M}, e::Integer, b::Integer) where {N,M}
+function edge_neighbor(octant::Octant{3,N,M}, e::Integer, b::Integer=_maxlevel[2]) where {N,M}
     @assert 1 ≤ e ≤ 12
     e -= 1
     l = octant.l
@@ -132,7 +134,7 @@ end
     corner_neighbor(octant::Octant, c::Integer, b::Integer)
 Computes the corner neighbor octant which is only connected by the corner `c` to `octant`
 """
-function corner_neighbor(octant::Octant{3,N,M}, c::Integer, b::Integer) where {N,M}
+function corner_neighbor(octant::Octant{3,N,M}, c::Integer, b::Integer=_maxlevel[2]) where {N,M}
     c -= 1
     l = octant.l
     h = _compute_size(b,octant.l)
@@ -143,7 +145,7 @@ function corner_neighbor(octant::Octant{3,N,M}, c::Integer, b::Integer) where {N
     return Octant{3,N,M}(l,(x,y,z))
 end
 
-function corner_neighbor(octant::Octant{2,N,M}, c::Integer, b::Integer) where {N,M}
+function corner_neighbor(octant::Octant{2,N,M}, c::Integer, b::Integer=_maxlevel[1]) where {N,M}
     c -= 1
     l = octant.l
     h = _compute_size(b,octant.l)
