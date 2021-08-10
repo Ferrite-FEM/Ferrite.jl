@@ -1,9 +1,29 @@
-abstract type AbstractAdaptiveTree{dim,N,M} <: AbstractCell{dim,N,M} end
+abstract type AbstractAdaptiveGrid{dim} <: AbstractGrid{dim} end
 abstract type AbstractAdaptiveCell{dim,N,M} <: AbstractCell{dim,N,M} end
 
 _maxlevel = [30,19]
 
-struct Octant{dim, N, M}  <: AbstractAdaptiveCell{dim,8,6}
+function set_maxlevel(dim::Integer,maxlevel::Integer)
+    _maxlevel[dim-1] = maxlevel
+end
+
+struct AdaptiveGrid{dim, C<:AbstractAdaptiveCell, T<:Real} <: AbstractAdaptiveGrid{dim}
+    cells::Vector{C}
+    nodes::Vector{Node{dim,T}}
+    # Sets
+    cellsets::Dict{String,Set{Int}}
+    nodesets::Dict{String,Set{Int}}
+    facesets::Dict{String,Set{FaceIndex}} 
+    edgesets::Dict{String,Set{EdgeIndex}} 
+    vertexsets::Dict{String,Set{VertexIndex}}
+    #Connectivities
+    𝒩𝒪::Matrix{T}
+    𝒩ℱ::Matrix{T}
+    ℰ𝒯::Array
+    𝒞𝒯::Array
+end
+
+struct Octant{dim, N, M}
     #Refinement level
     l::UInt
     #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)}
@@ -11,10 +31,11 @@ struct Octant{dim, N, M}  <: AbstractAdaptiveCell{dim,8,6}
 end
 
 # Follow z order, x before y before z for faces, edges and corners
-struct Octree{dim,N,M} <: AbstractAdaptiveTree{dim,N,M}
+struct Octree{dim,N,M} <: AbstractAdaptiveCell{dim,N,M}
     leaves::Vector{Octant{dim,N,M}}
     #maximum refinement level 
     b::UInt
+    nodes::NTuple{N,Int}
 end
 
 """
