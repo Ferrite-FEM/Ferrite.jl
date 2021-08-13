@@ -249,36 +249,47 @@ function get_point_values!(vals::Vector{T2}, ph::PointEvalHandler{DH}, dof_value
 
     fielddim = getfielddim(ph.dh, fieldname)
 
-    # preallocate some things that we need many times and that correspond to a given fieldhandler
-    pvs = [PointScalarValues(first(ph.local_coords), ip) for ip in func_interpolations] 
-    cell_dofs_fhs = [celldofs(ph.dh, first(fh.cellset)) for fh in ph.dh.fieldhandlers]
-    dof_ranges = [dof_range(fh, fieldname) for fh in ph.dh.fieldhandlers]
-    for i in eachindex(ph.cells)
-        # set NaN values if no cell was found for a point
-        if ismissing(ph.cells[i])
-            vals[i] = first(dof_values)*NaN
-            continue
-        end
-        
-        for fh in ph.dh.fieldhandlers
-            if ph.cells[i] ∈ fh.cellset
-                cell_dofs = celldofs!(cell_dofs_fhs[ph.ip_idxs[i]], ph.dh, ph.cells[i])
-                dofrange = dof_ranges[ph.ip_idxs[i]]
-                field_dofs = view(cell_dofs, dofrange)
-                pv = reinit!(pvs[ph.ip_idxs[i]], ph.local_coords[i], func_interpolations[ph.ip_idxs[i]]) # !! not known at compile time which type pv will have (refshape)
-                # reshape field_dofs so that they work with ScalarValues
-                # this looks a crappy case for type instability, but in my measurements it wasn't the bad part /Kim
-                if fielddim == 1
-                    @inbounds @views dof_values_reshaped = dof_values[field_dofs]
-                else
-                    dof_values_reshaped = reinterpret(Vec{fielddim, T}, dof_values[field_dofs]) # TODO: should this use inbounds or views?
-                end
-                vals[i] = function_value(pv, 1, dof_values_reshaped)::T2
-            end
-        end
+    for fh_idx in eachindex(ph.dh.fieldhandlers)
+        _get_point_values!(vals, dof_values, ph, func_interpolations[fh_idx], fh_idx, fieldname, fielddim)
     end
     return vals
 end
+
+# this is just a function barrier
+function _get_point_values!(
+    vals::Vector{T2},
+    dof_values::Vector{T},
+    ph::PointEvalHandler{DH,dim,T},
+    ip::Interpolation,
+    fh_idx::Int,
+    fieldname::Symbol,
+    fielddim::Int) where {T2,dim,T,refshape,DH<:MixedDofHandler}
+
+    local_coords = ph.local_coords
+    dh = ph.dh
+    cellset = Set{Int}(collect(1:length(ph.cells))[ph.ip_idxs .== fh_idx]) # TODO: should really store these sets and not ip_idxs
+    pv = PointScalarValues(first(local_coords), ip)
+    cell_dofs = celldofs(dh, first(cellset))
+    dofrange = dof_range(dh.fieldhandlers[fh_idx], fieldname)
+    for cellid in cellset
+        # set NaN values if no cell was found for a point
+        if ismissing(ph.cells[cellid])
+            vals[cellid] = first(dof_values)*NaN
+            continue
+        end
+        celldofs!(cell_dofs, dh, cellid)
+        # field_dofs = view(cell_dofs, dofrange_field)
+        reinit!(pv, local_coords[cellid], ip)
+        if fielddim == 1
+            @inbounds @views dof_values_reshaped = dof_values[cell_dofs[dofrange]]
+        else
+            dof_values_reshaped = reinterpret(Vec{fielddim, T}, dof_values[cell_dofs[dofrange]]) # TODO: should this use inbounds or views?
+        end
+        vals[cellid] = function_value(pv, 1, dof_values_reshaped)::T2
+    end
+    return vals
+end
+
 
 function get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, fieldname::Symbol; func_interpolations = [getfieldinterpolation(ph.dh, find_field(ph.dh, fieldname))]) where {T,DH<:DofHandler}
 
