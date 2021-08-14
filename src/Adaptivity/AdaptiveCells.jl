@@ -55,9 +55,8 @@ struct TopologyBWG{T}
     face_neighbor::SparseMatrixCSC{T}
     #maps a given octree `k` and corner `c` to neighbor octree `k'` and its corner`c'`
     corner_neighbor::SparseMatrixCSC{T}
-    #𝒩ℱ::Matrix{T}
-    #ℰ𝒯::Matrix{T}
-    #𝒞𝒯::Matrix{T}
+    #maps a given octree `k` and edge `e` to neighbor octree `k'` and its edge `e'`
+    edge_neighbor::SparseMatrixCSC{T}
 end
 
 #CAUTION: type piracy in order to display zero values of SparseMatrixCSC
@@ -65,11 +64,33 @@ Base.zero(::Type{Tuple{Int,Int}}) = (0,0)
 
 function TopologyBWG(cells::Vector{Cell{3,N,6}}) where N
     I_face = UInt[]; J_face = UInt[]; V_face = Tuple{Int,Int}[]
-    I_edge = UInt[]; J_edge = UInt[]; V_edge = UInt[]
-    I_corner = UInt[]; J_corner = UInt[]; V_corner = UInt[]
+    I_edge = UInt[]; J_edge = UInt[]; V_edge = Tuple{Int,Int}[]
+    I_corner = UInt[]; J_corner = UInt[]; V_corner = Tuple{Int,Int}[]
     for (cellid,cell) in enumerate(cells)
         neighbors = findall.(x->x ∈ cell.nodes,getproperty.(cells,:nodes)) 
+        for (neighborid,neighbor) in enumerate(neighbors)
+            neighbor_cell = cells[neighborid]
+            if length(neighbor) == 0
+                #not a neighbor
+                continue
+            elseif length(neighbor) == 1
+                #corner neighbor
+                _corner_neighbor!(V_corner,I_corner,J_corner,cellid,cell,neighbor,neighborid,neighbor_cell)
+            elseif length(neighbor) == 2
+                #corner neighbor
+                _edge_neighbor!(V_edge,I_edge,J_edge,cellid,cell,neighbor,neighborid,neighbor_cell)
+            elseif length(neighbor) == 4
+                #face neighbor
+                _face_neighbor!(V_face,I_face,J_face,cellid,cell,neighbor,neighborid,neighbor_cell)
+            else
+                continue
+            end 
+        end
     end
+    face_neighbor = sparse(I_face,J_face,V_face)
+    corner_neighbor = sparse(I_corner,J_corner,V_corner) 
+    edge_neighbor = sparse(I_edge,J_edge,V_edge)
+    return TopologyBWG(face_neighbor,corner_neighbor,edge_neighbor) 
 end
 
 function TopologyBWG(cells::Vector{Cell{2,N,4}}) where N
@@ -95,7 +116,8 @@ function TopologyBWG(cells::Vector{Cell{2,N,4}}) where N
     end
     face_neighbor = sparse(I_face,J_face,V_face)
     corner_neighbor = sparse(I_corner,J_corner,V_corner) 
-    return TopologyBWG(face_neighbor,corner_neighbor) 
+    edge_neighbor = spzeros(Tuple{Int,Int},0,0)
+    return TopologyBWG(face_neighbor,corner_neighbor,edge_neighbor) 
 end
 
 function _corner_neighbor!(V_corner, I_corner, J_corner, cellid, cell, neighbor, neighborid, neighbor_cell)
@@ -104,6 +126,16 @@ function _corner_neighbor!(V_corner, I_corner, J_corner, cellid, cell, neighbor,
     push!(V_corner,corner_neighbor)
     push!(I_corner,cellid)
     push!(J_corner,cell_corner_id)
+end
+
+function _edge_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor, neighborid, neighbor_cell)
+    neighbor_face = neighbor_cell.nodes[neighbor]
+    neighbor_face_id = findfirst(x->issubset(x,neighbor_face), edges(neighbor_cell))
+    cell_face_id = findfirst(x->issubset(x,neighbor_face),edges(cell))
+    face_neighbor = (neighborid, neighbor_face_id)
+    push!(V_face, face_neighbor)
+    push!(I_face, cellid)
+    push!(J_face, cell_face_id)
 end
 
 function _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor, neighborid, neighbor_cell)

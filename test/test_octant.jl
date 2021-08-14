@@ -183,4 +183,34 @@ end
     @test topology.face_neighbor[6,2] == (0,0) 
     @test topology.face_neighbor[6,3] == (0,0) 
     @test topology.face_neighbor[6,4] == (5,2) 
+#          (8)
+# (7) +-----+-----+(9)
+#     |  3  |  4  |
+# (4) +-----+-----+(6) bottom view
+#     |  1  |  2  |
+# (1) +-----+-----+(3)
+#          (2)
+#          (15)
+#(16) +-----+-----+(17)
+#     |  3  |  4  |
+#(13) +-----+-----+(15) top view
+#     |  1  |  2  |
+#(10) +-----+-----+(12)
+#         (11)
+    hexgrid = generate_grid(Hexahedron,(2,2,1)) 
+    cells = hexgrid.cells 
+    topology = Ferrite.TopologyBWG(cells)
+    @test topology.edge_neighbor[1,7] == (4,5)
+    @test topology.edge_neighbor[2,8] == (3,6)
+    @test topology.edge_neighbor[3,6] == (2,8)
+    @test topology.edge_neighbor[4,5] == (1,7)
+    @test all(iszero,topology.corner_neighbor)
+    @test topology.face_neighbor[1,3] == (2,5)
+    @test topology.face_neighbor[1,4] == (3,2)
+    @test topology.face_neighbor[2,4] == (4,2)
+    @test topology.face_neighbor[2,5] == (1,3)
+    @test topology.face_neighbor[3,2] == (1,4)
+    @test topology.face_neighbor[3,3] == (4,5)
+    @test topology.face_neighbor[4,2] == (2,4)
+    @test topology.face_neighbor[4,5] == (3,3)
 end
