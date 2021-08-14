@@ -164,3 +164,74 @@ end
     @test VertexIndex(1,1) in getvertexset(grid, "left_corner")
 
 end
+
+@testset "Grid topology" begin
+#                           (11)
+#                   (10)+-----+-----+(12)
+#                       |  5  |  6  |
+#                   (7) +-----+-----+(9)
+#                       |  3  |  4  |
+#                   (4) +-----+-----+(6)
+#                       |  1  |  2  |
+#                   (1) +-----+-----+(3)
+#                            (2)
+    quadgrid = generate_grid(Quadrilateral,(2,3))
+    topology = quadgrid.topology
+    #test corner neighbors maps cellid and local corner id to neighbor id and neighbor local corner id
+    @test topology.corner_neighbor[1,3] == (4,1)
+    @test topology.corner_neighbor[2,4] == (3,2)
+    @test topology.corner_neighbor[3,3] == (6,1)
+    @test topology.corner_neighbor[3,2] == (2,4)
+    @test topology.corner_neighbor[4,1] == (1,3)
+    @test topology.corner_neighbor[4,4] == (5,2)
+    @test topology.corner_neighbor[5,2] == (4,4)
+    @test topology.corner_neighbor[6,1] == (3,3)
+    #test face neighbor maps cellid and local face id to neighbor id and neighbor local face id 
+    @test topology.face_neighbor[1,2] == (2,4)
+    @test topology.face_neighbor[1,3] == (3,1)
+    @test topology.face_neighbor[2,3] == (4,1)
+    @test topology.face_neighbor[2,4] == (1,2)
+    @test topology.face_neighbor[3,1] == (1,3)
+    @test topology.face_neighbor[3,2] == (4,4)
+    @test topology.face_neighbor[3,3] == (5,1)
+    @test topology.face_neighbor[4,1] == (2,3)
+    @test topology.face_neighbor[4,3] == (6,1)
+    @test topology.face_neighbor[4,4] == (3,2)
+    @test topology.face_neighbor[5,1] == (3,3)
+    @test topology.face_neighbor[5,2] == (6,4)
+    @test topology.face_neighbor[5,3] == (0,0)
+    @test topology.face_neighbor[5,4] == (0,0)
+    @test topology.face_neighbor[6,1] == (4,3) 
+    @test topology.face_neighbor[6,2] == (0,0) 
+    @test topology.face_neighbor[6,3] == (0,0) 
+    @test topology.face_neighbor[6,4] == (5,2) 
+#                         (8)
+#                (7) +-----+-----+(9)
+#                    |  3  |  4  |
+#                (4) +-----+-----+(6) bottom view
+#                    |  1  |  2  |
+#                (1) +-----+-----+(3)
+#                         (2)
+#                         (15)
+#(               16) +-----+-----+(17)
+#                    |  3  |  4  |
+#(               13) +-----+-----+(15) top view
+#                    |  1  |  2  |
+#(               10) +-----+-----+(12)
+#                        (11)
+    hexgrid = generate_grid(Hexahedron,(2,2,1)) 
+    topology = hexgrid.topology
+    @test topology.edge_neighbor[1,7] == (4,5)
+    @test topology.edge_neighbor[2,8] == (3,6)
+    @test topology.edge_neighbor[3,6] == (2,8)
+    @test topology.edge_neighbor[4,5] == (1,7)
+    @test all(iszero,topology.corner_neighbor)
+    @test topology.face_neighbor[1,3] == (2,5)
+    @test topology.face_neighbor[1,4] == (3,2)
+    @test topology.face_neighbor[2,4] == (4,2)
+    @test topology.face_neighbor[2,5] == (1,3)
+    @test topology.face_neighbor[3,2] == (1,4)
+    @test topology.face_neighbor[3,3] == (4,5)
+    @test topology.face_neighbor[4,2] == (2,4)
+    @test topology.face_neighbor[4,5] == (3,3)
+end
