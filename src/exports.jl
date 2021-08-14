@@ -85,6 +85,11 @@ export
     transform!,
     generate_grid,
     compute_vertex_values,
+# AdaptiveGrid
+    ForestBWG,
+    make_adaptive,
+    OctreeBWG,
+    OctantBWG, 
 
 # Dofs
     DofHandler,
