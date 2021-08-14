@@ -250,7 +250,7 @@ function get_point_values!(vals::Vector{T2}, ph::PointEvalHandler{DH}, dof_value
     fielddim = getfielddim(ph.dh, fieldname)
 
     for fh_idx in eachindex(ph.dh.fieldhandlers)
-        _get_point_values!(vals, dof_values, ph, func_interpolations[fh_idx], fh_idx, fieldname, fielddim)
+        _get_point_values!(vals, dof_values, ph, func_interpolations[fh_idx], fh_idx, fieldname, Val(fielddim))
     end
     return vals
 end
@@ -259,11 +259,11 @@ end
 function _get_point_values!(
     vals::Vector{T2},
     dof_values::Vector{T},
-    ph::PointEvalHandler{DH,dim,T},
+    ph::PointEvalHandler{DH,dim},
     ip::Interpolation,
     fh_idx::Int,
     fieldname::Symbol,
-    fielddim::Int) where {T2,dim,T,refshape,DH<:MixedDofHandler}
+    fdim::Val{fielddim}) where {T2,dim,T,DH<:MixedDofHandler, fielddim}
 
     local_coords = ph.local_coords
     dh = ph.dh
@@ -280,15 +280,19 @@ function _get_point_values!(
         celldofs!(cell_dofs, dh, cellid)
         # field_dofs = view(cell_dofs, dofrange_field)
         reinit!(pv, local_coords[cellid], ip)
-        if fielddim == 1
-            @inbounds @views dof_values_reshaped = dof_values[cell_dofs[dofrange]]
-        else
-            dof_values_reshaped = reinterpret(Vec{fielddim, T}, dof_values[cell_dofs[dofrange]]) # TODO: should this use inbounds or views?
-        end
+        @inbounds @views dof_values_reshaped = _change_format(fdim, dof_values[cell_dofs[dofrange]])
+        # if fielddim == 1
+        #     @inbounds @views dof_values_reshaped = dof_values[cell_dofs[dofrange]]
+        # else
+        #     dof_values_reshaped = reinterpret(Vec{fielddim, T}, dof_values[cell_dofs[dofrange]]) # TODO: should this use inbounds or views?
+        # end
         vals[cellid] = function_value(pv, 1, dof_values_reshaped)::T2
     end
     return vals
 end
+
+_change_format(::Val{1}, dof_values::AbstractVector{T}) where T = dof_values
+_change_format(::Val{fielddim}, dof_values::AbstractVector{T}) where {fielddim, T} = reinterpret(Vec{fielddim, T}, dof_values)
 
 
 function get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, fieldname::Symbol; func_interpolations = [getfieldinterpolation(ph.dh, find_field(ph.dh, fieldname))]) where {T,DH<:DofHandler}
