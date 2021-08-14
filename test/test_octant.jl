@@ -152,8 +152,8 @@ end
                         Cell{2,4,4}((2,3,6,5)),
                         Cell{2,4,4}((4,5,8,7)),
                         Cell{2,4,4}((5,6,9,8)),
-                        Cell{2,4,4}((7,8,10,11)),
-                        Cell{2,4,4}((8,9,11,12))]
+                        Cell{2,4,4}((7,8,11,10)),
+                        Cell{2,4,4}((8,9,12,11))]
     topology = Ferrite.TopologyBWG(cells)
     #test corner neighbors maps cellid and local corner id to neighbor id and neighbor local corner id
     @test topology.corner_neighbor[1,3] == (4,1)
@@ -164,4 +164,23 @@ end
     @test topology.corner_neighbor[4,4] == (5,2)
     @test topology.corner_neighbor[5,2] == (4,4)
     @test topology.corner_neighbor[6,1] == (3,3)
+    #test face neighbor maps cellid and local face id to neighbor id and neighbor local face id 
+    @test topology.face_neighbor[1,2] == (2,4)
+    @test topology.face_neighbor[1,3] == (3,1)
+    @test topology.face_neighbor[2,3] == (4,1)
+    @test topology.face_neighbor[2,4] == (1,2)
+    @test topology.face_neighbor[3,1] == (1,3)
+    @test topology.face_neighbor[3,2] == (4,4)
+    @test topology.face_neighbor[3,3] == (5,1)
+    @test topology.face_neighbor[4,1] == (2,3)
+    @test topology.face_neighbor[4,3] == (6,1)
+    @test topology.face_neighbor[4,4] == (3,2)
+    @test topology.face_neighbor[5,1] == (3,3)
+    @test topology.face_neighbor[5,2] == (6,4)
+    @test topology.face_neighbor[5,3] == (0,0)
+    @test topology.face_neighbor[5,4] == (0,0)
+    @test topology.face_neighbor[6,1] == (4,3) 
+    @test topology.face_neighbor[6,2] == (0,0) 
+    @test topology.face_neighbor[6,3] == (0,0) 
+    @test topology.face_neighbor[6,4] == (5,2) 
 end
