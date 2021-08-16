@@ -178,33 +178,33 @@ end
     quadgrid = generate_grid(Quadrilateral,(2,3))
     topology = quadgrid.topology
     #test corner neighbors maps cellid and local corner id to neighbor id and neighbor local corner id
-    @test topology.corner_neighbor[1,3] == (4,1)
-    @test topology.corner_neighbor[2,4] == (3,2)
-    @test topology.corner_neighbor[3,3] == (6,1)
-    @test topology.corner_neighbor[3,2] == (2,4)
-    @test topology.corner_neighbor[4,1] == (1,3)
-    @test topology.corner_neighbor[4,4] == (5,2)
-    @test topology.corner_neighbor[5,2] == (4,4)
-    @test topology.corner_neighbor[6,1] == (3,3)
+    @test topology.corner_neighbor[1,3] == Ferrite.Neighbor((4,1))
+    @test topology.corner_neighbor[2,4] == Ferrite.Neighbor((3,2))
+    @test topology.corner_neighbor[3,3] == Ferrite.Neighbor((6,1))
+    @test topology.corner_neighbor[3,2] == Ferrite.Neighbor((2,4))
+    @test topology.corner_neighbor[4,1] == Ferrite.Neighbor((1,3))
+    @test topology.corner_neighbor[4,4] == Ferrite.Neighbor((5,2))
+    @test topology.corner_neighbor[5,2] == Ferrite.Neighbor((4,4))
+    @test topology.corner_neighbor[6,1] == Ferrite.Neighbor((3,3))
     #test face neighbor maps cellid and local face id to neighbor id and neighbor local face id 
-    @test topology.face_neighbor[1,2] == (2,4)
-    @test topology.face_neighbor[1,3] == (3,1)
-    @test topology.face_neighbor[2,3] == (4,1)
-    @test topology.face_neighbor[2,4] == (1,2)
-    @test topology.face_neighbor[3,1] == (1,3)
-    @test topology.face_neighbor[3,2] == (4,4)
-    @test topology.face_neighbor[3,3] == (5,1)
-    @test topology.face_neighbor[4,1] == (2,3)
-    @test topology.face_neighbor[4,3] == (6,1)
-    @test topology.face_neighbor[4,4] == (3,2)
-    @test topology.face_neighbor[5,1] == (3,3)
-    @test topology.face_neighbor[5,2] == (6,4)
-    @test topology.face_neighbor[5,3] == (0,0)
-    @test topology.face_neighbor[5,4] == (0,0)
-    @test topology.face_neighbor[6,1] == (4,3) 
-    @test topology.face_neighbor[6,2] == (0,0) 
-    @test topology.face_neighbor[6,3] == (0,0) 
-    @test topology.face_neighbor[6,4] == (5,2) 
+    @test topology.face_neighbor[1,2] == Ferrite.Neighbor((2,4))
+    @test topology.face_neighbor[1,3] == Ferrite.Neighbor((3,1))
+    @test topology.face_neighbor[2,3] == Ferrite.Neighbor((4,1))
+    @test topology.face_neighbor[2,4] == Ferrite.Neighbor((1,2))
+    @test topology.face_neighbor[3,1] == Ferrite.Neighbor((1,3))
+    @test topology.face_neighbor[3,2] == Ferrite.Neighbor((4,4))
+    @test topology.face_neighbor[3,3] == Ferrite.Neighbor((5,1))
+    @test topology.face_neighbor[4,1] == Ferrite.Neighbor((2,3))
+    @test topology.face_neighbor[4,3] == Ferrite.Neighbor((6,1))
+    @test topology.face_neighbor[4,4] == Ferrite.Neighbor((3,2))
+    @test topology.face_neighbor[5,1] == Ferrite.Neighbor((3,3))
+    @test topology.face_neighbor[5,2] == Ferrite.Neighbor((6,4))
+    @test topology.face_neighbor[5,3] == Ferrite.Neighbor((0,0))
+    @test topology.face_neighbor[5,4] == Ferrite.Neighbor((0,0))
+    @test topology.face_neighbor[6,1] == Ferrite.Neighbor((4,3)) 
+    @test topology.face_neighbor[6,2] == Ferrite.Neighbor((0,0)) 
+    @test topology.face_neighbor[6,3] == Ferrite.Neighbor((0,0)) 
+    @test topology.face_neighbor[6,4] == Ferrite.Neighbor((5,2)) 
 #                         (8)
 #                (7) +-----+-----+(9)
 #                    |  3  |  4  |
@@ -221,17 +221,46 @@ end
 #                        (11)
     hexgrid = generate_grid(Hexahedron,(2,2,1)) 
     topology = hexgrid.topology
-    @test topology.edge_neighbor[1,7] == (4,5)
-    @test topology.edge_neighbor[2,8] == (3,6)
-    @test topology.edge_neighbor[3,6] == (2,8)
-    @test topology.edge_neighbor[4,5] == (1,7)
+    @test topology.edge_neighbor[1,11] == Ferrite.Neighbor((4,9))
+    @test topology.edge_neighbor[2,12] == Ferrite.Neighbor((3,10))
+    @test topology.edge_neighbor[3,10] == Ferrite.Neighbor((2,12))
+    @test topology.edge_neighbor[4,9] == Ferrite.Neighbor((1,11))
     @test all(iszero,topology.corner_neighbor)
-    @test topology.face_neighbor[1,3] == (2,5)
-    @test topology.face_neighbor[1,4] == (3,2)
-    @test topology.face_neighbor[2,4] == (4,2)
-    @test topology.face_neighbor[2,5] == (1,3)
-    @test topology.face_neighbor[3,2] == (1,4)
-    @test topology.face_neighbor[3,3] == (4,5)
-    @test topology.face_neighbor[4,2] == (2,4)
-    @test topology.face_neighbor[4,5] == (3,3)
+    @test topology.face_neighbor[1,3] == Ferrite.Neighbor((2,5))
+    @test topology.face_neighbor[1,4] == Ferrite.Neighbor((3,2))
+    @test topology.face_neighbor[2,4] == Ferrite.Neighbor((4,2))
+    @test topology.face_neighbor[2,5] == Ferrite.Neighbor((1,3))
+    @test topology.face_neighbor[3,2] == Ferrite.Neighbor((1,4))
+    @test topology.face_neighbor[3,3] == Ferrite.Neighbor((4,5))
+    @test topology.face_neighbor[4,2] == Ferrite.Neighbor((2,4))
+    @test topology.face_neighbor[4,5] == Ferrite.Neighbor((3,3))
+
+#                   +-----+-----+
+#                   |\  6 |\  8 |
+#                   |  \  |  \  |
+#                   |  5 \| 7  \|
+#                   +-----+-----+
+#                   |\  2 |\  4 |
+#                   |  \  |  \  |
+#                   |  1 \| 3  \|
+#                   +-----+-----+
+# test for multiple corner_neighbors as in e.g. ele 3, local corner 3 (middle node)
+    trigrid = generate_grid(Triangle,(2,2))
+    topology = trigrid.topology
+    @test topology.corner_neighbor[3,3] == Ferrite.Neighbor([(5,2),(6,1),(7,1)])
+
+# test mixed grid
+    cells = [
+        Hexahedron((1, 2, 3, 4, 5, 6, 7, 8)),
+        Quadrilateral((3, 2, 9, 10)),
+        ]
+    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 10)]
+    grid = Grid(cells, nodes)
+    topology = grid.topology
+    @test all(iszero,topology.corner_neighbor)
+# currently, we have in a getdim(cell) != getdim(neighbor_cell) case an unsymmetric topology sparse matrix
+# this implies that the neighborhood info is different from the perspective of the cells
+# cell 2 is connected via its face, which is an edge for cell 1 and vice versa
+    @test topology.face_neighbor[2,1] == Ferrite.Neighbor((1,2))
+    @test topology.edge_neighbor[1,2] == Ferrite.Neighbor((2,1))
 end

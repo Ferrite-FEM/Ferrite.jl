@@ -68,26 +68,50 @@ struct VertexIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
+struct Neighbor
+    neighbor_info::Vector{Tuple{Int,Int}}
+end
+
+Neighbor(info::Tuple{Int,Int}) = Neighbor([info])
+Base.zero(::Type{Neighbor}) = Neighbor([(0,0)])
+Base.length(n::Neighbor) = length(n.neighbor_info)
+Base.getindex(n::Neighbor,i) = getindex(n.neighbor_info,i)
+Base.firstindex(n::Neighbor) = 1
+Base.lastindex(n::Neighbor) = length(n.neighbor_info)
+Base.:(==)(n1::Neighbor, n2::Neighbor) = n1.neighbor_info == n2.neighbor_info
+
+function Base.:+(n1::Neighbor, n2::Neighbor)
+    neighbor_info = [n1.neighbor_info; n2.neighbor_info]
+    return Neighbor(neighbor_info)
+end
+
+function Base.show(io::IO, ::MIME"text/plain", n::Neighbor)
+    if length(n) == 1
+        println(io, "$(n.neighbor_info[1])")
+    else
+        println(io, "$(n.neighbor_info...)")
+    end
+end
+
 face_npoints(::Cell{2,N,M}) where {N,M} = 2
+face_npoints(::Cell{3,4,1}) = 4 #not sure how to handle embedded cells e.g. Quadrilateral3D
+edge_npoints(::Cell{3,4,1}) = 2 #not sure how to handle embedded cells e.g. Quadrilateral3D
 face_npoints(::Cell{3,N,6}) where N = 4
 face_npoints(::Cell{3,N,4}) where N = 3
 edge_npoints(::Cell{3,N,M}) where {N,M} = 2
 
 getdim(::Cell{dim,N,M}) where {dim,N,M} = dim
 
-#CAUTION: type piracy in order to display zero values of SparseMatrixCSC
-Base.zero(::Type{Tuple{Int,Int}}) = (0,0) 
-
 struct Topology
-    face_neighbor::SparseMatrixCSC{Tuple{Int,Int},Int}
-    corner_neighbor::SparseMatrixCSC{Tuple{Int,Int},Int}
-    edge_neighbor::SparseMatrixCSC{Tuple{Int,Int},Int}
+    face_neighbor::SparseMatrixCSC{Neighbor,Int}
+    corner_neighbor::SparseMatrixCSC{Neighbor,Int}
+    edge_neighbor::SparseMatrixCSC{Neighbor,Int}
 end
 
 function Topology(cells::Vector{C}) where C <: AbstractCell
-    I_face = Int[]; J_face = Int[]; V_face = Tuple{Int,Int}[]
-    I_edge = Int[]; J_edge = Int[]; V_edge = Tuple{Int,Int}[]
-    I_corner = Int[]; J_corner = Int[]; V_corner = Tuple{Int,Int}[]
+    I_face = Int[]; J_face = Int[]; V_face = Neighbor[]
+    I_edge = Int[]; J_edge = Int[]; V_edge = Neighbor[]
+    I_corner = Int[]; J_corner = Int[]; V_corner = Neighbor[]
     for (cellid,cell) in enumerate(cells)
         neighbors = findall.(x->x ∈ cell.nodes,getproperty.(cells,:nodes)) 
         for (neighborid,neighbor) in enumerate(neighbors)
@@ -118,27 +142,35 @@ end
 function _corner_neighbor!(V_corner, I_corner, J_corner, cellid, cell, neighbor, neighborid, neighbor_cell)
     corner_neighbor = (neighborid, neighbor[1]) 
     cell_corner_id = findfirst(x->x==neighbor_cell.nodes[neighbor[1]], cell.nodes)
-    push!(V_corner,corner_neighbor)
+    push!(V_corner,Neighbor(corner_neighbor))
     push!(I_corner,cellid)
     push!(J_corner,cell_corner_id)
 end
 
-function _edge_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor, neighborid, neighbor_cell)
-    neighbor_face = neighbor_cell.nodes[neighbor]
-    neighbor_face_id = findfirst(x->issubset(x,neighbor_face), edges(neighbor_cell))
-    cell_face_id = findfirst(x->issubset(x,neighbor_face),edges(cell))
-    face_neighbor = (neighborid, neighbor_face_id)
-    push!(V_face, face_neighbor)
-    push!(I_face, cellid)
-    push!(J_face, cell_face_id)
+function _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor, neighborid, neighbor_cell)
+    neighbor_edge = neighbor_cell.nodes[neighbor]
+    if getdim(neighbor_cell) < 3
+        neighbor_edge_id = findfirst(x->issubset(x,neighbor_edge), faces(neighbor_cell))
+    else
+        neighbor_edge_id = findfirst(x->issubset(x,neighbor_edge), edges(neighbor_cell))
+    end
+    cell_edge_id = findfirst(x->issubset(x,neighbor_edge),edges(cell))
+    edge_neighbor = (neighborid, neighbor_edge_id)
+    push!(V_edge, Neighbor(edge_neighbor))
+    push!(I_edge, cellid)
+    push!(J_edge, cell_edge_id)
 end
 
 function _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor, neighborid, neighbor_cell)
     neighbor_face = neighbor_cell.nodes[neighbor]
-    neighbor_face_id = findfirst(x->issubset(x,neighbor_face), faces(neighbor_cell))
+    if getdim(neighbor_cell) == getdim(cell)
+        neighbor_face_id = findfirst(x->issubset(x,neighbor_face), faces(neighbor_cell))
+    else
+        neighbor_face_id = findfirst(x->issubset(x,neighbor_face), edges(neighbor_cell))
+    end
     cell_face_id = findfirst(x->issubset(x,neighbor_face),faces(cell))
     face_neighbor = (neighborid, neighbor_face_id)
-    push!(V_face, face_neighbor)
+    push!(V_face, Neighbor(face_neighbor))
     push!(I_face, cellid)
     push!(J_face, cell_face_id)
 end
