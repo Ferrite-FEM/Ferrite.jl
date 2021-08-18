@@ -68,12 +68,12 @@ struct VertexIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
-struct Neighbor
-    neighbor_info::Vector{Tuple{Int,Int}}
+struct Neighbor{T<:BoundaryIndex}
+    neighbor_info::Vector{T}
 end
 
-Neighbor(info::Tuple{Int,Int}) = Neighbor([info])
-Base.zero(::Type{Neighbor}) = Neighbor([(0,0)])
+Neighbor(info::T) where T <: BoundaryIndex = Neighbor([info])
+Base.zero(::Type{Neighbor}) = Neighbor(BoundaryIndex[])
 Base.length(n::Neighbor) = length(n.neighbor_info)
 Base.getindex(n::Neighbor,i) = getindex(n.neighbor_info,i)
 Base.firstindex(n::Neighbor) = 1
@@ -86,7 +86,9 @@ function Base.:+(n1::Neighbor, n2::Neighbor)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", n::Neighbor)
-    if length(n) == 1
+    if length(n) == 0
+        println(io, "No Neighbor")
+    elseif length(n) == 1
         println(io, "$(n.neighbor_info[1])")
     else
         println(io, "$(n.neighbor_info...)")
@@ -106,6 +108,13 @@ struct Topology
     face_neighbor::SparseMatrixCSC{Neighbor,Int}
     corner_neighbor::SparseMatrixCSC{Neighbor,Int}
     edge_neighbor::SparseMatrixCSC{Neighbor,Int}
+end
+
+function Topology()
+    face_neighbor = spzeros(Neighbor,0,0)
+    corner_neighbor = spzeros(Neighbor,0,0)
+    edge_neighbor = spzeros(Neighbor,0,0)
+    return Topology(face_neighbor,corner_neighbor,edge_neighbor)
 end
 
 function Topology(cells::Vector{C}) where C <: AbstractCell
@@ -140,7 +149,7 @@ function Topology(cells::Vector{C}) where C <: AbstractCell
 end
 
 function _corner_neighbor!(V_corner, I_corner, J_corner, cellid, cell, neighbor, neighborid, neighbor_cell)
-    corner_neighbor = (neighborid, neighbor[1]) 
+    corner_neighbor = VertexIndex((neighborid, neighbor[1]))
     cell_corner_id = findfirst(x->x==neighbor_cell.nodes[neighbor[1]], cell.nodes)
     push!(V_corner,Neighbor(corner_neighbor))
     push!(I_corner,cellid)
@@ -151,11 +160,12 @@ function _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor, neighbo
     neighbor_edge = neighbor_cell.nodes[neighbor]
     if getdim(neighbor_cell) < 3
         neighbor_edge_id = findfirst(x->issubset(x,neighbor_edge), faces(neighbor_cell))
+        edge_neighbor = FaceIndex((neighborid, neighbor_edge_id))
     else
         neighbor_edge_id = findfirst(x->issubset(x,neighbor_edge), edges(neighbor_cell))
+        edge_neighbor = EdgeIndex((neighborid, neighbor_edge_id))
     end
     cell_edge_id = findfirst(x->issubset(x,neighbor_edge),edges(cell))
-    edge_neighbor = (neighborid, neighbor_edge_id)
     push!(V_edge, Neighbor(edge_neighbor))
     push!(I_edge, cellid)
     push!(J_edge, cell_edge_id)
@@ -165,11 +175,12 @@ function _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor, neighbo
     neighbor_face = neighbor_cell.nodes[neighbor]
     if getdim(neighbor_cell) == getdim(cell)
         neighbor_face_id = findfirst(x->issubset(x,neighbor_face), faces(neighbor_cell))
+        face_neighbor = FaceIndex((neighborid, neighbor_face_id))
     else
         neighbor_face_id = findfirst(x->issubset(x,neighbor_face), edges(neighbor_cell))
+        face_neighbor = EdgeIndex((neighborid, neighbor_face_id))
     end
     cell_face_id = findfirst(x->issubset(x,neighbor_face),faces(cell))
-    face_neighbor = (neighborid, neighbor_face_id)
     push!(V_face, Neighbor(face_neighbor))
     push!(I_face, cellid)
     push!(J_face, cell_face_id)
