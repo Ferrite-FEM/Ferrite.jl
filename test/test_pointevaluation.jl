@@ -28,7 +28,6 @@ function isoparametric_mixeddofhandler()
 
     # set up PointEvalHandler and retrieve values
     ph = Ferrite.PointEvalHandler(projector.dh, points)
-    @btime Ferrite.get_point_values($ph, $dof_vals, $projector)
     vals = Ferrite.get_point_values(ph, dof_vals, projector)
     @test f.(points) ≈ vals
 
