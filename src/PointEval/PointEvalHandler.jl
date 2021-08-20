@@ -2,7 +2,6 @@ struct PointEvalHandler{DH<:AbstractDofHandler,dim,T<:Real}
     dh::DH
     cells::Vector{Union{Missing, Int}}
     local_coords::Vector{Vec{dim,T}} # TODO: store local coordinates instead of PointScalarValues (can we toss the PointScalarValues in that case?)
-    ip_idxs::Vector{Int}
     pointidx_sets::Vector{Set{Int}} # indices to access cells and local_coords
 end
 # TODO add missing cellset + make sure NaN are set if cells cannot be found
@@ -12,9 +11,9 @@ function PointEvalHandler(dh::AbstractDofHandler, points::AbstractVector{Vec{dim
     ) where {dim, T<:Real}
 
     node_cell_dicts = [_get_node_cell_map(dh.grid)]
-    cells, local_coords, ip_idxs, cellsets = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
+    cells, local_coords, cellsets = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
 
-    return PointEvalHandler(dh, cells, local_coords, ip_idxs, cellsets)
+    return PointEvalHandler(dh, cells, local_coords, cellsets)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
@@ -37,9 +36,9 @@ function PointEvalHandler(dh::MixedDofHandler{dim, T}, points::AbstractVector{Ve
     # TODO: test that geom_interpolation is compatible with grid (use this as a default)
 
     node_cell_dicts = [_get_node_cell_map(dh.grid, fh.cellset) for fh in dh.fieldhandlers]
-    cells, local_coords, ip_idxs, cellsets = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
+    cells, local_coords, cellsets = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
 
-   return PointEvalHandler(dh, cells, local_coords, ip_idxs, cellsets)
+   return PointEvalHandler(dh, cells, local_coords, cellsets)
 end
 
 get_default_geom_interpolations(dh::DofHandler) = [default_interpolation(typeof(first(dh.grid.cells)))]
@@ -61,7 +60,6 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
 
     cells = Vector{Union{Missing, Int}}(undef, length(points))
     local_coords = Vector{Vec{dim, T}}(undef, length(points))
-    ip_idxs = Vector{Int}(undef, length(points))
     cellset_vectors = [Int[] for i in eachindex(node_cell_dicts)]
 
     for point_idx in 1:length(points)
@@ -80,7 +78,6 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
                     cell_found = true
                     cells[point_idx] = cell
                     local_coords[point_idx] = local_coord
-                    ip_idxs[point_idx] = ip_idx
                     push!(cellset_vectors[ip_idx], point_idx)
                     break
                 end
@@ -88,7 +85,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
         end
         !cell_found && (cells[point_idx] = missing) #error("No cell found for point $(points[point_idx]), index $point_idx.")
     end
-    return cells, local_coords, ip_idxs, Set{Int}.(cellset_vectors)
+    return cells, local_coords, Set{Int}.(cellset_vectors)
 end
 
 # check if point is inside a cell based on physical coordinate
