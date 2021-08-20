@@ -3,6 +3,7 @@ struct PointEvalHandler{DH<:AbstractDofHandler,dim,T<:Real}
     cells::Vector{Union{Missing, Int}}
     local_coords::Vector{Vec{dim,T}} # TODO: store local coordinates instead of PointScalarValues (can we toss the PointScalarValues in that case?)
     pointidx_sets::Vector{Set{Int}} # indices to access cells and local_coords
+    missing_idxs::Set{Int} # cells for these indices could not be found
 end
 # TODO add missing cellset + make sure NaN are set if cells cannot be found
 
@@ -22,9 +23,9 @@ function PointEvalHandler(dh::AbstractDofHandler, points::AbstractVector{Vec{dim
     ) where {dim, T<:Real}
 
     node_cell_dicts = [_get_node_cell_map(dh.grid)]
-    cells, local_coords, cellsets = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
+    cells, local_coords, cellsets, missing_idxs = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
 
-    return PointEvalHandler(dh, cells, local_coords, cellsets)
+    return PointEvalHandler(dh, cells, local_coords, cellsets, missing_idxs)
 end
 
 # function interpolations need to be explicitely given, because we don't know which field we are looking for.
@@ -37,9 +38,9 @@ function PointEvalHandler(dh::MixedDofHandler{dim, T}, points::AbstractVector{Ve
     # TODO: test that geom_interpolation is compatible with grid (use this as a default)
 
     node_cell_dicts = [_get_node_cell_map(dh.grid, fh.cellset) for fh in dh.fieldhandlers]
-    cells, local_coords, cellsets = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
+    cells, local_coords, cellsets, missing_idxs = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
 
-   return PointEvalHandler(dh, cells, local_coords, cellsets)
+   return PointEvalHandler(dh, cells, local_coords, cellsets, missing_idxs)
 end
 
 function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_cell_dicts::Vector{Dict{Int, Vector{Int}}}, 
@@ -52,6 +53,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
     cells = Vector{Union{Missing, Int}}(undef, length(points))
     local_coords = Vector{Vec{dim, T}}(undef, length(points))
     cellset_vectors = [Int[] for i in eachindex(node_cell_dicts)]
+    missing_cells = Int[]
 
     for point_idx in 1:length(points)
         cell_found = false
@@ -73,10 +75,15 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
                     break
                 end
             end
+            cell_found && break
         end
-        !cell_found && (cells[point_idx] = missing) #error("No cell found for point $(points[point_idx]), index $point_idx.")
+        if ! cell_found
+            push!(missing_cells, point_idx)
+            cells[point_idx] = missing
+            @warn("No cell found for point number $point_idx, coordinate: $(points[point_idx]).")
+        end
     end
-    return cells, local_coords, Set{Int}.(cellset_vectors)
+    return cells, local_coords, Set{Int}.(cellset_vectors), Set{Int}(missing_cells)
 end
 
 # check if point is inside a cell based on physical coordinate
@@ -146,6 +153,7 @@ function find_local_coordinate(interpolation, cell_coordinates, global_coordinat
     return converged, local_guess
 end
 
+# return a Dict with a key for each node that contains a vector with the adjacent cells as value
 function _get_node_cell_map(grid::Grid, cellset::Set{Int}=Set{Int64}(1:getncells(grid)))
     cell_dict = Dict{Int, Vector{Int}}()
     for cellidx in cellset
@@ -162,6 +170,14 @@ end
 
 ##################################################################################################################
 # points in nodal order
+
+function _set_missing_vals!(vals::Vector{T}, ph::PointEvalHandler) where T
+    v = vals[first(first(ph.pointidx_sets))] # just needed for its type
+    for idx in ph.missing_idxs
+        vals[idx] = v*NaN
+    end
+    return vals
+end
 
 function get_point_values(
     ph::PointEvalHandler{DH},
@@ -182,6 +198,7 @@ function get_point_values(
     for fh_idx in eachindex(ph.dh.fieldhandlers)
         _get_point_values!(vals, nodal_values, func_interpolations[fh_idx], ph, fh_idx)
     end
+    _set_missing_vals!(vals, ph)
     return vals
 end
 
@@ -201,6 +218,7 @@ function get_point_values(
     npoints = length(ph.cells)
     vals = Vector{T}(undef, npoints)
     _get_point_values!(vals, nodal_values, func_interpolations[1], ph, 1)
+    _set_missing_vals!(vals, ph)
     return vals
 end
 
@@ -219,7 +237,6 @@ function _get_point_values!(vals::Vector{T}, nodal_values::Vector{T}, ip::Interp
     end
     return vals
 end
-
 
 ##################################################################################################################
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
@@ -257,10 +274,11 @@ function get_point_values!(vals::Vector{T2},
     # TODO: should really check that T2 corresponds to return type for fielddim!
 
     fielddim = getfielddim(ph.dh, fieldname)
-
+    
     for fh_idx in eachindex(ph.dh.fieldhandlers)
         _get_point_values!(vals, dof_values, ph, func_interpolations[fh_idx], fh_idx, fieldname, Val(fielddim))
     end
+    _set_missing_vals!(vals, ph)
     return vals
 end
 
@@ -276,9 +294,8 @@ function get_point_values!(vals::Vector{T2},
     # TODO: should really check that T2 corresponds to return type for fielddim!
 
     fielddim = getfielddim(ph.dh, fieldname)
-
     _get_point_values!(vals, dof_values, ph, func_interpolations[1], 1, fieldname, Val(fielddim))
-
+    _set_missing_vals!(vals, ph)
     return vals
 end
 
@@ -313,6 +330,7 @@ end
 
 ###################################################################################################################
 # work-arounds so that we can call stuff with the same Syntax
+
 _dof_range(dh::DofHandler, fieldname, ::Int) = dof_range(dh, fieldname)
 _dof_range(dh::MixedDofHandler, fieldname, fh_idx::Int) = dof_range(dh.fieldhandlers[fh_idx], fieldname)
 
