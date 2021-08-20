@@ -6,16 +6,6 @@ struct PointEvalHandler{DH<:AbstractDofHandler,dim,T<:Real}
 end
 # TODO add missing cellset + make sure NaN are set if cells cannot be found
 
-function PointEvalHandler(dh::AbstractDofHandler, points::AbstractVector{Vec{dim, T}},
-    geom_interpolations::Vector{<:Interpolation{dim}}=get_default_geom_interpolations(dh);
-    ) where {dim, T<:Real}
-
-    node_cell_dicts = [_get_node_cell_map(dh.grid)]
-    cells, local_coords, cellsets = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
-
-    return PointEvalHandler(dh, cells, local_coords, cellsets)
-end
-
 function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
     println(io, typeof(ph))
     println(io, "  number of points: ", length(ph.local_coords))
@@ -26,6 +16,17 @@ function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
         println(io, "  Could not find corresponding cell for ", n_missing, " points.")
     end
 end
+
+function PointEvalHandler(dh::AbstractDofHandler, points::AbstractVector{Vec{dim, T}},
+    geom_interpolations::Vector{<:Interpolation{dim}}=get_default_geom_interpolations(dh);
+    ) where {dim, T<:Real}
+
+    node_cell_dicts = [_get_node_cell_map(dh.grid)]
+    cells, local_coords, cellsets = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
+
+    return PointEvalHandler(dh, cells, local_coords, cellsets)
+end
+
 # function interpolations need to be explicitely given, because we don't know which field we are looking for.
 # Only one field at a time can be interpolated, so one function interpolation per FieldHandler (= per cellset) is sufficient.
 # If several fields should be interpolated with different function interpolations, several PointEvalHandlers need to be constructed.
@@ -39,16 +40,6 @@ function PointEvalHandler(dh::MixedDofHandler{dim, T}, points::AbstractVector{Ve
     cells, local_coords, cellsets = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
 
    return PointEvalHandler(dh, cells, local_coords, cellsets)
-end
-
-get_default_geom_interpolations(dh::DofHandler) = [default_interpolation(typeof(first(dh.grid.cells)))]
-
-function get_default_geom_interpolations(dh::MixedDofHandler{dim}) where {dim}
-    ips = Interpolation{dim}[]
-    for fh in dh.fieldhandlers
-        push!(ips, default_interpolation(typeof(dh.grid.cells[first(fh.cellset)])))
-    end
-    return ips
 end
 
 function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_cell_dicts::Vector{Dict{Int, Vector{Int}}}, 
@@ -169,19 +160,8 @@ function _get_node_cell_map(grid::Grid, cellset::Set{Int}=Set{Int64}(1:getncells
     return cell_dict
 end
 
-function get_func_interpolations(ph::PointEvalHandler{DH}, fieldname) where DH<:MixedDofHandler
-    func_interpolations = []
-    for fh in ph.dh.fieldhandlers
-        j = findfirst(i->i == fieldname, getfieldnames(fh))
-        if !(j === nothing)
-            push!(func_interpolations, fh.fields[j].interpolation)
-        else
-            push!(func_interpolations, missing)
-        end
-    end
-    return func_interpolations
-end
-get_func_interpolations(ph::PointEvalHandler{DH}, fieldname) where DH<:DofHandler = [getfieldinterpolation(ph.dh, find_field(ph.dh, fieldname))]
+##################################################################################################################
+# points in nodal order
 
 function get_point_values(
     ph::PointEvalHandler{DH},
@@ -204,6 +184,7 @@ function get_point_values(
     end
     return vals
 end
+
 function get_point_values(
     ph::PointEvalHandler{DH},
     nodal_values::Vector{T},
@@ -260,6 +241,8 @@ function get_point_values(
     get_point_values!(vals, ph, dof_values, fieldname; func_interpolations=func_interpolations)
     return vals
 end
+
+get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, ::L2Projector) where {DH<:MixedDofHandler,T} = get_point_values(ph, dof_values, :_)
 
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
 function get_point_values!(vals::Vector{T2},
@@ -328,12 +311,33 @@ function _get_point_values!(
     return vals
 end
 
-# a work-around so that we can call these with the same Syntax
-_dof_range(dh::MixedDofHandler, fieldname, fh_idx::Int) = dof_range(dh.fieldhandlers[fh_idx], fieldname)
+###################################################################################################################
+# work-arounds so that we can call stuff with the same Syntax
 _dof_range(dh::DofHandler, fieldname, ::Int) = dof_range(dh, fieldname)
+_dof_range(dh::MixedDofHandler, fieldname, fh_idx::Int) = dof_range(dh.fieldhandlers[fh_idx], fieldname)
 
 _change_format(::Val{1}, dof_values::AbstractVector{T}) where T = dof_values
 _change_format(::Val{fielddim}, dof_values::AbstractVector{T}) where {fielddim, T} = reinterpret(Vec{fielddim, T}, dof_values)
 
-get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, ::L2Projector) where {DH<:MixedDofHandler,T} = get_point_values(ph, dof_values, :_)
+get_default_geom_interpolations(dh::DofHandler) = [default_interpolation(typeof(first(dh.grid.cells)))]
+function get_default_geom_interpolations(dh::MixedDofHandler{dim}) where {dim}
+    ips = Interpolation{dim}[]
+    for fh in dh.fieldhandlers
+        push!(ips, default_interpolation(typeof(dh.grid.cells[first(fh.cellset)])))
+    end
+    return ips
+end
 
+get_func_interpolations(ph::PointEvalHandler{DH}, fieldname) where DH<:DofHandler = [getfieldinterpolation(ph.dh, find_field(ph.dh, fieldname))]
+function get_func_interpolations(ph::PointEvalHandler{DH}, fieldname) where DH<:MixedDofHandler
+    func_interpolations = []
+    for fh in ph.dh.fieldhandlers
+        j = findfirst(i->i == fieldname, getfieldnames(fh))
+        if !(j === nothing)
+            push!(func_interpolations, fh.fields[j].interpolation)
+        else
+            push!(func_interpolations, missing)
+        end
+    end
+    return func_interpolations
+end
