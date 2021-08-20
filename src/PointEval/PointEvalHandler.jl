@@ -185,11 +185,10 @@ function get_point_values(
     func_interpolations::Vector{<:Interpolation} = get_default_geom_interpolations(ph.dh),
     ) where {DH<:MixedDofHandler, T<:Union{Real, AbstractTensor}}
 
-    # TODO check for sub/superparametric approximations
+    if func_interpolations != get_default_geom_interpolations(ph.dh)
+        @warn("Obtaining point values based on nodal values is not recommended for superparametric approximations. You can igonre this warning for subparametric approximations.")
+    end
 
-    # if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
-    #     @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
-    # end
     length(nodal_values) == getnnodes(ph.dh.grid) || error("You must supply nodal values for all nodes of the Grid.")
 
     npoints = length(ph.cells)
@@ -208,11 +207,10 @@ function get_point_values(
     func_interpolations::Vector{<:Interpolation} = get_default_geom_interpolations(ph.dh),
     ) where {DH<:DofHandler, T<:Union{Real, AbstractTensor}}
 
-    # TODO check for sub/superparametric approximations
-
-    # if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
-    #     @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
-    # end
+    if func_interpolations != get_default_geom_interpolations(ph.dh)
+        @warn("Obtaining point values based on nodal values is not recommended for superparametric approximations. You can igonre this warning for subparametric approximations.")
+    end
+    
     length(nodal_values) == getnnodes(ph.dh.grid) || error("You must supply nodal values for all nodes of the Grid.")
 
     npoints = length(ph.cells)
@@ -271,8 +269,6 @@ function get_point_values!(vals::Vector{T2},
 
     length(dof_values) == ndofs(ph.dh) || error("You must supply nodal values for all $(ndofs(ph.dh)) dofs.")
 
-    # TODO: should really check that T2 corresponds to return type for fielddim!
-
     fielddim = getfielddim(ph.dh, fieldname)
     
     for fh_idx in eachindex(ph.dh.fieldhandlers)
@@ -290,8 +286,6 @@ function get_point_values!(vals::Vector{T2},
     ) where {T2, T,DH<:DofHandler} 
 
     length(dof_values) == ndofs(ph.dh) || error("You must supply nodal values for all $(ndofs(ph.dh)) dofs.")
-
-    # TODO: should really check that T2 corresponds to return type for fielddim!
 
     fielddim = getfielddim(ph.dh, fieldname)
     _get_point_values!(vals, dof_values, ph, func_interpolations[1], 1, fieldname, Val(fielddim))
