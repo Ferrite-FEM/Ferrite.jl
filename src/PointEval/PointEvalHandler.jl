@@ -22,6 +22,8 @@ function PointEvalHandler(dh::AbstractDofHandler, points::AbstractVector{Vec{dim
     geom_interpolations::Vector{<:Interpolation{dim}}=get_default_geom_interpolations(dh);
     ) where {dim, T<:Real}
 
+    getrefshape.(geom_interpolations) == getrefshape.(get_default_geom_interpolations(dh)) || error("The given geometry interpolations are incompatible with the given DofHandler.")
+
     node_cell_dicts = [_get_node_cell_map(dh.grid)]
     cells, local_coords, cellsets, missing_idxs = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
 
@@ -35,7 +37,7 @@ function PointEvalHandler(dh::MixedDofHandler{dim, T}, points::AbstractVector{Ve
     geom_interpolations::Vector{<:Interpolation{dim}}=get_default_geom_interpolations(dh);
     ) where {dim, T<:Real}
 
-    # TODO: test that geom_interpolation is compatible with grid (use this as a default)
+    getrefshape.(geom_interpolations) == getrefshape.(get_default_geom_interpolations(dh)) || error("The given geometry interpolations are incompatible with the given MixedDofHandler.")
 
     node_cell_dicts = [_get_node_cell_map(dh.grid, fh.cellset) for fh in dh.fieldhandlers]
     cells, local_coords, cellsets, missing_idxs = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
@@ -210,7 +212,7 @@ function get_point_values(
     if func_interpolations != get_default_geom_interpolations(ph.dh)
         @warn("Obtaining point values based on nodal values is not recommended for superparametric approximations. You can igonre this warning for subparametric approximations.")
     end
-    
+
     length(nodal_values) == getnnodes(ph.dh.grid) || error("You must supply nodal values for all nodes of the Grid.")
 
     npoints = length(ph.cells)
