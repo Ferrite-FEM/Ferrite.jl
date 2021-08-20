@@ -3,6 +3,10 @@ struct PointScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: CellValues{d
     N::Vector{T}
 end
 
+function Base.show(io::IO, ::MIME"text/plain", pv::PointScalarValues)
+    print(io, "$(typeof(pv)) with $(getnbasefunctions(pv)) shape functions.")
+end
+
 function PointScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation)
     PointScalarValues(Float64, quad_rule, func_interpol)
 end
