@@ -1,3 +1,12 @@
+"""
+    PointEvalHandler(dh::AbstractDofHandler, points::AbstractVector{Vec{dim,T}}) where {dim, T}
+    PointEvalHandler(dh::AbstractDofHandler, points::AbstractVector{Vec{dim,T}}, geom_interpolations::Vector{<:Interpolation{dim}}) where {dim, T}
+
+A `PointEvalHandler` computes the corresponding cell for each point in `points` and its local coordinate within the cell.
+When no `geom_interpolations` are given, the default interpolations of the grid are used. For using custom geometry interpolations hand in a vector of interpolations,
+whose order corresponds to the order of `FieldHandlers` within the given `MixedDofHandler`. For a `DofHandler`, give a Vector with your geometry interpolation as single entry.
+"""
+
 struct PointEvalHandler{DH<:AbstractDofHandler,dim,T<:Real}
     dh::DH
     cells::Vector{Union{Missing, Int}}
@@ -173,14 +182,18 @@ end
 ##################################################################################################################
 # points in nodal order
 
-function _set_missing_vals!(vals::Vector{T}, ph::PointEvalHandler) where T
-    v = vals[first(first(ph.pointidx_sets))] # just needed for its type
-    for idx in ph.missing_idxs
-        vals[idx] = v*NaN
-    end
-    return vals
-end
+"""
+    get_point_values(ph::PointEvalHandler, nodal_values::Vector{T}) where T
+    get_point_values(ph::PointEvalHandler, nodal_values::Vector{T}, func_interpolations::Vector{<:Interpolation}) where T
 
+Return a Vector{T} with the field values in the points of the `PointEvalHandler`. The field values are computed based on the `nodal_values` and interpolated to the local coordinates by the `func_interpolations`.
+The `nodal_values` must be given in nodal order.
+
+If no function interpolations are given, the interpolations are determined based on the grid. For using custom function interpolations hand in a vector of interpolations,
+whose order corresponds to the order of `FieldHandlers` within the `MixedDofHandler` that was used for constructing the `PointEvalHandler`. For a `DofHandler`, give a Vector with your function interpolation as single entry.
+
+This function should not be used for superparametric approximations. Instead, use the version which is based on `dof_values`.
+"""
 function get_point_values(
     ph::PointEvalHandler{DH},
     nodal_values::Vector{T},
@@ -240,10 +253,22 @@ end
 
 ##################################################################################################################
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
+"""
+    get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, fieldname::Symbol) where T
+    get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, fieldname::Symbol, func_interpolations::Vector{<:Interpolation}) where T
+    get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, ::L2Projector) where T
+    get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, ::L2Projector, func_interpolations::Vector{<:Interpolation}) where T
+
+Return a Vector{T} with the field values of field `fieldname` in the points of the `PointEvalHandler`. The field values are computed based on the `dof_values` and interpolated to the local coordinates by the `func_interpolations`.
+The `dof_values` must be given in the order of the dofs that corresponds to the `AbstractDofHandler` which was used to construct `ph`. If the `dof_values` are obtained by a `L2Projector`, the `L2Projector` can be handed over instead of the `fieldname`. 
+
+If no function interpolations are given, the field interpolations are extracted from the `AbstractDofHandler` of `ph`. For using custom function interpolations hand in a vector of interpolations,
+whose order corresponds to the order of `FieldHandlers` within the `MixedDofHandler` that was used for constructing `ph`. For a `DofHandler`, give a Vector with your function interpolation as single entry.
+"""
 function get_point_values(
     ph::PointEvalHandler{DH},
     dof_values::Vector{T},
-    fieldname::Symbol;
+    fieldname::Symbol,
     func_interpolations = get_func_interpolations(ph, fieldname)
     ) where {T,DH<:AbstractDofHandler}
 
@@ -259,13 +284,13 @@ function get_point_values(
     return vals
 end
 
-get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, ::L2Projector) where {DH<:MixedDofHandler,T} = get_point_values(ph, dof_values, :_)
+get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, ::L2Projector, func_interpolations = get_func_interpolations(ph, fieldname)) where {DH<:MixedDofHandler,T} = get_point_values(ph, dof_values, :_, func_interpolations)
 
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
 function get_point_values!(vals::Vector{T2},
     ph::PointEvalHandler{DH},
     dof_values::Vector{T},
-    fieldname::Symbol;
+    fieldname::Symbol,
     func_interpolations = get_func_interpolations(ph, fieldname)
     ) where {T2, T,DH<:MixedDofHandler} 
 
@@ -309,7 +334,7 @@ function _get_point_values!(
     local_coords = ph.local_coords
     dh = ph.dh
     point_idx_set = ph.pointidx_sets[fh_idx]
-    # preallocate some stuff specific to this fieldhandler
+    # preallocate some stuff specific to this cellset
     pv = PointScalarValues(first(local_coords), ip)
     cell_dofs = celldofs(dh, ph.cells[first(point_idx_set)])
     dofrange = _dof_range(dh, fieldname, fh_idx)
@@ -325,13 +350,24 @@ function _get_point_values!(
 end
 
 ###################################################################################################################
-# work-arounds so that we can call stuff with the same Syntax
+# utils 
 
-_dof_range(dh::DofHandler, fieldname, ::Int) = dof_range(dh, fieldname)
-_dof_range(dh::MixedDofHandler, fieldname, fh_idx::Int) = dof_range(dh.fieldhandlers[fh_idx], fieldname)
+# set NaNs for points where no cell was found
+function _set_missing_vals!(vals::Vector{T}, ph::PointEvalHandler) where T
+    v = vals[first(first(ph.pointidx_sets))] # just needed for its type
+    for idx in ph.missing_idxs
+        vals[idx] = v*NaN
+    end
+    return vals
+end
 
+# reshape dof_values based on fielddim
 _change_format(::Val{1}, dof_values::AbstractVector{T}) where T = dof_values
 _change_format(::Val{fielddim}, dof_values::AbstractVector{T}) where {fielddim, T} = reinterpret(Vec{fielddim, T}, dof_values)
+
+## work-arounds so that we can call stuff with the same syntax for DofHandler and MixedDofHandler
+_dof_range(dh::DofHandler, fieldname, ::Int) = dof_range(dh, fieldname)
+_dof_range(dh::MixedDofHandler, fieldname, fh_idx::Int) = dof_range(dh.fieldhandlers[fh_idx], fieldname)
 
 get_default_geom_interpolations(dh::DofHandler) = [default_interpolation(typeof(first(dh.grid.cells)))]
 function get_default_geom_interpolations(dh::MixedDofHandler{dim}) where {dim}
