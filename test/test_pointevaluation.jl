@@ -27,12 +27,12 @@ function isoparametric_mixeddofhandler()
     points = [Vec((x, 0.52)) for x in range(0.0, 1.0, length=100)]
 
     # set up PointEvalHandler and retrieve values
-    ph = Ferrite.PointEvalHandler(projector.dh, points)
-    vals = Ferrite.get_point_values(ph, dof_vals, projector)
+    ph = PointEvalHandler(projector.dh, points)
+    vals = get_point_values(ph, dof_vals, projector)
     @test f.(points) ≈ vals
 
     # alternatively retrieve vals from nodal values
-    vals = Ferrite.get_point_values(ph, nodal_vals)
+    vals = get_point_values(ph, nodal_vals)
     @test f.(points) ≈ vals
 end
 
@@ -66,12 +66,12 @@ dof_vals = project(projector, qp_vals, qr; project_to_nodes=false)
 points = [Vec((x, 0.52)) for x in range(0.0, 1.0, length=100)]
 
 # set up PointEvalHandler and retrieve values
-ph = Ferrite.PointEvalHandler(projector.dh, points)
-vals = Ferrite.get_point_values(ph, dof_vals, projector)
+ph = PointEvalHandler(projector.dh, points)
+vals = get_point_values(ph, dof_vals, projector)
 @test f.(points) ≈ vals
 
 # alternatively retrieve vals from nodal values
-vals = Ferrite.get_point_values(ph, nodal_vals)
+vals = get_point_values(ph, nodal_vals)
 @test f.(points) ≈ vals
 end
 
@@ -104,8 +104,8 @@ function superparametric()
     points = [Vec((x, 0.52)) for x in range(0.0, 1.0, length=100)]
 
     # set up PointEvalHandler and retrieve values
-    ph = Ferrite.PointEvalHandler(projector.dh, points)
-    vals = Ferrite.get_point_values(ph, dof_vals, projector)
+    ph = PointEvalHandler(projector.dh, points)
+    vals = get_point_values(ph, dof_vals, projector)
 
     # can recover a quadratic field by a quadratic approximation
     @test f.(points) ≈ vals
@@ -121,10 +121,10 @@ function dofhandler()
     close!(dh)
 
     ph = PointEvalHandler(dh, points)
-    vals = Ferrite.get_point_values(ph, dof_vals, :s)
+    vals = get_point_values(ph, dof_vals, :s)
     @test vals ≈ 1.0:9.0
 
-    vals = Ferrite.get_point_values(ph, collect(1.0:9.0))
+    vals = get_point_values(ph, collect(1.0:9.0))
     @test vals ≈ 1.0:9.0
 end
 
@@ -176,12 +176,18 @@ function mixed_grid()
 
     points = [Vec((x, 2x)) for x in range(0.0, 1.0, length=10)]
 
-    # first alternative: L2Projection
+    # first alternative: L2Projection to dofs
     dof_vals = project(projector, qp_vals_quads, qr; project_to_nodes = false)
     ph = PointEvalHandler(projector.dh, points)
-    vals = Ferrite.get_point_values(ph, dof_vals, projector)
+    vals = get_point_values(ph, dof_vals, projector)
     @test vals[1:5] ≈ f.(points[1:5])
     @test all(isnan.(vals[6:end]))
+    # second alternative: L2Projection to nodes
+    nodal_vals = project(projector, qp_vals_quads, qr; project_to_nodes = true)
+    vals = get_point_values(ph, nodal_vals)
+    @test vals[1:5] ≈ f.(points[1:5])
+    @test all(isnan.(vals[6:end]))
+
 
     # second alternative: assume a vector field :v
     dh = MixedDofHandler(mesh)
@@ -196,7 +202,7 @@ function mixed_grid()
     dof_vals = [1., 1., 2., 2., 4., 4., 3., 3., 6., 6., 5., 5.]
     points = [node.x for node in mesh.nodes]
     ph = PointEvalHandler(dh, points)
-    vals = Ferrite.get_point_values(ph, dof_vals, :v)
+    vals = get_point_values(ph, dof_vals, :v)
     @test vals == [Vec((i, i)) for i=1.0:6.0]
 end
 
