@@ -6,6 +6,7 @@ A `PointEvalHandler` computes the corresponding cell for each point in `points` 
 When no `geom_interpolations` are given, the default interpolations of the grid are used. For using custom geometry interpolations hand in a vector of interpolations,
 whose order corresponds to the order of `FieldHandlers` within the given `MixedDofHandler`. For a `DofHandler`, give a Vector with your geometry interpolation as single entry.
 """
+PointEvalHandler
 
 struct PointEvalHandler{DH<:AbstractDofHandler,dim,T<:Real}
     dh::DH
@@ -186,7 +187,7 @@ end
     get_point_values(ph::PointEvalHandler, nodal_values::Vector{T}) where T
     get_point_values(ph::PointEvalHandler, nodal_values::Vector{T}, func_interpolations::Vector{<:Interpolation}) where T
 
-Return a Vector{T} with the field values in the points of the `PointEvalHandler`. The field values are computed based on the `nodal_values` and interpolated to the local coordinates by the `func_interpolations`.
+Return a `Vector{T}` with the field values in the points of the `PointEvalHandler`. The field values are computed based on the `nodal_values` and interpolated to the local coordinates by the `func_interpolations`.
 The `nodal_values` must be given in nodal order.
 
 If no function interpolations are given, the interpolations are determined based on the grid. For using custom function interpolations hand in a vector of interpolations,
@@ -259,7 +260,7 @@ end
     get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, ::L2Projector) where T
     get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, ::L2Projector, func_interpolations::Vector{<:Interpolation}) where T
 
-Return a Vector{T} with the field values of field `fieldname` in the points of the `PointEvalHandler`. The field values are computed based on the `dof_values` and interpolated to the local coordinates by the `func_interpolations`.
+Return a `Vector{T}` (for a 1-dimensional field) or a `Vector{Vec{fielddim, T}}` (for a vector field) with the field values of field `fieldname` in the points of the `PointEvalHandler`. The field values are computed based on the `dof_values` and interpolated to the local coordinates by the `func_interpolations`.
 The `dof_values` must be given in the order of the dofs that corresponds to the `AbstractDofHandler` which was used to construct `ph`. If the `dof_values` are obtained by a `L2Projector`, the `L2Projector` can be handed over instead of the `fieldname`. 
 
 If no function interpolations are given, the field interpolations are extracted from the `AbstractDofHandler` of `ph`. For using custom function interpolations hand in a vector of interpolations,
