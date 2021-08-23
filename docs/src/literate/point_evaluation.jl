@@ -18,7 +18,7 @@
 include("l2_projection.jl");
 
 # We will evaluate heat flux distribution along the x-axis of the domain.
-points = [Vec((x, 0.5)) for x in range(-1.0, 1.0, length=101)];
+points = [Vec((x, 0.75)) for x in range(-1.0, 1.0, length=101)];
 
 # First, we need to generate a `PointEvalHandler`
 ph = PointEvalHandler(dh, points);
