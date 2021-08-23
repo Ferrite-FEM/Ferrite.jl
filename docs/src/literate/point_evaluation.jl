@@ -37,10 +37,10 @@ u_points = Ferrite.get_point_values(ph, u, :u);
 import Plots
 
 # Firstly, we are going to plot the temperature values across the x-axis
-Plots.plot(getindex.(points_upper,1), u_points, label="Temperature")
+Plots.plot(getindex.(points,1), u_points, label="Temperature")
 
 # Secondly, the first index of the flux value at each node is plotted. 
-Plots.plot(getindex.(points_upper,1), getindex.(q_points,1),label="Flux")
+Plots.plot(getindex.(points,1), getindex.(q_points,1),label="Flux")
 
 #md # ## [Plain Program](@id point_evaluation-plain-program)
 #md #
