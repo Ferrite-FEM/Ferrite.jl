@@ -236,48 +236,6 @@ end
 # The last step is to solve the system. First we call `doassemble`
 # to obtain the global stiffness matrix `K` and force vector `f`.
 M, K = assemble_linear(cellvalues_v, cellvalues_p, ν, M, K, dh);
-f = zeros(ndofs(dh))
-
-# To account for the boundary conditions we use the `apply!` function.
-# This modifies elements in `K` and `f` respectively, such that
-# we can get the correct solution vector `u` by using `\`.
-#apply!(M, ch)
-K2 = copy(K)
-apply!(K2, f, ch)
-
-# Steady-State Stokes Flow
-u₀ = K2\f
-vtk_grid("steady-states-stokes-flow.vtu", dh; compress=false) do vtk
-   vtk_point_data(vtk,dh,u₀)
-   vtk_save(vtk)
-end
-# Manual Implicit Euler
-function solve_stokes()
-    u₀ = zeros(ndofs(dh))
-    apply!(u₀,ch)
-
-    u_prev = u₀
-    u = zeros(ndofs(dh))
-
-    pvd = paraview_collection("transient-stokes-flow.pvd");
-
-    for t = Δt₀:Δt₀:T
-        A = M/Δt₀ - K
-        b = M/Δt₀*u_prev
-        update!(ch, t);
-        apply!(A,b,ch)
-        u = A\b
-        vtk_grid("transient-stokes-flow-$t.vtu", dh; compress=false) do vtk
-            vtk_point_data(vtk,dh,u)
-            vtk_save(vtk)
-            pvd[t] = vtk
-        end
-        u_prev = u
-    end
-
-    vtk_save(pvd)
-end
-solve_stokes()
 
 function OrdinaryDiffEq.initialize!(nlsolver::OrdinaryDiffEq.NLSolver{<:NLNewton,true}, integrator)
     @unpack u,uprev,t,dt,opts = integrator
