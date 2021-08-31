@@ -56,7 +56,7 @@
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
 # First we load Ferrite, and some other packages we need
-using Ferrite, SparseArrays, BlockArrays, OrdinaryDiffEq, LinearAlgebra
+using Ferrite, SparseArrays, BlockArrays, OrdinaryDiffEq, LinearAlgebra, UnPack
 # We start  generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
@@ -279,6 +279,21 @@ function solve_stokes()
 end
 solve_stokes()
 
+function OrdinaryDiffEq.initialize!(nlsolver::OrdinaryDiffEq.NLSolver{<:NLNewton,true}, integrator)
+    @unpack u,uprev,t,dt,opts = integrator
+    @unpack cache = nlsolver
+    @unpack weight = cache
+
+    cache.invγdt = inv(dt * nlsolver.γ)
+    cache.tstep = integrator.t + nlsolver.c * dt
+    OrdinaryDiffEq.calculate_residuals!(weight, fill!(weight, one(eltype(u))), uprev, u,
+                         opts.abstol, opts.reltol, opts.internalnorm, t)
+
+    apply!(u, ch)
+
+    nothing
+end
+
 # Solve with DifferentialEquations.jl
 mutable struct FerriteLinSolve{CH,F}
     ch::CH
@@ -290,9 +305,10 @@ function (p::FerriteLinSolve)(::Type{Val{:init}},f,u0_prototype)
     FerriteLinSolve(ch)
 end
 function (p::FerriteLinSolve)(x,A,b,update_matrix=false;reltol=nothing, kwargs...)
-    #println(A==K)
-    #apply_zero!(A, b, p.ch)
     if update_matrix
+        # Apply Dirichlet BCs
+        apply_zero!(A, b, p.ch)
+        # Update factorization
         p.A = p.factorization(A)
     end
     ldiv!(x, p.A, b)
@@ -302,9 +318,7 @@ end
 
 function navierstokes!(du,u,p,t)
     K = p[1]
-    ch = p[3]
     du .= K * u
-    apply_zero!(du, ch)
 end;
 
 u₀ = zeros(ndofs(dh))
@@ -312,9 +326,9 @@ apply!(u₀, ch)
 
 jac_sparsity = sparse(K)
 rhs = ODEFunction(navierstokes!, mass_matrix=M; jac_prototype=jac_sparsity)
-p = [K2, dh, ch]
+p = [K, dh, ch]
 problem = ODEProblem(rhs, u₀, (0.0,T), p)
-sol = solve(problem, ImplicitEuler(linsolve=FerriteLinSolve(ch)), progress=true, adaptive=false, progress_steps=1, dt=Δt₀, initializealg=NoInit())
+sol = solve(problem, ImplicitEuler(linsolve=FerriteLinSolve(ch)), progress=true, adaptive=true, progress_steps=1, dt=Δt₀, initializealg=NoInit())
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
