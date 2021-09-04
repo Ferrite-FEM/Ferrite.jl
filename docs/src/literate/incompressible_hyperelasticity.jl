@@ -11,7 +11,7 @@
 # In this example we study nearly incompressible hyperelasticity using the stable Taylor-Hood approximation. In spirit, this is the nonlinear analogue of 
 # [`incompressible_elasticity`](@__NBVIEWER_ROOT_URL__/examples/incompressible_hyperelasticity.ipynb) and the incompressible analogue of
 # [`hyperelasticity`](@__NBVIEWER_ROOT_URL__/examples/incompressible_hyperelasticity.ipynb). Much of the code follows from the above two examples.
-# The problem is formulated in the undeformed or reference configuration with the displacement $u$ and pressure $p$ being the unknown fields. We now briefly outline
+# The problem is formulated in the undeformed or reference configuration with the displacement `u` and pressure `p` being the unknown fields. We now briefly outline
 # the formulation. Consider the standard hyperelasticity problem 
 #
 # ```math
@@ -23,12 +23,12 @@
 # ```math
 #     \Psi(u) = \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J) + \frac{\lambda}{2}\left( J - 1\right){}^2.
 # ```
-# where $I_1 = F:F\equiv F_{ij}F_{ij}$ and $J = \det(F)$ denote the standard invariants and $F = \mathbb{I} + \nabla u$.
+# where I₁=F:F≡FᵢⱼFᵢⱼ and J = det(F) denote the standard invariants of the deformation gradient tensor F = 𝛪 + ∇u.
 # The above problem is ill-posed in the limit of incompressibility (or near incompressibility), namely when
 # ```math
 #     \lambda/\mu \rightarrow +\infty
 # ```
-# In order to alleviate the problem, we consider the partial legendre transform of the strain energy density $\Psi$
+# In order to alleviate the problem, we consider the partial legendre transform of the strain energy density Ψ
 # ```math
 #   \widehat{\Psi}(p) = \sup_{J} p(J - 1) - \frac{\mu}{2}\left(I_1 - 3 \right) + \mu \log(J) - \frac{\lambda}{2}\left( J - 1\right){}^2
 # ```
@@ -38,7 +38,7 @@
 # ```
 # which yields
 # ```math
-#   J^\star(p) = \frac{λ + p + \sqrt{(λ + p)^2 + 4 * λ * μ }}{(2 * λ}
+#   J^\star(p) = \frac{\lambda + p + \sqrt{(\lambda + p)^2 + 4 * \lambda * \mu }}{(2 * \lambda}
 # ```
 # Taking the partial legendre transform of $\widehat{\Psi}$ gives us back the original problem now reformulated as
 # ```math
@@ -56,10 +56,10 @@
 # ```math
 #   \int_\Omega \frac{\partial \Psi^\star}{\partial p}\delta p d\Omega
 # ```
-# where $\delta F = \delta\nabla u = \nabla \delta u$ and $\delta u$ and $\delta p$ denote test functions for the displacement field and pressure respectively.
+# where δF = δ∇u = ∇(δu) and δu and δp denote test functions for the displacement and pressure fields respectively.
 # In order to apply Newton's method to the above problem, we need to calculate the respective hessians (tangent),
-# namely, $\partial^2\Psi^\star/\partial F\partial F$, $\partial^2\Psi^\star/\partial p^2$ and $\partial^\Psi^\star/\partial F\partial p$ which
-# are determined directly via automatic differentiation using `Tensors.jl`. The rest of the program follows easily. We import the respective packages
+# namely, ∂²Ψ*/∂F∂F, ∂²Ψ*/∂p² and ∂²Ψ*/∂F∂p which can be determined conveniently from automatic differentiation. 
+# Hence we only need to define the potential. The rest of the program follows easily. First, we import the respective packages
 
 using Ferrite, Tensors, TimerOutputs, ProgressMeter
 using BlockArrays, SparseArrays, LinearAlgebra
@@ -84,8 +84,7 @@ end
 # The function to create corresponding cellvalues for the displacement field `u` and pressure `p`
 # follows in a similar fashion from the `incompressible_elasticity` example
 function create_values(interpolation_u, interpolation_p)
-    
-    # quadrature rules
+    ## quadrature rules
     qr      = QuadratureRule{3,RefTetrahedron}(4)
     face_qr = QuadratureRule{2,RefTetrahedron}(4)
 
@@ -122,7 +121,7 @@ function constitutive_driver(F, p, mp::NeoHooke)
 end;
 
 # The functions to create the `DofHandler` and `ConstraintHandler` (to assign corresponding boundary conditions) follow
-# likewise, namely
+# likewise from the incompressible elasticity example, namely
 
 function create_dofhandler(grid, ipu, ipp)
     dh = DofHandler(grid)
@@ -132,7 +131,9 @@ function create_dofhandler(grid, ipu, ipp)
     return dh
 end;
 
-
+# We are simulating a uniaxial tensile loading of a unit cube. Hence we apply a displacement field (`:u`) in `x` direction on the right face.
+# The left, bottom and back faces are fixed in the `x`, `y` and `z` components of the displacement so as to emulate the uniaxial nature
+# of the loading.
 function create_bc(dh)
     dbc = ConstraintHandler(dh)
     add!(dbc, Dirichlet(:u, getfaceset(dh.grid, "myLeft"), (x,t) -> zero(Vec{1}), [1]))
@@ -144,11 +145,8 @@ function create_bc(dh)
     return dbc
 end;
 
-# We are simulating a uniaxial tensile loading of a unit cube. Hence we apply a displacement in `x` direction on the right face.
-# The left, bottom and back faces are fixed in the `x`, `y` and `z` components of the displacement so as to simulate the uniaxial nature
-# of the loading.
-
-# Also, since we are considering incompressible hyperelasticity, an interesting quantity that we can compute is the deformed volume of the solid
+# Also, since we are considering incompressible hyperelasticity, an interesting quantity that we can compute is the deformed volume of the solid.
+# It is easy to show that this is equal to ∫J*dΩ where J=det(F). This can be done at the level of each element (cell) 
 function calculate_element_volume(cell, cellvalues_u, ue)
     reinit!(cellvalues_u, cell)
     evol=0.0;
@@ -159,10 +157,10 @@ function calculate_element_volume(cell, cellvalues_u, ue)
         J = det(F)
         evol += J * dΩ
     end
-    return evol;
-end
+    return evol
+end;
 
-
+# and then assembled over all the cells (elements)
 function calculate_volume_deformed_mesh(w, dh::DofHandler, cellvalues_u)
     evol::Float64 = 0.0
     @inbounds for cell in CellIterator(dh)
@@ -174,7 +172,7 @@ function calculate_volume_deformed_mesh(w, dh::DofHandler, cellvalues_u)
         evol += δevol;
     end
     return evol
-end
+end;
 
 # The function to assemble the element stiffness matrix for each element in the mesh now has a block structure like in 
 # `incompressible_elasticity`.
@@ -191,38 +189,36 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
 
     @inbounds for qp in 1:getnquadpoints(cellvalues_u)
         dΩ = getdetJdV(cellvalues_u, qp)
-        
-        ## Compute deformation gradient F and right Cauchy-Green tensor C
+        ## Compute deformation gradient F
         ∇u = function_gradient(cellvalues_u, qp, ue)
         p = function_value(cellvalues_p, qp, pe)
         F = one(∇u) + ∇u
         
-        ## Compute first Piola-Kirchhoff stress and tangent
+        ## Compute first Piola-Kirchhoff stress and tangent modulus
         ∂Ψ∂F, ∂²Ψ∂F², ∂Ψ∂p, ∂²Ψ∂p², ∂²Ψ∂F∂p = constitutive_driver(F, p, mp)
 
-        ## Loop over test functions
+        ## Loop over the `u`-test functions to calculate the `u`-`u` and `u`-`p` blocks
         @inbounds for i in 1:n_basefuncs_u
-            ## Test function gradient
+            ## gradient of the test function
             ∇δui = shape_gradient(cellvalues_u, qp, i)
             ## Add contribution to the residual from this test function
-            
             fe[BlockIndex((ublock), (i))] += ( ∇δui ⊡ ∂Ψ∂F) * dΩ
 
-            ∇δui∂S∂F = ∇δui ⊡ ∂²Ψ∂F² # Hoisted computation
+            ∇δui∂S∂F = ∇δui ⊡ ∂²Ψ∂F²
             @inbounds for j in 1:n_basefuncs_u
                 ∇δuj = shape_gradient(cellvalues_u, qp, j)
 
                 ## Add contribution to the tangent
                 Ke[BlockIndex((ublock, ublock), (i, j))] += ( ∇δui∂S∂F ⊡ ∇δuj ) * dΩ
             end
-
+            ## Loop over the `p`-test functions
             @inbounds for j in 1:n_basefuncs_p
                 δp = shape_value(cellvalues_p, qp, j)
                 ## Add contribution to the tangent
                 Ke[BlockIndex((ublock, pblock), (i, j))] += ( ∂²Ψ∂F∂p ⊡ ∇δui ) * δp * dΩ                
             end
         end
-
+        ## Loop over the `p`-test functions to calculate the `p-`u` and `p`-`p` blocks
         @inbounds for i in 1:n_basefuncs_p
             δp = shape_value(cellvalues_p, qp, i)
             fe[BlockIndex((pblock), (i))] += ( δp * ∂Ψ∂p) * dΩ
@@ -240,7 +236,7 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
     end
 end;
 
-# The only thing that changes in the assembly of the global stiffness matrix is extracting the corresponding element
+# The only thing that changes in the assembly of the global stiffness matrix is slicing the corresponding element
 # dofs for the displacement (see `global_dofsu`) and pressure (`global_dofsp`).
 function assemble_global!(K::SparseMatrixCSC, f, cellvalues_u::CellVectorValues{dim}, 
     cellvalues_p::CellScalarValues{dim}, dh::DofHandler, mp::NeoHooke, w) where {dim}
@@ -267,11 +263,12 @@ function assemble_global!(K::SparseMatrixCSC, f, cellvalues_u::CellVectorValues{
 end;
 
 # We now define a main function `solve`. For nonlinear quasistatic problems we often like to parameterize the 
-# solution in terms of a pseudo time like parameter, which in this case is used to gradually apply the boundary displacement
-# on the right face. Also we consider $\lambda/\mu = 10^4$
-
+# solution in terms of a pseudo time like parameter, which in this case is used to gradually apply the boundary
+# displacement on the right face. Also for definitenessm we consider λ/μ = 10⁴
 function solve(interpolation_u, interpolation_p)
     reset_timer!()
+
+    ## import the mesh
     grid = importTestGrid()
 
     ## Material parameters
@@ -279,10 +276,11 @@ function solve(interpolation_u, interpolation_p)
     λ = 1.E4 * μ
     mp = NeoHooke(μ, λ)
 
-    ## Finite element base
+    ## Create the DofHandler and CellValues
     dh = create_dofhandler(grid, interpolation_u, interpolation_p)
     cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
 
+    ## Create the DirichletBCs
     dbc = create_bc(dh)
 
     ## Pre-allocation of vectors for the solution and Newton increments
@@ -291,10 +289,12 @@ function solve(interpolation_u, interpolation_p)
     ΔΔw = zeros(_ndofs)
     apply!(w, dbc)
 
-    ## Create sparse matrix and residual vector
+    ## Create the sparse matrix and residual vector
     K = create_sparsity_pattern(dh)
     f = zeros(_ndofs)
 
+    ## We run the simulation parameterized by a time like parameter. `Tf` denotes the final value
+    ## of this parameter, and Δt denotes its increment in each step
     Tf = 2.0;
     Δt = 0.1;
     NEWTON_TOL = 1e-8
@@ -309,10 +309,7 @@ function solve(interpolation_u, interpolation_p)
         prog = ProgressMeter.ProgressThresh(NEWTON_TOL, "Solving:")
         fill!(ΔΔw, 0.0);
         while true; newton_itr += 1
-            # w .= wn .+ Δw # Current guess
             assemble_global!(K, f, cellvalues_u, cellvalues_p, dh, mp, w)
-            # return K, f;
-            # break;
             norm_res = norm(f[Ferrite.free_dofs(dbc)])
             apply_zero!(K, f, dbc)
             ProgressMeter.update!(prog, norm_res; showvalues = [(:iter, newton_itr)])
@@ -322,14 +319,14 @@ function solve(interpolation_u, interpolation_p)
             elseif newton_itr > 30
                 error("Reached maximum Newton iterations, aborting")
             end
-
+            ## Compute the incremental `dof`-vector (both displacement and pressure)
             ΔΔw .= K\f;
 
             apply_zero!(ΔΔw, dbc)
             w .-= ΔΔw
         end;
 
-        ## Save the solution
+        ## Save the solution fields
         @timeit "export" begin
             vtk_grid("hyperelasticity_incomp_mixed_$t.vtu", dh) do vtkfile
                 vtk_point_data(vtkfile, dh, w)
