@@ -24,10 +24,10 @@ module TestHyperElasticity
     end
 end
 
-module TestHyperElasticity
+module TestQuasiIncompressibleHyperElasticity
     mktempdir() do dir
         cd(dir) do
-            include(joinpath(@__DIR__, "../docs/src/literate/incompressible_hyperelasticity.jl"))
+            include(joinpath(@__DIR__, "../docs/src/literate/quasi_incompressible_hyperelasticity.jl"))
         end
     end
 end
