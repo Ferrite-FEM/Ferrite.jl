@@ -10,7 +10,7 @@
 #
 # In this example we study nearly incompressible hyperelasticity using the stable Taylor-Hood approximation. In spirit, this is the nonlinear analogue of 
 # [`incompressible_elasticity`](@__NBVIEWER_ROOT_URL__/examples/incompressible_hyperelasticity.ipynb) and the incompressible analogue of
-# [`hyperelasticity`](@__NBVIEWER_ROOT_URL__/examples/incompressible_hyperelasticity.ipynb). Much of the code follows from the above two examples.
+# [`hyperelasticity`](@__NBVIEWER_ROOT_URL__/examples/hyperelasticity.ipynb). Much of the code follows from the above two examples.
 # The problem is formulated in the undeformed or reference configuration with the displacement `u` and pressure `p` being the unknown fields. We now briefly outline
 # the formulation. Consider the standard hyperelasticity problem 
 #
