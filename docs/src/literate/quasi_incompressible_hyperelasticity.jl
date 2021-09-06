@@ -4,7 +4,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`incompressible_hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/quasi_incompressible_hyperelasticity.ipynb)
+#md #     [`quasi_incompressible_hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/quasi_incompressible_hyperelasticity.ipynb)
 #-
 # ## Introduction
 #
