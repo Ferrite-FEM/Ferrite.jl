@@ -198,7 +198,7 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
         ∂Ψ∂F, ∂²Ψ∂F², ∂Ψ∂p, ∂²Ψ∂p², ∂²Ψ∂F∂p = constitutive_driver(F, p, mp)
 
         ## Loop over the `u`-test functions to calculate the `u`-`u` and `u`-`p` blocks
-        @inbounds for i in 1:n_basefuncs_u
+        for i in 1:n_basefuncs_u
             ## gradient of the test function
             ∇δui = shape_gradient(cellvalues_u, qp, i)
             ## Add contribution to the residual from this test function
@@ -219,7 +219,7 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
             end
         end
         ## Loop over the `p`-test functions to calculate the `p-`u` and `p`-`p` blocks
-        @inbounds for i in 1:n_basefuncs_p
+        for i in 1:n_basefuncs_p
             δp = shape_value(cellvalues_p, qp, i)
             fe[BlockIndex((pblock), (i))] += ( δp * ∂Ψ∂p) * dΩ
 
