@@ -205,14 +205,14 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
             fe[BlockIndex((ublock), (i))] += ( ∇δui ⊡ ∂Ψ∂F) * dΩ
 
             ∇δui∂S∂F = ∇δui ⊡ ∂²Ψ∂F²
-            @inbounds for j in 1:n_basefuncs_u
+            for j in 1:n_basefuncs_u
                 ∇δuj = shape_gradient(cellvalues_u, qp, j)
 
                 ## Add contribution to the tangent
                 Ke[BlockIndex((ublock, ublock), (i, j))] += ( ∇δui∂S∂F ⊡ ∇δuj ) * dΩ
             end
             ## Loop over the `p`-test functions
-            @inbounds for j in 1:n_basefuncs_p
+            for j in 1:n_basefuncs_p
                 δp = shape_value(cellvalues_p, qp, j)
                 ## Add contribution to the tangent
                 Ke[BlockIndex((ublock, pblock), (i, j))] += ( ∂²Ψ∂F∂p ⊡ ∇δui ) * δp * dΩ                
@@ -223,11 +223,11 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
             δp = shape_value(cellvalues_p, qp, i)
             fe[BlockIndex((pblock), (i))] += ( δp * ∂Ψ∂p) * dΩ
 
-            @inbounds for j in 1:n_basefuncs_u
+            for j in 1:n_basefuncs_u
                 ∇δuj = shape_gradient(cellvalues_u, qp, j)
                 Ke[BlockIndex((pblock, ublock), (i, j))] += ∇δuj ⊡ ∂²Ψ∂F∂p * δp * dΩ
             end
-            @inbounds for j in 1:n_basefuncs_p
+            for j in 1:n_basefuncs_p
                 δp = shape_value(cellvalues_p, qp, j)
                 Ke[BlockIndex((pblock, pblock), (i, j))] += δp * ∂²Ψ∂p² * δp * dΩ
             end
