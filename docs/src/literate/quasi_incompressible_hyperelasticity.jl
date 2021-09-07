@@ -8,9 +8,9 @@
 #-
 # ## Introduction
 #
-# In this example we study nearly incompressible hyperelasticity using the stable Taylor-Hood approximation. In spirit, this is the nonlinear analogue of 
-# [`incompressible_elasticity`](@__NBVIEWER_ROOT_URL__/examples/incompressible_hyperelasticity.ipynb) and the incompressible analogue of
-# [`hyperelasticity`](@__NBVIEWER_ROOT_URL__/examples/hyperelasticity.ipynb). Much of the code follows from the above two examples.
+# In this example we study quasi- or nearly-incompressible hyperelasticity using the stable Taylor-Hood approximation. In spirit, this example is the nonlinear analogue of 
+# [`incompressible_elasticity`](@__NBVIEWER_ROOT_URL__/examples/incompressible_elasticity.ipynb) and the incompressible analogue of
+# [`hyperelasticity`](@__NBVIEWER_ROOT_URL__/examples/hyperelasticity.ipynb). Much of the code therefore follows from the above two examples.
 # The problem is formulated in the undeformed or reference configuration with the displacement `u` and pressure `p` being the unknown fields. We now briefly outline
 # the formulation. Consider the standard hyperelasticity problem 
 #
@@ -24,7 +24,7 @@
 #     \Psi(u) = \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J) + \frac{\lambda}{2}\left( J - 1\right){}^2.
 # ```
 # where I₁=F:F≡FᵢⱼFᵢⱼ and J = det(F) denote the standard invariants of the deformation gradient tensor F = 𝛪 + ∇u.
-# The above problem is ill-posed in the limit of incompressibility (or near incompressibility), namely when
+# The above problem is ill-posed in the limit of incompressibility (or near-incompressibility), namely when
 # ```math
 #     \lambda/\mu \rightarrow +\infty
 # ```
@@ -355,7 +355,7 @@ using Test                #src
 #md # ## Plain Program
 #md #
 #md # Below follows a version of the program without any comments.
-#md # The file is also available here: [`quas_incompressible_hyperelasticity.jl`](quasi_incompressible_hyperelasticity.jl)
+#md # The file is also available here: [`quasi_incompressible_hyperelasticity.jl`](quasi_incompressible_hyperelasticity.jl)
 #md #
 #md # ```julia
 #md # @__CODE__
