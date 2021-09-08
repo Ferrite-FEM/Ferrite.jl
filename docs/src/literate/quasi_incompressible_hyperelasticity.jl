@@ -15,51 +15,57 @@
 # the formulation. Consider the standard hyperelasticity problem 
 #
 # ```math
-#   u = \argmin_{v\in\mathcal{K}}\Pi(v),\quad \text{where}\quad \Pi(v)  = \int_\Omega \Psi(v) d\Omega .
+#   u = \argmin_{v\in\mathcal{K}}\Pi(v),\quad \text{where}\quad \Pi(v)  = \int_\Omega \Psi(v) \ \mathrm{d}\Omega\ .
 # ```
 # For clarity of presentation we ignore any non-zero surface tractions and body forces and instead consider only
 # applied displacements (i.e. non-homogeneous dirichlet boundary conditions). Moreover we stick our attention to the standard Neo-Hookean stored energy density 
 # 
 # ```math
-#     \Psi(u) = \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J) + \frac{\lambda}{2}\left( J - 1\right){}^2.
+#     \Psi(u) = \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J) + \frac{\lambda}{2}\left( J - 1\right){}^2,
 # ```
 # where I₁=F:F≡FᵢⱼFᵢⱼ and J = det(F) denote the standard invariants of the deformation gradient tensor F = 𝛪 + ∇u.
 # The above problem is ill-posed in the limit of incompressibility (or near-incompressibility), namely when
 # ```math
-#     \lambda/\mu \rightarrow +\infty
+#     \lambda/\mu \rightarrow +\infty.
 # ```
-# In order to alleviate the problem, we consider the partial legendre transform of the strain energy density Ψ
+# In order to alleviate the problem, we consider the partial legendre transform of the strain energy density Ψ with respect to J = det(F), namely
 # ```math
-#   \widehat{\Psi}(p) = \sup_{J} p(J - 1) - \frac{\mu}{2}\left(I_1 - 3 \right) + \mu \log(J) - \frac{\lambda}{2}\left( J - 1\right){}^2
+#   \widehat{\Psi}(p) = \sup_{J} \left[ p(J - 1) - \frac{\mu}{2}\left(I_1 - 3 \right) + \mu \log(J) - \frac{\lambda}{2}\left( J - 1\right){}^2 \right].
 # ```
-# where $J^\star$ is given by
+# The supremum, say J*, can be calculated in closed form by simply using the first order optimailty condition, i.e. ∂Ψ/∂J = 0. This gives 
 # ```math
-# J^\star = \arg\max \left[ p(J - 1) - \frac{\mu}{2}\left(I_1 - 3 \right) + \mu \log(J) - \frac{\lambda}{2}\left( J - 1\right){}^2\right]
+#   J^\star(p) = \frac{\lambda + p + \sqrt{(\lambda + p){}^2 + 4 \lambda \mu }}{(2 \lambda)}.
 # ```
-# which yields
+# Furthermore, taking the partial legendre transform of $\widehat{\Psi}$ once again, gives us back the original problem, i.e. 
 # ```math
-#   J^\star(p) = \frac{\lambda + p + \sqrt{(\lambda + p)^2 + 4 * \lambda * \mu }}{(2 * \lambda}
+#     \Psi(u) = \Psi^\star(u, p) = \sup_{p} \left[ p(J - 1) - p(J^\star - 1) + \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J^\star) + \frac{\lambda}{2}\left( J^\star - 1\right){}^2 \right].
 # ```
-# Taking the partial legendre transform of $\widehat{\Psi}$ gives us back the original problem now reformulated as
+# Therefore our original hyperelasticity problem can now be reformulated as
 # ```math
-#   \min_{u\in\mathcal{K}}\max_{p} \int_\Omega\Psi^{\star} (u, p)
+#   \inf_{u\in\mathcal{K}}\sup_{p} \int_\Omega\Psi^{\star} (u, p) \ \mathrm{d}\Omega.
 # ```
-# where $\Psi^\star (u, p)$ is given by
+# The total (modified) energy Π* can then be written as
 # ```math
-#   \int_\Omega p (J - J^\star) d\Omega + \int_\Omega \frac{\mu}{2} \left( I_1 - 3\right) d\Omega - \int_\Omega \mu\log(J^\star)d\Omega + \int_\Omega \frac{\lambda}{2}\left( J^\star - 1 \right){}^2
+#   \Pi^\star(u, p) = \int_\Omega p (J - J^\star) \ \mathrm{d}\Omega + \int_\Omega \frac{\mu}{2} \left( I_1 - 3\right) \ \mathrm{d}\Omega - \int_\Omega \mu\log(J^\star)\ \mathrm{d}\Omega + \int_\Omega \frac{\lambda}{2}\left( J^\star - 1 \right){}^2\ \mathrm{d}\Omega
 # ```
-# The euler-lagrange equations are then given by
+# Calculating the euler-lagrange equations from the above energy give us our governing equations in the weak form, namely
 # ```math
-#   \int_\Omega \frac{\partial\Psi^\star}{\partial F}:\delta F d\Omega = 0 
+#   \int_\Omega \frac{\partial\Psi^\star}{\partial F}:\delta F \ \mathrm{d}\Omega = 0 
 # ```
 # and
 # ```math
-#   \int_\Omega \frac{\partial \Psi^\star}{\partial p}\delta p d\Omega
+#   \int_\Omega \frac{\partial \Psi^\star}{\partial p}\delta p \ \mathrm{d}\Omega,
 # ```
-# where δF = δ∇u = ∇(δu) and δu and δp denote test functions for the displacement and pressure fields respectively.
-# In order to apply Newton's method to the above problem, we need to calculate the respective hessians (tangent),
-# namely, ∂²Ψ*/∂F∂F, ∂²Ψ*/∂p² and ∂²Ψ*/∂F∂p which can be determined conveniently from automatic differentiation. 
-# Hence we only need to define the potential. The rest of the program follows easily. First, we import the respective packages
+# where δF = δ∇u = ∇(δu) and δu and δp denote arbitrary variations with respect to displacement and pressure. See the references
+# below for a more detailed exmplanation of the above mathematical trick. Now, in order to apply Newton's method to the 
+# above problem, we further need to calculate the respective hessians (tangent), namely, ∂²Ψ*/∂F², ∂²Ψ*/∂p² and ∂²Ψ*/∂F∂p
+# which, using `Tensors.jl`, can be determined conveniently using automatic differentiation. Hence we only need to define the above potential.
+# The remaineder of the example follows similarly. 
+# ## References
+# 1. [A paradigm for higher-order polygonal elements in finite elasticity using a gradient correction scheme, CMAME 2016, 306, 216–251](http://pamies.cee.illinois.edu/Publications_files/CMAME_2016.pdf)
+# 2. [Approximation of incompressible large deformation elastic problems: some unresolved issues, Computational Mechanics, 2013](https://link.springer.com/content/pdf/10.1007/s00466-013-0869-0.pdf)
+#
+# We now get to the actual code. First, we import the respective packages
 
 using Ferrite, Tensors, TimerOutputs, ProgressMeter
 using BlockArrays, SparseArrays, LinearAlgebra
@@ -71,7 +77,8 @@ struct NeoHooke
     λ::Float64
 end
 
-# We then create a function to generate a simple test mesh on which to compute FE solution
+# We then create a function to generate a simple test mesh on which to compute FE solution. We also mark the boundaries
+# to later assign Dirichlet boundary conditions
 function importTestGrid()
     grid = generate_grid(Tetrahedron, (5, 5, 5), zero(Vec{3}), ones(Vec{3}))
     addfaceset!(grid, "myBottom", x -> norm(x[2]) ≈ 0.0);
@@ -79,7 +86,7 @@ function importTestGrid()
     addfaceset!(grid, "myRight", x -> norm(x[1]) ≈ 1.0);
     addfaceset!(grid, "myLeft", x -> norm(x[1]) ≈ 0.0);
     return grid
-end
+end;
 
 # The function to create corresponding cellvalues for the displacement field `u` and pressure `p`
 # follows in a similar fashion from the `incompressible_elasticity` example
@@ -109,7 +116,7 @@ function Ψ(F, p, mp::NeoHooke)
     J = det(F)
     Js = (λ + p + sqrt((λ + p)^2. + 4. * λ * μ ))/(2. * λ)
     return p * (Js - J) + μ / 2 * (Ic - 3) - μ * log(Js) + λ / 2 * (Js - 1)^2
-end
+end;
 
 # and it's derivatives (required in computing the jacobian and hessian respectively)
 function constitutive_driver(F, p, mp::NeoHooke)
@@ -328,7 +335,7 @@ function solve(interpolation_u, interpolation_p)
 
         ## Save the solution fields
         @timeit "export" begin
-            vtk_grid("hyperelasticity_incomp_mixed_$t.vtu", dh) do vtkfile
+            vtk_grid("hyperelasticity_incomp_mixed_$t.vtu", dh, compress=false) do vtkfile
                 vtk_point_data(vtkfile, dh, w)
                 vtk_save(vtkfile)
                 pvd[t] = vtkfile
@@ -350,7 +357,7 @@ vol_def = solve(quadratic, linear);
 
 # We can also check that the deformed volume is indeed close to 1 (as should be for a nearly incompressible material)
 using Test                #src     
-@test isapprox(vol_def, 1.0, atol=1E-3) # src
+@test isapprox(vol_def, 1.0, atol=1E-3) #src
 
 #md # ## Plain Program
 #md #
