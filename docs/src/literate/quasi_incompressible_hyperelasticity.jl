@@ -80,7 +80,7 @@ end
 # We then create a function to generate a simple test mesh on which to compute FE solution. We also mark the boundaries
 # to later assign Dirichlet boundary conditions
 function importTestGrid()
-    grid = generate_grid(Tetrahedron, (5, 5, 5), zero(Vec{3}), ones(Vec{3}))
+    grid = generate_grid(Tetrahedron, (5, 5, 5), zero(Vec{3}), ones(Vec{3}));
     addfaceset!(grid, "myBottom", x -> norm(x[2]) ≈ 0.0);
     addfaceset!(grid, "myBack", x -> norm(x[3]) ≈ 0.0);
     addfaceset!(grid, "myRight", x -> norm(x[1]) ≈ 1.0);
@@ -108,7 +108,7 @@ function create_values(interpolation_u, interpolation_p)
     return cellvalues_u, cellvalues_p, facevalues_u
 end;
 
-# We now create the function for $\Psi^\star$
+# We now create the function for Ψ*
 function Ψ(F, p, mp::NeoHooke)
     μ = mp.μ
     λ = mp.λ
@@ -156,7 +156,7 @@ end;
 # It is easy to show that this is equal to ∫J*dΩ where J=det(F). This can be done at the level of each element (cell) 
 function calculate_element_volume(cell, cellvalues_u, ue)
     reinit!(cellvalues_u, cell)
-    evol=0.0;
+    evol::FLoat64=0.0;
     @inbounds for qp in 1:getnquadpoints(cellvalues_u)
         dΩ = getdetJdV(cellvalues_u, qp)
         ∇u = function_gradient(cellvalues_u, qp, ue)
@@ -169,7 +169,7 @@ end;
 
 # and then assembled over all the cells (elements)
 function calculate_volume_deformed_mesh(w, dh::DofHandler, cellvalues_u)
-    evol::Float64 = 0.0
+    evol::Float64 = 0.0;
     @inbounds for cell in CellIterator(dh)
         global_dofs = celldofs(cell)
         nu = getnbasefunctions(cellvalues_u)
@@ -200,7 +200,7 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
         ∇u = function_gradient(cellvalues_u, qp, ue)
         p = function_value(cellvalues_p, qp, pe)
         F = one(∇u) + ∇u
-        
+
         ## Compute first Piola-Kirchhoff stress and tangent modulus
         ∂Ψ∂F, ∂²Ψ∂F², ∂Ψ∂p, ∂²Ψ∂p², ∂²Ψ∂F∂p = constitutive_driver(F, p, mp)
 
@@ -222,7 +222,7 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
             for j in 1:n_basefuncs_p
                 δp = shape_value(cellvalues_p, qp, j)
                 ## Add contribution to the tangent
-                Ke[BlockIndex((ublock, pblock), (i, j))] += ( ∂²Ψ∂F∂p ⊡ ∇δui ) * δp * dΩ                
+                Ke[BlockIndex((ublock, pblock), (i, j))] += ( ∂²Ψ∂F∂p ⊡ ∇δui ) * δp * dΩ
             end
         end
         ## Loop over the `p`-test functions to calculate the `p-`u` and `p`-`p` blocks
@@ -238,16 +238,14 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
                 δp = shape_value(cellvalues_p, qp, j)
                 Ke[BlockIndex((pblock, pblock), (i, j))] += δp * ∂²Ψ∂p² * δp * dΩ
             end
-
         end
     end
 end;
 
 # The only thing that changes in the assembly of the global stiffness matrix is slicing the corresponding element
 # dofs for the displacement (see `global_dofsu`) and pressure (`global_dofsp`).
-function assemble_global!(K::SparseMatrixCSC, f, cellvalues_u::CellVectorValues{dim}, 
-    cellvalues_p::CellScalarValues{dim}, dh::DofHandler, mp::NeoHooke, w) where {dim}
-    
+function assemble_global!(K::SparseMatrixCSC, f, cellvalues_u::CellVectorValues{dim},
+                         cellvalues_p::CellScalarValues{dim}, dh::DofHandler, mp::NeoHooke, w) where {dim}
     nu = getnbasefunctions(cellvalues_u)
     np = getnbasefunctions(cellvalues_p)
 
@@ -356,7 +354,7 @@ linear = Lagrange{3, RefTetrahedron, 1}()
 vol_def = solve(quadratic, linear);
 
 # We can also check that the deformed volume is indeed close to 1 (as should be for a nearly incompressible material)
-using Test                #src     
+using Test                #src
 @test isapprox(vol_def, 1.0, atol=1E-3) #src
 
 #md # ## Plain Program
