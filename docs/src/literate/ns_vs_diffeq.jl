@@ -303,12 +303,32 @@ apply!(u₀, ch)
 # runtime.
 jac_sparsity = sparse(K)
 function navierstokes!(du,u,p,t)
-    K = p[1]
+    K,dh,cellvalues = p
     du .= K * u
+
+    n_basefuncs = getnquadpoints(cellvalues)
+
+    ## Trilinear form evaluation
+    for cell in CellIterator(dh)
+        v_celldofs = celldofs(cell)
+        Ferrite.reinit!(cellvalues, cell)
+        v_cell = u[v_celldofs[dof_range(dh, :v)]]
+        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+            v_div = function_divergence(cellvalues, q_point, v_cell)
+            v_val = function_value(cellvalues, q_point, v_cell)
+            nl_contrib = - v_div * v_val
+            for j in 1:n_basefuncs
+                Nⱼ = shape_value(cellvalues, q_point, j)
+                du[v_celldofs[j]] += nl_contrib ⋅ Nⱼ * dΩ
+            end
+        end
+    end
 end;
 rhs = ODEFunction(navierstokes!, mass_matrix=M; jac_prototype=jac_sparsity)
-p = [K, dh]
-problem = ODEProblem(rhs, u₀, (0.0,T), p)
+p = [K, dh, cellvalues_v]
+problem = ODEProblem(rhs, u₀, (0.0,T), p);
+
 # Now we can put everything together by specifying how to solve the problem.
 # We want to use the modified extended BDF2 method with our custom linear
 # solver, which helps in the enforcement of the Dirichlet BDs. Further we
