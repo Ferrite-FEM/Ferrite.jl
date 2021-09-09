@@ -156,7 +156,7 @@ end;
 # It is easy to show that this is equal to ∫J*dΩ where J=det(F). This can be done at the level of each element (cell) 
 function calculate_element_volume(cell, cellvalues_u, ue)
     reinit!(cellvalues_u, cell)
-    evol::FLoat64=0.0;
+    evol::Float64=0.0;
     @inbounds for qp in 1:getnquadpoints(cellvalues_u)
         dΩ = getdetJdV(cellvalues_u, qp)
         ∇u = function_gradient(cellvalues_u, qp, ue)
