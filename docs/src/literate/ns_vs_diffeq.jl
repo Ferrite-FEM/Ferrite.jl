@@ -244,7 +244,7 @@ M, K = assemble_linear(cellvalues_v, cellvalues_p, ν, M, K, dh);
 # intermediate step towards integration with OrdinaryDiffEq.jl.
 function OrdinaryDiffEq.initialize!(nlsolver::OrdinaryDiffEq.NLSolver{<:NLNewton,true}, integrator)
     @unpack u,uprev,t,dt,opts = integrator
-    @unpack z, cache = nlsolver
+    @unpack z,tmp,cache = nlsolver
     @unpack weight = cache
 
     cache.invγdt = inv(dt * nlsolver.γ)
@@ -255,9 +255,11 @@ function OrdinaryDiffEq.initialize!(nlsolver::OrdinaryDiffEq.NLSolver{<:NLNewton
     ## Before starting the nonlinear solve we have to set the time correctly. Note that ch is a global variable.
     update!(ch, t)
 
-    ## The update of u takes uprev + z, so we have to enforce Dirichlet BCs here.
-    ## Note that modifying uprev may break error estimators.
+    ## The update of u takes uprev + z or tmp + z most of the time, so we have
+    ## to enforce Dirichlet BCs here. Note that these mutations may break the
+    ## error estimators.
     apply!(uprev, ch)
+    apply!(tmp, ch)
     apply_zero!(z, ch)
 
     nothing
