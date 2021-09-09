@@ -6,17 +6,17 @@ Pkg.precompile()
 include("generate.jl")
 
 GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
-    "heat_equation.md",
-    "l2_projection.md",
-    "helmholtz.md",
-    "incompressible_elasticity.md",
-    "hyperelasticity.md",
-    "threaded_assembly.md",
+    # "heat_equation.md",
+    # "l2_projection.md",
+    # "helmholtz.md",
+    # "incompressible_elasticity.md",
+    # "hyperelasticity.md",
+    # "threaded_assembly.md",
     "plasticity.md",
-    "transient_heat_equation.md",
-    "landau.md",
-    "linear_shell.md",
-    "quasi_incompressible_hyperelasticity.md"
+    # "transient_heat_equation.md",
+    # "landau.md",
+    # "linear_shell.md",
+    # "quasi_incompressible_hyperelasticity.md"
     )]
 
 # Build documentation.
