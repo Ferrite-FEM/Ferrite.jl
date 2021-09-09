@@ -15,7 +15,8 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "plasticity.md",
     "transient_heat_equation.md",
     "landau.md",
-    "linear_shell.md"
+    "linear_shell.md",
+    "quasi_incompressible_hyperelasticity.md"
     )]
 
 # Build documentation.
