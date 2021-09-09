@@ -125,7 +125,7 @@ ch = ConstraintHandler(dh);
 # specified our constraint we `add!` it to `ch`.
 noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> [0,0], [1,2])
 add!(ch, noslip_bc);
-inflow_bc = Dirichlet(:v, ∂Ω_inflow, (x, t) -> [4*vᵢₙ*x[2]*(0.41-x[2])/0.41^2,0], [1,2])
+inflow_bc = Dirichlet(:v, ∂Ω_inflow, (x, t) -> [clamp(t, 0.0, 1.0)*4*vᵢₙ*x[2]*(0.41-x[2])/0.41^2,0], [1,2])
 add!(ch, inflow_bc);
 
 # We also need to `close!` and `update!` our boundary conditions. When we call `close!`
@@ -237,9 +237,14 @@ end
 # to obtain the global stiffness matrix `K` and force vector `f`.
 M, K = assemble_linear(cellvalues_v, cellvalues_p, ν, M, K, dh);
 
+# At the time of writing this example we have no clean way to hook into the
+# nonlinear solver backend to apply the Dirichlet BCs. As a hotfix we override
+# the newton initialization. We cannot solve all emerging issues by developing
+# a customized newton algorithm here. This hack should only be seen as an
+# intermediate step towards integration with OrdinaryDiffEq.jl.
 function OrdinaryDiffEq.initialize!(nlsolver::OrdinaryDiffEq.NLSolver{<:NLNewton,true}, integrator)
     @unpack u,uprev,t,dt,opts = integrator
-    @unpack cache = nlsolver
+    @unpack z, cache = nlsolver
     @unpack weight = cache
 
     cache.invγdt = inv(dt * nlsolver.γ)
@@ -247,12 +252,19 @@ function OrdinaryDiffEq.initialize!(nlsolver::OrdinaryDiffEq.NLSolver{<:NLNewton
     OrdinaryDiffEq.calculate_residuals!(weight, fill!(weight, one(eltype(u))), uprev, u,
                          opts.abstol, opts.reltol, opts.internalnorm, t)
 
-    apply!(u, ch)
+    ## Before starting the nonlinear solve we have to set the time correctly. Note that ch is a global variable.
+    update!(ch, t)
+
+    ## The update of u takes uprev + z, so we have to enforce Dirichlet BCs here.
+    ## Note that modifying uprev may break error estimators.
+    apply!(uprev, ch)
+    apply_zero!(z, ch)
 
     nothing
 end
 
-# Solve with DifferentialEquations.jl
+# For the linear equations we can cleanly integrate with the linear solver
+# interface provided by the DifferentialEquations ecosystem.
 mutable struct FerriteLinSolve{CH,F}
     ch::CH
     factorization::F
@@ -274,19 +286,36 @@ function (p::FerriteLinSolve)(x,A,b,update_matrix=false;reltol=nothing, kwargs..
     return nothing
 end
 
+# These are our initial conditions. We start from the zero solution as
+# discussed above.
+u₀ = zeros(ndofs(dh))
+apply!(u₀, ch)
+
+# DifferentialEquations assumes dense matrices by default, which is not
+# feasible for semi-discretization of finize element models. We communicate
+# that a sparse matrix with specified pattern should be utilized through the
+# `jac_prototyp` argument. Additionally, we have to provide the mass matrix.
+# To apply the nonlinear portion of the Navier-Stokes problem we simply hand
+# over the dof handler to the right hand side as a parameter in addition to
+# the pre-assembled linear part (which is time independent) to save some
+# runtime.
+jac_sparsity = sparse(K)
 function navierstokes!(du,u,p,t)
     K = p[1]
     du .= K * u
 end;
-
-u₀ = zeros(ndofs(dh))
-apply!(u₀, ch)
-
-jac_sparsity = sparse(K)
 rhs = ODEFunction(navierstokes!, mass_matrix=M; jac_prototype=jac_sparsity)
-p = [K, dh, ch]
+p = [K, dh]
 problem = ODEProblem(rhs, u₀, (0.0,T), p)
-sol = solve(problem, ImplicitEuler(linsolve=FerriteLinSolve(ch)), progress=true, adaptive=true, progress_steps=1, dt=Δt₀, initializealg=NoInit())
+# Now we can put everything together by specifying how to solve the problem.
+# We want to use the modified extended BDF2 method with our custom linear
+# solver, which helps in the enforcement of the Dirichlet BDs. Further we
+# enable the progress bar with the `progess` and `progress_steps` arguments.
+# Finally we have to communicate the time step length and initialization
+# algorithm. Since we start with a valid initial state we do not use one of
+# DifferentialEquations.jl initialization algorithms.
+# NOTE: At the time of writing this [no index 2 initialization is implemented](https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019).
+sol = solve(problem, MEBDF2(linsolve=FerriteLinSolve(ch)), progress=true, progress_steps=1, dt=Δt₀, initializealg=NoInit())
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
