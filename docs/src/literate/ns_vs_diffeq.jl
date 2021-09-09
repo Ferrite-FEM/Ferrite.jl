@@ -1,7 +1,7 @@
 # # Incompressible Navier-Stokes Equations via [DifferentialEquations.jl]()
 #
 # ![](vortex-shedding.gif)
-#-
+#
 #
 # In this example we focus on a simple but visually appealing problem from
 # fluid dynamics, namely vortex shedding, which is also known as
@@ -21,8 +21,10 @@
 # The incompressible Navier-Stokes equations can be stated as the system
 #
 # ```math
-#  \partial_t v = \eta \Delta v - (v \cdot \nabla) v - \nabla p
-#  0 = \nabla \cdot v
+#  \begin{aligned}
+#    \partial_t v &= \eta \Delta v - (v \cdot \nabla) v - \nabla p \\
+#    0 &= \nabla \cdot v
+#  \end{aligned}
 # ```
 #
 # where $v$ is the unknown velocity field, $p$ the unknown pressure field
@@ -35,11 +37,12 @@
 # ### Weak Form
 #
 # ```math
-#  \int \partial_t v \cdot \phi = - \int \nu \nabla v : \nabla \phi - \int (v \cdot \nabla) v \cdot \phi + \int p \nabla \cdot \phi
-#  0 = \int \nabla \cdot v \psi
+#  \begin{aligned}
+#    \int \partial_t v \cdot \phi &= - \int \nu \nabla v : \nabla \phi - \int (v \cdot \nabla) v \cdot \phi + \int p \nabla \cdot \phi
+#    0 &= \int \nabla \cdot v \psi
+#  \end{aligned}
 # ```
 #
-# ```
 # where $\phi$ and $\psi$ are suitable test functions.
 #
 # Now we can discretize the problem as usual with the finite element method
@@ -49,11 +52,11 @@
 #  M [...] = K [...] + N([...])
 # ```
 #
-#-
+#
 # ## Commented Program
 #
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
-#md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
+# The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 #
 # First we load Ferrite, and some other packages we need
 using Ferrite, SparseArrays, BlockArrays, OrdinaryDiffEq, LinearAlgebra, UnPack
@@ -73,7 +76,7 @@ grid = generate_grid(Quadrilateral, (110, 10), Vec{2}((0.0, 0.0)), Vec{2}((2.2, 
 # to a `CellScalarValues` object.
 dim = 2
 T = 10
-Δt₀ = 0.01
+Δt₀ = 0.05
 
 ν = 0.001 #dynamic viscosity
 vᵢₙ = 0.3 #inflow velocity
@@ -191,11 +194,11 @@ function assemble_linear(cellvalues_v::CellVectorValues{dim}, cellvalues_p::Cell
                     Me[BlockIndex((v▄, v▄),(i, j))] += (v ⋅ φ) * dΩ
                 end
             end
-            #Viscosity term
             # For each quadrature point we loop over all the (local) shape functions.
             # We need the value and gradient of the testfunction `v` and also the gradient
             # of the trial function `u`. We get all of these from `cellvalues`.
             #+
+            #Viscosity term
             for i in 1:n_basefuncs_v
                 ∇v = shape_gradient(cellvalues_v, q_point, i)
                 for j in 1:n_basefuncs_v
@@ -230,7 +233,6 @@ function assemble_linear(cellvalues_v::CellVectorValues{dim}, cellvalues_p::Cell
     end
     return M, K
 end
-#md nothing # hide
 
 # ### Solution of the system
 # The last step is to solve the system. First we call `doassemble`
@@ -250,17 +252,19 @@ function OrdinaryDiffEq.initialize!(nlsolver::OrdinaryDiffEq.NLSolver{<:NLNewton
     cache.invγdt = inv(dt * nlsolver.γ)
     cache.tstep = integrator.t + nlsolver.c * dt
     OrdinaryDiffEq.calculate_residuals!(weight, fill!(weight, one(eltype(u))), uprev, u,
-                         opts.abstol, opts.reltol, opts.internalnorm, t)
+                         opts.abstol, opts.reltol, opts.internalnorm, t);
 
-    ## Before starting the nonlinear solve we have to set the time correctly. Note that ch is a global variable.
-    update!(ch, t)
+    # Before starting the nonlinear solve we have to set the time correctly. Note that ch is a global variable.
+    #+
+    update!(ch, t);
 
-    ## The update of u takes uprev + z or tmp + z most of the time, so we have
-    ## to enforce Dirichlet BCs here. Note that these mutations may break the
-    ## error estimators.
+    # The update of u takes uprev + z or tmp + z most of the time, so we have
+    # to enforce Dirichlet BCs here. Note that these mutations may break the
+    # error estimators.
+    #+
     apply!(uprev, ch)
     apply!(tmp, ch)
-    apply_zero!(z, ch)
+    apply_zero!(z, ch);
 
     nothing
 end
@@ -278,9 +282,9 @@ function (p::FerriteLinSolve)(::Type{Val{:init}},f,u0_prototype)
 end
 function (p::FerriteLinSolve)(x,A,b,update_matrix=false;reltol=nothing, kwargs...)
     if update_matrix
-        # Apply Dirichlet BCs
+        ## Apply Dirichlet BCs
         apply_zero!(A, b, p.ch)
-        # Update factorization
+        ## Update factorization
         p.A = p.factorization(A)
     end
     ldiv!(x, p.A, b)
@@ -337,7 +341,7 @@ problem = ODEProblem(rhs, u₀, (0.0,T), p);
 # algorithm. Since we start with a valid initial state we do not use one of
 # DifferentialEquations.jl initialization algorithms.
 # NOTE: At the time of writing this [no index 2 initialization is implemented](https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019).
-sol = solve(problem, MEBDF2(linsolve=FerriteLinSolve(ch)), progress=true, progress_steps=1, dt=Δt₀, initializealg=NoInit())
+sol = solve(problem, MEBDF2(linsolve=FerriteLinSolve(ch)), progress=true, progress_steps=1, dt=Δt₀, initializealg=NoInit());
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
@@ -352,16 +356,16 @@ for (solution,t) in zip(sol.u, sol.t)
         pvd[t] = vtk
     end
 end
-vtk_save(pvd)
+vtk_save(pvd);
 
 # ## test the result                #src
 # using Test                        #src
 # @test norm(u) ≈ 3.307743912641305 #src
 
-#md # ## [Plain Program](@id heat_equation-plain-program)
+#md # ## [Plain Program](@id ns_vs_diffeq-plain-program)
 #md #
 #md # Below follows a version of the program without any comments.
-#md # The file is also available here: [heat_equation.jl](heat_equation.jl)
+#md # The file is also available here: [ns_vs_diffeq.jl](ns_vs_diffeq.jl)
 #md #
 #md # ```julia
 #md # @__CODE__
