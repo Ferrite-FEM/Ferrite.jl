@@ -63,7 +63,7 @@ function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::MixedDofHandler, i::
     return global_coords
 end
 
-function cellnodes!(global_nodes::Vector{Int}, dh::MixedDofHandler, i::Int) where {dim,T}
+function cellnodes!(global_nodes::Vector{Int}, dh::MixedDofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_nodes) == nnodes_per_cell(dh, i)
     unsafe_copyto!(global_nodes, 1, dh.cell_nodes.values, dh.cell_nodes.offset[i], length(global_nodes))
@@ -170,7 +170,7 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
     field_names = Ferrite.getfieldnames(dh)  # all the fields in the problem
     numfields =  length(field_names)
 
-    # Create dicts that stores created dofs
+    # Create dicts that store created dofs
     # Each key should uniquely identify the given type
     vertexdicts = [Dict{Int, Array{Int}}() for _ in 1:numfields]
     edgedicts = [Dict{Tuple{Int,Int}, Array{Int}}() for _ in 1:numfields]
@@ -190,6 +190,7 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
         nextdof = _close!(
             dh,
             cellnumbers,
+            field_names,
             Ferrite.getfieldnames(fh),
             Ferrite.getfielddims(fh),
             Ferrite.getfieldinterpolations(fh),
@@ -220,7 +221,7 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
 
 end
 
-function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
+function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
 
     ip_infos = Ferrite.InterpolationInfo[]
     for interpolation in field_interpolations
@@ -241,24 +242,25 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims,
         cell_dofs = Int[]  # list of global dofs for each cell
         @debug "Creating dofs for cell #$ci"
 
-        for fi in 1:length(field_names)
-            @debug "\tfield: $(field_names[fi])"
-            ip_info = ip_infos[fi]
+        for (local_num, field_name) in enumerate(field_names)
+            fi = findfirst(i->i == field_name, global_field_names)
+            @debug "\tfield: $(field_name)"
+            ip_info = ip_infos[local_num]
 
             if ip_info.nvertexdofs > 0
-                nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[fi], ip_info.nvertexdofs, nextdof)
+                nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[local_num], ip_info.nvertexdofs, nextdof)
             end
 
             if ip_info.nedgedofs > 0 && dim == 3 #Edges only in 3d
-                nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[fi], ip_info.nedgedofs, nextdof)
+                nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[local_num], ip_info.nedgedofs, nextdof)
             end
 
             if ip_info.nfacedofs > 0 && (ip_info.dim == dim)
-                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[fi], ip_info.nfacedofs, nextdof)
+                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[local_num], ip_info.nfacedofs, nextdof)
             end
 
             if ip_info.ncelldofs > 0
-                nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[fi], ip_info.ncelldofs, nextdof)
+                nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[local_num], ip_info.ncelldofs, nextdof)
             end
 
         end
