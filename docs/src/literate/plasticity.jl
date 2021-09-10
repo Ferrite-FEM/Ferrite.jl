@@ -380,6 +380,7 @@ end
 u_max, traction_magnitude = solve();
 
 # Finally we plot the load-displacement curve.
+ENV["GKS_WSTYPE"]=100
 using Plots
 plot(
     vcat(0.0, u_max),                # add the origin as a point
