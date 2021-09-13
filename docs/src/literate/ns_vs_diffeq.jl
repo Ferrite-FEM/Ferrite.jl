@@ -60,8 +60,6 @@
 #
 # First we load Ferrite, and some other packages we need
 using Ferrite, SparseArrays, BlockArrays, OrdinaryDiffEq, LinearAlgebra, UnPack, FerriteGmsh
-using AlgebraicMultigrid: smoothed_aggregation, aspreconditioner
-using IterativeSolvers: gmres!
 # We start  generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
@@ -101,11 +99,11 @@ grid = saved_file_to_grid("holed_plate.msh")
 # to a `CellScalarValues` object.
 dim = 2
 T = 5
-Δt₀ = 0.0025
+Δt₀ = 0.01
 Δt_save = 0.05
 
 ν = 0.001 #dynamic viscosity
-vᵢₙ(t) = 1.5 #inflow velocity
+vᵢₙ(t) = 1.0 #inflow velocity
 
 ip_v = Lagrange{dim, RefCube, 2}()
 ip_geom = Lagrange{dim, RefCube, 1}()
@@ -297,7 +295,7 @@ end
 
 # For the linear equations we can cleanly integrate with the linear solver
 # interface provided by the DifferentialEquations ecosystem.
-mutable struct FerriteLinSolve{CH}
+mutable struct FerriteLinSolve{CH,F}
     ch::CH
     factorization::F
     A
