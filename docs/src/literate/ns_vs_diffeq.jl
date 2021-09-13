@@ -38,7 +38,7 @@
 #
 # ```math
 #  \begin{aligned}
-#    \int \partial_t v \cdot \phi &= - \int \nu \nabla v : \nabla \phi - \int (v \cdot \nabla) v \cdot \phi + \int p \nabla \cdot \phi
+#    \int \partial_t v \cdot \phi &= - \int \nu \nabla v : \nabla \phi - \int (v \cdot \nabla) v \cdot \phi + \int p \nabla \cdot \phi + \int_{\partial \Omega_{out}} \\
 #    0 &= \int \nabla \cdot v \psi
 #  \end{aligned}
 # ```
@@ -59,11 +59,36 @@
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 #
 # First we load Ferrite, and some other packages we need
-using Ferrite, SparseArrays, BlockArrays, OrdinaryDiffEq, LinearAlgebra, UnPack
+using Ferrite, SparseArrays, BlockArrays, OrdinaryDiffEq, LinearAlgebra, UnPack, FerriteGmsh
+using AlgebraicMultigrid: smoothed_aggregation, aspreconditioner
+using IterativeSolvers: gmres!
 # We start  generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Quadrilateral, (110, 10), Vec{2}((0.0, 0.0)), Vec{2}((2.2, 0.41)));
+# x_cells = 2*220
+# y_cells = 2*41
+# grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((2.2, 0.41)));
+
+# # Carve hole in the mesh and update boundaries.
+# cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05, 1:length(grid.cells))
+# hole_cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))<=0.05, 1:length(grid.cells))
+# # Gather all faces in the ring and touching the ring
+# hole_face_ring = Set{FaceIndex}()
+# for hci ∈ hole_cell_indices
+#     push!(hole_face_ring, FaceIndex((hci+1, 4)))
+#     push!(hole_face_ring, FaceIndex((hci-1, 2)))
+#     push!(hole_face_ring, FaceIndex((hci-x_cells, 3)))
+#     push!(hole_face_ring, FaceIndex((hci+x_cells, 1)))
+# end
+# grid.facesets["hole"] = Set(filter(x->x.idx[1] ∉ hole_cell_indices, collect(hole_face_ring)))
+
+# cell_indices_map = map(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05 ? indexin([ci], cell_indices)[1] : 0, 1:length(grid.cells))
+# grid.cells = grid.cells[cell_indices]
+# for facesetname in keys(grid.facesets)
+#     grid.facesets[facesetname] = Set(map(fi -> FaceIndex( cell_indices_map[fi.idx[1]] ,fi.idx[2]), collect(grid.facesets[facesetname])))
+# end
+
+grid = saved_file_to_grid("holed_plate.msh")
 
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
@@ -75,11 +100,12 @@ grid = generate_grid(Quadrilateral, (110, 10), Vec{2}((0.0, 0.0)), Vec{2}((2.2, 
 # same reference cube. We combine the interpolation and the quadrature rule
 # to a `CellScalarValues` object.
 dim = 2
-T = 10
-Δt₀ = 0.05
+T = 5
+Δt₀ = 0.0025
+Δt_save = 0.05
 
 ν = 0.001 #dynamic viscosity
-vᵢₙ = 0.3 #inflow velocity
+vᵢₙ(t) = 1.5 #inflow velocity
 
 ip_v = Lagrange{dim, RefCube, 2}()
 ip_geom = Lagrange{dim, RefCube, 1}()
@@ -116,7 +142,7 @@ ch = ConstraintHandler(dh);
 # Next we need to add constraints to `ch`. For this problem we define
 # homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
 # the `union` of all the face sets on the boundary.
-∂Ω_noslip = union(getfaceset.((grid, ), ["top", "bottom"])...);
+∂Ω_noslip = union(getfaceset.((grid, ), ["top", "bottom", "hole"])...);
 ∂Ω_inflow = getfaceset(grid, "left");
 ∂Ω_free = getfaceset(grid, "right");
 
@@ -128,7 +154,7 @@ ch = ConstraintHandler(dh);
 # specified our constraint we `add!` it to `ch`.
 noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> [0,0], [1,2])
 add!(ch, noslip_bc);
-inflow_bc = Dirichlet(:v, ∂Ω_inflow, (x, t) -> [clamp(t, 0.0, 1.0)*4*vᵢₙ*x[2]*(0.41-x[2])/0.41^2,0], [1,2])
+inflow_bc = Dirichlet(:v, ∂Ω_inflow, (x, t) -> [clamp(t, 0.0, 1.0)*4*vᵢₙ(t)*x[2]*(0.41-x[2])/0.41^2,0], [1,2])
 add!(ch, inflow_bc);
 
 # We also need to `close!` and `update!` our boundary conditions. When we call `close!`
@@ -271,7 +297,7 @@ end
 
 # For the linear equations we can cleanly integrate with the linear solver
 # interface provided by the DifferentialEquations ecosystem.
-mutable struct FerriteLinSolve{CH,F}
+mutable struct FerriteLinSolve{CH}
     ch::CH
     factorization::F
     A
@@ -312,8 +338,9 @@ function navierstokes!(du,u,p,t)
 
     n_basefuncs = getnquadpoints(cellvalues)
 
-    ## Trilinear form evaluation
+    ## Nonlinaer contribution
     for cell in CellIterator(dh)
+        ## Trilinear form evaluation
         v_celldofs = celldofs(cell)
         Ferrite.reinit!(cellvalues, cell)
         v_cell = u[v_celldofs[dof_range(dh, :v)]]
@@ -341,7 +368,7 @@ problem = ODEProblem(rhs, u₀, (0.0,T), p);
 # algorithm. Since we start with a valid initial state we do not use one of
 # DifferentialEquations.jl initialization algorithms.
 # NOTE: At the time of writing this [no index 2 initialization is implemented](https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019).
-sol = solve(problem, MEBDF2(linsolve=FerriteLinSolve(ch)), progress=true, progress_steps=1, dt=Δt₀, initializealg=NoInit());
+sol = solve(problem, MEBDF2(linsolve=FerriteLinSolve(ch)), progress=true, progress_steps=1, dt=Δt₀, saveat=Δt_save, initializealg=NoInit());
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
