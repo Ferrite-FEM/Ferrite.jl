@@ -59,34 +59,34 @@
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 #
 # First we load Ferrite, and some other packages we need
-using Ferrite, SparseArrays, BlockArrays, OrdinaryDiffEq, LinearAlgebra, UnPack, FerriteGmsh
+using Ferrite, SparseArrays, BlockArrays, OrdinaryDiffEq, LinearAlgebra, UnPack
 # We start  generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-# x_cells = 2*220
-# y_cells = 2*41
-# grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((2.2, 0.41)));
+x_cells = 220
+y_cells = 41
+grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((2.2, 0.41)));
 
-# # Carve hole in the mesh and update boundaries.
-# cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05, 1:length(grid.cells))
-# hole_cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))<=0.05, 1:length(grid.cells))
-# # Gather all faces in the ring and touching the ring
-# hole_face_ring = Set{FaceIndex}()
-# for hci ∈ hole_cell_indices
-#     push!(hole_face_ring, FaceIndex((hci+1, 4)))
-#     push!(hole_face_ring, FaceIndex((hci-1, 2)))
-#     push!(hole_face_ring, FaceIndex((hci-x_cells, 3)))
-#     push!(hole_face_ring, FaceIndex((hci+x_cells, 1)))
-# end
-# grid.facesets["hole"] = Set(filter(x->x.idx[1] ∉ hole_cell_indices, collect(hole_face_ring)))
+# Carve hole in the mesh and update boundaries.
+cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05, 1:length(grid.cells))
+hole_cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))<=0.05, 1:length(grid.cells))
+# Gather all faces in the ring and touching the ring
+hole_face_ring = Set{FaceIndex}()
+for hci ∈ hole_cell_indices
+    push!(hole_face_ring, FaceIndex((hci+1, 4)))
+    push!(hole_face_ring, FaceIndex((hci-1, 2)))
+    push!(hole_face_ring, FaceIndex((hci-x_cells, 3)))
+    push!(hole_face_ring, FaceIndex((hci+x_cells, 1)))
+end
+grid.facesets["hole"] = Set(filter(x->x.idx[1] ∉ hole_cell_indices, collect(hole_face_ring)))
 
-# cell_indices_map = map(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05 ? indexin([ci], cell_indices)[1] : 0, 1:length(grid.cells))
-# grid.cells = grid.cells[cell_indices]
-# for facesetname in keys(grid.facesets)
-#     grid.facesets[facesetname] = Set(map(fi -> FaceIndex( cell_indices_map[fi.idx[1]] ,fi.idx[2]), collect(grid.facesets[facesetname])))
-# end
+cell_indices_map = map(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05 ? indexin([ci], cell_indices)[1] : 0, 1:length(grid.cells))
+grid.cells = grid.cells[cell_indices]
+for facesetname in keys(grid.facesets)
+    grid.facesets[facesetname] = Set(map(fi -> FaceIndex( cell_indices_map[fi.idx[1]] ,fi.idx[2]), collect(grid.facesets[facesetname])))
+end
 
-grid = saved_file_to_grid("holed_plate.msh")
+# grid = saved_file_to_grid("holed_plate.msh")
 
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
