@@ -115,7 +115,7 @@ function generate_grid(C::Type{Cell{2,M,N}}, nel::NTuple{2,Int}, left::Vec{2,T}=
     UR = right
     LR = Vec{2}((UR[1], LL[2]))
     UL = Vec{2}((LL[1], UR[2]))
-    generate_grid(C, nel, LL, LR, UR, UL; build_topology)
+    generate_grid(C, nel, LL, LR, UR, UL; build_topology=build_topology)
 end
 
 # Quadrilateral
