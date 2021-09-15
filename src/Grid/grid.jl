@@ -68,12 +68,133 @@ struct VertexIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
+struct Neighbor{T<:BoundaryIndex}
+    neighbor_info::Vector{T}
+end
+
+Neighbor(info::T) where T <: BoundaryIndex = Neighbor([info])
+Base.zero(::Type{Neighbor}) = Neighbor(BoundaryIndex[])
+Base.length(n::Neighbor) = length(n.neighbor_info)
+Base.getindex(n::Neighbor,i) = getindex(n.neighbor_info,i)
+Base.firstindex(n::Neighbor) = 1
+Base.lastindex(n::Neighbor) = length(n.neighbor_info)
+Base.:(==)(n1::Neighbor, n2::Neighbor) = n1.neighbor_info == n2.neighbor_info
+
+function Base.:+(n1::Neighbor, n2::Neighbor)
+    neighbor_info = [n1.neighbor_info; n2.neighbor_info]
+    return Neighbor(neighbor_info)
+end
+
+function Base.show(io::IO, ::MIME"text/plain", n::Neighbor)
+    if length(n) == 0
+        println(io, "No Neighbor")
+    elseif length(n) == 1
+        println(io, "$(n.neighbor_info[1])")
+    else
+        println(io, "$(n.neighbor_info...)")
+    end
+end
+
+face_npoints(::Cell{2,N,M}) where {N,M} = 2
+face_npoints(::Cell{3,4,1}) = 4 #not sure how to handle embedded cells e.g. Quadrilateral3D
+edge_npoints(::Cell{3,4,1}) = 2 #not sure how to handle embedded cells e.g. Quadrilateral3D
+face_npoints(::Cell{3,N,6}) where N = 4
+face_npoints(::Cell{3,N,4}) where N = 3
+edge_npoints(::Cell{3,N,M}) where {N,M} = 2
+
+getdim(::Cell{dim,N,M}) where {dim,N,M} = dim
+
+abstract type AbstractTopology end
+
+struct GridTopology <: AbstractTopology
+    face_neighbor::SparseMatrixCSC{Neighbor,Int}
+    corner_neighbor::SparseMatrixCSC{Neighbor,Int}
+    edge_neighbor::SparseMatrixCSC{Neighbor,Int}
+end
+
+function GridTopology()
+    face_neighbor = spzeros(Neighbor,0,0)
+    corner_neighbor = spzeros(Neighbor,0,0)
+    edge_neighbor = spzeros(Neighbor,0,0)
+    return GridTopology(face_neighbor,corner_neighbor,edge_neighbor)
+end
+
+function GridTopology(cells::Vector{C}) where C <: AbstractCell
+    I_face = Int[]; J_face = Int[]; V_face = Neighbor[]
+    I_edge = Int[]; J_edge = Int[]; V_edge = Neighbor[]
+    I_corner = Int[]; J_corner = Int[]; V_corner = Neighbor[]
+    cell_node_table = getproperty.(cells,:nodes)
+    for (cellid,cell) in enumerate(cells)
+        neighbors = findall.(x->x ∈ cell.nodes,cell_node_table) 
+        for (neighborid,neighbor) in enumerate(neighbors)
+            neighbor_cell = cells[neighborid]
+            if length(neighbor) == 0
+                #not a neighbor
+                continue
+            elseif length(neighbor) == 1
+                #corner neighbor
+                _corner_neighbor!(V_corner,I_corner,J_corner,cellid,cell,neighbor,neighborid,neighbor_cell)
+            elseif getdim(cell) > 2 && length(neighbor) == edge_npoints(cell) 
+                #edge neighbor
+                _edge_neighbor!(V_edge,I_edge,J_edge,cellid,cell,neighbor,neighborid,neighbor_cell)
+            elseif getdim(cell) > 1 && length(neighbor) == face_npoints(cell)
+                #face neighbor
+                _face_neighbor!(V_face,I_face,J_face,cellid,cell,neighbor,neighborid,neighbor_cell)
+            else
+                continue
+            end 
+        end
+    end
+    face_neighbor = sparse(I_face,J_face,V_face)
+    corner_neighbor = sparse(I_corner,J_corner,V_corner) 
+    edge_neighbor = sparse(I_edge,J_edge,V_edge)
+    return GridTopology(face_neighbor,corner_neighbor,edge_neighbor) 
+end
+
+function _corner_neighbor!(V_corner, I_corner, J_corner, cellid, cell, neighbor, neighborid, neighbor_cell)
+    corner_neighbor = VertexIndex((neighborid, neighbor[1]))
+    cell_corner_id = findfirst(x->x==neighbor_cell.nodes[neighbor[1]], cell.nodes)
+    push!(V_corner,Neighbor(corner_neighbor))
+    push!(I_corner,cellid)
+    push!(J_corner,cell_corner_id)
+end
+
+function _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor, neighborid, neighbor_cell)
+    neighbor_edge = neighbor_cell.nodes[neighbor]
+    if getdim(neighbor_cell) < 3
+        neighbor_edge_id = findfirst(x->issubset(x,neighbor_edge), faces(neighbor_cell))
+        edge_neighbor = FaceIndex((neighborid, neighbor_edge_id))
+    else
+        neighbor_edge_id = findfirst(x->issubset(x,neighbor_edge), edges(neighbor_cell))
+        edge_neighbor = EdgeIndex((neighborid, neighbor_edge_id))
+    end
+    cell_edge_id = findfirst(x->issubset(x,neighbor_edge),edges(cell))
+    push!(V_edge, Neighbor(edge_neighbor))
+    push!(I_edge, cellid)
+    push!(J_edge, cell_edge_id)
+end
+
+function _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor, neighborid, neighbor_cell)
+    neighbor_face = neighbor_cell.nodes[neighbor]
+    if getdim(neighbor_cell) == getdim(cell)
+        neighbor_face_id = findfirst(x->issubset(x,neighbor_face), faces(neighbor_cell))
+        face_neighbor = FaceIndex((neighborid, neighbor_face_id))
+    else
+        neighbor_face_id = findfirst(x->issubset(x,neighbor_face), edges(neighbor_cell))
+        face_neighbor = EdgeIndex((neighborid, neighbor_face_id))
+    end
+    cell_face_id = findfirst(x->issubset(x,neighbor_face),faces(cell))
+    push!(V_face, Neighbor(face_neighbor))
+    push!(I_face, cellid)
+    push!(J_face, cell_face_id)
+end
+
 abstract type AbstractGrid{dim} end
 
 """
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 """
-mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
+mutable struct Grid{dim,C<:AbstractCell,T<:Real,topologytype<:AbstractTopology} <: AbstractGrid{dim}
     cells::Vector{C}
     nodes::Vector{Node{dim,T}}
     # Sets
@@ -84,6 +205,8 @@ mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     vertexsets::Dict{String,Set{VertexIndex}} 
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool,Int}
+    #topology
+    topology::topologytype
 end
 
 function Grid(cells::Vector{C},
@@ -93,8 +216,9 @@ function Grid(cells::Vector{C},
               facesets::Dict{String,Set{FaceIndex}}=Dict{String,Set{FaceIndex}}(),
               edgesets::Dict{String,Set{EdgeIndex}}=Dict{String,Set{EdgeIndex}}(),
               vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}(),
-              boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)) where {dim,C,T}
-    return Grid(cells, nodes, cellsets, nodesets, facesets, edgesets, vertexsets, boundary_matrix)
+              boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0),
+              topology::GridTopology=GridTopology()) where {dim,C,T}
+    return Grid(cells, nodes, cellsets, nodesets, facesets, edgesets, vertexsets, boundary_matrix, topology)
 end
 
 ##########################

@@ -164,3 +164,175 @@ end
     @test VertexIndex(1,1) in getvertexset(grid, "left_corner")
 
 end
+
+@testset "Grid topology" begin
+#                           (11)
+#                   (10)+-----+-----+(12)
+#                       |  5  |  6  |
+#                   (7) +-----+-----+(9)
+#                       |  3  |  4  |
+#                   (4) +-----+-----+(6)
+#                       |  1  |  2  |
+#                   (1) +-----+-----+(3)
+#                            (2)
+    quadgrid = generate_grid(Quadrilateral,(2,3);build_topology=true)
+    topology = quadgrid.topology
+    #test corner neighbors maps cellid and local corner id to neighbor id and neighbor local corner id
+    @test topology.corner_neighbor[1,3] == Ferrite.Neighbor(VertexIndex(4,1))
+    @test topology.corner_neighbor[2,4] == Ferrite.Neighbor(VertexIndex(3,2))
+    @test topology.corner_neighbor[3,3] == Ferrite.Neighbor(VertexIndex(6,1))
+    @test topology.corner_neighbor[3,2] == Ferrite.Neighbor(VertexIndex(2,4))
+    @test topology.corner_neighbor[4,1] == Ferrite.Neighbor(VertexIndex(1,3))
+    @test topology.corner_neighbor[4,4] == Ferrite.Neighbor(VertexIndex(5,2))
+    @test topology.corner_neighbor[5,2] == Ferrite.Neighbor(VertexIndex(4,4))
+    @test topology.corner_neighbor[6,1] == Ferrite.Neighbor(VertexIndex(3,3))
+    #test face neighbor maps cellid and local face id to neighbor id and neighbor local face id 
+    @test topology.face_neighbor[1,2] == Ferrite.Neighbor(FaceIndex(2,4))
+    @test topology.face_neighbor[1,3] == Ferrite.Neighbor(FaceIndex(3,1))
+    @test topology.face_neighbor[2,3] == Ferrite.Neighbor(FaceIndex(4,1))
+    @test topology.face_neighbor[2,4] == Ferrite.Neighbor(FaceIndex(1,2))
+    @test topology.face_neighbor[3,1] == Ferrite.Neighbor(FaceIndex(1,3))
+    @test topology.face_neighbor[3,2] == Ferrite.Neighbor(FaceIndex(4,4))
+    @test topology.face_neighbor[3,3] == Ferrite.Neighbor(FaceIndex(5,1))
+    @test topology.face_neighbor[4,1] == Ferrite.Neighbor(FaceIndex(2,3))
+    @test topology.face_neighbor[4,3] == Ferrite.Neighbor(FaceIndex(6,1))
+    @test topology.face_neighbor[4,4] == Ferrite.Neighbor(FaceIndex(3,2))
+    @test topology.face_neighbor[5,1] == Ferrite.Neighbor(FaceIndex(3,3))
+    @test topology.face_neighbor[5,2] == Ferrite.Neighbor(FaceIndex(6,4))
+    @test topology.face_neighbor[5,3] == Ferrite.Neighbor(Ferrite.BoundaryIndex[])
+    @test topology.face_neighbor[5,4] == Ferrite.Neighbor(Ferrite.BoundaryIndex[])
+    @test topology.face_neighbor[6,1] == Ferrite.Neighbor(FaceIndex(4,3))
+    @test topology.face_neighbor[6,2] == Ferrite.Neighbor(Ferrite.BoundaryIndex[])
+    @test topology.face_neighbor[6,3] == Ferrite.Neighbor(Ferrite.BoundaryIndex[])
+    @test topology.face_neighbor[6,4] == Ferrite.Neighbor(FaceIndex(5,2))
+#                         (8)
+#                (7) +-----+-----+(9)
+#                    |  3  |  4  |
+#                (4) +-----+-----+(6) bottom view
+#                    |  1  |  2  |
+#                (1) +-----+-----+(3)
+#                         (2)
+#                         (15)
+#               (16) +-----+-----+(17)
+#                    |  3  |  4  |
+#               (13) +-----+-----+(15) top view
+#                    |  1  |  2  |
+#               (10) +-----+-----+(12)
+#                        (11)
+    hexgrid = generate_grid(Hexahedron,(2,2,1);build_topology=true) 
+    topology = hexgrid.topology
+    @test topology.edge_neighbor[1,11] == Ferrite.Neighbor(EdgeIndex(4,9))
+    @test topology.edge_neighbor[2,12] == Ferrite.Neighbor(EdgeIndex(3,10))
+    @test topology.edge_neighbor[3,10] == Ferrite.Neighbor(EdgeIndex(2,12))
+    @test topology.edge_neighbor[4,9] == Ferrite.Neighbor(EdgeIndex(1,11))
+    @test all(iszero,topology.corner_neighbor)
+    @test topology.face_neighbor[1,3] == Ferrite.Neighbor(FaceIndex(2,5))
+    @test topology.face_neighbor[1,4] == Ferrite.Neighbor(FaceIndex(3,2))
+    @test topology.face_neighbor[2,4] == Ferrite.Neighbor(FaceIndex(4,2))
+    @test topology.face_neighbor[2,5] == Ferrite.Neighbor(FaceIndex(1,3))
+    @test topology.face_neighbor[3,2] == Ferrite.Neighbor(FaceIndex(1,4))
+    @test topology.face_neighbor[3,3] == Ferrite.Neighbor(FaceIndex(4,5))
+    @test topology.face_neighbor[4,2] == Ferrite.Neighbor(FaceIndex(2,4))
+    @test topology.face_neighbor[4,5] == Ferrite.Neighbor(FaceIndex(3,3))
+
+#                   +-----+-----+
+#                   |\  6 |\  8 |
+#                   |  \  |  \  |
+#                   |  5 \| 7  \|
+#                   +-----+-----+
+#                   |\  2 |\  4 |
+#                   |  \  |  \  |
+#                   |  1 \| 3  \|
+#                   +-----+-----+
+# test for multiple corner_neighbors as in e.g. ele 3, local corner 3 (middle node)
+    trigrid = generate_grid(Triangle,(2,2);build_topology=true)
+    topology = trigrid.topology
+    @test topology.corner_neighbor[3,3] == Ferrite.Neighbor([VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
+
+# test mixed grid
+    cells = [
+        Hexahedron((1, 2, 3, 4, 5, 6, 7, 8)),
+        Quadrilateral((3, 2, 9, 10)),
+        ]
+    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 10)]
+    grid = Grid(cells, nodes, topology=Ferrite.GridTopology(cells))
+    topology = grid.topology
+    @test all(iszero,topology.corner_neighbor)
+    @test topology.face_neighbor[2,1] == Ferrite.Neighbor(EdgeIndex(1,2))
+    @test topology.edge_neighbor[1,2] == Ferrite.Neighbor(FaceIndex(2,1))
+#                           
+#                   +-----+-----+-----+
+#                   |  7  |  8  |  9  |
+#                   +-----+-----+-----+
+#                   |  4  |  5  |  6  |
+#                   +-----+-----+-----+
+#                   |  1  |  2  |  3  |
+#                   +-----+-----+-----+
+# test application: form level 1 neighborhood patches of elements 
+    quadgrid = generate_grid(Quadrilateral,(3,3);build_topology=true)
+    patches = Vector{Int}[]
+
+    getelement(neighbor::Ferrite.Neighbor) = first.(neighbor.neighbor_info)
+    function getelements(neighbors::Vector{Ferrite.Neighbor})
+        neighborelements = Int[]
+        for neighbor in neighbors
+            append!(neighborelements, getelement(neighbor))
+        end
+        return neighborelements
+    end
+
+    for eleid in 1:getncells(quadgrid)
+        elepatch = [nonzeros(quadgrid.topology.face_neighbor[eleid,:]); nonzeros(quadgrid.topology.corner_neighbor[eleid,:])]
+        push!(patches, getelements(elepatch))
+    end 
+
+    @test issubset([4,5,2], patches[1]) # neighbor elements of element 1 are 4 5 and 2
+    @test issubset([1,4,5,6,3], patches[2])
+    @test issubset([2,5,6], patches[3])
+    @test issubset([7,8,5,2,1], patches[4])
+    @test issubset([1,2,3,4,6,7,8,9], patches[5])
+    @test issubset([3,2,5,8,9], patches[6])
+    @test issubset([4,5,8], patches[7])
+    @test issubset([7,4,5,6,9], patches[8])
+    @test issubset([8,5,6], patches[9])
+#                           
+#                   +-----+-----+-----+
+#                   |  7  |  8  |  9  |
+#                   +-----+-----+-----+
+#                   |  4  |  5  |  6  |
+#                   +-----+-----+-----+
+#                   |  1  |  2  |  3  |
+#                   +-----+-----+-----+
+# test application: integrate jump across element boundary 5
+    function reinit!(fv::FaceValues, cellid::Int, faceid::Int, grid)
+        coords = getcoordinates(grid, cellid)
+        Ferrite.reinit!(fv, coords, faceid)
+    end
+    reinit!(fv::FaceValues, faceid::FaceIndex, grid) = reinit!(fv,faceid[1],faceid[2],grid) # wrapper for reinit!(fv,cellid,faceid,grid)
+    face_neighbors_ele5 = nonzeros(quadgrid.topology.face_neighbor[5,:])    
+    ip = Lagrange{2, RefCube, 1}()
+    qr_face = QuadratureRule{1, RefCube}(2)
+    fv_ele = FaceVectorValues(qr_face, ip)
+    fv_neighbor = FaceVectorValues(qr_face, ip)
+    u_ele5 = [3.0 for _ in 1:8]
+    u_neighbors = [5.0 for _ in 1:8]
+    jump_int = 0.
+    jump_abs = 0.
+    for ele_faceid in 1:nfaces(quadgrid.cells[5])
+        reinit!(fv_ele, 5, ele_faceid, quadgrid)
+        for q_point in 1:getnquadpoints(fv_ele)
+            dΩ = getdetJdV(fv_ele, q_point)
+            normal_5 = getnormal(fv_ele, q_point)
+            u_5_n = function_value(fv_ele, q_point, u_ele5) ⋅ normal_5
+            for neighbor_entity in face_neighbors_ele5[ele_faceid].neighbor_info # only one entity can be changed to get rid of the for loop
+                reinit!(fv_neighbor, neighbor_entity, quadgrid)
+                normal_neighbor = getnormal(fv_neighbor, q_point) 
+                u_neighbor = function_value(fv_neighbor, q_point, u_neighbors) ⋅ normal_neighbor
+                jump_int += (u_5_n + u_neighbor) * dΩ
+                jump_abs += abs(u_5_n + u_neighbor) * dΩ
+            end 
+        end
+    end
+    @test isapprox(jump_abs, 2/3*2*4,atol=1e-6) # 2*4*0.66666, jump is always 2, 4 sides, length =0.66
+    @test isapprox(jump_int, 0.0, atol=1e-6)
+end
