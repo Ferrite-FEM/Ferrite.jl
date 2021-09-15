@@ -312,27 +312,27 @@ end
     face_neighbors_ele5 = nonzeros(quadgrid.topology.face_neighbor[5,:])    
     ip = Lagrange{2, RefCube, 1}()
     qr_face = QuadratureRule{1, RefCube}(2)
-    fv_ele = FaceScalarValues(qr_face, ip)
-    fv_neighbor = FaceScalarValues(qr_face, ip)
-    u_ele5 = [3.0,3.0,3.0,3.0]
-    u_neighbors = [5.0,5.0,5.0,5.0]
-    jump_int = zero(Vec{2})
-    jump_abs = zero(Vec{2})
+    fv_ele = FaceVectorValues(qr_face, ip)
+    fv_neighbor = FaceVectorValues(qr_face, ip)
+    u_ele5 = [3.0 for _ in 1:8]
+    u_neighbors = [5.0 for _ in 1:8]
+    jump_int = 0.
+    jump_abs = 0.
     for ele_faceid in 1:nfaces(quadgrid.cells[5])
         reinit!(fv_ele, 5, ele_faceid, quadgrid)
         for q_point in 1:getnquadpoints(fv_ele)
             dΩ = getdetJdV(fv_ele, q_point)
             normal_5 = getnormal(fv_ele, q_point)
-            u_5_n = function_value(fv_ele, q_point, u_ele5) * normal_5
+            u_5_n = function_value(fv_ele, q_point, u_ele5) ⋅ normal_5
             for neighbor_entity in face_neighbors_ele5[ele_faceid].neighbor_info # only one entity can be changed to get rid of the for loop
                 reinit!(fv_neighbor, neighbor_entity, quadgrid)
                 normal_neighbor = getnormal(fv_neighbor, q_point) 
-                u_neighbor = function_value(fv_neighbor, q_point, u_neighbors) * normal_neighbor
+                u_neighbor = function_value(fv_neighbor, q_point, u_neighbors) ⋅ normal_neighbor
                 jump_int += (u_5_n + u_neighbor) * dΩ
-                jump_abs += abs.(u_5_n) - abs.(u_neighbor) * dΩ
+                jump_abs += abs(u_5_n + u_neighbor) * dΩ
             end 
         end
     end
-    @test isapprox(jump_abs, [16/3,16/3],atol=1e-6) # 2*4*0.66666, jump is always 2, 4 sides with length 0.6666
-    @test isapprox(jump_int, [0.0, 0.0], atol=1e-6)
+    @test isapprox(jump_abs, 5.3333,atol=1e-6) # 2*4*0.66666, jump is always 2, 4 sides, length =0.66
+    @test isapprox(jump_int, 0.0, atol=1e-6)
 end
