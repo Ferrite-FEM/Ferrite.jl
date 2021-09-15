@@ -279,7 +279,7 @@ end
     function getelements(neighbors::Vector{Ferrite.Neighbor})
         neighborelements = Int[]
         for neighbor in neighbors
-            append!(neighborelements, getelement(neighbor)...)
+            append!(neighborelements, getelement(neighbor))
         end
         return neighborelements
     end
