@@ -328,11 +328,11 @@ end
                 reinit!(fv_neighbor, neighbor_entity, quadgrid)
                 normal_neighbor = getnormal(fv_neighbor, q_point) 
                 u_neighbor = function_value(fv_neighbor, q_point, u_neighbors) * normal_neighbor
-                jump_int += (u_5_n - u_neighbor) * dΩ
-                jump_abs += abs.(u_5_n - u_neighbor) * dΩ
+                jump_int += (u_5_n + u_neighbor) * dΩ
+                jump_abs += abs.(u_5_n) - abs.(u_neighbor) * dΩ
             end 
         end
     end
-    @test isapprox(jump_abs, [10.6666666,10.6666666],atol=1e-6) # side length 2 ???, jump value 2, 4 sides, 0.666 length 2*2*4*0.6666 = 10.6666
+    @test isapprox(jump_abs, [16/3,16/3],atol=1e-6) # 2*4*0.66666, jump is always 2, 4 sides with length 0.6666
     @test isapprox(jump_int, [0.0, 0.0], atol=1e-6)
 end
