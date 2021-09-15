@@ -107,7 +107,7 @@ end
 
 function generate_grid(C::Type{Cell{2,M,N}}, nel::NTuple{2,Int}, X::Vector{Vec{2,T}}; build_topology=false) where {M,N,T}
     @assert length(X) == 4
-    generate_grid(C, nel, X[1], X[2], X[3], X[4]; build_topology)
+    generate_grid(C, nel, X[1], X[2], X[3], X[4]; build_topology=build_topology)
 end
 
 function generate_grid(C::Type{Cell{2,M,N}}, nel::NTuple{2,Int}, left::Vec{2,T}=Vec{2}((-1.0,-1.0)), right::Vec{2,T}=Vec{2}((1.0,1.0));build_topology=false) where {M,N,T}
