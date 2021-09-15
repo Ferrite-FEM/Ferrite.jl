@@ -263,4 +263,39 @@ end
 # cell 2 is connected via its face, which is an edge for cell 1 and vice versa
     @test topology.face_neighbor[2,1] == Ferrite.Neighbor(EdgeIndex(1,2))
     @test topology.edge_neighbor[1,2] == Ferrite.Neighbor(FaceIndex(2,1))
+#                           
+#                   +-----+-----+-----+
+#                   |  7  |  8  |  9  |
+#                   +-----+-----+-----+
+#                   |  4  |  5  |  6  |
+#                   +-----+-----+-----+
+#                   |  1  |  2  |  3  |
+#                   +-----+-----+-----+
+# test application: form level 1 neighborhood patches of elements 
+    quadgrid = generate_grid(Quadrilateral,(3,3);build_topology=true)
+    patches = Vector{Int}[]
+
+    getelement(neighbor::Ferrite.Neighbor) = first.(neighbor.neighbor_info)
+    function getelements(neighbors::Vector{Ferrite.Neighbor})
+        neighborelements = Int[]
+        for neighbor in neighbors
+            append!(neighborelements, getelement(neighbor)...)
+        end
+        return neighborelements
+    end
+
+    for eleid in 1:getncells(quadgrid)
+        elepatch = [nonzeros(quadgrid.topology.face_neighbor[eleid,:]); nonzeros(quadgrid.topology.corner_neighbor[eleid,:])]
+        push!(patches, getelements(elepatch))
+    end 
+
+    @test issubset([4,5,2], patches[1]) # neighbor elements of element 1 are 4 5 and 2
+    @test issubset([1,4,5,6,3], patches[2])
+    @test issubset([2,5,6], patches[3])
+    @test issubset([7,8,5,2,1], patches[4])
+    @test issubset([1,2,3,4,6,7,8,9], patches[5])
+    @test issubset([3,2,5,8,9], patches[6])
+    @test issubset([4,5,8], patches[7])
+    @test issubset([7,4,5,6,9], patches[8])
+    @test issubset([8,5,6], patches[9])
 end
