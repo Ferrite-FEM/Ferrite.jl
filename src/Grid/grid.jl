@@ -104,25 +104,28 @@ edge_npoints(::Cell{3,N,M}) where {N,M} = 2
 
 getdim(::Cell{dim,N,M}) where {dim,N,M} = dim
 
-struct Topology
+abstract type AbstractTopology end
+
+struct GridTopology <: AbstractTopology
     face_neighbor::SparseMatrixCSC{Neighbor,Int}
     corner_neighbor::SparseMatrixCSC{Neighbor,Int}
     edge_neighbor::SparseMatrixCSC{Neighbor,Int}
 end
 
-function Topology()
+function GridTopology()
     face_neighbor = spzeros(Neighbor,0,0)
     corner_neighbor = spzeros(Neighbor,0,0)
     edge_neighbor = spzeros(Neighbor,0,0)
-    return Topology(face_neighbor,corner_neighbor,edge_neighbor)
+    return GridTopology(face_neighbor,corner_neighbor,edge_neighbor)
 end
 
-function Topology(cells::Vector{C}) where C <: AbstractCell
+function GridTopology(cells::Vector{C}) where C <: AbstractCell
     I_face = Int[]; J_face = Int[]; V_face = Neighbor[]
     I_edge = Int[]; J_edge = Int[]; V_edge = Neighbor[]
     I_corner = Int[]; J_corner = Int[]; V_corner = Neighbor[]
+    cell_node_table = getproperty.(cells,:nodes)
     for (cellid,cell) in enumerate(cells)
-        neighbors = findall.(x->x ∈ cell.nodes,getproperty.(cells,:nodes)) 
+        neighbors = findall.(x->x ∈ cell.nodes,cell_node_table) 
         for (neighborid,neighbor) in enumerate(neighbors)
             neighbor_cell = cells[neighborid]
             if length(neighbor) == 0
@@ -145,7 +148,7 @@ function Topology(cells::Vector{C}) where C <: AbstractCell
     face_neighbor = sparse(I_face,J_face,V_face)
     corner_neighbor = sparse(I_corner,J_corner,V_corner) 
     edge_neighbor = sparse(I_edge,J_edge,V_edge)
-    return Topology(face_neighbor,corner_neighbor,edge_neighbor) 
+    return GridTopology(face_neighbor,corner_neighbor,edge_neighbor) 
 end
 
 function _corner_neighbor!(V_corner, I_corner, J_corner, cellid, cell, neighbor, neighborid, neighbor_cell)
@@ -191,7 +194,7 @@ abstract type AbstractGrid{dim} end
 """
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 """
-mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
+mutable struct Grid{dim,C<:AbstractCell,T<:Real,topologytype<:AbstractTopology} <: AbstractGrid{dim}
     cells::Vector{C}
     nodes::Vector{Node{dim,T}}
     # Sets
@@ -203,7 +206,7 @@ mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool,Int}
     #topology
-    topology::Topology
+    topology::topologytype
 end
 
 function Grid(cells::Vector{C},
@@ -214,7 +217,7 @@ function Grid(cells::Vector{C},
               edgesets::Dict{String,Set{EdgeIndex}}=Dict{String,Set{EdgeIndex}}(),
               vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}(),
               boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0),
-              topology::Topology=Topology(cells)) where {dim,C,T}
+              topology::GridTopology=GridTopology()) where {dim,C,T}
     return Grid(cells, nodes, cellsets, nodesets, facesets, edgesets, vertexsets, boundary_matrix, topology)
 end
 

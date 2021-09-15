@@ -175,7 +175,7 @@ end
 #                       |  1  |  2  |
 #                   (1) +-----+-----+(3)
 #                            (2)
-    quadgrid = generate_grid(Quadrilateral,(2,3))
+    quadgrid = generate_grid(Quadrilateral,(2,3);build_topology=true)
     topology = quadgrid.topology
     #test corner neighbors maps cellid and local corner id to neighbor id and neighbor local corner id
     @test topology.corner_neighbor[1,3] == Ferrite.Neighbor(VertexIndex(4,1))
@@ -219,7 +219,7 @@ end
 #                    |  1  |  2  |
 #               (10) +-----+-----+(12)
 #                        (11)
-    hexgrid = generate_grid(Hexahedron,(2,2,1)) 
+    hexgrid = generate_grid(Hexahedron,(2,2,1);build_topology=true) 
     topology = hexgrid.topology
     @test topology.edge_neighbor[1,11] == Ferrite.Neighbor(EdgeIndex(4,9))
     @test topology.edge_neighbor[2,12] == Ferrite.Neighbor(EdgeIndex(3,10))
@@ -245,7 +245,7 @@ end
 #                   |  1 \| 3  \|
 #                   +-----+-----+
 # test for multiple corner_neighbors as in e.g. ele 3, local corner 3 (middle node)
-    trigrid = generate_grid(Triangle,(2,2))
+    trigrid = generate_grid(Triangle,(2,2);build_topology=true)
     topology = trigrid.topology
     @test topology.corner_neighbor[3,3] == Ferrite.Neighbor([VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
 
@@ -255,7 +255,7 @@ end
         Quadrilateral((3, 2, 9, 10)),
         ]
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 10)]
-    grid = Grid(cells, nodes)
+    grid = Grid(cells, nodes, topology=Ferrite.GridTopology(cells))
     topology = grid.topology
     @test all(iszero,topology.corner_neighbor)
 # currently, we have in a getdim(cell) != getdim(neighbor_cell) case an unsymmetric topology sparse matrix
