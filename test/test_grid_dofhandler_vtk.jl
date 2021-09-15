@@ -258,9 +258,6 @@ end
     grid = Grid(cells, nodes, topology=Ferrite.GridTopology(cells))
     topology = grid.topology
     @test all(iszero,topology.corner_neighbor)
-# currently, we have in a getdim(cell) != getdim(neighbor_cell) case an unsymmetric topology sparse matrix
-# this implies that the neighborhood info is different from the perspective of the cells
-# cell 2 is connected via its face, which is an edge for cell 1 and vice versa
     @test topology.face_neighbor[2,1] == Ferrite.Neighbor(EdgeIndex(1,2))
     @test topology.edge_neighbor[1,2] == Ferrite.Neighbor(FaceIndex(2,1))
 #                           
@@ -298,4 +295,44 @@ end
     @test issubset([4,5,8], patches[7])
     @test issubset([7,4,5,6,9], patches[8])
     @test issubset([8,5,6], patches[9])
+#                           
+#                   +-----+-----+-----+
+#                   |  7  |  8  |  9  |
+#                   +-----+-----+-----+
+#                   |  4  |  5  |  6  |
+#                   +-----+-----+-----+
+#                   |  1  |  2  |  3  |
+#                   +-----+-----+-----+
+# test application: integrate jump across element boundary 5
+    function reinit!(fv::FaceValues, cellid::Int, faceid::Int, grid)
+        coords = getcoordinates(grid, cellid)
+        Ferrite.reinit!(fv, coords, faceid)
+    end
+    reinit!(fv::FaceValues, faceid::FaceIndex, grid) = reinit!(fv,faceid[1],faceid[2],grid) # wrapper for reinit!(fv,cellid,faceid,grid)
+    face_neighbors_ele5 = nonzeros(quadgrid.topology.face_neighbor[5,:])    
+    ip = Lagrange{2, RefCube, 1}()
+    qr_face = QuadratureRule{1, RefCube}(2)
+    fv_ele = FaceScalarValues(qr_face, ip)
+    fv_neighbor = FaceScalarValues(qr_face, ip)
+    u_ele5 = [3.0,3.0,3.0,3.0]
+    u_neighbors = [5.0,5.0,5.0,5.0]
+    jump_int = zero(Vec{2})
+    jump_abs = zero(Vec{2})
+    for ele_faceid in 1:nfaces(quadgrid.cells[5])
+        reinit!(fv_ele, 5, ele_faceid, quadgrid)
+        for q_point in 1:getnquadpoints(fv_ele)
+            dΩ = getdetJdV(fv_ele, q_point)
+            normal_5 = getnormal(fv_ele, q_point)
+            u_5_n = function_value(fv_ele, q_point, u_ele5) * normal_5
+            for neighbor_entity in face_neighbors_ele5[ele_faceid].neighbor_info # only one entity can be changed to get rid of the for loop
+                reinit!(fv_neighbor, neighbor_entity, quadgrid)
+                normal_neighbor = getnormal(fv_neighbor, q_point) 
+                u_neighbor = function_value(fv_neighbor, q_point, u_neighbors) * normal_neighbor
+                jump_int += (u_5_n - u_neighbor) * dΩ
+                jump_abs += abs.(u_5_n - u_neighbor) * dΩ
+            end 
+        end
+    end
+    @test isapprox(jump_abs, [10.6666666,10.6666666],atol=1e-6) # side length 2 ???, jump value 2, 4 sides, 0.666 length 2*2*4*0.6666 = 10.6666
+    @test isapprox(jump_int, [0.0, 0.0], atol=1e-6)
 end
