@@ -333,6 +333,6 @@ end
             end 
         end
     end
-    @test isapprox(jump_abs, 5.3333,atol=1e-6) # 2*4*0.66666, jump is always 2, 4 sides, length =0.66
+    @test isapprox(jump_abs, 2/3*2*4,atol=1e-6) # 2*4*0.66666, jump is always 2, 4 sides, length =0.66
     @test isapprox(jump_int, 0.0, atol=1e-6)
 end
