@@ -109,6 +109,7 @@ export
     apply_rhs!,
     get_rhs_data,
     apply_zero!,
+    apply_multiple_rhs!,
     add!,
     free_dofs,
 
