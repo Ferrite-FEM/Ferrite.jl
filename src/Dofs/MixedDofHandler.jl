@@ -12,17 +12,6 @@ function FieldHandler(fields::Vector{Field}, cellset)
     return FieldHandler(fields, cellset)
 end
 
-struct CellVector{T}
-    values::Vector{T}
-    offset::Vector{Int}
-    length::Vector{Int}
-end
-
-function Base.getindex(elvec::CellVector, el::Int)
-    offset = elvec.offset[el]
-    return elvec.values[offset:offset + elvec.length[el]-1]
- end
-
 struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: Ferrite.AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
     cell_dofs::CellVector{Int}
