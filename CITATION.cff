@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use Ferrite.jl, please cite it as below."
+authors:
+- family-names: "Carlsson"
+  given-names: "Kristoffer"
+- family-names: "Ekre"
+  given-names: "Fredrik"
+- family-names: "Contributors"
+  given-names: " "
+title: "Ferrite.jl"
+version: 0.3.0
+date-released: 2021-03-25
+url: "https://github.com/Ferrite-FEM/Ferrite.jl"
