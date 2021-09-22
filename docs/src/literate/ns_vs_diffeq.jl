@@ -803,9 +803,11 @@ function solve_steady_stokes()
 
     prog = ProgressMeter.ProgressThresh(NEWTON_TOL, "Solving:")
     J = copy(K)
-    apply!(u, ch)
+    # apply!(u, ch)
     R = navier_stokes_residuals(dh, u, cellvalues_v, cellvalues_p)
     last_res = norm(R[ch.free_dofs])
+    R = zeros(ndofs(dh))
+    α = 1.0
     # Newton line search formulation: uᵢ₊₁ = uᵢ - α J⁻¹ R(uᵢ)
     # We solve for J uᶞᵢ = R(uᵢ) where J is the Gateux derivative of R
     while true
@@ -818,15 +820,15 @@ function solve_steady_stokes()
         #+
         # f = zeros(ndofs(dh))
         jac_assembler = start_assemble(J, R)
-        J .= K
+        # J .= K
         # R .= K*u
-        R .= navier_stokes_residuals(dh, u, cellvalues_v, cellvalues_p)
+        # R .= navier_stokes_residuals(dh, u, cellvalues_v, cellvalues_p)
 
         # It is now time to loop over all the cells in our grid. We do this by iterating
         # over a `CellIterator`. The iterator caches some useful things for us, for example
         # the nodal coordinates for the cell, and the local degrees of freedom.
         #+
-        @inbounds for (i,cell) in enumerate(CellIterator(dh))
+        @inbounds for cell in CellIterator(dh)
             # Always remember to reset the element stiffness matrix and
             # force vector since we reuse them for all elements.
             #+
@@ -862,21 +864,35 @@ function solve_steady_stokes()
                 ∇v = function_gradient(cellvalues_v, q_point, v_cell)
                 v = function_value(cellvalues_v, q_point, v_cell)
                 divv = function_divergence(cellvalues_v, q_point, v_cell)
-                # p = function_value(cellvalues_p, q_point, p_cell)
-                for j in 1:n_basefuncs_v
-                    φⱼ = shape_value(cellvalues_v, q_point, j)
-                    ∇φⱼ = shape_gradient(cellvalues_v, q_point, j)
-                    divφⱼ = shape_divergence(cellvalues_v, q_point, j)
-                    for i in 1:n_basefuncs_v
-                        φᵢ = shape_value(cellvalues_v, q_point, i)
-                        ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
-                        divφᵢ = shape_divergence(cellvalues_v, q_point, i)
+                p = function_value(cellvalues_p, q_point, p_cell)
+                for i ∈ 1:n_basefuncs_v
+                    φᵢ = shape_value(cellvalues_v, q_point, i)
+                    ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
+                    divφᵢ = shape_divergence(cellvalues_v, q_point, i)
+                    for j ∈ 1:n_basefuncs_v
+                        φⱼ = shape_value(cellvalues_v, q_point, j)
+                        ∇φⱼ = shape_gradient(cellvalues_v, q_point, j)
+                        divφⱼ = shape_divergence(cellvalues_v, q_point, j)
 
-                        Jₑ[BlockIndex((v▄, v▄), (j, i))] -= (v ⋅ ∇φᵢ + φᵢ ⋅ ∇v) ⋅ φⱼ * dΩ
+                        Jₑ[BlockIndex((v▄, v▄), (i, j))] += ν * ∇φⱼ ⊡ ∇φᵢ * dΩ
+
+                        Jₑ[BlockIndex((v▄, v▄), (i, j))] += ∇v ⋅ φⱼ ⋅ φᵢ * dΩ
+                        Jₑ[BlockIndex((v▄, v▄), (i, j))] += ∇φⱼ ⋅ v ⋅ φᵢ * dΩ
+                        # Jₑ[BlockIndex((v▄, v▄), (i, j))] += φⱼ ⋅ ∇v ⋅ φᵢ * dΩ
+                        # Jₑ[BlockIndex((v▄, v▄), (i, j))] += v ⋅ ∇φⱼ ⋅ φᵢ * dΩ
+
+                        # Jₑ[BlockIndex((v▄, v▄), (i, j))] += γ * divφⱼ * divφᵢ * dΩ #CURRENT
+
+                        # Jₑ[BlockIndex((v▄, v▄), (j, i))] -= (v ⋅ ∇φᵢ + φᵢ ⋅ ∇v) ⋅ φⱼ * dΩ
                         ## Stablizitaion term
                         # Jₑ[BlockIndex((v▄, v▄), (j, i))] -= γ * divφᵢ * divφⱼ * dΩ
                     end
-                    Rₑ[BlockIndex((v▄), (j))] -= v ⋅ ∇v ⋅ φⱼ * dΩ
+                    for j ∈ 1:n_basefuncs_p
+                        ψⱼ = shape_value(cellvalues_p, q_point, j)
+                        Jₑ[BlockIndex((p▄, v▄), (j, i))] -= ψⱼ * divφᵢ * dΩ
+                        Jₑ[BlockIndex((v▄, p▄), (i, j))] -= divφᵢ * ψⱼ * dΩ
+                    end
+                    # Rₑ[BlockIndex((v▄), (j))] -= v ⋅ ∇v ⋅ φᵢ * dΩ
                     ## Stablizitaion term
                     # Rₑ[BlockIndex((v▄), (j))] -= γ * divv ⋅ divφⱼ * dΩ
                     # for i in 1:n_basefuncs_v_dim
@@ -891,18 +907,28 @@ function solve_steady_stokes()
                     # Rₑ[BlockIndex((v▄), (j))] -= ν * ∇v ⊡ ∇φⱼ * dΩ
                     # Rₑ[BlockIndex((v▄), (j))] -= v ⋅ ∇v ⋅ φⱼ * dΩ
                     # Rₑ[BlockIndex((v▄), (j))] += p * divφⱼ * dΩ
+
+                    Rₑ[BlockIndex((v▄), (i))] -= ν * ∇v ⊡ ∇φᵢ * dΩ
+                    Rₑ[BlockIndex((v▄), (i))] -= ∇v ⋅ v ⋅ φᵢ * dΩ
+                    # Rₑ[BlockIndex((v▄), (i))] -= v ⋅ ∇v ⋅ φᵢ * dΩ
+                    Rₑ[BlockIndex((v▄), (i))] += p * divφᵢ * dΩ
+
+                    # Rₑ[BlockIndex((v▄), (i))] -= γ * divv * divφᵢ * dΩ #CURRENT
                 end
-                for j in 1:n_basefuncs_p
-                    ψⱼ = shape_value(cellvalues_p, q_point, j)
+                for i in 1:n_basefuncs_p
+                    ψᵢ = shape_value(cellvalues_p, q_point, i)
+                    divψᵢ = shape_divergence(cellvalues_p, q_point, i)
                     ## Stablizitaion Term
                     #     Rₑ[BlockIndex((p▄), (j))] += divv * ψⱼ * dΩ
-                    for i in 1:n_basefuncs_p
-                        ψᵢ = shape_value(cellvalues_p, q_point, i)
+                    for j in 1:n_basefuncs_p
+                        ψⱼ = shape_value(cellvalues_p, q_point, j)
                         ## Stablizitaion Term
                         #Jₑ[BlockIndex((v▄, v▄), (j, i))] -= (1.0/γ) *  ψⱼ * ψᵢ * dΩ
                         ## ???
                         # Jₑ[BlockIndex((p▄, p▄), (j, i))] -= ψᵢ * ψⱼ * dΩ
+                        # Jₑ[BlockIndex((p▄, p▄), (i, j))] += ψᵢ * ψⱼ * dΩ #CURRENT
                     end
+                    Rₑ[BlockIndex((p▄), (i))] += divv * ψᵢ * dΩ
                 end
             end
 
@@ -911,11 +937,18 @@ function solve_steady_stokes()
             #+
             assemble!(jac_assembler, all_celldofs, Rₑ, Jₑ)
         end
-
-        apply_zero!(J, R, ch)
-
+        #R[ch.prescribed_dofs] .= 0.0
+        # vtk_grid("steady-navier-stokes-flow-$newton_itr-residual-raw.vtu", dh; compress=false) do vtk
+        #     vtk_point_data(vtk,dh,R)
+        #     vtk_save(vtk)
+        # end
+        if newton_itr == 0
+            apply!(J,R,ch)
+        else
+            apply_zero!(J, R, ch)
+        end
         norm_res = norm(R[ch.free_dofs])
-        ProgressMeter.update!(prog, norm_res; showvalues = [(:iter, newton_itr), (:divv, compute_divergence(dh, u, cellvalues_v)), (:delta, norm(uᶞ))])
+        ProgressMeter.update!(prog, norm_res; showvalues = [(:iter, newton_itr), (:divv, compute_divergence(dh, u, cellvalues_v)), (:delta, norm(uᶞ)), (:line, α)])
         if norm_res < NEWTON_TOL
             println("Reached tolerance of $norm_res after $newton_itr Newton iterations, aborting")
             break
@@ -925,35 +958,39 @@ function solve_steady_stokes()
         end
 
         uᶞ = J\R
-        #uᶞ = gmres(J,R)
-        apply_zero!(uᶞ, ch)
-        if newton_itr == 0
-            u .-= uᶞ
-        else # line search
-            α = 2.0
-            uₛ = copy(u)
-            while α > 1e-5
-                α /= 2.0
-                uₛ = u - α*uᶞ
-                norm_res = norm(navier_stokes_residuals(dh, uₛ, cellvalues_v, cellvalues_p)[ch.free_dofs])
-                if norm_res < last_res
-                    break
-                end
-            end
-            last_res = norm_res
-            u .= uₛ
+        # uᶞ = gmres(J,R)
+        if newton_itr > 0
+            apply_zero!(uᶞ, ch)
+        else
+            apply!(uᶞ, ch)
         end
+        # if newton_itr == 0
+            u .+= uᶞ
+        # else # line search
+        #     α = 2.0
+        #     uₛ = copy(u)
+        #     while α > 1e-5
+        #         α /= 2.0
+        #         uₛ = u + α*uᶞ
+        #         norm_res = norm(navier_stokes_residuals(dh, uₛ, cellvalues_v, cellvalues_p)[ch.free_dofs])
+        #         if norm_res < last_res
+        #             break
+        #         end
+        #     end
+        #     last_res = norm_res
+        #     u .= uₛ
+        # end
         pressure_correction!(u, dh, cellvalues_p)
 
-        vtk_grid("steady-navier-stokes-flow-$newton_itr-residual.vtu", dh; compress=false) do vtk
-            vtk_point_data(vtk,dh,R)
-            vtk_save(vtk)
-        end
+        # vtk_grid("steady-navier-stokes-flow-$newton_itr-residual.vtu", dh; compress=false) do vtk
+        #     vtk_point_data(vtk,dh,R)
+        #     vtk_save(vtk)
+        # end
 
-        vtk_grid("steady-navier-stokes-flow-$newton_itr-delta.vtu", dh; compress=false) do vtk
-            vtk_point_data(vtk,dh,uᶞ)
-            vtk_save(vtk)
-        end
+        # vtk_grid("steady-navier-stokes-flow-$newton_itr-delta.vtu", dh; compress=false) do vtk
+        #     vtk_point_data(vtk,dh,uᶞ)
+        #     vtk_save(vtk)
+        # end
 
         vtk_grid("steady-navier-stokes-flow-$newton_itr.vtu", dh; compress=false) do vtk
             vtk_point_data(vtk,dh,u)
