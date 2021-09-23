@@ -1,6 +1,6 @@
 # # Incompressible Navier-Stokes Equations via [DifferentialEquations.jl]()
 #
-# ![](vortex-shedding.gif)
+# ![](https://user-images.githubusercontent.com/9196588/134514213-76d91d34-19ab-47c2-957e-16bb0c8669e1.gif)
 #
 #
 # In this example we focus on a simple but visually appealing problem from
@@ -63,36 +63,39 @@ using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack
 using Preconditioners
 # using OrdinaryDiffEq
 using FerriteGmsh
-using IterativeSolvers
 # We start  generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-x_cells = round(Int, 32)
-y_cells = round(Int, 32)
-grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((1.0, 1.0)));
+# x_cells = round(Int, 32)
+# y_cells = round(Int, 32)
+# grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((1.0, 1.0)));
 
-# x_cells = round(Int, 1.25*220)
-# y_cells = round(Int, 1.25*41)
+# x_cells = round(Int, 220)
+# y_cells = round(Int, 41)
 # grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((2.2, 0.41)));
 
-# # Carve hole in the mesh and update boundaries.
-# cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05, 1:length(grid.cells))
-# hole_cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))<=0.05, 1:length(grid.cells))
-# # Gather all faces in the ring and touching the ring
-# hole_face_ring = Set{FaceIndex}()
-# for hci ∈ hole_cell_indices
-#     push!(hole_face_ring, FaceIndex((hci+1, 4)))
-#     push!(hole_face_ring, FaceIndex((hci-1, 2)))
-#     push!(hole_face_ring, FaceIndex((hci-x_cells, 3)))
-#     push!(hole_face_ring, FaceIndex((hci+x_cells, 1)))
-# end
-# grid.facesets["hole"] = Set(filter(x->x.idx[1] ∉ hole_cell_indices, collect(hole_face_ring)))
+x_cells = round(Int, 2*110)
+y_cells = round(Int, 2*41)
+grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((1.1, 0.41)));
 
-# cell_indices_map = map(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05 ? indexin([ci], cell_indices)[1] : 0, 1:length(grid.cells))
-# grid.cells = grid.cells[cell_indices]
-# for facesetname in keys(grid.facesets)
-#     grid.facesets[facesetname] = Set(map(fi -> FaceIndex( cell_indices_map[fi.idx[1]] ,fi.idx[2]), collect(grid.facesets[facesetname])))
-# end
+# Carve hole in the mesh and update boundaries.
+cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05, 1:length(grid.cells))
+hole_cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))<=0.05, 1:length(grid.cells))
+# Gather all faces in the ring and touching the ring
+hole_face_ring = Set{FaceIndex}()
+for hci ∈ hole_cell_indices
+    push!(hole_face_ring, FaceIndex((hci+1, 4)))
+    push!(hole_face_ring, FaceIndex((hci-1, 2)))
+    push!(hole_face_ring, FaceIndex((hci-x_cells, 3)))
+    push!(hole_face_ring, FaceIndex((hci+x_cells, 1)))
+end
+grid.facesets["hole"] = Set(filter(x->x.idx[1] ∉ hole_cell_indices, collect(hole_face_ring)))
+
+cell_indices_map = map(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05 ? indexin([ci], cell_indices)[1] : 0, 1:length(grid.cells))
+grid.cells = grid.cells[cell_indices]
+for facesetname in keys(grid.facesets)
+    grid.facesets[facesetname] = Set(map(fi -> FaceIndex( cell_indices_map[fi.idx[1]] ,fi.idx[2]), collect(grid.facesets[facesetname])))
+end
 
 # grid = saved_file_to_grid("holed_plate.msh")
 
@@ -118,16 +121,12 @@ grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{
 # to a `CellScalarValues` object.
 dim = 2
 T = 10.0
-Δt₀ = 0.01
-Δt_save = 0.1
+Δt₀ = 0.001
+Δt_save = 0.01
 
-ϵᵣ = 0.0# stabilization strength
-γ = 1.0# other stabilization term for div-grad stabilization...
-
-# ν = 0.001 #dynamic viscosity
-ν = 1.0/100.0
-vᵢₙ(t) = 0.3 #inflow velocity
-#vᵢₙ(t) = clamp(t, 0.0, 1.0)*0.3 #inflow velocity
+ν = 1.0/1000.0 #dynamic viscosity
+vᵢₙ(t) = 1.0 #inflow velocity
+# vᵢₙ(t) = clamp(t, 0.0, 1.0)*1.0 #inflow velocity
 
 ip_v = Lagrange{dim, RefCube, 2}()
 ip_geom = Lagrange{dim, RefCube, 1}()
@@ -164,15 +163,15 @@ ch = ConstraintHandler(dh);
 # Next we need to add constraints to `ch`. For this problem we define
 # homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
 # the `union` of all the face sets on the boundary.
-# ∂Ω_noslip = union(getfaceset.((grid, ), ["top", "bottom", "hole"])...);
+∂Ω_noslip = union(getfaceset.((grid, ), ["top", "bottom", "hole"])...);
 # ∂Ω_noslip = union(getfaceset.((grid, ), ["top", "bottom"])...);
-# ∂Ω_inflow = getfaceset(grid, "left");
-# ∂Ω_free = getfaceset(grid, "right");
+∂Ω_inflow = getfaceset(grid, "left");
+∂Ω_free = getfaceset(grid, "right");
 
 # ∂Ω = union(getfaceset.((grid, ), ["top", "bottom", "left", "right"])...);
 
-∂Ω_noslip = union(getfaceset.((grid, ), ["bottom", "left", "right"])...);
-∂Ω_lidflow = getfaceset(grid, "top");
+# ∂Ω_noslip = union(getfaceset.((grid, ), ["bottom", "left", "right"])...);
+# ∂Ω_lidflow = getfaceset(grid, "top");
 
 # Now we are set up to define our constraint. We specify which field
 # the condition is for, and our combined face set `∂Ω`. The last
@@ -181,13 +180,13 @@ ch = ConstraintHandler(dh);
 # it is trivial -- no matter what $x$ and $t$ we return $0$. When we have
 # specified our constraint we `add!` it to `ch`.
 noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> [0,0], [1,2])
-add!(ch, noslip_bc);
+add!(ch, noslip_bc)
 
-# inflow_bc = Dirichlet(:v, ∂Ω_inflow, ((x,y), t) -> [4*vᵢₙ(t)*y*(0.41-y)/0.41^2,0], [1,2])
-# add!(ch, inflow_bc);
+inflow_bc = Dirichlet(:v, ∂Ω_inflow, ((x,y), t) -> [4*vᵢₙ(t)*y*(0.41-y)/0.41^2,0], [1,2])
+add!(ch, inflow_bc);
 
-lid_bc = Dirichlet(:v, ∂Ω_lidflow, (x, t) -> [1.0,0.0], [1,2])
-add!(ch, lid_bc);
+# lid_bc = Dirichlet(:v, ∂Ω_lidflow, (x, t) -> [1.0,0.0], [1,2])
+# add!(ch, lid_bc);
 
 # add!(ch, Dirichlet(:v, ∂Ω, (x, t) -> vₐₙₐ(x[1], x[2], t), [1,2]));
 # add!(ch, Dirichlet(:p, ∂Ω, (x, t) -> pₐₙₐ(x[1], x[2], t)));
@@ -199,31 +198,23 @@ add!(ch, lid_bc);
 close!(ch)
 update!(ch, 0.0);
 
-# ### Assembling the linear system
-# Now we have all the pieces needed to assemble the linear system, $K u = f$.
-# We define a function, `doassemble` to do the assembly, which takes our `cellvalues`,
-# the sparse matrix and our DofHandler as input arguments. The function returns the
-# assembled stiffness matrix, and the force vector.
-function assemble_linear(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, ν, M::SparseMatrixCSC, K::SparseMatrixCSC, dh::DofHandler) where {dim}
+function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, M::SparseMatrixCSC, dh::DofHandler) where {dim}
     # We allocate the element stiffness matrix and element force vector
     # just once before looping over all the cells instead of allocating
     # them every time in the loop.
     #+
     n_basefuncs_v = getnbasefunctions(cellvalues_v)
-    n_basefuncs_v_dim = Int(n_basefuncs_v/dim)
     n_basefuncs_p = getnbasefunctions(cellvalues_p)
     n_basefuncs = n_basefuncs_v + n_basefuncs_p
     v▄, p▄ = 1, 2
-    Me = PseudoBlockArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
-    Ke = PseudoBlockArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
+    Mₑ = PseudoBlockArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
 
     # Next we define the global force vector `f` and use that and
     # the stiffness matrix `K` and create an assembler. The assembler
     # is just a thin wrapper around `f` and `K` and some extra storage
     # to make the assembling faster.
     #+
-    stiffness_assembler = start_assemble(K)
-    mass_assembler = start_assemble(M)
+    stiffness_assembler = start_assemble(M)
 
     # It is now time to loop over all the cells in our grid. We do this by iterating
     # over a `CellIterator`. The iterator caches some useful things for us, for example
@@ -233,8 +224,74 @@ function assemble_linear(cellvalues_v::CellVectorValues{dim}, cellvalues_p::Cell
         # Always remember to reset the element stiffness matrix and
         # force vector since we reuse them for all elements.
         #+
-        fill!(Me, 0)
-        fill!(Ke, 0)
+        fill!(Mₑ, 0)
+
+        # For each cell we also need to reinitialize the cached values in `cellvalues`.
+        #+
+        Ferrite.reinit!(cellvalues_v, cell)
+
+        # It is now time to loop over all the quadrature points in the cell and
+        # assemble the contribution to `Kₑ` and `fe`. The integration weight
+        # can be queried from `cellvalues` by `getdetJdV`.
+        #+
+        for q_point in 1:getnquadpoints(cellvalues_v)
+            dΩ = getdetJdV(cellvalues_v, q_point)
+            # For each quadrature point we loop over all the (local) shape functions.
+            # We need the value and gradient of the testfunction `v` and also the gradient
+            # of the trial function `u`. We get all of these from `cellvalues`.
+            #+
+            ## Mass term
+            for i in 1:n_basefuncs_v
+                φᵢ = shape_value(cellvalues_v, q_point, i)
+                for j in 1:n_basefuncs_v
+                    φⱼ = shape_value(cellvalues_v, q_point, j)
+                    Mₑ[BlockIndex((v▄, v▄), (i, j))] += φᵢ ⋅ φⱼ * dΩ
+                end
+            end
+        end
+
+        # The last step in the element loop is to assemble `Kₑ` and `fe`
+        # into the global `K` and `f` with `assemble!`.
+        #+
+        assemble!(stiffness_assembler, celldofs(cell), Mₑ)
+    end
+    return M
+end
+
+M = assemble_mass_matrix(cellvalues_v, cellvalues_p, M, dh);
+
+# ### Assembling the linear system
+# Now we have all the pieces needed to assemble the linear system, $K u = f$.
+# We define a function, `doassemble` to do the assembly, which takes our `cellvalues`,
+# the sparse matrix and our DofHandler as input arguments. The function returns the
+# assembled stiffness matrix, and the force vector.
+function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, ν, K::SparseMatrixCSC, dh::DofHandler) where {dim}
+    # We allocate the element stiffness matrix and element force vector
+    # just once before looping over all the cells instead of allocating
+    # them every time in the loop.
+    #+
+    n_basefuncs_v = getnbasefunctions(cellvalues_v)
+    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    n_basefuncs = n_basefuncs_v + n_basefuncs_p
+    v▄, p▄ = 1, 2
+    Kₑ = PseudoBlockArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
+
+    # Next we define the global force vector `f` and use that and
+    # the stiffness matrix `K` and create an assembler. The assembler
+    # is just a thin wrapper around `f` and `K` and some extra storage
+    # to make the assembling faster.
+    #+
+    stiffness_assembler = start_assemble(K)
+
+    # It is now time to loop over all the cells in our grid. We do this by iterating
+    # over a `CellIterator`. The iterator caches some useful things for us, for example
+    # the nodal coordinates for the cell, and the local degrees of freedom.
+    #+
+    @inbounds for cell in CellIterator(dh)
+        # Always remember to reset the element stiffness matrix and
+        # force vector since we reuse them for all elements.
+        #+
+        fill!(Kₑ, 0)
 
         # For each cell we also need to reinitialize the cached values in `cellvalues`.
         #+
@@ -242,19 +299,11 @@ function assemble_linear(cellvalues_v::CellVectorValues{dim}, cellvalues_p::Cell
         Ferrite.reinit!(cellvalues_p, cell)
 
         # It is now time to loop over all the quadrature points in the cell and
-        # assemble the contribution to `Ke` and `fe`. The integration weight
+        # assemble the contribution to `Kₑ` and `fe`. The integration weight
         # can be queried from `cellvalues` by `getdetJdV`.
         #+
         for q_point in 1:getnquadpoints(cellvalues_v)
             dΩ = getdetJdV(cellvalues_v, q_point)
-            #Mass term
-            for i in 1:n_basefuncs_v
-                φᵢ = shape_value(cellvalues_v, q_point, i)
-                for j in 1:n_basefuncs_v
-                    φⱼ = shape_value(cellvalues_v, q_point, j)
-                    Me[BlockIndex((v▄, v▄),(i, j))] += (φᵢ ⋅ φⱼ) * dΩ
-                end
-            end
             # For each quadrature point we loop over all the (local) shape functions.
             # We need the value and gradient of the testfunction `v` and also the gradient
             # of the trial function `u`. We get all of these from `cellvalues`.
@@ -264,62 +313,39 @@ function assemble_linear(cellvalues_v::CellVectorValues{dim}, cellvalues_p::Cell
             #     ∇φᵢ = shape_symmetric_gradient(cellvalues_v, q_point, i)
             #     for j in 1:n_basefuncs_v
             #         ∇φⱼ = shape_symmetric_gradient(cellvalues_v, q_point, j)
-            #         Ke[BlockIndex((v▄, v▄), (i, j))] -= ν * 2* ∇φᵢ ⊡ ∇φⱼ * dΩ
+            #         Kₑ[BlockIndex((v▄, v▄), (i, j))] -= ν * 2* ∇φᵢ ⊡ ∇φⱼ * dΩ
             #     end
             # end
             for i in 1:n_basefuncs_v
                 ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
                 for j in 1:n_basefuncs_v
                     ∇φⱼ = shape_gradient(cellvalues_v, q_point, j)
-                    Ke[BlockIndex((v▄, v▄), (i, j))] -= ν * ∇φᵢ ⊡ ∇φⱼ * dΩ
+                    Kₑ[BlockIndex((v▄, v▄), (i, j))] -= ν * ∇φᵢ ⊡ ∇φⱼ * dΩ
                 end
             end
-            #Pressure term
-            # for j in 1:n_basefuncs_p
-            #     ψ = shape_value(cellvalues_p, q_point, j)
-            #     for i in 1:n_basefuncs_v_dim
-            #         for d in 1:dim
-            #             comp_idx = dim*(i-1) + d
-            #             #comp_idx = n_basefuncs_v_dim*(d-1) + i
-            #             ∂φ∂xd = cellvalues_v.dNdx[comp_idx,q_point][d,d]
-            #             Ke[BlockIndex((v▄, p▄), (comp_idx, j))] += (ψ * ∂φ∂xd) * dΩ
-            #             Ke[BlockIndex((p▄, v▄), (j, comp_idx))] += (ψ * ∂φ∂xd) * dΩ
-            #         end
-            #     end
-            # end
+            #Pressure + Incompressibility term
             for j in 1:n_basefuncs_p
                 ψ = shape_value(cellvalues_p, q_point, j)
                 for i in 1:n_basefuncs_v
                     divφ = shape_divergence(cellvalues_v, q_point, i)
-                    Ke[BlockIndex((v▄, p▄), (i, j))] += (ψ * divφ) * dΩ
-                    Ke[BlockIndex((p▄, v▄), (j, i))] += (ψ * divφ) * dΩ
+                    Kₑ[BlockIndex((v▄, p▄), (i, j))] += (divφ * ψ) * dΩ
+                    Kₑ[BlockIndex((p▄, v▄), (j, i))] += (ψ * divφ) * dΩ
                 end
-                #pressure stabilization
-                Ke[BlockIndex((p▄, p▄), (j, j))] += ϵᵣ * ψ * ψ  * dΩ
             end
-            #Incompressibility term
-            # for i in 1:n_basefuncs_p
-            #     ψ = shape_value(cellvalues_p, q_point, i)
-            #     for j in 1:n_basefuncs_v
-            #         divv = shape_divergence(cellvalues_v, q_point, j)
-            #         Ke[BlockIndex((p▄, v▄), (i, j))] += (ψ * divv) * dΩ
-            #     end
-            # end
         end
 
-        # The last step in the element loop is to assemble `Ke` and `fe`
+        # The last step in the element loop is to assemble `Kₑ` and `fe`
         # into the global `K` and `f` with `assemble!`.
         #+
-        assemble!(stiffness_assembler, celldofs(cell), Ke)
-        assemble!(mass_assembler, celldofs(cell), Me)
+        assemble!(stiffness_assembler, celldofs(cell), Kₑ)
     end
-    return M, K
+    return K
 end
 
 # ### Solution of the system
 # The last step is to solve the system. First we call `doassemble`
 # to obtain the global stiffness matrix `K` and force vector `f`.
-M, K = assemble_linear(cellvalues_v, cellvalues_p, ν, M, K, dh);
+K = assemble_stokes_matrix(cellvalues_v, cellvalues_p, ν, K, dh);
 
 # At the time of writing this example we have no clean way to hook into the
 # nonlinear solver backend to apply the Dirichlet BCs. As a hotfix we override
@@ -461,71 +487,124 @@ apply!(u₀, ch)
 
 # Steady-State Stokes Flow
 using ProgressMeter
-# SBDF-1
-function solve_transient_stokes()
+# SBDF-2 with SBDF-1 initialization
+function solve_transient_stokes(u₀)
     update!(ch, 0.0)
     apply!(u₀,ch)
 
-    u_prev = copy(u₀)
-    u = copy(u₀)
+    uₙ₋₂ = copy(u₀)
+    uₙ₋₁ = copy(u₀)
+    uₙ = copy(u₀)
 
     pvd = paraview_collection("transient-stokes-flow.pvd");
 
     t = 0.0
+    t_save = t+Δt_save
     vtk_grid("transient-stokes-flow-$t.vtu", dh; compress=false) do vtk
-        vtk_point_data(vtk,dh,u)
+        vtk_point_data(vtk,dh,u₀)
         vtk_save(vtk)
         pvd[t] = vtk
     end
 
-    #A = M/Δt₀ - K
-    #rhsdata = get_rhs_data(ch, A)
-    #apply!(A,ch)
-    #A_f = lu(A)
+    A = M/Δt₀ - K
+    b = M*uₙ₋₁/Δt₀
+    rhsdata = get_rhs_data(ch, A)
+    apply!(A,ch)
+    A_f = lu(A)
 
-    @showprogress for t = Δt₀:Δt₀:T
-        A = M/Δt₀ - K
-        b = M/Δt₀*u_prev
+    t += Δt₀
+
+    ## Nonlinear contribution
+    n_basefuncs = getnbasefunctions(cellvalues_v)
+    for cell in CellIterator(dh)
+        Ferrite.reinit!(cellvalues_v, cell)
+        ## Trilinear form evaluation
+        all_celldofs = celldofs(cell)
+        v_celldofs = all_celldofs[dof_range(dh, :v)]
+        v_cellₙ₋₁ = uₙ₋₁[v_celldofs]
+        for q_point in 1:getnquadpoints(cellvalues_v)
+            dΩ = getdetJdV(cellvalues_v, q_point)
+            ∇vₙ₋₁ = function_gradient(cellvalues_v, q_point, v_cellₙ₋₁)
+            vₙ₋₁ = function_value(cellvalues_v, q_point, v_cellₙ₋₁)
+            for i in 1:n_basefuncs
+                φᵢ = shape_value(cellvalues_v, q_point, i)
+                b[v_celldofs[i]] += (- ∇vₙ₋₁ ⋅ vₙ₋₁) ⋅ φᵢ * dΩ
+            end
+        end
+    end
+
+    # update!(ch, t);
+    # apply!(A,b,ch)
+    apply_rhs!(rhsdata, b, ch)
+    # u = cg(A,b)
+    # u = A\b
+    uₙ = A_f\b
+
+    if t >= t_save
+        t_save = t+Δt_save
+
+        vtk_grid("transient-stokes-flow-$t.vtu", dh; compress=false) do vtk
+            vtk_point_data(vtk,dh,uₙ)
+            vtk_save(vtk)
+            pvd[t] = vtk
+        end
+    end
+    uₙ₋₂ .= uₙ₋₁
+    uₙ₋₁ .= uₙ
+
+    A = 3*M/(2*Δt₀) - K
+    rhsdata = get_rhs_data(ch, A)
+    apply!(A,ch)
+    A_f = lu(A)
+
+    t += Δt₀
+
+    @showprogress for (step,t) = enumerate(t:Δt₀:T)
+        #A = M/Δt₀ - K
+        b = (4*M*uₙ₋₁-M*uₙ₋₂)/(2*Δt₀)
         ## Nonlinear contribution
-        b_nl = zeros(length(b))
         n_basefuncs = getnbasefunctions(cellvalues_v)
         for cell in CellIterator(dh)
             Ferrite.reinit!(cellvalues_v, cell)
             ## Trilinear form evaluation
             all_celldofs = celldofs(cell)
             v_celldofs = all_celldofs[dof_range(dh, :v)]
-            v_cell = u_prev[v_celldofs]
+            v_cellₙ₋₁ = uₙ₋₁[v_celldofs]
+            v_cellₙ₋₂ = uₙ₋₂[v_celldofs]
             for q_point in 1:getnquadpoints(cellvalues_v)
                 dΩ = getdetJdV(cellvalues_v, q_point)
-                v_grad = function_gradient(cellvalues_v, q_point, v_cell)
-                v_val = function_value(cellvalues_v, q_point, v_cell)
-                for j in 1:n_basefuncs
-                    φⱼ = shape_value(cellvalues_v, q_point, j)
-                    b_nl[v_celldofs[j]] += (v_val ⋅ v_grad) ⋅ φⱼ * dΩ
+                ∇vₙ₋₁ = function_gradient(cellvalues_v, q_point, v_cellₙ₋₁)
+                vₙ₋₁ = function_value(cellvalues_v, q_point, v_cellₙ₋₁)
+                ∇vₙ₋₂ = function_gradient(cellvalues_v, q_point, v_cellₙ₋₂)
+                vₙ₋₂ = function_value(cellvalues_v, q_point, v_cellₙ₋₂)
+                for i in 1:n_basefuncs
+                    φᵢ = shape_value(cellvalues_v, q_point, i)
+                    b[v_celldofs[i]] += (- 2 * ∇vₙ₋₁ ⋅ vₙ₋₁ + ∇vₙ₋₂ ⋅ vₙ₋₂) ⋅ φᵢ * dΩ
                 end
             end
         end
-        apply_zero!(b_nl, ch)
-        println("NL: ", norm(b_nl))
-        b += b_nl # COmment this line for stokes operator...
-        apply_zero!(b, ch)
 
-        update!(ch, t);
-        apply!(A,b,ch)
-        #apply_rhs!(rhsdata, b, ch)
-        u = cg(A,b)
-        #u = A\b
+        # update!(ch, t);
+        # apply!(A,b,ch)
+        apply_rhs!(rhsdata, b, ch)
+        # u = cg(A,b)
+        # u = A\b
+        uₙ = A_f\b
 
-        if !all(isfinite.(u))
+        if !all(isfinite.(uₙ))
             break
         end
+        if t >= t_save
+            t_save = t+Δt_save
 
-        vtk_grid("transient-stokes-flow-$t.vtu", dh; compress=false) do vtk
-            vtk_point_data(vtk,dh,u)
-            vtk_save(vtk)
-            pvd[t] = vtk
+            vtk_grid("transient-stokes-flow-$t.vtu", dh; compress=false) do vtk
+                vtk_point_data(vtk,dh,uₙ)
+                vtk_save(vtk)
+                pvd[t] = vtk
+            end
         end
-        u_prev .= u
+        uₙ₋₂ .= uₙ₋₁
+        uₙ₋₁ .= uₙ
         GC.gc()
     end
 
@@ -625,8 +704,8 @@ function solve_manufactured()
 
     update!(ch, T)
     apply!(A,f,ch)
-    #u = A\f
-    u = cg(A,f)
+    u = A\f
+    # u = cg(A,f)
     vtk_grid("analytic-steady-stokes-flow.vtu", dh; compress=false) do vtk
         vtk_point_data(vtk,dh,u)
         vtk_save(vtk)
@@ -728,7 +807,7 @@ function navier_stokes_residuals(dh, u, cellvalues_v, cellvalues_p)
                 divφⱼ = shape_divergence(cellvalues_v, q_point, j)
                 φⱼ = shape_value(cellvalues_v, q_point, j)
                 r[v_celldofs[j]] -= ν * ∇v ⊡ ∇φⱼ * dΩ
-                r[v_celldofs[j]] -= (v ⋅ ∇v) ⋅ φⱼ * dΩ
+                r[v_celldofs[j]] -= (∇v ⋅ v) ⋅ φⱼ * dΩ
                 r[v_celldofs[j]] += p * divφⱼ * dΩ
             end
             for j in 1:getnbasefunctions(cellvalues_p)
@@ -740,52 +819,20 @@ function navier_stokes_residuals(dh, u, cellvalues_v, cellvalues_p)
     return r
 end
 
-function solve_steady_stokes()
+function solve_steady_stokes(ν, f)
     A = copy(K)
-    f = zeros(ndofs(dh))
     update!(ch, T)
     apply!(A,f,ch)
     u = A\f
-    println("Res1 ", norm(navier_stokes_residuals(dh, u, cellvalues_v, cellvalues_p)[ch.free_dofs]))
-    pressure_correction!(u, dh, cellvalues_p)
-    println("Res2 ", norm(navier_stokes_residuals(dh, u, cellvalues_v, cellvalues_p)[ch.free_dofs]))
-    # u = gmres(A,f)
-    # println("Res3 ", norm(navier_stokes_residuals(dh, u, cellvalues_v, cellvalues_p)[ch.free_dofs]))
     vtk_grid("steady-stokes-flow.vtu", dh; compress=false) do vtk
         vtk_point_data(vtk,dh,u)
         vtk_save(vtk)
     end
+end
 
-    #f = zeros(ndofs(dh))
-    ## Nonlinear contribution
-    for cell in CellIterator(dh)
-        Ferrite.reinit!(cellvalues_v, cell)
-        ## Trilinear form evaluation
-        all_celldofs = celldofs(cell)
-        v_celldofs = all_celldofs[dof_range(dh, :v)]
-        v_cell = u[v_celldofs]
-        for q_point in 1:getnquadpoints(cellvalues_v)
-            dΩ = getdetJdV(cellvalues_v, q_point)
-            v = function_value(cellvalues_v, q_point, v_cell)
-            ∇v = function_gradient(cellvalues_v, q_point, v_cell)
-            for j in 1:getnbasefunctions(cellvalues_v)
-                φⱼ = shape_value(cellvalues_v, q_point, j)
-                # for i in 1:getnbasefunctions(cellvalues_v)
-                #     φᵢ = shape_value(cellvalues_v, q_point, i)
-                #     ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
-                #     f[v_celldofs[j]] += ((u[v_celldofs[i]]*φᵢ) ⋅ (u[v_celldofs[i]]*∇φᵢ)) ⋅ φⱼ * dΩ
-                # end
-                f[v_celldofs[j]] += v ⋅ ∇v ⋅ φⱼ * dΩ
-            end
-        end
-    end
-    vtk_grid("trilinearform.vtu", dh; compress=false) do vtk
-        vtk_point_data(vtk,dh,f)
-        vtk_save(vtk)
-    end
-    # return
-
-    u = zeros(ndofs(dh))
+# u = initial guess
+# ν = viscosity sequence
+function solve_steady_navier_stokes(u, ν)
     uᶞ = zeros(ndofs(dh))
     n_newton = 20
     newton_itr = -1
@@ -878,12 +925,7 @@ function solve_steady_stokes()
 
                         Jₑ[BlockIndex((v▄, v▄), (i, j))] += ∇v ⋅ φⱼ ⋅ φᵢ * dΩ
                         Jₑ[BlockIndex((v▄, v▄), (i, j))] += ∇φⱼ ⋅ v ⋅ φᵢ * dΩ
-                        # Jₑ[BlockIndex((v▄, v▄), (i, j))] += φⱼ ⋅ ∇v ⋅ φᵢ * dΩ
-                        # Jₑ[BlockIndex((v▄, v▄), (i, j))] += v ⋅ ∇φⱼ ⋅ φᵢ * dΩ
 
-                        # Jₑ[BlockIndex((v▄, v▄), (i, j))] += γ * divφⱼ * divφᵢ * dΩ #CURRENT
-
-                        # Jₑ[BlockIndex((v▄, v▄), (j, i))] -= (v ⋅ ∇φᵢ + φᵢ ⋅ ∇v) ⋅ φⱼ * dΩ
                         ## Stablizitaion term
                         # Jₑ[BlockIndex((v▄, v▄), (j, i))] -= γ * divφᵢ * divφⱼ * dΩ
                     end
@@ -892,42 +934,16 @@ function solve_steady_stokes()
                         Jₑ[BlockIndex((p▄, v▄), (j, i))] -= ψⱼ * divφᵢ * dΩ
                         Jₑ[BlockIndex((v▄, p▄), (i, j))] -= divφᵢ * ψⱼ * dΩ
                     end
-                    # Rₑ[BlockIndex((v▄), (j))] -= v ⋅ ∇v ⋅ φᵢ * dΩ
                     ## Stablizitaion term
                     # Rₑ[BlockIndex((v▄), (j))] -= γ * divv ⋅ divφⱼ * dΩ
-                    # for i in 1:n_basefuncs_v_dim
-                    #     for d in 1:dim
-                    #         comp_idx = dim*(i-1) + d
-                    #         #comp_idx = n_basefuncs_v_dim*(d-1) + i
-                    #         ∂φ∂xd = cellvalues_v.dNdx[comp_idx,q_point][d,d]
-                    #         Rₑ[BlockIndex((v▄), (j))] += (ψ * ∂φ∂xd) * dΩ
-                    #         Rₑ[BlockIndex((p▄), (j))] += (ψ * ∂φ∂xd) * dΩ
-                    #     end
-                    # end
-                    # Rₑ[BlockIndex((v▄), (j))] -= ν * ∇v ⊡ ∇φⱼ * dΩ
-                    # Rₑ[BlockIndex((v▄), (j))] -= v ⋅ ∇v ⋅ φⱼ * dΩ
-                    # Rₑ[BlockIndex((v▄), (j))] += p * divφⱼ * dΩ
 
                     Rₑ[BlockIndex((v▄), (i))] -= ν * ∇v ⊡ ∇φᵢ * dΩ
                     Rₑ[BlockIndex((v▄), (i))] -= ∇v ⋅ v ⋅ φᵢ * dΩ
-                    # Rₑ[BlockIndex((v▄), (i))] -= v ⋅ ∇v ⋅ φᵢ * dΩ
                     Rₑ[BlockIndex((v▄), (i))] += p * divφᵢ * dΩ
-
-                    # Rₑ[BlockIndex((v▄), (i))] -= γ * divv * divφᵢ * dΩ #CURRENT
                 end
                 for i in 1:n_basefuncs_p
                     ψᵢ = shape_value(cellvalues_p, q_point, i)
                     divψᵢ = shape_divergence(cellvalues_p, q_point, i)
-                    ## Stablizitaion Term
-                    #     Rₑ[BlockIndex((p▄), (j))] += divv * ψⱼ * dΩ
-                    for j in 1:n_basefuncs_p
-                        ψⱼ = shape_value(cellvalues_p, q_point, j)
-                        ## Stablizitaion Term
-                        #Jₑ[BlockIndex((v▄, v▄), (j, i))] -= (1.0/γ) *  ψⱼ * ψᵢ * dΩ
-                        ## ???
-                        # Jₑ[BlockIndex((p▄, p▄), (j, i))] -= ψᵢ * ψⱼ * dΩ
-                        # Jₑ[BlockIndex((p▄, p▄), (i, j))] += ψᵢ * ψⱼ * dΩ #CURRENT
-                    end
                     Rₑ[BlockIndex((p▄), (i))] += divv * ψᵢ * dΩ
                 end
             end
@@ -982,147 +998,11 @@ function solve_steady_stokes()
         # end
         pressure_correction!(u, dh, cellvalues_p)
 
-        # vtk_grid("steady-navier-stokes-flow-$newton_itr-residual.vtu", dh; compress=false) do vtk
-        #     vtk_point_data(vtk,dh,R)
-        #     vtk_save(vtk)
-        # end
-
-        # vtk_grid("steady-navier-stokes-flow-$newton_itr-delta.vtu", dh; compress=false) do vtk
-        #     vtk_point_data(vtk,dh,uᶞ)
-        #     vtk_save(vtk)
-        # end
-
         vtk_grid("steady-navier-stokes-flow-$newton_itr.vtu", dh; compress=false) do vtk
             vtk_point_data(vtk,dh,u)
             vtk_save(vtk)
         end
     end
-
-
-
-    # ## Fixed Point Iteration
-    # FP_TOL = 1e-9
-    # prog = ProgressMeter.ProgressThresh(FP_TOL, "Solving:")
-    # fp_iter = -1
-    # u_prev = copy(u)
-    # while true;
-    #     fp_iter += 1
-
-    #     u_prev .= u
-
-    #     A = copy(K)
-    #     f = zeros(ndofs(dh))
-
-    #     ## Nonlinear contribution
-    #     for cell in CellIterator(dh)
-    #         Ferrite.reinit!(cellvalues_v, cell)
-    #         ## Trilinear form evaluation
-    #         all_celldofs = celldofs(cell)
-    #         v_celldofs = all_celldofs[dof_range(dh, :v)]
-    #         v_cell = u_prev[v_celldofs]
-    #         for q_point in 1:getnquadpoints(cellvalues_v)
-    #             dΩ = getdetJdV(cellvalues_v, q_point)
-    #             ∇v = function_gradient(cellvalues_v, q_point, v_cell)
-    #             v = function_value(cellvalues_v, q_point, v_cell)
-    #             # for j in 1:getnbasefunctions(cellvalues_v)
-    #             #     φⱼ = shape_value(cellvalues_v, q_point, j)
-    #             #     f[v_celldofs[j]] += (v ⋅ ∇v) ⋅ φⱼ * dΩ
-    #             # end
-    #             for j in 1:getnbasefunctions(cellvalues_v)
-    #                 φⱼ = shape_value(cellvalues_v, q_point, j)
-    #                 for i in 1:getnbasefunctions(cellvalues_v)
-    #                     φᵢ = shape_value(cellvalues_v, q_point, i)
-    #                     ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
-    #                     f[v_celldofs[j]] += ((v_cell[i]*φᵢ) ⋅ (v_cell[i]*∇φᵢ)) ⋅ φⱼ * dΩ
-    #                 end
-    #             end
-    #         end
-    #     end
-
-    #     for dof in ch.prescribed_dofs
-    #         f[dof] = 0.0
-    #     end
-
-    #     apply!(A,f,ch)
-    #     u = A\f
-    #     pressure_correction!(u, dh, cellvalues_p)
-    #     #gmres!(u,A,f; abstol=1e-6, reltol=1e-6)
-
-    #     norm_rel = norm(u_prev - u)
-    #     res = norm(navier_stokes_residuals(dh, u, cellvalues_v, cellvalues_p)[ch.free_dofs])
-    #     ProgressMeter.update!(prog, norm_rel; showvalues = [(:iter, fp_iter), (:divv, compute_divergence(dh, u, cellvalues_v)), (:res, res)])
-
-    #     vtk_grid("steady-navier-stokes-flow-$fp_iter.vtu", dh; compress=false) do vtk
-    #         vtk_point_data(vtk,dh,u)
-    #         vtk_save(vtk)
-    #     end
-
-    #     if norm_rel < FP_TOL
-    #         println("FPI converged with $norm_rel.")
-    #         break;
-    #     end
-    # end
-
-    # ## Newton from Verfürth's numerics III script
-    # NEWTON_TOL = 1e-9
-    # prog = ProgressMeter.ProgressThresh(NEWTON_TOL, "Solving:")
-    # newton_iter = -1
-    # u_prev = copy(u)
-    # while true;
-    #     newton_iter += 1
-
-    #     u_prev .= u
-
-    #     A = copy(K)
-    #     f = zeros(ndofs(dh))
-
-    #     ## Nonlinear contributions
-    #     for cell in CellIterator(dh)
-    #         Ferrite.reinit!(cellvalues_v, cell)
-    #         all_celldofs = celldofs(cell)
-    #         v_celldofs = all_celldofs[dof_range(dh, :v)]
-    #         v_cell = u_prev[v_celldofs]
-    #         for q_point in 1:getnquadpoints(cellvalues_v)
-    #             dΩ = getdetJdV(cellvalues_v, q_point)
-    #             ∇v = function_gradient(cellvalues_v, q_point, v_cell)
-    #             v = function_value(cellvalues_v, q_point, v_cell)
-    #             for j in 1:getnbasefunctions(cellvalues_v)
-    #                 φⱼ = shape_value(cellvalues_v, q_point, j)
-    #                 for i in 1:getnbasefunctions(cellvalues_v)
-    #                     φᵢ = shape_value(cellvalues_v, q_point, i)
-    #                     ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
-    #                     A[v_celldofs[j],v_celldofs[i]] -= φᵢ ⋅ ∇v ⋅ φⱼ * dΩ
-    #                     A[v_celldofs[j],v_celldofs[i]] -= v ⋅ ∇φᵢ ⋅ φⱼ * dΩ
-    #                     f[v_celldofs[j]] -= v ⋅ ∇v ⋅ φⱼ * dΩ
-    #                 end
-    #             end
-    #         end
-    #     end
-
-    #     apply!(A,f,ch)
-    #     u = A\f
-    #     pressure_correction!(u, dh, cellvalues_p)
-    #     #gmres!(u,A,f; abstol=1e-6, reltol=1e-6)
-
-    #     u_diff = u_prev - u
-    #     vtk_grid("steady-navier-stokes-flow-$newton_iter-diff.vtu", dh; compress=false) do vtk
-    #         vtk_point_data(vtk,dh,u_diff)
-    #         vtk_save(vtk)
-    #     end
-    #     norm_rel = norm(u_prev - u)
-    #     res = norm(navier_stokes_residuals(dh, u, cellvalues_v, cellvalues_p)[ch.free_dofs])
-    #     ProgressMeter.update!(prog, norm_rel; showvalues = [(:iter, newton_iter), (:divv, compute_divergence(dh, u, cellvalues_v)), (:res, res)])
-
-    #     vtk_grid("steady-navier-stokes-flow-$newton_iter.vtu", dh; compress=false) do vtk
-    #         vtk_point_data(vtk,dh,u)
-    #         vtk_save(vtk)
-    #     end
-
-    #     if norm_rel < NEWTON_TOL
-    #         println("Newton converged with residual $res.")
-    #         break;
-    #     end
-    # end
 end
 # solve_stokes()
 throw EOFError()
