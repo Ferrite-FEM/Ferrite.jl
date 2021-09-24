@@ -29,9 +29,14 @@
 #
 # where $v$ is the unknown velocity field, $p$ the unknown pressure field
 # and $\nu$ the dynamic viscosity. We assume a constant density of 1 for the fluid.
+# We assume negligible coupling between the velocity components in the viscosity
+# assembly.
+# Finally we see that the pressure term appears only in combination with the gradient
+# operator, so for any solution p the function p + c is also an admissible solution, if
+# we do not impose Dirichlet conditions on the pressure. To resolve this we introduce the
+# implicit constraint that $ \int_\Omega p = 0 $.
 #
-#
-# ### Weak Form
+# ### Semi-Discrete Weak Form
 #
 # ```math
 #  \begin{aligned}
@@ -40,7 +45,7 @@
 #  \end{aligned}
 # ```
 #
-# where $\varphi$ and $\psi$ are suitable test functions. As the
+# where $\varphi$ and $\psi$ are suitable test functions.
 #
 # Now we can discretize the problem as usual with the finite element method
 # utilizing Taylor-Hood elements (Q2Q1) to yield a stable discretization.
@@ -61,20 +66,25 @@ using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack
 # Since we do note need the complete DifferentialEquations suite just load the required ODE infrastructure.
 using OrdinaryDiffEq
 
-# We start  generating a simple grid with 20x20 quadrilateral elements
-# using `generate_grid`. The generator defaults to the unit square,
-# so we don't need to specify the corners of the domain.
-x_cells = round(Int, 220)
-y_cells = round(Int, 41)
+# We start off by defining our only material parameter.
+ν = 1.0/1000.0 #dynamic viscosity
+
+# Next a fine 2D rectangular grid has to be generated. We leave the cell size parametric for flexibility when
+# playing around with the code. Note that the mesh is pretty fine, leading to a high memory consumption when
+# feeding the equation system to direct solvers.
+dim = 2
+cell_scale_factor = 2.0
+x_cells = round(Int, cell_scale_factor*220)
+y_cells = round(Int, cell_scale_factor*41)
 # CI chokes if the grid is too fine. :)     #src
 x_cells = round(Int, 55/3)                  #hide
 y_cells = round(Int, 41/3)                  #hide
 grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((2.2, 0.41)));
 
-# Carve hole in the mesh and update boundaries.
+# Next we carve a hole $B_{0.05}(0.2,0.2)$ in the mesh by deleting the cells and update the boundary face sets.
+# This code will be replaced once a proper mesh interface is avaliable.
 cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05, 1:length(grid.cells))
 hole_cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))<=0.05, 1:length(grid.cells));
-## Gather all faces in the ring and touching the ring
 hole_face_ring = Set{FaceIndex}()
 for hci ∈ hole_cell_indices
     push!(hole_face_ring, FaceIndex((hci+1, 4)))
@@ -83,7 +93,6 @@ for hci ∈ hole_cell_indices
     push!(hole_face_ring, FaceIndex((hci+x_cells, 1)))
 end
 grid.facesets["hole"] = Set(filter(x->x.idx[1] ∉ hole_cell_indices, collect(hole_face_ring)));
-## Finally update the node and cell indices
 cell_indices_map = map(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05 ? indexin([ci], cell_indices)[1] : 0, 1:length(grid.cells))
 grid.cells = grid.cells[cell_indices]
 for facesetname in keys(grid.facesets)
@@ -93,90 +102,70 @@ end;
 # We test against full development of the flow - so regenerate the grid                              #src
 grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((0.55, 0.41)));   #hide
 
-# ### Trial and test functions
-# A `CellValues` facilitates the process of evaluating values and gradients of
-# test and trial functions (among other things). Since the problem
-# is a scalar problem we will use a `CellScalarValues` object. To define
-# this we need to specify an interpolation space for the shape functions.
-# We use Lagrange functions (both for interpolating the function and the geometry)
-# based on the reference "cube". We also define a quadrature rule based on the
-# same reference cube. We combine the interpolation and the quadrature rule
-# to a `CellScalarValues` object.
-dim = 2
 T = 10.0
 Δt₀ = 0.01
 Δt_save = 0.1
 
-ν = 1.0/1000.0                  #dynamic viscosity
-vᵢₙ(t) = clamp(t, 0.0, 1.0)*1.0 #inflow velocity
-vᵢₙ(t) = clamp(t, 0.0, 1.0)*0.3 #hide
-
+# ### Function space
+# To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
+# We have to utilize the same quadrature rule because in the weak form the
+# linear pressure term is tested against a quadratic function.
 ip_v = Lagrange{dim, RefCube, 2}()
 ip_geom = Lagrange{dim, RefCube, 1}()
-qr_v = QuadratureRule{dim, RefCube}(4)
-cellvalues_v = CellVectorValues(qr_v, ip_v, ip_geom);
+qr = QuadratureRule{dim, RefCube}(4)
+cellvalues_v = CellVectorValues(qr, ip_v, ip_geom);
 
 ip_p = Lagrange{dim, RefCube, 1}()
-#Note that the pressure term comes in combination with a higher order test function...
-qr_p = QuadratureRule{dim, RefCube}(4) # = qr_v
-cellvalues_p = CellScalarValues(qr_p, ip_p, ip_geom);
+cellvalues_p = CellScalarValues(qr, ip_p, ip_geom);
 
-# ### Degrees of freedom
-# Next we need to define a `DofHandler`, which will take care of numbering
-# and distribution of degrees of freedom for our approximated fields.
-# We create the `DofHandler` and then add a single field called `u`.
-# Lastly we `close!` the `DofHandler`, it is now that the dofs are distributed
-# for all the elements.
 dh = DofHandler(grid)
 push!(dh, :v, dim, ip_v)
 push!(dh, :p, 1, ip_p)
 close!(dh);
 
-# Now that we have distributed all our dofs we can create our tangent matrix,
-# using `create_sparsity_pattern`. This function returns a sparse matrix
-# with the correct elements stored.
-M = create_sparsity_pattern(dh);
-K = create_sparsity_pattern(dh);
-
 # ### Boundary conditions
-# In Ferrite constraints like Dirichlet boundary conditions
-# are handled by a `ConstraintHandler`.
+# As in the DFG benchmark we apply no-slip conditions to the top, bottom and
+# cylinder boundary. The no-slip condition states that the velocity of the
+# fluid on this portion of the boundary is fixed to be zero.
 ch = ConstraintHandler(dh);
 
-# Next we need to add constraints to `ch`. For this problem we define
-# homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
-# the `union` of all the face sets on the boundary.
 nosplip_face_names = ["top", "bottom", "hole"];
 # No hole for the test present                                          #src
 nosplip_face_names = ["top", "bottom"]                                  #hide
 ∂Ω_noslip = union(getfaceset.((grid, ), nosplip_face_names)...);
-∂Ω_inflow = getfaceset(grid, "left");
-∂Ω_free = getfaceset(grid, "right");
-
-# Now we are set up to define our constraint. We specify which field
-# the condition is for, and our combined face set `∂Ω`. The last
-# argument is a function which takes the spatial coordinate $x$ and
-# the current time $t$ and returns the prescribed value. In this case
-# it is trivial -- no matter what $x$ and $t$ we return $0$. When we have
-# specified our constraint we `add!` it to `ch`.
 noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> [0,0], [1,2])
 add!(ch, noslip_bc)
 
+# The left boundary has a parabolic inflow with peak velocity of 1.0. This
+# ensures that for the given geometry the Reynolds number is 100, which
+# is already enough to obtain some simple vortex streets. By increasing the
+# velocity further we can obtain stronger vortices - which may need additional
+# refinement of the grid.
+∂Ω_inflow = getfaceset(grid, "left");
+
+vᵢₙ(t) = clamp(t, 0.0, 1.0)*1.0 #inflow velocity
+vᵢₙ(t) = clamp(t, 0.0, 1.0)*0.3 #hide
 parabolic_inflow_profile((x,y),t) = [4*vᵢₙ(t)*y*(0.41-y)/0.41^2,0]
 inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1,2])
 add!(ch, inflow_bc);
 
-# We also need to `close!` and `update!` our boundary conditions. When we call `close!`
-# the dofs which will be constrained by the boundary conditions are calculated and stored
-# in our `ch` object. Since the boundary conditions are, in this case,
-# independent of time we can `update!` them directly with e.g. $t = 0$.
+# The outflow boundary condition has been applied on the right side of the
+# cylinder when the weak form has been derived by setting the boundary integral
+# to zero. It is also called the do-nothing condition. Other outflow conditions
+# are also possible.
+∂Ω_free = getfaceset(grid, "right");
+
 close!(ch)
 update!(ch, 0.0);
 
+# ### Linear System Assembly
+# Next we describe how the block mass matrix and the Stokes matrix are assembled.
+#
+# For the block mass matrix we remember that only the first equation had a time derivative
+# and that the block mass matrix corresponds to the term arising from discretizing the time
+# derivatives. Hence, only the upper left block has non-zero components.
 function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, M::SparseMatrixCSC, dh::DofHandler) where {dim}
-    # We allocate the element stiffness matrix and element force vector
-    # just once before looping over all the cells instead of allocating
-    # them every time in the loop.
+    # We start again by allocating a buffer for the local matrix and some helpers, together with the assembler.
     #+
     n_basefuncs_v = getnbasefunctions(cellvalues_v)
     n_basefuncs_p = getnbasefunctions(cellvalues_p)
@@ -184,38 +173,17 @@ function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p:
     v▄, p▄ = 1, 2
     Mₑ = PseudoBlockArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
 
-    # Next we define the global force vector `f` and use that and
-    # the stiffness matrix `K` and create an assembler. The assembler
-    # is just a thin wrapper around `f` and `K` and some extra storage
-    # to make the assembling faster.
+    # It follows the assembly loop as explained in the basic tutorials.
     #+
-    stiffness_assembler = start_assemble(M)
-
-    # It is now time to loop over all the cells in our grid. We do this by iterating
-    # over a `CellIterator`. The iterator caches some useful things for us, for example
-    # the nodal coordinates for the cell, and the local degrees of freedom.
-    #+
+    mass_assembler = start_assemble(M)
     @inbounds for cell in CellIterator(dh)
-        # Always remember to reset the element stiffness matrix and
-        # force vector since we reuse them for all elements.
-        #+
         fill!(Mₑ, 0)
-
-        # For each cell we also need to reinitialize the cached values in `cellvalues`.
-        #+
         Ferrite.reinit!(cellvalues_v, cell)
 
-        # It is now time to loop over all the quadrature points in the cell and
-        # assemble the contribution to `Kₑ` and `fe`. The integration weight
-        # can be queried from `cellvalues` by `getdetJdV`.
-        #+
         for q_point in 1:getnquadpoints(cellvalues_v)
             dΩ = getdetJdV(cellvalues_v, q_point)
-            # For each quadrature point we loop over all the (local) shape functions.
-            # We need the value and gradient of the testfunction `v` and also the gradient
-            # of the trial function `u`. We get all of these from `cellvalues`.
+            # Remember that we assemble a vector mass term, hence the dot product.
             #+
-            #Mass term
             for i in 1:n_basefuncs_v
                 φᵢ = shape_value(cellvalues_v, q_point, i)
                 for j in 1:n_basefuncs_v
@@ -224,23 +192,26 @@ function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p:
                 end
             end
         end
-
-        # The last step in the element loop is to assemble `Kₑ` and `fe`
-        # into the global `K` and `f` with `assemble!`.
-        #+
-        assemble!(stiffness_assembler, celldofs(cell), Mₑ)
+        assemble!(mass_assembler, celldofs(cell), Mₑ)
     end
+
     return M
 end
 
-M = assemble_mass_matrix(cellvalues_v, cellvalues_p, M, dh);
-
-# ### Assembling the linear system
-# Note: We assume negligible coupling between the velocity components in the viscosity assembly.
+# Next we discuss the assembly of the Stokes matrix.
+# Remember that we use the same function spaces for trial and test, hence the
+# matrix has the following block form
+# ```math
+#   K &= \begin{matrix}
+#       A & B^T \\
+#       B & 0
+#   \end{matrix}
+# ```
+# which is also called saddle point matrix. These problems are known to have
+# a non-trivial kernel, which is a reflection of the strong form as discussed
+# in the theory portion if this example.
 function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, ν, K::SparseMatrixCSC, dh::DofHandler) where {dim}
-    # We allocate the element stiffness matrix and element force vector
-    # just once before looping over all the cells instead of allocating
-    # them every time in the loop.
+    # Again, we start again by allocating a buffer for the local matrix and some helpers, together with the assembler.
     #+
     n_basefuncs_v = getnbasefunctions(cellvalues_v)
     n_basefuncs_p = getnbasefunctions(cellvalues_p)
@@ -248,39 +219,18 @@ function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_
     v▄, p▄ = 1, 2
     Kₑ = PseudoBlockArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
 
-    # Next we define the global force vector `f` and use that and
-    # the stiffness matrix `K` and create an assembler. The assembler
-    # is just a thin wrapper around `f` and `K` and some extra storage
-    # to make the assembling faster.
-    #+
     stiffness_assembler = start_assemble(K)
 
-    # It is now time to loop over all the cells in our grid. We do this by iterating
-    # over a `CellIterator`. The iterator caches some useful things for us, for example
-    # the nodal coordinates for the cell, and the local degrees of freedom.
-    #+
     @inbounds for cell in CellIterator(dh)
-        # Always remember to reset the element stiffness matrix and
-        # force vector since we reuse them for all elements.
-        #+
         fill!(Kₑ, 0)
 
-        # For each cell we also need to reinitialize the cached values in `cellvalues`.
-        #+
         Ferrite.reinit!(cellvalues_v, cell)
         Ferrite.reinit!(cellvalues_p, cell)
 
-        # It is now time to loop over all the quadrature points in the cell and
-        # assemble the contribution to `Kₑ` and `fe`. The integration weight
-        # can be queried from `cellvalues` by `getdetJdV`.
-        #+
         for q_point in 1:getnquadpoints(cellvalues_v)
             dΩ = getdetJdV(cellvalues_v, q_point)
-            # For each quadrature point we loop over all the (local) shape functions.
-            # We need the value and gradient of the testfunction `v` and also the gradient
-            # of the trial function `u`. We get all of these from `cellvalues`.
+            # Viscosity term "A"
             #+
-            #Viscosity term
             for i in 1:n_basefuncs_v
                 ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
                 for j in 1:n_basefuncs_v
@@ -288,7 +238,8 @@ function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_
                     Kₑ[BlockIndex((v▄, v▄), (i, j))] -= ν * ∇φᵢ ⊡ ∇φⱼ * dΩ
                 end
             end
-            #Pressure + Incompressibility term - note the symmetry.
+            # Pressure + Incompressibility term B - note the symmetry.
+            #+
             for j in 1:n_basefuncs_p
                 ψ = shape_value(cellvalues_p, q_point, j)
                 for i in 1:n_basefuncs_v
@@ -307,13 +258,19 @@ function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_
     return K
 end
 
-# ### Solution of the system
-# The last step is to solve the system. First we call `doassemble`
-# to obtain the global stiffness matrix `K` and force vector `f`.
+# ### Solution of the semi-discretized system via DifferentialEquations.jl
+# First we assemble the linear portions for efficiency. These matrices are
+# assumed to be constant over time.
+M = create_sparsity_pattern(dh);
+M = assemble_mass_matrix(cellvalues_v, cellvalues_p, M, dh);
+
+K = create_sparsity_pattern(dh);
 K = assemble_stokes_matrix(cellvalues_v, cellvalues_p, ν, K, dh);
 
-# These are our initial conditions. We start from the zero solution as
-# discussed above.
+# These are our initial conditions. We start from the zero solution, because it
+# is trivially admissible if the Dirichlet conditions are zero everywhere on the
+# Dirichlet boundary for t=0. Note that the timestepper is also doing fine if the
+# Dirichlet condition is non-zero and not too pathological.
 u₀ = zeros(ndofs(dh))
 apply!(u₀, ch)
 
@@ -418,7 +375,7 @@ p = [K, dh, cellvalues_v]
 problem = ODEProblem(rhs, u₀, (0.0,T), p);
 
 # Now we can put everything together by specifying how to solve the problem.
-# We want to use the modified extended BDF2 method with our custom linear
+# We want to use the adaptive implicit Euler method with our custom linear
 # solver, which helps in the enforcement of the Dirichlet BCs. Further we
 # enable the progress bar with the `progess` and `progress_steps` arguments.
 # Finally we have to communicate the time step length and initialization
