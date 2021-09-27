@@ -421,7 +421,7 @@ function compute_divergence(dh, u, cellvalues_v)                            #src
     end                                                                     #src
     return divv                                                             #src
 end                                                                         #src
-begin                                                                       #src
+@testset "INS OrdinaryDiffEq" begin                                         #src
     u = integrator.integrator.u                                             #src
     Δdivv = abs(compute_divergence(dh, u, cellvalues_v))                    #src
     @test isapprox(Δdivv, 0.0, atol=1e-12)                                  #src
