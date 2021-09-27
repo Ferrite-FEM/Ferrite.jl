@@ -6,13 +6,16 @@
 # In this example we focus on a simple but visually appealing problem from
 # fluid dynamics, namely vortex shedding, which is also known as
 # von-Karman vortex streets, to show how to utilize [DifferentialEquations.jl]()
-# in tandem with [Ferrite.jl]().
+# in tandem with [Ferrite.jl](). To keep things simple we use a general approach
+# to discretize the system, hence we refrain from Chorin's more performant
+# projection method.
 #
 # ## Remarks on DifferentialEquations.jl
 #
-# The "timestep solvers" of [DifferentialEquations.jl]() assume that that the
+# The "time step solvers" of [DifferentialEquations.jl]() assume that that the
 # problem is provided in mass matrix form. The incompressible Navier-Stokes
-# equations can be rewritten in this form after discretization, yielding a DAE.
+# equations as stated above yield a DAE in this form after applying a spatial
+# discretization technique - in our case FEM.
 #
 # ## Incompressible Navier-Stokes Equations
 #
@@ -28,13 +31,21 @@
 # ```
 #
 # where $v$ is the unknown velocity field, $p$ the unknown pressure field
-# and $\nu$ the dynamic viscosity. We assume a constant density of 1 for the fluid.
-# We assume negligible coupling between the velocity components in the viscosity
-# assembly.
+# and $\nu$ the dynamic viscosity. We assume a constant density of 1 for the fluid
+# and negligible coupling between the velocity components.
 # Finally we see that the pressure term appears only in combination with the gradient
 # operator, so for any solution p the function p + c is also an admissible solution, if
 # we do not impose Dirichlet conditions on the pressure. To resolve this we introduce the
 # implicit constraint that $ \int_\Omega p = 0 $.
+#
+# Our setup is derived from [Turek's DFG benchmark](http://www.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/flow/dfg_benchmark1_re20.html).
+# We model a channel with size $0.41 \times 2.2$ and a hole of radius $0.05$ centered at $(0.2, 0.2)$.
+# The left side has a parabolic inflow profile, which is ramped up over time, modeled as the Dirichlet condition
+# $v_x(t) \mapsto 4*v_{in}(t)*y*(0.41-y)/0.41^2$ where $v_{in}(t) = clamp(t, 0.0, 1.0)$. With a viscosity of $\nu = 0.001$
+# this is enough to induce turbulence behind the cylinder which leads to vortex shedding. The top and bottom of our
+# channel have no-slip conditions, i.e. v = (0,0), while the right boundary has the do-nothing boundary condtion
+# $\nu \partial_n v - p n = 0$ to model outflow. With these boundary conditions we can choose the zero solution as a
+# feasible initial condition.
 #
 # ### Semi-Discrete Weak Form
 #
@@ -44,7 +55,6 @@
 #                                  0 &= \int \nabla \cdot v \psi
 #  \end{aligned}
 # ```
-#
 # where $\varphi$ and $\psi$ are suitable test functions.
 #
 # Now we can discretize the problem as usual with the finite element method
@@ -54,16 +64,16 @@
 # ```
 # Here M is the singular block mass matrix, K is the discretized Stokes operator and N the non-linear advective term.
 #
-# Details on the geometry and boundary conditions can be taken from [Turek's DFG benchmark](http://www.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/flow/dfg_benchmark1_re20.html).
 #
 # ## Commented Program
 #
-# Now we solve the problem in Ferrite. What follows is a program spliced with comments.
+# Now we solve the problem in Ferrite with DifferentialEquations.jl. What follows is a program spliced with comments.
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 #
 # First we load Ferrite, and some other packages we need
 using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack
-# Since we do note need the complete DifferentialEquations suite just load the required ODE infrastructure.
+# Since we do note need the complete DifferentialEquations suite just load the required ODE infrastructure, which can also handle
+# DAEs in mass matrix form.
 using OrdinaryDiffEq
 
 # We start off by defining our only material parameter.
@@ -102,10 +112,6 @@ end;
 # We test against full development of the flow - so regenerate the grid                              #src
 grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((0.55, 0.41)));   #hide
 
-T = 10.0
-Δt₀ = 0.01
-Δt_save = 0.1
-
 # ### Function space
 # To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
 # We have to utilize the same quadrature rule because in the weak form the
@@ -134,7 +140,7 @@ nosplip_face_names = ["top", "bottom", "hole"];
 nosplip_face_names = ["top", "bottom"]                                  #hide
 ∂Ω_noslip = union(getfaceset.((grid, ), nosplip_face_names)...);
 noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> [0,0], [1,2])
-add!(ch, noslip_bc)
+add!(ch, noslip_bc);
 
 # The left boundary has a parabolic inflow with peak velocity of 1.0. This
 # ensures that for the given geometry the Reynolds number is 100, which
@@ -196,7 +202,7 @@ function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p:
     end
 
     return M
-end
+end;
 
 # Next we discuss the assembly of the Stokes matrix.
 # Remember that we use the same function spaces for trial and test, hence the
@@ -256,11 +262,15 @@ function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_
         assemble!(stiffness_assembler, celldofs(cell), Kₑ)
     end
     return K
-end
+end;
 
 # ### Solution of the semi-discretized system via DifferentialEquations.jl
 # First we assemble the linear portions for efficiency. These matrices are
 # assumed to be constant over time.
+T = 10.0
+Δt₀ = 0.01
+Δt_save = 0.1
+
 M = create_sparsity_pattern(dh);
 M = assemble_mass_matrix(cellvalues_v, cellvalues_p, M, dh);
 
@@ -269,10 +279,10 @@ K = assemble_stokes_matrix(cellvalues_v, cellvalues_p, ν, K, dh);
 
 # These are our initial conditions. We start from the zero solution, because it
 # is trivially admissible if the Dirichlet conditions are zero everywhere on the
-# Dirichlet boundary for t=0. Note that the timestepper is also doing fine if the
+# Dirichlet boundary for t=0. Note that the time stepper is also doing fine if the
 # Dirichlet condition is non-zero and not too pathological.
 u₀ = zeros(ndofs(dh))
-apply!(u₀, ch)
+apply!(u₀, ch);
 
 # At the time of writing this example we have no clean way to hook into the
 # nonlinear solver backend to apply the Dirichlet BCs. As a hotfix we override
@@ -304,7 +314,7 @@ function OrdinaryDiffEq.initialize!(nlsolver::OrdinaryDiffEq.NLSolver{<:NLNewton
     apply_zero!(z, ch);
 
     nothing
-end
+end;
 
 # For the linear equations we can cleanly integrate with the linear solver
 # interface provided by the DifferentialEquations ecosystem. We use a direct
@@ -329,7 +339,7 @@ function (p::FerriteLinSolve)(x,A,b,update_matrix=false;reltol=nothing, kwargs..
     ldiv!(x, p.A, b)
     apply_zero!(x, p.ch)
     return nothing
-end
+end;
 
 # DifferentialEquations assumes dense matrices by default, which is not
 # feasible for semi-discretization of finize element models. We communicate
@@ -402,7 +412,7 @@ for (u,t) in integrator
         vtk_save(vtk)
         pvd[t] = vtk
     end
-end
+end;
 
 # Test the result for full proper development of the flow                   #src
 function compute_divergence(dh, u, cellvalues_v)                            #src
