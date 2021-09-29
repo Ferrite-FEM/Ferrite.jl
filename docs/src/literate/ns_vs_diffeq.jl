@@ -369,13 +369,13 @@ function navierstokes!(du,u,p,t)
             v = function_value(cellvalues_v, q_point, v_cell)
             for j in 1:n_basefuncs
                 φⱼ = shape_value(cellvalues_v, q_point, j)
-                # Note that the other gradient term is now on the left, which is the correct thing to do here.
-                # It can be quickly shown through index notation.
+                # Note that in Tensors.jl the definition $grad v = ∇v$ holds.
+                # With this information it can be quickly shown in index notation that
                 # ```math
-                # [(v \cdot \nabla) v]_i = v_j \partial_j v_i = \partial_j v_i v_j = (\nabla v) v
+                # [(v \cdot \nabla) v]_i = v_j (\partial_j v_i) = [v (\nabla v)^T]_i
                 # ```
                 #+
-                du[v_celldofs[j]] -= ∇v ⋅ v ⋅ φⱼ * dΩ
+                du[v_celldofs[j]] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
             end
         end
     end
@@ -412,7 +412,8 @@ for (u,t) in integrator
         vtk_save(vtk)
         pvd[t] = vtk
     end
-end;
+end
+vtk_save(pvd);
 
 # Test the result for full proper development of the flow                   #src
 function compute_divergence(dh, u, cellvalues_v)                            #src
