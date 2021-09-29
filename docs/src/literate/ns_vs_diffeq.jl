@@ -86,7 +86,7 @@
 #       0  & 0
 #  \end{bmatrix}}_{:=M}
 #  \begin{bmatrix}
-#      \mathrm{d}_t\hat{\mathbf{v}} \\
+#      \mathrm{d}_t\hat{v} \\
 #      \mathrm{d}\hat{p}
 #  \end{bmatrix}
 #  =
@@ -95,16 +95,19 @@
 #       B & 0
 #  \end{bmatrix}}_{:=K}
 #  \begin{bmatrix}
-#      \hat{\mathbf{v}} \\
+#      \hat{v} \\
 #      \hat{p}
 #  \end{bmatrix}
 #  +
 #  \begin{bmatrix}
-#      N(\hat{\mathbf{v}}, \hat{\mathbf{v}}, \hat{\varphi}) \\
+#      N(\hat{v}, \hat{v}, \hat{\varphi}) \\
 #      0
 #  \end{bmatrix}
 # ```
 # Here $M$ is the singular block mass matrix, $K$ is the discretized Stokes operator and $N$ the non-linear advection term.
+# $\hat{v}$ and $\hat{p}$ represent the nodal values of the discretizations of $v$ and $p$ respectively, while $\hat{\varphi}$
+# is the choice for the test function in the discretization. The hats are dropped in the implementation and only for clarity
+# in this section stated.
 #
 #
 # ## Commented Program
@@ -329,8 +332,10 @@ apply!(u₀, ch);
 # DifferentialEquations assumes dense matrices by default, which is not
 # feasible for semi-discretization of finite element models. We communicate
 # that a sparse matrix with specified pattern should be utilized through the
-# `jac_prototyp` argument.
-jac_sparsity = sparse(K)
+# `jac_prototyp` argument. It is simple to see that the Jacobian and the
+# stiffness matrix share the same sparsity pattern, since they share the
+# same relation between trial and test functions.
+jac_sparsity = sparse(K);
 
 # To apply the nonlinear portion of the Navier-Stokes problem we simply hand
 # over the dof handler and cell values to the right hand side as a parameter.
