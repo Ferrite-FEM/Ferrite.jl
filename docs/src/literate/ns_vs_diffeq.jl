@@ -4,18 +4,25 @@
 #
 #
 # In this example we focus on a simple but visually appealing problem from
-# fluid dynamics, namely vortex shedding, which is also known as
-# von-Karman vortex streets, to show how to utilize [DifferentialEquations.jl]()
-# in tandem with [Ferrite.jl](). To keep things simple we use a general approach
-# to discretize the system, hence we refrain from Chorin's more performant
-# projection method.
+# fluid dynamics, namely vortex shedding. This problem is also known as
+# [von-Karman vortex streets](https://en.wikipedia.org/wiki/K%C3%A1rm%C3%A1n_vortex_street). Within this example, we show how to utilize [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl)
+# in tandem with Ferrite.jl. To keep things simple we use a naive approach
+# to discretize the system.
 #
 # ## Remarks on DifferentialEquations.jl
 #
-# The "time step solvers" of [DifferentialEquations.jl]() assume that that the
+# Many "time step solvers" of [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) assume that that the
 # problem is provided in mass matrix form. The incompressible Navier-Stokes
 # equations as stated above yield a DAE in this form after applying a spatial
-# discretization technique - in our case FEM.
+# discretization technique - in our case FEM. The mass matrix form a ODEs and DAEs
+# is given as:
+# ```math
+#   M(t) \frac{du}{dt} = f(u,t)
+# ```
+# where $M$ is a possibly time-dependent mass matrix, $u$ our vector of unkowns
+# and $f$ the right hand side. For us $f$ can be seen as the spatial discretization
+# of all linear and non-linear operators depending on $u$ and $t$, but not on the time
+# derivative of $u$.
 #
 # ## Incompressible Navier-Stokes Equations
 #
@@ -67,7 +74,7 @@
 #
 # ## Commented Program
 #
-# Now we solve the problem in Ferrite with DifferentialEquations.jl. What follows is a program spliced with comments.
+# Now we solve the problem in Ferrite with [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl). What follows is a program spliced with comments.
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 #
 # First we load Ferrite, and some other packages we need
@@ -320,15 +327,19 @@ end;
 # interface provided by the DifferentialEquations ecosystem. We use a direct
 # solver for simplicity, altough it comes with some issues. Implementing
 # GMRES with efficient preconditioner is left open for future work.
+# It should also be noted that A can in theory take more types, for example
+# some block sparse type or just some discrete matrix-free operator.
 mutable struct FerriteLinSolve{CH,F}
     ch::CH
     factorization::F
     A
 end
+
 FerriteLinSolve(ch) = FerriteLinSolve(ch,lu,nothing)
 function (p::FerriteLinSolve)(::Type{Val{:init}},f,u0_prototype)
     FerriteLinSolve(ch)
 end
+
 function (p::FerriteLinSolve)(x,A,b,update_matrix=false;reltol=nothing, kwargs...)
     if update_matrix
         ## Apply Dirichlet BCs
