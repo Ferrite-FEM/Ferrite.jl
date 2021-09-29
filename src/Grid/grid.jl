@@ -106,20 +106,20 @@ getdim(::Cell{dim,N,M}) where {dim,N,M} = dim
 
 abstract type AbstractTopology end
 
-struct GridTopology <: AbstractTopology
+struct ExclusiveTopology <: AbstractTopology
     face_neighbor::SparseMatrixCSC{Neighbor,Int}
     corner_neighbor::SparseMatrixCSC{Neighbor,Int}
     edge_neighbor::SparseMatrixCSC{Neighbor,Int}
 end
 
-function GridTopology()
+function ExclusiveTopology()
     face_neighbor = spzeros(Neighbor,0,0)
     corner_neighbor = spzeros(Neighbor,0,0)
     edge_neighbor = spzeros(Neighbor,0,0)
-    return GridTopology(face_neighbor,corner_neighbor,edge_neighbor)
+    return ExclusiveTopology(face_neighbor,corner_neighbor,edge_neighbor)
 end
 
-function GridTopology(cells::Vector{C}) where C <: AbstractCell
+function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     I_face = Int[]; J_face = Int[]; V_face = Neighbor[]
     I_edge = Int[]; J_edge = Int[]; V_edge = Neighbor[]
     I_corner = Int[]; J_corner = Int[]; V_corner = Neighbor[]
@@ -148,7 +148,7 @@ function GridTopology(cells::Vector{C}) where C <: AbstractCell
     face_neighbor = sparse(I_face,J_face,V_face)
     corner_neighbor = sparse(I_corner,J_corner,V_corner) 
     edge_neighbor = sparse(I_edge,J_edge,V_edge)
-    return GridTopology(face_neighbor,corner_neighbor,edge_neighbor) 
+    return ExclusiveTopology(face_neighbor,corner_neighbor,edge_neighbor) 
 end
 
 function _corner_neighbor!(V_corner, I_corner, J_corner, cellid, cell, neighbor, neighborid, neighbor_cell)
@@ -189,6 +189,9 @@ function _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor, neighbo
     push!(J_face, cell_face_id)
 end
 
+getelement(neighbor::Ferrite.Neighbor) = first.(neighbor.neighbor_info)
+getelements(neighbors::Vector{Ferrite.Neighbor}) = getelement(sum(neighbors))
+
 abstract type AbstractGrid{dim} end
 
 """
@@ -217,13 +220,45 @@ function Grid(cells::Vector{C},
               edgesets::Dict{String,Set{EdgeIndex}}=Dict{String,Set{EdgeIndex}}(),
               vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}(),
               boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0),
-              topology::GridTopology=GridTopology()) where {dim,C,T}
+              topology::ExclusiveTopology=ExclusiveTopology()) where {dim,C,T}
     return Grid(cells, nodes, cellsets, nodesets, facesets, edgesets, vertexsets, boundary_matrix, topology)
 end
 
 ##########################
 # Grid utility functions #
 ##########################
+function full_neighborhood(grid::Grid{2,C,T,ExclusiveTopology}, cellidx::CellIndex, include_self=false) where {dim,C,T}
+    patch = getelements([nonzeros(grid.topology.corner_neighbor[cellidx.idx,:]);nonzeros(grid.topology.face_neighbor[cellidx.idx,:])])
+    if include_self
+        return [patch; cellidx.idx]
+    else 
+        return patch
+    end
+end
+
+function full_neighborhood(grid::Grid{3,C,T,ExclusiveTopology}, cellidx::CellIndex, include_self=false) where {dim,C,T}
+    patch = getelements([nonzeros(grid.topology.corner_neighbor[cellidx.idx,:]);nonzeros(grid.topology.face_neighbor[cellidx.idx,:]);nonzeros(grid.topology.edge_neighbor[cellidx.idx,:])])
+    if include_self
+        return [patch; cellidx.idx]
+    else 
+        return patch
+    end
+end
+
+function full_neighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, faceidx::FaceIndex, include_self=false) where {dim,C,T}
+    if include_self 
+        [grid.topology.face_neighbor[faceidx[1],faceidx[2]].neighbor_info; faceidx]
+    else
+        grid.topology.face_neighbor[faceidx[1],faceidx[2]].neighbor_info
+    end
+end
+
+function full_neighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, vertexidx::VertexIndex, include_self=false) where {dim,C,T}
+    cell = CellIndex(vertexidx[1]) 
+    patch = full_neighborhood(grid, cell, include_self=include_self)
+    vertex_patch = Vector{VertexIndex}()
+end
+
 @inline getdim(::AbstractGrid{dim}) where {dim} = dim
 @inline getcells(grid::AbstractGrid) = grid.cells
 @inline getcells(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.cells[v]

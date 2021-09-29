@@ -270,21 +270,7 @@ end
 #                   +-----+-----+-----+
 # test application: form level 1 neighborhood patches of elements 
     quadgrid = generate_grid(Quadrilateral,(3,3);build_topology=true)
-    patches = Vector{Int}[]
-
-    getelement(neighbor::Ferrite.Neighbor) = first.(neighbor.neighbor_info)
-    function getelements(neighbors::Vector{Ferrite.Neighbor})
-        neighborelements = Int[]
-        for neighbor in neighbors
-            append!(neighborelements, getelement(neighbor))
-        end
-        return neighborelements
-    end
-
-    for eleid in 1:getncells(quadgrid)
-        elepatch = [nonzeros(quadgrid.topology.face_neighbor[eleid,:]); nonzeros(quadgrid.topology.corner_neighbor[eleid,:])]
-        push!(patches, getelements(elepatch))
-    end 
+    patches = Vector{Int}[Ferrite.full_neighborhood(quadgrid, CellIndex(i)) for i in 1:getncells(quadgrid)]
 
     @test issubset([4,5,2], patches[1]) # neighbor elements of element 1 are 4 5 and 2
     @test issubset([1,4,5,6,3], patches[2])
