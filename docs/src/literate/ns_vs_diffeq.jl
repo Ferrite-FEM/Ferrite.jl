@@ -362,17 +362,15 @@ end;
 # interface provided by the DifferentialEquations ecosystem. We use a direct
 # solver for simplicity, altough it comes with some issues. Implementing
 # GMRES with efficient preconditioner is left open for future work.
-# It should also be noted that A can in theory take more types, for example
-# some block sparse type or just some discrete matrix-free operator.
-mutable struct FerriteLinSolve{CH,F}
+mutable struct FerriteLinSolve{CH,F,T<:Factorization}
     ch::CH
     factorization::F
-    A
+    A::T
 end
 
-FerriteLinSolve(ch) = FerriteLinSolve(ch,lu,nothing)
+FerriteLinSolve(ch) = FerriteLinSolve(ch,lu,lu(sparse(ones(1,1))))
 function (p::FerriteLinSolve)(::Type{Val{:init}},f,u0_prototype)
-    FerriteLinSolve(ch)
+    FerriteLinSolve(p.ch)
 end
 
 function (p::FerriteLinSolve)(x,A,b,update_matrix=false;reltol=nothing, kwargs...)
@@ -499,7 +497,7 @@ end                                                                         #src
         end                                                                 #src
     end                                                                     #src
     @test isapprox(sqrt(Δv), 0.0, atol=1e-3)                                #src
-end                                                                         #src
+end;                                                                        #src
 
 #md # ## [Plain Program](@id ns_vs_diffeq-plain-program)
 #md #
