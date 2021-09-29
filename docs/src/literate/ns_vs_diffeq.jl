@@ -34,16 +34,16 @@
 # and $\nu$ the dynamic viscosity. We assume a constant density of 1 for the fluid
 # and negligible coupling between the velocity components.
 # Finally we see that the pressure term appears only in combination with the gradient
-# operator, so for any solution p the function p + c is also an admissible solution, if
+# operator, so for any solution $p$ the function $p + c$ is also an admissible solution, if
 # we do not impose Dirichlet conditions on the pressure. To resolve this we introduce the
 # implicit constraint that $ \int_\Omega p = 0 $.
 #
 # Our setup is derived from [Turek's DFG benchmark](http://www.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/flow/dfg_benchmark1_re20.html).
 # We model a channel with size $0.41 \times 2.2$ and a hole of radius $0.05$ centered at $(0.2, 0.2)$.
 # The left side has a parabolic inflow profile, which is ramped up over time, modeled as the Dirichlet condition
-# $v_x(t) \mapsto 4*v_{in}(t)*y*(0.41-y)/0.41^2$ where $v_{in}(t) = clamp(t, 0.0, 1.0)$. With a viscosity of $\nu = 0.001$
+# $v_x(t) \mapsto 4 v_{in}(t) \cdot y \cdot (0.41-y)/0.41^2$ where $v_{in}(t) = \text{clamp}(t, 0.0, 1.0)$. With a viscosity of $\nu = 0.001$
 # this is enough to induce turbulence behind the cylinder which leads to vortex shedding. The top and bottom of our
-# channel have no-slip conditions, i.e. v = (0,0), while the right boundary has the do-nothing boundary condtion
+# channel have no-slip conditions, i.e. $v = (0,0)$, while the right boundary has the do-nothing boundary condtion
 # $\nu \partial_n v - p n = 0$ to model outflow. With these boundary conditions we can choose the zero solution as a
 # feasible initial condition.
 #
@@ -72,7 +72,7 @@
 #
 # First we load Ferrite, and some other packages we need
 using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack
-# Since we do note need the complete DifferentialEquations suite just load the required ODE infrastructure, which can also handle
+# Since we do not need the complete DifferentialEquations suite, we just load the required ODE infrastructure, which can also handle
 # DAEs in mass matrix form.
 using OrdinaryDiffEq
 
@@ -235,7 +235,7 @@ function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_
 
         for q_point in 1:getnquadpoints(cellvalues_v)
             dΩ = getdetJdV(cellvalues_v, q_point)
-            # Viscosity term "A"
+            # Viscosity term $A$
             #+
             for i in 1:n_basefuncs_v
                 ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
@@ -244,7 +244,7 @@ function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_
                     Kₑ[BlockIndex((v▄, v▄), (i, j))] -= ν * ∇φᵢ ⊡ ∇φⱼ * dΩ
                 end
             end
-            # Pressure + Incompressibility term B - note the symmetry.
+            # Pressure + Incompressibility term $B$ - note the symmetry.
             #+
             for j in 1:n_basefuncs_p
                 ψ = shape_value(cellvalues_p, q_point, j)
@@ -305,7 +305,7 @@ function OrdinaryDiffEq.initialize!(nlsolver::OrdinaryDiffEq.NLSolver{<:NLNewton
     #+
     update!(ch, cache.tstep);
 
-    # The update of u takes uprev + z or tmp + z most of the time, so we have
+    # The update of `u` takes `uprev + z` or `tmp + z` most of the time, so we have
     # to enforce Dirichlet BCs here. Note that these mutations may break the
     # error estimators.
     #+
@@ -342,7 +342,7 @@ function (p::FerriteLinSolve)(x,A,b,update_matrix=false;reltol=nothing, kwargs..
 end;
 
 # DifferentialEquations assumes dense matrices by default, which is not
-# feasible for semi-discretization of finize element models. We communicate
+# feasible for semi-discretization of finite element models. We communicate
 # that a sparse matrix with specified pattern should be utilized through the
 # `jac_prototyp` argument. Additionally, we have to provide the mass matrix.
 # To apply the nonlinear portion of the Navier-Stokes problem we simply hand
@@ -369,7 +369,7 @@ function navierstokes!(du,u,p,t)
             v = function_value(cellvalues_v, q_point, v_cell)
             for j in 1:n_basefuncs
                 φⱼ = shape_value(cellvalues_v, q_point, j)
-                # Note that the order the gradient term is now on the left, which is the correct thing to do here.
+                # Note that the other gradient term is now on the left, which is the correct thing to do here.
                 # It can be quickly shown through index notation.
                 # ```math
                 # [(v \cdot \nabla) v]_i = v_j \partial_j v_i = \partial_j v_i v_j = (\nabla v) v
