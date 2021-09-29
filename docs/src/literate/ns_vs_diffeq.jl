@@ -326,81 +326,61 @@ K = assemble_stokes_matrix(cellvalues_v, cellvalues_p, ν, K, dh);
 u₀ = zeros(ndofs(dh))
 apply!(u₀, ch);
 
-# At the time of writing this example we have no clean way to hook into the
-# nonlinear solver backend to apply the Dirichlet BCs. As a hotfix we override
-# the newton initialization. We cannot solve all emerging issues by developing
-# a customized newton algorithm here. This hack should only be seen as an
-# intermediate step towards integration with OrdinaryDiffEq.jl.
-function OrdinaryDiffEq.initialize!(nlsolver::OrdinaryDiffEq.NLSolver{<:NLNewton,true}, integrator)
-    ## This block is copy pasta from OrdinaryDiffEq
-    @unpack u,uprev,t,dt,opts = integrator
-    @unpack z,tmp,cache = nlsolver
-    @unpack weight = cache
-
-    cache.invγdt = inv(dt * nlsolver.γ)
-    cache.tstep = integrator.t + nlsolver.c * dt
-    OrdinaryDiffEq.calculate_residuals!(weight, fill!(weight, one(eltype(u))), uprev, u,
-                         opts.abstol, opts.reltol, opts.internalnorm, t);
-
-    # Before starting the nonlinear solve we have to set the time correctly.
-    # Note that ch is a global variable for now.
-    #+
-    update!(ch, cache.tstep);
-
-    # The update of `u` takes `uprev + z` or `tmp + z` most of the time, so we have
-    # to enforce Dirichlet BCs here. Note that these mutations may break the
-    # error estimators.
-    #+
-    apply!(uprev, ch)
-    apply!(tmp, ch)
-    apply_zero!(z, ch);
-
-    nothing
-end;
-
-# For the linear equations we can cleanly integrate with the linear solver
-# interface provided by the DifferentialEquations ecosystem. We use a direct
-# solver for simplicity, altough it comes with some issues. Implementing
-# GMRES with efficient preconditioner is left open for future work.
-mutable struct FerriteLinSolve{CH,F,T<:Factorization}
-    ch::CH
-    factorization::F
-    A::T
-end
-
-FerriteLinSolve(ch) = FerriteLinSolve(ch,lu,lu(sparse(ones(1,1))))
-function (p::FerriteLinSolve)(::Type{Val{:init}},f,u0_prototype)
-    FerriteLinSolve(p.ch)
-end
-
-function (p::FerriteLinSolve)(x,A,b,update_matrix=false;reltol=nothing, kwargs...)
-    if update_matrix
-        ## Apply Dirichlet BCs
-        apply_zero!(A, b, p.ch)
-        ## Update factorization
-        p.A = p.factorization(A)
-    end
-    ldiv!(x, p.A, b)
-    apply_zero!(x, p.ch)
-    return nothing
-end;
-
 # DifferentialEquations assumes dense matrices by default, which is not
 # feasible for semi-discretization of finite element models. We communicate
 # that a sparse matrix with specified pattern should be utilized through the
-# `jac_prototyp` argument. Additionally, we have to provide the mass matrix.
-# To apply the nonlinear portion of the Navier-Stokes problem we simply hand
-# over the dof handler to the right hand side as a parameter in addition to
-# the pre-assembled linear part (which is time independent) to save some
-# runtime.
+# `jac_prototyp` argument.
 jac_sparsity = sparse(K)
-function navierstokes!(du,u,p,t)
-    K,dh,cellvalues_v = p
+
+# To apply the nonlinear portion of the Navier-Stokes problem we simply hand
+# over the dof handler and cell values to the right hand side as a parameter.
+# Further the pre-assembled linear part (which is time independent) is
+# passed to save some runtime. To apply the time-dependent Dirichlet BCs, we
+# also hand over the constraint handler.
+# The basic idea to apply the Dirichlet BCs consistently is that we copy the
+# current solution `u`, apply the Dirichlet BCs on the copy, evaluate the
+# discretized right hand side of the Navier-Stokes equations with this vector
+# and finally set the rhs to zero on every constraint. This way we obtain a
+# correct solution for all dofs which are not Dirichlet constrained. These
+# dofs are then corrected in a post-processing step, when evaluating the
+# solution vector at specific time points.
+# It should be finally noted that this *trick does not work* out of the box
+# *for constraining algebraic portion* of the DAE, i.e. if we would like to
+# put a Dirichlet BC on pressure dofs. Here we have to set "$d_t p_i = p_i$" instead
+# of "$d_t p_i = 0$", because otherwise the equation system gets singular. This
+# is obvious when we also take into account that our mass matrix is zero for these
+# dofs, such that we obtain the equation $0 \cdot d_t p_i = p_i$.
+struct RHSparams
+    K::SparseMatrixCSC
+    ch::ConstraintHandler
+    dh::DofHandler
+    cellvalues_v::CellVectorValues
+end
+p = RHSparams(K, ch, dh, cellvalues_v)
+function navierstokes!(du,u_uc,p,t)
+    # Unpack the struct to save some allocations
+    #+
+    @unpack K,ch,dh,cellvalues_v = p
+
+    # We start by applying the time-dependent Dirichlet BCs. Note that we are
+    # not allowed to mutate `u_uc`! We also can not pre-allocate this variable
+    # if we want to use AD to derive the Jacobian matrix, which appears in the
+    # utilized implicit Euler. If we hand over the Jacobian analytically to
+    # the solver, or when utilizing a method which does not require building the
+    # Jacobian, then we could also hand over a buffer for `u` in our RHSparams
+    # structure to save the allocations made here.
+    #+
+    u = u_uc
+    update!(ch, t)
+    apply!(u, ch)
+
+    # Now we apply the rhs of the Navier-Stokes equations
+    #+
+    ## Linear contribution (Stokes operator)
     du .= K * u
 
-    n_basefuncs = getnbasefunctions(cellvalues_v)
-
     ## Nonlinear contribution
+    n_basefuncs = getnbasefunctions(cellvalues_v)
     for cell in CellIterator(dh)
         Ferrite.reinit!(cellvalues_v, cell)
         ## Trilinear form evaluation
@@ -424,9 +404,15 @@ function navierstokes!(du,u,p,t)
             end
         end
     end
+
+    # Finally, we have to ingore the evolution of the Dirichlet BCs for now.
+    # The solution vector will be corrected in a post-processing step.
+    #+
+    apply_zero!(du, ch)
 end;
+# Finally, together with our pre-assembled mass matrix, we are now able to
+# define our problem in mass matrix form.
 rhs = ODEFunction(navierstokes!, mass_matrix=M; jac_prototype=jac_sparsity)
-p = [K, dh, cellvalues_v]
 problem = ODEProblem(rhs, u₀, (0.0,T), p);
 
 # Now we can put everything together by specifying how to solve the problem.
@@ -436,12 +422,13 @@ problem = ODEProblem(rhs, u₀, (0.0,T), p);
 # Finally we have to communicate the time step length and initialization
 # algorithm. Since we start with a valid initial state we do not use one of
 # DifferentialEquations.jl initialization algorithms.
-# NOTE: At the time of writing this [no index 2 initialization is implemented](https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019).
+# NOTE: At the time of writing this [no Hessenberg index 2 initialization is implemented](https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019).
 #
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
-timestepper = ImplicitEuler(linsolve=FerriteLinSolve(ch))
+#timestepper = ImplicitEuler(linsolve=FerriteLinSolve(ch))
+timestepper = ImplicitEuler()
 integrator = init(
     problem, timestepper, initializealg=NoInit(), dt=Δt₀,
     adaptive=true, abstol=1e-3, reltol=1e-3,
@@ -450,7 +437,13 @@ integrator = init(
 
 pvd = paraview_collection("vortex-street.pvd");
 integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
-for (u,t) in integrator
+for (u_uc,t) in integrator
+    # We ignored the Dirichlet constraints in the solution vector up to now,
+    # so we have to bring them back now.
+    #+
+    update!(ch, t)
+    u = u_uc
+    apply!(u, ch)
     #compress=false flag because otherwise each vtk file will be stored in memory
     vtk_grid("vortex-street-$t.vtu", dh; compress=false) do vtk
         vtk_point_data(vtk,dh,u)
