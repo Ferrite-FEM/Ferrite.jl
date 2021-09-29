@@ -24,52 +24,87 @@
 # of all linear and non-linear operators depending on $u$ and $t$, but not on the time
 # derivative of $u$.
 #
-# ## Incompressible Navier-Stokes Equations
+# ## Some Theory on the Incompressible Navier-Stokes Equations
 #
-# ### Strong Form
+# ### Problem Description in Strong Form
 #
 # The incompressible Navier-Stokes equations can be stated as the system
 #
 # ```math
 #  \begin{aligned}
-#    \partial_t v &= \nu \Delta v - (v \cdot \nabla) v - \nabla p \\
-#               0 &= \nabla \cdot v
+#    \partial_t v &= \underbrace{\nu \Delta v}_{\text{viscosity}} - \underbrace{(v \cdot \nabla) v}_{\text{advection}} - \underbrace{\nabla p}_{\text{pressure}} \\
+#               0 &= \underbrace{\nabla \cdot v}_{\text{incompressibility}}
 #  \end{aligned}
 # ```
 #
-# where $v$ is the unknown velocity field, $p$ the unknown pressure field
-# and $\nu$ the dynamic viscosity. We assume a constant density of 1 for the fluid
-# and negligible coupling between the velocity components.
+# where $v$ is the unknown velocity field, $p$ the unknown pressure field,
+# $\nu$ the dynamic viscosity and $\Delta$ the Laplacian. In the derivation we assumed
+# a constant density of 1 for the fluid and negligible coupling between the velocity components.
 # Finally we see that the pressure term appears only in combination with the gradient
 # operator, so for any solution $p$ the function $p + c$ is also an admissible solution, if
 # we do not impose Dirichlet conditions on the pressure. To resolve this we introduce the
 # implicit constraint that $ \int_\Omega p = 0 $.
 #
+#
 # Our setup is derived from [Turek's DFG benchmark](http://www.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/flow/dfg_benchmark1_re20.html).
 # We model a channel with size $0.41 \times 2.2$ and a hole of radius $0.05$ centered at $(0.2, 0.2)$.
-# The left side has a parabolic inflow profile, which is ramped up over time, modeled as the Dirichlet condition
-# $v_x(t) \mapsto 4 v_{in}(t) \cdot y \cdot (0.41-y)/0.41^2$ where $v_{in}(t) = \text{clamp}(t, 0.0, 1.0)$. With a viscosity of $\nu = 0.001$
+# The left side has a parabolic inflow profile, which is ramped up over time, modeled as the time dependent
+# Dirichlet condition
+# ```math
+#  v(x,y,t)
+#  =
+#  \begin{bmatrix}
+#      4 v_{in}(t) \cdot y \cdot (0.41-y)/0.41^2 \\
+#      0
+#  \end{bmatrix}
+# ```
+# where $v_{in}(t) = \text{clamp}(t, 0.0, 1.0)$. With a viscosity of $\nu = 0.001$
 # this is enough to induce turbulence behind the cylinder which leads to vortex shedding. The top and bottom of our
-# channel have no-slip conditions, i.e. $v = (0,0)$, while the right boundary has the do-nothing boundary condtion
+# channel have no-slip conditions, i.e. $v = [0,0]^T$, while the right boundary has the do-nothing boundary condtion
 # $\nu \partial_n v - p n = 0$ to model outflow. With these boundary conditions we can choose the zero solution as a
 # feasible initial condition.
 #
-# ### Semi-Discrete Weak Form
+# ### Derivation of Semi-Discrete Weak Form
 #
+# By multiplying test functions $\varphi$ and $\psi$ from a suitable test function space on the strong form,
+# followed by integrating over the domain and applying partial integration to the pressure and viscosity terms
+# we can obtain the following weak form
 # ```math
 #  \begin{aligned}
-#    \int \partial_t v \cdot \varphi &= - \int \nu \nabla v : \nabla \varphi - \int (v \cdot \nabla) v \cdot \varphi + \int p \nabla \cdot \varphi + \int_{\partial \Omega_{N}} (\nu \partial_n v - p n ) \cdot \varphi \\
-#                                  0 &= \int \nabla \cdot v \psi
+#    \int \partial_t v \cdot \varphi &= - \int \nu \nabla v : \nabla \varphi - \int (v \cdot \nabla) v \cdot \varphi + \int p (\nabla \cdot \varphi) + \int_{\partial \Omega_{N}} \underbrace{(\nu \partial_n v - p n )}_{=0} \cdot \varphi \\
+#                                  0 &= (\int \nabla \cdot v) \psi
 #  \end{aligned}
 # ```
-# where $\varphi$ and $\psi$ are suitable test functions.
+# for all possible test functions from the suitable space.
 #
 # Now we can discretize the problem as usual with the finite element method
-# utilizing Taylor-Hood elements (Q2Q1) to yield a stable discretization.
+# utilizing Taylor-Hood elements (Q2Q1) to yield a stable discretization in
+# mass matrix form:
 # ```math
-#  M [\hat{\mathbf{v}}, \hat{p}] = K [\hat{\mathbf{v}}, \hat{p}] + [N(\hat{\mathbf{v}}, \hat{\mathbf{v}}, \hat{\varphi}), 0]
+#  \underbrace{\begin{bmatrix}
+#      M_v & 0 \\
+#       0  & 0
+#  \end{bmatrix}}_{:=M}
+#  \begin{bmatrix}
+#      \mathrm{d}_t\hat{\mathbf{v}} \\
+#      \mathrm{d}\hat{p}
+#  \end{bmatrix}
+#  =
+#  \underbrace{\begin{bmatrix}
+#       A & B^T \\
+#       B & 0
+#  \end{bmatrix}}_{:=K}
+#  \begin{bmatrix}
+#      \hat{\mathbf{v}} \\
+#      \hat{p}
+#  \end{bmatrix}
+#  +
+#  \begin{bmatrix}
+#      N(\hat{\mathbf{v}}, \hat{\mathbf{v}}, \hat{\varphi}) \\
+#      0
+#  \end{bmatrix}
 # ```
-# Here M is the singular block mass matrix, K is the discretized Stokes operator and N the non-linear advective term.
+# Here $M$ is the singular block mass matrix, $K$ is the discretized Stokes operator and $N$ the non-linear advection term.
 #
 #
 # ## Commented Program
@@ -84,7 +119,7 @@ using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack
 using OrdinaryDiffEq
 
 # We start off by defining our only material parameter.
-ν = 1.0/1000.0 #dynamic viscosity
+ν = 1.0/1000.0; #dynamic viscosity
 
 # Next a fine 2D rectangular grid has to be generated. We leave the cell size parametric for flexibility when
 # playing around with the code. Note that the mesh is pretty fine, leading to a high memory consumption when
@@ -215,10 +250,10 @@ end;
 # Remember that we use the same function spaces for trial and test, hence the
 # matrix has the following block form
 # ```math
-#   K &= \begin{matrix}
+#   K = \begin{bmatrix}
 #       A & B^T \\
 #       B & 0
-#   \end{matrix}
+#   \end{bmatrix}
 # ```
 # which is also called saddle point matrix. These problems are known to have
 # a non-trivial kernel, which is a reflection of the strong form as discussed
@@ -380,11 +415,12 @@ function navierstokes!(du,u,p,t)
             v = function_value(cellvalues_v, q_point, v_cell)
             for j in 1:n_basefuncs
                 φⱼ = shape_value(cellvalues_v, q_point, j)
-                # Note that in Tensors.jl the definition $grad v = ∇v$ holds.
+                # Note that in Tensors.jl the definition $\textrm{grad} v = \nabla v$ holds.
                 # With this information it can be quickly shown in index notation that
                 # ```math
                 # [(v \cdot \nabla) v]_i = v_j (\partial_j v_i) = [v (\nabla v)^T]_i
                 # ```
+                # where we should pay attentation to the transpose of the gradient.
                 #+
                 du[v_celldofs[j]] -= v ⋅ ∇v' ⋅ φⱼ * dΩ
             end
