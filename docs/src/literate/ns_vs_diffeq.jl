@@ -450,45 +450,45 @@ for (u_uc,t) in integrator
 end
 vtk_save(pvd);
 
-# Test the result for full proper development of the flow                   #src
-using Test                                                                  #src
-function compute_divergence(dh, u, cellvalues_v)                            #src
-    divv = 0.0                                                              #src
-    @inbounds for (i,cell) in enumerate(CellIterator(dh))                   #src
-        Ferrite.reinit!(cellvalues_v, cell)                                 #src
-        for q_point in 1:getnquadpoints(cellvalues_v)                       #src
-            dΩ = getdetJdV(cellvalues_v, q_point)                           #src
-                                                                            #src
-            all_celldofs = celldofs(cell)                                   #src
-            v_celldofs = all_celldofs[dof_range(dh, :v)]                    #src
-            v_cell = u[v_celldofs]                                          #src
-                                                                            #src
-            divv += function_divergence(cellvalues_v, q_point, v_cell) * dΩ #src
-        end                                                                 #src
-    end                                                                     #src
-    return divv                                                             #src
-end                                                                         #src
-@testset "INS OrdinaryDiffEq" begin                                         #src
-    u = integrator.integrator.u                                             #src
-    Δdivv = abs(compute_divergence(dh, u, cellvalues_v))                    #src
-    @test isapprox(Δdivv, 0.0, atol=1e-12)                                  #src
-                                                                            #src
-    Δv = 0.0                                                                #src
-    for cell in CellIterator(dh)                                            #src
-        Ferrite.reinit!(cellvalues_v, cell)                                 #src
-        all_celldofs = celldofs(cell)                                       #src
-        v_celldofs = all_celldofs[dof_range(dh, :v)]                        #src
-        v_cell = u[v_celldofs]                                              #src
-        coords = getcoordinates(cell)                                       #src
-        for q_point in 1:getnquadpoints(cellvalues_v)                       #src
-            dΩ = getdetJdV(cellvalues_v, q_point)                           #src
-            coords_qp = spatial_coordinate(cellvalues_v, q_point, coords)   #src
-            v = function_value(cellvalues_v, q_point, v_cell)               #src
-            Δv += norm(v - parabolic_inflow_profile(coords_qp, T))^2*dΩ     #src
-        end                                                                 #src
-    end                                                                     #src
-    @test isapprox(sqrt(Δv), 0.0, atol=1e-3)                                #src
-end;                                                                        #src
+# Test the result for full proper development of the flow                   #hide
+using Test                                                                  #hide
+function compute_divergence(dh, u, cellvalues_v)                            #hide
+    divv = 0.0                                                              #hide
+    @inbounds for (i,cell) in enumerate(CellIterator(dh))                   #hide
+        Ferrite.reinit!(cellvalues_v, cell)                                 #hide
+        for q_point in 1:getnquadpoints(cellvalues_v)                       #hide
+            dΩ = getdetJdV(cellvalues_v, q_point)                           #hide
+                                                                            #hide
+            all_celldofs = celldofs(cell)                                   #hide
+            v_celldofs = all_celldofs[dof_range(dh, :v)]                    #hide
+            v_cell = u[v_celldofs]                                          #hide
+                                                                            #hide
+            divv += function_divergence(cellvalues_v, q_point, v_cell) * dΩ #hide
+        end                                                                 #hide
+    end                                                                     #hide
+    return divv                                                             #hide
+end                                                                         #hide
+@testset "INS OrdinaryDiffEq" begin                                         #hide
+    u = integrator.integrator.u                                             #hide
+    Δdivv = abs(compute_divergence(dh, u, cellvalues_v))                    #hide
+    @test isapprox(Δdivv, 0.0, atol=1e-12)                                  #hide
+                                                                            #hide
+    Δv = 0.0                                                                #hide
+    for cell in CellIterator(dh)                                            #hide
+        Ferrite.reinit!(cellvalues_v, cell)                                 #hide
+        all_celldofs = celldofs(cell)                                       #hide
+        v_celldofs = all_celldofs[dof_range(dh, :v)]                        #hide
+        v_cell = u[v_celldofs]                                              #hide
+        coords = getcoordinates(cell)                                       #hide
+        for q_point in 1:getnquadpoints(cellvalues_v)                       #hide
+            dΩ = getdetJdV(cellvalues_v, q_point)                           #hide
+            coords_qp = spatial_coordinate(cellvalues_v, q_point, coords)   #hide
+            v = function_value(cellvalues_v, q_point, v_cell)               #hide
+            Δv += norm(v - parabolic_inflow_profile(coords_qp, T))^2*dΩ     #hide
+        end                                                                 #hide
+    end                                                                     #hide
+    @test isapprox(sqrt(Δv), 0.0, atol=1e-3)                                #hide
+end;                                                                        #hide
 
 #md # ## [Plain Program](@id ns_vs_diffeq-plain-program)
 #md #
