@@ -58,7 +58,7 @@
 #      0
 #  \end{bmatrix}
 # ```
-# where $v_{in}(t) = \text{clamp}(t, 0.0, 1.0)$. With a viscosity of $\nu = 0.001$
+# where $v_{in}(t) = \text{clamp}(t, 0.0, 1.0)$. With a dynamic viscosity of $\nu = 0.001$
 # this is enough to induce turbulence behind the cylinder which leads to vortex shedding. The top and bottom of our
 # channel have no-slip conditions, i.e. $v = [0,0]^T$, while the right boundary has the do-nothing boundary condtion
 # $\nu \partial_n v - p n = 0$ to model outflow. With these boundary conditions we can choose the zero solution as a
@@ -71,8 +71,8 @@
 # we can obtain the following weak form
 # ```math
 #  \begin{aligned}
-#    \int \partial_t v \cdot \varphi &= - \int \nu \nabla v : \nabla \varphi - \int (v \cdot \nabla) v \cdot \varphi + \int p (\nabla \cdot \varphi) + \int_{\partial \Omega_{N}} \underbrace{(\nu \partial_n v - p n )}_{=0} \cdot \varphi \\
-#                                  0 &= (\int \nabla \cdot v) \psi
+#    \int_\Omega \partial_t v \cdot \varphi &= - \int_\Omega \nu \nabla v : \nabla \varphi - \int_\Omega (v \cdot \nabla) v \cdot \varphi + \int_\Omega p (\nabla \cdot \varphi) + \int_{\partial \Omega_{N}} \underbrace{(\nu \partial_n v - p n )}_{=0} \cdot \varphi \\
+#                                  0 &= \int_\Omega (\nabla \cdot v) \psi
 #  \end{aligned}
 # ```
 # for all possible test functions from the suitable space.
