@@ -21,7 +21,7 @@
 # ```
 # where $M$ is a possibly time-dependent and not necessarily invertible mass matrix,
 # $u$ the vector of unknowns and $f$ the right hand side. For us $f$ can be interpreted as
-# the spatial discretization of all linear and non-linear operators depending on $u$ and $t$,
+# the spatial discretization of all linear and nonlinear operators depending on $u$ and $t$,
 # but not on the time derivative of $u$.
 #
 # ## Some Theory on the Incompressible Navier-Stokes Equations
@@ -101,10 +101,10 @@
 #      0
 #  \end{bmatrix}
 # ```
-# Here $M$ is the singular block mass matrix, $K$ is the discretized Stokes operator and $N$ the non-linear advection term.
-# $\hat{v}$ and $\hat{p}$ represent the time-dependent vectors of nodal values of the discretizations of $v$ and $p$ respectively,
-# while $\hat{\varphi}$ is the choice for the test function in the discretization. The hats are dropped in the implementation
-# and only stated for clarity in this section.
+# Here $M$ is the singular block mass matrix, $K$ is the discretized Stokes operator and $N$ the nonlinear advection term, which
+# is also called trilinear form. $\hat{v}$ and $\hat{p}$ represent the time-dependent vectors of nodal values of the discretizations
+# of $v$ and $p$ respectively, while $\hat{\varphi}$ is the choice for the test function in the discretization. The hats are dropped
+# in the implementation and only stated for clarity in this section.
 #
 #
 # ## Commented Implementation
@@ -213,16 +213,14 @@ update!(ch, 0.0);
 # and that the block mass matrix corresponds to the term arising from discretizing the time
 # derivatives. Hence, only the upper left block has non-zero components.
 function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, M::SparseMatrixCSC, dh::DofHandler) where {dim}
-    # We start again by allocating a buffer for the local matrix and some helpers, together with the assembler.
-    #+
+    ## Allocate a buffer for the local matrix and some helpers, together with the assembler.
     n_basefuncs_v = getnbasefunctions(cellvalues_v)
     n_basefuncs_p = getnbasefunctions(cellvalues_p)
     n_basefuncs = n_basefuncs_v + n_basefuncs_p
     v▄, p▄ = 1, 2
     Mₑ = PseudoBlockArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
 
-    # It follows the assembly loop as explained in the basic tutorials.
-    #+
+    ## It follows the assembly loop as explained in the basic tutorials.
     mass_assembler = start_assemble(M)
     @inbounds for cell in CellIterator(dh)
         fill!(Mₑ, 0)
@@ -230,8 +228,7 @@ function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p:
 
         for q_point in 1:getnquadpoints(cellvalues_v)
             dΩ = getdetJdV(cellvalues_v, q_point)
-            # Remember that we assemble a vector mass term, hence the dot product.
-            #+
+            ## Remember that we assemble a vector mass term, hence the dot product.
             for i in 1:n_basefuncs_v
                 φᵢ = shape_value(cellvalues_v, q_point, i)
                 for j in 1:n_basefuncs_v
@@ -259,19 +256,17 @@ end;
 # a non-trivial kernel, which is a reflection of the strong form as discussed
 # in the theory portion if this example.
 function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, ν, K::SparseMatrixCSC, dh::DofHandler) where {dim}
-    # We start again by allocating a buffer for the local matrix and some helpers, together with the assembler.
-    #+
+    ## Again, some buffers and helpers
     n_basefuncs_v = getnbasefunctions(cellvalues_v)
     n_basefuncs_p = getnbasefunctions(cellvalues_p)
     n_basefuncs = n_basefuncs_v + n_basefuncs_p
     v▄, p▄ = 1, 2
     Kₑ = PseudoBlockArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
 
+    ## Assembly loop
     stiffness_assembler = start_assemble(K)
-
     @inbounds for cell in CellIterator(dh)
-        # Don't forget to initialize everything
-        #+
+        ## Don't forget to initialize everything
         fill!(Kₑ, 0)
 
         Ferrite.reinit!(cellvalues_v, cell)
@@ -300,8 +295,7 @@ function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_
             end
         end
 
-        # The last step in the element loop is to assemble `Kₑ` into the system `K`.
-        #+
+        ## Assemble `Kₑ` into the Stokes matrix `K`.
         assemble!(stiffness_assembler, celldofs(cell), Kₑ)
     end
     return K
@@ -349,10 +343,10 @@ jac_sparsity = sparse(K);
 # solution vector at specific time points.
 # It should be finally noted that this **trick does not work** out of the box
 # **for constraining algebraic portion** of the DAE, i.e. if we would like to
-# put a Dirichlet BC on pressure dofs. As a workaround we have to set $\mathrm{d}_t p_i = 1$
-# instead of $\mathrm{d}_t p_i = 0$, because otherwise the equation system gets singular.
+# put a Dirichlet BC on pressure dofs. As a workaround we have to set $f_i = 1$
+# instead of $f_i = 0$, because otherwise the equation system gets singular.
 # This is obvious when we remember that our mass matrix is zero for these
-# dofs, such that we obtain the equation $0 \cdot \mathrm{d}_t p_i = 1*p_i$, which
+# dofs, such that we obtain the equation $0 \cdot \mathrm{d}_t p_i = 1 \cdot p_i$, which
 # now has a unique solution.
 struct RHSparams
     K::SparseMatrixCSC
@@ -363,7 +357,7 @@ end
 p = RHSparams(K, ch, dh, cellvalues_v)
 
 function navierstokes!(du,u_uc,p,t)
-    # Unpack the struct to save some allocations
+    # Unpack the struct to save some allocations.
     #+
     @unpack K,ch,dh,cellvalues_v = p
 
@@ -384,11 +378,10 @@ function navierstokes!(du,u_uc,p,t)
     ## Linear contribution (Stokes operator)
     du .= K * u
 
-    ## Nonlinear contribution
+    ## nonlinear contribution
     n_basefuncs = getnbasefunctions(cellvalues_v)
     for cell in CellIterator(dh)
         Ferrite.reinit!(cellvalues_v, cell)
-        ## Trilinear form evaluation
         all_celldofs = celldofs(cell)
         v_celldofs = all_celldofs[dof_range(dh, :v)]
         v_cell = u[v_celldofs]
@@ -410,7 +403,7 @@ function navierstokes!(du,u_uc,p,t)
         end
     end
 
-    # Fpr now we have to ingore the evolution of the Dirichlet BCs.
+    # For now we have to ingore the evolution of the Dirichlet BCs.
     # The DBC dofs in the solution vector will be corrected in a post-processing step.
     #+
     apply_zero!(du, ch)
