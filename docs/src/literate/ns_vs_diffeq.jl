@@ -1,4 +1,4 @@
-# # Incompressible Navier-Stokes Equations via [DifferentialEquations.jl]()
+# # Incompressible Navier-Stokes Equations via DifferentialEquations.jl
 #
 # ![](https://user-images.githubusercontent.com/9196588/134514213-76d91d34-19ab-47c2-957e-16bb0c8669e1.gif)
 #
