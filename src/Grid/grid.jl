@@ -283,6 +283,14 @@ function full_neighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, vertexidx::Ver
     end
 end
 
+function full_neighborhood(grid::Grid{3,C,T,ExclusiveTopology}, edgeidx::EdgeIndex, include_self=false) where {C,T}
+    if include_self 
+        return [grid.topology.edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info; edgeidx]
+    else
+        return grid.topology.edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info
+    end
+end
+
 @inline getdim(::AbstractGrid{dim}) where {dim} = dim
 @inline getcells(grid::AbstractGrid) = grid.cells
 @inline getcells(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.cells[v]
