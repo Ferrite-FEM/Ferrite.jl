@@ -6,7 +6,7 @@
 # In this example we focus on a simple but visually appealing problem from
 # fluid dynamics, namely vortex shedding. This problem is also known as
 # [von-Karman vortex streets](https://en.wikipedia.org/wiki/K%C3%A1rm%C3%A1n_vortex_street). Within this example, we show how to utilize [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl)
-# in tandem with Ferrite.jl. To keep things simple we use a naive approach
+# in tandem with Ferrite.jl to solve this space-time problem. To keep things simple we use a naive approach
 # to discretize the system.
 #
 # ## Remarks on DifferentialEquations.jl
@@ -17,26 +17,24 @@
 # discretization technique - in our case FEM. The mass matrix form of ODEs and DAEs
 # is given as:
 # ```math
-#   M(t) \frac{du}{dt} = f(u,t)
+#   M(t) \mathrm{d}_t u = f(u,t)
 # ```
-# where $M$ is a possibly time-dependent mass matrix, $u$ our vector of unkowns
-# and $f$ the right hand side. For us $f$ can be seen as the spatial discretization
-# of all linear and non-linear operators depending on $u$ and $t$, but not on the time
-# derivative of $u$.
+# where $M$ is a possibly time-dependent and not necessarily invertible mass matrix,
+# $u$ the vector of unknowns and $f$ the right hand side. For us $f$ can be interpreted as
+# the spatial discretization of all linear and non-linear operators depending on $u$ and $t$,
+# but not on the time derivative of $u$.
 #
 # ## Some Theory on the Incompressible Navier-Stokes Equations
 #
 # ### Problem Description in Strong Form
 #
 # The incompressible Navier-Stokes equations can be stated as the system
-#
 # ```math
 #  \begin{aligned}
 #    \partial_t v &= \underbrace{\nu \Delta v}_{\text{viscosity}} - \underbrace{(v \cdot \nabla) v}_{\text{advection}} - \underbrace{\nabla p}_{\text{pressure}} \\
 #               0 &= \underbrace{\nabla \cdot v}_{\text{incompressibility}}
 #  \end{aligned}
 # ```
-#
 # where $v$ is the unknown velocity field, $p$ the unknown pressure field,
 # $\nu$ the dynamic viscosity and $\Delta$ the Laplacian. In the derivation we assumed
 # a constant density of 1 for the fluid and negligible coupling between the velocity components.
@@ -44,7 +42,6 @@
 # operator, so for any solution $p$ the function $p + c$ is also an admissible solution, if
 # we do not impose Dirichlet conditions on the pressure. To resolve this we introduce the
 # implicit constraint that $ \int_\Omega p = 0 $.
-#
 #
 # Our setup is derived from [Turek's DFG benchmark](http://www.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/flow/dfg_benchmark1_re20.html).
 # We model a channel with size $0.41 \times 2.2$ and a hole of radius $0.05$ centered at $(0.2, 0.2)$.
@@ -54,7 +51,7 @@
 #  v(x,y,t)
 #  =
 #  \begin{bmatrix}
-#      4 v_{in}(t) \cdot y \cdot (0.41-y)/0.41^2 \\
+#      4 v_{in}(t) y (0.41-y)/0.41^2 \\
 #      0
 #  \end{bmatrix}
 # ```
@@ -87,7 +84,7 @@
 #  \end{bmatrix}}_{:=M}
 #  \begin{bmatrix}
 #      \mathrm{d}_t\hat{v} \\
-#      \mathrm{d}\hat{p}
+#      \mathrm{d}_t\hat{p}
 #  \end{bmatrix}
 #  =
 #  \underbrace{\begin{bmatrix}
@@ -105,14 +102,14 @@
 #  \end{bmatrix}
 # ```
 # Here $M$ is the singular block mass matrix, $K$ is the discretized Stokes operator and $N$ the non-linear advection term.
-# $\hat{v}$ and $\hat{p}$ represent the nodal values of the discretizations of $v$ and $p$ respectively, while $\hat{\varphi}$
-# is the choice for the test function in the discretization. The hats are dropped in the implementation and only for clarity
-# in this section stated.
+# $\hat{v}$ and $\hat{p}$ represent the time-dependent vectors of nodal values of the discretizations of $v$ and $p$ respectively,
+# while $\hat{\varphi}$ is the choice for the test function in the discretization. The hats are dropped in the implementation
+# and only stated for clarity in this section.
 #
 #
-# ## Commented Program
+# ## Commented Implementation
 #
-# Now we solve the problem in Ferrite with [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl). What follows is a program spliced with comments.
+# Now we solve the problem with Ferrite and [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl). What follows is a program spliced with comments.
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 #
 # First we load Ferrite, and some other packages we need
@@ -157,7 +154,7 @@ end;
 # We test against full development of the flow - so regenerate the grid                              #src
 grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((0.55, 0.41)));   #hide
 
-# ### Function space
+# ### Function Space
 # To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
 # We have to utilize the same quadrature rule because in the weak form the
 # linear pressure term is tested against a quadratic function.
@@ -174,7 +171,7 @@ push!(dh, :v, dim, ip_v)
 push!(dh, :p, 1, ip_p)
 close!(dh);
 
-# ### Boundary conditions
+# ### Boundary Conditions
 # As in the DFG benchmark we apply no-slip conditions to the top, bottom and
 # cylinder boundary. The no-slip condition states that the velocity of the
 # fluid on this portion of the boundary is fixed to be zero.
@@ -212,7 +209,7 @@ update!(ch, 0.0);
 # ### Linear System Assembly
 # Next we describe how the block mass matrix and the Stokes matrix are assembled.
 #
-# For the block mass matrix we remember that only the first equation had a time derivative
+# For the block mass matrix $M$ we remember that only the first equation had a time derivative
 # and that the block mass matrix corresponds to the term arising from discretizing the time
 # derivatives. Hence, only the upper left block has non-zero components.
 function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, M::SparseMatrixCSC, dh::DofHandler) where {dim}
@@ -262,7 +259,7 @@ end;
 # a non-trivial kernel, which is a reflection of the strong form as discussed
 # in the theory portion if this example.
 function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, ν, K::SparseMatrixCSC, dh::DofHandler) where {dim}
-    # Again, we start again by allocating a buffer for the local matrix and some helpers, together with the assembler.
+    # We start again by allocating a buffer for the local matrix and some helpers, together with the assembler.
     #+
     n_basefuncs_v = getnbasefunctions(cellvalues_v)
     n_basefuncs_p = getnbasefunctions(cellvalues_p)
@@ -273,6 +270,8 @@ function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_
     stiffness_assembler = start_assemble(K)
 
     @inbounds for cell in CellIterator(dh)
+        # Don't forget to initialize everything
+        #+
         fill!(Kₑ, 0)
 
         Ferrite.reinit!(cellvalues_v, cell)
@@ -280,7 +279,7 @@ function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_
 
         for q_point in 1:getnquadpoints(cellvalues_v)
             dΩ = getdetJdV(cellvalues_v, q_point)
-            # Viscosity term $A$
+            # Assemble local viscosity block of $A$
             #+
             for i in 1:n_basefuncs_v
                 ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
@@ -289,7 +288,7 @@ function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_
                     Kₑ[BlockIndex((v▄, v▄), (i, j))] -= ν * ∇φᵢ ⊡ ∇φⱼ * dΩ
                 end
             end
-            # Pressure + Incompressibility term $B$ - note the symmetry.
+            # Assemble local pressure and incompressibility blocks of $B^T$ and $B$.
             #+
             for j in 1:n_basefuncs_p
                 ψ = shape_value(cellvalues_p, q_point, j)
@@ -301,8 +300,7 @@ function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_
             end
         end
 
-        # The last step in the element loop is to assemble `Kₑ` and `fe`
-        # into the global `K` and `f` with `assemble!`.
+        # The last step in the element loop is to assemble `Kₑ` into the system `K`.
         #+
         assemble!(stiffness_assembler, celldofs(cell), Kₑ)
     end
@@ -324,7 +322,7 @@ K = assemble_stokes_matrix(cellvalues_v, cellvalues_p, ν, K, dh);
 
 # These are our initial conditions. We start from the zero solution, because it
 # is trivially admissible if the Dirichlet conditions are zero everywhere on the
-# Dirichlet boundary for t=0. Note that the time stepper is also doing fine if the
+# Dirichlet boundary for $t=0$. Note that the time stepper is also doing fine if the
 # Dirichlet condition is non-zero and not too pathological.
 u₀ = zeros(ndofs(dh))
 apply!(u₀, ch);
@@ -349,12 +347,13 @@ jac_sparsity = sparse(K);
 # correct solution for all dofs which are not Dirichlet constrained. These
 # dofs are then corrected in a post-processing step, when evaluating the
 # solution vector at specific time points.
-# It should be finally noted that this *trick does not work* out of the box
-# *for constraining algebraic portion* of the DAE, i.e. if we would like to
-# put a Dirichlet BC on pressure dofs. Here we have to set "$d_t p_i = p_i$" instead
-# of "$d_t p_i = 0$", because otherwise the equation system gets singular. This
-# is obvious when we also take into account that our mass matrix is zero for these
-# dofs, such that we obtain the equation $0 \cdot d_t p_i = p_i$.
+# It should be finally noted that this **trick does not work** out of the box
+# **for constraining algebraic portion** of the DAE, i.e. if we would like to
+# put a Dirichlet BC on pressure dofs. As a workaround we have to set $\mathrm{d}_t p_i = 1$
+# instead of $\mathrm{d}_t p_i = 0$, because otherwise the equation system gets singular.
+# This is obvious when we remember that our mass matrix is zero for these
+# dofs, such that we obtain the equation $0 \cdot \mathrm{d}_t p_i = 1*p_i$, which
+# now has a unique solution.
 struct RHSparams
     K::SparseMatrixCSC
     ch::ConstraintHandler
@@ -411,8 +410,8 @@ function navierstokes!(du,u_uc,p,t)
         end
     end
 
-    # Finally, we have to ingore the evolution of the Dirichlet BCs for now.
-    # The solution vector will be corrected in a post-processing step.
+    # Fpr now we have to ingore the evolution of the Dirichlet BCs.
+    # The DBC dofs in the solution vector will be corrected in a post-processing step.
     #+
     apply_zero!(du, ch)
 end;
