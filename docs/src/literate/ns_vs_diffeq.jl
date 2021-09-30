@@ -14,7 +14,7 @@
 # Many "time step solvers" of [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) assume that that the
 # problem is provided in mass matrix form. The incompressible Navier-Stokes
 # equations as stated above yield a DAE in this form after applying a spatial
-# discretization technique - in our case FEM. The mass matrix form a ODEs and DAEs
+# discretization technique - in our case FEM. The mass matrix form of ODEs and DAEs
 # is given as:
 # ```math
 #   M(t) \frac{du}{dt} = f(u,t)
@@ -362,6 +362,7 @@ struct RHSparams
     cellvalues_v::CellVectorValues
 end
 p = RHSparams(K, ch, dh, cellvalues_v)
+
 function navierstokes!(du,u_uc,p,t)
     # Unpack the struct to save some allocations
     #+
@@ -432,7 +433,6 @@ problem = ODEProblem(rhs, u₀, (0.0,T), p);
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
-#timestepper = ImplicitEuler(linsolve=FerriteLinSolve(ch))
 timestepper = ImplicitEuler()
 integrator = init(
     problem, timestepper, initializealg=NoInit(), dt=Δt₀,
