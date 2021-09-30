@@ -156,12 +156,12 @@ end
     #Test function add
     addfaceset!(grid, "left_face", (x)-> x[1] ≈ 0.0)
     addedgeset!(grid, "left_lower_edge", (x)-> x[1] ≈ 0.0 && x[3] ≈ 0.0)
-    addvertexset!(grid, "left_corner", (x)-> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
+    addvertexset!(grid, "left_vertex", (x)-> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
 
     @test 1 in Ferrite.getnodeset(grid, "node_set")
     @test FaceIndex(1,5) in getfaceset(grid, "left_face")
     @test EdgeIndex(1,4) in getedgeset(grid, "left_lower_edge")
-    @test VertexIndex(1,1) in getvertexset(grid, "left_corner")
+    @test VertexIndex(1,1) in getvertexset(grid, "left_vertex")
 
 end
 
@@ -177,15 +177,15 @@ end
 #                            (2)
     quadgrid = generate_grid(Quadrilateral,(2,3);build_topology=true)
     topology = quadgrid.topology
-    #test corner neighbors maps cellid and local corner id to neighbor id and neighbor local corner id
-    @test topology.corner_neighbor[1,3] == Ferrite.EntityNeighborhood(VertexIndex(4,1))
-    @test topology.corner_neighbor[2,4] == Ferrite.EntityNeighborhood(VertexIndex(3,2))
-    @test topology.corner_neighbor[3,3] == Ferrite.EntityNeighborhood(VertexIndex(6,1))
-    @test topology.corner_neighbor[3,2] == Ferrite.EntityNeighborhood(VertexIndex(2,4))
-    @test topology.corner_neighbor[4,1] == Ferrite.EntityNeighborhood(VertexIndex(1,3))
-    @test topology.corner_neighbor[4,4] == Ferrite.EntityNeighborhood(VertexIndex(5,2))
-    @test topology.corner_neighbor[5,2] == Ferrite.EntityNeighborhood(VertexIndex(4,4))
-    @test topology.corner_neighbor[6,1] == Ferrite.EntityNeighborhood(VertexIndex(3,3))
+    #test vertex neighbors maps cellid and local vertex id to neighbor id and neighbor local vertex id
+    @test topology.vertex_neighbor[1,3] == Ferrite.EntityNeighborhood(VertexIndex(4,1))
+    @test topology.vertex_neighbor[2,4] == Ferrite.EntityNeighborhood(VertexIndex(3,2))
+    @test topology.vertex_neighbor[3,3] == Ferrite.EntityNeighborhood(VertexIndex(6,1))
+    @test topology.vertex_neighbor[3,2] == Ferrite.EntityNeighborhood(VertexIndex(2,4))
+    @test topology.vertex_neighbor[4,1] == Ferrite.EntityNeighborhood(VertexIndex(1,3))
+    @test topology.vertex_neighbor[4,4] == Ferrite.EntityNeighborhood(VertexIndex(5,2))
+    @test topology.vertex_neighbor[5,2] == Ferrite.EntityNeighborhood(VertexIndex(4,4))
+    @test topology.vertex_neighbor[6,1] == Ferrite.EntityNeighborhood(VertexIndex(3,3))
     #test face neighbor maps cellid and local face id to neighbor id and neighbor local face id 
     @test topology.face_neighbor[1,2] == Ferrite.EntityNeighborhood(FaceIndex(2,4))
     @test topology.face_neighbor[1,3] == Ferrite.EntityNeighborhood(FaceIndex(3,1))
@@ -225,7 +225,7 @@ end
     @test topology.edge_neighbor[2,12] == Ferrite.EntityNeighborhood(EdgeIndex(3,10))
     @test topology.edge_neighbor[3,10] == Ferrite.EntityNeighborhood(EdgeIndex(2,12))
     @test topology.edge_neighbor[4,9] == Ferrite.EntityNeighborhood(EdgeIndex(1,11))
-    @test all(iszero,topology.corner_neighbor)
+    @test all(iszero,topology.vertex_neighbor)
     @test topology.face_neighbor[1,3] == Ferrite.EntityNeighborhood(FaceIndex(2,5))
     @test topology.face_neighbor[1,4] == Ferrite.EntityNeighborhood(FaceIndex(3,2))
     @test topology.face_neighbor[2,4] == Ferrite.EntityNeighborhood(FaceIndex(4,2))
@@ -244,10 +244,10 @@ end
 #                   |  \  |  \  |
 #                   |  1 \| 3  \|
 #                   +-----+-----+
-# test for multiple corner_neighbors as in e.g. ele 3, local corner 3 (middle node)
+# test for multiple vertex_neighbors as in e.g. ele 3, local vertex 3 (middle node)
     trigrid = generate_grid(Triangle,(2,2);build_topology=true)
     topology = trigrid.topology
-    @test topology.corner_neighbor[3,3] == Ferrite.EntityNeighborhood([VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
+    @test topology.vertex_neighbor[3,3] == Ferrite.EntityNeighborhood([VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
 
 # test mixed grid
     cells = [
@@ -257,7 +257,7 @@ end
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 10)]
     grid = Grid(cells, nodes, topology=Ferrite.ExclusiveTopology(cells))
     topology = grid.topology
-    @test all(iszero,topology.corner_neighbor)
+    @test all(iszero,topology.vertex_neighbor)
     @test topology.face_neighbor[2,1] == Ferrite.EntityNeighborhood(EdgeIndex(1,2))
     @test topology.edge_neighbor[1,2] == Ferrite.EntityNeighborhood(FaceIndex(2,1))
 #                           
