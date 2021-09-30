@@ -451,6 +451,7 @@ end
 vtk_save(pvd);
 
 # Test the result for full proper development of the flow                   #src
+using Test                                                                  #src
 function compute_divergence(dh, u, cellvalues_v)                            #src
     divv = 0.0                                                              #src
     @inbounds for (i,cell) in enumerate(CellIterator(dh))                   #src
