@@ -178,33 +178,33 @@ end
     quadgrid = generate_grid(Quadrilateral,(2,3);build_topology=true)
     topology = quadgrid.topology
     #test corner neighbors maps cellid and local corner id to neighbor id and neighbor local corner id
-    @test topology.corner_neighbor[1,3] == Ferrite.Neighbor(VertexIndex(4,1))
-    @test topology.corner_neighbor[2,4] == Ferrite.Neighbor(VertexIndex(3,2))
-    @test topology.corner_neighbor[3,3] == Ferrite.Neighbor(VertexIndex(6,1))
-    @test topology.corner_neighbor[3,2] == Ferrite.Neighbor(VertexIndex(2,4))
-    @test topology.corner_neighbor[4,1] == Ferrite.Neighbor(VertexIndex(1,3))
-    @test topology.corner_neighbor[4,4] == Ferrite.Neighbor(VertexIndex(5,2))
-    @test topology.corner_neighbor[5,2] == Ferrite.Neighbor(VertexIndex(4,4))
-    @test topology.corner_neighbor[6,1] == Ferrite.Neighbor(VertexIndex(3,3))
+    @test topology.corner_neighbor[1,3] == Ferrite.EntityNeighborhood(VertexIndex(4,1))
+    @test topology.corner_neighbor[2,4] == Ferrite.EntityNeighborhood(VertexIndex(3,2))
+    @test topology.corner_neighbor[3,3] == Ferrite.EntityNeighborhood(VertexIndex(6,1))
+    @test topology.corner_neighbor[3,2] == Ferrite.EntityNeighborhood(VertexIndex(2,4))
+    @test topology.corner_neighbor[4,1] == Ferrite.EntityNeighborhood(VertexIndex(1,3))
+    @test topology.corner_neighbor[4,4] == Ferrite.EntityNeighborhood(VertexIndex(5,2))
+    @test topology.corner_neighbor[5,2] == Ferrite.EntityNeighborhood(VertexIndex(4,4))
+    @test topology.corner_neighbor[6,1] == Ferrite.EntityNeighborhood(VertexIndex(3,3))
     #test face neighbor maps cellid and local face id to neighbor id and neighbor local face id 
-    @test topology.face_neighbor[1,2] == Ferrite.Neighbor(FaceIndex(2,4))
-    @test topology.face_neighbor[1,3] == Ferrite.Neighbor(FaceIndex(3,1))
-    @test topology.face_neighbor[2,3] == Ferrite.Neighbor(FaceIndex(4,1))
-    @test topology.face_neighbor[2,4] == Ferrite.Neighbor(FaceIndex(1,2))
-    @test topology.face_neighbor[3,1] == Ferrite.Neighbor(FaceIndex(1,3))
-    @test topology.face_neighbor[3,2] == Ferrite.Neighbor(FaceIndex(4,4))
-    @test topology.face_neighbor[3,3] == Ferrite.Neighbor(FaceIndex(5,1))
-    @test topology.face_neighbor[4,1] == Ferrite.Neighbor(FaceIndex(2,3))
-    @test topology.face_neighbor[4,3] == Ferrite.Neighbor(FaceIndex(6,1))
-    @test topology.face_neighbor[4,4] == Ferrite.Neighbor(FaceIndex(3,2))
-    @test topology.face_neighbor[5,1] == Ferrite.Neighbor(FaceIndex(3,3))
-    @test topology.face_neighbor[5,2] == Ferrite.Neighbor(FaceIndex(6,4))
-    @test topology.face_neighbor[5,3] == Ferrite.Neighbor(Ferrite.BoundaryIndex[])
-    @test topology.face_neighbor[5,4] == Ferrite.Neighbor(Ferrite.BoundaryIndex[])
-    @test topology.face_neighbor[6,1] == Ferrite.Neighbor(FaceIndex(4,3))
-    @test topology.face_neighbor[6,2] == Ferrite.Neighbor(Ferrite.BoundaryIndex[])
-    @test topology.face_neighbor[6,3] == Ferrite.Neighbor(Ferrite.BoundaryIndex[])
-    @test topology.face_neighbor[6,4] == Ferrite.Neighbor(FaceIndex(5,2))
+    @test topology.face_neighbor[1,2] == Ferrite.EntityNeighborhood(FaceIndex(2,4))
+    @test topology.face_neighbor[1,3] == Ferrite.EntityNeighborhood(FaceIndex(3,1))
+    @test topology.face_neighbor[2,3] == Ferrite.EntityNeighborhood(FaceIndex(4,1))
+    @test topology.face_neighbor[2,4] == Ferrite.EntityNeighborhood(FaceIndex(1,2))
+    @test topology.face_neighbor[3,1] == Ferrite.EntityNeighborhood(FaceIndex(1,3))
+    @test topology.face_neighbor[3,2] == Ferrite.EntityNeighborhood(FaceIndex(4,4))
+    @test topology.face_neighbor[3,3] == Ferrite.EntityNeighborhood(FaceIndex(5,1))
+    @test topology.face_neighbor[4,1] == Ferrite.EntityNeighborhood(FaceIndex(2,3))
+    @test topology.face_neighbor[4,3] == Ferrite.EntityNeighborhood(FaceIndex(6,1))
+    @test topology.face_neighbor[4,4] == Ferrite.EntityNeighborhood(FaceIndex(3,2))
+    @test topology.face_neighbor[5,1] == Ferrite.EntityNeighborhood(FaceIndex(3,3))
+    @test topology.face_neighbor[5,2] == Ferrite.EntityNeighborhood(FaceIndex(6,4))
+    @test topology.face_neighbor[5,3] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
+    @test topology.face_neighbor[5,4] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
+    @test topology.face_neighbor[6,1] == Ferrite.EntityNeighborhood(FaceIndex(4,3))
+    @test topology.face_neighbor[6,2] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
+    @test topology.face_neighbor[6,3] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
+    @test topology.face_neighbor[6,4] == Ferrite.EntityNeighborhood(FaceIndex(5,2))
 #                         (8)
 #                (7) +-----+-----+(9)
 #                    |  3  |  4  |
@@ -221,19 +221,19 @@ end
 #                        (11)
     hexgrid = generate_grid(Hexahedron,(2,2,1);build_topology=true) 
     topology = hexgrid.topology
-    @test topology.edge_neighbor[1,11] == Ferrite.Neighbor(EdgeIndex(4,9))
-    @test topology.edge_neighbor[2,12] == Ferrite.Neighbor(EdgeIndex(3,10))
-    @test topology.edge_neighbor[3,10] == Ferrite.Neighbor(EdgeIndex(2,12))
-    @test topology.edge_neighbor[4,9] == Ferrite.Neighbor(EdgeIndex(1,11))
+    @test topology.edge_neighbor[1,11] == Ferrite.EntityNeighborhood(EdgeIndex(4,9))
+    @test topology.edge_neighbor[2,12] == Ferrite.EntityNeighborhood(EdgeIndex(3,10))
+    @test topology.edge_neighbor[3,10] == Ferrite.EntityNeighborhood(EdgeIndex(2,12))
+    @test topology.edge_neighbor[4,9] == Ferrite.EntityNeighborhood(EdgeIndex(1,11))
     @test all(iszero,topology.corner_neighbor)
-    @test topology.face_neighbor[1,3] == Ferrite.Neighbor(FaceIndex(2,5))
-    @test topology.face_neighbor[1,4] == Ferrite.Neighbor(FaceIndex(3,2))
-    @test topology.face_neighbor[2,4] == Ferrite.Neighbor(FaceIndex(4,2))
-    @test topology.face_neighbor[2,5] == Ferrite.Neighbor(FaceIndex(1,3))
-    @test topology.face_neighbor[3,2] == Ferrite.Neighbor(FaceIndex(1,4))
-    @test topology.face_neighbor[3,3] == Ferrite.Neighbor(FaceIndex(4,5))
-    @test topology.face_neighbor[4,2] == Ferrite.Neighbor(FaceIndex(2,4))
-    @test topology.face_neighbor[4,5] == Ferrite.Neighbor(FaceIndex(3,3))
+    @test topology.face_neighbor[1,3] == Ferrite.EntityNeighborhood(FaceIndex(2,5))
+    @test topology.face_neighbor[1,4] == Ferrite.EntityNeighborhood(FaceIndex(3,2))
+    @test topology.face_neighbor[2,4] == Ferrite.EntityNeighborhood(FaceIndex(4,2))
+    @test topology.face_neighbor[2,5] == Ferrite.EntityNeighborhood(FaceIndex(1,3))
+    @test topology.face_neighbor[3,2] == Ferrite.EntityNeighborhood(FaceIndex(1,4))
+    @test topology.face_neighbor[3,3] == Ferrite.EntityNeighborhood(FaceIndex(4,5))
+    @test topology.face_neighbor[4,2] == Ferrite.EntityNeighborhood(FaceIndex(2,4))
+    @test topology.face_neighbor[4,5] == Ferrite.EntityNeighborhood(FaceIndex(3,3))
 
 #                   +-----+-----+
 #                   |\  6 |\  8 |
@@ -247,7 +247,7 @@ end
 # test for multiple corner_neighbors as in e.g. ele 3, local corner 3 (middle node)
     trigrid = generate_grid(Triangle,(2,2);build_topology=true)
     topology = trigrid.topology
-    @test topology.corner_neighbor[3,3] == Ferrite.Neighbor([VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
+    @test topology.corner_neighbor[3,3] == Ferrite.EntityNeighborhood([VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
 
 # test mixed grid
     cells = [
@@ -255,11 +255,11 @@ end
         Quadrilateral((3, 2, 9, 10)),
         ]
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 10)]
-    grid = Grid(cells, nodes, topology=Ferrite.GridTopology(cells))
+    grid = Grid(cells, nodes, topology=Ferrite.ExclusiveTopology(cells))
     topology = grid.topology
     @test all(iszero,topology.corner_neighbor)
-    @test topology.face_neighbor[2,1] == Ferrite.Neighbor(EdgeIndex(1,2))
-    @test topology.edge_neighbor[1,2] == Ferrite.Neighbor(FaceIndex(2,1))
+    @test topology.face_neighbor[2,1] == Ferrite.EntityNeighborhood(EdgeIndex(1,2))
+    @test topology.edge_neighbor[1,2] == Ferrite.EntityNeighborhood(FaceIndex(2,1))
 #                           
 #                   +-----+-----+-----+
 #                   |  7  |  8  |  9  |

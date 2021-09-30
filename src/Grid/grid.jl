@@ -68,26 +68,28 @@ struct VertexIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
-struct Neighbor{T<:BoundaryIndex}
+struct EntityNeighborhood{T<:Union{BoundaryIndex,CellIndex}}
     neighbor_info::Vector{T}
 end
 
-Neighbor(info::T) where T <: BoundaryIndex = Neighbor([info])
-Base.zero(::Type{Neighbor}) = Neighbor(BoundaryIndex[])
-Base.length(n::Neighbor) = length(n.neighbor_info)
-Base.getindex(n::Neighbor,i) = getindex(n.neighbor_info,i)
-Base.firstindex(n::Neighbor) = 1
-Base.lastindex(n::Neighbor) = length(n.neighbor_info)
-Base.:(==)(n1::Neighbor, n2::Neighbor) = n1.neighbor_info == n2.neighbor_info
+EntityNeighborhood(info::T) where T <: BoundaryIndex = EntityNeighborhood([info])
+Base.zero(::Type{EntityNeighborhood{T}}) where T = EntityNeighborhood(T[])
+Base.zero(::Type{EntityNeighborhood}) = EntityNeighborhood(BoundaryIndex[])
+Base.length(n::EntityNeighborhood) = length(n.neighbor_info)
+Base.getindex(n::EntityNeighborhood,i) = getindex(n.neighbor_info,i)
+Base.firstindex(n::EntityNeighborhood) = 1
+Base.lastindex(n::EntityNeighborhood) = length(n.neighbor_info)
+Base.:(==)(n1::EntityNeighborhood, n2::EntityNeighborhood) = n1.neighbor_info == n2.neighbor_info
+Base.iterate(n::EntityNeighborhood, state=1) = iterate(n.neighbor_info,state)
 
-function Base.:+(n1::Neighbor, n2::Neighbor)
+function Base.:+(n1::EntityNeighborhood, n2::EntityNeighborhood)
     neighbor_info = [n1.neighbor_info; n2.neighbor_info]
-    return Neighbor(neighbor_info)
+    return EntityNeighborhood(neighbor_info)
 end
 
-function Base.show(io::IO, ::MIME"text/plain", n::Neighbor)
+function Base.show(io::IO, ::MIME"text/plain", n::EntityNeighborhood)
     if length(n) == 0
-        println(io, "No Neighbor")
+        println(io, "No EntityNeighborhood")
     elseif length(n) == 1
         println(io, "$(n.neighbor_info[1])")
     else
@@ -101,60 +103,90 @@ edge_npoints(::Cell{3,4,1}) = 2 #not sure how to handle embedded cells e.g. Quad
 face_npoints(::Cell{3,N,6}) where N = 4
 face_npoints(::Cell{3,N,4}) where N = 3
 edge_npoints(::Cell{3,N,M}) where {N,M} = 2
+nvertices(::Cell{1,N,2}) where N = 2
+nvertices(::Cell{2,N,2}) where N = 2
+nvertices(::Cell{3,N,0}) where N = 2
+nvertices(::Cell{2,N,3}) where N = 3
+nvertices(::Cell{2,N,4}) where N = 4
+nvertices(::Cell{3,N,1}) where N = 4
+nvertices(::Cell{3,N,4}) where N = 4
+nvertices(::Cell{3,N,6}) where N = 8
 
 getdim(::Cell{dim,N,M}) where {dim,N,M} = dim
 
 abstract type AbstractTopology end
 
-struct ExclusiveTopology <: AbstractTopology
-    face_neighbor::SparseMatrixCSC{Neighbor,Int}
-    corner_neighbor::SparseMatrixCSC{Neighbor,Int}
-    edge_neighbor::SparseMatrixCSC{Neighbor,Int}
+struct ExclusiveTopology{T} <: AbstractTopology
+    cell_to_node::Vector{T}
+    node_to_cell::Vector{Vector{Int}}
+    cell_neighbor::Vector{EntityNeighborhood{CellIndex}}
+    face_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
+    corner_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
+    edge_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
 end
 
 function ExclusiveTopology()
-    face_neighbor = spzeros(Neighbor,0,0)
-    corner_neighbor = spzeros(Neighbor,0,0)
-    edge_neighbor = spzeros(Neighbor,0,0)
-    return ExclusiveTopology(face_neighbor,corner_neighbor,edge_neighbor)
+    cell_to_node = zeros(Int,0)
+    node_to_cell = [[0]]
+    cell_neighbor = zeros(EntityNeighborhood{CellIndex},0)
+    face_neighbor = spzeros(EntityNeighborhood,0,0)
+    corner_neighbor = spzeros(EntityNeighborhood,0,0)
+    edge_neighbor = spzeros(EntityNeighborhood,0,0)
+    return ExclusiveTopology(cell_to_node,node_to_cell,cell_neighbor,face_neighbor,corner_neighbor,edge_neighbor)
 end
 
 function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
-    I_face = Int[]; J_face = Int[]; V_face = Neighbor[]
-    I_edge = Int[]; J_edge = Int[]; V_edge = Neighbor[]
-    I_corner = Int[]; J_corner = Int[]; V_corner = Neighbor[]
-    cell_node_table = getproperty.(cells,:nodes)
-    for (cellid,cell) in enumerate(cells)
-        neighbors = findall.(x->x ∈ cell.nodes,cell_node_table) 
-        for (neighborid,neighbor) in enumerate(neighbors)
-            neighbor_cell = cells[neighborid]
-            if length(neighbor) == 0
-                #not a neighbor
-                continue
-            elseif length(neighbor) == 1
-                #corner neighbor
-                _corner_neighbor!(V_corner,I_corner,J_corner,cellid,cell,neighbor,neighborid,neighbor_cell)
-            elseif getdim(cell) > 2 && length(neighbor) == edge_npoints(cell) 
-                #edge neighbor
-                _edge_neighbor!(V_edge,I_edge,J_edge,cellid,cell,neighbor,neighborid,neighbor_cell)
-            elseif getdim(cell) > 1 && length(neighbor) == face_npoints(cell)
-                #face neighbor
-                _face_neighbor!(V_face,I_face,J_face,cellid,cell,neighbor,neighborid,neighbor_cell)
+    cell_node_table = getproperty.(cells,:nodes) #needs generic interface for <: AbstractCell
+    node_cell_table = Vector{Vector{Int}}(undef, maximum(maximum(cell_node_table))) #dirty, assuming id from 1 to nnodes
+    
+    for (cellid, cell_nodes) in enumerate(cell_node_table)
+       for node in cell_nodes
+            if isassigned(node_cell_table, node)
+                push!(node_cell_table[node], cellid)
             else
-                continue
-            end 
-        end
+                node_cell_table[node] = [cellid]
+            end
+        end 
     end
+
+    I_face = Int[]; J_face = Int[]; V_face = EntityNeighborhood[]
+    I_edge = Int[]; J_edge = Int[]; V_edge = EntityNeighborhood[]
+    I_corner = Int[]; J_corner = Int[]; V_corner = EntityNeighborhood[]   
+    cell_neighbor_table = Vector{EntityNeighborhood{CellIndex}}(undef, length(cells)) 
+
+    for (cellid, cell) in enumerate(cells)    
+        #cell neighborhood
+        cell_neighbors = getindex.((node_cell_table,), cell_node_table[cellid]) # cell -> vertex -> cell
+        cell_neighbors = unique(reduce(vcat,cell_neighbors)) # non unique list initially 
+        filter!(x->x!=cellid, cell_neighbors) # get rid of self neighborhood
+        cell_neighbor_table[cellid] = EntityNeighborhood(CellIndex.(cell_neighbors)) 
+
+        for neighbor in cell_neighbors
+            neighbor_local_ids = findall(x->x in cell.nodes, cells[neighbor].nodes)
+            cell_local_ids = findall(x->x in cells[neighbor].nodes, cell.nodes)
+            # corner neighbor
+            if length(cell_local_ids) == 1
+                _corner_neighbor!(V_corner, I_corner, J_corner, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
+            # face neighbor
+            elseif length(cell_local_ids) == face_npoints(cell)
+                _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor]) 
+            # edge neighbor
+            elseif getdim(cell) > 2 && length(cell_local_ids) == edge_npoints(cell)
+                _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
+            end
+        end       
+    end
+
     face_neighbor = sparse(I_face,J_face,V_face)
     corner_neighbor = sparse(I_corner,J_corner,V_corner) 
     edge_neighbor = sparse(I_edge,J_edge,V_edge)
-    return ExclusiveTopology(face_neighbor,corner_neighbor,edge_neighbor) 
+    return ExclusiveTopology(cell_node_table,node_cell_table,cell_neighbor_table,face_neighbor,corner_neighbor,edge_neighbor) 
 end
 
 function _corner_neighbor!(V_corner, I_corner, J_corner, cellid, cell, neighbor, neighborid, neighbor_cell)
     corner_neighbor = VertexIndex((neighborid, neighbor[1]))
     cell_corner_id = findfirst(x->x==neighbor_cell.nodes[neighbor[1]], cell.nodes)
-    push!(V_corner,Neighbor(corner_neighbor))
+    push!(V_corner,EntityNeighborhood(corner_neighbor))
     push!(I_corner,cellid)
     push!(J_corner,cell_corner_id)
 end
@@ -169,7 +201,7 @@ function _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor, neighbo
         edge_neighbor = EdgeIndex((neighborid, neighbor_edge_id))
     end
     cell_edge_id = findfirst(x->issubset(x,neighbor_edge),edges(cell))
-    push!(V_edge, Neighbor(edge_neighbor))
+    push!(V_edge, EntityNeighborhood(edge_neighbor))
     push!(I_edge, cellid)
     push!(J_edge, cell_edge_id)
 end
@@ -184,13 +216,14 @@ function _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor, neighbo
         face_neighbor = EdgeIndex((neighborid, neighbor_face_id))
     end
     cell_face_id = findfirst(x->issubset(x,neighbor_face),faces(cell))
-    push!(V_face, Neighbor(face_neighbor))
+    push!(V_face, EntityNeighborhood(face_neighbor))
     push!(I_face, cellid)
     push!(J_face, cell_face_id)
 end
 
-getelement(neighbor::Ferrite.Neighbor) = first.(neighbor.neighbor_info)
-getelements(neighbors::Vector{Ferrite.Neighbor}) = getelement(sum(neighbors))
+getelement(neighbor::EntityNeighborhood{T}) where T <: BoundaryIndex = first.(neighbor.neighbor_info)
+getelement(neighbor::EntityNeighborhood{CellIndex}) = getproperty.(neighbor.neighbor_info, :idx)
+getelements(neighbors::Vector{T}) where T <: EntityNeighborhood = reduce(vcat, getelement.(neighbors))
 
 abstract type AbstractGrid{dim} end
 
@@ -227,8 +260,8 @@ end
 ##########################
 # Grid utility functions #
 ##########################
-function full_neighborhood(grid::Grid{2,C,T,ExclusiveTopology}, cellidx::CellIndex, include_self=false) where {dim,C,T}
-    patch = getelements([nonzeros(grid.topology.corner_neighbor[cellidx.idx,:]);nonzeros(grid.topology.face_neighbor[cellidx.idx,:])])
+function full_neighborhood(grid::Grid{2,C,T,Top}, cellidx::CellIndex, include_self=false) where {dim,C,T,Top<:ExclusiveTopology}
+    patch = getelement(grid.topology.cell_neighbor[cellidx.idx])
     if include_self
         return [patch; cellidx.idx]
     else 
@@ -236,7 +269,7 @@ function full_neighborhood(grid::Grid{2,C,T,ExclusiveTopology}, cellidx::CellInd
     end
 end
 
-function full_neighborhood(grid::Grid{3,C,T,ExclusiveTopology}, cellidx::CellIndex, include_self=false) where {dim,C,T}
+function full_neighborhood(grid::Grid{3,C,T,Top}, cellidx::CellIndex, include_self=false) where {dim,C,T,Top<:ExclusiveTopology}
     patch = getelements([nonzeros(grid.topology.corner_neighbor[cellidx.idx,:]);nonzeros(grid.topology.face_neighbor[cellidx.idx,:]);nonzeros(grid.topology.edge_neighbor[cellidx.idx,:])])
     if include_self
         return [patch; cellidx.idx]
@@ -245,18 +278,12 @@ function full_neighborhood(grid::Grid{3,C,T,ExclusiveTopology}, cellidx::CellInd
     end
 end
 
-function full_neighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, faceidx::FaceIndex, include_self=false) where {dim,C,T}
+function full_neighborhood(grid::Grid{dim,C,T,Top}, faceidx::FaceIndex, include_self=false) where {dim,C,T,Top<:ExclusiveTopology}
     if include_self 
-        [grid.topology.face_neighbor[faceidx[1],faceidx[2]].neighbor_info; faceidx]
+        return [grid.topology.face_neighbor[faceidx[1],faceidx[2]].neighbor_info; faceidx]
     else
-        grid.topology.face_neighbor[faceidx[1],faceidx[2]].neighbor_info
+        return grid.topology.face_neighbor[faceidx[1],faceidx[2]].neighbor_info
     end
-end
-
-function full_neighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, vertexidx::VertexIndex, include_self=false) where {dim,C,T}
-    cell = CellIndex(vertexidx[1]) 
-    patch = full_neighborhood(grid, cell, include_self=include_self)
-    vertex_patch = Vector{VertexIndex}()
 end
 
 @inline getdim(::AbstractGrid{dim}) where {dim} = dim
