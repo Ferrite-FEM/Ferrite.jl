@@ -260,17 +260,8 @@ end
 ##########################
 # Grid utility functions #
 ##########################
-function full_neighborhood(grid::Grid{2,C,T,Top}, cellidx::CellIndex, include_self=false) where {dim,C,T,Top<:ExclusiveTopology}
+function full_neighborhood(grid::Grid{dim,C,T,Top}, cellidx::CellIndex, include_self=false) where {dim,C,T,Top<:ExclusiveTopology}
     patch = getelement(grid.topology.cell_neighbor[cellidx.idx])
-    if include_self
-        return [patch; cellidx.idx]
-    else 
-        return patch
-    end
-end
-
-function full_neighborhood(grid::Grid{3,C,T,Top}, cellidx::CellIndex, include_self=false) where {dim,C,T,Top<:ExclusiveTopology}
-    patch = getelements([nonzeros(grid.topology.corner_neighbor[cellidx.idx,:]);nonzeros(grid.topology.face_neighbor[cellidx.idx,:]);nonzeros(grid.topology.edge_neighbor[cellidx.idx,:])])
     if include_self
         return [patch; cellidx.idx]
     else 
