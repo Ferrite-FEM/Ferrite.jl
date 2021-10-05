@@ -184,8 +184,7 @@ end
 # points in nodal order
 
 """
-    get_point_values(ph::PointEvalHandler, nodal_values::Vector{T}) where T
-    get_point_values(ph::PointEvalHandler, nodal_values::Vector{T}, func_interpolations::Vector{<:Interpolation}) where T
+    get_point_values(ph::PointEvalHandler, nodal_values::Vector{T}, [func_interpolations::Vector{<:Interpolation}]) where T
 
 Return a `Vector{T}` with the field values in the points of the `PointEvalHandler`. The field values are computed based on the `nodal_values` and interpolated to the local coordinates by the `func_interpolations`.
 The `nodal_values` must be given in nodal order.
@@ -255,10 +254,8 @@ end
 ##################################################################################################################
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
 """
-    get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, fieldname::Symbol) where T
-    get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, fieldname::Symbol, func_interpolations::Vector{<:Interpolation}) where T
-    get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, ::L2Projector) where T
-    get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, ::L2Projector, func_interpolations::Vector{<:Interpolation}) where T
+    get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, fieldname::Symbol, [func_interpolations::Vector{<:Interpolation}]) where T
+    get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, ::L2Projector, [func_interpolations::Vector{<:Interpolation}]) where T
 
 Return a `Vector{T}` (for a 1-dimensional field) or a `Vector{Vec{fielddim, T}}` (for a vector field) with the field values of field `fieldname` in the points of the `PointEvalHandler`. The field values are computed based on the `dof_values` and interpolated to the local coordinates by the `func_interpolations`.
 The `dof_values` must be given in the order of the dofs that corresponds to the `AbstractDofHandler` which was used to construct `ph`. If the `dof_values` are obtained by a `L2Projector`, the `L2Projector` can be handed over instead of the `fieldname`. 
