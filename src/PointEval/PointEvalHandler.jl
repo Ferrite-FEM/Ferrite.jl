@@ -278,11 +278,11 @@ function get_point_values(
     else
         vals = Vector{Vec{fielddim, T}}(undef, npoints)
     end
-    get_point_values!(vals, ph, dof_values, fieldname; func_interpolations=func_interpolations)
+    get_point_values!(vals, ph, dof_values, fieldname, func_interpolations)
     return vals
 end
 
-get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, ::L2Projector, func_interpolations = get_func_interpolations(ph, fieldname)) where {DH<:MixedDofHandler,T} = get_point_values(ph, dof_values, :_, func_interpolations)
+get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, ::L2Projector, func_interpolations = get_func_interpolations(ph, :_)) where {DH<:MixedDofHandler,T} = get_point_values(ph, dof_values, :_, func_interpolations)
 
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
 function get_point_values!(vals::Vector{T2},
@@ -306,7 +306,7 @@ end
 function get_point_values!(vals::Vector{T2},
     ph::PointEvalHandler{DH},
     dof_values::Vector{T},
-    fieldname::Symbol;
+    fieldname::Symbol,
     func_interpolations = get_func_interpolations(ph, fieldname)
     ) where {T2, T,DH<:DofHandler} 
 
