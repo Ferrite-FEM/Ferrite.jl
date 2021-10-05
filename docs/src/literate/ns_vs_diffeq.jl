@@ -112,7 +112,7 @@
 # Now we solve the problem with Ferrite and [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl). What follows is a program spliced with comments.
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 #
-# First we load Ferrite, and some other packages we need
+# First we load Ferrite and some other packages we need
 using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack
 # Since we do not need the complete DifferentialEquations suite, we just load the required ODE infrastructure, which can also handle
 # DAEs in mass matrix form.
@@ -156,7 +156,7 @@ grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{
 
 # ### Function Space
 # To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
-# We have to utilize the same quadrature rule because in the weak form the
+# We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
 # linear pressure term is tested against a quadratic function.
 ip_v = Lagrange{dim, RefCube, 2}()
 ip_geom = Lagrange{dim, RefCube, 1}()
