@@ -534,6 +534,48 @@ function test_subparametric_triangle()
     @test celldofs(dh, 1) == [i for i in 1:12]
 end
 
+function test_separate_fields_on_separate_domains()
+    # 5_______6
+    # |\      | 
+    # |   \   |
+    # 3______\4
+    # |       |
+    # |       |
+    # 1_______2 
+    # Given: a vector field :q defined on the quad and a scalar field :t defined on the triangles
+    nodes = [Node((0.0, 0.0)),
+            Node((1.0, 0.0)),
+            Node((0.0, 1.0)),
+            Node((1.0, 1.0)),
+            Node((0.0, 2.0)),
+            Node((1.0, 2.0))]
+    cells = Ferrite.AbstractCell[Quadrilateral((1,2,4,3)),
+            Triangle((3,4,5)),
+            Triangle((4,6,5))]
+    mesh = Grid(cells, nodes)
+    addcellset!(mesh, "quads", Set{Int}((1,)))
+    addcellset!(mesh, "tris", Set{Int}((2, 3)))
+
+    dh = MixedDofHandler(mesh)
+    ip_tri = Lagrange{2,RefTetrahedron,1}()
+    ip_quad = Lagrange{2,RefCube,1}()
+    field = Field(:q, ip_quad, 2) # vector field :q only on quad
+    fh_quad = FieldHandler([field], getcellset(mesh, "quads"))
+    push!(dh, fh_quad)
+
+    field = Field(:t, ip_tri, 1) # scalar field :t only on tris
+    fh_tri = FieldHandler([field], getcellset(mesh, "tris"))
+    push!(dh, fh_tri)
+    close!(dh)
+
+    # Expect: 8 dofs for the quad and 4 new dofs for the triangles
+    @test ndofs(dh) == 12
+    @test celldofs(dh, 1) == [i for i in 1:8]
+    @test celldofs(dh, 2) == [9, 10, 11]
+    @test celldofs(dh, 3) == [10, 12, 11]
+
+end
+
 @testset "MixedDofHandler" begin
 
     test_1d_bar_beam();
@@ -557,4 +599,5 @@ end
     test_subparametric_triangle();
     test_reshape_to_nodes()
     test_mixed_grid_show()
+    test_separate_fields_on_separate_domains();
 end
