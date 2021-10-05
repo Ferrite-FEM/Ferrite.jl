@@ -69,6 +69,20 @@ function test_2d_scalar()
     @test celldofs(dh, 2) == [3, 2, 5]
 end
 
+function test_2d_error()
+
+    grid = get_2d_grid()
+    # the refshape of the field must be the same as the refshape of the elements it is added to
+    field1 = create_field(name=:u, spatial_dim=2, field_dim=1, order=1, cellshape=RefTetrahedron)
+    field2 = create_field(name=:u, spatial_dim=2, field_dim=1, order=1, cellshape=RefCube)
+    dh = MixedDofHandler(grid);
+    @test_throws ErrorException push!(dh, FieldHandler([field1], Set(1)));
+    @test_throws ErrorException push!(dh, FieldHandler([field2], Set(2)));
+    # all cells within a FieldHandler should be of the same celltype
+    @test_throws ErrorException push!(dh, FieldHandler([field1], Set([1,2])));
+
+end
+
 function test_2d_vector()
 
     grid = get_2d_grid()
@@ -91,7 +105,7 @@ function test_2d_mixed_1_el()
     grid = get_2d_grid()
     ## mixed field of same order
     field1 = create_field(name = :u, spatial_dim=2, field_dim = 2, order = 1, cellshape = RefCube)
-    field2 = create_field(name = :p, spatial_dim=2, field_dim = 1, order = 1, cellshape = RefTetrahedron)
+    field2 = create_field(name = :p, spatial_dim=2, field_dim = 1, order = 1, cellshape = RefCube)
     dh = MixedDofHandler(grid);
     push!(dh, FieldHandler([field1, field2], Set(1)));
     close!(dh)
@@ -106,11 +120,13 @@ function test_2d_mixed_2_el()
 
     grid = get_2d_grid()
     ## mixed field of same order
-    field1 = create_field(name = :u, spatial_dim=2, field_dim = 2, order = 1, cellshape = RefCube)
-    field2 = create_field(name = :p, spatial_dim=2, field_dim = 1, order = 1, cellshape = RefTetrahedron)
+    field1_quad = create_field(name = :u, spatial_dim=2, field_dim = 2, order = 1, cellshape = RefCube)
+    field2_quad = create_field(name = :p, spatial_dim=2, field_dim = 1, order = 1, cellshape = RefCube)
+    field1_tri = create_field(name = :u, spatial_dim=2, field_dim = 2, order = 1, cellshape = RefTetrahedron)
+    field2_tri = create_field(name = :p, spatial_dim=2, field_dim = 1, order = 1, cellshape = RefTetrahedron)
     dh = MixedDofHandler(grid);
-    push!(dh, FieldHandler([field1, field2], Set(1)));
-    push!(dh, FieldHandler([field1, field2], Set(2)));
+    push!(dh, FieldHandler([field1_quad, field2_quad], Set(1)));
+    push!(dh, FieldHandler([field1_tri, field2_tri], Set(2)));
     close!(dh)
 
     # THEN: we expect 15 dofs
@@ -119,35 +135,6 @@ function test_2d_mixed_2_el()
     @test ndofs_per_cell(dh, 2) == 9
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     @test celldofs(dh, 2) == [5, 6, 3, 4, 13, 14, 11, 10, 15]
-end
-
-function test_2d_mixed_2_tri()
-    cells = [
-        Triangle((1, 2, 3)),
-        Triangle((2, 4, 3))
-        ]
-    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 4)]
-    grid = Grid(cells, nodes)
-    field1 = create_field(name = :u, spatial_dim=2, field_dim = 2, order = 1, cellshape = RefCube)
-    field2 = create_field(name = :p, spatial_dim=2, field_dim = 1, order = 1, cellshape = RefTetrahedron)
-    dh = MixedDofHandler(grid);
-    push!(dh, FieldHandler([field1, field2], Set(1)));
-    push!(dh, FieldHandler([field1, field2], Set(2)));
-    close!(dh)
-    @test ndofs(dh) == 12
-    @test ndofs_per_cell(dh, 1) == 9
-    @test ndofs_per_cell(dh, 2) == 9
-    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9]
-    @test celldofs(dh, 2) == [3, 4, 10, 11, 5, 6, 8, 12, 9]
-
-    # reference
-    # grid = generate_grid(Triangle, (1, 1))
-    # dh = DofHandler(grid)
-    # push!(dh, :u, 2, Lagrange{2,RefTetrahedron,1}())
-    # push!(dh, :p, 1, Lagrange{2,RefTetrahedron,1}())
-    # close!(dh)
-    # celldofs(dh, 1)
-    # celldofs(dh, 2)
 end
 
 function test_face_dofs_2_tri()
@@ -402,12 +389,13 @@ function test_element_order()
         ]
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 6)]
     grid = Grid(cells, nodes)
-    field1 = create_field(name=:u, spatial_dim=3, field_dim=2, order=1, cellshape=RefTetrahedron)
+    field1_tri = create_field(name=:u, spatial_dim=3, field_dim=2, order=1, cellshape=RefTetrahedron)
+    field1_quad = create_field(name=:u, spatial_dim=3, field_dim=2, order=1, cellshape=RefCube)
 
     dh = MixedDofHandler(grid);
     # Note the jump in cell numbers
-    push!(dh, FieldHandler([field1], Set((1, 3))));
-    push!(dh, FieldHandler([field1], Set(2)));
+    push!(dh, FieldHandler([field1_tri], Set((1, 3))));
+    push!(dh, FieldHandler([field1_quad], Set(2)));
     # Dofs are first created for cell 1 and 3, thereafter cell 2
     close!(dh)
 
@@ -418,20 +406,135 @@ function test_element_order()
 
 end
 
+function test_field_on_subdomain()
+    grid = get_2d_grid() # cell 1: quad, cell2: triangle
+    dh = MixedDofHandler(grid)
+
+    # assume two fields: a scalar field :s and a vector field :v
+    # :v lives on both cells, :s lives only on the triangle
+    ip_tri = Lagrange{2,RefTetrahedron,1}()
+    ip_quad = Lagrange{2,RefCube,1}()
+    v_tri = Field(:v, ip_tri, 2)
+    v_quad = Field(:v, ip_quad, 2)
+    s = Field(:s, ip_tri, 1)
+
+    push!(dh, FieldHandler([v_quad], Set((1,))))
+    push!(dh, FieldHandler([v_tri, s], Set((2,))))
+
+    close!(dh)
+
+    # retrieve field dimensions
+    @test Ferrite.getfielddim(dh, :v) == 2
+    @test Ferrite.getfielddim(dh, :s) ==1
+
+    # find field in FieldHandler
+    @test Ferrite.find_field(dh.fieldhandlers[1], :v) == 1
+    @test Ferrite.find_field(dh.fieldhandlers[2], :v) == 1
+    @test Ferrite.find_field(dh.fieldhandlers[2], :s) == 2
+    @test_throws ErrorException Ferrite.find_field(dh.fieldhandlers[1], :s)
+end
+
+
 function test_mixed_grid_show()
     grid = get_2d_grid()
     str = sprint(show, MIME("text/plain"), grid)
     @test occursin("2 Quadrilateral/Triangle cells", str)
 end
 
+# regression tests for https://github.com/KristofferC/JuAFEM.jl/issues/315 
+function test_subparametric_quad()
+    #linear geometry
+    grid = generate_grid(Quadrilateral, (1,1))
+    ip      = Lagrange{2,RefCube,2}()
+    
+    field = Field(:u, ip, 2)
+    fh = FieldHandler([field], Set(1:getncells(grid)))
+    
+    dh = MixedDofHandler(grid)
+    push!(dh, fh)
+    close!(dh)
+    
+    ch = ConstraintHandler(dh)
+    dbc1 = Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 2)
+    add!(ch, dbc1)
+    close!(ch)
+    update!(ch, 1.0)
+    @test getnbasefunctions(Ferrite.getfieldinterpolation(dh,1)) == 9 # algebraic nbasefunctions
+    @test celldofs(dh, 1) == [i for i in 1:18]
+end
+
+function test_subparametric_triangle()
+    #linear geometry
+    grid = generate_grid(Triangle, (1,1))
+
+    ip = Lagrange{2,RefTetrahedron,2}()
+    
+    field = Field(:u, ip, 2)
+    fh = FieldHandler([field], Set(1:getncells(grid)))
+    
+    dh = MixedDofHandler(grid)
+    push!(dh, fh)
+    close!(dh)
+    
+    ch = ConstraintHandler(dh)
+    dbc1 = Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 2)
+    add!(ch, dbc1)
+    close!(ch)
+    update!(ch, 1.0)
+    @test getnbasefunctions(Ferrite.getfieldinterpolation(dh,1)) == 6 # algebraic nbasefunctions
+    @test celldofs(dh, 1) == [i for i in 1:12]
+end
+
+function test_separate_fields_on_separate_domains()
+    # 5_______6
+    # |\      | 
+    # |   \   |
+    # 3______\4
+    # |       |
+    # |       |
+    # 1_______2 
+    # Given: a vector field :q defined on the quad and a scalar field :t defined on the triangles
+    nodes = [Node((0.0, 0.0)),
+            Node((1.0, 0.0)),
+            Node((0.0, 1.0)),
+            Node((1.0, 1.0)),
+            Node((0.0, 2.0)),
+            Node((1.0, 2.0))]
+    cells = Ferrite.AbstractCell[Quadrilateral((1,2,4,3)),
+            Triangle((3,4,5)),
+            Triangle((4,6,5))]
+    mesh = Grid(cells, nodes)
+    addcellset!(mesh, "quads", Set{Int}((1,)))
+    addcellset!(mesh, "tris", Set{Int}((2, 3)))
+
+    dh = MixedDofHandler(mesh)
+    ip_tri = Lagrange{2,RefTetrahedron,1}()
+    ip_quad = Lagrange{2,RefCube,1}()
+    field = Field(:q, ip_quad, 2) # vector field :q only on quad
+    fh_quad = FieldHandler([field], getcellset(mesh, "quads"))
+    push!(dh, fh_quad)
+
+    field = Field(:t, ip_tri, 1) # scalar field :t only on tris
+    fh_tri = FieldHandler([field], getcellset(mesh, "tris"))
+    push!(dh, fh_tri)
+    close!(dh)
+
+    # Expect: 8 dofs for the quad and 4 new dofs for the triangles
+    @test ndofs(dh) == 12
+    @test celldofs(dh, 1) == [i for i in 1:8]
+    @test celldofs(dh, 2) == [9, 10, 11]
+    @test celldofs(dh, 3) == [10, 12, 11]
+
+end
+
 @testset "MixedDofHandler" begin
 
     test_1d_bar_beam();
     test_2d_scalar();
+    test_2d_error();
     test_2d_vector();
     test_2d_mixed_1_el();
     test_2d_mixed_2_el();
-    test_2d_mixed_2_tri();
     test_face_dofs_2_tri();
     test_face_dofs_quad_tri();
     test_serendipity_quad_tri();
@@ -441,5 +544,9 @@ end
     test_3d_mixed_field_mixed_celltypes();
     test_2_element_heat_eq();
     test_element_order();
-    test_mixed_grid_show()
+    test_field_on_subdomain();
+    test_mixed_grid_show();
+    test_subparametric_quad();
+    test_subparametric_triangle();
+    test_separate_fields_on_separate_domains();
 end

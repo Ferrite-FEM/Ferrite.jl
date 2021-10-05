@@ -1,4 +1,5 @@
 # to test vtk-files
+using StableRNGs
 OVERWRITE_CHECKSUMS = false
 checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")
 checksum_list = read(checksums_file, String)
@@ -16,6 +17,7 @@ end
                             (Triangle,               2),
                             (QuadraticTriangle,      2),
                             (Hexahedron,             3),
+                            (Cell{3,20,6},           3),
                             (Tetrahedron,            3))
 
         # create test grid, do some operations on it and then test
@@ -35,7 +37,7 @@ end
         addfaceset!(grid, "right-faceset", getfaceset(grid, "right"))
         addnodeset!(grid, "middle-nodes", x -> norm(x) < radius)
 
-        gridfilename = "grid-$(JuAFEM.celltypes[celltype])"
+        gridfilename = "grid-$(Ferrite.celltypes[celltype])"
         vtk_grid(gridfilename, grid) do vtk
             vtk_cellset(vtk, grid, "cell-1")
             vtk_cellset(vtk, grid, "middle-cells")
@@ -68,11 +70,11 @@ end
         end
         close!(ch)
         update!(ch, 0.0)
-        Random.seed!(1234)
-        u = rand(ndofs(dofhandler))
+        rng = StableRNG(1234)
+        u = rand(rng, ndofs(dofhandler))
         apply!(u, ch)
 
-        dofhandlerfilename = "dofhandler-$(JuAFEM.celltypes[celltype])"
+        dofhandlerfilename = "dofhandler-$(Ferrite.celltypes[celltype])"
         vtk_grid(dofhandlerfilename, dofhandler) do vtk
             vtk_point_data(vtk, ch)
             vtk_point_data(vtk, dofhandler, u)
@@ -91,9 +93,7 @@ end
 
 end # of testset
 
-if OVERWRITE_CHECKSUMS
-    close(csio)
-end
+close(csio)
 
 
 # right = Vec{2, Float64}(ntuple(x->1.5, dim))
@@ -101,7 +101,7 @@ end
 
 @testset "Grid utils" begin
 
-    grid = JuAFEM.generate_grid(QuadraticQuadrilateral, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
+    grid = Ferrite.generate_grid(QuadraticQuadrilateral, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
 
     addcellset!(grid, "cell_set", [1]);
     node_set = Set(1:getnnodes(grid))
@@ -114,7 +114,6 @@ end
     @test length(getnodes(grid, "node_set")) == 9
 
     @test collect(getcoordinates(getnodes(grid, 5)).data) ≈ [0.5, 0.5]
-
 
     @test getcells(grid, "cell_set") == [getcells(grid, 1)]
 
@@ -141,4 +140,27 @@ end
         n += cellid(c)
     end
     @test n == div(getncells(grid)*(getncells(grid) + 1), 2)
+end
+
+@testset "Grid sets" begin
+
+    grid = Ferrite.generate_grid(Hexahedron, (1, 1, 1), Vec((0.,0., 0.)), Vec((1.,1.,1.)))
+
+    #Test manual add
+    addcellset!(grid, "cell_set", [1]);
+    addnodeset!(grid, "node_set", [1])
+    addfaceset!(grid, "face_set", [FaceIndex(1,1)])
+    addedgeset!(grid, "edge_set", [EdgeIndex(1,1)])
+    addvertexset!(grid, "vert_set", [VertexIndex(1,1)])
+
+    #Test function add
+    addfaceset!(grid, "left_face", (x)-> x[1] ≈ 0.0)
+    addedgeset!(grid, "left_lower_edge", (x)-> x[1] ≈ 0.0 && x[3] ≈ 0.0)
+    addvertexset!(grid, "left_corner", (x)-> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
+
+    @test 1 in Ferrite.getnodeset(grid, "node_set")
+    @test FaceIndex(1,5) in getfaceset(grid, "left_face")
+    @test EdgeIndex(1,4) in getedgeset(grid, "left_lower_edge")
+    @test VertexIndex(1,1) in getvertexset(grid, "left_corner")
+
 end

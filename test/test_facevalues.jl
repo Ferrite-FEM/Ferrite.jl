@@ -14,16 +14,16 @@ for (func_interpol, quad_rule) in  (
 
     for fe_valtype in (FaceScalarValues, FaceVectorValues)
         fv = fe_valtype(quad_rule, func_interpol)
-        ndim = JuAFEM.getdim(func_interpol)
+        ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
         fe_valtype == FaceScalarValues && @test getnbasefunctions(fv) == n_basefuncs
-        fe_valtype == FaceVectorValues && @test getnbasefunctions(fv) == n_basefuncs * JuAFEM.getdim(func_interpol)
+        fe_valtype == FaceVectorValues && @test getnbasefunctions(fv) == n_basefuncs * Ferrite.getdim(func_interpol)
 
         xs, n = valid_coordinates_and_normals(func_interpol)
         for face in 1:getnfaces(func_interpol)
             reinit!(fv, xs, face)
-            @test JuAFEM.getcurrentface(fv) == face
+            @test Ferrite.getcurrentface(fv) == face
 
             # We test this by applying a given deformation gradient on all the nodes.
             # Since this is a linear deformation we should get back the exact values
@@ -43,7 +43,7 @@ for (func_interpol, quad_rule) in  (
                 @test function_gradient(fv, i, u) ≈ H
                 @test function_symmetric_gradient(fv, i, u) ≈ 0.5(H + H')
                 @test function_divergence(fv, i, u) ≈ tr(H)
-                ndim == 3 && @test function_curl(fv, i, u) ≈ JuAFEM.curl(H)
+                ndim == 3 && @test function_curl(fv, i, u) ≈ Ferrite.curl(H)
                 function_value(fv, i, u)
                 if isa(fv, FaceScalarValues)
                     @test function_gradient(fv, i, u_scal) ≈ V
@@ -52,7 +52,7 @@ for (func_interpol, quad_rule) in  (
                     @test function_gradient(fv, i, u_vector) ≈ function_gradient(fv, i, u) ≈ H
                     @test function_value(fv, i, u_vector) ≈ function_value(fv, i, u)
                     @test function_divergence(fv, i, u_vector) ≈ function_divergence(fv, i, u) ≈ tr(H)
-                    ndim == 3 && @test function_curl(fv, i, u_vector) ≈ JuAFEM.curl(H)
+                    ndim == 3 && @test function_curl(fv, i, u_vector) ≈ Ferrite.curl(H)
                 end
             end
 
@@ -61,11 +61,11 @@ for (func_interpol, quad_rule) in  (
             for i in 1:getnquadpoints(fv)
                 vol += getdetJdV(fv,i)
             end
-            x_face = xs[[JuAFEM.faces(func_interpol)[face]...]]
-            @test vol ≈ calculate_volume(JuAFEM.getlowerdim(func_interpol), x_face)
+            x_face = xs[[Ferrite.faces(func_interpol)[face]...]]
+            @test vol ≈ calculate_volume(Ferrite.getlowerdim(func_interpol), x_face)
 
             # Test quadrature rule after reinit! with ref. coords
-            x = JuAFEM.reference_coordinates(func_interpol)
+            x = Ferrite.reference_coordinates(func_interpol)
             reinit!(fv, x, face)
             vol = 0.0
             for i in 1:getnquadpoints(fv)
@@ -85,7 +85,7 @@ for (func_interpol, quad_rule) in  (
         fvc = copy(fv)
         for fname in fieldnames(typeof(fv))
             @test typeof(fv) == typeof(fvc)
-            if !isa(getfield(fv, fname), JuAFEM.ScalarWrapper)
+            if !isa(getfield(fv, fname), Ferrite.ScalarWrapper)
                 @test pointer(getfield(fv, fname)) != pointer(getfield(fvc, fname))
                 @test getfield(fv, fname) == getfield(fvc, fname)
             end

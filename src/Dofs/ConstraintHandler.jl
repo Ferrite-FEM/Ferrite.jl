@@ -28,19 +28,19 @@ which applies the condition via `apply!`.
 """
 struct Dirichlet # <: Constraint
     f::Function # f(x,t) -> value
-    faces::Union{Set{Int},Set{Tuple{Int,Int}}}
+    faces::Union{Set{Int},Set{FaceIndex},Set{EdgeIndex},Set{VertexIndex}}
     field_name::Symbol
     components::Vector{Int} # components of the field
     local_face_dofs::Vector{Int}
     local_face_dofs_offset::Vector{Int}
 end
-function Dirichlet(field_name::Symbol, faces::Union{Set{Int},Set{Tuple{Int,Int}}}, f::Function, component::Int=1)
-    Dirichlet(field_name, faces, f, [component])
+function Dirichlet(field_name::Symbol, faces::Union{T}, f::Function, component::Int=1) where T
+    Dirichlet(field_name, copy(faces), f, [component])
 end
-function Dirichlet(field_name::Symbol, faces::Union{Set{Int},Set{Tuple{Int,Int}}}, f::Function, components::AbstractVector{Int})
+function Dirichlet(field_name::Symbol, faces::Set{T}, f::Function, components::AbstractVector{Int}) where T
     unique(components) == components || error("components not unique: $components")
     # issorted(components) || error("components not sorted: $components")
-    return Dirichlet(f, faces, field_name, Vector(components), Int[], Int[])
+    return Dirichlet(f, copy(faces), field_name, Vector(components), Int[], Int[])
 end
 
 """
@@ -57,6 +57,53 @@ struct ConstraintHandler{DH<:AbstractDofHandler,T}
     bcvalues::Vector{BCValues{T}}
     dh::DH
     closed::ScalarWrapper{Bool}
+end
+
+"""
+    RHSData
+
+Stores the constrained columns and mean of the diagonal of stiffness matrix `A`.
+"""
+struct RHSData{T}
+    m::T
+    constrained_columns::SparseMatrixCSC{T, Int}
+end
+
+"""
+    get_rhs_data(ch::ConstraintHandler, A::SparseMatrixCSC) -> RHSData
+
+Returns the needed RHSData for apply_rhs!
+"""
+function get_rhs_data(ch::ConstraintHandler, A::SparseMatrixCSC)
+    m = meandiag(A)
+    constrained_columns = A[:, ch.prescribed_dofs]
+    return RHSData(m, constrained_columns)
+end
+
+"""
+    apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)
+
+Applies the boundary condition to the right-hand-side vector without modifying the stiffness matrix
+"""
+function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)
+    K = data.constrained_columns
+    @assert length(f) == 0 || length(f) == size(K, 1)
+    @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
+
+    m = data.m
+    @inbounds for i in 1:length(ch.values)
+        d = ch.prescribed_dofs[i]
+        v = ch.values[i]
+        if !applyzero && v != 0
+            for j in nzrange(K, i)
+                f[K.rowval[j]] -= v * K.nzval[j]
+            end
+        end
+        if length(f) != 0
+            vz = applyzero ? zero(eltype(f)) : v
+            f[d] = vz * m
+        end
+    end
 end
 
 function ConstraintHandler(dh::AbstractDofHandler)
@@ -117,21 +164,32 @@ Add a `Dirichlet boundary` condition to the `ConstraintHandler`.
 """
 function add!(ch::ConstraintHandler, dbc::Dirichlet)
     dbc_check(ch, dbc)
+    celltype = getcelltype(ch.dh.grid)
+    @assert isconcretetype(celltype)
+
     field_idx = find_field(ch.dh, dbc.field_name)
     # Extract stuff for the field
     interpolation = getfieldinterpolation(ch.dh, field_idx)#ch.dh.field_interpolations[field_idx]
     field_dim = getfielddim(ch.dh, field_idx)#ch.dh.field_dims[field_idx] # TODO: I think we don't need to extract these here ...
-    bcvalue = getbcvalue(ch.dh, field_idx)
+    
+    
+    if eltype(dbc.faces)==Int #Special case when dbc.faces is a nodeset
+        bcvalue = BCValues(interpolation, default_interpolation(celltype), FaceIndex) #Not used by node bcs, but still have to pass it as an argument
+    else
+        bcvalue = BCValues(interpolation, default_interpolation(celltype), eltype(dbc.faces))
+    end
     _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue)
+
     return ch
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int}}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues)
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where Index<:BoundaryIndex
     # calculate which local dof index live on each face
     # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
     local_face_dofs = Int[]
     local_face_dofs_offset = Int[1]
-    for (i, face) in enumerate(faces(interpolation))
+    boundary = boundaryfunction(eltype(bcfaces))
+    for (i, face) in enumerate(boundary(interpolation))
         for fdof in face, d in 1:field_dim
             if d ∈ dbc.components # skip unless this component should be constrained
                 push!(local_face_dofs, (fdof-1)*field_dim + d + offset)
@@ -144,8 +202,12 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
-    #_celldofs = fill(0, ndofs_per_cell(ch.dh))
+    redundant_faces = Index[]
     for (cellidx, faceidx) in bcfaces
+        if cellidx ∉ cellset
+            push!(redundant_faces, Index(cellidx, faceidx)) # will be removed from dbc
+            continue # skip faces that are not part of the cellset
+        end
         _celldofs = fill(0, ndofs_per_cell(ch.dh, cellidx))
         celldofs!(_celldofs, ch.dh, cellidx) # extract the dofs for this cell
         r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
@@ -153,25 +215,26 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Tuple{Int,Int
         @debug println("adding dofs $(_celldofs[local_face_dofs[r]]) to dbc")
     end
 
+    setdiff!(dbc.faces, redundant_faces)
     # save it to the ConstraintHandler
     push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
     append!(ch.prescribed_dofs, constrained_dofs)
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues)
-    if interpolation !== default_interpolation(getcelltype(ch.dh.grid))
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
+    if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
 
     ncomps = length(dbc.components)
     nnodes = getnnodes(ch.dh.grid)
     interpol_points = getnbasefunctions(interpolation)
-    _celldofs = fill(0, ndofs_per_cell(ch.dh))
+    _celldofs = fill(0, ndofs_per_cell(ch.dh, first(cellset)))
     node_dofs = zeros(Int, ncomps, nnodes)
     visited = falses(nnodes)
-    for (cellidx, cell) in enumerate(ch.dh.grid.cells)
-        celldofs!(_celldofs, ch.dh, cellidx) # update the dofs for this cell
+    for cell in CellIterator(ch.dh, collect(cellset)) # only go over cells that belong to current FieldHandler
+        celldofs!(_celldofs, cell) # update the dofs for this cell
         for idx in 1:min(interpol_points, length(cell.nodes))
             node = cell.nodes[idx]
             if !visited[node]
@@ -190,7 +253,8 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     sizehint!(dbc.local_face_dofs, length(bcnodes))
     for node in bcnodes
         if !visited[node]
-            error("Unable to add a Dirichlet boundary condition to node $node as there are no degrees of freedom on this node.")
+            # either the node belongs to another field handler or it does not have dofs in the constrained field
+            continue
         end
         for i in 1:ncomps
             push!(constrained_dofs, node_dofs[i,node])
@@ -209,7 +273,6 @@ end
 function update!(ch::ConstraintHandler, time::Real=0.0)
     @assert ch.closed[]
     for (i,dbc) in enumerate(ch.dbcs)
-        field_idx = find_field(ch.dh, dbc.field_name)
         # Function barrier
         _update!(ch.values, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
                  dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, convert(Float64, time))
@@ -217,7 +280,7 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
 end
 
 # for faces
-function _update!(values::Vector{Float64}, f::Function, faces::Set{Tuple{Int,Int}}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+function _update!(values::Vector{Float64}, f::Function, faces::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::T) where {T}
 
@@ -259,8 +322,8 @@ end
 
 # for nodes
 function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
-                  components::Vector{Int}, dh::DofHandler{dim,C,M}, facevalues::BCValues,
-                  dofmapping::Dict{Int,Int}, time::Float64) where {dim,C,M}
+                  components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
+                  dofmapping::Dict{Int,Int}, time::Float64)
     counter = 1
     for (idx, nodenumber) in enumerate(nodeidxs)
         x = dh.grid.nodes[nodenumber].x
@@ -290,9 +353,10 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
         data = zeros(Float64, nd, getnnodes(ch.dh.grid))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
-            if eltype(dbc.faces) <: Tuple
+            if eltype(dbc.faces) <: BoundaryIndex
+                functype = boundaryfunction(eltype(dbc.faces))
                 for (cellidx, faceidx) in dbc.faces
-                    for facenode in faces(ch.dh.grid.cells[cellidx])[faceidx]
+                    for facenode in functype(ch.dh.grid.cells[cellidx])[faceidx]
                         for component in dbc.components
                             data[component, facenode] = 1
                         end
@@ -313,7 +377,7 @@ end
 
 function apply!(v::AbstractVector, ch::ConstraintHandler)
     @assert length(v) == ndofs(ch.dh)
-    v[ch.prescribed_dofs] = ch.values # .= ??
+    v[ch.prescribed_dofs] = ch.values
     return v
 end
 
@@ -358,7 +422,7 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
         zero_out_columns!(K′, ch.prescribed_dofs)
         transpose!(K, K′)
     elseif strategy == APPLY_INPLACE
-        K[ch.prescribed_dofs, :] = 0
+        K[ch.prescribed_dofs, :] .= 0
     else
         error("Unknown apply strategy")
     end
@@ -395,25 +459,44 @@ end
 
 #Function for adding constraint when using multiple celltypes
 function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
-    dbc.faces isa Set{Tuple{Int}} && error("Can only apply boundary conditions to faces (not nodes).")
-    _check_cellset_dirichlet(fh.cellset, dbc.faces)
-    #dbc_check(ch, dbc)
+    _check_cellset_dirichlet(ch.dh.grid, fh.cellset, dbc.faces)
+
+    celltype = getcelltype(ch.dh.grid, first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
 
     field_idx = find_field(fh, dbc.field_name)
     # Extract stuff for the field
     interpolation = getfieldinterpolations(fh)[field_idx]
     field_dim = getfielddims(fh)[field_idx]
-    bcvalue = fh.bc_values[field_idx]
-    
-    JuAFEM._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue)
+
+    if eltype(dbc.faces)==Int #Special case when dbc.faces is a nodeset
+        bcvalue = BCValues(interpolation, default_interpolation(celltype), FaceIndex) #Not used by node bcs, but still have to pass it as an argument
+    else
+        bcvalue = BCValues(interpolation, default_interpolation(celltype), eltype(dbc.faces))
+    end
+
+    Ferrite._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue, fh.cellset)
     return ch
 end
 
-function _check_cellset_dirichlet(cellset::Set{Int}, faceset::Set{Tuple{Int,Int}})
+function _check_cellset_dirichlet(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex})
     for (cellid,faceid) in faceset
         if !(cellid in cellset)
-            error("You are trying to add a constraint to a face that is not in the cellset of the fieldhandler.")
+            @warn("You are trying to add a constraint to a face that is not in the cellset of the fieldhandler. The face will be skipped.")
         end
     end
 end
 
+function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int})
+    nodes = Set{Int}()
+    for cellid in cellset
+        for nodeid in grid.cells[cellid].nodes
+            nodeid ∈ nodes || push!(nodes, nodeid)
+        end
+    end
+
+    for nodeid in nodeset
+        if !(nodeid ∈ nodes)
+            @warn("You are trying to add a constraint to a node that is not in the cellset of the fieldhandler. The node will be skipped.")
+        end
+    end
+end

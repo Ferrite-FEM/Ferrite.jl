@@ -17,7 +17,7 @@ struct DofHandler{dim,C,T} <: AbstractDofHandler
     # TODO: field_interpolations can probably be better typed: We should at least require
     #       all the interpolations to have the same dimension and reference shape
     field_interpolations::Vector{Interpolation}
-    bc_values::Vector{BCValues{T}} # for boundary conditions
+    bc_values::Vector{BCValues{T}} # TODO: BcValues is created/handeld by the constrainthandler, so this can be removed
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
     closed::ScalarWrapper{Bool}
@@ -26,7 +26,8 @@ struct DofHandler{dim,C,T} <: AbstractDofHandler
 end
 
 function DofHandler(grid::Grid)
-    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, JuAFEM.ScalarWrapper(-1))
+    isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. Use MixedDofHandler instead of DofHandler")
+    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)

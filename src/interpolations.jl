@@ -17,13 +17,14 @@ The following interpolations are implemented:
 * `Lagrange{2,RefTetrahedron,2}`
 * `Lagrange{3,RefCube,1}`
 * `Serendipity{2,RefCube,2}`
+* `Serendipity{3,RefCube,2}`
 * `Lagrange{3,RefTetrahedron,1}`
 * `Lagrange{3,RefTetrahedron,2}`
 
 # Examples
 ```jldoctest
 julia> ip = Lagrange{2,RefTetrahedron,2}()
-JuAFEM.Lagrange{2,JuAFEM.RefTetrahedron,2}()
+Ferrite.Lagrange{2,Ferrite.RefTetrahedron,2}()
 
 julia> getnbasefunctions(ip)
 6
@@ -282,6 +283,7 @@ getnbasefunctions(::Lagrange{3,RefTetrahedron,1}) = 4
 nvertexdofs(::Lagrange{3,RefTetrahedron,1}) = 1
 
 faces(::Lagrange{3,RefTetrahedron,1}) = ((1,2,3), (1,2,4), (2,3,4), (1,4,3))
+edges(::Lagrange{3,RefTetrahedron,1}) = ((1,2), (2,3), (3,1), (1,4), (2,4), (3,4))
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,1})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
@@ -309,6 +311,7 @@ nvertexdofs(::Lagrange{3,RefTetrahedron,2}) = 1
 nedgedofs(::Lagrange{3,RefTetrahedron,2}) = 1
 
 faces(::Lagrange{3,RefTetrahedron,2}) = ((1,2,3,5,6,7), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
+edges(::Lagrange{3,RefTetrahedron,2}) = ((1,5,2), (2,6,3), (3,7,1), (1,8,4), (2,9,4), (3,10,4))
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,2})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
@@ -349,6 +352,7 @@ getnbasefunctions(::Lagrange{3,RefCube,1}) = 8
 nvertexdofs(::Lagrange{3,RefCube,1}) = 1
 
 faces(::Lagrange{3,RefCube,1}) = ((1,4,3,2), (1,2,6,5), (2,3,7,6), (3,4,8,7), (1,5,8,4), (5,6,7,8))
+edges(::Lagrange{3,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1), (1,5), (2,6), (3,7), (4,8), (5,6), (6,7), (7,8), (8,5))
 
 function reference_coordinates(::Lagrange{3,RefCube,1})
     return [Vec{3, Float64}((-1.0, -1.0, -1.0)),
@@ -414,5 +418,66 @@ function value(ip::Serendipity{2,RefCube,2}, i::Int, ξ::Vec{2})
     i == 6 && return 0.5(1 + ξ_x) * (1 - ξ_y * ξ_y)
     i == 7 && return 0.5(1 - ξ_x * ξ_x) * (1 + ξ_y)
     i == 8 && return 0.5(1 - ξ_x) * (1 - ξ_y * ξ_y)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+##################################
+# Serendipity dim 3 RefCube order 2 #
+##################################
+getnbasefunctions(::Serendipity{3,RefCube,2}) = 20
+getlowerdim(::Serendipity{3,RefCube,2}) = Serendipity{2,RefCube,2}()
+getlowerorder(::Serendipity{3,RefCube,2}) = Lagrange{3,RefCube,1}()
+nvertexdofs(::Serendipity{3,RefCube,2}) = 1
+nedgedofs(::Serendipity{3,RefCube,2}) = 1
+
+faces(::Serendipity{3,RefCube,2}) = ((1,4,3,2,12,11,10,9), (1,2,6,5,9,18,13,17), (2,3,7,6,10,19,14,18), (3,4,8,7,11,20,15,19), (1,5,8,4,17,16,20,12), (5,6,7,8,13,14,15,16))
+
+function reference_coordinates(::Serendipity{3,RefCube,2})
+    return [Vec{3, Float64}((-1.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0,  1.0,  1.0)),
+            Vec{3, Float64}((-1.0,  1.0,  1.0)),
+            Vec{3, Float64}((0.0, -1.0, -1.0)),
+            Vec{3, Float64}((1.0, 0.0, -1.0)),
+            Vec{3, Float64}((0.0, 1.0, -1.0)),
+            Vec{3, Float64}((-1.0, 0.0, -1.0)),
+            Vec{3, Float64}((0.0, -1.0, 1.0)),
+            Vec{3, Float64}((1.0, 0.0, 1.0)),
+            Vec{3, Float64}((0.0, 1.0, 1.0)),
+            Vec{3, Float64}((-1.0, 0.0, 1.0)),
+            Vec{3, Float64}((-1.0, -1.0, 0.0)),
+            Vec{3, Float64}((1.0, -1.0, 0.0)),
+            Vec{3, Float64}((1.0, 1.0, 0.0)),
+            Vec{3, Float64}((-1.0, 1.0, 0.0)),]
+end
+
+function value(ip::Serendipity{3,RefCube,2}, i::Int, ξ::Vec{3})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    ξ_z = ξ[3]
+    i == 1 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z) - 0.5(value(ip,12,ξ) + value(ip,9,ξ) + value(ip,17,ξ))
+    i == 2 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z) - 0.5(value(ip,9,ξ) + value(ip,10,ξ) + value(ip,18,ξ))
+    i == 3 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z) - 0.5(value(ip,10,ξ) + value(ip,11,ξ) + value(ip,19,ξ))
+    i == 4 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z) - 0.5(value(ip,11,ξ) + value(ip,12,ξ) + value(ip,20,ξ))
+    i == 5 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z) - 0.5(value(ip,16,ξ) + value(ip,13,ξ) + value(ip,17,ξ))
+    i == 6 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z) - 0.5(value(ip,13,ξ) + value(ip,14,ξ) + value(ip,18,ξ))
+    i == 7 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z) - 0.5(value(ip,14,ξ) + value(ip,15,ξ) + value(ip,19,ξ))
+    i == 8 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z) - 0.5(value(ip,15,ξ) + value(ip,16,ξ) + value(ip,20,ξ))
+    i == 9 && return 0.25(1 - ξ_x^2) * (1 - ξ_y) * (1 - ξ_z)
+    i == 10 && return 0.25(1 + ξ_x) * (1 - ξ_y^2) * (1 - ξ_z)
+    i == 11 && return 0.25(1 - ξ_x^2) * (1 + ξ_y) * (1 - ξ_z)
+    i == 12 && return 0.25(1 - ξ_x) * (1 - ξ_y^2) * (1 - ξ_z)
+    i == 13 && return 0.25(1 - ξ_x^2) * (1 - ξ_y) * (1 + ξ_z)
+    i == 14 && return 0.25(1 + ξ_x) * (1 - ξ_y^2) * (1 + ξ_z)
+    i == 15 && return 0.25(1 - ξ_x^2) * (1 + ξ_y) * (1 + ξ_z)
+    i == 16 && return 0.25(1 - ξ_x) * (1 - ξ_y^2) * (1 + ξ_z)
+    i == 17 && return 0.25(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z^2)
+    i == 18 && return 0.25(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z^2)
+    i == 19 && return 0.25(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z^2)
+    i == 20 && return 0.25(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z^2)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end

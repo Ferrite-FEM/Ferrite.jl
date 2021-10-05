@@ -50,7 +50,6 @@ const Tetrahedron = Cell{3,4,4}
 const QuadraticTetrahedron = Cell{3,10,4}
 
 const Hexahedron = Cell{3,8,6}
-const QuadraticHexahedron = Cell{3,20,6} # Function interpolation for this doesn't exist in JuAFEM yet
 
 """
 A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh
@@ -60,13 +59,27 @@ struct CellIndex
 end
 
 """
-A `FaceIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, face).
+A `FaceIndex` wraps an (Int, Int) and defines a local face by pointing to a (cell, face).
 """
-struct FaceIndex
+struct FaceIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
-abstract type AbstractGrid end
+"""
+A `EdgeIndex` wraps an (Int, Int) and defines a local edge by pointing to a (cell, edge).
+"""
+struct EdgeIndex <: BoundaryIndex
+    idx::Tuple{Int,Int} # cell and side
+end
+
+"""
+A `VertexIndex` wraps an (Int, Int) and defines a local vertex by pointing to a (cell, vert).
+"""
+struct VertexIndex <: BoundaryIndex
+    idx::Tuple{Int,Int} # cell and side
+end
+
+abstract type AbstractGrid{dim} end
 
 """
     Grid{dim, C<:AbstractCell, T<:Real} <: AbstractGrid}
@@ -76,18 +89,22 @@ A `Grid` is a collection of `Cells` and `Node`s which covers the computational d
 # Fields
 - `cells::Vector{C}`: stores all cells of the grid
 - `nodes::Vector{Node{dim,T}}`: stores the `dim` dimensional nodes of the grid
-- `cellsets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of cell ids
-- `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of node ids
-- `facesets::Dict{String,Set{Tuple{Int,Int}}}`: maps a `String` to a `Set` of `Tuple{Int,Int} (global_cell_id, local_face_id)`
+- `cellsets::Dict{String,Set{CellIndex}}`: maps a `String` key to a `Set` of cell ids
+- `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
+- `facesets::Dict{String,Set{FaceIndex}}`: maps a `String` to a `Set` of `Tuple{Int,Int} (global_cell_id, local_face_id)`
+_ `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id` 
+- `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
 - `boundary_matrix::SparseMatrixCSC{Bool,Int}`: optional, only needed by `onboundary` to check if a cell is on the boundary, see, e.g. Helmholtz example
 """
-mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid
+mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     cells::Vector{C}
     nodes::Vector{Node{dim,T}}
     # Sets
     cellsets::Dict{String,Set{Int}}
     nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{Tuple{Int,Int}}} # TODO: This could be Set{FaceIndex} which could result in nicer use later
+    facesets::Dict{String,Set{FaceIndex}} 
+    edgesets::Dict{String,Set{EdgeIndex}} 
+    vertexsets::Dict{String,Set{VertexIndex}} 
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool,Int}
 end
@@ -96,15 +113,17 @@ function Grid(cells::Vector{C},
               nodes::Vector{Node{dim,T}};
               cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
               nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
-              facesets::Dict{String,Set{Tuple{Int,Int}}}=Dict{String,Set{Tuple{Int,Int}}}(),
+              facesets::Dict{String,Set{FaceIndex}}=Dict{String,Set{FaceIndex}}(),
+              edgesets::Dict{String,Set{EdgeIndex}}=Dict{String,Set{EdgeIndex}}(),
+              vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}(),
               boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)) where {dim,C,T}
-    return Grid(cells, nodes, cellsets, nodesets, facesets, boundary_matrix)
+    return Grid(cells, nodes, cellsets, nodesets, facesets, edgesets, vertexsets, boundary_matrix)
 end
 
 ##########################
 # Grid utility functions #
 ##########################
-@inline getdim(grid::Grid{dim}) where {dim} = dim
+@inline getdim(grid::AbstractGrid{dim}) where {dim} = dim
 """
     getcells(grid::AbstractGrid) 
     getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}} 
@@ -120,6 +139,7 @@ Whereas the last option tries to call a `cellset` of the `grid`.
 @inline getncells(grid::AbstractGrid) = length(grid.cells)
 "Returns the celltype of the `grid`."
 @inline getcelltype(grid::AbstractGrid) = eltype(grid.cells)
+@inline getcelltype(grid::AbstractGrid, i::Int) = typeof(grid.cells[i])
 
 """
     getnodes(grid::AbstractGrid) 
@@ -151,6 +171,12 @@ The last option tries to call a `nodeset` of the `grid`.
 @inline getfaceset(grid::AbstractGrid, set::String) = grid.facesets[set]
 "Returns all facesets of the `grid`"
 @inline getfacesets(grid::AbstractGrid) = grid.facesets
+
+@inline getedgeset(grid::AbstractGrid, set::String) = grid.edgesets[set]
+@inline getedgesets(grid::AbstractGrid) = grid.edgesets
+
+@inline getvertexset(grid::AbstractGrid, set::String) = grid.vertexsets[set]
+@inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
 
 n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
 
@@ -244,7 +270,7 @@ function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=tr
 end
 
 """
-    addfaceset!(grid::AbstractGrid, name::String, faceid::Set{Tuple{Int,Int}})
+    addfaceset!(grid::AbstractGrid, name::String, faceid::Union{Set{FaceIndex},Vector{FaceIndex}})
     addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) 
 
 Adds a `faceset::Dict{String, Set{Tuple{Int,Int}}` to the `grid` with key `name`.
@@ -256,29 +282,41 @@ addfaceset!(gird, "right", Set(((2,2),(4,2))) #see grid manual example for refer
 addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
 ```
 """
-function addfaceset!(grid::AbstractGrid, name::String, faceid::Set{Tuple{Int,Int}})
-    _check_setname(grid.facesets, name)
-    faceset = Set(faceid)
-    _warn_emptyset(faceset)
-    grid.facesets[name] = faceset
+addfaceset!(grid::Grid, name::String, set::Union{Set{FaceIndex},Vector{FaceIndex}}) = 
+    _addset!(grid, name, set, grid.facesets)
+addedgeset!(grid::Grid, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) = 
+    _addset!(grid, name, set, grid.edgesets)
+addvertexset!(grid::Grid, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) = 
+    _addset!(grid, name, set, grid.vertexsets)
+function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
+    _check_setname(dict, name)
+    set = Set(_set)
+    _warn_emptyset(set)
+    dict[name] = set
     grid
 end
 
-function addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true)
-    _check_setname(grid.facesets, name)
-    faceset = Set{Tuple{Int,Int}}()
+addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
+    _addset!(grid, name, f, Ferrite.faces, grid.facesets, FaceIndex; all=all)
+addedgeset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
+    _addset!(grid, name, f, Ferrite.edges, grid.edgesets, EdgeIndex; all=all)
+addvertexset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
+    _addset!(grid, name, f, Ferrite.vertices, grid.vertexsets, VertexIndex; all=all)
+function _addset!(grid::AbstractGrid, name::String, f::Function, _ftype::Function, dict::Dict, _indextype::Type; all::Bool=true)
+    _check_setname(dict, name)
+    _set = Set{_indextype}()
     for (cell_idx, cell) in enumerate(getcells(grid))
-        for (face_idx, face) in enumerate(faces(cell))
+        for (face_idx, face) in enumerate(_ftype(cell))
             pass = all
             for node_idx in face
                 v = f(grid.nodes[node_idx].x)
                 all ? (!v && (pass = false; break)) : (v && (pass = true; break))
             end
-            pass && push!(faceset, (cell_idx, face_idx))
+            pass && push!(_set, _indextype(cell_idx, face_idx))
         end
     end
-    _warn_emptyset(faceset)
-    grid.facesets[name] = faceset
+    _warn_emptyset(_set)
+    dict[name] = _set
     grid
 end
 
@@ -362,7 +400,7 @@ const celltypes = Dict{DataType, String}(Cell{1,2,2}  => "Line",
                                          Cell{3,4,4}  => "Tetrahedron",
                                          Cell{3,10,4} => "QuadraticTetrahedron",
                                          Cell{3,8,6}  => "Hexahedron",
-                                         Cell{3,20,6} => "QuadraticHexahedron")
+                                         Cell{3,20,6} => "Cell{3,20,6}")
 
 # Functions to uniquely identify vertices, edges and faces, used when distributing
 # dofs over a mesh. For this we can ignore the nodes on edged, faces and inside cells,
@@ -381,9 +419,9 @@ edges(c::Line3D) = ((c.nodes[1],c.nodes[2]),)
 vertices(c::Union{Tetrahedron,QuadraticTetrahedron}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
 edges(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]), (c.nodes[1],c.nodes[4]), (c.nodes[2],c.nodes[4]), (c.nodes[3],c.nodes[4]))
 faces(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[2],c.nodes[3]), (c.nodes[1],c.nodes[2],c.nodes[4]), (c.nodes[2],c.nodes[3],c.nodes[4]), (c.nodes[1],c.nodes[4],c.nodes[3]))
-vertices(c::Union{Hexahedron,QuadraticHexahedron}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[5], c.nodes[6], c.nodes[7], c.nodes[8])
-edges(c::Union{Hexahedron,QuadraticHexahedron}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]), (c.nodes[1],c.nodes[5]), (c.nodes[2],c.nodes[6]), (c.nodes[3],c.nodes[7]), (c.nodes[4],c.nodes[8]), (c.nodes[5],c.nodes[6]), (c.nodes[6],c.nodes[7]), (c.nodes[7],c.nodes[8]), (c.nodes[8],c.nodes[5]))
-faces(c::Union{Hexahedron,QuadraticHexahedron}) = ((c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))
+vertices(c::Union{Hexahedron,Cell{3,20,6}}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[5], c.nodes[6], c.nodes[7], c.nodes[8])
+edges(c::Union{Hexahedron,Cell{3,20,6}}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]), (c.nodes[5],c.nodes[6]), (c.nodes[6],c.nodes[7]), (c.nodes[7],c.nodes[8]), (c.nodes[8],c.nodes[5]), (c.nodes[1],c.nodes[5]), (c.nodes[2],c.nodes[6]), (c.nodes[3],c.nodes[7]), (c.nodes[4],c.nodes[8]))
+faces(c::Union{Hexahedron,Cell{3,20,6}}) = ((c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))
 edges(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
 faces(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2],c.nodes[3],c.nodes[4]),)
 
@@ -397,4 +435,23 @@ default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2,RefCube,2}()
 default_interpolation(::Type{Tetrahedron}) = Lagrange{3,RefTetrahedron,1}()
 default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{3,RefTetrahedron,2}()
 default_interpolation(::Type{Hexahedron}) = Lagrange{3,RefCube,1}()
-default_interpolation(::Type{QuadraticHexahedron}) = Lagrange{3,RefCube,2}()
+default_interpolation(::Type{Cell{3,20,6}}) = Serendipity{3,RefCube,2}()
+
+boundaryfunction(::Type{FaceIndex}) = Ferrite.faces
+boundaryfunction(::Type{EdgeIndex}) = Ferrite.edges
+boundaryfunction(::Type{VertexIndex}) = Ferrite.vertices
+
+for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
+    @eval begin  
+        #Constructor
+        ($INDEX)(a::Int, b::Int) = ($INDEX)((a,b))
+
+        Base.getindex(I::($INDEX), i::Int) = I.idx[i]
+        
+        #To be able to do a,b = faceidx
+        Base.iterate(I::($INDEX), state::Int=1) = (state==3) ?  nothing : (I[state], state+1)
+
+        #For (cellid, faceidx) in faceset
+        Base.in(v::Tuple{Int, Int}, s::Set{$INDEX}) = in($INDEX(v), s)
+    end
+end
