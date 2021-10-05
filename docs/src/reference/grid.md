@@ -7,6 +7,10 @@ DocTestSetup = :(using Ferrite)
 ```@docs
 Node
 Cell
+CellIndex
+VertexIndex
+EdgeIndex
+FaceIndex
 Grid
 ```
 
@@ -17,7 +21,7 @@ getcells
 getncells
 getnodes
 getnnodes
-JuAFEM.nnodes_per_cell
+Ferrite.nnodes_per_cell
 getcellset
 getnodeset
 getfaceset
