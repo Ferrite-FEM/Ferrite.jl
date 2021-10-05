@@ -33,7 +33,7 @@
 # ### Material parameters and state variables
 #
 # Start by loading some necessary packages
-using Ferrite, SparseArrays, LinearAlgebra, Printf
+using Ferrite, Tensors, SparseArrays, LinearAlgebra, Printf
 
 # We define a J₂-plasticity-material, containing material parameters and the elastic
 # stiffness Dᵉ (since it is constant)
@@ -62,17 +62,12 @@ end;
 #md #     material parameters ``E`` and ``ν`` - simply as a convenience for the user.
 #md #
 
-# Define a `struct` to store the material state.
-mutable struct MaterialState{T, S <: SecondOrderTensor{3, T}}
+# Define a `struct` to store the material state for a Gauss point.
+struct MaterialState{T, S <: SecondOrderTensor{3, T}}
     ## Store "converged" values
     ϵᵖ::S # plastic strain
     σ::S # stress
     k::T # hardening variable
-
-    ## Store temporary values used during equilibrium iterations
-    temp_ϵᵖ::S
-    temp_σ::S
-    temp_k::T
 end
 
 # Constructor for initializing a material state. Every quantity is set to zero.
@@ -80,19 +75,9 @@ function MaterialState()
     return MaterialState(
                 zero(SymmetricTensor{2, 3}),
                 zero(SymmetricTensor{2, 3}),
-                0.0,
-                zero(SymmetricTensor{2, 3}),
-                zero(SymmetricTensor{2, 3}),
                 0.0)
 end
 
-# Next, we define a method to update the material state after equilibrium has
-# been found. This will be called at the end of each time-step.
-function update_state!(state::MaterialState)
-    state.ϵᵖ = state.temp_ϵᵖ
-    state.σ = state.temp_σ
-    state.k = state.temp_k
-end;
 # For later use, during the post-processing step, we define a function to
 # compute the von Mises effective stress.
 function vonMises(σ)
@@ -104,25 +89,23 @@ end;
 #
 # This is the actual method which computes the stress and material tangent
 # stiffness in a given integration point.
-# Input is the current strain and material state.
+# Input is the current strain and the material state from the previous timestep.
 function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticity, state::MaterialState)
     ## unpack some material parameters
     G = material.G
-    K = material.K
     H = material.H
 
     ## We use (•)ᵗ to denote *trial*-values
     σᵗ = material.Dᵉ ⊡ (ϵ - state.ϵᵖ) # trial-stress
     sᵗ = dev(σᵗ)         # deviatoric part of trial-stress
     J₂ = 0.5 * sᵗ ⊡ sᵗ   # second invariant of sᵗ
-    σᵗₑ = sqrt(3.0*J₂)   # effetive trial-stress (von Mises stress)
+    σᵗₑ = sqrt(3.0*J₂)   # effective trial-stress (von Mises stress)
     σʸ = material.σ₀ + H * state.k # Previous yield limit
 
     φᵗ  = σᵗₑ - σʸ # Trial-value of the yield surface
 
     if φᵗ < 0.0 # elastic loading
-        state.temp_σ = σᵗ
-        return state.temp_σ, material.Dᵉ
+        return σᵗ, material.Dᵉ, MaterialState(state.ϵᵖ, σᵗ, state.k)
     else # plastic loading
         h = H + 3G
         μ =  φᵗ / h   # plastic multiplier
@@ -143,12 +126,11 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
         Dtemp(i,j,k,l) = -2G*b * Q(i,j,k,l) - 9G^2 / (h*σₑ^2) * s[i,j]*s[k,l]
         D = material.Dᵉ + SymmetricTensor{4, 3}(Dtemp)
 
-        ## Store outputs in the material state
-        Δϵᵖ = 3/2 *μ / σₑ*s            # plastic strain
-        state.temp_ϵᵖ = state.ϵᵖ + Δϵᵖ  # plastic strain
-        state.temp_k = state.k + μ     # hardening variable
-        state.temp_σ = σ               # updated stress
-        return state.temp_σ, D
+        ## Return new state
+        Δϵᵖ = 3/2 * μ / σₑ * s # plastic strain
+        ϵᵖ = state.ϵᵖ + Δϵᵖ    # plastic strain
+        k = state.k + μ        # hardening variable
+        return σ, D, MaterialState(ϵᵖ, σ, k)
     end
 end
 
@@ -196,20 +178,22 @@ end;
 # * Tangent stiffness `K`
 function doassemble(cellvalues::CellVectorValues{dim},
                     facevalues::FaceVectorValues{dim}, K::SparseMatrixCSC, grid::Grid,
-                    dh::DofHandler, material::J2Plasticity, u, states, t) where {dim}
+                    dh::DofHandler, material::J2Plasticity, u, states, states_old, t) where {dim}
     r = zeros(ndofs(dh))
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)
     re = zeros(nu)     # element residual vector
     ke = zeros(nu, nu) # element tangent matrix
 
-    for (cell, state) in zip(CellIterator(dh), states)
+    for (i, cell) in enumerate(CellIterator(dh))
         fill!(ke, 0)
         fill!(re, 0)
         eldofs = celldofs(cell)
         ue = u[eldofs]
+        state = @view states[:, i]
+        state_old = @view states_old[:, i]
         assemble_cell!(ke, re, cell, cellvalues, facevalues, grid, material,
-                       ue, state, t)
+                       ue, state, state_old, t)
         assemble!(assembler, eldofs, re, ke)
     end
     return K, r
@@ -221,23 +205,21 @@ end
 #md #     and then symmetrize it.
 #md #
 function assemble_cell!(Ke, re, cell, cellvalues, facevalues, grid, material,
-                        ue, state, t)
+                        ue, state, state_old, t)
     n_basefuncs = getnbasefunctions(cellvalues)
     reinit!(cellvalues, cell)
 
     for q_point in 1:getnquadpoints(cellvalues)
         ## For each integration point, compute stress and material stiffness
-        ∇u = function_gradient(cellvalues, q_point, ue)
-        ϵ = symmetric(∇u) # Total strain
-        σ, D = compute_stress_tangent(ϵ, material, state[q_point])
+        ϵ = function_symmetric_gradient(cellvalues, q_point, ue) # Total strain
+        σ, D, state[q_point] = compute_stress_tangent(ϵ, material, state_old[q_point])
 
         dΩ = getdetJdV(cellvalues, q_point)
         for i in 1:n_basefuncs
-            δϵ = symmetric(shape_gradient(cellvalues, q_point, i))
-
+            δϵ = shape_symmetric_gradient(cellvalues, q_point, i)
             re[i] += (δϵ ⊡ σ) * dΩ # add internal force to residual
-            for j in 1:i
-                Δϵ = symmetric(shape_gradient(cellvalues, q_point, j))
+            for j in 1:i # loop only over lower half
+                Δϵ = shape_symmetric_gradient(cellvalues, q_point, j)
                 Ke[i, j] += δϵ ⊡ D ⊡ Δϵ * dΩ
             end
         end
@@ -308,10 +290,8 @@ function solve()
     ## Create material states. One array for each cell, where each element is an array of material-
     ## states - one for each integration point
     nqp = getnquadpoints(cellvalues)
-    states = [[MaterialState() for _ in 1:nqp] for _ in 1:getncells(grid)]
-
-    ## states = [MaterialState() for _ in 1:nqp for _ in 1:getncells(grid)]
-    ## temp_states = [MaterialState() for _ in 1:nqp for _ in 1:getncells(grid)]
+    states = [MaterialState() for _ in 1:nqp, _ in 1:getncells(grid)]
+    states_old = [MaterialState() for _ in 1:nqp, _ in 1:getncells(grid)]
 
     ## Newton-Raphson loop
     NEWTON_TOL = 1 # 1 N
@@ -332,7 +312,7 @@ function solve()
                 break
             end
             K, r = doassemble(cellvalues, facevalues, K, grid, dh, material, u,
-                             states, traction);
+                             states, states_old, traction);
             norm_r = norm(r[Ferrite.free_dofs(dbcs)])
 
             print("Iteration: $newton_itr \tresidual: $(@sprintf("%.8f", norm_r))\n")
@@ -346,9 +326,8 @@ function solve()
         end
 
         ## Update all the material states after we have reached equilibrium
-        for cell_states in states
-            foreach(update_state!, cell_states)
-        end
+        states .= states_old
+
         u_max[timestep] = max(abs.(u)...) # maximum displacement in current timestep
     end
 
@@ -358,7 +337,7 @@ function solve()
     ## The following is a quick (and dirty) way of extracting average cell data for export.
     mises_values = zeros(getncells(grid))
     κ_values = zeros(getncells(grid))
-    for (el, cell_states) in enumerate(states)
+    for (el, cell_states) in enumerate(eachcol(states))
         for state in cell_states
             mises_values[el] += vonMises(state.σ)
             κ_values[el] += state.k*material.H
@@ -398,7 +377,7 @@ xlabel!("Maximum deflection [m]")
 
 ## test the result                       #src
 using Test                               #src
-@test norm(u_max[end]) ≈ 0.2544526451    #src
+@test norm(u_max[end]) ≈ 0.255056309     #src
 
 #md # ## [Raw source](@id plasticity-raw-code)
 #md #
