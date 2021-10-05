@@ -20,7 +20,7 @@
 #   M(t) \mathrm{d}_t u = f(u,t)
 # ```
 # where $M$ is a possibly time-dependent and not necessarily invertible mass matrix,
-# $u$ the vector of unknowns and $f$ the right hand side. For us $f$ can be interpreted as
+# $u$ the vector of unknowns and $f$ the right-hand-side (RHS). For us $f$ can be interpreted as
 # the spatial discretization of all linear and nonlinear operators depending on $u$ and $t$,
 # but not on the time derivative of $u$.
 #
@@ -330,14 +330,14 @@ apply!(u₀, ch);
 jac_sparsity = sparse(K);
 
 # To apply the nonlinear portion of the Navier-Stokes problem we simply hand
-# over the dof handler and cell values to the right hand side as a parameter.
+# over the dof handler and cell values to the right-hand-side (RHS) as a parameter.
 # Further the pre-assembled linear part (which is time independent) is
 # passed to save some runtime. To apply the time-dependent Dirichlet BCs, we
 # also hand over the constraint handler.
 # The basic idea to apply the Dirichlet BCs consistently is that we copy the
 # current solution `u`, apply the Dirichlet BCs on the copy, evaluate the
-# discretized right hand side of the Navier-Stokes equations with this vector
-# and finally set the rhs to zero on every constraint. This way we obtain a
+# discretized RHS of the Navier-Stokes equations with this vector
+# and finally set the RHS to zero on every constraint. This way we obtain a
 # correct solution for all dofs which are not Dirichlet constrained. These
 # dofs are then corrected in a post-processing step, when evaluating the
 # solution vector at specific time points.
@@ -450,7 +450,7 @@ for (u_uc,t) in integrator
 end
 vtk_save(pvd);
 
-# Test the result for full proper development of the flow                   #hide
+# Test the result for full proper development of the flow                   #src
 using Test                                                                  #hide
 function compute_divergence(dh, u, cellvalues_v)                            #hide
     divv = 0.0                                                              #hide
