@@ -31,13 +31,13 @@ You can install Ferrite from the Pkg REPL (press `]` in the Julia
 REPL to enter `pkg>` mode):
 
 ```
-pkg> add https://github.com/Ferrite-FEM/Ferrite.jl.git
+pkg> add Ferrite
 ```
 
 !!! note
     Alternative installation method:
     ```julia
-    julia> import Pkg; Pkg.add(PackageSpec(url = "https://github.com/Ferrite-FEM/Ferrite.jl.git"))
+    julia> import Pkg; Pkg.add("Ferrite")
     ```
 
 To load the package, use

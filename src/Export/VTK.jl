@@ -1,13 +1,17 @@
 cell_to_vtkcell(::Type{Line}) = VTKCellTypes.VTK_LINE
+cell_to_vtkcell(::Type{Line2D}) = VTKCellTypes.VTK_LINE
+cell_to_vtkcell(::Type{Line3D}) = VTKCellTypes.VTK_LINE
 cell_to_vtkcell(::Type{QuadraticLine}) = VTKCellTypes.VTK_QUADRATIC_EDGE
 
 cell_to_vtkcell(::Type{Quadrilateral}) = VTKCellTypes.VTK_QUAD
+cell_to_vtkcell(::Type{Quadrilateral3D}) = VTKCellTypes.VTK_QUAD
 cell_to_vtkcell(::Type{QuadraticQuadrilateral}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
 cell_to_vtkcell(::Type{Triangle}) = VTKCellTypes.VTK_TRIANGLE
 cell_to_vtkcell(::Type{QuadraticTriangle}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
 cell_to_vtkcell(::Type{Cell{2,8,4}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
 
 cell_to_vtkcell(::Type{Hexahedron}) = VTKCellTypes.VTK_HEXAHEDRON
+cell_to_vtkcell(::Type{Cell{3,20,6}}) = VTKCellTypes.VTK_QUADRATIC_HEXAHEDRON
 cell_to_vtkcell(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
 cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 
@@ -96,45 +100,12 @@ the cell is in the set and 0 otherwise.
 vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellset::String) =
     vtk_cellset(vtk, grid, [cellset])
 
-import Ferrite.field_offset
-function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler, u::Vector, suffix="")
+function WriteVTK.vtk_point_data(vtkfile, dh::AbstractDofHandler, u::Vector, suffix="")
 
     fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
 
     for name in fieldnames
-        @debug println("exporting field $(name)")
-        field_dim = getfielddim(dh, name)
-        space_dim = field_dim == 2 ? 3 : field_dim
-        data = fill(NaN, space_dim, getnnodes(dh.grid))  # set default value
-
-        for fh in dh.fieldhandlers
-            # check if this fh contains this field, otherwise continue to the next
-            field_pos = findfirst(i->i == name, getfieldnames(fh))
-            field_pos === nothing && continue
-
-            cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
-            offset = field_offset(fh, name)
-
-            for cellnum in cellnumbers
-                cell = dh.grid.cells[cellnum]
-                n = ndofs_per_cell(dh, cellnum)
-                eldofs = zeros(Int, n)
-                _celldofs = celldofs!(eldofs, dh, cellnum)
-                counter = 1
-
-                for node in cell.nodes
-                    for d in 1:field_dim
-                        data[d, node] = u[_celldofs[counter + offset]]
-                        @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
-                        counter += 1
-                    end
-                    if field_dim == 2
-                        # paraview requires 3D-data so pad with zero
-                        data[3, node] = 0
-                    end
-                end
-            end
-        end
+        data = reshape_to_nodes(dh, u, name)
         vtk_point_data(vtkfile, data, string(name, suffix))
     end
 

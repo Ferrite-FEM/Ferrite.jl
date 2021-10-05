@@ -17,7 +17,7 @@ struct DofHandler{dim,C,T} <: AbstractDofHandler
     # TODO: field_interpolations can probably be better typed: We should at least require
     #       all the interpolations to have the same dimension and reference shape
     field_interpolations::Vector{Interpolation}
-    bc_values::Vector{BCValues{T}} # for boundary conditions
+    bc_values::Vector{BCValues{T}} # TODO: BcValues is created/handeld by the constrainthandler, so this can be removed
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
     closed::ScalarWrapper{Bool}
@@ -26,6 +26,7 @@ struct DofHandler{dim,C,T} <: AbstractDofHandler
 end
 
 function DofHandler(grid::Grid)
+    isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. Use MixedDofHandler instead of DofHandler")
     DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end
 
@@ -395,26 +396,46 @@ function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; com
     vtk_grid(filename, dh.grid; compress=compress)
 end
 
-# Exports the FE field `u` to `vtkfile`
-function WriteVTK.vtk_point_data(vtkfile, dh::DofHandler, u::Vector, suffix="")
-    for f in 1:nfields(dh)
-        @debug println("exporting field $(dh.field_names[f])")
-        field_dim = dh.field_dims[f]
-        space_dim = field_dim == 2 ? 3 : field_dim
-        data = fill(0.0, space_dim, getnnodes(dh.grid))
-        offset = field_offset(dh, dh.field_names[f])
-        for cell in CellIterator(dh)
-            _celldofs = celldofs(cell)
-            counter = 1
-            for node in getnodes(cell)
-                for d in 1:dh.field_dims[f]
-                    data[d, node] = u[_celldofs[counter + offset]]
-                    @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
-                    counter += 1
-                end
+"""
+    reshape_to_nodes(dh::AbstractDofHandler, u::Vector{T}, fieldname::Symbol) where T
+
+Reshape the entries of the dof-vector `u` which correspond to the field `fieldname` in nodal order.
+Return a matrix with a column for every node and a row for every dimension of the field.
+For superparametric fields only the entries corresponding to nodes of the grid will be returned. Do not use this function for subparametric approximations.
+"""
+function reshape_to_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol) where T
+    # make sure the field exists
+    fieldname ∈ Ferrite.getfieldnames(dh) || error("Field $fieldname not found.")
+
+    field_idx = findfirst(i->i==fieldname, getfieldnames(dh))
+    offset = field_offset(dh, fieldname)
+    field_dim = getfielddim(dh, field_idx)
+
+    space_dim = field_dim == 2 ? 3 : field_dim
+    data = fill(zero(T), space_dim, getnnodes(dh.grid))
+
+    reshape_field_data!(data, dh, u, offset, field_dim)
+
+    return data
+end
+
+function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=Set{Int}(1:getncells(dh.grid))) where T
+
+    _celldofs = Vector{Int}(undef, ndofs_per_cell(dh, first(cellset)))
+    for cell in CellIterator(dh, collect(cellset))
+        celldofs!( _celldofs, cell)
+        counter = 1
+        for node in getnodes(cell)
+            for d in 1:field_dim
+                data[d, node] = u[_celldofs[counter + field_offset]]
+                @debug println("  exporting $(u[_celldofs[counter + field_offset]]) for dof#$(_celldofs[counter + field_offset])")
+                counter += 1
+            end
+            if field_dim == 2
+                # paraview requires 3D-data so pad with zero
+                data[3, node] = 0
             end
         end
-        vtk_point_data(vtkfile, data, string(dh.field_names[f], suffix))
     end
-    return vtkfile
+    return data
 end

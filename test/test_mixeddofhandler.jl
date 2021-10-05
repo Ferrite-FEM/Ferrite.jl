@@ -434,11 +434,146 @@ function test_field_on_subdomain()
     @test_throws ErrorException Ferrite.find_field(dh.fieldhandlers[1], :s)
 end
 
+function test_reshape_to_nodes()
+
+    # 5_______6
+    # |\      | 
+    # |   \   |
+    # 3______\4
+    # |       |
+    # |       |
+    # 1_______2 
+
+    nodes = [Node((0.0, 0.0)),
+    Node((1.0, 0.0)),
+    Node((0.0, 1.0)),
+    Node((1.0, 1.0)),
+    Node((0.0, 2.0)),
+    Node((1.0, 2.0))]
+    cells = Ferrite.AbstractCell[Quadrilateral((1,2,4,3)),
+    Triangle((3,4,6)),
+    Triangle((3,6,5))]
+    mesh = Grid(cells, nodes)
+    addcellset!(mesh, "quads", Set{Int}((1,)))
+    addcellset!(mesh, "tris", Set{Int}((2, 3)))
+
+    ip_quad = Lagrange{2,RefCube,1}()
+    ip_tri = Lagrange{2,RefTetrahedron,1}()
+
+    dh = MixedDofHandler(mesh)
+    field_v_tri = Field(:v, ip_tri, 2) # vector field :v everywhere
+    fh_tri = FieldHandler([field_v_tri], getcellset(mesh, "tris"))
+    push!(dh, fh_tri)
+    field_v_quad = Field(:v, ip_quad, 2)
+    field_s_quad = Field(:s, ip_quad, 1) # scalar field :s only on quad
+    fh_quad = FieldHandler([field_v_quad, field_s_quad], getcellset(mesh, "quads"))
+    push!(dh, fh_quad)
+    close!(dh)
+
+    u = collect(1.:16.)
+
+    s_nodes = reshape_to_nodes(dh, u, :s)
+    @test s_nodes[1:4] ≈ [13., 14., 16., 15.]
+    @test all(isnan.(s_nodes[5:6]))
+    v_nodes = reshape_to_nodes(dh, u, :v)
+    @test v_nodes ≈ hcat(   [9., 10., 0.],
+                    [11., 12., 0.],
+                    [1., 2., 0.],
+                    [3., 4., 0.],
+                    [7., 8., 0.],
+                    [5., 6., 0.])
+end
 
 function test_mixed_grid_show()
     grid = get_2d_grid()
     str = sprint(show, MIME("text/plain"), grid)
     @test occursin("2 Quadrilateral/Triangle cells", str)
+end
+
+# regression tests for https://github.com/KristofferC/JuAFEM.jl/issues/315 
+function test_subparametric_quad()
+    #linear geometry
+    grid = generate_grid(Quadrilateral, (1,1))
+    ip      = Lagrange{2,RefCube,2}()
+    
+    field = Field(:u, ip, 2)
+    fh = FieldHandler([field], Set(1:getncells(grid)))
+    
+    dh = MixedDofHandler(grid)
+    push!(dh, fh)
+    close!(dh)
+    
+    ch = ConstraintHandler(dh)
+    dbc1 = Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 2)
+    add!(ch, dbc1)
+    close!(ch)
+    update!(ch, 1.0)
+    @test getnbasefunctions(Ferrite.getfieldinterpolation(dh,1)) == 9 # algebraic nbasefunctions
+    @test celldofs(dh, 1) == [i for i in 1:18]
+end
+
+function test_subparametric_triangle()
+    #linear geometry
+    grid = generate_grid(Triangle, (1,1))
+
+    ip = Lagrange{2,RefTetrahedron,2}()
+    
+    field = Field(:u, ip, 2)
+    fh = FieldHandler([field], Set(1:getncells(grid)))
+    
+    dh = MixedDofHandler(grid)
+    push!(dh, fh)
+    close!(dh)
+    
+    ch = ConstraintHandler(dh)
+    dbc1 = Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 2)
+    add!(ch, dbc1)
+    close!(ch)
+    update!(ch, 1.0)
+    @test getnbasefunctions(Ferrite.getfieldinterpolation(dh,1)) == 6 # algebraic nbasefunctions
+    @test celldofs(dh, 1) == [i for i in 1:12]
+end
+
+function test_separate_fields_on_separate_domains()
+    # 5_______6
+    # |\      | 
+    # |   \   |
+    # 3______\4
+    # |       |
+    # |       |
+    # 1_______2 
+    # Given: a vector field :q defined on the quad and a scalar field :t defined on the triangles
+    nodes = [Node((0.0, 0.0)),
+            Node((1.0, 0.0)),
+            Node((0.0, 1.0)),
+            Node((1.0, 1.0)),
+            Node((0.0, 2.0)),
+            Node((1.0, 2.0))]
+    cells = Ferrite.AbstractCell[Quadrilateral((1,2,4,3)),
+            Triangle((3,4,5)),
+            Triangle((4,6,5))]
+    mesh = Grid(cells, nodes)
+    addcellset!(mesh, "quads", Set{Int}((1,)))
+    addcellset!(mesh, "tris", Set{Int}((2, 3)))
+
+    dh = MixedDofHandler(mesh)
+    ip_tri = Lagrange{2,RefTetrahedron,1}()
+    ip_quad = Lagrange{2,RefCube,1}()
+    field = Field(:q, ip_quad, 2) # vector field :q only on quad
+    fh_quad = FieldHandler([field], getcellset(mesh, "quads"))
+    push!(dh, fh_quad)
+
+    field = Field(:t, ip_tri, 1) # scalar field :t only on tris
+    fh_tri = FieldHandler([field], getcellset(mesh, "tris"))
+    push!(dh, fh_tri)
+    close!(dh)
+
+    # Expect: 8 dofs for the quad and 4 new dofs for the triangles
+    @test ndofs(dh) == 12
+    @test celldofs(dh, 1) == [i for i in 1:8]
+    @test celldofs(dh, 2) == [9, 10, 11]
+    @test celldofs(dh, 3) == [10, 12, 11]
+
 end
 
 @testset "MixedDofHandler" begin
@@ -459,5 +594,10 @@ end
     test_2_element_heat_eq();
     test_element_order();
     test_field_on_subdomain();
+    test_mixed_grid_show();
+    test_subparametric_quad();
+    test_subparametric_triangle();
+    test_reshape_to_nodes()
     test_mixed_grid_show()
+    test_separate_fields_on_separate_domains();
 end

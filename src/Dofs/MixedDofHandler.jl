@@ -2,7 +2,6 @@
 mutable struct FieldHandler
     fields::Vector{Field}
     cellset::Set{Int}
-    bc_values::Vector{BCValues} # for boundary conditions
 end
 """
     FieldHandler(fields::Vector{Field}, cellset)
@@ -10,9 +9,7 @@ end
 Construct a `FieldHandler` based on an array of `Field`s and assigns it a set of cells.
 """
 function FieldHandler(fields::Vector{Field}, cellset)
-    # TODO for now, only accept isoparamtric mapping
-    bc_values = [BCValues(field.interpolation, field.interpolation) for field in fields]
-    FieldHandler(fields, cellset, bc_values)
+    return FieldHandler(fields, cellset)
 end
 
 struct CellVector{T}
@@ -66,7 +63,7 @@ function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::MixedDofHandler, i::
     return global_coords
 end
 
-function cellnodes!(global_nodes::Vector{Int}, dh::MixedDofHandler, i::Int) where {dim,T}
+function cellnodes!(global_nodes::Vector{Int}, dh::MixedDofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_nodes) == nnodes_per_cell(dh, i)
     unsafe_copyto!(global_nodes, 1, dh.cell_nodes.values, dh.cell_nodes.offset[i], length(global_nodes))
@@ -138,19 +135,20 @@ end
 function Base.push!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolation)
     @assert !isclosed(dh)
 
+    celltype = getcelltype(dh.grid)
+    @assert isconcretetype(celltype)
+
     if length(dh.fieldhandlers) == 0
         cellset = Set(1:getncells(dh.grid))
-        push!(dh.fieldhandlers, FieldHandler(Field[],cellset,BCValues[]))
+        push!(dh.fieldhandlers, FieldHandler(Field[], cellset))
     elseif length(dh.fieldhandlers) > 1
         error("If you have more than one FieldHandler, you must specify field")
     end
     fh = first(dh.fieldhandlers)
 
     field = Field(name,ip,dim)
-    bc_value = BCValues(field.interpolation, field.interpolation)
 
     push!(fh.fields, field)
-    push!(fh.bc_values, bc_value)
 
     return dh
 end
@@ -172,7 +170,7 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
     field_names = Ferrite.getfieldnames(dh)  # all the fields in the problem
     numfields =  length(field_names)
 
-    # Create dicts that stores created dofs
+    # Create dicts that store created dofs
     # Each key should uniquely identify the given type
     vertexdicts = [Dict{Int, Array{Int}}() for _ in 1:numfields]
     edgedicts = [Dict{Tuple{Int,Int}, Array{Int}}() for _ in 1:numfields]
@@ -192,6 +190,7 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
         nextdof = _close!(
             dh,
             cellnumbers,
+            field_names,
             Ferrite.getfieldnames(fh),
             Ferrite.getfielddims(fh),
             Ferrite.getfieldinterpolations(fh),
@@ -222,7 +221,7 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
 
 end
 
-function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
+function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
 
     ip_infos = Ferrite.InterpolationInfo[]
     for interpolation in field_interpolations
@@ -243,24 +242,25 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, field_names, field_dims,
         cell_dofs = Int[]  # list of global dofs for each cell
         @debug "Creating dofs for cell #$ci"
 
-        for fi in 1:length(field_names)
-            @debug "\tfield: $(field_names[fi])"
-            ip_info = ip_infos[fi]
+        for (local_num, field_name) in enumerate(field_names)
+            fi = findfirst(i->i == field_name, global_field_names)
+            @debug "\tfield: $(field_name)"
+            ip_info = ip_infos[local_num]
 
             if ip_info.nvertexdofs > 0
-                nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[fi], ip_info.nvertexdofs, nextdof)
+                nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[local_num], ip_info.nvertexdofs, nextdof)
             end
 
             if ip_info.nedgedofs > 0 && dim == 3 #Edges only in 3d
-                nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[fi], ip_info.nedgedofs, nextdof)
+                nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[local_num], ip_info.nedgedofs, nextdof)
             end
 
             if ip_info.nfacedofs > 0 && (ip_info.dim == dim)
-                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[fi], ip_info.nfacedofs, nextdof)
+                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[local_num], ip_info.nfacedofs, nextdof)
             end
 
             if ip_info.ncelldofs > 0
-                nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[fi], ip_info.ncelldofs, nextdof)
+                nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[local_num], ip_info.ncelldofs, nextdof)
             end
 
         end
@@ -414,4 +414,23 @@ find_field(dh::MixedDofHandler, field_name::Symbol) = find_field(first(dh.fieldh
 field_offset(dh::MixedDofHandler, field_name::Symbol) = field_offset(first(dh.fieldhandlers), field_name)
 getfieldinterpolation(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].interpolation
 getfielddim(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].dim
-getbcvalue(dh::MixedDofHandler, field_idx::Int) =  dh.fieldhandlers[1].bc_values[field_idx]
+
+function reshape_to_nodes(dh::MixedDofHandler, u::Vector{Float64}, fieldname::Symbol)
+
+    # make sure the field exists
+    fieldname ∈ Ferrite.getfieldnames(dh) || error("Field $fieldname not found.")
+
+    field_dim = getfielddim(dh, fieldname)
+    space_dim = field_dim == 2 ? 3 : field_dim
+    data = fill(NaN, space_dim, getnnodes(dh.grid))  # set default value
+
+    for fh in dh.fieldhandlers
+        # check if this fh contains this field, otherwise continue to the next
+        field_pos = findfirst(i->i == fieldname, getfieldnames(fh))
+        field_pos === nothing && continue
+        offset = field_offset(fh, fieldname)
+
+        reshape_field_data!(data, dh, u, offset, field_dim, fh.cellset)
+    end
+    return data
+end
