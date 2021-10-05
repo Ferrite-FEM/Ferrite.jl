@@ -1,6 +1,5 @@
 """
-    PointEvalHandler(dh::AbstractDofHandler, points::AbstractVector{Vec{dim,T}}) where {dim, T}
-    PointEvalHandler(dh::AbstractDofHandler, points::AbstractVector{Vec{dim,T}}, geom_interpolations::Vector{<:Interpolation{dim}}) where {dim, T}
+    PointEvalHandler(dh::AbstractDofHandler, points::AbstractVector{Vec{dim,T}}, [geom_interpolations::Vector{<:Interpolation{dim}}]) where {dim, T}
 
 A `PointEvalHandler` computes the corresponding cell for each point in `points` and its local coordinate within the cell.
 When no `geom_interpolations` are given, the default interpolations of the grid are used. For using custom geometry interpolations hand in a vector of interpolations,
