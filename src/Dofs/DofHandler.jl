@@ -288,6 +288,23 @@ function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::Grid{dim,C}, i::In
     end
     return global_coords
 end
+
+function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid{dim}, i::Int) where {dim}
+    C = getcelltype(grid)
+    @assert length(global_nodes) == nnodes(C)
+    for j in 1:nnodes(C)
+        global_nodes[j] = getcells(grid, i).nodes[j] ##TODO getnodes(::AbstractCell); only vertices(::AbstractCell) available
+    end 
+    return global_nodes
+end
+
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,T}
+    C = getcelltype(grid)
+    @assert length(global_coords) == nnodes(C)
+    global_coords .= getcoordinates(grid, i)
+    return global_coords
+end
+
 cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, dh.grid, i)
 
 function celldofs(dh::DofHandler, i::Int)
