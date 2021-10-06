@@ -9,7 +9,7 @@ Operates slightly faster than [`MixedDofHandler`](@docs). Supports:
 - `Grid`s with a single concrete cell type.
 - One or several fields on the whole domaine.
 """
-struct DofHandler{dim,C,T} <: AbstractDofHandler
+struct DofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     field_names::Vector{Symbol}
     field_dims::Vector{Int}
     # TODO: field_interpolations can probably be better typed: We should at least require
@@ -19,7 +19,7 @@ struct DofHandler{dim,C,T} <: AbstractDofHandler
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
     closed::ScalarWrapper{Bool}
-    grid::Grid{dim,C,T}
+    grid::G
     ndofs::ScalarWrapper{Int}
 end
 
