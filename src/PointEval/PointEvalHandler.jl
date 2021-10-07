@@ -71,9 +71,10 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
             node_cell_dict = node_cell_dicts[ip_idx]
             geom_interpol = geom_interpolations[ip_idx]
             # loop over points
-            for node in nearest_nodes[point_idx], cell in get(node_cell_dict, node, [0])
-                # if node is not part of the fieldhandler, try the next node
-                cell == 0 ? continue : nothing
+            for node in nearest_nodes[point_idx]
+                cells = get(node_cell_dict, node, nothing)
+                cells === nothing && continue # if node is not part of the fieldhandler, try the next node
+                for cell in cells
 
                 cell_coords = getcoordinates(grid, cell)
                 is_in_cell, local_coord = point_in_cell(geom_interpol, cell_coords, points[point_idx])
@@ -168,11 +169,8 @@ function _get_node_cell_map(grid::Grid, cellset::Set{Int}=Set{Int64}(1:getncells
     cell_dict = Dict{Int, Vector{Int}}()
     for cellidx in cellset
         for node in grid.cells[cellidx].nodes
-            if haskey(cell_dict, node)
-                push!(cell_dict[node], cellidx)
-            else
-                cell_dict[node] = [cellidx]
-            end
+            v = get!(Vector{Int}, cell_dict, node)
+            push!(v, cellidx)
         end
     end
     return cell_dict
