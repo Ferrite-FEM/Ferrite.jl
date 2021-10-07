@@ -7,8 +7,8 @@
 #
 # After running a simulation, we usually want to visualize the results in different ways.
 # The `L2Projector` and the `PointEvalHandler` build a pipeline for doing so. With the `L2Projector`,
-# integration point quantities can be projected to the nodes. The `PointEvalHandler` allows to evaluate a 
-# field whose values are known in the nodes in any coordinate. Thus with the combination of both functionalities,
+# integration point quantities can be projected to the nodes. The `PointEvalHandler` enables evaluation of
+# the finite element approximated function in any coordinate in the domain. Thus with the combination of both functionalities,
 # both nodal quantities and integration point quantities can be evaluated in any coordinate, allowing for example
 # cut-planes through 3D structures or cut-lines through 2D-structures.
 #
@@ -16,7 +16,7 @@
 # determined on a square domain. In this example, we first compute the heat flux in each
 # integration point (based on the solved temperature field) and then we do an L2-projection
 # of the fluxes to the nodes of the mesh. By doing this, we can more easily visualize
-# integration points quantities. Finally, we visualize the temperature field hand the heat fluxes along a cut-line.
+# integration points quantities. Finally, we visualize the temperature field and the heat fluxes along a cut-line.
 #
 # The L2-projection is defined as follows: Find projection ``q(\boldsymbol{x}) \in L_2(\Omega)`` such that
 # ```math
@@ -97,7 +97,7 @@ q_points = Ferrite.get_point_values(ph, q_nodes);
 
 # We can also extract the field values, here the temperature, right away from the result vector of the simulation, that is stored in `u`. Opposed to the heat flux vector obtained from the `L2Projection`, the values are stored in the order of the degrees of freedom. 
 # Therefore, we additionally give the field name which we want to extract from the dof-vector.
-# Notice that for using this function, the `PointEvalHandler` should always be constructed with the same `DofHandler` 
+# Notice that for using this function, the `PointEvalHandler` must always be constructed with the same `DofHandler` 
 # which was used for computing the dof-vector.
 u_points = Ferrite.get_point_values(ph, u, :u);
 
@@ -108,7 +108,7 @@ import Plots
 # Firstly, we are going to plot the temperature values along the given line.
 Plots.plot(getindex.(points,1), u_points, label="Temperature", xlabel="X-Coordinate", ylabel = "Temperature")
 
-# Secondly, the horizontal heat flux (= the first component of the heat flux vector) is plotted.
+# Secondly, the horizontal heat flux (i.e. the first component of the heat flux vector) is plotted.
 Plots.plot(getindex.(points,1), getindex.(q_points,1),label="Flux", legend=:topleft, xlabel = "X-Coordinate", ylabel = "Heat flux")
 
 #md # ## [Plain Program](@id postprocessing-plain-program)
