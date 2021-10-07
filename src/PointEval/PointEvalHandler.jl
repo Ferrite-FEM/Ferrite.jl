@@ -61,7 +61,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
     local_coords = Vector{Union{Nothing, Vec{dim, T}}}(nothing, length(points))
-    cellset_vectors = [Int[] for i in eachindex(node_cell_dicts)]
+    cellset_sets = [Set{Int}() for _ in eachindex(node_cell_dicts)]
 
     for point_idx in 1:length(points)
         cell_found = false
@@ -79,7 +79,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
                         cell_found = true
                         cells[point_idx] = cell
                         local_coords[point_idx] = local_coord
-                        push!(cellset_vectors[ip_idx], point_idx)
+                        push!(cellset_sets[ip_idx], point_idx)
                         break
                     end
                 end
@@ -91,7 +91,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
             @warn("No cell found for point number $point_idx, coordinate: $(points[point_idx]).")
         end
     end
-    return cells, local_coords, Set{Int}.(cellset_vectors)
+    return cells, local_coords, cellset_sets
 end
 
 # check if point is inside a cell based on physical coordinate
@@ -106,28 +106,26 @@ end
 
 # check if point is inside a cell based on isoparametric coordinate
 function _check_isoparametric_boundaries(::Type{RefCube}, x_local::Vec{dim, T}) where {dim, T}
-    inside = true
     for x in x_local
-        if abs(x) - 1.0 < sqrt(eps(T))#x >= -1.0 && x<= 1.0 || abs(x) ≈ 1.0 # might happen on the boundary of the cell
-             nothing
-        else
-            inside = false
+        if abs(x) - 1.0 > sqrt(eps(T))
+             return false
         end
     end
-    return inside
+    return true
 end
 
 # check if point is inside a cell based on isoparametric coordinate
 function _check_isoparametric_boundaries(::Type{RefTetrahedron}, x_local::Vec{dim, T}) where {dim, T}
-    inside = true
     tol = sqrt(eps(T))
     for x in x_local
-        x > -tol && x - 1.0 < tol ? nothing : inside = false
-        # x >= 0.0 && x<= 1.0 ? nothing : inside = false
+        if x < -tol || x - 1 > tol
+            return false
+        end
     end
-    sum(x_local) > -tol && sum(x_local) - 1. < tol ? nothing : inside=false
-    # 0.0 <= 1-sum(x_local) <= 1.0 ? nothing : inside=false
-    return inside
+    if sum(x_local) < -tol || sum(x_local) - 1. > tol
+        return false
+    end
+    return true
 end
 
 # TODO: should we make iteration params optional keyword arguments?
