@@ -1,15 +1,22 @@
-# # L2-projection
+# # Postprocessing
 #
 # ![](heat_square_fluxes.png)
 
 
 # ## Introduction
 #
+# After running a simulation, we usually want to visualize the results in different ways.
+# The `L2Projector` and the `PointEvalHandler` build a pipeline for doing so. With the `L2Projector`,
+# integration point quantities can be projected to the nodes. The `PointEvalHandler` allows to evaluate a 
+# field whose values are known in the nodes in any coordinate. Thus with the combination of both functionalities,
+# both nodal quantities and integration point quantities can be evaluated in any coordinate, allowing for example
+# cut-planes through 3D structures or cut-lines through 2D-structures.
+#
 # This example continues from the Heat equation example, where the temperature field was
 # determined on a square domain. In this example, we first compute the heat flux in each
 # integration point (based on the solved temperature field) and then we do an L2-projection
 # of the fluxes to the nodes of the mesh. By doing this, we can more easily visualize
-# integration points quantities.
+# integration points quantities. Finally, we visualize the temperature field hand the heat fluxes along a cut-line.
 #
 # The L2-projection is defined as follows: Find projection ``q(\boldsymbol{x}) \in L_2(\Omega)`` such that
 # ```math
@@ -75,10 +82,39 @@ vtk_grid("heat_equation_flux", grid) do vtk
     vtk_point_data(vtk, q_nodes, "q")
 end;
 
-#md # ## [Plain Program](@id l2_projection-plain-program)
+# ## Point Evaluation
+# ![](heat_square_pointevaluation.png)
+
+# Consider a cut-line through the domain, like the black line in the figure above.
+# We will evaluate the temperature and the heat flux distribution along a horizontal line.
+points = [Vec((x, 0.75)) for x in range(-1.0, 1.0, length=101)];
+
+# First, we need to generate a `PointEvalHandler`
+ph = PointEvalHandler(dh, points);
+
+# After the L2-Projection, the heat fluxes are stored in `q_nodes` in nodal order. We can extract the heat fluxes in the `points` as follows:
+q_points = Ferrite.get_point_values(ph, q_nodes);
+
+# We can also extract the field values, here the temperature, right away from the result vector of the simulation, that is stored in `u`. Opposed to the heat flux vector obtained from the `L2Projection`, the values are stored in the order of the degrees of freedom. 
+# Therefore, we additionally give the field name which we want to extract from the dof-vector.
+# Notice that for using this function, the `PointEvalHandler` should always be constructed with the same `DofHandler` 
+# which was used for computing the dof-vector.
+u_points = Ferrite.get_point_values(ph, u, :u);
+
+# Now, we can plot the temperature and flux values with the help of any plotting library, e.g. Plots.jl. 
+# To do this, we need to import the package:
+import Plots
+
+# Firstly, we are going to plot the temperature values along the given line.
+Plots.plot(getindex.(points,1), u_points, label="Temperature", xlabel="X-Coordinate", ylabel = "Temperature")
+
+# Secondly, the horizontal heat flux (= the first component of the heat flux vector) is plotted.
+Plots.plot(getindex.(points,1), getindex.(q_points,1),label="Flux", legend=:topleft, xlabel = "X-Coordinate", ylabel = "Heat flux")
+
+#md # ## [Plain Program](@id postprocessing-plain-program)
 #md #
 #md # Below follows a version of the program without any comments.
-#md # The file is also available here: [l2_projection.jl](l2_projection.jl)
+#md # The file is also available here: [postprocessing.jl](postprocessing.jl)
 #md #
 #md # ```julia
 #md # @__CODE__
