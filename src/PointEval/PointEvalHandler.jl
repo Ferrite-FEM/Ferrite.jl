@@ -56,7 +56,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
      geom_interpolations::Vector{<:Interpolation{dim}}) where {dim, T<:Real}
 
     # set up tree structure for finding nearest nodes to points
-    kdtree = KDTree([node.x for node in grid.nodes])
+    kdtree = KDTree(reinterpret(Vec{dim,T}, grid.nodes)
     nearest_nodes, _ = knn(kdtree, points, 3, true) #TODO 3 is a random value, it shouldn't matter because likely the nearest node is the one we want
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
