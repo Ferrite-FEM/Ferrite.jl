@@ -69,7 +69,7 @@ include("L2_projection.jl")
 include("Export/VTK.jl")
 
 # Point Evaluation
-include(joinpath("PointEval", "PointEvalHandler.jl"))
+include("PointEval/PointEvalHandler.jl")
 
 # Other
 include("deprecations.jl")

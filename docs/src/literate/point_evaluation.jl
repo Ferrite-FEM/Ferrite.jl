@@ -4,7 +4,7 @@
 # ![](heat_square_pointevaluation.png)
 # ## Introduction
 #
-# For postprocessing puposes we often want to evaluate quantities in arbitrary points of the domain, e.g.
+# For postprocessing purposes we often want to evaluate quantities in arbitrary points of the domain, e.g.
 # for plotting them along lines or planes through the domain. The `PointEvalHandler` (in combination with the `L2Projector`) 
 # allows to extract field values in arbitrary points.
 # 
@@ -17,7 +17,7 @@
 # Start by simply running the L2-projection example to solve the problem, compute the heat fluxes and project them to nodes.
 include("l2_projection.jl");
 
-# We will evaluate the temperature and teh heat flux distribution along a horizontal line (the black line in the picture above).
+# We will evaluate the temperature and the heat flux distribution along a horizontal line (the black line in the picture above).
 points = [Vec((x, 0.75)) for x in range(-1.0, 1.0, length=101)];
 
 # First, we need to generate a `PointEvalHandler`

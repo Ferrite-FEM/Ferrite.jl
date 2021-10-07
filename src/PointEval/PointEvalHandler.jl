@@ -10,11 +10,10 @@ PointEvalHandler
 struct PointEvalHandler{DH<:AbstractDofHandler,dim,T<:Real}
     dh::DH
     cells::Vector{Union{Missing, Int}}
-    local_coords::Vector{Vec{dim,T}} # TODO: store local coordinates instead of PointScalarValues (can we toss the PointScalarValues in that case?)
+    local_coords::Vector{Vec{dim,T}}
     pointidx_sets::Vector{Set{Int}} # indices to access cells and local_coords
     missing_idxs::Set{Int} # cells for these indices could not be found
 end
-# TODO add missing cellset + make sure NaN are set if cells cannot be found
 
 function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
     println(io, typeof(ph))
@@ -88,7 +87,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
             end
             cell_found && break
         end
-        if ! cell_found
+        if !cell_found
             push!(missing_cells, point_idx)
             cells[point_idx] = missing
             @warn("No cell found for point number $point_idx, coordinate: $(points[point_idx]).")
