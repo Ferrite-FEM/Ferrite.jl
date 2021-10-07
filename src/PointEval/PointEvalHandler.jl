@@ -9,10 +9,9 @@ PointEvalHandler
 
 struct PointEvalHandler{DH<:AbstractDofHandler,dim,T<:Real}
     dh::DH
-    cells::Vector{Union{Missing, Int}}
-    local_coords::Vector{Vec{dim,T}}
+    cells::Vector{Union{Nothing, Int}}
+    local_coords::Vector{Union{Nothing, Vec{dim,T}}}
     pointidx_sets::Vector{Set{Int}} # indices to access cells and local_coords
-    missing_idxs::Set{Int} # cells for these indices could not be found
 end
 
 function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
@@ -33,9 +32,9 @@ function PointEvalHandler(dh::AbstractDofHandler, points::AbstractVector{Vec{dim
     getrefshape.(geom_interpolations) == getrefshape.(get_default_geom_interpolations(dh)) || error("The given geometry interpolations are incompatible with the given DofHandler.")
 
     node_cell_dicts = [_get_node_cell_map(dh.grid)]
-    cells, local_coords, cellsets, missing_idxs = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
+    cells, local_coords, cellsets = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
 
-    return PointEvalHandler(dh, cells, local_coords, cellsets, missing_idxs)
+    return PointEvalHandler(dh, cells, local_coords, cellsets)
 end
 
 # function interpolations need to be explicitely given, because we don't know which field we are looking for.
@@ -48,9 +47,9 @@ function PointEvalHandler(dh::MixedDofHandler{dim, T}, points::AbstractVector{Ve
     getrefshape.(geom_interpolations) == getrefshape.(get_default_geom_interpolations(dh)) || error("The given geometry interpolations are incompatible with the given MixedDofHandler.")
 
     node_cell_dicts = [_get_node_cell_map(dh.grid, fh.cellset) for fh in dh.fieldhandlers]
-    cells, local_coords, cellsets, missing_idxs = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
+    cells, local_coords, cellsets = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
 
-   return PointEvalHandler(dh, cells, local_coords, cellsets, missing_idxs)
+   return PointEvalHandler(dh, cells, local_coords, cellsets)
 end
 
 function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_cell_dicts::Vector{Dict{Int, Vector{Int}}}, 
@@ -60,10 +59,9 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
     kdtree = KDTree([node.x for node in grid.nodes])
     nearest_nodes, _ = knn(kdtree, points, 3, true) #TODO 3 is a random value, it shouldn't matter because likely the nearest node is the one we want
 
-    cells = Vector{Union{Missing, Int}}(undef, length(points))
-    local_coords = Vector{Vec{dim, T}}(undef, length(points))
+    cells = Vector{Union{Nothing, Int}}(nothing, length(points))
+    local_coords = Vector{Union{Nothing, Vec{dim, T}}}(nothing, length(points))
     cellset_vectors = [Int[] for i in eachindex(node_cell_dicts)]
-    missing_cells = Int[]
 
     for point_idx in 1:length(points)
         cell_found = false
@@ -90,12 +88,10 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
             cell_found && break
         end
         if !cell_found
-            push!(missing_cells, point_idx)
-            cells[point_idx] = missing
             @warn("No cell found for point number $point_idx, coordinate: $(points[point_idx]).")
         end
     end
-    return cells, local_coords, Set{Int}.(cellset_vectors), Set{Int}(missing_cells)
+    return cells, local_coords, Set{Int}.(cellset_vectors)
 end
 
 # check if point is inside a cell based on physical coordinate
@@ -353,7 +349,8 @@ end
 # set NaNs for points where no cell was found
 function _set_missing_vals!(vals::Vector{T}, ph::PointEvalHandler) where T
     v = vals[first(first(ph.pointidx_sets))] # just needed for its type
-    for idx in ph.missing_idxs
+    for (idx, cell) in enumerate(ph.cells)
+        cell !== nothing && continue
         vals[idx] = v*NaN
     end
     return vals
