@@ -149,7 +149,7 @@ function find_local_coordinate(interpolation, cell_coordinates, global_coordinat
             break
         end
         dNdξ = Ferrite.derivative(interpolation, local_guess)
-        J = zero(Tensor{dim, dim})
+        J = zero(Tensor{2, dim})
         for j in 1:n_basefuncs
             J += cell_coordinates[j] ⊗ dNdξ[j]
         end
