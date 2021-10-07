@@ -24,7 +24,7 @@ function scalar_field()
     dof_vals = project(projector, qp_vals, qr; project_to_nodes=false)
 
     # points where we want to retrieve field values
-    points = [Vec((x, 0.52)) for x in range(0.0, 1.0, length=100)]
+    points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
 
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(projector.dh, points)
@@ -63,7 +63,7 @@ function vector_field()
     dof_vals = project(projector, qp_vals, qr; project_to_nodes=false)
 
     # points where we want to retrieve field values
-    points = [Vec((x, 0.52)) for x in range(0.0, 1.0, length=100)]
+    points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
 
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(projector.dh, points)
@@ -99,7 +99,7 @@ function superparametric()
     dof_vals = project(projector, qp_vals, qr; project_to_nodes=false)
 
     # points where we want to retrieve field values
-    points = [Vec((x, 0.52)) for x in range(0.0, 1.0, length=100)]
+    points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
 
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(projector.dh, points)
@@ -172,7 +172,7 @@ function mixed_grid()
     # construct projector 
     projector = L2Projector(ip_quad, mesh; set=getcellset(mesh, "quads"))
 
-    points = [Vec((x, 2x)) for x in range(0.0, 1.0, length=10)]
+    points = [Vec((x, 2x)) for x in range(0.0; stop=1.0, length=10)]
 
     # first alternative: L2Projection to dofs
     dof_vals = project(projector, qp_vals_quads, qr; project_to_nodes = false)
