@@ -161,6 +161,27 @@ function test_projection_mixedgrid()
     end
 end
 
+function test_node_reordering()
+    grid = generate_grid(Quadrilateral, (1, 1), Vec((0.,0.)), Vec((2.,2.)))
+    dim = 2
+    ip = Lagrange{dim, RefCube, 2}()
+    ip_geo = Lagrange{dim, RefCube,1}()
+    qr = QuadratureRule{dim, RefCube}(3)
+    cv = CellScalarValues(qr, ip, ip_geo)
+
+    f(x) = x[1]+x[2]
+
+    qp_values = [[f(spatial_coordinate(cv, qp, getcoordinates(cell))) for qp in 1:getnquadpoints(cv)] for cell in CellIterator(grid)]
+
+    projector = L2Projector(ip, grid)
+    projected_vals_nodes = project(projector, qp_values, qr)
+    projected_vals_dofs = project(projector, qp_values, qr; project_to_nodes=false)
+
+    tol = 1e-12
+    @test all(projected_vals_nodes - [0.0, 2.0, 2.0, 4.0] .< tol)
+    @test all(projected_vals_dofs - [0., 2., 4., 2., 1., 3., 3., 1., 2.] .< tol)
+end
+
 @testset "Test L2-Projection" begin
     test_projection(1, RefCube)
     test_projection(1, RefTetrahedron)
@@ -168,3 +189,11 @@ end
     test_projection(2, RefTetrahedron)
     test_projection_mixedgrid()
 end
+
+
+dh = MixedDofHandler(grid)
+field = Field(:_, ip, 2)
+
+fh = FieldHandler([field], Set(1:1))
+push!(dh, fh)
+_, vertex_dict, edge_dict, face_dict = Ferrite.__close!(dh)
