@@ -117,15 +117,11 @@ end
 # check if point is inside a cell based on isoparametric coordinate
 function _check_isoparametric_boundaries(::Type{RefTetrahedron}, x_local::Vec{dim, T}) where {dim, T}
     tol = sqrt(eps(T))
-    for x in x_local
-        if x < -tol || x - 1 > tol
-            return false
-        end
-    end
-    if sum(x_local) < -tol || sum(x_local) - 1. > tol
+    if all(x -> x > -tol, x_local) && sum(x_local) - 1 < tol
+        return true
+    else
         return false
     end
-    return true
 end
 
 # TODO: should we make iteration params optional keyword arguments?
