@@ -189,11 +189,3 @@ end
     test_projection(2, RefTetrahedron)
     test_projection_mixedgrid()
 end
-
-
-dh = MixedDofHandler(grid)
-field = Field(:_, ip, 2)
-
-fh = FieldHandler([field], Set(1:1))
-push!(dh, fh)
-_, vertex_dict, edge_dict, face_dict = Ferrite.__close!(dh)
