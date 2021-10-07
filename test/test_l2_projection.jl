@@ -188,4 +188,5 @@ end
     test_projection(2, RefCube)
     test_projection(2, RefTetrahedron)
     test_projection_mixedgrid()
+    test_node_reordering()
 end
