@@ -109,10 +109,10 @@ function point_in_cell(geom_interpol::Interpolation{dim,shape,order}, cell_coord
 end
 
 # check if point is inside a cell based on isoparametric coordinate
-function _check_isoparametric_boundaries(::Type{RefCube}, x_local::Vec{dim}) where {dim}
+function _check_isoparametric_boundaries(::Type{RefCube}, x_local::Vec{dim, T}) where {dim, T}
     inside = true
     for x in x_local
-        if x >= -1.0 && x<= 1.0 || abs(x) ≈ 1.0 # might happen on the boundary of the cell
+        if abs(x) - 1.0 < sqrt(eps(T))#x >= -1.0 && x<= 1.0 || abs(x) ≈ 1.0 # might happen on the boundary of the cell
              nothing
         else
             inside = false
@@ -122,12 +122,15 @@ function _check_isoparametric_boundaries(::Type{RefCube}, x_local::Vec{dim}) whe
 end
 
 # check if point is inside a cell based on isoparametric coordinate
-function _check_isoparametric_boundaries(::Type{RefTetrahedron}, x_local::Vec{dim}) where {dim}
+function _check_isoparametric_boundaries(::Type{RefTetrahedron}, x_local::Vec{dim, T}) where {dim, T}
     inside = true
+    tol = sqrt(eps(T))
     for x in x_local
-        x >= 0.0 && x<= 1.0 ? nothing : inside = false
+        x > -tol && x - 1.0 < tol ? nothing : inside = false
+        # x >= 0.0 && x<= 1.0 ? nothing : inside = false
     end
-    0.0 <= 1-sum(x_local) <= 1.0 ? nothing : inside=false
+    sum(x_local) > -tol && sum(x_local) - 1. < tol ? nothing : inside=false
+    # 0.0 <= 1-sum(x_local) <= 1.0 ? nothing : inside=false
     return inside
 end
 
