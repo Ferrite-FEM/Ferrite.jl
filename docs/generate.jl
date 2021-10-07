@@ -9,7 +9,12 @@ for example in readdir(EXAMPLEDIR)
         input = abspath(joinpath(EXAMPLEDIR, example))
         script = Literate.script(input, GENERATEDDIR)
         code = strip(read(script, String))
-        mdpost(str) = replace(str, "@__CODE__" => code)
+
+        # remove "hidden" lines which are not shown in the markdown
+        line_ending_symbol = occursin(code, "\r\n") ? "\r\n" : "\n"
+        code_clean = join(filter(x->!endswith(x,"#hide"),split(code, r"\n|\r\n")), line_ending_symbol)
+
+        mdpost(str) = replace(str, "@__CODE__" => code_clean)
         Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
         Literate.notebook(input, GENERATEDDIR, execute = true)
     elseif any(endswith.(example, [".png", ".jpg", ".gif"]))
