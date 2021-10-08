@@ -32,13 +32,47 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compre
 end
 
 """
+    vtk_point_data(vtk, data::Vector{<:SymmetricTensor{2}}, name)
+
+Write the second order tensor field `data` to the vtk file. Twodimensional tensors are padded with zeros.
+The tensor field is written such that Paraview recognizes the tensor components, where `XX` corresponds to the `[1,1]` component and so on.
+"""
+# symmetric tensors are recognized by Paraview, so we want the elements to be displayed correctly
+function WriteVTK.vtk_point_data(
+    vtk::WriteVTK.DatasetFile,
+    data::Union{
+        Vector{SymmetricTensor{2,dim,T,M}}
+        },
+    name::AbstractString
+    ) where {dim,T,M}
+
+    if dim == 1
+        noutputs = 1
+        sort_paraview = [1]
+    elseif dim == 2
+        noutputs = 6
+        sort_paraview = [1,4,2]
+    elseif dim == 3
+        noutputs = 6
+        sort_paraview = [1,4,6,2,5,3]
+    end
+
+    npoints = length(data)
+    out = zeros(T, noutputs, npoints)
+    out[sort_paraview, :] .= reshape(reinterpret(T, data), (M, npoints))
+
+    return vtk_point_data(vtk, out, name)
+end
+
+"""
     vtk_point_data(vtk, data::Vector{<:Tensor}, name)
 
 Write the tensor field data to the vtk file. Only writes the tensor values available in `data`.
-In the vtu-file, ordering of the tensor components is coulumn-wise (just like Julia).
+In the vtu-file, ordering of the tensor components is column-wise (just like Julia).
 [1 2
  3 4] => 1, 3, 2, 4
 """
+# for all tensors that Paraview doesn't recognize
 function WriteVTK.vtk_point_data(
     vtk::WriteVTK.DatasetFile,
     data::Union{
