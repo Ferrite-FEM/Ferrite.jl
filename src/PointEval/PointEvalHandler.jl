@@ -37,9 +37,6 @@ function PointEvalHandler(dh::AbstractDofHandler, points::AbstractVector{Vec{dim
     return PointEvalHandler(dh, cells, local_coords, cellsets)
 end
 
-# function interpolations need to be explicitely given, because we don't know which field we are looking for.
-# Only one field at a time can be interpolated, so one function interpolation per FieldHandler (= per cellset) is sufficient.
-# If several fields should be interpolated with different function interpolations, several PointEvalHandlers need to be constructed.
 function PointEvalHandler(dh::MixedDofHandler{dim, T}, points::AbstractVector{Vec{dim, T}},
     geom_interpolations::Vector{<:Interpolation{dim}}=get_default_geom_interpolations(dh);
     ) where {dim, T<:Real}

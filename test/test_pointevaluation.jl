@@ -204,10 +204,49 @@ function mixed_grid()
     @test vals == [Vec((i, i)) for i=1.0:6.0]
 end
 
+function oneD()
+    # isoparametric approximation
+    mesh = generate_grid(Line, (2,))
+    f(x) = x[1]
+    nodal_vals = [f(p.x) for p in mesh.nodes]
+
+    ip_f = Lagrange{1,RefCube,1}() # function interpolation
+    ip_g = Lagrange{1,RefCube,1}() # geometry interpolation
+
+    # compute values in quadrature points
+    qr = QuadratureRule{1, RefCube}(2)
+    cv = CellScalarValues(qr, ip_f, ip_g)
+    qp_vals = [Vector{Float64}(undef, getnquadpoints(cv)) for i=1:getncells(mesh)]
+    for cellid in eachindex(mesh.cells)
+        xe = getcoordinates(mesh, cellid)
+        reinit!(cv, xe)
+        for qp in 1:getnquadpoints(cv)
+            qp_vals[cellid][qp] = f(spatial_coordinate(cv, qp, xe))
+        end
+    end
+
+    # do a L2Projection for getting values in dofs
+    projector = L2Projector(ip_f, mesh)
+    dof_vals = project(projector, qp_vals, qr; project_to_nodes=false)
+
+    # points where we want to retrieve field values
+    points = [Vec((x,)) for x in range(-1.0; stop=1.0, length=5)]
+
+    # set up PointEvalHandler and retrieve values
+    ph = PointEvalHandler(projector.dh, points)
+    vals = get_point_values(ph, dof_vals, projector)
+    @test f.(points) ≈ vals
+
+    # alternatively retrieve vals from nodal values
+    vals = get_point_values(ph, nodal_vals)
+    @test f.(points) ≈ vals
+end
+
 @testset "PointEvalHandler" begin
     scalar_field()
     vector_field()
     dofhandler()
     superparametric()
     mixed_grid()
+    oneD()
 end
