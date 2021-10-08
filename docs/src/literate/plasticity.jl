@@ -325,8 +325,8 @@ function solve()
             u -= Δu
         end
 
-        ## Update all the material states after we have reached equilibrium
-        states .= states_old
+        ## Update the old states with the converged values for next timestep
+        states_old .= states
 
         u_max[timestep] = max(abs.(u)...) # maximum displacement in current timestep
     end
@@ -365,7 +365,7 @@ plot(
     vcat(0.0, traction_magnitude),
     linewidth=2,
     title="Traction-displacement",
-    label=[""],
+    label=nothing,
     markershape=:auto
     )
 ylabel!("Traction [Pa]")
@@ -377,7 +377,7 @@ xlabel!("Maximum deflection [m]")
 
 ## test the result                       #src
 using Test                               #src
-@test norm(u_max[end]) ≈ 0.255056309     #src
+@test norm(u_max[end]) ≈ 0.254452645     #src
 
 #md # ## [Raw source](@id plasticity-raw-code)
 #md #
