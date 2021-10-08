@@ -179,7 +179,7 @@ The `nodal_values` must be given in nodal order.
 If no function interpolations are given, the interpolations are determined based on the grid. For using custom function interpolations hand in a vector of interpolations,
 whose order corresponds to the order of `FieldHandlers` within the `MixedDofHandler` that was used for constructing the `PointEvalHandler`. For a `DofHandler`, give a Vector with your function interpolation as single entry.
 
-This function should not be used for superparametric approximations. Instead, use the version which is based on `dof_values`.
+This function should not be used for subparametric approximations. Instead, use the version which is based on `dof_values`.
 """
 function get_point_values(
     ph::PointEvalHandler{DH},
@@ -188,7 +188,7 @@ function get_point_values(
     ) where {DH<:MixedDofHandler, T<:Union{Real, AbstractTensor}}
 
     if func_interpolations != get_default_geom_interpolations(ph.dh)
-        @warn("Obtaining point values based on nodal values is not recommended for superparametric approximations. You can igonre this warning for subparametric approximations.")
+        @warn("Obtaining point values based on nodal values is not recommended for subparametric approximations. You can igonre this warning for superparametric approximations.")
     end
 
     length(nodal_values) == getnnodes(ph.dh.grid) || error("You must supply nodal values for all nodes of the Grid.")
@@ -210,7 +210,7 @@ function get_point_values(
     ) where {DH<:DofHandler, T<:Union{Real, AbstractTensor}}
 
     if func_interpolations != get_default_geom_interpolations(ph.dh)
-        @warn("Obtaining point values based on nodal values is not recommended for superparametric approximations. You can igonre this warning for subparametric approximations.")
+        @warn("Obtaining point values based on nodal values is not recommended for subparametric approximations. You can igonre this warning for superparametric approximations.")
     end
 
     length(nodal_values) == getnnodes(ph.dh.grid) || error("You must supply nodal values for all nodes of the Grid.")
