@@ -7,8 +7,8 @@ whose order corresponds to the order of `FieldHandlers` within the given `MixedD
 """
 PointEvalHandler
 
-struct PointEvalHandler{DH<:AbstractDofHandler,dim,T<:Real}
-    dh::DH
+struct PointEvalHandler{G,dim,T<:Real}
+    grid::G
     cells::Vector{Union{Nothing, Int}}
     local_coords::Vector{Union{Nothing, Vec{dim,T}}}
     pointidx_sets::Vector{Set{Int}} # indices to access cells and local_coords
@@ -17,40 +17,21 @@ end
 function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
     println(io, typeof(ph))
     println(io, "  number of points: ", length(ph.local_coords))
-    n_missing = sum(ismissing.(ph.cells))
+    n_missing = sum(x -> x === nothing, ph.cells)
     if n_missing == 0
-        println(io, "  Found corresponding cell for all points.")
+        print(io, "  Found corresponding cell for all points.")
     else
-        println(io, "  Could not find corresponding cell for ", n_missing, " points.")
+        print(io, "  Could not find corresponding cell for ", n_missing, " points.")
     end
 end
 
-function PointEvalHandler(dh::AbstractDofHandler, points::AbstractVector{Vec{dim, T}},
-    geom_interpolations::Vector{<:Interpolation{dim}}=get_default_geom_interpolations(dh);
-    ) where {dim, T<:Real}
-
-    getrefshape.(geom_interpolations) == getrefshape.(get_default_geom_interpolations(dh)) || error("The given geometry interpolations are incompatible with the given DofHandler.")
-
-    node_cell_dicts = [_get_node_cell_map(dh.grid)]
-    cells, local_coords, cellsets = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
-
-    return PointEvalHandler(dh, cells, local_coords, cellsets)
+function PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim,T}}) where {dim, T}
+    node_cell_dicts = _get_node_cell_map(grid)
+    cells, local_coords, cellsets = _get_cellcoords(points, grid, node_cell_dicts)
+    return PointEvalHandler(grid, cells, local_coords, cellsets)
 end
 
-function PointEvalHandler(dh::MixedDofHandler{dim, T}, points::AbstractVector{Vec{dim, T}},
-    geom_interpolations::Vector{<:Interpolation{dim}}=get_default_geom_interpolations(dh);
-    ) where {dim, T<:Real}
-
-    getrefshape.(geom_interpolations) == getrefshape.(get_default_geom_interpolations(dh)) || error("The given geometry interpolations are incompatible with the given MixedDofHandler.")
-
-    node_cell_dicts = [_get_node_cell_map(dh.grid, fh.cellset) for fh in dh.fieldhandlers]
-    cells, local_coords, cellsets = _get_cellcoords(points, dh.grid, node_cell_dicts, geom_interpolations)
-
-   return PointEvalHandler(dh, cells, local_coords, cellsets)
-end
-
-function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_cell_dicts::Vector{Dict{Int, Vector{Int}}}, 
-     geom_interpolations::Vector{<:Interpolation{dim}}) where {dim, T<:Real}
+function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}) where {dim, T<:Real, C}
 
     # set up tree structure for finding nearest nodes to points
     kdtree = KDTree(reinterpret(Vec{dim,T}, grid.nodes))
@@ -62,9 +43,8 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
 
     for point_idx in 1:length(points)
         cell_found = false
-        for ip_idx in 1:length(node_cell_dicts) # all cells in a node_cell_dict have the same geom_interpolation
-            node_cell_dict = node_cell_dicts[ip_idx]
-            geom_interpol = geom_interpolations[ip_idx]
+        for (idx, (CT, node_cell_dict)) in enumerate(node_cell_dicts)
+            geom_interpol = default_interpolation(CT)
             # loop over points
             for node in nearest_nodes[point_idx]
                 possible_cells = get(node_cell_dict, node, nothing)
@@ -76,7 +56,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_ce
                         cell_found = true
                         cells[point_idx] = cell
                         local_coords[point_idx] = local_coord
-                        push!(cellset_sets[ip_idx], point_idx)
+                        push!(cellset_sets[idx], point_idx)
                         break
                     end
                 end
@@ -103,22 +83,16 @@ end
 
 # check if point is inside a cell based on isoparametric coordinate
 function _check_isoparametric_boundaries(::Type{RefCube}, x_local::Vec{dim, T}) where {dim, T}
-    for x in x_local
-        if abs(x) - 1.0 > sqrt(eps(T))
-             return false
-        end
-    end
-    return true
+    tol = sqrt(eps(T))
+    # All in the range [-1, 1]
+    return all(x -> abs(x) - 1 < tol, x_local)
 end
 
 # check if point is inside a cell based on isoparametric coordinate
 function _check_isoparametric_boundaries(::Type{RefTetrahedron}, x_local::Vec{dim, T}) where {dim, T}
     tol = sqrt(eps(T))
-    if all(x -> x > -tol, x_local) && sum(x_local) - 1 < tol
-        return true
-    else
-        return false
-    end
+    # Positive and below the plane 1 - ξx - ξy - ξz
+    return all(x -> x > -tol, x_local) && sum(x_local) - 1 < tol
 end
 
 # TODO: should we make iteration params optional keyword arguments?
@@ -156,91 +130,25 @@ function find_local_coordinate(interpolation, cell_coordinates, global_coordinat
 end
 
 # return a Dict with a key for each node that contains a vector with the adjacent cells as value
-function _get_node_cell_map(grid::Grid, cellset::Set{Int}=Set{Int64}(1:getncells(grid)))
-    cell_dict = Dict{Int, Vector{Int}}()
-    for cellidx in cellset
-        for node in grid.cells[cellidx].nodes
-            v = get!(Vector{Int}, cell_dict, node)
-            push!(v, cellidx)
+function _get_node_cell_map(grid::Grid)
+    C = eltype(grid.cells) # possibly abstract
+    cell_dicts = Dict{Type{<:C}, Dict{Int, Vector{Int}}}()
+    ctypes = Set{Type{<:C}}(typeof(c) for c in grid.cells)
+    for ctype in ctypes
+        cell_dict = cell_dicts[ctype] = Dict{Int,Vector{Int}}()
+        for (cellidx, cell) in enumerate(grid.cells)
+            cell isa ctype || continue
+            for node in cell.nodes
+                v = get!(Vector{Int}, cell_dict, node)
+                push!(v, cellidx)
+            end
         end
     end
-    return cell_dict
+    return cell_dicts
 end
-
-##################################################################################################################
-# points in nodal order
 
 """
-    get_point_values(ph::PointEvalHandler, nodal_values::Vector{T}, [func_interpolations::Vector{<:Interpolation}]) where T
-
-Return a `Vector{T}` with the field values in the points of the `PointEvalHandler`. The field values are computed based on the `nodal_values` and interpolated to the local coordinates by the `func_interpolations`.
-The `nodal_values` must be given in nodal order.
-
-If no function interpolations are given, the interpolations are determined based on the grid. For using custom function interpolations hand in a vector of interpolations,
-whose order corresponds to the order of `FieldHandlers` within the `MixedDofHandler` that was used for constructing the `PointEvalHandler`. For a `DofHandler`, give a Vector with your function interpolation as single entry.
-
-This function should not be used for subparametric approximations. Instead, use the version which is based on `dof_values`.
-"""
-function get_point_values(
-    ph::PointEvalHandler{DH},
-    nodal_values::Vector{T},
-    func_interpolations::Vector{<:Interpolation} = get_default_geom_interpolations(ph.dh),
-    ) where {DH<:MixedDofHandler, T<:Union{Real, AbstractTensor}}
-
-    if func_interpolations != get_default_geom_interpolations(ph.dh)
-        @warn("Obtaining point values based on nodal values is not recommended for subparametric approximations. You can igonre this warning for superparametric approximations.")
-    end
-
-    length(nodal_values) == getnnodes(ph.dh.grid) || error("You must supply nodal values for all nodes of the Grid.")
-
-    npoints = length(ph.cells)
-    vals = Vector{T}(undef, npoints)
-    # for type stability with the MixedDofHandler, we want compute this per FieldHandler, as all cells in a FieldHandler share the interpolation
-    for fh_idx in eachindex(ph.dh.fieldhandlers)
-        _get_point_values!(vals, nodal_values, func_interpolations[fh_idx], ph, fh_idx)
-    end
-    _set_missing_vals!(vals, ph)
-    return vals
-end
-
-function get_point_values(
-    ph::PointEvalHandler{DH},
-    nodal_values::Vector{T},
-    func_interpolations::Vector{<:Interpolation} = get_default_geom_interpolations(ph.dh),
-    ) where {DH<:DofHandler, T<:Union{Real, AbstractTensor}}
-
-    if func_interpolations != get_default_geom_interpolations(ph.dh)
-        @warn("Obtaining point values based on nodal values is not recommended for subparametric approximations. You can igonre this warning for superparametric approximations.")
-    end
-
-    length(nodal_values) == getnnodes(ph.dh.grid) || error("You must supply nodal values for all nodes of the Grid.")
-
-    npoints = length(ph.cells)
-    vals = Vector{T}(undef, npoints)
-    _get_point_values!(vals, nodal_values, func_interpolations[1], ph, 1)
-    _set_missing_vals!(vals, ph)
-    return vals
-end
-
-# this is just a function barrier
-function _get_point_values!(vals::Vector{T}, nodal_values::Vector{T}, ip::Interpolation, ph::PointEvalHandler, fh_idx::Int) where T
-    # allocate quantities specific to Celltype / Interpolation
-    pv = PointScalarValues(ph.local_coords[first(ph.pointidx_sets[fh_idx])], ip)
-    nnodes = nnodes_per_cell(ph.dh.grid, first(ph.cells[first(ph.pointidx_sets[fh_idx])]))
-    node_idxs = Vector{Int}(undef, nnodes)
-
-    # compute point values
-    for point_idx in ph.pointidx_sets[fh_idx]
-        reinit!(pv, ph.local_coords[point_idx], ip)
-        node_idxs[1:nnodes] .= getcells(ph.dh.grid, ph.cells[point_idx]).nodes
-        @inbounds @views vals[point_idx] = function_value(pv, 1, nodal_values[node_idxs])
-    end
-    return vals
-end
-
-##################################################################################################################
-# values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
-"""
+TODO: Update docstring
     get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, fieldname::Symbol, [func_interpolations::Vector{<:Interpolation}]) where T
     get_point_values(ph::PointEvalHandler, dof_values::Vector{T}, ::L2Projector, [func_interpolations::Vector{<:Interpolation}]) where T
 
@@ -250,74 +158,89 @@ The `dof_values` must be given in the order of the dofs that corresponds to the 
 If no function interpolations are given, the field interpolations are extracted from the `AbstractDofHandler` of `ph`. For using custom function interpolations hand in a vector of interpolations,
 whose order corresponds to the order of `FieldHandlers` within the `MixedDofHandler` that was used for constructing `ph`. For a `DofHandler`, give a Vector with your function interpolation as single entry.
 """
-function get_point_values(
-    ph::PointEvalHandler{DH},
-    dof_values::Vector{T},
-    fieldname::Symbol,
-    func_interpolations = get_func_interpolations(ph, fieldname)
-    ) where {T,DH<:AbstractDofHandler}
+get_point_values
 
-    fielddim = getfielddim(ph.dh, fieldname)
+function get_point_values(ph::PointEvalHandler, proj::L2Projector, dof_vals::AbstractVector)
+    get_point_values(ph, proj.dh, dof_vals)
+end
+
+function get_point_values(ph::PointEvalHandler, dh::AbstractDofHandler, dof_vals::AbstractVector{T},
+                           fname::Symbol=find_single_field(dh)) where {T}
+    fdim = getfielddim(dh, fname)
     npoints = length(ph.cells)
     # for a scalar field return a Vector of Scalars, for a vector field return a Vector of Vecs
-    if fielddim == 1
-        vals = Vector{T}(undef, npoints)
+    if fdim == 1
+        out_vals = fill!(Vector{T}(undef, npoints), T(NaN))
     else
-        vals = Vector{Vec{fielddim, T}}(undef, npoints)
+        nanv = convert(Vec{fdim,T}, NaN * zero(Vec{fdim,T}))
+        out_vals = fill!(Vector{Vec{fdim, T}}(undef, npoints), nanv)
     end
-    get_point_values!(vals, ph, dof_values, fieldname, func_interpolations)
-    return vals
+    func_interpolations = get_func_interpolations(dh, fname)
+    get_point_values!(out_vals, ph, dh, dof_vals, fname, func_interpolations)
+    return out_vals
 end
-
-get_point_values(ph::PointEvalHandler{DH}, dof_values::Vector{T}, ::L2Projector, func_interpolations = get_func_interpolations(ph, :_)) where {DH<:MixedDofHandler,T} = get_point_values(ph, dof_values, :_, func_interpolations)
+function find_single_field(dh)
+    ns = getfieldnames(dh)
+    if length(ns) != 1
+        throw(ArgumentError("multiple fields in DoF handler, must specify which"))
+    end
+    return ns[1]
+end
 
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
-function get_point_values!(vals::Vector{T2},
-    ph::PointEvalHandler{DH},
-    dof_values::Vector{T},
-    fieldname::Symbol,
-    func_interpolations = get_func_interpolations(ph, fieldname)
-    ) where {T2, T,DH<:MixedDofHandler} 
+function get_point_values!(out_vals::Vector{T2},
+    ph::PointEvalHandler,
+    dh::MixedDofHandler,
+    dof_vals::Vector{T},
+    fname::Symbol,
+    func_interpolations
+    ) where {T2, T} 
 
-    length(dof_values) == ndofs(ph.dh) || error("You must supply nodal values for all $(ndofs(ph.dh)) dofs.")
+    # TODO: I don't think this is correct??
+    # length(dof_vals) == ndofs(dh) || error("You must supply nodal values for all $(ndofs(dh)) dofs.")
 
-    fielddim = getfielddim(ph.dh, fieldname)
+    fdim = getfielddim(dh, fname)
     
-    for fh_idx in eachindex(ph.dh.fieldhandlers)
-        _get_point_values!(vals, dof_values, ph, func_interpolations[fh_idx], fh_idx, fieldname, Val(fielddim))
+    for fh_idx in eachindex(dh.fieldhandlers)
+        ip = func_interpolations[fh_idx]
+        if ip !== nothing
+            _get_point_values!(out_vals, dof_vals, ph, dh, ip, fh_idx, fname, Val(fdim))
+        end
     end
-    _set_missing_vals!(vals, ph)
-    return vals
+    _set_missing_vals!(out_vals, ph)
+    return out_vals
 end
 
-function get_point_values!(vals::Vector{T2},
-    ph::PointEvalHandler{DH},
-    dof_values::Vector{T},
-    fieldname::Symbol,
-    func_interpolations = get_func_interpolations(ph, fieldname)
-    ) where {T2, T,DH<:DofHandler} 
+function get_point_values!(out_vals::Vector{T2},
+    ph::PointEvalHandler,
+    dh::DofHandler,
+    dof_vals::Vector{T},
+    fname::Symbol,
+    func_interpolations
+    ) where {T2, T} 
 
-    length(dof_values) == ndofs(ph.dh) || error("You must supply nodal values for all $(ndofs(ph.dh)) dofs.")
+    # TODO: I don't think this is correct??
+    length(dof_vals) == ndofs(dh) || error("You must supply nodal values for all $(ndofs(dh)) dofs.")
 
-    fielddim = getfielddim(ph.dh, fieldname)
-    _get_point_values!(vals, dof_values, ph, func_interpolations[1], 1, fieldname, Val(fielddim))
-    _set_missing_vals!(vals, ph)
-    return vals
+    fdim = getfielddim(dh, fname)
+    _get_point_values!(out_vals, dof_vals, ph, dh, func_interpolations[1], 1, fname, Val(fdim))
+    _set_missing_vals!(out_vals, ph)
+    return out_vals
 end
 
-# this is just a function barrier
+# this is just a function barrier (https://youtu.be/_lK4cX5xGiQ)
 function _get_point_values!(
-    vals::Vector{T2},
-    dof_values::Vector{T},
-    ph::PointEvalHandler{DH,dim},
+    out_vals::Vector{T2},
+    dof_vals::Vector{T},
+    ph::PointEvalHandler,
+    dh::AbstractDofHandler,
     ip::Interpolation,
     fh_idx::Int,
     fieldname::Symbol,
-    fdim::Val{fielddim}) where {T2,dim,T,DH<:AbstractDofHandler, fielddim}
+    fdim::Val{fielddim}) where {T2,T,fielddim}
 
     # extract variables
     local_coords = ph.local_coords
-    dh = ph.dh
     point_idx_set = ph.pointidx_sets[fh_idx]
     # preallocate some stuff specific to this cellset
     pv = PointScalarValues(first(local_coords), ip)
@@ -328,10 +251,10 @@ function _get_point_values!(
     for pointid in point_idx_set
         celldofs!(cell_dofs, dh, ph.cells[pointid])
         reinit!(pv, local_coords[pointid], ip)
-        @inbounds @views dof_values_reshaped = _change_format(fdim, dof_values[cell_dofs[dofrange]])
-        vals[pointid] = function_value(pv, 1, dof_values_reshaped)
+        @inbounds @views dof_vals_reshaped = _change_format(fdim, dof_vals[cell_dofs[dofrange]])
+        out_vals[pointid] = function_value(pv, 1, dof_vals_reshaped)
     end
-    return vals
+    return out_vals
 end
 
 ###################################################################################################################
@@ -339,10 +262,11 @@ end
 
 # set NaNs for points where no cell was found
 function _set_missing_vals!(vals::Vector{T}, ph::PointEvalHandler) where T
-    v = vals[first(first(ph.pointidx_sets))] # just needed for its type
+    # TODO: Remove this 
+    return
     for (idx, cell) in enumerate(ph.cells)
         cell !== nothing && continue
-        vals[idx] = v*NaN
+        vals[idx] *= NaN
     end
     return vals
 end
@@ -355,24 +279,25 @@ _change_format(::Val{fielddim}, dof_values::AbstractVector{T}) where {fielddim, 
 _dof_range(dh::DofHandler, fieldname, ::Int) = dof_range(dh, fieldname)
 _dof_range(dh::MixedDofHandler, fieldname, fh_idx::Int) = dof_range(dh.fieldhandlers[fh_idx], fieldname)
 
-get_default_geom_interpolations(dh::DofHandler) = [default_interpolation(typeof(first(dh.grid.cells)))]
+get_default_geom_interpolations(grid::Grid) = (error(); [default_interpolation(typeof(first(dh.grid.cells)))])
 function get_default_geom_interpolations(dh::MixedDofHandler{dim}) where {dim}
     ips = Interpolation{dim}[]
+    error()
     for fh in dh.fieldhandlers
         push!(ips, default_interpolation(typeof(dh.grid.cells[first(fh.cellset)])))
     end
     return ips
 end
 
-get_func_interpolations(ph::PointEvalHandler{DH}, fieldname) where DH<:DofHandler = [getfieldinterpolation(ph.dh, find_field(ph.dh, fieldname))]
-function get_func_interpolations(ph::PointEvalHandler{DH}, fieldname) where DH<:MixedDofHandler
-    func_interpolations = []
-    for fh in ph.dh.fieldhandlers
-        j = findfirst(i->i == fieldname, getfieldnames(fh))
-        if !(j === nothing)
-            push!(func_interpolations, fh.fields[j].interpolation)
-        else
+get_func_interpolations(dh::DH, fieldname) where DH<:DofHandler = [getfieldinterpolation(dh, find_field(dh, fieldname))]
+function get_func_interpolations(dh::DH, fieldname) where DH<:MixedDofHandler
+    func_interpolations = Union{Interpolation,Nothing}[]
+    for fh in dh.fieldhandlers
+        j = findfirst(i -> i === fieldname, getfieldnames(fh))
+        if j === nothing
             push!(func_interpolations, missing)
+        else
+            push!(func_interpolations, fh.fields[j].interpolation)
         end
     end
     return func_interpolations
