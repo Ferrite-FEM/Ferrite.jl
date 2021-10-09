@@ -37,7 +37,6 @@ end
 Write the second order tensor field `data` to the vtk file. Twodimensional tensors are padded with zeros.
 The tensor field is written such that Paraview recognizes the tensor components, where `XX` corresponds to the `[1,1]` component and so on.
 """
-# symmetric tensors are recognized by Paraview, so we want the elements to be displayed correctly
 function WriteVTK.vtk_point_data(
     vtk::WriteVTK.DatasetFile,
     data::Union{
@@ -72,7 +71,6 @@ In the vtu-file, ordering of the tensor components is column-wise (just like Jul
 [1 2
  3 4] => 1, 3, 2, 4
 """
-# for all tensors that Paraview doesn't recognize
 function WriteVTK.vtk_point_data(
     vtk::WriteVTK.DatasetFile,
     data::Union{
