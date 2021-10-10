@@ -62,7 +62,7 @@ function vector_field()
     projector = L2Projector(ip_f, mesh)
     projector_vals = project(projector, qp_vals, qr; project_to_nodes=false)
     # TODO: project_to_nodes should probably return dof values and not Vecs for vector fields
-    projector_vals = convert(Vector{Float64}, reinterpret(Float64, projector_vals))
+    # projector_vals = convert(Vector{Float64}, reinterpret(Float64, projector_vals))
 
     # points where we want to retrieve field values
     points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
