@@ -86,5 +86,5 @@
     @test Ferrite.ndofs_per_cell(dhs[1]) == Ferrite.ndofs_per_cell(dhs[2])
     @test Ferrite.celldofs(dhs[1],3) == Ferrite.celldofs(dhs[2],3)
     @test Ferrite.ndofs(dhs[1]) == Ferrite.ndofs(dhs[2])
-    @test isapprox(us[1],us[2],atol=1e-8)
+    @test isapprox(u1,u2,atol=1e-8)
 end
