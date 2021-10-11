@@ -22,16 +22,16 @@ function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
     end
 end
 
-function PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim,T}}) where {dim, T}
+function PointEvalHandler(grid::AbstractGrid, points::AbstractVector{Vec{dim,T}}) where {dim, T}
     node_cell_dicts = _get_node_cell_map(grid)
     cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts)
     return PointEvalHandler(grid, cells, local_coords)
 end
 
-function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::Grid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}) where {dim, T<:Real, C}
+function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}) where {dim, T<:Real, C}
 
     # set up tree structure for finding nearest nodes to points
-    kdtree = KDTree(reinterpret(Vec{dim,T}, grid.nodes))
+    kdtree = KDTree(reinterpret(Vec{dim,T}, getnodes(grid)))
     nearest_nodes, _ = knn(kdtree, points, 3, true) #TODO 3 is a random value, it shouldn't matter because likely the nearest node is the one we want
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
@@ -125,13 +125,14 @@ function find_local_coordinate(interpolation, cell_coordinates, global_coordinat
 end
 
 # return a Dict with a key for each node that contains a vector with the adjacent cells as value
-function _get_node_cell_map(grid::Grid)
-    C = eltype(grid.cells) # possibly abstract
+function _get_node_cell_map(grid::AbstractGrid)
+    cells = getcells(grid)
+    C = eltype(cells) # possibly abstract
     cell_dicts = Dict{Type{<:C}, Dict{Int, Vector{Int}}}()
-    ctypes = Set{Type{<:C}}(typeof(c) for c in grid.cells)
+    ctypes = Set{Type{<:C}}(typeof(c) for c in cells)
     for ctype in ctypes
         cell_dict = cell_dicts[ctype] = Dict{Int,Vector{Int}}()
-        for (cellidx, cell) in enumerate(grid.cells)
+        for (cellidx, cell) in enumerate(cells)
             cell isa ctype || continue
             for node in cell.nodes
                 v = get!(Vector{Int}, cell_dict, node)

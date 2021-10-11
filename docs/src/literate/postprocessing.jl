@@ -72,14 +72,15 @@ q_gp = compute_heat_fluxes(cellvalues, dh, u);
 projector = L2Projector(ip, grid);
 
 # Project the integration point values to the nodal values
-q_nodes = project(projector, q_gp, qr);
+q_projected = project(projector, q_gp, qr; project_to_nodes=false); # TODO: this should be default.
 
 
 # ## Exporting to VTK
-# To visualize the heat flux, we export the projected field `q_nodes`
+# To visualize the heat flux, we export the projected field `q_projected`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
 vtk_grid("heat_equation_flux", grid) do vtk
-    vtk_point_data(vtk, q_nodes, "q")
+    ## TODO: This doesn't work (correctly) yet (https://github.com/Ferrite-FEM/Ferrite.jl/issues/278)
+    vtk_point_data(vtk, q_projected, "q")
 end;
 
 # ## Point Evaluation
@@ -89,27 +90,31 @@ end;
 # We will evaluate the temperature and the heat flux distribution along a horizontal line.
 points = [Vec((x, 0.75)) for x in range(-1.0, 1.0, length=101)];
 
-# First, we need to generate a `PointEvalHandler`
-ph = PointEvalHandler(dh, points);
+# First, we need to generate a `PointEvalHandler`. This will find and store the cells
+# containing the input points.
+ph = PointEvalHandler(grid, points);
 
-# After the L2-Projection, the heat fluxes are stored in `q_nodes` in nodal order. We can extract the heat fluxes in the `points` as follows:
-q_points = Ferrite.get_point_values(ph, q_nodes);
+# After the L2-Projection, the heat fluxes `q_projected` are stored in the DoF-ordering
+# determined by the projector's internal DoFHandler, so to evalute the flux `q` at our points
+# we give the `PointEvalHandler`, the `L2Projector` and the values `q_projected`.
+q_points = get_point_values(ph, projector, q_projected);
 
-# We can also extract the field values, here the temperature, right away from the result vector of the simulation, that is stored in `u`. Opposed to the heat flux vector obtained from the `L2Projection`, the values are stored in the order of the degrees of freedom. 
-# Therefore, we additionally give the field name which we want to extract from the dof-vector.
-# Notice that for using this function, the `PointEvalHandler` must always be constructed with the same `DofHandler` 
-# which was used for computing the dof-vector.
-u_points = Ferrite.get_point_values(ph, u, :u);
+# We can also extract the field values, here the temperature, right away from the result
+# vector of the simulation, that is stored in `u`. These values are stored in the order of
+# our initial DofHandler so the input is not the `PointEvalHandler`, the original `DofHandler`,
+# the dof-vector `u`, and (optionally for single-field problems) the name of the field.
+# from the `L2Projection`, the values are stored in the order of the degrees of freedom.
+u_points = Ferrite.get_point_values(ph, dh, u, :u);
 
 # Now, we can plot the temperature and flux values with the help of any plotting library, e.g. Plots.jl. 
 # To do this, we need to import the package:
 import Plots
 
 # Firstly, we are going to plot the temperature values along the given line.
-Plots.plot(getindex.(points,1), u_points, label="Temperature", xlabel="X-Coordinate", ylabel = "Temperature")
+Plots.plot(getindex.(points,1), u_points, xlabel="x (coordinate)", ylabel="u (temperature)", label=nothing)
 
 # Secondly, the horizontal heat flux (i.e. the first component of the heat flux vector) is plotted.
-Plots.plot(getindex.(points,1), getindex.(q_points,1),label="Flux", legend=:topleft, xlabel = "X-Coordinate", ylabel = "Heat flux")
+Plots.plot(getindex.(points,1), getindex.(q_points,1), xlabel="x (coordinate)", ylabel="q_x (flux in x-direction)", label=nothing)
 
 #md # ## [Plain Program](@id postprocessing-plain-program)
 #md #
