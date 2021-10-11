@@ -25,6 +25,21 @@ const SUITE = BenchmarkGroup()
 #----------------------------------------------------------------------#
 SUITE["mesh"] = BenchmarkGroup()
 
+# Generator benchmarks
+SUITE["mesh"]["generator"] = BenchmarkGroup()
+
+# Strucutred hyperrectangle generators
+SUITE["mesh"]["generator"]["hyperrectangle"] = BenchmarkGroup()
+for dim ∈ 1:3
+    SUITE["mesh"]["generator"]["hyperrectangle"]["dim",string(dim)] = BenchmarkGroup()
+    for geo_type ∈ FerriteBenchmarkHelper.geo_types_for_topological_dim(dim)
+        SUITE["mesh"]["generator"]["hyperrectangle"]["dim",string(dim)][string(geo_type)] = @benchmarkable generate_grid($geo_type, $tuple(repeat([1], dim)...));
+    end
+end
+
+# TODO AMR performance
+# TODO topology performance
+
 #----------------------------------------------------------------------#
 # Benchmarks around the dof management
 #----------------------------------------------------------------------#
