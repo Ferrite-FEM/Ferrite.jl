@@ -9,6 +9,13 @@ L2Projector
 project
 ```
 
+
+# Postprocessing
+```@docs
+PointEvalHandler
+get_point_values
+```
+
 ```@docs
 reshape_to_nodes
 ```

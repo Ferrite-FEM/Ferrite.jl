@@ -5,8 +5,8 @@ using Reexport
 
 using LinearAlgebra
 using SparseArrays
-
 using Base: @propagate_inbounds
+using NearestNeighbors
 
 include("exports.jl")
 
@@ -43,6 +43,7 @@ include("Quadrature/quadrature.jl")
 # FEValues
 include("FEValues/cell_values.jl")
 include("FEValues/face_values.jl")
+include("PointEval/point_values.jl")
 include("FEValues/common_values.jl")
 include("FEValues/face_integrals.jl")
 
@@ -66,6 +67,9 @@ include("L2_projection.jl")
 
 # Export
 include("Export/VTK.jl")
+
+# Point Evaluation
+include("PointEval/PointEvalHandler.jl")
 
 # Other
 include("deprecations.jl")

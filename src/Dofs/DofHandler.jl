@@ -69,6 +69,12 @@ getfieldinterpolation(dh::DofHandler, field_idx::Int) = dh.field_interpolations[
 getfielddim(dh::DofHandler, field_idx::Int) = dh.field_dims[field_idx]
 getbcvalue(dh::DofHandler, field_idx::Int) = dh.bc_values[field_idx]
 
+function getfielddim(dh::DofHandler, name::Symbol)
+    field_pos = findfirst(i->i == name, getfieldnames(dh))
+    field_pos === nothing && error("did not find field $name")
+    return dh.field_dims[field_pos]
+end
+
 """
     dof_range(dh:DofHandler, field_name)
 

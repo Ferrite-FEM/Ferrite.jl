@@ -2,7 +2,7 @@
 
 using Base: @propagate_inbounds
 
-const ScalarValues{dim,T,shape} = Union{CellScalarValues{dim,T,shape},FaceScalarValues{dim,T,shape}}
+const ScalarValues{dim,T,shape} = Union{CellScalarValues{dim,T,shape},FaceScalarValues{dim,T,shape},PointScalarValues{dim,T,shape}}
 const VectorValues{dim,T,shape} = Union{CellVectorValues{dim,T,shape},FaceVectorValues{dim,T,shape}}
 
 getnbasefunctions(cv::Values) = size(cv.N, 1)
