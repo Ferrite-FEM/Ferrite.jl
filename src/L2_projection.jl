@@ -85,7 +85,7 @@ function L2Projector(
     _, vertex_dict, _, _ = __close!(dh)
 
     M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
-    M_cholesky = cholesky(M)  # TODO maybe have a lazy eval instead of precomputing? / JB
+    M_cholesky = cholesky(M)
 
     # For deprecated API
     fe_values = qr_rhs === nothing ? nothing :
@@ -153,7 +153,7 @@ end
 
 
 """
-    project(proj::L2Projector, vals::Vector{Vector{T}}}, qr_rhs::QuadratureRule; project_to_nodes=true)
+    project(proj::L2Projector, vals, qr_rhs::QuadratureRule; project_to_nodes=true)
 
 Makes a L2 projection of data `vals` to the nodes of the grid using the projector `proj`
 (see [`L2Projector`](@ref)).
@@ -167,12 +167,22 @@ where ``f`` is the data to project, i.e. `vals`.
 
 The data `vals` should be a vector, with length corresponding to number of elements, of vectors,
 with length corresponding to number of quadrature points per element, matching the number of points in `qr_rhs`.
-Example scalar input data:
+Alternatively, `vals` can be a matrix, with number of columns corresponding to number of elements,
+and number of rows corresponding to number of points in `qr_rhs`.
+Example (scalar) input data:
 ```julia
 vals = [
     [0.44, 0.98, 0.32], # data for quadrature point 1, 2, 3 of element 1
     [0.29, 0.48, 0.55], # data for quadrature point 1, 2, 3 of element 2
     # ...
+]
+```
+or equivalent in matrix form:
+```julia
+vals = [
+    0.44 0.29 # ...
+    0.98 0.48 # ...
+    0.32 0.55 # ...
 ]
 ```
 Supported data types to project are `Number`s and `AbstractTensor`s.
@@ -182,7 +192,7 @@ If the parameter `project_to_nodes` is `true`, then the projection returns the v
 field over the domain, which is useful if one wants to interpolate the projected values.
 """
 function project(proj::L2Projector,
-                 vars::Vector{Vector{T}},
+                 vars::AbstractVector{<:AbstractVector{T}},
                  qr_rhs::Union{QuadratureRule,Nothing}=nothing;
                  project_to_nodes::Bool=true) where T <: Union{Number, AbstractTensor}
 
@@ -192,26 +202,29 @@ function project(proj::L2Projector,
         CellScalarValues(qr_rhs, proj.func_ip, proj.geom_ip)
 
     M = T <: AbstractTensor ? length(vars[1][1].data) : 1
-    make_T(vals) = T <: AbstractTensor ? T(Tuple(vals)) : vals[1]
 
-    projected_vals = _project(vars, proj, fe_values, M)
+    projected_vals = _project(vars, proj, fe_values, M, T)::Vector{T}
     if project_to_nodes
         # NOTE we may have more projected values than verticies in the mesh => not all values are returned
         nnodes = getnnodes(proj.dh.grid)
-        reordered_vals = fill(NaN, nnodes, size(projected_vals, 2))
+        reordered_vals = fill(convert(T, NaN * zero(T)), nnodes)
         for node = 1:nnodes
-            if haskey(proj.node2dof_map, node)
-                reordered_vals[node, :] = projected_vals[proj.node2dof_map[node], :]
+            if (k = get(proj.node2dof_map, node, nothing); k !== nothing)
+                @assert length(k) == 1
+                reordered_vals[node] = projected_vals[k[1]]
             end
         end
-        return T[make_T(reordered_vals[i,:]) for i=1:size(reordered_vals, 1)]
+        return reordered_vals
     else
-        # convert back to the original tensor type
-        return T[make_T(projected_vals[i,:]) for i=1:size(projected_vals, 1)]
+        return projected_vals
     end
 end
+function project(p::L2Projector, vars::AbstractMatrix, qr_rhs::QuadratureRule; project_to_nodes=true)
+    # TODO: Random access into vars is required for now, hence the collect
+    return project(p, collect(eachcol(vars)), qr_rhs; project_to_nodes=project_to_nodes)
+end
 
-function _project(vars, proj::L2Projector, fe_values::Values, M::Integer)
+function _project(vars, proj::L2Projector, fe_values::Values, M::Integer, ::Type{T}) where {T}
     # Assemble the multi-column rhs, f = ∭( v ⋅ x̂ )dΩ
     # The number of columns corresponds to the length of the data-tuple in the tensor x̂.
 
@@ -251,6 +264,9 @@ function _project(vars, proj::L2Projector, fe_values::Values, M::Integer)
     end
 
     # solve for the projected nodal values
-    return proj.M_cholesky \ f
+    projected_vals = proj.M_cholesky \ f
 
+    # Recast to original input type
+    make_T(vals) = T <: AbstractTensor ? T(Tuple(vals)) : vals[1]
+    return T[make_T(x) for x in eachrow(projected_vals)]
 end
