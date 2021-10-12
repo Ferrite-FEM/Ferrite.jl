@@ -281,6 +281,7 @@ end
 SUITE["assembly"]["common-local"] = BenchmarkGroup()
 COMMON_LOCAL_ASSEMBLY = SUITE["assembly"]["common-local"]
 for spatial_dim ∈ 1:3
+    ξ_dummy = Vec{spatial_dim}(ntuple(x->0.0, spatial_dim))
     COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim] = BenchmarkGroup()
     for geo_type ∈ FerriteBenchmarkHelper.geo_types_for_spatial_dim(spatial_dim)
         COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)] = BenchmarkGroup()
@@ -289,17 +290,13 @@ for spatial_dim ∈ 1:3
         ref_type = FerriteBenchmarkHelper.default_refshape(geo_type)
         ip_geo = Ferrite.default_interpolation(geo_type)
 
-        for order ∈ 1:2
-            # higher order Lagrange on hex not working yet...
-            order > 1 && geo_type ∈ [Hexahedron] && continue
+        # Nodal interpolation tests
+        for order ∈ 1:2, ip_type ∈ [Lagrange, Serendipity]
+            ip = ip_type{spatial_dim, ref_type, order}()
 
-            # Currenlty we just benchmark nodal Lagrange bases.
-            COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)]["Lagrange",string(order)] = BenchmarkGroup()
-            LAGRANGE_SUITE = COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)]["Lagrange",string(order)]
-            LAGRANGE_SUITE["ritz-galerkin"] = BenchmarkGroup()
-            LAGRANGE_SUITE["petrov-galerkin"] = BenchmarkGroup()
+            # Skip over elements which are not implemented
+            !applicable(Ferrite.value, ip, 1, ξ_dummy) && continue
 
-            ip = Lagrange{spatial_dim, ref_type, order}()
             qr = QuadratureRule{spatial_dim, ref_type}(2*order-1)
 
             csv = CellScalarValues(qr, ip, ip_geo);
@@ -307,6 +304,12 @@ for spatial_dim ∈ 1:3
 
             cvv = CellVectorValues(qr, ip, ip_geo);
             cvv2 = CellVectorValues(qr, ip, ip_geo);
+
+            # Currenlty we just benchmark nodal Lagrange bases.
+            COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)][string(ip_type),string(order)] = BenchmarkGroup()
+            LAGRANGE_SUITE = COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)][string(ip_type),string(order)]
+            LAGRANGE_SUITE["ritz-galerkin"] = BenchmarkGroup()
+            LAGRANGE_SUITE["petrov-galerkin"] = BenchmarkGroup()
 
             # Scalar shape φ and test ψ: ∫ φ ψ
             LAGRANGE_SUITE["ritz-galerkin"]["mass"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $csv, shape_value, shape_value, *)
@@ -346,7 +349,7 @@ for spatial_dim ∈ 1:3
         ref_type = FerriteBenchmarkHelper.default_refshape(geo_type)
         ip_geo = Ferrite.default_interpolation(geo_type)
 
-        for order ∈ 1:2
+        for order ∈ [2]
             # higher order Lagrange on hex not working yet...
             order > 1 && geo_type ∈ [Hexahedron] && continue
 
