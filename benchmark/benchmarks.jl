@@ -340,47 +340,40 @@ end
 
 SUITE["assembly"]["Dirichlet"] = BenchmarkGroup()
 DIRICHLET_SUITE = SUITE["assembly"]["Dirichlet"]
-for spatial_dim ∈ 1:3
-    DIRICHLET_SUITE["spatial-dim",spatial_dim] = BenchmarkGroup()
-    for geo_type ∈ FerriteBenchmarkHelper.geo_types_for_spatial_dim(spatial_dim)
-        DIRICHLET_SUITE["spatial-dim",spatial_dim][string(geo_type)] = BenchmarkGroup()
+# span artifical scope...
+for spatial_dim ∈ [2]
+    # Benchmark application on global system
+    DIRICHLET_SUITE["global"] = BenchmarkGroup()
 
-        grid = generate_grid(geo_type, tuple(repeat([3], spatial_dim)...));
-        ref_type = FerriteBenchmarkHelper.default_refshape(geo_type)
-        ip_geo = Ferrite.default_interpolation(geo_type)
+    geo_type = Quadrilateral
+    grid = generate_grid(geo_type, tuple([spatial_dim, spatial_dim]));
+    ref_type = FerriteBenchmarkHelper.default_refshape(geo_type)
+    ip_geo = Ferrite.default_interpolation(geo_type)
+    order = 2
 
-        for order ∈ [2]
-            # higher order Lagrange on hex not working yet...
-            order > 1 && geo_type ∈ [Hexahedron] && continue
+    # assemble a mass matrix to apply BCs on (because its cheap)
+    ip = Lagrange{spatial_dim, ref_type, order}()
+    qr = QuadratureRule{spatial_dim, ref_type}(2*order-1)
+    cellvalues = CellScalarValues(qr, ip, ip_geo);
+    dh = DofHandler(grid)
+    push!(dh, :u, 1, ip)
+    close!(dh);
 
-            DIRICHLET_SUITE["spatial-dim",spatial_dim][string(geo_type)]["Lagrange", order] = BenchmarkGroup()
-            LAGRANGE_SUITE = DIRICHLET_SUITE["spatial-dim",spatial_dim][string(geo_type)]["Lagrange", order]
+    ch = ConstraintHandler(dh);
+    ∂Ω = union(getfaceset.((grid, ), ["left"])...);
+    dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
+    add!(ch, dbc);
+    close!(ch);
 
-            # mass problem helper
-            ip = Lagrange{spatial_dim, ref_type, order}()
-            qr = QuadratureRule{spatial_dim, ref_type}(2*order-1)
-            cellvalues = CellScalarValues(qr, ip, ip_geo);
-            dh = DofHandler(grid)
-            push!(dh, :u, 1, ip)
-            close!(dh);
+    # Non-symmetric application
+    M, f = FerriteAssemblyHelper._assemble_mass(dh, cellvalues, false);
+    DIRICHLET_SUITE["global"]["apply!(M,f,APPLY_TRANSPOSE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_TRANSPOSE));
+    DIRICHLET_SUITE["global"]["apply!(M,f,APPLY_INPLACE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_INPLACE));
+    # Symmetric application
+    M, f = FerriteAssemblyHelper._assemble_mass(dh, cellvalues, true);
+    DIRICHLET_SUITE["global"]["apply!(M_sym,f,APPLY_TRANSPOSE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_TRANSPOSE));
+    DIRICHLET_SUITE["global"]["apply!(M_sym,f,APPLY_INPLACE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_INPLACE));
 
-            ch = ConstraintHandler(dh);
-            ∂Ω = union(getfaceset.((grid, ), ["left"])...);
-            dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
-            add!(ch, dbc);
-            close!(ch);
-
-            M, f = FerriteAssemblyHelper._assemble_mass(dh, cellvalues, false);
-
-            LAGRANGE_SUITE["apply!(M,f,APPLY_TRANSPOSE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_TRANSPOSE));
-            LAGRANGE_SUITE["apply!(M,f,APPLY_INPLACE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_INPLACE));
-            LAGRANGE_SUITE["apply!(f)"] = @benchmarkable apply!($f, $ch);
-            LAGRANGE_SUITE["apply_zero!(f)"] = @benchmarkable apply!($f, $ch);
-
-            M, f = FerriteAssemblyHelper._assemble_mass(dh, cellvalues, true);
-
-            LAGRANGE_SUITE["apply!(M_sym,f,APPLY_TRANSPOSE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_TRANSPOSE));
-            LAGRANGE_SUITE["apply!(M_sym,f,APPLY_INPLACE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_INPLACE));
-        end
-    end
+    DIRICHLET_SUITE["global"]["apply!(f)"] = @benchmarkable apply!($f, $ch);
+    DIRICHLET_SUITE["global"]["apply_zero!(f)"] = @benchmarkable apply!($f, $ch);
 end
