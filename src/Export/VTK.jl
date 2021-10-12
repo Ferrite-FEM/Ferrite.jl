@@ -31,70 +31,42 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compre
     return vtk_grid(filename, coords, cls; compress=compress)
 end
 
-"""
-    vtk_point_data(vtk, data::Vector{<:SymmetricTensor{2}}, name)
+# ParaView uses this ordering for SymmetricTensors. Regular Tensors
+# aren't recognized as tensorfields, but let's use the same ordering anyway
+const PARAVIEW_VOIGT_ORDER = ([1], [1 3; 4 2], [1 4 6; 7 2 5; 9 8 3])
+function toparaview!(v, x::Vec{D}) where D
+    v[1:D] .= x
+end
+function toparaview!(v, x::SecondOrderTensor{D}) where D
+    tovoigt!(v, x; order=PARAVIEW_VOIGT_ORDER[D])
+end
+function toparaview!(v, x::SymmetricTensor{2,2})
+    # Since 2D tensors are padded to 3D we need to place the output in
+    # the correct positions with this view
+    tovoigt!(@view(v[[1, 2, 4]]), x; order=PARAVIEW_VOIGT_ORDER[2])
+end
 
-Write the second order tensor field `data` to the vtk file. Twodimensional tensors are padded with zeros.
-The tensor field is written such that Paraview recognizes the tensor components, where `XX` corresponds to the `[1,1]` component and so on.
+"""
+    vtk_point_data(vtk, data::Vector{<:AbstractTensor}, name)
+
+Write the tensor field `data` to the vtk file. Two-dimensional tensors are padded with zeros.
+
+For second order tensors the following indexing ordering is used:
+`[11, 22, 33, 12, 23, 13, 21, 32, 31]`. This is the order that ParaView uses.
 """
 function WriteVTK.vtk_point_data(
     vtk::WriteVTK.DatasetFile,
-    data::Union{
-        Vector{SymmetricTensor{2,dim,T,M}}
-        },
+    data::Vector{S},
     name::AbstractString
-    ) where {dim,T,M}
-
-    if dim == 1
-        noutputs = 1
-        sort_paraview = [1]
-    elseif dim == 2
-        noutputs = 6
-        sort_paraview = [1,4,2]
-    elseif dim == 3
-        noutputs = 6
-        sort_paraview = [1,4,6,2,5,3]
-    end
-
+    ) where {O, D, T, M, S <: Union{Tensor{O, D, T, M}, SymmetricTensor{O, D, T, M}}}
+    noutputs = S <: SymmetricTensor{2,2} ? 6 : # Pad 2D SymmetricTensors to 3D
+               S <: Vec{2} ? 3 : # Pad 2D Vec to 3D
+               M
     npoints = length(data)
     out = zeros(T, noutputs, npoints)
-    out[sort_paraview, :] .= reshape(reinterpret(T, data), (M, npoints))
-
-    return vtk_point_data(vtk, out, name)
-end
-
-"""
-    vtk_point_data(vtk, data::Vector{<:Tensor}, name)
-
-Write the tensor field data to the vtk file. Only writes the tensor values available in `data`.
-In the vtu-file, ordering of the tensor components is column-wise (just like Julia).
-[1 2
- 3 4] => 1, 3, 2, 4
-"""
-function WriteVTK.vtk_point_data(
-    vtk::WriteVTK.DatasetFile,
-    data::Union{
-        Vector{Tensor{order,dim,T,M}},
-        Vector{SymmetricTensor{order,dim,T,M}}
-        },
-    name::AbstractString
-    ) where {order,dim,T,M}
-
-    npoints = length(data)
-    out = zeros(T, M, npoints)
-    out[1:M, :] .= reshape(reinterpret(T, data), (M, npoints))
-    return vtk_point_data(vtk, out, name)
-end
-
-"""
-    vtk_point_data(vtk, data::Vector{<:Vec}, name)
-
-Write the vector field data to the vtk file.
-"""
-function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, data::Vector{Vec{dim,T}}, name::AbstractString) where {dim,T}
-    npoints = length(data)
-    out = zeros(T, (dim == 2 ? 3 : dim), npoints)
-    out[1:dim, :] .= reshape(reinterpret(T, data), (dim, npoints))
+    for i in 1:npoints
+        toparaview!(@view(out[:, i]), data[i])
+    end
     return vtk_point_data(vtk, out, name)
 end
 
@@ -103,9 +75,6 @@ function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String
     z[collect(getnodeset(grid, nodeset))] .= 1.0
     vtk_point_data(vtk, z, nodeset)
 end
-
-
-
 
 """
     vtk_cellset(vtk, grid::Grid)
