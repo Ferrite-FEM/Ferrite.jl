@@ -13,8 +13,7 @@ end
 
 # TODO refactor into grid
 # Quadratic* not yet functional in 3D
-default_refshape(::Union{Type{Line}, Type{Line2D}, Type{Line3D}, Type{QuadraticLine}, Type{Quadrilateral}, Type{Quadrilateral3D}, Type{QuadraticQuadrilateral}, Type{Hexahedron}}) = RefCube
-default_refshape(::Union{Type{Triangle}, Type{QuadraticTriangle}, Type{Tetrahedron}}) = RefTetrahedron
+default_refshape(cell::Ferrite.AbstractCell) = typeof(Ferrite.default_interpolation(typeof(cell))).parameters[2]
 
 end
 
@@ -34,7 +33,7 @@ HYPERRECTANGLE_GENERATOR = SUITE["mesh"]["generator"]["hyperrectangle"]
 for spatial_dim ∈ 1:3
     HYPERRECTANGLE_GENERATOR["spatial-dim",spatial_dim] = BenchmarkGroup()
     for geo_type ∈ FerriteBenchmarkHelper.geo_types_for_spatial_dim(spatial_dim)
-        HYPERRECTANGLE_GENERATOR["spatial-dim",spatial_dim][string(geo_type)] = @benchmarkable generate_grid($geo_type, $(tuple(repeat([4], spatial_dim)...)));
+        HYPERRECTANGLE_GENERATOR["spatial-dim",spatial_dim][string(geo_type)] = @benchmarkable generate_grid($geo_type, $ntuple(x->4, spatial_dim));
     end
 end
 
@@ -59,7 +58,7 @@ for spatial_dim ∈ 1:3
             NUMBERING_SUITE["spatial-dim",spatial_dim][string(geo_type)]["grid-size-",grid_size] = BenchmarkGroup()
             NUMBERING_SUITE["spatial-dim",spatial_dim][string(geo_type)]["grid-size-",grid_size] = BenchmarkGroup()
 
-            grid = generate_grid(geo_type, tuple(repeat([grid_size], spatial_dim)...));
+            grid = generate_grid(geo_type, ntuple(x->grid_size, spatial_dim));
 
             for field_dim ∈ 1:3
                 NUMBERING_SUITE["spatial-dim",spatial_dim][string(geo_type)]["grid-size-",grid_size]["field-dim-", field_dim] = BenchmarkGroup()
