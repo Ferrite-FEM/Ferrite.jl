@@ -5,10 +5,10 @@ module FerriteBenchmarkHelper
 
 using Ferrite
 
-function geo_types_for_spatial_dim(dim)
-    dim == 1 && return [Line, QuadraticLine]
-    dim == 2 && return [Triangle, QuadraticTriangle, Quadrilateral, QuadraticQuadrilateral]
-    dim == 3 && return [Tetrahedron, Hexahedron] # Quadratic* not yet functional in 3D. 3D triangle missing. Embedded also missing.
+function geo_types_for_spatial_dim(spatial_dim)
+    spatial_dim == 1 && return [Line, QuadraticLine]
+    spatial_dim == 2 && return [Triangle, QuadraticTriangle, Quadrilateral, QuadraticQuadrilateral]
+    spatial_dim == 3 && return [Tetrahedron, Hexahedron] # Quadratic* not yet functional in 3D. 3D triangle missing. Embedded also missing.
 end
 
 # TODO refactor into grid
@@ -46,23 +46,25 @@ end
 #----------------------------------------------------------------------#
 SUITE["dof-management"] = BenchmarkGroup()
 SUITE["dof-management"]["numbering"] = BenchmarkGroup()
+# !!! NOTE close! must wrapped into a custom function, because consecutive calls to close!, since the dofs are already distributed.
 NUMBERING_SUITE = SUITE["dof-management"]["numbering"]
 for spatial_dim ∈ 1:3
-    NUMBERING_SUITE["spatial-dim",string(spatial_dim)] = BenchmarkGroup()
+    NUMBERING_SUITE["spatial-dim",spatial_dim] = BenchmarkGroup()
     for geo_type ∈ FerriteBenchmarkHelper.geo_types_for_spatial_dim(spatial_dim)
-        NUMBERING_SUITE["spatial-dim",string(spatial_dim)][string(geo_type)] = BenchmarkGroup()
+        NUMBERING_SUITE["spatial-dim",spatial_dim][string(geo_type)] = BenchmarkGroup()
 
         ref_type = FerriteBenchmarkHelper.default_refshape(geo_type)
 
-        for grid_size ∈ [3, 6, 12] #multiple grid sized to estimate computational complexity...
-            NUMBERING_SUITE["spatial-dim",string(spatial_dim)][string(geo_type)]["grid-size-",grid_size] = BenchmarkGroup()
-            NUMBERING_SUITE["spatial-dim",string(spatial_dim)][string(geo_type)]["grid-size-",grid_size] = BenchmarkGroup()
+        for grid_size ∈ [3, 6, 9] #multiple grid sized to estimate computational complexity...
+            NUMBERING_SUITE["spatial-dim",spatial_dim][string(geo_type)]["grid-size-",grid_size] = BenchmarkGroup()
+            NUMBERING_SUITE["spatial-dim",spatial_dim][string(geo_type)]["grid-size-",grid_size] = BenchmarkGroup()
 
             grid = generate_grid(geo_type, tuple(repeat([grid_size], spatial_dim)...));
 
             for field_dim ∈ 1:3
-                NUMBERING_SUITE["spatial-dim",string(spatial_dim)][string(geo_type)]["grid-size-",grid_size]["field-dim-", field_dim] = BenchmarkGroup()
-                NUMBERING_FIELD_DIM_SUITE = NUMBERING_SUITE["spatial-dim",string(spatial_dim)][string(geo_type)]["grid-size-",grid_size]["field-dim-", field_dim]
+                NUMBERING_SUITE["spatial-dim",spatial_dim][string(geo_type)]["grid-size-",grid_size]["field-dim-", field_dim] = BenchmarkGroup()
+                NUMBERING_FIELD_DIM_SUITE = NUMBERING_SUITE["spatial-dim",spatial_dim][string(geo_type)]["grid-size-",grid_size]["field-dim-", field_dim]
+                # Lagrange tests
                 for order ∈ 1:2
                     # higher order Lagrange on hex not working yet...
                     order > 1 && geo_type ∈ [Hexahedron] && continue
@@ -133,7 +135,7 @@ end
 #----------------------------------------------------------------------#
 SUITE["assembly"] = BenchmarkGroup()
 
-module FerriteAssemblyBenchmarks
+module FerriteAssemblyHelper
 
 using Ferrite
 
@@ -243,18 +245,50 @@ function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.Abstra
     f
 end
 
+function _assemble_mass(dh, cellvalues, sym)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    Me = zeros(n_basefuncs, n_basefuncs)
+    fe = zeros(n_basefuncs)
+
+    M = sym ? create_symmetric_sparsity_pattern(dh) : create_sparsity_pattern(dh);
+    f = zeros(ndofs(dh))
+
+    assembler = start_assemble(M, f);
+    @inbounds for cell in CellIterator(dh)
+        fill!(Me, 0)
+
+        reinit!(cellvalues, cell)
+
+        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+
+            for i in 1:n_basefuncs
+                φ  = shape_value(cellvalues, q_point, i)
+                fe[i] += φ * dΩ
+                for j in 1:n_basefuncs
+                    ψ  = shape_value(cellvalues, q_point, j)
+                    Me[i, j] += (φ * ψ) * dΩ
+                end
+            end
+        end
+
+        assemble!(assembler, celldofs(cell), Me, fe)
+    end
+
+    return M, f
+end
+
 end
 
 # Permute over common combinations for some commonly required local matrices.
 SUITE["assembly"]["common-local"] = BenchmarkGroup()
 COMMON_LOCAL_ASSEMBLY = SUITE["assembly"]["common-local"]
-# dim(topo) = dim(geo)
-for dim ∈ 1:3
-    COMMON_LOCAL_ASSEMBLY["dim",string(dim)] = BenchmarkGroup()
-    for geo_type ∈ FerriteBenchmarkHelper.geo_types_for_spatial_dim(dim)
-        COMMON_LOCAL_ASSEMBLY["dim",string(dim)][string(geo_type)] = BenchmarkGroup()
+for spatial_dim ∈ 1:3
+    COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim] = BenchmarkGroup()
+    for geo_type ∈ FerriteBenchmarkHelper.geo_types_for_spatial_dim(spatial_dim)
+        COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)] = BenchmarkGroup()
 
-        grid = generate_grid(geo_type, tuple(repeat([1], dim)...));
+        grid = generate_grid(geo_type, tuple(repeat([1], spatial_dim)...));
         ref_type = FerriteBenchmarkHelper.default_refshape(geo_type)
         ip_geo = Ferrite.default_interpolation(geo_type)
 
@@ -263,13 +297,13 @@ for dim ∈ 1:3
             order > 1 && geo_type ∈ [Hexahedron] && continue
 
             # Currenlty we just benchmark nodal Lagrange bases.
-            COMMON_LOCAL_ASSEMBLY["dim",string(dim)][string(geo_type)]["Lagrange",string(order)] = BenchmarkGroup()
-            LAGRANGE_SUITE = COMMON_LOCAL_ASSEMBLY["dim",string(dim)][string(geo_type)]["Lagrange",string(order)]
+            COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)]["Lagrange",string(order)] = BenchmarkGroup()
+            LAGRANGE_SUITE = COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)]["Lagrange",string(order)]
             LAGRANGE_SUITE["ritz-galerkin"] = BenchmarkGroup()
             LAGRANGE_SUITE["petrov-galerkin"] = BenchmarkGroup()
 
-            ip = Lagrange{dim, ref_type, order}()
-            qr = QuadratureRule{dim, ref_type}(2*order-1)
+            ip = Lagrange{spatial_dim, ref_type, order}()
+            qr = QuadratureRule{spatial_dim, ref_type}(2*order-1)
 
             csv = CellScalarValues(qr, ip, ip_geo);
             csv2 = CellScalarValues(qr, ip, ip_geo);
@@ -278,30 +312,75 @@ for dim ∈ 1:3
             cvv2 = CellVectorValues(qr, ip, ip_geo);
 
             # Scalar shape φ and test ψ: ∫ φ ψ
-            LAGRANGE_SUITE["ritz-galerkin"]["mass"] = @benchmarkable FerriteAssemblyBenchmarks._generalized_ritz_galerkin_assemble_local_matrix($grid, $csv, shape_value, shape_value, *)
-            LAGRANGE_SUITE["petrov-galerkin"]["mass"] = @benchmarkable FerriteAssemblyBenchmarks._generalized_petrov_galerkin_assemble_local_matrix($grid, $csv, shape_value, $csv2, shape_value, *)
+            LAGRANGE_SUITE["ritz-galerkin"]["mass"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $csv, shape_value, shape_value, *)
+            LAGRANGE_SUITE["petrov-galerkin"]["mass"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $csv, shape_value, $csv2, shape_value, *)
             # Vectorial shape φ and test ψ: ∫ φ ⋅ ψ
-            LAGRANGE_SUITE["ritz-galerkin"]["vector-mass"] = @benchmarkable FerriteAssemblyBenchmarks._generalized_ritz_galerkin_assemble_local_matrix($grid, $cvv, shape_value, shape_value, ⋅)
-            LAGRANGE_SUITE["petrov-galerkin"]["vector-mass"] = @benchmarkable FerriteAssemblyBenchmarks._generalized_petrov_galerkin_assemble_local_matrix($grid, $cvv, shape_value, $cvv2, shape_value, ⋅)
+            LAGRANGE_SUITE["ritz-galerkin"]["vector-mass"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $cvv, shape_value, shape_value, ⋅)
+            LAGRANGE_SUITE["petrov-galerkin"]["vector-mass"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $cvv, shape_value, $cvv2, shape_value, ⋅)
             # Scalar shape φ and test ψ: ∫ ∇φ ⋅ ∇ψ
-            LAGRANGE_SUITE["ritz-galerkin"]["Laplace"] = @benchmarkable FerriteAssemblyBenchmarks._generalized_ritz_galerkin_assemble_local_matrix($grid, $csv, shape_gradient, shape_gradient, ⋅)
-            LAGRANGE_SUITE["petrov-galerkin"]["Laplace"] = @benchmarkable FerriteAssemblyBenchmarks._generalized_petrov_galerkin_assemble_local_matrix($grid, $csv, shape_gradient, $csv2, shape_gradient, ⋅)
+            LAGRANGE_SUITE["ritz-galerkin"]["Laplace"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $csv, shape_gradient, shape_gradient, ⋅)
+            LAGRANGE_SUITE["petrov-galerkin"]["Laplace"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $csv, shape_gradient, $csv2, shape_gradient, ⋅)
             # Vectorial shape φ and test ψ: ∫ ∇φ : ∇ψ
-            LAGRANGE_SUITE["ritz-galerkin"]["vector-Laplace"] = @benchmarkable FerriteAssemblyBenchmarks._generalized_ritz_galerkin_assemble_local_matrix($grid, $cvv, shape_gradient, shape_gradient, ⊡)
-            LAGRANGE_SUITE["petrov-galerkin"]["vector-Laplace"] = @benchmarkable FerriteAssemblyBenchmarks._generalized_petrov_galerkin_assemble_local_matrix($grid, $cvv, shape_gradient, $cvv2, shape_gradient, ⊡)
+            LAGRANGE_SUITE["ritz-galerkin"]["vector-Laplace"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $cvv, shape_gradient, shape_gradient, ⊡)
+            LAGRANGE_SUITE["petrov-galerkin"]["vector-Laplace"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $cvv, shape_gradient, $cvv2, shape_gradient, ⊡)
             # Vectorial shape φ and scalar test ψ: ∫ (∇ ⋅ φ) ψ
-            LAGRANGE_SUITE["petrov-galerkin"]["pressure-velocity"] = @benchmarkable FerriteAssemblyBenchmarks._generalized_petrov_galerkin_assemble_local_matrix($grid, $cvv, shape_divergence, $csv, shape_value, *)
+            LAGRANGE_SUITE["petrov-galerkin"]["pressure-velocity"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $cvv, shape_divergence, $csv, shape_value, *)
 
-            if dim > 1
-                qr_face = QuadratureRule{dim-1, ref_type}(2*order-1)
+            if spatial_dim > 1
+                qr_face = QuadratureRule{spatial_dim-1, ref_type}(2*order-1)
                 fsv = FaceScalarValues(qr_face, ip, ip_geo);
                 fsv2 = FaceScalarValues(qr_face, ip, ip_geo);
 
-                LAGRANGE_SUITE["ritz-galerkin"]["face-flux"] = @benchmarkable FerriteAssemblyBenchmarks._generalized_ritz_galerkin_assemble_local_matrix($grid, $fsv, shape_gradient, shape_value, *)
-                LAGRANGE_SUITE["petrov-galerkin"]["face-flux"] = @benchmarkable FerriteAssemblyBenchmarks._generalized_petrov_galerkin_assemble_local_matrix($grid, $fsv, shape_gradient, $fsv2, shape_value, *)
+                LAGRANGE_SUITE["ritz-galerkin"]["face-flux"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $fsv, shape_gradient, shape_value, *)
+                LAGRANGE_SUITE["petrov-galerkin"]["face-flux"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $fsv, shape_gradient, $fsv2, shape_value, *)
             end
         end
     end
 end
 
 SUITE["assembly"]["Dirichlet"] = BenchmarkGroup()
+DIRICHLET_SUITE = SUITE["assembly"]["Dirichlet"]
+for spatial_dim ∈ 1:3
+    DIRICHLET_SUITE["spatial-dim",spatial_dim] = BenchmarkGroup()
+    for geo_type ∈ FerriteBenchmarkHelper.geo_types_for_spatial_dim(spatial_dim)
+        DIRICHLET_SUITE["spatial-dim",spatial_dim][string(geo_type)] = BenchmarkGroup()
+
+        grid = generate_grid(geo_type, tuple(repeat([3], spatial_dim)...));
+        ref_type = FerriteBenchmarkHelper.default_refshape(geo_type)
+        ip_geo = Ferrite.default_interpolation(geo_type)
+
+        for order ∈ 1:2
+            # higher order Lagrange on hex not working yet...
+            order > 1 && geo_type ∈ [Hexahedron] && continue
+
+            DIRICHLET_SUITE["spatial-dim",spatial_dim][string(geo_type)]["Lagrange", order] = BenchmarkGroup()
+            LAGRANGE_SUITE = DIRICHLET_SUITE["spatial-dim",spatial_dim][string(geo_type)]["Lagrange", order]
+
+            # mass problem helper
+            ip = Lagrange{spatial_dim, ref_type, order}()
+            qr = QuadratureRule{spatial_dim, ref_type}(2*order-1)
+            cellvalues = CellScalarValues(qr, ip, ip_geo);
+            dh = DofHandler(grid)
+            push!(dh, :u, 1, ip)
+            close!(dh);
+
+            ch = ConstraintHandler(dh);
+            ∂Ω = union(getfaceset.((grid, ), ["left"])...);
+            dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
+            add!(ch, dbc);
+            close!(ch);
+
+            M, f = FerriteAssemblyHelper._assemble_mass(dh, cellvalues, false);
+
+            LAGRANGE_SUITE["apply!(M,f,APPLY_TRANSPOSE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_TRANSPOSE));
+            LAGRANGE_SUITE["apply!(M,f,APPLY_INPLACE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_INPLACE));
+            LAGRANGE_SUITE["apply!(f)"] = @benchmarkable apply!($f, $ch);
+            LAGRANGE_SUITE["apply_zero!(f)"] = @benchmarkable apply!($f, $ch);
+
+            M, f = FerriteAssemblyHelper._assemble_mass(dh, cellvalues, true);
+
+            LAGRANGE_SUITE["apply!(M_sym,f,APPLY_TRANSPOSE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_TRANSPOSE));
+            LAGRANGE_SUITE["apply!(M_sym,f,APPLY_INPLACE)"] = @benchmarkable apply!($M, $f, $ch; strategy=$(Ferrite.APPLY_INPLACE));
+        end
+    end
+end
