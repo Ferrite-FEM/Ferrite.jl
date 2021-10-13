@@ -80,7 +80,7 @@ struct InterpolationInfo
     ncelldofs::Int
     dim::Int
     InterpolationInfo(interpolation::Interpolation{dim}) where {dim} =
-        new(nvertexdofs(interpolation), nedgedofs(interpolation), 
+        new(nvertexdofs(interpolation), nedgedofs(interpolation),
             nfacedofs(interpolation),   ncelldofs(interpolation), dim)
 end
 
@@ -91,9 +91,21 @@ end
 #   celldof: dof that is local to the element
 
 # Fallbacks for the interpolations which are used to distribute the dofs correctly
+"""
+Number of dofs per vertex
+"""
 nvertexdofs(::Interpolation) = 0
+"""
+Number of dofs per edge
+"""
 nedgedofs(::Interpolation)   = 0
+"""
+Number of dofs per face
+"""
 nfacedofs(::Interpolation)   = 0
+"""
+Total number of dofs in the interior
+"""
 ncelldofs(::Interpolation)   = 0
 
 # Needed for distrubuting dofs on shells correctly (face in 2d is edge in 3d)
@@ -105,6 +117,38 @@ vertices(::Interpolation{2,RefCube}) = (1,2,3,4)
 vertices(::Interpolation{3,RefCube}) = (1,2,3,4,5,6,7,8)
 vertices(::Interpolation{2,RefTetrahedron}) = (1,2,3)
 vertices(::Interpolation{3,RefTetrahedron}) = (1,2,3,4)
+
+#########################
+# DiscontinuousLagrange #
+#########################
+# TODO generalize to arbitrary basis positionings.
+"""
+Piecewise discontinous Lagrange basis via Gauss-Lobatto points.
+"""
+struct DiscontinuousLagrange{dim,shape,order} <: Interpolation{dim,shape,order} end
+
+getlowerdim(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = DiscontinuousLagrange{dim-1,shape,order}()
+getlowerorder(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = DiscontinuousLagrange{dim,shape,order-1}()
+
+# TODO generalize properly
+# ncelldofs(::DiscontinuousLagrange{dim,RefCube,order}) where {dim,order} = (order+1)^dim
+# ncelldofs(::DiscontinuousLagrange{2,RefTetrahedron,order}) where {order} = (order+1)*(order+2)/2
+# ncelldofs(::DiscontinuousLagrange{3,RefTetrahedron,order}) where {order} = (order+1)*(order+2)/2
+getnbasefunctions(::DiscontinuousLagrange{dim,ref_geo,order}) where {dim,ref_geo,order} = getnbasefunctions(Lagrange{dim,ref_geo,order}())
+ncelldofs(::DiscontinuousLagrange{dim,ref_geo,order}) where {dim,ref_geo,order} = getnbasefunctions(DiscontinuousLagrange{dim,ref_geo,order}())
+
+getnbasefunctions(::DiscontinuousLagrange{dim,ref_geo,0}) where {dim,ref_geo} = 1
+ncelldofs(::DiscontinuousLagrange{dim,ref_geo,0}) where {dim,ref_geo} = 1
+
+faces(::DiscontinuousLagrange{dim,ref_geo,order}) where {dim,ref_geo,order} = ()
+
+function reference_coordinates(ip::DiscontinuousLagrange{dim, RefCube, 0}) where {dim}
+    return repeat([Vec{2, Float64}(ntuple(x->0.0, dim))])*getnbasefunctions(ip)
+end
+
+function value(ip::Union{DiscontinuousLagrange{dim,ref_type,0}}, i::Int, ξ::Vec{dim}) where {ref_type, dim}
+    return 1.0
+end
 
 ############
 # Lagrange #
@@ -165,14 +209,14 @@ nvertexdofs(::Lagrange{2,RefCube,1}) = 1
 
 faces(::Lagrange{2,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1))
 
-function reference_coordinates(::Lagrange{2,RefCube,1})
+function reference_coordinates(::Union{Lagrange{2,RefCube,1}, DiscontinuousLagrange{2,RefCube,1}})
     return [Vec{2, Float64}((-1.0, -1.0)),
             Vec{2, Float64}(( 1.0, -1.0)),
             Vec{2, Float64}(( 1.0,  1.0,)),
             Vec{2, Float64}((-1.0,  1.0,))]
 end
 
-function value(ip::Lagrange{2,RefCube,1}, i::Int, ξ::Vec{2})
+function value(ip::Union{Lagrange{2,RefCube,1}, DiscontinuousLagrange{2,RefCube,1}}, i::Int, ξ::Vec{2})
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25
