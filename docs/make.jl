@@ -7,7 +7,7 @@ include("generate.jl")
 
 GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "heat_equation.md",
-    "l2_projection.md",
+    "postprocessing.md",
     "helmholtz.md",
     "incompressible_elasticity.md",
     "hyperelasticity.md",
@@ -16,7 +16,8 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "transient_heat_equation.md",
     "landau.md",
     "linear_shell.md",
-    "quasi_incompressible_hyperelasticity.md"
+    "quasi_incompressible_hyperelasticity.md",
+    "ns_vs_diffeq.md",
     )]
 
 # Build documentation.

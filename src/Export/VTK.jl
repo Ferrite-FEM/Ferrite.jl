@@ -32,10 +32,42 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compre
 end
 
 """
+    vtk_point_data(vtk, data::Vector{<:SymmetricTensor{2}}, name)
+
+Write the second order tensor field `data` to the vtk file. Twodimensional tensors are padded with zeros.
+The tensor field is written such that Paraview recognizes the tensor components, where `XX` corresponds to the `[1,1]` component and so on.
+"""
+function WriteVTK.vtk_point_data(
+    vtk::WriteVTK.DatasetFile,
+    data::Union{
+        Vector{SymmetricTensor{2,dim,T,M}}
+        },
+    name::AbstractString
+    ) where {dim,T,M}
+
+    if dim == 1
+        noutputs = 1
+        sort_paraview = [1]
+    elseif dim == 2
+        noutputs = 6
+        sort_paraview = [1,4,2]
+    elseif dim == 3
+        noutputs = 6
+        sort_paraview = [1,4,6,2,5,3]
+    end
+
+    npoints = length(data)
+    out = zeros(T, noutputs, npoints)
+    out[sort_paraview, :] .= reshape(reinterpret(T, data), (M, npoints))
+
+    return vtk_point_data(vtk, out, name)
+end
+
+"""
     vtk_point_data(vtk, data::Vector{<:Tensor}, name)
 
 Write the tensor field data to the vtk file. Only writes the tensor values available in `data`.
-In the vtu-file, ordering of the tensor components is coulumn-wise (just like Julia).
+In the vtu-file, ordering of the tensor components is column-wise (just like Julia).
 [1 2
  3 4] => 1, 3, 2, 4
 """
@@ -100,45 +132,12 @@ the cell is in the set and 0 otherwise.
 vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellset::String) =
     vtk_cellset(vtk, grid, [cellset])
 
-import Ferrite.field_offset
-function WriteVTK.vtk_point_data(vtkfile, dh::MixedDofHandler, u::Vector, suffix="")
+function WriteVTK.vtk_point_data(vtkfile, dh::AbstractDofHandler, u::Vector, suffix="")
 
     fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
 
     for name in fieldnames
-        @debug println("exporting field $(name)")
-        field_dim = getfielddim(dh, name)
-        space_dim = field_dim == 2 ? 3 : field_dim
-        data = fill(NaN, space_dim, getnnodes(dh.grid))  # set default value
-
-        for fh in dh.fieldhandlers
-            # check if this fh contains this field, otherwise continue to the next
-            field_pos = findfirst(i->i == name, getfieldnames(fh))
-            field_pos === nothing && continue
-
-            cellnumbers = sort(collect(fh.cellset))  # TODO necessary to have them ordered?
-            offset = field_offset(fh, name)
-
-            for cellnum in cellnumbers
-                cell = dh.grid.cells[cellnum]
-                n = ndofs_per_cell(dh, cellnum)
-                eldofs = zeros(Int, n)
-                _celldofs = celldofs!(eldofs, dh, cellnum)
-                counter = 1
-
-                for node in cell.nodes
-                    for d in 1:field_dim
-                        data[d, node] = u[_celldofs[counter + offset]]
-                        @debug println("  exporting $(u[_celldofs[counter + offset]]) for dof#$(_celldofs[counter + offset])")
-                        counter += 1
-                    end
-                    if field_dim == 2
-                        # paraview requires 3D-data so pad with zero
-                        data[3, node] = 0
-                    end
-                end
-            end
-        end
+        data = reshape_to_nodes(dh, u, name)
         vtk_point_data(vtkfile, data, string(name, suffix))
     end
 
