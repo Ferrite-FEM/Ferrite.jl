@@ -23,7 +23,7 @@ A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
 However, a `cell` is not defined by the nodes but rather by the global node ids
 
 # Fields
-- `nodes::Ntuple{N,Int}`: N-tuple that stores the node ids
+- `nodes::Ntuple{N,Int}`: N-tuple that stores the node ids. The ordering defines a cell's and its subentities' orientations.
 """
 struct Cell{dim,N,M} <: AbstractCell{dim,N,M}
     nodes::NTuple{N,Int}
