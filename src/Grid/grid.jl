@@ -155,73 +155,73 @@ to a Node.
 @inline getnodes(grid::AbstractGrid) = grid.nodes
 @inline getnodes(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.nodes[v]
 @inline getnodes(grid::AbstractGrid, setname::String) = grid.nodes[collect(getnodeset(grid,setname))]
-"Returns the number of nodes in the grid"
+"Returns the number of nodes in the grid."
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
-"Returns the number of nodes of the `i`-th cell"
+"Returns the number of nodes of the `i`-th cell."
 @inline nnodes_per_cell(grid::AbstractGrid, i::Int=1) = nnodes(grid.cells[i])
 
 """
     getcellset(grid::AbstractGrid, setname::String)
 
-Returns all cells as cellid in a `Set` of a given `setname`
+Returns all cells as cellid in a `Set` of a given `setname`.
 """
 @inline getcellset(grid::AbstractGrid, setname::String) = grid.cellsets[setname]
 """
     getcellsets(grid::AbstractGrid)
 
-Returns all cellsets of the `grid`
+Returns all cellsets of the `grid`.
 """
 @inline getcellsets(grid::AbstractGrid) = grid.cellsets
 
 """
     getnodeset(grid::AbstractGrid, setname::String)
 
-Returns all nodes as nodeid in a `Set` of a given `setname`
+Returns all nodes as nodeid in a `Set` of a given `setname`.
 """
 @inline getnodeset(grid::AbstractGrid, setname::String) = grid.nodesets[setname]
 """
     getnodesets(grid::AbstractGrid)
 
-Returns all nodesets of the `grid`
+Returns all nodesets of the `grid`.
 """
 @inline getnodesets(grid::AbstractGrid) = grid.nodesets
 
 """
     getfaceset(grid::AbstractGrid, setname::String)
 
-Returns all faces as `FaceIndex` in a `Set` of a given `setname`
+Returns all faces as `FaceIndex` in a `Set` of a given `setname`.
 """
 @inline getfaceset(grid::AbstractGrid, setname::String) = grid.facesets[setname]
 """
     getfacesets(grid::AbstractGrid)
 
-Returns all facesets of the `grid`
+Returns all facesets of the `grid`.
 """
 @inline getfacesets(grid::AbstractGrid) = grid.facesets
 
 """
     getedgeset(grid::AbstractGrid, setname::String)
 
-Returns all edges as `EdgeIndex` in a `Set` of a given `setname`
+Returns all edges as `EdgeIndex` in a `Set` of a given `setname`.
 """
 @inline getedgeset(grid::AbstractGrid, setname::String) = grid.edgesets[setname]
 """
     getedgesets(grid::AbstractGrid)
 
-Returns all edge sets of the grid
+Returns all edge sets of the grid.
 """
 @inline getedgesets(grid::AbstractGrid) = grid.edgesets
 
 """
     getedgeset(grid::AbstractGrid, setname::String)
 
-Returns all vertices as `VertexIndex` in a `Set` of a given `setname`
+Returns all vertices as `VertexIndex` in a `Set` of a given `setname`.
 """
 @inline getvertexset(grid::AbstractGrid, setname::String) = grid.vertexsets[setname]
 """
     getvertexsets(grid::AbstractGrid)
 
-Returns all vertex sets of the grid
+Returns all vertex sets of the grid.
 """
 @inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
 
