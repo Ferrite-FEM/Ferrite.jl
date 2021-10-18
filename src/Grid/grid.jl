@@ -20,7 +20,8 @@ abstract type AbstractCell{dim,N,M} end
 """
     Cell{dim,N,M} <: AbstractCell{dim,N,M}
 A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
-However, a `cell` is not defined by the nodes but rather by the global node ids
+However, a `cell` is not defined by the nodes but rather by the global node ids.
+The parameter `dim` refers here to the geometrical/ambient dimension, i.e. the dimension of the `nodes` in the grid and **not** the topological dimension of the cell.
 
 # Fields
 - `nodes::Ntuple{N,Int}`: N-tuple that stores the node ids. The ordering defines a cell's and its subentities' orientations.
