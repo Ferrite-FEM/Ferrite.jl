@@ -86,6 +86,10 @@ export
     generate_grid,
     compute_vertex_values,
 
+# Grid coloring
+    create_coloring,
+    vtk_cell_data_colors,
+
 # Dofs
     DofHandler,
     close!,
