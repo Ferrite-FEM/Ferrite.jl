@@ -302,17 +302,22 @@ for spatial_dim ∈ 1:3
 
             qr = QuadratureRule{spatial_dim, ref_type}(2*order-1)
 
+            # Currenlty we just benchmark nodal Lagrange bases.
+            COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)][string(ip_type),string(order)] = BenchmarkGroup()
+            LAGRANGE_SUITE = COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)][string(ip_type),string(order)]
+            LAGRANGE_SUITE["fe-values"] = BenchmarkGroup()
+            LAGRANGE_SUITE["ritz-galerkin"] = BenchmarkGroup()
+            LAGRANGE_SUITE["petrov-galerkin"] = BenchmarkGroup()
+
+            # Note: at the time of writing this PR the ctor makes the heavy lifting and caches important values.
+            LAGRANGE_SUITE["fe-values"]["scalar"] = @benchmarkable CellScalarValues($qr, $ip, $ip_geo);
+            LAGRANGE_SUITE["fe-values"]["vector"] = @benchmarkable CellVectorValues($qr, $ip, $ip_geo);
+
             csv = CellScalarValues(qr, ip, ip_geo);
             csv2 = CellScalarValues(qr, ip, ip_geo);
 
             cvv = CellVectorValues(qr, ip, ip_geo);
             cvv2 = CellVectorValues(qr, ip, ip_geo);
-
-            # Currenlty we just benchmark nodal Lagrange bases.
-            COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)][string(ip_type),string(order)] = BenchmarkGroup()
-            LAGRANGE_SUITE = COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)][string(ip_type),string(order)]
-            LAGRANGE_SUITE["ritz-galerkin"] = BenchmarkGroup()
-            LAGRANGE_SUITE["petrov-galerkin"] = BenchmarkGroup()
 
             # Scalar shape φ and test ψ: ∫ φ ψ
             LAGRANGE_SUITE["ritz-galerkin"]["mass"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $csv, shape_value, shape_value, *)
