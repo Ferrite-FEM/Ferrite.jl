@@ -481,3 +481,34 @@ function value(ip::Serendipity{3,RefCube,2}, i::Int, ξ::Vec{3})
     i == 20 && return 0.25(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z^2)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
+
+############
+#  Nedelec #
+############
+struct Nedelec{dim,shape,order} <: Interpolation{dim,shape,order} end
+const Nédélec = Nedelec
+getlowerdim(::Nedelec{dim,shape,order}) where {dim,shape,order} = Nedelec{dim-1,shape,order}()
+getlowerorder(::Nedelec{dim,shape,order}) where {dim,shape,order} = Nedelec{dim,shape,order-1}()
+#########################################
+# Nedelec dim 2 RefTetrahedron order 1 #
+#########################################
+getnbasefunctions(::Nedelec{2,RefTetrahedron,1}) = 3
+nfacedofs(::Nedelec{2,RefTetrahedron,1}) = 1
+
+vertices(::Nedelec{2,RefTetrahedron,1}) = (1,2,3)
+faces(::Nedelec{2,RefTetrahedron,1}) = ((1,2), (2,3), (3,1))
+
+function reference_coordinates(::Nedelec{2,RefTetrahedron,1})
+    return [Vec{2, Float64}((1.0, 0.0)),
+            Vec{2, Float64}((0.0, 1.0)),
+            Vec{2, Float64}((0.0, 0.0))]
+end
+
+function value(ip::Nedelec{2,RefTetrahedron,1}, i::Int, ξ::Vec{2})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    i == 1 && return Vec{2}((1-ξ_y,ξ_x))
+    i == 2 && return Vec{2}((-ξ_y,ξ_x))
+    i == 3 && return Vec{2}((ξ_y,1-ξ_x))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end

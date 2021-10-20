@@ -5,6 +5,8 @@ export
     RefTetrahedron,
     Lagrange,
     Serendipity,
+    Nedelec,
+    Nédélec,
     getnbasefunctions,
 
 # Quadrature
