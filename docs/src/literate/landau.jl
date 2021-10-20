@@ -84,7 +84,7 @@ end
 
 function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elpotential) where {DIM, T}
     grid = generate_grid(Tetrahedron, gridsize, left, right)
-    questionmark, threadindices = Ferrite.create_coloring(grid)
+    threadindices = Ferrite.create_coloring(grid)
 
     qr  = QuadratureRule{DIM, RefTetrahedron}(2)
     cvP = CellVectorValues(qr, Lagrange{DIM, RefTetrahedron, 1}())

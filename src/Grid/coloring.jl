@@ -64,7 +64,7 @@ function greedy_coloring(incidence_matrix, cells=1:size(incidence_matrix, 1))
         cell_colors[cellid] = free_color
         push!(final_colors[free_color], cellid)
     end
-    return cell_colors, final_colors
+    return final_colors
 end
 
 # See Appendix A in https://www.math.colostate.edu/%7Ebangerth/publications/2013-pattern.pdf
@@ -104,44 +104,37 @@ function workstream_coloring(incidence_matrix)
     ###############
     # TODO: The reference uses DSATUR algorithm instead of greedy
     # TODO: Zones can be colorized in parallel
-    zone_colors = Tuple{Dict{Int,Int},Vector{Vector{Int}}}[greedy_coloring(incidence_matrix, z) for z in zones]
+    zone_colors = Vector{Vector{Int}}[greedy_coloring(incidence_matrix, z) for z in zones]
 
     ################
     # 3. Gathering #
     ################
-    Nodd,  Zodd  = findmax(x -> isodd(x)  ? length(zone_colors[x][2]) : typemin(Int), 1:length(zone_colors))
-    Neven, Zeven = findmax(x -> iseven(x) ? length(zone_colors[x][2]) : typemin(Int), 1:length(zone_colors))
+    Nodd,  Zodd  = findmax(x -> isodd(x)  ? length(zone_colors[x]) : typemin(Int), 1:length(zone_colors))
+    Neven, Zeven = findmax(x -> iseven(x) ? length(zone_colors[x]) : typemin(Int), 1:length(zone_colors))
     N = Nodd + Neven
-    final_colors = append!(zone_colors[Zodd][2], zone_colors[Zeven][2]) # Reuse these for output
-    map!(x -> x + Nodd, values(zone_colors[Zeven][1])) # Update to global numbering
-    cell_colors = merge!(zone_colors[Zodd][1], zone_colors[Zeven][1])   # Reuse these for output
+    final_colors = append!(zone_colors[Zodd], zone_colors[Zeven]) # Reuse these for output
     color_sizes = map(length, final_colors)
-    zone_color_map = Dict{Int,Int}()
     used_for_zone = Set{Int}()
     for Z in 1:length(zone_colors)
         (Z == Zodd || Z == Zeven) && continue
-        zone_cell_colors, zone_color_vectors = zone_colors[Z]
+        zone_color_vectors = zone_colors[Z]
         odd = isodd(Z)
 
-        empty!(zone_color_map)
         empty!(used_for_zone)
 
         for local_color in sortperm(zone_color_vectors; by=length, rev=true)
             cond = odd ? (x -> x <= Nodd) : (x -> x > Nodd)
             _, global_color = findmin(x -> (cond(x) && x ∉ used_for_zone) ? color_sizes[x] : typemax(Int), 1:N)
             push!(used_for_zone, global_color)
-            zone_color_map[local_color] = global_color
             append!(final_colors[global_color], zone_color_vectors[local_color])
             map!(length, color_sizes, final_colors)
         end
-        map!(x -> zone_color_map[x], values(zone_cell_colors))
-        merge!(cell_colors, zone_cell_colors)
     end
 
     # Maybe nice to sort?
     foreach(sort!, final_colors)
 
-    return cell_colors, final_colors
+    return final_colors
 end
 
 @enum ColoringAlgorithm GREEDY WORKSTREAM
@@ -169,6 +162,17 @@ Two different algorithms are available, specified with the `alg` keyword argumen
    e.g. grids from `generate_grid`.
 
 The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
+
+!!! note "Cell to color mapping"
+    In a previous version of Ferrite this function returned a dictionary mapping
+    cell ID to color numbers as the first argument. If you need this mapping you
+    can create it using the following construct:
+    ```julia
+    colors = create_coloring(...)
+    cell_colormap = Dict{Int,Int}(
+        cellid => color for (color, cellids) in enumerate(final_colors) for cellid in cellids
+    )
+    ```
 """
 function create_coloring(g::Grid; alg::ColoringAlgorithm=WORKSTREAM)
     incidence_matrix = create_incidence_matrix(g)

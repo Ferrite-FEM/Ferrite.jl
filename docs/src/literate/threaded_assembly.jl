@@ -21,8 +21,8 @@ using Ferrite, SparseArrays
 
 function create_example_2d_grid()
     grid = generate_grid(Quadrilateral, (10, 10), Vec{2}((0.0, 0.0)), Vec{2}((10.0, 10.0)))
-    _, colors_workstream = create_coloring(grid; alg=Ferrite.WORKSTREAM)
-    _, colors_greedy = create_coloring(grid; alg=Ferrite.GREEDY)
+    colors_workstream = create_coloring(grid; alg=Ferrite.WORKSTREAM)
+    colors_greedy = create_coloring(grid; alg=Ferrite.GREEDY)
     vtk_grid("colored", grid) do vtk
         vtk_cell_data_colors(vtk, colors_workstream, "workstream-coloring")
         vtk_cell_data_colors(vtk, colors_greedy, "greedy-coloring")
@@ -41,8 +41,8 @@ create_example_2d_grid();
 # #### Grid for the beam
 function create_colored_cantilever_grid(celltype, n)
     grid = generate_grid(celltype, (10*n, n, n), Vec{3}((0.0, 0.0, 0.0)), Vec{3}((10.0, 1.0, 1.0)))
-    _, final_colors = create_coloring(grid)
-    return grid, final_colors
+    colors = create_coloring(grid)
+    return grid, colors
 end;
 
 # #### DofHandler
