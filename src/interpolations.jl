@@ -157,6 +157,7 @@ struct Lagrange{dim,shape,order} <: Interpolation{dim,shape,order} end
 
 getlowerdim(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim-1,shape,order}()
 getlowerorder(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim,shape,order-1}()
+getlowerorder(::Lagrange{dim,shape,1}) where {dim,shape} = DiscontinuousLagrange{dim,shape,0}()
 
 ##################################
 # Lagrange dim 1 RefCube order 1 #
@@ -421,6 +422,97 @@ function value(ip::Lagrange{3,RefCube,1}, i::Int, ξ::Vec{3})
     i == 6 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z)
     i == 7 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z)
     i == 8 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+
+##################################
+# Lagrange dim 3 RefCube order 2 #
+##################################
+# Based on vtkTriQuadraticHexahedron
+getnbasefunctions(::Lagrange{3,RefCube,2}) = 27
+nvertexdofs(::Lagrange{3,RefCube,2}) = 1
+nedgedofs(::Lagrange{3,RefCube,2}) = 1
+nfacedofs(::Lagrange{3,RefCube,2}) = 1
+ncelldofs(::Lagrange{3,RefCube,2}) = 1
+
+faces(::Lagrange{3,RefCube,2}) = ((1,2,6,5, 9,18,13,17, 23), (2,3,7,6, 10,19,14,18, 22), (3,4,8,7, 11,20,15,19, 24), (1,5,8,4, 12,17,16,20, 21), (1,4,3,2, 9,10,11,12, 25), (5,6,7,8, 13,14,15,16, 26))
+edges(::Lagrange{3,RefCube,2}) = ((1,2), (2,3), (3,4), (4,1), (1,5), (2,6), (3,7), (4,8), (5,6), (6,7), (7,8), (8,5))
+
+function reference_coordinates(::Lagrange{3,RefCube,2})
+           # vertex
+    return [Vec{3, Float64}((-1.0, -1.0, -1.0)), #  0
+            Vec{3, Float64}(( 1.0, -1.0, -1.0)), #  1
+            Vec{3, Float64}(( 1.0,  1.0, -1.0)), #  2
+            Vec{3, Float64}((-1.0,  1.0, -1.0)), #  3
+            Vec{3, Float64}((-1.0, -1.0,  1.0)), #  4
+            Vec{3, Float64}(( 1.0, -1.0,  1.0)), #  5
+            Vec{3, Float64}(( 1.0,  1.0,  1.0)), #  6
+            Vec{3, Float64}((-1.0,  1.0,  1.0)), #  7
+            # edge
+            Vec{3, Float64}(( 0.0, -1.0, -1.0)), #  8
+            Vec{3, Float64}(( 1.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0,  0.0,  1.0)),
+            Vec{3, Float64}(( 0.0,  1.0,  1.0)),
+            Vec{3, Float64}((-1.0,  0.0,  1.0)),
+            Vec{3, Float64}((-1.0, -1.0,  0.0)),
+            Vec{3, Float64}(( 1.0, -1.0,  0.0)),
+            Vec{3, Float64}(( 1.0,  1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  1.0,  0.0)), # 19
+            # face
+            Vec{3, Float64}(( 0.0, -1.0,  0.0)), # 20
+            Vec{3, Float64}(( 1.0,  0.0,  0.0)),
+            Vec{3, Float64}(( 0.0,  1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  0.0,  0.0)),
+            Vec{3, Float64}(( 0.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0,  0.0,  1.0)), # 25
+            # interior
+            Vec{3, Float64}((0.0, 0.0, 0.0)),    # 26
+            ]
+end
+
+function value(ip::Lagrange{3,RefCube,2}, i::Int, ξ::Vec{3})
+    # Some local helpers.
+    @inline φ₁(x) = -0.5*x*(1-x)
+    @inline φ₂(x) = (1+x)*(1-x)
+    @inline φ₃(x) = 0.5*x*(1+x)
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    ξ_z = ξ[3]
+    # vertices
+    i == 1 && return φ₁(ξ_x) * φ₁(ξ_y) * φ₁(ξ_z)
+    i == 2 && return φ₃(ξ_x) * φ₁(ξ_y) * φ₁(ξ_z)
+    i == 3 && return φ₃(ξ_x) * φ₃(ξ_y) * φ₁(ξ_z)
+    i == 4 && return φ₁(ξ_x) * φ₃(ξ_y) * φ₁(ξ_z)
+    i == 5 && return φ₁(ξ_x) * φ₁(ξ_y) * φ₃(ξ_z)
+    i == 6 && return φ₃(ξ_x) * φ₁(ξ_y) * φ₃(ξ_z)
+    i == 7 && return φ₃(ξ_x) * φ₃(ξ_y) * φ₃(ξ_z)
+    i == 8 && return φ₁(ξ_x) * φ₃(ξ_y) * φ₃(ξ_z)
+    # edges
+    i ==  9 && return φ₂(ξ_x) * φ₁(ξ_y) * φ₁(ξ_z)
+    i == 10 && return φ₃(ξ_x) * φ₂(ξ_y) * φ₁(ξ_z)
+    i == 11 && return φ₂(ξ_x) * φ₃(ξ_y) * φ₁(ξ_z)
+    i == 12 && return φ₁(ξ_x) * φ₂(ξ_y) * φ₁(ξ_z)
+    i == 13 && return φ₂(ξ_x) * φ₁(ξ_y) * φ₃(ξ_z)
+    i == 14 && return φ₃(ξ_x) * φ₂(ξ_y) * φ₃(ξ_z)
+    i == 15 && return φ₂(ξ_x) * φ₃(ξ_y) * φ₃(ξ_z)
+    i == 16 && return φ₁(ξ_x) * φ₂(ξ_y) * φ₃(ξ_z)
+    i == 17 && return φ₁(ξ_x) * φ₁(ξ_y) * φ₂(ξ_z)
+    i == 18 && return φ₃(ξ_x) * φ₁(ξ_y) * φ₂(ξ_z)
+    i == 19 && return φ₃(ξ_x) * φ₃(ξ_y) * φ₂(ξ_z)
+    i == 20 && return φ₁(ξ_x) * φ₃(ξ_y) * φ₂(ξ_z)
+    # faces
+    i == 21 && return φ₂(ξ_x) * φ₁(ξ_y) * φ₂(ξ_z)
+    i == 22 && return φ₃(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
+    i == 23 && return φ₂(ξ_x) * φ₃(ξ_y) * φ₂(ξ_z)
+    i == 24 && return φ₁(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
+    i == 25 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₁(ξ_z)
+    i == 26 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₃(ξ_z)
+    # interior
+    i == 27 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
