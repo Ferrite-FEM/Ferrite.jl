@@ -7,10 +7,17 @@ for interpolation in (Lagrange{1, RefCube, 1}(),
                       Lagrange{2, RefTetrahedron, 1}(),
                       Lagrange{2, RefTetrahedron, 2}(),
                       Lagrange{3, RefCube, 1}(),
+                      Lagrange{3, RefCube, 2}(),
                       Serendipity{2, RefCube, 2}(),
                       Serendipity{3, RefCube, 2}(),
                       Lagrange{3, RefTetrahedron, 1}(),
-                      Lagrange{3, RefTetrahedron, 2}(),)
+                      Lagrange{3, RefTetrahedron, 2}(),
+                      #
+                      DiscontinuousLagrange{1, RefCube, 0}(),
+                      DiscontinuousLagrange{2, RefCube, 0}(),
+                      DiscontinuousLagrange{3, RefCube, 0}(),
+                      DiscontinuousLagrange{2, RefTetrahedron, 0}(),
+                      DiscontinuousLagrange{3, RefTetrahedron, 0}(),)
 
     # Test of utility functions
     ndim = Ferrite.getdim(interpolation)

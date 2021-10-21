@@ -4,6 +4,7 @@ export
     RefCube,
     RefTetrahedron,
     Lagrange,
+    DiscontinuousLagrange,
     Serendipity,
     getnbasefunctions,
 
@@ -53,7 +54,7 @@ export
     Tetrahedron,
     QuadraticTetrahedron,
     Hexahedron,
-    QuadraticHexahedron,
+    #QuadraticHexahedron,
     CellIndex,
     FaceIndex,
     EdgeIndex,
