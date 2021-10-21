@@ -134,27 +134,27 @@ getlowerorder(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} 
 # ncelldofs(::DiscontinuousLagrange{dim,RefCube,order}) where {dim,order} = (order+1)^dim
 # ncelldofs(::DiscontinuousLagrange{2,RefTetrahedron,order}) where {order} = (order+1)*(order+2)/2
 # ncelldofs(::DiscontinuousLagrange{3,RefTetrahedron,order}) where {order} = (order+1)*(order+2)/2
-getnbasefunctions(::DiscontinuousLagrange{dim,ref_geo,order}) where {dim,ref_geo,order} = getnbasefunctions(Lagrange{dim,ref_geo,order}())
-ncelldofs(::DiscontinuousLagrange{dim,ref_geo,order}) where {dim,ref_geo,order} = getnbasefunctions(DiscontinuousLagrange{dim,ref_geo,order}())
+getnbasefunctions(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = getnbasefunctions(Lagrange{dim,shape,order}())
+ncelldofs(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = getnbasefunctions(DiscontinuousLagrange{dim,shape,order}())
 
-getnbasefunctions(::DiscontinuousLagrange{dim,ref_geo,0}) where {dim,ref_geo} = 1
-ncelldofs(::DiscontinuousLagrange{dim,ref_geo,0}) where {dim,ref_geo} = 1
+getnbasefunctions(::DiscontinuousLagrange{dim,shape,0}) where {dim,shape} = 1
+ncelldofs(::DiscontinuousLagrange{dim,shape,0}) where {dim,shape} = 1
 
-faces(::DiscontinuousLagrange{dim,ref_geo,order}) where {dim,ref_geo,order} = ()
+faces(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = ()
 
 # Mirror the Lagrange element for now.
-function reference_coordinates(ip::DiscontinuousLagrange{dim, ref_type, order}) where {dim, ref_type, order}
-    return reference_coordinates(Lagrange{dim, ref_type, order}())
+function reference_coordinates(ip::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order}
+    return reference_coordinates(Lagrange{dim,shape,order}())
 end
-function value(ip::DiscontinuousLagrange{dim,ref_type,order}, i::Int, ξ::Vec{dim}) where {dim, ref_type, order}
+function value(ip::DiscontinuousLagrange{dim,shape,order}, i::Int, ξ::Vec{dim}) where {dim,shape,order}
     return value(Lagrange{dim, ref_type, order}())
 end
 
 # Excepting the L0 element.
-function reference_coordinates(ip::DiscontinuousLagrange{dim, ref_type, 0}) where {dim, ref_type}
-    return repeat([Vec{dim, Float64}(ntuple(x->0.0, dim))])*getnbasefunctions(ip)
+function reference_coordinates(ip::DiscontinuousLagrange{dim,shape,0}) where {dim,shape}
+    return [Vec{dim, Float64}(ntuple(x->0.0, dim))]
 end
-function value(ip::DiscontinuousLagrange{dim,ref_type,0}, i::Int, ξ::Vec{dim}) where {dim,ref_type}
+function value(ip::DiscontinuousLagrange{dim,shape,0}, i::Int, ξ::Vec{dim}) where {dim,shape}
     return 1.0
 end
 
