@@ -565,9 +565,9 @@ function value(ip::Serendipity{2,RefCube,2}, i::Int, ξ::Vec{2})
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
-##################################
+#####################################
 # Serendipity dim 3 RefCube order 2 #
-##################################
+#####################################
 getnbasefunctions(::Serendipity{3,RefCube,2}) = 20
 getlowerdim(::Serendipity{3,RefCube,2}) = Serendipity{2,RefCube,2}()
 getlowerorder(::Serendipity{3,RefCube,2}) = Lagrange{3,RefCube,1}()
@@ -623,5 +623,40 @@ function value(ip::Serendipity{3,RefCube,2}, i::Int, ξ::Vec{3})
     i == 18 && return 0.25(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z^2)
     i == 19 && return 0.25(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z^2)
     i == 20 && return 0.25(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z^2)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+
+#############################
+# Crouzeix–Raviart Elements #
+#############################
+"""
+Classical non-conforming Crouzeix–Raviart element.
+
+For details we refer ot the original paper:
+M. Crouzeix and P. Raviart. "Conforming and nonconforming finite element 
+methods for solving the stationary Stokes equations I." ESAIM: Mathematical Modelling 
+and Numerical Analysis-Modélisation Mathématique et Analyse Numérique 7.R3 (1973): 33-75.
+"""
+struct CrouzeixRaviart{dim,order} <: Interpolation{dim,RefTetrahedron,order} end
+
+getnbasefunctions(::CrouzeixRaviart{2,1}) = 3
+nfacedofs(::CrouzeixRaviart{2,1}) = 1
+
+vertices(::CrouzeixRaviart{2,1}) = ()
+faces(::CrouzeixRaviart{2,1}) = ((1,), (2,), (3,))
+
+function reference_coordinates(::CrouzeixRaviart{2,1})
+    return [Vec{2, Float64}((0.5, 0.5)),
+            Vec{2, Float64}((0.0, 0.5)),
+            Vec{2, Float64}((0.5, 0.0))]
+end
+
+function value(ip::CrouzeixRaviart{2,1}, i::Int, ξ::Vec{2})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    i == 1 && return 2*ξ_x + 2*ξ_y - 1.0
+    i == 2 && return 1.0 - 2*ξ_x
+    i == 3 && return 1.0 - 2*ξ_y
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
