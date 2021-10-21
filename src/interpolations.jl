@@ -437,7 +437,7 @@ end
 ##################################
 # Lagrange dim 3 RefCube order 2 #
 ##################################
-# Based on vtkTriQuadraticHexahedron
+# Based on vtkTriQuadraticHexahedron (see https://kitware.github.io/vtk-examples/site/Cxx/GeometricObjects/IsoparametricCellsDemo/)
 getnbasefunctions(::Lagrange{3,RefCube,2}) = 27
 nvertexdofs(::Lagrange{3,RefCube,2}) = 1
 nedgedofs(::Lagrange{3,RefCube,2}) = 1
@@ -445,7 +445,7 @@ nfacedofs(::Lagrange{3,RefCube,2}) = 1
 ncelldofs(::Lagrange{3,RefCube,2}) = 1
 
 faces(::Lagrange{3,RefCube,2}) = ((1,2,6,5, 9,18,13,17, 23), (2,3,7,6, 10,19,14,18, 22), (3,4,8,7, 11,20,15,19, 24), (1,5,8,4, 12,17,16,20, 21), (1,4,3,2, 9,10,11,12, 25), (5,6,7,8, 13,14,15,16, 26))
-edges(::Lagrange{3,RefCube,2}) = ((1,2), (2,3), (3,4), (4,1), (1,5), (2,6), (3,7), (4,8), (5,6), (6,7), (7,8), (8,5))
+edges(::Lagrange{3,RefCube,2}) = ((1,2, 9), (2,3, 10), (3,4, 11), (4,1, 12), (1,5, 16), (2,6, 19), (3,7, 18), (4,8, 19), (5,6, 13), (6,7, 14), (7,8, 15), (8,5, 16))
 
 function reference_coordinates(::Lagrange{3,RefCube,2})
            # vertex
