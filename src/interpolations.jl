@@ -142,11 +142,19 @@ ncelldofs(::DiscontinuousLagrange{dim,ref_geo,0}) where {dim,ref_geo} = 1
 
 faces(::DiscontinuousLagrange{dim,ref_geo,order}) where {dim,ref_geo,order} = ()
 
-function reference_coordinates(ip::DiscontinuousLagrange{dim, RefCube, 0}) where {dim}
-    return repeat([Vec{2, Float64}(ntuple(x->0.0, dim))])*getnbasefunctions(ip)
+# Mirror the Lagrange element for now.
+function reference_coordinates(ip::DiscontinuousLagrange{dim, ref_type, order}) where {dim, ref_type, order}
+    return reference_coordinates(Lagrange{dim, ref_type, order}())
+end
+function value(ip::DiscontinuousLagrange{dim,ref_type,order}, i::Int, ξ::Vec{dim}) where {dim, ref_type, order}
+    return value(Lagrange{dim, ref_type, order}())
 end
 
-function value(ip::Union{DiscontinuousLagrange{dim,ref_type,0}}, i::Int, ξ::Vec{dim}) where {ref_type, dim}
+# Excepting the L0 element.
+function reference_coordinates(ip::DiscontinuousLagrange{dim, ref_type, 0}) where {dim, ref_type}
+    return repeat([Vec{dim, Float64}(ntuple(x->0.0, dim))])*getnbasefunctions(ip)
+end
+function value(ip::DiscontinuousLagrange{dim,ref_type,0}, i::Int, ξ::Vec{dim}) where {dim,ref_type}
     return 1.0
 end
 
@@ -210,14 +218,14 @@ nvertexdofs(::Lagrange{2,RefCube,1}) = 1
 
 faces(::Lagrange{2,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1))
 
-function reference_coordinates(::Union{Lagrange{2,RefCube,1}, DiscontinuousLagrange{2,RefCube,1}})
+function reference_coordinates(::Lagrange{2,RefCube,1})
     return [Vec{2, Float64}((-1.0, -1.0)),
             Vec{2, Float64}(( 1.0, -1.0)),
             Vec{2, Float64}(( 1.0,  1.0,)),
             Vec{2, Float64}((-1.0,  1.0,))]
 end
 
-function value(ip::Union{Lagrange{2,RefCube,1}, DiscontinuousLagrange{2,RefCube,1}}, i::Int, ξ::Vec{2})
+function value(ip::Lagrange{2,RefCube,1}, i::Int, ξ::Vec{2})
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25
