@@ -19,6 +19,8 @@ for interpolation in (Lagrange{1, RefCube, 1}(),
                       DiscontinuousLagrange{2, RefTetrahedron, 0}(),
                       DiscontinuousLagrange{3, RefTetrahedron, 0}(),
                       #
+                      BubbleEnrichedLagrange{2,RefTetrahedron,1}(),
+                      #
                       CrouzeixRaviart{2,1}(),)
 
     # Test of utility functions

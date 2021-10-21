@@ -108,7 +108,7 @@ Total number of dofs in the interior
 """
 ncelldofs(::Interpolation)   = 0
 
-# Needed for distrubuting dofs on shells correctly (face in 2d is edge in 3d)
+# Needed for distributing dofs on shells correctly (face in 2d is edge in 3d)
 edges(ip::Interpolation{2}) = faces(ip)
 nedgedofs(ip::Interpolation{2}) = nfacedofs(ip)
 
@@ -521,6 +521,42 @@ function value(ip::Lagrange{3,RefCube,2}, i::Int, ξ::Vec{3})
     i == 26 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₃(ξ_z)
     # interior
     i == 27 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+###################
+# Bubble elements #
+###################
+"""
+Lagrange element with bubble stabilization.
+"""
+struct BubbleEnrichedLagrange{dim,ref_shape,order} <: Interpolation{dim,ref_shape,order} end
+getlowerdim(ip::BubbleEnrichedLagrange{dim,ref_shape,order}) where {dim,ref_shape,order} = Lagrange{dim-1,ref_shape,order}()
+
+################################################
+# Lagrange-Bubble dim 2 RefTetrahedron order 1 #
+################################################
+# Taken from https://defelement.com/elements/bubble-enriched-lagrange.html
+getnbasefunctions(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 4
+nvertexdofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 1
+ncelldofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 1
+
+faces(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = ((1,2), (2,3), (3,1))
+
+function reference_coordinates(::BubbleEnrichedLagrange{2,RefTetrahedron,1})
+    return [Vec{2, Float64}((1.0, 0.0)),
+            Vec{2, Float64}((0.0, 1.0)),
+            Vec{2, Float64}((0.0, 0.0)),
+            Vec{2, Float64}((1/3, 1/3)),]
+end
+
+function value(ip::BubbleEnrichedLagrange{2,RefTetrahedron,1}, i::Int, ξ::Vec{2})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    i == 1 && return ξ_x*(9ξ_y^2 + 9ξ_x*ξ_y - 9ξ_y + 1)
+    i == 2 && return ξ_y*(9ξ_x^2 + 9ξ_x*ξ_y - 9ξ_x + 1)
+    i == 3 && return 9ξ_x^2*ξ_y + 9ξ_x*ξ_y^2 - 9ξ_x*ξ_y - ξ_x - ξ_y + 1
+    i == 4 && return 27ξ_x*ξ_y*(1 - ξ_x - ξ_y)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 

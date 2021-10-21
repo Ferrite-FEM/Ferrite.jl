@@ -3,6 +3,7 @@ export
     Interpolation,
     RefCube,
     RefTetrahedron,
+    BubbleEnrichedLagrange,
     CrouzeixRaviart,
     Lagrange,
     DiscontinuousLagrange,
