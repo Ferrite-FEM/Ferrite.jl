@@ -482,14 +482,12 @@ function reference_coordinates(::Lagrange{3,RefCube,2})
             ]
 end
 
-function value(ip::Lagrange{3,RefCube,2}, i::Int, ξ::Vec{3})
+function value(ip::Lagrange{3,RefCube,2}, i::Int, ξ::Vec{3, T}) where {T}
     # Some local helpers.
-    @inline φ₁(x) = -0.5*x*(1-x)
-    @inline φ₂(x) = (1+x)*(1-x)
-    @inline φ₃(x) = 0.5*x*(1+x)
-    ξ_x = ξ[1]
-    ξ_y = ξ[2]
-    ξ_z = ξ[3]
+    @inline φ₁(x::T) = -0.5*x*(1-x)
+    @inline φ₂(x::T) = (1+x)*(1-x)
+    @inline φ₃(x::T) = 0.5*x*(1+x)
+    (ξ_x, ξ_y, ξ_z) = ξ
     # vertices
     i == 1 && return φ₁(ξ_x) * φ₁(ξ_y) * φ₁(ξ_z)
     i == 2 && return φ₃(ξ_x) * φ₁(ξ_y) * φ₁(ξ_z)
