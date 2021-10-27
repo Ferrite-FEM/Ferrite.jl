@@ -43,6 +43,47 @@ function Dirichlet(field_name::Symbol, faces::Set{T}, f::Function, components::A
     return Dirichlet(f, copy(faces), field_name, Vector(components), Int[], Int[])
 end
 
+struct LinearConstraint
+
+end
+
+struct Constraint
+
+end
+struct FollowerDofs
+    masterdof::Dof
+    slaveface::Vector{FaceIndex}
+
+    components::Vector{Int} # components of the field
+    local_face_dofs::Vector{Int}
+    local_face_dofs_offset::Vector{Int}
+end
+
+SimpleConstraint(masterdof, getfaceset(grid, "topface"), :u, [1,])
+
+add_penalty!(ch, followerconstrint, penatly = 10^9)
+add_lagrange!(ch, followerconstrint)
+
+function apply!(K, f, ch, d, Δd)
+
+    for c in ch.penatly_constraints
+        apply!(c, K, f, d, Δd)
+    end
+    
+end
+
+function apply!(ch, K, f, d, Δd, λ)
+
+        getG(G, ch, d)
+        getH(H, ch ,d)
+
+        f[m,m] += G
+        K[m,m] += H
+
+end
+
+
+
 """
     ConstraintHandler
 
