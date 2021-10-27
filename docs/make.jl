@@ -36,6 +36,7 @@ makedocs(
             "manual/degrees_of_freedom.md",
             "manual/assembly.md",
             "manual/boundary_conditions.md",
+            "manual/constraints.md",
             "manual/grid.md",
             "manual/export.md"
             ],
