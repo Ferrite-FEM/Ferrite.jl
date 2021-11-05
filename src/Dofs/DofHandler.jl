@@ -124,6 +124,17 @@ function sortface(face::Tuple{Int,Int,Int})
     return (a, b, c)
 end
 
+function sortface(face::Tuple{Int,Int,Int,Int})
+    a, b, c, d = face
+    c, d = minmax(c, d)
+    b, d = minmax(b, d)
+    a, d = minmax(a, d)
+    b, c = minmax(b, c)
+    a, c = minmax(a, c)
+    a, b = minmax(a, b)
+    return (a, b, c)
+end
+
 function close!(dh::DofHandler)
     dh, _, _, _ = __close!(dh)
     return dh

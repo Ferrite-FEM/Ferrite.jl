@@ -211,7 +211,7 @@ getnormal(fv::FaceValues, qp::Int) = fv.normals[qp]
 """
     BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}})
 
-`BCValues` stores the shape values at all faces/edges/vertices (depending on `boundary_type`) for the geomatric interpolation (`geom_interpol`), 
+`BCValues` stores the shape values at all faces/edges/vertices (depending on `boundary_type`) for the geomatric interpolation (`geom_interpol`),
 for each dof-position determined by the `func_interpol`. Used mainly by the `ConstrainHandler`.
 """
 struct BCValues{T}
@@ -238,8 +238,8 @@ function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_in
         push!(qrs, qrf)
     end
 
-    n_qpoints = length(getweights(qrs[1])) # assume same in all
     n_faces = length(qrs)
+    n_qpoints = n_faces == 0 ? 0 : length(getweights(qrs[1])) # assume same in all
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
     M =    fill(zero(T)           * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
 
