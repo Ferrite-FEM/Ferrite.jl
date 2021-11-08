@@ -103,16 +103,8 @@ edge_npoints(::Cell{3,4,1}) = 2 #not sure how to handle embedded cells e.g. Quad
 face_npoints(::Cell{3,N,6}) where N = 4
 face_npoints(::Cell{3,N,4}) where N = 3
 edge_npoints(::Cell{3,N,M}) where {N,M} = 2
-nvertices(::Cell{1,N,2}) where N = 2
-nvertices(::Cell{2,N,2}) where N = 2
-nvertices(::Cell{3,N,0}) where N = 2
-nvertices(::Cell{2,N,3}) where N = 3
-nvertices(::Cell{2,N,4}) where N = 4
-nvertices(::Cell{3,N,1}) where N = 4
-nvertices(::Cell{3,N,4}) where N = 4
-nvertices(::Cell{3,N,6}) where N = 8
 
-getdim(::Cell{dim,N,M}) where {dim,N,M} = dim
+getdim(::Cell{dim}) where dim = dim
 
 abstract type AbstractTopology end
 
@@ -122,6 +114,7 @@ struct ExclusiveTopology <: AbstractTopology
     face_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
     vertex_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
     edge_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
+    vertex_vertex_neighbor::Vector{EntityNeighborhood{VertexIndex}}
 end
 
 function ExclusiveTopology()
@@ -130,7 +123,8 @@ function ExclusiveTopology()
     face_neighbor = spzeros(EntityNeighborhood,0,0)
     vertex_neighbor = spzeros(EntityNeighborhood,0,0)
     edge_neighbor = spzeros(EntityNeighborhood,0,0)
-    return ExclusiveTopology(vertex_to_cell,cell_neighbor,face_neighbor,vertex_neighbor,edge_neighbor)
+    vertex_vertex_neighbor = zeros(EntityNeighborhood{VertexIndex},0)
+    return ExclusiveTopology(vertex_to_cell,cell_neighbor,face_neighbor,vertex_neighbor,edge_neighbor,vertex_vertex_neighbor)
 end
 
 function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
@@ -178,7 +172,30 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     face_neighbor = sparse(I_face,J_face,V_face)
     vertex_neighbor = sparse(I_vertex,J_vertex,V_vertex) 
     edge_neighbor = sparse(I_edge,J_edge,V_edge)
-    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_neighbor,vertex_neighbor,edge_neighbor) 
+
+    vertex_vertex_table = EntityNeighborhood[]
+    vertex_vertex_global = Vector{Vector{Int}}()
+    # Vertex Connectivity
+    for global_vertexid in 1:maximum(maximum(cell_vertices_table)) #dirty, assuming id from 1 to nnodes
+        #Cellset that contains given vertex 
+        cellset = vertex_cell_table[global_vertexid]
+        vertex_neighbors_local = VertexIndex[]
+        vertex_neighbors_global = Int[]
+        for cell in cellset
+            neighbor_boundary = getdim(cells[cell]) == 2 ? [faces(cells[cell])...] : [edges(cells[cell])...] #get lowest dimension boundary
+            neighbor_connected_faces = neighbor_boundary[findall(x->global_vertexid in x, neighbor_boundary)]
+            neighbor_vertices_global = getindex.(neighbor_connected_faces, findfirst.(x->x!=global_vertexid,neighbor_connected_faces))
+            neighbor_vertices_local= [VertexIndex(cell,local_vertex) for local_vertex in findall(x->x in neighbor_vertices_global, vertices(cells[cell]))]
+            append!(vertex_neighbors_local, neighbor_vertices_local)
+            append!(vertex_neighbors_global, neighbor_vertices_global)
+        end
+        push!(vertex_vertex_table, EntityNeighborhood(vertex_neighbors_local))
+        push!(vertex_vertex_global, vertex_neighbors_global)
+    end 
+
+    # Face Skeleton
+
+    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_neighbor,vertex_neighbor,edge_neighbor,vertex_vertex_table)
 end
 
 function _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor, neighborid, neighbor_cell)
@@ -275,46 +292,15 @@ function full_neighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, faceidx::FaceI
     end
 end
 
-function full_neighborhood(grid::Grid{2,C,T,ExclusiveTopology}, vertexidx::VertexIndex, include_self=false) where {C,T}
+function full_neighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, vertexidx::VertexIndex, include_self=false) where {dim,C,T}
     cellid, local_vertexid = vertexidx[1], vertexidx[2]
     cell_vertices = vertices(getcells(grid,cellid))
     global_vertexid = cell_vertices[local_vertexid]
-
-    #Cellset that contains given vertex 
-    cellset = grid.topology.vertex_to_cell[global_vertexid]
-    vertex_neighbors_local = VertexIndex[]
-    vertex_neighbors_global = Int[]
-    for cell in cellset
-        neighbor_faces = [faces(getcells(grid,cell))...]
-        neighbor_connected_faces = neighbor_faces[findall(x->global_vertexid in x, neighbor_faces)]
-        neighbor_vertices_global = getindex.(neighbor_connected_faces, findfirst.(x->x!=global_vertexid,neighbor_connected_faces))
-        include_self && push!(neighbor_vertices_global, global_vertexid)
-        neighbor_vertices_local= [VertexIndex(cell,local_vertex) for local_vertex in findall(x->x in neighbor_vertices_global, vertices(getcells(grid,cell)))]
-        append!(vertex_neighbors_local, neighbor_vertices_local)
-        append!(vertex_neighbors_global, neighbor_vertices_global)
+    if include_self
+        return [grid.topology.vertex_vertex_neighbor[global_vertexid].neighbor_info; vertexidx]
+    else
+        return grid.topology.vertex_vertex_neighbor[global_vertexid].neighbor_info
     end
-    return vertex_neighbors_local
-end
-
-function full_neighborhood(grid::Grid{3,C,T,ExclusiveTopology}, vertexidx::VertexIndex, include_self=false) where {C,T}
-    cellid, local_vertexid = vertexidx[1], vertexidx[2]
-    cell_vertices = vertices(getcells(grid,cellid))
-    global_vertexid = cell_vertices[local_vertexid]
-
-    #Cellset that contains given vertex 
-    cellset = grid.topology.vertex_to_cell[global_vertexid]
-    vertex_neighbors_local = VertexIndex[]
-    vertex_neighbors_global = Int[]
-    for cell in cellset
-        neighbor_edges = [edges(getcells(grid,cell))...]
-        neighbor_connected_edges = neighbor_edges[findall(x->global_vertexid in x, neighbor_edges)]
-        neighbor_vertices_global = getindex.(neighbor_connected_edges, findfirst.(x->x!=global_vertexid,neighbor_connected_edges))
-        include_self && push!(neighbor_vertices_global, global_vertexid)
-        neighbor_vertices_local= [VertexIndex(cell,local_vertex) for local_vertex in findall(x->x in neighbor_vertices_global, vertices(getcells(grid,cell)))]
-        append!(vertex_neighbors_local, neighbor_vertices_local)
-        append!(vertex_neighbors_global, neighbor_vertices_global)
-    end
-    return vertex_neighbors_local
 end
 
 function full_neighborhood(grid::Grid{3,C,T,ExclusiveTopology}, edgeidx::EdgeIndex, include_self=false) where {C,T}

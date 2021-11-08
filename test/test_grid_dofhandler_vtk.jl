@@ -281,6 +281,13 @@ end
     @test issubset([4,5,8], patches[7])
     @test issubset([7,4,5,6,9], patches[8])
     @test issubset([8,5,6], patches[9])
+    
+    @test Ferrite.full_neighborhood(quadgrid, VertexIndex(1,1)) == [VertexIndex(1,2), VertexIndex(1,4)]
+    @test Ferrite.full_neighborhood(quadgrid, VertexIndex(2,1)) == [VertexIndex(1,1), VertexIndex(1,3), VertexIndex(2,2), VertexIndex(2,4)]
+    @test Ferrite.full_neighborhood(quadgrid, VertexIndex(5,4)) == [VertexIndex(4,2), VertexIndex(4,4), VertexIndex(5,1), VertexIndex(5,3), VertexIndex(7,1), VertexIndex(7,3), VertexIndex(8,2), VertexIndex(8,4)]
+    @test Ferrite.toglobal(quadgrid, Ferrite.full_neighborhood(quadgrid, VertexIndex(1,1))) == [2,5]
+    @test Ferrite.toglobal(quadgrid, Ferrite.full_neighborhood(quadgrid, VertexIndex(2,1))) == [1,6,3]
+    @test Ferrite.toglobal(quadgrid, Ferrite.full_neighborhood(quadgrid, VertexIndex(5,4))) == [6,9,11,14]
 #                           
 #                   +-----+-----+-----+
 #                   |  7  |  8  |  9  |
@@ -295,7 +302,7 @@ end
         Ferrite.reinit!(fv, coords, faceid)
     end
     reinit!(fv::FaceValues, faceid::FaceIndex, grid) = reinit!(fv,faceid[1],faceid[2],grid) # wrapper for reinit!(fv,cellid,faceid,grid)
-    face_neighbors_ele5 = nonzeros(quadgrid.topology.face_neighbor[5,:])    
+    face_neighbors_ele5 = nonzeros(quadgrid.topology.face_neighbor[5,:]) 
     ip = Lagrange{2, RefCube, 1}()
     qr_face = QuadratureRule{1, RefCube}(2)
     fv_ele = FaceVectorValues(qr_face, ip)
