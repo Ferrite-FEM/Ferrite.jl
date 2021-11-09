@@ -115,6 +115,7 @@ struct ExclusiveTopology <: AbstractTopology
     vertex_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
     edge_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
     vertex_vertex_neighbor::Vector{EntityNeighborhood{VertexIndex}}
+    face_skeleton::Vector{FaceIndex}
 end
 
 function ExclusiveTopology()
@@ -124,7 +125,8 @@ function ExclusiveTopology()
     vertex_neighbor = spzeros(EntityNeighborhood,0,0)
     edge_neighbor = spzeros(EntityNeighborhood,0,0)
     vertex_vertex_neighbor = zeros(EntityNeighborhood{VertexIndex},0)
-    return ExclusiveTopology(vertex_to_cell,cell_neighbor,face_neighbor,vertex_neighbor,edge_neighbor,vertex_vertex_neighbor)
+    face_skeleton = FaceIndex[]
+    return ExclusiveTopology(vertex_to_cell,cell_neighbor,face_neighbor,vertex_neighbor,edge_neighbor,vertex_vertex_neighbor,face_skeleton)
 end
 
 function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
@@ -194,8 +196,20 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     end 
 
     # Face Skeleton
-
-    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_neighbor,vertex_neighbor,edge_neighbor,vertex_vertex_table)
+    face_skeleton_global = Set{NTuple}()
+    face_skeleton_local = Vector{FaceIndex}()
+    fs_length = length(face_skeleton_global)
+    for (cellid,cell) in enumerate(cells)
+        for (local_face_id,face) in enumerate(faces(cell))
+            push!(face_skeleton_global, sortface(face))
+            fs_length_new = length(face_skeleton_global)
+            if fs_length != fs_length_new
+                push!(face_skeleton_local, FaceIndex(cellid,local_face_id)) 
+                fs_length = fs_length_new
+            end
+        end
+    end
+    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_neighbor,vertex_neighbor,edge_neighbor,vertex_vertex_table,face_skeleton_local)
 end
 
 function _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor, neighborid, neighbor_cell)
