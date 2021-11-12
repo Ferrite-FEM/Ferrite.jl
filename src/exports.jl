@@ -3,7 +3,10 @@ export
     Interpolation,
     RefCube,
     RefTetrahedron,
+    BubbleEnrichedLagrange,
+    CrouzeixRaviart,
     Lagrange,
+    DiscontinuousLagrange,
     Serendipity,
     getnbasefunctions,
 
@@ -53,7 +56,7 @@ export
     Tetrahedron,
     QuadraticTetrahedron,
     Hexahedron,
-    QuadraticHexahedron,
+    #QuadraticHexahedron,
     CellIndex,
     FaceIndex,
     EdgeIndex,
@@ -86,6 +89,10 @@ export
     generate_grid,
     compute_vertex_values,
 
+# Grid coloring
+    create_coloring,
+    vtk_cell_data_colors,
+
 # Dofs
     DofHandler,
     close!,
@@ -100,6 +107,7 @@ export
     MixedDofHandler,
     FieldHandler,
     Field,
+    reshape_to_nodes,
 
 # Constraints
     ConstraintHandler,
@@ -132,4 +140,8 @@ export
 
 # L2 Projection
     project,
-    L2Projector
+    L2Projector,
+
+# Point Evaluation
+    PointEvalHandler,
+    get_point_values

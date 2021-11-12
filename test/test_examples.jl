@@ -31,3 +31,11 @@ module TestQuasiIncompressibleHyperElasticity
         end
     end
 end
+
+# module TestNavierStokesDiffeqIntegration
+#     mktempdir() do dir
+#         cd(dir) do
+#             include(joinpath(@__DIR__, "../docs/src/literate/ns_vs_diffeq.jl"))
+#         end
+#     end
+# end

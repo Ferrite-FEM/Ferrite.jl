@@ -39,14 +39,16 @@ function test_projection(order, refshape)
     # Now recover the nodal values using a L2 projection.
     proj = L2Projector(ip, grid; geom_ip=ip_geom)
     point_vars = project(proj, qp_values, qr)
+    qp_values_matrix = reduce(hcat, qp_values)
+    point_vars_2 = project(proj, qp_values_matrix, qr)
     ## Old API with fe values as first arg
     proj2 = @test_deprecated L2Projector(cv, ip, grid)
-    point_vars_2 = @test_deprecated project(qp_values, proj2)
+    point_vars_3 = @test_deprecated project(qp_values, proj2)
     ## Old API with qr as first arg
     proj3 = @test_deprecated L2Projector(qr, ip, grid)
-    point_vars_3 = @test_deprecated project(qp_values, proj3)
+    point_vars_4 = @test_deprecated project(qp_values, proj3)
 
-    @test point_vars ≈ point_vars_2 ≈ point_vars_3
+    @test point_vars ≈ point_vars_2 ≈ point_vars_3 ≈ point_vars_4
 
     if order == 1
         # A linear approximation can not recover a quadratic solution,
@@ -72,7 +74,12 @@ function test_projection(order, refshape)
     # Tensor
     f_tensor(x) = Tensor{2,2,Float64}((f(x),2*f(x),3*f(x),4*f(x)))
     qp_values = analytical(f_tensor)
+    qp_values_matrix = reduce(hcat, qp_values)::Matrix
     point_vars = project(proj, qp_values, qr)
+    point_vars_2 = project(proj, qp_values_matrix, qr)
+
+    @test point_vars ≈ point_vars_2
+
     if order == 1
         ae = [Tensor{2,2,Float64}((f_approx(i),2*f_approx(i),3*f_approx(i),4*f_approx(i))) for i in 1:4]
     elseif order == 2
@@ -83,7 +90,12 @@ function test_projection(order, refshape)
     # SymmetricTensor
     f_stensor(x) = SymmetricTensor{2,2,Float64}((f(x),2*f(x),3*f(x)))
     qp_values = analytical(f_stensor)
+    qp_values_matrix = reduce(hcat, qp_values)
     point_vars = project(proj, qp_values, qr)
+    point_vars_2 = project(proj, qp_values_matrix, qr)
+
+    @test point_vars ≈ point_vars_2
+
     if order == 1
         ae = [SymmetricTensor{2,2,Float64}((f_approx(i),2*f_approx(i),3*f_approx(i))) for i in 1:4]
     elseif order == 2
@@ -132,6 +144,7 @@ function test_projection_mixedgrid()
     ae = compute_vertex_values(mesh, f)
     # analytical values
     qp_values = [[f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
+    qp_values_matrix = reduce(hcat, qp_values)
 
     # Now recover the nodal values using a L2 projection.
     # Assume f would only exist on the first cell, we project it to the nodes of the
@@ -139,16 +152,18 @@ function test_projection_mixedgrid()
     # nodes that do not belong to the 1st cell
     proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=1:1)
     point_vars = project(proj, qp_values, qr)
+    point_vars_2 = project(proj, qp_values_matrix, qr)
     ## Old API with fe values as first arg
     proj = @test_deprecated L2Projector(cv, ip, mesh, 1:1)
-    point_vars_2 = @test_deprecated project(qp_values, proj)
+    point_vars_3 = @test_deprecated project(qp_values, proj)
     ## Old API with qr as first arg
     proj = @test_deprecated L2Projector(qr, ip, mesh, 1:1)
-    point_vars_3 = @test_deprecated project(qp_values, proj)
+    point_vars_4 = @test_deprecated project(qp_values, proj)
 
     # In the nodes of the 1st cell we should recover the field
     for node in mesh.cells[1].nodes
-        @test ae[node] ≈ point_vars[node] ≈ point_vars_2[node] ≈ point_vars_3[node]
+        @test ae[node] ≈ point_vars[node] ≈ point_vars_2[node] ≈ point_vars_3[node] ≈
+                         point_vars_4[node]
     end
 
     # in all other nodes we should have NaNs
@@ -157,8 +172,30 @@ function test_projection_mixedgrid()
              @test isnan(point_vars[node][d1, d2])
              @test isnan(point_vars_2[node][d1, d2])
              @test isnan(point_vars_3[node][d1, d2])
+             @test isnan(point_vars_4[node][d1, d2])
          end
     end
+end
+
+function test_node_reordering()
+    grid = generate_grid(Quadrilateral, (1, 1), Vec((0.,0.)), Vec((2.,2.)))
+    dim = 2
+    ip = Lagrange{dim, RefCube, 2}()
+    ip_geo = Lagrange{dim, RefCube,1}()
+    qr = QuadratureRule{dim, RefCube}(3)
+    cv = CellScalarValues(qr, ip, ip_geo)
+
+    f(x) = x[1]+x[2]
+
+    qp_values = [[f(spatial_coordinate(cv, qp, getcoordinates(cell))) for qp in 1:getnquadpoints(cv)] for cell in CellIterator(grid)]
+
+    projector = L2Projector(ip, grid)
+    projected_vals_nodes = project(projector, qp_values, qr)
+    projected_vals_dofs = project(projector, qp_values, qr; project_to_nodes=false)
+
+    tol = 1e-12
+    @test all(projected_vals_nodes - [0.0, 2.0, 2.0, 4.0] .< tol)
+    @test all(projected_vals_dofs - [0., 2., 4., 2., 1., 3., 3., 1., 2.] .< tol)
 end
 
 @testset "Test L2-Projection" begin
@@ -167,4 +204,5 @@ end
     test_projection(2, RefCube)
     test_projection(2, RefTetrahedron)
     test_projection_mixedgrid()
+    test_node_reordering()
 end

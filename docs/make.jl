@@ -2,12 +2,14 @@ using Documenter, Ferrite, Pkg
 
 Pkg.precompile()
 
+const is_ci = haskey(ENV, "GITHUB_ACTIONS")
+
 # Generate examples
 include("generate.jl")
 
 GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "heat_equation.md",
-    "l2_projection.md",
+    "postprocessing.md",
     "helmholtz.md",
     "incompressible_elasticity.md",
     "hyperelasticity.md",
@@ -16,12 +18,13 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "transient_heat_equation.md",
     "landau.md",
     "linear_shell.md",
-    "quasi_incompressible_hyperelasticity.md"
+    "quasi_incompressible_hyperelasticity.md",
+    "ns_vs_diffeq.md",
     )]
 
 # Build documentation.
 makedocs(
-    format = Documenter.HTML(prettyurls = haskey(ENV, "GITHUB_ACTIONS")), # disable for local builds
+    format = Documenter.HTML(prettyurls=is_ci), # disable for local builds
     sitename = "Ferrite.jl",
     doctest = false,
     # strict = VERSION.minor == 6 && sizeof(Int) == 8, # only strict mode on 0.6 and Int64
@@ -56,7 +59,7 @@ cd(joinpath(@__DIR__, "build", "examples")) do
 end
 
 
-# Deploy built documentation from Travis.
+# Deploy built documentation
 deploydocs(
     repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
     push_preview=true,

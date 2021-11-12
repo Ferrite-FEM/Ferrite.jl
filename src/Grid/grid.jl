@@ -114,7 +114,7 @@ struct ExclusiveTopology <: AbstractTopology
     face_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
     vertex_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
     edge_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
-    vertex_vertex_neighbor::Vector{EntityNeighborhood{VertexIndex}}
+    vertex_vertex_neighbor::Dict{Int,EntityNeighborhood{VertexIndex}}
     face_skeleton::Vector{FaceIndex}
 end
 
@@ -124,14 +124,14 @@ function ExclusiveTopology()
     face_neighbor = spzeros(EntityNeighborhood,0,0)
     vertex_neighbor = spzeros(EntityNeighborhood,0,0)
     edge_neighbor = spzeros(EntityNeighborhood,0,0)
-    vertex_vertex_neighbor = zeros(EntityNeighborhood{VertexIndex},0)
+    vertex_vertex_neighbor = Dict(0=>EntityNeighborhood(VertexIndex(0,0)))
     face_skeleton = FaceIndex[]
     return ExclusiveTopology(vertex_to_cell,cell_neighbor,face_neighbor,vertex_neighbor,edge_neighbor,vertex_vertex_neighbor,face_skeleton)
 end
 
 function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     cell_vertices_table = vertices.(cells) #needs generic interface for <: AbstractCell
-    vertex_cell_table = Dict{Int,Vector{Int}}() #dirty, assuming id from 1 to nnodes
+    vertex_cell_table = Dict{Int,Vector{Int}}() 
     
     for (cellid, cell_nodes) in enumerate(cell_vertices_table)
        for node in cell_nodes
@@ -175,10 +175,10 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     vertex_neighbor = sparse(I_vertex,J_vertex,V_vertex) 
     edge_neighbor = sparse(I_edge,J_edge,V_edge)
 
-    vertex_vertex_table = EntityNeighborhood[]
-    vertex_vertex_global = Vector{Vector{Int}}()
+    vertex_vertex_table = Dict{Int,EntityNeighborhood}()
+    vertex_vertex_global = Dict{Int,Vector{Int}}()
     # Vertex Connectivity
-    for global_vertexid in keys(vertex_cell_table) #dirty, assuming id from 1 to nnodes
+    for global_vertexid in keys(vertex_cell_table)
         #Cellset that contains given vertex 
         cellset = vertex_cell_table[global_vertexid]
         vertex_neighbors_local = VertexIndex[]
@@ -191,8 +191,8 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
             append!(vertex_neighbors_local, neighbor_vertices_local)
             append!(vertex_neighbors_global, neighbor_vertices_global)
         end
-        push!(vertex_vertex_table, EntityNeighborhood(vertex_neighbors_local))
-        push!(vertex_vertex_global, vertex_neighbors_global)
+        vertex_vertex_table[global_vertexid] =  EntityNeighborhood(vertex_neighbors_local)
+        vertex_vertex_global[global_vertexid] = vertex_neighbors_global
     end 
 
     # Face Skeleton

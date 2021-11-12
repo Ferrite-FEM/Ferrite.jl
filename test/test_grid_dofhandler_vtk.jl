@@ -95,9 +95,59 @@ end # of testset
 
 close(csio)
 
+@testset "vtk tensor export" begin
+    # open files
+    checksums_file_tensors = joinpath(dirname(@__FILE__), "checksums2.sha1")
+    if OVERWRITE_CHECKSUMS
+        csio = open(checksums_file_tensors, "w")
+    else
+        csio = open(checksums_file_tensors, "r")
+    end
 
-# right = Vec{2, Float64}(ntuple(x->1.5, dim))
-# left = -right
+    # 3D grid
+    grid = generate_grid(Hexahedron, (1,1,1))
+
+    sym_tensor_data = [SymmetricTensor{2,3}(ntuple(i->i, 6)) for j=1.0:8.0]
+    tensor_data = [Tensor{2,3}(ntuple(i->i, 9)) for j=1.0:8.0]
+    vector_data = [Vec{3}(ntuple(i->i, 3)) for j=1:8]
+
+    filename_3d = "test_vtk_3d"
+    vtk_grid(filename_3d, grid) do vtk_file
+        vtk_point_data(vtk_file, sym_tensor_data, "symmetric tensor")
+        vtk_point_data(vtk_file, tensor_data, "tensor")
+        vtk_point_data(vtk_file, vector_data, "vector")
+    end
+
+    # 2D grid
+    grid = generate_grid(Quadrilateral, (1,1))
+
+    sym_tensor_data = [SymmetricTensor{2,2}(ntuple(i->i, 3)) for j=1.0:4.0]
+    tensor_data = [Tensor{2,2}(ntuple(i->i, 4)) for j=1.0:4.0]
+    tensor_data_1D = [SymmetricTensor{2,1}(ntuple(i->i, 1)) for j=1.0:4.0]
+    vector_data = [Vec{2}(ntuple(i->i, 2)) for j=1:4]
+
+    filename_2d = "test_vtk_2d"
+    vtk_grid(filename_2d, grid) do vtk_file
+        vtk_point_data(vtk_file, sym_tensor_data, "symmetric tensor")
+        vtk_point_data(vtk_file, tensor_data, "tensor")
+        vtk_point_data(vtk_file, tensor_data_1D, "tensor_1d")
+        vtk_point_data(vtk_file, vector_data, "vector")
+    end
+
+    # test the shas of the files
+    files = [filename_3d, filename_2d]
+    for filename in files
+        sha = bytes2hex(open(SHA.sha1, filename*".vtu"))
+        if OVERWRITE_CHECKSUMS
+            write(csio, sha, "\n")
+        else
+            @test chomp(readline(csio)) == sha
+            rm(filename*".vtu")
+        end
+    end
+
+    close(csio)
+end
 
 @testset "Grid utils" begin
 
@@ -289,14 +339,14 @@ end
     @test Ferrite.toglobal(quadgrid, Ferrite.full_neighborhood(quadgrid, VertexIndex(2,1))) == [1,6,3]
     @test Ferrite.toglobal(quadgrid, Ferrite.full_neighborhood(quadgrid, VertexIndex(5,4))) == [6,9,11,14]
     
-    @test grid.topology.face_skeleton == [FaceIndex(1,1),FaceIndex(1,2),FaceIndex(1,3),FaceIndex(1,4),
+    @test quadgrid.topology.face_skeleton == [FaceIndex(1,1),FaceIndex(1,2),FaceIndex(1,3),FaceIndex(1,4),
                                           FaceIndex(2,1),FaceIndex(2,2),FaceIndex(2,3),
                                           FaceIndex(3,1),FaceIndex(3,2),FaceIndex(3,3),
                                           FaceIndex(4,2),FaceIndex(4,3),FaceIndex(4,4),
                                           FaceIndex(5,2),FaceIndex(5,3),FaceIndex(6,2),FaceIndex(6,3),
                                           FaceIndex(7,2),FaceIndex(7,3),FaceIndex(7,4),
                                           FaceIndex(8,2),FaceIndex(8,3),FaceIndex(9,2),FaceIndex(9,3)]
-    @test length(grid.topology.face_skeleton) == 4*3 + 3*4
+    @test length(quadgrid.topology.face_skeleton) == 4*3 + 3*4
 
     quadratic_quadgrid = generate_grid(QuadraticQuadrilateral,(3,3);build_topology=true)
     quadratic_quadgrid.topology.face_skeleton == quadgrid.topology.face_skeleton
@@ -340,4 +390,28 @@ end
     end
     @test isapprox(jump_abs, 2/3*2*4,atol=1e-6) # 2*4*0.66666, jump is always 2, 4 sides, length =0.66
     @test isapprox(jump_int, 0.0, atol=1e-6)
+end
+
+@testset "grid coloring" begin
+    function test_coloring(grid)
+        for alg in (Ferrite.GREEDY, Ferrite.WORKSTREAM)
+            color_vectors = create_coloring(grid; alg=alg)
+            @test sum(length, color_vectors) == getncells(grid)
+            @test union(Set.(color_vectors)...) == Set(1:getncells(grid))
+            conn = Ferrite.create_incidence_matrix(grid)
+            for color in color_vectors, c1 in color, c2 in color
+                @test !conn[c1, c2]
+            end
+        end
+    end
+    test_coloring(generate_grid(Line, (5,)))
+    test_coloring(generate_grid(QuadraticLine, (5,)))
+    test_coloring(generate_grid(Triangle, (5, 5)))
+    test_coloring(generate_grid(QuadraticTriangle, (5, 5)))
+    test_coloring(generate_grid(Quadrilateral, (5, 5)))
+    test_coloring(generate_grid(QuadraticQuadrilateral, (5, 5)))
+    test_coloring(generate_grid(Tetrahedron, (5, 5, 5)))
+    # test_coloring(generate_grid(QuadraticTetrahedron, (5, 5, 5)))
+    test_coloring(generate_grid(Hexahedron, (5, 5, 5)))
+    # test_coloring(generate_grid(QuadraticHexahedron, (5, 5, 5)))
 end
