@@ -299,7 +299,7 @@ end
     @test length(grid.topology.face_skeleton) == 4*3 + 3*4
 
     quadratic_quadgrid = generate_grid(QuadraticQuadrilateral,(3,3);build_topology=true)
-    quadratic_quadgrid.topology.face_skeleton == quadgrid.face_skeleton
+    quadratic_quadgrid.topology.face_skeleton == quadgrid.topology.face_skeleton
 #                           
 #                   +-----+-----+-----+
 #                   |  7  |  8  |  9  |
