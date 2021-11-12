@@ -289,7 +289,7 @@ end
     @test Ferrite.toglobal(quadgrid, Ferrite.full_neighborhood(quadgrid, VertexIndex(2,1))) == [1,6,3]
     @test Ferrite.toglobal(quadgrid, Ferrite.full_neighborhood(quadgrid, VertexIndex(5,4))) == [6,9,11,14]
     
-    @test grid.topology.face_skeleton == [FaceIndex(1,1),FaceIndex(1,2),FaceIndex(1,3),FaceIndex(1,4)
+    @test grid.topology.face_skeleton == [FaceIndex(1,1),FaceIndex(1,2),FaceIndex(1,3),FaceIndex(1,4),
                                           FaceIndex(2,1),FaceIndex(2,2),FaceIndex(2,3),
                                           FaceIndex(3,1),FaceIndex(3,2),FaceIndex(3,3),
                                           FaceIndex(4,2),FaceIndex(4,3),FaceIndex(4,4),
@@ -297,6 +297,9 @@ end
                                           FaceIndex(7,2),FaceIndex(7,3),FaceIndex(7,4),
                                           FaceIndex(8,2),FaceIndex(8,3),FaceIndex(9,2),FaceIndex(9,3)]
     @test length(grid.topology.face_skeleton) == 4*3 + 3*4
+
+    quadratic_quadgrid = generate_grid(QuadraticQuadrilateral,(3,3);build_topology=true)
+    quadratic_quadgrid.topology.face_skeleton == quadgrid.face_skeleton
 #                           
 #                   +-----+-----+-----+
 #                   |  7  |  8  |  9  |

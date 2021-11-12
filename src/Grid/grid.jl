@@ -109,7 +109,7 @@ getdim(::Cell{dim}) where dim = dim
 abstract type AbstractTopology end
 
 struct ExclusiveTopology <: AbstractTopology
-    vertex_to_cell::Vector{Vector{Int}}
+    vertex_to_cell::Dict{Int,Vector{Int}}
     cell_neighbor::Vector{EntityNeighborhood{CellIndex}}
     face_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
     vertex_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
@@ -119,7 +119,7 @@ struct ExclusiveTopology <: AbstractTopology
 end
 
 function ExclusiveTopology()
-    vertex_to_cell = [[0]]
+    vertex_to_cell = Dict(0=>[0])
     cell_neighbor = zeros(EntityNeighborhood{CellIndex},0)
     face_neighbor = spzeros(EntityNeighborhood,0,0)
     vertex_neighbor = spzeros(EntityNeighborhood,0,0)
@@ -131,11 +131,11 @@ end
 
 function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     cell_vertices_table = vertices.(cells) #needs generic interface for <: AbstractCell
-    vertex_cell_table = Vector{Vector{Int}}(undef, maximum(maximum(cell_vertices_table))) #dirty, assuming id from 1 to nnodes
+    vertex_cell_table = Dict{Int,Vector{Int}}() #dirty, assuming id from 1 to nnodes
     
     for (cellid, cell_nodes) in enumerate(cell_vertices_table)
        for node in cell_nodes
-            if isassigned(vertex_cell_table, node)
+            if haskey(vertex_cell_table, node)
                 push!(vertex_cell_table[node], cellid)
             else
                 vertex_cell_table[node] = [cellid]
@@ -178,7 +178,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     vertex_vertex_table = EntityNeighborhood[]
     vertex_vertex_global = Vector{Vector{Int}}()
     # Vertex Connectivity
-    for global_vertexid in 1:maximum(maximum(cell_vertices_table)) #dirty, assuming id from 1 to nnodes
+    for global_vertexid in keys(vertex_cell_table) #dirty, assuming id from 1 to nnodes
         #Cellset that contains given vertex 
         cellset = vertex_cell_table[global_vertexid]
         vertex_neighbors_local = VertexIndex[]
