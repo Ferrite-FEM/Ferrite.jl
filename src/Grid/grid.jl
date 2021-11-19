@@ -289,6 +289,19 @@ end
 ##########################
 # Grid utility functions #
 ##########################
+
+"""
+    full_neighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, cellidx::CellIndex, include_self=false)
+    full_neighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, faceidx::FaceIndex, include_self=false)
+    full_neighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, vertexidx::VertexIndex, include_self=false)
+    full_neighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, EdgeIndex::EdgeIndex, include_self=false)
+
+Returns all directly connected entities of the same type, i.e. calling the function with a `VertexIndex` will return
+a list of directly connected vertices (connected via face/edge). If `include_self` is true, the given `*Index` is included 
+in the returned list.
+
+**Warning:** this feature is highly experimental and very likely subjected to interface changes in the future.
+"""
 function full_neighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, cellidx::CellIndex, include_self=false) where {dim,C,T}
     patch = getcells(grid.topology.cell_neighbor[cellidx.idx])
     if include_self
@@ -324,6 +337,13 @@ function full_neighborhood(grid::Grid{3,C,T,ExclusiveTopology}, edgeidx::EdgeInd
         return grid.topology.edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info
     end
 end
+
+"""
+    faceskeleton(grid) -> Vector{FaceIndex}
+Returns an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit` 
+`FaceValues`.
+"""
+faceskeleton(grid::Grid{dim,C,T,ExclusiveTopology}) where {dim,C,T} =  grid.topology.face_skeleton
 
 toglobal(grid::Grid,vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1]))[vertexidx[2]]
 toglobal(grid::Grid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))

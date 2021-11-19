@@ -61,6 +61,8 @@ export
     FaceIndex,
     EdgeIndex,
     VertexIndex,
+    full_neighborhood,
+    faceskeleton,
     getcells,
     getncells,
     getnodes,
