@@ -113,3 +113,60 @@ end
 
     @test ch.prescribed_dofs == [10, 11, 14, 25, 27]
 end
+
+@testset "linear constraints"
+
+    grid = generate_grid(Line, (10,))
+    dh = DofHandler(grid)
+    push!(dh, :u, 1)
+    close!(dh)
+
+    K = create_sparsity_pattern(dh)
+    f = zeros(ndofs(dh)); f[end] = 1.0
+    for cell in CellIterator(dh)
+        K[celldofs(cell),celldofs(cell)] += 2.0*[1 -1; -1 1]
+    end
+    Ktmp = copy(K)
+    ftmp = copy(f)
+
+    test_lcs = [
+        #Simple homogeneous constraint
+        [LinearConstraint(4, [(7 => 1.0)], 0.0)],
+        #Two dofs and inhomogeneity
+        [LinearConstraint(2, [(5 => 1.0), (6 =>2.0)], 1.0)],
+        #Two linear constraints
+        [LinearConstraint(2, [9=>1.0], 0.0),
+         LinearConstraint(3, [9=>1.0], 0.0)],
+        #
+        [LinearConstraint(2, [7=>3.0, 8=>1.0], -1.0),
+         LinearConstraint(4, [9=>-1.0], 2.0)]
+    ]
+
+    for lcs in test_lcs
+        K = copy(Ktmp)
+        f = copy(ftmp)
+        
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x,t)->0.0))
+        for lc in lcs
+            add!(ch, lc)
+        end
+        close!(ch)
+        update!(ch, 0.0)
+        C, g = Ferrite.create_constraint_matrix(ch)
+
+        #Solve by actually condensing matrix
+        ff  = C'*(f - K*g)
+        KK = C'*K*C;
+        _aa = KK\ff
+        aa = C*_aa + g
+
+        #Solving by modifying K inplace
+        apply!(K, f, ch)
+        a = K\f
+        apply!(a,ch)
+
+        @show all( a .≈ aa)
+    end
+
+end

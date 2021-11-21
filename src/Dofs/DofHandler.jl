@@ -315,7 +315,8 @@ with stored values in the correct places.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-@inline create_sparsity_pattern(dh::DofHandler) = _create_sparsity_pattern(dh, false)
+@inline create_sparsity_pattern(dh::DofHandler) = _create_sparsity_pattern(dh, nothing, false)
+@inline create_sparsity_pattern(dh::DofHandler, ch) = _create_sparsity_pattern(dh, ch, false)
 
 """
     create_symmetric_sparsity_pattern(dh::DofHandler)
@@ -326,9 +327,10 @@ triangle of the matrix. Return a `Symmetric{SparseMatrixCSC}`.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-@inline create_symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_create_sparsity_pattern(dh, true), :U)
+@inline create_symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
+@inline create_symmetric_sparsity_pattern(dh::DofHandler, ch) = Symmetric(_create_sparsity_pattern(dh, ch, true), :U)
 
-function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
+function _create_sparsity_pattern(dh::DofHandler, ch=nothing, sym::Bool=false)
     ncells = getncells(dh.grid)
     n = ndofs_per_cell(dh)
     N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
@@ -362,6 +364,11 @@ function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
         I[cnt] = d
         J[cnt] = d
     end
+
+    if ch !== nothing
+        #TODO
+    end
+
     resize!(I, cnt)
     resize!(J, cnt)
     V = zeros(length(I))

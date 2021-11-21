@@ -105,6 +105,7 @@ export
 # Constraints
     ConstraintHandler,
     Dirichlet,
+    LinearConstraint,
     update!,
     apply!,
     apply_rhs!,

@@ -43,46 +43,17 @@ function Dirichlet(field_name::Symbol, faces::Set{T}, f::Function, components::A
     return Dirichlet(f, copy(faces), field_name, Vector(components), Int[], Int[])
 end
 
-struct LinearConstraint
 
+"""
+    LinearConstraint(constrained_dofs::Int, master_dofs::Vector{Int}, coeffs::Vector{T}, b::T) where T
+
+Defines a constrained dof according to the form u_i = ∑(u[j] * a[j]) + b
+"""
+struct LinearConstraint{T}
+    constrained_dof::Int
+    entries::Vector{Pair{Int, T}} # masterdof and factor
+    b::T #Inhomegintiy
 end
-
-struct Constraint
-
-end
-struct FollowerDofs
-    masterdof::Dof
-    slaveface::Vector{FaceIndex}
-
-    components::Vector{Int} # components of the field
-    local_face_dofs::Vector{Int}
-    local_face_dofs_offset::Vector{Int}
-end
-
-SimpleConstraint(masterdof, getfaceset(grid, "topface"), :u, [1,])
-
-add_penalty!(ch, followerconstrint, penatly = 10^9)
-add_lagrange!(ch, followerconstrint)
-
-function apply!(K, f, ch, d, Δd)
-
-    for c in ch.penatly_constraints
-        apply!(c, K, f, d, Δd)
-    end
-    
-end
-
-function apply!(ch, K, f, d, Δd, λ)
-
-        getG(G, ch, d)
-        getH(H, ch ,d)
-
-        f[m,m] += G
-        K[m,m] += H
-
-end
-
-
 
 """
     ConstraintHandler
@@ -91,13 +62,19 @@ Collection of constraints.
 """
 struct ConstraintHandler{DH<:AbstractDofHandler,T}
     dbcs::Vector{Dirichlet}
+    lcs::Vector{LinearConstraint}
     prescribed_dofs::Vector{Int}
     free_dofs::Vector{Int}
-    values::Vector{T}
-    dofmapping::Dict{Int,Int} # global dof -> index into dofs and values
+    inhomogeneities::Vector{T}
+    dofmapping::Dict{Int,Int} # global dof -> index into dofs and inhomogeneities
     bcvalues::Vector{BCValues{T}}
     dh::DH
     closed::ScalarWrapper{Bool}
+end
+
+function ConstraintHandler(dh::AbstractDofHandler)
+    @assert isclosed(dh)
+    ConstraintHandler(Dirichlet[], LinearConstraint[], Int[], Int[], Float64[], Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false))
 end
 
 """
@@ -132,9 +109,9 @@ function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, app
     @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
 
     m = data.m
-    @inbounds for i in 1:length(ch.values)
+    @inbounds for i in 1:length(ch.inhomogeneities)
         d = ch.prescribed_dofs[i]
-        v = ch.values[i]
+        v = ch.inhomogeneities[i]
         if !applyzero && v != 0
             for j in nzrange(K, i)
                 f[K.rowval[j]] -= v * K.nzval[j]
@@ -145,11 +122,6 @@ function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, app
             f[d] = vz * m
         end
     end
-end
-
-function ConstraintHandler(dh::AbstractDofHandler)
-    @assert isclosed(dh)
-    ConstraintHandler(Dirichlet[], Int[], Int[], Float64[], Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", ch::ConstraintHandler)
@@ -174,14 +146,26 @@ prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 Close and finalize the `ConstraintHandler`.
 """
 function close!(ch::ConstraintHandler)
-    fdofs = setdiff(1:ndofs(ch.dh), ch.prescribed_dofs)
-    copy!!(ch.free_dofs, fdofs)
-    copy!!(ch.prescribed_dofs, unique(ch.prescribed_dofs)) # for v0.7: unique!(ch.prescribed_dofs)
-    sort!(ch.prescribed_dofs) # YOLO
-    fill!(resize!(ch.values, length(ch.prescribed_dofs)), NaN)
+    @assert(!isclosed(ch))
+
+    unique!(ch.prescribed_dofs)
+    copy!!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
+
+    I = sortperm(ch.prescribed_dofs) # YOLO
+    ch.prescribed_dofs .= ch.prescribed_dofs[I]
+    ch.inhomogeneities .= ch.inhomogeneities[I]
+    
     for i in 1:length(ch.prescribed_dofs)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
     end
+
+    #TODO: 
+    # Do a bunch of checks to see if the linear constraints are linearly indepented etc.
+    # If they are not, it is possible to automatically reformulate the linear constraints
+    # such that they become lineare independent. However, at this point, it is left to
+    # the user to assure this.
+    
+    
     ch.closed[] = true
     return ch
 end
@@ -224,7 +208,18 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
     return ch
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where Index<:BoundaryIndex
+function add!(ch::ConstraintHandler, newlc::LinearConstraint)
+    
+    for lc in ch.lcs
+        (lc.constrained_dof == newlc.constrained_dof) && error("Constraint already exist for dof $(lc.constrained_dof)")
+        (newlc.constrained_dof in first.(lc.entries)) && error("New constrained dof $(newlc.constrained_dof) is already used as a master dof.")
+    end
+    push!(ch.lcs, newlc)
+    append!(ch.prescribed_dofs, newlc.constrained_dof)
+    push!(ch.inhomogeneities, newlc.b)
+end
+
+function _add!(ch::ConstraintHandler{DH,T}, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where {DH,T,Index<:BoundaryIndex}
     # calculate which local dof index live on each face
     # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
     local_face_dofs = Int[]
@@ -261,6 +256,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, inter
     push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
     append!(ch.prescribed_dofs, constrained_dofs)
+    append!(ch.inhomogeneities, zeros(T, length(constrained_dofs)).*NaN )
 end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
@@ -308,6 +304,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
     append!(ch.prescribed_dofs, constrained_dofs)
+    append!(ch.inhomogeneities, zeros(T, length(constrained_dofs)).*NaN )
 end
 
 # Updates the DBC's to the current time `time`
@@ -315,13 +312,13 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
     @assert ch.closed[]
     for (i,dbc) in enumerate(ch.dbcs)
         # Function barrier
-        _update!(ch.values, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
+        _update!(ch.inhomogeneities, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
                  dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, convert(Float64, time))
     end
 end
 
 # for faces
-function _update!(values::Vector{Float64}, f::Function, faces::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::T) where {T}
 
@@ -354,7 +351,7 @@ function _update!(values::Vector{Float64}, f::Function, faces::Set{<:BoundaryInd
                 counter += 1
 
                 dbc_index = dofmapping[globaldof]
-                values[dbc_index] = bc_value[i]
+                inhomogeneities[dbc_index] = bc_value[i]
                 @debug println("prescribing value $(bc_value[i]) on global dof $(globaldof)")
             end
         end
@@ -362,7 +359,7 @@ function _update!(values::Vector{Float64}, f::Function, faces::Set{<:BoundaryInd
 end
 
 # for nodes
-function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+function _update!(inhomogeneities::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::Float64)
     counter = 1
@@ -374,7 +371,7 @@ function _update!(values::Vector{Float64}, f::Function, nodes::Set{Int}, field::
             globaldof = globaldofs[counter]
             counter += 1
             dbc_index = dofmapping[globaldof]
-            values[dbc_index] = v
+            inhomogeneities[dbc_index] = v
             @debug println("prescribing value $(v) on global dof $(globaldof)")
         end
     end
@@ -418,13 +415,33 @@ end
 
 function apply!(v::AbstractVector, ch::ConstraintHandler)
     @assert length(v) == ndofs(ch.dh)
-    v[ch.prescribed_dofs] = ch.values
+    v[ch.prescribed_dofs] = ch.inhomogeneities
+
+    #Apply linear constraints, e.g u2 = u6 + b
+    for lc in ch.lcs
+        v[lc.constrained_dof] = 0.0
+        for (d,s) in lc.entries
+            v[lc.constrained_dof] += s*v[d]
+        end
+        v[lc.constrained_dof] += lc.b
+    end
+
     return v
 end
 
 function apply_zero!(v::AbstractVector, ch::ConstraintHandler)
     @assert length(v) == ndofs(ch.dh)
     v[ch.prescribed_dofs] .= 0
+
+    #TODO: double check if this is correct :thinking_face:
+    #Apply linear constraints (without inhomogeneities)
+    for lc in ch.lcs
+        v[lc.constrained_dof] = 0.0
+        for (d,s) in lc.entries
+            v[lc.constrained_dof] += s*v[d]
+        end
+    end
+
     return v
 end
 
@@ -446,9 +463,11 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
     @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
 
     m = meandiag(K) # Use the mean of the diagonal here to not ruin things for iterative solver
-    @inbounds for i in 1:length(ch.values)
+
+    #Add inhomogeneities to f: (f - K*ch.inhomogeneities)
+    @inbounds for i in 1:length(ch.inhomogeneities)
         d = ch.prescribed_dofs[i]
-        v = ch.values[i]
+        v = ch.inhomogeneities[i]
 
         if !applyzero && v != 0
             for j in nzrange(K, d)
@@ -456,6 +475,11 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
             end
         end
     end
+
+    #Condense K and f: C'*K*C   C'*f
+    _condense(K, f, ch.lcs, ndofs(ch.dh))
+
+    #Remove constrained dofs from Matrix
     zero_out_columns!(K, ch.prescribed_dofs)
     if strategy == APPLY_TRANSPOSE
         K′ = copy(K)
@@ -467,16 +491,120 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
     else
         error("Unknown apply strategy")
     end
-    @inbounds for i in 1:length(ch.values)
+
+    #Add meandiag to constraint dirichlet dofs
+    @inbounds for i in 1:length(ch.inhomogeneities)
         d = ch.prescribed_dofs[i]
-        v = ch.values[i]
         K[d, d] = m
-        # We will only enter here with an empty f vector if we have assured that v == 0 for all dofs
         if length(f) != 0
-            vz = applyzero ? zero(eltype(f)) : v
+            vz = applyzero ? zero(eltype(f)) : ch.inhomogeneities[i]
             f[d] = vz * m
         end
     end
+end
+
+# Copied from deal ii AffineConstraints::condense
+function _condense(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearConstraint}, ndofs::Int)
+
+    #Maybe pre-compute and store in ConstraintHandler
+    distribute = zeros(Int, ndofs)
+    for c in 1:length(lcs)
+        distribute[lcs[c].constrained_dof] = c;
+    end
+
+    @inbounds for col in 1:ndofs
+        if distribute[col] == 0
+            @inbounds for a in nzrange(K, col)
+    
+                row = K.rowval[a]
+    
+                if distribute[row] != 0
+    
+                    lc = lcs[distribute[row]]
+                    @inbounds for (d,v) in lc.entries
+                        v *= K.nzval[a]
+                        K[d,col] += v
+                    end
+    
+                    # f - K*g -- This has already been done in outside this functions
+                    #if length(f) != 0
+                    #    f[col] -= K.nzval[a] * lc.b;
+                    #end
+
+                end
+
+
+            end
+    
+        else
+            
+            @inbounds for a in nzrange(K, col)
+    
+                row = K.rowval[a]
+    
+                if distribute[row] == 0
+    
+                    lc = lcs[distribute[col]]
+                    @inbounds for (d,v) in lc.entries
+                        v *= K.nzval[a]
+                        K[row,d] += v
+                    end
+    
+                else
+                    lc1 = lcs[distribute[col]]
+                    @inbounds for (d1,v1) in lc1.entries
+                        lc2 = lcs[distribute[row]]
+                        @inbounds for (d2,v2) in lc2.entries
+                            v = v1*v2*K.nzval[a]
+                            K[d1,d2] += v
+                        end
+                    end
+                end
+            end
+
+            if length(f) != 0
+                
+                lc = lcs[distribute[col]]
+                @inbounds for (d,v) in lc.entries
+                    f[d] += f[col] * v
+                end
+    
+                f[lc.constrained_dof] = 0.0;
+            end
+        end
+    end
+end
+
+function create_constraint_matrix(ch::ConstraintHandler{dh,T}) where {dh,T}
+    @assert(isclosed(ch))
+
+    distribute = zeros(Int, ndofs(ch.dh))
+    for (i,d) in enumerate(ch.free_dofs)
+        distribute[d] = i;
+    end
+
+    I = Int[]; J = Int[]; V = Int[];
+    g = zeros(T, ndofs(ch.dh)) #inhomogeneities
+    
+    for d in ch.free_dofs
+       push!(I, d)
+       push!(J, distribute[d])
+       push!(V, 1.0) 
+    end
+    
+    for lc in ch.lcs
+        for (d, v) in lc.entries
+            push!(I, lc.constrained_dof)
+            push!(J, distribute[d])
+            push!(V, v)
+        end
+        g[lc.constrained_dof] = lc.b
+    end
+    g[ch.prescribed_dofs] .= ch.inhomogeneities
+
+    C = sparse(I,J,V, ndofs(ch.dh), length(ch.free_dofs))
+
+    return C, g
 end
 
 # columns need to be stored entries, this is not checked
