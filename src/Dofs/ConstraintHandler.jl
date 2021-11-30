@@ -147,8 +147,8 @@ Close and finalize the `ConstraintHandler`.
 """
 function close!(ch::ConstraintHandler)
     @assert(!isclosed(ch))
+    @assert length(unique(ch.prescribed_dofs))==length(ch.prescribed_dofs) #isunique
 
-    unique!(ch.prescribed_dofs)
     copy!!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
 
     I = sortperm(ch.prescribed_dofs) # YOLO
@@ -214,8 +214,9 @@ function add!(ch::ConstraintHandler, newlc::LinearConstraint)
         (lc.constrained_dof == newlc.constrained_dof) && error("Constraint already exist for dof $(lc.constrained_dof)")
         (newlc.constrained_dof in first.(lc.entries)) && error("New constrained dof $(newlc.constrained_dof) is already used as a master dof.")
     end
+
     push!(ch.lcs, newlc)
-    append!(ch.prescribed_dofs, newlc.constrained_dof)
+    push!(ch.prescribed_dofs, newlc.constrained_dof)
     push!(ch.inhomogeneities, newlc.b)
 end
 
@@ -255,6 +256,7 @@ function _add!(ch::ConstraintHandler{DH,T}, dbc::Dirichlet, bcfaces::Set{Index},
     # save it to the ConstraintHandler
     push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
+    unique!(constrained_dofs)
     append!(ch.prescribed_dofs, constrained_dofs)
     append!(ch.inhomogeneities, zeros(T, length(constrained_dofs)).*NaN )
 end
@@ -384,7 +386,7 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
     for dbc in ch.dbcs
         push!(unique_fields, dbc.field_name)
     end
-    unique_fields = unique(unique_fields) # TODO v0.7: unique!(unique_fields)
+    unique!(unique_fields)
 
     for field in unique_fields
         nd = ndim(ch.dh, field)
@@ -413,30 +415,15 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
     return vtkfile
 end
 
-function apply!(v::AbstractVector, ch::ConstraintHandler)
+apply_zero!(v::AbstractVector, ch::ConstraintHandler) = _apply_v(v, ch, true)
+apply!(     v::AbstractVector, ch::ConstraintHandler) = _apply_v(v, ch, false)
+
+function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
     @assert length(v) == ndofs(ch.dh)
-    v[ch.prescribed_dofs] = ch.inhomogeneities
+    v[ch.prescribed_dofs] .= apply_zero ? 0.0 : ch.inhomogeneities
 
     #Apply linear constraints, e.g u2 = u6 + b
     for lc in ch.lcs
-        v[lc.constrained_dof] = 0.0
-        for (d,s) in lc.entries
-            v[lc.constrained_dof] += s*v[d]
-        end
-        v[lc.constrained_dof] += lc.b
-    end
-
-    return v
-end
-
-function apply_zero!(v::AbstractVector, ch::ConstraintHandler)
-    @assert length(v) == ndofs(ch.dh)
-    v[ch.prescribed_dofs] .= 0
-
-    #TODO: double check if this is correct :thinking_face:
-    #Apply linear constraints (without inhomogeneities)
-    for lc in ch.lcs
-        v[lc.constrained_dof] = 0.0
         for (d,s) in lc.entries
             v[lc.constrained_dof] += s*v[d]
         end
@@ -477,7 +464,7 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
     end
 
     #Condense K and f: C'*K*C   C'*f
-    _condense(K, f, ch.lcs, ndofs(ch.dh))
+    _condense!(K, f, ch.lcs, ndofs(ch.dh))
 
     #Remove constrained dofs from Matrix
     zero_out_columns!(K, ch.prescribed_dofs)
@@ -504,9 +491,10 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
 end
 
 # Copied from deal ii AffineConstraints::condense
-function _condense(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearConstraint}, ndofs::Int)
+function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearConstraint}, ndofs::Int)
 
-    #Maybe pre-compute and store in ConstraintHandler
+    # Store linear constraint index for each constrained dof
+    # Maybe pre-compute and store in ConstraintHandler
     distribute = zeros(Int, ndofs)
     for c in 1:length(lcs)
         distribute[lcs[c].constrained_dof] = c;
@@ -515,41 +503,29 @@ function _condense(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearCons
     @inbounds for col in 1:ndofs
         if distribute[col] == 0
             @inbounds for a in nzrange(K, col)
-    
                 row = K.rowval[a]
-    
                 if distribute[row] != 0
-    
                     lc = lcs[distribute[row]]
                     @inbounds for (d,v) in lc.entries
                         v *= K.nzval[a]
                         K[d,col] += v
                     end
     
-                    # f - K*g -- This has already been done in outside this functions
+                    # Perform f - K*g. However, this has already been done in outside this functions so we skip this.
                     #if length(f) != 0
                     #    f[col] -= K.nzval[a] * lc.b;
                     #end
-
                 end
-
-
             end
-    
-        else
-            
+        else    
             @inbounds for a in nzrange(K, col)
-    
                 row = K.rowval[a]
-    
                 if distribute[row] == 0
-    
                     lc = lcs[distribute[col]]
                     @inbounds for (d,v) in lc.entries
                         v *= K.nzval[a]
                         K[row,d] += v
                     end
-    
                 else
                     lc1 = lcs[distribute[col]]
                     @inbounds for (d1,v1) in lc1.entries
@@ -563,18 +539,24 @@ function _condense(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearCons
             end
 
             if length(f) != 0
-                
                 lc = lcs[distribute[col]]
                 @inbounds for (d,v) in lc.entries
                     f[d] += f[col] * v
                 end
-    
                 f[lc.constrained_dof] = 0.0;
             end
         end
     end
 end
 
+"""
+    create_constraint_matrix(ch::ConstraintHandler)
+
+Creates and returns the constraint matrix, C, and the inhomogeneities, g, from the linear and Dirichlet constraints.
+
+The constraint matrix relates constrained and free degrees of freedom via a = C*a_f + g. The 
+condensed system of linear equations is obtained as C'*K*C and C'*(f - K*g)
+"""
 function create_constraint_matrix(ch::ConstraintHandler{dh,T}) where {dh,T}
     @assert(isclosed(ch))
 
