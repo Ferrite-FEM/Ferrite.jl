@@ -365,14 +365,19 @@ function _create_sparsity_pattern(dh::DofHandler, ch=nothing, sym::Bool=false)
         J[cnt] = d
     end
 
-    if ch !== nothing
-        #TODO
-    end
-
     resize!(I, cnt)
     resize!(J, cnt)
     V = zeros(length(I))
     K = sparse(I, J, V)
+
+    # Add entries to K corresponding to condensation due the linear constraints
+    # Note, this requires the K matrix, which is why we can push!() to the I,J,V
+    # triplet directly.
+    if ch !== nothing
+        @assert isclosed!(ch)
+        _condense!(K, eltype(K)[], ch.lcs, ndofs(dh))
+    end
+
     return K
 end
 
