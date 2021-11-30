@@ -147,13 +147,18 @@ Close and finalize the `ConstraintHandler`.
 """
 function close!(ch::ConstraintHandler)
     @assert(!isclosed(ch))
-    @assert length(unique(ch.prescribed_dofs))==length(ch.prescribed_dofs) #isunique
 
-    copy!!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
-
+    #Make ch.prescribed_dofs unique and sorted, and do the same operations for ch.inhomogeneities
+    # TODO: This is probably quite slow atm, and the unique!() and sort() functions can be combined?
+    dofs_vals = unique(first, zip(ch.prescribed_dofs, ch.inhomogeneities))
+    copy!!(ch.prescribed_dofs, getindex.(dofs_vals, 1))
+    copy!!(ch.inhomogeneities, getindex.(dofs_vals, 2))
+    
     I = sortperm(ch.prescribed_dofs) # YOLO
     ch.prescribed_dofs .= ch.prescribed_dofs[I]
     ch.inhomogeneities .= ch.inhomogeneities[I]
+    
+    copy!!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
     
     for i in 1:length(ch.prescribed_dofs)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
@@ -220,9 +225,10 @@ function add!(ch::ConstraintHandler, newlc::LinearConstraint)
     push!(ch.inhomogeneities, newlc.b)
 end
 
-function _add!(ch::ConstraintHandler{DH,T}, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where {DH,T,Index<:BoundaryIndex}
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where {Index<:BoundaryIndex}
     # calculate which local dof index live on each face
     # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
+    T = eltype(ch.inhomogeneities)
     local_face_dofs = Int[]
     local_face_dofs_offset = Int[1]
     boundary = boundaryfunction(eltype(bcfaces))
@@ -256,7 +262,6 @@ function _add!(ch::ConstraintHandler{DH,T}, dbc::Dirichlet, bcfaces::Set{Index},
     # save it to the ConstraintHandler
     push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
-    unique!(constrained_dofs)
     append!(ch.prescribed_dofs, constrained_dofs)
     append!(ch.inhomogeneities, zeros(T, length(constrained_dofs)).*NaN )
 end
@@ -265,6 +270,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
+    T = eltype(ch.inhomogeneities)
 
     ncomps = length(dbc.components)
     nnodes = getnnodes(ch.dh.grid)

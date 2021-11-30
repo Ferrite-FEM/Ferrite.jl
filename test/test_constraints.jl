@@ -15,7 +15,7 @@
     update!(ch)
 
     @test ch.prescribed_dofs == collect(1:9)
-    @test ch.values == [-1, -1, 1, -1, -1, 1, 0, 0, 0]
+    @test ch.inhomogeneities == [-1, -1, 1, -1, -1, 1, 0, 0, 0]
 
     ## test node bc with mixed dof handler
    dim = 2
@@ -43,7 +43,7 @@
    update!(ch)
 
    @test ch.prescribed_dofs == [1,3,9,19,20,23,27]
-   @test ch.values == [1.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0]
+   @test ch.inhomogeneities == [1.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0]
 
    ## MixedDofHandler: let first FieldHandler not have all fields
    dim = 2
@@ -68,7 +68,7 @@
    update!(ch)
 
    @test ch.prescribed_dofs == [1,3,9,13,14]
-   @test ch.values == [1.0, 1.0, 1.0, 2.0, 2.0]
+   @test ch.inhomogeneities == [1.0, 1.0, 1.0, 2.0, 2.0]
 end
 
 @testset "edge bc" begin
@@ -87,7 +87,7 @@ end
     update!(ch)
 
     @test ch.prescribed_dofs == [1,2,3,10,11,12]
-    @test ch.values == [-1.0, -1.0, -1.0, -1.0, 1.0, -1.0]
+    @test ch.inhomogeneities == [-1.0, -1.0, -1.0, -1.0, 1.0, -1.0]
 
 
     #Shell mesh edge bcs
@@ -114,7 +114,7 @@ end
     @test ch.prescribed_dofs == [10, 11, 14, 25, 27]
 end
 
-@testset "linear constraints"
+@testset "linear constraints" begin
 
     grid = generate_grid(Line, (10,))
     dh = DofHandler(grid)
@@ -166,7 +166,7 @@ end
         a = K\f
         apply!(a,ch)
 
-        @show all( a .≈ aa)
+        @test all(a .≈ aa)
     end
 
 end
