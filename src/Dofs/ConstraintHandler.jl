@@ -169,7 +169,7 @@ function close!(ch::ConstraintHandler)
     # If they are not, it is possible to automatically reformulate the linear constraints
     # such that they become lineare independent. However, at this point, it is left to
     # the user to assure this.
-    
+    sort!(ch.lcs, by = (lc)-> lc.constrained_dof)    
     
     ch.closed[] = true
     return ch
@@ -458,13 +458,15 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
     m = meandiag(K) # Use the mean of the diagonal here to not ruin things for iterative solver
 
     #Add inhomogeneities to f: (f - K*ch.inhomogeneities)
-    @inbounds for i in 1:length(ch.inhomogeneities)
-        d = ch.prescribed_dofs[i]
-        v = ch.inhomogeneities[i]
+    if !applyzero 
+        @inbounds for i in 1:length(ch.inhomogeneities)
+            d = ch.prescribed_dofs[i]
+            v = ch.inhomogeneities[i]
 
-        if !applyzero && v != 0
-            for j in nzrange(K, d)
-                f[K.rowval[j]] -= v * K.nzval[j]
+            if v != 0
+                for j in nzrange(K, d)
+                    f[K.rowval[j]] -= v * K.nzval[j]
+                end
             end
         end
     end
@@ -497,7 +499,7 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
 end
 
 # Copied from deal ii AffineConstraints::condense
-function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearConstraint}, ndofs::Int)
+function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearConstraint}, ndofs::Int, sparsity_pattern::Bool=false)
 
     # Store linear constraint index for each constrained dof
     # Maybe pre-compute and store in ConstraintHandler
@@ -506,15 +508,22 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearCon
         distribute[lcs[c].constrained_dof] = c;
     end
 
-    @inbounds for col in 1:ndofs
+    for col in 1:ndofs
         if distribute[col] == 0
-            @inbounds for a in nzrange(K, col)
-                row = K.rowval[a]
+            #Since we will possibly be pushing new entries to K, the fields K.rowval and K.nzval will grow.
+            # Therefor we must extract these before iterating over K
+            range = nzrange(K, col)
+            _rows = K.rowval[range]
+            _vals = K.nzval[range]
+            for (row, Kval) in zip(_rows, _vals)
                 if distribute[row] != 0
                     lc = lcs[distribute[row]]
-                    @inbounds for (d,v) in lc.entries
-                        v *= K.nzval[a]
-                        K[d,col] += v
+                    for (d,v) in lc.entries
+                        if sparsity_pattern
+                            add_entry!(K, d, col)
+                        else
+                            K[d,col] += v*Kval
+                        end
                     end
     
                     # Perform f - K*g. However, this has already been done in outside this functions so we skip this.
@@ -524,21 +533,32 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearCon
                 end
             end
         else    
-            @inbounds for a in nzrange(K, col)
-                row = K.rowval[a]
+            #Since we will possibly be pushing new entries to K, the fields K.rowval and K.nzval will grow.
+            # Therefor we must extract these before iterating over K
+            range = nzrange(K, col)
+            _rows = K.rowval[range]
+            _vals = K.nzval[range]
+            for (row, Kval) in zip(_rows, _vals)
+                #@show a,row,col
                 if distribute[row] == 0
                     lc = lcs[distribute[col]]
-                    @inbounds for (d,v) in lc.entries
-                        v *= K.nzval[a]
-                        K[row,d] += v
+                    for (d,v) in lc.entries
+                        if sparsity_pattern
+                            add_entry!(K, row, d)
+                        else
+                            K[row,d] += v*Kval
+                        end
                     end
                 else
                     lc1 = lcs[distribute[col]]
-                    @inbounds for (d1,v1) in lc1.entries
+                    for (d1,v1) in lc1.entries
                         lc2 = lcs[distribute[row]]
-                        @inbounds for (d2,v2) in lc2.entries
-                            v = v1*v2*K.nzval[a]
-                            K[d1,d2] += v
+                        for (d2,v2) in lc2.entries
+                            if sparsity_pattern
+                                add_entry!(K, d1, d2)
+                            else
+                                K[d1,d2] += v1*v2*Kval
+                            end
                         end
                     end
                 end
@@ -546,14 +566,29 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearCon
 
             if length(f) != 0
                 lc = lcs[distribute[col]]
-                @inbounds for (d,v) in lc.entries
+                for (d,v) in lc.entries
                     f[d] += f[col] * v
                 end
-                f[lc.constrained_dof] = 0.0;
+                f[lc.constrained_dof] = 0.0
             end
         end
     end
 end
+
+function add_entry!(K::SparseMatrixCSC, i::Integer, j::Integer)
+    K[i,j] = 1.0;
+    K[i,j] = 0.0;
+end
+
+#=
+function hasentry(K, i, j)
+    for r in nzrange(K, j)
+        if i == K.rowval[r]
+            return true
+        end
+    end
+    return false
+end =#
 
 """
     create_constraint_matrix(ch::ConstraintHandler)
@@ -657,3 +692,9 @@ function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset
         end
     end
 end
+
+@inline create_symmetric_sparsity_pattern(dh::MixedDofHandler, ch::ConstraintHandler) = Symmetric(_create_sparsity_pattern(dh, ch, true), :U)
+@inline create_symmetric_sparsity_pattern(dh::DofHandler,      ch::ConstraintHandler) = Symmetric(_create_sparsity_pattern(dh, ch, true), :U)
+
+@inline create_sparsity_pattern(dh::MixedDofHandler, ch::ConstraintHandler) = _create_sparsity_pattern(dh, ch, false)
+@inline create_sparsity_pattern(dh::DofHandler,      ch::ConstraintHandler) = _create_sparsity_pattern(dh, ch, false)
