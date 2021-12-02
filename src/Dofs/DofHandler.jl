@@ -316,7 +316,6 @@ with stored values in the correct places.
 See the [Sparsity Pattern](@ref) section of the manual.
 """
 @inline create_sparsity_pattern(dh::DofHandler) = _create_sparsity_pattern(dh, nothing, false)
-@inline create_sparsity_pattern(dh::DofHandler, ch) = _create_sparsity_pattern(dh, ch, false)
 
 """
     create_symmetric_sparsity_pattern(dh::DofHandler)
@@ -328,9 +327,8 @@ triangle of the matrix. Return a `Symmetric{SparseMatrixCSC}`.
 See the [Sparsity Pattern](@ref) section of the manual.
 """
 @inline create_symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
-@inline create_symmetric_sparsity_pattern(dh::DofHandler, ch) = Symmetric(_create_sparsity_pattern(dh, ch, true), :U)
 
-function _create_sparsity_pattern(dh::DofHandler, ch=nothing, sym::Bool=false)
+function _create_sparsity_pattern(dh::DofHandler, ch, sym::Bool)
     ncells = getncells(dh.grid)
     n = ndofs_per_cell(dh)
     N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
@@ -374,8 +372,8 @@ function _create_sparsity_pattern(dh::DofHandler, ch=nothing, sym::Bool=false)
     # Note, this requires the K matrix, which is why we can push!() to the I,J,V
     # triplet directly.
     if ch !== nothing
-        @assert isclosed!(ch)
-        _condense!(K, eltype(K)[], ch.lcs, ndofs(dh))
+        @assert isclosed(ch)
+        _condense!(K, eltype(K)[], ch.lcs, ndofs(dh), true)
     end
 
     return K
