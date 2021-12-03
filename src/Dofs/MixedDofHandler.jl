@@ -385,7 +385,7 @@ function _create_sparsity_pattern(dh::MixedDofHandler, ch, sym::Bool)
     # triplet directly.
     if ch !== nothing
         @assert isclosed(ch)
-        _condense!(K, eltype(K)[], ch.lcs, ndofs(dh), true)
+        _condense_sparsity_pattern!(K, ch.lcs)
     end
 
     return K

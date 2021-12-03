@@ -472,7 +472,7 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
     end
 
     #Condense K and f: C'*K*C   C'*f
-    _condense!(K, f, ch.lcs, ndofs(ch.dh))
+    _condense!(K, f, ch.lcs)
 
     #Remove constrained dofs from Matrix
     zero_out_columns!(K, ch.prescribed_dofs)
@@ -499,7 +499,58 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
 end
 
 # Copied from deal ii AffineConstraints::condense
-function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearConstraint}, ndofs::Int, sparsity_pattern::Bool=false)
+function _condense_sparsity_pattern!(K::SparseMatrixCSC, lcs::Vector{LinearConstraint})
+
+    ndofs = size(K, 1)
+
+    # Store linear constraint index for each constrained dof
+    # Maybe pre-compute and store in ConstraintHandler
+    distribute = zeros(Int, ndofs)
+    for c in 1:length(lcs)
+        distribute[lcs[c].constrained_dof] = c;
+    end
+
+    for col in 1:ndofs
+        #Since we will possibly be pushing new entries to K, the field K.rowval will grow.
+        # Therefor we must extract this before iterating over K
+        range = nzrange(K, col)
+        _rows = K.rowval[range]
+        if distribute[col] == 0
+            for row in _rows
+                if distribute[row] != 0
+                    lc = lcs[distribute[row]]
+                    for (d,v) in lc.entries
+                        add_entry!(K, d, col)
+                    end
+                end
+            end
+        else    
+            for row in _rows
+                if distribute[row] == 0
+                    lc = lcs[distribute[col]]
+                    for (d,v) in lc.entries
+                        add_entry!(K, row, d)
+                    end
+                else
+                    lc1 = lcs[distribute[col]]
+                    for (d1,v1) in lc1.entries
+                        lc2 = lcs[distribute[row]]
+                        for (d2,v2) in lc2.entries
+                            add_entry!(K, d1, d2)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+# Copied from deal ii AffineConstraints::condense
+function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearConstraint})
+
+    ndofs = size(K, 1)
+    condense_f = !(length(f) == 0)
+    condense_f && @assert( length(f) == ndofs )
 
     # Store linear constraint index for each constrained dof
     # Maybe pre-compute and store in ConstraintHandler
@@ -510,61 +561,43 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearCon
 
     for col in 1:ndofs
         if distribute[col] == 0
-            #Since we will possibly be pushing new entries to K, the fields K.rowval and K.nzval will grow.
-            # Therefor we must extract these before iterating over K
-            range = nzrange(K, col)
-            _rows = K.rowval[range]
-            _vals = K.nzval[range]
-            for (row, Kval) in zip(_rows, _vals)
+            for a in nzrange(K, col)
+                row = K.rowval[a]
                 if distribute[row] != 0
                     lc = lcs[distribute[row]]
                     for (d,v) in lc.entries
-                        if sparsity_pattern
-                            add_entry!(K, d, col)
-                        else
-                            K[d,col] += v*Kval
-                        end
+                        Kval = K.nzval[a]
+                        _addindex_sparsematrix!(K, v*Kval, d, col)
                     end
     
                     # Perform f - K*g. However, this has already been done in outside this functions so we skip this.
-                    #if length(f) != 0
+                    #if condense_f
                     #    f[col] -= K.nzval[a] * lc.b;
                     #end
                 end
             end
         else    
-            #Since we will possibly be pushing new entries to K, the fields K.rowval and K.nzval will grow.
-            # Therefor we must extract these before iterating over K
-            range = nzrange(K, col)
-            _rows = K.rowval[range]
-            _vals = K.nzval[range]
-            for (row, Kval) in zip(_rows, _vals)
-                #@show a,row,col
+            for a in nzrange(K, col)
+                row = K.rowval[a]
                 if distribute[row] == 0
                     lc = lcs[distribute[col]]
                     for (d,v) in lc.entries
-                        if sparsity_pattern
-                            add_entry!(K, row, d)
-                        else
-                            K[row,d] += v*Kval
-                        end
+                        Kval = K.nzval[a]
+                        _addindex_sparsematrix!(K, v*Kval, row, d)
                     end
                 else
                     lc1 = lcs[distribute[col]]
                     for (d1,v1) in lc1.entries
                         lc2 = lcs[distribute[row]]
                         for (d2,v2) in lc2.entries
-                            if sparsity_pattern
-                                add_entry!(K, d1, d2)
-                            else
-                                K[d1,d2] += v1*v2*Kval
-                            end
+                            Kval = K.nzval[a]
+                            _addindex_sparsematrix!(K, v1*v2*Kval, d1, d2)
                         end
                     end
                 end
             end
 
-            if length(f) != 0
+            if condense_f
                 lc = lcs[distribute[col]]
                 for (d,v) in lc.entries
                     f[d] += f[col] * v
@@ -575,20 +608,28 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearCon
     end
 end
 
-function add_entry!(K::SparseMatrixCSC, i::Integer, j::Integer)
-    K[i,j] = 1.0;
-    K[i,j] = 0.0;
+# Copied from SparseArrays._setindex_scalar!(...)
+# Custom SparseArrays._setindex_scalar!() that throws error if entry K(_i,_j) does not exist
+function _addindex_sparsematrix!(A::SparseMatrixCSC{Tv,Ti}, v::Tv, i::Ti, j::Ti) where {Tv, Ti}
+    if !((1 <= i <= size(A, 1)) & (1 <= j <= size(A, 2)))
+        throw(BoundsError(A, (i,j)))
+    end
+    coljfirstk = Int(SparseArrays.getcolptr(A)[j])
+    coljlastk = Int(SparseArrays.getcolptr(A)[j+1] - 1)
+    searchk = searchsortedfirst(rowvals(A), i, coljfirstk, coljlastk, Base.Order.Forward)
+    if searchk <= coljlastk && rowvals(A)[searchk] == i
+        # Column j contains entry A[i,j]. Update and return
+        nonzeros(A)[searchk] += v
+        return A
+    end
+    error("Sparsity pattern missing entries for the condensation pattern. Make sure to call `create_sparsity_pattern(dh::DofHandler, ch::ConstraintHandler) when using linear constraints.`")
 end
 
-#=
-function hasentry(K, i, j)
-    for r in nzrange(K, j)
-        if i == K.rowval[r]
-            return true
-        end
-    end
-    return false
-end =#
+#A[i,j] += 0.0 does not add entry to sparse matrices, so we need to first add a one and then remove it
+function add_entry!(A::SparseMatrixCSC, i::Int, j::Int)
+    A[i,j] = 1.0
+    A[i,j] = 0.0
+end
 
 """
     create_constraint_matrix(ch::ConstraintHandler)

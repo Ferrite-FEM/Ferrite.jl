@@ -121,14 +121,6 @@ end
     push!(dh, :u, 1)
     close!(dh)
 
-    K = create_sparsity_pattern(dh)
-    f = zeros(ndofs(dh)); f[end] = 1.0
-    for cell in CellIterator(dh)
-        K[celldofs(cell),celldofs(cell)] += 2.0*[1 -1; -1 1]
-    end
-    Ktmp = copy(K)
-    ftmp = copy(f)
-
     test_lcs = [
         #Simple homogeneous constraint
         [LinearConstraint(4, [(7 => 1.0)], 0.0)],
@@ -143,9 +135,6 @@ end
     ]
 
     for lcs in test_lcs
-        K = copy(Ktmp)
-        f = copy(ftmp)
-        
         ch = ConstraintHandler(dh)
         add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x,t)->0.0))
         for lc in lcs
@@ -154,6 +143,13 @@ end
         close!(ch)
         update!(ch, 0.0)
         C, g = Ferrite.create_constraint_matrix(ch)
+        
+        #Assemble
+        K = create_sparsity_pattern(dh, ch)
+        f = zeros(ndofs(dh)); f[end] = 1.0
+        for cell in CellIterator(dh)
+            K[celldofs(cell),celldofs(cell)] += 2.0*[1 -1; -1 1]
+        end
 
         #Solve by actually condensing matrix
         ff  = C'*(f - K*g)
