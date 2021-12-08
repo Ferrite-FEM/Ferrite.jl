@@ -118,6 +118,8 @@ struct ExclusiveTopology <: AbstractTopology
     face_skeleton::Vector{FaceIndex}
 end
 
+struct NoTopology <: AbstractTopology end
+
 function ExclusiveTopology()
     vertex_to_cell = Dict(0=>[0])
     cell_neighbor = zeros(EntityNeighborhood{CellIndex},0)
@@ -282,7 +284,7 @@ function Grid(cells::Vector{C},
               edgesets::Dict{String,Set{EdgeIndex}}=Dict{String,Set{EdgeIndex}}(),
               vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}(),
               boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0),
-              topology::ExclusiveTopology=ExclusiveTopology()) where {dim,C,T}
+              topology::Topology=NoTopology()) where {dim,C,T,Topology<:AbstractTopology}
     return Grid(cells, nodes, cellsets, nodesets, facesets, edgesets, vertexsets, boundary_matrix, topology)
 end
 
