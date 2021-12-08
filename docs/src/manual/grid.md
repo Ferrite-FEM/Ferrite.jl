@@ -86,3 +86,9 @@ Set{Tuple{Int64,Int64}} with 2 elements:
   (2, 2)
   (4, 2)
 ```
+
+## Topology
+
+Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`Ferrite.full_neighborhood`](@ref) and [`Ferrite.faceskeleton`](@ref)
+are the interface to obtain topological information. The [`Ferrite.full_neighborhood`](@ref) can construct lists of directly connected entities based on a given entity (`CellIndex,FaceIndex,EdgeIndex,VertexIndex`).
+The [`Ferrite.faceskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.
