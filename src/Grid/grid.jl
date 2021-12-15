@@ -109,12 +109,19 @@ getdim(::Cell{dim}) where dim = dim
 abstract type AbstractTopology end
 
 struct ExclusiveTopology <: AbstractTopology
+    # maps a global vertex id to all cells containing the vertex
     vertex_to_cell::Dict{Int,Vector{Int}}
+    # index of the vector = cell id ->  all other connected cells
     cell_neighbor::Vector{EntityNeighborhood{CellIndex}}
+    # face_neighbor[cellid,local_face_id] -> exclusive connected entities (not restricted to one entity)
     face_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
+    # vertex_neighbor[cellid,local_vertex_id] -> exclusive connected entities to the given vertex
     vertex_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
+    # edge_neighbor[cellid,local_edge_id] -> exclusive connected entities of the given edge
     edge_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
+    # maps global vertex id to all directly (by edge or face) connected vertices (no diagonal connection considered)
     vertex_vertex_neighbor::Dict{Int,EntityNeighborhood{VertexIndex}}
+    # list of unique faces in the grid given as FaceIndex
     face_skeleton::Vector{FaceIndex}
 end
 
