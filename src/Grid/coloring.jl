@@ -1,7 +1,8 @@
 # Incidence matrix for element connections in the grid
-function create_incidence_matrix(g::Grid)
+function create_incidence_matrix(g::Grid, cellset::Set{Int}=Set{Int}(1:getncells(g)))
     cell_containing_node = Dict{Int, Set{Int}}()
-    for (cellid, cell) in enumerate(g.cells)
+    for cellid in cellset
+        cell = getcells(g, cellid)
         for v in cell.nodes
             if !haskey(cell_containing_node, v)
                 cell_containing_node[v] = Set{Int}()
@@ -68,13 +69,13 @@ function greedy_coloring(incidence_matrix, cells=1:size(incidence_matrix, 1))
 end
 
 # See Appendix A in https://www.math.colostate.edu/%7Ebangerth/publications/2013-pattern.pdf
-function workstream_coloring(incidence_matrix)
+function workstream_coloring(incidence_matrix, cellset::Set{Int})
     ###################
     # 1. Partitioning #
     ###################
     zones = Set{Int}[]
     ## Zone 1: Just the first element
-    push!(zones, Set{Int}(1))
+    push!(zones, Set{Int}(first(cellset)))
     Z = 2
     Z0 = Set{Int}() # Dummy zone
     n_visited = 1
@@ -84,6 +85,7 @@ function workstream_coloring(incidence_matrix)
         # Loop over all elements in previous zone and add their neigbouring elements
         # unless they are in any of the previous 2 zones.
         for c in get(zones, Z-1, Z0)
+            c ∈ cellset || continue # technically not needed as long as incidence matrix is created with cellset
             for r in nzrange(incidence_matrix, c)
                 cell_neighbour = incidence_matrix.rowval[r]
                 if !(cell_neighbour in get(zones, Z-2, Z0) || cell_neighbour in get(zones, Z-1, Z0))
@@ -174,12 +176,12 @@ The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
     )
     ```
 """
-function create_coloring(g::Grid; alg::ColoringAlgorithm=WORKSTREAM)
-    incidence_matrix = create_incidence_matrix(g)
+function create_coloring(g::Grid; alg::ColoringAlgorithm=WORKSTREAM, cellset::Set{Int}=Set{Int}(1:getncells(g)))
+    incidence_matrix = create_incidence_matrix(g, cellset)
     if alg === WORKSTREAM
-        return workstream_coloring(incidence_matrix)
+        return workstream_coloring(incidence_matrix, cellset)
     elseif alg === GREEDY
-        return greedy_coloring(incidence_matrix)
+        return greedy_coloring(incidence_matrix, cellset)
     else
         error("impossible")
     end
@@ -189,9 +191,11 @@ end
     vtk_cell_data_colors(vtkfile, cell_colors, name="coloring")
 
 Write cell colors (see [`create_coloring`](@ref)) to a VTK file for visualization.
+
+In case of coloring a subset, the cells which are not part of the subset are represented as color 0.
 """
 function vtk_cell_data_colors(vtkfile, cell_colors::AbstractVector{<:AbstractVector{<:Integer}}, name="coloring")
-    color_vector = zeros(sum(length, cell_colors))
+    color_vector = zeros(Int, vtkfile.Ncls)
     for (i, cells_color) in enumerate(cell_colors)
         for cell in cells_color
             color_vector[cell] = i
