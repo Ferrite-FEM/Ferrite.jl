@@ -176,7 +176,7 @@ The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
     )
     ```
 """
-function create_coloring(g::Grid; alg::ColoringAlgorithm=WORKSTREAM, cellset::Set{Int}=Set{Int}(1:getncells(g)))
+function create_coloring(g::Grid, cellset::Set{Int}=Set{Int}(1:getncells(g)); alg::ColoringAlgorithm=WORKSTREAM)
     incidence_matrix = create_incidence_matrix(g, cellset)
     if alg === WORKSTREAM
         return workstream_coloring(incidence_matrix, cellset)

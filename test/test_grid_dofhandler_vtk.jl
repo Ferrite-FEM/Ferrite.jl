@@ -218,7 +218,7 @@ end
 @testset "grid coloring" begin
     function test_coloring(grid, cellset=Set(1:getncells(grid)))
         for alg in (Ferrite.GREEDY, Ferrite.WORKSTREAM)
-            color_vectors = create_coloring(grid; alg=alg, cellset=cellset)
+            color_vectors = create_coloring(grid, cellset; alg=alg)
             @test sum(length, color_vectors) == length(cellset)
             @test union(Set.(color_vectors)...) == cellset
             conn = Ferrite.create_incidence_matrix(grid, cellset)
