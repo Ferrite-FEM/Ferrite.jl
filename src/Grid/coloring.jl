@@ -142,10 +142,10 @@ end
 @enum ColoringAlgorithm GREEDY WORKSTREAM
 
 """
-    create_coloring(g::Grid; alg::ColoringAlgorithm)
+    create_coloring(g::Grid, cellset::Set{Int}=Set(1:getncells(g)); alg::ColoringAlgorithm)
 
 Create a coloring of the cells in grid `g` such that no neighboring cells
-have the same color.
+have the same color. If only a subset of cells should be colored, the cells to color can be specified by `cellset`.
 
 Returns a vector of vectors with cell indexes, e.g.:
 
@@ -159,9 +159,10 @@ ret = [
 Two different algorithms are available, specified with the `alg` keyword argument:
  - `alg = Ferrite.WORKSTREAM` (default): Three step algorithm from
    [*WorkStream*](https://www.math.colostate.edu/%7Ebangerth/publications/2013-pattern.pdf)
-   , albeit with a greedy coloring in the second step.
- - `alg = Ferrite.GREEDY`: greedy algorithm that works well for structured grid such as
-   e.g. grids from `generate_grid`.
+   , albeit with a greedy coloring in the second step. Generally results in more colors than `Ferrite.GREEDY`,
+   however the cells are more equally distributed among the colors.
+ - `alg = Ferrite.GREEDY`: greedy algorithm that works well for structured quadrilateral grids such as
+   e.g. quadrilateral grids from `generate_grid`.
 
 The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
 
