@@ -251,7 +251,6 @@ function function_divergence(::IsScalarValued, fe_v::Values{dim}, q_point::Int, 
     return diverg
 end
 
-# See https://github.com/Ferrite-FEM/Ferrite.jl/issues/336
 function_divergence(::IsVectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T} =
     tr(function_gradient(fe_v, q_point, u, dof_range))
 
@@ -288,7 +287,6 @@ function Base.show(io::IO, ::MIME"text/plain", fe_v::Values)
 end
 
 # copy
-# TODO: needs to be adapted to new traits
 for ValueType in (CellScalarValues, CellVectorValues, FaceScalarValues, FaceVectorValues)
     args = [:(copy(cv.$fname)) for fname in fieldnames(ValueType)]
     @eval begin
