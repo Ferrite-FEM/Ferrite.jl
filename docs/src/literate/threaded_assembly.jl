@@ -11,18 +11,25 @@
 # No cells with the same color has any shared nodes (dofs).
 # This means that it is safe to assemble in parallel as long as we only assemble
 # one color at a time.
+#
+# For this structured grid the greedy algorithm uses fewer colors, but both algorithms
+# result in colors that contain roughly the same number of elements. For unstructured
+# grids the greedy algorithm can result in colors with very few element. For those
+# cases the workstream algorithm is better since it tries to balance the colors evenly.
 
 using Ferrite, SparseArrays
 
 function create_example_2d_grid()
     grid = generate_grid(Quadrilateral, (10, 10), Vec{2}((0.0, 0.0)), Vec{2}((10.0, 10.0)))
-    cell_colors, colors = Ferrite.create_coloring(grid)
+    colors_workstream = create_coloring(grid; alg=Ferrite.WORKSTREAM)
+    colors_greedy = create_coloring(grid; alg=Ferrite.GREEDY)
     vtk_grid("colored", grid) do vtk
-        Ferrite.vtk_cell_data_colors(vtk, grid, colors)
+        vtk_cell_data_colors(vtk, colors_workstream, "workstream-coloring")
+        vtk_cell_data_colors(vtk, colors_greedy, "greedy-coloring")
     end
-end;
+end
 
-create_example_2d_grid()
+create_example_2d_grid();
 
 # ![](coloring.png)
 
@@ -34,8 +41,8 @@ create_example_2d_grid()
 # #### Grid for the beam
 function create_colored_cantilever_grid(celltype, n)
     grid = generate_grid(celltype, (10*n, n, n), Vec{3}((0.0, 0.0, 0.0)), Vec{3}((10.0, 1.0, 1.0)))
-    cell_colors, final_colors = Ferrite.create_coloring(grid)
-    return grid, final_colors
+    colors = create_coloring(grid)
+    return grid, colors
 end;
 
 # #### DofHandler

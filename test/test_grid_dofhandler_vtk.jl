@@ -214,3 +214,27 @@ end
     @test VertexIndex(1,1) in getvertexset(grid, "left_corner")
 
 end
+
+@testset "grid coloring" begin
+    function test_coloring(grid)
+        for alg in (Ferrite.GREEDY, Ferrite.WORKSTREAM)
+            color_vectors = create_coloring(grid; alg=alg)
+            @test sum(length, color_vectors) == getncells(grid)
+            @test union(Set.(color_vectors)...) == Set(1:getncells(grid))
+            conn = Ferrite.create_incidence_matrix(grid)
+            for color in color_vectors, c1 in color, c2 in color
+                @test !conn[c1, c2]
+            end
+        end
+    end
+    test_coloring(generate_grid(Line, (5,)))
+    test_coloring(generate_grid(QuadraticLine, (5,)))
+    test_coloring(generate_grid(Triangle, (5, 5)))
+    test_coloring(generate_grid(QuadraticTriangle, (5, 5)))
+    test_coloring(generate_grid(Quadrilateral, (5, 5)))
+    test_coloring(generate_grid(QuadraticQuadrilateral, (5, 5)))
+    test_coloring(generate_grid(Tetrahedron, (5, 5, 5)))
+    # test_coloring(generate_grid(QuadraticTetrahedron, (5, 5, 5)))
+    test_coloring(generate_grid(Hexahedron, (5, 5, 5)))
+    # test_coloring(generate_grid(QuadraticHexahedron, (5, 5, 5)))
+end

@@ -3,7 +3,10 @@ export
     Interpolation,
     RefCube,
     RefTetrahedron,
+    BubbleEnrichedLagrange,
+    CrouzeixRaviart,
     Lagrange,
+    DiscontinuousLagrange,
     Serendipity,
     Nedelec,
     Nédélec,
@@ -55,7 +58,7 @@ export
     Tetrahedron,
     QuadraticTetrahedron,
     Hexahedron,
-    QuadraticHexahedron,
+    #QuadraticHexahedron,
     CellIndex,
     FaceIndex,
     EdgeIndex,
@@ -87,6 +90,10 @@ export
     transform!,
     generate_grid,
     compute_vertex_values,
+
+# Grid coloring
+    create_coloring,
+    vtk_cell_data_colors,
 
 # Dofs
     DofHandler,
