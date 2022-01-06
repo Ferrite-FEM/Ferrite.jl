@@ -74,31 +74,37 @@ function workstream_coloring(incidence_matrix, cellset::Set{Int})
     # 1. Partitioning #
     ###################
     zones = Set{Int}[]
-    ## Zone 1: Just the first element
-    push!(zones, Set{Int}(first(cellset)))
-    Z = 2
+    n_visited = 0
+    Z = 1
     Z0 = Set{Int}() # Dummy zone
-    n_visited = 1
-    ## Zone N: All elements with connection to elements in Zone N-1
-    while true
-        s = Set{Int}()
-        # Loop over all elements in previous zone and add their neigbouring elements
-        # unless they are in any of the previous 2 zones.
-        for c in get(zones, Z-1, Z0)
-            c ∈ cellset || continue # technically not needed as long as incidence matrix is created with cellset
-            for r in nzrange(incidence_matrix, c)
-                cell_neighbour = incidence_matrix.rowval[r]
-                if !(cell_neighbour in get(zones, Z-2, Z0) || cell_neighbour in get(zones, Z-1, Z0))
-                    push!(s, cell_neighbour)
+    while n_visited < length(cellset)
+        remaining_cellset = setdiff(cellset, zones...)
+        ## Zone 1: Just the first element
+        push!(zones, Set{Int}(first(remaining_cellset)))
+        Z += 1
+        n_visited += 1
+        ## Zone N: All elements with connection to elements in Zone N-1
+        while true
+            s = Set{Int}()
+            # Loop over all elements in previous zone and add their neigbouring elements
+            # unless they are in any of the previous 2 zones.
+            empty_zone = true
+            for c in get(zones, Z-1, Z0)
+                c ∈ cellset || continue # technically not needed as long as incidence matrix is created with cellset
+                for r in nzrange(incidence_matrix, c)
+                    cell_neighbour = incidence_matrix.rowval[r]
+                    if !(cell_neighbour in get(zones, Z-2, Z0) || cell_neighbour in get(zones, Z-1, Z0))
+                        push!(s, cell_neighbour)
+                        empty_zone = false
+                    end
                 end
             end
+            empty_zone && break # no more cells connected to previous zone
+
+            push!(zones, s)
+            n_visited += length(s)
+            Z += 1
         end
-        push!(zones, s)
-        n_visited += length(s)
-        if n_visited >= size(incidence_matrix, 1)
-            break
-        end
-        Z += 1
     end
 
     ###############
