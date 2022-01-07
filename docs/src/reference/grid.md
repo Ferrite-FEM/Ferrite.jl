@@ -48,6 +48,12 @@ addfaceset!
 addnodeset!
 ```
 
+### Multithreaded Assembly
+```@docs
+create_coloring
+```
+
+
 ## AbstractGrid
 
 It can be very useful to use a grid type for a certain special case, e.g. mixed cell types, adaptivity, IGA, etc.

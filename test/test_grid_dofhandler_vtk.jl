@@ -214,3 +214,36 @@ end
     @test VertexIndex(1,1) in getvertexset(grid, "left_corner")
 
 end
+
+@testset "grid coloring" begin
+    function test_coloring(grid, cellset=Set(1:getncells(grid)))
+        for alg in (Ferrite.GREEDY, Ferrite.WORKSTREAM)
+            color_vectors = create_coloring(grid, cellset; alg=alg)
+            @test sum(length, color_vectors) == length(cellset)
+            @test union(Set.(color_vectors)...) == cellset
+            conn = Ferrite.create_incidence_matrix(grid, cellset)
+            for color in color_vectors, c1 in color, c2 in color
+                @test !conn[c1, c2]
+            end
+        end
+    end
+    test_coloring(generate_grid(Line, (5,)))
+    test_coloring(generate_grid(QuadraticLine, (5,)))
+    test_coloring(generate_grid(Triangle, (5, 5)))
+    test_coloring(generate_grid(QuadraticTriangle, (5, 5)))
+    test_coloring(generate_grid(Quadrilateral, (5, 5)))
+    test_coloring(generate_grid(QuadraticQuadrilateral, (5, 5)))
+    test_coloring(generate_grid(Tetrahedron, (5, 5, 5)))
+    # test_coloring(generate_grid(QuadraticTetrahedron, (5, 5, 5)))
+    test_coloring(generate_grid(Hexahedron, (5, 5, 5)))
+    # test_coloring(generate_grid(QuadraticHexahedron, (5, 5, 5)))
+
+    # color only a subset
+    test_coloring(generate_grid(Line, (5,)), Set{Int}(1:3))
+    test_coloring(generate_grid(Triangle, (5, 5)), Set{Int}(1:3^2))
+    test_coloring(generate_grid(Quadrilateral, (5, 5)), Set{Int}(1:3^2))
+    test_coloring(generate_grid(Tetrahedron, (5, 5, 5)), Set{Int}(1:3^3))
+    test_coloring(generate_grid(Hexahedron, (5, 5, 5)), Set{Int}(1:3^3))
+    # unconnected subset
+    test_coloring(generate_grid(Triangle, (10, 10)), union(Set(1:10), Set(70:80)))
+end

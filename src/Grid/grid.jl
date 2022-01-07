@@ -279,7 +279,7 @@ end
 # Sets
 
 _check_setname(dict, name) = haskey(dict, name) && throw(ArgumentError("there already exists a set with the name: $name"))
-_warn_emptyset(set) = length(set) == 0 && @warn("no entities added to set")
+_warn_emptyset(set, name) = length(set) == 0 && @warn("no entities added to the set with name: $name")
 
 """
     addcellset!(grid::AbstractGrid, name::String, cellid::Union{Set{Int}, Vector{Int}})
@@ -297,13 +297,13 @@ addcellset!(grid, "right", x -> norm(x[1]) < 2.0 ) #add cell to cellset right, i
 function addcellset!(grid::AbstractGrid, name::String, cellid::Union{Set{Int},Vector{Int}})
     _check_setname(grid.cellsets,  name)
     cells = Set(cellid)
-    _warn_emptyset(cells)
+    _warn_emptyset(cells, name)
     grid.cellsets[name] = cells
     grid
 end
 
 function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true)
-    _check_setname(grid.cellsets,  name)
+    _check_setname(grid.cellsets, name)
     cells = Set{Int}()
     for (i, cell) in enumerate(getcells(grid))
         pass = all
@@ -314,7 +314,7 @@ function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=tr
         end
         pass && push!(cells, i)
     end
-    _warn_emptyset(cells)
+    _warn_emptyset(cells, name)
     grid.cellsets[name] = cells
     grid
 end
@@ -341,7 +341,7 @@ addvertexset!(grid::Grid, name::String, set::Union{Set{VertexIndex},Vector{Verte
 function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
     _check_setname(dict, name)
     set = Set(_set)
-    _warn_emptyset(set)
+    _warn_emptyset(set, name)
     dict[name] = set
     grid
 end
@@ -365,7 +365,7 @@ function _addset!(grid::AbstractGrid, name::String, f::Function, _ftype::Functio
             pass && push!(_set, _indextype(cell_idx, face_idx))
         end
     end
-    _warn_emptyset(_set)
+    _warn_emptyset(_set, name)
     dict[name] = _set
     grid
 end
@@ -380,7 +380,7 @@ However, instead of mapping a cell id to the `String` key, a set of node ids is 
 function addnodeset!(grid::AbstractGrid, name::String, nodeid::Union{Vector{Int},Set{Int}})
     _check_setname(grid.nodesets, name)
     grid.nodesets[name] = Set(nodeid)
-    _warn_emptyset(grid.nodesets[name])
+    _warn_emptyset(grid.nodesets[name], name)
     grid
 end
 
@@ -391,7 +391,7 @@ function addnodeset!(grid::AbstractGrid, name::String, f::Function)
         f(n.x) && push!(nodes, i)
     end
     grid.nodesets[name] = nodes
-    _warn_emptyset(grid.nodesets[name])
+    _warn_emptyset(grid.nodesets[name], name)
     grid
 end
 
