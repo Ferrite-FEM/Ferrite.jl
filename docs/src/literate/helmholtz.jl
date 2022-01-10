@@ -26,7 +26,7 @@
 # \int \nabla δu \cdot \nabla u d\Omega
 # + \int δu \cdot u d\Omega
 # - \int δu \cdot f d\Omega
-# - \int δu \cdot g_2 d\Gamma_2 = 0 \forall δu
+# - \int δu g_2 d\Gamma_2 = 0 \forall δu
 # ```
 #
 # where $δu$ is a suitable test function that satisfies:
@@ -132,7 +132,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
 
         # Now we manually add the von Neumann boundary terms
         # ```math
-        # \int δu \cdot g_2 d\Gamma_2
+        # \int δu g_2 d\Gamma_2
         # ```
         #+
         for face in 1:nfaces(cell)
@@ -143,11 +143,11 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
                 for q_point in 1:getnquadpoints(facevalues)
                     coords_qp = spatial_coordinate(facevalues, q_point, coords)
                     n = getnormal(facevalues, q_point)
-                    g = gradient(u_ana, coords_qp) ⋅ n
+                    g_2 = gradient(u_ana, coords_qp) ⋅ n
                     dΓ = getdetJdV(facevalues, q_point)
                     for i in 1:n_basefuncs
                         δu = shape_value(facevalues, q_point, i)
-                        fe[i] += (δu * g) * dΓ
+                        fe[i] += (δu * g_2) * dΓ
                     end
                 end
             end
