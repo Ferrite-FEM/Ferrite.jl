@@ -198,6 +198,88 @@ function test_node_reordering()
     @test all(projected_vals_dofs - [0., 2., 4., 2., 1., 3., 3., 1., 2.] .< tol)
 end
 
+function test_export(;subset::Bool)
+    grid = generate_grid(Quadrilateral, (2, 1))
+    qr = QuadratureRule{2,RefCube}(2)
+    ip = Lagrange{2,RefCube,1}()
+    cv = CellScalarValues(qr, ip)
+    nqp = getnquadpoints(cv)
+    qpdata_scalar = [zeros(nqp) for _ in 1:getncells(grid)]
+    qpdata_vec = [zeros(Vec{2}, nqp) for _ in 1:getncells(grid)]
+    qpdata_tens = [zeros(Tensor{2,2}, nqp) for _ in 1:getncells(grid)]
+    qpdata_stens = [zeros(SymmetricTensor{2,2}, nqp) for _ in 1:getncells(grid)]
+    function f(x)
+        if subset && x[1] > 0.001
+            return NaN
+        else
+            return 2x[1] + x[2]
+        end
+    end
+    for cell in CellIterator(grid)
+        reinit!(cv, cell)
+        xh = getcoordinates(cell)
+        for qp in 1:getnquadpoints(cv)
+            x = spatial_coordinate(cv, qp, xh)
+            qpdata_scalar[cellid(cell)][qp] = f(x)
+            qpdata_vec[cellid(cell)][qp] = Vec{2}(i -> i * f(x))
+            qpdata_tens[cellid(cell)][qp] = Tensor{2,2}((i,j) -> i * j * f(x))
+            qpdata_stens[cellid(cell)][qp] = SymmetricTensor{2,2}((i,j) -> i * j * f(x))
+        end
+    end
+    p = subset ? L2Projector(ip, grid; set=1:1) : L2Projector(ip, grid)
+    p_scalar = project(p, qpdata_scalar, qr; project_to_nodes=false)::Vector{Float64}
+    p_vec = project(p, qpdata_vec, qr; project_to_nodes=false)::Vector{<:Vec{2}}
+    p_tens = project(p, qpdata_tens, qr; project_to_nodes=false)::Vector{<:Tensor{2,2}}
+    p_stens = project(p, qpdata_stens, qr; project_to_nodes=false)::Vector{<:SymmetricTensor{2,2}}
+
+    # reshaping for export with reshape_to_nodes
+    fnodes = [f(x.x) for x in grid.nodes]
+    nindex = isnan.(fnodes)
+    findex = (!isnan).(fnodes)
+    let r = reshape_to_nodes(p, p_scalar)
+        @test size(r) == (1, 6)
+        @test all(isnan, r[nindex])
+        @test r[findex] ≈ fnodes[findex]
+    end
+    let r = reshape_to_nodes(p, p_vec)
+        @test size(r) == (3, getnnodes(grid))
+        @test r[1, findex] ≈  fnodes[findex]
+        @test r[2, findex] ≈ 2fnodes[findex]
+        @test r[3, findex] ≈ 0fnodes[findex]
+        @test all(isnan, r[:, nindex])
+    end
+    let r = reshape_to_nodes(p, p_tens)
+        @test size(r) == (4, getnnodes(grid))
+        @test r[1, findex] ≈  fnodes[findex] # 11-components
+        @test r[2, findex] ≈ 4fnodes[findex] # 22-components
+        @test r[3, findex] ≈ 2fnodes[findex] # 12-components
+        @test r[4, findex] ≈ 2fnodes[findex] # 21-components
+        @test all(isnan, r[:, nindex])
+    end
+    let r = reshape_to_nodes(p, p_stens)
+        @test size(r) == (6, getnnodes(grid))
+        @test r[1, findex] ≈  fnodes[findex] # 11-components
+        @test r[2, findex] ≈ 4fnodes[findex] # 22-components
+        @test r[3, findex] ≈ 0fnodes[findex] # 33-components
+        @test r[4, findex] ≈ 2fnodes[findex] # 12-components
+        @test r[5, findex] ≈ 0fnodes[findex] # 23-components
+        @test r[6, findex] ≈ 0fnodes[findex] # 13-components
+        @test all(isnan, r[:, nindex])
+    end
+
+    mktempdir() do tmp
+        fname = vtk_grid(joinpath(tmp, "projected"), grid) do vtk
+            vtk_point_data(vtk, p, p_scalar, "p_scalar")
+            vtk_point_data(vtk, p, p_vec, "p_vec")
+            vtk_point_data(vtk, p, p_tens, "p_tens")
+            vtk_point_data(vtk, p, p_stens, "p_stens")
+        end
+        @test bytes2hex(open(SHA.sha1, fname[1], "r")) ==
+              (subset ? "bdad51fbc5a7ba7ba5ccf6521464064be7710dd6" :
+                        "887852db513a27d57eacc0482bb888908a793e38")
+    end
+end
+
 @testset "Test L2-Projection" begin
     test_projection(1, RefCube)
     test_projection(1, RefTetrahedron)
@@ -205,4 +287,6 @@ end
     test_projection(2, RefTetrahedron)
     test_projection_mixedgrid()
     test_node_reordering()
+    test_export(subset=false)
+    test_export(subset=true)
 end

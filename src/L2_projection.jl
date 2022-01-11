@@ -270,3 +270,37 @@ function _project(vars, proj::L2Projector, fe_values::Values, M::Integer, ::Type
     make_T(vals) = T <: AbstractTensor ? T(Tuple(vals)) : vals[1]
     return T[make_T(x) for x in eachrow(projected_vals)]
 end
+
+function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, proj::L2Projector, vals::Vector{T}, name::AbstractString) where T
+    data = reshape_to_nodes(proj, vals)
+    @assert size(data, 2) == getnnodes(proj.dh.grid)
+    vtk_point_data(vtk, data, name)
+    return vtk
+end
+
+# Numbers can be handled by the method for MixedDofHandler
+reshape_to_nodes(proj::L2Projector, vals::AbstractVector{<:Number}) =
+    reshape_to_nodes(proj.dh, vals, only(getfieldnames(proj.dh)))
+
+# Deal with projected tensors
+function reshape_to_nodes(proj::L2Projector, vals::AbstractVector{S}) where {order, dim, T, M, S <: Union{Tensor{order,dim,T,M}, SymmetricTensor{order,dim,T,M}}}
+    dh = proj.dh
+    # The internal dofhandler in the projector is a scalar field, but the values in vals
+    # can be any tensor field, however, the number of dofs should always match the length of vals
+    @assert ndofs(dh) == length(vals)
+    nout = S <: SymmetricTensor{2,2} ? 6 : # Pad 2D SymmetricTensors to 3D
+           S <: Vec{2} ? 3 : # Pad 2D Vec to 3D
+           M
+    data = fill(T(NaN), nout, getnnodes(dh.grid))
+    _celldofs = Vector{Int}(undef, ndofs_per_cell(dh, first(proj.set)))
+    for cell in CellIterator(dh, proj.set)
+        @assert length(getnodes(cell)) == length(_celldofs)
+        celldofs!(_celldofs, cell)
+        for (node, dof) in zip(getnodes(cell), _celldofs)
+            v = @view data[:, node]
+            fill!(v, 0) # remove NaNs for this node
+            toparaview!(v, vals[dof])
+        end
+    end
+    return data
+end
