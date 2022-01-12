@@ -31,19 +31,11 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compre
     return vtk_grid(filename, coords, cls; compress=compress)
 end
 
-# ParaView uses this ordering for SymmetricTensors. Regular Tensors
-# aren't recognized as tensorfields, but let's use the same ordering anyway
-const PARAVIEW_VOIGT_ORDER = ([1], [1 3; 4 2], [1 4 6; 7 2 5; 9 8 3])
 function toparaview!(v, x::Vec{D}) where D
     v[1:D] .= x
 end
 function toparaview!(v, x::SecondOrderTensor{D}) where D
-    tovoigt!(v, x; order=PARAVIEW_VOIGT_ORDER[D])
-end
-function toparaview!(v, x::SymmetricTensor{2,2})
-    # Since 2D tensors are padded to 3D we need to place the output in
-    # the correct positions with this view
-    tovoigt!(@view(v[[1, 2, 4]]), x; order=PARAVIEW_VOIGT_ORDER[2])
+    tovoigt!(v, x)
 end
 
 """
@@ -52,22 +44,34 @@ end
 Write the tensor field `data` to the vtk file. Two-dimensional tensors are padded with zeros.
 
 For second order tensors the following indexing ordering is used:
-`[11, 22, 33, 12, 23, 13, 21, 32, 31]`. This is the order that ParaView uses.
+`[11, 22, 33, 23, 13, 12, 32, 31, 21]`. This is the default Voigt order in Tensors.jl.
 """
 function WriteVTK.vtk_point_data(
     vtk::WriteVTK.DatasetFile,
     data::Vector{S},
     name::AbstractString
     ) where {O, D, T, M, S <: Union{Tensor{O, D, T, M}, SymmetricTensor{O, D, T, M}}}
-    noutputs = S <: SymmetricTensor{2,2} ? 6 : # Pad 2D SymmetricTensors to 3D
-               S <: Vec{2} ? 3 : # Pad 2D Vec to 3D
-               M
+    noutputs = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
     npoints = length(data)
     out = zeros(T, noutputs, npoints)
     for i in 1:npoints
         toparaview!(@view(out[:, i]), data[i])
     end
-    return vtk_point_data(vtk, out, name)
+    return vtk_point_data(vtk, out, name; component_names=component_names(S))
+end
+
+function component_names(::Type{S}) where S
+    names =
+        S <:             Vec{1}   ? ["x"] :
+        S <:             Vec      ? ["x", "y", "z"] : # Pad 2D Vec to 3D
+        S <:          Tensor{2,1} ? ["xx"] :
+        S <: SymmetricTensor{2,1} ? ["xx"] :
+        S <:          Tensor{2,2} ? ["xx", "yy", "xy", "yx"] :
+        S <: SymmetricTensor{2,2} ? ["xx", "yy", "xy"] :
+        S <:          Tensor{2,3} ? ["xx", "yy", "zz", "yz", "xz", "xy", "zy", "zx", "yx"] :
+        S <: SymmetricTensor{2,3} ? ["xx", "yy", "zz", "yz", "xz", "xy"] :
+                                    nothing
+    return names
 end
 
 function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String) where {dim}

@@ -274,7 +274,7 @@ end
 function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, proj::L2Projector, vals::Vector{T}, name::AbstractString) where T
     data = reshape_to_nodes(proj, vals)
     @assert size(data, 2) == getnnodes(proj.dh.grid)
-    vtk_point_data(vtk, data, name)
+    vtk_point_data(vtk, data, name; component_names=component_names(T))
     return vtk
 end
 
@@ -288,9 +288,7 @@ function reshape_to_nodes(proj::L2Projector, vals::AbstractVector{S}) where {ord
     # The internal dofhandler in the projector is a scalar field, but the values in vals
     # can be any tensor field, however, the number of dofs should always match the length of vals
     @assert ndofs(dh) == length(vals)
-    nout = S <: SymmetricTensor{2,2} ? 6 : # Pad 2D SymmetricTensors to 3D
-           S <: Vec{2} ? 3 : # Pad 2D Vec to 3D
-           M
+    nout = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
     data = fill(T(NaN), nout, getnnodes(dh.grid))
     _celldofs = Vector{Int}(undef, ndofs_per_cell(dh, first(proj.set)))
     for cell in CellIterator(dh, proj.set)
