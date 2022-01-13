@@ -257,13 +257,10 @@ function test_export(;subset::Bool)
         @test all(isnan, r[:, nindex])
     end
     let r = reshape_to_nodes(p, p_stens)
-        @test size(r) == (6, getnnodes(grid))
+        @test size(r) == (3, getnnodes(grid))
         @test r[1, findex] ≈  fnodes[findex] # 11-components
         @test r[2, findex] ≈ 4fnodes[findex] # 22-components
-        @test r[3, findex] ≈ 0fnodes[findex] # 33-components
-        @test r[4, findex] ≈ 2fnodes[findex] # 12-components
-        @test r[5, findex] ≈ 0fnodes[findex] # 23-components
-        @test r[6, findex] ≈ 0fnodes[findex] # 13-components
+        @test r[3, findex] ≈ 2fnodes[findex] # 12-components
         @test all(isnan, r[:, nindex])
     end
 
@@ -275,8 +272,8 @@ function test_export(;subset::Bool)
             vtk_point_data(vtk, p, p_stens, "p_stens")
         end
         @test bytes2hex(open(SHA.sha1, fname[1], "r")) ==
-              (subset ? "bdad51fbc5a7ba7ba5ccf6521464064be7710dd6" :
-                        "887852db513a27d57eacc0482bb888908a793e38")
+              (subset ? "261cfe21de7a478e14f455e783694651a91eeb60" :
+                        "3b8ffb444db1b4cee1246a751da88136116fe49b")
     end
 end
 
