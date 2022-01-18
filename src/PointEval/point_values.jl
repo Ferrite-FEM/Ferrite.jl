@@ -33,6 +33,8 @@ function PointScalarValues(coord::Vec{dim,T}, ip::Interpolation{dim, refshape}) 
     return PointScalarValues(qr, ip)
 end
 
+getnquadpoints(pv::PointScalarValues) = 1
+
 # allow to use function_value with any
 Base.@pure _valuetype(::PointScalarValues{dim}, ::Vector{T}) where {dim, T<:AbstractTensor} = T
 
