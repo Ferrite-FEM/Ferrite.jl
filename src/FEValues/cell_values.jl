@@ -142,10 +142,8 @@ end
 
 function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_geom_basefuncs = getngeobasefunctions(cv)
-    n_func_basefuncs = getn_scalarbasefunctions(cv)
+    n_func_basefuncs = getnbasefunctions(cv)
     @assert length(x) == n_geom_basefuncs
-    isa(cv, CellVectorValues) && (n_func_basefuncs *= dim)
-
 
     @inbounds for i in 1:length(cv.qr_weights)
         w = cv.qr_weights[i]
