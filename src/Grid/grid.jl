@@ -2,7 +2,12 @@
 # Main types for meshes #
 #########################
 """
+    Node{dim, T}
+
 A `Node` is a point in space.
+
+# Fields
+- `x::Vec{dim,T}`: stores the coordinates
 """
 struct Node{dim,T}
     x::Vec{dim,T}
@@ -10,10 +15,18 @@ end
 Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
 getcoordinates(n::Node) = n.x
 
-"""
-A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
-"""
+
 abstract type AbstractCell{dim,N,M} end
+"""
+    Cell{dim,N,M} <: AbstractCell{dim,N,M}
+A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
+However, a `cell` is not defined by the nodes but rather by the global node ids.
+The parameter `dim` refers here to the geometrical/ambient dimension, i.e. the dimension of the `nodes` in the grid and **not** the topological dimension of the cell.
+A `Cell` has `N` nodes and `M` faces.
+
+# Fields
+- `nodes::Ntuple{N,Int}`: N-tuple that stores the node ids. The ordering defines a cell's and its subentities' orientations.
+"""
 struct Cell{dim,N,M} <: AbstractCell{dim,N,M}
     nodes::NTuple{N,Int}
 end
@@ -48,21 +61,21 @@ struct CellIndex
 end
 
 """
-A `FaceIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, face).
+A `FaceIndex` wraps an (Int, Int) and defines a local face by pointing to a (cell, face).
 """
 struct FaceIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
 """
-A `EdgeIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, edge).
+A `EdgeIndex` wraps an (Int, Int) and defines a local edge by pointing to a (cell, edge).
 """
 struct EdgeIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
 """
-A `VertexIndex` wraps an (Int, Int) and defines a face by pointing to a (cell, vert).
+A `VertexIndex` wraps an (Int, Int) and defines a local vertex by pointing to a (cell, vert).
 """
 struct VertexIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
@@ -266,7 +279,21 @@ getcells(neighbors::Vector{T}) where T <: EntityNeighborhood = reduce(vcat, getc
 abstract type AbstractGrid{dim} end
 
 """
+    Grid{dim, C<:AbstractCell, T<:Real} <: AbstractGrid}
+
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
+There are multiple helper structures to apply boundary conditions or define subdomains. They are gathered in the `cellsets`, `nodesets`,
+`facesets`, `edgesets` and `vertexsets`. 
+
+# Fields
+- `cells::Vector{C}`: stores all cells of the grid
+- `nodes::Vector{Node{dim,T}}`: stores the `dim` dimensional nodes of the grid
+- `cellsets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of cell ids
+- `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
+- `facesets::Dict{String,Set{FaceIndex}}`: maps a `String` to a `Set` of `Set{FaceIndex} (global_cell_id, local_face_id)`
+- `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id` 
+- `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
+- `boundary_matrix::SparseMatrixCSC{Bool,Int}`: optional, only needed by `onboundary` to check if a cell is on the boundary, see, e.g. Helmholtz example
 """
 mutable struct Grid{dim,C<:AbstractCell,T<:Real,topologytype<:AbstractTopology} <: AbstractGrid{dim}
     cells::Vector{C}
@@ -298,7 +325,6 @@ end
 ##########################
 # Grid utility functions #
 ##########################
-
 """
     full_neighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, cellidx::CellIndex, include_self=false)
     full_neighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, faceidx::FaceIndex, include_self=false)
@@ -358,37 +384,123 @@ toglobal(grid::Grid,vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1
 toglobal(grid::Grid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))
 
 @inline getdim(::AbstractGrid{dim}) where {dim} = dim
+"""
+    getcells(grid::AbstractGrid) 
+    getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}} 
+    getcells(grid::AbstractGrid, setname::String)
+
+Returns either all `cells::Collection{C<:AbstractCell}` of a `<:AbstractGrid` or a subset based on an `Int`, `Vector{Int}` or `String`.
+Whereas the last option tries to call a `cellset` of the `grid`. `Collection` can be any indexable type, for `Grid` it is `Vector{C<:AbstractCell}`.
+"""
 @inline getcells(grid::AbstractGrid) = grid.cells
 @inline getcells(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.cells[v]
-@inline getcells(grid::AbstractGrid, set::String) = grid.cells[collect(grid.cellsets[set])]
+@inline getcells(grid::AbstractGrid, setname::String) = grid.cells[collect(getcellset(grid,setname))]
+"Returns the number of cells in the `<:AbstractGrid`."
 @inline getncells(grid::AbstractGrid) = length(grid.cells)
+"Returns the celltype of the `<:AbstractGrid`."
 @inline getcelltype(grid::AbstractGrid) = eltype(grid.cells)
 @inline getcelltype(grid::AbstractGrid, i::Int) = typeof(grid.cells[i])
 
+"""
+    getnodes(grid::AbstractGrid) 
+    getnodes(grid::AbstractGrid, v::Union{Int,Vector{Int}}
+    getnodes(grid::AbstractGrid, setname::String)
+
+Returns either all `nodes::Collection{N}` of a `<:AbstractGrid` or a subset based on an `Int`, `Vector{Int}` or `String`.
+The last option tries to call a `nodeset` of the `<:AbstractGrid`. `Collection{N}` refers to some indexable collection where each element corresponds
+to a Node.
+"""
 @inline getnodes(grid::AbstractGrid) = grid.nodes
 @inline getnodes(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.nodes[v]
-@inline getnodes(grid::AbstractGrid, set::String) = grid.nodes[collect(grid.nodesets[set])]
+@inline getnodes(grid::AbstractGrid, setname::String) = grid.nodes[collect(getnodeset(grid,setname))]
+"Returns the number of nodes in the grid."
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
+"Returns the number of nodes of the `i`-th cell."
 @inline nnodes_per_cell(grid::AbstractGrid, i::Int=1) = nnodes(grid.cells[i])
 
-@inline getcellset(grid::AbstractGrid, set::String) = grid.cellsets[set]
+"""
+    getcellset(grid::AbstractGrid, setname::String)
+
+Returns all cells as cellid in a `Set` of a given `setname`.
+"""
+@inline getcellset(grid::AbstractGrid, setname::String) = grid.cellsets[setname]
+"""
+    getcellsets(grid::AbstractGrid)
+
+Returns all cellsets of the `grid`.
+"""
 @inline getcellsets(grid::AbstractGrid) = grid.cellsets
 
-@inline getnodeset(grid::AbstractGrid, set::String) = grid.nodesets[set]
+"""
+    getnodeset(grid::AbstractGrid, setname::String)
+
+Returns all nodes as nodeid in a `Set` of a given `setname`.
+"""
+@inline getnodeset(grid::AbstractGrid, setname::String) = grid.nodesets[setname]
+"""
+    getnodesets(grid::AbstractGrid)
+
+Returns all nodesets of the `grid`.
+"""
 @inline getnodesets(grid::AbstractGrid) = grid.nodesets
 
-@inline getfaceset(grid::AbstractGrid, set::String) = grid.facesets[set]
+"""
+    getfaceset(grid::AbstractGrid, setname::String)
+
+Returns all faces as `FaceIndex` in a `Set` of a given `setname`.
+"""
+@inline getfaceset(grid::AbstractGrid, setname::String) = grid.facesets[setname]
+"""
+    getfacesets(grid::AbstractGrid)
+
+Returns all facesets of the `grid`.
+"""
 @inline getfacesets(grid::AbstractGrid) = grid.facesets
 
-@inline getedgeset(grid::AbstractGrid, set::String) = grid.edgesets[set]
+"""
+    getedgeset(grid::AbstractGrid, setname::String)
+
+Returns all edges as `EdgeIndex` in a `Set` of a given `setname`.
+"""
+@inline getedgeset(grid::AbstractGrid, setname::String) = grid.edgesets[setname]
+"""
+    getedgesets(grid::AbstractGrid)
+
+Returns all edge sets of the grid.
+"""
 @inline getedgesets(grid::AbstractGrid) = grid.edgesets
 
-@inline getvertexset(grid::AbstractGrid, set::String) = grid.vertexsets[set]
+"""
+    getedgeset(grid::AbstractGrid, setname::String)
+
+Returns all vertices as `VertexIndex` in a `Set` of a given `setname`.
+"""
+@inline getvertexset(grid::AbstractGrid, setname::String) = grid.vertexsets[setname]
+"""
+    getvertexsets(grid::AbstractGrid)
+
+Returns all vertex sets of the grid.
+"""
 @inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
 
 n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
 
+"""
+    function compute_vertex_values(grid::AbstractGrid, f::Function)
+    function compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function)    
+    function compute_vertex_values(grid::AbstractGrid, set::String, f::Function)
 
+Given a `grid` and some function `f`, `compute_vertex_values` computes all nodal values,
+ i.e. values at the nodes,  of the function `f`. 
+The function implements two dispatches, where only a subset of the grid's node is used.
+
+```julia
+    compute_vertex_values(grid, x -> sin(x[1]) + cos([2]))
+    compute_vertex_values(grid, [9, 6, 3], x -> sin(x[1]) + cos([2])) #compute function values at nodes with id 9,6,3
+    compute_vertex_values(grid, "right", x -> sin(x[1]) + cos([2])) #compute function values at nodes belonging to nodeset right
+```
+
+"""
 @inline function compute_vertex_values(nodes::Vector{Node{dim,T}}, f::Function) where{dim,T}
     map(n -> f(getcoordinates(n)), nodes)
 end
@@ -406,7 +518,11 @@ end
 end
 
 # Transformations
+"""
+    transform!(grid::Abstractgrid, f::Function)
 
+Transform all nodes of the `grid` based on some transformation function `f`.
+"""
 function transform!(g::AbstractGrid, f::Function)
     c = similar(g.nodes)
     for i in 1:length(c)
@@ -419,18 +535,31 @@ end
 # Sets
 
 _check_setname(dict, name) = haskey(dict, name) && throw(ArgumentError("there already exists a set with the name: $name"))
-_warn_emptyset(set) = length(set) == 0 && @warn("no entities added to set")
+_warn_emptyset(set, name) = length(set) == 0 && @warn("no entities added to the set with name: $name")
 
+"""
+    addcellset!(grid::AbstractGrid, name::String, cellid::Union{Set{Int}, Vector{Int}})
+    addcellset!(grid::AbstractGrid, name::String, f::function; all::Bool=true)
+
+Adds a cellset to the grid with key `name`.
+Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
+The `MixedDofHandler` can construct different fields which live not on the whole domain, but rather on a cellset. 
+
+```julia
+addcellset!(grid, "left", Set((1,3))) #add cells with id 1 and 3 to cellset left
+addcellset!(grid, "right", x -> norm(x[1]) < 2.0 ) #add cell to cellset right, if x[1] of each cell's node is smaller than 2.0
+```
+"""
 function addcellset!(grid::AbstractGrid, name::String, cellid::Union{Set{Int},Vector{Int}})
     _check_setname(grid.cellsets,  name)
     cells = Set(cellid)
-    _warn_emptyset(cells)
+    _warn_emptyset(cells, name)
     grid.cellsets[name] = cells
     grid
 end
 
 function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true)
-    _check_setname(grid.cellsets,  name)
+    _check_setname(grid.cellsets, name)
     cells = Set{Int}()
     for (i, cell) in enumerate(getcells(grid))
         pass = all
@@ -441,11 +570,24 @@ function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=tr
         end
         pass && push!(cells, i)
     end
-    _warn_emptyset(cells)
+    _warn_emptyset(cells, name)
     grid.cellsets[name] = cells
     grid
 end
 
+"""
+    addfaceset!(grid::AbstractGrid, name::String, faceid::Union{Set{FaceIndex},Vector{FaceIndex}})
+    addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) 
+
+Adds a faceset to the grid with key `name`.
+A faceset maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id, local_face_id)`.
+Facesets are used to initialize `Dirichlet` structs, that are needed to specify the boundary for the `ConstraintHandler`.
+
+```julia
+addfaceset!(gird, "right", Set(((2,2),(4,2))) #see grid manual example for reference
+addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
+```
+"""
 addfaceset!(grid::Grid, name::String, set::Union{Set{FaceIndex},Vector{FaceIndex}}) = 
     _addset!(grid, name, set, grid.facesets)
 addedgeset!(grid::Grid, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) = 
@@ -455,7 +597,7 @@ addvertexset!(grid::Grid, name::String, set::Union{Set{VertexIndex},Vector{Verte
 function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
     _check_setname(dict, name)
     set = Set(_set)
-    _warn_emptyset(set)
+    _warn_emptyset(set, name)
     dict[name] = set
     grid
 end
@@ -479,15 +621,22 @@ function _addset!(grid::AbstractGrid, name::String, f::Function, _ftype::Functio
             pass && push!(_set, _indextype(cell_idx, face_idx))
         end
     end
-    _warn_emptyset(_set)
+    _warn_emptyset(_set, name)
     dict[name] = _set
     grid
 end
 
+"""
+    addnodeset!(grid::AbstractGrid, name::String, nodeid::Union{Vector{Int},Set{Int}})
+    addnodeset!(grid::AbstractGrid, name::String, f::Function)    
+
+Adds a `nodeset::Dict{String, Set{Int}}` to the `grid` with key `name`. Has the same interface as `addcellset`. 
+However, instead of mapping a cell id to the `String` key, a set of node ids is returned.
+"""
 function addnodeset!(grid::AbstractGrid, name::String, nodeid::Union{Vector{Int},Set{Int}})
     _check_setname(grid.nodesets, name)
     grid.nodesets[name] = Set(nodeid)
-    _warn_emptyset(grid.nodesets[name])
+    _warn_emptyset(grid.nodesets[name], name)
     grid
 end
 
@@ -498,13 +647,13 @@ function addnodeset!(grid::AbstractGrid, name::String, f::Function)
         f(n.x) && push!(nodes, i)
     end
     grid.nodesets[name] = nodes
-    _warn_emptyset(grid.nodesets[name])
+    _warn_emptyset(grid.nodesets[name], name)
     grid
 end
 
 """
-    getcoordinates!(x::Vector, grid::Grid, cell::Int)
-Update the coordinate vector `x` for cell number `cell`.
+    getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::Int)
+Fills the vector `x` with the coordinates of a cell, defined by its cell id.
 """
 @inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::Int) where {dim,T}
     #@assert length(x) == N
@@ -516,7 +665,7 @@ end
 @inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, face::FaceIndex) where {dim, T} = getcoordinates!(x, grid, face.idx[1])
 
 """
-    getcoordinates(grid::Grid, cell)
+    getcoordinates(grid::AbstractGrid, cell)
 Return a vector with the coordinates of the vertices of cell number `cell`.
 """
 @inline function getcoordinates(grid::AbstractGrid, cell::Int)

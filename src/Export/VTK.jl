@@ -31,71 +31,47 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compre
     return vtk_grid(filename, coords, cls; compress=compress)
 end
 
-"""
-    vtk_point_data(vtk, data::Vector{<:SymmetricTensor{2}}, name)
+function toparaview!(v, x::Vec{D}) where D
+    v[1:D] .= x
+end
+function toparaview!(v, x::SecondOrderTensor{D}) where D
+    tovoigt!(v, x)
+end
 
-Write the second order tensor field `data` to the vtk file. Twodimensional tensors are padded with zeros.
-The tensor field is written such that Paraview recognizes the tensor components, where `XX` corresponds to the `[1,1]` component and so on.
+"""
+    vtk_point_data(vtk, data::Vector{<:AbstractTensor}, name)
+
+Write the tensor field `data` to the vtk file. Two-dimensional tensors are padded with zeros.
+
+For second order tensors the following indexing ordering is used:
+`[11, 22, 33, 23, 13, 12, 32, 31, 21]`. This is the default Voigt order in Tensors.jl.
 """
 function WriteVTK.vtk_point_data(
     vtk::WriteVTK.DatasetFile,
-    data::Union{
-        Vector{SymmetricTensor{2,dim,T,M}}
-        },
+    data::Vector{S},
     name::AbstractString
-    ) where {dim,T,M}
-
-    if dim == 1
-        noutputs = 1
-        sort_paraview = [1]
-    elseif dim == 2
-        noutputs = 6
-        sort_paraview = [1,4,2]
-    elseif dim == 3
-        noutputs = 6
-        sort_paraview = [1,4,6,2,5,3]
-    end
-
+    ) where {O, D, T, M, S <: Union{Tensor{O, D, T, M}, SymmetricTensor{O, D, T, M}}}
+    noutputs = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
     npoints = length(data)
     out = zeros(T, noutputs, npoints)
-    out[sort_paraview, :] .= reshape(reinterpret(T, data), (M, npoints))
-
-    return vtk_point_data(vtk, out, name)
+    for i in 1:npoints
+        toparaview!(@view(out[:, i]), data[i])
+    end
+    return vtk_point_data(vtk, out, name; component_names=component_names(S))
 end
 
-"""
-    vtk_point_data(vtk, data::Vector{<:Tensor}, name)
-
-Write the tensor field data to the vtk file. Only writes the tensor values available in `data`.
-In the vtu-file, ordering of the tensor components is column-wise (just like Julia).
-[1 2
- 3 4] => 1, 3, 2, 4
-"""
-function WriteVTK.vtk_point_data(
-    vtk::WriteVTK.DatasetFile,
-    data::Union{
-        Vector{Tensor{order,dim,T,M}},
-        Vector{SymmetricTensor{order,dim,T,M}}
-        },
-    name::AbstractString
-    ) where {order,dim,T,M}
-
-    npoints = length(data)
-    out = zeros(T, M, npoints)
-    out[1:M, :] .= reshape(reinterpret(T, data), (M, npoints))
-    return vtk_point_data(vtk, out, name)
-end
-
-"""
-    vtk_point_data(vtk, data::Vector{<:Vec}, name)
-
-Write the vector field data to the vtk file.
-"""
-function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, data::Vector{Vec{dim,T}}, name::AbstractString) where {dim,T}
-    npoints = length(data)
-    out = zeros(T, (dim == 2 ? 3 : dim), npoints)
-    out[1:dim, :] .= reshape(reinterpret(T, data), (dim, npoints))
-    return vtk_point_data(vtk, out, name)
+function component_names(::Type{S}) where S
+    names =
+        S <:             Vec{1}   ? ["x"] :
+        S <:             Vec      ? ["x", "y", "z"] : # Pad 2D Vec to 3D
+        S <:          Tensor{2,1} ? ["xx"] :
+        S <: SymmetricTensor{2,1} ? ["xx"] :
+        S <:          Tensor{2,2} ? ["xx", "yy", "xy", "yx"] :
+        S <: SymmetricTensor{2,2} ? ["xx", "yy", "xy"] :
+        S <:          Tensor{2,3} ? ["xx", "yy", "zz", "yz", "xz", "xy", "zy", "zx", "yx"] :
+        S <: SymmetricTensor{2,3} ? ["xx", "yy", "zz", "yz", "xz", "xy"] :
+                                    nothing
+    return names
 end
 
 function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String) where {dim}
@@ -103,9 +79,6 @@ function vtk_nodeset(vtk::WriteVTK.DatasetFile, grid::Grid{dim}, nodeset::String
     z[collect(getnodeset(grid, nodeset))] .= 1.0
     vtk_point_data(vtk, z, nodeset)
 end
-
-
-
 
 """
     vtk_cellset(vtk, grid::Grid)

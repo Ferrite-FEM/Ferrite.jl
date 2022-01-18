@@ -26,7 +26,7 @@
 # \int \nabla δu \cdot \nabla u d\Omega
 # + \int δu \cdot u d\Omega
 # - \int δu \cdot f d\Omega
-# + \int δu \cdot (n \cdot \nabla u - g_2) d\Gamma_2
+# - \int δu g_2 d\Gamma_2 = 0 \forall δu
 # ```
 #
 # where $δu$ is a suitable test function that satisfies:
@@ -132,7 +132,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
 
         # Now we manually add the von Neumann boundary terms
         # ```math
-        # \int δu \cdot (n \cdot \nabla u - g_2) d\Gamma_2
+        # \int δu g_2 d\Gamma_2
         # ```
         #+
         for face in 1:nfaces(cell)
@@ -143,15 +143,11 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
                 for q_point in 1:getnquadpoints(facevalues)
                     coords_qp = spatial_coordinate(facevalues, q_point, coords)
                     n = getnormal(facevalues, q_point)
-                    g = gradient(u_ana, coords_qp) ⋅ n
+                    g_2 = gradient(u_ana, coords_qp) ⋅ n
                     dΓ = getdetJdV(facevalues, q_point)
                     for i in 1:n_basefuncs
                         δu = shape_value(facevalues, q_point, i)
-                        fe[i] += -(δu * g) * dΓ
-                        for j in 1:n_basefuncs
-                            ∇u = shape_gradient(cellvalues, q_point, j)
-                            Ke[i, j] += (δu * ∇u ⋅ n) * dΓ
-                        end
+                        fe[i] += (δu * g_2) * dΓ
                     end
                 end
             end
@@ -173,7 +169,7 @@ vtk_save(vtkfile)
 using Test #src
 #src this test catches unexpected changes in the result over time.
 #src the true maximum is slightly bigger then 1.0
-@test maximum(u) ≈ 0.995280389173959 #src
+@test maximum(u) ≈ 0.9952772469054607 #src
 @test u_ana(Vec{2}((-0.5, -0.5))) ≈ 1 #src
 @test u_ana(Vec{2}((0.5, -0.5)))  ≈ 1 #src
 @test u_ana(Vec{2}((-0.5, 0.5)))  ≈ 1 #src
