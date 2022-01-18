@@ -3,22 +3,22 @@
 using Base: @propagate_inbounds
 
 abstract type FieldTrait end
-struct IsVectorValued <: FieldTrait end
-struct IsScalarValued <: FieldTrait end
+struct VectorValued <: FieldTrait end
+struct ScalarValued <: FieldTrait end
 
-FieldTrait(::Type{<:CellScalarValues}) = IsScalarValued()
-FieldTrait(::Type{<:FaceScalarValues}) = IsScalarValued()
-FieldTrait(::Type{<:PointScalarValues}) = IsScalarValued()
-FieldTrait(::Type{<:CellVectorValues}) = IsVectorValued()
-FieldTrait(::Type{<:FaceVectorValues}) = IsVectorValued()
+FieldTrait(::Type{<:CellScalarValues}) = ScalarValued()
+FieldTrait(::Type{<:FaceScalarValues}) = ScalarValued()
+FieldTrait(::Type{<:PointScalarValues}) = ScalarValued()
+FieldTrait(::Type{<:CellVectorValues}) = VectorValued()
+FieldTrait(::Type{<:FaceVectorValues}) = VectorValued()
 
 
 getnbasefunctions(cv::Values) = size(cv.N, 1)
 getngeobasefunctions(cv::Values) = size(cv.M, 1)
 
 getn_scalarbasefunctions(cv::T) where T = getn_scalarbasefunctions(FieldTrait(T), cv)
-getn_scalarbasefunctions(::IsScalarValued, cv::Values) = size(cv.N, 1)
-getn_scalarbasefunctions(::IsVectorValued, cv::Values{dim}) where {dim} = size(cv.N, 1) ÷ dim
+getn_scalarbasefunctions(::ScalarValued, cv::Values) = size(cv.N, 1)
+getn_scalarbasefunctions(::VectorValued, cv::Values{dim}) where {dim} = size(cv.N, 1) ÷ dim
 
 """
     reinit!(cv::CellValues, x::Vector)
@@ -95,7 +95,7 @@ quadrature point `q_point`.
 
 shape_curl(cv::T, q_point, base_func) where T = shape_curl(FieldTrait(T), cv, q_point, base_func)
 
-function shape_curl(::IsVectorValued, cv::Values, q_point::Int, base_func::Int)
+function shape_curl(::VectorValued, cv::Values, q_point::Int, base_func::Int)
     return curl(shape_gradient(cv, q_point, base_func))
 end
 curl(∇v) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
@@ -118,7 +118,7 @@ function_value(fe_v::T, q_point, u) where T = function_value(FieldTrait(T), fe_v
 
 function function_value(ft::FieldTrait, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
-    isa(ft, IsVectorValued) && (n_base_funcs *= dim)
+    isa(ft, VectorValued) && (n_base_funcs *= dim)
     @assert length(dof_range) == n_base_funcs
     @boundscheck checkbounds(u, dof_range)
     val = zero(_valuetype(fe_v, u))
@@ -128,7 +128,7 @@ function function_value(ft::FieldTrait, fe_v::Values{dim}, q_point::Int, u::Abst
     return val
 end
 
-function function_value(::IsVectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
+function function_value(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
     val = zero(Vec{dim, T})
@@ -143,9 +143,9 @@ function function_value(::IsVectorValued, fe_v::Values{dim}, q_point::Int, u::Ab
 end
 
 _valuetype(t::T, v) where T = _valuetype(FieldTrait(T), t, v)
-Base.@pure _valuetype(::IsScalarValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = T
-Base.@pure _valuetype(::IsScalarValued, ::Values{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Vec{dim,T}
-Base.@pure _valuetype(::IsVectorValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Vec{dim,T}
+Base.@pure _valuetype(::ScalarValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = T
+Base.@pure _valuetype(::ScalarValued, ::Values{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Vec{dim,T}
+Base.@pure _valuetype(::VectorValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Vec{dim,T}
 # Base.@pure _valuetype(::VectorValues{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Vec{dim,T}
 
 """
@@ -169,7 +169,7 @@ function_gradient(fe_v::T, q_point, u, dof_range) where T = function_gradient(Fi
 
 function function_gradient(ft::FieldTrait, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
-    isa(ft, IsVectorValued) && (n_base_funcs *= dim)
+    isa(ft, VectorValued) && (n_base_funcs *= dim)
     @assert length(dof_range) == n_base_funcs
     @boundscheck checkbounds(u, dof_range)
     grad = zero(_gradienttype(fe_v, u))
@@ -180,10 +180,10 @@ function function_gradient(ft::FieldTrait, fe_v::Values{dim}, q_point::Int, u::A
 end
 
 _gradienttype(values::T, v) where T = _gradienttype(FieldTrait(T), values, v)
-Base.@pure _gradienttype(::IsScalarValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Vec{dim,T}
-Base.@pure _gradienttype(::IsVectorValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
+Base.@pure _gradienttype(::ScalarValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Vec{dim,T}
+Base.@pure _gradienttype(::VectorValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
 
-function function_gradient(::IsScalarValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
+function function_gradient(::ScalarValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
     grad = zero(Tensor{2,dim,T})
@@ -193,7 +193,7 @@ function function_gradient(::IsScalarValued, fe_v::Values{dim}, q_point::Int, u:
     return grad
 end
 
-function function_gradient(::IsVectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
+function function_gradient(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
     grad = zero(Tensor{2,dim,T})
@@ -241,7 +241,7 @@ where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
 function_divergence(fe_v::T, q_point, u) where T = function_divergence(FieldTrait(T), fe_v, q_point, u)
 
-function function_divergence(::IsScalarValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
+function function_divergence(::ScalarValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
     diverg = zero(T)
@@ -251,10 +251,10 @@ function function_divergence(::IsScalarValued, fe_v::Values{dim}, q_point::Int, 
     return diverg
 end
 
-function_divergence(::IsVectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T} =
+function_divergence(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T} =
     tr(function_gradient(fe_v, q_point, u, dof_range))
 
-function_divergence(::IsVectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} =
+function_divergence(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} =
     tr(function_gradient(fe_v, q_point, u))
 
 function_curl(fe_v::Values, q_point::Int, u::AbstractVector, dof_range = eachindex(u)) =
