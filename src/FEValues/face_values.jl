@@ -166,9 +166,8 @@ end
 
 function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) where {dim,T}
     n_geom_basefuncs = getngeobasefunctions(fv)
-    n_func_basefuncs = getn_scalarbasefunctions(fv)
+    n_func_basefuncs = getnbasefunctions(fv)
     @assert length(x) == n_geom_basefuncs
-    isa(fv, FaceVectorValues) && (n_func_basefuncs *= dim)
 
     fv.current_face[] = face
     cb = getcurrentface(fv)

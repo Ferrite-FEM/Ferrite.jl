@@ -116,9 +116,8 @@ nodal values of ``\\mathbf{u}``.
 function_value(fe_v::T, q_point, u, dof_range) where T = function_value(FieldTrait(T), fe_v, q_point, u, dof_range)
 function_value(fe_v::T, q_point, u) where T = function_value(FieldTrait(T), fe_v, q_point, u)
 
-function function_value(ft::FieldTrait, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
-    n_base_funcs = getn_scalarbasefunctions(fe_v)
-    isa(ft, VectorValued) && (n_base_funcs *= dim)
+function function_value(::FieldTrait, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
+    n_base_funcs = getnbasefunctions(fe_v)
     @assert length(dof_range) == n_base_funcs
     @boundscheck checkbounds(u, dof_range)
     val = zero(_valuetype(fe_v, u))
@@ -167,9 +166,8 @@ where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 function_gradient(fe_v::T, q_point, u) where T = function_gradient(FieldTrait(T), fe_v, q_point, u)
 function_gradient(fe_v::T, q_point, u, dof_range) where T = function_gradient(FieldTrait(T), fe_v, q_point, u, dof_range)
 
-function function_gradient(ft::FieldTrait, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
-    n_base_funcs = getn_scalarbasefunctions(fe_v)
-    isa(ft, VectorValued) && (n_base_funcs *= dim)
+function function_gradient(::FieldTrait, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
+    n_base_funcs = getnbasefunctions(fe_v)
     @assert length(dof_range) == n_base_funcs
     @boundscheck checkbounds(u, dof_range)
     grad = zero(_gradienttype(fe_v, u))
