@@ -85,7 +85,7 @@ u_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} N_i(\mathbf{x}) \, a_i,\qquad
 ```
 
 In the following the argument $\mathbf{x}$ is dropped to keep the notation compact.
-We may now inserted these approximations in the weak form, which results in
+We may now insert these approximations in the weak form, which results in
 
 ```math
 \sum_j^N \left(\sum_i^N \delta a_i \int_{\Omega_\mathrm{h}} \nabla N_i \cdot (k \nabla N_j) \, \mathrm{d}\Omega \right) a_j =
