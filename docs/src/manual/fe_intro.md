@@ -153,5 +153,5 @@ the finite element method. To give a few recommendations there is:
 * *Finite Element Procedures* by K.J. Bathe
 * *The Finite Element Method: Its Basis and Fundamentals* by Olek Zienkiewicz, Robert Taylor and J.Z. Zhu
 * *Higher-Order Finite Element Methods* by Pavel Šolín, Karel Segeth and Ivo Doležel
-This list is neither ment to be exhaustive, nor does the absence of a work mean that it is in any way
+This list is neither meant to be exhaustive, nor does the absence of a work mean that it is in any way
 bad or not recommendable.
