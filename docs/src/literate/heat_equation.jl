@@ -26,7 +26,7 @@
 #
 # The resulting weak form is given by
 # ```math
-# \int_{\Omega} \nabla v \cdot \nabla u \ d\Omega = \int_{\Omega} v \ d\Omega \quad \forall v \in \mathbb{T},
+# \int_{\Omega} \nabla \delta u \cdot \nabla u \ d\Omega = \int_{\Omega} \delta u \ d\Omega \quad \forall \delta u \in \mathbb{T},
 # ```
 # where $\mathbb{T}$ is a suitable test function space.
 #-
@@ -153,21 +153,21 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
             # For each quadrature point we loop over all the (local) shape functions.
-            # We need the value and gradient of the testfunction `v` and also the gradient
-            # of the trial function `u`. We get all of these from `cellvalues`.
-            # Please note that the variables named $\nabla v$ and $\nabla u$ are actually
-            # $\nabla \phi_i(\textbf{x}_q)$ and $\nabla \phi_j(\textbf{x}_q)$, and
-            # $v$ is actually $\phi_i(\textbf{x}_q)$. However, to underline the strong
-            # relation between the weak form and the implementation, we the code is written
-            # with the symbols in the weak form instead.
+            # We need the value and gradient of the test function `δu` and also the
+            # gradient of the trial function `u`. We get all of these from `cellvalues`.
+            # Please note that the variables `δu`, `∇δu` and `∇u` are actually
+            # $\phi_i(\textbf{x}_q)$, $\nabla \phi_i(\textbf{x}_q)$ and $\nabla
+            # \phi_j(\textbf{x}_q)$, i.e. the evaluation of the trial and test functions.
+            # However, to underline the strong parallel between the weak form and the
+            # implementation, this example uses the symbols appearing in the weak form.
             #+
             for i in 1:n_basefuncs
-                v  = shape_value(cellvalues, q_point, i)
-                ∇v = shape_gradient(cellvalues, q_point, i)
-                fe[i] += v * dΩ
+                δu  = shape_value(cellvalues, q_point, i)
+                ∇δu = shape_gradient(cellvalues, q_point, i)
+                fe[i] += δu * dΩ
                 for j in 1:n_basefuncs
                     ∇u = shape_gradient(cellvalues, q_point, j)
-                    Ke[i, j] += (∇v ⋅ ∇u) * dΩ
+                    Ke[i, j] += (∇δu ⋅ ∇u) * dΩ
                 end
             end
         end
