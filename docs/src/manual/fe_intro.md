@@ -47,7 +47,7 @@ constant conductivity $k$.
 ## Weak Form
 
 The solution to the equation above is usually calculated from the corresponding weak
-form. By multiplying the equation with an arbitrary test function $\delta u$, integrating
+form. By multiplying the equation with an arbitrary *test function* $\delta u$, integrating
 over the domain and using partial integration we obtain the *weak form*. Now our problem
 can be stated as:
 
@@ -74,17 +74,20 @@ and denote it with $\Omega_h$. In this example the corners of the triangles are 
 *nodes*.
 
 Next we introduce the finite element approximation $u_\mathrm{h} \approx u$ as a sum of N nodal
-shape functions, where we denote each of these function by $\phi_i$ and the corresponding nodal
-values $\hat{u}_i$. In this example we choose to approximate the test function in the same way. This
-approach is known as the *Galerkin finite element method*. Formally we write the evaluation
-of our approximations at a specific point $\mathbf{x}$ in our domain $\Omega$ as:
+*shape functions*, where we denote each of these function by $\phi_i$ and the corresponding *nodal
+values* $\hat{u}_i$. Depending on the community, shape functions are also called *trial functions*.
+In this example we choose to approximate the test function in the same way. This approach is known
+as the *Galerkin finite element method*. Formally we write the evaluation of our approximations
+at a specific point $\mathbf{x}$ in our domain $\Omega$ as:
 
 ```math
 u_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} \phi_i(\mathbf{x}) \, \hat{u}_i,\qquad
 \delta u_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} \phi_i(\mathbf{x}) \, \delta \hat{u}_i \, .
 ```
 
-In the following the argument $\mathbf{x}$ is dropped to keep the notation compact.
+Since test and trial functions are usually chosen in such a way, that they build the basis of
+some function space (basis as in basis of a vector space), sometimes are they are also called *basis
+functions*. In the following the argument $\mathbf{x}$ is dropped to keep the notation compact.
 We may now insert these approximations in the weak form, which results in
 
 ```math
