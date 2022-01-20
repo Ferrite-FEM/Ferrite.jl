@@ -136,8 +136,26 @@ let us rewrite the formula for the stiffness matrix entries as follows:
     = \sum_{E \in \Omega_\mathrm{h}} \int_E \nabla N_i \cdot (k \nabla N_j) \mathrm{d}\Omega \, .
 ```
 This formulation underlines the element-centric perspective of finite element methods and
-reflects how it is usually implemented in software. For an example of the implementation to
-solve a heat problem with `Ferrite` check out [this thoroughly commented example](@ref Heat-Equation).
+reflects how it is usually implemented in software.
+
+Computing the element integrals by hand can become a tedious task. To avoid this issue we
+approximate the element integrals with a technique called *numerical integration*. Skipping any
+of the mathematical details, the basic idea is to evaluate the function under the integral at
+specific points and weighting the evaluations accordingly, such that their sum approximates the
+volume properly. A very nice feature of these techniques is, that under quite general
+circumstances the formula is not just an approximation, but the exact evaluation of the integral.
+To avoid the recomputation of just mentioned evaluation position of the integral for each
+individual element, we perform a coordinate transformation onto a so-called *reference element*.
+Formally we write
+```math
+    \int_E \nabla N_i \cdot (k \nabla N_j) \mathrm{d}\Omega
+    \approx \sum_p \nabla N_i(x_p) \cdot (k(x_p) \nabla N_j(x_p)) \, w_p \, \textrm{det}(J(x_p)) \, ,
+```
+where J is the Jacobian of the coordinate transformation function. The computation of the
+transformation, weights, positions and of the Jacobi determinant is handled by Ferrite.
+
+For an example of the implementation to solve a heat problem with `Ferrite` check out [this
+thoroughly commented example](@ref Heat-Equation).
 
 ## More Details
 
