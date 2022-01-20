@@ -20,6 +20,12 @@ getn_scalarbasefunctions(cv::T) where T = getn_scalarbasefunctions(FieldTrait(T)
 getn_scalarbasefunctions(::ScalarValued, cv::Values) = size(cv.N, 1)
 getn_scalarbasefunctions(::VectorValued, cv::Values{dim}) where {dim} = size(cv.N, 1) ÷ dim
 
+function checkquadpoint(cv::Union{CellScalarValues,FaceScalarValues,CellVectorValues,FaceVectorValues,PointScalarValues}, qp::Int)
+    0 < qp <= getnquadpoints(cv) || error("quadrature point out of range")
+    return nothing
+end
+checkquadpoint(_, _::Int) = nothing
+
 """
     reinit!(cv::CellValues, x::Vector)
     reinit!(bv::FaceValues, x::Vector, face::Int)
@@ -120,6 +126,7 @@ function function_value(::FieldTrait, fe_v::Values{dim}, q_point::Int, u::Abstra
     n_base_funcs = getnbasefunctions(fe_v)
     @assert length(dof_range) == n_base_funcs
     @boundscheck checkbounds(u, dof_range)
+    @boundscheck checkquadpoint(fe_v, q_point)
     val = zero(_valuetype(fe_v, u))
     @inbounds for (i, j) in enumerate(dof_range)
         val += shape_value(fe_v, q_point, i) * u[j]
@@ -130,6 +137,7 @@ end
 function function_value(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
+    @boundscheck checkquadpoint(fe_v, q_point)
     val = zero(Vec{dim, T})
     basefunc = 1
     @inbounds for i in 1:n_base_funcs
@@ -170,6 +178,7 @@ function function_gradient(::FieldTrait, fe_v::Values{dim}, q_point::Int, u::Abs
     n_base_funcs = getnbasefunctions(fe_v)
     @assert length(dof_range) == n_base_funcs
     @boundscheck checkbounds(u, dof_range)
+    @boundscheck checkquadpoint(fe_v, q_point)
     grad = zero(_gradienttype(fe_v, u))
     @inbounds for (i, j) in enumerate(dof_range)
         grad += shape_gradient(fe_v, q_point, i) * u[j]
@@ -184,6 +193,7 @@ Base.@pure _gradienttype(::VectorValued, ::Values{dim}, ::AbstractVector{T}) whe
 function function_gradient(::ScalarValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
+    @boundscheck checkquadpoint(fe_v, q_point)
     grad = zero(Tensor{2,dim,T})
     @inbounds for i in 1:n_base_funcs
         grad += u[i] ⊗ shape_gradient(fe_v, q_point, i)
@@ -194,6 +204,7 @@ end
 function function_gradient(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
+    @boundscheck checkquadpoint(fe_v, q_point)
     grad = zero(Tensor{2,dim,T})
     basefunc_count = 1
     @inbounds for i in 1:n_base_funcs
@@ -242,6 +253,7 @@ function_divergence(fe_v::T, q_point, u) where T = function_divergence(FieldTrai
 function function_divergence(::ScalarValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     @assert length(u) == n_base_funcs
+    @boundscheck checkquadpoint(fe_v, q_point)
     diverg = zero(T)
     @inbounds for i in 1:n_base_funcs
         diverg += shape_gradient(fe_v, q_point, i) ⋅ u[i]
@@ -273,6 +285,7 @@ The coordinate is computed, using the geometric interpolation, as
 function spatial_coordinate(fe_v::Values{dim}, q_point::Int, x::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getngeobasefunctions(fe_v)
     @assert length(x) == n_base_funcs
+    @boundscheck checkquadpoint(fe_v, q_point)
     vec = zero(Vec{dim,T})
     @inbounds for i in 1:n_base_funcs
         vec += geometric_value(fe_v, q_point, i) * x[i]
