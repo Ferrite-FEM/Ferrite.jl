@@ -36,7 +36,7 @@ end
 getnquadpoints(pv::PointScalarValues) = 1
 
 # allow to use function_value with any
-Base.@pure _valuetype(::PointScalarValues{dim}, ::Vector{T}) where {dim, T<:AbstractTensor} = T
+_valuetype(::PointScalarValues{dim}, ::Vector{T}) where {dim, T<:AbstractTensor} = T
 
 # allow on-the-fly updating
 function reinit!(pv::PointScalarValues{dim,T,refshape}, coord::Vec{dim,T}, func_interpol::Interpolation{dim,refshape,order}) where {dim,T,refshape,order}
