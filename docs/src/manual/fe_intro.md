@@ -13,10 +13,10 @@ TODO: Image of domain with boundary annotation and boundary normal vector.
 The strong form of the heat equation may be written as:
 
 ```math
-- \nabla \cdot \mathbf{q}(u) = b \quad \forall \, x \in \Omega,
+- \nabla \cdot \mathbf{q}(u) = f \quad \forall \, x \in \Omega,
 ```
 
-where $u$ is the unknown temperature field, $\mathbf{q}$ is the heat flux, $b$ is an
+where $u$ is the unknown temperature field, $\mathbf{q}$ is the heat flux, $f$ is an
 internal heat source, and $\Omega$ is the domain on which the equation is defined. To
 complete the problem we need to specify what happens at the domain boundary $\Gamma$.
 This set of specifications is called *boundary conditions*. There are different types of
@@ -74,55 +74,55 @@ and denote it with $\Omega_h$. In this example the corners of the triangles are 
 *nodes*.
 
 Next we introduce the finite element approximation $u_\mathrm{h} \approx u$ as a sum of N nodal
-shape functions, where we denote each of these function by $N_i$ and the corresponding nodal
-values $a_i$. In this example we choose to approximate the test function in the same way. This
+shape functions, where we denote each of these function by $\phi_i$ and the corresponding nodal
+values $\hat{u}_i$. In this example we choose to approximate the test function in the same way. This
 approach is known as the *Galerkin finite element method*. Formally we write the evaluation
 of our approximations at a specific point $\mathbf{x}$ in our domain $\Omega$ as:
 
 ```math
-u_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} N_i(\mathbf{x}) \, a_i,\qquad
-\delta u_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} N_i(\mathbf{x}) \, \delta a_i \, .
+u_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} \phi_i(\mathbf{x}) \, \hat{u}_i,\qquad
+\delta u_\mathrm{h}(\mathbf{x}) = \sum_{i=1}^{\mathrm{N}} \phi_i(\mathbf{x}) \, \delta \hat{u}_i \, .
 ```
 
 In the following the argument $\mathbf{x}$ is dropped to keep the notation compact.
 We may now insert these approximations in the weak form, which results in
 
 ```math
-\sum_j^N \left(\sum_i^N \delta a_i \int_{\Omega_\mathrm{h}} \nabla N_i \cdot (k \nabla N_j) \, \mathrm{d}\Omega \right) a_j =
-\sum_i^N \delta a_i \int_{\Gamma_\mathrm{N}} N_i \, q^\mathrm{p} \, \mathrm{d}\Gamma +
-\sum_i^N \delta a_i \int_{\Omega_\mathrm{h}} N_i \, b \, \mathrm{d}\Omega \, .
+\sum_j^N \left(\sum_i^N \delta \hat{u}_i \int_{\Omega_\mathrm{h}} \nabla \phi_i \cdot (k \nabla \phi_j) \, \mathrm{d}\Omega \right) \hat{u}_j =
+\sum_i^N \delta \hat{u}_i \int_{\Gamma_\mathrm{N}} \phi_i \, q^\mathrm{p} \, \mathrm{d}\Gamma +
+\sum_i^N \delta \hat{u}_i \int_{\Omega_\mathrm{h}} \phi_i \, f \, \mathrm{d}\Omega \, .
 ```
 
 Since this equation must hold for arbitrary $\delta u_\mathrm{h}$, the equation must especially
-hold for the specific choice that only one of the nodal values $\delta a_i$ is fixed to 1 while
+hold for the specific choice that only one of the nodal values $\delta \hat{u}_i$ is fixed to 1 while
 an all other coefficients are fixed to 0. Repeating this argument for all $i$ from 1 to N we obtain
 N linear equations. This way the discrete problem can be written as a system of linear equations
 
 ```math
-\underline{K}\ \underline{a} = \underline{f} \, ,
+\underline{\underline{K}}\ \underline{\hat{u}} = \underline{\hat{f}} \, ,
 ```
 
-where we call $\underline{K}$ the (tangent) *stiffness matrix*, $\underline{a}$ the *solution
-vector* with the nodal values and $\underline{f}$ the *force vector*. The specific naming is for
+where we call $\underline{K}$ the (tangent) *stiffness matrix*, $\underline{\hat{u}}$ the *solution
+vector* with the nodal values and $\underline{\hat{f}}$ the *force vector*. The specific naming is for
 historical reasons, because the finite element method has its origins in mechanics. The elements
-of $\underline{K}$ and $\underline{f}$ are given by
+of $\underline{K}$ and $\underline{\hat{f}}$ are given by
 
 ```math
-\underline{K}_{ij} =
-    \int_{\Omega_\mathrm{h}} \nabla N_i \cdot (k \nabla N_j) \mathrm{d}\Omega \, , \\
+K_{ij} =
+    \int_{\Omega_\mathrm{h}} \nabla \phi_i \cdot (k \nabla \phi_j) \mathrm{d}\Omega \, , \\
 
-\underline{f}_{i} =
-    \int_{\Gamma_\mathrm{N}} N_i \, q^\mathrm{p} \, \mathrm{d}\Gamma + \int_{\Omega_\mathrm{h}} N_i \, b \, \mathrm{d}\Omega \, .
+\hat{f}_{i} =
+    \int_{\Gamma_\mathrm{N}} \phi_i \, q^\mathrm{p} \, \mathrm{d}\Gamma + \int_{\Omega_\mathrm{h}} \phi_i \, f \, \mathrm{d}\Omega \, .
 ```
 
 Finally we also need to take care of the Dirichlet boundary conditions. These are enforce by
-setting the corresponding $a_i$ to the prescribed values and eliminating the associated equations
+setting the corresponding $\hat{u}_i$ to the prescribed values and eliminating the associated equations
 from the system. Now, solving this equation system yields an the nodal values and thus an
 approximation to the true solution.
 
 ## Notes on the Implementation
 
-In practice, the shape functions $N_i$ are only non-zero on parts of the domain $\Omega_\mathrm{h}$.
+In practice, the shape functions $\phi_i$ are only non-zero on parts of the domain $\Omega_\mathrm{h}$.
 Thus, the integrals are evaluated on sub-domains, called *elements* or *cells*.
 
 TODO: Image of a linear basis function on the grid above.
@@ -131,9 +131,9 @@ Each cell gives a contribution to the global stiffness matrix and force vector. 
 of constructing the system of equations is also called *assembly*. For clarification,
 let us rewrite the formula for the stiffness matrix entries as follows:
 ```math
-\underline{K}_{ij}
-    = \int_{\Omega_\mathrm{h}} \nabla N_i \cdot (k \nabla N_j) \mathrm{d}\Omega
-    = \sum_{E \in \Omega_\mathrm{h}} \int_E \nabla N_i \cdot (k \nabla N_j) \mathrm{d}\Omega \, .
+K_{ij}
+    = \int_{\Omega_\mathrm{h}} \nabla \phi_i \cdot (k \nabla \phi_j) \mathrm{d}\Omega
+    = \sum_{E \in \Omega_\mathrm{h}} \int_E \nabla \phi_i \cdot (k \nabla \phi_j) \mathrm{d}\Omega \, .
 ```
 This formulation underlines the element-centric perspective of finite element methods and
 reflects how it is usually implemented in software.
@@ -148,11 +148,16 @@ To avoid the recomputation of just mentioned evaluation position of the integral
 individual element, we perform a coordinate transformation onto a so-called *reference element*.
 Formally we write
 ```math
-    \int_E \nabla N_i \cdot (k \nabla N_j) \mathrm{d}\Omega
-    \approx \sum_p \nabla N_i(x_p) \cdot (k(x_p) \nabla N_j(x_p)) \, w_p \, \textrm{det}(J(x_p)) \, ,
+    \int_E \nabla \phi_i \cdot (k \nabla \phi_j) \mathrm{d}\Omega
+    \approx \sum_p \nabla \phi_i(\textbf{x}_p) \cdot (k(\textbf{x}_p) \nabla \phi_j(\textbf{x}_p)) \, w_p \, \textrm{det}(J(\textbf{x}_p)) \, ,
 ```
 where J is the Jacobian of the coordinate transformation function. The computation of the
 transformation, weights, positions and of the Jacobi determinant is handled by Ferrite.
+On an intuitive level, and to explain the notation used in the implementation, we think of
+```math
+    \mathrm{d}\Omega \approx \, w \, \textrm{det}(J)
+```
+being the chosen approximation when changing from the integral to the finite summation.
 
 For an example of the implementation to solve a heat problem with `Ferrite` check out [this
 thoroughly commented example](@ref Heat-Equation).
