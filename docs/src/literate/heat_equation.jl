@@ -13,22 +13,22 @@
 # The strong form of the (linear) heat equation is given by
 #
 # ```math
-#  -\nabla \cdot (k \nabla u) = f  \quad x \in \Omega,
+#  -\nabla \cdot (k \nabla u) = f  \quad \textbf{x} \in \Omega,
 # ```
 #
 # where $u$ is the unknown temperature field, $k$ the heat conductivity,
 # $f$ the heat source and $\Omega$ the domain. For simplicity we set $f = 1$
 # and $k = 1$. We will consider homogeneous Dirichlet boundary conditions such that
 # ```math
-# u(x) = 0 \quad x \in \partial \Omega,
+# u(\textbf{x}) = 0 \quad \textbf{x} \in \partial \Omega,
 # ```
 # where $\partial \Omega$ denotes the boundary of $\Omega$.
 #
 # The resulting weak form is given by
 # ```math
-# \int_{\Omega} \nabla v \cdot \nabla u \ d\Omega = \int_{\Omega} v \ d\Omega,
+# \int_{\Omega} \nabla v \cdot \nabla u \ d\Omega = \int_{\Omega} v \ d\Omega \quad \forall v \in \mathbb{T},
 # ```
-# where $v$ is a suitable test function.
+# where $\mathbb{T}$ is a suitable test function space.
 #-
 # ## Commented Program
 #
@@ -91,9 +91,9 @@ ch = ConstraintHandler(dh);
 
 # Now we are set up to define our constraint. We specify which field
 # the condition is for, and our combined face set `∂Ω`. The last
-# argument is a function which takes the spatial coordinate $x$ and
+# argument is a function which takes the spatial coordinate $\textbf{x}$ and
 # the current time $t$ and returns the prescribed value. In this case
-# it is trivial -- no matter what $x$ and $t$ we return $0$. When we have
+# it is trivial -- no matter what $\textbf{x}$ and $t$ we return $0$. When we have
 # specified our constraint we `add!` it to `ch`.
 dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
 add!(ch, dbc);
@@ -110,6 +110,10 @@ update!(ch, 0.0);
 # We define a function, `doassemble` to do the assembly, which takes our `cellvalues`,
 # the sparse matrix and our DofHandler as input arguments. The function returns the
 # assembled stiffness matrix, and the force vector.
+# Note that here `f` and `u` correspond to $\underline{\hat{f}}$ and $\underline{\hat{u}}$
+# from the introduction, since they represent the discretized versions. However, through
+# the code we use `f` and `u` instead to reflect the strong connection between the weak
+# form and the Ferrite implementation.
 function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler) where {dim}
     # We allocate the element stiffness matrix and element force vector
     # just once before looping over all the cells instead of allocating
@@ -151,6 +155,11 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
             # For each quadrature point we loop over all the (local) shape functions.
             # We need the value and gradient of the testfunction `v` and also the gradient
             # of the trial function `u`. We get all of these from `cellvalues`.
+            # Please note that the variables named $\nabla v$ and $\nabla u$ are actually
+            # $\nabla \phi_i(\textbf{x}_q)$ and $\nabla \phi_j(\textbf{x}_q)$, and
+            # $v$ is actually $\phi_i(\textbf{x}_q)$. However, to underline the strong
+            # relation between the weak form and the implementation, we the code is written
+            # with the symbols in the weak form instead.
             #+
             for i in 1:n_basefuncs
                 v  = shape_value(cellvalues, q_point, i)

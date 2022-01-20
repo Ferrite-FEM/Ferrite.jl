@@ -149,7 +149,7 @@ individual element, we perform a coordinate transformation onto a so-called *ref
 Formally we write
 ```math
     \int_E \nabla \phi_i \cdot (k \nabla \phi_j) \mathrm{d}\Omega
-    \approx \sum_p \nabla \phi_i(\textbf{x}_p) \cdot (k(\textbf{x}_p) \nabla \phi_j(\textbf{x}_p)) \, w_p \, \textrm{det}(J(\textbf{x}_p)) \, ,
+    \approx \sum_q \nabla \phi_i(\textbf{x}_q) \cdot (k(\textbf{x}_q) \nabla \phi_j(\textbf{x}_q)) \, w_q \, \textrm{det}(J(\textbf{x}_q)) \, ,
 ```
 where J is the Jacobian of the coordinate transformation function. The computation of the
 transformation, weights, positions and of the Jacobi determinant is handled by Ferrite.
