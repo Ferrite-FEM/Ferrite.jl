@@ -173,11 +173,12 @@ and concise. There is a large corpus of literature and online tutorials containi
 the finite element method. To give a few recommendations there is:
 * [Hans Petter Langtangen's Script](http://hplgit.github.io/INF5620/doc/pub/sphinx-fem/index.html)
 * [Wolfgang Bangerth's Lecture Series](https://www.math.colostate.edu/~bangerth/videos.html)
+* *Introduction to the Finite Element Method* by Niels Ottosen and Hans Petersson
 * *The Finite Element Method for Elliptic Problems* by Philippe Ciarlet
 * *Finite Elements: Theory, Fast Solvers, and Applications in Elasticity Theory* by Dietrich Braess
 * *An Analysis of the Finite Element Method* by Gilbert Strang and George Fix
-* *Finite Element Procedures* by K.J. Bathe
-* *The Finite Element Method: Its Basis and Fundamentals* by Olek Zienkiewicz, Robert Taylor and J.Z. Zhu
+* *Finite Element Procedures* by Klaus-Jürgen Bathe
+* *The Finite Element Method: Its Basis and Fundamentals* by Olgierd Cecil Zienkiewicz, Robert Taylor and J.Z. Zhu
 * *Higher-Order Finite Element Methods* by Pavel Šolín, Karel Segeth and Ivo Doležel
 This list is neither meant to be exhaustive, nor does the absence of a work mean that it is in any way
-bad or not recommendable.
+bad or not recommendable. The ordering of the articles also has no particular meaning.
