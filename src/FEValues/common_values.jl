@@ -150,10 +150,10 @@ function function_value(::VectorValued, fe_v::Values{dim}, q_point::Int, u::Abst
 end
 
 _valuetype(t::T, v) where T = _valuetype(FieldTrait(T), t, v)
-Base.@pure _valuetype(::ScalarValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = T
-Base.@pure _valuetype(::ScalarValued, ::Values{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Vec{dim,T}
-Base.@pure _valuetype(::VectorValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Vec{dim,T}
-# Base.@pure _valuetype(::VectorValues{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Vec{dim,T}
+_valuetype(::ScalarValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = T
+_valuetype(::ScalarValued, ::Values{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Vec{dim,T}
+_valuetype(::VectorValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Vec{dim,T}
+# _valuetype(::VectorValues{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Vec{dim,T}
 
 """
     function_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector)
@@ -187,8 +187,8 @@ function function_gradient(::FieldTrait, fe_v::Values{dim}, q_point::Int, u::Abs
 end
 
 _gradienttype(values::T, v) where T = _gradienttype(FieldTrait(T), values, v)
-Base.@pure _gradienttype(::ScalarValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Vec{dim,T}
-Base.@pure _gradienttype(::VectorValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
+ _gradienttype(::ScalarValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Vec{dim,T}
+_gradienttype(::VectorValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
 
 function function_gradient(::ScalarValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
