@@ -147,7 +147,7 @@ of the mathematical details, the basic idea is to evaluate the function under th
 specific points and weighting the evaluations accordingly, such that their sum approximates the
 volume properly. A very nice feature of these techniques is, that under quite general
 circumstances the formula is not just an approximation, but the exact evaluation of the integral.
-To avoid the recomputation of just mentioned evaluation position of the integral for each
+To avoid the recomputation of the just mentioned evaluation positions of the integral for each
 individual element, we perform a coordinate transformation onto a so-called *reference element*.
 Formally we write
 ```math
