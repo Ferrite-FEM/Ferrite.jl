@@ -425,7 +425,7 @@ apply_zero!(v::AbstractVector, ch::ConstraintHandler) = _apply_v(v, ch, true)
 apply!(     v::AbstractVector, ch::ConstraintHandler) = _apply_v(v, ch, false)
 
 function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
-    @assert length(v) == ndofs(ch.dh)
+    @assert length(v) >= ndofs(ch.dh)
     v[ch.prescribed_dofs] .= apply_zero ? 0.0 : ch.inhomogeneities
 
     #Apply linear constraints, e.g u2 = u6 + b
@@ -498,7 +498,7 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
     end
 end
 
-# Copied from deal ii AffineConstraints::condense
+# Similar to Ferrite._condense!(K, ch), but only add the non-zero entreis to K (that arises from the condensation process)
 function _condense_sparsity_pattern!(K::SparseMatrixCSC, lcs::Vector{LinearConstraint})
 
     ndofs = size(K, 1)
@@ -545,7 +545,7 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC, lcs::Vector{LinearConst
     end
 end
 
-# Copied from deal ii AffineConstraints::condense
+#Condenses K and f: C'*K*C   C'*f
 function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearConstraint})
 
     ndofs = size(K, 1)
@@ -625,10 +625,12 @@ function _addindex_sparsematrix!(A::SparseMatrixCSC{Tv,Ti}, v::Tv, i::Ti, j::Ti)
     error("Sparsity pattern missing entries for the condensation pattern. Make sure to call `create_sparsity_pattern(dh::DofHandler, ch::ConstraintHandler) when using linear constraints.`")
 end
 
-#A[i,j] += 0.0 does not add entry to sparse matrices, so we need to first add a one and then remove it
+#A[i,j] += 0.0 does not add entries to sparse matrices, so we need to first add 1.0, and then remove it
 function add_entry!(A::SparseMatrixCSC, i::Int, j::Int)
-    A[i,j] = 1.0
-    A[i,j] = 0.0
+    if A[i,j] == 0.0 # Check first if zero to not remove already non-zero entries
+        A[i,j] = 1.0
+        A[i,j] = 0.0
+    end
 end
 
 """
