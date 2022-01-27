@@ -168,6 +168,7 @@ function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) 
     n_geom_basefuncs = getngeobasefunctions(fv)
     n_func_basefuncs = getnbasefunctions(fv)
     @assert length(x) == n_geom_basefuncs
+    @boundscheck checkface(fv, face)
 
     fv.current_face[] = face
     cb = getcurrentface(fv)
@@ -261,4 +262,11 @@ function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{
         x += bcv.M[i,q_point,face] * xh[i] # geometric_value(fe_v, q_point, i) * xh[i]
     end
     return x
+end
+
+nfaces(fv) = size(fv.N, 3)
+
+function checkface(fv::FaceValues, face::Int)
+    0 < face <= nfaces(fv) || error("Face index out of range.")
+    return nothing
 end
