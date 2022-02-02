@@ -6,4 +6,5 @@ DocTestSetup = :(using Ferrite)
 
 ```@docs
 DofHandler
+ndofs
 ```

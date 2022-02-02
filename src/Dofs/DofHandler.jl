@@ -44,6 +44,11 @@ function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
     end
 end
 
+"""
+    ndofs(dh::AbstractDofHandler)
+
+Return the number of degrees of freedom in `dh`
+"""
 ndofs(dh::AbstractDofHandler) = dh.ndofs[]
 ndofs_per_cell(dh::AbstractDofHandler, cell::Int=1) = dh.cell_dofs_offset[cell+1] - dh.cell_dofs_offset[cell]
 isclosed(dh::AbstractDofHandler) = dh.closed[]
