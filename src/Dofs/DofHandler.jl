@@ -86,7 +86,8 @@ end
 Return the local dof range for `field_name`. Example:
 
 ```jldoctest
-julia> grid = generate_grid(Triangle, (3, 3));
+julia> grid = generate_grid(Triangle, (3, 3))
+Grid{2, Triangle, Float64} with 18 Triangle cells and 16 nodes
 
 julia> dh = DofHandler(grid); push!(dh, :u, 3); push!(dh, :p, 1); close!(dh);
 
