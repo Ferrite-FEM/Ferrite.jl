@@ -24,7 +24,7 @@ dbc = Dirichlet(:u, ∂Ω, (x, t) -> sin(t), [1, 3]) # applied to component 1 an
 ```
 
 `Dirichlet` boundary conditions are added to a [`ConstraintHandler`](@ref)
-which applies the condition via `apply!`.
+which applies the condition via [`apply!`](@ref) and/or [`apply_zero!`(@ref).
 """
 struct Dirichlet # <: Constraint
     f::Function # f(x,t) -> value
@@ -72,7 +72,11 @@ end
 """
     get_rhs_data(ch::ConstraintHandler, A::SparseMatrixCSC) -> RHSData
 
-Returns the needed RHSData for apply_rhs!
+Returns the needed [`RHSData`](@ref) for [`apply_rhs!`](@ref).
+
+This must be used when the same stiffness matrix is reused for multiple steps,
+for example when timestepping, with different non-homogeneouos Dirichlet boundary
+conditions.
 """
 function get_rhs_data(ch::ConstraintHandler, A::SparseMatrixCSC)
     m = meandiag(A)
@@ -83,7 +87,9 @@ end
 """
     apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)
 
-Applies the boundary condition to the right-hand-side vector without modifying the stiffness matrix
+Applies the boundary condition to the right-hand-side vector without modifying the stiffness matrix.
+
+See also: [`get_rhs_data`](@ref).
 """
 function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)
     K = data.constrained_columns
@@ -374,6 +380,67 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
     end
     return vtkfile
 end
+
+"""
+
+    apply!(K::SparseMatrixCSC, rhs::AbstractVector, ch::ConstraintHandler)
+
+Adjust the matrix `K` and right hand side `rhs` to account for the Dirichlet boundary
+conditions specified in `ch` such that `K \\ rhs` gives the expected solution.
+
+    apply!(v::AbstractVector, ch::ConstraintHandler)
+
+Apply Dirichlet boundary conditions, specified in `ch`, to the solution vector `v`.
+
+# Examples
+```julia
+K, f = assemble_system(...) # Assemble system
+apply!(K, f, ch)            # Adjust K and f to account for boundary conditions
+u = K \\ f                   # Solve the system, u should be "approximately correct"
+apply!(u, ch)               # Explicitly make sure bcs are correct
+```
+
+!!! note
+    The last operation is not strictly necessary since the boundary conditions should
+    already be fulfilled after `apply!(K, f, ch)`. However, solvers of linear systems are
+    not exact, and thus `apply!(u, ch)` can be used to make sure the boundary conditions
+    are fulfilled exactly.
+"""
+apply!
+
+"""
+    apply_zero!(K::SparseMatrixCSC, rhs::AbstractVector, ch::ConstraintHandler)
+
+Adjust the matrix `K` and the right hand side `rhs` to account for prescribed Dirichlet
+boundary conditions such that `du = K \\ rhs` give the expected result (e.g. with `du` zero
+for all prescribed degrees of freedom).
+
+    apply_zero!(v::AbstractVector, ch::ConstraintHandler)
+
+Zero-out values in `v` corresponding to prescribed degrees of freedom.
+
+These methods are typically used in e.g. a Newton solver where the increment, `du`, should
+be prescribed to zero even for non-homogeneouos boundary conditions.
+
+See also: [`apply!`](@ref).
+
+# Examples
+```julia
+u = un + Δu                 # Current guess
+K, g = assemble_system(...) # Assemble residual and tangent for current guess
+apply_zero!(K, g, ch)       # Adjust tangent and residual to take prescribed values into account
+ΔΔu = - K \\ g               # Compute the increment, prescribed values are "approximately" zero
+apply_zero!(ΔΔu, ch)        # Make sure values are exactly zero
+Δu .+= ΔΔu                  # Update current guess
+```
+
+!!! note
+    The last call to `apply_zero!` is not strictly necessary since the boundary conditions
+    should already be fulfilled after `apply!(K, g, ch)`. However, solvers of linear
+    systems are not exact, and thus `apply!(ΔΔu, ch)` can be used to make sure the values
+    for the prescribed degrees of freedom are fulfilled exactly.
+"""
+apply_zero!
 
 function apply!(v::AbstractVector, ch::ConstraintHandler)
     @assert length(v) == ndofs(ch.dh)
