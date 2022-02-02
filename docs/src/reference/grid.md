@@ -115,4 +115,3 @@ end
 Now, you would be able to assemble the heat equation example over the new custom `SmallGrid` type.
 Note that this particular subtype isn't able to handle boundary entity sets and so, you can't describe boundaries with it.
 In order to use boundaries, e.g. for Dirichlet constraints in the ConstraintHandler, you would need to dispatch the `AbstractGrid` sets utility functions on `SmallGrid`.
->>>>>>> master
