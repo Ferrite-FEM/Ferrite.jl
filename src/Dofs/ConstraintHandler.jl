@@ -24,7 +24,7 @@ dbc = Dirichlet(:u, ∂Ω, (x, t) -> sin(t), [1, 3]) # applied to component 1 an
 ```
 
 `Dirichlet` boundary conditions are added to a [`ConstraintHandler`](@ref)
-which applies the condition via [`apply!`](@ref) and/or [`apply_zero!`(@ref).
+which applies the condition via [`apply!`](@ref) and/or [`apply_zero!`](@ref).
 """
 struct Dirichlet # <: Constraint
     f::Function # f(x,t) -> value
