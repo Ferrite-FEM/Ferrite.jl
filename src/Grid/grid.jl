@@ -326,10 +326,10 @@ end
 # Grid utility functions #
 ##########################
 """
-    getneighbors(grid::Grid{dim,C,T,ExclusiveTopology}, cellidx::CellIndex, include_self=false)
-    getneighbors(grid::Grid{dim,C,T,ExclusiveTopology}, faceidx::FaceIndex, include_self=false)
-    getneighbors(grid::Grid{dim,C,T,ExclusiveTopology}, vertexidx::VertexIndex, include_self=false)
-    getneighbors(grid::Grid{dim,C,T,ExclusiveTopology}, EdgeIndex::EdgeIndex, include_self=false)
+    getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, cellidx::CellIndex, include_self=false)
+    getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, faceidx::FaceIndex, include_self=false)
+    getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, vertexidx::VertexIndex, include_self=false)
+    getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, EdgeIndex::EdgeIndex, include_self=false)
 
 Returns all directly connected entities of the same type, i.e. calling the function with a `VertexIndex` will return
 a list of directly connected vertices (connected via face/edge). If `include_self` is true, the given `*Index` is included 
@@ -337,7 +337,7 @@ in the returned list.
 
 **Warning:** this feature is highly experimental and very likely subjected to interface changes in the future.
 """
-function getneighbors(grid::Grid{dim,C,T,ExclusiveTopology}, cellidx::CellIndex, include_self=false) where {dim,C,T}
+function getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, cellidx::CellIndex, include_self=false) where {dim,C,T}
     patch = getcells(grid.topology.cell_neighbor[cellidx.idx])
     if include_self
         return [patch; cellidx.idx]
@@ -346,7 +346,7 @@ function getneighbors(grid::Grid{dim,C,T,ExclusiveTopology}, cellidx::CellIndex,
     end
 end
 
-function getneighbors(grid::Grid{dim,C,T,ExclusiveTopology}, faceidx::FaceIndex, include_self=false) where {dim,C,T}
+function getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, faceidx::FaceIndex, include_self=false) where {dim,C,T}
     if include_self 
         return [grid.topology.face_neighbor[faceidx[1],faceidx[2]].neighbor_info; faceidx]
     else
@@ -354,7 +354,7 @@ function getneighbors(grid::Grid{dim,C,T,ExclusiveTopology}, faceidx::FaceIndex,
     end
 end
 
-function getneighbors(grid::Grid{dim,C,T,ExclusiveTopology}, vertexidx::VertexIndex, include_self=false) where {dim,C,T}
+function getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, vertexidx::VertexIndex, include_self=false) where {dim,C,T}
     cellid, local_vertexid = vertexidx[1], vertexidx[2]
     cell_vertices = vertices(getcells(grid,cellid))
     global_vertexid = cell_vertices[local_vertexid]
@@ -365,7 +365,7 @@ function getneighbors(grid::Grid{dim,C,T,ExclusiveTopology}, vertexidx::VertexIn
     end
 end
 
-function getneighbors(grid::Grid{3,C,T,ExclusiveTopology}, edgeidx::EdgeIndex, include_self=false) where {C,T}
+function getneighborhood(grid::Grid{3,C,T,ExclusiveTopology}, edgeidx::EdgeIndex, include_self=false) where {C,T}
     if include_self 
         return [grid.topology.edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info; edgeidx]
     else

@@ -320,7 +320,7 @@ end
 #                   +-----+-----+-----+
 # test application: form level 1 neighborhood patches of elements 
     quadgrid = generate_grid(Quadrilateral,(3,3);build_topology=true)
-    patches = Vector{Int}[Ferrite.getneighbors(quadgrid, CellIndex(i)) for i in 1:getncells(quadgrid)]
+    patches = Vector{Int}[Ferrite.getneighborhood(quadgrid, CellIndex(i)) for i in 1:getncells(quadgrid)]
 
     @test issubset([4,5,2], patches[1]) # neighbor elements of element 1 are 4 5 and 2
     @test issubset([1,4,5,6,3], patches[2])
@@ -332,12 +332,12 @@ end
     @test issubset([7,4,5,6,9], patches[8])
     @test issubset([8,5,6], patches[9])
     
-    @test Ferrite.getneighbors(quadgrid, VertexIndex(1,1)) == [VertexIndex(1,2), VertexIndex(1,4)]
-    @test Ferrite.getneighbors(quadgrid, VertexIndex(2,1)) == [VertexIndex(1,1), VertexIndex(1,3), VertexIndex(2,2), VertexIndex(2,4)]
-    @test Ferrite.getneighbors(quadgrid, VertexIndex(5,4)) == [VertexIndex(4,2), VertexIndex(4,4), VertexIndex(5,1), VertexIndex(5,3), VertexIndex(7,1), VertexIndex(7,3), VertexIndex(8,2), VertexIndex(8,4)]
-    @test Ferrite.toglobal(quadgrid, Ferrite.getneighbors(quadgrid, VertexIndex(1,1))) == [2,5]
-    @test Ferrite.toglobal(quadgrid, Ferrite.getneighbors(quadgrid, VertexIndex(2,1))) == [1,6,3]
-    @test Ferrite.toglobal(quadgrid, Ferrite.getneighbors(quadgrid, VertexIndex(5,4))) == [6,9,11,14]
+    @test Ferrite.getneighborhood(quadgrid, VertexIndex(1,1)) == [VertexIndex(1,2), VertexIndex(1,4)]
+    @test Ferrite.getneighborhood(quadgrid, VertexIndex(2,1)) == [VertexIndex(1,1), VertexIndex(1,3), VertexIndex(2,2), VertexIndex(2,4)]
+    @test Ferrite.getneighborhood(quadgrid, VertexIndex(5,4)) == [VertexIndex(4,2), VertexIndex(4,4), VertexIndex(5,1), VertexIndex(5,3), VertexIndex(7,1), VertexIndex(7,3), VertexIndex(8,2), VertexIndex(8,4)]
+    @test Ferrite.toglobal(quadgrid, Ferrite.getneighborhood(quadgrid, VertexIndex(1,1))) == [2,5]
+    @test Ferrite.toglobal(quadgrid, Ferrite.getneighborhood(quadgrid, VertexIndex(2,1))) == [1,6,3]
+    @test Ferrite.toglobal(quadgrid, Ferrite.getneighborhood(quadgrid, VertexIndex(5,4))) == [6,9,11,14]
     
     @test quadgrid.topology.face_skeleton == [FaceIndex(1,1),FaceIndex(1,2),FaceIndex(1,3),FaceIndex(1,4),
                                           FaceIndex(2,1),FaceIndex(2,2),FaceIndex(2,3),

@@ -38,7 +38,7 @@ compute_vertex_values
 transform!
 getcoordinates
 getcoordinates!
-Ferrite.getneighbors
+Ferrite.getneighborhood
 Ferrite.faceskeleton
 ```
 
