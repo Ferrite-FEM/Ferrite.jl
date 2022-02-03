@@ -11,6 +11,7 @@ UpdateFlags(; nodes::Bool=true, coords::Bool=true, celldofs::Bool=true) =
 """
     CellIterator(grid::Grid)
     CellIterator(grid::DofHandler)
+    CellIterator(grid::MixedDofHandler)
 
 Return a `CellIterator` to conveniently loop over all the cells in a grid.
 

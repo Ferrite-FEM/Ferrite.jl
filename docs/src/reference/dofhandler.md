@@ -6,6 +6,7 @@ DocTestSetup = :(using Ferrite)
 
 ```@docs
 DofHandler
+CellIterator
 ndofs
 dof_range
 ```
