@@ -405,13 +405,15 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
     @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
 
     m = meandiag(K) # Use the mean of the diagonal here to not ruin things for iterative solver
-    @inbounds for i in 1:length(ch.values)
-        d = ch.prescribed_dofs[i]
-        v = ch.values[i]
+    if !applyzero
+        @inbounds for i in 1:length(ch.values)
+            d = ch.prescribed_dofs[i]
+            v = ch.values[i]
 
-        if !applyzero && v != 0
-            for j in nzrange(K, d)
-                f[K.rowval[j]] -= v * K.nzval[j]
+            if v != 0
+                for j in nzrange(K, d)
+                    f[K.rowval[j]] -= v * K.nzval[j]
+                end
             end
         end
     end
