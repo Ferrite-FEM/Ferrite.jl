@@ -22,4 +22,4 @@ include("test_pointevaluation.jl")
 # include("test_notebooks.jl")
 include("test_apply_rhs.jl")
 include("test_examples.jl")
-@test isa([Core.eval(Ferrite,type) for type in names(Ferrite)], Vector)  # Test that all exported symbols are defined
+@test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined
