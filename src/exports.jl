@@ -17,8 +17,6 @@ export
 
 # FEValues
     CellValues,
-    ScalarValues,
-    VectorValues,
     CellScalarValues,
     CellVectorValues,
     FaceValues,
