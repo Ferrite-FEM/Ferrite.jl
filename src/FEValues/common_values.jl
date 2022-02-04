@@ -111,8 +111,8 @@ curl(∇v) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - �
 
 Compute the value of the function in a quadrature point. `u` is a vector with values
 for the degrees of freedom. For a scalar valued function, `u` contains scalars.
-For a vector valued function, `u` can be a vector of scalars (for use of `VectorValues`)
-or `u` can be a vector of `Vec`s (for use with ScalarValues).
+For a vector valued function, `u` can be a vector of scalars (for use of `CellVectorValues` or `FaceVectorValues`)
+or `u` can be a vector of `Vec`s (for use with `CellScalarValues` or `FaceScalarValues`).
 
 The value of a scalar valued function is computed as ``u(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) u_i``
 where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function the value is calculated as
@@ -153,21 +153,20 @@ _valuetype(t::T, v) where T = _valuetype(FieldTrait(T), t, v)
 _valuetype(::ScalarValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = T
 _valuetype(::ScalarValued, ::Values{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Vec{dim,T}
 _valuetype(::VectorValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Vec{dim,T}
-# _valuetype(::VectorValues{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Vec{dim,T}
 
 """
     function_gradient(fe_v::Values{dim}, q_point::Int, u::AbstractVector)
 
 Compute the gradient of the function in a quadrature point. `u` is a vector with values
 for the degrees of freedom. For a scalar valued function, `u` contains scalars.
-For a vector valued function, `u` can be a vector of scalars (for use of `VectorValues`)
-or `u` can be a vector of `Vec`s (for use with ScalarValues).
+For a vector valued function, `u` can be a vector of scalars (for use of `CellVectorValues` or `FaceVectorValues`)
+or `u` can be a vector of `Vec`s (for use with `CellScalarValues` or `FaceScalarValues`).
 
-The gradient of a scalar function or a vector valued function with use of `VectorValues` is computed as
+The gradient of a scalar function or a vector valued function with use of `CellVectorValues`/`FaceVectorValues` is computed as
 ``\\mathbf{\\nabla} u(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x}) u_i`` or
 ``\\mathbf{\\nabla} u(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} \\mathbf{N}_i (\\mathbf{x}) u_i`` respectively,
 where ``u_i`` are the nodal values of the function.
-For a vector valued function with use of `ScalarValues` the gradient is computed as
+For a vector valued function with use of `CellScalarValues`/`FaceScalarValues` the gradient is computed as
 ``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{u}_i \\otimes \\mathbf{\\nabla} N_i (\\mathbf{x})``
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
