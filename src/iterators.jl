@@ -23,6 +23,13 @@ for cell in CellIterator(grid)
     reinit!(cv, cell)             # reinit! the FE-base with a CellIterator
 end
 ```
+Here, `cell::CellIterator`. Looking at a specific cell (instead of 
+looping over all), e.g. nr 10, can be done by
+```julia
+cell = CellIterator(grid)   # Refers to cell nr. 1 upon creation
+reinit!(cell, 10)           # Update to cell nr. 10
+dofs = celldofs(cell)       # Get the dofs for cell nr. 10
+```
 """
 struct CellIterator{dim,C,T,DH<:Union{AbstractDofHandler,Nothing}}
     flags::UpdateFlags
