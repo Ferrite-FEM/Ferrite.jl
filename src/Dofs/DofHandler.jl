@@ -315,7 +315,7 @@ with stored values in the correct places.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-@inline create_sparsity_pattern(dh::DofHandler) = _create_sparsity_pattern(dh, nothing, false)
+create_sparsity_pattern(dh::DofHandler) = _create_sparsity_pattern(dh, nothing, false)
 
 """
     create_symmetric_sparsity_pattern(dh::DofHandler)
@@ -326,9 +326,9 @@ triangle of the matrix. Return a `Symmetric{SparseMatrixCSC}`.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-@inline create_symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
+create_symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
 
-function _create_sparsity_pattern(dh::DofHandler, ch, sym::Bool)
+function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool)
     ncells = getncells(dh.grid)
     n = ndofs_per_cell(dh)
     N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
@@ -369,11 +369,11 @@ function _create_sparsity_pattern(dh::DofHandler, ch, sym::Bool)
     K = sparse(I, J, V)
 
     # Add entries to K corresponding to condensation due the linear constraints
-    # Note, this requires the K matrix, which is why we can push!() to the I,J,V
+    # Note, this requires the K matrix, which is why we can't push!() to the I,J,V
     # triplet directly.
     if ch !== nothing
         @assert isclosed(ch)
-        _condense_sparsity_pattern!(K, ch.lcs)
+        _condense_sparsity_pattern!(K, ch.acs)
     end
 
     return K

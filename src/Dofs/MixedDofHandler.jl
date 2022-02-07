@@ -337,7 +337,7 @@ end
 
 
 # TODO if not too slow it can replace the "Grid-version"
-function _create_sparsity_pattern(dh::MixedDofHandler, ch, sym::Bool)
+function _create_sparsity_pattern(dh::MixedDofHandler, ch#=::Union{ConstraintHandler,Nothing}=#, sym::Bool)
     ncells = getncells(dh.grid)
     N::Int = 0
     for element_id = 1:ncells  # TODO check for correctness
@@ -381,19 +381,19 @@ function _create_sparsity_pattern(dh::MixedDofHandler, ch, sym::Bool)
     K = sparse(I, J, V)
 
     # Add entries to K corresponding to condensation due the linear constraints
-    # Note, this requires the K matrix, which is why we can push!() to the I,J,V
+    # Note, this requires the K matrix, which is why we can't push!() to the I,J,V
     # triplet directly.
     if ch !== nothing
         @assert isclosed(ch)
-        _condense_sparsity_pattern!(K, ch.lcs)
+        _condense_sparsity_pattern!(K, ch.acs)
     end
 
     return K
 
 end
 
-@inline create_sparsity_pattern(dh::MixedDofHandler) = _create_sparsity_pattern(dh, nothing, false)
-@inline create_symmetric_sparsity_pattern(dh::MixedDofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
+create_sparsity_pattern(dh::MixedDofHandler) = _create_sparsity_pattern(dh, nothing, false)
+create_symmetric_sparsity_pattern(dh::MixedDofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
 
 function find_field(fh::FieldHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, getfieldnames(fh))

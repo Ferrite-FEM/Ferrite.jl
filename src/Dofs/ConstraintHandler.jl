@@ -45,14 +45,14 @@ end
 
 
 """
-    LinearConstraint(constrained_dofs::Int, master_dofs::Vector{Int}, coeffs::Vector{T}, b::T) where T
+    AffineConstraint(constrained_dofs::Int, master_dofs::Vector{Int}, coeffs::Vector{T}, b::T) where T
 
-Defines a constrained dof according to the form u_i = ∑(u[j] * a[j]) + b
+Define an affine/linear constraint to constrain dofs of the form `u_i = ∑(u[j] * a[j]) + b`.
 """
-struct LinearConstraint{T}
+struct AffineConstraint{T}
     constrained_dof::Int
-    entries::Vector{Pair{Int, T}} # masterdof and factor
-    b::T #Inhomegintiy
+    entries::Vector{Pair{Int, T}} # masterdofs and factors
+    b::T # inhomogeneity
 end
 
 """
@@ -62,7 +62,7 @@ Collection of constraints.
 """
 struct ConstraintHandler{DH<:AbstractDofHandler,T}
     dbcs::Vector{Dirichlet}
-    lcs::Vector{LinearConstraint}
+    acs::Vector{AffineConstraint}
     prescribed_dofs::Vector{Int}
     free_dofs::Vector{Int}
     inhomogeneities::Vector{T}
@@ -74,7 +74,7 @@ end
 
 function ConstraintHandler(dh::AbstractDofHandler)
     @assert isclosed(dh)
-    ConstraintHandler(Dirichlet[], LinearConstraint[], Int[], Int[], Float64[], Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false))
+    ConstraintHandler(Dirichlet[], AffineConstraint[], Int[], Int[], Float64[], Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false))
 end
 
 """
@@ -148,13 +148,13 @@ Close and finalize the `ConstraintHandler`.
 function close!(ch::ConstraintHandler)
     @assert(!isclosed(ch))
 
-    #Make ch.prescribed_dofs unique and sorted, and do the same operations for ch.inhomogeneities
+    # Make ch.prescribed_dofs unique and sorted, and do the same operations for ch.inhomogeneities
     # TODO: This is probably quite slow atm, and the unique!() and sort() functions can be combined?
     dofs_vals = unique(first, zip(ch.prescribed_dofs, ch.inhomogeneities))
     copy!!(ch.prescribed_dofs, getindex.(dofs_vals, 1))
     copy!!(ch.inhomogeneities, getindex.(dofs_vals, 2))
     
-    I = sortperm(ch.prescribed_dofs) # YOLO
+    I = sortperm(ch.prescribed_dofs)
     ch.prescribed_dofs .= ch.prescribed_dofs[I]
     ch.inhomogeneities .= ch.inhomogeneities[I]
     
@@ -164,12 +164,12 @@ function close!(ch::ConstraintHandler)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
     end
 
-    #TODO: 
-    # Do a bunch of checks to see if the linear constraints are linearly indepented etc.
-    # If they are not, it is possible to automatically reformulate the linear constraints
-    # such that they become lineare independent. However, at this point, it is left to
+    # TODO:
+    # Do a bunch of checks to see if the affine constraints are linearly indepented etc.
+    # If they are not, it is possible to automatically reformulate the constraints
+    # such that they become independent. However, at this point, it is left to
     # the user to assure this.
-    sort!(ch.lcs, by = (lc)-> lc.constrained_dof)    
+    sort!(ch.acs, by = ac -> ac.constrained_dof)
     
     ch.closed[] = true
     return ch
@@ -190,7 +190,7 @@ end
 """
     add!(ch::ConstraintHandler, dbc::Dirichlet)
 
-Add a `Dirichlet boundary` condition to the `ConstraintHandler`.
+Add a `Dirichlet` boundary condition to the `ConstraintHandler`.
 """
 function add!(ch::ConstraintHandler, dbc::Dirichlet)
     dbc_check(ch, dbc)
@@ -213,22 +213,28 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
     return ch
 end
 
-function add!(ch::ConstraintHandler, newlc::LinearConstraint)
-    
-    for lc in ch.lcs
-        (lc.constrained_dof == newlc.constrained_dof) && error("Constraint already exist for dof $(lc.constrained_dof)")
-        (newlc.constrained_dof in first.(lc.entries)) && error("New constrained dof $(newlc.constrained_dof) is already used as a master dof.")
-    end
+"""
+    add!(ch::ConstraintHandler, ac::AffineConstraint)
 
-    push!(ch.lcs, newlc)
-    push!(ch.prescribed_dofs, newlc.constrained_dof)
-    push!(ch.inhomogeneities, newlc.b)
+Add the `AffineConstraint` to the `ConstraintHandler`.
+"""
+function add!(ch::ConstraintHandler, newac::AffineConstraint)
+    # Basic error checking
+    for ac in ch.acs
+        (ac.constrained_dof == newac.constrained_dof) &&
+            error("Constraint already exist for dof $(ac.constrained_dof)")
+        any(x -> x.first == newac.constrained_dof, ac.entries) &&
+            error("New constrained dof $(newac.constrained_dof) is already used as a master dof.")
+    end
+    push!(ch.acs, newac)
+    push!(ch.prescribed_dofs, newac.constrained_dof)
+    push!(ch.inhomogeneities, newac.b)
+    return ch
 end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where {Index<:BoundaryIndex}
     # calculate which local dof index live on each face
     # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
-    T = eltype(ch.inhomogeneities)
     local_face_dofs = Int[]
     local_face_dofs_offset = Int[1]
     boundary = boundaryfunction(eltype(bcfaces))
@@ -263,14 +269,16 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, inter
     push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
     append!(ch.prescribed_dofs, constrained_dofs)
-    append!(ch.inhomogeneities, zeros(T, length(constrained_dofs)).*NaN )
+    for _ in 1:length(constrained_dofs)
+        push!(ch.inhomogeneities, NaN)
+    end
+    return ch
 end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
     if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
-    T = eltype(ch.inhomogeneities)
 
     ncomps = length(dbc.components)
     nnodes = getnnodes(ch.dh.grid)
@@ -312,7 +320,10 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
     append!(ch.prescribed_dofs, constrained_dofs)
-    append!(ch.inhomogeneities, zeros(T, length(constrained_dofs)).*NaN )
+    for _ in 1:length(constrained_dofs)
+        push!(ch.inhomogeneities, NaN)
+    end
+    return ch
 end
 
 # Updates the DBC's to the current time `time`
@@ -427,14 +438,12 @@ apply!(     v::AbstractVector, ch::ConstraintHandler) = _apply_v(v, ch, false)
 function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
     @assert length(v) >= ndofs(ch.dh)
     v[ch.prescribed_dofs] .= apply_zero ? 0.0 : ch.inhomogeneities
-
-    #Apply linear constraints, e.g u2 = u6 + b
-    for lc in ch.lcs
-        for (d,s) in lc.entries
-            v[lc.constrained_dof] += s*v[d]
+    # Apply affine constraints, e.g u2 = u6 + b
+    for ac in ch.acs
+        for (d, s) in ac.entries
+            v[ac.constrained_dof] += s * v[d]
         end
     end
-
     return v
 end
 
@@ -457,12 +466,11 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
 
     m = meandiag(K) # Use the mean of the diagonal here to not ruin things for iterative solver
 
-    #Add inhomogeneities to f: (f - K*ch.inhomogeneities)
+    # Add inhomogeneities to f: (f - K * ch.inhomogeneities)
     if !applyzero 
         @inbounds for i in 1:length(ch.inhomogeneities)
             d = ch.prescribed_dofs[i]
             v = ch.inhomogeneities[i]
-
             if v != 0
                 for j in nzrange(K, d)
                     f[K.rowval[j]] -= v * K.nzval[j]
@@ -471,10 +479,10 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
         end
     end
 
-    #Condense K and f: C'*K*C   C'*f
-    _condense!(K, f, ch.lcs)
+    # Condense K (C' * K * C) and f (C' * f)
+    _condense!(K, f, ch.acs)
 
-    #Remove constrained dofs from Matrix
+    # Remove constrained dofs from the matrix
     zero_out_columns!(K, ch.prescribed_dofs)
     if strategy == APPLY_TRANSPOSE
         K′ = copy(K)
@@ -487,7 +495,7 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
         error("Unknown apply strategy")
     end
 
-    #Add meandiag to constraint dirichlet dofs
+    # Add meandiag to constraint dofs
     @inbounds for i in 1:length(ch.inhomogeneities)
         d = ch.prescribed_dofs[i]
         K[d, d] = m
@@ -498,28 +506,27 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
     end
 end
 
-# Similar to Ferrite._condense!(K, ch), but only add the non-zero entreis to K (that arises from the condensation process)
-function _condense_sparsity_pattern!(K::SparseMatrixCSC, lcs::Vector{LinearConstraint})
-
+# Similar to Ferrite._condense!(K, ch), but only add the non-zero entries to K (that arises from the condensation process)
+function _condense_sparsity_pattern!(K::SparseMatrixCSC, acs::Vector{AffineConstraint})
     ndofs = size(K, 1)
 
     # Store linear constraint index for each constrained dof
     # Maybe pre-compute and store in ConstraintHandler
     distribute = zeros(Int, ndofs)
-    for c in 1:length(lcs)
-        distribute[lcs[c].constrained_dof] = c;
+    for c in 1:length(acs)
+        distribute[acs[c].constrained_dof] = c
     end
 
     for col in 1:ndofs
-        #Since we will possibly be pushing new entries to K, the field K.rowval will grow.
+        # Since we will possibly be pushing new entries to K, the field K.rowval will grow.
         # Therefor we must extract this before iterating over K
         range = nzrange(K, col)
         _rows = K.rowval[range]
         if distribute[col] == 0
             for row in _rows
                 if distribute[row] != 0
-                    lc = lcs[distribute[row]]
-                    for (d,v) in lc.entries
+                    ac = acs[distribute[row]]
+                    for (d, _) in ac.entries
                         add_entry!(K, d, col)
                     end
                 end
@@ -527,15 +534,15 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC, lcs::Vector{LinearConst
         else    
             for row in _rows
                 if distribute[row] == 0
-                    lc = lcs[distribute[col]]
-                    for (d,v) in lc.entries
+                    ac = acs[distribute[col]]
+                    for (d, _) in ac.entries
                         add_entry!(K, row, d)
                     end
                 else
-                    lc1 = lcs[distribute[col]]
-                    for (d1,v1) in lc1.entries
-                        lc2 = lcs[distribute[row]]
-                        for (d2,v2) in lc2.entries
+                    ac1 = acs[distribute[col]]
+                    for (d1, _) in ac1.entries
+                        ac2 = acs[distribute[row]]
+                        for (d2, _) in ac2.entries
                             add_entry!(K, d1, d2)
                         end
                     end
@@ -545,8 +552,8 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC, lcs::Vector{LinearConst
     end
 end
 
-#Condenses K and f: C'*K*C   C'*f
-function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearConstraint})
+# Condenses K and f: C'*K*C, C'*f, in-place assuming the sparsity pattern is correct
+function _condense!(K::SparseMatrixCSC, f::AbstractVector, acs::Vector{AffineConstraint})
 
     ndofs = size(K, 1)
     condense_f = !(length(f) == 0)
@@ -555,8 +562,8 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearCon
     # Store linear constraint index for each constrained dof
     # Maybe pre-compute and store in ConstraintHandler
     distribute = zeros(Int, ndofs)
-    for c in 1:length(lcs)
-        distribute[lcs[c].constrained_dof] = c;
+    for c in 1:length(acs)
+        distribute[acs[c].constrained_dof] = c
     end
 
     for col in 1:ndofs
@@ -564,15 +571,15 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearCon
             for a in nzrange(K, col)
                 row = K.rowval[a]
                 if distribute[row] != 0
-                    lc = lcs[distribute[row]]
-                    for (d,v) in lc.entries
+                    ac = acs[distribute[row]]
+                    for (d, v) in ac.entries
                         Kval = K.nzval[a]
-                        _addindex_sparsematrix!(K, v*Kval, d, col)
+                        _addindex_sparsematrix!(K, v * Kval, d, col)
                     end
     
                     # Perform f - K*g. However, this has already been done in outside this functions so we skip this.
                     #if condense_f
-                    #    f[col] -= K.nzval[a] * lc.b;
+                    #    f[col] -= K.nzval[a] * ac.b;
                     #end
                 end
             end
@@ -580,29 +587,29 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, lcs::Vector{LinearCon
             for a in nzrange(K, col)
                 row = K.rowval[a]
                 if distribute[row] == 0
-                    lc = lcs[distribute[col]]
-                    for (d,v) in lc.entries
+                    ac = acs[distribute[col]]
+                    for (d,v) in ac.entries
                         Kval = K.nzval[a]
-                        _addindex_sparsematrix!(K, v*Kval, row, d)
+                        _addindex_sparsematrix!(K, v * Kval, row, d)
                     end
                 else
-                    lc1 = lcs[distribute[col]]
-                    for (d1,v1) in lc1.entries
-                        lc2 = lcs[distribute[row]]
-                        for (d2,v2) in lc2.entries
+                    ac1 = acs[distribute[col]]
+                    for (d1,v1) in ac1.entries
+                        ac2 = acs[distribute[row]]
+                        for (d2,v2) in ac2.entries
                             Kval = K.nzval[a]
-                            _addindex_sparsematrix!(K, v1*v2*Kval, d1, d2)
+                            _addindex_sparsematrix!(K, v1 * v2 * Kval, d1, d2)
                         end
                     end
                 end
             end
 
             if condense_f
-                lc = lcs[distribute[col]]
-                for (d,v) in lc.entries
+                ac = acs[distribute[col]]
+                for (d,v) in ac.entries
                     f[d] += f[col] * v
                 end
-                f[lc.constrained_dof] = 0.0
+                f[ac.constrained_dof] = 0.0
             end
         end
     end
@@ -625,32 +632,35 @@ function _addindex_sparsematrix!(A::SparseMatrixCSC{Tv,Ti}, v::Tv, i::Ti, j::Ti)
     error("Sparsity pattern missing entries for the condensation pattern. Make sure to call `create_sparsity_pattern(dh::DofHandler, ch::ConstraintHandler) when using linear constraints.`")
 end
 
-#A[i,j] += 0.0 does not add entries to sparse matrices, so we need to first add 1.0, and then remove it
+# A[i,j] += 0.0 does not add entries to sparse matrices, so we need to first add 1.0, and then remove it
+# TODO: Maybe this can be done for vectors i and j instead of doing it individually?
 function add_entry!(A::SparseMatrixCSC, i::Int, j::Int)
-    if A[i,j] == 0.0 # Check first if zero to not remove already non-zero entries
-        A[i,j] = 1.0
-        A[i,j] = 0.0
+    if iszero(A[i,j]) # Check first if zero to not remove already non-zero entries
+        A[i,j] = 1
+        A[i,j] = 0
     end
 end
 
 """
     create_constraint_matrix(ch::ConstraintHandler)
 
-Creates and returns the constraint matrix, C, and the inhomogeneities, g, from the linear and Dirichlet constraints.
+Create and return the constraint matrix, `C`, and the inhomogeneities, `g`, from the affine
+(linear) and Dirichlet constraints in `ch`.
 
-The constraint matrix relates constrained and free degrees of freedom via a = C*a_f + g. The 
-condensed system of linear equations is obtained as C'*K*C and C'*(f - K*g)
+The constraint matrix relates constrained, `a_c`, and free, `a_f`, degrees of freedom via
+`a_c = C * a_f + g`. The condensed system of linear equations is obtained as
+`C' * K * C = C' *  (f - K * g)`.
 """
 function create_constraint_matrix(ch::ConstraintHandler{dh,T}) where {dh,T}
     @assert(isclosed(ch))
 
     distribute = zeros(Int, ndofs(ch.dh))
-    for (i,d) in enumerate(ch.free_dofs)
+    for (i, d) in enumerate(ch.free_dofs)
         distribute[d] = i;
     end
 
-    I = Int[]; J = Int[]; V = Int[];
-    g = zeros(T, ndofs(ch.dh)) #inhomogeneities
+    I = Int[]; J = Int[]; V = T[];
+    g = zeros(T, ndofs(ch.dh)) # inhomogeneities
     
     for d in ch.free_dofs
        push!(I, d)
@@ -658,17 +668,17 @@ function create_constraint_matrix(ch::ConstraintHandler{dh,T}) where {dh,T}
        push!(V, 1.0) 
     end
     
-    for lc in ch.lcs
-        for (d, v) in lc.entries
-            push!(I, lc.constrained_dof)
+    for ac in ch.acs
+        for (d, v) in ac.entries
+            push!(I, ac.constrained_dof)
             push!(J, distribute[d])
             push!(V, v)
         end
-        g[lc.constrained_dof] = lc.b
+        g[ac.constrained_dof] = ac.b
     end
     g[ch.prescribed_dofs] .= ch.inhomogeneities
 
-    C = sparse(I,J,V, ndofs(ch.dh), length(ch.free_dofs))
+    C = sparse(I, J,  V, ndofs(ch.dh), length(ch.free_dofs))
 
     return C, g
 end
@@ -736,8 +746,8 @@ function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset
     end
 end
 
-@inline create_symmetric_sparsity_pattern(dh::MixedDofHandler, ch::ConstraintHandler) = Symmetric(_create_sparsity_pattern(dh, ch, true), :U)
-@inline create_symmetric_sparsity_pattern(dh::DofHandler,      ch::ConstraintHandler) = Symmetric(_create_sparsity_pattern(dh, ch, true), :U)
+create_symmetric_sparsity_pattern(dh::MixedDofHandler, ch::ConstraintHandler) = Symmetric(_create_sparsity_pattern(dh, ch, true), :U)
+create_symmetric_sparsity_pattern(dh::DofHandler,      ch::ConstraintHandler) = Symmetric(_create_sparsity_pattern(dh, ch, true), :U)
 
-@inline create_sparsity_pattern(dh::MixedDofHandler, ch::ConstraintHandler) = _create_sparsity_pattern(dh, ch, false)
-@inline create_sparsity_pattern(dh::DofHandler,      ch::ConstraintHandler) = _create_sparsity_pattern(dh, ch, false)
+create_sparsity_pattern(dh::MixedDofHandler, ch::ConstraintHandler) = _create_sparsity_pattern(dh, ch, false)
+create_sparsity_pattern(dh::DofHandler,      ch::ConstraintHandler) = _create_sparsity_pattern(dh, ch, false)
