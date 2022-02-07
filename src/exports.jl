@@ -110,6 +110,7 @@ export
 # Constraints
     ConstraintHandler,
     Dirichlet,
+    AffineConstraint,
     update!,
     apply!,
     apply_rhs!,
