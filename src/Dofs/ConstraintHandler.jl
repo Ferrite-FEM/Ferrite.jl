@@ -578,21 +578,19 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC, acs::Vector{AffineConst
     ndofs = size(K, 1)
 
     # Store linear constraint index for each constrained dof
-    # Maybe pre-compute and store in ConstraintHandler
-    distribute = zeros(Int, ndofs)
-    for c in 1:length(acs)
-        distribute[acs[c].constrained_dof] = c
-    end
+    distribute = Dict{Int,Int}(acs[c].constrained_dof => c for c in 1:length(acs))
 
     for col in 1:ndofs
         # Since we will possibly be pushing new entries to K, the field K.rowval will grow.
         # Therefor we must extract this before iterating over K
         range = nzrange(K, col)
         _rows = K.rowval[range]
-        if distribute[col] == 0
+        dcol = get(distribute, col, 0)
+        if dcol == 0
             for row in _rows
-                if distribute[row] != 0
-                    ac = acs[distribute[row]]
+                drow = get(distribute, row, 0)
+                if drow != 0
+                    ac = acs[drow]
                     for (d, _) in ac.entries
                         add_entry!(K, d, col)
                     end
@@ -600,13 +598,14 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC, acs::Vector{AffineConst
             end
         else    
             for row in _rows
-                if distribute[row] == 0
-                    ac = acs[distribute[col]]
+                drow = get(distribute, row, 0)
+                if drow == 0
+                    ac = acs[dcol]
                     for (d, _) in ac.entries
                         add_entry!(K, row, d)
                     end
                 else
-                    ac1 = acs[distribute[col]]
+                    ac1 = acs[dcol]
                     for (d1, _) in ac1.entries
                         ac2 = acs[distribute[row]]
                         for (d2, _) in ac2.entries
@@ -627,18 +626,16 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, acs::Vector{AffineCon
     condense_f && @assert( length(f) == ndofs )
 
     # Store linear constraint index for each constrained dof
-    # Maybe pre-compute and store in ConstraintHandler
-    distribute = zeros(Int, ndofs)
-    for c in 1:length(acs)
-        distribute[acs[c].constrained_dof] = c
-    end
+    distribute = Dict{Int,Int}(acs[c].constrained_dof => c for c in 1:length(acs))
 
     for col in 1:ndofs
-        if distribute[col] == 0
+        dcol = get(distribute, col, 0)
+        if dcol == 0
             for a in nzrange(K, col)
                 row = K.rowval[a]
-                if distribute[row] != 0
-                    ac = acs[distribute[row]]
+                drow = get(distribute, row, 0)
+                if drow != 0
+                    ac = acs[drow]
                     for (d, v) in ac.entries
                         Kval = K.nzval[a]
                         _addindex_sparsematrix!(K, v * Kval, d, col)
@@ -653,16 +650,17 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, acs::Vector{AffineCon
         else    
             for a in nzrange(K, col)
                 row = K.rowval[a]
-                if distribute[row] == 0
-                    ac = acs[distribute[col]]
+                drow = get(distribute, row, 0)
+                if drow == 0
+                    ac = acs[dcol]
                     for (d,v) in ac.entries
                         Kval = K.nzval[a]
                         _addindex_sparsematrix!(K, v * Kval, row, d)
                     end
                 else
-                    ac1 = acs[distribute[col]]
+                    ac1 = acs[dcol]
                     for (d1,v1) in ac1.entries
-                        ac2 = acs[distribute[row]]
+                        ac2 = acs[drow]
                         for (d2,v2) in ac2.entries
                             Kval = K.nzval[a]
                             _addindex_sparsematrix!(K, v1 * v2 * Kval, d1, d2)
@@ -672,7 +670,7 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, acs::Vector{AffineCon
             end
 
             if condense_f
-                ac = acs[distribute[col]]
+                ac = acs[dcol]
                 for (d,v) in ac.entries
                     f[d] += f[col] * v
                 end
@@ -721,24 +719,20 @@ The constraint matrix relates constrained, `a_c`, and free, `a_f`, degrees of fr
 function create_constraint_matrix(ch::ConstraintHandler{dh,T}) where {dh,T}
     @assert(isclosed(ch))
 
-    distribute = zeros(Int, ndofs(ch.dh))
-    for (i, d) in enumerate(ch.free_dofs)
-        distribute[d] = i;
-    end
-
     I = Int[]; J = Int[]; V = T[];
     g = zeros(T, ndofs(ch.dh)) # inhomogeneities
     
-    for d in ch.free_dofs
+    for (j, d) in enumerate(ch.free_dofs)
        push!(I, d)
-       push!(J, distribute[d])
+       push!(J, j)
        push!(V, 1.0) 
     end
     
     for ac in ch.acs
         for (d, v) in ac.entries
             push!(I, ac.constrained_dof)
-            push!(J, distribute[d])
+            j = searchsortedfirst(ch.free_dofs, d)
+            push!(J, j)
             push!(V, v)
         end
         g[ac.constrained_dof] = ac.b
