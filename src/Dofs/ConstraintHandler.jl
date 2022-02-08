@@ -159,13 +159,13 @@ function close!(ch::ConstraintHandler)
     dofs_vals = unique(first, zip(ch.prescribed_dofs, ch.inhomogeneities))
     copy!!(ch.prescribed_dofs, getindex.(dofs_vals, 1))
     copy!!(ch.inhomogeneities, getindex.(dofs_vals, 2))
-    
+
     I = sortperm(ch.prescribed_dofs)
     ch.prescribed_dofs .= ch.prescribed_dofs[I]
     ch.inhomogeneities .= ch.inhomogeneities[I]
-    
+
     copy!!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
-    
+
     for i in 1:length(ch.prescribed_dofs)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
     end
@@ -176,7 +176,7 @@ function close!(ch::ConstraintHandler)
     # such that they become independent. However, at this point, it is left to
     # the user to assure this.
     sort!(ch.acs, by = ac -> ac.constrained_dof)
-    
+
     ch.closed[] = true
     return ch
 end
@@ -207,8 +207,8 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
     # Extract stuff for the field
     interpolation = getfieldinterpolation(ch.dh, field_idx)#ch.dh.field_interpolations[field_idx]
     field_dim = getfielddim(ch.dh, field_idx)#ch.dh.field_dims[field_idx] # TODO: I think we don't need to extract these here ...
-    
-    
+
+
     if eltype(dbc.faces)==Int #Special case when dbc.faces is a nodeset
         bcvalue = BCValues(interpolation, default_interpolation(celltype), FaceIndex) #Not used by node bcs, but still have to pass it as an argument
     else
@@ -239,19 +239,8 @@ function add!(ch::ConstraintHandler, newac::AffineConstraint)
 end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where {Index<:BoundaryIndex}
-    # calculate which local dof index live on each face
-    # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
-    local_face_dofs = Int[]
-    local_face_dofs_offset = Int[1]
-    boundary = boundaryfunction(eltype(bcfaces))
-    for (i, face) in enumerate(boundary(interpolation))
-        for fdof in face, d in 1:field_dim
-            if d ∈ dbc.components # skip unless this component should be constrained
-                push!(local_face_dofs, (fdof-1)*field_dim + d + offset)
-            end
-        end
-        push!(local_face_dofs_offset, length(local_face_dofs) + 1)
-    end
+    local_face_dofs, local_face_dofs_offset =
+        _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset)
     copy!!(dbc.local_face_dofs, local_face_dofs)
     copy!!(dbc.local_face_dofs_offset, local_face_dofs_offset)
 
@@ -279,6 +268,22 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, inter
         push!(ch.inhomogeneities, NaN)
     end
     return ch
+end
+
+# Calculate which local dof index live on each face:
+# face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
+function _local_face_dofs_for_bc(interpolation, field_dim, components, offset)
+    local_face_dofs = Int[]
+    local_face_dofs_offset = Int[1]
+    for (_, face) in enumerate(faces(interpolation))
+        for fdof in face, d in 1:field_dim
+            if d in components
+                push!(local_face_dofs, (fdof-1)*field_dim + d + offset)
+            end
+        end
+        push!(local_face_dofs_offset, length(local_face_dofs) + 1)
+    end
+    return local_face_dofs, local_face_dofs_offset
 end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
@@ -534,7 +539,7 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
     m = meandiag(K) # Use the mean of the diagonal here to not ruin things for iterative solver
 
     # Add inhomogeneities to f: (f - K * ch.inhomogeneities)
-    if !applyzero 
+    if !applyzero
         @inbounds for i in 1:length(ch.inhomogeneities)
             d = ch.prescribed_dofs[i]
             v = ch.inhomogeneities[i]
@@ -596,7 +601,7 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC, acs::Vector{AffineConst
                     end
                 end
             end
-        else    
+        else
             for row in _rows
                 drow = get(distribute, row, 0)
                 if drow == 0
@@ -640,14 +645,14 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, acs::Vector{AffineCon
                         Kval = K.nzval[a]
                         _addindex_sparsematrix!(K, v * Kval, d, col)
                     end
-    
+
                     # Perform f - K*g. However, this has already been done in outside this functions so we skip this.
                     #if condense_f
                     #    f[col] -= K.nzval[a] * ac.b;
                     #end
                 end
             end
-        else    
+        else
             for a in nzrange(K, col)
                 row = K.rowval[a]
                 drow = get(distribute, row, 0)
@@ -721,13 +726,13 @@ function create_constraint_matrix(ch::ConstraintHandler{dh,T}) where {dh,T}
 
     I = Int[]; J = Int[]; V = T[];
     g = zeros(T, ndofs(ch.dh)) # inhomogeneities
-    
+
     for (j, d) in enumerate(ch.free_dofs)
        push!(I, d)
        push!(J, j)
-       push!(V, 1.0) 
+       push!(V, 1.0)
     end
-    
+
     for ac in ch.acs
         for (d, v) in ac.entries
             push!(I, ac.constrained_dof)
@@ -812,3 +817,196 @@ create_symmetric_sparsity_pattern(dh::DofHandler,      ch::ConstraintHandler) = 
 
 create_sparsity_pattern(dh::MixedDofHandler, ch::ConstraintHandler) = _create_sparsity_pattern(dh, ch, false)
 create_sparsity_pattern(dh::DofHandler,      ch::ConstraintHandler) = _create_sparsity_pattern(dh, ch, false)
+
+
+"""
+    StronglyPeriodicDirichlet(...)
+"""
+struct StronglyPeriodicDirichlet
+    field_name::Symbol
+    components::Vector{Int} # components of the field
+    face_pairs::Vector{Pair{String,String}}
+end
+
+function add!(ch::ConstraintHandler, spdbc::StronglyPeriodicDirichlet)
+    field_idx = find_field(ch.dh, spdbc.field_name)
+    interpolation = getfieldinterpolation(ch.dh, field_idx)
+    field_dim = getfielddim(ch.dh, field_idx)
+    _add!(ch, spdbc, interpolation, field_dim, field_offset(ch.dh, spdbc.field_name))
+    return ch
+end
+
+struct FaceWithDofs{N}
+    # face::FaceIndex
+    # node_idxs::NTuple{N,Int}
+    dofs::Vector{Int}
+end
+
+function _add!(ch::ConstraintHandler, spdbc::StronglyPeriodicDirichlet, interpolation::Interpolation,
+               field_dim::Int, offset::Int)
+    grid = ch.dh.grid
+    Tx = typeof(first(ch.dh.grid.nodes).x) # Vec{D,T}
+    # TODO: This requires full periodicity for now. (Why? I don't remember,
+    #       but something in the code below assumes this... I think...)
+    @assert length(spdbc.face_pairs) == length(Tx)
+
+    # Indices of the local dofs for the faces
+    local_face_dofs, local_face_dofs_offset =
+        _local_face_dofs_for_bc(interpolation, field_dim, spdbc.components, offset)
+    mirrored_local_face_dofs =
+        mirror_local_dofs(local_face_dofs, local_face_dofs_offset, interpolation, length(spdbc.components))
+
+    # First, create the facemap which maps mirror faces to image faces
+    face_map = Dict{FaceIndex,FaceIndex}() # mirror face => image face
+    dof_map = Dict{Int,Int}() # mirror dof => image => dof
+
+    # Some stuff for finding the corner points
+    all_node_idxs = Set{Int}()
+    max_x = Tx(i -> typemin(eltype(Tx)))
+    min_x = Tx(i -> typemax(eltype(Tx)))
+
+    for (xyz, (mirror, image)) in enumerate(spdbc.face_pairs)
+        # Need the order here, so collect
+        mirror_faceset = collect(getfaceset(grid, mirror))
+        mirror_mean_x = Tx[] # mean face coordinates
+        for (c, f) in mirror_faceset
+            fn = faces(grid.cells[c])[f]
+            push!(mirror_mean_x, sum(grid.nodes[i].x for i in fn) / length(fn))
+            # Also keep track of all nodes for corner finding
+            union!(all_node_idxs, grid.cells[c].nodes)
+        end
+        # Same dance for the image
+        image_faceset = collect(getfaceset(grid,  image))
+        image_mean_x = Tx[]
+        for (c, f) in image_faceset
+            fn = faces(grid.cells[c])[f]
+            push!(image_mean_x, sum(grid.nodes[i].x for i in fn) / length(fn))
+            # Also keep track of all nodes for corner finding
+            union!(all_node_idxs, grid.cells[c].nodes)
+        end
+        function extract_single_x_on_face(fs) # :)
+            c, f = first(fs)
+            fn = faces(grid.cells[c])[f]
+            return grid.nodes[fn[1]].x
+        end
+        # Add a shift to help the tree search
+        xmirror = extract_single_x_on_face(mirror_faceset)
+        ximage  = extract_single_x_on_face(image_faceset)
+        xdist = ximage[xyz] - xmirror[xyz]
+        @assert xdist > 0
+        shift = Tx(i -> i == xyz ? xdist : 0)
+        for i in eachindex(mirror_mean_x)
+            mirror_mean_x[i] += shift
+        end
+        # Use KDTree to find closest face
+        tree = KDTree(image_mean_x)
+        idxs, _ = NearestNeighbors.nn(tree, mirror_mean_x)
+        for (m, idx) in zip(mirror_faceset, idxs)
+            face_map[m] = image_faceset[idx]
+        end
+        # Update maximum/minimum coords from the bounding box of the tree
+        max_x = Tx(i -> i == xyz ? max(max_x[i], tree.hyper_rec.maxes[i]) : max_x[i])
+        min_x = Tx(i -> i == xyz ? min(min_x[i], tree.hyper_rec.maxes[i] - xdist) : min_x[i])
+
+        # Create the constraints
+        mirror_dofs = zeros(Int, ndofs_per_cell(ch.dh))
+         image_dofs = zeros(Int, ndofs_per_cell(ch.dh))
+        for (m, i) in face_map
+            celldofs!(mirror_dofs, ch.dh, m[1])
+            celldofs!( image_dofs, ch.dh, i[1])
+
+            mdof_range = local_face_dofs_offset[m[2]] : (local_face_dofs_offset[m[2] + 1] - 1)
+            idof_range = local_face_dofs_offset[i[2]] : (local_face_dofs_offset[i[2] + 1] - 1)
+
+            for (md, id) in zip(mdof_range, idof_range)
+                cdof = mirror_dofs[mirrored_local_face_dofs[md]]
+                mdof = image_dofs[local_face_dofs[id]]
+
+                if haskey(dof_map, mdof)
+                    mdof′ = dof_map[mdof]
+                    # @info "$cdof => $mdof, but $mdof => $mdof′, remapping $cdof => $mdof′."
+                    push!(dof_map, cdof => mdof′)
+                # elseif haskey(dof_map, cdof) && dof_map[cdof] == mdof
+                    # @info "$cdof => $mdof already in the set, skipping."
+                elseif haskey(dof_map, cdof)
+                    # @info "$cdof => $mdof, but $cdof => $(dof_map[cdof]) already, skipping."
+                else
+                    # @info "$cdof => $mdof."
+                    push!(dof_map, cdof => mdof)
+                end
+            end
+        end
+    end
+
+    # Find the corners and put homogeneous Dirichlet there instead
+    all_node_idxs_v = collect(all_node_idxs)
+    points = construct_cornerish(min_x, max_x)
+    tree = KDTree(Tx[grid.nodes[i].x for i in all_node_idxs_v])
+    idxs, _ = NearestNeighbors.nn(tree, points)
+    corner_set = Set{Int}(all_node_idxs_v[i] for i in idxs)
+
+    # TODO: Maybe let user pass this if it is not homogeneous?
+    dbc = Dirichlet(spdbc.field_name, corner_set, (x, _) -> spdbc.components * eltype(x)(0), spdbc.components)
+
+    # Create a temp constraint handler just to find the dofs in the nodes...
+    chtmp = ConstraintHandler(ch.dh)
+    add!(chtmp, dbc); close!(chtmp)
+    foreach(x -> delete!(dof_map, x), chtmp.prescribed_dofs)
+
+    # Need to reset the internal of this DBC in order to add! it again...
+    resize!(dbc.local_face_dofs, 0)
+    resize!(dbc.local_face_dofs_offset, 0)
+
+    # Any remaining mappings are added as homogeneous AffineConstraints
+    for (k, v) in dof_map
+        ac = AffineConstraint(k, [v => 1.0], 0.0)
+        add!(ch, ac)
+    end
+    # Add the Dirichlet for the corners
+    add!(ch, dbc)
+
+    return ch
+end
+function construct_cornerish(min_x::V, max_x::V) where {T, V <: Vec{1,T}}
+    lx = max_x - min_x
+    max_x += lx
+    min_x -= lx
+    return V[min_x, max_x]
+end
+function construct_cornerish(min_x::V, max_x::V) where {T, V <: Vec{2,T}}
+    lx = max_x - min_x
+    max_x += lx
+    min_x -= lx
+    return V[
+       max_x,
+       min_x,
+       Vec{2,T}((max_x[1], min_x[2])),
+       Vec{2,T}((min_x[1], max_x[2])),
+    ]
+end
+function construct_cornerish(min_x::V, max_x::V) where {T, V <: Vec{3,T}}
+    error("not implemented yet, please contribute :)")
+end
+
+function mirror_local_dofs(_, _, ::Lagrange{1}, ::Int)
+    # For 1D there is nothing to do
+end
+function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{2,RefCube}, n::Int)
+    # For 2D we always permute since Ferrite defines dofs counter-clockwise
+    ret = copy(local_face_dofs)
+    for (i, f) in enumerate(faces(ip))
+        this_offset = local_face_dofs_offset[i]
+        other_offset = this_offset + n
+        for d in 1:n
+            idx1 = this_offset + (d - 1)
+            idx2 = other_offset + (d - 1)
+            tmp = ret[idx1]
+            ret[idx1] = ret[idx2]
+            ret[idx2] = tmp
+        end
+    end
+    return ret
+end
+function mirror_local_dofs(_, _, ::Lagrange{3})
+    error("not implemented yet, please contribute :)")
+end
