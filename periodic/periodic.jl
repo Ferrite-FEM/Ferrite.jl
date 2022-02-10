@@ -21,8 +21,8 @@ close!(dh);
 
 ch = ConstraintHandler(dh);
 
-spdbc = Ferrite.StronglyPeriodicDirichlet(:u, [1], ["left" => "right", "bottom" => "top"])
-add!(ch, spdbc)
+pdbc = PeriodicDirichlet(:u, [1], ["left" => "right", "bottom" => "top"])
+add!(ch, pdbc)
 close!(ch)
 update!(ch, 0.0)
 

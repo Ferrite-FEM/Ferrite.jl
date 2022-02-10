@@ -820,41 +820,46 @@ create_sparsity_pattern(dh::DofHandler,      ch::ConstraintHandler) = _create_sp
 
 
 """
-    StronglyPeriodicDirichlet(...)
+    PeriodicDirichlet(u, Γ₋ => Γ₊, component)
+
+Create a periodic Dirichlet boundary condition for the field `u`, with a mirror boundary,
+`Γ₋` and an image boundary, `Γ₊`. The condition is imposed in a strong sense, and requires
+(i) a periodic domain (usually a cube) and (ii) a periodic mesh.
+
+A periodic Dirichlet boundary condition is defined by ``[[u]] = 0``, where
+``[[\\bullet]] = u(x_{+}) - u(x_{-})`` is the "jump operator". This means that the field
+``u`` on the mirror boundary is constrained to the value of ``u`` on the image boundary.
+
+Non-homogeneouos periodic boundary conditions, ``[[u]] = C``, for some offset ``C`` are
+also supported.
 """
-struct StronglyPeriodicDirichlet
+struct PeriodicDirichlet
     field_name::Symbol
     components::Vector{Int} # components of the field
     face_pairs::Vector{Pair{String,String}}
 end
 
-function add!(ch::ConstraintHandler, spdbc::StronglyPeriodicDirichlet)
-    field_idx = find_field(ch.dh, spdbc.field_name)
+function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
+    field_idx = find_field(ch.dh, pdbc.field_name)
     interpolation = getfieldinterpolation(ch.dh, field_idx)
     field_dim = getfielddim(ch.dh, field_idx)
-    _add!(ch, spdbc, interpolation, field_dim, field_offset(ch.dh, spdbc.field_name))
+    _add!(ch, pdbc, interpolation, field_dim, field_offset(ch.dh, pdbc.field_name))
     return ch
 end
 
-struct FaceWithDofs{N}
-    # face::FaceIndex
-    # node_idxs::NTuple{N,Int}
-    dofs::Vector{Int}
-end
-
-function _add!(ch::ConstraintHandler, spdbc::StronglyPeriodicDirichlet, interpolation::Interpolation,
+function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::Interpolation,
                field_dim::Int, offset::Int)
     grid = ch.dh.grid
     Tx = typeof(first(ch.dh.grid.nodes).x) # Vec{D,T}
     # TODO: This requires full periodicity for now. (Why? I don't remember,
     #       but something in the code below assumes this... I think...)
-    @assert length(spdbc.face_pairs) == length(Tx)
+    @assert length(pdbc.face_pairs) == length(Tx)
 
     # Indices of the local dofs for the faces
     local_face_dofs, local_face_dofs_offset =
-        _local_face_dofs_for_bc(interpolation, field_dim, spdbc.components, offset)
+        _local_face_dofs_for_bc(interpolation, field_dim, pdbc.components, offset)
     mirrored_local_face_dofs =
-        mirror_local_dofs(local_face_dofs, local_face_dofs_offset, interpolation, length(spdbc.components))
+        mirror_local_dofs(local_face_dofs, local_face_dofs_offset, interpolation, length(pdbc.components))
 
     # First, create the facemap which maps mirror faces to image faces
     face_map = Dict{FaceIndex,FaceIndex}() # mirror face => image face
@@ -865,7 +870,7 @@ function _add!(ch::ConstraintHandler, spdbc::StronglyPeriodicDirichlet, interpol
     max_x = Tx(i -> typemin(eltype(Tx)))
     min_x = Tx(i -> typemax(eltype(Tx)))
 
-    for (xyz, (mirror, image)) in enumerate(spdbc.face_pairs)
+    for (xyz, (mirror, image)) in enumerate(pdbc.face_pairs)
         # Need the order here, so collect
         mirror_faceset = collect(getfaceset(grid, mirror))
         mirror_mean_x = Tx[] # mean face coordinates
@@ -946,7 +951,7 @@ function _add!(ch::ConstraintHandler, spdbc::StronglyPeriodicDirichlet, interpol
     corner_set = Set{Int}(all_node_idxs_v[i] for i in idxs)
 
     # TODO: Maybe let user pass this if it is not homogeneous?
-    dbc = Dirichlet(spdbc.field_name, corner_set, (x, _) -> spdbc.components * eltype(x)(0), spdbc.components)
+    dbc = Dirichlet(pdbc.field_name, corner_set, (x, _) -> pdbc.components * eltype(x)(0), pdbc.components)
 
     # Create a temp constraint handler just to find the dofs in the nodes...
     chtmp = ConstraintHandler(ch.dh)

@@ -7,6 +7,7 @@ DocTestSetup = :(using Ferrite)
 ```@docs
 ConstraintHandler
 Dirichlet
+PeriodicDirichlet
 add!
 close!
 apply!
