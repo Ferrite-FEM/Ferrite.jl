@@ -23,11 +23,12 @@ struct DofHandler{dim,C,T} <: AbstractDofHandler
     closed::ScalarWrapper{Bool}
     grid::Grid{dim,C,T}
     ndofs::ScalarWrapper{Int}
+    local_facedofs::CellVector{Int}
 end
 
 function DofHandler(grid::Grid)
     isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. Use MixedDofHandler instead of DofHandler")
-    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
+    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1), CellVector(Int[],Int[],Int[]))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
@@ -278,6 +279,23 @@ function __close!(dh::DofHandler{dim}) where {dim}
     dh.ndofs[] = maximum(dh.cell_dofs)
     dh.closed[] = true
 
+    #Extract local facedofs
+    for iface in 1:nfaces(getcelltype(dh.grid))
+        local_face_dofs = []
+        for i in 1:nfields(dh)
+            ip = dh.field_interpolations[i]
+            field_dim = dh.field_dims[i]
+            field_faces = faces(ip)
+            offset = (i-1) * getnbasefunctions(ip)*field_dim
+            for fdof in field_faces[iface], d in 1:field_dim
+                push!(local_face_dofs, (fdof-1)*field_dim + d + offset)
+            end
+        end
+        push!(dh.local_facedofs.offset, length(dh.local_facedofs.values)+1)
+        push!(dh.local_facedofs.length, length(local_face_dofs))
+        append!(dh.local_facedofs.values, local_face_dofs)
+    end
+
     return dh, vertexdicts, edgedicts, facedicts
 
 end
@@ -287,6 +305,15 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
     unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
     return global_dofs
+end
+
+function facedofs!(global_face_dofs::Vector{Int}, dh::DofHandler, faceid::FaceIndex, global_cell_dofs::Vector{Int} = zeros(Int,ndofs_per_cell(dh, faceid[1])))
+    cellid, faceidx = faceid
+    celldofs!(global_cell_dofs, dh, cellid)
+    for (i,fdof) in enumerate(dh.local_facedofs[faceidx])
+        global_face_dofs[i] = global_cell_dofs[fdof]
+    end
+    return global_face_dofs
 end
 
 function cellnodes!(global_nodes::Vector{Int}, grid::Grid{dim,C}, i::Int) where {dim,C}
