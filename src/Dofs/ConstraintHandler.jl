@@ -820,24 +820,27 @@ create_sparsity_pattern(dh::DofHandler,      ch::ConstraintHandler) = _create_sp
 
 
 """
-    PeriodicDirichlet(u, Γ⁻ => Γ⁺, f, component)
+    PeriodicDirichlet(u, Γ⁻ => Γ⁺, component=1)
+    PeriodicDirichlet(u, Γ⁻ => Γ⁺, f, component=1)
 
 Create a periodic Dirichlet boundary condition for the field `u`, with a mirror boundary,
 `Γ⁻` and an image boundary, `Γ⁺`. The condition is imposed in a strong sense, and requires
 (i) a periodic domain (usually a cube) and (ii) a periodic mesh.
 
-A periodic Dirichlet boundary condition is defined by ``[[u]] = 0``, where
-``[[\\bullet]] = u(x^{+}) - u(x_{-})`` is the "jump operator". This means that the field
-``u`` on the mirror boundary is constrained to the value of ``u`` on the image boundary.
-
-Non-homogeneouos periodic boundary conditions, ``[[u]] = C``, for some offset ``C`` are
-also supported.
+See also manual section on [Periodic boundary conditions](@ref).
 """
 struct PeriodicDirichlet
     field_name::Symbol
     components::Vector{Int} # components of the field
     face_pairs::Vector{Pair{String,String}}
+    func::Union{Function,Nothing}
 end
+
+PeriodicDirichlet(fn::Symbol, fp::Vector{<:Pair}, c::Union{Int,Vector{Int}}=1) =
+    PeriodicDirichlet(fn, fp, nothing, c)
+
+PeriodicDirichlet(fn::Symbol, fp::Vector{<:Pair}, f::Union{Function,Nothing}, c::Union{Int,Vector{Int}}=1) =
+    PeriodicDirichlet(fn, sort!(vec(collect(c))), fp, f)
 
 function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     field_idx = find_field(ch.dh, pdbc.field_name)
@@ -950,21 +953,47 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
     idxs, _ = NearestNeighbors.nn(tree, points)
     corner_set = Set{Int}(all_node_idxs_v[i] for i in idxs)
 
-    # TODO: Maybe let user pass this if it is not homogeneous?
-    dbc = Dirichlet(pdbc.field_name, corner_set, (x, _) -> pdbc.components * eltype(x)(0), pdbc.components)
+    dbc = Dirichlet(pdbc.field_name, corner_set,
+        pdbc.func === nothing ? (x, _) -> pdbc.components * eltype(x)(0) : pdbc.func,
+        pdbc.components
+    )
 
     # Create a temp constraint handler just to find the dofs in the nodes...
     chtmp = ConstraintHandler(ch.dh)
-    add!(chtmp, dbc); close!(chtmp)
+    add!(chtmp, dbc)
+    close!(chtmp)
+    # No need to update!(chtmp, t) here since we only care about the dofs
+    # TODO: Right? maybe if the user passed f we need to...
     foreach(x -> delete!(dof_map, x), chtmp.prescribed_dofs)
 
     # Need to reset the internal of this DBC in order to add! it again...
     resize!(dbc.local_face_dofs, 0)
     resize!(dbc.local_face_dofs_offset, 0)
 
+    # Create another temp constraint handler if we need to compute inhomogeneities
+    inhomogeneity_map = nothing
+    if pdbc.func !== nothing
+        chtmp2 = ConstraintHandler(ch.dh)
+        all_faces = union!(Set{FaceIndex}(),
+            (getfaceset(grid, x) for x in Iterators.flatten(pdbc.face_pairs))...
+        )
+        dbc_all = Dirichlet(pdbc.field_name, all_faces, pdbc.func, pdbc.components)
+        add!(chtmp2, dbc_all); close!(chtmp2)
+        # Call update! here since we need it to construct the affine constraints...
+        # TODO: This doesn't allow for time dependent constraints...
+        update!(chtmp2, 0.0)
+        inhomogeneity_map = Dict{Int, Float64}()
+        for (k, v) in dof_map
+            g = chtmp2.inhomogeneities
+            push!(inhomogeneity_map,
+                  v => - g[chtmp2.dofmapping[v]] + g[chtmp2.dofmapping[k]]
+            )
+        end
+    end
+
     # Any remaining mappings are added as homogeneous AffineConstraints
     for (k, v) in dof_map
-        ac = AffineConstraint(k, [v => 1.0], 0.0)
+        ac = AffineConstraint(k, [v => 1.0], inhomogeneity_map === nothing ? 0.0 : inhomogeneity_map[v])
         add!(ch, ac)
     end
     # Add the Dirichlet for the corners
