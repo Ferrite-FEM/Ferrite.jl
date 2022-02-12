@@ -820,14 +820,14 @@ create_sparsity_pattern(dh::DofHandler,      ch::ConstraintHandler) = _create_sp
 
 
 """
-    PeriodicDirichlet(u, Γ₋ => Γ₊, component)
+    PeriodicDirichlet(u, Γ⁻ => Γ⁺, f, component)
 
 Create a periodic Dirichlet boundary condition for the field `u`, with a mirror boundary,
-`Γ₋` and an image boundary, `Γ₊`. The condition is imposed in a strong sense, and requires
+`Γ⁻` and an image boundary, `Γ⁺`. The condition is imposed in a strong sense, and requires
 (i) a periodic domain (usually a cube) and (ii) a periodic mesh.
 
 A periodic Dirichlet boundary condition is defined by ``[[u]] = 0``, where
-``[[\\bullet]] = u(x_{+}) - u(x_{-})`` is the "jump operator". This means that the field
+``[[\\bullet]] = u(x^{+}) - u(x_{-})`` is the "jump operator". This means that the field
 ``u`` on the mirror boundary is constrained to the value of ``u`` on the image boundary.
 
 Non-homogeneouos periodic boundary conditions, ``[[u]] = C``, for some offset ``C`` are
