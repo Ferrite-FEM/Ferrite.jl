@@ -1025,7 +1025,7 @@ end
 function mirror_local_dofs(_, _, ::Lagrange{1}, ::Int)
     # For 1D there is nothing to do
 end
-function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{2,RefCube}, n::Int)
+function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{2,<:Union{RefCube,RefTetrahedron}}, n::Int)
     # For 2D we always permute since Ferrite defines dofs counter-clockwise
     ret = copy(local_face_dofs)
     for (i, f) in enumerate(faces(ip))
