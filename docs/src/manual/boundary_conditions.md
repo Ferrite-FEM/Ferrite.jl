@@ -74,13 +74,14 @@ the fluctuation is periodic.
 A periodic Dirichlet boundary condition is described by
 
 ```math
-[[u]] = 0 \quad \mathrm{on} \quad \Gamma^{+},
+\llbracket u \rrbracket = 0 \quad \mathrm{on} \quad \Gamma^{+},
 ```
 
-where ``[[\bullet]] := \bullet(x^{+}) - \bullet(x^{-})`` is the "jump operator", and ``x^{+}``
-and ``x^{-}`` coordinates on the image, ``\Gamma^{+}``, and mirror, ``\Gamma^{-}``, part
-of the boundary. Thus, this condition ensure that the jump, or difference, in the solution
-between the image and mirror boundary is the zero -- the solution becomes periodic.
+where ``\llbracket \bullet \rrbracket := \bullet(x^{+}) - \bullet(x^{-})`` is the "jump
+operator", and ``x^{+}`` and ``x^{-}`` coordinates on the image, ``\Gamma^{+}``, and
+mirror, ``\Gamma^{-}``, part of the boundary. Thus, this condition ensure that the jump,
+or difference, in the solution between the image and mirror boundary is the zero -- the
+solution becomes periodic.
 
 In `Ferrite` periodic Dirichlet boundary conditions can be added to the `ConstraintHandler`
 by adding a `PeriodicDirichlet` as follows:
@@ -121,7 +122,8 @@ it is possible to solve for ``u`` rather than just ``u^{\mu}``. In order to stil
 a periodic fluctuation the constraint can instead be described by
 
 ```math
-[[u]] = [[u^{\mathrm{M}}]] \quad \mathrm{on} \quad \Gamma^{+}.
+\llbracket u \rrbracket = \llbracket u^{\mathrm{M}} \rrbracket
+\quad \mathrm{on} \quad \Gamma^{+}.
 ```
 
 The `PeriodicDirichlet` constraint can be used for this too, although the constraint in this
