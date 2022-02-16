@@ -1,6 +1,6 @@
 # # Computational homogenization
 #
-# ![](periodic-rve.png)
+# ![](rve_homogenization.png)
 #
 # Figure 1: *Von Mise stress in an RVE with 5 stiff inclusions embedded in a softer matrix
 # material loaded in shear. The problem is solved with homogeneous Dirichlet boundary
