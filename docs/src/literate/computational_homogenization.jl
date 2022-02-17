@@ -160,7 +160,7 @@
 # = \bar{\sigma}_{ij}(\hat{\boldsymbol{u}}_{kl}),
 # ```
 #
-# where the homogenized stress, ``\bar{\boldsymbol{\sigma}}(\boldsymbol{u})``, is computes
+# where the homogenized stress, ``\bar{\boldsymbol{\sigma}}(\boldsymbol{u})``, is computed
 # as the volume average of the stress in the RVE, i.e.
 #
 # ```math
@@ -172,6 +172,11 @@
 
 
 # ## Commented Program
+#
+# Now we will see how this can be implemented in `Ferrite`. What follows is a program
+# with comments in between which describe the different steps.
+#md # You can also find the same program without comments at the end of the page,
+#md # see [Plain program](@ref homogenization-plain-program).
 
 using Ferrite, SparseArrays, LinearAlgebra
 using Test #src
@@ -191,7 +196,9 @@ using FerriteGmsh
 #jl grid = saved_file_to_grid("periodic-rve.msh")
 #md grid = saved_file_to_grid("periodic-rve.msh")
 #-
-#md grid = saved_file_to_grid("periodic-rve-coarse.msh"); #hide
+#md grid = redirect_stdout(devnull) do                #hide
+#md     saved_file_to_grid("periodic-rve-coarse.msh") #hide
+#md end                                               #hide
 
 grid = saved_file_to_grid("periodic-rve.msh") #src
 
