@@ -567,8 +567,8 @@ function homogenize_test(u::Matrix, dh, cv, E_incl, E_mat)                     #
     return ĒΩ / Ω                                                              #src
 end                                                                            #src
 
-@test homogenize_test(reduce(hcat, u.dirichlet), dh, cellvalues, 10*C, C) ≈ E_dirichlet #src
-@test homogenize_test(reduce(hcat, u.periodic), dh, cellvalues, 10*C, C) ≈ E_periodic #src
+@test homogenize_test(reduce(hcat, u.dirichlet), dh, cellvalues, Ei, Em) ≈ E_dirichlet #src
+@test homogenize_test(reduce(hcat, u.periodic), dh, cellvalues, Ei, Em) ≈ E_periodic #src
 
 #md # ## [Plain program](@id homogenization-plain-program)
 #md #
