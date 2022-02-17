@@ -707,8 +707,8 @@ end
 
 function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) ")
-    typestrs = sort!(collect(Set(celltypes[typeof(x)] for x in grid.cells)))
-    str = join(io, typestrs, '/')
+    typestrs = sort!(collect(Set(repr(typeof(x)) for x in grid.cells)))
+    join(io, typestrs, '/')
     print(io, " cells and $(getnnodes(grid)) nodes")
 end
 
