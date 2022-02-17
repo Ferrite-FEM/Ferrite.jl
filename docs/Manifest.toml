@@ -143,11 +143,6 @@ git-tree-sha1 = "9f02045d934dc030edad45944ea80dbd1f0ebea7"
 uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
 version = "0.5.7"
 
-[[Crayons]]
-git-tree-sha1 = "249fe38abf76d48563e2f4556bebd215aa317e15"
-uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
-version = "4.1.1"
-
 [[DEDataArrays]]
 deps = ["ArrayInterface", "DocStringExtensions", "LinearAlgebra", "RecursiveArrayTools", "SciMLBase", "StaticArrays"]
 git-tree-sha1 = "31186e61936fbbccb41d809ad4338c9f7addf7ae"
@@ -685,12 +680,6 @@ git-tree-sha1 = "bcaef4fc7a0cfe2cba636d84cda54b5e4e4ca3cd"
 uuid = "d125e4d3-2237-4719-b19c-fa641b8a4667"
 version = "0.1.8"
 
-[[MarchingCubes]]
-deps = ["StaticArrays"]
-git-tree-sha1 = "f6dc3e93fa928bdd4a193d1209b62994a57e7590"
-uuid = "299715c1-40a9-479a-aaf9-4a633d36f717"
-version = "0.1.1"
-
 [[Markdown]]
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
@@ -1201,12 +1190,6 @@ deps = ["REPL"]
 git-tree-sha1 = "53915e50200959667e78a92a418594b428dffddf"
 uuid = "1cfade01-22cf-5700-b092-accc4b62d6e1"
 version = "0.4.1"
-
-[[UnicodePlots]]
-deps = ["Contour", "Crayons", "Dates", "LinearAlgebra", "MarchingCubes", "NaNMath", "SparseArrays", "StaticArrays", "StatsBase"]
-git-tree-sha1 = "8c2f2be8d51cf8554cc4d26e13a48ee59c856410"
-uuid = "b8865327-cd53-5732-bb35-84acbb429228"
-version = "2.8.0"
 
 [[Unzip]]
 git-tree-sha1 = "34db80951901073501137bdbc3d5a8e7bbd06670"

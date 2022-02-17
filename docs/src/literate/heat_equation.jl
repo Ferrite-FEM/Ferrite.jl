@@ -69,15 +69,7 @@ close!(dh);
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `create_sparsity_pattern`. This function returns a sparse matrix
 # with the correct elements stored.
-K = create_sparsity_pattern(dh);
-
-# We can inspect the pattern using the `spy` function from `UnicodePlots.jl`.
-# By default the stored values are set to $0$, so we first need to
-# fill the stored values, e.g. `K.nzval` with something meaningful.
-
-using UnicodePlots
-fill!(K.nzval, 1.0)
-spy(K; height = 15)
+K = create_sparsity_pattern(dh)
 
 # ### Boundary conditions
 # In Ferrite constraints like Dirichlet boundary conditions
