@@ -28,9 +28,9 @@ version = "3.2.2"
 
 [[ArrayLayouts]]
 deps = ["FillArrays", "LinearAlgebra", "SparseArrays"]
-git-tree-sha1 = "e1ba79094cae97b688fb42d31cbbfd63a69706e4"
+git-tree-sha1 = "56c347caf09ad8acb3e261fe75f8e09652b7b05b"
 uuid = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
-version = "0.7.8"
+version = "0.7.10"
 
 [[Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -46,9 +46,9 @@ version = "0.1.2"
 
 [[BlockArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra"]
-git-tree-sha1 = "5524e27323cf4c4505699c3fb008c3f772269945"
+git-tree-sha1 = "c4672a35316689ed3f331c42055ca741a5f5f571"
 uuid = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
-version = "0.16.9"
+version = "0.16.10"
 
 [[Bzip2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -198,9 +198,9 @@ version = "1.0.3"
 
 [[DiffRules]]
 deps = ["IrrationalConstants", "LogExpFunctions", "NaNMath", "Random", "SpecialFunctions"]
-git-tree-sha1 = "84083a5136b6abf426174a58325ffd159dd6d94f"
+git-tree-sha1 = "dd933c4ef7b4c270aacd4eb88fa64c147492acf0"
 uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
-version = "1.9.1"
+version = "1.10.0"
 
 [[Distances]]
 deps = ["LinearAlgebra", "SparseArrays", "Statistics", "StatsAPI"]
@@ -281,7 +281,7 @@ uuid = "9aa1b823-49e4-5ca5-8b0f-3971ec8bab6a"
 version = "0.3.2"
 
 [[Ferrite]]
-deps = ["FerriteGmsh", "LinearAlgebra", "NearestNeighbors", "Reexport", "SparseArrays", "Tensors", "WriteVTK"]
+deps = ["LinearAlgebra", "NearestNeighbors", "Reexport", "SparseArrays", "Tensors", "WriteVTK"]
 path = ".."
 uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
 version = "0.3.3"
@@ -554,9 +554,9 @@ version = "1.7.1"
 
 [[Latexify]]
 deps = ["Formatting", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdown", "Printf", "Requires"]
-git-tree-sha1 = "a8f4f279b6fa3c3c4f1adadd78a621b13a506bce"
+git-tree-sha1 = "25d90d444b608666143d7e276c17be6f5f3e9bb9"
 uuid = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
-version = "0.15.9"
+version = "0.15.10"
 
 [[LayoutPointers]]
 deps = ["ArrayInterface", "LinearAlgebra", "ManualMemory", "SIMDTypes", "Static"]

@@ -2,15 +2,16 @@
 #
 # ![](rve_homogenization.png)
 #
-# Figure 1: *Von Mise stress in an RVE with 5 stiff inclusions embedded in a softer matrix
-# material loaded in shear. The problem is solved with homogeneous Dirichlet boundary
-# conditions (left) and (strong) periodic boundary conditions (right).*
+# Figure 1: *von Mises stress in an RVE with 5 stiff inclusions embedded in a softer matrix
+# material that is loaded in shear. The problem is solved by using homogeneous Dirichlet
+# boundary conditions (left) and (strong) periodic boundary conditions (right).*
 #
 # ## Introduction
 #
-# In this example we will solve the RVE problem for computational homogenization of
-# linear elasticity and compute the effective/homogenized stiffness of an RVE with 5
-# stiff circular inclusions embedded in a softer matrix material (see Figure 1).
+# In this example we will solve the Representative Volume Element (RVE) problem for
+# computational homogenization of linear elasticity and compute the effective/homogenized
+# stiffness of an RVE with 5 stiff circular inclusions embedded in a softer matrix material
+# (see Figure 1).
 #
 # It is possible to obtain upper and lower bounds on the stiffness analytically, see for
 # example [Rule of mixtures](https://en.wikipedia.org/wiki/Rule_of_mixtures). An upper
@@ -173,18 +174,26 @@
 # ## Commented Program
 
 using Ferrite, SparseArrays, LinearAlgebra
-using Test #hide
+using Test #src
 
-# We first load the mesh file: [`periodic-rve.msh`](periodic-rve.msh). The mesh is generated
-# with [`gmsh`](https://gmsh.info/), and we read it in as a `Ferrite` grid using the
-# [`FerriteGmsh`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package:
+# We first load the mesh file [`periodic-rve.msh`](periodic-rve.msh)
+# ([`periodic-rve-coarse.msh`](periodic-rve-coarse.msh) for a coarser mesh). The mesh is
+# generated with [`gmsh`](https://gmsh.info/), and we read it in as a `Ferrite` grid using
+# the [`FerriteGmsh`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package:
 
 using FerriteGmsh
-grid = saved_file_to_grid("periodic-rve.msh")
-gridc = saved_file_to_grid("periodic-rve-coarse.msh") #hide
-grid #hide
+#src notebook: use coarse mesh to decrease build time
+#src   script: use the fine mesh
+#src markdown: use the coarse mesh to decrease build time, but make it look like the fine
+#nb ## grid = saved_file_to_grid("periodic-rve.msh")
+#nb grid = saved_file_to_grid("periodic-rve-coarse.msh")
+#jl ## grid = saved_file_to_grid("periodic-rve-coarse.msh")
+#jl grid = saved_file_to_grid("periodic-rve.msh")
+#md grid = saved_file_to_grid("periodic-rve.msh")
 #-
-grid = gridc; #hide
+#md grid = saved_file_to_grid("periodic-rve-coarse.msh"); #hide
+
+grid = saved_file_to_grid("periodic-rve.msh") #src
 
 # Next we construct the interpolation and quadrature rule, and combining them into
 # cellvalues as usual:
@@ -285,19 +294,18 @@ Ei = 10 * Em;
 # we want to solve the system 3 times, once for each macroscopic strain component, we
 # assemble 3 right-hand-sides.
 
-function doassemble!(cellvalues::CellVectorValues, K::SparseMatrixCSC, dh::DofHandler)
+function doassemble!(cellvalues::CellVectorValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ)
 
     n_basefuncs = getnbasefunctions(cellvalues)
     ndpc = ndofs_per_cell(dh)
     Ke = zeros(ndpc, ndpc)
-    fe = zeros(ndpc, 3)
-    f = zeros(ndofs(dh), 3)
+    fe = zeros(ndpc, length(εᴹ))
+    f = zeros(ndofs(dh), length(εᴹ))
     assembler = start_assemble(K)
 
     for cell in CellIterator(dh)
-        #Elements in the "inclusions" cell set have 10x stiffness
-        E = cellid(cell) in getcellset(dh.grid, "inclusions") ? Ei : Em
 
+        E = cellid(cell) in getcellset(dh.grid, "inclusions") ? Ei : Em
         reinit!(cellvalues, cell)
         fill!(Ke, 0)
         fill!(fe, 0)
@@ -328,8 +336,8 @@ end;
 # return the right hand side(s) which we collect in another named tuple.
 
 rhs = (
-    dirichlet = doassemble!(cellvalues, K.dirichlet, dh),
-    periodic  = doassemble!(cellvalues, K.periodic,  dh),
+    dirichlet = doassemble!(cellvalues, K.dirichlet, dh, εᴹ),
+    periodic  = doassemble!(cellvalues, K.periodic,  dh, εᴹ),
 );
 
 # The next step is to solve the systems. Since application of boundary conditions, using
@@ -465,18 +473,38 @@ end);
 # We can check that the result are what we expect, namely that the stiffness with Dirichlet
 # boundary conditions is higher than when using periodic boundary conditions, and that
 # the Reuss assumption is an lower bound, and the Voigt assumption a upper bound. We first
-# compute the Voigt and Reuss bounds:
+# compute the volume fraction of the matrix, and then the Voigt and Reuss bounds:
 
-vm = 0.648 # Volume fraction for the matrix material
+function matrix_volume_fraction(grid, cellvalues)
+    V  = 0.0 # Total volume
+    Vm = 0.0 # Volume of the matrix
+    for c in CellIterator(grid)
+        reinit!(cellvalues, c)
+        is_matrix = !(cellid(c) in getcellset(grid, "inclusions"))
+        for qp in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, qp)
+            V += dΩ
+            if is_matrix
+                Vm += dΩ
+            end
+        end
+    end
+    return Vm / V
+end
+
+vm = matrix_volume_fraction(grid, cellvalues)
+#-
 E_voigt = vm * Em + (1-vm) * Ei
 E_reuss = inv(vm * inv(Em) + (1-vm) * inv(Ei));
 
-# We can now compare the eigenvalues of the tensors. We expect
-# ``E_\mathrm{Reuss} \leq E_\mathrm{PeriodicBC} \leq E_\mathrm{DirichletBC} \leq E_\mathrm{Voigt}``, which is what we get:
-t = #hide
-(first ∘ eigvals).((E_reuss, E_periodic, E_dirichlet, E_voigt))
-@test issorted(t) #hide
-round.(t; digits = -8) #hide
+# We can now compare the different computed stiffness tensors. We expect
+# ``E_\mathrm{Reuss} \leq E_\mathrm{PeriodicBC} \leq E_\mathrm{DirichletBC} \leq
+# E_\mathrm{Voigt}``. A simple thing to compare are the eigenvalues of the tensors. Here
+# we look at the first eigenvalue:
+
+ev = (first ∘ eigvals).((E_reuss, E_periodic, E_dirichlet, E_voigt))
+@test issorted(ev) #src
+round.(ev; digits=-8)
 
 # Finally, we export the solution and the stress field to a VTK file. For the export we
 # also compute the macroscopic part of the displacement.
@@ -488,13 +516,13 @@ uM = zeros(ndofs(dh))
 
 vtk_grid("homogenization", dh) do vtk
     for i in 1:3
-        #Compute macroscopic solution
+        ## Compute macroscopic solution
         update!(chM, i)
         apply!(uM, chM)
-        #Dirichlet
+        ## Dirichlet
         vtk_point_data(vtk, dh, uM + u.dirichlet[i], "_dirichlet_$i")
         vtk_point_data(vtk, projector, σ.dirichlet[i], "σvM_dirichlet_$i")
-        #Periodic
+        ## Periodic
         vtk_point_data(vtk, dh, uM + u.periodic[i], "_periodic_$i")
         vtk_point_data(vtk, projector, σ.periodic[i], "σvM_periodic_$i")
     end
@@ -516,9 +544,8 @@ function homogenize_test(u::Matrix, dh, cv, E_incl, E_mat)                     #
         for qp in 1:getnquadpoints(cv)                                         #src
             dΩ = getdetJdV(cv, qp)                                             #src
             Ω += dΩ                                                            #src
-            #compute u^ij and u^kl                                             #src
+            ## compute u^ij and u^kl                                           #src
             Ē′ = SymmetricTensor{4,2}((i, j, k, l) -> begin                    #src
-                #for l in 1:2, k in l:2, j in 1:2, i in j:2                    #src
                 ij = i == j == 1 ? 1 : i == j == 2 ? 2 : 3                     #src
                 kl = k == l == 1 ? 1 : k == l == 2 ? 2 : 3                     #src
                 εij = function_symmetric_gradient(cv, qp, view(ue, :, ij)) +   #src
@@ -536,7 +563,7 @@ end                                                                            #
 @test homogenize_test(reduce(hcat, u.dirichlet), dh, cellvalues, 10*C, C) ≈ E_dirichlet #src
 @test homogenize_test(reduce(hcat, u.periodic), dh, cellvalues, 10*C, C) ≈ E_periodic #src
 
-#md # ## [Raw source](@id homogenization-raw-code)
+#md # ## [Plain program](@id homogenization-plain-program)
 #md #
 #md # Below follows a version of the program without any comments.
 #md # The file is also available here:
@@ -545,4 +572,3 @@ end                                                                            #
 #md # ```julia
 #md # @__CODE__
 #md # ```
-
