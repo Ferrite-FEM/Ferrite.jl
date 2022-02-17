@@ -10,17 +10,25 @@ UpdateFlags(; nodes::Bool=true, coords::Bool=true, celldofs::Bool=true) =
 
 """
     CellIterator(grid::Grid)
-    CellIterator(grid::DofHandler)
+    CellIterator(dh::DofHandler)
+    CellIterator(mdh::MixedDofHandler)
 
 Return a `CellIterator` to conveniently loop over all the cells in a grid.
 
 # Examples
 ```julia
-for cell in CellIterator(grid)
+for cell in CellIterator(dh)      # dh::DofHandler
     coords = getcoordinates(cell) # get the coordinates
     dofs = celldofs(cell)         # get the dofs for this cell
     reinit!(cv, cell)             # reinit! the FE-base with a CellIterator
 end
+```
+Here, `cell::CellIterator`. Looking at a specific cell (instead of 
+looping over all), e.g. nr 10, can be done by
+```julia
+cell = CellIterator(dh)     # Refers to cell nr. 1 upon creation
+reinit!(cell, 10)           # Update to cell nr. 10
+dofs = celldofs(cell)       # Get the dofs for cell nr. 10
 ```
 """
 struct CellIterator{dim,C,T,DH<:Union{AbstractDofHandler,Nothing}}
