@@ -4,6 +4,11 @@ import Literate
 EXAMPLEDIR = joinpath(@__DIR__, "src", "literate")
 GENERATEDDIR = joinpath(@__DIR__, "src", "examples")
 mkpath(GENERATEDDIR)
+
+# Download some assets
+include("download_resources.jl")
+
+# Run Literate on all examples
 for example in readdir(EXAMPLEDIR)
     if endswith(example, ".jl")
         input = abspath(joinpath(EXAMPLEDIR, example))
@@ -13,6 +18,8 @@ for example in readdir(EXAMPLEDIR)
         # remove "hidden" lines which are not shown in the markdown
         line_ending_symbol = occursin(code, "\r\n") ? "\r\n" : "\n"
         code_clean = join(filter(x->!endswith(x,"#hide"),split(code, r"\n|\r\n")), line_ending_symbol)
+        code_clean = replace(code_clean, r"^# This file was generated .*$"m => "")
+        code_clean = strip(code_clean)
 
         mdpost(str) = replace(str, "@__CODE__" => code_clean)
         Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)

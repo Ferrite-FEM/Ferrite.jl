@@ -110,6 +110,7 @@ export
 # Constraints
     ConstraintHandler,
     Dirichlet,
+    PeriodicDirichlet,
     AffineConstraint,
     update!,
     apply!,
