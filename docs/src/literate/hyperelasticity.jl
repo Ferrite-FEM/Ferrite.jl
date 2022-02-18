@@ -4,10 +4,14 @@
 # *conjugate gradient*, *automatic differentiation*
 #
 # ![hyperelasticity.png](hyperelasticity.png)
+#
+# *Figure 1*: Cube loaded in torsion modeled with a hyper elastic material model and
+# finite strain.
+#
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/hyperelasticity.ipynb)
+#md #     [`hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/hyperelasticity.ipynb).
 #-
 # ## Introduction
 #
@@ -280,10 +284,10 @@ u = solve();
 using Test                        #src
 @test norm(u) ≈ 4.865189736192834 #src
 
-#md # ## Plain Program
+#md # ## Plain program
 #md #
-#md # Below follows a version of the program without any comments.
-#md # The file is also available here: [hyperelasticity.jl](hyperelasticity.jl)
+#md # Here follows a version of the program without any comments.
+#md # The file is also available here: [`hyperelasticity.jl`](hyperelasticity.jl).
 #md #
 #md # ```julia
 #md # @__CODE__

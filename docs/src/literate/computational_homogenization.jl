@@ -2,9 +2,15 @@
 #
 # ![](rve_homogenization.png)
 #
-# Figure 1: *von Mises stress in an RVE with 5 stiff inclusions embedded in a softer matrix
+# *Figure 1*: von Mises stress in an RVE with 5 stiff inclusions embedded in a softer matrix
 # material that is loaded in shear. The problem is solved by using homogeneous Dirichlet
-# boundary conditions (left) and (strong) periodic boundary conditions (right).*
+# boundary conditions (left) and (strong) periodic boundary conditions (right).
+#
+#-
+#md # !!! tip
+#md #     This example is also available as a Jupyter notebook:
+#md #     [`computational_homogenization.ipynb`](@__NBVIEWER_ROOT_URL__/examples/computational_homogenization.ipynb).
+#-
 #
 # ## Introduction
 #
@@ -147,7 +153,7 @@
 # ``\hat{\boldsymbol{u}}_{12} = \hat{\boldsymbol{u}}_{21}`` by using
 #
 # ```math
-# \bar{\boldsymbol{\varepsilon}} = \begin{pmatrix}1 & 0\\ 0 & 0\end{pmatrix}, \quad 
+# \bar{\boldsymbol{\varepsilon}} = \begin{pmatrix}1 & 0\\ 0 & 0\end{pmatrix}, \quad
 # \bar{\boldsymbol{\varepsilon}} = \begin{pmatrix}0 & 0\\ 0 & 1\end{pmatrix}, \quad
 # \bar{\boldsymbol{\varepsilon}} = \begin{pmatrix}0 & 0.5\\ 0.5 & 0\end{pmatrix}
 # ```
@@ -171,7 +177,7 @@
 # ```
 
 
-# ## Commented Program
+# ## Commented program
 #
 # Now we will see how this can be implemented in `Ferrite`. What follows is a program
 # with comments in between which describe the different steps.
@@ -572,9 +578,9 @@ end                                                                            #
 
 #md # ## [Plain program](@id homogenization-plain-program)
 #md #
-#md # Below follows a version of the program without any comments.
+#md # Here follows a version of the program without any comments.
 #md # The file is also available here:
-#md # [computational_homogenization.jl](computational_homogenization.jl)
+#md # [`computational_homogenization.jl`](computational_homogenization.jl).
 #md #
 #md # ```julia
 #md # @__CODE__

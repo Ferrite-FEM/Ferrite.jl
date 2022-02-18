@@ -22,8 +22,14 @@ for example in readdir(EXAMPLEDIR)
         code_clean = strip(code_clean)
 
         mdpost(str) = replace(str, "@__CODE__" => code_clean)
+        function nbpre(str)
+            # \llbracket and \rr bracket not supported by MathJax (Jupyter/nbviewer)
+            str = replace(str, "\\llbracket" => "[\\![", "\\rrbracket" => "]\\!]")
+            return str
+        end
+
         Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
-        Literate.notebook(input, GENERATEDDIR, execute = is_ci) # Don't execute locally
+        Literate.notebook(input, GENERATEDDIR, preprocess = nbpre, execute = is_ci) # Don't execute locally
     elseif any(endswith.(example, [".png", ".jpg", ".gif"]))
         cp(joinpath(EXAMPLEDIR, example), joinpath(GENERATEDDIR, example); force=true)
     else

@@ -441,8 +441,7 @@ for (u_uc,t) in integrator
     update!(ch, t)
     u = copy(u_uc)
     apply!(u, ch)
-    #compress=false flag because otherwise each vtk file will be stored in memory
-    vtk_grid("vortex-street-$t.vtu", dh; compress=false) do vtk
+    vtk_grid("vortex-street-$t.vtu", dh) do vtk
         vtk_point_data(vtk,dh,u)
         vtk_save(vtk)
         pvd[t] = vtk
@@ -491,10 +490,10 @@ end                                                                         #hid
     @test isapprox(sqrt(Δv), 0.0, atol=1e-3)                                #hide
 end;                                                                        #hide
 
-#md # ## [Plain Program](@id ns_vs_diffeq-plain-program)
+#md # ## [Plain program](@id ns_vs_diffeq-plain-program)
 #md #
-#md # Below follows a version of the program without any comments.
-#md # The file is also available here: [ns_vs_diffeq.jl](ns_vs_diffeq.jl)
+#md # Here follows a version of the program without any comments.
+#md # The file is also available here: [`ns_vs_diffeq.jl`](ns_vs_diffeq.jl).
 #md #
 #md # ```julia
 #md # @__CODE__

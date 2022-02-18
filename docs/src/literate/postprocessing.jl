@@ -1,8 +1,16 @@
 # # Postprocessing
 #
 # ![](heat_square_fluxes.png)
-
-
+#
+# *Figure 1*: Heat flux computed from the solution to the heat equation on
+# the unit square, see previous example: [Heat equation](@ref).
+#
+#-
+#md # !!! tip
+#md #     This example is also available as a Jupyter notebook:
+#md #     [`postprocessing.ipynb`](@__NBVIEWER_ROOT_URL__/examples/postprocessing.ipynb).
+#-
+#
 # ## Introduction
 #
 # After running a simulation, we usually want to visualize the results in different ways.
@@ -78,14 +86,18 @@ q_projected = project(projector, q_gp, qr; project_to_nodes=false); # TODO: this
 # ## Exporting to VTK
 # To visualize the heat flux, we export the projected field `q_projected`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
+# The result is also visualized in *Figure 1*.
 vtk_grid("heat_equation_flux", grid) do vtk
     vtk_point_data(vtk, projector, q_projected, "q")
 end;
 
 # ## Point Evaluation
 # ![](heat_square_pointevaluation.png)
+#
+# *Figure 2*: Visualization of the cut line where we want to compute
+# the temperature and heat flux.
 
-# Consider a cut-line through the domain, like the black line in the figure above.
+# Consider a cut-line through the domain like the black line in *Figure 2* above.
 # We will evaluate the temperature and the heat flux distribution along a horizontal line.
 points = [Vec((x, 0.75)) for x in range(-1.0, 1.0, length=101)];
 
@@ -94,7 +106,7 @@ points = [Vec((x, 0.75)) for x in range(-1.0, 1.0, length=101)];
 ph = PointEvalHandler(grid, points);
 
 # After the L2-Projection, the heat fluxes `q_projected` are stored in the DoF-ordering
-# determined by the projector's internal DoFHandler, so to evalute the flux `q` at our points
+# determined by the projector's internal DoFHandler, so to evaluate the flux `q` at our points
 # we give the `PointEvalHandler`, the `L2Projector` and the values `q_projected`.
 q_points = get_point_values(ph, projector, q_projected);
 
@@ -105,20 +117,22 @@ q_points = get_point_values(ph, projector, q_projected);
 # from the `L2Projection`, the values are stored in the order of the degrees of freedom.
 u_points = Ferrite.get_point_values(ph, dh, u, :u);
 
-# Now, we can plot the temperature and flux values with the help of any plotting library, e.g. Plots.jl. 
+# Now, we can plot the temperature and flux values with the help of any plotting library, e.g. Plots.jl.
 # To do this, we need to import the package:
 import Plots
 
 # Firstly, we are going to plot the temperature values along the given line.
 Plots.plot(getindex.(points,1), u_points, xlabel="x (coordinate)", ylabel="u (temperature)", label=nothing)
+# *Figure 3*: Temperature along the cut line from *Figure 2*.
 
 # Secondly, the horizontal heat flux (i.e. the first component of the heat flux vector) is plotted.
 Plots.plot(getindex.(points,1), getindex.(q_points,1), xlabel="x (coordinate)", ylabel="q_x (flux in x-direction)", label=nothing)
+# *Figure 4*: ``x``-component of the flux along the cut line from *Figure 2*.
 
-#md # ## [Plain Program](@id postprocessing-plain-program)
+#md # ## [Plain program](@id postprocessing-plain-program)
 #md #
-#md # Below follows a version of the program without any comments.
-#md # The file is also available here: [postprocessing.jl](postprocessing.jl)
+#md # Here follows a version of the program without any comments.
+#md # The file is also available here: [`postprocessing.jl`](postprocessing.jl).
 #md #
 #md # ```julia
 #md # @__CODE__
