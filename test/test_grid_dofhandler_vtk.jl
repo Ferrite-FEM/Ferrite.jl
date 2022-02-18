@@ -37,7 +37,7 @@ end
         addfaceset!(grid, "right-faceset", getfaceset(grid, "right"))
         addnodeset!(grid, "middle-nodes", x -> norm(x) < radius)
 
-        gridfilename = "grid-$(Ferrite.celltypes[celltype])"
+        gridfilename = "grid-$(repr(celltype))"
         vtk_grid(gridfilename, grid) do vtk
             vtk_cellset(vtk, grid, "cell-1")
             vtk_cellset(vtk, grid, "middle-cells")
@@ -74,7 +74,7 @@ end
         u = rand(rng, ndofs(dofhandler))
         apply!(u, ch)
 
-        dofhandlerfilename = "dofhandler-$(Ferrite.celltypes[celltype])"
+        dofhandlerfilename = "dofhandler-$(repr(celltype))"
         vtk_grid(dofhandlerfilename, dofhandler) do vtk
             vtk_point_data(vtk, ch)
             vtk_point_data(vtk, dofhandler, u)
