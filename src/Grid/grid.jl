@@ -53,6 +53,12 @@ const QuadraticTetrahedron = Cell{3,10,4}
 
 const Hexahedron = Cell{3,8,6}
 
+const implemented_celltypes = (Line, Line2D, Line3D, QuadraticLine, 
+                               Triangle, QuadraticTriangle,
+                               Quadrilateral, Quadrilateral3D, QuadraticQuadrilateral,
+                               Tetrahedron, QuadraticTetrahedron,
+                               Hexahedron, Cell{2,20,6})
+
 """
 A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh
 """
@@ -437,20 +443,6 @@ function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
     join(io, typestrs, '/')
     print(io, " cells and $(getnnodes(grid)) nodes")
 end
-
-const celltypes = Dict{DataType, String}(Cell{1,2,2}  => "Line",
-                                         Cell{2,2,2}  => "2D-Line",
-                                         Cell{3,2,0}  => "3D-Line",
-                                         Cell{1,3,2}  => "QuadraticLine",
-                                         Cell{2,3,3}  => "Triangle",
-                                         Cell{2,6,3}  => "QuadraticTriangle",
-                                         Cell{2,4,4}  => "Quadrilateral",
-                                         Cell{3,4,1}  => "3D-Quadrilateral",
-                                         Cell{2,9,4}  => "QuadraticQuadrilateral",
-                                         Cell{3,4,4}  => "Tetrahedron",
-                                         Cell{3,10,4} => "QuadraticTetrahedron",
-                                         Cell{3,8,6}  => "Hexahedron",
-                                         Cell{3,20,6} => "Cell{3,20,6}")
 
 # Functions to uniquely identify vertices, edges and faces, used when distributing
 # dofs over a mesh. For this we can ignore the nodes on edged, faces and inside cells,
