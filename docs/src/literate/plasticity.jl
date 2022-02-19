@@ -1,10 +1,16 @@
 # # von Mises plasticity
 #
 # ![Shows the von Mises stress distribution in a cantilever beam.](plasticity.png)
+#
 # *Figure 1.* A coarse mesh solution of a cantilever beam subjected to a load
 # causing plastic deformations. The initial yield limit is 200 MPa but due to
 # hardening it increases up to approximately 240 MPa.
-
+#
+#-
+#md # !!! tip
+#md #     This example is also available as a Jupyter notebook:
+#md #     [`plasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/plasticity.ipynb).
+#-
 #
 # ## Introduction
 #
@@ -19,12 +25,6 @@
 # To illustrate the use of the plasticity model, we setup and solve a FE-problem
 # consisting of a cantilever beam loaded at its free end. But first, we shortly
 # describe the parts of the implementation deadling with the material modeling.
-
-#-
-#md # !!! tip
-#md #     This example is also available as a Jupyter notebook:
-#md #     [`plasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/plasticity.ipynb)
-#-
 
 # ## Material modeling
 # This section describes the `struct`s and methods used to implement the material
@@ -371,7 +371,6 @@ plot(
 ylabel!("Traction [Pa]")
 xlabel!("Maximum deflection [m]")
 
-
 # *Figure 2.* Load-displacement-curve for the beam, showing a clear decrease
 # in stiffness as more material starts to yield.
 
@@ -379,10 +378,10 @@ xlabel!("Maximum deflection [m]")
 using Test                               #src
 @test norm(u_max[end]) ≈ 0.254452645     #src
 
-#md # ## [Raw source](@id plasticity-raw-code)
+#md # ## [Plain program](@id plasticity-plain-program)
 #md #
-#md # Below follows a version of the program without any comments.
-#md # The file is also available here: [plasticity.jl](plasticity.jl)
+#md # Here follows a version of the program without any comments.
+#md # The file is also available here: [`plasticity.jl`](plasticity.jl).
 #md #
 #md # ```julia
 #md # @__CODE__
