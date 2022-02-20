@@ -769,6 +769,22 @@ end
 
 
 #Function for adding constraint when using multiple celltypes
+function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
+    for fh in ch.dh.fieldhandlers
+        if overlaps(fh, dbc)
+            add!(ch, fh, dbc)
+        end
+    end
+end
+
+function overlaps(fh::FieldHandler, dbc::Dirichlet)
+    dbc.field_name in getfieldnames(fh) || return false # Must contain the correct field
+    for (cellid, _) in dbc.faces
+        cellid in fh.cellset && return true
+    end
+    return false
+end
+
 function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
     _check_cellset_dirichlet(ch.dh.grid, fh.cellset, dbc.faces)
 
