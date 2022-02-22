@@ -16,7 +16,7 @@ enforce these constraints, e.g. penalty methods and Lagrange multiplier methods.
 
 ## Affine constraints
 
-Affine (or linear) constraints can be handled directly in Ferrite. Affine (or linear) constraints can typically
+Affine constraints can be handled directly in Ferrite. Affine (or linear) constraints can typically
 be expressed as:
 
 ```math
