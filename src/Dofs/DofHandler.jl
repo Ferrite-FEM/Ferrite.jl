@@ -1,15 +1,13 @@
-struct Field
-    name::Symbol
-    interpolation::Interpolation
-    dim::Int
-end
-
 abstract type AbstractDofHandler end
 
 """
     DofHandler(grid::Grid)
 
-Construct a `DofHandler` based on the grid `grid`.
+Construct a `DofHandler` based on `grid`.
+
+Operates slightly faster than [`MixedDofHandler`](@docs). Supports:
+- `Grid`s with a single concrete cell type.
+- One or several fields on the whole domaine.
 """
 struct DofHandler{dim,C,T} <: AbstractDofHandler
     field_names::Vector{Symbol}
@@ -105,6 +103,15 @@ function dof_range(dh::DofHandler, field_name::Symbol)
     return (offset+1):(offset+n_field_dofs)
 end
 
+"""
+    push!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
+
+Add a `dim`-dimensional `Field` called `name` which is approximated by `ip` to `dh`.
+
+The field is added to all cells of the underlying grid. In case no interpolation `ip` is given,
+the default interpolation of the grid's celltype is used. 
+If the grid uses several celltypes, [`push!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
+"""
 function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
     @assert !isclosed(dh)
     @assert !in(name, dh.field_names)
