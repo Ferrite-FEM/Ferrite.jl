@@ -50,6 +50,10 @@ struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{di
     dMdξ::Array{Vec{dim,T},3}
     qr_weights::Vector{T}
     current_face::ScalarWrapper{Int}
+    # The following fields are deliberately abstract -- they are never used in
+    # performance critical code, just stored here for convenience.
+    func_interp::Interpolation{dim,refshape}
+    geo_interp::Interpolation{dim,refshape}
 end
 
 function FaceScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
@@ -93,7 +97,7 @@ function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
 
     detJdV = fill(T(NaN), n_qpoints, n_faces)
 
-    FaceScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0), func_interpol, geom_interpol)
 end
 
 # FaceVectorValues
@@ -107,6 +111,10 @@ struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: FaceValues{
     dMdξ::Array{Vec{dim,T},3}
     qr_weights::Vector{T}
     current_face::ScalarWrapper{Int}
+    # The following fields are deliberately abstract -- they are never used in
+    # performance critical code, just stored here for convenience.
+    func_interp::Interpolation{dim,refshape}
+    geo_interp::Interpolation{dim,refshape}
 end
 
 function FaceVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
@@ -161,7 +169,7 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
     detJdV = fill(T(NaN), n_qpoints, n_faces)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    FaceVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0), func_interpol, geom_interpol)
 end
 
 function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) where {dim,T}

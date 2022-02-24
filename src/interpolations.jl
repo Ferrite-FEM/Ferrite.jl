@@ -32,6 +32,8 @@ julia> getnbasefunctions(ip)
 """
 abstract type Interpolation{dim,shape,order} end
 
+Base.copy(ip::Interpolation) = ip
+
 """
 Return the dimension of an `Interpolation`
 """
