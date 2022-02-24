@@ -42,6 +42,10 @@ struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: CellValues{di
     M::Matrix{T}
     dMdξ::Matrix{Vec{dim,T}}
     qr_weights::Vector{T}
+    # The following fields are deliberately abstract -- they are never used in
+    # performance critical code, just stored here for convenience.
+    func_interp::Interpolation{dim,refshape}
+    geo_interp::Interpolation{dim,refshape}
 end
 
 function CellScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
@@ -78,7 +82,7 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
 
     detJdV = fill(T(NaN), n_qpoints)
 
-    CellScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
+    CellScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights, func_interpol, geom_interpol)
 end
 
 # CellVectorValues
@@ -90,6 +94,10 @@ struct CellVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: CellValues{
     M::Matrix{T}
     dMdξ::Matrix{Vec{dim,T}}
     qr_weights::Vector{T}
+    # The following fields are deliberately abstract -- they are never used in
+    # performance critical code, just stored here for convenience.
+    func_interp::Interpolation{dim,refshape}
+    geo_interp::Interpolation{dim,refshape}
 end
 
 function CellVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
@@ -137,7 +145,7 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
     detJdV = fill(T(NaN), n_qpoints)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    CellVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights)
+    CellVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights, func_interpol, geom_interpol)
 end
 
 function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,T}

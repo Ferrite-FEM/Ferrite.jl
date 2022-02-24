@@ -76,10 +76,14 @@ for (func_interpol, quad_rule) in  (
 
         # test copy
         cvc = copy(cv)
+        @test typeof(cv) == typeof(cvc)
         for fname in fieldnames(typeof(cv))
-            @test typeof(cv) == typeof(cvc)
-            @test pointer(getfield(cv, fname)) != pointer(getfield(cvc, fname))
-            @test getfield(cv, fname) == getfield(cvc, fname)
+            v = getfield(cv, fname)
+            vc = getfield(cvc, fname)
+            if hasmethod(pointer, Tuple{typeof(v)})
+                @test pointer(getfield(cv, fname)) != pointer(getfield(cvc, fname))
+            end
+            @test v == vc
         end
     end
 end
