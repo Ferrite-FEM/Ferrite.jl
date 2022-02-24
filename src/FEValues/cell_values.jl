@@ -160,7 +160,7 @@ function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,
             fecv_J += x[j] ⊗ cv.dMdξ[j, i]
         end
         detJ = det(fecv_J)
-        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
         cv.detJdV[i] = detJ * w
         Jinv = inv(fecv_J)
         for j in 1:n_func_basefuncs
