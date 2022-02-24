@@ -8,7 +8,9 @@ struct ScalarValued <: FieldTrait end
 
 FieldTrait(::Type{<:CellScalarValues}) = ScalarValued()
 FieldTrait(::Type{<:FaceScalarValues}) = ScalarValued()
+FieldTrait(::Type{<:PointScalarValuesInternal}) = ScalarValued()
 FieldTrait(::Type{<:PointScalarValues}) = ScalarValued()
+FieldTrait(::Type{<:PointVectorValues}) = VectorValued()
 FieldTrait(::Type{<:CellVectorValues}) = VectorValued()
 FieldTrait(::Type{<:FaceVectorValues}) = VectorValued()
 
@@ -120,8 +122,7 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
 nodal values of ``\\mathbf{u}``.
 """
-function_value(fe_v::T, q_point, u, dof_range) where T = function_value(FieldTrait(T), fe_v, q_point, u, dof_range)
-function_value(fe_v::T, q_point, u) where T = function_value(FieldTrait(T), fe_v, q_point, u)
+function_value(fe_v::T, args...) where T <: Values = function_value(FieldTrait(T), fe_v, args...)
 
 function function_value(::FieldTrait, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
     n_base_funcs = getnbasefunctions(fe_v)
@@ -172,8 +173,7 @@ For a vector valued function with use of `ScalarValues` the gradient is computed
 ``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{u}_i \\otimes \\mathbf{\\nabla} N_i (\\mathbf{x})``
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
-function_gradient(fe_v::T, q_point, u) where T = function_gradient(FieldTrait(T), fe_v, q_point, u)
-function_gradient(fe_v::T, q_point, u, dof_range) where T = function_gradient(FieldTrait(T), fe_v, q_point, u, dof_range)
+function_gradient(fe_v::T, args...) where T <: Values = function_gradient(FieldTrait(T), fe_v, args...)
 
 function function_gradient(::FieldTrait, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
     n_base_funcs = getnbasefunctions(fe_v)
@@ -249,7 +249,7 @@ The divergence of a vector valued functions in the quadrature point ``\\mathbf{x
 ``\\mathbf{\\nabla} \\cdot \\mathbf{u}(\\mathbf{x_q}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x_q}) \\cdot \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function_divergence(fe_v::T, q_point, u) where T = function_divergence(FieldTrait(T), fe_v, q_point, u)
+function_divergence(fe_v::T, args...) where T <: Values = function_divergence(FieldTrait(T), fe_v, args...)
 
 function function_divergence(::ScalarValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)

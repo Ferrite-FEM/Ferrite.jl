@@ -144,4 +144,8 @@ export
 
 # Point Evaluation
     PointEvalHandler,
-    get_point_values
+    get_point_values,
+    PointIterator,
+    PointLocation,
+    PointScalarValues,
+    PointVectorValues

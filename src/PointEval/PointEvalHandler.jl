@@ -1,7 +1,25 @@
 """
-PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim,T}}) where {dim, T}
+    PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim,T}}) where {dim, T}
 
-A `PointEvalHandler` computes the corresponding cell for each point in `points` and its local coordinate within the cell.
+The `PointEvalHandler` can be used for function evaluation in *arbitrary points* in the
+domain -- not just in quadrature points or nodes.
+
+The constructor takes a grid and a vector of coordinates for the points. The
+`PointEvalHandler` computes i) the corresponding cell, and ii) the (local) coordinate
+within the cell, for each point. The fields of the `PointEvalHandler` are:
+ - `cells::Vector{Union{Int,Nothing}}`: vector with cell IDs for the points, with `nothing`
+   for points that could not be found.
+ - `local_coords::Vector{Union{Vec,Nothing}}`: vector with the local coordinates
+   (i.e. coordinates in the reference configuration) for the points, with `nothing` for
+   points that could not be found.
+
+There are two ways to use the `PointEvalHandler` to evaluate functions:
+
+ - [`get_point_values`](@ref): can be used when the function is described by
+   i) a `dh::DofHandler` + `uh::Vector` (for example the FE-solution), or
+   ii) a `p::L2Projector` + `ph::Vector` (for projected data).
+ - Iteration with [`PointIterator`](@ref) + [`PointValues`](@ref): can be used for more
+   flexible evaluation in the points, for example to compute gradients.
 """
 PointEvalHandler
 
@@ -39,7 +57,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
 
     for point_idx in 1:length(points)
         cell_found = false
-        for (idx, (CT, node_cell_dict)) in enumerate(node_cell_dicts)
+        for (CT, node_cell_dict) in node_cell_dicts
             geom_interpol = default_interpolation(CT)
             # loop over points
             for node in nearest_nodes[point_idx]
@@ -102,7 +120,7 @@ function find_local_coordinate(interpolation, cell_coordinates, global_coordinat
     max_iters = 10
     tol_norm = 1e-10
     converged = false
-    for iter in 1:max_iters
+    for _ in 1:max_iters
         N = Ferrite.value(interpolation, local_guess)
 
         global_guess = zero(Vec{dim})
@@ -236,14 +254,14 @@ function _get_point_values!(
     # extract variables
     local_coords = ph.local_coords
     # preallocate some stuff specific to this cellset
-    pv = PointScalarValues(first(local_coords), ip)
+    pv = PointScalarValuesInternal(first(local_coords), ip)
     first_cell = cellset === nothing ? 1 : first(cellset)
     cell_dofs = Vector{Int}(undef, ndofs_per_cell(dh, first_cell))
 
     # compute point values
     for pointid in eachindex(ph.cells)
         cellid = ph.cells[pointid]
-        cellid ===nothing && continue # next point if no cell was found for this one
+        cellid === nothing && continue # next point if no cell was found for this one
         cellset !== nothing && (cellid ∈ cellset || continue) # no need to check the cellset for a regular DofHandler
         celldofs!(cell_dofs, dh, ph.cells[pointid])
         reinit!(pv, local_coords[pointid], ip)
@@ -272,4 +290,76 @@ function get_func_interpolations(dh::DH, fieldname) where DH<:MixedDofHandler
         end
     end
     return func_interpolations
+end
+
+# Iteration of PointEvalHandler
+"""
+    PointIterator(ph::PointEvalHandler)
+
+Create an iterator over the points in the [`PointEvalHandler`](@ref).
+The elements of the iterator are either a [`PointLocation`](@ref), if the corresponding
+point could be found in the grid, or `nothing`, if the point was not found.
+
+A `PointLocation` can be used to query the cell ID with [`cellid`](@ref), and can be used
+to reinitialize [`PointValues`](@ref) with [`reinit!`](@ref).
+
+# Examples
+```julia
+ph = PointEvalHandler(grid, points)
+
+for point in PointIterator(ph)
+    point === nothing && continue # Skip any points that weren't found
+    reinit!(pointvalues, point)   # Update pointvalues
+    # ...
+end
+```
+"""
+PointIterator
+
+struct PointIterator{PH<:PointEvalHandler}
+    ph::PH
+    coords::Vector{Vec{2,Float64}}
+end
+
+function PointIterator(ph::PointEvalHandler{G}) where {D,C,T,G<:Grid{D,C,T}}
+    n = nnodes_per_cell(ph.grid)
+    coords = zeros(Vec{D,T}, n) # resize!d later if needed
+    return PointIterator(ph, coords)
+end
+
+"""
+    PointLocation
+
+Element of a [`PointIterator`](@ref), typically used to reinitialize
+[`PointValues`](@ref). Fields:
+ - `cid::Int`: ID of the cell containing the point
+ - `local_coord::Vec`: the local (reference) coordinate of the point
+ - `coords::Vector{Vec}`: the coordinates of the cell
+"""
+struct PointLocation{V}
+    cid::Int
+    local_coord::V
+    coords::Vector{V}
+end
+
+function Base.iterate(p::PointIterator, state = 1)
+    if state > length(p.ph.cells)
+        return nothing
+    elseif p.ph.cells[state] === nothing
+        return (nothing, state + 1)
+    else
+        cid = (p.ph.cells[state])::Int
+        local_coord = (p.ph.local_coords[state])::Vec
+        n = nnodes_per_cell(p.ph.grid, cid)
+        cellcoords!(resize!(p.coords, n), p.ph.grid, cid)
+        point = PointLocation(cid, local_coord, p.coords)
+        return (point, state + 1)
+    end
+end
+
+cellid(p::PointLocation) = p.cid
+
+function reinit!(pv::PointValues, point::PointLocation)
+    reinit!(pv, point.coords, point.local_coord)
+    return pv
 end
