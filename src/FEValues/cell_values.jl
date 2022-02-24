@@ -41,7 +41,7 @@ struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: CellValues{di
     detJdV::Vector{T}
     M::Matrix{T}
     dMdξ::Matrix{Vec{dim,T}}
-    qr_weights::Vector{T}
+    qr::QuadratureRule{dim,refshape,T}
     # The following fields are deliberately abstract -- they are never used in
     # performance critical code, just stored here for convenience.
     func_interp::Interpolation{dim,refshape}
@@ -82,7 +82,7 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
 
     detJdV = fill(T(NaN), n_qpoints)
 
-    CellScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights, func_interpol, geom_interpol)
+    CellScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule, func_interpol, geom_interpol)
 end
 
 # CellVectorValues
@@ -93,7 +93,7 @@ struct CellVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: CellValues{
     detJdV::Vector{T}
     M::Matrix{T}
     dMdξ::Matrix{Vec{dim,T}}
-    qr_weights::Vector{T}
+    qr::QuadratureRule{dim,refshape,T}
     # The following fields are deliberately abstract -- they are never used in
     # performance critical code, just stored here for convenience.
     func_interp::Interpolation{dim,refshape}
@@ -145,7 +145,7 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
     detJdV = fill(T(NaN), n_qpoints)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    CellVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule.weights, func_interpol, geom_interpol)
+    CellVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule, func_interpol, geom_interpol)
 end
 
 function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,T}
@@ -153,8 +153,8 @@ function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,
     n_func_basefuncs = getnbasefunctions(cv)
     @assert length(x) == n_geom_basefuncs
 
-    @inbounds for i in 1:length(cv.qr_weights)
-        w = cv.qr_weights[i]
+    @inbounds for i in 1:length(cv.qr.weights)
+        w = cv.qr.weights[i]
         fecv_J = zero(Tensor{2,dim})
         for j in 1:n_geom_basefuncs
             fecv_J += x[j] ⊗ cv.dMdξ[j, i]
