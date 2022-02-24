@@ -40,7 +40,7 @@ reinit!
 
 Return the number of quadrature points for the `Values` object.
 """
-getnquadpoints(fe::Values) = length(fe.qr_weights)
+getnquadpoints(fe::Values) = length(fe.qr.weights)
 
 """
     getdetJdV(fe_v::Values, q_point::Int)
