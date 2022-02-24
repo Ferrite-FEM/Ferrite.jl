@@ -12,6 +12,7 @@ FieldTrait(::Type{<:PointScalarValues}) = ScalarValued()
 FieldTrait(::Type{<:CellVectorValues}) = VectorValued()
 FieldTrait(::Type{<:FaceVectorValues}) = VectorValued()
 
+@noinline throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
 
 getnbasefunctions(cv::Values) = size(cv.N, 1)
 getngeobasefunctions(cv::Values) = size(cv.M, 1)

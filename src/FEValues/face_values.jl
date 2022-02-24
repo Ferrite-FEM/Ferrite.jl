@@ -199,7 +199,7 @@ function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) 
         fv.normals[i] = weight_norm / norm(weight_norm)
         detJ = norm(weight_norm)
 
-        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
         fv.detJdV[i, cb] = detJ * w
         Jinv = inv(fefv_J)
         for j in 1:n_func_basefuncs
