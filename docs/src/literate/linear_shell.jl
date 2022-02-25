@@ -304,7 +304,7 @@ function integrate_shell!(ke, cv, qr_ooplane, X, data)
             B = ForwardDiff.jacobian(
                 (a) -> strain(a, N, dNdx, ζ, dζdx, q, ef1, ef2, h), zeros(Float64, ndofs) )
 
-            dV = det(J) * cv.qr_weights[iqp] * qr_ooplane.weights[oqp]
+            dV = det(J) * cv.qr.weights[iqp] * qr_ooplane.weights[oqp]
             ke .+= B'*data.C*B * dV
         end
     end
