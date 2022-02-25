@@ -770,11 +770,17 @@ end
 
 #Function for adding constraint when using multiple celltypes
 function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
+    dbc_added = false
     for fh in ch.dh.fieldhandlers
         if overlaps(fh, dbc)
-            add!(ch, fh, dbc)
+            # If dbc have dofs not in fh, then these will be removed from dbc, hence deepcopy
+            # In this case, add! will warn, unless warn_check_cellset=false
+            add!(ch, fh, deepcopy(dbc), warn_check_cellset=false)
+            dbc_added = true
         end
     end
+    dbc_added || @warn("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's MixedDofHandler")
+    return ch
 end
 
 function overlaps(fh::FieldHandler, dbc::Dirichlet)
@@ -785,8 +791,8 @@ function overlaps(fh::FieldHandler, dbc::Dirichlet)
     return false
 end
 
-function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
-    _check_cellset_dirichlet(ch.dh.grid, fh.cellset, dbc.faces)
+function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_check_cellset=true)
+    warn_check_cellset && _check_cellset_dirichlet(ch.dh.grid, fh.cellset, dbc.faces)
 
     celltype = getcelltype(ch.dh.grid, first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
 
