@@ -14,6 +14,9 @@ project
 ```@docs
 PointEvalHandler
 get_point_values
+PointValues
+PointIterator
+PointLocation
 ```
 
 ```@docs
