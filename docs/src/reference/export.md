@@ -14,7 +14,7 @@ project
 ```@docs
 PointEvalHandler
 get_point_values
-PointValues
+Ferrite.PointValues
 PointIterator
 PointLocation
 ```
