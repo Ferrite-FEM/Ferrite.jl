@@ -150,6 +150,7 @@ end
         for cell in CellIterator(dh)
             K[celldofs(cell), celldofs(cell)] += 2.0 * [1 -1; -1 1]
         end
+        copies = (K = copy(K), f1 = copy(f), f2 = copy(f))
 
         # Solve by actually condensing the matrix
         ff  = C' * (f - K * g)
@@ -162,7 +163,15 @@ end
         a = K \ f
         apply!(a, ch)
 
-        @test a ≈ aa
+        # Solve with extracted RHS data
+        rhs = get_rhs_data(ch, copies.K)
+        apply!(copies.K, ch)
+        apply_rhs!(rhs, copies.f1, ch)
+        a_rhs1 = apply!(copies.K \ copies.f1, ch)
+        apply_rhs!(rhs, copies.f2, ch)
+        a_rhs2 = apply!(copies.K \ copies.f2, ch)
+
+        @test a ≈ aa ≈ a_rhs1 ≈ a_rhs2
     end
 
 end
