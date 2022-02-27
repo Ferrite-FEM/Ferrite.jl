@@ -1,15 +1,30 @@
+"""
+Field(name::Symbol, interpolation::Interpolation, dim::Int)
 
+Construct `dim`-dimensional `Field` called `name` which is approximated by `interpolation`.
+
+The interpolation is used for distributing the degrees of freedom.
+"""
+struct Field
+    name::Symbol
+    interpolation::Interpolation
+    dim::Int
+end
+
+"""
+    FieldHandler(fields::Vector{Field}, cellset::Set{Int})
+
+Construct a `FieldHandler` based on an array of [`Field`](@ref)s and assigns it a set of cells.
+
+A `FieldHandler` must fullfill the following requirements:
+- All [`Cell`](@ref)s in `cellset` are of the same type.
+- Each field only uses a single interpolation on the `cellset`.
+
+Notice that a `FieldHandler` can hold several fields.
+"""
 mutable struct FieldHandler
     fields::Vector{Field}
     cellset::Set{Int}
-end
-"""
-    FieldHandler(fields::Vector{Field}, cellset)
-
-Construct a `FieldHandler` based on an array of `Field`s and assigns it a set of cells.
-"""
-function FieldHandler(fields::Vector{Field}, cellset)
-    return FieldHandler(fields, cellset)
 end
 
 struct CellVector{T}
@@ -23,7 +38,14 @@ function Base.getindex(elvec::CellVector, el::Int)
     return elvec.values[offset:offset + elvec.length[el]-1]
  end
 
-struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: Ferrite.AbstractDofHandler
+"""
+    MixedDofHandler(grid::Grid)
+
+Construct a `MixedDofHandler` based on `grid`. Supports:
+- `Grid`s with or without concrete element type (E.g. "mixed" grids with several different element types.)
+- One or several fields, which can live on the whole domain or on subsets of the `Grid`.
+"""
+struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
     cell_dofs::CellVector{Int}
     cell_nodes::CellVector{Int}
@@ -110,6 +132,11 @@ Returns the number of unique fields defined.
 """
 nfields(dh::MixedDofHandler) = length(getfieldnames(dh))
 
+"""
+    push!(dh::MixedDofHandler, fh::FieldHandler)
+
+Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
+"""
 function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
     @assert !isclosed(dh)
     _check_same_celltype(dh.grid, collect(fh.cellset))
@@ -161,10 +188,16 @@ function Base.push!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolati
 end
 
 """
-    close!(dh::MixedDofHandler)
+    close!(dh::AbstractDofHandler)
 
-Closes the dofhandler and creates degrees of freedom for each cell.
-Dofs are created in the following order: Go through each FieldHandler in the order they were added. For each field in the FieldHandler, create dofs for the cell. This means that dofs on a particular cell will be numbered according to the fields; first dofs for field 1, then field 2, etc.
+Closes `dh` and creates degrees of freedom for each cell.
+
+If there are several fields, the dofs are added in the following order:
+For a `MixedDofHandler`, go through each `FieldHandler` in the order they were added.
+For each field in the `FieldHandler` or in the `DofHandler` (again, in the order the fields were added),
+create dofs for the cell.
+This means that dofs on a particular cell, the dofs will be numbered according to the fields;
+first dofs for field 1, then field 2, etc.
 """
 function close!(dh::MixedDofHandler)
     dh, _, _, _ = __close!(dh)
