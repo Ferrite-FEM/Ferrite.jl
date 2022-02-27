@@ -113,6 +113,7 @@ nfields(dh::MixedDofHandler) = length(getfieldnames(dh))
 function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
     @assert !isclosed(dh)
     _check_same_celltype(dh.grid, collect(fh.cellset))
+    _check_cellset_intersections(dh, fh)
     # the field interpolations should have the same refshape as the cells they are applied to
     refshapes_fh = getrefshape.(getfieldinterpolations(fh))
     # extract the celltype from the first cell as the celltypes are all equal
@@ -124,6 +125,12 @@ function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
 
     push!(dh.fieldhandlers, fh)
     return dh
+end
+
+function _check_cellset_intersections(dh::MixedDofHandler, fh::FieldHandler)
+    for _fh in dh.fieldhandlers
+        isempty(intersect(_fh.cellset, fh.cellset)) || error("Each cell can only belong to a single FieldHandler.")
+    end
 end
 
 function Base.push!(dh::MixedDofHandler, name::Symbol, dim::Int)
