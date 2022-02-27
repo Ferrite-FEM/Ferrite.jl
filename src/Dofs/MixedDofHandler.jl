@@ -1,5 +1,5 @@
 """
-Field(name::Symbol, interpolation::Interpolation, dim::Int)
+    Field(name::Symbol, interpolation::Interpolation, dim::Int)
 
 Construct `dim`-dimensional `Field` called `name` which is approximated by `interpolation`.
 
@@ -19,6 +19,8 @@ Construct a `FieldHandler` based on an array of [`Field`](@ref)s and assigns it 
 A `FieldHandler` must fullfill the following requirements:
 - All [`Cell`](@ref)s in `cellset` are of the same type.
 - Each field only uses a single interpolation on the `cellset`.
+- Each cell belongs only to a single `FieldHandler`, i.e. all fields on a cell must be added
+within the same `FieldHandler`.
 
 Notice that a `FieldHandler` can hold several fields.
 """
