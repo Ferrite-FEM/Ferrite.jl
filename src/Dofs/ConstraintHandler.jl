@@ -111,22 +111,31 @@ See also: [`get_rhs_data`](@ref).
 """
 function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false)
     K = data.constrained_columns
-    @assert length(f) == 0 || length(f) == size(K, 1)
-    @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
-
+    @assert length(f) == size(K, 1)
+    @boundscheck checkbounds(f, ch.prescribed_dofs)
     m = data.m
+
+    # TODO: Can the loops be combined or does the order matter?
     @inbounds for i in 1:length(ch.inhomogeneities)
-        d = ch.prescribed_dofs[i]
         v = ch.inhomogeneities[i]
         if !applyzero && v != 0
             for j in nzrange(K, i)
                 f[K.rowval[j]] -= v * K.nzval[j]
             end
         end
-        if length(f) != 0
-            vz = applyzero ? zero(eltype(f)) : v
-            f[d] = vz * m
+    end
+    @inbounds for ac in ch.acs
+        global_dof = ac.constrained_dof
+        for (d, v) in ac.entries
+            f[d] += f[global_dof] * v
         end
+        f[global_dof] = 0
+    end
+    @inbounds for i in 1:length(ch.inhomogeneities)
+        d = ch.prescribed_dofs[i]
+        v = ch.inhomogeneities[i]
+        vz = applyzero ? zero(eltype(f)) : v
+        f[d] = vz * m
     end
 end
 
@@ -679,6 +688,7 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, acs::Vector{AffineCon
                 for (d,v) in ac.entries
                     f[d] += f[col] * v
                 end
+                @assert ac.constrained_dof == col
                 f[ac.constrained_dof] = 0.0
             end
         end

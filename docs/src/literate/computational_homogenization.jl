@@ -368,7 +368,6 @@ rhsdata = (
 )
 
 apply!(K.dirichlet, ch.dirichlet)
-Kp = copy(K.periodic) #hide
 apply!(K.periodic,  ch.periodic)
 
 # We can now solve the problem(s). Note that we only use `apply_rhs!` in the loops below.
@@ -388,14 +387,9 @@ for i in 1:size(rhs.dirichlet, 2)
     push!(u.dirichlet, u_i)                            # Save the solution vector
 end
 
-rhs_p = copy(rhs.periodic) #hide
 for i in 1:size(rhs.periodic, 2)
     rhs_i = @view rhs.periodic[:, i]                   # Extract this RHS
     apply_rhs!(rhsdata.periodic, rhs_i, ch.periodic)   # Apply BC
-    rhs_i = @view rhs_p[:, i] #hide
-    Kpp = copy(Kp) #hide
-    apply!(Kpp, rhs_i, ch.periodic) #hide
-    copy!(K.periodic, Kpp) #hide
     u_i = cholesky(Symmetric(K.periodic)) \ rhs_i      # Solve
     apply!(u_i, ch.periodic)                           # Apply BC on the solution
     push!(u.periodic, u_i)                             # Save the solution vector
