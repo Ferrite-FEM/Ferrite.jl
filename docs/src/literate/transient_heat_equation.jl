@@ -1,11 +1,17 @@
 # # Time Dependent Problems
 #
 # ![](transient_heat.gif)
+#
+# *Figure 1*: Visualization of the temperature time evolution on a unit
+# square where the prescribed temperature on the upper and lower parts
+# of the boundary increase with time.
+#
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`transient_heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/examples/transient_heat_equation.ipynb)
+#md #     [`transient_heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/examples/transient_heat_equation.ipynb).
 #-
+#
 # ## Introduction
 #
 # In this example we extend the heat equation by a time dependent term, i.e.
@@ -40,7 +46,7 @@
 # \mathbf{M} \mathbf{u}_{n+1} + Δt \mathbf{K} \mathbf{u}_{n+1} = Δt \mathbf{f} + \mathbf{M} \mathbf{u}_{n}
 # ```
 # In this example we apply the boundary conditions to the assembled discrete operators (mass matrix $\mathbf{M}$ and stiffnes matrix $\mathbf{K}$)
-# only once. We utilize the fact that in finite element computations Dirichlet conditions can be applied by 
+# only once. We utilize the fact that in finite element computations Dirichlet conditions can be applied by
 # zero out rows and columns that correspond
 # to a prescribed dof in the system matrix ($\mathbf{A} = Δt \mathbf{K} + \mathbf{M}$) and setting the value of the right-hand side vector to the value
 # of the Dirichlet condition. Thus, we only need to apply in every time step the Dirichlet condition to the right-hand side of the problem.
@@ -191,8 +197,8 @@ for t in 0:Δt:T
     b = Δt .* f .+ M * uₙ
     #Then, we can apply the boundary conditions of the current time step.
     apply_rhs!(rhsdata, b, ch)
-   
-    #Finally, we can solve the time step and save the solution afterwards. 
+
+    #Finally, we can solve the time step and save the solution afterwards.
     u = A \ b;
 
     vtk_grid("transient-heat-$t", dh) do vtk
@@ -200,15 +206,17 @@ for t in 0:Δt:T
         vtk_save(vtk)
         pvd[t] = vtk
     end
-   #At the end of the time loop, we set the previous solution to the current one and go to the next time step. 
+   #At the end of the time loop, we set the previous solution to the current one and go to the next time step.
    uₙ .= u
 end
 # In order to use the .pvd file we need to store it to the disk, which is done by:
 vtk_save(pvd);
-#md # ## [Plain Program](@id transient_heat_equation-plain-program)
+
+#md # ## [Plain program](@id transient_heat_equation-plain-program)
 #md #
-#md # Below follows a version of the program without any comments.
-#md # The file is also available here: [transient_heat_equation.jl](transient_heat_equation.jl)
+#md # Here follows a version of the program without any comments.
+#md # The file is also available here:
+#md # [`transient_heat_equation.jl`](transient_heat_equation.jl).
 #md #
 #md # ```julia
 #md # @__CODE__

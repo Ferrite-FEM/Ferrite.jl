@@ -1,15 +1,13 @@
-struct Field
-    name::Symbol
-    interpolation::Interpolation
-    dim::Int
-end
-
 abstract type AbstractDofHandler end
 
 """
     DofHandler(grid::Grid)
 
-Construct a `DofHandler` based on the grid `grid`.
+Construct a `DofHandler` based on `grid`.
+
+Operates slightly faster than [`MixedDofHandler`](@docs). Supports:
+- `Grid`s with a single concrete cell type.
+- One or several fields on the whole domaine.
 """
 struct DofHandler{dim,C,T} <: AbstractDofHandler
     field_names::Vector{Symbol}
@@ -44,6 +42,11 @@ function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
     end
 end
 
+"""
+    ndofs(dh::AbstractDofHandler)
+
+Return the number of degrees of freedom in `dh`
+"""
 ndofs(dh::AbstractDofHandler) = dh.ndofs[]
 ndofs_per_cell(dh::AbstractDofHandler, cell::Int=1) = dh.cell_dofs_offset[cell+1] - dh.cell_dofs_offset[cell]
 isclosed(dh::AbstractDofHandler) = dh.closed[]
@@ -81,7 +84,8 @@ end
 Return the local dof range for `field_name`. Example:
 
 ```jldoctest
-julia> grid = generate_grid(Triangle, (3, 3));
+julia> grid = generate_grid(Triangle, (3, 3))
+Grid{2, Triangle, Float64} with 18 Triangle cells and 16 nodes
 
 julia> dh = DofHandler(grid); push!(dh, :u, 3); push!(dh, :p, 1); close!(dh);
 
@@ -99,6 +103,15 @@ function dof_range(dh::DofHandler, field_name::Symbol)
     return (offset+1):(offset+n_field_dofs)
 end
 
+"""
+    push!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
+
+Add a `dim`-dimensional `Field` called `name` which is approximated by `ip` to `dh`.
+
+The field is added to all cells of the underlying grid. In case no interpolation `ip` is given,
+the default interpolation of the grid's celltype is used. 
+If the grid uses several celltypes, [`push!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
+"""
 function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
     @assert !isclosed(dh)
     @assert !in(name, dh.field_names)
@@ -290,18 +303,21 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
 end
 
 function cellnodes!(global_nodes::Vector{Int}, grid::Grid{dim,C}, i::Int) where {dim,C}
-    @assert length(global_nodes) == nnodes(C)
-    for j in 1:nnodes(C) # Currently assuming that DofHandler only has one celltype
-        global_nodes[j] = grid.cells[i].nodes[j]
+    nodes = grid.cells[i].nodes
+    N = length(nodes)
+    @assert length(global_nodes) == N
+    for j in 1:N
+        global_nodes[j] = nodes[j]
     end
     return global_nodes
 end
 
 function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::Grid{dim,C}, i::Int) where {dim,C,T}
-    @assert length(global_coords) == nnodes(C)
-    for j in 1:nnodes(C) # Currently assuming that DofHandler only has one celltype
-        nodeid = grid.cells[i].nodes[j]
-        global_coords[j] = grid.nodes[nodeid].x
+    nodes = grid.cells[i].nodes
+    N = length(nodes)
+    @assert length(global_coords) == N
+    for j in 1:N
+        global_coords[j] = grid.nodes[nodes[j]].x
     end
     return global_coords
 end
@@ -326,7 +342,7 @@ with stored values in the correct places.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-@inline create_sparsity_pattern(dh::DofHandler) = _create_sparsity_pattern(dh, false)
+create_sparsity_pattern(dh::DofHandler) = _create_sparsity_pattern(dh, nothing, false)
 
 """
     create_symmetric_sparsity_pattern(dh::DofHandler)
@@ -337,9 +353,9 @@ triangle of the matrix. Return a `Symmetric{SparseMatrixCSC}`.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-@inline create_symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_create_sparsity_pattern(dh, true), :U)
+create_symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
 
-function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
+function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool)
     ncells = getncells(dh.grid)
     n = ndofs_per_cell(dh)
     N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
@@ -373,10 +389,20 @@ function _create_sparsity_pattern(dh::DofHandler, sym::Bool)
         I[cnt] = d
         J[cnt] = d
     end
+
     resize!(I, cnt)
     resize!(J, cnt)
     V = zeros(length(I))
     K = sparse(I, J, V)
+
+    # Add entries to K corresponding to condensation due the linear constraints
+    # Note, this requires the K matrix, which is why we can't push!() to the I,J,V
+    # triplet directly.
+    if ch !== nothing
+        @assert isclosed(ch)
+        _condense_sparsity_pattern!(K, ch.acs)
+    end
+
     return K
 end
 

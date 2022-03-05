@@ -2,7 +2,6 @@ function scalar_field()
     # isoparametric approximation
     mesh = generate_grid(QuadraticQuadrilateral, (20, 20))
     f(x) = x[1]^2
-    nodal_vals = [f(p.x) for p in mesh.nodes]
 
     ip_f = Lagrange{2,RefCube,2}() # function interpolation
     ip_g = Lagrange{2,RefCube,2}() # geometry interpolation
@@ -129,6 +128,86 @@ function dofhandler()
     # @test vals ≈ 1.0:9.0
 end
 
+function dofhandler2()
+    # Computes the L2 projection of a quadratic field exactly
+    # but not using L2Projector since we want the DofHandler dofs
+    mesh = generate_grid(Quadrilateral, (20, 20))
+    ip_f = Lagrange{2,RefCube,2}()
+    ip_g = Lagrange{2,RefCube,1}()
+    qr = QuadratureRule{2,RefCube}(3)
+    csv = CellScalarValues(qr, ip_f, ip_g)
+    cvv = CellVectorValues(qr, ip_f, ip_g)
+    dh = DofHandler(mesh);
+    push!(dh, :s, 1, ip_f)
+    push!(dh, :v, 2, ip_f)
+    close!(dh)
+    M = create_sparsity_pattern(dh)
+    f = zeros(ndofs(dh))
+    asm = start_assemble(M, f)
+    me = zeros(ndofs_per_cell(dh), ndofs_per_cell(dh))
+    fe = zeros(ndofs_per_cell(dh))
+    s_dofs = dof_range(dh, :s)
+    v_dofs = dof_range(dh, :v)
+    f_s(x) = 1.0 + x[1] + x[2] + x[1] * x[2]
+    f_v(x) = Vec{2}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2]))
+    for cell in CellIterator(dh)
+        fill!(me, 0)
+        fill!(fe, 0)
+        reinit!(csv, cell)
+        reinit!(cvv, cell)
+        for qp in 1:getnquadpoints(csv)
+            dΩ = getdetJdV(csv, qp)
+            x = spatial_coordinate(csv, qp, getcoordinates(cell))
+            for i in 1:getnbasefunctions(csv)
+                δui = shape_value(csv, qp, i)
+                fe[s_dofs[i]] += ( δui * f_s(x) ) * dΩ
+                for j in 1:getnbasefunctions(csv)
+                    δuj = shape_value(csv, qp, j)
+                    me[s_dofs[i], s_dofs[j]] += δui * δuj * dΩ
+                end
+            end
+            for i in 1:getnbasefunctions(cvv)
+                δui = shape_value(cvv, qp, i)
+                fe[v_dofs[i]] += ( δui ⋅ f_v(x) ) * dΩ
+                for j in 1:getnbasefunctions(cvv)
+                    δuj = shape_value(cvv, qp, j)
+                    me[v_dofs[i], v_dofs[j]] += δui ⋅ δuj * dΩ
+                end
+            end
+        end
+        assemble!(asm, celldofs(cell), me, fe)
+    end
+    uh = M \ f
+
+    points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
+    ph = PointEvalHandler(mesh, points)
+    @test all(x -> x !== nothing, ph.cells)
+    psv = PointScalarValues(ip_f, ip_g)
+    pvv = PointVectorValues(ip_f, ip_g)
+    for (x, point) in zip(points, PointIterator(ph))
+        point === nothing && continue
+        # Test scalar field
+        reinit!(psv, point)
+        @test function_value(psv, uh[celldofs(dh, cellid(point))], s_dofs) ≈
+              function_value(psv, uh[celldofs(dh, cellid(point))][s_dofs]) ≈
+              f_s(x)
+        @test function_gradient(psv, uh[celldofs(dh, cellid(point))], s_dofs) ≈
+              function_gradient(psv, uh[celldofs(dh, cellid(point))][s_dofs]) ≈
+              Tensors.gradient(f_s, x)
+        # Test vector field
+        reinit!(pvv, point)
+        @test function_value(pvv, uh[celldofs(dh, cellid(point))], v_dofs) ≈
+              function_value(pvv, uh[celldofs(dh, cellid(point))][v_dofs]) ≈
+              f_v(x)
+        @test function_gradient(pvv, uh[celldofs(dh, cellid(point))], v_dofs) ≈
+              function_gradient(pvv, uh[celldofs(dh, cellid(point))][v_dofs]) ≈
+              Tensors.gradient(f_v, x)
+        @test function_symmetric_gradient(pvv, uh[celldofs(dh, cellid(point))], v_dofs) ≈
+              function_symmetric_gradient(pvv, uh[celldofs(dh, cellid(point))][v_dofs]) ≈
+              symmetric(Tensors.gradient(f_v, x))
+    end
+end
+
 function mixed_grid()
     ## Mixed grid where not all cells have the same fields 
 
@@ -251,7 +330,43 @@ end
     scalar_field()
     vector_field()
     dofhandler()
+    dofhandler2()
     superparametric()
     mixed_grid()
     oneD()
+end
+
+@testset "PointValues" begin
+    ip_f = Lagrange{2,RefCube,2}()
+    ip_g = Lagrange{2,RefCube,1}()
+    x = Vec{2,Float64}.([(0.0, 0.0), (2.0, 0.5), (2.5, 2.5), (0.5, 2.0)])
+    ξ₁ = Vec{2,Float64}((0.12, -0.34))
+    ξ₂ = Vec{2,Float64}((0.56, -0.78))
+    qr = QuadratureRule{2,RefCube,Float64}([2.0, 2.0], [ξ₁, ξ₂])
+
+    # PointScalarValues
+    csv = CellScalarValues(qr, ip_f, ip_g)
+    reinit!(csv, x)
+    psv = PointScalarValues(csv)
+    us = rand(getnbasefunctions(ip_f)) .+ 1
+    reinit!(psv, x, ξ₁)
+    @test function_value(psv, us) ≈ function_value(csv, 1, us)
+    @test function_gradient(psv, us) ≈ function_gradient(csv, 1, us)
+    reinit!(psv, x, ξ₂)
+    @test function_value(psv, us) ≈ function_value(csv, 2, us)
+    @test function_gradient(psv, us) ≈ function_gradient(csv, 2, us)
+
+    # PointVectorValues
+    cvv = CellVectorValues(qr, ip_f, ip_g)
+    reinit!(cvv, x)
+    pvv = PointVectorValues(cvv)
+    uv = rand(2 * getnbasefunctions(ip_f)) .+ 1
+    reinit!(pvv, x, ξ₁)
+    @test function_value(pvv, uv) ≈ function_value(cvv, 1, uv)
+    @test function_gradient(pvv, uv) ≈ function_gradient(cvv, 1, uv)
+    @test function_symmetric_gradient(pvv, uv) ≈ function_symmetric_gradient(cvv, 1, uv)
+    reinit!(pvv, x, ξ₂)
+    @test function_value(pvv, uv) ≈ function_value(cvv, 2, uv)
+    @test function_gradient(pvv, uv) ≈ function_gradient(cvv, 2, uv)
+    @test function_symmetric_gradient(pvv, uv) ≈ function_symmetric_gradient(cvv, 2, uv)
 end

@@ -20,11 +20,12 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "linear_shell.md",
     "quasi_incompressible_hyperelasticity.md",
     "ns_vs_diffeq.md",
+    "computational_homogenization.md",
     )]
 
 # Build documentation.
 makedocs(
-    format = Documenter.HTML(prettyurls=is_ci), # disable for local builds
+    format = Documenter.HTML(),
     sitename = "Ferrite.jl",
     doctest = false,
     # strict = VERSION.minor == 6 && sizeof(Int) == 8, # only strict mode on 0.6 and Int64
@@ -36,6 +37,7 @@ makedocs(
             "manual/degrees_of_freedom.md",
             "manual/assembly.md",
             "manual/boundary_conditions.md",
+            "manual/constraints.md",
             "manual/grid.md",
             "manual/export.md"
             ],

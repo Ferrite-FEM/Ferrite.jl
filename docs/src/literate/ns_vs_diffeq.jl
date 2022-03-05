@@ -369,14 +369,14 @@ function navierstokes!(du,u_uc,p,t)
     # Jacobian, then we could also hand over a buffer for `u` in our RHSparams
     # structure to save the allocations made here.
     #+
-    u = u_uc
+    u = copy(u_uc)
     update!(ch, t)
     apply!(u, ch)
 
     # Now we apply the rhs of the Navier-Stokes equations
     #+
     ## Linear contribution (Stokes operator)
-    du .= K * u
+    mul!(du, K, u) # du .= K * u
 
     ## nonlinear contribution
     n_basefuncs = getnbasefunctions(cellvalues_v)
@@ -439,10 +439,9 @@ for (u_uc,t) in integrator
     # so we have to bring them back now.
     #+
     update!(ch, t)
-    u = u_uc
+    u = copy(u_uc)
     apply!(u, ch)
-    #compress=false flag because otherwise each vtk file will be stored in memory
-    vtk_grid("vortex-street-$t.vtu", dh; compress=false) do vtk
+    vtk_grid("vortex-street-$t.vtu", dh) do vtk
         vtk_point_data(vtk,dh,u)
         vtk_save(vtk)
         pvd[t] = vtk
@@ -469,7 +468,8 @@ function compute_divergence(dh, u, cellvalues_v)                            #hid
     return divv                                                             #hide
 end                                                                         #hide
 @testset "INS OrdinaryDiffEq" begin                                         #hide
-    u = integrator.integrator.u                                             #hide
+    u = copy(integrator.integrator.u)                                       #hide
+    apply!(u, ch)                                                           #hide
     Δdivv = abs(compute_divergence(dh, u, cellvalues_v))                    #hide
     @test isapprox(Δdivv, 0.0, atol=1e-12)                                  #hide
                                                                             #hide
@@ -490,10 +490,10 @@ end                                                                         #hid
     @test isapprox(sqrt(Δv), 0.0, atol=1e-3)                                #hide
 end;                                                                        #hide
 
-#md # ## [Plain Program](@id ns_vs_diffeq-plain-program)
+#md # ## [Plain program](@id ns_vs_diffeq-plain-program)
 #md #
-#md # Below follows a version of the program without any comments.
-#md # The file is also available here: [ns_vs_diffeq.jl](ns_vs_diffeq.jl)
+#md # Here follows a version of the program without any comments.
+#md # The file is also available here: [`ns_vs_diffeq.jl`](ns_vs_diffeq.jl).
 #md #
 #md # ```julia
 #md # @__CODE__

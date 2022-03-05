@@ -8,18 +8,18 @@
 #-
 # ## Introduction
 #
-# In this example we study quasi- or nearly-incompressible hyperelasticity using the stable Taylor-Hood approximation. In spirit, this example is the nonlinear analogue of 
+# In this example we study quasi- or nearly-incompressible hyperelasticity using the stable Taylor-Hood approximation. In spirit, this example is the nonlinear analogue of
 # [`incompressible_elasticity`](@__NBVIEWER_ROOT_URL__/examples/incompressible_elasticity.ipynb) and the incompressible analogue of
 # [`hyperelasticity`](@__NBVIEWER_ROOT_URL__/examples/hyperelasticity.ipynb). Much of the code therefore follows from the above two examples.
 # The problem is formulated in the undeformed or reference configuration with the displacement `u` and pressure `p` being the unknown fields. We now briefly outline
-# the formulation. Consider the standard hyperelasticity problem 
+# the formulation. Consider the standard hyperelasticity problem
 #
 # ```math
 #   u = \argmin_{v\in\mathcal{K}}\Pi(v),\quad \text{where}\quad \Pi(v)  = \int_\Omega \Psi(v) \ \mathrm{d}\Omega\ .
 # ```
 # For clarity of presentation we ignore any non-zero surface tractions and body forces and instead consider only
-# applied displacements (i.e. non-homogeneous dirichlet boundary conditions). Moreover we stick our attention to the standard Neo-Hookean stored energy density 
-# 
+# applied displacements (i.e. non-homogeneous dirichlet boundary conditions). Moreover we stick our attention to the standard Neo-Hookean stored energy density
+#
 # ```math
 #     \Psi(u) = \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J) + \frac{\lambda}{2}\left( J - 1\right){}^2,
 # ```
@@ -32,11 +32,11 @@
 # ```math
 #   \widehat{\Psi}(u, p) = \sup_{J} \left[ p(J - 1) - \frac{\mu}{2}\left(I_1 - 3 \right) + \mu \log(J) - \frac{\lambda}{2}\left( J - 1\right){}^2 \right].
 # ```
-# The supremum, say $J^\star$, can be calculated in closed form by the first order optimailty condition $\partial\widehat{\Psi}/\partial J = 0$. This gives 
+# The supremum, say $J^\star$, can be calculated in closed form by the first order optimailty condition $\partial\widehat{\Psi}/\partial J = 0$. This gives
 # ```math
 #   J^\star(p) = \frac{\lambda + p + \sqrt{(\lambda + p){}^2 + 4 \lambda \mu }}{(2 \lambda)}.
 # ```
-# Furthermore, taking the partial legendre transform of $\widehat{\Psi}$ once again, gives us back the original problem, i.e. 
+# Furthermore, taking the partial legendre transform of $\widehat{\Psi}$ once again, gives us back the original problem, i.e.
 # ```math
 #     \Psi(u) = \Psi^\star(u, p) = \sup_{p} \left[ p(J - 1) - p(J^\star - 1) + \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J^\star) + \frac{\lambda}{2}\left( J^\star - 1\right){}^2 \right].
 # ```
@@ -50,17 +50,17 @@
 # ```
 # The euler-lagrange equations corresponding to the above energy give us our governing PDEs in the weak form, namely
 # ```math
-#   \int_\Omega \frac{\partial\Psi^\star}{\partial F}:\delta F \ \mathrm{d}\Omega = 0 
+#   \int_\Omega \frac{\partial\Psi^\star}{\partial F}:\delta F \ \mathrm{d}\Omega = 0
 # ```
 # and
 # ```math
 #   \int_\Omega \frac{\partial \Psi^\star}{\partial p}\delta p \ \mathrm{d}\Omega = 0,
 # ```
 # where δF = δ∇u = ∇(δu) and δu and δp denote arbitrary variations with respect to displacement and pressure (or the test functions). See the references
-# below for a more detailed explanation of the above mathematical trick. Now, in order to apply Newton's method to the 
+# below for a more detailed explanation of the above mathematical trick. Now, in order to apply Newton's method to the
 # above problem, we further need to linearize the above equations and calculate the respective hessians (or tangents), namely, $\partial^2\Psi^\star/\partial F^2$, $\partial^2\Psi^\star/\partial p^2$ and $\partial^2\Psi^\star/\partial F\partial p$
 # which, using `Tensors.jl`, can be determined conveniently using automatic differentiation (see the code below). Hence we only need to define the above potential.
-# The remaineder of the example follows similarly. 
+# The remaineder of the example follows similarly.
 # ## References
 # 1. [A paradigm for higher-order polygonal elements in finite elasticity using a gradient correction scheme, CMAME 2016, 306, 216–251](http://pamies.cee.illinois.edu/Publications_files/CMAME_2016.pdf)
 # 2. [Approximation of incompressible large deformation elastic problems: some unresolved issues, Computational Mechanics, 2013](https://link.springer.com/content/pdf/10.1007/s00466-013-0869-0.pdf)
@@ -153,7 +153,7 @@ function create_bc(dh)
 end;
 
 # Also, since we are considering incompressible hyperelasticity, an interesting quantity that we can compute is the deformed volume of the solid.
-# It is easy to show that this is equal to ∫J*dΩ where J=det(F). This can be done at the level of each element (cell) 
+# It is easy to show that this is equal to ∫J*dΩ where J=det(F). This can be done at the level of each element (cell)
 function calculate_element_volume(cell, cellvalues_u, ue)
     reinit!(cellvalues_u, cell)
     evol::Float64=0.0;
@@ -181,7 +181,7 @@ function calculate_volume_deformed_mesh(w, dh::DofHandler, cellvalues_u)
     return evol
 end;
 
-# The function to assemble the element stiffness matrix for each element in the mesh now has a block structure like in 
+# The function to assemble the element stiffness matrix for each element in the mesh now has a block structure like in
 # `incompressible_elasticity`.
 function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
     ## Reinitialize cell values, and reset output arrays
@@ -267,7 +267,7 @@ function assemble_global!(K::SparseMatrixCSC, f, cellvalues_u::CellVectorValues{
     end
 end;
 
-# We now define a main function `solve`. For nonlinear quasistatic problems we often like to parameterize the 
+# We now define a main function `solve`. For nonlinear quasistatic problems we often like to parameterize the
 # solution in terms of a pseudo time like parameter, which in this case is used to gradually apply the boundary
 # displacement on the right face. Also for definitenessm we consider λ/μ = 10⁴
 function solve(interpolation_u, interpolation_p)
@@ -332,7 +332,7 @@ function solve(interpolation_u, interpolation_p)
         end;
 
         ## Save the solution fields
-        vtk_grid("hyperelasticity_incomp_mixed_$t.vtu", dh, compress=false) do vtkfile
+        vtk_grid("hyperelasticity_incomp_mixed_$t.vtu", dh) do vtkfile
             vtk_point_data(vtkfile, dh, w)
             vtk_save(vtkfile)
             pvd[t] = vtkfile
@@ -347,16 +347,18 @@ end;
 # We can now test the solution using the Taylor-Hood approximation
 quadratic = Lagrange{3, RefTetrahedron, 2}()
 linear = Lagrange{3, RefTetrahedron, 1}()
-vol_def = solve(quadratic, linear);
+vol_def = solve(quadratic, linear)
 
-# We can also check that the deformed volume is indeed close to 1 (as should be for a nearly incompressible material)
+# The deformed volume is indeed close to 1 (as should be for a nearly incompressible material).
+
 using Test                #src
 @test isapprox(vol_def, 1.0, atol=1E-3) #src
 
-#md # ## Plain Program
+#md # ## Plain program
 #md #
-#md # Below follows a version of the program without any comments.
-#md # The file is also available here: [`quasi_incompressible_hyperelasticity.jl`](quasi_incompressible_hyperelasticity.jl)
+#md # Here follows a version of the program without any comments.
+#md # The file is also available here:
+#md # [`quasi_incompressible_hyperelasticity.jl`](quasi_incompressible_hyperelasticity.jl).
 #md #
 #md # ```julia
 #md # @__CODE__

@@ -17,8 +17,6 @@ export
 
 # FEValues
     CellValues,
-    ScalarValues,
-    VectorValues,
     CellScalarValues,
     CellVectorValues,
     FaceValues,
@@ -114,6 +112,8 @@ export
 # Constraints
     ConstraintHandler,
     Dirichlet,
+    PeriodicDirichlet,
+    AffineConstraint,
     update!,
     apply!,
     apply_rhs!,
@@ -146,4 +146,8 @@ export
 
 # Point Evaluation
     PointEvalHandler,
-    get_point_values
+    get_point_values,
+    PointIterator,
+    PointLocation,
+    PointScalarValues,
+    PointVectorValues
