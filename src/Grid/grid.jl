@@ -138,19 +138,6 @@ struct ExclusiveTopology <: AbstractTopology
     face_skeleton::Vector{FaceIndex}
 end
 
-struct NoTopology <: AbstractTopology end
-
-function ExclusiveTopology()
-    vertex_to_cell = Dict(0=>[0])
-    cell_neighbor = zeros(EntityNeighborhood{CellIndex},0)
-    face_neighbor = spzeros(EntityNeighborhood,0,0)
-    vertex_neighbor = spzeros(EntityNeighborhood,0,0)
-    edge_neighbor = spzeros(EntityNeighborhood,0,0)
-    vertex_vertex_neighbor = Dict(0=>EntityNeighborhood(VertexIndex(0,0)))
-    face_skeleton = FaceIndex[]
-    return ExclusiveTopology(vertex_to_cell,cell_neighbor,face_neighbor,vertex_neighbor,edge_neighbor,vertex_vertex_neighbor,face_skeleton)
-end
-
 function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     cell_vertices_table = vertices.(cells) #needs generic interface for <: AbstractCell
     vertex_cell_table = Dict{Int,Vector{Int}}() 
@@ -278,6 +265,8 @@ getcells(neighbors::Vector{T}) where T <: EntityNeighborhood = reduce(vcat, getc
 
 abstract type AbstractGrid{dim} end
 
+ExclusiveTopology(grid::AbstractGrid) = ExclusiveTopology(getcells(grid))
+
 """
     Grid{dim, C<:AbstractCell, T<:Real} <: AbstractGrid}
 
@@ -295,7 +284,7 @@ There are multiple helper structures to apply boundary conditions or define subd
 - `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
 - `boundary_matrix::SparseMatrixCSC{Bool,Int}`: optional, only needed by `onboundary` to check if a cell is on the boundary, see, e.g. Helmholtz example
 """
-mutable struct Grid{dim,C<:AbstractCell,T<:Real,topologytype<:AbstractTopology} <: AbstractGrid{dim}
+mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     cells::Vector{C}
     nodes::Vector{Node{dim,T}}
     # Sets
@@ -306,8 +295,6 @@ mutable struct Grid{dim,C<:AbstractCell,T<:Real,topologytype<:AbstractTopology} 
     vertexsets::Dict{String,Set{VertexIndex}} 
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool,Int}
-    #topology
-    topology::topologytype
 end
 
 function Grid(cells::Vector{C},
@@ -317,19 +304,18 @@ function Grid(cells::Vector{C},
               facesets::Dict{String,Set{FaceIndex}}=Dict{String,Set{FaceIndex}}(),
               edgesets::Dict{String,Set{EdgeIndex}}=Dict{String,Set{EdgeIndex}}(),
               vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}(),
-              boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0),
-              topology::Topology=NoTopology()) where {dim,C,T,Topology<:AbstractTopology}
-    return Grid(cells, nodes, cellsets, nodesets, facesets, edgesets, vertexsets, boundary_matrix, topology)
+              boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)) where {dim,C,T}
+    return Grid(cells, nodes, cellsets, nodesets, facesets, edgesets, vertexsets, boundary_matrix)
 end
 
 ##########################
 # Grid utility functions #
 ##########################
 """
-    getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, cellidx::CellIndex, include_self=false)
-    getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, faceidx::FaceIndex, include_self=false)
-    getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, vertexidx::VertexIndex, include_self=false)
-    getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, EdgeIndex::EdgeIndex, include_self=false)
+    getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, cellidx::CellIndex, include_self=false)
+    getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, faceidx::FaceIndex, include_self=false)
+    getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, vertexidx::VertexIndex, include_self=false)
+    getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, EdgeIndex::EdgeIndex, include_self=false)
 
 Returns all directly connected entities of the same type, i.e. calling the function with a `VertexIndex` will return
 a list of directly connected vertices (connected via face/edge). If `include_self` is true, the given `*Index` is included 
@@ -337,8 +323,8 @@ in the returned list.
 
 **Warning:** this feature is highly experimental and very likely subjected to interface changes in the future.
 """
-function getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, cellidx::CellIndex, include_self=false) where {dim,C,T}
-    patch = getcells(grid.topology.cell_neighbor[cellidx.idx])
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
+    patch = getcells(top.cell_neighbor[cellidx.idx])
     if include_self
         return [patch; cellidx.idx]
     else 
@@ -346,30 +332,30 @@ function getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, cellidx::CellInd
     end
 end
 
-function getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, faceidx::FaceIndex, include_self=false) where {dim,C,T}
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
     if include_self 
-        return [grid.topology.face_neighbor[faceidx[1],faceidx[2]].neighbor_info; faceidx]
+        return [top.face_neighbor[faceidx[1],faceidx[2]].neighbor_info; faceidx]
     else
-        return grid.topology.face_neighbor[faceidx[1],faceidx[2]].neighbor_info
+        return top.face_neighbor[faceidx[1],faceidx[2]].neighbor_info
     end
 end
 
-function getneighborhood(grid::Grid{dim,C,T,ExclusiveTopology}, vertexidx::VertexIndex, include_self=false) where {dim,C,T}
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
     cellid, local_vertexid = vertexidx[1], vertexidx[2]
     cell_vertices = vertices(getcells(grid,cellid))
     global_vertexid = cell_vertices[local_vertexid]
     if include_self
-        return [grid.topology.vertex_vertex_neighbor[global_vertexid].neighbor_info; vertexidx]
+        return [top.vertex_vertex_neighbor[global_vertexid].neighbor_info; vertexidx]
     else
-        return grid.topology.vertex_vertex_neighbor[global_vertexid].neighbor_info
+        return top.vertex_vertex_neighbor[global_vertexid].neighbor_info
     end
 end
 
-function getneighborhood(grid::Grid{3,C,T,ExclusiveTopology}, edgeidx::EdgeIndex, include_self=false) where {C,T}
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx::EdgeIndex, include_self=false)
     if include_self 
-        return [grid.topology.edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info; edgeidx]
+        return [top.edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info; edgeidx]
     else
-        return grid.topology.edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info
+        return top.edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info
     end
 end
 
@@ -378,7 +364,7 @@ end
 Returns an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit` 
 `FaceValues`.
 """
-faceskeleton(grid::Grid{dim,C,T,ExclusiveTopology}) where {dim,C,T} =  grid.topology.face_skeleton
+faceskeleton(top::ExclusiveTopology, grid::AbstractGrid) =  top.face_skeleton
 
 toglobal(grid::Grid,vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1]))[vertexidx[2]]
 toglobal(grid::Grid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))

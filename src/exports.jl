@@ -59,6 +59,7 @@ export
     FaceIndex,
     EdgeIndex,
     VertexIndex,
+    ExclusiveTopology,
     full_neighborhood,
     faceskeleton,
     getcells,

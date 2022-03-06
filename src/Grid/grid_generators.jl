@@ -22,7 +22,7 @@ e.g. `Triangle` or `Hexahedron`. `nel` is a tuple of the number of elements in e
 generate_grid
 
 # Line
-function generate_grid(::Type{Line}, nel::NTuple{1,Int}, left::Vec{1,T}=Vec{1}((-1.0,)), right::Vec{1,T}=Vec{1}((1.0,)); build_topology=false) where {T}
+function generate_grid(::Type{Line}, nel::NTuple{1,Int}, left::Vec{1,T}=Vec{1}((-1.0,)), right::Vec{1,T}=Vec{1}((1.0,))) where {T}
     nel_x = nel[1]
     n_nodes = nel_x + 1
 
@@ -50,12 +50,11 @@ function generate_grid(::Type{Line}, nel::NTuple{1,Int}, left::Vec{1,T}=Vec{1}((
     # Cell face sets
     facesets = Dict("left"  => Set{FaceIndex}([boundary[1]]),
                     "right" => Set{FaceIndex}([boundary[2]]))
-    build_topology ? (topology = ExclusiveTopology(cells)) : (topology = NoTopology())
-    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix, topology=topology)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # QuadraticLine
-function generate_grid(::Type{QuadraticLine}, nel::NTuple{1,Int}, left::Vec{1,T}=Vec{1}((-1.0,)), right::Vec{1,T}=Vec{1}((1.0,)); build_topology=false) where {T}
+function generate_grid(::Type{QuadraticLine}, nel::NTuple{1,Int}, left::Vec{1,T}=Vec{1}((-1.0,)), right::Vec{1,T}=Vec{1}((1.0,))) where {T}
     nel_x = nel[1]
     n_nodes = 2*nel_x + 1
 
@@ -81,8 +80,7 @@ function generate_grid(::Type{QuadraticLine}, nel::NTuple{1,Int}, left::Vec{1,T}
     # Cell face sets
     facesets = Dict("left"  => Set{FaceIndex}([boundary[1]]),
                     "right" => Set{FaceIndex}([boundary[2]]))
-    build_topology ? (topology = ExclusiveTopology(cells)) : (topology = NoTopology())
-    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix, topology=topology)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
@@ -105,21 +103,21 @@ function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
 end
 
 
-function generate_grid(C::Type{Cell{2,M,N}}, nel::NTuple{2,Int}, X::Vector{Vec{2,T}}; build_topology=false) where {M,N,T}
+function generate_grid(C::Type{Cell{2,M,N}}, nel::NTuple{2,Int}, X::Vector{Vec{2,T}}) where {M,N,T}
     @assert length(X) == 4
-    generate_grid(C, nel, X[1], X[2], X[3], X[4]; build_topology=build_topology)
+    generate_grid(C, nel, X[1], X[2], X[3], X[4])
 end
 
-function generate_grid(C::Type{Cell{2,M,N}}, nel::NTuple{2,Int}, left::Vec{2,T}=Vec{2}((-1.0,-1.0)), right::Vec{2,T}=Vec{2}((1.0,1.0));build_topology=false) where {M,N,T}
+function generate_grid(C::Type{Cell{2,M,N}}, nel::NTuple{2,Int}, left::Vec{2,T}=Vec{2}((-1.0,-1.0)), right::Vec{2,T}=Vec{2}((1.0,1.0))) where {M,N,T}
     LL = left
     UR = right
     LR = Vec{2}((UR[1], LL[2]))
     UL = Vec{2}((LL[1], UR[2]))
-    generate_grid(C, nel, LL, LR, UR, UL; build_topology=build_topology)
+    generate_grid(C, nel, LL, LR, UR, UL)
 end
 
 # Quadrilateral
-function generate_grid(C::Type{Quadrilateral}, nel::NTuple{2,Int}, LL::Vec{2,T}, LR::Vec{2,T}, UR::Vec{2,T}, UL::Vec{2,T}; build_topology=false) where {T}
+function generate_grid(C::Type{Quadrilateral}, nel::NTuple{2,Int}, LL::Vec{2,T}, LR::Vec{2,T}, UR::Vec{2,T}, UL::Vec{2,T}) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_tot = nel_x*nel_y
     n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1
     n_nodes = n_nodes_x * n_nodes_y
@@ -152,12 +150,11 @@ function generate_grid(C::Type{Quadrilateral}, nel::NTuple{2,Int}, LL::Vec{2,T},
     facesets["top"]    = Set{FaceIndex}(boundary[(1:length(cell_array[:,end])) .+ offset]); offset += length(cell_array[:,end])
     facesets["left"]   = Set{FaceIndex}(boundary[(1:length(cell_array[1,:]))   .+ offset]); offset += length(cell_array[1,:])
 
-    build_topology ? (topology = ExclusiveTopology(cells)) : (topology = NoTopology())
-    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix, topology=topology)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # QuadraticQuadrilateral
-function generate_grid(::Type{QuadraticQuadrilateral}, nel::NTuple{2,Int}, LL::Vec{2,T}, LR::Vec{2,T}, UR::Vec{2,T}, UL::Vec{2,T}; build_topology=false) where {T}
+function generate_grid(::Type{QuadraticQuadrilateral}, nel::NTuple{2,Int}, LL::Vec{2,T}, LR::Vec{2,T}, UR::Vec{2,T}, UL::Vec{2,T}) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_tot = nel_x*nel_y
     n_nodes_x = 2*nel_x + 1; n_nodes_y = 2*nel_y + 1
     n_nodes = n_nodes_x * n_nodes_y
@@ -192,12 +189,11 @@ function generate_grid(::Type{QuadraticQuadrilateral}, nel::NTuple{2,Int}, LL::V
     facesets["top"]    = Set{FaceIndex}(boundary[(1:length(cell_array[:,end])) .+ offset]); offset += length(cell_array[:,end])
     facesets["left"]   = Set{FaceIndex}(boundary[(1:length(cell_array[1,:]))   .+ offset]); offset += length(cell_array[1,:])
 
-    build_topology ? (topology = ExclusiveTopology(cells)) : (topology = NoTopology())
-    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix, topology=topology)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # Hexahedron
-function generate_grid(::Type{Hexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0)); build_topology=false) where {T}
+function generate_grid(::Type{Hexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]; nel_tot = nel_x*nel_y*nel_z
     n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1; n_nodes_z = nel_z + 1
     n_nodes = n_nodes_x * n_nodes_y * n_nodes_z
@@ -240,11 +236,10 @@ function generate_grid(::Type{Hexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Ve
     facesets["left"]   = Set{FaceIndex}(boundary[(1:length(cell_array[1,:,:][:]))   .+ offset]); offset += length(cell_array[1,:,:][:])
     facesets["top"]    = Set{FaceIndex}(boundary[(1:length(cell_array[:,:,end][:])) .+ offset]); offset += length(cell_array[:,:,end][:])
 
-    build_topology ? (topology = ExclusiveTopology(cells)) : (topology = NoTopology())
-    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix, topology=topology)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end 
 
-function Ferrite.generate_grid(::Type{Cell{3,20,6}}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0)); build_topology=false) where {T}
+function Ferrite.generate_grid(::Type{Cell{3,20,6}}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]; nel_tot = nel_x*nel_y*nel_z
     nnode_x = 2nel_x + 1; nnode_y = 2nel_y + 1; nnode_z = 2nel_z + 1 #Note: not the actually number of nodes in x/y/z, just a temporary variables
 
@@ -299,12 +294,11 @@ function Ferrite.generate_grid(::Type{Cell{3,20,6}}, nel::NTuple{3,Int}, left::V
     facesets["left"]   = Set{FaceIndex}(boundary[(1:length(cell_array[1,:,:][:]))   .+ offset]); offset += length(cell_array[1,:,:][:])
     facesets["top"]    = Set{FaceIndex}(boundary[(1:length(cell_array[:,:,end][:])) .+ offset]); offset += length(cell_array[:,:,end][:])
 
-    build_topology ? (topology = ExclusiveTopology(cells)) : (topology = NoTopology())
-    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix, topology=topology)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)   
 end
 
 # Triangle
-function generate_grid(::Type{Triangle}, nel::NTuple{2,Int}, LL::Vec{2,T}, LR::Vec{2,T}, UR::Vec{2,T}, UL::Vec{2,T}; build_topology=false) where {T}
+function generate_grid(::Type{Triangle}, nel::NTuple{2,Int}, LL::Vec{2,T}, LR::Vec{2,T}, UR::Vec{2,T}, UL::Vec{2,T}) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_tot = 2*nel_x*nel_y
     n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1
     n_nodes = n_nodes_x * n_nodes_y
@@ -338,12 +332,11 @@ function generate_grid(::Type{Triangle}, nel::NTuple{2,Int}, LL::Vec{2,T}, LR::V
     facesets["top"]    = Set{FaceIndex}(boundary[(1:length(cell_array[2,:,end])) .+ offset]); offset += length(cell_array[2,:,end])
     facesets["left"]   = Set{FaceIndex}(boundary[(1:length(cell_array[1,1,:]))   .+ offset]); offset += length(cell_array[1,1,:])
 
-    build_topology ? (topology = ExclusiveTopology(cells)) : (topology = NoTopology())
-    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix, topology=topology)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # QuadraticTriangle
-function generate_grid(::Type{QuadraticTriangle}, nel::NTuple{2,Int}, LL::Vec{2,T}, LR::Vec{2,T}, UR::Vec{2,T}, UL::Vec{2,T}; build_topology=false) where {T}
+function generate_grid(::Type{QuadraticTriangle}, nel::NTuple{2,Int}, LL::Vec{2,T}, LR::Vec{2,T}, UR::Vec{2,T}, UL::Vec{2,T}) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_tot = 2*nel_x*nel_y
     n_nodes_x = 2*nel_x + 1; n_nodes_y = 2*nel_y + 1
     n_nodes = n_nodes_x * n_nodes_y
@@ -379,12 +372,11 @@ function generate_grid(::Type{QuadraticTriangle}, nel::NTuple{2,Int}, LL::Vec{2,
     facesets["top"]    = Set{FaceIndex}(boundary[(1:length(cell_array[2,:,end])) .+ offset]); offset += length(cell_array[2,:,end])
     facesets["left"]   = Set{FaceIndex}(boundary[(1:length(cell_array[1,1,:]))   .+ offset]); offset += length(cell_array[1,1,:])
 
-    build_topology ? (topology = ExclusiveTopology(cells)) : (topology = NoTopology())
-    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix, topology=topology)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
 # Tetrahedron
-function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0)); build_topology=false) where {T}
+function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
     nodes_per_dim = cells_per_dim .+ 1
 
     cells_per_cube = 6
@@ -460,6 +452,5 @@ function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3,Int}, left::
         "top" => Set(to),
     )
 
-    build_topology ? (topology = ExclusiveTopology(cells)) : (topology = NoTopology())
-    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix, topology=topology)
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
