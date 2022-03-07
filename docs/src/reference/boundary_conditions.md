@@ -10,6 +10,7 @@ Dirichlet
 PeriodicDirichlet
 add!
 close!
+update!
 apply!
 apply_zero!
 get_rhs_data

@@ -25,6 +25,10 @@ dbc = Dirichlet(:u, ∂Ω, (x, t) -> sin(t), [1, 3]) # applied to component 1 an
 
 `Dirichlet` boundary conditions are added to a [`ConstraintHandler`](@ref)
 which applies the condition via [`apply!`](@ref) and/or [`apply_zero!`](@ref).
+
+If the boundary condition depends on data that is not available when defining the
+constraint (e.g. "runtime computed" data) the function can take an additional argument.
+The third argument is passed through from the call to `update!`.
 """
 struct Dirichlet # <: Constraint
     f::Function # f(x,t) -> value
@@ -34,10 +38,10 @@ struct Dirichlet # <: Constraint
     local_face_dofs::Vector{Int}
     local_face_dofs_offset::Vector{Int}
 end
-function Dirichlet(field_name::Symbol, faces::Union{T}, f::Function, component::Int=1) where T
+function Dirichlet(field_name::Symbol, faces::Set, f::Function, component::Int=1)
     Dirichlet(field_name, copy(faces), f, [component])
 end
-function Dirichlet(field_name::Symbol, faces::Set{T}, f::Function, components::AbstractVector{Int}) where T
+function Dirichlet(field_name::Symbol, faces::Set, f::Function, components::AbstractVector{Int})
     unique(components) == components || error("components not unique: $components")
     # issorted(components) || error("components not sorted: $components")
     return Dirichlet(f, copy(faces), field_name, Vector(components), Int[], Int[])
@@ -346,18 +350,34 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     return ch
 end
 
-# Updates the DBC's to the current time `time`
-function update!(ch::ConstraintHandler, time::Real=0.0)
+"""
+    update!(ch::ConstraintHandler, t=0.0, params=nothing)
+
+Update the constraints inside the constraint handler for a new time-step.
+
+For every constraint in the handler `update!` calls `f(x, t)`, or `f(x, t, params)` if
+applicable, where `f` is the function(s) corresponding to the constraints added to the
+constraint handler.
+"""
+function update!(ch::ConstraintHandler, time::Real=0.0, params=nothing)
     @assert ch.closed[]
-    for (i,dbc) in enumerate(ch.dbcs)
+    for (i, dbc) in enumerate(ch.dbcs)
+        # If the underlying BC function accepts three arguments we create an internal
+        # closure here that includes params and then use only x, and t in the call later.
+        if params !== nothing &&
+           hasmethod(dbc.f, Tuple{typeof(ch.dh.grid.nodes[1].x), typeof(time), typeof(params)})
+            wrapper_f = (x, t) -> dbc.f(x, t, params)
+        else
+            wrapper_f = dbc.f
+        end
         # Function barrier
-        _update!(ch.inhomogeneities, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
+        _update!(ch.inhomogeneities, wrapper_f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
                  dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, convert(Float64, time))
     end
 end
 
 # for faces
-function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:BoundaryIndex}, ::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::T) where {T}
 
@@ -398,11 +418,11 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:Bo
 end
 
 # for nodes
-function _update!(inhomogeneities::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+function _update!(inhomogeneities::Vector{Float64}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::Float64)
     counter = 1
-    for (idx, nodenumber) in enumerate(nodeidxs)
+    for nodenumber in nodeidxs
         x = dh.grid.nodes[nodenumber].x
         bc_value = f(x, time)
         @assert length(bc_value) == length(components)
@@ -800,7 +820,7 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
 end
 
 function _check_cellset_dirichlet(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex})
-    for (cellid,faceid) in faceset
+    for (cellid, _) in faceset
         if !(cellid in cellset)
             @warn("You are trying to add a constraint to a face that is not in the cellset of the fieldhandler. The face will be skipped.")
         end
@@ -1038,7 +1058,7 @@ end
 function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{2,<:Union{RefCube,RefTetrahedron}}, n::Int)
     # For 2D we always permute since Ferrite defines dofs counter-clockwise
     ret = copy(local_face_dofs)
-    for (i, f) in enumerate(faces(ip))
+    for (i, _) in enumerate(faces(ip))
         this_offset = local_face_dofs_offset[i]
         other_offset = this_offset + n
         for d in 1:n

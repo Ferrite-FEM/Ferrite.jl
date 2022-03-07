@@ -517,14 +517,14 @@ round.(ev; digits=-8)
 # also compute the macroscopic part of the displacement.
 
 chM = ConstraintHandler(dh)
-add!(chM, Dirichlet(:u, Set(1:getnnodes(grid)), (x, t) -> εᴹ[Int(t)] ⋅ x, [1, 2]))
+add!(chM, Dirichlet(:u, Set(1:getnnodes(grid)), (x, _, εᴹ) -> εᴹ ⋅ x, [1, 2]))
 close!(chM)
 uM = zeros(ndofs(dh))
 
 vtk_grid("homogenization", dh) do vtk
     for i in 1:3
         ## Compute macroscopic solution
-        update!(chM, i)
+        update!(chM, 0.0, εᴹ[i])
         apply!(uM, chM)
         ## Dirichlet
         vtk_point_data(vtk, dh, uM + u.dirichlet[i], "_dirichlet_$i")
