@@ -62,7 +62,7 @@ Collection of constraints.
 """
 struct ConstraintHandler{DH<:AbstractDofHandler,T}
     dbcs::Vector{Dirichlet}
-    acs::Vector{AffineConstraint}
+    acs::Vector{AffineConstraint{T}}
     prescribed_dofs::Vector{Int}
     free_dofs::Vector{Int}
     inhomogeneities::Vector{T}
@@ -74,7 +74,7 @@ end
 
 function ConstraintHandler(dh::AbstractDofHandler)
     @assert isclosed(dh)
-    ConstraintHandler(Dirichlet[], AffineConstraint[], Int[], Int[], Float64[], Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false))
+    ConstraintHandler(Dirichlet[], AffineConstraint{Float64}[], Int[], Int[], Float64[], Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false))
 end
 
 """
@@ -588,12 +588,18 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
 end
 
 # Similar to Ferrite._condense!(K, ch), but only add the non-zero entries to K (that arises from the condensation process)
-function _condense_sparsity_pattern!(K::SparseMatrixCSC, acs::Vector{AffineConstraint})
+function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, acs::Vector{AffineConstraint{T}}) where T
     ndofs = size(K, 1)
-
+    (length(acs) == 0) && return 
     # Store linear constraint index for each constrained dof
     distribute = Dict{Int,Int}(acs[c].constrained_dof => c for c in 1:length(acs))
 
+    #Adding new entries to K was extremely slow, so craete a new sparsity triplet for the condensed sparsity pattern
+    N = length(acs)*10 # TODO: Better size estimate for additional condensed sparsity pattern.
+    I = Int[]; resize!(I, N)
+    J = Int[]; resize!(J, N)
+
+    cnt = 0
     for col in 1:ndofs
         # Since we will possibly be pushing new entries to K, the field K.rowval will grow.
         # Therefor we must extract this before iterating over K
@@ -606,7 +612,10 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC, acs::Vector{AffineConst
                 if drow != 0
                     ac = acs[drow]
                     for (d, _) in ac.entries
-                        add_entry!(K, d, col)
+                        if !_addindex_sparsematrix!(K, 0.0, d, col)
+                            cnt += 1
+                            _add_or_grow(cnt, I, J, d, col)
+                        end
                     end
                 end
             end
@@ -616,24 +625,42 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC, acs::Vector{AffineConst
                 if drow == 0
                     ac = acs[dcol]
                     for (d, _) in ac.entries
-                        add_entry!(K, row, d)
+                        if !_addindex_sparsematrix!(K, 0.0, row, d)
+                            cnt += 1
+                            _add_or_grow(cnt, I, J, row, d)
+                        end
                     end
                 else
                     ac1 = acs[dcol]
                     for (d1, _) in ac1.entries
                         ac2 = acs[distribute[row]]
                         for (d2, _) in ac2.entries
-                            add_entry!(K, d1, d2)
+                            if !_addindex_sparsematrix!(K, 0.0, d1, d2)
+                                cnt += 1
+                                _add_or_grow(cnt, I, J, d1, d2)
+                            end
                         end
                     end
                 end
             end
         end
     end
+
+    resize!(I, cnt)
+    resize!(J, cnt)
+
+    # Fill the sparse matrix with a non-zero value so that :+ operation does not remove entries with value zero.
+    # Use eps(T) so that the it does not affect the current values of the sparse matrix (I need to call _condense_sparsity_pattern() in other places of my code /Elias)
+    V = fill(eps(T), length(I))
+    K2 = sparse(I, J, V, ndofs, ndofs)
+
+    K .+= K2
+
+    return nothing
 end
 
 # Condenses K and f: C'*K*C, C'*f, in-place assuming the sparsity pattern is correct
-function _condense!(K::SparseMatrixCSC, f::AbstractVector, acs::Vector{AffineConstraint})
+function _condense!(K::SparseMatrixCSC, f::AbstractVector, acs::Vector{AffineConstraint{T}}) where T
 
     ndofs = size(K, 1)
     condense_f = !(length(f) == 0)
@@ -652,7 +679,7 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, acs::Vector{AffineCon
                     ac = acs[drow]
                     for (d, v) in ac.entries
                         Kval = K.nzval[a]
-                        _addindex_sparsematrix!(K, v * Kval, d, col)
+                        _addindex_sparsematrix!(K, v * Kval, d, col) || _sparsity_error()
                     end
 
                     # Perform f - K*g. However, this has already been done in outside this functions so we skip this.
@@ -669,7 +696,7 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, acs::Vector{AffineCon
                     ac = acs[dcol]
                     for (d,v) in ac.entries
                         Kval = K.nzval[a]
-                        _addindex_sparsematrix!(K, v * Kval, row, d)
+                        _addindex_sparsematrix!(K, v * Kval, row, d) || _sparsity_error()
                     end
                 else
                     ac1 = acs[dcol]
@@ -677,7 +704,7 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, acs::Vector{AffineCon
                         ac2 = acs[drow]
                         for (d2,v2) in ac2.entries
                             Kval = K.nzval[a]
-                            _addindex_sparsematrix!(K, v1 * v2 * Kval, d1, d2)
+                            _addindex_sparsematrix!(K, v1 * v2 * Kval, d1, d2) || _sparsity_error()
                         end
                     end
                 end
@@ -695,8 +722,20 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, acs::Vector{AffineCon
     end
 end
 
+_sparsity_error() = error("Sparsity pattern missing entries for the condensation pattern. Make sure to call `create_sparsity_pattern(dh::DofHandler, ch::ConstraintHandler) when using linear constraints.`")
+
+function _add_or_grow(cnt::Int, I::Vector{Int}, J::Vector{Int}, dofi::Int, dofj::Int)
+    if cnt > length(J)
+        resize!(I, trunc(Int, length(I) * 1.5))
+        resize!(J, trunc(Int, length(J) * 1.5))
+    end
+    I[cnt] = dofi
+    J[cnt] = dofj
+end
+
 # Copied from SparseArrays._setindex_scalar!(...)
 # Custom SparseArrays._setindex_scalar!() that throws error if entry K(_i,_j) does not exist
+# Returns true if it successfully added the new value, returns false otherwise.
 function _addindex_sparsematrix!(A::SparseMatrixCSC{Tv,Ti}, v::Tv, i::Ti, j::Ti) where {Tv, Ti}
     if !((1 <= i <= size(A, 1)) & (1 <= j <= size(A, 2)))
         throw(BoundsError(A, (i,j)))
@@ -707,18 +746,9 @@ function _addindex_sparsematrix!(A::SparseMatrixCSC{Tv,Ti}, v::Tv, i::Ti, j::Ti)
     if searchk <= coljlastk && rowvals(A)[searchk] == i
         # Column j contains entry A[i,j]. Update and return
         nonzeros(A)[searchk] += v
-        return A
+        return true
     end
-    error("Sparsity pattern missing entries for the condensation pattern. Make sure to call `create_sparsity_pattern(dh::DofHandler, ch::ConstraintHandler) when using linear constraints.`")
-end
-
-# A[i,j] += 0.0 does not add entries to sparse matrices, so we need to first add 1.0, and then remove it
-# TODO: Maybe this can be done for vectors i and j instead of doing it individually?
-function add_entry!(A::SparseMatrixCSC, i::Int, j::Int)
-    if iszero(A[i,j]) # Check first if zero to not remove already non-zero entries
-        A[i,j] = 1
-        A[i,j] = 0
-    end
+        return false
 end
 
 """
