@@ -206,12 +206,12 @@ end
     #Test function add
     addfaceset!(grid, "left_face", (x)-> x[1] ≈ 0.0)
     addedgeset!(grid, "left_lower_edge", (x)-> x[1] ≈ 0.0 && x[3] ≈ 0.0)
-    addvertexset!(grid, "left_vertex", (x)-> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
+    addvertexset!(grid, "left_corner", (x)-> x[1] ≈ 0.0 && x[2] ≈ 0.0 && x[3] ≈ 0.0)
 
     @test 1 in Ferrite.getnodeset(grid, "node_set")
     @test FaceIndex(1,5) in getfaceset(grid, "left_face")
     @test EdgeIndex(1,4) in getedgeset(grid, "left_lower_edge")
-    @test VertexIndex(1,1) in getvertexset(grid, "left_vertex")
+    @test VertexIndex(1,1) in getvertexset(grid, "left_corner")
 
 end
 
