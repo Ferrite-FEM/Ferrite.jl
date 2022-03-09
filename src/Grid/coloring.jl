@@ -145,7 +145,14 @@ function workstream_coloring(incidence_matrix, cellset::Set{Int})
     return final_colors
 end
 
-@enum ColoringAlgorithm GREEDY WORKSTREAM
+# @enum ColoringAlgorithm GREEDY WORKSTREAM
+baremodule ColoringAlgorithm
+    struct T x::Int end
+    const Greedy = T(0)
+    const WorkStream = T(1)
+end
+const GREEDY = ColoringAlgorithm.Greedy
+const WORKSTREAM = ColoringAlgorithm.WorkStream
 
 """
     create_coloring(g::Grid, cellset::Set{Int}=Set(1:getncells(g)); alg::ColoringAlgorithm)
@@ -163,11 +170,11 @@ ret = [
 ```
 
 Two different algorithms are available, specified with the `alg` keyword argument:
- - `alg = Ferrite.WORKSTREAM` (default): Three step algorithm from
+ - `alg = Ferrite.ColoringAlgorithm.WorkStream` (default): Three step algorithm from
    [*WorkStream*](https://www.math.colostate.edu/%7Ebangerth/publications/2013-pattern.pdf)
    , albeit with a greedy coloring in the second step. Generally results in more colors than `Ferrite.GREEDY`,
    however the cells are more equally distributed among the colors.
- - `alg = Ferrite.GREEDY`: greedy algorithm that works well for structured quadrilateral grids such as
+ - `alg = Ferrite.ColoringAlgorithm.Greedy`: greedy algorithm that works well for structured quadrilateral grids such as
    e.g. quadrilateral grids from `generate_grid`.
 
 The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
@@ -183,11 +190,11 @@ The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
     )
     ```
 """
-function create_coloring(g::Grid, cellset::Set{Int}=Set{Int}(1:getncells(g)); alg::ColoringAlgorithm=WORKSTREAM)
+function create_coloring(g::Grid, cellset::Set{Int}=Set{Int}(1:getncells(g)); alg::ColoringAlgorithm.T=ColoringAlgorithm.WorkStream)
     incidence_matrix = create_incidence_matrix(g, cellset)
-    if alg === WORKSTREAM
+    if alg === ColoringAlgorithm.WorkStream
         return workstream_coloring(incidence_matrix, cellset)
-    elseif alg === GREEDY
+    elseif alg === ColoringAlgorithm.Greedy
         return greedy_coloring(incidence_matrix, cellset)
     else
         error("impossible")
