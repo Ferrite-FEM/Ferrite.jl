@@ -89,6 +89,7 @@ export
 
 # Grid coloring
     create_coloring,
+    ColoringAlgorithm,
     vtk_cell_data_colors,
 
 # Dofs
@@ -119,6 +120,7 @@ export
     apply_zero!,
     add!,
     free_dofs,
+    ApplyStrategy,
 
 # iterators
     CellIterator,

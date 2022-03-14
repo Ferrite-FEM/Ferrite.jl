@@ -23,8 +23,8 @@ using Ferrite, SparseArrays
 
 function create_example_2d_grid()
     grid = generate_grid(Quadrilateral, (10, 10), Vec{2}((0.0, 0.0)), Vec{2}((10.0, 10.0)))
-    colors_workstream = create_coloring(grid; alg=Ferrite.WORKSTREAM)
-    colors_greedy = create_coloring(grid; alg=Ferrite.GREEDY)
+    colors_workstream = create_coloring(grid; alg=ColoringAlgorithm.WorkStream)
+    colors_greedy = create_coloring(grid; alg=ColoringAlgorithm.Greedy)
     vtk_grid("colored", grid) do vtk
         vtk_cell_data_colors(vtk, colors_workstream, "workstream-coloring")
         vtk_cell_data_colors(vtk, colors_greedy, "greedy-coloring")
