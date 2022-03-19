@@ -18,21 +18,26 @@
 # In this example we will solve a problem in a finite strain setting using an
 # hyperelastic material model. In order to compute the stress we will use automatic
 # differentiation, to solve the non-linear system we use Newton's
-# method, and for solving the Newton increment we use conjugate gradient.
+# method, and for solving the Newton increment we use conjugate gradients.
 #
 # The weak format is expressed in terms of the first Piola-Kirchoff stress ``\mathbf{P}``
 # as follows: Find ``u \in \mathbb{U}`` such that
 #
 # ```math
-#  \int_\Omega [\delta \mathbf{u} \otimes \nabla] : \mathbf{P}(\mathbf{u})\ \mathrm{d}\Omega =
+# \int_\Omega \nabla \delta \mathbf{u} : \mathbf{P}(\mathbf{u})\ \mathrm{d}\Omega =
 # \int_\Omega \delta \mathbf{u} \cdot \mathbf{b}\ \mathrm{d}\Omega + \int_{\Gamma^\mathrm{N}}
-# \mathbf{u} \cdot \mathbf{t}\ \mathrm{d}\Gamma
+# \delta \mathbf{u} \cdot \mathbf{t}\ \mathrm{d}\Gamma
 # \quad \forall \delta \mathbf{u} \in \mathbb{U}^0,
 # ```
 #
 # where ``\mathbf{u}`` is the unknown displacement field, ``\mathbf{b}`` is the body force, ``\mathbf{t}``
 # is the traction on the Neumann part of the boundary, and where ``\mathbb{U}`` and ``\mathbb{U}^0`` are
-# suitable trial and test sets.
+# suitable trial and test sets. ``\Omega`` denotes the reference domain, which is also called reference
+# or material domain. Gradients are defined with respect to the reference domain. Note that for
+# large deformation problems it is also possibile that gradients and integrals are defined on the
+# deformed domain, which is also called the current or spatial domain, depending on the specific
+# formulation.
+#
 
 using Ferrite, Tensors, TimerOutputs, ProgressMeter
 import KrylovMethods, IterativeSolvers
@@ -40,14 +45,15 @@ import KrylovMethods, IterativeSolvers
 # ## Hyperelastic material model
 #
 # The stress can be derived from an energy potential, defined in
-# terms of the right Cauchy-Green tensor ``\mathbf{C}``. We shall use a neo-Hookean model, where
-# the potential can be written as
+# terms of the right Cauchy-Green tensor ``\mathbf{C} = \mathbf{F}^{\mathrm{T}} \mathbf{F}``,
+# where ``\mathbf{F} = \mathbf{I} + \nabla \mathbf{u}`` is the deformation gradient.
+# We shall use a neo-Hookean model, where the potential can be written as
 #
 # ```math
 # \Psi(\mathbf{C}) = \frac{\mu}{2} (I_C - 3) - \mu \ln(J) + \frac{\lambda}{2} \ln(J)^2,
 # ```
 #
-# where ``I_C = \mathrm{tr}(C)``, ``J = \sqrt{\det(C)}`` and ``\mu`` and ``\lambda`` material parameters.
+# where ``I_C = \mathrm{tr}(\mathbf{C})``, ``J = \sqrt{\det(\mathbf{C})}`` and ``\mu`` and ``\lambda`` material parameters.
 # From the potential we obtain the second Piola-Kirchoff stress ``\mathbf{S}`` as
 #
 # ```math
@@ -85,8 +91,8 @@ function constitutive_driver(C, mp::NeoHooke)
 end;
 
 # Finally, for the finite element problem we need ``\mathbf{P}`` and
-# ``\frac{\partial \mathbf{P}}{\partial \mathbf{F}}``, which can be obtained by the following
-# transformations
+# ``\frac{\partial \mathbf{P}}{\partial \mathbf{F}}``, which can be
+# obtained by using the following relations:
 #
 # ```math
 # \begin{align*}
@@ -95,6 +101,35 @@ end;
 # \frac{\partial \mathbf{S}}{\partial \mathbf{C}} : [\mathbf{F}^\mathrm{T} \bar{\otimes} \mathbf{I}]
 # + \mathbf{I} \bar{\otimes} \mathbf{S}.
 # \end{align*}
+# ```
+#
+# ## Newton's Method
+#
+# As mentioned above, to deal with the non-linear weak form we first linearize
+# the problem such that we can apply Newton's method, and then apply the FEM to
+# discretize the problem. Skipping a detailed derivation Newton's method can
+# be expressed as:
+# Given some initial guess ``u^0``, find a sequence ``u^{k}`` by iterating
+#
+# ```math
+# u^{k+1} = u^{k} - \Delta u^{k}
+# ```
+#
+# util some termination condition has been met. Therin we determine ``\Delta u^{k}``
+#
+# ```math
+# K(u^{k}) \Delta u^{k} = g(u^{k})
+# ```
+#
+# where $K$ is the Jacobi matrix and $g$ the global residual, such that
+#
+# ```math
+# K_{ij} = \int_{\Omega} \nabla \delta u_{i} : \frac{\partial \mathbf{P}}{\partial \mathbf{F}} : \nabla \delta u_{j} \, \mathrm{d} \Omega
+# ```
+# and
+#
+# ```math
+# g_{i} = \int_{\Omega} \nabla \delta u_{i} : \mathbf{P} - \delta u_{i} \cdot b \, \mathrm{d} \Omega
 # ```
 #
 # ## Finite element assembly
