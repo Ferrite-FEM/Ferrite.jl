@@ -30,13 +30,13 @@
 # \quad \forall \delta \mathbf{u} \in \mathbb{U}^0,
 # ```
 #
-# where ``\mathbf{u}`` is the unknown displacement field, ``\mathbf{b}`` is the body force, ``\mathbf{t}``
-# is the traction on the Neumann part of the boundary, and where ``\mathbb{U}`` and ``\mathbb{U}^0`` are
-# suitable trial and test sets. ``\Omega`` denotes the reference domain, which is also called reference
-# or material domain. Gradients are defined with respect to the reference domain. Note that for
-# large deformation problems it is also possibile that gradients and integrals are defined on the
-# deformed domain, which is also called the current or spatial domain, depending on the specific
-# formulation.
+# where ``\mathbf{u}`` is the unknown displacement field, ``\mathbf{b}`` is the body force acting
+# on the reference domain, ``\mathbf{t}`` is the traction acting on the Neumann part of the reference
+# domain's boundary, and where ``\mathbb{U}`` and ``\mathbb{U}^0`` are suitable trial and test sets.
+# ``\Omega`` denotes the reference domain, which is also called reference or material domain.
+# Gradients are defined with respect to the reference domain. Note that for large deformation problems
+# it is also possibile that gradients and integrals are defined on the deformed domain, which is also
+# called the current or spatial domain, depending on the specific formulation.
 #
 
 using Ferrite, Tensors, TimerOutputs, ProgressMeter
@@ -50,10 +50,11 @@ import KrylovMethods, IterativeSolvers
 # We shall use a neo-Hookean model, where the potential can be written as
 #
 # ```math
-# \Psi(\mathbf{C}) = \frac{\mu}{2} (I_C - 3) - \mu \ln(J) + \frac{\lambda}{2} \ln(J)^2,
+# \Psi(\mathbf{C}) = \frac{\mu}{2} (I_1 - 3) - \mu \ln(J) + \frac{\lambda}{2} \ln(J)^2,
 # ```
 #
-# where ``I_C = \mathrm{tr}(\mathbf{C})``, ``J = \sqrt{\det(\mathbf{C})}`` and ``\mu`` and ``\lambda`` material parameters.
+# where ``I_1 = \mathrm{tr}(\mathbf{C})`` is the first invariant, ``J = \sqrt{\det(\mathbf{C})}``
+# and ``\mu`` and ``\lambda`` material parameters.
 # From the potential we obtain the second Piola-Kirchoff stress ``\mathbf{S}`` as
 #
 # ```math
@@ -107,7 +108,7 @@ end;
 #
 # As mentioned above, to deal with the non-linear weak form we first linearize
 # the problem such that we can apply Newton's method, and then apply the FEM to
-# discretize the problem. Skipping a detailed derivation Newton's method can
+# discretize the problem. Skipping a detailed derivation, Newton's method can
 # be expressed as:
 # Given some initial guess ``\mathbf{u}^0``, find a sequence ``\mathbf{u}^{k}`` by iterating
 #
@@ -121,7 +122,8 @@ end;
 # \mathbf{K}(\mathbf{u}^{k}) \Delta \mathbf{u}^{k} = \mathbf{g}(\mathbf{u}^{k})
 # ```
 #
-# where $K$ is the Jacobi matrix and $g$ the global residual, such that
+# where $\mathbf{g}$ is the global residual and $\mathbf{K} = \frac{\partial g}{\partial u}$
+# the Jacobi matrix, such that
 #
 # ```math
 # K_{ij} = \int_{\Omega} \nabla \delta u_{i} : \frac{\partial \mathbf{P}}{\partial \mathbf{F}} : \nabla \delta u_{j} \, \mathrm{d} \Omega
@@ -131,6 +133,10 @@ end;
 # ```math
 # g_{i} = \int_{\Omega} \nabla \delta u_{i} : \mathbf{P} - \delta u_{i} \cdot \mathbf{b} \, \mathrm{d} \Omega
 # ```
+#
+# A detailed derivation can be found in every continuum mechanics book, which has a
+# chapter about finite elasticity theory. We used "Nonlinear solid mechanics: a continuum
+# approach for engineering science." by Gerhard Holzapfel (chapter 8) as a reference.
 #
 # ## Finite element assembly
 #

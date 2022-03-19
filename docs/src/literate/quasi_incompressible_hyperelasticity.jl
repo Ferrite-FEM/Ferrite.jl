@@ -26,7 +26,7 @@
 # ```math
 #     \Psi(\mathbf{u}) = \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J) + \frac{\lambda}{2}\left( J - 1\right){}^2,
 # ```
-# where $I_1 = \mathbf{F}:\mathbf{F} = F_{ij}F_{ij}$ and $J = \det(\mathbf{F})$ denote the standard invariants of the deformation gradient tensor $\mathbf{F} = \mathbf{I}+\nabla \mathbf{u}$.
+# where $I_1 = \tf{\mathbf{C}} = F_{ij}F_{ij} = \tr(F)$ and $J = \det(\mathbf{F})$ denote the standard invariants of the deformation gradient tensor $\mathbf{F} = \mathbf{I}+\nabla \mathbf{u}$.
 # The above problem is ill-posed in the limit of incompressibility (or near-incompressibility), namely when
 # ```math
 #     \lambda/\mu \rightarrow +\infty.
@@ -59,7 +59,7 @@
 # ```math
 #   \int_\Omega \frac{\partial \Psi^\star}{\partial p}\delta p \ \mathrm{d}\Omega = 0,
 # ```
-# where δF = δ∇u = ∇(δu) and δu and δp denote arbitrary variations with respect to displacement and pressure (or the test functions). See the references
+# where $\delta \mathrm{F} = \delta \mathrm{grad}_0(\mathbf{u}) = \mathrm{grad}_0(\delta \mathbf{u})$ and $\delta \mathbf{u}$ and $\delta p$ denote arbitrary variations with respect to displacement and pressure (or the test functions). See the references
 # below for a more detailed explanation of the above mathematical trick. Now, in order to apply Newton's method to the
 # above problem, we further need to linearize the above equations and calculate the respective hessians (or tangents), namely, $\partial^2\Psi^\star/\partial \mathbf{F}^2$, $\partial^2\Psi^\star/\partial p^2$ and $\partial^2\Psi^\star/\partial \mathbf{F}\partial p$
 # which, using `Tensors.jl`, can be determined conveniently using automatic differentiation (see the code below). Hence we only need to define the above potential.
