@@ -5,7 +5,7 @@
 #
 # ![hyperelasticity.png](hyperelasticity.png)
 #
-# *Figure 1*: Cube loaded in torsion modeled with a hyper elastic material model and
+# *Figure 1*: Cube loaded in torsion modeled with a hyperelastic material model and
 # finite strain.
 #
 #-
@@ -20,7 +20,7 @@
 # differentiation, to solve the non-linear system we use Newton's
 # method, and for solving the Newton increment we use conjugate gradients.
 #
-# The weak format is expressed in terms of the first Piola-Kirchoff stress ``\mathbf{P}``
+# The weak form is expressed in terms of the first Piola-Kirchoff stress ``\mathbf{P}``
 # as follows: Find ``u \in \mathbb{U}`` such that
 #
 # ```math
@@ -109,16 +109,16 @@ end;
 # the problem such that we can apply Newton's method, and then apply the FEM to
 # discretize the problem. Skipping a detailed derivation Newton's method can
 # be expressed as:
-# Given some initial guess ``u^0``, find a sequence ``u^{k}`` by iterating
+# Given some initial guess ``\mathbf{u}^0``, find a sequence ``\mathbf{u}^{k}`` by iterating
 #
 # ```math
-# u^{k+1} = u^{k} - \Delta u^{k}
+# \mathbf{u}^{k+1} = \mathbf{u}^{k} - \Delta \mathbf{u}^{k}
 # ```
 #
-# util some termination condition has been met. Therin we determine ``\Delta u^{k}``
+# util some termination condition has been met. Therin we determine ``\Delta \mathbf{u}^{k}``
 #
 # ```math
-# K(u^{k}) \Delta u^{k} = g(u^{k})
+# \mathbf{K}(\mathbf{u}^{k}) \Delta \mathbf{u}^{k} = \mathbf{g}(\mathbf{u}^{k})
 # ```
 #
 # where $K$ is the Jacobi matrix and $g$ the global residual, such that
@@ -129,7 +129,7 @@ end;
 # and
 #
 # ```math
-# g_{i} = \int_{\Omega} \nabla \delta u_{i} : \mathbf{P} - \delta u_{i} \cdot b \, \mathrm{d} \Omega
+# g_{i} = \int_{\Omega} \nabla \delta u_{i} : \mathbf{P} - \delta u_{i} \cdot \mathbf{b} \, \mathrm{d} \Omega
 # ```
 #
 # ## Finite element assembly
