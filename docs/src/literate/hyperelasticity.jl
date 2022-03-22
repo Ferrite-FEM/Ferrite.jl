@@ -24,8 +24,8 @@
 # as follows: Find ``u \in \mathbb{U}`` such that
 #
 # ```math
-# \int_\Omega \nabla \delta \mathbf{u} : \mathbf{P}(\mathbf{u})\ \mathrm{d}\Omega =
-# \int_\Omega \delta \mathbf{u} \cdot \mathbf{b}\ \mathrm{d}\Omega + \int_{\Gamma^\mathrm{N}}
+# \int_{\Omega} \nabla_{\mathbf{X}} \delta \mathbf{u} : \mathbf{P}(\mathbf{u})\ \mathrm{d}\Omega =
+# \int_{\Omega} \delta \mathbf{u} \cdot \mathbf{b}\ \mathrm{d}\Omega + \int_{\Gamma^\mathrm{N}}
 # \delta \mathbf{u} \cdot \mathbf{t}\ \mathrm{d}\Gamma
 # \quad \forall \delta \mathbf{u} \in \mathbb{U}^0,
 # ```
@@ -34,9 +34,10 @@
 # on the reference domain, ``\mathbf{t}`` is the traction acting on the Neumann part of the reference
 # domain's boundary, and where ``\mathbb{U}`` and ``\mathbb{U}^0`` are suitable trial and test sets.
 # ``\Omega`` denotes the reference domain, which is also called reference or material domain.
-# Gradients are defined with respect to the reference domain. Note that for large deformation problems
-# it is also possibile that gradients and integrals are defined on the deformed domain, which is also
-# called the current or spatial domain, depending on the specific formulation.
+# Gradients (i.e. ``\nabla_{\mathbf{X}}``) are defined with respect to the reference domain, here denoted with
+# an ``X``. Note that for large deformation problems it is also possibile that gradients and integrals
+# are defined on the deformed domain, which is also called the current or spatial domain, depending
+# on the specific formulation.
 #
 
 using Ferrite, Tensors, TimerOutputs, ProgressMeter
@@ -46,7 +47,7 @@ import KrylovMethods, IterativeSolvers
 #
 # The stress can be derived from an energy potential, defined in
 # terms of the right Cauchy-Green tensor ``\mathbf{C} = \mathbf{F}^{\mathrm{T}} \mathbf{F}``,
-# where ``\mathbf{F} = \mathbf{I} + \nabla \mathbf{u}`` is the deformation gradient.
+# where ``\mathbf{F} = \mathbf{I} + \nabla_{\mathbf{X}} \mathbf{u}`` is the deformation gradient.
 # We shall use a neo-Hookean model, where the potential can be written as
 #
 # ```math
@@ -126,12 +127,12 @@ end;
 # the Jacobi matrix, such that
 #
 # ```math
-# K_{ij} = \int_{\Omega} \nabla \delta u_{i} : \frac{\partial \mathbf{P}}{\partial \mathbf{F}} : \nabla \delta u_{j} \, \mathrm{d} \Omega
+# K_{ij} = \int_{\Omega} \nabla_{\mathbf{X}} \delta \mathbf{u}_{i} : \frac{\partial \mathbf{P}}{\partial \mathbf{F}} : \nabla_{\mathbf{X}} \delta \mathbf{u}_{j} \, \mathrm{d} \Omega
 # ```
 # and
 #
 # ```math
-# g_{i} = \int_{\Omega} \nabla \delta u_{i} : \mathbf{P} - \delta u_{i} \cdot \mathbf{b} \, \mathrm{d} \Omega
+# g_{i} = \int_{\Omega} \nabla_{\mathbf{X}} \delta \mathbf{u}_{i} : \mathbf{P} - \delta \mathbf{u}_{i} \cdot \mathbf{b} \, \mathrm{d} \Omega
 # ```
 #
 # A detailed derivation can be found in every continuum mechanics book, which has a
