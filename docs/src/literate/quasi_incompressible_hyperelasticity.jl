@@ -26,7 +26,7 @@
 # ```math
 #     \Psi(\mathbf{u}) = \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J) + \frac{\lambda}{2}\left( J - 1\right){}^2,
 # ```
-# where $I_1 = \tf{\mathbf{C}} = F_{ij}F_{ij} = \tr(F)$ and $J = \det(\mathbf{F})$ denote the standard invariants of the deformation gradient tensor $\mathbf{F} = \mathbf{I}+\nabla \mathbf{u}$.
+# where $I_1 = \tr{\mathbf{C}} = \tr(F^T F) = F_{ij}F_{ij}$ and $J = \det(\mathbf{F})$ denote the standard invariants of the deformation gradient tensor $\mathbf{F} = \mathbf{I}+\nabla \mathbf{u}$.
 # The above problem is ill-posed in the limit of incompressibility (or near-incompressibility), namely when
 # ```math
 #     \lambda/\mu \rightarrow +\infty.

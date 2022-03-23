@@ -34,8 +34,9 @@
 # on the reference domain, ``\mathbf{t}`` is the traction acting on the Neumann part of the reference
 # domain's boundary, and where ``\mathbb{U}`` and ``\mathbb{U}^0`` are suitable trial and test sets.
 # ``\Omega`` denotes the reference domain, which is also called reference or material domain.
-# Gradients (i.e. ``\nabla_{\mathbf{X}}``) are defined with respect to the reference domain, here denoted with
-# an ``X``. Note that for large deformation problems it is also possibile that gradients and integrals
+# Gradients are defined with respect to the reference domain, here denoted with  an ``X``. 
+# Formally this is expressed as ``\nabla_{\mathbf{X}} \bullet := \sum_{i=1}^{dim} \frac{\partial(\bullet)}{\partial X_i}``.
+# Note that for large deformation problems it is also possibile that gradients and integrals
 # are defined on the deformed domain, which is also called the current or spatial domain, depending
 # on the specific formulation.
 #
@@ -117,7 +118,7 @@ end;
 # \mathbf{u}^{k+1} = \mathbf{u}^{k} - \Delta \mathbf{u}^{k}
 # ```
 #
-# util some termination condition has been met. Therin we determine ``\Delta \mathbf{u}^{k}``
+# until some termination condition has been met. Therein we determine ``\Delta \mathbf{u}^{k}``
 #
 # ```math
 # \mathbf{K}(\mathbf{u}^{k}) \Delta \mathbf{u}^{k} = \mathbf{g}(\mathbf{u}^{k})
