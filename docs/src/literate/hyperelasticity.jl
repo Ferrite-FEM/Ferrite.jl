@@ -35,7 +35,7 @@
 # domain's boundary, and where ``\mathbb{U}`` and ``\mathbb{U}^0`` are suitable trial and test sets.
 # ``\Omega`` denotes the reference domain, which is also called reference or material domain.
 # Gradients are defined with respect to the reference domain, here denoted with  an ``X``. 
-# Formally this is expressed as ``\nabla_{\mathbf{X}} \bullet := \sum_{i=1}^{dim} \frac{\partial(\bullet)}{\partial X_i}``.
+# Formally this is expressed as ``(\nabla_{\mathbf{X}} \bullet)_{ij} := \frac{\partial(\bullet)_i}{\partial X_j}``.
 # Note that for large deformation problems it is also possibile that gradients and integrals
 # are defined on the deformed domain, which is also called the current or spatial domain, depending
 # on the specific formulation.
