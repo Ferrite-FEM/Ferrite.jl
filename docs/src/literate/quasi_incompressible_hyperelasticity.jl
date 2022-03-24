@@ -11,26 +11,29 @@
 # In this example we study quasi- or nearly-incompressible hyperelasticity using the stable Taylor-Hood approximation. In spirit, this example is the nonlinear analogue of
 # [`incompressible_elasticity`](@__NBVIEWER_ROOT_URL__/examples/incompressible_elasticity.ipynb) and the incompressible analogue of
 # [`hyperelasticity`](@__NBVIEWER_ROOT_URL__/examples/hyperelasticity.ipynb). Much of the code therefore follows from the above two examples.
-# The problem is formulated in the undeformed or reference configuration with the displacement `u` and pressure `p` being the unknown fields. We now briefly outline
+# The problem is formulated in the undeformed or reference configuration with the displacement $\mathbf{u}$ and pressure $p$ being the unknown fields. We now briefly outline
 # the formulation. Consider the standard hyperelasticity problem
 #
 # ```math
-#   u = \argmin_{v\in\mathcal{K}}\Pi(v),\quad \text{where}\quad \Pi(v)  = \int_\Omega \Psi(v) \ \mathrm{d}\Omega\ .
+#   \mathbf{u} = \argmin_{\mathbf{v}\in\mathcal{K}(\Omega)}\Pi(\mathbf{v}),\quad \text{where}\quad \Pi(\mathbf{v})  = \int_\Omega \Psi(\mathbf{v}) \ \mathrm{d}\Omega\ .
 # ```
+#
+# where $\mathcal{K}(\Omega)$ is a suitable function space.
+#
 # For clarity of presentation we ignore any non-zero surface tractions and body forces and instead consider only
 # applied displacements (i.e. non-homogeneous dirichlet boundary conditions). Moreover we stick our attention to the standard Neo-Hookean stored energy density
 #
 # ```math
-#     \Psi(u) = \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J) + \frac{\lambda}{2}\left( J - 1\right){}^2,
+#     \Psi(\mathbf{u}) = \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J) + \frac{\lambda}{2}\left( J - 1\right){}^2,
 # ```
-# where $I_1 = F:F = F_{ij}F_{ij}$ and J = det(F) denote the standard invariants of the deformation gradient tensor $F = \mathbb{I}+\nabla u$.
+# where $I_1 = \mathrm{tr}(\mathbf{C}) = \mathrm{tr}(\mathbf{F}^\mathrm{T} \mathbf{F}) = F_{ij}F_{ij}$ and $J = \det(\mathbf{F})$ denote the standard invariants of the deformation gradient tensor $\mathbf{F} = \mathbf{I}+\nabla_{\mathbf{X}} \mathbf{u}$.
 # The above problem is ill-posed in the limit of incompressibility (or near-incompressibility), namely when
 # ```math
 #     \lambda/\mu \rightarrow +\infty.
 # ```
-# In order to alleviate the problem, we consider the partial legendre transform of the strain energy density Ψ with respect to J = det(F), namely
+# In order to alleviate the problem, we consider the partial legendre transform of the strain energy density $\Psi$ with respect to $J = \det(\mathbf{F})$, namely
 # ```math
-#   \widehat{\Psi}(u, p) = \sup_{J} \left[ p(J - 1) - \frac{\mu}{2}\left(I_1 - 3 \right) + \mu \log(J) - \frac{\lambda}{2}\left( J - 1\right){}^2 \right].
+#   \widehat{\Psi}(\mathbf{u}, p) = \sup_{J} \left[ p(J - 1) - \frac{\mu}{2}\left(I_1 - 3 \right) + \mu \log(J) - \frac{\lambda}{2}\left( J - 1\right){}^2 \right].
 # ```
 # The supremum, say $J^\star$, can be calculated in closed form by the first order optimailty condition $\partial\widehat{\Psi}/\partial J = 0$. This gives
 # ```math
@@ -38,33 +41,35 @@
 # ```
 # Furthermore, taking the partial legendre transform of $\widehat{\Psi}$ once again, gives us back the original problem, i.e.
 # ```math
-#     \Psi(u) = \Psi^\star(u, p) = \sup_{p} \left[ p(J - 1) - p(J^\star - 1) + \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J^\star) + \frac{\lambda}{2}\left( J^\star - 1\right){}^2 \right].
+#     \Psi(\mathbf{u}) = \Psi^\star(\mathbf{u}, p) = \sup_{p} \left[ p(J - 1) - p(J^\star - 1) + \frac{\mu}{2}\left(I_1 - 3 \right) - \mu \log(J^\star) + \frac{\lambda}{2}\left( J^\star - 1\right){}^2 \right].
 # ```
 # Therefore our original hyperelasticity problem can now be reformulated as
 # ```math
-#   \inf_{u\in\mathcal{K}}\sup_{p} \int_\Omega\Psi^{\star} (u, p) \ \mathrm{d}\Omega.
+#   \inf_{\mathbf{u}\in\mathcal{K}(\Omega)}\sup_{p} \int_\Omega\Psi^{\star} (\mathbf{u}, p) \, \mathrm{d}\Omega.
 # ```
 # The total (modified) energy $\Pi^\star$ can then be written as
 # ```math
-#   \Pi^\star(u, p) = \int_\Omega p (J - J^\star) \ \mathrm{d}\Omega + \int_\Omega \frac{\mu}{2} \left( I_1 - 3\right) \ \mathrm{d}\Omega - \int_\Omega \mu\log(J^\star)\ \mathrm{d}\Omega + \int_\Omega \frac{\lambda}{2}\left( J^\star - 1 \right){}^2\ \mathrm{d}\Omega
+#   \Pi^\star(\mathbf{u}, p) = \int_\Omega p (J - J^\star) \ \mathrm{d}\Omega + \int_\Omega \frac{\mu}{2} \left( I_1 - 3\right) \ \mathrm{d}\Omega - \int_\Omega \mu\log(J^\star)\ \mathrm{d}\Omega + \int_\Omega \frac{\lambda}{2}\left( J^\star - 1 \right){}^2\ \mathrm{d}\Omega
 # ```
-# The euler-lagrange equations corresponding to the above energy give us our governing PDEs in the weak form, namely
+# The Euler-Lagrange equations corresponding to the above energy give us our governing PDEs in the weak form, namely
 # ```math
-#   \int_\Omega \frac{\partial\Psi^\star}{\partial F}:\delta F \ \mathrm{d}\Omega = 0
+#   \int_\Omega \frac{\partial\Psi^\star}{\partial \mathbf{F}}:\delta \mathbf{F} \ \mathrm{d}\Omega = 0
 # ```
 # and
 # ```math
 #   \int_\Omega \frac{\partial \Psi^\star}{\partial p}\delta p \ \mathrm{d}\Omega = 0,
 # ```
-# where δF = δ∇u = ∇(δu) and δu and δp denote arbitrary variations with respect to displacement and pressure (or the test functions). See the references
+# where $\delta \mathrm{F} = \delta \mathrm{grad}_0(\mathbf{u}) = \mathrm{grad}_0(\delta \mathbf{u})$ and $\delta \mathbf{u}$ and $\delta p$ denote arbitrary variations with respect to displacement and pressure (or the test functions). See the references
 # below for a more detailed explanation of the above mathematical trick. Now, in order to apply Newton's method to the
-# above problem, we further need to linearize the above equations and calculate the respective hessians (or tangents), namely, $\partial^2\Psi^\star/\partial F^2$, $\partial^2\Psi^\star/\partial p^2$ and $\partial^2\Psi^\star/\partial F\partial p$
+# above problem, we further need to linearize the above equations and calculate the respective hessians (or tangents), namely, $\partial^2\Psi^\star/\partial \mathbf{F}^2$, $\partial^2\Psi^\star/\partial p^2$ and $\partial^2\Psi^\star/\partial \mathbf{F}\partial p$
 # which, using `Tensors.jl`, can be determined conveniently using automatic differentiation (see the code below). Hence we only need to define the above potential.
 # The remaineder of the example follows similarly.
 # ## References
 # 1. [A paradigm for higher-order polygonal elements in finite elasticity using a gradient correction scheme, CMAME 2016, 306, 216–251](http://pamies.cee.illinois.edu/Publications_files/CMAME_2016.pdf)
 # 2. [Approximation of incompressible large deformation elastic problems: some unresolved issues, Computational Mechanics, 2013](https://link.springer.com/content/pdf/10.1007/s00466-013-0869-0.pdf)
 #
+
+# ## Implementation
 # We now get to the actual code. First, we import the respective packages
 
 using Ferrite, Tensors, ProgressMeter
