@@ -157,7 +157,7 @@ end
 
 function _check_cellset_intersections(dh::MixedDofHandler, fh::FieldHandler)
     for _fh in dh.fieldhandlers
-        isempty(intersect(_fh.cellset, fh.cellset)) || error("Each cell can only belong to a single FieldHandler.")
+        isdisjoint(_fh.cellset, fh.cellset) || error("Each cell can only belong to a single FieldHandler.")
     end
 end
 
