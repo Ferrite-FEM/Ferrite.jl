@@ -576,6 +576,20 @@ function test_separate_fields_on_separate_domains()
 
 end
 
+function test_unique_cellsets()
+    grid = generate_grid(Quadrilateral, (2, 1))
+    set_u = Set(1:2)
+    set_v = Set(1:1)
+
+    dim = Ferrite.getdim(grid)
+    ip = Lagrange{dim,RefCube,1}()
+
+    # bug
+    dh = MixedDofHandler(grid)
+    push!(dh, FieldHandler([Field(:u, ip, 1)], set_u))
+    @test_throws ErrorException push!(dh, FieldHandler([Field(:v, ip, 1)], set_v))
+end
+
 @testset "MixedDofHandler" begin
 
     test_1d_bar_beam();
@@ -600,4 +614,5 @@ end
     test_reshape_to_nodes()
     test_mixed_grid_show()
     test_separate_fields_on_separate_domains();
+    test_unique_cellsets()
 end
