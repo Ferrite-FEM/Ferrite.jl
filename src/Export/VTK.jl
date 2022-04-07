@@ -15,6 +15,8 @@ cell_to_vtkcell(::Type{Cell{3,20,6}}) = VTKCellTypes.VTK_QUADRATIC_HEXAHEDRON
 cell_to_vtkcell(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
 cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 
+nodes_to_vtknodes(cell::AbstractCell) = collect(cell.nodes)
+
 """
     vtk_grid(filename::AbstractString, grid::Grid)
 
@@ -25,7 +27,7 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compre
     cls = MeshCell[]
     for cell in grid.cells
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
-        push!(cls, MeshCell(celltype, collect(cell.nodes)))
+        push!(cls, MeshCell(celltype, nodes_to_vtknodes(cell)))
     end
     coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
     return vtk_grid(filename, coords, cls; compress=compress)
