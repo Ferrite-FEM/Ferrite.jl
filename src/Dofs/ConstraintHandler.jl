@@ -166,14 +166,14 @@ function close!(ch::ConstraintHandler)
     # Make ch.prescribed_dofs unique and sorted, and do the same operations for ch.inhomogeneities
     # TODO: This is probably quite slow atm, and the unique!() and sort() functions can be combined?
     dofs_vals = unique(first, zip(ch.prescribed_dofs, ch.inhomogeneities))
-    copy!!(ch.prescribed_dofs, getindex.(dofs_vals, 1))
-    copy!!(ch.inhomogeneities, getindex.(dofs_vals, 2))
+    copy!(ch.prescribed_dofs, getindex.(dofs_vals, 1))
+    copy!(ch.inhomogeneities, getindex.(dofs_vals, 2))
 
     I = sortperm(ch.prescribed_dofs)
     ch.prescribed_dofs .= ch.prescribed_dofs[I]
     ch.inhomogeneities .= ch.inhomogeneities[I]
 
-    copy!!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
+    copy!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
 
     for i in 1:length(ch.prescribed_dofs)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
@@ -250,8 +250,8 @@ end
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where {Index<:BoundaryIndex}
     local_face_dofs, local_face_dofs_offset =
         _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundaryfunction(eltype(bcfaces)))
-    copy!!(dbc.local_face_dofs, local_face_dofs)
-    copy!!(dbc.local_face_dofs_offset, local_face_dofs_offset)
+    copy!(dbc.local_face_dofs, local_face_dofs)
+    copy!(dbc.local_face_dofs_offset, local_face_dofs_offset)
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
@@ -336,7 +336,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     end
 
     # save it to the ConstraintHandler
-    copy!!(dbc.local_face_dofs_offset, constrained_dofs) # use this field to store the global dofs
+    copy!(dbc.local_face_dofs_offset, constrained_dofs) # use this field to store the global dofs
     push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
     append!(ch.prescribed_dofs, constrained_dofs)
