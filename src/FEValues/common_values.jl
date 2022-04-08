@@ -105,9 +105,9 @@ quadrature point `q_point`.
 shape_curl(cv::T, q_point, base_func) where T = shape_curl(FieldTrait(T), cv, q_point, base_func)
 
 function shape_curl(::VectorValued, cv::Values, q_point::Int, base_func::Int)
-    return curl(shape_gradient(cv, q_point, base_func))
+    return curl_from_gradient(shape_gradient(cv, q_point, base_func))
 end
-curl(∇v) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
+curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
 
 """
     function_value(fe_v::Values, q_point::Int, u::AbstractVector)
@@ -269,10 +269,10 @@ function_divergence(::VectorValued, fe_v::Values{dim}, q_point::Int, u::Abstract
     tr(function_gradient(fe_v, q_point, u))
 
 function_curl(fe_v::Values, q_point::Int, u::AbstractVector, dof_range = eachindex(u)) =
-    curl(function_gradient(fe_v, q_point, u, dof_range))
+    curl_from_gradient(function_gradient(fe_v, q_point, u, dof_range))
 
 function_curl(fe_v::Values, q_point::Int, u::AbstractVector{Vec{3, T}}) where T =
-    curl(function_gradient(fe_v, q_point, u))
+    curl_from_gradient(function_gradient(fe_v, q_point, u))
 
 """
     spatial_coordinate(fe_v::Values{dim}, q_point::Int, x::AbstractVector)
