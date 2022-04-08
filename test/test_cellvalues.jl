@@ -40,7 +40,7 @@ for (func_interpol, quad_rule) in  (
             @test function_gradient(cv, i, u) ≈ H
             @test function_symmetric_gradient(cv, i, u) ≈ 0.5(H + H')
             @test function_divergence(cv, i, u) ≈ tr(H)
-            ndim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl(H)
+            ndim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl_from_gradient(H)
             function_value(cv, i, u)
             if isa(cv, CellScalarValues)
                 @test function_gradient(cv, i, u_scal) ≈ V
@@ -49,7 +49,7 @@ for (func_interpol, quad_rule) in  (
                 @test function_gradient(cv, i, u_vector) ≈ function_gradient(cv, i, u) ≈ H
                 @test function_value(cv, i, u_vector) ≈ function_value(cv, i, u)
                 @test function_divergence(cv, i, u_vector) ≈ function_divergence(cv, i, u) ≈ tr(H)
-                ndim == 3 && @test function_curl(cv, i, u_vector) ≈ Ferrite.curl(H)
+                ndim == 3 && @test function_curl(cv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
             end
         end
 
