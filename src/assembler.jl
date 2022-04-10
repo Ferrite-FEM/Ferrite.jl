@@ -88,7 +88,7 @@ function start_assemble(K::SparseMatrixCSC, f::Vector=Float64[]; fillzero::Bool=
     fillzero && (fill!(K.nzval, 0.0); fill!(f, 0.0))
     AssemblerSparsityPattern(K, f, Int[], Int[])
 end
-function start_assemble(K::Symmetric, f::Vector=Float64[]; fillzero::Bool=true)
+function start_assemble(K::Symmetric{Td,SparseMatrixCSC{Td,Ti}}, f::Vector=Float64[]; fillzero::Bool=true) where{Td,Ti}
     fillzero && (fill!(K.data.nzval, 0.0); fill!(f, 0.0))
     AssemblerSymmetricSparsityPattern(K, f, Int[], Int[])
 end
