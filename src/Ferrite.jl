@@ -51,6 +51,7 @@ include("FEValues/face_integrals.jl")
 include("Grid/grid.jl")
 include("Grid/grid_generators.jl")
 include("Grid/coloring.jl")
+include("Grid/mixed_grid.jl")
 
 # Dofs
 include("Dofs/DofHandler.jl")

@@ -23,9 +23,9 @@ A `FieldHandler` must fullfill the following requirements:
 
 Notice that a `FieldHandler` can hold several fields.
 """
-mutable struct FieldHandler
+mutable struct FieldHandler{CI}
     fields::Vector{Field}
-    cellset::Set{Int}
+    cellset::Set{CI}
 end
 
 struct CellVector{T}
@@ -46,18 +46,16 @@ Construct a `MixedDofHandler` based on `grid`. Supports:
 - `Grid`s with or without concrete element type (E.g. "mixed" grids with several different element types.)
 - One or several fields, which can live on the whole domain or on subsets of the `Grid`.
 """
-struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
+struct MixedDofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
     cell_dofs::CellVector{Int}
-    cell_nodes::CellVector{Int}
-    cell_coords::CellVector{Vec{dim,T}}
     closed::ScalarWrapper{Bool}
     grid::G
     ndofs::ScalarWrapper{Int}
 end
 
-function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
-    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],Int[],Int[]), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
+function MixedDofHandler(grid::G) where {dim, G<:AbstractGrid{dim}}
+    return MixedDofHandler{dim,G}(FieldHandler[], CellVector(Int[],Int[],Int[]), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
 getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
@@ -73,26 +71,14 @@ function celldofs!(global_dofs::Vector{Int}, dh::MixedDofHandler, i::Int)
     unsafe_copyto!(global_dofs, 1, dh.cell_dofs.values, dh.cell_dofs.offset[i], length(global_dofs))
     return global_dofs
 end
+celldofs!(global_dofs::Vector{Int}, dh::MixedDofHandler, i::CellId) = celldofs!(global_dofs, dh, globalid(dh.grid, i))
 
 function celldofs(dh::MixedDofHandler, i::Int)
     @assert isclosed(dh)
     return dh.cell_dofs[i]
 end
 
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::MixedDofHandler, i::Int) where {dim,T}
-    @assert isclosed(dh)
-    @assert length(global_coords) == nnodes_per_cell(dh, i)
-    unsafe_copyto!(global_coords, 1, dh.cell_coords.values, dh.cell_coords.offset[i], length(global_coords))
-    return global_coords
-end
-
-function cellnodes!(global_nodes::Vector{Int}, dh::MixedDofHandler, i::Int)
-    @assert isclosed(dh)
-    @assert length(global_nodes) == nnodes_per_cell(dh, i)
-    unsafe_copyto!(global_nodes, 1, dh.cell_nodes.values, dh.cell_nodes.offset[i], length(global_nodes))
-    return global_nodes
-end
-
+cellcoords!(global_coords::Vector{<:Vec}, dh::MixedDofHandler, i) = cellcoords!(global_coords, dh.grid, i)
 
 """
     getfieldnames(dh::MixedDofHandler)
@@ -140,12 +126,12 @@ Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
 """
 function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
     @assert !isclosed(dh)
-    _check_same_celltype(dh.grid, collect(fh.cellset))
+    # _check_same_celltype(dh.grid, collect(fh.cellset))
     _check_cellset_intersections(dh, fh)
     # the field interpolations should have the same refshape as the cells they are applied to
     refshapes_fh = getrefshape.(getfieldinterpolations(fh))
     # extract the celltype from the first cell as the celltypes are all equal
-    cell_type = typeof(dh.grid.cells[first(fh.cellset)])
+    cell_type = typeof(getcells(dh.grid, first(fh.cellset)))
     refshape_cellset = getrefshape(default_interpolation(cell_type))
     for refshape in refshapes_fh
         refshape_cellset == refshape || error("The RefShapes of the fieldhandlers interpolations must correspond to the RefShape of the cells it is applied to.")
@@ -227,7 +213,8 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
     @debug "\n\nCreating dofs\n"
     for fh in dh.fieldhandlers
         # sort the cellset since we want to loop through the cells in a fixed order
-        cellnumbers = sort(collect(fh.cellset))
+        # now only works for MixedGrid
+        cellnumbers = get_sorted_cellset(fh)
         nextdof = _close!(
             dh,
             cellnumbers,
@@ -244,23 +231,13 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
     dh.ndofs[] = maximum(dh.cell_dofs.values)
     dh.closed[] = true
 
-    #Create cell_nodes and cell_coords (similar to cell_dofs)
-    push!(dh.cell_nodes.offset, 1)
-    push!(dh.cell_coords.offset, 1)
-    for cell in dh.grid.cells
-        for nodeid in cell.nodes
-            push!(dh.cell_nodes.values, nodeid)
-            push!(dh.cell_coords.values, dh.grid.nodes[nodeid].x)
-        end
-        push!(dh.cell_nodes.offset, length(dh.cell_nodes.values)+1)
-        push!(dh.cell_coords.offset, length(dh.cell_coords.values)+1)
-        push!(dh.cell_nodes.length, length(cell.nodes))
-        push!(dh.cell_coords.length, length(cell.nodes))
-    end
-
     return dh, vertexdicts, edgedicts, facedicts
 
 end
+
+get_sorted_cellset(fh::FieldHandler{Int}) = sort!(collect(fh.cellset))
+get_sorted_cellset(fh::FieldHandler{CellId{I}}) where I = sort!(collect(fh.cellset), by=c->c.i)
+globalid(::AbstractGrid, i::Int) = i # fallback for regular grids
 
 function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
 
@@ -277,9 +254,10 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
 
     # loop over all the cells, and distribute dofs for all the fields
     for ci in cellnumbers
-        dh.cell_dofs.offset[ci] = length(dh.cell_dofs.values)+1
+        gi = globalid(dh.grid, ci)
+        dh.cell_dofs.offset[gi] = length(dh.cell_dofs.values)+1
 
-        cell = dh.grid.cells[ci]
+        cell = getcells(dh.grid, ci)
         cell_dofs = Int[]  # list of global dofs for each cell
         @debug "Creating dofs for cell #$ci"
 
@@ -301,13 +279,13 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
             end
 
             if ip_info.ncelldofs > 0
-                nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[local_num], ip_info.ncelldofs, nextdof)
+                nextdof = add_cell_dofs(cell_dofs, gi, celldicts[fi], field_dims[local_num], ip_info.ncelldofs, nextdof)
             end
 
         end
         # after done creating dofs for the cell, push them to the global list
         push!(dh.cell_dofs.values, cell_dofs...)
-        dh.cell_dofs.length[ci] = length(cell_dofs)
+        dh.cell_dofs.length[gi] = length(cell_dofs)
 
         @debug "Dofs for cell #$ci:\n\t$cell_dofs"
     end # cell loop

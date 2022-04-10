@@ -41,7 +41,7 @@ struct CellIterator{dim,C,T,DH<:Union{AbstractDofHandler,Nothing}}
     dh::Union{DH,Nothing}
     celldofs::Vector{Int}
 
-    function CellIterator{dim,C,T}(dh::Union{DofHandler{dim,C,T},MixedDofHandler{dim,T,G},Nothing}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T,G}
+    function CellIterator{dim,C,T}(dh::Union{DofHandler{dim,C,T},MixedDofHandler{dim,G},Nothing}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T,G}
         isconcretetype(C) || _check_same_celltype(dh.grid, cellset)
         N = nnodes_per_cell(dh.grid, cellset === nothing ? 1 : first(cellset))
         cell = ScalarWrapper(0)

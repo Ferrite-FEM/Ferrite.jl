@@ -312,8 +312,9 @@ function cellnodes!(global_nodes::Vector{Int}, grid::Grid{dim,C}, i::Int) where 
     return global_nodes
 end
 
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::Grid{dim,C}, i::Int) where {dim,C,T}
-    nodes = grid.cells[i].nodes
+# shared implementation for all grids
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::C) where {dim,C<:Ferrite.AbstractCell,T}
+    nodes = cell.nodes
     N = length(nodes)
     @assert length(global_coords) == N
     for j in 1:N
@@ -321,6 +322,12 @@ function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::Grid{dim,C}, i::In
     end
     return global_coords
 end
+
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid, i) where {dim,T}
+    cell = getcells(grid, i)
+    cellcoords!(global_coords, grid, cell)
+end
+
 cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, dh.grid, i)
 
 function celldofs(dh::DofHandler, i::Int)
