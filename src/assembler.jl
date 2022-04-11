@@ -91,12 +91,12 @@ Create a `AssemblerSparsityPattern` or `AssemblerSymmetricSparsityPattern` assem
 The keyword argument fillzero can be set to false if `K` and `f` should keep their current values. 
 
 """
-start_assemble(f::Vector{Td}, K::Union{SparseMatrixCSC, Symmetric{Td,SparseMatrixCSC{Td,Int}}}; fillzero::Bool=true)  where{Td} = start_assemble(K, f; fillzero=fillzero)
+start_assemble(f::Vector{Td}, K::Union{SparseMatrixCSC, Symmetric{Td,SparseMatrixCSC{Td,Ti}}}; fillzero::Bool=true)  where{Td,Ti} = start_assemble(K, f; fillzero=fillzero)
 function start_assemble(K::SparseMatrixCSC{Td}, f::Vector=Td[]; fillzero::Bool=true) where{Td}
     fillzero && (fill!(K.nzval, zero(Td)); fill!(f, zero(Td)))
     AssemblerSparsityPattern(K, f, Int[], Int[])
 end
-function start_assemble(K::Symmetric{Td,SparseMatrixCSC{Td,Int}}, f::Vector=Td[]; fillzero::Bool=true) where{Td}
+function start_assemble(K::Symmetric{Td,SparseMatrixCSC{Td,Ti}}, f::Vector=Td[]; fillzero::Bool=true) where{Td,Ti}
     fillzero && (fill!(K.data.nzval, zero(Td)); fill!(f, zero(Td)))
     AssemblerSymmetricSparsityPattern(K, f, Int[], Int[])
 end
