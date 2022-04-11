@@ -18,7 +18,7 @@ end
 """
     start_assemble([N=0]) -> Assembler
 
-Call before starting an assembly.
+Call to start assembling the stiffness matrix without using the `AssemblerSparsityPattern` or `AssemblerSymmetricSparsityPattern` options below. 
 
 Returns an `Assembler` type that is used to hold the intermediate
 data before an assembly is finished.
@@ -28,7 +28,7 @@ function start_assemble(N::Int=0)
 end
 
 """
-    assemble!(a, Ke, edof)
+    assemble!(a::Assembler, Ke, edof)
 
 Assembles the element matrix `Ke` into `a`.
 """
@@ -47,7 +47,7 @@ end
     end_assemble(a::Assembler) -> K
 
 Finalizes an assembly. Returns a sparse matrix with the
-assembled values.
+assembled values. Note that this is not necessary for `AbstractSparseAssembler`s
 """
 function end_assemble(a::Assembler)
     return sparse(a.I, a.J, a.V)
@@ -83,16 +83,29 @@ end
 @inline getsparsemat(a::AssemblerSparsityPattern) = a.K
 @inline getsparsemat(a::AssemblerSymmetricSparsityPattern) = a.K.data
 
-start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; fillzero::Bool=true) = start_assemble(K, f; fillzero=fillzero)
-function start_assemble(K::SparseMatrixCSC, f::Vector=Float64[]; fillzero::Bool=true)
-    fillzero && (fill!(K.nzval, 0.0); fill!(f, 0.0))
+"""
+    start_assemble(f::Vector, K::Union{SparseMatrixCSC{Td}, Symmetric{Td,SparseMatrixCSC{Td,Int}}}; fillzero::Bool=true) where{Td} -> AbstractSparseAssembler
+    start_assemble(K::Union{SparseMatrixCSC{Td}, Symmetric{Td,SparseMatrixCSC{Td,Int}}}, f::Vector=Td[]; fillzero::Bool=true) where{Td} -> AbstractSparseAssembler
+
+Create a `AssemblerSparsityPattern` or `AssemblerSymmetricSparsityPattern` assembler used to fill out the sparse stiffness matrix `K` and the force vector `f`.
+The keyword argument fillzero can be set to false if `K` and `f` should keep their current values. 
+
+"""
+start_assemble(f::Vector{Td}, K::Union{SparseMatrixCSC, Symmetric{Td,SparseMatrixCSC{Td,Int}}}; fillzero::Bool=true)  where{Td} = start_assemble(K, f; fillzero=fillzero)
+function start_assemble(K::SparseMatrixCSC{Td}, f::Vector=Td[]; fillzero::Bool=true) where{Td}
+    fillzero && (fill!(K.nzval, zero(Td)); fill!(f, zero(Td)))
     AssemblerSparsityPattern(K, f, Int[], Int[])
 end
-function start_assemble(K::Symmetric{Td,SparseMatrixCSC{Td,Ti}}, f::Vector=Float64[]; fillzero::Bool=true) where{Td,Ti}
-    fillzero && (fill!(K.data.nzval, 0.0); fill!(f, 0.0))
+function start_assemble(K::Symmetric{Td,SparseMatrixCSC{Td,Int}}, f::Vector=Td[]; fillzero::Bool=true) where{Td}
+    fillzero && (fill!(K.data.nzval, zero(Td)); fill!(f, zero(Td)))
     AssemblerSymmetricSparsityPattern(K, f, Int[], Int[])
 end
-
+"""
+    function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix{T}, fe::AbstractVector=T[]) where{T}
+    function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, fe::AbstractVector, Ke::AbstractMatrix)
+    
+Assemble the element stiffness matrix `Ke` (and force vector `fe`) into the global stiffness (and force) in `A`, given the element degrees of freedom `dofs`
+"""
 @propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
     assemble!(A, dofs, Ke, eltype(Ke)[])
 end
