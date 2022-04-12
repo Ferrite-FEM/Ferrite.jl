@@ -18,10 +18,14 @@ end
 """
     start_assemble([N=0]) -> Assembler
 
-Call to start assembling the stiffness matrix without using the `AssemblerSparsityPattern` or `AssemblerSymmetricSparsityPattern` options below. 
+Call to start assembling the stiffness matrix. 
 
 Returns an `Assembler` type that is used to hold the intermediate
 data before an assembly is finished.
+
+Note that giving a sparse matrix as input, see below and 
+as described in the [Assembly](@ref) part of the manual, 
+can be more efficient. 
 """
 function start_assemble(N::Int=0)
     return Assembler(N)
@@ -88,7 +92,7 @@ end
     start_assemble(K::Union{SparseMatrixCSC{Td}, Symmetric{Td,SparseMatrixCSC{Td,Int}}}, f::Vector=Td[]; fillzero::Bool=true) where{Td} -> AbstractSparseAssembler
 
 Create a `AssemblerSparsityPattern` or `AssemblerSymmetricSparsityPattern` assembler used to fill out the sparse stiffness matrix `K` and the force vector `f`.
-The keyword argument fillzero can be set to false if `K` and `f` should keep their current values. 
+The keyword argument `fillzero` can be set to false if `K` and `f` should keep their current values. 
 
 """
 start_assemble(f::Vector{Td}, K::Union{SparseMatrixCSC, Symmetric{Td,SparseMatrixCSC{Td,Ti}}}; fillzero::Bool=true)  where{Td,Ti} = start_assemble(K, f; fillzero=fillzero)
@@ -100,9 +104,10 @@ function start_assemble(K::Symmetric{Td,SparseMatrixCSC{Td,Ti}}, f::Vector=Td[];
     fillzero && (fill!(K.data.nzval, zero(Td)); fill!(f, zero(Td)))
     AssemblerSymmetricSparsityPattern(K, f, Int[], Int[])
 end
+
 """
-    function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix{T}, fe::AbstractVector=T[]) where{T}
-    function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, fe::AbstractVector, Ke::AbstractMatrix)
+    assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix{T}, fe::AbstractVector=T[]) where{T}
+    assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, fe::AbstractVector, Ke::AbstractMatrix)
     
 Assemble the element stiffness matrix `Ke` (and force vector `fe`) into the global stiffness (and force) in `A`, given the element degrees of freedom `dofs`
 """
