@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg
-   width="37.450924mm"
-   height="70.472183mm"
+   width="72.901855mm"
+   height="138.94437mm"
    version="1.1"
    id="svg390"
    sodipodi:docname="porous_media.svg"
@@ -37,9 +37,9 @@
      inkscape:pageopacity="0.0"
      inkscape:pagecheckerboard="0"
      showgrid="false"
-     inkscape:zoom="2.295932"
-     inkscape:cx="91.248347"
-     inkscape:cy="123.04371"
+     inkscape:zoom="1.147966"
+     inkscape:cx="-33.537579"
+     inkscape:cy="205.14545"
      inkscape:window-width="2560"
      inkscape:window-height="1377"
      inkscape:window-x="-8"
@@ -53,38 +53,38 @@
      fit-margin-bottom="1"
      inkscape:document-units="mm" />
   <rect
-     style="fill:#969696;fill-opacity:1;stroke:none;stroke-width:1.88976;stroke-linecap:round;stroke-linejoin:round"
+     style="fill:#969696;fill-opacity:1;stroke:none;stroke-width:3.77952;stroke-linecap:round;stroke-linejoin:round"
      id="rect1259"
-     width="95.964027"
-     height="194.05684"
-     x="21.980762"
-     y="36.174183" />
+     width="191.92805"
+     height="388.11368"
+     x="40.181999"
+     y="68.56884" />
   <path
-     style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-     d="m 21.980726,36.174191 h 40.1337 l 9.045,11.68922 7.7935,11.39089 6.3424,10.80162 4.7282,9.94113 2.9971,8.82178 1.1857,7.48298 -0.6549,5.949399 -1.0128,2.35214 -1.4633,1.91574 -1.8991,1.46455 -2.3227,1.00594 -5.8652,0.62873 -7.3602,-1.23278 -8.6675,-3.06224 -9.7534,-4.81277 -10.5983,-6.442499 -11.1681,-7.90706 -11.4601,-9.17435 z"
+     style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:2px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     d="m 40.181925,68.568856 h 80.267395 l 18.09,23.37844 15.587,22.781784 12.6848,21.60324 9.45641,19.88226 5.9942,17.64356 2.3714,14.96596 -1.3098,11.89879 -2.0256,4.70428 -2.9266,3.83148 -3.7982,2.9291 -4.6454,2.01188 -11.73041,1.25746 -14.7204,-2.46556 -17.335,-6.12448 -19.5068,-9.62554 -21.196595,-12.88499 -22.3362,-15.81412 -22.9202,-18.3487 z"
      id="path3897" />
   <path
-     style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-     d="M 117.94473,230.23103 H 84.840026 l -13.8583,-20.2743 -12.3684,-19.62832 -10.4838,-18.36102 -8.2634,-16.51184 -3.2163,-7.39422 -2.5686,-6.74085 -1.9015,-6.03323 -1.2198,-5.27876 -0.5283,-4.47992 0.168,-3.64903 0.8643,-2.78608 0.6915,-1.06266 0.8618,-0.83829 0.9496,-0.57694 1.0956,-0.38217 2.6173,-0.17998 3.1676,0.60653 3.6958,1.38564 4.1999,2.1549 4.6771,2.91183 10.6445,8.00321 12.1224,10.72272 13.2668,13.1439 14.048204,15.20512 14.4427,16.85208 z"
+     style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:2px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     d="m 232.10994,456.68254 h -66.20942 l -27.7166,-40.5486 -24.7368,-39.25664 -20.967595,-36.72204 -16.5268,-33.02368 -6.4326,-14.78844 -5.1372,-13.4817 -3.803,-12.06646 -2.4396,-10.55752 -1.0566,-8.95984 0.336,-7.29806 1.7286,-5.57216 1.383,-2.12532 1.7236,-1.67658 1.8992,-1.15388 2.1912,-0.76435 5.2346,-0.35996 6.3352,1.21307 7.3916,2.77128 8.3998,4.3098 9.354195,5.82366 21.289,16.00642 24.2448,21.44544 26.53361,26.2878 28.09641,30.41024 28.8854,33.70416 z"
      id="path3899" />
   <path
-     style="fill:none;stroke:#000000;stroke-width:1.88976;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
-     d="M 17.111326,36.163843 V 230.24136"
+     style="fill:none;stroke:#000000;stroke-width:3.77952;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+     d="M 30.443125,68.54816 V 456.7032"
      id="path4420" />
   <path
-     style="fill:none;stroke:#000000;stroke-width:1.88976;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
-     d="m 21.980726,234.17593 h 62.8593"
+     style="fill:none;stroke:#000000;stroke-width:3.77952;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+     d="M 40.181925,464.57234 H 165.90052"
      id="path4455" />
   <path
-     style="fill:none;stroke:#000000;stroke-width:1.88976;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
-     d="M 62.114426,31.243071 H 117.94473"
+     style="fill:none;stroke:#000000;stroke-width:3.77952;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+     d="M 120.44932,58.706616 H 232.10994"
      id="path4732" />
   <path
-     style="fill:none;stroke:#000000;stroke-width:1.88975;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
-     d="M 21.988026,252.25364 H 117.93763"
+     style="fill:none;stroke:#000000;stroke-width:3.7795;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+     d="M 40.196525,500.72776 H 232.09574"
      id="path5485" />
   <g
-     transform="matrix(0.96,0,0,0.96,73.860474,182.78523)"
+     transform="matrix(1.92,0,0,1.92,143.94142,361.79094)"
      ns3:version="1.6.0"
      ns3:texconverter="pdflatex"
      ns3:pdfconverter="inkscape"
@@ -233,7 +233,7 @@
     </g>
   </g>
   <g
-     transform="matrix(0.96,0,0,0.96,39.778453,67.254804)"
+     transform="matrix(1.92,0,0,1.92,75.777379,130.73008)"
      ns3:version="1.6.0"
      ns3:texconverter="pdflatex"
      ns3:pdfconverter="inkscape"
@@ -382,7 +382,7 @@
     </g>
   </g>
   <g
-     transform="matrix(0.96,0,0,0.96,69.462288,123.10807)"
+     transform="matrix(1.92,0,0,1.92,135.14505,242.43662)"
      ns3:version="1.6.0"
      ns3:texconverter="pdflatex"
      ns3:pdfconverter="inkscape"
@@ -544,7 +544,7 @@
     </g>
   </g>
   <g
-     transform="matrix(0.96,0,0,0.96,34.440197,255.8219)"
+     transform="matrix(1.92,0,0,1.92,65.100867,507.86428)"
      ns3:version="1.6.0"
      ns3:texconverter="pdflatex"
      ns3:pdfconverter="inkscape"
@@ -794,7 +794,7 @@
     </g>
   </g>
   <g
-     transform="matrix(0.96,0,0,0.96,14.696336,238.17581)"
+     transform="matrix(1.92,0,0,1.92,25.613145,472.5721)"
      ns3:version="1.6.0"
      ns3:texconverter="pdflatex"
      ns3:pdfconverter="inkscape"
@@ -1062,7 +1062,7 @@
     </g>
   </g>
   <g
-     transform="matrix(0.96,0,0,0.96,57.118213,19.811458)"
+     transform="matrix(1.92,0,0,1.92,110.4569,35.84339)"
      ns3:version="1.6.0"
      ns3:texconverter="pdflatex"
      ns3:pdfconverter="inkscape"
@@ -1304,7 +1304,7 @@
     </g>
   </g>
   <g
-     transform="matrix(0,-0.96,0.96,0,3.7797676,166.18568)"
+     transform="matrix(0,-1.92,1.92,0,3.7800076,328.59184)"
      ns3:version="1.6.0"
      ns3:texconverter="pdflatex"
      ns3:pdfconverter="inkscape"
@@ -1572,11 +1572,11 @@
     </g>
   </g>
   <path
-     style="fill:none;stroke:#000000;stroke-width:1.88976;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
-     d="M 123.94479,36.163841 V 230.24136"
+     style="fill:none;stroke:#000000;stroke-width:3.77952;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+     d="M 244.11006,68.548156 V 456.7032"
      id="path5319" />
   <g
-     transform="matrix(0,-0.96,0.96,0,129.39908,166.18568)"
+     transform="matrix(0,-1.92,1.92,0,255.01864,328.59184)"
      ns3:version="1.6.0"
      ns3:texconverter="pdflatex"
      ns3:pdfconverter="inkscape"
@@ -1844,11 +1844,11 @@
     </g>
   </g>
   <path
-     style="fill:none;stroke:#000000;stroke-width:1.88975;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
-     d="M 21.987974,14.664073 H 117.93758"
+     style="fill:none;stroke:#000000;stroke-width:3.7795;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+     d="M 40.196421,25.548618 H 232.09564"
      id="path5525" />
   <g
-     transform="matrix(0.96,0,0,0.96,59.185697,3.7797676)"
+     transform="matrix(1.92,0,0,1.92,114.59187,3.7800076)"
      ns3:version="1.6.0"
      ns3:texconverter="pdflatex"
      ns3:pdfconverter="inkscape"
