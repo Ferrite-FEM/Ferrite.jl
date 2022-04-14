@@ -11,8 +11,8 @@
 # `:u`, as well as the liquid pressure, `:p`, as unknown. The computational domain
 # is shown below
 #
-# ![The porous media consisting of impermeable solid aggregates and a permeable porous matrix](porous_media.svg)
-# ![Pressure evolution](porous_media.gif)
+# ![The porous media consisting of impermeable solid aggregates and a permeable porous matrix.](porous_media.svg)
+# ![Pressure evolution.](porous_media.gif)
 #
 # ## Theory of porous media
 # The strong forms for the mass balance of the liquid is given as
