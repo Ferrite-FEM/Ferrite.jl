@@ -31,7 +31,7 @@
 # The functions ``\mathrm{div}()`` and ``\mathrm{grad}()`` represent the divergence and 
 # gradient, respectively. Furthermore, the balance of momentum is given as 
 # ```math
-#    \mathrm{div}(\boldsymbol{\sigma}) &= \boldsymbol{0}
+#    \mathrm{div}(\boldsymbol{\sigma}) = \boldsymbol{0}
 # ```
 # where ``\boldsymbol{\sigma}`` is the Cauchy stress. For simplicity in this example, 
 # body loads, e.g. due to gravity, are not included. 
@@ -49,7 +49,7 @@
 # Finally, we use the most simple Terzaghi effective stress combined with linear 
 # isotropic elasticity
 # ```math
-# \boldsymbol{\sigma} = 2G \boldsymbol{\epsilon}^\mathrm{dev} + 3 K \boldsymbol{\epsilon}^\mathrm{vol} - p \boldsymbol{I}
+# \boldsymbol{\sigma} = \boldsymbol{\mathrm{E}}:\boldsymbol{\epsilon} - p\boldsymbol{I} = 2G \boldsymbol{\epsilon}^\mathrm{dev} + 3 K \boldsymbol{\epsilon}^\mathrm{vol} - p \boldsymbol{I}
 # ```
 # ### Weak form
 # From the above strong form with constitutive equations (and including boundary conditions), 
@@ -72,13 +72,13 @@
 # For each relevant part, we can specify these matrices and vectors as 
 # ```math
 # \begin{align*}
-#   K_{ij}^\mathrm{pp} &= \int_\Omega \mathrm{grad}\left(\delta N\supscr{p}_i\right)\cdot \left[\frac{k}{n}\mathrm{grad}\left(N\supscr{p}_j\right)\right] \mathrm{d}\Omega \\
-#   L_{ij}^\mathrm{pp} &= \int_\Omega \delta N_i^\mathrm{p} N_j^\mathrm{p}/K_\mathrm{l} \mathrm{d}\Omega \\
-#   L_{ij}^\mathrm{pu} &= \int_\Omega \delta N_i^\mathrm{p} \mathrm{div}\left(\boldsymbol{N}_j^\mathrm{u}\right) \mathrm{d}\Omega \\
-#   K_{ij}^\mathrm{uu} &= - \int_\Omega \mathrm{grad}\left(\boldsymbol{\delta N}^\mathrm{u}_i\right) : \boldsymbol{\mathrm{E}} : \mathrm{grad}\left(\boldsymbol{N}_j^\mathrm{u}\right) \mathrm{d} \Omega \\ 
-#   K_{ij}^\mathrm{up} &= \int_\Omega \mathrm{div}\left(\boldsymbol{\delta N}_i^\mathrm{u}\right) N_j^\mathrm{p} \mathrm{d}\Omega \\
-#   f_{i}^\mathrm{p,ext} &= \int_\Gamma \delta N_i^\mathrm{p} \tilde{\boldsymbol{v}}_\mathrm{l} \cdot \boldsymbol{n} \mathrm{d}\Gamma \\
-#   f_{i}^\mathrm{u,ext} &= -\int_\Gamma \boldsymbol{\delta N}_i^\mathrm{u} \cdot \boldsymbol{t} \mathrm{d} \Gamma 
+# K_{ij}^\mathrm{p} &= \int_\Omega \mathrm{grad}\left(\delta N\supscr{p}_i\right)\cdot \left[\frac{k}{n}\mathrm{grad}\left(N\supscr{p}_j\right)\right] \mathrm{d}\Omega \\
+# L_{ij}^\mathrm{pp} &= \int_\Omega \delta N_i^\mathrm{p} N_j^\mathrm{p}/K_\mathrm{l} \mathrm{d}\Omega \\
+# L_{ij}^\mathrm{pu} &= \int_\Omega \delta N_i^\mathrm{p} \mathrm{div}\left(\boldsymbol{N}_j^\mathrm{u}\right) \mathrm{d}\Omega \\
+# K_{ij}^\mathrm{uu} &= - \int_\Omega \mathrm{grad}\left(\boldsymbol{\delta N}^\mathrm{u}_i\right) : \boldsymbol{\mathrm{E}} : \mathrm{grad}\left(\boldsymbol{N}_j^\mathrm{u}\right) \mathrm{d} \Omega \\ 
+# K_{ij}^\mathrm{up} &= \int_\Omega \mathrm{div}\left(\boldsymbol{\delta N}_i^\mathrm{u}\right) N_j^\mathrm{p} \mathrm{d}\Omega \\
+# f_{i}^\mathrm{p,ext} &= \int_\Gamma \delta N_i^\mathrm{p} \tilde{\boldsymbol{v}}_\mathrm{l} \cdot \boldsymbol{n} \mathrm{d}\Gamma\\
+# f_{i}^\mathrm{u,ext} &= -\int_\Gamma \boldsymbol{\delta N}_i^\mathrm{u} \cdot \boldsymbol{t} \mathrm{d} \Gamma
 # \end{align*}
 # ```
 # This results in the equation system 
@@ -302,7 +302,7 @@ function setup_problem(;t_rise=0.1, p_max=100.0)
 end
 
 # ### Solving
-# Given the `MixedDofHandler`, ´ConstraintHandler`, and `CellValues`, 
+# Given the `MixedDofHandler`, `ConstraintHandler`, and `CellValues`, 
 # we can solve the problem by stepping through the time history
 function solve(dh, ch, cv; Δt=0.025, t_total=1.0)
     ## Assemble stiffness matrix
