@@ -21,6 +21,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "quasi_incompressible_hyperelasticity.md",
     "ns_vs_diffeq.md",
     "computational_homogenization.md",
+    "porous_media.md"
     )]
 
 # Build documentation.

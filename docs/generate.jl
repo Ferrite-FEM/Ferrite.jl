@@ -30,7 +30,7 @@ for example in readdir(EXAMPLEDIR)
 
         Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
         Literate.notebook(input, GENERATEDDIR, preprocess = nbpre, execute = is_ci) # Don't execute locally
-    elseif any(endswith.(example, [".png", ".jpg", ".gif"]))
+    elseif any(endswith.(example, [".png", ".jpg", ".gif", ".svg"]))
         cp(joinpath(EXAMPLEDIR, example), joinpath(GENERATEDDIR, example); force=true)
     else
         @warn "ignoring $example"
