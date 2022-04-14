@@ -143,12 +143,12 @@ end
 # we require a few more inputs to get the element force and stiffness. We dispatch 
 # on the cellvalues being a tuple of `CellVectorValues` and `CellScalarValues`.
 function element_routine!(Ke, fext, cell, fh::FieldHandler, cvs::Tuple{CellVectorValues, CellScalarValues}, a_old, Δt)
-    # Setup cellvalues and give easier names
     reinit!.(cvs, (cell,))
+    # Give easier names
     cv_u, cv_p = cvs
     num_u_basefuncs, num_p_basefuncs = getnbasefunctions.(cvs)
     
-    # Chech that cellvalues are compatible with eachother (should have same quadrature rule)
+    # Check that cellvalues are compatible with each other (should have same quadrature rule)
     @assert getnquadpoints(cv_u) == getnquadpoints(cv_p)
 
     # Reset element stiffness and external force
