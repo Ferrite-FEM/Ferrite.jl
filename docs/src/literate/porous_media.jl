@@ -103,6 +103,9 @@
 # Material parameters are hard-coded in for simplicity. 
 # 
 # ## Implementation
+# We now solve the problem step by step. The full program with fewer comments is found in 
+#md # the final [section](@ref porous-media-plain-program)
+# 
 # Required packages
 using Ferrite, FerriteMeshParser, Tensors
 #
@@ -244,7 +247,7 @@ function get_grid()
     ## Import grid from abaqus mesh
     grid = get_ferrite_grid(joinpath(@__DIR__, "porous_media_0p25.inp"))
 
-    # Create cellsets for each fieldhandler
+    ## Create cellsets for each fieldhandler
     addcellset!(grid, "solid3", intersect(getcellset(grid, "solid"), getcellset(grid, "CPS3")))
     addcellset!(grid, "solid4", intersect(getcellset(grid, "solid"), getcellset(grid, "CPS4R")))
     addcellset!(grid, "porous3", intersect(getcellset(grid, "porous"), getcellset(grid, "CPS3")))
@@ -326,3 +329,12 @@ end
 # Finally we call the functions to actually run the code
 dh, ch, cv = setup_problem()
 solve(dh, ch, cv)
+
+#md # ## [Plain program](@id porous-media-plain-program)
+#md #
+#md # Here follows a version of the program without any comments.
+#md # The file is also available here: [`porous_media.jl`](porous_media.jl).
+#md #
+#md # ```julia
+#md # @__CODE__
+#md # ```
