@@ -23,9 +23,8 @@ Call to start assembling the stiffness matrix.
 Returns an `Assembler` type that is used to hold the intermediate
 data before an assembly is finished.
 
-Note that giving a sparse matrix as input, see below and 
-as described in the [Assembly](@ref) part of the manual, 
-can be more efficient. 
+Note that giving a sparse matrix as input can be more efficient. See below and 
+as described in the [manual](@ref assembly_in_manual).
 """
 function start_assemble(N::Int=0)
     return Assembler(N)
