@@ -143,31 +143,31 @@ end
 # we require a few more inputs to get the element force and stiffness. We dispatch 
 # on the cellvalues being a tuple of `CellVectorValues` and `CellScalarValues`.
 function element_routine!(Ke, fext, cell, fh::FieldHandler, cvs::Tuple{CellVectorValues, CellScalarValues}, a_old, Δt)
+    ## Setup cellvalues and give easier names
     reinit!.(cvs, (cell,))
-    # Give easier names
     cv_u, cv_p = cvs
     num_u_basefuncs, num_p_basefuncs = getnbasefunctions.(cvs)
     
-    # Check that cellvalues are compatible with each other (should have same quadrature rule)
+    ## Check that cellvalues are compatible with each other (should have same quadrature rule)
     @assert getnquadpoints(cv_u) == getnquadpoints(cv_p)
 
-    # Reset element stiffness and external force
+    ## Reset element stiffness and external force
     fill!(Ke, 0.0)
     fill!(fext, 0.0)
 
-    # Assign views to the matrix and vector parts
+    ## Assign views to the matrix and vector parts
     udofs = dof_range(fh, :u)
     pdofs = dof_range(fh, :p)
     Kuu = @view Ke[udofs, udofs]
     Kpu = @view Ke[pdofs, udofs]
     Kup = @view Ke[udofs, pdofs]
     Kpp = @view Ke[pdofs, pdofs]
-    # fu = @view fext[udofs]    # Not used, traction is zero or displacements prescribed
+    ## fu = @view fext[udofs]    # Not used, traction is zero or displacements prescribed
     fp = @view fext[pdofs]
     au_old = @view a_old[udofs]
     ap_old = @view a_old[pdofs]
 
-    # Material parameters
+    ## Material parameters
     μ = 1.e-4       # [Ns/mm^2] Dynamic viscosity
     k = 5.0e-6      # [mm^2] Intrinsic permeability
     k_darcy = k/μ
@@ -175,10 +175,10 @@ function element_routine!(Ke, fext, cell, fh::FieldHandler, cvs::Tuple{CellVecto
     K_liquid = 2.e3 # [MPa] Liquid bulk modulus
     dσdϵ = elastic_stiffness()
 
-    # Assemble stiffness and force vectors
+    ## Assemble stiffness and force vectors
     for q_point in 1:getnquadpoints(cv_u)    
         dΩ = getdetJdV(cv_u, q_point)
-        # Variation of u_i
+        ## Variation of u_i
         for i in 1:num_u_basefuncs
             ∇δNu = shape_symmetric_gradient(cv_u, q_point, i)
             div_δNu = shape_divergence(cv_u, q_point, i)
@@ -191,7 +191,7 @@ function element_routine!(Ke, fext, cell, fh::FieldHandler, cvs::Tuple{CellVecto
                 Kup[i, j] += div_δNu * Np
             end
         end
-        # Variation of p_i
+        ## Variation of p_i
         for i in 1:num_p_basefuncs
             δNp = shape_value(cv_p, q_point, i)
             ∇δNp = shape_gradient(cv_p, q_point, i)
@@ -213,7 +213,9 @@ function element_routine!(Ke, fext, cell, fh::FieldHandler, cvs::Tuple{CellVecto
     end
 end
 
-# Assemble all cells
+# ### Assembly
+# In order to assemble the contribution from each cell, we first 
+# loop over each field with the following function.
 function doassemble!(K, f, dh, cvs, a_old, Δt)
     assembler = start_assemble(K, f)
     for (fh, cv) in zip(dh.fieldhandlers, cvs)
@@ -221,6 +223,9 @@ function doassemble!(K, f, dh, cvs, a_old, Δt)
     end
 end
 
+# When calling the `doassemble!` with a specific `FieldHandler`, 
+# we can then loop over all cells in its cellset. This ensures
+# that the `CellIterator` and `element_routine!` is type stable.
 function doassemble!(assembler, dh, cv, fh::FieldHandler, a_old, Δt)
     n = ndofs_per_cell(dh, first(fh.cellset))
     Ke = zeros(n,n)
@@ -231,10 +236,11 @@ function doassemble!(assembler, dh, cv, fh::FieldHandler, a_old, Δt)
     end
 end
 
-# Solve the finite element problem
-function solve()
-    Δt, T, t_rise = (0.025, 1.0, 0.1)  # Time step, total time, and pressure rise time
-    p_max = 100.0   # MPa, max pressure
+# ### Mesh import
+# In this example, we import the mesh from an Abaqus input file using `FerriteMeshParser`'s 
+# `get_ferrite_grid` function. We then create one cellset for each phase (solid and porous)
+# for each element type. These 4 sets will later be used in their own `FieldHandler`
+function get_grid()
     ## Import grid from abaqus mesh
     grid = get_ferrite_grid(joinpath(@__DIR__, "porous_media_0p25.inp"))
 
@@ -243,8 +249,16 @@ function solve()
     addcellset!(grid, "solid4", intersect(getcellset(grid, "solid"), getcellset(grid, "CPS4R")))
     addcellset!(grid, "porous3", intersect(getcellset(grid, "porous"), getcellset(grid, "CPS3")))
     addcellset!(grid, "porous4", intersect(getcellset(grid, "porous"), getcellset(grid, "CPS4R")))
+    return grid
+end
 
-    ## Setup the interpolation and integration for each field
+# ### Problem setup 
+# Define the finite element interpolation, integration, and boundary conditions. 
+function setup_problem(;t_rise=0.1, p_max=100.0)
+
+    grid = get_grid()
+
+    ## Setup the interpolation and integration rules
     dim=Ferrite.getdim(grid)    
     ip3_lin = Lagrange{dim, RefTetrahedron, 1}()
     ip4_lin = Lagrange{dim, RefCube, 1}()
@@ -261,9 +275,9 @@ function solve()
     push!(dh, FieldHandler([Field(:u, ip4_quad, dim), Field(:p, ip4_lin, 1)], getcellset(grid,"porous4")))
     close!(dh)
 
-    # Setup cellvalues with the same order as the FieldHandlers in the dh
-    # - Linear displacement elements in the solid domain
-    # - Taylor hood (quadratic displacement, linear pressure) and linear geometry in porous domain
+    ## Setup cellvalues with the same order as the FieldHandlers in the dh
+    ## - Linear displacement elements in the solid domain
+    ## - Taylor hood (quadratic displacement, linear pressure) and linear geometry in porous domain
     cv = ( CellVectorValues(qr3, ip3_lin), 
            CellVectorValues(qr4, ip4_lin),
            (CellVectorValues(qr3, ip3_quad, ip3_lin), CellScalarValues(qr3, ip3_lin)),
@@ -271,23 +285,29 @@ function solve()
 
     ## Add boundary conditions, use code from PR427.jl to make more general
     ch = ConstraintHandler(dh);
-    # With #PR427 (keep code for if/when it is merged)
-    # add!(ch, Dirichlet(:u, getfaceset(grid, "bottom"), (x, t) -> zero(Vec{2}), [1,2]))
-    # add!(ch, Dirichlet(:p, getfaceset(grid, "bottom_p"), (x, t) -> 0.0))
-    # add!(ch, Dirichlet(:p, getfaceset(grid, "top_p"), (x, t) -> p_max*clamp(t/t_rise,0,1)))
-    # With master (only works if no tri-elements on boundary)
+    ## With #PR427 (keep code for if/when it is merged)
+    ## add!(ch, Dirichlet(:u, getfaceset(grid, "bottom"), (x, t) -> zero(Vec{2}), [1,2]))
+    ## add!(ch, Dirichlet(:p, getfaceset(grid, "bottom_p"), (x, t) -> 0.0))
+    ## add!(ch, Dirichlet(:p, getfaceset(grid, "top_p"), (x, t) -> p_max*clamp(t/t_rise,0,1)))
+    ## With master (only works if no tri-elements on boundary)
     add!(ch, dh.fieldhandlers[2], Dirichlet(:u, getfaceset(grid, "bottom"), (x, t) -> zero(Vec{2}), [1,2]))
     add!(ch, dh.fieldhandlers[4], Dirichlet(:u, getfaceset(grid, "bottom_p"), (x, t) -> zero(Vec{2}), [1,2]))
     add!(ch, dh.fieldhandlers[4], Dirichlet(:p, getfaceset(grid, "bottom_p"), (x, t) -> 0.0))
     add!(ch, dh.fieldhandlers[4], Dirichlet(:p, getfaceset(grid, "top_p"), (x, t) -> p_max*clamp(t/t_rise,0,1)))
     close!(ch)
+    return dh, ch, cv
+end
 
+# ### Solving
+# Given the `MixedDofHandler`, ´ConstraintHandler`, and `CellValues`, 
+# we can solve the problem by stepping through the time history
+function solve!(dh, ch, cv; Δt=0.025, t_total=1.0)
     ## Assemble stiffness matrix
     K = create_sparsity_pattern(dh);
     f = zeros(ndofs(dh))
     a = zeros(ndofs(dh))
     pvd = paraview_collection("porous_media.pvd");
-    for (step, t) = enumerate(0:Δt:T)
+    for (step, t) = enumerate(0:Δt:t_total)
         if t>0    
             doassemble!(K, f, dh, cv, a, Δt)
             update!(ch, t)
@@ -303,4 +323,6 @@ function solve()
     vtk_save(pvd);
 end
 
-solve() # Solve the full problem
+# Finally we call the functions to actually run the code
+dh, ch, cv = setup_problem()
+solve(dh, ch, cv)
