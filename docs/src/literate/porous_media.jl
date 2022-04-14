@@ -125,7 +125,7 @@ end
 # Next, we define the element routines. First for the case of the linear elastic impermeable solid aggregates
 # In this simplified example, we dispatch on the cellvalues which are only `CellVectorValues` for the 
 # solid aggregates. Note that the unused inputs here are used for the porous matrix below. 
-function element_routine!(Ke, _, assembler, cell, _, cv::CellVectorValues, _, _)
+function element_routine!(Ke, _, cell, _, cv::CellVectorValues, _, _)
     reinit!(cv, cell)
     n_basefuncs = getnbasefunctions(cv)
     fill!(Ke, 0)
@@ -304,7 +304,7 @@ end
 # ### Solving
 # Given the `MixedDofHandler`, ´ConstraintHandler`, and `CellValues`, 
 # we can solve the problem by stepping through the time history
-function solve!(dh, ch, cv; Δt=0.025, t_total=1.0)
+function solve(dh, ch, cv; Δt=0.025, t_total=1.0)
     ## Assemble stiffness matrix
     K = create_sparsity_pattern(dh);
     f = zeros(ndofs(dh))
