@@ -11,7 +11,7 @@
 # `:u`, as well as the liquid pressure, `:p`, as unknown. The computational domain
 # is shown below
 #
-# ![The porous media consisting of impermeable solid aggregates and a permeable porous matrix.](porous_media.svg)
+# ![Computational domain](porous_media.svg)
 # ![Pressure evolution.](porous_media.gif)
 #
 # ## Theory of porous media
@@ -240,7 +240,7 @@ function doassemble!(assembler, dh, cv, fh::FieldHandler, a_old, Δt)
 end
 
 # ### Mesh import
-# In this example, we import the mesh from an Abaqus input file using `FerriteMeshParser`'s 
+# In this example, we import the mesh from the Abaqus input file, [`porous_media_0p25.inp`](porous_media_0p25.inp) using `FerriteMeshParser`'s 
 # `get_ferrite_grid` function. We then create one cellset for each phase (solid and porous)
 # for each element type. These 4 sets will later be used in their own `FieldHandler`
 function get_grid()
