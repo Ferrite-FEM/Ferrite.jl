@@ -302,8 +302,8 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     return global_dofs
 end
 
-function cellnodes!(global_nodes::Vector{Int}, grid::Grid{dim,C}, i::Int) where {dim,C}
-    nodes = grid.cells[i].nodes
+function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid{dim}, i::Int) where {dim,C}
+    nodes = getcells(grid,i).nodes
     N = length(nodes)
     @assert length(global_nodes) == N
     for j in 1:N
@@ -312,29 +312,13 @@ function cellnodes!(global_nodes::Vector{Int}, grid::Grid{dim,C}, i::Int) where 
     return global_nodes
 end
 
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::Grid{dim,C}, i::Int) where {dim,C,T}
-    nodes = grid.cells[i].nodes
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,C,T}
+    nodes = getcells(grid,i).nodes
     N = length(nodes)
     @assert length(global_coords) == N
     for j in 1:N
-        global_coords[j] = grid.nodes[nodes[j]].x
+        global_coords[j] = getnodes(grid.nodes,nodes[j]).x
     end
-    return global_coords
-end
-
-function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid{dim}, i::Int) where {dim}
-    C = getcelltype(grid)
-    @assert length(global_nodes) == nnodes(C)
-    for j in 1:nnodes(C)
-        global_nodes[j] = getcells(grid, i).nodes[j] ##TODO getnodes(::AbstractCell); only vertices(::AbstractCell) available
-    end 
-    return global_nodes
-end
-
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,T}
-    C = getcelltype(grid)
-    @assert length(global_coords) == nnodes(C)
-    global_coords .= getcoordinates(grid, i)
     return global_coords
 end
 
