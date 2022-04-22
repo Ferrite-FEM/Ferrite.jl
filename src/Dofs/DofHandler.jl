@@ -9,7 +9,7 @@ Operates slightly faster than [`MixedDofHandler`](@docs). Supports:
 - `Grid`s with a single concrete cell type.
 - One or several fields on the whole domaine.
 """
-struct DofHandler{dim,C,T} <: AbstractDofHandler
+struct DofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     field_names::Vector{Symbol}
     field_dims::Vector{Int}
     # TODO: field_interpolations can probably be better typed: We should at least require
@@ -19,11 +19,11 @@ struct DofHandler{dim,C,T} <: AbstractDofHandler
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
     closed::ScalarWrapper{Bool}
-    grid::Grid{dim,C,T}
+    grid::G
     ndofs::ScalarWrapper{Int}
 end
 
-function DofHandler(grid::Grid)
+function DofHandler(grid::AbstractGrid)
     isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. Use MixedDofHandler instead of DofHandler")
     DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end
@@ -302,8 +302,8 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     return global_dofs
 end
 
-function cellnodes!(global_nodes::Vector{Int}, grid::Grid{dim,C}, i::Int) where {dim,C}
-    nodes = grid.cells[i].nodes
+function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid{dim}, i::Int) where {dim,C}
+    nodes = getcells(grid,i).nodes
     N = length(nodes)
     @assert length(global_nodes) == N
     for j in 1:N
@@ -312,15 +312,16 @@ function cellnodes!(global_nodes::Vector{Int}, grid::Grid{dim,C}, i::Int) where 
     return global_nodes
 end
 
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::Grid{dim,C}, i::Int) where {dim,C,T}
-    nodes = grid.cells[i].nodes
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,C,T}
+    nodes = getcells(grid,i).nodes
     N = length(nodes)
     @assert length(global_coords) == N
     for j in 1:N
-        global_coords[j] = grid.nodes[nodes[j]].x
+        global_coords[j] = getcoordinates(getnodes(grid,nodes[j]))
     end
     return global_coords
 end
+
 cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, dh.grid, i)
 
 function celldofs(dh::DofHandler, i::Int)
