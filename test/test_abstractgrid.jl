@@ -10,6 +10,7 @@
     Ferrite.getncells(grid::SmallGrid{dim,N}) where {dim,N} = N
     Ferrite.getcelltype(grid::SmallGrid) = eltype(grid.cells_test)
     Ferrite.getcelltype(grid::SmallGrid, i::Int) = typeof(grid.cells_test[i])
+    Ferrite.getcoordinates(x::NTuple{dim,Float64}) where dim = Vec{dim,Float64}(x)
 
     Ferrite.getnodes(grid::SmallGrid) = grid.nodes_test
     Ferrite.getnodes(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.nodes_test[v]
