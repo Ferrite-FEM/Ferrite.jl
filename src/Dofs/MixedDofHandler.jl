@@ -1,5 +1,5 @@
 """
-Field(name::Symbol, interpolation::Interpolation, dim::Int)
+    Field(name::Symbol, interpolation::Interpolation, dim::Int)
 
 Construct `dim`-dimensional `Field` called `name` which is approximated by `interpolation`.
 
@@ -19,6 +19,7 @@ Construct a `FieldHandler` based on an array of [`Field`](@ref)s and assigns it 
 A `FieldHandler` must fullfill the following requirements:
 - All [`Cell`](@ref)s in `cellset` are of the same type.
 - Each field only uses a single interpolation on the `cellset`.
+- Each cell belongs only to a single `FieldHandler`, i.e. all fields on a cell must be added within the same `FieldHandler`.
 
 Notice that a `FieldHandler` can hold several fields.
 """
@@ -140,6 +141,7 @@ Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
 function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
     @assert !isclosed(dh)
     _check_same_celltype(dh.grid, collect(fh.cellset))
+    _check_cellset_intersections(dh, fh)
     # the field interpolations should have the same refshape as the cells they are applied to
     refshapes_fh = getrefshape.(getfieldinterpolations(fh))
     # extract the celltype from the first cell as the celltypes are all equal
@@ -151,6 +153,12 @@ function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
 
     push!(dh.fieldhandlers, fh)
     return dh
+end
+
+function _check_cellset_intersections(dh::MixedDofHandler, fh::FieldHandler)
+    for _fh in dh.fieldhandlers
+        isdisjoint(_fh.cellset, fh.cellset) || error("Each cell can only belong to a single FieldHandler.")
+    end
 end
 
 function Base.push!(dh::MixedDofHandler, name::Symbol, dim::Int)

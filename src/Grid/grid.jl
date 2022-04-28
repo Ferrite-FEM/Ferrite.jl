@@ -664,15 +664,6 @@ end
 @inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
 @inline getcoordinates(grid::AbstractGrid, face::FaceIndex) = getcoordinates(grid, face.idx[1])
 
-# Iterate over cell vector
-function Base.iterate(c::Vector{Cell{dim,N}}, state = 1) where {dim, N}
-    if state > length(c)
-        return nothing
-    else
-        return (CellIndex(state), state + 1)
-    end
-end
-
 function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) ")
     typestrs = sort!(collect(Set(celltypes[typeof(x)] for x in grid.cells)))
