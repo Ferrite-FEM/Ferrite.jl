@@ -346,7 +346,8 @@ Returns all directly connected entities of the same type, i.e. calling the funct
 a list of directly connected vertices (connected via face/edge). If `include_self` is true, the given `*Index` is included 
 in the returned list.
 
-**Warning:** this feature is highly experimental and very likely subjected to interface changes in the future.
+!!! warning
+    This feature is highly experimental and very likely subjected to interface changes in the future.
 """
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
     patch = getcells(top.cell_neighbor[cellidx.idx])

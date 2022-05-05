@@ -38,6 +38,7 @@ compute_vertex_values
 transform!
 getcoordinates
 getcoordinates!
+Ferrite.ExclusiveTopology
 Ferrite.getneighborhood
 Ferrite.faceskeleton
 ```
