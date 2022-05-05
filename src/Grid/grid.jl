@@ -315,7 +315,7 @@ end
     getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, cellidx::CellIndex, include_self=false)
     getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, faceidx::FaceIndex, include_self=false)
     getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, vertexidx::VertexIndex, include_self=false)
-    getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, EdgeIndex::EdgeIndex, include_self=false)
+    getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, edgeidx::EdgeIndex, include_self=false)
 
 Returns all directly connected entities of the same type, i.e. calling the function with a `VertexIndex` will return
 a list of directly connected vertices (connected via face/edge). If `include_self` is true, the given `*Index` is included 
