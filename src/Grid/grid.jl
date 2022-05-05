@@ -110,8 +110,16 @@ function Base.show(io::IO, ::MIME"text/plain", n::EntityNeighborhood)
     end
 end
 
+"""
+    face_npoints(::AbstractCell{dim,N,M)
+Specifies for each subtype of AbstractCell how many nodes form a face
+"""
 face_npoints(::Cell{2,N,M}) where {N,M} = 2
 face_npoints(::Cell{3,4,1}) = 4 #not sure how to handle embedded cells e.g. Quadrilateral3D
+"""
+    edge_npoints(::AbstractCell{dim,N,M)
+Specifies for each subtype of AbstractCell how many nodes form an edge
+"""
 edge_npoints(::Cell{3,4,1}) = 2 #not sure how to handle embedded cells e.g. Quadrilateral3D
 face_npoints(::Cell{3,N,6}) where N = 4
 face_npoints(::Cell{3,N,4}) where N = 3
@@ -121,6 +129,23 @@ getdim(::Cell{dim}) where dim = dim
 
 abstract type AbstractTopology end
 
+"""
+    ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
+`ExclusiveTopology` saves topological data of the grid. The constructor works with an `AbstractCell`
+vector for all cells that dispatch `vertices`, `faces` and in 3D `edges` as well as the utility functions
+`face_npoints` and `edge_npoints`.
+The struct saves the highest dimensional neighborhood, i.e. if something is connected by a face and an
+ edge only the face neighborhood is saved. The lower dimensional neighborhood is recomputed, if needed.
+
+# Fields
+- `vertex_to_cell::Dict{Int,Vector{Int}}`: global vertex id to all cells containing the vertex
+- `cell_neighbor::Vector{EntityNeighborhood{CellIndex}}`: cellid to all connected cells
+- `face_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: face_neighbor[cellid,local_face_id] -> neighboring face
+- `vertex_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: vertex_neighbor[cellid,local_vertex_id] -> neighboring vertex
+- `edge_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: edge_neighbor[cellid_local_vertex_id] -> neighboring edge
+- `vertex_vertex_neighbor::Dict{Int,EntityNeighborhood{VertexIndex}}`: global vertex id -> all connected vertices by edge or face
+- `face_skeleton::Vector{FaceIndex}`: list of unique faces in the grid 
+"""
 struct ExclusiveTopology <: AbstractTopology
     # maps a global vertex id to all cells containing the vertex
     vertex_to_cell::Dict{Int,Vector{Int}}
