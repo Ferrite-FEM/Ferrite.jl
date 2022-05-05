@@ -128,7 +128,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
     # over a `CellIterator`. The iterator caches some useful things for us, for example
     # the nodal coordinates for the cell, and the local degrees of freedom.
     #+
-    @inbounds for cell in CellIterator(dh)
+    for cell in CellIterator(dh)
         # Always remember to reset the element stiffness matrix and
         # force vector since we reuse them for all elements.
         #+
