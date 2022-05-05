@@ -140,9 +140,9 @@ The struct saves the highest dimensional neighborhood, i.e. if something is conn
 # Fields
 - `vertex_to_cell::Dict{Int,Vector{Int}}`: global vertex id to all cells containing the vertex
 - `cell_neighbor::Vector{EntityNeighborhood{CellIndex}}`: cellid to all connected cells
-- `face_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: face_neighbor[cellid,local_face_id] -> neighboring face
-- `vertex_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: vertex_neighbor[cellid,local_vertex_id] -> neighboring vertex
-- `edge_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: edge_neighbor[cellid_local_vertex_id] -> neighboring edge
+- `face_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: `face_neighbor[cellid,local_face_id]` -> neighboring face
+- `vertex_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: `vertex_neighbor[cellid,local_vertex_id]` -> neighboring vertex
+- `edge_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: `edge_neighbor[cellid_local_vertex_id]` -> neighboring edge
 - `vertex_vertex_neighbor::Dict{Int,EntityNeighborhood{VertexIndex}}`: global vertex id -> all connected vertices by edge or face
 - `face_skeleton::Vector{FaceIndex}`: list of unique faces in the grid 
 """
