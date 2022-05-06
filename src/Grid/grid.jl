@@ -131,7 +131,7 @@ abstract type AbstractTopology end
 
 """
     ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
-`ExclusiveTopology` saves topological data of the grid. The constructor works with an `AbstractCell`
+`ExclusiveTopology` saves topological (connectivity) data of the grid. The constructor works with an `AbstractCell`
 vector for all cells that dispatch `vertices`, `faces` and in 3D `edges` as well as the utility functions
 `face_npoints` and `edge_npoints`.
 The struct saves the highest dimensional neighborhood, i.e. if something is connected by a face and an
