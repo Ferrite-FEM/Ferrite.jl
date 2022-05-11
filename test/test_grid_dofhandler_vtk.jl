@@ -217,7 +217,7 @@ end
 
 @testset "grid coloring" begin
     function test_coloring(grid, cellset=Set(1:getncells(grid)))
-        for alg in (Ferrite.GREEDY, Ferrite.WORKSTREAM)
+        for alg in (ColoringAlgorithm.Greedy, ColoringAlgorithm.WorkStream)
             color_vectors = create_coloring(grid, cellset; alg=alg)
             @test sum(length, color_vectors) == length(cellset)
             @test union(Set.(color_vectors)...) == cellset

@@ -536,10 +536,13 @@ function apply_zero!(K::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch:
     apply!(K, f, ch, true)
 end
 
-@enum(ApplyStrategy, APPLY_TRANSPOSE, APPLY_INPLACE)
+@enumx ApplyStrategy Transpose Inplace
+# For backwards compatibility
+const APPLY_TRANSPOSE = ApplyStrategy.Transpose
+const APPLY_INPLACE = ApplyStrategy.Inplace
 
 function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false;
-                strategy::ApplyStrategy=APPLY_TRANSPOSE)
+                strategy::ApplyStrategy.T=ApplyStrategy.Transpose)
     K = isa(KK, Symmetric) ? KK.data : KK
     @assert length(f) == 0 || length(f) == size(K, 1)
     @boundscheck checkbounds(K, ch.prescribed_dofs, ch.prescribed_dofs)
@@ -565,12 +568,12 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
 
     # Remove constrained dofs from the matrix
     zero_out_columns!(K, ch.prescribed_dofs)
-    if strategy == APPLY_TRANSPOSE
+    if strategy === ApplyStrategy.Transpose
         K′ = copy(K)
         transpose!(K′, K)
         zero_out_columns!(K′, ch.prescribed_dofs)
         transpose!(K, K′)
-    elseif strategy == APPLY_INPLACE
+    elseif strategy === ApplyStrategy.Inplace
         K[ch.prescribed_dofs, :] .= 0
     else
         error("Unknown apply strategy")

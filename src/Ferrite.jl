@@ -7,6 +7,7 @@ using LinearAlgebra
 using SparseArrays
 using Base: @propagate_inbounds
 using NearestNeighbors
+using EnumX
 
 include("exports.jl")
 
