@@ -37,7 +37,7 @@ For a scalar field, the `FaceScalarValues` type should be used. For vector field
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
 """
-FaceValues
+FaceValues, FaceScalarValues, FaceVectorValues
 
 # FaceScalarValues
 struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{dim,T,refshape}

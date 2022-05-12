@@ -31,7 +31,7 @@ utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape 
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
 """
-CellValues
+CellValues, CellScalarValues, CellVectorValues
 
 # CellScalarValues
 struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: CellValues{dim,T,refshape}
