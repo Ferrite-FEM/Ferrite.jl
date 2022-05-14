@@ -51,6 +51,8 @@ using LinearAlgebra
 const ∇ = Tensors.gradient
 const Δ = Tensors.hessian;
 
+k = 2.0
+
 grid = generate_grid(Quadrilateral, (150, 150))
 
 dim = 2
@@ -60,6 +62,7 @@ qr_face = QuadratureRule{dim-1, RefCube}(2)
 cellvalues = CellScalarValues(qr, ip);
 facevalues = FaceScalarValues(qr_face, ip);
 
+# add Complex?
 dh = DofHandler(grid)
 push!(dh, :u, 1)
 close!(dh)
@@ -68,20 +71,12 @@ close!(dh)
 # This is a good testing strategy for PDE codes and known as the method of manufactured solutions.
 
 function u_ana(x::Vec{2, T}) where {T}
-    xs = (Vec{2}((-0.5,  0.5)),
-          Vec{2}((-0.5, -0.5)),
-          Vec{2}(( 0.5,  -0.5)))
-    σ = 1/8
-    s = zero(eltype(x))
-    for i in 1:3
-        s += exp(- norm(x - xs[i])^2 / σ^2)
-    end
-    return max(1e-15 * one(T), s) # Denormals, be gone
+    return exp(im*k*x[1])
 end;
 
-dbcs = ConstraintHandler(dh)
 # The (strong) Dirichlet boundary condition can be handled automatically by the Ferrite library.
-dbc = Dirichlet(:u, union(getfaceset(grid, "top"), getfaceset(grid, "right")), (x,t) -> u_ana(x))
+dbcs = ConstraintHandler(dh;bctype=ComplexF64)
+dbc = Dirichlet(:u, union(getfaceset(grid, "left"), getfaceset(grid, "bottom"), getfaceset(grid, "top"), getfaceset(grid, "right")), (x,t) -> u_ana(x))
 add!(dbcs, dbc)
 close!(dbcs)
 update!(dbcs, 0.0)
@@ -91,14 +86,15 @@ K = create_sparsity_pattern(dh);
 function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarValues{dim},
                          K::SparseMatrixCSC, dh::DofHandler) where {dim}
     b = 1.0
-    f = zeros(ndofs(dh))
+	fill!(K.nzval, zero(ComplexF64))
+    f = zeros(ComplexF64, ndofs(dh))
     assembler = start_assemble(K, f)
     
     n_basefuncs = getnbasefunctions(cellvalues)
     global_dofs = zeros(Int, ndofs_per_cell(dh))
 
-    fe = zeros(n_basefuncs) # Local force vector
-    Ke = zeros(n_basefuncs, n_basefuncs) # Local stiffness mastrix
+    fe = zeros(ComplexF64, n_basefuncs) # Local force vector
+    Ke = zeros(ComplexF64, n_basefuncs, n_basefuncs) # Local stiffness mastrix
 
     @inbounds for (cellcount, cell) in enumerate(CellIterator(dh))
         fill!(Ke, 0)
@@ -117,7 +113,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
             coords_qp = spatial_coordinate(cellvalues, q_point, coords)
-            f_true = -LinearAlgebra.tr(hessian(u_ana, coords_qp)) + u_ana(coords_qp)
+            f_true = zero(ComplexF64)
             for i in 1:n_basefuncs
                 δu = shape_value(cellvalues, q_point, i)
                 ∇δu = shape_gradient(cellvalues, q_point, i)
@@ -129,29 +125,6 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
                 end
             end
         end
-
-        # Now we manually add the von Neumann boundary terms
-        # ```math
-        # \int δu g_2 d\Gamma_2
-        # ```
-        #+
-        for face in 1:nfaces(cell)
-            if onboundary(cell, face) && 
-                   ((cellcount, face) ∈ getfaceset(grid, "left") || 
-                    (cellcount, face) ∈ getfaceset(grid, "bottom"))
-                reinit!(facevalues, cell, face)
-                for q_point in 1:getnquadpoints(facevalues)
-                    coords_qp = spatial_coordinate(facevalues, q_point, coords)
-                    n = getnormal(facevalues, q_point)
-                    g_2 = gradient(u_ana, coords_qp) ⋅ n
-                    dΓ = getdetJdV(facevalues, q_point)
-                    for i in 1:n_basefuncs
-                        δu = shape_value(facevalues, q_point, i)
-                        fe[i] += (δu * g_2) * dΓ
-                    end
-                end
-            end
-        end
    
         celldofs!(global_dofs, cell)
         assemble!(assembler, global_dofs, fe, Ke)
@@ -159,18 +132,16 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
     return K, f
 end;
 
-K, f = doassemble(cellvalues, facevalues, K, dh);
+# We should be able to remove this at some point
+K = create_sparsity_pattern(dh; field_type=ComplexF64)
+K, f = doassemble(cellvalues, facevalues, K, dh)
 apply!(K, f, dbcs)
-u = Symmetric(K) \ f;
+u = K \ f
+u
 
 vtkfile = vtk_grid("helmholtz", dh)
-vtk_point_data(vtkfile, dh, u)
+vtk_point_data(vtkfile, dh, real.(u), "_real")
+vtk_point_data(vtkfile, dh, imag.(u), "_imag")
 vtk_save(vtkfile)
-using Test #src
-#src this test catches unexpected changes in the result over time.
-#src the true maximum is slightly bigger then 1.0
-@test maximum(u) ≈ 0.9952772469054607 #src
-@test u_ana(Vec{2}((-0.5, -0.5))) ≈ 1 #src
-@test u_ana(Vec{2}((0.5, -0.5)))  ≈ 1 #src
-@test u_ana(Vec{2}((-0.5, 0.5)))  ≈ 1 #src
+
 println("Helmholtz successful")

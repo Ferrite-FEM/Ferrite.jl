@@ -84,7 +84,7 @@ end
 abstract type AbstractGrid{dim} end
 
 """
-    Grid{dim, C<:AbstractCell, T<:Real} <: AbstractGrid}
+    Grid{dim, C<:AbstractCell, T<:Number} <: AbstractGrid}
 
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 There are multiple helper structures to apply boundary conditions or define subdomains. They are gathered in the `cellsets`, `nodesets`,
@@ -100,7 +100,7 @@ There are multiple helper structures to apply boundary conditions or define subd
 - `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
 - `boundary_matrix::SparseMatrixCSC{Bool,Int}`: optional, only needed by `onboundary` to check if a cell is on the boundary, see, e.g. Helmholtz example
 """
-mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
+mutable struct Grid{dim,C<:AbstractCell,T<:Number} <: AbstractGrid{dim}
     cells::Vector{C}
     nodes::Vector{Node{dim,T}}
     # Sets

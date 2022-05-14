@@ -23,9 +23,11 @@ struct DofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     ndofs::ScalarWrapper{Int}
 end
 
-function DofHandler(grid::AbstractGrid)
+dof_type(::DofHandler{dim, T}) where {dim,T} = T
+
+function DofHandler(grid::AbstractGrid, dof_type=Float64)
     isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. Use MixedDofHandler instead of DofHandler")
-    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
+    DofHandler(Symbol[], Int[], Interpolation[], BCValues{dof_type}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
@@ -343,7 +345,7 @@ with stored values in the correct places.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-create_sparsity_pattern(dh::DofHandler) = _create_sparsity_pattern(dh, nothing, false)
+create_sparsity_pattern(dh::DofHandler;kwargs...) = _create_sparsity_pattern(dh, nothing, false; kwargs...)
 
 """
     create_symmetric_sparsity_pattern(dh::DofHandler)
@@ -356,7 +358,7 @@ See the [Sparsity Pattern](@ref) section of the manual.
 """
 create_symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
 
-function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool)
+function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool; field_type::Type = dof_type(dh))
     ncells = getncells(dh.grid)
     n = ndofs_per_cell(dh)
     N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
@@ -393,7 +395,7 @@ function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler,
 
     resize!(I, cnt)
     resize!(J, cnt)
-    V = zeros(length(I))
+    V = zeros(field_type, length(I))
     K = sparse(I, J, V)
 
     # Add entries to K corresponding to condensation due the linear constraints
