@@ -40,6 +40,7 @@ export
 
 # Grid
     Grid,
+    DistributedGrid,
     Node,
     Cell,
     Line,
@@ -97,6 +98,7 @@ export
 
 # Dofs
     DofHandler,
+    DistributedDofHandler,
     close!,
     ndofs,
     ndofs_per_cell,

@@ -5,6 +5,9 @@ version = "0.3.4"
 [deps]
 EnumX = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+MPIPreferences = "3da0fdf6-3ccc-4f1b-acd9-58baa6c99267"
+Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
 NearestNeighbors = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
@@ -35,6 +38,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [targets]
-test = ["BlockArrays", "Downloads", "ForwardDiff", "IterativeSolvers", "KrylovMethods",
-        "NBInclude", "Pkg", "ProgressMeter", "Random", "SHA", "StableRNGs", "Test",
-        "TimerOutputs"]
+test = ["BlockArrays", "Downloads", "ForwardDiff", "IterativeSolvers", "KrylovMethods", "NBInclude", "Pkg", "ProgressMeter", "Random", "SHA", "StableRNGs", "Test", "TimerOutputs"]
