@@ -33,6 +33,12 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compre
     return vtk_grid(filename, coords, cls; compress=compress)
 end
 
+function WriteVTK.vtk_grid(filename::AbstractString, dgrid::DistributedGrid{dim,C,T}; compress::Bool=true) where {dim,C,T}
+    my_rank = MPI.Comm_rank(dgrid.grid_comm)
+    return vtk_grid("$filename.$my_rank", dgrid.local_grid; compress=compress)
+end
+
+
 function toparaview!(v, x::Vec{D}) where D
     v[1:D] .= x
 end
