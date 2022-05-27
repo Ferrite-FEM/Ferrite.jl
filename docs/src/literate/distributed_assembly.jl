@@ -48,7 +48,19 @@ grid = generate_grid(Quadrilateral, (4, 4));
 
 dgrid = DistributedGrid(grid, MPI.COMM_WORLD)
 
-vtk_grid("grid", dgrid; compress=false) do pvtk
+vtk_grid("grid", dgrid; compress=false) do vtk
+    u = Vector{Float64}(undef,length(dgrid.local_grid.nodes))
+    for rank ∈ 1:MPI.Comm_size(MPI.COMM_WORLD)
+        fill!(u, 0.0)
+        for sv ∈ dgrid.shared_vertices
+            if haskey(sv.remote_vertices, rank)
+                (cellidx,i) = sv.local_idx
+                nodeidx = dgrid.local_grid.cells[cellidx].nodes[i]
+                u[nodeidx] = rank
+            end
+        end
+        vtk_point_data(vtk, u,"sv $rank")
+    end
 end
 
 # Shutdown MPI
