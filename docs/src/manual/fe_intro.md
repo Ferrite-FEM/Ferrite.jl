@@ -6,14 +6,13 @@ heat equation, also known as the Poisson equation. We will use this equation as 
 example of the method, and demonstrate how we go from the strong form of the equation, to
 the weak form, and then finally to the discrete FE problem.
 
-## Strong Form
+## Strong form
 
-TODO: Image of domain with boundary annotation and boundary normal vector.
 
 The strong form of the heat equation may be written as:
 
 ```math
-- \nabla \cdot \mathbf{q}(u) = f \quad \forall \, x \in \Omega,
+- \nabla \cdot \mathbf{q}(u) = f \quad \forall \, \mathbf{x} \in \Omega,
 ```
 
 where $u$ is the unknown temperature field, $\mathbf{q}$ is the heat flux, $f$ is an
@@ -22,7 +21,7 @@ complete the problem we need to specify what happens at the domain boundary $\Ga
 This set of specifications is called *boundary conditions*. There are different types of
 boundary conditions, where the most common ones are Dirichlet -- which means that the solution
 $u$ is known at some part of the boundary, and Neumann -- which means that the gradient
-of the solution, $\nabla$ is known. Formally we write for our example
+of the solution, $\nabla u$ is known. Formally we write for our example
 
 ```math
 u = u^\mathrm{p} \quad \forall \, \mathbf{x} \in \Gamma_\mathrm{D},\\
@@ -44,7 +43,7 @@ flux, $\mathbf{q}$. The simplest case is to use Fourier's law
 where $k$ is the conductivity of the material. For simplicity we will consider only
 constant conductivity $k$.
 
-## Weak Form
+## Weak form
 
 The solution to the equation above is usually calculated from the corresponding weak
 form. By multiplying the equation with an arbitrary *test function* $\delta u$, integrating
@@ -63,9 +62,8 @@ where $\mathbb{U}, \mathbb{T}$ are suitable function spaces with sufficiently re
 functions. Under very general assumptions it can be shown that the solution to the weak
 form is identical to the solution to the strong form.
 
-## Finite Element Approximation
+## Finite Element approximation
 
-TODO: Image of geometric discretization with triangles.
 
 Using the finite element method to solve partial differential equations is usually
 preceded with the construction of a discretization of the domain $\Omega$ into a finite
@@ -74,8 +72,8 @@ and denote it with $\Omega_h$. In this example the corners of the triangles are 
 *nodes*.
 
 Next we introduce the finite element approximation $u_\mathrm{h} \approx u$ as a sum of N nodal
-*shape functions*, where we denote each of these function by $\phi_i$ and the corresponding *nodal
-values* $\hat{u}_i$. Depending on the community, shape functions are also called *trial functions*.
+*shape functions*, where we denote each of these function by $\phi_i$ and the corresponding *nodal values*
+$\hat{u}_i$. Note that *shape functions* are sometimes referred to as *base functions* or *trial functions*, and instead of $\phi_i$ they are sometimes denoted $N_i$.
 In this example we choose to approximate the test function in the same way. This approach is known
 as the *Galerkin finite element method*. Formally we write the evaluation of our approximations
 at a specific point $\mathbf{x}$ in our domain $\Omega$ as:
@@ -91,7 +89,7 @@ functions*. In the following the argument $\mathbf{x}$ is dropped to keep the no
 We may now insert these approximations in the weak form, which results in
 
 ```math
-\sum_j^N \left(\sum_i^N \delta \hat{u}_i \int_{\Omega_\mathrm{h}} \nabla \phi_i \cdot (k \nabla \phi_j) \, \mathrm{d}\Omega \right) \hat{u}_j =
+\sum_i^N \left(\sum_j^N \delta \hat{u}_i \int_{\Omega_\mathrm{h}} \nabla \phi_i \cdot (k \nabla \phi_j) \, \mathrm{d}\Omega \right) \hat{u}_j =
 \sum_i^N \delta \hat{u}_i \int_{\Gamma_\mathrm{N}} \phi_i \, q^\mathrm{p} \, \mathrm{d}\Gamma +
 \sum_i^N \delta \hat{u}_i \int_{\Omega_\mathrm{h}} \phi_i \, f \, \mathrm{d}\Omega \, .
 ```
@@ -105,36 +103,35 @@ N linear equations. This way the discrete problem can be written as a system of 
 \underline{\underline{K}}\ \underline{\hat{u}} = \underline{\hat{f}} \, ,
 ```
 
-where we call $\underline{K}$ the (tangent) *stiffness matrix*, $\underline{\hat{u}}$ the *solution
+where we call $\underline{\underline{K}}$ the (tangent) *stiffness matrix*, $\underline{\hat{u}}$ the *solution
 vector* with the nodal values and $\underline{\hat{f}}$ the *force vector*. The specific naming is for
 historical reasons, because the finite element method has its origins in mechanics. The elements
-of $\underline{K}$ and $\underline{\hat{f}}$ are given by
+of $\underline{\underline{K}}$ and $\underline{\hat{f}}$ are given by
 
 ```math
-K_{ij} =
+(\underline{\underline{K}})_{ij} =
     \int_{\Omega_\mathrm{h}} \nabla \phi_i \cdot (k \nabla \phi_j) \mathrm{d}\Omega \, , \\
 
-\hat{f}_{i} =
+(\underline{\hat{f}})_{i} =
     \int_{\Gamma_\mathrm{N}} \phi_i \, q^\mathrm{p} \, \mathrm{d}\Gamma + \int_{\Omega_\mathrm{h}} \phi_i \, f \, \mathrm{d}\Omega \, .
 ```
 
-Finally we also need to take care of the Dirichlet boundary conditions. These are enforce by
+Finally we also need to take care of the Dirichlet boundary conditions. These are enforced by
 setting the corresponding $\hat{u}_i$ to the prescribed values and eliminating the associated equations
-from the system. Now, solving this equation system yields an the nodal values and thus an
+from the system. Now, solving this equation system yields the nodal values and thus an
 approximation to the true solution.
 
-## Notes on the Implementation
+## Notes on the implementation
 
 In practice, the shape functions $\phi_i$ are only non-zero on parts of the domain $\Omega_\mathrm{h}$.
 Thus, the integrals are evaluated on sub-domains, called *elements* or *cells*.
 
-TODO: Image of a linear basis function on the grid above.
 
 Each cell gives a contribution to the global stiffness matrix and force vector. The process
 of constructing the system of equations is also called *assembly*. For clarification,
 let us rewrite the formula for the stiffness matrix entries as follows:
 ```math
-K_{ij}
+(\underline{\underline{K}})_{ij}
     = \int_{\Omega_\mathrm{h}} \nabla \phi_i \cdot (k \nabla \phi_j) \mathrm{d}\Omega
     = \sum_{E \in \Omega_\mathrm{h}} \int_E \nabla \phi_i \cdot (k \nabla \phi_j) \mathrm{d}\Omega \, .
 ```
@@ -154,7 +151,7 @@ Formally we write
     \int_E \nabla \phi_i \cdot (k \nabla \phi_j) \mathrm{d}\Omega
     \approx \sum_q \nabla \phi_i(\textbf{x}_q) \cdot (k(\textbf{x}_q) \nabla \phi_j(\textbf{x}_q)) \, w_q \, \textrm{det}(J(\textbf{x}_q)) \, ,
 ```
-where J is the Jacobian of the coordinate transformation function. The computation of the
+where ``J`` is the Jacobian of the coordinate transformation function. The computation of the
 transformation, weights, positions and of the Jacobi determinant is handled by Ferrite.
 On an intuitive level, and to explain the notation used in the implementation, we think of
 ```math

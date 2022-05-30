@@ -28,7 +28,7 @@
 # ```math
 # \int_{\Omega} \nabla \delta u \cdot \nabla u \ d\Omega = \int_{\Omega} \delta u \ d\Omega \quad \forall \delta u \in \mathbb{T},
 # ```
-# where $\mathbb{T}$ is a suitable test function space.
+# where $\delta u$ is a test function and $\mathbb{T}$ is a suitable test function space.
 #-
 # ## Commented Program
 #
