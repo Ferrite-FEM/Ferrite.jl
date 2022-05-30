@@ -18,22 +18,22 @@
 # The strong form of the (linear) heat equation is given by
 #
 # ```math
-#  -\nabla \cdot (k \nabla u) = f  \quad x \in \Omega,
+#  -\nabla \cdot (k \nabla u) = f  \quad \textbf{x} \in \Omega,
 # ```
 #
 # where $u$ is the unknown temperature field, $k$ the heat conductivity,
 # $f$ the heat source and $\Omega$ the domain. For simplicity we set $f = 1$
 # and $k = 1$. We will consider homogeneous Dirichlet boundary conditions such that
 # ```math
-# u(x) = 0 \quad x \in \partial \Omega,
+# u(\textbf{x}) = 0 \quad \textbf{x} \in \partial \Omega,
 # ```
 # where $\partial \Omega$ denotes the boundary of $\Omega$.
 #
 # The resulting weak form is given by
 # ```math
-# \int_{\Omega} \nabla v \cdot \nabla u \ d\Omega = \int_{\Omega} v \ d\Omega,
+# \int_{\Omega} \nabla \delta u \cdot \nabla u \ d\Omega = \int_{\Omega} \delta u \ d\Omega \quad \forall \delta u \in \mathbb{T},
 # ```
-# where $v$ is a suitable test function.
+# where $\delta u$ is a test function and $\mathbb{T}$ is a suitable test function space.
 #-
 # ## Commented Program
 #
@@ -88,9 +88,9 @@ ch = ConstraintHandler(dh);
 
 # Now we are set up to define our constraint. We specify which field
 # the condition is for, and our combined face set `∂Ω`. The last
-# argument is a function which takes the spatial coordinate $x$ and
+# argument is a function which takes the spatial coordinate $\textbf{x}$ and
 # the current time $t$ and returns the prescribed value. In this case
-# it is trivial -- no matter what $x$ and $t$ we return $0$. When we have
+# it is trivial -- no matter what $\textbf{x}$ and $t$ we return $0$. When we have
 # specified our constraint we `add!` it to `ch`.
 dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
 add!(ch, dbc);
@@ -107,6 +107,10 @@ update!(ch, 0.0);
 # We define a function, `doassemble` to do the assembly, which takes our `cellvalues`,
 # the sparse matrix and our DofHandler as input arguments. The function returns the
 # assembled stiffness matrix, and the force vector.
+# Note that here `f` and `u` correspond to $\underline{\hat{f}}$ and $\underline{\hat{u}}$
+# from the introduction, since they represent the discretized versions. However, through
+# the code we use `f` and `u` instead to reflect the strong connection between the weak
+# form and the Ferrite implementation.
 function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler) where {dim}
     # We allocate the element stiffness matrix and element force vector
     # just once before looping over all the cells instead of allocating
@@ -146,16 +150,21 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
             # For each quadrature point we loop over all the (local) shape functions.
-            # We need the value and gradient of the testfunction `v` and also the gradient
-            # of the trial function `u`. We get all of these from `cellvalues`.
+            # We need the value and gradient of the test function `δu` and also the
+            # gradient of the trial function `u`. We get all of these from `cellvalues`.
+            # Please note that the variables `δu`, `∇δu` and `∇u` are actually
+            # $\phi_i(\textbf{x}_q)$, $\nabla \phi_i(\textbf{x}_q)$ and $\nabla
+            # \phi_j(\textbf{x}_q)$, i.e. the evaluation of the trial and test functions.
+            # However, to underline the strong parallel between the weak form and the
+            # implementation, this example uses the symbols appearing in the weak form.
             #+
             for i in 1:n_basefuncs
-                v  = shape_value(cellvalues, q_point, i)
-                ∇v = shape_gradient(cellvalues, q_point, i)
-                fe[i] += v * dΩ
+                δu  = shape_value(cellvalues, q_point, i)
+                ∇δu = shape_gradient(cellvalues, q_point, i)
+                fe[i] += δu * dΩ
                 for j in 1:n_basefuncs
                     ∇u = shape_gradient(cellvalues, q_point, j)
-                    Ke[i, j] += (∇v ⋅ ∇u) * dΩ
+                    Ke[i, j] += (∇δu ⋅ ∇u) * dΩ
                 end
             end
         end
