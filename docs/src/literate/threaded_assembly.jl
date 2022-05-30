@@ -1,9 +1,11 @@
 # # Threaded Assembly
+#
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`threaded_assembly.ipynb`](@__NBVIEWER_ROOT_URL__/examples/threaded_assembly.ipynb)
-
+#md #     [`threaded_assembly.ipynb`](@__NBVIEWER_ROOT_URL__/examples/threaded_assembly.ipynb).
+#-
+#
 # ## Example of a colored grid
 #
 # Creates a simple 2D grid and colors it.
@@ -21,8 +23,8 @@ using Ferrite, SparseArrays
 
 function create_example_2d_grid()
     grid = generate_grid(Quadrilateral, (10, 10), Vec{2}((0.0, 0.0)), Vec{2}((10.0, 10.0)))
-    colors_workstream = create_coloring(grid; alg=Ferrite.WORKSTREAM)
-    colors_greedy = create_coloring(grid; alg=Ferrite.GREEDY)
+    colors_workstream = create_coloring(grid; alg=ColoringAlgorithm.WorkStream)
+    colors_greedy = create_coloring(grid; alg=ColoringAlgorithm.Greedy)
     vtk_grid("colored", grid) do vtk
         vtk_cell_data_colors(vtk, colors_workstream, "workstream-coloring")
         vtk_cell_data_colors(vtk, colors_greedy, "greedy-coloring")
@@ -32,6 +34,9 @@ end
 create_example_2d_grid();
 
 # ![](coloring.png)
+#
+# *Figure 1*: Element coloring using the "workstream"-algorithm (left) and the "greedy"-
+# algorithm (right).
 
 # ## Cantilever beam in 3D with threaded assembly
 # We will now look at an example where we assemble the stiffness matrix using multiple
@@ -196,10 +201,10 @@ run_assemble()
 # * 3 threads 0.83 seconds
 # * 4 threads 0.75 seconds
 
-#md # ## [Plain Program](@id threaded_assembly-plain-program)
+#md # ## [Plain program](@id threaded_assembly-plain-program)
 #md #
-#md # Below follows a version of the program without any comments.
-#md # The file is also available here: [threaded_assembly.jl](threaded_assembly.jl)
+#md # Here follows a version of the program without any comments.
+#md # The file is also available here: [`threaded_assembly.jl`](threaded_assembly.jl).
 #md #
 #md # ```julia
 #md # @__CODE__

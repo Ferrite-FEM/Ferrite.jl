@@ -37,7 +37,7 @@ For a scalar field, the `FaceScalarValues` type should be used. For vector field
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
 """
-FaceValues
+FaceValues, FaceScalarValues, FaceVectorValues
 
 # FaceScalarValues
 struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{dim,T,refshape}
@@ -48,8 +48,16 @@ struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{di
     normals::Vector{Vec{dim,T}}
     M::Array{T,3}
     dMdξ::Array{Vec{dim,T},3}
-    qr_weights::Vector{T}
+    # 'Any' is 'dim-1' here -- this is deliberately abstractly typed. Only qr.weights is
+    # accessed in performance critical code so this doesn't seem to be a problem in
+    # practice since qr.weights is correctly inferred as Vector{T}, and T is a parameter
+    # of the struct.
+    qr::QuadratureRule{<:Any,refshape,T}
     current_face::ScalarWrapper{Int}
+    # The following fields are deliberately abstract -- they are never used in
+    # performance critical code, just stored here for convenience.
+    func_interp::Interpolation{dim,refshape}
+    geo_interp::Interpolation{dim,refshape}
 end
 
 function FaceScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
@@ -93,7 +101,7 @@ function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
 
     detJdV = fill(T(NaN), n_qpoints, n_faces)
 
-    FaceScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule, ScalarWrapper(0), func_interpol, geom_interpol)
 end
 
 # FaceVectorValues
@@ -105,8 +113,16 @@ struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: FaceValues{
     normals::Vector{Vec{dim,T}}
     M::Array{T,3}
     dMdξ::Array{Vec{dim,T},3}
-    qr_weights::Vector{T}
+    # 'Any' is 'dim-1' here -- this is deliberately abstractly typed. Only qr.weights is
+    # accessed in performance critical code so this doesn't seem to be a problem in
+    # practice since qr.weights is correctly inferred as Vector{T}, and T is a parameter
+    # of the struct.
+    qr::QuadratureRule{<:Any,refshape,T}
     current_face::ScalarWrapper{Int}
+    # The following fields are deliberately abstract -- they are never used in
+    # performance critical code, just stored here for convenience.
+    func_interp::Interpolation{dim,refshape}
+    geo_interp::Interpolation{dim,refshape}
 end
 
 function FaceVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
@@ -161,7 +177,7 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
     detJdV = fill(T(NaN), n_qpoints, n_faces)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    FaceVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule, ScalarWrapper(0), func_interpol, geom_interpol)
 end
 
 function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) where {dim,T}
@@ -173,8 +189,8 @@ function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) 
     fv.current_face[] = face
     cb = getcurrentface(fv)
 
-    @inbounds for i in 1:length(fv.qr_weights)
-        w = fv.qr_weights[i]
+    @inbounds for i in 1:length(fv.qr.weights)
+        w = fv.qr.weights[i]
         fefv_J = zero(Tensor{2,dim})
         for j in 1:n_geom_basefuncs
             fefv_J += x[j] ⊗ fv.dMdξ[j, i, cb]
@@ -183,7 +199,7 @@ function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) 
         fv.normals[i] = weight_norm / norm(weight_norm)
         detJ = norm(weight_norm)
 
-        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
         fv.detJdV[i, cb] = detJ * w
         Jinv = inv(fefv_J)
         for j in 1:n_func_basefuncs

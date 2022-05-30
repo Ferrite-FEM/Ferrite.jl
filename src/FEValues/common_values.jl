@@ -8,10 +8,13 @@ struct ScalarValued <: FieldTrait end
 
 FieldTrait(::Type{<:CellScalarValues}) = ScalarValued()
 FieldTrait(::Type{<:FaceScalarValues}) = ScalarValued()
+FieldTrait(::Type{<:PointScalarValuesInternal}) = ScalarValued()
 FieldTrait(::Type{<:PointScalarValues}) = ScalarValued()
+FieldTrait(::Type{<:PointVectorValues}) = VectorValued()
 FieldTrait(::Type{<:CellVectorValues}) = VectorValued()
 FieldTrait(::Type{<:FaceVectorValues}) = VectorValued()
 
+@noinline throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
 
 getnbasefunctions(cv::Values) = size(cv.N, 1)
 getngeobasefunctions(cv::Values) = size(cv.M, 1)
@@ -40,7 +43,7 @@ reinit!
 
 Return the number of quadrature points for the `Values` object.
 """
-getnquadpoints(fe::Values) = length(fe.qr_weights)
+getnquadpoints(fe::Values) = length(fe.qr.weights)
 
 """
     getdetJdV(fe_v::Values, q_point::Int)
@@ -102,9 +105,9 @@ quadrature point `q_point`.
 shape_curl(cv::T, q_point, base_func) where T = shape_curl(FieldTrait(T), cv, q_point, base_func)
 
 function shape_curl(::VectorValued, cv::Values, q_point::Int, base_func::Int)
-    return curl(shape_gradient(cv, q_point, base_func))
+    return curl_from_gradient(shape_gradient(cv, q_point, base_func))
 end
-curl(∇v) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
+curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
 
 """
     function_value(fe_v::Values, q_point::Int, u::AbstractVector)
@@ -119,8 +122,7 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
 nodal values of ``\\mathbf{u}``.
 """
-function_value(fe_v::T, q_point, u, dof_range) where T = function_value(FieldTrait(T), fe_v, q_point, u, dof_range)
-function_value(fe_v::T, q_point, u) where T = function_value(FieldTrait(T), fe_v, q_point, u)
+function_value(fe_v::T, args...) where T <: Values = function_value(FieldTrait(T), fe_v, args...)
 
 function function_value(::FieldTrait, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
     n_base_funcs = getnbasefunctions(fe_v)
@@ -171,8 +173,7 @@ For a vector valued function with use of `ScalarValues` the gradient is computed
 ``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{u}_i \\otimes \\mathbf{\\nabla} N_i (\\mathbf{x})``
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
-function_gradient(fe_v::T, q_point, u) where T = function_gradient(FieldTrait(T), fe_v, q_point, u)
-function_gradient(fe_v::T, q_point, u, dof_range) where T = function_gradient(FieldTrait(T), fe_v, q_point, u, dof_range)
+function_gradient(fe_v::T, args...) where T <: Values = function_gradient(FieldTrait(T), fe_v, args...)
 
 function function_gradient(::FieldTrait, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
     n_base_funcs = getnbasefunctions(fe_v)
@@ -248,7 +249,7 @@ The divergence of a vector valued functions in the quadrature point ``\\mathbf{x
 ``\\mathbf{\\nabla} \\cdot \\mathbf{u}(\\mathbf{x_q}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x_q}) \\cdot \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function_divergence(fe_v::T, q_point, u) where T = function_divergence(FieldTrait(T), fe_v, q_point, u)
+function_divergence(fe_v::T, args...) where T <: Values = function_divergence(FieldTrait(T), fe_v, args...)
 
 function function_divergence(::ScalarValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
@@ -268,10 +269,10 @@ function_divergence(::VectorValued, fe_v::Values{dim}, q_point::Int, u::Abstract
     tr(function_gradient(fe_v, q_point, u))
 
 function_curl(fe_v::Values, q_point::Int, u::AbstractVector, dof_range = eachindex(u)) =
-    curl(function_gradient(fe_v, q_point, u, dof_range))
+    curl_from_gradient(function_gradient(fe_v, q_point, u, dof_range))
 
 function_curl(fe_v::Values, q_point::Int, u::AbstractVector{Vec{3, T}}) where T =
-    curl(function_gradient(fe_v, q_point, u))
+    curl_from_gradient(function_gradient(fe_v, q_point, u))
 
 """
     spatial_coordinate(fe_v::Values{dim}, q_point::Int, x::AbstractVector)

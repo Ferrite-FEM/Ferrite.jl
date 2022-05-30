@@ -21,5 +21,3 @@ end
 @inline Base.getindex(s::ScalarWrapper) = s.x
 @inline Base.setindex!(s::ScalarWrapper, v) = s.x = v
 Base.copy(s::ScalarWrapper{T}) where {T} = ScalarWrapper{T}(copy(s.x))
-
-copy!!(x, y) = copyto!(resize!(x, length(y)), y) # Future.copy!

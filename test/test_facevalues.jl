@@ -43,7 +43,7 @@ for (func_interpol, quad_rule) in  (
                 @test function_gradient(fv, i, u) ≈ H
                 @test function_symmetric_gradient(fv, i, u) ≈ 0.5(H + H')
                 @test function_divergence(fv, i, u) ≈ tr(H)
-                ndim == 3 && @test function_curl(fv, i, u) ≈ Ferrite.curl(H)
+                ndim == 3 && @test function_curl(fv, i, u) ≈ Ferrite.curl_from_gradient(H)
                 function_value(fv, i, u)
                 if isa(fv, FaceScalarValues)
                     @test function_gradient(fv, i, u_scal) ≈ V
@@ -52,7 +52,7 @@ for (func_interpol, quad_rule) in  (
                     @test function_gradient(fv, i, u_vector) ≈ function_gradient(fv, i, u) ≈ H
                     @test function_value(fv, i, u_vector) ≈ function_value(fv, i, u)
                     @test function_divergence(fv, i, u_vector) ≈ function_divergence(fv, i, u) ≈ tr(H)
-                    ndim == 3 && @test function_curl(fv, i, u_vector) ≈ Ferrite.curl(H)
+                    ndim == 3 && @test function_curl(fv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
                 end
             end
 
@@ -83,12 +83,15 @@ for (func_interpol, quad_rule) in  (
 
         # test copy
         fvc = copy(fv)
+        @test typeof(fv) == typeof(fvc)
         for fname in fieldnames(typeof(fv))
-            @test typeof(fv) == typeof(fvc)
-            if !isa(getfield(fv, fname), Ferrite.ScalarWrapper)
-                @test pointer(getfield(fv, fname)) != pointer(getfield(fvc, fname))
-                @test getfield(fv, fname) == getfield(fvc, fname)
+            v = getfield(fv, fname)
+            v isa Ferrite.ScalarWrapper && continue
+            vc = getfield(fvc, fname)
+            if hasmethod(pointer, Tuple{typeof(v)})
+                @test pointer(v) != pointer(vc)
             end
+            @test v == vc
         end
     end
 end

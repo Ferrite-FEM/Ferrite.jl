@@ -39,3 +39,17 @@ end
 #         end
 #     end
 # end
+
+module TestComputationalHomogenization
+    # Add this unregistered package here
+    import Pkg; Pkg.add(Pkg.PackageSpec(url = "https://github.com/Ferrite-FEM/FerriteGmsh.jl"))
+    include(joinpath(@__DIR__, "../docs/download_resources.jl"))
+    mktempdir() do dir
+        cd(dir) do
+            cp(joinpath(@__DIR__, "../docs/src/examples/periodic-rve.msh"),
+               joinpath(dir, "periodic-rve.msh")
+            )
+            include(joinpath(@__DIR__, "../docs/src/literate/computational_homogenization.jl"))
+        end
+    end
+end

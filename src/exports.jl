@@ -17,8 +17,6 @@ export
 
 # FEValues
     CellValues,
-    ScalarValues,
-    VectorValues,
     CellScalarValues,
     CellVectorValues,
     FaceValues,
@@ -61,6 +59,9 @@ export
     FaceIndex,
     EdgeIndex,
     VertexIndex,
+    ExclusiveTopology,
+    getneighborhood,
+    faceskeleton,
     getcells,
     getncells,
     getnodes,
@@ -91,6 +92,7 @@ export
 
 # Grid coloring
     create_coloring,
+    ColoringAlgorithm,
     vtk_cell_data_colors,
 
 # Dofs
@@ -112,6 +114,8 @@ export
 # Constraints
     ConstraintHandler,
     Dirichlet,
+    PeriodicDirichlet,
+    AffineConstraint,
     update!,
     apply!,
     apply_rhs!,
@@ -119,6 +123,7 @@ export
     apply_zero!,
     add!,
     free_dofs,
+    ApplyStrategy,
 
 # iterators
     CellIterator,
@@ -144,4 +149,8 @@ export
 
 # Point Evaluation
     PointEvalHandler,
-    get_point_values
+    get_point_values,
+    PointIterator,
+    PointLocation,
+    PointScalarValues,
+    PointVectorValues

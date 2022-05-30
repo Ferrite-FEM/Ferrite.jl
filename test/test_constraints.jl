@@ -15,7 +15,7 @@
     update!(ch)
 
     @test ch.prescribed_dofs == collect(1:9)
-    @test ch.values == [-1, -1, 1, -1, -1, 1, 0, 0, 0]
+    @test ch.inhomogeneities == [-1, -1, 1, -1, -1, 1, 0, 0, 0]
 
     ## test node bc with mixed dof handler
    dim = 2
@@ -43,7 +43,7 @@
    update!(ch)
 
    @test ch.prescribed_dofs == [1,3,9,19,20,23,27]
-   @test ch.values == [1.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0]
+   @test ch.inhomogeneities == [1.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0]
 
    ## MixedDofHandler: let first FieldHandler not have all fields
    dim = 2
@@ -68,7 +68,7 @@
    update!(ch)
 
    @test ch.prescribed_dofs == [1,3,9,13,14]
-   @test ch.values == [1.0, 1.0, 1.0, 2.0, 2.0]
+   @test ch.inhomogeneities == [1.0, 1.0, 1.0, 2.0, 2.0]
 end
 
 @testset "edge bc" begin
@@ -87,7 +87,7 @@ end
     update!(ch)
 
     @test ch.prescribed_dofs == [1,2,3,10,11,12]
-    @test ch.values == [-1.0, -1.0, -1.0, -1.0, 1.0, -1.0]
+    @test ch.inhomogeneities == [-1.0, -1.0, -1.0, -1.0, 1.0, -1.0]
 
 
     #Shell mesh edge bcs
@@ -112,4 +112,66 @@ end
     update!(ch)
 
     @test ch.prescribed_dofs == [10, 11, 14, 25, 27]
+end
+
+@testset "affine constraints" begin
+
+    grid = generate_grid(Line, (10,))
+    dh = DofHandler(grid)
+    push!(dh, :u, 1)
+    close!(dh)
+
+    test_acs = [
+        # Simple homogeneous constraint
+        [AffineConstraint(4, [(7 => 1.0)], 0.0)],
+        # Two dofs and inhomogeneity
+        [AffineConstraint(2, [(5 => 1.0), (6 =>2.0)], 1.0)],
+        # Two linear constraints
+        [AffineConstraint(2, [9=>1.0], 0.0),
+         AffineConstraint(3, [9=>1.0], 0.0)],
+        #
+        [AffineConstraint(2, [7=>3.0, 8=>1.0], -1.0),
+         AffineConstraint(4, [9=>-1.0], 2.0)]
+    ]
+
+    for acs in test_acs
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x,t)->0.0))
+        for lc in acs
+            add!(ch, lc)
+        end
+        close!(ch)
+        update!(ch, 0.0)
+        C, g = Ferrite.create_constraint_matrix(ch)
+        
+        # Assemble
+        K = create_sparsity_pattern(dh, ch)
+        f = zeros(ndofs(dh)); f[end] = 1.0
+        for cell in CellIterator(dh)
+            K[celldofs(cell), celldofs(cell)] += 2.0 * [1 -1; -1 1]
+        end
+        copies = (K = copy(K), f1 = copy(f), f2 = copy(f))
+
+        # Solve by actually condensing the matrix
+        ff  = C' * (f - K * g)
+        KK = C' * K * C
+        _aa = KK \ ff
+        aa = C * _aa + g
+
+        # Solving by modifying K inplace
+        apply!(K, f, ch)
+        a = K \ f
+        apply!(a, ch)
+
+        # Solve with extracted RHS data
+        rhs = get_rhs_data(ch, copies.K)
+        apply!(copies.K, ch)
+        apply_rhs!(rhs, copies.f1, ch)
+        a_rhs1 = apply!(copies.K \ copies.f1, ch)
+        apply_rhs!(rhs, copies.f2, ch)
+        a_rhs2 = apply!(copies.K \ copies.f2, ch)
+
+        @test a ≈ aa ≈ a_rhs1 ≈ a_rhs2
+    end
+
 end

@@ -40,6 +40,8 @@ struct QuadratureRule{dim,shape,T}
     points::Vector{Vec{dim,T}}
 end
 
+Base.copy(qr::QuadratureRule) = qr # TODO: Is it ever useful to get an actual copy?
+
 """
     getweights(qr::QuadratureRule)
 
