@@ -6,13 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.3.5] - 2022-05-30
 ### Added
 - Functionality for querying information about the grid topology (e.g. neighboring cells,
   boundaries, ...). ([#363][github-363])
 ### Fixed
 - Fix application of boundary conditions when combining RHSData and affine constraints.
   ([#431][github-431])
-
 
 ## [0.3.4] - 2022-02-25
 ### Added
@@ -62,7 +63,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-425]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/425
 [github-428]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/428
 
-[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.5...HEAD
+[0.3.5]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.1...v0.3.2
