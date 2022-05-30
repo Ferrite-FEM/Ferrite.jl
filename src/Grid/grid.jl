@@ -36,28 +36,25 @@ nnodes(c::C) where {C<:AbstractCell} = nnodes(typeof(c))
 nnodes(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = N
 
 # Typealias for commonly used cells
-const Line  = Cell{1,2,2}
-const Line2D = Cell{2,2,1}
-const Line3D = Cell{3,2,0}
-const QuadraticLine = Cell{1,3,2}
-
-const Triangle = Cell{2,3,3}
-const QuadraticTriangle = Cell{2,6,3}
-
-const Quadrilateral = Cell{2,4,4}
-const Quadrilateral3D = Cell{3,4,1}
-const QuadraticQuadrilateral = Cell{2,9,4}
-
-const Tetrahedron = Cell{3,4,4}
-const QuadraticTetrahedron = Cell{3,10,4}
-
-const Hexahedron = Cell{3,8,6}
-
-const implemented_celltypes = (Line, Line2D, Line3D, QuadraticLine, 
-                               Triangle, QuadraticTriangle,
-                               Quadrilateral, Quadrilateral3D, QuadraticQuadrilateral,
-                               Tetrahedron, QuadraticTetrahedron,
-                               Hexahedron, Cell{2,20,6})
+const implemented_celltypes = (
+    (const Line  = Cell{1,2,2}),
+    (const Line2D = Cell{2,2,1}),
+    (const Line3D = Cell{3,2,0}),
+    (const QuadraticLine = Cell{1,3,2}),
+    
+    (const Triangle = Cell{2,3,3}),
+    (const QuadraticTriangle = Cell{2,6,3}),
+    
+    (const Quadrilateral = Cell{2,4,4}),
+    (const Quadrilateral3D = Cell{3,4,1}),
+    (const QuadraticQuadrilateral = Cell{2,9,4}),
+    
+    (const Tetrahedron = Cell{3,4,4}),
+    (const QuadraticTetrahedron = Cell{3,10,4}),
+    
+    (const Hexahedron = Cell{3,8,6}),
+    (Cell{2,20,6})
+)
 
 """
 A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh
