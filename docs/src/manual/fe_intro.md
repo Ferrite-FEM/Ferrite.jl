@@ -40,8 +40,9 @@ flux, $\mathbf{q}$. The simplest case is to use Fourier's law
 \mathbf{q}(u) = -k \nabla u
 ```
 
-where $k$ is the conductivity of the material. For simplicity we will consider only
-constant conductivity $k$.
+where $k$ is the conductivity of the material. In general the conductivity can vary
+throughout the domain as a function of the coordinate, i.e. $k = k(\mathbf{x})$, but for
+simplicity we will consider only constant conductivity $k$.
 
 ## Weak form
 
@@ -72,8 +73,9 @@ and denote it with $\Omega_h$. In this example the corners of the triangles are 
 *nodes*.
 
 Next we introduce the finite element approximation $u_\mathrm{h} \approx u$ as a sum of N nodal
-*shape functions*, where we denote each of these function by $\phi_i$ and the corresponding *nodal values*
-$\hat{u}_i$. Note that *shape functions* are sometimes referred to as *base functions* or *trial functions*, and instead of $\phi_i$ they are sometimes denoted $N_i$.
+*shape functions*, where we denote each of these function by $\phi_i$ and the corresponding
+*nodal values* $\hat{u}_i$. Note that *shape functions* are sometimes referred to as
+*base functions* or *trial functions*, and instead of $\phi_i$ they are sometimes denoted $N_i$.
 In this example we choose to approximate the test function in the same way. This approach is known
 as the *Galerkin finite element method*. Formally we write the evaluation of our approximations
 at a specific point $\mathbf{x}$ in our domain $\Omega$ as:
@@ -89,9 +91,9 @@ functions*. In the following the argument $\mathbf{x}$ is dropped to keep the no
 We may now insert these approximations in the weak form, which results in
 
 ```math
-\sum_i^N \left(\sum_j^N \delta \hat{u}_i \int_{\Omega_\mathrm{h}} \nabla \phi_i \cdot (k \nabla \phi_j) \, \mathrm{d}\Omega \right) \hat{u}_j =
-\sum_i^N \delta \hat{u}_i \int_{\Gamma_\mathrm{N}} \phi_i \, q^\mathrm{p} \, \mathrm{d}\Gamma +
-\sum_i^N \delta \hat{u}_i \int_{\Omega_\mathrm{h}} \phi_i \, f \, \mathrm{d}\Omega \, .
+\sum_i^N \delta \hat{u}_i \left(\sum_j^N \int_{\Omega_\mathrm{h}} \nabla \phi_i \cdot (k \nabla \phi_j) \, \mathrm{d}\Omega \ \hat{u}_j \right) =
+\sum_i^N \delta \hat{u}_i \left( \int_{\Gamma_\mathrm{N}} \phi_i \, q^\mathrm{p} \, \mathrm{d}\Gamma +
+\int_{\Omega_\mathrm{h}} \phi_i \, f \, \mathrm{d}\Omega \right) \, .
 ```
 
 Since this equation must hold for arbitrary $\delta u_\mathrm{h}$, the equation must especially
@@ -162,7 +164,7 @@ being the chosen approximation when changing from the integral to the finite sum
 For an example of the implementation to solve a heat problem with `Ferrite` check out [this
 thoroughly commented example](@ref Heat-Equation).
 
-## More Details
+## More details
 
 We finally want to note that this quick introduction barely scratches the surface of the finite element
 method. Also, we presented some things in a simplified way for the sake of keeping this article short
