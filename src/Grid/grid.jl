@@ -371,7 +371,21 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::
     cell_vertices = vertices(getcells(grid,cellid))
     global_vertexid = cell_vertices[local_vertexid]
     if include_self
-        return [top.vertex_vertex_neighbor[global_vertexid].neighbor_info; vertexidx]
+        myself = Dict{Int,Int}()
+        result = copy(top.vertex_vertex_neighbor[global_vertexid].neighbor_info)
+        push!(result, vertexidx)
+        for neighbor ∈ top.vertex_vertex_neighbor[global_vertexid].neighbor_info
+            other_cellid = neighbor[1]
+            for (other_local_vertexid, other_vertex) ∈ enumerate(vertices(getcells(grid,other_cellid)))
+                if global_vertexid==other_vertex
+                    myself[other_cellid] = other_local_vertexid
+                end
+            end
+        end
+        for (other_cellid, other_local_vertexid) ∈ myself
+            push!(result, VertexIndex(other_cellid, other_local_vertexid))
+        end
+        return result
     else
         return top.vertex_vertex_neighbor[global_vertexid].neighbor_info
     end
