@@ -48,7 +48,7 @@ MPI.Init()
 # We start  generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Quadrilateral, (3, 3));
+grid = generate_grid(Quadrilateral, (20, 20));
 
 dgrid = DistributedGrid(grid, MPI.COMM_WORLD)
 
@@ -131,21 +131,26 @@ function adjust_numbering!(dh)
 
                     # Update shared vertex lookup table
                     if haskey(dgrid.shared_vertices,VertexIndex(ci,vi))
+                        master_rank = my_rank
+                        for master_rank_new ∈ keys(dgrid.shared_vertices[VertexIndex(ci,vi)].remote_vertices)
+                            master_rank = min(master_rank, master_rank_new)
+                        end
                         for (remote_rank, svs) ∈ dgrid.shared_vertices[VertexIndex(ci,vi)].remote_vertices
-                            if remote_rank > my_rank # I own the dof - we have to send information
+                            if master_rank == my_rank # I own the dof - we have to send information
                                 if !haskey(vertices_send,remote_rank)
                                     # vertices_send[remote_rank] = Vector{Ferrite.SharedVertex}()
                                     vertices_send[remote_rank] = Vector{Ferrite.VertexIndex}()
                                 end
                                 @debug println("      prepare sending vertex #$(VertexIndex(ci,vi)) to $remote_rank (R$my_rank)")
-                                push!(vertices_send[remote_rank],VertexIndex(ci,vi))
-                                # push!(vertices_send,Ferrite.SharedVertex)
-                            else # dof is owned by remote - we have to receive information
+                                for i ∈ svs
+                                    push!(vertices_send[remote_rank],VertexIndex(ci,vi))
+                                end
+                            elseif master_rank == remote_rank  # dof is owned by remote - we have to receive information
                                 if !haskey(n_vertices_recv,remote_rank)
                                     # vertices_recv[remote_rank] = Vector{Ferrite.SharedVertex}()
-                                    n_vertices_recv[remote_rank] = 1
+                                    n_vertices_recv[remote_rank] = length(svs)
                                 else
-                                    n_vertices_recv[remote_rank] += 1
+                                    n_vertices_recv[remote_rank] += length(svs)
                                 end
                                 @debug println("      prepare receiving vertex #$(VertexIndex(ci,vi)) from $remote_rank (R$my_rank)")
                                 # push!(vertices_recv,svs)
