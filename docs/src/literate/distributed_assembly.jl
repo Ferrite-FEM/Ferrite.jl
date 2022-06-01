@@ -38,22 +38,27 @@
 # First we load Ferrite, and some other packages we need
 using Ferrite, SparseArrays, MPI
 
+macro debug(ex)
+    return :($(esc(ex)))
+end
+
 # Launch MPI
 MPI.Init()
 
 # We start  generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Quadrilateral, (4, 4));
+grid = generate_grid(Quadrilateral, (3, 3));
 
 dgrid = DistributedGrid(grid, MPI.COMM_WORLD)
 
+# TODO refactor this into a utility function
 vtk_grid("grid", dgrid; compress=false) do vtk
     u = Vector{Float64}(undef,length(dgrid.local_grid.nodes))
     for rank ∈ 1:MPI.Comm_size(MPI.COMM_WORLD)
         fill!(u, 0.0)
-        for sv ∈ dgrid.shared_vertices
-            if haskey(sv.remote_vertices, rank)
+        for sv ∈ values(dgrid.shared_vertices)
+            if haskey(sv.remote_vertices,rank)
                 (cellidx,i) = sv.local_idx
                 nodeidx = dgrid.local_grid.cells[cellidx].nodes[i]
                 u[nodeidx] = rank
@@ -62,12 +67,6 @@ vtk_grid("grid", dgrid; compress=false) do vtk
         vtk_point_data(vtk, u,"sv $rank")
     end
 end
-
-# Shutdown MPI
-MPI.Finalize()
-
-# Early out for testing.
-exit(0)
 
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
@@ -89,9 +88,185 @@ cellvalues = CellScalarValues(qr, ip);
 # We create the `DofHandler` and then add a single field called `u`.
 # Lastly we `close!` the `DofHandler`, it is now that the dofs are distributed
 # for all the elements.
-dh = DistributedDofHandler(grid)
+dh = DofHandler(dgrid.local_grid)
 push!(dh, :u, 1)
 close!(dh);
+
+# We have to renumber the dofs to their global numbering.
+function adjust_numbering!(dh)
+    my_rank = MPI.Comm_rank(MPI.COMM_WORLD)+1
+
+    local_to_global = Vector{Int}(undef,ndofs(dh))
+    fill!(local_to_global,0) # 0 is the invalid index!
+    # Start by numbering local dofs only from 1:#local_dofs
+
+    # # Lookup for synchronization in the form (Remote Rank,Shared Entity)
+    # # @TODO replace dict with vector and tie to MPI neighborhood graph of the mesh
+    # vertices_send = Dict{Int,Vector{Ferrite.SharedVertex}}()
+    # vertices_recv = Dict{Int,Vector{Ferrite.SharedVertex}}()
+    vertices_send = Dict{Int,Vector{VertexIndex}}()
+    n_vertices_recv = Dict{Int,Int}()
+
+    next_local_idx = 1
+    for (ci, cell) in enumerate(getcells(dh.grid))
+        @debug println("cell #$ci (R$my_rank)")
+        for fi in 1:Ferrite.nfields(dh)
+            @debug println("  field: $(dh.field_names[fi]) (R$my_rank)")
+            interpolation_info = Ferrite.InterpolationInfo(dh.field_interpolations[fi])
+            if interpolation_info.nvertexdofs > 0
+                for (vi,vertex) in enumerate(Ferrite.vertices(cell))
+                    @debug println("    vertex#$vertex (R$my_rank)")
+                    # Dof is owned if it is local or if my rank is the smallest in the neighborhood
+                    if !haskey(dgrid.shared_vertices,VertexIndex(ci,vi)) || all(keys(dgrid.shared_vertices[VertexIndex(ci,vi)].remote_vertices) .> my_rank)
+                        # Update dof assignment
+                        dof_local_idx = dh.vertexdicts[fi][vertex]
+                        if local_to_global[dof_local_idx] == 0
+                            @debug println("      mapping vertex dof#$dof_local_idx to $next_local_idx (R$my_rank)")
+                            local_to_global[dof_local_idx] = next_local_idx
+                            next_local_idx += 1
+                        else
+                            @debug println("      vertex dof#$dof_local_idx already mapped to $(local_to_global[dof_local_idx]) (R$my_rank)")
+                        end
+                    end
+
+                    # Update shared vertex lookup table
+                    if haskey(dgrid.shared_vertices,VertexIndex(ci,vi))
+                        for (remote_rank, svs) ∈ dgrid.shared_vertices[VertexIndex(ci,vi)].remote_vertices
+                            if remote_rank > my_rank # I own the dof - we have to send information
+                                if !haskey(vertices_send,remote_rank)
+                                    # vertices_send[remote_rank] = Vector{Ferrite.SharedVertex}()
+                                    vertices_send[remote_rank] = Vector{Ferrite.VertexIndex}()
+                                end
+                                @debug println("      prepare sending vertex #$(VertexIndex(ci,vi)) to $remote_rank (R$my_rank)")
+                                push!(vertices_send[remote_rank],VertexIndex(ci,vi))
+                                # push!(vertices_send,Ferrite.SharedVertex)
+                            else # dof is owned by remote - we have to receive information
+                                if !haskey(n_vertices_recv,remote_rank)
+                                    # vertices_recv[remote_rank] = Vector{Ferrite.SharedVertex}()
+                                    n_vertices_recv[remote_rank] = 1
+                                else
+                                    n_vertices_recv[remote_rank] += 1
+                                end
+                                @debug println("      prepare receiving vertex #$(VertexIndex(ci,vi)) from $remote_rank (R$my_rank)")
+                                # push!(vertices_recv,svs)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    #
+    num_true_local_dofs = next_local_idx-1
+    @debug println("#true local dofs $num_true_local_dofs (R$my_rank)")
+
+    # @TODO optimize the following synchronization with MPI line graph topology 
+    # and allgather
+    # Set true local indices
+    local_offset = 0
+    if my_rank > 1
+        local_offset = MPI.Recv(Int, MPI.COMM_WORLD; source=my_rank-1-1)
+    end
+    if my_rank < MPI.Comm_size(MPI.COMM_WORLD)
+        MPI.Send(local_offset+num_true_local_dofs, MPI.COMM_WORLD; dest=my_rank+1-1)
+    end
+    @debug println("#shifted local dof range $(local_offset+1):$(local_offset+num_true_local_dofs) (R$my_rank)")
+
+    for i ∈ 1:length(local_to_global)
+        if local_to_global[i] != 0
+            local_to_global[i] += local_offset
+        end
+    end
+
+    # Sync remote dofs
+    for sending_rank ∈ 1:MPI.Comm_size(MPI.COMM_WORLD)
+        if my_rank == sending_rank
+            for remote_rank ∈ 1:MPI.Comm_size(MPI.COMM_WORLD)
+                if haskey(vertices_send, remote_rank)
+                    n_vertices = length(vertices_send[remote_rank])
+                    @debug println("Sending $n_vertices vertices to rank $remote_rank (R$my_rank)")
+                    remote_cells = Array{Int64}(undef,n_vertices)
+                    remote_cell_vis = Array{Int64}(undef,n_vertices)
+                    next_buffer_idx = 1
+                    for lvi ∈ vertices_send[remote_rank]
+                        sv = dgrid.shared_vertices[lvi]
+                        @assert haskey(sv.remote_vertices, remote_rank)
+                        for (cvi, llvi) ∈ sv.remote_vertices[remote_rank][1:1] # Just don't ask :)
+                            remote_cells[next_buffer_idx] = cvi
+                            remote_cell_vis[next_buffer_idx] = llvi 
+                            next_buffer_idx += 1
+                        end
+                    end
+                    MPI.Send(remote_cells, MPI.COMM_WORLD; dest=remote_rank-1)
+                    MPI.Send(remote_cell_vis, MPI.COMM_WORLD; dest=remote_rank-1)
+                    for fi ∈ 1:Ferrite.nfields(dh)
+                        next_buffer_idx = 1
+                        if length(dh.vertexdicts[fi]) == 0
+                            @debug println("Skipping send on field $(dh.field_names[fi]) (R$my_rank)")
+                            continue
+                        end
+                        # fill correspondence array
+                        corresponding_global_dofs = Array{Int64}(undef,n_vertices)
+                        for (lci,lclvi) ∈ vertices_send[remote_rank]
+                            vi = Ferrite.vertices(getcells(getgrid(dh),lci))[lclvi]
+                            if haskey(dh.vertexdicts[fi], vi)
+                                corresponding_global_dofs[next_buffer_idx] = local_to_global[dh.vertexdicts[fi][vi]]
+                            end
+                            next_buffer_idx += 1
+                        end
+                        MPI.Send(corresponding_global_dofs, MPI.COMM_WORLD; dest=remote_rank-1)
+                    end
+                end
+            end
+        else
+            if haskey(n_vertices_recv, sending_rank)
+                n_vertices = n_vertices_recv[sending_rank]
+                @debug println("Receiving $n_vertices vertices from rank $sending_rank (R$my_rank)")
+                local_cells = Array{Int64}(undef,n_vertices)
+                local_cell_vis = Array{Int64}(undef,n_vertices)
+                MPI.Recv!(local_cells, MPI.COMM_WORLD; source=sending_rank-1)
+                MPI.Recv!(local_cell_vis, MPI.COMM_WORLD; source=sending_rank-1)
+                for fi in 1:Ferrite.nfields(dh)
+                    if length(dh.vertexdicts[fi]) == 0
+                        @debug println("  Skipping recv on field $(dh.field_names[fi]) (R$my_rank)")
+                        continue
+                    end
+                    corresponding_global_dofs = Array{Int64}(undef,n_vertices)
+                    MPI.Recv!(corresponding_global_dofs, MPI.COMM_WORLD; source=sending_rank-1)
+                    for (cdi,(lci,lclvi)) ∈ enumerate(zip(local_cells,local_cell_vis))
+                        vi = Ferrite.vertices(getcells(getgrid(dh),lci))[lclvi]
+                        if haskey(dh.vertexdicts[fi], vi)
+                            local_to_global[dh.vertexdicts[fi][vi]] = corresponding_global_dofs[cdi]
+                            @debug println("  Updating field $(dh.field_names[fi]) vertex $(VertexIndex(lci,lclvi)) to $(corresponding_global_dofs[cdi]) (R$my_rank)")
+                        else
+                            @debug println("  Skipping recv on field $(dh.field_names[fi]) vertex $vi (R$my_rank)")
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    # Postcondition: All local dofs need a corresponding global dof!
+    @assert findfirst(local_to_global .== 0) == nothing
+
+    vtk_grid("dofs", dgrid; compress=false) do vtk
+        u = Vector{Float64}(undef,length(dgrid.local_grid.nodes))
+        fill!(u, 0.0)
+        for i=1:length(u)
+            u[i] = local_to_global[dh.vertexdicts[1][i]]
+        end
+        vtk_point_data(vtk, u,"dof")
+    end
+end
+adjust_numbering!(dh)
+
+# Shutdown MPI
+MPI.Finalize()
+
+# Early out for testing.
+exit(0)
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `create_sparsity_pattern`. This function returns a sparse matrix
@@ -200,7 +375,8 @@ K, f = doassemble(cellvalues, K, dh);
 # This modifies elements in `K` and `f` respectively, such that
 # we can get the correct solution vector `u` by using `\`.
 apply!(K, f, ch)
-u = cg(K, f);
+#u = PartitionedArray...
+cg!(u, K, f);
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`

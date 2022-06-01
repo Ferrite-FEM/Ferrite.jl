@@ -5,6 +5,9 @@ using MPI
 """
 abstract type AbstractDistributedGrid{sdim} <: AbstractGrid{sdim} end
 
+# TODO the following three structs can be merged to one struct with type parameter.
+"""
+"""
 struct SharedVertex
     local_idx::VertexIndex
     remote_vertices::Dict{Int,Vector{VertexIndex}}
@@ -14,7 +17,7 @@ end
 """
 struct SharedFace
     local_idx::FaceIndex
-    remote_edges::Dict{Int,Vector{FaceIndex}}
+    remote_faces::Dict{Int,Vector{FaceIndex}}
 end
 
 """
@@ -35,21 +38,26 @@ mutable struct DistributedGrid{dim,C<:AbstractCell,T<:Real} <: AbstractDistribut
     # Here we store the full local grid
     local_grid::Grid{dim,C,T}
     # Local copies of the shared entities of the form (local index, (process id in grid_comm, remote index))
-    shared_vertices::Vector{SharedVertex}
-    shared_edges::Vector{SharedEdge}
-    shared_faces::Vector{SharedFace}
+    # The entities consistently contain their *Index, because faces and edges are not materialized. 
+    shared_vertices::Dict{VertexIndex,SharedVertex}
+    shared_edges::Dict{EdgeIndex,SharedEdge}
+    shared_faces::Dict{FaceIndex,SharedFace}
 end
 
 """
 """
-function DistributedGrid(grid_to_distribute::Grid, grid_comm::MPI.Comm; partition_alg = :RECURSIVE)
+function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_comm::MPI.Comm; partition_alg = :RECURSIVE) where {dim,C,T}
     grid_topology = ExclusiveTopology(grid_to_distribute)
     return DistributedGrid(grid_to_distribute, grid_topology, grid_comm; partition_alg=partition_alg)
 end
 
-function create_partitioning(grid::Grid, grid_topology::ExclusiveTopology, n_partitions, partition_alg)
+function create_partitioning(grid::Grid{dim,C,T}, grid_topology::ExclusiveTopology, n_partitions, partition_alg) where {dim,C,T}
     N = getncells(grid)
     @assert N > 0
+    
+    if n_partitions == 1
+        return ones(N)
+    end
 
     # Set up the element connectivity graph
     xadj = Vector{Metis.idx_t}(undef, N+1)
@@ -123,12 +131,14 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
 
     # 6. Extract sets
     # @TODO deduplicate the code. We should be able to merge each of these into a macro or function.
-    global_to_local_cell_map = Dict{Int,Int}()
-    begin
+    # We build this map now, so we avoid the communication later.
+    global_to_local_cell_map = Dict{Int,Dict{Int,Int}}()
+    for rank ∈ 1:MPI.Comm_size(grid_comm)
+        global_to_local_cell_map[rank] = Dict{Int,Int}()
         next_local_cell_idx = 1
         for global_cell_idx ∈ 1:N
-            if parts[global_cell_idx] == (my_rank)
-                global_to_local_cell_map[global_cell_idx] = next_local_cell_idx
+            if parts[global_cell_idx] == rank
+                global_to_local_cell_map[rank][global_cell_idx] = next_local_cell_idx
                 next_local_cell_idx += 1
             end
         end
@@ -138,8 +148,8 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
     for key ∈ keys(grid_to_distribute.cellsets)
         cellsets[key] = Set{Int}() # create empty set, so it does not crash during assembly
         for global_cell_idx ∈ grid_to_distribute.cellsets[key]
-            if haskey(global_to_local_cell_map, global_cell_idx)
-                push!(cellsets[key], global_to_local_cell_map[global_cell_idx])
+            if haskey(global_to_local_cell_map[my_rank], global_cell_idx)
+                push!(cellsets[key], global_to_local_cell_map[my_rank][global_cell_idx])
             end
         end
     end
@@ -158,8 +168,8 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
     for key ∈ keys(grid_to_distribute.facesets)
         facesets[key] = Set{FaceIndex}() # create empty set, so it does not crash during assembly
         for (global_cell_idx, i) ∈ grid_to_distribute.facesets[key]
-            if haskey(global_to_local_cell_map, global_cell_idx)
-                push!(facesets[key], FaceIndex(global_to_local_cell_map[global_cell_idx], i))
+            if haskey(global_to_local_cell_map[my_rank], global_cell_idx)
+                push!(facesets[key], FaceIndex(global_to_local_cell_map[my_rank][global_cell_idx], i))
             end
         end
     end
@@ -168,8 +178,8 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
     for key ∈ keys(grid_to_distribute.edgesets)
         edgesets[key] = Set{EdgeIndex}() # create empty set, so it does not crash during assembly
         for (global_cell_idx, i) ∈ grid_to_distribute.edgesets[key]
-            if haskey(global_to_local_cell_map, global_cell_idx)
-                push!(edgesets[key], EdgeIndex(global_to_local_cell_map[global_cell_idx], i))
+            if haskey(global_to_local_cell_map[my_rank], global_cell_idx)
+                push!(edgesets[key], EdgeIndex(global_to_local_cell_map[my_rank][global_cell_idx], i))
             end
         end
     end
@@ -178,8 +188,8 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
     for key ∈ keys(grid_to_distribute.vertexsets)
         vertexsets[key] = Set{VertexIndex}() # create empty set, so it does not crash during assembly
         for (global_cell_idx, i) ∈ grid_to_distribute.vertexsets[key]
-            if haskey(global_to_local_cell_map, global_cell_idx)
-                push!(vertexsets[key], VertexIndex(global_to_local_cell_map[global_cell_idx], i))
+            if haskey(global_to_local_cell_map[my_rank], global_cell_idx)
+                push!(vertexsets[key], VertexIndex(global_to_local_cell_map[my_rank][global_cell_idx], i))
             end
         end
     end
@@ -194,28 +204,33 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
         vertexsets=vertexsets
     )
 
-    shared_vertices = Vector{SharedVertex}()
-    shared_edges = Vector{SharedEdge}()
-    shared_faces = Vector{SharedFace}()
+    shared_vertices = Dict{VertexIndex,SharedVertex}()
+    shared_edges = Dict{EdgeIndex,SharedEdge}()
+    shared_faces = Dict{FaceIndex,SharedFace}()
     for (global_cell_idx,global_cell) ∈ enumerate(getcells(grid_to_distribute))
         if parts[global_cell_idx] == my_rank
             # Vertex
-            for (i, global_node_idx) ∈ enumerate(vertices(global_cell))
+            for (i, _) ∈ enumerate(vertices(global_cell))
                 cell_vertex = VertexIndex(global_cell_idx, i)
                 remote_vertices = Dict{Int,Vector{VertexIndex}}()
-                for (global_cell_neighbor_idx, j) ∈ getneighborhood(grid_topology, grid_to_distribute, cell_vertex)
+                for (global_cell_neighbor_idx, j) ∈ getneighborhood(grid_topology, grid_to_distribute, cell_vertex, true)
                     other_rank = parts[global_cell_neighbor_idx]
                     if other_rank != my_rank
-                        # Todo remote local cell id
-                        if !haskey(remote_vertices,other_rank)
-                            remote_vertices[other_rank] = Vector(undef,0)
+                        n1 = vertices(getcells(grid_to_distribute,global_cell_idx))[i]
+                        n2 = vertices(getcells(grid_to_distribute,global_cell_neighbor_idx))[j]
+                        if n1 == n2
+                            if !haskey(remote_vertices,other_rank)
+                                remote_vertices[other_rank] = Vector(undef,0)
+                            end
+                            @debug println("Detected shared vertex $cell_vertex neighbor $(VertexIndex(global_cell_neighbor_idx,j)) (R$my_rank)")
+                            push!(remote_vertices[other_rank], VertexIndex(global_to_local_cell_map[other_rank][global_cell_neighbor_idx], j))
                         end
-                        push!(remote_vertices[other_rank], VertexIndex(global_cell_neighbor_idx, j))
                     end
                 end
 
                 if length(remote_vertices) > 0
-                    push!(shared_vertices, SharedVertex(VertexIndex(global_to_local_cell_map[global_cell_idx], i), remote_vertices))
+                    idx = VertexIndex(global_to_local_cell_map[my_rank][global_cell_idx], i)
+                    shared_vertices[idx] = SharedVertex(idx, remote_vertices)
                 end
             end
 
@@ -247,3 +262,14 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
 
     return DistributedGrid(grid_comm,grid_comm,local_grid,shared_vertices,shared_edges,shared_faces)
 end
+
+@inline getlocalgrid(dgrid::AbstractDistributedGrid) = dgrid.local_grid
+
+@inline getcells(dgrid::AbstractDistributedGrid) = getcells(getlocalgrid(grid))
+@inline getcells(dgrid::AbstractDistributedGrid, v::Union{Int, Vector{Int}}) = getcells(getlocalgrid(grid),v)
+@inline getcells(dgrid::AbstractDistributedGrid, setname::String) = getcells(getlocalgrid(grid),setname)
+"Returns the number of cells in the `<:AbstractDistributedGrid`."
+@inline getncells(dgrid::AbstractDistributedGrid) = length(getcells(getlocalgrid(dgrid)))
+"Returns the celltype of the `<:AbstractDistributedGrid`."
+@inline getcelltype(dgrid::AbstractDistributedGrid) = eltype(getcells(getlocalgrid(dgrid)))
+@inline getcelltype(dgrid::AbstractDistributedGrid, i::Int) = typeof(getcells(getlocalgrid(dgrid),i))

@@ -64,6 +64,8 @@ export
     getneighborhood,
     faceskeleton,
     getcells,
+    getgrid,
+    getlocalgrid,
     getncells,
     getnodes,
     getnnodes,
