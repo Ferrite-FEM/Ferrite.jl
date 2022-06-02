@@ -36,7 +36,7 @@
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
 # First we load Ferrite, and some other packages we need
-using Ferrite, SparseArrays, MPI
+using Ferrite, SparseArrays, MPI, PartitionedArrays
 
 macro debug(ex)
     return :($(esc(ex)))
@@ -48,7 +48,7 @@ MPI.Init()
 # We start  generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Quadrilateral, (20, 20));
+grid = generate_grid(Quadrilateral, (2, 2));
 
 dgrid = DistributedGrid(grid, MPI.COMM_WORLD)
 
@@ -93,7 +93,7 @@ push!(dh, :u, 1)
 close!(dh);
 
 # We have to renumber the dofs to their global numbering.
-function adjust_numbering!(dh)
+function local_to_global_numbering(dh, dgrid)
     my_rank = MPI.Comm_rank(MPI.COMM_WORLD)+1
 
     local_to_global = Vector{Int}(undef,ndofs(dh))
@@ -102,8 +102,6 @@ function adjust_numbering!(dh)
 
     # # Lookup for synchronization in the form (Remote Rank,Shared Entity)
     # # @TODO replace dict with vector and tie to MPI neighborhood graph of the mesh
-    # vertices_send = Dict{Int,Vector{Ferrite.SharedVertex}}()
-    # vertices_recv = Dict{Int,Vector{Ferrite.SharedVertex}}()
     vertices_send = Dict{Int,Vector{VertexIndex}}()
     n_vertices_recv = Dict{Int,Int}()
 
@@ -138,7 +136,6 @@ function adjust_numbering!(dh)
                         for (remote_rank, svs) ∈ dgrid.shared_vertices[VertexIndex(ci,vi)].remote_vertices
                             if master_rank == my_rank # I own the dof - we have to send information
                                 if !haskey(vertices_send,remote_rank)
-                                    # vertices_send[remote_rank] = Vector{Ferrite.SharedVertex}()
                                     vertices_send[remote_rank] = Vector{Ferrite.VertexIndex}()
                                 end
                                 @debug println("      prepare sending vertex #$(VertexIndex(ci,vi)) to $remote_rank (R$my_rank)")
@@ -147,13 +144,11 @@ function adjust_numbering!(dh)
                                 end
                             elseif master_rank == remote_rank  # dof is owned by remote - we have to receive information
                                 if !haskey(n_vertices_recv,remote_rank)
-                                    # vertices_recv[remote_rank] = Vector{Ferrite.SharedVertex}()
                                     n_vertices_recv[remote_rank] = length(svs)
                                 else
                                     n_vertices_recv[remote_rank] += length(svs)
                                 end
                                 @debug println("      prepare receiving vertex #$(VertexIndex(ci,vi)) from $remote_rank (R$my_rank)")
-                                # push!(vertices_recv,svs)
                             end
                         end
                     end
@@ -264,19 +259,42 @@ function adjust_numbering!(dh)
         end
         vtk_point_data(vtk, u,"dof")
     end
+
+    return local_to_global
 end
-adjust_numbering!(dh)
+local_to_global = local_to_global_numbering(dh, dgrid);
 
-# Shutdown MPI
-MPI.Finalize()
+function compute_dof_ownership(dh, dgrid)
+    my_rank = MPI.Comm_rank(dgrid.grid_comm)+1
 
-# Early out for testing.
-exit(0)
+    dof_owner = Vector{Int}(undef,ndofs(dh))
+    fill!(dof_owner, my_rank)
+
+    for ((lci, lclvi),sv) ∈ dgrid.shared_vertices
+        owner_rank = minimum([collect(keys(sv.remote_vertices));my_rank])
+
+        if owner_rank != my_rank
+            for fi in 1:Ferrite.nfields(dh)
+                vi = Ferrite.vertices(getcells(getgrid(dh),lci))[lclvi]
+                if haskey(dh.vertexdicts[fi], vi)
+                    local_dof_idx = dh.vertexdicts[fi][vi]
+                    dof_owner[local_dof_idx] = owner_rank
+                end
+            end
+        end
+    end
+
+    return dof_owner
+end
+dof_owner = compute_dof_ownership(dh, dgrid);
+
+nltdofs = sum(dof_owner.==(MPI.Comm_rank(MPI.COMM_WORLD)+1))
+ndofs_total = MPI.Allreduce(nltdofs, MPI.SUM, MPI.COMM_WORLD)
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `create_sparsity_pattern`. This function returns a sparse matrix
 # with the correct elements stored.
-K = create_sparsity_pattern(dh)
+#K = create_sparsity_pattern(dh)
 
 # ### Boundary conditions
 # In Ferrite constraints like Dirichlet boundary conditions
@@ -309,7 +327,7 @@ update!(ch, 0.0);
 # We define a function, `doassemble` to do the assembly, which takes our `cellvalues`,
 # the sparse matrix and our DofHandler as input arguments. The function returns the
 # assembled stiffness matrix, and the force vector.
-function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler) where {dim}
+function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_gdof, ldof_to_part, ngdofs) where {dim}
     # We allocate the element stiffness matrix and element force vector
     # just once before looping over all the cells instead of allocating
     # them every time in the loop.
@@ -318,19 +336,55 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
 
+    # I have no idea why we have to convert the types 5000 times like this........ look todo below.
+    comm = MPI.COMM_WORLD
+    np = MPI.Comm_size(comm)
+    my_rank = MPI.Comm_rank(comm)+1
+
+    @debug println("starting assembly... (R$my_rank)")
+
+    # Neighborhood - self
+    neighbors_unique = unique(ldof_to_part)
+    neighbors = MPIData(Int32.(neighbors_unique[neighbors_unique.!=my_rank]), comm, (np,))
+
+    @debug println("neighbors $neighbors (R$my_rank)")
+
+    # Extract locally owned dofs
+    ltdof_indices = ldof_to_part.==my_rank
+    ltdof_to_gdof = ldof_to_gdof[ltdof_indices]
+
+    @debug println("ltdof_to_gdof $ltdof_to_gdof (R$my_rank)")
+
+    # Process owns rows
+    row_indices = PartitionedArrays.IndexSet(my_rank, ltdof_to_gdof, repeat(Int32[my_rank], sum(ltdof_indices)))
+    row_data = MPIData(row_indices, comm, (np,))
+    row_exchanger = Exchanger(row_data,neighbors)
+    rows = PRange(ngdofs,row_data,row_exchanger)
+
+    # And shares some cols
+    col_indices = PartitionedArrays.IndexSet(my_rank, ldof_to_gdof, Int32.(ldof_to_part))
+    col_data = MPIData(col_indices, comm, (np,))
+    col_exchanger = Exchanger(col_data,neighbors)
+    cols = PRange(ngdofs,col_data,col_exchanger)
+
     # Next we define the global force vector `f` and use that and
     # the stiffness matrix `K` and create an assembler. The assembler
     # is just a thin wrapper around `f` and `K` and some extra storage
     # to make the assembling faster.
     #+
-    f = zeros(ndofs(dh))
-    assembler = start_assemble(K, f)
+    @debug println("cols and rows constructed (R$my_rank)")
+    f = PartitionedArrays.PVector(0.0,cols)
+    @debug println("f constructed (R$my_rank)")
+    assembler = start_assemble()
+    @debug println("starting assembly (R$my_rank)")
 
     # It is now time to loop over all the cells in our grid. We do this by iterating
     # over a `CellIterator`. The iterator caches some useful things for us, for example
     # the nodal coordinates for the cell, and the local degrees of freedom.
     #+
     for cell in CellIterator(dh)
+        @debug println("assembling cell #$(cell.current_cellid.x) (R$my_rank)")
+
         # Always remember to reset the element stiffness matrix and
         # force vector since we reuse them for all elements.
         #+
@@ -346,6 +400,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
         # can be queried from `cellvalues` by `getdetJdV`.
         #+
         for q_point in 1:getnquadpoints(cellvalues)
+            @debug println("assembling qp $q_point (R$my_rank)")
             dΩ = getdetJdV(cellvalues, q_point)
             # For each quadrature point we loop over all the (local) shape functions.
             # We need the value and gradient of the testfunction `v` and also the gradient
@@ -365,8 +420,19 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
         # The last step in the element loop is to assemble `Ke` and `fe`
         # into the global `K` and `f` with `assemble!`.
         #+
-        assemble!(assembler, celldofs(cell), fe, Ke)
+        @debug println("assembling cell finished local (R$my_rank)")
+        Ferrite.assemble!(assembler, celldofs(cell), Ke)
+        @debug println("assembling cell finished global (R$my_rank)")
+        #Ferrite.assemble!(f, celldofs(cell), fe)
     end
+
+    @debug println("done assembling (R$my_rank)")
+
+    I_ = MPIData(assembler.I, comm, (np,))
+    J_ = MPIData(assembler.J, comm, (np,))
+    V_ = MPIData(assembler.V, comm, (np,))
+    # println(dof_partition_prange)
+    K = PartitionedArrays.PSparseMatrix(I_, J_, V_, rows, cols, ids=:local)
     return K, f
 end
 #md nothing # hide
@@ -374,7 +440,13 @@ end
 # ### Solution of the system
 # The last step is to solve the system. First we call `doassemble`
 # to obtain the global stiffness matrix `K` and force vector `f`.
-K, f = doassemble(cellvalues, K, dh);
+K, f = doassemble(cellvalues, dh, local_to_global, dof_owner, ndofs_total);
+
+# Shutdown MPI
+MPI.Finalize()
+
+# Early out for testing.
+exit(0)
 
 # To account for the boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f` respectively, such that
