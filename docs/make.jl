@@ -1,4 +1,6 @@
-using Documenter, Ferrite, Pkg
+using Documenter, Ferrite, Pkg, TimerOutputs
+
+reset_timer!()
 
 Pkg.precompile()
 
@@ -24,7 +26,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     )]
 
 # Build documentation.
-makedocs(
+@timeit "makedocs" makedocs(
     format = Documenter.HTML(),
     sitename = "Ferrite.jl",
     doctest = false,
@@ -56,13 +58,15 @@ makedocs(
 )
 
 # make sure there are no *.vtu files left around from the build
-cd(joinpath(@__DIR__, "build", "examples")) do
+@timeit "remove vtk files" cd(joinpath(@__DIR__, "build", "examples")) do
     foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
 end
 
 
 # Deploy built documentation
-deploydocs(
+@timeit "deploydocs" deploydocs(
     repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
     push_preview=true,
 )
+
+print_timer()

@@ -9,10 +9,11 @@ mkpath(GENERATEDDIR)
 include("download_resources.jl")
 
 # Run Literate on all examples
-for example in readdir(EXAMPLEDIR)
+@timeit "Literate." for example in readdir(EXAMPLEDIR)
     if endswith(example, ".jl")
         input = abspath(joinpath(EXAMPLEDIR, example))
-        script = Literate.script(input, GENERATEDDIR)
+        name = basename(input)
+        script = @timeit "script()" @timeit name Literate.script(input, GENERATEDDIR)
         code = strip(read(script, String))
 
         # remove "hidden" lines which are not shown in the markdown
@@ -28,8 +29,12 @@ for example in readdir(EXAMPLEDIR)
             return str
         end
 
-        Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
-        Literate.notebook(input, GENERATEDDIR, preprocess = nbpre, execute = is_ci) # Don't execute locally
+        @timeit "markdown()" @timeit name begin
+            Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
+        end
+        @timeit "notebook()"  @timeit name begin
+            Literate.notebook(input, GENERATEDDIR, preprocess = nbpre, execute = is_ci) # Don't execute locally
+        end
     elseif any(endswith.(example, [".png", ".jpg", ".gif"]))
         cp(joinpath(EXAMPLEDIR, example), joinpath(GENERATEDDIR, example); force=true)
     else
@@ -38,7 +43,7 @@ for example in readdir(EXAMPLEDIR)
 end
 
 # remove any .vtu files in the generated dir (should not be deployed)
-cd(GENERATEDDIR) do
+@timeit "remove vtk files" cd(GENERATEDDIR) do
     foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
     foreach(file -> endswith(file, ".pvd") && rm(file), readdir())
 end

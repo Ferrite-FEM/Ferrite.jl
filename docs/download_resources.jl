@@ -4,7 +4,7 @@ import Downloads
 const directory = joinpath(@__DIR__, "src", "examples")
 mkpath(directory)
 
-for (file, url) in [
+@timeit "downloading resources" for (file, url) in [
         "periodic-rve.msh" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/periodic-rve.msh",
         "periodic-rve-coarse.msh" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/periodic-rve-coarse.msh",
     ]
