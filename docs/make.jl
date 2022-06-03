@@ -2,9 +2,13 @@ using Documenter, Ferrite, Pkg, TimerOutputs
 
 reset_timer!()
 
-Pkg.precompile()
+if "revise" in ARGS
+    using Revise
+    @timeit "Revise.revise()" Revise.revise()
+end
 
 const is_ci = haskey(ENV, "GITHUB_ACTIONS")
+const is_draft = "draft" in ARGS
 
 # Generate examples
 include("generate.jl")
@@ -32,6 +36,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     doctest = false,
     # strict = VERSION.minor == 6 && sizeof(Int) == 8, # only strict mode on 0.6 and Int64
     strict = false,
+    draft = is_draft,
     pages = Any[
         "Home" => "index.md",
         "manual/fe_intro.md",
@@ -64,9 +69,11 @@ end
 
 
 # Deploy built documentation
-@timeit "deploydocs" deploydocs(
-    repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
-    push_preview=true,
-)
+if !is_draft
+    @timeit "deploydocs" deploydocs(
+        repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
+        push_preview=true,
+    )
+end
 
 print_timer()

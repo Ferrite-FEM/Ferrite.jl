@@ -13,8 +13,12 @@ include("download_resources.jl")
     if endswith(example, ".jl")
         input = abspath(joinpath(EXAMPLEDIR, example))
         name = basename(input)
-        script = @timeit "script()" @timeit name Literate.script(input, GENERATEDDIR)
-        code = strip(read(script, String))
+        if !is_draft
+            script = @timeit "script()" @timeit name Literate.script(input, GENERATEDDIR)
+            code = strip(read(script, String))
+        else
+            code = "<< no script output when building as draft >>"
+        end
 
         # remove "hidden" lines which are not shown in the markdown
         line_ending_symbol = occursin(code, "\r\n") ? "\r\n" : "\n"
@@ -32,8 +36,10 @@ include("download_resources.jl")
         @timeit "markdown()" @timeit name begin
             Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
         end
-        @timeit "notebook()"  @timeit name begin
-            Literate.notebook(input, GENERATEDDIR, preprocess = nbpre, execute = is_ci) # Don't execute locally
+        if !is_draft
+            @timeit "notebook()"  @timeit name begin
+                Literate.notebook(input, GENERATEDDIR, preprocess = nbpre, execute = is_ci) # Don't execute locally
+            end
         end
     elseif any(endswith.(example, [".png", ".jpg", ".gif"]))
         cp(joinpath(EXAMPLEDIR, example), joinpath(GENERATEDDIR, example); force=true)
