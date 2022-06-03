@@ -1,5 +1,6 @@
 # Download some assets necessary for docs/testing not stored in the repo
 import Downloads
+using TimerOutputs
 
 const directory = joinpath(@__DIR__, "src", "examples")
 mkpath(directory)
