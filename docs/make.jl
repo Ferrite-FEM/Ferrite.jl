@@ -1,10 +1,11 @@
 using Documenter, Ferrite, Pkg, TimerOutputs
 
-reset_timer!()
+dto = TimerOutput()
+reset_timer!(dto)
 
 if "revise" in ARGS
     using Revise
-    @timeit "Revise.revise()" Revise.revise()
+    @timeit dto "Revise.revise()" Revise.revise()
 end
 
 const is_ci = haskey(ENV, "GITHUB_ACTIONS")
@@ -30,7 +31,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     )]
 
 # Build documentation.
-@timeit "makedocs" makedocs(
+@timeit dto "makedocs" makedocs(
     format = Documenter.HTML(),
     sitename = "Ferrite.jl",
     doctest = false,
@@ -63,17 +64,17 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
 )
 
 # make sure there are no *.vtu files left around from the build
-@timeit "remove vtk files" cd(joinpath(@__DIR__, "build", "examples")) do
+@timeit dto "remove vtk files" cd(joinpath(@__DIR__, "build", "examples")) do
     foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
 end
 
 
 # Deploy built documentation
 if !is_draft
-    @timeit "deploydocs" deploydocs(
+    @timeit dto "deploydocs" deploydocs(
         repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
         push_preview=true,
     )
 end
 
-print_timer()
+print_timer(dto)

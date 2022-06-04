@@ -9,12 +9,12 @@ mkpath(GENERATEDDIR)
 include("download_resources.jl")
 
 # Run Literate on all examples
-@timeit "Literate." for example in readdir(EXAMPLEDIR)
+@timeit dto "Literate." for example in readdir(EXAMPLEDIR)
     if endswith(example, ".jl")
         input = abspath(joinpath(EXAMPLEDIR, example))
         name = basename(input)
         if !is_draft
-            script = @timeit "script()" @timeit name Literate.script(input, GENERATEDDIR)
+            script = @timeit dto "script()" @timeit dto name Literate.script(input, GENERATEDDIR)
             code = strip(read(script, String))
         else
             code = "<< no script output when building as draft >>"
@@ -33,11 +33,11 @@ include("download_resources.jl")
             return str
         end
 
-        @timeit "markdown()" @timeit name begin
+        @timeit dto "markdown()" @timeit dto name begin
             Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
         end
         if !is_draft
-            @timeit "notebook()"  @timeit name begin
+            @timeit dto "notebook()"  @timeit dto name begin
                 Literate.notebook(input, GENERATEDDIR, preprocess = nbpre, execute = is_ci) # Don't execute locally
             end
         end
@@ -49,7 +49,7 @@ include("download_resources.jl")
 end
 
 # remove any .vtu files in the generated dir (should not be deployed)
-@timeit "remove vtk files" cd(GENERATEDDIR) do
+@timeit dto "remove vtk files" cd(GENERATEDDIR) do
     foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
     foreach(file -> endswith(file, ".pvd") && rm(file), readdir())
 end
