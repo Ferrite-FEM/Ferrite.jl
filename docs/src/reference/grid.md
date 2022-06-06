@@ -42,6 +42,7 @@ getcoordinates!
 Ferrite.ExclusiveTopology
 Ferrite.getneighborhood
 Ferrite.faceskeleton
+Ferrite.toglobal
 ```
 
 ### Grid Sets Utility

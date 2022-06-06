@@ -341,10 +341,10 @@ end
 # Grid utility functions #
 ##########################
 """
-    getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, cellidx::CellIndex, include_self=false)
-    getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, faceidx::FaceIndex, include_self=false)
-    getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, vertexidx::VertexIndex, include_self=false)
-    getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, edgeidx::EdgeIndex, include_self=false)
+    getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
+    getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
+    getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
+    getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self=false)
 
 Returns all directly connected entities of the same type, i.e. calling the function with a `VertexIndex` will return
 a list of directly connected vertices (connected via face/edge). If `include_self` is true, the given `*Index` is included 
@@ -375,7 +375,12 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::
     cell_vertices = vertices(getcells(grid,cellid))
     global_vertexid = cell_vertices[local_vertexid]
     if include_self
-        return [top.vertex_vertex_neighbor[global_vertexid].neighbor_info; vertexidx]
+        self_reference_local = VertexIndex[]
+        for cellid in top.vertex_to_cell[global_vertexid]
+            local_vertex = VertexIndex(cellid,findfirst(x->x==global_vertexid,vertices(getcells(grid,cellid))))
+            push!(self_reference_local,local_vertex)
+        end
+        return [top.vertex_vertex_neighbor[global_vertexid].neighbor_info; self_reference_local]
     else
         return top.vertex_vertex_neighbor[global_vertexid].neighbor_info
     end
@@ -396,8 +401,13 @@ Returns an iterateable face skeleton. The skeleton consists of `FaceIndex` that 
 """
 faceskeleton(top::ExclusiveTopology, grid::AbstractGrid) =  top.face_skeleton
 
-toglobal(grid::Grid,vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1]))[vertexidx[2]]
-toglobal(grid::Grid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))
+"""
+    toglobal(grid::AbstractGrid, vertexidx::VertexIndex)
+    toglobal(grid::AbstractGrid, vertexidx::Vector{VertexIndex}) -> Vector{Int}
+This function takes the local vertex representation (a `VertexIndex`) and looks up the unique global id (an `Int`).
+"""
+toglobal(grid::AbstractGrid,vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1]))[vertexidx[2]]
+toglobal(grid::AbstractGrid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))
 
 @inline getdim(::AbstractGrid{dim}) where {dim} = dim
 """
