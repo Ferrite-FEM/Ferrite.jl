@@ -402,7 +402,7 @@ Returns an iterateable face skeleton. The skeleton consists of `FaceIndex` that 
 faceskeleton(top::ExclusiveTopology, grid::AbstractGrid) =  top.face_skeleton
 
 """
-    toglobal(grid::AbstractGrid, vertexidx::VertexIndex)
+    toglobal(grid::AbstractGrid, vertexidx::VertexIndex) -> Int
     toglobal(grid::AbstractGrid, vertexidx::Vector{VertexIndex}) -> Vector{Int}
 This function takes the local vertex representation (a `VertexIndex`) and looks up the unique global id (an `Int`).
 """
