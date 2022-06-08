@@ -271,9 +271,9 @@ end
     hexgrid = generate_grid(Hexahedron,(2,2,1)) 
     topology = ExclusiveTopology(hexgrid)
     @test topology.edge_neighbor[1,11] == Ferrite.EntityNeighborhood(EdgeIndex(4,9))
-    @test getneighborhood(topology,grid,EdgeIndex(1,11),true) == [EdgeIndex(4,9),EdgeIndex(2,12),EdgeIndex(3,10),EdgeIndex(1,11)]
+    @test getneighborhood(topology,hexgrid,EdgeIndex(1,11),true) == [EdgeIndex(4,9),EdgeIndex(2,12),EdgeIndex(3,10),EdgeIndex(1,11)]
     @test topology.edge_neighbor[2,12] == Ferrite.EntityNeighborhood(EdgeIndex(3,10))
-    @test getneighborhood(topology,grid,EdgeIndex(2,12),true) == [EdgeIndex(3,10),EdgeIndex(1,11),EdgeIndex(4,9),EdgeIndex(2,12)]
+    @test getneighborhood(topology,hexgrid,EdgeIndex(2,12),true) == [EdgeIndex(3,10),EdgeIndex(1,11),EdgeIndex(4,9),EdgeIndex(2,12)]
     @test topology.edge_neighbor[3,10] == Ferrite.EntityNeighborhood(EdgeIndex(2,12))
     @test topology.edge_neighbor[4,9] == Ferrite.EntityNeighborhood(EdgeIndex(1,11))
     @test isempty(topology.vertex_neighbor)
