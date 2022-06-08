@@ -375,10 +375,11 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::
     cell_vertices = vertices(getcells(grid,cellid))
     global_vertexid = cell_vertices[local_vertexid]
     if include_self
-        self_reference_local = VertexIndex[]
-        for cellid in top.vertex_to_cell[global_vertexid]
+        vertex_to_cell = top.vertex_to_cell[global_vertexid]
+        self_reference_local = Vector{VertexIndex}(undef,length(vertex_to_cell))
+        for (i,cellid) in enumerate(vertex_to_cell)
             local_vertex = VertexIndex(cellid,findfirst(x->x==global_vertexid,vertices(getcells(grid,cellid))))
-            push!(self_reference_local,local_vertex)
+            self_reference_local[i] = local_vertex
         end
         return [top.vertex_vertex_neighbor[global_vertexid].neighbor_info; self_reference_local]
     else
