@@ -67,14 +67,14 @@ struct ConstraintHandler{DH<:AbstractDofHandler,T}
     free_dofs::Vector{Int}
     inhomogeneities::Vector{T}
     dofmapping::Dict{Int,Int} # global dof -> index into dofs and inhomogeneities
-    bcvalues::Vector{BCValues{T}}
+    bcvalues::Vector{BCValues{Float64}} # BCValues are just the shape functions, not the BCs themselves
     dh::DH
     closed::ScalarWrapper{Bool}
 end
 
-function ConstraintHandler(dh::AbstractDofHandler)
+function ConstraintHandler(dh::AbstractDofHandler;bctype=Float64)
     @assert isclosed(dh)
-    ConstraintHandler(Dirichlet[], AffineConstraint[], Int[], Int[], Float64[], Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false))
+    ConstraintHandler(Dirichlet[], AffineConstraint[], Int[], Int[], bctype[], Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false))
 end
 
 """
@@ -357,7 +357,7 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
 end
 
 # for faces
-function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+function _update!(inhomogeneities::Vector, f::Function, faces::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::T) where {T}
 
