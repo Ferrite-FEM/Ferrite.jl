@@ -128,6 +128,7 @@ end
 # Grid utility functions #
 ##########################
 @inline getdim(grid::AbstractGrid{dim}) where {dim} = dim
+@inline getnode_eltype(grid::Grid{dim,C,T}) where {dim,C,T} = T
 """
     getcells(grid::AbstractGrid) 
     getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}} 

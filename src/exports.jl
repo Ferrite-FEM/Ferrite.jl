@@ -102,6 +102,7 @@ export
     create_sparsity_pattern,
     create_symmetric_sparsity_pattern,
     dof_range,
+    dof_type,
     renumber!,
     MixedDofHandler,
     FieldHandler,

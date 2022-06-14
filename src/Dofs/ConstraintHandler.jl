@@ -72,10 +72,12 @@ struct ConstraintHandler{DH<:AbstractDofHandler,T}
     closed::ScalarWrapper{Bool}
 end
 
-function ConstraintHandler(dh::AbstractDofHandler;bctype=Float64)
+function ConstraintHandler(dh::AbstractDofHandler)
     @assert isclosed(dh)
-    ConstraintHandler(Dirichlet[], AffineConstraint[], Int[], Int[], bctype[], Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false))
+    ConstraintHandler(Dirichlet[], AffineConstraint[], Int[], Int[], dof_type(dh)[], Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false))
 end
+
+dof_type(::ConstraintHandler{DH,T}) where {DH,T} = T
 
 """
     RHSData
@@ -398,7 +400,7 @@ function _update!(inhomogeneities::Vector, f::Function, faces::Set{<:BoundaryInd
 end
 
 # for nodes
-function _update!(inhomogeneities::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+function _update!(inhomogeneities::Vector, f::Function, nodes::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::Float64)
     counter = 1

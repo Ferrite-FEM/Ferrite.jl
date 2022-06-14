@@ -41,7 +41,7 @@ struct CellIterator{dim,C,T,DH<:Union{AbstractDofHandler,Nothing}}
     dh::Union{DH,Nothing}
     celldofs::Vector{Int}
 
-    function CellIterator{dim,C,T}(dh::Union{DofHandler{dim,T,G},MixedDofHandler{dim,T,G},Nothing}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T,G}
+    function CellIterator{dim,C,T}(dh::Union{DofHandler{dim},MixedDofHandler{dim},Nothing}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T,G}
         isconcretetype(C) || _check_same_celltype(dh.grid, cellset)
         N = nnodes_per_cell(dh.grid, cellset === nothing ? 1 : first(cellset))
         cell = ScalarWrapper(0)
@@ -64,8 +64,8 @@ end
 
 CellIterator(grid::Grid{dim,C,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
     CellIterator{dim,C,T}(grid, cellset, flags)
-CellIterator(dh::DofHandler{dim,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
-    CellIterator{dim,getcelltype(dh.grid),T}(dh, cellset, flags)
+CellIterator(dh::DofHandler{dim}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C} =
+    CellIterator{dim,getcelltype(dh.grid),getnode_eltype(dh.grid)}(dh, cellset, flags)
 CellIterator(dh::MixedDofHandler{dim,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,T} =
     CellIterator{dim,getcelltype(dh.grid),T}(dh, cellset, flags)
 

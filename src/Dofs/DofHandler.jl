@@ -15,7 +15,6 @@ struct DofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     # TODO: field_interpolations can probably be better typed: We should at least require
     #       all the interpolations to have the same dimension and reference shape
     field_interpolations::Vector{Interpolation}
-    bc_values::Vector{BCValues{T}} # TODO: BcValues is created/handeld by the constrainthandler, so this can be removed
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
     closed::ScalarWrapper{Bool}
@@ -25,10 +24,12 @@ end
 
 dof_type(::DofHandler{dim, T}) where {dim,T} = T
 
-function DofHandler(grid::AbstractGrid, dof_type=Float64)
+function DofHandler(T::DataType, grid::AbstractGrid)
     isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. Use MixedDofHandler instead of DofHandler")
-    DofHandler(Symbol[], Int[], Interpolation[], BCValues{dof_type}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
+    DofHandler{getdim(grid),T,typeof(grid)}(Symbol[], Int[], Interpolation[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end
+
+DofHandler(grid::AbstractGrid) = DofHandler(Float64, grid)
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
     println(io, "DofHandler")
@@ -72,7 +73,6 @@ end
 
 getfieldinterpolation(dh::DofHandler, field_idx::Int) = dh.field_interpolations[field_idx]
 getfielddim(dh::DofHandler, field_idx::Int) = dh.field_dims[field_idx]
-getbcvalue(dh::DofHandler, field_idx::Int) = dh.bc_values[field_idx]
 
 function getfielddim(dh::DofHandler, name::Symbol)
     field_pos = findfirst(i->i == name, getfieldnames(dh))
@@ -111,7 +111,7 @@ end
 Add a `dim`-dimensional `Field` called `name` which is approximated by `ip` to `dh`.
 
 The field is added to all cells of the underlying grid. In case no interpolation `ip` is given,
-the default interpolation of the grid's celltype is used. 
+the default interpolation of the grid's celltype is used.
 If the grid uses several celltypes, [`push!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
 """
 function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
@@ -120,7 +120,6 @@ function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=de
     push!(dh.field_names, name)
     push!(dh.field_dims, dim)
     push!(dh.field_interpolations, ip)
-    push!(dh.bc_values, BCValues(ip, default_interpolation(getcelltype(dh.grid))))
     return dh
 end
 
@@ -358,7 +357,7 @@ See the [Sparsity Pattern](@ref) section of the manual.
 """
 create_symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
 
-function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool; field_type::Type = dof_type(dh))
+function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool)
     ncells = getncells(dh.grid)
     n = ndofs_per_cell(dh)
     N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
@@ -395,7 +394,7 @@ function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler,
 
     resize!(I, cnt)
     resize!(J, cnt)
-    V = zeros(field_type, length(I))
+    V = zeros(dof_type(dh), length(I))
     K = sparse(I, J, V)
 
     # Add entries to K corresponding to condensation due the linear constraints
