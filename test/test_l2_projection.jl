@@ -129,6 +129,8 @@ function test_projection_mixedgrid()
     push!(cells, Triangle((2,3,6)))
     push!(cells, Triangle((2,6,5)))
 
+    quadset = 1:1
+    triaset = 2:3
     mesh = Grid(cells, nodes)
 
     order = 2
@@ -175,6 +177,39 @@ function test_projection_mixedgrid()
              @test isnan(point_vars_4[node][d1, d2])
          end
     end
+
+
+    #
+    #Do the same thing but for the triangle set
+    #
+    order = 2
+    ip = Lagrange{dim, RefTetrahedron, order}()
+    ip_geom = Lagrange{dim, RefTetrahedron, 1}()
+    qr = QuadratureRule{dim, RefTetrahedron}(4)
+    cv = CellScalarValues(qr, ip, ip_geom)
+    nqp = getnquadpoints(cv)
+
+    qp_values_tria = [zeros(SymmetricTensor{2,2}, nqp) for _ in triaset]
+    qp_values_matrix_tria = [zero(SymmetricTensor{2,2}) for _ in 1:nqp, _ in triaset]
+    for (ic, cellid) in enumerate(triaset)
+        xe = getcoordinates(mesh, cellid)
+        ae = compute_vertex_values(mesh, f)
+        # analytical values
+        qp_values = [f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]
+        qp_values_tria[ic] = qp_values
+        qp_values_matrix_tria[:, ic] .= qp_values
+    end
+
+    #tria
+    proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=triaset)
+    point_vars = project(proj, qp_values_tria, qr)
+    point_vars_2 = project(proj, qp_values_matrix_tria, qr)
+    for cellid in triaset
+        for node in mesh.cells[cellid].nodes
+            @test ae[node] ≈ point_vars[node] ≈ point_vars_2[node]
+        end
+    end
+
 end
 
 function test_node_reordering()

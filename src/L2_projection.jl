@@ -239,11 +239,11 @@ function _project(vars, proj::L2Projector, fe_values::Values, M::Integer, ::Type
     get_data(x::Number, i) = x
 
     ## Assemble contributions from each cell
-    for cellnum in proj.set
+    for (ic,cellnum) in enumerate(proj.set)
         celldofs!(cell_dofs, proj.dh, cellnum)
         fill!(fe, 0)
         Xe = getcoordinates(proj.dh.grid, cellnum)
-        cell_vars = vars[cellnum]
+        cell_vars = vars[ic]
         reinit!(fe_values, Xe)
 
         for q_point = 1:nqp
