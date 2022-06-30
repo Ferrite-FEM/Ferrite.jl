@@ -10,20 +10,88 @@ the most common ones, Dirichlet and Neumann boundary conditions, and how to do i
 
 ## Dirichlet Boundary Conditions
 
-At a Dirichlet boundary the solution is prescribed to a given value. For the discrete
-FE-solution this means that there are some degrees of freedom that are fixed. To be able
-to tell which degrees of freedom we should constrain we need the `DofHandler`.
+At a Dirichlet boundary the unknown field is prescribed to a given value. For the discrete
+FE-solution this means that there are some degrees of freedom that are fixed. To handle
+Dirichlet boundary conditions in Ferrite we use the [`ConstraintHandler`](@ref). A
+constraint handler is created from a DoF handler:
 
 ```julia
 ch = ConstraintHandler(dh)
 ```
 
-TBW
+We can now create Dirichlet constraints and add them to the constraint handler. To create a
+Dirichlet constraint we need to specify a field name, a part of the boundary, and a function
+for computing the prescribed value. Example:
+
+```julia
+dbc1 = Dirichlet(
+    :u,                       # Name of the field
+    getfaceset(grid, "left"), # Part of the boundary
+    (x, t) -> 1.0 * t,        # Function mapping coordinate and time to a prescribed value
+)
+```
+
+The field name is given as a symbol, just like when the field was added to the dof handler,
+the part of the boundary where this constraint is active is given as a face set, and the
+function computing the prescribed value should accept two input arguments (coordinate `x`
+and time `t`) and return the prescribed value.
+
+!!! note "Multiple sets"
+    To apply a constraint on multiple face sets in the grid you can use `union` to join
+    them, for example
+    ```julia
+    left_right = union(getfaceset(grid, "left"), getfaceset(grid, "right"))
+    ```
+    creates a new face set containing all faces in the `"left"` and "`right`" face sets,
+    which can be passed to the `Dirichlet` constructor.
+
+By default the constraint is added to the first component of the given field. To add the
+constraint to multiple components a fourth argument with the components should be passed to
+the constructor. Here is an example where a constraint is added to component 1 and 3 of a
+vector field `:u`:
+
+```julia
+dbc2 = Dirichlet(
+    :u,                       # Name of the field
+    getfaceset(grid, "left"), # Part of the boundary
+    (x, t) -> [0.0, 0.0],     # Function mapping coordinate and time to a prescribed value
+    [1, 3],                   # Components
+)
+```
+
+Note that the return value of the function must match with the components -- in the example
+above we prescibe components 1 and 3 to 0 so we return a vector of length 2.
+
+Adding the constraints to the constraint handler is done with [`add!`](@ref):
+
+```julia
+add!(ch, dbc1)
+add!(ch, dbc2)
+```
+
+Finally, just like for the dof handler, we need to use [`close!`](@ref) to finalize the
+constraint handler. Internally this will then compute the degrees-of-freedom that match the
+constraints we added.
+
+Since the constraints can in general depend on time we also need to need to call
+[`update!`](@ref) with the current time in order to compute the prescribed values. The
+same constraint handler can then be used for all time steps by calling `update!` with the
+proper time, e.g.:
+
+```julia
+for t in 0.0:0.1:1.0
+    update!(ch, t) # Compute prescribed values for this t
+    # Solve for time t...
+end
+```
+
+!!! note
+    You *must* call `update!`, even if your constraints does not depend on time
+    (as `dbc2` above), e.g. `update!(ch, 0.0)`.
 
 !!! note "Examples"
-    The following commented examples makes use of Dirichlet boundary conditions:
-    - [Heat Equation](@ref)
-    - TODO
+    Most examples make use of Dirichlet boundary conditions, for example [Heat
+    Equation](@ref).
 
 
 ## Neumann Boundary Conditions
