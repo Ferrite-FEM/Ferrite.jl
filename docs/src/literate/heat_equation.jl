@@ -28,12 +28,12 @@
 # u(\textbf{x}) = 0 \quad \textbf{x} \in \partial \Omega,
 # ```
 # where $\partial \Omega$ denotes the boundary of $\Omega$.
-#
-# The resulting weak form is given by
+# The resulting weak form is given given as follows: Find ``u \in \mathbb{U}`` such that
 # ```math
 # \int_{\Omega} \nabla \delta u \cdot \nabla u \ d\Omega = \int_{\Omega} \delta u \ d\Omega \quad \forall \delta u \in \mathbb{T},
 # ```
-# where $\delta u$ is a test function and $\mathbb{T}$ is a suitable test function space.
+# where $\delta u$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
+# trial and test function sets, respectively.
 #-
 # ## Commented Program
 #
@@ -42,7 +42,7 @@
 #
 # First we load Ferrite, and some other packages we need
 using Ferrite, SparseArrays
-# We start  generating a simple grid with 20x20 quadrilateral elements
+# We start by generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
 grid = generate_grid(Quadrilateral, (20, 20));
@@ -53,8 +53,8 @@ grid = generate_grid(Quadrilateral, (20, 20));
 # is a scalar problem we will use a `CellScalarValues` object. To define
 # this we need to specify an interpolation space for the shape functions.
 # We use Lagrange functions (both for interpolating the function and the geometry)
-# based on the reference "cube". We also define a quadrature rule based on the
-# same reference cube. We combine the interpolation and the quadrature rule
+# based on the two-dimensional reference "cube". We also define a quadrature rule based on
+# the same reference cube. We combine the interpolation and the quadrature rule
 # to a `CellScalarValues` object.
 dim = 2
 ip = Lagrange{dim, RefCube, 1}()
@@ -64,7 +64,7 @@ cellvalues = CellScalarValues(qr, ip);
 # ### Degrees of freedom
 # Next we need to define a `DofHandler`, which will take care of numbering
 # and distribution of degrees of freedom for our approximated fields.
-# We create the `DofHandler` and then add a single field called `u`.
+# We create the `DofHandler` and then add a single scalar field called `:u`.
 # Lastly we `close!` the `DofHandler`, it is now that the dofs are distributed
 # for all the elements.
 dh = DofHandler(grid)
@@ -73,7 +73,7 @@ close!(dh);
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `create_sparsity_pattern`. This function returns a sparse matrix
-# with the correct elements stored.
+# with the correct entries stored.
 K = create_sparsity_pattern(dh)
 
 # ### Boundary conditions
@@ -84,7 +84,12 @@ ch = ConstraintHandler(dh);
 # Next we need to add constraints to `ch`. For this problem we define
 # homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
 # the `union` of all the face sets on the boundary.
-∂Ω = union(getfaceset.((grid, ), ["left", "right", "top", "bottom"])...);
+∂Ω = union(
+    getfaceset(grid, "left"),
+    getfaceset(grid, "right"),
+    getfaceset(grid, "top"),
+    getfaceset(grid, "bottom"),
+);
 
 # Now we are set up to define our constraint. We specify which field
 # the condition is for, and our combined face set `∂Ω`. The last
@@ -96,92 +101,106 @@ dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
 add!(ch, dbc);
 
 # We also need to `close!` and `update!` our boundary conditions. When we call `close!`
-# the dofs which will be constrained by the boundary conditions are calculated and stored
+# the dofs corresponding to our constraints are calculated and stored
 # in our `ch` object. Since the boundary conditions are, in this case,
 # independent of time we can `update!` them directly with e.g. $t = 0$.
 close!(ch)
 update!(ch, 0.0);
 
 # ### Assembling the linear system
+#
 # Now we have all the pieces needed to assemble the linear system, $K u = f$.
-# We define a function, `doassemble` to do the assembly, which takes our `cellvalues`,
-# the sparse matrix and our DofHandler as input arguments. The function returns the
-# assembled stiffness matrix, and the force vector.
-# Note that here `f` and `u` correspond to $\underline{\hat{f}}$ and $\underline{\hat{u}}$
-# from the introduction, since they represent the discretized versions. However, through
-# the code we use `f` and `u` instead to reflect the strong connection between the weak
-# form and the Ferrite implementation.
-function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler) where {dim}
-    # We allocate the element stiffness matrix and element force vector
-    # just once before looping over all the cells instead of allocating
-    # them every time in the loop.
-    #+
+# Assembling of the global system is done by looping over all the elements in order to
+# compute the element contributions ``K_e`` and ``f_e``, which are then assembled to the
+# appropriate place in the global ``K`` and ``f``.
+#
+# #### Element assembly
+# We define the function `assemble_element!` (see below) which computes the contribution for
+# an element. The function takes pre-allocated `ke` and `fe` (they are allocated once and
+# then reused for all elements) so we first need to make sure that they are all zeroes at
+# the start of the function by using `fill!`. Then we loop over all the quadrature points,
+# and for each quadrature point we loop over all the (local) shape functions. We need the
+# value and gradient of the test function, `δu` and also the gradient of the trial function
+# `u`. We get all of these from `cellvalues`.
+#
+# !!! note "Notation"
+#     Comparing with the brief finite element introduction in [Introduction to FEM](@ref),
+#     the variables `δu`, `∇δu` and `∇u` are actually $\phi_i(\textbf{x}_q)$, $\nabla
+#     \phi_i(\textbf{x}_q)$ and $\nabla \phi_j(\textbf{x}_q)$, i.e. the evaluation of the
+#     trial and test functions in the quadrature point ``\textbf{x}_q``. However, to
+#     underline the strong parallel between the weak form and the implementation, this
+#     example uses the symbols appearing in the weak form.
+
+function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellScalarValues)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    ## Reset to 0
+    fill!(Ke, 0)
+    fill!(fe, 0)
+    ## Loop over quadrature points
+    for q_point in 1:getnquadpoints(cellvalues)
+        ## Get the quadrature weight
+        dΩ = getdetJdV(cellvalues, q_point)
+        ## Loop over test shape functions
+        for i in 1:n_basefuncs
+            δu  = shape_value(cellvalues, q_point, i)
+            ∇δu = shape_gradient(cellvalues, q_point, i)
+            ## Add contribution to fe
+            fe[i] += δu * dΩ
+            ## Loop over trial shape functions
+            for j in 1:n_basefuncs
+                ∇u = shape_gradient(cellvalues, q_point, j)
+                ## Add contribution to Ke
+                Ke[i, j] += (∇δu ⋅ ∇u) * dΩ
+            end
+        end
+    end
+    return Ke, fe
+end
+#md nothing # hide
+
+# #### Global assembly
+# We define the function `assemble_global` to loop over the elements and do the global
+# assembly. The function takes our `cellvalues`, the sparse matrix `K`, and our DofHandler
+# as input arguments and returns the assembled global stiffness matrix, and the assembled
+# global force vector. We start by allocating `Ke`, `fe`, and the global force vector `f`.
+# We also create an assembler by using `start_assemble`. The assembler lets us assemble into
+# `K` and `f` efficiently. We then start the loop over all the elements. In each loop
+# iteration we reinitialize `cellvalues` (to update derivatives of shape functions etc.),
+# compute the element contribution with `assemble_element!`, and then assemble into the
+# global `K` and `f` with `assemble!`.
+#
+# !!! note "Notation"
+#     Comparing again with [Introduction to FEM](@ref), `f` and `u` correspond to
+#     $\underline{\hat{f}}$ and $\underline{\hat{u}}$, since they represent the discretized
+#     versions. However, through the code we use `f` and `u` instead to reflect the strong
+#     connection between the weak form and the Ferrite implementation.
+
+function assemble_global(cellvalues::CellScalarValues, K::SparseMatrixCSC, dh::DofHandler)
+    ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
-
-    # Next we define the global force vector `f` and use that and
-    # the stiffness matrix `K` and create an assembler. The assembler
-    # is just a thin wrapper around `f` and `K` and some extra storage
-    # to make the assembling faster.
-    #+
+    ## Allocate global force vector f
     f = zeros(ndofs(dh))
+    ## Create an assembler
     assembler = start_assemble(K, f)
-
-    # It is now time to loop over all the cells in our grid. We do this by iterating
-    # over a `CellIterator`. The iterator caches some useful things for us, for example
-    # the nodal coordinates for the cell, and the local degrees of freedom.
-    #+
+    ## Loop over all cels
     for cell in CellIterator(dh)
-        # Always remember to reset the element stiffness matrix and
-        # force vector since we reuse them for all elements.
-        #+
-        fill!(Ke, 0)
-        fill!(fe, 0)
-
-        # For each cell we also need to reinitialize the cached values in `cellvalues`.
-        #+
+        ## Reinitialize cellvalues for this cell
         reinit!(cellvalues, cell)
-
-        # It is now time to loop over all the quadrature points in the cell and
-        # assemble the contribution to `Ke` and `fe`. The integration weight
-        # can be queried from `cellvalues` by `getdetJdV`.
-        #+
-        for q_point in 1:getnquadpoints(cellvalues)
-            dΩ = getdetJdV(cellvalues, q_point)
-            # For each quadrature point we loop over all the (local) shape functions.
-            # We need the value and gradient of the test function `δu` and also the
-            # gradient of the trial function `u`. We get all of these from `cellvalues`.
-            # Please note that the variables `δu`, `∇δu` and `∇u` are actually
-            # $\phi_i(\textbf{x}_q)$, $\nabla \phi_i(\textbf{x}_q)$ and $\nabla
-            # \phi_j(\textbf{x}_q)$, i.e. the evaluation of the trial and test functions.
-            # However, to underline the strong parallel between the weak form and the
-            # implementation, this example uses the symbols appearing in the weak form.
-            #+
-            for i in 1:n_basefuncs
-                δu  = shape_value(cellvalues, q_point, i)
-                ∇δu = shape_gradient(cellvalues, q_point, i)
-                fe[i] += δu * dΩ
-                for j in 1:n_basefuncs
-                    ∇u = shape_gradient(cellvalues, q_point, j)
-                    Ke[i, j] += (∇δu ⋅ ∇u) * dΩ
-                end
-            end
-        end
-
-        # The last step in the element loop is to assemble `Ke` and `fe`
-        # into the global `K` and `f` with `assemble!`.
-        #+
-        assemble!(assembler, celldofs(cell), fe, Ke)
+        ## Compute element contribution
+        assemble_element!(Ke, fe, cellvalues)
+        ## Assemble Ke and fe into K and f
+        assemble!(assembler, celldofs(cell), Ke, fe)
     end
     return K, f
 end
 #md nothing # hide
 
 # ### Solution of the system
-# The last step is to solve the system. First we call `doassemble`
+# The last step is to solve the system. First we call `assemble_global`
 # to obtain the global stiffness matrix `K` and force vector `f`.
-K, f = doassemble(cellvalues, K, dh);
+K, f = assemble_global(cellvalues, K, dh);
 
 # To account for the boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f` respectively, such that
