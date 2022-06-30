@@ -104,6 +104,25 @@ function dof_range(dh::DofHandler, field_name::Symbol)
 end
 
 """
+    global_dof_range(dh::DofHandler, field_name::Symbol)
+
+Return the global index range for `field_name`.
+"""
+function global_dof_range(dh::DofHandler, field_name::Symbol)
+    dofs = Set{Int}()
+    eldofs = zeros(Int, ndofs_per_cell(dh))
+    field_range = dof_range(dh, field_name)
+    for i in 1:getncells(dh.grid)
+        celldofs!(eldofs, dh, i)
+        for j in field_range
+            @inbounds d = eldofs[j]
+            d in dofs || push!(dofs, d)
+        end
+    end
+    return sort!(collect(Int, dofs))
+end
+
+"""
     push!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
 
 Add a `dim`-dimensional `Field` called `name` which is approximated by `ip` to `dh`.
