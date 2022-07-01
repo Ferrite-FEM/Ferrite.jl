@@ -1,0 +1,12 @@
+details.admonition.collapsible summary.admonition-header::before {
+    content: "\f055";
+}
+details[open].admonition.collapsible summary.admonition-header::before {
+    content: "\f056";
+}
+details.admonition.collapsible summary.admonition-header {
+    list-style: none;
+}
+details.admonition.collapsible {
+    background-color: inherit;
+}

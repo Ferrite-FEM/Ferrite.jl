@@ -338,7 +338,7 @@ version = "0.3.2"
 deps = ["EnumX", "LinearAlgebra", "NearestNeighbors", "Reexport", "SparseArrays", "Tensors", "WriteVTK"]
 path = ".."
 uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
-version = "0.3.5"
+version = "0.3.6"
 
 [[FerriteGmsh]]
 deps = ["Ferrite", "Reexport", "gmsh_jll"]
@@ -597,12 +597,6 @@ deps = ["LinearAlgebra", "Printf"]
 git-tree-sha1 = "49b0c1dd5c292870577b8f58c51072bd558febb9"
 uuid = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
 version = "0.5.4"
-
-[[KrylovMethods]]
-deps = ["LinearAlgebra", "Printf", "SparseArrays"]
-git-tree-sha1 = "fb8c55d7059fbde87ee44dbe4e5c27e32b369224"
-uuid = "9a2cd570-f05c-5dc1-9209-93ad6f5727f7"
-version = "0.6.0"
 
 [[LAME_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
