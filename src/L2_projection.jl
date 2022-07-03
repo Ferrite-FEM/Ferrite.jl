@@ -102,6 +102,13 @@ function _mass_qr(::Lagrange{dim, RefTetrahedron, 2}) where {dim}
     return QuadratureRule{dim,RefTetrahedron}(4)
 end
 
+function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
+    println(io, "L2Projector")
+    println(io, "  projection on:           ", length(proj.set), "/", getncells(proj.dh.grid), " cells in grid")
+    println(io, "  function interpolation:  ", proj.func_ip)
+    println(io, "  geometric interpolation: ", proj.geom_ip)
+end
+
 function _assemble_L2_matrix(fe_values, set, dh)
 
     n = Ferrite.getn_scalarbasefunctions(fe_values)
