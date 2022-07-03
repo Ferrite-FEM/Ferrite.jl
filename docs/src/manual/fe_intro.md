@@ -170,7 +170,7 @@ We finally want to note that this quick introduction barely scratches the surfac
 method. Also, we presented some things in a simplified way for the sake of keeping this article short
 and concise. There is a large corpus of literature and online tutorials containing more details about
 the finite element method. To give a few recommendations there is:
-* [Hans Petter Langtangen's Script](http://hplgit.github.io/INF5620/doc/pub/sphinx-fem/index.html)
+* [Hans Petter Langtangen's Script](https://hplgit.github.io/INF5620/doc/pub/sphinx-fem/index.html)
 * [Wolfgang Bangerth's Lecture Series](https://www.math.colostate.edu/~bangerth/videos.html)
 * *Introduction to the Finite Element Method* by Niels Ottosen and Hans Petersson
 * *The Finite Element Method for Elliptic Problems* by Philippe Ciarlet
