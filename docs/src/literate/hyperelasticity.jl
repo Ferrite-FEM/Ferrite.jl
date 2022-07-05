@@ -78,7 +78,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 # and the tangent of ``\mathbf{S}`` as
 #
 # ```math
-# \frac{\partial \mathbf{S}}{\partial \mathbf{C}} = 2 \frac{\partial^2 \Psi}{\partial \mathbf{C}^2}.
+# \frac{\partial \mathbf{S}}{\partial \mathbf{C}} = 4 \frac{\partial^2 \Psi}{\partial \mathbf{C}^2}.
 # ```
 #
 # Finally, for the finite element problem we need ``\mathbf{P}`` and
@@ -164,7 +164,7 @@ function constitutive_driver(C, mp::NeoHooke)
     ## Compute all derivatives in one function call
     ∂²Ψ∂C², ∂Ψ∂C = Tensors.hessian(y -> Ψ(y, mp), C, :all)
     S = 2.0 * ∂Ψ∂C
-    ∂S∂C = 2.0 * ∂²Ψ∂C²
+    ∂S∂C = 4.0 * ∂²Ψ∂C²
     return S, ∂S∂C
 end;
 
