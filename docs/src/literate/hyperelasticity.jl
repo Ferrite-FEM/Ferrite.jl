@@ -409,7 +409,7 @@ u = solve();
 
 ## test the result                #src
 using Test                        #src
-@test norm(u) ≈ 4.865189736192834 #src
+@test norm(u) ≈ 4.766569347736084 #src
 
 #md # ## Plain program
 #md #

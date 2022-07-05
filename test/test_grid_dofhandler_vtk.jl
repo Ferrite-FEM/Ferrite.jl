@@ -2,7 +2,6 @@
 using StableRNGs
 OVERWRITE_CHECKSUMS = false
 checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")
-checksum_list = read(checksums_file, String)
 if OVERWRITE_CHECKSUMS
     csio = open(checksums_file, "w")
 else
@@ -49,7 +48,7 @@ end
         if OVERWRITE_CHECKSUMS
             write(csio, sha, "\n")
         else
-            @test chomp(readline(csio)) == sha
+            @test sha in split(chomp(readline(csio)))
             rm(gridfilename*".vtu")
         end
 
@@ -85,7 +84,7 @@ end
         if OVERWRITE_CHECKSUMS
             write(csio, sha, "\n")
         else
-            @test chomp(readline(csio)) == sha
+            @test sha in split(chomp(readline(csio)))
             rm(dofhandlerfilename*".vtu")
         end
 
@@ -99,7 +98,7 @@ close(csio)
     # open files
     checksums_file_tensors = joinpath(dirname(@__FILE__), "checksums2.sha1")
     if OVERWRITE_CHECKSUMS
-        csio = open(checksums_file_tensors, "w")
+        csio = open(checksums_file_tensors, "a")
     else
         csio = open(checksums_file_tensors, "r")
     end
@@ -141,7 +140,7 @@ close(csio)
         if OVERWRITE_CHECKSUMS
             write(csio, sha, "\n")
         else
-            @test chomp(readline(csio)) == sha
+            @test sha in split(chomp(readline(csio)))
             rm(filename*".vtu")
         end
     end
