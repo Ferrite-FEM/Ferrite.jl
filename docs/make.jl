@@ -32,7 +32,9 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
 
 # Build documentation.
 @timeit dto "makedocs" makedocs(
-    format = Documenter.HTML(),
+    format = Documenter.HTML(
+        assets = ["assets/custom.css"],
+    ),
     sitename = "Ferrite.jl",
     doctest = false,
     # strict = VERSION.minor == 6 && sizeof(Int) == 8, # only strict mode on 0.6 and Int64
