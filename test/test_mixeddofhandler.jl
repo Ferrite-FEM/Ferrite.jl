@@ -370,7 +370,7 @@ function test_2_element_heat_eq()
         # vtk_point_data(vtk, ch)  #FIXME
     end
     sha = bytes2hex(open(SHA.sha1, gridfilename*".vtu"))
-    @test sha == "e96732c000b0b385db7444f002461468b60b3b2c"
+    @test sha in ("e96732c000b0b385db7444f002461468b60b3b2c", "7b26edc27b5e59a2f60907374cd5a5790cc37a6a")
 
 end
 
