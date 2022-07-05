@@ -355,11 +355,13 @@ function solve()
 
     ## Pre-allocation of vectors for the solution and Newton increments
     _ndofs = ndofs(dh)
-    un = zeros(_ndofs) # previous solution vector
     u  = zeros(_ndofs)
     Δu = zeros(_ndofs)
-    ΔΔu = zeros(_ndofs)
-    apply!(un, dbcs)
+
+    ## We apply the Dirichlet constraints to our solution prior to the
+    ## starting Newton iterations, because the values at these points must
+    ## be constant during the nonlinear solve.
+    apply!(u, dbcs)
 
     ## Create sparse matrix and residual vector
     K = create_sparsity_pattern(dh)
@@ -372,23 +374,36 @@ function solve()
     prog = ProgressMeter.ProgressThresh(NEWTON_TOL, "Solving:")
 
     while true; newton_itr += 1
-        u .= un .+ Δu # Current guess
+        ## We start by assembling the linear problem for the Newton iteration.
         assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
-        normg = norm(g[Ferrite.free_dofs(dbcs)])
-        apply_zero!(K, g, dbcs)
-        ProgressMeter.update!(prog, normg; showvalues = [(:iter, newton_itr)])
 
+        ## We explicitly force the change at the Dirichlet nodes to be zero,
+        ## because we already applied the constraint on our solution vector,
+        ## and hence the solution is correct by construction at these dofs.
+        apply_zero!(K, g, dbcs)
+
+        ## If the solution is exact enough, then the benefit of more Newton
+        ## iterations becomes negligible.
+        normg = norm(g[Ferrite.free_dofs(dbcs)])
+        ProgressMeter.update!(prog, normg; showvalues = [(:iter, newton_itr)])
         if normg < NEWTON_TOL
             break
+        ## Sometimes the Newton fails to find a solution and diverges.
+        ## An easy way to catch this divergent behavior is to restrict
+        ## the total number of Newton iterations.
         elseif newton_itr > NEWTON_MAXITER
             error("Reached maximum Newton iterations, aborting")
         end
 
         ## Compute increment using conjugate gradients
-        @timeit "linear solve (IterativeSolvers.cg!)" IterativeSolvers.cg!(ΔΔu, K, g; maxiter=1000)
+        @timeit "linear solve (IterativeSolvers.cg!)" IterativeSolvers.cg!(Δu, K, g; maxiter=1000)
 
-        apply_zero!(ΔΔu, dbcs)
-        Δu .-= ΔΔu
+        ## The solver might not yield fully converged increment at the
+        ## Dirichlet boundary, so we force the increment to be zero there.
+        apply_zero!(Δu, dbcs)
+
+        ## Finally we update our solution witht he increment.
+        u .-= Δu
     end
 
     ## Save the solution
