@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.7] - 2022-07-05
+### Fixed
+- Fix tests for newer version of WriteVTK (no functional change). ([#462][github-462])
+### Other improvements
+ - Various improvements to the heat equation example and the hyperelasticity example in the
+   documentation. ([#460][github-460], [#461][github-461])
+
+## [0.3.6] - 2022-06-30
+### Fixed
+- Fix a bug with `L2Projection` of mixed grid. ([#456][github-456])
+### Other improvements
+ - Expanded manual section of Dirichlet BCs. ([#458][github-458])
+
 ## [0.3.5] - 2022-05-30
 ### Added
 - Functionality for querying information about the grid topology (e.g. neighboring cells,
@@ -62,6 +75,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-418]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/418
 [github-425]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/425
 [github-428]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/428
+[github-456]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/456
+[github-458]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/458
+[github-460]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/460
+[github-461]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/461
+[github-462]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/462
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.5...HEAD
 [0.3.5]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.4...v0.3.5
