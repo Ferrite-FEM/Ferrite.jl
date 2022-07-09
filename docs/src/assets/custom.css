@@ -1,3 +1,7 @@
+html.theme--documenter-light body div#documenter nav.docs-sidebar a.docs-logo img,
+html.theme--documenter-dark body div#documenter nav.docs-sidebar a.docs-logo img {
+    max-height: 10rem;
+}
 details.admonition.collapsible summary.admonition-header::before {
     content: "\f055";
 }

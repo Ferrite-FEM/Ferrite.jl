@@ -33,7 +33,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
 # Build documentation.
 @timeit dto "makedocs" makedocs(
     format = Documenter.HTML(
-        assets = ["assets/custom.css"],
+        assets = ["assets/custom.css", "assets/favicon.ico"],
     ),
     sitename = "Ferrite.jl",
     doctest = false,
