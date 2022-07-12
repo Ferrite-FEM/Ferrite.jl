@@ -1,8 +1,13 @@
 """
-    PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim,T}}) where {dim, T}
+    PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim,T}}; kwargs...) where {dim, T}
 
 The `PointEvalHandler` can be used for function evaluation in *arbitrary points* in the
 domain -- not just in quadrature points or nodes.
+
+The `PointEvalHandler` takes the following keyword arguments:
+ - `search_nneighbors`: How many nodes should be found in the nearest neighbor search for each
+   point. Usually there is no need to change this setting. Default value: `3`.
+ - `warn`: Show a warning if a point is not found. Default value: `true`.
 
 The constructor takes a grid and a vector of coordinates for the points. The
 `PointEvalHandler` computes i) the corresponding cell, and ii) the (local) coordinate
@@ -40,17 +45,17 @@ function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
     end
 end
 
-function PointEvalHandler(grid::AbstractGrid, points::AbstractVector{Vec{dim,T}}; search_nneighbours=3, warn=true) where {dim, T}
+function PointEvalHandler(grid::AbstractGrid, points::AbstractVector{Vec{dim,T}}; search_nneighbors=3, warn=true) where {dim, T}
     node_cell_dicts = _get_node_cell_map(grid)
-    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbours, warn)
+    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn)
     return PointEvalHandler(grid, cells, local_coords)
 end
 
-function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}, search_nneighbours, warn) where {dim, T<:Real, C}
+function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}, serach_nneighbors, warn) where {dim, T<:Real, C}
 
     # set up tree structure for finding nearest nodes to points
     kdtree = KDTree(reinterpret(Vec{dim,T}, getnodes(grid)))
-    nearest_nodes, _ = knn(kdtree, points, search_nneighbours, true) #TODO 3 is a random value, it shouldn't matter because likely the nearest node is the one we want
+    nearest_nodes, _ = knn(kdtree, points, serach_nneighbors, true) #TODO 3 is a random value, it shouldn't matter because likely the nearest node is the one we want
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
     local_coords = Vector{Union{Nothing, Vec{dim, T}}}(nothing, length(points))
