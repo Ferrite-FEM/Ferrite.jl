@@ -55,7 +55,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
 
     # set up tree structure for finding nearest nodes to points
     kdtree = KDTree(reinterpret(Vec{dim,T}, getnodes(grid)))
-    nearest_nodes, _ = knn(kdtree, points, serach_nneighbors, true) #TODO 3 is a random value, it shouldn't matter because likely the nearest node is the one we want
+    nearest_nodes, _ = knn(kdtree, points, serach_nneighbors, true) 
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
     local_coords = Vector{Union{Nothing, Vec{dim, T}}}(nothing, length(points))
