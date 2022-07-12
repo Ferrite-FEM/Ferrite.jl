@@ -51,11 +51,11 @@ function PointEvalHandler(grid::AbstractGrid, points::AbstractVector{Vec{dim,T}}
     return PointEvalHandler(grid, cells, local_coords)
 end
 
-function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}, serach_nneighbors, warn) where {dim, T<:Real, C}
+function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}, search_nneighbors, warn) where {dim, T<:Real, C}
 
     # set up tree structure for finding nearest nodes to points
     kdtree = KDTree(reinterpret(Vec{dim,T}, getnodes(grid)))
-    nearest_nodes, _ = knn(kdtree, points, serach_nneighbors, true) 
+    nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true) 
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
     local_coords = Vector{Union{Nothing, Vec{dim, T}}}(nothing, length(points))
@@ -266,7 +266,9 @@ function _get_point_values!(
     # extract variables
     local_coords = ph.local_coords
     # preallocate some stuff specific to this cellset
-    pv = PointScalarValuesInternal(local_coords[findfirst(x->!isnothing(x), local_coords)], ip)
+    idx = findfirst(!isnothing, local_coords)
+    idx === nothing && return out_vals
+    pv = PointScalarValuesInternal(local_coords[idx], ip)
     first_cell = cellset === nothing ? 1 : first(cellset)
     cell_dofs = Vector{Int}(undef, ndofs_per_cell(dh, first_cell))
 
