@@ -2,6 +2,11 @@ html.theme--documenter-light body div#documenter nav.docs-sidebar a.docs-logo im
 html.theme--documenter-dark body div#documenter nav.docs-sidebar a.docs-logo img {
     max-height: 10rem;
 }
+div.docs-package-name {
+    font-family: "JuliaMono";
+    font-weight: normal !important;
+    font-size: 1.7rem !important;
+}
 details.admonition.collapsible summary.admonition-header::before {
     content: "\f055";
 }
