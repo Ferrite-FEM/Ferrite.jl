@@ -1,4 +1,8 @@
-# Ferrite
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/assets/logo-horizontal.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/assets/logo-horizontal-dark.svg">
+  <img alt="Ferrite.jl logo." src="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/assets/logo-horizontal.svg">
+</picture>
 
 ![Build Status](https://github.com/Ferrite-FEM/Ferrite.jl/workflows/CI/badge.svg?event=push)
 [![codecov.io](http://codecov.io/github/Ferrite-FEM/Ferrite.jl/coverage.svg?branch=master)](http://codecov.io/github/Ferrite-FEM/Ferrite.jl?branch=master)
