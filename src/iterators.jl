@@ -26,7 +26,7 @@ end
 Here, `cell::CellIterator`. Looking at a specific cell (instead of 
 looping over all), e.g. nr 10, can be done by
 ```julia
-cell = CellIterator(dh)     # Refers to cell nr. 1 upon creation
+cell = CellIterator(dh)     # Uninitialized upon creation
 reinit!(cell, 10)           # Update to cell nr. 10
 dofs = celldofs(cell)       # Get the dofs for cell nr. 10
 ```
