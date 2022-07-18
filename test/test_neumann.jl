@@ -10,7 +10,7 @@
         nh = NeumannHandler(dh)
         fv = FaceVectorValues(
             QuadratureRule{1, RefCube}(2), Lagrange{2, RefCube, 1}())
-        fun(_, t) = Vec{2}((t, 10t))
+        fun(_, t, _) = Vec{2}((t, 10t))
         add!(nh, Neumann(:u, grid.facesets["right"], fv, fun))
         
         # Test applying the Neumann bc

@@ -5,7 +5,7 @@ struct Neumann{FV}      # cells and faces are a deconstructed
     faces::Vector{Int}  # with CellIterator 
     face_values::FV     
     field_name::Symbol
-    fun                 # f(x::Vec, t::Number)->Union{<:Number, <:Vec}
+    fun # f(x::Vec, t::Number, normal::Vec)->Union{<:Number, <:Vec}
 end
 
 function Neumann(field_name::Symbol, ∂Ω::Set{FaceIndex}, fv::FaceValues, f)
@@ -28,7 +28,8 @@ function calculate_element_force!(fe::Vector, cell::CellIterator, fv::FaceValues
     for q_point in 1:getnquadpoints(fv)
         dΓ = getdetJdV(fv, q_point)
         x = spatial_coordinate(fv, q_point, cell.coords)
-        b = fun(x, time)
+        n = getnormal(fv, q_point)
+        b = fun(x, time, n)
         for i in 1:getnbasefunctions(fv)
             δu = shape_value(fv, q_point, i)
             fe[i] += δu ⋅ b * dΓ
