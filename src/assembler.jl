@@ -35,17 +35,17 @@ function start_assemble(N::Int=0)
 end
 
 """
-    assemble!(a::Assembler, Ke, edof)
+    assemble!(a::Assembler, dofs, Ke)
 
 Assembles the element matrix `Ke` into `a`.
 """
-function assemble!(a::Assembler{T}, edof::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
-    n_dofs = length(edof)
+function assemble!(a::Assembler{T}, dofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
+    n_dofs = length(dofs)
     append!(a.V, Ke)
     @inbounds for j in 1:n_dofs
-        append!(a.I, edof)
+        append!(a.I, dofs)
         for i in 1:n_dofs
-            push!(a.J, edof[j])
+            push!(a.J, dofs[j])
         end
     end
 end
@@ -61,14 +61,14 @@ function end_assemble(a::Assembler)
 end
 
 """
-    assemble!(g, edof, ge)
+    assemble!(g, dofs, ge)
 
 Assembles the element residual `ge` into the global residual vector `g`.
 """
-@propagate_inbounds function assemble!(g::AbstractVector{T}, edof::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
-    @boundscheck checkbounds(g, edof)
-    @inbounds for i in 1:length(edof)
-        g[edof[i]] += ge[i]
+@propagate_inbounds function assemble!(g::AbstractVector{T}, dofs::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
+    @boundscheck checkbounds(g, dofs)
+    @inbounds for i in 1:length(dofs)
+        g[dofs[i]] += ge[i]
     end
 end
 
