@@ -61,7 +61,7 @@ function end_assemble(a::Assembler)
 end
 
 """
-    assemble!(g, ge, edof)
+    assemble!(g, edof, ge)
 
 Assembles the element residual `ge` into the global residual vector `g`.
 """
