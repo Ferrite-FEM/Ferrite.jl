@@ -73,6 +73,7 @@ include("Export/VTK.jl")
 include("PointEval/PointEvalHandler.jl")
 
 # Other
+include("neumann.jl")
 include("deprecations.jl")
 
 end # module

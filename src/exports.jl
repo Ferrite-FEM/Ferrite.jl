@@ -125,6 +125,10 @@ export
     free_dofs,
     ApplyStrategy,
 
+# Neumann BC
+    NeumannHandler,
+    Neumann,
+
 # iterators
     CellIterator,
     UpdateFlags,
