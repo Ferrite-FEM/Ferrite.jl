@@ -92,19 +92,31 @@ dh = DofHandler(dgrid.local_grid)
 push!(dh, :u, 1)
 close!(dh);
 
-# We have to renumber the dofs to their global numbering.
-function local_to_global_numbering(dh, dgrid)
+# Renumber the dofs in local ordering to their corresponding global numbering.
+# TODO: Refactor for MixedDofHandler integration
+function local_to_global_numbering(dh::DofHandler, dgrid)
+    # MPI rank starting with 1 to match Julia's index convention
     my_rank = MPI.Comm_rank(MPI.COMM_WORLD)+1
 
     local_to_global = Vector{Int}(undef,ndofs(dh))
     fill!(local_to_global,0) # 0 is the invalid index!
     # Start by numbering local dofs only from 1:#local_dofs
 
-    # # Lookup for synchronization in the form (Remote Rank,Shared Entity)
-    # # @TODO replace dict with vector and tie to MPI neighborhood graph of the mesh
+    # Lookup for synchronization in the form (Remote Rank,Shared Entity)
+    # @TODO replace dict with vector and tie to MPI neighborhood graph of the mesh
     vertices_send = Dict{Int,Vector{VertexIndex}}()
     n_vertices_recv = Dict{Int,Int}()
 
+    # We start by assigning a local dof to all owned entities.
+    # An entity is owned if:
+    # 1. *All* topological neighbors are on the local process
+    # 2. If the rank of the local process it lower than the rank of *all* topological neighbors
+    # A topological neighbor in this context is hereby defined per entity:
+    # * vertex: All elements whose vertex is the vertex in question
+    # * cell: Just the cell itself
+    # * All other entities: All cells for which one of the corresponding entities interior intersects 
+    #                       with the interior of the entity in question.
+    # TODO: implement for entitied with dim > 0
     next_local_idx = 1
     for (ci, cell) in enumerate(getcells(dh.grid))
         @debug println("cell #$ci (R$my_rank)")
@@ -173,13 +185,17 @@ function local_to_global_numbering(dh, dgrid)
     end
     @debug println("#shifted local dof range $(local_offset+1):$(local_offset+num_true_local_dofs) (R$my_rank)")
 
+    # Shift assigned local dofs (dofs with value >0) into the global range
+    # At this point in the algorithm the dofs with value 0 are the dofs owned of neighboring processes
     for i ∈ 1:length(local_to_global)
         if local_to_global[i] != 0
             local_to_global[i] += local_offset
         end
     end
 
-    # Sync remote dofs
+    # Sync non-owned dofs with neighboring processes.
+    # TODO: implement for entitied with dim > 0
+    # TODO: Use MPI graph primitives to simplify this code
     for sending_rank ∈ 1:MPI.Comm_size(MPI.COMM_WORLD)
         if my_rank == sending_rank
             for remote_rank ∈ 1:MPI.Comm_size(MPI.COMM_WORLD)
@@ -362,7 +378,11 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     @debug println("ldof_to_gdof $ldof_to_gdof (R$my_rank)")
     @debug println("ldof_to_rank $ldof_to_rank (R$my_rank)")
 
-    # Process owns rows
+    # Process owns rows of owned dofs. The process also may write to some remote dofs, 
+    # which correspond to non-owned share entities. Here we construct the rows for the
+    # distributed matrix.
+    # We decide for row (i.e. test function) ownership, because it the image of
+    # SpMV is process local.
     row_indices = PartitionedArrays.IndexSet(my_rank, ldof_to_gdof, Int32.(ldof_to_rank))
     row_data = MPIData(row_indices, comm, (np,))
     row_exchanger = Exchanger(row_data,neighbors)
@@ -370,7 +390,9 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
 
     @debug println("rows done (R$my_rank)")
 
-    # And all corresponding non-zero rows
+    # For the locally visible columns we also have to take into account that remote
+    # processes will write their data in some of these, because their remotely 
+    # owned trial functions overlap with the locally owned test functions.
     ghost_dof_to_global = Int[]
     ghost_dof_rank = Int32[]
     #TODO obtain ghosts algorithmic
