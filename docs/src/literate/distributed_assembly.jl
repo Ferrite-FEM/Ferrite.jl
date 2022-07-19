@@ -327,7 +327,7 @@ update!(ch, 0.0);
 # We define a function, `doassemble` to do the assembly, which takes our `cellvalues`,
 # the sparse matrix and our DofHandler as input arguments. The function returns the
 # assembled stiffness matrix, and the force vector.
-function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_gdof, ldof_to_part, ngdofs, dgrid) where {dim}
+function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_gdof, ldof_to_rank, ngdofs, dgrid) where {dim}
     # We allocate the element stiffness matrix and element force vector
     # just once before looping over all the cells instead of allocating
     # them every time in the loop.
@@ -355,23 +355,34 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     @debug println("neighbors $neighbors (R$my_rank)")
 
     # Extract locally owned dofs
-    ltdof_indices = ldof_to_part.==my_rank
+    ltdof_indices = ldof_to_rank.==my_rank
     ltdof_to_gdof = ldof_to_gdof[ltdof_indices]
 
     @debug println("ltdof_to_gdof $ltdof_to_gdof (R$my_rank)")
     @debug println("ldof_to_gdof $ldof_to_gdof (R$my_rank)")
-    @debug println("ldof_to_part $ldof_to_part (R$my_rank)")
+    @debug println("ldof_to_rank $ldof_to_rank (R$my_rank)")
 
     # Process owns rows
-    row_indices = PartitionedArrays.IndexSet(my_rank, ltdof_to_gdof, repeat(Int32[my_rank], sum(ltdof_indices)))
+    row_indices = PartitionedArrays.IndexSet(my_rank, ldof_to_gdof, Int32.(ldof_to_rank))
     row_data = MPIData(row_indices, comm, (np,))
     row_exchanger = Exchanger(row_data,neighbors)
     rows = PRange(ngdofs,row_data,row_exchanger)
 
     @debug println("rows done (R$my_rank)")
 
-    # And shares some cols
-    col_indices = PartitionedArrays.IndexSet(my_rank, ldof_to_gdof, Int32.(ldof_to_part))
+    # And all corresponding non-zero rows
+    #all_local_rows = copy(ldof_to_gdof)
+    #all_local_row_ranks = ...
+    #TODO optimize with graph topology
+    #for neighbor ∈
+    if my_rank == 1 
+        all_local_cols = collect(1:9)
+        all_local_col_ranks = [1,1,1,1,1,1,2,2,2]
+    else
+        all_local_cols = copy(ldof_to_gdof)
+        all_local_col_ranks = copy(ldof_to_rank)
+    end
+    col_indices = PartitionedArrays.IndexSet(my_rank, all_local_cols, Int32.(all_local_col_ranks))
     col_data = MPIData(col_indices, comm, (np,))
     col_exchanger = Exchanger(col_data,neighbors)
     cols = PRange(ngdofs,col_data,col_exchanger)
@@ -437,10 +448,29 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
 
     @debug println("done assembling (R$my_rank)")
 
+    # Fix ghost layer - the locations for remote processes to write their data into
+    if my_rank == 1
+        # ltdofs
+        append!(assembler.I, [3,3,3,4,4,6,6])
+        append!(assembler.J, [7,8,9,7,8,7,9])
+        append!(assembler.V, zeros(7))
+        # # gdofs?
+        # # append!(assembler.I, [7,7,7,7,7,7, 8,8,8,8, 9,9,9,9])
+        # # append!(assembler.J, [3,4,6,7,6,9, 3,4,7,8, 3,6,7,9])
+        # # append!(assembler.V, zeros(6+4+4))
+        # append!(assembler.I, [7,7,7,7, 8,8, 9,9])
+        # append!(assembler.J, [3,4,6,6, 3,4, 3,6])
+        # append!(assembler.V, zeros(4+2+2))
+    else
+        # append!(assembler.I, [1,1,2,2,2,5,5])
+        # append!(assembler.J, [7,8,9,7,8,8,9])
+        # append!(assembler.V, zeros(7))
+    end
     I_ = MPIData(assembler.I, comm, (np,))
     J_ = MPIData(assembler.J, comm, (np,))
     V_ = MPIData(assembler.V, comm, (np,))
-    # println(dof_partition_prange)
+    @debug println("I=$(assembler.I) (R$my_rank)")
+    @debug println("J=$(assembler.J) (R$my_rank)")
     K = PartitionedArrays.PSparseMatrix(I_, J_, V_, rows, cols, ids=:local)
     return K, f
 end
