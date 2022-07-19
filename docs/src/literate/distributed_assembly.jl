@@ -53,7 +53,7 @@ grid = generate_grid(Quadrilateral, (2, 2));
 dgrid = DistributedGrid(grid, MPI.COMM_WORLD)
 
 # TODO refactor this into a utility function
-vtk_grid("grid", dgrid; compress=false) do vtk
+@debug vtk_grid("grid", dgrid; compress=false) do vtk
     u = Vector{Float64}(undef,length(dgrid.local_grid.nodes))
     for rank ∈ 1:MPI.Comm_size(MPI.COMM_WORLD)
         fill!(u, 0.0)
@@ -251,7 +251,7 @@ function local_to_global_numbering(dh, dgrid)
     # Postcondition: All local dofs need a corresponding global dof!
     @assert findfirst(local_to_global .== 0) == nothing
 
-    vtk_grid("dofs", dgrid; compress=false) do vtk
+    @debug vtk_grid("dofs", dgrid; compress=false) do vtk
         u = Vector{Float64}(undef,length(dgrid.local_grid.nodes))
         fill!(u, 0.0)
         for i=1:length(u)
@@ -327,7 +327,7 @@ update!(ch, 0.0);
 # We define a function, `doassemble` to do the assembly, which takes our `cellvalues`,
 # the sparse matrix and our DofHandler as input arguments. The function returns the
 # assembled stiffness matrix, and the force vector.
-function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_gdof, ldof_to_part, ngdofs) where {dim}
+function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_gdof, ldof_to_part, ngdofs, dgrid) where {dim}
     # We allocate the element stiffness matrix and element force vector
     # just once before looping over all the cells instead of allocating
     # them every time in the loop.
@@ -344,8 +344,13 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     @debug println("starting assembly... (R$my_rank)")
 
     # Neighborhood - self
-    neighbors_unique = unique(ldof_to_part)
-    neighbors = MPIData(Int32.(neighbors_unique[neighbors_unique.!=my_rank]), comm, (np,))
+    neighbors_set = Set()
+    for (vi, sv) ∈ dgrid.shared_vertices
+        for (rank, vvi) ∈ sv.remote_vertices
+            push!(neighbors_set, rank)
+        end
+    end
+    neighbors = MPIData(Int32.(neighbors_set), comm, (np,))
 
     @debug println("neighbors $neighbors (R$my_rank)")
 
@@ -354,12 +359,16 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     ltdof_to_gdof = ldof_to_gdof[ltdof_indices]
 
     @debug println("ltdof_to_gdof $ltdof_to_gdof (R$my_rank)")
+    @debug println("ldof_to_gdof $ldof_to_gdof (R$my_rank)")
+    @debug println("ldof_to_part $ldof_to_part (R$my_rank)")
 
     # Process owns rows
     row_indices = PartitionedArrays.IndexSet(my_rank, ltdof_to_gdof, repeat(Int32[my_rank], sum(ltdof_indices)))
     row_data = MPIData(row_indices, comm, (np,))
     row_exchanger = Exchanger(row_data,neighbors)
     rows = PRange(ngdofs,row_data,row_exchanger)
+
+    @debug println("rows done (R$my_rank)")
 
     # And shares some cols
     col_indices = PartitionedArrays.IndexSet(my_rank, ldof_to_gdof, Int32.(ldof_to_part))
@@ -440,7 +449,7 @@ end
 # ### Solution of the system
 # The last step is to solve the system. First we call `doassemble`
 # to obtain the global stiffness matrix `K` and force vector `f`.
-K, f = doassemble(cellvalues, dh, local_to_global, dof_owner, ndofs_total);
+K, f = doassemble(cellvalues, dh, local_to_global, dof_owner, ndofs_total, dgrid);
 
 # Shutdown MPI
 MPI.Finalize()
