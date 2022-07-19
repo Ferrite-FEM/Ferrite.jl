@@ -371,18 +371,19 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     @debug println("rows done (R$my_rank)")
 
     # And all corresponding non-zero rows
-    #all_local_rows = copy(ldof_to_gdof)
-    #all_local_row_ranks = ...
-    #TODO optimize with graph topology
-    #for neighbor ∈
-    if my_rank == 1 
-        all_local_cols = collect(1:9)
-        all_local_col_ranks = [1,1,1,1,1,1,2,2,2]
-    else
-        all_local_cols = copy(ldof_to_gdof)
-        all_local_col_ranks = copy(ldof_to_rank)
+    ghost_dof_to_global = Int[]
+    ghost_dof_rank = Int32[]
+    #TODO obtain ghosts algorithmic
+    if my_rank == 1
+        append!(ghost_dof_to_global, collect(7:9))
+        append!(ghost_dof_rank, [2,2,2])
     end
-    col_indices = PartitionedArrays.IndexSet(my_rank, all_local_cols, Int32.(all_local_col_ranks))
+    all_local_cols = Int[ldof_to_gdof; ghost_dof_to_global]
+    all_local_col_ranks = Int32[ldof_to_rank; ghost_dof_rank]
+    @debug println("all_local_cols $all_local_cols (R$my_rank)")
+    @debug println("all_local_col_ranks $all_local_col_ranks (R$my_rank)")
+
+    col_indices = PartitionedArrays.IndexSet(my_rank, all_local_cols, all_local_col_ranks)
     col_data = MPIData(col_indices, comm, (np,))
     col_exchanger = Exchanger(col_data,neighbors)
     cols = PRange(ngdofs,col_data,col_exchanger)
@@ -449,22 +450,14 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     @debug println("done assembling (R$my_rank)")
 
     # Fix ghost layer - the locations for remote processes to write their data into
+    #TODO obtain ghost interaction algorithmic
     if my_rank == 1
         # ltdofs
         append!(assembler.I, [3,3,3,4,4,6,6])
         append!(assembler.J, [7,8,9,7,8,7,9])
         append!(assembler.V, zeros(7))
-        # # gdofs?
-        # # append!(assembler.I, [7,7,7,7,7,7, 8,8,8,8, 9,9,9,9])
-        # # append!(assembler.J, [3,4,6,7,6,9, 3,4,7,8, 3,6,7,9])
-        # # append!(assembler.V, zeros(6+4+4))
-        # append!(assembler.I, [7,7,7,7, 8,8, 9,9])
-        # append!(assembler.J, [3,4,6,6, 3,4, 3,6])
-        # append!(assembler.V, zeros(4+2+2))
     else
-        # append!(assembler.I, [1,1,2,2,2,5,5])
-        # append!(assembler.J, [7,8,9,7,8,8,9])
-        # append!(assembler.V, zeros(7))
+        # no ghost layer
     end
     I_ = MPIData(assembler.I, comm, (np,))
     J_ = MPIData(assembler.J, comm, (np,))
