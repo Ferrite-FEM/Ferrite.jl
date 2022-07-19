@@ -13,7 +13,7 @@ function Neumann(field_name::Symbol, ∂Ω::Set{FaceIndex}, fv::FaceValues, f)
     return Neumann(cells, faces, fv, field_name, f)
 end
 
-function apply!(f::Vector{T}, nbc::Neumann, dh::DofHandler, time) where T
+function old_apply!(f::Vector{T}, nbc::Neumann, dh::DofHandler, time) where T
     dofs = collect(dof_range(dh, nbc.field_name))
     fe = zeros(T, length(dofs))
     for (i, cell) in enumerate(CellIterator(dh, nbc.cells))
@@ -22,12 +22,38 @@ function apply!(f::Vector{T}, nbc::Neumann, dh::DofHandler, time) where T
     end
 end
 
+function apply!(f::Vector{T}, nbc::Neumann, dh::DofHandler, time) where T
+    # Recreate for test purposes
+    tmp_faceindices = Set((FaceIndex(c,f) for (c,f) in zip(nbc.cells, nbc.faces)))
+    dofs = collect(dof_range(dh, nbc.field_name))
+    fe = zeros(T, length(dofs))
+    for face in FaceIterator(dh, tmp_faceindices)
+        calculate_element_force!(fe, face, nbc.face_values, time, nbc.fun)
+        assemble!(f, view(celldofs(face), dofs), fe)
+    end
+end
+
 function calculate_element_force!(fe::Vector, cell::CellIterator, fv::FaceValues, face_nr::Int, time, fun)
     fill!(fe, 0)
     reinit!(fv, cell, face_nr)
     for q_point in 1:getnquadpoints(fv)
         dΓ = getdetJdV(fv, q_point)
-        x = spatial_coordinate(fv, q_point, cell.coords)
+        x = spatial_coordinate(fv, q_point, getcoordinates(cell))
+        n = getnormal(fv, q_point)
+        b = fun(x, time, n)
+        for i in 1:getnbasefunctions(fv)
+            δu = shape_value(fv, q_point, i)
+            fe[i] += δu ⋅ b * dΓ
+        end
+    end
+end
+
+function calculate_element_force!(fe::Vector, face::FaceIterator, fv::FaceValues, time, fun)
+    fill!(fe, 0)
+    reinit!(fv, face)
+    for q_point in 1:getnquadpoints(fv)
+        dΓ = getdetJdV(fv, q_point)
+        x = spatial_coordinate(fv, q_point, getcoordinates(face))
         n = getnormal(fv, q_point)
         b = fun(x, time, n)
         for i in 1:getnbasefunctions(fv)
