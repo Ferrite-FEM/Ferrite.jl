@@ -17,7 +17,7 @@ function old_apply!(f::Vector{T}, nbc::Neumann, dh::DofHandler, time) where T
     dofs = collect(dof_range(dh, nbc.field_name))
     fe = zeros(T, length(dofs))
     for (i, cell) in enumerate(CellIterator(dh, nbc.cells))
-        calculate_element_force!(fe, cell, nbc.face_values, nbc.faces[i], time, nbc.fun)
+        calculate_neumann_contribution!(fe, cell, nbc.face_values, nbc.faces[i], time, nbc.fun)
         assemble!(f, view(celldofs(cell), dofs), fe)
     end
 end
@@ -28,12 +28,12 @@ function apply!(f::Vector{T}, nbc::Neumann, dh::DofHandler, time) where T
     dofs = collect(dof_range(dh, nbc.field_name))
     fe = zeros(T, length(dofs))
     for face in FaceIterator(dh, tmp_faceindices)
-        calculate_element_force!(fe, face, nbc.face_values, time, nbc.fun)
+        calculate_neumann_contribution!(fe, face, nbc.face_values, time, nbc.fun)
         assemble!(f, view(celldofs(face), dofs), fe)
     end
 end
 
-function calculate_element_force!(fe::Vector, cell::CellIterator, fv::FaceValues, face_nr::Int, time, fun)
+function calculate_neumann_contribution!(fe::Vector, cell::CellIterator, fv::FaceValues, face_nr::Int, time, fun)
     fill!(fe, 0)
     reinit!(fv, cell, face_nr)
     for q_point in 1:getnquadpoints(fv)
@@ -48,7 +48,7 @@ function calculate_element_force!(fe::Vector, cell::CellIterator, fv::FaceValues
     end
 end
 
-function calculate_element_force!(fe::Vector, face::FaceIterator, fv::FaceValues, time, fun)
+function calculate_neumann_contribution!(fe::Vector, face::FaceIterator, fv::FaceValues, time, fun)
     fill!(fe, 0)
     reinit!(fv, face)
     for q_point in 1:getnquadpoints(fv)
