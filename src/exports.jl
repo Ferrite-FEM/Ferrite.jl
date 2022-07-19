@@ -82,6 +82,7 @@ export
     getfacesets,
     getedgesets,
     getvertexsets,
+    global_comm,
     onboundary,
     nfaces,
     addnodeset!,

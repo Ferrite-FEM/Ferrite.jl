@@ -44,9 +44,11 @@ mutable struct DistributedGrid{dim,C<:AbstractCell,T<:Real} <: AbstractDistribut
     shared_faces::Dict{FaceIndex,SharedFace}
 end
 
+global_comm(dgrid::DistributedGrid) = dgrid.grid_comm
+
 """
 """
-function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_comm::MPI.Comm; partition_alg = :RECURSIVE) where {dim,C,T}
+function DistributedGrid(grid_to_distribute::Grid{dim,C,T}; grid_comm::MPI.Comm = MPI.COMM_WORLD, partition_alg = :RECURSIVE) where {dim,C,T}
     grid_topology = ExclusiveTopology(grid_to_distribute)
     return DistributedGrid(grid_to_distribute, grid_topology, grid_comm; partition_alg=partition_alg)
 end

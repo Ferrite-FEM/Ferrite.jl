@@ -50,12 +50,12 @@ MPI.Init()
 # so we don't need to specify the corners of the domain.
 grid = generate_grid(Quadrilateral, (2, 2));
 
-dgrid = DistributedGrid(grid, MPI.COMM_WORLD)
+dgrid = DistributedGrid(grid)
 
 # TODO refactor this into a utility function
 @debug vtk_grid("grid", dgrid; compress=false) do vtk
     u = Vector{Float64}(undef,length(dgrid.local_grid.nodes))
-    for rank ∈ 1:MPI.Comm_size(MPI.COMM_WORLD)
+    for rank ∈ 1:MPI.Comm_size(global_comm(dgrid))
         fill!(u, 0.0)
         for sv ∈ values(dgrid.shared_vertices)
             if haskey(sv.remote_vertices,rank)
@@ -96,7 +96,7 @@ close!(dh);
 # TODO: Refactor for MixedDofHandler integration
 function local_to_global_numbering(dh::DofHandler, dgrid)
     # MPI rank starting with 1 to match Julia's index convention
-    my_rank = MPI.Comm_rank(MPI.COMM_WORLD)+1
+    my_rank = MPI.Comm_rank(global_comm(dgrid))+1
 
     local_to_global = Vector{Int}(undef,ndofs(dh))
     fill!(local_to_global,0) # 0 is the invalid index!
@@ -178,10 +178,10 @@ function local_to_global_numbering(dh::DofHandler, dgrid)
     # Set true local indices
     local_offset = 0
     if my_rank > 1
-        local_offset = MPI.Recv(Int, MPI.COMM_WORLD; source=my_rank-1-1)
+        local_offset = MPI.Recv(Int, global_comm(dgrid); source=my_rank-1-1)
     end
-    if my_rank < MPI.Comm_size(MPI.COMM_WORLD)
-        MPI.Send(local_offset+num_true_local_dofs, MPI.COMM_WORLD; dest=my_rank+1-1)
+    if my_rank < MPI.Comm_size(global_comm(dgrid))
+        MPI.Send(local_offset+num_true_local_dofs, global_comm(dgrid); dest=my_rank+1-1)
     end
     @debug println("#shifted local dof range $(local_offset+1):$(local_offset+num_true_local_dofs) (R$my_rank)")
 
@@ -196,9 +196,9 @@ function local_to_global_numbering(dh::DofHandler, dgrid)
     # Sync non-owned dofs with neighboring processes.
     # TODO: implement for entitied with dim > 0
     # TODO: Use MPI graph primitives to simplify this code
-    for sending_rank ∈ 1:MPI.Comm_size(MPI.COMM_WORLD)
+    for sending_rank ∈ 1:MPI.Comm_size(global_comm(dgrid))
         if my_rank == sending_rank
-            for remote_rank ∈ 1:MPI.Comm_size(MPI.COMM_WORLD)
+            for remote_rank ∈ 1:MPI.Comm_size(global_comm(dgrid))
                 if haskey(vertices_send, remote_rank)
                     n_vertices = length(vertices_send[remote_rank])
                     @debug println("Sending $n_vertices vertices to rank $remote_rank (R$my_rank)")
@@ -214,8 +214,8 @@ function local_to_global_numbering(dh::DofHandler, dgrid)
                             next_buffer_idx += 1
                         end
                     end
-                    MPI.Send(remote_cells, MPI.COMM_WORLD; dest=remote_rank-1)
-                    MPI.Send(remote_cell_vis, MPI.COMM_WORLD; dest=remote_rank-1)
+                    MPI.Send(remote_cells, global_comm(dgrid); dest=remote_rank-1)
+                    MPI.Send(remote_cell_vis, global_comm(dgrid); dest=remote_rank-1)
                     for fi ∈ 1:Ferrite.nfields(dh)
                         next_buffer_idx = 1
                         if length(dh.vertexdicts[fi]) == 0
@@ -231,7 +231,7 @@ function local_to_global_numbering(dh::DofHandler, dgrid)
                             end
                             next_buffer_idx += 1
                         end
-                        MPI.Send(corresponding_global_dofs, MPI.COMM_WORLD; dest=remote_rank-1)
+                        MPI.Send(corresponding_global_dofs, global_comm(dgrid); dest=remote_rank-1)
                     end
                 end
             end
@@ -241,15 +241,15 @@ function local_to_global_numbering(dh::DofHandler, dgrid)
                 @debug println("Receiving $n_vertices vertices from rank $sending_rank (R$my_rank)")
                 local_cells = Array{Int64}(undef,n_vertices)
                 local_cell_vis = Array{Int64}(undef,n_vertices)
-                MPI.Recv!(local_cells, MPI.COMM_WORLD; source=sending_rank-1)
-                MPI.Recv!(local_cell_vis, MPI.COMM_WORLD; source=sending_rank-1)
+                MPI.Recv!(local_cells, global_comm(dgrid); source=sending_rank-1)
+                MPI.Recv!(local_cell_vis, global_comm(dgrid); source=sending_rank-1)
                 for fi in 1:Ferrite.nfields(dh)
                     if length(dh.vertexdicts[fi]) == 0
                         @debug println("  Skipping recv on field $(dh.field_names[fi]) (R$my_rank)")
                         continue
                     end
                     corresponding_global_dofs = Array{Int64}(undef,n_vertices)
-                    MPI.Recv!(corresponding_global_dofs, MPI.COMM_WORLD; source=sending_rank-1)
+                    MPI.Recv!(corresponding_global_dofs, global_comm(dgrid); source=sending_rank-1)
                     for (cdi,(lci,lclvi)) ∈ enumerate(zip(local_cells,local_cell_vis))
                         vi = Ferrite.vertices(getcells(getgrid(dh),lci))[lclvi]
                         if haskey(dh.vertexdicts[fi], vi)
@@ -281,7 +281,7 @@ end
 local_to_global = local_to_global_numbering(dh, dgrid);
 
 function compute_dof_ownership(dh, dgrid)
-    my_rank = MPI.Comm_rank(dgrid.grid_comm)+1
+    my_rank = MPI.Comm_rank(global_comm(dgrid))+1
 
     dof_owner = Vector{Int}(undef,ndofs(dh))
     fill!(dof_owner, my_rank)
@@ -304,8 +304,8 @@ function compute_dof_ownership(dh, dgrid)
 end
 dof_owner = compute_dof_ownership(dh, dgrid);
 
-nltdofs = sum(dof_owner.==(MPI.Comm_rank(MPI.COMM_WORLD)+1))
-ndofs_total = MPI.Allreduce(nltdofs, MPI.SUM, MPI.COMM_WORLD)
+nltdofs = sum(dof_owner.==(MPI.Comm_rank(global_comm(dgrid))+1))
+ndofs_total = MPI.Allreduce(nltdofs, MPI.SUM, global_comm(dgrid))
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `create_sparsity_pattern`. This function returns a sparse matrix
@@ -353,7 +353,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     fe = zeros(n_basefuncs)
 
     # I have no idea why we have to convert the types 5000 times like this........ look todo below.
-    comm = MPI.COMM_WORLD
+    comm = global_comm(dgrid)
     np = MPI.Comm_size(comm)
     my_rank = MPI.Comm_rank(comm)+1
 
