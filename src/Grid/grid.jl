@@ -406,8 +406,8 @@ Returns an iterateable face skeleton. The skeleton consists of `FaceIndex` that 
 """
 faceskeleton(top::ExclusiveTopology, grid::AbstractGrid) =  top.face_skeleton
 
-toglobal(grid::Grid,vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1]))[vertexidx[2]]
-toglobal(grid::Grid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))
+toglobal(grid::AbstractGrid,vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1]))[vertexidx[2]]
+toglobal(grid::AbstractGrid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))
 
 @inline getdim(::AbstractGrid{dim}) where {dim} = dim
 """
