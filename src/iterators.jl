@@ -156,17 +156,25 @@ struct FaceIterator{CI<:CellIterator} <: AbstractGridIterator
     ci::CI
 end
 
+function FaceIterator(dh::AbstractDofHandler, faces::Vector{Int}, cells::Vector{Int}, args...)
+    if length(faces)!=length(cells)
+        msg = "faces and cells have different lengths: $(length(faces)) vs $(length(cells))"
+        throw(DimensionMismatch(msg))
+    end
+    return FaceIterator(faces, ScalarWrapper(0), CellIterator(dh, cells, args...))
+end
+
+function FaceIterator(dh::AbstractDofHandler, faceset, cellset=nothing, args...)
+    cells, faces = _get_cells_and_faces(faceset, cellset)
+    return FaceIterator(faces, ScalarWrapper(0), CellIterator(dh, cells, args...))
+end
+
 function _get_cells_and_faces(faceset, ::Nothing)
     tuple((collect([faceindex[j] for faceindex in faceset]) for j in 1:2)...)
 end
 
 function _get_cells_and_faces(faceset, cellset)
     tuple((collect([faceindex[j] for faceindex in faceset if faceindex[1] in cellset]) for j in 1:2)...)
-end
-
-function FaceIterator(dh::AbstractDofHandler, faceset, cellset=nothing, args...)
-    cells, faces = _get_cells_and_faces(faceset, cellset)
-    return FaceIterator(faces, ScalarWrapper(0), CellIterator(dh, cells, args...))
 end
 
 @inline Base.length(fi::FaceIterator)  = length(fi.ci)

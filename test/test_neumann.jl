@@ -26,6 +26,14 @@ function get_lever_arms(dh, fset, field, ncomp=1, rotcomp=2)
     return a
 end
 
+# Can go in docs:
+function standard_neumann_fun(bfun, fv::FaceValues, q_point::Int, i::Int, x::Vec, time)
+    δu = shape_value(fv, q_point, i)
+    b = bfun(x, time, getnormal(fv, q_point))
+    dΓ = getdetJdV(fv, q_point)
+    return (δu ⋅ b) * dΓ
+end
+
 @testset "Neumann" begin
     @testset "DofHandler" begin
         # Setup of test mesh
@@ -37,8 +45,9 @@ end
         nh = NeumannHandler(dh)
         fv = FaceVectorValues(
             QuadratureRule{1, RefCube}(2), Lagrange{2, RefCube, 1}())
-        fun(_, t, _) = Vec{2}((t, 10t))
-        add!(nh, Neumann(:u, grid.facesets["right"], fv, fun))
+        bfun_2d(_, t, _) = Vec{2}((t, 10t))
+        nfun_2d(args...) = standard_neumann_fun(bfun_2d, args...)
+        add!(nh, Neumann(:u, fv, grid.facesets["right"], nfun_2d))
         
         # Test applying the Neumann bc
         f = zeros(ndofs(dh))
@@ -73,14 +82,21 @@ end
         fv_s = FaceScalarValues(qr, ip)
         x_scale, y_scale, z_scale = rand(3)
         ny = Vec{3}((0,1.,0)); nz = Vec{3}((0,0,1.))
-        fun(x,t,n) = t*(x_scale*n + y_scale*ny + z_scale*nz)
-        add!(nh, Neumann(:u, fset, fv, fun))
+        bfun_3d(_,t,n) = t*(x_scale*n + y_scale*ny + z_scale*nz)
+        nfun_3d(args...) = standard_neumann_fun(bfun_3d, args...)
+        add!(nh, Neumann(:u, fv, fset, nfun_3d))
         p_scale = rand()
-        add!(nh, Neumann(:p, fset, fv_s, (args...)->p_scale))
+        bfun_3d_p(args...) = p_scale 
+        nfun_3d_p(args...) =  standard_neumann_fun(bfun_3d_p, args...)
+        add!(nh, Neumann(:p, fv_s, fset, nfun_3d_p))
         
         # Test applying the Neumann bc
+        area = 2*2
         f = zeros(ndofs(dh))
-        apply!(f, nh, 1.0)
+        apply!(f, nh, 0.0)  # Only :p field gets values
+        @test sum(f) ≈ p_scale*area
+        fill!(f, 0)         # Reset (equivalent to start_assemble)
+        apply!(f, nh, 1.0)  # Both :u and :p fields get values
     
         #= 
         Due to the triangle mesh, the result will not be evenly 
@@ -90,7 +106,6 @@ end
         dof, as well as for identifying which nodes to sum over
         to get total force. 
         =# 
-        area = 2*2
         for (i,scale) in enumerate((x_scale, y_scale, z_scale))
             @test area*scale ≈ f ⋅ get_unitdofvals(dh, fset, :u, i)
         end
