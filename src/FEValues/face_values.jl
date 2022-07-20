@@ -183,7 +183,7 @@ end
 function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) where {dim,T}
     n_geom_basefuncs = getngeobasefunctions(fv)
     n_func_basefuncs = getnbasefunctions(fv)
-    @assert length(x) == n_geom_basefuncs
+    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     @boundscheck checkface(fv, face)
 
     fv.current_face[] = face
@@ -271,7 +271,7 @@ end
 getnquadpoints(bcv::BCValues) = size(bcv.M, 2)
 function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = size(bcv.M, 1)
-    @assert length(xh) == n_base_funcs
+    length(xh) == n_base_funcs || throw_incompatible_coord_length(length(xh), n_base_funcs)
     x = zero(Vec{dim,T})
     face = bcv.current_face[]
     @inbounds for i in 1:n_base_funcs
