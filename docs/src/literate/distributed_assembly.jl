@@ -506,26 +506,31 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
 
     println("received $ghost_recv_buffer_dofs with owners $ghost_recv_buffer_ranks (R$my_rank)")
 
-    return  0, 0
-
     # #TODO obtain ghosts algorithmic
-    if np == 2
-        if my_rank == 1
-            append!(ghost_dof_to_global, collect(7:9))
-            append!(ghost_dof_rank, [2,2,2])
-        else
-            # no ghosts
-        end
-    elseif np == 3
-        if my_rank == 1
-            append!(ghost_dof_to_global, [5,6,7,8,9])
-            append!(ghost_dof_rank, [2,2,2,3,3])
-        elseif my_rank == 2
-            append!(ghost_dof_to_global, [1,3,8,9])
-            append!(ghost_dof_rank, [1,1,3,3])
-        else
-            # no ghosts
-        end        
+    # if np == 2
+    #     if my_rank == 1
+    #         append!(ghost_dof_to_global, collect(7:9))
+    #         append!(ghost_dof_rank, [2,2,2])
+    #     else
+    #         # no ghosts
+    #     end
+    # elseif np == 3
+    #     if my_rank == 1
+    #         append!(ghost_dof_to_global, [5,6,7,8,9])
+    #         append!(ghost_dof_rank, [2,2,2,3,3])
+    #     elseif my_rank == 2
+    #         append!(ghost_dof_to_global, [1,3,8,9])
+    #         append!(ghost_dof_rank, [1,1,3,3])
+    #     else
+    #         # no ghosts
+    #     end        
+    # end
+
+    unique_ghosts = sort(unique(first,zip(ghost_recv_buffer_dofs,ghost_recv_buffer_ranks)))
+    # unzip manually
+    for (dof,rank) ∈ unique_ghosts
+        push!(ghost_dof_to_global, dof)
+        push!(ghost_dof_rank, rank)
     end
 
     # ------------- Construct rows and cols of distributed matrix --------

@@ -5,29 +5,39 @@ using MPI
 """
 abstract type AbstractDistributedGrid{sdim} <: AbstractGrid{sdim} end
 
+abstract type SharedEntity end
+
 # TODO the following three structs can be merged to one struct with type parameter.
 """
 """
-struct SharedVertex
+struct SharedVertex <: SharedEntity
     local_idx::VertexIndex
     remote_vertices::Dict{Int,Vector{VertexIndex}}
 end
 
+remote_entities(sv::SharedVertex) = sv.remote_vertices
+
 """
 """
-struct SharedFace
+struct SharedFace <: SharedEntity
     local_idx::FaceIndex
     remote_faces::Dict{Int,Vector{FaceIndex}}
 end
 
+remote_entities(sf::SharedFace) = sf.remote_faces
+
 """
 """
-struct SharedEdge
+struct SharedEdge <: SharedEntity
     local_idx::EdgeIndex
     remote_edges::Dict{Int,Vector{EdgeIndex}}
 end
 
+remote_entities(se::SharedEdge) = se.remote_edges
+
 """
+@TODO docs
+@TODO PArrays ready constructor
 """
 mutable struct DistributedGrid{dim,C<:AbstractCell,T<:Real} <: AbstractDistributedGrid{dim}
     # Dense comminicator on the grid
@@ -44,7 +54,21 @@ mutable struct DistributedGrid{dim,C<:AbstractCell,T<:Real} <: AbstractDistribut
     shared_faces::Dict{FaceIndex,SharedFace}
 end
 
-global_comm(dgrid::DistributedGrid) = dgrid.grid_comm
+"""
+"""
+is_shared_vertex(dgrid::AbstractDistributedGrid, vi::VertexIndex) = haskey(dgrid.shared_vertices, vi)
+
+
+"""
+Global dense communicator of the distributed grid.
+"""
+global_comm(dgrid::AbstractDistributedGrid) = dgrid.grid_comm
+
+"""
+Graph communicator for shared vertices. Guaranteed to be derived from the communicator 
+returned by @global_comm .
+"""
+vertex_comm(dgrid::AbstractDistributedGrid) = dgrid.interface_comm
 
 """
 """
@@ -262,16 +286,34 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
         end
     end
 
-    return DistributedGrid(grid_comm,grid_comm,local_grid,shared_vertices,shared_edges,shared_faces)
+    # Neighborhood graph
+    neighbors_set = Set{Cint}()
+    for (vi, sv) ∈ shared_vertices
+        for (rank, vvi) ∈ sv.remote_vertices
+            push!(neighbors_set, rank)
+        end
+    end
+    # Adjust ranks back to to C index convention
+    dest = collect(neighbors_set).-1
+    degree = length(dest)
+    interface_comm = MPI.Dist_graph_create(grid_comm, Cint[my_rank-1], Cint[degree], Cint.(dest))
+
+    return DistributedGrid(grid_comm,interface_comm,local_grid,shared_vertices,shared_edges,shared_faces)
 end
 
 @inline getlocalgrid(dgrid::AbstractDistributedGrid) = dgrid.local_grid
 
 @inline getcells(dgrid::AbstractDistributedGrid) = getcells(getlocalgrid(grid))
-@inline getcells(dgrid::AbstractDistributedGrid, v::Union{Int, Vector{Int}}) = getcells(getlocalgrid(grid),v)
-@inline getcells(dgrid::AbstractDistributedGrid, setname::String) = getcells(getlocalgrid(grid),setname)
+@inline getcells(dgrid::AbstractDistributedGrid, v::Union{Int, Vector{Int}}) = getcells(getlocalgrid(dgrid),v)
+@inline getcells(dgrid::AbstractDistributedGrid, setname::String) = getcells(getlocalgrid(dgrid),setname)
 "Returns the number of cells in the `<:AbstractDistributedGrid`."
 @inline getncells(dgrid::AbstractDistributedGrid) = length(getcells(getlocalgrid(dgrid)))
 "Returns the celltype of the `<:AbstractDistributedGrid`."
 @inline getcelltype(dgrid::AbstractDistributedGrid) = eltype(getcells(getlocalgrid(dgrid)))
 @inline getcelltype(dgrid::AbstractDistributedGrid, i::Int) = typeof(getcells(getlocalgrid(dgrid),i))
+
+# Here we define the entity ownership by the process sharing an entity with lowest rank in the grid communicator.
+function compute_owner(dgrid::AbstractDistributedGrid, shared_entity::SharedEntity)::Int32
+    my_rank = MPI.Comm_rank(global_comm(dgrid))+1 # Shift rank up by 1 to match Julia's indexing convention
+    return minimum([my_rank; [remote_rank for (remote_rank, _) ∈ remote_entities(shared_entity)]])
+end
