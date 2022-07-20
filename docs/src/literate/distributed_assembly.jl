@@ -504,6 +504,12 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     ghost_recv_buffer_ranks = zeros(Int, sum(ghost_recv_buffer_lengths))
     MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_ranks,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_ranks,ghost_recv_buffer_lengths), vertex_comm(dgrid))
 
+    # Reconstruct source ranks
+    ghost_recv_buffer_source_ranks = Int[]
+    for (source_idx, recv_len) ∈ enumerate(ghost_recv_buffer_lengths)
+        append!(ghost_recv_buffer_source_ranks, ones(recv_len)*sources[source_idx])
+    end
+    
     println("received $ghost_recv_buffer_dofs with owners $ghost_recv_buffer_ranks (R$my_rank)")
 
     # #TODO obtain ghosts algorithmic
@@ -544,6 +550,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     col_exchanger = Exchanger(col_data,neighbors)
     cols = PRange(ngdofs,col_data,col_exchanger)
 
+    # --------------------- Local assembly --------------------
     # Next we define the global force vector `f` and use that and
     # the stiffness matrix `K` and create an assembler. The assembler
     # is just a thin wrapper around `f` and `K` and some extra storage
@@ -605,6 +612,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
 
     @debug println("done assembling (R$my_rank)")
 
+    # --------------------- Add ghost entries in IJ --------------------
     # Fix ghost layer - the locations for remote processes to write their data into
     unique_ghosts_dre = zip(ghost_recv_buffer_dofs,ghost_recv_buffer_ranks,ghost_recv_buffer_elements)
     @debug println("unique_ghosts_dre $unique_ghosts_dre (R$my_rank)")
@@ -614,20 +622,27 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     for (pivot_vi, pivot_sv) ∈ dgrid.shared_vertices
         # Loop over owned shared vertices
         if my_rank == Ferrite.compute_owner(dgrid, pivot_sv)
+            @debug println("Fixing ghost layer $pivot_vi (R$my_rank)")
             pivot_vertex = Ferrite.toglobal(getlocalgrid(dgrid), pivot_vi)
-            for (d,r,e) ∈ unique_ghosts_dre
-                re = Ferrite.remote_entities(pivot_sv)
-                d_local = findfirst(x->x==d,ghost_dof_to_global)
-                if haskey(re, r)
-                    for (remote_cell_idx,_) ∈ re[r]
-                        if remote_cell_idx == e
+            # Now compare the vertex against EVERY ghost dof...
+            for (i,(global_ghost_dof,ghost_owner_rank,ghost_cell_idx)) ∈ enumerate(unique_ghosts_dre)
+                source_rank = ghost_recv_buffer_source_ranks[i]
+                pivot_remotes = Ferrite.remote_entities(pivot_sv)
+                local_ghost_dof = findfirst(x->x==global_ghost_dof, all_local_cols)
+                # ...where we have to check that the ghost is on the correct rank ...
+                if haskey(pivot_remotes, source_rank)
+                    @debug println("  $pivot_vi found for rank $source_rank with dof $global_ghost_dof (R$my_rank)")
+                    for (remote_cell_idx,_) ∈ pivot_remotes[source_rank]
+                        # ... and that it is the correct element.
+                        if remote_cell_idx == ghost_cell_idx
+                            @debug println("    $pivot_vi synced against remote cell $remote_cell_idx (R$my_rank)")
                             for field_idx in 1:Ferrite.nfields(dh)
                                 if !haskey(dh.vertexdicts[field_idx], pivot_vertex)
                                     continue
                                 end
-
+                                @debug println("      handling field $field_idx (R$my_rank)")
                                 pivot_dof = dh.vertexdicts[field_idx][pivot_vertex]
-                                push!(IJ, (pivot_dof, d_local))
+                                push!(IJ, (pivot_dof, local_ghost_dof))
                             end
                         end
                     end
@@ -635,12 +650,12 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
             end
         end
     end
+    # Deduplicate entries.
     unique!(IJ)
-    @debug println("IJ=$(IJ) (R$my_rank)")
 
     for (i,j) ∈ IJ
         push!(assembler.I, i)
-        push!(assembler.J, j+length(ldof_to_gdof))
+        push!(assembler.J, j)
         push!(assembler.V, 0.0)
     end
 
