@@ -352,23 +352,40 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
 
-    # I have no idea why we have to convert the types 5000 times like this........ look todo below.
+    # @TODO put the code below into a "distributed assembler" struct and functions
+    # @TODO the code below can be massively simplified by introducing a ghost layer to the 
+    #       distributed grid, which can efficiently precompute some of the values below.
     comm = global_comm(dgrid)
     np = MPI.Comm_size(comm)
     my_rank = MPI.Comm_rank(comm)+1
 
     @debug println("starting assembly... (R$my_rank)")
 
-    # Neighborhood - self
-    neighbors_set = Set()
-    for (vi, sv) ∈ dgrid.shared_vertices
-        for (rank, vvi) ∈ sv.remote_vertices
-            push!(neighbors_set, rank)
-        end
-    end
-    neighbors = MPIData(Int32.(neighbors_set), comm, (np,))
+    # Neighborhood graph
+    # @TODO cleanup old code below and use graph primitives instead.
+    (source_len, destination_len, _) = MPI.Dist_graph_neighbors_count(vertex_comm(dgrid))
+    sources = Vector{Cint}(undef, source_len)
+    destinations = Vector{Cint}(undef, destination_len)
+    MPI.Dist_graph_neighbors!(vertex_comm(dgrid), sources, destinations)
 
-    @debug println("neighbors $neighbors (R$my_rank)")
+    # Adjust to Julia index convention
+    sources .+= 1
+    destinations .+= 1
+
+    @debug println("Neighborhood | $sources | $destinations (R$my_rank)")
+
+    # Invert the relations to clarify the code
+    source_index = Dict{Cint, Int}()
+    for (i,remote_rank) ∈ enumerate(sources)
+        source_index[remote_rank] = i
+    end
+    destination_index = Dict{Int, Cint}()
+    for (i,remote_rank) ∈ enumerate(destinations)
+        destination_index[remote_rank] = i
+    end
+
+    # Note: We assume a symmetric neighborhood for now... this may not be true in general.
+    neighbors = MPIData(Int32.(sources), comm, (np,))
 
     # Extract locally owned dofs
     ltdof_indices = ldof_to_rank.==my_rank
@@ -394,12 +411,124 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     # processes will write their data in some of these, because their remotely 
     # owned trial functions overlap with the locally owned test functions.
     ghost_dof_to_global = Int[]
+    ghost_dof_element_index = Int[]
     ghost_dof_rank = Int32[]
-    #TODO obtain ghosts algorithmic
-    if my_rank == 1
-        append!(ghost_dof_to_global, collect(7:9))
-        append!(ghost_dof_rank, [2,2,2])
+
+    # ------------ Ghost dof synchronization ----------   
+    # Prepare sending ghost dofs to neighbors
+    #@TODO comminication can be optimized by deduplicating entries in the following arrays
+    #@TODO reorder communication by field to eliminate need for `ghost_dof_field_index_to_send`
+    ghost_dof_to_send = [Int[] for i ∈ 1:destination_len] # global dof id
+    ghost_rank_to_send = [Int[] for i ∈ 1:destination_len] # rank of dof
+    ghost_dof_field_index_to_send = [Int[] for i ∈ 1:destination_len]
+    ghost_element_to_send = [Int[] for i ∈ 1:destination_len] # corresponding element
+    ghost_dof_owner = [Int[] for i ∈ 1:destination_len] # corresponding owner
+    for (pivot_vi, pivot_sv) ∈ dgrid.shared_vertices
+        # We start by searching shared vertices which are not owned by us
+        pivot_vertex_owner_rank = Ferrite.compute_owner(dgrid, pivot_sv)
+        pivot_cell_idx = pivot_vi[1]
+
+        if my_rank != pivot_vertex_owner_rank
+            sender_slot = destination_index[pivot_vertex_owner_rank]
+
+            @debug println("$pivot_vi may require synchronization (R$my_rank)")
+            # We have to send ALL dofs on the element to the remote.
+            # @TODO send actually ALL dofs (currently only vertex dofs for a first version...)
+            pivot_cell = getcells(dgrid, pivot_cell_idx)
+            for (other_vertex_idx, other_vertex) ∈ enumerate(Ferrite.vertices(pivot_cell))
+                # Skip self
+                other_vi = VertexIndex(pivot_cell_idx, other_vertex_idx)
+                if other_vi == pivot_vi
+                    continue
+                end
+
+                if is_shared_vertex(dgrid, other_vi)
+                    #@TODO We should be able to remove more redundant communication is many cases.
+                    other_sv = dgrid.shared_vertices[other_vi]
+                    other_vertex_owner_rank = Ferrite.compute_owner(dgrid, other_sv)
+                    # Also skip if the "other vertex" is already owned by the process owning the pivot vertex
+                    if other_vertex_owner_rank == pivot_vertex_owner_rank
+                        continue;
+                    end
+                    # A vertex is also not a ghost vertex if it touches the domain of the rank of the pivot
+                    if pivot_vertex_owner_rank ∈ keys(other_sv.remote_vertices)
+                        continue
+                    end
+                else
+                    other_vertex_owner_rank = my_rank
+                end
+
+                # Now we have to sync all fields separately
+                @debug println("  Ghost candidate $other_vi for $pivot_vi (R$my_rank)")
+                for field_idx in 1:Ferrite.nfields(dh)
+                    pivot_vertex = Ferrite.toglobal(getlocalgrid(dgrid), pivot_vi)
+                    # If any of the two vertices is not defined on the current field, just skip.
+                    if !haskey(dh.vertexdicts[field_idx], pivot_vertex) || !haskey(dh.vertexdicts[field_idx], other_vertex)
+                        continue
+                    end
+                    @debug println("    $other_vi is ghost for $pivot_vi in field $field_idx (R$my_rank)")
+
+                    other_vertex_dof = dh.vertexdicts[field_idx][other_vertex]
+
+                    append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[other_vertex_dof])
+                    append!(ghost_rank_to_send[sender_slot], other_vertex_owner_rank)
+                    append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
+                    append!(ghost_element_to_send[sender_slot], pivot_cell_idx)
+                end
+            end
+        end
     end
+
+    ghost_send_buffer_lengths = Int[length(i) for i ∈ ghost_element_to_send]
+    ghost_recv_buffer_lengths = zeros(Int, destination_len)
+    MPI.Neighbor_alltoall!(UBuffer(ghost_send_buffer_lengths,1), UBuffer(ghost_recv_buffer_lengths,1), vertex_comm(dgrid));
+    @debug for (i,ghost_recv_buffer_length) ∈ enumerate(ghost_recv_buffer_lengths)
+        println("receiving $ghost_recv_buffer_length ghosts from $(sources[i])  (R$my_rank)")
+    end
+
+    # Communicate ghost information
+    # @TODO coalesce communication
+    ghost_send_buffer_dofs = vcat(ghost_dof_to_send...)
+    ghost_recv_buffer_dofs = zeros(Int, sum(ghost_recv_buffer_lengths))
+    MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_dofs,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_dofs,ghost_recv_buffer_lengths), vertex_comm(dgrid))
+
+    ghost_send_buffer_elements = vcat(ghost_element_to_send...)
+    ghost_recv_buffer_elements = zeros(Int, sum(ghost_recv_buffer_lengths))
+    MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_elements,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_elements,ghost_recv_buffer_lengths), vertex_comm(dgrid))
+
+    ghost_send_buffer_fields = vcat(ghost_dof_field_index_to_send...)
+    ghost_recv_buffer_fields = zeros(Int, sum(ghost_recv_buffer_lengths))
+    MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_fields,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_fields,ghost_recv_buffer_lengths), vertex_comm(dgrid))
+
+    ghost_send_buffer_ranks = vcat(ghost_rank_to_send...)
+    ghost_recv_buffer_ranks = zeros(Int, sum(ghost_recv_buffer_lengths))
+    MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_ranks,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_ranks,ghost_recv_buffer_lengths), vertex_comm(dgrid))
+
+    println("received $ghost_recv_buffer_dofs with owners $ghost_recv_buffer_ranks (R$my_rank)")
+
+    return  0, 0
+
+    # #TODO obtain ghosts algorithmic
+    if np == 2
+        if my_rank == 1
+            append!(ghost_dof_to_global, collect(7:9))
+            append!(ghost_dof_rank, [2,2,2])
+        else
+            # no ghosts
+        end
+    elseif np == 3
+        if my_rank == 1
+            append!(ghost_dof_to_global, [5,6,7,8,9])
+            append!(ghost_dof_rank, [2,2,2,3,3])
+        elseif my_rank == 2
+            append!(ghost_dof_to_global, [1,3,8,9])
+            append!(ghost_dof_rank, [1,1,3,3])
+        else
+            # no ghosts
+        end        
+    end
+
+    # ------------- Construct rows and cols of distributed matrix --------
     all_local_cols = Int[ldof_to_gdof; ghost_dof_to_global]
     all_local_col_ranks = Int32[ldof_to_rank; ghost_dof_rank]
     @debug println("all_local_cols $all_local_cols (R$my_rank)")
@@ -416,7 +545,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     # to make the assembling faster.
     #+
     @debug println("cols and rows constructed (R$my_rank)")
-    f = PartitionedArrays.PVector(0.0,cols)
+    f = PartitionedArrays.PVector(0.0,rows)
     @debug println("f constructed (R$my_rank)")
     assembler = start_assemble()
     @debug println("starting assembly (R$my_rank)")
@@ -473,13 +602,30 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
 
     # Fix ghost layer - the locations for remote processes to write their data into
     #TODO obtain ghost interaction algorithmic
-    if my_rank == 1
-        # ltdofs
-        append!(assembler.I, [3,3,3,4,4,6,6])
-        append!(assembler.J, [7,8,9,7,8,7,9])
-        append!(assembler.V, zeros(7))
-    else
-        # no ghost layer
+    if np == 2
+        if my_rank == 1
+            # ltdofs
+            append!(assembler.I, [3,3,3, 4,4, 6,6])
+            append!(assembler.J, [7,8,9, 7,8, 7,9])
+            append!(assembler.V, zeros(7))
+        else
+            # no ghost layer
+        end
+    elseif np == 3
+        if my_rank == 1
+            # ltdofs
+            append!(assembler.I, [3,3, 1,1, 4,4,4,4,4])
+            append!(assembler.J, [9,6, 5,8, 8,5,7,6,9])
+            append!(assembler.V, zeros(9))
+        elseif my_rank == 2
+            # all_local_cols [5, 4, 6, 7, 1, 3, 8, 9] (R2)
+            # ltdofs
+            append!(assembler.I, [1,1, 3,3])
+            append!(assembler.J, [5,7, 6,8])
+            append!(assembler.V, zeros(4))
+        else
+            # no ghost layer
+        end
     end
     I_ = MPIData(assembler.I, comm, (np,))
     J_ = MPIData(assembler.J, comm, (np,))
