@@ -526,9 +526,9 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     #     end        
     # end
 
-    unique_ghosts = sort(unique(first,zip(ghost_recv_buffer_dofs,ghost_recv_buffer_ranks)))
+    unique_ghosts_dr = sort(unique(first,zip(ghost_recv_buffer_dofs,ghost_recv_buffer_ranks)))
     # unzip manually
-    for (dof,rank) ∈ unique_ghosts
+    for (dof,rank) ∈ unique_ghosts_dr
         push!(ghost_dof_to_global, dof)
         push!(ghost_dof_rank, rank)
     end
@@ -606,32 +606,66 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     @debug println("done assembling (R$my_rank)")
 
     # Fix ghost layer - the locations for remote processes to write their data into
-    #TODO obtain ghost interaction algorithmic
-    if np == 2
-        if my_rank == 1
-            # ltdofs
-            append!(assembler.I, [3,3,3, 4,4, 6,6])
-            append!(assembler.J, [7,8,9, 7,8, 7,9])
-            append!(assembler.V, zeros(7))
-        else
-            # no ghost layer
-        end
-    elseif np == 3
-        if my_rank == 1
-            # ltdofs
-            append!(assembler.I, [3,3, 1,1, 4,4,4,4,4])
-            append!(assembler.J, [9,6, 5,8, 8,5,7,6,9])
-            append!(assembler.V, zeros(9))
-        elseif my_rank == 2
-            # all_local_cols [5, 4, 6, 7, 1, 3, 8, 9] (R2)
-            # ltdofs
-            append!(assembler.I, [1,1, 3,3])
-            append!(assembler.J, [5,7, 6,8])
-            append!(assembler.V, zeros(4))
-        else
-            # no ghost layer
+    unique_ghosts_dre = zip(ghost_recv_buffer_dofs,ghost_recv_buffer_ranks,ghost_recv_buffer_elements)
+    @debug println("unique_ghosts_dre $unique_ghosts_dre (R$my_rank)")
+
+    # @TODO this is dead slow. optimize.
+    IJ = []
+    for (pivot_vi, pivot_sv) ∈ dgrid.shared_vertices
+        # Loop over owned shared vertices
+        if my_rank == Ferrite.compute_owner(dgrid, pivot_sv)
+            pivot_vertex = Ferrite.toglobal(getlocalgrid(dgrid), pivot_vi)
+            for (d,r,e) ∈ unique_ghosts_dre
+                re = Ferrite.remote_entities(pivot_sv)
+                d_local = findfirst(x->x==d,ghost_dof_to_global)
+                if haskey(re, r)
+                    for (remote_cell_idx,_) ∈ re[r]
+                        if remote_cell_idx == e
+                            for field_idx in 1:Ferrite.nfields(dh)
+                                if !haskey(dh.vertexdicts[field_idx], pivot_vertex)
+                                    continue
+                                end
+
+                                pivot_dof = dh.vertexdicts[field_idx][pivot_vertex]
+                                push!(IJ, (pivot_dof, d_local))
+                            end
+                        end
+                    end
+                end
+            end
         end
     end
+    unique!(IJ)
+    @debug println("IJ=$(IJ) (R$my_rank)")
+
+    for (i,j) ∈ IJ
+        push!(assembler.I, i)
+        push!(assembler.J, j+length(ldof_to_gdof))
+        push!(assembler.V, 0.0)
+    end
+
+    # if np == 2
+    #     if my_rank == 1
+    #         append!(assembler.I, [3,3,3, 4,4, 6,6])
+    #         append!(assembler.J, [7,8,9, 7,8, 7,9])
+    #         append!(assembler.V, zeros(7))
+    #     else
+    #         # no ghost layer
+    #     end
+    # elseif np == 3
+    #     if my_rank == 1
+    #         append!(assembler.I, [3,3, 1,1, 4,4,4,4,4])
+    #         append!(assembler.J, [9,6, 5,8, 8,5,7,6,9])
+    #         append!(assembler.V, zeros(9))
+    #     elseif my_rank == 2
+    #         # all_local_cols [5, 4, 6, 7, 1, 3, 8, 9] (R2)
+    #         append!(assembler.I, [1,1, 3,3])
+    #         append!(assembler.J, [5,7, 6,8])
+    #         append!(assembler.V, zeros(4))
+    #     else
+    #         # no ghost layer
+    #     end
+    # end
     I_ = MPIData(assembler.I, comm, (np,))
     J_ = MPIData(assembler.J, comm, (np,))
     V_ = MPIData(assembler.V, comm, (np,))
