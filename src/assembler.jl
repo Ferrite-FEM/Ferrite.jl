@@ -51,6 +51,27 @@ function assemble!(a::Assembler{T}, dofs::AbstractVector{Int}, Ke::AbstractMatri
 end
 
 """
+    assemble!(a::Assembler, rowdofs, coldofs, Ke)
+
+Assembles the matrix `Ke` into `a` according to the dofs specified by `rowdofs` and `coldofs`.
+"""
+function assemble!(a::Ferrite.Assembler{T}, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
+    nrows = length(rowdofs)
+    ncols = length(coldofs)
+
+    @assert(size(Ke,1) == nrows)
+    @assert(size(Ke,2) == ncols)
+
+    append!(a.V, Ke)
+    @inbounds for i in 1:ncols
+        for j in 1:nrows
+            push!(a.J, coldofs[i])
+            push!(a.I, rowdofs[j])
+        end
+    end
+end
+
+"""
     end_assemble(a::Assembler) -> K
 
 Finalizes an assembly. Returns a sparse matrix with the
