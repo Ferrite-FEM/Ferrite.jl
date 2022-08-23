@@ -252,7 +252,7 @@ function mixed_grid()
     end
 
     # construct projector 
-    projector = L2Projector(ip_quad, mesh; set=getcellset(mesh, "quads"))
+    projector = L2Projector(ip_quad, mesh; cell_idxs=sort!(collect(getcellset(mesh, "quads"))))
 
     points = [Vec((x, 2x)) for x in range(0.0; stop=1.0, length=10)]
 

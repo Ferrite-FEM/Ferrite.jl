@@ -6,7 +6,7 @@ struct L2Projector <: AbstractProjector
     geom_ip::Interpolation
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::MixedDofHandler
-    set::Vector{Int}
+    cell_idxs::Vector{Int}
     node2dof_map::Dict{Int64, Array{Int64,N} where N}
     fe_values::Union{CellValues,Nothing} # only used for deprecated constructor
     qr_rhs::Union{QuadratureRule,Nothing}    # only used for deprecated constructor
@@ -38,7 +38,7 @@ function L2Projector(qr::QuadratureRule, func_ip::Interpolation,
     geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(set)])))
     Base.depwarn("L2Projector(qr, func_ip, grid) is deprecated, " *
                  "use L2Projector(func_ip, grid) instead.", :L2Projector)
-    return L2Projector(func_ip, grid; qr_lhs=qr_mass, set=set, geom_ip=geom_ip, qr_rhs=qr)
+    return L2Projector(func_ip, grid; qr_lhs=qr_mass, cell_idxs=collect(set), geom_ip=geom_ip, qr_rhs=qr)
 end
 
 """
@@ -49,10 +49,10 @@ is the function interpolation used for the projection and `grid` the grid
 over which the projection is applied.
 
 Keyword arguments:
- - `qr_lhs`: quadrature for the left hand side. Defaults to a quadrature which exactly
+ - `qr_lhs`: Quadrature for the left hand side. Defaults to a quadrature which exactly
    integrates a mass matrix with `func_ip` as the interpolation.
- - `set`: element set over which the projection applies. Defaults to all elements in the grid.
- - `geom_ip`: geometric interpolation. Defaults to the default interpolation for the grid.
+ - `cell_idxs`: List of elements over which the projection applies. Defaults to all elements in the grid. 
+ - `geom_ip`: Geometric interpolation. Defaults to the default interpolation for the grid.
 
 
 The `L2Projector` acts as the integrated left hand side of the projection equation:
@@ -68,30 +68,30 @@ function L2Projector(
         func_ip::Interpolation,
         grid::AbstractGrid;
         qr_lhs::QuadratureRule = _mass_qr(func_ip),
-        set = 1:getncells(grid),
-        geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(set)])),
+        cell_idxs = collect(1:getncells(grid)),
+        geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(cell_idxs)])),
         qr_rhs::Union{QuadratureRule,Nothing}=nothing, # deprecated
     )
 
-    _check_same_celltype(grid, collect(set)) # TODO this does the right thing, but gives the wrong error message if it fails
+    _check_same_celltype(grid, cell_idxs) # TODO this does the right thing, but gives the wrong error message if it fails
 
     fe_values_mass = CellScalarValues(qr_lhs, func_ip, geom_ip)
 
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
     dh = MixedDofHandler(grid)
     field = Field(:_, func_ip, 1) # we need to create the field, but the interpolation is not used here
-    fh = FieldHandler([field], Set(set))
+    fh = FieldHandler([field], Set(cell_idxs))
     push!(dh, fh)
     _, vertex_dict, _, _ = __close!(dh)
 
-    M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
+    M = _assemble_L2_matrix(fe_values_mass, cell_idxs, dh)  # the "mass" matrix
     M_cholesky = cholesky(M)
 
     # For deprecated API
     fe_values = qr_rhs === nothing ? nothing :
                 CellScalarValues(qr_rhs, func_ip, geom_ip)
 
-    return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set), vertex_dict[1], fe_values, qr_rhs)
+    return L2Projector(func_ip, geom_ip, M_cholesky, dh, cell_idxs, vertex_dict[1], fe_values, qr_rhs)
 end
 
 # Quadrature sufficient for integrating a mass matrix
@@ -169,11 +169,14 @@ The data `vals` should be a vector, with length corresponding to number of eleme
 with length corresponding to number of quadrature points per element, matching the number of points in `qr_rhs`.
 Alternatively, `vals` can be a matrix, with number of columns corresponding to number of elements,
 and number of rows corresponding to number of points in `qr_rhs`.
+
+It is assumed that the order of values corresponds to the order of cell indices in `proj.cell_idxs`. 
+
 Example (scalar) input data:
 ```julia
 vals = [
-    [0.44, 0.98, 0.32], # data for quadrature point 1, 2, 3 of element 1
-    [0.29, 0.48, 0.55], # data for quadrature point 1, 2, 3 of element 2
+    [0.44, 0.98, 0.32], # data for quadrature point 1, 2, 3 of element `proj.cell_idxs[1]`
+    [0.29, 0.48, 0.55], # data for quadrature point 1, 2, 3 of element `proj.cell_idxs[2]`
     # ...
 ]
 ```
@@ -239,7 +242,7 @@ function _project(vars, proj::L2Projector, fe_values::Values, M::Integer, ::Type
     get_data(x::Number, i) = x
 
     ## Assemble contributions from each cell
-    for (ic,cellnum) in enumerate(proj.set)
+    for (ic,cellnum) in pairs(proj.cell_idxs)
         celldofs!(cell_dofs, proj.dh, cellnum)
         fill!(fe, 0)
         Xe = getcoordinates(proj.dh.grid, cellnum)
@@ -290,8 +293,8 @@ function reshape_to_nodes(proj::L2Projector, vals::AbstractVector{S}) where {ord
     @assert ndofs(dh) == length(vals)
     nout = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
     data = fill(T(NaN), nout, getnnodes(dh.grid))
-    _celldofs = Vector{Int}(undef, ndofs_per_cell(dh, first(proj.set)))
-    for cell in CellIterator(dh, proj.set)
+    _celldofs = Vector{Int}(undef, ndofs_per_cell(dh, first(proj.cell_idxs)))
+    for cell in CellIterator(dh, proj.cell_idxs)
         @assert length(getnodes(cell)) == length(_celldofs)
         celldofs!(_celldofs, cell)
         for (node, dof) in zip(getnodes(cell), _celldofs)
