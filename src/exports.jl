@@ -83,6 +83,7 @@ export
     getedgesets,
     getvertexsets,
     global_comm,
+    vertex_comm,
     onboundary,
     nfaces,
     addnodeset!,
@@ -93,6 +94,7 @@ export
     transform!,
     generate_grid,
     compute_vertex_values,
+    is_shared_vertex,
 
 # Grid coloring
     create_coloring,

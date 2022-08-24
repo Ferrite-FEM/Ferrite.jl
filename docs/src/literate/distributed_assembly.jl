@@ -42,13 +42,75 @@ macro debug(ex)
     return :($(esc(ex)))
 end
 
+# @TODO contribute diagnostics upstream
+function PartitionedArrays.matrix_exchanger(values,row_exchanger,row_lids,col_lids)
+    part = get_part_ids(row_lids)
+    parts_rcv = row_exchanger.parts_rcv
+    parts_snd = row_exchanger.parts_snd
+
+    function setup_rcv(part,parts_rcv,row_lids,col_lids,values)
+        owner_to_i = Dict(( owner=>i for (i,owner) in enumerate(parts_rcv) ))
+        ptrs = zeros(Int32,length(parts_rcv)+1)
+        for (li,lj,v) in nziterator(values)
+            owner = row_lids.lid_to_part[li]
+            if owner != part
+            ptrs[owner_to_i[owner]+1] +=1
+            end
+        end
+        length_to_ptrs!(ptrs)
+        k_rcv_data = zeros(Int,ptrs[end]-1)
+        gi_rcv_data = zeros(Int,ptrs[end]-1)
+        gj_rcv_data = zeros(Int,ptrs[end]-1)
+        for (k,(li,lj,v)) in enumerate(nziterator(values))
+            owner = row_lids.lid_to_part[li]
+            if owner != part
+            p = ptrs[owner_to_i[owner]]
+            k_rcv_data[p] = k
+            gi_rcv_data[p] = row_lids.lid_to_gid[li]
+            gj_rcv_data[p] = col_lids.lid_to_gid[lj]
+            ptrs[owner_to_i[owner]] += 1
+            end
+        end
+        rewind_ptrs!(ptrs)
+        k_rcv = Table(k_rcv_data,ptrs)
+        gi_rcv = Table(gi_rcv_data,ptrs)
+        gj_rcv = Table(gj_rcv_data,ptrs)
+        k_rcv, gi_rcv, gj_rcv
+    end
+
+    k_rcv, gi_rcv, gj_rcv = map_parts(setup_rcv,part,parts_rcv,row_lids,col_lids,values)
+
+    gi_snd = exchange(gi_rcv,parts_snd,parts_rcv)
+    gj_snd = exchange(gj_rcv,parts_snd,parts_rcv)
+
+    function setup_snd(part,row_lids,col_lids,gi_snd,gj_snd,values)
+        ptrs = gi_snd.ptrs
+        k_snd_data = zeros(Int,ptrs[end]-1)
+        for p in 1:length(gi_snd.data)
+            gi = gi_snd.data[p]
+            gj = gj_snd.data[p]
+            li = row_lids.gid_to_lid[gi]
+            lj = col_lids.gid_to_lid[gj]
+            k = nzindex(values,li,lj)
+            PartitionedArrays.@check k > 0 "The sparsity pattern of the ghost layer is inconsistent - $part | ($li, $lj) | ($gi, $gj)"
+            k_snd_data[p] = k
+        end
+        k_snd = Table(k_snd_data,ptrs)
+        k_snd
+    end
+
+    k_snd = map_parts(setup_snd,part,row_lids,col_lids,gi_snd,gj_snd,values)
+
+    Exchanger(parts_rcv,parts_snd,k_rcv,k_snd)
+end
+
 # Launch MPI
 MPI.Init()
 
 # We start  generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Quadrilateral, (2, 2));
+grid = generate_grid(Quadrilateral, (2, 3));
 
 dgrid = DistributedGrid(grid)
 
@@ -265,7 +327,7 @@ function local_to_global_numbering(dh::DofHandler, dgrid)
     end
 
     # Postcondition: All local dofs need a corresponding global dof!
-    @assert findfirst(local_to_global .== 0) == nothing
+    @assert findfirst(local_to_global .== 0) === nothing
 
     @debug vtk_grid("dofs", dgrid; compress=false) do vtk
         u = Vector{Float64}(undef,length(dgrid.local_grid.nodes))
@@ -423,6 +485,72 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     ghost_dof_field_index_to_send = [Int[] for i ∈ 1:destination_len]
     ghost_element_to_send = [Int[] for i ∈ 1:destination_len] # corresponding element
     ghost_dof_owner = [Int[] for i ∈ 1:destination_len] # corresponding owner
+    # for (pivot_vi, pivot_sv) ∈ dgrid.shared_vertices
+    #     # We start by searching shared vertices which are not owned by us
+    #     pivot_vertex_owner_rank = Ferrite.compute_owner(dgrid, pivot_sv)
+    #     pivot_cell_idx = pivot_vi[1]
+        
+    #     # Ghost is per definition non-local
+    #     if my_rank != pivot_vertex_owner_rank
+    #         sender_slot = destination_index[pivot_vertex_owner_rank]
+
+    #         @debug println("$pivot_vi may require synchronization (R$my_rank)")
+    #         # We have to send ALL dofs on the element to the remote.
+    #         # @TODO send actually ALL dofs (currently only vertex dofs for a first version...)
+    #         pivot_cell = getcells(dgrid, pivot_cell_idx)
+    #         for (other_vertex_idx, other_vertex) ∈ enumerate(Ferrite.vertices(pivot_cell))
+    #             # Skip self
+    #             other_vi = VertexIndex(pivot_cell_idx, other_vertex_idx)
+    #             if other_vi == pivot_vi
+    #                 continue
+    #             end
+
+    #             if is_shared_vertex(dgrid, other_vi)
+    #                 #@TODO We should be able to remove more redundant communication is many cases.
+    #                 other_sv = dgrid.shared_vertices[other_vi]
+    #                 other_vertex_owner_rank = Ferrite.compute_owner(dgrid, other_sv)
+
+    #                 # "Other vertex" is not a ghost vertex if it touches the element itself
+    #                 if haskey(other_sv.remote_vertices, pivot_vertex_owner_rank)
+    #                     pivot_vertex_adjacent_elements = [nei for (nei, _) ∈ pivot_sv.remote_vertices[pivot_vertex_owner_rank]]
+    #                     skip_me = false
+    #                     for (nei, _) ∈ other_sv.remote_vertices[pivot_vertex_owner_rank]
+    #                         if nei ∈ pivot_vertex_adjacent_elements
+    #                             skip_me = true
+    #                             break
+    #                         end
+    #                     end
+    #                     if skip_me
+    #                         @debug println("  Skipping $other_vi for $pivot_vi (R$my_rank)")
+    #                         continue
+    #                     end
+    #                 end
+    #             else
+    #                 # If the vertex is not a shared one, we always have to sync it
+    #                 other_vertex_owner_rank = my_rank
+    #             end
+
+    #             # Now we have to sync all fields separately
+    #             @debug println("  Ghost candidate $other_vi for $pivot_vi (R$my_rank)")
+    #             for field_idx in 1:Ferrite.nfields(dh)
+    #                 pivot_vertex = Ferrite.toglobal(getlocalgrid(dgrid), pivot_vi)
+    #                 # If any of the two vertices is not defined on the current field, just skip.
+    #                 if !haskey(dh.vertexdicts[field_idx], pivot_vertex) || !haskey(dh.vertexdicts[field_idx], other_vertex)
+    #                     continue
+    #                 end
+    #                 @debug println("    $other_vi is ghost for $pivot_vi in field $field_idx (R$my_rank)")
+
+    #                 other_vertex_dof = dh.vertexdicts[field_idx][other_vertex]
+
+    #                 append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[other_vertex_dof])
+    #                 append!(ghost_rank_to_send[sender_slot], other_vertex_owner_rank)
+    #                 append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
+    #                 append!(ghost_element_to_send[sender_slot], pivot_cell_idx)
+    #             end
+    #         end
+    #     end
+    # end
+
     for (pivot_vi, pivot_sv) ∈ dgrid.shared_vertices
         # We start by searching shared vertices which are not owned by us
         pivot_vertex_owner_rank = Ferrite.compute_owner(dgrid, pivot_sv)
@@ -652,10 +780,26 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     end
     # Deduplicate entries.
     unique!(IJ)
+    @debug println("IJ $IJ (R$my_rank)")
 
     for (i,j) ∈ IJ
         push!(assembler.I, i)
         push!(assembler.J, j)
+        push!(assembler.V, 0.0)
+    end
+
+    # Manually check if these are the missing ones.
+    if my_rank == 2
+        push!(assembler.I, 5)
+        push!(assembler.J, 2)
+        push!(assembler.V, 0.0)
+
+        push!(assembler.I, 4)
+        push!(assembler.J, 7)
+        push!(assembler.V, 0.0)
+
+        push!(assembler.I, 7)
+        push!(assembler.J, 4)
         push!(assembler.V, 0.0)
     end
 

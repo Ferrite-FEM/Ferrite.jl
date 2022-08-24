@@ -15,7 +15,7 @@ struct SharedVertex <: SharedEntity
     remote_vertices::Dict{Int,Vector{VertexIndex}}
 end
 
-remote_entities(sv::SharedVertex) = sv.remote_vertices
+@inline remote_entities(sv::SharedVertex) = sv.remote_vertices
 
 """
 """
@@ -24,7 +24,7 @@ struct SharedFace <: SharedEntity
     remote_faces::Dict{Int,Vector{FaceIndex}}
 end
 
-remote_entities(sf::SharedFace) = sf.remote_faces
+@inline remote_entities(sf::SharedFace) = sf.remote_faces
 
 """
 """
@@ -33,7 +33,7 @@ struct SharedEdge <: SharedEntity
     remote_edges::Dict{Int,Vector{EdgeIndex}}
 end
 
-remote_entities(se::SharedEdge) = se.remote_edges
+@inline remote_entities(se::SharedEdge) = se.remote_edges
 
 """
 @TODO docs
@@ -303,7 +303,7 @@ end
 
 @inline getlocalgrid(dgrid::AbstractDistributedGrid) = dgrid.local_grid
 
-@inline getcells(dgrid::AbstractDistributedGrid) = getcells(getlocalgrid(grid))
+@inline getcells(dgrid::AbstractDistributedGrid) = getcells(getlocalgrid(dgrid))
 @inline getcells(dgrid::AbstractDistributedGrid, v::Union{Int, Vector{Int}}) = getcells(getlocalgrid(dgrid),v)
 @inline getcells(dgrid::AbstractDistributedGrid, setname::String) = getcells(getlocalgrid(dgrid),setname)
 "Returns the number of cells in the `<:AbstractDistributedGrid`."
