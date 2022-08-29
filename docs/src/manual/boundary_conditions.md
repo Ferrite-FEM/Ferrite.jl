@@ -103,7 +103,7 @@ to evaluate the boundary integral:
 
 ```julia
 for face in 1:nfaces(cell)
-    if onboundary(cell, face) && (cellid(cell), face) ∈ getfaceset(grid, "Neumann Boundary")
+    if (cellid(cell), face) ∈ getfaceset(grid, "Neumann Boundary")
         reinit!(facevalues, cell, face)
         for q_point in 1:getnquadpoints(facevalues)
             dΓ = getdetJdV(facevalues, q_point)
@@ -116,9 +116,8 @@ for face in 1:nfaces(cell)
 end
 ```
 
-We start by looping over all the faces of the cell, next we have to check if
-this particular face is located on the boundary, and then also check that the
-face is located on our face-set called `"Neumann Boundary"`. If we have determined
+We start by looping over all the faces of the cell, next we check if this particular face is
+located on our faceset of interest called `"Neumann Boundary"`. If we have determined
 that the current face is indeed on the boundary and in our faceset, then we
 reinitialize `facevalues` for this face, using [`reinit!`](@ref). When `reinit!`ing
 `facevalues` we also need to give the face number in addition to the cell.
