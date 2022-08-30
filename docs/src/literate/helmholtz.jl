@@ -136,9 +136,8 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
         # ```
         #+
         for face in 1:nfaces(cell)
-            if onboundary(cell, face) && 
-                   ((cellcount, face) ∈ getfaceset(grid, "left") || 
-                    (cellcount, face) ∈ getfaceset(grid, "bottom"))
+            if (cellcount, face) ∈ getfaceset(grid, "left") || 
+                (cellcount, face) ∈ getfaceset(grid, "bottom")
                 reinit!(facevalues, cell, face)
                 for q_point in 1:getnquadpoints(facevalues)
                     coords_qp = spatial_coordinate(facevalues, q_point, coords)
