@@ -228,7 +228,7 @@ function assemble_cell!(Ke, re, cell, cellvalues, facevalues, grid, material,
 
     ## Add traction as a negative contribution to the element residual `re`:
     for face in 1:nfaces(cell)
-        if onboundary(cell, face) && (cellid(cell), face) ∈ getfaceset(grid, "right")
+        if (cellid(cell), face) ∈ getfaceset(grid, "right")
             reinit!(facevalues, cell, face)
             for q_point in 1:getnquadpoints(facevalues)
                 dΓ = getdetJdV(facevalues, q_point)
