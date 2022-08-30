@@ -160,7 +160,7 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, gr
     ## We loop over all the faces in the cell, then check if the face
     ## is in our `"traction"` faceset.
     @inbounds for face in 1:nfaces(cell)
-        if onboundary(cell, face) && (cellid(cell), face) ∈ getfaceset(grid, "traction")
+        if (cellid(cell), face) ∈ getfaceset(grid, "traction")
             reinit!(facevalues_u, cell, face)
             for q_point in 1:getnquadpoints(facevalues_u)
                 dΓ = getdetJdV(facevalues_u, q_point)
