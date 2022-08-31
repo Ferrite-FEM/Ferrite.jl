@@ -40,14 +40,7 @@ end
 Assembles the element matrix `Ke` into `a`.
 """
 function assemble!(a::Assembler{T}, dofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
-    n_dofs = length(dofs)
-    append!(a.V, Ke)
-    @inbounds for j in 1:n_dofs
-        append!(a.I, dofs)
-        for i in 1:n_dofs
-            push!(a.J, dofs[j])
-        end
-    end
+    assemble!(a, dofs, dofs, Ke)
 end
 
 """
@@ -64,9 +57,9 @@ function assemble!(a::Ferrite.Assembler{T}, rowdofs::AbstractVector{Int}, coldof
 
     append!(a.V, Ke)
     @inbounds for i in 1:ncols
-        for j in 1:nrows
+        append!(a.I, rowdofs)
+        for _ in 1:nrows
             push!(a.J, coldofs[i])
-            push!(a.I, rowdofs[j])
         end
     end
 end
