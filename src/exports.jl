@@ -89,6 +89,7 @@ export
     transform!,
     generate_grid,
     compute_vertex_values,
+    cellcoords!,
 
 # Grid coloring
     create_coloring,

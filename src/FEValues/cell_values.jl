@@ -167,4 +167,5 @@ function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,
             cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
         end
     end
+    return cv
 end

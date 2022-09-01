@@ -62,7 +62,7 @@ struct ScratchValues{T, CV <: CellValues, FV <: FaceValues, TT <: AbstractTensor
     cellvalues::CV
     facevalues::FV
     global_dofs::Vector{Int}
-    ɛ::Vector{TT}
+    ε::Vector{TT}
     coordinates::Vector{Vec{dim, T}}
     assembler::Ferrite.AssemblerSparsityPattern{T, Ti}
 end;
@@ -88,7 +88,7 @@ function create_scratchbuffer(K, f, dh::DofHandler)
     global_dofs = zeros(Int, nd)
     fe = zeros(nd)
     ke = zeros(nd, nd)
-    ɛ = [zero(SymmetricTensor{2, 3}) for _ in 1:nd]
+    ε = [zero(SymmetricTensor{2, 3}) for _ in 1:nd]
     coordinates = [zero(Vec{3}) for _ in 1:length(dh.grid.cells[1].nodes)]
 
     return ScratchValues(ke, fe, cellvalues, facevalues, global_dofs, ε, coordinates, assembler)
@@ -97,8 +97,9 @@ end;
 # ## Threaded assemble
 
 # The assembly function loops over each color and does a threaded assembly for that color
-function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}) where {dim}
+function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::SymmetricTensor{4})
 
+    fill!(K.nzval, 0)
     f = zeros(ndofs(dh))
     # scratches = create_scratchvalues(K, f, dh)
     b = Vec{3}((0.0, 0.0, 0.0)) # Body force
@@ -112,7 +113,8 @@ function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::S
                 Threads.@spawn begin
                     local scratch = create_scratchbuffer(K, f, dh)
                     for ci in workqueue
-                        assemble_cell!(scratch, ci, K, grid, dh, C, b)
+                        # println("Now I am doing color $(ci)")
+                        assemble_cell!(scratch, ci, grid, dh, C, b)
                     end
                 end
             end
@@ -124,13 +126,13 @@ end
 
 # The cell assembly function is written the same way as if it was a single threaded example.
 # The only difference is that we unpack the variables from our `scratch`.
-function assemble_cell!(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC,
+function assemble_cell!(scratch::ScratchValues, cell::Int,
                         grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}, b::Vec{dim}) where {dim}
 
     ## Unpack our stuff from the scratch
-    Ke, fe, cellvalues, facevalues, global_dofs, ɛ, coordinates, assembler =
+    Ke, fe, cellvalues, facevalues, global_dofs, ε, coordinates, assembler =
          scratch.Ke, scratch.fe, scratch.cellvalues, scratch.facevalues,
-         scratch.global_dofs, scratch.ɛ, scratch.coordinates, scratch.assembler
+         scratch.global_dofs, scratch.ε, scratch.coordinates, scratch.assembler
 
     fill!(Ke, 0)
     fill!(fe, 0)
@@ -138,24 +140,25 @@ function assemble_cell!(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC,
     n_basefuncs = getnbasefunctions(cellvalues)
 
     ## Fill up the coordinates
-    nodeids = grid.cells[cell].nodes
-    for j in 1:length(coordinates)
-        coordinates[j] = grid.nodes[nodeids[j]].x
-    end
+    Ferrite.cellcoords!(coordinates, grid, cell)
+    # nodeids = grid.cells[cell].nodes
+    # for j in 1:length(coordinates)
+    #     coordinates[j] = grid.nodes[nodeids[j]].x
+    # end
 
     reinit!(cellvalues, coordinates)
 
     for q_point in 1:getnquadpoints(cellvalues)
         for i in 1:n_basefuncs
-            ɛ[i] = symmetric(shape_gradient(cellvalues, q_point, i))
+            ε[i] = shape_symmetric_gradient(cellvalues, q_point, i)
         end
         dΩ = getdetJdV(cellvalues, q_point)
         for i in 1:n_basefuncs
             δu = shape_value(cellvalues, q_point, i)
             fe[i] += (δu ⋅ b) * dΩ
-            ɛC = ɛ[i] ⊡ C
+            εC = ε[i] ⊡ C
             for j in 1:n_basefuncs
-                Ke[i, j] += (ɛC ⊡ ɛ[j]) * dΩ
+                Ke[i, j] += (εC ⊡ ε[j]) * dΩ
             end
         end
     end
@@ -179,6 +182,12 @@ end;
     b = @elapsed @time K, f = doassemble(K, colors, grid, dh, C);
  #   return b
 #end
+#
+#
+
+x = 1
+
+y = 1
 
 #run_assemble()
 
