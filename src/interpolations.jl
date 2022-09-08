@@ -337,7 +337,7 @@ end
 getnbasefunctions(::Lagrange{3,RefTetrahedron,1}) = 4
 nvertexdofs(::Lagrange{3,RefTetrahedron,1}) = 1
 
-faces(::Lagrange{3,RefTetrahedron,1}) = ((1,2,3), (1,2,4), (2,3,4), (1,4,3))
+faces(::Lagrange{3,RefTetrahedron,1}) = ((1,3,2), (1,2,4), (2,3,4), (1,4,3))
 edges(::Lagrange{3,RefTetrahedron,1}) = ((1,2), (2,3), (3,1), (1,4), (2,4), (3,4))
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,1})
@@ -365,7 +365,7 @@ getnbasefunctions(::Lagrange{3,RefTetrahedron,2}) = 10
 nvertexdofs(::Lagrange{3,RefTetrahedron,2}) = 1
 nedgedofs(::Lagrange{3,RefTetrahedron,2}) = 1
 
-faces(::Lagrange{3,RefTetrahedron,2}) = ((1,2,3,5,6,7), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
+faces(::Lagrange{3,RefTetrahedron,2}) = ((1,3,2,7,6,5), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
 edges(::Lagrange{3,RefTetrahedron,2}) = ((1,5,2), (2,6,3), (3,7,1), (1,8,4), (2,9,4), (3,10,4))
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,2})
@@ -446,7 +446,14 @@ nedgedofs(::Lagrange{3,RefCube,2}) = 1
 nfacedofs(::Lagrange{3,RefCube,2}) = 1
 ncelldofs(::Lagrange{3,RefCube,2}) = 1
 
-faces(::Lagrange{3,RefCube,2}) = ((1,2,6,5, 9,18,13,17, 23), (2,3,7,6, 10,19,14,18, 22), (3,4,8,7, 11,20,15,19, 24), (1,5,8,4, 12,17,16,20, 21), (1,4,3,2, 9,10,11,12, 25), (5,6,7,8, 13,14,15,16, 26))
+faces(::Lagrange{3,RefCube,2}) = (
+    (1,4,3,2, 9,10,11,12, 25),
+    (1,2,6,5, 9,18,13,17, 23),
+    (2,3,7,6, 10,19,14,18, 22),
+    (3,4,8,7, 11,20,15,19, 24),
+    (1,5,8,4, 12,17,16,20, 21),
+    (5,6,7,8, 13,14,15,16, 26),
+)
 edges(::Lagrange{3,RefCube,2}) = ((1,2, 9), (2,3, 10), (3,4, 11), (4,1, 12), (1,5, 16), (2,6, 19), (3,7, 18), (4,8, 19), (5,6, 13), (6,7, 14), (7,8, 15), (8,5, 16))
 
 function reference_coordinates(::Lagrange{3,RefCube,2})

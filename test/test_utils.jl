@@ -44,7 +44,7 @@ function reference_normals(::Lagrange{3, RefTetrahedron})
 end
 
 # Lagrange{3, Cube}
-function reference_normals(::Lagrange{3, RefCube, 1})
+function reference_normals(::Lagrange{3, RefCube})
     return [Vec{3, Float64}(( 0.0,  0.0, -1.0)),
             Vec{3, Float64}(( 0.0, -1.0,  0.0)),
             Vec{3, Float64}(( 1.0,  0.0,  0.0)),

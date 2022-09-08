@@ -51,6 +51,30 @@ for interpolation in (Lagrange{1, RefCube, 1}(),
             end
         end
     end
+
+    # Test that faces(...) return in counter clockwise order (viewing from the outside)
+    if interpolation isa Lagrange
+        function __outward_normal(coords::Vector{<:Vec{1}}, nodes)
+            n = coords[nodes[1]]
+            return n / norm(n)
+        end
+        function __outward_normal(coords::Vector{<:Vec{2}}, nodes)
+            p1 = coords[nodes[1]]
+            p2 = coords[nodes[2]]
+            n = Vec{2}((p2[2] - p1[2], - p2[1] + p1[1]))
+            return n / norm(n)
+        end
+        function __outward_normal(coords::Vector{<:Vec{3}}, nodes)
+            p1 = coords[nodes[1]]
+            p2 = coords[nodes[2]]
+            p3 = coords[nodes[3]]
+            n = (p3 - p2) × (p1 - p2)
+            return n / norm(n)
+        end
+        for (facenodes, normal) in zip(Ferrite.faces(interpolation), reference_normals(interpolation))
+            @test __outward_normal(coords, facenodes) ≈ normal
+        end
+    end
 end
 
 end
