@@ -110,10 +110,6 @@ Total number of dofs in the interior
 """
 ncelldofs(::Interpolation)   = 0
 
-# Needed for distributing dofs on shells correctly (face in 2d is edge in 3d)
-edges(ip::Interpolation{2}) = faces(ip)
-nedgedofs(ip::Interpolation{2}) = nfacedofs(ip)
-
 # Fallbacks for vertices
 vertices(::Interpolation{2,RefCube}) = (1,2,3,4)
 vertices(::Interpolation{3,RefCube}) = (1,2,3,4,5,6,7,8)
@@ -702,4 +698,36 @@ function value(ip::CrouzeixRaviart{2,1}, i::Int, ξ::Vec{2})
     i == 2 && return 1.0 - 2*ξ_x
     i == 3 && return 1.0 - 2*ξ_y
     throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+################################################################
+# Wrapper Interolation for structural elements (shells, beams) #
+################################################################
+"""
+
+"""
+struct ShellInterpolation{dim_p,dim_s,shape,order,I<:Interpolation} <: Interpolation{dim_s,shape,order} 
+    ip::I
+end
+
+function ShellInterpolation(ip::I) where {shape, order, I<:Interpolation{2,shape,order}}
+    return ShellInterpolation{2,3,shape,order,I}(ip)
+end
+
+getnbasefunctions(si::ShellInterpolation) = getnbasefunctions(si.ip)
+nedgedofs(si::ShellInterpolation) = nfacedofs(si.ip)
+nvertexdofs(si::ShellInterpolation) = nvertexdofs(si.ip)
+ncelldofs(si::ShellInterpolation) = ncelldofs(si.ip)
+#nfacedofs(si::ShellInterpolation) = ??
+
+edges(si::ShellInterpolation) = faces(si.ip) # Shell edges -> the faces of a two interpolation
+vertices(si::ShellInterpolation) = vertices(si.ip)
+#faces(si::ShellInterpolation) = ??
+
+function reference_coordinates(si::ShellInterpolation)
+    return reference_coordinates(si.ip) #Expand to 3d?
+end
+
+function value(si::ShellInterpolation, i::Int, ξ::Vec{2})
+    return value(si.ip, i, ξ)
 end

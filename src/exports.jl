@@ -9,6 +9,7 @@ export
     DiscontinuousLagrange,
     Serendipity,
     getnbasefunctions,
+    ShellInterpolation,
 
 # Quadrature
     QuadratureRule,

@@ -296,7 +296,7 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
                 nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[local_num], ip_info.nedgedofs, nextdof)
             end
 
-            if ip_info.nfacedofs > 0 && (ip_info.dim == dim)
+            if ip_info.nfacedofs > 0
                 nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[local_num], ip_info.nfacedofs, nextdof)
             end
 
