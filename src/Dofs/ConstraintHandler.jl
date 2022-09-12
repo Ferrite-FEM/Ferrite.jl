@@ -845,31 +845,48 @@ See also manual section on [Periodic boundary conditions](@ref).
 struct PeriodicDirichlet
     field_name::Symbol
     components::Vector{Int} # components of the field
-    face_pairs::Vector{Pair{String,String}}
+    face_pairs::Vector{Pair{String,String}} # legacy that will populate face_map on add!
+    face_map::Dict{FaceIndex,FaceIndex}
     func::Union{Function,Nothing}
 end
 
-PeriodicDirichlet(fn::Symbol, fp::Vector{<:Pair}, c::Union{Int,Vector{Int}}=1) =
+# Default to no inhomogeneity function
+PeriodicDirichlet(fn::Symbol, fp::Union{Vector{<:Pair},Dict{FaceIndex,FaceIndex}}, c::Union{Int,Vector{Int}}=1) =
     PeriodicDirichlet(fn, fp, nothing, c)
 
-PeriodicDirichlet(fn::Symbol, fp::Vector{<:Pair}, f::Union{Function,Nothing}, c::Union{Int,Vector{Int}}=1) =
-    PeriodicDirichlet(fn, sort!(vec(collect(c))), fp, f)
+# Basic constructor for the simple case where face_map will be populated in
+# add!(::ConstraintHandler, ...) instead
+function PeriodicDirichlet(fn::Symbol, fp::Vector{<:Pair}, f::Union{Function,Nothing}, c::Union{Int,Vector{Int}}=1)
+    components = sort!(vec(collect(c)))
+    face_map = Dict{FaceIndex,FaceIndex}() # This will be populated in add!(::ConstraintHandler, ...) instead
+    return PeriodicDirichlet(fn, components, fp, face_map, f)
+end
+
+function PeriodicDirichlet(fn::Symbol, fm::Dict{FaceIndex,FaceIndex}, f::Union{Function,Nothing}, c::Union{Int,Vector{Int}}=1)
+    components = sort!(vec(collect(c)))
+    return PeriodicDirichlet(fn, components, Pair{String,String}[], fm, f)
+end
 
 function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
+    # Legacy code: Might need to build the face_map
+    is_legacy = !isempty(pdbc.face_pairs) && isempty(pdbc.face_map)
+    if is_legacy
+        for (mset, iset) in pdbc.face_pairs
+            collect_periodic_faces!(pdbc.face_map, ch.dh.grid, mset, iset, identity) # TODO: Better transform
+        end
+    end
     field_idx = find_field(ch.dh, pdbc.field_name)
     interpolation = getfieldinterpolation(ch.dh, field_idx)
     field_dim = getfielddim(ch.dh, field_idx)
-    _add!(ch, pdbc, interpolation, field_dim, field_offset(ch.dh, pdbc.field_name))
+    _add!(ch, pdbc, interpolation, field_dim, field_offset(ch.dh, pdbc.field_name), is_legacy)
     return ch
 end
 
 function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::Interpolation,
-               field_dim::Int, offset::Int)
+               field_dim::Int, offset::Int, is_legacy::Bool=false)
     grid = ch.dh.grid
+    face_map = pdbc.face_map
     Tx = typeof(first(ch.dh.grid.nodes).x) # Vec{D,T}
-    # TODO: This requires full periodicity for now. (Why? I don't remember,
-    #       but something in the code below assumes this... I think...)
-    @assert length(pdbc.face_pairs) == length(Tx)
 
     # Indices of the local dofs for the faces
     local_face_dofs, local_face_dofs_offset =
@@ -877,119 +894,105 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
     mirrored_local_face_dofs =
         mirror_local_dofs(local_face_dofs, local_face_dofs_offset, interpolation, length(pdbc.components))
 
-    # First, create the facemap which maps mirror faces to image faces
-    face_map = Dict{FaceIndex,FaceIndex}() # mirror face => image face
-    dof_map = Dict{Int,Int}() # mirror dof => image => dof
+    # Dof map for mirror dof => image dof
+    dof_map = Dict{Int,Int}()
 
-    # Some stuff for finding the corner points
-    all_node_idxs = Set{Int}()
-    max_x = Tx(i -> typemin(eltype(Tx)))
-    min_x = Tx(i -> typemax(eltype(Tx)))
+    mirror_dofs = zeros(Int, ndofs_per_cell(ch.dh))
+     image_dofs = zeros(Int, ndofs_per_cell(ch.dh))
+    for (m, i) in face_map
+        celldofs!(mirror_dofs, ch.dh, m[1])
+        celldofs!( image_dofs, ch.dh, i[1])
 
-    for (xyz, (mirror, image)) in enumerate(pdbc.face_pairs)
-        # Need the order here, so collect
-        mirror_faceset = collect(getfaceset(grid, mirror))
-        mirror_mean_x = Tx[] # mean face coordinates
-        for (c, f) in mirror_faceset
-            fn = faces(grid.cells[c])[f]
-            push!(mirror_mean_x, sum(grid.nodes[i].x for i in fn) / length(fn))
-            # Also keep track of all nodes for corner finding
-            union!(all_node_idxs, grid.cells[c].nodes)
-        end
-        # Same dance for the image
-        image_faceset = collect(getfaceset(grid,  image))
-        image_mean_x = Tx[]
-        for (c, f) in image_faceset
-            fn = faces(grid.cells[c])[f]
-            push!(image_mean_x, sum(grid.nodes[i].x for i in fn) / length(fn))
-            # Also keep track of all nodes for corner finding
-            union!(all_node_idxs, grid.cells[c].nodes)
-        end
-        function extract_single_x_on_face(fs) # :)
-            c, f = first(fs)
-            fn = faces(grid.cells[c])[f]
-            return grid.nodes[fn[1]].x
-        end
-        # Add a shift to help the tree search
-        xmirror = extract_single_x_on_face(mirror_faceset)
-        ximage  = extract_single_x_on_face(image_faceset)
-        xdist = ximage[xyz] - xmirror[xyz]
-        @assert xdist > 0
-        shift = Tx(i -> i == xyz ? xdist : 0)
-        for i in eachindex(mirror_mean_x)
-            mirror_mean_x[i] += shift
-        end
-        # Use KDTree to find closest face
-        tree = KDTree(image_mean_x)
-        idxs, _ = NearestNeighbors.nn(tree, mirror_mean_x)
-        for (m, idx) in zip(mirror_faceset, idxs)
-            face_map[m] = image_faceset[idx]
-        end
-        # Update maximum/minimum coords from the bounding box of the tree
-        max_x = Tx(i -> i == xyz ? max(max_x[i], tree.hyper_rec.maxes[i]) : max_x[i])
-        min_x = Tx(i -> i == xyz ? min(min_x[i], tree.hyper_rec.maxes[i] - xdist) : min_x[i])
+        mdof_range = local_face_dofs_offset[m[2]] : (local_face_dofs_offset[m[2] + 1] - 1)
+        idof_range = local_face_dofs_offset[i[2]] : (local_face_dofs_offset[i[2] + 1] - 1)
 
-        # Create the constraints
-        mirror_dofs = zeros(Int, ndofs_per_cell(ch.dh))
-         image_dofs = zeros(Int, ndofs_per_cell(ch.dh))
-        for (m, i) in face_map
-            celldofs!(mirror_dofs, ch.dh, m[1])
-            celldofs!( image_dofs, ch.dh, i[1])
+        for (md, id) in zip(mdof_range, idof_range)
+            cdof = mirror_dofs[mirrored_local_face_dofs[md]]
+            mdof = image_dofs[local_face_dofs[id]]
 
-            mdof_range = local_face_dofs_offset[m[2]] : (local_face_dofs_offset[m[2] + 1] - 1)
-            idof_range = local_face_dofs_offset[i[2]] : (local_face_dofs_offset[i[2] + 1] - 1)
-
-            for (md, id) in zip(mdof_range, idof_range)
-                cdof = mirror_dofs[mirrored_local_face_dofs[md]]
-                mdof = image_dofs[local_face_dofs[id]]
-
-                if haskey(dof_map, mdof)
-                    mdof′ = dof_map[mdof]
-                    # @info "$cdof => $mdof, but $mdof => $mdof′, remapping $cdof => $mdof′."
-                    push!(dof_map, cdof => mdof′)
-                # elseif haskey(dof_map, cdof) && dof_map[cdof] == mdof
-                    # @info "$cdof => $mdof already in the set, skipping."
-                elseif haskey(dof_map, cdof)
-                    # @info "$cdof => $mdof, but $cdof => $(dof_map[cdof]) already, skipping."
-                else
-                    # @info "$cdof => $mdof."
-                    push!(dof_map, cdof => mdof)
-                end
+            if haskey(dof_map, mdof)
+                mdof′ = dof_map[mdof]
+                # @info "$cdof => $mdof, but $mdof => $mdof′, remapping $cdof => $mdof′."
+                # TODO: Is this needed now when untangling below?
+                push!(dof_map, cdof => mdof′)
+            # elseif haskey(dof_map, cdof) && dof_map[cdof] == mdof
+                # @info "$cdof => $mdof already in the set, skipping."
+            elseif haskey(dof_map, cdof)
+                # @info "$cdof => $mdof, but $cdof => $(dof_map[cdof]) already, skipping."
+            else
+                # @info "$cdof => $mdof."
+                push!(dof_map, cdof => mdof)
             end
         end
     end
 
-    # Find the corners and put homogeneous Dirichlet there instead
-    all_node_idxs_v = collect(all_node_idxs)
-    points = construct_cornerish(min_x, max_x)
-    tree = KDTree(Tx[grid.nodes[i].x for i in all_node_idxs_v])
-    idxs, _ = NearestNeighbors.nn(tree, points)
-    corner_set = Set{Int}(all_node_idxs_v[i] for i in idxs)
+    # Need to untangle in case we have 1 => 2 and 2 => 3 into 1 => 3 and 2 => 3.
+    # Note that a single pass is enough (no need to iterate) since all constraints are
+    # between just one mirror dof and one image dof.
+    remaps = Dict{Int, Int}()
+    for (k, v) in dof_map
+        if haskey(dof_map, v)
+            remaps[k] = get(remaps, v, dof_map[v])
+        end
+    end
+    for (k, v) in remaps
+        # @info "Remapping $k => $(dof_map[k]) to $k => $v"
+        dof_map[k] = v
+    end
+    @assert isempty(intersect(keys(dof_map), values(dof_map)))
 
-    dbc = Dirichlet(pdbc.field_name, corner_set,
-        pdbc.func === nothing ? (x, _) -> pdbc.components * eltype(x)(0) : pdbc.func,
-        pdbc.components
-    )
+    # For legacy code add Dirichlet conditions in the corners
+    if is_legacy
+        Base.depwarn("It looks like you are using legacy code for PeriodicDirichlet " *
+                     "meaning that the solution is automatically locked in the \"corners\"." *
+                     "This will not be done automatically in the future. Instead add a " *
+                     "Dirichlet boundary condition on the relevant nodeset.",
+                     :PeriodicDirichlet)
+        all_node_idxs = Set{Int}()
+        min_x = Tx(i -> typemax(eltype(Tx)))
+        max_x = Tx(i -> typemin(eltype(Tx)))
+        for facepair in face_map, faceidx in facepair
+            cellidx, faceidx = faceidx
+            nodes = faces(grid.cells[cellidx])[faceidx]
+            union!(all_node_idxs, nodes)
+            for n in nodes
+                x = grid.nodes[n].x
+                min_x = Tx(i -> min(min_x[i], x[i]))
+                max_x = Tx(i -> max(max_x[i], x[i]))
+            end
+        end
+        all_node_idxs_v = collect(all_node_idxs)
+        points = construct_cornerish(min_x, max_x)
+        tree = KDTree(Tx[grid.nodes[i].x for i in all_node_idxs_v])
+        idxs, _ = NearestNeighbors.nn(tree, points)
+        corner_set = Set{Int}(all_node_idxs_v[i] for i in idxs)
 
-    # Create a temp constraint handler just to find the dofs in the nodes...
-    chtmp = ConstraintHandler(ch.dh)
-    add!(chtmp, dbc)
-    close!(chtmp)
-    # No need to update!(chtmp, t) here since we only care about the dofs
-    # TODO: Right? maybe if the user passed f we need to...
-    foreach(x -> delete!(dof_map, x), chtmp.prescribed_dofs)
+        dbc = Dirichlet(pdbc.field_name, corner_set,
+            pdbc.func === nothing ? (x, _) -> pdbc.components * eltype(x)(0) : pdbc.func,
+            pdbc.components
+        )
 
-    # Need to reset the internal of this DBC in order to add! it again...
-    resize!(dbc.local_face_dofs, 0)
-    resize!(dbc.local_face_dofs_offset, 0)
+        # Create a temp constraint handler just to find the dofs in the nodes...
+        chtmp = ConstraintHandler(ch.dh)
+        add!(chtmp, dbc)
+        close!(chtmp)
+        # No need to update!(chtmp, t) here since we only care about the dofs
+        # TODO: Right? maybe if the user passed f we need to...
+        foreach(x -> delete!(dof_map, x), chtmp.prescribed_dofs)
 
-    # Create another temp constraint handler if we need to compute inhomogeneities
+        # Need to reset the internal of this DBC in order to add! it again...
+        resize!(dbc.local_face_dofs, 0)
+        resize!(dbc.local_face_dofs_offset, 0)
+
+        # Add the Dirichlet for the corners
+        add!(ch, dbc)
+    end
+
     inhomogeneity_map = nothing
     if pdbc.func !== nothing
+        # Create another temp constraint handler if we need to compute inhomogeneities
         chtmp2 = ConstraintHandler(ch.dh)
-        all_faces = union!(Set{FaceIndex}(),
-            (getfaceset(grid, x) for x in Iterators.flatten(pdbc.face_pairs))...
-        )
+        all_faces = union!(Set{FaceIndex}(), keys(face_map), values(face_map))
         dbc_all = Dirichlet(pdbc.field_name, all_faces, pdbc.func, pdbc.components)
         add!(chtmp2, dbc_all); close!(chtmp2)
         # Call update! here since we need it to construct the affine constraints...
@@ -1009,11 +1012,10 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
         ac = AffineConstraint(k, [v => 1.0], inhomogeneity_map === nothing ? 0.0 : inhomogeneity_map[v])
         add!(ch, ac)
     end
-    # Add the Dirichlet for the corners
-    add!(ch, dbc)
 
     return ch
 end
+
 function construct_cornerish(min_x::V, max_x::V) where {T, V <: Vec{1,T}}
     lx = max_x - min_x
     max_x += lx
@@ -1056,4 +1058,256 @@ function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange
 end
 function mirror_local_dofs(_, _, ::Lagrange{3})
     error("not implemented yet, please contribute :)")
+end
+
+"""
+    collect_periodic_faces(grid::Grid, mset, iset, transform::Union{Function,Nothing}=nothing)
+
+Match all mirror faces in `mset` with a corresponding image face in `iset`. Return a
+dictionary which maps each mirror face to a image face. The result can then be passed to
+[`PeriodicDirichlet`](@ref).
+
+`mset` and `iset` can be given as a `String` (an existing face set in the grid) or as a
+`Set{FaceIndex}` directly.
+
+By default this function looks for a matching face in the directions of the coordinate
+system. For other types of periodicities the `transform` function can be used. The
+`transform` function is applied on the coordinates of the mirror face, and is expected to
+transform the coordinates to the matching locations in the image set.
+
+See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
+"""
+function collect_periodic_faces(grid::Grid, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing)
+    return collect_periodic_faces!(Dict{FaceIndex,FaceIndex}(), grid, mset, iset, transform)
+end
+
+"""
+    collect_periodic_faces(grid::Grid, all_faces::Union{Set{FaceIndex},String,Nothing}=nothing)
+
+Split all faces in `all_faces` into image and mirror sets. For each matching pair, the face
+located further along the vector `(1, 1, 1)` becomes the image face.
+
+If no set is given, all faces on the outer boundary of the grid (i.e. all faces that do not
+have a neighbor) is used.
+
+See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
+"""
+function collect_periodic_faces(grid::Grid, all_faces::Union{Set{FaceIndex},String,Nothing}=nothing)
+    return collect_periodic_faces!(Dict{FaceIndex,FaceIndex}(), grid, all_faces)
+end
+
+
+"""
+    collect_periodic_faces!(face_map::Dict{FaceIndex,FaceIndex}, grid::Grid, mset, iset, transform::Union{Function,Nothing})
+
+Same as [`collect_periodic_faces`](@ref) but adds all matches to the existing `face_map`.
+"""
+function collect_periodic_faces!(face_map::Dict{FaceIndex,FaceIndex}, grid::Grid, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing)
+    mset = __to_faceset(grid, mset)
+    iset = __to_faceset(grid, iset)
+    if transform === nothing
+        # This method is destructive, hence the copy
+        __collect_periodic_faces_bruteforce!(face_map, grid, copy(mset), copy(iset), #=sort=#false)
+    else
+        # This method relies on ordering, hence the collect
+        __collect_periodic_faces_tree!(face_map, grid, collect(mset), collect(iset), transform)
+    end
+    return face_map
+end
+
+function collect_periodic_faces!(face_map::Dict{FaceIndex,FaceIndex}, grid::Grid, faceset::Union{Set{FaceIndex},String,Nothing})
+    faceset = faceset === nothing ? __collect_boundary_faces(grid) : copy(__to_faceset(grid, faceset))
+    if mod(length(faceset), 2) != 0
+        error("uneven number of faces")
+    end
+    return __collect_periodic_faces_bruteforce!(face_map, grid, faceset, faceset, #=sort=#true)
+end
+
+__to_faceset(_, set::Set{FaceIndex}) = set
+__to_faceset(grid, set::String) = getfaceset(grid, set)
+function __collect_boundary_faces(grid::Grid)
+    candidates = Dict{Tuple, FaceIndex}()
+    for (ci, c) in enumerate(grid.cells)
+        for (fi, fn) in enumerate(faces(c))
+            fn = sortface(fn)
+            if haskey(candidates, fn)
+                delete!(candidates, fn)
+            else
+                candidates[fn] = FaceIndex(ci, fi)
+            end
+        end
+    end
+    return Set{FaceIndex}(values(candidates))
+end
+
+function __collect_periodic_faces_tree!(face_map::Dict{FaceIndex,FaceIndex}, grid::Grid, mset::Vector{FaceIndex}, iset::Vector{FaceIndex}, transformation::F) where F <: Function
+    if length(mset) != length(mset)
+        error("different number of faces in mirror and image set")
+    end
+    Tx = typeof(first(grid.nodes).x)
+
+    mirror_mean_x = Tx[]
+    for (c, f) in mset
+        fn = faces(grid.cells[c])[f]
+        # Apply transformation to all coordinates
+        push!(mirror_mean_x, sum(transformation(grid.nodes[i].x)::Tx for i in fn) / length(fn))
+    end
+
+    # Same dance for the image
+    image_mean_x = Tx[]
+    for (c, f) in iset
+        fn = faces(grid.cells[c])[f]
+        push!(image_mean_x, sum(grid.nodes[i].x for i in fn) / length(fn))
+    end
+
+    # Use KDTree to find closest face
+    tree = KDTree(image_mean_x)
+    idxs, _ = NearestNeighbors.nn(tree, mirror_mean_x)
+    for (m, idx) in zip(mset, idxs)
+        face_map[m] = iset[idx]
+    end
+
+    # Make sure the mapping is unique
+    @assert all(x -> in(x, keys(face_map)), mset)
+    @assert all(x -> in(x, values(face_map)), iset)
+    if !allunique(values(face_map))
+        error("did not find a unique mapping between faces")
+    end
+
+    return face_map
+end
+
+# This method empties mset and iset
+function __collect_periodic_faces_bruteforce!(face_map::Dict{FaceIndex,FaceIndex}, grid::Grid, mset::Set{FaceIndex}, iset::Set{FaceIndex}, sort::Bool)
+    if length(mset) != length(iset)
+        error("different faces in mirror and image")
+    end
+    while length(mset) > 0
+        fi = first(mset)
+        found = false
+        for fj in iset
+            fi == fj && continue
+            r = __check_periodic_faces(grid, fi, fj)
+            r === nothing && continue
+            push!(face_map, sort ? r : fi => fj)
+            delete!(mset, fi)
+            delete!(iset, fj)
+            found = true
+            break
+        end
+        found || error("did not find a corresponding periodic face")
+    end
+    @assert isempty(mset) && isempty(iset)
+    return face_map
+end
+
+function __periodic_options(::T) where T <: Vec{2}
+    # (3^2 - 1) / 2 options
+    return (
+        Vec{2}((1.0,  0.0)),
+        Vec{2}((0.0,  1.0)),
+        Vec{2}((1.0,  1.0)) / sqrt(2),
+        Vec{2}((1.0,  -1.0)) / sqrt(2),
+    )
+end
+function __periodic_options(::T) where T <: Vec{3}
+    # (3^3 - 1) / 2 options
+    return (
+        Vec{3}((1.0,  0.0, 0.0)),
+        Vec{3}((0.0,  1.0, 0.0)),
+        Vec{3}((0.0,  0.0, 1.0)),
+        Vec{3}((1.0,  1.0, 0.0)) / sqrt(2),
+        Vec{3}((0.0,  1.0, 1.0)) / sqrt(2),
+        Vec{3}((1.0,  0.0, 1.0)) / sqrt(2),
+        Vec{3}((1.0,  1.0, 1.0)) / sqrt(3),
+        Vec{3}((1.0,  -1.0, 0.0)) / sqrt(2),
+        Vec{3}((0.0,  1.0, -1.0)) / sqrt(2),
+        Vec{3}((1.0,  0.0, -1.0)) / sqrt(2),
+        Vec{3}((1.0,  1.0, -1.0)) / sqrt(3),
+        Vec{3}((1.0,  -1.0, 1.0)) / sqrt(3),
+        Vec{3}((1.0,  -1.0, -1.0)) / sqrt(3),
+    )
+end
+
+function __outward_normal(grid::Grid{2}, nodes)
+    n1::Vec{2} = grid.nodes[nodes[1]].x
+    n2::Vec{2} = grid.nodes[nodes[2]].x
+    n = Vec{2}((n2[2] - n1[2], - n2[1] + n1[1]))
+    return n / norm(n)
+end
+
+function __outward_normal(grid::Grid{3}, nodes)
+    n1::Vec{3} = grid.nodes[nodes[1]].x
+    n2::Vec{3} = grid.nodes[nodes[2]].x
+    n3::Vec{3} = grid.nodes[nodes[3]].x
+    n = (n3 - n2) × (n1 - n2)
+    return n / norm(n)
+end
+
+# Check if two faces are periodic
+function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex)
+    cii, fii = fi
+    nodes_i = faces(grid.cells[cii])[fii]
+    cij, fij = fj
+    nodes_j = faces(grid.cells[cij])[fij]
+
+    # 1. Check that normals are opposite TODO: Should use FaceValues here
+    ni = __outward_normal(grid, nodes_i)
+    nj = __outward_normal(grid, nodes_j)
+    TOL = 1e-12
+    if norm(ni + nj) >= TOL
+        return nothing
+    end
+
+    # 2. Find the periodic direction using the vector between the midpoint of the faces
+    xmi = sum(grid.nodes[i].x for i in nodes_i) / length(nodes_i)
+    xmj = sum(grid.nodes[i].x for i in nodes_j) / length(nodes_j)
+    xmij = xmj - xmi
+    h = 2 * norm(xmj - grid.nodes[nodes_j[1]].x) # Approximate element size
+    TOLh = TOL * h
+    found = false
+    local len
+    for o in __periodic_options(xmij)
+        len = xmij ⋅ o
+        if norm(xmij - len * o) < TOLh
+            found = true
+            break
+        end
+    end
+    found || return nothing
+
+    # 3. Check that the first node of fi have a corresponding node in fj
+    nodes_j = reverse(nodes_j)
+    xi = grid.nodes[nodes_i[1]].x
+    node_rot = 0
+    found = false
+    # local len
+    for j in eachindex(nodes_j)
+        xj = grid.nodes[nodes_j[j]].x
+        xij = xj - xi
+        if norm(xij - xmij) < TOLh
+            found = true
+            # node_rot = j
+            break
+        end
+        node_rot += 1
+    end
+    found || return nothing
+
+    # 4. Check the remaining nodes for the same criteria, now with known node_rot
+    for i in 2:length(nodes_j)
+        xi = grid.nodes[nodes_i[i]].x
+        xj = grid.nodes[nodes_j[mod1(i + node_rot, end)]].x
+        xij = xj - xi
+        if norm(xij - xmij) >= TOLh
+            return nothing
+        end
+    end
+
+    # 5. Faces match! Face below the diagonal become the mirror.
+    if len > 0
+        return fi => fj
+    else
+        return fj => fi
+    end
 end
