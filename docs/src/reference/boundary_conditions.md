@@ -8,6 +8,8 @@ DocTestSetup = :(using Ferrite)
 ConstraintHandler
 Dirichlet
 PeriodicDirichlet
+collect_periodic_faces
+collect_periodic_faces!
 add!
 close!
 apply!

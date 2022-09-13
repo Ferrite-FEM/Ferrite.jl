@@ -175,3 +175,184 @@ end
     end
 
 end
+
+# Rotate pi/2 around z
+function rotpio2(v)
+    v3 = Vec{3}(i -> i <= length(v) ? v[i] : 0.0)
+    z = Vec{3}((0.0, 0.0, 1.0))
+    rv = Tensors.rotate(v3, z, pi/2)
+    return typeof(v)(i -> rv[i])
+end
+
+@testset "periodic bc: collect_periodic_faces" begin
+    # 1D (TODO: Broken)
+    # grid = generate_grid(Line, (2,))
+    # face_map = collect_periodic_faces(grid)
+
+
+    # 2D simple grid
+    #       3       3
+    #   ┌───────┬───────┐
+    #   │       │       │
+    # 4 │   3   │   4   │ 2
+    #   │       │       │
+    #   ├───────┼───────┤
+    #   │       │       │
+    # 4 │   1   │   2   │ 2
+    #   │       │       │
+    #   └───────┴───────┘
+    #       1       1
+    grid = generate_grid(Quadrilateral, (2, 2))
+    correct_map = Dict{FaceIndex,FaceIndex}(
+        FaceIndex(1, 1) => FaceIndex(3, 3),
+        FaceIndex(2, 1) => FaceIndex(4, 3),
+        FaceIndex(1, 4) => FaceIndex(2, 2),
+        FaceIndex(3, 4) => FaceIndex(4, 2),
+    )
+
+    # Brute force path with no boundary info
+    face_map = collect_periodic_faces(grid)
+    @test face_map == correct_map
+
+    # Brute force path with boundary info
+    face_map = collect_periodic_faces(grid,
+        union(
+            getfaceset(grid, "left"),
+            getfaceset(grid, "bottom"),
+        ),
+        union(
+            getfaceset(grid, "right"),
+            getfaceset(grid, "top"),
+        )
+    )
+    @test face_map == correct_map
+
+    # Brute force, keeping the mirror/image ordering
+    face_map = collect_periodic_faces(grid,
+        union(
+            getfaceset(grid, "right"),
+            getfaceset(grid, "top"),
+        ),
+        union(
+            getfaceset(grid, "left"),
+            getfaceset(grid, "bottom"),
+        )
+    )
+    @test face_map == Dict(values(correct_map) .=> keys(correct_map))
+
+    # Known pairs with transformation
+    face_map = collect_periodic_faces(grid, "left", "right", x -> x + Vec{2}((1.0, 0.0)))
+    collect_periodic_faces!(face_map, grid, "bottom", "top", x -> x + Vec{2}((0.0, 1.0)))
+    @test face_map == correct_map
+
+    # More advanced transformation by rotation
+    face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
+    collect_periodic_faces!(face_map, grid, "right", "top", rotpio2)
+    @test face_map == Dict{FaceIndex,FaceIndex}(
+        FaceIndex(3, 4) => FaceIndex(1, 1),
+        FaceIndex(1, 4) => FaceIndex(2, 1),
+        FaceIndex(2, 2) => FaceIndex(4, 3),
+        FaceIndex(4, 2) => FaceIndex(3, 3),
+    )
+
+    # 3D simple grid (TODO: better than just smoke tests...)
+    grid = generate_grid(Hexahedron, (2, 2, 2))
+    face_map = collect_periodic_faces(grid)
+    @test length(face_map) == 12
+end # testset
+
+@testset "periodic bc: dof mapping" begin
+    grid = generate_grid(Quadrilateral, (2, 2))
+    face_map = collect_periodic_faces(grid, "left", "right")
+    collect_periodic_faces!(face_map, grid, "bottom", "top")
+    function get_dof_map(ch)
+        m = Dict{Int,Int}()
+        for ac in ch.acs
+            mdof = ac.constrained_dof
+            @test ac.b == 0
+            @test length(ac.entries) == 1
+            idof, weight = first(ac.entries)
+            @test weight == 1
+            m[mdof] = idof
+        end
+        return m
+    end
+
+    #             Distributed dofs
+    #       Scalar                Vector
+    #  8───────7───────9   15,16───13,14───17,18
+    #  │       │       │     │       │       │
+    #  │       │       │     │       │       │
+    #  │       │       │     │       │       │
+    #  4───────3───────6    7,8─────5,6────11,12
+    #  │       │       │     │       │       │
+    #  │       │       │     │       │       │
+    #  │       │       │     │       │       │
+    #  1───────2───────5    1,2─────3,4─────9,10
+
+    # Scalar
+    dh = DofHandler(grid)
+    push!(dh, :s, 1)
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    pbc = PeriodicDirichlet(:s, face_map)
+    add!(ch, pbc)
+    dof_map = get_dof_map(ch)
+    @test dof_map == Dict{Int,Int}(
+        1 => 9,
+        2 => 7,
+        5 => 9,
+        4 => 6,
+        8 => 9,
+    )
+
+    # Vector
+    dh = DofHandler(grid)
+    push!(dh, :v, 2)
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    pbc = PeriodicDirichlet(:v, face_map, [1, 2])
+    add!(ch, pbc)
+    dof_map = get_dof_map(ch)
+    @test dof_map == Dict{Int,Int}(
+        1 => 17, 2 => 18,
+        3 => 13, 4 => 14,
+        9 => 17, 10 => 18,
+        7 => 11, 8 => 12,
+        15 => 17, 16 => 18,
+    )
+    ## Just component #2
+    ch = ConstraintHandler(dh)
+    pbc = PeriodicDirichlet(:v, face_map, 2)
+    add!(ch, pbc)
+    dof_map = get_dof_map(ch)
+    @test dof_map == Dict{Int,Int}(
+        2 => 18,
+        4 => 14,
+        10 => 18,
+        8 => 12,
+        16 => 18,
+    )
+
+    # Rotation (TODO: No support for rotating the dofs yet!)
+    face_map_rot = collect_periodic_faces(grid, "left", "bottom", rotpio2)
+    collect_periodic_faces!(face_map_rot, grid, "right", "top", rotpio2)
+    ch = ConstraintHandler(dh)
+    pbc = PeriodicDirichlet(:v, face_map_rot, [1, 2])
+    add!(ch, pbc)
+    dof_map = get_dof_map(ch)
+    @test_broken dof_map == Dict{Int,Int}(
+        # 15 => 15, # 15 -> 1 -> 9 -> 17 -> 15
+        # 16 => 16, # 16 -> 2 -> 10 -> 18 -> 16
+        7 => 3,
+        8 => 4,
+        1 => 15, # 1 -> 9 -> 17 -> 15
+        2 => 16, # 2 -> 10 -> 18 -> 16
+        9 => 17,
+        10 => 18,
+        11 => 13,
+        12 => 14,
+        17 => 15,
+        18 => 16,
+    )
+end # testset

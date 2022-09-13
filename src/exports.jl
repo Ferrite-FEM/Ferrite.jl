@@ -115,6 +115,8 @@ export
     ConstraintHandler,
     Dirichlet,
     PeriodicDirichlet,
+    collect_periodic_faces,
+    collect_periodic_faces!,
     AffineConstraint,
     update!,
     apply!,
