@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+ - New higher order function interpolations for triangles (`Lagrange{2,RefTetrahedron,3}`,
+   `Lagrange{2,RefTetrahedron,4}`, and `Lagrange{2,RefTetrahedron,5}`). ([#482][github-482],
+   [#512][github-512])
 ### Changed
  - The default components to constrain in `Dirichlet` and `PeriodicDirichlet` have changed
    from component 1 to all components of the field. For scalar problems this has no effect.
@@ -120,6 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-475]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/475
 [github-478]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/478
 [github-481]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/481
+[github-482]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/482
 [github-487]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/487
 [github-494]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/494
 [github-496]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/496
@@ -129,6 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-505]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/505
 [github-506]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/506
 [github-509]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/509
+[github-512]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/512
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.8...HEAD
 [0.3.8]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.7...v0.3.8

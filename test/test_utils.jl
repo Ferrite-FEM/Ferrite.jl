@@ -126,6 +126,12 @@ function calculate_volume(::Lagrange{2, RefTetrahedron, 2}, x::Vector{Vec{dim, T
     return vol
 end
 
+# TODO: Only correct for linear sides
+function calculate_volume(::Lagrange{2, RefTetrahedron, O}, x::Vector{Vec{dim, T}}) where {T, dim, O}
+    vol = norm((x[1] - x[3]) × (x[2] - x[3])) * 0.5
+    return vol
+end
+
 function calculate_volume(::Lagrange{3, RefTetrahedron, order}, x::Vector{Vec{3, T}}) where {T, order}
     vol = norm((x[2] - x[1]) ⋅ ((x[3] - x[1]) × (x[4] - x[1]))) / 6.0
     return vol
