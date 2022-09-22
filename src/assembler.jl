@@ -160,7 +160,11 @@ end
 end
 
 @propagate_inbounds function _assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
+    ld = length(dofs)
+    @assert size(Ke, 1) == ld
+    @assert size(Ke, 2) == ld
     if length(fe) != 0
+        @assert length(fe) == ld
         @boundscheck checkbounds(A.f, dofs)
         @inbounds assemble!(A.f, dofs, fe)
     end
@@ -169,14 +173,14 @@ end
     permutation = A.permutation
     sorteddofs = A.sorteddofs
     @boundscheck checkbounds(K, dofs, dofs)
-    resize!(permutation, length(dofs))
-    resize!(sorteddofs, length(dofs))
+    resize!(permutation, ld)
+    resize!(sorteddofs, ld)
     copyto!(sorteddofs, dofs)
     sortperm2!(sorteddofs, permutation)
 
     current_col = 1
     @inbounds for Kcol in sorteddofs
-        maxlookups = sym ? current_col : length(dofs)
+        maxlookups = sym ? current_col : ld
         current_idx = 1
         for r in nzrange(K, Kcol)
             Kerow = permutation[current_idx]
