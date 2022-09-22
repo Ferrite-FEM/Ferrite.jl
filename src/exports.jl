@@ -117,6 +117,7 @@ export
     PeriodicDirichlet,
     collect_periodic_faces,
     collect_periodic_faces!,
+    PeriodicFacePair,
     AffineConstraint,
     update!,
     apply!,
