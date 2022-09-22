@@ -34,15 +34,16 @@ struct Dirichlet # <: Constraint
     local_face_dofs::Vector{Int}
     local_face_dofs_offset::Vector{Int}
 end
-function Dirichlet(field_name::Symbol, faces::Union{T}, f::Function, component::Int=1) where T
-    Dirichlet(field_name, copy(faces), f, [component])
-end
-function Dirichlet(field_name::Symbol, faces::Set{T}, f::Function, components::AbstractVector{Int}) where T
-    unique(components) == components || error("components not unique: $components")
-    # issorted(components) || error("components not sorted: $components")
-    return Dirichlet(f, copy(faces), field_name, Vector(components), Int[], Int[])
+function Dirichlet(field_name::Symbol, faces::Set, f::Function, components=1)
+    return Dirichlet(f, copy(faces), field_name, __to_components(components), Int[], Int[])
 end
 
+function __to_components(c)
+    components = convert(Vector{Int}, vec(collect(Int, c)))
+    issorted(components) || error("components not sorted: $components")
+    allunique(components) || error("components not unique: $components")
+    return components
+end
 
 """
     AffineConstraint(constrained_dofs::Int, master_dofs::Vector{Int}, coeffs::Vector{T}, b::T) where T
@@ -282,6 +283,7 @@ end
 # Calculate which local dof index live on each face:
 # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
 function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F=faces) where F
+    @assert issorted(components)
     local_face_dofs = Int[]
     local_face_dofs_offset = Int[1]
     for (_, face) in enumerate(boundaryfunc(interpolation))
@@ -857,20 +859,18 @@ struct PeriodicDirichlet
 end
 
 # Default to no inhomogeneity function
-PeriodicDirichlet(fn::Symbol, fp::Union{Vector{<:Pair},Vector{PeriodicFacePair}}, c::Union{Int,Vector{Int}}=1) =
+PeriodicDirichlet(fn::Symbol, fp::Union{Vector{<:Pair},Vector{PeriodicFacePair}}, c=1) =
     PeriodicDirichlet(fn, fp, nothing, c)
 
 # Basic constructor for the simple case where face_map will be populated in
 # add!(::ConstraintHandler, ...) instead
-function PeriodicDirichlet(fn::Symbol, fp::Vector{<:Pair}, f::Union{Function,Nothing}, c::Union{Int,Vector{Int}}=1)
-    components = sort!(vec(collect(c)))
+function PeriodicDirichlet(fn::Symbol, fp::Vector{<:Pair}, f::Union{Function,Nothing}, c=1)
     face_map = PeriodicFacePair[] # This will be populated in add!(::ConstraintHandler, ...) instead
-    return PeriodicDirichlet(fn, components, fp, face_map, f)
+    return PeriodicDirichlet(fn, __to_components(c), fp, face_map, f)
 end
 
-function PeriodicDirichlet(fn::Symbol, fm::Vector{PeriodicFacePair}, f::Union{Function,Nothing}, c::Union{Int,Vector{Int}}=1)
-    components = sort!(vec(collect(c)))
-    return PeriodicDirichlet(fn, components, Pair{String,String}[], fm, f)
+function PeriodicDirichlet(fn::Symbol, fm::Vector{PeriodicFacePair}, f::Union{Function,Nothing}, c=1)
+    return PeriodicDirichlet(fn, __to_components(c), Pair{String,String}[], fm, f)
 end
 
 function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)

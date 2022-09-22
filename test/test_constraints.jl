@@ -855,9 +855,9 @@ end # testset
         if D == 3
             compare_by_dbc(
                 dh,
-                PeriodicDirichlet(:v, collect_periodic_faces(grid, "front", "back"), collect(1:D)),
-                Dirichlet(:v, getfaceset(grid, "front"), (x,t) -> [0., 0.], collect(1:D)),
-                Dirichlet(:v, getfaceset(grid, "back"), (x,t) -> [0., 0.], collect(1:D)),
+                PeriodicDirichlet(:v, collect_periodic_faces(grid, "front", "back"), 1:D),
+                Dirichlet(:v, getfaceset(grid, "front"), (x,t) -> [0., 0.], 1:D),
+                Dirichlet(:v, getfaceset(grid, "back"), (x,t) -> [0., 0.], 1:D),
             )
             compare_by_dbc(
                 dh,
