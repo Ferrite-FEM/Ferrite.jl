@@ -256,10 +256,9 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, inter
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
-    redundant_faces = Index[]
     for (cellidx, faceidx) in bcfaces
         if cellidx ∉ cellset
-            push!(redundant_faces, Index(cellidx, faceidx)) # will be removed from dbc
+            delete!(dbc.faces, Index(cellidx, faceidx))
             continue # skip faces that are not part of the cellset
         end
         _celldofs = fill(0, ndofs_per_cell(ch.dh, cellidx))
@@ -269,7 +268,6 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, inter
         @debug println("adding dofs $(_celldofs[local_face_dofs[r]]) to dbc")
     end
 
-    setdiff!(dbc.faces, redundant_faces)
     # save it to the ConstraintHandler
     push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
