@@ -3,6 +3,10 @@ DocTestSetup = :(using Ferrite)
 ```
 
 # Grid
+A Ferrite `Grid` can be generated with the `generate_grid` function. 
+More advanced meshes can be imported with the 
+[`FerriteMeshParser.jl`](https://github.com/Ferrite-FEM/FerriteMeshParser.jl) (currently for Abaqus .inp files),
+or even created with the [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package. 
 
 In Ferrite a Grid is a collection of `Node`s and `Cell`s and is parameterized in its physical dimensionality and cell type.
 `Node`s are points in the physical space and can be initialized by a N-Tuple, where N corresponds to the dimensions.
