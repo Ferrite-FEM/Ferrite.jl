@@ -3,7 +3,7 @@ DocTestSetup = :(using Ferrite)
 ```
 
 # Grid
-A Ferrite `Grid` can be generated with the generate_grid` function. 
+A Ferrite `Grid` can be generated with the `generate_grid` function. 
 More advanced meshes can be imported with the 
 [`FerriteMeshParser.jl`](https://github.com/Ferrite-FEM/FerriteMeshParser.jl) (currently for Abaqus .inp files),
 or even created with the [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package. 
