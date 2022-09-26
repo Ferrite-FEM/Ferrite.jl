@@ -47,9 +47,6 @@ using Ferrite, SparseArrays
 # so we don't need to specify the corners of the domain.
 grid = generate_grid(Quadrilateral, (20, 20));
 
-# Creating or importing more advanced meshes is possible with the [FerriteGmsh.jl](https://github.com/Ferrite-FEM/FerriteGmsh.jl) or 
-# [FerriteMeshParser.jl](https://github.com/Ferrite-FEM/FerriteMeshParser.jl) packages. 
-
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
 # test and trial functions (among other things). Since the problem
