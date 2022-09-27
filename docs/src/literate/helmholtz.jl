@@ -23,10 +23,10 @@
 #
 # We will use the following weak formulation:
 # ```math
-# \int \nabla δu \cdot \nabla u d\Omega
-# + \int δu \cdot u d\Omega
-# - \int δu \cdot f d\Omega
-# - \int δu g_2 d\Gamma_2 = 0 \quad \forall δu
+# \int_\Omega \nabla δu \cdot \nabla u \, d\Omega
+# + \int_\Omega δu \cdot u \, d\Omega
+# - \int_\Omega δu \cdot f \, d\Omega
+# - \int_{\Gamma_2} δu g_2 \, d\Gamma = 0 \quad \forall δu
 # ```
 #
 # where $δu$ is a suitable test function that satisfies:
@@ -108,9 +108,9 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
         reinit!(cellvalues, cell)
         # First we derive the non boundary part of the variation problem from the destined solution `u_ana`
         # ```math
-        # \int \nabla δu \cdot \nabla u d\Omega
-        # + \int δu \cdot u d\Omega
-        # - \int δu \cdot f d\Omega
+        # \int_\Omega \nabla δu \cdot \nabla u \, d\Omega
+        # + \int_\Omega δu \cdot u \, d\Omega
+        # - \int_\Omega δu \cdot f \, d\Omega
         # ```
         #+
 
@@ -132,7 +132,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
 
         # Now we manually add the von Neumann boundary terms
         # ```math
-        # \int δu g_2 d\Gamma_2
+        # \int_{\Gamma_2} δu g_2 \, d\Gamma
         # ```
         #+
         for face in 1:nfaces(cell)
