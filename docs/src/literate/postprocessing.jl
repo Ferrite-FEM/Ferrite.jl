@@ -114,7 +114,7 @@ q_points = get_point_values(ph, projector, q_projected);
 # vector of the simulation, that is stored in `u`. These values are stored in the order of
 # our initial DofHandler so the input is not the `PointEvalHandler`, the original `DofHandler`,
 # the dof-vector `u`, and (optionally for single-field problems) the name of the field.
-# from the `L2Projection`, the values are stored in the order of the degrees of freedom.
+# From the `L2Projection`, the values are stored in the order of the degrees of freedom.
 u_points = Ferrite.get_point_values(ph, dh, u, :u);
 
 # Now, we can plot the temperature and flux values with the help of any plotting library, e.g. Plots.jl.
