@@ -26,7 +26,7 @@
 # \int \nabla δu \cdot \nabla u d\Omega
 # + \int δu \cdot u d\Omega
 # - \int δu \cdot f d\Omega
-# - \int δu g_2 d\Gamma_2 = 0 \forall δu
+# - \int δu g_2 d\Gamma_2 = 0 \quad \forall δu
 # ```
 #
 # where $δu$ is a suitable test function that satisfies:
