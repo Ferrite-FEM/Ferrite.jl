@@ -274,7 +274,7 @@ end
     @test topology.edge_neighbor[2,12] == Ferrite.EntityNeighborhood(EdgeIndex(3,10))
     @test topology.edge_neighbor[3,10] == Ferrite.EntityNeighborhood(EdgeIndex(2,12))
     @test topology.edge_neighbor[4,9] == Ferrite.EntityNeighborhood(EdgeIndex(1,11))
-    @test all(iszero,topology.vertex_neighbor)
+    @test isempty(topology.vertex_neighbor)
     @test topology.face_neighbor[1,3] == Ferrite.EntityNeighborhood(FaceIndex(2,5))
     @test topology.face_neighbor[1,4] == Ferrite.EntityNeighborhood(FaceIndex(3,2))
     @test topology.face_neighbor[2,4] == Ferrite.EntityNeighborhood(FaceIndex(4,2))
@@ -306,7 +306,7 @@ end
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 10)]
     grid = Grid(cells, nodes)
     topology = ExclusiveTopology(grid)
-    @test all(iszero,topology.vertex_neighbor)
+    @test isempty(topology.vertex_neighbor)
     @test topology.face_neighbor[2,1] == Ferrite.EntityNeighborhood(EdgeIndex(1,2))
     @test topology.edge_neighbor[1,2] == Ferrite.EntityNeighborhood(FaceIndex(2,1))
 #                           
