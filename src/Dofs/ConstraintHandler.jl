@@ -854,9 +854,10 @@ struct PeriodicDirichlet
     face_pairs::Vector{Pair{String,String}} # legacy that will populate face_map on add!
     face_map::Vector{PeriodicFacePair}
     func::Union{Function,Nothing}
+    rotation_matrix::Union{Matrix{Float64},Nothing}
 end
 
-# Default to no inhomogeneity function
+# Default to no inhomogeneity function/rotation
 PeriodicDirichlet(fn::Symbol, fp::Union{Vector{<:Pair},Vector{PeriodicFacePair}}, c=1) =
     PeriodicDirichlet(fn, fp, nothing, c)
 
@@ -864,11 +865,19 @@ PeriodicDirichlet(fn::Symbol, fp::Union{Vector{<:Pair},Vector{PeriodicFacePair}}
 # add!(::ConstraintHandler, ...) instead
 function PeriodicDirichlet(fn::Symbol, fp::Vector{<:Pair}, f::Union{Function,Nothing}, c=1)
     face_map = PeriodicFacePair[] # This will be populated in add!(::ConstraintHandler, ...) instead
-    return PeriodicDirichlet(fn, __to_components(c), fp, face_map, f)
+    return PeriodicDirichlet(fn, __to_components(c), fp, face_map, f, nothing)
 end
 
-function PeriodicDirichlet(fn::Symbol, fm::Vector{PeriodicFacePair}, f::Union{Function,Nothing}, c=1)
-    return PeriodicDirichlet(fn, __to_components(c), Pair{String,String}[], fm, f)
+function PeriodicDirichlet(fn::Symbol, fm::Vector{PeriodicFacePair}, f_or_r::Union{AbstractMatrix,Function,Nothing}, c=1)
+    f = f_or_r isa Function ? f_or_r : nothing
+    rotation_matrix = f_or_r isa AbstractMatrix ? f_or_r : nothing
+    components = __to_components(c)
+    if rotation_matrix !== nothing
+        if !(length(components) == size(rotation_matrix, 1) == size(rotation_matrix, 2))
+            error("size of rotation matrix does not match the number of components")
+        end
+    end
+    return PeriodicDirichlet(fn, components, Pair{String,String}[], fm, f, rotation_matrix)
 end
 
 function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
@@ -882,12 +891,28 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     field_idx = find_field(ch.dh, pdbc.field_name)
     interpolation = getfieldinterpolation(ch.dh, field_idx)
     field_dim = getfielddim(ch.dh, field_idx)
-    _add!(ch, pdbc, interpolation, field_dim, field_offset(ch.dh, pdbc.field_name), is_legacy)
+    if pdbc.rotation_matrix === nothing
+        dof_map_t = Int
+        iterator_f = identity
+    else
+        @assert pdbc.func === nothing # Verified in constructor
+        if is_legacy
+            error("legacy mode not supported with rotations")
+        end
+        nc = length(pdbc.components)
+        @assert nc == size(pdbc.rotation_matrix, 1) == size(pdbc.rotation_matrix, 2) # Verified in constructor
+        if nc !== field_dim
+            error("rotations currently only supported when all components are periodic")
+        end
+        dof_map_t = Vector{Int}
+        iterator_f = x -> Iterators.partition(x, nc)
+    end
+    _add!(ch, pdbc, interpolation, field_dim, field_offset(ch.dh, pdbc.field_name), is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f)
     return ch
 end
 
 function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::Interpolation,
-               field_dim::Int, offset::Int, is_legacy::Bool=false)
+               field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T},Nothing}, ::Type{dof_map_t}, iterator_f::F) where {T, dof_map_t, F <: Function}
     grid = ch.dh.grid
     face_map = pdbc.face_map
     Tx = typeof(first(ch.dh.grid.nodes).x) # Vec{D,T}
@@ -897,11 +922,10 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
         _local_face_dofs_for_bc(interpolation, field_dim, pdbc.components, offset)
     mirrored_indices =
         mirror_local_dofs(local_face_dofs, local_face_dofs_offset, interpolation, length(pdbc.components))
-
     rotated_indices = rotate_local_dofs(local_face_dofs, local_face_dofs_offset, interpolation, length(pdbc.components))
 
     # Dof map for mirror dof => image dof
-    dof_map = Dict{Int,Int}()
+    dof_map = Dict{dof_map_t,dof_map_t}()
 
     mirror_dofs = zeros(Int, ndofs_per_cell(ch.dh))
      image_dofs = zeros(Int, ndofs_per_cell(ch.dh))
@@ -914,7 +938,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
         mdof_range = local_face_dofs_offset[m[2]] : (local_face_dofs_offset[m[2] + 1] - 1)
         idof_range = local_face_dofs_offset[i[2]] : (local_face_dofs_offset[i[2] + 1] - 1)
 
-        for (md, id) in zip(mdof_range, idof_range)
+        for (md, id) in zip(iterator_f(mdof_range), iterator_f(idof_range))
             mdof = image_dofs[local_face_dofs[id]]
             # Rotate the mirror index
             rotated_md = rotated_indices[md, face_pair.rotation + 1]
@@ -943,7 +967,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
     # Need to untangle in case we have 1 => 2 and 2 => 3 into 1 => 3 and 2 => 3.
     # Note that a single pass is enough (no need to iterate) since all constraints are
     # between just one mirror dof and one image dof.
-    remaps = Dict{Int, Int}()
+    remaps = Dict{dof_map_t, dof_map_t}()
     for (k, v) in dof_map
         if haskey(dof_map, v)
             remaps[k] = get(remaps, v, dof_map[v])
@@ -1025,8 +1049,17 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
 
     # Any remaining mappings are added as homogeneous AffineConstraints
     for (k, v) in dof_map
-        ac = AffineConstraint(k, [v => 1.0], inhomogeneity_map === nothing ? 0.0 : inhomogeneity_map[k])
-        add!(ch, ac)
+        if dof_map_t === Int
+            ac = AffineConstraint(k, [v => 1.0], inhomogeneity_map === nothing ? 0.0 : inhomogeneity_map[k])
+            add!(ch, ac)
+        else
+            @assert inhomogeneity_map === nothing
+            for (i, ki) in pairs(k)
+                vs = Pair{Int,eltype(T)}[v[j] => rotation_matrix[j, i] for j in 1:length(v)]
+                ac = AffineConstraint(ki, vs, 0.0)
+                add!(ch, ac)
+            end
+        end
     end
 
     return ch
