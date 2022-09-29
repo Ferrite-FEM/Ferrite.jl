@@ -340,12 +340,10 @@ uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
 version = "0.3.7"
 
 [[FerriteGmsh]]
-deps = ["Ferrite", "Reexport", "gmsh_jll"]
-git-tree-sha1 = "502e8fe43ff4342e42207d8ecbdc76787970ef69"
-repo-rev = "master"
-repo-url = "https://github.com/Ferrite-FEM/FerriteGmsh.jl.git"
+deps = ["Ferrite", "Gmsh"]
+git-tree-sha1 = "ab52b403356f18bbf0a533a7e8f26c86a8da70f6"
 uuid = "4f95f4f8-b27c-4ae5-9a39-ea55e634e36b"
-version = "0.1.0"
+version = "1.0.0"
 
 [[FillArrays]]
 deps = ["LinearAlgebra", "Random", "SparseArrays", "Statistics"]
@@ -461,6 +459,12 @@ deps = ["Artifacts", "Gettext_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Libic
 git-tree-sha1 = "a32d672ac2c967f3deb8a81d828afc739c838a06"
 uuid = "7746bdde-850d-59dc-9ae8-88ece973131d"
 version = "2.68.3+2"
+
+[[Gmsh]]
+deps = ["gmsh_jll"]
+git-tree-sha1 = "4d4dedef84147934837c683538467cea54c44d44"
+uuid = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
+version = "0.2.2"
 
 [[Graphite2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1250,9 +1254,9 @@ version = "0.1.1"
 
 [[Tensors]]
 deps = ["ForwardDiff", "LinearAlgebra", "SIMD", "StaticArrays", "Statistics"]
-git-tree-sha1 = "d04564923243e1c306369fb6df9b6792fd0818c4"
+git-tree-sha1 = "2aeb143305a3ff33d3241263d13d14db64948a2d"
 uuid = "48a634ad-e948-5137-8d70-aa71f2a747f4"
-version = "1.11.0"
+version = "1.12.0"
 
 [[Test]]
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
