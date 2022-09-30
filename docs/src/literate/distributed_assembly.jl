@@ -485,74 +485,9 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     ghost_dof_field_index_to_send = [Int[] for i ∈ 1:destination_len]
     ghost_element_to_send = [Int[] for i ∈ 1:destination_len] # corresponding element
     ghost_dof_owner = [Int[] for i ∈ 1:destination_len] # corresponding owner
-    # for (pivot_vi, pivot_sv) ∈ dgrid.shared_vertices
-    #     # We start by searching shared vertices which are not owned by us
-    #     pivot_vertex_owner_rank = Ferrite.compute_owner(dgrid, pivot_sv)
-    #     pivot_cell_idx = pivot_vi[1]
-        
-    #     # Ghost is per definition non-local
-    #     if my_rank != pivot_vertex_owner_rank
-    #         sender_slot = destination_index[pivot_vertex_owner_rank]
-
-    #         @debug println("$pivot_vi may require synchronization (R$my_rank)")
-    #         # We have to send ALL dofs on the element to the remote.
-    #         # @TODO send actually ALL dofs (currently only vertex dofs for a first version...)
-    #         pivot_cell = getcells(dgrid, pivot_cell_idx)
-    #         for (other_vertex_idx, other_vertex) ∈ enumerate(Ferrite.vertices(pivot_cell))
-    #             # Skip self
-    #             other_vi = VertexIndex(pivot_cell_idx, other_vertex_idx)
-    #             if other_vi == pivot_vi
-    #                 continue
-    #             end
-
-    #             if is_shared_vertex(dgrid, other_vi)
-    #                 #@TODO We should be able to remove more redundant communication is many cases.
-    #                 other_sv = dgrid.shared_vertices[other_vi]
-    #                 other_vertex_owner_rank = Ferrite.compute_owner(dgrid, other_sv)
-
-    #                 # "Other vertex" is not a ghost vertex if it touches the element itself
-    #                 if haskey(other_sv.remote_vertices, pivot_vertex_owner_rank)
-    #                     pivot_vertex_adjacent_elements = [nei for (nei, _) ∈ pivot_sv.remote_vertices[pivot_vertex_owner_rank]]
-    #                     skip_me = false
-    #                     for (nei, _) ∈ other_sv.remote_vertices[pivot_vertex_owner_rank]
-    #                         if nei ∈ pivot_vertex_adjacent_elements
-    #                             skip_me = true
-    #                             break
-    #                         end
-    #                     end
-    #                     if skip_me
-    #                         @debug println("  Skipping $other_vi for $pivot_vi (R$my_rank)")
-    #                         continue
-    #                     end
-    #                 end
-    #             else
-    #                 # If the vertex is not a shared one, we always have to sync it
-    #                 other_vertex_owner_rank = my_rank
-    #             end
-
-    #             # Now we have to sync all fields separately
-    #             @debug println("  Ghost candidate $other_vi for $pivot_vi (R$my_rank)")
-    #             for field_idx in 1:Ferrite.nfields(dh)
-    #                 pivot_vertex = Ferrite.toglobal(getlocalgrid(dgrid), pivot_vi)
-    #                 # If any of the two vertices is not defined on the current field, just skip.
-    #                 if !haskey(dh.vertexdicts[field_idx], pivot_vertex) || !haskey(dh.vertexdicts[field_idx], other_vertex)
-    #                     continue
-    #                 end
-    #                 @debug println("    $other_vi is ghost for $pivot_vi in field $field_idx (R$my_rank)")
-
-    #                 other_vertex_dof = dh.vertexdicts[field_idx][other_vertex]
-
-    #                 append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[other_vertex_dof])
-    #                 append!(ghost_rank_to_send[sender_slot], other_vertex_owner_rank)
-    #                 append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
-    #                 append!(ghost_element_to_send[sender_slot], pivot_cell_idx)
-    #             end
-    #         end
-    #     end
-    # end
-
+    ghost_dof_pivot_to_send = [Int[] for i ∈ 1:destination_len] # corresponding dof to interact with
     for (pivot_vi, pivot_sv) ∈ dgrid.shared_vertices
-        # We start by searching shared vertices which are not owned by us
+        # Start by searching shared vertices which are not owned
         pivot_vertex_owner_rank = Ferrite.compute_owner(dgrid, pivot_sv)
         pivot_cell_idx = pivot_vi[1]
 
@@ -571,17 +506,8 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
                 end
 
                 if is_shared_vertex(dgrid, other_vi)
-                    #@TODO We should be able to remove more redundant communication is many cases.
                     other_sv = dgrid.shared_vertices[other_vi]
                     other_vertex_owner_rank = Ferrite.compute_owner(dgrid, other_sv)
-                    # Also skip if the "other vertex" is already owned by the process owning the pivot vertex
-                    if other_vertex_owner_rank == pivot_vertex_owner_rank
-                        continue;
-                    end
-                    # A vertex is also not a ghost vertex if it touches the domain of the rank of the pivot
-                    if pivot_vertex_owner_rank ∈ keys(other_sv.remote_vertices)
-                        continue
-                    end
                 else
                     other_vertex_owner_rank = my_rank
                 end
@@ -596,8 +522,10 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
                     end
                     @debug println("    $other_vi is ghost for $pivot_vi in field $field_idx (R$my_rank)")
 
+                    pivot_vertex_dof = dh.vertexdicts[field_idx][pivot_vertex]
                     other_vertex_dof = dh.vertexdicts[field_idx][other_vertex]
 
+                    append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_vertex_dof])
                     append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[other_vertex_dof])
                     append!(ghost_rank_to_send[sender_slot], other_vertex_owner_rank)
                     append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
@@ -632,39 +560,25 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     ghost_recv_buffer_ranks = zeros(Int, sum(ghost_recv_buffer_lengths))
     MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_ranks,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_ranks,ghost_recv_buffer_lengths), vertex_comm(dgrid))
 
+    ghost_send_buffer_dofs_piv = vcat(ghost_dof_pivot_to_send...)
+    ghost_recv_buffer_dofs_piv = zeros(Int, sum(ghost_recv_buffer_lengths))
+    MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_dofs_piv,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_dofs_piv,ghost_recv_buffer_lengths), vertex_comm(dgrid))
+
     # Reconstruct source ranks
     ghost_recv_buffer_source_ranks = Int[]
     for (source_idx, recv_len) ∈ enumerate(ghost_recv_buffer_lengths)
         append!(ghost_recv_buffer_source_ranks, ones(recv_len)*sources[source_idx])
     end
-    
-    println("received $ghost_recv_buffer_dofs with owners $ghost_recv_buffer_ranks (R$my_rank)")
 
-    # #TODO obtain ghosts algorithmic
-    # if np == 2
-    #     if my_rank == 1
-    #         append!(ghost_dof_to_global, collect(7:9))
-    #         append!(ghost_dof_rank, [2,2,2])
-    #     else
-    #         # no ghosts
-    #     end
-    # elseif np == 3
-    #     if my_rank == 1
-    #         append!(ghost_dof_to_global, [5,6,7,8,9])
-    #         append!(ghost_dof_rank, [2,2,2,3,3])
-    #     elseif my_rank == 2
-    #         append!(ghost_dof_to_global, [1,3,8,9])
-    #         append!(ghost_dof_rank, [1,1,3,3])
-    #     else
-    #         # no ghosts
-    #     end        
-    # end
+    @debug println("received $ghost_recv_buffer_dofs with owners $ghost_recv_buffer_ranks (R$my_rank)")
 
     unique_ghosts_dr = sort(unique(first,zip(ghost_recv_buffer_dofs,ghost_recv_buffer_ranks)))
-    # unzip manually
+    # unzip manually and make sure we do not add duplicate entries to our columns
     for (dof,rank) ∈ unique_ghosts_dr
-        push!(ghost_dof_to_global, dof)
-        push!(ghost_dof_rank, rank)
+        if rank != my_rank && dof ∉ ldof_to_gdof
+            push!(ghost_dof_to_global, dof)
+            push!(ghost_dof_rank, rank)
+        end
     end
 
     # ------------- Construct rows and cols of distributed matrix --------
@@ -742,95 +656,32 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
 
     # --------------------- Add ghost entries in IJ --------------------
     # Fix ghost layer - the locations for remote processes to write their data into
-    unique_ghosts_dre = zip(ghost_recv_buffer_dofs,ghost_recv_buffer_ranks,ghost_recv_buffer_elements)
+    unique_ghosts_dre = zip(ghost_recv_buffer_dofs_piv, ghost_recv_buffer_dofs, ghost_recv_buffer_ranks)
     @debug println("unique_ghosts_dre $unique_ghosts_dre (R$my_rank)")
-
-    # @TODO this is dead slow. optimize.
-    IJ = []
-    for (pivot_vi, pivot_sv) ∈ dgrid.shared_vertices
-        # Loop over owned shared vertices
-        if my_rank == Ferrite.compute_owner(dgrid, pivot_sv)
-            @debug println("Fixing ghost layer $pivot_vi (R$my_rank)")
-            pivot_vertex = Ferrite.toglobal(getlocalgrid(dgrid), pivot_vi)
-            # Now compare the vertex against EVERY ghost dof...
-            for (i,(global_ghost_dof,ghost_owner_rank,ghost_cell_idx)) ∈ enumerate(unique_ghosts_dre)
-                source_rank = ghost_recv_buffer_source_ranks[i]
-                pivot_remotes = Ferrite.remote_entities(pivot_sv)
-                local_ghost_dof = findfirst(x->x==global_ghost_dof, all_local_cols)
-                # ...where we have to check that the ghost is on the correct rank ...
-                if haskey(pivot_remotes, source_rank)
-                    @debug println("  $pivot_vi found for rank $source_rank with dof $global_ghost_dof (R$my_rank)")
-                    for (remote_cell_idx,_) ∈ pivot_remotes[source_rank]
-                        # ... and that it is the correct element.
-                        if remote_cell_idx == ghost_cell_idx
-                            @debug println("    $pivot_vi synced against remote cell $remote_cell_idx (R$my_rank)")
-                            for field_idx in 1:Ferrite.nfields(dh)
-                                if !haskey(dh.vertexdicts[field_idx], pivot_vertex)
-                                    continue
-                                end
-                                @debug println("      handling field $field_idx (R$my_rank)")
-                                pivot_dof = dh.vertexdicts[field_idx][pivot_vertex]
-                                push!(IJ, (pivot_dof, local_ghost_dof))
-                            end
-                        end
-                    end
-                end
-            end
-        end
+    IJfix = []
+    for (i,(pivot_dof, global_ghost_dof, ghost_owner_rank)) ∈ enumerate(unique_ghosts_dre)
+        push!(IJfix, (pivot_dof, global_ghost_dof))
     end
-    # Deduplicate entries.
-    unique!(IJ)
-    @debug println("IJ $IJ (R$my_rank)")
+    @debug println("IJfix $IJfix (R$my_rank)")
 
-    for (i,j) ∈ IJ
-        push!(assembler.I, i)
-        push!(assembler.J, j)
-        push!(assembler.V, 0.0)
+    I = map(i->ldof_to_gdof[i], assembler.I)
+    J = map(j->ldof_to_gdof[j], assembler.J)
+    V = map(v->v, assembler.V)
+
+    for (i,j) ∈ IJfix
+        push!(I, i)
+        push!(J, j)
+        push!(V, 0.0)
     end
 
-    # Manually check if these are the missing ones.
-    if my_rank == 2
-        push!(assembler.I, 5)
-        push!(assembler.J, 2)
-        push!(assembler.V, 0.0)
-
-        push!(assembler.I, 4)
-        push!(assembler.J, 7)
-        push!(assembler.V, 0.0)
-
-        push!(assembler.I, 7)
-        push!(assembler.J, 4)
-        push!(assembler.V, 0.0)
-    end
-
-    # if np == 2
-    #     if my_rank == 1
-    #         append!(assembler.I, [3,3,3, 4,4, 6,6])
-    #         append!(assembler.J, [7,8,9, 7,8, 7,9])
-    #         append!(assembler.V, zeros(7))
-    #     else
-    #         # no ghost layer
-    #     end
-    # elseif np == 3
-    #     if my_rank == 1
-    #         append!(assembler.I, [3,3, 1,1, 4,4,4,4,4])
-    #         append!(assembler.J, [9,6, 5,8, 8,5,7,6,9])
-    #         append!(assembler.V, zeros(9))
-    #     elseif my_rank == 2
-    #         # all_local_cols [5, 4, 6, 7, 1, 3, 8, 9] (R2)
-    #         append!(assembler.I, [1,1, 3,3])
-    #         append!(assembler.J, [5,7, 6,8])
-    #         append!(assembler.V, zeros(4))
-    #     else
-    #         # no ghost layer
-    #     end
-    # end
-    I_ = MPIData(assembler.I, comm, (np,))
-    J_ = MPIData(assembler.J, comm, (np,))
-    V_ = MPIData(assembler.V, comm, (np,))
-    @debug println("I=$(assembler.I) (R$my_rank)")
-    @debug println("J=$(assembler.J) (R$my_rank)")
-    K = PartitionedArrays.PSparseMatrix(I_, J_, V_, rows, cols, ids=:local)
+    @debug println("I=$(I) (R$my_rank)")
+    @debug println("J=$(J) (R$my_rank)")
+    K = PartitionedArrays.PSparseMatrix(
+        MPIData(I, comm, (np,)), 
+        MPIData(J, comm, (np,)), 
+        MPIData(V, comm, (np,)), 
+        rows, cols, ids=:global
+    )
     return K, f
 end
 #md nothing # hide
