@@ -1,9 +1,11 @@
 # # Incompressible Elasticity
 #
+#-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`incompressible_elasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/incompressible_elasticity.ipynb)
-
+#md #     [`incompressible_elasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/incompressible_elasticity.ipynb).
+#-
+#
 # ## Introduction
 #
 # Mixed elements can be used to overcome locking when the material becomes
@@ -15,8 +17,9 @@
 # The quadratic/linear element is also known as the Taylor-Hood element.
 # We will consider Cook's Membrane with an applied traction on the right hand side.
 #-
-# ## Commented Program
+# ## Commented program
 #
+# What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next
 #md # [section](@ref incompressible_elasticity-plain-program).
 using Ferrite
@@ -226,10 +229,11 @@ u2 = solve(0.4999999, quadratic, linear);
 using Test                         #src
 @test norm(u2) ≈ 919.2122668839389 #src
 
-#md # ## [Plain Program](@id incompressible_elasticity-plain-program)
+#md # ## [Plain program](@id incompressible_elasticity-plain-program)
 #md #
-#md # Below follows a version of the program without any comments.
-#md # The file is also available here: [incompressible_elasticity.jl](incompressible_elasticity.jl)
+#md # Here follows a version of the program without any comments.
+#md # The file is also available here:
+#md # [`incompressible_elasticity.jl`](incompressible_elasticity.jl).
 #md #
 #md # ```julia
 #md # @__CODE__

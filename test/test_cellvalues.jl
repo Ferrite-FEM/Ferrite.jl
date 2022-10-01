@@ -40,7 +40,7 @@ for (func_interpol, quad_rule) in  (
             @test function_gradient(cv, i, u) ≈ H
             @test function_symmetric_gradient(cv, i, u) ≈ 0.5(H + H')
             @test function_divergence(cv, i, u) ≈ tr(H)
-            ndim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl(H)
+            ndim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl_from_gradient(H)
             function_value(cv, i, u)
             if isa(cv, CellScalarValues)
                 @test function_gradient(cv, i, u_scal) ≈ V
@@ -49,7 +49,7 @@ for (func_interpol, quad_rule) in  (
                 @test function_gradient(cv, i, u_vector) ≈ function_gradient(cv, i, u) ≈ H
                 @test function_value(cv, i, u_vector) ≈ function_value(cv, i, u)
                 @test function_divergence(cv, i, u_vector) ≈ function_divergence(cv, i, u) ≈ tr(H)
-                ndim == 3 && @test function_curl(cv, i, u_vector) ≈ Ferrite.curl(H)
+                ndim == 3 && @test function_curl(cv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
             end
         end
 
@@ -76,10 +76,14 @@ for (func_interpol, quad_rule) in  (
 
         # test copy
         cvc = copy(cv)
+        @test typeof(cv) == typeof(cvc)
         for fname in fieldnames(typeof(cv))
-            @test typeof(cv) == typeof(cvc)
-            @test pointer(getfield(cv, fname)) != pointer(getfield(cvc, fname))
-            @test getfield(cv, fname) == getfield(cvc, fname)
+            v = getfield(cv, fname)
+            vc = getfield(cvc, fname)
+            if hasmethod(pointer, Tuple{typeof(v)})
+                @test pointer(getfield(cv, fname)) != pointer(getfield(cvc, fname))
+            end
+            @test v == vc
         end
     end
 end
@@ -101,6 +105,56 @@ end
     ip_geo = Lagrange{dim, RefCube, 1}()
     cv = CellScalarValues(qr, ip_fe, ip_geo)
     reinit!(cv, cell)
+end
+
+@testset "error paths in function_* and reinit!" begin
+    dim = 2
+    qp = 1
+    ip = Lagrange{dim,RefTetrahedron,1}()
+    qr = QuadratureRule{dim,RefTetrahedron}(1)
+    qr_f = QuadratureRule{1,RefTetrahedron}(1)
+    csv = CellScalarValues(qr, ip)
+    cvv = CellVectorValues(qr, ip)
+    fsv = FaceScalarValues(qr_f, ip)
+    fvv = FaceVectorValues(qr_f, ip)
+    x, n = valid_coordinates_and_normals(ip)
+    reinit!(csv, x)
+    reinit!(cvv, x)
+    reinit!(fsv, x, 1)
+    reinit!(fvv, x, 1)
+
+    # Wrong number of coordinates
+    xx = [x; x]
+    @test_throws ArgumentError reinit!(csv, xx)
+    @test_throws ArgumentError reinit!(cvv, xx)
+    @test_throws ArgumentError reinit!(fsv, xx, 1)
+    @test_throws ArgumentError reinit!(fvv, xx, 1)
+
+    @test_throws ArgumentError spatial_coordinate(csv, qp, xx)
+    @test_throws ArgumentError spatial_coordinate(cvv, qp, xx)
+    @test_throws ArgumentError spatial_coordinate(fsv, qp, xx)
+    @test_throws ArgumentError spatial_coordinate(fvv, qp, xx)
+
+    # Wrong number of (local) dofs
+    # Scalar values, scalar dofs
+    ue = rand(getnbasefunctions(csv) + 1)
+    @test_throws ArgumentError function_value(csv, qp, ue)
+    @test_throws ArgumentError function_gradient(csv, qp, ue)
+    # Vector values, scalar dofs
+    ue = rand(getnbasefunctions(cvv) + 1)
+    @test_throws ArgumentError function_value(cvv, qp, ue)
+    @test_throws ArgumentError function_gradient(cvv, qp, ue)
+    @test_throws ArgumentError function_divergence(cvv, qp, ue)
+    # Scalar values, vector dofs
+    ue = [rand(Vec{dim}) for _ in 1:(getnbasefunctions(csv) + 1)]
+    @test_throws ArgumentError function_value(csv, qp, ue)
+    @test_throws ArgumentError function_gradient(csv, qp, ue)
+    @test_throws ArgumentError function_divergence(csv, qp, ue)
+    # Vector values, vector dofs
+    ue = [rand(Vec{dim}) for _ in 1:(getnbasefunctions(cvv) ÷ dim + 1)]
+    @test_throws ArgumentError function_value(cvv, qp, ue)
+    @test_throws ArgumentError function_gradient(cvv, qp, ue)
+    @test_throws ArgumentError function_divergence(cvv, qp, ue)
 end
 
 end # of testset

@@ -2,7 +2,7 @@
 DocTestSetup = :(using Ferrite)
 ```
 
-# Assembly
+# [Assembly](@id man-assembly)
 
 When the local stiffness matrix and force vector have been calculated
 they should be assembled into the global stiffness matrix and the
@@ -65,26 +65,47 @@ A = start_assemble(K, f)
 ```
 
 where `K` is the global stiffness matrix, and `f` the global force vector.
-It is optional to give the force vector to the assembler -- sometimes
+It is optional to pass the force vector to the assembler -- sometimes
 there is no need to assemble a global force vector.
 
-fds
+The [`assemble!`](@ref) function is used to assemble element contributions
+to the assembler. For example, to assemble the element tangent stiffness `ke`
+and the element force vector `fe` to the assembler `A`, the following code can
+be used:
 
 ```julia
 assemble!(A, celldofs, ke)
 assemble!(A, celldofs, ke, fe)
 ```
 
+which perform the following operations in an efficient manner:
 
-To give a more
+```julia
+K[celldofs, celldofs] += ke
+f[celldofs]           += fe
+```
+
+## Pseudo-code for efficient assembly
+
+Quite often the same sparsity pattern can be reused multiple times. For example:
+
+ - For time-dependent problems the pattern can be reused for all timesteps
+ - For non-linear problems the pattern can be reused for all iterations
+
+In such cases it is enough to construct the global matrix `K` once. Below is
+some pseudo-code for how to do this for a time-dependent problem:
 
 ```julia
 K = create_sparsity_pattern(dh)
 f = zeros(ndofs(dh))
-A = start_assemble(K, f)
 
-for cell in CellIterator(dh)
-    ke, fe = ...
-    assemble!(A, celldofs(cell), ke, fe)
+for t in 1:timesteps
+    A = start_assemble(K, f) # start_assemble zeroes K and f
+    for cell in CellIterator(dh)
+        ke, fe = element_routine(...)
+        assemble!(A, celldofs(cell), ke, fe)
+    end
+    # Apply boundary conditions and solve for u(t)
+    # ...
 end
 ```

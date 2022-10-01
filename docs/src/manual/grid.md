@@ -3,6 +3,10 @@ DocTestSetup = :(using Ferrite)
 ```
 
 # Grid
+A Ferrite `Grid` can be generated with the `generate_grid` function. 
+More advanced meshes can be imported with the 
+[`FerriteMeshParser.jl`](https://github.com/Ferrite-FEM/FerriteMeshParser.jl) (currently for Abaqus .inp files),
+or even created with the [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package. 
 
 In Ferrite a Grid is a collection of `Node`s and `Cell`s and is parameterized in its physical dimensionality and cell type.
 `Node`s are points in the physical space and can be initialized by a N-Tuple, where N corresponds to the dimensions.
@@ -86,3 +90,9 @@ Set{Tuple{Int64,Int64}} with 2 elements:
   (2, 2)
   (4, 2)
 ```
+
+## Topology
+
+Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`Ferrite.full_neighborhood`](@ref) and [`Ferrite.faceskeleton`](@ref)
+are the interface to obtain topological information. The [`Ferrite.full_neighborhood`](@ref) can construct lists of directly connected entities based on a given entity (`CellIndex,FaceIndex,EdgeIndex,VertexIndex`).
+The [`Ferrite.faceskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.

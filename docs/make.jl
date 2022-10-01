@@ -1,13 +1,22 @@
-using Documenter, Ferrite, Pkg
+using Documenter, Ferrite, Pkg, TimerOutputs
 
-Pkg.precompile()
+dto = TimerOutput()
+reset_timer!(dto)
+
+if "revise" in ARGS
+    using Revise
+    @timeit dto "Revise.revise()" Revise.revise()
+end
+
+const is_ci = haskey(ENV, "GITHUB_ACTIONS")
+const is_draft = "draft" in ARGS
 
 # Generate examples
 include("generate.jl")
 
 GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "heat_equation.md",
-    "l2_projection.md",
+    "postprocessing.md",
     "helmholtz.md",
     "incompressible_elasticity.md",
     "hyperelasticity.md",
@@ -15,16 +24,22 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "plasticity.md",
     "transient_heat_equation.md",
     "landau.md",
-    "linear_shell.md"
+    "linear_shell.md",
+    "quasi_incompressible_hyperelasticity.md",
+    "ns_vs_diffeq.md",
+    "computational_homogenization.md",
     )]
 
 # Build documentation.
-makedocs(
-    format = Documenter.HTML(prettyurls = haskey(ENV, "GITHUB_ACTIONS")), # disable for local builds
+@timeit dto "makedocs" makedocs(
+    format = Documenter.HTML(
+        assets = ["assets/custom.css", "assets/favicon.ico"],
+    ),
     sitename = "Ferrite.jl",
     doctest = false,
     # strict = VERSION.minor == 6 && sizeof(Int) == 8, # only strict mode on 0.6 and Int64
     strict = false,
+    draft = is_draft,
     pages = Any[
         "Home" => "index.md",
         "manual/fe_intro.md",
@@ -32,6 +47,7 @@ makedocs(
             "manual/degrees_of_freedom.md",
             "manual/assembly.md",
             "manual/boundary_conditions.md",
+            "manual/constraints.md",
             "manual/grid.md",
             "manual/export.md"
             ],
@@ -50,13 +66,17 @@ makedocs(
 )
 
 # make sure there are no *.vtu files left around from the build
-cd(joinpath(@__DIR__, "build", "examples")) do
+@timeit dto "remove vtk files" cd(joinpath(@__DIR__, "build", "examples")) do
     foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
 end
 
 
-# Deploy built documentation from Travis.
-deploydocs(
-    repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
-    push_preview=true,
-)
+# Deploy built documentation
+if !is_draft
+    @timeit dto "deploydocs" deploydocs(
+        repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
+        push_preview=true,
+    )
+end
+
+print_timer(dto)

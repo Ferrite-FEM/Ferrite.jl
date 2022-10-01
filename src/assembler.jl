@@ -18,27 +18,48 @@ end
 """
     start_assemble([N=0]) -> Assembler
 
-Call before starting an assembly.
+Create an `Assembler` object which can be used to assemble element contributions to the
+global sparse matrix. Use [`assemble!`](@ref) for each element, and [`end_assemble`](@ref),
+to finalize the assembly and return the sparse matrix.
 
-Returns an `Assembler` type that is used to hold the intermediate
-data before an assembly is finished.
+Note that giving a sparse matrix as input can be more efficient. See below and 
+as described in the [manual](@ref assembly_in_manual).
+
+!!! note
+    When the same matrix pattern is used multiple times (for e.g. multiple time steps or
+    Newton iterations) it is more efficient to create the sparse matrix **once** and reuse
+    the same pattern. See the [manual section](@ref man-assembly) on assembly.
 """
 function start_assemble(N::Int=0)
     return Assembler(N)
 end
 
 """
-    assemble!(a, Ke, edof)
+    assemble!(a::Assembler, dofs, Ke)
 
 Assembles the element matrix `Ke` into `a`.
 """
-function assemble!(a::Assembler{T}, edof::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
-    n_dofs = length(edof)
+function assemble!(a::Assembler{T}, dofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
+    assemble!(a, dofs, dofs, Ke)
+end
+
+"""
+    assemble!(a::Assembler, rowdofs, coldofs, Ke)
+
+Assembles the matrix `Ke` into `a` according to the dofs specified by `rowdofs` and `coldofs`.
+"""
+function assemble!(a::Ferrite.Assembler{T}, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
+    nrows = length(rowdofs)
+    ncols = length(coldofs)
+
+    @assert(size(Ke,1) == nrows)
+    @assert(size(Ke,2) == ncols)
+
     append!(a.V, Ke)
-    @inbounds for j in 1:n_dofs
-        append!(a.I, edof)
-        for i in 1:n_dofs
-            push!(a.J, edof[j])
+    @inbounds for i in 1:ncols
+        append!(a.I, rowdofs)
+        for _ in 1:nrows
+            push!(a.J, coldofs[i])
         end
     end
 end
@@ -47,21 +68,21 @@ end
     end_assemble(a::Assembler) -> K
 
 Finalizes an assembly. Returns a sparse matrix with the
-assembled values.
+assembled values. Note that this step is not necessary for `AbstractSparseAssembler`s.
 """
 function end_assemble(a::Assembler)
     return sparse(a.I, a.J, a.V)
 end
 
 """
-    assemble!(g, ge, edof)
+    assemble!(g, dofs, ge)
 
 Assembles the element residual `ge` into the global residual vector `g`.
 """
-@propagate_inbounds function assemble!(g::AbstractVector{T}, edof::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
-    @boundscheck checkbounds(g, edof)
-    @inbounds for i in 1:length(edof)
-        g[edof[i]] += ge[i]
+@propagate_inbounds function assemble!(g::AbstractVector{T}, dofs::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
+    @boundscheck checkbounds(g, dofs)
+    @inbounds for i in 1:length(dofs)
+        g[dofs[i]] += ge[i]
     end
 end
 
@@ -83,15 +104,47 @@ end
 @inline getsparsemat(a::AssemblerSparsityPattern) = a.K
 @inline getsparsemat(a::AssemblerSymmetricSparsityPattern) = a.K.data
 
+"""
+    start_assemble(K::SparseMatrixCSC;            fillzero::Bool=true) -> AssemblerSparsityPattern
+    start_assemble(K::SparseMatrixCSC, f::Vector; fillzero::Bool=true) -> AssemblerSparsityPattern
+
+Create a `AssemblerSparsityPattern` from the matrix `K` and optional vector `f`.
+
+    start_assemble(K::Symmetric{SparseMatrixCSC};                 fillzero::Bool=true) -> AssemblerSymmetricSparsityPattern
+    start_assemble(K::Symmetric{SparseMatrixCSC}, f::Vector=Td[]; fillzero::Bool=true) -> AssemblerSymmetricSparsityPattern
+
+Create a `AssemblerSymmetricSparsityPattern` from the matrix `K` and optional vector `f`.
+
+`AssemblerSparsityPattern` and `AssemblerSymmetricSparsityPattern` allocate workspace
+necessary for efficient matrix assembly. To assemble the contribution from an element, use
+[`assemble!`](@ref).
+
+The keyword argument `fillzero` can be set to `false` if `K` and `f` should not be zeroed
+out, but instead keep their current values.
+"""
+start_assemble(K::Union{SparseMatrixCSC, Symmetric{<:Any,SparseMatrixCSC}}, f::Vector; fillzero::Bool)
+
 start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; fillzero::Bool=true) = start_assemble(K, f; fillzero=fillzero)
-function start_assemble(K::SparseMatrixCSC, f::Vector=Float64[]; fillzero::Bool=true)
-    fillzero && (fill!(K.nzval, 0.0); fill!(f, 0.0))
-    AssemblerSparsityPattern(K, f, Int[], Int[])
+function start_assemble(K::SparseMatrixCSC{T}, f::Vector=T[]; fillzero::Bool=true) where {T}
+    fillzero && (fill!(K.nzval, zero(T)); fill!(f, zero(T)))
+    return AssemblerSparsityPattern(K, f, Int[], Int[])
 end
-function start_assemble(K::Symmetric, f::Vector=Float64[]; fillzero::Bool=true)
-    fillzero && (fill!(K.data.nzval, 0.0); fill!(f, 0.0))
-    AssemblerSymmetricSparsityPattern(K, f, Int[], Int[])
+function start_assemble(K::Symmetric{T,<:SparseMatrixCSC}, f::Vector=T[]; fillzero::Bool=true) where T
+    fillzero && (fill!(K.data.nzval, zero(T)); fill!(f, zero(T)))
+    return AssemblerSymmetricSparsityPattern(K, f, Int[], Int[])
 end
+
+"""
+    assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
+    assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+
+Assemble the element stiffness matrix `Ke` (and optional force vector `fe`) into the global
+stiffness (and force) in `A`, given the element degrees of freedom `dofs`.
+
+This is equivalent to `K[dofs, dofs] += Ke` and `f[dofs] += fe`, where `K` is the global
+stiffness matrix and `f` the global force/residual vector, but more efficient.
+"""
+assemble!(::AbstractSparseAssembler, ::AbstractVector{Int}, ::AbstractMatrix, ::AbstractVector)
 
 @propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
     assemble!(A, dofs, Ke, eltype(Ke)[])
@@ -107,7 +160,11 @@ end
 end
 
 @propagate_inbounds function _assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
+    ld = length(dofs)
+    @assert size(Ke, 1) == ld
+    @assert size(Ke, 2) == ld
     if length(fe) != 0
+        @assert length(fe) == ld
         @boundscheck checkbounds(A.f, dofs)
         @inbounds assemble!(A.f, dofs, fe)
     end
@@ -116,14 +173,14 @@ end
     permutation = A.permutation
     sorteddofs = A.sorteddofs
     @boundscheck checkbounds(K, dofs, dofs)
-    resize!(permutation, length(dofs))
-    resize!(sorteddofs, length(dofs))
+    resize!(permutation, ld)
+    resize!(sorteddofs, ld)
     copyto!(sorteddofs, dofs)
     sortperm2!(sorteddofs, permutation)
 
     current_col = 1
     @inbounds for Kcol in sorteddofs
-        maxlookups = sym ? current_col : length(dofs)
+        maxlookups = sym ? current_col : ld
         current_idx = 1
         for r in nzrange(K, Kcol)
             Kerow = permutation[current_idx]

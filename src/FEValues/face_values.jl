@@ -37,7 +37,7 @@ For a scalar field, the `FaceScalarValues` type should be used. For vector field
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
 """
-FaceValues
+FaceValues, FaceScalarValues, FaceVectorValues
 
 # FaceScalarValues
 struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{dim,T,refshape}
@@ -48,8 +48,16 @@ struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{di
     normals::Vector{Vec{dim,T}}
     M::Array{T,3}
     dMdξ::Array{Vec{dim,T},3}
-    qr_weights::Vector{T}
+    # 'Any' is 'dim-1' here -- this is deliberately abstractly typed. Only qr.weights is
+    # accessed in performance critical code so this doesn't seem to be a problem in
+    # practice since qr.weights is correctly inferred as Vector{T}, and T is a parameter
+    # of the struct.
+    qr::QuadratureRule{<:Any,refshape,T}
     current_face::ScalarWrapper{Int}
+    # The following fields are deliberately abstract -- they are never used in
+    # performance critical code, just stored here for convenience.
+    func_interp::Interpolation{dim,refshape}
+    geo_interp::Interpolation{dim,refshape}
 end
 
 function FaceScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
@@ -93,7 +101,7 @@ function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
 
     detJdV = fill(T(NaN), n_qpoints, n_faces)
 
-    FaceScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule, ScalarWrapper(0), func_interpol, geom_interpol)
 end
 
 # FaceVectorValues
@@ -105,8 +113,16 @@ struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: FaceValues{
     normals::Vector{Vec{dim,T}}
     M::Array{T,3}
     dMdξ::Array{Vec{dim,T},3}
-    qr_weights::Vector{T}
+    # 'Any' is 'dim-1' here -- this is deliberately abstractly typed. Only qr.weights is
+    # accessed in performance critical code so this doesn't seem to be a problem in
+    # practice since qr.weights is correctly inferred as Vector{T}, and T is a parameter
+    # of the struct.
+    qr::QuadratureRule{<:Any,refshape,T}
     current_face::ScalarWrapper{Int}
+    # The following fields are deliberately abstract -- they are never used in
+    # performance critical code, just stored here for convenience.
+    func_interp::Interpolation{dim,refshape}
+    geo_interp::Interpolation{dim,refshape}
 end
 
 function FaceVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
@@ -161,20 +177,20 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
     detJdV = fill(T(NaN), n_qpoints, n_faces)
     MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    FaceVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule.weights, ScalarWrapper(0))
+    FaceVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule, ScalarWrapper(0), func_interpol, geom_interpol)
 end
 
 function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) where {dim,T}
     n_geom_basefuncs = getngeobasefunctions(fv)
-    n_func_basefuncs = getn_scalarbasefunctions(fv)
-    @assert length(x) == n_geom_basefuncs
-    isa(fv, FaceVectorValues) && (n_func_basefuncs *= dim)
+    n_func_basefuncs = getnbasefunctions(fv)
+    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+    @boundscheck checkface(fv, face)
 
     fv.current_face[] = face
     cb = getcurrentface(fv)
 
-    @inbounds for i in 1:length(fv.qr_weights)
-        w = fv.qr_weights[i]
+    @inbounds for i in 1:length(fv.qr.weights)
+        w = fv.qr.weights[i]
         fefv_J = zero(Tensor{2,dim})
         for j in 1:n_geom_basefuncs
             fefv_J += x[j] ⊗ fv.dMdξ[j, i, cb]
@@ -183,7 +199,7 @@ function reinit!(fv::FaceValues{dim}, x::AbstractVector{Vec{dim,T}}, face::Int) 
         fv.normals[i] = weight_norm / norm(weight_norm)
         detJ = norm(weight_norm)
 
-        detJ > 0.0 || throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
         fv.detJdV[i, cb] = detJ * w
         Jinv = inv(fefv_J)
         for j in 1:n_func_basefuncs
@@ -211,7 +227,7 @@ getnormal(fv::FaceValues, qp::Int) = fv.normals[qp]
 """
     BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}})
 
-`BCValues` stores the shape values at all faces/edges/vertices (depending on `boundary_type`) for the geomatric interpolation (`geom_interpol`), 
+`BCValues` stores the shape values at all faces/edges/vertices (depending on `boundary_type`) for the geomatric interpolation (`geom_interpol`),
 for each dof-position determined by the `func_interpol`. Used mainly by the `ConstrainHandler`.
 """
 struct BCValues{T}
@@ -238,8 +254,8 @@ function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_in
         push!(qrs, qrf)
     end
 
-    n_qpoints = length(getweights(qrs[1])) # assume same in all
     n_faces = length(qrs)
+    n_qpoints = n_faces == 0 ? 0 : length(getweights(qrs[1])) # assume same in all
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
     M =    fill(zero(T)           * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
 
@@ -255,11 +271,18 @@ end
 getnquadpoints(bcv::BCValues) = size(bcv.M, 2)
 function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = size(bcv.M, 1)
-    @assert length(xh) == n_base_funcs
+    length(xh) == n_base_funcs || throw_incompatible_coord_length(length(xh), n_base_funcs)
     x = zero(Vec{dim,T})
     face = bcv.current_face[]
     @inbounds for i in 1:n_base_funcs
         x += bcv.M[i,q_point,face] * xh[i] # geometric_value(fe_v, q_point, i) * xh[i]
     end
     return x
+end
+
+nfaces(fv) = size(fv.N, 3)
+
+function checkface(fv::FaceValues, face::Int)
+    0 < face <= nfaces(fv) || error("Face index out of range.")
+    return nothing
 end

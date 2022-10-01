@@ -17,6 +17,7 @@ The following interpolations are implemented:
 * `Lagrange{2,RefTetrahedron,2}`
 * `Lagrange{3,RefCube,1}`
 * `Serendipity{2,RefCube,2}`
+* `Serendipity{3,RefCube,2}`
 * `Lagrange{3,RefTetrahedron,1}`
 * `Lagrange{3,RefTetrahedron,2}`
 
@@ -30,6 +31,8 @@ julia> getnbasefunctions(ip)
 ```
 """
 abstract type Interpolation{dim,shape,order} end
+
+Base.copy(ip::Interpolation) = ip
 
 """
 Return the dimension of an `Interpolation`
@@ -79,7 +82,7 @@ struct InterpolationInfo
     ncelldofs::Int
     dim::Int
     InterpolationInfo(interpolation::Interpolation{dim}) where {dim} =
-        new(nvertexdofs(interpolation), nedgedofs(interpolation), 
+        new(nvertexdofs(interpolation), nedgedofs(interpolation),
             nfacedofs(interpolation),   ncelldofs(interpolation), dim)
 end
 
@@ -90,12 +93,24 @@ end
 #   celldof: dof that is local to the element
 
 # Fallbacks for the interpolations which are used to distribute the dofs correctly
+"""
+Number of dofs per vertex
+"""
 nvertexdofs(::Interpolation) = 0
+"""
+Number of dofs per edge
+"""
 nedgedofs(::Interpolation)   = 0
+"""
+Number of dofs per face
+"""
 nfacedofs(::Interpolation)   = 0
+"""
+Total number of dofs in the interior
+"""
 ncelldofs(::Interpolation)   = 0
 
-# Needed for distrubuting dofs on shells correctly (face in 2d is edge in 3d)
+# Needed for distributing dofs on shells correctly (face in 2d is edge in 3d)
 edges(ip::Interpolation{2}) = faces(ip)
 nedgedofs(ip::Interpolation{2}) = nfacedofs(ip)
 
@@ -105,6 +120,46 @@ vertices(::Interpolation{3,RefCube}) = (1,2,3,4,5,6,7,8)
 vertices(::Interpolation{2,RefTetrahedron}) = (1,2,3)
 vertices(::Interpolation{3,RefTetrahedron}) = (1,2,3,4)
 
+#########################
+# DiscontinuousLagrange #
+#########################
+# TODO generalize to arbitrary basis positionings.
+"""
+Piecewise discontinous Lagrange basis via Gauss-Lobatto points.
+"""
+struct DiscontinuousLagrange{dim,shape,order} <: Interpolation{dim,shape,order} end
+
+getlowerdim(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = DiscontinuousLagrange{dim-1,shape,order}()
+getlowerorder(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = DiscontinuousLagrange{dim,shape,order-1}()
+
+# TODO generalize properly
+# ncelldofs(::DiscontinuousLagrange{dim,RefCube,order}) where {dim,order} = (order+1)^dim
+# ncelldofs(::DiscontinuousLagrange{2,RefTetrahedron,order}) where {order} = (order+1)*(order+2)/2
+# ncelldofs(::DiscontinuousLagrange{3,RefTetrahedron,order}) where {order} = (order+1)*(order+2)/2
+getnbasefunctions(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = getnbasefunctions(Lagrange{dim,shape,order}())
+ncelldofs(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = getnbasefunctions(DiscontinuousLagrange{dim,shape,order}())
+
+getnbasefunctions(::DiscontinuousLagrange{dim,shape,0}) where {dim,shape} = 1
+ncelldofs(::DiscontinuousLagrange{dim,shape,0}) where {dim,shape} = 1
+
+faces(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = ()
+
+# Mirror the Lagrange element for now.
+function reference_coordinates(ip::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order}
+    return reference_coordinates(Lagrange{dim,shape,order}())
+end
+function value(ip::DiscontinuousLagrange{dim,shape,order}, i::Int, ξ::Vec{dim}) where {dim,shape,order}
+    return value(Lagrange{dim, ref_type, order}())
+end
+
+# Excepting the L0 element.
+function reference_coordinates(ip::DiscontinuousLagrange{dim,shape,0}) where {dim,shape}
+    return [Vec{dim, Float64}(ntuple(x->0.0, dim))]
+end
+function value(ip::DiscontinuousLagrange{dim,shape,0}, i::Int, ξ::Vec{dim}) where {dim,shape}
+    return 1.0
+end
+
 ############
 # Lagrange #
 ############
@@ -112,6 +167,7 @@ struct Lagrange{dim,shape,order} <: Interpolation{dim,shape,order} end
 
 getlowerdim(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim-1,shape,order}()
 getlowerorder(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim,shape,order-1}()
+getlowerorder(::Lagrange{dim,shape,1}) where {dim,shape} = DiscontinuousLagrange{dim,shape,0}()
 
 ##################################
 # Lagrange dim 1 RefCube order 1 #
@@ -281,7 +337,7 @@ end
 getnbasefunctions(::Lagrange{3,RefTetrahedron,1}) = 4
 nvertexdofs(::Lagrange{3,RefTetrahedron,1}) = 1
 
-faces(::Lagrange{3,RefTetrahedron,1}) = ((1,2,3), (1,2,4), (2,3,4), (1,4,3))
+faces(::Lagrange{3,RefTetrahedron,1}) = ((1,3,2), (1,2,4), (2,3,4), (1,4,3))
 edges(::Lagrange{3,RefTetrahedron,1}) = ((1,2), (2,3), (3,1), (1,4), (2,4), (3,4))
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,1})
@@ -309,7 +365,7 @@ getnbasefunctions(::Lagrange{3,RefTetrahedron,2}) = 10
 nvertexdofs(::Lagrange{3,RefTetrahedron,2}) = 1
 nedgedofs(::Lagrange{3,RefTetrahedron,2}) = 1
 
-faces(::Lagrange{3,RefTetrahedron,2}) = ((1,2,3,5,6,7), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
+faces(::Lagrange{3,RefTetrahedron,2}) = ((1,3,2,7,6,5), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
 edges(::Lagrange{3,RefTetrahedron,2}) = ((1,5,2), (2,6,3), (3,7,1), (1,8,4), (2,9,4), (3,10,4))
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,2})
@@ -379,6 +435,137 @@ function value(ip::Lagrange{3,RefCube,1}, i::Int, ξ::Vec{3})
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
+
+##################################
+# Lagrange dim 3 RefCube order 2 #
+##################################
+# Based on vtkTriQuadraticHexahedron (see https://kitware.github.io/vtk-examples/site/Cxx/GeometricObjects/IsoparametricCellsDemo/)
+getnbasefunctions(::Lagrange{3,RefCube,2}) = 27
+nvertexdofs(::Lagrange{3,RefCube,2}) = 1
+nedgedofs(::Lagrange{3,RefCube,2}) = 1
+nfacedofs(::Lagrange{3,RefCube,2}) = 1
+ncelldofs(::Lagrange{3,RefCube,2}) = 1
+
+faces(::Lagrange{3,RefCube,2}) = (
+    (1,4,3,2, 12,11,10,9, 21),
+    (1,2,6,5, 9,18,13,17, 22),
+    (2,3,7,6, 10,19,14,18, 23),
+    (3,4,8,7, 11,20,15,19, 24),
+    (1,5,8,4, 17,16,20,12, 25),
+    (5,6,7,8, 13,14,15,16, 26),
+)
+edges(::Lagrange{3,RefCube,2}) = ((1,2, 9), (2,3, 10), (3,4, 11), (4,1, 12), (5,6, 13), (6,7, 14), (7,8, 15), (8,5, 16), (1,5, 17), (2,6, 18), (3,7, 19), (4,8, 20))
+
+function reference_coordinates(::Lagrange{3,RefCube,2})
+           # vertex
+    return [Vec{3, Float64}((-1.0, -1.0, -1.0)), #  1
+            Vec{3, Float64}(( 1.0, -1.0, -1.0)), #  2
+            Vec{3, Float64}(( 1.0,  1.0, -1.0)), #  3
+            Vec{3, Float64}((-1.0,  1.0, -1.0)), #  4
+            Vec{3, Float64}((-1.0, -1.0,  1.0)), #  5
+            Vec{3, Float64}(( 1.0, -1.0,  1.0)), #  6
+            Vec{3, Float64}(( 1.0,  1.0,  1.0)), #  7
+            Vec{3, Float64}((-1.0,  1.0,  1.0)), #  8
+            # edge
+            Vec{3, Float64}(( 0.0, -1.0, -1.0)), #  9
+            Vec{3, Float64}(( 1.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0,  0.0,  1.0)),
+            Vec{3, Float64}(( 0.0,  1.0,  1.0)),
+            Vec{3, Float64}((-1.0,  0.0,  1.0)),
+            Vec{3, Float64}((-1.0, -1.0,  0.0)),
+            Vec{3, Float64}(( 1.0, -1.0,  0.0)),
+            Vec{3, Float64}(( 1.0,  1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  1.0,  0.0)), # 20
+            Vec{3, Float64}(( 0.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0, -1.0,  0.0)),
+            Vec{3, Float64}(( 1.0,  0.0,  0.0)),
+            Vec{3, Float64}(( 0.0,  1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  0.0,  0.0)),
+            Vec{3, Float64}(( 0.0,  0.0,  1.0)), # 26
+            # interior
+            Vec{3, Float64}((0.0, 0.0, 0.0)),    # 27
+            ]
+end
+
+function value(ip::Lagrange{3,RefCube,2}, i::Int, ξ::Vec{3, T}) where {T}
+    # Some local helpers.
+    @inline φ₁(x::T) = -0.5*x*(1-x)
+    @inline φ₂(x::T) = (1+x)*(1-x)
+    @inline φ₃(x::T) = 0.5*x*(1+x)
+    (ξ_x, ξ_y, ξ_z) = ξ
+    # vertices
+    i == 1 && return φ₁(ξ_x) * φ₁(ξ_y) * φ₁(ξ_z)
+    i == 2 && return φ₃(ξ_x) * φ₁(ξ_y) * φ₁(ξ_z)
+    i == 3 && return φ₃(ξ_x) * φ₃(ξ_y) * φ₁(ξ_z)
+    i == 4 && return φ₁(ξ_x) * φ₃(ξ_y) * φ₁(ξ_z)
+    i == 5 && return φ₁(ξ_x) * φ₁(ξ_y) * φ₃(ξ_z)
+    i == 6 && return φ₃(ξ_x) * φ₁(ξ_y) * φ₃(ξ_z)
+    i == 7 && return φ₃(ξ_x) * φ₃(ξ_y) * φ₃(ξ_z)
+    i == 8 && return φ₁(ξ_x) * φ₃(ξ_y) * φ₃(ξ_z)
+    # edges
+    i ==  9 && return φ₂(ξ_x) * φ₁(ξ_y) * φ₁(ξ_z)
+    i == 10 && return φ₃(ξ_x) * φ₂(ξ_y) * φ₁(ξ_z)
+    i == 11 && return φ₂(ξ_x) * φ₃(ξ_y) * φ₁(ξ_z)
+    i == 12 && return φ₁(ξ_x) * φ₂(ξ_y) * φ₁(ξ_z)
+    i == 13 && return φ₂(ξ_x) * φ₁(ξ_y) * φ₃(ξ_z)
+    i == 14 && return φ₃(ξ_x) * φ₂(ξ_y) * φ₃(ξ_z)
+    i == 15 && return φ₂(ξ_x) * φ₃(ξ_y) * φ₃(ξ_z)
+    i == 16 && return φ₁(ξ_x) * φ₂(ξ_y) * φ₃(ξ_z)
+    i == 17 && return φ₁(ξ_x) * φ₁(ξ_y) * φ₂(ξ_z)
+    i == 18 && return φ₃(ξ_x) * φ₁(ξ_y) * φ₂(ξ_z)
+    i == 19 && return φ₃(ξ_x) * φ₃(ξ_y) * φ₂(ξ_z)
+    i == 20 && return φ₁(ξ_x) * φ₃(ξ_y) * φ₂(ξ_z)
+    # faces
+    i == 21 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₁(ξ_z)
+    i == 22 && return φ₂(ξ_x) * φ₁(ξ_y) * φ₂(ξ_z)
+    i == 23 && return φ₃(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
+    i == 24 && return φ₂(ξ_x) * φ₃(ξ_y) * φ₂(ξ_z)
+    i == 25 && return φ₁(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
+    i == 26 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₃(ξ_z)
+    # interior
+    i == 27 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+###################
+# Bubble elements #
+###################
+"""
+Lagrange element with bubble stabilization.
+"""
+struct BubbleEnrichedLagrange{dim,ref_shape,order} <: Interpolation{dim,ref_shape,order} end
+getlowerdim(ip::BubbleEnrichedLagrange{dim,ref_shape,order}) where {dim,ref_shape,order} = Lagrange{dim-1,ref_shape,order}()
+
+################################################
+# Lagrange-Bubble dim 2 RefTetrahedron order 1 #
+################################################
+# Taken from https://defelement.com/elements/bubble-enriched-lagrange.html
+getnbasefunctions(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 4
+nvertexdofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 1
+ncelldofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 1
+
+faces(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = ((1,2), (2,3), (3,1))
+
+function reference_coordinates(::BubbleEnrichedLagrange{2,RefTetrahedron,1})
+    return [Vec{2, Float64}((1.0, 0.0)),
+            Vec{2, Float64}((0.0, 1.0)),
+            Vec{2, Float64}((0.0, 0.0)),
+            Vec{2, Float64}((1/3, 1/3)),]
+end
+
+function value(ip::BubbleEnrichedLagrange{2,RefTetrahedron,1}, i::Int, ξ::Vec{2})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    i == 1 && return ξ_x*(9ξ_y^2 + 9ξ_x*ξ_y - 9ξ_y + 1)
+    i == 2 && return ξ_y*(9ξ_x^2 + 9ξ_x*ξ_y - 9ξ_x + 1)
+    i == 3 && return 9ξ_x^2*ξ_y + 9ξ_x*ξ_y^2 - 9ξ_x*ξ_y - ξ_x - ξ_y + 1
+    i == 4 && return 27ξ_x*ξ_y*(1 - ξ_x - ξ_y)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
 ###############
 # Serendipity #
 ###############
@@ -417,5 +604,101 @@ function value(ip::Serendipity{2,RefCube,2}, i::Int, ξ::Vec{2})
     i == 6 && return 0.5(1 + ξ_x) * (1 - ξ_y * ξ_y)
     i == 7 && return 0.5(1 - ξ_x * ξ_x) * (1 + ξ_y)
     i == 8 && return 0.5(1 - ξ_x) * (1 - ξ_y * ξ_y)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+#####################################
+# Serendipity dim 3 RefCube order 2 #
+#####################################
+getnbasefunctions(::Serendipity{3,RefCube,2}) = 20
+getlowerdim(::Serendipity{3,RefCube,2}) = Serendipity{2,RefCube,2}()
+getlowerorder(::Serendipity{3,RefCube,2}) = Lagrange{3,RefCube,1}()
+nvertexdofs(::Serendipity{3,RefCube,2}) = 1
+nedgedofs(::Serendipity{3,RefCube,2}) = 1
+
+faces(::Serendipity{3,RefCube,2}) = ((1,4,3,2,12,11,10,9), (1,2,6,5,9,18,13,17), (2,3,7,6,10,19,14,18), (3,4,8,7,11,20,15,19), (1,5,8,4,17,16,20,12), (5,6,7,8,13,14,15,16))
+
+function reference_coordinates(::Serendipity{3,RefCube,2})
+    return [Vec{3, Float64}((-1.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0,  1.0,  1.0)),
+            Vec{3, Float64}((-1.0,  1.0,  1.0)),
+            Vec{3, Float64}((0.0, -1.0, -1.0)),
+            Vec{3, Float64}((1.0, 0.0, -1.0)),
+            Vec{3, Float64}((0.0, 1.0, -1.0)),
+            Vec{3, Float64}((-1.0, 0.0, -1.0)),
+            Vec{3, Float64}((0.0, -1.0, 1.0)),
+            Vec{3, Float64}((1.0, 0.0, 1.0)),
+            Vec{3, Float64}((0.0, 1.0, 1.0)),
+            Vec{3, Float64}((-1.0, 0.0, 1.0)),
+            Vec{3, Float64}((-1.0, -1.0, 0.0)),
+            Vec{3, Float64}((1.0, -1.0, 0.0)),
+            Vec{3, Float64}((1.0, 1.0, 0.0)),
+            Vec{3, Float64}((-1.0, 1.0, 0.0)),]
+end
+
+function value(ip::Serendipity{3,RefCube,2}, i::Int, ξ::Vec{3})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    ξ_z = ξ[3]
+    i == 1 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z) - 0.5(value(ip,12,ξ) + value(ip,9,ξ) + value(ip,17,ξ))
+    i == 2 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z) - 0.5(value(ip,9,ξ) + value(ip,10,ξ) + value(ip,18,ξ))
+    i == 3 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z) - 0.5(value(ip,10,ξ) + value(ip,11,ξ) + value(ip,19,ξ))
+    i == 4 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z) - 0.5(value(ip,11,ξ) + value(ip,12,ξ) + value(ip,20,ξ))
+    i == 5 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z) - 0.5(value(ip,16,ξ) + value(ip,13,ξ) + value(ip,17,ξ))
+    i == 6 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z) - 0.5(value(ip,13,ξ) + value(ip,14,ξ) + value(ip,18,ξ))
+    i == 7 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z) - 0.5(value(ip,14,ξ) + value(ip,15,ξ) + value(ip,19,ξ))
+    i == 8 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z) - 0.5(value(ip,15,ξ) + value(ip,16,ξ) + value(ip,20,ξ))
+    i == 9 && return 0.25(1 - ξ_x^2) * (1 - ξ_y) * (1 - ξ_z)
+    i == 10 && return 0.25(1 + ξ_x) * (1 - ξ_y^2) * (1 - ξ_z)
+    i == 11 && return 0.25(1 - ξ_x^2) * (1 + ξ_y) * (1 - ξ_z)
+    i == 12 && return 0.25(1 - ξ_x) * (1 - ξ_y^2) * (1 - ξ_z)
+    i == 13 && return 0.25(1 - ξ_x^2) * (1 - ξ_y) * (1 + ξ_z)
+    i == 14 && return 0.25(1 + ξ_x) * (1 - ξ_y^2) * (1 + ξ_z)
+    i == 15 && return 0.25(1 - ξ_x^2) * (1 + ξ_y) * (1 + ξ_z)
+    i == 16 && return 0.25(1 - ξ_x) * (1 - ξ_y^2) * (1 + ξ_z)
+    i == 17 && return 0.25(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z^2)
+    i == 18 && return 0.25(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z^2)
+    i == 19 && return 0.25(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z^2)
+    i == 20 && return 0.25(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z^2)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+
+#############################
+# Crouzeix–Raviart Elements #
+#############################
+"""
+Classical non-conforming Crouzeix–Raviart element.
+
+For details we refer ot the original paper:
+M. Crouzeix and P. Raviart. "Conforming and nonconforming finite element 
+methods for solving the stationary Stokes equations I." ESAIM: Mathematical Modelling 
+and Numerical Analysis-Modélisation Mathématique et Analyse Numérique 7.R3 (1973): 33-75.
+"""
+struct CrouzeixRaviart{dim,order} <: Interpolation{dim,RefTetrahedron,order} end
+
+getnbasefunctions(::CrouzeixRaviart{2,1}) = 3
+nfacedofs(::CrouzeixRaviart{2,1}) = 1
+
+vertices(::CrouzeixRaviart{2,1}) = ()
+faces(::CrouzeixRaviart{2,1}) = ((1,), (2,), (3,))
+
+function reference_coordinates(::CrouzeixRaviart{2,1})
+    return [Vec{2, Float64}((0.5, 0.5)),
+            Vec{2, Float64}((0.0, 0.5)),
+            Vec{2, Float64}((0.5, 0.0))]
+end
+
+function value(ip::CrouzeixRaviart{2,1}, i::Int, ξ::Vec{2})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    i == 1 && return 2*ξ_x + 2*ξ_y - 1.0
+    i == 2 && return 1.0 - 2*ξ_x
+    i == 3 && return 1.0 - 2*ξ_y
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end

@@ -23,3 +23,33 @@ module TestHyperElasticity
         end
     end
 end
+
+module TestQuasiIncompressibleHyperElasticity
+    mktempdir() do dir
+        cd(dir) do
+            include(joinpath(@__DIR__, "../docs/src/literate/quasi_incompressible_hyperelasticity.jl"))
+        end
+    end
+end
+
+# module TestNavierStokesDiffeqIntegration
+#     mktempdir() do dir
+#         cd(dir) do
+#             include(joinpath(@__DIR__, "../docs/src/literate/ns_vs_diffeq.jl"))
+#         end
+#     end
+# end
+
+module TestComputationalHomogenization
+    # Add this unregistered package here
+    import Pkg; Pkg.add(Pkg.PackageSpec(url = "https://github.com/Ferrite-FEM/FerriteGmsh.jl"))
+    include(joinpath(@__DIR__, "../docs/download_resources.jl"))
+    mktempdir() do dir
+        cd(dir) do
+            cp(joinpath(@__DIR__, "../docs/src/examples/periodic-rve.msh"),
+               joinpath(dir, "periodic-rve.msh")
+            )
+            include(joinpath(@__DIR__, "../docs/src/literate/computational_homogenization.jl"))
+        end
+    end
+end

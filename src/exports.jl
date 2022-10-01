@@ -3,7 +3,10 @@ export
     Interpolation,
     RefCube,
     RefTetrahedron,
+    BubbleEnrichedLagrange,
+    CrouzeixRaviart,
     Lagrange,
+    DiscontinuousLagrange,
     Serendipity,
     getnbasefunctions,
 
@@ -14,8 +17,6 @@ export
 
 # FEValues
     CellValues,
-    ScalarValues,
-    VectorValues,
     CellScalarValues,
     CellVectorValues,
     FaceValues,
@@ -53,11 +54,14 @@ export
     Tetrahedron,
     QuadraticTetrahedron,
     Hexahedron,
-    QuadraticHexahedron,
+    #QuadraticHexahedron,
     CellIndex,
     FaceIndex,
     EdgeIndex,
     VertexIndex,
+    ExclusiveTopology,
+    getneighborhood,
+    faceskeleton,
     getcells,
     getncells,
     getnodes,
@@ -91,6 +95,11 @@ export
     OctreeBWG,
     OctantBWG, 
 
+# Grid coloring
+    create_coloring,
+    ColoringAlgorithm,
+    vtk_cell_data_colors,
+
 # Dofs
     DofHandler,
     close!,
@@ -105,10 +114,16 @@ export
     MixedDofHandler,
     FieldHandler,
     Field,
+    reshape_to_nodes,
 
 # Constraints
     ConstraintHandler,
     Dirichlet,
+    PeriodicDirichlet,
+    collect_periodic_faces,
+    collect_periodic_faces!,
+    PeriodicFacePair,
+    AffineConstraint,
     update!,
     apply!,
     apply_rhs!,
@@ -116,6 +131,7 @@ export
     apply_zero!,
     add!,
     free_dofs,
+    ApplyStrategy,
 
 # iterators
     CellIterator,
@@ -137,4 +153,12 @@ export
 
 # L2 Projection
     project,
-    L2Projector
+    L2Projector,
+
+# Point Evaluation
+    PointEvalHandler,
+    get_point_values,
+    PointIterator,
+    PointLocation,
+    PointScalarValues,
+    PointVectorValues

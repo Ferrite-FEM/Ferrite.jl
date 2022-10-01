@@ -1,0 +1,91 @@
+@testset "AbstractGrid" begin
+
+    struct SmallGrid{dim,N,C<:Ferrite.AbstractCell} <: Ferrite.AbstractGrid{dim}
+        nodes_test::Vector{NTuple{dim,Float64}}
+        cells_test::NTuple{N,C}
+    end
+
+    Ferrite.getcells(grid::SmallGrid) = grid.cells_test
+    Ferrite.getcells(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.cells_test[v]
+    Ferrite.getncells(grid::SmallGrid{dim,N}) where {dim,N} = N
+    Ferrite.getcelltype(grid::SmallGrid) = eltype(grid.cells_test)
+    Ferrite.getcelltype(grid::SmallGrid, i::Int) = typeof(grid.cells_test[i])
+    Ferrite.getcoordinates(x::NTuple{dim,Float64}) where dim = Vec{dim,Float64}(x)
+
+    Ferrite.getnodes(grid::SmallGrid) = grid.nodes_test
+    Ferrite.getnodes(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.nodes_test[v]
+    Ferrite.getnnodes(grid::SmallGrid) = length(grid.nodes_test)
+    Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
+    Ferrite.n_faces_per_cell(grid::SmallGrid) = nfaces(eltype(grid.cells_test))
+    function Ferrite.getcoordinates!(x::Vector{Vec{dim,T}}, grid::SmallGrid, cell::Int) where {dim,T}
+        for i in 1:length(x)
+            x[i] = Vec{dim,T}(grid.nodes_test[grid.cells_test[cell].nodes[i]])
+        end
+    end
+    function Ferrite.getcoordinates(grid::SmallGrid{dim}, cell::Int) where dim
+        nodeidx = grid.cells_test[cell].nodes
+        return [Vec{dim,Float64}(grid.nodes_test[i]) for i in nodeidx]::Vector{Vec{dim,Float64}}
+    end
+
+    nodes = [(-1.0,-1.0); (0.0,-1.0); (1.0,-1.0); (-1.0,0.0); (0.0,0.0); (1.0,0.0); (-1.0,1.0); (0.0,1.0); (1.0,1.0)]
+    cells = (Quadrilateral((1,2,5,4)), Quadrilateral((2,3,6,5)), Quadrilateral((4,5,8,7)), Quadrilateral((5,6,9,8)))
+    subtype_grid = SmallGrid(nodes,cells)
+    reference_grid = generate_grid(Quadrilateral, (2,2))
+
+    ip = Lagrange{2, RefCube, 1}()
+    qr = QuadratureRule{2, RefCube}(2)
+    cellvalues = CellScalarValues(qr, ip);
+    
+    dhs = [DofHandler(grid) for grid in (subtype_grid, reference_grid)]
+    u1 = Vector{Float64}(undef, 9)
+    u2 = Vector{Float64}(undef, 9)
+    ∂Ω = union(getfaceset.((reference_grid, ), ["left", "right", "top", "bottom"])...)
+    dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
+
+    function doassemble!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler) where {dim}
+        n_basefuncs = getnbasefunctions(cellvalues)
+        Ke = zeros(n_basefuncs, n_basefuncs)
+        fe = zeros(n_basefuncs)
+        f = zeros(ndofs(dh))
+        assembler = start_assemble(K, f)
+        for cellid in 1:getncells(dh.grid)
+            fill!(Ke, 0)
+            fill!(fe, 0)
+            coords = getcoordinates(dh.grid, cellid)
+            reinit!(cellvalues, coords)
+            for q_point in 1:getnquadpoints(cellvalues)
+                dΩ = getdetJdV(cellvalues, q_point)
+                for i in 1:n_basefuncs
+                    v  = shape_value(cellvalues, q_point, i)
+                    ∇v = shape_gradient(cellvalues, q_point, i)
+                    fe[i] += v * dΩ
+                    for j in 1:n_basefuncs
+                        ∇u = shape_gradient(cellvalues, q_point, j)
+                        Ke[i, j] += (∇v ⋅ ∇u) * dΩ
+                    end
+                end
+            end
+            assemble!(assembler, celldofs(dh,cellid), fe, Ke)
+        end
+        return K, f
+    end
+
+    for (dh,u) in zip(dhs,(u1,u2))
+        push!(dh, :u, 1)
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, dbc)
+        close!(ch)
+        update!(ch, 0.0)
+        K = create_sparsity_pattern(dh);
+        K, f = doassemble!(cellvalues, K, dh);
+        apply!(K, f, ch)
+        sol = K \ f
+        u .= sol
+    end
+
+    @test Ferrite.ndofs_per_cell(dhs[1]) == Ferrite.ndofs_per_cell(dhs[2])
+    @test Ferrite.celldofs(dhs[1],3) == Ferrite.celldofs(dhs[2],3)
+    @test Ferrite.ndofs(dhs[1]) == Ferrite.ndofs(dhs[2])
+    @test isapprox(u1,u2,atol=1e-8)
+end
