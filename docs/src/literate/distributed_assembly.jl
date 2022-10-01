@@ -36,7 +36,7 @@
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
 # First we load Ferrite, and some other packages we need
-using Ferrite, SparseArrays, MPI, PartitionedArrays
+using Ferrite, SparseArrays, MPI, PartitionedArrays, IterativeSolvers
 
 macro debug(ex)
     return :($(esc(ex)))
@@ -110,7 +110,7 @@ MPI.Init()
 # We start  generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Quadrilateral, (2, 3));
+grid = generate_grid(Quadrilateral, (20, 20));
 
 dgrid = DistributedGrid(grid)
 
@@ -369,11 +369,6 @@ dof_owner = compute_dof_ownership(dh, dgrid);
 nltdofs = sum(dof_owner.==(MPI.Comm_rank(global_comm(dgrid))+1))
 ndofs_total = MPI.Allreduce(nltdofs, MPI.SUM, global_comm(dgrid))
 
-# Now that we have distributed all our dofs we can create our tangent matrix,
-# using `create_sparsity_pattern`. This function returns a sparse matrix
-# with the correct elements stored.
-#K = create_sparsity_pattern(dh)
-
 # ### Boundary conditions
 # In Ferrite constraints like Dirichlet boundary conditions
 # are handled by a `ConstraintHandler`.
@@ -382,7 +377,7 @@ ch = ConstraintHandler(dh);
 # Next we need to add constraints to `ch`. For this problem we define
 # homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
 # the `union` of all the face sets on the boundary.
-∂Ω = union(getfaceset.((grid, ), ["left", "right", "top", "bottom"])...);
+∂Ω = union(getfaceset.((getlocalgrid(dgrid), ), ["left", "right", "top", "bottom"])...);
 
 # Now we are set up to define our constraint. We specify which field
 # the condition is for, and our combined face set `∂Ω`. The last
@@ -691,34 +686,52 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
 end
 #md nothing # hide
 
+my_rank = MPI.Comm_rank(global_comm(dgrid))+1
+
 # ### Solution of the system
 # The last step is to solve the system. First we call `doassemble`
 # to obtain the global stiffness matrix `K` and force vector `f`.
 K, f = doassemble(cellvalues, dh, local_to_global, dof_owner, ndofs_total, dgrid);
 
-# Shutdown MPI
-MPI.Finalize()
-
-# Early out for testing.
-exit(0)
-
 # To account for the boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f` respectively, such that
-# we can get the correct solution vector `u` by using `\`.
+# we can get the correct solution vector `u` by using a parallel 
+# iterative solver.
+"""
+Poor man's Dirichlet BC application for PartitionedArrays. :)
+"""
+function apply!(K::PartitionedArrays.PSparseMatrix, f::PartitionedArrays.PVector, ch::ConstraintHandler)
+    map_parts(local_view(f, f.rows)) do f_local
+        f_local[ch.prescribed_dofs] .= 0.0
+    end
+
+    map_parts(local_view(K, K.rows, K.cols)) do K_local
+        for cdof in ch.prescribed_dofs
+            K_local[cdof, :] .= 0.0 
+            K_local[:, cdof] .= 0.0 
+            K_local[cdof, cdof] = 1.0 
+        end
+    end
+end
+
 apply!(K, f, ch)
-#u = PartitionedArray...
-cg!(u, K, f);
+u = cg(K, f);
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
-vtk_grid("heat_equation_distributed", dh) do vtk
-    vtk_point_data(vtk, dh, u)
+vtk_grid("heat_equation_distributed-$my_rank", dh) do vtk
+    map_parts(local_view(u, u.rows)) do u_local
+        vtk_point_data(vtk, dh, u_local)
+    end
 end
 
 ## test the result                #src
 using Test                        #src
 @test norm(u) ≈ 3.307743912641305 #src
+
+# Shutdown MPI
+MPI.Finalize()
 
 #md # ## [Plain program](@id distributed-assembly-plain-program)
 #md #
