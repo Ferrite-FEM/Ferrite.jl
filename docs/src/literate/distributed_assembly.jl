@@ -649,9 +649,10 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
         @debug println("assembling cell finished local (R$my_rank)")
         Ferrite.assemble!(assembler, celldofs(cell), Ke)
         @debug println("assembling cell finished global (R$my_rank)")
-        #Ferrite.assemble!(f, celldofs(cell), fe)
+        map_parts(local_view(f, f.rows)) do f_local
+            Ferrite.assemble!(f_local, celldofs(cell), fe)
+        end
     end
-
     @debug println("done assembling (R$my_rank)")
 
     # --------------------- Add ghost entries in IJ --------------------
@@ -682,6 +683,10 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
         MPIData(V, comm, (np,)), 
         rows, cols, ids=:global
     )
+
+    PartitionedArrays.assemble!(K)
+    PartitionedArrays.assemble!(f)
+
     return K, f
 end
 #md nothing # hide
