@@ -209,7 +209,7 @@ end
 # ```
 # where ``\{p_i: i \in 1..D\}`` are the pressure dofs on the boundary.
 
-function setup_constraints(dh)
+function setup_constraints(dh, mean_value_constraint::AffineConstraint)
     ch = ConstraintHandler(dh)
     ## Periodic BC
     R = rotation_tensor(-pi/2)
@@ -299,6 +299,32 @@ function assemble_system!(K, f, dh, cvu, cvp)
 end
 #md nothing #hide
 
+function setup_mean_constraint(dh, fvp)
+    C = zeros(ndofs(dh))
+    set = union(
+        getfaceset(dh.grid, "Γ1"),
+        getfaceset(dh.grid, "Γ2"),
+        getfaceset(dh.grid, "Γ3"),
+        getfaceset(dh.grid, "Γ4"),
+    )
+    element_dofs = zeros(Int, ndofs_per_cell(dh))
+    range_p = dof_range(dh, :p)
+    Ce = zeros(ndofs_per_cell(dh))
+    for (ci, fi) in set
+        Ce .= 0
+        reinit!(fvp, ci, fi)
+        celldofs!(element_dofs, dh, ci)
+        for qp in 1:getnquadpoints(fvp)
+            dΓ = getdetJdV(fvp, qp)
+            for (i, I) in pairs(range_p)
+                Ce[I] += shape_value(fvp, qp, i) * dΓ
+            end
+        end
+        C[element_dofs] .+= Ce
+    end
+    return C
+end
+
 # ### Running the simulation
 #
 # We now have all the puzzle pieces, and just need to define the main function, which puts
@@ -313,11 +339,13 @@ function main()
     ipp = Lagrange{2,RefTetrahedron,1}() # linear
     ## Dofs
     dh = setup_dofs(grid, ipu, ipp)
-    ## Boundary conditions
-    ch = setup_constraints(dh)
     ## FE values
     ipg = Lagrange{2,RefTetrahedron,1}() # linear geometric interpolation
     cvu, cvp = setup_fevalues(ipu, ipp, ipg)
+    ## Integrate mean value constraint
+    mean_value_constraint = setup_mean_constraint(dh, cvu)
+    ## Boundary conditions
+    ch = setup_constraints(dh, mean_value_constraint)
     ## Global tangent matrix and rhs
     K = create_sparsity_pattern(dh, ch)
     f = zeros(ndofs(dh))
