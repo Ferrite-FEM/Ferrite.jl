@@ -121,35 +121,34 @@ using OrdinaryDiffEq
 # We start off by defining our only material parameter.
 ν = 1.0/1000.0; #dynamic viscosity
 
-# Next a fine 2D rectangular grid has to be generated. We leave the cell size parametric for flexibility when
-# playing around with the code. Note that the mesh is pretty fine, leading to a high memory consumption when
+# Next a rectangular grid with a cylinder in it has to be generated.
+# We use `Gmsh` for the creation of the mesh and `FerriteGmsh` to translate it to a `Ferrite.Grid`
+# Note that the mesh is pretty fine, leading to a high memory consumption when
 # feeding the equation system to direct solvers.
-dim = 2
-cell_scale_factor = 2.0
-x_cells = round(Int, cell_scale_factor*220)
-y_cells = round(Int, cell_scale_factor*41)
-# CI chokes if the grid is too fine. :)     #src
-x_cells = round(Int, 55/3)                  #hide
-y_cells = round(Int, 41/3)                  #hide
-grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((2.2, 0.41)));
-
-# Next we carve a hole $B_{0.05}(0.2,0.2)$ in the mesh by deleting the cells and update the boundary face sets.
-# This code will be replaced once a proper mesh interface is avaliable.
-cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05, 1:length(grid.cells))
-hole_cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))<=0.05, 1:length(grid.cells));
-hole_face_ring = Set{FaceIndex}()
-for hci ∈ hole_cell_indices
-    push!(hole_face_ring, FaceIndex((hci+1, 4)))
-    push!(hole_face_ring, FaceIndex((hci-1, 2)))
-    push!(hole_face_ring, FaceIndex((hci-x_cells, 3)))
-    push!(hole_face_ring, FaceIndex((hci+x_cells, 1)))
-end
-grid.facesets["hole"] = Set(filter(x->x.idx[1] ∉ hole_cell_indices, collect(hole_face_ring)));
-cell_indices_map = map(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05 ? indexin([ci], cell_indices)[1] : 0, 1:length(grid.cells))
-grid.cells = grid.cells[cell_indices]
-for facesetname in keys(grid.facesets)
-    grid.facesets[facesetname] = Set(map(fi -> FaceIndex( cell_indices_map[fi.idx[1]] ,fi.idx[2]), collect(grid.facesets[facesetname])))
-end;
+using FerriteGmsh
+using FerriteGmsh: Gmsh
+Gmsh.initialize()
+# We specify first the rectangle, the cylinder, the surface spanned by the cylinder and the boolean difference of rectangle and cylinder.
+rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 2.2, 0.41)
+circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
+circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
+circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
+gmsh.model.occ.cut([(2,rect_tag)],[(2,circle_surf_tag)])
+# Now, the geometrical entities need to be synchronized in order to be available outside of `gmsh.model.occ`
+gmsh.model.occ.synchronize()
+# In the next lines, we add the physical groups needed to define boundary conditions.
+gmsh.model.model.add_physical_group(1,[5],6,"hole")
+gmsh.model.model.add_physical_group(1,[2],7,"left")
+gmsh.model.model.add_physical_group(1,[4],8,"top")
+gmsh.model.model.add_physical_group(1,[3],9,"right")
+gmsh.model.model.add_physical_group(1,[1],10,"bottom")
+gmsh.model.model.add_physical_group(2,[1],11,"domain")
+# Since we want a quad mesh, we specify the meshing algorithm to the quasi structured quad one.
+# For a complete list, [see the Gmsh docs](https://gmsh.info/doc/texinfo/gmsh.html#Mesh-options-list).
+gmsh.option.setNumber("Mesh.Algorithm",11)
+# In the next step, the mesh is generated and finally translated.
+gmsh.model.mesh.generate(2)
+grid = togrid()
 
 # We test against full development of the flow - so regenerate the grid                              #src
 grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((0.55, 0.41)));   #hide
@@ -158,6 +157,7 @@ grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{
 # To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
 # We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
 # linear pressure term is tested against a quadratic function.
+dim = 2
 ip_v = Lagrange{dim, RefCube, 2}()
 ip_geom = Lagrange{dim, RefCube, 1}()
 qr = QuadratureRule{dim, RefCube}(4)
@@ -178,8 +178,6 @@ close!(dh);
 ch = ConstraintHandler(dh);
 
 nosplip_face_names = ["top", "bottom", "hole"];
-# No hole for the test present                                          #src
-nosplip_face_names = ["top", "bottom"]                                  #hide
 ∂Ω_noslip = union(getfaceset.((grid, ), nosplip_face_names)...);
 noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> [0,0], [1,2])
 add!(ch, noslip_bc);
