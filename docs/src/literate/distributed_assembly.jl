@@ -788,7 +788,7 @@ end
 
 ## test the result                #src
 using Test                        #src
-@test norm(u) ≈ 3.307743912641305 #src
+@test norm(u) ≈ 9.536307974872432 #src
 
 # Shutdown MPI
 MPI.Finalize()
