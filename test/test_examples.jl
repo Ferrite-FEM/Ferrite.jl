@@ -41,8 +41,6 @@ end
 # end
 
 module TestComputationalHomogenization
-    # Add this unregistered package here
-    import Pkg; Pkg.add(Pkg.PackageSpec(url = "https://github.com/Ferrite-FEM/FerriteGmsh.jl"))
     include(joinpath(@__DIR__, "../docs/download_resources.jl"))
     mktempdir() do dir
         cd(dir) do
@@ -55,8 +53,6 @@ module TestComputationalHomogenization
 end
 
 module TestStokesFlow
-    # Add this unregistered package here
-    import Pkg; Pkg.add(Pkg.PackageSpec(url = "https://github.com/Ferrite-FEM/FerriteGmsh.jl"))
     mktempdir() do dir
         cd(dir) do
             include(joinpath(@__DIR__, "../docs/src/literate/stokes-flow.jl"))
