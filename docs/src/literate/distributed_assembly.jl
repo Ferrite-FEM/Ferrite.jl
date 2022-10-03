@@ -141,8 +141,9 @@ end
 # to a `CellScalarValues` object.
 dim = 2
 ip = Lagrange{dim, RefCube, 1}()
-qr = QuadratureRule{dim, RefCube}(2)
-cellvalues = CellScalarValues(qr, ip);
+ip_geo = Lagrange{dim, RefCube, 1}()
+qr = QuadratureRule{dim, RefCube}(3)
+cellvalues = CellScalarValues(qr, ip, ip_geo);
 
 # ### Degrees of freedom
 # Next we need to define a `DofHandler`, which will take care of numbering
@@ -151,7 +152,7 @@ cellvalues = CellScalarValues(qr, ip);
 # Lastly we `close!` the `DofHandler`, it is now that the dofs are distributed
 # for all the elements.
 dh = DofHandler(dgrid.local_grid)
-push!(dh, :u, 1)
+push!(dh, :u, 1, ip)
 close!(dh);
 
 # Renumber the dofs in local ordering to their corresponding global numbering.
@@ -473,7 +474,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
 
     # ------------ Ghost dof synchronization ----------   
     # Prepare sending ghost dofs to neighbors
-    #@TODO comminication can be optimized by deduplicating entries in the following arrays
+    #@TODO communication can be optimized by deduplicating entries in, and compressing the following arrays
     #@TODO reorder communication by field to eliminate need for `ghost_dof_field_index_to_send`
     ghost_dof_to_send = [Int[] for i ∈ 1:destination_len] # global dof id
     ghost_rank_to_send = [Int[] for i ∈ 1:destination_len] # rank of dof
@@ -481,50 +482,33 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     ghost_element_to_send = [Int[] for i ∈ 1:destination_len] # corresponding element
     ghost_dof_owner = [Int[] for i ∈ 1:destination_len] # corresponding owner
     ghost_dof_pivot_to_send = [Int[] for i ∈ 1:destination_len] # corresponding dof to interact with
-    for (pivot_vi, pivot_sv) ∈ dgrid.shared_vertices
-        # Start by searching shared vertices which are not owned
-        pivot_vertex_owner_rank = Ferrite.compute_owner(dgrid, pivot_sv)
-        pivot_cell_idx = pivot_vi[1]
+    for shared_entity_set ∈ [dgrid.shared_vertices, dgrid.shared_faces, dgrid.shared_edges]
+        for (pivot_entity, pivot_shared_entity) ∈ shared_entity_set
+            # Start by searching shared entities which are not owned
+            pivot_entity_owner_rank = Ferrite.compute_owner(dgrid, pivot_shared_entity)
+            pivot_cell_idx = pivot_entity[1]
 
-        if my_rank != pivot_vertex_owner_rank
-            sender_slot = destination_index[pivot_vertex_owner_rank]
+            if my_rank != pivot_entity_owner_rank
+                sender_slot = destination_index[pivot_entity_owner_rank]
 
-            @debug println("$pivot_vi may require synchronization (R$my_rank)")
-            # We have to send ALL dofs on the element to the remote.
-            # @TODO send actually ALL dofs (currently only vertex dofs for a first version...)
-            pivot_cell = getcells(dgrid, pivot_cell_idx)
-            for (other_vertex_idx, other_vertex) ∈ enumerate(Ferrite.vertices(pivot_cell))
-                # Skip self
-                other_vi = VertexIndex(pivot_cell_idx, other_vertex_idx)
-                if other_vi == pivot_vi
-                    continue
-                end
+                @debug println("$pivot_entity may require synchronization (R$my_rank)")
+                # Note: We have to send ALL dofs on the element to the remote.
+                cell_dofs_upper_bound = (pivot_cell_idx == getncells(dh.grid)) ? length(dh.cell_dofs) : dh.cell_dofs_offset[pivot_cell_idx+1]
+                cell_dofs = dh.cell_dofs[dh.cell_dofs_offset[pivot_cell_idx]:cell_dofs_upper_bound]
 
-                if is_shared_vertex(dgrid, other_vi)
-                    other_sv = dgrid.shared_vertices[other_vi]
-                    other_vertex_owner_rank = Ferrite.compute_owner(dgrid, other_sv)
-                else
-                    other_vertex_owner_rank = my_rank
-                end
+                pivot_entity_global = Ferrite.toglobal(getlocalgrid(dgrid), pivot_entity)
 
-                # Now we have to sync all fields separately
-                @debug println("  Ghost candidate $other_vi for $pivot_vi (R$my_rank)")
-                for field_idx in 1:Ferrite.nfields(dh)
-                    pivot_vertex = Ferrite.toglobal(getlocalgrid(dgrid), pivot_vi)
-                    # If any of the two vertices is not defined on the current field, just skip.
-                    if !haskey(dh.vertexdicts[field_idx], pivot_vertex) || !haskey(dh.vertexdicts[field_idx], other_vertex)
-                        continue
+                for (field_idx, field_name) in zip(1:Ferrite.nfields(dh), Ferrite.getfieldnames(dh))
+                    pivot_entity_dof = Ferrite.entity_dofs(dh, field_idx, pivot_entity_global)
+                    # Extract dofs belonging to the current field
+                    cell_field_dofs = cell_dofs[Ferrite.dof_range(dh, field_name)]
+                    for cell_field_dof ∈ cell_field_dofs
+                        append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_entity_dof])
+                        append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_field_dof])
+                        append!(ghost_rank_to_send[sender_slot], ldof_to_rank[cell_field_dof])
+                        append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
+                        append!(ghost_element_to_send[sender_slot], pivot_cell_idx)
                     end
-                    @debug println("    $other_vi is ghost for $pivot_vi in field $field_idx (R$my_rank)")
-
-                    pivot_vertex_dof = dh.vertexdicts[field_idx][pivot_vertex]
-                    other_vertex_dof = dh.vertexdicts[field_idx][other_vertex]
-
-                    append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_vertex_dof])
-                    append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[other_vertex_dof])
-                    append!(ghost_rank_to_send[sender_slot], other_vertex_owner_rank)
-                    append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
-                    append!(ghost_element_to_send[sender_slot], pivot_cell_idx)
                 end
             end
         end

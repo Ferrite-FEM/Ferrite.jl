@@ -409,6 +409,12 @@ faceskeleton(top::ExclusiveTopology, grid::AbstractGrid) =  top.face_skeleton
 toglobal(grid::AbstractGrid,vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1]))[vertexidx[2]]
 toglobal(grid::AbstractGrid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))
 
+toglobal(grid::AbstractGrid,faceidx::FaceIndex) = sortface(faces(getcells(grid,faceidx[1])[faceidx[2]]))
+toglobal(grid::AbstractGrid,faceidx::Vector{FaceIndex}) = unique(toglobal.((grid,),faceidx))
+
+toglobal(grid::AbstractGrid,edgeidx::EdgeIndex) = sortedge(faces(getcells(grid,edgeidx[1])[edgeidx[2]]))
+toglobal(grid::AbstractGrid,edgeidx::Vector{EdgeIndex}) = unique(toglobal.((grid,),edgeidx))
+
 @inline getdim(::AbstractGrid{dim}) where {dim} = dim
 """
     getcells(grid::AbstractGrid)
