@@ -839,14 +839,25 @@ struct PeriodicFacePair
 end
 
 """
-    PeriodicDirichlet(u, Γ⁻ => Γ⁺, component=1)
-    PeriodicDirichlet(u, Γ⁻ => Γ⁺, f, component=1)
+    PeriodicDirichlet(u, face_mapping, component=1)
+    PeriodicDirichlet(u, face_mapping, R::AbstractMatrix, component=1)
+    PeriodicDirichlet(u, face_mapping, f::Function, component=1)
 
-Create a periodic Dirichlet boundary condition for the field `u`, with a mirror boundary,
-`Γ⁻` and an image boundary, `Γ⁺`. The condition is imposed in a strong sense, and requires
-(i) a periodic domain (usually a cube) and (ii) a periodic mesh.
+Create a periodic Dirichlet boundary condition for the field `u` on the face-pairs given in
+`face_mapping`. The mapping can be computed with [`collect_periodic_faces`](@ref). The
+constraint ensures that degrees-of-freedom on the mirror face are constrained to the
+corresponding degrees-of-freedom on the image face. The condition is imposed in a
+strong sense, and requires (i) a periodic domain and (ii) a periodic mesh.
 
-See also manual section on [Periodic boundary conditions](@ref).
+If the mapping is not aligned with the coordinate axis (e.g. rotated) a rotation matrix `R`
+should be passed to the constructor. This matrix rotates dofs on the mirror face to the
+image face. Note that this is only applicable for vector-valued problems.
+
+To construct an inhomogeneous periodic constraint it is possible to pass a function `f`.
+Note that this is currently only supported when the periodicity is aligned with the
+coordinate axes.
+
+See the manual section on [Periodic boundary conditions](@ref) for more information.
 """
 struct PeriodicDirichlet
     field_name::Symbol
