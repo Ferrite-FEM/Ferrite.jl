@@ -394,11 +394,11 @@ end
 end
 
 @testset "grid coloring" begin
-    function test_coloring(grid, cellset=Set(1:getncells(grid)))
+    function test_coloring(grid, cellset=1:getncells(grid))
         for alg in (ColoringAlgorithm.Greedy, ColoringAlgorithm.WorkStream)
             color_vectors = create_coloring(grid, cellset; alg=alg)
             @test sum(length, color_vectors) == length(cellset)
-            @test union(Set.(color_vectors)...) == cellset
+            @test union(Set.(color_vectors)...) == Set(cellset)
             conn = Ferrite.create_incidence_matrix(grid, cellset)
             for color in color_vectors, c1 in color, c2 in color
                 @test !conn[c1, c2]
@@ -417,7 +417,7 @@ end
     # test_coloring(generate_grid(QuadraticHexahedron, (5, 5, 5)))
 
     # color only a subset
-    test_coloring(generate_grid(Line, (5,)), Set{Int}(1:3))
+    test_coloring(generate_grid(Line, (5,)), 1:3)
     test_coloring(generate_grid(Triangle, (5, 5)), Set{Int}(1:3^2))
     test_coloring(generate_grid(Quadrilateral, (5, 5)), Set{Int}(1:3^2))
     test_coloring(generate_grid(Tetrahedron, (5, 5, 5)), Set{Int}(1:3^3))

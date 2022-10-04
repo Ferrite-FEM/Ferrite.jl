@@ -1,5 +1,5 @@
 # Incidence matrix for element connections in the grid
-function create_incidence_matrix(g::Grid, cellset::Set{Int}=Set{Int}(1:getncells(g)))
+function create_incidence_matrix(g::Grid, cellset=1:getncells(g))
     cell_containing_node = Dict{Int, Set{Int}}()
     for cellid in cellset
         cell = getcells(g, cellid)
@@ -69,7 +69,7 @@ function greedy_coloring(incidence_matrix, cells=1:size(incidence_matrix, 1))
 end
 
 # See Appendix A in https://www.math.colostate.edu/%7Ebangerth/publications/2013-pattern.pdf
-function workstream_coloring(incidence_matrix, cellset::Set{Int})
+function workstream_coloring(incidence_matrix, cellset)
     ###################
     # 1. Partitioning #
     ###################
@@ -77,10 +77,12 @@ function workstream_coloring(incidence_matrix, cellset::Set{Int})
     n_visited = 0
     Z = 1
     Z0 = Set{Int}() # Dummy zone
+    remaining_cells = Set{Int}(cellset)
     while n_visited < length(cellset)
-        remaining_cellset = setdiff(cellset, zones...)
+        setdiff!(remaining_cells, zones...)
         ## Zone 1: Just the first element
-        push!(zones, Set{Int}(first(remaining_cellset)))
+        @assert length(remaining_cells) > 0
+        push!(zones, Set{Int}(first(remaining_cells)))
         Z += 1
         n_visited += 1
         ## Zone N: All elements with connection to elements in Zone N-1
@@ -151,7 +153,7 @@ const GREEDY = ColoringAlgorithm.Greedy
 const WORKSTREAM = ColoringAlgorithm.WorkStream
 
 """
-    create_coloring(g::Grid, cellset::Set{Int}=Set(1:getncells(g)); alg::ColoringAlgorithm)
+    create_coloring(g::Grid, cellset=1:getncells(g); alg::ColoringAlgorithm)
 
 Create a coloring of the cells in grid `g` such that no neighboring cells
 have the same color. If only a subset of cells should be colored, the cells to color can be specified by `cellset`.
@@ -186,7 +188,7 @@ The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
     )
     ```
 """
-function create_coloring(g::Grid, cellset::Set{Int}=Set{Int}(1:getncells(g)); alg::ColoringAlgorithm.T=ColoringAlgorithm.WorkStream)
+function create_coloring(g::Grid, cellset=1:getncells(g); alg::ColoringAlgorithm.T=ColoringAlgorithm.WorkStream)
     incidence_matrix = create_incidence_matrix(g, cellset)
     if alg === ColoringAlgorithm.WorkStream
         return workstream_coloring(incidence_matrix, cellset)
