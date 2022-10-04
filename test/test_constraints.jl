@@ -176,11 +176,11 @@ end
 
 end
 
-# Rotate pi/2 around dir
+# Rotate -pi/2 around dir
 function rotpio2(v, dir=3)
     v3 = Vec{3}(i -> i <= length(v) ? v[i] : 0.0)
     z = Vec{3}(i -> i == dir ? 1.0 : 0.0)
-    rv = Tensors.rotate(v3, z, pi/2)
+    rv = Tensors.rotate(v3, z, -pi/2)
     return typeof(v)(i -> rv[i])
 end
 
@@ -241,8 +241,8 @@ end
         @test issetequal(face_map, map(x -> PeriodicFacePair(x.image, x.mirror, x.rotation, x.mirrored), correct_map))
 
         # Known pairs with transformation
-        face_map = collect_periodic_faces(grid, "left", "right", x -> x + Vec{2}((1.0, 0.0)))
-        collect_periodic_faces!(face_map, grid, "bottom", "top", x -> x + Vec{2}((0.0, 1.0)))
+        face_map = collect_periodic_faces(grid, "left", "right", x -> x - Vec{2}((2.0, 0.0)))
+        collect_periodic_faces!(face_map, grid, "bottom", "top", x -> x - Vec{2}((0.0, 2.0)))
         @test issetequal(face_map, correct_map)
 
         # More advanced transformation by rotation
@@ -256,7 +256,7 @@ end
         ])
 
         # Rotate and translate
-        face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) + Vec{2}((-1.0, 0.0)))
+        face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
         @test issetequal(face_map, [
             PeriodicFacePair(FaceIndex(1, 1), FaceIndex(1, 4), 0x00, true),
             PeriodicFacePair(FaceIndex(2, 1), FaceIndex(3, 4), 0x00, true),
@@ -318,8 +318,8 @@ end
         @test issetequal(face_map, map(x -> PeriodicFacePair(x.image, x.mirror, x.rotation, x.mirrored), correct_map))
 
         # Known pairs with transformation
-        face_map = collect_periodic_faces(grid, "left", "right", x -> x + Vec{2}((1.0, 0.0)))
-        collect_periodic_faces!(face_map, grid, "bottom", "top", x -> x + Vec{2}((0.0, 1.0)))
+        face_map = collect_periodic_faces(grid, "left", "right", x -> x - Vec{2}((2.0, 0.0)))
+        collect_periodic_faces!(face_map, grid, "bottom", "top", x -> x - Vec{2}((0.0, 2.0)))
         @test issetequal(face_map, correct_map)
 
         # More advanced transformation by rotation
@@ -333,7 +333,7 @@ end
         ])
 
         # Rotate and translate
-        face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) + Vec{2}((-1.0, 0.0)))
+        face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
         @test issetequal(face_map, [
             PeriodicFacePair(FaceIndex(1, 1), FaceIndex(1, 3), 0x00, true),
             PeriodicFacePair(FaceIndex(3, 1), FaceIndex(5, 3), 0x00, true),
@@ -352,7 +352,7 @@ end
     ])
 
     grid = generate_grid(Hexahedron, (2, 2, 2))
-    face_map = collect_periodic_faces(grid, "left", "right", x -> x + Vec{3}((1.0, 0.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "left", "right", x -> x - Vec{3}((2.0, 0.0, 0.0)))
     collect_periodic_faces!(face_map, grid, "bottom", "top")
     collect_periodic_faces!(face_map, grid, "front", "back")
     @test issetequal(face_map, [
@@ -382,7 +382,7 @@ end
 
     # Rotation and translation
     grid = generate_grid(Hexahedron, (2, 2, 2))
-    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(x) + Vec{3}((-1.0, 0.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(x) - Vec{3}((0.0, 2.0, 0.0)))
     @test issetequal(face_map, [
         PeriodicFacePair(FaceIndex(1, 2), FaceIndex(1, 5), 0x00, true),
         PeriodicFacePair(FaceIndex(2, 2), FaceIndex(3, 5), 0x00, true),
@@ -391,18 +391,6 @@ end
     ])
 
     ####################################################################
-    #
-    #truth
-    PeriodicFacePair(FaceIndex(1, 4), FaceIndex(4, 1), 0x00, true)
-    PeriodicFacePair(FaceIndex(2, 2), FaceIndex(6, 1), 0x00, true)
-    PeriodicFacePair(FaceIndex(2, 1), FaceIndex(3, 3), 0x02, true)
-    PeriodicFacePair(FaceIndex(5, 1), FaceIndex(4, 3), 0x02, true)
-    PeriodicFacePair(FaceIndex(1, 1), FaceIndex(5, 3), 0x00, true)
-    PeriodicFacePair(FaceIndex(3, 1), FaceIndex(6, 3), 0x00, true)
-
-
-    #
-    #
 
     # 3D tetra grid
     grid = generate_grid(Tetrahedron, (1, 1, 1))
@@ -417,7 +405,7 @@ end
     ])
 
     grid = generate_grid(Tetrahedron, (2, 2, 2))
-    face_map = collect_periodic_faces(grid, "left", "right", x -> x + Vec{3}((1.0, 0.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "left", "right", x -> x - Vec{3}((2.0, 0.0, 0.0)))
     collect_periodic_faces!(face_map, grid, "bottom", "top")
     collect_periodic_faces!(face_map, grid, "front", "back")
     @test issetequal(face_map, [
@@ -457,7 +445,7 @@ end
 
     # Rotation and translation
     grid = generate_grid(Tetrahedron, (1, 1, 1))
-    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(rotate(x, Vec{3}((0., 1., 0.)), 3pi/2)) + Vec{3}((-1.0, 0.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(rotate(x, Vec{3}((1., 0., 0.)), 3pi/2)) - Vec{3}((0.0, 2.0, 0.0)))
     @test issetequal(face_map, [
         PeriodicFacePair(FaceIndex(2, 1), FaceIndex(1, 4), 0x01, true)
         PeriodicFacePair(FaceIndex(5, 1), FaceIndex(2, 2), 0x01, true)
@@ -540,7 +528,7 @@ end # testset
 
     # Rotation and translation
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) + Vec{2}((-1.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -594,7 +582,7 @@ end # testset
     # Rotation with dof rotation
     face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
     ch = ConstraintHandler(dh)
-    pbc = PeriodicDirichlet(:v, face_map, rotation_tensor(π/2), [1, 2])
+    pbc = PeriodicDirichlet(:v, face_map, rotation_tensor(-π/2), [1, 2])
     add!(ch, pbc)
     dof_map = get_dof_map(ch)
     correct_dof_map = Dict{Int,Any}(
@@ -613,7 +601,7 @@ end # testset
     end
 
     # Rotation and translation
-    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) + Vec{2}((-1.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
     ch = ConstraintHandler(dh)
     pbc = PeriodicDirichlet(:v, face_map, [1, 2])
     add!(ch, pbc)
@@ -671,7 +659,7 @@ end # testset
 
     # Rotation and translation
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) + Vec{2}((-1.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -701,7 +689,7 @@ end # testset
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
-    pbc = PeriodicDirichlet(:v, face_map, rotation_tensor(π/2), [1, 2])
+    pbc = PeriodicDirichlet(:v, face_map, rotation_tensor(-π/2), [1, 2])
     add!(ch, pbc)
     close!(ch)
     dof_map = get_dof_map(ch)
@@ -765,7 +753,7 @@ end # testset
     )
 
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(x) + Vec{3}((-1.0, 0.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(x) - Vec{3}((0.0, 2.0, 0.0)))
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -838,7 +826,7 @@ end # testset
         6 => 20,
     )
 
-    # 3D tetra vector with dof rotation
+    # 3D hex vector with dof rotation
     grid = generate_grid(Hexahedron, (1, 1, 1))
     dh = DofHandler(grid)
     push!(dh, :v, 3)
@@ -851,12 +839,18 @@ end # testset
     close!(ch)
     dof_map = get_dof_map(ch)
     correct_dof_map = Dict{Int,Any}(
-        13 => [4 => 0, 5 => 0, 6 => -1],
+        1 => [4 => 0, 5 => 0, 6 => 1],
+        2 => [4 => 0, 5 => 1, 6 => 0],
+        3 => [4 => -1, 5 => 0, 6 => 0],
+        10 => [7 => 0, 8 => 0, 9 => 1],
+        11 => [7 => 0, 8 => 1, 9 => 0],
+        12 => [7 => -1, 8 => 0, 9 => 0],
+        13 => [4 => 0, 5 => 0, 6 => 1],
         14 => [4 => 0, 5 => 1, 6 => 0],
-        15 => [4 => 1, 5 => 0, 6 => 0],
-        22 => [7 => 0, 8 => 0, 9 => -1],
+        15 => [4 => -1, 5 => 0, 6 => 0],
+        22 => [7 => 0, 8 => 0, 9 => 1],
         23 => [7 => 0, 8 => 1, 9 => 0],
-        24 => [7 => 1, 8 => 0, 9 => 0],
+        24 => [7 => -1, 8 => 0, 9 => 0],
     )
     @test length(dof_map) == length(correct_dof_map)
     for (k, v) in dof_map

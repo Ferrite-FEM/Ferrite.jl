@@ -331,10 +331,10 @@ end
 # parallel to each other we need to i) compute the mapping between each mirror face and the
 # corresponding image face (on the element level) and ii) describe the dof relation between
 # dofs on these two faces. In Ferrite this is done by defining a transformation of entities
-# on the mirror boundary such that they line up with the matching entities on the image
-# boundary. In this example we consider the outlet ``\Gamma_3`` to be the mirror, and the
-# inlet ``\Gamma_1`` to be the image. The necessary transformation to apply then becomes a
-# rotation of ``-\pi/2`` radians around the out-of-plane axis. We set up the rotation matrix
+# on the image boundary such that they line up with the matching entities on the mirror
+# boundary. In this example we consider the inlet ``\Gamma_1`` to be the image, and the
+# outlet ``\Gamma_3`` to be the mirror. The necessary transformation to apply then becomes a
+# rotation of ``\pi/2`` radians around the out-of-plane axis. We set up the rotation matrix
 # `R`, and then compute the mapping between mirror and image faces using
 # [`collect_periodic_faces`](@ref) where the rotation is applied to the coordinates. In the
 # next step we construct the constraint using the [`PeriodicDirichlet`](@ref) constructor.
@@ -350,7 +350,7 @@ end
 function setup_constraints(dh, fvp)
     ch = ConstraintHandler(dh)
     ## Periodic BC
-    R = rotation_tensor(-pi / 2)
+    R = rotation_tensor(π / 2)
     periodic_faces = collect_periodic_faces(dh.grid, "Γ3", "Γ1", x -> R ⋅ x)
     periodic = PeriodicDirichlet(:u, periodic_faces, R, [1, 2])
     add!(ch, periodic)

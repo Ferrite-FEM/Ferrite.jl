@@ -1054,8 +1054,10 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
             add!(ch, ac)
         else
             @assert inhomogeneity_map === nothing
+            @assert rotation_matrix !== nothing
             for (i, ki) in pairs(k)
-                vs = Pair{Int,eltype(T)}[v[j] => rotation_matrix[j, i] for j in 1:length(v)]
+                # u_mirror = R ⋅ u_image
+                vs = Pair{Int,eltype(T)}[v[j] => rotation_matrix[i, j] for j in 1:length(v)]
                 ac = AffineConstraint(ki, vs, 0.0)
                 add!(ch, ac)
             end
@@ -1201,8 +1203,8 @@ dictionary which maps each mirror face to a image face. The result can then be p
 
 By default this function looks for a matching face in the directions of the coordinate
 system. For other types of periodicities the `transform` function can be used. The
-`transform` function is applied on the coordinates of the mirror face, and is expected to
-transform the coordinates to the matching locations in the image set.
+`transform` function is applied on the coordinates of the image face, and is expected to
+transform the coordinates to the matching locations in the mirror set.
 
 See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
 """
@@ -1278,15 +1280,15 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
     mirror_mean_x = Tx[]
     for (c, f) in mset
         fn = faces(grid.cells[c])[f]
-        # Apply transformation to all coordinates
-        push!(mirror_mean_x, sum(transformation(grid.nodes[i].x)::Tx for i in fn) / length(fn))
+        push!(mirror_mean_x, sum(grid.nodes[i].x for i in fn) / length(fn))
     end
 
     # Same dance for the image
     image_mean_x = Tx[]
     for (c, f) in iset
         fn = faces(grid.cells[c])[f]
-        push!(image_mean_x, sum(grid.nodes[i].x for i in fn) / length(fn))
+        # Apply transformation to all coordinates
+        push!(image_mean_x, sum(transformation(grid.nodes[i].x)::Tx for i in fn) / length(fn))
     end
 
     # Use KDTree to find closest face
@@ -1467,8 +1469,8 @@ function __check_periodic_faces_f(grid::Grid, fi::FaceIndex, fj::FaceIndex, xmi,
     nodes_j = faces(grid.cells[cij])[fij]
 
     # 1. Check if normals are aligned or opposite TODO: Should use FaceValues here
-    ni = __outward_normal(grid, nodes_i, transformation)
-    nj = __outward_normal(grid, nodes_j)
+    ni = __outward_normal(grid, nodes_i)
+    nj = __outward_normal(grid, nodes_j, transformation)
     TOL = 1e-12
     if norm(ni + nj) < TOL
         mirror = true
@@ -1483,11 +1485,11 @@ function __check_periodic_faces_f(grid::Grid, fi::FaceIndex, fj::FaceIndex, xmi,
     h = 2 * norm(xmj - grid.nodes[nodes_j[1]].x) # Approximate element size
     TOLh = TOL * h
     nodes_i = mirror ? circshift_tuple(reverse(nodes_i), 1) : nodes_i # reverse if necessary
-    xj = grid.nodes[nodes_j[1]].x
+    xj = transformation(grid.nodes[nodes_j[1]].x)
     node_rot = 0
     found = false
     for i in eachindex(nodes_i)
-        xi = transformation(grid.nodes[nodes_i[i]].x)
+        xi = grid.nodes[nodes_i[i]].x
         xij = xj - xi
         if norm(xij - xmij) < TOLh
             found = true
