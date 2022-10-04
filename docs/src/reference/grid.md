@@ -65,7 +65,7 @@ FerriteGmsh.togrid
 
 !!! note "Why you should read a .msh file"
     Reading a `.msh` file is the advertised way, since otherwise you remesh whenver you run the code.
-    Further, if you choose to define to read the grid directly from the current model of the gmsh API you get artificial nodes,
+    Further, if you choose to read the grid directly from the current model of the gmsh API you get artificial nodes,
     which doesn't harm the FE computation, but maybe distort your sophisticated grid operations (if present).
     For more information, see [this issue](https://github.com/Ferrite-FEM/FerriteGmsh.jl/issues/20).
 
