@@ -128,6 +128,7 @@ using OrdinaryDiffEq
 using FerriteGmsh
 using FerriteGmsh: Gmsh
 Gmsh.initialize()
+gmsh.option.set_number("General.Verbosity", 2)
 dim = 2
 # We specify first the rectangle, the cylinder, the surface spanned by the cylinder and the boolean difference of rectangle and cylinder.
 rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 2.2, 0.41)
@@ -155,6 +156,7 @@ gmsh.option.setNumber("Mesh.MeshSizeMax",0.1)           #hide
 # In the next step, the mesh is generated and finally translated.
 gmsh.model.mesh.generate(dim)
 grid = togrid()
+Gmsh.finalize()
 
 # We test against full development of the flow - so regenerate the grid                              #src
 grid = generate_grid(Quadrilateral, (55÷3, 41÷3), Vec{2}((0.0, 0.0)), Vec{2}((0.55, 0.41)));         #hide
