@@ -57,6 +57,10 @@ create_coloring
 ```
 
 ## Mesh Reading
+Currently, there are two registered packages for reading in meshes into `Ferrite.jl`: [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) and [`FerriteMeshParser.jl`](https://github.com/Ferrite-FEM/FerriteMeshParser.jl).
+Their functionalities are briefly described below.
+
+### FerriteGmsh
 `FerriteGmsh.jl` supports all defined cells with an alias in [`Ferrite.jl`](https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/src/Grid/grid.jl#L39-L54) as well as the 3D Serendipity `Cell{3,20,6}`.
 Either, a mesh is created on the fly with the gmsh API or a mesh in `.msh` or `.geo` format can be read and translated with the `FerriteGmsh.togrid` function.
 ```@docs
@@ -72,6 +76,18 @@ FerriteGmsh.togrid
 If you want to read another, not yet supported cell from gmsh, consider to open a PR at `FerriteGmsh` that extends the [`gmshtoferritecell` dict](https://github.com/Ferrite-FEM/FerriteGmsh.jl/blob/c9de4f64b3ad3c73fcb36758855a6e517c6d0d95/src/FerriteGmsh.jl#L6-L15)
 and if needed, reorder the element nodes by dispatching [`FerriteGmsh.translate_elements`](https://github.com/Ferrite-FEM/FerriteGmsh.jl/blob/c9de4f64b3ad3c73fcb36758855a6e517c6d0d95/src/FerriteGmsh.jl#L17-L63).
 The reordering of nodes is necessary if the Gmsh ordering doesn't match the one from Ferrite. Gmsh ordering is documented [here](https://gmsh.info/doc/texinfo/gmsh.html#Node-ordering).
+
+### FerriteMeshParser
+`FerriteMeshParser.jl` converts the mesh in an Abaqus input file (`.inp`) to a `Ferrite.Grid` with its function `get_ferrite_grid`. 
+The translations for most of Abaqus' standard 2d and 3d continuum elements to a `Ferrite.Cell` are defined. 
+Custom translations can be given as input, which can be used to import other (custom) elements or to override the default translation.
+```@docs
+FerriteMeshParser.get_ferrite_grid
+```
+
+If you are missing the translation of an Abaqus element that is equivalent to a `Ferrite.Cell`, 
+consider to open an [issue](https://github.com/Ferrite-FEM/FerriteMeshParser.jl/issues/new) or a pull request. 
+
 
 ## AbstractGrid
 
