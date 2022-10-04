@@ -57,11 +57,17 @@ create_coloring
 ```
 
 ## Mesh Reading
+
+### FerriteGmsh
+
 `FerriteGmsh.jl` supports all defined cells with an alias in [`Ferrite.jl`](https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/src/Grid/grid.jl#L39-L54) as well as the 3D Serendipity `Cell{3,20,6}`.
 Either, a mesh is created on the fly with the gmsh API or a mesh in `.msh` or `.geo` format can be read and translated with the `FerriteGmsh.togrid` function.
 ```@docs
 FerriteGmsh.togrid
 ```
+`FerriteGmsh.jl` supports currently the translation of `cellsets` and `facesets`.
+Such sets are defined in Gmsh as `PhysicalGroups` of dimension `dim` and `dim-1`, respectively.
+In case only a part of the mesh is the domain, the domain can be specified by providing the keyword argument `domain` the name of the `PhysicalGroups` in the [`FerriteGmsh.togrid`](@ref) function.
 
 !!! note "Why you should read a .msh file"
     Reading a `.msh` file is the advertised way, since otherwise you remesh whenver you run the code.
