@@ -56,6 +56,21 @@ addnodeset!
 create_coloring
 ```
 
+## Mesh Reading
+`FerriteGmsh.jl` supports all defined cells with an alias in (`Ferrite.jl`)(https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/src/Grid/grid.jl#L39-L54) as well as the 3D Serendipity `Cell{3,20,6}`.
+Either, a mesh is created on the fly with the gmsh API or a mesh in `.msh` or `.geo` format can be read and translated with the `FerriteGmsh.togrid` function.
+```@docs
+FerriteGmsh.togrid
+```
+
+!!! note "Why you should read a .msh file"
+    Reading a `.msh` file is the advertised way, since otherwise you remesh whenver you run the code.
+    Further, if you choose to define to read the grid directly from the current model of the gmsh API you get artificial nodes,
+    which doesn't harm the FE computation, but maybe distort your sophisticated grid operations (if present).
+    For more information, see [this issue](https://github.com/Ferrite-FEM/FerriteGmsh.jl/issues/20).
+
+If you want to read another, not yet supported cell from gmsh, consider to open a PR at `FerriteGmsh` that extends the [`gmshtoferritecell` dict](https://github.com/Ferrite-FEM/FerriteGmsh.jl/blob/master/src/FerriteGmsh.jl#L6-L15)
+and if needed, reorder the element nodes by dispatching [`FerriteGmsh.translate_elements`](https://github.com/Ferrite-FEM/FerriteGmsh.jl/blob/master/src/FerriteGmsh.jl#L17-L63)
 
 ## AbstractGrid
 
