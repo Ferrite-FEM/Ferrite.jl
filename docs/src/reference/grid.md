@@ -7,6 +7,7 @@ DocTestSetup = :(using Ferrite)
 ## Grid
 
 ```@docs
+generate_grid
 Node
 Cell
 CellIndex
