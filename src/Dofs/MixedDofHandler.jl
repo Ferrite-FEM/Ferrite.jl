@@ -412,26 +412,20 @@ function _create_sparsity_pattern(dh::MixedDofHandler, ch#=::Union{ConstraintHan
     end
     resize!(I, cnt)
     resize!(J, cnt)
-    V = zeros(length(I))
-    K = sparse(I, J, V)
 
-    #If ConstraintHandler is given, create the condensation pattern due to affine constraints
+    # If ConstraintHandler is given, create the condensation pattern due to affine constraints
     if ch !== nothing
         @assert isclosed(ch)
 
-        #Make V equal to ones instead of zeros because :+-operator removes entries with zeros.
         V = ones(length(I))
         K = sparse(I, J, V, ndofs(dh), ndofs(dh))
-        
         _condense_sparsity_pattern!(K, ch.acs)
         fill!(K.nzval, 0.0)
     else
         V = zeros(length(I))
         K = sparse(I, J, V, ndofs(dh), ndofs(dh))
     end
-    
     return K
-
 end
 
 create_sparsity_pattern(dh::MixedDofHandler) = _create_sparsity_pattern(dh, nothing, false)

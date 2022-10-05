@@ -594,8 +594,8 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, acs::Vector{AffineCo
     # Store linear constraint index for each constrained dof
     distribute = Dict{Int,Int}(acs[c].constrained_dof => c for c in 1:length(acs))
 
-    #Adding new entries to K was extremely slow, so craete a new sparsity triplet for the condensed sparsity pattern
-    N = length(acs)*10 # TODO: Better size estimate for additional condensed sparsity pattern.
+    #Adding new entries to K is extremely slow, so create a new sparsity triplet for the condensed sparsity pattern
+    N = length(acs)*2 # TODO: Better size estimate for additional condensed sparsity pattern.
     I = Int[]; resize!(I, N)
     J = Int[]; resize!(J, N)
 
@@ -650,8 +650,7 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, acs::Vector{AffineCo
     resize!(J, cnt)
 
     # Fill the sparse matrix with a non-zero value so that :+ operation does not remove entries with value zero.
-    # Use eps(T) so that the it does not affect the current values of the sparse matrix (I need to call _condense_sparsity_pattern() in other places of my code /Elias)
-    V = fill(eps(T), length(I))
+    V = fill(1.0, length(I))
     K2 = sparse(I, J, V, ndofs, ndofs)
 
     K .+= K2
@@ -748,7 +747,7 @@ function _addindex_sparsematrix!(A::SparseMatrixCSC{Tv,Ti}, v::Tv, i::Ti, j::Ti)
         nonzeros(A)[searchk] += v
         return true
     end
-        return false
+    return false
 end
 
 """
