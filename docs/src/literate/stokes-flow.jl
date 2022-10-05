@@ -133,7 +133,7 @@
 #     \underline{f}_{u} \\
 #     \underline{0} \\
 #     \underline{0}
-#     \end{bmatrix},
+#     \end{bmatrix}.
 #     ```
 
 # ## Commented program
