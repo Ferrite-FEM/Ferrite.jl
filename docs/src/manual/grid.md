@@ -10,7 +10,6 @@ A Ferrite `Grid` can be generated with the [`generate_grid`](@ref) function.
 More advanced meshes can be imported with the 
 [`FerriteMeshParser.jl`](https://github.com/Ferrite-FEM/FerriteMeshParser.jl) (from Abaqus input files),
 or even created and translated with the [`Gmsh.jl`](https://github.com/JuliaFEM/Gmsh.jl) and [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package, respectively.
-For more information about this, consider the docs of [`FerriteGmsh.togrid`](@ref) as well as the [Stokes Flow](@ref) and [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](@ref) example.
 
 ### FerriteGmsh
 
@@ -32,6 +31,7 @@ In case only a part of the mesh is the domain, the domain can be specified by pr
 If you want to read another, not yet supported cell from gmsh, consider to open a PR at `FerriteGmsh` that extends the [`gmshtoferritecell` dict](https://github.com/Ferrite-FEM/FerriteGmsh.jl/blob/c9de4f64b3ad3c73fcb36758855a6e517c6d0d95/src/FerriteGmsh.jl#L6-L15)
 and if needed, reorder the element nodes by dispatching [`FerriteGmsh.translate_elements`](https://github.com/Ferrite-FEM/FerriteGmsh.jl/blob/c9de4f64b3ad3c73fcb36758855a6e517c6d0d95/src/FerriteGmsh.jl#L17-L63).
 The reordering of nodes is necessary if the Gmsh ordering doesn't match the one from Ferrite. Gmsh ordering is documented [here](https://gmsh.info/doc/texinfo/gmsh.html#Node-ordering).
+For an exemplary usage of `Gmsh.jl` and `FerriteGmsh.jl`, consider the [Stokes Flow](@ref) and [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](@ref) example.
 
 ### FerriteMeshParser
 
@@ -62,7 +62,7 @@ Consider the following 2D mesh:
 The cells of the grid can be described in the following way
 
 ```julia
-julia> elements = [
+julia> cells = [
               Quadrilateral((1,2,5,4)),
               Quadrilateral((2,3,6,5)),
               Quadrilateral((4,5,8,7)),
@@ -103,14 +103,14 @@ julia> faces = [
 
 The local ID can be constructed based on elements, corresponding faces and chosen interpolation, since the face ordering is interpolation dependent.
 ```julia
-julia> function compute_faceset(elements, global_faces, ip::Interpolation{dim}) where {dim}
+julia> function compute_faceset(cells, global_faces, ip::Interpolation{dim}) where {dim}
            local_faces = Ferrite.faces(ip)
            nodes_per_face = length(local_faces[1])
            d = Dict{NTuple{nodes_per_face, Int}, FaceIndex}()
-           for (e, element) in enumerate(elements) # e is global element number
+           for (c, cell) in enumerate(cells) # c is global cell number
                for (f, face) in enumerate(local_faces) # f is local face number
                    # store the global nodes for the particular element, local face combination
-                   d[ntuple(i-> element.nodes[face[i]], nodes_per_face)] = FaceIndex(e, f)
+                   d[ntuple(i-> cell.nodes[face[i]], nodes_per_face)] = FaceIndex(c, f)
                end
            end
        
@@ -123,9 +123,9 @@ julia> function compute_faceset(elements, global_faces, ip::Interpolation{dim}) 
            return faces
        end
 
-julia> interpolation = Lagrange{2, RefTetrahedron, 1}()
+julia> interpolation = Lagrange{2, RefCube, 1}()
 
-julia> compute_faceset(elements, faces, interpolation)
+julia> compute_faceset(cells, faces, interpolation)
 Vector{FaceIndex} with 2 elements:
   FaceIndex((2, 2))
   FaceIndex((4, 2))
@@ -195,6 +195,6 @@ In order to use boundaries, e.g. for Dirichlet constraints in the ConstraintHand
 
 ## Topology
 
-Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`Ferrite.full_neighborhood`](@ref) and [`Ferrite.faceskeleton`](@ref)
-are the interface to obtain topological information. The [`Ferrite.full_neighborhood`](@ref) can construct lists of directly connected entities based on a given entity (`CellIndex,FaceIndex,EdgeIndex,VertexIndex`).
+Ferrite.jl's `Grid` type offers experimental features w.r.t. topology information. The functions [`Ferrite.getneighborhood`](@ref) and [`Ferrite.faceskeleton`](@ref)
+are the interface to obtain topological information. The [`Ferrite.getneighborhood`](@ref) can construct lists of directly connected entities based on a given entity (`CellIndex,FaceIndex,EdgeIndex,VertexIndex`).
 The [`Ferrite.faceskeleton`](@ref) function can be used to evaluate integrals over material interfaces or computing element interface values such as jumps.
