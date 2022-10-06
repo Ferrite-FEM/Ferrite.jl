@@ -8,7 +8,7 @@ DocTestSetup = :(using Ferrite)
 
 A Ferrite `Grid` can be generated with the [`generate_grid`](@ref) function. 
 More advanced meshes can be imported with the 
-[`FerriteMeshParser.jl`](https://github.com/Ferrite-FEM/FerriteMeshParser.jl) (currently for Abaqus .inp files),
+[`FerriteMeshParser.jl`](https://github.com/Ferrite-FEM/FerriteMeshParser.jl) (from Abaqus input files),
 or even created and translated with the [`Gmsh.jl`](https://github.com/JuliaFEM/Gmsh.jl) and [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) package, respectively.
 For more information about this, consider the docs of [`FerriteGmsh.togrid`](@ref) as well as the [Stokes Flow](@ref) and [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](@ref) example.
 
