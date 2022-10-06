@@ -1,26 +1,31 @@
 # abstract type Constraint end
 """
-    Dirichlet(u, ∂Ω, f)
-    Dirichlet(u, ∂Ω, f, component)
+    Dirichlet(u::Symbol, ∂Ω::Set, f::Function, components=nothing)
 
 Create a Dirichlet boundary condition on `u` on the `∂Ω` part of
 the boundary. `f` is a function that takes two arguments, `x` and `t`
 where `x` is the spatial coordinate and `t` is the current time,
-and returns the prescribed value. For example, here we create a
+and returns the prescribed value. `components` specify the components
+of `u` that are prescribed by this condition. By default all components
+of `u` are prescribed.
+
+For example, here we create a
 Dirichlet condition for the `:u` field, on the faceset called
 `∂Ω` and the value given by the `sin` function:
 
-```julia
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> sin(t))
-```
+*Examples*
+```jldoctest
+# Obtain the faceset from the grid
+∂Ω = getfaceset(grid, "boundary-1")
 
-If `:u` is a vector field we can specify which component the condition
-should be applied to by specifying `component`. `component` can be given
-either as an integer, or as a vector, for example:
+# Prescribe scalar field :s on ∂Ω to sin(t)
+dbc = Dirichlet(:s, ∂Ω, (x, t) -> sin(t))
 
-```julia
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> sin(t), 1)      # applied to component 1
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> sin(t), [1, 3]) # applied to component 1 and 3
+# Prescribe all components of vector field :v on ∂Ω to 0
+dbc = Dirichlet(:v, ∂Ω, (x, t) -> 0 * x)
+
+# Prescribe component 2 and 3 of vector field :v on ∂Ω to [sin(t), cos(t)]
+dbc = Dirichlet(:v, ∂Ω, (x, t) -> [sin(t), cos(t)], [2, 3])
 ```
 
 `Dirichlet` boundary conditions are added to a [`ConstraintHandler`](@ref)
@@ -34,14 +39,18 @@ struct Dirichlet # <: Constraint
     local_face_dofs::Vector{Int}
     local_face_dofs_offset::Vector{Int}
 end
-function Dirichlet(field_name::Symbol, faces::Set, f::Function, components=1)
+function Dirichlet(field_name::Symbol, faces::Set, f::Function, components=nothing)
     return Dirichlet(f, copy(faces), field_name, __to_components(components), Int[], Int[])
 end
 
+# components=nothing is default and means that all components should be constrained
+# but since number of components isn't known here it will be populated in add!
+__to_components(::Nothing) = Int[]
 function __to_components(c)
     components = convert(Vector{Int}, vec(collect(Int, c)))
-    issorted(components) || error("components not sorted: $components")
-    allunique(components) || error("components not unique: $components")
+    isempty(components) && error("components are empty: $c")
+    issorted(components) || error("components not sorted: $c")
+    allunique(components) || error("components not unique: $c")
     return components
 end
 
@@ -191,33 +200,29 @@ function close!(ch::ConstraintHandler)
     return ch
 end
 
-function dbc_check(ch::ConstraintHandler, dbc::Dirichlet)
-    # check input
-    dbc.field_name in getfieldnames(ch.dh) || throw(ArgumentError("field $(dbc.field_name) does not exist in DofHandler, existing fields are $(getfieldnames(ch.dh))"))
-    #TODO FIX!!
-    #for component in dbc.components
-    #    0 < component <= ndim(ch.dh, dbc.field_name) || error("component $component is not within the range of field $field which has $(ndim(ch.dh, field)) dimensions")
-    #end
-    if length(dbc.faces) == 0
-        @warn("added Dirichlet Boundary Condition to set containing 0 entities")
-    end
-end
-
 """
     add!(ch::ConstraintHandler, dbc::Dirichlet)
 
 Add a `Dirichlet` boundary condition to the `ConstraintHandler`.
 """
 function add!(ch::ConstraintHandler, dbc::Dirichlet)
-    dbc_check(ch, dbc)
+    if length(dbc.faces) == 0
+        @warn("adding Dirichlet Boundary Condition to set containing 0 entities")
+    end
     celltype = getcelltype(ch.dh.grid)
     @assert isconcretetype(celltype)
 
-    field_idx = find_field(ch.dh, dbc.field_name)
     # Extract stuff for the field
-    interpolation = getfieldinterpolation(ch.dh, field_idx)#ch.dh.field_interpolations[field_idx]
-    field_dim = getfielddim(ch.dh, field_idx)#ch.dh.field_dims[field_idx] # TODO: I think we don't need to extract these here ...
+    field_idx = find_field(ch.dh, dbc.field_name) # throws if name not found
+    interpolation = getfieldinterpolation(ch.dh, field_idx)
+    field_dim = getfielddim(ch.dh, field_idx)
 
+    if !all(c -> 0 < c <= field_dim, dbc.components)
+        error("components $(dbc.components) not within range of field :$(dbc.field_name) ($(field_dim) dimension(s))")
+    end
+
+    # Empty components means constrain them all
+    isempty(dbc.components) && append!(dbc.components, 1:field_dim)
 
     if eltype(dbc.faces)==Int #Special case when dbc.faces is a nodeset
         bcvalue = BCValues(interpolation, default_interpolation(celltype), FaceIndex) #Not used by node bcs, but still have to pass it as an argument
@@ -816,10 +821,17 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
 
     celltype = getcelltype(ch.dh.grid, first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
 
-    field_idx = find_field(fh, dbc.field_name)
     # Extract stuff for the field
+    field_idx = find_field(fh, dbc.field_name)
     interpolation = getfieldinterpolations(fh)[field_idx]
     field_dim = getfielddims(fh)[field_idx]
+
+    if !all(c -> 0 < c <= field_dim, dbc.components)
+        error("components $(dbc.components) not within range of field :$(dbc.field_name) ($(field_dim) dimension(s))")
+    end
+
+    # Empty components means constrain them all
+    isempty(dbc.components) && append!(dbc.components, 1:field_dim)
 
     if eltype(dbc.faces)==Int #Special case when dbc.faces is a nodeset
         bcvalue = BCValues(interpolation, default_interpolation(celltype), FaceIndex) #Not used by node bcs, but still have to pass it as an argument
@@ -868,15 +880,15 @@ struct PeriodicFacePair
 end
 
 """
-    PeriodicDirichlet(u, face_mapping, component=1)
-    PeriodicDirichlet(u, face_mapping, R::AbstractMatrix, component=1)
-    PeriodicDirichlet(u, face_mapping, f::Function, component=1)
+    PeriodicDirichlet(u::Symbol, face_mapping, components=nothing)
+    PeriodicDirichlet(u::Symbol, face_mapping, R::AbstractMatrix, components=nothing)
+    PeriodicDirichlet(u::Symbol, face_mapping, f::Function, components=nothing)
 
 Create a periodic Dirichlet boundary condition for the field `u` on the face-pairs given in
 `face_mapping`. The mapping can be computed with [`collect_periodic_faces`](@ref). The
 constraint ensures that degrees-of-freedom on the mirror face are constrained to the
-corresponding degrees-of-freedom on the image face. The condition is imposed in a
-strong sense, and requires (i) a periodic domain and (ii) a periodic mesh.
+corresponding degrees-of-freedom on the image face. `components` specify the components of
+`u` that are prescribed by this condition. By default all components of `u` are prescribed.
 
 If the mapping is not aligned with the coordinate axis (e.g. rotated) a rotation matrix `R`
 should be passed to the constructor. This matrix rotates dofs on the mirror face to the
@@ -898,25 +910,20 @@ struct PeriodicDirichlet
 end
 
 # Default to no inhomogeneity function/rotation
-PeriodicDirichlet(fn::Symbol, fp::Union{Vector{<:Pair},Vector{PeriodicFacePair}}, c=1) =
+PeriodicDirichlet(fn::Symbol, fp::Union{Vector{<:Pair},Vector{PeriodicFacePair}}, c=nothing) =
     PeriodicDirichlet(fn, fp, nothing, c)
 
 # Basic constructor for the simple case where face_map will be populated in
 # add!(::ConstraintHandler, ...) instead
-function PeriodicDirichlet(fn::Symbol, fp::Vector{<:Pair}, f::Union{Function,Nothing}, c=1)
+function PeriodicDirichlet(fn::Symbol, fp::Vector{<:Pair}, f::Union{Function,Nothing}, c=nothing)
     face_map = PeriodicFacePair[] # This will be populated in add!(::ConstraintHandler, ...) instead
     return PeriodicDirichlet(fn, __to_components(c), fp, face_map, f, nothing)
 end
 
-function PeriodicDirichlet(fn::Symbol, fm::Vector{PeriodicFacePair}, f_or_r::Union{AbstractMatrix,Function,Nothing}, c=1)
+function PeriodicDirichlet(fn::Symbol, fm::Vector{PeriodicFacePair}, f_or_r::Union{AbstractMatrix,Function,Nothing}, c=nothing)
     f = f_or_r isa Function ? f_or_r : nothing
     rotation_matrix = f_or_r isa AbstractMatrix ? f_or_r : nothing
     components = __to_components(c)
-    if rotation_matrix !== nothing
-        if !(length(components) == size(rotation_matrix, 1) == size(rotation_matrix, 2))
-            error("size of rotation matrix does not match the number of components")
-        end
-    end
     return PeriodicDirichlet(fn, components, Pair{String,String}[], fm, f, rotation_matrix)
 end
 
@@ -931,6 +938,14 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     field_idx = find_field(ch.dh, pdbc.field_name)
     interpolation = getfieldinterpolation(ch.dh, field_idx)
     field_dim = getfielddim(ch.dh, field_idx)
+
+    if !all(c -> 0 < c <= field_dim, pdbc.components)
+        error("components $(pdbc.components) not within range of field :$(pdbc.field_name) ($(field_dim) dimension(s))")
+    end
+
+    # Empty components means constrain them all
+    isempty(pdbc.components) && append!(pdbc.components, 1:field_dim)
+
     if pdbc.rotation_matrix === nothing
         dof_map_t = Int
         iterator_f = identity
@@ -940,7 +955,9 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
             error("legacy mode not supported with rotations")
         end
         nc = length(pdbc.components)
-        @assert nc == size(pdbc.rotation_matrix, 1) == size(pdbc.rotation_matrix, 2) # Verified in constructor
+        if !(nc == size(pdbc.rotation_matrix, 1) == size(pdbc.rotation_matrix, 2))
+            error("size of rotation matrix does not match the number of components")
+        end
         if nc !== field_dim
             error("rotations currently only supported when all components are periodic")
         end
