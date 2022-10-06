@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+ - The default components to constrain in `Dirichlet` and `PeriodicDirichlet` have changed
+   from component 1 to all components of the field. For scalar problems this has no effect.
+   ([#506][github-506], [#509][github-509])
 
 ## [0.3.8] - 2022-10-05
 ### Added
@@ -123,6 +127,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-501]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/501
 [github-503]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/503
 [github-505]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/505
+[github-506]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/506
+[github-509]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/509
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.8...HEAD
 [0.3.8]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.7...v0.3.8

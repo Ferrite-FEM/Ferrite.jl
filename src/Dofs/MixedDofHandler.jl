@@ -102,9 +102,7 @@ Returns the union of all the fields. Can be used as an iterable over all the fie
 function getfieldnames(dh::MixedDofHandler)
     fieldnames = Vector{Symbol}()
     for fh in dh.fieldhandlers
-        for name in getfieldnames(fh)
-            push!(fieldnames, name)
-        end
+        append!(fieldnames, getfieldnames(fh))
     end
     return unique!(fieldnames)
 end
@@ -441,7 +439,7 @@ create_symmetric_sparsity_pattern(dh::MixedDofHandler) = Symmetric(_create_spars
 
 function find_field(fh::FieldHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, getfieldnames(fh))
-    j === nothing && error("did not find field $field_name")
+    j === nothing && error("could not find field :$field_name in FieldHandler (existing fields: $(getfieldnames(fh)))")
     return j
 end
 

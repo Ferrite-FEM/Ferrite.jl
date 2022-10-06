@@ -55,7 +55,7 @@ getfieldnames(dh::AbstractDofHandler) = dh.field_names
 ndim(dh::AbstractDofHandler, field_name::Symbol) = dh.field_dims[find_field(dh, field_name)]
 function find_field(dh::DofHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, dh.field_names)
-    j == 0 && error("did not find field $field_name")
+    j === nothing && error("could not find field :$field_name in DofHandler (existing fields: $(getfieldnames(dh)))")
     return j
 end
 

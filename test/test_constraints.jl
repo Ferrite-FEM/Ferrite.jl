@@ -1,4 +1,79 @@
 # misc constraint tests
+
+@testset "constructors and error checking" begin
+    grid = generate_grid(Triangle, (2, 2))
+    Γ = getfaceset(grid, "left")
+    face_map = collect_periodic_faces(grid, "left", "right")
+    dh = DofHandler(grid)
+    push!(dh, :s, 1)
+    push!(dh, :v, 2)
+    close!(dh)
+    ch = ConstraintHandler(dh)
+
+    # Dirichlet
+    @test_throws ErrorException("components are empty: $(Int)[]") Dirichlet(:u, Γ, (x, t) -> 0, Int[])
+    @test_throws ErrorException("components not sorted: [2, 1]") Dirichlet(:u, Γ, (x, t) -> 0, Int[2, 1])
+    @test_throws ErrorException("components not unique: [2, 2]") Dirichlet(:u, Γ, (x, t) -> 0, Int[2, 2])
+    ## Scalar
+    dbc = Dirichlet(:s, Γ, (x, t) -> 0)
+    add!(ch, dbc)
+    @test dbc.components == [1]
+    dbc = Dirichlet(:s, Γ, (x, t) -> 0, [1])
+    add!(ch, dbc)
+    @test dbc.components == [1]
+    dbc = Dirichlet(:s, Γ, (x, t) -> 0, [1, 2])
+    @test_throws ErrorException("components [1, 2] not within range of field :s (1 dimension(s))") add!(ch, dbc)
+    dbc = Dirichlet(:p, Γ, (x, t) -> 0)
+    @test_throws ErrorException("could not find field :p in DofHandler (existing fields: [:s, :v])") add!(ch, dbc)
+    ## Vector
+    dbc = Dirichlet(:v, Γ, (x, t) -> 0)
+    add!(ch, dbc)
+    @test dbc.components == [1, 2]
+    dbc = Dirichlet(:v, Γ, (x, t) -> 0, [1])
+    add!(ch, dbc)
+    @test dbc.components == [1]
+    dbc = Dirichlet(:v, Γ, (x, t) -> 0, [2, 3])
+    @test_throws ErrorException("components [2, 3] not within range of field :v (2 dimension(s))") add!(ch, dbc)
+
+    # PeriodicDirichlet
+    @test_throws ErrorException("components are empty: $(Int)[]") PeriodicDirichlet(:u, face_map, Int[])
+    @test_throws ErrorException("components not sorted: [2, 1]") PeriodicDirichlet(:u, face_map, Int[2, 1])
+    @test_throws ErrorException("components not unique: [2, 2]") PeriodicDirichlet(:u, face_map, Int[2, 2])
+    ## Scalar
+    pdbc = PeriodicDirichlet(:s, face_map)
+    add!(ConstraintHandler(dh), pdbc)
+    @test pdbc.components == [1]
+    pdbc = PeriodicDirichlet(:s, face_map, (x,t) -> 0)
+    add!(ConstraintHandler(dh), pdbc)
+    @test pdbc.components == [1]
+    pdbc = PeriodicDirichlet(:s, face_map, [1])
+    add!(ConstraintHandler(dh), pdbc)
+    @test pdbc.components == [1]
+    pdbc = PeriodicDirichlet(:s, face_map, [1, 2])
+    @test_throws ErrorException("components [1, 2] not within range of field :s (1 dimension(s))") add!(ConstraintHandler(dh), pdbc)
+    pdbc = PeriodicDirichlet(:p, face_map)
+    @test_throws ErrorException("could not find field :p in DofHandler (existing fields: [:s, :v])") add!(ConstraintHandler(dh), pdbc)
+    ## Vector
+    pdbc = PeriodicDirichlet(:v, face_map)
+    add!(ConstraintHandler(dh), pdbc)
+    @test pdbc.components == [1, 2]
+    pdbc = PeriodicDirichlet(:v, face_map, (x, t) -> 0*x)
+    add!(ConstraintHandler(dh), pdbc)
+    @test pdbc.components == [1, 2]
+    pdbc = PeriodicDirichlet(:v, face_map, rand(2,2))
+    add!(ConstraintHandler(dh), pdbc)
+    @test pdbc.components == [1, 2]
+    pdbc = PeriodicDirichlet(:v, face_map, rand(1,1))
+    @test_throws ErrorException("size of rotation matrix does not match the number of components") add!(ConstraintHandler(dh), pdbc)
+    pdbc = PeriodicDirichlet(:v, face_map, (x, t) -> 0, [1])
+    add!(ConstraintHandler(dh), pdbc)
+    @test pdbc.components == [1]
+    pdbc = PeriodicDirichlet(:v, face_map, (x, t) -> 0, [2, 3])
+    @test_throws ErrorException("components [2, 3] not within range of field :v (2 dimension(s))") add!(ConstraintHandler(dh), pdbc)
+    pdbc = PeriodicDirichlet(:v, face_map, rand(2, 2), [2, 3])
+    @test_throws ErrorException("components [2, 3] not within range of field :v (2 dimension(s))") add!(ConstraintHandler(dh), pdbc)
+end
+
 @testset "node bc" begin
     grid = generate_grid(Triangle, (1, 1))
     addnodeset!(grid, "nodeset", x-> x[2] == -1 || x[1] == -1)
