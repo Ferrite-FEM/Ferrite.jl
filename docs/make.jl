@@ -1,4 +1,4 @@
-using Documenter, Ferrite, FerriteGmsh, FerriteMeshParser, Pkg, TimerOutputs
+using Documenter, Ferrite, FerriteGmsh, FerriteMeshParser, TimerOutputs
 
 dto = TimerOutput()
 reset_timer!(dto)

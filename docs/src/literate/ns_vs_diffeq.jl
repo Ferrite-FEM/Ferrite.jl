@@ -113,7 +113,7 @@
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 #
 # First we load Ferrite and some other packages we need
-using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack
+using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, LinearSolve
 # Since we do not need the complete DifferentialEquations suite, we just load the required ODE infrastructure, which can also handle
 # DAEs in mass matrix form.
 using OrdinaryDiffEq
@@ -425,7 +425,7 @@ problem = ODEProblem(rhs, u₀, (0.0,T), p);
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
-timestepper = ImplicitEuler()
+timestepper = ImplicitEuler(linsolve = UMFPACKFactorization(reuse_symbolic=false))
 integrator = init(
     problem, timestepper, initializealg=NoInit(), dt=Δt₀,
     adaptive=true, abstol=1e-3, reltol=1e-3,
