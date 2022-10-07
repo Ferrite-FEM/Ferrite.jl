@@ -543,9 +543,9 @@ getlowerdim(ip::BubbleEnrichedLagrange{dim,ref_shape,order}) where {dim,ref_shap
 # Lagrange-Bubble dim 2 RefTetrahedron order 1 #
 ################################################
 # Taken from https://defelement.com/elements/bubble-enriched-lagrange.html
-getnbasefunctions(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 4
-nvertexdofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 1
-ncelldofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 1
+getnbasefunctions(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = 4
+nvertexdofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = 1
+ncelldofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = 1
 
 faces(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = ((1,2), (2,3), (3,1))
 

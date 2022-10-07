@@ -102,9 +102,7 @@ Returns the union of all the fields. Can be used as an iterable over all the fie
 function getfieldnames(dh::MixedDofHandler)
     fieldnames = Vector{Symbol}()
     for fh in dh.fieldhandlers
-        for name in getfieldnames(fh)
-            push!(fieldnames, name)
-        end
+        append!(fieldnames, getfieldnames(fh))
     end
     return unique!(fieldnames)
 end
@@ -379,6 +377,8 @@ end
 
 # TODO if not too slow it can replace the "Grid-version"
 function _create_sparsity_pattern(dh::MixedDofHandler, ch#=::Union{ConstraintHandler,Nothing}=#, sym::Bool)
+    @assert isclosed(dh)
+
     ncells = getncells(dh.grid)
     N::Int = 0
     for element_id = 1:ncells  # TODO check for correctness
@@ -418,19 +418,20 @@ function _create_sparsity_pattern(dh::MixedDofHandler, ch#=::Union{ConstraintHan
     end
     resize!(I, cnt)
     resize!(J, cnt)
-    V = zeros(length(I))
-    K = sparse(I, J, V)
 
-    # Add entries to K corresponding to condensation due the linear constraints
-    # Note, this requires the K matrix, which is why we can't push!() to the I,J,V
-    # triplet directly.
+    # If ConstraintHandler is given, create the condensation pattern due to affine constraints
     if ch !== nothing
         @assert isclosed(ch)
+
+        V = ones(length(I))
+        K = sparse(I, J, V, ndofs(dh), ndofs(dh))
         _condense_sparsity_pattern!(K, ch.acs)
+        fill!(K.nzval, 0.0)
+    else
+        V = zeros(length(I))
+        K = sparse(I, J, V, ndofs(dh), ndofs(dh))
     end
-
     return K
-
 end
 
 create_sparsity_pattern(dh::MixedDofHandler) = _create_sparsity_pattern(dh, nothing, false)
@@ -438,7 +439,7 @@ create_symmetric_sparsity_pattern(dh::MixedDofHandler) = Symmetric(_create_spars
 
 function find_field(fh::FieldHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, getfieldnames(fh))
-    j === nothing && error("did not find field $field_name")
+    j === nothing && error("could not find field :$field_name in FieldHandler (existing fields: $(getfieldnames(fh)))")
     return j
 end
 

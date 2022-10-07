@@ -55,7 +55,7 @@ getfieldnames(dh::AbstractDofHandler) = dh.field_names
 ndim(dh::AbstractDofHandler, field_name::Symbol) = dh.field_dims[find_field(dh, field_name)]
 function find_field(dh::DofHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, dh.field_names)
-    j == 0 && error("did not find field $field_name")
+    j === nothing && error("could not find field :$field_name in DofHandler (existing fields: $(getfieldnames(dh)))")
     return j
 end
 
@@ -302,7 +302,7 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     return global_dofs
 end
 
-function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid{dim}, i::Int) where {dim,C}
+function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid{dim}, i::Int) where {dim}
     nodes = getcells(grid,i).nodes
     N = length(nodes)
     @assert length(global_nodes) == N
@@ -312,7 +312,7 @@ function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid{dim}, i::Int) 
     return global_nodes
 end
 
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,C,T}
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,T}
     nodes = getcells(grid,i).nodes
     N = length(nodes)
     @assert length(global_coords) == N
@@ -357,6 +357,7 @@ See the [Sparsity Pattern](@ref) section of the manual.
 create_symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
 
 function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool)
+    @assert isclosed(dh)
     ncells = getncells(dh.grid)
     n = ndofs_per_cell(dh)
     N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
@@ -393,17 +394,19 @@ function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler,
 
     resize!(I, cnt)
     resize!(J, cnt)
-    V = zeros(length(I))
-    K = sparse(I, J, V)
 
-    # Add entries to K corresponding to condensation due the linear constraints
-    # Note, this requires the K matrix, which is why we can't push!() to the I,J,V
-    # triplet directly.
+    # If ConstraintHandler is given, create the condensation pattern due to affine constraints
     if ch !== nothing
         @assert isclosed(ch)
-        _condense_sparsity_pattern!(K, ch.acs)
-    end
 
+        V = ones(length(I))
+        K = sparse(I, J, V, ndofs(dh), ndofs(dh))
+        _condense_sparsity_pattern!(K, ch.acs)
+        fill!(K.nzval, 0.0)
+    else
+        V = zeros(length(I))
+        K = sparse(I, J, V, ndofs(dh), ndofs(dh))
+    end
     return K
 end
 

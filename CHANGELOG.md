@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+ - The default components to constrain in `Dirichlet` and `PeriodicDirichlet` have changed
+   from component 1 to all components of the field. For scalar problems this has no effect.
+   ([#506][github-506], [#509][github-509])
+
+## [0.3.8] - 2022-10-05
+### Added
+ - Ferrite.jl now has a logo! ([#464][github-464])
+ - New keyword argument `search_nneighbors::Int` in `PointEvalHandler` for specifying how
+   many neighboring elements to consider in the kNN search. The default is still 3 (usually
+   sufficient). ([#466][github-466])
+ - The IJV-assembler now support assembling non-square matrices. ([#471][github-471])
+ - Periodic boundary conditions have been reworked and generalized. It now supports
+   arbitrary relations between the mirror and image boundaries (e.g. not only translations
+   in x/y/z direction). ([#478][github-478], [#481][github-481], [#496][github-496],
+   [#501][github-501])
+### Fixed
+ - Fix `PointEvalHandler` when the first point is missing. ([#466][github-466])
+ - Fix the ordering of nodes on the face for `(Quadratic)Tetrahedron` cells.
+   ([#475][github-475])
+### Other improvements
+ - Many improvements to the documentation. ([#467][github-467], [#473][github-473],
+   [#487][github-487], [#494][github-494], [#500][github-500])
+ - Improved error messages in `reinit!` when number of geometric base functions and number
+   of element coordinates mismatch. ([#469][github-469])
+ - Remove some unnecessary function parametrizations. ([#503][github-503])
+ - Remove some unnecessary allocations in grid coloring. ([#505][github-505])
+ - More efficient way of creating the sparsity pattern when using `AffineConstraints` and/or
+   `PeriodicDirichlet`. ([#436][github-436])
 
 ## [0.3.7] - 2022-07-05
 ### Fixed
@@ -75,13 +104,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-418]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/418
 [github-425]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/425
 [github-428]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/428
+[github-436]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/436
 [github-456]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/456
 [github-458]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/458
 [github-460]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/460
 [github-461]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/461
 [github-462]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/462
+[github-464]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/464
+[github-466]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/466
+[github-466]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/466
+[github-467]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/467
+[github-469]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/469
+[github-471]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/471
+[github-473]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/473
+[github-475]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/475
+[github-478]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/478
+[github-481]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/481
+[github-487]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/487
+[github-494]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/494
+[github-496]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/496
+[github-500]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/500
+[github-501]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/501
+[github-503]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/503
+[github-505]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/505
+[github-506]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/506
+[github-509]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/509
 
-[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.5...HEAD
+[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.8...HEAD
+[0.3.8]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.7...v0.3.8
+[0.3.7]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.6...v0.3.7
+[0.3.6]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.2...v0.3.3

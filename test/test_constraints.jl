@@ -1,4 +1,79 @@
 # misc constraint tests
+
+@testset "constructors and error checking" begin
+    grid = generate_grid(Triangle, (2, 2))
+    Γ = getfaceset(grid, "left")
+    face_map = collect_periodic_faces(grid, "left", "right")
+    dh = DofHandler(grid)
+    push!(dh, :s, 1)
+    push!(dh, :v, 2)
+    close!(dh)
+    ch = ConstraintHandler(dh)
+
+    # Dirichlet
+    @test_throws ErrorException("components are empty: $(Int)[]") Dirichlet(:u, Γ, (x, t) -> 0, Int[])
+    @test_throws ErrorException("components not sorted: [2, 1]") Dirichlet(:u, Γ, (x, t) -> 0, Int[2, 1])
+    @test_throws ErrorException("components not unique: [2, 2]") Dirichlet(:u, Γ, (x, t) -> 0, Int[2, 2])
+    ## Scalar
+    dbc = Dirichlet(:s, Γ, (x, t) -> 0)
+    add!(ch, dbc)
+    @test dbc.components == [1]
+    dbc = Dirichlet(:s, Γ, (x, t) -> 0, [1])
+    add!(ch, dbc)
+    @test dbc.components == [1]
+    dbc = Dirichlet(:s, Γ, (x, t) -> 0, [1, 2])
+    @test_throws ErrorException("components [1, 2] not within range of field :s (1 dimension(s))") add!(ch, dbc)
+    dbc = Dirichlet(:p, Γ, (x, t) -> 0)
+    @test_throws ErrorException("could not find field :p in DofHandler (existing fields: [:s, :v])") add!(ch, dbc)
+    ## Vector
+    dbc = Dirichlet(:v, Γ, (x, t) -> 0)
+    add!(ch, dbc)
+    @test dbc.components == [1, 2]
+    dbc = Dirichlet(:v, Γ, (x, t) -> 0, [1])
+    add!(ch, dbc)
+    @test dbc.components == [1]
+    dbc = Dirichlet(:v, Γ, (x, t) -> 0, [2, 3])
+    @test_throws ErrorException("components [2, 3] not within range of field :v (2 dimension(s))") add!(ch, dbc)
+
+    # PeriodicDirichlet
+    @test_throws ErrorException("components are empty: $(Int)[]") PeriodicDirichlet(:u, face_map, Int[])
+    @test_throws ErrorException("components not sorted: [2, 1]") PeriodicDirichlet(:u, face_map, Int[2, 1])
+    @test_throws ErrorException("components not unique: [2, 2]") PeriodicDirichlet(:u, face_map, Int[2, 2])
+    ## Scalar
+    pdbc = PeriodicDirichlet(:s, face_map)
+    add!(ConstraintHandler(dh), pdbc)
+    @test pdbc.components == [1]
+    pdbc = PeriodicDirichlet(:s, face_map, (x,t) -> 0)
+    add!(ConstraintHandler(dh), pdbc)
+    @test pdbc.components == [1]
+    pdbc = PeriodicDirichlet(:s, face_map, [1])
+    add!(ConstraintHandler(dh), pdbc)
+    @test pdbc.components == [1]
+    pdbc = PeriodicDirichlet(:s, face_map, [1, 2])
+    @test_throws ErrorException("components [1, 2] not within range of field :s (1 dimension(s))") add!(ConstraintHandler(dh), pdbc)
+    pdbc = PeriodicDirichlet(:p, face_map)
+    @test_throws ErrorException("could not find field :p in DofHandler (existing fields: [:s, :v])") add!(ConstraintHandler(dh), pdbc)
+    ## Vector
+    pdbc = PeriodicDirichlet(:v, face_map)
+    add!(ConstraintHandler(dh), pdbc)
+    @test pdbc.components == [1, 2]
+    pdbc = PeriodicDirichlet(:v, face_map, (x, t) -> 0*x)
+    add!(ConstraintHandler(dh), pdbc)
+    @test pdbc.components == [1, 2]
+    pdbc = PeriodicDirichlet(:v, face_map, rand(2,2))
+    add!(ConstraintHandler(dh), pdbc)
+    @test pdbc.components == [1, 2]
+    pdbc = PeriodicDirichlet(:v, face_map, rand(1,1))
+    @test_throws ErrorException("size of rotation matrix does not match the number of components") add!(ConstraintHandler(dh), pdbc)
+    pdbc = PeriodicDirichlet(:v, face_map, (x, t) -> 0, [1])
+    add!(ConstraintHandler(dh), pdbc)
+    @test pdbc.components == [1]
+    pdbc = PeriodicDirichlet(:v, face_map, (x, t) -> 0, [2, 3])
+    @test_throws ErrorException("components [2, 3] not within range of field :v (2 dimension(s))") add!(ConstraintHandler(dh), pdbc)
+    pdbc = PeriodicDirichlet(:v, face_map, rand(2, 2), [2, 3])
+    @test_throws ErrorException("components [2, 3] not within range of field :v (2 dimension(s))") add!(ConstraintHandler(dh), pdbc)
+end
+
 @testset "node bc" begin
     grid = generate_grid(Triangle, (1, 1))
     addnodeset!(grid, "nodeset", x-> x[2] == -1 || x[1] == -1)
@@ -176,11 +251,11 @@ end
 
 end
 
-# Rotate pi/2 around dir
+# Rotate -pi/2 around dir
 function rotpio2(v, dir=3)
     v3 = Vec{3}(i -> i <= length(v) ? v[i] : 0.0)
     z = Vec{3}(i -> i == dir ? 1.0 : 0.0)
-    rv = Tensors.rotate(v3, z, pi/2)
+    rv = Tensors.rotate(v3, z, -pi/2)
     return typeof(v)(i -> rv[i])
 end
 
@@ -241,8 +316,8 @@ end
         @test issetequal(face_map, map(x -> PeriodicFacePair(x.image, x.mirror, x.rotation, x.mirrored), correct_map))
 
         # Known pairs with transformation
-        face_map = collect_periodic_faces(grid, "left", "right", x -> x + Vec{2}((1.0, 0.0)))
-        collect_periodic_faces!(face_map, grid, "bottom", "top", x -> x + Vec{2}((0.0, 1.0)))
+        face_map = collect_periodic_faces(grid, "left", "right", x -> x - Vec{2}((2.0, 0.0)))
+        collect_periodic_faces!(face_map, grid, "bottom", "top", x -> x - Vec{2}((0.0, 2.0)))
         @test issetequal(face_map, correct_map)
 
         # More advanced transformation by rotation
@@ -256,7 +331,7 @@ end
         ])
 
         # Rotate and translate
-        face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) + Vec{2}((-1.0, 0.0)))
+        face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
         @test issetequal(face_map, [
             PeriodicFacePair(FaceIndex(1, 1), FaceIndex(1, 4), 0x00, true),
             PeriodicFacePair(FaceIndex(2, 1), FaceIndex(3, 4), 0x00, true),
@@ -318,8 +393,8 @@ end
         @test issetequal(face_map, map(x -> PeriodicFacePair(x.image, x.mirror, x.rotation, x.mirrored), correct_map))
 
         # Known pairs with transformation
-        face_map = collect_periodic_faces(grid, "left", "right", x -> x + Vec{2}((1.0, 0.0)))
-        collect_periodic_faces!(face_map, grid, "bottom", "top", x -> x + Vec{2}((0.0, 1.0)))
+        face_map = collect_periodic_faces(grid, "left", "right", x -> x - Vec{2}((2.0, 0.0)))
+        collect_periodic_faces!(face_map, grid, "bottom", "top", x -> x - Vec{2}((0.0, 2.0)))
         @test issetequal(face_map, correct_map)
 
         # More advanced transformation by rotation
@@ -333,7 +408,7 @@ end
         ])
 
         # Rotate and translate
-        face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) + Vec{2}((-1.0, 0.0)))
+        face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
         @test issetequal(face_map, [
             PeriodicFacePair(FaceIndex(1, 1), FaceIndex(1, 3), 0x00, true),
             PeriodicFacePair(FaceIndex(3, 1), FaceIndex(5, 3), 0x00, true),
@@ -352,7 +427,7 @@ end
     ])
 
     grid = generate_grid(Hexahedron, (2, 2, 2))
-    face_map = collect_periodic_faces(grid, "left", "right", x -> x + Vec{3}((1.0, 0.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "left", "right", x -> x - Vec{3}((2.0, 0.0, 0.0)))
     collect_periodic_faces!(face_map, grid, "bottom", "top")
     collect_periodic_faces!(face_map, grid, "front", "back")
     @test issetequal(face_map, [
@@ -382,7 +457,7 @@ end
 
     # Rotation and translation
     grid = generate_grid(Hexahedron, (2, 2, 2))
-    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(x) + Vec{3}((-1.0, 0.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(x) - Vec{3}((0.0, 2.0, 0.0)))
     @test issetequal(face_map, [
         PeriodicFacePair(FaceIndex(1, 2), FaceIndex(1, 5), 0x00, true),
         PeriodicFacePair(FaceIndex(2, 2), FaceIndex(3, 5), 0x00, true),
@@ -391,18 +466,6 @@ end
     ])
 
     ####################################################################
-    #
-    #truth
-    PeriodicFacePair(FaceIndex(1, 4), FaceIndex(4, 1), 0x00, true)
-    PeriodicFacePair(FaceIndex(2, 2), FaceIndex(6, 1), 0x00, true)
-    PeriodicFacePair(FaceIndex(2, 1), FaceIndex(3, 3), 0x02, true)
-    PeriodicFacePair(FaceIndex(5, 1), FaceIndex(4, 3), 0x02, true)
-    PeriodicFacePair(FaceIndex(1, 1), FaceIndex(5, 3), 0x00, true)
-    PeriodicFacePair(FaceIndex(3, 1), FaceIndex(6, 3), 0x00, true)
-
-
-    #
-    #
 
     # 3D tetra grid
     grid = generate_grid(Tetrahedron, (1, 1, 1))
@@ -417,7 +480,7 @@ end
     ])
 
     grid = generate_grid(Tetrahedron, (2, 2, 2))
-    face_map = collect_periodic_faces(grid, "left", "right", x -> x + Vec{3}((1.0, 0.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "left", "right", x -> x - Vec{3}((2.0, 0.0, 0.0)))
     collect_periodic_faces!(face_map, grid, "bottom", "top")
     collect_periodic_faces!(face_map, grid, "front", "back")
     @test issetequal(face_map, [
@@ -457,7 +520,7 @@ end
 
     # Rotation and translation
     grid = generate_grid(Tetrahedron, (1, 1, 1))
-    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(rotate(x, Vec{3}((0., 1., 0.)), 3pi/2)) + Vec{3}((-1.0, 0.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(rotate(x, Vec{3}((1., 0., 0.)), 3pi/2)) - Vec{3}((0.0, 2.0, 0.0)))
     @test issetequal(face_map, [
         PeriodicFacePair(FaceIndex(2, 1), FaceIndex(1, 4), 0x01, true)
         PeriodicFacePair(FaceIndex(5, 1), FaceIndex(2, 2), 0x01, true)
@@ -468,14 +531,17 @@ end # testset
     grid = generate_grid(Quadrilateral, (2, 2))
 
     function get_dof_map(ch)
-        m = Dict{Int,Int}()
+        m = Dict{Int,Any}()
         for ac in ch.acs
             mdof = ac.constrained_dof
             @test ac.b == 0
-            @test length(ac.entries) == 1
-            idof, weight = first(ac.entries)
-            @test weight == 1
-            m[mdof] = idof
+            if length(ac.entries) == 1
+                idof, weight = first(ac.entries)
+                @test weight == 1
+                m[mdof] = idof
+            else
+                m[mdof] = ac.entries
+            end
         end
         return m
     end
@@ -537,7 +603,7 @@ end # testset
 
     # Rotation and translation
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) + Vec{2}((-1.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -574,7 +640,7 @@ end # testset
         16 => 18,
     )
 
-    # Rotation
+    # Rotation without dof rotation
     face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
     ch = ConstraintHandler(dh)
     pbc = PeriodicDirichlet(:v, face_map, [1, 2])
@@ -588,8 +654,29 @@ end # testset
         2 => 10,
     )
 
+    # Rotation with dof rotation
+    face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
+    ch = ConstraintHandler(dh)
+    pbc = PeriodicDirichlet(:v, face_map, rotation_tensor(-π/2), [1, 2])
+    add!(ch, pbc)
+    dof_map = get_dof_map(ch)
+    correct_dof_map = Dict{Int,Any}(
+        15 => [9 => 0, 10 => 1], # 15 -> 2 -> 10
+        16 => [9 => -1, 10 => 0], # 16 -> -1 -> -9
+        7 => [3 => 0, 4 => 1],
+        8 => [3 => -1, 4 => 0],
+        1 => [9 => 0, 10 => 1],
+        2 => [9 => -1, 10 => 0],
+    )
+    @test length(dof_map) == length(correct_dof_map)
+    for (k, v) in dof_map
+        cmap = correct_dof_map[k]
+        @test first.(v) == first.(cmap)
+        @test last.(v) ≈ last.(cmap)
+    end
+
     # Rotation and translation
-    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) + Vec{2}((-1.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
     ch = ConstraintHandler(dh)
     pbc = PeriodicDirichlet(:v, face_map, [1, 2])
     add!(ch, pbc)
@@ -647,7 +734,7 @@ end # testset
 
     # Rotation and translation
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) + Vec{2}((-1.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "bottom", "left", x -> rotpio2(x) - Vec{2}((0.0, 2.0)))
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -657,6 +744,48 @@ end # testset
         12 => 20,
         10 => 17,
     )
+
+    # Face rotation with dof rotation
+    # 33,34──37,38──31,32──47,48──43,44
+    #   │             │             │
+    #   │             │             │
+    # 39,40  41,42  35,36  49,50  45,46
+    #   │             │             │
+    #   │             │             │
+    #  7,8───13,14───5,6───27,28──21,22
+    #   │             │             │
+    #   │             │             │
+    # 15,16  17,18  11,12  29,30  25,26
+    #   │             │             │
+    #   │             │             │
+    #  1,2────9,10───3,4───23,24──19,20
+    dh = DofHandler(grid)
+    push!(dh, :v, 2, Lagrange{2,RefCube,2}())
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
+    pbc = PeriodicDirichlet(:v, face_map, rotation_tensor(-π/2), [1, 2])
+    add!(ch, pbc)
+    close!(ch)
+    dof_map = get_dof_map(ch)
+    correct_dof_map = Dict{Int,Any}(
+        33 => [19 => 0, 20 => 1], # 33 -> 2 -> 20
+        34 => [19 => -1, 20 => 0], # 34 -> -1 -> -19
+        39 => [9 => 0, 10 => 1],
+        40 => [9 => -1, 10 => 0],
+        7 => [3 => 0, 4 => 1],
+        8 => [3 => -1, 4 => 0],
+        15 => [23 => 0, 24 => 1],
+        16 => [23 => -1, 24 => 0],
+        1 => [19 => 0, 20 => 1],
+        2 => [19 => -1, 20 => 0],
+    )
+    @test length(dof_map) == length(correct_dof_map)
+    for (k, v) in dof_map
+        cmap = correct_dof_map[k]
+        @test first.(v) == first.(cmap)
+        @test last.(v) ≈ last.(cmap)
+    end
 
     # 3D hex scalar/vector
     grid = generate_grid(Hexahedron, (1, 1, 1))
@@ -699,7 +828,7 @@ end # testset
     )
 
     ch = ConstraintHandler(dh)
-    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(x) + Vec{3}((-1.0, 0.0, 0.0)))
+    face_map = collect_periodic_faces(grid, "front", "left", x -> rotpio2(x) - Vec{3}((0.0, 2.0, 0.0)))
     pbc = PeriodicDirichlet(:s, face_map)
     add!(ch, pbc)
     @test get_dof_map(ch) == Dict{Int,Int}(
@@ -737,7 +866,7 @@ end # testset
         Dirichlet(:v, getfaceset(grid, "right"), (x, t) -> 0., [2]),
     )
 
-    # 3D tetra
+    # 3D tetra scalar
     grid = generate_grid(Tetrahedron, (1, 1, 1))
     dh = DofHandler(grid)
     push!(dh, :s, 1)
@@ -751,6 +880,7 @@ end # testset
         1 => 7, 2 => 7, 3 => 7, 4 => 7, 5 => 7, 6 => 7, 8 => 7,
     )
 
+    # 3D tetra vector
     grid = generate_grid(Tetrahedron, (2, 1, 1))
     dh = DofHandler(grid)
     push!(dh, :v, 2)
@@ -770,6 +900,39 @@ end # testset
         5 => 19,
         6 => 20,
     )
+
+    # 3D hex vector with dof rotation
+    grid = generate_grid(Hexahedron, (1, 1, 1))
+    dh = DofHandler(grid)
+    push!(dh, :v, 3)
+    close!(dh)
+    rot = rotation_tensor(Vec{3}((0., 1., 0.)), π/2)
+    face_map = collect_periodic_faces(grid, "left", "bottom", x -> rot ⋅ x)
+    ch = ConstraintHandler(dh)
+    pbc = PeriodicDirichlet(:v, face_map, rot, [1, 2, 3])
+    add!(ch, pbc)
+    close!(ch)
+    dof_map = get_dof_map(ch)
+    correct_dof_map = Dict{Int,Any}(
+        1 => [4 => 0, 5 => 0, 6 => 1],
+        2 => [4 => 0, 5 => 1, 6 => 0],
+        3 => [4 => -1, 5 => 0, 6 => 0],
+        10 => [7 => 0, 8 => 0, 9 => 1],
+        11 => [7 => 0, 8 => 1, 9 => 0],
+        12 => [7 => -1, 8 => 0, 9 => 0],
+        13 => [4 => 0, 5 => 0, 6 => 1],
+        14 => [4 => 0, 5 => 1, 6 => 0],
+        15 => [4 => -1, 5 => 0, 6 => 0],
+        22 => [7 => 0, 8 => 0, 9 => 1],
+        23 => [7 => 0, 8 => 1, 9 => 0],
+        24 => [7 => -1, 8 => 0, 9 => 0],
+    )
+    @test length(dof_map) == length(correct_dof_map)
+    for (k, v) in dof_map
+        cmap = correct_dof_map[k]
+        @test first.(v) == first.(cmap)
+        @test last.(v) ≈ last.(cmap)
+    end
 
     for (D, CT, IT) in (
         (2, Quadrilateral, Lagrange{2,RefCube,1}()),

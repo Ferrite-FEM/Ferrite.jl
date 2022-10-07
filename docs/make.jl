@@ -1,4 +1,4 @@
-using Documenter, Ferrite, Pkg, TimerOutputs
+using Documenter, Ferrite, FerriteGmsh, FerriteMeshParser, Pkg, TimerOutputs
 
 dto = TimerOutput()
 reset_timer!(dto)
@@ -28,6 +28,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "quasi_incompressible_hyperelasticity.md",
     "ns_vs_diffeq.md",
     "computational_homogenization.md",
+    "stokes-flow.md",
     )]
 
 # Build documentation.

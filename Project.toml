@@ -1,6 +1,6 @@
 name = "Ferrite"
 uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
-version = "0.3.7"
+version = "0.3.8"
 
 [deps]
 EnumX = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
@@ -22,7 +22,9 @@ julia = "1.6"
 [extras]
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
+FerriteGmsh = "4f95f4f8-b27c-4ae5-9a39-ea55e634e36b"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 NBInclude = "0db19996-df87-5ea3-a455-e3a50d440464"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
@@ -34,6 +36,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [targets]
-test = ["BlockArrays", "Downloads", "ForwardDiff", "IterativeSolvers",
-        "NBInclude", "Pkg", "ProgressMeter", "Random", "SHA", "StableRNGs", "Test",
-        "TimerOutputs"]
+test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "IterativeSolvers", "NBInclude", "Pkg", "ProgressMeter", "Random", "SHA", "StableRNGs", "Test", "TimerOutputs"]
