@@ -231,6 +231,7 @@ function Base.show(io::IO, ::MIME"text/plain", o::OctantBWG{2,N,M}) where {N,M}
 end
 
 _compute_size(b::Integer,l::Integer) = 2^(b-l)
+_maximum_size(b::Integer) = 2^(b) 
 # return the two adjacent faces $f_i$ adjacent to edge `edge`
 _face(edge::Int) = 𝒮[edge, :]
 # return the `i`-th adjacent face fᵢ to edge `edge`
