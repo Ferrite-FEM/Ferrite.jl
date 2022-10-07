@@ -148,7 +148,7 @@ gmsh.model.model.add_physical_group(dim,[1],11,"domain");
 # Since we want a quad mesh, we specify the meshing algorithm to the quasi structured quad one.
 # For a complete list, [see the Gmsh docs](https://gmsh.info/doc/texinfo/gmsh.html#Mesh-options-list).
 gmsh.option.setNumber("Mesh.Algorithm",11)
-gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",300)
+gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",200)
 gmsh.option.setNumber("Mesh.MeshSizeMax",0.005)
 # remove fine mesh settings for CI                      #src
 gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",4)   #hide
