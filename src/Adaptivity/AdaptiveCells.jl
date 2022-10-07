@@ -47,9 +47,12 @@ struct OctreeBWG{dim,N,M} <: AbstractAdaptiveCell{dim,N,M}
     nodes::NTuple{N,Int}
 end
 
-OctreeBWG{3,8,6}(nodes,b=_maxlevel[2]) = OctreeBWG{3,8,6}([zero(OctantBWG{3,8,6})],b,nodes)
-OctreeBWG{2,4,4}(nodes,b=_maxlevel[1]) = OctreeBWG{2,4,4}([zero(OctantBWG{2,4,4})],b,nodes)
+OctreeBWG{3,8,6}(nodes::NTuple,b=_maxlevel[2]) = OctreeBWG{3,8,6}([zero(OctantBWG{3,8,6})],b,nodes)
+OctreeBWG{2,4,4}(nodes::NTuple,b=_maxlevel[1]) = OctreeBWG{2,4,4}([zero(OctantBWG{2,4,4})],b,nodes)
+OctreeBWG(cell::Quadrilateral) = OctreeBWG{2,4,4}(cell.nodes)
+OctreeBWG(cell::Hexahedron) = OctreeBWG{3,8,6}(cell.nodes)
 
+Base.length(tree::OctreeBWG) = length(tree.leaves)
 
 """
     ForestBWG{dim, C<:AbstractAdaptiveCell, T<:Real} <: AbstractAdaptiveGrid{dim}
@@ -68,18 +71,33 @@ struct ForestBWG{dim, C<:OctreeBWG, T<:Real} <: AbstractAdaptiveGrid{dim}
     topology::ExclusiveTopology
 end
 
-function make_adaptive(grid::Grid,::Type{ForestBWG})
-    cells = grid.cells
-    nodes = grid.nodes
-    cellsets = grid.cellsets
-    nodesets = grid.nodesets
-    facesets = grid.facesets
-    edgesets = grid.edgesets
-    vertexsets = grid.vertexsets
-
+function ForestBWG(grid::AbstractGrid{dim}) where dim
+    cells = getcells(grid)
+    C = eltype(cells)
+    @assert isconcretetype(C)
+    @assert (C == Quadrilateral && dim == 2) || (C == Hexahedron && dim == 3)
     topology = ExclusiveTopology(cells)
-    
-    return ForestBWG{3,8,6}(cells,nodes,cellsets,nodesets,facesets,edgesets,vertexsets,topology)
+    cells = OctreeBWG.(grid.cells)
+    nodes = getnodes(grid)
+    cellsets = getcellsets(grid)
+    nodesets = getnodesets(grid)
+    facesets = getfacesets(grid)
+    edgesets = getedgesets(grid)
+    vertexsets = getvertexsets(grid)
+    return ForestBWG(cells,nodes,cellsets,nodesets,facesets,edgesets,vertexsets,topology)
+end
+
+function getncells(grid::ForestBWG)
+    numcells = 0
+    for tree in grid.cells
+        numcells += length(tree) 
+    end
+    return numcells
+end
+
+function Base.show(io::IO, ::MIME"text/plain", agrid::ForestBWG)
+    println(io, "ForestBWG with ")
+    println(io, "   $(getncells(agrid)) cells")
 end
 
 """
