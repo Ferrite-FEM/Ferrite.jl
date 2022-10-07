@@ -771,9 +771,11 @@ version = "2.14.0"
 
 [[deps.LiveServer]]
 deps = ["HTTP", "MIMEs", "Pkg", "Sockets"]
-git-tree-sha1 = "97eb7d407d0296a294de417b498876dc19f0f41b"
+git-tree-sha1 = "af11a3662103715954be5042747bd98cb1dc4229"
+repo-rev = "fe/include-dirs"
+repo-url = "https://github.com/fredrikekre/LiveServer.jl"
 uuid = "16fef848-5104-11e9-1b77-fb7a48bbb589"
-version = "1.0.3"
+version = "1.1.0"
 
 [[deps.LogExpFunctions]]
 deps = ["ChainRulesCore", "ChangesOfVariables", "DocStringExtensions", "InverseFunctions", "IrrationalConstants", "LinearAlgebra"]
