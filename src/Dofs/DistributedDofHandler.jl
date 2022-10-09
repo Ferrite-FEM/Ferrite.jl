@@ -104,7 +104,7 @@ end
 """
 Compute the number of dofs owned by the current process.
 """
-num_local_true_dofs(dh::DistributedDofHandler) = sum(dh.ldof_to_rank==(MPI.Comm_rank(global_comm(dh.grid))+1))
+num_local_true_dofs(dh::DistributedDofHandler) = sum(dh.ldof_to_rank .== (MPI.Comm_rank(global_comm(dh.grid))+1))
 
 """
 Compute the number of dofs visible to the current process.
