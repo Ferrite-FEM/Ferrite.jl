@@ -32,7 +32,7 @@ function DofHandler(grid::AbstractGrid{dim}) where {dim}
     DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1), Dict{Int,Int}[], Dict{Tuple{Int,Int},Tuple{Int,Bool}}[],Dict{NTuple{dim,Int},Int}[])
 end
 
-function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
+function Base.show(io::IO, ::MIME"text/plain", dh::Union{DofHandler, DistributedDofHandler})
     println(io, "DofHandler")
     println(io, "  Fields:")
     for i in 1:nfields(dh)
@@ -124,13 +124,13 @@ The field is added to all cells of the underlying grid. In case no interpolation
 the default interpolation of the grid's celltype is used. 
 If the grid uses several celltypes, [`push!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
 """
-function Base.push!(dh::AbstractDofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
+function Base.push!(dh::AbstractDofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(getgrid(dh))))
     @assert !isclosed(dh)
     @assert !in(name, dh.field_names)
     push!(dh.field_names, name)
     push!(dh.field_dims, dim)
     push!(dh.field_interpolations, ip)
-    push!(dh.bc_values, BCValues(ip, default_interpolation(getcelltype(dh.grid))))
+    push!(dh.bc_values, BCValues(ip, default_interpolation(getcelltype(getgrid(dh)))))
     return dh
 end
 
@@ -165,7 +165,7 @@ function close!(dh::DofHandler)
 end
 
 # close the DofHandler and distribute all the dofs
-function __close!(dh::DofHandler{dim}) where {dim}
+function __close!(dh::Union{DofHandler{dim}, DistributedDofHandler{dim}}) where {dim}
     @assert !isclosed(dh)
 
     # `vertexdict` keeps track of the visited vertices. We store the global vertex
@@ -213,7 +213,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     push!(dh.cell_dofs_offset, 1) # dofs for the first cell start at 1
 
     # loop over all the cells, and distribute dofs for all the fields
-    for (ci, cell) in enumerate(getcells(dh.grid))
+    for (ci, cell) in enumerate(getcells(getgrid(dh)))
         @debug println("cell #$ci")
         for fi in 1:nfields(dh)
             interpolation_info = interpolation_infos[fi]
@@ -314,7 +314,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     return dh
 end
 
-function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
+function celldofs!(global_dofs::Vector{Int}, dh::Union{DofHandler, DistributedDofHandler}, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
     unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
@@ -341,9 +341,9 @@ function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim},
     return global_coords
 end
 
-cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, dh.grid, i)
+cellcoords!(global_coords::Vector{<:Vec}, dh::Union{DofHandler, DistributedDofHandler}, i::Int) = cellcoords!(global_coords, getgrid(dh), i)
 
-function celldofs(dh::DofHandler, i::Int)
+function celldofs(dh::Union{DofHandler, DistributedDofHandler}, i::Int)
     @assert isclosed(dh)
     n = ndofs_per_cell(dh, i)
     global_dofs = zeros(Int, n)
@@ -376,7 +376,7 @@ See the [Sparsity Pattern](@ref) section of the manual.
 create_symmetric_sparsity_pattern(dh::AbstractDofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
 
 function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool)
-    ncells = getncells(dh.grid)
+    ncells = getncells(getgrid(dh))
     n = ndofs_per_cell(dh)
     N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
     N += ndofs(dh) # always add the diagonal elements
@@ -447,7 +447,7 @@ function renumber!(dh::AbstractDofHandler, perm::AbstractVector{<:Integer})
 end
 
 function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
-    vtk_grid(filename, dh.grid; compress=compress)
+    vtk_grid(filename, getgrid(dh); compress=compress)
 end
 
 """
@@ -457,7 +457,7 @@ Reshape the entries of the dof-vector `u` which correspond to the field `fieldna
 Return a matrix with a column for every node and a row for every dimension of the field.
 For superparametric fields only the entries corresponding to nodes of the grid will be returned. Do not use this function for subparametric approximations.
 """
-function reshape_to_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol) where T
+function reshape_to_nodes(dh::Union{DofHandler, DistributedDofHandler}, u::Vector{T}, fieldname::Symbol) where T
     # make sure the field exists
     fieldname ∈ Ferrite.getfieldnames(dh) || error("Field $fieldname not found.")
 
@@ -466,14 +466,14 @@ function reshape_to_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol) where
     field_dim = getfielddim(dh, field_idx)
 
     space_dim = field_dim == 2 ? 3 : field_dim
-    data = fill(zero(T), space_dim, getnnodes(dh.grid))
+    data = fill(zero(T), space_dim, getnnodes(getgrid(dh)))
 
     reshape_field_data!(data, dh, u, offset, field_dim)
 
     return data
 end
 
-function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=Set{Int}(1:getncells(dh.grid))) where T
+function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=Set{Int}(1:getncells(getgrid(dh)))) where T
 
     _celldofs = Vector{Int}(undef, ndofs_per_cell(dh, first(cellset)))
     for cell in CellIterator(dh, collect(cellset))
