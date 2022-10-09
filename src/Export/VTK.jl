@@ -17,6 +17,9 @@ cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 
 nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
 
+pvtkwrapper(vtkfile) = vtkfile
+pvtkwrapper(pvtkfile::WriteVTK.PVTKFile) = pvtkfile.vtk
+
 """
     vtk_grid(filename::AbstractString, grid::Grid)
 
@@ -36,13 +39,12 @@ end
 function WriteVTK.vtk_grid(filename::AbstractString, dgrid::DistributedGrid{dim,C,T}; compress::Bool=true) where {dim,C,T}
     part   = MPI.Comm_rank(global_comm(dgrid))+1
     nparts = MPI.Comm_size(global_comm(dgrid))
-    grid = getlocalgrid(dgrid)
     cls = MeshCell[]
-    for cell in getcells(grid)
+    for cell in getcells(dgrid)
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
         push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
     end
-    coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
+    coords = reshape(reinterpret(T, getnodes(dgrid)), (dim, getnnodes(dgrid)))
     return pvtk_grid(filename, coords, cls; part=part, nparts=nparts, compress=compress)
 end
 
@@ -73,16 +75,16 @@ function WriteVTK.vtk_point_data(
     for i in 1:npoints
         toparaview!(@view(out[:, i]), data[i])
     end
-    return vtk_point_data(vtk, out, name; component_names=component_names(S))
+    return vtk_point_data(pvtkwrapper(vtk), out, name; component_names=component_names(S))
 end
 
 
 function WriteVTK.vtk_point_data(
-    vtk::WriteVTK.PVTKFile,
+    pvtk::WriteVTK.PVTKFile,
     data::Vector{S},
     name::AbstractString
     ) where {O, D, T, M, S <: Union{AbstractFloat, Tensor{O, D, T, M}, SymmetricTensor{O, D, T, M}}}
-    return vtk_point_data(vtk.vtk, data, name)
+    return vtk_point_data(pvtk.vtk, data, name)
 end
 
 function component_names(::Type{S}) where S
@@ -136,7 +138,7 @@ function WriteVTK.vtk_point_data(vtkfile, dh::AbstractDofHandler, u::Vector, suf
 
     for name in fieldnames
         data = reshape_to_nodes(dh, u, name)
-        vtk_point_data(vtkfile, data, string(name, suffix))
+        vtk_point_data(pvtkwrapper(vtkfile), data, string(name, suffix))
     end
 
     return vtkfile
@@ -148,6 +150,34 @@ using PartitionedArrays
 """
 function WriteVTK.vtk_point_data(vtk, dh::AbstractDofHandler, u::PVector)
     map_parts(local_view(u, u.rows)) do u_local
-        vtk_point_data(vtk, dh, u_local)
+        vtk_point_data(pvtkwrapper(vtk), dh, u_local)
     end
+end
+
+"""
+Enrich the VTK file with meta information about shared vertices.
+"""
+function vtk_shared_vertices(vtk, dgrid::DistributedGrid)
+    u = Vector{Float64}(undef, getnnodes(dgrid))
+    my_rank = MPI.Comm_rank(global_comm(dgrid))+1
+    for rank ∈ 1:MPI.Comm_size(global_comm(dgrid))
+        fill!(u, 0.0)
+        for sv ∈ values(get_shared_vertices(dgrid))
+            if haskey(sv.remote_vertices, rank)
+                (cellidx, i) = sv.local_idx
+                cell = getcells(dgrid, cellidx)
+                u[vertices(cell)[i]] = rank
+            end
+        end
+        vtk_point_data(pvtkwrapper(vtk), u, "shared vertices of $my_rank")
+    end
+end
+
+"""
+Enrich the VTK file with partitioning meta information.
+"""
+function vtk_partitioning(vtk, dgrid::DistributedGrid)
+    u  = Vector{Float64}(undef, getncells(dgrid))
+    u .= MPI.Comm_rank(global_comm(dgrid))+1
+    vtk_cell_data(pvtkwrapper(vtk), u, "partitioning")
 end

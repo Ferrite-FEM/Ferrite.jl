@@ -97,6 +97,9 @@ export
     generate_distributed_grid,
     compute_vertex_values,
     is_shared_vertex,
+    get_shared_vertices,
+    get_shared_faces,
+    get_shared_edges,
 
 # Grid coloring
     create_coloring,
@@ -158,6 +161,8 @@ export
     vtk_nodeset,
     vtk_cellset,
     vtk_save,
+    vtk_shared_vertices,
+    vtk_partitioning,
 
 # L2 Projection
     project,

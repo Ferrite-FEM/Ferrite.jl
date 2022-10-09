@@ -481,3 +481,7 @@ function reshape_to_nodes(dh::DistributedDofHandler, u::Vector{T}, fieldname::Sy
 
     return data
 end
+
+function WriteVTK.vtk_grid(filename::AbstractString, dh::DistributedDofHandler; compress::Bool=true)
+    vtk_grid(filename, getglobalgrid(dh); compress=compress)
+end

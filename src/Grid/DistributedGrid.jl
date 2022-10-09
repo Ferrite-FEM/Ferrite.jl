@@ -54,21 +54,25 @@ mutable struct DistributedGrid{dim,C<:AbstractCell,T<:Real} <: AbstractDistribut
     shared_faces::Dict{FaceIndex,SharedFace}
 end
 
+@inline get_shared_vertices(dgrid::AbstractDistributedGrid) = dgrid.shared_vertices
+@inline get_shared_edges(dgrid::AbstractDistributedGrid) = dgrid.shared_edges
+@inline get_shared_faces(dgrid::AbstractDistributedGrid) = dgrid.shared_faces
+
 """
 """
-is_shared_vertex(dgrid::AbstractDistributedGrid, vi::VertexIndex) = haskey(dgrid.shared_vertices, vi)
+@inline is_shared_vertex(dgrid::AbstractDistributedGrid, vi::VertexIndex) = haskey(dgrid.shared_vertices, vi)
 
 
 """
 Global dense communicator of the distributed grid.
 """
-global_comm(dgrid::AbstractDistributedGrid) = dgrid.grid_comm
+@inline global_comm(dgrid::AbstractDistributedGrid) = dgrid.grid_comm
 
 """
 Graph communicator for shared vertices. Guaranteed to be derived from the communicator 
 returned by @global_comm .
 """
-vertex_comm(dgrid::AbstractDistributedGrid) = dgrid.interface_comm
+@inline vertex_comm(dgrid::AbstractDistributedGrid) = dgrid.interface_comm
 
 """
 """
@@ -303,11 +307,16 @@ end
 
 @inline getlocalgrid(dgrid::AbstractDistributedGrid) = dgrid.local_grid
 
+@inline getnodes(dgrid::AbstractDistributedGrid) = getnodes(getlocalgrid(dgrid))
+@inline getnodes(grid::AbstractDistributedGrid, v::Union{Int, Vector{Int}}) = getnodes(getlocalgrid(dgrid), v)
+@inline getnodes(grid::AbstractDistributedGrid, setname::String) = getnodes(getlocalgrid(dgrid), setname)
+@inline getnnodes(dgrid::AbstractDistributedGrid) = getnnodes(getlocalgrid(dgrid))
+
 @inline getcells(dgrid::AbstractDistributedGrid) = getcells(getlocalgrid(dgrid))
 @inline getcells(dgrid::AbstractDistributedGrid, v::Union{Int, Vector{Int}}) = getcells(getlocalgrid(dgrid),v)
 @inline getcells(dgrid::AbstractDistributedGrid, setname::String) = getcells(getlocalgrid(dgrid),setname)
 "Returns the number of cells in the `<:AbstractDistributedGrid`."
-@inline getncells(dgrid::AbstractDistributedGrid) = length(getcells(getlocalgrid(dgrid)))
+@inline getncells(dgrid::AbstractDistributedGrid) = getncells(getlocalgrid(dgrid))
 "Returns the celltype of the `<:AbstractDistributedGrid`."
 @inline getcelltype(dgrid::AbstractDistributedGrid) = eltype(getcells(getlocalgrid(dgrid)))
 @inline getcelltype(dgrid::AbstractDistributedGrid, i::Int) = typeof(getcells(getlocalgrid(dgrid),i))
