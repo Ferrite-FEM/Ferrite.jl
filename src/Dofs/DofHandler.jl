@@ -32,10 +32,10 @@ function DofHandler(grid::AbstractGrid{dim}) where {dim}
     DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1), Dict{Int,Int}[], Dict{Tuple{Int,Int},Tuple{Int,Bool}}[],Dict{NTuple{dim,Int},Int}[])
 end
 
-function Base.show(io::IO, ::MIME"text/plain", dh::Union{DofHandler, DistributedDofHandler})
+function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
     println(io, "DofHandler")
     println(io, "  Fields:")
-    for i in 1:nfields(dh)
+    for i in 1:num_fields(dh)
         println(io, "    ", repr(dh.field_names[i]), ", interpolation: ", dh.field_interpolations[i],", dim: ", dh.field_dims[i])
     end
     if !isclosed(dh)
@@ -62,7 +62,7 @@ Return the number of degrees of freedom in `dh`
 ndofs(dh::AbstractDofHandler) = dh.ndofs[]
 ndofs_per_cell(dh::AbstractDofHandler, cell::Int=1) = dh.cell_dofs_offset[cell+1] - dh.cell_dofs_offset[cell]
 isclosed(dh::AbstractDofHandler) = dh.closed[]
-nfields(dh::AbstractDofHandler) = length(dh.field_names)
+num_fields(dh::AbstractDofHandler) = length(dh.field_names)
 getfieldnames(dh::AbstractDofHandler) = dh.field_names
 getfieldinterpolation(dh::AbstractDofHandler, field_idx::Int) = dh.field_interpolations[field_idx]
 getfielddim(dh::AbstractDofHandler, field_idx::Int) = dh.field_dims[field_idx]
@@ -165,13 +165,13 @@ function close!(dh::DofHandler)
 end
 
 # close the DofHandler and distribute all the dofs
-function __close!(dh::Union{DofHandler{dim}, DistributedDofHandler{dim}}) where {dim}
+function __close!(dh::DofHandler{dim}) where {dim}
     @assert !isclosed(dh)
 
     # `vertexdict` keeps track of the visited vertices. We store the global vertex
     # number and the first dof we added to that vertex.
-    resize!(dh.vertexdicts, nfields(dh))
-    for i in 1:nfields(dh)
+    resize!(dh.vertexdicts, num_fields(dh))
+    for i in 1:num_fields(dh)
         dh.vertexdicts[i] = Dict{Tuple{Int,Int},Tuple{Int,Bool}}()
     end
 
@@ -180,8 +180,8 @@ function __close!(dh::Union{DofHandler{dim}, DistributedDofHandler{dim}}) where 
     # of the first edge we encounter and add dofs too. When we encounter the same edge
     # the next time we check if the direction is the same, otherwise we reuse the dofs
     # in the reverse order
-    resize!(dh.edgedicts, nfields(dh))
-    for i in 1:nfields(dh)
+    resize!(dh.edgedicts, num_fields(dh))
+    for i in 1:num_fields(dh)
         dh.edgedicts[i] = Dict{Tuple{Int,Int},Tuple{Int,Bool}}()
     end
 
@@ -189,8 +189,8 @@ function __close!(dh::Union{DofHandler{dim}, DistributedDofHandler{dim}}) where 
     # added to the face; if we encounter the same face again we *always* reverse the order
     # In 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a
     # face (i.e. a surface) is uniquely determined by 3 vertices.
-    resize!(dh.facedicts, nfields(dh))
-    for i in 1:nfields(dh)
+    resize!(dh.facedicts, num_fields(dh))
+    for i in 1:num_fields(dh)
         dh.facedicts[i] = Dict{NTuple{dim,Int},Int}()
     end
 
@@ -215,7 +215,7 @@ function __close!(dh::Union{DofHandler{dim}, DistributedDofHandler{dim}}) where 
     # loop over all the cells, and distribute dofs for all the fields
     for (ci, cell) in enumerate(getcells(getgrid(dh)))
         @debug println("cell #$ci")
-        for fi in 1:nfields(dh)
+        for fi in 1:num_fields(dh)
             interpolation_info = interpolation_infos[fi]
             @debug println("  field: $(dh.field_names[fi])")
             if interpolation_info.nvertexdofs > 0
@@ -314,7 +314,7 @@ function __close!(dh::Union{DofHandler{dim}, DistributedDofHandler{dim}}) where 
     return dh
 end
 
-function celldofs!(global_dofs::Vector{Int}, dh::Union{DofHandler, DistributedDofHandler}, i::Int)
+function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
     unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
@@ -341,9 +341,9 @@ function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim},
     return global_coords
 end
 
-cellcoords!(global_coords::Vector{<:Vec}, dh::Union{DofHandler, DistributedDofHandler}, i::Int) = cellcoords!(global_coords, getgrid(dh), i)
+cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, getgrid(dh), i)
 
-function celldofs(dh::Union{DofHandler, DistributedDofHandler}, i::Int)
+function celldofs(dh::DofHandler, i::Int)
     @assert isclosed(dh)
     n = ndofs_per_cell(dh, i)
     global_dofs = zeros(Int, n)
@@ -457,7 +457,7 @@ Reshape the entries of the dof-vector `u` which correspond to the field `fieldna
 Return a matrix with a column for every node and a row for every dimension of the field.
 For superparametric fields only the entries corresponding to nodes of the grid will be returned. Do not use this function for subparametric approximations.
 """
-function reshape_to_nodes(dh::Union{DofHandler, DistributedDofHandler}, u::Vector{T}, fieldname::Symbol) where T
+function reshape_to_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol) where T
     # make sure the field exists
     fieldname ∈ Ferrite.getfieldnames(dh) || error("Field $fieldname not found.")
 

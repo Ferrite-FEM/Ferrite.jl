@@ -22,23 +22,23 @@ struct DistributedDofHandler{dim,T,G<:AbstractDistributedGrid{dim}} <: AbstractD
     grid::G
     ndofs::ScalarWrapper{Int}
 
-    vertexdicts::Array{Dict{Int,Int}}
-    edgedicts::Array{Tuple{Int,Int},Tuple{Int,Bool}}
-    facedicts::Array{Tuple{Int,Int},Int}
+    vertexdicts::Vector{Dict{Int,Int}}
+    edgedicts::Vector{Dict{Tuple{Int,Int},Tuple{Int,Bool}}}
+    facedicts::Vector{Dict{NTuple{dim,Int},Int}}
 
     ldof_to_gdof::Vector{Int}
-    ldof_to_rank::Vector{Int}
+    ldof_to_rank::Vector{Int32}
 end
 
-function DistributedDofHandler(grid::AbstractDistributedGrid)
+function DistributedDofHandler(grid::AbstractDistributedGrid{dim}) where {dim}
     isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. DistributedMixedDofHandler not implemented yet.")
-    DistributedDofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
+    DistributedDofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1), Dict{Int,Int}[], Dict{Tuple{Int,Int},Tuple{Int,Bool}}[],Dict{NTuple{dim,Int},Int}[], Int[], Int32[])
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DistributedDofHandler)
     println(io, "DistributedDofHandler")
     println(io, "  Fields:")
-    for i in 1:nfields(dh)
+    for i in 1:num_fields(dh)
         println(io, "    ", repr(dh.field_names[i]), ", interpolation: ", dh.field_interpolations[i],", dim: ", dh.field_dims[i])
     end
     if !isclosed(dh)
@@ -55,6 +55,28 @@ getglobalgrid(dh::DistributedDofHandler) = dh.grid
 # Compat layer against serial code
 getgrid(dh::DistributedDofHandler) = getlocalgrid(dh)
 
+# TODO this is copy pasta from DofHandler.jl
+function celldofs!(global_dofs::Vector{Int}, dh::DistributedDofHandler, i::Int)
+    @assert isclosed(dh)
+    @assert length(global_dofs) == ndofs_per_cell(dh, i)
+    unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
+    return global_dofs
+end
+
+# TODO this is copy pasta from DofHandler.jl
+cellcoords!(global_coords::Vector{<:Vec}, dh::DistributedDofHandler, i::Int) = cellcoords!(global_coords, getgrid(dh), i)
+
+# TODO this is copy pasta from DofHandler.jl
+function celldofs(dh::DistributedDofHandler, i::Int)
+    @assert isclosed(dh)
+    n = ndofs_per_cell(dh, i)
+    global_dofs = zeros(Int, n)
+    unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], n)
+    return global_dofs
+end
+
+renumber!(dh::DistributedDofHandler, perm::AbstractVector{<:Integer}) = (@assert false) && "Unimplemented"
+
 function compute_dof_ownership(dh, dgrid)
     my_rank = MPI.Comm_rank(global_comm(dgrid))+1
 
@@ -65,7 +87,7 @@ function compute_dof_ownership(dh, dgrid)
         owner_rank = minimum([collect(keys(sv.remote_vertices));my_rank])
 
         if owner_rank != my_rank
-            for fi in 1:Ferrite.nfields(dh)
+            for fi in 1:Ferrite.num_fields(dh)
                 vi = Ferrite.vertices(getcells(getgrid(dh),lci))[lclvi]
                 if haskey(dh.vertexdicts[fi], vi)
                     local_dof_idx = dh.vertexdicts[fi][vi]
@@ -124,7 +146,7 @@ function local_to_global_numbering(dh::DistributedDofHandler, dgrid::AbstractDis
     next_local_idx = 1
     for (ci, cell) in enumerate(getcells(getgrid(dh)))
         @debug println("cell #$ci (R$my_rank)")
-        for fi in 1:Ferrite.nfields(dh)
+        for fi in 1:Ferrite.num_fields(dh)
             @debug println("  field: $(dh.field_names[fi]) (R$my_rank)")
             interpolation_info = Ferrite.InterpolationInfo(dh.field_interpolations[fi])
             if interpolation_info.nvertexdofs > 0
@@ -220,7 +242,7 @@ function local_to_global_numbering(dh::DistributedDofHandler, dgrid::AbstractDis
                     end
                     MPI.Send(remote_cells, global_comm(dgrid); dest=remote_rank-1)
                     MPI.Send(remote_cell_vis, global_comm(dgrid); dest=remote_rank-1)
-                    for fi ∈ 1:Ferrite.nfields(dh)
+                    for fi ∈ 1:Ferrite.num_fields(dh)
                         next_buffer_idx = 1
                         if length(dh.vertexdicts[fi]) == 0
                             @debug println("Skipping send on field $(dh.field_names[fi]) (R$my_rank)")
@@ -247,7 +269,7 @@ function local_to_global_numbering(dh::DistributedDofHandler, dgrid::AbstractDis
                 local_cell_vis = Array{Int64}(undef,n_vertices)
                 MPI.Recv!(local_cells, global_comm(dgrid); source=sending_rank-1)
                 MPI.Recv!(local_cell_vis, global_comm(dgrid); source=sending_rank-1)
-                for fi in 1:Ferrite.nfields(dh)
+                for fi in 1:Ferrite.num_fields(dh)
                     if length(dh.vertexdicts[fi]) == 0
                         @debug println("  Skipping recv on field $(dh.field_names[fi]) (R$my_rank)")
                         continue
@@ -285,6 +307,157 @@ end
 
 function close!(dh::DistributedDofHandler)
     __close!(dh)
-    dh.ldof_to_gdof = local_to_global_numbering(dh, getglobalgrid(dh));
-    dh.ldof_to_rank = compute_dof_ownership(dh, dgrid);
+    append!(dh.ldof_to_gdof, local_to_global_numbering(dh, getglobalgrid(dh)))
+    append!(dh.ldof_to_rank, compute_dof_ownership(dh, getglobalgrid(dh)))
+end
+
+# TODO this is copy pasta from DofHandler.jl
+# close the DofHandler and distribute all the dofs
+function __close!(dh::DistributedDofHandler{dim}) where {dim}
+    @assert !isclosed(dh)
+
+    # `vertexdict` keeps track of the visited vertices. We store the global vertex
+    # number and the first dof we added to that vertex.
+    resize!(dh.vertexdicts, num_fields(dh))
+    for i in 1:num_fields(dh)
+        dh.vertexdicts[i] = Dict{Tuple{Int,Int},Tuple{Int,Bool}}()
+    end
+
+    # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem
+    # An edge is determined from two vertices, but we also need to store the direction
+    # of the first edge we encounter and add dofs too. When we encounter the same edge
+    # the next time we check if the direction is the same, otherwise we reuse the dofs
+    # in the reverse order
+    resize!(dh.edgedicts, num_fields(dh))
+    for i in 1:num_fields(dh)
+        dh.edgedicts[i] = Dict{Tuple{Int,Int},Tuple{Int,Bool}}()
+    end
+
+    # `facedict` keeps track of the visited faces. We only need to store the first dof we
+    # added to the face; if we encounter the same face again we *always* reverse the order
+    # In 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a
+    # face (i.e. a surface) is uniquely determined by 3 vertices.
+    resize!(dh.facedicts, num_fields(dh))
+    for i in 1:num_fields(dh)
+        dh.facedicts[i] = Dict{NTuple{dim,Int},Int}()
+    end
+
+    # celldofs are never shared between different cells so there is no need
+    # for a `celldict` to keep track of which cells we have added dofs too.
+
+    # We create the `InterpolationInfo` structs with precomputed information for each
+    # interpolation since that allows having the cell loop as the outermost loop,
+    # and the interpolation loop inside without using a function barrier
+    interpolation_infos = InterpolationInfo[]
+    for interpolation in dh.field_interpolations
+        # push!(dh.interpolation_info, InterpolationInfo(interpolation))
+        push!(interpolation_infos, InterpolationInfo(interpolation))
+    end
+
+    # not implemented yet: more than one facedof per face in 3D
+    dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
+
+    nextdof = 1 # next free dof to distribute
+    push!(dh.cell_dofs_offset, 1) # dofs for the first cell start at 1
+
+    # loop over all the cells, and distribute dofs for all the fields
+    for (ci, cell) in enumerate(getcells(getgrid(dh)))
+        @debug println("cell #$ci")
+        for fi in 1:num_fields(dh)
+            interpolation_info = interpolation_infos[fi]
+            @debug println("  field: $(dh.field_names[fi])")
+            if interpolation_info.nvertexdofs > 0
+                for vertex in vertices(cell)
+                    @debug println("    vertex#$vertex")
+                    token = Base.ht_keyindex2!(dh.vertexdicts[fi], vertex)
+                    if token > 0 # haskey(dh.vertexdicts[fi], vertex) # reuse dofs
+                        reuse_dof = dh.vertexdicts[fi].vals[token] # dh.vertexdicts[fi][vertex]
+                        for d in 1:dh.field_dims[fi]
+                            @debug println("      reusing dof #$(reuse_dof + (d-1))")
+                            push!(dh.cell_dofs, reuse_dof + (d-1))
+                        end
+                    else # token <= 0, distribute new dofs
+                        for vertexdof in 1:interpolation_info.nvertexdofs
+                            Base._setindex!(dh.vertexdicts[fi], nextdof, vertex, -token) # dh.vertexdicts[fi][vertex] = nextdof
+                            for d in 1:dh.field_dims[fi]
+                                @debug println("      adding dof#$nextdof")
+                                push!(dh.cell_dofs, nextdof)
+                                nextdof += 1
+                            end
+                        end
+                    end
+                end # vertex loop
+            end
+            if dim == 3 # edges only in 3D
+                if interpolation_info.nedgedofs > 0
+                    for edge in edges(cell)
+                        sedge, dir = sortedge(edge)
+                        @debug println("    edge#$sedge dir: $(dir)")
+                        token = Base.ht_keyindex2!(dh.edgedicts[fi], sedge)
+                        if token > 0 # haskey(dh.edgedicts[fi], sedge), reuse dofs
+                            startdof, olddir = dh.edgedicts[fi].vals[token] # dh.edgedicts[fi][sedge] # first dof for this edge (if dir == true)
+                            for edgedof in (dir == olddir ? (1:interpolation_info.nedgedofs) : (interpolation_info.nedgedofs:-1:1))
+                                for d in 1:dh.field_dims[fi]
+                                    reuse_dof = startdof + (d-1) + (edgedof-1)*dh.field_dims[fi]
+                                    @debug println("      reusing dof#$(reuse_dof)")
+                                    push!(dh.cell_dofs, reuse_dof)
+                                end
+                            end
+                        else # token <= 0, distribute new dofs
+                            Base._setindex!(dh.edgedicts[fi], (nextdof, dir), sedge, -token) # dh.edgedicts[fi][sedge] = (nextdof, dir),  store only the first dof for the edge
+                            for edgedof in 1:interpolation_info.nedgedofs
+                                for d in 1:dh.field_dims[fi]
+                                    @debug println("      adding dof#$nextdof")
+                                    push!(dh.cell_dofs, nextdof)
+                                    nextdof += 1
+                                end
+                            end
+                        end
+                    end # edge loop
+                end
+            end
+            if interpolation_info.nfacedofs > 0 && (interpolation_info.dim == dim)
+                for face in faces(cell)
+                    sface = sortface(face) # TODO: faces(cell) may as well just return the sorted list
+                    @debug println("    face#$sface")
+                    token = Base.ht_keyindex2!(dh.facedicts[fi], sface)
+                    if token > 0 # haskey(dh.facedicts[fi], sface), reuse dofs
+                        startdof = dh.facedicts[fi].vals[token] # dh.facedicts[fi][sface]
+                        for facedof in interpolation_info.nfacedofs:-1:1 # always reverse (YOLO)
+                            for d in 1:dh.field_dims[fi]
+                                reuse_dof = startdof + (d-1) + (facedof-1)*dh.field_dims[fi]
+                                @debug println("      reusing dof#$(reuse_dof)")
+                                push!(dh.cell_dofs, reuse_dof)
+                            end
+                        end
+                    else # distribute new dofs
+                        Base._setindex!(dh.facedicts[fi], nextdof, sface, -token)# dh.facedicts[fi][sface] = nextdof,  store the first dof for this face
+                        for facedof in 1:interpolation_info.nfacedofs
+                            for d in 1:dh.field_dims[fi]
+                                @debug println("      adding dof#$nextdof")
+                                push!(dh.cell_dofs, nextdof)
+                                nextdof += 1
+                            end
+                        end
+                    end
+                end # face loop
+            end
+            if interpolation_info.ncelldofs > 0 # always distribute new dofs for cell
+                @debug println("    cell#$ci")
+                for celldof in 1:interpolation_info.ncelldofs
+                    for d in 1:dh.field_dims[fi]
+                        @debug println("      adding dof#$nextdof")
+                        push!(dh.cell_dofs, nextdof)
+                        nextdof += 1
+                    end
+                end # cell loop
+            end
+        end # field loop
+        # push! the first index of the next cell to the offset vector
+        push!(dh.cell_dofs_offset, length(dh.cell_dofs)+1)
+    end # cell loop
+    dh.ndofs[] = maximum(dh.cell_dofs)
+    dh.closed[] = true
+
+    return dh
 end
