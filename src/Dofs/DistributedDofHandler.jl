@@ -462,3 +462,20 @@ function __close!(dh::DistributedDofHandler{dim}) where {dim}
 
     return dh
 end
+
+# TODO this is copy pasta from DofHandler.jl
+function reshape_to_nodes(dh::DistributedDofHandler, u::Vector{T}, fieldname::Symbol) where T
+    # make sure the field exists
+    fieldname ∈ Ferrite.getfieldnames(dh) || error("Field $fieldname not found.")
+
+    field_idx = findfirst(i->i==fieldname, getfieldnames(dh))
+    offset = field_offset(dh, fieldname)
+    field_dim = getfielddim(dh, field_idx)
+
+    space_dim = field_dim == 2 ? 3 : field_dim
+    data = fill(zero(T), space_dim, getnnodes(getgrid(dh)))
+
+    reshape_field_data!(data, dh, u, offset, field_dim)
+
+    return data
+end
