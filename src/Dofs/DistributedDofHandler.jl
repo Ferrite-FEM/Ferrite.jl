@@ -113,7 +113,7 @@ num_local_dofs(dh::DistributedDofHandler) = length(dh.ldof_to_gdof)
 """
 Compute the number of dofs in the global system.
 """
-num_global_dofs(dh::DistributedDofHandler) = MPI.Allreduce(nltdofs(dh), MPI.SUM, global_comm(dgrid))
+num_global_dofs(dh::DistributedDofHandler) = MPI.Allreduce(num_local_true_dofs(dh), MPI.SUM, global_comm(dgrid))
 
 """
 Renumber the dofs in local ordering to their corresponding global numbering.
