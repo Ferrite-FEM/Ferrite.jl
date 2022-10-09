@@ -41,15 +41,15 @@ struct CellIterator{dim,C,T,DH<:Union{AbstractDofHandler,Nothing}}
     dh::Union{DH,Nothing}
     celldofs::Vector{Int}
 
-    function CellIterator{dim,C,T}(dh::Union{DofHandler{dim,T,G},MixedDofHandler{dim,T,G},Nothing}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T,G}
-        isconcretetype(C) || _check_same_celltype(dh.grid, cellset)
-        N = nnodes_per_cell(dh.grid, cellset === nothing ? 1 : first(cellset))
+    function CellIterator{dim,C,T}(dh::Union{DofHandler{dim,T,G},DistributedDofHandler{dim,T,G},MixedDofHandler{dim,T,G},Nothing}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T,G}
+        isconcretetype(C) || _check_same_celltype(getgrid(dh), cellset)
+        N = nnodes_per_cell(getgrid(dh), cellset === nothing ? 1 : first(cellset))
         cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim,T}, N)
         n = ndofs_per_cell(dh, cellset === nothing ? 1 : first(cellset))
         celldofs = zeros(Int, n)
-        return new{dim,C,T,typeof(dh)}(flags, dh.grid, cell, nodes, coords, cellset, dh, celldofs)
+        return new{dim,C,T,typeof(dh)}(flags, getgrid(dh), cell, nodes, coords, cellset, dh, celldofs)
     end
 
     function CellIterator{dim,C,T}(grid::Grid{dim,C,T}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T}
@@ -66,6 +66,8 @@ CellIterator(grid::Grid{dim,C,T}, cellset::Union{AbstractVector{Int},Nothing}=no
     CellIterator{dim,C,T}(grid, cellset, flags)
 CellIterator(dh::DofHandler{dim,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
     CellIterator{dim,getcelltype(dh.grid),T}(dh, cellset, flags)
+CellIterator(dh::DistributedDofHandler{dim,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
+    CellIterator{dim,getcelltype(getlocalgrid(dh)),T}(dh, cellset, flags)
 CellIterator(dh::MixedDofHandler{dim,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,T} =
     CellIterator{dim,getcelltype(dh.grid),T}(dh, cellset, flags)
 
