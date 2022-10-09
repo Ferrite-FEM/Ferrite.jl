@@ -1,11 +1,15 @@
 @testset "interpolations" begin
 
-for interpolation in (Lagrange{1, RefCube, 1}(),
+for interpolation in (
+                      Lagrange{1, RefCube, 1}(),
                       Lagrange{1, RefCube, 2}(),
                       Lagrange{2, RefCube, 1}(),
                       Lagrange{2, RefCube, 2}(),
                       Lagrange{2, RefTetrahedron, 1}(),
                       Lagrange{2, RefTetrahedron, 2}(),
+                      Lagrange{2, RefTetrahedron, 3}(),
+                      Lagrange{2, RefTetrahedron, 4}(),
+                      Lagrange{2, RefTetrahedron, 5}(),
                       Lagrange{3, RefCube, 1}(),
                       Lagrange{3, RefCube, 2}(),
                       Serendipity{2, RefCube, 2}(),
@@ -21,7 +25,8 @@ for interpolation in (Lagrange{1, RefCube, 1}(),
                       #
                       BubbleEnrichedLagrange{2,RefTetrahedron,1}(),
                       #
-                      CrouzeixRaviart{2,1}(),)
+                      CrouzeixRaviart{2,1}(),
+    )
 
     # Test of utility functions
     ndim = Ferrite.getdim(interpolation)
@@ -47,7 +52,7 @@ for interpolation in (Lagrange{1, RefCube, 1}(),
             if k == node
                 @test N_node[k] ≈ 1.0
             else
-                @test N_node[k] ≈ 0.0
+                @test N_node[k] ≈ 0.0 atol=4eps(Float64)
             end
         end
     end
