@@ -36,7 +36,7 @@
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
 # First we load Ferrite, and some other packages we need
-using Ferrite, SparseArrays, MPI, PartitionedArrays, IterativeSolvers
+using Ferrite, SparseArrays, MPI, PartitionedArrays, IterativeSolvers, HYPRE
 
 macro debug(ex)
     return :($(esc(ex)))
@@ -459,6 +459,8 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     # We decide for row (i.e. test function) ownership, because it the image of
     # SpMV is process local.
     row_indices = PartitionedArrays.IndexSet(my_rank, ldof_to_gdof, Int32.(ldof_to_rank))
+    #FIXME: This below must be fixed before we can assemble to HYPRE IJ. Problem seems to be that rows and cols must be continuously assigned.
+    #row_indices = PartitionedArrays.IndexRange(my_rank, length(ltdof_indices), ltdof_to_gdof[1], ldof_to_gdof[.!ltdof_indices], Int32.(ldof_to_rank[.!ltdof_indices]))
     row_data = MPIData(row_indices, comm, (np,))
     row_exchanger = Exchanger(row_data,neighbors)
     rows = PRange(ngdofs,row_data,row_exchanger)
@@ -567,6 +569,8 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DofHandler, ldof_to_g
     @debug println("all_local_col_ranks $all_local_col_ranks (R$my_rank)")
 
     col_indices = PartitionedArrays.IndexSet(my_rank, all_local_cols, all_local_col_ranks)
+    #FIXME: This below must be fixed before we can assemble to HYPRE IJ. Problem seems to be that rows and cols must be continuously assigned.
+    #col_indices = PartitionedArrays.IndexRange(my_rank, length(ltdof_indices), ltdof_to_gdof[1], all_local_cols[all_local_col_ranks .!= my_rank], Int32.(all_local_col_ranks[all_local_col_ranks .!= my_rank]))
     col_data = MPIData(col_indices, comm, (np,))
     col_exchanger = Exchanger(col_data,neighbors)
     cols = PRange(ngdofs,col_data,col_exchanger)
@@ -759,7 +763,26 @@ function apply!(K::PartitionedArrays.PSparseMatrix, f::PartitionedArrays.PVector
 end
 
 apply!(K, f, ch)
-u = cg(K, f);
+
+# Compute the solution
+# Note: At the moment of writing this we have no good preconditioners for PSparseMatrix in Julia, 
+# partly due to unimplemented multiplication operators for the matrix data type.
+u = cg(K, f)
+
+# Compute the solution with HYPRE (needs the hotfix in https://github.com/fredrikekre/HYPRE.jl/pull/4 to function)
+# u_ = HYPRE.solve(
+#     HYPRE.PCG(
+#         global_comm(dgrid);
+#         Precond = HYPRE.BoomerAMG()
+#     ),
+#     HYPRE.HYPREMatrix(K),
+#     HYPRE.HYPREVector(f)
+# )
+
+# Convert back to PartitionedArrays vector
+# u = PVector(0.0, K.cols)
+# copy!(u, u_)
+# PartitionedArrays.assemble!(u)
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
