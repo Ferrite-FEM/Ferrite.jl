@@ -122,6 +122,10 @@ export
     FieldHandler,
     Field,
     reshape_to_nodes,
+    num_fields,
+    getfieldnames,
+    dof_range,
+    entity_dofs,
 
 # Constraints
     ConstraintHandler,
