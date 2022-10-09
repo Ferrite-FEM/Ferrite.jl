@@ -103,7 +103,7 @@ end
 """
 Compute the number of dofs owned by the current process.
 """
-num_local_true_dofs(dh::DistributedDofHandler) = sum(dof_owner.==(MPI.Comm_rank(global_comm(dgrid))+1))
+num_local_true_dofs(dh::DistributedDofHandler) = sum(dh.ldof_to_rank==(MPI.Comm_rank(global_comm(dh.grid))+1))
 
 """
 Compute the number of dofs visible to the current process.
@@ -113,7 +113,7 @@ num_local_dofs(dh::DistributedDofHandler) = length(dh.ldof_to_gdof)
 """
 Compute the number of dofs in the global system.
 """
-num_global_dofs(dh::DistributedDofHandler) = MPI.Allreduce(num_local_true_dofs(dh), MPI.SUM, global_comm(dgrid))
+num_global_dofs(dh::DistributedDofHandler) = MPI.Allreduce(num_local_true_dofs(dh), MPI.SUM, global_comm(dh.grid))
 
 """
 Renumber the dofs in local ordering to their corresponding global numbering.
@@ -309,6 +309,7 @@ function close!(dh::DistributedDofHandler)
     __close!(dh)
     append!(dh.ldof_to_gdof, local_to_global_numbering(dh, getglobalgrid(dh)))
     append!(dh.ldof_to_rank, compute_dof_ownership(dh, getglobalgrid(dh)))
+    dh.ndofs.x = num_local_dofs(dh)
 end
 
 # TODO this is copy pasta from DofHandler.jl
