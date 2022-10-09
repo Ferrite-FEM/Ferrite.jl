@@ -110,9 +110,7 @@ MPI.Init()
 # We start  generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Quadrilateral, (20, 20));
-
-dgrid = DistributedGrid(grid)
+dgrid = generate_distributed_grid(Quadrilateral, (20, 20));
 
 # TODO refactor this into a utility function
 @debug vtk_grid("grid", dgrid; compress=false) do vtk

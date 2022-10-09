@@ -93,6 +93,7 @@ export
     addcellset!,
     transform!,
     generate_grid,
+    generate_distributed_grid,
     compute_vertex_values,
     is_shared_vertex,
 

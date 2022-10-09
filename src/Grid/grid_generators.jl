@@ -454,3 +454,11 @@ function generate_grid(::Type{Tetrahedron}, cells_per_dim::NTuple{3,Int}, left::
 
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
+
+"""
+Helper to generate distributed grids.
+It is designed to replace the call to [`generate_grid`](@ref) for use in distributed environments.
+"""
+function generate_distributed_grid(args...)
+    return DistributedGrid(generate_grid(args...))
+end
