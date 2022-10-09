@@ -77,7 +77,8 @@ end
 
 renumber!(dh::DistributedDofHandler, perm::AbstractVector{<:Integer}) = (@assert false) && "Unimplemented"
 
-function compute_dof_ownership(dh, dgrid)
+function compute_dof_ownership(dh)
+    dgrid = dh.grid
     my_rank = MPI.Comm_rank(global_comm(dgrid))+1
 
     dof_owner = Vector{Int}(undef,ndofs(dh))
@@ -120,7 +121,8 @@ Renumber the dofs in local ordering to their corresponding global numbering.
 
 TODO: Refactor for MixedDofHandler integration
 """
-function local_to_global_numbering(dh::DistributedDofHandler, dgrid::AbstractDistributedGrid)
+function local_to_global_numbering(dh::DistributedDofHandler)
+    dgrid = dh.grid
     # MPI rank starting with 1 to match Julia's index convention
     my_rank = MPI.Comm_rank(global_comm(dgrid))+1
 
@@ -307,8 +309,8 @@ end
 
 function close!(dh::DistributedDofHandler)
     __close!(dh)
-    append!(dh.ldof_to_gdof, local_to_global_numbering(dh, getglobalgrid(dh)))
-    append!(dh.ldof_to_rank, compute_dof_ownership(dh, getglobalgrid(dh)))
+    append!(dh.ldof_to_gdof, local_to_global_numbering(dh))
+    append!(dh.ldof_to_rank, compute_dof_ownership(dh))
     dh.ndofs.x = num_local_dofs(dh)
 end
 
