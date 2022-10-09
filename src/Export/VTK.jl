@@ -25,7 +25,7 @@ which data can be appended to, see `vtk_point_data` and `vtk_cell_data`.
 """
 function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compress::Bool=true) where {dim,C,T}
     cls = MeshCell[]
-    for cell in grid.cells
+    for cell in getcells(grid)
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
         push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
     end
@@ -34,8 +34,16 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compre
 end
 
 function WriteVTK.vtk_grid(filename::AbstractString, dgrid::DistributedGrid{dim,C,T}; compress::Bool=true) where {dim,C,T}
-    my_rank = MPI.Comm_rank(dgrid.grid_comm)
-    return vtk_grid("$filename.$my_rank", dgrid.local_grid; compress=compress)
+    part   = MPI.Comm_rank(global_comm(dgrid))+1
+    nparts = MPI.Comm_size(global_comm(dgrid))
+    grid = getlocalgrid(dgrid)
+    cls = MeshCell[]
+    for cell in getcells(grid)
+        celltype = Ferrite.cell_to_vtkcell(typeof(cell))
+        push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
+    end
+    coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
+    return pvtk_grid(filename, coords, cls; part=part, nparts=nparts, compress=compress)
 end
 
 
@@ -68,6 +76,15 @@ function WriteVTK.vtk_point_data(
     return vtk_point_data(vtk, out, name; component_names=component_names(S))
 end
 
+
+function WriteVTK.vtk_point_data(
+    vtk::WriteVTK.PVTKFile,
+    data::Vector{S},
+    name::AbstractString
+    ) where {O, D, T, M, S <: Union{AbstractFloat, Tensor{O, D, T, M}, SymmetricTensor{O, D, T, M}}}
+    return vtk_point_data(vtk.vtk, data, name)
+end
+
 function component_names(::Type{S}) where S
     names =
         S <:             Vec{1}   ? ["x"] :
@@ -94,7 +111,7 @@ end
 Export all cell sets in the grid. Each cell set is exported with
 `vtk_cell_data` with value 1 if the cell is in the set, and 0 otherwise.
 """
-function vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellsets=keys(grid.cellsets))
+function vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellsets=keys(getcells(grid)ets))
     z = zeros(getncells(grid))
     for cellset in cellsets
         z .= 0.0
@@ -123,4 +140,14 @@ function WriteVTK.vtk_point_data(vtkfile, dh::AbstractDofHandler, u::Vector, suf
     end
 
     return vtkfile
+end
+
+using PartitionedArrays
+
+"""
+"""
+function WriteVTK.vtk_point_data(vtk, dh::AbstractDofHandler, u::PVector)
+    map_parts(local_view(u, u.rows)) do u_local
+        vtk_point_data(vtk, dh, u_local)
+    end
 end
