@@ -209,7 +209,7 @@ Add a `Dirichlet` boundary condition to the `ConstraintHandler`.
 """
 function add!(ch::ConstraintHandler, dbc::Dirichlet)
     dbc_check(ch, dbc)
-    celltype = getcelltype(ch.dh.grid)
+    celltype = getcelltype(getgrid(ch.dh))
     @assert isconcretetype(celltype)
 
     field_idx = find_field(ch.dh, dbc.field_name)
@@ -247,7 +247,7 @@ function add!(ch::ConstraintHandler, newac::AffineConstraint)
     return ch
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where {Index<:BoundaryIndex}
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(getgrid(ch.dh)))) where {Index<:BoundaryIndex}
     local_face_dofs, local_face_dofs_offset =
         _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundaryfunction(eltype(bcfaces)))
     copy!(dbc.local_face_dofs, local_face_dofs)
@@ -295,13 +295,13 @@ function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, b
     return local_face_dofs, local_face_dofs_offset
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
-    if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(getgrid(ch.dh))))
+    if interpolation !== default_interpolation(typeof(getcells(getgrid(ch.dh), first(cellset))))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
 
     ncomps = length(dbc.components)
-    nnodes = getnnodes(ch.dh.grid)
+    nnodes = getnnodes(getgrid(ch.dh))
     interpol_points = getnbasefunctions(interpolation)
     _celldofs = fill(0, ndofs_per_cell(ch.dh, first(cellset)))
     node_dofs = zeros(Int, ncomps, nnodes)
@@ -361,10 +361,10 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:Bo
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::T) where {T}
 
-    dim = getdim(dh.grid)
+    dim = getdim(getgrid(dh))
     _tmp_cellid = first(faces)[1]
 
-    N = nnodes_per_cell(dh.grid, _tmp_cellid)
+    N = nnodes_per_cell(getgrid(dh), _tmp_cellid)
     xh = zeros(Vec{dim, T}, N) # pre-allocate
     _celldofs = fill(0, ndofs_per_cell(dh, _tmp_cellid))
 
@@ -403,7 +403,7 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, nodes::Set{Int}
                   dofmapping::Dict{Int,Int}, time::Float64)
     counter = 1
     for (idx, nodenumber) in enumerate(nodeidxs)
-        x = dh.grid.nodes[nodenumber].x
+        x = getgrid(dh).nodes[nodenumber].x
         bc_value = f(x, time)
         @assert length(bc_value) == length(components)
         for v in bc_value
@@ -427,13 +427,13 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
 
     for field in unique_fields
         nd = ndim(ch.dh, field)
-        data = zeros(Float64, nd, getnnodes(ch.dh.grid))
+        data = zeros(Float64, nd, getnnodes(getgrid(ch.dh)))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
             if eltype(dbc.faces) <: BoundaryIndex
                 functype = boundaryfunction(eltype(dbc.faces))
                 for (cellidx, faceidx) in dbc.faces
-                    for facenode in functype(ch.dh.grid.cells[cellidx])[faceidx]
+                    for facenode in functype(getcells(getgrid(ch.dh), cellidx))[faceidx]
                         for component in dbc.components
                             data[component, facenode] = 1
                         end
@@ -783,9 +783,9 @@ end
 
 #Function for adding constraint when using multiple celltypes
 function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
-    _check_cellset_dirichlet(ch.dh.grid, fh.cellset, dbc.faces)
+    _check_cellset_dirichlet(getgrid(ch.dh), fh.cellset, dbc.faces)
 
-    celltype = getcelltype(ch.dh.grid, first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
+    celltype = getcelltype(getgrid(ch.dh), first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
 
     field_idx = find_field(fh, dbc.field_name)
     # Extract stuff for the field
@@ -813,7 +813,7 @@ end
 function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int})
     nodes = Set{Int}()
     for cellid in cellset
-        for nodeid in grid.cells[cellid].nodes
+        for nodeid in getcells(grid, cellid).nodes
             nodeid ∈ nodes || push!(nodes, nodeid)
         end
     end
@@ -865,8 +865,8 @@ end
 
 function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::Interpolation,
                field_dim::Int, offset::Int)
-    grid = ch.dh.grid
-    Tx = typeof(first(ch.dh.grid.nodes).x) # Vec{D,T}
+    grid = getgrid(ch.dh)
+    Tx = typeof(first(getgrid(ch.dh).nodes).x) # Vec{D,T}
     # TODO: This requires full periodicity for now. (Why? I don't remember,
     #       but something in the code below assumes this... I think...)
     @assert length(pdbc.face_pairs) == length(Tx)
@@ -891,23 +891,23 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
         mirror_faceset = collect(getfaceset(grid, mirror))
         mirror_mean_x = Tx[] # mean face coordinates
         for (c, f) in mirror_faceset
-            fn = faces(grid.cells[c])[f]
+            fn = faces(getcells(grid, c))[f]
             push!(mirror_mean_x, sum(grid.nodes[i].x for i in fn) / length(fn))
             # Also keep track of all nodes for corner finding
-            union!(all_node_idxs, grid.cells[c].nodes)
+            union!(all_node_idxs, getcells(grid, c).nodes)
         end
         # Same dance for the image
         image_faceset = collect(getfaceset(grid,  image))
         image_mean_x = Tx[]
         for (c, f) in image_faceset
-            fn = faces(grid.cells[c])[f]
+            fn = faces(getcells(grid, c))[f]
             push!(image_mean_x, sum(grid.nodes[i].x for i in fn) / length(fn))
             # Also keep track of all nodes for corner finding
-            union!(all_node_idxs, grid.cells[c].nodes)
+            union!(all_node_idxs, getcells(grid, c).nodes)
         end
         function extract_single_x_on_face(fs) # :)
             c, f = first(fs)
-            fn = faces(grid.cells[c])[f]
+            fn = faces(getcells(grid, c))[f]
             return grid.nodes[fn[1]].x
         end
         # Add a shift to help the tree search
