@@ -153,6 +153,7 @@ export
     start_assemble,
     assemble!,
     end_assemble,
+    PartitionedArraysCOOAssembler,
 
 # VTK export
     vtk_grid,
