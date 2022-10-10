@@ -173,6 +173,48 @@ function vtk_shared_vertices(vtk, dgrid::DistributedGrid)
     end
 end
 
+
+"""
+Enrich the VTK file with meta information about shared faces.
+"""
+function vtk_shared_faces(vtk, dgrid::DistributedGrid)
+    u = Vector{Float64}(undef, getnnodes(dgrid))
+    my_rank = MPI.Comm_rank(global_comm(dgrid))+1
+    for rank ∈ 1:MPI.Comm_size(global_comm(dgrid))
+        fill!(u, 0.0)
+        for sf ∈ values(get_shared_faces(dgrid))
+            if haskey(sf.remote_faces, rank)
+                (cellidx, i) = sf.local_idx
+                cell = getcells(dgrid, cellidx)
+                facenodes = faces(cell)[i]
+                u[[facenodes...]] .= my_rank
+            end
+        end
+        vtk_point_data(pvtkwrapper(vtk), u, "shared faces with $rank")
+    end
+end
+
+
+"""
+Enrich the VTK file with meta information about shared edges.
+"""
+function vtk_shared_edges(vtk, dgrid::DistributedGrid)
+    u = Vector{Float64}(undef, getnnodes(dgrid))
+    my_rank = MPI.Comm_rank(global_comm(dgrid))+1
+    for rank ∈ 1:MPI.Comm_size(global_comm(dgrid))
+        fill!(u, 0.0)
+        for se ∈ values(get_shared_edges(dgrid))
+            if haskey(se.remote_edges, rank)
+                (cellidx, i) = se.local_idx
+                cell = getcells(dgrid, cellidx)
+                edgenodes = edges(cell)[i]
+                u[[edgenodes...]] .= my_rank
+            end
+        end
+        vtk_point_data(pvtkwrapper(vtk), u, "shared edges with $rank")
+    end
+end
+
 """
 Enrich the VTK file with partitioning meta information.
 """

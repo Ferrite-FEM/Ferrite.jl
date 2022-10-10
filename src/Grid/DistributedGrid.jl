@@ -243,16 +243,15 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
             for (i, _) ∈ enumerate(vertices(global_cell))
                 cell_vertex = VertexIndex(global_cell_idx, i)
                 remote_vertices = Dict{Int,Vector{VertexIndex}}()
-                for (global_cell_neighbor_idx, j) ∈ getneighborhood(grid_topology, grid_to_distribute, cell_vertex, true)
+                for other_vertex ∈ getneighborhood(grid_topology, grid_to_distribute, cell_vertex, true)
+                    (global_cell_neighbor_idx, j) = other_vertex
                     other_rank = parts[global_cell_neighbor_idx]
                     if other_rank != my_rank
-                        n1 = vertices(getcells(grid_to_distribute,global_cell_idx))[i]
-                        n2 = vertices(getcells(grid_to_distribute,global_cell_neighbor_idx))[j]
-                        if n1 == n2
+                        if toglobal(grid_to_distribute,cell_vertex) == toglobal(grid_to_distribute,other_vertex)
                             if !haskey(remote_vertices,other_rank)
                                 remote_vertices[other_rank] = Vector(undef,0)
                             end
-                            @debug println("Detected shared vertex $cell_vertex neighbor $(VertexIndex(global_cell_neighbor_idx,j)) (R$my_rank)")
+                            @debug println("Detected shared vertex $cell_vertex neighbor $other_vertex (R$my_rank)")
                             push!(remote_vertices[other_rank], VertexIndex(global_to_local_cell_map[other_rank][global_cell_neighbor_idx], j))
                         end
                     end
@@ -264,29 +263,57 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
                 end
             end
 
-            # # Edge
-            # if dim > 2
-            #     for (i, global_vertex_idx) ∈ enumerate(edges(global_cell))
-            #         cell_edge = EdgeIndex(global_cell_idx, i)
-            #         for (global_cell_neighbor_idx, j) ∈ getneighborhood(grid_topology, grid_to_distribute, cell_edge)
-            #             if parts[global_cell_neighbor_idx] != my_rank
-            #                 push!(shared_edges, cell_edge)
-            #             end
-            #         end
-            #     end
-            # end
+            # Face
+            if dim > 1
+                for (i, global_face_idx) ∈ enumerate(faces(global_cell))
+                    cell_face = FaceIndex(global_cell_idx, i)
+                    remote_faces = Dict{Int,Vector{FaceIndex}}()
+                    for other_face ∈ getneighborhood(grid_topology, grid_to_distribute, cell_face, true)
+                        (global_cell_neighbor_idx, j) = other_face
+                        other_rank = parts[global_cell_neighbor_idx]
+                        if other_rank != my_rank
+                            if toglobal(grid_to_distribute,cell_face) == toglobal(grid_to_distribute,other_face)
+                                if !haskey(remote_faces,other_rank)
+                                    remote_faces[other_rank] = Vector(undef,0)
+                                end
+                                @debug println("Detected shared face $cell_face neighbor $other_face (R$my_rank)")
+                                push!(remote_faces[other_rank], FaceIndex(global_to_local_cell_map[other_rank][global_cell_neighbor_idx], j))
+                            end
+                        end
+                    end
 
-            # # Face
-            # if dim > 1
-            #     for (i, global_vertex_idx) ∈ enumerate(faces(global_cell))
-            #         cell_face = FaceIndex(global_cell_idx, i)
-            #         for (global_cell_neighbor_idx, j) ∈ getneighborhood(grid_topology, grid_to_distribute, cell_face)
-            #             if parts[global_cell_neighbor_idx] != my_rank
-            #                 push!(shared_faces, cell_face)
-            #             end
-            #         end
-            #     end
-            # end
+                    if length(remote_faces) > 0
+                        idx = FaceIndex(global_to_local_cell_map[my_rank][global_cell_idx], i)
+                        shared_faces[idx] = SharedFace(idx, remote_faces)
+                    end
+                end
+            end
+
+            # Edge
+            if dim > 2
+                for (i, global_vertex_idx) ∈ enumerate(edges(global_cell))
+                    cell_edge = EdgeIndex(global_cell_idx, i)
+                    remote_edges = Dict{Int,Vector{EdgeIndex}}()
+                    for other_edge ∈ getneighborhood(grid_topology, grid_to_distribute, cell_edge, true)
+                        (global_cell_neighbor_idx, j) = other_edge
+                        other_rank = parts[global_cell_neighbor_idx]
+                        if other_rank != my_rank
+                            if toglobal(grid_to_distribute,cell_edge) == toglobal(grid_to_distribute,other_edge)
+                                if !haskey(remote_edges,other_edge)
+                                    remote_edges[other_edge] = Vector(undef,0)
+                                end
+                                @debug println("Detected shared edge $cell_edge neighbor $other_edge (R$my_rank)")
+                                push!(remote_edges[other_edge], EdgeIndex(global_to_local_cell_map[other_rank][global_cell_neighbor_idx], j))
+                            end
+                        end
+                    end
+
+                    if length(remote_edges) > 0
+                        idx = EdgeIndex(global_to_local_cell_map[my_rank][global_cell_idx], i)
+                        shared_edges[idx] = SharedEdge(idx, remote_edges)
+                    end
+                end
+            end
         end
     end
 
