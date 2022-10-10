@@ -80,6 +80,19 @@ function morton(o::OctantBWG{2},l::Integer,b::Integer)
     return (id >> (b-l))+1
 end
 
+function morton(o::OctantBWG{3},l::Integer,b::Integer)
+    x = UInt32(o.xyz[1])
+    y = UInt32(o.xyz[2])
+    z = UInt32(o.xyz[3])
+    id = UInt64(0)
+    for i in 0:62
+        id = id | ((x & (1 << i)) << i)
+        id = id | ((y & (1 << i)) << (i+1))
+        id = id | ((z & (1 << i)) << (i+2))
+    end 
+    return (id >> (b-l))+1
+end
+
 """
     ForestBWG{dim, C<:AbstractAdaptiveCell, T<:Real} <: AbstractAdaptiveGrid{dim}
 `p4est` adaptive grid implementation based on Burstedde, Wilcox, Ghattas [2011]
