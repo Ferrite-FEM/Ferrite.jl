@@ -300,10 +300,10 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
                         if other_rank != my_rank
                             if toglobal(grid_to_distribute,cell_edge) == toglobal(grid_to_distribute,other_edge)
                                 if !haskey(remote_edges,other_edge)
-                                    remote_edges[other_edge] = Vector(undef,0)
+                                    remote_edges[other_rank] = Vector(undef,0)
                                 end
                                 @debug println("Detected shared edge $cell_edge neighbor $other_edge (R$my_rank)")
-                                push!(remote_edges[other_edge], EdgeIndex(global_to_local_cell_map[other_rank][global_cell_neighbor_idx], j))
+                                push!(remote_edges[other_rank], EdgeIndex(global_to_local_cell_map[other_rank][global_cell_neighbor_idx], j))
                             end
                         end
                     end
