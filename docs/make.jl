@@ -24,7 +24,7 @@ using Documenter, Ferrite, FerriteGmsh, FerriteMeshParser
             push!(cmd.exec, "-H", "Content-Type: application/json")
             push!(cmd.exec, "--fail")
             push!(cmd.exec, "https://api.github.com/repos/$(repo)/pulls/$(prnr)")
-            @info "Running curl command" cmd
+            @info "Running curl command" cmd cmd.env
             # Run the command (silently)
             run(cmd)
             response = run_and_capture(cmd)
@@ -45,7 +45,7 @@ end
 const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 
 # Generate examples
-include("generate.jl")
+# include("generate.jl")
 
 GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "heat_equation.md",
@@ -85,7 +85,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
             "manual/grid.md",
             "manual/export.md"
             ],
-        "Examples" => GENERATEDEXAMPLES,
+        # "Examples" => GENERATEDEXAMPLES,
         "API Reference" => [
             "reference/quadrature.md",
             "reference/interpolations.md",
@@ -100,9 +100,9 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
 )
 
 # make sure there are no *.vtu files left around from the build
-@timeit dto "remove vtk files" cd(joinpath(@__DIR__, "build", "examples")) do
-    foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
-end
+# @timeit dto "remove vtk files" cd(joinpath(@__DIR__, "build", "examples")) do
+#     foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
+# end
 
 
 # Deploy built documentation
