@@ -13,7 +13,7 @@ include("download_resources.jl")
     if endswith(example, ".jl")
         input = abspath(joinpath(EXAMPLEDIR, example))
         name = basename(input)
-        if !is_draft
+        if !liveserver
             script = @timeit dto "script()" @timeit dto name Literate.script(input, GENERATEDDIR)
             code = strip(read(script, String))
         else
@@ -36,7 +36,7 @@ include("download_resources.jl")
         @timeit dto "markdown()" @timeit dto name begin
             Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
         end
-        if !is_draft
+        if !liveserver
             @timeit dto "notebook()"  @timeit dto name begin
                 Literate.notebook(input, GENERATEDDIR, preprocess = nbpre, execute = is_ci) # Don't execute locally
             end
