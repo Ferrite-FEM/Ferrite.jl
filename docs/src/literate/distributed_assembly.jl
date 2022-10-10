@@ -44,7 +44,7 @@ close!(dh);
 # Nothing has to be changed here either.
 ch = ConstraintHandler(dh);
 ∂Ω = union(getfaceset.((getlocalgrid(dgrid), ), ["left", "right", "top", "bottom"])...);
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
+dbc = Dirichlet(:u, ∂Ω, (x, t) -> 1)
 add!(ch, dbc);
 close!(ch)
 update!(ch, 0.0);
@@ -151,7 +151,7 @@ for cell in CellIterator(dh)                                            #src
         for q_point in 1:getnquadpoints(cellvalues)                     #src
             x = spatial_coordinate(cellvalues, q_point, coords)         #src
             for i in 1:n_basefuncs                                      #src
-                uₐₙₐ    = prod(cos, x*π/2)                              #src
+                uₐₙₐ    = prod(cos, x*π/2)+1.0                          #src
                 uₐₚₚᵣₒₓ = function_value(cellvalues, q_point, uₑ)       #src
                 @test isapprox(uₐₙₐ, uₐₚₚᵣₒₓ; atol=1e-1)                #src
             end                                                         #src
