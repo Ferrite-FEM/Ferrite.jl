@@ -14,8 +14,9 @@
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
 # First we load Ferrite, and some other packages we need
-using Ferrite, MPI #, PartitionedArrays
+using Ferrite, MPI
 using IterativeSolvers #, HYPRE
+using PartitionedArrays #src
 
 # Launch MPI
 MPI.Init()
@@ -43,7 +44,7 @@ close!(dh);
 # Nothing has to be changed here either.
 ch = ConstraintHandler(dh);
 ∂Ω = union(getfaceset.((getlocalgrid(dgrid), ), ["left", "right", "top", "bottom"])...);
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> 1)
+dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
 add!(ch, dbc);
 close!(ch)
 update!(ch, 0.0);
@@ -70,14 +71,18 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DistributedDofHandler
         fill!(fe, 0)
 
         reinit!(cellvalues, cell)
-
+        coords = getcoordinates(cell)
+                
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
             
             for i in 1:n_basefuncs
                 v  = shape_value(cellvalues, q_point, i)
                 ∇v = shape_gradient(cellvalues, q_point, i)
-                fe[i] += v * dΩ
+                # Manufactured solution of Π cos(xᵢπ)
+                x = spatial_coordinate(cellvalues, q_point, coords)
+                fe[i] += (π/2)^2 * dim * prod(cos, x*π/2) * v * dΩ
+
                 for j in 1:n_basefuncs
                     ∇u = shape_gradient(cellvalues, q_point, j)
                     Ke[i, j] += (∇v ⋅ ∇u) * dΩ
@@ -135,9 +140,24 @@ vtk_grid("heat_equation_distributed", dh) do vtk
     vtk_partitioning(vtk, dgrid)
 end
 
-## test the result                #src
-using Test                        #src
-@test norm(u) ≈ 9.536307974872432 #src
+## Test the result against the manufactured solution                    #src
+using Test                                                              #src
+for cell in CellIterator(dh)                                            #src
+    reinit!(cellvalues, cell)                                           #src
+    n_basefuncs = getnbasefunctions(cellvalues)                         #src
+    coords = getcoordinates(cell)                                       #src
+    map_parts(local_view(u, u.rows)) do u_local                         #src
+        uₑ = u_local[celldofs(cell)]                                    #src
+        for q_point in 1:getnquadpoints(cellvalues)                     #src
+            x = spatial_coordinate(cellvalues, q_point, coords)         #src
+            for i in 1:n_basefuncs                                      #src
+                uₐₙₐ    = prod(cos, x*π/2)                              #src
+                uₐₚₚᵣₒₓ = function_value(cellvalues, q_point, uₑ)       #src
+                @test isapprox(uₐₙₐ, uₐₚₚᵣₒₓ; atol=1e-1)                #src
+            end                                                         #src
+        end                                                             #src
+    end                                                                 #src
+end                                                                     #src
 
 # Finally, we gracefully shutdown MPI
 MPI.Finalize()
