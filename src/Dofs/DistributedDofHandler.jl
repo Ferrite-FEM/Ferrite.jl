@@ -154,8 +154,9 @@ function local_to_global_numbering(dh::DistributedDofHandler)
             if interpolation_info.nvertexdofs > 0
                 for (vi,vertex) in enumerate(Ferrite.vertices(cell))
                     @debug println("    vertex#$vertex (R$my_rank)")
+                    lvi = VertexIndex(ci,vi)
                     # Dof is owned if it is local or if my rank is the smallest in the neighborhood
-                    if !haskey(dgrid.shared_vertices,VertexIndex(ci,vi)) || all(keys(dgrid.shared_vertices[VertexIndex(ci,vi)].remote_vertices) .> my_rank)
+                    if !haskey(dgrid.shared_vertices,lvi) || all(keys(dgrid.shared_vertices[lvi].remote_vertices) .> my_rank)
                         # Update dof assignment
                         dof_local_idx = dh.vertexdicts[fi][vertex]
                         if local_to_global[dof_local_idx] == 0
@@ -168,19 +169,19 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                     end
 
                     # Update shared vertex lookup table
-                    if haskey(dgrid.shared_vertices,VertexIndex(ci,vi))
+                    if haskey(dgrid.shared_vertices,lvi)
                         master_rank = my_rank
-                        for master_rank_new ∈ keys(dgrid.shared_vertices[VertexIndex(ci,vi)].remote_vertices)
+                        for master_rank_new ∈ keys(dgrid.shared_vertices[lvi].remote_vertices)
                             master_rank = min(master_rank, master_rank_new)
                         end
-                        for (remote_rank, svs) ∈ dgrid.shared_vertices[VertexIndex(ci,vi)].remote_vertices
+                        for (remote_rank, svs) ∈ dgrid.shared_vertices[lvi].remote_vertices
                             if master_rank == my_rank # I own the dof - we have to send information
                                 if !haskey(vertices_send,remote_rank)
                                     vertices_send[remote_rank] = Vector{Ferrite.VertexIndex}()
                                 end
-                                @debug println("      prepare sending vertex #$(VertexIndex(ci,vi)) to $remote_rank (R$my_rank)")
+                                @debug println("      prepare sending vertex #$(lvi) to $remote_rank (R$my_rank)")
                                 for i ∈ svs
-                                    push!(vertices_send[remote_rank],VertexIndex(ci,vi))
+                                    push!(vertices_send[remote_rank],lvi)
                                 end
                             elseif master_rank == remote_rank  # dof is owned by remote - we have to receive information
                                 if !haskey(n_vertices_recv,remote_rank)
@@ -188,7 +189,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                                 else
                                     n_vertices_recv[remote_rank] += length(svs)
                                 end
-                                @debug println("      prepare receiving vertex #$(VertexIndex(ci,vi)) from $remote_rank (R$my_rank)")
+                                @debug println("      prepare receiving vertex #$(lvi) from $remote_rank (R$my_rank)")
                             end
                         end
                     end

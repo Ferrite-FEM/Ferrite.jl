@@ -223,7 +223,7 @@ struct PartitionedArraysCOOAssembler{T}
     rows
     f::PVector
 
-    👻
+    👻remotes
     dh
 
     # TODO PartitionedArrays backend as additional input arg
@@ -307,14 +307,13 @@ struct PartitionedArraysCOOAssembler{T}
         ghost_dof_rank = Int32[]
 
         # ------------ Ghost dof synchronization ----------
-        # Prepare sending 👻 ghost dofs to neighbors
+        # Prepare sending ghost dofs to neighbors 👻
         #@TODO move relevant parts into dof handler
         #@TODO communication can be optimized by deduplicating entries in, and compressing the following arrays
         #@TODO reorder communication by field to eliminate need for `ghost_dof_field_index_to_send`
         ghost_dof_to_send = [Int[] for i ∈ 1:destination_len] # global dof id
         ghost_rank_to_send = [Int[] for i ∈ 1:destination_len] # rank of dof
-        ghost_dof_field_index_to_send = [Int[] for i ∈ 1:destination_len]
-        ghost_element_to_send = [Int[] for i ∈ 1:destination_len] # corresponding element
+        # ghost_dof_field_index_to_send = [Int[] for i ∈ 1:destination_len]
         ghost_dof_owner = [Int[] for i ∈ 1:destination_len] # corresponding owner
         ghost_dof_pivot_to_send = [Int[] for i ∈ 1:destination_len] # corresponding dof to interact with
         for shared_entity_set ∈ [dgrid.shared_vertices, dgrid.shared_faces, dgrid.shared_edges]
@@ -341,15 +340,14 @@ struct PartitionedArraysCOOAssembler{T}
                             append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_entity_dof])
                             append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_field_dof])
                             append!(ghost_rank_to_send[sender_slot], ldof_to_rank[cell_field_dof])
-                            append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
-                            append!(ghost_element_to_send[sender_slot], pivot_cell_idx)
+                            # append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
                         end
                     end
                 end
             end
         end
 
-        ghost_send_buffer_lengths = Int[length(i) for i ∈ ghost_element_to_send]
+        ghost_send_buffer_lengths = Int[length(i) for i ∈ ghost_dof_to_send]
         ghost_recv_buffer_lengths = zeros(Int, destination_len)
         MPI.Neighbor_alltoall!(UBuffer(ghost_send_buffer_lengths,1), UBuffer(ghost_recv_buffer_lengths,1), vertex_comm(dgrid));
         @debug for (i,ghost_recv_buffer_length) ∈ enumerate(ghost_recv_buffer_lengths)
@@ -362,13 +360,9 @@ struct PartitionedArraysCOOAssembler{T}
         ghost_recv_buffer_dofs = zeros(Int, sum(ghost_recv_buffer_lengths))
         MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_dofs,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_dofs,ghost_recv_buffer_lengths), vertex_comm(dgrid))
 
-        ghost_send_buffer_elements = vcat(ghost_element_to_send...)
-        ghost_recv_buffer_elements = zeros(Int, sum(ghost_recv_buffer_lengths))
-        MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_elements,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_elements,ghost_recv_buffer_lengths), vertex_comm(dgrid))
-
-        ghost_send_buffer_fields = vcat(ghost_dof_field_index_to_send...)
-        ghost_recv_buffer_fields = zeros(Int, sum(ghost_recv_buffer_lengths))
-        MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_fields,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_fields,ghost_recv_buffer_lengths), vertex_comm(dgrid))
+        # ghost_send_buffer_fields = vcat(ghost_dof_field_index_to_send...)
+        # ghost_recv_buffer_fields = zeros(Int, sum(ghost_recv_buffer_lengths))
+        # MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_fields,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_fields,ghost_recv_buffer_lengths), vertex_comm(dgrid))
 
         ghost_send_buffer_ranks = vcat(ghost_rank_to_send...)
         ghost_recv_buffer_ranks = zeros(Int, sum(ghost_recv_buffer_lengths))
@@ -413,10 +407,10 @@ struct PartitionedArraysCOOAssembler{T}
         f = PartitionedArrays.PVector(0.0,rows)
         @debug println("f constructed (R$my_rank)")
 
-        👻 = zip(ghost_recv_buffer_dofs_piv, ghost_recv_buffer_dofs, ghost_recv_buffer_ranks)
-        @debug println("👻 $👻 (R$my_rank)")
+        👻remotes = zip(ghost_recv_buffer_dofs_piv, ghost_recv_buffer_dofs, ghost_recv_buffer_ranks)
+        @debug println("👻remotes $👻remotes (R$my_rank)")
 
-        return new(I, J, V, cols, rows, f, 👻, dh)
+        return new(I, J, V, cols, rows, f, 👻remotes, dh)
     end
 end
 
@@ -450,7 +444,7 @@ function end_assemble(assembler::PartitionedArraysCOOAssembler{T}) where {T}
 
     # Fix ghost layer 👻! Note that the locations for remote processes to write their
     # data into are missing up to this point.
-    for (i, (pivot_dof, global_ghost_dof, ghost_owner_rank)) ∈ enumerate(assembler.👻)
+    for (i, (pivot_dof, global_ghost_dof, ghost_owner_rank)) ∈ enumerate(assembler.👻remotes)
         push!(I, pivot_dof)
         push!(J, global_ghost_dof)
         push!(V, 0.0)
