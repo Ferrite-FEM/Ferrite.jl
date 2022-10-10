@@ -319,7 +319,7 @@ struct PartitionedArraysCOOAssembler{T}
         for shared_entity_set ∈ [dgrid.shared_vertices, dgrid.shared_faces, dgrid.shared_edges]
             for (pivot_entity, pivot_shared_entity) ∈ shared_entity_set
                 # Start by searching shared entities which are not owned
-                pivot_entity_owner_rank = Ferrite.compute_owner(dgrid, pivot_shared_entity)
+                pivot_entity_owner_rank = compute_owner(dgrid, pivot_shared_entity)
                 pivot_cell_idx = pivot_entity[1]
 
                 if my_rank != pivot_entity_owner_rank
@@ -330,12 +330,13 @@ struct PartitionedArraysCOOAssembler{T}
                     cell_dofs_upper_bound = (pivot_cell_idx == getncells(dh.grid)) ? length(dh.cell_dofs) : dh.cell_dofs_offset[pivot_cell_idx+1]
                     cell_dofs = dh.cell_dofs[dh.cell_dofs_offset[pivot_cell_idx]:cell_dofs_upper_bound]
 
-                    pivot_entity_global = Ferrite.toglobal(getlocalgrid(dgrid), pivot_entity)
+                    pivot_entity_global = toglobal(getlocalgrid(dgrid), pivot_entity)
 
-                    for (field_idx, field_name) in zip(1:num_fields(dh), Ferrite.getfieldnames(dh))
-                        pivot_entity_dof = Ferrite.entity_dofs(dh, field_idx, pivot_entity_global)
+                    for (field_idx, field_name) in zip(1:num_fields(dh), getfieldnames(dh))
+                        !has_entity_dof(dh, field_idx, pivot_entity_global) && continue
+                        pivot_entity_dof = entity_dofs(dh, field_idx, pivot_entity_global)
                         # Extract dofs belonging to the current field
-                        cell_field_dofs = cell_dofs[Ferrite.dof_range(dh, field_name)]
+                        cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
                         for cell_field_dof ∈ cell_field_dofs
                             append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_entity_dof])
                             append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_field_dof])
