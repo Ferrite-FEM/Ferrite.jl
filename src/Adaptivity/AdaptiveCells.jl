@@ -19,6 +19,7 @@ end
 Construct an `octant` based on dimension `dim`, level `l`, amount of levels `b` and morton index `m`
 """
 function OctantBWG(dim::Integer, l::Integer, m::Integer, b::Integer=_maxlevel[dim-1])
+    @assert l ≤ b #maximum refinement level exceeded
     @assert m ≤ 2^(dim*l)
     x,y,z = (0,0,0) 
     h = _compute_size(b,l) 
@@ -47,12 +48,36 @@ struct OctreeBWG{dim,N,M} <: AbstractAdaptiveCell{dim,N,M}
     nodes::NTuple{N,Int}
 end
 
+function refine!(octree::OctreeBWG{dim,N,M}, o::OctantBWG{dim,N,M}) where {dim,N,M}
+    #TODO write generic morton idx identification
+    morton_o = findfirst(x->x==o,octree.leaves)
+    # how to obtain id from morton index ?
+    old_octant = popat!(octree.leaves,morton_o)
+    self_child_id = child_id(old_octant,octree.b)
+    start_child_id = self_child_id * (self_child_id != 1 ? (self_child_id - 1) : (1)) # shift morton idx about one level
+    for child_mort_id in start_child_id+1:(start_child_id+N)
+        insert!(octree.leaves,morton_o,OctantBWG(dim,old_octant.l+1,child_mort_id,octree.b))
+        morton_o += 1
+    end
+end
+
 OctreeBWG{3,8,6}(nodes::NTuple,b=_maxlevel[2]) = OctreeBWG{3,8,6}([zero(OctantBWG{3,8,6})],b,nodes)
 OctreeBWG{2,4,4}(nodes::NTuple,b=_maxlevel[1]) = OctreeBWG{2,4,4}([zero(OctantBWG{2,4,4})],b,nodes)
-OctreeBWG(cell::Quadrilateral) = OctreeBWG{2,4,4}(cell.nodes)
-OctreeBWG(cell::Hexahedron) = OctreeBWG{3,8,6}(cell.nodes)
+OctreeBWG(cell::Quadrilateral,b=_maxlevel[2]) = OctreeBWG{2,4,4}(cell.nodes,b)
+OctreeBWG(cell::Hexahedron,b=_maxlevel[1]) = OctreeBWG{3,8,6}(cell.nodes,b)
 
 Base.length(tree::OctreeBWG) = length(tree.leaves)
+
+function morton(o::OctantBWG{dim,N,M},b=_maxlevel[dim==2 ? 2 : 1]) where {dim,N,M}
+    recursive_o = OctantBWG{dim,N,M}(o.l,o.xyz)
+    level = recursive_o.l
+    morton_idx = 0
+    while level > 0
+        morton_idx += child_id(recursive_o,b)
+        level -= 1
+        recursive_o = parent(recursive_o,b)
+    end
+end
 
 """
     ForestBWG{dim, C<:AbstractAdaptiveCell, T<:Real} <: AbstractAdaptiveGrid{dim}
@@ -71,13 +96,13 @@ struct ForestBWG{dim, C<:OctreeBWG, T<:Real} <: AbstractAdaptiveGrid{dim}
     topology::ExclusiveTopology
 end
 
-function ForestBWG(grid::AbstractGrid{dim}) where dim
+function ForestBWG(grid::AbstractGrid{dim},b=_maxlevel[dim==2 ? 2 : 1]) where dim
     cells = getcells(grid)
     C = eltype(cells)
     @assert isconcretetype(C)
     @assert (C == Quadrilateral && dim == 2) || (C == Hexahedron && dim == 3)
     topology = ExclusiveTopology(cells)
-    cells = OctreeBWG.(grid.cells)
+    cells = OctreeBWG.(grid.cells,b)
     nodes = getnodes(grid)
     cellsets = getcellsets(grid)
     nodesets = getnodesets(grid)
@@ -103,7 +128,7 @@ end
 """
     child_id(octant::OctantBWG, b::Integer)
 Given some OctantBWG `octant` and maximum refinement level `b`, compute the child_id of `octant`
-note the following quote from Burstedde et al:
+note the following quote from Bursedde et al:
   children are numbered from 0 for the front lower left child, 
   to 1 for the front lower right child, to 2 for the back lower left, and so on, with
   4, . . . , 7 being the four children on top of the children 0, . . . , 3.
@@ -145,7 +170,7 @@ of `octant`, respectively. These computed octants are called first and last desc
 since they are connected to `octant` by a path down the octree to the maximum level  `b`
 """
 function descendants(octant::OctantBWG{dim,N,M}, b::Integer=_maxlevel[dim-1]) where {dim,N,M}
-    l1 = b-1; l2 = b-1 # not sure 
+    l1 = octant.l+1; l2 = octant.l+1 # not sure 
     h = _compute_size(b,octant.l)
     return OctantBWG{dim,N,M}(l1,octant.xyz), OctantBWG{dim,N,M}(l2,octant.xyz .+ (h-2))
 end

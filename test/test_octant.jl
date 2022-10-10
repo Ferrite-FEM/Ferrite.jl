@@ -137,3 +137,68 @@ end
     @test Ferrite.corner_neighbor(Ferrite.OctantBWG{2,4,4}(2,(2,0)),2,3) == Ferrite.OctantBWG{2,4,4}(2,(4,-2))
     @test Ferrite.corner_neighbor(Ferrite.OctantBWG{2,4,4}(2,(2,0)),4,3) == Ferrite.OctantBWG{2,4,4}(2,(4,2))
 end
+
+@testset "OctreeBWG Operations" begin
+    # maximum level == 3
+    # Octant level 0 size == 2^3=8
+    # Octant level 1 size == 2^3/2 = 4
+    # Octant level 2 size == 2^3/2 = 2
+    # Octant level 3 size == 2^3/2 = 1
+    # test translation constructor
+    grid = generate_grid(Quadrilateral,(2,2))
+    adaptive_grid = ForestBWG(grid,3)
+    for cell in adaptive_grid.cells
+        @test cell isa OctreeBWG 
+        cell.leaves[1] == OctantBWG(2,0,1,cell.b) 
+    end
+    #simple first and second level refinement
+    # first case
+    # x-----------x-----------x
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # x-----x-----x-----------|
+    # |     |     |           | 
+    # |     |     |           |
+    # |     |     |           |
+    # x--x--x-----x           |
+    # |  |  |     |           |
+    # x--x--x     |           |
+    # |  |  |     |           |
+    # x--x--x-----x-----------x
+    refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    @test length(adaptive_gird.cells[1].leaves) == 4
+    for (m,octant) in zip(1:4,adaptive_grid.cells[1].leaves)
+        @test octant == OctantBWG(2,1,m,adaptive_grid.cells[1].b)
+    end
+    refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    # octree holds now 3 first level and 4 second level
+    @test length(adaptive_gird.cells[1].leaves) == 7
+    for (m,octant) in zip(1:4,adaptive_grid.cells[1].leaves)
+        @test octant == OctantBWG(2,1,m,adaptive_grid.cells[1].b)
+    end
+    # second case
+    # x-----------x-----------x
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # |           |           |
+    # x-----x--x--x-----------x
+    # |     |  |  |           |
+    # |     x--x--x           |
+    # |     |  |  |           |
+    # x-----x--x--x           |
+    # |     |     |           |
+    # |     |     |           |
+    # x-----x-----x-----------x
+    adaptive_grid = ForestBWG(grid,3)
+    refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[4])
+    @test length(adaptive_gird.cells[1].leaves) == 7
+    @test all(getproperty.(adaptive.grid.cells[1].leaves[1:3],:l) .== 1)
+end
