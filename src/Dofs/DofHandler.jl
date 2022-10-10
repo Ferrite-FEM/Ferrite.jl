@@ -47,11 +47,11 @@ function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
 end
 
 has_entity_dof(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = haskey(dh.vertexdicts[field_idx], vertex)
-#has_entity_dof(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = haskey(dh.edgedicts[field_idx], edge)
+has_entity_dof(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = haskey(dh.edgedicts[field_idx], edge)
 has_entity_dof(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = haskey(dh.facedicts[field_idx], face)
 
 entity_dofs(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = dh.vertexdicts[field_idx][vertex]
-#entity_dofs(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = dh.edgedicts[field_idx][edge]
+entity_dofs(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = dh.edgedicts[field_idx][edge]
 entity_dofs(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = dh.facedicts[field_idx][face]
 
 """
