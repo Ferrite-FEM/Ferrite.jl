@@ -7,6 +7,7 @@ using Random
 using LinearAlgebra
 using SparseArrays
 
+include("test_octant.jl")
 include("test_utils.jl")
 include("test_interpolations.jl")
 include("test_cellvalues.jl")

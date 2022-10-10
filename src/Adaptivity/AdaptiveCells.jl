@@ -49,15 +49,14 @@ struct OctreeBWG{dim,N,M} <: AbstractAdaptiveCell{dim,N,M}
 end
 
 function refine!(octree::OctreeBWG{dim,N,M}, o::OctantBWG{dim,N,M}) where {dim,N,M}
-    #TODO write generic morton idx identification
-    morton_o = findfirst(x->x==o,octree.leaves)
+    leave_idx = findfirst(x->x==o,octree.leaves)
     # how to obtain id from morton index ?
-    old_octant = popat!(octree.leaves,morton_o)
-    self_child_id = child_id(old_octant,octree.b)
-    start_child_id = self_child_id * (self_child_id != 1 ? (self_child_id - 1) : (1)) # shift morton idx about one level
-    for child_mort_id in start_child_id+1:(start_child_id+N)
-        insert!(octree.leaves,morton_o,OctantBWG(dim,old_octant.l+1,child_mort_id,octree.b))
-        morton_o += 1
+    old_octant = popat!(octree.leaves,leave_idx)
+    start_child_id = morton(old_octant,old_octant.l,octree.b)
+    end_child_id = start_child_id + N-1
+    for child_mort_id in start_child_id:end_child_id
+        insert!(octree.leaves,leave_idx,OctantBWG(dim,old_octant.l+1,child_mort_id,octree.b))
+        leave_idx += 1
     end
 end
 
@@ -68,15 +67,17 @@ OctreeBWG(cell::Hexahedron,b=_maxlevel[1]) = OctreeBWG{3,8,6}(cell.nodes,b)
 
 Base.length(tree::OctreeBWG) = length(tree.leaves)
 
-function morton(o::OctantBWG{dim,N,M},b=_maxlevel[dim==2 ? 2 : 1]) where {dim,N,M}
-    recursive_o = OctantBWG{dim,N,M}(o.l,o.xyz)
-    level = recursive_o.l
-    morton_idx = 0
-    while level > 0
-        morton_idx += child_id(recursive_o,b)
-        level -= 1
-        recursive_o = parent(recursive_o,b)
-    end
+# TODO: parametrize in unsigned length
+# dispatch 3D Case
+function morton(o::OctantBWG{2},l::Integer,b::Integer)
+    x = UInt32(o.xyz[1])
+    y = UInt32(o.xyz[2])
+    id = UInt64(0)
+    for i in 0:62
+        id = id | ((x & (1 << i)) << i)
+        id = id | ((y & (1 << i)) << (i+1))
+    end 
+    return (id >> (b-l))+1
 end
 
 """
@@ -170,9 +171,9 @@ of `octant`, respectively. These computed octants are called first and last desc
 since they are connected to `octant` by a path down the octree to the maximum level  `b`
 """
 function descendants(octant::OctantBWG{dim,N,M}, b::Integer=_maxlevel[dim-1]) where {dim,N,M}
-    l1 = octant.l+1; l2 = octant.l+1 # not sure 
+    l1 = b; l2 = b # not sure 
     h = _compute_size(b,octant.l)
-    return OctantBWG{dim,N,M}(l1,octant.xyz), OctantBWG{dim,N,M}(l2,octant.xyz .+ (h-2))
+    return OctantBWG{dim,N,M}(l1,octant.xyz), OctantBWG{dim,N,M}(l2,octant.xyz .+ (h-1))
 end
 
 function face_neighbor(octant::OctantBWG{dim,N,M}, f::Integer, b::Integer=_maxlevel[dim-1]) where {dim,N,M}

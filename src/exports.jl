@@ -91,7 +91,6 @@ export
     compute_vertex_values,
 # AdaptiveGrid
     ForestBWG,
-    make_adaptive,
     OctreeBWG,
     OctantBWG, 
 
