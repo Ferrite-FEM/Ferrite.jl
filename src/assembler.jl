@@ -223,7 +223,7 @@ struct PartitionedArraysCOOAssembler{T}
     rows
     f::PVector
 
-    unique_ghosts_dre
+    👻
     dh
 
     # TODO PartitionedArrays backend as additional input arg
@@ -307,7 +307,7 @@ struct PartitionedArraysCOOAssembler{T}
         ghost_dof_rank = Int32[]
 
         # ------------ Ghost dof synchronization ----------
-        # Prepare sending ghost dofs to neighbors
+        # Prepare sending 👻 ghost dofs to neighbors
         #@TODO move relevant parts into dof handler
         #@TODO communication can be optimized by deduplicating entries in, and compressing the following arrays
         #@TODO reorder communication by field to eliminate need for `ghost_dof_field_index_to_send`
@@ -356,7 +356,7 @@ struct PartitionedArraysCOOAssembler{T}
             println("receiving $ghost_recv_buffer_length ghosts from $(sources[i])  (R$my_rank)")
         end
 
-        # Communicate ghost information
+        # Communicate ghost information 👻
         # @TODO coalesce communication
         ghost_send_buffer_dofs = vcat(ghost_dof_to_send...)
         ghost_recv_buffer_dofs = zeros(Int, sum(ghost_recv_buffer_lengths))
@@ -413,10 +413,10 @@ struct PartitionedArraysCOOAssembler{T}
         f = PartitionedArrays.PVector(0.0,rows)
         @debug println("f constructed (R$my_rank)")
 
-        unique_ghosts_dre = zip(ghost_recv_buffer_dofs_piv, ghost_recv_buffer_dofs, ghost_recv_buffer_ranks)
-        @debug println("unique_ghosts_dre $unique_ghosts_dre (R$my_rank)")
+        👻 = zip(ghost_recv_buffer_dofs_piv, ghost_recv_buffer_dofs, ghost_recv_buffer_ranks)
+        @debug println("👻 $👻 (R$my_rank)")
 
-        return new(I, J, V, cols, rows, f, unique_ghosts_dre, dh)
+        return new(I, J, V, cols, rows, f, 👻, dh)
     end
 end
 
@@ -443,14 +443,14 @@ function end_assemble(assembler::PartitionedArraysCOOAssembler{T}) where {T}
     np = MPI.Comm_size(comm)
     my_rank = MPI.Comm_rank(comm)+1
 
-    # --------------------- Add ghost entries in IJ --------------------
+    # --------------------- Add ghost entries in IJ 👻 --------------------
     I = map(i->assembler.dh.ldof_to_gdof[i], assembler.I)
     J = map(j->assembler.dh.ldof_to_gdof[j], assembler.J)
     V = map(v->v, assembler.V)
 
-    # Fix ghost layer! Note that the locations for remote processes to write their
+    # Fix ghost layer 👻! Note that the locations for remote processes to write their
     # data into are missing up to this point.
-    for (i,(pivot_dof, global_ghost_dof, ghost_owner_rank)) ∈ enumerate(assembler.unique_ghosts_dre)
+    for (i, (pivot_dof, global_ghost_dof, ghost_owner_rank)) ∈ enumerate(assembler.👻)
         push!(I, pivot_dof)
         push!(J, global_ghost_dof)
         push!(V, 0.0)
