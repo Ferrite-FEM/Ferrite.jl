@@ -43,7 +43,13 @@ FerriteMeshParser.get_ferrite_grid
 ```
 
 If you are missing the translation of an Abaqus element that is equivalent to a `Ferrite.Cell`,
-consider to open an [issue](https://github.com/Ferrite-FEM/FerriteMeshParser.jl/issues/new) or a pull request. 
+consider to open an [issue](https://github.com/Ferrite-FEM/FerriteMeshParser.jl/issues/new) or a pull request.
+
+!!! note "Common pitfalls for reading a custom mesh"
+    In case you write your own custom mesh reader, take care of the Ferrite.jl's anti-clockwise cell node ordering.
+    For an illustrative example consider the quadrilateral node ordering in the [`Grid` Datastructure](@ref) example.
+    If you encounter the error message `det(J) is not positive`, but your mesh looks fine in a vtk export, it is very likely
+    that the node ordering is clockwise instead of anti-clockwise.
 
 ## `Grid` Datastructure
 
