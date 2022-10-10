@@ -166,10 +166,10 @@ function vtk_shared_vertices(vtk, dgrid::DistributedGrid)
             if haskey(sv.remote_vertices, rank)
                 (cellidx, i) = sv.local_idx
                 cell = getcells(dgrid, cellidx)
-                u[vertices(cell)[i]] = rank
+                u[vertices(cell)[i]] = my_rank
             end
         end
-        vtk_point_data(pvtkwrapper(vtk), u, "shared vertices of $my_rank")
+        vtk_point_data(pvtkwrapper(vtk), u, "shared vertices with $rank")
     end
 end
 
