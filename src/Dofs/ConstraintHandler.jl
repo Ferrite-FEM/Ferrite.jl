@@ -1060,6 +1060,19 @@ end
 
 using PartitionedArrays
 
+function meandiag(K::PartitionedArrays.PSparseMatrix)
+    # Get local portion of z
+    z_pa = map_parts(local_view(K, K.rows, K.cols)) do K_local
+        z = zero(eltype(K_local))
+        for i in 1:size(K_local, 1)
+            z += abs(K_local[i, i])
+        end
+        return z;
+    end
+    # z = get_part(z_pa, MPI.Comm_rank(z_pa.comm)+1) # Crashes :)
+    return MPI.Allreduce(z_pa.part, MPI.SUM, z_pa.comm) / size(K, 1)
+end
+
 """
 Poor man's Dirichlet BC application for PartitionedArrays. :)
 
@@ -1070,7 +1083,7 @@ function apply_zero!(K::PartitionedArrays.PSparseMatrix, f::PartitionedArrays.PV
         f_local[ch.prescribed_dofs] .= 0.0
     end
 
-    map_parts(local_view(K, K.rows, K.cols)) do K_local
+    map_parts(local_view(K, K.rows, K.cols), local_view(f, f.rows)) do K_local, f_local
         for cdof in ch.prescribed_dofs
             K_local[cdof, :] .= 0.0
             K_local[:, cdof] .= 0.0
@@ -1086,9 +1099,19 @@ Poor man's Dirichlet BC application for PartitionedArrays. :)
     TODO optimize.
 """
 function apply!(K::PartitionedArrays.PSparseMatrix, f::PartitionedArrays.PVector, ch::ConstraintHandler)
+    # Start by substracting the inhomogeneous solution from the right hand side
+    u_constrained = PartitionedArrays.PVector(0.0, K.cols)
+    map_parts(local_view(u_constrained, u_constrained.rows)) do u_local
+        u_local[ch.prescribed_dofs] .= ch.inhomogeneities
+    end
+    f .-= K*u_constrained
+
+    m = meandiag(K)
+
+    # Then fix the 
     map_parts(local_view(f, f.rows), f.rows.partition) do f_local, partition
         # Note: RHS only non-zero for owned RHS entries
-        f_local[ch.prescribed_dofs] .= ch.inhomogeneities .* map(p -> p == partition.part, partition.lid_to_part[ch.prescribed_dofs])
+        f_local[ch.prescribed_dofs] .= ch.inhomogeneities .* map(p -> p == partition.part, partition.lid_to_part[ch.prescribed_dofs]) * m
     end
 
     # Zero out locally visible rows and columns
@@ -1096,12 +1119,13 @@ function apply!(K::PartitionedArrays.PSparseMatrix, f::PartitionedArrays.PVector
         for cdof ∈ ch.prescribed_dofs
             K_local[cdof, :] .= 0.0
             K_local[:, cdof] .= 0.0
-            K_local[cdof, cdof] = 1.0
+            K_local[cdof, cdof] = m
         end
     end
 
     # Zero out columns associated to the ghost dofs constrained on a remote process
-    # TODO optimize
+    # TODO optimize. If we assume that the sparsity pattern is symmetric, then we can constrain
+    #      via the column information of the matrix.
 
     # Step 1: Send out all local ghosts to all other processes...
     remote_ghost_gdofs, remote_ghost_parts = map_parts(K.cols.partition) do partition
