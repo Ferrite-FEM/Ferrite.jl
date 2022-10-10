@@ -1,6 +1,10 @@
 # Dunavant, D. A. (1985), High degree efficient symmetrical Gaussian quadrature
 # rules for the triangle. Int. J. Numer. Meth. Engng., 21: 1129–1148. doi:
 # 10.1002/nme.1620210612
+
+# points / weights of order 9 to 20 have been obtained using the python module
+# quadpy-0.16.9
+
 function _get_gauss_tridata(n::Int)
     if (n == 1)
     xw=[0.33333333333333 0.33333333333333 1.00000000000000 / 2.0];
