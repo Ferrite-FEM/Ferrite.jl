@@ -1150,12 +1150,14 @@ function apply!(K::PartitionedArrays.PSparseMatrix, f::PartitionedArrays.PVector
     @debug println("Got $remote_ghosts_recv (R$my_rank)")
 
     # Step 2: Union with all locally constrained dofs
+    @debug println("$my_rank : Step 2....")
     remote_ghosts_constrained_send = copy(remote_ghosts_recv)
     for (i, remote_ghost_dof) ∈ enumerate(remote_ghosts_recv)
         remote_ghosts_constrained_send[i] = remote_ghost_dof ∈ K.cols.partition.part.lid_to_gid[ch.prescribed_dofs]
     end
 
     # Step 3: Send trash back
+    @debug println("$my_rank : Step 3....")
     remote_ghosts_constrained_recv = Vector{Int}(undef, sum(buffer_sizes_send))
     MPI.Alltoallv!(VBuffer(remote_ghosts_constrained_send, buffer_sizes_recv), VBuffer(remote_ghosts_constrained_recv, buffer_sizes_send), comm)
 

@@ -79,22 +79,38 @@ end
 renumber!(dh::DistributedDofHandler, perm::AbstractVector{<:Integer}) = (@assert false) && "Unimplemented"
 
 function compute_dof_ownership(dh)
-    dgrid = dh.grid
+    dgrid = getglobalgrid(dh)
     my_rank = MPI.Comm_rank(global_comm(dgrid))+1
 
     dof_owner = Vector{Int}(undef,ndofs(dh))
     fill!(dof_owner, my_rank)
 
-    for ((lci, lclvi),sv) ∈ dgrid.shared_vertices
-        owner_rank = minimum([collect(keys(sv.remote_vertices));my_rank])
+    for (lvi, sv) ∈ get_shared_vertices(dgrid)
+        for field_idx in 1:num_fields(dh)
+            vi = toglobal(dgrid, lvi)
+            if has_vertex_dofs(dh, field_idx, vi)
+                local_dof_idx = vertex_dofs(dh, field_idx, vi)
+                dof_owner[local_dof_idx] = compute_owner(dgrid, sv)
+            end
+        end
+    end
 
-        if owner_rank != my_rank
-            for fi in 1:num_fields(dh)
-                vi = vertices(getcells(getgrid(dh),lci))[lclvi]
-                if haskey(dh.vertexdicts[fi], vi)
-                    local_dof_idx = dh.vertexdicts[fi][vi]
-                    dof_owner[local_dof_idx] = owner_rank
-                end
+    for (lfi, sf) ∈ get_shared_faces(dgrid)
+        for field_idx in 1:num_fields(dh)
+            fi = toglobal(dgrid, lfi)
+            if has_face_dofs(dh, field_idx, fi)
+                local_dof_idx = face_dofs(dh, field_idx, fi)
+                dof_owner[local_dof_idx] = compute_owner(dgrid, sf)
+            end
+        end
+    end
+
+    for (lei, se) ∈ get_shared_edges(dgrid)
+        for field_idx in 1:num_fields(dh)
+            ei = toglobal(dgrid, lei)
+            if has_edge_dofs(dh, field_idx, ei)
+                local_dof_idx = edge_dofs(dh, field_idx, ei)
+                dof_owner[local_dof_idx] = compute_owner(dgrid, se)
             end
         end
     end
@@ -205,6 +221,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
 
             if dim > 2 # edges only in 3D
                 if interpolation_info.nedgedofs > 0
+                    error("Broken. Each process counts a different number of local edges and hence we have a mismatch in the MPI messages.")
                     for (ei,edge) in enumerate(edges(cell))
                         @debug println("    edge#$edge (R$my_rank)")
                         lei = EdgeIndex(ci,ei)
@@ -235,7 +252,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                                     end
                                     @debug println("      prepare sending edge #$(lei) to $remote_rank (R$my_rank)")
                                     for i ∈ svs
-                                        push!(edges_send[remote_rank],lei)
+                                        push!(edges_send[remote_rank], lei)
                                     end
                                 elseif master_rank == remote_rank  # dof is owned by remote - we have to receive information
                                     if !haskey(n_edges_recv,remote_rank)
@@ -523,6 +540,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                     end
                     corresponding_global_dofs = Array{Int64}(undef,n_edges)
                     MPI.Recv!(corresponding_global_dofs, global_comm(dgrid); source=sending_rank-1)
+                    @debug println("   Received $corresponding_global_dofs edge dofs from $sending_rank (R$my_rank)")
                     for (cdi,(lci,lclvi)) ∈ enumerate(zip(local_cells,local_cell_vis))
                         vi = sortedge(edges(getcells(getgrid(dh),lci))[lclvi])[1]
                         if haskey(dh.edgedicts[field_idx], vi)
@@ -538,8 +556,18 @@ function local_to_global_numbering(dh::DistributedDofHandler)
     end
 
     # Postcondition: All local dofs need a corresponding global dof!
-    @debug println("Local to global mapping: $local_to_global")
+    @debug println("Local to global mapping: $local_to_global (R$my_rank)")
     @assert findfirst(local_to_global .== 0) === nothing
+
+    @debug vtk_grid("dofs", dgrid; compress=false) do vtk
+        u = Vector{Float64}(undef,length(dgrid.local_grid.nodes))
+        fill!(u, 0.0)
+        for i=1:length(u)
+            u[i] = local_to_global[dh.vertexdicts[1][i]]
+        end
+        vtk_point_data(vtk, u,"dof")
+        vtk_partitioning(vtk, dgrid)
+    end
 
     return local_to_global
 end

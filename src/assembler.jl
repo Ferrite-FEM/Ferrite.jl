@@ -296,7 +296,7 @@ struct PartitionedArraysCOOAssembler{T}
         #FIXME: This below must be fixed before we can assemble to HYPRE IJ. Problem seems to be that rows and cols must be continuously assigned.
         #row_indices = PartitionedArrays.IndexRange(my_rank, length(ltdof_indices), ltdof_to_gdof[1], ldof_to_gdof[.!ltdof_indices], Int32.(ldof_to_rank[.!ltdof_indices]))
         row_data = MPIData(row_indices, comm, (np,))
-        row_exchanger = Exchanger(row_data,neighbors)
+        row_exchanger = Exchanger(row_data)
         rows = PRange(ngdofs,row_data,row_exchanger)
 
         @debug println("rows done (R$my_rank)")
@@ -321,6 +321,7 @@ struct PartitionedArraysCOOAssembler{T}
             # Start by searching shared entities which are not owned
             pivot_vertex_owner_rank = compute_owner(dgrid, pivot_shared_vertex)
             pivot_cell_idx = pivot_vertex[1]
+            pivot_vertex_global = toglobal(getlocalgrid(dgrid), pivot_vertex)
 
             if my_rank != pivot_vertex_owner_rank
                 sender_slot = destination_index[pivot_vertex_owner_rank]
@@ -330,11 +331,12 @@ struct PartitionedArraysCOOAssembler{T}
                 cell_dofs_upper_bound = (pivot_cell_idx == getncells(dh.grid)) ? length(dh.cell_dofs) : dh.cell_dofs_offset[pivot_cell_idx+1]
                 cell_dofs = dh.cell_dofs[dh.cell_dofs_offset[pivot_cell_idx]:cell_dofs_upper_bound]
 
-                pivot_vertex_global = toglobal(getlocalgrid(dgrid), pivot_vertex)
-
                 for (field_idx, field_name) in zip(1:num_fields(dh), getfieldnames(dh))
                     !has_vertex_dofs(dh, field_idx, pivot_vertex_global) && continue
                     pivot_vertex_dof = vertex_dofs(dh, field_idx, pivot_vertex_global)
+
+                    @debug println("  adding dof $pivot_vertex_dof to ghost sync synchronization on slot $sender_slot (R$my_rank)")
+
                     # Extract dofs belonging to the current field
                     cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
                     for cell_field_dof ∈ cell_field_dofs
@@ -366,6 +368,9 @@ struct PartitionedArraysCOOAssembler{T}
                     for (field_idx, field_name) in zip(1:num_fields(dh), getfieldnames(dh))
                         !has_face_dofs(dh, field_idx, pivot_face_global) && continue
                         pivot_face_dof = face_dofs(dh, field_idx, pivot_face_global)
+                        
+                        @debug println("  adding dof $pivot_face_dof to ghost sync synchronization on slot $sender_slot (R$my_rank)")
+                        
                         # Extract dofs belonging to the current field
                         cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
                         for cell_field_dof ∈ cell_field_dofs
@@ -463,11 +468,10 @@ struct PartitionedArraysCOOAssembler{T}
         #FIXME: This below must be fixed before we can assemble to HYPRE IJ. Problem seems to be that rows and cols must be continuously assigned.
         #col_indices = PartitionedArrays.IndexRange(my_rank, length(ltdof_indices), ltdof_to_gdof[1], all_local_cols[all_local_col_ranks .!= my_rank], Int32.(all_local_col_ranks[all_local_col_ranks .!= my_rank]))
         col_data = MPIData(col_indices, comm, (np,))
-        col_exchanger = Exchanger(col_data,neighbors)
+        col_exchanger = Exchanger(col_data)
         cols = PRange(ngdofs,col_data,col_exchanger)
 
         @debug println("cols and rows constructed (R$my_rank)")
-
         f = PartitionedArrays.PVector(0.0,rows)
         @debug println("f constructed (R$my_rank)")
 

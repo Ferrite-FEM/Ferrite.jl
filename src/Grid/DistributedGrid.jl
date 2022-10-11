@@ -126,9 +126,18 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
     N = getncells(grid_to_distribute)
     @assert N > 0
 
-    my_rank = MPI.Comm_rank(grid_comm)+1
-
     parts = create_partitioning(grid_to_distribute, grid_topology, MPI.Comm_size(grid_comm), partition_alg)
+
+    DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::ExclusiveTopology, grid_comm::MPI.Comm, parts)
+end
+
+"""
+"""    
+function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::ExclusiveTopology, grid_comm::MPI.Comm, parts::Vector{Int32}) where {dim,C,T}
+    N = getncells(grid_to_distribute)
+    @assert N > 0
+
+    my_rank = MPI.Comm_rank(grid_comm)+1
 
     # Start extraction of local grid
     # 1. Extract local cells
@@ -240,10 +249,6 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
         vertexsets=vertexsets
     )
 
-    @debug if my_rank == 1
-        @show grid_topology
-    end
-
     shared_vertices = Dict{VertexIndex,SharedVertex}()
     shared_edges = Dict{EdgeIndex,SharedEdge}()
     shared_faces = Dict{FaceIndex,SharedFace}()
@@ -275,7 +280,7 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
 
             # Face
             if dim > 1
-                for (i, global_face_idx) ∈ enumerate(faces(global_cell))
+                for (i, _) ∈ enumerate(faces(global_cell))
                     cell_face = FaceIndex(global_cell_idx, i)
                     remote_faces = Dict{Int,Vector{FaceIndex}}()
                     for other_face ∈ getneighborhood(grid_topology, grid_to_distribute, cell_face, true)
@@ -301,7 +306,7 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
 
             # Edge
             if dim > 2
-                for (i, global_vertex_idx) ∈ enumerate(edges(global_cell))
+                for (i, _) ∈ enumerate(edges(global_cell))
                     cell_edge = EdgeIndex(global_cell_idx, i)
                     remote_edges = Dict{Int,Vector{EdgeIndex}}()
                     for other_edge ∈ getneighborhood(grid_topology, grid_to_distribute, cell_edge, true)
