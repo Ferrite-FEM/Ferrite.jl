@@ -412,7 +412,7 @@ toglobal(grid::AbstractGrid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((
 toglobal(grid::AbstractGrid,faceidx::FaceIndex) = sortface(faces(getcells(grid,faceidx[1]))[faceidx[2]])
 toglobal(grid::AbstractGrid,faceidx::Vector{FaceIndex}) = unique(toglobal.((grid,),faceidx))
 
-toglobal(grid::AbstractGrid,edgeidx::EdgeIndex) = sortedge(edges(getcells(grid,edgeidx[1]))[edgeidx[2]])
+toglobal(grid::AbstractGrid,edgeidx::EdgeIndex) = sortedge(edges(getcells(grid,edgeidx[1]))[edgeidx[2]])[1]
 toglobal(grid::AbstractGrid,edgeidx::Vector{EdgeIndex}) = unique(toglobal.((grid,),edgeidx))
 
 @inline getdim(::AbstractGrid{dim}) where {dim} = dim

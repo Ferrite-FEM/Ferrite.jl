@@ -236,6 +236,7 @@ struct PartitionedArraysCOOAssembler{T}
         nldofs = num_local_dofs(dh)
         ngdofs = num_global_dofs(dh)
         dgrid = getglobalgrid(dh)
+        dim = getdim(dgrid)
 
         I = Int[]
         J = Int[]
@@ -316,29 +317,91 @@ struct PartitionedArraysCOOAssembler{T}
         # ghost_dof_field_index_to_send = [Int[] for i ∈ 1:destination_len]
         ghost_dof_owner = [Int[] for i ∈ 1:destination_len] # corresponding owner
         ghost_dof_pivot_to_send = [Int[] for i ∈ 1:destination_len] # corresponding dof to interact with
-        for shared_entity_set ∈ [dgrid.shared_vertices, dgrid.shared_faces, dgrid.shared_edges]
-            for (pivot_entity, pivot_shared_entity) ∈ shared_entity_set
+        for (pivot_vertex, pivot_shared_vertex) ∈ dgrid.shared_vertices
+            # Start by searching shared entities which are not owned
+            pivot_vertex_owner_rank = compute_owner(dgrid, pivot_shared_vertex)
+            pivot_cell_idx = pivot_vertex[1]
+
+            if my_rank != pivot_vertex_owner_rank
+                sender_slot = destination_index[pivot_vertex_owner_rank]
+
+                @debug println("$pivot_vertex may require synchronization (R$my_rank)")
+                # Note: We have to send ALL dofs on the element to the remote.
+                cell_dofs_upper_bound = (pivot_cell_idx == getncells(dh.grid)) ? length(dh.cell_dofs) : dh.cell_dofs_offset[pivot_cell_idx+1]
+                cell_dofs = dh.cell_dofs[dh.cell_dofs_offset[pivot_cell_idx]:cell_dofs_upper_bound]
+
+                pivot_vertex_global = toglobal(getlocalgrid(dgrid), pivot_vertex)
+
+                for (field_idx, field_name) in zip(1:num_fields(dh), getfieldnames(dh))
+                    !has_vertex_dofs(dh, field_idx, pivot_vertex_global) && continue
+                    pivot_vertex_dof = vertex_dofs(dh, field_idx, pivot_vertex_global)
+                    # Extract dofs belonging to the current field
+                    cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
+                    for cell_field_dof ∈ cell_field_dofs
+                        append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_vertex_dof])
+                        append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_field_dof])
+                        append!(ghost_rank_to_send[sender_slot], ldof_to_rank[cell_field_dof])
+                        # append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
+                    end
+                end
+            end
+        end
+
+        if dim > 1
+            for (pivot_face, pivot_shared_face) ∈ dgrid.shared_faces
                 # Start by searching shared entities which are not owned
-                pivot_entity_owner_rank = compute_owner(dgrid, pivot_shared_entity)
-                pivot_cell_idx = pivot_entity[1]
+                pivot_face_owner_rank = compute_owner(dgrid, pivot_shared_face)
+                pivot_cell_idx = pivot_face[1]
 
-                if my_rank != pivot_entity_owner_rank
-                    sender_slot = destination_index[pivot_entity_owner_rank]
+                if my_rank != pivot_face_owner_rank
+                    sender_slot = destination_index[pivot_face_owner_rank]
 
-                    @debug println("$pivot_entity may require synchronization (R$my_rank)")
+                    @debug println("$pivot_face may require synchronization (R$my_rank)")
                     # Note: We have to send ALL dofs on the element to the remote.
                     cell_dofs_upper_bound = (pivot_cell_idx == getncells(dh.grid)) ? length(dh.cell_dofs) : dh.cell_dofs_offset[pivot_cell_idx+1]
                     cell_dofs = dh.cell_dofs[dh.cell_dofs_offset[pivot_cell_idx]:cell_dofs_upper_bound]
 
-                    pivot_entity_global = toglobal(getlocalgrid(dgrid), pivot_entity)
+                    pivot_face_global = toglobal(getlocalgrid(dgrid), pivot_face)
 
                     for (field_idx, field_name) in zip(1:num_fields(dh), getfieldnames(dh))
-                        !has_entity_dof(dh, field_idx, pivot_entity_global) && continue
-                        pivot_entity_dof = entity_dofs(dh, field_idx, pivot_entity_global)
+                        !has_face_dofs(dh, field_idx, pivot_face_global) && continue
+                        pivot_face_dof = face_dofs(dh, field_idx, pivot_face_global)
                         # Extract dofs belonging to the current field
                         cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
                         for cell_field_dof ∈ cell_field_dofs
-                            append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_entity_dof])
+                            append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_face_dof])
+                            append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_field_dof])
+                            append!(ghost_rank_to_send[sender_slot], ldof_to_rank[cell_field_dof])
+                            # append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
+                        end
+                    end
+                end
+            end
+        end
+
+        if dim > 2
+            for (pivot_edge, pivot_shared_edge) ∈ dgrid.shared_edges
+                # Start by searching shared entities which are not owned
+                pivot_edge_owner_rank = compute_owner(dgrid, pivot_shared_edge)
+                pivot_cell_idx = pivot_edge[1]
+
+                if my_rank != pivot_edge_owner_rank
+                    sender_slot = destination_index[pivot_edge_owner_rank]
+
+                    @debug println("$pivot_edge may require synchronization (R$my_rank)")
+                    # Note: We have to send ALL dofs on the element to the remote.
+                    cell_dofs_upper_bound = (pivot_cell_idx == getncells(dh.grid)) ? length(dh.cell_dofs) : dh.cell_dofs_offset[pivot_cell_idx+1]
+                    cell_dofs = dh.cell_dofs[dh.cell_dofs_offset[pivot_cell_idx]:cell_dofs_upper_bound]
+
+                    pivot_edge_global = toglobal(getlocalgrid(dgrid), pivot_edge)
+
+                    for (field_idx, field_name) in zip(1:num_fields(dh), getfieldnames(dh))
+                        !has_edge_dofs(dh, field_idx, pivot_edge_global) && continue
+                        pivot_edge_dof = edge_dofs(dh, field_idx, pivot_edge_global)
+                        # Extract dofs belonging to the current field
+                        cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
+                        for cell_field_dof ∈ cell_field_dofs
+                            append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_edge_dof])
                             append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_field_dof])
                             append!(ghost_rank_to_send[sender_slot], ldof_to_rank[cell_field_dof])
                             # append!(ghost_dof_field_index_to_send[sender_slot], field_idx)

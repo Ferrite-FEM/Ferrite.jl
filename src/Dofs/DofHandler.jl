@@ -46,13 +46,23 @@ function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
     end
 end
 
-has_entity_dof(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = haskey(dh.vertexdicts[field_idx], vertex)
-has_entity_dof(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = haskey(dh.edgedicts[field_idx], edge)
-has_entity_dof(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = haskey(dh.facedicts[field_idx], face)
+# has_entity_dof(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = haskey(dh.vertexdicts[field_idx], vertex)
+# has_entity_dof(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = haskey(dh.edgedicts[field_idx], edge)
+# has_entity_dof(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = haskey(dh.facedicts[field_idx], face)
 
-entity_dofs(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = dh.vertexdicts[field_idx][vertex]
-entity_dofs(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = dh.edgedicts[field_idx][edge]
-entity_dofs(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = dh.facedicts[field_idx][face]
+has_cell_dofs(dh::AbstractDofHandler, field_idx::Int, cell::Int) = haskey(dh.celldicts[field_idx], cell)
+has_vertex_dofs(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = haskey(dh.vertexdicts[field_idx], vertex)
+has_edge_dofs(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = haskey(dh.edgedicts[field_idx], edge)
+has_face_dofs(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = haskey(dh.facedicts[field_idx], face)
+
+# entity_dofs(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = dh.vertexdicts[field_idx][vertex]
+# entity_dofs(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = dh.edgedicts[field_idx][edge]
+# entity_dofs(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = dh.facedicts[field_idx][face]
+
+cell_dofs(dh::AbstractDofHandler, field_idx::Int, cell::Int) = dh.celldicts[field_idx][cell]
+vertex_dofs(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = dh.vertexdicts[field_idx][vertex]
+edge_dofs(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = dh.edgedicts[field_idx][edge]
+face_dofs(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = dh.facedicts[field_idx][face]
 
 """
     ndofs(dh::AbstractDofHandler)
