@@ -61,7 +61,7 @@ has_face_dofs(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) whe
 
 cell_dofs(dh::AbstractDofHandler, field_idx::Int, cell::Int) = dh.celldicts[field_idx][cell]
 vertex_dofs(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = dh.vertexdicts[field_idx][vertex]
-edge_dofs(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = dh.edgedicts[field_idx][edge]
+edge_dofs(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = dh.edgedicts[field_idx][edge][1]
 face_dofs(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = dh.facedicts[field_idx][face]
 
 """

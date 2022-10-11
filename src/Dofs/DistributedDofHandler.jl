@@ -25,6 +25,7 @@ struct DistributedDofHandler{dim,T,G<:AbstractDistributedGrid{dim}} <: AbstractD
     vertexdicts::Vector{Dict{Int,Int}}
     edgedicts::Vector{Dict{Tuple{Int,Int},Tuple{Int,Bool}}}
     facedicts::Vector{Dict{NTuple{dim,Int},Int}}
+    celldicts::Vector{Dict{Int,Vector{Int}}}
 
     ldof_to_gdof::Vector{Int}
     ldof_to_rank::Vector{Int32}
@@ -32,7 +33,7 @@ end
 
 function DistributedDofHandler(grid::AbstractDistributedGrid{dim}) where {dim}
     isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. DistributedMixedDofHandler not implemented yet.")
-    DistributedDofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1), Dict{Int,Int}[], Dict{Tuple{Int,Int},Tuple{Int,Bool}}[],Dict{NTuple{dim,Int},Int}[], Int[], Int32[])
+    DistributedDofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, ScalarWrapper(-1), Dict{Int,Int}[], Dict{Tuple{Int,Int},Tuple{Int,Bool}}[],Dict{NTuple{dim,Int},Int}[], Dict{Int,Vector{Int}}[], Int[], Int32[])
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DistributedDofHandler)
@@ -88,8 +89,8 @@ function compute_dof_ownership(dh)
         owner_rank = minimum([collect(keys(sv.remote_vertices));my_rank])
 
         if owner_rank != my_rank
-            for fi in 1:Ferrite.num_fields(dh)
-                vi = Ferrite.vertices(getcells(getgrid(dh),lci))[lclvi]
+            for fi in 1:num_fields(dh)
+                vi = vertices(getcells(getgrid(dh),lci))[lclvi]
                 if haskey(dh.vertexdicts[fi], vi)
                     local_dof_idx = dh.vertexdicts[fi][vi]
                     dof_owner[local_dof_idx] = owner_rank
@@ -122,7 +123,8 @@ Renumber the dofs in local ordering to their corresponding global numbering.
 TODO: Refactor for MixedDofHandler integration
 """
 function local_to_global_numbering(dh::DistributedDofHandler)
-    dgrid = dh.grid
+    dgrid = getglobalgrid(dh)
+    dim = getdim(dgrid)
     # MPI rank starting with 1 to match Julia's index convention
     my_rank = MPI.Comm_rank(global_comm(dgrid))+1
 
@@ -134,6 +136,10 @@ function local_to_global_numbering(dh::DistributedDofHandler)
     # @TODO replace dict with vector and tie to MPI neighborhood graph of the mesh
     vertices_send = Dict{Int,Vector{VertexIndex}}()
     n_vertices_recv = Dict{Int,Int}()
+    faces_send = Dict{Int,Vector{FaceIndex}}()
+    n_faces_recv = Dict{Int,Int}()
+    edges_send = Dict{Int,Vector{EdgeIndex}}()
+    n_edges_recv = Dict{Int,Int}()
 
     # We start by assigning a local dof to all owned entities.
     # An entity is owned if:
@@ -148,17 +154,17 @@ function local_to_global_numbering(dh::DistributedDofHandler)
     next_local_idx = 1
     for (ci, cell) in enumerate(getcells(getgrid(dh)))
         @debug println("cell #$ci (R$my_rank)")
-        for fi in 1:Ferrite.num_fields(dh)
-            @debug println("  field: $(dh.field_names[fi]) (R$my_rank)")
-            interpolation_info = Ferrite.InterpolationInfo(dh.field_interpolations[fi])
+        for field_idx in 1:num_fields(dh)
+            @debug println("  field: $(dh.field_names[field_idx]) (R$my_rank)")
+            interpolation_info = InterpolationInfo(dh.field_interpolations[field_idx])
             if interpolation_info.nvertexdofs > 0
-                for (vi,vertex) in enumerate(Ferrite.vertices(cell))
+                for (vi,vertex) in enumerate(vertices(cell))
                     @debug println("    vertex#$vertex (R$my_rank)")
                     lvi = VertexIndex(ci,vi)
                     # Dof is owned if it is local or if my rank is the smallest in the neighborhood
-                    if !haskey(dgrid.shared_vertices,lvi) || all(keys(dgrid.shared_vertices[lvi].remote_vertices) .> my_rank)
+                    if !is_shared_vertex(dgrid, lvi) || (compute_owner(dgrid, get_shared_vertex(dgrid, lvi)) == my_rank)
                         # Update dof assignment
-                        dof_local_idx = dh.vertexdicts[fi][vertex]
+                        dof_local_idx = dh.vertexdicts[field_idx][vertex]
                         if local_to_global[dof_local_idx] == 0
                             @debug println("      mapping vertex dof#$dof_local_idx to $next_local_idx (R$my_rank)")
                             local_to_global[dof_local_idx] = next_local_idx
@@ -169,15 +175,16 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                     end
 
                     # Update shared vertex lookup table
-                    if haskey(dgrid.shared_vertices,lvi)
+                    if is_shared_vertex(dgrid, lvi)
                         master_rank = my_rank
-                        for master_rank_new ∈ keys(dgrid.shared_vertices[lvi].remote_vertices)
+                        remote_vertex_dict = remote_entities(get_shared_vertex(dgrid, lvi))
+                        for master_rank_new ∈ keys(remote_vertex_dict)
                             master_rank = min(master_rank, master_rank_new)
                         end
-                        for (remote_rank, svs) ∈ dgrid.shared_vertices[lvi].remote_vertices
+                        for (remote_rank, svs) ∈ remote_vertex_dict
                             if master_rank == my_rank # I own the dof - we have to send information
                                 if !haskey(vertices_send,remote_rank)
-                                    vertices_send[remote_rank] = Vector{Ferrite.VertexIndex}()
+                                    vertices_send[remote_rank] = Vector{VertexIndex}()
                                 end
                                 @debug println("      prepare sending vertex #$(lvi) to $remote_rank (R$my_rank)")
                                 for i ∈ svs
@@ -195,7 +202,119 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                     end
                 end
             end
-        end
+
+            if dim > 2 # edges only in 3D
+                if interpolation_info.nedgedofs > 0
+                    for (ei,edge) in enumerate(edges(cell))
+                        @debug println("    edge#$edge (R$my_rank)")
+                        lei = EdgeIndex(ci,ei)
+                        # Dof is owned if it is local or if my rank is the smallest in the neighborhood
+                        if !is_shared_edge(dgrid, lei) || (compute_owner(dgrid, get_shared_edge(dgrid, lei)) == my_rank)
+                            # Update dof assignment
+                            dof_local_idx = dh.edgedicts[field_idx][toglobal(getlocalgrid(dgrid), lei)][1]
+                            if local_to_global[dof_local_idx] == 0
+                                @debug println("      mapping edge dof#$dof_local_idx to $next_local_idx (R$my_rank)")
+                                local_to_global[dof_local_idx] = next_local_idx
+                                next_local_idx += 1
+                            else
+                                @debug println("      edge dof#$dof_local_idx already mapped to $(local_to_global[dof_local_idx]) (R$my_rank)")
+                            end
+                        end
+
+                        # Update shared edge lookup table
+                        if is_shared_edge(dgrid, lei)
+                            master_rank = my_rank
+                            remote_edge_dict = remote_entities(get_shared_edge(dgrid, lei))
+                            for master_rank_new ∈ keys(remote_edge_dict)
+                                master_rank = min(master_rank, master_rank_new)
+                            end
+                            for (remote_rank, svs) ∈ remote_edge_dict
+                                if master_rank == my_rank # I own the dof - we have to send information
+                                    if !haskey(edges_send,remote_rank)
+                                        edges_send[remote_rank] = Vector{EdgeIndex}()
+                                    end
+                                    @debug println("      prepare sending edge #$(lei) to $remote_rank (R$my_rank)")
+                                    for i ∈ svs
+                                        push!(edges_send[remote_rank],lei)
+                                    end
+                                elseif master_rank == remote_rank  # dof is owned by remote - we have to receive information
+                                    if !haskey(n_edges_recv,remote_rank)
+                                        n_edges_recv[remote_rank] = length(svs)
+                                    else
+                                        n_edges_recv[remote_rank] += length(svs)
+                                    end
+                                    @debug println("      prepare receiving edge #$(lei) from $remote_rank (R$my_rank)")
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+
+            if interpolation_info.nfacedofs > 0 && (interpolation_info.dim == dim)
+                for (fi,face) in enumerate(faces(cell))
+                    @debug println("    face#$face (R$my_rank)")
+                    lfi = FaceIndex(ci,fi)
+                    # Dof is owned if it is local or if my rank is the smallest in the neighborhood
+                    if !is_shared_face(dgrid, lfi) || (compute_owner(dgrid, get_shared_face(dgrid, lfi)) == my_rank)
+                        # Update dof assignment
+                        dof_local_idx = dh.facedicts[field_idx][toglobal(getlocalgrid(dgrid), lfi)]
+                        if local_to_global[dof_local_idx] == 0
+                            @debug println("      mapping face dof#$dof_local_idx to $next_local_idx (R$my_rank)")
+                            local_to_global[dof_local_idx] = next_local_idx
+                            next_local_idx += 1
+                        else
+                            @debug println("      face dof#$dof_local_idx already mapped to $(local_to_global[dof_local_idx]) (R$my_rank)")
+                        end
+                    end
+
+                    # Update shared face lookup table
+                    if is_shared_face(dgrid, lfi)
+                        master_rank = my_rank
+                        remote_face_dict = remote_entities(get_shared_face(dgrid, lfi))
+                        for master_rank_new ∈ keys(remote_face_dict)
+                            master_rank = min(master_rank, master_rank_new)
+                        end
+                        for (remote_rank, svs) ∈ remote_face_dict
+                            if master_rank == my_rank # I own the dof - we have to send information
+                                if !haskey(faces_send,remote_rank)
+                                    faces_send[remote_rank] = Vector{FaceIndex}()
+                                end
+                                @debug println("      prepare sending face #$(lfi) to $remote_rank (R$my_rank)")
+                                for i ∈ svs
+                                    push!(faces_send[remote_rank],lfi)
+                                end
+                            elseif master_rank == remote_rank  # dof is owned by remote - we have to receive information
+                                if !haskey(n_faces_recv,remote_rank)
+                                    n_faces_recv[remote_rank] = length(svs)
+                                else
+                                    n_faces_recv[remote_rank] += length(svs)
+                                end
+                                @debug println("      prepare receiving face #$(lfi) from $remote_rank (R$my_rank)")
+                            end
+                        end
+                    end
+                end # face loop
+            end
+
+            if interpolation_info.ncelldofs > 0 # always distribute new dofs for cell
+                @debug println("    cell#$ci")
+                for celldof in 1:interpolation_info.ncelldofs
+                    for d in 1:dh.field_dims[field_idx]
+                        # Update dof assignment
+                        dof_local_idx = dh.celldicts[field_idx][ci][celldof]
+                        if local_to_global[dof_local_idx] == 0
+                            @debug println("      mapping cell dof#$dof_local_idx to $next_local_idx (R$my_rank)")
+                            local_to_global[dof_local_idx] = next_local_idx
+                            next_local_idx += 1
+                        else
+                            # Should never happen...
+                            @debug println("      cell dof#$dof_local_idx already mapped to $(local_to_global[dof_local_idx]) (R$my_rank)")
+                        end
+                    end
+                end # cell loop
+            end
+        end # field loop
     end
 
     #
@@ -225,6 +344,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
     # Sync non-owned dofs with neighboring processes.
     # TODO: implement for entitied with dim > 0
     # TODO: Use MPI graph primitives to simplify this code
+    # TODO: Simplify with dimension-agnostic code...
     for sending_rank ∈ 1:MPI.Comm_size(global_comm(dgrid))
         if my_rank == sending_rank
             for remote_rank ∈ 1:MPI.Comm_size(global_comm(dgrid))
@@ -245,7 +365,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                     end
                     MPI.Send(remote_cells, global_comm(dgrid); dest=remote_rank-1)
                     MPI.Send(remote_cell_vis, global_comm(dgrid); dest=remote_rank-1)
-                    for fi ∈ 1:Ferrite.num_fields(dh)
+                    for fi ∈ 1:num_fields(dh)
                         next_buffer_idx = 1
                         if length(dh.vertexdicts[fi]) == 0
                             @debug println("Skipping send on field $(dh.field_names[fi]) (R$my_rank)")
@@ -254,9 +374,81 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                         # fill correspondence array
                         corresponding_global_dofs = Array{Int64}(undef,n_vertices)
                         for (lci,lclvi) ∈ vertices_send[remote_rank]
-                            vi = Ferrite.vertices(getcells(getgrid(dh),lci))[lclvi]
+                            vi = vertices(getcells(getgrid(dh),lci))[lclvi]
                             if haskey(dh.vertexdicts[fi], vi)
                                 corresponding_global_dofs[next_buffer_idx] = local_to_global[dh.vertexdicts[fi][vi]]
+                            end
+                            next_buffer_idx += 1
+                        end
+                        MPI.Send(corresponding_global_dofs, global_comm(dgrid); dest=remote_rank-1)
+                    end
+                end
+
+                if haskey(faces_send, remote_rank)
+                    n_faces = length(faces_send[remote_rank])
+                    @debug println("Sending $n_faces faces to rank $remote_rank (R$my_rank)")
+                    remote_cells = Array{Int64}(undef,n_faces)
+                    remote_cell_vis = Array{Int64}(undef,n_faces)
+                    next_buffer_idx = 1
+                    for lvi ∈ faces_send[remote_rank]
+                        sv = dgrid.shared_faces[lvi]
+                        @assert haskey(sv.remote_faces, remote_rank)
+                        for (cvi, llvi) ∈ sv.remote_faces[remote_rank][1:1] # Just don't ask :)
+                            remote_cells[next_buffer_idx] = cvi
+                            remote_cell_vis[next_buffer_idx] = llvi 
+                            next_buffer_idx += 1
+                        end
+                    end
+                    MPI.Send(remote_cells, global_comm(dgrid); dest=remote_rank-1)
+                    MPI.Send(remote_cell_vis, global_comm(dgrid); dest=remote_rank-1)
+                    for fi ∈ 1:num_fields(dh)
+                        next_buffer_idx = 1
+                        if length(dh.facedicts[fi]) == 0
+                            @debug println("Skipping send on field $(dh.field_names[fi]) (R$my_rank)")
+                            continue
+                        end
+                        # fill correspondence array
+                        corresponding_global_dofs = Array{Int64}(undef,n_faces)
+                        for (lci,lclvi) ∈ faces_send[remote_rank]
+                            vi = sortface(faces(getcells(getgrid(dh),lci))[lclvi])
+                            if haskey(dh.facedicts[fi], vi)
+                                corresponding_global_dofs[next_buffer_idx] = local_to_global[dh.facedicts[fi][vi]]
+                            end
+                            next_buffer_idx += 1
+                        end
+                        MPI.Send(corresponding_global_dofs, global_comm(dgrid); dest=remote_rank-1)
+                    end
+                end
+
+                if haskey(edges_send, remote_rank)
+                    n_edges = length(edges_send[remote_rank])
+                    @debug println("Sending $n_edges edges to rank $remote_rank (R$my_rank)")
+                    remote_cells = Array{Int64}(undef,n_edges)
+                    remote_cell_vis = Array{Int64}(undef,n_edges)
+                    next_buffer_idx = 1
+                    for lvi ∈ edges_send[remote_rank]
+                        sv = dgrid.shared_edges[lvi]
+                        @assert haskey(sv.remote_edges, remote_rank)
+                        for (cvi, llvi) ∈ sv.remote_edges[remote_rank][1:1] # Just don't ask :)
+                            remote_cells[next_buffer_idx] = cvi
+                            remote_cell_vis[next_buffer_idx] = llvi 
+                            next_buffer_idx += 1
+                        end
+                    end
+                    MPI.Send(remote_cells, global_comm(dgrid); dest=remote_rank-1)
+                    MPI.Send(remote_cell_vis, global_comm(dgrid); dest=remote_rank-1)
+                    for fi ∈ 1:num_fields(dh)
+                        next_buffer_idx = 1
+                        if length(dh.facedicts[fi]) == 0
+                            @debug println("Skipping send on field $(dh.field_names[fi]) (R$my_rank)")
+                            continue
+                        end
+                        # fill correspondence array
+                        corresponding_global_dofs = Array{Int64}(undef,n_edges)
+                        for (lci,lclvi) ∈ edges_send[remote_rank]
+                            vi = sortedge(edges(getcells(getgrid(dh),lci))[lclvi])[1]
+                            if haskey(dh.edgedicts[fi], vi)
+                                corresponding_global_dofs[next_buffer_idx] = local_to_global[dh.edgedicts[fi][vi][1]]
                             end
                             next_buffer_idx += 1
                         end
@@ -272,20 +464,72 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                 local_cell_vis = Array{Int64}(undef,n_vertices)
                 MPI.Recv!(local_cells, global_comm(dgrid); source=sending_rank-1)
                 MPI.Recv!(local_cell_vis, global_comm(dgrid); source=sending_rank-1)
-                for fi in 1:Ferrite.num_fields(dh)
-                    if length(dh.vertexdicts[fi]) == 0
-                        @debug println("  Skipping recv on field $(dh.field_names[fi]) (R$my_rank)")
+                for field_idx in 1:num_fields(dh)
+                    if length(dh.vertexdicts[field_idx]) == 0
+                        @debug println("  Skipping recv on field $(dh.field_names[field_idx]) (R$my_rank)")
                         continue
                     end
                     corresponding_global_dofs = Array{Int64}(undef,n_vertices)
                     MPI.Recv!(corresponding_global_dofs, global_comm(dgrid); source=sending_rank-1)
                     for (cdi,(lci,lclvi)) ∈ enumerate(zip(local_cells,local_cell_vis))
-                        vi = Ferrite.vertices(getcells(getgrid(dh),lci))[lclvi]
-                        if haskey(dh.vertexdicts[fi], vi)
-                            local_to_global[dh.vertexdicts[fi][vi]] = corresponding_global_dofs[cdi]
-                            @debug println("  Updating field $(dh.field_names[fi]) vertex $(VertexIndex(lci,lclvi)) to $(corresponding_global_dofs[cdi]) (R$my_rank)")
+                        vi = vertices(getcells(getgrid(dh),lci))[lclvi]
+                        if haskey(dh.vertexdicts[field_idx], vi)
+                            local_to_global[dh.vertexdicts[field_idx][vi]] = corresponding_global_dofs[cdi]
+                            @debug println("  Updating field $(dh.field_names[field_idx]) vertex $(VertexIndex(lci,lclvi)) to $(corresponding_global_dofs[cdi]) (R$my_rank)")
                         else
-                            @debug println("  Skipping recv on field $(dh.field_names[fi]) vertex $vi (R$my_rank)")
+                            @debug println("  Skipping recv on field $(dh.field_names[field_idx]) vertex $vi (R$my_rank)")
+                        end
+                    end
+                end
+            end
+
+            if haskey(n_faces_recv, sending_rank)
+                n_faces = n_faces_recv[sending_rank]
+                @debug println("Receiving $n_faces faces from rank $sending_rank (R$my_rank)")
+                local_cells = Array{Int64}(undef,n_faces)
+                local_cell_vis = Array{Int64}(undef,n_faces)
+                MPI.Recv!(local_cells, global_comm(dgrid); source=sending_rank-1)
+                MPI.Recv!(local_cell_vis, global_comm(dgrid); source=sending_rank-1)
+                for field_idx in 1:num_fields(dh)
+                    if length(dh.facedicts[field_idx]) == 0
+                        @debug println("  Skipping recv on field $(dh.field_names[field_idx]) (R$my_rank)")
+                        continue
+                    end
+                    corresponding_global_dofs = Array{Int64}(undef,n_faces)
+                    MPI.Recv!(corresponding_global_dofs, global_comm(dgrid); source=sending_rank-1)
+                    for (cdi,(lci,lclvi)) ∈ enumerate(zip(local_cells,local_cell_vis))
+                        vi = sortface(faces(getcells(getgrid(dh),lci))[lclvi])
+                        if haskey(dh.facedicts[field_idx], vi)
+                            local_to_global[dh.facedicts[field_idx][vi]] = corresponding_global_dofs[cdi]
+                            @debug println("  Updating field $(dh.field_names[field_idx]) face $(FaceIndex(lci,lclvi)) to $(corresponding_global_dofs[cdi]) (R$my_rank)")
+                        else
+                            @debug println("  Skipping recv on field $(dh.field_names[field_idx]) face $vi (R$my_rank)")
+                        end
+                    end
+                end
+            end
+
+            if haskey(n_edges_recv, sending_rank)
+                n_edges = n_edges_recv[sending_rank]
+                @debug println("Receiving $n_edges edges from rank $sending_rank (R$my_rank)")
+                local_cells = Array{Int64}(undef,n_edges)
+                local_cell_vis = Array{Int64}(undef,n_edges)
+                MPI.Recv!(local_cells, global_comm(dgrid); source=sending_rank-1)
+                MPI.Recv!(local_cell_vis, global_comm(dgrid); source=sending_rank-1)
+                for field_idx in 1:num_fields(dh)
+                    if length(dh.edgedicts[field_idx]) == 0
+                        @debug println("  Skipping recv on field $(dh.field_names[field_idx]) (R$my_rank)")
+                        continue
+                    end
+                    corresponding_global_dofs = Array{Int64}(undef,n_edges)
+                    MPI.Recv!(corresponding_global_dofs, global_comm(dgrid); source=sending_rank-1)
+                    for (cdi,(lci,lclvi)) ∈ enumerate(zip(local_cells,local_cell_vis))
+                        vi = sortedge(edges(getcells(getgrid(dh),lci))[lclvi])[1]
+                        if haskey(dh.edgedicts[field_idx], vi)
+                            local_to_global[dh.edgedicts[field_idx][vi][1]] = corresponding_global_dofs[cdi]
+                            @debug println("  Updating field $(dh.field_names[field_idx]) edge $(EdgeIndex(lci,lclvi)) to $(corresponding_global_dofs[cdi]) (R$my_rank)")
+                        else
+                            @debug println("  Skipping recv on field $(dh.field_names[field_idx]) edge $vi (R$my_rank)")
                         end
                     end
                 end
@@ -294,16 +538,8 @@ function local_to_global_numbering(dh::DistributedDofHandler)
     end
 
     # Postcondition: All local dofs need a corresponding global dof!
+    @debug println("Local to global mapping: $local_to_global")
     @assert findfirst(local_to_global .== 0) === nothing
-
-    @debug vtk_grid("dofs", dgrid; compress=false) do vtk
-        u = Vector{Float64}(undef,length(dgrid.local_grid.nodes))
-        fill!(u, 0.0)
-        for i=1:length(u)
-            u[i] = local_to_global[dh.vertexdicts[1][i]]
-        end
-        vtk_point_data(vtk, u,"dof")
-    end
 
     return local_to_global
 end
@@ -344,6 +580,11 @@ function __close!(dh::DistributedDofHandler{dim}) where {dim}
     resize!(dh.facedicts, num_fields(dh))
     for i in 1:num_fields(dh)
         dh.facedicts[i] = Dict{NTuple{dim,Int},Int}()
+    end
+
+    resize!(dh.celldicts, num_fields(dh))
+    for i in 1:num_fields(dh)
+        dh.celldicts[i] = Dict{Int,Vector{Int}}()
     end
 
     # celldofs are never shared between different cells so there is no need
@@ -451,6 +692,10 @@ function __close!(dh::DistributedDofHandler{dim}) where {dim}
                 for celldof in 1:interpolation_info.ncelldofs
                     for d in 1:dh.field_dims[fi]
                         @debug println("      adding dof#$nextdof")
+                        if !haskey(dh.celldicts[fi], ci)
+                            dh.celldicts[fi][ci] = Vector{Int}(undef,0)
+                        end
+                        push!(dh.celldicts[fi][ci], nextdof)
                         push!(dh.cell_dofs, nextdof)
                         nextdof += 1
                     end
@@ -469,7 +714,7 @@ end
 # TODO this is copy pasta from DofHandler.jl
 function reshape_to_nodes(dh::DistributedDofHandler, u::Vector{T}, fieldname::Symbol) where T
     # make sure the field exists
-    fieldname ∈ Ferrite.getfieldnames(dh) || error("Field $fieldname not found.")
+    fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
 
     field_idx = findfirst(i->i==fieldname, getfieldnames(dh))
     offset = field_offset(dh, fieldname)

@@ -58,9 +58,15 @@ end
 @inline get_shared_edges(dgrid::AbstractDistributedGrid) = dgrid.shared_edges
 @inline get_shared_faces(dgrid::AbstractDistributedGrid) = dgrid.shared_faces
 
+@inline get_shared_vertex(dgrid::AbstractDistributedGrid, vi::VertexIndex) = dgrid.shared_vertices[vi]
+@inline get_shared_edge(dgrid::AbstractDistributedGrid, ei::EdgeIndex) = dgrid.shared_edges[ei]
+@inline get_shared_face(dgrid::AbstractDistributedGrid, fi::FaceIndex) = dgrid.shared_faces[fi]
+
 """
 """
 @inline is_shared_vertex(dgrid::AbstractDistributedGrid, vi::VertexIndex) = haskey(dgrid.shared_vertices, vi)
+@inline is_shared_edge(dgrid::AbstractDistributedGrid, ei::EdgeIndex) = haskey(dgrid.shared_edges, ei)
+@inline is_shared_face(dgrid::AbstractDistributedGrid, fi::FaceIndex) = haskey(dgrid.shared_faces, fi)
 
 
 """
