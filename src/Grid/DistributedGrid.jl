@@ -240,6 +240,10 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
         vertexsets=vertexsets
     )
 
+    @debug if my_rank == 1
+        @show grid_topology
+    end
+
     shared_vertices = Dict{VertexIndex,SharedVertex}()
     shared_edges = Dict{EdgeIndex,SharedEdge}()
     shared_faces = Dict{FaceIndex,SharedFace}()
