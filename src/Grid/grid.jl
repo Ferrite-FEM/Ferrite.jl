@@ -392,12 +392,24 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx::EdgeIndex, include_self=false)
-    if include_self
-        return [top.edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info; edgeidx]
+    cellid, local_edgeidx = edgeidx[1], edgeidx[2]
+    cell_edges = edges(getcells(grid,cellid))
+    nonlocal_edgeid = cell_edges[local_edgeidx] 
+    if include_self  
+        cell_neighbors = getneighborhood(top,grid,CellIndex(cellid))
+        self_reference_local = EdgeIndex[]
+        for cellid in cell_neighbors
+            local_neighbor_edgeid = findfirst(x->issubset(x,nonlocal_edgeid),edges(getcells(grid,cellid)))
+            local_neighbor_edgeid === nothing && continue
+            local_edge = EdgeIndex(cellid,local_neighbor_edgeid)
+            push!(self_reference_local, local_edge)
+        end
+        return unique([top.edge_neighbor[cellid, local_edgeidx].neighbor_info; self_reference_local; edgeidx])
     else
-        return top.edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info
+        return top.edge_neighbor[cellid, local_edgeidx].neighbor_info
     end
 end
+
 
 """
     faceskeleton(grid) -> Vector{FaceIndex}
