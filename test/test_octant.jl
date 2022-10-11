@@ -92,6 +92,21 @@ end
     @test Ferrite.child_id(Ferrite.OctantBWG(3,2,24,3),3) == 8
     @test Ferrite.child_id(Ferrite.OctantBWG(3,2,64,3),3) == 8
     @test Ferrite.child_id(Ferrite.OctantBWG(3,2,9,3),3) == 1
+    #maxlevel = 10 takes too long
+    maxlevel = 6
+    levels = collect(1:maxlevel)
+    morton_ids = [1:2^(2*l) for l in levels]
+    for (level,morton_range) in zip(levels,morton_ids)
+        for morton_id in morton_range
+            @test Int(Ferrite.morton(OctantBWG(2,level,morton_id,maxlevel),level,maxlevel)) == morton_id
+        end
+    end
+    morton_ids = [1:2^(3*l) for l in levels]
+    for (level,morton_range) in zip(levels,morton_ids)
+        for morton_id in morton_range
+            @test Int(Ferrite.morton(OctantBWG(3,level,morton_id,maxlevel),level,maxlevel)) == morton_id
+        end
+    end
 end
 
 @testset "OctantBWG Operations" begin
@@ -149,7 +164,7 @@ end
     adaptive_grid = ForestBWG(grid,3)
     for cell in adaptive_grid.cells
         @test cell isa OctreeBWG 
-        cell.leaves[1] == OctantBWG(2,0,1,cell.b) 
+        @test cell.leaves[1] == OctantBWG(2,0,1,Int(cell.b)) 
     end
     #simple first and second level refinement
     # first case
@@ -173,13 +188,13 @@ end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
     @test length(adaptive_grid.cells[1].leaves) == 4
     for (m,octant) in zip(1:4,adaptive_grid.cells[1].leaves)
-        @test octant == OctantBWG(2,1,m,adaptive_grid.cells[1].b)
+        @test octant == OctantBWG(2,1,m,Int(adaptive_grid.cells[1].b))
     end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
     # octree holds now 3 first level and 4 second level
     @test length(adaptive_grid.cells[1].leaves) == 7
     for (m,octant) in zip(1:4,adaptive_grid.cells[1].leaves)
-        @test octant == OctantBWG(2,2,m,adaptive_grid.cells[1].b)
+        @test octant == OctantBWG(2,2,m,Int(adaptive_grid.cells[1].b))
     end
     # second case
     # x-----------x-----------x
@@ -210,7 +225,7 @@ end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
     @test length(adaptive_grid.cells[1].leaves) == 8
     for (m,octant) in zip(1:8,adaptive_grid.cells[1].leaves)
-        @test octant == OctantBWG(3,1,m,adaptive_grid.cells[1].b)
+        @test octant == OctantBWG(3,1,m,Int(adaptive_grid.cells[1].b))
     end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
     @test length(adaptive_grid.cells[1].leaves) == 15

@@ -11,17 +11,17 @@ struct OctantBWG{dim, N, M} <: AbstractCell{dim,N,M}
     #Refinement level
     l::UInt
     #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)}
-    xyz::NTuple{dim,Int} 
+    xyz::NTuple{dim,Int}
 end
 
 """
     OctantBWG(dim::Integer, l::Integer, b::Integer, m::Integer)
 Construct an `octant` based on dimension `dim`, level `l`, amount of levels `b` and morton index `m`
 """
-function OctantBWG(dim::Integer, l::Integer, m::Integer, b::Integer=_maxlevel[dim-1])
+function OctantBWG(dim::T, l::T, m::T, b::T=_maxlevel[dim-1]) where T <: Integer
     @assert l ≤ b #maximum refinement level exceeded
-    @assert m ≤ 2^(dim*l)
-    x,y,z = (0,0,0) 
+    @assert m ≤ (one(T)+one(T))^(dim*l)
+    x,y,z = (zero(T),zero(T),zero(T)) 
     h = _compute_size(b,l) 
     for i in 0:l-1
         x = x | (h*((m-1) & 2^(dim*i))÷2^((dim-1)*i))
@@ -37,10 +37,51 @@ function OctantBWG(dim::Integer, l::Integer, m::Integer, b::Integer=_maxlevel[di
     end 
 end
 
+# TODO: parametrize in unsigned length
+# From BWG 2011
+# > The octant coordinates are stored as integers of a fixed number b of bits,
+# > where the highest (leftmost) bit represents the first vertical level of the
+# > octree (counting the root as level zero), the second highest bit the second level of the octree, and so on.
+# Morton Index can thus be constructed by interleaving the integer bits:
+# m(Oct) := (y_b,x_b,y_b-1,x_b-1,...y0,x0)_2
+# further we assume the following
+# > Due to the two-complement representation of integers in practically all current hardware,
+# > where the highest digit denotes the negated appropriate power of two, bitwise operations as used,
+# > for example, in Algorithm 1 yield the correct result even for negative coordinates.
+# also from BWG 2011
+# TODO: use LUT method from https://www.forceflow.be/2013/10/07/morton-encodingdecoding-through-bit-interleaving-implementations/
+function morton(o::OctantBWG{2},l::Integer,b::Integer)
+    x = Int32(o.xyz[1])
+    y = Int32(o.xyz[2])
+    id = Int64(0)
+    # first shift extract i-th bit and second shift extracts inserts it at interleaved index 
+    for i in 0:31
+        id = id | ((x & (1 << i)) << i)
+        id = id | ((y & (1 << i)) << (i+1))
+    end
+    # discard the bit information about deeper levels
+    return (id >> ((b-l)*2))+1
+end
+
+function morton(o::OctantBWG{3},l::Integer,b::Integer)
+    x = Int32(o.xyz[1])
+    y = Int32(o.xyz[2])
+    z = Int32(o.xyz[3])
+    id = Int64(0)
+    for i in 0:20
+        id = id | ((x & (1 << i)) << (2*i))
+        id = id | ((y & (1 << i)) << (2*i+1))
+        id = id | ((z & (1 << i)) << (2*i+2))
+    end
+    # discard the bit information about deeper levels
+    return (id >> ((b-l)*3))+1
+end
+
 Base.zero(::Type{OctantBWG{3, 8, 6}}) = OctantBWG(3, 0, 1)
 Base.zero(::Type{OctantBWG{2, 4, 4}}) = OctantBWG(2, 0, 1)
 
 # Follow z order, x before y before z for faces, edges and corners
+# TODO: consider list instead of Vector datastructure
 struct OctreeBWG{dim,N,M} <: AbstractAdaptiveCell{dim,N,M}
     leaves::Vector{OctantBWG{dim,N,M}}
     #maximum refinement level 
@@ -55,7 +96,7 @@ function refine!(octree::OctreeBWG{dim,N,M}, o::OctantBWG{dim,N,M}) where {dim,N
     start_child_id = morton(old_octant,old_octant.l,octree.b)
     end_child_id = start_child_id + N-1
     for child_mort_id in start_child_id:end_child_id
-        insert!(octree.leaves,leave_idx,OctantBWG(dim,old_octant.l+1,child_mort_id,octree.b))
+        insert!(octree.leaves,leave_idx,OctantBWG(dim,Int(old_octant.l+1),child_mort_id,Int(octree.b))) #TODO remove me after introducing parametrization
         leave_idx += 1
     end
 end
@@ -66,32 +107,6 @@ OctreeBWG(cell::Quadrilateral,b=_maxlevel[2]) = OctreeBWG{2,4,4}(cell.nodes,b)
 OctreeBWG(cell::Hexahedron,b=_maxlevel[1]) = OctreeBWG{3,8,6}(cell.nodes,b)
 
 Base.length(tree::OctreeBWG) = length(tree.leaves)
-
-# TODO: parametrize in unsigned length
-# dispatch 3D Case
-function morton(o::OctantBWG{2},l::Integer,b::Integer)
-    x = UInt32(o.xyz[1])
-    y = UInt32(o.xyz[2])
-    id = UInt64(0)
-    for i in 0:62
-        id = id | ((x & (1 << i)) << i)
-        id = id | ((y & (1 << i)) << (i+1))
-    end 
-    return (id >> (b-l))+1
-end
-
-function morton(o::OctantBWG{3},l::Integer,b::Integer)
-    x = UInt32(o.xyz[1])
-    y = UInt32(o.xyz[2])
-    z = UInt32(o.xyz[3])
-    id = UInt64(0)
-    for i in 0:62
-        id = id | ((x & (1 << i)) << i)
-        id = id | ((y & (1 << i)) << (i+1))
-        id = id | ((z & (1 << i)) << (i+2))
-    end 
-    return (id >> (b-l))+1
-end
 
 """
     ForestBWG{dim, C<:AbstractAdaptiveCell, T<:Real} <: AbstractAdaptiveGrid{dim}
@@ -110,7 +125,7 @@ struct ForestBWG{dim, C<:OctreeBWG, T<:Real} <: AbstractAdaptiveGrid{dim}
     topology::ExclusiveTopology
 end
 
-function ForestBWG(grid::AbstractGrid{dim},b=_maxlevel[dim==2 ? 2 : 1]) where dim
+function ForestBWG(grid::AbstractGrid{dim},b=_maxlevel[dim-1]) where dim
     cells = getcells(grid)
     C = eltype(cells)
     @assert isconcretetype(C)
