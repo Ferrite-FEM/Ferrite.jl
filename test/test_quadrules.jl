@@ -33,7 +33,7 @@
     # Tetrahedron
     g = (x) -> sqrt(sum(x))
     dim = 2
-    for order in (1,2,3,4,5,6,7,8)
+    for order in 1:20
         qr = QuadratureRule{dim, RefTetrahedron}(:legendre, order)
         # http://www.wolframalpha.com/input/?i=integrate+sqrt(x%2By)+from+x+%3D+0+to+1,+y+%3D+0+to+1-x
         @test integrate(qr, g) - 0.4 < 0.01
@@ -53,23 +53,4 @@
     @test_throws ArgumentError QuadratureRule{dim, RefTetrahedron}(:einstein, 2)
     @test_throws ArgumentError QuadratureRule{dim, RefTetrahedron}(0)
 
-end
-
-using SpecialFunctions
-f(x, y, p, q) = x ^ p * y ^ q
-@testset "2D Quadrature order" begin
-    nbtests, degmax, ordermax = 1, 20, 20
-    for k = 1:nbtests
-        for degree = 1:degmax
-            p = rand(0:degree)
-            q = degree - p 
-            Ipq = gamma(BigFloat("$(p + 1)")) * gamma(BigFloat("$(q + 1)")) / 
-                  gamma(BigFloat("$(p + q + 3)"))        
-            for order = degree:ordermax 
-                xw = Ferrite._get_gauss_tridata(order)
-                Inum = sum(f(xw[k, 1], xw[k, 2], p, q) * xw[k, 3] for k = 1:size(xw, 1))
-                @test abs(Inum - Ipq) < 1e-14        
-            end
-        end
-    end
 end
