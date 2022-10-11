@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+ - New Gaussian quadrature formula for triangles up to order 20
+### Added
  - New higher order function interpolations for triangles (`Lagrange{2,RefTetrahedron,3}`,
    `Lagrange{2,RefTetrahedron,4}`, and `Lagrange{2,RefTetrahedron,5}`). ([#482][github-482],
    [#512][github-512])
