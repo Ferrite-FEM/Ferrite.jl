@@ -46,7 +46,7 @@ If you are missing the translation of an Abaqus element that is equivalent to a 
 consider to open an [issue](https://github.com/Ferrite-FEM/FerriteMeshParser.jl/issues/new) or a pull request.
 
 !!! note "Common pitfalls for reading a custom mesh"
-    In case you write your own custom mesh reader, take care of the Ferrite.jl's anti-clockwise cell node ordering.
+    In case you read custom cells or write your own custom mesh reader, take care of the Ferrite.jl's anti-clockwise cell node ordering.
     For an illustrative example consider the quadrilateral node ordering in the [`Grid` Datastructure](@ref) example.
     If you encounter the error message `det(J) is not positive`, but your mesh looks fine in a vtk export, it is very likely
     that the node ordering is clockwise instead of anti-clockwise.
@@ -77,7 +77,10 @@ julia> cells = [
 ```
 
 where each Quadrilateral, which is a subtype of `AbstractCell` saves in the field `nodes` the tuple of node IDs.
-Additionally, the data structure `Grid` can hold node-, face- and cellsets. 
+Each `<: AbstractCell` defines, just as in the example above, the nodes in anti-clockwise ordering.
+This is a convention in Ferrite, which is used to ensure that the transformation from reference space to physical space yields a positive determinant of the Jacobi.
+The function `reference_coordinates` (in `src/interpolations.jl`) defines the expected node ordering by the index of the returned `Vector{Vec{dim,T}}` and is dispatched for each `Interpolation`.
+The data structure `Grid` can hold node-, face- and cellsets. 
 All of these three sets are defined by a dictionary that maps a string key to a `Set`. 
 For the special case of node- and cellsets the dictionary's value is of type `Set{Int}`, i.e. a keyword is mapped to a node or cell ID, respectively. 
 
