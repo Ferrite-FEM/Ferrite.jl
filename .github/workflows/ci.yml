@@ -13,7 +13,7 @@ jobs:
     continue-on-error: ${{ matrix.julia-version == 'nightly' }}
     strategy:
       matrix:
-        julia-version: ['1.6', '^1.7.0-0', 'nightly']
+        julia-version: ['1.6', '1', 'nightly']
         os: ['ubuntu-latest']
         include:
           - os: windows-latest
@@ -40,7 +40,7 @@ jobs:
         with:
           version: '1'
       - name: Install dependencies
-        run: julia --project=docs -e 'using Pkg; Pkg.instantiate()'
+        run: julia --project=docs -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

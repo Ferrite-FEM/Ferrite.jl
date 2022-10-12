@@ -2,7 +2,6 @@
 using StableRNGs
 OVERWRITE_CHECKSUMS = false
 checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")
-checksum_list = read(checksums_file, String)
 if OVERWRITE_CHECKSUMS
     csio = open(checksums_file, "w")
 else
@@ -49,7 +48,7 @@ end
         if OVERWRITE_CHECKSUMS
             write(csio, sha, "\n")
         else
-            @test chomp(readline(csio)) == sha
+            @test sha in split(chomp(readline(csio)))
             rm(gridfilename*".vtu")
         end
 
@@ -85,7 +84,7 @@ end
         if OVERWRITE_CHECKSUMS
             write(csio, sha, "\n")
         else
-            @test chomp(readline(csio)) == sha
+            @test sha in split(chomp(readline(csio)))
             rm(dofhandlerfilename*".vtu")
         end
 
@@ -99,7 +98,7 @@ close(csio)
     # open files
     checksums_file_tensors = joinpath(dirname(@__FILE__), "checksums2.sha1")
     if OVERWRITE_CHECKSUMS
-        csio = open(checksums_file_tensors, "w")
+        csio = open(checksums_file_tensors, "a")
     else
         csio = open(checksums_file_tensors, "r")
     end
@@ -141,7 +140,7 @@ close(csio)
         if OVERWRITE_CHECKSUMS
             write(csio, sha, "\n")
         else
-            @test chomp(readline(csio)) == sha
+            @test sha in split(chomp(readline(csio)))
             rm(filename*".vtu")
         end
     end
@@ -275,7 +274,7 @@ end
     @test topology.edge_neighbor[2,12] == Ferrite.EntityNeighborhood(EdgeIndex(3,10))
     @test topology.edge_neighbor[3,10] == Ferrite.EntityNeighborhood(EdgeIndex(2,12))
     @test topology.edge_neighbor[4,9] == Ferrite.EntityNeighborhood(EdgeIndex(1,11))
-    @test all(iszero,topology.vertex_neighbor)
+    @test isempty(topology.vertex_neighbor)
     @test topology.face_neighbor[1,3] == Ferrite.EntityNeighborhood(FaceIndex(2,5))
     @test topology.face_neighbor[1,4] == Ferrite.EntityNeighborhood(FaceIndex(3,2))
     @test topology.face_neighbor[2,4] == Ferrite.EntityNeighborhood(FaceIndex(4,2))
@@ -307,7 +306,7 @@ end
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 10)]
     grid = Grid(cells, nodes)
     topology = ExclusiveTopology(grid)
-    @test all(iszero,topology.vertex_neighbor)
+    @test isempty(topology.vertex_neighbor)
     @test topology.face_neighbor[2,1] == Ferrite.EntityNeighborhood(EdgeIndex(1,2))
     @test topology.edge_neighbor[1,2] == Ferrite.EntityNeighborhood(FaceIndex(2,1))
 #                           
@@ -395,11 +394,11 @@ end
 end
 
 @testset "grid coloring" begin
-    function test_coloring(grid, cellset=Set(1:getncells(grid)))
+    function test_coloring(grid, cellset=1:getncells(grid))
         for alg in (ColoringAlgorithm.Greedy, ColoringAlgorithm.WorkStream)
             color_vectors = create_coloring(grid, cellset; alg=alg)
             @test sum(length, color_vectors) == length(cellset)
-            @test union(Set.(color_vectors)...) == cellset
+            @test union(Set.(color_vectors)...) == Set(cellset)
             conn = Ferrite.create_incidence_matrix(grid, cellset)
             for color in color_vectors, c1 in color, c2 in color
                 @test !conn[c1, c2]
@@ -418,11 +417,41 @@ end
     # test_coloring(generate_grid(QuadraticHexahedron, (5, 5, 5)))
 
     # color only a subset
-    test_coloring(generate_grid(Line, (5,)), Set{Int}(1:3))
+    test_coloring(generate_grid(Line, (5,)), 1:3)
     test_coloring(generate_grid(Triangle, (5, 5)), Set{Int}(1:3^2))
     test_coloring(generate_grid(Quadrilateral, (5, 5)), Set{Int}(1:3^2))
     test_coloring(generate_grid(Tetrahedron, (5, 5, 5)), Set{Int}(1:3^3))
     test_coloring(generate_grid(Hexahedron, (5, 5, 5)), Set{Int}(1:3^3))
     # unconnected subset
     test_coloring(generate_grid(Triangle, (10, 10)), union(Set(1:10), Set(70:80)))
+end
+
+@testset "DoF distribution" begin
+    # _________
+    # |\      |
+    # |  \  2 |
+    # | 1  \  |
+    # |______\|
+    grid = generate_grid(Triangle, (1, 1))
+
+    ## Lagrange{2,RefTetrahedron,3}
+    dh = DofHandler(grid)
+    push!(dh, :u, 1, Lagrange{2,RefTetrahedron,3}())
+    close!(dh)
+    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    @test celldofs(dh, 2) == [2, 11, 3, 12, 13, 14, 15, 7, 6, 16]
+
+    ## Lagrange{2,RefTetrahedron,4}
+    dh = DofHandler(grid)
+    push!(dh, :u, 1, Lagrange{2,RefTetrahedron,4}())
+    close!(dh)
+    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    @test celldofs(dh, 2) == [2, 16, 3, 17, 18, 19, 20, 21, 22, 9, 8, 7, 23, 24, 25]
+
+    ## Lagrange{2,RefTetrahedron,5}
+    dh = DofHandler(grid)
+    push!(dh, :u, 1, Lagrange{2,RefTetrahedron,5}())
+    close!(dh)
+    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+    @test celldofs(dh, 2) == [2, 22, 3, 23, 24, 25, 26, 27, 28, 29, 30, 11, 10, 9, 8, 31, 32, 33, 34, 35, 36]
 end

@@ -128,12 +128,15 @@ export
     num_fields,
     getfieldnames,
     dof_range,
-    entity_dofs,
+    #entity_dofs,
 
 # Constraints
     ConstraintHandler,
     Dirichlet,
     PeriodicDirichlet,
+    collect_periodic_faces,
+    collect_periodic_faces!,
+    PeriodicFacePair,
     AffineConstraint,
     update!,
     apply!,

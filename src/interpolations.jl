@@ -330,6 +330,97 @@ function value(ip::Lagrange{2,RefTetrahedron,2}, i::Int, ξ::Vec{2})
     i == 6 && return 4ξ_x * γ
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
+###############################################
+# Lagrange dim 2 RefTetrahedron order 3, 4, 5 #
+###############################################
+# see https://getfem.readthedocs.io/en/latest/userdoc/appendixA.html
+
+const Lagrange2Tri345 = Union{
+    Lagrange{2,RefTetrahedron,3},
+    Lagrange{2,RefTetrahedron,4},
+    Lagrange{2,RefTetrahedron,5},
+}
+
+function getnbasefunctions(ip::Lagrange2Tri345)
+    order = getorder(ip)
+    return (order + 1) * (order + 2) ÷ 2
+end
+
+nvertexdofs(::Lagrange2Tri345) = 1
+nedgedofs(ip::Lagrange2Tri345) = getorder(ip) - 1
+nfacedofs(ip::Lagrange2Tri345) = getorder(ip) - 1
+function ncelldofs(ip::Lagrange2Tri345)
+    order = getorder(ip)
+    return (order + 1) * (order + 2) ÷ 2 - 3 * order
+end
+
+# Permutation to switch numbering to Ferrite ordering
+const permdof2D = Dict{Int,Vector{Int}}(
+    1 => [1, 2, 3],
+    2 => [3, 6, 1, 5, 4, 2],
+    3 => [4, 10, 1, 7, 9, 8, 5, 2, 3, 6],
+    4 => [5, 15, 1, 9, 12, 14, 13, 10, 6, 2, 3, 4, 7, 8, 11],
+    5 => [6, 21, 1, 11, 15, 18, 20, 19, 16, 12, 7, 2, 3, 4, 5, 8, 9, 10, 13, 14, 17],
+)
+
+vertices(::Lagrange2Tri345) = (1, 2, 3)
+
+function faces(ip::Lagrange2Tri345)
+    order = getorder(ip)
+    if order == 1
+        return ((1,2), (2,3), (3,1))
+    elseif order == 2
+        return ((1,2,4), (2,3,5), (3,1,6))
+    elseif order == 3
+        return ((1,2,4,5), (2,3,6,7), (3,1,8,9))
+    elseif order == 4
+        return ((1,2,4,5,6), (2,3,7,8,9), (3,1,10,11,12))
+    elseif order == 5
+        return ((1,2,4,5,6,7), (2,3,8,9,10,11), (3,1,12,13,14,15))
+    else
+        error("unreachable")
+    end
+end
+
+function reference_coordinates(ip::Lagrange2Tri345)
+    order = getorder(ip)
+    coordpts = Vector{Vec{2, Float64}}()
+    for k = 0:order
+        for l = 0:(order - k)
+            push!(coordpts, Vec{2, Float64}((l / order, k / order)))
+        end
+    end
+    return permute!(coordpts, permdof2D[order])
+end
+
+function value(ip::Lagrange2Tri345, i::Int, ξ::Vec{2})
+    order = getorder(ip)
+    i = permdof2D[order][i]
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    γ = 1. - ξ_x - ξ_y
+    i1, i2, i3 = _numlin_basis2D(i, order)
+    val = one(γ)
+    i1 ≥ 1 && (val *= prod((order * γ - j) / (j + 1) for j = 0:(i1 - 1)))
+    i2 ≥ 1 && (val *= prod((order * ξ_x - j) / (j + 1) for j = 0:(i2 - 1)))
+    i3 ≥ 1 && (val *= prod((order * ξ_y - j) / (j + 1) for j = 0:(i3 - 1)))
+    return val
+end
+
+function _numlin_basis2D(i, order)
+    c, j1, j2, j3 = 0, 0, 0, 0
+    for k = 0:order
+        if i <= c + (order + 1 - k)
+            j2 = i - c - 1
+            break
+        else
+            j3 += 1
+            c += order + 1 - k
+        end
+    end
+    j1 = order - j2 -j3
+    return j1, j2, j3
+end
 
 #########################################
 # Lagrange dim 3 RefTetrahedron order 1 #
@@ -337,7 +428,7 @@ end
 getnbasefunctions(::Lagrange{3,RefTetrahedron,1}) = 4
 nvertexdofs(::Lagrange{3,RefTetrahedron,1}) = 1
 
-faces(::Lagrange{3,RefTetrahedron,1}) = ((1,2,3), (1,2,4), (2,3,4), (1,4,3))
+faces(::Lagrange{3,RefTetrahedron,1}) = ((1,3,2), (1,2,4), (2,3,4), (1,4,3))
 edges(::Lagrange{3,RefTetrahedron,1}) = ((1,2), (2,3), (3,1), (1,4), (2,4), (3,4))
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,1})
@@ -365,7 +456,7 @@ getnbasefunctions(::Lagrange{3,RefTetrahedron,2}) = 10
 nvertexdofs(::Lagrange{3,RefTetrahedron,2}) = 1
 nedgedofs(::Lagrange{3,RefTetrahedron,2}) = 1
 
-faces(::Lagrange{3,RefTetrahedron,2}) = ((1,2,3,5,6,7), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
+faces(::Lagrange{3,RefTetrahedron,2}) = ((1,3,2,7,6,5), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
 edges(::Lagrange{3,RefTetrahedron,2}) = ((1,5,2), (2,6,3), (3,7,1), (1,8,4), (2,9,4), (3,10,4))
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,2})
@@ -543,9 +634,9 @@ getlowerdim(ip::BubbleEnrichedLagrange{dim,ref_shape,order}) where {dim,ref_shap
 # Lagrange-Bubble dim 2 RefTetrahedron order 1 #
 ################################################
 # Taken from https://defelement.com/elements/bubble-enriched-lagrange.html
-getnbasefunctions(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 4
-nvertexdofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 1
-ncelldofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 1
+getnbasefunctions(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = 4
+nvertexdofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = 1
+ncelldofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = 1
 
 faces(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = ((1,2), (2,3), (3,1))
 

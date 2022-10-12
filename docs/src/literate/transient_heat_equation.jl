@@ -34,12 +34,12 @@
 # ```
 # The semidiscrete weak form is given by
 # ```math
-# \int_{\Omega}\frac{\partial u}{\partial t}\cdot v \ d\Omega + \int_{\Omega} \nabla v \cdot \nabla u \ d\Omega = \int_{\Omega} v \ d\Omega,
+# \int_{\Omega}v \frac{\partial u}{\partial t} \ \mathrm{d}\Omega + \int_{\Omega} \nabla v \cdot \nabla u \ \mathrm{d}\Omega = \int_{\Omega} v \ \mathrm{d}\Omega,
 # ```
 # where $v$ is a suitable test function. Now, we still need to discretize the time derivative. An implicit Euler scheme is applied,
 # which yields:
 # ```math
-# \int_{\Omega}u_{n+1}\cdot v \ d\Omega + \Delta t\int_{\Omega} \nabla v \cdot \nabla u_{n+1} \ d\Omega = \Delta t\int_{\Omega} v \ d\Omega + \int_{\Omega} u_{n}\cdot v \ d\Omega.
+# \int_{\Omega} v\, u_{n+1}\ \mathrm{d}\Omega + \Delta t\int_{\Omega} \nabla v \cdot \nabla u_{n+1} \ \mathrm{d}\Omega = \Delta t\int_{\Omega} v \ \mathrm{d}\Omega + \int_{\Omega} v \, u_{n} \ \mathrm{d}\Omega.
 # ```
 # If we assemble the discrete operators, we get the following algebraic system:
 # ```math
@@ -77,7 +77,7 @@ close!(dh);
 # By means of the `DofHandler` we can allocate the needed `SparseMatrixCSC`.
 # `M` refers here to the so called mass matrix, which always occurs in time related terms, i.e.
 # ```math
-# M_{ij} = \int_{\Omega} u_i \cdot v_j \ d\Omega,
+# M_{ij} = \int_{\Omega} v_i \, u_j \ \mathrm{d}\Omega,
 # ```
 # where $u_i$ and $v_j$ are trial and test functions, respectively.
 K = create_sparsity_pattern(dh);
@@ -161,7 +161,7 @@ function doassemble_M!(M::SparseMatrixCSC, cellvalues::CellScalarValues{dim}, dh
                 v  = shape_value(cellvalues, q_point, i)
                 for j in 1:n_basefuncs
                     u = shape_value(cellvalues, q_point, j)
-                    Me[i, j] += (v ⋅ u) * dΩ
+                    Me[i, j] += (v * u) * dΩ
                 end
             end
         end
