@@ -7,11 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
- - New Gaussian quadrature formula for triangles up to order 20
-### Added
  - New higher order function interpolations for triangles (`Lagrange{2,RefTetrahedron,3}`,
    `Lagrange{2,RefTetrahedron,4}`, and `Lagrange{2,RefTetrahedron,5}`). ([#482][github-482],
    [#512][github-512])
+ - New Gaussian quadrature formula for triangles up to order 20. ([#514][github-514])
 ### Changed
  - The default components to constrain in `Dirichlet` and `PeriodicDirichlet` have changed
    from component 1 to all components of the field. For scalar problems this has no effect.
@@ -137,6 +136,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-506]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/506
 [github-509]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/509
 [github-512]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/512
+[github-514]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/514
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.8...HEAD
 [0.3.8]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.7...v0.3.8
