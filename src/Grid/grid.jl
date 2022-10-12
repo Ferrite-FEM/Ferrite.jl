@@ -359,10 +359,12 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::Ce
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
+    # TODO cleaner solution...
+    data = faceidx[2] <= size(top.edge_neighbor, 2) ? top.face_neighbor[faceidx[1],faceidx[2]].neighbor_info : []
     if include_self
-        return [top.face_neighbor[faceidx[1],faceidx[2]].neighbor_info; faceidx]
+        return [data; faceidx]
     else
-        return top.face_neighbor[faceidx[1],faceidx[2]].neighbor_info
+        return data
     end
 end
 
@@ -394,8 +396,10 @@ end
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx::EdgeIndex, include_self=false)
     cellid, local_edgeidx = edgeidx[1], edgeidx[2]
     cell_edges = edges(getcells(grid,cellid))
-    nonlocal_edgeid = cell_edges[local_edgeidx] 
-    if include_self  
+    nonlocal_edgeid = cell_edges[local_edgeidx]
+    # TODO cleaner solution...
+    data = local_edgeidx <= size(top.edge_neighbor, 2) ? top.edge_neighbor[cellid, local_edgeidx].neighbor_info : []
+    if include_self
         cell_neighbors = getneighborhood(top,grid,CellIndex(cellid))
         self_reference_local = EdgeIndex[]
         for cellid in cell_neighbors
@@ -404,9 +408,9 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx:
             local_edge = EdgeIndex(cellid,local_neighbor_edgeid)
             push!(self_reference_local, local_edge)
         end
-        return unique([top.edge_neighbor[cellid, local_edgeidx].neighbor_info; self_reference_local; edgeidx])
+        return unique([data; self_reference_local; edgeidx])
     else
-        return top.edge_neighbor[cellid, local_edgeidx].neighbor_info
+        return unique(data)
     end
 end
 
