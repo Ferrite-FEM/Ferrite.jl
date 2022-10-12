@@ -93,7 +93,7 @@ function refine!(octree::OctreeBWG{dim,N,M}, o::OctantBWG{dim,N,M}) where {dim,N
     leave_idx = findfirst(x->x==o,octree.leaves)
     # how to obtain id from morton index ?
     old_octant = popat!(octree.leaves,leave_idx)
-    start_child_id = morton(old_octant,old_octant.l,octree.b)
+    start_child_id = morton(old_octant,old_octant.l+1,octree.b)
     end_child_id = start_child_id + N-1
     for child_mort_id in start_child_id:end_child_id
         insert!(octree.leaves,leave_idx,OctantBWG(dim,Int(old_octant.l+1),child_mort_id,Int(octree.b))) #TODO remove me after introducing parametrization
