@@ -247,7 +247,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                             for (remote_rank, svs) ∈ remote_edge_dict
                                 if master_rank == my_rank # I own the dof - we have to send information
                                     if !haskey(edges_send,remote_rank)
-                                        edges_send[remote_rank] = Vector{EdgeIndex}()
+                                        edges_send[remote_rank] = EdgeIndex[]
                                     end
                                     @debug println("      prepare sending edge #$(lei) to $remote_rank (R$my_rank)")
                                     for i ∈ svs
@@ -255,7 +255,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                                     end
                                 elseif master_rank == remote_rank  # dof is owned by remote - we have to receive information
                                     if !haskey(edges_recv,remote_rank)
-                                        edges_recv[remote_rank] = Array{EdgeIndex}()
+                                        edges_recv[remote_rank] = EdgeIndex[]
                                     end
                                     push!(edges_recv[remote_rank], lei)
                                     @debug println("      prepare receiving edge #$(lei) from $remote_rank (R$my_rank)")
@@ -293,7 +293,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                         for (remote_rank, svs) ∈ remote_face_dict
                             if master_rank == my_rank # I own the dof - we have to send information
                                 if !haskey(faces_send,remote_rank)
-                                    faces_send[remote_rank] = Vector{FaceIndex}()
+                                    faces_send[remote_rank] = FaceIndex[]
                                 end
                                 @debug println("      prepare sending face #$(lfi) to $remote_rank (R$my_rank)")
                                 for i ∈ svs
