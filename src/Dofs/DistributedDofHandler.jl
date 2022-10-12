@@ -155,7 +155,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
     faces_send = Dict{Int,Vector{FaceIndex}}()
     n_faces_recv = Dict{Int,Int}()
     edges_send = Dict{Int,Vector{EdgeIndex}}()
-    n_edges_recv = Dict{Int,Int}()
+    edges_recv = Dict{Int,Vector{EdgeIndex}}()
 
     # We start by assigning a local dof to all owned entities.
     # An entity is owned if:
@@ -221,7 +221,6 @@ function local_to_global_numbering(dh::DistributedDofHandler)
 
             if dim > 2 # edges only in 3D
                 if interpolation_info.nedgedofs > 0
-                    error("Broken. Each process counts a different number of local edges and hence we have a mismatch in the MPI messages.")
                     for (ei,edge) in enumerate(edges(cell))
                         @debug println("    edge#$edge (R$my_rank)")
                         lei = EdgeIndex(ci,ei)
@@ -255,11 +254,10 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                                         push!(edges_send[remote_rank], lei)
                                     end
                                 elseif master_rank == remote_rank  # dof is owned by remote - we have to receive information
-                                    if !haskey(n_edges_recv,remote_rank)
-                                        n_edges_recv[remote_rank] = length(svs)
-                                    else
-                                        n_edges_recv[remote_rank] += length(svs)
+                                    if !haskey(edges_recv,remote_rank)
+                                        edges_recv[remote_rank] = Array{EdgeIndex}()
                                     end
+                                    push!(edges_recv[remote_rank], lei)
                                     @debug println("      prepare receiving edge #$(lei) from $remote_rank (R$my_rank)")
                                 end
                             end
@@ -438,12 +436,22 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                 end
 
                 if haskey(edges_send, remote_rank)
-                    n_edges = length(edges_send[remote_rank])
+                    # Well .... that some hotfix straight outta hell.
+                    edges_send_unique_set = Set{Tuple{Int,Int}}()
+                    edges_send_unique = Set{EdgeIndex}()
+                    for lei ∈ edges_send[remote_rank]
+                        edge = toglobal(dgrid, lei)
+                        if edge ∉ edges_send_unique_set
+                            push!(edges_send_unique_set, edge)
+                            push!(edges_send_unique, lei)
+                        end
+                    end
+                    n_edges = length(edges_send_unique)
                     @debug println("Sending $n_edges edges to rank $remote_rank (R$my_rank)")
                     remote_cells = Array{Int64}(undef,n_edges)
                     remote_cell_vis = Array{Int64}(undef,n_edges)
                     next_buffer_idx = 1
-                    for lvi ∈ edges_send[remote_rank]
+                    for lvi ∈ edges_send_unique
                         sv = dgrid.shared_edges[lvi]
                         @assert haskey(sv.remote_edges, remote_rank)
                         for (cvi, llvi) ∈ sv.remote_edges[remote_rank][1:1] # Just don't ask :)
@@ -462,7 +470,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                         end
                         # fill correspondence array
                         corresponding_global_dofs = Array{Int64}(undef,n_edges)
-                        for (lci,lclvi) ∈ edges_send[remote_rank]
+                        for (lci,lclvi) ∈ edges_send_unique
                             vi = sortedge(edges(getcells(getgrid(dh),lci))[lclvi])[1]
                             if haskey(dh.edgedicts[fi], vi)
                                 corresponding_global_dofs[next_buffer_idx] = local_to_global[dh.edgedicts[fi][vi][1]]
@@ -526,8 +534,14 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                 end
             end
 
-            if haskey(n_edges_recv, sending_rank)
-                n_edges = n_edges_recv[sending_rank]
+            if haskey(edges_recv, sending_rank)
+                edges_recv_unique_set = Set{Tuple{Int,Int}}()
+                for lei ∈ edges_recv[remote_rank]
+                    edge = toglobal(dgrid, lei)
+                    push!(edges_send_unique_set, edge)
+                    end
+                end
+                n_edges = length(edges_recv_unique_set)
                 @debug println("Receiving $n_edges edges from rank $sending_rank (R$my_rank)")
                 local_cells = Array{Int64}(undef,n_edges)
                 local_cell_vis = Array{Int64}(undef,n_edges)
