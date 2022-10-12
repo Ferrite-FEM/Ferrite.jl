@@ -138,6 +138,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
         # For each cell we also need to reinitialize the cached values in `cellvalues`.
         #+
         reinit!(cellvalues, cell)
+        coords = getcoordinates(cell)                               #src
 
         # It is now time to loop over all the quadrature points in the cell and
         # assemble the contribution to `Ke` and `fe`. The integration weight
@@ -149,10 +150,15 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
             # We need the value and gradient of the testfunction `v` and also the gradient
             # of the trial function `u`. We get all of these from `cellvalues`.
             #+
+            x = spatial_coordinate(cellvalues, q_point, coords)     #src
             for i in 1:n_basefuncs
                 v  = shape_value(cellvalues, q_point, i)
                 ∇v = shape_gradient(cellvalues, q_point, i)
+                if false                                            #src
                 fe[i] += v * dΩ
+                else                                                #src
+                fe[i] += (π/2)^2 * dim * prod(cos, x*π/2) * v * dΩ  #src
+                end                                                 #src
                 for j in 1:n_basefuncs
                     ∇u = shape_gradient(cellvalues, q_point, j)
                     Ke[i, j] += (∇v ⋅ ∇u) * dΩ
@@ -187,9 +193,22 @@ vtk_grid("heat_equation", dh) do vtk
     vtk_point_data(vtk, dh, u)
 end
 
-## test the result                #src
-using Test                        #src
-@test norm(u) ≈ 3.307743912641305 #src
+## Test the result against the manufactured solution                #src
+using Test                                                          #src
+for cell in CellIterator(dh)                                        #src
+    reinit!(cellvalues, cell)                                       #src
+    n_basefuncs = getnbasefunctions(cellvalues)                     #src
+    coords = getcoordinates(cell)                                   #src
+    uₑ = u[celldofs(cell)]                                          #src
+    for q_point in 1:getnquadpoints(cellvalues)                     #src
+        x = spatial_coordinate(cellvalues, q_point, coords)         #src
+        for i in 1:n_basefuncs                                      #src
+            uₐₙₐ    = prod(cos, x*π/2)                              #src
+            uₐₚₚᵣₒₓ = function_value(cellvalues, q_point, uₑ)       #src
+            @test isapprox(uₐₙₐ, uₐₚₚᵣₒₓ; atol=1e-1)                #src
+        end                                                         #src
+    end                                                             #src
+end                                                                 #src
 
 #md # ## [Plain program](@id heat_equation-plain-program)
 #md #
