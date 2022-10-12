@@ -76,7 +76,7 @@ function celldofs(dh::DistributedDofHandler, i::Int)
     return global_dofs
 end
 
-renumber!(dh::DistributedDofHandler, perm::AbstractVector{<:Integer}) = (@assert false) && "Unimplemented"
+renumber!(dh::DistributedDofHandler, perm::AbstractVector{<:Integer}) = error("Not implemented.")
 
 function compute_dof_ownership(dh)
     dgrid = getglobalgrid(dh)
@@ -464,7 +464,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                     MPI.Send(remote_cell_vis, global_comm(dgrid); dest=remote_rank-1)
                     for fi ∈ 1:num_fields(dh)
                         next_buffer_idx = 1
-                        if length(dh.facedicts[fi]) == 0
+                        if length(dh.edgedicts[fi]) == 0
                             @debug println("Skipping send on field $(dh.field_names[fi]) (R$my_rank)")
                             continue
                         end
