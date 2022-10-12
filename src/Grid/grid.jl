@@ -360,7 +360,7 @@ end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
     # TODO cleaner solution...
-    data = faceidx[2] <= size(top.edge_neighbor, 2) ? top.face_neighbor[faceidx[1],faceidx[2]].neighbor_info : []
+    data = faceidx[2] <= size(top.face_neighbor, 2) ? top.face_neighbor[faceidx[1],faceidx[2]].neighbor_info : []
     if include_self
         return [data; faceidx]
     else
