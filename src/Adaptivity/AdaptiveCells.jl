@@ -7,37 +7,48 @@ function set_maxlevel(dim::Integer,maxlevel::Integer)
     _maxlevel[dim-1] = maxlevel
 end
 
-struct OctantBWG{dim, N, M} <: AbstractCell{dim,N,M}
+struct OctantBWG{dim, N, M, T} <: AbstractCell{dim,N,M}
     #Refinement level
-    l::UInt
+    l::T
     #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)}
-    xyz::NTuple{dim,Int}
+    xyz::NTuple{dim,T}
 end
 
 """
     OctantBWG(dim::Integer, l::Integer, b::Integer, m::Integer)
 Construct an `octant` based on dimension `dim`, level `l`, amount of levels `b` and morton index `m`
 """
-function OctantBWG(dim::T, l::T, m::T, b::T=_maxlevel[dim-1]) where T <: Integer
+function OctantBWG(dim::Integer, l::T, m::T, b::T=_maxlevel[dim-1]) where T <: Integer
     @assert l ≤ b #maximum refinement level exceeded
     @assert m ≤ (one(T)+one(T))^(dim*l)
     x,y,z = (zero(T),zero(T),zero(T)) 
-    h = _compute_size(b,l) 
-    for i in 0:l-1
-        x = x | (h*((m-1) & 2^(dim*i))÷2^((dim-1)*i))
-        y = y | (h*((m-1) & 2^(dim*i+1))÷2^((dim-1)*i+1))
-        z = z | (h*((m-1) & 2^(dim*i+2))÷2^((dim-1)*i+2))
+    h = Int32(_compute_size(b,l))
+    _zero = zero(T)
+    _one = one(T)
+    _two = _one + _one
+    for i in _zero:l-_one
+        x = x | (h*((m-_one) & _two^(dim*i))÷_two^((dim-_one)*i))
+        y = y | (h*((m-_one) & _two^(dim*i+_one))÷_two^((dim-_one)*i+_one))
+        z = z | (h*((m-_one) & _two^(dim*i+_two))÷_two^((dim-_one)*i+_two))
     end
     if dim == 2
-        OctantBWG{dim,4,4}(l,(x,y)) 
+        OctantBWG{dim,4,4,T}(l,(x,y)) 
     elseif dim == 3
-        OctantBWG{dim,8,6}(l,(x,y,z)) 
+        OctantBWG{dim,8,6,T}(l,(x,y,z)) 
     else
         error("$dim Dimension not supported")
     end 
 end
 
-# TODO: parametrize in unsigned length
+OctantBWG(dim::Int,l::Int,m::Int,b::Int=_maxlevel[dim-1]) = OctantBWG(dim,Int32(l),Int32(m),Int32(b))
+OctantBWG(dim::Int,l::Int,m::Int,b::Int32) = OctantBWG(dim,Int32(l),Int32(m),b)
+OctantBWG(dim::Int,l::Int32,m::Int,b::Int32) = OctantBWG(dim,l,Int32(m),b)
+OctantBWG(level::Int,coords::NTuple) = OctantBWG(Int32(level),Int32.(coords))
+OctantBWG(level::Int32,coords::NTuple) = OctantBWG(level,Int32.(coords))
+function OctantBWG(level::Int32, coords::NTuple{dim,Int32}) where dim
+    dim == 2 ? OctantBWG{2,4,4,Int32}(level,coords) : OctantBWG{3,8,6,Int32}(level,coords)
+end
+
 # From BWG 2011
 # > The octant coordinates are stored as integers of a fixed number b of bits,
 # > where the highest (leftmost) bit represents the first vertical level of the
@@ -50,31 +61,17 @@ end
 # > for example, in Algorithm 1 yield the correct result even for negative coordinates.
 # also from BWG 2011
 # TODO: use LUT method from https://www.forceflow.be/2013/10/07/morton-encodingdecoding-through-bit-interleaving-implementations/
-function morton(o::OctantBWG{2},l::Integer,b::Integer)
-    x = Int32(o.xyz[1])
-    y = Int32(o.xyz[2])
-    id = Int64(0)
-    # first shift extract i-th bit and second shift extracts inserts it at interleaved index 
-    for i in 0:31
-        id = id | ((x & (1 << i)) << i)
-        id = id | ((y & (1 << i)) << (i+1))
+function morton(o::OctantBWG{dim,N,M,T},l::Integer,b::Integer) where {dim,N,M,T}
+    id = zero(widen(eltype(o.xyz)))
+    loop_length = (sizeof(typeof(id))*T(8)) ÷ dim - one(T)
+    for i in zero(T):loop_length
+        for d in zero(T):dim-one(T)
+            # first shift extract i-th bit and second shift inserts it at interleaved index 
+            id = id | ((o.xyz[d+one(T)] & (one(T) << i)) << ((dim-one(T))*i+d))
+        end
     end
     # discard the bit information about deeper levels
-    return (id >> ((b-l)*2))+1
-end
-
-function morton(o::OctantBWG{3},l::Integer,b::Integer)
-    x = Int32(o.xyz[1])
-    y = Int32(o.xyz[2])
-    z = Int32(o.xyz[3])
-    id = Int64(0)
-    for i in 0:20
-        id = id | ((x & (1 << i)) << (2*i))
-        id = id | ((y & (1 << i)) << (2*i+1))
-        id = id | ((z & (1 << i)) << (2*i+2))
-    end
-    # discard the bit information about deeper levels
-    return (id >> ((b-l)*3))+1
+    return (id >> ((b-l)*dim))+one(T)
 end
 
 Base.zero(::Type{OctantBWG{3, 8, 6}}) = OctantBWG(3, 0, 1)
@@ -82,42 +79,43 @@ Base.zero(::Type{OctantBWG{2, 4, 4}}) = OctantBWG(2, 0, 1)
 
 # Follow z order, x before y before z for faces, edges and corners
 # TODO: consider list instead of Vector datastructure
-struct OctreeBWG{dim,N,M} <: AbstractAdaptiveCell{dim,N,M}
-    leaves::Vector{OctantBWG{dim,N,M}}
+struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{dim,N,M}
+    leaves::Vector{OctantBWG{dim,N,M,T}}
     #maximum refinement level 
-    b::UInt
+    b::T
     nodes::NTuple{N,Int}
 end
 
-function refine!(octree::OctreeBWG{dim,N,M}, o::OctantBWG{dim,N,M}) where {dim,N,M}
+function refine!(octree::OctreeBWG{dim,N,M,T}, o::OctantBWG{dim,N,M,T}) where {dim,N,M,T<:Integer}
     # really the only way?
     leave_idx = findfirst(x->x==o,octree.leaves)
     # how to obtain id from morton index ?
     old_octant = popat!(octree.leaves,leave_idx)
-    start_child_id = morton(old_octant,old_octant.l+1,octree.b)
-    end_child_id = start_child_id + N-1
+    start_child_id = morton(old_octant,old_octant.l+one(T),octree.b)
+    end_child_id = start_child_id + N-one(T)
     for child_mort_id in start_child_id:end_child_id
-        insert!(octree.leaves,leave_idx,OctantBWG(dim,Int(old_octant.l+1),child_mort_id,Int(octree.b))) #TODO remove me after introducing parametrization
+        insert!(octree.leaves,leave_idx,OctantBWG(dim,old_octant.l+one(T),child_mort_id,octree.b)) #TODO remove me after introducing parametrization
         leave_idx += 1
     end
 end
 
-function coarsen!(octree::OctreeBWG{dim,N,M}, o::OctantBWG{dim,N,M}) where {dim,N,M}
+function coarsen!(octree::OctreeBWG{dim,N,M,T}, o::OctantBWG{dim,N,M,T}) where {dim,N,M,T}
+    _two = T(2)
     leave_idx = findfirst(x->x==o,octree.leaves)
-    shift = child_id(o,octree.b) - 1
-    if shift != 0
+    shift = child_id(o,octree.b) - one(T)
+    if shift != zero(T)
         old_morton = morton(o,o.l,octree.b)
-        o = OctantBWG(dim,Int(o.l),old_morton,Int(octree.b)) #TODO fix after parametrization
+        o = OctantBWG(dim,o.l,old_morton,octree.b)
     end
     window_start = leave_idx - shift
-    window_length = 2^dim - 1
+    window_length = _two^dim - one(T)
     new_octant = parent(o, octree.b)
     octree.leaves[leave_idx - shift] = new_octant
-    deleteat!(octree.leaves,leave_idx-shift+1:leave_idx-shift+window_length)
+    deleteat!(octree.leaves,leave_idx-shift+one(T):leave_idx-shift+window_length)
 end
 
-OctreeBWG{3,8,6}(nodes::NTuple,b=_maxlevel[2]) = OctreeBWG{3,8,6}([zero(OctantBWG{3,8,6})],b,nodes)
-OctreeBWG{2,4,4}(nodes::NTuple,b=_maxlevel[1]) = OctreeBWG{2,4,4}([zero(OctantBWG{2,4,4})],b,nodes)
+OctreeBWG{3,8,6}(nodes::NTuple,b=_maxlevel[2]) = OctreeBWG{3,8,6,Int32}([zero(OctantBWG{3,8,6})],Int32(b),nodes)
+OctreeBWG{2,4,4}(nodes::NTuple,b=_maxlevel[1]) = OctreeBWG{2,4,4,Int32}([zero(OctantBWG{2,4,4})],Int32(b),nodes)
 OctreeBWG(cell::Quadrilateral,b=_maxlevel[2]) = OctreeBWG{2,4,4}(cell.nodes,b)
 OctreeBWG(cell::Hexahedron,b=_maxlevel[1]) = OctreeBWG{3,8,6}(cell.nodes,b)
 
@@ -197,11 +195,11 @@ function child_id(octant::OctantBWG{2},b::Integer=_maxlevel[1])
     return i+0x01
 end
 
-function parent(octant::OctantBWG{dim,N,M}, b::Integer=_maxlevel[dim-1]) where {dim,N,M}
-    if octant.l > 0 
-        h = _compute_size(b,octant.l)
-        l = octant.l - 0x01
-        return OctantBWG{dim,N,M}(l,octant.xyz .& ~h)
+function parent(octant::OctantBWG{dim,N,M,T}, b::Integer=_maxlevel[dim-1]) where {dim,N,M,T}
+    if octant.l > zero(T)
+        h = T(_compute_size(b,octant.l))
+        l = octant.l - one(T)
+        return OctantBWG(l,octant.xyz .& ~h)
     else 
         error("root has no parent")
     end
@@ -213,77 +211,89 @@ Given an `octant`, computes the two smallest possible octants that fit into the 
 of `octant`, respectively. These computed octants are called first and last descendants of `octant`
 since they are connected to `octant` by a path down the octree to the maximum level  `b`
 """
-function descendants(octant::OctantBWG{dim,N,M}, b::Integer=_maxlevel[dim-1]) where {dim,N,M}
+function descendants(octant::OctantBWG{dim,N,M,T}, b::Integer=_maxlevel[dim-1]) where {dim,N,M,T}
     l1 = b; l2 = b # not sure 
-    h = _compute_size(b,octant.l)
-    return OctantBWG{dim,N,M}(l1,octant.xyz), OctantBWG{dim,N,M}(l2,octant.xyz .+ (h-1))
+    h = T(_compute_size(b,octant.l))
+    return OctantBWG(l1,octant.xyz), OctantBWG(l2,octant.xyz .+ (h-one(T)))
 end
 
-function face_neighbor(octant::OctantBWG{dim,N,M}, f::Integer, b::Integer=_maxlevel[dim-1]) where {dim,N,M}
+function face_neighbor(octant::OctantBWG{dim,N,M,T}, f::T, b::T=_maxlevel[dim-1]) where {dim,N,M,T}
     l = octant.l
-    h = _compute_size(b,octant.l)
+    h = T(_compute_size(b,octant.l))
     x,y,z = octant.xyz 
-    x += ((f == 1) ? -h : ((f == 2) ? h : 0))
-    y += ((f == 3) ? -h : ((f == 4) ? h : 0))
-    z += ((f == 5) ? -h : ((f == 6) ? h : 0))
-    return OctantBWG{dim,N,M}(l,(x,y,z))
+    x += ((f == T(1)) ? -h : ((f == T(2)) ? h : zero(T)))
+    y += ((f == T(3)) ? -h : ((f == T(4)) ? h : zero(T)))
+    z += ((f == T(5)) ? -h : ((f == T(6)) ? h : zero(T)))
+    dim == 2 ? OctantBWG(l,(x,y)) : OctantBWG(l,(x,y,z))
 end
+#TODO: not nice don't know how to dispatch this
+face_neighbor(o::OctantBWG{dim,N,M,T}, f::Int, b::Int) where {dim,N,M,T} = face_neighbor(o,T(f),T(b))
 
 """
     edge_neighbor(octant::OctantBWG, e::Integer, b::Integer)
 Computes the edge neighbor octant which is only connected by the edge `e` to `octant`
 """
-function edge_neighbor(octant::OctantBWG{3,N,M}, e::Integer, b::Integer=_maxlevel[2]) where {N,M}
+function edge_neighbor(octant::OctantBWG{3,N,M,T}, e::T, b::T=_maxlevel[2]) where {N,M,T}
     @assert 1 ≤ e ≤ 12
-    e -= 1
+    e -= one(T)
     l = octant.l
-    h = _compute_size(b,octant.l)
+    _one = one(T)
+    _two = T(2)
+    h = T(_compute_size(b,octant.l))
     ox,oy,oz = octant.xyz
-    case = e ÷ 4
-    if case == 0
+    case = e ÷ T(4)
+    if case == zero(T)
         x = ox 
-        y = oy + (2*(e & 0x01) - 1)*h 
-        z = oz + ((e & 0x02) - 1)*h
-        return OctantBWG{3,N,M}(l,(x,y,z))
-    elseif case == 1
-        x = ox  + (2*(e & 0x01) - 1)*h 
+        y = oy + (_two*(e & _one) - one(T))*h 
+        z = oz + ((e & _two) - _one)*h
+        return OctantBWG(l,(x,y,z))
+    elseif case == one(T)
+        x = ox  + (_two*(e & _one) - _one)*h 
         y = oy 
-        z = oz + ((e & 0x02) - 1)*h
-        return OctantBWG{3,N,M}(l,(x,y,z))  
-    elseif case == 2
-        x = ox + (2*(e & 0x01) - 1)*h 
-        y = oy + ((e & 0x02) - 1)*h
+        z = oz + ((e & _two) - _one)*h
+        return OctantBWG(l,(x,y,z))  
+    elseif case == _two
+        x = ox + (_two*(e & _one) - _one)*h 
+        y = oy + ((e & _two) - _one)*h
         z = oz
-        return OctantBWG{3,N,M}(l,(x,y,z))
+        return OctantBWG(l,(x,y,z))
     else
         error("edge case not found")
     end
 end
+#TODO: not nice don't know how to dispatch this
+edge_neighbor(o::OctantBWG{3,N,M,T}, e::Int, b::Int) where {N,M,T} = edge_neighbor(o,T(e),T(b))
 
 """
     corner_neighbor(octant::OctantBWG, c::Integer, b::Integer)
 Computes the corner neighbor octant which is only connected by the corner `c` to `octant`
 """
-function corner_neighbor(octant::OctantBWG{3,N,M}, c::Integer, b::Integer=_maxlevel[2]) where {N,M}
-    c -= 1
+function corner_neighbor(octant::OctantBWG{3,N,M,T}, c::T, b::T=_maxlevel[2]) where {N,M,T}
+    c -= one(T)
     l = octant.l
-    h = _compute_size(b,octant.l)
+    h = T(_compute_size(b,octant.l))
     ox,oy,oz = octant.xyz
-    x = ox + (2*(c & 1) - 1)*h 
-    y = oy + ((c & 2) - 1)*h
-    z = oz + ((c & 4)/2 - 1)*h
-    return OctantBWG{3,N,M}(l,(x,y,z))
+    _one = one(T)
+    _two = T(2)
+    x = ox + (_two*(c & _one) - _one)*h 
+    y = oy + ((c & _two) - _one)*h
+    z = oz + ((c & T(4))÷_two - _one)*h
+    return OctantBWG(l,(x,y,z))
 end
 
-function corner_neighbor(octant::OctantBWG{2,N,M}, c::Integer, b::Integer=_maxlevel[1]) where {N,M}
-    c -= 1
+function corner_neighbor(octant::OctantBWG{2,N,M,T}, c::T, b::T=_maxlevel[1]) where {N,M,T}
+    c -= one(T)
     l = octant.l
     h = _compute_size(b,octant.l)
     ox,oy = octant.xyz
-    x = ox + (2*(c & 1) - 1)*h 
-    y = oy + ((c & 2) - 1)*h
-    return OctantBWG{2,N,M}(l,(x,y))
+    _one = one(T)
+    _two = T(2)
+    x = ox + (_two*(c & _one) - _one)*h 
+    y = oy + ((c & _two) - _one)*h
+    return OctantBWG(l,(x,y))
 end
+#TODO: not nice don't know how to dispatch this
+corner_neighbor(o::OctantBWG{dim,N,M,T}, c::Int, b::Int) where {dim,N,M,T} = corner_neighbor(o,T(c),T(b))
 
 function Base.show(io::IO, ::MIME"text/plain", o::OctantBWG{3,N,M}) where {N,M}
     x,y,z = o.xyz

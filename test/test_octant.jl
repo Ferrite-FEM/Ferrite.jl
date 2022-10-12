@@ -37,48 +37,19 @@
 end
 
 @testset "OctantBWG Encoding" begin
-    # Tests from Figure 3a) and 3b) of Burstedde et al
-    o = Ferrite.OctantBWG{3,8,6}(2,(0,4,2))
-    b = 0x03
+#    # Tests from Figure 3a) and 3b) of Burstedde et al
+    o = Ferrite.OctantBWG(3,2,21,3)
+    b = 3
     @test Ferrite.child_id(o,b) == 5
     @test Ferrite.child_id(Ferrite.parent(o,b),b) == 3
-    @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.OctantBWG{3,8,6}(0,(0,0,0))
+    @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.OctantBWG(3,0,1,b)
     @test_throws ErrorException Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b)
-    o = Ferrite.OctantBWG{3,8,6}(2,(2,2,0))
+    o = Ferrite.OctantBWG(3,2,4,3)
     @test Ferrite.child_id(o,b) == 4 
     @test Ferrite.child_id(Ferrite.parent(o,b),b) == 1 
-    @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.OctantBWG{3,8,6}(0,(0,0,0))
-    @test_throws ErrorException Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b)    
-
-    # Now I shift the root about (1,1,1)
-    o = Ferrite.OctantBWG{3,8,6}(2,(0,4,2) .+ 1)
-    b = 0x03
-    @test Ferrite.child_id(o,b) == 5
-    @test Ferrite.child_id(Ferrite.parent(o,b),b) == 3
-    @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.OctantBWG{3,8,6}(0,(0,0,0) .+ 1)
-    @test_throws ErrorException Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b)
-    o = Ferrite.OctantBWG{3,8,6}(2,(2,2,0) .+ 1)
-    @test Ferrite.child_id(o,b) == 4 
-    @test Ferrite.child_id(Ferrite.parent(o,b),b) == 1 
-    @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.OctantBWG{3,8,6}(0,(0,0,0) .+ 1)
+    @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.OctantBWG(3,0,1,b)
     @test_throws ErrorException Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b)
 
-    # coordinate system always on lowest level
-    # dim 3, level 2, morton id 2, number of levels 3
-    @test Ferrite.OctantBWG(3,2,2,3) == Ferrite.OctantBWG{3,8,6}(2,(2,0,0)) 
-    # dim 3, level 1, morton id 2, number of levels 3
-    @test Ferrite.OctantBWG(3,1,2,3) == Ferrite.OctantBWG{3,8,6}(1,(4,0,0)) 
-    # dim 3, level 0, morton id 2, number of levels 3
-    @test_throws AssertionError Ferrite.OctantBWG(3,0,2,3)
-    # dim 3, level 2, morton id 4, number of levels 3
-    @test Ferrite.OctantBWG(3,2,4,3) == Ferrite.OctantBWG{3,8,6}(2,(2,2,0)) 
-    @test Ferrite.OctantBWG(3,1,4,3) == Ferrite.OctantBWG{3,8,6}(1,(4,4,0)) 
-    @test Ferrite.OctantBWG(3,2,5,3) == Ferrite.OctantBWG{3,8,6}(2,(0,0,2)) 
-    @test Ferrite.OctantBWG(3,1,5,3) == Ferrite.OctantBWG{3,8,6}(1,(0,0,4)) 
-    @test Ferrite.OctantBWG(2,1,1,3) == Ferrite.OctantBWG{2,4,4}(1,(0,0))
-    @test Ferrite.OctantBWG(2,1,2,3) == Ferrite.OctantBWG{2,4,4}(1,(4,0))
-    @test Ferrite.OctantBWG(2,1,3,3) == Ferrite.OctantBWG{2,4,4}(1,(0,4))
-    @test Ferrite.OctantBWG(2,1,4,3) == Ferrite.OctantBWG{2,4,4}(1,(4,4))
     @test Ferrite.child_id(Ferrite.OctantBWG(2,1,1,3),3) == 1
     @test Ferrite.child_id(Ferrite.OctantBWG(2,1,2,3),3) == 2
     @test Ferrite.child_id(Ferrite.OctantBWG(2,1,3,3),3) == 3
@@ -110,47 +81,47 @@ end
 end
 
 @testset "OctantBWG Operations" begin
-    o = Ferrite.OctantBWG{3,8,6}(1,(2,0,0))
-    @test Ferrite.face_neighbor(o,0x01,0x02) == Ferrite.OctantBWG{3,8,6}(1,(0,0,0)) 
-    @test Ferrite.face_neighbor(o,0x02,0x02) == Ferrite.OctantBWG{3,8,6}(1,(4,0,0)) 
-    @test Ferrite.face_neighbor(o,0x03,0x02) == Ferrite.OctantBWG{3,8,6}(1,(2,-2,0))
-    @test Ferrite.face_neighbor(o,0x04,0x02) == Ferrite.OctantBWG{3,8,6}(1,(2,2,0)) 
-    @test Ferrite.face_neighbor(o,0x05,0x02) == Ferrite.OctantBWG{3,8,6}(1,(2,0,-2))
-    @test Ferrite.face_neighbor(o,0x06,0x02) == Ferrite.OctantBWG{3,8,6}(1,(2,0,2)) 
-    #@test Ferrite.descendants(o,2) == (Ferrite.OctantBWG{3,8,6}(1,(2,0,0)), Ferrite.OctantBWG{3,8,6}(1,(2,0,0)))
-    #@test Ferrite.descendants(o,3) == (Ferrite.OctantBWG{3,8,6}(2,(2,0,0)), Ferrite.OctantBWG{3,8,6}(2,(4,2,2)))
+    o = Ferrite.OctantBWG(1,(2,0,0))
+    @test Ferrite.face_neighbor(o,1,2) == Ferrite.OctantBWG(1,(0,0,0)) 
+    @test Ferrite.face_neighbor(o,2,2) == Ferrite.OctantBWG(1,(4,0,0)) 
+    @test Ferrite.face_neighbor(o,3,2) == Ferrite.OctantBWG(1,(2,-2,0))
+    @test Ferrite.face_neighbor(o,4,2) == Ferrite.OctantBWG(1,(2,2,0)) 
+    @test Ferrite.face_neighbor(o,5,2) == Ferrite.OctantBWG(1,(2,0,-2))
+    @test Ferrite.face_neighbor(o,6,2) == Ferrite.OctantBWG(1,(2,0,2)) 
+    @test Ferrite.descendants(o,2) == (Ferrite.OctantBWG(2,(2,0,0)), Ferrite.OctantBWG(2,(3,1,1)))
+    @test Ferrite.descendants(o,3) == (Ferrite.OctantBWG(3,(2,0,0)), Ferrite.OctantBWG(3,(5,3,3)))
 
-    o = Ferrite.OctantBWG{3,8,6}(1,(0,0,0))
-    @test Ferrite.face_neighbor(o,1,2) == Ferrite.OctantBWG{3,8,6}(1,(-2,0,0)) 
-    @test Ferrite.face_neighbor(o,2,2) == Ferrite.OctantBWG{3,8,6}(1,(2,0,0)) 
-    @test Ferrite.face_neighbor(o,3,2) == Ferrite.OctantBWG{3,8,6}(1,(0,-2,0))
-    @test Ferrite.face_neighbor(o,4,2) == Ferrite.OctantBWG{3,8,6}(1,(0,2,0)) 
-    @test Ferrite.face_neighbor(o,5,2) == Ferrite.OctantBWG{3,8,6}(1,(0,0,-2))
-    @test Ferrite.face_neighbor(o,6,2) == Ferrite.OctantBWG{3,8,6}(1,(0,0,2)) 
-    o = Ferrite.OctantBWG{3,8,6}(0,(0,0,0))
-    #@test Ferrite.descendants(o,2) == (Ferrite.OctantBWG{3,8,6}(1,(0,0,0)), Ferrite.OctantBWG{3,8,6}(1,(2,2,2)))
-    #@test Ferrite.descendants(o,3) == (Ferrite.OctantBWG{3,8,6}(2,(0,0,0)), Ferrite.OctantBWG{3,8,6}(2,(6,6,6)))
+    o = Ferrite.OctantBWG(1,(0,0,0))
+    @test Ferrite.face_neighbor(o,1,2) == Ferrite.OctantBWG(1,(-2,0,0)) 
+    @test Ferrite.face_neighbor(o,2,2) == Ferrite.OctantBWG(1,(2,0,0)) 
+    @test Ferrite.face_neighbor(o,3,2) == Ferrite.OctantBWG(1,(0,-2,0))
+    @test Ferrite.face_neighbor(o,4,2) == Ferrite.OctantBWG(1,(0,2,0)) 
+    @test Ferrite.face_neighbor(o,5,2) == Ferrite.OctantBWG(1,(0,0,-2))
+    @test Ferrite.face_neighbor(o,6,2) == Ferrite.OctantBWG(1,(0,0,2)) 
+    o = Ferrite.OctantBWG(0,(0,0,0))
+    @test Ferrite.descendants(o,2) == (Ferrite.OctantBWG(2,(0,0,0)), Ferrite.OctantBWG(2,(3,3,3)))
+    @test Ferrite.descendants(o,3) == (Ferrite.OctantBWG(3,(0,0,0)), Ferrite.OctantBWG(3,(7,7,7)))
     
-    @test Ferrite.edge_neighbor(Ferrite.OctantBWG{3,8,6}(2,(2,0,0)),1,3) == Ferrite.OctantBWG{3,8,6}(2,(2,-2,-2))
-    @test Ferrite.edge_neighbor(Ferrite.OctantBWG{3,8,6}(2,(2,0,0)),4,3) == Ferrite.OctantBWG{3,8,6}(2,(2,2,2))
-    @test Ferrite.edge_neighbor(Ferrite.OctantBWG{3,8,6}(2,(2,0,0)),6,3) == Ferrite.OctantBWG{3,8,6}(2,(4,0,-2))
-    @test Ferrite.edge_neighbor(Ferrite.OctantBWG{3,8,6}(2,(2,0,0)),9,3) == Ferrite.OctantBWG{3,8,6}(2,(0,-2,0))
-    @test Ferrite.edge_neighbor(Ferrite.OctantBWG{3,8,6}(2,(2,0,0)),12,3) == Ferrite.OctantBWG{3,8,6}(2,(4,2,0))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(2,0,0)),1,3) == Ferrite.OctantBWG(2,(2,-2,-2))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(2,0,0)),4,3) == Ferrite.OctantBWG(2,(2,2,2))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(2,0,0)),6,3) == Ferrite.OctantBWG(2,(4,0,-2))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(2,0,0)),9,3) == Ferrite.OctantBWG(2,(0,-2,0))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(2,0,0)),12,3) == Ferrite.OctantBWG(2,(4,2,0))
 
-    @test Ferrite.edge_neighbor(Ferrite.OctantBWG{3,8,6}(3,(0,0,0)),1,4)  == Ferrite.OctantBWG{3,8,6}(3,(0,-2,-2))
-    @test Ferrite.edge_neighbor(Ferrite.OctantBWG{3,8,6}(3,(0,0,0)),12,4) == Ferrite.OctantBWG{3,8,6}(3,(2,2,0))
-    @test Ferrite.edge_neighbor(Ferrite.OctantBWG{3,8,6}(2,(0,0,0)),1,4)  == Ferrite.OctantBWG{3,8,6}(2,(0,-4,-4))
-    @test Ferrite.edge_neighbor(Ferrite.OctantBWG{3,8,6}(2,(0,0,0)),12,4) == Ferrite.OctantBWG{3,8,6}(2,(4,4,0))
-    @test Ferrite.edge_neighbor(Ferrite.OctantBWG{3,8,6}(1,(0,0,0)),1,4)  == Ferrite.OctantBWG{3,8,6}(1,(0,-8,-8))
-    @test Ferrite.edge_neighbor(Ferrite.OctantBWG{3,8,6}(1,(0,0,0)),12,4) == Ferrite.OctantBWG{3,8,6}(1,(8,8,0))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(3,(0,0,0)),1,4)  == Ferrite.OctantBWG(3,(0,-2,-2))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(3,(0,0,0)),12,4) == Ferrite.OctantBWG(3,(2,2,0))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(0,0,0)),1,4)  == Ferrite.OctantBWG(2,(0,-4,-4))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(2,(0,0,0)),12,4) == Ferrite.OctantBWG(2,(4,4,0))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(1,(0,0,0)),1,4)  == Ferrite.OctantBWG(1,(0,-8,-8))
+    @test Ferrite.edge_neighbor(Ferrite.OctantBWG(1,(0,0,0)),12,4) == Ferrite.OctantBWG(1,(8,8,0))
 
-    @test Ferrite.corner_neighbor(Ferrite.OctantBWG{3,8,6}(2,(2,0,0)),1,3) == Ferrite.OctantBWG{3,8,6}(2,(0,-2,-2))
-    @test Ferrite.corner_neighbor(Ferrite.OctantBWG{3,8,6}(2,(2,0,0)),4,3) == Ferrite.OctantBWG{3,8,6}(2,(4,2,-2))
-    @test Ferrite.corner_neighbor(Ferrite.OctantBWG{3,8,6}(2,(2,0,0)),8,3) == Ferrite.OctantBWG{3,8,6}(2,(4,2,2))
+    @test Ferrite.corner_neighbor(Ferrite.OctantBWG(2,(2,0,0)),1,3) == Ferrite.OctantBWG(2,(0,-2,-2))
+    @test Ferrite.corner_neighbor(Ferrite.OctantBWG(2,(2,0,0)),4,3) == Ferrite.OctantBWG(2,(4,2,-2))
+    @test Ferrite.corner_neighbor(Ferrite.OctantBWG(2,(2,0,0)),8,3) == Ferrite.OctantBWG(2,(4,2,2))
 
-    @test Ferrite.corner_neighbor(Ferrite.OctantBWG{2,4,4}(2,(2,0)),1,3) == Ferrite.OctantBWG{2,4,4}(2,(0,-2))
-    @test Ferrite.corner_neighbor(Ferrite.OctantBWG{2,4,4}(2,(2,0)),2,3) == Ferrite.OctantBWG{2,4,4}(2,(4,-2))
-    @test Ferrite.corner_neighbor(Ferrite.OctantBWG{2,4,4}(2,(2,0)),4,3) == Ferrite.OctantBWG{2,4,4}(2,(4,2))
+    @test Ferrite.corner_neighbor(Ferrite.OctantBWG(2,(2,0)),1,3) == Ferrite.OctantBWG(2,(0,-2))
+    @test Ferrite.corner_neighbor(Ferrite.OctantBWG(2,(2,0)),2,3) == Ferrite.OctantBWG(2,(4,-2))
+    @test Ferrite.corner_neighbor(Ferrite.OctantBWG(2,(2,0)),4,3) == Ferrite.OctantBWG(2,(4,2))
 end
 
 @testset "OctreeBWG Operations" begin
@@ -164,7 +135,7 @@ end
     adaptive_grid = ForestBWG(grid,3)
     for cell in adaptive_grid.cells
         @test cell isa OctreeBWG 
-        @test cell.leaves[1] == OctantBWG(2,0,1,Int(cell.b)) 
+        @test cell.leaves[1] == OctantBWG(2,0,1,cell.b) 
     end
     #simple first and second level refinement
     # first case
@@ -188,13 +159,13 @@ end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
     @test length(adaptive_grid.cells[1].leaves) == 4
     for (m,octant) in zip(1:4,adaptive_grid.cells[1].leaves)
-        @test octant == OctantBWG(2,1,m,Int(adaptive_grid.cells[1].b))
+        @test octant == OctantBWG(2,1,m,adaptive_grid.cells[1].b)
     end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
     # octree holds now 3 first level and 4 second level
     @test length(adaptive_grid.cells[1].leaves) == 7
     for (m,octant) in zip(1:4,adaptive_grid.cells[1].leaves)
-        @test octant == OctantBWG(2,2,m,Int(adaptive_grid.cells[1].b))
+        @test octant == OctantBWG(2,2,m,adaptive_grid.cells[1].b)
     end
     # second case
     # x-----------x-----------x
@@ -262,12 +233,12 @@ end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
     @test length(adaptive_grid.cells[1].leaves) == 8
     for (m,octant) in zip(1:8,adaptive_grid.cells[1].leaves)
-        @test octant == OctantBWG(3,1,m,Int(adaptive_grid.cells[1].b))
+        @test octant == OctantBWG(3,1,m,adaptive_grid.cells[1].b)
     end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
     @test length(adaptive_grid.cells[1].leaves) == 15
     for (m,octant) in zip(1:8,adaptive_grid.cells[1].leaves)
-        @test octant == OctantBWG(3,2,m,Int(adaptive_grid.cells[1].b))
+        @test octant == OctantBWG(3,2,m,adaptive_grid.cells[1].b)
     end
     adaptive_grid = ForestBWG(grid,3)
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
