@@ -536,7 +536,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
 
             if haskey(edges_recv, sending_rank)
                 edges_recv_unique_set = Set{Tuple{Int,Int}}()
-                for lei ∈ edges_recv[remote_rank]
+                for lei ∈ edges_recv[sending_rank]
                     edge = toglobal(dgrid, lei)
                     push!(edges_send_unique_set, edge)
                 end
