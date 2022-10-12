@@ -572,15 +572,15 @@ function local_to_global_numbering(dh::DistributedDofHandler)
     @debug println("Local to global mapping: $local_to_global (R$my_rank)")
     @assert findfirst(local_to_global .== 0) === nothing
 
-    @debug vtk_grid("dofs", dgrid; compress=false) do vtk
-        u = Vector{Float64}(undef,length(dgrid.local_grid.nodes))
-        fill!(u, 0.0)
-        for i=1:length(u)
-            u[i] = local_to_global[dh.vertexdicts[1][i]]
-        end
-        vtk_point_data(vtk, u,"dof")
-        vtk_partitioning(vtk, dgrid)
-    end
+    # @debug vtk_grid("dofs", dgrid; compress=false) do vtk
+    #     u = Vector{Float64}(undef,length(dgrid.local_grid.nodes))
+    #     fill!(u, 0.0)
+    #     for i=1:length(u)
+    #         u[i] = local_to_global[dh.vertexdicts[1][i]]
+    #     end
+    #     vtk_point_data(vtk, u,"dof")
+    #     vtk_partitioning(vtk, dgrid)
+    # end
 
     return local_to_global
 end
