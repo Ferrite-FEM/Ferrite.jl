@@ -674,7 +674,7 @@ function __close!(dh::DistributedDofHandler{dim}) where {dim}
                     end
                 end # vertex loop
             end
-            if dim == 3 # edges only in 3D
+            if dim > 2 # edges only in 3D
                 if interpolation_info.nedgedofs > 0
                     for edge in edges(cell)
                         sedge, dir = sortedge(edge)
