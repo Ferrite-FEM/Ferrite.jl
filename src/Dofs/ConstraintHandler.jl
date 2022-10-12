@@ -360,6 +360,7 @@ end
 function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::T) where {T}
+    length(faces) == 0 && return
 
     dim = getdim(getgrid(dh))
     _tmp_cellid = first(faces)[1]
@@ -401,6 +402,8 @@ end
 function _update!(inhomogeneities::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::Float64)
+    length(nodes) == 0 && return
+
     counter = 1
     for (idx, nodenumber) in enumerate(nodeidxs)
         x = getgrid(dh).nodes[nodenumber].x
