@@ -539,7 +539,6 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                 for lei ∈ edges_recv[remote_rank]
                     edge = toglobal(dgrid, lei)
                     push!(edges_send_unique_set, edge)
-                    end
                 end
                 n_edges = length(edges_recv_unique_set)
                 @debug println("Receiving $n_edges edges from rank $sending_rank (R$my_rank)")
