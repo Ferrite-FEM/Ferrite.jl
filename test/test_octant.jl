@@ -265,6 +265,11 @@ end
         refine_all(adaptive_grid,l)
         for tree in adaptive_grid.cells
             @test all(Ferrite.morton.(tree.leaves,l,5) == collect(1:2^(3*l)))
+            # reconstruct parents
+            parents = unique(Ferrite.parent.(tree.leaves,5))
+            @test length(parents) == 2^(3*(l-1))
+            morton_parents = Ferrite.morton.(parents,l-1,5)
+            @test all(morton_parents .== collect(1:2^(3*(l-1))))
         end
     end
 end
