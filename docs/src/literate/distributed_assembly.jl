@@ -23,14 +23,22 @@ MPI.Init()
 
 # We start generating a simple grid with 20x20 quadrilateral elements
 # and distribute it across our processors using `generate_distributed_grid`. 
-dgrid = generate_distributed_grid(Quadrilateral, (20, 20));
+# dgrid = generate_distributed_grid(QuadraticQuadrilateral, (3, 1));
+# dgrid = generate_distributed_grid(Tetrahedron, (2, 2, 2));
+dgrid = generate_distributed_grid(Hexahedron, (2, 2, 2)); #src
+# dgrid = generate_distributed_grid(Tetrahedron, (3, 3, 3)); #src
 
 # ### Trial and test functions
 # Nothing changes here.
 dim = 2
-ip = Lagrange{dim, RefCube, 1}()
-ip_geo = Lagrange{dim, RefCube, 1}()
-qr = QuadratureRule{dim, RefCube}(3)
+dim = 3 #src
+ref = RefCube
+# ref = RefTetrahedron #src
+ip = Lagrange{dim, ref, 1}()
+ip = Lagrange{dim, ref, 2}() #src
+ip_geo = Lagrange{dim, ref, 1}()
+qr = QuadratureRule{dim, ref}(2)
+qr = QuadratureRule{dim, ref}(4) #src
 cellvalues = CellScalarValues(qr, ip, ip_geo);
 
 # ### Degrees of freedom
@@ -44,10 +52,16 @@ close!(dh);
 # Nothing has to be changed here either.
 ch = ConstraintHandler(dh);
 ∂Ω = union(getfaceset.((getlocalgrid(dgrid), ), ["left", "right", "top", "bottom"])...);
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> 1)
+∂Ω = union(getfaceset.((getlocalgrid(dgrid), ), ["left", "right", "top", "bottom", "front", "back"])...); #src
+dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
+dbc_val = 0 #src
+dbc = Dirichlet(:u, ∂Ω, (x, t) -> dbc_val) #src
 add!(ch, dbc);
 close!(ch)
 update!(ch, 0.0);
+
+my_rank = MPI.Comm_rank(MPI.COMM_WORLD)
+println("R$my_rank: prescribing $(ch.prescribed_dofs) on $∂Ω")
 
 # ### Assembling the linear system
 # Assembling the system works also mostly analogue.
@@ -137,7 +151,16 @@ vtk_grid("heat_equation_distributed", dh) do vtk
     # the visualization with some meta  information about 
     # the grid and its partitioning
     vtk_shared_vertices(vtk, dgrid)
+    vtk_shared_faces(vtk, dgrid)
+    vtk_shared_edges(vtk, dgrid) #src
     vtk_partitioning(vtk, dgrid)
+end
+
+map_parts(local_view(u, u.rows)) do u_local
+    my_rank = MPI.Comm_rank(MPI.COMM_WORLD)
+    open("solution-$(my_rank)","w") do io
+        println(io, u_local)
+    end
 end
 
 ## Test the result against the manufactured solution                    #src
@@ -151,7 +174,7 @@ for cell in CellIterator(dh)                                            #src
         for q_point in 1:getnquadpoints(cellvalues)                     #src
             x = spatial_coordinate(cellvalues, q_point, coords)         #src
             for i in 1:n_basefuncs                                      #src
-                uₐₙₐ    = prod(cos, x*π/2)+1.0                          #src
+                uₐₙₐ    = prod(cos, x*π/2)+dbc_val                      #src
                 uₐₚₚᵣₒₓ = function_value(cellvalues, q_point, uₑ)       #src
                 @test isapprox(uₐₙₐ, uₐₚₚᵣₒₓ; atol=1e-1)                #src
             end                                                         #src
