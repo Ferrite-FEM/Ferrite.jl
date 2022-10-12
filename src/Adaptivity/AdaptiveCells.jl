@@ -61,7 +61,7 @@ end
 # > for example, in Algorithm 1 yield the correct result even for negative coordinates.
 # also from BWG 2011
 # TODO: use LUT method from https://www.forceflow.be/2013/10/07/morton-encodingdecoding-through-bit-interleaving-implementations/
-function morton(o::OctantBWG{dim,N,M,T},l::Integer,b::Integer) where {dim,N,M,T}
+function morton(o::OctantBWG{dim,N,M,T},l::T,b::T) where {dim,N,M,T}
     id = zero(widen(eltype(o.xyz)))
     loop_length = (sizeof(typeof(id))*T(8)) ÷ dim - one(T)
     for i in zero(T):loop_length
@@ -94,7 +94,7 @@ function refine!(octree::OctreeBWG{dim,N,M,T}, o::OctantBWG{dim,N,M,T}) where {d
     start_child_id = morton(old_octant,old_octant.l+one(T),octree.b)
     end_child_id = start_child_id + N-one(T)
     for child_mort_id in start_child_id:end_child_id
-        insert!(octree.leaves,leave_idx,OctantBWG(dim,old_octant.l+one(T),child_mort_id,octree.b)) #TODO remove me after introducing parametrization
+        insert!(octree.leaves,leave_idx,OctantBWG(dim,old_octant.l+one(T),child_mort_id,octree.b))
         leave_idx += 1
     end
 end
@@ -226,8 +226,8 @@ function face_neighbor(octant::OctantBWG{dim,N,M,T}, f::T, b::T=_maxlevel[dim-1]
     z += ((f == T(5)) ? -h : ((f == T(6)) ? h : zero(T)))
     dim == 2 ? OctantBWG(l,(x,y)) : OctantBWG(l,(x,y,z))
 end
-#TODO: not nice don't know how to dispatch this
-face_neighbor(o::OctantBWG{dim,N,M,T}, f::Int, b::Int) where {dim,N,M,T} = face_neighbor(o,T(f),T(b))
+#TODO: cannot specify T1,T2,T3 to be of subtype Integer, stack overflow
+face_neighbor(o::OctantBWG{dim,N,M,T1}, f::T2, b::T3) where {dim,N,M,T1,T2,T3} = face_neighbor(o,T1(f),T1(b))
 
 """
     edge_neighbor(octant::OctantBWG, e::Integer, b::Integer)
@@ -261,8 +261,8 @@ function edge_neighbor(octant::OctantBWG{3,N,M,T}, e::T, b::T=_maxlevel[2]) wher
         error("edge case not found")
     end
 end
-#TODO: not nice don't know how to dispatch this
-edge_neighbor(o::OctantBWG{3,N,M,T}, e::Int, b::Int) where {N,M,T} = edge_neighbor(o,T(e),T(b))
+#TODO: cannot specify T1,T2,T3 to be of subtype Integer, stack overflow
+edge_neighbor(o::OctantBWG{3,N,M,T1}, e::T2, b::T3) where {N,M,T1,T2,T3} = edge_neighbor(o,T1(e),T1(b))
 
 """
     corner_neighbor(octant::OctantBWG, c::Integer, b::Integer)
@@ -292,8 +292,8 @@ function corner_neighbor(octant::OctantBWG{2,N,M,T}, c::T, b::T=_maxlevel[1]) wh
     y = oy + ((c & _two) - _one)*h
     return OctantBWG(l,(x,y))
 end
-#TODO: not nice don't know how to dispatch this
-corner_neighbor(o::OctantBWG{dim,N,M,T}, c::Int, b::Int) where {dim,N,M,T} = corner_neighbor(o,T(c),T(b))
+#TODO: cannot specify T1,T2,T3 to be of subtype Integer, stack overflow
+corner_neighbor(o::OctantBWG{dim,N,M,T1}, c::T2, b::T3) where {dim,N,M,T1,T2,T3} = corner_neighbor(o,T1(c),T1(b))
 
 function Base.show(io::IO, ::MIME"text/plain", o::OctantBWG{3,N,M}) where {N,M}
     x,y,z = o.xyz
