@@ -216,9 +216,9 @@ end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[4])
     @test length(adaptive_grid.cells[1].leaves) == 7
     @test all(getproperty.(adaptive_grid.cells[1].leaves[1:3],:l) .== 1)
-    ###################################################
-    ####uniform refinement for all cells and levels####
-    ###################################################
+    ##################################################################
+    ####uniform refinement and coarsening for all cells and levels####
+    ##################################################################
     adaptive_grid = ForestBWG(grid,8)
     function refine_all(grid::ForestBWG,l)
         for tree in adaptive_grid.cells
@@ -231,11 +231,27 @@ end
            end
         end
     end
+    function coarsen_all(adaptive_grid)
+        for tree in adaptive_grid.cells
+            for leaf in tree.leaves
+                if Ferrite.child_id(leaf,tree.b) == 1
+                    Ferrite.coarsen!(tree,leaf)
+                end
+            end
+        end
+    end
     for l in 1:8
         refine_all(adaptive_grid,l)
         for tree in adaptive_grid.cells
             @test all(Ferrite.morton.(tree.leaves,l,8) == collect(1:2^(2*l)))
         end
+    end
+    #now go back from finest to coarsest
+    for l in 7:-1:0
+        coarsen_all(adaptive_grid) 
+        for tree in adaptive_grid.cells
+            @test all(Ferrite.morton.(tree.leaves,l,8) == collect(1:2^(2*l)))
+        end 
     end
     #########################
     # now do the same with 3D
@@ -261,15 +277,18 @@ end
     @test all(getproperty.(adaptive_grid.cells[1].leaves[4:11],:l) .== 2)
     @test all(getproperty.(adaptive_grid.cells[1].leaves[12:end],:l) .== 1)
     adaptive_grid = ForestBWG(grid,5)
+    #go from coarsest to finest uniformly
     for l in 1:5
         refine_all(adaptive_grid,l)
         for tree in adaptive_grid.cells
             @test all(Ferrite.morton.(tree.leaves,l,5) == collect(1:2^(3*l)))
-            # reconstruct parents
-            parents = unique(Ferrite.parent.(tree.leaves,5))
-            @test length(parents) == 2^(3*(l-1))
-            morton_parents = Ferrite.morton.(parents,l-1,5)
-            @test all(morton_parents .== collect(1:2^(3*(l-1))))
         end
+    end
+    #now go back from finest to coarsest
+    for l in 4:-1:0
+        coarsen_all(adaptive_grid) 
+        for tree in adaptive_grid.cells
+            @test all(Ferrite.morton.(tree.leaves,l,5) == collect(1:2^(3*l)))
+        end 
     end
 end

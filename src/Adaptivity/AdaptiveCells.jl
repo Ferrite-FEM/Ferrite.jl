@@ -90,6 +90,7 @@ struct OctreeBWG{dim,N,M} <: AbstractAdaptiveCell{dim,N,M}
 end
 
 function refine!(octree::OctreeBWG{dim,N,M}, o::OctantBWG{dim,N,M}) where {dim,N,M}
+    # really the only way?
     leave_idx = findfirst(x->x==o,octree.leaves)
     # how to obtain id from morton index ?
     old_octant = popat!(octree.leaves,leave_idx)
@@ -99,6 +100,20 @@ function refine!(octree::OctreeBWG{dim,N,M}, o::OctantBWG{dim,N,M}) where {dim,N
         insert!(octree.leaves,leave_idx,OctantBWG(dim,Int(old_octant.l+1),child_mort_id,Int(octree.b))) #TODO remove me after introducing parametrization
         leave_idx += 1
     end
+end
+
+function coarsen!(octree::OctreeBWG{dim,N,M}, o::OctantBWG{dim,N,M}) where {dim,N,M}
+    leave_idx = findfirst(x->x==o,octree.leaves)
+    shift = child_id(o,octree.b) - 1
+    if shift != 0
+        old_morton = morton(o,o.l,octree.b)
+        o = OctantBWG(dim,Int(o.l),old_morton,Int(octree.b)) #TODO fix after parametrization
+    end
+    window_start = leave_idx - shift
+    window_length = 2^dim - 1
+    new_octant = parent(o, octree.b)
+    octree.leaves[leave_idx - shift] = new_octant
+    deleteat!(octree.leaves,leave_idx-shift+1:leave_idx-shift+window_length)
 end
 
 OctreeBWG{3,8,6}(nodes::NTuple,b=_maxlevel[2]) = OctreeBWG{3,8,6}([zero(OctantBWG{3,8,6})],b,nodes)
