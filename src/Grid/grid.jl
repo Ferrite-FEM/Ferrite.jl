@@ -32,6 +32,8 @@ struct Cell{dim,N,M} <: AbstractCell{dim,N,M}
 end
 nfaces(c::C) where {C<:AbstractCell} = nfaces(typeof(c))
 nfaces(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = M
+nedges(c::C) where {C<:AbstractCell} = length(edges(c))
+nvertices(c::C) where {C<:AbstractCell} = length(vertices(c))
 nnodes(c::C) where {C<:AbstractCell} = nnodes(typeof(c))
 nnodes(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = N
 
@@ -207,7 +209,43 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
             end
         end       
     end
-
+    
+    celltype = eltype(cells)
+    if isconcretetype(celltype)
+        dim = getdim(cells[1])
+        _nvertices = nvertices(cells[1])
+        push!(V_vertex,zero(EntityNeighborhood{VertexIndex}))
+        push!(I_vertex,1); push!(J_vertex,_nvertices)
+        if dim > 1
+            _nfaces = nfaces(cells[1])
+            push!(V_face,zero(EntityNeighborhood{FaceIndex}))
+            push!(I_face,1); push!(J_face,_nfaces)
+        end
+        if dim > 2
+            _nedges = nedges(cells[1])
+            push!(V_edge,zero(EntityNeighborhood{EdgeIndex}))
+            push!(I_edge,1); push!(J_edge,_nedges)
+        end
+    else
+        celltypes = typeof.(cells) 
+        for celltype in celltypes
+            celltypeidx = findfirst(x->typeof(x)==celltype,cells)
+            dim = getdim(cells[celltypeidx])
+            _nvertices = nvertices(cells[celltypeidx])
+            push!(V_vertex,zero(EntityNeighborhood{VertexIndex}))
+            push!(I_vertex,celltypeidx); push!(J_vertex,_nvertices)
+            if dim > 1
+                _nfaces = nfaces(cells[celltypeidx])
+                push!(V_face,zero(EntityNeighborhood{FaceIndex}))
+                push!(I_face,celltypeidx); push!(J_face,_nfaces)
+            end
+            if dim > 2
+                _nedges = nedges(cells[celltypeidx])
+                push!(V_edge,zero(EntityNeighborhood{EdgeIndex}))
+                push!(I_edge,celltypeidx); push!(J_edge,_nedges)
+            end
+        end
+    end
     face_neighbor = sparse(I_face,J_face,V_face)
     vertex_neighbor = sparse(I_vertex,J_vertex,V_vertex) 
     edge_neighbor = sparse(I_edge,J_edge,V_edge)
@@ -391,18 +429,18 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx:
     cellid, local_edgeidx = edgeidx[1], edgeidx[2]
     cell_edges = edges(getcells(grid,cellid))
     nonlocal_edgeid = cell_edges[local_edgeidx] 
+    cell_neighbors = getneighborhood(top,grid,CellIndex(cellid))
+    self_reference_local = EdgeIndex[]
+    for cellid in cell_neighbors
+        local_neighbor_edgeid = findfirst(x->issubset(x,nonlocal_edgeid),edges(getcells(grid,cellid)))
+        local_neighbor_edgeid === nothing && continue
+        local_edge = EdgeIndex(cellid,local_neighbor_edgeid)
+        push!(self_reference_local, local_edge)
+    end
     if include_self  
-        cell_neighbors = getneighborhood(top,grid,CellIndex(cellid))
-        self_reference_local = EdgeIndex[]
-        for cellid in cell_neighbors
-            local_neighbor_edgeid = findfirst(x->issubset(x,nonlocal_edgeid),edges(getcells(grid,cellid)))
-            local_neighbor_edgeid === nothing && continue
-            local_edge = EdgeIndex(cellid,local_neighbor_edgeid)
-            push!(self_reference_local, local_edge)
-        end
         return unique([top.edge_neighbor[cellid, local_edgeidx].neighbor_info; self_reference_local; edgeidx])
     else
-        return top.edge_neighbor[cellid, local_edgeidx].neighbor_info
+        return unique([top.edge_neighbor[cellid, local_edgeidx].neighbor_info; self_reference_local])
     end
 end
 
