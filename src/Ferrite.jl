@@ -64,6 +64,7 @@ include("Mesh/utils.jl")
 
 # Dofs
 include("Dofs/DofHandler.jl")
+include("Dofs/NewDofHandler.jl")
 include("Dofs/MixedDofHandler.jl")
 include("Dofs/ConstraintHandler.jl")
 

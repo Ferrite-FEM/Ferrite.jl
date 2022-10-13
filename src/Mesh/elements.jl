@@ -69,6 +69,7 @@ const elementtypes = Dict{DataType, String}(Element{1,RefCube,2}     => "Line",
                                             Element{2,RefCube,4}     => "Quadrilateral",
                                             Element{2,RefCube,9}     => "QuadraticQuadrilateral",
                                             Element{3,RefCube,8}     => "Hexahedron",
+                                            Element{4,RefCube,16}    => "Tesserract",
                                             Element{3,RefCube,27}    => "QuadraticHexahedron",
                                             Element{3,RefCube,20}    => "SerendipityHexahedron",
                                             Element{2,RefSimplex,3}  => "Triangle",
@@ -88,10 +89,12 @@ get_geo_interpolation(::Type{TriangleElement})                = Lagrange{2, RefS
 get_geo_interpolation(::Type{QuadraticTriangleElement})       = Lagrange{2, RefSimplex, 2}
 get_geo_interpolation(::Type{TetrahedronElement})             = Lagrange{3, RefSimplex, 1}
 get_geo_interpolation(::Type{QuadraticTetrahedronElement})    = Lagrange{3, RefSimplex, 2}
-get_geo_interpolation(e::Element{Dim, RefGeo, N})             = get_geo_interpolation(typeof(e)) where {Dim, RefGeo, N}
+# Redirection helper
+get_geo_interpolation(e::Element{Dim, RefGeo, N}) where {Dim, RefGeo, N} = get_geo_interpolation(typeof(e)) 
 
 # Compat code against old API.
-default_interpolation(e::Element{Dim, RefGeo, N}) = get_geo_interpolation(e)
+default_interpolation(e::Element{Dim, RefGeo, N}) where {Dim, RefGeo, N} = get_geo_interpolation(e)
+default_interpolation(et::Type{Element{Dim, RefGeo, N}}) where {Dim, RefGeo, N} = get_geo_interpolation(et)
 
 # ---------------------------------- Topological Entity Interface --------------------------------
 # Functions to uniquely identify vertices, edges and faces, used when distributing
@@ -117,13 +120,13 @@ edges(c::Union{HexahedronElement,Element{3,RefCube,20}}) = ((c.nodes[1],c.nodes[
 faces(c::Union{HexahedronElement,Element{3,RefCube,20}}) = ((c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))
 
 # Cubes
-getbasegeometry(::Type{Element{1, RefCube, N}}) = LineElement where {N}
-getbasegeometry(::Type{Element{2, RefCube, N}}) = QuadrilateralElement where {N}
-getbasegeometry(::Type{Element{3, RefCube, N}}) = HexahedronElement where {N}
-getbasegeometry(::Type{Element{4, RefCube, N}}) = TesserractElement where {N}
+getbasegeometry(::Type{Element{1, RefCube, N}}) where {N} = LineElement 
+getbasegeometry(::Type{Element{2, RefCube, N}}) where {N} = QuadrilateralElement
+getbasegeometry(::Type{Element{3, RefCube, N}}) where {N} = HexahedronElement
+getbasegeometry(::Type{Element{4, RefCube, N}}) where {N} = TesserractElement
 # Simplices
-getbasegeometry(::Type{Element{1, RefSimplex, N}}) = LineElement where {N}
-getbasegeometry(::Type{Element{2, RefSimplex, N}}) = TriangleElement where {N}
-getbasegeometry(::Type{Element{3, RefSimplex, N}}) = TetrahedronElement where {N}
+getbasegeometry(::Type{Element{1, RefSimplex, N}}) where {N} = LineElement
+getbasegeometry(::Type{Element{2, RefSimplex, N}}) where {N} = TriangleElement
+getbasegeometry(::Type{Element{3, RefSimplex, N}}) where {N} = TetrahedronElement
 # Redirection helper
-getbasegeometry(e::Element{Dim, RefGeo, N}) = getbasegeometry(typeof(e)) where {Dim, RefGeo, N}
+getbasegeometry(e::Element{Dim, RefGeo, N}) where {Dim, RefGeo, N} = getbasegeometry(typeof(e))

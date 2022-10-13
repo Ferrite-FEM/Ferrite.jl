@@ -156,4 +156,10 @@ export
     PointIterator,
     PointLocation,
     PointScalarValues,
-    PointVectorValues
+    PointVectorValues,
+
+
+# All the new stuff goes here
+    generate_mesh,
+    QuadrilateralElement,
+    NewDofHandler
