@@ -58,6 +58,7 @@ function find_field(dh::DofHandler, field_name::Symbol)
     j === nothing && error("could not find field :$field_name in DofHandler (existing fields: $(getfieldnames(dh)))")
     return j
 end
+getgrid(dh::DofHandler) = dh.grid
 
 # Calculate the offset to the first local dof of a field
 function field_offset(dh::DofHandler, field_name::Symbol)
@@ -431,7 +432,7 @@ function renumber!(dh::AbstractDofHandler, perm::AbstractVector{<:Integer})
 end
 
 function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
-    vtk_grid(filename, dh.grid; compress=compress)
+    vtk_grid(filename, getgrid(dh); compress=compress)
 end
 
 """
@@ -457,8 +458,7 @@ function reshape_to_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol) where
     return data
 end
 
-function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=Set{Int}(1:getncells(dh.grid))) where T
-
+function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=Set{Int}(1:getncells(getgrid(dh)))) where T
     _celldofs = Vector{Int}(undef, ndofs_per_cell(dh, first(cellset)))
     for cell in CellIterator(dh, collect(cellset))
         celldofs!( _celldofs, cell)

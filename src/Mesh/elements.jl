@@ -40,7 +40,8 @@ nfaces(::Type{<:AbstractElement{dim, RefSimplex}}) where {dim} = (dim+1)
 nnodes(c::C) where {C<:AbstractElement} = nnodes(typeof(c))
 nnodes(::Type{Element{Dim, RefGeo, N}}) where {Dim, RefGeo, N} = N
 
-getdim(::Element{Dim}) where Dim = Dim
+getdim(::Element{Dim, RefGeo, N}) where {Dim, RefGeo, N} = Dim
+getdim(::Type{Element{Dim, RefGeo, N}}) where {Dim, RefGeo, N} = Dim
 
 """
 A `ElementIndex` wraps an Int and corresponds to a element with that number in the mesh
@@ -78,17 +79,17 @@ const elementtypes = Dict{DataType, String}(Element{1,RefCube,2}     => "Line",
                                             Element{3,RefSimplex,10} => "QuadraticTetrahedron");
 
 # Helper to always get the correct geometric interpolation
-get_geo_interpolation(::Type{LineElement})                    = Lagrange{1, RefCube, 1}
-get_geo_interpolation(::Type{QuadraticLineElement})           = Lagrange{1, RefCube, 2}
-get_geo_interpolation(::Type{QuadrilateralElement})           = Lagrange{2, RefCube, 1}
-get_geo_interpolation(::Type{QuadraticQuadrilateralElement})  = Lagrange{2, RefCube, 2}
-get_geo_interpolation(::Type{HexahedronElement})              = Lagrange{3, RefCube, 1}
-get_geo_interpolation(::Type{QuadraticHexahedronElement})     = Lagrange{3, RefCube, 2}
-get_geo_interpolation(::Type{TesserractElement})              = Lagrange{1, RefCube, 1}
-get_geo_interpolation(::Type{TriangleElement})                = Lagrange{2, RefSimplex, 1}
-get_geo_interpolation(::Type{QuadraticTriangleElement})       = Lagrange{2, RefSimplex, 2}
-get_geo_interpolation(::Type{TetrahedronElement})             = Lagrange{3, RefSimplex, 1}
-get_geo_interpolation(::Type{QuadraticTetrahedronElement})    = Lagrange{3, RefSimplex, 2}
+get_geo_interpolation(::Type{LineElement})                    = Lagrange{1, RefCube, 1}()
+get_geo_interpolation(::Type{QuadraticLineElement})           = Lagrange{1, RefCube, 2}()
+get_geo_interpolation(::Type{QuadrilateralElement})           = Lagrange{2, RefCube, 1}()
+get_geo_interpolation(::Type{QuadraticQuadrilateralElement})  = Lagrange{2, RefCube, 2}()
+get_geo_interpolation(::Type{HexahedronElement})              = Lagrange{3, RefCube, 1}()
+get_geo_interpolation(::Type{QuadraticHexahedronElement})     = Lagrange{3, RefCube, 2}()
+get_geo_interpolation(::Type{TesserractElement})              = Lagrange{1, RefCube, 1}()
+get_geo_interpolation(::Type{TriangleElement})                = Lagrange{2, RefSimplex, 1}()
+get_geo_interpolation(::Type{QuadraticTriangleElement})       = Lagrange{2, RefSimplex, 2}()
+get_geo_interpolation(::Type{TetrahedronElement})             = Lagrange{3, RefSimplex, 1}()
+get_geo_interpolation(::Type{QuadraticTetrahedronElement})    = Lagrange{3, RefSimplex, 2}()
 # Redirection helper
 get_geo_interpolation(e::Element{Dim, RefGeo, N}) where {Dim, RefGeo, N} = get_geo_interpolation(typeof(e)) 
 

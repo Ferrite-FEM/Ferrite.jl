@@ -25,7 +25,13 @@ end
 getmesh(dh::NewDofHandler) = dh.mesh
 
 # Compat helper
-getgrid(dh::NewDofHandler) = getmesh(dh)
+@inline getgrid(dh::NewDofHandler) = getmesh(dh)
+@inline ndofs_per_cell(dh::NewDofHandler, i::Int=1) = ndofs_per_element(dh, i)
+@inline celldofs!(v::Vector, dh::NewDofHandler, i::Int) = elementdofs!(v, dh, i)
+@inline cellnodes!(v::Vector, dh::NewDofHandler, i::Int) = elementnodes!(v, dh, i)
+@inline cellcoords!(v, dh::NewDofHandler, i::Int) = elementcoords!(v, dh, i)
+
+@inline ndofs_per_element(dh::NewDofHandler, element_idx::Int=1) = dh.element_dofs_offset[element_idx+1] - dh.element_dofs_offset[element_idx]
 
 function NewDofHandler(mesh::AbstractMesh)
     isconcretetype(getelementtype(mesh)) || error("Mesh includes different elementtypes. Use MixedNewDofHandler instead of NewDofHandler")
@@ -96,7 +102,7 @@ function dof_range(dh::NewDofHandler, field_name::Symbol)
 end
 
 """
-    push!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
+    add_field!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
 
 Add a `dim`-dimensional `Field` called `name` which is approximated by `ip` to `dh`.
 
@@ -104,10 +110,9 @@ The field is added to all elements of the underlying mesh. In case no interpolat
 the default interpolation of the mesh's elementtype is used. 
 If the mesh uses several elementtypes, [`push!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
 """
-function Base.push!(dh::NewDofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getelementtype(dh.mesh)))
+function add_field!(dh::NewDofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getelementtype(dh.mesh)))
     @assert !isclosed(dh)
     @assert !in(name, dh.field_names)
-    println("Here")
     push!(dh.field_names, name)
     push!(dh.field_dims, dim)
     push!(dh.field_interpolations, ip)
@@ -162,7 +167,7 @@ function __close!(dh::NewDofHandler)
     end
 
     # not implemented yet: more than one facedof per face in 3D
-    dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
+    max_element_dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
 
     nextdof = 1 # next free dof to distribute
     push!(dh.element_dofs_offset, 1) # dofs for the first element start at 1
@@ -195,7 +200,7 @@ function __close!(dh::NewDofHandler)
                     end
                 end # vertex loop
             end
-            if dim == 3 # edges only in 3D
+            if max_element_dim > 2 # edges only in 3D
                 if interpolation_info.nedgedofs > 0
                     for edge in edges(element)
                         sedge, dir = sortedge(edge)
@@ -223,7 +228,7 @@ function __close!(dh::NewDofHandler)
                     end # edge loop
                 end
             end
-            if interpolation_info.nfacedofs > 0 && (interpolation_info.dim == dim)
+            if max_element_dim > 1 && interpolation_info.nfacedofs > 0 && (interpolation_info.dim == max_element_dim)
                 for face in faces(element)
                     sface = sortface(face) # TODO: faces(element) may as well just return the sorted list
                     @debug println("    face#$sface")
@@ -249,9 +254,9 @@ function __close!(dh::NewDofHandler)
                     end
                 end # face loop
             end
-            if interpolation_info.nelementdofs > 0 # always distribute new dofs for element
+            if interpolation_info.ncelldofs > 0 # always distribute new dofs for element
                 @debug println("    element#$ci")
-                for elementdof in 1:interpolation_info.nelementdofs
+                for elementdof in 1:interpolation_info.ncelldofs
                     for d in 1:dh.field_dims[fi]
                         @debug println("      adding dof#$nextdof")
                         push!(dh.element_dofs, nextdof)

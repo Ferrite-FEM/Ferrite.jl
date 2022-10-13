@@ -17,6 +17,22 @@ cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 
 nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
 
+cell_to_vtkcell(::Type{LineElement}) = VTKCellTypes.VTK_LINE
+cell_to_vtkcell(::Type{QuadraticLineElement}) = VTKCellTypes.VTK_QUADRATIC_EDGE
+
+cell_to_vtkcell(::Type{QuadrilateralElement}) = VTKCellTypes.VTK_QUAD
+cell_to_vtkcell(::Type{QuadraticQuadrilateralElement}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
+cell_to_vtkcell(::Type{TriangleElement}) = VTKCellTypes.VTK_TRIANGLE
+cell_to_vtkcell(::Type{QuadraticTriangleElement}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
+cell_to_vtkcell(::Type{Element{2,RefCube,8}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
+
+cell_to_vtkcell(::Type{HexahedronElement}) = VTKCellTypes.VTK_HEXAHEDRON
+# cell_to_vtkcell(::Type{Cell{3,20,6}}) = VTKCellTypes.VTK_QUADRATIC_HEXAHEDRON
+cell_to_vtkcell(::Type{TetrahedronElement}) = VTKCellTypes.VTK_TETRA
+cell_to_vtkcell(::Type{QuadraticTetrahedronElement}) = VTKCellTypes.VTK_QUADRATIC_TETRA
+
+nodes_to_vtkorder(element::AbstractElement) = collect(element.nodes)
+
 """
     vtk_grid(filename::AbstractString, grid::Grid)
 
@@ -25,11 +41,21 @@ which data can be appended to, see `vtk_point_data` and `vtk_cell_data`.
 """
 function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compress::Bool=true) where {dim,C,T}
     cls = MeshCell[]
-    for cell in grid.cells
+    for cell in getcells(grid)
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
         push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
     end
-    coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
+    coords = reshape(reinterpret(T, getnodes(grid)), (getdim(grid), getnnodes(grid)))
+    return vtk_grid(filename, coords, cls; compress=compress)
+end
+
+function WriteVTK.vtk_grid(filename::AbstractString, grid::Mesh{sdim,ElementType,T}; compress::Bool=true) where {sdim,ElementType,T}
+    cls = MeshCell[]
+    for cell in getcells(grid)
+        celltype = Ferrite.cell_to_vtkcell(typeof(cell))
+        push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
+    end
+    coords = reshape(reinterpret(T, getnodes(grid)), (getdim(grid), getnnodes(grid)))
     return vtk_grid(filename, coords, cls; compress=compress)
 end
 

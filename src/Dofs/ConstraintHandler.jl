@@ -209,7 +209,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
     if length(dbc.faces) == 0
         @warn("adding Dirichlet Boundary Condition to set containing 0 entities")
     end
-    celltype = getcelltype(ch.dh.grid)
+    celltype = getcelltype(getgrid(ch.dh))
     @assert isconcretetype(celltype)
 
     # Extract stuff for the field
@@ -253,7 +253,7 @@ function add!(ch::ConstraintHandler, newac::AffineConstraint)
     return ch
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where {Index<:BoundaryIndex}
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(getgrid(ch.dh)))) where {Index<:BoundaryIndex}
     local_face_dofs, local_face_dofs_offset =
         _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundaryfunction(eltype(bcfaces)))
     copy!(dbc.local_face_dofs, local_face_dofs)
@@ -300,21 +300,21 @@ function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, b
     return local_face_dofs, local_face_dofs_offset
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
-    if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(getgrid(ch.dh))))
+    if interpolation !== default_interpolation(typeof(getcells(getgrid(ch.dh), first(cellset))))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
 
     ncomps = length(dbc.components)
-    nnodes = getnnodes(ch.dh.grid)
+    nnodes = getnnodes(getgrid(ch.dh))
     interpol_points = getnbasefunctions(interpolation)
     _celldofs = fill(0, ndofs_per_cell(ch.dh, first(cellset)))
     node_dofs = zeros(Int, ncomps, nnodes)
     visited = falses(nnodes)
     for cell in CellIterator(ch.dh, collect(cellset)) # only go over cells that belong to current FieldHandler
         celldofs!(_celldofs, cell) # update the dofs for this cell
-        for idx in 1:min(interpol_points, length(cell.nodes))
-            node = cell.nodes[idx]
+        for idx in 1:min(interpol_points, nnodes(cell))
+            node = getnodes(cell, idx)
             if !visited[node]
                 noderange = (offset + (idx-1)*field_dim + 1):(offset + idx*field_dim) # the dofs in this node
                 for (i,c) in enumerate(dbc.components)
@@ -366,10 +366,10 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:Bo
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, time::T) where {T}
 
-    dim = getdim(dh.grid)
+    dim = getdim(getgrid(dh))
     _tmp_cellid = first(faces)[1]
 
-    N = nnodes_per_cell(dh.grid, _tmp_cellid)
+    N = nnodes_per_cell(getgrid(dh), _tmp_cellid)
     xh = zeros(Vec{dim, T}, N) # pre-allocate
     _celldofs = fill(0, ndofs_per_cell(dh, _tmp_cellid))
 
@@ -408,7 +408,7 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, nodes::Set{Int}
                   dofmapping::Dict{Int,Int}, time::Float64)
     counter = 1
     for (idx, nodenumber) in enumerate(nodeidxs)
-        x = dh.grid.nodes[nodenumber].x
+        x = getnodes(getgrid(dh), nodenumber).x
         bc_value = f(x, time)
         @assert length(bc_value) == length(components)
         for v in bc_value
@@ -432,13 +432,13 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
 
     for field in unique_fields
         nd = ndim(ch.dh, field)
-        data = zeros(Float64, nd, getnnodes(ch.dh.grid))
+        data = zeros(Float64, nd, getnnodes(getgrid(ch.dh)))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
             if eltype(dbc.faces) <: BoundaryIndex
                 functype = boundaryfunction(eltype(dbc.faces))
                 for (cellidx, faceidx) in dbc.faces
-                    for facenode in functype(ch.dh.grid.cells[cellidx])[faceidx]
+                    for facenode in functype(getcells(getgrid(ch.dh), cellidx))[faceidx]
                         for component in dbc.components
                             data[component, facenode] = 1
                         end
@@ -817,9 +817,9 @@ end
 
 #Function for adding constraint when using multiple celltypes
 function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
-    _check_cellset_dirichlet(ch.dh.grid, fh.cellset, dbc.faces)
+    _check_cellset_dirichlet(getgrid(ch.dh), fh.cellset, dbc.faces)
 
-    celltype = getcelltype(ch.dh.grid, first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
+    celltype = getcelltype(getgrid(ch.dh), first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
 
     # Extract stuff for the field
     field_idx = find_field(fh, dbc.field_name)
@@ -854,7 +854,7 @@ end
 function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int})
     nodes = Set{Int}()
     for cellid in cellset
-        for nodeid in grid.cells[cellid].nodes
+        for nodeid in getnodes(getcells(grid, cellid))
             nodeid ∈ nodes || push!(nodes, nodeid)
         end
     end
@@ -932,7 +932,7 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     is_legacy = !isempty(pdbc.face_pairs) && isempty(pdbc.face_map)
     if is_legacy
         for (mset, iset) in pdbc.face_pairs
-            collect_periodic_faces!(pdbc.face_map, ch.dh.grid, mset, iset, identity) # TODO: Better transform
+            collect_periodic_faces!(pdbc.face_map, getgrid(ch.dh), mset, iset, identity) # TODO: Better transform
         end
     end
     field_idx = find_field(ch.dh, pdbc.field_name)
@@ -970,9 +970,9 @@ end
 
 function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::Interpolation,
                field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T},Nothing}, ::Type{dof_map_t}, iterator_f::F) where {T, dof_map_t, F <: Function}
-    grid = ch.dh.grid
+    grid = getgrid(ch.dh)
     face_map = pdbc.face_map
-    Tx = typeof(first(ch.dh.grid.nodes).x) # Vec{D,T}
+    Tx = typeof(getnodes(first(getgrid(ch.dh))).x) # Vec{D,T}
 
     # Indices of the local dofs for the faces
     local_face_dofs, local_face_dofs_offset =
@@ -1048,17 +1048,17 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
         max_x = Tx(i -> typemin(eltype(Tx)))
         for facepair in face_map, faceidx in (facepair.mirror, facepair.image)
             cellidx, faceidx = faceidx
-            nodes = faces(grid.cells[cellidx])[faceidx]
+            nodes = faces(getcells(grid, cellidx))[faceidx]
             union!(all_node_idxs, nodes)
             for n in nodes
-                x = grid.nodes[n].x
+                x = getnodes(grid, n).x
                 min_x = Tx(i -> min(min_x[i], x[i]))
                 max_x = Tx(i -> max(max_x[i], x[i]))
             end
         end
         all_node_idxs_v = collect(all_node_idxs)
         points = construct_cornerish(min_x, max_x)
-        tree = KDTree(Tx[grid.nodes[i].x for i in all_node_idxs_v])
+        tree = KDTree(Tx[getnodes(grid, i).x for i in all_node_idxs_v])
         idxs, _ = NearestNeighbors.nn(tree, points)
         corner_set = Set{Int}(all_node_idxs_v[i] for i in idxs)
 
@@ -1315,7 +1315,7 @@ __to_faceset(_, set::Set{FaceIndex}) = set
 __to_faceset(grid, set::String) = getfaceset(grid, set)
 function __collect_boundary_faces(grid::Grid)
     candidates = Dict{Tuple, FaceIndex}()
-    for (ci, c) in enumerate(grid.cells)
+    for (ci, c) in enumerate(getcells(grid))
         for (fi, fn) in enumerate(faces(c))
             fn = sortface(fn)
             if haskey(candidates, fn)
@@ -1332,20 +1332,20 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
     if length(mset) != length(mset)
         error("different number of faces in mirror and image set")
     end
-    Tx = typeof(first(grid.nodes).x)
+    Tx = typeof(first(getnodes(grid).x))
 
     mirror_mean_x = Tx[]
     for (c, f) in mset
-        fn = faces(grid.cells[c])[f]
-        push!(mirror_mean_x, sum(grid.nodes[i].x for i in fn) / length(fn))
+        fn = faces(getcells(grid, c))[f]
+        push!(mirror_mean_x, sum(getnodes(grid, i).x for i in fn) / length(fn))
     end
 
     # Same dance for the image
     image_mean_x = Tx[]
     for (c, f) in iset
-        fn = faces(grid.cells[c])[f]
+        fn = faces(getcells(grid, c))[f]
         # Apply transformation to all coordinates
-        push!(image_mean_x, sum(transformation(grid.nodes[i].x)::Tx for i in fn) / length(fn))
+        push!(image_mean_x, sum(transformation(getnodes(grid, i).x)::Tx for i in fn) / length(fn))
     end
 
     # Use KDTree to find closest face
@@ -1422,16 +1422,16 @@ function __periodic_options(::T) where T <: Vec{3}
 end
 
 function __outward_normal(grid::Grid{2}, nodes, transformation::F=identity) where F <: Function
-    n1::Vec{2} = transformation(grid.nodes[nodes[1]].x)
-    n2::Vec{2} = transformation(grid.nodes[nodes[2]].x)
+    n1::Vec{2} = transformation(getnodes(grid, nodes[1]).x)
+    n2::Vec{2} = transformation(getnodes(grid, nodes[2]).x)
     n = Vec{2}((n2[2] - n1[2], - n2[1] + n1[1]))
     return n / norm(n)
 end
 
 function __outward_normal(grid::Grid{3}, nodes, transformation::F=identity) where F <: Function
-    n1::Vec{3} = transformation(grid.nodes[nodes[1]].x)
-    n2::Vec{3} = transformation(grid.nodes[nodes[2]].x)
-    n3::Vec{3} = transformation(grid.nodes[nodes[3]].x)
+    n1::Vec{3} = transformation(getnodes(grid, nodes[1]).x)
+    n2::Vec{3} = transformation(getnodes(grid, nodes[2]).x)
+    n3::Vec{3} = transformation(getnodes(grid, nodes[3]).x)
     n = (n3 - n2) × (n1 - n2)
     return n / norm(n)
 end
@@ -1444,9 +1444,9 @@ end
 # have opposing normal vectors
 function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_order::Bool)
     cii, fii = fi
-    nodes_i = faces(grid.cells[cii])[fii]
+    nodes_i = faces(getcells(grid, cii))[fii]
     cij, fij = fj
-    nodes_j = faces(grid.cells[cij])[fij]
+    nodes_j = faces(getcells(grid, cij))[fij]
 
     # 1. Check that normals are opposite TODO: Should use FaceValues here
     ni = __outward_normal(grid, nodes_i)
@@ -1457,10 +1457,10 @@ function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_
     end
 
     # 2. Find the periodic direction using the vector between the midpoint of the faces
-    xmi = sum(grid.nodes[i].x for i in nodes_i) / length(nodes_i)
-    xmj = sum(grid.nodes[i].x for i in nodes_j) / length(nodes_j)
+    xmi = sum(getnodes(grid, i).x for i in nodes_i) / length(nodes_i)
+    xmj = sum(getnodes(grid, i).x for i in nodes_j) / length(nodes_j)
     xmij = xmj - xmi
-    h = 2 * norm(xmj - grid.nodes[nodes_j[1]].x) # Approximate element size
+    h = 2 * norm(xmj - getnodes(grid, nodes_j[1]).x) # Approximate element size
     TOLh = TOL * h
     found = false
     local len
@@ -1476,11 +1476,11 @@ function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_
     # 3. Check that the first node of fj have a corresponding node in fi
     #    In this method faces are mirrored (opposite normal vectors) so reverse the nodes
     nodes_i = circshift_tuple(reverse(nodes_i), 1)
-    xj = grid.nodes[nodes_j[1]].x
+    xj = getnodes(grid, nodes_j[1]).x
     node_rot = 0
     found = false
     for i in eachindex(nodes_i)
-        xi = grid.nodes[nodes_i[i]].x
+        xi = getnodes(grid, nodes_i[i]).x
         xij = xj - xi
         if norm(xij - xmij) < TOLh
             found = true
@@ -1492,8 +1492,8 @@ function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_
 
     # 4. Check the remaining nodes for the same criteria, now with known node_rot
     for j in 2:length(nodes_j)
-        xi = grid.nodes[nodes_i[mod1(j + node_rot, end)]].x
-        xj = grid.nodes[nodes_j[j]].x
+        xi = getnodes(grid, nodes_i[mod1(j + node_rot, end)]).x
+        xj = getnodes(grid, nodes_j[j]).x
         xij = xj - xi
         if norm(xij - xmij) >= TOLh
             return nothing
@@ -1521,9 +1521,9 @@ end
 # vectors, and ii) compute the relative rotation.
 function __check_periodic_faces_f(grid::Grid, fi::FaceIndex, fj::FaceIndex, xmi, xmj, transformation::F) where F
     cii, fii = fi
-    nodes_i = faces(grid.cells[cii])[fii]
+    nodes_i = faces(getcells(grid, cii))[fii]
     cij, fij = fj
-    nodes_j = faces(grid.cells[cij])[fij]
+    nodes_j = faces(getcells(grid, cij))[fij]
 
     # 1. Check if normals are aligned or opposite TODO: Should use FaceValues here
     ni = __outward_normal(grid, nodes_i)
@@ -1539,14 +1539,14 @@ function __check_periodic_faces_f(grid::Grid, fi::FaceIndex, fj::FaceIndex, xmi,
 
     # 2. Compute the relative rotation
     xmij = xmj - xmi
-    h = 2 * norm(xmj - grid.nodes[nodes_j[1]].x) # Approximate element size
+    h = 2 * norm(xmj - getnodes(grid, nodes_j[1]).x) # Approximate element size
     TOLh = TOL * h
     nodes_i = mirror ? circshift_tuple(reverse(nodes_i), 1) : nodes_i # reverse if necessary
-    xj = transformation(grid.nodes[nodes_j[1]].x)
+    xj = transformation(getnodes(grid, nodes_j[1]).x)
     node_rot = 0
     found = false
     for i in eachindex(nodes_i)
-        xi = grid.nodes[nodes_i[i]].x
+        xi = getnodes(grid, nodes_i[i]).x
         xij = xj - xi
         if norm(xij - xmij) < TOLh
             found = true

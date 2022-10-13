@@ -42,6 +42,14 @@ end
 toglobal(mesh::Mesh, vertexidx::VertexIndex) = vertices(getelements(mesh,vertexidx[1]))[vertexidx[2]]
 toglobal(mesh::Mesh, vertexidx::Vector{VertexIndex}) = unique(toglobal.((mesh,),vertexidx))
 
+# Compat helper
+@inline getcelltype(mesh::AbstractMesh) = getelementtype(mesh)
+@inline getcelltype(mesh::AbstractMesh, i::Int) = getelementtype(mesh, i)
+@inline getcells(mesh::AbstractMesh) = getelements(mesh)
+@inline getcells(mesh::AbstractMesh, v::Union{Int, Vector{Int}}) = getelements(mesh, v)
+@inline getncells(mesh::AbstractMesh) = getnelements(mesh)
+@inline nnodes_per_cell(dh::AbstractMesh, i::Int=1) = nnodes_per_element(dh, i)
+
 """
 Get the spatial dimension of the mesh.
 """

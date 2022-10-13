@@ -31,43 +31,51 @@ reinit!(cell, 10)           # Update to cell nr. 10
 dofs = celldofs(cell)       # Get the dofs for cell nr. 10
 ```
 """
-struct CellIterator{dim,C,T,DH<:Union{AbstractDofHandler,Nothing}}
+struct CellIterator{GridType<:AbstractGrid,NodeType,DH<:Union{AbstractDofHandler,Nothing}}
     flags::UpdateFlags
-    grid::Grid{dim,C,T}
+    grid::GridType
     current_cellid::ScalarWrapper{Int}
     nodes::Vector{Int}
-    coords::Vector{Vec{dim,T}}
+    coords::Vector{NodeType}
     cellset::Union{Vector{Int},Nothing}
     dh::Union{DH,Nothing}
     celldofs::Vector{Int}
 
-    function CellIterator{dim,C,T}(dh::Union{DofHandler{dim,T,G},MixedDofHandler{dim,T,G},Nothing}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T,G}
-        isconcretetype(C) || _check_same_celltype(dh.grid, cellset)
-        N = nnodes_per_cell(dh.grid, cellset === nothing ? 1 : first(cellset))
+    function CellIterator(dh::Union{DofHandler{dim,T,G},MixedDofHandler{dim,T,G},Nothing}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,T,G}
+        grid = getgrid(dh)
+        isconcretetype(getcelltype(grid)) || _check_same_celltype(grid, cellset)
+        N = nnodes_per_cell(grid, cellset === nothing ? 1 : first(cellset))
         cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim,T}, N)
         n = ndofs_per_cell(dh, cellset === nothing ? 1 : first(cellset))
         celldofs = zeros(Int, n)
-        return new{dim,C,T,typeof(dh)}(flags, dh.grid, cell, nodes, coords, cellset, dh, celldofs)
+        return new{G,Vec{dim,T},typeof(dh)}(flags, grid, cell, nodes, coords, cellset, dh, celldofs)
     end
 
-    function CellIterator{dim,C,T}(grid::Grid{dim,C,T}, cellset::Union{AbstractVector{Int},Nothing}, flags::UpdateFlags) where {dim,C,T}
+    function CellIterator(dh::NewDofHandler{G}, cellset::Union{AbstractVector{Int}, Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {G}
+        grid = getgrid(dh)
+        sdim = getdim(grid)
+        isconcretetype(getcelltype(grid)) || _check_same_celltype(grid, cellset)
+        N = nnodes_per_cell(grid, cellset === nothing ? 1 : first(cellset))
+        cell = ScalarWrapper(0)
+        nodes = zeros(Int, N)
+        NodeType = typeof(grid.nodes[1].x)
+        coords = zeros(NodeType, N)
+        n = ndofs_per_cell(dh, cellset === nothing ? 1 : first(cellset))
+        celldofs = zeros(Int, n)
+        return new{typeof(grid),NodeType,typeof(dh)}(flags, grid, cell, nodes, coords, cellset, dh, celldofs)
+    end
+
+    function CellIterator(grid::Grid{dim,C,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T}
         isconcretetype(C) || _check_same_celltype(grid, cellset)
         N = nnodes_per_cell(grid, cellset === nothing ? 1 : first(cellset))
         cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim,T}, N)
-        return new{dim,C,T,Nothing}(flags, grid, cell, nodes, coords, cellset)
+        return new{typeof(grid),Vec{dim,T},nothing}(flags, grid, cell, nodes, coords, cellset)
     end
 end
-
-CellIterator(grid::Grid{dim,C,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,C,T} =
-    CellIterator{dim,C,T}(grid, cellset, flags)
-CellIterator(dh::DofHandler{dim,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,T} =
-    CellIterator{dim,getcelltype(dh.grid),T}(dh, cellset, flags)
-CellIterator(dh::MixedDofHandler{dim,T}, cellset::Union{AbstractVector{Int},Nothing}=nothing, flags::UpdateFlags=UpdateFlags()) where {dim,T} =
-    CellIterator{dim,getcelltype(dh.grid),T}(dh, cellset, flags)
 
 # iterator interface
 function Base.iterate(ci::CellIterator, state = 1)
@@ -86,13 +94,13 @@ Base.eltype(::Type{T})         where {T<:CellIterator} = T
 # utility
 @inline getnodes(ci::CellIterator) = ci.nodes
 @inline getcoordinates(ci::CellIterator) = ci.coords
-@inline nfaces(ci::CellIterator) = nfaces(eltype(ci.grid.cells))
+@inline nfaces(ci::CellIterator) = nfaces(eltype(getcells(ci.grid)))
 @inline onboundary(ci::CellIterator, face::Int) = ci.grid.boundary_matrix[face, ci.current_cellid[]]
 @inline cellid(ci::CellIterator) = ci.current_cellid[]
 @inline celldofs!(v::Vector, ci::CellIterator) = celldofs!(v, ci.dh, ci.current_cellid[])
 @inline celldofs(ci::CellIterator) = ci.celldofs
 
-function reinit!(ci::CellIterator{dim,C}, i::Int) where {dim,C}
+function reinit!(ci::CellIterator, i::Int)
     ci.current_cellid[] = ci.cellset === nothing ? i : ci.cellset[i]
 
     if ci.flags.nodes
@@ -125,12 +133,12 @@ function check_compatible_geointerpolation(cv::Union{CellValues, FaceValues}, ci
     end
 end
 
-@inline function reinit!(cv::CellValues{dim,T}, ci::CellIterator{dim,N,T}) where {dim,N,T}
+@inline function reinit!(cv::CellValues, ci::CellIterator)
     check_compatible_geointerpolation(cv, ci)
     reinit!(cv, ci.coords)
 end
 
-@inline function reinit!(fv::FaceValues{dim,T}, ci::CellIterator{dim,N,T}, face::Int) where {dim,N,T}
+@inline function reinit!(fv::FaceValues, ci::CellIterator, face::Int)
     check_compatible_geointerpolation(fv, ci)
     reinit!(fv, ci.coords, face)
 end
