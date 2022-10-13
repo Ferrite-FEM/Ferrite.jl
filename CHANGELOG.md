@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - New higher order function interpolations for triangles (`Lagrange{2,RefTetrahedron,3}`,
    `Lagrange{2,RefTetrahedron,4}`, and `Lagrange{2,RefTetrahedron,5}`). ([#482][github-482],
    [#512][github-512])
- - New Gaussian quadrature formula for triangles up to order 20. ([#514][github-514])
+ - New Gaussian quadrature formula for triangles up to order 15. ([#514][github-514])
 ### Changed
  - The default components to constrain in `Dirichlet` and `PeriodicDirichlet` have changed
    from component 1 to all components of the field. For scalar problems this has no effect.
