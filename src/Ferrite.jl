@@ -18,8 +18,11 @@ and `RefTetrahedron` in 2 and 3 dimensions.
 """
 abstract type AbstractRefShape end
 
-struct RefTetrahedron <: AbstractRefShape end
+struct RefSimplex <: AbstractRefShape end
+const RefTetrahedron = RefSimplex
 struct RefCube <: AbstractRefShape end
+struct RefPyramid <: AbstractRefShape end
+struct RefWedge <: AbstractRefShape end
 
 """
 Abstract type which has `CellValues` and `FaceValues` as subtypes
@@ -52,6 +55,12 @@ include("FEValues/face_integrals.jl")
 include("Grid/grid.jl")
 include("Grid/grid_generators.jl")
 include("Grid/coloring.jl")
+
+# New Grid Interface
+include("Mesh/elements.jl")
+include("Mesh/mesh.jl")
+include("Mesh/mesh_generators.jl")
+include("Mesh/utils.jl")
 
 # Dofs
 include("Dofs/DofHandler.jl")
