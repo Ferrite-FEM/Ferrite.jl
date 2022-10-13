@@ -152,7 +152,7 @@ gettypes(u::Union) = [u.a; gettypes(u.b)]
 gettypes(u) = [u]
 
 # close the DofHandler and distribute all the dofs
-function __close!(dh::NewDofHandler) where
+function __close!(dh::NewDofHandler)
     @assert !isclosed(dh)
 
     # Step 1: Materialize Mesh
