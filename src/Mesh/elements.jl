@@ -98,6 +98,18 @@ default_interpolation(e::Element{Dim, RefGeo, N}) where {Dim, RefGeo, N} = get_g
 default_interpolation(et::Type{Element{Dim, RefGeo, N}}) where {Dim, RefGeo, N} = get_geo_interpolation(et)
 
 # ---------------------------------- Topological Entity Interface --------------------------------
+# We start with the dimension-agnostic interface. This table stores the mapping from dim to codim function
+const codim_table = [
+    [x->(1,),vertices],
+    [x->(1,),faces,vertices],
+    [x->(1,),faces,edges,vertices],
+];
+"""
+Return the nodes associated to the codimensional portion of an element.
+"""
+entities_with_codim(element::Element{Dim,RefGeo,N}, codim::Int) where{Dim,RefGeo, N} = codim_table[Dim][codim+1](element)
+num_entities_with_codim(element::Element{Dim,RefGeo,N}, codim::Int) where{Dim,RefGeo, N} = length(entities_with_codim(element, codim))
+
 # Functions to uniquely identify vertices, edges and faces, used when distributing
 # dofs over a mesh. For this we can ignore the nodes on edged, faces and inside elements,
 # we only need to use the nodes that are vertices.

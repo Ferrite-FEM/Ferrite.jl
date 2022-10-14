@@ -48,6 +48,7 @@ toglobal(mesh::Mesh, vertexidx::Vector{VertexIndex}) = unique(toglobal.((mesh,),
 @inline getcells(mesh::AbstractMesh) = getelements(mesh)
 @inline getcells(mesh::AbstractMesh, v::Union{Int, Vector{Int}}) = getelements(mesh, v)
 @inline getncells(mesh::AbstractMesh) = getnelements(mesh)
+@inline getelementtypes(mesh::Mesh{sdim, ElementType, T}) where {sdim, ElementType, T} = ElementType
 @inline nnodes_per_cell(dh::AbstractMesh, i::Int=1) = nnodes_per_element(dh, i)
 
 """

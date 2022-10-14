@@ -120,7 +120,7 @@ function add_field!(dh::NewDofHandler, name::Symbol, dim::Int, ip::Interpolation
 end
 
 function close!(dh::NewDofHandler)
-    dh, _, _, _ = __close!(dh)
+    __close!(dh)
     return dh
 end
 
@@ -128,35 +128,137 @@ end
 gettypes(u::Union) = [u.a; gettypes(u.b)]
 gettypes(u) = [u]
 
+# TODO coalesce insert into list and index extraction...
+# TODO look into how to handle more general elements (as in e.g. virtual element methods)
+# Cubes
+function add_entities!(face_list::Dict{NTuple{Dim, Int}, Int}, connectivity::Vector{Vector{Int}}, e::Element{Dim, RefCube, N}) where {Dim, N}
+    local_connectivity = Vector{Int}(undef, length(faces(e)))
+    for (face_idx, face) ∈ enumerate(faces(e))
+        face_rep = sortface(face)
+        if !haskey(face_list, face_rep)
+            face_list[face_rep] = length(face_list)+1
+        end
+        local_connectivity[face_idx] = face_list[face_rep]
+    end
+    push!(connectivity, local_connectivity)
+end
+
+function add_entities!(edge_list::Dict{NTuple{2, Int}, Int}, connectivity::Vector{Vector{Int}}, e::Element{3, RefCube, N}) where {Dim, N}
+    local_connectivity = Vector{Int}(undef, length(edges(e)))
+    for (edge_idx, edge) ∈ enumerate(edges(e))
+        edge_rep = sortedge(edge)[1]
+        if !haskey(edge_list, edge_rep)
+            edge_list[edge_rep] = length(edge_list)+1
+        end
+        local_connectivity[edge_idx] = edge_list[edge_rep]
+    end
+    push!(connectivity, local_connectivity)
+end
+
+function add_entities!(vertex_list::Dict{Int, Int}, connectivity::Vector{Vector{Int}}, e::Element{Dim, RefCube, N}) where {Dim, N}
+    local_connectivity = Vector{Int}(undef, length(vertices(e)))
+    for (vertex_idx, vertex) ∈ enumerate(vertices(e))
+        if !haskey(vertex_list, vertex)
+            vertex_list[vertex] = length(vertex_list)+1
+        end
+        local_connectivity[vertex_idx] = vertex_list[vertex]
+    end
+    push!(connectivity, local_connectivity)
+end
+
+# Simplices
+function add_entities!(face_list::Dict{NTuple{Dim, Int}, Int}, connectivity::Vector{Vector{Int}}, e::Element{Dim, RefSimplex, N}) where {Dim, N}
+    local_connectivity = Vector{Int}(undef, length(faces(e)))
+    for (face_idx, face) ∈ enumerate(faces(e))
+        face_rep = sortface(face)
+        if !haskey(face_list, face_rep)
+            face_list[face_rep] = length(face_list)+1
+        end
+        local_connectivity[face_idx] = face_list[face_rep]
+    end
+    push!(connectivity, local_connectivity)
+end
+
+function add_entities!(edge_list::Dict{NTuple{2, Int}, Int}, connectivity::Vector{Vector{Int}}, e::Element{3, RefSimplex, N}) where {Dim, N}
+    local_connectivity = Vector{Int}(undef, length(edges(e)))
+    for (edge_idx, edge) ∈ enumerate(edges(e))
+        edge_rep = sortedge(edge)[1]
+        if !haskey(edge_list, edge_rep)
+            edge_list[edge_rep] = length(edge_list)+1
+        end
+        local_connectivity[edge_idx] = edge_list[edge_rep]
+    end
+    push!(connectivity, local_connectivity)
+end
+
+function add_entities!(vertex_list::Dict{Int, Int}, connectivity::Vector{Vector{Int}}, e::Element{Dim, RefSimplex, N}) where {Dim, N}
+    local_connectivity = Vector{Int}(undef, length(vertices(e)))
+    for (vertex_idx, vertex) ∈ enumerate(vertices(e))
+        if !haskey(vertex_list, vertex)
+            vertex_list[vertex] = length(vertex_list)+1
+        end
+        local_connectivity[vertex_idx] = vertex_list[vertex]
+    end
+    push!(connectivity, local_connectivity)
+end
+
+# TODO data structure for this?
+function num_dofs_on_codim(interpolation_info::InterpolationInfo, dim::Int, codim::Int)
+    if dim == codim
+        return interpolation_info.nvertexdofs
+    elseif codim == 2
+        return interpolation_info.nedgedofs
+    elseif codim == 1
+        return interpolation_info.nfacedofs
+    elseif codim == 0
+        return interpolation_info.ncelldofs
+    else
+        error("No dof information for dim=$dim, codim=$codim in $interpolation_info.")
+    end
+end
+
 # close the DofHandler and distribute all the dofs
 function __close!(dh::NewDofHandler)
     @assert !isclosed(dh)
 
-    # Step 1: Materialize Mesh
+    #######################################################################################
+    ###### Phase 1: Materialize possibly broken mesh (i.e. ignore all non-conformities) ###
+    #######################################################################################
+    #
+    #NOTE Refactor into the mesh topology interface.
+    #NOTE Subobtimal data structures ahead!
+    #
     mesh = getmesh(dh)
-    element_types = gettypes(eltype(getelements(mesh)))
+    element_types = gettypes(getelementtypes(mesh))
+    #@assert(isconcretetype(element_types)) # remove this restriction later.
     max_element_dim = maximum([getdim(et) for et ∈ element_types])
 
-    # `vertexdict` keeps track of the visited vertices. We store the global vertex
-    # number and the first dof we added to that vertex.
-    vertexdicts = [Dict{Int,Int}() for _ in 1:nfields(dh)]
+    # 4d not functional yet
+    @assert(max_element_dim < 4)
 
-    # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem
-    # An edge is determined from two vertices, but we also need to store the direction
-    # of the first edge we encounter and add dofs too. When we encounter the same edge
-    # the next time we check if the direction is the same, otherwise we reuse the dofs
-    # in the reverse order
-    edgedicts = [Dict{Tuple{Int,Int},Tuple{Int,Bool}}() for _ in 1:nfields(dh)]
+    # not implemented yet: more than one facedof per face in 3D
+    max_element_dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
 
-    # `facedict` keeps track of the visited faces. We only need to store the first dof we
-    # added to the face; if we encounter the same face again we *always* reverse the order
-    # In 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a
-    # face (i.e. a surface) is uniquely determined by 3 vertices.
-    facedicts = [Dict{NTuple{max_element_dim,Int},Int}() for _ in 1:nfields(dh)]
+    # Find types for codimensional entities
+    #TODO better data structures...
+    # coentities[element_dimension][entity_codimension] -> Simple materialized representation of entity
+    # connectivity[element_dimension][entity_codimension][local_index] -> Face/Edge/Vertex index in coentity set
+    #NOTE connectivity is an inefficient, simplified version of what the topology interface should become!
+    coentities   = ntuple(j->ntuple(i->(j-i+1 > 1) ? Dict{NTuple{j-i+1,Int},Int}() : Dict{Int, Int}(), max(j, 0)), max_element_dim)
+    connectivity = ntuple(j->ntuple(i->Vector{Vector{Int}}(), max(j, 0)), max_element_dim)
 
-    # elementdofs are never shared between different elements so there is no need
-    # for a `elementdict` to keep track of which elements we have added dofs too.
+    # Primitive materialization of elements 
+    for element ∈ getelements(mesh)
+        # Loop over all codimensional entities, i.e. faces, edges, but ignore 
+        # the full actual element (codim=0).
+        for codim ∈ 1:max_element_dim
+            add_entities!(coentities[getdim(element)][codim], connectivity[getdim(element)][codim], element)
+        end
+    end
 
+    #######################################################################################
+    ######                             Phase 2: Distribute dofs                       #####
+    #######################################################################################
     # We create the `InterpolationInfo` structs with precomputed information for each
     # interpolation since that allows having the element loop as the outermost loop,
     # and the interpolation loop inside without using a function barrier
@@ -166,113 +268,59 @@ function __close!(dh::NewDofHandler)
         push!(interpolation_infos, InterpolationInfo(interpolation))
     end
 
-    # not implemented yet: more than one facedof per face in 3D
-    max_element_dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
-
-    nextdof = 1 # next free dof to distribute
+    # We can simplify this quite a bit by rearranging the loops below.
+    # TODO check importance of this reordering...
+    codim_ordering_by_dim = [
+        [1,0],      # vertex, cell
+        [2,1,0],    # vertex, face, cell
+        [3,1,2,0],  # vertex, edge, face, cell
+        [4,1,2,3,0] # Vertex, face, edge, planar, cell
+    ]
+    element_current_idx_by_dim = [
+        1,1,1,1
+    ]
+    #TODO check type stability and performance
     push!(dh.element_dofs_offset, 1) # dofs for the first element start at 1
-
-    # loop over all the elements, and distribute dofs for all the fields
-    for (ci, element) in enumerate(getelements(dh.mesh))
-        @debug println("element #$ci")
+    for (gei, element) in enumerate(getelements(dh.mesh))
+        next_field_offset = 0
+        current_element_dim = getdim(element)
+        ei = element_current_idx_by_dim[current_element_dim]
+        @debug println("global element #$gei of dim $current_element_dim with dimension-local index $ei")
         for fi in 1:nfields(dh)
             interpolation_info = interpolation_infos[fi]
-            @debug println("  field: $(dh.field_names[fi])")
-            if interpolation_info.nvertexdofs > 0
-                for vertex in vertices(element)
-                    @debug println("    vertex#$vertex")
-                    token = Base.ht_keyindex2!(vertexdicts[fi], vertex)
-                    if token > 0 # haskey(vertexdicts[fi], vertex) # reuse dofs
-                        reuse_dof = vertexdicts[fi].vals[token] # vertexdicts[fi][vertex]
+            @debug println("  field: $(dh.field_names[fi]) with dof offset $next_field_offset")
+            entity_based_offset = 0
+            for current_entity_codim ∈ codim_ordering_by_dim[current_element_dim]
+                @debug println("    entity codim $current_entity_codim | dim $(current_element_dim-current_entity_codim) with dof offset $entity_based_offset")
+                current_ndofs_on_entity = num_dofs_on_codim(interpolation_info, current_element_dim, current_entity_codim)
+                if current_ndofs_on_entity > 0
+                    # Compute the number of entities with codim > mine
+                    for local_entity_nodes ∈ entities_with_codim(element, current_entity_codim)
+                        current_entity_idx          = coentities[current_element_dim][current_entity_codim][local_entity_nodes]
+                        # current_entity_connectivity = connectivity[current_element_dim][current_entity_codim][ei]
+                        startdof = next_field_offset + entity_based_offset + current_entity_idx
                         for d in 1:dh.field_dims[fi]
-                            @debug println("      reusing dof #$(reuse_dof + (d-1))")
-                            push!(dh.element_dofs, reuse_dof + (d-1))
-                        end
-                    else # token <= 0, distribute new dofs
-                        for vertexdof in 1:interpolation_info.nvertexdofs
-                            Base._setindex!(vertexdicts[fi], nextdof, vertex, -token) # vertexdicts[fi][vertex] = nextdof
-                            for d in 1:dh.field_dims[fi]
-                                @debug println("      adding dof#$nextdof")
-                                push!(dh.element_dofs, nextdof)
-                                nextdof += 1
-                            end
+                            computed_dof = startdof + (d-1) + (current_ndofs_on_entity-1)*dh.field_dims[fi]
+                            push!(dh.element_dofs, computed_dof)
+                            @debug println("      added dof $computed_dof")
                         end
                     end
-                end # vertex loop
-            end
-            if max_element_dim > 2 # edges only in 3D
-                if interpolation_info.nedgedofs > 0
-                    for edge in edges(element)
-                        sedge, dir = sortedge(edge)
-                        @debug println("    edge#$sedge dir: $(dir)")
-                        token = Base.ht_keyindex2!(edgedicts[fi], sedge)
-                        if token > 0 # haskey(edgedicts[fi], sedge), reuse dofs
-                            startdof, olddir = edgedicts[fi].vals[token] # edgedicts[fi][sedge] # first dof for this edge (if dir == true)
-                            for edgedof in (dir == olddir ? (1:interpolation_info.nedgedofs) : (interpolation_info.nedgedofs:-1:1))
-                                for d in 1:dh.field_dims[fi]
-                                    reuse_dof = startdof + (d-1) + (edgedof-1)*dh.field_dims[fi]
-                                    @debug println("      reusing dof#$(reuse_dof)")
-                                    push!(dh.element_dofs, reuse_dof)
-                                end
-                            end
-                        else # token <= 0, distribute new dofs
-                            Base._setindex!(edgedicts[fi], (nextdof, dir), sedge, -token) # edgedicts[fi][sedge] = (nextdof, dir),  store only the first dof for the edge
-                            for edgedof in 1:interpolation_info.nedgedofs
-                                for d in 1:dh.field_dims[fi]
-                                    @debug println("      adding dof#$nextdof")
-                                    push!(dh.element_dofs, nextdof)
-                                    nextdof += 1
-                                end
-                            end
-                        end
-                    end # edge loop
+                    # TODO permutate the dofs according to a reference orientation given by the entity on the adjacent element with the lowest index!
+                    entity_based_offset += current_ndofs_on_entity*length(coentities[current_element_dim][current_entity_codim])*dh.field_dims[fi]
                 end
             end
-            if max_element_dim > 1 && interpolation_info.nfacedofs > 0 && (interpolation_info.dim == max_element_dim)
-                for face in faces(element)
-                    sface = sortface(face) # TODO: faces(element) may as well just return the sorted list
-                    @debug println("    face#$sface")
-                    token = Base.ht_keyindex2!(facedicts[fi], sface)
-                    if token > 0 # haskey(facedicts[fi], sface), reuse dofs
-                        startdof = facedicts[fi].vals[token] # facedicts[fi][sface]
-                        for facedof in interpolation_info.nfacedofs:-1:1 # always reverse (YOLO)
-                            for d in 1:dh.field_dims[fi]
-                                reuse_dof = startdof + (d-1) + (facedof-1)*dh.field_dims[fi]
-                                @debug println("      reusing dof#$(reuse_dof)")
-                                push!(dh.element_dofs, reuse_dof)
-                            end
-                        end
-                    else # distribute new dofs
-                        Base._setindex!(facedicts[fi], nextdof, sface, -token)# facedicts[fi][sface] = nextdof,  store the first dof for this face
-                        for facedof in 1:interpolation_info.nfacedofs
-                            for d in 1:dh.field_dims[fi]
-                                @debug println("      adding dof#$nextdof")
-                                push!(dh.element_dofs, nextdof)
-                                nextdof += 1
-                            end
-                        end
-                    end
-                end # face loop
-            end
-            if interpolation_info.ncelldofs > 0 # always distribute new dofs for element
-                @debug println("    element#$ci")
-                for elementdof in 1:interpolation_info.ncelldofs
-                    for d in 1:dh.field_dims[fi]
-                        @debug println("      adding dof#$nextdof")
-                        push!(dh.element_dofs, nextdof)
-                        nextdof += 1
-                    end
-                end # element loop
-            end
-        end # field loop
-        # push! the first index of the next element to the offset vector
+
+            next_field_offset += entity_based_offset
+        end
+
+        element_current_idx_by_dim[current_element_dim] += 1
         push!(dh.element_dofs_offset, length(dh.element_dofs)+1)
-    end # element loop
+    end
+
     dh.ndofs[] = maximum(dh.element_dofs)
     dh.closed[] = true
 
-    return dh, vertexdicts, edgedicts, facedicts
-
+    # return dh, vertexdicts, edgedicts, facedicts
 end
 
 function elementdofs!(global_dofs::Vector{Int}, dh::NewDofHandler, i::Int)

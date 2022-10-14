@@ -1,4 +1,4 @@
-const DEBUG = false
+const DEBUG = true
 
 @static if DEBUG
     @eval begin
