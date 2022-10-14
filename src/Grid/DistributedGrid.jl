@@ -92,7 +92,7 @@ function create_partitioning(grid::Grid{dim,C,T}, grid_topology::ExclusiveTopolo
     @assert N > 0
     
     if n_partitions == 1
-        return ones(N)
+        return ones(Metis.idx_t, N)
     end
 
     # Set up the element connectivity graph
