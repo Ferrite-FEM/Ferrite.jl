@@ -598,7 +598,7 @@ end
 # Similar to Ferrite._condense!(K, ch), but only add the non-zero entries to K (that arises from the condensation process)
 function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, acs::Vector{AffineConstraint{T}}) where T
     ndofs = size(K, 1)
-    (length(acs) == 0) && return 
+    (length(acs) == 0) && return
     # Store linear constraint index for each constrained dof
     distribute = Dict{Int,Int}(acs[c].constrained_dof => c for c in 1:length(acs))
 
@@ -972,7 +972,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
                field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T},Nothing}, ::Type{dof_map_t}, iterator_f::F) where {T, dof_map_t, F <: Function}
     grid = getgrid(ch.dh)
     face_map = pdbc.face_map
-    Tx = typeof(getnodes(first(getgrid(ch.dh))).x) # Vec{D,T}
+    Tx = typeof(first(getnodes(grid)).x) # Vec{D,T}
 
     # Indices of the local dofs for the faces
     local_face_dofs, local_face_dofs_offset =
@@ -1332,7 +1332,7 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
     if length(mset) != length(mset)
         error("different number of faces in mirror and image set")
     end
-    Tx = typeof(first(getnodes(grid).x))
+    Tx = typeof(first(getnodes(grid)).x)
 
     mirror_mean_x = Tx[]
     for (c, f) in mset
