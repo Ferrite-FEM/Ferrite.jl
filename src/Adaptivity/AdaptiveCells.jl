@@ -155,6 +155,8 @@ function ForestBWG(grid::AbstractGrid{dim},b=_maxlevel[dim-1]) where dim
     return ForestBWG(cells,nodes,cellsets,nodesets,facesets,edgesets,vertexsets,topology)
 end
 
+getneighborhood(forest::ForestBWG,idx) = getneighborhood(forest.topology,forest,idx)
+
 function getncells(grid::ForestBWG)
     numcells = 0
     for tree in grid.cells
@@ -162,6 +164,9 @@ function getncells(grid::ForestBWG)
     end
     return numcells
 end
+
+getcelltype(grid::ForestBWG) = eltype(grid.cells)
+getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same cell type TODO
 
 function Base.show(io::IO, ::MIME"text/plain", agrid::ForestBWG)
     println(io, "ForestBWG with ")
@@ -213,7 +218,7 @@ of `octant`, respectively. These computed octants are called first and last desc
 since they are connected to `octant` by a path down the octree to the maximum level  `b`
 """
 function descendants(octant::OctantBWG{dim,N,M,T}, b::Integer=_maxlevel[dim-1]) where {dim,N,M,T}
-    l1 = b; l2 = b # not sure 
+    l1 = b; l2 = b
     h = T(_compute_size(b,octant.l))
     return OctantBWG(l1,octant.xyz), OctantBWG(l2,octant.xyz .+ (h-one(T)))
 end
@@ -228,6 +233,38 @@ function face_neighbor(octant::OctantBWG{dim,N,M,T}, f::T, b::T=_maxlevel[dim-1]
     dim == 2 ? OctantBWG(l,(x,y)) : OctantBWG(l,(x,y,z))
 end
 face_neighbor(o::OctantBWG{dim,N,M,T1}, f::T2, b::T3) where {dim,N,M,T1<:Integer,T2<:Integer,T3<:Integer} = face_neighbor(o,T1(f),T1(b))
+
+#TODO: this is not working in 2d as of now, indices used in the paper confuse me
+function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) where {dim,N,M,T1<:Integer,T2<:Integer}
+    _one = one(T2)
+    _two = T2(2)
+    #currently rotation not encoded
+    kprime, fprime = getneighborhood(forest,FaceIndex(k,f))[1]
+    a₂ = f ÷ 2; b₂ = fprime ÷ 2 
+    sprime = _one - ((f & _one) ⊻ (fprime & _one))
+    s = zeros(T2,2)
+    b = zeros(T2,3)
+    r = 0 #no rotation information in face_neighbor currently
+    if dim == 2
+        a₀ = 1 - a₂; b₀ = 1 - b₂; s[1] = r #no rotation as of now
+    else
+        a₀ = (f < 3) ? 1 : 0; a₁ = (f < 5) ? 2 : 1
+        #u = ℛ[1,f] ⊻ ℛ[1,fprime] ⊻ T2((r == 1) | (r == 3))
+        b[1] = (fprime < 3) ? 1 : 0; b[2] = (fprime < 5) ? 2 : 1
+        #v = T2(ℛ[f,fprime] == 1)
+        s[1] = r & 2; s[2] = r & 3
+    end
+    b = forest.cells[1].b
+    l = o.l; g = 2^b - 2^(b-l)
+    x = T2((s[1] == 1) ? o.xyz[1] : g - o.xyz[1])
+    y = T2((s[2] == 1) ? o.xyz[2] : g - o.xyz[2])
+    z = T2((_two*(fprime & 1) - 1)*2^b + sprime*g + (1-2*sprime)*o.xyz[2])
+    if dim == 2
+        return OctantBWG(l,(x,z)) 
+    else
+        return OctantBWG(l,(x,y,z))
+    end
+end
 
 """
     edge_neighbor(octant::OctantBWG, e::Integer, b::Integer)
