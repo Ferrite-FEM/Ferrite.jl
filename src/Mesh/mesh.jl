@@ -26,8 +26,8 @@ mutable struct Mesh{sdim,ElementType<:AbstractElement,T<:Real} <: AbstractMesh{s
     elementsets::Dict{String,Set{ElementIndex}}
     nodesets::Dict{String,Set{Int}}
     facesets::Dict{String,Set{FaceIndex}}
-    # edgesets::Dict{String,Set{EdgeIndex}}     # never used and depend on element dim?
-    # vertexsets::Dict{String,Set{VertexIndex}} # never used and depend on element dim?
+    edgesets::Dict{String,Set{EdgeIndex}}
+    vertexsets::Dict{String,Set{VertexIndex}}
 end
 
 function Mesh(elements::Vector{C},
