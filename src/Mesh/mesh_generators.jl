@@ -12,6 +12,12 @@ function generate_mesh(C::Type{Element{Dim,Ref,N}}, nel::NTuple{Dim,Int}, SDim::
     generate_mesh(C, nel, Vec{SDim}(ntuple(x->-1.0, SDim)), Vec{SDim}(ntuple(x->1.0, SDim)))
 end
 
+function generate_mesh(C::Type{Element{2,Ref,N}}, nel::NTuple{2,Int}, X::Vector{Vec{2,T}}) where {Ref,N,T}
+    @assert length(X) == 4
+    generate_mesh(C, nel, X[1], X[2], X[3], X[4])
+end
+
+
 function generate_mesh(C::Type{Element{2,Ref,N}}, nel::NTuple{2,Int}, left::Vec{2,T}=Vec{2}((-1.0,-1.0)), right::Vec{2,T}=Vec{2}((1.0,1.0))) where {Ref,N,T}
     LL = left
     UR = right

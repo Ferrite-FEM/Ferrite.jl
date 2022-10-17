@@ -35,8 +35,10 @@ function Mesh(elements::Vector{C},
               elementsets::Dict{String,Set{ElementIndex}}=Dict{String,Set{ElementIndex}}(),
               nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
               facesets::Dict{String,Set{FaceIndex}}=Dict{String,Set{FaceIndex}}(),
+              edgesets::Dict{String,Set{EdgeIndex}}=Dict{String,Set{EdgeIndex}}(),
+              vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}()
               ) where {sdim,C,T}
-    return Mesh(elements, nodes, elementsets, nodesets, facesets)
+    return Mesh(elements, nodes, elementsets, nodesets, facesets, edgesets, vertexsets)
 end
 
 toglobal(mesh::Mesh, vertexidx::VertexIndex) = vertices(getelements(mesh,vertexidx[1]))[vertexidx[2]]

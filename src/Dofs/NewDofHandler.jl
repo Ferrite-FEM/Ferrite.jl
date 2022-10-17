@@ -236,9 +236,6 @@ function __close!(dh::NewDofHandler)
     # 4d not functional yet
     @assert(max_element_dim < 4)
 
-    # not implemented yet: more than one facedof per face in 3D
-    max_element_dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
-
     # Find types for codimensional entities
     #TODO better data structures...
     # coentities[element_dimension][entity_codimension] -> Simple materialized representation of entity
@@ -269,6 +266,9 @@ function __close!(dh::NewDofHandler)
         push!(interpolation_infos, InterpolationInfo(interpolation))
     end
 
+    # not implemented yet: more than one facedof per face in 3D
+    max_element_dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
+
     # We can simplify this quite a bit by rearranging the loops below.
     # TODO check importance of this reordering...
     codim_ordering_by_dim = [
@@ -280,16 +280,34 @@ function __close!(dh::NewDofHandler)
     element_current_idx_by_dim = [
         1,1,1,1
     ]
+
+    #  TODO We should be able to condense this one.
+    field_offsets = zeros(Int, nfields(dh)+1)
+    for fi in 1:nfields(dh)
+        interpolation_info = interpolation_infos[fi]
+        field_dim = getfielddim(dh, fi)
+        for edim ∈ 1:max_element_dim
+            for codim ∈ 0:edim
+                num_entities = codim == 0 ? getnelements(mesh) : length(coentities[edim][codim])
+                ndofs_on_entity = num_dofs_on_codim(interpolation_info, edim, codim)
+                field_offsets[fi+1] += field_dim*num_entities*ndofs_on_entity
+            end
+        end
+        field_offsets[fi+1] += field_offsets[fi]
+        @debug println("field: $(dh.field_names[fi]) with dof range $(field_offsets[fi]:field_offsets[fi+1])")
+    end
+
     #TODO check type stability and performance
     push!(dh.element_dofs_offset, 1) # dofs for the first element start at 1
-    for (gei, element) in enumerate(getelements(dh.mesh))
-        next_field_offset = 0
+    for (gei, element) in enumerate(getelements(getmesh(dh)))
         current_element_dim = getdim(element)
         ei = element_current_idx_by_dim[current_element_dim]
         @debug println("global element #$gei of dim $current_element_dim with dimension-local index $ei")
         for fi in 1:nfields(dh)
             interpolation_info = interpolation_infos[fi]
-            @debug println("  field: $(dh.field_names[fi]) with dof offset $next_field_offset")
+            field_dim = getfielddim(dh, fi)
+            #@debug println("  field: $(dh.field_names[fi]) with dof offset $next_field_offset")
+            @debug println("  field: $(dh.field_names[fi])")
             entity_based_offset = 0
             for current_entity_codim ∈ codim_ordering_by_dim[current_element_dim]
                 @debug println("    entity codim $current_entity_codim | dim $(current_element_dim-current_entity_codim) with dof offset $entity_based_offset")
@@ -299,28 +317,25 @@ function __close!(dh::NewDofHandler)
                     for local_entity_rep ∈ entities_with_codim(element, current_entity_codim)
                         # TODO handle this better...
                         local_entity_rep_unique = (current_element_dim > 1 && current_entity_codim == 1) ? sortface(local_entity_rep) : (current_element_dim > 2 && current_entity_codim == 2) ? sortedge(local_entity_rep)[1] : local_entity_rep;
-                        current_entity_idx          = current_entity_codim == 0 ? local_entity_rep_unique : coentities[current_element_dim][current_entity_codim][local_entity_rep_unique]
+                        current_entity_idx      = current_entity_codim == 0 ? local_entity_rep_unique : coentities[current_element_dim][current_entity_codim][local_entity_rep_unique]
                         # current_entity_connectivity = connectivity[current_element_dim][current_entity_codim][ei]
-                        startdof = next_field_offset + entity_based_offset + current_entity_idx
-                        for d in 1:dh.field_dims[fi]
-                            computed_dof = startdof + (d-1) + (current_ndofs_on_entity-1)*dh.field_dims[fi]
+                        startdof = field_offsets[fi] + entity_based_offset + field_dim*(current_entity_idx-1) + 1
+                        for d in 1:field_dim
+                            computed_dof = startdof + (d-1) + (current_ndofs_on_entity-1)*field_dim
                             push!(dh.element_dofs, computed_dof)
                             @debug println("      added dof $computed_dof")
                         end
                     end
                     # TODO permutate the dofs according to a reference orientation given by the entity on the adjacent element with the lowest index!
                     num_entities = current_entity_codim == 0 ? 1 : length(coentities[current_element_dim][current_entity_codim])
-                    entity_based_offset += current_ndofs_on_entity*num_entities*dh.field_dims[fi]
+                    entity_based_offset += current_ndofs_on_entity*num_entities*field_dim
                 end
             end
-
-            next_field_offset += entity_based_offset
         end
 
         element_current_idx_by_dim[current_element_dim] += 1
         push!(dh.element_dofs_offset, length(dh.element_dofs)+1)
     end
-
     dh.ndofs[] = maximum(dh.element_dofs)
     dh.closed[] = true
 
