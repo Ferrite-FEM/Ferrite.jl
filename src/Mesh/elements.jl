@@ -3,17 +3,22 @@
 #######################################################
 
 """
-    AbstractElement{Dim, RefGeo, N}
+    AbstractElement{Dim, RefGeo}
+
+Element supertype to describe geometries which are transformable 
+to some `Dim`-dimensional reference geometry of type `RefGeo`.
 """
-abstract type AbstractElement{Dim, RefGeo, N} end
+abstract type AbstractElement{Dim, RefGeo} end
 
 """
     Element{Dim, RefGeo, N} <: AbstractElement{Dim, RefGeo}
 
-We define an element as a discrete subdomain with `N` nodes and dimension
-`Dim` which can be transformed to some reference geometry `RefGeo`.
+Standart data structure to describe nodal finite elements.
+* `Dim` refers to the dimension of the reference geometry
+* `RefGeo` is the type of reference geometry
+* `N` refers to the number of nodes
 """
-struct Element{Dim, RefGeo, N} <: AbstractElement{Dim, RefGeo, N}
+struct Element{Dim, RefGeo, N} <: AbstractElement{Dim, RefGeo}
     nodes::NTuple{N, Int}
 
     function Element(ip_geo::InterpolationType) where {InterpolationType <: Interpolation}
@@ -121,7 +126,7 @@ vertices(c::Union{TriangleElement,QuadraticTriangleElement}) = (c.nodes[1], c.no
 faces(c::Union{TriangleElement,QuadraticTriangleElement}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]))
 
 vertices(c::Union{QuadrilateralElement,QuadraticQuadrilateralElement}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
-faces(c::Union{QuadrilateralElement,QuadraticQuadrilateral}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
+faces(c::Union{QuadrilateralElement,QuadraticQuadrilateralElement}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
 
 # 3D: vertices, edges, faces
 vertices(c::Union{TetrahedronElement,QuadraticTetrahedronElement}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
