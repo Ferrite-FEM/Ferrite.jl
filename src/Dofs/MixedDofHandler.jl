@@ -485,3 +485,5 @@ function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) 
     end
     return data
 end
+
+@inline getgrid(dh::MixedDofHandler) = dh.grid

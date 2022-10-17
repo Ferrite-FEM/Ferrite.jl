@@ -73,7 +73,7 @@ struct CellIterator{GridType<:AbstractGrid,NodeType,DH<:Union{AbstractDofHandler
         cell = ScalarWrapper(0)
         nodes = zeros(Int, N)
         coords = zeros(Vec{dim,T}, N)
-        return new{typeof(grid),Vec{dim,T},nothing}(flags, grid, cell, nodes, coords, cellset)
+        return new{typeof(grid),Vec{dim,T},Nothing}(flags, grid, cell, nodes, coords, cellset)
     end
 end
 
@@ -93,6 +93,7 @@ Base.eltype(::Type{T})         where {T<:CellIterator} = T
 
 # utility
 @inline getnodes(ci::CellIterator) = ci.nodes
+@inline getnodes(ci::CellIterator, node_idx::Union{Int, AbstractVector{Int}}) = ci.nodes[node_idx]
 @inline getcoordinates(ci::CellIterator) = ci.coords
 @inline nfaces(ci::CellIterator) = nfaces(eltype(getcells(ci.grid)))
 @inline onboundary(ci::CellIterator, face::Int) = ci.grid.boundary_matrix[face, ci.current_cellid[]]

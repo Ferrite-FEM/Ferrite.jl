@@ -313,7 +313,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     visited = falses(nnodes)
     for cell in CellIterator(ch.dh, collect(cellset)) # only go over cells that belong to current FieldHandler
         celldofs!(_celldofs, cell) # update the dofs for this cell
-        for idx in 1:min(interpol_points, nnodes(cell))
+        for idx in 1:min(interpol_points, nnodes)
             node = getnodes(cell, idx)
             if !visited[node]
                 noderange = (offset + (idx-1)*field_dim + 1):(offset + idx*field_dim) # the dofs in this node
@@ -854,7 +854,7 @@ end
 function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int})
     nodes = Set{Int}()
     for cellid in cellset
-        for nodeid in getnodes(getcells(grid, cellid))
+        for nodeid in getnodeids(getcells(grid, cellid))
             nodeid ∈ nodes || push!(nodes, nodeid)
         end
     end

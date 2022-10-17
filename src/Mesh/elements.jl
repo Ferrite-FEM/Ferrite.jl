@@ -37,6 +37,8 @@ struct Element{Dim, RefGeo, N} <: AbstractElement{Dim, RefGeo}
         return new{Dim, RefGeo, N}(nodes)
     end
 end
+getnodeid(e::Element, i::Int) = e.nodes[i]
+getnodeids(e::Element) = e.nodes
 
 nfaces(c::C) where {C<:AbstractElement} = nfaces(typeof(c))
 nfaces(::Type{<:AbstractElement{dim, RefCube}}) where {dim} = 2*dim

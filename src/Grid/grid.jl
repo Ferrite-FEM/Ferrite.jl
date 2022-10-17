@@ -30,6 +30,8 @@ A `Cell` has `N` nodes and `M` faces.
 struct Cell{dim,N,M} <: AbstractCell{dim,N,M}
     nodes::NTuple{N,Int}
 end
+getnodeid(c::Cell, i::Int) = c.nodes[i]
+getnodeids(c::Cell) = c.nodes
 nfaces(c::C) where {C<:AbstractCell} = nfaces(typeof(c))
 nfaces(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = M
 nnodes(c::C) where {C<:AbstractCell} = nnodes(typeof(c))
