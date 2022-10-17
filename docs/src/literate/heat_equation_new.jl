@@ -45,8 +45,8 @@ using Ferrite, SparseArrays
 # We start by generating a simple mesh with 20x20 quadrilateral elements
 # using `generate_mesh`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-nel_x = 6
-nel_y = 6
+nel_x = 10
+nel_y = 10
 mesh_quad = generate_mesh(QuadrilateralElement, (nel_x, nel_y));
 #mesh = mesh_quad
 
@@ -62,10 +62,10 @@ for i ∈ 1:2:(n_nodes_x-2)
         push!(elements, QuadrilateralElement((node_array[i+1,j+1], node_array[i+2,j+1], node_array[i+2,j+2], node_array[i+1,j+2])))
 
         push!(elements, Ferrite.TriangleElement((node_array[i+1,j], node_array[i+2,j], node_array[i+1,j+1])))
-        push!(elements, Ferrite.TriangleElement((node_array[i+1,j+1], node_array[i+2,j+1], node_array[i+2,j])))
+        push!(elements, Ferrite.TriangleElement((node_array[i+1,j+1], node_array[i+2,j], node_array[i+2,j+1])))
 
         push!(elements, Ferrite.TriangleElement((node_array[i+1-1,j+1], node_array[i+2-1,j+1], node_array[i+1-1,j+1+1])))
-        push!(elements, Ferrite.TriangleElement((node_array[i+1-1,j+1+1], node_array[i+2-1,j+1+1], node_array[i+2-1,j+1])))
+        push!(elements, Ferrite.TriangleElement((node_array[i+1-1,j+1+1], node_array[i+2-1,j+1], node_array[i+2-1,j+1+1])))
     end
 end
 mesh = Ferrite.Mesh(elements, nodes)
@@ -80,10 +80,16 @@ mesh = Ferrite.Mesh(elements, nodes)
 # the same reference cube. We combine the interpolation and the quadrature rule
 # to a `CellScalarValues` object.
 dim = 2
-ip = Lagrange{dim, RefCube, 2}()
-ip_geo = Lagrange{dim, RefCube, 1}()
-qr = QuadratureRule{dim, RefCube}(2)
-cellvalues = CellScalarValues(qr, ip, ip_geo);
+ip_quad = Lagrange{dim, RefCube, 1}()
+ip_geo_quad = Lagrange{dim, RefCube, 1}()
+qr_quad = QuadratureRule{dim, RefCube}(2)
+ip_tri = Lagrange{dim, Ferrite.RefSimplex, 1}()
+ip_geo_tri = Lagrange{dim, Ferrite.RefSimplex, 1}()
+qr_tri = QuadratureRule{dim, Ferrite.RefSimplex}(2)
+cellvalues = Dict([
+    Ferrite.TriangleElement => CellScalarValues(qr_tri, ip_tri, ip_geo_tri),
+    QuadrilateralElement => CellScalarValues(qr_quad, ip_quad, ip_geo_quad)
+])
 
 # ### Degrees of freedom
 # Next we need to define a `NewDofHandler`, which will take care of numbering
@@ -96,13 +102,11 @@ ip_field = Lagrange{dim, Union{RefCube, Ferrite.RefSimplex}, 1}()
 Ferrite.add_field!(dh, :u, 1, ip_field)
 close!(dh);
 
-u = [i for i ∈ 1:ndofs(dh)]
+# u = [i for i ∈ 1:ndofs(dh)]
 
-vtk_grid("heat_equation", dh) do vtk
-    vtk_point_data(vtk, u, "u")
-end
-
-exit(0)
+# vtk_grid("heat_equation", dh) do vtk
+#     vtk_point_data(vtk, u, "u")
+# end
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `create_sparsity_pattern`. This function returns a sparse matrix
@@ -112,7 +116,7 @@ K = create_sparsity_pattern(dh)
 # ### Boundary conditions
 # In Ferrite constraints like Dirichlet boundary conditions
 # are handled by a `ConstraintHandler`.
-ch = ConstraintHandler(dh);
+# ch = ConstraintHandler(dh);
 
 # Next we need to add constraints to `ch`. For this problem we define
 # homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
@@ -130,15 +134,15 @@ ch = ConstraintHandler(dh);
 # the current time $t$ and returns the prescribed value. In this case
 # it is trivial -- no matter what $\textbf{x}$ and $t$ we return $0$. When we have
 # specified our constraint we `add!` it to `ch`.
-dbc = Dirichlet(:u, Set([VertexIndex(1,1)]), (x, t) -> 0)
-add!(ch, dbc);
+# dbc = Dirichlet(:u, Set([VertexIndex(1,1)]), (x, t) -> 0)
+# add!(ch, dbc);
 
 # We also need to `close!` and `update!` our boundary conditions. When we call `close!`
 # the dofs corresponding to our constraints are calculated and stored
 # in our `ch` object. Since the boundary conditions are, in this case,
 # independent of time we can `update!` them directly with e.g. $t = 0$.
-close!(ch)
-update!(ch, 0.0);
+# close!(ch)
+# update!(ch, 0.0);
 
 # ### Assembling the linear system
 #
@@ -208,23 +212,28 @@ end
 #     versions. However, through the code we use `f` and `u` instead to reflect the strong
 #     connection between the weak form and the Ferrite implementation.
 
-function assemble_global(cellvalues::CellScalarValues, K::SparseMatrixCSC, dh::NewDofHandler)
-    ## Allocate the element stiffness matrix and element force vector
-    n_basefuncs = getnbasefunctions(cellvalues)
-    Ke = zeros(n_basefuncs, n_basefuncs)
-    fe = zeros(n_basefuncs)
+function assemble_global(cellvalues, K::SparseMatrixCSC, dh::NewDofHandler)
     ## Allocate global force vector f
     f = zeros(ndofs(dh))
     ## Create an assembler
     assembler = start_assemble(K, f)
     ## Loop over all cels
-    for cell in CellIterator(dh)
-        ## Reinitialize cellvalues for this cell
-        reinit!(cellvalues, cell)
+    for (elidx, element) ∈ enumerate(dh.mesh.elements)
+        ## Allocate the element stiffness matrix and element force vector
+        elementvalues = cellvalues[typeof(element)]
+        coords = Vector{Vec{dim,Float64}}(undef, length(element.nodes))
+        Ferrite.elementcoords!(coords, dh.mesh, elidx)
+        reinit!(elementvalues, coords)
+        cur_elementdofs = zeros(Int, Ferrite.ndofs_per_element(dh, elidx))
+        Ferrite.elementdofs!(cur_elementdofs, dh, elidx)
+        n_basefuncs = getnbasefunctions(elementvalues)
+        Ke = zeros(n_basefuncs, n_basefuncs)
+        fe = zeros(n_basefuncs)
+
         ## Compute element contribution
-        assemble_element!(Ke, fe, cellvalues)
+        assemble_element!(Ke, fe, elementvalues)
         ## Assemble Ke and fe into K and f
-        assemble!(assembler, celldofs(cell), Ke, fe)
+        assemble!(assembler, cur_elementdofs, Ke, fe)
     end
     return K, f
 end
@@ -234,18 +243,21 @@ end
 # The last step is to solve the system. First we call `assemble_global`
 # to obtain the global stiffness matrix `K` and force vector `f`.
 K, f = assemble_global(cellvalues, K, dh);
-
+K[1,:] .= 0.0
+K[:,1] .= 0.0
+K[1,1] = 1.0
 # To account for the boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f` respectively, such that
 # we can get the correct solution vector `u` by using `\`.
-apply!(K, f, ch)
+# apply!(K, f, ch)
 u = K \ f;
 
 # ### Exporting to VTK
 # To visualize the result we export the mesh and our field `u`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
 vtk_grid("heat_equation", dh) do vtk
-    vtk_point_data(vtk, dh, u)
+    #FIXME export is wrong like this
+    vtk_point_data(vtk, u, "u")
 end
 
 ## test the result                #src

@@ -411,16 +411,23 @@ create_symmetric_sparsity_pattern(dh::NewDofHandler) = Symmetric(_create_sparsit
 
 function _create_sparsity_pattern(dh::NewDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool)
     @assert isclosed(dh)
-    nelements = getnelements(dh.mesh)
-    n = ndofs_per_element(dh)
-    N = sym ? div(n*(n+1), 2) * nelements : n^2 * nelements
+    
+    
+    ncells = getncells(getmesh(dh))
+    N::Int = 0
+    for element_id = 1:ncells  # TODO check for correctness
+        n = ndofs_per_cell(dh, element_id)
+        N += sym ? div(n*(n+1), 2) : n^2
+    end
     N += ndofs(dh) # always add the diagonal elements
     I = Int[]; resize!(I, N)
     J = Int[]; resize!(J, N)
-    global_dofs = zeros(Int, n)
+
     cnt = 0
-    for element_id in 1:nelements
-        elementdofs!(global_dofs, dh, element_id)
+    for element_id in 1:ncells
+        n = ndofs_per_cell(dh, element_id)
+        global_dofs = zeros(Int, n)
+        celldofs!(global_dofs, dh, element_id)
         @inbounds for j in 1:n, i in 1:n
             dofi = global_dofs[i]
             dofj = global_dofs[j]
@@ -432,7 +439,6 @@ function _create_sparsity_pattern(dh::NewDofHandler, ch#=::Union{ConstraintHandl
             end
             I[cnt] = dofi
             J[cnt] = dofj
-
         end
     end
     @inbounds for d in 1:ndofs(dh)
@@ -444,7 +450,6 @@ function _create_sparsity_pattern(dh::NewDofHandler, ch#=::Union{ConstraintHandl
         I[cnt] = d
         J[cnt] = d
     end
-
     resize!(I, cnt)
     resize!(J, cnt)
 
