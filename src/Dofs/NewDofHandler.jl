@@ -107,7 +107,7 @@ end
 Add a `dim`-dimensional `Field` called `name` which is approximated by `ip` to `dh`.
 
 The field is added to all elements of the underlying mesh. In case no interpolation `ip` is given,
-the default interpolation of the mesh's elementtype is used. 
+the default interpolation of the mesh's elementtype is used.
 If the mesh uses several elementtypes, [`push!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
 """
 function add_field!(dh::NewDofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getelementtype(dh.mesh)))
@@ -247,12 +247,13 @@ function __close!(dh::NewDofHandler)
     coentities   = ntuple(j->ntuple(i->(j-i+1 > 1) ? Dict{NTuple{j-i+1,Int},Int}() : Dict{Int, Int}(), max(j, 0)), max_element_dim)
     connectivity = ntuple(j->ntuple(i->Vector{Vector{Int}}(), max(j, 0)), max_element_dim)
 
-    # Primitive materialization of elements 
+    # Primitive materialization of elements
     for element ∈ getelements(mesh)
-        # Loop over all codimensional entities, i.e. faces, edges, but ignore 
+        # Loop over all codimensional entities, i.e. faces, edges, but ignore
         # the full actual element (codim=0).
         for codim ∈ 1:max_element_dim
-            add_entities!(coentities[getdim(element)][codim], connectivity[getdim(element)][codim], element)
+            edim = getdim(element)
+            add_entities!(coentities[edim][codim], connectivity[edim][codim], element)
         end
     end
 
@@ -295,8 +296,10 @@ function __close!(dh::NewDofHandler)
                 current_ndofs_on_entity = num_dofs_on_codim(interpolation_info, current_element_dim, current_entity_codim)
                 if current_ndofs_on_entity > 0
                     # Compute the number of entities with codim > mine
-                    for local_entity_nodes ∈ entities_with_codim(element, current_entity_codim)
-                        current_entity_idx          = coentities[current_element_dim][current_entity_codim][local_entity_nodes]
+                    for local_entity_rep ∈ entities_with_codim(element, current_entity_codim)
+                        # TODO handle this better...
+                        local_entity_rep_unique = (current_element_dim > 1 && current_entity_codim == 1) ? sortface(local_entity_rep) : (current_element_dim > 2 && current_entity_codim == 2) ? sortedge(local_entity_rep)[1] : local_entity_rep;
+                        current_entity_idx          = current_entity_codim == 0 ? local_entity_rep_unique : coentities[current_element_dim][current_entity_codim][local_entity_rep_unique]
                         # current_entity_connectivity = connectivity[current_element_dim][current_entity_codim][ei]
                         startdof = next_field_offset + entity_based_offset + current_entity_idx
                         for d in 1:dh.field_dims[fi]
@@ -306,7 +309,8 @@ function __close!(dh::NewDofHandler)
                         end
                     end
                     # TODO permutate the dofs according to a reference orientation given by the entity on the adjacent element with the lowest index!
-                    entity_based_offset += current_ndofs_on_entity*length(coentities[current_element_dim][current_entity_codim])*dh.field_dims[fi]
+                    num_entities = current_entity_codim == 0 ? 1 : length(coentities[current_element_dim][current_entity_codim])
+                    entity_based_offset += current_ndofs_on_entity*num_entities*dh.field_dims[fi]
                 end
             end
 

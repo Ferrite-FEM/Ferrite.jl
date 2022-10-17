@@ -144,7 +144,7 @@ The struct saves the highest dimensional neighborhood, i.e. if something is conn
 - `vertex_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: `vertex_neighbor[cellid,local_vertex_id]` -> neighboring vertex
 - `edge_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: `edge_neighbor[cellid_local_vertex_id]` -> neighboring edge
 - `vertex_vertex_neighbor::Dict{Int,EntityNeighborhood{VertexIndex}}`: global vertex id -> all connected vertices by edge or face
-- `face_skeleton::Vector{FaceIndex}`: list of unique faces in the grid 
+- `face_skeleton::Vector{FaceIndex}`: list of unique faces in the grid
 """
 struct ExclusiveTopology <: AbstractTopology
     # maps a global vertex id to all cells containing the vertex
@@ -165,8 +165,8 @@ end
 
 function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     cell_vertices_table = vertices.(cells) #needs generic interface for <: AbstractCell
-    vertex_cell_table = Dict{Int,Vector{Int}}() 
-    
+    vertex_cell_table = Dict{Int,Vector{Int}}()
+
     for (cellid, cell_nodes) in enumerate(cell_vertices_table)
        for node in cell_nodes
             if haskey(vertex_cell_table, node)
@@ -174,20 +174,20 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
             else
                 vertex_cell_table[node] = [cellid]
             end
-        end 
+        end
     end
 
     I_face = Int[]; J_face = Int[]; V_face = EntityNeighborhood[]
     I_edge = Int[]; J_edge = Int[]; V_edge = EntityNeighborhood[]
-    I_vertex = Int[]; J_vertex = Int[]; V_vertex = EntityNeighborhood[]   
-    cell_neighbor_table = Vector{EntityNeighborhood{CellIndex}}(undef, length(cells)) 
+    I_vertex = Int[]; J_vertex = Int[]; V_vertex = EntityNeighborhood[]
+    cell_neighbor_table = Vector{EntityNeighborhood{CellIndex}}(undef, length(cells))
 
-    for (cellid, cell) in enumerate(cells)    
+    for (cellid, cell) in enumerate(cells)
         #cell neighborhood
         cell_neighbors = getindex.((vertex_cell_table,), cell_vertices_table[cellid]) # cell -> vertex -> cell
-        cell_neighbors = unique(reduce(vcat,cell_neighbors)) # non unique list initially 
+        cell_neighbors = unique(reduce(vcat,cell_neighbors)) # non unique list initially
         filter!(x->x!=cellid, cell_neighbors) # get rid of self neighborhood
-        cell_neighbor_table[cellid] = EntityNeighborhood(CellIndex.(cell_neighbors)) 
+        cell_neighbor_table[cellid] = EntityNeighborhood(CellIndex.(cell_neighbors))
 
         for neighbor in cell_neighbors
             neighbor_local_ids = findall(x->x in cell.nodes, cells[neighbor].nodes)
@@ -197,23 +197,23 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
                 _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
             # face neighbor
             elseif length(cell_local_ids) == face_npoints(cell)
-                _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor]) 
+                _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
             # edge neighbor
             elseif getdim(cell) > 2 && length(cell_local_ids) == edge_npoints(cell)
                 _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
             end
-        end       
+        end
     end
 
     face_neighbor = sparse(I_face,J_face,V_face)
-    vertex_neighbor = sparse(I_vertex,J_vertex,V_vertex) 
+    vertex_neighbor = sparse(I_vertex,J_vertex,V_vertex)
     edge_neighbor = sparse(I_edge,J_edge,V_edge)
 
     vertex_vertex_table = Dict{Int,EntityNeighborhood}()
     vertex_vertex_global = Dict{Int,Vector{Int}}()
     # Vertex Connectivity
     for global_vertexid in keys(vertex_cell_table)
-        #Cellset that contains given vertex 
+        #Cellset that contains given vertex
         cellset = vertex_cell_table[global_vertexid]
         vertex_neighbors_local = VertexIndex[]
         vertex_neighbors_global = Int[]
@@ -227,7 +227,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
         end
         vertex_vertex_table[global_vertexid] =  EntityNeighborhood(vertex_neighbors_local)
         vertex_vertex_global[global_vertexid] = vertex_neighbors_global
-    end 
+    end
 
     # Face Skeleton
     face_skeleton_global = Set{NTuple}()
@@ -238,7 +238,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
             push!(face_skeleton_global, sortface(face))
             fs_length_new = length(face_skeleton_global)
             if fs_length != fs_length_new
-                push!(face_skeleton_local, FaceIndex(cellid,local_face_id)) 
+                push!(face_skeleton_local, FaceIndex(cellid,local_face_id))
                 fs_length = fs_length_new
             end
         end
@@ -297,7 +297,7 @@ ExclusiveTopology(grid::AbstractGrid) = ExclusiveTopology(getcells(grid))
 
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 There are multiple helper structures to apply boundary conditions or define subdomains. They are gathered in the `cellsets`, `nodesets`,
-`facesets`, `edgesets` and `vertexsets`. 
+`facesets`, `edgesets` and `vertexsets`.
 
 # Fields
 - `cells::Vector{C}`: stores all cells of the grid
@@ -305,7 +305,7 @@ There are multiple helper structures to apply boundary conditions or define subd
 - `cellsets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of cell ids
 - `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
 - `facesets::Dict{String,Set{FaceIndex}}`: maps a `String` to a `Set` of `Set{FaceIndex} (global_cell_id, local_face_id)`
-- `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id` 
+- `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id`
 - `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
 - `boundary_matrix::SparseMatrixCSC{Bool,Int}`: optional, only needed by `onboundary` to check if a cell is on the boundary, see, e.g. Helmholtz example
 """
@@ -315,9 +315,9 @@ mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     # Sets
     cellsets::Dict{String,Set{Int}}
     nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{FaceIndex}} 
-    edgesets::Dict{String,Set{EdgeIndex}} 
-    vertexsets::Dict{String,Set{VertexIndex}} 
+    facesets::Dict{String,Set{FaceIndex}}
+    edgesets::Dict{String,Set{EdgeIndex}}
+    vertexsets::Dict{String,Set{VertexIndex}}
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool,Int}
 end
@@ -343,7 +343,7 @@ end
     getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, edgeidx::EdgeIndex, include_self=false)
 
 Returns all directly connected entities of the same type, i.e. calling the function with a `VertexIndex` will return
-a list of directly connected vertices (connected via face/edge). If `include_self` is true, the given `*Index` is included 
+a list of directly connected vertices (connected via face/edge). If `include_self` is true, the given `*Index` is included
 in the returned list.
 
 !!! warning
@@ -353,13 +353,13 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::Ce
     patch = getcells(top.cell_neighbor[cellidx.idx])
     if include_self
         return [patch; cellidx.idx]
-    else 
+    else
         return patch
     end
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
-    if include_self 
+    if include_self
         return [top.face_neighbor[faceidx[1],faceidx[2]].neighbor_info; faceidx]
     else
         return top.face_neighbor[faceidx[1],faceidx[2]].neighbor_info
@@ -378,7 +378,7 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx::EdgeIndex, include_self=false)
-    if include_self 
+    if include_self
         return [top.edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info; edgeidx]
     else
         return top.edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info
@@ -387,7 +387,7 @@ end
 
 """
     faceskeleton(grid) -> Vector{FaceIndex}
-Returns an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit` 
+Returns an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit`
 `FaceValues`.
 """
 faceskeleton(top::ExclusiveTopology, grid::AbstractGrid) =  top.face_skeleton
@@ -397,8 +397,8 @@ toglobal(grid::Grid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),v
 
 @inline getdim(::AbstractGrid{dim}) where {dim} = dim
 """
-    getcells(grid::AbstractGrid) 
-    getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}} 
+    getcells(grid::AbstractGrid)
+    getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}}
     getcells(grid::AbstractGrid, setname::String)
 
 Returns either all `cells::Collection{C<:AbstractCell}` of a `<:AbstractGrid` or a subset based on an `Int`, `Vector{Int}` or `String`.
@@ -414,7 +414,7 @@ Whereas the last option tries to call a `cellset` of the `grid`. `Collection` ca
 @inline getcelltype(grid::AbstractGrid, i::Int) = typeof(grid.cells[i])
 
 """
-    getnodes(grid::AbstractGrid) 
+    getnodes(grid::AbstractGrid)
     getnodes(grid::AbstractGrid, v::Union{Int,Vector{Int}}
     getnodes(grid::AbstractGrid, setname::String)
 
@@ -499,11 +499,11 @@ n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
 
 """
     function compute_vertex_values(grid::AbstractGrid, f::Function)
-    function compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function)    
+    function compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function)
     function compute_vertex_values(grid::AbstractGrid, set::String, f::Function)
 
 Given a `grid` and some function `f`, `compute_vertex_values` computes all nodal values,
- i.e. values at the nodes,  of the function `f`. 
+ i.e. values at the nodes,  of the function `f`.
 The function implements two dispatches, where only a subset of the grid's node is used.
 
 ```julia
@@ -555,7 +555,7 @@ _warn_emptyset(set, name) = length(set) == 0 && @warn("no entities added to the 
 
 Adds a cellset to the grid with key `name`.
 Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
-The `MixedDofHandler` can construct different fields which live not on the whole domain, but rather on a cellset. 
+The `MixedDofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
 
 ```julia
 addcellset!(grid, "left", Set((1,3))) #add cells with id 1 and 3 to cellset left
@@ -589,7 +589,7 @@ end
 
 """
     addfaceset!(grid::AbstractGrid, name::String, faceid::Union{Set{FaceIndex},Vector{FaceIndex}})
-    addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) 
+    addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true)
 
 Adds a faceset to the grid with key `name`.
 A faceset maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id, local_face_id)`.
@@ -600,11 +600,11 @@ addfaceset!(gird, "right", Set(((2,2),(4,2))) #see grid manual example for refer
 addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
 ```
 """
-addfaceset!(grid::Grid, name::String, set::Union{Set{FaceIndex},Vector{FaceIndex}}) = 
+addfaceset!(grid::Grid, name::String, set::Union{Set{FaceIndex},Vector{FaceIndex}}) =
     _addset!(grid, name, set, grid.facesets)
-addedgeset!(grid::Grid, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) = 
+addedgeset!(grid::Grid, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) =
     _addset!(grid, name, set, grid.edgesets)
-addvertexset!(grid::Grid, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) = 
+addvertexset!(grid::Grid, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) =
     _addset!(grid, name, set, grid.vertexsets)
 function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
     _check_setname(dict, name)
@@ -614,11 +614,11 @@ function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
     grid
 end
 
-addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
+addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) =
     _addset!(grid, name, f, Ferrite.faces, grid.facesets, FaceIndex; all=all)
-addedgeset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
+addedgeset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) =
     _addset!(grid, name, f, Ferrite.edges, grid.edgesets, EdgeIndex; all=all)
-addvertexset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
+addvertexset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) =
     _addset!(grid, name, f, Ferrite.vertices, grid.vertexsets, VertexIndex; all=all)
 function _addset!(grid::AbstractGrid, name::String, f::Function, _ftype::Function, dict::Dict, _indextype::Type; all::Bool=true)
     _check_setname(dict, name)
@@ -640,9 +640,9 @@ end
 
 """
     addnodeset!(grid::AbstractGrid, name::String, nodeid::Union{Vector{Int},Set{Int}})
-    addnodeset!(grid::AbstractGrid, name::String, f::Function)    
+    addnodeset!(grid::AbstractGrid, name::String, f::Function)
 
-Adds a `nodeset::Dict{String, Set{Int}}` to the `grid` with key `name`. Has the same interface as `addcellset`. 
+Adds a `nodeset::Dict{String, Set{Int}}` to the `grid` with key `name`. Has the same interface as `addcellset`.
 However, instead of mapping a cell id to the `String` key, a set of node ids is returned.
 """
 function addnodeset!(grid::AbstractGrid, name::String, nodeid::Union{Vector{Int},Set{Int}})
@@ -751,12 +751,12 @@ boundaryfunction(::Type{EdgeIndex}) = Ferrite.edges
 boundaryfunction(::Type{VertexIndex}) = Ferrite.vertices
 
 for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
-    @eval begin  
+    @eval begin
         #Constructor
         ($INDEX)(a::Int, b::Int) = ($INDEX)((a,b))
 
         Base.getindex(I::($INDEX), i::Int) = I.idx[i]
-        
+
         #To be able to do a,b = faceidx
         Base.iterate(I::($INDEX), state::Int=1) = (state==3) ?  nothing : (I[state], state+1)
 

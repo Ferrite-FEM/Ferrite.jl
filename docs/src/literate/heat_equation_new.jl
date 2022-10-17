@@ -45,7 +45,7 @@ using Ferrite, SparseArrays
 # We start by generating a simple mesh with 20x20 quadrilateral elements
 # using `generate_mesh`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-mesh = generate_mesh(QuadrilateralElement, (20, 20));
+mesh = generate_mesh(QuadrilateralElement, (5, 5));
 
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
@@ -57,9 +57,10 @@ mesh = generate_mesh(QuadrilateralElement, (20, 20));
 # the same reference cube. We combine the interpolation and the quadrature rule
 # to a `CellScalarValues` object.
 dim = 2
-ip = Lagrange{dim, RefCube, 1}()
+ip = Lagrange{dim, RefCube, 2}()
+ip_geo = Lagrange{dim, RefCube, 1}()
 qr = QuadratureRule{dim, RefCube}(2)
-cellvalues = CellScalarValues(qr, ip);
+cellvalues = CellScalarValues(qr, ip, ip_geo);
 
 # ### Degrees of freedom
 # Next we need to define a `NewDofHandler`, which will take care of numbering
@@ -69,7 +70,7 @@ cellvalues = CellScalarValues(qr, ip);
 # for all the elements.
 dh = NewDofHandler(mesh)
 #push!(dh, :u, 1)
-Ferrite.add_field!(dh, :u, 1)
+Ferrite.add_field!(dh, :u, 1, ip)
 close!(dh);
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
