@@ -34,7 +34,7 @@ getmesh(dh::NewDofHandler) = dh.mesh
 @inline ndofs_per_element(dh::NewDofHandler, element_idx::Int=1) = dh.element_dofs_offset[element_idx+1] - dh.element_dofs_offset[element_idx]
 
 function NewDofHandler(mesh::AbstractMesh)
-    isconcretetype(getelementtype(mesh)) || error("Mesh includes different elementtypes. Use MixedNewDofHandler instead of NewDofHandler")
+    # isconcretetype(getelementtype(mesh)) || error("Mesh includes different elementtypes. Use MixedNewDofHandler instead of NewDofHandler")
     NewDofHandler(Symbol[], Int[], Interpolation[], Int[], Int[], ScalarWrapper(false), mesh, Ferrite.ScalarWrapper(-1))
 end
 
@@ -217,6 +217,10 @@ function num_dofs_on_codim(interpolation_info::InterpolationInfo, dim::Int, codi
     end
 end
 
+get_compatible_interpolation(e, ip) = error("Incompatible interpolations provided!")
+get_compatible_interpolation(e::Ferrite.Element{Dim, RefGeo, N}, ip::Interpolation{Dim, IPRefGeo, O}) where {N, Dim, O, IPRefGeo, RefGeo <: IPRefGeo} = typeof(ip).name.wrapper{Dim, RefGeo, O}()
+get_compatible_interpolation(e::Type{Ferrite.Element{Dim, RefGeo, N}}, ip::Interpolation{Dim, IPRefGeo, O}) where {N, Dim, O, IPRefGeo, RefGeo <: IPRefGeo} = typeof(ip).name.wrapper{Dim, RefGeo, O}()
+
 # close the DofHandler and distribute all the dofs
 function __close!(dh::NewDofHandler)
     @assert !isclosed(dh)
@@ -230,8 +234,18 @@ function __close!(dh::NewDofHandler)
     #
     mesh = getmesh(dh)
     element_types = gettypes(getelementtypes(mesh))
+    element_type_idx = Dict([element_type => i for (i, element_type) ∈ enumerate(element_types)])
     #@assert(isconcretetype(element_types)) # remove this restriction later.
     max_element_dim = maximum([getdim(et) for et ∈ element_types])
+    interpolation_infos = ntuple(field_idx->[InterpolationInfo(get_compatible_interpolation(element, dh.field_interpolations[field_idx])) for element ∈ element_types], nfields(dh))
+    # TODO relax this assumption later
+    for field_interpolation_info ∈ interpolation_infos
+        for i ∈ 2:length(field_interpolation_info)
+            @assert field_interpolation_info[i].nvertexdofs == first(field_interpolation_info).nvertexdofs
+            @assert field_interpolation_info[i].nedgedofs == first(field_interpolation_info).nedgedofs
+            @assert field_interpolation_info[i].nfacedofs == first(field_interpolation_info).nfacedofs
+        end
+    end
 
     # 4d not functional yet
     @assert(max_element_dim < 4)
@@ -257,17 +271,8 @@ function __close!(dh::NewDofHandler)
     #######################################################################################
     ######                             Phase 2: Distribute dofs                       #####
     #######################################################################################
-    # We create the `InterpolationInfo` structs with precomputed information for each
-    # interpolation since that allows having the element loop as the outermost loop,
-    # and the interpolation loop inside without using a function barrier
-    interpolation_infos = InterpolationInfo[]
-    for interpolation in dh.field_interpolations
-        # push!(dh.interpolation_info, InterpolationInfo(interpolation))
-        push!(interpolation_infos, InterpolationInfo(interpolation))
-    end
-
     # not implemented yet: more than one facedof per face in 3D
-    max_element_dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
+    # max_element_dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
 
     # We can simplify this quite a bit by rearranging the loops below.
     # TODO check importance of this reordering...
@@ -277,14 +282,15 @@ function __close!(dh::NewDofHandler)
         [3,1,2,0],  # vertex, edge, face, cell
         [4,1,2,3,0] # Vertex, face, edge, planar, cell
     ]
+    # Running index of current element
     element_current_idx_by_dim = [
         1,1,1,1
     ]
 
-    #  TODO We should be able to condense this one.
+    # TODO We should be able to condense this one.
     field_offsets = zeros(Int, nfields(dh)+1)
     for fi in 1:nfields(dh)
-        interpolation_info = interpolation_infos[fi]
+        interpolation_info = interpolation_infos[fi][1]
         field_dim = getfielddim(dh, fi)
         for edim ∈ 1:max_element_dim
             for codim ∈ 0:edim
@@ -304,7 +310,7 @@ function __close!(dh::NewDofHandler)
         ei = element_current_idx_by_dim[current_element_dim]
         @debug println("global element #$gei of dim $current_element_dim with dimension-local index $ei")
         for fi in 1:nfields(dh)
-            interpolation_info = interpolation_infos[fi]
+            interpolation_info = interpolation_infos[fi][element_type_idx[typeof(element)]]
             field_dim = getfielddim(dh, fi)
             #@debug println("  field: $(dh.field_names[fi]) with dof offset $next_field_offset")
             @debug println("  field: $(dh.field_names[fi])")

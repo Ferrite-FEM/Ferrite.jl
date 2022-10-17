@@ -45,7 +45,30 @@ using Ferrite, SparseArrays
 # We start by generating a simple mesh with 20x20 quadrilateral elements
 # using `generate_mesh`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-mesh = generate_mesh(QuadrilateralElement, (5, 5));
+nel_x = 6
+nel_y = 6
+mesh_quad = generate_mesh(QuadrilateralElement, (nel_x, nel_y));
+#mesh = mesh_quad
+
+nodes = mesh_quad.nodes
+elements = Union{QuadrilateralElement, Ferrite.TriangleElement}[]
+n_nodes_x = nel_x+1
+n_nodes_y = nel_y+1
+n_nodes = n_nodes_x*n_nodes_y
+node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y))
+for i ∈ 1:2:(n_nodes_x-2)
+    for j ∈ 1:2:(n_nodes_y-2)
+        push!(elements, QuadrilateralElement((node_array[i,j], node_array[i+1,j], node_array[i+1,j+1], node_array[i,j+1])))
+        push!(elements, QuadrilateralElement((node_array[i+1,j+1], node_array[i+2,j+1], node_array[i+2,j+2], node_array[i+1,j+2])))
+
+        push!(elements, Ferrite.TriangleElement((node_array[i+1,j], node_array[i+2,j], node_array[i+1,j+1])))
+        push!(elements, Ferrite.TriangleElement((node_array[i+1,j+1], node_array[i+2,j+1], node_array[i+2,j])))
+
+        push!(elements, Ferrite.TriangleElement((node_array[i+1-1,j+1], node_array[i+2-1,j+1], node_array[i+1-1,j+1+1])))
+        push!(elements, Ferrite.TriangleElement((node_array[i+1-1,j+1+1], node_array[i+2-1,j+1+1], node_array[i+2-1,j+1])))
+    end
+end
+mesh = Ferrite.Mesh(elements, nodes)
 
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
@@ -69,9 +92,17 @@ cellvalues = CellScalarValues(qr, ip, ip_geo);
 # Lastly we `close!` the `NewDofHandler`, it is now that the dofs are distributed
 # for all the elements.
 dh = NewDofHandler(mesh)
-#push!(dh, :u, 1)
-Ferrite.add_field!(dh, :u, 1, ip)
+ip_field = Lagrange{dim, Union{RefCube, Ferrite.RefSimplex}, 1}()
+Ferrite.add_field!(dh, :u, 1, ip_field)
 close!(dh);
+
+u = [i for i ∈ 1:ndofs(dh)]
+
+vtk_grid("heat_equation", dh) do vtk
+    vtk_point_data(vtk, u, "u")
+end
+
+exit(0)
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `create_sparsity_pattern`. This function returns a sparse matrix
@@ -86,12 +117,12 @@ ch = ConstraintHandler(dh);
 # Next we need to add constraints to `ch`. For this problem we define
 # homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
 # the `union` of all the face sets on the boundary.
-∂Ω = union(
-    getfaceset(mesh, "left"),
-    getfaceset(mesh, "right"),
-    getfaceset(mesh, "top"),
-    getfaceset(mesh, "bottom"),
-);
+# ∂Ω = union(
+#     getfaceset(mesh, "left"),
+#     getfaceset(mesh, "right"),
+#     getfaceset(mesh, "top"),
+#     getfaceset(mesh, "bottom"),
+# );
 
 # Now we are set up to define our constraint. We specify which field
 # the condition is for, and our combined face set `∂Ω`. The last
@@ -99,7 +130,7 @@ ch = ConstraintHandler(dh);
 # the current time $t$ and returns the prescribed value. In this case
 # it is trivial -- no matter what $\textbf{x}$ and $t$ we return $0$. When we have
 # specified our constraint we `add!` it to `ch`.
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
+dbc = Dirichlet(:u, Set([VertexIndex(1,1)]), (x, t) -> 0)
 add!(ch, dbc);
 
 # We also need to `close!` and `update!` our boundary conditions. When we call `close!`
