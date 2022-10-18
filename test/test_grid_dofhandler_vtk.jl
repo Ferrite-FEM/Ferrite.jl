@@ -284,6 +284,11 @@ end
     @test topology.face_neighbor[3,3] == Ferrite.EntityNeighborhood(FaceIndex(4,5))
     @test topology.face_neighbor[4,2] == Ferrite.EntityNeighborhood(FaceIndex(2,4))
     @test topology.face_neighbor[4,5] == Ferrite.EntityNeighborhood(FaceIndex(3,3))
+    serendipitygrid = generate_grid(Cell{3,20,6},(2,2,1)) 
+    stopology = ExclusiveTopology(serendipitygrid)
+    # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
+    @test all(stopology.face_neighbor .== topology.face_neighbor)
+    @test all(stopology.vertex_neighbor .== topology.vertex_neighbor)
 
 #                   +-----+-----+
 #                   |\  6 |\  8 |
@@ -298,6 +303,11 @@ end
     trigrid = generate_grid(Triangle,(2,2))
     topology = ExclusiveTopology(trigrid)
     @test topology.vertex_neighbor[3,3] == Ferrite.EntityNeighborhood([VertexIndex(5,2),VertexIndex(6,1),VertexIndex(7,1)])
+    quadtrigrid = generate_grid(QuadraticTriangle,(2,2))
+    quadtopology = ExclusiveTopology(trigrid)
+    # add more regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
+    @test all(quadtopology.face_neighbor .== topology.face_neighbor)
+    @test all(quadtopology.vertex_neighbor .== topology.vertex_neighbor)
 
 # test mixed grid
     cells = [

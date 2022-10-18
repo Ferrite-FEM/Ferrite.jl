@@ -195,8 +195,8 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
         cell_neighbor_table[cellid] = EntityNeighborhood(CellIndex.(cell_neighbors)) 
 
         for neighbor in cell_neighbors
-            neighbor_local_ids = findall(x->x in vertices(cell), vertices(cells[neighbor]))
-            cell_local_ids = findall(x->x in vertices(cells[neighbor]), vertices(cell))
+            neighbor_local_ids = findall(x->x in cell_vertices_table[cellid], cell_vertices_table[neighbor])
+            cell_local_ids = findall(x->x in cell_vertices_table[neighbor], cell_vertices_table[cellid])
             # vertex neighbor
             if length(cell_local_ids) == 1
                 _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
