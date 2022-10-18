@@ -88,18 +88,18 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}; grid_comm::MPI.Comm 
 end
 
 function create_partitioning(grid::Grid{dim,C,T}, grid_topology::ExclusiveTopology, n_partitions, partition_alg) where {dim,C,T}
-    N = getncells(grid)
-    @assert N > 0
+    n_cells_global = getncells(grid)
+    @assert n_cells_global > 0
     
     if n_partitions == 1
-        return ones(Metis.idx_t, N)
+        return ones(Metis.idx_t, n_cells_global)
     end
 
     # Set up the element connectivity graph
-    xadj = Vector{Metis.idx_t}(undef, N+1)
+    xadj = Vector{Metis.idx_t}(undef, n_cells_global+1)
     xadj[1] = 1
     adjncy = Vector{Metis.idx_t}(undef, 0)
-    @inbounds for i in 1:N
+    @inbounds for i in 1:n_cells_global
         n_neighbors = 0
         for neighbor ∈ getneighborhood(grid_topology, grid, CellIndex(i))
             push!(adjncy, neighbor)
@@ -111,7 +111,7 @@ function create_partitioning(grid::Grid{dim,C,T}, grid_topology::ExclusiveTopolo
     # Generate a partitioning
     return Metis.partition(
         Metis.Graph(
-            Metis.idx_t(N),
+            Metis.idx_t(n_cells_global),
             xadj,
             adjncy
         ),
@@ -123,8 +123,8 @@ end
 """
 """
 function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::ExclusiveTopology, grid_comm::MPI.Comm; partition_alg = :RECURSIVE) where {dim,C,T}
-    N = getncells(grid_to_distribute)
-    @assert N > 0
+    n_cells_global = getncells(grid_to_distribute)
+    @assert n_cells_global > 0
 
     parts = create_partitioning(grid_to_distribute, grid_topology, MPI.Comm_size(grid_comm), partition_alg)
 
@@ -134,14 +134,15 @@ end
 """
 """    
 function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::ExclusiveTopology, grid_comm::MPI.Comm, parts::Vector{Int32}) where {dim,C,T}
-    N = getncells(grid_to_distribute)
-    @assert N > 0
+    n_cells_global = getncells(grid_to_distribute)
+    @assert n_cells_global > 0 # Empty input mesh...
 
     my_rank = MPI.Comm_rank(grid_comm)+1
 
     # Start extraction of local grid
     # 1. Extract local cells
-    local_cells = getcells(grid_to_distribute)[[i for i ∈ 1:N if parts[i] == my_rank]]
+    local_cells = getcells(grid_to_distribute)[[i for i ∈ 1:n_cells_global if parts[i] == my_rank]]
+    @assert length(local_cells) > 0 # Cannot handle empty partitions yet
 
     # 2. Find unique nodes
     local_node_index_set = Set{Int}()
@@ -181,7 +182,7 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
     for rank ∈ 1:MPI.Comm_size(grid_comm)
         global_to_local_cell_map[rank] = Dict{Int,Int}()
         next_local_cell_idx = 1
-        for global_cell_idx ∈ 1:N
+        for global_cell_idx ∈ 1:n_cells_global
             if parts[global_cell_idx] == rank
                 global_to_local_cell_map[rank][global_cell_idx] = next_local_cell_idx
                 next_local_cell_idx += 1
