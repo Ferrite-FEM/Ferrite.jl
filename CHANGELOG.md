@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+ - Add debug mode toggle ([#524][github-524])
  - New higher order function interpolations for triangles (`Lagrange{2,RefTetrahedron,3}`,
    `Lagrange{2,RefTetrahedron,4}`, and `Lagrange{2,RefTetrahedron,5}`). ([#482][github-482],
    [#512][github-512])
