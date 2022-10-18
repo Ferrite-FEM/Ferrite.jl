@@ -1,6 +1,6 @@
 export
 # Utils
-    toggle_debug,
+toggle_ferrite_debug_mode,
 
 # Interpolations
     Interpolation,
