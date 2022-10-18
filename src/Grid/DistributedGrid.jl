@@ -369,3 +369,18 @@ function compute_owner(dgrid::AbstractDistributedGrid, shared_entity::SharedEnti
     my_rank = MPI.Comm_rank(global_comm(dgrid))+1 # Shift rank up by 1 to match Julia's indexing convention
     return minimum([my_rank; [remote_rank for (remote_rank, _) ∈ remote_entities(shared_entity)]])
 end
+
+@inline getcellset(grid::AbstractDistributedGrid, setname::String) = getcellset(getlocalgrid(grid), setname)
+@inline getcellsets(grid::AbstractDistributedGrid) = getcellsets(getlocalgrid(grid))
+
+@inline getnodeset(grid::AbstractDistributedGrid, setname::String) = getnodeset(getlocalgrid(grid), setname)
+@inline getnodesets(grid::AbstractDistributedGrid) = getnodeset(getlocalgrid(grid), setname)
+
+@inline getfaceset(grid::AbstractDistributedGrid, setname::String) = getfaceset(getlocalgrid(grid), setname)
+@inline getfacesets(grid::AbstractDistributedGrid) = getfaceset(getlocalgrid(grid), setname)
+
+@inline getedgeset(grid::AbstractDistributedGrid, setname::String) = getedgeset(getlocalgrid(grid), setname)
+@inline getedgesets(grid::AbstractDistributedGrid) = getedgeset(getlocalgrid(grid), setname)
+
+@inline getvertexset(grid::AbstractDistributedGrid, setname::String) = getvertexset(getlocalgrid(grid), setname)
+@inline getvertexsets(grid::AbstractDistributedGrid) = getvertexset(getlocalgrid(grid), setname)

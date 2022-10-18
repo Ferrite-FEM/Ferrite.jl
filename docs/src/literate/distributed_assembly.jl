@@ -51,8 +51,8 @@ close!(dh);
 # ### Boundary conditions
 # Nothing has to be changed here either.
 ch = ConstraintHandler(dh);
-∂Ω = union(getfaceset.((getlocalgrid(dgrid), ), ["left", "right", "top", "bottom"])...);
-∂Ω = union(getfaceset.((getlocalgrid(dgrid), ), ["left", "right", "top", "bottom", "front", "back"])...); #src
+∂Ω = union(getfaceset.((dgrid, ), ["left", "right", "top", "bottom"])...);
+∂Ω = union(getfaceset.((dgrid, ), ["left", "right", "top", "bottom", "front", "back"])...); #src
 dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
 dbc_val = 0 #src
 dbc = Dirichlet(:u, ∂Ω, (x, t) -> dbc_val) #src
