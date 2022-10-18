@@ -80,6 +80,26 @@ where each Quadrilateral, which is a subtype of `AbstractCell` saves in the fiel
 Each `<: AbstractCell` defines, just as in the example above, the nodes in anti-clockwise ordering.
 This is a convention in Ferrite, which is used to ensure that the transformation from reference space to physical space yields a positive determinant of the Jacobi.
 The function `reference_coordinates` (in `src/interpolations.jl`) defines the expected node ordering by the index of the returned `Vector{Vec{dim,T}}` and is dispatched for each `Interpolation`.
+### Anti-Clockwise Ordering
+Ferrite.jl's ordering w.r.t. nodes, edges and faces of each `<:AbstractCell` or `<:Interpolation`, respectively, can be visualized by `elementinfo` of [FerriteViz.jl](https://github.com/Ferrite-FEM/FerriteViz.jl) with the Makie backend of your choice.
+Below, the anti-clockwise ordering of nodes and faces are shown for different two-dimensional interpolations.
+
+```@example ordering
+import CairoMakie
+CairoMakie.activate!(type = "svg")
+using Ferrite
+using FerriteViz
+
+fig = CairoMakie.Figure(resolution=(1000,400))
+kwargs=(markersize=6,textsize=15,facelabeloffset=(-10,0))
+elementinfo(fig[1,1],Lagrange{2,RefTetrahedron,1};kwargs...)
+elementinfo(fig[1,2],Lagrange{2,RefTetrahedron,2};kwargs...)
+elementinfo(fig[1,3],Lagrange{2,RefCube,1};kwargs...)
+elementinfo(fig[1,4],Lagrange{2,RefCube,2};kwargs...)
+fig
+```
+
+### Entity sets in `Grid`
 The data structure `Grid` can hold node-, face- and cellsets. 
 All of these three sets are defined by a dictionary that maps a string key to a `Set`. 
 For the special case of node- and cellsets the dictionary's value is of type `Set{Int}`, i.e. a keyword is mapped to a node or cell ID, respectively. 
