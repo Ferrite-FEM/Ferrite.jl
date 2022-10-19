@@ -91,7 +91,7 @@ using Ferrite
 using FerriteViz
 
 fig = CairoMakie.Figure(resolution=(1000,400))
-kwargs=(markersize=8,textsize=15,facelabeloffset=(-10,0),facelabelcolor=:orange,nodelabelcolor=:blue)
+kwargs=(markersize=8,textsize=15,facelabeloffset=(-10,-20),facelabelcolor=:orange,nodelabelcolor=:blue)
 fp1 = elementinfo(fig[1,1],Lagrange{2,RefTetrahedron,1};kwargs...)
 fp1.axis.aspect = CairoMakie.AxisAspect(1) #hide
 fp1.axis.limits = (-0.3,1.3,-0.3,1.3) #hide
