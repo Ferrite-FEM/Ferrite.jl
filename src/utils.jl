@@ -3,7 +3,7 @@ using Preferences
 const DEBUG = @load_preference("use_debug", false)
 
 """
-toggle_ferrite_debug_mode(use_debug = true)
+debug_mode(enable = true)
 
 Helper to turn on or off debug helpers in Ferrite.
 """
