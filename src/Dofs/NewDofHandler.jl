@@ -131,75 +131,81 @@ gettypes(u) = [u]
 # TODO coalesce insert into list and index extraction...
 # TODO look into how to handle more general elements (as in e.g. virtual element methods)
 # Cubes
-function add_entities!(face_list::Dict{NTuple{Dim, Int}, Int}, connectivity::Vector{Vector{Int}}, e::Element{Dim, RefCube, N}) where {Dim, N}
-    local_connectivity = Vector{Int}(undef, length(faces(e)))
+function add_entities!(face_list::Dict{NTuple{Dim, Int}, Int}, local_connectivity::Dict{Int,Vector{Tuple{Int, Int}}},  element_idx::Int, e::Element{Dim, RefCube, N}) where {Dim, N}
     for (face_idx, face) ∈ enumerate(faces(e))
         face_rep = sortface(face)
         if !haskey(face_list, face_rep)
             face_list[face_rep] = length(face_list)+1
         end
-        local_connectivity[face_idx] = face_list[face_rep]
+        if !haskey(local_connectivity, face_list[face_rep])
+            local_connectivity[face_list[face_rep]] = Tuple{Int, Int}[]
+        end
+        push!(local_connectivity[face_list[face_rep]], (element_idx, face_idx))
     end
-    push!(connectivity, local_connectivity)
 end
 
-function add_entities!(edge_list::Dict{NTuple{2, Int}, Int}, connectivity::Vector{Vector{Int}}, e::Element{3, RefCube, N}) where {Dim, N}
-    local_connectivity = Vector{Int}(undef, length(edges(e)))
+function add_entities!(edge_list::Dict{NTuple{2, Int}, Int}, local_connectivity::Dict{Int,Vector{Tuple{Int, Int}}},  element_idx::Int, e::Element{3, RefCube, N}) where {Dim, N}
     for (edge_idx, edge) ∈ enumerate(edges(e))
         edge_rep = sortedge(edge)[1]
         if !haskey(edge_list, edge_rep)
             edge_list[edge_rep] = length(edge_list)+1
         end
-        local_connectivity[edge_idx] = edge_list[edge_rep]
+        if !haskey(local_connectivity, edge_list[edge_rep])
+            local_connectivity[edge_list[edge]] = Tuple{Int, Int}[]
+        end
+        push!(local_connectivity[edge_list[edge_rep]], (element_idx, edge_idx))
     end
-    push!(connectivity, local_connectivity)
 end
 
-function add_entities!(vertex_list::Dict{Int, Int}, connectivity::Vector{Vector{Int}}, e::Element{Dim, RefCube, N}) where {Dim, N}
-    local_connectivity = Vector{Int}(undef, length(vertices(e)))
+function add_entities!(vertex_list::Dict{Int, Int}, local_connectivity::Dict{Int,Vector{Tuple{Int, Int}}},  element_idx::Int, e::Element{Dim, RefCube, N}) where {Dim, N}
     for (vertex_idx, vertex) ∈ enumerate(vertices(e))
         if !haskey(vertex_list, vertex)
             vertex_list[vertex] = length(vertex_list)+1
         end
-        local_connectivity[vertex_idx] = vertex_list[vertex]
+        if !haskey(local_connectivity, vertex_list[vertex])
+            local_connectivity[vertex_list[vertex]] = Tuple{Int, Int}[]
+        end
+        push!(local_connectivity[vertex_list[vertex]], (element_idx, vertex_idx))
     end
-    push!(connectivity, local_connectivity)
 end
 
 # Simplices
-function add_entities!(face_list::Dict{NTuple{Dim, Int}, Int}, connectivity::Vector{Vector{Int}}, e::Element{Dim, RefSimplex, N}) where {Dim, N}
-    local_connectivity = Vector{Int}(undef, length(faces(e)))
+function add_entities!(face_list::Dict{NTuple{Dim, Int}, Int}, local_connectivity::Dict{Int,Vector{Tuple{Int, Int}}},  element_idx::Int, e::Element{Dim, RefSimplex, N}) where {Dim, N}
     for (face_idx, face) ∈ enumerate(faces(e))
         face_rep = sortface(face)
         if !haskey(face_list, face_rep)
             face_list[face_rep] = length(face_list)+1
         end
-        local_connectivity[face_idx] = face_list[face_rep]
+        if !haskey(local_connectivity, face_list[face_rep])
+            local_connectivity[face_list[face_rep]] = Tuple{Int, Int}[]
+        end
+        push!(local_connectivity[face_list[face_rep]], (element_idx, face_idx))
     end
-    push!(connectivity, local_connectivity)
 end
 
-function add_entities!(edge_list::Dict{NTuple{2, Int}, Int}, connectivity::Vector{Vector{Int}}, e::Element{3, RefSimplex, N}) where {Dim, N}
-    local_connectivity = Vector{Int}(undef, length(edges(e)))
+function add_entities!(edge_list::Dict{NTuple{2, Int}, Int}, local_connectivity::Dict{Int,Vector{Tuple{Int, Int}}},  element_idx::Int, e::Element{3, RefSimplex, N}) where {Dim, N}
     for (edge_idx, edge) ∈ enumerate(edges(e))
         edge_rep = sortedge(edge)[1]
         if !haskey(edge_list, edge_rep)
             edge_list[edge_rep] = length(edge_list)+1
         end
-        local_connectivity[edge_idx] = edge_list[edge_rep]
+        if !haskey(local_connectivity, edge_list[edge_rep])
+            local_connectivity[edge_list[edge]] = Tuple{Int, Int}[]
+        end
+        push!(local_connectivity[edge_list[edge_rep]], (element_idx, edge_idx))
     end
-    push!(connectivity, local_connectivity)
 end
 
-function add_entities!(vertex_list::Dict{Int, Int}, connectivity::Vector{Vector{Int}}, e::Element{Dim, RefSimplex, N}) where {Dim, N}
-    local_connectivity = Vector{Int}(undef, length(vertices(e)))
+function add_entities!(vertex_list::Dict{Int, Int}, local_connectivity::Dict{Int,Vector{Tuple{Int, Int}}},  element_idx::Int, e::Element{Dim, RefSimplex, N}) where {Dim, N}
     for (vertex_idx, vertex) ∈ enumerate(vertices(e))
         if !haskey(vertex_list, vertex)
             vertex_list[vertex] = length(vertex_list)+1
         end
-        local_connectivity[vertex_idx] = vertex_list[vertex]
+        if !haskey(local_connectivity, vertex_list[vertex])
+            local_connectivity[vertex_list[vertex]] = Tuple{Int, Int}[]
+        end
+        push!(local_connectivity[vertex_list[vertex]], (element_idx, vertex_idx))
     end
-    push!(connectivity, local_connectivity)
 end
 
 # TODO data structure for this?
@@ -229,16 +235,19 @@ function __close!(dh::NewDofHandler)
     ###### Phase 1: Materialize possibly broken mesh (i.e. ignore all non-conformities) ###
     #######################################################################################
     #
+    # What happens here?
+    # We basically build bijections between continuous indices and unique representations
+    # of subentities and how they connect back to elements to allow fast identification.
+    #
     #NOTE Refactor into the mesh topology interface.
     #NOTE Subobtimal data structures ahead!
     #
     mesh = getmesh(dh)
     element_types = gettypes(getelementtypes(mesh))
     element_type_idx = Dict([element_type => i for (i, element_type) ∈ enumerate(element_types)])
-    #@assert(isconcretetype(element_types)) # remove this restriction later.
     max_element_dim = maximum([getdim(et) for et ∈ element_types])
     interpolation_infos = ntuple(field_idx->[InterpolationInfo(get_compatible_interpolation(element, dh.field_interpolations[field_idx])) for element ∈ element_types], nfields(dh))
-    # TODO relax this assumption later
+    # TODO relax this assumption later - possibly non-conforming interpolations not supported yet.
     for field_interpolation_info ∈ interpolation_infos
         for i ∈ 2:length(field_interpolation_info)
             @assert field_interpolation_info[i].nvertexdofs == first(field_interpolation_info).nvertexdofs
@@ -250,23 +259,101 @@ function __close!(dh::NewDofHandler)
     # 4d not functional yet
     @assert(max_element_dim < 4)
 
-    # Find types for codimensional entities
     #TODO better data structures...
-    # coentities[element_dimension][entity_codimension] -> Simple materialized representation of entity
-    # connectivity[element_dimension][entity_codimension][local_index] -> Face/Edge/Vertex index in coentity set
-    #NOTE connectivity is an inefficient, simplified version of what the topology interface should become!
-    coentities   = ntuple(j->ntuple(i->(j-i+1 > 1) ? Dict{NTuple{j-i+1,Int},Int}() : Dict{Int, Int}(), max(j, 0)), max_element_dim)
-    connectivity = ntuple(j->ntuple(i->Vector{Vector{Int}}(), max(j, 0)), max_element_dim)
+    # "subentities" is a helper to map the unique representation of an entity to its unique index.
+    # Example: subentities[element_dimension][entity_codimension] -> Simple "materialized" representation of entity
+    subentities  = ntuple(element_dim->ntuple(entity_codim->(element_dim-entity_codim+1 > 1) ? Dict{NTuple{element_dim-entity_codim+1,Int},Int}() : Dict{Int, Int}(), max(element_dim, 0)), max_element_dim)
+    # "connectivity" is a helper to find which elements are attached to the unique representation of an entity
+    # connectivity[element_dimension][entity_codimension][unique_entity_index] -> Tuple vector in format "vector of (element_idx, local_entity_idx)"
+    connectivity = ntuple(element_dim->ntuple(entity_codim->Dict{Int,Vector{Tuple{Int, Int}}}(), max(element_dim, 0)), max_element_dim)
 
-    # Primitive materialization of elements
-    for element ∈ getelements(mesh)
+    #NOTE this above is an inefficient, simplified version of what the topology interface should become!
+    # Primitive materialization of elements and induction of simple topology
+    for (element_idx, element) ∈ enumerate(getelements(mesh))
         # Loop over all codimensional entities, i.e. faces, edges, but ignore
         # the full actual element (codim=0).
-        for codim ∈ 1:max_element_dim
-            edim = getdim(element)
-            add_entities!(coentities[edim][codim], connectivity[edim][codim], element)
+        edim = getdim(element)
+        for codim ∈ 1:edim
+            add_entities!(subentities[edim][codim], connectivity[edim][codim], element_idx, element)
         end
     end
+    @debug @show subentities
+    @debug @show connectivity
+
+    # TODO data structures and better algorithm...
+    # This is basically a reordered version of the data structure above...
+    entities = ntuple(entity_dim->(entity_dim > 1) ? Dict{NTuple{entity_dim,Int},Int}() : Dict{Int, Int}(), max_element_dim) 
+    entity_to_element = ntuple(entity_dim->Dict{Int,Vector{Tuple{Int,Int}}}(), max_element_dim)
+    for edim ∈ 1:max_element_dim
+        for codim ∈ 1:edim # TODO codim 0 for interior dofs
+            subentity_dim = edim-codim
+            for (subentity_identifier, subentity_index) ∈ subentities[edim][codim]
+                if !haskey(entities[subentity_dim+1], subentity_identifier)
+                    entities[subentity_dim+1][subentity_identifier] = length(entities[subentity_dim+1])+1
+                end
+                entity_id = entities[subentity_dim+1][subentity_identifier]
+                if !haskey(entity_to_element[subentity_dim+1], entity_id)
+                    entity_to_element[subentity_dim+1][entity_id] = Tuple{Int,Int}[]
+                end
+                # TODO this is currently an incomplete list and just for demonstration purposes....
+                append!(entity_to_element[subentity_dim+1][entity_id], connectivity[edim][codim][subentity_index])
+            end
+        end
+    end
+    @debug @show entities
+    @debug @show entity_to_element
+
+    #######################################################################################
+    ######                             Phase 2: Distribute dofs                       #####
+    #######################################################################################
+    # not implemented yet: more than one facedof per face in 3D
+    # max_element_dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
+ 
+    # --------------------------------------------------------------------------
+    # ------------------- DoF Distribution Pseudo-Algorithm -------------------- 
+    # --------------------------------------------------------------------------
+    # For each field `f`
+    #   For each entity of dim `d`
+    #     For each entity with topology `t` of dim `d` in mesh
+    #       Compute local dof index via: dof = vdim*entity_index*ndofs_per_entity
+    #       Shift dof index
+    #       Store dof per element `dof_list`
+    #     End
+    #     For each entity with topology `t` of dim `d` in mesh
+    #       Push shifted dofs in per element dof list in correct order
+    #       Permutate higher order nodes on elements connected to  
+    #     End
+    #   End
+    # End
+    # --------------------------------------------------------------------------
+
+    # element_dofs = [Vector{Int}() for i ∈ 1:getnelements(mesh)]
+    # dof_offset = 0
+    # for fi in 1:nfields(dh)
+    #     for entity_dim ∈ 0:(max_element_dim-1) #FIXME interior dofs not included yet...
+    #         # Unique iterator over entities!
+    #         for (entity_identifier, entity_index) ∈ entities[entity_dim+1]
+    #             @info (entity_identifier, entity_index)
+    #             adjacent_element_info = entity_to_element[entity_dim+1][entity_identifier]
+    #             # this is a hotfix for demonstration purposes... does not work for "mixed interpolations" yet
+    #             interpolation_info = interpolation_infos[fi][element_type_idx[typeof(getelements(mesh, adjacent_element_info[1][1]))]]
+    #             #TODO if 0 < entity_dim < max_element_dim permutate dofs correctly...
+    #             @info current_ndofs_on_entity
+    #         end
+    #     end
+    # end
+
+    # # Wrapper to not break code which relies on these two arrays.
+    # push!(dh.element_dofs_offset, 1)
+    # for dofs_on_element ∈ element_dofs
+    #     append(dh.element_dofs, dof_on_element)
+    #     push!(dh.element_dofs_offset, dh.element_dofs_offset+length(dofs_on_element)+1)
+    # end
+    # dh.ndofs[] = maximum(dh.element_dofs)
+    # dh.closed[] = true
+    # return
+
+    # ----------------------------- ALTERNATIVE TO ABOVE ---------------------------------
 
     #######################################################################################
     ######                             Phase 2: Distribute dofs                       #####
@@ -294,13 +381,13 @@ function __close!(dh::NewDofHandler)
         field_dim = getfielddim(dh, fi)
         for edim ∈ 1:max_element_dim
             for codim ∈ 0:edim
-                num_entities = codim == 0 ? getnelements(mesh) : length(coentities[edim][codim])
+                num_entities = codim == 0 ? getnelements(mesh) : length(subentities[edim][codim])
                 ndofs_on_entity = num_dofs_on_codim(interpolation_info, edim, codim)
                 field_offsets[fi+1] += field_dim*num_entities*ndofs_on_entity
             end
         end
         field_offsets[fi+1] += field_offsets[fi]
-        @debug println("field: $(dh.field_names[fi]) with dof range $(field_offsets[fi]:field_offsets[fi+1])")
+        @debug println("field: $(dh.field_names[fi]) with dof range $((field_offsets[fi]+1):field_offsets[fi+1])")
     end
 
     #TODO check type stability and performance
@@ -323,8 +410,7 @@ function __close!(dh::NewDofHandler)
                     for local_entity_rep ∈ entities_with_codim(element, current_entity_codim)
                         # TODO handle this better...
                         local_entity_rep_unique = (current_element_dim > 1 && current_entity_codim == 1) ? sortface(local_entity_rep) : (current_element_dim > 2 && current_entity_codim == 2) ? sortedge(local_entity_rep)[1] : local_entity_rep;
-                        current_entity_idx      = current_entity_codim == 0 ? local_entity_rep_unique : coentities[current_element_dim][current_entity_codim][local_entity_rep_unique]
-                        # current_entity_connectivity = connectivity[current_element_dim][current_entity_codim][ei]
+                        current_entity_idx      = current_entity_codim == 0 ? local_entity_rep_unique : subentities[current_element_dim][current_entity_codim][local_entity_rep_unique]
                         startdof = field_offsets[fi] + entity_based_offset + field_dim*(current_entity_idx-1) + 1
                         for d in 1:field_dim
                             computed_dof = startdof + (d-1) + (current_ndofs_on_entity-1)*field_dim
@@ -333,7 +419,7 @@ function __close!(dh::NewDofHandler)
                         end
                     end
                     # TODO permutate the dofs according to a reference orientation given by the entity on the adjacent element with the lowest index!
-                    num_entities = current_entity_codim == 0 ? 1 : length(coentities[current_element_dim][current_entity_codim])
+                    num_entities = current_entity_codim == 0 ? 1 : length(subentities[current_element_dim][current_entity_codim])
                     entity_based_offset += current_ndofs_on_entity*num_entities*field_dim
                 end
             end
