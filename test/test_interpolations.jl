@@ -80,6 +80,23 @@ for interpolation in (
             @test __outward_normal(coords, facenodes) ≈ normal
         end
     end
+    # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
+    interpolation_type = typeof(interpolation).name.wrapper
+    if func_order > 1 && interpolation_type != Ferrite.Serendipity
+        first_order = interpolation_type{ndim,r_shape,1}() 
+        for (highorderface, firstorderface) in zip(Ferrite.faces(interpolation), Ferrite.faces(first_order))
+            for (h_node, f_node) in zip(highorderface, firstorderface)
+                @test h_node == f_node
+            end
+        end
+        if ndim > 2
+            for (highorderedge, firstorderedge) in zip(Ferrite.edges(interpolation), Ferrite.edges(first_order))
+                for (h_node, f_node) in zip(highorderedge, firstorderedge)
+                    @test h_node == f_node
+                end
+            end
+        end
+    end
 end
 
 end
