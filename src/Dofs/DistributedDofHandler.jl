@@ -90,7 +90,9 @@ function compute_dof_ownership(dh)
             vi = toglobal(dgrid, lvi)
             if has_vertex_dofs(dh, field_idx, vi)
                 local_dof_idx = vertex_dofs(dh, field_idx, vi)
-                dof_owner[local_dof_idx] = compute_owner(dgrid, sv)
+                for d in 1:dh.field_dims[field_idx]
+                    dof_owner[local_dof_idx+d-1] = compute_owner(dgrid, sv)
+                end
             end
         end
     end
@@ -100,7 +102,9 @@ function compute_dof_ownership(dh)
             fi = toglobal(dgrid, lfi)
             if has_face_dofs(dh, field_idx, fi)
                 local_dof_idx = face_dofs(dh, field_idx, fi)
-                dof_owner[local_dof_idx] = compute_owner(dgrid, sf)
+                for d in 1:dh.field_dims[field_idx]
+                    dof_owner[local_dof_idx+d-1] = compute_owner(dgrid, sf)
+                end
             end
         end
     end
@@ -110,7 +114,9 @@ function compute_dof_ownership(dh)
             ei = toglobal(dgrid, lei)
             if has_edge_dofs(dh, field_idx, ei)
                 local_dof_idx = edge_dofs(dh, field_idx, ei)
-                dof_owner[local_dof_idx] = compute_owner(dgrid, se)
+                for d in 1:dh.field_dims[field_idx]
+                    dof_owner[local_dof_idx+d-1] = compute_owner(dgrid, se)
+                end
             end
         end
     end
@@ -182,11 +188,15 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                         # Update dof assignment
                         dof_local_idx = dh.vertexdicts[field_idx][vertex]
                         if local_to_global[dof_local_idx] == 0
-                            @debug println("      mapping vertex dof#$dof_local_idx to $next_local_idx (R$my_rank)")
-                            local_to_global[dof_local_idx] = next_local_idx
-                            next_local_idx += 1
+                            for d in 1:dh.field_dims[field_idx]
+                                @debug println("      mapping vertex dof#$dof_local_idx to $next_local_idx (R$my_rank)")
+                                local_to_global[dof_local_idx+d-1] = next_local_idx
+                                next_local_idx += 1
+                            end
                         else
-                            @debug println("      vertex dof#$dof_local_idx already mapped to $(local_to_global[dof_local_idx]) (R$my_rank)")
+                            for d in 1:dh.field_dims[field_idx]
+                                @debug println("      vertex dof#$(dof_local_idx+d-1) already mapped to $(local_to_global[dof_local_idx+d-1]) (R$my_rank)")
+                            end
                         end
                     end
 
@@ -229,11 +239,15 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                             # Update dof assignment
                             dof_local_idx = dh.edgedicts[field_idx][toglobal(getlocalgrid(dgrid), lei)][1]
                             if local_to_global[dof_local_idx] == 0
-                                @debug println("      mapping edge dof#$dof_local_idx to $next_local_idx (R$my_rank)")
-                                local_to_global[dof_local_idx] = next_local_idx
-                                next_local_idx += 1
+                                for d in 1:dh.field_dims[field_idx]
+                                    @debug println("      mapping edge dof#$(dof_local_idx+d-1) to $next_local_idx (R$my_rank)")
+                                    local_to_global[dof_local_idx+d-1] = next_local_idx
+                                    next_local_idx += 1
+                                end
                             else
-                                @debug println("      edge dof#$dof_local_idx already mapped to $(local_to_global[dof_local_idx]) (R$my_rank)")
+                                for d in 1:dh.field_dims[field_idx]
+                                    @debug println("      edge dof#$(dof_local_idx+d-1) already mapped to $(local_to_global[dof_local_idx+d-1]) (R$my_rank)")
+                                end
                             end
                         end
 
@@ -275,11 +289,15 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                         # Update dof assignment
                         dof_local_idx = dh.facedicts[field_idx][toglobal(getlocalgrid(dgrid), lfi)]
                         if local_to_global[dof_local_idx] == 0
-                            @debug println("      mapping face dof#$dof_local_idx to $next_local_idx (R$my_rank)")
-                            local_to_global[dof_local_idx] = next_local_idx
-                            next_local_idx += 1
+                            for d in 1:dh.field_dims[field_idx]
+                                @debug println("      mapping face dof#$(dof_local_idx+d-1) to $next_local_idx (R$my_rank)")
+                                local_to_global[dof_local_idx+d-1] = next_local_idx
+                                next_local_idx += 1
+                            end
                         else
-                            @debug println("      face dof#$dof_local_idx already mapped to $(local_to_global[dof_local_idx]) (R$my_rank)")
+                            for d in 1:dh.field_dims[field_idx]
+                                @debug println("      face dof#$(dof_local_idx+d-1) already mapped to $(local_to_global[dof_local_idx+d-1]) (R$my_rank)")
+                            end
                         end
                     end
 
@@ -315,16 +333,18 @@ function local_to_global_numbering(dh::DistributedDofHandler)
             if interpolation_info.ncelldofs > 0 # always distribute new dofs for cell
                 @debug println("    cell#$ci")
                 for celldof in 1:interpolation_info.ncelldofs
-                    for d in 1:dh.field_dims[field_idx]
-                        # Update dof assignment
-                        dof_local_idx = dh.celldicts[field_idx][ci][celldof]
-                        if local_to_global[dof_local_idx] == 0
-                            @debug println("      mapping cell dof#$dof_local_idx to $next_local_idx (R$my_rank)")
-                            local_to_global[dof_local_idx] = next_local_idx
+                    # Update dof assignment
+                    dof_local_idx = dh.celldicts[field_idx][ci][celldof]
+                    if local_to_global[dof_local_idx+d-1] == 0
+                        for d in 1:dh.field_dims[field_idx]
+                            @debug println("      mapping cell dof#$(dof_local_idx+d-1) to $next_local_idx (R$my_rank)")
+                            local_to_global[dof_local_idx+d-1] = next_local_idx
                             next_local_idx += 1
-                        else
+                        end
+                    else
+                        for d in 1:dh.field_dims[field_idx]
                             # Should never happen...
-                            @debug println("      cell dof#$dof_local_idx already mapped to $(local_to_global[dof_local_idx]) (R$my_rank)")
+                            @debug println("      WARNING! cell dof#$(dof_local_idx+d-1) already mapped to $(local_to_global[dof_local_idx+d-1]) (R$my_rank)")
                         end
                     end
                 end # cell loop
@@ -374,7 +394,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                         @assert haskey(sv.remote_vertices, remote_rank)
                         for (cvi, llvi) ∈ sv.remote_vertices[remote_rank][1:1] # Just don't ask :)
                             remote_cells[next_buffer_idx] = cvi
-                            remote_cell_vis[next_buffer_idx] = llvi 
+                            remote_cell_vis[next_buffer_idx] = llvi
                             next_buffer_idx += 1
                         end
                     end
@@ -499,8 +519,10 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                     for (cdi,(lci,lclvi)) ∈ enumerate(zip(local_cells,local_cell_vis))
                         vi = vertices(getcells(getgrid(dh),lci))[lclvi]
                         if haskey(dh.vertexdicts[field_idx], vi)
-                            local_to_global[dh.vertexdicts[field_idx][vi]] = corresponding_global_dofs[cdi]
-                            @debug println("  Updating field $(dh.field_names[field_idx]) vertex $(VertexIndex(lci,lclvi)) to $(corresponding_global_dofs[cdi]) (R$my_rank)")
+                            for d in 1:dh.field_dims[field_idx]
+                                local_to_global[dh.vertexdicts[field_idx][vi]+d-1] = corresponding_global_dofs[cdi]+d-1
+                                @debug println("  Updating field $(dh.field_names[field_idx]) vertex $(VertexIndex(lci,lclvi)) to $(corresponding_global_dofs[cdi]+d-1) (R$my_rank)")
+                            end
                         else
                             @debug println("  Skipping recv on field $(dh.field_names[field_idx]) vertex $vi (R$my_rank)")
                         end
