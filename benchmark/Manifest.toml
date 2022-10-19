@@ -100,8 +100,6 @@ version = "1.0.3"
 
 [[deps.Ferrite]]
 deps = ["EnumX", "LinearAlgebra", "NearestNeighbors", "Reexport", "SparseArrays", "Tensors", "WriteVTK"]
-git-tree-sha1 = "3bf1ae6d2fa781c6872e76eec379493f30d29989"
-repo-rev = "do/performance-regression-tests"
 repo-url = ".."
 uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
 version = "0.3.8"
