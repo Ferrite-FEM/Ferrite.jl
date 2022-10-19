@@ -7,11 +7,15 @@ toggle_ferrite_debug_mode(use_debug = true)
 
 Helper to turn on or off debug helpers in Ferrite.
 """
-function toggle_ferrite_debug_mode(use_debug = true)
-    @set_preferences!("use_debug" => use_debug)
+function debug_mode(enable = true)
+    @set_preferences!("use_debug" => enable)
     DEBUG_STR = DEBUG ? "ON" : "OFF"
-    USE_DEBUG_STR = use_debug ? "ON" : "OFF"
-    @info("Toggling debug mode from $DEBUG_STR to $USE_DEBUG_STR. Restart your Julia session for this change to take effect!")
+    NEW_DEBUG_STR = enable ? "ON" : "OFF"
+    if DEBUG != enable
+        @info("Toggling debug mode from $DEBUG_STR to $NEW_DEBUG_STR. Restart your Julia session for this change to take effect!")
+    else
+        @info("Debug mode already $DEBUG_STR.")
+    end
 end
 
 @static if DEBUG

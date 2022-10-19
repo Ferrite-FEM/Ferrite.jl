@@ -1,7 +1,4 @@
 export
-# Utils
-toggle_ferrite_debug_mode,
-
 # Interpolations
     Interpolation,
     RefCube,

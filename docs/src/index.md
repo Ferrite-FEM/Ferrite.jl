@@ -53,14 +53,14 @@ tracking down bugs. It can be turned on and off via
 
 ```julia
 using Ferrite
-toggle_ferrite_debug_mode()
+Ferrite.debug_mode()
 ```
 
 followed by restarting the Julia process. It can be turned off again by calling
 
 ```julia
 using Ferrite
-toggle_ferrite_debug_mode(false)
+Ferrite.debug_mode(false)
 ```
 
 also followed by restarting the Julia process.
