@@ -15,6 +15,7 @@ WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 [compat]
 EnumX = "1"
 NearestNeighbors = "0.4"
+Preferences = "1"
 Reexport = "1"
 Tensors = "1"
 WriteVTK = "1.13"
