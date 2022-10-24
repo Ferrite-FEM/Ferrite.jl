@@ -391,16 +391,19 @@ struct PartitionedArraysCOOAssembler{T}
                 for (field_idx, field_name) in zip(1:num_fields(dh), getfieldnames(dh))
                     !has_vertex_dofs(dh, field_idx, pivot_vertex_global) && continue
                     pivot_vertex_dof = vertex_dofs(dh, field_idx, pivot_vertex_global)
+                    
+                    for d ∈ 1:dh.field_dims[field_idx]
+                        @debug println("  adding dof $(pivot_vertex_dof+d-1) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
 
-                    @debug println("  adding dof $pivot_vertex_dof to ghost sync synchronization on slot $sender_slot (R$my_rank)")
-
-                    # Extract dofs belonging to the current field
-                    cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
-                    for cell_field_dof ∈ cell_field_dofs
-                        append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_vertex_dof])
-                        append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_field_dof])
-                        append!(ghost_rank_to_send[sender_slot], ldof_to_rank[cell_field_dof])
-                        append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
+                        # Extract dofs belonging to the current field
+                        #cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
+                        #for cell_field_dof ∈ cell_field_dofs
+                        for cell_dof ∈ cell_dofs
+                            append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_vertex_dof+d-1])
+                            append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_dof])
+                            append!(ghost_rank_to_send[sender_slot], ldof_to_rank[cell_dof])
+                            append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
+                        end
                     end
                 end
             end
@@ -426,15 +429,18 @@ struct PartitionedArraysCOOAssembler{T}
                         !has_face_dofs(dh, field_idx, pivot_face_global) && continue
                         pivot_face_dof = face_dofs(dh, field_idx, pivot_face_global)
                         
-                        @debug println("  adding dof $pivot_face_dof to ghost sync synchronization on slot $sender_slot (R$my_rank)")
-                        
-                        # Extract dofs belonging to the current field
-                        cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
-                        for cell_field_dof ∈ cell_field_dofs
-                            append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_face_dof])
-                            append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_field_dof])
-                            append!(ghost_rank_to_send[sender_slot], ldof_to_rank[cell_field_dof])
-                            append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
+                        for d ∈ 1:dh.field_dims[field_idx]
+                            @debug println("  adding dof $(pivot_face_dof+d-1) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
+                            
+                            # Extract dofs belonging to the current field
+                            #cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
+                            #for cell_field_dof ∈ cell_field_dofs
+                            for cell_dof ∈ cell_dofs
+                                append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_face_dof+d-1])
+                                append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_dof])
+                                append!(ghost_rank_to_send[sender_slot], ldof_to_rank[cell_dof])
+                                append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
+                            end
                         end
                     end
                 end
@@ -460,13 +466,18 @@ struct PartitionedArraysCOOAssembler{T}
                     for (field_idx, field_name) in zip(1:num_fields(dh), getfieldnames(dh))
                         !has_edge_dofs(dh, field_idx, pivot_edge_global) && continue
                         pivot_edge_dof = edge_dofs(dh, field_idx, pivot_edge_global)
-                        # Extract dofs belonging to the current field
-                        cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
-                        for cell_field_dof ∈ cell_field_dofs
-                            append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_edge_dof])
-                            append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_field_dof])
-                            append!(ghost_rank_to_send[sender_slot], ldof_to_rank[cell_field_dof])
-                            append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
+
+                        for d ∈ 1:dh.field_dims[field_idx]
+                            @debug println("  adding dof $(pivot_edge_dof+d-1) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
+                            # Extract dofs belonging to the current field
+                            #cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
+                            #for cell_field_dof ∈ cell_field_dofs
+                            for cell_dof ∈ cell_dofs
+                                append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_edge_dof+d-1])
+                                append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_dof])
+                                append!(ghost_rank_to_send[sender_slot], ldof_to_rank[cell_dof])
+                                # append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
+                            end
                         end
                     end
                 end
@@ -571,8 +582,8 @@ function end_assemble(assembler::PartitionedArraysCOOAssembler{T}) where {T}
     # data into are missing up to this point.
     # TODO here still the interaction between fields is missing...
     for (i, (pivot_dof, global_ghost_dof, ghost_owner_rank, ghost_field_idx)) ∈ enumerate(assembler.👻remotes)
-        for dᵢ ∈ 1:assembler.dh.field_dims[ghost_field_idx]
-            for dⱼ ∈ 1:assembler.dh.field_dims[ghost_field_idx]
+        for dᵢ ∈ 1:1#assembler.dh.field_dims[ghost_field_idx]
+            for dⱼ ∈ 1:1#assembler.dh.field_dims[ghost_field_idx]
                 push!(I, pivot_dof+dᵢ-1)
                 push!(J, global_ghost_dof+dⱼ-1)
                 push!(V, 0.0)

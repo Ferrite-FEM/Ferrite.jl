@@ -547,8 +547,10 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                     for (cdi,(lci,lclvi)) ∈ enumerate(zip(local_cells,local_cell_vis))
                         vi = sortface(faces(getcells(getgrid(dh),lci))[lclvi])
                         if haskey(dh.facedicts[field_idx], vi)
-                            local_to_global[dh.facedicts[field_idx][vi]] = corresponding_global_dofs[cdi]
-                            @debug println("  Updating field $(dh.field_names[field_idx]) face $(FaceIndex(lci,lclvi)) to $(corresponding_global_dofs[cdi]) (R$my_rank)")
+                            for d in 1:dh.field_dims[field_idx]
+                                local_to_global[dh.facedicts[field_idx][vi]+d-1] = corresponding_global_dofs[cdi]+d-1
+                                @debug println("  Updating field $(dh.field_names[field_idx]) face $(FaceIndex(lci,lclvi)) to $(corresponding_global_dofs[cdi]) (R$my_rank)")
+                            end
                         else
                             @debug println("  Skipping recv on field $(dh.field_names[field_idx]) face $vi (R$my_rank)")
                         end
@@ -579,8 +581,10 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                     for (cdi,(lci,lclvi)) ∈ enumerate(zip(local_cells,local_cell_vis))
                         vi = sortedge(edges(getcells(getgrid(dh),lci))[lclvi])[1]
                         if haskey(dh.edgedicts[field_idx], vi)
-                            local_to_global[dh.edgedicts[field_idx][vi][1]] = corresponding_global_dofs[cdi]
-                            @debug println("  Updating field $(dh.field_names[field_idx]) edge $(EdgeIndex(lci,lclvi)) to $(corresponding_global_dofs[cdi]) (R$my_rank)")
+                            for d in 1:dh.field_dims[field_idx]
+                                local_to_global[dh.edgedicts[field_idx][vi][1]+d-1] = corresponding_global_dofs[cdi]+d-1
+                                @debug println("  Updating field $(dh.field_names[field_idx]) edge $(EdgeIndex(lci,lclvi)) to $(corresponding_global_dofs[cdi]) (R$my_rank)")
+                            end
                         else
                             @debug println("  Skipping recv on field $(dh.field_names[field_idx]) edge $vi (R$my_rank)")
                         end
