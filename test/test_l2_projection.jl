@@ -152,7 +152,7 @@ function test_projection_mixedgrid()
     # Assume f would only exist on the first cell, we project it to the nodes of the
     # 1st cell while ignoring the rest of the domain. NaNs should be stored in all
     # nodes that do not belong to the 1st cell
-    proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=1:1)
+    proj = L2Projector(ip, mesh; geom_ip=ip_geom, cell_idxs=1:1)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
     ## Old API with fe values as first arg
@@ -201,7 +201,7 @@ function test_projection_mixedgrid()
     end
 
     #tria
-    proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=triaset)
+    proj = L2Projector(ip, mesh; geom_ip=ip_geom, cell_idxs=triaset)
     point_vars = project(proj, qp_values_tria, qr)
     point_vars_2 = project(proj, qp_values_matrix_tria, qr)
     for cellid in triaset
@@ -261,7 +261,7 @@ function test_export(;subset::Bool)
             qpdata_stens[cellid(cell)][qp] = SymmetricTensor{2,2}((i,j) -> i * j * f(x))
         end
     end
-    p = subset ? L2Projector(ip, grid; set=1:1) : L2Projector(ip, grid)
+    p = subset ? L2Projector(ip, grid; cell_idxs=1:1) : L2Projector(ip, grid)
     p_scalar = project(p, qpdata_scalar, qr; project_to_nodes=false)::Vector{Float64}
     p_vec = project(p, qpdata_vec, qr; project_to_nodes=false)::Vector{<:Vec{2}}
     p_tens = project(p, qpdata_tens, qr; project_to_nodes=false)::Vector{<:Tensor{2,2}}
