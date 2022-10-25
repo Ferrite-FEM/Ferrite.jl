@@ -225,8 +225,10 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
     isempty(dbc.components) && append!(dbc.components, 1:field_dim)
 
     if eltype(dbc.faces)==Int #Special case when dbc.faces is a nodeset
+        # Idea: Node knows its coordinate a priori, so this can be simplified.
         bcvalue = BCValues(interpolation, default_interpolation(celltype), FaceIndex) #Not used by node bcs, but still have to pass it as an argument
     else
+        # Idea: Grab cell from "faces"
         bcvalue = BCValues(interpolation, default_interpolation(celltype), eltype(dbc.faces))
     end
     _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue)

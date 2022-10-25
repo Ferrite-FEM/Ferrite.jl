@@ -12,8 +12,6 @@ Operates slightly faster than [`MixedDofHandler`](@docs). Supports:
 struct NewDofHandler{G<:AbstractMesh} <: AbstractDofHandler
     field_names::Vector{Symbol}
     field_dims::Vector{Int}
-    # TODO: field_interpolations can probably be better typed: We should at least require
-    #       all the interpolations to have the same dimension and reference shape
     field_interpolations::Vector{Interpolation}
     element_dofs::Vector{Int}
     element_dofs_offset::Vector{Int}
@@ -30,6 +28,15 @@ getmesh(dh::NewDofHandler) = dh.mesh
 @inline celldofs!(v::Vector, dh::NewDofHandler, i::Int) = elementdofs!(v, dh, i)
 @inline cellnodes!(v::Vector, dh::NewDofHandler, i::Int) = elementnodes!(v, dh, i)
 @inline cellcoords!(v, dh::NewDofHandler, i::Int) = elementcoords!(v, dh, i)
+
+function elementcoords!(global_coords::Vector{Vec{sdim,T}}, grid::AbstractMesh{sdim}, e::E) where {E <: AbstractElement, sdim, T}
+    N = nnodes(e)
+    @assert length(global_coords) == N
+    for j in 1:N
+        global_coords[j] = getcoordinates(getnode(grid, getnodeid(e, j)))
+    end
+    return global_coords
+end
 
 @inline ndofs_per_element(dh::NewDofHandler, element_idx::Int=1) = dh.element_dofs_offset[element_idx+1] - dh.element_dofs_offset[element_idx]
 
@@ -282,7 +289,7 @@ function __close!(dh::NewDofHandler)
 
     # TODO data structures and better algorithm...
     # This is basically a reordered version of the data structure above...
-    entities = ntuple(entity_dim->(entity_dim > 1) ? Dict{NTuple{entity_dim,Int},Int}() : Dict{Int, Int}(), max_element_dim) 
+    entities = ntuple(entity_dim->(entity_dim > 1) ? Dict{NTuple{entity_dim,Int},Int}() : Dict{Int, Int}(), max_element_dim)
     entity_to_element = ntuple(entity_dim->Dict{Int,Vector{Tuple{Int,Int}}}(), max_element_dim)
     for edim ∈ 1:max_element_dim
         for codim ∈ 1:edim # TODO codim 0 for interior dofs
@@ -308,9 +315,9 @@ function __close!(dh::NewDofHandler)
     #######################################################################################
     # not implemented yet: more than one facedof per face in 3D
     # max_element_dim == 3 && @assert(!any(x->x.nfacedofs > 1, interpolation_infos))
- 
+
     # --------------------------------------------------------------------------
-    # ------------------- DoF Distribution Pseudo-Algorithm -------------------- 
+    # ------------------- DoF Distribution Pseudo-Algorithm --------------------
     # --------------------------------------------------------------------------
     # For each field `f`
     #   For each entity of dim `d`
@@ -321,7 +328,7 @@ function __close!(dh::NewDofHandler)
     #     End
     #     For each entity with topology `t` of dim `d` in mesh
     #       Push shifted dofs in per element dof list in correct order
-    #       Permutate higher order nodes on elements connected to  
+    #       Permutate higher order nodes on elements connected to
     #     End
     #   End
     # End
@@ -497,8 +504,8 @@ create_symmetric_sparsity_pattern(dh::NewDofHandler) = Symmetric(_create_sparsit
 
 function _create_sparsity_pattern(dh::NewDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool)
     @assert isclosed(dh)
-    
-    
+
+
     ncells = getncells(getmesh(dh))
     N::Int = 0
     for element_id = 1:ncells  # TODO check for correctness

@@ -58,8 +58,8 @@ Get the spatial dimension of the mesh.
 """
 @inline getdim(::AbstractMesh{sdim}) where {sdim} = sdim
 """
-    getelements(mesh::AbstractMesh) 
-    getelements(mesh::AbstractMesh, v::Union{Int,Vector{Int}} 
+    getelements(mesh::AbstractMesh)
+    getelements(mesh::AbstractMesh, v::Union{Int,Vector{Int}}
     getelements(mesh::AbstractMesh, setname::String)
 
 Returns either all `elements::Collection{C<:AbstractElement}` of a `<:AbstractMesh` or a subset based on an `Int`, `Vector{Int}` or `String`.
@@ -75,7 +75,7 @@ Whereas the last option tries to call a `elementset` of the `mesh`. `Collection`
 @inline getelementtype(mesh::AbstractMesh, i::Int) = typeof(mesh.elements[i])
 
 """
-    getnodes(mesh::AbstractMesh) 
+    getnodes(mesh::AbstractMesh)
     getnodes(mesh::AbstractMesh, v::Union{Int,Vector{Int}}
     getnodes(mesh::AbstractMesh, setname::String)
 
@@ -85,6 +85,7 @@ to a Node.
 """
 @inline getnodes(mesh::AbstractMesh) = mesh.nodes
 @inline getnodes(mesh::AbstractMesh, v::Union{Int, Vector{Int}}) = mesh.nodes[v]
+@inline getnode(mesh::AbstractMesh, v::Int) = mesh.nodes[v]
 @inline getnodes(mesh::AbstractMesh, setname::String) = mesh.nodes[collect(getnodeset(mesh,setname))]
 "Returns the number of nodes in the mesh."
 @inline getnnodes(mesh::AbstractMesh) = length(mesh.nodes)
@@ -136,7 +137,7 @@ Returns all facesets of the `mesh`.
 
 Adds a elementset to the mesh with key `name`.
 Elementsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
-The `MixedDofHandler` can construct different fields which live not on the whole domain, but rather on a elementset. 
+The `MixedDofHandler` can construct different fields which live not on the whole domain, but rather on a elementset.
 
 ```julia
 addelementset!(mesh, "left", Set((1,3))) #add elements with id 1 and 3 to elementset left
@@ -170,7 +171,7 @@ end
 
 """
     addfaceset!(mesh::AbstractMesh, name::String, faceid::Union{Set{FaceIndex},Vector{FaceIndex}})
-    addfaceset!(mesh::AbstractMesh, name::String, f::Function; all::Bool=true) 
+    addfaceset!(mesh::AbstractMesh, name::String, f::Function; all::Bool=true)
 
 Adds a faceset to the mesh with key `name`.
 A faceset maps a `String` key to a `Set` of tuples corresponding to `(global_element_id, local_face_id)`.
@@ -181,7 +182,7 @@ addfaceset!(gird, "right", Set(((2,2),(4,2))) #see mesh manual example for refer
 addfaceset!(mesh, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
 ```
 """
-addfaceset!(mesh::Mesh, name::String, set::Union{Set{FaceIndex},Vector{FaceIndex}}) = 
+addfaceset!(mesh::Mesh, name::String, set::Union{Set{FaceIndex},Vector{FaceIndex}}) =
     _addset!(mesh, name, set, mesh.facesets)
 function _addset!(mesh::AbstractMesh, name::String, _set, dict::Dict)
     _check_setname(dict, name)
@@ -191,7 +192,7 @@ function _addset!(mesh::AbstractMesh, name::String, _set, dict::Dict)
     mesh
 end
 
-addfaceset!(mesh::AbstractMesh, name::String, f::Function; all::Bool=true) = 
+addfaceset!(mesh::AbstractMesh, name::String, f::Function; all::Bool=true) =
     _addset!(mesh, name, f, Ferrite.faces, mesh.facesets, FaceIndex; all=all)
 function _addset!(mesh::AbstractMesh, name::String, f::Function, _ftype::Function, dict::Dict, _indextype::Type; all::Bool=true)
     _check_setname(dict, name)
@@ -213,9 +214,9 @@ end
 
 """
     addnodeset!(mesh::AbstractMesh, name::String, nodeid::Union{Vector{Int},Set{Int}})
-    addnodeset!(mesh::AbstractMesh, name::String, f::Function)    
+    addnodeset!(mesh::AbstractMesh, name::String, f::Function)
 
-Adds a `nodeset::Dict{String, Set{Int}}` to the `mesh` with key `name`. Has the same interface as `addelementset`. 
+Adds a `nodeset::Dict{String, Set{Int}}` to the `mesh` with key `name`. Has the same interface as `addelementset`.
 However, instead of mapping a element id to the `String` key, a set of node ids is returned.
 """
 function addnodeset!(mesh::AbstractMesh, name::String, nodeid::Union{Vector{Int},Set{Int}})

@@ -110,7 +110,7 @@ end
 Add a `dim`-dimensional `Field` called `name` which is approximated by `ip` to `dh`.
 
 The field is added to all cells of the underlying grid. In case no interpolation `ip` is given,
-the default interpolation of the grid's celltype is used. 
+the default interpolation of the grid's celltype is used.
 If the grid uses several celltypes, [`push!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
 """
 function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
@@ -303,24 +303,30 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     return global_dofs
 end
 
-function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid{dim}, i::Int) where {dim}
-    nodes = getcells(grid,i).nodes
-    N = length(nodes)
+function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid{dim}, c::C) where {dim, C <: AbstractCell}
+    N = nnodes(c)
     @assert length(global_nodes) == N
     for j in 1:N
-        global_nodes[j] = nodes[j]
+        global_nodes[j] = getnode(c, j)
     end
     return global_nodes
 end
 
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,T}
-    nodes = getcells(grid,i).nodes
-    N = length(nodes)
+function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
+    return cellnodes!(global_nodes, grid, getcell(grid, i))
+end
+
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, c::C) where {C <: AbstractCell, dim, T}
+    N = nnodes(c)
     @assert length(global_coords) == N
     for j in 1:N
-        global_coords[j] = getcoordinates(getnodes(grid,nodes[j]))
+        global_coords[j] = getcoordinates(getnode(grid, c.nodes[j]))
     end
     return global_coords
+end
+
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,T}
+    return cellcoords!(global_nodes, grid, getcell(grid, i))
 end
 
 cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, dh.grid, i)

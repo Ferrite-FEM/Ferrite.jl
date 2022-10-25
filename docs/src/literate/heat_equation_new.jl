@@ -116,7 +116,7 @@ K = create_sparsity_pattern(dh)
 # ### Boundary conditions
 # In Ferrite constraints like Dirichlet boundary conditions
 # are handled by a `ConstraintHandler`.
-# ch = ConstraintHandler(dh);
+ch = ConstraintHandler(dh);
 
 # Next we need to add constraints to `ch`. For this problem we define
 # homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
@@ -134,7 +134,7 @@ K = create_sparsity_pattern(dh)
 # the current time $t$ and returns the prescribed value. In this case
 # it is trivial -- no matter what $\textbf{x}$ and $t$ we return $0$. When we have
 # specified our constraint we `add!` it to `ch`.
-# dbc = Dirichlet(:u, Set([VertexIndex(1,1)]), (x, t) -> 0)
+# dbc = Dirichlet(:u, Set([FaceIndex(1,1)]), (x, t) -> 0)
 # add!(ch, dbc);
 
 # We also need to `close!` and `update!` our boundary conditions. When we call `close!`
@@ -212,6 +212,27 @@ end
 #     versions. However, through the code we use `f` and `u` instead to reflect the strong
 #     connection between the weak form and the Ferrite implementation.
 
+function handle_element(cellvalues, dh, assembler, elidx, element::E) where {E <: Ferrite.Element}
+    #TODO buffers
+    ##TODO how to improve here?
+    elementvalues = cellvalues[typeof(element)]
+    coords = Vector{Vec{dim,Float64}}(undef, length(element.nodes))
+    Ferrite.elementcoords!(coords, dh.mesh, element)
+    reinit!(elementvalues, coords)
+
+    n_basefuncs = getnbasefunctions(elementvalues)
+    Ke = zeros(n_basefuncs, n_basefuncs)
+    fe = zeros(n_basefuncs)
+
+    ## Compute element contribution
+    assemble_element!(Ke, fe, elementvalues)
+
+    ## Assemble Ke and fe into K and f
+    cur_elementdofs = zeros(Int, Ferrite.ndofs_per_element(dh, elidx))
+    Ferrite.elementdofs!(cur_elementdofs, dh, elidx)
+    assemble!(assembler, cur_elementdofs, Ke, fe)
+end
+
 function assemble_global(cellvalues, K::SparseMatrixCSC, dh::NewDofHandler)
     ## Allocate global force vector f
     f = zeros(ndofs(dh))
@@ -219,21 +240,7 @@ function assemble_global(cellvalues, K::SparseMatrixCSC, dh::NewDofHandler)
     assembler = start_assemble(K, f)
     ## Loop over all cels
     for (elidx, element) ∈ enumerate(dh.mesh.elements)
-        ## Allocate the element stiffness matrix and element force vector
-        elementvalues = cellvalues[typeof(element)]
-        coords = Vector{Vec{dim,Float64}}(undef, length(element.nodes))
-        Ferrite.elementcoords!(coords, dh.mesh, elidx)
-        reinit!(elementvalues, coords)
-        cur_elementdofs = zeros(Int, Ferrite.ndofs_per_element(dh, elidx))
-        Ferrite.elementdofs!(cur_elementdofs, dh, elidx)
-        n_basefuncs = getnbasefunctions(elementvalues)
-        Ke = zeros(n_basefuncs, n_basefuncs)
-        fe = zeros(n_basefuncs)
-
-        ## Compute element contribution
-        assemble_element!(Ke, fe, elementvalues)
-        ## Assemble Ke and fe into K and f
-        assemble!(assembler, cur_elementdofs, Ke, fe)
+        handle_element(cellvalues, dh, assembler, elidx, element)
     end
     return K, f
 end
@@ -249,7 +256,7 @@ K[1,1] = 1.0
 # To account for the boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f` respectively, such that
 # we can get the correct solution vector `u` by using `\`.
-# apply!(K, f, ch)
+apply!(K, f, ch)
 u = K \ f;
 
 # ### Exporting to VTK
