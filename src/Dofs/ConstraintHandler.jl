@@ -541,8 +541,8 @@ function apply_zero!(K::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch:
     apply!(K, f, ch, true)
 end
 
+# For backwards compatibility, not used anymore
 @enumx ApplyStrategy Transpose Inplace
-# For backwards compatibility
 const APPLY_TRANSPOSE = ApplyStrategy.Transpose
 const APPLY_INPLACE = ApplyStrategy.Inplace
 
@@ -573,16 +573,7 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
 
     # Remove constrained dofs from the matrix
     zero_out_columns!(K, ch.prescribed_dofs)
-    if strategy === ApplyStrategy.Transpose
-        K′ = copy(K)
-        transpose!(K′, K)
-        zero_out_columns!(K′, ch.prescribed_dofs)
-        transpose!(K, K′)
-    elseif strategy === ApplyStrategy.Inplace
-        K[ch.prescribed_dofs, :] .= 0
-    else
-        error("Unknown apply strategy")
-    end
+    zero_out_rows!(K, ch.dofmapping)
 
     # Add meandiag to constraint dofs
     @inbounds for i in 1:length(ch.inhomogeneities)
@@ -805,6 +796,15 @@ function zero_out_columns!(K, dofs::Vector{Int}) # can be removed in 0.7 with #2
     end
 end
 
+function zero_out_rows!(K, dofmapping)
+    rowval = K.rowval
+    nzval = K.nzval
+    @inbounds for i in eachindex(rowval, nzval)
+        if haskey(dofmapping, rowval[i])
+            nzval[i] = 0
+        end
+    end
+end
 
 function meandiag(K::AbstractMatrix)
     z = zero(eltype(K))
