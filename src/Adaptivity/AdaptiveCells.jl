@@ -184,11 +184,12 @@ function getcells(forest::ForestBWG{dim}) where dim
 end
 
 function getcells(forest::ForestBWG{dim}, cellid::Int)  where dim
+    _mod = dim == 2 ? 4 : 8
     nleaves = length.(forest.cells)
     nleaves_cumsum = cumsum(nleaves)
     k = findfirst(x->cellid<=x,nleaves_cumsum)
-    leaveid = cellid % 4
-    leaveid = leaveid == 0 ? 4 : leaveid
+    leaveid = cellid % _mod
+    leaveid = leaveid == 0 ? _mod : leaveid
     return forest.cells[k].leaves[leaveid]
 end
 
