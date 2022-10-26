@@ -263,3 +263,25 @@ end
         end 
     end
 end
+
+@testset "ForestBWG AbstractGrid Interfacing" begin 
+    function refine_all(grid::ForestBWG,l)
+        for tree in adaptive_grid.cells
+           for leaf in tree.leaves
+               if leaf.l != l-1 #maxlevel
+                   continue
+               else
+                   Ferrite.refine!(tree,leaf)
+               end
+           end
+        end
+    end
+    maxlevel = 3
+    grid = generate_grid(Quadrilateral,(2,2))
+    adaptive_grid = ForestBWG(grid,maxlevel)
+    for l in 1:maxlevel
+        refine_all(adaptive_grid,l)
+        @test getncells(adaptive_grid) == 2^(2*l) * 4 == length(getcells(adaptive_grid))
+    end
+     
+end

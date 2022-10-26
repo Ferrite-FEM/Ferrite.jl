@@ -61,19 +61,21 @@ end
 # > for example, in Algorithm 1 yield the correct result even for negative coordinates.
 # also from BWG 2011
 # TODO: use LUT method from https://www.forceflow.be/2013/10/07/morton-encodingdecoding-through-bit-interleaving-implementations/
-function morton(o::OctantBWG{dim,N,M,T},l::T,b::T) where {dim,N,M,T<:Integer}
-    id = zero(widen(eltype(o.xyz)))
-    loop_length = (sizeof(typeof(id))*T(8)) ÷ dim - one(T)
-    for i in zero(T):loop_length
-        for d in zero(T):dim-one(T)
+function morton(octant::OctantBWG{dim,N,M,T},l::T,b::T) where {dim,N,M,T<:Integer}
+    o = one(T)
+    z = zero(T)
+    id = zero(widen(eltype(octant.xyz)))
+    loop_length = (sizeof(typeof(id))*T(8)) ÷ dim - o
+    for i in z:loop_length
+        for d in z:dim-o
             # first shift extract i-th bit and second shift inserts it at interleaved index 
-            id = id | ((o.xyz[d+one(T)] & (one(T) << i)) << ((dim-one(T))*i+d))
+            id = id | ((octant.xyz[d+o] & (o << i)) << ((dim-o)*i+d))
         end
     end
     # discard the bit information about deeper levels
-    return (id >> ((b-l)*dim))+one(T)
+    return (id >> ((b-l)*dim))+o
 end
-morton(o::OctantBWG{dim,N,M,T1},l::T2,b::T3) where {dim,N,M,T1<:Integer,T2<:Integer,T3<:Integer} = morton(o,T1(l),T1(b))
+morton(octant::OctantBWG{dim,N,M,T1},l::T2,b::T3) where {dim,N,M,T1<:Integer,T2<:Integer,T3<:Integer} = morton(octant,T1(l),T1(b))
 
 Base.zero(::Type{OctantBWG{3, 8, 6}}) = OctantBWG(3, 0, 1)
 Base.zero(::Type{OctantBWG{2, 4, 4}}) = OctantBWG(2, 0, 1)
@@ -87,20 +89,21 @@ struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{dim,N,M}
     nodes::NTuple{N,Int}
 end
 
-function refine!(octree::OctreeBWG{dim,N,M,T}, o::OctantBWG{dim,N,M,T}) where {dim,N,M,T<:Integer}
+function refine!(octree::OctreeBWG{dim,N,M,T}, pivot_octant::OctantBWG{dim,N,M,T}) where {dim,N,M,T<:Integer}
+    o = one(T)
     # really the only way?
-    leave_idx = findfirst(x->x==o,octree.leaves)
+    leave_idx = findfirst(x->x==pivot_octant,octree.leaves)
     # how to obtain id from morton index ?
     old_octant = popat!(octree.leaves,leave_idx)
-    start_child_id = morton(old_octant,old_octant.l+one(T),octree.b)
-    end_child_id = start_child_id + N-one(T)
+    start_child_id = morton(old_octant,old_octant.l+o,octree.b)
+    end_child_id = start_child_id + N-o
     for child_mort_id in start_child_id:end_child_id
-        insert!(octree.leaves,leave_idx,OctantBWG(dim,old_octant.l+one(T),child_mort_id,octree.b))
+        insert!(octree.leaves,leave_idx,OctantBWG(dim,old_octant.l+o,child_mort_id,octree.b))
         leave_idx += 1
     end
 end
 
-function coarsen!(octree::OctreeBWG{dim,N,M,T}, o::OctantBWG{dim,N,M,T}) where {dim,N,M,T}
+function coarsen!(octree::OctreeBWG{dim,N,M,T}, o::OctantBWG{dim,N,M,T}) where {dim,N,M,T<:Integer}
     _two = T(2)
     leave_idx = findfirst(x->x==o,octree.leaves)
     shift = child_id(o,octree.b) - one(T)
@@ -165,12 +168,37 @@ function getncells(grid::ForestBWG)
     return numcells
 end
 
+function getcells(forest::ForestBWG{dim}) where dim
+    celltype = dim == 2 ? OctantBWG{2,4,4,Int32} : OctantBWG{3,8,6,Int32}
+    ncells = getncells(forest)
+    cellvector = Vector{celltype}(undef,ncells)
+    o = one(Int32)
+    cellid = o
+    for tree in forest.cells
+        for leaf in tree.leaves
+            cellvector[cellid] = leaf
+            cellid += o
+        end
+    end
+    return cellvector
+end
+
+function getcells(forest::ForestBWG{dim}, cellid::Int)  where dim
+    nleaves = length.(forest.cells)
+    nleaves_cumsum = cumsum(nleaves)
+    k = findfirst(x->cellid<=x,nleaves_cumsum)
+    leaveid = cellid % 4
+    leaveid = leaveid == 0 ? 4 : leaveid
+    return forest.cells[k].leaves[leaveid]
+end
+
 getcelltype(grid::ForestBWG) = eltype(grid.cells)
 getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same cell type TODO
 
 function Base.show(io::IO, ::MIME"text/plain", agrid::ForestBWG)
     println(io, "ForestBWG with ")
     println(io, "   $(getncells(agrid)) cells")
+    println(io, "   $(length(agrid.cells)) trees")
 end
 
 """
