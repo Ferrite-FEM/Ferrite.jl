@@ -184,13 +184,13 @@ function getcells(forest::ForestBWG{dim}) where dim
 end
 
 function getcells(forest::ForestBWG{dim}, cellid::Int)  where dim
-    _mod = dim == 2 ? 4 : 8
+    #TODO should nleaves be saved by forest?
     nleaves = length.(forest.cells)
     nleaves_cumsum = cumsum(nleaves)
     k = findfirst(x->cellid<=x,nleaves_cumsum)
-    leaveid = cellid % _mod
-    leaveid = leaveid == 0 ? _mod : leaveid
-    return forest.cells[k].leaves[leaveid]
+    #TODO is this actually correct?
+    leafid = k == 1 ? cellid : cellid - (nleaves_cumsum[k] - nleaves[k])
+    return forest.cells[k].leaves[leafid]
 end
 
 getcelltype(grid::ForestBWG) = eltype(grid.cells)
