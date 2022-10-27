@@ -184,8 +184,9 @@ function getcells(forest::ForestBWG{dim}) where dim
 end
 
 function getcells(forest::ForestBWG{dim}, cellid::Int)  where dim
+    @warn "Slow dispatch, consider to call `getcells(forest)` once instead" maxlog=1 #TODO doc page for performance
     #TODO should nleaves be saved by forest?
-    nleaves = length.(forest.cells)
+    nleaves = length.(forest.cells) # cells=trees
     nleaves_cumsum = cumsum(nleaves)
     k = findfirst(x->cellid<=x,nleaves_cumsum)
     #TODO is this actually correct?
