@@ -532,15 +532,16 @@ end # testset
 
     function get_dof_map(ch)
         m = Dict{Int,Any}()
-        for ac in ch.acs
-            mdof = ac.constrained_dof
-            @test ac.b == 0
-            if length(ac.entries) == 1
-                idof, weight = first(ac.entries)
-                @test weight == 1
-                m[mdof] = idof
-            else
-                m[mdof] = ac.entries
+        for (mdof,b,entries) in zip(ch.prescribed_dofs, ch.inhomogeneities, ch.dofcoefficients)
+            if entries !== nothing
+                @test b == 0
+                if length(entries) == 1
+                    idof, weight = first(entries)
+                    @test weight == 1
+                    m[mdof] = idof
+                else
+                    m[mdof] = entries
+                end
             end
         end
         return m
