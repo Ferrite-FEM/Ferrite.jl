@@ -105,7 +105,7 @@
                     # Test average value
                     a = zeros(ndofs(dh))
                     f(x) = ones(Vec{dim})
-                    initial_conditions!(a, dh, :u, f)
+                    apply_analytical!(a, dh, :u, f)
                     @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
 
                     # If not super/subparametric, compare with ConstraintHandler and node set 
@@ -122,8 +122,8 @@
                         close!(ch); update!(ch, 0.0)
                         apply!(a_ch, ch)
 
-                        initial_conditions!(a, dh, :u, fu)
-                        initial_conditions!(a, dh, :p, fp)
+                        apply_analytical!(a, dh, :u, fu)
+                        apply_analytical!(a, dh, :p, fp)
 
                         @test a ≈ a_ch 
                     end 
@@ -143,7 +143,7 @@
                     # Test average value
                     a = zeros(ndofs(dh))
                     f(x) = ones(Vec{dim})
-                    initial_conditions!(a, dh, :u, f)
+                    apply_analytical!(a, dh, :u, f)
                     @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
                 end
             end

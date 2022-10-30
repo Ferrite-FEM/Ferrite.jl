@@ -10,7 +10,7 @@ function _default_interpolation(dh::DofHandler)
 end
 
 """
-    initial_conditions!(
+    apply_analytical!(
         a::AbstractVector, dh::AbstractDofHandler, field::Symbol, f::Function,
         cellset=1:getncells(dh.grid))
 
@@ -20,7 +20,7 @@ The initial condition is given by `f(x)` where `x` is the spatial coordinate
 of the degree of freedom. For scalar fields, `f(x)::Number`, 
 and for vector fields with dimension `dim`, `f(x)::Vec{dim}`
 """
-function initial_conditions!(
+function apply_analytical!(
     a::AbstractVector, dh::DofHandler, field::Symbol, f::Function, 
     cellset=1:getncells(dh.grid)
     )
@@ -30,10 +30,10 @@ function initial_conditions!(
     ip_fun = getfieldinterpolation(dh, field_idx)
     celldofinds = dof_range(dh, field)
     field_dim = getfielddim(dh, field_idx)
-    initial_conditions!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, cellset)
+    apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, cellset)
 end
 
-function initial_conditions!(
+function apply_analytical!(
     a::AbstractVector, dh::MixedDofHandler, field::Symbol, f::Function, 
     cellset=1:getncells(dh.grid),
     )
@@ -53,12 +53,12 @@ function initial_conditions!(
         ip_fun = getfieldinterpolation(fh, field_idx)
         field_dim = getfielddim(fh, field_idx)
         celldofinds = dof_range(fh, field)
-        initial_conditions!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, intersect(fh.cellset, cellset))
+        apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, intersect(fh.cellset, cellset))
     end
     return a
 end
 
-function initial_conditions!(
+function apply_analytical!(
     a::Vector, dh::AbstractDofHandler, celldofinds, field_dim,
     ip_fun::Interpolation, ip_geo::Interpolation, f::Function, cellset)
     
@@ -74,12 +74,12 @@ function initial_conditions!(
         celldofs!(c_dofs, dh, cellnr)
         # f_dofs .= c_dofs[celldofinds]
         foreach(i->(f_dofs[i] = c_dofs[celldofinds[i]]), 1:length(celldofinds)) 
-        initial_conditions!(a, f_dofs, coords, field_dim, ip_fun, ip_geo, f)
+        apply_analytical!(a, f_dofs, coords, field_dim, ip_fun, ip_geo, f)
     end
     return a
 end
 
-function initial_conditions!(a::Vector, dofs::Vector{Int}, coords::Vector{XT}, field_dim, ip_fun, ip_geo, f) where {XT<:Vec}
+function apply_analytical!(a::Vector, dofs::Vector{Int}, coords::Vector{XT}, field_dim, ip_fun, ip_geo, f) where {XT<:Vec}
 
     getnbasefunctions(ip_geo) == length(coords) || error("coords=$coords not compatible with ip_ge=$ip_geo")
     ref_coords = reference_coordinates(ip_fun)
