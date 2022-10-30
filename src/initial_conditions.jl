@@ -14,11 +14,13 @@ end
         a::AbstractVector, dh::AbstractDofHandler, field::Symbol, f::Function,
         cellset=1:getncells(dh.grid))
 
-Apply initial conditions to the degree of freedom vector `a` on the field `field` 
-for all cells in `cellset`.
-The initial condition is given by `f(x)` where `x` is the spatial coordinate 
+Apply a solution `f(x)` by modifying the values in the degree of freedom vector `a`
+pertaining to the field `field` for all cells in `cellset`.
+The function `f(x)` are given the spatial coordinate 
 of the degree of freedom. For scalar fields, `f(x)::Number`, 
-and for vector fields with dimension `dim`, `f(x)::Vec{dim}`
+and for vector fields with dimension `dim`, `f(x)::Vec{dim}`.
+
+This function can be used to apply initial conditions for time dependent problems.
 """
 function apply_analytical!(
     a::AbstractVector, dh::DofHandler, field::Symbol, f::Function, 
@@ -30,7 +32,7 @@ function apply_analytical!(
     ip_fun = getfieldinterpolation(dh, field_idx)
     celldofinds = dof_range(dh, field)
     field_dim = getfielddim(dh, field_idx)
-    apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, cellset)
+    _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, cellset)
 end
 
 function apply_analytical!(
@@ -46,12 +48,12 @@ function apply_analytical!(
         ip_fun = getfieldinterpolation(fh, field_idx)
         field_dim = getfielddim(fh, field_idx)
         celldofinds = dof_range(fh, field)
-        apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, intersect(fh.cellset, cellset))
+        _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, intersect(fh.cellset, cellset))
     end
     return a
 end
 
-function apply_analytical!(
+function _apply_analytical!(
     a::Vector, dh::AbstractDofHandler, celldofinds, field_dim,
     ip_fun::Interpolation, ip_geo::Interpolation, f::Function, cellset)
     
@@ -67,12 +69,12 @@ function apply_analytical!(
         celldofs!(c_dofs, dh, cellnr)
         # f_dofs .= c_dofs[celldofinds]
         foreach(i->(f_dofs[i] = c_dofs[celldofinds[i]]), 1:length(celldofinds)) 
-        apply_analytical!(a, f_dofs, coords, field_dim, ip_fun, ip_geo, f)
+        _apply_analytical!(a, f_dofs, coords, field_dim, ip_fun, ip_geo, f)
     end
     return a
 end
 
-function apply_analytical!(a::Vector, dofs::Vector{Int}, coords::Vector{XT}, field_dim, ip_fun, ip_geo, f) where {XT<:Vec}
+function _apply_analytical!(a::Vector, dofs::Vector{Int}, coords::Vector{XT}, field_dim, ip_fun, ip_geo, f) where {XT<:Vec}
 
     getnbasefunctions(ip_geo) == length(coords) || error("coords=$coords not compatible with ip_ge=$ip_geo")
     ref_coords = reference_coordinates(ip_fun)
