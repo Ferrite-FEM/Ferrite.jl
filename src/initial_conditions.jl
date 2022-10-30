@@ -90,8 +90,9 @@ function initial_conditions!(a::Vector, dofs::Vector{Int}, coords::Vector{XT}, f
         for (i,x_node) in enumerate(coords)
             x_dof += value(ip_geo, i, refpoint) * x_node
         end
-        ic = f(x_dof)
-        foreach(idim->( a[dofs[field_dim*(i_dof-1)+idim]] = ic[idim] ), 1:length(ic))
+        for (idim, icval) in enumerate(f(x_dof))
+            a[dofs[field_dim*(i_dof-1)+idim]] = icval
+        end
     end
     return a
 end
