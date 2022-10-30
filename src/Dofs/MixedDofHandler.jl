@@ -113,17 +113,12 @@ end
 
 Returns the dimension of a specific field, given by name. Note that it will return the dimension of the first field found among the `FieldHandler`s.
 """
-function getfielddim(dh::MixedDofHandler, name::Symbol)
-
-    for fh in dh.fieldhandlers
-        field_pos = findfirst(i->i == name, getfieldnames(fh))
-        if field_pos !== nothing
-            return fh.fields[field_pos].dim
-        end
-    end
-    error("did not find field $name")
+function getfielddim(dh::MixedDofHandler, field_idxs::NTuple{2, Int})
+    fh_idx, field_idx = field_idxs
+    fielddim = dh.fieldhandlers[fh_idx].fields[field_idx].dim
+    return fielddim
 end
-
+getfielddim(dh::MixedDofHandler, name::Symbol) = getfielddim(dh, find_field(dh, name))
 
 """
     nfields(dh::MixedDofHandler)
@@ -137,6 +132,7 @@ nfields(dh::MixedDofHandler) = length(getfieldnames(dh))
 
 Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
 """
+#TODO: perhaps check that a field with the same name is the same field?
 function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
     @assert !isclosed(dh)
     _check_same_celltype(dh.grid, collect(fh.cellset))
@@ -436,17 +432,36 @@ end
 create_sparsity_pattern(dh::MixedDofHandler) = _create_sparsity_pattern(dh, nothing, false)
 create_symmetric_sparsity_pattern(dh::MixedDofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
 
-function find_field(fh::FieldHandler, field_name::Symbol)
-    j = findfirst(i->i == field_name, getfieldnames(fh))
-    j === nothing && error("could not find field :$field_name in FieldHandler (existing fields: $(getfieldnames(fh)))")
-    return j
+function find_field(dh::MixedDofHandler, field_name::Symbol)
+    for (fh_idx, fh) in pairs(dh.fieldhandlers)
+        field_idx = _find_field(fh, field_name)
+        !isnothing(field_idx) && return (fh_idx, field_idx)
+    end
+    error("Did not find field :$field_name
+          (existing fields: $(getfieldnames(dh))).")
 end
+
+function find_field(fh::FieldHandler, field_name::Symbol)
+    field_idx = _find_field(fh, field_name)
+    isnothing(field_idx) && error("Did not find field :$field_name in FieldHandler (existing fields: $(getfieldnames(fh)))")
+    return field_idx
+end
+
+function _find_field(fh::FieldHandler, field_name::Symbol)
+    for (field_idx, field) in pairs(fh.fields)
+        if field.name == field_name
+            return field_idx
+        end
+    end
+    return nothing
+end
+
 
 # Calculate the offset to the first local dof of a field
 function field_offset(fh::FieldHandler, field_name::Symbol)
     offset = 0
     for i in 1:find_field(fh, field_name)-1
-        offset += getnbasefunctions(getfieldinterpolations(fh)[i])::Int * getfielddims(fh)[i]
+        offset += getnbasefunctions(fh.fields[i].interpolation)::Int * fh.fields[i].dim
     end
     return offset
 end
@@ -460,9 +475,14 @@ function Ferrite.dof_range(fh::FieldHandler, field_name::Symbol)
     return (offset+1):(offset+n_field_dofs)
 end
 
-find_field(dh::MixedDofHandler, field_name::Symbol) = find_field(first(dh.fieldhandlers), field_name)
+#find_field(dh::MixedDofHandler, field_name::Symbol) = find_field(first(dh.fieldhandlers), field_name)
 field_offset(dh::MixedDofHandler, field_name::Symbol) = field_offset(first(dh.fieldhandlers), field_name)
-getfieldinterpolation(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].interpolation
+
+function getfieldinterpolation(dh::MixedDofHandler, field_idxs::NTuple{2,Int})
+    fh_idx, field_idx = field_idxs
+    ip = dh.fieldhandlers[fh_idx].fields[field_idx].interpolation
+end
+getfieldinterpolation(dh::MixedDofHandler, field_idx::Int) = getfieldinterpolation(dh, (1,field_idx))
 getfielddim(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].dim
 
 function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) where T
