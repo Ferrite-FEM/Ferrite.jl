@@ -665,14 +665,23 @@ end
 
 """
     getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::Int)
-Fills the vector `x` with the coordinates of a cell, defined by its cell id.
+    getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::AbstractCell)
+
+Fills the vector `x` with the coordinates of a cell defined by either its cellid or the cell object itself.
 """
-@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::Int) where {dim,T}
-    #@assert length(x) == N
-    @inbounds for i in 1:length(x)
-        x[i] = grid.nodes[grid.cells[cell].nodes[i]].x
-    end
+
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T} 
+    cell = getcells(grid, cellid)
+    getcoordinates!(x, grid, cell)
 end
+
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim,T}
+    @inbounds for i in 1:length(x)
+        x[i] = grid.nodes[cell.nodes[i]].x
+    end
+    return x
+end
+
 @inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
 @inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, face::FaceIndex) where {dim, T} = getcoordinates!(x, grid, face.idx[1])
 
@@ -681,11 +690,12 @@ end
 Return a vector with the coordinates of the vertices of cell number `cell`.
 """
 @inline function getcoordinates(grid::AbstractGrid, cell::Int)
-    # TODO pretty ugly, worth it?
-    dim = typeof(grid.cells[cell]).parameters[1]
-    T = typeof(grid).parameters[3]
-    nodeidx = grid.cells[cell].nodes
-    return [grid.nodes[i].x for i in nodeidx]::Vector{Vec{dim,T}}
+    dim = getdim(grid)
+    T = typeof(grid).parameters[3] #TODO: should be part of the grid interface
+    _cell = getcells(grid, cell)
+    N = nnodes(_cell)
+    x = Vector{Vec{dim, T}}(undef, N)
+    getcoordinates!(x, grid, _cell)
 end
 @inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
 @inline getcoordinates(grid::AbstractGrid, face::FaceIndex) = getcoordinates(grid, face.idx[1])
