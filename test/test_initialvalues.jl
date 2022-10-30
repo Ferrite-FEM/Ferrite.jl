@@ -150,4 +150,14 @@
         end
     end
 
+    @testset "Exceptions" begin
+        dh = testdh(Quadrilateral, 1, 1)
+        @test_throws "The field v was not found" apply_analytical!(zeros(ndofs(dh)), dh, :v, x->0.0)
+        @test_throws "length(f(x)) must be" apply_analytical!(zeros(ndofs(dh)), dh, :u, x->0.0)     # Should be f(x)::Vec{2}
+
+        mdh = testmdh(2, 1, 1)
+        @test_throws "The field v was not found" apply_analytical!(zeros(ndofs(mdh)), mdh, :v, x->0.0)
+        @test_throws "length(f(x)) must be" apply_analytical!(zeros(ndofs(mdh)), mdh, :u, x->0.0)   # Should be f(x)::Vec{2}
+    end
+
 end
