@@ -104,7 +104,7 @@
 
                     # Test average value
                     a = zeros(ndofs(dh))
-                    f = Returns(ones(Vec{dim}))
+                    f(x) = ones(Vec{dim})
                     initial_conditions!(a, dh, :u, f)
                     @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
 
@@ -142,7 +142,7 @@
 
                     # Test average value
                     a = zeros(ndofs(dh))
-                    f = Returns(ones(Vec{dim}))
+                    f(x) = ones(Vec{dim})
                     initial_conditions!(a, dh, :u, f)
                     @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
                 end
