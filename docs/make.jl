@@ -64,7 +64,8 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
             "reference/assembly.md",
             "reference/boundary_conditions.md",
             "reference/grid.md",
-            "reference/export.md"
+            "reference/export.md",
+            "reference/utils.md",
             ]
         ],
 )

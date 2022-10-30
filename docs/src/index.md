@@ -45,3 +45,22 @@ To load the package, use
 ```julia
 using Ferrite
 ```
+
+## Debugging Information
+
+There is a debug mode to aid the development of new algorithms in Ferrite, as well as to
+help tracking down bugs. It can be turned on via
+
+```julia
+using Ferrite
+Ferrite.debug_mode()
+```
+
+followed by restarting the Julia process. It can be turned off again by calling
+
+```julia
+using Ferrite
+Ferrite.debug_mode(enable=false)
+```
+
+also followed by restarting the Julia process.
