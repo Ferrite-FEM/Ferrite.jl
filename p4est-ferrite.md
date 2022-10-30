@@ -1,6 +1,7 @@
 # P4est in Julia with Ferrite
 
 All of it is based on these papers:
+
 - [Original p4est paper](https://p4est.github.io/papers/BursteddeWilcoxGhattas11.pdf)
 - [Extension to anisotropic refinement, aka p6est](https://epubs.siam.org/doi/10.1137/140974407)
 - [Extension to RefTet elements and in depth explanations](https://bonndoc.ulb.uni-bonn.de/xmlui/handle/20.500.11811/7661); basically monography about t8code
@@ -10,6 +11,7 @@ All of it is based on these papers:
 One of the most important concepts, where everything is based on, are space filling curves (SFC).
 In particular, [Z-order (also named Morton order, Morton space-filling curves)](https://en.wikipedia.org/wiki/Z-order_curve) are used in p4est.
 The basic idea is that each Octant (in 3D) or quadrant (in 2D) can be encoded by 2 quantities
+
 - the level `l`
 - the lower left (front) coordinates `xyz`
 
@@ -99,7 +101,7 @@ x-----------x-----------x
 |     3     |     4     |
 |           |           |
 |           |           |
-x-----------------------x
+x-----------x-----------x
 |           |           |
 |           |           |
 |     1     |     2     |
