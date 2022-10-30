@@ -54,6 +54,7 @@ function __to_components(c)
     return components
 end
 
+const DofCoefficients{T} = Vector{Pair{Int,T}}
 """
     AffineConstraint(constrained_dofs::Int, master_dofs::Vector{Int}, coeffs::Vector{T}, b::T) where T
 
@@ -61,7 +62,7 @@ Define an affine/linear constraint to constrain dofs of the form `u_i = ∑(u[j]
 """
 struct AffineConstraint{T}
     constrained_dof::Int
-    entries::Vector{Pair{Int, T}} # masterdofs and factors
+    entries::DofCoefficients{T} # masterdofs and factors
     b::T # inhomogeneity
 end
 
@@ -72,11 +73,13 @@ Collection of constraints.
 """
 struct ConstraintHandler{DH<:AbstractDofHandler,T}
     dbcs::Vector{Dirichlet}
-    acs::Vector{AffineConstraint{T}}
     prescribed_dofs::Vector{Int}
     free_dofs::Vector{Int}
     inhomogeneities::Vector{T}
-    dofmapping::Dict{Int,Int} # global dof -> index into dofs and inhomogeneities
+    # `nothing` for pure DBC constraint, otherwise affine constraint
+    dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}
+    # global dof -> index into dofs and inhomogeneities and dofcoefficients
+    dofmapping::Dict{Int,Int}
     bcvalues::Vector{BCValues{T}}
     dh::DH
     closed::ScalarWrapper{Bool}
@@ -84,7 +87,10 @@ end
 
 function ConstraintHandler(dh::AbstractDofHandler)
     @assert isclosed(dh)
-    ConstraintHandler(Dirichlet[], AffineConstraint{Float64}[], Int[], Int[], Float64[], Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false))
+    ConstraintHandler(
+        Dirichlet[], Int[], Int[], Float64[], Union{Nothing,DofCoefficients{Float64}}[],
+        Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false),
+    )
 end
 
 """
@@ -134,18 +140,16 @@ function apply_rhs!(data::RHSData, f::AbstractVector, ch::ConstraintHandler, app
             end
         end
     end
-    @inbounds for ac in ch.acs
-        global_dof = ac.constrained_dof
-        for (d, v) in ac.entries
-            f[d] += f[global_dof] * v
+    @inbounds for (i, pdof) in pairs(ch.prescribed_dofs)
+        dofcoef = ch.dofcoefficients[i]
+        b = ch.inhomogeneities[i]
+        if dofcoef !== nothing # if affine constraint
+            for (d, v) in dofcoef
+                f[d] += f[pdof] * v
+            end
         end
-        f[global_dof] = 0
-    end
-    @inbounds for i in 1:length(ch.inhomogeneities)
-        d = ch.prescribed_dofs[i]
-        v = ch.inhomogeneities[i]
-        vz = applyzero ? zero(eltype(f)) : v
-        f[d] = vz * m
+        bz = applyzero ? zero(eltype(f)) : b
+        f[pdof] = bz * m
     end
 end
 
@@ -172,16 +176,12 @@ Close and finalize the `ConstraintHandler`.
 """
 function close!(ch::ConstraintHandler)
     @assert(!isclosed(ch))
-
-    # Make ch.prescribed_dofs unique and sorted, and do the same operations for ch.inhomogeneities
-    # TODO: This is probably quite slow atm, and the unique!() and sort() functions can be combined?
-    dofs_vals = unique(first, zip(ch.prescribed_dofs, ch.inhomogeneities))
-    copy!(ch.prescribed_dofs, getindex.(dofs_vals, 1))
-    copy!(ch.inhomogeneities, getindex.(dofs_vals, 2))
+    @assert( allunique(ch.prescribed_dofs) )
 
     I = sortperm(ch.prescribed_dofs)
     ch.prescribed_dofs .= ch.prescribed_dofs[I]
     ch.inhomogeneities .= ch.inhomogeneities[I]
+    ch.dofcoefficients .= ch.dofcoefficients[I]
 
     copy!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
 
@@ -189,12 +189,14 @@ function close!(ch::ConstraintHandler)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
     end
 
+    # TODO: Store index for each affine constraint?
+    # affine_mapping = Dict{Int,Int}(pdof => i for (i, pdof) in pairs(cd.prescribed_dofs) if ch.dofcoefficients[i] !== nothing )
+
     # TODO:
     # Do a bunch of checks to see if the affine constraints are linearly indepented etc.
     # If they are not, it is possible to automatically reformulate the constraints
     # such that they become independent. However, at this point, it is left to
     # the user to assure this.
-    sort!(ch.acs, by = ac -> ac.constrained_dof)
 
     ch.closed[] = true
     return ch
@@ -239,17 +241,35 @@ end
 
 Add the `AffineConstraint` to the `ConstraintHandler`.
 """
-function add!(ch::ConstraintHandler, newac::AffineConstraint)
-    # Basic error checking
-    for ac in ch.acs
-        (ac.constrained_dof == newac.constrained_dof) &&
-            error("Constraint already exist for dof $(ac.constrained_dof)")
-        any(x -> x.first == newac.constrained_dof, ac.entries) &&
-            error("New constrained dof $(newac.constrained_dof) is already used as a master dof.")
+function add!(ch::ConstraintHandler, ac::AffineConstraint)
+    # TODO: Would be nice to pass nothing if ac.entries is empty, but then we lose the fact
+    #       that this constraint is an AffineConstraint which is currently needed in update!
+    #       in order to not update inhomogeneities for affine constraints
+    add_prescribed_dof!(ch, ac.constrained_dof, ac.b, #=isempty(ac.entries) ? nothing : =# ac.entries)
+end
+
+"""
+    add_prescribed_dof!(ch, constrained_dof::Int, inhomogeneity, dofcoefficients=nothing)
+
+Add a constrained dof directly to the `ConstraintHandler`.
+This function checks if the `constrained_dof` is already constrained, and overrides the old
+constraint if true.
+"""
+function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomogeneity, dofcoefficients=nothing)
+    @assert(!isclosed(ch))
+    i = get(ch.dofmapping, constrained_dof, 0)
+    if i != 0
+        @debug @warn "dof $i already prescribed, overriding the old constraint"
+        ch.prescribed_dofs[i] = constrained_dof
+        ch.inhomogeneities[i] = inhomogeneity
+        ch.dofcoefficients[i] = dofcoefficients
+    else
+        N = length(ch.dofmapping)
+        push!(ch.prescribed_dofs, constrained_dof)
+        push!(ch.inhomogeneities, inhomogeneity)
+        push!(ch.dofcoefficients, dofcoefficients)
+        ch.dofmapping[constrained_dof] = N + 1
     end
-    push!(ch.acs, newac)
-    push!(ch.prescribed_dofs, newac.constrained_dof)
-    push!(ch.inhomogeneities, newac.b)
     return ch
 end
 
@@ -276,9 +296,8 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, inter
     # save it to the ConstraintHandler
     push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
-    append!(ch.prescribed_dofs, constrained_dofs)
-    for _ in 1:length(constrained_dofs)
-        push!(ch.inhomogeneities, NaN)
+    for d in constrained_dofs
+        add_prescribed_dof!(ch, d, NaN, nothing)
     end
     return ch
 end
@@ -344,9 +363,8 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     copy!(dbc.local_face_dofs_offset, constrained_dofs) # use this field to store the global dofs
     push!(ch.dbcs, dbc)
     push!(ch.bcvalues, bcvalue)
-    append!(ch.prescribed_dofs, constrained_dofs)
-    for _ in 1:length(constrained_dofs)
-        push!(ch.inhomogeneities, NaN)
+    for d in constrained_dofs
+        add_prescribed_dof!(ch, d, NaN, nothing)
     end
     return ch
 end
@@ -357,14 +375,14 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
     for (i,dbc) in enumerate(ch.dbcs)
         # Function barrier
         _update!(ch.inhomogeneities, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
-                 dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, convert(Float64, time))
+                 dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, convert(Float64, time))
     end
 end
 
 # for faces
 function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
-                  dofmapping::Dict{Int,Int}, time::T) where {T}
+                  dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::T) where {T}
 
     dim = getdim(dh.grid)
     _tmp_cellid = first(faces)[1]
@@ -395,8 +413,12 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:Bo
                 counter += 1
 
                 dbc_index = dofmapping[globaldof]
-                inhomogeneities[dbc_index] = bc_value[i]
-                @debug println("prescribing value $(bc_value[i]) on global dof $(globaldof)")
+                # Only DBC dofs are currently update!-able so don't modify inhomogeneities
+                # for affine constraints
+                if dofcoefficients[dbc_index] === nothing
+                    inhomogeneities[dbc_index] = bc_value[i]
+                    @debug println("prescribing value $(bc_value[i]) on global dof $(globaldof)")
+                end
             end
         end
     end
@@ -405,7 +427,7 @@ end
 # for nodes
 function _update!(inhomogeneities::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
-                  dofmapping::Dict{Int,Int}, time::Float64)
+                  dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::T) where T
     counter = 1
     for (idx, nodenumber) in enumerate(nodeidxs)
         x = dh.grid.nodes[nodenumber].x
@@ -415,8 +437,12 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, nodes::Set{Int}
             globaldof = globaldofs[counter]
             counter += 1
             dbc_index = dofmapping[globaldof]
-            inhomogeneities[dbc_index] = v
-            @debug println("prescribing value $(v) on global dof $(globaldof)")
+            # Only DBC dofs are currently update!-able so don't modify inhomogeneities
+            # for affine constraints
+            if dofcoefficients[dbc_index] === nothing
+                inhomogeneities[dbc_index] = v
+                @debug println("prescribing value $(v) on global dof $(globaldof)")
+            end
         end
     end
 end
@@ -524,10 +550,11 @@ apply!(     v::AbstractVector, ch::ConstraintHandler) = _apply_v(v, ch, false)
 function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
     @assert length(v) >= ndofs(ch.dh)
     v[ch.prescribed_dofs] .= apply_zero ? 0.0 : ch.inhomogeneities
-    # Apply affine constraints, e.g u2 = u6 + b
-    for ac in ch.acs
-        for (d, s) in ac.entries
-            v[ac.constrained_dof] += s * v[d]
+    # Apply affine constraints, e.g u2 = s6*u6 + s3*u3 (inhomogenity added above)
+    for (dof, dofcoef) in zip(ch.prescribed_dofs, ch.dofcoefficients)
+        dofcoef === nothing && continue
+        for (d, s) in dofcoef
+            v[dof] += s * v[d]
         end
     end
     return v
@@ -541,8 +568,8 @@ function apply_zero!(K::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch:
     apply!(K, f, ch, true)
 end
 
+# For backwards compatibility, not used anymore
 @enumx ApplyStrategy Transpose Inplace
-# For backwards compatibility
 const APPLY_TRANSPOSE = ApplyStrategy.Transpose
 const APPLY_INPLACE = ApplyStrategy.Inplace
 
@@ -569,20 +596,11 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
     end
 
     # Condense K (C' * K * C) and f (C' * f)
-    _condense!(K, f, ch.acs)
+    _condense!(K, f, ch.dofcoefficients, ch.dofmapping)
 
     # Remove constrained dofs from the matrix
     zero_out_columns!(K, ch.prescribed_dofs)
-    if strategy === ApplyStrategy.Transpose
-        K′ = copy(K)
-        transpose!(K′, K)
-        zero_out_columns!(K′, ch.prescribed_dofs)
-        transpose!(K, K′)
-    elseif strategy === ApplyStrategy.Inplace
-        K[ch.prescribed_dofs, :] .= 0
-    else
-        error("Unknown apply strategy")
-    end
+    zero_out_rows!(K, ch.dofmapping)
 
     # Add meandiag to constraint dofs
     @inbounds for i in 1:length(ch.inhomogeneities)
@@ -595,15 +613,24 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
     end
 end
 
-# Similar to Ferrite._condense!(K, ch), but only add the non-zero entries to K (that arises from the condensation process)
-function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, acs::Vector{AffineConstraint{T}}) where T
-    ndofs = size(K, 1)
-    (length(acs) == 0) && return 
-    # Store linear constraint index for each constrained dof
-    distribute = Dict{Int,Int}(acs[c].constrained_dof => c for c in 1:length(acs))
+# Fetch dof coefficients for a dof prescribed by an affine constraint. Return nothing if the
+# dof is not prescribed, or prescribed by DBC.
+@inline function coefficients_for_dof(dofmapping, dofcoeffs, dof)
+    idx = get(dofmapping, dof, 0)
+    idx == 0 && return nothing
+    return dofcoeffs[idx]
+end
 
-    #Adding new entries to K is extremely slow, so create a new sparsity triplet for the condensed sparsity pattern
-    N = length(acs)*2 # TODO: Better size estimate for additional condensed sparsity pattern.
+# Similar to Ferrite._condense!(K, ch), but only add the non-zero entries to K (that arises from the condensation process)
+function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, dofmapping::Dict{Int,Int}) where T
+    ndofs = size(K, 1)
+
+    # Return early if there are no non-trivial affine constraints
+    any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
+
+    # Adding new entries to K is extremely slow, so create a new sparsity triplet for the
+    # condensed sparsity pattern
+    N = 2 * length(dofcoefficients) # TODO: Better size estimate for additional condensed sparsity pattern.
     I = Int[]; resize!(I, N)
     J = Int[]; resize!(J, N)
 
@@ -613,40 +640,33 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, acs::Vector{AffineCo
         # Therefor we must extract this before iterating over K
         range = nzrange(K, col)
         _rows = K.rowval[range]
-        dcol = get(distribute, col, 0)
-        if dcol == 0
+        col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
+        if col_coeffs === nothing
             for row in _rows
-                drow = get(distribute, row, 0)
-                if drow != 0
-                    ac = acs[drow]
-                    for (d, _) in ac.entries
-                        if !_addindex_sparsematrix!(K, 0.0, d, col)
-                            cnt += 1
-                            _add_or_grow(cnt, I, J, d, col)
-                        end
+                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
+                row_coeffs === nothing && continue
+                for (d, _) in row_coeffs
+                    if !_addindex_sparsematrix!(K, 0.0, d, col)
+                        cnt += 1
+                        _add_or_grow(cnt, I, J, d, col)
                     end
                 end
             end
         else
             for row in _rows
-                drow = get(distribute, row, 0)
-                if drow == 0
-                    ac = acs[dcol]
-                    for (d, _) in ac.entries
+                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
+                if row_coeffs === nothing
+                    for (d, _) in col_coeffs
                         if !_addindex_sparsematrix!(K, 0.0, row, d)
                             cnt += 1
                             _add_or_grow(cnt, I, J, row, d)
                         end
                     end
                 else
-                    ac1 = acs[dcol]
-                    for (d1, _) in ac1.entries
-                        ac2 = acs[distribute[row]]
-                        for (d2, _) in ac2.entries
-                            if !_addindex_sparsematrix!(K, 0.0, d1, d2)
-                                cnt += 1
-                                _add_or_grow(cnt, I, J, d1, d2)
-                            end
+                    for (d1, _) in col_coeffs, (d2, _) in row_coeffs
+                        if !_addindex_sparsematrix!(K, 0.0, d1, d2)
+                            cnt += 1
+                            _add_or_grow(cnt, I, J, d1, d2)
                         end
                     end
                 end
@@ -667,63 +687,54 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, acs::Vector{AffineCo
 end
 
 # Condenses K and f: C'*K*C, C'*f, in-place assuming the sparsity pattern is correct
-function _condense!(K::SparseMatrixCSC, f::AbstractVector, acs::Vector{AffineConstraint{T}}) where T
+function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int,Int}) where T
 
     ndofs = size(K, 1)
     condense_f = !(length(f) == 0)
     condense_f && @assert( length(f) == ndofs )
 
-    # Store linear constraint index for each constrained dof
-    distribute = Dict{Int,Int}(acs[c].constrained_dof => c for c in 1:length(acs))
+    # Return early if there are no non-trivial affine constraints
+    any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
 
     for col in 1:ndofs
-        dcol = get(distribute, col, 0)
-        if dcol == 0
+        col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
+        if col_coeffs === nothing
             for a in nzrange(K, col)
                 row = K.rowval[a]
-                drow = get(distribute, row, 0)
-                if drow != 0
-                    ac = acs[drow]
-                    for (d, v) in ac.entries
-                        Kval = K.nzval[a]
-                        _addindex_sparsematrix!(K, v * Kval, d, col) || _sparsity_error()
-                    end
-
-                    # Perform f - K*g. However, this has already been done in outside this functions so we skip this.
-                    #if condense_f
-                    #    f[col] -= K.nzval[a] * ac.b;
-                    #end
+                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
+                row_coeffs === nothing && continue
+                for (d, v) in row_coeffs
+                    Kval = K.nzval[a]
+                    _addindex_sparsematrix!(K, v * Kval, d, col) || _sparsity_error()
                 end
+
+                # Perform f - K*g. However, this has already been done in outside this functions so we skip this.
+                # if condense_f
+                #     f[col] -= K.nzval[a] * ac.b;
+                # end
             end
         else
             for a in nzrange(K, col)
                 row = K.rowval[a]
-                drow = get(distribute, row, 0)
-                if drow == 0
-                    ac = acs[dcol]
-                    for (d,v) in ac.entries
+                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
+                if row_coeffs === nothing
+                    for (d, v) in col_coeffs
                         Kval = K.nzval[a]
                         _addindex_sparsematrix!(K, v * Kval, row, d) || _sparsity_error()
                     end
                 else
-                    ac1 = acs[dcol]
-                    for (d1,v1) in ac1.entries
-                        ac2 = acs[drow]
-                        for (d2,v2) in ac2.entries
-                            Kval = K.nzval[a]
-                            _addindex_sparsematrix!(K, v1 * v2 * Kval, d1, d2) || _sparsity_error()
-                        end
+                    for (d1, v1) in col_coeffs, (d2, v2) in row_coeffs
+                        Kval = K.nzval[a]
+                        _addindex_sparsematrix!(K, v1 * v2 * Kval, d1, d2) || _sparsity_error()
                     end
                 end
             end
 
             if condense_f
-                ac = acs[dcol]
-                for (d,v) in ac.entries
+                for (d, v) in col_coeffs
                     f[d] += f[col] * v
                 end
-                @assert ac.constrained_dof == col
-                f[ac.constrained_dof] = 0.0
+                f[col] = 0.0
             end
         end
     end
@@ -780,14 +791,16 @@ function create_constraint_matrix(ch::ConstraintHandler{dh,T}) where {dh,T}
        push!(V, 1.0)
     end
 
-    for ac in ch.acs
-        for (d, v) in ac.entries
-            push!(I, ac.constrained_dof)
-            j = searchsortedfirst(ch.free_dofs, d)
-            push!(J, j)
-            push!(V, v)
+    for (i,pdof) in enumerate(ch.prescribed_dofs)
+        dofcoef = ch.dofcoefficients[i]
+        if dofcoef !== nothing #if affine constraint
+            for (d, v) in dofcoef
+                push!(I, pdof)
+                j = searchsortedfirst(ch.free_dofs, d)
+                push!(J, j)
+                push!(V, v)
+            end
         end
-        g[ac.constrained_dof] = ac.b
     end
     g[ch.prescribed_dofs] .= ch.inhomogeneities
 
@@ -805,6 +818,15 @@ function zero_out_columns!(K, dofs::Vector{Int}) # can be removed in 0.7 with #2
     end
 end
 
+function zero_out_rows!(K, dofmapping)
+    rowval = K.rowval
+    nzval = K.nzval
+    @inbounds for i in eachindex(rowval, nzval)
+        if haskey(dofmapping, rowval[i])
+            nzval[i] = 0
+        end
+    end
+end
 
 function meandiag(K::AbstractMatrix)
     z = zero(eltype(K))
