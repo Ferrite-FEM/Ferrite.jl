@@ -46,7 +46,7 @@ function initial_conditions!(
         @warn("The field $field was not found in the dof handler")
         return a
     end
-    if length(ip_geo) != length(dh.fieldhandlers)
+    if length(ip_geos) != length(dh.fieldhandlers)
         error("$(length(ip_geos)) ip_geos and $(length(dh.fieldhandlers)) fieldhandlers")
     end
 
