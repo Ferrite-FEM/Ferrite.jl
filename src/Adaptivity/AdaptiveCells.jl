@@ -80,7 +80,11 @@ morton(octant::OctantBWG{dim,N,M,T1},l::T2,b::T3) where {dim,N,M,T1<:Integer,T2<
 Base.zero(::Type{OctantBWG{3, 8, 6}}) = OctantBWG(3, 0, 1)
 Base.zero(::Type{OctantBWG{2, 4, 4}}) = OctantBWG(2, 0, 1)
 
-# Follow z order, x before y before z for faces, edges and corners
+ncorners(::Type{OctantBWG{dim,N}}) where {dim,N} = N
+ncorners(o::OctantBWG) = ncorners(typeof(o))
+nchilds(::Type{OctantBWG{dim,N}}) where {dim,N} = N
+nchilds(o::OctantBWG) = nchilds(typeof(o))# Follow z order, x before y before z for faces, edges and corners
+
 # TODO: consider list instead of Vector datastructure
 struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{dim,N,M}
     leaves::Vector{OctantBWG{dim,N,M,T}}
@@ -124,6 +128,13 @@ OctreeBWG(cell::Quadrilateral,b=_maxlevel[2]) = OctreeBWG{2,4,4}(cell.nodes,b)
 OctreeBWG(cell::Hexahedron,b=_maxlevel[1]) = OctreeBWG{3,8,6}(cell.nodes,b)
 
 Base.length(tree::OctreeBWG) = length(tree.leaves)
+
+#maybe not use Base.in, but semantically feels correct
+function Base.in(oct::OctantBWG{dim},tree::OctreeBWG{dim}) where dim
+    maxsize = _maximum_size(tree.b)
+    outside = any(xyz -> xyz >= maxsize, oct.xyz) || any(xyz -> xyz < 0, oct.xyz)
+    return !outside
+end
 
 """
     ForestBWG{dim, C<:AbstractAdaptiveCell, T<:Real} <: AbstractAdaptiveGrid{dim}
@@ -196,6 +207,25 @@ end
 
 getcelltype(grid::ForestBWG) = eltype(grid.cells)
 getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same cell type TODO
+
+function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
+    _ncorners = ncorners(C)
+    nodeidx = 1
+    nodes_duplicate = Vector{Node{dim,T}}(undef,getncells(forest)*_ncorners)
+    nodids = Vector{Int}(undef,getncells(forest)*_ncorners)
+    for tree in forest.cells
+        for leaf in tree.leaves
+            for c in 1:_ncorners
+                neighbor = corner_neighbor(leaf,c,tree.b)
+                if neighbor ∈ tree # checks if neighbor is in boundary of tree (w.r.t. octree coordinates)
+                    # check if the leafid is smaller then the neighbor or what?
+                else
+                    # now how do I recover the interoctree neighborhood type?
+                end
+            end
+        end
+    end
+end
 
 function Base.show(io::IO, ::MIME"text/plain", agrid::ForestBWG)
     println(io, "ForestBWG with ")
