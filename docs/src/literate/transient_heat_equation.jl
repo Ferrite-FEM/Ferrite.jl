@@ -20,8 +20,8 @@
 # ```
 #
 # where $u$ is the unknown temperature field, $k$ the heat conductivity,
-# $f$ the heat source and $\Omega$ the domain. For simplicity we set $f = 1$
-# and $k = 1$. We define homogeneous Dirichlet boundary conditions along the left and right edge of the domain.
+# $f$ the heat source and $\Omega$ the domain. For simplicity, we hard code $f = 0.1$
+# and $k = 10^{-3}$. We define homogeneous Dirichlet boundary conditions along the left and right edge of the domain.
 # ```math
 # u(x,t) = 0 \quad x \in \partial \Omega_1,
 # ```
@@ -34,12 +34,12 @@
 # ```
 # The semidiscrete weak form is given by
 # ```math
-# \int_{\Omega}v \frac{\partial u}{\partial t} \ \mathrm{d}\Omega + \int_{\Omega} \nabla v \cdot \nabla u \ \mathrm{d}\Omega = \int_{\Omega} v \ \mathrm{d}\Omega,
+# \int_{\Omega}v \frac{\partial u}{\partial t} \ \mathrm{d}\Omega + \int_{\Omega} k \nabla v \cdot \nabla u \ \mathrm{d}\Omega = \int_{\Omega} f v \ \mathrm{d}\Omega,
 # ```
 # where $v$ is a suitable test function. Now, we still need to discretize the time derivative. An implicit Euler scheme is applied,
 # which yields:
 # ```math
-# \int_{\Omega} v\, u_{n+1}\ \mathrm{d}\Omega + \Delta t\int_{\Omega} \nabla v \cdot \nabla u_{n+1} \ \mathrm{d}\Omega = \Delta t\int_{\Omega} v \ \mathrm{d}\Omega + \int_{\Omega} v \, u_{n} \ \mathrm{d}\Omega.
+# \int_{\Omega} v\, u_{n+1}\ \mathrm{d}\Omega + \Delta t\int_{\Omega} k \nabla v \cdot \nabla u_{n+1} \ \mathrm{d}\Omega = \Delta t\int_{\Omega} f v \ \mathrm{d}\Omega + \int_{\Omega} v \, u_{n} \ \mathrm{d}\Omega.
 # ```
 # If we assemble the discrete operators, we get the following algebraic system:
 # ```math
@@ -91,15 +91,17 @@ f = zeros(ndofs(dh));
 max_temp = 100
 Δt = 1
 T = 200
+t_rise = 100
 ch = ConstraintHandler(dh);
 
 # Here, we define the boundary condition related to $\partial \Omega_1$.
 ∂Ω₁ = union(getfaceset.((grid, ), ["left", "right"])...)
 dbc = Dirichlet(:u, ∂Ω₁, (x, t) -> 0)
 add!(ch, dbc);
-# While the next code block corresponds to the linearly increasing temperature description on $\partial \Omega_2$.
+# While the next code block corresponds to the linearly increasing temperature description on $\partial \Omega_2$
+# untill `t=t_rise`, and then keep constant
 ∂Ω₂ = union(getfaceset.((grid, ), ["top", "bottom"])...)
-dbc = Dirichlet(:u, ∂Ω₂, (x, t) -> t*(max_temp/T))
+dbc = Dirichlet(:u, ∂Ω₂, (x, t) -> max_temp*clamp(t/t_rise, 0, 1))
 add!(ch, dbc)
 close!(ch)
 update!(ch, 0.0);
@@ -127,10 +129,10 @@ function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellScalarValu
             for i in 1:n_basefuncs
                 v  = shape_value(cellvalues, q_point, i)
                 ∇v = shape_gradient(cellvalues, q_point, i)
-                fe[i] += v * dΩ
+                fe[i] += 0.1*v * dΩ
                 for j in 1:n_basefuncs
                     ∇u = shape_gradient(cellvalues, q_point, j)
-                    Ke[i, j] += (∇v ⋅ ∇u) * dΩ
+                    Ke[i, j] += 1.e-3*(∇v ⋅ ∇u) * dΩ
                 end
             end
         end
@@ -180,16 +182,24 @@ A = (Δt .* K) + M;
 # by `get_rhs_data`. The function returns a `RHSData` struct, which contains all needed informations to apply
 # the boundary conditions solely on the right-hand-side vector of the problem.
 rhsdata = get_rhs_data(ch, A);
-# We set the initial time step, denoted by uₙ,  to $\mathbf{0}$.
+# We set the initial time step, denoted by uₙ, to a bubble-shape described by 
+# $(x_1^2-1)(x_2^2-1)$, such that it is zero at the boundaries and half the max temperature in the center.
 uₙ = zeros(length(f));
+apply_analytical!(uₙ, dh, :u, x->(1-x[1]^2)*(1-x[2]^2)*max_temp)
 # Here, we apply **once** the boundary conditions to the system matrix `A`.
 apply!(A, ch);
 
 # To store the solution, we initialize a `paraview_collection` (.pvd) file.
 pvd = paraview_collection("transient-heat.pvd");
+t=0
+vtk_grid("transient-heat-$t", dh) do vtk
+    vtk_point_data(vtk, dh, uₙ)
+    vtk_save(vtk)
+    pvd[t] = vtk
+end
 
 # At this point everything is set up and we can finally approach the time loop.
-for t in 0:Δt:T
+for t in Δt:Δt:T
     #First of all, we need to update the Dirichlet boundary condition values.
     update!(ch, t)
 
