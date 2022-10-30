@@ -1,6 +1,7 @@
 # # Time Dependent Problems
 #
 # ![](transient_heat.gif)
+# ![](transient_heat_colorbar.svg)
 #
 # *Figure 1*: Visualization of the temperature time evolution on a unit
 # square where the prescribed temperature on the upper and lower parts
