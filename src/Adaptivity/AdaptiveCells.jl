@@ -21,7 +21,7 @@ Construct an `octant` based on dimension `dim`, level `l`, amount of levels `b` 
 function OctantBWG(dim::Integer, l::T, m::T, b::T=_maxlevel[dim-1]) where T <: Integer
     @assert l ≤ b #maximum refinement level exceeded
     @assert m ≤ (one(T)+one(T))^(dim*l)
-    x,y,z = (zero(T),zero(T),zero(T)) 
+    x,y,z = (zero(T),zero(T),zero(T))
     h = Int32(_compute_size(b,l))
     _zero = zero(T)
     _one = one(T)
@@ -32,12 +32,12 @@ function OctantBWG(dim::Integer, l::T, m::T, b::T=_maxlevel[dim-1]) where T <: I
         z = z | (h*((m-_one) & _two^(dim*i+_two))÷_two^((dim-_one)*i+_two))
     end
     if dim == 2
-        OctantBWG{dim,4,4,T}(l,(x,y)) 
+        OctantBWG{dim,4,4,T}(l,(x,y))
     elseif dim == 3
-        OctantBWG{dim,8,6,T}(l,(x,y,z)) 
+        OctantBWG{dim,8,6,T}(l,(x,y,z))
     else
         error("$dim Dimension not supported")
-    end 
+    end
 end
 
 OctantBWG(dim::Int,l::Int,m::Int,b::Int=_maxlevel[dim-1]) = OctantBWG(dim,Int32(l),Int32(m),Int32(b))
@@ -80,7 +80,7 @@ morton(octant::OctantBWG{dim,N,M,T1},l::T2,b::T3) where {dim,N,M,T1<:Integer,T2<
 Base.zero(::Type{OctantBWG{3, 8, 6}}) = OctantBWG(3, 0, 1)
 Base.zero(::Type{OctantBWG{2, 4, 4}}) = OctantBWG(2, 0, 1)
 
-ncorners(::Type{OctantBWG{dim,N}}) where {dim,N} = N
+ncorners(::Type{OctantBWG{dim,N,M,T}}) where {dim,N,M,T} = N
 ncorners(o::OctantBWG) = ncorners(typeof(o))
 nchilds(::Type{OctantBWG{dim,N}}) where {dim,N} = N
 nchilds(o::OctantBWG) = nchilds(typeof(o))# Follow z order, x before y before z for faces, edges and corners
@@ -88,7 +88,7 @@ nchilds(o::OctantBWG) = nchilds(typeof(o))# Follow z order, x before y before z 
 # TODO: consider list instead of Vector datastructure
 struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{dim,N,M}
     leaves::Vector{OctantBWG{dim,N,M,T}}
-    #maximum refinement level 
+    #maximum refinement level
     b::T
     nodes::NTuple{N,Int}
 end
@@ -129,8 +129,7 @@ OctreeBWG(cell::Hexahedron,b=_maxlevel[1]) = OctreeBWG{3,8,6}(cell.nodes,b)
 
 Base.length(tree::OctreeBWG) = length(tree.leaves)
 
-#maybe not use Base.in, but semantically feels correct
-function Base.in(oct::OctantBWG{dim},tree::OctreeBWG{dim}) where dim
+function inside(tree::OctreeBWG{dim},oct::OctantBWG{dim}) where dim
     maxsize = _maximum_size(tree.b)
     outside = any(xyz -> xyz >= maxsize, oct.xyz) || any(xyz -> xyz < 0, oct.xyz)
     return !outside
@@ -146,8 +145,8 @@ struct ForestBWG{dim, C<:OctreeBWG, T<:Real} <: AbstractAdaptiveGrid{dim}
     # Sets
     cellsets::Dict{String,Set{Int}}
     nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{FaceIndex}} 
-    edgesets::Dict{String,Set{EdgeIndex}} 
+    facesets::Dict{String,Set{FaceIndex}}
+    edgesets::Dict{String,Set{EdgeIndex}}
     vertexsets::Dict{String,Set{VertexIndex}}
     #Topology
     topology::ExclusiveTopology
@@ -174,7 +173,7 @@ getneighborhood(forest::ForestBWG,idx) = getneighborhood(forest.topology,forest,
 function getncells(grid::ForestBWG)
     numcells = 0
     for tree in grid.cells
-        numcells += length(tree) 
+        numcells += length(tree)
     end
     return numcells
 end
@@ -209,22 +208,44 @@ getcelltype(grid::ForestBWG) = eltype(grid.cells)
 getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same cell type TODO
 
 function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
-    _ncorners = ncorners(C)
-    nodeidx = 1
-    nodes_duplicate = Vector{Node{dim,T}}(undef,getncells(forest)*_ncorners)
-    nodids = Vector{Int}(undef,getncells(forest)*_ncorners)
-    for tree in forest.cells
+    nodes = Vector{Node{dim,Int32}}()
+    sizehint!(nodes,getncells(forest)*2^dim) # TODO worth it? max is everything duplicate
+    for (k,tree) in enumerate(forest.cells)
         for leaf in tree.leaves
-            for c in 1:_ncorners
+            for c in 1:ncorners(leaf)
                 neighbor = corner_neighbor(leaf,c,tree.b)
-                if neighbor ∈ tree # checks if neighbor is in boundary of tree (w.r.t. octree coordinates)
-                    # check if the leafid is smaller then the neighbor or what?
+                if inside(tree,neighbor) # checks if neighbor is in boundary of tree (w.r.t. octree coordinates)
+                    # I think the below is valid
+                    neighbor_morton = morton(neighbor,neighbor.l,tree.b)
+                    leaf_morton = morton(leaf,leaf.l,tree.b)
+                    # If the participating neighbor has higher morton id assign new node
+                    if leaf_morton < neighbor_morton
+                        push!(nodes, Node(transform_corner(forest,k,c,leaf).xyz))
+                    end
                 else
-                    # now how do I recover the interoctree neighborhood type?
+                    #TODO I don't know how to handle the other case, the below doesn't work
+                    lowest_octree = true
+                    for f in corner_face_participation(dim,c)
+                        k′ = getneighborhood(forest,FaceIndex(k,f))
+                        if isempty(k′)
+                            continue
+                        else
+                            k′ = k′[1][1] # always half face, ugly TODO
+                        end
+                        if k′ < k
+                            lowest_octree = false
+                            break
+                        end
+                    end
+                    if lowest_octree
+                        #transform needs the neighbor c
+                       push!(nodes,Node(transform_corner(forest,k,c,leaf).xyz))
+                    end
                 end
             end
         end
     end
+    return nodes
 end
 
 function Base.show(io::IO, ::MIME"text/plain", agrid::ForestBWG)
@@ -237,10 +258,10 @@ end
     child_id(octant::OctantBWG, b::Integer)
 Given some OctantBWG `octant` and maximum refinement level `b`, compute the child_id of `octant`
 note the following quote from Bursedde et al:
-  children are numbered from 0 for the front lower left child, 
+  children are numbered from 0 for the front lower left child,
   to 1 for the front lower right child, to 2 for the back lower left, and so on, with
   4, . . . , 7 being the four children on top of the children 0, . . . , 3.
-shifted by 1 due to julia 1 based indexing 
+shifted by 1 due to julia 1 based indexing
 """
 function child_id(octant::OctantBWG{3},b::Integer=_maxlevel[2])
     i = 0x00
@@ -266,7 +287,7 @@ function parent(octant::OctantBWG{dim,N,M,T}, b::Integer=_maxlevel[dim-1]) where
         h = T(_compute_size(b,octant.l))
         l = octant.l - one(T)
         return OctantBWG(l,octant.xyz .& ~h)
-    else 
+    else
         error("root has no parent")
     end
 end
@@ -286,7 +307,7 @@ end
 function face_neighbor(octant::OctantBWG{dim,N,M,T}, f::T, b::T=_maxlevel[dim-1]) where {dim,N,M,T<:Integer}
     l = octant.l
     h = T(_compute_size(b,octant.l))
-    x,y,z = octant.xyz 
+    x,y,z = octant.xyz
     x += ((f == T(1)) ? -h : ((f == T(2)) ? h : zero(T)))
     y += ((f == T(3)) ? -h : ((f == T(4)) ? h : zero(T)))
     z += ((f == T(5)) ? -h : ((f == T(6)) ? h : zero(T)))
@@ -300,7 +321,7 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2
     _two = T2(2)
     #currently rotation not encoded
     kprime, fprime = getneighborhood(forest,FaceIndex(k,f))[1]
-    a₂ = f ÷ 2; b₂ = fprime ÷ 2 
+    a₂ = f ÷ 2; b₂ = fprime ÷ 2
     sprime = _one - ((f & _one) ⊻ (fprime & _one))
     s = zeros(T2,2)
     b = zeros(T2,3)
@@ -320,11 +341,30 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2
     y = T2((s[2] == 1) ? o.xyz[2] : g - o.xyz[2])
     z = T2((_two*(fprime & 1) - 1)*2^b + sprime*g + (1-2*sprime)*o.xyz[2])
     if dim == 2
-        return OctantBWG(l,(x,z)) 
+        return OctantBWG(l,(x,z))
     else
         return OctantBWG(l,(x,y,z))
     end
 end
+
+"""
+    transform_corner(forest,k,c',oct)
+    transform_corner(forest,v::VertexIndex,oct)
+
+Algorithm 12 in p4est paper to transform corner into different octree coordinate system
+Note: in Algorithm 12 is c as a argument, but it's never used, therefore I removed it
+"""
+function transform_corner(forest::ForestBWG,k::T1,c′::T1,oct::OctantBWG{dim,N,M,T2}) where {dim,N,M,T1<:Integer,T2<:Integer}
+    # make a dispatch that returns only the coordinates?
+    b = forest.cells[k].b
+    l = oct.l; g = 2^b - 2^(b-l)
+    _inside = inside(forest.cells[k],oct)
+    h⁻ = _inside ? 0 : -2^(b-l); h⁺ = _inside ? g : 2^b
+    xyz = ntuple(i->((c′-1) & 2^(i-1) == 0) ? h⁻ : h⁺,dim)
+    return OctantBWG(l,xyz)
+end
+
+transform_corner(forest::ForestBWG,v::VertexIndex,oct::OctantBWG) = transform_corner(forest,v[1],v[2],oct)
 
 """
     edge_neighbor(octant::OctantBWG, e::Integer, b::Integer)
@@ -340,17 +380,17 @@ function edge_neighbor(octant::OctantBWG{3,N,M,T}, e::T, b::T=_maxlevel[2]) wher
     ox,oy,oz = octant.xyz
     case = e ÷ T(4)
     if case == zero(T)
-        x = ox 
-        y = oy + (_two*(e & _one) - one(T))*h 
+        x = ox
+        y = oy + (_two*(e & _one) - one(T))*h
         z = oz + ((e & _two) - _one)*h
         return OctantBWG(l,(x,y,z))
     elseif case == one(T)
-        x = ox  + (_two*(e & _one) - _one)*h 
-        y = oy 
+        x = ox  + (_two*(e & _one) - _one)*h
+        y = oy
         z = oz + ((e & _two) - _one)*h
-        return OctantBWG(l,(x,y,z))  
+        return OctantBWG(l,(x,y,z))
     elseif case == _two
-        x = ox + (_two*(e & _one) - _one)*h 
+        x = ox + (_two*(e & _one) - _one)*h
         y = oy + ((e & _two) - _one)*h
         z = oz
         return OctantBWG(l,(x,y,z))
@@ -371,7 +411,7 @@ function corner_neighbor(octant::OctantBWG{3,N,M,T}, c::T, b::T=_maxlevel[2]) wh
     ox,oy,oz = octant.xyz
     _one = one(T)
     _two = T(2)
-    x = ox + (_two*(c & _one) - _one)*h 
+    x = ox + (_two*(c & _one) - _one)*h
     y = oy + ((c & _two) - _one)*h
     z = oz + ((c & T(4))÷_two - _one)*h
     return OctantBWG(l,(x,y,z))
@@ -384,11 +424,19 @@ function corner_neighbor(octant::OctantBWG{2,N,M,T}, c::T, b::T=_maxlevel[1]) wh
     ox,oy = octant.xyz
     _one = one(T)
     _two = T(2)
-    x = ox + (_two*(c & _one) - _one)*h 
+    x = ox + (_two*(c & _one) - _one)*h
     y = oy + ((c & _two) - _one)*h
     return OctantBWG(l,(x,y))
 end
 corner_neighbor(o::OctantBWG{dim,N,M,T1}, c::T2, b::T3) where {dim,N,M,T1<:Integer,T2<:Integer,T3<:Integer} = corner_neighbor(o,T1(c),T1(b))
+
+function corner_face_participation(dim::T,c::T) where T<:Integer
+    if dim == 2
+        return 𝒱₂_perm[findall(x->c ∈ x, eachrow(𝒱₂))]
+    else
+        return 𝒱₃_perm[findall(x->c ∈ x, eachrow(𝒱₃))]
+    end
+end
 
 function Base.show(io::IO, ::MIME"text/plain", o::OctantBWG{3,N,M}) where {N,M}
     x,y,z = o.xyz
@@ -405,13 +453,13 @@ function Base.show(io::IO, ::MIME"text/plain", o::OctantBWG{2,N,M}) where {N,M}
 end
 
 _compute_size(b::Integer,l::Integer) = 2^(b-l)
-_maximum_size(b::Integer) = 2^(b) 
+_maximum_size(b::Integer) = 2^(b)
 # return the two adjacent faces $f_i$ adjacent to edge `edge`
 _face(edge::Int) = 𝒮[edge, :]
 # return the `i`-th adjacent face fᵢ to edge `edge`
 _face(edge::Int, i::Int) = 𝒮[edge, i]
 # return two face corners ξᵢ of the face `face` along edge `edge`
-_face_edge_corners(edge::Int, face::Int) = 𝒯[edge,face] 
+_face_edge_corners(edge::Int, face::Int) = 𝒯[edge,face]
 # return the two `edge` corners cᵢ
 _edge_corners(edge::Int) = 𝒰[edge,:]
 # return the `i`-th edge corner of `edge`
@@ -422,7 +470,7 @@ _neighbor_corner(f::Int,f′::Int,r::Int,ξ::Int) = 𝒫[𝒬[ℛ[f,f′],r],ξ]
 # map given `face` and `ξ` to corner `c`. Need to provide dim for different lookup 
 function _face_corners(dim::Int,face::Int,ξ::Int)
     if dim == 2
-        return 𝒱₂[face,ξ] 
+        return 𝒱₂[face,ξ]
     elseif dim == 3
         return 𝒱₃[face,ξ]
     else
@@ -432,7 +480,7 @@ end
 
 function _face_corners(dim::Int,face::Int)
     if dim == 2
-        return 𝒱₂[face,:] 
+        return 𝒱₂[face,:]
     elseif dim == 3
         return 𝒱₃[face,:]
     else
@@ -452,7 +500,7 @@ const 𝒮 = [3  5
            1  3
            2  3
            1  4
-           2  4] 
+           2  4]
 
 # (0,0) non existing connections
 const 𝒯 = [(0, 0)  (0, 0)  (1, 2)  (0, 0)  (1, 2)  (0, 0)
@@ -484,7 +532,7 @@ const 𝒰 = [1  2
 const 𝒱₂ = [1  3
             2  4
             1  2
-            3  4] 
+            3  4]
 
 const 𝒱₃ = [1  3  5  7
             2  4  6  8
@@ -492,6 +540,18 @@ const 𝒱₃ = [1  3  5  7
             3  4  7  8
             1  2  3  4
             5  6  7  8]
+
+const 𝒱₂_perm = [4
+                 2
+                 1
+                 3]
+
+const 𝒱₃_perm = [2
+                 4
+                 3
+                 5
+                 1
+                 6]
 
 const ℛ = [1  2  2  1  1  2
            3  1  1  2  2  1
