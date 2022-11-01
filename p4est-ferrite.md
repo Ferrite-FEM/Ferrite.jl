@@ -5,6 +5,7 @@ All of it is based on these papers:
 - [Original p4est paper](https://p4est.github.io/papers/BursteddeWilcoxGhattas11.pdf)
 - [Extension to anisotropic refinement, aka p6est](https://epubs.siam.org/doi/10.1137/140974407)
 - [Extension to RefTet elements and in depth explanations](https://bonndoc.ulb.uni-bonn.de/xmlui/handle/20.500.11811/7661); basically monography about t8code
+- [Lucas sent me this, lots of algorithms I could need](https://epubs.siam.org/doi/epdf/10.1137/140970963)
 
 ## Important Concepts
 
