@@ -282,7 +282,12 @@ See also [Time Dependent Problems](@ref) for one example.
 *Note about solving DAE:* 
 A Differential Algebraic Equations (DAE) is an equation of the form
 ``\boldsymbol{r}(\boldsymbol{x}(t),\boldsymbol{x}'(t),t)=\boldsymbol{0}``,
-which cannot be expressed as an ODE.
+which usually cannot be expressed as a true ODE. They occur often,
+but not always, in forms where some time derivatives are missing
+``
+x_1'(t) = f(\boldsymbol{x}(t),t)
+0 = g(\boldsymbol{x}(t),t)`
+``
 In for such equations, it is usually necessary to specify initial conditions 
 for both ``\boldsymbol{x}(0)`` and ``\boldsymbol{x}'(0)``, and these must be consistent,
 i.e. ``\boldsymbol{r}(\boldsymbol{x}(0),\boldsymbol{x}'(0),0)=\boldsymbol{0}``.
