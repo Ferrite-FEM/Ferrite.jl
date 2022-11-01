@@ -183,10 +183,10 @@ A = (Δt .* K) + M;
 # by `get_rhs_data`. The function returns a `RHSData` struct, which contains all needed informations to apply
 # the boundary conditions solely on the right-hand-side vector of the problem.
 rhsdata = get_rhs_data(ch, A);
-# We set the initial time step, denoted by uₙ, to a bubble-shape described by 
+# We set the values at initial time step, denoted by uₙ, to a bubble-shape described by 
 # $(x_1^2-1)(x_2^2-1)$, such that it is zero at the boundaries and half the max temperature in the center.
 uₙ = zeros(length(f));
-apply_analytical!(uₙ, dh, :u, x->(1-x[1]^2)*(1-x[2]^2)*max_temp)
+apply_analytical!(uₙ, dh, :u, x->(x[1]^2-1)*(x[2]^2-1)*max_temp)
 # Here, we apply **once** the boundary conditions to the system matrix `A`.
 apply!(A, ch);
 
