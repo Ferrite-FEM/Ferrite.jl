@@ -200,10 +200,10 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
 
     # Create dicts that store created dofs
     # Each key should uniquely identify the given type
-    vertexdicts = [Dict{Int, Array{Int}}() for _ in 1:numfields]
-    edgedicts = [Dict{Tuple{Int,Int}, Array{Int}}() for _ in 1:numfields]
-    facedicts = [Dict{Tuple{Int,Int}, Array{Int}}() for _ in 1:numfields]
-    celldicts = [Dict{Int, Array{Int}}() for _ in 1:numfields]
+    vertexdicts = [Dict{Int, UnitRange{Int}}() for _ in 1:numfields]
+    edgedicts = [Dict{Tuple{Int,Int}, UnitRange{Int}}() for _ in 1:numfields]
+    facedicts = [Dict{Tuple{Int,Int}, UnitRange{Int}}() for _ in 1:numfields]
+    celldicts = [Dict{Int, UnitRange{Int}}() for _ in 1:numfields]
 
     # Set initial values
     nextdof = 1  # next free dof to distribute
@@ -249,11 +249,12 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
     end
 
     # loop over all the cells, and distribute dofs for all the fields
+    cell_dofs = Int[]  # list of global dofs for each cell
     for ci in cellnumbers
         dh.cell_dofs.offset[ci] = length(dh.cell_dofs.values)+1
 
         cell = dh.grid.cells[ci]
-        cell_dofs = Int[]  # list of global dofs for each cell
+        empty!(cell_dofs)
         @debug "Creating dofs for cell #$ci"
 
         for (local_num, field_name) in enumerate(field_names)
@@ -279,7 +280,7 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
 
         end
         # after done creating dofs for the cell, push them to the global list
-        push!(dh.cell_dofs.values, cell_dofs...)
+        append!(dh.cell_dofs.values, cell_dofs)
         dh.cell_dofs.length[ci] = length(cell_dofs)
 
         @debug "Dofs for cell #$ci:\n\t$cell_dofs"
@@ -300,7 +301,7 @@ function get_or_create_dofs!(nextdof, field_dim; dict, key)
         return nextdof, dict[key]
 
     else  # create new dofs
-        dofs = collect(nextdof : nextdof + field_dim-1)
+        dofs = nextdof : (nextdof + field_dim-1)
         @debug "\t\tkey: $key dofs: $dofs"
         Base._setindex!(dict, dofs, key, -token) #
         nextdof += field_dim
@@ -312,7 +313,7 @@ function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, ne
     for vertex in Ferrite.vertices(cell)
         @debug "\tvertex #$vertex"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=vertexdict, key=vertex)
-        push!(cell_dofs, dofs...)
+        append!(cell_dofs, dofs)
     end
     return nextdof
 end
@@ -324,7 +325,7 @@ function add_face_dofs(cell_dofs, cell, facedict, field_dim, nfacedofs, nextdof)
         sface = Ferrite.sortface(face)
         @debug "\tface #$sface"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=facedict, key=sface)
-        push!(cell_dofs, dofs...)
+        append!(cell_dofs, dofs)
     end
     return nextdof
 end
@@ -335,7 +336,7 @@ function add_edge_dofs(cell_dofs, cell, edgedict, field_dim, nedgedofs, nextdof)
         sedge, dir = Ferrite.sortedge(edge)
         @debug "\tedge #$sedge"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=edgedict, key=sedge)
-        push!(cell_dofs, dofs...)
+        append!(cell_dofs, dofs)
     end
     return nextdof
 end
@@ -344,7 +345,7 @@ function add_cell_dofs(cell_dofs, cell, celldict, field_dim, ncelldofs, nextdof)
     for celldof in 1:ncelldofs
         @debug "\tcell #$cell"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=celldict, key=cell)
-        push!(cell_dofs, dofs...)
+        append!(cell_dofs, dofs)
     end
     return nextdof
 end
