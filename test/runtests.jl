@@ -8,7 +8,7 @@ using LinearAlgebra
 using SparseArrays
 
 include("test_utils.jl")
-include("test_initialvalues.jl")
+include("test_solutiontransfer.jl")
 include("test_interpolations.jl")
 include("test_cellvalues.jl")
 include("test_facevalues.jl")

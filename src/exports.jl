@@ -110,7 +110,7 @@ export
     FieldHandler,
     Field,
     reshape_to_nodes,
-    apply_analytical!,
+    transfer_solution!,
 
 # Constraints
     ConstraintHandler,

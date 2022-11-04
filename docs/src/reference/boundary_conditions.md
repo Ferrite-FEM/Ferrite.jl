@@ -22,5 +22,5 @@ Ferrite.RHSData
 # Initial conditions
 
 ```@docs
-apply_analytical!
+transfer_solution!
 ```

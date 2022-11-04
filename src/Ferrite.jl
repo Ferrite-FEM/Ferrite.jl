@@ -59,7 +59,7 @@ include("Dofs/MixedDofHandler.jl")
 include("Dofs/ConstraintHandler.jl")
 
 include("iterators.jl")
-include("initial_conditions.jl")
+include("solutiontransfer.jl")
 
 # Assembly
 include("assembler.jl")
