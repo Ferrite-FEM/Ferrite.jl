@@ -85,7 +85,6 @@ ncorners(o::OctantBWG) = ncorners(typeof(o))
 nchilds(::Type{OctantBWG{dim,N}}) where {dim,N} = N
 nchilds(o::OctantBWG) = nchilds(typeof(o))# Follow z order, x before y before z for faces, edges and corners
 
-# TODO: consider list instead of Vector datastructure
 struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{dim,N,M}
     leaves::Vector{OctantBWG{dim,N,M,T}}
     #maximum refinement level
@@ -197,6 +196,7 @@ function getcells(forest::ForestBWG{dim}, cellid::Int)  where dim
     @warn "Slow dispatch, consider to call `getcells(forest)` once instead" maxlog=1 #TODO doc page for performance
     #TODO should nleaves be saved by forest?
     nleaves = length.(forest.cells) # cells=trees
+    #TODO remove that later by for loop or IBWG 2015 iterator approach
     nleaves_cumsum = cumsum(nleaves)
     k = findfirst(x->cellid<=x,nleaves_cumsum)
     #TODO is this actually correct?
@@ -207,12 +207,14 @@ end
 getcelltype(grid::ForestBWG) = eltype(grid.cells)
 getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same cell type TODO
 
+#TODO: this function should wrap the LNodes Iterator of IBWG2015
 function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     nodes = Vector{Node{dim,Int32}}()
-    sizehint!(nodes,getncells(forest)*2^dim) # TODO worth it? max is everything duplicate
+    sizehint!(nodes,getncells(forest)*2^dim)
     for (k,tree) in enumerate(forest.cells)
         for leaf in tree.leaves
             for c in 1:ncorners(leaf)
+                #below doesn't work since I need to check and loop for supp(c), see IBWG 2015
                 neighbor = corner_neighbor(leaf,c,tree.b)
                 if inside(tree,neighbor) # checks if neighbor is in boundary of tree (w.r.t. octree coordinates)
                     # I think the below is valid
@@ -263,22 +265,30 @@ note the following quote from Bursedde et al:
   4, . . . , 7 being the four children on top of the children 0, . . . , 3.
 shifted by 1 due to julia 1 based indexing
 """
-function child_id(octant::OctantBWG{3},b::Integer=_maxlevel[2])
+function child_id(octant::OctantBWG{dim,N,M,T},b::Integer=_maxlevel[2]) where {dim,N,M,T<:Integer}
     i = 0x00
-    h = _compute_size(b,octant.l)
-    x,y,z = octant.xyz
-    i = i | ((x & h) != 0x00 ? 0x01 : 0x00)
-    i = i | ((y & h) != 0x00 ? 0x02 : 0x00)
-    i = i | ((z & h) != 0x00 ? 0x04 : 0x00)
+    t = T(2)
+    z = zero(T)
+    h = T(_compute_size(b,octant.l))
+    xyz = octant.xyz
+    for j in 0:(dim-1)
+        i = i | ((xyz[j+1] & h) != z ? t^j : z)
+    end
     return i+0x01
 end
 
-function child_id(octant::OctantBWG{2},b::Integer=_maxlevel[1])
+"""
+    ancestor_id(octant::OctantBWG, l::Integer, b::Integer)
+Algorithm 3.2 of IBWG 2015 that generalizes `child_id` for different queried levels.
+"""
+function ancestor_id(octant::OctantBWG{dim,N,M,T}, l::Integer, b::Integer=_maxlevel[dim-1]) where {dim,N,M,T<:Integer}
     i = 0x00
-    h = _compute_size(b, octant.l)
-    x,y = octant.xyz
-    i = i | ((x & h) != 0x00 ? 0x01 : 0x00)
-    i = i | ((y & h) != 0x00 ? 0x02 : 0x00)
+    t = T(2)
+    z = zero(T)
+    h = T(_compute_size(b,l))
+    for j in 0:(dim-1)
+       i = i | ((octant.xyz[j+1] & h) != z ? t^j : z)
+    end
     return i+0x01
 end
 
