@@ -274,7 +274,7 @@ For example, specify the initial pressure as a function of the y-coordinate
 grid = generate_grid(Quadrilateral, (10,10))
 dh = DofHandler(grid); push!(dh, :u, 2); push!(dh, :p, 1); close!(dh)
 u = zeros(ndofs(dh))
-transfer_solution!(u, dh, :p, x->ρ*g*x[2])
+transfer_solution!(u, dh, x->ρ*g*x[2], :p)
 ```
 
 See also [Time Dependent Problems](@ref) for one example. 
