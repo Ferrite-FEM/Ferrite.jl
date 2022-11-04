@@ -85,6 +85,22 @@ ncorners(o::OctantBWG) = ncorners(typeof(o))
 nchilds(::Type{OctantBWG{dim,N}}) where {dim,N} = N
 nchilds(o::OctantBWG) = nchilds(typeof(o))# Follow z order, x before y before z for faces, edges and corners
 
+Base.isequal(o1::OctantBWG, o2::OctantBWG) = (o1.l == o2.l) && (o1.xyz == o2.xyz)
+"""
+    o1::OctantBWG < o2::OctantBWG
+Implements Algorithm 2.1 of IBWG 2015.
+Checks first if mortonid is smaller and later if level is smaller.
+Thus, ancestors precede descendants (preordering).
+"""
+function Base.isless(o1::OctantBWG, o2::OctantBWG)
+    if o1.xyz != o2.xyz
+        #TODO verify b=o1.l/b=o2.l as argument potential bug otherwise
+        return morton(o1,o1.l,o1.l) < morton(o2,o2.l,o2.l)
+    else
+        return o1.l < o2.l
+    end
+end
+
 struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{dim,N,M}
     leaves::Vector{OctantBWG{dim,N,M,T}}
     #maximum refinement level
@@ -132,6 +148,33 @@ function inside(tree::OctreeBWG{dim},oct::OctantBWG{dim}) where dim
     maxsize = _maximum_size(tree.b)
     outside = any(xyz -> xyz >= maxsize, oct.xyz) || any(xyz -> xyz < 0, oct.xyz)
     return !outside
+end
+
+"""
+    split_array(octree::OctreeBWG, a::OctantBWG)
+Algorithm 3.3 of IBWG2015. So far tested for root and level 1 and level 2 elements.
+Need to verify further
+TODO update this docs
+"""
+function split_array(octree::OctreeBWG{dim}, a::OctantBWG{dim,N,M,T}) where {dim,N,M,T}
+    leaves = octree.leaves
+    o = one(T)
+    𝐤 = T[i==1 ? 1 : length(leaves)+1 for i in 1:2^dim+1]
+    for i in 2:2^dim
+        m = 𝐤[i-1]
+        while m < 𝐤[i]
+            n = m + (𝐤[i] - m)÷2
+            c = ancestor_id(leaves[n], a.l+o, octree.b)
+            if c < i
+                m = n+1
+            else
+                for j in i:c
+                    𝐤[j] = n
+                end
+            end
+        end
+    end
+    return [view(leaves,𝐤[i]:𝐤[i+1]-1) for i in 1:2^dim]
 end
 
 """
@@ -280,8 +323,10 @@ end
 """
     ancestor_id(octant::OctantBWG, l::Integer, b::Integer)
 Algorithm 3.2 of IBWG 2015 that generalizes `child_id` for different queried levels.
+Applied to a single octree, i.e. the array of leaves, yields a monotonic sequence
 """
 function ancestor_id(octant::OctantBWG{dim,N,M,T}, l::Integer, b::Integer=_maxlevel[dim-1]) where {dim,N,M,T<:Integer}
+    @assert 0 < l ≤ octant.l
     i = 0x00
     t = T(2)
     z = zero(T)
