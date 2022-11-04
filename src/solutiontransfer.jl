@@ -9,13 +9,24 @@ function _default_interpolation(dh::DofHandler)
     return default_interpolation(typeof(getcells(dh.grid, 1)))
 end
 
+# If fieldname==nothing, check that dh only has one field and return that fieldname 
+# If a fieldname is given, check that it exist in the dofhandler
+function _check_fieldname(dh, fieldname)
+    all_fields = getfieldnames(dh)
+    isnothing(fieldname) && length(all_fields)>1 && error("A fieldname must be given if there are multiple fields")
+    field = isnothing(fieldname) ? first(all_fields) : fieldname
+    field ∉ getfieldnames(dh) && error("The fieldname $field was not found in the dof handler")
+    return field
+end
+
 """
     transfer_solution!(
-        a::AbstractVector, dh::AbstractDofHandler, field::Symbol, f::Function,
+        a::AbstractVector, dh::AbstractDofHandler, f::Function, 
+        fieldname::Symbol=first(getfieldnames(dh)), 
         cellset=1:getncells(dh.grid))
 
 Apply a solution `f(x)` by modifying the values in the degree of freedom vector `a`
-pertaining to the field `field` for all cells in `cellset`.
+pertaining to the field `fieldname` for all cells in `cellset`.
 The function `f(x)` are given the spatial coordinate 
 of the degree of freedom. For scalar fields, `f(x)::Number`, 
 and for vector fields with dimension `dim`, `f(x)::Vec{dim}`.
@@ -23,10 +34,11 @@ and for vector fields with dimension `dim`, `f(x)::Vec{dim}`.
 This function can be used to apply initial conditions for time dependent problems.
 """
 function transfer_solution!(
-    a::AbstractVector, dh::DofHandler, field::Symbol, f::Function, 
+    a::AbstractVector, dh::DofHandler, f::Function, 
+    fieldname::Union{Symbol,Nothing}=nothing,
     cellset=1:getncells(dh.grid)
     )
-    field ∉ getfieldnames(dh) && error("The field $field was not found in the dof handler")
+    field = _check_fieldname(dh, fieldname)
     ip_geo=_default_interpolation(dh)
     field_idx = find_field(dh, field)
     ip_fun = getfieldinterpolation(dh, field_idx)
@@ -36,12 +48,13 @@ function transfer_solution!(
 end
 
 function transfer_solution!(
-    a::AbstractVector, dh::MixedDofHandler, field::Symbol, f::Function, 
+    a::AbstractVector, dh::MixedDofHandler, f::Function, 
+    fieldname::Union{Symbol,Nothing}=nothing,
     cellset=1:getncells(dh.grid),
     )
-    field ∉ getfieldnames(dh) && error("The field $field was not found in the dof handler")
+    field = _check_fieldname(dh, fieldname)
     ip_geos=_default_interpolations(dh)
-    
+
     for (fh, ip_geo) in zip(dh.fieldhandlers, ip_geos)
         field ∈ getfieldnames(fh) || continue
         field_idx = find_field(fh, field)

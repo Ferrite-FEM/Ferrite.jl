@@ -107,7 +107,7 @@
                         # Test average value
                         a = zeros(ndofs(dh))
                         f(x) = ones(Vec{dim})
-                        transfer_solution!(a, dh, :u, f)
+                        transfer_solution!(a, dh, f, :u)
                         @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
 
                         # If not super/subparametric, compare with ConstraintHandler and node set 
@@ -124,14 +124,21 @@
                             close!(ch); update!(ch, 0.0)
                             apply!(a_ch, ch)
 
-                            transfer_solution!(a, dh, :u, fu)
-                            transfer_solution!(a, dh, :p, fp)
+                            transfer_solution!(a, dh, fu, :u)
+                            transfer_solution!(a, dh, fp, :p)
 
                             @test a ≈ a_ch 
                         end 
                     end
                 end
             end
+            # Check that works with a single field without giving field name
+            grid = generate_grid(Quadrilateral, (2,2))
+            dh = DofHandler(grid); push!(dh, :p, 1); close!(dh)
+            a = zeros(ndofs(dh))
+            transfer_solution!(a, dh, x->1.0)
+            @test all(x->x≈1.0, a)
+
         end
 
         @testset "MixedDofHandler" begin
@@ -145,7 +152,7 @@
                         # Test average value
                         a = zeros(ndofs(dh))
                         f(x) = ones(Vec{dim})
-                        transfer_solution!(a, dh, :u, f)
+                        transfer_solution!(a, dh, f, :u)
                         @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
                     end
                 end
@@ -154,12 +161,13 @@
 
         @testset "Exceptions" begin
             dh = testdh(Quadrilateral, 1, 1)
-            @test_throws ErrorException transfer_solution!(zeros(ndofs(dh)), dh, :v, x->0.0)
-            @test_throws ErrorException transfer_solution!(zeros(ndofs(dh)), dh, :u, x->0.0)     # Should be f(x)::Vec{2}
+            @test_throws ErrorException transfer_solution!(zeros(ndofs(dh)), dh, x->0.0, :v)    # Missing field
+            @test_throws ErrorException transfer_solution!(zeros(ndofs(dh)), dh, x->0.0, :u)    # Should be f(x)::Vec{2}
+            @test_throws ErrorException transfer_solution!(zeros(ndofs(dh)), dh, x->0.0)        # Multiple fields in dh
 
             mdh = testmdh(2, 1, 1)
-            @test_throws ErrorException transfer_solution!(zeros(ndofs(mdh)), mdh, :v, x->0.0)
-            @test_throws ErrorException transfer_solution!(zeros(ndofs(mdh)), mdh, :u, x->0.0)   # Should be f(x)::Vec{2}
+            @test_throws ErrorException transfer_solution!(zeros(ndofs(mdh)), mdh, x->0.0, :v)  # Missing field
+            @test_throws ErrorException transfer_solution!(zeros(ndofs(mdh)), mdh, x->0.0, :u)  # Should be f(x)::Vec{2}
         end
     end
 
