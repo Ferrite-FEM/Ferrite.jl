@@ -167,18 +167,11 @@ All of the functionality is serial, nothing in terms of distributed is implement
 - take a `Grid` and make a `ForestBWG` out of it
 
 ### Open questions
-- How much do we cache
-    - We only save very few things and so, sometimes we need to ad hoc compute things.
-      **Example**: when determining the cell with cellid `i`. We need to go through all trees, determine the length of `leaves`
-                   and take the sum in a cumulative way in order to detect to which tree `i` belongs to.
-                   We could of course cache the number of leaves and get rid of `length(leaves)` calls for each tree
-- How to count the nodes? (Actually most important one) In Algorithm 20 of the p4est paper is, an algorithm to count the unique nodes.
-  However, as far as I understand the algorithm covers only important aspects of hanging nodes and distributed stuff.
-  So, how to count the unique nodes? We need this for `getcoordinates` and the like.
-  Maybe by computing face_neighbors and take their coordinate (and of course transform it later)
-- What datastructure for the `leaves` ? Currently it's a vector but is there something which exploits that only contiguous pieces are added/removed?
+- How to count the nodes? 4th paper has an answer to that which is called `LNodes`.
+Algorithm 6.2, which relies on Iterate, Algorithm 5.3. This alrogithm in turn depends on Algorithm 5.2. and 5.1 
 
 ### Open TODOs
+- Implement the Iterator of IBWG 2015
 - Coordinate transformation from octree coordinate system to physical coordinate system
 - Octant dispatches that are required to fulfill `<:AbstractCell`
 - Morton index can be computed much faster by methods I commented above the function

@@ -82,7 +82,7 @@ Base.zero(::Type{OctantBWG{2, 4, 4}}) = OctantBWG(2, 0, 1)
 
 ncorners(::Type{OctantBWG{dim,N,M,T}}) where {dim,N,M,T} = N
 ncorners(o::OctantBWG) = ncorners(typeof(o))
-nchilds(::Type{OctantBWG{dim,N}}) where {dim,N} = N
+nchilds(::Type{OctantBWG{dim,N,M,T}}) where {dim,N,M,T} = N
 nchilds(o::OctantBWG) = nchilds(typeof(o))# Follow z order, x before y before z for faces, edges and corners
 
 Base.isequal(o1::OctantBWG, o2::OctantBWG) = (o1.l == o2.l) && (o1.xyz == o2.xyz)
@@ -101,6 +101,14 @@ function Base.isless(o1::OctantBWG, o2::OctantBWG)
     end
 end
 
+function children(octant::OctantBWG{dim,N,M,T}, b::Integer) where {dim,N,M,T}
+    o = one(T)
+    _nchilds = nchilds(octant)
+    startid = morton(octant,octant.l+o,b)
+    endid = startid + _nchilds + o
+    return ntuple(i->OctantBWG(dim,octant.l+o,(startid:endid)[i],b),_nchilds)
+end
+
 struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{dim,N,M}
     leaves::Vector{OctantBWG{dim,N,M,T}}
     #maximum refinement level
@@ -110,14 +118,12 @@ end
 
 function refine!(octree::OctreeBWG{dim,N,M,T}, pivot_octant::OctantBWG{dim,N,M,T}) where {dim,N,M,T<:Integer}
     o = one(T)
-    # really the only way?
+    # TODO replace this with recursive search function
     leave_idx = findfirst(x->x==pivot_octant,octree.leaves)
-    # how to obtain id from morton index ?
     old_octant = popat!(octree.leaves,leave_idx)
-    start_child_id = morton(old_octant,old_octant.l+o,octree.b)
-    end_child_id = start_child_id + N-o
-    for child_mort_id in start_child_id:end_child_id
-        insert!(octree.leaves,leave_idx,OctantBWG(dim,old_octant.l+o,child_mort_id,octree.b))
+    _children = children(pivot_octant,octree.b)
+    for child in _children
+        insert!(octree.leaves,leave_idx,child)
         leave_idx += 1
     end
 end
@@ -152,19 +158,17 @@ end
 
 """
     split_array(octree::OctreeBWG, a::OctantBWG)
-Algorithm 3.3 of IBWG2015. So far tested for root and level 1 and level 2 elements.
-Need to verify further
-TODO update this docs
+    split_array(octantarray, a::OctantBWG, b::Integer)
+Algorithm 3.3 of IBWG2015. Efficient binary search
 """
-function split_array(octree::OctreeBWG{dim}, a::OctantBWG{dim,N,M,T}) where {dim,N,M,T}
-    leaves = octree.leaves
+function split_array(octantarray, a::OctantBWG{dim,N,M,T}, b::Integer) where {dim,N,M,T}
     o = one(T)
-    𝐤 = T[i==1 ? 1 : length(leaves)+1 for i in 1:2^dim+1]
+    𝐤 = T[i==1 ? 1 : length(octantarray)+1 for i in 1:2^dim+1]
     for i in 2:2^dim
         m = 𝐤[i-1]
         while m < 𝐤[i]
             n = m + (𝐤[i] - m)÷2
-            c = ancestor_id(leaves[n], a.l+o, octree.b)
+            c = ancestor_id(octantarray[n], a.l+o, b)
             if c < i
                 m = n+1
             else
@@ -174,12 +178,53 @@ function split_array(octree::OctreeBWG{dim}, a::OctantBWG{dim,N,M,T}) where {dim
             end
         end
     end
-    return [view(leaves,𝐤[i]:𝐤[i+1]-1) for i in 1:2^dim]
+    #TODO non-allocating way?
+    return ntuple(i->view(octantarray,𝐤[i]:𝐤[i+1]-1),2^dim)
+end
+
+split_array(tree::OctreeBWG, a::OctantBWG) = split_array(tree.leaves, a, tree.b)
+
+function search(octantarray, a::OctantBWG{dim,N,M,T1}, idxset::Vector{T2}, b::Integer, Match=match) where {dim,N,M,T1<:Integer,T2}
+    isempty(octantarray) && return
+    isleaf = (length(octantarray) == 1 && a ∈ octantarray) ? true : false
+    idxset_match = eltype(idxset)[]
+    for q in idxset
+        if Match(a,isleaf,q,b)
+            push!(idxset_match,q)
+        end
+    end
+    if isempty(idxset_match) && !isleaf
+        𝐇 = split_array(octantarray,a,b)
+        _children = children(a,b)
+        for (child,h) in zip(_children,𝐇)
+            search(h,child,idxset_match,b)
+        end
+    end
+    return idxset_match
+end
+
+search(tree::OctreeBWG, a::OctantBWG, idxset, Match=match) = search(tree.leaves, a, idxset, tree.b, match)
+
+"""
+    match(o::OctantBWG, isleaf::Bool, q)
+from IBWG2015
+> match returns true if there is a leaf r ∈ 𝒪 that is a descendant of o
+> such that match_q(r) = true, and is allowed to return a false positive
+> (i.e., true even if match_q(r) = false for all descendants leaves of o)
+> if isleaf=true, then the return  value of match is irrelevant
+I don't understand what of a to check against index q
+"""
+function match(o::OctantBWG, isleaf::Bool, q, b)
+    isleaf && (return true)
+    println(q)
+    println(o)
+    return false
 end
 
 """
     ForestBWG{dim, C<:AbstractAdaptiveCell, T<:Real} <: AbstractAdaptiveGrid{dim}
 `p4est` adaptive grid implementation based on Burstedde, Wilcox, Ghattas [2011]
+and Isaac, Burstedde, Wilcox, Ghattas [2015]
 """
 struct ForestBWG{dim, C<:OctreeBWG, T<:Real} <: AbstractAdaptiveGrid{dim}
     cells::Vector{C}
