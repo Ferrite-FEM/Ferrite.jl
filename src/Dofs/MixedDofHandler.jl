@@ -57,7 +57,8 @@ struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
 end
 
 function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
-    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],Int[],Int[]), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
+    ncells = getncells(grid)
+    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],zeros(Int,ncells),zeros(Int,ncells)), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end
 
 getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
@@ -218,9 +219,6 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
 
     # Set initial values
     nextdof = 1  # next free dof to distribute
-
-    append!(dh.cell_dofs.offset, zeros(getncells(dh.grid)))
-    append!(dh.cell_dofs.length, zeros(getncells(dh.grid)))
 
     @debug "\n\nCreating dofs\n"
     for fh in dh.fieldhandlers
