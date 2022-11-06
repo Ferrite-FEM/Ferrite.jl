@@ -63,8 +63,6 @@ getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
 getfielddims(fh::FieldHandler) = [field.dim for field in fh.fields]
 getfieldinterpolations(fh::FieldHandler) = [field.interpolation for field in fh.fields]
 ndofs_per_cell(dh::MixedDofHandler, cell::Int=1) = dh.cell_dofs.length[cell]
-nnodes_per_cell(dh::MixedDofHandler, cell::Int=1) = dh.cell_nodes.length[cell]
-
 
 function celldofs!(global_dofs::Vector{Int}, dh::MixedDofHandler, i::Int)
     @assert isclosed(dh)
