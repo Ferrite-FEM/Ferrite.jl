@@ -56,7 +56,7 @@ end
 
 function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
     ncells = getncells(grid)
-    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],zeros(Int, ncells),zeros(Int, ncells)), Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
+    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],zeros(Int, ncells),zeros(Int, ncells)), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
 getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
@@ -194,8 +194,8 @@ end
 
 function __close!(dh::MixedDofHandler{dim}) where {dim}
 
-    @assert !Ferrite.isclosed(dh)
-    field_names = Ferrite.getfieldnames(dh)  # all the fields in the problem
+    @assert !isclosed(dh)
+    field_names = getfieldnames(dh)  # all the fields in the problem
     numfields =  length(field_names)
 
     # Create dicts that store created dofs
@@ -216,9 +216,9 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
             dh,
             cellnumbers,
             field_names,
-            Ferrite.getfieldnames(fh),
-            Ferrite.getfielddims(fh),
-            Ferrite.getfieldinterpolations(fh),
+            getfieldnames(fh),
+            getfielddims(fh),
+            getfieldinterpolations(fh),
             nextdof,
             vertexdicts,
             edgedicts,
@@ -234,9 +234,9 @@ end
 
 function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
 
-    ip_infos = Ferrite.InterpolationInfo[]
+    ip_infos = InterpolationInfo[]
     for interpolation in field_interpolations
-        ip_info = Ferrite.InterpolationInfo(interpolation)
+        ip_info = InterpolationInfo(interpolation)
         # these are not implemented yet (or have not been tested)
         @assert(ip_info.nvertexdofs <= 1)
         @assert(ip_info.nedgedofs <= 1)
@@ -307,7 +307,7 @@ function get_or_create_dofs!(nextdof, field_dim; dict, key)
 end
 
 function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, nextdof)
-    for vertex in Ferrite.vertices(cell)
+    for vertex in vertices(cell)
         @debug "\tvertex #$vertex"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=vertexdict, key=vertex)
         append!(cell_dofs, dofs)
@@ -318,8 +318,8 @@ end
 function add_face_dofs(cell_dofs, cell, facedict, field_dim, nfacedofs, nextdof)
     @assert nfacedofs == 1 "Currently only supports interpolations with nfacedofs = 1"
 
-    for face in Ferrite.faces(cell)
-        sface = Ferrite.sortface(face)
+    for face in faces(cell)
+        sface = sortface(face)
         @debug "\tface #$sface"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=facedict, key=sface)
         append!(cell_dofs, dofs)
@@ -329,8 +329,8 @@ end
 
 function add_edge_dofs(cell_dofs, cell, edgedict, field_dim, nedgedofs, nextdof)
     @assert nedgedofs == 1 "Currently only supports interpolations with nedgedofs = 1"
-    for edge in Ferrite.edges(cell)
-        sedge, dir = Ferrite.sortedge(edge)
+    for edge in edges(cell)
+        sedge, dir = sortedge(edge)
         @debug "\tedge #$sedge"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=edgedict, key=sedge)
         append!(cell_dofs, dofs)
@@ -449,8 +449,8 @@ function field_offset(dh::MixedDofHandler, field_name::Symbol)
     field_offset(dh.fieldhandlers[fh_idx], field_idx)
 end
 
-function Ferrite.dof_range(fh::FieldHandler, field_idx::Int)
-    offset = Ferrite.field_offset(fh, field_idx)
+function dof_range(fh::FieldHandler, field_idx::Int)
+    offset = field_offset(fh, field_idx)
     field_interpolation = fh.fields[field_idx].interpolation
     field_dim = fh.fields[field_idx].dim
     n_field_dofs = getnbasefunctions(field_interpolation)::Int * field_dim
@@ -474,7 +474,7 @@ getfieldinterpolation(dh::MixedDofHandler, field_idx::Int) = getfieldinterpolati
 function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) where T
 
     # make sure the field exists
-    fieldname ∈ Ferrite.getfieldnames(dh) || error("Field $fieldname not found.")
+    fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
 
     field_dim = getfielddim(dh, fieldname)
     space_dim = field_dim == 2 ? 3 : field_dim
