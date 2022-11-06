@@ -109,6 +109,31 @@ function children(octant::OctantBWG{dim,N,M,T}, b::Integer) where {dim,N,M,T}
     return ntuple(i->OctantBWG(dim,octant.l+o,(startid:endid)[i],b),_nchilds)
 end
 
+function vertex(octant::OctantBWG{dim,N,M,T}, c::Integer, b::Integer) where {dim,N,M,T}
+    h = T(_compute_size(b,octant.l))
+    return ntuple(d->((c-1) & (2^(d-1))) == 0 ? octant.xyz[d] : octant.xyz[d] + h ,dim)
+end
+
+function vertices(octant::OctantBWG{dim},b::Integer) where {dim}
+    _nvertices = 2^dim
+    return ntuple(i->vertex(octant,i,b),_nvertices)
+end
+
+function face(octant::OctantBWG{2}, f::Integer, b::Integer)
+    cornerid = view(𝒱₂,f,:)
+    return ntuple(i->corner(octant, cornerid[i], b),2)
+end
+
+function face(octant::OctantBWG{3}, f::Integer, b::Integer)
+    cornerid = view(𝒱₃,f,:)
+    return ntuple(i->corner(octant, cornerid[i], b),4)
+end
+
+function edge(octant::OctantBWG{3}, e::Integer, b::Integer)
+    cornerid = view(𝒰,e,:)
+    return ntuple(i->corner(octant,cornerid[i], b),2)
+end
+
 struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{dim,N,M}
     leaves::Vector{OctantBWG{dim,N,M,T}}
     #maximum refinement level
