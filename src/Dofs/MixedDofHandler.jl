@@ -119,6 +119,7 @@ function getfielddim(dh::MixedDofHandler, field_idxs::NTuple{2, Int})
     return fielddim
 end
 getfielddim(dh::MixedDofHandler, name::Symbol) = getfielddim(dh, find_field(dh, name))
+getfielddim(dh::MixedDofHandler, field_idx::Int) = getfielddim(dh, (1, field_idx))
 
 """
     nfields(dh::MixedDofHandler)
@@ -447,6 +448,7 @@ function find_field(fh::FieldHandler, field_name::Symbol)
     return field_idx
 end
 
+# No error if field not found
 function _find_field(fh::FieldHandler, field_name::Symbol)
     for (field_idx, field) in pairs(fh.fields)
         if field.name == field_name
@@ -456,34 +458,41 @@ function _find_field(fh::FieldHandler, field_name::Symbol)
     return nothing
 end
 
-
 # Calculate the offset to the first local dof of a field
-function field_offset(fh::FieldHandler, field_name::Symbol)
+function field_offset(fh::FieldHandler, field_idx::Int)
     offset = 0
-    for i in 1:find_field(fh, field_name)-1
+    for i in 1:(field_idx-1)
         offset += getnbasefunctions(fh.fields[i].interpolation)::Int * fh.fields[i].dim
     end
     return offset
 end
+field_offset(fh::FieldHandler, field_name::Symbol) = field_offset(fh, find_field(fh, field_name))
+function field_offset(dh::MixedDofHandler, field_name::Symbol)
+    fh_idx, field_idx = find_field(dh, field_name)
+    field_offset(dh.fieldhandlers[fh_idx], field_idx)
+end
 
-function Ferrite.dof_range(fh::FieldHandler, field_name::Symbol)
-    f = Ferrite.find_field(fh, field_name)
-    offset = Ferrite.field_offset(fh, field_name)
-    field_interpolation = fh.fields[f].interpolation
-    field_dim = fh.fields[f].dim
+function Ferrite.dof_range(fh::FieldHandler, field_idx::Int)
+    offset = Ferrite.field_offset(fh, field_idx)
+    field_interpolation = fh.fields[field_idx].interpolation
+    field_dim = fh.fields[field_idx].dim
     n_field_dofs = getnbasefunctions(field_interpolation)::Int * field_dim
     return (offset+1):(offset+n_field_dofs)
 end
+dof_range(fh::FieldHandler, field_name::Symbol) = dof_range(fh, find_field(fh, field_name))
 
-#find_field(dh::MixedDofHandler, field_name::Symbol) = find_field(first(dh.fieldhandlers), field_name)
-field_offset(dh::MixedDofHandler, field_name::Symbol) = field_offset(first(dh.fieldhandlers), field_name)
+function dof_range(dh::MixedDofHandler, field_idxs::Tuple{Int,Int})
+    fh_idx, field_idx = field_idxs
+    dof_range(dh.fieldhandlers[fh_idx], field_idx)
+end
+dof_range(dh::MixedDofHandler, field_name::Symbol) = dof_range(dh, find_field(dh, field_name))
+
 
 function getfieldinterpolation(dh::MixedDofHandler, field_idxs::NTuple{2,Int})
     fh_idx, field_idx = field_idxs
     ip = dh.fieldhandlers[fh_idx].fields[field_idx].interpolation
 end
 getfieldinterpolation(dh::MixedDofHandler, field_idx::Int) = getfieldinterpolation(dh, (1,field_idx))
-getfielddim(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].dim
 
 function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) where T
 
