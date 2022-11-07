@@ -127,7 +127,7 @@ function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::S
 
     for color in colors
         ## Each color is safe to assemble threaded
-        Threads.@threads for i in 1:length(color)
+        Threads.@threads :static for i in 1:length(color)
             assemble_cell!(scratches[Threads.threadid()], color[i], K, grid, dh, C, b)
         end
     end
