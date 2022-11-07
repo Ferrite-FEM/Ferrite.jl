@@ -121,17 +121,65 @@ end
 
 function face(octant::OctantBWG{2}, f::Integer, b::Integer)
     cornerid = view(𝒱₂,f,:)
-    return ntuple(i->corner(octant, cornerid[i], b),2)
+    return ntuple(i->vertex(octant, cornerid[i], b),2)
 end
 
 function face(octant::OctantBWG{3}, f::Integer, b::Integer)
     cornerid = view(𝒱₃,f,:)
-    return ntuple(i->corner(octant, cornerid[i], b),4)
+    return ntuple(i->vertex(octant, cornerid[i], b),4)
 end
 
 function edge(octant::OctantBWG{3}, e::Integer, b::Integer)
     cornerid = view(𝒰,e,:)
-    return ntuple(i->corner(octant,cornerid[i], b),2)
+    return ntuple(i->vertex(octant,cornerid[i], b),2)
+end
+
+"""
+    boundaryset(o::OctantBWG{2}, i::Integer, b::Integer
+implements two dimensional boundaryset table from Fig.4.1 IBWG 2015
+TODO: could be done little bit less ugly
+"""
+function boundaryset(o::OctantBWG{2,N,M,T}, i::Integer, b::Integer) where {N,M,T}
+    settype = Set{Union{Tuple{T,T},NTuple{2,Tuple{T,T}}}}
+    if i==1
+        return settype((vertex(o,1,b),face(o,1,b),face(o,3,b)))
+    elseif i==2
+        return settype((vertex(o,2,b),face(o,2,b),face(o,3,b)))
+    elseif i==3
+        return settype((vertex(o,3,b),face(o,1,b),face(o,4,b)))
+    elseif i==4
+        return settype((vertex(o,4,b),face(o,2,b),face(o,4,b)))
+    else
+        throw("no boundary")
+    end
+end
+
+"""
+    boundaryset(o::OctantBWG{3}, i::Integer, b::Integer
+implements three dimensional boundaryset table from Fig.4.1 IBWG 2015
+TODO: could be done little bit less ugly
+"""
+function boundaryset(o::OctantBWG{3,N,M,T}, i::Integer, b::Integer) where {N,M,T}
+    settype = Set{Union{Tuple{T,T,T},NTuple{2,Tuple{T,T,T}},NTuple{4,Tuple{T,T,T}}}}
+    if i==1
+        return settype((vertex(o,1,b),edge(o,1,b),edge(o,5,b),edge(o,9,b), face(o,1,b),face(o,3,b),face(o,5,b)))
+    elseif i==2
+        return settype((vertex(o,2,b),edge(o,1,b),edge(o,6,b),edge(o,10,b),face(o,2,b),face(o,3,b),face(o,5,b)))
+    elseif i==3
+        return settype((vertex(o,3,b),edge(o,2,b),edge(o,5,b),edge(o,11,b),face(o,1,b),face(o,4,b),face(o,5,b)))
+    elseif i==4
+        return settype((vertex(o,4,b),edge(o,2,b),edge(o,6,b),edge(o,12,b),face(o,2,b),face(o,4,b),face(o,5,b)))
+    elseif i==5
+        return settype((vertex(o,5,b),edge(o,3,b),edge(o,7,b),edge(o,9,b), face(o,1,b),face(o,3,b),face(o,6,b)))
+    elseif i==6
+        return settype((vertex(o,6,b),edge(o,3,b),edge(o,8,b),edge(o,10,b),face(o,2,b),face(o,3,b),face(o,6,b)))
+    elseif i==7
+        return settype((vertex(o,7,b),edge(o,4,b),edge(o,7,b),edge(o,11,b),face(o,1,b),face(o,4,b),face(o,6,b)))
+    elseif i==8
+        return settype((vertex(o,8,b),edge(o,4,b),edge(o,8,b),edge(o,12,b),face(o,2,b),face(o,4,b),face(o,6,b)))
+    else
+        throw("no boundary")
+    end
 end
 
 struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{dim,N,M}
