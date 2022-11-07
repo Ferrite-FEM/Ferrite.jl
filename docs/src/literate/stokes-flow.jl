@@ -319,7 +319,7 @@ function setup_mean_constraint(dh, fvp)
     V ./= V[constrained_dof]
     mean_value_constraint = AffineConstraint(
         constrained_dof,
-        Pair{Int,Float64}[J[i] => -V[i] for i in 1:length(J) if i != constrained_dof],
+        Pair{Int,Float64}[J[i] => -V[i] for i in 1:length(J) if J[i] != constrained_dof],
         0.0,
     )
     return mean_value_constraint
@@ -460,7 +460,7 @@ function main()
     vtk_grid("stokes-flow", grid) do vtk
         vtk_point_data(vtk, dh, u)
     end
-    Sys.isapple() || @test norm(u) ≈ 0.32353713318639005 #src
+    Sys.isapple() || @test norm(u) ≈ 0.32254330524111213 #src
     return
 end
 #md nothing #hide

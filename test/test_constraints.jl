@@ -1032,5 +1032,137 @@ end # testset
         end
     end
 
+end # testset
+
+@testset "Affine constraints with master dofs that are prescribed" begin
+    grid = generate_grid(Quadrilateral, (2, 2))
+    dh = DofHandler(grid); push!(dh, :u, 1); close!(dh)
+
+    #  8───7───9
+    #  │   │   │
+    #  4───3───6
+    #  │   │   │
+    #  1───2───5
+
+    ke = [ 1.0   -0.25  -0.5   -0.25
+          -0.25   1.0   -0.25  -0.5
+          -0.5   -0.25   1.0   -0.25
+          -0.25  -0.5   -0.25   1.0 ]
+    fe = rand(4)
+
+@testset "affine constraints before/after Dirichlet" begin
+    # Construct two ConstraintHandler's which should result in the same end result.
+
+    ## Ordering of constraints for first ConstraintHandler:
+    ##  1. DBC left: u1 = u4 = u8 = 0
+    ##  2. DBC right: u5 = u6 = u9 = 1
+    ##  3. Periodic bottom/top: u1 = u8, u2 = u7, u5 = u9
+    ## meaning that u1 = 0 and u5 = 1 are overwritten by 3 and we end up with
+    ##  u1 = u8 = 0
+    ##  u2 = u7
+    ##  u4 = 0
+    ##  u5 = u9 = 1
+    ##  u6 = 1
+    ##  u8 = 0
+    ##  u9 = 1
+    ## where the inhomogeneity of u1 and u5 have to be resolved at runtime.
+    ch1 = ConstraintHandler(dh)
+    add!(ch1, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0))
+    add!(ch1, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 1))
+    add!(ch1, PeriodicDirichlet(:u, collect_periodic_faces(grid, "bottom", "top")))
+    close!(ch1)
+    update!(ch1, 0)
+
+    ## Ordering of constraints for second ConstraintHandler:
+    ##  1. Periodic bottom/top: u1 = u8, u2 = u7, u5 = u9
+    ##  2. DBC left: u1 = u4 = u8 = 0
+    ##  3. DBC right: u5 = u6 = u9 = 1
+    ## meaning that u1 = u8 and u5 = u9 are overwritten by 2 and 3 and we end up with
+    ##  u1 = 0
+    ##  u2 = u7
+    ##  u4 = 0
+    ##  u5 = 1
+    ##  u6 = 1
+    ##  u8 = 0
+    ##  u9 = 1
+    ch2 = ConstraintHandler(dh)
+    add!(ch2, PeriodicDirichlet(:u, collect_periodic_faces(grid, "bottom", "top")))
+    add!(ch2, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0))
+    add!(ch2, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 1))
+    close!(ch2)
+    update!(ch2, 0)
+
+    K1 = create_sparsity_pattern(dh, ch1)
+    f1 = zeros(ndofs(dh))
+    a1 = start_assemble(K1, f1)
+    K2 = create_sparsity_pattern(dh, ch2)
+    f2 = zeros(ndofs(dh))
+    a2 = start_assemble(K2, f2)
+
+    for cell in CellIterator(dh)
+        assemble!(a1, celldofs(cell), ke, fe)
+        assemble!(a2, celldofs(cell), ke, fe)
+    end
+
+    # Equivalent assembly
+    @test K1 == K2
+    @test f1 == f2
+
+    # Equivalence after apply!
+    apply!(K1, f1, ch1)
+    apply!(K2, f2, ch2)
+    @test K1 == K2
+    @test f1 == f2
+    @test apply!(K1 \ f1, ch1) ≈ apply!(K2 \ f2, ch2)
+end # subtestset
+
+@testset "time dependence" begin
+    ## Pure Dirichlet
+    ch1 = ConstraintHandler(dh)
+    add!(ch1, Dirichlet(:u, getfaceset(grid, "top"), (x, t) -> 3.0t + 2.0))
+    add!(ch1, Dirichlet(:u, getfaceset(grid, "bottom"), (x, t) -> 1.5t + 1.0))
+    add!(ch1, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 1.0t))
+    add!(ch1, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 2.0t))
+    close!(ch1)
+    ## Dirichlet with corresponding AffineConstraint on dof 2 and 7
+    ch2 = ConstraintHandler(dh)
+    add!(ch2, AffineConstraint(7, [8 => 1.0, 9 => 1.0], 2.0))
+    add!(ch2, AffineConstraint(2, [1 => 0.5, 5 => 0.5], 1.0))
+    add!(ch2, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 1.0t))
+    add!(ch2, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 2.0t))
+    close!(ch2)
+
+    K1 = create_sparsity_pattern(dh, ch1)
+    f1 = zeros(ndofs(dh))
+    K2 = create_sparsity_pattern(dh, ch2)
+    f2 = zeros(ndofs(dh))
+
+    for t in (1.0, 2.0)
+        update!(ch1, t)
+        update!(ch2, t)
+        a1 = start_assemble(K1, f1)
+        a2 = start_assemble(K2, f2)
+        for cell in CellIterator(dh)
+            assemble!(a1, celldofs(cell), ke, fe)
+            assemble!(a2, celldofs(cell), ke, fe)
+        end
+        @test K1 == K2
+        @test f1 == f2
+        apply!(K1, f1, ch1)
+        apply!(K2, f2, ch2)
+        @test K1 == K2
+        @test f1 == f2
+        @test K1 \ f1 ≈ K2 \ f2
+    end
+
+end # subtestset
+
+
+@testset "error paths" begin
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint(1, [2 => 1.0], 0.0))
+    add!(ch, AffineConstraint(2, [3 => 1.0], 0.0))
+    @test_throws ErrorException("nested affine constraints currently not supported") close!(ch)
+end # subtestset
 
 end # testset

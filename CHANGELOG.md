@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    always override any previous constraints. Conflicting constraints could previously cause
    problems when a DoF where prescribed by both `Dirichlet` and `AffineConstraint`.
    ([#529][github-529])
+### Fixed
+ - Fix affine constraints with prescribed dofs in the right-hand-side. In particular, dofs
+   that are prescribed by just an inhomogeneity are now handled correctly, and nested affine
+   constraints now give an error instead of silently giving the wrong result.
+   ([#530][github-530], [#535][github-535])
 
 ## [0.3.9] - 2022-10-19
 ### Added
@@ -153,6 +158,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-514]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/514
 [github-524]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/524
 [github-529]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/529
+[github-530]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/530
+[github-535]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/535
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.9...HEAD
 [0.3.9]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.8...v0.3.9
