@@ -32,6 +32,12 @@ of the degree of freedom. For scalar fields, `f(x)::Number`,
 and for vector fields with dimension `dim`, `f(x)::Vec{dim}`.
 
 This function can be used to apply initial conditions for time dependent problems.
+
+!!! note
+    This function only works for so-called nodal finite elements, i.e. when 
+    the FE-approximation at the degree of freedom location is equal to that 
+    value, which is the case for e.g. Lagrange and Serendipity interpolations. 
+
 """
 function apply_analytical!(
     a::AbstractVector, dh::DofHandler, f::Function, 
