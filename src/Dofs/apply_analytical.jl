@@ -34,9 +34,11 @@ and for vector fields with dimension `dim`, `f(x)::Vec{dim}`.
 This function can be used to apply initial conditions for time dependent problems.
 
 !!! note
-    This function only works for so-called nodal finite elements, i.e. when 
-    the FE-approximation at the degree of freedom location is equal to that 
-    value, which is the case for e.g. Lagrange and Serendipity interpolations. 
+    This function only works for standard nodal finite element interpolations 
+    when the function value at the (algebraic) node is equal to the corresponding 
+    degree of freedom value.
+    This holds for e.g. Lagrange and Serendipity interpolations, including 
+    sub- and superparametric elements. 
 
 """
 function apply_analytical!(
