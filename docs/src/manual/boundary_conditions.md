@@ -267,14 +267,14 @@ When solving time-dependent problems, initial conditions, different from zero, m
 For finite element formulations of ODE-type, 
 i.e. ``\boldsymbol{u}'(t) = \boldsymbol{f}(\boldsymbol{u}(t),t)``, 
 where ``\boldsymbol{u}(t)`` are the degrees of freedom,
-initial conditions can be specified by the [`transfer_solution!`](@ref) function.
+initial conditions can be specified by the [`apply_analytical!`](@ref) function.
 For example, specify the initial pressure as a function of the y-coordinate
 ```julia
 ρ = 1000; g=9.81    # density [kg/m³] and gravity [N/kg]
 grid = generate_grid(Quadrilateral, (10,10))
 dh = DofHandler(grid); push!(dh, :u, 2); push!(dh, :p, 1); close!(dh)
 u = zeros(ndofs(dh))
-transfer_solution!(u, dh, x->ρ*g*x[2], :p)
+apply_analytical!(u, dh, x->ρ*g*x[2], :p)
 ```
 
 See also [Time Dependent Problems](@ref) for one example. 

@@ -20,7 +20,7 @@ function _check_fieldname(dh, fieldname)
 end
 
 """
-    transfer_solution!(
+    apply_analytical!(
         a::AbstractVector, dh::AbstractDofHandler, f::Function, 
         fieldname::Symbol=first(getfieldnames(dh)), 
         cellset=1:getncells(dh.grid))
@@ -33,7 +33,7 @@ and for vector fields with dimension `dim`, `f(x)::Vec{dim}`.
 
 This function can be used to apply initial conditions for time dependent problems.
 """
-function transfer_solution!(
+function apply_analytical!(
     a::AbstractVector, dh::DofHandler, f::Function, 
     fieldname::Union{Symbol,Nothing}=nothing,
     cellset=1:getncells(dh.grid)
@@ -44,10 +44,10 @@ function transfer_solution!(
     ip_fun = getfieldinterpolation(dh, field_idx)
     celldofinds = dof_range(dh, field)
     field_dim = getfielddim(dh, field_idx)
-    _transfer_solution!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, cellset)
+    _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, cellset)
 end
 
-function transfer_solution!(
+function apply_analytical!(
     a::AbstractVector, dh::MixedDofHandler, f::Function, 
     fieldname::Union{Symbol,Nothing}=nothing,
     cellset=1:getncells(dh.grid),
@@ -61,12 +61,12 @@ function transfer_solution!(
         ip_fun = getfieldinterpolation(fh, field_idx)
         field_dim = getfielddim(fh, field_idx)
         celldofinds = dof_range(fh, field)
-        _transfer_solution!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, intersect(fh.cellset, cellset))
+        _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, intersect(fh.cellset, cellset))
     end
     return a
 end
 
-function _transfer_solution!(
+function _apply_analytical!(
     a::Vector, dh::AbstractDofHandler, celldofinds, field_dim,
     ip_fun::Interpolation, ip_geo::Interpolation, f::Function, cellset)
     
@@ -82,12 +82,12 @@ function _transfer_solution!(
         celldofs!(c_dofs, dh, cellnr)
         # f_dofs .= c_dofs[celldofinds]
         foreach(i->(f_dofs[i] = c_dofs[celldofinds[i]]), 1:length(celldofinds)) 
-        _transfer_solution!(a, f_dofs, coords, field_dim, ip_fun, ip_geo, f)
+        _apply_analytical!(a, f_dofs, coords, field_dim, ip_fun, ip_geo, f)
     end
     return a
 end
 
-function _transfer_solution!(a::Vector, dofs::Vector{Int}, coords::Vector{XT}, field_dim, ip_fun, ip_geo, f) where {XT<:Vec}
+function _apply_analytical!(a::Vector, dofs::Vector{Int}, coords::Vector{XT}, field_dim, ip_fun, ip_geo, f) where {XT<:Vec}
 
     getnbasefunctions(ip_geo) == length(coords) || error("coords=$coords not compatible with ip_ge=$ip_geo")
     ref_coords = reference_coordinates(ip_fun)
