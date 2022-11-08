@@ -184,8 +184,10 @@ end
 
 """
     find_range_boundaries(f::OctantBWG{dim,N,M,T}, l::OctantBWG{dim,N,M,T}, s::OctantBWG{dim,N,M,T}, idxset, b)
+    find_range_boundaries(s::OctantBWG{dim,N,M,T}, idxset, b)
 Algorithm 4.2 of IBWG 2015
-TODO against what to test?
+TODO against what to test? Seems to work in the sense that if idxset has elements in the set 
+that are not part of the boundary, they are not returned
 """
 function find_range_boundaries(f::OctantBWG{dim,N,M,T}, l::OctantBWG{dim,N,M,T}, s::OctantBWG{dim,N,M,T}, idxset, b) where {dim,N,M,T}
     o = one(T)
@@ -214,6 +216,12 @@ function find_range_boundaries(f::OctantBWG{dim,N,M,T}, l::OctantBWG{dim,N,M,T},
         idxset_match_k = find_range_boundaries(fk,l,kidz[k],idxset_match_k,b)
     end
     return idxset_match ∪ idxset_match_j ∪ idxset_match_k
+end
+
+#for convenience
+function find_range_boundaries(s::OctantBWG, idxset, b)
+    f,l = descendants(s,b)
+    return find_range_boundaries(f,l,s,idxset,b)
 end
 
 boundarysettype(::OctantBWG{3,N,M,T}) where {N,M,T} = Set{Union{Tuple{T,T,T},NTuple{2,Tuple{T,T,T}},NTuple{4,Tuple{T,T,T}}}}
