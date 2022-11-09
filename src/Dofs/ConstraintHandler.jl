@@ -1634,3 +1634,178 @@ function __check_periodic_faces_f(grid::Grid, fi::FaceIndex, fj::FaceIndex, xmi,
 
     return PeriodicFacePair(fi, fj, node_rot, mirror)
 end
+
+
+######################################
+## Local application of constraints ##
+######################################
+
+"""
+    apply_local!(
+        local_matrix::AbstractMatrix, local_vector::AbstractVector,
+        global_dofs::AbstractVector, ch::ConstraintHandler;
+        apply_zero::Bool = false
+    )
+
+Similar to [`apply!`](@ref) but perform condensation of constrained degrees-of-freedom
+locally in `local_matrix` and `local_vector` *before* they are to be assembled into the
+global system.
+
+When the keyword argument `apply_zero` is `true` all inhomogeneities are set to `0` (cf.
+[`apply!`](@ref) vs [`apply_zero!`](@ref)).
+
+This method can only be used if all constraints are "local", i.e. no constraint couples with
+dofs outside of the element dofs (`global_dofs`) since condensation of such constraints
+requires writing to entries in the global matrix/vector. For such a case,
+[`apply_assemble!`](@ref) can be used instead.
+
+Note that this method is destructive since it, by definition, modifies `local_matrix` and
+`local_vector`.
+"""
+function apply_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
+                      global_dofs::AbstractVector, ch::ConstraintHandler;
+                      apply_zero::Bool = false)
+    return _apply_local!(local_matrix, local_vector, global_dofs, ch, apply_zero,
+                         #=global_matrix=# nothing, #=global_vector=# nothing)
+end
+
+# Element local application of boundary conditions. Global matrix and vectors are necessary
+# if there are affine constraints that connect dofs from different elements.
+function _apply_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
+                       global_dofs::AbstractVector, ch::ConstraintHandler, apply_zero::Bool,
+                       global_matrix, global_vector)
+    # TODO: With apply_zero it shouldn't be required to pass the vector.
+    length(global_dofs) == size(local_matrix, 1) == size(local_matrix, 2) == length(local_vector) || error("?")
+    # First pass over the dofs check whether there are any constrained dofs at all
+    has_constraints = false
+    has_nontrivial_affine_constraints = false
+    # 1. Adjust local vector
+    @inbounds for (local_dof, global_dof) in pairs(global_dofs)
+        # Check if this dof is constrained
+        pdofs_index = get(ch.dofmapping, global_dof, nothing)
+        pdofs_index === nothing && continue # Not constrained, move on
+        has_constraints = true
+        # Add inhomogeneities to local_vector: local_vector - local_matrix * inhomogeneities
+        v = ch.inhomogeneities[pdofs_index]
+        if !apply_zero && v != 0
+            for j in axes(local_matrix, 1)
+                local_vector[j] -= v * local_matrix[j, local_dof]
+            end
+        end
+        # Check if this is an affine constraint
+        has_nontrivial_affine_constraints = has_nontrivial_affine_constraints || (
+           coeffs = ch.dofcoefficients[pdofs_index];
+           !(coeffs === nothing || isempty(coeffs))
+        )
+    end
+    # 2. Compute mean of diagonal before modifying local matrix
+    m = has_constraints ? meandiag(local_matrix) : zero(eltype(local_matrix))
+    # 3. Condense any affine constraints
+    if has_nontrivial_affine_constraints
+        # Condense this constraint locally if possible, and otherwise modifies the global arrays.
+        _condense_local!(local_matrix, local_vector, global_matrix, global_vector, global_dofs, ch.dofmapping, ch.dofcoefficients)
+    end
+    # 4. Zero out columns/rows of local matrix and replace diagonal entries with the mean
+    if has_constraints
+        @inbounds for (local_dof, global_dof) in pairs(global_dofs)
+            pdofs_index = get(ch.dofmapping, global_dof, nothing)
+            pdofs_index === nothing && continue # Not constrained, move on
+            # Zero the column
+            for local_row in axes(local_matrix, 1)
+                local_matrix[local_row, local_dof] = 0
+            end
+            # Zero the row
+            for local_col in axes(local_matrix, 2)
+                local_matrix[local_dof, local_col] = 0
+            end
+            # Replace diagonal with mean
+            local_matrix[local_dof, local_dof] = m
+            v = ch.inhomogeneities[pdofs_index]
+            local_vector[local_dof] = apply_zero ? zero(eltype(local_vector)) : (v * m)
+        end
+    end
+    return
+end
+
+# Condensation of affine constraints on element level. If possible this function only
+# modifies the local arrays.
+@noinline missing_global() = error("can not condense constraint without the global matrix and vector")
+function _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
+                          global_matrix#=::SparseMatrixCSC=#, global_vector#=::Vector=#,
+                          global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector)
+    @assert axes(local_matrix, 1) == axes(local_matrix, 2) ==
+            axes(local_vector, 1) == axes(global_dofs, 1)
+    has_global_arrays = global_matrix !== nothing && global_vector !== nothing
+    for (local_col, global_col) in pairs(global_dofs)
+        col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, global_col)
+        if col_coeffs === nothing
+            for (local_row, global_row) in pairs(global_dofs)
+                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, global_row)
+                row_coeffs === nothing && continue # Neither the column nor the row are constrained: Do nothing
+                for (global_mrow, weight) in row_coeffs
+                    mw = local_matrix[local_row, local_col] * weight
+                    local_mrow = findfirst(==(global_mrow), global_dofs)
+                    if local_mrow === nothing
+                        # Only modify the global array if this isn't prescribed since we
+                        # can't zero it out later like with the local matrix.
+                        if !haskey(dofmapping, global_col) && !haskey(dofmapping, global_mrow)
+                            has_global_arrays || missing_global()
+                            _addindex_sparsematrix!(global_matrix, mw, global_mrow, global_col)
+                        end
+                    else
+                        local_matrix[local_mrow, local_col] += mw
+                    end
+                end
+            end
+        else
+            for (local_row, global_row) in pairs(global_dofs)
+                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, global_row)
+                if row_coeffs === nothing
+                    for (global_mcol, weight) in col_coeffs
+                        local_mcol = findfirst(==(global_mcol), global_dofs)
+                        mw = local_matrix[local_row, local_col] * weight
+                        if local_mcol === nothing
+                            # Only modify the global array if this isn't prescribed since we
+                            # can't zero it out later like with the local matrix.
+                            if !haskey(dofmapping, global_row) && !haskey(dofmapping, global_mcol)
+                                has_global_arrays || missing_global()
+                                _addindex_sparsematrix!(global_matrix, mw, global_row, global_mcol)
+                            end
+                        else
+                            local_matrix[local_row, local_mcol] += mw
+                        end
+                    end
+                else
+                    for (global_mcol, weight_col) in col_coeffs
+                        local_mcol = findfirst(==(global_mcol), global_dofs)
+                        for (global_mrow, weight_row) in row_coeffs
+                            mww = local_matrix[local_row, local_col] * weight_col * weight_row
+                            local_mrow = findfirst(==(global_mrow), global_dofs)
+                            if local_mcol === nothing || local_mrow === nothing
+                                # Only modify the global array if this isn't prescribed since we
+                                # can't zero it out later like with the local matrix.
+                                if !haskey(dofmapping, global_mrow) && !haskey(dofmapping, global_mcol)
+                                    has_global_arrays || missing_global()
+                                    _addindex_sparsematrix!(global_matrix, mww, global_mrow, global_mcol)
+                                end
+                            else
+                                local_matrix[local_mrow, local_mcol] += mww
+                            end
+                        end
+                    end
+                end
+            end
+            for (global_mcol, weight) in col_coeffs
+                vw = local_vector[local_col] * weight
+                local_mcol = findfirst(==(global_mcol), global_dofs)
+                if local_mcol === nothing
+                    has_global_arrays || missing_global()
+                    global_vector[global_mcol] += vw
+                else
+                    local_vector[local_mcol] += vw
+                end
+            end
+            local_vector[local_col] = 0
+        end
+    end
+end

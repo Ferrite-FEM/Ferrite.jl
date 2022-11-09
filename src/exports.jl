@@ -124,6 +124,8 @@ export
     apply_rhs!,
     get_rhs_data,
     apply_zero!,
+    apply_local!,
+    apply_assemble!,
     add!,
     free_dofs,
     ApplyStrategy,

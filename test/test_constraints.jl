@@ -218,13 +218,21 @@ end
         close!(ch)
         update!(ch, 0.0)
         C, g = Ferrite.create_constraint_matrix(ch)
-        
+
         # Assemble
         K = create_sparsity_pattern(dh, ch)
         f = zeros(ndofs(dh)); f[end] = 1.0
+        Kl = create_sparsity_pattern(dh, ch)
+        fl = copy(f)
+        assembler = start_assemble(Kl, fl)
         for cell in CellIterator(dh)
-            K[celldofs(cell), celldofs(cell)] += 2.0 * [1 -1; -1 1]
+            local_matrix = 2.0 * [1 -1; -1 1]
+            local_vector = zeros(2)
+            K[celldofs(cell), celldofs(cell)] += local_matrix
+            # Assemble with local condensation
+            apply_assemble!(assembler, ch, celldofs(cell), local_matrix, local_vector)
         end
+        fl[end] += 1
         copies = (K = copy(K), f1 = copy(f), f2 = copy(f))
 
         # Solve by actually condensing the matrix
@@ -238,6 +246,10 @@ end
         a = K \ f
         apply!(a, ch)
 
+        # Solve with matrix assembled by local condensation
+        al = Kl \ fl
+        apply!(al, ch)
+
         # Solve with extracted RHS data
         rhs = get_rhs_data(ch, copies.K)
         apply!(copies.K, ch)
@@ -246,7 +258,7 @@ end
         apply_rhs!(rhs, copies.f2, ch)
         a_rhs2 = apply!(copies.K \ copies.f2, ch)
 
-        @test a ≈ aa ≈ a_rhs1 ≈ a_rhs2
+        @test a ≈ aa ≈ al ≈ a_rhs1 ≈ a_rhs2
     end
 
 end
@@ -1165,4 +1177,201 @@ end # subtestset
     @test_throws ErrorException("nested affine constraints currently not supported") close!(ch)
 end # subtestset
 
+end # testset
+
+@testset "local application of bc" begin
+    grid = generate_grid(Quadrilateral, (5,5))
+    dh = DofHandler(grid)
+    push!(dh, :u, 1)
+    close!(dh)
+    # Dirichlet BC
+    ch_dbc = ConstraintHandler(dh)
+    add!(ch_dbc, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0))
+    add!(ch_dbc, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 1))
+    close!(ch_dbc)
+    update!(ch_dbc, 0)
+    # Dirichlet BC as affine constraints
+    ch_ac = ConstraintHandler(dh)
+    for (dof, value) in zip(ch_dbc.prescribed_dofs, ch_dbc.inhomogeneities)
+        add!(ch_ac, AffineConstraint(dof, Pair{Int,Float64}[], value))
+    end
+    close!(ch_ac)
+    update!(ch_ac, 0)
+    # Periodic constraints (non-local couplings) #
+    ch_p = ConstraintHandler(dh)
+    # TODO: Order matters, but probably shouldn't, see Ferrite-FEM/Ferrite.jl#530
+    face_map = collect_periodic_faces(grid, getfaceset(grid, "bottom"), getfaceset(grid, "top"))
+    add!(ch_p, PeriodicDirichlet(:u, face_map))
+    add!(ch_p, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0))
+    add!(ch_p, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 1))
+    close!(ch_p)
+    update!(ch_p, 0)
+
+    function element!(ke, fe, cv, k, b)
+        fill!(ke, 0)
+        fill!(fe, 0)
+        for qp in 1:getnquadpoints(cv)
+            dΩ = getdetJdV(cv, qp)
+            for i in 1:getnbasefunctions(cv)
+                ϕi = shape_value(cv, qp, i)
+                fe[i] += ( ϕi * b ) * dΩ
+                for j in 1:getnbasefunctions(cv)
+                    ∇ϕi = shape_gradient(cv, qp, i)
+                    ∇ϕj = shape_gradient(cv, qp, j)
+                    ke[i,j] += ( ∇ϕi ⋅ (k * ∇ϕj) ) * dΩ
+                end
+            end
+        end
+    end
+
+    for azero in (nothing, false, true)
+
+        S = create_sparsity_pattern(dh)
+        f = zeros(ndofs(dh))
+
+        K_dbc_standard = copy(S)
+        f_dbc_standard = copy(f)
+        assembler_dbc_standard = start_assemble(K_dbc_standard, f_dbc_standard)
+        K_dbc_ch = copy(S)
+        f_dbc_ch = copy(f)
+        assembler_dbc_ch = start_assemble(K_dbc_ch, f_dbc_ch)
+        K_dbc_local = copy(S)
+        f_dbc_local = copy(f)
+        assembler_dbc_local = start_assemble(K_dbc_local, f_dbc_local)
+
+        S = create_sparsity_pattern(dh, ch_ac)
+
+        K_ac_standard = copy(S)
+        f_ac_standard = copy(f)
+        assembler_ac_standard = start_assemble(K_ac_standard, f_ac_standard)
+        K_ac_ch = copy(S)
+        f_ac_ch = copy(f)
+        assembler_ac_ch = start_assemble(K_ac_ch, f_ac_ch)
+        K_ac_local = copy(S)
+        f_ac_local = copy(f)
+        assembler_ac_local = start_assemble(K_ac_local, f_ac_local)
+
+        S = create_sparsity_pattern(dh, ch_p)
+
+        K_p_standard = copy(S)
+        f_p_standard = copy(f)
+        assembler_p_standard = start_assemble(K_p_standard, f_p_standard)
+        K_p_ch = copy(S)
+        f_p_ch = copy(f)
+        assembler_p_ch = start_assemble(K_p_ch, f_p_ch)
+        # K_p_local = copy(S)
+        # f_p_local = copy(f)
+        # assembler_p_local = start_assemble(K_p_local, f_p_local)
+
+        ke = zeros(ndofs_per_cell(dh), ndofs_per_cell(dh))
+        fe = zeros(ndofs_per_cell(dh))
+        cv = CellScalarValues(QuadratureRule{2,RefCube}(2), Lagrange{2,RefCube,1}())
+
+        for cell in CellIterator(dh)
+            reinit!(cv, cell)
+            global_dofs = celldofs(cell)
+            element!(ke, fe, cv, cellid(cell), 1/cellid(cell))
+            # Standard application
+            assemble!(assembler_dbc_standard, global_dofs, ke, fe)
+            assemble!(assembler_ac_standard, global_dofs, ke, fe)
+            assemble!(assembler_p_standard, global_dofs, ke, fe)
+            # Assemble with ConstraintHandler
+            let apply_f! = azero === nothing ? apply_assemble! :
+                (args...) -> apply_assemble!(args...; apply_zero=azero)
+                let ke = copy(ke), fe = copy(fe)
+                    apply_f!(assembler_dbc_ch, ch_dbc, global_dofs, ke, fe)
+                end
+                let ke = copy(ke), fe = copy(fe)
+                    apply_f!(assembler_ac_ch, ch_ac, global_dofs, ke, fe)
+                end
+                let ke = copy(ke), fe = copy(fe)
+                    apply_f!(assembler_p_ch, ch_p, global_dofs, ke, fe)
+                end
+            end
+            # Assemble after apply_local!
+            let apply_f! = azero === nothing ? apply_local! :
+                (args...) -> apply_local!(args...; apply_zero=azero)
+                let ke = copy(ke), fe = copy(fe)
+                    apply_f!(ke, fe, global_dofs, ch_dbc)
+                    assemble!(assembler_dbc_local, global_dofs, ke, fe)
+                end
+                let ke = copy(ke), fe = copy(fe)
+                    apply_f!(ke, fe, global_dofs, ch_ac)
+                    assemble!(assembler_ac_local, global_dofs, ke, fe)
+                end
+                let ke = copy(ke), fe = copy(fe)
+                    if cellid(cell) in first.(getfaceset(grid, "bottom"))
+                        # Throws for all cells on the image boundary
+                        @test_throws ErrorException apply_f!(ke, fe, global_dofs, ch_p)
+                    else
+                        # Should not throw otherwise
+                        apply_f!(ke, fe, global_dofs, ch_p)
+                    end
+                    # assemble!(assembler_p_local, ch_p, global_dofs, ke, fe)
+                end
+            end
+        end
+
+        # apply! for the standard ones
+        let apply_f! = azero === true ? apply_zero! : apply!
+            apply_f!(K_dbc_standard, f_dbc_standard, ch_dbc)
+            apply_f!(K_ac_standard, f_ac_standard, ch_ac)
+            apply_f!(K_p_standard, f_p_standard, ch_p)
+        end
+
+        fdofs = free_dofs(ch_dbc)
+        fdofs′ = free_dofs(ch_ac)
+        @test fdofs == fdofs′
+
+        # Everything should be identical now for free entries
+        @test K_dbc_standard[fdofs, fdofs] ≈ K_dbc_ch[fdofs, fdofs] ≈ K_dbc_local[fdofs, fdofs] ≈
+              K_ac_standard[fdofs, fdofs] ≈ K_ac_ch[fdofs, fdofs] ≈ K_ac_local[fdofs, fdofs]
+        @test f_dbc_standard[fdofs] ≈ f_dbc_ch[fdofs] ≈ f_dbc_local[fdofs] ≈
+              f_ac_standard[fdofs] ≈ f_ac_ch[fdofs] ≈ f_ac_local[fdofs]
+        fdofs_p = free_dofs(ch_p)
+        @test K_p_standard[fdofs_p, fdofs_p] ≈ K_p_ch[fdofs_p, fdofs_p]
+        @test f_p_standard[fdofs_p] ≈ f_p_ch[fdofs_p]
+
+        # For prescribed dofs the matrices will be diagonal, but different
+        pdofs = ch_dbc.prescribed_dofs
+        @test isdiag(K_dbc_standard[pdofs, pdofs])
+        @test isdiag(K_dbc_ch[pdofs, pdofs])
+        @test isdiag(K_dbc_local[pdofs, pdofs])
+        @test isdiag(K_ac_standard[pdofs, pdofs])
+        @test isdiag(K_ac_ch[pdofs, pdofs])
+        @test isdiag(K_ac_local[pdofs, pdofs])
+        pdofs_p = ch_p.prescribed_dofs
+        @test isdiag(K_p_standard[pdofs_p, pdofs_p])
+        @test isdiag(K_p_ch[pdofs_p, pdofs_p])
+
+        # No coupling between constraints (no post-solve apply! needed) so this should
+        # compute the inhomogeneities correctly
+        scale = azero === true ? 0 : 1
+        @test f_dbc_standard[pdofs] ./ diag(K_dbc_standard[pdofs, pdofs]) ≈ scale * ch_dbc.inhomogeneities
+        @test f_dbc_ch[pdofs] ./ diag(K_dbc_ch[pdofs, pdofs]) ≈ scale * ch_dbc.inhomogeneities
+        @test f_dbc_local[pdofs] ./ diag(K_dbc_local[pdofs, pdofs]) ≈ scale * ch_dbc.inhomogeneities
+        @test f_ac_standard[pdofs] ./ diag(K_ac_standard[pdofs, pdofs]) ≈ scale * ch_ac.inhomogeneities
+        @test f_ac_ch[pdofs] ./ diag(K_ac_ch[pdofs, pdofs]) ≈ scale * ch_ac.inhomogeneities
+        @test f_ac_local[pdofs] ./ diag(K_ac_local[pdofs, pdofs]) ≈ scale * ch_ac.inhomogeneities
+
+        # Test the solutions
+        u_dbc = K_dbc_standard \ f_dbc_standard
+        u_p = (azero === true ? apply_zero! : apply!)(K_p_standard \ f_p_standard, ch_p)
+        if azero === true
+            @test norm(u_dbc) ≈ 0.06401424182205259
+            @test norm(u_p) ≈ 0.02672553850330505
+        else
+            @test norm(u_dbc) ≈ 3.8249286998373586
+            @test norm(u_p) ≈ 3.7828270430540893
+        end
+        # vtk_grid("local_application_azero_$(azero)", grid) do vtk
+        #     vtk_point_data(vtk, dh, u_dbc, "_dbc")
+        #     vtk_point_data(vtk, dh, u_p, "_p")
+        # end
+        @test K_dbc_standard \ f_dbc_standard ≈ K_dbc_ch \ f_dbc_ch ≈ K_dbc_local \ f_dbc_local ≈
+              K_ac_standard \ f_ac_standard ≈ K_ac_ch \ f_ac_ch ≈ K_ac_local \ f_ac_local
+        let apply_f! = azero === true ? apply_zero! : apply!
+            @test apply_f!(K_p_standard \ f_p_standard, ch_p) ≈ apply_f!(K_p_ch \ f_p_ch, ch_p)
+        end
+    end
 end # testset

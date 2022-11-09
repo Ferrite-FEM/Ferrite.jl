@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+ - New functions `apply_local!` and `apply_assemble!` for applying constraints locally on
+   the element level before assembling to the global system. ([#528][github-528])
 ### Changed
  - Runtime and allocations for application of boundary conditions in `apply!` and
    `apply_zero!` have been improved. As a result, the `strategy` keyword argument is
@@ -127,6 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-418]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/418
 [github-425]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/425
 [github-428]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/428
+[github-431]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/431
 [github-436]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/436
 [github-456]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/456
 [github-458]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/458
@@ -157,6 +161,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-512]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/512
 [github-514]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/514
 [github-524]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/524
+[github-528]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/528
 [github-529]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/529
 [github-530]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/530
 [github-535]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/535
