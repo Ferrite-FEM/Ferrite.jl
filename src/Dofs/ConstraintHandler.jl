@@ -76,6 +76,9 @@ struct ConstraintHandler{DH<:AbstractDofHandler,T}
     prescribed_dofs::Vector{Int}
     free_dofs::Vector{Int}
     inhomogeneities::Vector{T}
+    # Store the original constant inhomogeneities for affine constraints used to compute
+    # "effective" inhomogeneities in `update!` and then stored in .inhomogeneities.
+    affine_inhomogeneities::Vector{Union{Nothing,T}}
     # `nothing` for pure DBC constraint, otherwise affine constraint
     dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}
     # global dof -> index into dofs and inhomogeneities and dofcoefficients
@@ -88,7 +91,7 @@ end
 function ConstraintHandler(dh::AbstractDofHandler)
     @assert isclosed(dh)
     ConstraintHandler(
-        Dirichlet[], Int[], Int[], Float64[], Union{Nothing,DofCoefficients{Float64}}[],
+        Dirichlet[], Int[], Int[], Float64[], Union{Nothing,Float64}[], Union{Nothing,DofCoefficients{Float64}}[],
         Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false),
     )
 end
@@ -181,6 +184,7 @@ function close!(ch::ConstraintHandler)
     I = sortperm(ch.prescribed_dofs)
     ch.prescribed_dofs .= ch.prescribed_dofs[I]
     ch.inhomogeneities .= ch.inhomogeneities[I]
+    ch.affine_inhomogeneities .= ch.affine_inhomogeneities[I]
     ch.dofcoefficients .= ch.dofcoefficients[I]
 
     copy!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
@@ -197,6 +201,25 @@ function close!(ch::ConstraintHandler)
     # If they are not, it is possible to automatically reformulate the constraints
     # such that they become independent. However, at this point, it is left to
     # the user to assure this.
+
+    # Basic verification of constraints:
+    # - `add_prescribed_dof` make sure all prescribed dofs are unique by overwriting the old
+    #   constraint when adding a new (TODO: Might change in the future, see comment in
+    #   `add_prescribed_dof`.)
+    # - We allow affine constraints to have prescribed dofs as master dofs iff those master
+    #   dofs are constrained with just an inhomogeneity (i.e. DBC). The effective
+    #   inhomogeneity is computed in `update!`.
+    for coeffs in ch.dofcoefficients
+        coeffs === nothing && continue
+        for (d, _) in coeffs
+            i = get(ch.dofmapping, d, 0)
+            i == 0 && continue
+            icoeffs = ch.dofcoefficients[i]
+            if !(icoeffs === nothing || isempty(icoeffs))
+                error("nested affine constraints currently not supported")
+            end
+        end
+    end
 
     ch.closed[] = true
     return ch
@@ -262,11 +285,13 @@ function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomo
         @debug @warn "dof $i already prescribed, overriding the old constraint"
         ch.prescribed_dofs[i] = constrained_dof
         ch.inhomogeneities[i] = inhomogeneity
+        ch.affine_inhomogeneities[i] = dofcoefficients === nothing ? nothing : inhomogeneity
         ch.dofcoefficients[i] = dofcoefficients
     else
         N = length(ch.dofmapping)
         push!(ch.prescribed_dofs, constrained_dof)
         push!(ch.inhomogeneities, inhomogeneity)
+        push!(ch.affine_inhomogeneities, dofcoefficients === nothing ? nothing : inhomogeneity)
         push!(ch.dofcoefficients, dofcoefficients)
         ch.dofmapping[constrained_dof] = N + 1
     end
@@ -377,6 +402,26 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
         _update!(ch.inhomogeneities, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
                  dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, convert(Float64, time))
     end
+    # Compute effective inhomogeneity for affine constraints with prescribed dofs in the
+    # RHS. For example, in u2 = w3 * u3 + w4 * u4 + b2 we allow e.g. u3 to be prescribed by
+    # a trivial constraint with just an inhomogeneity (e.g. DBC), for example u3 = f(t).
+    # This value have now been computed in _update! and we can compute the effective
+    # inhomogeneity h2 for u2 which becomes h2 = w3 * u3 + b2 = w3 * f3(t) + b2.
+    for i in eachindex(ch.prescribed_dofs, ch.dofcoefficients, ch.inhomogeneities)
+        coeffs = ch.dofcoefficients[i]
+        coeffs === nothing && continue
+        h = ch.affine_inhomogeneities[i]
+        @assert h !== nothing
+        for (d, w) in coeffs
+            j = get(ch.dofmapping, d, 0)
+            j == 0 && continue
+            # If this dof is prescribed it must only have an inhomogeneity (verified in close!)
+            @assert (jcoeffs = ch.dofcoefficients[j]; jcoeffs === nothing || isempty(jcoeffs))
+            h += ch.inhomogeneities[j] * w
+        end
+        ch.inhomogeneities[i] = h
+    end
+    return nothing
 end
 
 # for faces
@@ -550,9 +595,11 @@ apply!(     v::AbstractVector, ch::ConstraintHandler) = _apply_v(v, ch, false)
 function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
     @assert length(v) >= ndofs(ch.dh)
     v[ch.prescribed_dofs] .= apply_zero ? 0.0 : ch.inhomogeneities
-    # Apply affine constraints, e.g u2 = s6*u6 + s3*u3 (inhomogenity added above)
-    for (dof, dofcoef) in zip(ch.prescribed_dofs, ch.dofcoefficients)
+    # Apply affine constraints, e.g u2 = s6*u6 + s3*u3 + h2
+    for (dof, dofcoef, h) in zip(ch.prescribed_dofs, ch.dofcoefficients, ch.affine_inhomogeneities)
         dofcoef === nothing && continue
+        @assert h !== nothing
+        v[dof] = h
         for (d, s) in dofcoef
             v[dof] += s * v[d]
         end
