@@ -687,6 +687,9 @@ end
 @inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
 @inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, face::FaceIndex) where {dim, T} = getcoordinates!(x, grid, face.idx[1])
 
+# TODO: Deprecate one of `cellcoords!` and `getcoordinates!`, as they do the same thing
+cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,T} = getcoordinates!(global_coords, grid, i) 
+
 """
     getcoordinates(grid::AbstractGrid, cell)
 Return a vector with the coordinates of the vertices of cell number `cell`.
