@@ -14,7 +14,7 @@ struct Node{dim,T}
 end
 Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
 getcoordinates(n::Node) = n.x
-
+getnodenumbertype(::Node{dim,T}) where {dim,T} = T
 
 abstract type AbstractCell{dim,N,M} end
 """
@@ -429,6 +429,8 @@ to a Node.
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
 "Returns the number of nodes of the `i`-th cell."
 @inline nnodes_per_cell(grid::AbstractGrid, i::Int=1) = nnodes(grid.cells[i])
+"Return the number type of the nodal coordinates."
+@inline getnodenumbertype(grid::AbstractGrid) = getnodenumbertype(first(getnodes(grid)))
 
 """
     getcellset(grid::AbstractGrid, setname::String)
@@ -677,7 +679,7 @@ end
 
 @inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim,T}
     @inbounds for i in 1:length(x)
-        x[i] = grid.nodes[cell.nodes[i]].x
+        x[i] = getcoordinates(getnodes(grid, cell.nodes[i]))
     end
     return x
 end
@@ -691,7 +693,7 @@ Return a vector with the coordinates of the vertices of cell number `cell`.
 """
 @inline function getcoordinates(grid::AbstractGrid, cell::Int)
     dim = getdim(grid)
-    T = typeof(grid).parameters[3] #TODO: should be part of the grid interface
+    T = getnodenumbertype(grid)
     _cell = getcells(grid, cell)
     N = nnodes(_cell)
     x = Vector{Vec{dim, T}}(undef, N)
