@@ -15,7 +15,7 @@
     Ferrite.getnodes(grid::SmallGrid) = grid.nodes_test
     Ferrite.getnodes(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.nodes_test[v]
     Ferrite.getnnodes(grid::SmallGrid) = length(grid.nodes_test)
-    Ferrite.getnodenumbertype(::SmallGrid) = Float64
+    Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
     Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
     Ferrite.n_faces_per_cell(grid::SmallGrid) = nfaces(eltype(grid.cells_test))
 
