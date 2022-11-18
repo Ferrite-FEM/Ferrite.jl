@@ -2,13 +2,23 @@
 DocTestSetup = :(using Ferrite)
 ```
 
-# Boundary Conditions
+# Boundary conditions
 
-Every PDE is accompanied with boundary conditions. There are different types of boundary
-conditions, and they need to be handled in different ways. Below we discuss how to handle
-the most common ones, Dirichlet and Neumann boundary conditions, and how to do it `Ferrite`.
+Every PDE is accompanied with boundary conditions. Two of the most well-known types are
+Dirichlet (essential) and Neumann (natural) boundary conditions. The former results in
+constraints on specific degrees-of-freedom of the discretized problem, whereas the latter
+instead gives a contribution to the right hand side, and naturally these need to be handled
+in very different ways. There are also other types of boundary conditions and constraints
+that are of interest when solving a PDE and in this document we discuss how these various
+constraints can be imposed in Ferrite.jl.
 
-## Dirichlet Boundary Conditions
+```@contents
+Pages = ["boundary_conditions.md"]
+Depth = 2:2
+```
+
+
+## [Dirichlet (essential) boundary conditions](@id Dirichlet-boundary-conditions)
 
 At a Dirichlet boundary the unknown field is prescribed to a given value. For the discrete
 FE-solution this means that there are some degrees of freedom that are fixed. To handle
@@ -94,7 +104,7 @@ end
     Equation](@ref).
 
 
-## Neumann Boundary Conditions
+## Neumann boundary conditions
 
 At the Neumann part of the boundary we know something about the gradient of the solution.
 
