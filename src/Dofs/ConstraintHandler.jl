@@ -686,7 +686,7 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
         col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
         if col_coeffs === nothing
             for ri in nzrange(K, col)
-                row = @inbounds K.rowval[ri]
+                row = K.rowval[ri]
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 row_coeffs === nothing && continue
                 for (d, _) in row_coeffs
@@ -698,7 +698,7 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
             end
         else
             for ri in nzrange(K, col)
-                row = @inbounds K.rowval[ri]
+                row = K.rowval[ri]
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 if row_coeffs === nothing
                     for (d, _) in col_coeffs
