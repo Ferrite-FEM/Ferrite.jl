@@ -333,7 +333,7 @@ with stored values in the correct places.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-create_sparsity_pattern(dh::DofHandler) = _create_sparsity_pattern(dh, nothing, false)
+create_sparsity_pattern(dh::AbstractDofHandler) = _create_sparsity_pattern(dh, nothing, false)
 
 """
     create_symmetric_sparsity_pattern(dh::DofHandler)
@@ -344,11 +344,12 @@ triangle of the matrix. Return a `Symmetric{SparseMatrixCSC}`.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-create_symmetric_sparsity_pattern(dh::DofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
+create_symmetric_sparsity_pattern(dh::AbstractDofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
 
-function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool)
+function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool)
     @assert isclosed(dh)
     ncells = getncells(dh.grid)
+    # Compute approximate size for the buffers using the dofs in the first element
     n = ndofs_per_cell(dh)
     N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
     N += ndofs(dh) # always add the diagonal elements
@@ -357,8 +358,10 @@ function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler,
     global_dofs = zeros(Int, n)
     cnt = 0
     for element_id in 1:ncells
+        # MixedDofHandler might have varying number of dofs per element
+        resize!(global_dofs, ndofs_per_cell(dh, element_id))
         celldofs!(global_dofs, dh, element_id)
-        @inbounds for j in 1:n, i in 1:n
+        @inbounds for j in eachindex(global_dofs), i in eachindex(global_dofs)
             dofi = global_dofs[i]
             dofj = global_dofs[j]
             sym && (dofi > dofj && continue)
