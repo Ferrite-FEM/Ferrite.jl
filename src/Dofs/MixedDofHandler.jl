@@ -374,68 +374,6 @@ function add_cell_dofs(cell_dofs, cell, celldict, field_dim, ncelldofs, nextdof)
 end
 
 
-# TODO if not too slow it can replace the "Grid-version"
-function _create_sparsity_pattern(dh::MixedDofHandler, ch#=::Union{ConstraintHandler,Nothing}=#, sym::Bool)
-    @assert isclosed(dh)
-
-    ncells = getncells(dh.grid)
-    N::Int = 0
-    for element_id = 1:ncells  # TODO check for correctness
-        n = ndofs_per_cell(dh, element_id)
-        N += sym ? div(n*(n+1), 2) : n^2
-    end
-    N += ndofs(dh) # always add the diagonal elements
-    I = Int[]; resize!(I, N)
-    J = Int[]; resize!(J, N)
-
-    cnt = 0
-    for element_id in 1:ncells
-        n = ndofs_per_cell(dh, element_id)
-        global_dofs = zeros(Int, n)
-        celldofs!(global_dofs, dh, element_id)
-        @inbounds for j in 1:n, i in 1:n
-            dofi = global_dofs[i]
-            dofj = global_dofs[j]
-            sym && (dofi > dofj && continue)
-            cnt += 1
-            if cnt > length(J)
-                resize!(I, trunc(Int, length(I) * 1.5))
-                resize!(J, trunc(Int, length(J) * 1.5))
-            end
-            I[cnt] = dofi
-            J[cnt] = dofj
-        end
-    end
-    @inbounds for d in 1:ndofs(dh)
-        cnt += 1
-        if cnt > length(J)
-            resize!(I, trunc(Int, length(I) + ndofs(dh)))
-            resize!(J, trunc(Int, length(J) + ndofs(dh)))
-        end
-        I[cnt] = d
-        J[cnt] = d
-    end
-    resize!(I, cnt)
-    resize!(J, cnt)
-
-    # If ConstraintHandler is given, create the condensation pattern due to affine constraints
-    if ch !== nothing
-        @assert isclosed(ch)
-
-        V = ones(length(I))
-        K = sparse(I, J, V, ndofs(dh), ndofs(dh))
-        _condense_sparsity_pattern!(K, ch.dofcoefficients, ch.dofmapping)
-        fill!(K.nzval, 0.0)
-    else
-        V = zeros(length(I))
-        K = sparse(I, J, V, ndofs(dh), ndofs(dh))
-    end
-    return K
-end
-
-create_sparsity_pattern(dh::MixedDofHandler) = _create_sparsity_pattern(dh, nothing, false)
-create_symmetric_sparsity_pattern(dh::MixedDofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
-
 function find_field(fh::FieldHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, getfieldnames(fh))
     j === nothing && error("could not find field :$field_name in FieldHandler (existing fields: $(getfieldnames(fh)))")
