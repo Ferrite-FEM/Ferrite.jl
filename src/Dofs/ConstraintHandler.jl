@@ -683,13 +683,10 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
 
     cnt = 0
     for col in 1:ndofs
-        # Since we will possibly be pushing new entries to K, the field K.rowval will grow.
-        # Therefor we must extract this before iterating over K
-        range = nzrange(K, col)
-        _rows = K.rowval[range]
         col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
         if col_coeffs === nothing
-            for row in _rows
+            for ri in nzrange(K, col)
+                row = K.rowval[ri]
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 row_coeffs === nothing && continue
                 for (d, _) in row_coeffs
@@ -700,7 +697,8 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
                 end
             end
         else
-            for row in _rows
+            for ri in nzrange(K, col)
+                row = K.rowval[ri]
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 if row_coeffs === nothing
                     for (d, _) in col_coeffs
