@@ -108,6 +108,8 @@ function getfieldnames(dh::MixedDofHandler)
     return unique!(fieldnames)
 end
 
+getfielddim(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].dim
+getfielddim(fh::FieldHandler, field_name::Symbol) = getfielddim(fh, find_field(fh, field_name))
 """
     getfielddim(dh::MixedDofHandler, name::Symbol)
 
@@ -115,11 +117,10 @@ Returns the dimension of a specific field, given by name. Note that it will retu
 """
 function getfielddim(dh::MixedDofHandler, field_idxs::NTuple{2, Int})
     fh_idx, field_idx = field_idxs
-    fielddim = dh.fieldhandlers[fh_idx].fields[field_idx].dim
+    fielddim = getfielddim(dh.fieldhandlers[fh_idx], field_idx)
     return fielddim
 end
 getfielddim(dh::MixedDofHandler, name::Symbol) = getfielddim(dh, find_field(dh, name))
-getfielddim(dh::MixedDofHandler, field_idx::Int) = getfielddim(dh, (1, field_idx))
 
 """
     nfields(dh::MixedDofHandler)
@@ -467,8 +468,10 @@ function field_offset(fh::FieldHandler, field_idx::Int)
     return offset
 end
 field_offset(fh::FieldHandler, field_name::Symbol) = field_offset(fh, find_field(fh, field_name))
-function field_offset(dh::MixedDofHandler, field_name::Symbol)
-    fh_idx, field_idx = find_field(dh, field_name)
+
+field_offset(dh::MixedDofHandler, field_name::Symbol) = field_offset(dh, find_field(dh, field_name))
+function field_offset(dh::MixedDofHandler, field_idxs::Tuple{Int, Int})
+    fh_idx, field_idx = field_idxs
     field_offset(dh.fieldhandlers[fh_idx], field_idx)
 end
 
@@ -491,8 +494,10 @@ dof_range(dh::MixedDofHandler, field_name::Symbol) = dof_range(dh, find_field(dh
 function getfieldinterpolation(dh::MixedDofHandler, field_idxs::NTuple{2,Int})
     fh_idx, field_idx = field_idxs
     ip = dh.fieldhandlers[fh_idx].fields[field_idx].interpolation
+    return ip
 end
-getfieldinterpolation(dh::MixedDofHandler, field_idx::Int) = getfieldinterpolation(dh, (1,field_idx))
+getfieldinterpolation(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].interpolation
+getfieldinterpolation(fh::FieldHandler, field_name::Symbol) = getfieldinterpolation(fh, find_field(fh, field_name))
 
 function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) where T
 
