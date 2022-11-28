@@ -77,26 +77,33 @@ The programs are sorted as
 	
  Keywords: Non-linear problem, hyperelasticity, finite strain, large deformations, Newton's method, automatic differentiation, coupled problem, mixed elements, displacement-pressure equation, incompressibility
 
-12.	[Incompressible Navier-Stokes Equations via DifferentialEquations.jl](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/ns_vs_diffeq/)  
-
- The weak form of the semi-discretized incompressible Navier-Stokes equations are derived from the strong form and implemented in the finite element code. Then, the time-dependent solution is calculated by using the DifferentialEquations.jl package. For this purpose, the PDE is required in a specific form.  
-	
- Keywords: Fluid dynamics, weak and strong form, solver, incompressibility, time-dependent problem
-
-13.	[Computational homogenization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/computational_homogenization/)  
+12.	[Computational homogenization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/computational_homogenization/)  
 
  A two-dimensional representative volume element (RVE) is loaded in shear. Dirichlet and periodic boundary conditions are applied and the results from the homogenization are compared to the Voigt and Reuss bounds.  
 	
  Keywords: homogenization, periodic boundary conditions, representative volume element (RVE), microscale, Voigt and Reuss bound
 
-14.	[Stokes flow](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/stokes-flow/)  
+13.	[Stokes flow](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/stokes-flow/)  
 
  Stokes flow on a quarter circle is solved by applying periodic boundary conditions. The weak and strong form of the problem are discussed including constrains. Mesh generation is done directly via the Gmsh API.  
 	
  Keywords: Periodic boundary conditions, multiple fields, mean value constraint, mesh generation with Gmsh, coupled problem, weak and strong form
+ 
+14.	[Topology Optimization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/topology_optimization/)  
+
+ Topology optimization is shown for the bending problem by using a SIMP material model. To avoid numerical instabilities, a regularization scheme requiring the calculation of the Laplacian is imposed, which is done by using the grid topology functionalities.  
 	
+ Keywords: Topology optimization, weak and strong form, non-linear problem, Laplacian, grid topology
+
+## Other examples
+1.	[Incompressible Navier-Stokes Equations via DifferentialEquations.jl](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/ns_vs_diffeq/)  
+
+ The weak form of the semi-discretized incompressible Navier-Stokes equations are derived from the strong form and implemented in the finite element code. Then, the time-dependent solution is calculated by using the DifferentialEquations.jl package. For this purpose, the PDE is required in a specific form.  
+	
+ Keywords: Fluid dynamics, weak and strong form, solver, incompressibility, time-dependent problem
+
 ## Grouped by topic
 * Fundamentals: [Heat Equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/heat_equation/), [Postprocessing](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/postprocessing/), [Helmholtz Equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/helmholtz/)
-* Non-linear Problems: [Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/hyperelasticity/), [von Mises Plasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/plasticity/), [Nearly Incompressible Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/quasi_incompressible_hyperelasticity/)
+* Non-linear Problems: [Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/hyperelasticity/), [von Mises Plasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/plasticity/), [Nearly Incompressible Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/quasi_incompressible_hyperelasticity/), [Topology Optimization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/topology_optimization/)
 * Time dependent problems: [Time Dependent Problems](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/transient_heat_equation/), [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/ns_vs_diffeq/)
 * Advanced: [Threaded Assembly](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/threaded_assembly/), [Ginzburg-Landau model energy minimization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/landau/)

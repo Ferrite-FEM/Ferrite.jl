@@ -32,6 +32,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "ns_vs_diffeq.md",
     "computational_homogenization.md",
     "stokes-flow.md",
+	"topology_optimization.md",
     )]
 
 # Build documentation.
