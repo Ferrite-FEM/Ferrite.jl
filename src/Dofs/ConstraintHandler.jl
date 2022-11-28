@@ -745,11 +745,12 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
         col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
         if col_coeffs === nothing
             for a in nzrange(K, col)
+                Kval = K.nzval[a]
+                iszero(Kval) && continue
                 row = K.rowval[a]
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 row_coeffs === nothing && continue
                 for (d, v) in row_coeffs
-                    Kval = K.nzval[a]
                     _addindex_sparsematrix!(K, v * Kval, d, col) || _sparsity_error()
                 end
 
@@ -760,16 +761,16 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
             end
         else
             for a in nzrange(K, col)
+                Kval = K.nzval[a]
+                iszero(Kval) && continue
                 row = K.rowval[a]
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 if row_coeffs === nothing
                     for (d, v) in col_coeffs
-                        Kval = K.nzval[a]
                         _addindex_sparsematrix!(K, v * Kval, row, d) || _sparsity_error()
                     end
                 else
                     for (d1, v1) in col_coeffs, (d2, v2) in row_coeffs
-                        Kval = K.nzval[a]
                         _addindex_sparsematrix!(K, v1 * v2 * Kval, d1, d2) || _sparsity_error()
                     end
                 end
@@ -1738,10 +1739,12 @@ function _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVe
         col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, global_col)
         if col_coeffs === nothing
             for (local_row, global_row) in pairs(global_dofs)
+                m = local_matrix[local_row, local_col]
+                iszero(m) && continue # Skip early when zero to avoid remaining lookups
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, global_row)
                 row_coeffs === nothing && continue # Neither the column nor the row are constrained: Do nothing
                 for (global_mrow, weight) in row_coeffs
-                    mw = local_matrix[local_row, local_col] * weight
+                    mw = m * weight
                     local_mrow = findfirst(==(global_mrow), global_dofs)
                     if local_mrow === nothing
                         # Only modify the global array if this isn't prescribed since we
@@ -1757,11 +1760,13 @@ function _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVe
             end
         else
             for (local_row, global_row) in pairs(global_dofs)
+                m = local_matrix[local_row, local_col]
+                iszero(m) && continue # Skip early when zero to avoid remaining lookups
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, global_row)
                 if row_coeffs === nothing
                     for (global_mcol, weight) in col_coeffs
                         local_mcol = findfirst(==(global_mcol), global_dofs)
-                        mw = local_matrix[local_row, local_col] * weight
+                        mw = m * weight
                         if local_mcol === nothing
                             # Only modify the global array if this isn't prescribed since we
                             # can't zero it out later like with the local matrix.
@@ -1777,7 +1782,7 @@ function _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVe
                     for (global_mcol, weight_col) in col_coeffs
                         local_mcol = findfirst(==(global_mcol), global_dofs)
                         for (global_mrow, weight_row) in row_coeffs
-                            mww = local_matrix[local_row, local_col] * weight_col * weight_row
+                            mww = m * weight_col * weight_row
                             local_mrow = findfirst(==(global_mrow), global_dofs)
                             if local_mcol === nothing || local_mrow === nothing
                                 # Only modify the global array if this isn't prescribed since we
