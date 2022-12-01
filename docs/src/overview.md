@@ -13,7 +13,7 @@ The programs are sorted as
 ## List of examples (chronological order)
 1.	[Heat Equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/heat_equation/)  
 
- This example is the easiest way for getting started. The heat equation is solved on a unit square. For this purpose, a program is set up containing all the important aspects of finite element computation, including a short introduction to weak and strong forms, trial and test functions, degrees of freedom, boundary conditions, element assembly, global assembly, solving the system and visualizing the results.  
+ This example presents the easiest way to get started. The heat equation is solved on a unit square. For this purpose, a program is set up containing the core aspects of finite element computation: weak and strong forms, trial and test functions, degrees of freedom, boundary conditions, element routine, global assembly, solving the system and visualizing the results.
  
  Keywords: Fundamentals, heat equation, weak and strong form, Dirichlet boundary condition, assembly
 
