@@ -444,7 +444,7 @@ function topopt(β,ρ,n,filename; output=:false)
         end
   
         ## update density
-        χ = UpdateDensity(dh, states, mp, ρ, topology, Δh)
+        χ = update_density(dh, states, mp, ρ, topology, Δh)
         
         ## update old displacement, density and compliance
         un .= u
