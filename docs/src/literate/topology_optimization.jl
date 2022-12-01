@@ -249,7 +249,7 @@ end
 # $\eta$ and $\beta$ by the average driving forces to make the choice of the parameters independent
 # from the specific problem. 
 
-function UpdateDensity(dh, states, mp, ρ, topology, Δh)   
+function update_density(dh, states, mp, ρ, topology, Δh)   
     pΨ, χn = DrivingForces(states, mp, dh) ## driving forces, old density field
     ∇²χ = approximate_laplacian(dh, topology, χn, Δh) ## Laplacian
 
