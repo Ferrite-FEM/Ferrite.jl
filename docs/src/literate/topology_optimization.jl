@@ -165,7 +165,7 @@ end
 # For this purpose, we iterate through all elements and calculate the average strain in each
 # element. Then, we compute the driving force from the formula introduced at the beginning.
 
-function DrivingForces(states, mp, dh)
+function compute_driving_forces(states, mp, dh)
     pΨ = zeros(length(states))
     χn = zeros(length(states))
     for (element, state) in zip(CellIterator(dh), states)
