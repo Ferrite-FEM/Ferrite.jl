@@ -8,14 +8,6 @@ push!(dh, :u, 2, Lagrange{2,RefTetrahedron,2}())
 push!(dh, :p, 1, Lagrange{2,RefTetrahedron,1}())
 close!(dh)
 
-# renumber!
-perm = randperm(ndofs(dh))
-iperm = invperm(perm)
-dofs = copy(dh.cell_dofs)
-Ferrite.renumber!(Ferrite.renumber!(dh, perm), iperm)
-@test dofs == dh.cell_dofs
-
-
 # dof_range
 @test (@inferred dof_range(dh, :u)) == 1:12
 @test (@inferred dof_range(dh, :p)) == 13:15
@@ -105,4 +97,74 @@ s_nodes = reshape_to_nodes(dh, u, :s)
 @test s_nodes ≈ [i+0.3 for i=1:4]'
 v_nodes = reshape_to_nodes(dh, u, :v)
 @test v_nodes ≈ [i==3 ? 0.0 : j+i/10 for i=1:3, j=1:4]
+end
+
+@testset "renumber!" begin
+    function dhmdhch()
+        local dh, mdh, ch
+        grid = generate_grid(Triangle, (10, 10))
+        dh = DofHandler(grid)
+        push!(dh, :u, 1)
+        close!(dh)
+        mdh = MixedDofHandler(grid)
+        push!(mdh, FieldHandler([Field(:u, Lagrange{2,RefTetrahedron,1}(), 1)], Set(1:getncells(grid)÷2)))
+        push!(mdh, FieldHandler([Field(:u, Lagrange{2,RefTetrahedron,1}(), 1)], Set((getncells(grid)÷2+1):getncells(grid))))
+        close!(mdh)
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0))
+        add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 2))
+        face_map = collect_periodic_faces(grid, "bottom", "top")
+        add!(ch, PeriodicDirichlet(:u, face_map))
+        close!(ch)
+        update!(ch, 0)
+        return dh, mdh, ch
+    end
+    dh, mdh, ch = dhmdhch()
+
+    perm = randperm(ndofs(dh))
+    iperm = invperm(perm)
+
+    # Roundtrip tests
+    original_dofs = copy(dh.cell_dofs)
+    renumber!(dh, perm)
+    renumber!(dh, iperm)
+    @test original_dofs == dh.cell_dofs
+    original_dofs_mdh = copy(mdh.cell_dofs.values)
+    renumber!(mdh, perm)
+    renumber!(mdh, iperm)
+    @test original_dofs_mdh == mdh.cell_dofs.values
+    original_prescribed = copy(ch.prescribed_dofs)
+    original_inhomogeneities = copy(ch.inhomogeneities)
+    original_affine_inhomogeneities = copy(ch.affine_inhomogeneities)
+    original_dofcoefficients = [c === nothing ? c : copy(c) for c in ch.dofcoefficients]
+    renumber!(dh, ch, perm)
+    renumber!(dh, ch, iperm)
+    @test original_dofs == dh.cell_dofs
+    @test original_prescribed == ch.prescribed_dofs
+    @test original_inhomogeneities == ch.inhomogeneities
+    @test original_affine_inhomogeneities == ch.affine_inhomogeneities
+    @test original_dofcoefficients == ch.dofcoefficients
+
+    # Integration tests
+    K = create_sparsity_pattern(dh, ch)
+    f = zeros(ndofs(dh))
+    a = start_assemble(K, f)
+    dhp, _, chp = dhmdhch()
+    renumber!(dhp, chp, perm)
+    Kp = create_sparsity_pattern(dhp, chp)
+    fp = zeros(ndofs(dhp))
+    ap = start_assemble(Kp, fp)
+    for cellid in 1:getncells(dh.grid)
+        ke = Float64[3 -1 -2; -1 4 -1; -2 -1 5] * cellid
+        fe = Float64[1, 2, 3] * cellid
+        assemble!(a, celldofs(dh, cellid), ke, fe)
+        assemble!(ap, celldofs(dhp, cellid), ke, fe)
+    end
+    apply!(K, f, ch)
+    apply!(Kp, fp, chp)
+    u = K \ f
+    up = Kp \ fp
+    @test norm(u) ≈ norm(up) ≈ 15.47826706793882
+    @test u ≈ up[perm]
+    @test u[iperm] ≈ up
 end

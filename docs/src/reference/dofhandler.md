@@ -18,6 +18,10 @@ FieldHandler
 close!(::MixedDofHandler)
 ```
 
+```@docs
+renumber!
+```
+
 ## Common methods
 ```@docs
 ndofs
