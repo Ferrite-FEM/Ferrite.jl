@@ -154,7 +154,7 @@ function MaterialState(ρ, n_qp)
     return MaterialState(ρ, Array{SymmetricTensor{2,2,Float64},1}(undef, n_qp))
 end
 
-function UpdateMaterialStates!(χn1, states, dh)
+function update_material_states!(χn1, states, dh)
     for (element, state) in zip(CellIterator(dh),states)
         state.χ = χn1[cellid(element)]
     end
