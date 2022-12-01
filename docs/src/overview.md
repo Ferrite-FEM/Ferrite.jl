@@ -21,7 +21,7 @@ The programs are sorted as
 
  Based on example 1, visualization of the flux variable is done via the L2Projector. Additionally, the point evaluation along a line is shown.  
 	
- Keywords: Fundamentals, postprocessing, heat equation, flux, L2projection, point Evaluation
+ Keywords: Fundamentals, postprocessing, heat equation, flux, L2-projection, point evaluation
 
 3.	[Helmholtz equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/helmholtz/)  
 
