@@ -449,7 +449,7 @@ function topopt(β,ρ,n,filename; output=:false)
         ## update old displacement, density and compliance
         un .= u
         Δu .= 0.0
-        UpdateMaterialStates!(χ, states, dh)
+        update_material_states!(χ, states, dh)
         compliance_n = compliance
         
         ## output during calculation
