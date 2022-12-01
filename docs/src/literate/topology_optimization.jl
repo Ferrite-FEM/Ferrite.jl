@@ -250,7 +250,7 @@ end
 # from the specific problem. 
 
 function update_density(dh, states, mp, ρ, topology, Δh)   
-    pΨ, χn = DrivingForces(states, mp, dh) ## driving forces, old density field
+    pΨ, χn = compute_driving_forces(states, mp, dh) ## driving forces, old density field
     ∇²χ = approximate_laplacian(dh, topology, χn, Δh) ## Laplacian
 
     p_Ω = sum(pΨ)/length(pΨ) ## average driving force
