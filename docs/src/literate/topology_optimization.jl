@@ -184,7 +184,7 @@ end
 # the function call will return an empty object. In that case we use the dictionary to instead find the opposite
 # face, as discussed in the introduction. Then, the approximation of the Laplacian reduces to the sum below. 
 
-function Laplacian(dh, topology, χn, Δh)
+function approximate_laplacian(dh, topology, χn, Δh)
     ∇²χ = zeros(getncells(dh.grid))
     _nfaces = nfaces(dh.grid.cells[1])
     opp = Dict(1=>3, 2=>4, 3=>1, 4=>2)
