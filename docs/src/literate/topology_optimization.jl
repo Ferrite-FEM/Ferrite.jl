@@ -290,7 +290,7 @@ end
 
 # The element routine is used to calculate the elementwise stiffness matrix and the residual. In contrast to a purely
 # elastomechanic problem, for topology optimization we additionally use our material state to receive the density value of
-# the element and to store the strain of each quadrature point.
+# the element and to store the strain at each quadrature point.
 
 function elmt!(Ke, re, element, cellvalues, facevalues, grid, mp, ue, state)
     n_basefuncs = getnbasefunctions(cellvalues)
