@@ -263,7 +263,7 @@ function UpdateDensity(dh, states, mp, ρ, topology, Δh)
 end
 #md nothing # hide
     
-# Now, we move on the Finite Element part of the program. We use the following function to assemble our linear system.
+# Now, we move on to the Finite Element part of the program. We use the following function to assemble our linear system.
 
 function doassemble!(cellvalues::CellVectorValues{dim}, facevalues::FaceVectorValues{dim}, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states) where {dim}
     r = zeros(ndofs(dh))
