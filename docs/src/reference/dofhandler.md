@@ -20,6 +20,9 @@ close!(::MixedDofHandler)
 
 ```@docs
 renumber!
+DofOrder.FieldWise
+DofOrder.ComponentWise
+DofOrder.CellWise
 ```
 
 ## Common methods
