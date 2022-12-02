@@ -208,9 +208,10 @@ function approximate_laplacian(dh, topology, χn, Δh)
 end
 #md nothing # hide
 
+# For the iterative computation of the solution, a function is needed to update the densities in each element.
 # To ensure that the mass is kept constant, we have to calculate the constraint
 # parameter $\lambda$, which we do via the bisection method. We repeat the calculation
-# until the difference between the current density and target density nearly vanishes. 
+# until the difference between the average density (calculated from the element-wise trial densities) and the target density nearly vanishes. 
 
 function compute_χn1(χn, Δχ, ρ, ηs, χ_min) 
     n_el = length(χn)

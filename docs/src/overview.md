@@ -33,7 +33,7 @@ The programs are sorted as
 
  A mixed element for solving unidirectional displacement-pressure coupling is constructed. The solution for nearly incompressible materials is compared for different interpolations.  
 	
- Keywords: Mixed elements, unidirectional coupling, displacement-pressure equation, incompressibility, stability
+ Keywords: Mixed elements, multiple fields, unidirectional coupling, displacement-pressure equation, incompressibility, stability
 
 5.	[Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/hyperelasticity/)  
 
@@ -69,13 +69,13 @@ The programs are sorted as
 
  A program for the use of linear shell elements is set up. The theoretical background is introduced as well.  
 	
- Keywords: Shell elements, displacements, rotations, ForwardDiff.jl, under integration
+ Keywords: Shell elements, displacements, rotations, multiple fields, ForwardDiff.jl, reduced integration
  
 11.	[Nearly Incompressible Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/quasi_incompressible_hyperelasticity/)  
 
  This program combines ideas from the examples Incompressible Elasticity and Hyperelasticity to construct a mixed element solving three-dimensional displacement-pressure equations.
 	
- Keywords: Non-linear problem, hyperelasticity, finite strain, large deformations, Newton's method, automatic differentiation, coupled problem, mixed elements, displacement-pressure equation, incompressibility
+ Keywords: Non-linear problem, hyperelasticity, finite strain, large deformations, Newton's method, automatic differentiation, coupled problem, mixed elements, multiple fields, displacement-pressure equation, incompressibility
 
 12.	[Computational homogenization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/computational_homogenization/)  
 
@@ -103,7 +103,10 @@ The programs are sorted as
  Keywords: Fluid dynamics, weak and strong form, solver, incompressibility, time-dependent problem
 
 ## Grouped by topic
-* Fundamentals: [Heat Equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/heat_equation/), [Postprocessing](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/postprocessing/), [Helmholtz Equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/helmholtz/)
+* Fundamentals: [Heat Equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/heat_equation/), [Postprocessing](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/postprocessing/), [Helmholtz Equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/helmholtz/), [Incompressible Elasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/incompressible_elasticity/)
 * Non-linear Problems: [Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/hyperelasticity/), [von Mises Plasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/plasticity/), [Nearly Incompressible Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/quasi_incompressible_hyperelasticity/), [Topology Optimization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/topology_optimization/)
 * Time dependent problems: [Time Dependent Problems](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/transient_heat_equation/), [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/ns_vs_diffeq/)
+* Multiple fields: [Incompressible Elasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/incompressible_elasticity/), [Linear shell](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/linear_shell/), [Nearly Incompressible Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/quasi_incompressible_hyperelasticity/)
+* Coupled problems: [Stokes flow](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/stokes-flow/)     
+* Periodic problems: [Computational homogenization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/computational_homogenization/), [Stokes flow](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/stokes-flow/)
 * Advanced: [Threaded Assembly](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/threaded_assembly/), [Ginzburg-Landau model energy minimization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/landau/)
