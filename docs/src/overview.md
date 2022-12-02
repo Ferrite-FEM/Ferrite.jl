@@ -27,7 +27,7 @@ The programs are sorted as
 
  The Helmholtz equation is solved on a unit square. Dirichlet and Neumann boundary conditions are applied at different parts of the boundary. A known analytical solution is approximately reproduced to verify the finite element solution.  
 	
- Keywords: Fundamentals, Helmholtz equation, Dirichlet boundary condition, Neumann boundary condition, verification
+ Keywords: Fundamentals, Helmholtz equation, Dirichlet boundary condition, Neumann boundary condition, verification, boundary integrals
 
 4.	[Incompressible Elasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/incompressible_elasticity/)  
 
