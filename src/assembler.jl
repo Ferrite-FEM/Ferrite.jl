@@ -82,7 +82,10 @@ Assembles the element residual `ge` into the global residual vector `g`.
 @propagate_inbounds function assemble!(g::AbstractVector{T}, dofs::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
     @boundscheck checkbounds(g, dofs)
     @inbounds for i in 1:length(dofs)
-        g[dofs[i]] += ge[i]
+        val = ge[i]
+        if !iszero(val)
+            g[dofs[i]] += val
+        end
     end
 end
 
@@ -181,18 +184,38 @@ end
     current_col = 1
     @inbounds for Kcol in sorteddofs
         maxlookups = sym ? current_col : ld
-        current_idx = 1
-        for r in nzrange(K, Kcol)
-            Kerow = permutation[current_idx]
-            if K.rowval[r] == dofs[Kerow]
-                Kecol = permutation[current_col]
-                K.nzval[r] += Ke[Kerow, Kecol]
-                current_idx += 1
+        Kecol = permutation[current_col]
+        ri = 1 # row index pointer for the local matrix
+        Ri = 1 # row index pointer for the global matrix
+        nzr = nzrange(K, Kcol)
+        while Ri <= length(nzr) && ri <= maxlookups
+            R = nzr[Ri]
+            Krow = K.rowval[R]
+            Kerow = permutation[ri]
+            val = Ke[Kerow, Kecol]
+            if Krow == dofs[Kerow]
+                # Match: add the value (if non-zero) and advance the pointers
+                if !iszero(val)
+                    K.nzval[R] += val
+                end
+                ri += 1
+                Ri += 1
+            elseif Krow < dofs[Kerow]
+                # No match yet: advance the global matrix row pointer
+                Ri += 1
+            else # Krow > dofs[Kerow]
+                # No match: no entry exist in the global matrix for this row. This is
+                # allowed as long as the value which would have been inserted is zero.
+                iszero(val) || error("some row indices were not found")
+                # Advance the local matrix row pointer
+                ri += 1
             end
-            current_idx > maxlookups && break
         end
-        if current_idx <= maxlookups
-            error("some row indices were not found")
+        # Make sure that remaining entries in this column of the local matrix are all zero
+        for i in ri:maxlookups
+            if !iszero(Ke[permutation[i], Kecol])
+                error("some row indices were not found")
+            end
         end
         current_col += 1
     end
