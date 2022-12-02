@@ -257,7 +257,7 @@ function update_density(dh, states, mp, ρ, topology, Δh)
 
     Δχ = pΨ + mp.β*p_Ω*∇²χ
     
-    χn1 = Bisection(χn, Δχ, ρ, mp.η*p_Ω, mp.χ_min)
+    χn1 = compute_χn1(χn, Δχ, ρ, mp.η*p_Ω, mp.χ_min)
     
     return χn1
 end
