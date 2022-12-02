@@ -212,7 +212,7 @@ end
 # parameter $\lambda$, which we do via the bisection method. We repeat the calculation
 # until the difference between the current density and target density nearly vanishes. 
 
-function Bisection(χn, Δχ, ρ, ηs, χ_min) 
+function compute_χn1(χn, Δχ, ρ, ηs, χ_min) 
     n_el = length(χn)
     
     χ_trial = zeros(n_el)
