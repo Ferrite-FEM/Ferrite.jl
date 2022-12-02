@@ -448,7 +448,8 @@ function main()
     ## Boundary conditions
     ch = setup_constraints(dh, fvp)
     ## Global tangent matrix and rhs
-    K = create_sparsity_pattern(dh, ch)
+    coupling = [true true; true false] # no coupling between pressure test/trial functions
+    K = create_sparsity_pattern(dh, ch; coupling=coupling)
     f = zeros(ndofs(dh))
     ## Assemble system
     assemble_system!(K, f, dh, cvu, cvp)

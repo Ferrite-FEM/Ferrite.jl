@@ -934,8 +934,10 @@ function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset
     end
 end
 
-create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler) = Symmetric(_create_sparsity_pattern(dh, ch, true), :U)
-create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler) = _create_sparsity_pattern(dh, ch, false)
+create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling=nothing) =
+    Symmetric(_create_sparsity_pattern(dh, ch, true, coupling), :U)
+create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling=nothing) =
+    _create_sparsity_pattern(dh, ch, false, coupling)
 
 struct PeriodicFacePair
     mirror::FaceIndex
