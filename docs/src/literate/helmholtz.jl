@@ -93,14 +93,14 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
     b = 1.0
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
-    
+
     n_basefuncs = getnbasefunctions(cellvalues)
     global_dofs = zeros(Int, ndofs_per_cell(dh))
 
     fe = zeros(n_basefuncs) # Local force vector
     Ke = zeros(n_basefuncs, n_basefuncs) # Local stiffness mastrix
 
-    @inbounds for (cellcount, cell) in enumerate(CellIterator(dh))
+    for (cellcount, cell) in enumerate(CellIterator(dh))
         fill!(Ke, 0)
         fill!(fe, 0)
         coords = getcoordinates(cell)
