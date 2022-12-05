@@ -10,7 +10,7 @@ The programs are sorted as
 * A complete list shortly summarizing the topic, what they teach and which keywords related to the task they contain
 * Grouped by topic 
 
-## List of examples (chronological order)
+## List of examples (sequential order)
 1.	[Heat Equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/heat_equation/)  
 
  This example presents the easiest way to get started. The heat equation is solved on a unit square. For this purpose, a program is set up containing the core aspects of finite element computation: weak and strong forms, trial and test functions, degrees of freedom, boundary conditions, element routine, global assembly, solving the system and visualizing the results.
@@ -104,9 +104,8 @@ The programs are sorted as
 
 ## Grouped by topic
 * Fundamentals: [Heat Equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/heat_equation/), [Postprocessing](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/postprocessing/), [Helmholtz Equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/helmholtz/), [Incompressible Elasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/incompressible_elasticity/)
-* Non-linear Problems: [Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/hyperelasticity/), [von Mises Plasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/plasticity/), [Nearly Incompressible Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/quasi_incompressible_hyperelasticity/), [Topology Optimization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/topology_optimization/)
+* Non-linear Problems: [Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/hyperelasticity/), [von Mises Plasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/plasticity/), [Nearly Incompressible Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/quasi_incompressible_hyperelasticity/), [Computational homogenization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/computational_homogenization/), [Topology Optimization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/topology_optimization/)
 * Time dependent problems: [Time Dependent Problems](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/transient_heat_equation/), [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/ns_vs_diffeq/)
-* Multiple fields: [Incompressible Elasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/incompressible_elasticity/), [Linear shell](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/linear_shell/), [Nearly Incompressible Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/quasi_incompressible_hyperelasticity/)
-* Coupled problems: [Stokes flow](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/stokes-flow/)     
+* Multiple fields: [Incompressible Elasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/incompressible_elasticity/), [Linear shell](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/linear_shell/), [Nearly Incompressible Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/quasi_incompressible_hyperelasticity/), [Stokes flow](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/stokes-flow/)     
 * Periodic problems: [Computational homogenization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/computational_homogenization/), [Stokes flow](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/stokes-flow/)
 * Advanced: [Threaded Assembly](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/threaded_assembly/), [Ginzburg-Landau model energy minimization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/landau/)

@@ -30,8 +30,8 @@
 # ```math
 # G = \int_{\Omega} \frac{1}{2} \chi^p \varepsilon : C : \varepsilon \; \text{d}V - \int_{\Omega} \boldsymbol{f} \cdot \boldsymbol{u} \; \text{d}V - \int_{\partial\Omega} \boldsymbol{t} \cdot \boldsymbol{u} \; \text{d}A.
 # ```
-# which we will solve with the finite element method using Ferrite. Furthermore, we receive the evolution equation of the density 
-# and the additional Neumann boundary condition
+# Furthermore, we receive the evolution equation of the density
+# and the additional Neumann boundary condition in the strong form
 # ```math
 # p_\chi + \eta \dot{\chi} + \lambda + \gamma - \beta \nabla^2 \chi \ni 0 \quad \forall \textbf{x} \in \Omega, 
 # ```
@@ -42,6 +42,9 @@
 # ```math
 # p_\chi = \frac{1}{2} p \chi^{p-1} \varepsilon : C : \varepsilon.
 # ```
+# We obtain the mechanical displacement field by applying the Finite Element Method to the weak form
+# of the Gibbs energy using Ferrite. In contrast, we use the evolution equation (i.e. the strong form) to calculate
+# the value of the density field $\chi$. The advantage of this "split" approach is the very high computation speed.
 # The evolution equation consists of the driving force, the damping paramter $\eta$, the regularization parameter $\beta$ times the Laplacian,
 # which is necessary to avoid numerical issues like mesh dependence or checkerboarding, and the constraint parameters $\lambda$, to keep the mass constant,
 # and $\gamma$, to avoid leaving the set $[\chi_{\text{min}}, 1]$. By including gradient regularization, it becomes necessary to calculate the Laplacian.
@@ -115,7 +118,7 @@ function create_bc(dh)
 end
 #md nothing # hide
 
-# Now, we define a struct to store all necessary material parameters (stiffnes tensor of the bulk material
+# Now, we define a struct to store all necessary material parameters (stiffness tensor of the bulk material
 # and the parameters for topology optimization) and add a constructor to the struct to
 # initialize it by using the common material parameters Young's modulus and Poisson number.
 
@@ -134,9 +137,7 @@ function MaterialParameters(E, ν, χ_min, p, β, η)
     G = E / 2(1 + ν) ## =μ
     λ = E*ν/(1-ν^2) ## correction for plane stress included
 
-    temp(i,j,k,l) = λ * δ(i,j)*δ(k,l) + G* (δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)) 
-    
-    C = SymmetricTensor{4, 2}(temp)
+    C = SymmetricTensor{4, 2}((i,j,k,l) -> λ * δ(i,j)*δ(k,l) + G* (δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)))
     return MaterialParameters(C, χ_min, p, β, η)
 end
 #md nothing # hide
@@ -212,6 +213,7 @@ end
 # To ensure that the mass is kept constant, we have to calculate the constraint
 # parameter $\lambda$, which we do via the bisection method. We repeat the calculation
 # until the difference between the average density (calculated from the element-wise trial densities) and the target density nearly vanishes. 
+# By using the extremal values of $\Delta \chi$ as the starting interval, we guarantee that the method converges eventually.
 
 function compute_χn1(χn, Δχ, ρ, ηs, χ_min) 
     n_el = length(χn)
