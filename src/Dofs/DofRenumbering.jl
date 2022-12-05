@@ -176,8 +176,8 @@ function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.Compone
     dofs_for_blocks = [Set{Int}() for _ in 1:nblocks]
     dof_ranges = [dof_range(dh, f) for f in dh.field_names]
     component_offsets = pushfirst!(cumsum(dh.field_dims), 0)
-    flags = UpdateFlags(nodes=false, coords=false, celldofs=true)
-    @inbounds for cell in CellIterator(dh, #=cellset=# nothing, flags)
+    flags = UpdateFlags(nodes=false, coords=false, dofs=true)
+    @inbounds for cell in CellIterator(dh, flags)
         cdofs = celldofs(cell)
         for i in eachindex(dh.field_names)
             rng = dof_ranges[i]

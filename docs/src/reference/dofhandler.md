@@ -35,5 +35,6 @@ Ferrite.getfielddim(::MixedDofHandler, ::Symbol)
 
 # CellIterator
 ```@docs
+CellCache
 CellIterator
 ```

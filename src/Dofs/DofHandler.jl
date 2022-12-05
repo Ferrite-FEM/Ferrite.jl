@@ -474,11 +474,10 @@ function reshape_to_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol) where
     return data
 end
 
-function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=Set{Int}(1:getncells(dh.grid))) where T
+function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=1:getncells(dh.grid)) where T
 
-    _celldofs = Vector{Int}(undef, ndofs_per_cell(dh, first(cellset)))
-    for cell in CellIterator(dh, collect(cellset))
-        celldofs!( _celldofs, cell)
+    for cell in CellIterator(dh, cellset, UpdateFlags(; nodes=true, coords=false, dofs=true))
+        _celldofs = celldofs(cell)
         counter = 1
         for node in getnodes(cell)
             for d in 1:field_dim

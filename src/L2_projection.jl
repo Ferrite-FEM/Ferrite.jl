@@ -290,10 +290,9 @@ function reshape_to_nodes(proj::L2Projector, vals::AbstractVector{S}) where {ord
     @assert ndofs(dh) == length(vals)
     nout = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
     data = fill(T(NaN), nout, getnnodes(dh.grid))
-    _celldofs = Vector{Int}(undef, ndofs_per_cell(dh, first(proj.set)))
     for cell in CellIterator(dh, proj.set)
+        _celldofs = celldofs(cell)
         @assert length(getnodes(cell)) == length(_celldofs)
-        celldofs!(_celldofs, cell)
         for (node, dof) in zip(getnodes(cell), _celldofs)
             v = @view data[:, node]
             fill!(v, 0) # remove NaNs for this node

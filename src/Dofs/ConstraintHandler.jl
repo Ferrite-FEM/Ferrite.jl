@@ -306,16 +306,16 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, inter
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
+    cc = CellCache(ch.dh, UpdateFlags(; nodes=false, coords=false, dofs=true))
     for (cellidx, faceidx) in bcfaces
         if cellidx ∉ cellset
             delete!(dbc.faces, Index(cellidx, faceidx))
             continue # skip faces that are not part of the cellset
         end
-        _celldofs = fill(0, ndofs_per_cell(ch.dh, cellidx))
-        celldofs!(_celldofs, ch.dh, cellidx) # extract the dofs for this cell
+        reinit!(cc, cellidx)
         r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
-        append!(constrained_dofs, _celldofs[local_face_dofs[r]]) # TODO: for-loop over r and simply push! to ch.prescribed_dofs
-        @debug println("adding dofs $(_celldofs[local_face_dofs[r]]) to dbc")
+        append!(constrained_dofs, cc.dofs[local_face_dofs[r]]) # TODO: for-loop over r and simply push! to ch.prescribed_dofs
+        @debug println("adding dofs $(cc.dofs[local_face_dofs[r]]) to dbc")
     end
 
     # save it to the ConstraintHandler
@@ -352,18 +352,16 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     ncomps = length(dbc.components)
     nnodes = getnnodes(ch.dh.grid)
     interpol_points = getnbasefunctions(interpolation)
-    _celldofs = fill(0, ndofs_per_cell(ch.dh, first(cellset)))
     node_dofs = zeros(Int, ncomps, nnodes)
     visited = falses(nnodes)
-    for cell in CellIterator(ch.dh, collect(cellset)) # only go over cells that belong to current FieldHandler
-        celldofs!(_celldofs, cell) # update the dofs for this cell
+    for cell in CellIterator(ch.dh, cellset) # only go over cells that belong to current FieldHandler
         for idx in 1:min(interpol_points, length(cell.nodes))
             node = cell.nodes[idx]
             if !visited[node]
                 noderange = (offset + (idx-1)*field_dim + 1):(offset + idx*field_dim) # the dofs in this node
                 for (i,c) in enumerate(dbc.components)
-                    node_dofs[i,node] = _celldofs[noderange[c]]
-                    @debug println("adding dof $(_celldofs[noderange[c]]) to node_dofs")
+                    node_dofs[i,node] = cell.dofs[noderange[c]]
+                    @debug println("adding dof $(cell.dofs[noderange[c]]) to node_dofs")
                 end
                 visited[node] = true
             end
@@ -429,16 +427,9 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:Bo
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::T) where {T}
 
-    dim = getdim(dh.grid)
-    _tmp_cellid = first(faces)[1]
-
-    N = nnodes_per_cell(dh.grid, _tmp_cellid)
-    xh = zeros(Vec{dim, T}, N) # pre-allocate
-    _celldofs = fill(0, ndofs_per_cell(dh, _tmp_cellid))
-
+    cc = CellCache(dh, UpdateFlags(; nodes=false, coords=true, dofs=true))
     for (cellidx, faceidx) in faces
-        cellcoords!(xh, dh, cellidx)
-        celldofs!(_celldofs, dh, cellidx) # update global dofs for this cell
+        reinit!(cc, cellidx)
 
         # no need to reinit!, enough to update current_face since we only need geometric shape functions M
         facevalues.current_face[] = faceidx
@@ -448,13 +439,13 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:Bo
         counter = 1
 
         for location in 1:getnquadpoints(facevalues)
-            x = spatial_coordinate(facevalues, location, xh)
+            x = spatial_coordinate(facevalues, location, cc.coords)
             bc_value = f(x, time)
             @assert length(bc_value) == length(components)
 
             for i in 1:length(components)
                 # find the global dof
-                globaldof = _celldofs[local_face_dofs[r[counter]]]
+                globaldof = cc.dofs[local_face_dofs[r[counter]]]
                 counter += 1
 
                 dbc_index = dofmapping[globaldof]
