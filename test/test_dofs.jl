@@ -255,3 +255,97 @@ end
         @test sign.(diff(celldofs(dh, el)[r])) == sign.(diff(celldofs(dho, el)[r]))
     end
 end
+
+@testset "dof coupling" begin
+    grid = generate_grid(Quadrilateral, (1, 1))
+    dh = DofHandler(grid)
+    push!(dh, :u, 2)
+    push!(dh, :p, 1)
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    close!(ch)
+    udofs = vdofs = dof_range(dh, :u)
+    u1dofs = v1dofs = udofs[1:2:end]
+    u2dofs = v2dofs = udofs[2:2:end]
+    pdofs = qdofs = dof_range(dh, :p)
+
+    function is_stored(A, i, j)
+        A = A isa Symmetric ? A.data : A
+        for m in nzrange(A, j)
+            A.rowval[m] == i && return true
+        end
+        return false
+    end
+
+    # Full coupling (default)
+    K = create_sparsity_pattern(dh)
+    for j in 1:ndofs(dh), i in 1:ndofs(dh)
+        @test is_stored(K, i, j)
+    end
+
+    # Field coupling
+    coupling = [
+    #   u    p
+        true true  # v
+        true false # q
+    ]
+    K = create_sparsity_pattern(dh; coupling=coupling)
+    Kch = create_sparsity_pattern(dh, ch; coupling=coupling)
+    @test K.rowval == Kch.rowval
+    @test K.colptr == Kch.colptr
+    KS = create_symmetric_sparsity_pattern(dh; coupling=coupling)
+    KSch = create_symmetric_sparsity_pattern(dh, ch; coupling=coupling)
+    @test KS.data.rowval == KSch.data.rowval
+    @test KS.data.colptr == KSch.data.colptr
+    for j in udofs, i in Iterators.flatten((vdofs, qdofs))
+        @test is_stored(K, i, j)
+        @test is_stored(KS, i, j) == (i <= j)
+    end
+    for j in pdofs, i in vdofs
+        @test is_stored(K, i, j)
+        @test is_stored(KS, i, j)
+    end
+    for j in pdofs, i in qdofs
+        @test is_stored(K, i, j) == (i == j)
+        @test is_stored(KS, i, j) == (i == j)
+    end
+
+    # Component coupling
+    coupling = [
+    #   u1    u2    p
+        true  true  false # v1
+        true  false true  # v2
+        false true  true  # q
+    ]
+    K = create_sparsity_pattern(dh; coupling=coupling)
+    KS = create_symmetric_sparsity_pattern(dh; coupling=coupling)
+    for j in u1dofs, i in vdofs
+        @test is_stored(K, i, j)
+        @test is_stored(KS, i, j) == (i <= j)
+    end
+    for j in u1dofs, i in qdofs
+        @test !is_stored(K, i, j)
+        @test !is_stored(KS, i, j)
+    end
+    for j in u2dofs, i in Iterators.flatten((v1dofs, qdofs))
+        @test is_stored(K, i, j)
+        @test is_stored(KS, i, j) == (i <= j)
+    end
+    for j in u2dofs, i in v2dofs
+        @test is_stored(K, i, j) == (i == j)
+        @test is_stored(KS, i, j) == (i == j)
+    end
+    for j in pdofs, i in v1dofs
+        @test !is_stored(K, i, j)
+        @test !is_stored(KS, i, j)
+    end
+    for j in pdofs, i in Iterators.flatten((v2dofs, qdofs))
+        @test is_stored(K, i, j)
+        @test is_stored(KS, i, j) == (i <= j)
+    end
+
+    # Error paths
+    @test_throws ErrorException("coupling not square") create_sparsity_pattern(dh; coupling=[true true])
+    @test_throws ErrorException("coupling not symmetric") create_symmetric_sparsity_pattern(dh; coupling=[true true; false true])
+    @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
+end

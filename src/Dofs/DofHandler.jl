@@ -322,21 +322,60 @@ function celldofs(dh::DofHandler, i::Int)
     return global_dofs
 end
 
+# Compute a coupling matrix of size (ndofs_per_cell × ndofs_per_cell) based on the input
+# coupling which can be of size i) (nfields × nfields) specifying coupling between fields,
+# ii) (ncomponents × ncomponents) specifying coupling between components, or iii)
+# (ndofs_per_cell × ndofs_per_cell) specifying coupling between all local dofs, i.e. a
+# "template" local matrix.
+function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatrix{Bool}, sym::Bool)
+    out = zeros(Bool, ndofs_per_cell(dh), ndofs_per_cell(dh))
+    sz = size(coupling, 1)
+    sz == size(coupling, 2) || error("coupling not square")
+    sym && (issymmetric(coupling) || error("coupling not symmetric"))
+    dof_ranges = [dof_range(dh, f) for f in dh.field_names]
+    if sz == length(dh.field_names) # Coupling given by fields
+        for (j, jrange) in pairs(dof_ranges), (i, irange) in pairs(dof_ranges)
+            out[irange, jrange] .= coupling[i, j]
+        end
+    elseif sz == sum(dh.field_dims) # Coupling given by components
+        component_offsets = pushfirst!(cumsum(dh.field_dims), 0)
+        for (jf, jrange) in pairs(dof_ranges), (j, J) in pairs(jrange)
+            jc = mod1(j, dh.field_dims[jf]) + component_offsets[jf]
+            for (i_f, irange) in pairs(dof_ranges), (i, I) in pairs(irange)
+                ic = mod1(i, dh.field_dims[i_f]) + component_offsets[i_f]
+                out[I, J] = coupling[ic, jc]
+            end
+        end
+    elseif sz == ndofs_per_cell(dh) # Coupling given by template local matrix
+        out .= coupling
+    else
+        error("could not create coupling")
+    end
+    return out
+end
+
 # Creates a sparsity pattern from the dofs in a DofHandler.
 # Returns a sparse matrix with the correct storage pattern.
 """
-    create_sparsity_pattern(dh::DofHandler)
+    create_sparsity_pattern(dh::DofHandler; coupling)
 
 Create the sparsity pattern corresponding to the degree of freedom
 numbering in the [`DofHandler`](@ref). Return a `SparseMatrixCSC`
 with stored values in the correct places.
 
+The keyword argument `coupling` can be used to specify how fields (or components) in the dof
+handler couple to each other. `coupling` should be a square matrix of booleans with
+`nfields` (or `ncomponents`) rows/columns with `true` if fields are coupled and `false` if
+not. By default full coupling is assumed.
+
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-create_sparsity_pattern(dh::AbstractDofHandler) = _create_sparsity_pattern(dh, nothing, false)
+function create_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing)
+    return _create_sparsity_pattern(dh, nothing, false, coupling)
+end
 
 """
-    create_symmetric_sparsity_pattern(dh::DofHandler)
+    create_symmetric_sparsity_pattern(dh::DofHandler; coupling)
 
 Create the symmetric sparsity pattern corresponding to the degree of freedom
 numbering in the [`DofHandler`](@ref) by only considering the upper
@@ -344,14 +383,18 @@ triangle of the matrix. Return a `Symmetric{SparseMatrixCSC}`.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-create_symmetric_sparsity_pattern(dh::AbstractDofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
+create_symmetric_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing) = Symmetric(_create_sparsity_pattern(dh, nothing, true, coupling), :U)
 
-function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool)
+function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool, coupling::Union{AbstractMatrix{Bool}, Nothing})
     @assert isclosed(dh)
     ncells = getncells(dh.grid)
+    if coupling !== nothing
+        # Extend coupling to be of size (ndofs_per_cell × ndofs_per_cell)
+        coupling = _coupling_to_local_dof_coupling(dh, coupling, sym)
+    end
     # Compute approximate size for the buffers using the dofs in the first element
     n = ndofs_per_cell(dh)
-    N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
+    N = (coupling === nothing ? (sym ? div(n*(n+1), 2) : n^2) : count(coupling)) * ncells
     N += ndofs(dh) # always add the diagonal elements
     I = Int[]; resize!(I, N)
     J = Int[]; resize!(J, N)
@@ -362,6 +405,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
         resize!(global_dofs, ndofs_per_cell(dh, element_id))
         celldofs!(global_dofs, dh, element_id)
         @inbounds for j in eachindex(global_dofs), i in eachindex(global_dofs)
+            coupling === nothing || coupling[i, j] || continue
             dofi = global_dofs[i]
             dofj = global_dofs[j]
             sym && (dofi > dofj && continue)
