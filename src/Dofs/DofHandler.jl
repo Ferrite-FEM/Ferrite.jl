@@ -403,33 +403,6 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     return K
 end
 
-# dof renumbering
-"""
-    renumber!(dh::AbstractDofHandler, perm)
-    renumber!(dh::AbstractDofHandler, ch::ConstraintHandler, perm)
-
-Renumber the degrees of freedom in the DofHandler and/or ConstraintHandler according to the
-permutation `perm`.
-
-!!! warning
-    The dof numbering in the DofHandler and ConstraintHandler must be always consistent. It
-    is therefore necessary to either renumber *before* creating the ConstraintHandler in the
-    first place, or to renumber the DofHandler and the ConstraintHandler *together*.
-"""
-renumber!
-
-function renumber!(dh::AbstractDofHandler, perm::AbstractVector{<:Integer})
-    @assert isclosed(dh)
-    @assert isperm(perm) && length(perm) == ndofs(dh)
-    cell_dofs = dh isa DofHandler ? dh.cell_dofs :
-                dh isa MixedDofHandler ? dh.cell_dofs.values :
-                error("renumber! not implemented for $(typeof(dh))")
-    for i in eachindex(cell_dofs)
-        cell_dofs[i] = perm[cell_dofs[i]]
-    end
-    return dh
-end
-
 function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
     vtk_grid(filename, dh.grid; compress=compress)
 end
