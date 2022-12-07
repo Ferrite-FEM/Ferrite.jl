@@ -690,7 +690,7 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 row_coeffs === nothing && continue
                 for (d, _) in row_coeffs
-                    if !_addindex_sparsematrix!(K, 0.0, d, col)
+                    if !Base.isstored(K, d, col)
                         cnt += 1
                         _add_or_grow(cnt, I, J, d, col)
                     end
@@ -702,14 +702,14 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 if row_coeffs === nothing
                     for (d, _) in col_coeffs
-                        if !_addindex_sparsematrix!(K, 0.0, row, d)
+                        if !Base.isstored(K, row, d)
                             cnt += 1
                             _add_or_grow(cnt, I, J, row, d)
                         end
                     end
                 else
                     for (d1, _) in col_coeffs, (d2, _) in row_coeffs
-                        if !_addindex_sparsematrix!(K, 0.0, d1, d2)
+                        if !Base.isstored(K, d1, d2)
                             cnt += 1
                             _add_or_grow(cnt, I, J, d1, d2)
                         end
@@ -751,7 +751,7 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 row_coeffs === nothing && continue
                 for (d, v) in row_coeffs
-                    _addindex_sparsematrix!(K, v * Kval, d, col) || _sparsity_error()
+                    addindex!(K, v * Kval, d, col)
                 end
 
                 # Perform f - K*g. However, this has already been done in outside this functions so we skip this.
@@ -767,11 +767,11 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 if row_coeffs === nothing
                     for (d, v) in col_coeffs
-                        _addindex_sparsematrix!(K, v * Kval, row, d) || _sparsity_error()
+                        addindex!(K, v * Kval, row, d)
                     end
                 else
                     for (d1, v1) in col_coeffs, (d2, v2) in row_coeffs
-                        _addindex_sparsematrix!(K, v1 * v2 * Kval, d1, d2) || _sparsity_error()
+                        addindex!(K, v1 * v2 * Kval, d1, d2)
                     end
                 end
             end
@@ -786,8 +786,6 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
     end
 end
 
-_sparsity_error() = error("Sparsity pattern missing entries for the condensation pattern. Make sure to call `create_sparsity_pattern(dh::DofHandler, ch::ConstraintHandler) when using linear constraints.`")
-
 function _add_or_grow(cnt::Int, I::Vector{Int}, J::Vector{Int}, dofi::Int, dofj::Int)
     if cnt > length(J)
         resize!(I, trunc(Int, length(I) * 1.5))
@@ -795,24 +793,6 @@ function _add_or_grow(cnt::Int, I::Vector{Int}, J::Vector{Int}, dofi::Int, dofj:
     end
     I[cnt] = dofi
     J[cnt] = dofj
-end
-
-# Copied from SparseArrays._setindex_scalar!(...)
-# Custom SparseArrays._setindex_scalar!() that throws error if entry K(_i,_j) does not exist
-# Returns true if it successfully added the new value, returns false otherwise.
-function _addindex_sparsematrix!(A::SparseMatrixCSC{Tv,Ti}, v::Tv, i::Ti, j::Ti) where {Tv, Ti}
-    if !((1 <= i <= size(A, 1)) & (1 <= j <= size(A, 2)))
-        throw(BoundsError(A, (i,j)))
-    end
-    coljfirstk = Int(SparseArrays.getcolptr(A)[j])
-    coljlastk = Int(SparseArrays.getcolptr(A)[j+1] - 1)
-    searchk = searchsortedfirst(rowvals(A), i, coljfirstk, coljlastk, Base.Order.Forward)
-    if searchk <= coljlastk && rowvals(A)[searchk] == i
-        # Column j contains entry A[i,j]. Update and return
-        nonzeros(A)[searchk] += v
-        return true
-    end
-    return false
 end
 
 """
@@ -1750,7 +1730,7 @@ function _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVe
                         # can't zero it out later like with the local matrix.
                         if !haskey(dofmapping, global_col) && !haskey(dofmapping, global_mrow)
                             has_global_arrays || missing_global()
-                            _addindex_sparsematrix!(global_matrix, mw, global_mrow, global_col)
+                            addindex!(global_matrix, mw, global_mrow, global_col)
                         end
                     else
                         local_matrix[local_mrow, local_col] += mw
@@ -1771,7 +1751,7 @@ function _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVe
                             # can't zero it out later like with the local matrix.
                             if !haskey(dofmapping, global_row) && !haskey(dofmapping, global_mcol)
                                 has_global_arrays || missing_global()
-                                _addindex_sparsematrix!(global_matrix, mw, global_row, global_mcol)
+                                addindex!(global_matrix, mw, global_row, global_mcol)
                             end
                         else
                             local_matrix[local_row, local_mcol] += mw
@@ -1788,7 +1768,7 @@ function _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVe
                                 # can't zero it out later like with the local matrix.
                                 if !haskey(dofmapping, global_mrow) && !haskey(dofmapping, global_mcol)
                                     has_global_arrays || missing_global()
-                                    _addindex_sparsematrix!(global_matrix, mww, global_mrow, global_mcol)
+                                    addindex!(global_matrix, mww, global_mrow, global_mcol)
                                 end
                             else
                                 local_matrix[local_mrow, local_mcol] += mww

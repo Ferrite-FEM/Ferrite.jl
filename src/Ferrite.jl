@@ -35,6 +35,9 @@ abstract type BoundaryIndex end
 
 include("utils.jl")
 
+# Matrix/Vector utilities
+include("arrayutils.jl")
+
 # Interpolations
 include("interpolations.jl")
 
