@@ -12,10 +12,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.julia-version == 'nightly' }}
     strategy:
+      fail-fast: false
       matrix:
         julia-version: ['1.6', '1.8.2', '1.8.3', 'nightly']
-        os: ['windows-latest', 'macOS-latest']
+        os: ['windows-latest']
         include:
+          - os: macOS-latest
+            julia-version: '1'
           - os: ubuntu-latest
             julia-version: '1'
     steps:
