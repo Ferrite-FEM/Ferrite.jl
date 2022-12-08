@@ -202,13 +202,18 @@ function setup_grid(h=0.05)
     gmsh.model.mesh.generate(2)
 
     ## Save the mesh, and read back in as a Ferrite Grid
-    grid = mktempdir() do dir
+    grid = mktempdir() do dir1
+        @show dir1
         # This avoids a Julia issue with temporary directory cleanup that #src
         # happens on Windows (JuliaLang/julia#47730)                      #src
         dir = mktempdir(; cleanup=false)                                  #src
+        @show dir
+        @show readdir(dir)
         path = joinpath(dir, "mesh.msh")
         gmsh.write(path)
+        @show readdir(dir)
         togrid(path)
+        @show readdir(dir)
     end
 
     ## Finalize the Gmsh library

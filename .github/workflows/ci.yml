@@ -14,11 +14,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        julia-version: ['1.6', '1.8.2', '1.8.3', 'nightly']
+        julia-version: ['1.8.2', '1.8.3']
         os: ['windows-latest']
         include:
-          - os: macOS-latest
-            julia-version: '1'
           - os: ubuntu-latest
             julia-version: '1'
     steps:
