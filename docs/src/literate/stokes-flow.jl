@@ -203,6 +203,9 @@ function setup_grid(h=0.05)
 
     ## Save the mesh, and read back in as a Ferrite Grid
     grid = mktempdir() do dir
+        # This avoids a Julia issue with temporary directory cleanup that #src
+        # happens on Windows (JuliaLang/julia#47730)                      #src
+        dir = mktempdir(; cleanup=false)                                  #src
         path = joinpath(dir, "mesh.msh")
         gmsh.write(path)
         togrid(path)
@@ -461,7 +464,7 @@ function main()
     vtk_grid("stokes-flow", grid) do vtk
         vtk_point_data(vtk, dh, u)
     end
-    Sys.isapple() || @test norm(u) ≈ 0.32254330524111213 #src
+    @test norm(u) ≈ 0.32254330524111213 #src
     return
 end
 #md nothing #hide

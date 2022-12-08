@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: master
+    branches: ['master', 'fe/fix-ci']
     tags: '*'
 
 jobs:
@@ -13,12 +13,10 @@ jobs:
     continue-on-error: ${{ matrix.julia-version == 'nightly' }}
     strategy:
       matrix:
-        julia-version: ['1.6', '1', 'nightly']
-        os: ['ubuntu-latest']
+        julia-version: ['1.6', '1.8.2', '1.8.3', 'nightly']
+        os: ['windows-latest', 'macOS-latest']
         include:
-          - os: windows-latest
-            julia-version: '1'
-          - os: macOS-latest
+          - os: ubuntu-latest
             julia-version: '1'
     steps:
       - uses: actions/checkout@v2
