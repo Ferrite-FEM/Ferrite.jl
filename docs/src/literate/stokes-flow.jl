@@ -212,8 +212,9 @@ function setup_grid(h=0.05)
         path = joinpath(dir, "mesh.msh")
         gmsh.write(path)
         @show readdir(dir)
-        togrid(path)
+        gg = togrid(path)
         @show readdir(dir)
+        gg
     end
 
     ## Finalize the Gmsh library
