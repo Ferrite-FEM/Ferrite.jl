@@ -209,10 +209,12 @@ function setup_grid(h=0.05)
         path = joinpath(dir, "mesh.msh")
         @info "Before gmsh.write" dir readdir(dir) dir1 readdir(dir1) path isfile(path)
         gmsh.write(path)
+        sleep(5)
         @info "After gmsh.write/before FerriteGmsh.togrid" dir readdir(dir) dir1 readdir(dir1) path isfile(path)
         local gg
         try
             gg = togrid(path)
+            @error "FerriteGmsh.togrid(path) worked!"
         catch e
             @error "FerriteGmsh.togrid(path) failed" e
         end
@@ -220,6 +222,7 @@ function setup_grid(h=0.05)
         cp(path, pathcopy)
         try
             gg = togrid(pathcopy)
+            @error "FerriteGmsh.togrid(pathcopy) worked!"
         catch e
             @error "FerriteGmsh.togrid(pathcopy) failed" e
         end
