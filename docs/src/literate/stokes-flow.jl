@@ -207,11 +207,23 @@ function setup_grid(h=0.05)
         # happens on Windows (JuliaLang/julia#47730)
         dir = mktempdir(; cleanup=false)
         path = joinpath(dir, "mesh.msh")
-        @info "Before gmsh.write" dir readdir(dir) dir1 readdir(dir1) path
+        @info "Before gmsh.write" dir readdir(dir) dir1 readdir(dir1) path isfile(path)
         gmsh.write(path)
-        @info "After gmsh.write/before FerriteGmsh.togrid" dir readdir(dir) dir1 readdir(dir1) path
-        gg = togrid(path)
-        @info "After FerriteGmsh.togrid" dir readdir(dir) dir1 readdir(dir1) path
+        @info "After gmsh.write/before FerriteGmsh.togrid" dir readdir(dir) dir1 readdir(dir1) path isfile(path)
+        local gg
+        try
+            gg = togrid(path)
+        catch e
+            @error "FerriteGmsh.togrid(path) failed" e
+        end
+        pathcopy = joinpath(pwd(), "meshcopy.msh")
+        cp(path, pathcopy)
+        try
+            gg = togrid(pathcopy)
+        catch e
+            @error "FerriteGmsh.togrid(pathcopy) failed" e
+        end
+        @info "After FerriteGmsh.togrid" dir readdir(dir) dir1 readdir(dir1) path isfile(path)
         gg
     end
 
