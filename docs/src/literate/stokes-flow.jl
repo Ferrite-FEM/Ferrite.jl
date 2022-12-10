@@ -202,31 +202,32 @@ function setup_grid(h=0.05)
     gmsh.model.mesh.generate(2)
 
     ## Save the mesh, and read back in as a Ferrite Grid
-    grid = mktempdir() do dir1
-        # This avoids a Julia issue with temporary directory cleanup that
-        # happens on Windows (JuliaLang/julia#47730)
-        dir = mktempdir(; cleanup=false)
-        path = joinpath(pwd(), "mesh.msh")
-        @info "Before gmsh.write" dir readdir(dir) dir1 readdir(dir1) path isfile(path)
+    grid = mktempdir() do dir
+        path = joinpath(dir, "mesh.msh")
         gmsh.write(path)
-        sleep(5)
-        @info "After gmsh.write/before FerriteGmsh.togrid" dir readdir(dir) dir1 readdir(dir1) path isfile(path)
-        local gg
-        try
-            gg = togrid(path)
-            @error "FerriteGmsh.togrid(path) worked!"
-        catch e
-            @error "FerriteGmsh.togrid(path) failed" e
-        end
-        pathcopy = joinpath(pwd(), "meshcopy.msh")
+        pathcopy = joinpath(dir, "meshcopy.msh")
         cp(path, pathcopy)
-        try
-            gg = togrid(pathcopy)
-            @error "FerriteGmsh.togrid(pathcopy) worked!"
-        catch e
-            @error "FerriteGmsh.togrid(pathcopy) failed" e
+        gg = togrid(pathcopy)
+        for _ in 1:5
+            @info "Trying to delete" path
+            try
+                rm(path; force=true)
+                break
+            catch e
+                @error "Failed to delete" e
+            end
+            sleep(1)
         end
-        @info "After FerriteGmsh.togrid" dir readdir(dir) dir1 readdir(dir1) path isfile(path)
+        for _ in 1:5
+            @info "Trying to delete" pathcopy
+            try
+                rm(pathcopy; force=true)
+                break
+            catch e
+                @error "Failed to delete" e
+            end
+            sleep(1)
+        end
         gg
     end
 
