@@ -205,9 +205,9 @@ function setup_grid(h=0.05)
     grid = mktempdir() do dir
         path = joinpath(dir, "mesh.msh")
         gmsh.write(path)
-        pathcopy = joinpath(dir, "meshcopy.msh")
-        cp(path, pathcopy)
-        @info "Paths: " path isfile(path) pathcopy isfile(pathcopy)
+        pathcopy = joinpath(pwd(), "meshcopy.msh")
+        mv(path, pathcopy)
+        @info "Paths: " pwd() path isfile(path) pathcopy isfile(pathcopy)
         gg = togrid(pathcopy)
         for _ in 1:5
             @info "Trying to delete" path
