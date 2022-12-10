@@ -206,7 +206,7 @@ function setup_grid(h=0.05)
         # This avoids a Julia issue with temporary directory cleanup that
         # happens on Windows (JuliaLang/julia#47730)
         dir = mktempdir(; cleanup=false)
-        path = joinpath(dir, "mesh.msh")
+        path = joinpath(pwd(), "mesh.msh")
         @info "Before gmsh.write" dir readdir(dir) dir1 readdir(dir1) path isfile(path)
         gmsh.write(path)
         sleep(5)
