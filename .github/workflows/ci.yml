@@ -30,19 +30,3 @@ jobs:
       - uses: codecov/codecov-action@v1
         with:
           file: lcov.info
-  docs:
-    name: Documentation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@v1
-        with:
-          version: '1'
-      - name: Install dependencies
-        run: julia --project=docs -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
-      - name: Build and deploy
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
-          GKSwstype: '100'
-        run: julia --project=docs --color=yes docs/make.jl
