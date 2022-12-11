@@ -6,13 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+ - [Metis.jl](https://github.com/JuliaSparse/Metis.jl) extension for fill-reducing DoF
+   permutation. This uses Julias new package extension mechanism (requires Julia 1.10) to
+   support a new DoF renumbering order `DofOrder.Ext{Metis}()` that can be passed to
+   `renumber!` to renumber DoFs using the Metis.jl library. ([#393][github-393],
+   [#549][github-549])
 
 ## [0.3.10] - 2022-12-11
 ### Added
  - New functions `apply_local!` and `apply_assemble!` for applying constraints locally on
    the element level before assembling to the global system. ([#528][github-528])
  - New functionality to renumber DoFs by fields or by components. This is useful when you
-   need the global matrix to be blocked. ([#545][github-545])
+   need the global matrix to be blocked. ([#378][github-378], [#545][github-545])
  - Functionality to renumber DoFs in DofHandler and ConstraintHandler simultaneously:
    `renumber!(dh::DofHandler, ch::ConstraintHandler, order)`. Previously renumbering had to
    be done *before* creating the ConstraintHandler since otherwise DoF numbers would be
@@ -153,10 +159,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [github-352]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/352
 [github-363]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/363
+[github-378]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/378
 [github-385]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/385
 [github-386]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/386
 [github-390]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/390
 [github-392]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/392
+[github-393]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/393
 [github-401]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/401
 [github-402]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/402
 [github-404]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/404
@@ -215,6 +223,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-544]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/544
 [github-545]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/545
 [github-547]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/547
+[github-549]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/549
 [github-550]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/550
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.10...HEAD

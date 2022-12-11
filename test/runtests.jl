@@ -7,6 +7,11 @@ using Random
 using LinearAlgebra
 using SparseArrays
 
+const HAS_EXTENSIONS = isdefined(Base, :get_extension)
+if HAS_EXTENSIONS
+    import Metis
+end
+
 include("test_utils.jl")
 include("test_interpolations.jl")
 include("test_cellvalues.jl")

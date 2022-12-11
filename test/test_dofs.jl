@@ -254,6 +254,16 @@ end
     for el in 1:2, r in [dof_range(dh, :v)[1:2:end], dof_range(dh, :v)[2:2:end], dof_range(dh, :s)]
         @test sign.(diff(celldofs(dh, el)[r])) == sign.(diff(celldofs(dho, el)[r]))
     end
+
+    # Metis ordering
+    if HAS_EXTENSIONS
+        # TODO: Should probably test that the new order result in less fill-in
+        dh, ch = testdhch()
+        renumber!(dh, DofOrder.Ext{Metis}())
+        @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}())
+        renumber!(dh, DofOrder.Ext{Metis}(coupling=[true true; true false]))
+        @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}(coupling=[true true; true false]))
+    end
 end
 
 @testset "dof coupling" begin
