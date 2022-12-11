@@ -319,7 +319,7 @@ function setup_mean_constraint(dh, fvp)
     V ./= V[constrained_dof]
     mean_value_constraint = AffineConstraint(
         constrained_dof,
-        Pair{Int,Float64}[J[i] => -V[i] for i in 1:length(J) if i != constrained_dof],
+        Pair{Int,Float64}[J[i] => -V[i] for i in 1:length(J) if J[i] != constrained_dof],
         0.0,
     )
     return mean_value_constraint
@@ -448,7 +448,8 @@ function main()
     ## Boundary conditions
     ch = setup_constraints(dh, fvp)
     ## Global tangent matrix and rhs
-    K = create_sparsity_pattern(dh, ch)
+    coupling = [true true; true false] # no coupling between pressure test/trial functions
+    K = create_sparsity_pattern(dh, ch; coupling=coupling)
     f = zeros(ndofs(dh))
     ## Assemble system
     assemble_system!(K, f, dh, cvu, cvp)
@@ -460,7 +461,7 @@ function main()
     vtk_grid("stokes-flow", grid) do vtk
         vtk_point_data(vtk, dh, u)
     end
-    Sys.isapple() || @test norm(u) ≈ 0.32353713318639005 #src
+    Sys.isapple() || @test norm(u) ≈ 0.32254330524111213 #src
     return
 end
 #md nothing #hide

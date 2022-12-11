@@ -168,26 +168,13 @@ Next, we define some helper functions that take care of the node handling.
 Ferrite.getnodes(grid::SmallGrid) = grid.nodes_test
 Ferrite.getnodes(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.nodes_test[v]
 Ferrite.getnnodes(grid::SmallGrid) = length(grid.nodes_test)
+Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
 Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
 Ferrite.n_faces_per_cell(grid::SmallGrid) = nfaces(eltype(grid.cells_test))
 ```
 
-Finally, we define `getcoordinates`, which is an important function, if we want to assemble a problem.
-The transformation from the reference space to the physical one requires information about the coordinates in order to construct the
-Jacobian. The return of this part is later handled over to `reinit!`.
-
-```julia
-function Ferrite.getcoordinates!(x::Vector{Vec{dim,T}}, grid::SmallGrid, cell::Int) where {dim,T}
-    for i in 1:length(x)
-        x[i] = Vec{dim,T}(grid.nodes_test[grid.cells_test[cell].nodes[i]])
-    end
-end
-
-function Ferrite.getcoordinates(grid::SmallGrid{dim}, cell::Int) where dim
-    nodeidx = grid.cells_test[cell].nodes
-    return [Vec{dim,Float64}(grid.nodes_test[i]) for i in nodeidx]::Vector{Vec{dim,Float64}}
-end
-```
+These definitions make many of `Ferrite`s functions work out of the box, e.g. you can now call 
+`getcoordinates(grid, cellid)` on the `SmallGrid`. 
 
 Now, you would be able to assemble the heat equation example over the new custom `SmallGrid` type.
 Note that this particular subtype isn't able to handle boundary entity sets and so, you can't describe boundaries with it.

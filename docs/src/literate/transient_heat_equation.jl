@@ -117,7 +117,7 @@ function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellScalarValu
 
     assembler = start_assemble(K, f)
 
-    @inbounds for cell in CellIterator(dh)
+    for cell in CellIterator(dh)
 
         fill!(Ke, 0)
         fill!(fe, 0)
@@ -151,7 +151,7 @@ function doassemble_M!(M::SparseMatrixCSC, cellvalues::CellScalarValues{dim}, dh
 
     assembler = start_assemble(M)
 
-    @inbounds for cell in CellIterator(dh)
+    for cell in CellIterator(dh)
 
         fill!(Me, 0)
 
