@@ -690,10 +690,8 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 row_coeffs === nothing && continue
                 for (d, _) in row_coeffs
-                    if !Base.isstored(K, d, col)
-                        cnt += 1
-                        _add_or_grow(cnt, I, J, d, col)
-                    end
+                    cnt += 1
+                    _add_or_grow(cnt, I, J, d, col)
                 end
             end
         else
@@ -702,17 +700,13 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 if row_coeffs === nothing
                     for (d, _) in col_coeffs
-                        if !Base.isstored(K, row, d)
-                            cnt += 1
-                            _add_or_grow(cnt, I, J, row, d)
-                        end
+                        cnt += 1
+                        _add_or_grow(cnt, I, J, row, d)
                     end
                 else
                     for (d1, _) in col_coeffs, (d2, _) in row_coeffs
-                        if !Base.isstored(K, d1, d2)
-                            cnt += 1
-                            _add_or_grow(cnt, I, J, d1, d2)
-                        end
+                        cnt += 1
+                        _add_or_grow(cnt, I, J, d1, d2)
                     end
                 end
             end
