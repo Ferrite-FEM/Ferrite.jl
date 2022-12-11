@@ -356,7 +356,7 @@ version = "1.2.8"
 deps = ["EnumX", "LinearAlgebra", "NearestNeighbors", "Preferences", "Reexport", "SparseArrays", "Tensors", "WriteVTK"]
 path = ".."
 uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
-version = "0.3.9"
+version = "0.3.10"
 
 [[deps.FerriteGmsh]]
 deps = ["Ferrite", "Gmsh"]
