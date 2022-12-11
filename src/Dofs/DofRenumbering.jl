@@ -25,6 +25,18 @@ module DofOrder
         ComponentWise(x=Int[]) = new(_check_target_blocks(x))
     end
 
+    """
+        DofOrder.Ext{T}
+
+    DoF permutation order from external package `T`. Currently supported extensions:
+    - `DofOrder.Ext{Metis}`: Fill-reducing permutation from
+      [Metis.jl](https://github.com/JuliaSparse/Metis.jl).
+    """
+    abstract type Ext{T} end
+    function Ext{T}(args...; kwargs...) where T
+        throw(ArgumentError("Unknown external order DofOrder.Ext{$T}. See documentation for `DofOrder.Ext` for details."))
+    end
+
 end # module DofOrder
 
 """
@@ -39,6 +51,8 @@ ordering `order`.
    `perm[i]`.
  - [`DofOrder.FieldWise()`](@ref) for renumbering dofs field wise.
  - [`DofOrder.ComponentWise()`](@ref) for renumbering dofs component wise.
+ - `DofOrder.Ext{T}` for "external" renumber permutations, see documentation for
+   `DofOrder.Ext` for details.
 
 !!! warning
     The dof numbering in the DofHandler and ConstraintHandler *must always be consistent*.
@@ -203,4 +217,8 @@ function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.Compone
     # Construct permutation
     perm = invperm(iperm)
     return perm
+end
+
+function compute_renumber_permutation(dh::AbstractDofHandler, ::Union{ConstraintHandler,Nothing}, ::DofOrder.Ext{M}) where M
+    error("Renumbering extension based on package $M not available.")
 end
