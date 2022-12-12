@@ -9,21 +9,10 @@ function _default_interpolation(dh::DofHandler)
     return default_interpolation(typeof(getcells(dh.grid, 1)))
 end
 
-# If fieldname==nothing, check that dh only has one field and return that fieldname 
-# If a fieldname is given, check that it exist in the dofhandler
-function _check_fieldname(dh, fieldname)
-    all_fields = getfieldnames(dh)
-    isnothing(fieldname) && length(all_fields) > 1 && error("A fieldname must be given if there are multiple fields")
-    field = isnothing(fieldname) ? first(all_fields) : fieldname
-    field ∉ getfieldnames(dh) && error("The fieldname $field was not found in the dof handler")
-    return field
-end
-
 """
     apply_analytical!(
         a::AbstractVector, dh::AbstractDofHandler, f::Function, 
-        fieldname::Symbol=first(getfieldnames(dh)), 
-        cellset=1:getncells(dh.grid))
+        fieldname::Symbol, cellset=1:getncells(dh.grid))
 
 Apply a solution `f(x)` by modifying the values in the degree of freedom vector `a`
 pertaining to the field `fieldname` for all cells in `cellset`.
@@ -42,33 +31,31 @@ This function can be used to apply initial conditions for time dependent problem
 
 """
 function apply_analytical!(
-    a::AbstractVector, dh::DofHandler, f::Function,
-    fieldname::Union{Symbol,Nothing}=nothing,
+    a::AbstractVector, dh::DofHandler, f::Function, fieldname::Symbol,
     cellset=1:getncells(dh.grid)
     )
-    field = _check_fieldname(dh, fieldname)
+    fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
     ip_geo = _default_interpolation(dh)
-    field_idx = find_field(dh, field)
+    field_idx = find_field(dh, fieldname)
     ip_fun = getfieldinterpolation(dh, field_idx)
-    celldofinds = dof_range(dh, field)
+    celldofinds = dof_range(dh, fieldname)
     field_dim = getfielddim(dh, field_idx)
     _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, cellset)
 end
 
 function apply_analytical!(
-    a::AbstractVector, dh::MixedDofHandler, f::Function,
-    fieldname::Union{Symbol,Nothing}=nothing,
+    a::AbstractVector, dh::MixedDofHandler, f::Function, fieldname::Symbol,
     cellset=1:getncells(dh.grid),
     )
-    field = _check_fieldname(dh, fieldname)
+    fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
     ip_geos = _default_interpolations(dh)
 
     for (fh, ip_geo) in zip(dh.fieldhandlers, ip_geos)
-        field ∈ getfieldnames(fh) || continue
-        field_idx = find_field(fh, field)
+        fieldname ∈ getfieldnames(fh) || continue
+        field_idx = find_field(fh, fieldname)
         ip_fun = getfieldinterpolation(fh, field_idx)
         field_dim = getfielddim(fh, field_idx)
-        celldofinds = dof_range(fh, field)
+        celldofinds = dof_range(fh, fieldname)
         _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, intersect(fh.cellset, cellset))
     end
     return a
@@ -88,8 +75,9 @@ function _apply_analytical!(
     for cellnr in cellset
         cellcoords!(coords, dh, cellnr)
         celldofs!(c_dofs, dh, cellnr)
-        # f_dofs .= c_dofs[celldofinds]
-        foreach(i -> (f_dofs[i] = c_dofs[celldofinds[i]]), 1:length(celldofinds))
+        for (i, celldofind) in enumerate(celldofinds)
+            f_dofs[i] = c_dofs[celldofind]
+        end
         _apply_analytical!(a, f_dofs, coords, field_dim, ip_fun, ip_geo, f)
     end
     return a

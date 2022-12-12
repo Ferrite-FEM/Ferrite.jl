@@ -131,13 +131,6 @@
                 end
             end
         end
-        # Check that works with a single field without giving field name
-        grid = generate_grid(Quadrilateral, (2,2))
-        dh = DofHandler(grid); push!(dh, :p, 1); close!(dh)
-        a = zeros(ndofs(dh))
-        apply_analytical!(a, dh, x->1.0)
-        @test all(x->x≈1.0, a)
-
     end
 
     @testset "MixedDofHandler" begin
@@ -162,7 +155,6 @@
         dh = testdh(Quadrilateral, 1, 1)
         @test_throws ErrorException apply_analytical!(zeros(ndofs(dh)), dh, x->0.0, :v)    # Missing field
         @test_throws ErrorException apply_analytical!(zeros(ndofs(dh)), dh, x->0.0, :u)    # Should be f(x)::Vec{2}
-        @test_throws ErrorException apply_analytical!(zeros(ndofs(dh)), dh, x->0.0)        # Multiple fields in dh
 
         mdh = testmdh(2, 1, 1)
         @test_throws ErrorException apply_analytical!(zeros(ndofs(mdh)), mdh, x->0.0, :v)  # Missing field
