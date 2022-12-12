@@ -106,7 +106,7 @@
                     # Test average value
                     a = zeros(ndofs(dh))
                     f(x) = ones(Vec{dim})
-                    apply_analytical!(a, dh, f, :u)
+                    apply_analytical!(a, dh, :u, f)
                     @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
 
                     # If not super/subparametric, compare with ConstraintHandler and node set 
@@ -123,8 +123,8 @@
                         close!(ch); update!(ch, 0.0)
                         apply!(a_ch, ch)
 
-                        apply_analytical!(a, dh, fu, :u)
-                        apply_analytical!(a, dh, fp, :p)
+                        apply_analytical!(a, dh, :u, fu)
+                        apply_analytical!(a, dh, :p, fp)
 
                         @test a ≈ a_ch 
                     end 
@@ -144,7 +144,7 @@
                     # Test average value
                     a = zeros(ndofs(dh))
                     f(x) = ones(Vec{dim})
-                    apply_analytical!(a, dh, f, :u)
+                    apply_analytical!(a, dh, :u, f)
                     @test sum(a)/length(a) ≈ num_udofs/(num_udofs+num_pdofs)
                 end
             end
@@ -153,11 +153,11 @@
 
     @testset "Exceptions" begin
         dh = testdh(Quadrilateral, 1, 1)
-        @test_throws ErrorException apply_analytical!(zeros(ndofs(dh)), dh, x->0.0, :v)    # Missing field
-        @test_throws ErrorException apply_analytical!(zeros(ndofs(dh)), dh, x->0.0, :u)    # Should be f(x)::Vec{2}
+        @test_throws ErrorException apply_analytical!(zeros(ndofs(dh)), dh, :v, x->0.0)    # Missing field
+        @test_throws ErrorException apply_analytical!(zeros(ndofs(dh)), dh, :u, x->0.0)    # Should be f(x)::Vec{2}
 
         mdh = testmdh(2, 1, 1)
-        @test_throws ErrorException apply_analytical!(zeros(ndofs(mdh)), mdh, x->0.0, :v)  # Missing field
-        @test_throws ErrorException apply_analytical!(zeros(ndofs(mdh)), mdh, x->0.0, :u)  # Should be f(x)::Vec{2}
+        @test_throws ErrorException apply_analytical!(zeros(ndofs(mdh)), mdh, :v, x->0.0)  # Missing field
+        @test_throws ErrorException apply_analytical!(zeros(ndofs(mdh)), mdh, :u, x->0.0)  # Should be f(x)::Vec{2}
     end
 end

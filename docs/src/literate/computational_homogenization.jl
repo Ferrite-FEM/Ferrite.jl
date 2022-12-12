@@ -521,7 +521,7 @@ uM = zeros(ndofs(dh))
 vtk_grid("homogenization", dh) do vtk
     for i in 1:3
         ## Compute macroscopic solution
-        apply_analytical!(uM, dh, x -> εᴹ[i] ⋅ x, :u)
+        apply_analytical!(uM, dh, :u, x -> εᴹ[i] ⋅ x)
         ## Dirichlet
         vtk_point_data(vtk, dh, uM + u.dirichlet[i], "_dirichlet_$i")
         vtk_point_data(vtk, projector, σ.dirichlet[i], "σvM_dirichlet_$i")

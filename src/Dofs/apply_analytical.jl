@@ -11,8 +11,8 @@ end
 
 """
     apply_analytical!(
-        a::AbstractVector, dh::AbstractDofHandler, f::Function, 
-        fieldname::Symbol, cellset=1:getncells(dh.grid))
+        a::AbstractVector, dh::AbstractDofHandler, fieldname::Symbol, 
+        f::Function, cellset=1:getncells(dh.grid))
 
 Apply a solution `f(x)` by modifying the values in the degree of freedom vector `a`
 pertaining to the field `fieldname` for all cells in `cellset`.
@@ -31,7 +31,7 @@ This function can be used to apply initial conditions for time dependent problem
 
 """
 function apply_analytical!(
-    a::AbstractVector, dh::DofHandler, f::Function, fieldname::Symbol,
+    a::AbstractVector, dh::DofHandler, fieldname::Symbol, f::Function,
     cellset=1:getncells(dh.grid)
     )
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
@@ -44,7 +44,7 @@ function apply_analytical!(
 end
 
 function apply_analytical!(
-    a::AbstractVector, dh::MixedDofHandler, f::Function, fieldname::Symbol,
+    a::AbstractVector, dh::MixedDofHandler, fieldname::Symbol, f::Function,
     cellset=1:getncells(dh.grid),
     )
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
