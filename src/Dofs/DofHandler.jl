@@ -59,6 +59,13 @@ function find_field(dh::DofHandler, field_name::Symbol)
     return j
 end
 
+"""
+    getgrid(dh::AbstractDofHandler)
+
+Return the underlying grid representation of `dh`
+"""
+getgrid(dh::AbstractDofHandler) = dh.grid
+
 # Calculate the offset to the first local dof of a field
 function field_offset(dh::DofHandler, field_name::Symbol)
     offset = 0
@@ -112,13 +119,13 @@ The field is added to all cells of the underlying grid. In case no interpolation
 the default interpolation of the grid's celltype is used. 
 If the grid uses several celltypes, [`push!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
 """
-function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
+function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(getgrid(dh))))
     @assert !isclosed(dh)
     @assert !in(name, dh.field_names)
     push!(dh.field_names, name)
     push!(dh.field_dims, dim)
     push!(dh.field_interpolations, ip)
-    push!(dh.bc_values, BCValues(ip, default_interpolation(getcelltype(dh.grid))))
+    push!(dh.bc_values, BCValues(ip, default_interpolation(getcelltype(getgrid(dh)))))
     return dh
 end
 
@@ -193,7 +200,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     push!(dh.cell_dofs_offset, 1) # dofs for the first cell start at 1
 
     # loop over all the cells, and distribute dofs for all the fields
-    for (ci, cell) in enumerate(getcells(dh.grid))
+    for (ci, cell) in enumerate(getcells(getgrid(dh)))
         @debug println("cell #$ci")
         for fi in 1:nfields(dh)
             interpolation_info = interpolation_infos[fi]
@@ -312,7 +319,7 @@ function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid{dim}, i::Int) 
     return global_nodes
 end
 
-cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, dh.grid, i)
+cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, getgrid(dh), i)
 
 function celldofs(dh::DofHandler, i::Int)
     @assert isclosed(dh)
@@ -387,7 +394,7 @@ create_symmetric_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing) = Sy
 
 function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool, coupling::Union{AbstractMatrix{Bool}, Nothing})
     @assert isclosed(dh)
-    ncells = getncells(dh.grid)
+    ncells = getncells(getgrid(dh))
     if coupling !== nothing
         # Extend coupling to be of size (ndofs_per_cell × ndofs_per_cell)
         coupling = _coupling_to_local_dof_coupling(dh, coupling, sym)
@@ -448,7 +455,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
 end
 
 function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
-    vtk_grid(filename, dh.grid; compress=compress)
+    vtk_grid(filename, getgrid(dh); compress=compress)
 end
 
 """
@@ -467,14 +474,14 @@ function reshape_to_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol) where
     field_dim = getfielddim(dh, field_idx)
 
     space_dim = field_dim == 2 ? 3 : field_dim
-    data = fill(zero(T), space_dim, getnnodes(dh.grid))
+    data = fill(zero(T), space_dim, getnnodes(getgrid(dh)))
 
     reshape_field_data!(data, dh, u, offset, field_dim)
 
     return data
 end
 
-function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=Set{Int}(1:getncells(dh.grid))) where T
+function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=Set{Int}(1:getncells(getgrid(dh)))) where T
 
     _celldofs = Vector{Int}(undef, ndofs_per_cell(dh, first(cellset)))
     for cell in CellIterator(dh, collect(cellset))
