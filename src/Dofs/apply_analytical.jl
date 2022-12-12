@@ -64,8 +64,9 @@ end
 function _apply_analytical!(
     a::Vector, dh::AbstractDofHandler, celldofinds, field_dim,
     ip_fun::Interpolation, ip_geo::Interpolation, f::Function, cellset)
-
+    
     coords = getcoordinates(dh.grid, first(cellset))
+    cdv = CellDofValues(ip_fun, ip_geo)
     c_dofs = celldofs(dh, first(cellset))
     f_dofs = zeros(Int, length(celldofinds))
 
@@ -73,27 +74,19 @@ function _apply_analytical!(
     length(f(first(coords))) == field_dim || error("length(f(x)) must be equal to dimension of the field ($field_dim)")
 
     for cellnr in cellset
-        cellcoords!(coords, dh, cellnr)
+        getcoordinates!(coords, dh.grid, cellnr)
         celldofs!(c_dofs, dh, cellnr)
         for (i, celldofind) in enumerate(celldofinds)
             f_dofs[i] = c_dofs[celldofind]
         end
-        _apply_analytical!(a, f_dofs, coords, field_dim, ip_fun, ip_geo, f)
+        _apply_analytical!(a, f_dofs, coords, field_dim, cdv, f)
     end
     return a
 end
 
-function _apply_analytical!(a::Vector, dofs::Vector{Int}, coords::Vector{XT}, field_dim, ip_fun, ip_geo, f) where {XT<:Vec}
-
-    getnbasefunctions(ip_geo) == length(coords) || error("coords=$coords not compatible with ip_ge=$ip_geo")
-    ref_coords = reference_coordinates(ip_fun)
-    length(ref_coords) * field_dim == length(dofs) || error("$ip_fun must have length(dofs)=$(length(dofs)) reference coords")
-
-    for (i_dof, refpoint) in enumerate(ref_coords)
-        x_dof = zero(XT)
-        for (i, x_node) in enumerate(coords)
-            x_dof += value(ip_geo, i, refpoint) * x_node
-        end
+function _apply_analytical!(a::Vector, dofs::Vector{Int}, coords::Vector{<:Vec}, field_dim, cdv::CellDofValues, f)
+    for i_dof in 1:getnquadpoints(cdv)
+        x_dof = spatial_coordinate(cdv, i_dof, coords)
         for (idim, icval) in enumerate(f(x_dof))
             a[dofs[field_dim*(i_dof-1)+idim]] = icval
         end
