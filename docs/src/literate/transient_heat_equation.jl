@@ -96,12 +96,12 @@ t_rise = 100
 ch = ConstraintHandler(dh);
 
 # Here, we define the boundary condition related to $\partial \Omega_1$.
-∂Ω₁ = union(getfaceset.((grid, ), ["left", "right"])...)
+∂Ω₁ = union(getfaceset.((grid,), ["left", "right"])...)
 dbc = Dirichlet(:u, ∂Ω₁, (x, t) -> 0)
 add!(ch, dbc);
 # While the next code block corresponds to the linearly increasing temperature description on $\partial \Omega_2$
 # until `t=t_rise`, and then keep constant
-∂Ω₂ = union(getfaceset.((grid, ), ["top", "bottom"])...)
+∂Ω₂ = union(getfaceset.((grid,), ["top", "bottom"])...)
 dbc = Dirichlet(:u, ∂Ω₂, (x, t) -> max_temp * clamp(t / t_rise, 0, 1))
 add!(ch, dbc)
 close!(ch)
@@ -128,7 +128,7 @@ function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellScalarValu
             dΩ = getdetJdV(cellvalues, q_point)
 
             for i in 1:n_basefuncs
-                v  = shape_value(cellvalues, q_point, i)
+                v = shape_value(cellvalues, q_point, i)
                 ∇v = shape_gradient(cellvalues, q_point, i)
                 fe[i] += 0.1 * v * dΩ
                 for j in 1:n_basefuncs
@@ -161,7 +161,7 @@ function doassemble_M!(M::SparseMatrixCSC, cellvalues::CellScalarValues{dim}, dh
             dΩ = getdetJdV(cellvalues, q_point)
 
             for i in 1:n_basefuncs
-                v  = shape_value(cellvalues, q_point, i)
+                v = shape_value(cellvalues, q_point, i)
                 for j in 1:n_basefuncs
                     u = shape_value(cellvalues, q_point, j)
                     Me[i, j] += (v * u) * dΩ
@@ -210,15 +210,15 @@ for t in Δt:Δt:T
     apply_rhs!(rhsdata, b, ch)
 
     #Finally, we can solve the time step and save the solution afterwards.
-    u = A \ b;
+    u = A \ b
 
     vtk_grid("transient-heat-$t", dh) do vtk
         vtk_point_data(vtk, dh, u)
         vtk_save(vtk)
         pvd[t] = vtk
     end
-   #At the end of the time loop, we set the previous solution to the current one and go to the next time step.
-   uₙ .= u
+    #At the end of the time loop, we set the previous solution to the current one and go to the next time step.
+    uₙ .= u
 end
 # In order to use the .pvd file we need to store it to the disk, which is done by:
 vtk_save(pvd);

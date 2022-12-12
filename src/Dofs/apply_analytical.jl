@@ -2,7 +2,7 @@
 function _default_interpolations(dh::MixedDofHandler)
     fhs = dh.fieldhandlers
     getcelltype(i) = typeof(getcells(dh.grid, first(fhs[i].cellset)))
-    ntuple(i->default_interpolation(getcelltype(i)), length(fhs))
+    ntuple(i -> default_interpolation(getcelltype(i)), length(fhs))
 end
 
 function _default_interpolation(dh::DofHandler)
@@ -13,7 +13,7 @@ end
 # If a fieldname is given, check that it exist in the dofhandler
 function _check_fieldname(dh, fieldname)
     all_fields = getfieldnames(dh)
-    isnothing(fieldname) && length(all_fields)>1 && error("A fieldname must be given if there are multiple fields")
+    isnothing(fieldname) && length(all_fields) > 1 && error("A fieldname must be given if there are multiple fields")
     field = isnothing(fieldname) ? first(all_fields) : fieldname
     field ∉ getfieldnames(dh) && error("The fieldname $field was not found in the dof handler")
     return field
@@ -42,12 +42,12 @@ This function can be used to apply initial conditions for time dependent problem
 
 """
 function apply_analytical!(
-    a::AbstractVector, dh::DofHandler, f::Function, 
+    a::AbstractVector, dh::DofHandler, f::Function,
     fieldname::Union{Symbol,Nothing}=nothing,
     cellset=1:getncells(dh.grid)
     )
     field = _check_fieldname(dh, fieldname)
-    ip_geo=_default_interpolation(dh)
+    ip_geo = _default_interpolation(dh)
     field_idx = find_field(dh, field)
     ip_fun = getfieldinterpolation(dh, field_idx)
     celldofinds = dof_range(dh, field)
@@ -56,12 +56,12 @@ function apply_analytical!(
 end
 
 function apply_analytical!(
-    a::AbstractVector, dh::MixedDofHandler, f::Function, 
+    a::AbstractVector, dh::MixedDofHandler, f::Function,
     fieldname::Union{Symbol,Nothing}=nothing,
     cellset=1:getncells(dh.grid),
     )
     field = _check_fieldname(dh, fieldname)
-    ip_geos=_default_interpolations(dh)
+    ip_geos = _default_interpolations(dh)
 
     for (fh, ip_geo) in zip(dh.fieldhandlers, ip_geos)
         field ∈ getfieldnames(fh) || continue
@@ -77,7 +77,7 @@ end
 function _apply_analytical!(
     a::Vector, dh::AbstractDofHandler, celldofinds, field_dim,
     ip_fun::Interpolation, ip_geo::Interpolation, f::Function, cellset)
-    
+
     coords = getcoordinates(dh.grid, first(cellset))
     c_dofs = celldofs(dh, first(cellset))
     f_dofs = zeros(Int, length(celldofinds))
@@ -89,7 +89,7 @@ function _apply_analytical!(
         cellcoords!(coords, dh, cellnr)
         celldofs!(c_dofs, dh, cellnr)
         # f_dofs .= c_dofs[celldofinds]
-        foreach(i->(f_dofs[i] = c_dofs[celldofinds[i]]), 1:length(celldofinds)) 
+        foreach(i -> (f_dofs[i] = c_dofs[celldofinds[i]]), 1:length(celldofinds))
         _apply_analytical!(a, f_dofs, coords, field_dim, ip_fun, ip_geo, f)
     end
     return a
@@ -99,11 +99,11 @@ function _apply_analytical!(a::Vector, dofs::Vector{Int}, coords::Vector{XT}, fi
 
     getnbasefunctions(ip_geo) == length(coords) || error("coords=$coords not compatible with ip_ge=$ip_geo")
     ref_coords = reference_coordinates(ip_fun)
-    length(ref_coords)*field_dim == length(dofs) || error("$ip_fun must have length(dofs)=$(length(dofs)) reference coords")
+    length(ref_coords) * field_dim == length(dofs) || error("$ip_fun must have length(dofs)=$(length(dofs)) reference coords")
 
     for (i_dof, refpoint) in enumerate(ref_coords)
         x_dof = zero(XT)
-        for (i,x_node) in enumerate(coords)
+        for (i, x_node) in enumerate(coords)
             x_dof += value(ip_geo, i, refpoint) * x_node
         end
         for (idim, icval) in enumerate(f(x_dof))
