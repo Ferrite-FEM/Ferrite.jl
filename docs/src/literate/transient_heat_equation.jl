@@ -100,9 +100,9 @@ ch = ConstraintHandler(dh);
 dbc = Dirichlet(:u, ∂Ω₁, (x, t) -> 0)
 add!(ch, dbc);
 # While the next code block corresponds to the linearly increasing temperature description on $\partial \Omega_2$
-# untill `t=t_rise`, and then keep constant
+# until `t=t_rise`, and then keep constant
 ∂Ω₂ = union(getfaceset.((grid, ), ["top", "bottom"])...)
-dbc = Dirichlet(:u, ∂Ω₂, (x, t) -> max_temp*clamp(t/t_rise, 0, 1))
+dbc = Dirichlet(:u, ∂Ω₂, (x, t) -> max_temp * clamp(t / t_rise, 0, 1))
 add!(ch, dbc)
 close!(ch)
 update!(ch, 0.0);
@@ -130,10 +130,10 @@ function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellScalarValu
             for i in 1:n_basefuncs
                 v  = shape_value(cellvalues, q_point, i)
                 ∇v = shape_gradient(cellvalues, q_point, i)
-                fe[i] += 0.1*v * dΩ
+                fe[i] += 0.1 * v * dΩ
                 for j in 1:n_basefuncs
                     ∇u = shape_gradient(cellvalues, q_point, j)
-                    Ke[i, j] += 1.e-3*(∇v ⋅ ∇u) * dΩ
+                    Ke[i, j] += 1e-3 * (∇v ⋅ ∇u) * dΩ
                 end
             end
         end
@@ -186,13 +186,13 @@ rhsdata = get_rhs_data(ch, A);
 # We set the values at initial time step, denoted by uₙ, to a bubble-shape described by 
 # $(x_1^2-1)(x_2^2-1)$, such that it is zero at the boundaries and the maximum temperature in the center.
 uₙ = zeros(length(f));
-apply_analytical!(uₙ, dh, x->(x[1]^2-1)*(x[2]^2-1)*max_temp);
+apply_analytical!(uₙ, dh, x -> (x[1]^2 - 1) * (x[2]^2 - 1) * max_temp);
 # Here, we apply **once** the boundary conditions to the system matrix `A`.
 apply!(A, ch);
 
 # To store the solution, we initialize a `paraview_collection` (.pvd) file.
 pvd = paraview_collection("transient-heat.pvd");
-t=0
+t = 0
 vtk_grid("transient-heat-$t", dh) do vtk
     vtk_point_data(vtk, dh, uₙ)
     vtk_save(vtk)
