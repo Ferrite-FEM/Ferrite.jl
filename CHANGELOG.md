@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- New function `apply_analytical!` for setting the values of the degrees of freedom for a 
+  specific field according to a spatial function `f(x)`. ([#532][github-532])
 
 ## [0.3.10] - 2022-12-11
 ### Added
@@ -202,6 +205,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-528]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/528
 [github-529]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/529
 [github-530]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/530
+[github-532]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/532
 [github-533]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/533
 [github-534]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/534
 [github-535]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/535
@@ -216,6 +220,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-545]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/545
 [github-547]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/547
 [github-550]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/550
+
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.10...HEAD
 [0.3.10]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.9...v0.3.10
