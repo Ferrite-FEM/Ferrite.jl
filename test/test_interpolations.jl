@@ -22,6 +22,11 @@ for interpolation in (
                       DiscontinuousLagrange{3, RefCube, 0}(),
                       DiscontinuousLagrange{2, RefTetrahedron, 0}(),
                       DiscontinuousLagrange{3, RefTetrahedron, 0}(),
+                      DiscontinuousLagrange{1, RefCube, 1}(),
+                      DiscontinuousLagrange{2, RefCube, 1}(),
+                      DiscontinuousLagrange{3, RefCube, 1}(),
+                      DiscontinuousLagrange{2, RefTetrahedron, 1}(),
+                      DiscontinuousLagrange{3, RefTetrahedron, 1}(),
                       #
                       BubbleEnrichedLagrange{2,RefTetrahedron,1}(),
                       #

@@ -149,7 +149,7 @@ function reference_coordinates(ip::DiscontinuousLagrange{dim,shape,order}) where
     return reference_coordinates(Lagrange{dim,shape,order}())
 end
 function value(ip::DiscontinuousLagrange{dim,shape,order}, i::Int, ξ::Vec{dim}) where {dim,shape,order}
-    return value(Lagrange{dim, ref_type, order}())
+    return value(Lagrange{dim, shape, order}(), i, ξ)
 end
 
 # Excepting the L0 element.
