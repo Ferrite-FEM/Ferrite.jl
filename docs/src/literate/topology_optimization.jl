@@ -482,7 +482,7 @@ end
 # complete output with all iteration steps, it is possible to set the output 
 # parameter to `true`.
 
-topopt(0.5*1e-3, 0.5, 60, "betasmall"; output=false);
+topopt(0.5*1e-3, 0.5, 60, "betasmall"; output=:false);
 topopt(1.0*1e-3, 0.5, 60, "betalarge"; output=:false);
 ## topopt(1.0*1e-3, 0.5, 60, "topopt_animation"; output=:true); # can be used to create animations
 
