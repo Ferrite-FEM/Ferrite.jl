@@ -18,6 +18,12 @@ FieldHandler
 close!(::MixedDofHandler)
 ```
 
+```@docs
+renumber!
+DofOrder.FieldWise
+DofOrder.ComponentWise
+```
+
 ## Common methods
 ```@docs
 ndofs

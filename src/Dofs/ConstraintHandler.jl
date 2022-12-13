@@ -76,6 +76,9 @@ struct ConstraintHandler{DH<:AbstractDofHandler,T}
     prescribed_dofs::Vector{Int}
     free_dofs::Vector{Int}
     inhomogeneities::Vector{T}
+    # Store the original constant inhomogeneities for affine constraints used to compute
+    # "effective" inhomogeneities in `update!` and then stored in .inhomogeneities.
+    affine_inhomogeneities::Vector{Union{Nothing,T}}
     # `nothing` for pure DBC constraint, otherwise affine constraint
     dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}
     # global dof -> index into dofs and inhomogeneities and dofcoefficients
@@ -88,7 +91,7 @@ end
 function ConstraintHandler(dh::AbstractDofHandler)
     @assert isclosed(dh)
     ConstraintHandler(
-        Dirichlet[], Int[], Int[], Float64[], Union{Nothing,DofCoefficients{Float64}}[],
+        Dirichlet[], Int[], Int[], Float64[], Union{Nothing,Float64}[], Union{Nothing,DofCoefficients{Float64}}[],
         Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false),
     )
 end
@@ -181,6 +184,7 @@ function close!(ch::ConstraintHandler)
     I = sortperm(ch.prescribed_dofs)
     ch.prescribed_dofs .= ch.prescribed_dofs[I]
     ch.inhomogeneities .= ch.inhomogeneities[I]
+    ch.affine_inhomogeneities .= ch.affine_inhomogeneities[I]
     ch.dofcoefficients .= ch.dofcoefficients[I]
 
     copy!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
@@ -197,6 +201,25 @@ function close!(ch::ConstraintHandler)
     # If they are not, it is possible to automatically reformulate the constraints
     # such that they become independent. However, at this point, it is left to
     # the user to assure this.
+
+    # Basic verification of constraints:
+    # - `add_prescribed_dof` make sure all prescribed dofs are unique by overwriting the old
+    #   constraint when adding a new (TODO: Might change in the future, see comment in
+    #   `add_prescribed_dof`.)
+    # - We allow affine constraints to have prescribed dofs as master dofs iff those master
+    #   dofs are constrained with just an inhomogeneity (i.e. DBC). The effective
+    #   inhomogeneity is computed in `update!`.
+    for coeffs in ch.dofcoefficients
+        coeffs === nothing && continue
+        for (d, _) in coeffs
+            i = get(ch.dofmapping, d, 0)
+            i == 0 && continue
+            icoeffs = ch.dofcoefficients[i]
+            if !(icoeffs === nothing || isempty(icoeffs))
+                error("nested affine constraints currently not supported")
+            end
+        end
+    end
 
     ch.closed[] = true
     return ch
@@ -262,11 +285,13 @@ function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomo
         @debug @warn "dof $i already prescribed, overriding the old constraint"
         ch.prescribed_dofs[i] = constrained_dof
         ch.inhomogeneities[i] = inhomogeneity
+        ch.affine_inhomogeneities[i] = dofcoefficients === nothing ? nothing : inhomogeneity
         ch.dofcoefficients[i] = dofcoefficients
     else
         N = length(ch.dofmapping)
         push!(ch.prescribed_dofs, constrained_dof)
         push!(ch.inhomogeneities, inhomogeneity)
+        push!(ch.affine_inhomogeneities, dofcoefficients === nothing ? nothing : inhomogeneity)
         push!(ch.dofcoefficients, dofcoefficients)
         ch.dofmapping[constrained_dof] = N + 1
     end
@@ -377,6 +402,26 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
         _update!(ch.inhomogeneities, dbc.f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
                  dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, convert(Float64, time))
     end
+    # Compute effective inhomogeneity for affine constraints with prescribed dofs in the
+    # RHS. For example, in u2 = w3 * u3 + w4 * u4 + b2 we allow e.g. u3 to be prescribed by
+    # a trivial constraint with just an inhomogeneity (e.g. DBC), for example u3 = f(t).
+    # This value have now been computed in _update! and we can compute the effective
+    # inhomogeneity h2 for u2 which becomes h2 = w3 * u3 + b2 = w3 * f3(t) + b2.
+    for i in eachindex(ch.prescribed_dofs, ch.dofcoefficients, ch.inhomogeneities)
+        coeffs = ch.dofcoefficients[i]
+        coeffs === nothing && continue
+        h = ch.affine_inhomogeneities[i]
+        @assert h !== nothing
+        for (d, w) in coeffs
+            j = get(ch.dofmapping, d, 0)
+            j == 0 && continue
+            # If this dof is prescribed it must only have an inhomogeneity (verified in close!)
+            @assert (jcoeffs = ch.dofcoefficients[j]; jcoeffs === nothing || isempty(jcoeffs))
+            h += ch.inhomogeneities[j] * w
+        end
+        ch.inhomogeneities[i] = h
+    end
+    return nothing
 end
 
 # for faces
@@ -550,9 +595,11 @@ apply!(     v::AbstractVector, ch::ConstraintHandler) = _apply_v(v, ch, false)
 function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
     @assert length(v) >= ndofs(ch.dh)
     v[ch.prescribed_dofs] .= apply_zero ? 0.0 : ch.inhomogeneities
-    # Apply affine constraints, e.g u2 = s6*u6 + s3*u3 (inhomogenity added above)
-    for (dof, dofcoef) in zip(ch.prescribed_dofs, ch.dofcoefficients)
+    # Apply affine constraints, e.g u2 = s6*u6 + s3*u3 + h2
+    for (dof, dofcoef, h) in zip(ch.prescribed_dofs, ch.dofcoefficients, ch.affine_inhomogeneities)
         dofcoef === nothing && continue
+        @assert h !== nothing
+        v[dof] = h
         for (d, s) in dofcoef
             v[dof] += s * v[d]
         end
@@ -636,38 +683,30 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
 
     cnt = 0
     for col in 1:ndofs
-        # Since we will possibly be pushing new entries to K, the field K.rowval will grow.
-        # Therefor we must extract this before iterating over K
-        range = nzrange(K, col)
-        _rows = K.rowval[range]
         col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
         if col_coeffs === nothing
-            for row in _rows
+            for ri in nzrange(K, col)
+                row = K.rowval[ri]
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 row_coeffs === nothing && continue
                 for (d, _) in row_coeffs
-                    if !_addindex_sparsematrix!(K, 0.0, d, col)
-                        cnt += 1
-                        _add_or_grow(cnt, I, J, d, col)
-                    end
+                    cnt += 1
+                    _add_or_grow(cnt, I, J, d, col)
                 end
             end
         else
-            for row in _rows
+            for ri in nzrange(K, col)
+                row = K.rowval[ri]
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 if row_coeffs === nothing
                     for (d, _) in col_coeffs
-                        if !_addindex_sparsematrix!(K, 0.0, row, d)
-                            cnt += 1
-                            _add_or_grow(cnt, I, J, row, d)
-                        end
+                        cnt += 1
+                        _add_or_grow(cnt, I, J, row, d)
                     end
                 else
                     for (d1, _) in col_coeffs, (d2, _) in row_coeffs
-                        if !_addindex_sparsematrix!(K, 0.0, d1, d2)
-                            cnt += 1
-                            _add_or_grow(cnt, I, J, d1, d2)
-                        end
+                        cnt += 1
+                        _add_or_grow(cnt, I, J, d1, d2)
                     end
                 end
             end
@@ -700,12 +739,13 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
         col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
         if col_coeffs === nothing
             for a in nzrange(K, col)
+                Kval = K.nzval[a]
+                iszero(Kval) && continue
                 row = K.rowval[a]
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 row_coeffs === nothing && continue
                 for (d, v) in row_coeffs
-                    Kval = K.nzval[a]
-                    _addindex_sparsematrix!(K, v * Kval, d, col) || _sparsity_error()
+                    addindex!(K, v * Kval, d, col)
                 end
 
                 # Perform f - K*g. However, this has already been done in outside this functions so we skip this.
@@ -715,17 +755,17 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
             end
         else
             for a in nzrange(K, col)
+                Kval = K.nzval[a]
+                iszero(Kval) && continue
                 row = K.rowval[a]
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 if row_coeffs === nothing
                     for (d, v) in col_coeffs
-                        Kval = K.nzval[a]
-                        _addindex_sparsematrix!(K, v * Kval, row, d) || _sparsity_error()
+                        addindex!(K, v * Kval, row, d)
                     end
                 else
                     for (d1, v1) in col_coeffs, (d2, v2) in row_coeffs
-                        Kval = K.nzval[a]
-                        _addindex_sparsematrix!(K, v1 * v2 * Kval, d1, d2) || _sparsity_error()
+                        addindex!(K, v1 * v2 * Kval, d1, d2)
                     end
                 end
             end
@@ -740,8 +780,6 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
     end
 end
 
-_sparsity_error() = error("Sparsity pattern missing entries for the condensation pattern. Make sure to call `create_sparsity_pattern(dh::DofHandler, ch::ConstraintHandler) when using linear constraints.`")
-
 function _add_or_grow(cnt::Int, I::Vector{Int}, J::Vector{Int}, dofi::Int, dofj::Int)
     if cnt > length(J)
         resize!(I, trunc(Int, length(I) * 1.5))
@@ -749,24 +787,6 @@ function _add_or_grow(cnt::Int, I::Vector{Int}, J::Vector{Int}, dofi::Int, dofj:
     end
     I[cnt] = dofi
     J[cnt] = dofj
-end
-
-# Copied from SparseArrays._setindex_scalar!(...)
-# Custom SparseArrays._setindex_scalar!() that throws error if entry K(_i,_j) does not exist
-# Returns true if it successfully added the new value, returns false otherwise.
-function _addindex_sparsematrix!(A::SparseMatrixCSC{Tv,Ti}, v::Tv, i::Ti, j::Ti) where {Tv, Ti}
-    if !((1 <= i <= size(A, 1)) & (1 <= j <= size(A, 2)))
-        throw(BoundsError(A, (i,j)))
-    end
-    coljfirstk = Int(SparseArrays.getcolptr(A)[j])
-    coljlastk = Int(SparseArrays.getcolptr(A)[j+1] - 1)
-    searchk = searchsortedfirst(rowvals(A), i, coljfirstk, coljlastk, Base.Order.Forward)
-    if searchk <= coljlastk && rowvals(A)[searchk] == i
-        # Column j contains entry A[i,j]. Update and return
-        nonzeros(A)[searchk] += v
-        return true
-    end
-    return false
 end
 
 """
@@ -888,11 +908,10 @@ function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset
     end
 end
 
-create_symmetric_sparsity_pattern(dh::MixedDofHandler, ch::ConstraintHandler) = Symmetric(_create_sparsity_pattern(dh, ch, true), :U)
-create_symmetric_sparsity_pattern(dh::DofHandler,      ch::ConstraintHandler) = Symmetric(_create_sparsity_pattern(dh, ch, true), :U)
-
-create_sparsity_pattern(dh::MixedDofHandler, ch::ConstraintHandler) = _create_sparsity_pattern(dh, ch, false)
-create_sparsity_pattern(dh::DofHandler,      ch::ConstraintHandler) = _create_sparsity_pattern(dh, ch, false)
+create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling=nothing) =
+    Symmetric(_create_sparsity_pattern(dh, ch, true, coupling), :U)
+create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling=nothing) =
+    _create_sparsity_pattern(dh, ch, false, coupling)
 
 struct PeriodicFacePair
     mirror::FaceIndex
@@ -1586,4 +1605,183 @@ function __check_periodic_faces_f(grid::Grid, fi::FaceIndex, fj::FaceIndex, xmi,
     end
 
     return PeriodicFacePair(fi, fj, node_rot, mirror)
+end
+
+
+######################################
+## Local application of constraints ##
+######################################
+
+"""
+    apply_local!(
+        local_matrix::AbstractMatrix, local_vector::AbstractVector,
+        global_dofs::AbstractVector, ch::ConstraintHandler;
+        apply_zero::Bool = false
+    )
+
+Similar to [`apply!`](@ref) but perform condensation of constrained degrees-of-freedom
+locally in `local_matrix` and `local_vector` *before* they are to be assembled into the
+global system.
+
+When the keyword argument `apply_zero` is `true` all inhomogeneities are set to `0` (cf.
+[`apply!`](@ref) vs [`apply_zero!`](@ref)).
+
+This method can only be used if all constraints are "local", i.e. no constraint couples with
+dofs outside of the element dofs (`global_dofs`) since condensation of such constraints
+requires writing to entries in the global matrix/vector. For such a case,
+[`apply_assemble!`](@ref) can be used instead.
+
+Note that this method is destructive since it, by definition, modifies `local_matrix` and
+`local_vector`.
+"""
+function apply_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
+                      global_dofs::AbstractVector, ch::ConstraintHandler;
+                      apply_zero::Bool = false)
+    return _apply_local!(local_matrix, local_vector, global_dofs, ch, apply_zero,
+                         #=global_matrix=# nothing, #=global_vector=# nothing)
+end
+
+# Element local application of boundary conditions. Global matrix and vectors are necessary
+# if there are affine constraints that connect dofs from different elements.
+function _apply_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
+                       global_dofs::AbstractVector, ch::ConstraintHandler, apply_zero::Bool,
+                       global_matrix, global_vector)
+    # TODO: With apply_zero it shouldn't be required to pass the vector.
+    length(global_dofs) == size(local_matrix, 1) == size(local_matrix, 2) == length(local_vector) || error("?")
+    # First pass over the dofs check whether there are any constrained dofs at all
+    has_constraints = false
+    has_nontrivial_affine_constraints = false
+    # 1. Adjust local vector
+    @inbounds for (local_dof, global_dof) in pairs(global_dofs)
+        # Check if this dof is constrained
+        pdofs_index = get(ch.dofmapping, global_dof, nothing)
+        pdofs_index === nothing && continue # Not constrained, move on
+        has_constraints = true
+        # Add inhomogeneities to local_vector: local_vector - local_matrix * inhomogeneities
+        v = ch.inhomogeneities[pdofs_index]
+        if !apply_zero && v != 0
+            for j in axes(local_matrix, 1)
+                local_vector[j] -= v * local_matrix[j, local_dof]
+            end
+        end
+        # Check if this is an affine constraint
+        has_nontrivial_affine_constraints = has_nontrivial_affine_constraints || (
+           coeffs = ch.dofcoefficients[pdofs_index];
+           !(coeffs === nothing || isempty(coeffs))
+        )
+    end
+    # 2. Compute mean of diagonal before modifying local matrix
+    m = has_constraints ? meandiag(local_matrix) : zero(eltype(local_matrix))
+    # 3. Condense any affine constraints
+    if has_nontrivial_affine_constraints
+        # Condense this constraint locally if possible, and otherwise modifies the global arrays.
+        _condense_local!(local_matrix, local_vector, global_matrix, global_vector, global_dofs, ch.dofmapping, ch.dofcoefficients)
+    end
+    # 4. Zero out columns/rows of local matrix and replace diagonal entries with the mean
+    if has_constraints
+        @inbounds for (local_dof, global_dof) in pairs(global_dofs)
+            pdofs_index = get(ch.dofmapping, global_dof, nothing)
+            pdofs_index === nothing && continue # Not constrained, move on
+            # Zero the column
+            for local_row in axes(local_matrix, 1)
+                local_matrix[local_row, local_dof] = 0
+            end
+            # Zero the row
+            for local_col in axes(local_matrix, 2)
+                local_matrix[local_dof, local_col] = 0
+            end
+            # Replace diagonal with mean
+            local_matrix[local_dof, local_dof] = m
+            v = ch.inhomogeneities[pdofs_index]
+            local_vector[local_dof] = apply_zero ? zero(eltype(local_vector)) : (v * m)
+        end
+    end
+    return
+end
+
+# Condensation of affine constraints on element level. If possible this function only
+# modifies the local arrays.
+@noinline missing_global() = error("can not condense constraint without the global matrix and vector")
+function _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
+                          global_matrix#=::SparseMatrixCSC=#, global_vector#=::Vector=#,
+                          global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector)
+    @assert axes(local_matrix, 1) == axes(local_matrix, 2) ==
+            axes(local_vector, 1) == axes(global_dofs, 1)
+    has_global_arrays = global_matrix !== nothing && global_vector !== nothing
+    for (local_col, global_col) in pairs(global_dofs)
+        col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, global_col)
+        if col_coeffs === nothing
+            for (local_row, global_row) in pairs(global_dofs)
+                m = local_matrix[local_row, local_col]
+                iszero(m) && continue # Skip early when zero to avoid remaining lookups
+                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, global_row)
+                row_coeffs === nothing && continue # Neither the column nor the row are constrained: Do nothing
+                for (global_mrow, weight) in row_coeffs
+                    mw = m * weight
+                    local_mrow = findfirst(==(global_mrow), global_dofs)
+                    if local_mrow === nothing
+                        # Only modify the global array if this isn't prescribed since we
+                        # can't zero it out later like with the local matrix.
+                        if !haskey(dofmapping, global_col) && !haskey(dofmapping, global_mrow)
+                            has_global_arrays || missing_global()
+                            addindex!(global_matrix, mw, global_mrow, global_col)
+                        end
+                    else
+                        local_matrix[local_mrow, local_col] += mw
+                    end
+                end
+            end
+        else
+            for (local_row, global_row) in pairs(global_dofs)
+                m = local_matrix[local_row, local_col]
+                iszero(m) && continue # Skip early when zero to avoid remaining lookups
+                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, global_row)
+                if row_coeffs === nothing
+                    for (global_mcol, weight) in col_coeffs
+                        local_mcol = findfirst(==(global_mcol), global_dofs)
+                        mw = m * weight
+                        if local_mcol === nothing
+                            # Only modify the global array if this isn't prescribed since we
+                            # can't zero it out later like with the local matrix.
+                            if !haskey(dofmapping, global_row) && !haskey(dofmapping, global_mcol)
+                                has_global_arrays || missing_global()
+                                addindex!(global_matrix, mw, global_row, global_mcol)
+                            end
+                        else
+                            local_matrix[local_row, local_mcol] += mw
+                        end
+                    end
+                else
+                    for (global_mcol, weight_col) in col_coeffs
+                        local_mcol = findfirst(==(global_mcol), global_dofs)
+                        for (global_mrow, weight_row) in row_coeffs
+                            mww = m * weight_col * weight_row
+                            local_mrow = findfirst(==(global_mrow), global_dofs)
+                            if local_mcol === nothing || local_mrow === nothing
+                                # Only modify the global array if this isn't prescribed since we
+                                # can't zero it out later like with the local matrix.
+                                if !haskey(dofmapping, global_mrow) && !haskey(dofmapping, global_mcol)
+                                    has_global_arrays || missing_global()
+                                    addindex!(global_matrix, mww, global_mrow, global_mcol)
+                                end
+                            else
+                                local_matrix[local_mrow, local_mcol] += mww
+                            end
+                        end
+                    end
+                end
+            end
+            for (global_mcol, weight) in col_coeffs
+                vw = local_vector[local_col] * weight
+                local_mcol = findfirst(==(global_mcol), global_dofs)
+                if local_mcol === nothing
+                    has_global_arrays || missing_global()
+                    global_vector[global_mcol] += vw
+                else
+                    local_vector[local_mcol] += vw
+                end
+            end
+            local_vector[local_col] = 0
+        end
+    end
 end

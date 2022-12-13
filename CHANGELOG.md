@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+ - [Metis.jl](https://github.com/JuliaSparse/Metis.jl) extension for fill-reducing DoF
+   permutation. This uses Julias new package extension mechanism (requires Julia 1.10) to
+   support a new DoF renumbering order `DofOrder.Ext{Metis}()` that can be passed to
+   `renumber!` to renumber DoFs using the Metis.jl library. ([#393][github-393],
+   [#549][github-549])
+
+## [0.3.10] - 2022-12-11
+### Added
+ - New functions `apply_local!` and `apply_assemble!` for applying constraints locally on
+   the element level before assembling to the global system. ([#528][github-528])
+ - New functionality to renumber DoFs by fields or by components. This is useful when you
+   need the global matrix to be blocked. ([#378][github-378], [#545][github-545])
+ - Functionality to renumber DoFs in DofHandler and ConstraintHandler simultaneously:
+   `renumber!(dh::DofHandler, ch::ConstraintHandler, order)`. Previously renumbering had to
+   be done *before* creating the ConstraintHandler since otherwise DoF numbers would be
+   inconsistent. However, this was inconvenient in cases where the constraints impact the
+   new DoF order permutation. ([#542][github-542])
+ - The coupling between fields can now be specified when creating the global matrix with
+   `create_sparsity_pattern` by passing a `Matrix{Bool}`. For example, in a problem with
+   unknowns `(u, p)` and corresponding test functions `(v, q)`, if there is no coupling
+   between `p` and `q` it is unnecessary to allocate entries in the global matrix
+   corresponding to these DoFs. This can now be communicated to `create_sparsity_pattern` by
+   passing the coupling matrix `[true true; true false]` in the keyword argument `coupling`.
+   ([#544][github-544])
 ### Changed
  - Runtime and allocations for application of boundary conditions in `apply!` and
    `apply_zero!` have been improved. As a result, the `strategy` keyword argument is
@@ -16,6 +41,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    always override any previous constraints. Conflicting constraints could previously cause
    problems when a DoF where prescribed by both `Dirichlet` and `AffineConstraint`.
    ([#529][github-529])
+ - Entries in local matrix/vector are now ignored in the assembly procedure. This allows,
+   for example, using a dense local matrix `[a b; c d]` even if no entries exist in the
+   global matrix for the `d` block, i.e. in `[A B; C D]` the `D` block is zero, and these
+   global entries might not exist in the sparse matrix. (Such sparsity patterns can now be
+   created by `create_sparsity_pattern`, see [#544][github-544].) ([#543][github-543])
+### Fixed
+ - Fix affine constraints with prescribed DoFs in the right-hand-side. In particular, DoFs
+   that are prescribed by just an inhomogeneity are now handled correctly, and nested affine
+   constraints now give an error instead of silently giving the wrong result.
+   ([#530][github-530], [#535][github-535])
+ - Fixed internal inconsistency in edge ordering for 2nd order RefTetrahedron and RefCube.
+   ([#520][github-520], [#523][github-523])
+### Other improvements
+ - Performance improvements:
+    - Reduced time and memory allocations in DoF distribution for `MixedDofHandler`.
+      ([#533][github-533])
+    - Reduced time and memory allocations reductions in `getcoordinates!`.
+      ([#536][github-536])
+    - Reduced time and memory allocations in affine constraint condensation.
+      ([#537][github-537], [#541][github-541], [#550][github-550])
+ - Documentation improvements:
+    - Use `:static` scheduling for threaded `for`-loop ([#534][github-534])
+    - Remove use of `@inbounds` ([#547][github-547])
+ - Unification of `create_sparsity_pattern` methods to remove code duplication between
+   `DofHandler` and `MixedDofHandler`. ([#538][github-538], [#540][github-540])
 
 ## [0.3.9] - 2022-10-19
 ### Added
@@ -109,10 +159,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [github-352]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/352
 [github-363]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/363
+[github-378]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/378
 [github-385]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/385
 [github-386]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/386
 [github-390]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/390
 [github-392]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/392
+[github-393]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/393
 [github-401]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/401
 [github-402]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/402
 [github-404]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/404
@@ -122,6 +174,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-418]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/418
 [github-425]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/425
 [github-428]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/428
+[github-431]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/431
 [github-436]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/436
 [github-456]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/456
 [github-458]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/458
@@ -151,10 +204,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-509]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/509
 [github-512]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/512
 [github-514]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/514
+[github-520]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
+[github-523]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/523
 [github-524]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/524
+[github-528]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/528
 [github-529]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/529
+[github-530]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/530
+[github-533]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/533
+[github-534]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/534
+[github-535]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/535
+[github-536]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/536
+[github-537]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/537
+[github-538]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/538
+[github-540]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/540
+[github-541]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/541
+[github-542]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/542
+[github-543]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/543
+[github-544]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/544
+[github-545]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/545
+[github-547]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/547
+[github-549]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/549
+[github-550]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/550
 
-[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.9...HEAD
+[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.10...HEAD
+[0.3.10]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.6...v0.3.7
