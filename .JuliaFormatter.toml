@@ -1,0 +1,7 @@
+margin = 200
+always_for_in = "nothing"
+whitespace_typedefs = false
+whitespace_in_kwargs = true
+join_lines_based_on_source = true
+format_docstrings = true
+format_markdown = true
