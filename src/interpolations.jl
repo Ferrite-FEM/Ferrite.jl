@@ -153,9 +153,18 @@ function value(ip::DiscontinuousLagrange{dim,shape,order}, i::Int, ξ::Vec{dim})
 end
 
 # Excepting the L0 element.
-function reference_coordinates(ip::DiscontinuousLagrange{dim,shape,0}) where {dim,shape}
+function reference_coordinates(ip::DiscontinuousLagrange{dim,RefCube,0}) where dim
     return [Vec{dim, Float64}(ntuple(x->0.0, dim))]
 end
+
+function reference_coordinates(ip::DiscontinuousLagrange{2,RefTetrahedron,0})
+    return [Vec{2,Float64}((1/3,1/3))]
+end
+
+function reference_coordinates(ip::DiscontinuousLagrange{3,RefTetrahedron,0})
+   return [Vec{3,Float64}((1/4,1/4,1/4))]
+end
+
 function value(ip::DiscontinuousLagrange{dim,shape,0}, i::Int, ξ::Vec{dim}) where {dim,shape}
     return 1.0
 end
