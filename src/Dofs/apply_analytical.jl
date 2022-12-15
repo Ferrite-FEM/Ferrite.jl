@@ -63,12 +63,12 @@ end
 
 function _apply_analytical!(
     a::Vector, dh::AbstractDofHandler, celldofinds, field_dim,
-    ip_fun::Interpolation{<:Any,RefShape}, ip_geo::Interpolation, f::Function, cellset) where RefShape
+    ip_fun::Interpolation{dim,RefShape}, ip_geo::Interpolation, f::Function, cellset) where {dim, RefShape}
 
     coords = getcoordinates(dh.grid, first(cellset))
     ref_points = reference_coordinates(ip_fun)
     dummy_weights = zeros(length(ref_points))
-    qr = QuadratureRule{RefShape}(dummy_weights, ref_points)
+    qr = QuadratureRule{dim, RefShape}(dummy_weights, ref_points)
     cv = CellScalarValues(qr, ip_fun, ip_geo)
     c_dofs = celldofs(dh, first(cellset))
     f_dofs = zeros(Int, length(celldofinds))
