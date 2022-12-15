@@ -16,24 +16,24 @@ end
 
 Apply a solution `f(x)` by modifying the values in the degree of freedom vector `a`
 pertaining to the field `fieldname` for all cells in `cellset`.
-The function `f(x)` are given the spatial coordinate 
-of the degree of freedom. For scalar fields, `f(x)::Number`, 
+The function `f(x)` are given the spatial coordinate
+of the degree of freedom. For scalar fields, `f(x)::Number`,
 and for vector fields with dimension `dim`, `f(x)::Vec{dim}`.
 
 This function can be used to apply initial conditions for time dependent problems.
 
 !!! note
-    This function only works for standard nodal finite element interpolations 
-    when the function value at the (algebraic) node is equal to the corresponding 
+    
+    This function only works for standard nodal finite element interpolations
+    when the function value at the (algebraic) node is equal to the corresponding
     degree of freedom value.
-    This holds for e.g. Lagrange and Serendipity interpolations, including 
-    sub- and superparametric elements. 
-
+    This holds for e.g. Lagrange and Serendipity interpolations, including
+    sub- and superparametric elements.
 """
 function apply_analytical!(
     a::AbstractVector, dh::DofHandler, fieldname::Symbol, f::Function,
-    cellset=1:getncells(dh.grid)
-    )
+    cellset = 1:getncells(dh.grid))
+
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
     ip_geo = _default_interpolation(dh)
     field_idx = find_field(dh, fieldname)
@@ -45,8 +45,8 @@ end
 
 function apply_analytical!(
     a::AbstractVector, dh::MixedDofHandler, fieldname::Symbol, f::Function,
-    cellset=1:getncells(dh.grid),
-    )
+    cellset = 1:getncells(dh.grid))
+
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
     ip_geos = _default_interpolations(dh)
 
@@ -64,7 +64,7 @@ end
 function _apply_analytical!(
     a::Vector, dh::AbstractDofHandler, celldofinds, field_dim,
     ip_fun::Interpolation, ip_geo::Interpolation, f::Function, cellset)
-    
+
     coords = getcoordinates(dh.grid, first(cellset))
     cdv = CellDofValues(ip_fun, ip_geo)
     c_dofs = celldofs(dh, first(cellset))
