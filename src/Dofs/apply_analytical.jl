@@ -63,10 +63,13 @@ end
 
 function _apply_analytical!(
     a::Vector, dh::AbstractDofHandler, celldofinds, field_dim,
-    ip_fun::Interpolation, ip_geo::Interpolation, f::Function, cellset)
+    ip_fun::Interpolation{<:Any,RefShape}, ip_geo::Interpolation, f::Function, cellset) where RefShape
 
     coords = getcoordinates(dh.grid, first(cellset))
-    cdv = CellDofValues(ip_fun, ip_geo)
+    ref_points = reference_coordinates(ip_fun)
+    dummy_weights = zeros(length(ref_points))
+    qr = QuadratureRule{RefShape}(dummy_weights, ref_points)
+    cv = CellScalarValues(qr, ip_fun, ip_geo)
     c_dofs = celldofs(dh, first(cellset))
     f_dofs = zeros(Int, length(celldofinds))
 
@@ -79,14 +82,14 @@ function _apply_analytical!(
         for (i, celldofind) in enumerate(celldofinds)
             f_dofs[i] = c_dofs[celldofind]
         end
-        _apply_analytical!(a, f_dofs, coords, field_dim, cdv, f)
+        _apply_analytical!(a, f_dofs, coords, field_dim, cv, f)
     end
     return a
 end
 
-function _apply_analytical!(a::Vector, dofs::Vector{Int}, coords::Vector{<:Vec}, field_dim, cdv::CellDofValues, f)
-    for i_dof in 1:getnquadpoints(cdv)
-        x_dof = spatial_coordinate(cdv, i_dof, coords)
+function _apply_analytical!(a::Vector, dofs::Vector{Int}, coords::Vector{<:Vec}, field_dim, cv::CellScalarValues, f)
+    for i_dof in 1:getnquadpoints(cv)
+        x_dof = spatial_coordinate(cv, i_dof, coords)
         for (idim, icval) in enumerate(f(x_dof))
             a[dofs[field_dim*(i_dof-1)+idim]] = icval
         end
