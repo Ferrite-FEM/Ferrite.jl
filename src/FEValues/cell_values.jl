@@ -19,7 +19,6 @@ utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape 
 **Common methods:**
 
   - [`reinit!`](@ref)
-
   - [`getnquadpoints`](@ref)
   - [`getdetJdV`](@ref)
   - [`shape_value`](@ref)
@@ -55,7 +54,7 @@ function CellScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolatio
 end
 
 function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_interpol::Interpolation,
-    geom_interpol::Interpolation = func_interpol) where {dim,T,shape<:AbstractRefShape}
+        geom_interpol::Interpolation = func_interpol) where {dim,T,shape<:AbstractRefShape}
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
@@ -106,7 +105,7 @@ function CellVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolatio
 end
 
 function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_interpol::Interpolation,
-    geom_interpol::Interpolation = func_interpol) where {dim,T,shape<:AbstractRefShape}
+        geom_interpol::Interpolation = func_interpol) where {dim,T,shape<:AbstractRefShape}
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
