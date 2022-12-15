@@ -62,13 +62,13 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
 
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(func_interpol)
-    N = fill(zero(T) * T(NaN), n_func_basefuncs, n_qpoints)
+    N    = fill(zero(T)          * T(NaN), n_func_basefuncs, n_qpoints)
     dNdx = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
     dNdξ = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M = fill(zero(T) * T(NaN), n_geom_basefuncs, n_qpoints)
+    M    = fill(zero(T)          * T(NaN), n_geom_basefuncs, n_qpoints)
     dMdξ = fill(zero(Vec{dim,T}) * T(NaN), n_geom_basefuncs, n_qpoints)
 
     for (qp, ξ) in enumerate(quad_rule.points)
@@ -113,13 +113,13 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
 
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(func_interpol) * dim
-    N = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
+    N    = fill(zero(Vec{dim,T})      * T(NaN), n_func_basefuncs, n_qpoints)
     dNdx = fill(zero(Tensor{2,dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
     dNdξ = fill(zero(Tensor{2,dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M = fill(zero(T) * T(NaN), n_geom_basefuncs, n_qpoints)
+    M    = fill(zero(T)          * T(NaN), n_geom_basefuncs, n_qpoints)
     dMdξ = fill(zero(Vec{dim,T}) * T(NaN), n_geom_basefuncs, n_qpoints)
 
     for (qp, ξ) in enumerate(quad_rule.points)
