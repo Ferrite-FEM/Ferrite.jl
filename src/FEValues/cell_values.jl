@@ -10,26 +10,26 @@ utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape 
 `CellScalarValues` type should be used. For vector field, both subtypes can be used.
 
 **Arguments:**
-
-  - `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
-  - `quad_rule`: an instance of a [`QuadratureRule`](@ref)
-  - `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
-  - `geom_interpol`: an optional instance of a [`Interpolation`](@ref) which is used to interpolate the geometry
+* `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
+* `quad_rule`: an instance of a [`QuadratureRule`](@ref)
+* `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
+* `geom_interpol`: an optional instance of a [`Interpolation`](@ref) which is used to interpolate the geometry
 
 **Common methods:**
+* [`reinit!`](@ref)
+* [`getnquadpoints`](@ref)
+* [`getdetJdV`](@ref)
 
-  - [`reinit!`](@ref)
-  - [`getnquadpoints`](@ref)
-  - [`getdetJdV`](@ref)
-  - [`shape_value`](@ref)
-  - [`shape_gradient`](@ref)
-  - [`shape_symmetric_gradient`](@ref)
-  - [`shape_divergence`](@ref)
-  - [`function_value`](@ref)
-  - [`function_gradient`](@ref)
-  - [`function_symmetric_gradient`](@ref)
-  - [`function_divergence`](@ref)
-  - [`spatial_coordinate`](@ref)
+* [`shape_value`](@ref)
+* [`shape_gradient`](@ref)
+* [`shape_symmetric_gradient`](@ref)
+* [`shape_divergence`](@ref)
+
+* [`function_value`](@ref)
+* [`function_gradient`](@ref)
+* [`function_symmetric_gradient`](@ref)
+* [`function_divergence`](@ref)
+* [`spatial_coordinate`](@ref)
 """
 CellValues, CellScalarValues, CellVectorValues
 
