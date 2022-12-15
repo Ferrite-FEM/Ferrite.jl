@@ -311,16 +311,16 @@ function generate_grid(::Type{Triangle}, nel::NTuple{2,Int}, LL::Vec{2,T}, LR::V
     node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y))
     cells = Triangle[]
     for j in 1:nel_y, i in 1:nel_x
-        push!(cells, Triangle((node_array[i+1,j], node_array[i,j+1], node_array[i,j]))) # ◺
-        push!(cells, Triangle((node_array[i,j+1], node_array[i+1,j], node_array[i+1,j+1]))) # ◹
+        push!(cells, Triangle((node_array[i,j], node_array[i+1,j], node_array[i,j+1]))) # ◺
+        push!(cells, Triangle((node_array[i+1,j], node_array[i+1,j+1], node_array[i,j+1]))) # ◹
     end
 
     # Cell faces
     cell_array = reshape(collect(1:nel_tot),(2, nel_x, nel_y))
-    boundary = FaceIndex[[FaceIndex(cl, 3) for cl in cell_array[1,:,1]];
-                               [FaceIndex(cl, 2) for cl in cell_array[2,end,:]];
-                               [FaceIndex(cl, 3) for cl in cell_array[2,:,end]];
-                               [FaceIndex(cl, 2) for cl in cell_array[1,1,:]]]
+    boundary = FaceIndex[[FaceIndex(cl, 1) for cl in cell_array[1,:,1]];
+                               [FaceIndex(cl, 1) for cl in cell_array[2,end,:]];
+                               [FaceIndex(cl, 2) for cl in cell_array[2,:,end]];
+                               [FaceIndex(cl, 3) for cl in cell_array[1,1,:]]]
 
     boundary_matrix = boundaries_to_sparse(boundary)
 
