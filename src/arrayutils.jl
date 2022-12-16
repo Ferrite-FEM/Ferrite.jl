@@ -21,6 +21,23 @@ existing in the sparsity pattern of `A` this method throws a `SparsityError`.
 """
 addindex!(A, v, i, j)
 
+"""
+    fillzero!(A::AbstractVecOrMat{T})
+
+Fill the (stored) entries of the vector or matrix `A` with zeros.
+
+Fallback: `fill!(A, zero(T))`.
+"""
+fillzero!(A)
+
+function fillzero!(A::AbstractVecOrMat{T}) where T
+    return fill!(A, zero(T))
+end
+
+##################################
+## SparseArrays.SparseMatrixCSC ##
+##################################
+
 function addindex!(A::SparseMatrixCSC{Tv}, v, i::Integer, j::Integer) where Tv
     return addindex!(A, Tv(v), Int(i), Int(j))
 end
@@ -40,4 +57,13 @@ function addindex!(A::SparseMatrixCSC{Tv}, v::Tv, i::Int, j::Int) where Tv
         # (i, j) not stored. Throw.
         throw(SparsityError())
     end
+end
+
+function fillzero!(A::SparseMatrixCSC{T}) where T
+    fill!(nonzeros(A), zero(T))
+    return A
+end
+function fillzero!(A::Symmetric{T,<:SparseMatrixCSC}) where T
+    fillzero!(A.data)
+    return A
 end

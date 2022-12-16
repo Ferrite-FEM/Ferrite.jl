@@ -129,11 +129,11 @@ start_assemble(K::Union{SparseMatrixCSC, Symmetric{<:Any,SparseMatrixCSC}}, f::V
 
 start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; fillzero::Bool=true) = start_assemble(K, f; fillzero=fillzero)
 function start_assemble(K::SparseMatrixCSC{T}, f::Vector=T[]; fillzero::Bool=true) where {T}
-    fillzero && (fill!(K.nzval, zero(T)); fill!(f, zero(T)))
+    fillzero && (fillzero!(K); fillzero!(f))
     return AssemblerSparsityPattern(K, f, Int[], Int[])
 end
 function start_assemble(K::Symmetric{T,<:SparseMatrixCSC}, f::Vector=T[]; fillzero::Bool=true) where T
-    fillzero && (fill!(K.data.nzval, zero(T)); fill!(f, zero(T)))
+    fillzero && (fillzero!(K); fillzero!(f))
     return AssemblerSymmetricSparsityPattern(K, f, Int[], Int[])
 end
 
