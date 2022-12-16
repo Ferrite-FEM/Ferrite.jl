@@ -91,6 +91,14 @@ end
 
 abstract type AbstractSparseAssembler end
 
+"""
+    matrix_handle(a::AbstractSparseAssembler)
+    vector_handle(a::AbstractSparseAssembler)
+
+Return a reference to the underlying matrix/vector of the assembler.
+"""
+matrix_handle, vector_handle
+
 struct AssemblerSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
     K::SparseMatrixCSC{Tv,Ti}
     f::Vector{Tv}
@@ -104,8 +112,9 @@ struct AssemblerSymmetricSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
     sorteddofs::Vector{Int}
 end
 
-@inline getsparsemat(a::AssemblerSparsityPattern) = a.K
-@inline getsparsemat(a::AssemblerSymmetricSparsityPattern) = a.K.data
+matrix_handle(a::AssemblerSparsityPattern) = a.K
+matrix_handle(a::AssemblerSymmetricSparsityPattern) = a.K.data
+vector_handle(a::Union{AssemblerSparsityPattern, AssemblerSymmetricSparsityPattern}) = a.f
 
 """
     start_assemble(K::SparseMatrixCSC;            fillzero::Bool=true) -> AssemblerSparsityPattern
@@ -172,7 +181,7 @@ end
         @inbounds assemble!(A.f, dofs, fe)
     end
 
-    K = getsparsemat(A)
+    K = matrix_handle(A)
     permutation = A.permutation
     sorteddofs = A.sorteddofs
     @boundscheck checkbounds(K, dofs, dofs)
@@ -252,7 +261,7 @@ function apply_assemble!(
     )
     _apply_local!(
         local_matrix, local_vector, global_dofs, ch, apply_zero,
-        getsparsemat(assembler), assembler.f
+        matrix_handle(assembler), vector_handle(assembler),
     )
     assemble!(assembler, global_dofs, local_matrix, local_vector)
     return
