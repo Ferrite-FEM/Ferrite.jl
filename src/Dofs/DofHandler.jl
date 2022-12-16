@@ -439,7 +439,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
         V = ones(length(I))
         K = sparse(I, J, V, ndofs(dh), ndofs(dh))
         _condense_sparsity_pattern!(K, ch.dofcoefficients, ch.dofmapping)
-        fill!(K.nzval, 0.0)
+        fillzero!(K)
     else
         V = zeros(length(I))
         K = sparse(I, J, V, ndofs(dh), ndofs(dh))
