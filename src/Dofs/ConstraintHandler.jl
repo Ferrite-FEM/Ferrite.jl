@@ -717,8 +717,8 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
     resize!(J, cnt)
 
     # Fill the sparse matrix with a non-zero value so that :+ operation does not remove entries with value zero.
-    V = fill(1.0, length(I))
-    K2 = sparse(I, J, V, ndofs, ndofs)
+    K2 = spzeros!!(Float64, I, J, ndofs, ndofs)
+    fill!(K2.nzval, 1)
 
     K .+= K2
 
