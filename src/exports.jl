@@ -111,6 +111,7 @@ export
     FieldHandler,
     Field,
     reshape_to_nodes,
+    apply_analytical!,
 
 # Constraints
     ConstraintHandler,

@@ -260,3 +260,34 @@ pdbc = PeriodicDirichlet(
         (x, t) -> ū + ∇ū  ⋅ (x - x̄)
     )
     ```
+
+# Initial Conditions
+
+When solving time-dependent problems, initial conditions, different from zero, may be required. 
+For finite element formulations of ODE-type, 
+i.e. ``\boldsymbol{u}'(t) = \boldsymbol{f}(\boldsymbol{u}(t),t)``, 
+where ``\boldsymbol{u}(t)`` are the degrees of freedom,
+initial conditions can be specified by the [`apply_analytical!`](@ref) function.
+For example, specify the initial pressure as a function of the y-coordinate
+```julia
+ρ = 1000; g = 9.81    # density [kg/m³] and gravity [N/kg]
+grid = generate_grid(Quadrilateral, (10,10))
+dh = DofHandler(grid); push!(dh, :u, 2); push!(dh, :p, 1); close!(dh)
+u = zeros(ndofs(dh))
+apply_analytical!(u, dh, :p, x -> ρ * g * x[2])
+```
+
+See also [Time Dependent Problems](@ref) for one example. 
+
+*Note about solving DAE:* 
+A Differential Algebraic Equations (DAE) is an equation of the form
+``\boldsymbol{r}(\boldsymbol{u}(t),\boldsymbol{u}'(t),t)=\boldsymbol{0}``,
+which usually cannot be expressed as a true ODE. They occur often,
+but not always, in forms where some time derivatives are missing
+```math
+u_1'(t) = f(\boldsymbol{u}(t),t)
+0 = g(\boldsymbol{u}(t),t)`
+```
+In for such equations, it is usually necessary to specify initial conditions 
+for both ``\boldsymbol{u}(0)`` and ``\boldsymbol{u}'(0)``, and these must be consistent,
+i.e. ``\boldsymbol{r}(\boldsymbol{u}(0),\boldsymbol{u}'(0),0)=\boldsymbol{0}``.

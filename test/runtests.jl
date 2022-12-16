@@ -27,5 +27,6 @@ include("test_l2_projection.jl")
 include("test_pointevaluation.jl")
 # include("test_notebooks.jl")
 include("test_apply_rhs.jl")
+include("test_apply_analytical.jl")
 include("test_examples.jl")
 @test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined
