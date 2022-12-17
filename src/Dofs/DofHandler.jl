@@ -432,18 +432,16 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     resize!(I, cnt)
     resize!(J, cnt)
 
+    K = spzeros!!(Float64, I, J, ndofs(dh), ndofs(dh))
+
     # If ConstraintHandler is given, create the condensation pattern due to affine constraints
     if ch !== nothing
         @assert isclosed(ch)
-
-        V = ones(length(I))
-        K = sparse(I, J, V, ndofs(dh), ndofs(dh))
+        fill!(K.nzval, 1)
         _condense_sparsity_pattern!(K, ch.dofcoefficients, ch.dofmapping)
         fillzero!(K)
-    else
-        V = zeros(length(I))
-        K = sparse(I, J, V, ndofs(dh), ndofs(dh))
     end
+
     return K
 end
 
