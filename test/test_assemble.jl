@@ -14,7 +14,7 @@
     a = start_assemble()
     Ke = rand(4, 4)
     assemble!(a, dofs, Ke)
-    K = end_assemble(a)
+    K = finish_assemble(a)
     @test K[1,1] == Ke[1,1]
     @test K[1,5] == Ke[1,3]
     @test K[5,1] == Ke[3,1]
@@ -25,7 +25,7 @@
     a = start_assemble()
     Ke = rand(length(rdofs), length(cdofs))
     assemble!(a, rdofs, cdofs, Ke)
-    K = end_assemble(a)
+    K = finish_assemble(a)
     @test (K[rdofs,cdofs] .== Ke) |> all
 
     # SparseMatrix assembler
