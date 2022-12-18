@@ -1,4 +1,4 @@
-struct Assembler{T}
+struct IJVAssembler{T}
     I::Vector{Int}
     J::Vector{Int}
     V::Vector{T}
@@ -16,9 +16,9 @@ function Assembler(N)
 end
 
 """
-    start_assemble([N=0]) -> Assembler
+    start_assemble([N=0]) -> IJVAssembler
 
-Create an `Assembler` object which can be used to assemble element contributions to the
+Create an `IJVAssembler` object which can be used to assemble element contributions to the
 global sparse matrix. Use [`assemble!`](@ref) for each element, and [`finish_assemble`](@ref),
 to finalize the assembly and return the sparse matrix.
 
@@ -31,24 +31,24 @@ as described in the [manual](@ref assembly_in_manual).
     the same pattern. See the [manual section](@ref man-assembly) on assembly.
 """
 function start_assemble(N::Int=0)
-    return Assembler(N)
+    return IJVAssembler(N)
 end
 
 """
-    assemble!(a::Assembler, dofs, Ke)
+    assemble!(a::IJVAssembler, dofs, Ke)
 
 Assembles the element matrix `Ke` into `a`.
 """
-function assemble!(a::Assembler{T}, dofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
+function assemble!(a::IJVAssembler{T}, dofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
     assemble!(a, dofs, dofs, Ke)
 end
 
 """
-    assemble!(a::Assembler, rowdofs, coldofs, Ke)
+    assemble!(a::IJVAssembler, rowdofs, coldofs, Ke)
 
 Assembles the matrix `Ke` into `a` according to the dofs specified by `rowdofs` and `coldofs`.
 """
-function assemble!(a::Ferrite.Assembler{T}, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
+function assemble!(a::IJVAssembler{T}, rowdofs::AbstractVector{Int}, coldofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
     nrows = length(rowdofs)
     ncols = length(coldofs)
 
@@ -65,12 +65,12 @@ function assemble!(a::Ferrite.Assembler{T}, rowdofs::AbstractVector{Int}, coldof
 end
 
 """
-    finish_assemble(a::Assembler) -> K
+    finish_assemble(a::IJVAssembler) -> K
 
 Finalizes an assembly. Returns a sparse matrix with the
 assembled values. Note that this step is not necessary for `AbstractSparseAssembler`s.
 """
-function finish_assemble(a::Assembler)
+function finish_assemble(a::IJVAssembler)
     return sparse(a.I, a.J, a.V)
 end
 
