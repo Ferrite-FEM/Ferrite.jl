@@ -1,45 +1,60 @@
-struct IJVAssembler{T}
+abstract type AbstractSparseAssembler end
+
+struct IJVAssembler{T} <: AbstractSparseAssembler
+    I::Vector{Int}
+    J::Vector{Int}
+    V::Vector{T}
+    f::Vector{T}
+end
+
+# Matrix-view of the assembler for matrix_handle
+struct IJVMatrix{T} <: AbstractMatrix{T}
     I::Vector{Int}
     J::Vector{Int}
     V::Vector{T}
 end
-
-function Assembler(N)
-    I = Int[]
-    J = Int[]
-    V = Float64[]
-    sizehint!(I, N)
-    sizehint!(J, N)
-    sizehint!(V, N)
-
-    Assembler(I, J, V)
+function addindex!(A::IJVMatrix{T}, v::T, i::Int, j::Int) where T
+    iszero(v) && return A
+    push!(A.I, i)
+    push!(A.J, j)
+    push!(A.V, v)
+    return A
 end
+matrix_handle(a::IJVAssembler) = IJVMatrix(a.I, a.J, a.V)
+vector_handle(a::IJVAssembler) = a.f
 
 """
     start_assemble([N=0]) -> IJVAssembler
+    start_assemble(f::AbstractVector, [N=0]) -> IJVAssembler
 
 Create an `IJVAssembler` object which can be used to assemble element contributions to the
-global sparse matrix. Use [`assemble!`](@ref) for each element, and [`finish_assemble`](@ref),
-to finalize the assembly and return the sparse matrix.
-
-Note that giving a sparse matrix as input can be more efficient. See below and 
-as described in the [manual](@ref assembly_in_manual).
+global sparse matrix and optionally the global vector `f`. Use [`assemble!`](@ref) for each
+element, and [`finish_assemble`](@ref), to finalize the assembly and return the sparse
+matrix.
 
 !!! note
     When the same matrix pattern is used multiple times (for e.g. multiple time steps or
     Newton iterations) it is more efficient to create the sparse matrix **once** and reuse
     the same pattern. See the [manual section](@ref man-assembly) on assembly.
 """
-function start_assemble(N::Int=0)
-    return IJVAssembler(N)
+function start_assemble(f::Vector{T}, N::Int=0) where T
+    I = Int[]; sizehint!(I, N)
+    J = Int[]; sizehint!(J, N)
+    V = T[];   sizehint!(V, N)
+    return IJVAssembler(I, J, V, f)
 end
+start_assemble(N::Int=0) = start_assemble(Float64[], N)
 
 """
     assemble!(a::IJVAssembler, dofs, Ke)
+    assemble!(a::IJVAssembler, dofs, Ke, fe)
 
-Assembles the element matrix `Ke` into `a`.
+Assembles the element matrix `Ke` and element vector `fe` into the assembler `a`.
 """
-function assemble!(a::IJVAssembler{T}, dofs::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
+function assemble!(a::IJVAssembler{T}, dofs::AbstractVector{Int}, Ke::AbstractMatrix{T}, fe::Union{AbstractVector{T},Nothing}=nothing) where {T}
+    if fe !== nothing
+        assemble!(vector_handle(a), dofs, fe)
+    end
     assemble!(a, dofs, dofs, Ke)
 end
 
@@ -65,13 +80,22 @@ function assemble!(a::IJVAssembler{T}, rowdofs::AbstractVector{Int}, coldofs::Ab
 end
 
 """
-    finish_assemble(a::IJVAssembler) -> K
+    finish_assemble(a::IJVAssembler) -> K, f
 
-Finalizes an assembly. Returns a sparse matrix with the
-assembled values. Note that this step is not necessary for `AbstractSparseAssembler`s.
+Finalizes a `IJVAssembler` assembly. Return a sparse matrix `K :: SparseMatrixCSC` with the
+assembled matrix values, and the dense vector `f :: Vector` with the assembled vector
+values.
+
+Note that the vector `f` is empty (but still returned) if the assembler was used for matrix
+entries only.
 """
 function finish_assemble(a::IJVAssembler)
-    return sparse(a.I, a.J, a.V)
+    A = sparse(a.I, a.J, a.V)
+    f = a.f
+    if !(length(f) == 0 || length(f) == size(A, 1) == size(A, 2))
+        error("size mismatch between matrix (size $(size(A))) and vector (length $(length(f)))")
+    end
+    return A, f
 end
 
 """
@@ -88,8 +112,6 @@ Assembles the element residual `ge` into the global residual vector `g`.
         end
     end
 end
-
-abstract type AbstractSparseAssembler end
 
 """
     matrix_handle(a::AbstractSparseAssembler)

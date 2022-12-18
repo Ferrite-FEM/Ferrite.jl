@@ -1226,6 +1226,7 @@ end # testset
 
     for azero in (nothing, false, true)
 
+        # Dirichlet BC
         S = create_sparsity_pattern(dh)
         f = zeros(ndofs(dh))
 
@@ -1239,6 +1240,7 @@ end # testset
         f_dbc_local = copy(f)
         assembler_dbc_local = start_assemble(K_dbc_local, f_dbc_local)
 
+        # Dirichlet BC as AffineConstraint
         S = create_sparsity_pattern(dh, ch_ac)
 
         K_ac_standard = copy(S)
@@ -1250,7 +1252,9 @@ end # testset
         K_ac_local = copy(S)
         f_ac_local = copy(f)
         assembler_ac_local = start_assemble(K_ac_local, f_ac_local)
+        assemblerij_ac_local = start_assemble(copy(f))
 
+        # Periodic BC (non-local AffineConstraint)
         S = create_sparsity_pattern(dh, ch_p)
 
         K_p_standard = copy(S)
@@ -1259,6 +1263,7 @@ end # testset
         K_p_ch = copy(S)
         f_p_ch = copy(f)
         assembler_p_ch = start_assemble(K_p_ch, f_p_ch)
+        assemblerij_p_ch = start_assemble(copy(f))
         # K_p_local = copy(S)
         # f_p_local = copy(f)
         # assembler_p_local = start_assemble(K_p_local, f_p_local)
@@ -1287,6 +1292,9 @@ end # testset
                 let ke = copy(ke), fe = copy(fe)
                     apply_f!(assembler_p_ch, ch_p, global_dofs, ke, fe)
                 end
+                let ke = copy(ke), fe = copy(fe)
+                    apply_f!(assemblerij_p_ch, ch_p, global_dofs, ke, fe)
+                end
             end
             # Assemble after apply_local!
             let apply_f! = azero === nothing ? apply_local! :
@@ -1298,6 +1306,10 @@ end # testset
                 let ke = copy(ke), fe = copy(fe)
                     apply_f!(ke, fe, global_dofs, ch_ac)
                     assemble!(assembler_ac_local, global_dofs, ke, fe)
+                end
+                let ke = copy(ke), fe = copy(fe)
+                    apply_f!(ke, fe, global_dofs, ch_ac)
+                    assemble!(assemblerij_ac_local, global_dofs, ke, fe)
                 end
                 let ke = copy(ke), fe = copy(fe)
                     if cellid(cell) in first.(getfaceset(grid, "bottom"))
@@ -1312,6 +1324,10 @@ end # testset
             end
         end
 
+        # Finish IJV assemblers
+        Kij_ac_local, fij_ac_local = finish_assemble(assemblerij_ac_local)
+        Kij_p_ch, fij_p_ch = finish_assemble(assemblerij_p_ch)
+
         # apply! for the standard ones
         let apply_f! = azero === true ? apply_zero! : apply!
             apply_f!(K_dbc_standard, f_dbc_standard, ch_dbc)
@@ -1325,12 +1341,13 @@ end # testset
 
         # Everything should be identical now for free entries
         @test K_dbc_standard[fdofs, fdofs] ≈ K_dbc_ch[fdofs, fdofs] ≈ K_dbc_local[fdofs, fdofs] ≈
-              K_ac_standard[fdofs, fdofs] ≈ K_ac_ch[fdofs, fdofs] ≈ K_ac_local[fdofs, fdofs]
+              K_ac_standard[fdofs, fdofs] ≈ K_ac_ch[fdofs, fdofs] ≈ K_ac_local[fdofs, fdofs] ≈
+              Kij_ac_local[fdofs, fdofs]
         @test f_dbc_standard[fdofs] ≈ f_dbc_ch[fdofs] ≈ f_dbc_local[fdofs] ≈
-              f_ac_standard[fdofs] ≈ f_ac_ch[fdofs] ≈ f_ac_local[fdofs]
+              f_ac_standard[fdofs] ≈ f_ac_ch[fdofs] ≈ f_ac_local[fdofs] ≈ fij_ac_local[fdofs]
         fdofs_p = free_dofs(ch_p)
-        @test K_p_standard[fdofs_p, fdofs_p] ≈ K_p_ch[fdofs_p, fdofs_p]
-        @test f_p_standard[fdofs_p] ≈ f_p_ch[fdofs_p]
+        @test K_p_standard[fdofs_p, fdofs_p] ≈ K_p_ch[fdofs_p, fdofs_p] ≈ Kij_p_ch[fdofs_p, fdofs_p]
+        @test f_p_standard[fdofs_p] ≈ f_p_ch[fdofs_p] ≈ fij_p_ch[fdofs_p]
 
         # For prescribed dofs the matrices will be diagonal, but different
         pdofs = ch_dbc.prescribed_dofs
@@ -1340,9 +1357,11 @@ end # testset
         @test isdiag(K_ac_standard[pdofs, pdofs])
         @test isdiag(K_ac_ch[pdofs, pdofs])
         @test isdiag(K_ac_local[pdofs, pdofs])
+        @test isdiag(Kij_ac_local[pdofs, pdofs])
         pdofs_p = ch_p.prescribed_dofs
         @test isdiag(K_p_standard[pdofs_p, pdofs_p])
         @test isdiag(K_p_ch[pdofs_p, pdofs_p])
+        @test isdiag(Kij_p_ch[pdofs_p, pdofs_p])
 
         # No coupling between constraints (no post-solve apply! needed) so this should
         # compute the inhomogeneities correctly
@@ -1353,6 +1372,7 @@ end # testset
         @test f_ac_standard[pdofs] ./ diag(K_ac_standard[pdofs, pdofs]) ≈ scale * ch_ac.inhomogeneities
         @test f_ac_ch[pdofs] ./ diag(K_ac_ch[pdofs, pdofs]) ≈ scale * ch_ac.inhomogeneities
         @test f_ac_local[pdofs] ./ diag(K_ac_local[pdofs, pdofs]) ≈ scale * ch_ac.inhomogeneities
+        @test fij_ac_local[pdofs] ./ diag(Kij_ac_local[pdofs, pdofs]) ≈ scale * ch_ac.inhomogeneities
 
         # Test the solutions
         u_dbc = K_dbc_standard \ f_dbc_standard
@@ -1369,9 +1389,10 @@ end # testset
         #     vtk_point_data(vtk, dh, u_p, "_p")
         # end
         @test K_dbc_standard \ f_dbc_standard ≈ K_dbc_ch \ f_dbc_ch ≈ K_dbc_local \ f_dbc_local ≈
-              K_ac_standard \ f_ac_standard ≈ K_ac_ch \ f_ac_ch ≈ K_ac_local \ f_ac_local
+              K_ac_standard \ f_ac_standard ≈ K_ac_ch \ f_ac_ch ≈ K_ac_local \ f_ac_local ≈ Kij_ac_local \ fij_ac_local
         let apply_f! = azero === true ? apply_zero! : apply!
-            @test apply_f!(K_p_standard \ f_p_standard, ch_p) ≈ apply_f!(K_p_ch \ f_p_ch, ch_p)
+            @test apply_f!(K_p_standard \ f_p_standard, ch_p) ≈ apply_f!(K_p_ch \ f_p_ch, ch_p) ≈
+                  apply_f!(Kij_p_ch \ fij_p_ch, ch_p)
         end
     end
 end # testset
