@@ -42,6 +42,11 @@ function addindex!(b::AbstractVector{T}, v::T, i::Int) where T
     return b
 end
 
+function addindex!(A::AbstractVector, v, i::Int)
+    A[i] += v
+    return A
+end
+
 """
     fillzero!(A::AbstractVecOrMat{T})
 

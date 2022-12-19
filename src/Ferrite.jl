@@ -96,6 +96,7 @@ include("iterators.jl")
 
 # Assembly
 include("assembler.jl")
+include("pattern.jl")
 
 # Projection
 include("L2_projection.jl")
