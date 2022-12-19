@@ -4,10 +4,13 @@ struct UpdateFlags
     nodes::Bool
     coords::Bool
     dofs::Bool
+    function UpdateFlagsKW(; nodes::Bool=false, coords::Bool=false, dofs::Bool=false)
+        return new(nodes, coords, dofs)
+    end
+    function UpdateFlags(; kwargs...)
+        return isempty(kwargs) ? new(true, true, true) : UpdateFlagsKW(; kwargs...)
+    end
 end
-
-UpdateFlags(; nodes::Bool=true, coords::Bool=true, dofs::Bool=true) =
-    UpdateFlags(nodes, coords, dofs)
 
 
 ###############

@@ -306,7 +306,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, inter
 
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
-    cc = CellCache(ch.dh, UpdateFlags(; nodes=false, coords=false, dofs=true))
+    cc = CellCache(ch.dh, UpdateFlags(; dofs=true))
     for (cellidx, faceidx) in bcfaces
         if cellidx ∉ cellset
             delete!(dbc.faces, Index(cellidx, faceidx))
@@ -427,7 +427,7 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:Bo
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::T) where {T}
 
-    cc = CellCache(dh, UpdateFlags(; nodes=false, coords=true, dofs=true))
+    cc = CellCache(dh, UpdateFlags(; coords=true, dofs=true))
     for (cellidx, faceidx) in faces
         reinit!(cc, cellidx)
 

@@ -474,7 +474,7 @@ end
 
 function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=1:getncells(dh.grid)) where T
 
-    for cell in CellIterator(dh, cellset, UpdateFlags(; nodes=true, coords=false, dofs=true))
+    for cell in CellIterator(dh, cellset, UpdateFlags(; nodes=true, dofs=true))
         _celldofs = celldofs(cell)
         counter = 1
         for node in getnodes(cell)
