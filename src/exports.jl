@@ -133,6 +133,7 @@ export
     ApplyStrategy,
 
 # iterators
+    CellCache,
     CellIterator,
     UpdateFlags,
     cellid,
