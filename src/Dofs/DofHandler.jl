@@ -15,7 +15,7 @@ struct DofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     # TODO: field_interpolations can probably be better typed: We should at least require
     #       all the interpolations to have the same dimension and reference shape
     field_interpolations::Vector{Interpolation}
-    bc_values::Vector{BCValues{T}} # TODO: BcValues is created/handeld by the constrainthandler, so this can be removed
+    #bc_values::Vector{BCValues{T}} # TODO: BcValues is created/handeld by the constrainthandler, so this can be removed
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
     closed::ScalarWrapper{Bool}
@@ -23,9 +23,9 @@ struct DofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     ndofs::ScalarWrapper{Int}
 end
 
-function DofHandler(grid::AbstractGrid)
+function DofHandler(grid::AbstractGrid{dim}) where {dim}
     isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. Use MixedDofHandler instead of DofHandler")
-    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
+    DofHandler{dim,Float64,typeof(grid)}(Symbol[], Int[], Interpolation[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
@@ -70,7 +70,6 @@ end
 
 getfieldinterpolation(dh::DofHandler, field_idx::Int) = dh.field_interpolations[field_idx]
 getfielddim(dh::DofHandler, field_idx::Int) = dh.field_dims[field_idx]
-getbcvalue(dh::DofHandler, field_idx::Int) = dh.bc_values[field_idx]
 
 function getfielddim(dh::DofHandler, name::Symbol)
     field_pos = findfirst(i->i == name, getfieldnames(dh))
@@ -118,7 +117,7 @@ function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=de
     push!(dh.field_names, name)
     push!(dh.field_dims, dim)
     push!(dh.field_interpolations, ip)
-    push!(dh.bc_values, BCValues(ip, default_interpolation(getcelltype(dh.grid))))
+    #push!(dh.bc_values, BCValues(ip, default_interpolation(getcelltype(dh.grid))))
     return dh
 end
 
@@ -248,7 +247,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
                     end # edge loop
                 end
             end
-            if interpolation_info.nfacedofs > 0 && (interpolation_info.dim == dim)
+            if interpolation_info.nfacedofs > 0
                 for face in faces(cell)
                     sface = sortface(face) # TODO: faces(cell) may as well just return the sorted list
                     @debug println("    face#$sface")

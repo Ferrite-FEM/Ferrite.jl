@@ -34,8 +34,8 @@ cv = CellScalarValues(qr_inplane, ip)
 # Next we distribute displacement dofs,`:u = (x,y,z)` and rotational dofs, `:θ = (θ₁,  θ₂)`.
 #+
 dh = DofHandler(grid)
-push!(dh, :u, 3, ip)
-push!(dh, :θ, 2, ip)
+push!(dh, :u, 3, ShellInterpolation(ip))
+push!(dh, :θ, 2, ShellInterpolation(ip))
 close!(dh)
 
 # In order to apply our boundary conditions, we first need to create some edge- and vertex-sets. This 

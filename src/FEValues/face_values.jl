@@ -242,15 +242,16 @@ function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_in
     # set up quadrature rules for each face with dof-positions
     # (determined by func_interpol) as the quadrature points
     interpolation_coords = reference_coordinates(func_interpol)
+    dim_p = typeof(first(interpolation_coords)).parameters[2] #Required for shells and beams
 
-    qrs = QuadratureRule{dim,refshape,T}[]
+    qrs = QuadratureRule{dim_p,refshape,T}[]
     faces = boundaryfunction(boundary_type) # faces, edges or vertices
     for face in faces(func_interpol)
-        dofcoords = Vec{dim,T}[]
+        dofcoords = Vec{dim_p,T}[]
         for facedof in face
             push!(dofcoords, interpolation_coords[facedof])
         end
-        qrf = QuadratureRule{dim,refshape,T}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used
+        qrf = QuadratureRule{dim_p,refshape,T}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used
         push!(qrs, qrf)
     end
 
