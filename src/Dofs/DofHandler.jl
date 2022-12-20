@@ -371,7 +371,7 @@ not. By default full coupling is assumed.
 See the [Sparsity Pattern](@ref) section of the manual.
 """
 function create_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing)
-    return _create_sparsity_pattern(dh, nothing, false, coupling)
+    return _create_sparsity_pattern(dh, nothing, false, true, coupling)
 end
 
 """
@@ -383,10 +383,15 @@ triangle of the matrix. Return a `Symmetric{SparseMatrixCSC}`.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-create_symmetric_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing) = Symmetric(_create_sparsity_pattern(dh, nothing, true, coupling), :U)
+function create_symmetric_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing)
+    return Symmetric(_create_sparsity_pattern(dh, nothing, true, true, coupling), :U)
+end
 
-function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool, coupling::Union{AbstractMatrix{Bool}, Nothing})
+function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool, keep_constrained::Bool, coupling::Union{AbstractMatrix{Bool},Nothing})
     @assert isclosed(dh)
+    if !keep_constrained
+        @assert ch !== nothing && isclosed(ch)
+    end
     ncells = getncells(dh.grid)
     if coupling !== nothing
         # Extend coupling to be of size (ndofs_per_cell × ndofs_per_cell)
@@ -409,6 +414,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
             dofi = global_dofs[i]
             dofj = global_dofs[j]
             sym && (dofi > dofj && continue)
+            !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
             cnt += 1
             if cnt > length(J)
                 resize!(I, trunc(Int, length(I) * 1.5))
@@ -438,7 +444,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     if ch !== nothing
         @assert isclosed(ch)
         fill!(K.nzval, 1)
-        _condense_sparsity_pattern!(K, ch.dofcoefficients, ch.dofmapping)
+        _condense_sparsity_pattern!(K, ch.dofcoefficients, ch.dofmapping, keep_constrained)
         fillzero!(K)
     end
 

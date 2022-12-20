@@ -1375,3 +1375,54 @@ end # testset
         end
     end
 end # testset
+
+@testset "Sparsity pattern without constrained dofs" begin
+    grid = generate_grid(Triangle, (5, 5))
+    dh = DofHandler(grid)
+    push!(dh, :u, 1)
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0))
+    close!(ch)
+    Kfull = create_sparsity_pattern(dh, ch)
+    K = create_sparsity_pattern(dh, ch; keep_constrained=false)
+    # Pattern tests
+    nonzero_edges = Set(
+        (i, j) for d in 1:getncells(grid)
+               for (i, j) in Iterators.product(celldofs(dh, d), celldofs(dh, d))
+    )
+    zero_edges = setdiff(Set(Iterators.product(1:ndofs(dh), 1:ndofs(dh))), nonzero_edges)
+    for (i, j) in zero_edges
+        @test Base.isstored(K, i, j) == Base.isstored(Kfull, i, j) == false
+    end
+    for (i, j) in nonzero_edges
+        if i != j && (haskey(ch.dofmapping, i) || haskey(ch.dofmapping, j))
+            @test !Base.isstored(K, i, j)
+        else
+            @test Base.isstored(K, i, j)
+        end
+        @test Base.isstored(Kfull, i, j)
+    end
+    # Assembly
+    afull = start_assemble(Kfull)
+    a = start_assemble(K)
+    Kc = copy(K)
+    ac = start_assemble(Kc, zeros(ndofs(dh)))
+    for cell in CellIterator(dh)
+        ke = rand(ndofs_per_cell(dh), ndofs_per_cell(dh))
+        assemble!(afull, celldofs(cell), ke)
+        kec = copy(ke)
+        apply_local!(kec, rand(ndofs_per_cell(dh)), celldofs(cell), ch)
+        assemble!(a, celldofs(cell), kec)
+        apply_assemble!(ac, ch, celldofs(cell), ke, rand(ndofs_per_cell(dh)))
+    end
+    apply!(Kfull, ch)
+    fd = free_dofs(ch)
+    pd = ch.prescribed_dofs
+    @test K ≈ Kc
+    @test K[fd, fd] ≈ Kc[fd, fd] ≈ Kfull[fd, fd]
+    for d in ch.prescribed_dofs
+        K[d, d] = Kc[d, d] = Kfull[d, d] = 1
+    end
+    @test K ≈ Kc ≈ Kfull
+end # testset

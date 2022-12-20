@@ -660,7 +660,7 @@ end
 end
 
 # Similar to Ferrite._condense!(K, ch), but only add the non-zero entries to K (that arises from the condensation process)
-function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, dofmapping::Dict{Int,Int}) where T
+function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, dofmapping::Dict{Int,Int}, keep_constrained::Bool) where T
     ndofs = size(K, 1)
 
     # Return early if there are no non-trivial affine constraints
@@ -676,6 +676,7 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
     for col in 1:ndofs
         col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
         if col_coeffs === nothing
+            !keep_constrained && haskey(dofmapping, col) && continue
             for ri in nzrange(K, col)
                 row = K.rowval[ri]
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
@@ -690,14 +691,19 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
                 row = K.rowval[ri]
                 row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
                 if row_coeffs === nothing
+                    !keep_constrained && haskey(dofmapping, row) && continue
                     for (d, _) in col_coeffs
                         cnt += 1
                         _add_or_grow(cnt, I, J, row, d)
                     end
                 else
-                    for (d1, _) in col_coeffs, (d2, _) in row_coeffs
-                        cnt += 1
-                        _add_or_grow(cnt, I, J, d1, d2)
+                    for (d1, _) in col_coeffs
+                        !keep_constrained && haskey(dofmapping, d1) && continue
+                        for (d2, _) in row_coeffs
+                            !keep_constrained && haskey(dofmapping, d2) && continue
+                            cnt += 1
+                            _add_or_grow(cnt, I, J, d1, d2)
+                        end
                     end
                 end
             end
@@ -899,10 +905,14 @@ function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset
     end
 end
 
-create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling=nothing) =
-    Symmetric(_create_sparsity_pattern(dh, ch, true, coupling), :U)
-create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling=nothing) =
-    _create_sparsity_pattern(dh, ch, false, coupling)
+function create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
+        keep_constrained::Bool=true, coupling=nothing)
+    return Symmetric(_create_sparsity_pattern(dh, ch, true, keep_constrained, coupling), :U)
+end
+function create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
+        keep_constrained::Bool=true, coupling=nothing)
+    return _create_sparsity_pattern(dh, ch, false, keep_constrained, coupling)
+end
 
 struct PeriodicFacePair
     mirror::FaceIndex
