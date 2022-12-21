@@ -287,6 +287,7 @@ end
 getcells(neighbor::EntityNeighborhood{T}) where T <: BoundaryIndex = first.(neighbor.neighbor_info)
 getcells(neighbor::EntityNeighborhood{CellIndex}) = getproperty.(neighbor.neighbor_info, :idx)
 getcells(neighbors::Vector{T}) where T <: EntityNeighborhood = reduce(vcat, getcells.(neighbors))
+getcells(neighbors::Vector{T}) where T <: BoundaryIndex = getindex.(neighbors,1)
 
 abstract type AbstractGrid{dim} end
 

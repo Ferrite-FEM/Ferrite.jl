@@ -32,6 +32,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "ns_vs_diffeq.md",
     "computational_homogenization.md",
     "stokes-flow.md",
+	"topology_optimization.md",
     )]
 
 # Build documentation.
@@ -55,7 +56,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
             "manual/grid.md",
             "manual/export.md"
             ],
-        "Examples" => GENERATEDEXAMPLES,
+        "Examples" => ["overview.md";GENERATEDEXAMPLES],
         "API Reference" => [
             "reference/quadrature.md",
             "reference/interpolations.md",
