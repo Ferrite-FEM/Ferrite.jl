@@ -9,6 +9,7 @@ end
 
 """
     addindex!(A::AbstractMatrix{T}, v::T, i::Int, j::Int)
+    addindex!(b::AbstractVector{T}, v::T, i::Int)
 
 Equivalent to `A[i, j] += v` but more efficient.
 
@@ -30,6 +31,15 @@ function addindex!(A::AbstractMatrix{T}, v::T, i::Int, j::Int) where T
     iszero(v) && return A
     A[i, j] += v
     return A
+end
+
+function addindex!(b::AbstractVector{T}, v, i::Integer) where T
+    return addindex!(b, T(v), Int(i))
+end
+function addindex!(b::AbstractVector{T}, v::T, i::Int) where T
+    iszero(v) && return b
+    b[i] += v
+    return b
 end
 
 """
