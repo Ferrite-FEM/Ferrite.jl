@@ -1007,8 +1007,8 @@ end # testset
         compare_by_dbc(
             dh,
             PeriodicDirichlet(:v, collect_periodic_faces(grid, "left", "right"), collect(1:D)),
-            Dirichlet(:v, getfaceset(grid, "left"), (x,t) -> [0., 0.], collect(1:D)),
-            Dirichlet(:v, getfaceset(grid, "right"), (x,t) -> [0., 0.], collect(1:D)),
+            Dirichlet(:v, getfaceset(grid, "left"), (x,t) -> fill(0., D), collect(1:D)),
+            Dirichlet(:v, getfaceset(grid, "right"), (x,t) -> fill(0., D), collect(1:D)),
         )
         compare_by_dbc(
             dh,
@@ -1032,8 +1032,8 @@ end # testset
             compare_by_dbc(
                 dh,
                 PeriodicDirichlet(:v, collect_periodic_faces(grid, "front", "back"), 1:D),
-                Dirichlet(:v, getfaceset(grid, "front"), (x,t) -> [0., 0.], 1:D),
-                Dirichlet(:v, getfaceset(grid, "back"), (x,t) -> [0., 0.], 1:D),
+                Dirichlet(:v, getfaceset(grid, "front"), (x,t) -> fill(0., D), 1:D),
+                Dirichlet(:v, getfaceset(grid, "back"), (x,t) -> fill(0., D), 1:D),
             )
             compare_by_dbc(
                 dh,
