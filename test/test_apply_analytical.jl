@@ -94,7 +94,7 @@
     end
 
     @testset "DofHandler" begin
-        for (CT,name) in Ferrite.celltypes
+        for CT in Ferrite.implemented_celltypes
             for ip_order_u in 1:2
                 for ip_order_p in 1:2
                     dh = testdh(CT, ip_order_u, ip_order_p)
