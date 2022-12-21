@@ -82,10 +82,7 @@ Assembles the element residual `ge` into the global residual vector `g`.
 @propagate_inbounds function assemble!(g::AbstractVector{T}, dofs::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
     @boundscheck checkbounds(g, dofs)
     @inbounds for i in 1:length(dofs)
-        val = ge[i]
-        if !iszero(val)
-            g[dofs[i]] += val
-        end
+        addindex!(g, ge[i], dofs[i])
     end
 end
 

@@ -1777,7 +1777,7 @@ function _condense_local!(local_matrix::AbstractMatrix, local_vector::AbstractVe
                 local_mcol = findfirst(==(global_mcol), global_dofs)
                 if local_mcol === nothing
                     has_global_arrays || missing_global()
-                    global_vector[global_mcol] += vw
+                    addindex!(global_vector, vw, global_mcol)
                 else
                     local_vector[local_mcol] += vw
                 end
