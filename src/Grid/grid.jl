@@ -36,22 +36,25 @@ nnodes(c::C) where {C<:AbstractCell} = nnodes(typeof(c))
 nnodes(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = N
 
 # Typealias for commonly used cells
-const Line  = Cell{1,2,2}
-const Line2D = Cell{2,2,1}
-const Line3D = Cell{3,2,0}
-const QuadraticLine = Cell{1,3,2}
-
-const Triangle = Cell{2,3,3}
-const QuadraticTriangle = Cell{2,6,3}
-
-const Quadrilateral = Cell{2,4,4}
-const Quadrilateral3D = Cell{3,4,1}
-const QuadraticQuadrilateral = Cell{2,9,4}
-
-const Tetrahedron = Cell{3,4,4}
-const QuadraticTetrahedron = Cell{3,10,4}
-
-const Hexahedron = Cell{3,8,6}
+const implemented_celltypes = (
+    (const Line  = Cell{1,2,2}),
+    (const Line2D = Cell{2,2,1}),
+    (const Line3D = Cell{3,2,0}),
+    (const QuadraticLine = Cell{1,3,2}),
+    
+    (const Triangle = Cell{2,3,3}),
+    (const QuadraticTriangle = Cell{2,6,3}),
+    
+    (const Quadrilateral = Cell{2,4,4}),
+    (const Quadrilateral3D = Cell{3,4,1}),
+    (const QuadraticQuadrilateral = Cell{2,9,4}),
+    
+    (const Tetrahedron = Cell{3,4,4}),
+    (const QuadraticTetrahedron = Cell{3,10,4}),
+    
+    (const Hexahedron = Cell{3,8,6}),
+    (Cell{2,20,6})
+)
 
 """
 A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh
@@ -708,24 +711,10 @@ end
 
 function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) ")
-    typestrs = sort!(collect(Set(celltypes[typeof(x)] for x in grid.cells)))
-    str = join(io, typestrs, '/')
+    typestrs = sort!(collect(Set(repr(typeof(x)) for x in grid.cells)))
+    join(io, typestrs, '/')
     print(io, " cells and $(getnnodes(grid)) nodes")
 end
-
-const celltypes = Dict{DataType, String}(Cell{1,2,2}  => "Line",
-                                         Cell{2,2,2}  => "2D-Line",
-                                         Cell{3,2,0}  => "3D-Line",
-                                         Cell{1,3,2}  => "QuadraticLine",
-                                         Cell{2,3,3}  => "Triangle",
-                                         Cell{2,6,3}  => "QuadraticTriangle",
-                                         Cell{2,4,4}  => "Quadrilateral",
-                                         Cell{3,4,1}  => "3D-Quadrilateral",
-                                         Cell{2,9,4}  => "QuadraticQuadrilateral",
-                                         Cell{3,4,4}  => "Tetrahedron",
-                                         Cell{3,10,4} => "QuadraticTetrahedron",
-                                         Cell{3,8,6}  => "Hexahedron",
-                                         Cell{3,20,6} => "Cell{3,20,6}")
 
 # Functions to uniquely identify vertices, edges and faces, used when distributing
 # dofs over a mesh. For this we can ignore the nodes on edged, faces and inside cells,
