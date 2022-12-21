@@ -359,3 +359,20 @@ end
     @test_throws ErrorException("coupling not symmetric") create_symmetric_sparsity_pattern(dh; coupling=[true true; false true])
     @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
 end
+
+@testset "global_dof_range" begin
+    grid = generate_grid(Quadrilateral, (2, 2))
+    for Handler in (DofHandler, MixedDofHandler)
+        dh = Handler(grid)
+        push!(dh, :u, 2)
+        push!(dh, :p, 1)
+        close!(dh)
+        err = ErrorException("dofs for field u not continuously enumerated, renumber by field")
+        @test_throws err global_dof_range(dh, :u)
+        renumber!(dh, DofOrder.FieldWise())
+        ru = global_dof_range(dh, :u)
+        @test ru == 1:18
+        rp = global_dof_range(dh, :p)
+        @test rp == 19:27
+    end
+end
