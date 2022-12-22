@@ -44,7 +44,7 @@ function reference_normals(::Lagrange{3, RefTetrahedron})
 end
 
 # Lagrange{3, Cube}
-function reference_normals(::Lagrange{3, RefCube, 1})
+function reference_normals(::Lagrange{3, RefCube})
     return [Vec{3, Float64}(( 0.0,  0.0, -1.0)),
             Vec{3, Float64}(( 0.0, -1.0,  0.0)),
             Vec{3, Float64}(( 1.0,  0.0,  0.0)),
@@ -123,6 +123,12 @@ function calculate_volume(::Lagrange{2, RefTetrahedron, 2}, x::Vector{Vec{dim, T
           norm((x[6] - x[4]) × (x[5] - x[4])) * 0.5 +
           norm((x[1] - x[6]) × (x[4] - x[6])) * 0.5 +
           norm((x[4] - x[5]) × (x[2] - x[5])) * 0.5
+    return vol
+end
+
+# TODO: Only correct for linear sides
+function calculate_volume(::Lagrange{2, RefTetrahedron, O}, x::Vector{Vec{dim, T}}) where {T, dim, O}
+    vol = norm((x[1] - x[3]) × (x[2] - x[3])) * 0.5
     return vol
 end
 

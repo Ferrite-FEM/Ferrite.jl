@@ -328,7 +328,7 @@ function solve()
         ## Update the old states with the converged values for next timestep
         states_old .= states
 
-        u_max[timestep] = max(abs.(u)...) # maximum displacement in current timestep
+        u_max[timestep] = maximum(abs.(u)) # maximum displacement in current timestep
     end
 
     ## ## Postprocessing

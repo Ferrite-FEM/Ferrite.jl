@@ -113,7 +113,7 @@
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 #
 # First we load Ferrite and some other packages we need
-using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack
+using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, LinearSolve
 # Since we do not need the complete DifferentialEquations suite, we just load the required ODE infrastructure, which can also handle
 # DAEs in mass matrix form.
 using OrdinaryDiffEq
@@ -222,7 +222,7 @@ function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p:
 
     ## It follows the assembly loop as explained in the basic tutorials.
     mass_assembler = start_assemble(M)
-    @inbounds for cell in CellIterator(dh)
+    for cell in CellIterator(dh)
         fill!(Mₑ, 0)
         Ferrite.reinit!(cellvalues_v, cell)
 
@@ -265,7 +265,7 @@ function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_
 
     ## Assembly loop
     stiffness_assembler = start_assemble(K)
-    @inbounds for cell in CellIterator(dh)
+    for cell in CellIterator(dh)
         ## Don't forget to initialize everything
         fill!(Kₑ, 0)
 
@@ -425,7 +425,7 @@ problem = ODEProblem(rhs, u₀, (0.0,T), p);
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
-timestepper = ImplicitEuler()
+timestepper = ImplicitEuler(linsolve = UMFPACKFactorization(reuse_symbolic=false))
 integrator = init(
     problem, timestepper, initializealg=NoInit(), dt=Δt₀,
     adaptive=true, abstol=1e-3, reltol=1e-3,
@@ -453,7 +453,7 @@ vtk_save(pvd);
 using Test                                                                  #hide
 function compute_divergence(dh, u, cellvalues_v)                            #hide
     divv = 0.0                                                              #hide
-    @inbounds for (i,cell) in enumerate(CellIterator(dh))                   #hide
+    for cell in CellIterator(dh)                                            #hide
         Ferrite.reinit!(cellvalues_v, cell)                                 #hide
         for q_point in 1:getnquadpoints(cellvalues_v)                       #hide
             dΩ = getdetJdV(cellvalues_v, q_point)                           #hide

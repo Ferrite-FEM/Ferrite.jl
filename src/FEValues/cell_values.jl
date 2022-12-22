@@ -31,7 +31,7 @@ utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape 
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
 """
-CellValues
+CellValues, CellScalarValues, CellVectorValues
 
 # CellScalarValues
 struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: CellValues{dim,T,refshape}
@@ -151,7 +151,7 @@ end
 function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_geom_basefuncs = getngeobasefunctions(cv)
     n_func_basefuncs = getnbasefunctions(cv)
-    @assert length(x) == n_geom_basefuncs
+    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
 
     @inbounds for i in 1:length(cv.qr.weights)
         w = cv.qr.weights[i]

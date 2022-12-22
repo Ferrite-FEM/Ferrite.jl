@@ -149,13 +149,22 @@ function reference_coordinates(ip::DiscontinuousLagrange{dim,shape,order}) where
     return reference_coordinates(Lagrange{dim,shape,order}())
 end
 function value(ip::DiscontinuousLagrange{dim,shape,order}, i::Int, ξ::Vec{dim}) where {dim,shape,order}
-    return value(Lagrange{dim, ref_type, order}())
+    return value(Lagrange{dim, shape, order}(), i, ξ)
 end
 
 # Excepting the L0 element.
-function reference_coordinates(ip::DiscontinuousLagrange{dim,shape,0}) where {dim,shape}
+function reference_coordinates(ip::DiscontinuousLagrange{dim,RefCube,0}) where dim
     return [Vec{dim, Float64}(ntuple(x->0.0, dim))]
 end
+
+function reference_coordinates(ip::DiscontinuousLagrange{2,RefTetrahedron,0})
+    return [Vec{2,Float64}((1/3,1/3))]
+end
+
+function reference_coordinates(ip::DiscontinuousLagrange{3,RefTetrahedron,0})
+   return [Vec{3,Float64}((1/4,1/4,1/4))]
+end
+
 function value(ip::DiscontinuousLagrange{dim,shape,0}, i::Int, ξ::Vec{dim}) where {dim,shape}
     return 1.0
 end
@@ -330,6 +339,97 @@ function value(ip::Lagrange{2,RefTetrahedron,2}, i::Int, ξ::Vec{2})
     i == 6 && return 4ξ_x * γ
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
+###############################################
+# Lagrange dim 2 RefTetrahedron order 3, 4, 5 #
+###############################################
+# see https://getfem.readthedocs.io/en/latest/userdoc/appendixA.html
+
+const Lagrange2Tri345 = Union{
+    Lagrange{2,RefTetrahedron,3},
+    Lagrange{2,RefTetrahedron,4},
+    Lagrange{2,RefTetrahedron,5},
+}
+
+function getnbasefunctions(ip::Lagrange2Tri345)
+    order = getorder(ip)
+    return (order + 1) * (order + 2) ÷ 2
+end
+
+nvertexdofs(::Lagrange2Tri345) = 1
+nedgedofs(ip::Lagrange2Tri345) = getorder(ip) - 1
+nfacedofs(ip::Lagrange2Tri345) = getorder(ip) - 1
+function ncelldofs(ip::Lagrange2Tri345)
+    order = getorder(ip)
+    return (order + 1) * (order + 2) ÷ 2 - 3 * order
+end
+
+# Permutation to switch numbering to Ferrite ordering
+const permdof2D = Dict{Int,Vector{Int}}(
+    1 => [1, 2, 3],
+    2 => [3, 6, 1, 5, 4, 2],
+    3 => [4, 10, 1, 7, 9, 8, 5, 2, 3, 6],
+    4 => [5, 15, 1, 9, 12, 14, 13, 10, 6, 2, 3, 4, 7, 8, 11],
+    5 => [6, 21, 1, 11, 15, 18, 20, 19, 16, 12, 7, 2, 3, 4, 5, 8, 9, 10, 13, 14, 17],
+)
+
+vertices(::Lagrange2Tri345) = (1, 2, 3)
+
+function faces(ip::Lagrange2Tri345)
+    order = getorder(ip)
+    if order == 1
+        return ((1,2), (2,3), (3,1))
+    elseif order == 2
+        return ((1,2,4), (2,3,5), (3,1,6))
+    elseif order == 3
+        return ((1,2,4,5), (2,3,6,7), (3,1,8,9))
+    elseif order == 4
+        return ((1,2,4,5,6), (2,3,7,8,9), (3,1,10,11,12))
+    elseif order == 5
+        return ((1,2,4,5,6,7), (2,3,8,9,10,11), (3,1,12,13,14,15))
+    else
+        error("unreachable")
+    end
+end
+
+function reference_coordinates(ip::Lagrange2Tri345)
+    order = getorder(ip)
+    coordpts = Vector{Vec{2, Float64}}()
+    for k = 0:order
+        for l = 0:(order - k)
+            push!(coordpts, Vec{2, Float64}((l / order, k / order)))
+        end
+    end
+    return permute!(coordpts, permdof2D[order])
+end
+
+function value(ip::Lagrange2Tri345, i::Int, ξ::Vec{2})
+    order = getorder(ip)
+    i = permdof2D[order][i]
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    γ = 1. - ξ_x - ξ_y
+    i1, i2, i3 = _numlin_basis2D(i, order)
+    val = one(γ)
+    i1 ≥ 1 && (val *= prod((order * γ - j) / (j + 1) for j = 0:(i1 - 1)))
+    i2 ≥ 1 && (val *= prod((order * ξ_x - j) / (j + 1) for j = 0:(i2 - 1)))
+    i3 ≥ 1 && (val *= prod((order * ξ_y - j) / (j + 1) for j = 0:(i3 - 1)))
+    return val
+end
+
+function _numlin_basis2D(i, order)
+    c, j1, j2, j3 = 0, 0, 0, 0
+    for k = 0:order
+        if i <= c + (order + 1 - k)
+            j2 = i - c - 1
+            break
+        else
+            j3 += 1
+            c += order + 1 - k
+        end
+    end
+    j1 = order - j2 -j3
+    return j1, j2, j3
+end
 
 #########################################
 # Lagrange dim 3 RefTetrahedron order 1 #
@@ -337,7 +437,7 @@ end
 getnbasefunctions(::Lagrange{3,RefTetrahedron,1}) = 4
 nvertexdofs(::Lagrange{3,RefTetrahedron,1}) = 1
 
-faces(::Lagrange{3,RefTetrahedron,1}) = ((1,2,3), (1,2,4), (2,3,4), (1,4,3))
+faces(::Lagrange{3,RefTetrahedron,1}) = ((1,3,2), (1,2,4), (2,3,4), (1,4,3))
 edges(::Lagrange{3,RefTetrahedron,1}) = ((1,2), (2,3), (3,1), (1,4), (2,4), (3,4))
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,1})
@@ -365,8 +465,8 @@ getnbasefunctions(::Lagrange{3,RefTetrahedron,2}) = 10
 nvertexdofs(::Lagrange{3,RefTetrahedron,2}) = 1
 nedgedofs(::Lagrange{3,RefTetrahedron,2}) = 1
 
-faces(::Lagrange{3,RefTetrahedron,2}) = ((1,2,3,5,6,7), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
-edges(::Lagrange{3,RefTetrahedron,2}) = ((1,5,2), (2,6,3), (3,7,1), (1,8,4), (2,9,4), (3,10,4))
+faces(::Lagrange{3,RefTetrahedron,2}) = ((1,3,2,7,6,5), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
+edges(::Lagrange{3,RefTetrahedron,2}) = ((1,2,5), (2,3,6), (3,1,7), (1,4,8), (2,4,9), (3,4,10))
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,2})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
@@ -446,21 +546,28 @@ nedgedofs(::Lagrange{3,RefCube,2}) = 1
 nfacedofs(::Lagrange{3,RefCube,2}) = 1
 ncelldofs(::Lagrange{3,RefCube,2}) = 1
 
-faces(::Lagrange{3,RefCube,2}) = ((1,2,6,5, 9,18,13,17, 23), (2,3,7,6, 10,19,14,18, 22), (3,4,8,7, 11,20,15,19, 24), (1,5,8,4, 12,17,16,20, 21), (1,4,3,2, 9,10,11,12, 25), (5,6,7,8, 13,14,15,16, 26))
-edges(::Lagrange{3,RefCube,2}) = ((1,2, 9), (2,3, 10), (3,4, 11), (4,1, 12), (1,5, 16), (2,6, 19), (3,7, 18), (4,8, 19), (5,6, 13), (6,7, 14), (7,8, 15), (8,5, 16))
+faces(::Lagrange{3,RefCube,2}) = (
+    (1,4,3,2, 12,11,10,9, 21),
+    (1,2,6,5, 9,18,13,17, 22),
+    (2,3,7,6, 10,19,14,18, 23),
+    (3,4,8,7, 11,20,15,19, 24),
+    (1,5,8,4, 17,16,20,12, 25),
+    (5,6,7,8, 13,14,15,16, 26),
+)
+edges(::Lagrange{3,RefCube,2}) = ((1,2, 9), (2,3, 10), (3,4, 11), (4,1, 12), (1,5, 17), (2,6, 18), (3,7, 19), (4,8, 20), (5,6, 13), (6,7, 14), (7,8, 15), (8,5, 16))
 
 function reference_coordinates(::Lagrange{3,RefCube,2})
            # vertex
-    return [Vec{3, Float64}((-1.0, -1.0, -1.0)), #  0
-            Vec{3, Float64}(( 1.0, -1.0, -1.0)), #  1
-            Vec{3, Float64}(( 1.0,  1.0, -1.0)), #  2
-            Vec{3, Float64}((-1.0,  1.0, -1.0)), #  3
-            Vec{3, Float64}((-1.0, -1.0,  1.0)), #  4
-            Vec{3, Float64}(( 1.0, -1.0,  1.0)), #  5
-            Vec{3, Float64}(( 1.0,  1.0,  1.0)), #  6
-            Vec{3, Float64}((-1.0,  1.0,  1.0)), #  7
+    return [Vec{3, Float64}((-1.0, -1.0, -1.0)), #  1
+            Vec{3, Float64}(( 1.0, -1.0, -1.0)), #  2
+            Vec{3, Float64}(( 1.0,  1.0, -1.0)), #  3
+            Vec{3, Float64}((-1.0,  1.0, -1.0)), #  4
+            Vec{3, Float64}((-1.0, -1.0,  1.0)), #  5
+            Vec{3, Float64}(( 1.0, -1.0,  1.0)), #  6
+            Vec{3, Float64}(( 1.0,  1.0,  1.0)), #  7
+            Vec{3, Float64}((-1.0,  1.0,  1.0)), #  8
             # edge
-            Vec{3, Float64}(( 0.0, -1.0, -1.0)), #  8
+            Vec{3, Float64}(( 0.0, -1.0, -1.0)), #  9
             Vec{3, Float64}(( 1.0,  0.0, -1.0)),
             Vec{3, Float64}(( 0.0,  1.0, -1.0)),
             Vec{3, Float64}((-1.0,  0.0, -1.0)),
@@ -471,16 +578,15 @@ function reference_coordinates(::Lagrange{3,RefCube,2})
             Vec{3, Float64}((-1.0, -1.0,  0.0)),
             Vec{3, Float64}(( 1.0, -1.0,  0.0)),
             Vec{3, Float64}(( 1.0,  1.0,  0.0)),
-            Vec{3, Float64}((-1.0,  1.0,  0.0)), # 19
-            # face
-            Vec{3, Float64}(( 0.0, -1.0,  0.0)), # 20
+            Vec{3, Float64}((-1.0,  1.0,  0.0)), # 20
+            Vec{3, Float64}(( 0.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0, -1.0,  0.0)),
             Vec{3, Float64}(( 1.0,  0.0,  0.0)),
             Vec{3, Float64}(( 0.0,  1.0,  0.0)),
             Vec{3, Float64}((-1.0,  0.0,  0.0)),
-            Vec{3, Float64}(( 0.0,  0.0, -1.0)),
-            Vec{3, Float64}(( 0.0,  0.0,  1.0)), # 25
+            Vec{3, Float64}(( 0.0,  0.0,  1.0)), # 26
             # interior
-            Vec{3, Float64}((0.0, 0.0, 0.0)),    # 26
+            Vec{3, Float64}((0.0, 0.0, 0.0)),    # 27
             ]
 end
 
@@ -513,11 +619,11 @@ function value(ip::Lagrange{3,RefCube,2}, i::Int, ξ::Vec{3, T}) where {T}
     i == 19 && return φ₃(ξ_x) * φ₃(ξ_y) * φ₂(ξ_z)
     i == 20 && return φ₁(ξ_x) * φ₃(ξ_y) * φ₂(ξ_z)
     # faces
-    i == 21 && return φ₂(ξ_x) * φ₁(ξ_y) * φ₂(ξ_z)
-    i == 22 && return φ₃(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
-    i == 23 && return φ₂(ξ_x) * φ₃(ξ_y) * φ₂(ξ_z)
-    i == 24 && return φ₁(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
-    i == 25 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₁(ξ_z)
+    i == 21 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₁(ξ_z)
+    i == 22 && return φ₂(ξ_x) * φ₁(ξ_y) * φ₂(ξ_z)
+    i == 23 && return φ₃(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
+    i == 24 && return φ₂(ξ_x) * φ₃(ξ_y) * φ₂(ξ_z)
+    i == 25 && return φ₁(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
     i == 26 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₃(ξ_z)
     # interior
     i == 27 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
@@ -537,9 +643,9 @@ getlowerdim(ip::BubbleEnrichedLagrange{dim,ref_shape,order}) where {dim,ref_shap
 # Lagrange-Bubble dim 2 RefTetrahedron order 1 #
 ################################################
 # Taken from https://defelement.com/elements/bubble-enriched-lagrange.html
-getnbasefunctions(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 4
-nvertexdofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 1
-ncelldofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) where {dim, ref_shape} = 1
+getnbasefunctions(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = 4
+nvertexdofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = 1
+ncelldofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = 1
 
 faces(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = ((1,2), (2,3), (3,1))
 

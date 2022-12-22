@@ -9,11 +9,16 @@ mkpath(GENERATEDDIR)
 include("download_resources.jl")
 
 # Run Literate on all examples
-for example in readdir(EXAMPLEDIR)
+@timeit dto "Literate." for example in readdir(EXAMPLEDIR)
     if endswith(example, ".jl")
         input = abspath(joinpath(EXAMPLEDIR, example))
-        script = Literate.script(input, GENERATEDDIR)
-        code = strip(read(script, String))
+        name = basename(input)
+        if !liveserver
+            script = @timeit dto "script()" @timeit dto name Literate.script(input, GENERATEDDIR)
+            code = strip(read(script, String))
+        else
+            code = "<< no script output when building as draft >>"
+        end
 
         # remove "hidden" lines which are not shown in the markdown
         line_ending_symbol = occursin(code, "\r\n") ? "\r\n" : "\n"
@@ -28,8 +33,14 @@ for example in readdir(EXAMPLEDIR)
             return str
         end
 
-        Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
-        Literate.notebook(input, GENERATEDDIR, preprocess = nbpre, execute = is_ci) # Don't execute locally
+        @timeit dto "markdown()" @timeit dto name begin
+            Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
+        end
+        if !liveserver
+            @timeit dto "notebook()"  @timeit dto name begin
+                Literate.notebook(input, GENERATEDDIR, preprocess = nbpre, execute = is_ci) # Don't execute locally
+            end
+        end
     elseif any(endswith.(example, [".png", ".jpg", ".gif"]))
         cp(joinpath(EXAMPLEDIR, example), joinpath(GENERATEDDIR, example); force=true)
     else
@@ -38,7 +49,7 @@ for example in readdir(EXAMPLEDIR)
 end
 
 # remove any .vtu files in the generated dir (should not be deployed)
-cd(GENERATEDDIR) do
+@timeit dto "remove vtk files" cd(GENERATEDDIR) do
     foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
     foreach(file -> endswith(file, ".pvd") && rm(file), readdir())
 end

@@ -239,11 +239,11 @@ function _project(vars, proj::L2Projector, fe_values::Values, M::Integer, ::Type
     get_data(x::Number, i) = x
 
     ## Assemble contributions from each cell
-    for cellnum in proj.set
+    for (ic,cellnum) in enumerate(proj.set)
         celldofs!(cell_dofs, proj.dh, cellnum)
         fill!(fe, 0)
         Xe = getcoordinates(proj.dh.grid, cellnum)
-        cell_vars = vars[cellnum]
+        cell_vars = vars[ic]
         reinit!(fe_values, Xe)
 
         for q_point = 1:nqp
@@ -290,10 +290,9 @@ function reshape_to_nodes(proj::L2Projector, vals::AbstractVector{S}) where {ord
     @assert ndofs(dh) == length(vals)
     nout = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
     data = fill(T(NaN), nout, getnnodes(dh.grid))
-    _celldofs = Vector{Int}(undef, ndofs_per_cell(dh, first(proj.set)))
     for cell in CellIterator(dh, proj.set)
+        _celldofs = celldofs(cell)
         @assert length(getnodes(cell)) == length(_celldofs)
-        celldofs!(_celldofs, cell)
         for (node, dof) in zip(getnodes(cell), _celldofs)
             v = @view data[:, node]
             fill!(v, 0) # remove NaNs for this node

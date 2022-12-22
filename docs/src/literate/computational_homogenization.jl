@@ -368,7 +368,6 @@ rhsdata = (
 )
 
 apply!(K.dirichlet, ch.dirichlet)
-Kp = copy(K.periodic) #hide
 apply!(K.periodic,  ch.periodic)
 
 # We can now solve the problem(s). Note that we only use `apply_rhs!` in the loops below.
@@ -388,14 +387,9 @@ for i in 1:size(rhs.dirichlet, 2)
     push!(u.dirichlet, u_i)                            # Save the solution vector
 end
 
-rhs_p = copy(rhs.periodic) #hide
 for i in 1:size(rhs.periodic, 2)
     rhs_i = @view rhs.periodic[:, i]                   # Extract this RHS
     apply_rhs!(rhsdata.periodic, rhs_i, ch.periodic)   # Apply BC
-    rhs_i = @view rhs_p[:, i] #hide
-    Kpp = copy(Kp) #hide
-    apply!(Kpp, rhs_i, ch.periodic) #hide
-    copy!(K.periodic, Kpp) #hide
     u_i = cholesky(Symmetric(K.periodic)) \ rhs_i      # Solve
     apply!(u_i, ch.periodic)                           # Apply BC on the solution
     push!(u.periodic, u_i)                             # Save the solution vector
@@ -522,16 +516,12 @@ round.(ev; digits=-8)
 # Finally, we export the solution and the stress field to a VTK file. For the export we
 # also compute the macroscopic part of the displacement.
 
-chM = ConstraintHandler(dh)
-add!(chM, Dirichlet(:u, Set(1:getnnodes(grid)), (x, t) -> εᴹ[Int(t)] ⋅ x, [1, 2]))
-close!(chM)
 uM = zeros(ndofs(dh))
 
 vtk_grid("homogenization", dh) do vtk
     for i in 1:3
         ## Compute macroscopic solution
-        update!(chM, i)
-        apply!(uM, chM)
+        apply_analytical!(uM, dh, :u, x -> εᴹ[i] ⋅ x)
         ## Dirichlet
         vtk_point_data(vtk, dh, uM + u.dirichlet[i], "_dirichlet_$i")
         vtk_point_data(vtk, projector, σ.dirichlet[i], "σvM_dirichlet_$i")

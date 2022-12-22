@@ -1,6 +1,16 @@
-using Documenter, Ferrite, Pkg
+using TimerOutputs
 
-Pkg.precompile()
+dto = TimerOutput()
+reset_timer!(dto)
+
+const liveserver = "liveserver" in ARGS
+
+if liveserver
+    using Revise
+    @timeit dto "Revise.revise()" Revise.revise()
+end
+
+using Documenter, Ferrite, FerriteGmsh, FerriteMeshParser
 
 const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 
@@ -21,15 +31,20 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "quasi_incompressible_hyperelasticity.md",
     "ns_vs_diffeq.md",
     "computational_homogenization.md",
+    "stokes-flow.md",
+	"topology_optimization.md",
     )]
 
 # Build documentation.
-makedocs(
-    format = Documenter.HTML(),
+@timeit dto "makedocs" makedocs(
+    format = Documenter.HTML(
+        assets = ["assets/custom.css", "assets/favicon.ico"],
+    ),
     sitename = "Ferrite.jl",
     doctest = false,
     # strict = VERSION.minor == 6 && sizeof(Int) == 8, # only strict mode on 0.6 and Int64
     strict = false,
+    draft = liveserver,
     pages = Any[
         "Home" => "index.md",
         "manual/fe_intro.md",
@@ -41,7 +56,7 @@ makedocs(
             "manual/grid.md",
             "manual/export.md"
             ],
-        "Examples" => GENERATEDEXAMPLES,
+        "Examples" => ["overview.md";GENERATEDEXAMPLES],
         "API Reference" => [
             "reference/quadrature.md",
             "reference/interpolations.md",
@@ -50,19 +65,24 @@ makedocs(
             "reference/assembly.md",
             "reference/boundary_conditions.md",
             "reference/grid.md",
-            "reference/export.md"
+            "reference/export.md",
+            "reference/utils.md",
             ]
         ],
 )
 
 # make sure there are no *.vtu files left around from the build
-cd(joinpath(@__DIR__, "build", "examples")) do
+@timeit dto "remove vtk files" cd(joinpath(@__DIR__, "build", "examples")) do
     foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
 end
 
 
 # Deploy built documentation
-deploydocs(
-    repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
-    push_preview=true,
-)
+if !liveserver
+    @timeit dto "deploydocs" deploydocs(
+        repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
+        push_preview=true,
+    )
+end
+
+print_timer(dto)

@@ -59,6 +59,9 @@ export
     FaceIndex,
     EdgeIndex,
     VertexIndex,
+    ExclusiveTopology,
+    getneighborhood,
+    faceskeleton,
     getcells,
     getncells,
     getnodes,
@@ -89,6 +92,7 @@ export
 
 # Grid coloring
     create_coloring,
+    ColoringAlgorithm,
     vtk_cell_data_colors,
 
 # Dofs
@@ -102,25 +106,34 @@ export
     create_symmetric_sparsity_pattern,
     dof_range,
     renumber!,
+    DofOrder,
     MixedDofHandler,
     FieldHandler,
     Field,
     reshape_to_nodes,
+    apply_analytical!,
 
 # Constraints
     ConstraintHandler,
     Dirichlet,
     PeriodicDirichlet,
+    collect_periodic_faces,
+    collect_periodic_faces!,
+    PeriodicFacePair,
     AffineConstraint,
     update!,
     apply!,
     apply_rhs!,
     get_rhs_data,
     apply_zero!,
+    apply_local!,
+    apply_assemble!,
     add!,
     free_dofs,
+    ApplyStrategy,
 
 # iterators
+    CellCache,
     CellIterator,
     UpdateFlags,
     cellid,

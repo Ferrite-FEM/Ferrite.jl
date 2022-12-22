@@ -1,15 +1,31 @@
+"""
+    Field(name::Symbol, interpolation::Interpolation, dim::Int)
 
+Construct `dim`-dimensional `Field` called `name` which is approximated by `interpolation`.
+
+The interpolation is used for distributing the degrees of freedom.
+"""
+struct Field
+    name::Symbol
+    interpolation::Interpolation
+    dim::Int
+end
+
+"""
+    FieldHandler(fields::Vector{Field}, cellset::Set{Int})
+
+Construct a `FieldHandler` based on an array of [`Field`](@ref)s and assigns it a set of cells.
+
+A `FieldHandler` must fullfill the following requirements:
+- All [`Cell`](@ref)s in `cellset` are of the same type.
+- Each field only uses a single interpolation on the `cellset`.
+- Each cell belongs only to a single `FieldHandler`, i.e. all fields on a cell must be added within the same `FieldHandler`.
+
+Notice that a `FieldHandler` can hold several fields.
+"""
 mutable struct FieldHandler
     fields::Vector{Field}
     cellset::Set{Int}
-end
-"""
-    FieldHandler(fields::Vector{Field}, cellset)
-
-Construct a `FieldHandler` based on an array of `Field`s and assigns it a set of cells.
-"""
-function FieldHandler(fields::Vector{Field}, cellset)
-    return FieldHandler(fields, cellset)
 end
 
 struct CellVector{T}
@@ -23,7 +39,14 @@ function Base.getindex(elvec::CellVector, el::Int)
     return elvec.values[offset:offset + elvec.length[el]-1]
  end
 
-struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: Ferrite.AbstractDofHandler
+"""
+    MixedDofHandler(grid::Grid)
+
+Construct a `MixedDofHandler` based on `grid`. Supports:
+- `Grid`s with or without concrete element type (E.g. "mixed" grids with several different element types.)
+- One or several fields, which can live on the whole domain or on subsets of the `Grid`.
+"""
+struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
     cell_dofs::CellVector{Int}
     cell_nodes::CellVector{Int}
@@ -34,7 +57,8 @@ struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: Ferrite.AbstractDofHandler
 end
 
 function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
-    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],Int[],Int[]), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
+    ncells = getncells(grid)
+    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],zeros(Int,ncells),zeros(Int,ncells)), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end
 
 getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
@@ -79,9 +103,7 @@ Returns the union of all the fields. Can be used as an iterable over all the fie
 function getfieldnames(dh::MixedDofHandler)
     fieldnames = Vector{Symbol}()
     for fh in dh.fieldhandlers
-        for name in getfieldnames(fh)
-            push!(fieldnames, name)
-        end
+        append!(fieldnames, getfieldnames(fh))
     end
     return unique!(fieldnames)
 end
@@ -110,9 +132,15 @@ Returns the number of unique fields defined.
 """
 nfields(dh::MixedDofHandler) = length(getfieldnames(dh))
 
+"""
+    push!(dh::MixedDofHandler, fh::FieldHandler)
+
+Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
+"""
 function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
     @assert !isclosed(dh)
     _check_same_celltype(dh.grid, collect(fh.cellset))
+    _check_cellset_intersections(dh, fh)
     # the field interpolations should have the same refshape as the cells they are applied to
     refshapes_fh = getrefshape.(getfieldinterpolations(fh))
     # extract the celltype from the first cell as the celltypes are all equal
@@ -124,6 +152,12 @@ function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
 
     push!(dh.fieldhandlers, fh)
     return dh
+end
+
+function _check_cellset_intersections(dh::MixedDofHandler, fh::FieldHandler)
+    for _fh in dh.fieldhandlers
+        isdisjoint(_fh.cellset, fh.cellset) || error("Each cell can only belong to a single FieldHandler.")
+    end
 end
 
 function Base.push!(dh::MixedDofHandler, name::Symbol, dim::Int)
@@ -154,10 +188,16 @@ function Base.push!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolati
 end
 
 """
-    close!(dh::MixedDofHandler)
+    close!(dh::AbstractDofHandler)
 
-Closes the dofhandler and creates degrees of freedom for each cell.
-Dofs are created in the following order: Go through each FieldHandler in the order they were added. For each field in the FieldHandler, create dofs for the cell. This means that dofs on a particular cell will be numbered according to the fields; first dofs for field 1, then field 2, etc.
+Closes `dh` and creates degrees of freedom for each cell.
+
+If there are several fields, the dofs are added in the following order:
+For a `MixedDofHandler`, go through each `FieldHandler` in the order they were added.
+For each field in the `FieldHandler` or in the `DofHandler` (again, in the order the fields were added),
+create dofs for the cell.
+This means that dofs on a particular cell, the dofs will be numbered according to the fields;
+first dofs for field 1, then field 2, etc.
 """
 function close!(dh::MixedDofHandler)
     dh, _, _, _ = __close!(dh)
@@ -172,16 +212,13 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
 
     # Create dicts that store created dofs
     # Each key should uniquely identify the given type
-    vertexdicts = [Dict{Int, Array{Int}}() for _ in 1:numfields]
-    edgedicts = [Dict{Tuple{Int,Int}, Array{Int}}() for _ in 1:numfields]
-    facedicts = [Dict{Tuple{Int,Int}, Array{Int}}() for _ in 1:numfields]
-    celldicts = [Dict{Int, Array{Int}}() for _ in 1:numfields]
+    vertexdicts = [Dict{Int, UnitRange{Int}}() for _ in 1:numfields]
+    edgedicts = [Dict{Tuple{Int,Int}, UnitRange{Int}}() for _ in 1:numfields]
+    facedicts = [Dict{Tuple{Int,Int}, UnitRange{Int}}() for _ in 1:numfields]
+    celldicts = [Dict{Int, UnitRange{Int}}() for _ in 1:numfields]
 
     # Set initial values
     nextdof = 1  # next free dof to distribute
-
-    append!(dh.cell_dofs.offset, zeros(getncells(dh.grid)))
-    append!(dh.cell_dofs.length, zeros(getncells(dh.grid)))
 
     @debug "\n\nCreating dofs\n"
     for fh in dh.fieldhandlers
@@ -235,11 +272,12 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
     end
 
     # loop over all the cells, and distribute dofs for all the fields
+    cell_dofs = Int[]  # list of global dofs for each cell
     for ci in cellnumbers
         dh.cell_dofs.offset[ci] = length(dh.cell_dofs.values)+1
 
         cell = dh.grid.cells[ci]
-        cell_dofs = Int[]  # list of global dofs for each cell
+        empty!(cell_dofs)
         @debug "Creating dofs for cell #$ci"
 
         for (local_num, field_name) in enumerate(field_names)
@@ -265,7 +303,7 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
 
         end
         # after done creating dofs for the cell, push them to the global list
-        push!(dh.cell_dofs.values, cell_dofs...)
+        append!(dh.cell_dofs.values, cell_dofs)
         dh.cell_dofs.length[ci] = length(cell_dofs)
 
         @debug "Dofs for cell #$ci:\n\t$cell_dofs"
@@ -286,7 +324,7 @@ function get_or_create_dofs!(nextdof, field_dim; dict, key)
         return nextdof, dict[key]
 
     else  # create new dofs
-        dofs = collect(nextdof : nextdof + field_dim-1)
+        dofs = nextdof : (nextdof + field_dim-1)
         @debug "\t\tkey: $key dofs: $dofs"
         Base._setindex!(dict, dofs, key, -token) #
         nextdof += field_dim
@@ -298,7 +336,7 @@ function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, ne
     for vertex in Ferrite.vertices(cell)
         @debug "\tvertex #$vertex"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=vertexdict, key=vertex)
-        push!(cell_dofs, dofs...)
+        append!(cell_dofs, dofs)
     end
     return nextdof
 end
@@ -310,7 +348,7 @@ function add_face_dofs(cell_dofs, cell, facedict, field_dim, nfacedofs, nextdof)
         sface = Ferrite.sortface(face)
         @debug "\tface #$sface"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=facedict, key=sface)
-        push!(cell_dofs, dofs...)
+        append!(cell_dofs, dofs)
     end
     return nextdof
 end
@@ -321,7 +359,7 @@ function add_edge_dofs(cell_dofs, cell, edgedict, field_dim, nedgedofs, nextdof)
         sedge, dir = Ferrite.sortedge(edge)
         @debug "\tedge #$sedge"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=edgedict, key=sedge)
-        push!(cell_dofs, dofs...)
+        append!(cell_dofs, dofs)
     end
     return nextdof
 end
@@ -330,74 +368,15 @@ function add_cell_dofs(cell_dofs, cell, celldict, field_dim, ncelldofs, nextdof)
     for celldof in 1:ncelldofs
         @debug "\tcell #$cell"
         nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=celldict, key=cell)
-        push!(cell_dofs, dofs...)
+        append!(cell_dofs, dofs)
     end
     return nextdof
 end
 
 
-# TODO if not too slow it can replace the "Grid-version"
-function _create_sparsity_pattern(dh::MixedDofHandler, ch#=::Union{ConstraintHandler,Nothing}=#, sym::Bool)
-    ncells = getncells(dh.grid)
-    N::Int = 0
-    for element_id = 1:ncells  # TODO check for correctness
-        n = ndofs_per_cell(dh, element_id)
-        N += sym ? div(n*(n+1), 2) : n^2
-    end
-    N += ndofs(dh) # always add the diagonal elements
-    I = Int[]; resize!(I, N)
-    J = Int[]; resize!(J, N)
-
-    cnt = 0
-    for element_id in 1:ncells
-        n = ndofs_per_cell(dh, element_id)
-        global_dofs = zeros(Int, n)
-        celldofs!(global_dofs, dh, element_id)
-        @inbounds for j in 1:n, i in 1:n
-            dofi = global_dofs[i]
-            dofj = global_dofs[j]
-            sym && (dofi > dofj && continue)
-            cnt += 1
-            if cnt > length(J)
-                resize!(I, trunc(Int, length(I) * 1.5))
-                resize!(J, trunc(Int, length(J) * 1.5))
-            end
-            I[cnt] = dofi
-            J[cnt] = dofj
-        end
-    end
-    @inbounds for d in 1:ndofs(dh)
-        cnt += 1
-        if cnt > length(J)
-            resize!(I, trunc(Int, length(I) + ndofs(dh)))
-            resize!(J, trunc(Int, length(J) + ndofs(dh)))
-        end
-        I[cnt] = d
-        J[cnt] = d
-    end
-    resize!(I, cnt)
-    resize!(J, cnt)
-    V = zeros(length(I))
-    K = sparse(I, J, V)
-
-    # Add entries to K corresponding to condensation due the linear constraints
-    # Note, this requires the K matrix, which is why we can't push!() to the I,J,V
-    # triplet directly.
-    if ch !== nothing
-        @assert isclosed(ch)
-        _condense_sparsity_pattern!(K, ch.acs)
-    end
-
-    return K
-
-end
-
-create_sparsity_pattern(dh::MixedDofHandler) = _create_sparsity_pattern(dh, nothing, false)
-create_symmetric_sparsity_pattern(dh::MixedDofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
-
 function find_field(fh::FieldHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, getfieldnames(fh))
-    j === nothing && error("did not find field $field_name")
+    j === nothing && error("could not find field :$field_name in FieldHandler (existing fields: $(getfieldnames(fh)))")
     return j
 end
 
@@ -421,7 +400,9 @@ end
 
 find_field(dh::MixedDofHandler, field_name::Symbol) = find_field(first(dh.fieldhandlers), field_name)
 field_offset(dh::MixedDofHandler, field_name::Symbol) = field_offset(first(dh.fieldhandlers), field_name)
+getfieldinterpolation(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].interpolation
 getfieldinterpolation(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].interpolation
+getfielddim(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].dim
 getfielddim(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].dim
 
 function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) where T

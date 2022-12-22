@@ -64,7 +64,7 @@ close!(ch)
 update!(ch, 0.0)
 
 # Next we define relevant data for the shell, such as shear correction factor and stiffness matrix for the material. 
-# In this linear shell, plane stress is assumed, ie $\\sigma_{zz} = 0 $. Therefor, the stiffness matrix is 5x5 (opposed to the normal 6x6).
+# In this linear shell, plane stress is assumed, ie $\\sigma_{zz} = 0$. Therefor, the stiffness matrix is 5x5 (opposed to the normal 6x6).
 #+
 κ = 5/6 # Shear correction factor
 E = 210.0

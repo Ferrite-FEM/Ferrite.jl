@@ -326,6 +326,15 @@ function oneD()
     # @test f.(points) ≈ vals
 end
 
+function first_point_missing()
+    mesh = generate_grid(Quadrilateral, (1, 1))
+    points = [Vec(2.0, 0.0), Vec(0.0, 0.0)]
+    ph = PointEvalHandler(mesh, points; warn=false)
+    
+    @test isnothing(ph.local_coords[1])
+    @test ph.local_coords[2] == Vec(0.0, 0.0)
+end
+
 @testset "PointEvalHandler" begin
     scalar_field()
     vector_field()
@@ -334,6 +343,7 @@ end
     superparametric()
     mixed_grid()
     oneD()
+    first_point_missing()
 end
 
 @testset "PointValues" begin

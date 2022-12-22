@@ -29,6 +29,22 @@ function checkquadpoint(cv::Union{CellScalarValues,FaceScalarValues,CellVectorVa
 end
 checkquadpoint(_, _::Int) = nothing
 
+@noinline function throw_incompatible_dof_length(length_ue, n_base_funcs)
+    throw(ArgumentError(
+        "the number of base functions ($(n_base_funcs)) does not match the length " *
+        "of the vector ($(length_ue)). Perhaps you passed the global vector, " *
+        "or forgot to pass a dof_range?"
+    ))
+end
+@noinline function throw_incompatible_coord_length(length_x, n_base_funcs)
+    throw(ArgumentError(
+        "the number of (geometric) base functions ($(n_base_funcs)) does not match " *
+        "the number of coordinates in the vector ($(length_x)). Perhaps you forgot to " *
+        "use an appropriate geometric interpolation when creating FE values? See " *
+        "https://github.com/Ferrite-FEM/Ferrite.jl/issues/265 for more details."
+    ))
+end
+
 """
     reinit!(cv::CellValues, x::Vector)
     reinit!(bv::FaceValues, x::Vector, face::Int)
@@ -105,9 +121,9 @@ quadrature point `q_point`.
 shape_curl(cv::T, q_point, base_func) where T = shape_curl(FieldTrait(T), cv, q_point, base_func)
 
 function shape_curl(::VectorValued, cv::Values, q_point::Int, base_func::Int)
-    return curl(shape_gradient(cv, q_point, base_func))
+    return curl_from_gradient(shape_gradient(cv, q_point, base_func))
 end
-curl(∇v) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
+curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
 
 """
     function_value(fe_v::Values, q_point::Int, u::AbstractVector)
@@ -126,7 +142,7 @@ function_value(fe_v::T, args...) where T <: Values = function_value(FieldTrait(T
 
 function function_value(::FieldTrait, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
     n_base_funcs = getnbasefunctions(fe_v)
-    @assert length(dof_range) == n_base_funcs
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
     @boundscheck checkbounds(u, dof_range)
     @boundscheck checkquadpoint(fe_v, q_point)
     val = zero(_valuetype(fe_v, u))
@@ -138,7 +154,7 @@ end
 
 function function_value(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
-    @assert length(u) == n_base_funcs
+    length(u) == n_base_funcs || throw_incompatible_dof_length(length(u), n_base_funcs)
     @boundscheck checkquadpoint(fe_v, q_point)
     val = zero(Vec{dim, T})
     basefunc = 1
@@ -177,7 +193,7 @@ function_gradient(fe_v::T, args...) where T <: Values = function_gradient(FieldT
 
 function function_gradient(::FieldTrait, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T}
     n_base_funcs = getnbasefunctions(fe_v)
-    @assert length(dof_range) == n_base_funcs
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
     @boundscheck checkbounds(u, dof_range)
     @boundscheck checkquadpoint(fe_v, q_point)
     grad = zero(_gradienttype(fe_v, u))
@@ -193,7 +209,7 @@ _gradienttype(::VectorValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} 
 
 function function_gradient(::ScalarValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
-    @assert length(u) == n_base_funcs
+    length(u) == n_base_funcs || throw_incompatible_dof_length(length(u), n_base_funcs)
     @boundscheck checkquadpoint(fe_v, q_point)
     grad = zero(Tensor{2,dim,T})
     @inbounds for i in 1:n_base_funcs
@@ -204,7 +220,7 @@ end
 
 function function_gradient(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
-    @assert length(u) == n_base_funcs
+    length(u) == n_base_funcs || throw_incompatible_dof_length(length(u), n_base_funcs)
     @boundscheck checkquadpoint(fe_v, q_point)
     grad = zero(Tensor{2,dim,T})
     basefunc_count = 1
@@ -253,7 +269,7 @@ function_divergence(fe_v::T, args...) where T <: Values = function_divergence(Fi
 
 function function_divergence(::ScalarValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
-    @assert length(u) == n_base_funcs
+    length(u) == n_base_funcs || throw_incompatible_dof_length(length(u), n_base_funcs)
     @boundscheck checkquadpoint(fe_v, q_point)
     diverg = zero(T)
     @inbounds for i in 1:n_base_funcs
@@ -269,10 +285,10 @@ function_divergence(::VectorValued, fe_v::Values{dim}, q_point::Int, u::Abstract
     tr(function_gradient(fe_v, q_point, u))
 
 function_curl(fe_v::Values, q_point::Int, u::AbstractVector, dof_range = eachindex(u)) =
-    curl(function_gradient(fe_v, q_point, u, dof_range))
+    curl_from_gradient(function_gradient(fe_v, q_point, u, dof_range))
 
 function_curl(fe_v::Values, q_point::Int, u::AbstractVector{Vec{3, T}}) where T =
-    curl(function_gradient(fe_v, q_point, u))
+    curl_from_gradient(function_gradient(fe_v, q_point, u))
 
 """
     spatial_coordinate(fe_v::Values{dim}, q_point::Int, x::AbstractVector)
@@ -285,7 +301,7 @@ The coordinate is computed, using the geometric interpolation, as
 """
 function spatial_coordinate(fe_v::Values{dim}, q_point::Int, x::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getngeobasefunctions(fe_v)
-    @assert length(x) == n_base_funcs
+    length(x) == n_base_funcs || throw_incompatible_coord_length(length(x), n_base_funcs)
     @boundscheck checkquadpoint(fe_v, q_point)
     vec = zero(Vec{dim,T})
     @inbounds for i in 1:n_base_funcs
