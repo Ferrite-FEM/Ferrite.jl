@@ -60,7 +60,7 @@ dbc2 = Dirichlet(
 ```
 
 Note that the return value of the function must match with the components -- in the example
-above we prescibe components 1 and 3 to 0 so we return a vector of length 2.
+above we prescribe components 1 and 3 to 0 so we return a vector of length 2.
 
 Adding the constraints to the constraint handler is done with [`add!`](@ref):
 
