@@ -23,7 +23,7 @@ Such sets are defined in Gmsh as `PhysicalGroups` of dimension `dim` and `dim-1`
 In case only a part of the mesh is the domain, the domain can be specified by providing the keyword argument `domain` the name of the `PhysicalGroups` in the [`FerriteGmsh.togrid`](@ref) function.
 
 !!! note "Why you should read a .msh file"
-    Reading a `.msh` file is the advertised way, since otherwise you remesh whenver you run the code.
+    Reading a `.msh` file is the advertised way, since otherwise you remesh whenever you run the code.
     Further, if you choose to read the grid directly from the current model of the gmsh API you get artificial nodes,
     which doesn't harm the FE computation, but maybe distort your sophisticated grid operations (if present).
     For more information, see [this issue](https://github.com/Ferrite-FEM/FerriteGmsh.jl/issues/20).
