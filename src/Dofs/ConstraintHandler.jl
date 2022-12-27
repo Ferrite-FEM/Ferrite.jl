@@ -877,9 +877,14 @@ function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
     dbc_added = false
     for fh in ch.dh.fieldhandlers
         if overlaps(fh, dbc)
-            # If dbc have dofs not in fh, then these will be removed from dbc, hence deepcopy
+            # Recreating the `dbc` will create a copy of `dbc.faces`. 
+            # If `dbc` have dofs not in `fh`, these will be removed from `dbc`, 
+            # thus the need to copy `dbc.faces`.
             # In this case, add! will warn, unless warn_check_cellset=false
-            add!(ch, fh, deepcopy(dbc), warn_check_cellset=false)
+            dbc_ = Dirichlet(dbc.field_name, dbc.faces, dbc.f, 
+                isempty(dbc.components) ? nothing : dbc.components) 
+                # Check for empty already done when user created `dbc`
+            add!(ch, fh, dbc_, warn_check_cellset=false)
             dbc_added = true
         end
     end
