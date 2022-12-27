@@ -16,6 +16,7 @@ collect_periodic_faces
 collect_periodic_faces!
 add!
 close!
+update!
 apply!
 apply_zero!
 apply_local!

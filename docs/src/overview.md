@@ -63,7 +63,7 @@ The programs are sorted as
   
  A basic Ginzburg-Landau model is solved by combining `Ferrite` with `ForwardDiff`. Using threads, the calculation time is optimized.  
 	
- Keywords: Gizburg-Landau, ForwardDiff.jl, parallelization, optimization, performance
+ Keywords: Ginzburg-Landau, ForwardDiff.jl, parallelization, optimization, performance
 
 10.	[Linear shell](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/linear_shell/)  
 

@@ -93,19 +93,22 @@ ch = ConstraintHandler(dh);
 
 # Now we are set up to define our constraint. We specify which field
 # the condition is for, and our combined face set `∂Ω`. The last
-# argument is a function which takes the spatial coordinate $\textbf{x}$ and
-# the current time $t$ and returns the prescribed value. In this case
-# it is trivial -- no matter what $\textbf{x}$ and $t$ we return $0$. When we have
+# argument is a function of the form $f(\textbf{x})$ or $f(\textbf{x}, t)$,
+# where $\textbf{x}$ is the spatial coordinate and
+# $t$ the current time, and returns the prescribed value. Since the boundary condition in
+# this case do not depend on time we define our function as $f(\textbf{x}) = 0$, i.e.
+# no matter what $\textbf{x}$ we return $0$. When we have
 # specified our constraint we `add!` it to `ch`.
 dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
 add!(ch, dbc);
 
-# We also need to `close!` and `update!` our boundary conditions. When we call `close!`
+# Finally we also need to `close!` our constraint handler. When we call `close!`
 # the dofs corresponding to our constraints are calculated and stored
-# in our `ch` object. Since the boundary conditions are, in this case,
-# independent of time we can `update!` them directly with e.g. $t = 0$.
+# in our `ch` object.
 close!(ch)
-update!(ch, 0.0);
+
+# Note that if one or more of the constraints are time dependent we would use
+# [`update!`](@ref) to recompute prescribed values in each new timestep.
 
 # ### Assembling the linear system
 #
