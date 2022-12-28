@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    support a new DoF renumbering order `DofOrder.Ext{Metis}()` that can be passed to
    `renumber!` to renumber DoFs using the Metis.jl library. ([#393][github-393],
    [#549][github-549])
+ - New function `apply_analytical!` for setting the values of the degrees of freedom for a 
+   specific field according to a spatial function `f(x)`. ([#532][github-532])
+
 
 ## [0.3.10] - 2022-12-11
 ### Added
@@ -210,6 +213,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-528]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/528
 [github-529]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/529
 [github-530]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/530
+[github-532]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/532
 [github-533]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/533
 [github-534]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/534
 [github-535]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/535

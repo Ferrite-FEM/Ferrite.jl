@@ -40,6 +40,11 @@ struct QuadratureRule{dim,shape,T}
     points::Vector{Vec{dim,T}}
 end
 
+function QuadratureRule{dim, shape}(weights::AbstractVector{Tw}, points::AbstractVector{Vec{dim,Tp}}) where {dim, shape, Tw, Tp}
+    T = promote_type(Tw, Tp)
+    QuadratureRule{dim,shape,T}(weights, points)
+end
+
 Base.copy(qr::QuadratureRule) = qr # TODO: Is it ever useful to get an actual copy?
 
 """

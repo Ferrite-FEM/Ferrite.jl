@@ -82,14 +82,19 @@ Assembles the element residual `ge` into the global residual vector `g`.
 @propagate_inbounds function assemble!(g::AbstractVector{T}, dofs::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
     @boundscheck checkbounds(g, dofs)
     @inbounds for i in 1:length(dofs)
-        val = ge[i]
-        if !iszero(val)
-            g[dofs[i]] += val
-        end
+        addindex!(g, ge[i], dofs[i])
     end
 end
 
 abstract type AbstractSparseAssembler end
+
+"""
+    matrix_handle(a::AbstractSparseAssembler)
+    vector_handle(a::AbstractSparseAssembler)
+
+Return a reference to the underlying matrix/vector of the assembler.
+"""
+matrix_handle, vector_handle
 
 struct AssemblerSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
     K::SparseMatrixCSC{Tv,Ti}
@@ -104,8 +109,9 @@ struct AssemblerSymmetricSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
     sorteddofs::Vector{Int}
 end
 
-@inline getsparsemat(a::AssemblerSparsityPattern) = a.K
-@inline getsparsemat(a::AssemblerSymmetricSparsityPattern) = a.K.data
+matrix_handle(a::AssemblerSparsityPattern) = a.K
+matrix_handle(a::AssemblerSymmetricSparsityPattern) = a.K.data
+vector_handle(a::Union{AssemblerSparsityPattern, AssemblerSymmetricSparsityPattern}) = a.f
 
 """
     start_assemble(K::SparseMatrixCSC;            fillzero::Bool=true) -> AssemblerSparsityPattern
@@ -129,11 +135,11 @@ start_assemble(K::Union{SparseMatrixCSC, Symmetric{<:Any,SparseMatrixCSC}}, f::V
 
 start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; fillzero::Bool=true) = start_assemble(K, f; fillzero=fillzero)
 function start_assemble(K::SparseMatrixCSC{T}, f::Vector=T[]; fillzero::Bool=true) where {T}
-    fillzero && (fill!(K.nzval, zero(T)); fill!(f, zero(T)))
+    fillzero && (fillzero!(K); fillzero!(f))
     return AssemblerSparsityPattern(K, f, Int[], Int[])
 end
 function start_assemble(K::Symmetric{T,<:SparseMatrixCSC}, f::Vector=T[]; fillzero::Bool=true) where T
-    fillzero && (fill!(K.data.nzval, zero(T)); fill!(f, zero(T)))
+    fillzero && (fillzero!(K); fillzero!(f))
     return AssemblerSymmetricSparsityPattern(K, f, Int[], Int[])
 end
 
@@ -172,7 +178,7 @@ end
         @inbounds assemble!(A.f, dofs, fe)
     end
 
-    K = getsparsemat(A)
+    K = matrix_handle(A)
     permutation = A.permutation
     sorteddofs = A.sorteddofs
     @boundscheck checkbounds(K, dofs, dofs)
@@ -252,7 +258,7 @@ function apply_assemble!(
     )
     _apply_local!(
         local_matrix, local_vector, global_dofs, ch, apply_zero,
-        getsparsemat(assembler), assembler.f
+        matrix_handle(assembler), vector_handle(assembler),
     )
     assemble!(assembler, global_dofs, local_matrix, local_vector)
     return
