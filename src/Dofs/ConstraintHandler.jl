@@ -56,9 +56,11 @@ end
 
 const DofCoefficients{T} = Vector{Pair{Int,T}}
 """
-    AffineConstraint(constrained_dofs::Int, master_dofs::Vector{Int}, coeffs::Vector{T}, b::T) where T
+    AffineConstraint(constrained_dof::Int, entires::Vector{Pair{Int,T}}, b::T) where T
 
-Define an affine/linear constraint to constrain dofs of the form `u_i = ∑(u[j] * a[j]) + b`.
+Define an affine/linear constraint to constrain one degree of freedom, `u[i]`, 
+such that `u[i] = ∑(u[j] * a[j]) + b`, 
+where `i=constrained_dof` and each element in `entries` are `j => a[j]`
 """
 struct AffineConstraint{T}
     constrained_dof::Int
