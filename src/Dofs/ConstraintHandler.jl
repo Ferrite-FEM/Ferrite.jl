@@ -938,7 +938,7 @@ end
 """
     create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling)
 
-Create a symmetric sparsity pattern accounting for affine constraints in `ch`. See 
+Create a sparsity pattern accounting for affine constraints in `ch`. See 
 the Affine Constraints section of the manual for further details. 
 """
 function create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
