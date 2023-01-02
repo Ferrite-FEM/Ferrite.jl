@@ -925,10 +925,22 @@ function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset
     end
 end
 
+"""
+    create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler, coupling)
+
+Create a symmetric sparsity pattern accounting for affine constraints in `ch`. See 
+the Affine Constraints section of the manual for further details. 
+"""
 function create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
         keep_constrained::Bool=true, coupling=nothing)
     return Symmetric(_create_sparsity_pattern(dh, ch, true, keep_constrained, coupling), :U)
 end
+"""
+    create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling)
+
+Create a symmetric sparsity pattern accounting for affine constraints in `ch`. See 
+the Affine Constraints section of the manual for further details. 
+"""
 function create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
         keep_constrained::Bool=true, coupling=nothing)
     return _create_sparsity_pattern(dh, ch, false, keep_constrained, coupling)
