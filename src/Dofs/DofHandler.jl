@@ -20,12 +20,13 @@ struct DofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     cell_dofs_offset::Vector{Int}
     closed::ScalarWrapper{Bool}
     grid::G
+    ctrl_dofs::Vector{Tuple{Symbol,Int}} # Could also be OrderedDict...
     ndofs::ScalarWrapper{Int}
 end
 
 function DofHandler(grid::AbstractGrid)
     isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. Use MixedDofHandler instead of DofHandler")
-    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
+    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Tuple{Symbol,Int}[], Ferrite.ScalarWrapper(-1))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
@@ -58,6 +59,17 @@ function find_field(dh::DofHandler, field_name::Symbol)
     j === nothing && error("could not find field :$field_name in DofHandler (existing fields: $(getfieldnames(dh)))")
     return j
 end
+
+get_num_control_dofs(dh::DofHandler) = sum(last, dh.ctrl_dofs; init=0)
+function get_control_dofrange(dh::DofHandler, name::Symbol)
+    @assert isclosed(dh)
+    ctrl_start = ndofs(dh)-get_num_control_dofs(dh)
+    nr = findfirst(ctrldof->first(ctrldof)==name, dh.ctrl_dofs)
+    isnothing(nr) && throw(KeyError("$name not a control dof in the DofHandler"))
+    d1 = nr==1 ? 1 : (sum(i->last(dh.ctrl_dofs[i]), 1:(nr-1)) + 1)
+    return ctrl_start .+ (d1:(d1 + last(dh.ctrl_dofs[nr]) - 1))
+end
+add_control_dof!(dh::DofHandler, name::Symbol, number::Int) = push!(dh.ctrl_dofs, (name,number))
 
 # Calculate the offset to the first local dof of a field
 function field_offset(dh::DofHandler, field_name::Symbol)
@@ -288,7 +300,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
         # push! the first index of the next cell to the offset vector
         push!(dh.cell_dofs_offset, length(dh.cell_dofs)+1)
     end # cell loop
-    dh.ndofs[] = maximum(dh.cell_dofs)
+    dh.ndofs[] = maximum(dh.cell_dofs) + get_num_control_dofs(dh)
     dh.closed[] = true
 
     return dh, vertexdicts, edgedicts, facedicts
