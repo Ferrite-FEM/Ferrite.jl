@@ -610,7 +610,7 @@ function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
     for (dof, dofcoef, h) in zip(ch.prescribed_dofs, ch.dofcoefficients, ch.affine_inhomogeneities)
         dofcoef === nothing && continue
         @assert h !== nothing
-        v[dof] = h
+        v[dof] = apply_zero ? 0.0 : h
         for (d, s) in dofcoef
             v[dof] += s * v[d]
         end
