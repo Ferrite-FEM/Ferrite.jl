@@ -261,6 +261,63 @@ end
         @test a ≈ aa ≈ al ≈ a_rhs1 ≈ a_rhs2
     end
 
+    # Test nonlinear solution procedure (on linear problem) with affine constraints 
+    # using standard assembly (i.e. not local condensation)
+    @testset "nonlinear" begin
+        params = (k=1.0, f=1.0, a=1.0, b=0.2, tol=1e-10, maxiter=2)
+        grid = generate_grid(Line, (2,)); addfaceset!(grid, "center", x->x[1]≈0.0)
+        dh = DofHandler(grid); push!(dh, :u, 1); close!(dh)
+
+        function doassemble!(K, r, dh, a, params)
+            # Spring elements 
+            k = params.k
+            Ke = [k -k; -k k]
+            # Quick and dirty assem
+            assembler = start_assemble(K, r)
+            for cell in CellIterator(dh)
+                ae = a[celldofs(cell)]
+                re = Ke*ae
+                assemble!(assembler, celldofs(cell), Ke, re)
+            end
+            r[3] -= params.f # Force on the main dof (right side)
+        end
+
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:u, getfaceset(grid, "center"), (x,t)->Vec{1}((0.0,))))
+        add!(ch, AffineConstraint(1, [3=>params.a], params.b))
+        close!(ch)
+
+        K = create_sparsity_pattern(dh, ch)
+        r = zeros(ndofs(dh))
+        a = zeros(ndofs(dh))
+
+        # Nonlinear solution
+        apply!(a, ch) 
+        for niter = 0:params.maxiter
+            doassemble!(K, r, dh, a, params)
+            apply_zero!(K, r, ch)
+            norm(r) < params.tol && break
+            Δa = -K\r 
+            apply_zero!(Δa, ch)
+            a .+= Δa
+        end
+        @test norm(r) < params.tol
+        a_nonlinear = copy(a)
+
+        # Linear solution
+        fill!(a, NaN) # (not used)
+        doassemble!(K, r, dh, a, params)
+        f = zero(r); f[end] = params.f
+        apply!(K, f, ch)
+        a_linear = K\f
+        apply!(a_linear, ch)
+
+        # Analytical comparison
+        a3 = (params.f/params.k - params.b)/(1 + params.a)
+        a_analytical = [params.a*a3+params.b; 0.0; a3]
+        @test a_linear ≈ a_analytical
+        @test a_nonlinear ≈ a_analytical
+    end
 end
 
 # Rotate -pi/2 around dir
