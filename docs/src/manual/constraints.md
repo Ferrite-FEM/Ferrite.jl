@@ -58,6 +58,9 @@ apply!(a, ch) # enforces affine constraints
 
 ```
 
+Note that replacing `f` with `r=-f` and solving `a = -K\r` in the example above will not work correctly for affine constraints.
+In this case, use the procedure for nonlinear problems below. 
+
 ### Solving nonlinear problems
 When solving the nonlinear system `r(a)=0` using a Newton-type of method
 the updated guess is given by `Δa=-K\r` 
