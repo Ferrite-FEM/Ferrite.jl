@@ -58,13 +58,12 @@ apply!(a, ch) # enforces affine constraints
 
 ```
 
-Note that replacing `f` with `r=-f` and solving `a = -K\r` in the example above will not work correctly for affine constraints.
-In this case, use the procedure for nonlinear problems below. 
+Note: Replacing `f` with `r=-f` and solving `a = -K\r` in the example above may give the wrong result.
+Instead, use the procedure for nonlinear problems when applying affine constraints to such problem formulations.
 
 ### Solving nonlinear problems
-When solving the nonlinear system `r(a)=0` using a Newton-type of method
-the updated guess is given by `Δa=-K\r` 
-(where `K=∂r/∂a` if the standard Newton's method is used).
+A Newton-type solution method for the nonlinear system `r(a)=0` uses the 
+update `Δa=-K\r` (where `K=∂r/∂a` if the standard Newton's method is used).
 ```julia
 a = initial_guess(...)  # Make any initial guess for a here, e.g. `a=zeros(ndofs(dh))`
 apply!(a, ch)           # Make the guess fulfill all constraints in `ch`
