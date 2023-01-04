@@ -16,7 +16,7 @@ enforce these constraints, e.g. penalty methods and Lagrange multiplier methods.
 
 ## Affine constraints
 
-Affine constraints can be handled directly in Ferrite. Affine (or linear) constraints can typically
+Affine constraints can be handled directly in Ferrite. Affine (first) and linear (second) constraints can typically
 be expressed as:
 
 ```math
@@ -35,14 +35,15 @@ add!(ch, lc1)
 add!(ch, lc2)
 ```
 
-Linear constraint will affect the sparsity pattern of the stiffness matrix, and as such, it is important to also include 
+Affine constraints will affect the sparsity pattern of the stiffness matrix, and as such, it is important to also include 
 the `ConstraintHandler` as an argument when creating the sparsity pattern:
 
 ```julia
 K = create_sparsity_pattern(dh, ch)
 ```
 
-When solving the system, we account for the affine constraints in the same way as we account for 
+### Solving linear problems
+When solving the system `K⋅a=f`, we account for the affine constraints in the same way as we account for 
 `Dirichlet` boundary conditions; by first calling `apply!(K, f, ch)`. This will condense `K` and `f` inplace (i.e
 no new matrix will be created). Note however that we must also call `apply!` on the solution vector after 
 solving the system to enforce the affine constraints:
@@ -55,4 +56,21 @@ apply!(K, f, ch)
 a = K\f
 apply!(a, ch) # enforces affine constraints
 
+```
+
+### Solving nonlinear problems
+When solving the nonlinear system `r(a)=0` using a Newton-type of method
+the updated guess is given by `Δa=-K\r` 
+(where `K=∂r/∂a` if the standard Newton's method is used).
+```julia
+a = initial_guess(...)  # Make any initial guess for a here, e.g. `a=zeros(ndofs(dh))`
+apply!(a, ch)           # Make the guess fulfill all constraints in `ch`
+for iter in 1:maxiter
+    doassemble!(K, r, ...)
+    apply_zero!(K, r, ch)   # Modify `K` and `r` to account for the constraints. 
+    check_convergence(r, ...) && break # Only check convergence after `apply_zero!(K, r, ch)`
+    Δa=-K\r                 # Calculate update
+    apply_zero!(Δa, ch)     # Change prescribed values such that `a+Δa` fullfills constraints provided that `a` does.
+    a .+= Δa
+end
 ```
