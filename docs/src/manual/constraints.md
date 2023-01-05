@@ -58,9 +58,6 @@ apply!(a, ch) # enforces affine constraints
 
 ```
 
-Note: Replacing `f` with `r=-f` and solving `a = -K\r` in the example above may give the wrong result.
-Instead, use the procedure for nonlinear problems when applying affine constraints to such problem formulations.
-
 ### Solving nonlinear problems
 It is important to check the residual **after** applying boundary conditions when 
 solving nonlinear problems with affine constraints. 
