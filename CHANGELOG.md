@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    specific field according to a spatial function `f(x)`. ([#532][github-532])
 
 ### Fixed
- - Fix `apply_zero!(Δa, ch)` when using inhomogeneous affine constraints
+ - Fix `apply_zero!(Δa, ch)` when using inhomogeneous affine constraints ([#575][github-575])
 
 
 ## [0.3.10] - 2022-12-11
@@ -232,6 +232,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-547]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/547
 [github-549]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/549
 [github-550]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/550
+[github-575]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/575
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.10...HEAD
 [0.3.10]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.9...v0.3.10
