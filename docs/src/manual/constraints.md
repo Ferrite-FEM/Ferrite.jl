@@ -7,10 +7,10 @@ DocTestSetup = :(using Ferrite)
 PDEs can in general be subjected to a number of constraints, 
 
 ```math
-g_I(\boldsymbol{a}) = 0, \quad I = 1 \text{ to } n_c
+g_I(\underline{a}) = 0, \quad I = 1 \text{ to } n_c
 ```
 
-where $g$ are (non-linear) constraint equations, $\boldsymbol{a}$ is a vector of the
+where $g$ are (non-linear) constraint equations, $\underline{a}$ is a vector of the
 degrees of freedom, and $n_c$ is the number of constraints. There are many ways to
 enforce these constraints, e.g. penalty methods and Lagrange multiplier methods. 
 
@@ -43,7 +43,7 @@ K = create_sparsity_pattern(dh, ch)
 ```
 
 ### Solving linear problems
-To solve the system ``\boldsymbol{K}\boldsymbol{a}=\boldsymbol{f}``, account for affine constraints the same way as for 
+To solve the system ``\underline{\underline{K}}\underline{a}=\underline{f}``, account for affine constraints the same way as for 
 `Dirichlet` boundary conditions; first call `apply!(K, f, ch)`. This will condense `K` and `f` inplace (i.e
 no new matrix will be created). Note however that we must also call `apply!` on the solution vector after 
 solving the system to enforce the affine constraints:
