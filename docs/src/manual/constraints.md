@@ -69,7 +69,7 @@ a = initial_guess(...)  # Make any initial guess for a here, e.g. `a=zeros(ndofs
 Δa = similar(a)         # Preallocate Δa
 apply!(a, ch)           # Make the guess fulfill all constraints in `ch`
 for iter in 1:maxiter
-    doassemble!(K, r, ...)
+    doassemble!(K, r, ...)  # Assemble the residual, r, and stiffness, K=∂r/∂a.
     apply_zero!(K, r, ch)   # Modify `K` and `r` to account for the constraints. 
     check_convergence(r, ...) && break # Only check convergence after `apply_zero!(K, r, ch)`
     Δa .-= K \ r            # Calculate update
