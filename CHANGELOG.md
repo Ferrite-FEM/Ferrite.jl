@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - New function `apply_analytical!` for setting the values of the degrees of freedom for a 
    specific field according to a spatial function `f(x)`. ([#532][github-532])
 
+### Fixed
+ - Fix `apply_zero!(Δa, ch)` when using inhomogeneous affine constraints
+
 
 ## [0.3.10] - 2022-12-11
 ### Added
