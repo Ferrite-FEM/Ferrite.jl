@@ -63,7 +63,7 @@ It is important to check the residual **after** applying boundary conditions whe
 solving nonlinear problems with affine constraints. 
 `apply_zero!(K, r, ch)` modifies the residual entries for dofs that are involved 
 in constraints to account for constraint forces. 
-The following pseudo-code shows a typical pattern for solving a non-linear problem with Newtons method:
+The following pseudo-code shows a typical pattern for solving a non-linear problem with Newton's method:
 ```julia
 a = initial_guess(...)  # Make any initial guess for a here, e.g. `a=zeros(ndofs(dh))`
 Δa = similar(a)         # Preallocate Δa
