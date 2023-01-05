@@ -62,8 +62,11 @@ Note: Replacing `f` with `r=-f` and solving `a = -K\r` in the example above may 
 Instead, use the procedure for nonlinear problems when applying affine constraints to such problem formulations.
 
 ### Solving nonlinear problems
-A Newton-type solution method for the nonlinear system `r(a)=0` uses the 
-update `Δa=-K\r` (where `K=∂r/∂a` if the standard Newton's method is used).
+It is important to check the residual **after** applying boundary conditions when 
+solving nonlinear problems with affine constraints. 
+`apply_zero!(K, r, ch)` modifies the residual entries for dofs that are involved 
+in constraints to account for constraint forces. 
+The following pseudo-code shows the typical pattern for solving a non-linear problem with Newtons method:
 ```julia
 a = initial_guess(...)  # Make any initial guess for a here, e.g. `a=zeros(ndofs(dh))`
 apply!(a, ch)           # Make the guess fulfill all constraints in `ch`
@@ -72,7 +75,7 @@ for iter in 1:maxiter
     apply_zero!(K, r, ch)   # Modify `K` and `r` to account for the constraints. 
     check_convergence(r, ...) && break # Only check convergence after `apply_zero!(K, r, ch)`
     Δa=-K\r                 # Calculate update
-    apply_zero!(Δa, ch)     # Change prescribed values such that `a+Δa` fullfills constraints provided that `a` does.
+    apply_zero!(Δa, ch)     # Change constrained values such that `a+Δa` fullfills constraints provided that `a` does.
     a .+= Δa
 end
 ```
