@@ -43,8 +43,8 @@ K = create_sparsity_pattern(dh, ch)
 ```
 
 ### Solving linear problems
-When solving the system `K⋅a=f`, we account for the affine constraints in the same way as we account for 
-`Dirichlet` boundary conditions; by first calling `apply!(K, f, ch)`. This will condense `K` and `f` inplace (i.e
+To solve the system ``\boldsymbol{K}\boldsymbol{a}=\boldsymbol{f}``, account for affine constraints the same way as for 
+`Dirichlet` boundary conditions; first call `apply!(K, f, ch)`. This will condense `K` and `f` inplace (i.e
 no new matrix will be created). Note however that we must also call `apply!` on the solution vector after 
 solving the system to enforce the affine constraints:
 
@@ -63,15 +63,16 @@ It is important to check the residual **after** applying boundary conditions whe
 solving nonlinear problems with affine constraints. 
 `apply_zero!(K, r, ch)` modifies the residual entries for dofs that are involved 
 in constraints to account for constraint forces. 
-The following pseudo-code shows the typical pattern for solving a non-linear problem with Newtons method:
+The following pseudo-code shows a typical pattern for solving a non-linear problem with Newtons method:
 ```julia
 a = initial_guess(...)  # Make any initial guess for a here, e.g. `a=zeros(ndofs(dh))`
+Δa = similar(a)         # Preallocate Δa
 apply!(a, ch)           # Make the guess fulfill all constraints in `ch`
 for iter in 1:maxiter
     doassemble!(K, r, ...)
     apply_zero!(K, r, ch)   # Modify `K` and `r` to account for the constraints. 
     check_convergence(r, ...) && break # Only check convergence after `apply_zero!(K, r, ch)`
-    Δa=-K\r                 # Calculate update
+    Δa .-= K \ r            # Calculate update
     apply_zero!(Δa, ch)     # Change constrained values such that `a+Δa` fullfills constraints provided that `a` does.
     a .+= Δa
 end
