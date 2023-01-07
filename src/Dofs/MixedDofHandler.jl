@@ -49,8 +49,6 @@ Construct a `MixedDofHandler` based on `grid`. Supports:
 struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
     cell_dofs::CellVector{Int}
-    cell_nodes::CellVector{Int}
-    cell_coords::CellVector{Vec{dim,T}}
     closed::ScalarWrapper{Bool}
     grid::G
     ndofs::ScalarWrapper{Int}
@@ -58,7 +56,7 @@ end
 
 function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
     ncells = getncells(grid)
-    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],zeros(Int,ncells),zeros(Int,ncells)), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), ScalarWrapper(false), grid, ScalarWrapper(-1))
+    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],zeros(Int,ncells),zeros(Int,ncells)), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
 getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
@@ -101,20 +99,14 @@ function celldofs(dh::MixedDofHandler, i::Int)
     return dh.cell_dofs[i]
 end
 
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::MixedDofHandler, i::Int) where {dim,T}
-    @assert isclosed(dh)
-    @assert length(global_coords) == nnodes_per_cell(dh, i)
-    unsafe_copyto!(global_coords, 1, dh.cell_coords.values, dh.cell_coords.offset[i], length(global_coords))
-    return global_coords
+#TODO: perspectively remove in favor of `getcoordinates!(global_coords, grid, i)`?
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::MixedDofHandler, i::Union{Int, <:AbstractCell}) where {dim,T}
+    cellcoords!(global_coords, dh.grid, i)
 end
 
-function cellnodes!(global_nodes::Vector{Int}, dh::MixedDofHandler, i::Int)
-    @assert isclosed(dh)
-    @assert length(global_nodes) == nnodes_per_cell(dh, i)
-    unsafe_copyto!(global_nodes, 1, dh.cell_nodes.values, dh.cell_nodes.offset[i], length(global_nodes))
-    return global_nodes
+function cellnodes!(global_nodes::Vector{Int}, dh::MixedDofHandler, i::Union{Int, <:AbstractCell})
+    cellnodes!(global_nodes, dh.grid, i)
 end
-
 
 """
     getfieldnames(dh::MixedDofHandler)
@@ -264,20 +256,6 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
     end
     dh.ndofs[] = maximum(dh.cell_dofs.values)
     dh.closed[] = true
-
-    #Create cell_nodes and cell_coords (similar to cell_dofs)
-    push!(dh.cell_nodes.offset, 1)
-    push!(dh.cell_coords.offset, 1)
-    for cell in dh.grid.cells
-        for nodeid in cell.nodes
-            push!(dh.cell_nodes.values, nodeid)
-            push!(dh.cell_coords.values, dh.grid.nodes[nodeid].x)
-        end
-        push!(dh.cell_nodes.offset, length(dh.cell_nodes.values)+1)
-        push!(dh.cell_coords.offset, length(dh.cell_coords.values)+1)
-        push!(dh.cell_nodes.length, length(cell.nodes))
-        push!(dh.cell_coords.length, length(cell.nodes))
-    end
 
     return dh, vertexdicts, edgedicts, facedicts
 
