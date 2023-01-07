@@ -556,7 +556,7 @@ _warn_emptyset(set, name) = length(set) == 0 && @warn("no entities added to the 
 Adds a cellset to the grid with key `name`.
 Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
 The `MixedDofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
-`all=true` (default) implies that `f(x)` must return `true` for all nodal coordinates `x` in the cell if the cell 
+`all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` in the cell if the cell
 should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 
 ```julia
@@ -596,7 +596,7 @@ end
 Adds a faceset to the grid with key `name`.
 A faceset maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id, local_face_id)`.
 Facesets are used to initialize `Dirichlet` structs, that are needed to specify the boundary for the `ConstraintHandler`.
-`all=true` (default) implies that `f(x)` must return `true` for all nodal coordinates `x` on the face if the face
+`all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` on the face if the face
 should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 
 ```julia
