@@ -18,6 +18,7 @@ FieldHandler
 close!(::MixedDofHandler)
 ```
 
+## Dof renumbering
 ```@docs
 renumber!
 DofOrder.FieldWise
@@ -27,10 +28,20 @@ DofOrder.ComponentWise
 ## Common methods
 ```@docs
 ndofs
+ndofs_per_cell
 dof_range
-Ferrite.nfields(::MixedDofHandler)
-Ferrite.getfieldnames(::MixedDofHandler)
-Ferrite.getfielddim(::MixedDofHandler, ::Symbol)
+celldofs
+celldofs!
+```
+
+## `AbstractDofHandler` interface
+The following are *internal* methods that need to be implemented to fulfill the `AbstractDofHandler`
+interface.
+```@docs
+Ferrite.find_field
+Ferrite.field_offset
+Ferrite.getfieldinterpolation
+Ferrite.getfielddim
 ```
 
 # CellIterator
