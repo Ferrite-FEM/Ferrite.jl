@@ -35,6 +35,9 @@ abstract type BoundaryIndex end
 
 include("utils.jl")
 
+# Matrix/Vector utilities
+include("arrayutils.jl")
+
 # Interpolations
 include("interpolations.jl")
 
@@ -57,6 +60,8 @@ include("Grid/coloring.jl")
 include("Dofs/DofHandler.jl")
 include("Dofs/MixedDofHandler.jl")
 include("Dofs/ConstraintHandler.jl")
+include("Dofs/apply_analytical.jl")
+include("Dofs/DofRenumbering.jl")
 
 include("iterators.jl")
 

@@ -106,10 +106,12 @@ export
     create_symmetric_sparsity_pattern,
     dof_range,
     renumber!,
+    DofOrder,
     MixedDofHandler,
     FieldHandler,
     Field,
     reshape_to_nodes,
+    apply_analytical!,
 
 # Constraints
     ConstraintHandler,
@@ -131,6 +133,7 @@ export
     ApplyStrategy,
 
 # iterators
+    CellCache,
     CellIterator,
     UpdateFlags,
     cellid,

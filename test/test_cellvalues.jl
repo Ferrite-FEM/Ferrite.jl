@@ -91,7 +91,7 @@ for (func_interpol, quad_rule) in  (
     end
 end
 
-@testset "#265" begin
+@testset "#265: error message for incompatible geometric interpolation" begin
     dim = 1
     deg = 1
     grid = generate_grid(Line, (2,))
@@ -104,7 +104,7 @@ end
     qr = QuadratureRule{dim, RefCube}(deg+1)
     cv = CellScalarValues(qr, ip_fe, ip_geo)
     res = @test_throws ArgumentError reinit!(cv, cell)
-    @test occursin("#265", res.value.msg)
+    @test occursin("265", res.value.msg)
     ip_geo = Lagrange{dim, RefCube, 1}()
     cv = CellScalarValues(qr, ip_fe, ip_geo)
     reinit!(cv, cell)

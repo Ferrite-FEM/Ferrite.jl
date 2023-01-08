@@ -18,6 +18,12 @@ FieldHandler
 close!(::MixedDofHandler)
 ```
 
+```@docs
+renumber!
+DofOrder.FieldWise
+DofOrder.ComponentWise
+```
+
 ## Common methods
 ```@docs
 ndofs
@@ -29,5 +35,6 @@ Ferrite.getfielddim(::MixedDofHandler, ::Symbol)
 
 # CellIterator
 ```@docs
+CellCache
 CellIterator
 ```
