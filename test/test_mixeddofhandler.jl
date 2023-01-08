@@ -508,7 +508,7 @@ function test_subparametric_quad()
     add!(ch, dbc1)
     close!(ch)
     update!(ch, 1.0)
-    @test getnbasefunctions(Ferrite.getfieldinterpolation(dh,1)) == 9 # algebraic nbasefunctions
+    @test getnbasefunctions(Ferrite.getfieldinterpolation(fh,1)) == 9 # algebraic nbasefunctions
     @test celldofs(dh, 1) == [i for i in 1:18]
 end
 
@@ -530,7 +530,7 @@ function test_subparametric_triangle()
     add!(ch, dbc1)
     close!(ch)
     update!(ch, 1.0)
-    @test getnbasefunctions(Ferrite.getfieldinterpolation(dh,1)) == 6 # algebraic nbasefunctions
+    @test getnbasefunctions(Ferrite.getfieldinterpolation(fh,1)) == 6 # algebraic nbasefunctions
     @test celldofs(dh, 1) == [i for i in 1:12]
 end
 
