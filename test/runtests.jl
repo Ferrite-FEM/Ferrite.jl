@@ -1,6 +1,7 @@
 using Ferrite
 using Tensors
 using Test
+using Logging
 using ForwardDiff
 import SHA
 using Random
