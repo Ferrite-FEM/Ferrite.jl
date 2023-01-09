@@ -152,13 +152,12 @@ end
 
 Here, the names of the fields as well as their underlying datastructure changed compared to the `Grid` type. This would lead to the fact, that any usage
 with the utility functions and DoF management will not work. So, we need to feed into the interface how to handle this subtyped datastructure.
-We start with the utility functions that are associated with the cells of the grid:
+We start with defining how to get the cells of the grid:
 
 ```julia
 Ferrite.getcells(grid::SmallGrid) = grid.cells_test
-Ferrite.getncells(grid::SmallGrid{dim,N}) where {dim,N} = N
 ```
-where the latter is not required, but makes it possible to know the size statically (as opposed to for `Grid`).
+which allows calling, e.g., `getcells(grid, 2)` to get the second cell, or `getcelltype` and `getncells`.
 Next, we define some helper functions that take care of the node handling.
 
 ```julia

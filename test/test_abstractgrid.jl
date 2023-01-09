@@ -6,10 +6,8 @@
     end
 
     Ferrite.getcells(grid::SmallGrid) = grid.cells_test
-    
-    Ferrite.getncells(grid::SmallGrid{dim,N}) where {dim,N} = N # Works without, but this gives static info about ncells
-    Ferrite.getcoordinates(x::NTuple{dim,Float64}) where dim = Vec{dim,Float64}(x)
 
+    Ferrite.getcoordinates(x::NTuple{dim,Float64}) where dim = Vec{dim,Float64}(x)
     Ferrite.getnodes(grid::SmallGrid) = grid.nodes_test
     Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
 
@@ -74,4 +72,8 @@
     @test Ferrite.celldofs(dhs[1],3) == Ferrite.celldofs(dhs[2],3)
     @test Ferrite.ndofs(dhs[1]) == Ferrite.ndofs(dhs[2])
     @test isapprox(u1,u2,atol=1e-8)
+
+    # Check that getncells(grid::SmallGrid{dim,N}) where {dim,N} = N isn't required
+    _infersizetest(g::Ferrite.AbstractGrid) = Val{getncells(g)}()
+    @inferred _infersizetest(subtype_grid)
 end
