@@ -546,9 +546,15 @@ end
 Adjust the matrix `K` and right hand side `rhs` to account for the Dirichlet boundary
 conditions specified in `ch` such that `K \\ rhs` gives the expected solution.
 
+!!! note
+    `apply!(K, rhs, ch)` essentially calculates 
+    `rhs[free_dofs] = rhs[free_dofs] - K[free_dofs, constrained_dofs] * a[constrained]`
+    where `a[constrained]` are the inhomogeneities. 
+    Consequently, the sign of `rhs` matters (in contrast to for `apply_zero!`).
+
     apply!(v::AbstractVector, ch::ConstraintHandler)
 
-Apply Dirichlet boundary conditions, specified in `ch`, to the solution vector `v`.
+Apply Dirichlet boundary conditions and affine constraints, specified in `ch`, to the solution vector `v`.
 
 # Examples
 ```julia
@@ -570,14 +576,16 @@ apply!
     apply_zero!(K::SparseMatrixCSC, rhs::AbstractVector, ch::ConstraintHandler)
 
 Adjust the matrix `K` and the right hand side `rhs` to account for prescribed Dirichlet
-boundary conditions such that `du = K \\ rhs` give the expected result (e.g. with `du` zero
-for all prescribed degrees of freedom).
+boundary conditions and affine constraints such that `du = K \\ rhs` gives the expected 
+result (e.g. `Δu` zero for all degrees of freedom prescribed by Dirichlet conditions).
 
     apply_zero!(v::AbstractVector, ch::ConstraintHandler)
 
-Zero-out values in `v` corresponding to prescribed degrees of freedom.
+Zero-out values in `v` corresponding to prescribed degrees of freedom and update values 
+prescribed by affine constraints, such that if `a` fullfilled the affine constraints, 
+`a±v` also will. 
 
-These methods are typically used in e.g. a Newton solver where the increment, `du`, should
+These methods are typically used in e.g. a Newton solver where the increment, `Δu`, should
 be prescribed to zero even for non-homogeneouos boundary conditions.
 
 See also: [`apply!`](@ref).
@@ -587,15 +595,16 @@ See also: [`apply!`](@ref).
 u = un + Δu                 # Current guess
 K, g = assemble_system(...) # Assemble residual and tangent for current guess
 apply_zero!(K, g, ch)       # Adjust tangent and residual to take prescribed values into account
-ΔΔu = - K \\ g               # Compute the increment, prescribed values are "approximately" zero
+ΔΔu = K \\ g                # Compute the (negative) increment, prescribed values are "approximately" zero
 apply_zero!(ΔΔu, ch)        # Make sure values are exactly zero
-Δu .+= ΔΔu                  # Update current guess
+Δu .-= ΔΔu                  # Update current guess
 ```
 
 !!! note
-    The last call to `apply_zero!` is not strictly necessary since the boundary conditions
-    should already be fulfilled after `apply!(K, g, ch)`. However, solvers of linear
-    systems are not exact, and thus `apply!(ΔΔu, ch)` can be used to make sure the values
+    The last call to `apply_zero!` is only strictly necessary for affine constraints. 
+    However, even if the Dirichlet boundary conditions should be fulfilled after 
+    `apply!(K, g, ch)`, solvers of linear systems are not exact. 
+    `apply!(ΔΔu, ch)` can be used to make sure the values
     for the prescribed degrees of freedom are fulfilled exactly.
 """
 apply_zero!

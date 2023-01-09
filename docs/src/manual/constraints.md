@@ -66,14 +66,13 @@ in constraints to account for constraint forces.
 The following pseudo-code shows a typical pattern for solving a non-linear problem with Newton's method:
 ```julia
 a = initial_guess(...)  # Make any initial guess for a here, e.g. `a=zeros(ndofs(dh))`
-Δa = similar(a)         # Preallocate Δa
 apply!(a, ch)           # Make the guess fulfill all constraints in `ch`
 for iter in 1:maxiter
     doassemble!(K, r, ...)  # Assemble the residual, r, and stiffness, K=∂r/∂a.
     apply_zero!(K, r, ch)   # Modify `K` and `r` to account for the constraints. 
     check_convergence(r, ...) && break # Only check convergence after `apply_zero!(K, r, ch)`
-    Δa .= .- (K \ r)        # Calculate update
+    Δa = K \ r              # Calculate the (negative) update
     apply_zero!(Δa, ch)     # Change constrained values such that `a+Δa` fullfills constraints provided that `a` does.
-    a .+= Δa
+    a .-= Δa
 end
 ```
