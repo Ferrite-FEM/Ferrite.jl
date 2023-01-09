@@ -611,11 +611,11 @@ addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasti
 ```
 """
 addfaceset!(grid::Grid, name::String, set::Union{Set{FaceIndex},Vector{FaceIndex}}) = 
-    _addset!(grid, name, set, grid.facesets)
+    _addset!(grid, name, set, getfacesets(grid))
 addedgeset!(grid::Grid, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) = 
-    _addset!(grid, name, set, grid.edgesets)
+    _addset!(grid, name, set, getedgesets(grid))
 addvertexset!(grid::Grid, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) = 
-    _addset!(grid, name, set, grid.vertexsets)
+    _addset!(grid, name, set, getvertexsets(grid))
 function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
     _check_setname(dict, name)
     set = Set(_set)
@@ -625,11 +625,11 @@ function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
 end
 
 addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, Ferrite.faces, grid.facesets, FaceIndex; all=all)
+    _addset!(grid, name, f, Ferrite.faces, getfacesets(grid), FaceIndex; all=all)
 addedgeset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, Ferrite.edges, grid.edgesets, EdgeIndex; all=all)
+    _addset!(grid, name, f, Ferrite.edges, getedgesets(grid), EdgeIndex; all=all)
 addvertexset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, Ferrite.vertices, grid.vertexsets, VertexIndex; all=all)
+    _addset!(grid, name, f, Ferrite.vertices, getvertexsets(grid), VertexIndex; all=all)
 function _addset!(grid::AbstractGrid, name::String, f::Function, _ftype::Function, dict::Dict, _indextype::Type; all::Bool=true)
     _check_setname(dict, name)
     _set = Set{_indextype}()
@@ -713,9 +713,9 @@ end
 @inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
 @inline getcoordinates(grid::AbstractGrid, face::FaceIndex) = getcoordinates(grid, face.idx[1])
 
-function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
+function Base.show(io::IO, ::MIME"text/plain", grid::AbstractGrid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) ")
-    typestrs = sort!(collect(Set(repr(typeof(x)) for x in grid.cells)))
+    typestrs = sort!(collect(Set(repr(typeof(x)) for x in getcells(grid))))
     join(io, typestrs, '/')
     print(io, " cells and $(getnnodes(grid)) nodes")
 end
