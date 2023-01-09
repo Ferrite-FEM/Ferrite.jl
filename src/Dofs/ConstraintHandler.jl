@@ -547,10 +547,13 @@ Adjust the matrix `K` and right hand side `rhs` to account for the Dirichlet bou
 conditions specified in `ch` such that `K \\ rhs` gives the expected solution.
 
 !!! note
-    `apply!(K, rhs, ch)` essentially calculates 
+    `apply!(K, rhs, ch)` essentially calculates
+
     `rhs[free_dofs] = rhs[free_dofs] - K[free_dofs, constrained_dofs] * a[constrained]`
+    
     where `a[constrained]` are the inhomogeneities. 
     Consequently, the sign of `rhs` matters (in contrast to for `apply_zero!`).
+
 
     apply!(v::AbstractVector, ch::ConstraintHandler)
 
