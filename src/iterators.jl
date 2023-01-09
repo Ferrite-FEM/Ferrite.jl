@@ -113,7 +113,7 @@ cellid(cc::CellCache) = cc.cellid[]
 celldofs!(v::Vector, cc::CellCache) = copyto!(v, cc.dofs) # celldofs!(v, cc.dh, cc.cellid[])
 
 # TODO: These should really be replaced with something better...
-nfaces(cc::CellCache) = nfaces(eltype(cc.grid.cells))
+nfaces(cc::CellCache) = nfaces(getcelltype(cc.grid))
 onboundary(cc::CellCache, face::Int) = cc.grid.boundary_matrix[face, cc.cellid[]]
 
 ##################
@@ -183,8 +183,8 @@ Base.length(ci::CellIterator) = length(ci.set)
 
 
 function _check_same_celltype(grid::AbstractGrid, cellset)
-    celltype = typeof(grid.cells[first(cellset)])
-    if !all(typeof(grid.cells[i]) == celltype for i in cellset)
+    celltype = getcelltype(grid, first(cellset))
+    if !all(getcelltype(grid, i) == celltype for i in cellset)
         error("The cells in the cellset are not all of the same celltype.")
     end
 end

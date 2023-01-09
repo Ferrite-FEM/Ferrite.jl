@@ -144,7 +144,7 @@ function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
     # the field interpolations should have the same refshape as the cells they are applied to
     refshapes_fh = getrefshape.(getfieldinterpolations(fh))
     # extract the celltype from the first cell as the celltypes are all equal
-    cell_type = typeof(dh.grid.cells[first(fh.cellset)])
+    cell_type = getcelltype(dh.grid, first(fh.cellset))
     refshape_cellset = getrefshape(default_interpolation(cell_type))
     for refshape in refshapes_fh
         refshape_cellset == refshape || error("The RefShapes of the fieldhandlers interpolations must correspond to the RefShape of the cells it is applied to.")

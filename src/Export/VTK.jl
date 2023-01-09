@@ -25,7 +25,7 @@ which data can be appended to, see `vtk_point_data` and `vtk_cell_data`.
 """
 function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compress::Bool=true) where {dim,C,T}
     cls = MeshCell[]
-    for cell in grid.cells
+    for cell in getcells(grid)
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
         push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
     end
@@ -88,7 +88,7 @@ end
 Export all cell sets in the grid. Each cell set is exported with
 `vtk_cell_data` with value 1 if the cell is in the set, and 0 otherwise.
 """
-function vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellsets=keys(grid.cellsets))
+function vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellsets=keys(getcellsets(grid)))
     z = zeros(getncells(grid))
     for cellset in cellsets
         z .= 0.0

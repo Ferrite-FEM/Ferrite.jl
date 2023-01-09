@@ -351,7 +351,7 @@ function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, b
 end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
-    if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
+    if interpolation !== default_interpolation(getcelltype(ch.dh.grid, first(cellset)))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
 
@@ -484,7 +484,7 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, nodes::Set{Int}
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where T
     counter = 1
     for (idx, nodenumber) in enumerate(nodeidxs)
-        x = dh.grid.nodes[nodenumber].x
+        x = getcoordinates(getnodes(dh.grid, nodenumber))
         bc_value = f(x, time)
         @assert length(bc_value) == length(components)
         for v in bc_value
@@ -518,7 +518,7 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
             if eltype(dbc.faces) <: BoundaryIndex
                 functype = boundaryfunction(eltype(dbc.faces))
                 for (cellidx, faceidx) in dbc.faces
-                    for facenode in functype(ch.dh.grid.cells[cellidx])[faceidx]
+                    for facenode in functype(getcells(ch.dh.grid, cellidx))[faceidx]
                         for component in dbc.components
                             data[component, facenode] = 1
                         end
@@ -938,7 +938,7 @@ end
 function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int})
     nodes = Set{Int}()
     for cellid in cellset
-        for nodeid in grid.cells[cellid].nodes
+        for nodeid in getcells(grid, cellid).nodes
             nodeid ∈ nodes || push!(nodes, nodeid)
         end
     end
@@ -1059,7 +1059,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
                field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T},Nothing}, ::Type{dof_map_t}, iterator_f::F) where {T, dof_map_t, F <: Function}
     grid = ch.dh.grid
     face_map = pdbc.face_map
-    Tx = typeof(first(ch.dh.grid.nodes).x) # Vec{D,T}
+    Tx = typeof(getcoordinates(getnodes(ch.dh.grid, 1))) # Vec{D,T}
 
     # Indices of the local dofs for the faces
     local_face_dofs, local_face_dofs_offset =
@@ -1135,10 +1135,10 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
         max_x = Tx(i -> typemin(eltype(Tx)))
         for facepair in face_map, faceidx in (facepair.mirror, facepair.image)
             cellidx, faceidx = faceidx
-            nodes = faces(grid.cells[cellidx])[faceidx]
+            nodes = faces(getcells(grid, cellidx))[faceidx]
             union!(all_node_idxs, nodes)
             for n in nodes
-                x = grid.nodes[n].x
+                x = getcoordinates(getnodes(grid, n))
                 min_x = Tx(i -> min(min_x[i], x[i]))
                 max_x = Tx(i -> max(max_x[i], x[i]))
             end
@@ -1402,7 +1402,7 @@ __to_faceset(_, set::Set{FaceIndex}) = set
 __to_faceset(grid, set::String) = getfaceset(grid, set)
 function __collect_boundary_faces(grid::Grid)
     candidates = Dict{Tuple, FaceIndex}()
-    for (ci, c) in enumerate(grid.cells)
+    for (ci, c) in enumerate(getcells(grid))
         for (fi, fn) in enumerate(faces(c))
             fn = sortface(fn)
             if haskey(candidates, fn)
@@ -1423,14 +1423,14 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
 
     mirror_mean_x = Tx[]
     for (c, f) in mset
-        fn = faces(grid.cells[c])[f]
+        fn = faces(getcells(grid, c))[f]
         push!(mirror_mean_x, sum(grid.nodes[i].x for i in fn) / length(fn))
     end
 
     # Same dance for the image
     image_mean_x = Tx[]
     for (c, f) in iset
-        fn = faces(grid.cells[c])[f]
+        fn = faces(getcells(grid, c))[f]
         # Apply transformation to all coordinates
         push!(image_mean_x, sum(transformation(grid.nodes[i].x)::Tx for i in fn) / length(fn))
     end
