@@ -1059,7 +1059,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
                field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T},Nothing}, ::Type{dof_map_t}, iterator_f::F) where {T, dof_map_t, F <: Function}
     grid = ch.dh.grid
     face_map = pdbc.face_map
-    Tx = typeof(getcoordinates(getnodes(ch.dh.grid, 1))) # Vec{D,T}
+    Tx = typeof(getcoordinates(first(getnodes(ch.dh.grid)))) # Vec{D,T}
 
     # Indices of the local dofs for the faces
     local_face_dofs, local_face_dofs_offset =
@@ -1419,7 +1419,7 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
     if length(mset) != length(mset)
         error("different number of faces in mirror and image set")
     end
-    Tx = typeof(getcoordinates(getnodes(grid, 1)))
+    Tx = typeof(getcoordinates(first(getnodes(grid))))
 
     mirror_mean_x = Tx[]
     for (c, f) in mset
