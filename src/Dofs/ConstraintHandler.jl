@@ -1419,12 +1419,12 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
     if length(mset) != length(mset)
         error("different number of faces in mirror and image set")
     end
-    Tx = typeof(first(grid.nodes).x)
+    Tx = typeof(getcoordinates(getnodes(grid, 1)))
 
     mirror_mean_x = Tx[]
     for (c, f) in mset
         fn = faces(getcells(grid, c))[f]
-        push!(mirror_mean_x, sum(grid.nodes[i].x for i in fn) / length(fn))
+        push!(mirror_mean_x, sum(getcoordinates(getnodes(grid, i)) for i in fn) / length(fn))
     end
 
     # Same dance for the image
@@ -1432,7 +1432,7 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
     for (c, f) in iset
         fn = faces(getcells(grid, c))[f]
         # Apply transformation to all coordinates
-        push!(image_mean_x, sum(transformation(grid.nodes[i].x)::Tx for i in fn) / length(fn))
+        push!(image_mean_x, sum(transformation(getcoordinates(getnodes(grid, i)))::Tx for i in fn) / length(fn))
     end
 
     # Use KDTree to find closest face

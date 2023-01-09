@@ -35,7 +35,7 @@ end
 
 function L2Projector(qr::QuadratureRule, func_ip::Interpolation,
     grid::Ferrite.AbstractGrid, set=1:getncells(grid), qr_mass::QuadratureRule=_mass_qr(func_ip),
-    geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(set)])))
+    geom_ip::Interpolation = default_interpolation(getcelltype(grid, first(set))))
     Base.depwarn("L2Projector(qr, func_ip, grid) is deprecated, " *
                  "use L2Projector(func_ip, grid) instead.", :L2Projector)
     return L2Projector(func_ip, grid; qr_lhs=qr_mass, set=set, geom_ip=geom_ip, qr_rhs=qr)
@@ -69,7 +69,7 @@ function L2Projector(
         grid::AbstractGrid;
         qr_lhs::QuadratureRule = _mass_qr(func_ip),
         set = 1:getncells(grid),
-        geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(set)])),
+        geom_ip::Interpolation = default_interpolation(getcelltype(grid, first(set))),
         qr_rhs::Union{QuadratureRule,Nothing}=nothing, # deprecated
     )
 
