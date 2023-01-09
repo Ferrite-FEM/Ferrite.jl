@@ -577,7 +577,7 @@ apply!
 
 Adjust the matrix `K` and the right hand side `rhs` to account for prescribed Dirichlet
 boundary conditions and affine constraints such that `du = K \\ rhs` gives the expected 
-result (e.g. `Δu` zero for all degrees of freedom prescribed by Dirichlet conditions).
+result (e.g. `du` zero for all degrees of freedom prescribed by Dirichlet conditions).
 
     apply_zero!(v::AbstractVector, ch::ConstraintHandler)
 
@@ -585,7 +585,7 @@ Zero-out values in `v` corresponding to prescribed degrees of freedom and update
 prescribed by affine constraints, such that if `a` fullfilled the affine constraints, 
 `a±v` also will. 
 
-These methods are typically used in e.g. a Newton solver where the increment, `Δu`, should
+These methods are typically used in e.g. a Newton solver where the increment, `du`, should
 be prescribed to zero even for non-homogeneouos boundary conditions.
 
 See also: [`apply!`](@ref).
