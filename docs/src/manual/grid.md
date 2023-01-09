@@ -156,21 +156,15 @@ We start with the utility functions that are associated with the cells of the gr
 
 ```julia
 Ferrite.getcells(grid::SmallGrid) = grid.cells_test
-Ferrite.getcells(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.cells_test[v]
 Ferrite.getncells(grid::SmallGrid{dim,N}) where {dim,N} = N
-Ferrite.getcelltype(grid::SmallGrid) = eltype(grid.cells_test)
-Ferrite.getcelltype(grid::SmallGrid, i::Int) = typeof(grid.cells_test[i])
 ```
-
+where the latter is not required, but makes it possible to know the size statically (as opposed to for `Grid`).
 Next, we define some helper functions that take care of the node handling.
 
 ```julia
 Ferrite.getnodes(grid::SmallGrid) = grid.nodes_test
-Ferrite.getnodes(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.nodes_test[v]
-Ferrite.getnnodes(grid::SmallGrid) = length(grid.nodes_test)
+Ferrite.getcoordinates(x::NTuple{dim,Float64}) where dim = Vec{dim,Float64}(x)
 Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
-Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
-Ferrite.n_faces_per_cell(grid::SmallGrid) = nfaces(eltype(grid.cells_test))
 ```
 
 These definitions make many of `Ferrite`s functions work out of the box, e.g. you can now call 

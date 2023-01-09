@@ -409,13 +409,13 @@ Returns either all `cells::Collection{C<:AbstractCell}` of a `<:AbstractGrid` or
 Whereas the last option tries to call a `cellset` of the `grid`. `Collection` can be any indexable type, for `Grid` it is `Vector{C<:AbstractCell}`.
 """
 @inline getcells(grid::AbstractGrid) = grid.cells
-@inline getcells(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.cells[v]
-@inline getcells(grid::AbstractGrid, setname::String) = grid.cells[collect(getcellset(grid,setname))]
+@inline getcells(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = getcells(grid)[v]
+@inline getcells(grid::AbstractGrid, setname::String) = getcells(grid, collect(getcellset(grid,setname)))
 "Returns the number of cells in the `<:AbstractGrid`."
-@inline getncells(grid::AbstractGrid) = length(grid.cells)
+@inline getncells(grid::AbstractGrid) = length(getcells(grid))
 "Returns the celltype of the `<:AbstractGrid`."
-@inline getcelltype(grid::AbstractGrid) = eltype(grid.cells)
-@inline getcelltype(grid::AbstractGrid, i::Int) = typeof(grid.cells[i])
+@inline getcelltype(grid::AbstractGrid) = eltype(getcells(grid))
+@inline getcelltype(grid::AbstractGrid, i::Int) = typeof(getcells(grid, i))
 
 """
     getnodes(grid::AbstractGrid) 
@@ -427,12 +427,12 @@ The last option tries to call a `nodeset` of the `<:AbstractGrid`. `Collection{N
 to a Node.
 """
 @inline getnodes(grid::AbstractGrid) = grid.nodes
-@inline getnodes(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = grid.nodes[v]
-@inline getnodes(grid::AbstractGrid, setname::String) = grid.nodes[collect(getnodeset(grid,setname))]
+@inline getnodes(grid::AbstractGrid, v::Union{Int, Vector{Int}}) = getnodes(grid)[v]
+@inline getnodes(grid::AbstractGrid, setname::String) = getnodes(grid, collect(getnodeset(grid,setname)))
 "Returns the number of nodes in the grid."
-@inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
+@inline getnnodes(grid::AbstractGrid) = length(getnodes(grid))
 "Returns the number of nodes of the `i`-th cell."
-@inline nnodes_per_cell(grid::AbstractGrid, i::Int=1) = nnodes(grid.cells[i])
+@inline nnodes_per_cell(grid::AbstractGrid, i::Int=1) = nnodes(getcells(grid, i))
 "Return the number type of the nodal coordinates."
 @inline get_coordinate_eltype(grid::AbstractGrid) = get_coordinate_eltype(first(getnodes(grid)))
 
@@ -441,7 +441,7 @@ to a Node.
 
 Returns all cells as cellid in a `Set` of a given `setname`.
 """
-@inline getcellset(grid::AbstractGrid, setname::String) = grid.cellsets[setname]
+@inline getcellset(grid::AbstractGrid, setname::String) = getcellsets(grid)[setname]
 """
     getcellsets(grid::AbstractGrid)
 
@@ -454,7 +454,7 @@ Returns all cellsets of the `grid`.
 
 Returns all nodes as nodeid in a `Set` of a given `setname`.
 """
-@inline getnodeset(grid::AbstractGrid, setname::String) = grid.nodesets[setname]
+@inline getnodeset(grid::AbstractGrid, setname::String) = getnodesets(grid)[setname]
 """
     getnodesets(grid::AbstractGrid)
 
@@ -467,7 +467,7 @@ Returns all nodesets of the `grid`.
 
 Returns all faces as `FaceIndex` in a `Set` of a given `setname`.
 """
-@inline getfaceset(grid::AbstractGrid, setname::String) = grid.facesets[setname]
+@inline getfaceset(grid::AbstractGrid, setname::String) = getfacesets(grid)[setname]
 """
     getfacesets(grid::AbstractGrid)
 
@@ -480,7 +480,7 @@ Returns all facesets of the `grid`.
 
 Returns all edges as `EdgeIndex` in a `Set` of a given `setname`.
 """
-@inline getedgeset(grid::AbstractGrid, setname::String) = grid.edgesets[setname]
+@inline getedgeset(grid::AbstractGrid, setname::String) = getedgesets(grid)[setname]
 """
     getedgesets(grid::AbstractGrid)
 
@@ -489,11 +489,11 @@ Returns all edge sets of the grid.
 @inline getedgesets(grid::AbstractGrid) = grid.edgesets
 
 """
-    getedgeset(grid::AbstractGrid, setname::String)
+    getvertexset(grid::AbstractGrid, setname::String)
 
 Returns all vertices as `VertexIndex` in a `Set` of a given `setname`.
 """
-@inline getvertexset(grid::AbstractGrid, setname::String) = grid.vertexsets[setname]
+@inline getvertexset(grid::AbstractGrid, setname::String) = getvertexsets(grid)[setname]
 """
     getvertexsets(grid::AbstractGrid)
 
@@ -501,7 +501,7 @@ Returns all vertex sets of the grid.
 """
 @inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
 
-n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
+n_faces_per_cell(grid::Grid) = nfaces(getcelltype(grid))
 
 """
     function compute_vertex_values(grid::AbstractGrid, f::Function)
@@ -571,7 +571,7 @@ addcellset!(grid, "right", x -> norm(x[1]) < 2.0 ) #add cell to cellset right, i
 ```
 """
 function addcellset!(grid::AbstractGrid, name::String, cellid::Union{Set{Int},Vector{Int}})
-    _check_setname(grid.cellsets,  name)
+    _check_setname(getcellsets(grid),  name)
     cells = Set(cellid)
     _warn_emptyset(cells, name)
     grid.cellsets[name] = cells
@@ -579,13 +579,13 @@ function addcellset!(grid::AbstractGrid, name::String, cellid::Union{Set{Int},Ve
 end
 
 function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true)
-    _check_setname(grid.cellsets, name)
+    _check_setname(getcellsets(grid), name)
     cells = Set{Int}()
     for (i, cell) in enumerate(getcells(grid))
         pass = all
         for node_idx in cell.nodes
-            node = grid.nodes[node_idx]
-            v = f(node.x)
+            node = getnodes(grid, node_idx)
+            v = f(getcoordinates(node))
             all ? (!v && (pass = false; break)) : (v && (pass = true; break))
         end
         pass && push!(cells, i)
@@ -637,7 +637,7 @@ function _addset!(grid::AbstractGrid, name::String, f::Function, _ftype::Functio
         for (face_idx, face) in enumerate(_ftype(cell))
             pass = all
             for node_idx in face
-                v = f(grid.nodes[node_idx].x)
+                v = f(getcoordinates(getnodes(grid, node_idx)))
                 all ? (!v && (pass = false; break)) : (v && (pass = true; break))
             end
             pass && push!(_set, _indextype(cell_idx, face_idx))
@@ -656,20 +656,20 @@ Adds a `nodeset::Dict{String, Set{Int}}` to the `grid` with key `name`. Has the 
 However, instead of mapping a cell id to the `String` key, a set of node ids is returned.
 """
 function addnodeset!(grid::AbstractGrid, name::String, nodeid::Union{Vector{Int},Set{Int}})
-    _check_setname(grid.nodesets, name)
+    _check_setname(getnodesets(grid), name)
     grid.nodesets[name] = Set(nodeid)
-    _warn_emptyset(grid.nodesets[name], name)
+    _warn_emptyset(getnodeset(grid, name), name)
     grid
 end
 
 function addnodeset!(grid::AbstractGrid, name::String, f::Function)
-    _check_setname(grid.nodesets, name)
+    _check_setname(getnodesets(grid), name)
     nodes = Set{Int}()
     for (i, n) in enumerate(getnodes(grid))
         f(n.x) && push!(nodes, i)
     end
     grid.nodesets[name] = nodes
-    _warn_emptyset(grid.nodesets[name], name)
+    _warn_emptyset(getnodeset(grid, name), name)
     grid
 end
 
