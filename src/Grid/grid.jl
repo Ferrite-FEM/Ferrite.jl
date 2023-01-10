@@ -875,6 +875,7 @@ default_interpolation(::Type{Tetrahedron}) = Lagrange{3,RefTetrahedron,1}()
 default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{3,RefTetrahedron,2}()
 default_interpolation(::Type{Hexahedron}) = Lagrange{3,RefCube,1}()
 default_interpolation(::Type{Cell{3,20,6}}) = Serendipity{3,RefCube,2}()
+default_interpolation(::Type{Wedge}) = Lagrange{3,RefPrism,1}()
 
 """
     boundaryfunction(::Type{<:BoundaryIndex})
