@@ -97,7 +97,7 @@ end
     grid = generate_grid(Line, (2,))
     ip_fe = Lagrange{dim, RefCube, deg}()
     dh = DofHandler(grid)
-    push!(dh, :u, 1, ip_fe)
+    add!(dh, :u, 1, ip_fe)
     close!(dh);
     cell = first(CellIterator(dh))
     ip_geo = Lagrange{dim, RefCube, 2}()

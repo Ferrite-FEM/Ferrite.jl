@@ -87,7 +87,7 @@ Return the local dof range for `field_name`. Example:
 julia> grid = generate_grid(Triangle, (3, 3))
 Grid{2, Triangle, Float64} with 18 Triangle cells and 16 nodes
 
-julia> dh = DofHandler(grid); push!(dh, :u, 3); push!(dh, :p, 1); close!(dh);
+julia> dh = DofHandler(grid); add!(dh, :u, 3); add!(dh, :p, 1); close!(dh);
 
 julia> dof_range(dh, :u)
 1:9
@@ -104,15 +104,15 @@ function dof_range(dh::DofHandler, field_name::Symbol)
 end
 
 """
-    push!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
+    add!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
 
 Add a `dim`-dimensional `Field` called `name` which is approximated by `ip` to `dh`.
 
 The field is added to all cells of the underlying grid. In case no interpolation `ip` is given,
 the default interpolation of the grid's celltype is used. 
-If the grid uses several celltypes, [`push!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
+If the grid uses several celltypes, [`add!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
 """
-function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
+function add!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
     @assert !isclosed(dh)
     @assert !in(name, dh.field_names)
     push!(dh.field_names, name)

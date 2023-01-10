@@ -14,7 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    [#549][github-549])
  - New function `apply_analytical!` for setting the values of the degrees of freedom for a 
    specific field according to a spatial function `f(x)`. ([#532][github-532])
-
+### Deprecated
+ - Adding fields to a DoF handler with `push!(dh, ...)` has been deprecated in favor of
+   `add!(dh, ...)`. This is to make it consistent with how constraints are added to a
+   constraint handler. ([#578][github-578])
 
 ## [0.3.10] - 2022-12-11
 ### Added
@@ -229,6 +232,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-547]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/547
 [github-549]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/549
 [github-550]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/550
+[github-578]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/578
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.10...HEAD
 [0.3.10]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.9...v0.3.10

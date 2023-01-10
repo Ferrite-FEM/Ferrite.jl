@@ -90,7 +90,7 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
     cvP = CellVectorValues(qr, Lagrange{DIM, RefTetrahedron, 1}())
 
     dofhandler = DofHandler(grid)
-    push!(dofhandler, :P, 3)
+    add!(dofhandler, :P, 3)
     close!(dofhandler)
 
     dofvector = zeros(ndofs(dofhandler))

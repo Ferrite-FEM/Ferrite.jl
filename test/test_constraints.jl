@@ -5,8 +5,8 @@
     Γ = getfaceset(grid, "left")
     face_map = collect_periodic_faces(grid, "left", "right")
     dh = DofHandler(grid)
-    push!(dh, :s, 1)
-    push!(dh, :v, 2)
+    add!(dh, :s, 1)
+    add!(dh, :v, 2)
     close!(dh)
     ch = ConstraintHandler(dh)
 
@@ -78,8 +78,8 @@ end
     grid = generate_grid(Triangle, (1, 1))
     addnodeset!(grid, "nodeset", x-> x[2] == -1 || x[1] == -1)
     dh = DofHandler(grid)
-    push!(dh, :u, 2)
-    push!(dh, :p, 1)
+    add!(dh, :u, 2)
+    add!(dh, :p, 1)
     close!(dh)
     ch = ConstraintHandler(dh)
     dbc1 = Dirichlet(:u, getnodeset(grid, "nodeset"), (x,t) -> x, [1, 2])
@@ -105,8 +105,8 @@ end
    ip_linear = Lagrange{dim, RefCube, 1}()
    field_u = Field(:u, ip_quadratic, dim)
    field_c = Field(:c, ip_linear, 1)
-   push!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set1")))
-   push!(dh, FieldHandler([field_u], getcellset(mesh, "set2")))
+   add!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set1")))
+   add!(dh, FieldHandler([field_u], getcellset(mesh, "set2")))
 
    close!(dh)
 
@@ -131,8 +131,8 @@ end
    field_c = Field(:c, ip, 1)
 
    dh = MixedDofHandler(mesh)
-   push!(dh, FieldHandler([field_u], getcellset(mesh, "set1")))
-   push!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set2")))
+   add!(dh, FieldHandler([field_u], getcellset(mesh, "set1")))
+   add!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set2")))
    close!(dh)
 
    ch = ConstraintHandler(dh)
@@ -151,8 +151,8 @@ end
     addedgeset!(grid, "edge", x-> x[1] ≈ -1.0 && x[3] ≈ -1.0)
 
     dh = DofHandler(grid)
-    push!(dh, :u, 3)
-    push!(dh, :p, 1)
+    add!(dh, :u, 3)
+    add!(dh, :p, 1)
     close!(dh)
 
     ch = ConstraintHandler(dh)
@@ -175,8 +175,8 @@ end
 
     #3d quad with 1st order 2d interpolation
     dh = DofHandler(grid)
-    push!(dh, :u, 1, Lagrange{2,RefCube,2}())
-    push!(dh, :θ, 1, Lagrange{2,RefCube,2}())
+    add!(dh, :u, 1, Lagrange{2,RefCube,2}())
+    add!(dh, :θ, 1, Lagrange{2,RefCube,2}())
     close!(dh)
 
     addedgeset!(grid, "edge", x -> x[2] ≈ 0.0) #bottom edge
@@ -264,7 +264,7 @@ end
 
     grid = generate_grid(Line, (10,))
     dh = DofHandler(grid)
-    push!(dh, :u, 1)
+    add!(dh, :u, 1)
     close!(dh)
 
     test_acs = [
@@ -659,7 +659,7 @@ end # testset
 
     # Scalar
     dh = DofHandler(grid)
-    push!(dh, :s, 1)
+    add!(dh, :s, 1)
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
@@ -698,7 +698,7 @@ end # testset
 
     # Vector
     dh = DofHandler(grid)
-    push!(dh, :v, 2)
+    add!(dh, :v, 2)
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
@@ -784,7 +784,7 @@ end # testset
     #  │       │       │
     #  1───5───2───12──10
     dh = DofHandler(grid)
-    push!(dh, :s, 1, Lagrange{2,RefCube,2}())
+    add!(dh, :s, 1, Lagrange{2,RefCube,2}())
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
@@ -844,7 +844,7 @@ end # testset
     #   │             │             │
     #  1,2────9,10───3,4───23,24──19,20
     dh = DofHandler(grid)
-    push!(dh, :v, 2, Lagrange{2,RefCube,2}())
+    add!(dh, :v, 2, Lagrange{2,RefCube,2}())
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
@@ -875,8 +875,8 @@ end # testset
     grid = generate_grid(Hexahedron, (1, 1, 1))
     face_map = collect_periodic_faces(grid)
     dh = DofHandler(grid)
-    push!(dh, :s, 1)
-    push!(dh, :v, 2)
+    add!(dh, :s, 1)
+    add!(dh, :v, 2)
     close!(dh)
 
     ch = ConstraintHandler(dh)
@@ -925,8 +925,8 @@ end # testset
     # Quadratic interpolation
     grid = generate_grid(Hexahedron, (5, 5, 5))
     dh = DofHandler(grid)
-    push!(dh, :s, 1, Lagrange{3,RefCube,2}())
-    push!(dh, :v, 2, Lagrange{3,RefCube,2}())
+    add!(dh, :s, 1, Lagrange{3,RefCube,2}())
+    add!(dh, :v, 2, Lagrange{3,RefCube,2}())
     close!(dh)
 
     compare_by_dbc(
@@ -953,7 +953,7 @@ end # testset
     # 3D tetra scalar
     grid = generate_grid(Tetrahedron, (1, 1, 1))
     dh = DofHandler(grid)
-    push!(dh, :s, 1)
+    add!(dh, :s, 1)
     close!(dh)
     face_map = collect_periodic_faces(grid)
     ch = ConstraintHandler(dh)
@@ -967,7 +967,7 @@ end # testset
     # 3D tetra vector
     grid = generate_grid(Tetrahedron, (2, 1, 1))
     dh = DofHandler(grid)
-    push!(dh, :v, 2)
+    add!(dh, :v, 2)
     close!(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
     ch = ConstraintHandler(dh)
@@ -988,7 +988,7 @@ end # testset
     # 3D hex vector with dof rotation
     grid = generate_grid(Hexahedron, (1, 1, 1))
     dh = DofHandler(grid)
-    push!(dh, :v, 3)
+    add!(dh, :v, 3)
     close!(dh)
     rot = rotation_tensor(Vec{3}((0., 1., 0.)), π/2)
     face_map = collect_periodic_faces(grid, "left", "bottom", x -> rot ⋅ x)
@@ -1030,8 +1030,8 @@ end # testset
     )
         grid = generate_grid(CT, ntuple(i -> 5, D))
         dh = DofHandler(grid)
-        push!(dh, :s, 1, IT)
-        push!(dh, :v, D, IT)
+        add!(dh, :s, 1, IT)
+        add!(dh, :v, D, IT)
         close!(dh)
 
         # Scalar
@@ -1119,7 +1119,7 @@ end # testset
 
 @testset "Affine constraints with master dofs that are prescribed" begin
     grid = generate_grid(Quadrilateral, (2, 2))
-    dh = DofHandler(grid); push!(dh, :u, 1); close!(dh)
+    dh = DofHandler(grid); add!(dh, :u, 1); close!(dh)
 
     #  8───7───9
     #  │   │   │
@@ -1253,7 +1253,7 @@ end # testset
 @testset "local application of bc" begin
     grid = generate_grid(Quadrilateral, (5,5))
     dh = DofHandler(grid)
-    push!(dh, :u, 1)
+    add!(dh, :u, 1)
     close!(dh)
     # Dirichlet BC
     ch_dbc = ConstraintHandler(dh)
@@ -1450,7 +1450,7 @@ end # testset
 @testset "Sparsity pattern without constrained dofs" begin
     grid = generate_grid(Triangle, (5, 5))
     dh = DofHandler(grid)
-    push!(dh, :u, 1)
+    add!(dh, :u, 1)
     close!(dh)
     ch = ConstraintHandler(dh)
     add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0))
