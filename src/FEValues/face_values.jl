@@ -255,7 +255,7 @@ function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_in
     end
 
     n_faces = length(qrs)
-    n_qpoints = n_faces == 0 ? 0 : length(getweights(qrs[1])) # assume same in all
+    n_qpoints = n_faces == 0 ? 0 : maximum(length.(getweights.(qrs))) # Bound number of qps correctly.
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
     M =    fill(zero(T)           * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
 
