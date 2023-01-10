@@ -56,6 +56,7 @@ export
     QuadraticTetrahedron,
     Hexahedron,
     #QuadraticHexahedron,
+    Wedge,
     CellIndex,
     FaceIndex,
     EdgeIndex,
