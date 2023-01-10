@@ -580,7 +580,7 @@ apply!
 
 Adjust the matrix `K` and the right hand side `rhs` to account for prescribed Dirichlet
 boundary conditions and affine constraints such that `du = K \\ rhs` gives the expected 
-result (e.g. `du` zero for all degrees of freedom prescribed by Dirichlet conditions).
+result (e.g. `du` zero for all prescribed degrees of freedom).
 
     apply_zero!(v::AbstractVector, ch::ConstraintHandler)
 
