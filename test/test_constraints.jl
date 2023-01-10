@@ -266,7 +266,7 @@ end
     @testset "nonlinear" begin
         params = (k=1.0, f=1.0, a=1.0, b=0.2, tol=1e-10, maxiter=2)
         grid = generate_grid(Line, (2,)); addfaceset!(grid, "center", x->x[1]≈0.0)
-        dh = DofHandler(grid); push!(dh, :u, 1); close!(dh)
+        dh = DofHandler(grid); add!(dh, :u, 1); close!(dh)
 
         function doassemble!(K, r, dh, a, params)
             # Spring elements 
