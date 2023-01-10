@@ -68,7 +68,7 @@ cellvalues = CellScalarValues(qr, ip);
 # Lastly we `close!` the `DofHandler`, it is now that the dofs are distributed
 # for all the elements.
 dh = DofHandler(grid)
-push!(dh, :u, 1)
+add!(dh, :u, 1)
 close!(dh);
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
