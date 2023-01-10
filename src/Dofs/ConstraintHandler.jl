@@ -585,8 +585,8 @@ result (e.g. `du` zero for all degrees of freedom prescribed by Dirichlet condit
     apply_zero!(v::AbstractVector, ch::ConstraintHandler)
 
 Zero-out values in `v` corresponding to prescribed degrees of freedom and update values 
-prescribed by affine constraints, such that if `a` fullfilled the affine constraints, 
-`a±v` also will. 
+prescribed by affine constraints, such that if `a` fullfills the constraints,
+`a ± v` also will.
 
 These methods are typically used in e.g. a Newton solver where the increment, `du`, should
 be prescribed to zero even for non-homogeneouos boundary conditions.
