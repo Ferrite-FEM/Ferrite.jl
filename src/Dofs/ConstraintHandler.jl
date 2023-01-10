@@ -56,9 +56,11 @@ end
 
 const DofCoefficients{T} = Vector{Pair{Int,T}}
 """
-    AffineConstraint(constrained_dofs::Int, master_dofs::Vector{Int}, coeffs::Vector{T}, b::T) where T
+    AffineConstraint(constrained_dof::Int, entires::Vector{Pair{Int,T}}, b::T) where T
 
-Define an affine/linear constraint to constrain dofs of the form `u_i = ∑(u[j] * a[j]) + b`.
+Define an affine/linear constraint to constrain one degree of freedom, `u[i]`, 
+such that `u[i] = ∑(u[j] * a[j]) + b`, 
+where `i=constrained_dof` and each element in `entries` are `j => a[j]`
 """
 struct AffineConstraint{T}
     constrained_dof::Int
@@ -544,9 +546,18 @@ end
 Adjust the matrix `K` and right hand side `rhs` to account for the Dirichlet boundary
 conditions specified in `ch` such that `K \\ rhs` gives the expected solution.
 
+!!! note
+    `apply!(K, rhs, ch)` essentially calculates
+
+    `rhs[free_dofs] = rhs[free_dofs] - K[free_dofs, constrained_dofs] * a[constrained]`
+    
+    where `a[constrained]` are the inhomogeneities. 
+    Consequently, the sign of `rhs` matters (in contrast to for `apply_zero!`).
+
+
     apply!(v::AbstractVector, ch::ConstraintHandler)
 
-Apply Dirichlet boundary conditions, specified in `ch`, to the solution vector `v`.
+Apply Dirichlet boundary conditions and affine constraints, specified in `ch`, to the solution vector `v`.
 
 # Examples
 ```julia
@@ -568,12 +579,14 @@ apply!
     apply_zero!(K::SparseMatrixCSC, rhs::AbstractVector, ch::ConstraintHandler)
 
 Adjust the matrix `K` and the right hand side `rhs` to account for prescribed Dirichlet
-boundary conditions such that `du = K \\ rhs` give the expected result (e.g. with `du` zero
-for all prescribed degrees of freedom).
+boundary conditions and affine constraints such that `du = K \\ rhs` gives the expected 
+result (e.g. `du` zero for all prescribed degrees of freedom).
 
     apply_zero!(v::AbstractVector, ch::ConstraintHandler)
 
-Zero-out values in `v` corresponding to prescribed degrees of freedom.
+Zero-out values in `v` corresponding to prescribed degrees of freedom and update values 
+prescribed by affine constraints, such that if `a` fullfills the constraints,
+`a ± v` also will.
 
 These methods are typically used in e.g. a Newton solver where the increment, `du`, should
 be prescribed to zero even for non-homogeneouos boundary conditions.
@@ -585,15 +598,16 @@ See also: [`apply!`](@ref).
 u = un + Δu                 # Current guess
 K, g = assemble_system(...) # Assemble residual and tangent for current guess
 apply_zero!(K, g, ch)       # Adjust tangent and residual to take prescribed values into account
-ΔΔu = - K \\ g               # Compute the increment, prescribed values are "approximately" zero
+ΔΔu = K \\ g                # Compute the (negative) increment, prescribed values are "approximately" zero
 apply_zero!(ΔΔu, ch)        # Make sure values are exactly zero
-Δu .+= ΔΔu                  # Update current guess
+Δu .-= ΔΔu                  # Update current guess
 ```
 
 !!! note
-    The last call to `apply_zero!` is not strictly necessary since the boundary conditions
-    should already be fulfilled after `apply!(K, g, ch)`. However, solvers of linear
-    systems are not exact, and thus `apply!(ΔΔu, ch)` can be used to make sure the values
+    The last call to `apply_zero!` is only strictly necessary for affine constraints. 
+    However, even if the Dirichlet boundary conditions should be fulfilled after 
+    `apply!(K, g, ch)`, solvers of linear systems are not exact. 
+    `apply!(ΔΔu, ch)` can be used to make sure the values
     for the prescribed degrees of freedom are fulfilled exactly.
 """
 apply_zero!
@@ -608,7 +622,7 @@ function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
     for (dof, dofcoef, h) in zip(ch.prescribed_dofs, ch.dofcoefficients, ch.affine_inhomogeneities)
         dofcoef === nothing && continue
         @assert h !== nothing
-        v[dof] = h
+        v[dof] = apply_zero ? 0.0 : h
         for (d, s) in dofcoef
             v[dof] += s * v[d]
         end
@@ -950,10 +964,22 @@ function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset
     end
 end
 
+"""
+    create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler, coupling)
+
+Create a symmetric sparsity pattern accounting for affine constraints in `ch`. See 
+the Affine Constraints section of the manual for further details. 
+"""
 function create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
         keep_constrained::Bool=true, coupling=nothing)
     return Symmetric(_create_sparsity_pattern(dh, ch, true, keep_constrained, coupling), :U)
 end
+"""
+    create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling)
+
+Create a sparsity pattern accounting for affine constraints in `ch`. See 
+the Affine Constraints section of the manual for further details. 
+"""
 function create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
         keep_constrained::Bool=true, coupling=nothing)
     return _create_sparsity_pattern(dh, ch, false, keep_constrained, coupling)
