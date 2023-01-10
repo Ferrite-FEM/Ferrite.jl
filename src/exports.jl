@@ -141,7 +141,7 @@ export
 # assembly
     start_assemble,
     assemble!,
-    end_assemble,
+    finish_assemble,
 
 # VTK export
     vtk_grid,

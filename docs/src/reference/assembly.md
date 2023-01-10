@@ -7,7 +7,7 @@ DocTestSetup = :(using Ferrite)
 ```@docs
 start_assemble
 assemble!
-end_assemble
+finish_assemble
 ```
 
 ```@docs
