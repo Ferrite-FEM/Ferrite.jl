@@ -14,6 +14,7 @@ cell_to_vtkcell(::Type{Hexahedron}) = VTKCellTypes.VTK_HEXAHEDRON
 cell_to_vtkcell(::Type{Cell{3,20,6}}) = VTKCellTypes.VTK_QUADRATIC_HEXAHEDRON
 cell_to_vtkcell(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
 cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
+cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
 
 nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
 
