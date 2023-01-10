@@ -1,6 +1,6 @@
 @testset "interpolations" begin
 
-for interpolation in (
+@testset "$interpolation" for interpolation in (
                       Lagrange{1, RefCube, 1}(),
                       Lagrange{1, RefCube, 2}(),
                       Lagrange{2, RefCube, 1}(),
@@ -16,6 +16,7 @@ for interpolation in (
                       Serendipity{3, RefCube, 2}(),
                       Lagrange{3, RefTetrahedron, 1}(),
                       Lagrange{3, RefTetrahedron, 2}(),
+                      Lagrange{3, RefPrism, 1}(),
                       #
                       DiscontinuousLagrange{1, RefCube, 0}(),
                       DiscontinuousLagrange{2, RefCube, 0}(),
@@ -50,14 +51,15 @@ for interpolation in (
            reinterpret(Float64, Ferrite.derivative(interpolation, x))
     @test sum(Ferrite.value(interpolation, x)) ≈ 1.0
 
+    # Check for dirac delta property of interpolation
     coords = Ferrite.reference_coordinates(interpolation)
-    for node in 1:n_basefuncs
-        N_node = Ferrite.value(interpolation, coords[node])
-        for k in 1:node
-            if k == node
-                @test N_node[k] ≈ 1.0
+    @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
+        N_dof = Ferrite.value(interpolation, coords[dof])
+        for k in 1:n_basefuncs
+            if k == dof
+                @test N_dof[k] ≈ 1.0
             else
-                @test N_node[k] ≈ 0.0 atol=4eps(Float64)
+                @test N_dof[k] ≈ 0.0 atol=4eps(Float64)
             end
         end
     end

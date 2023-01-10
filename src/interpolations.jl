@@ -119,6 +119,7 @@ vertices(::Interpolation{2,RefCube}) = (1,2,3,4)
 vertices(::Interpolation{3,RefCube}) = (1,2,3,4,5,6,7,8)
 vertices(::Interpolation{2,RefTetrahedron}) = (1,2,3)
 vertices(::Interpolation{3,RefTetrahedron}) = (1,2,3,4)
+vertices(::Interpolation{3,RefPrism}) = (1,2,3,4,5,6)
 
 #########################
 # DiscontinuousLagrange #
@@ -627,6 +628,37 @@ function value(ip::Lagrange{3,RefCube,2}, i::Int, ξ::Vec{3, T}) where {T}
     i == 26 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₃(ξ_z)
     # interior
     i == 27 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+
+###################################
+# Lagrange dim 3 RefPrism order 1 #
+###################################
+# Build on https://defelement.com/elements/examples/prism-Lagrange-1.html
+getnbasefunctions(::Lagrange{3,RefPrism,1}) = 6
+nvertexdofs(::Lagrange{3,RefPrism,1}) = 1
+
+faces(::Lagrange{3,RefPrism,1}) = ((1,3,2), (1,2,5,4), (3,1,4,6), (2,3,6,5), (4,5,6))
+edges(::Lagrange{3,RefPrism,1}) = ((2,1), (1,3), (1,4), (3,2), (2,5), (3,6), (4,5), (4,6), (6,5))
+
+function reference_coordinates(::Lagrange{3,RefPrism,1})
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0)),
+            Vec{3, Float64}((1.0, 0.0, 1.0)),
+            Vec{3, Float64}((0.0, 1.0, 1.0))]
+end
+
+function value(ip::Lagrange{3,RefPrism,1}, i::Int, ξ::Vec{3})
+    (x,y,z) = ξ
+    i == 1 && return 1-x-y -z*(1-x-y)
+    i == 2 && return x*(1-z)
+    i == 3 && return y*(1-z)
+    i == 4 && return z*(1-x-y)
+    i == 5 && return x*z
+    i == 6 && return y*z
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 

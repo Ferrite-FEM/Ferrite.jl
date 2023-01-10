@@ -53,6 +53,15 @@ function reference_normals(::Lagrange{3, RefCube})
             Vec{3, Float64}(( 0.0,  0.0,  1.0))]
 end
 
+# Lagrange{3, Wedge}
+function reference_normals(::Lagrange{3, RefPrism})
+    return [Vec{3, Float64}(( 0.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0, -1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  0.0,  0.0)),
+            Vec{3, Float64}((1/√2, 1/√2,  0.0)),
+            Vec{3, Float64}(( 0.0,  0.0,  1.0))]
+end
+
 # Serendipity{2, RefCube}
 reference_normals(::Serendipity{2, RefCube, 2}) = reference_normals(Lagrange{2, RefCube,1}())
 
