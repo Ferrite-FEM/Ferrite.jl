@@ -241,8 +241,8 @@ end
 
 function setup_dofs(grid, ipu, ipp)
     dh = DofHandler(grid)
-    push!(dh, :u, 2, ipu)
-    push!(dh, :p, 1, ipp)
+    add!(dh, :u, 2, ipu)
+    add!(dh, :p, 1, ipp)
     close!(dh)
     return dh
 end

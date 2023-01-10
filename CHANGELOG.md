@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
  - Fix `apply_zero!(Δa, ch)` when using inhomogeneous affine constraints ([#575][github-575])
 
+### Deprecated
+ - Adding fields to a DoF handler with `push!(dh, ...)` has been deprecated in favor of
+   `add!(dh, ...)`. This is to make it consistent with how constraints are added to a
+   constraint handler. ([#578][github-578])
 
 ## [0.3.10] - 2022-12-11
 ### Added
@@ -233,6 +237,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-549]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/549
 [github-550]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/550
 [github-575]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/575
+[github-578]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/578
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.10...HEAD
 [0.3.10]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.9...v0.3.10

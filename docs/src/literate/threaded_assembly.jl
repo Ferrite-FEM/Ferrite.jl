@@ -53,7 +53,7 @@ end;
 # #### DofHandler
 function create_dofhandler(grid::Grid{dim}) where {dim}
     dh = DofHandler(grid)
-    push!(dh, :u, dim) # Add a displacement field
+    add!(dh, :u, dim) # Add a displacement field
     close!(dh)
 end;
 

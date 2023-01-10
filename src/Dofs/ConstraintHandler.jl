@@ -887,8 +887,35 @@ end
 
 
 #Function for adding constraint when using multiple celltypes
-function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
-    _check_cellset_dirichlet(ch.dh.grid, fh.cellset, dbc.faces)
+function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
+    dbc_added = false
+    for fh in ch.dh.fieldhandlers
+        if overlaps(fh, dbc)
+            # Recreating the `dbc` will create a copy of `dbc.faces`. 
+            # If `dbc` have dofs not in `fh`, these will be removed from `dbc`, 
+            # thus the need to copy `dbc.faces`.
+            # In this case, add! will warn, unless warn_check_cellset=false
+            dbc_ = Dirichlet(dbc.field_name, dbc.faces, dbc.f, 
+                isempty(dbc.components) ? nothing : dbc.components) 
+                # Check for empty already done when user created `dbc`
+            add!(ch, fh, dbc_, warn_check_cellset=false)
+            dbc_added = true
+        end
+    end
+    dbc_added || @warn("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's MixedDofHandler")
+    return ch
+end
+
+function overlaps(fh::FieldHandler, dbc::Dirichlet)
+    dbc.field_name in getfieldnames(fh) || return false # Must contain the correct field
+    for (cellid, _) in dbc.faces
+        cellid in fh.cellset && return true
+    end
+    return false
+end
+
+function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_check_cellset=true)
+    warn_check_cellset && _check_cellset_dirichlet(ch.dh.grid, fh.cellset, dbc.faces)
 
     celltype = getcelltype(ch.dh.grid, first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
 
