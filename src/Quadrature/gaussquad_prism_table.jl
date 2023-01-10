@@ -5,7 +5,7 @@
 # Note that the original rule is defined on [-1,1]^3 while our reference prism is defined on [0,1]^3, hence we transform in the end.
 function _get_gauss_prismdata_polyquad(n::Int)
     if n == 1
-        xw = [-1/3 -1/3 0 4]
+        return reshape([1/3 1/3 0 1/2], (1,4))
     elseif n == 2
         xw = [
             -0.33333333333333333333333333333333333333  -0.33333333333333333333333333333333333333  -0.99999999999999985119303811076522004183   0.66666666666666686507594918564641756458
