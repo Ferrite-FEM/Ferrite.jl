@@ -232,6 +232,7 @@ for each dof-position determined by the `func_interpol`. Used mainly by the `Con
 """
 struct BCValues{T}
     M::Array{T,3}
+    nqp::Array{Int}
     current_face::ScalarWrapper{Int}
 end
 
@@ -257,18 +258,20 @@ function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_in
     n_faces = length(qrs)
     n_qpoints = n_faces == 0 ? 0 : maximum(length.(getweights.(qrs))) # Bound number of qps correctly.
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M =    fill(zero(T)           * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
+    M   = fill(zero(T) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
+    nqp = zeros(Int,n_faces)
 
-    for face in 1:n_faces, (qp, ξ) in enumerate(qrs[face].points)
-        for i in 1:n_geom_basefuncs
+    for face in 1:n_faces
+        for (qp, ξ) in enumerate(qrs[face].points), i in 1:n_geom_basefuncs
             M[i, qp, face] = value(geom_interpol, i, ξ)
         end
+        nqp[face] = length(qrs[face].points)
     end
 
-    BCValues{T}(M, ScalarWrapper(0))
+    BCValues{T}(M, nqp, ScalarWrapper(0))
 end
 
-getnquadpoints(bcv::BCValues) = size(bcv.M, 2)
+getnquadpoints(bcv::BCValues) = bcv.nqp[bcv.current_face.x]
 function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = size(bcv.M, 1)
     length(xh) == n_base_funcs || throw_incompatible_coord_length(length(xh), n_base_funcs)
