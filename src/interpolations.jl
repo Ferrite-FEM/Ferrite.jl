@@ -32,6 +32,24 @@ julia> getnbasefunctions(ip)
 """
 abstract type Interpolation{dim,shape,order} end
 
+# struct that gathers all the information needed to distribute
+# dofs for a given interpolation.
+struct InterpolationInfo
+    nvertexdofs::Vector{Int}
+    nedgedofs::Vector{Int}
+    nfacedofs::Vector{Int}
+    ncelldofs::Int
+    function InterpolationInfo(interpolation::Interpolation)
+        new(
+            [length(i) for i ∈ vertexdof_indices(interpolation)],
+            [length(i) for i ∈ edgedof_interior_indices(interpolation)],
+            [length(i) for i ∈ facedof_interior_indices(interpolation)],
+            length(celldof_interior_indices(interpolation)),
+        )
+    end
+end
+
+# Some redundant information about the geometry of the reference cells.
 nfaces(::Interpolation{dim, RefCube}) where {dim}= 2*dim
 nfaces(::Interpolation{2, RefTetrahedron})       = 3
 nfaces(::Interpolation{3, RefTetrahedron})       = 4
