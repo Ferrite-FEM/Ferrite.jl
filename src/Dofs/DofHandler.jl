@@ -201,7 +201,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     end
 
     # not implemented yet: more than one facedof per face in 3D
-    dim == 3 && @assert(!any(x->any(y > 1, x.nfacedofs), interpolation_infos))
+    dim == 3 && @assert(!any(x->any(y->y > 1, x.nfacedofs), interpolation_infos))
 
     nextdof = 1 # next free dof to distribute
     push!(dh.cell_dofs_offset, 1) # dofs for the first cell start at 1
@@ -232,11 +232,11 @@ function __close!(dh::DofHandler{dim}) where {dim}
                             end
                         end
                     end
-                end 
+                end
             end # vertex loop
             if dim == 3 # edges only in 3D
                 for (ei, edge) in enumerate(edges(cell))
-                    if interpolation_info.nedgedofs[ei] > 0
+                    if interpolation_info.dim == 3 && interpolation_info.nedgedofs[ei] > 0
                         sedge, dir = sortedge(edge)
                         @debug println("    edge#$sedge dir: $(dir)")
                         token = Base.ht_keyindex2!(edgedicts[field_idx], sedge)
@@ -259,12 +259,35 @@ function __close!(dh::DofHandler{dim}) where {dim}
                                 end
                             end
                         end
-                    end # edge loop
-                end
+                    elseif interpolation_info.dim == 2 && interpolation_info.nfacedofs[ei] > 0 # hotfix for current embedded elements
+                        sedge, dir = sortedge(edge)
+                        @debug println("    edge#$sedge dir: $(dir)")
+                        token = Base.ht_keyindex2!(edgedicts[field_idx], sedge)
+                        if token > 0 # haskey(edgedicts[field_idx], sedge), reuse dofs
+                            startdof, olddir = edgedicts[field_idx].vals[token] # edgedicts[field_idx][sedge] # first dof for this edge (if dir == true)
+                            for edgedof in (dir == olddir ? (1:interpolation_info.nfacedofs[ei]) : (interpolation_info.nfacedofs[ei]:-1:1))
+                                for d in 1:dh.field_dims[field_idx]
+                                    reuse_dof = startdof + (d-1) + (edgedof-1)*dh.field_dims[field_idx]
+                                    @debug println("      reusing dof#$(reuse_dof)")
+                                    push!(dh.cell_dofs, reuse_dof)
+                                end
+                            end
+                        else # token <= 0, distribute new dofs
+                            Base._setindex!(edgedicts[field_idx], (nextdof, dir), sedge, -token) # edgedicts[field_idx][sedge] = (nextdof, dir),  store only the first dof for the edge
+                            for edgedof in 1:interpolation_info.nfacedofs[ei]
+                                for d in 1:dh.field_dims[field_idx]
+                                    @debug println("      adding dof#$nextdof")
+                                    push!(dh.cell_dofs, nextdof)
+                                    nextdof += 1
+                                end
+                            end
+                        end
+                    end 
+                end # edge loop
             end
             for (fi, face) in enumerate(faces(cell))
                 if interpolation_info.nfacedofs[fi] > 0 && (interpolation_info.dim == dim)
-                    sface = sortface(face) # TODO: faces(cell) may as well just return the sorted list
+                    sface = sortface(face)
                     @debug println("    face#$sface")
                     token = Base.ht_keyindex2!(facedicts[field_idx], sface)
                     if token > 0 # haskey(facedicts[field_idx], sface), reuse dofs
@@ -286,8 +309,8 @@ function __close!(dh::DofHandler{dim}) where {dim}
                             end
                         end
                     end
-                end # face loop
-            end
+                end
+            end # face loop
             if interpolation_info.ncelldofs > 0 # always distribute new dofs for cell
                 @debug println("    cell#$ci")
                 for celldof in 1:interpolation_info.ncelldofs
