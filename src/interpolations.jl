@@ -662,6 +662,82 @@ function value(ip::Lagrange{3,RefPrism,1}, i::Int, ξ::Vec{3})
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
+###################################
+# Lagrange dim 3 RefPrism order 2 #
+###################################
+# Build on https://defelement.com/elements/examples/prism-Lagrange-2.html .
+# This should be simply the tensor-product of a quadratic triangle with a quadratic line.
+getnbasefunctions(::Lagrange{3,RefPrism,2}) = 18
+nvertexdofs(::Lagrange{3,RefPrism,2}) = 1
+#TODO other dofs. Needs redesign of dof distribution.
+
+faces(::Lagrange{3,RefPrism,2}) = (
+    #Vertices| Edges  | Face 
+    (1,3,2  , 8,9,6          ), 
+    (1,2,5,4, 7,11,13,9,   16), 
+    (3,1,4,6, 8,9,14,15,   17), 
+    (2,3,6,5, 10,12,15,11, 18), 
+    (4,5,6  , 13,15,14       )
+)
+edges(::Lagrange{3,RefPrism,2}) = (
+    #Vert|Edge
+    (2,1, 7),
+    (1,3, 8),
+    (1,4, 9),
+    (3,2, 10),
+    (2,5, 11),
+    (3,6, 12),
+    (4,5, 13),
+    (4,6, 14),
+    (6,5, 15))
+
+function reference_coordinates(::Lagrange{3,RefPrism,2})
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0)),
+            Vec{3, Float64}((1.0, 0.0, 1.0)),
+            Vec{3, Float64}((0.0, 1.0, 1.0)),
+            Vec{3, Float64}((1/2, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1/2, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1/2)),
+            Vec{3, Float64}((1/2, 1/2, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 1/2)),
+            Vec{3, Float64}((0.0, 1.0, 1/2)),
+            Vec{3, Float64}((1/2, 0.0, 1.0)),
+            Vec{3, Float64}((0.0, 1/2, 1.0)),
+            Vec{3, Float64}((1/2, 1/2, 1.0)),
+            Vec{3, Float64}((1/2, 0.0, 1/2)),
+            Vec{3, Float64}((0.0, 1/2, 1/2)),
+            Vec{3, Float64}((1/2, 1/2, 1/2))]
+end
+
+function value(ip::Lagrange{3,RefPrism,2}, i::Int, ξ::Vec{3})
+    (x,y,z) = ξ
+    x² = x*x
+    y² = y*y
+    z² = z*z
+    i == 1  && return 4*x²*z² - 6x²*z +2x² +8x*y*z² -12x*y*z +4x*y -6x*z² +9x*z -3x +4y²*z² -6y²*z + 2y² -6y*z² +9y*z -3*y +2z² -3z +1
+    i == 2  && return x*(4x*z² -6x*z +2x -2z² +3z -1)
+    i == 3  && return y*(4y*z² -6y*z +2y -2z² +3z -1)
+    i == 4  && return z*(4x²*z -2x² + 8x*y*z -4x*y -6x*z +3x +4y²*z -2y² -6y*z +3y +2z -1)
+    i == 5  && return x*z*(4x*z -2x -2z +1)
+    i == 6  && return y*z*(4y*z -2y -2z +1)
+    i == 7  && return 4x*(-2x*z² +3x*z -x -2*y*z² +3y*z -y +2z² -3z +1)
+    i == 8  && return 4y*(-2x*z² +3x*z -x -2*y*z² +3y*z -y +2z² -3z +1)
+    i == 9  && return 4z*(-2x²*z +2x² -4x*y*z +4x*y +3x*z -3x -2y²*z +2y² +3y*z -3y -z +1)
+    i == 10 && return 4x*y*(2z² -3z +1)
+    i == 11 && return 4x*z*(-2x*z +2x +z -1)
+    i == 12 && return 4y*z*(-2y*z +2y +z -1)
+    i == 13 && return 4x*z*(-2x*z +x -2y*z +y +2z -1)
+    i == 14 && return 4y*z*(-2x*z +x -2y*z +y +2z -1)
+    i == 15 && return 4x*y*z*(2z -1)
+    i == 16 && return 16x*z*(x*z -x +y*z -y -z +1)
+    i == 17 && return 16y*z*(x*z -x +y*z -y -z +1)
+    i == 18 && return 16x*y*z*(1 -z)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
 ###################
 # Bubble elements #
 ###################
