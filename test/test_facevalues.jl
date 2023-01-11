@@ -21,7 +21,7 @@ for (func_interpol, quad_rule) in  (
         fe_valtype == FaceVectorValues && @test getnbasefunctions(fv) == n_basefuncs * Ferrite.getdim(func_interpol)
 
         xs, n = valid_coordinates_and_normals(func_interpol)
-        for face in 1:getnfaces(func_interpol)
+        for face in 1:Ferrite.nfaces(func_interpol)
             reinit!(fv, xs, face)
             @test Ferrite.getcurrentface(fv) == face
 
@@ -61,7 +61,7 @@ for (func_interpol, quad_rule) in  (
             for i in 1:getnquadpoints(fv)
                 vol += getdetJdV(fv,i)
             end
-            x_face = xs[[Ferrite.faces(func_interpol)[face]...]]
+            x_face = xs[[Ferrite.facedof_indices(func_interpol)[face]...]]
             @test vol ≈ calculate_volume(Ferrite.getlowerdim(func_interpol), x_face)
 
             # Test quadrature rule after reinit! with ref. coords
