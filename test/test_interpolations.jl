@@ -17,6 +17,7 @@
                       Lagrange{3, RefTetrahedron, 1}(),
                       Lagrange{3, RefTetrahedron, 2}(),
                       Lagrange{3, RefPrism, 1}(),
+                      Lagrange{3, RefPrism, 2}(),
                       #
                       DiscontinuousLagrange{1, RefCube, 0}(),
                       DiscontinuousLagrange{2, RefCube, 0}(),

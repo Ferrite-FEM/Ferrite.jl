@@ -5,6 +5,7 @@
 #####################################
 reference_volume(::Interpolation{dim, RefCube}) where {dim} = 2^dim
 reference_volume(::Interpolation{dim, RefTetrahedron}) where {dim} = 1 / factorial(dim)
+reference_volume(::Interpolation{  3, RefPrism}) = 1/2
 # For faces
 reference_volume(fs::Interpolation, ::Int) = reference_volume(Ferrite.getlowerdim(fs))
 reference_volume(fs::Interpolation{2, RefTetrahedron}, face::Int) = face == 1 ? sqrt(2) : 1.0
