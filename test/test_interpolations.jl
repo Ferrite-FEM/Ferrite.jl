@@ -45,6 +45,7 @@
     applicable(Ferrite.getlowerdim, interpolation) && @test typeof(Ferrite.getlowerdim(interpolation)) <: Interpolation{ndim-1}
     applicable(Ferrite.getlowerorder, interpolation) && @test typeof(Ferrite.getlowerorder(interpolation)) <: Interpolation{ndim,r_shape,func_order-1}
 
+    # Check partition of unity at random point.
     n_basefuncs = getnbasefunctions(interpolation)
     x = rand(Tensor{1, ndim})
     f = (x) -> Ferrite.value(interpolation, Tensor{1, ndim}(x))
@@ -52,8 +53,13 @@
            reinterpret(Float64, Ferrite.derivative(interpolation, x))
     @test sum(Ferrite.value(interpolation, x)) ≈ 1.0
 
-    # Check for dirac delta property of interpolation
+    # Check if the important functions are consistens
     coords = Ferrite.reference_coordinates(interpolation)
+    @test length(coords) == getnbasefunctions(interpolation)
+    @test Ferrite.value(interpolation, length(coords), x) == Ferrite.value(interpolation, length(coords), x)
+    @test_throws BoundsError Ferrite.value(interpolation, length(coords)+1, x)
+
+    # Check for dirac delta property of interpolation
     @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
         N_dof = Ferrite.value(interpolation, coords[dof])
         for k in 1:n_basefuncs
