@@ -39,12 +39,14 @@ struct InterpolationInfo
     nedgedofs::Vector{Int}
     nfacedofs::Vector{Int}
     ncelldofs::Int
-    function InterpolationInfo(interpolation::Interpolation)
+    dim::Int
+    function InterpolationInfo(interpolation::Interpolation{dim}) where {dim}
         new(
             [length(i) for i ∈ vertexdof_indices(interpolation)],
             [length(i) for i ∈ edgedof_interior_indices(interpolation)],
             [length(i) for i ∈ facedof_interior_indices(interpolation)],
             length(celldof_interior_indices(interpolation)),
+            dim,
         )
     end
 end
