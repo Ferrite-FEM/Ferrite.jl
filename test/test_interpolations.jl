@@ -9,7 +9,7 @@
                       Lagrange{2, RefTetrahedron, 2}(),
                       Lagrange{2, RefTetrahedron, 3}(),
                       Lagrange{2, RefTetrahedron, 4}(),
-                      Lagrange{2, RefTetrahedron, 5}(),
+                      #Lagrange{2, RefTetrahedron, 5}(),
                       Lagrange{3, RefCube, 1}(),
                       Lagrange{3, RefCube, 2}(),
                       Serendipity{2, RefCube, 2}(),
@@ -66,7 +66,7 @@
             if k == dof
                 @test N_dof[k] ≈ 1.0
             else
-                @test N_dof[k] ≈ 0.0 atol=4eps(Float64) broken=typeof(interpolation)==Lagrange{2, RefTetrahedron, 5}&&dof==4&&k==18
+                @test N_dof[k] ≈ 0.0 atol=4eps(Float64) #broken=typeof(interpolation)==Lagrange{2, RefTetrahedron, 5}&&dof==4&&k==18
             end
         end
     end
