@@ -58,7 +58,7 @@ end
 
 function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
     ncells = getncells(grid)
-    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],zeros(Int,ncells),zeros(Int,ncells)), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
+    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],zeros(Int,ncells),zeros(Int,ncells)), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
 getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
@@ -205,9 +205,8 @@ function close!(dh::MixedDofHandler)
 end
 
 function __close!(dh::MixedDofHandler{dim}) where {dim}
-
-    @assert !Ferrite.isclosed(dh)
-    field_names = Ferrite.getfieldnames(dh)  # all the fields in the problem
+    @assert !isclosed(dh)
+    field_names = getfieldnames(dh)  # all the fields in the problem
     numfields =  length(field_names)
 
     # Create dicts that store created dofs
@@ -228,9 +227,9 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
             dh,
             cellnumbers,
             field_names,
-            Ferrite.getfieldnames(fh),
-            Ferrite.getfielddims(fh),
-            Ferrite.getfieldinterpolations(fh),
+            getfieldnames(fh),
+            getfielddims(fh),
+            getfieldinterpolations(fh),
             nextdof,
             vertexdicts,
             edgedicts,
@@ -259,15 +258,12 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
 end
 
 function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
-
-    ip_infos = Ferrite.InterpolationInfo[]
+    ip_infos = InterpolationInfo[]
     for interpolation in field_interpolations
-        ip_info = Ferrite.InterpolationInfo(interpolation)
+        ip_info = InterpolationInfo(interpolation)
         # these are not implemented yet (or have not been tested)
-        @assert(ip_info.nvertexdofs <= 1)
-        @assert(ip_info.nedgedofs <= 1)
-        @assert(ip_info.nfacedofs <= 1)
-        @assert(ip_info.ncelldofs <= 1)  # not tested but probably works
+        @assert(all(ip_info.nedgedofs .<= 1))
+        @assert(all(ip_info.nfacedofs .<= 1))
         push!(ip_infos, ip_info)
     end
 
@@ -285,22 +281,25 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
             @debug "\tfield: $(field_name)"
             ip_info = ip_infos[local_num]
 
-            if ip_info.nvertexdofs > 0
-                nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[local_num], ip_info.nvertexdofs, nextdof)
+            # We first distribute the vertex dofs
+            nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[local_num], ip_info.nvertexdofs, nextdof)
+
+            # Then the edge dofs
+            if dim == 3
+                if ip_info.dim == 3 # Regular 3D element
+                    nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[local_num], ip_info.nedgedofs, nextdof)
+                elseif ip_info.dim == 2 # 2D embedded element in 3D
+                    nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[local_num], ip_info.nfacedofs, nextdof)
+                end
             end
 
-            if ip_info.nedgedofs > 0 && dim == 3 #Edges only in 3d
-                nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[local_num], ip_info.nedgedofs, nextdof)
-            end
-
-            if ip_info.nfacedofs > 0 && (ip_info.dim == dim)
+            # Then the face dofs
+            if ip_info.dim == dim # Regular 3D element
                 nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[local_num], ip_info.nfacedofs, nextdof)
             end
 
-            if ip_info.ncelldofs > 0
-                nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[local_num], ip_info.ncelldofs, nextdof)
-            end
-
+            # And finally the celldofs
+            nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[local_num], ip_info.ncelldofs, nextdof)
         end
         # after done creating dofs for the cell, push them to the global list
         append!(dh.cell_dofs.values, cell_dofs)
@@ -316,13 +315,11 @@ Returns the next global dof number and an array of dofs.
 If dofs have already been created for the object (vertex, face) then simply return those, otherwise create new dofs.
 """
 function get_or_create_dofs!(nextdof, field_dim; dict, key)
-
     token = Base.ht_keyindex2!(dict, key)
     if token > 0  # vertex, face etc. visited before
         # reuse stored dofs (TODO unless field is discontinuous)
         @debug "\t\tkey: $key dofs: $(dict[key])  (reused dofs)"
         return nextdof, dict[key]
-
     else  # create new dofs
         dofs = nextdof : (nextdof + field_dim-1)
         @debug "\t\tkey: $key dofs: $dofs"
@@ -333,33 +330,39 @@ function get_or_create_dofs!(nextdof, field_dim; dict, key)
 end
 
 function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, nextdof)
-    for vertex in Ferrite.vertices(cell)
-        @debug "\tvertex #$vertex"
-        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=vertexdict, key=vertex)
-        append!(cell_dofs, dofs)
+    for (vi, vertex) in enumerate(vertices(cell))
+        if nvertexdofs[vi] > 0
+            @debug "\tvertex #$vertex"
+            nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=vertexdict, key=vertex)
+            append!(cell_dofs, dofs)
+        end
     end
     return nextdof
 end
 
 function add_face_dofs(cell_dofs, cell, facedict, field_dim, nfacedofs, nextdof)
-    @assert nfacedofs == 1 "Currently only supports interpolations with nfacedofs = 1"
+    @debug @assert all(nfacedofs .<= 1) "Currently only supports interpolations with less that 2 dofs per face"
 
-    for face in Ferrite.faces(cell)
-        sface = Ferrite.sortface(face)
-        @debug "\tface #$sface"
-        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=facedict, key=sface)
-        append!(cell_dofs, dofs)
+    for (fi,face) in enumerate(faces(cell))
+        if nfacedofs[fi] > 0
+            sface = sortface(face)
+            @debug "\tface #$sface"
+            nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=facedict, key=sface)
+            # TODO permutate dofs according to face orientation
+            append!(cell_dofs, dofs)
+        end
     end
     return nextdof
 end
 
 function add_edge_dofs(cell_dofs, cell, edgedict, field_dim, nedgedofs, nextdof)
-    @assert nedgedofs == 1 "Currently only supports interpolations with nedgedofs = 1"
-    for edge in Ferrite.edges(cell)
-        sedge, dir = Ferrite.sortedge(edge)
-        @debug "\tedge #$sedge"
-        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=edgedict, key=sedge)
-        append!(cell_dofs, dofs)
+    for (ei,edge) in enumerate(edges(cell))
+        if nedgedofs[ei] > 0
+            sedge, dir = sortedge(edge)
+            @debug "\tedge #$sedge"
+            nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=edgedict, key=sedge)
+            append!(cell_dofs, dofs)
+        end
     end
     return nextdof
 end
@@ -389,9 +392,9 @@ function field_offset(fh::FieldHandler, field_name::Symbol)
     return offset
 end
 
-function Ferrite.dof_range(fh::FieldHandler, field_name::Symbol)
-    f = Ferrite.find_field(fh, field_name)
-    offset = Ferrite.field_offset(fh, field_name)
+function dof_range(fh::FieldHandler, field_name::Symbol)
+    f = find_field(fh, field_name)
+    offset = field_offset(fh, field_name)
     field_interpolation = fh.fields[f].interpolation
     field_dim = fh.fields[f].dim
     n_field_dofs = getnbasefunctions(field_interpolation)::Int * field_dim
@@ -406,9 +409,8 @@ getfielddim(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].dim
 getfielddim(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].dim
 
 function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) where T
-
     # make sure the field exists
-    fieldname ∈ Ferrite.getfieldnames(dh) || error("Field $fieldname not found.")
+    fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
 
     field_dim = getfielddim(dh, fieldname)
     space_dim = field_dim == 2 ? 3 : field_dim
