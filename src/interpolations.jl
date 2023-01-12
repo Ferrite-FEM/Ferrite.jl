@@ -121,10 +121,6 @@ getnbasefunctions
 #   edgedof: dof on a line between 2 vertices (i.e. "corners") (3D only)
 #   celldof: dof that is local to the element
 
-# Needed for distributing dofs on shells correctly (face in 2d is edge in 3d)
-# Ferrite.edgedof_indices(ip::Interpolation{2}) = Ferrite.facedof_indices(ip)
-# Ferrite.edgedof_interior_indices(ip::Interpolation{2}) = Ferrite.facedof_interior_indices(ip)
-
 """
     vertexdof_indices(::Interpolation)
 
