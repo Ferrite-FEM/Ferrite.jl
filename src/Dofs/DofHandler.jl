@@ -9,7 +9,6 @@ Operates slightly faster than [`MixedDofHandler`](@ref). Supports:
 - `Grid`s with a single concrete cell type.
 - One or several fields on the whole domaine.
 """
-# struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
 struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     field_names::Vector{Symbol}
     field_dims::Vector{Int}
