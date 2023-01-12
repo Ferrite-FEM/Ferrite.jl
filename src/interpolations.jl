@@ -740,10 +740,10 @@ getnbasefunctions(::Lagrange{3,RefPrism,2}) = 18
 vertexdof_indices(::Lagrange{3,RefPrism,2}) = ((1,), (2,), (3,), (4,), (5,), (6,),)
 facedof_indices(::Lagrange{3,RefPrism,2}) = (
     #Vertices| Edges  | Face 
-    (1,3,2  , 8,9,6          ), 
+    (1,3,2  , 8,10,7         ),
     (1,2,5,4, 7,11,13,9,   16), 
-    (3,1,4,6, 8,9,14,15,   17), 
-    (2,3,6,5, 10,12,15,11, 18), 
+    (3,1,4,6, 8,9,14,12,   17),
+    (2,3,6,5, 10,12,15,11, 18),
     (4,5,6  , 13,15,14       ),
 )
 facedof_interior_indices(::Lagrange{3,RefPrism,2}) = (
