@@ -14,14 +14,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    [#549][github-549])
  - New function `apply_analytical!` for setting the values of the degrees of freedom for a 
    specific field according to a spatial function `f(x)`. ([#532][github-532])
+ - Support for classical trilinear and triquadratic wedge elements. 
+   ([#581][github-581])
+ - Symmetric quadrature rules up to order 10 for prismatic elements. ([#581][github-581])
+ - Finer granulation of dof distribution, allowing to distribute different amounts of dofs
+   per entity. ([#581][github-581])
 
 ### Fixed
  - Fix `apply_zero!(Δa, ch)` when using inhomogeneous affine constraints ([#575][github-575])
+ - Dof distribution for embedded elements ([#581][github-581]).
 
 ### Deprecated
  - Adding fields to a DoF handler with `push!(dh, ...)` has been deprecated in favor of
    `add!(dh, ...)`. This is to make it consistent with how constraints are added to a
    constraint handler. ([#578][github-578])
+ - To clarify the dof management `vertices(ip)`, `edges(ip)` and `faces(ip)` has been
+   deprecated in favor of `vertexdof_indices(ip)`, `edgedof_indices(ip)` and 
+   `facedof_indices(ip)`. ([#578][github-578])
 
 ## [0.3.10] - 2022-12-11
 ### Added
@@ -238,6 +247,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-550]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/550
 [github-575]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/575
 [github-578]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/578
+[github-581]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/581
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.10...HEAD
 [0.3.10]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.9...v0.3.10
