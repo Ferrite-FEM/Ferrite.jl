@@ -31,6 +31,9 @@ for interpolation in (
                       BubbleEnrichedLagrange{2,RefTetrahedron,1}(),
                       #
                       CrouzeixRaviart{2,1}(),
+                      CrouzeixRaviart{3,1}(),
+                      RannacherTurek{2,1}(),
+                      RannacherTurek{3,1}(),
     )
 
     # Test of utility functions

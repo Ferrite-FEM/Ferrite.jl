@@ -5,6 +5,7 @@ export
     RefTetrahedron,
     BubbleEnrichedLagrange,
     CrouzeixRaviart,
+    RannacherTurek,
     Lagrange,
     DiscontinuousLagrange,
     Serendipity,

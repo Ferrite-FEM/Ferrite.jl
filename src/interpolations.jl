@@ -782,6 +782,9 @@ and Numerical Analysis-Modélisation Mathématique et Analyse Numérique 7.R3 (1
 """
 struct CrouzeixRaviart{dim,order} <: Interpolation{dim,RefTetrahedron,order} end
 
+#################################################
+# Non-conforming Crouzeix-Raviart dim 2 order 1 #
+#################################################
 getnbasefunctions(::CrouzeixRaviart{2,1}) = 3
 nfacedofs(::CrouzeixRaviart{2,1}) = 1
 
@@ -802,3 +805,98 @@ function value(ip::CrouzeixRaviart{2,1}, i::Int, ξ::Vec{2})
     i == 3 && return 1.0 - 2*ξ_y
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
+
+#################################################
+# Non-conforming Crouzeix-Raviart dim 3 order 1 #
+#################################################
+getnbasefunctions(::CrouzeixRaviart{3,1}) = 4
+nfacedofs(::CrouzeixRaviart{3,1}) = 1
+
+vertices(::CrouzeixRaviart{3,1}) = ()
+faces(::CrouzeixRaviart{3,1}) = ((1,), (2,), (3,), (4,))
+
+function reference_coordinates(::CrouzeixRaviart{3,1})
+    return [
+            Vec{3, Float64}((1/3, 1/3, 0.0)),
+            Vec{3, Float64}((1/3, 0.0, 1/3)),
+            Vec{3, Float64}((0.0, 1/3, 1/3)),
+            Vec{3, Float64}((1/3, 1/3, 1/3)),
+            ]
+end
+
+function value(ip::CrouzeixRaviart{3,1}, i::Int, ξ::Vec{3})
+    (x,y,z) = ξ
+    i == 1 && return 1 -3x
+    i == 2 && return 1 -3y
+    i == 3 && return 1 -3z
+    i == 4 && return 3x +3y +3z -2
+    return throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+"""
+Classical non-conforming Rannacher-Turek element.
+
+This element is basically the idea from Crouzeix and Raviart applied to
+quadrilaterals. For details see the original paper:
+R. Rannacher and S. Turek. "Simple nonconforming quadrilateral Stokes element."
+Numerical Methods for Partial Differential Equations 8.2 (1992): 97-111.
+"""
+struct RannacherTurek{dim,order} <: Interpolation{dim,RefCube,order} end
+
+#################################
+# Rannacher-Turek dim 2 order 1 #
+#################################
+getnbasefunctions(::RannacherTurek{2,1}) = 4
+nfacedofs(::RannacherTurek{2,1}) = 1
+
+vertices(::RannacherTurek{2,1}) = ()
+faces(::RannacherTurek{2,1}) = ((1,), (2,), (3,), (4,))
+
+function reference_coordinates(::RannacherTurek{2,1})
+    return [Vec{2, Float64}(( 0.0, -1.0)),
+            Vec{2, Float64}((-1.0,  0.0)),
+            Vec{2, Float64}(( 1.0,  0.0)),
+            Vec{2, Float64}(( 0.0,  1.0))]
+end
+
+function value(ip::RannacherTurek{2,1}, i::Int, ξ::Vec{2})
+    (x,y) = ξ
+
+    i == 1 && return -(x+1)^2/4 +(y+1)^2/4 +(x+1)/2 -(y+1)   +3/4
+    i == 2 && return  (x+1)^2/4 -(y+1)^2/4 -(x+1)   +(y+1)/2 +3/4
+    i == 3 && return  (x+1)^2/4 -(y+1)^2/4          +(y+1)/2 -1/4
+    i == 4 && return -(x+1)^2/4 +(y+1)^2/4 +(x+1)/2          -1/4
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+#################################
+# Rannacher-Turek dim 3 order 1 #
+#################################
+getnbasefunctions(::RannacherTurek{3,1}) = 6
+nfacedofs(::RannacherTurek{3,1}) = 1
+
+vertices(::RannacherTurek{3,1}) = ()
+faces(::RannacherTurek{3,1}) = ((1,), (2,), (3,), (4,), (5,), (6,))
+
+function reference_coordinates(::RannacherTurek{3,1})
+    return [Vec{3, Float64}(( 0.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0, -1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  0.0,  0.0)),
+            Vec{3, Float64}(( 1.0,  0.0,  0.0)),
+            Vec{3, Float64}(( 0.0,  1.0,  0.0)),
+            Vec{3, Float64}(( 0.0,  0.0,  1.0)),]
+end
+
+function value(ip::RannacherTurek{3,1}, i::Int, ξ::Vec{3})
+    (x,y,z) = ξ
+
+    i == 1 && return -2((x+1))^2/12 +1(x+1)/3 -2((y+1))^2/12 +1(y+1)/3 +4((z+1))^2/12 -7(z+1)/6 + 2/3
+    i == 2 && return -2((x+1))^2/12 +1(x+1)/3 +4((y+1))^2/12 -7(y+1)/6 -2((z+1))^2/12 +1(z+1)/3 + 2/3
+    i == 3 && return  4((x+1))^2/12 -7(x+1)/6 -2((y+1))^2/12 +1(y+1)/3 -2((z+1))^2/12 +1(z+1)/3 + 2/3
+    i == 4 && return  4((x+1))^2/12 -1(x+1)/6 -2((y+1))^2/12 +1(y+1)/3 -2((z+1))^2/12 +1(z+1)/3 - 1/3
+    i == 5 && return -2((x+1))^2/12 +1(x+1)/3 +4((y+1))^2/12 -1(y+1)/6 -2((z+1))^2/12 +1(z+1)/3 - 1/3
+    i == 6 && return -2((x+1))^2/12 +1(x+1)/3 -2((y+1))^2/12 +1(y+1)/3 +4((z+1))^2/12 -1(z+1)/6 - 1/3
+
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
