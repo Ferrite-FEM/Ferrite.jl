@@ -5,7 +5,7 @@ abstract type AbstractDofHandler end
 
 Construct a `DofHandler` based on `grid`.
 
-Operates slightly faster than [`MixedDofHandler`](@docs). Supports:
+Operates slightly faster than [`MixedDofHandler`](@ref). Supports:
 - `Grid`s with a single concrete cell type.
 - One or several fields on the whole domaine.
 """
