@@ -23,7 +23,7 @@ global sparse matrix. Use [`assemble!`](@ref) for each element, and [`end_assemb
 to finalize the assembly and return the sparse matrix.
 
 Note that giving a sparse matrix as input can be more efficient. See below and 
-as described in the [manual](@ref assembly_in_manual).
+as described in the [manual](@ref man-assembly).
 
 !!! note
     When the same matrix pattern is used multiple times (for e.g. multiple time steps or

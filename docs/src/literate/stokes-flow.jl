@@ -78,7 +78,7 @@
 # and a third equation ``\delta\lambda \int_{\Gamma} p\ \mathrm{d}\Gamma = 0`` so that we
 # can solve for ``\lambda``. However, since we in this case are not interested in computing
 # ``\lambda``, and since the constraint is linear, we can directly embed this constraint
-# using an [`AffineConstraint`](@ref) in Ferrite.
+# using an `AffineConstraint` in Ferrite.
 #
 # After FE discretization we obtain a linear system of the form
 # ``\underline{\underline{K}}\ \underline{a} = \underline{f}``, where

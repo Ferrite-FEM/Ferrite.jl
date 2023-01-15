@@ -314,7 +314,7 @@ Create an iterator over the points in the [`PointEvalHandler`](@ref).
 The elements of the iterator are either a [`PointLocation`](@ref), if the corresponding
 point could be found in the grid, or `nothing`, if the point was not found.
 
-A `PointLocation` can be used to query the cell ID with [`cellid`](@ref), and can be used
+A `PointLocation` can be used to query the cell ID with `cellid`, and can be used
 to reinitialize [`PointValues`](@ref) with [`reinit!`](@ref).
 
 # Examples
