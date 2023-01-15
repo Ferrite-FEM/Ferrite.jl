@@ -161,8 +161,8 @@ nfields(dh::MixedDofHandler) = length(getfieldnames(dh))
 
 Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
 """
-#TODO: perhaps check that a field with the same name is the same field?
 function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
+    #TODO: perhaps check that a field with the same name is the same field?
     @assert !isclosed(dh)
     _check_same_celltype(dh.grid, collect(fh.cellset))
     _check_cellset_intersections(dh, fh)
