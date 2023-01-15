@@ -489,7 +489,7 @@ Example:
 julia> grid = generate_grid(Triangle, (3, 3))
 Grid{2, Triangle, Float64} with 18 Triangle cells and 16 nodes
 
-julia> dh = MixedDofHandler(grid); push!(dh, :u, 3); push!(dh, :p, 1); close!(dh);
+julia> dh = MixedDofHandler(grid); add!(dh, :u, 3); add!(dh, :p, 1); close!(dh);
 
 julia> dof_range(dh, :u)
 1:9
