@@ -137,8 +137,8 @@ end;
 
 function create_dofhandler(grid, ipu, ipp)
     dh = DofHandler(grid)
-    push!(dh, :u, 3, ipu) # displacement dim = 3
-    push!(dh, :p, 1, ipp) # pressure dim = 1
+    add!(dh, :u, 3, ipu) # displacement dim = 3
+    add!(dh, :p, 1, ipp) # pressure dim = 1
     close!(dh)
     return dh
 end;

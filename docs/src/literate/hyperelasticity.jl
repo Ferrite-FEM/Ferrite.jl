@@ -323,7 +323,7 @@ function solve()
 
     ## DofHandler
     dh = DofHandler(grid)
-    push!(dh, :u, 3) # Add a displacement field
+    add!(dh, :u, 3) # Add a displacement field
     close!(dh)
 
     function rotation(X, t, θ = deg2rad(60.0))
