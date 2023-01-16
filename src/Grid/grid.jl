@@ -679,7 +679,6 @@ end
 
 Fills the vector `x` with the coordinates of a cell defined by either its cellid or the cell object itself.
 """
-
 @inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T} 
     cell = getcells(grid, cellid)
     getcoordinates!(x, grid, cell)

@@ -257,7 +257,7 @@ update!(ch_periodic, 0.0)
 
 # This will now constrain any degrees of freedom located on the mirror boundaries to
 # the matching degree of freedom on the image boundaries. Internally this will create
-# a number of [`AffineConstraint`](@ref)s of the form `u_i = 1 * u_j + 0`:
+# a number of `AffineConstraint`s of the form `u_i = 1 * u_j + 0`:
 # ```julia
 # a = AffineConstraint(u_m, [u_i => 1], 0)
 # ```

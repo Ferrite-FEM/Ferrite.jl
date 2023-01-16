@@ -67,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Added an overview of the Examples section. ([#531][github-531])
     - Added an example showing topology optimization. ([#531][github-531])
     - Various typo fixes. ([#574][github-574])
+    - Fix broken links. ([#583][github-583])
 
 ## [0.3.10] - 2022-12-11
 ### Added
