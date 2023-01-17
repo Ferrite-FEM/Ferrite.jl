@@ -9,7 +9,11 @@ using LinearAlgebra
 using SparseArrays
 
 const HAS_EXTENSIONS = isdefined(Base, :get_extension)
-if HAS_EXTENSIONS
+
+# https://github.com/JuliaLang/julia/pull/47749
+const MODULE_CAN_BE_TYPE_PARAMETER = VERSION >= v"1.10.0-DEV.90"
+
+if HAS_EXTENSIONS && MODULE_CAN_BE_TYPE_PARAMETER
     import Metis
 end
 

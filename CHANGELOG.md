@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
  - [Metis.jl](https://github.com/JuliaSparse/Metis.jl) extension for fill-reducing DoF
-   permutation. This uses Julias new package extension mechanism (requires Julia 1.9) to
+   permutation. This uses Julias new package extension mechanism (requires Julia 1.10) to
    support a new DoF renumbering order `DofOrder.Ext{Metis}()` that can be passed to
    `renumber!` to renumber DoFs using the Metis.jl library. ([#393][github-393],
    [#549][github-549])

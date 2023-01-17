@@ -18,7 +18,7 @@ Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
 
 [extensions]
 FerriteBlockArrays = "BlockArrays"
-MetisExt = "Metis"
+FerriteMetis = "Metis"
 
 [compat]
 EnumX = "1"
