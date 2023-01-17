@@ -711,9 +711,9 @@ end
 
 function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
     cell = getcells(grid, i)
-    cellnodes!(global_nodes, grid, cell)
+    _cellnodes!(global_nodes, cell)
 end
-function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, cell::AbstractCell)
+function _cellnodes!(global_nodes::Vector{Int}, cell::AbstractCell)
     @assert length(global_nodes) == nnodes(cell)
     @inbounds for i in 1:length(global_nodes)
         global_nodes[i] = cell.nodes[i]
