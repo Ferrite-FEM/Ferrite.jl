@@ -302,16 +302,6 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     return global_dofs
 end
 
-function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid{dim}, i::Int) where {dim}
-    nodes = getcells(grid,i).nodes
-    N = length(nodes)
-    @assert length(global_nodes) == N
-    for j in 1:N
-        global_nodes[j] = nodes[j]
-    end
-    return global_nodes
-end
-
 cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, dh.grid, i)
 
 function celldofs(dh::DofHandler, i::Int)

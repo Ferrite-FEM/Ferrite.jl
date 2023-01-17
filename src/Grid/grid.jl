@@ -712,6 +712,18 @@ end
 @inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
 @inline getcoordinates(grid::AbstractGrid, face::FaceIndex) = getcoordinates(grid, face.idx[1])
 
+function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
+    cell = getcells(grid, i)
+    _cellnodes!(global_nodes, cell)
+end
+function _cellnodes!(global_nodes::Vector{Int}, cell::AbstractCell)
+    @assert length(global_nodes) == nnodes(cell)
+    @inbounds for i in 1:length(global_nodes)
+        global_nodes[i] = cell.nodes[i]
+    end
+    return global_nodes
+end
+
 function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) ")
     typestrs = sort!(collect(Set(repr(typeof(x)) for x in grid.cells)))
