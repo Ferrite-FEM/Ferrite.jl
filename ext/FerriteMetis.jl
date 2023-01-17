@@ -1,4 +1,4 @@
-module MetisExt
+module FerriteMetis
 
 using Ferrite
 using Ferrite: AbstractDofHandler
@@ -80,4 +80,4 @@ function Ferrite.compute_renumber_permutation(
     return perm
 end
 
-end # module MetisExt
+end # module FerriteMetis
