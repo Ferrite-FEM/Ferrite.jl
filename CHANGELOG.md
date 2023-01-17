@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.3.11] - 2023-01-17
 ### Added
  - [Metis.jl](https://github.com/JuliaSparse/Metis.jl) extension for fill-reducing DoF
    permutation. This uses Julias new package extension mechanism (requires Julia 1.10) to
@@ -43,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    time. ([#459][github-459])
  - The elements of a `CellIterator` are now `CellCache` instead of the iterator itself,
    which was confusing in some cases. This change does not affect typical user code.
-   [#546][github-546])
+   ([#546][github-546])
 ### Deprecated
  - Adding fields to a DoF handler with `push!(dh, ...)` has been deprecated in favor of
    `add!(dh, ...)`. This is to make it consistent with how constraints are added to a
@@ -296,8 +298,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-574]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/574
 [github-575]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/575
 [github-578]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/578
+[github-583]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/583
 
-[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.10...HEAD
+[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.11...HEAD
+[0.3.11]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.10...v0.3.11
 [0.3.10]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.7...v0.3.8
