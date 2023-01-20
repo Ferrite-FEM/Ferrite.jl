@@ -1,5 +1,9 @@
 module FerriteMetis
 
+# This extension requires modules as type parameters
+# https://github.com/JuliaLang/julia/pull/47749
+if VERSION >= v"1.10.0-DEV.90"
+
 using Ferrite
 using Ferrite: AbstractDofHandler
 using Metis.LibMetis: idx_t
@@ -79,5 +83,7 @@ function Ferrite.compute_renumber_permutation(
 
     return perm
 end
+
+end # VERSION check
 
 end # module FerriteMetis
