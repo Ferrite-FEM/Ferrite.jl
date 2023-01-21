@@ -6,7 +6,7 @@ function test_apply_rhs()
     cellvalues = CellScalarValues(qr, ip)
     
     dh = DofHandler(grid)
-    push!(dh, :u, 1)
+    add!(dh, :u, 1)
     close!(dh)
     
     K = create_sparsity_pattern(dh)

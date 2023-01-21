@@ -1,6 +1,7 @@
 using Ferrite
 using Tensors
 using Test
+using Logging
 using ForwardDiff
 import SHA
 using Random
@@ -8,7 +9,11 @@ using LinearAlgebra
 using SparseArrays
 
 const HAS_EXTENSIONS = isdefined(Base, :get_extension)
-if HAS_EXTENSIONS
+
+# https://github.com/JuliaLang/julia/pull/47749
+const MODULE_CAN_BE_TYPE_PARAMETER = VERSION >= v"1.10.0-DEV.90"
+
+if HAS_EXTENSIONS && MODULE_CAN_BE_TYPE_PARAMETER
     import Metis
 end
 
@@ -28,5 +33,6 @@ include("test_pointevaluation.jl")
 # include("test_notebooks.jl")
 include("test_apply_rhs.jl")
 include("test_apply_analytical.jl")
+HAS_EXTENSIONS && include("blockarrays.jl")
 include("test_examples.jl")
 @test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined

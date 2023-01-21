@@ -561,7 +561,9 @@ _warn_emptyset(set, name) = length(set) == 0 && @warn("no entities added to the 
 
 Adds a cellset to the grid with key `name`.
 Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
-The `MixedDofHandler` can construct different fields which live not on the whole domain, but rather on a cellset. 
+The `MixedDofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
+`all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` in the cell if the cell
+should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 
 ```julia
 addcellset!(grid, "left", Set((1,3))) #add cells with id 1 and 3 to cellset left
@@ -600,6 +602,8 @@ end
 Adds a faceset to the grid with key `name`.
 A faceset maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id, local_face_id)`.
 Facesets are used to initialize `Dirichlet` structs, that are needed to specify the boundary for the `ConstraintHandler`.
+`all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` on the face if the face
+should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 
 ```julia
 addfaceset!(gird, "right", Set(((2,2),(4,2))) #see grid manual example for reference
@@ -675,7 +679,6 @@ end
 
 Fills the vector `x` with the coordinates of a cell defined by either its cellid or the cell object itself.
 """
-
 @inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T} 
     cell = getcells(grid, cellid)
     getcoordinates!(x, grid, cell)
@@ -708,6 +711,18 @@ Return a vector with the coordinates of the vertices of cell number `cell`.
 end
 @inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
 @inline getcoordinates(grid::AbstractGrid, face::FaceIndex) = getcoordinates(grid, face.idx[1])
+
+function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
+    cell = getcells(grid, i)
+    _cellnodes!(global_nodes, cell)
+end
+function _cellnodes!(global_nodes::Vector{Int}, cell::AbstractCell)
+    @assert length(global_nodes) == nnodes(cell)
+    @inbounds for i in 1:length(global_nodes)
+        global_nodes[i] = cell.nodes[i]
+    end
+    return global_nodes
+end
 
 function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) ")

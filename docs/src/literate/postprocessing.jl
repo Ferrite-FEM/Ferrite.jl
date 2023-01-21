@@ -3,7 +3,7 @@
 # ![](heat_square_fluxes.png)
 #
 # *Figure 1*: Heat flux computed from the solution to the heat equation on
-# the unit square, see previous example: [Heat equation](@ref).
+# the unit square, see previous example: [Heat Equation](@ref).
 #
 #-
 #md # !!! tip

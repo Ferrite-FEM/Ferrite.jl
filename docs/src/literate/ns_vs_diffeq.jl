@@ -167,8 +167,8 @@ ip_p = Lagrange{dim, RefCube, 1}()
 cellvalues_p = CellScalarValues(qr, ip_p, ip_geom);
 
 dh = DofHandler(grid)
-push!(dh, :v, dim, ip_v)
-push!(dh, :p, 1, ip_p)
+add!(dh, :v, dim, ip_v)
+add!(dh, :p, 1, ip_p)
 close!(dh);
 
 # ### Boundary Conditions
