@@ -155,7 +155,7 @@ end;
 function create_dofhandler(grid, interpolation)
     dh = DofHandler(grid)
     dim = 3
-    push!(dh, :u, dim, interpolation) # add a displacement field with 3 components
+    add!(dh, :u, dim, interpolation) # add a displacement field with 3 components
     close!(dh)
     return dh
 end

@@ -24,7 +24,7 @@ function L2Projector(fe_values::Ferrite.Values, interp::Interpolation,
     dh = MixedDofHandler(grid)
     field = Field(:_, interp, 1)
     fh = FieldHandler([field], Set(set))
-    push!(dh, fh)
+    add!(dh, fh)
     _, vertex_dict, _, _ = __close!(dh)
 
     M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
@@ -81,7 +81,7 @@ function L2Projector(
     dh = MixedDofHandler(grid)
     field = Field(:_, func_ip, 1) # we need to create the field, but the interpolation is not used here
     fh = FieldHandler([field], Set(set))
-    push!(dh, fh)
+    add!(dh, fh)
     _, vertex_dict, _, _ = __close!(dh)
 
     M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix

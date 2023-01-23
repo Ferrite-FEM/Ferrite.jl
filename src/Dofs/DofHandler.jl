@@ -5,7 +5,7 @@ abstract type AbstractDofHandler end
 
 Construct a `DofHandler` based on `grid`.
 
-Operates slightly faster than [`MixedDofHandler`](@docs). Supports:
+Operates slightly faster than [`MixedDofHandler`](@ref). Supports:
 - `Grid`s with a single concrete cell type.
 - One or several fields on the whole domaine.
 """
@@ -87,7 +87,7 @@ Return the local dof range for `field_name`. Example:
 julia> grid = generate_grid(Triangle, (3, 3))
 Grid{2, Triangle, Float64} with 18 Triangle cells and 16 nodes
 
-julia> dh = DofHandler(grid); push!(dh, :u, 3); push!(dh, :p, 1); close!(dh);
+julia> dh = DofHandler(grid); add!(dh, :u, 3); add!(dh, :p, 1); close!(dh);
 
 julia> dof_range(dh, :u)
 1:9
@@ -104,15 +104,15 @@ function dof_range(dh::DofHandler, field_name::Symbol)
 end
 
 """
-    push!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
+    add!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
 
 Add a `dim`-dimensional `Field` called `name` which is approximated by `ip` to `dh`.
 
 The field is added to all cells of the underlying grid. In case no interpolation `ip` is given,
 the default interpolation of the grid's celltype is used. 
-If the grid uses several celltypes, [`push!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
+If the grid uses several celltypes, [`add!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
 """
-function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
+function add!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
     @assert !isclosed(dh)
     @assert !in(name, dh.field_names)
     push!(dh.field_names, name)
@@ -300,16 +300,6 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
     unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
     return global_dofs
-end
-
-function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid{dim}, i::Int) where {dim}
-    nodes = getcells(grid,i).nodes
-    N = length(nodes)
-    @assert length(global_nodes) == N
-    for j in 1:N
-        global_nodes[j] = nodes[j]
-    end
-    return global_nodes
 end
 
 cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, dh.grid, i)

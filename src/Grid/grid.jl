@@ -679,7 +679,6 @@ end
 
 Fills the vector `x` with the coordinates of a cell defined by either its cellid or the cell object itself.
 """
-
 @inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T} 
     cell = getcells(grid, cellid)
     getcoordinates!(x, grid, cell)
@@ -712,6 +711,18 @@ Return a vector with the coordinates of the vertices of cell number `cell`.
 end
 @inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
 @inline getcoordinates(grid::AbstractGrid, face::FaceIndex) = getcoordinates(grid, face.idx[1])
+
+function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
+    cell = getcells(grid, i)
+    _cellnodes!(global_nodes, cell)
+end
+function _cellnodes!(global_nodes::Vector{Int}, cell::AbstractCell)
+    @assert length(global_nodes) == nnodes(cell)
+    @inbounds for i in 1:length(global_nodes)
+        global_nodes[i] = cell.nodes[i]
+    end
+    return global_nodes
+end
 
 function Base.show(io::IO, ::MIME"text/plain", grid::AbstractGrid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) ")

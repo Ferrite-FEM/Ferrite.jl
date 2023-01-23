@@ -4,8 +4,8 @@ using Ferrite, BlockArrays, SparseArrays, Test
     grid = generate_grid(Triangle, (10, 10))
 
     dh = DofHandler(grid)
-    push!(dh, :u, 2)
-    push!(dh, :p, 1)
+    add!(dh, :u, 2)
+    add!(dh, :p, 1)
     close!(dh)
     renumber!(dh, DofOrder.FieldWise())
     nd = ndofs(dh) ÷ 3

@@ -55,7 +55,7 @@
     end
 
     for (dh,u) in zip(dhs,(u1,u2))
-        push!(dh, :u, 1)
+        add!(dh, :u, 1)
         close!(dh)
         ch = ConstraintHandler(dh)
         add!(ch, dbc)
