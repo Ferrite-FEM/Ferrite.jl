@@ -133,11 +133,11 @@ Returns the number of unique fields defined.
 nfields(dh::MixedDofHandler) = length(getfieldnames(dh))
 
 """
-    push!(dh::MixedDofHandler, fh::FieldHandler)
+    add!(dh::MixedDofHandler, fh::FieldHandler)
 
 Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
 """
-function Base.push!(dh::MixedDofHandler, fh::FieldHandler)
+function add!(dh::MixedDofHandler, fh::FieldHandler)
     @assert !isclosed(dh)
     _check_same_celltype(dh.grid, collect(fh.cellset))
     _check_cellset_intersections(dh, fh)
@@ -160,13 +160,13 @@ function _check_cellset_intersections(dh::MixedDofHandler, fh::FieldHandler)
     end
 end
 
-function Base.push!(dh::MixedDofHandler, name::Symbol, dim::Int)
+function add!(dh::MixedDofHandler, name::Symbol, dim::Int)
     celltype = getcelltype(dh.grid)
-    isconcretetype(celltype) || error("If you have more than one celltype in Grid, you must use push!(dh::MixedDofHandler, fh::FieldHandler)")
-    push!(dh, name, dim, default_interpolation(celltype))
+    isconcretetype(celltype) || error("If you have more than one celltype in Grid, you must use add!(dh::MixedDofHandler, fh::FieldHandler)")
+    add!(dh, name, dim, default_interpolation(celltype))
 end
 
-function Base.push!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolation)
+function add!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolation)
     @assert !isclosed(dh)
 
     celltype = getcelltype(dh.grid)
@@ -400,7 +400,9 @@ end
 
 find_field(dh::MixedDofHandler, field_name::Symbol) = find_field(first(dh.fieldhandlers), field_name)
 field_offset(dh::MixedDofHandler, field_name::Symbol) = field_offset(first(dh.fieldhandlers), field_name)
+getfieldinterpolation(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].interpolation
 getfieldinterpolation(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].interpolation
+getfielddim(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].dim
 getfielddim(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].dim
 
 function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) where T

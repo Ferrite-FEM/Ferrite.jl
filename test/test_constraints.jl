@@ -5,8 +5,8 @@
     Γ = getfaceset(grid, "left")
     face_map = collect_periodic_faces(grid, "left", "right")
     dh = DofHandler(grid)
-    push!(dh, :s, 1)
-    push!(dh, :v, 2)
+    add!(dh, :s, 1)
+    add!(dh, :v, 2)
     close!(dh)
     ch = ConstraintHandler(dh)
 
@@ -78,8 +78,8 @@ end
     grid = generate_grid(Triangle, (1, 1))
     addnodeset!(grid, "nodeset", x-> x[2] == -1 || x[1] == -1)
     dh = DofHandler(grid)
-    push!(dh, :u, 2)
-    push!(dh, :p, 1)
+    add!(dh, :u, 2)
+    add!(dh, :p, 1)
     close!(dh)
     ch = ConstraintHandler(dh)
     dbc1 = Dirichlet(:u, getnodeset(grid, "nodeset"), (x,t) -> x, [1, 2])
@@ -105,8 +105,8 @@ end
    ip_linear = Lagrange{dim, RefCube, 1}()
    field_u = Field(:u, ip_quadratic, dim)
    field_c = Field(:c, ip_linear, 1)
-   push!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set1")))
-   push!(dh, FieldHandler([field_u], getcellset(mesh, "set2")))
+   add!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set1")))
+   add!(dh, FieldHandler([field_u], getcellset(mesh, "set2")))
 
    close!(dh)
 
@@ -131,8 +131,8 @@ end
    field_c = Field(:c, ip, 1)
 
    dh = MixedDofHandler(mesh)
-   push!(dh, FieldHandler([field_u], getcellset(mesh, "set1")))
-   push!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set2")))
+   add!(dh, FieldHandler([field_u], getcellset(mesh, "set1")))
+   add!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set2")))
    close!(dh)
 
    ch = ConstraintHandler(dh)
@@ -151,8 +151,8 @@ end
     addedgeset!(grid, "edge", x-> x[1] ≈ -1.0 && x[3] ≈ -1.0)
 
     dh = DofHandler(grid)
-    push!(dh, :u, 3)
-    push!(dh, :p, 1)
+    add!(dh, :u, 3)
+    add!(dh, :p, 1)
     close!(dh)
 
     ch = ConstraintHandler(dh)
@@ -175,8 +175,8 @@ end
 
     #3d quad with 1st order 2d interpolation
     dh = DofHandler(grid)
-    push!(dh, :u, 1, Lagrange{2,RefCube,2}())
-    push!(dh, :θ, 1, Lagrange{2,RefCube,2}())
+    add!(dh, :u, 1, Lagrange{2,RefCube,2}())
+    add!(dh, :θ, 1, Lagrange{2,RefCube,2}())
     close!(dh)
 
     addedgeset!(grid, "edge", x -> x[2] ≈ 0.0) #bottom edge
@@ -189,11 +189,82 @@ end
     @test ch.prescribed_dofs == [10, 11, 14, 25, 27]
 end
 
+@testset "edge bc mixed grid" begin
+    # Test mesh
+    # 6---7---8---9---10    
+    # |   |2 /|   |   |     :u 1:5
+    # | 1 | / | 4 | 5 |     :v 1:2
+    # |   |/ 3|   |   |     
+    # 1---2---3---4---5
+    #
+    # |---A---|---B---|
+    #     |---C---|
+    #
+    # Dofs per node (note, depends on push! order below) (:u, [:v])
+    # node nr     1        2      3      4      5      6      7      8       9     10
+    nodedofs = [(1, 5), (2, 6), (11,), (12,), (14,), (4,8), (3,7), (9,10), (13,), (15,)]
+    
+    # Create Grid based on above drawing
+    nodes = [Node{2,Float64}(Vec{2,Float64}((i, j))) for j in 0:1 for i in 0:4]
+    quadcells = [Quadrilateral((i, i+1, i+6, i+5)) for i in [1, 3, 4]]
+    tricells = [Triangle((2,8,7)), Triangle((2,3,8))]
+    cells = [quadcells[1], tricells..., quadcells[2:end]...]
+    cellsets = Dict("onlyuQ" => Set(4:5), "onlyuT" => Set(3:3),
+                    "uandvQ" => Set(1:1), "uandvT" => Set(2:2))
+    facesets = Dict("A" => Set((FaceIndex(1,1), FaceIndex(3,1))),
+                    "B" => Set((FaceIndex(4,1), FaceIndex(5,1))),
+                    "C" => Set((FaceIndex(3,1), FaceIndex(4,1))))
+    grid = Grid(cells, nodes, cellsets=cellsets, facesets=facesets)
+
+    # Create MixedDofHandler based on grid
+    dim = Ferrite.getdim(grid)  # 2
+    ip_quad = Lagrange{dim,RefCube,1}()
+    ip_tria = Lagrange{dim,RefTetrahedron,1}()
+    dh = MixedDofHandler(grid)
+    field_uT = Field(:u, ip_tria, 1)
+    field_uQ = Field(:u, ip_quad, 1)
+    field_vT = Field(:v, ip_tria, 1)
+    field_vQ = Field(:v, ip_quad, 1)
+
+    # Order important for test to ensure consistent dof ordering
+    push!(dh, FieldHandler([field_uQ, field_vQ], getcellset(grid, "uandvQ")))
+    push!(dh, FieldHandler([field_uT, field_vT], getcellset(grid, "uandvT")))
+    push!(dh, FieldHandler([field_uT], getcellset(grid, "onlyuT")))
+    push!(dh, FieldHandler([field_uQ], getcellset(grid, "onlyuQ")))
+    close!(dh)
+
+    # Add constraints 
+    ch = ConstraintHandler(dh)
+    dA_u = Dirichlet(:u, getfaceset(grid, "A"), (x,t) -> 1.0)
+    dA_v = Dirichlet(:v, getfaceset(grid, "A"), (x,t) -> 2.0)
+    dB_u = Dirichlet(:u, getfaceset(grid, "B"), (x,t) -> 3.0)  # Note, overwrites dA_u on node 3 
+    dB_v = Dirichlet(:v, getfaceset(grid, "B"), (x,t) -> 4.0)  # :v not on cells with "B"-faces
+    dC_v = Dirichlet(:v, getfaceset(grid, "C"), (x,t) -> 5.0)  # :v not on cells with "C"-faces
+    
+    @test_logs min_level=Logging.Warn add!(ch, dA_u)    # No warning should be issued
+    @test_logs min_level=Logging.Warn add!(ch, dA_v)    # No warning should be issued
+    @test_logs min_level=Logging.Warn add!(ch, dB_u)    # No warning should be issued
+    @test_logs (:warn,) add!(ch, dB_v)  # Warn about :v not in cells connected with dB_v's faceset
+    @test_logs (:warn,) add!(ch, dC_v)  # Warn about :v not in cells connected with dC_v's faceset
+    close!(ch)
+    
+    # The full bottom part of the mesh has been prescribed
+    @test sort(ch.prescribed_dofs) == sort([nd[i] for nd in nodedofs[1:5] for i in 1:length(nd)])
+
+    # Test that the correct dofs have been prescribed
+    update!(ch, 0.0)
+    #                 nodes       N1,  N2,  N1,  N2,  N3,  N4,  N5
+    #                 field       :u,  :u,  :v,  :v,  :u,  :u,  :u
+    #                   dof        1,   2,   5,   6,  11,  12,  14
+    @test ch.inhomogeneities == [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 3.0]
+    # Note that dB_u overwrite dA_u @ N3, hence the value 3.0 there
+end
+
 @testset "affine constraints" begin
 
     grid = generate_grid(Line, (10,))
     dh = DofHandler(grid)
-    push!(dh, :u, 1)
+    add!(dh, :u, 1)
     close!(dh)
 
     test_acs = [
@@ -261,6 +332,63 @@ end
         @test a ≈ aa ≈ al ≈ a_rhs1 ≈ a_rhs2
     end
 
+    # Test nonlinear solution procedure (on linear problem) with affine constraints 
+    # using standard assembly (i.e. not local condensation)
+    @testset "nonlinear" begin
+        params = (k=1.0, f=1.0, a=1.0, b=0.2, tol=1e-10, maxiter=2)
+        grid = generate_grid(Line, (2,)); addfaceset!(grid, "center", x->x[1]≈0.0)
+        dh = DofHandler(grid); add!(dh, :u, 1); close!(dh)
+
+        function doassemble!(K, r, dh, a, params)
+            # Spring elements 
+            k = params.k
+            Ke = [k -k; -k k]
+            # Quick and dirty assem
+            assembler = start_assemble(K, r)
+            for cell in CellIterator(dh)
+                ae = a[celldofs(cell)]
+                re = Ke*ae
+                assemble!(assembler, celldofs(cell), Ke, re)
+            end
+            r[3] -= params.f # Force on the main dof (right side)
+        end
+
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:u, getfaceset(grid, "center"), (x,t)->Vec{1}((0.0,))))
+        add!(ch, AffineConstraint(1, [3=>params.a], params.b))
+        close!(ch)
+
+        K = create_sparsity_pattern(dh, ch)
+        r = zeros(ndofs(dh))
+        a = zeros(ndofs(dh))
+
+        # Nonlinear solution
+        apply!(a, ch) 
+        for niter = 0:params.maxiter
+            doassemble!(K, r, dh, a, params)
+            apply_zero!(K, r, ch)
+            norm(r) < params.tol && break
+            Δa = -K\r 
+            apply_zero!(Δa, ch)
+            a .+= Δa
+        end
+        @test norm(r) < params.tol
+        a_nonlinear = copy(a)
+
+        # Linear solution
+        fill!(a, NaN) # (not used)
+        doassemble!(K, r, dh, a, params)
+        f = zero(r); f[end] = params.f
+        apply!(K, f, ch)
+        a_linear = K\f
+        apply!(a_linear, ch)
+
+        # Analytical comparison
+        a3 = (params.f/params.k - params.b)/(1 + params.a)
+        a_analytical = [params.a*a3+params.b; 0.0; a3]
+        @test a_linear ≈ a_analytical
+        @test a_nonlinear ≈ a_analytical
+    end
 end
 
 # Rotate -pi/2 around dir
@@ -588,7 +716,7 @@ end # testset
 
     # Scalar
     dh = DofHandler(grid)
-    push!(dh, :s, 1)
+    add!(dh, :s, 1)
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
@@ -627,7 +755,7 @@ end # testset
 
     # Vector
     dh = DofHandler(grid)
-    push!(dh, :v, 2)
+    add!(dh, :v, 2)
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
@@ -713,7 +841,7 @@ end # testset
     #  │       │       │
     #  1───5───2───12──10
     dh = DofHandler(grid)
-    push!(dh, :s, 1, Lagrange{2,RefCube,2}())
+    add!(dh, :s, 1, Lagrange{2,RefCube,2}())
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
@@ -773,7 +901,7 @@ end # testset
     #   │             │             │
     #  1,2────9,10───3,4───23,24──19,20
     dh = DofHandler(grid)
-    push!(dh, :v, 2, Lagrange{2,RefCube,2}())
+    add!(dh, :v, 2, Lagrange{2,RefCube,2}())
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
@@ -804,8 +932,8 @@ end # testset
     grid = generate_grid(Hexahedron, (1, 1, 1))
     face_map = collect_periodic_faces(grid)
     dh = DofHandler(grid)
-    push!(dh, :s, 1)
-    push!(dh, :v, 2)
+    add!(dh, :s, 1)
+    add!(dh, :v, 2)
     close!(dh)
 
     ch = ConstraintHandler(dh)
@@ -854,8 +982,8 @@ end # testset
     # Quadratic interpolation
     grid = generate_grid(Hexahedron, (5, 5, 5))
     dh = DofHandler(grid)
-    push!(dh, :s, 1, Lagrange{3,RefCube,2}())
-    push!(dh, :v, 2, Lagrange{3,RefCube,2}())
+    add!(dh, :s, 1, Lagrange{3,RefCube,2}())
+    add!(dh, :v, 2, Lagrange{3,RefCube,2}())
     close!(dh)
 
     compare_by_dbc(
@@ -882,7 +1010,7 @@ end # testset
     # 3D tetra scalar
     grid = generate_grid(Tetrahedron, (1, 1, 1))
     dh = DofHandler(grid)
-    push!(dh, :s, 1)
+    add!(dh, :s, 1)
     close!(dh)
     face_map = collect_periodic_faces(grid)
     ch = ConstraintHandler(dh)
@@ -896,7 +1024,7 @@ end # testset
     # 3D tetra vector
     grid = generate_grid(Tetrahedron, (2, 1, 1))
     dh = DofHandler(grid)
-    push!(dh, :v, 2)
+    add!(dh, :v, 2)
     close!(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
     ch = ConstraintHandler(dh)
@@ -917,7 +1045,7 @@ end # testset
     # 3D hex vector with dof rotation
     grid = generate_grid(Hexahedron, (1, 1, 1))
     dh = DofHandler(grid)
-    push!(dh, :v, 3)
+    add!(dh, :v, 3)
     close!(dh)
     rot = rotation_tensor(Vec{3}((0., 1., 0.)), π/2)
     face_map = collect_periodic_faces(grid, "left", "bottom", x -> rot ⋅ x)
@@ -959,8 +1087,8 @@ end # testset
     )
         grid = generate_grid(CT, ntuple(i -> 5, D))
         dh = DofHandler(grid)
-        push!(dh, :s, 1, IT)
-        push!(dh, :v, D, IT)
+        add!(dh, :s, 1, IT)
+        add!(dh, :v, D, IT)
         close!(dh)
 
         # Scalar
@@ -1007,8 +1135,8 @@ end # testset
         compare_by_dbc(
             dh,
             PeriodicDirichlet(:v, collect_periodic_faces(grid, "left", "right"), collect(1:D)),
-            Dirichlet(:v, getfaceset(grid, "left"), (x,t) -> [0., 0.], collect(1:D)),
-            Dirichlet(:v, getfaceset(grid, "right"), (x,t) -> [0., 0.], collect(1:D)),
+            Dirichlet(:v, getfaceset(grid, "left"), (x,t) -> fill(0., D), collect(1:D)),
+            Dirichlet(:v, getfaceset(grid, "right"), (x,t) -> fill(0., D), collect(1:D)),
         )
         compare_by_dbc(
             dh,
@@ -1032,8 +1160,8 @@ end # testset
             compare_by_dbc(
                 dh,
                 PeriodicDirichlet(:v, collect_periodic_faces(grid, "front", "back"), 1:D),
-                Dirichlet(:v, getfaceset(grid, "front"), (x,t) -> [0., 0.], 1:D),
-                Dirichlet(:v, getfaceset(grid, "back"), (x,t) -> [0., 0.], 1:D),
+                Dirichlet(:v, getfaceset(grid, "front"), (x,t) -> fill(0., D), 1:D),
+                Dirichlet(:v, getfaceset(grid, "back"), (x,t) -> fill(0., D), 1:D),
             )
             compare_by_dbc(
                 dh,
@@ -1048,7 +1176,7 @@ end # testset
 
 @testset "Affine constraints with master dofs that are prescribed" begin
     grid = generate_grid(Quadrilateral, (2, 2))
-    dh = DofHandler(grid); push!(dh, :u, 1); close!(dh)
+    dh = DofHandler(grid); add!(dh, :u, 1); close!(dh)
 
     #  8───7───9
     #  │   │   │
@@ -1182,7 +1310,7 @@ end # testset
 @testset "local application of bc" begin
     grid = generate_grid(Quadrilateral, (5,5))
     dh = DofHandler(grid)
-    push!(dh, :u, 1)
+    add!(dh, :u, 1)
     close!(dh)
     # Dirichlet BC
     ch_dbc = ConstraintHandler(dh)
@@ -1374,4 +1502,55 @@ end # testset
             @test apply_f!(K_p_standard \ f_p_standard, ch_p) ≈ apply_f!(K_p_ch \ f_p_ch, ch_p)
         end
     end
+end # testset
+
+@testset "Sparsity pattern without constrained dofs" begin
+    grid = generate_grid(Triangle, (5, 5))
+    dh = DofHandler(grid)
+    add!(dh, :u, 1)
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0))
+    close!(ch)
+    Kfull = create_sparsity_pattern(dh, ch)
+    K = create_sparsity_pattern(dh, ch; keep_constrained=false)
+    # Pattern tests
+    nonzero_edges = Set(
+        (i, j) for d in 1:getncells(grid)
+               for (i, j) in Iterators.product(celldofs(dh, d), celldofs(dh, d))
+    )
+    zero_edges = setdiff(Set(Iterators.product(1:ndofs(dh), 1:ndofs(dh))), nonzero_edges)
+    for (i, j) in zero_edges
+        @test Base.isstored(K, i, j) == Base.isstored(Kfull, i, j) == false
+    end
+    for (i, j) in nonzero_edges
+        if i != j && (haskey(ch.dofmapping, i) || haskey(ch.dofmapping, j))
+            @test !Base.isstored(K, i, j)
+        else
+            @test Base.isstored(K, i, j)
+        end
+        @test Base.isstored(Kfull, i, j)
+    end
+    # Assembly
+    afull = start_assemble(Kfull)
+    a = start_assemble(K)
+    Kc = copy(K)
+    ac = start_assemble(Kc, zeros(ndofs(dh)))
+    for cell in CellIterator(dh)
+        ke = rand(ndofs_per_cell(dh), ndofs_per_cell(dh))
+        assemble!(afull, celldofs(cell), ke)
+        kec = copy(ke)
+        apply_local!(kec, rand(ndofs_per_cell(dh)), celldofs(cell), ch)
+        assemble!(a, celldofs(cell), kec)
+        apply_assemble!(ac, ch, celldofs(cell), ke, rand(ndofs_per_cell(dh)))
+    end
+    apply!(Kfull, ch)
+    fd = free_dofs(ch)
+    pd = ch.prescribed_dofs
+    @test K ≈ Kc
+    @test K[fd, fd] ≈ Kc[fd, fd] ≈ Kfull[fd, fd]
+    for d in ch.prescribed_dofs
+        K[d, d] = Kc[d, d] = Kfull[d, d] = 1
+    end
+    @test K ≈ Kc ≈ Kfull
 end # testset

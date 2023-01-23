@@ -5,7 +5,7 @@ abstract type AbstractDofHandler end
 
 Construct a `DofHandler` based on `grid`.
 
-Operates slightly faster than [`MixedDofHandler`](@docs). Supports:
+Operates slightly faster than [`MixedDofHandler`](@ref). Supports:
 - `Grid`s with a single concrete cell type.
 - One or several fields on the whole domaine.
 """
@@ -94,7 +94,7 @@ Return the local dof range for `field_name`. Example:
 julia> grid = generate_grid(Triangle, (3, 3))
 Grid{2, Triangle, Float64} with 18 Triangle cells and 16 nodes
 
-julia> dh = DofHandler(grid); push!(dh, :u, 3); push!(dh, :p, 1); close!(dh);
+julia> dh = DofHandler(grid); add!(dh, :u, 3); add!(dh, :p, 1); close!(dh);
 
 julia> dof_range(dh, :u)
 1:9
@@ -111,15 +111,15 @@ function dof_range(dh::DofHandler, field_name::Symbol)
 end
 
 """
-    push!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
+    add!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
 
 Add a `dim`-dimensional `Field` called `name` which is approximated by `ip` to `dh`.
 
 The field is added to all cells of the underlying grid. In case no interpolation `ip` is given,
 the default interpolation of the grid's celltype is used. 
-If the grid uses several celltypes, [`push!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
+If the grid uses several celltypes, [`add!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
 """
-function Base.push!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(getgrid(dh))))
+function add!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(getgrid(dh))))
     @assert !isclosed(dh)
     @assert !in(name, dh.field_names)
     push!(dh.field_names, name)
@@ -309,16 +309,6 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     return global_dofs
 end
 
-function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid{dim}, i::Int) where {dim}
-    nodes = getcells(grid,i).nodes
-    N = length(nodes)
-    @assert length(global_nodes) == N
-    for j in 1:N
-        global_nodes[j] = nodes[j]
-    end
-    return global_nodes
-end
-
 cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, getgrid(dh), i)
 
 function celldofs(dh::DofHandler, i::Int)
@@ -378,7 +368,7 @@ not. By default full coupling is assumed.
 See the [Sparsity Pattern](@ref) section of the manual.
 """
 function create_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing)
-    return _create_sparsity_pattern(dh, nothing, false, coupling)
+    return _create_sparsity_pattern(dh, nothing, false, true, coupling)
 end
 
 """
@@ -390,10 +380,15 @@ triangle of the matrix. Return a `Symmetric{SparseMatrixCSC}`.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-create_symmetric_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing) = Symmetric(_create_sparsity_pattern(dh, nothing, true, coupling), :U)
+function create_symmetric_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing)
+    return Symmetric(_create_sparsity_pattern(dh, nothing, true, true, coupling), :U)
+end
 
-function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool, coupling::Union{AbstractMatrix{Bool}, Nothing})
+function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool, keep_constrained::Bool, coupling::Union{AbstractMatrix{Bool},Nothing})
     @assert isclosed(dh)
+    if !keep_constrained
+        @assert ch !== nothing && isclosed(ch)
+    end
     ncells = getncells(getgrid(dh))
     if coupling !== nothing
         # Extend coupling to be of size (ndofs_per_cell × ndofs_per_cell)
@@ -416,6 +411,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
             dofi = global_dofs[i]
             dofj = global_dofs[j]
             sym && (dofi > dofj && continue)
+            !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
             cnt += 1
             if cnt > length(J)
                 resize!(I, trunc(Int, length(I) * 1.5))
@@ -439,18 +435,16 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     resize!(I, cnt)
     resize!(J, cnt)
 
+    K = spzeros!!(Float64, I, J, ndofs(dh), ndofs(dh))
+
     # If ConstraintHandler is given, create the condensation pattern due to affine constraints
     if ch !== nothing
         @assert isclosed(ch)
-
-        V = ones(length(I))
-        K = sparse(I, J, V, ndofs(dh), ndofs(dh))
-        _condense_sparsity_pattern!(K, ch.dofcoefficients, ch.dofmapping)
-        fill!(K.nzval, 0.0)
-    else
-        V = zeros(length(I))
-        K = sparse(I, J, V, ndofs(dh), ndofs(dh))
+        fill!(K.nzval, 1)
+        _condense_sparsity_pattern!(K, ch.dofcoefficients, ch.dofmapping, keep_constrained)
+        fillzero!(K)
     end
+
     return K
 end
 
@@ -481,11 +475,10 @@ function reshape_to_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol) where
     return data
 end
 
-function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=Set{Int}(1:getncells(getgrid(dh)))) where T
+function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=1:getncells(getgrid(dh))) where T
 
-    _celldofs = Vector{Int}(undef, ndofs_per_cell(dh, first(cellset)))
-    for cell in CellIterator(dh, collect(cellset))
-        celldofs!( _celldofs, cell)
+    for cell in CellIterator(dh, cellset, UpdateFlags(; nodes=true, coords=false, dofs=true))
+        _celldofs = celldofs(cell)
         counter = 1
         for node in getnodes(cell)
             for d in 1:field_dim

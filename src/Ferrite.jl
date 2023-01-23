@@ -60,6 +60,7 @@ include("Grid/coloring.jl")
 include("Dofs/DofHandler.jl")
 include("Dofs/MixedDofHandler.jl")
 include("Dofs/ConstraintHandler.jl")
+include("Dofs/apply_analytical.jl")
 include("Dofs/DofRenumbering.jl")
 
 include("iterators.jl")

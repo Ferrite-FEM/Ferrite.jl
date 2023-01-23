@@ -218,7 +218,7 @@ cellvalues = CellVectorValues(qr, ip);
 
 # We define a dof handler with a displacement field `:u`:
 dh = DofHandler(grid)
-push!(dh, :u, 2)
+add!(dh, :u, 2)
 close!(dh);
 
 # Now we need to define boundary conditions. As discussed earlier we will solve the problem
@@ -257,7 +257,7 @@ update!(ch_periodic, 0.0)
 
 # This will now constrain any degrees of freedom located on the mirror boundaries to
 # the matching degree of freedom on the image boundaries. Internally this will create
-# a number of [`AffineConstraint`](@ref)s of the form `u_i = 1 * u_j + 0`:
+# a number of `AffineConstraint`s of the form `u_i = 1 * u_j + 0`:
 # ```julia
 # a = AffineConstraint(u_m, [u_i => 1], 0)
 # ```
@@ -516,16 +516,12 @@ round.(ev; digits=-8)
 # Finally, we export the solution and the stress field to a VTK file. For the export we
 # also compute the macroscopic part of the displacement.
 
-chM = ConstraintHandler(dh)
-add!(chM, Dirichlet(:u, Set(1:getnnodes(grid)), (x, t) -> εᴹ[Int(t)] ⋅ x, [1, 2]))
-close!(chM)
 uM = zeros(ndofs(dh))
 
 vtk_grid("homogenization", dh) do vtk
     for i in 1:3
         ## Compute macroscopic solution
-        update!(chM, i)
-        apply!(uM, chM)
+        apply_analytical!(uM, dh, :u, x -> εᴹ[i] ⋅ x)
         ## Dirichlet
         vtk_point_data(vtk, dh, uM + u.dirichlet[i], "_dirichlet_$i")
         vtk_point_data(vtk, projector, σ.dirichlet[i], "σvM_dirichlet_$i")

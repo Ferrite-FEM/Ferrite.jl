@@ -22,6 +22,11 @@ for interpolation in (
                       DiscontinuousLagrange{3, RefCube, 0}(),
                       DiscontinuousLagrange{2, RefTetrahedron, 0}(),
                       DiscontinuousLagrange{3, RefTetrahedron, 0}(),
+                      DiscontinuousLagrange{1, RefCube, 1}(),
+                      DiscontinuousLagrange{2, RefCube, 1}(),
+                      DiscontinuousLagrange{3, RefCube, 1}(),
+                      DiscontinuousLagrange{2, RefTetrahedron, 1}(),
+                      DiscontinuousLagrange{3, RefTetrahedron, 1}(),
                       #
                       BubbleEnrichedLagrange{2,RefTetrahedron,1}(),
                       #
@@ -98,5 +103,10 @@ for interpolation in (
         end
     end
 end
+
+@test Ferrite.reference_coordinates(DiscontinuousLagrange{2,RefTetrahedron,0}()) ≈ [Vec{2,Float64}((1/3,1/3))]
+@test Ferrite.reference_coordinates(DiscontinuousLagrange{2,RefCube,0}()) ≈ [Vec{2,Float64}((0,0))]
+@test Ferrite.reference_coordinates(DiscontinuousLagrange{3,RefTetrahedron,0}()) ≈ [Vec{3,Float64}((1/4,1/4,1/4))]
+@test Ferrite.reference_coordinates(DiscontinuousLagrange{3,RefCube,0}()) ≈ [Vec{3,Float64}((0,0,0))]
 
 end

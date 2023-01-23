@@ -90,7 +90,7 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
     cvP = CellVectorValues(qr, Lagrange{DIM, RefTetrahedron, 1}())
 
     dofhandler = DofHandler(grid)
-    push!(dofhandler, :P, 3)
+    add!(dofhandler, :P, 3)
     close!(dofhandler)
 
     dofvector = zeros(ndofs(dofhandler))
@@ -205,12 +205,12 @@ function minimize!(model; kwargs...)
 
     od = TwiceDifferentiable(f, g!, h!, model.dofs, 0.0, ∇f, ∇²f)
 
-    # this way of minimizing is only beneficial when the initial guess is completely off,
-    # then a quick couple of ConjuageGradient steps brings us easily closer to the minimum.
-    # res = optimize(od, model.dofs, ConjugateGradient(linesearch=BackTracking()), Optim.Options(show_trace=true, show_every=1, g_tol=1e-20, iterations=10))
-    # model.dofs .= res.minimizer
-    # to get the final convergence, Newton's method is more ideal since the energy landscape should be almost parabolic
-    #+
+    ## this way of minimizing is only beneficial when the initial guess is completely off,
+    ## then a quick couple of ConjuageGradient steps brings us easily closer to the minimum.
+    ## res = optimize(od, model.dofs, ConjugateGradient(linesearch=BackTracking()), Optim.Options(show_trace=true, show_every=1, g_tol=1e-20, iterations=10))
+    ## model.dofs .= res.minimizer
+    ## to get the final convergence, Newton's method is more ideal since the energy landscape should be almost parabolic
+    ##+
     res = optimize(od, model.dofs, Newton(linesearch=BackTracking()), Optim.Options(show_trace=true, show_every=1, g_tol=1e-20))
     model.dofs .= res.minimizer
     return res

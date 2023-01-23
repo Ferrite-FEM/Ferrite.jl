@@ -111,6 +111,7 @@ export
     FieldHandler,
     Field,
     reshape_to_nodes,
+    apply_analytical!,
 
 # Constraints
     ConstraintHandler,
@@ -132,6 +133,7 @@ export
     ApplyStrategy,
 
 # iterators
+    CellCache,
     CellIterator,
     UpdateFlags,
     cellid,
