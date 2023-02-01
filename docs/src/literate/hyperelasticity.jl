@@ -375,7 +375,7 @@ function solve()
     while true; newton_itr += 1
         ## Construct the current guess
         u .= un .+ Δu
-        ## Compute residual and tanget for current guess
+        ## Compute residual and tangent for current guess
         assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
         ## Apply boundary conditions
         apply_zero!(K, g, dbcs)
