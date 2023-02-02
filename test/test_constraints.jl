@@ -1554,3 +1554,29 @@ end # testset
     end
     @test K ≈ Kc ≈ Kfull
 end # testset
+
+@testset "apply!(::Symmetric, ...)" begin
+    # Specifically this test that values below the diagonal of K2::Symmetric aren't touched
+    # and that the missing values are instead taken from above the diagonal.
+    grid = generate_grid(Line, (2,))
+    dh = DofHandler(grid)
+    add!(dh, :u, 1)
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:u, getfaceset(grid, "left"), x -> 1))
+    close!(ch)
+    K1 = rand(3, 3); K1 = sparse(K1'K1)
+    K2 = copy(K1); K2[2:3, 1] .= 42; K2[3, 2] = NaN; K2 = Symmetric(K2)
+    @test K1 == K2
+    f1 = Float64[1, 2, 3]
+    f2 = copy(f1)
+    apply!(K1, f1, ch)
+    apply!(K2, f2, ch)
+    @test K1 == K2
+    @test f1 == f2
+    # Error for affine constraints
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint(1, [3 => 1.0], 1.0))
+    close!(ch)
+    @test_throws ErrorException("condensation of ::Symmetric matrix not supported") apply!(K2, f2, ch)
+end
