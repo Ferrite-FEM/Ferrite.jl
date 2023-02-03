@@ -915,7 +915,7 @@ end
 function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
     dbc_added = false
     for fh in ch.dh.fieldhandlers
-        if overlaps(fh, dbc)
+        if dbc.field_name in getfieldnames(fh) && _is_cellset_dirichlet_ok(ch.dh.grid, fh.cellset, dbc.faces)
             # Recreating the `dbc` will create a copy of `dbc.faces`. 
             # If `dbc` have dofs not in `fh`, these will be removed from `dbc`, 
             # thus the need to copy `dbc.faces`.
@@ -929,14 +929,6 @@ function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
     end
     dbc_added || @warn("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's MixedDofHandler")
     return ch
-end
-
-function overlaps(fh::FieldHandler, dbc::Dirichlet)
-    dbc.field_name in getfieldnames(fh) || return false # Must contain the correct field
-    for (cellid, _) in dbc.faces
-        cellid in fh.cellset && return true
-    end
-    return false
 end
 
 function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_check_cellset=true)
@@ -966,15 +958,22 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_chec
     return ch
 end
 
-function _check_cellset_dirichlet(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex})
-    for (cellid,faceid) in faceset
-        if !(cellid in cellset)
-            @warn("You are trying to add a constraint to a face that is not in the cellset of the fieldhandler. The face will be skipped.")
-        end
+function _check_cellset_dirichlet(grid::AbstractGrid, cellset, faceset)
+    if !(_is_cellset_dirichlet_ok(grid, cellset, faceset))
+        @warn("You are trying to add a constraint a face/edge/node that is not in the cellset of the fieldhandler. This location will be skipped")
     end
 end
 
-function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int})
+function _is_cellset_dirichlet_ok(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex})
+    for (cellid,faceid) in faceset
+        if !(cellid in cellset)
+            return false
+        end
+    end
+    return true
+end
+
+function _is_cellset_dirichlet_ok(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int})
     nodes = Set{Int}()
     for cellid in cellset
         for nodeid in grid.cells[cellid].nodes
@@ -984,9 +983,10 @@ function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset
 
     for nodeid in nodeset
         if !(nodeid ∈ nodes)
-            @warn("You are trying to add a constraint to a node that is not in the cellset of the fieldhandler. The node will be skipped.")
+            return false
         end
     end
+    return true
 end
 
 """
