@@ -915,17 +915,19 @@ end
 function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
     dbc_added = false
     for fh in ch.dh.fieldhandlers
-        _, some_in = _all_or_some_in_cellset(ch.dh.grid, fh.cellset, dbc.faces)
-        if dbc.field_name in getfieldnames(fh) && some_in
-            # Recreating the `dbc` will create a copy of `dbc.faces`. 
-            # If `dbc` have dofs not in `fh`, these will be removed from `dbc`, 
-            # thus the need to copy `dbc.faces`.
-            # In this case, add! will warn, unless warn_check_cellset=false
-            dbc_ = Dirichlet(dbc.field_name, dbc.faces, dbc.f, 
-                isempty(dbc.components) ? nothing : dbc.components) 
-                # Check for empty already done when user created `dbc`
-            add!(ch, fh, dbc_, warn_check_cellset=false)
-            dbc_added = true
+        if dbc.field_name in getfieldnames(fh)
+            _, some_in = _all_or_some_in_cellset(ch.dh.grid, fh.cellset, dbc.faces)
+            if some_in    
+                # Recreating the `dbc` will create a copy of `dbc.faces`. 
+                # If `dbc` have dofs not in `fh`, these will be removed from `dbc`, 
+                # thus the need to copy `dbc.faces`.
+                # In this case, add! will warn, unless warn_check_cellset=false
+                dbc_ = Dirichlet(dbc.field_name, dbc.faces, dbc.f, 
+                    isempty(dbc.components) ? nothing : dbc.components) 
+                    # Check for empty already done when user created `dbc`
+                add!(ch, fh, dbc_, warn_check_cellset=false)
+                dbc_added = true
+            end
         end
     end
     dbc_added || @warn("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's MixedDofHandler")
