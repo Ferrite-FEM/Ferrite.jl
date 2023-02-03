@@ -645,7 +645,8 @@ const APPLY_INPLACE = ApplyStrategy.Inplace
 
 function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false;
                 strategy::ApplyStrategy.T=ApplyStrategy.Transpose)
-    K = isa(KK, Symmetric) ? KK.data : KK
+    sym = isa(KK, Symmetric)
+    K = sym ? KK.data : KK
     @assert length(f) == 0 || length(f) == size(K, 1)
     @boundscheck checkbounds(K, ch.prescribed_dofs, ch.prescribed_dofs)
     @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
@@ -659,14 +660,33 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
             v = ch.inhomogeneities[i]
             if v != 0
                 for j in nzrange(K, d)
-                    f[K.rowval[j]] -= v * K.nzval[j]
+                    r = K.rowval[j]
+                    sym && r > d && break # don't look below diagonal
+                    f[r] -= v * K.nzval[j]
+                end
+            end
+        end
+        if sym
+            # In the symmetric case, for a constrained dof `d`, we handle the contribution
+            # from `K[1:d, d]` in the loop above, but we are still missing the contribution
+            # from `K[(d+1):size(K,1), d]`. These values are not stored, but since the
+            # matrix is symmetric we can instead use `K[d, (d+1):size(K,1)]`. Looping over
+            # rows is slow, so loop over all columns again, and check if the row is a
+            # constrained row.
+            @inbounds for col in 1:size(K, 2)
+                for ri in nzrange(K, col)
+                    row = K.rowval[ri]
+                    row >= col && break
+                    if (i = get(ch.dofmapping, row, 0); i != 0)
+                        f[col] -= ch.inhomogeneities[i] * K.nzval[ri]
+                    end
                 end
             end
         end
     end
 
     # Condense K (C' * K * C) and f (C' * f)
-    _condense!(K, f, ch.dofcoefficients, ch.dofmapping)
+    _condense!(K, f, ch.dofcoefficients, ch.dofmapping, sym)
 
     # Remove constrained dofs from the matrix
     zero_out_columns!(K, ch.prescribed_dofs)
@@ -755,7 +775,7 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
 end
 
 # Condenses K and f: C'*K*C, C'*f, in-place assuming the sparsity pattern is correct
-function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int,Int}) where T
+function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int,Int}, sym::Bool=false) where T
 
     ndofs = size(K, 1)
     condense_f = !(length(f) == 0)
@@ -763,6 +783,11 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
 
     # Return early if there are no non-trivial affine constraints
     any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
+
+    # TODO: The rest of this method can't handle K::Symmetric
+    if sym
+        error("condensation of ::Symmetric matrix not supported")
+    end
 
     for col in 1:ndofs
         col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
