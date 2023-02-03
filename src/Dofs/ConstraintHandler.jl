@@ -915,7 +915,8 @@ end
 function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
     dbc_added = false
     for fh in ch.dh.fieldhandlers
-        if dbc.field_name in getfieldnames(fh) && _is_cellset_dirichlet_ok(ch.dh.grid, fh.cellset, dbc.faces)
+        _, some_in = _all_or_some_in_cellset(ch.dh.grid, fh.cellset, dbc.faces)
+        if dbc.field_name in getfieldnames(fh) && some_in
             # Recreating the `dbc` will create a copy of `dbc.faces`. 
             # If `dbc` have dofs not in `fh`, these will be removed from `dbc`, 
             # thus the need to copy `dbc.faces`.
@@ -959,21 +960,31 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_chec
 end
 
 function _check_cellset_dirichlet(grid::AbstractGrid, cellset, faceset)
-    if !(_is_cellset_dirichlet_ok(grid, cellset, faceset))
+    all_in, _ = _all_or_some_in_cellset(grid, cellset, faceset)
+    if !all_in
         @warn("You are trying to add a constraint a face/edge/node that is not in the cellset of the fieldhandler. This location will be skipped")
     end
 end
 
-function _is_cellset_dirichlet_ok(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex})
+# Return (true, true) if all items in faceset/nodeset are in the cellset
+# Return (false, true) if some items in faceset/nodeset are in the cellset
+# Return (false, false) if no items in faceset/nodeset are in the cellset
+function _all_or_some_in_cellset(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex})
+    all_in_cellset = true
+    some_in_cellset = false
     for (cellid,faceid) in faceset
         if !(cellid in cellset)
-            return false
+            all_in_cellset = false
+        elseif !some_in_cellset
+            some_in_cellset = true
         end
     end
-    return true
+    return all_in_cellset, some_in_cellset
 end
 
-function _is_cellset_dirichlet_ok(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int})
+function _all_or_some_in_cellset(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int})
+    all_in_cellset = true
+    some_in_cellset = false
     nodes = Set{Int}()
     for cellid in cellset
         for nodeid in grid.cells[cellid].nodes
@@ -983,10 +994,12 @@ function _is_cellset_dirichlet_ok(grid::AbstractGrid, cellset::Set{Int}, nodeset
 
     for nodeid in nodeset
         if !(nodeid ∈ nodes)
-            return false
+            all_in_cellset = false
+        elseif !some_in_cellset
+            some_in_cellset=true
         end
     end
-    return true
+    return all_in_cellset, some_in_cellset
 end
 
 """
