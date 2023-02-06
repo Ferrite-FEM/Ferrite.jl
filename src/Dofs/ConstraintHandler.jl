@@ -931,7 +931,7 @@ function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
 end
 
 function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_not_in_cellset=true)
-    if warn_not_in_cellset && !(_in_cellset(ch.dh.grid, cellset, faceset; all=true))
+    if warn_not_in_cellset && !(_in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=true))
         @warn("You are trying to add a constraint a face/edge/node that is not in the cellset of the fieldhandler. This location will be skipped")
     end
 
