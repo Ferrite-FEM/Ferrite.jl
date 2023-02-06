@@ -980,7 +980,7 @@ function _in_cellset(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryI
     return all # if not returned by now and all==false, then no `cellid`s where in cellset
 end
 
-function _in_cellset(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int}, all=true)
+function _in_cellset(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int}; all=true)
     nodes = Set{Int}()
     for cellid in cellset
         for nodeid in grid.cells[cellid].nodes
