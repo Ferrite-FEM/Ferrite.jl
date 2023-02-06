@@ -918,11 +918,11 @@ function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
         if dbc.field_name in getfieldnames(fh) && _in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=false)
             # Dofs in `dbc` not in `fh` will be removed, hence `dbc.faces` must be copied.
             # Recreating the `dbc` will create a copy of `dbc.faces`.
-            # In this case, add! will warn, unless warn_check_cellset=false
+            # In this case, add! will warn, unless `warn_not_in_cellset=false`
             dbc_ = Dirichlet(dbc.field_name, dbc.faces, dbc.f, 
                 isempty(dbc.components) ? nothing : dbc.components) 
                 # Check for empty already done when user created `dbc`
-            add!(ch, fh, dbc_, warn_check_cellset=false)
+            add!(ch, fh, dbc_, warn_not_in_cellset=false)
             dbc_added = true
         end
     end
@@ -930,8 +930,10 @@ function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
     return ch
 end
 
-function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_check_cellset=true)
-    warn_check_cellset && _check_cellset_dirichlet(ch.dh.grid, fh.cellset, dbc.faces)
+function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_not_in_cellset=true)
+    if warn_not_in_cellset && !(_in_cellset(grid, cellset, faceset; all=true))
+        @warn("You are trying to add a constraint a face/edge/node that is not in the cellset of the fieldhandler. This location will be skipped")
+    end
 
     celltype = getcelltype(ch.dh.grid, first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
 
@@ -955,12 +957,6 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_chec
 
     Ferrite._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue, fh.cellset)
     return ch
-end
-
-function _check_cellset_dirichlet(grid::AbstractGrid, cellset, faceset)
-    if !_in_cellset(grid, cellset, faceset; all=true)
-        @warn("You are trying to add a constraint a face/edge/node that is not in the cellset of the fieldhandler. This location will be skipped")
-    end
 end
 
 # If all==true, return true only if all items in faceset/nodeset are in the cellset
