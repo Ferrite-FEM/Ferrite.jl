@@ -227,10 +227,10 @@ end
     field_vQ = Field(:v, ip_quad, 1)
 
     # Order important for test to ensure consistent dof ordering
-    push!(dh, FieldHandler([field_uQ, field_vQ], getcellset(grid, "uandvQ")))
-    push!(dh, FieldHandler([field_uT, field_vT], getcellset(grid, "uandvT")))
-    push!(dh, FieldHandler([field_uT], getcellset(grid, "onlyuT")))
-    push!(dh, FieldHandler([field_uQ], getcellset(grid, "onlyuQ")))
+    add!(dh, FieldHandler([field_uQ, field_vQ], getcellset(grid, "uandvQ")))
+    add!(dh, FieldHandler([field_uT, field_vT], getcellset(grid, "uandvT")))
+    add!(dh, FieldHandler([field_uT], getcellset(grid, "onlyuT")))
+    add!(dh, FieldHandler([field_uQ], getcellset(grid, "onlyuQ")))
     close!(dh)
 
     # Add constraints 
