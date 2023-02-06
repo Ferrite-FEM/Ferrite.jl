@@ -962,31 +962,25 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_chec
 end
 
 function _check_cellset_dirichlet(grid::AbstractGrid, cellset, faceset)
-    all_in, _ = _all_or_some_in_cellset(grid, cellset, faceset)
-    if !all_in
+    if !_in_cellset(grid, cellset, faceset; all=true)
         @warn("You are trying to add a constraint a face/edge/node that is not in the cellset of the fieldhandler. This location will be skipped")
     end
 end
 
-# Return (true, true) if all items in faceset/nodeset are in the cellset
-# Return (false, true) if some items in faceset/nodeset are in the cellset
-# Return (false, false) if no items in faceset/nodeset are in the cellset
-function _all_or_some_in_cellset(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex})
-    all_in_cellset = true
-    some_in_cellset = false
+# If all==true, return true only if all items in faceset/nodeset are in the cellset
+# If all==false, return true if some items in faceset/nodeset are in the cellset
+function _in_cellset(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex}; all=true)
     for (cellid,faceid) in faceset
-        if !(cellid in cellset)
-            all_in_cellset = false
-        elseif !some_in_cellset
-            some_in_cellset = true
+        if cellid in cellset
+            all || return true
+        else
+            all && return false
         end
     end
-    return all_in_cellset, some_in_cellset
+    return all # if not returned by now and all==false, then no `cellid`s where in cellset
 end
 
-function _all_or_some_in_cellset(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int})
-    all_in_cellset = true
-    some_in_cellset = false
+function _in_cellset(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int}, all=true)
     nodes = Set{Int}()
     for cellid in cellset
         for nodeid in grid.cells[cellid].nodes
@@ -995,13 +989,13 @@ function _all_or_some_in_cellset(grid::AbstractGrid, cellset::Set{Int}, nodeset:
     end
 
     for nodeid in nodeset
-        if !(nodeid ∈ nodes)
-            all_in_cellset = false
-        elseif !some_in_cellset
-            some_in_cellset=true
+        if nodeid ∈ nodes
+            all || return true 
+        else
+            all && return false
         end
     end
-    return all_in_cellset, some_in_cellset
+    return all # if not returned by now and all==false, then no `cellid`s where in cellset
 end
 
 """
