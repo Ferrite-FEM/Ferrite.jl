@@ -726,7 +726,11 @@ end
 
 function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) ")
-    typestrs = sort!(collect(Set(repr(typeof(x)) for x in grid.cells)))
+    if isconcretetype(eltype(grid.cells))
+        typestrs = [repr(eltype(grid.cells))]
+    else
+        typestrs = sort!(repr.(Set(typeof(x) for x in grid.cells)))
+    end
     join(io, typestrs, '/')
     print(io, " cells and $(getnnodes(grid)) nodes")
 end
