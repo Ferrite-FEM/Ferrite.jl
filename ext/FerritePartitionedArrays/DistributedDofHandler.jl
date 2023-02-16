@@ -9,18 +9,18 @@ Supports:
 - `Grid`s with a single concrete cell type.
 - One or several fields on the whole domaine.
 """
-struct DistributedDofHandler{dim,T,G<:AbstractDistributedGrid{dim}} <: AbstractDofHandler
+struct DistributedDofHandler{dim,T,G<:Ferrite.AbstractDistributedGrid{dim}} <: Ferrite.AbstractDofHandler
     field_names::Vector{Symbol}
     field_dims::Vector{Int}
     # TODO: field_interpolations can probably be better typed: We should at least require
     #       all the interpolations to have the same dimension and reference shape
     field_interpolations::Vector{Interpolation}
-    bc_values::Vector{BCValues{T}} # TODO: BcValues is created/handeld by the constrainthandler, so this can be removed
+    bc_values::Vector{Ferrite.BCValues{T}} # TODO: BcValues is created/handeld by the constrainthandler, so this can be removed
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
-    closed::ScalarWrapper{Bool}
+    closed::Ferrite.ScalarWrapper{Bool}
     grid::G
-    ndofs::ScalarWrapper{Int}
+    ndofs::Ferrite.ScalarWrapper{Int}
 
     vertexdicts::Vector{Dict{Int,Int}}
     edgedicts::Vector{Dict{Tuple{Int,Int},Tuple{Int,Bool}}}
@@ -31,7 +31,7 @@ struct DistributedDofHandler{dim,T,G<:AbstractDistributedGrid{dim}} <: AbstractD
     ldof_to_rank::Vector{Int32}
 end
 
-function DistributedDofHandler(grid::AbstractDistributedGrid{dim}) where {dim}
+function DistributedDofHandler(grid::Ferrite.AbstractDistributedGrid{dim}) where {dim}
     isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. DistributedMixedDofHandler not implemented yet.")
     DistributedDofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, ScalarWrapper(-1), Dict{Int,Int}[], Dict{Tuple{Int,Int},Tuple{Int,Bool}}[],Dict{NTuple{dim,Int},Int}[], Dict{Int,Vector{Int}}[], Int[], Int32[])
 end

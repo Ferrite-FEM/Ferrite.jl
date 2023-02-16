@@ -2,7 +2,7 @@
 # TODO the following three structs can be merged to one struct with type parameter.
 """
 """
-struct SharedVertex <: SharedEntity
+struct SharedVertex <: Ferrite.SharedEntity
     local_idx::VertexIndex
     remote_vertices::Dict{Int,Vector{VertexIndex}}
 end
@@ -11,7 +11,7 @@ end
 
 """
 """
-struct SharedFace <: SharedEntity
+struct SharedFace <: Ferrite.SharedEntity
     local_idx::FaceIndex
     remote_faces::Dict{Int,Vector{FaceIndex}}
 end
@@ -20,7 +20,7 @@ end
 
 """
 """
-struct SharedEdge <: SharedEntity
+struct SharedEdge <: Ferrite.SharedEntity
     local_idx::EdgeIndex
     remote_edges::Dict{Int,Vector{EdgeIndex}}
 end
@@ -31,7 +31,7 @@ end
 @TODO docs
 @TODO PArrays ready constructor
 """
-mutable struct DistributedGrid{dim,C<:AbstractCell,T<:Real} <: AbstractDistributedGrid{dim}
+mutable struct DistributedGrid{dim,C<:Ferrite.AbstractCell,T<:Real} <: Ferrite.AbstractDistributedGrid{dim}
     # Dense comminicator on the grid
     grid_comm::MPI.Comm
     # Sparse communicator along the shared vertex neighbors
@@ -317,7 +317,7 @@ end
 
 
 # Here we define the entity ownership by the process sharing an entity with lowest rank in the grid communicator.
-function compute_owner(dgrid::AbstractDistributedGrid, shared_entity::SharedEntity)::Int32
+function compute_owner(dgrid::Ferrite.AbstractDistributedGrid, shared_entity::Ferrite.SharedEntity)::Int32
     my_rank = MPI.Comm_rank(global_comm(dgrid))+1 # Shift rank up by 1 to match Julia's indexing convention
     return minimum([my_rank; [remote_rank for (remote_rank, _) ∈ remote_entities(shared_entity)]])
 end
