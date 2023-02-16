@@ -13,7 +13,6 @@ include("FerritePartitionedArrays/grid.jl")
 include("FerritePartitionedArrays/DistributedDofHandler.jl")
 include("FerritePartitionedArrays/assembler.jl")
 include("FerritePartitionedArrays/constraints.jl")
-include("FerritePartitionedArrays/iterators.jl")
 include("FerritePartitionedArrays/vtk-export.jl")
 
 export 
