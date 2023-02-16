@@ -31,8 +31,8 @@ function QuadPointValuesAll(::Val{NS}, ::Val{:vector}, ip::Interpolation, ξ::TX
     dNdξ_scalar = ntuple(i->gradient(z->value(ip, i, z), ξ), getnbasefunctions(ip))
 
     function construct_vectorspace(scalar_var::Tuple, k::Int)
-        i = rem(k-1, dim) + 1   # index in 1:getnbasefunctions(ip)
-        j = div(k-1, dim) + 1   # index in 1:dim
+        i = div(k-1, dim) + 1   # index in 1:getnbasefunctions(ip)
+        j = rem(k-1, dim) + 1   # index in 1:dim
         ej = Vec{dim}(l->l==j ? 1.0 : 0.0)
         return ej ⊗ scalar_var[i]
     end

@@ -152,6 +152,7 @@ function run_assemble(n = 20)
     scratches = create_scratchvalues(K, f, dh);
     doassemble!(scratches, colors, dh, C, b); # compilation
 
+    scratches = create_scratchvalues(K, f, dh);
     b = @elapsed @time doassemble!(scratches, colors, dh, C, b);
     return b
 end
