@@ -281,7 +281,7 @@ struct COOAssembler{T}
     end
 end
 
-@propagate_inbounds function assemble!(a::COOAssembler{T}, edof::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
+@propagate_inbounds function Ferrite.assemble!(a::COOAssembler{T}, edof::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
     n_dofs = length(edof)
     append!(a.V, Ke)
     @inbounds for j in 1:n_dofs
@@ -292,14 +292,14 @@ end
     end
 end
 
-@propagate_inbounds function assemble!(a::COOAssembler{T}, dofs::AbstractVector{Int}, fe::AbstractVector{T}, Ke::AbstractMatrix{T}) where {T}
+@propagate_inbounds function Ferrite.assemble!(a::COOAssembler{T}, dofs::AbstractVector{Int}, fe::AbstractVector{T}, Ke::AbstractMatrix{T}) where {T}
     Ferrite.assemble!(a, dofs, Ke)
     map_parts(local_view(a.f, a.f.rows)) do f_local
         Ferrite.assemble!(f_local, dofs, fe)
     end
 end
 
-function end_assemble(assembler::COOAssembler{T}) where {T}
+function Ferrite.end_assemble(assembler::COOAssembler{T}) where {T}
     comm = global_comm(getglobalgrid(assembler.dh))
     np = MPI.Comm_size(comm)
     my_rank = MPI.Comm_rank(comm)+1

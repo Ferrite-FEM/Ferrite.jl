@@ -1,4 +1,4 @@
-function meandiag(K::PartitionedArrays.PSparseMatrix)
+function Ferrite.meandiag(K::PartitionedArrays.PSparseMatrix)
     # Get local portion of z
     z_pa = map_parts(local_view(K, K.rows, K.cols)) do K_local
         z = zero(eltype(K_local))
@@ -16,7 +16,7 @@ Poor man's Dirichlet BC application for PartitionedArrays. :)
 
     TODO integrate with constraints.
 """
-function apply_zero!(K::PartitionedArrays.PSparseMatrix, f::PartitionedArrays.PVector, ch::ConstraintHandler)
+function Ferrite.apply_zero!(K::PartitionedArrays.PSparseMatrix, f::PartitionedArrays.PVector, ch::ConstraintHandler)
     map_parts(local_view(f, f.rows), f.rows.partition) do f_local, partition
         f_local[ch.prescribed_dofs] .= 0.0
     end
@@ -36,7 +36,7 @@ Poor man's Dirichlet BC application for PartitionedArrays. :)
     TODO integrate with constraints.
     TODO optimize.
 """
-function apply!(K::PartitionedArrays.PSparseMatrix, f::PartitionedArrays.PVector, ch::ConstraintHandler)
+function Ferrite.apply!(K::PartitionedArrays.PSparseMatrix, f::PartitionedArrays.PVector, ch::ConstraintHandler)
     # Start by substracting the inhomogeneous solution from the right hand side
     u_constrained = PartitionedArrays.PVector(0.0, K.cols)
     map_parts(local_view(u_constrained, u_constrained.rows)) do u_local

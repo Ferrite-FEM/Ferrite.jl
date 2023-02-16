@@ -54,10 +54,10 @@ getlocalgrid(dh::DistributedDofHandler) = getlocalgrid(dh.grid)
 getglobalgrid(dh::DistributedDofHandler) = dh.grid
 
 # Compat layer against serial code
-getgrid(dh::DistributedDofHandler) = getlocalgrid(dh)
+Ferrite.getgrid(dh::DistributedDofHandler) = getlocalgrid(dh)
 
 # TODO this is copy pasta from DofHandler.jl
-function celldofs!(global_dofs::Vector{Int}, dh::DistributedDofHandler, i::Int)
+function Ferrite.celldofs!(global_dofs::Vector{Int}, dh::DistributedDofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
     unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
@@ -65,10 +65,10 @@ function celldofs!(global_dofs::Vector{Int}, dh::DistributedDofHandler, i::Int)
 end
 
 # TODO this is copy pasta from DofHandler.jl
-cellcoords!(global_coords::Vector{<:Vec}, dh::DistributedDofHandler, i::Int) = cellcoords!(global_coords, getgrid(dh), i)
+Ferrite.cellcoords!(global_coords::Vector{<:Vec}, dh::DistributedDofHandler, i::Int) = cellcoords!(global_coords, getgrid(dh), i)
 
 # TODO this is copy pasta from DofHandler.jl
-function celldofs(dh::DistributedDofHandler, i::Int)
+function Ferrite.celldofs(dh::DistributedDofHandler, i::Int)
     @assert isclosed(dh)
     n = ndofs_per_cell(dh, i)
     global_dofs = zeros(Int, n)
@@ -76,7 +76,7 @@ function celldofs(dh::DistributedDofHandler, i::Int)
     return global_dofs
 end
 
-renumber!(dh::DistributedDofHandler, perm::AbstractVector{<:Integer}) = error("Not implemented.")
+Ferrite.renumber!(dh::DistributedDofHandler, perm::AbstractVector{<:Integer}) = error("Not implemented.")
 
 function compute_dof_ownership(dh)
     dgrid = getglobalgrid(dh)
@@ -611,7 +611,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
     return local_to_global
 end
 
-function close!(dh::DistributedDofHandler)
+function Ferrite.close!(dh::DistributedDofHandler)
     __close!(dh)
     append!(dh.ldof_to_gdof, local_to_global_numbering(dh))
     append!(dh.ldof_to_rank, compute_dof_ownership(dh))
@@ -620,7 +620,7 @@ end
 
 # TODO this is copy pasta from DofHandler.jl
 # close the DofHandler and distribute all the dofs
-function __close!(dh::DistributedDofHandler{dim}) where {dim}
+function Ferrite.__close!(dh::DistributedDofHandler{dim}) where {dim}
     @assert !isclosed(dh)
 
     # `vertexdict` keeps track of the visited vertices. We store the global vertex
@@ -779,7 +779,7 @@ function __close!(dh::DistributedDofHandler{dim}) where {dim}
 end
 
 # TODO this is copy pasta from DofHandler.jl
-function reshape_to_nodes(dh::DistributedDofHandler, u::Vector{T}, fieldname::Symbol) where T
+function Ferrite.reshape_to_nodes(dh::DistributedDofHandler, u::Vector{T}, fieldname::Symbol) where T
     # make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
 
