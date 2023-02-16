@@ -23,6 +23,7 @@ FerritePartitionedArrays = ["MPI", "PartitionedArrays"]
 EnumX = "1"
 MPI = "^0.20.2"
 NearestNeighbors = "0.4"
+PartitionedArrays = "0.2.15"
 Reexport = "1"
 Tensors = "^1.12"
 WriteVTK = "1.13"
