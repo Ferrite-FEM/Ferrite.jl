@@ -28,7 +28,6 @@ export
     vtk_shared_vertices,
     vtk_shared_faces,
     vtk_shared_edges,
-    vtk_partitioning
+    vtk_partitioning    
     
-
 end # module FerritePartitionedArrays
