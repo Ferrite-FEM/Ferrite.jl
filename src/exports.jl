@@ -94,7 +94,6 @@ export
     addcellset!,
     transform!,
     generate_grid,
-    generate_distributed_grid,
     compute_vertex_values,
     is_shared_vertex,
     get_shared_vertices,
@@ -108,7 +107,6 @@ export
 
 # Dofs
     DofHandler,
-    DistributedDofHandler,
     close!,
     ndofs,
     num_local_true_dofs,
@@ -156,7 +154,6 @@ export
     start_assemble,
     assemble!,
     end_assemble,
-    PartitionedArraysCOOAssembler,
 
 # VTK export
     vtk_grid,
@@ -165,10 +162,10 @@ export
     vtk_nodeset,
     vtk_cellset,
     vtk_save,
-    vtk_shared_vertices,
-    vtk_shared_faces,
-    vtk_shared_edges,
-    vtk_partitioning,
+    # vtk_shared_vertices,
+    # vtk_shared_faces,
+    # vtk_shared_edges,
+    # vtk_partitioning,
 
 # L2 Projection
     project,

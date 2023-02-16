@@ -56,7 +56,6 @@ include("Grid/coloring.jl")
 
 # Dofs
 include("Dofs/DofHandler.jl")
-include("Dofs/DistributedDofHandler.jl")
 include("Dofs/MixedDofHandler.jl")
 include("Dofs/ConstraintHandler.jl")
 
