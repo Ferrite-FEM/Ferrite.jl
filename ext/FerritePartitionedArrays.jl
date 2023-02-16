@@ -17,8 +17,11 @@ include("FerritePartitionedArrays/vtk-export.jl")
 export 
     # assembler
     COOAssembler,
+    # dofhandler
+    DistributedDofHandler,
     # grid
     DistributedGrid,
+    generate_distributed_grid,
     # vtk-export
     vtk_shared_vertices,
     vtk_shared_faces,
