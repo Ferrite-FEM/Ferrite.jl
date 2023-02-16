@@ -6,7 +6,7 @@ function WriteVTK.vtk_grid(filename::AbstractString, dgrid::DistributedGrid{dim,
     cls = MeshCell[]
     for cell in getcells(dgrid)
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
-        push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
+        push!(cls, MeshCell(celltype, Ferrite.nodes_to_vtkorder(cell)))
     end
     coords = reshape(reinterpret(T, getnodes(dgrid)), (dim, getnnodes(dgrid)))
     return pvtk_grid(filename, coords, cls; part=part, nparts=nparts, compress=compress)
@@ -16,7 +16,7 @@ end
 """
 function WriteVTK.vtk_point_data(vtk, dh::Ferrite.AbstractDofHandler, u::PVector)
     map_parts(local_view(u, u.rows)) do u_local
-        vtk_point_data(pvtkwrapper(vtk), dh, u_local)
+        vtk_point_data(Ferrite.pvtkwrapper(vtk), dh, u_local)
     end
 end
 
@@ -32,10 +32,10 @@ function vtk_shared_vertices(vtk, dgrid::DistributedGrid)
             if haskey(sv.remote_vertices, rank)
                 (cellidx, i) = sv.local_idx
                 cell = getcells(dgrid, cellidx)
-                u[vertices(cell)[i]] = my_rank
+                u[Ferrite.vertices(cell)[i]] = my_rank
             end
         end
-        vtk_point_data(pvtkwrapper(vtk), u, "shared vertices with $rank")
+        vtk_point_data(Ferrite.pvtkwrapper(vtk), u, "shared vertices with $rank")
     end
 end
 
@@ -52,11 +52,11 @@ function vtk_shared_faces(vtk, dgrid::DistributedGrid)
             if haskey(sf.remote_faces, rank)
                 (cellidx, i) = sf.local_idx
                 cell = getcells(dgrid, cellidx)
-                facenodes = faces(cell)[i]
+                facenodes = Ferrite.faces(cell)[i]
                 u[[facenodes...]] .= my_rank
             end
         end
-        vtk_point_data(pvtkwrapper(vtk), u, "shared faces with $rank")
+        vtk_point_data(Ferrite.pvtkwrapper(vtk), u, "shared faces with $rank")
     end
 end
 
@@ -73,11 +73,11 @@ function vtk_shared_edges(vtk, dgrid::DistributedGrid)
             if haskey(se.remote_edges, rank)
                 (cellidx, i) = se.local_idx
                 cell = getcells(dgrid, cellidx)
-                edgenodes = edges(cell)[i]
+                edgenodes = Ferrite.edges(cell)[i]
                 u[[edgenodes...]] .= my_rank
             end
         end
-        vtk_point_data(pvtkwrapper(vtk), u, "shared edges with $rank")
+        vtk_point_data(Ferrite.pvtkwrapper(vtk), u, "shared edges with $rank")
     end
 end
 
@@ -87,5 +87,5 @@ Enrich the VTK file with partitioning meta information.
 function vtk_partitioning(vtk, dgrid::DistributedGrid)
     u  = Vector{Float64}(undef, getncells(dgrid))
     u .= MPI.Comm_rank(global_comm(dgrid))+1
-    vtk_cell_data(pvtkwrapper(vtk), u, "partitioning")
+    vtk_cell_data(Ferrite.pvtkwrapper(vtk), u, "partitioning")
 end

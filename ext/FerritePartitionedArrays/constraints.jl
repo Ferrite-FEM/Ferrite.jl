@@ -44,7 +44,7 @@ function Ferrite.apply!(K::PartitionedArrays.PSparseMatrix, f::PartitionedArrays
     end
     f .-= K*u_constrained
 
-    m = meandiag(K)
+    m = Ferrite.meandiag(K)
 
     # Then fix the 
     map_parts(local_view(f, f.rows), f.rows.partition) do f_local, partition

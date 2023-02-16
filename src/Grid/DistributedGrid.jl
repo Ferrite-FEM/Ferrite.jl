@@ -21,17 +21,6 @@ abstract type SharedEntity end
 @inline is_shared_face(dgrid::AbstractDistributedGrid, fi::FaceIndex) = haskey(dgrid.shared_faces, fi)
 
 
-"""
-Global dense communicator of the distributed grid.
-"""
-@inline global_comm(dgrid::AbstractDistributedGrid) = dgrid.grid_comm
-
-"""
-Graph communicator for shared vertices. Guaranteed to be derived from the communicator 
-returned by @global_comm .
-"""
-@inline vertex_comm(dgrid::AbstractDistributedGrid) = dgrid.interface_comm
-
 @inline getlocalgrid(dgrid::AbstractDistributedGrid) = dgrid.local_grid
 
 @inline getnodes(dgrid::AbstractDistributedGrid) = getnodes(getlocalgrid(dgrid))

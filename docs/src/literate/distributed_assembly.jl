@@ -18,15 +18,17 @@ using Ferrite, MPI
 using IterativeSolvers #, HYPRE
 using PartitionedArrays #src
 
+FerritePartitionedArrays = Base.get_extension(Ferrite, :FerritePartitionedArrays)
+
 # Launch MPI
 MPI.Init()
 
 # We start generating a simple grid with 20x20 quadrilateral elements
 # and distribute it across our processors using `generate_distributed_grid`. 
-# dgrid = generate_distributed_grid(QuadraticQuadrilateral, (3, 1));
-# dgrid = generate_distributed_grid(Tetrahedron, (2, 2, 2));
-dgrid = generate_distributed_grid(Hexahedron, (2, 2, 2)); #src
-# dgrid = generate_distributed_grid(Tetrahedron, (3, 3, 3)); #src
+# dgrid = FerritePartitionedArrays.generate_distributed_grid(QuadraticQuadrilateral, (3, 1));
+# dgrid = FerritePartitionedArrays.generate_distributed_grid(Tetrahedron, (2, 2, 2));
+dgrid = FerritePartitionedArrays.generate_distributed_grid(Hexahedron, (2, 1, 1)); #src
+# dgrid = FerritePartitionedArrays.generate_distributed_grid(Tetrahedron, (3, 3, 3)); #src
 
 # ### Trial and test functions
 # Nothing changes here.
@@ -44,7 +46,7 @@ cellvalues = CellScalarValues(qr, ip, ip_geo);
 # ### Degrees of freedom
 # To handle the dofs correctly we now utilize the `DistributedDofHandle` 
 # instead of the `DofHandler`. For the user the interface is the same.
-dh = DistributedDofHandler(dgrid)
+dh = FerritePartitionedArrays.DistributedDofHandler(dgrid)
 push!(dh, :u, 1, ip)
 close!(dh);
 
@@ -65,7 +67,7 @@ println("R$my_rank: prescribing $(ch.prescribed_dofs) on $∂Ω")
 
 # ### Assembling the linear system
 # Assembling the system works also mostly analogue.
-function doassemble(cellvalues::CellScalarValues{dim}, dh::DistributedDofHandler) where {dim}
+function doassemble(cellvalues::CellScalarValues{dim}, dh::FerritePartitionedArrays.DistributedDofHandler) where {dim}
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
@@ -77,7 +79,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::DistributedDofHandler
     # may trigger a large amount of communication.
     # NOTE: At the time of writing the only backend available is a COO 
     #       assembly via PartitionedArrays.jl .
-    assembler = PartitionedArraysCOOAssembler{Float64}(dh)
+    assembler = FerritePartitionedArrays.COOAssembler{Float64}(dh)
 
     # For the local assembly nothing changes
     for cell in CellIterator(dh)
@@ -150,10 +152,10 @@ vtk_grid("heat_equation_distributed", dh) do vtk
     # For debugging purposes it can be helpful to enrich 
     # the visualization with some meta  information about 
     # the grid and its partitioning
-    vtk_shared_vertices(vtk, dgrid)
-    vtk_shared_faces(vtk, dgrid)
-    vtk_shared_edges(vtk, dgrid) #src
-    vtk_partitioning(vtk, dgrid)
+    FerritePartitionedArrays.vtk_shared_vertices(vtk, dgrid)
+    FerritePartitionedArrays.vtk_shared_faces(vtk, dgrid)
+    FerritePartitionedArrays.vtk_shared_edges(vtk, dgrid) #src
+    FerritePartitionedArrays.vtk_partitioning(vtk, dgrid)
 end
 
 map_parts(local_view(u, u.rows)) do u_local

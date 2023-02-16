@@ -24,6 +24,7 @@ getcells
 getncells
 getnodes
 getnnodes
+getdim
 Ferrite.nnodes_per_cell
 getcellset
 getcellsets

@@ -46,6 +46,16 @@ mutable struct DistributedGrid{dim,C<:Ferrite.AbstractCell,T<:Real} <: Ferrite.A
     shared_faces::Dict{FaceIndex,SharedFace}
 end
 
+"""
+Global dense communicator of the distributed grid.
+"""
+@inline global_comm(dgrid::DistributedGrid) = dgrid.grid_comm
+
+"""
+Graph communicator for shared vertices. Guaranteed to be derived from the communicator 
+returned by @global_comm .
+"""
+@inline vertex_comm(dgrid::DistributedGrid) = dgrid.interface_comm
 
 """
 """
@@ -223,14 +233,14 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
     for (global_cell_idx,global_cell) ∈ enumerate(getcells(grid_to_distribute))
         if parts[global_cell_idx] == my_rank
             # Vertex
-            for (i, _) ∈ enumerate(vertices(global_cell))
+            for (i, _) ∈ enumerate(Ferrite.vertices(global_cell))
                 cell_vertex = VertexIndex(global_cell_idx, i)
                 remote_vertices = Dict{Int,Vector{VertexIndex}}()
                 for other_vertex ∈ getneighborhood(grid_topology, grid_to_distribute, cell_vertex, true)
                     (global_cell_neighbor_idx, j) = other_vertex
                     other_rank = parts[global_cell_neighbor_idx]
                     if other_rank != my_rank
-                        if toglobal(grid_to_distribute,cell_vertex) == toglobal(grid_to_distribute,other_vertex)
+                        if Ferrite.toglobal(grid_to_distribute,cell_vertex) == Ferrite.toglobal(grid_to_distribute,other_vertex)
                             if !haskey(remote_vertices,other_rank)
                                 remote_vertices[other_rank] = Vector(undef,0)
                             end
@@ -248,14 +258,14 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
 
             # Face
             if dim > 1
-                for (i, _) ∈ enumerate(faces(global_cell))
+                for (i, _) ∈ enumerate(Ferrite.faces(global_cell))
                     cell_face = FaceIndex(global_cell_idx, i)
                     remote_faces = Dict{Int,Vector{FaceIndex}}()
                     for other_face ∈ getneighborhood(grid_topology, grid_to_distribute, cell_face, true)
                         (global_cell_neighbor_idx, j) = other_face
                         other_rank = parts[global_cell_neighbor_idx]
                         if other_rank != my_rank
-                            if toglobal(grid_to_distribute,cell_face) == toglobal(grid_to_distribute,other_face)
+                            if Ferrite.toglobal(grid_to_distribute,cell_face) == Ferrite.toglobal(grid_to_distribute,other_face)
                                 if !haskey(remote_faces,other_rank)
                                     remote_faces[other_rank] = Vector(undef,0)
                                 end
@@ -274,14 +284,14 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
 
             # Edge
             if dim > 2
-                for (i, _) ∈ enumerate(edges(global_cell))
+                for (i, _) ∈ enumerate(Ferrite.edges(global_cell))
                     cell_edge = EdgeIndex(global_cell_idx, i)
                     remote_edges = Dict{Int,Vector{EdgeIndex}}()
                     for other_edge ∈ getneighborhood(grid_topology, grid_to_distribute, cell_edge, true)
                         (global_cell_neighbor_idx, j) = other_edge
                         other_rank = parts[global_cell_neighbor_idx]
                         if other_rank != my_rank
-                            if toglobal(grid_to_distribute,cell_edge) == toglobal(grid_to_distribute,other_edge)
+                            if Ferrite.toglobal(grid_to_distribute,cell_edge) == Ferrite.toglobal(grid_to_distribute,other_edge)
                                 if !haskey(remote_edges,other_edge)
                                     remote_edges[other_rank] = Vector(undef,0)
                                 end
