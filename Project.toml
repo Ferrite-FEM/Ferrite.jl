@@ -15,10 +15,9 @@ WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 [weakdeps]
 MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 PartitionedArrays = "5a9dfac6-5c52-46f7-8278-5e2210713be9"
-Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [extensions]
-FerritePartitionedArrays = ["Pkg", "MPI", "PartitionedArrays"]
+FerritePartitionedArrays = ["MPI", "PartitionedArrays"]
 
 [compat]
 EnumX = "1"
