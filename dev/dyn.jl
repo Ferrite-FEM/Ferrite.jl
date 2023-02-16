@@ -157,6 +157,6 @@ function run_assemble(n = 20)
     return b
 end
 
-open("bench_thread_dynamic.log"; append=true) do fid
+open("dyn.log"; append=true) do fid
     write(fid, "$(Threads.nthreads()), $(run_assemble())\n")
 end

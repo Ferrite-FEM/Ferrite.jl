@@ -1,29 +1,8 @@
-
 using Ferrite, SparseArrays
 
-function create_example_2d_grid()
-    grid = generate_grid(Quadrilateral, (10, 10), Vec{2}((0.0, 0.0)), Vec{2}((10.0, 10.0)))
-    colors_workstream = create_coloring(grid; alg=ColoringAlgorithm.WorkStream)
-    colors_greedy = create_coloring(grid; alg=ColoringAlgorithm.Greedy)
-    vtk_grid("colored", grid) do vtk
-        vtk_cell_data_colors(vtk, colors_workstream, "workstream-coloring")
-        vtk_cell_data_colors(vtk, colors_greedy, "greedy-coloring")
-    end
-end
+using ThreadPinning
+pinthreads(:cores)
 
-create_example_2d_grid();
-
-# ![](coloring.png)
-#
-# *Figure 1*: Element coloring using the "workstream"-algorithm (left) and the "greedy"-
-# algorithm (right).
-
-# ## Cantilever beam in 3D with threaded assembly
-# We will now look at an example where we assemble the stiffness matrix using multiple
-# threads. We set up a simple grid and create a coloring, then create a DofHandler,
-# and define the material stiffness
-
-# #### Grid for the beam
 function create_colored_cantilever_grid(celltype, n)
     grid = generate_grid(celltype, (10*n, n, n), Vec{3}((0.0, 0.0, 0.0)), Vec{3}((10.0, 1.0, 1.0)))
     colors = create_coloring(grid)
@@ -99,16 +78,17 @@ end;
 # ## Threaded assemble
 
 # The assembly function loops over each color and does a threaded assembly for that color
-function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}) where {dim}
-
-    f = zeros(ndofs(dh))
-    scratches = create_scratchvalues(K, f, dh)
-    b = Vec{3}((0.0, 0.0, 1.0)) # Body force
-
+function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}, f::Vector{Float64}, scratches::Vector{SV}, b::Vec{dim}) where {dim, SV}
+    ## Each color is safe to assemble threaded
     for color in colors
-        ## Each color is safe to assemble threaded
-        Threads.@threads :static for i in 1:length(color)
-            assemble_cell!(scratches[Threads.threadid()], color[i], K, grid, dh, C, b)
+        ## We try to equipartition the array to increase load per task.
+        chunk_size = max(1, 1 + length(color) ÷ Threads.nthreads())
+        color_partition = [color[i:min(i + chunk_size - 1, end)] for i in 1:chunk_size:length(color)]
+        ## Now we should have a 1:1 correspondence between tasks and elements to assemble.
+        Threads.@threads :static for i in 1:length(color_partition)
+            for cellid ∈ color_partition[i]
+                assemble_cell!(scratches[i], cellid, K, grid, dh, C, b)
+            end
         end
     end
 
@@ -156,8 +136,8 @@ function assemble_cell!(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC,
     celldofs!(global_dofs, dh, cell)
     assemble!(assembler, global_dofs, fe, Ke)
 end;
-
-function run_assemble(n = 20; timing=true)
+#= LIKWID not possible on cluster?
+function run_assemble_perf(n = 30)
     refshape = RefCube
     quadrature_order = 2
     dim = 3
@@ -167,12 +147,44 @@ function run_assemble(n = 20; timing=true)
 
     K = create_sparsity_pattern(dh);
     C = create_stiffness(Val{3}());
+    f = zeros(ndofs(dh))
+    scratches = create_scratchvalues(K, f, dh)
+    b = Vec{3}((0.0, 0.0, 0.0))
     ## compilation
-    K, f = doassemble(K, colors, grid, dh, C);
-    if timing
-        b = @elapsed @time K, f = doassemble(K, colors, grid, dh, C);
-    else
-        b = 0.0
-    end
+    doassemble(K, colors, grid, dh, C, f, scratches, b);
+    return @perfmon "FLOPS_DP" doassemble(K, colors, grid, dh, C, f, scratches, b);
+end
+
+metrics, events = run_assemble_perf();
+clocks = [res["Clock [MHz]"] for res in metrics["FLOPS_DP"]]
+println("Clock [MHz] (min, avg, max): ", minimum(clocks), " | ", mean(clocks), " | " , maximum(clocks)) 
+
+thread_times = [res["Runtime unhalted [s]"] for res in metrics["FLOPS_DP"]]
+println("Runtime unhalted [s] (min, avg, max): ", minimum(thread_times), " | ", mean(thread_times), " | " , maximum(thread_times))
+
+println("Total runtime [s] ", first([res["Runtime (RDTSC) [s]"] for res in metrics["FLOPS_DP"]]))
+=#
+
+function run_assemble(n = 20)
+    refshape = RefCube
+    quadrature_order = 2
+    dim = 3
+    
+    grid, colors = create_colored_cantilever_grid(Hexahedron, n);
+    dh = create_dofhandler(grid);
+
+    K = create_sparsity_pattern(dh);
+    C = create_stiffness(Val{3}());
+    f = zeros(ndofs(dh))
+    scratches = create_scratchvalues(K, f, dh)
+    b = Vec{3}((0.0, 0.0, 0.0))
+    ## compilation
+    doassemble(K, colors, grid, dh, C, f, scratches, b);
+
+    b = @elapsed @time K, f = doassemble(K, colors, grid, dh, C, f, scratches, b);
     return b
+end
+
+open("bench_thread_latest.log"; append=true) do fid
+    write(fid, "$(Threads.nthreads()), $(run_assemble())\n")
 end

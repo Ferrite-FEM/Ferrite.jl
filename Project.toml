@@ -10,6 +10,7 @@ Preferences = "21216c6a-2e73-6563-6e65-726566657250"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
+ThreadPinning = "811555cd-349b-4f26-b7bc-1f208b848042"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [compat]
