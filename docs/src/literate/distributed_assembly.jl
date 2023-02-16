@@ -27,7 +27,7 @@ MPI.Init()
 # and distribute it across our processors using `generate_distributed_grid`. 
 # dgrid = FerritePartitionedArrays.generate_distributed_grid(QuadraticQuadrilateral, (3, 1));
 # dgrid = FerritePartitionedArrays.generate_distributed_grid(Tetrahedron, (2, 2, 2));
-dgrid = FerritePartitionedArrays.generate_distributed_grid(Hexahedron, (2, 1, 1)); #src
+dgrid = FerritePartitionedArrays.generate_distributed_grid(Hexahedron, (2, 2, 2)); #src
 # dgrid = FerritePartitionedArrays.generate_distributed_grid(Tetrahedron, (3, 3, 3)); #src
 
 # ### Trial and test functions
