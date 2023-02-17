@@ -32,12 +32,14 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "ns_vs_diffeq.md",
     "computational_homogenization.md",
     "stokes-flow.md",
+	"topology_optimization.md",
     )]
 
 # Build documentation.
 @timeit dto "makedocs" makedocs(
     format = Documenter.HTML(
         assets = ["assets/custom.css", "assets/favicon.ico"],
+        canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
     ),
     sitename = "Ferrite.jl",
     doctest = false,
@@ -55,7 +57,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
             "manual/grid.md",
             "manual/export.md"
             ],
-        "Examples" => GENERATEDEXAMPLES,
+        "Examples" => ["overview.md";GENERATEDEXAMPLES],
         "API Reference" => [
             "reference/quadrature.md",
             "reference/interpolations.md",
@@ -64,7 +66,8 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
             "reference/assembly.md",
             "reference/boundary_conditions.md",
             "reference/grid.md",
-            "reference/export.md"
+            "reference/export.md",
+            "reference/utils.md",
             ]
         ],
 )

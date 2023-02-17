@@ -125,6 +125,7 @@ export
     create_symmetric_sparsity_pattern,
     dof_range,
     renumber!,
+    DofOrder,
     MixedDofHandler,
     FieldHandler,
     Field,
@@ -135,6 +136,7 @@ export
     getfielddim,
     dof_range,
     #entity_dofs,
+    apply_analytical!,
 
 # Constraints
     ConstraintHandler,
@@ -149,11 +151,14 @@ export
     apply_rhs!,
     get_rhs_data,
     apply_zero!,
+    apply_local!,
+    apply_assemble!,
     add!,
     free_dofs,
     ApplyStrategy,
 
 # iterators
+    CellCache,
     CellIterator,
     UpdateFlags,
     cellid,

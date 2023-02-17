@@ -27,14 +27,14 @@ for computing the prescribed value. Example:
 dbc1 = Dirichlet(
     :u,                       # Name of the field
     getfaceset(grid, "left"), # Part of the boundary
-    (x, t) -> 1.0 * t,        # Function mapping coordinate and time to a prescribed value
+    x -> 1.0,                 # Function mapping coordinate to a prescribed value
 )
 ```
 
 The field name is given as a symbol, just like when the field was added to the dof handler,
 the part of the boundary where this constraint is active is given as a face set, and the
-function computing the prescribed value should accept two input arguments (coordinate `x`
-and time `t`) and return the prescribed value.
+function computing the prescribed value should be of the form `f(x)` or `f(x, t)`
+(coordinate `x` and time `t`) and return the prescribed value(s).
 
 !!! note "Multiple sets"
     To apply a constraint on multiple face sets in the grid you can use `union` to join
@@ -45,8 +45,8 @@ and time `t`) and return the prescribed value.
     creates a new face set containing all faces in the `"left"` and "`right`" face sets,
     which can be passed to the `Dirichlet` constructor.
 
-By default the constraint is added to the first component of the given field. To add the
-constraint to multiple components a fourth argument with the components should be passed to
+By default the constraint is added to all components of the given field. To add the
+constraint to selected components a fourth argument with the components should be passed to
 the constructor. Here is an example where a constraint is added to component 1 and 3 of a
 vector field `:u`:
 
@@ -54,13 +54,13 @@ vector field `:u`:
 dbc2 = Dirichlet(
     :u,                       # Name of the field
     getfaceset(grid, "left"), # Part of the boundary
-    (x, t) -> [0.0, 0.0],     # Function mapping coordinate and time to a prescribed value
+    x -> [0.0, 0.0],          # Function mapping coordinate to prescribed values
     [1, 3],                   # Components
 )
 ```
 
 Note that the return value of the function must match with the components -- in the example
-above we prescibe components 1 and 3 to 0 so we return a vector of length 2.
+above we prescribe components 1 and 3 to 0 so we return a vector of length 2.
 
 Adding the constraints to the constraint handler is done with [`add!`](@ref):
 
@@ -73,10 +73,9 @@ Finally, just like for the dof handler, we need to use [`close!`](@ref) to final
 constraint handler. Internally this will then compute the degrees-of-freedom that match the
 constraints we added.
 
-Since the constraints can in general depend on time we also need to need to call
-[`update!`](@ref) with the current time in order to compute the prescribed values. The
-same constraint handler can then be used for all time steps by calling `update!` with the
-proper time, e.g.:
+If one or more of the constraints depend on time, i.e. they are specified as `f(x, t)`, the
+prescribed values can be recomputed in each new time step by calling [`update!`](@ref) with
+the proper time, e.g.:
 
 ```julia
 for t in 0.0:0.1:1.0
@@ -84,10 +83,6 @@ for t in 0.0:0.1:1.0
     # Solve for time t...
 end
 ```
-
-!!! note
-    You *must* call `update!`, even if your constraints does not depend on time
-    (as `dbc2` above), e.g. `update!(ch, 0.0)`.
 
 !!! note "Examples"
     Most examples make use of Dirichlet boundary conditions, for example [Heat
@@ -260,3 +255,34 @@ pdbc = PeriodicDirichlet(
         (x, t) -> ū + ∇ū  ⋅ (x - x̄)
     )
     ```
+
+# Initial Conditions
+
+When solving time-dependent problems, initial conditions, different from zero, may be required. 
+For finite element formulations of ODE-type, 
+i.e. ``\boldsymbol{u}'(t) = \boldsymbol{f}(\boldsymbol{u}(t),t)``, 
+where ``\boldsymbol{u}(t)`` are the degrees of freedom,
+initial conditions can be specified by the [`apply_analytical!`](@ref) function.
+For example, specify the initial pressure as a function of the y-coordinate
+```julia
+ρ = 1000; g = 9.81    # density [kg/m³] and gravity [N/kg]
+grid = generate_grid(Quadrilateral, (10,10))
+dh = DofHandler(grid); add!(dh, :u, 2); add!(dh, :p, 1); close!(dh)
+u = zeros(ndofs(dh))
+apply_analytical!(u, dh, :p, x -> ρ * g * x[2])
+```
+
+See also [Time Dependent Problems](@ref) for one example. 
+
+*Note about solving DAE:* 
+A Differential Algebraic Equations (DAE) is an equation of the form
+``\boldsymbol{r}(\boldsymbol{u}(t),\boldsymbol{u}'(t),t)=\boldsymbol{0}``,
+which usually cannot be expressed as a true ODE. They occur often,
+but not always, in forms where some time derivatives are missing
+```math
+u_1'(t) = f(\boldsymbol{u}(t),t)
+0 = g(\boldsymbol{u}(t),t)`
+```
+In for such equations, it is usually necessary to specify initial conditions 
+for both ``\boldsymbol{u}(0)`` and ``\boldsymbol{u}'(0)``, and these must be consistent,
+i.e. ``\boldsymbol{r}(\boldsymbol{u}(0),\boldsymbol{u}'(0),0)=\boldsymbol{0}``.

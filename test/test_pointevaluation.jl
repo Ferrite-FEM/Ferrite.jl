@@ -116,7 +116,7 @@ function dofhandler()
     points = [node.x for node in mesh.nodes] # same as nodes
 
     dh = DofHandler(mesh)
-    push!(dh, :s, 1) # a scalar field
+    add!(dh, :s, 1) # a scalar field
     close!(dh)
 
     ph = PointEvalHandler(mesh, points)
@@ -138,8 +138,8 @@ function dofhandler2()
     csv = CellScalarValues(qr, ip_f, ip_g)
     cvv = CellVectorValues(qr, ip_f, ip_g)
     dh = DofHandler(mesh);
-    push!(dh, :s, 1, ip_f)
-    push!(dh, :v, 2, ip_f)
+    add!(dh, :s, 1, ip_f)
+    add!(dh, :v, 2, ip_f)
     close!(dh)
     M = create_sparsity_pattern(dh)
     f = zeros(ndofs(dh))
@@ -274,10 +274,10 @@ function mixed_grid()
     dh = MixedDofHandler(mesh)
     field = Field(:v, ip_quad, 2)
     fh_quad = FieldHandler([field], getcellset(mesh, "quads"))
-    push!(dh, fh_quad)
+    add!(dh, fh_quad)
     field = Field(:v, ip_tri, 2) 
     fh_tri = FieldHandler([field], getcellset(mesh, "tris"))
-    push!(dh, fh_tri)
+    add!(dh, fh_tri)
     close!(dh)
 
     dof_vals = [1., 1., 2., 2., 4., 4., 3., 3., 6., 6., 5., 5.]

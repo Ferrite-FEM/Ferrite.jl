@@ -345,14 +345,16 @@ uuid = "29a986be-02c6-4525-aec4-84b980013641"
 version = "1.2.8"
 
 [[deps.Ferrite]]
-deps = ["EnumX", "LinearAlgebra", "Metis", "NearestNeighbors", "Reexport", "SparseArrays", "Tensors", "WriteVTK"]
+deps = ["EnumX", "LinearAlgebra", "NearestNeighbors", "Preferences", "Reexport", "SparseArrays", "Tensors", "WriteVTK"]
 path = ".."
 uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
-version = "0.3.8"
-weakdeps = ["MPI", "PartitionedArrays"]
+version = "0.3.11"
+weakdeps = ["BlockArrays", "MPI", "Metis", "PartitionedArrays"]
 
     [deps.Ferrite.extensions]
-    FerritePartitionedArrays = ["MPI", "PartitionedArrays"]
+    FerriteBlockArrays = "BlockArrays"
+    FerriteMetis = "Metis"
+    FerritePartitionedArrays = ["MPI", "Metis", "PartitionedArrays"]
 
 [[deps.FerriteGmsh]]
 deps = ["Ferrite", "Gmsh"]
@@ -778,9 +780,9 @@ version = "2.14.0"
 
 [[deps.LiveServer]]
 deps = ["HTTP", "MIMEs", "Pkg", "Sockets"]
-git-tree-sha1 = "af11a3662103715954be5042747bd98cb1dc4229"
+git-tree-sha1 = "b0db05c042a7c54bb858f9846a4ca39ac15f8c44"
 uuid = "16fef848-5104-11e9-1b77-fb7a48bbb589"
-version = "1.1.0"
+version = "1.1.1"
 
 [[deps.LogExpFunctions]]
 deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]

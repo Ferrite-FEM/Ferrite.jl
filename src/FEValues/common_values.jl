@@ -39,7 +39,9 @@ end
 @noinline function throw_incompatible_coord_length(length_x, n_base_funcs)
     throw(ArgumentError(
         "the number of (geometric) base functions ($(n_base_funcs)) does not match " *
-        "the number of coordinates in the vector ($(length_x))."
+        "the number of coordinates in the vector ($(length_x)). Perhaps you forgot to " *
+        "use an appropriate geometric interpolation when creating FE values? See " *
+        "https://github.com/Ferrite-FEM/Ferrite.jl/issues/265 for more details."
     ))
 end
 

@@ -36,7 +36,7 @@ end
         addfaceset!(grid, "right-faceset", getfaceset(grid, "right"))
         addnodeset!(grid, "middle-nodes", x -> norm(x) < radius)
 
-        gridfilename = "grid-$(Ferrite.celltypes[celltype])"
+        gridfilename = "grid-$(repr(celltype))"
         vtk_grid(gridfilename, grid) do vtk
             vtk_cellset(vtk, grid, "cell-1")
             vtk_cellset(vtk, grid, "middle-cells")
@@ -55,8 +55,8 @@ end
         # Create a DofHandler, add some things, write to file and
         # then check the resulting sha
         dofhandler = DofHandler(grid)
-        push!(dofhandler, :temperature, 1)
-        push!(dofhandler, :displacement, 3)
+        add!(dofhandler, :temperature, 1)
+        add!(dofhandler, :displacement, 3)
         close!(dofhandler)
         ch = ConstraintHandler(dofhandler)
         dbc = Dirichlet(:temperature, union(getfaceset(grid, "left"), getfaceset(grid, "right-faceset")), (x,t)->1)
@@ -73,7 +73,7 @@ end
         u = rand(rng, ndofs(dofhandler))
         apply!(u, ch)
 
-        dofhandlerfilename = "dofhandler-$(Ferrite.celltypes[celltype])"
+        dofhandlerfilename = "dofhandler-$(repr(celltype))"
         vtk_grid(dofhandlerfilename, dofhandler) do vtk
             vtk_point_data(vtk, ch)
             vtk_point_data(vtk, dofhandler, u)
@@ -436,21 +436,21 @@ end
 
     ## Lagrange{2,RefTetrahedron,3}
     dh = DofHandler(grid)
-    push!(dh, :u, 1, Lagrange{2,RefTetrahedron,3}())
+    add!(dh, :u, 1, Lagrange{2,RefTetrahedron,3}())
     close!(dh)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     @test celldofs(dh, 2) == [2, 11, 3, 12, 13, 14, 15, 7, 6, 16]
 
     ## Lagrange{2,RefTetrahedron,4}
     dh = DofHandler(grid)
-    push!(dh, :u, 1, Lagrange{2,RefTetrahedron,4}())
+    add!(dh, :u, 1, Lagrange{2,RefTetrahedron,4}())
     close!(dh)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     @test celldofs(dh, 2) == [2, 16, 3, 17, 18, 19, 20, 21, 22, 9, 8, 7, 23, 24, 25]
 
     ## Lagrange{2,RefTetrahedron,5}
     dh = DofHandler(grid)
-    push!(dh, :u, 1, Lagrange{2,RefTetrahedron,5}())
+    add!(dh, :u, 1, Lagrange{2,RefTetrahedron,5}())
     close!(dh)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
     @test celldofs(dh, 2) == [2, 22, 3, 23, 24, 25, 26, 27, 28, 29, 30, 11, 10, 9, 8, 31, 32, 33, 34, 35, 36]

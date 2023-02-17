@@ -62,8 +62,8 @@ end;
 # with possibly different interpolations
 function create_dofhandler(grid, ipu, ipp)
     dh = DofHandler(grid)
-    push!(dh, :u, 2, ipu) # displacement
-    push!(dh, :p, 1, ipp) # pressure
+    add!(dh, :u, 2, ipu) # displacement
+    add!(dh, :p, 1, ipp) # pressure
     close!(dh)
     return dh
 end;
@@ -127,7 +127,7 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, gr
     reinit!(cellvalues_p, cell)
 
     ## We only assemble lower half triangle of the stiffness matrix and then symmetrize it.
-    @inbounds for q_point in 1:getnquadpoints(cellvalues_u)
+    for q_point in 1:getnquadpoints(cellvalues_u)
         for i in 1:n_basefuncs_u
             ɛdev[i] = dev(symmetric(shape_gradient(cellvalues_u, q_point, i)))
         end
@@ -159,7 +159,7 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, gr
     ## We integrate the Neumann boundary using the facevalues.
     ## We loop over all the faces in the cell, then check if the face
     ## is in our `"traction"` faceset.
-    @inbounds for face in 1:nfaces(cell)
+    for face in 1:nfaces(cell)
         if onboundary(cell, face) && (cellid(cell), face) ∈ getfaceset(grid, "traction")
             reinit!(facevalues_u, cell, face)
             for q_point in 1:getnquadpoints(facevalues_u)

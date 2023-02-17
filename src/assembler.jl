@@ -23,7 +23,7 @@ global sparse matrix. Use [`assemble!`](@ref) for each element, and [`end_assemb
 to finalize the assembly and return the sparse matrix.
 
 Note that giving a sparse matrix as input can be more efficient. See below and 
-as described in the [manual](@ref assembly_in_manual).
+as described in the [manual](@ref man-assembly).
 
 !!! note
     When the same matrix pattern is used multiple times (for e.g. multiple time steps or
@@ -82,11 +82,19 @@ Assembles the element residual `ge` into the global residual vector `g`.
 @propagate_inbounds function assemble!(g::AbstractVector{T}, dofs::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
     @boundscheck checkbounds(g, dofs)
     @inbounds for i in 1:length(dofs)
-        g[dofs[i]] += ge[i]
+        addindex!(g, ge[i], dofs[i])
     end
 end
 
 abstract type AbstractSparseAssembler end
+
+"""
+    matrix_handle(a::AbstractSparseAssembler)
+    vector_handle(a::AbstractSparseAssembler)
+
+Return a reference to the underlying matrix/vector of the assembler.
+"""
+matrix_handle, vector_handle
 
 struct AssemblerSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
     K::SparseMatrixCSC{Tv,Ti}
@@ -101,8 +109,18 @@ struct AssemblerSymmetricSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
     sorteddofs::Vector{Int}
 end
 
-@inline getsparsemat(a::AssemblerSparsityPattern) = a.K
-@inline getsparsemat(a::AssemblerSymmetricSparsityPattern) = a.K.data
+function Base.show(io::IO, ::MIME"text/plain", a::Union{AssemblerSparsityPattern,AssemblerSymmetricSparsityPattern})
+    print(io, typeof(a), " for assembling into:\n - ")
+    summary(io, a.K)
+    if !isempty(a.f)
+        print(io, "\n - ")
+        summary(io, a.f)
+    end
+end
+
+matrix_handle(a::AssemblerSparsityPattern) = a.K
+matrix_handle(a::AssemblerSymmetricSparsityPattern) = a.K.data
+vector_handle(a::Union{AssemblerSparsityPattern, AssemblerSymmetricSparsityPattern}) = a.f
 
 """
     start_assemble(K::SparseMatrixCSC;            fillzero::Bool=true) -> AssemblerSparsityPattern
@@ -126,11 +144,11 @@ start_assemble(K::Union{SparseMatrixCSC, Symmetric{<:Any,SparseMatrixCSC}}, f::V
 
 start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; fillzero::Bool=true) = start_assemble(K, f; fillzero=fillzero)
 function start_assemble(K::SparseMatrixCSC{T}, f::Vector=T[]; fillzero::Bool=true) where {T}
-    fillzero && (fill!(K.nzval, zero(T)); fill!(f, zero(T)))
+    fillzero && (fillzero!(K); fillzero!(f))
     return AssemblerSparsityPattern(K, f, Int[], Int[])
 end
 function start_assemble(K::Symmetric{T,<:SparseMatrixCSC}, f::Vector=T[]; fillzero::Bool=true) where T
-    fillzero && (fill!(K.data.nzval, zero(T)); fill!(f, zero(T)))
+    fillzero && (fillzero!(K); fillzero!(f))
     return AssemblerSymmetricSparsityPattern(K, f, Int[], Int[])
 end
 
@@ -169,7 +187,7 @@ end
         @inbounds assemble!(A.f, dofs, fe)
     end
 
-    K = getsparsemat(A)
+    K = matrix_handle(A)
     permutation = A.permutation
     sorteddofs = A.sorteddofs
     @boundscheck checkbounds(K, dofs, dofs)
@@ -181,21 +199,78 @@ end
     current_col = 1
     @inbounds for Kcol in sorteddofs
         maxlookups = sym ? current_col : ld
-        current_idx = 1
-        for r in nzrange(K, Kcol)
-            Kerow = permutation[current_idx]
-            if K.rowval[r] == dofs[Kerow]
-                Kecol = permutation[current_col]
-                K.nzval[r] += Ke[Kerow, Kecol]
-                current_idx += 1
+        Kecol = permutation[current_col]
+        ri = 1 # row index pointer for the local matrix
+        Ri = 1 # row index pointer for the global matrix
+        nzr = nzrange(K, Kcol)
+        while Ri <= length(nzr) && ri <= maxlookups
+            R = nzr[Ri]
+            Krow = K.rowval[R]
+            Kerow = permutation[ri]
+            val = Ke[Kerow, Kecol]
+            if Krow == dofs[Kerow]
+                # Match: add the value (if non-zero) and advance the pointers
+                if !iszero(val)
+                    K.nzval[R] += val
+                end
+                ri += 1
+                Ri += 1
+            elseif Krow < dofs[Kerow]
+                # No match yet: advance the global matrix row pointer
+                Ri += 1
+            else # Krow > dofs[Kerow]
+                # No match: no entry exist in the global matrix for this row. This is
+                # allowed as long as the value which would have been inserted is zero.
+                iszero(val) || error("some row indices were not found")
+                # Advance the local matrix row pointer
+                ri += 1
             end
-            current_idx > maxlookups && break
         end
-        if current_idx <= maxlookups
-            error("some row indices were not found")
+        # Make sure that remaining entries in this column of the local matrix are all zero
+        for i in ri:maxlookups
+            if !iszero(Ke[permutation[i], Kecol])
+                error("some row indices were not found")
+            end
         end
         current_col += 1
     end
+end
+
+
+## assemble! with local condensation ##
+
+"""
+    apply_assemble!(
+        assembler::AbstractSparseAssembler, ch::ConstraintHandler,
+        global_dofs::AbstractVector{Int},
+        local_matrix::AbstractMatrix, local_vector::AbstractVector;
+        apply_zero::Bool = false
+    )
+
+Assemble `local_matrix` and `local_vector` into the global system in `assembler` by first
+doing constraint condensation using [`apply_local!`](@ref).
+
+This is similar to using [`apply_local!`](@ref) followed by [`assemble!`](@ref) with the
+advantage that non-local constraints can be handled, since this method can write to entries
+of the global matrix and vector outside of the indices in `global_dofs`.
+
+When the keyword argument `apply_zero` is `true` all inhomogeneities are set to `0` (cf.
+[`apply!`](@ref) vs [`apply_zero!`](@ref)).
+
+Note that this method is destructive since it modifies `local_matrix` and `local_vector`.
+"""
+function apply_assemble!(
+        assembler::AbstractSparseAssembler, ch::ConstraintHandler,
+        global_dofs::AbstractVector{Int},
+        local_matrix::AbstractMatrix, local_vector::AbstractVector;
+        apply_zero::Bool = false
+    )
+    _apply_local!(
+        local_matrix, local_vector, global_dofs, ch, apply_zero,
+        matrix_handle(assembler), vector_handle(assembler),
+    )
+    assemble!(assembler, global_dofs, local_matrix, local_vector)
+    return
 end
 
 

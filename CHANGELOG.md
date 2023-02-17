@@ -6,10 +6,137 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+ - Fix an issue in constraint application of `Symmetric`-wrapped sparse matrices (i.e.
+   obtained from `create_symmatric_sparsity_pattern`). In particular, `apply!(K::Symmetric,
+   f, ch)` would incorrectly modify `f` if any of the constraints were inhomogeneous.
+   ([#592][github-592])
+
+## [0.3.11] - 2023-01-17
+### Added
+ - [Metis.jl](https://github.com/JuliaSparse/Metis.jl) extension for fill-reducing DoF
+   permutation. This uses Julias new package extension mechanism (requires Julia 1.10) to
+   support a new DoF renumbering order `DofOrder.Ext{Metis}()` that can be passed to
+   `renumber!` to renumber DoFs using the Metis.jl library. ([#393][github-393],
+   [#549][github-549])
+ - [BlockArrays.jl](https://github.com/JuliaArrays/BlockArrays.jl) extension for creating a
+   globally blocked system matrix. `create_sparsity_pattern(BlockMatrix, dh, ch; kwargs...)`
+   return a matrix that is blocked by field (requires DoFs to be (re)numbered by field, i.e.
+   `renumber!(dh, DofOrder.FieldWise())`). For custom blocking it is possible to pass an
+   uninitialized `BlockMatrix` with the correct block sizes (see `BlockArrays.jl` docs).
+   This functionality is useful for e.g. special solvers where individual blocks need to be
+   extracted. Requires Julia version 1.9 or above. ([#567][github-567])
+ - New function `apply_analytical!` for setting the values of the degrees of freedom for a
+   specific field according to a spatial function `f(x)`. ([#532][github-532])
+ - New cache struct `CellCache` to be used when iterating over the cells in a grid or DoF
+   handler. `CellCache` caches nodes, coordinates, and DoFs, for the cell. The cache `cc`
+   can be re-initialized for a new cell index `ci` by calling `reinit!(cc, ci)`. This can be
+   used as an alternative to `CellIterator` when more control over which element to loop
+   over is needed. See documentation for `CellCache` for more information.
+   ([#546][github-546])
+ - It is now possible to create the sparsity pattern without constrained entries (they will
+   be zeroed out later anyway) by passing `keep_constrained=false` to
+   `create_sparsity_pattern`. This naturally only works together with local condensation of
+   constraints since there won't be space allocated in the global matrix for the full (i.e.
+   "non-condensed") element matrix. Creating the matrix without constrained entries reduces
+   the memory footprint, but unless a significant amount of DoFs are constrained (e.g. high
+   mesh resolution at a boundary) the savings are negligible. ([#539][github-539])
+### Changed
+ - `ConstraintHandler`: `update!` is now called implicitly in `close!`. This was easy to
+   miss, and somewhat of a strange requirement when solving problems without time stepping.
+   ([#459][github-459])
+ - The function for computing the inhomogeneity in a `Dirichlet` constraint can now be
+   specified as either `f(x)` or `f(x, t)`, where `x` is the spatial coordinate and `t` the
+   time. ([#459][github-459])
+ - The elements of a `CellIterator` are now `CellCache` instead of the iterator itself,
+   which was confusing in some cases. This change does not affect typical user code.
+   ([#546][github-546])
+### Deprecated
+ - Adding fields to a DoF handler with `push!(dh, ...)` has been deprecated in favor of
+   `add!(dh, ...)`. This is to make it consistent with how constraints are added to a
+   constraint handler. ([#578][github-578])
+### Fixed
+ - Fix `shape_value` for the linear, discontinuous Lagrange interpolation.
+   ([#553][github-553])
+ - Fix `reference_coordinate` dispatch for discontinuous Lagrange interpolations.
+   ([#559][github-559])
+ - Fix `show(::Grid)` for custom cell types. ([#570][github-570])
+ - Fix `apply_zero!(Δa, ch)` when using inhomogeneous affine constraints
+   ([#575][github-575])
+### Other improvements
+ - Internal changes defining a new global matrix/vector "interface". These changes make it
+   easy to enable more array types (e.g. `BlockMatrix` support added in this release) and
+   solvers in the future. ([#562][github-562], [#571][github-571])
+ - Performance improvements:
+    - Reduced time and memory allocations for global sparse matrix creation (Julia >= 1.10).
+      ([#563][github-563])
+ - Documentation improvements:
+    - Added an overview of the Examples section. ([#531][github-531])
+    - Added an example showing topology optimization. ([#531][github-531])
+    - Various typo fixes. ([#574][github-574])
+    - Fix broken links. ([#583][github-583])
+
+## [0.3.10] - 2022-12-11
+### Added
+ - New functions `apply_local!` and `apply_assemble!` for applying constraints locally on
+   the element level before assembling to the global system. ([#528][github-528])
+ - New functionality to renumber DoFs by fields or by components. This is useful when you
+   need the global matrix to be blocked. ([#378][github-378], [#545][github-545])
+ - Functionality to renumber DoFs in DofHandler and ConstraintHandler simultaneously:
+   `renumber!(dh::DofHandler, ch::ConstraintHandler, order)`. Previously renumbering had to
+   be done *before* creating the ConstraintHandler since otherwise DoF numbers would be
+   inconsistent. However, this was inconvenient in cases where the constraints impact the
+   new DoF order permutation. ([#542][github-542])
+ - The coupling between fields can now be specified when creating the global matrix with
+   `create_sparsity_pattern` by passing a `Matrix{Bool}`. For example, in a problem with
+   unknowns `(u, p)` and corresponding test functions `(v, q)`, if there is no coupling
+   between `p` and `q` it is unnecessary to allocate entries in the global matrix
+   corresponding to these DoFs. This can now be communicated to `create_sparsity_pattern` by
+   passing the coupling matrix `[true true; true false]` in the keyword argument `coupling`.
+   ([#544][github-544])
+### Changed
+ - Runtime and allocations for application of boundary conditions in `apply!` and
+   `apply_zero!` have been improved. As a result, the `strategy` keyword argument is
+   obsolete and thus ignored. ([#489][github-489])
+ - The internal representation of `Dirichlet` boundary conditions and `AffineConstraint`s in
+   the `ConstraintHandler` have been unified. As a result, conflicting constraints on DoFs
+   are handled more consistently: the constraint added last to the `ConstraintHandler` now
+   always override any previous constraints. Conflicting constraints could previously cause
+   problems when a DoF where prescribed by both `Dirichlet` and `AffineConstraint`.
+   ([#529][github-529])
+ - Entries in local matrix/vector are now ignored in the assembly procedure. This allows,
+   for example, using a dense local matrix `[a b; c d]` even if no entries exist in the
+   global matrix for the `d` block, i.e. in `[A B; C D]` the `D` block is zero, and these
+   global entries might not exist in the sparse matrix. (Such sparsity patterns can now be
+   created by `create_sparsity_pattern`, see [#544][github-544].) ([#543][github-543])
+### Fixed
+ - Fix affine constraints with prescribed DoFs in the right-hand-side. In particular, DoFs
+   that are prescribed by just an inhomogeneity are now handled correctly, and nested affine
+   constraints now give an error instead of silently giving the wrong result.
+   ([#530][github-530], [#535][github-535])
+ - Fixed internal inconsistency in edge ordering for 2nd order RefTetrahedron and RefCube.
+   ([#520][github-520], [#523][github-523])
+### Other improvements
+ - Performance improvements:
+    - Reduced time and memory allocations in DoF distribution for `MixedDofHandler`.
+      ([#533][github-533])
+    - Reduced time and memory allocations reductions in `getcoordinates!`.
+      ([#536][github-536])
+    - Reduced time and memory allocations in affine constraint condensation.
+      ([#537][github-537], [#541][github-541], [#550][github-550])
+ - Documentation improvements:
+    - Use `:static` scheduling for threaded `for`-loop ([#534][github-534])
+    - Remove use of `@inbounds` ([#547][github-547])
+ - Unification of `create_sparsity_pattern` methods to remove code duplication between
+   `DofHandler` and `MixedDofHandler`. ([#538][github-538], [#540][github-540])
+
+## [0.3.9] - 2022-10-19
 ### Added
  - New higher order function interpolations for triangles (`Lagrange{2,RefTetrahedron,3}`,
    `Lagrange{2,RefTetrahedron,4}`, and `Lagrange{2,RefTetrahedron,5}`). ([#482][github-482],
    [#512][github-512])
+ - New Gaussian quadrature formula for triangles up to order 15. ([#514][github-514])
+ - Add debug mode for working with Ferrite internals. ([#524][github-524])
 ### Changed
  - The default components to constrain in `Dirichlet` and `PeriodicDirichlet` have changed
    from component 1 to all components of the field. For scalar problems this has no effect.
@@ -95,10 +222,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [github-352]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/352
 [github-363]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/363
+[github-378]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/378
 [github-385]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/385
 [github-386]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/386
 [github-390]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/390
 [github-392]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/392
+[github-393]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/393
 [github-401]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/401
 [github-402]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/402
 [github-404]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/404
@@ -108,9 +237,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-418]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/418
 [github-425]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/425
 [github-428]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/428
+[github-431]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/431
 [github-436]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/436
 [github-456]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/456
 [github-458]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/458
+[github-459]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/459
 [github-460]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/460
 [github-461]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/461
 [github-462]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/462
@@ -126,6 +257,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-481]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/481
 [github-482]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/482
 [github-487]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/487
+[github-489]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/489
 [github-494]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/494
 [github-496]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/496
 [github-500]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/500
@@ -135,8 +267,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-506]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/506
 [github-509]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/509
 [github-512]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/512
+[github-514]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/514
+[github-520]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
+[github-523]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/523
+[github-524]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/524
+[github-528]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/528
+[github-529]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/529
+[github-530]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/530
+[github-531]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/531
+[github-532]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/532
+[github-533]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/533
+[github-534]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/534
+[github-535]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/535
+[github-536]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/536
+[github-537]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/537
+[github-538]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/538
+[github-539]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/539
+[github-540]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/540
+[github-541]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/541
+[github-542]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/542
+[github-543]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/543
+[github-544]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/544
+[github-545]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/545
+[github-546]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/546
+[github-547]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/547
+[github-549]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/549
+[github-550]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/550
+[github-553]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/553
+[github-559]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/559
+[github-562]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/562
+[github-563]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/563
+[github-567]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/567
+[github-570]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/570
+[github-571]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/571
+[github-574]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/574
+[github-575]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/575
+[github-578]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/578
+[github-583]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/583
+[github-592]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/592
 
-[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.8...HEAD
+[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.11...HEAD
+[0.3.11]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.10...v0.3.11
+[0.3.10]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.9...v0.3.10
+[0.3.9]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.5...v0.3.6

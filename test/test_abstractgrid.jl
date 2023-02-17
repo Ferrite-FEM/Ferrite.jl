@@ -15,17 +15,9 @@
     Ferrite.getnodes(grid::SmallGrid) = grid.nodes_test
     Ferrite.getnodes(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.nodes_test[v]
     Ferrite.getnnodes(grid::SmallGrid) = length(grid.nodes_test)
+    Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
     Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
     Ferrite.n_faces_per_cell(grid::SmallGrid) = nfaces(eltype(grid.cells_test))
-    function Ferrite.getcoordinates!(x::Vector{Vec{dim,T}}, grid::SmallGrid, cell::Int) where {dim,T}
-        for i in 1:length(x)
-            x[i] = Vec{dim,T}(grid.nodes_test[grid.cells_test[cell].nodes[i]])
-        end
-    end
-    function Ferrite.getcoordinates(grid::SmallGrid{dim}, cell::Int) where dim
-        nodeidx = grid.cells_test[cell].nodes
-        return [Vec{dim,Float64}(grid.nodes_test[i]) for i in nodeidx]::Vector{Vec{dim,Float64}}
-    end
 
     nodes = [(-1.0,-1.0); (0.0,-1.0); (1.0,-1.0); (-1.0,0.0); (0.0,0.0); (1.0,0.0); (-1.0,1.0); (0.0,1.0); (1.0,1.0)]
     cells = (Quadrilateral((1,2,5,4)), Quadrilateral((2,3,6,5)), Quadrilateral((4,5,8,7)), Quadrilateral((5,6,9,8)))
@@ -71,7 +63,7 @@
     end
 
     for (dh,u) in zip(dhs,(u1,u2))
-        push!(dh, :u, 1)
+        add!(dh, :u, 1)
         close!(dh)
         ch = ConstraintHandler(dh)
         add!(ch, dbc)

@@ -78,7 +78,7 @@
 # and a third equation ``\delta\lambda \int_{\Gamma} p\ \mathrm{d}\Gamma = 0`` so that we
 # can solve for ``\lambda``. However, since we in this case are not interested in computing
 # ``\lambda``, and since the constraint is linear, we can directly embed this constraint
-# using an [`AffineConstraint`](@ref) in Ferrite.
+# using an `AffineConstraint` in Ferrite.
 #
 # After FE discretization we obtain a linear system of the form
 # ``\underline{\underline{K}}\ \underline{a} = \underline{f}``, where
@@ -241,8 +241,8 @@ end
 
 function setup_dofs(grid, ipu, ipp)
     dh = DofHandler(grid)
-    push!(dh, :u, 2, ipu)
-    push!(dh, :p, 1, ipp)
+    add!(dh, :u, 2, ipu)
+    add!(dh, :p, 1, ipp)
     close!(dh)
     return dh
 end
@@ -319,7 +319,7 @@ function setup_mean_constraint(dh, fvp)
     V ./= V[constrained_dof]
     mean_value_constraint = AffineConstraint(
         constrained_dof,
-        Pair{Int,Float64}[J[i] => -V[i] for i in 1:length(J) if i != constrained_dof],
+        Pair{Int,Float64}[J[i] => -V[i] for i in 1:length(J) if J[i] != constrained_dof],
         0.0,
     )
     return mean_value_constraint
@@ -448,7 +448,8 @@ function main()
     ## Boundary conditions
     ch = setup_constraints(dh, fvp)
     ## Global tangent matrix and rhs
-    K = create_sparsity_pattern(dh, ch)
+    coupling = [true true; true false] # no coupling between pressure test/trial functions
+    K = create_sparsity_pattern(dh, ch; coupling=coupling)
     f = zeros(ndofs(dh))
     ## Assemble system
     assemble_system!(K, f, dh, cvu, cvp)
@@ -460,7 +461,7 @@ function main()
     vtk_grid("stokes-flow", grid) do vtk
         vtk_point_data(vtk, dh, u)
     end
-    Sys.isapple() || @test norm(u) ≈ 0.32353713318639005 #src
+    Sys.isapple() || @test norm(u) ≈ 0.32254330524111213 #src
     return
 end
 #md nothing #hide

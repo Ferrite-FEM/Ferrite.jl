@@ -34,8 +34,8 @@ cv = CellScalarValues(qr_inplane, ip)
 # Next we distribute displacement dofs,`:u = (x,y,z)` and rotational dofs, `:θ = (θ₁,  θ₂)`.
 #+
 dh = DofHandler(grid)
-push!(dh, :u, 3, ip)
-push!(dh, :θ, 2, ip)
+add!(dh, :u, 3, ip)
+add!(dh, :θ, 2, ip)
 close!(dh)
 
 # In order to apply our boundary conditions, we first need to create some edge- and vertex-sets. This 
@@ -64,7 +64,7 @@ close!(ch)
 update!(ch, 0.0)
 
 # Next we define relevant data for the shell, such as shear correction factor and stiffness matrix for the material. 
-# In this linear shell, plane stress is assumed, ie $\\sigma_{zz} = 0 $. Therefor, the stiffness matrix is 5x5 (opposed to the normal 6x6).
+# In this linear shell, plane stress is assumed, ie $\\sigma_{zz} = 0$. Therefor, the stiffness matrix is 5x5 (opposed to the normal 6x6).
 #+
 κ = 5/6 # Shear correction factor
 E = 210.0

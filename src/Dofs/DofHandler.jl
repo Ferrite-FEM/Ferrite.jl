@@ -5,7 +5,7 @@ abstract type AbstractDofHandler end
 
 Construct a `DofHandler` based on `grid`.
 
-Operates slightly faster than [`MixedDofHandler`](@docs). Supports:
+Operates slightly faster than [`MixedDofHandler`](@ref). Supports:
 - `Grid`s with a single concrete cell type.
 - One or several fields on the whole domaine.
 """
@@ -189,7 +189,7 @@ Return the local dof range for `field_name`. Example:
 julia> grid = generate_grid(Triangle, (3, 3))
 Grid{2, Triangle, Float64} with 18 Triangle cells and 16 nodes
 
-julia> dh = DofHandler(grid); push!(dh, :u, 3); push!(dh, :p, 1); close!(dh);
+julia> dh = DofHandler(grid); add!(dh, :u, 3); add!(dh, :p, 1); close!(dh);
 
 julia> dof_range(dh, :u)
 1:9
@@ -205,15 +205,15 @@ function dof_range(dh::AbstractDofHandler, field_name::Symbol)
 end
 
 """
-    push!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
+    add!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
 
 Add a `dim`-dimensional `Field` called `name` which is approximated by `ip` to `dh`.
 
 The field is added to all cells of the underlying grid. In case no interpolation `ip` is given,
 the default interpolation of the grid's celltype is used. 
-If the grid uses several celltypes, [`push!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
+If the grid uses several celltypes, [`add!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
 """
-function Base.push!(dh::AbstractDofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(getgrid(dh))))
+function add!(dh::AbstractDofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(getgrid(dh))))
     @assert !isclosed(dh)
     @assert !in(name, dh.field_names)
     push!(dh.field_names, name)
@@ -404,28 +404,6 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     return global_dofs
 end
 
-function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid{dim}, i::Int) where {dim}
-    nodes = getcells(grid,i).nodes
-    N = length(nodes)
-    @assert length(global_nodes) == N
-    for j in 1:N
-        global_nodes[j] = nodes[j]
-    end
-    return global_nodes
-end
-
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,T}
-    nodes = getcells(grid,i).nodes
-    N = length(nodes)
-    @assert length(global_coords) == N
-    for j in 1:N
-        global_coords[j] = getcoordinates(getnodes(grid,nodes[j]))
-    end
-    return global_coords
-end
-
-cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, getgrid(dh), i)
-
 function celldofs(dh::DofHandler, i::Int)
     @assert isclosed(dh)
     n = ndofs_per_cell(dh, i)
@@ -434,21 +412,60 @@ function celldofs(dh::DofHandler, i::Int)
     return global_dofs
 end
 
+# Compute a coupling matrix of size (ndofs_per_cell × ndofs_per_cell) based on the input
+# coupling which can be of size i) (nfields × nfields) specifying coupling between fields,
+# ii) (ncomponents × ncomponents) specifying coupling between components, or iii)
+# (ndofs_per_cell × ndofs_per_cell) specifying coupling between all local dofs, i.e. a
+# "template" local matrix.
+function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatrix{Bool}, sym::Bool)
+    out = zeros(Bool, ndofs_per_cell(dh), ndofs_per_cell(dh))
+    sz = size(coupling, 1)
+    sz == size(coupling, 2) || error("coupling not square")
+    sym && (issymmetric(coupling) || error("coupling not symmetric"))
+    dof_ranges = [dof_range(dh, f) for f in dh.field_names]
+    if sz == length(dh.field_names) # Coupling given by fields
+        for (j, jrange) in pairs(dof_ranges), (i, irange) in pairs(dof_ranges)
+            out[irange, jrange] .= coupling[i, j]
+        end
+    elseif sz == sum(dh.field_dims) # Coupling given by components
+        component_offsets = pushfirst!(cumsum(dh.field_dims), 0)
+        for (jf, jrange) in pairs(dof_ranges), (j, J) in pairs(jrange)
+            jc = mod1(j, dh.field_dims[jf]) + component_offsets[jf]
+            for (i_f, irange) in pairs(dof_ranges), (i, I) in pairs(irange)
+                ic = mod1(i, dh.field_dims[i_f]) + component_offsets[i_f]
+                out[I, J] = coupling[ic, jc]
+            end
+        end
+    elseif sz == ndofs_per_cell(dh) # Coupling given by template local matrix
+        out .= coupling
+    else
+        error("could not create coupling")
+    end
+    return out
+end
+
 # Creates a sparsity pattern from the dofs in a DofHandler.
 # Returns a sparse matrix with the correct storage pattern.
 """
-    create_sparsity_pattern(dh::AbstractDofHandler)
+    create_sparsity_pattern(dh::AbstractDofHandler; coupling)
 
 Create the sparsity pattern corresponding to the degree of freedom
 numbering in the [`AbstractDofHandler`](@ref). Return a `SparseMatrixCSC`
 with stored values in the correct places.
 
+The keyword argument `coupling` can be used to specify how fields (or components) in the dof
+handler couple to each other. `coupling` should be a square matrix of booleans with
+`nfields` (or `ncomponents`) rows/columns with `true` if fields are coupled and `false` if
+not. By default full coupling is assumed.
+
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-create_sparsity_pattern(dh::AbstractDofHandler) = _create_sparsity_pattern(dh, nothing, false)
+function create_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing)
+    return _create_sparsity_pattern(dh, nothing, false, true, coupling)
+end
 
 """
-    create_symmetric_sparsity_pattern(dh::AbstractDofHandler)
+    create_symmetric_sparsity_pattern(dh::DofHandler; coupling)
 
 Create the symmetric sparsity pattern corresponding to the degree of freedom
 numbering in the [`AbstractDofHandler`](@ref) by only considering the upper
@@ -456,24 +473,38 @@ triangle of the matrix. Return a `Symmetric{SparseMatrixCSC}`.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-create_symmetric_sparsity_pattern(dh::AbstractDofHandler) = Symmetric(_create_sparsity_pattern(dh, nothing, true), :U)
+function create_symmetric_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing)
+    return Symmetric(_create_sparsity_pattern(dh, nothing, true, true, coupling), :U)
+end
 
-function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool)
+function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool, keep_constrained::Bool, coupling::Union{AbstractMatrix{Bool},Nothing})
     @assert isclosed(dh)
+    if !keep_constrained
+        @assert ch !== nothing && isclosed(ch)
+    end
     ncells = getncells(getgrid(dh))
+    if coupling !== nothing
+        # Extend coupling to be of size (ndofs_per_cell × ndofs_per_cell)
+        coupling = _coupling_to_local_dof_coupling(dh, coupling, sym)
+    end
+    # Compute approximate size for the buffers using the dofs in the first element
     n = ndofs_per_cell(dh)
-    N = sym ? div(n*(n+1), 2) * ncells : n^2 * ncells
+    N = (coupling === nothing ? (sym ? div(n*(n+1), 2) : n^2) : count(coupling)) * ncells
     N += ndofs(dh) # always add the diagonal elements
     I = Int[]; resize!(I, N)
     J = Int[]; resize!(J, N)
     global_dofs = zeros(Int, n)
     cnt = 0
     for element_id in 1:ncells
+        # MixedDofHandler might have varying number of dofs per element
+        resize!(global_dofs, ndofs_per_cell(dh, element_id))
         celldofs!(global_dofs, dh, element_id)
-        @inbounds for j in 1:n, i in 1:n
+        @inbounds for j in eachindex(global_dofs), i in eachindex(global_dofs)
+            coupling === nothing || coupling[i, j] || continue
             dofi = global_dofs[i]
             dofj = global_dofs[j]
             sym && (dofi > dofj && continue)
+            !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
             cnt += 1
             if cnt > length(J)
                 resize!(I, trunc(Int, length(I) * 1.5))
@@ -497,39 +528,17 @@ function _create_sparsity_pattern(dh::DofHandler, ch#=::Union{ConstraintHandler,
     resize!(I, cnt)
     resize!(J, cnt)
 
+    K = spzeros!!(Float64, I, J, ndofs(dh), ndofs(dh))
+
     # If ConstraintHandler is given, create the condensation pattern due to affine constraints
     if ch !== nothing
         @assert isclosed(ch)
-
-        V = ones(length(I))
-        K = sparse(I, J, V, ndofs(dh), ndofs(dh))
-        _condense_sparsity_pattern!(K, ch.acs)
-        fill!(K.nzval, 0.0)
-    else
-        V = zeros(length(I))
-        K = sparse(I, J, V, ndofs(dh), ndofs(dh))
+        fill!(K.nzval, 1)
+        _condense_sparsity_pattern!(K, ch.dofcoefficients, ch.dofmapping, keep_constrained)
+        fillzero!(K)
     end
+
     return K
-end
-
-# dof renumbering
-"""
-    renumber!(dh::DofHandler, perm)
-
-Renumber the degrees of freedom in the DofHandler according to the
-permuation `perm`.
-
-!!! warning
-    Remember to do renumbering *before* adding boundary conditions,
-    otherwise the mapping for the dofs will be wrong.
-"""
-function renumber!(dh::AbstractDofHandler, perm::AbstractVector{<:Integer})
-    @assert isperm(perm) && length(perm) == ndofs(dh)
-    cell_dofs = dh.cell_dofs
-    for i in eachindex(cell_dofs)
-        cell_dofs[i] = perm[cell_dofs[i]]
-    end
-    return dh
 end
 
 function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
@@ -561,9 +570,8 @@ end
 
 function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=Set{Int}(1:getncells(getgrid(dh)))) where T
 
-    _celldofs = Vector{Int}(undef, ndofs_per_cell(dh, first(cellset)))
-    for cell in CellIterator(dh, collect(cellset))
-        celldofs!( _celldofs, cell)
+    for cell in CellIterator(dh, cellset, UpdateFlags(; nodes=true, coords=false, dofs=true))
+        _celldofs = celldofs(cell)
         counter = 1
         for node in getnodes(cell)
             for d in 1:field_dim

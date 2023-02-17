@@ -53,9 +53,11 @@ module TestComputationalHomogenization
 end
 
 module TestStokesFlow
+if !Sys.iswindows()
     mktempdir() do dir
         cd(dir) do
             include(joinpath(@__DIR__, "../docs/src/literate/stokes-flow.jl"))
         end
     end
+end
 end

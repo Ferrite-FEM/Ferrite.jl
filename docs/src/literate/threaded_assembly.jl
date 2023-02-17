@@ -53,7 +53,7 @@ end;
 # #### DofHandler
 function create_dofhandler(grid::Grid{dim}) where {dim}
     dh = DofHandler(grid)
-    push!(dh, :u, dim) # Add a displacement field
+    add!(dh, :u, dim) # Add a displacement field
     close!(dh)
 end;
 
@@ -127,7 +127,7 @@ function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::S
 
     for color in colors
         ## Each color is safe to assemble threaded
-        Threads.@threads for i in 1:length(color)
+        Threads.@threads :static for i in 1:length(color)
             assemble_cell!(scratches[Threads.threadid()], color[i], K, grid, dh, C, b)
         end
     end

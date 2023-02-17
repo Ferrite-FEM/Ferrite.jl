@@ -149,13 +149,22 @@ function reference_coordinates(ip::DiscontinuousLagrange{dim,shape,order}) where
     return reference_coordinates(Lagrange{dim,shape,order}())
 end
 function value(ip::DiscontinuousLagrange{dim,shape,order}, i::Int, ξ::Vec{dim}) where {dim,shape,order}
-    return value(Lagrange{dim, ref_type, order}())
+    return value(Lagrange{dim, shape, order}(), i, ξ)
 end
 
 # Excepting the L0 element.
-function reference_coordinates(ip::DiscontinuousLagrange{dim,shape,0}) where {dim,shape}
+function reference_coordinates(ip::DiscontinuousLagrange{dim,RefCube,0}) where dim
     return [Vec{dim, Float64}(ntuple(x->0.0, dim))]
 end
+
+function reference_coordinates(ip::DiscontinuousLagrange{2,RefTetrahedron,0})
+    return [Vec{2,Float64}((1/3,1/3))]
+end
+
+function reference_coordinates(ip::DiscontinuousLagrange{3,RefTetrahedron,0})
+   return [Vec{3,Float64}((1/4,1/4,1/4))]
+end
+
 function value(ip::DiscontinuousLagrange{dim,shape,0}, i::Int, ξ::Vec{dim}) where {dim,shape}
     return 1.0
 end
@@ -457,7 +466,7 @@ nvertexdofs(::Lagrange{3,RefTetrahedron,2}) = 1
 nedgedofs(::Lagrange{3,RefTetrahedron,2}) = 1
 
 faces(::Lagrange{3,RefTetrahedron,2}) = ((1,3,2,7,6,5), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
-edges(::Lagrange{3,RefTetrahedron,2}) = ((1,5,2), (2,6,3), (3,7,1), (1,8,4), (2,9,4), (3,10,4))
+edges(::Lagrange{3,RefTetrahedron,2}) = ((1,2,5), (2,3,6), (3,1,7), (1,4,8), (2,4,9), (3,4,10))
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,2})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
@@ -545,7 +554,7 @@ faces(::Lagrange{3,RefCube,2}) = (
     (1,5,8,4, 17,16,20,12, 25),
     (5,6,7,8, 13,14,15,16, 26),
 )
-edges(::Lagrange{3,RefCube,2}) = ((1,2, 9), (2,3, 10), (3,4, 11), (4,1, 12), (5,6, 13), (6,7, 14), (7,8, 15), (8,5, 16), (1,5, 17), (2,6, 18), (3,7, 19), (4,8, 20))
+edges(::Lagrange{3,RefCube,2}) = ((1,2, 9), (2,3, 10), (3,4, 11), (4,1, 12), (1,5, 17), (2,6, 18), (3,7, 19), (4,8, 20), (5,6, 13), (6,7, 14), (7,8, 15), (8,5, 16))
 
 function reference_coordinates(::Lagrange{3,RefCube,2})
            # vertex
