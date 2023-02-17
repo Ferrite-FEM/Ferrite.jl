@@ -604,11 +604,7 @@ function Ferrite.close!(dh::DistributedDofHandler)
 end
 
 
-function close_hypre!(dh::DistributedDofHandler)
-    Ferrite.__close!(dh)
-    # Compute the owners of the dofs
-    append!(dh.ldof_to_rank, compute_dof_ownership(dh))
-
+function hypre_reorder!(dh::DistributedDofHandler)
     # Reorder to make local dofs continuous
     next_local_dof = 1
     next_nonlocal_dof = num_local_true_dofs(dh)+1
@@ -628,13 +624,10 @@ function close_hypre!(dh::DistributedDofHandler)
         cell_dofs[i] = permutation[cell_dofs[i]]
     end
 
-    dh.ldof_to_rank .= dh.ldof_to_rank[permutation]
-    # dh.ldof_to_gdof .= dh.ldof_to_gdof[permutation]
-
-    # Communicate the numbering to make it global
-    append!(dh.ldof_to_gdof, local_to_global_numbering(dh))
-
-    return dh
+    dh.ldof_to_rank .= dh.ldof_to_rank[permutation]  
+    Ferrite.@debug println("Updated dof ranks: $(dh.ldof_to_rank) (R$my_rank)")
+    dh.ldof_to_gdof .= dh.ldof_to_gdof[permutation]
+    Ferrite.@debug println("Updated local to global: $(dh.ldof_to_gdof) (R$my_rank)")
 end
 
 function WriteVTK.vtk_grid(filename::AbstractString, dh::DistributedDofHandler; compress::Bool=true)

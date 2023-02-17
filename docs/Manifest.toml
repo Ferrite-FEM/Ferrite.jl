@@ -2,7 +2,7 @@
 
 julia_version = "1.9.0-beta4"
 manifest_format = "2.0"
-project_hash = "496d72ebf77bfce22849d2f38c0edb3979829e55"
+project_hash = "27e3c9a6b7b6a6a2a2a32de6779b15088202d916"
 
 [[deps.ANSIColoredPrinters]]
 git-tree-sha1 = "574baf8110975760d391c710b6341da1afa48d8c"
@@ -522,6 +522,18 @@ git-tree-sha1 = "37e4657cd56b11abe3d10cd4a1ec5fbdb4180263"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 version = "1.7.4"
 
+[[deps.HYPRE]]
+deps = ["CEnum", "HYPRE_jll", "Libdl", "MPI", "PartitionedArrays", "SparseArrays", "SparseMatricesCSR"]
+git-tree-sha1 = "b45b676f271aff979a680d47bc0b364b6919b52b"
+uuid = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
+version = "1.4.0"
+
+[[deps.HYPRE_jll]]
+deps = ["Artifacts", "JLLWrappers", "LAPACK_jll", "LazyArtifacts", "Libdl", "MPICH_jll", "MPIPreferences", "MPItrampoline_jll", "MicrosoftMPI_jll", "OpenBLAS_jll", "OpenMPI_jll", "Pkg", "TOML"]
+git-tree-sha1 = "b77d3eca75f8442e034ccf415c87405a49e77985"
+uuid = "0a602bbd-b08b-5d75-8d32-0de6eef44785"
+version = "2.23.1+1"
+
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg"]
 git-tree-sha1 = "129acf094d168394e80ee1dc4bc06ec835e510a3"
@@ -622,6 +634,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "f6250b16881adf048549549fba48b1161acdac8c"
 uuid = "c1c5ebd0-6772-5130-a774-d5fcae4a789d"
 version = "3.100.1+0"
+
+[[deps.LAPACK_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pkg", "libblastrampoline_jll"]
+git-tree-sha1 = "a539affa8228208f5a3396037165b04bff9a2ba6"
+uuid = "51474c39-65e3-53ba-86ba-03b1b862ec14"
+version = "3.10.0+1"
 
 [[deps.LERC_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -765,12 +783,10 @@ deps = ["ArrayInterfaceCore", "DocStringExtensions", "FastLapackInterface", "GPU
 git-tree-sha1 = "ed97c2b4e46d02d4c866d3ccfae039a6c09568b1"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 version = "1.35.0"
+weakdeps = ["HYPRE"]
 
     [deps.LinearSolve.extensions]
     LinearSolveHYPRE = "HYPRE"
-
-    [deps.LinearSolve.weakdeps]
-    HYPRE = "b5ffcf37-a2bd-41ab-a3da-4bd9bc8ad771"
 
 [[deps.Literate]]
 deps = ["Base64", "IOCapture", "JSON", "REPL"]

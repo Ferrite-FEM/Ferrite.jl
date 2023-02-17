@@ -16,7 +16,7 @@
 # First we load Ferrite, and some other packages we need
 using Ferrite, MPI
 using IterativeSolvers #, HYPRE
-using PartitionedArrays #src
+using PartitionedArrays, Metis #src
 
 FerritePartitionedArrays = Base.get_extension(Ferrite, :FerritePartitionedArrays)
 
@@ -47,7 +47,7 @@ cellvalues = CellScalarValues(qr, ip, ip_geo);
 # To handle the dofs correctly we now utilize the `DistributedDofHandle` 
 # instead of the `DofHandler`. For the user the interface is the same.
 dh = FerritePartitionedArrays.DistributedDofHandler(dgrid)
-push!(dh, :u, 1, ip)
+add!(dh, :u, 1, ip)
 close!(dh);
 
 # ### Boundary conditions
