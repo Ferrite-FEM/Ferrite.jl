@@ -246,7 +246,7 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
                             if !haskey(remote_vertices,other_rank)
                                 remote_vertices[other_rank] = Vector(undef,0)
                             end
-                            @debug println("Detected shared vertex $cell_vertex neighbor $other_vertex (R$my_rank)")
+                            Ferrite.@debug println("Detected shared vertex $cell_vertex neighbor $other_vertex (R$my_rank)")
                             push!(remote_vertices[other_rank], VertexIndex(global_to_local_cell_map[other_rank][global_cell_neighbor_idx], j))
                         end
                     end
@@ -271,7 +271,7 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
                                 if !haskey(remote_faces,other_rank)
                                     remote_faces[other_rank] = Vector(undef,0)
                                 end
-                                @debug println("Detected shared face $cell_face neighbor $other_face (R$my_rank)")
+                                Ferrite.@debug println("Detected shared face $cell_face neighbor $other_face (R$my_rank)")
                                 push!(remote_faces[other_rank], FaceIndex(global_to_local_cell_map[other_rank][global_cell_neighbor_idx], j))
                             end
                         end
@@ -297,7 +297,7 @@ function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::Exclu
                                 if !haskey(remote_edges,other_edge)
                                     remote_edges[other_rank] = Vector(undef,0)
                                 end
-                                @debug println("Detected shared edge $cell_edge neighbor $other_edge (R$my_rank)")
+                                Ferrite.@debug println("Detected shared edge $cell_edge neighbor $other_edge (R$my_rank)")
                                 push!(remote_edges[other_rank], EdgeIndex(global_to_local_cell_map[other_rank][global_cell_neighbor_idx], j))
                             end
                         end

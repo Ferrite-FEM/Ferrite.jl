@@ -39,7 +39,7 @@ struct COOAssembler{T}
         np = MPI.Comm_size(comm)
         my_rank = global_rank(dgrid)
 
-        @debug println("starting assembly... (R$my_rank)")
+        Ferrite.@debug println("starting assembly... (R$my_rank)")
 
         # Neighborhood graph
         # @TODO cleanup old code below and use graph primitives instead.
@@ -52,7 +52,7 @@ struct COOAssembler{T}
         sources .+= 1
         destinations .+= 1
 
-        @debug println("Neighborhood | $sources | $destinations (R$my_rank)")
+        Ferrite.@debug println("Neighborhood | $sources | $destinations (R$my_rank)")
 
         # Invert the relations to clarify the code
         source_index = Dict{Cint, Int}()
@@ -71,9 +71,9 @@ struct COOAssembler{T}
         ltdof_indices = ldof_to_rank.==my_rank
         ltdof_to_gdof = ldof_to_gdof[ltdof_indices]
 
-        @debug println("ltdof_to_gdof $ltdof_to_gdof (R$my_rank)")
-        @debug println("ldof_to_gdof $ldof_to_gdof (R$my_rank)")
-        @debug println("ldof_to_rank $ldof_to_rank (R$my_rank)")
+        Ferrite.@debug println("ltdof_to_gdof $ltdof_to_gdof (R$my_rank)")
+        Ferrite.@debug println("ldof_to_gdof $ldof_to_gdof (R$my_rank)")
+        Ferrite.@debug println("ldof_to_rank $ldof_to_rank (R$my_rank)")
 
         # Process owns rows of owned dofs. The process also may write to some remote dofs,
         # which correspond to non-owned share entities. Here we construct the rows for the
@@ -87,7 +87,7 @@ struct COOAssembler{T}
         row_exchanger = Exchanger(row_data)
         rows = PRange(ngdofs,row_data,row_exchanger)
 
-        @debug println("rows done (R$my_rank)")
+        Ferrite.@debug println("rows done (R$my_rank)")
 
         # For the locally visible columns we also have to take into account that remote
         # processes will write their data in some of these, because their remotely
@@ -113,7 +113,7 @@ struct COOAssembler{T}
             if my_rank != pivot_vertex_owner_rank
                 sender_slot = destination_index[pivot_vertex_owner_rank]
 
-                @debug println("$pivot_vertex may require synchronization (R$my_rank)")
+                Ferrite.@debug println("$pivot_vertex may require synchronization (R$my_rank)")
                 # Note: We have to send ALL dofs on the element to the remote.
                 cell_dofs_upper_bound = (pivot_cell_idx == getncells(dh.grid)) ? length(dh.cell_dofs) : dh.cell_dofs_offset[pivot_cell_idx+1]
                 cell_dofs = dh.cell_dofs[dh.cell_dofs_offset[pivot_cell_idx]:cell_dofs_upper_bound]
@@ -123,7 +123,7 @@ struct COOAssembler{T}
                     pivot_vertex_dofs = Ferrite.vertex_dofs(dh, field_idx, pivot_vertex)
                     
                     for d ∈ 1:dh.field_dims[field_idx]
-                        @debug println("  adding dof $(pivot_vertex_dofs[d]) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
+                        Ferrite.@debug println("  adding dof $(pivot_vertex_dofs[d]) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
 
                         # Extract dofs belonging to the current field
                         #cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
@@ -148,7 +148,7 @@ struct COOAssembler{T}
                 if my_rank != pivot_face_owner_rank
                     sender_slot = destination_index[pivot_face_owner_rank]
 
-                    @debug println("$pivot_face may require synchronization (R$my_rank)")
+                    Ferrite.@debug println("$pivot_face may require synchronization (R$my_rank)")
                     # Note: We have to send ALL dofs on the element to the remote.
                     cell_dofs_upper_bound = (pivot_cell_idx == getncells(dh.grid)) ? length(dh.cell_dofs) : dh.cell_dofs_offset[pivot_cell_idx+1]
                     cell_dofs = dh.cell_dofs[dh.cell_dofs_offset[pivot_cell_idx]:cell_dofs_upper_bound]
@@ -158,7 +158,7 @@ struct COOAssembler{T}
                         pivot_face_dofs = Ferrite.face_dofs(dh, field_idx, pivot_face)
                         
                         for d ∈ 1:dh.field_dims[field_idx]
-                            @debug println("  adding dof $(pivot_face_dofs[d]) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
+                            Ferrite.@debug println("  adding dof $(pivot_face_dofs[d]) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
                             
                             # Extract dofs belonging to the current field
                             #cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
@@ -184,7 +184,7 @@ struct COOAssembler{T}
                 if my_rank != pivot_edge_owner_rank
                     sender_slot = destination_index[pivot_edge_owner_rank]
 
-                    @debug println("$pivot_edge may require synchronization (R$my_rank)")
+                    Ferrite.@debug println("$pivot_edge may require synchronization (R$my_rank)")
                     # Note: We have to send ALL dofs on the element to the remote.
                     cell_dofs_upper_bound = (pivot_cell_idx == getncells(dh.grid)) ? length(dh.cell_dofs) : dh.cell_dofs_offset[pivot_cell_idx+1]
                     cell_dofs = dh.cell_dofs[dh.cell_dofs_offset[pivot_cell_idx]:cell_dofs_upper_bound]
@@ -194,7 +194,7 @@ struct COOAssembler{T}
                         pivot_edge_dofs = Ferrite.edge_dofs(dh, field_idx, pivot_edge)
 
                         for d ∈ 1:dh.field_dims[field_idx]
-                            @debug println("  adding dof $(pivot_edge_dofs[d]) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
+                            Ferrite.@debug println("  adding dof $(pivot_edge_dofs[d]) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
                             # Extract dofs belonging to the current field
                             #cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
                             #for cell_field_dof ∈ cell_field_dofs
@@ -213,7 +213,7 @@ struct COOAssembler{T}
         ghost_send_buffer_lengths = Int[length(i) for i ∈ ghost_dof_to_send]
         ghost_recv_buffer_lengths = zeros(Int, destination_len)
         MPI.Neighbor_alltoall!(UBuffer(ghost_send_buffer_lengths,1), UBuffer(ghost_recv_buffer_lengths,1), vertex_comm(dgrid));
-        @debug for (i,ghost_recv_buffer_length) ∈ enumerate(ghost_recv_buffer_lengths)
+        Ferrite.@debug for (i,ghost_recv_buffer_length) ∈ enumerate(ghost_recv_buffer_lengths)
             println("receiving $ghost_recv_buffer_length ghosts from $(sources[i])  (R$my_rank)")
         end
 
@@ -241,7 +241,7 @@ struct COOAssembler{T}
             append!(ghost_recv_buffer_source_ranks, ones(recv_len)*sources[source_idx])
         end
 
-        @debug println("received $ghost_recv_buffer_dofs with owners $ghost_recv_buffer_ranks (R$my_rank)")
+        Ferrite.@debug println("received $ghost_recv_buffer_dofs with owners $ghost_recv_buffer_ranks (R$my_rank)")
 
         unique_ghosts_dr = sort(unique(first,zip(ghost_recv_buffer_dofs,ghost_recv_buffer_ranks)))
         # unzip manually and make sure we do not add duplicate entries to our columns
@@ -255,8 +255,8 @@ struct COOAssembler{T}
         # ------------- Construct rows and cols of distributed matrix --------
         all_local_cols = Int[ldof_to_gdof; ghost_dof_to_global]
         all_local_col_ranks = Int32[ldof_to_rank; ghost_dof_rank]
-        @debug println("all_local_cols $all_local_cols (R$my_rank)")
-        @debug println("all_local_col_ranks $all_local_col_ranks (R$my_rank)")
+        Ferrite.@debug println("all_local_cols $all_local_cols (R$my_rank)")
+        Ferrite.@debug println("all_local_col_ranks $all_local_col_ranks (R$my_rank)")
 
         col_indices = PartitionedArrays.IndexSet(my_rank, all_local_cols, all_local_col_ranks)
         #FIXME: This below must be fixed before we can assemble to HYPRE IJ. Problem seems to be that rows and cols must be continuously assigned.
@@ -265,12 +265,12 @@ struct COOAssembler{T}
         col_exchanger = Exchanger(col_data)
         cols = PRange(ngdofs,col_data,col_exchanger)
 
-        @debug println("cols and rows constructed (R$my_rank)")
+        Ferrite.@debug println("cols and rows constructed (R$my_rank)")
         f = PartitionedArrays.PVector(0.0,rows)
-        @debug println("f constructed (R$my_rank)")
+        Ferrite.@debug println("f constructed (R$my_rank)")
 
         👻remotes = zip(ghost_recv_buffer_dofs_piv, ghost_recv_buffer_dofs, ghost_recv_buffer_ranks,ghost_recv_buffer_fields)
-        @debug println("👻remotes $👻remotes (R$my_rank)")
+        Ferrite.@debug println("👻remotes $👻remotes (R$my_rank)")
 
         return new(I, J, V, cols, rows, f, 👻remotes, dh)
     end
@@ -318,8 +318,8 @@ function Ferrite.end_assemble(assembler::COOAssembler{T}) where {T}
         end
     end
 
-    @debug println("I=$(I) (R$my_rank)")
-    @debug println("J=$(J) (R$my_rank)")
+    Ferrite.@debug println("I=$(I) (R$my_rank)")
+    Ferrite.@debug println("J=$(J) (R$my_rank)")
     K = PartitionedArrays.PSparseMatrix(
         MPIData(I, comm, (np,)),
         MPIData(J, comm, (np,)),

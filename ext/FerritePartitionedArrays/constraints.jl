@@ -81,25 +81,25 @@ function Ferrite.apply!(K::PartitionedArrays.PSparseMatrix, f::PartitionedArrays
         buffer_sizes_send[part] += 1
     end
     MPI.Alltoall!(UBuffer(buffer_sizes_send, 1), UBuffer(buffer_sizes_recv, 1), comm)
-    @debug println("Got $buffer_sizes_recv (R$my_rank)")
+    Ferrite.@debug println("Got $buffer_sizes_recv (R$my_rank)")
 
     remote_ghosts_recv = Vector{Int}(undef, sum(buffer_sizes_recv))
     MPI.Alltoallv!(VBuffer(remote_ghost_gdofs.part, buffer_sizes_send), VBuffer(remote_ghosts_recv, buffer_sizes_recv), comm)
-    @debug println("Got $remote_ghosts_recv (R$my_rank)")
+    Ferrite.@debug println("Got $remote_ghosts_recv (R$my_rank)")
 
     # Step 2: Union with all locally constrained dofs
-    @debug println("$my_rank : Step 2....")
+    Ferrite.@debug println("$my_rank : Step 2....")
     remote_ghosts_constrained_send = copy(remote_ghosts_recv)
     for (i, remote_ghost_dof) ∈ enumerate(remote_ghosts_recv)
         remote_ghosts_constrained_send[i] = remote_ghost_dof ∈ K.cols.partition.part.lid_to_gid[ch.prescribed_dofs]
     end
 
     # Step 3: Send trash back
-    @debug println("$my_rank : Step 3....")
+    Ferrite.@debug println("$my_rank : Step 3....")
     remote_ghosts_constrained_recv = Vector{Int}(undef, sum(buffer_sizes_send))
     MPI.Alltoallv!(VBuffer(remote_ghosts_constrained_send, buffer_sizes_recv), VBuffer(remote_ghosts_constrained_recv, buffer_sizes_send), comm)
 
-    @debug println("$my_rank : remote constraints on $(remote_ghost_gdofs.part[remote_ghosts_constrained_recv .== 1])")
+    Ferrite.@debug println("$my_rank : remote constraints on $(remote_ghost_gdofs.part[remote_ghosts_constrained_recv .== 1])")
 
     # Step 4: Constrain remaining columns
     map_parts(local_view(K, K.rows, K.cols), K.cols.partition) do K_local, partition
