@@ -181,3 +181,21 @@ function (::Type{QuadratureRule{3, RefPrism}})(quad_type::Symbol, order::Int)
     weights = data[:, 4]
     QuadratureRule{3,RefPrism,Float64}(weights, points)
 end
+
+# Grab pyramid quadrature rule from table
+function (::Type{QuadratureRule{3, RefPyramid}})(quad_type::Symbol, order::Int)
+    if quad_type == :polyquad
+        data = _get_gauss_pyramiddata_polyquad(order)
+    else
+        throw(ArgumentError("unsupported quadrature rule"))
+    end
+    n_points = size(data,1)
+    points = Vector{Vec{3,Float64}}(undef, n_points)
+
+    for p in 1:size(data, 1)
+        points[p] = Vec{3,Float64}(@ntuple 3 i -> data[p, i])
+    end
+    weights = data[:, 4]
+    QuadratureRule{3,RefPyramid,Float64}(weights, points)
+end
+

@@ -18,6 +18,7 @@
                       Lagrange{3, RefTetrahedron, 2}(),
                       Lagrange{3, RefPrism, 1}(),
                       Lagrange{3, RefPrism, 2}(),
+                      Lagrange{3, RefPyramid, 1}(),
                       #
                       DiscontinuousLagrange{1, RefCube, 0}(),
                       DiscontinuousLagrange{2, RefCube, 0}(),
@@ -141,4 +142,30 @@ end
 @test Ferrite.reference_coordinates(DiscontinuousLagrange{3,RefTetrahedron,0}()) ≈ [Vec{3,Float64}((1/4,1/4,1/4))]
 @test Ferrite.reference_coordinates(DiscontinuousLagrange{3,RefCube,0}()) ≈ [Vec{3,Float64}((0,0,0))]
 
+end
+
+qr = QuadratureRule{3,RefPyramid}(:polyquad, 4)
+ip = Lagrange{3,RefPyramid,1}()
+cv = CellVectorValues(qr,ip)
+
+sum(qr.weights)
+
+coords = Ferrite.reference_coordinates(ip)
+reinit!(cv, coords)
+sum(i->getdetJdV(cv, i), 1:getnquadpoints(cv))
+
+for (j,ξ) in enumerate(coords)
+    @show j
+    for i in 1:getnbasefunctions(ip)
+        N = Ferrite.value(ip, i, ξ)
+        @show i, N
+        @assert (i == j) ? N == 1.0 : N == 0.0
+    end
+end
+
+ξ = Vec((0.0,0.0,0.99))
+x = zero(ξ)
+for i in 1:getnbasefunctions(ip)
+    @show N = Ferrite.value(ip, i, ξ)
+    x += N*coords[i]
 end

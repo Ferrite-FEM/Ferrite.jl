@@ -4,6 +4,7 @@ export
     RefCube,
     RefTetrahedron,
     RefPrism,
+    RefPyramid,
     BubbleEnrichedLagrange,
     CrouzeixRaviart,
     Lagrange,

@@ -1018,3 +1018,61 @@ function value(ip::CrouzeixRaviart{2,1}, i::Int, ξ::Vec{2})
     i == 3 && return 1.0 - 2*ξ_y
     throw(BoundsError("no shape function $i for interpolation $ip"))
 end
+
+###################################
+# Lagrange dim 3 RefPyramid order 1 #
+###################################
+
+#DIFFERENT POSSIBLITIES:
+# Build on https://defelement.com/elements/examples/pyramid-Lagrange-1.html
+# OR https://manuals.dianafea.com/d101/Theory/node39.html
+# Quadrature rules: https://people.math.sc.edu/Burkardt/f_src/felippa/felippa.html
+getnbasefunctions(::Lagrange{3,RefPyramid,1}) = 5
+
+vertexdof_indices(::Lagrange{3,RefPyramid,1}) = ((1,), (2,), (3,), (4,), (5,),)
+facedof_indices(::Lagrange{3,RefPyramid,1}) = ((1,2,3,4), (1,2,5), (2,3,5), (3,4,5), (4,1,5), )
+#edgedof_indices(::Lagrange{3,RefPyramid,1}) = ((1,2), (1,3), (1,4), (3,2), (2,5), (3,6), (4,5), (4,6), (6,5))
+
+function reference_coordinates(::Lagrange{3,RefPyramid,1})
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, .0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0))]
+end
+
+function value(ip::Lagrange{3,RefPyramid,1}, i::Int, ξ::Vec{3})
+    (x,y,z) = ξ
+    zzero = z ≈ 1.0
+    i == 1 && return zzero ? 0.0 : (-x*y+(z-1)*(-x-y-z+1))/(z-1)
+    i == 2 && return zzero ? 0.0 : x*(y+z-1)/(z-1)
+    i == 3 && return zzero ? 0.0 : -x*y/(z-1)
+    i == 4 && return zzero ? 0.0 : y*(x+z-1)/(z-1)
+    i == 5 && return zzero ? 1.0 : z
+    throw(BoundsError("no shape function $i for interpolation $ip"))
+end
+
+#=
+getnbasefunctions(::Lagrange{3,RefPyramid,1}) = 5
+
+vertexdof_indices(::Lagrange{3,RefPyramid,1}) = ((1,), (2,), (3,), (4,), (5,),)
+facedof_indices(::Lagrange{3,RefPyramid,1}) = ((1,2,3,4), (1,2,5), (2,3,5), (3,4,5), (4,1,5), )
+#edgedof_indices(::Lagrange{3,RefPyramid,1}) = ((1,2), (1,3), (1,4), (3,2), (2,5), (3,6), (4,5), (4,6), (6,5))
+
+function reference_coordinates(::Lagrange{3,RefPyramid,1})
+    return [Vec{3, Float64}((-1.0, -1.0, -1.0)),
+            Vec{3, Float64}((1.0, -1.0, -1.0)),
+            Vec{3, Float64}((1.0, 1.0, -1.0)),
+            Vec{3, Float64}((-1.0, 1.0, -1.0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0))]
+end
+
+function value(ip::Lagrange{3,RefPyramid,1}, i::Int, ξ::Vec{3})
+    (x,y,z) = ξ
+    i == 1 && return 1/8*(1-x)*(1-y)*(1-z)
+    i == 2 && return 1/8*(1+x)*(1-y)*(1-z)
+    i == 3 && return 1/8*(1+x)*(1+y)*(1-z)
+    i == 4 && return 1/8*(1-x)*(1+y)*(1-z)
+    i == 5 && return 1/2*(1+z)
+    throw(BoundsError("no shape function $i for interpolation $ip"))
+end=#

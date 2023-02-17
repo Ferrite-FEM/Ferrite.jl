@@ -55,7 +55,8 @@ const implemented_celltypes = (
     (const Hexahedron = Cell{3,8,6}),
     (Cell{2,20,6}),
 
-    (const Wedge = Cell{3,6,5})
+    (const Wedge = Cell{3,6,5}),
+    (const Pyramid = Cell{3,5,5})
 )
 
 """
@@ -749,6 +750,9 @@ vertices(c::Wedge) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[5]
 edges(c::Wedge) = ((c.nodes[2],c.nodes[1]), (c.nodes[1],c.nodes[3]), (c.nodes[1],c.nodes[4]), (c.nodes[3],c.nodes[2]), (c.nodes[2],c.nodes[5]), (c.nodes[3],c.nodes[6]), (c.nodes[4],c.nodes[5]), (c.nodes[4],c.nodes[6]), (c.nodes[6],c.nodes[5]))
 faces(c::Wedge) = ((c.nodes[1],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[5],c.nodes[4]), (c.nodes[3],c.nodes[1],c.nodes[4],c.nodes[6]), (c.nodes[2],c.nodes[3],c.nodes[6],c.nodes[5]), (c.nodes[4],c.nodes[5],c.nodes[6]))
 
+vertices(c::Pyramid) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[5],)
+faces(c::Pyramid) = ((c.nodes[1],c.nodes[2],c.nodes[3], c.nodes[4]), (c.nodes[1],c.nodes[2],c.nodes[5]), (c.nodes[2],c.nodes[3],c.nodes[5]), (c.nodes[3],c.nodes[4],c.nodes[5]), (c.nodes[4],c.nodes[1],c.nodes[5]))
+
 # random stuff
 default_interpolation(::Union{Type{Line},Type{Line2D},Type{Line3D}}) = Lagrange{1,RefCube,1}()
 default_interpolation(::Type{QuadraticLine}) = Lagrange{1,RefCube,2}()
@@ -761,6 +765,7 @@ default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{3,RefTetrahedron,
 default_interpolation(::Type{Hexahedron}) = Lagrange{3,RefCube,1}()
 default_interpolation(::Type{Cell{3,20,6}}) = Serendipity{3,RefCube,2}()
 default_interpolation(::Type{Wedge}) = Lagrange{3,RefPrism,1}()
+default_interpolation(::Type{Pyramid}) = Lagrange{3,RefPyramid,1}()
 
 boundaryfunction(::Type{FaceIndex}) = Ferrite.faces
 boundaryfunction(::Type{EdgeIndex}) = Ferrite.edges
