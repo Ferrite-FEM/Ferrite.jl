@@ -283,7 +283,7 @@ function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{
     return x
 end
 
-nfaces(fv) = size(fv.N, 3)
+nfaces(fv::FaceValues) = size(fv.N, 3)
 
 function checkface(fv::FaceValues, face::Int)
     0 < face <= nfaces(fv) || error("Face index out of range.")

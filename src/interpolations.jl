@@ -62,6 +62,7 @@ nfaces(::Interpolation{dim, RefCube}) where {dim}= 2*dim
 nfaces(::Interpolation{2, RefTetrahedron})       = 3
 nfaces(::Interpolation{3, RefTetrahedron})       = 4
 nfaces(::Interpolation{3, RefPrism})             = 5
+nfaces(::Interpolation{3, RefPyramid})           = 5
 
 nedges(::Interpolation{1, RefCube})          =  0
 nedges(::Interpolation{2, RefCube})          =  0
@@ -69,11 +70,13 @@ nedges(::Interpolation{3, RefCube})          = 12
 nedges(::Interpolation{2, RefTetrahedron})   =  0
 nedges(::Interpolation{3, RefTetrahedron})   =  6
 nedges(::Interpolation{3, RefPrism})         =  9
+nedges(::Interpolation{3, RefPyramid})       =  8
 
 nvertices(::Interpolation{dim, RefCube}) where {dim} = 2^dim
 nvertices(::Interpolation{2, RefTetrahedron})        = 3
 nvertices(::Interpolation{3, RefTetrahedron})        = 4
 nvertices(::Interpolation{3, RefPrism})              = 6
+nvertices(::Interpolation{3, RefPyramid})            = 5
 
 Base.copy(ip::Interpolation) = ip
 
@@ -1030,8 +1033,8 @@ end
 getnbasefunctions(::Lagrange{3,RefPyramid,1}) = 5
 
 vertexdof_indices(::Lagrange{3,RefPyramid,1}) = ((1,), (2,), (3,), (4,), (5,),)
-facedof_indices(::Lagrange{3,RefPyramid,1}) = ((1,2,3,4), (1,2,5), (2,3,5), (3,4,5), (4,1,5), )
-#edgedof_indices(::Lagrange{3,RefPyramid,1}) = ((1,2), (1,3), (1,4), (3,2), (2,5), (3,6), (4,5), (4,6), (6,5))
+facedof_indices(::Lagrange{3,RefPyramid,1}) = ((1,4,3,2), (1,2,5), (2,3,5), (3,4,5), (4,1,5), )
+edgedof_indices(::Lagrange{3,RefPyramid,1}) = ((1,2), (2,3), (3,4), (4,1), (1,5), (2,6), (3,5), (4,6))
 
 function reference_coordinates(::Lagrange{3,RefPyramid,1})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),

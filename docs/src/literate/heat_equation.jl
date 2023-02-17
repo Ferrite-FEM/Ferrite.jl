@@ -47,6 +47,32 @@ using Ferrite, SparseArrays
 # so we don't need to specify the corners of the domain.
 grid = generate_grid(Quadrilateral, (20, 20));
 
+nodes = Node.([
+    Vec((0.0,0.0,0.0)),
+    Vec((1.0,0.0,0.0)),
+    Vec((1.0,1.0,0.0)),
+    Vec((0.0,1.0,0.0)),
+    Vec((0.0,0.0,2.0)),
+    Vec((1.0,0.0,2.0)),
+    Vec((1.0,1.0,2.0)),
+    Vec((0.0,1.0,2.0)),
+    Vec((0.5,0.5,1.0))]
+)
+Pyramid = Ferrite.Pyramid
+cells = Pyramid[
+    Pyramid((1,2,3,4,9)),
+    Pyramid((1,5,6,2,9)),
+    Pyramid((2,6,7,3,9)),
+    Pyramid((4,3,7,8,9)),
+    Pyramid((1,4,8,5,9)),
+    Pyramid((5,8,7,6,9))
+]
+
+
+grid = Grid(cells,nodes)
+
+addfaceset!(grid, "left", x->x[1]≈0.0)
+
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
 # test and trial functions (among other things). Since the problem
@@ -56,9 +82,9 @@ grid = generate_grid(Quadrilateral, (20, 20));
 # based on the two-dimensional reference "cube". We also define a quadrature rule based on
 # the same reference cube. We combine the interpolation and the quadrature rule
 # to a `CellScalarValues` object.
-dim = 2
-ip = Lagrange{dim, RefCube, 1}()
-qr = QuadratureRule{dim, RefCube}(2)
+dim = 3
+ip = Lagrange{dim, RefPyramid, 1}()
+qr = QuadratureRule{dim, RefPyramid}(:polyquad, 2)
 cellvalues = CellScalarValues(qr, ip);
 
 # ### Degrees of freedom
@@ -86,9 +112,6 @@ ch = ConstraintHandler(dh);
 # the `union` of all the face sets on the boundary.
 ∂Ω = union(
     getfaceset(grid, "left"),
-    getfaceset(grid, "right"),
-    getfaceset(grid, "top"),
-    getfaceset(grid, "bottom"),
 );
 
 # Now we are set up to define our constraint. We specify which field
@@ -190,6 +213,7 @@ function assemble_global(cellvalues::CellScalarValues, K::SparseMatrixCSC, dh::D
     ## Loop over all cels
     for cell in CellIterator(dh)
         ## Reinitialize cellvalues for this cell
+        @show getcoordinates(cell)
         reinit!(cellvalues, cell)
         ## Compute element contribution
         assemble_element!(Ke, fe, cellvalues)
@@ -219,8 +243,8 @@ vtk_grid("heat_equation", dh) do vtk
 end
 
 ## test the result                #src
-using Test                        #src
-@test norm(u) ≈ 3.307743912641305 #src
+#using Test                        #src
+#@test norm(u) ≈ 3.307743912641305 #src
 
 #md # ## [Plain program](@id heat_equation-plain-program)
 #md #
