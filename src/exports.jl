@@ -40,7 +40,6 @@ export
 
 # Grid
     Grid,
-    DistributedGrid,
     Node,
     Cell,
     Line,
@@ -66,7 +65,6 @@ export
     getcells,
     getgrid,
     getlocalgrid,
-    getglobalgrid,
     getncells,
     getnodes,
     getnnodes,
@@ -84,7 +82,6 @@ export
     getedgesets,
     getvertexsets,
     getdim,
-    vertex_comm,
     onboundary,
     nfaces,
     addnodeset!,
@@ -114,9 +111,6 @@ export
     DofHandler,
     close!,
     ndofs,
-    num_local_true_dofs,
-    num_local_dofs,
-    num_global_dofs,
     ndofs_per_cell,
     celldofs!,
     celldofs,
