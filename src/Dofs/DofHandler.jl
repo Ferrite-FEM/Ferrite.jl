@@ -21,15 +21,11 @@ struct DofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     closed::ScalarWrapper{Bool}
     grid::G
     ndofs::ScalarWrapper{Int}
-
-    vertexdicts::Vector{Dict{Int,Int}}
-    edgedicts::Vector{Dict{Tuple{Int,Int},Tuple{Int,Bool}}}
-    facedicts::Vector{Dict{NTuple{dim,Int},Int}}
 end
 
 function DofHandler(grid::AbstractGrid{dim}) where {dim}
     isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. Use MixedDofHandler instead of DofHandler")
-    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1), Dict{Int,Int}[], Dict{Tuple{Int,Int},Tuple{Int,Bool}}[],Dict{NTuple{dim,Int},Int}[])
+    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
@@ -51,18 +47,18 @@ Get the spatial dimension of a dofhandler.
 """
 getdim(dh::DofHandler{dim}) where {dim} = dim 
 
-# has_entity_dof(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = haskey(dh.vertexdicts[field_idx], vertex)
-# has_entity_dof(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = haskey(dh.edgedicts[field_idx], edge)
-# has_entity_dof(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = haskey(dh.facedicts[field_idx], face)
+# has_entity_dof(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = haskey(vertexdicts[field_idx], vertex)
+# has_entity_dof(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = haskey(edgedicts[field_idx], edge)
+# has_entity_dof(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = haskey(facedicts[field_idx], face)
 
 has_cell_dofs(dh::AbstractDofHandler, field_idx::Int, cell::Int) = ncelldofs(getfieldinterpolation(dh, field_idx)) > 0
 has_vertex_dofs(dh::AbstractDofHandler, field_idx::Int, vertex::VertexIndex) = nvertexdofs(getfieldinterpolation(dh, field_idx)) > 0
 has_edge_dofs(dh::AbstractDofHandler, field_idx::Int, edge::EdgeIndex) = nedgedofs(getfieldinterpolation(dh, field_idx)) > 0
-has_face_dofs(dh::AbstractDofHandler, field_idx::Int, face::FaceIndex) where {dim} = nfacedofs(getfieldinterpolation(dh, field_idx)) > 0
+has_face_dofs(dh::AbstractDofHandler, field_idx::Int, face::FaceIndex) = nfacedofs(getfieldinterpolation(dh, field_idx)) > 0
 
-# entity_dofs(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = dh.vertexdicts[field_idx][vertex]
-# entity_dofs(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = dh.edgedicts[field_idx][edge]
-# entity_dofs(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = dh.facedicts[field_idx][face]
+# entity_dofs(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = vertexdicts[field_idx][vertex]
+# entity_dofs(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = edgedicts[field_idx][edge]
+# entity_dofs(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = facedicts[field_idx][face]
 
 """
 Compute the dofs belonging to a given cell of a given field.
@@ -264,29 +260,20 @@ function __close!(dh::DofHandler{dim}) where {dim}
 
     # `vertexdict` keeps track of the visited vertices. We store the global vertex
     # number and the first dof we added to that vertex.
-    resize!(dh.vertexdicts, num_fields(dh))
-    for i in 1:num_fields(dh)
-        dh.vertexdicts[i] = Dict{Tuple{Int,Int},Tuple{Int,Bool}}()
-    end
+    vertexdicts = [Dict{Int,Int}() for _ in 1:nfields(dh)]
 
     # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem
     # An edge is determined from two vertices, but we also need to store the direction
     # of the first edge we encounter and add dofs too. When we encounter the same edge
     # the next time we check if the direction is the same, otherwise we reuse the dofs
     # in the reverse order
-    resize!(dh.edgedicts, num_fields(dh))
-    for i in 1:num_fields(dh)
-        dh.edgedicts[i] = Dict{Tuple{Int,Int},Tuple{Int,Bool}}()
-    end
+    edgedicts = [Dict{Tuple{Int,Int},Tuple{Int,Bool}}() for _ in 1:nfields(dh)]
 
     # `facedict` keeps track of the visited faces. We only need to store the first dof we
     # added to the face; if we encounter the same face again we *always* reverse the order
     # In 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a
     # face (i.e. a surface) is uniquely determined by 3 vertices.
-    resize!(dh.facedicts, num_fields(dh))
-    for i in 1:num_fields(dh)
-        dh.facedicts[i] = Dict{NTuple{dim,Int},Int}()
-    end
+    facedicts = [Dict{NTuple{dim,Int},Int}() for _ in 1:nfields(dh)]
 
     # celldofs are never shared between different cells so there is no need
     # for a `celldict` to keep track of which cells we have added dofs too.
@@ -315,16 +302,16 @@ function __close!(dh::DofHandler{dim}) where {dim}
             if interpolation_info.nvertexdofs > 0
                 for vertex in vertices(cell)
                     @debug println("    vertex#$vertex")
-                    token = Base.ht_keyindex2!(dh.vertexdicts[fi], vertex)
-                    if token > 0 # haskey(dh.vertexdicts[fi], vertex) # reuse dofs
-                        reuse_dof = dh.vertexdicts[fi].vals[token] # dh.vertexdicts[fi][vertex]
+                    token = Base.ht_keyindex2!(vertexdicts[fi], vertex)
+                    if token > 0 # haskey(vertexdicts[fi], vertex) # reuse dofs
+                        reuse_dof = vertexdicts[fi].vals[token] # vertexdicts[fi][vertex]
                         for d in 1:dh.field_dims[fi]
                             @debug println("      reusing dof #$(reuse_dof + (d-1))")
                             push!(dh.cell_dofs, reuse_dof + (d-1))
                         end
                     else # token <= 0, distribute new dofs
                         for vertexdof in 1:interpolation_info.nvertexdofs
-                            Base._setindex!(dh.vertexdicts[fi], nextdof, vertex, -token) # dh.vertexdicts[fi][vertex] = nextdof
+                            Base._setindex!(vertexdicts[fi], nextdof, vertex, -token) # vertexdicts[fi][vertex] = nextdof
                             for d in 1:dh.field_dims[fi]
                                 @debug println("      adding dof#$nextdof")
                                 push!(dh.cell_dofs, nextdof)
@@ -339,9 +326,9 @@ function __close!(dh::DofHandler{dim}) where {dim}
                     for edge in edges(cell)
                         sedge, dir = sortedge(edge)
                         @debug println("    edge#$sedge dir: $(dir)")
-                        token = Base.ht_keyindex2!(dh.edgedicts[fi], sedge)
-                        if token > 0 # haskey(dh.edgedicts[fi], sedge), reuse dofs
-                            startdof, olddir = dh.edgedicts[fi].vals[token] # dh.edgedicts[fi][sedge] # first dof for this edge (if dir == true)
+                        token = Base.ht_keyindex2!(edgedicts[fi], sedge)
+                        if token > 0 # haskey(edgedicts[fi], sedge), reuse dofs
+                            startdof, olddir = edgedicts[fi].vals[token] # edgedicts[fi][sedge] # first dof for this edge (if dir == true)
                             for edgedof in (dir == olddir ? (1:interpolation_info.nedgedofs) : (interpolation_info.nedgedofs:-1:1))
                                 for d in 1:dh.field_dims[fi]
                                     reuse_dof = startdof + (d-1) + (edgedof-1)*dh.field_dims[fi]
@@ -350,7 +337,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
                                 end
                             end
                         else # token <= 0, distribute new dofs
-                            Base._setindex!(dh.edgedicts[fi], (nextdof, dir), sedge, -token) # dh.edgedicts[fi][sedge] = (nextdof, dir),  store only the first dof for the edge
+                            Base._setindex!(edgedicts[fi], (nextdof, dir), sedge, -token) # edgedicts[fi][sedge] = (nextdof, dir),  store only the first dof for the edge
                             for edgedof in 1:interpolation_info.nedgedofs
                                 for d in 1:dh.field_dims[fi]
                                     @debug println("      adding dof#$nextdof")
@@ -366,9 +353,9 @@ function __close!(dh::DofHandler{dim}) where {dim}
                 for face in faces(cell)
                     sface = sortface(face) # TODO: faces(cell) may as well just return the sorted list
                     @debug println("    face#$sface")
-                    token = Base.ht_keyindex2!(dh.facedicts[fi], sface)
-                    if token > 0 # haskey(dh.facedicts[fi], sface), reuse dofs
-                        startdof = dh.facedicts[fi].vals[token] # dh.facedicts[fi][sface]
+                    token = Base.ht_keyindex2!(facedicts[fi], sface)
+                    if token > 0 # haskey(facedicts[fi], sface), reuse dofs
+                        startdof = facedicts[fi].vals[token] # facedicts[fi][sface]
                         for facedof in interpolation_info.nfacedofs:-1:1 # always reverse (YOLO)
                             for d in 1:dh.field_dims[fi]
                                 reuse_dof = startdof + (d-1) + (facedof-1)*dh.field_dims[fi]
@@ -377,7 +364,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
                             end
                         end
                     else # distribute new dofs
-                        Base._setindex!(dh.facedicts[fi], nextdof, sface, -token)# dh.facedicts[fi][sface] = nextdof,  store the first dof for this face
+                        Base._setindex!(facedicts[fi], nextdof, sface, -token)# facedicts[fi][sface] = nextdof,  store the first dof for this face
                         for facedof in 1:interpolation_info.nfacedofs
                             for d in 1:dh.field_dims[fi]
                                 @debug println("      adding dof#$nextdof")
@@ -405,7 +392,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     dh.ndofs[] = maximum(dh.cell_dofs)
     dh.closed[] = true
 
-    return dh.vertexdicts, dh.edgedicts, dh.facedicts
+    return dh, vertexdicts, edgedicts, facedicts
 end
 
 function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)

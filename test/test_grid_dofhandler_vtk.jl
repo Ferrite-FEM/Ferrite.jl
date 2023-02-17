@@ -462,7 +462,7 @@ end
     push!(dh, :v, 1, Lagrange{3,RefCube,2}())
     push!(dh, :w, 3, Lagrange{3,RefCube,1}())
     push!(dh, :x, 3, Lagrange{3,RefCube,2}())
-    vertexdicts, edgedicts, facedicts = Ferrite.__close!(dh)
+    _, vertexdicts, edgedicts, facedicts = Ferrite.__close!(dh)
     @test Ferrite.find_field(dh, :u) == 1
     @test Ferrite.find_field(dh, :v) == 2
     @test Ferrite.find_field(dh, :w) == 3

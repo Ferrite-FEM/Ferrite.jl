@@ -22,18 +22,13 @@ struct DistributedDofHandler{dim,T,G<:Ferrite.AbstractDistributedGrid{dim}} <: F
     grid::G
     ndofs::Ferrite.ScalarWrapper{Int}
 
-    vertexdicts::Vector{Dict{Int,Int}}
-    edgedicts::Vector{Dict{Tuple{Int,Int},Tuple{Int,Bool}}}
-    facedicts::Vector{Dict{NTuple{dim,Int},Int}}
-    celldicts::Vector{Dict{Int,Vector{Int}}}
-
     ldof_to_gdof::Vector{Int}
     ldof_to_rank::Vector{Int32}
 end
 
 function DistributedDofHandler(grid::Ferrite.AbstractDistributedGrid{dim}) where {dim}
     isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. DistributedMixedDofHandler not implemented yet.")
-    DistributedDofHandler(Symbol[], Int[], Interpolation[], Ferrite.BCValues{Float64}[], Int[], Int[], Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1), Dict{Int,Int}[], Dict{Tuple{Int,Int},Tuple{Int,Bool}}[],Dict{NTuple{dim,Int},Int}[], Dict{Int,Vector{Int}}[], Int[], Int32[])
+    DistributedDofHandler(Symbol[], Int[], Interpolation[], Ferrite.BCValues{Float64}[], Int[], Int[], Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1), Int[], Int32[])
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DistributedDofHandler)
@@ -165,13 +160,12 @@ function local_to_global_numbering(dh::DistributedDofHandler)
     # * cell: Just the cell itself
     # * All other entities: All cells for which one of the corresponding entities interior intersects 
     #                       with the interior of the entity in question.
-    # TODO: implement for entitied with dim > 0
     next_local_idx = 1
     for (ci, cell) in enumerate(getcells(getgrid(dh)))
         Ferrite.@debug println("cell #$ci (R$my_rank)")
         for field_idx in 1:num_fields(dh)
             Ferrite.@debug println("  field: $(dh.field_names[field_idx]) (R$my_rank)")
-            interpolation_info = Ferrite.InterpolationInfo(dh.field_interpolations[field_idx])
+            interpolation_info = Ferrite.InterpolationInfo(Ferrite.getfieldinterpolation(dh, field_idx))
             if interpolation_info.nvertexdofs > 0
                 for (vi,vertex) in enumerate(Ferrite.vertices(cell))
                     Ferrite.@debug println("    vertex#$vertex (R$my_rank)")
@@ -179,16 +173,16 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                     # Dof is owned if it is local or if my rank is the smallest in the neighborhood
                     if !is_shared_vertex(dgrid, lvi) || (compute_owner(dgrid, get_shared_vertex(dgrid, lvi)) == my_rank)
                         # Update dof assignment
-                        dof_local_idx = dh.vertexdicts[field_idx][vertex]
-                        if local_to_global[dof_local_idx] == 0
-                            for d in 1:dh.field_dims[field_idx]
-                                Ferrite.@debug println("      mapping vertex dof#$dof_local_idx to $next_local_idx (R$my_rank)")
-                                local_to_global[dof_local_idx+d-1] = next_local_idx
+                        dof_local_indices = Ferrite.vertex_dofs(dh, field_idx, lvi)
+                        if local_to_global[dof_local_indices[1]] == 0
+                            for d in 1:getfielddim(dh, field_idx)
+                                Ferrite.@debug println("      mapping vertex dof#$dof_local_indices[d] to $next_local_idx (R$my_rank)")
+                                local_to_global[dof_local_indices[d]] = next_local_idx
                                 next_local_idx += 1
                             end
                         else
-                            for d in 1:dh.field_dims[field_idx]
-                                Ferrite.@debug println("      vertex dof#$(dof_local_idx+d-1) already mapped to $(local_to_global[dof_local_idx+d-1]) (R$my_rank)")
+                            for d in 1:getfielddim(dh, field_idx)
+                                Ferrite.@debug println("      vertex dof#$(dof_local_indices[d]) already mapped to $(local_to_global[dof_local_indices[d]]) (R$my_rank)")
                             end
                         end
                     end
@@ -230,16 +224,16 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                         # Dof is owned if it is local or if my rank is the smallest in the neighborhood
                         if !is_shared_edge(dgrid, lei) || (compute_owner(dgrid, get_shared_edge(dgrid, lei)) == my_rank)
                             # Update dof assignment
-                            dof_local_idx = dh.edgedicts[field_idx][Ferrite.toglobal(getlocalgrid(dgrid), lei)][1]
-                            if local_to_global[dof_local_idx] == 0
-                                for d in 1:dh.field_dims[field_idx]
-                                    Ferrite.@debug println("      mapping edge dof#$(dof_local_idx+d-1) to $next_local_idx (R$my_rank)")
-                                    local_to_global[dof_local_idx+d-1] = next_local_idx
+                            dof_local_indices = Ferrite.edge_dofs(dh, field_idx, lei)
+                            if local_to_global[dof_local_indices[1]] == 0
+                                for d in 1:getfielddim(dh, field_idx)
+                                    Ferrite.@debug println("      mapping edge dof#$(dof_local_indices[d]) to $next_local_idx (R$my_rank)")
+                                    local_to_global[dof_local_indices[d]] = next_local_idx
                                     next_local_idx += 1
                                 end
                             else
-                                for d in 1:dh.field_dims[field_idx]
-                                    Ferrite.@debug println("      edge dof#$(dof_local_idx+d-1) already mapped to $(local_to_global[dof_local_idx+d-1]) (R$my_rank)")
+                                for d in 1:getfielddim(dh, field_idx)
+                                    Ferrite.@debug println("      edge dof#$(dof_local_indices[d]) already mapped to $(local_to_global[dof_local_indices[d]]) (R$my_rank)")
                                 end
                             end
                         end
@@ -280,16 +274,16 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                     # Dof is owned if it is local or if my rank is the smallest in the neighborhood
                     if !is_shared_face(dgrid, lfi) || (compute_owner(dgrid, get_shared_face(dgrid, lfi)) == my_rank)
                         # Update dof assignment
-                        dof_local_idx = dh.facedicts[field_idx][Ferrite.toglobal(getlocalgrid(dgrid), lfi)]
-                        if local_to_global[dof_local_idx] == 0
-                            for d in 1:dh.field_dims[field_idx]
-                                Ferrite.@debug println("      mapping face dof#$(dof_local_idx+d-1) to $next_local_idx (R$my_rank)")
-                                local_to_global[dof_local_idx+d-1] = next_local_idx
+                        dof_local_indices = Ferrite.face_dofs(dh, field_idx, lfi)
+                        if local_to_global[dof_local_indices[1]] == 0
+                            for d in 1:getfielddim(dh, field_idx)
+                                Ferrite.@debug println("      mapping face dof#$(dof_local_indices[d]) to $next_local_idx (R$my_rank)")
+                                local_to_global[dof_local_indices[d]] = next_local_idx
                                 next_local_idx += 1
                             end
                         else
-                            for d in 1:dh.field_dims[field_idx]
-                                Ferrite.@debug println("      face dof#$(dof_local_idx+d-1) already mapped to $(local_to_global[dof_local_idx+d-1]) (R$my_rank)")
+                            for d in 1:getfielddim(dh, field_idx)
+                                Ferrite.@debug println("      face dof#$(dof_local_indices[d]) already mapped to $(local_to_global[dof_local_indices[d]]) (R$my_rank)")
                             end
                         end
                     end
@@ -325,19 +319,19 @@ function local_to_global_numbering(dh::DistributedDofHandler)
 
             if interpolation_info.ncelldofs > 0 # always distribute new dofs for cell
                 Ferrite.@debug println("    cell#$ci")
-                for celldof in 1:interpolation_info.ncelldofs
+                if interpolation_info.ncelldofs > 0
                     # Update dof assignment
-                    dof_local_idx = dh.celldicts[field_idx][ci][celldof]
-                    if local_to_global[dof_local_idx] == 0
-                        for d in 1:dh.field_dims[field_idx]
-                            Ferrite.@debug println("      mapping cell dof#$(dof_local_idx+d-1) to $next_local_idx (R$my_rank)")
-                            local_to_global[dof_local_idx+d-1] = next_local_idx
+                    dof_local_indices = Ferrite.cell_dofs(dh, field_idx, ci)
+                    if local_to_global[dof_local_indices[1]] == 0
+                        for d in 1:getfielddim(dh, field_idx)
+                            Ferrite.@debug println("      mapping cell dof#$(dof_local_indices[d]) to $next_local_idx (R$my_rank)")
+                            local_to_global[dof_local_indices[d]] = next_local_idx
                             next_local_idx += 1
                         end
                     else
-                        for d in 1:dh.field_dims[field_idx]
+                        for d in 1:getfielddim(dh, field_idx)
                             # Should never happen...
-                            Ferrite.@debug println("      WARNING! cell dof#$(dof_local_idx+d-1) already mapped to $(local_to_global[dof_local_idx+d-1]) (R$my_rank)")
+                            Ferrite.@debug println("      WARNING! cell dof#$(dof_local_indices[d]) already mapped to $(local_to_global[dof_local_indices[d]]) (R$my_rank)")
                         end
                     end
                 end # cell loop
@@ -393,18 +387,20 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                     end
                     MPI.Send(remote_cells, global_comm(dgrid); dest=remote_rank-1)
                     MPI.Send(remote_cell_vis, global_comm(dgrid); dest=remote_rank-1)
-                    for fi ∈ 1:num_fields(dh)
+                    for field_idx ∈ 1:num_fields(dh)
                         next_buffer_idx = 1
-                        if length(dh.vertexdicts[fi]) == 0
-                            Ferrite.@debug println("Skipping send on field $(dh.field_names[fi]) (R$my_rank)")
+                        ip = Ferrite.getfieldinterpolation(dh, field_idx)
+                        if Ferrite.nvertexdofs(ip) == 0
+                            Ferrite.@debug println("Skipping send vertex on field $(dh.field_names[field_idx]) (R$my_rank)")
                             continue
                         end
                         # fill correspondence array
                         corresponding_global_dofs = Array{Int64}(undef,n_vertices)
-                        for (lci,lclvi) ∈ vertices_send[remote_rank]
-                            vi = Ferrite.vertices(getcells(getgrid(dh),lci))[lclvi]
-                            if haskey(dh.vertexdicts[fi], vi)
-                                corresponding_global_dofs[next_buffer_idx] = local_to_global[dh.vertexdicts[fi][vi]]
+                        for vertex ∈ vertices_send[remote_rank]
+                            if Ferrite.has_vertex_dofs(dh, field_idx, vertex)
+                                # We just put the first dof into the array to reduce communication
+                                vdofs = Ferrite.vertex_dofs(dh, field_idx, vertex)
+                                corresponding_global_dofs[next_buffer_idx] = local_to_global[vdofs[1]]
                             end
                             next_buffer_idx += 1
                         end
@@ -429,18 +425,20 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                     end
                     MPI.Send(remote_cells, global_comm(dgrid); dest=remote_rank-1)
                     MPI.Send(remote_cell_vis, global_comm(dgrid); dest=remote_rank-1)
-                    for fi ∈ 1:num_fields(dh)
+                    for field_idx ∈ 1:num_fields(dh)
                         next_buffer_idx = 1
-                        if length(dh.facedicts[fi]) == 0
-                            Ferrite.@debug println("Skipping send on field $(dh.field_names[fi]) (R$my_rank)")
+                        ip = Ferrite.getfieldinterpolation(dh, field_idx)
+                        if Ferrite.nfacedofs(ip) == 0
+                            Ferrite.@debug println("Skipping send faces on field $(dh.field_names[field_idx]) (R$my_rank)")
                             continue
                         end
                         # fill correspondence array
                         corresponding_global_dofs = Array{Int64}(undef,n_faces)
-                        for (lci,lclvi) ∈ faces_send[remote_rank]
-                            vi = Ferrite.sortface(Ferrite.faces(getcells(getgrid(dh),lci))[lclvi])
-                            if haskey(dh.facedicts[fi], vi)
-                                corresponding_global_dofs[next_buffer_idx] = local_to_global[dh.facedicts[fi][vi]]
+                        for face ∈ faces_send[remote_rank]
+                            if Ferrite.has_face_dofs(dh, field_idx, face)
+                                # We just put the first dof into the array to reduce communication
+                                fdofs = Ferrite.face_dofs(dh, field_idx, face)
+                                corresponding_global_dofs[next_buffer_idx] = local_to_global[fdofs[1]]
                             end
                             next_buffer_idx += 1
                         end
@@ -475,18 +473,20 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                     end
                     MPI.Send(remote_cells, global_comm(dgrid); dest=remote_rank-1)
                     MPI.Send(remote_cell_vis, global_comm(dgrid); dest=remote_rank-1)
-                    for fi ∈ 1:num_fields(dh)
+                    for field_idx ∈ 1:num_fields(dh)
                         next_buffer_idx = 1
-                        if length(dh.edgedicts[fi]) == 0
-                            Ferrite.@debug println("Skipping send on field $(dh.field_names[fi]) (R$my_rank)")
+                        ip = Ferrite.getfieldinterpolation(dh, field_idx)
+                        if Ferrite.nedgedofs(ip) == 0
+                            Ferrite.@debug println("Skipping send edges on field $(dh.field_names[field_idx]) (R$my_rank)")
                             continue
                         end
                         # fill correspondence array
                         corresponding_global_dofs = Array{Int64}(undef,n_edges)
-                        for (lci,lclvi) ∈ edges_send_unique
-                            vi = Ferrite.sortedge(Ferrite.edges(getcells(getgrid(dh),lci))[lclvi])[1]
-                            if haskey(dh.edgedicts[fi], vi)
-                                corresponding_global_dofs[next_buffer_idx] = local_to_global[dh.edgedicts[fi][vi][1]]
+                        for edge ∈ edges_send_unique
+                            if Ferrite.has_edge_dofs(dh, field_idx, edge)
+                                # We just put the first dof into the array to reduce communication
+                                edofs = Ferrite.edge_dofs(dh, field_idx, edge)
+                                corresponding_global_dofs[next_buffer_idx] = local_to_global[edofs[1]]
                             end
                             next_buffer_idx += 1
                         end
@@ -503,21 +503,22 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                 MPI.Recv!(local_cells, global_comm(dgrid); source=sending_rank-1)
                 MPI.Recv!(local_cell_vis, global_comm(dgrid); source=sending_rank-1)
                 for field_idx in 1:num_fields(dh)
-                    if length(dh.vertexdicts[field_idx]) == 0
-                        Ferrite.@debug println("  Skipping recv on field $(dh.field_names[field_idx]) (R$my_rank)")
+                    ip = Ferrite.getfieldinterpolation(dh, field_idx)
+                    if Ferrite.nvertexdofs(ip) == 0
+                        Ferrite.@debug println("  Skipping recv of vertices on field $(dh.field_names[field_idx]) (R$my_rank)")
                         continue
                     end
                     corresponding_global_dofs = Array{Int64}(undef,n_vertices)
                     MPI.Recv!(corresponding_global_dofs, global_comm(dgrid); source=sending_rank-1)
-                    for (cdi,(lci,lclvi)) ∈ enumerate(zip(local_cells,local_cell_vis))
-                        vi = Ferrite.vertices(getcells(getgrid(dh),lci))[lclvi]
-                        if haskey(dh.vertexdicts[field_idx], vi)
-                            for d in 1:dh.field_dims[field_idx]
-                                local_to_global[dh.vertexdicts[field_idx][vi]+d-1] = corresponding_global_dofs[cdi]+d-1
-                                Ferrite.@debug println("  Updating field $(dh.field_names[field_idx]) vertex $(VertexIndex(lci,lclvi)) to $(corresponding_global_dofs[cdi]+d-1) (R$my_rank)")
+                    for (cdi,vertex) ∈ enumerate(VertexIndex.(zip(local_cells,local_cell_vis)))
+                        if Ferrite.has_vertex_dofs(dh, field_idx, vertex)
+                            vdofs = Ferrite.vertex_dofs(dh, field_idx, vertex)
+                            for d in 1:getfielddim(dh, field_idx)
+                                local_to_global[vdofs[d]] = corresponding_global_dofs[cdi]+d-1
+                                Ferrite.@debug println("  Updating field $(dh.field_names[field_idx]) vertex $vertex to $(corresponding_global_dofs[cdi]+d-1) (R$my_rank)")
                             end
                         else
-                            Ferrite.@debug println("  Skipping recv on field $(dh.field_names[field_idx]) vertex $vi (R$my_rank)")
+                            Ferrite.@debug println("  Skipping recv on field $(dh.field_names[field_idx]) vertex $vertex (R$my_rank)")
                         end
                     end
                 end
@@ -531,21 +532,22 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                 MPI.Recv!(local_cells, global_comm(dgrid); source=sending_rank-1)
                 MPI.Recv!(local_cell_vis, global_comm(dgrid); source=sending_rank-1)
                 for field_idx in 1:num_fields(dh)
-                    if length(dh.facedicts[field_idx]) == 0
-                        Ferrite.@debug println("  Skipping recv on field $(dh.field_names[field_idx]) (R$my_rank)")
+                    ip = Ferrite.getfieldinterpolation(dh, field_idx)
+                    if Ferrite.nfacedofs(ip) == 0
+                        Ferrite.@debug println("  Skipping recv of faces on field $(dh.field_names[field_idx]) (R$my_rank)")
                         continue
                     end
                     corresponding_global_dofs = Array{Int64}(undef,n_faces)
                     MPI.Recv!(corresponding_global_dofs, global_comm(dgrid); source=sending_rank-1)
-                    for (cdi,(lci,lclvi)) ∈ enumerate(zip(local_cells,local_cell_vis))
-                        vi = Ferrite.sortface(Ferrite.faces(getcells(getgrid(dh),lci))[lclvi])
-                        if haskey(dh.facedicts[field_idx], vi)
-                            for d in 1:dh.field_dims[field_idx]
-                                local_to_global[dh.facedicts[field_idx][vi]+d-1] = corresponding_global_dofs[cdi]+d-1
-                                Ferrite.@debug println("  Updating field $(dh.field_names[field_idx]) face $(FaceIndex(lci,lclvi)) to $(corresponding_global_dofs[cdi]) (R$my_rank)")
+                    for (cdi,face) ∈ enumerate(FaceIndex.(zip(local_cells,local_cell_vis)))
+                        if Ferrite.has_face_dofs(dh, field_idx, face)
+                            fdofs = Ferrite.face_dofs(dh, field_idx, face)
+                            for d in 1:getfielddim(dh, field_idx)
+                                local_to_global[fdofs[d]] = corresponding_global_dofs[cdi]+d-1
+                                Ferrite.@debug println("  Updating field $(dh.field_names[field_idx]) face $face to $(corresponding_global_dofs[cdi]) (R$my_rank)")
                             end
                         else
-                            Ferrite.@debug println("  Skipping recv on field $(dh.field_names[field_idx]) face $vi (R$my_rank)")
+                            Ferrite.@debug println("  Skipping recv on field $(dh.field_names[field_idx]) face $face (R$my_rank)")
                         end
                     end
                 end
@@ -564,22 +566,23 @@ function local_to_global_numbering(dh::DistributedDofHandler)
                 MPI.Recv!(local_cells, global_comm(dgrid); source=sending_rank-1)
                 MPI.Recv!(local_cell_vis, global_comm(dgrid); source=sending_rank-1)
                 for field_idx in 1:num_fields(dh)
-                    if length(dh.edgedicts[field_idx]) == 0
+                    ip = Ferrite.getfieldinterpolation(dh, field_idx)
+                    if Ferrite.nedgedofs(ip) == 0
                         Ferrite.@debug println("  Skipping recv on field $(dh.field_names[field_idx]) (R$my_rank)")
                         continue
                     end
                     corresponding_global_dofs = Array{Int64}(undef,n_edges)
                     MPI.Recv!(corresponding_global_dofs, global_comm(dgrid); source=sending_rank-1)
                     Ferrite.@debug println("   Received $corresponding_global_dofs edge dofs from $sending_rank (R$my_rank)")
-                    for (cdi,(lci,lclvi)) ∈ enumerate(zip(local_cells,local_cell_vis))
-                        vi = Ferrite.sortedge(Ferrite.edges(getcells(getgrid(dh),lci))[lclvi])[1]
-                        if haskey(dh.edgedicts[field_idx], vi)
-                            for d in 1:dh.field_dims[field_idx]
-                                local_to_global[dh.edgedicts[field_idx][vi][1]+d-1] = corresponding_global_dofs[cdi]+d-1
-                                Ferrite.@debug println("  Updating field $(dh.field_names[field_idx]) edge $(EdgeIndex(lci,lclvi)) to $(corresponding_global_dofs[cdi]) (R$my_rank)")
+                    for (cdi,edge) ∈ enumerate(EdgeIndex.(zip(local_cells,local_cell_vis)))
+                        if Ferrite.has_edge_dofs(dh, field_idx, edge)
+                            edofs = Ferrite.edge_dofs(dh, field_idx, edge)
+                            for d in 1:getfielddim(dh, field_idx)
+                                local_to_global[edofs[d]] = corresponding_global_dofs[cdi]+d-1
+                                Ferrite.@debug println("  Updating field $(dh.field_names[field_idx]) edge $edge to $(corresponding_global_dofs[cdi]) (R$my_rank)")
                             end
                         else
-                            Ferrite.@debug println("  Skipping recv on field $(dh.field_names[field_idx]) edge $vi (R$my_rank)")
+                            Ferrite.@debug println("  Skipping recv on field $(dh.field_names[field_idx]) edge $edge (R$my_rank)")
                         end
                     end
                 end
@@ -618,34 +621,20 @@ function Ferrite.__close!(dh::DistributedDofHandler{dim}) where {dim}
 
     # `vertexdict` keeps track of the visited vertices. We store the global vertex
     # number and the first dof we added to that vertex.
-    resize!(dh.vertexdicts, num_fields(dh))
-    for i in 1:num_fields(dh)
-        dh.vertexdicts[i] = Dict{Tuple{Int,Int},Tuple{Int,Bool}}()
-    end
+    vertexdicts = [Dict{Int,Int}() for _ in 1:num_fields(dh)]
 
     # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem
     # An edge is determined from two vertices, but we also need to store the direction
     # of the first edge we encounter and add dofs too. When we encounter the same edge
     # the next time we check if the direction is the same, otherwise we reuse the dofs
     # in the reverse order
-    resize!(dh.edgedicts, num_fields(dh))
-    for i in 1:num_fields(dh)
-        dh.edgedicts[i] = Dict{Tuple{Int,Int},Tuple{Int,Bool}}()
-    end
+    edgedicts = [Dict{Tuple{Int,Int},Tuple{Int,Bool}}() for _ in 1:num_fields(dh)]
 
     # `facedict` keeps track of the visited faces. We only need to store the first dof we
     # added to the face; if we encounter the same face again we *always* reverse the order
     # In 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a
     # face (i.e. a surface) is uniquely determined by 3 vertices.
-    resize!(dh.facedicts, num_fields(dh))
-    for i in 1:num_fields(dh)
-        dh.facedicts[i] = Dict{NTuple{dim,Int},Int}()
-    end
-
-    resize!(dh.celldicts, num_fields(dh))
-    for i in 1:num_fields(dh)
-        dh.celldicts[i] = Dict{Int,Vector{Int}}()
-    end
+    facedicts = [Dict{NTuple{dim,Int},Int}() for _ in 1:num_fields(dh)]
 
     # celldofs are never shared between different cells so there is no need
     # for a `celldict` to keep track of which cells we have added dofs too.
@@ -674,16 +663,16 @@ function Ferrite.__close!(dh::DistributedDofHandler{dim}) where {dim}
             if interpolation_info.nvertexdofs > 0
                 for vertex in Ferrite.vertices(cell)
                     Ferrite.@debug println("    vertex#$vertex")
-                    token = Base.ht_keyindex2!(dh.vertexdicts[fi], vertex)
-                    if token > 0 # haskey(dh.vertexdicts[fi], vertex) # reuse dofs
-                        reuse_dof = dh.vertexdicts[fi].vals[token] # dh.vertexdicts[fi][vertex]
+                    token = Base.ht_keyindex2!(vertexdicts[fi], vertex)
+                    if token > 0 # haskey(vertexdicts[fi], vertex) # reuse dofs
+                        reuse_dof = vertexdicts[fi].vals[token] # vertexdicts[fi][vertex]
                         for d in 1:dh.field_dims[fi]
                             Ferrite.@debug println("      reusing dof #$(reuse_dof + (d-1))")
                             push!(dh.cell_dofs, reuse_dof + (d-1))
                         end
                     else # token <= 0, distribute new dofs
                         for vertexdof in 1:interpolation_info.nvertexdofs
-                            Base._setindex!(dh.vertexdicts[fi], nextdof, vertex, -token) # dh.vertexdicts[fi][vertex] = nextdof
+                            Base._setindex!(vertexdicts[fi], nextdof, vertex, -token) # vertexdicts[fi][vertex] = nextdof
                             for d in 1:dh.field_dims[fi]
                                 Ferrite.@debug println("      adding dof#$nextdof")
                                 push!(dh.cell_dofs, nextdof)
@@ -698,9 +687,9 @@ function Ferrite.__close!(dh::DistributedDofHandler{dim}) where {dim}
                     for edge in Ferrite.edges(cell)
                         sedge, dir = Ferrite.sortedge(edge)
                         Ferrite.@debug println("    edge#$sedge dir: $(dir)")
-                        token = Base.ht_keyindex2!(dh.edgedicts[fi], sedge)
-                        if token > 0 # haskey(dh.edgedicts[fi], sedge), reuse dofs
-                            startdof, olddir = dh.edgedicts[fi].vals[token] # dh.edgedicts[fi][sedge] # first dof for this edge (if dir == true)
+                        token = Base.ht_keyindex2!(edgedicts[fi], sedge)
+                        if token > 0 # haskey(edgedicts[fi], sedge), reuse dofs
+                            startdof, olddir = edgedicts[fi].vals[token] # edgedicts[fi][sedge] # first dof for this edge (if dir == true)
                             for edgedof in (dir == olddir ? (1:interpolation_info.nedgedofs) : (interpolation_info.nedgedofs:-1:1))
                                 for d in 1:dh.field_dims[fi]
                                     reuse_dof = startdof + (d-1) + (edgedof-1)*dh.field_dims[fi]
@@ -709,7 +698,7 @@ function Ferrite.__close!(dh::DistributedDofHandler{dim}) where {dim}
                                 end
                             end
                         else # token <= 0, distribute new dofs
-                            Base._setindex!(dh.edgedicts[fi], (nextdof, dir), sedge, -token) # dh.edgedicts[fi][sedge] = (nextdof, dir),  store only the first dof for the edge
+                            Base._setindex!(edgedicts[fi], (nextdof, dir), sedge, -token) # edgedicts[fi][sedge] = (nextdof, dir),  store only the first dof for the edge
                             for edgedof in 1:interpolation_info.nedgedofs
                                 for d in 1:dh.field_dims[fi]
                                     Ferrite.@debug println("      adding dof#$nextdof")
@@ -725,9 +714,9 @@ function Ferrite.__close!(dh::DistributedDofHandler{dim}) where {dim}
                 for face in Ferrite.faces(cell)
                     sface = Ferrite.sortface(face) # TODO: faces(cell) may as well just return the sorted list
                     Ferrite.@debug println("    face#$sface")
-                    token = Base.ht_keyindex2!(dh.facedicts[fi], sface)
-                    if token > 0 # haskey(dh.facedicts[fi], sface), reuse dofs
-                        startdof = dh.facedicts[fi].vals[token] # dh.facedicts[fi][sface]
+                    token = Base.ht_keyindex2!(facedicts[fi], sface)
+                    if token > 0 # haskey(facedicts[fi], sface), reuse dofs
+                        startdof = facedicts[fi].vals[token] # facedicts[fi][sface]
                         for facedof in interpolation_info.nfacedofs:-1:1 # always reverse (YOLO)
                             for d in 1:dh.field_dims[fi]
                                 reuse_dof = startdof + (d-1) + (facedof-1)*dh.field_dims[fi]
@@ -736,7 +725,7 @@ function Ferrite.__close!(dh::DistributedDofHandler{dim}) where {dim}
                             end
                         end
                     else # distribute new dofs
-                        Base._setindex!(dh.facedicts[fi], nextdof, sface, -token)# dh.facedicts[fi][sface] = nextdof,  store the first dof for this face
+                        Base._setindex!(facedicts[fi], nextdof, sface, -token)# facedicts[fi][sface] = nextdof,  store the first dof for this face
                         for facedof in 1:interpolation_info.nfacedofs
                             for d in 1:dh.field_dims[fi]
                                 Ferrite.@debug println("      adding dof#$nextdof")
@@ -752,10 +741,6 @@ function Ferrite.__close!(dh::DistributedDofHandler{dim}) where {dim}
                 for celldof in 1:interpolation_info.ncelldofs
                     for d in 1:dh.field_dims[fi]
                         Ferrite.@debug println("      adding dof#$nextdof")
-                        if !haskey(dh.celldicts[fi], ci)
-                            dh.celldicts[fi][ci] = Vector{Int}(undef,0)
-                        end
-                        push!(dh.celldicts[fi][ci], nextdof)
                         push!(dh.cell_dofs, nextdof)
                         nextdof += 1
                     end
@@ -768,7 +753,7 @@ function Ferrite.__close!(dh::DistributedDofHandler{dim}) where {dim}
     dh.ndofs[] = maximum(dh.cell_dofs)
     dh.closed[] = true
 
-    return dh
+    return dh, vertexdicts, edgedicts, facedicts
 end
 
 # TODO this is copy pasta from DofHandler.jl
