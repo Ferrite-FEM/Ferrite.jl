@@ -69,7 +69,17 @@ function CellCache(dh::DH, flags::UpdateFlags=UpdateFlags()) where {DH<:Abstract
     return CellCache(flags, getgrid(dh), ScalarWrapper(-1), nodes, coords, dh, celldofs)
 end
 
-# TODO: Can always resize and combine the two reinit! methods maybe?
+function reinit!(cc::CellCache{<:Any,<:AbstractGrid,<:Nothing}, i::Int)
+    cc.cellid[] = i
+    if cc.flags.nodes
+        cellnodes!(cc.nodes, cc.grid, i)
+    end
+    if cc.flags.coords
+        cellcoords!(cc.coords, cc.grid, i)
+    end
+    return cc
+end
+
 function reinit!(cc::CellCache{<:Any,<:AbstractGrid,<:DofHandler}, i::Int)
     cc.cellid[] = i
     if cc.flags.nodes
@@ -78,7 +88,7 @@ function reinit!(cc::CellCache{<:Any,<:AbstractGrid,<:DofHandler}, i::Int)
     if cc.flags.coords
         cellcoords!(cc.coords, cc.grid, i)
     end
-    if cc.dh !== nothing && cc.flags.dofs
+    if cc.flags.dofs
         celldofs!(cc.dofs, cc.dh, i)
     end
     return cc
