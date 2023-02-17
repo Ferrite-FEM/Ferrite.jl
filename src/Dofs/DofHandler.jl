@@ -171,6 +171,11 @@ function field_offset(dh::AbstractDofHandler, field_name::Symbol)
     return field_offset(dh,field_idx)
 end
 
+function getfielddim(dh::AbstractDofHandler, field_name::Symbol) 
+    field_idx = findfirst(i->i == field_name, getfieldnames(dh))
+    field_idx === nothing && error("did not find field $field_name")
+    return getfielddim(dh, field_idx)
+end
 
 """
 """
