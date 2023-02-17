@@ -454,4 +454,58 @@ end
     close!(dh)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
     @test celldofs(dh, 2) == [2, 22, 3, 23, 24, 25, 26, 27, 28, 29, 30, 11, 10, 9, 8, 31, 32, 33, 34, 35, 36]
+
+    # Consistency check for dof computation.
+    grid = generate_grid(Hexahedron, (2, 2, 2))
+    dh = DofHandler(grid)
+    push!(dh, :u, 3, Lagrange{3,RefCube,2}())
+    push!(dh, :v, 1, Lagrange{3,RefCube,2}())
+    push!(dh, :w, 3, Lagrange{3,RefCube,1}())
+    push!(dh, :x, 3, Lagrange{3,RefCube,2}())
+    vertexdicts, edgedicts, facedicts = Ferrite.__close!(dh)
+    @test Ferrite.find_field(dh, :u) == 1
+    @test Ferrite.find_field(dh, :v) == 2
+    @test Ferrite.find_field(dh, :w) == 3
+    for (ci,cell) ∈ enumerate(getcells(grid))
+        for field_idx ∈ 1:3
+            for vi ∈ 1:length(Ferrite.vertices(cell))
+                vertex = VertexIndex(ci,vi)
+                global_vertex = Ferrite.toglobal(grid, vertex)
+                dofs = Ferrite.vertex_dofs(dh, field_idx, vertex)
+                if !haskey(vertexdicts[field_idx], global_vertex)
+                    @test empty(dofs)
+                    @test !Ferrite.has_vertex_dofs(dh, field_idx, vertex)
+                else 
+                    @test vertexdicts[field_idx][global_vertex] == dofs[1]
+                    @test Ferrite.has_vertex_dofs(dh, field_idx, vertex)
+                end
+            end
+
+            for fi ∈ 1:length(Ferrite.faces(cell))
+                face = FaceIndex(ci,fi)
+                global_face = Ferrite.toglobal(grid, face)
+                dofs = Ferrite.face_dofs(dh, field_idx, face)
+                if !haskey(facedicts[field_idx], global_face)
+                    @test isempty(dofs)
+                    @test !Ferrite.has_face_dofs(dh, field_idx, face)
+                else
+                    @test facedicts[field_idx][global_face] == dofs[1]
+                    @test Ferrite.has_face_dofs(dh, field_idx, face)
+                end
+            end
+
+            for ei ∈ 1:length(Ferrite.edges(cell))
+                edge = EdgeIndex(ci,ei)
+                global_edge = Ferrite.toglobal(grid, edge)
+                dofs = Ferrite.edge_dofs(dh, field_idx, edge)
+                if !haskey(edgedicts[field_idx], global_edge) 
+                    @test isempty(dofs) 
+                    @test !Ferrite.has_edge_dofs(dh, field_idx, edge)
+                else
+                    @test edgedicts[field_idx][global_edge][1] == dofs[1]
+                    @test Ferrite.has_edge_dofs(dh, field_idx, edge)
+                end
+            end
+        end
+    end
 end

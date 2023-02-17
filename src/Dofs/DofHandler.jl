@@ -46,23 +46,98 @@ function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
     end
 end
 
+"""
+Get the spatial dimension of a dofhandler.
+"""
+getdim(dh::DofHandler{dim}) where {dim} = dim 
+
 # has_entity_dof(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = haskey(dh.vertexdicts[field_idx], vertex)
 # has_entity_dof(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = haskey(dh.edgedicts[field_idx], edge)
 # has_entity_dof(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = haskey(dh.facedicts[field_idx], face)
 
-has_cell_dofs(dh::AbstractDofHandler, field_idx::Int, cell::Int) = haskey(dh.celldicts[field_idx], cell)
-has_vertex_dofs(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = haskey(dh.vertexdicts[field_idx], vertex)
-has_edge_dofs(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = haskey(dh.edgedicts[field_idx], edge)
-has_face_dofs(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = haskey(dh.facedicts[field_idx], face)
+has_cell_dofs(dh::AbstractDofHandler, field_idx::Int, cell::Int) = ncelldofs(getfieldinterpolation(dh, field_idx)) > 0
+has_vertex_dofs(dh::AbstractDofHandler, field_idx::Int, vertex::VertexIndex) = nvertexdofs(getfieldinterpolation(dh, field_idx)) > 0
+has_edge_dofs(dh::AbstractDofHandler, field_idx::Int, edge::EdgeIndex) = nedgedofs(getfieldinterpolation(dh, field_idx)) > 0
+has_face_dofs(dh::AbstractDofHandler, field_idx::Int, face::FaceIndex) where {dim} = nfacedofs(getfieldinterpolation(dh, field_idx)) > 0
 
 # entity_dofs(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = dh.vertexdicts[field_idx][vertex]
 # entity_dofs(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = dh.edgedicts[field_idx][edge]
 # entity_dofs(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = dh.facedicts[field_idx][face]
 
-cell_dofs(dh::AbstractDofHandler, field_idx::Int, cell::Int) = dh.celldicts[field_idx][cell]
-vertex_dofs(dh::AbstractDofHandler, field_idx::Int, vertex::Int) = dh.vertexdicts[field_idx][vertex]
-edge_dofs(dh::AbstractDofHandler, field_idx::Int, edge::Tuple{Int,Int}) = dh.edgedicts[field_idx][edge][1]
-face_dofs(dh::AbstractDofHandler, field_idx::Int, face::NTuple{dim,Int}) where {dim} = dh.facedicts[field_idx][face]
+"""
+Compute the dofs belonging to a given cell of a given field.
+"""
+function cell_dofs(dh::AbstractDofHandler, field_idx::Int, cell::Int)
+    ip = getfieldinterpolation(dh, field_idx)
+    fdim = getfielddim(dh, field_idx)
+    nentitydofs = fdim*ncelldofs(ip)
+    totaldofs = fdim*getnbasefunctions(ip)
+    ldofs = dof_range(dh, field_idx)[(totaldofs-nentitydofs+1):totaldofs]
+    return celldofs(dh, cell)[ldofs]
+end
+
+"""
+Compute the dofs belonging to a given vertex of a given field.
+"""
+function vertex_dofs(dh::AbstractDofHandler, field_idx::Int, vertex::VertexIndex)
+    ip = getfieldinterpolation(dh, field_idx)
+    nvdofs = Ferrite.nvertexdofs(ip)
+    nvdofs == 0 && return Int[]
+    fdim = getfielddim(dh, field_idx)
+    cell,local_vertex_index = vertex
+    cell_geo = getcells(getgrid(dh), cell)
+    nvertices = length(Ferrite.vertices(cell_geo))
+    nentitydofs = fdim*nvdofs*nvertices
+    ldofr = Ferrite.dof_range(dh, field_idx)[1:nentitydofs]
+    vdofs = Ferrite.celldofs(dh, cell)[ldofr]
+    return reshape(vdofs, (fdim,nvertices))[:, local_vertex_index]
+end
+
+"""
+Compute the dofs belonging to a given edge of a given field.
+"""
+function edge_dofs(dh::AbstractDofHandler, field_idx::Int, edge::EdgeIndex)
+    ip = getfieldinterpolation(dh, field_idx)
+    nedofs = Ferrite.nedgedofs(ip)
+    nedofs == 0 && return Int[]
+    nvdofs = Ferrite.nvertexdofs(ip)
+    fdim = getfielddim(dh, field_idx)
+    cell,local_edge_index = edge
+    cell_geo = getcells(getgrid(dh), cell)
+    nedges_on_cell = length(Ferrite.edges(cell_geo))
+    nvertices_on_cell = length(Ferrite.vertices(cell_geo))
+    nentitydofs = fdim*nedofs*nedges_on_cell
+    offset = fdim*nvdofs*nvertices_on_cell
+    edge_dofrange = Ferrite.dof_range(dh, field_idx)[(offset+1):(offset+nentitydofs)]
+    lodal_edgedofs = Ferrite.celldofs(dh, cell)[edge_dofrange]
+    return reshape(lodal_edgedofs, (fdim,nedges_on_cell))[:, local_edge_index]
+end
+
+"""
+Compute the dofs belonging to a given face of a given field.
+"""
+function face_dofs(dh::AbstractDofHandler, field_idx::Int, face::FaceIndex)
+    ip = Ferrite.getfieldinterpolation(dh, field_idx)
+    dim = getdim(dh)
+    nfdofs = Ferrite.nfacedofs(ip)
+    nfdofs == 0 && return Int[]
+    nvdofs = Ferrite.nvertexdofs(ip)
+    fdim = getfielddim(dh, field_idx)
+    cell,local_face_index = face
+    cell_geo = getcells(getgrid(dh), cell)
+    nedges_on_cell = length(Ferrite.edges(cell_geo))
+    nfaces_on_cell = length(Ferrite.faces(cell_geo))
+    nvertices_on_cell = length(Ferrite.vertices(cell_geo))
+    nentitydofs = fdim*Ferrite.nfacedofs(ip)*nfaces_on_cell
+    offset = fdim*nvdofs*nvertices_on_cell
+    if dim > 2
+        nedofs = Ferrite.nedgedofs(ip)
+        offset += fdim*nedofs*nedges_on_cell
+    end
+    face_dofrange = Ferrite.dof_range(dh, field_idx)[(offset+1):(offset+nentitydofs)]
+    local_facedofs = Ferrite.celldofs(dh, cell)[face_dofrange]
+    return reshape(local_facedofs, (fdim,nfaces_on_cell))[:, local_face_index]
+end
 
 """
     ndofs(dh::AbstractDofHandler)
@@ -78,6 +153,7 @@ getfieldinterpolation(dh::AbstractDofHandler, field_idx::Int) = dh.field_interpo
 getfielddim(dh::AbstractDofHandler, field_idx::Int) = dh.field_dims[field_idx]
 getbcvalue(dh::AbstractDofHandler, field_idx::Int) = dh.bc_values[field_idx]
 getgrid(dh::AbstractDofHandler) = dh.grid
+
 function find_field(dh::AbstractDofHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, dh.field_names)
     j === nothing && error("could not find field :$field_name in DofHandler (existing fields: $(getfieldnames(dh)))")
@@ -85,18 +161,27 @@ function find_field(dh::AbstractDofHandler, field_name::Symbol)
 end
 
 # Calculate the offset to the first local dof of a field
-function field_offset(dh::AbstractDofHandler, field_name::Symbol)
+function field_offset(dh::AbstractDofHandler, field_idx::Int)
     offset = 0
-    for i in 1:find_field(dh, field_name)-1
+    for i in 1:field_idx-1
         offset += getnbasefunctions(getfieldinterpolation(dh,i))::Int * getfielddim(dh, i)
     end
     return offset
 end
 
-function getfielddim(dh::AbstractDofHandler, name::Symbol)
-    field_pos = findfirst(i->i == name, getfieldnames(dh))
-    field_pos === nothing && error("did not find field $name")
-    return getfielddim(dh, field_pos)
+function field_offset(dh::AbstractDofHandler, field_name::Symbol)
+    field_idx = findfirst(i->i == field_name, getfieldnames(dh))
+    field_idx === nothing && error("did not find field $field_name")
+    return field_offset(dh,field_idx)
+end
+
+
+"""
+"""
+function dof_range(dh::AbstractDofHandler, field_idx::Int)
+    offset = field_offset(dh, field_idx)
+    n_field_dofs = getnbasefunctions(getfieldinterpolation(dh, field_idx))::Int * getfielddim(dh, field_idx)
+    return (offset+1):(offset+n_field_dofs)
 end
 
 """
@@ -118,10 +203,9 @@ julia> dof_range(dh, :p)
 ```
 """
 function dof_range(dh::AbstractDofHandler, field_name::Symbol)
-    f = find_field(dh, field_name)
-    offset = field_offset(dh, field_name)
-    n_field_dofs = getnbasefunctions(dh.field_interpolations[f])::Int * getfielddim(dh, f)
-    return (offset+1):(offset+n_field_dofs)
+    field_idx = findfirst(i->i == field_name, getfieldnames(dh))
+    field_idx === nothing && error("did not find field $field_name")
+    return dof_range(dh, field_idx)
 end
 
 """
@@ -170,7 +254,8 @@ function sortface(face::Tuple{Int,Int,Int,Int})
 end
 
 function close!(dh::DofHandler)
-    return __close!(dh)
+    __close!(dh)
+    return dh
 end
 
 # close the DofHandler and distribute all the dofs
@@ -320,7 +405,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     dh.ndofs[] = maximum(dh.cell_dofs)
     dh.closed[] = true
 
-    return dh
+    return dh.vertexdicts, dh.edgedicts, dh.facedicts
 end
 
 function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)

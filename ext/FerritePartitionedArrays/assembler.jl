@@ -109,7 +109,6 @@ struct COOAssembler{T}
             # Start by searching shared entities which are not owned
             pivot_vertex_owner_rank = compute_owner(dgrid, pivot_shared_vertex)
             pivot_cell_idx = pivot_vertex[1]
-            pivot_vertex_global = Ferrite.toglobal(getlocalgrid(dgrid), pivot_vertex)
 
             if my_rank != pivot_vertex_owner_rank
                 sender_slot = destination_index[pivot_vertex_owner_rank]
@@ -120,17 +119,17 @@ struct COOAssembler{T}
                 cell_dofs = dh.cell_dofs[dh.cell_dofs_offset[pivot_cell_idx]:cell_dofs_upper_bound]
 
                 for (field_idx, field_name) in zip(1:num_fields(dh), getfieldnames(dh))
-                    !Ferrite.has_vertex_dofs(dh, field_idx, pivot_vertex_global) && continue
-                    pivot_vertex_dof = Ferrite.vertex_dofs(dh, field_idx, pivot_vertex_global)
+                    !Ferrite.has_vertex_dofs(dh, field_idx, pivot_vertex) && continue
+                    pivot_vertex_dofs = Ferrite.vertex_dofs(dh, field_idx, pivot_vertex)
                     
                     for d ∈ 1:dh.field_dims[field_idx]
-                        @debug println("  adding dof $(pivot_vertex_dof+d-1) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
+                        @debug println("  adding dof $(pivot_vertex_dofs[d]) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
 
                         # Extract dofs belonging to the current field
                         #cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
                         #for cell_field_dof ∈ cell_field_dofs
                         for cell_dof ∈ cell_dofs
-                            append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_vertex_dof+d-1])
+                            append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_vertex_dofs[d]])
                             append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_dof])
                             append!(ghost_rank_to_send[sender_slot], ldof_to_rank[cell_dof])
                             append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
@@ -154,20 +153,18 @@ struct COOAssembler{T}
                     cell_dofs_upper_bound = (pivot_cell_idx == getncells(dh.grid)) ? length(dh.cell_dofs) : dh.cell_dofs_offset[pivot_cell_idx+1]
                     cell_dofs = dh.cell_dofs[dh.cell_dofs_offset[pivot_cell_idx]:cell_dofs_upper_bound]
 
-                    pivot_face_global = Ferrite.toglobal(getlocalgrid(dgrid), pivot_face)
-
                     for (field_idx, field_name) in zip(1:num_fields(dh), getfieldnames(dh))
-                        !Ferrite.has_face_dofs(dh, field_idx, pivot_face_global) && continue
-                        pivot_face_dof = Ferrite.face_dofs(dh, field_idx, pivot_face_global)
+                        !Ferrite.has_face_dofs(dh, field_idx, pivot_face) && continue
+                        pivot_face_dofs = Ferrite.face_dofs(dh, field_idx, pivot_face)
                         
                         for d ∈ 1:dh.field_dims[field_idx]
-                            @debug println("  adding dof $(pivot_face_dof+d-1) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
+                            @debug println("  adding dof $(pivot_face_dofs[d]) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
                             
                             # Extract dofs belonging to the current field
                             #cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
                             #for cell_field_dof ∈ cell_field_dofs
                             for cell_dof ∈ cell_dofs
-                                append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_face_dof+d-1])
+                                append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_face_dofs[d]])
                                 append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_dof])
                                 append!(ghost_rank_to_send[sender_slot], ldof_to_rank[cell_dof])
                                 append!(ghost_dof_field_index_to_send[sender_slot], field_idx)
@@ -192,19 +189,17 @@ struct COOAssembler{T}
                     cell_dofs_upper_bound = (pivot_cell_idx == getncells(dh.grid)) ? length(dh.cell_dofs) : dh.cell_dofs_offset[pivot_cell_idx+1]
                     cell_dofs = dh.cell_dofs[dh.cell_dofs_offset[pivot_cell_idx]:cell_dofs_upper_bound]
 
-                    pivot_edge_global = Ferrite.toglobal(getlocalgrid(dgrid), pivot_edge)
-
                     for (field_idx, field_name) in zip(1:num_fields(dh), getfieldnames(dh))
-                        !Ferrite.has_edge_dofs(dh, field_idx, pivot_edge_global) && continue
-                        pivot_edge_dof = Ferrite.edge_dofs(dh, field_idx, pivot_edge_global)
+                        !Ferrite.has_edge_dofs(dh, field_idx, pivot_edge) && continue
+                        pivot_edge_dofs = Ferrite.edge_dofs(dh, field_idx, pivot_edge)
 
                         for d ∈ 1:dh.field_dims[field_idx]
-                            @debug println("  adding dof $(pivot_edge_dof+d-1) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
+                            @debug println("  adding dof $(pivot_edge_dofs[d]) to ghost sync synchronization on slot $sender_slot (R$my_rank)")
                             # Extract dofs belonging to the current field
                             #cell_field_dofs = cell_dofs[dof_range(dh, field_name)]
                             #for cell_field_dof ∈ cell_field_dofs
                             for cell_dof ∈ cell_dofs
-                                append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_edge_dof+d-1])
+                                append!(ghost_dof_pivot_to_send[sender_slot], ldof_to_gdof[pivot_edge_dofs[d]])
                                 append!(ghost_dof_to_send[sender_slot], ldof_to_gdof[cell_dof])
                                 append!(ghost_rank_to_send[sender_slot], ldof_to_rank[cell_dof])
                                 append!(ghost_dof_field_index_to_send[sender_slot], field_idx)

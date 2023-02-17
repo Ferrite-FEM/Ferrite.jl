@@ -50,6 +50,8 @@ function Base.show(io::IO, ::MIME"text/plain", dh::DistributedDofHandler)
     end
 end
 
+Ferrite.getdim(dh::DistributedDofHandler{dim}) where {dim} = dim 
+
 Ferrite.getlocalgrid(dh::DistributedDofHandler) = Ferrite.getlocalgrid(dh.grid)
 getglobalgrid(dh::DistributedDofHandler) = dh.grid
 
@@ -87,36 +89,27 @@ function compute_dof_ownership(dh)
 
     for (lvi, sv) ∈ get_shared_vertices(dgrid)
         for field_idx in 1:num_fields(dh)
-            vi = Ferrite.toglobal(dgrid, lvi)
-            if Ferrite.has_vertex_dofs(dh, field_idx, vi)
-                local_dof_idx = Ferrite.vertex_dofs(dh, field_idx, vi)
-                for d in 1:dh.field_dims[field_idx]
-                    dof_owner[local_dof_idx+d-1] = compute_owner(dgrid, sv)
-                end
+            if Ferrite.has_vertex_dofs(dh, field_idx, lvi)
+                local_dof_indices = Ferrite.vertex_dofs(dh, field_idx, lvi)
+                dof_owner[local_dof_indices] .= compute_owner(dgrid, sv)
             end
         end
     end
 
     for (lfi, sf) ∈ get_shared_faces(dgrid)
         for field_idx in 1:num_fields(dh)
-            fi = Ferrite.toglobal(dgrid, lfi)
-            if Ferrite.has_face_dofs(dh, field_idx, fi)
-                local_dof_idx = Ferrite.face_dofs(dh, field_idx, fi)
-                for d in 1:dh.field_dims[field_idx]
-                    dof_owner[local_dof_idx+d-1] = compute_owner(dgrid, sf)
-                end
+            if Ferrite.has_face_dofs(dh, field_idx, lfi)
+                local_dof_indices = Ferrite.face_dofs(dh, field_idx, lfi)
+                dof_owner[local_dof_indices] .= compute_owner(dgrid, sf)
             end
         end
     end
 
     for (lei, se) ∈ get_shared_edges(dgrid)
         for field_idx in 1:num_fields(dh)
-            ei = Ferrite.toglobal(dgrid, lei)
-            if Ferrite.has_edge_dofs(dh, field_idx, ei)
-                local_dof_idx = Ferrite.edge_dofs(dh, field_idx, ei)
-                for d in 1:dh.field_dims[field_idx]
-                    dof_owner[local_dof_idx+d-1] = compute_owner(dgrid, se)
-                end
+            if Ferrite.has_edge_dofs(dh, field_idx, lei)
+                local_dof_indices = Ferrite.edge_dofs(dh, field_idx, lei)
+                dof_owner[local_dof_indices] .= compute_owner(dgrid, se)
             end
         end
     end
