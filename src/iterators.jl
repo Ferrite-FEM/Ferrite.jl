@@ -163,7 +163,7 @@ function CellIterator(gridordh::Union{Grid,AbstractDofHandler},
     if gridordh isa MixedDofHandler
         # TODO: Since the CellCache is resizeable this is not really necessary to check
         #       here, but might be useful to catch slow code paths?
-        _check_same_celltype(grid, set)
+        _check_same_celltype(getgrid(gridordh), set)
     end
     return CellIterator(CellCache(gridordh, flags), set)
 end
