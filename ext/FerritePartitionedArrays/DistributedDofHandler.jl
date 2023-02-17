@@ -77,7 +77,7 @@ Ferrite.renumber!(dh::DistributedDofHandler, perm::AbstractVector{<:Integer}) = 
 
 function compute_dof_ownership(dh)
     dgrid = getglobalgrid(dh)
-    my_rank = MPI.Comm_rank(global_comm(dgrid))+1
+    my_rank = global_rank(dgrid)
 
     dof_owner = Vector{Int}(undef,ndofs(dh))
     fill!(dof_owner, my_rank)
@@ -115,7 +115,7 @@ end
 """
 Compute the number of dofs owned by the current process.
 """
-num_local_true_dofs(dh::DistributedDofHandler) = sum(dh.ldof_to_rank .== (MPI.Comm_rank(global_comm(dh.grid))+1))
+num_local_true_dofs(dh::DistributedDofHandler) = sum(dh.ldof_to_rank .== global_rank(getglobalgrid(dh)))
 
 """
 Compute the number of dofs visible to the current process.
@@ -125,7 +125,7 @@ num_local_dofs(dh::DistributedDofHandler) = length(dh.ldof_to_gdof)
 """
 Compute the number of dofs in the global system.
 """
-num_global_dofs(dh::DistributedDofHandler) = MPI.Allreduce(num_local_true_dofs(dh), MPI.SUM, global_comm(dh.grid))
+num_global_dofs(dh::DistributedDofHandler) = MPI.Allreduce(num_local_true_dofs(dh), MPI.SUM, global_comm(getglobalgrid(dh)))
 
 """
 Renumber the dofs in local ordering to their corresponding global numbering.
@@ -136,7 +136,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
     dgrid = getglobalgrid(dh)
     dim = getdim(dgrid)
     # MPI rank starting with 1 to match Julia's index convention
-    my_rank = MPI.Comm_rank(global_comm(dgrid))+1
+    my_rank = global_rank(dgrid)
 
     local_to_global = Vector{Int}(undef,ndofs(dh))
     fill!(local_to_global,0) # 0 is the invalid index!
@@ -601,6 +601,8 @@ function Ferrite.close!(dh::DistributedDofHandler)
     append!(dh.ldof_to_gdof, local_to_global_numbering(dh))
     append!(dh.ldof_to_rank, compute_dof_ownership(dh))
     dh.ndofs.x = num_local_dofs(dh)
+    # Reorder to make local dofs continuous
+    sum(dh.ldof_to_rank.==)
 end
 
 function WriteVTK.vtk_grid(filename::AbstractString, dh::DistributedDofHandler; compress::Bool=true)

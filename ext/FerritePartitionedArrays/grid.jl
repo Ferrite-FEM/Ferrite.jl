@@ -57,6 +57,8 @@ returned by @global_comm .
 """
 @inline vertex_comm(dgrid::DistributedGrid) = dgrid.interface_comm
 
+@inline global_rank(dgrid::DistributedGrid) =  MPI.Comm_rank(global_comm(dgrid))+1
+
 """
 """
 function DistributedGrid(grid_to_distribute::Grid{dim,C,T}; grid_comm::MPI.Comm = MPI.COMM_WORLD, partition_alg = :RECURSIVE) where {dim,C,T}

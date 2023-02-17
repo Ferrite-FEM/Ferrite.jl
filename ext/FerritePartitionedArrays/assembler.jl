@@ -37,7 +37,7 @@ struct COOAssembler{T}
         #       distributed grid, which can efficiently precompute some of the values below.
         comm = global_comm(dgrid)
         np = MPI.Comm_size(comm)
-        my_rank = MPI.Comm_rank(comm)+1
+        my_rank = global_rank(dgrid)
 
         @debug println("starting assembly... (R$my_rank)")
 
@@ -295,9 +295,10 @@ end
 end
 
 function Ferrite.end_assemble(assembler::COOAssembler{T}) where {T}
-    comm = global_comm(getglobalgrid(assembler.dh))
+    dgrid = getglobalgrid(assembler.dh)
+    comm = global_comm(dgrid)
     np = MPI.Comm_size(comm)
-    my_rank = MPI.Comm_rank(comm)+1
+    my_rank = global_rank(dgrid)
 
     # --------------------- Add ghost entries in IJ 👻 --------------------
     I = map(i->assembler.dh.ldof_to_gdof[i], assembler.I)
