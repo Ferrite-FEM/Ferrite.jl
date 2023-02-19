@@ -15,75 +15,15 @@
 #
 # First we load Ferrite, and some other packages we need
 using Ferrite, MPI
-using IterativeSolvers #, HYPRE
-using PartitionedArrays #src
+using IterativeSolvers
+using PartitionedArrays, Metis
 using SparseArrays, BlockArrays
 
-
-function PartitionedArrays.matrix_exchanger(values,row_exchanger,row_lids,col_lids)
-
-    part = PartitionedArrays.get_part_ids(row_lids)
-    parts_rcv = row_exchanger.parts_rcv
-    parts_snd = row_exchanger.parts_snd
-  
-    function setup_rcv(part,parts_rcv,row_lids,col_lids,values)
-      owner_to_i = Dict(( owner=>i for (i,owner) in enumerate(parts_rcv) ))
-      ptrs = zeros(Int32,length(parts_rcv)+1)
-      for (li,lj,v) in nziterator(values)
-        owner = row_lids.lid_to_part[li]
-        if owner != part
-          ptrs[owner_to_i[owner]+1] +=1
-        end
-      end
-      length_to_ptrs!(ptrs)
-      k_rcv_data = zeros(Int,ptrs[end]-1)
-      gi_rcv_data = zeros(Int,ptrs[end]-1)
-      gj_rcv_data = zeros(Int,ptrs[end]-1)
-      for (k,(li,lj,v)) in enumerate(nziterator(values))
-        owner = row_lids.lid_to_part[li]
-        if owner != part
-          p = ptrs[owner_to_i[owner]]
-          k_rcv_data[p] = k
-          gi_rcv_data[p] = row_lids.lid_to_gid[li]
-          gj_rcv_data[p] = col_lids.lid_to_gid[lj]
-          ptrs[owner_to_i[owner]] += 1
-        end
-      end
-      rewind_ptrs!(ptrs)
-      k_rcv = Table(k_rcv_data,ptrs)
-      gi_rcv = Table(gi_rcv_data,ptrs)
-      gj_rcv = Table(gj_rcv_data,ptrs)
-      k_rcv, gi_rcv, gj_rcv
-    end
-  
-    k_rcv, gi_rcv, gj_rcv = PartitionedArrays.map_parts(setup_rcv,part,parts_rcv,row_lids,col_lids,values)
-  
-    gi_snd = PartitionedArrays.exchange(gi_rcv,parts_snd,parts_rcv)
-    gj_snd = PartitionedArrays.exchange(gj_rcv,parts_snd,parts_rcv)
-  
-    function setup_snd(part,row_lids,col_lids,gi_snd,gj_snd,values)
-      ptrs = gi_snd.ptrs
-      k_snd_data = zeros(Int,ptrs[end]-1)
-      for p in 1:length(gi_snd.data)
-        gi = gi_snd.data[p]
-        gj = gj_snd.data[p]
-        li = row_lids.gid_to_lid[gi]
-        lj = col_lids.gid_to_lid[gj]
-        k = nzindex(values,li,lj)
-        PartitionedArrays.@check k > 0 "The sparsity pattern of the ghost layer is inconsistent on part $part | local index ($li,$lj) | global index ($gi, $gj)"
-        k_snd_data[p] = k
-      end
-      k_snd = Table(k_snd_data,ptrs)
-      k_snd
-    end
-  
-    k_snd = map_parts(setup_snd,part,row_lids,col_lids,gi_snd,gj_snd,values)
-  
-    PartitionedArrays.Exchanger(parts_rcv,parts_snd,k_rcv,k_snd)
-  end
+FerritePartitionedArrays = Base.get_extension(Ferrite, :FerritePartitionedArrays)
 
 # Launch MPI
 MPI.Init()
+
 # First we generate a simple grid, specifying the 4 corners of Cooks membrane.
 function create_cook_grid(nx, ny)
     corners = [Vec{2}((0.0,   0.0)),
@@ -94,7 +34,7 @@ function create_cook_grid(nx, ny)
     ## facesets for boundary conditions
     addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0);
     addfaceset!(grid, "traction", x -> norm(x[1]) ≈ 48.0);
-    return DistributedGrid(grid)
+    return FerritePartitionedArrays.DistributedGrid(grid)
 end;
 
 # Next we define a function to set up our cell- and facevalues.
@@ -120,7 +60,7 @@ end;
 # We create a DofHandler, with two fields, `:u` and `:p`,
 # with possibly different interpolations
 function create_dofhandler(grid, ipu, ipp)
-    dh = DistributedDofHandler(grid)
+    dh = FerritePartitionedArrays.DistributedDofHandler(grid)
     push!(dh, :u, 2, ipu) # displacement
     push!(dh, :p, 1, ipp) # pressure
     close!(dh)
@@ -148,10 +88,10 @@ end
 # element matrix. Since Ferrite does not force us to use any particular matrix type we will
 # use a `PseudoBlockArray` from `BlockArrays.jl`.
 function doassemble(cellvalues_u::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim},
-                    facevalues_u::FaceVectorValues{dim}, grid::DistributedGrid,
-                    dh::DistributedDofHandler, mp::LinearElasticity) where {dim}
+                    facevalues_u::FaceVectorValues{dim}, grid::FerritePartitionedArrays.DistributedGrid,
+                    dh::FerritePartitionedArrays.DistributedDofHandler, mp::LinearElasticity) where {dim}
 
-    assembler = PartitionedArraysCOOAssembler{Float64}(dh)
+    assembler = FerritePartitionedArrays.COOAssembler{Float64}(dh)
     nu = getnbasefunctions(cellvalues_u)
     np = getnbasefunctions(cellvalues_p)
 
@@ -253,7 +193,7 @@ function solve(ν, interpolation_u, interpolation_p)
     dh = create_dofhandler(grid, interpolation_u, interpolation_p)
     dbc = create_bc(dh)
     vtk_grid("cook_dgrid", dh) do vtk
-        vtk_partitioning(vtk, grid)
+        FerritePartitionedArrays.vtk_partitioning(vtk, grid)
     end
     ## cellvalues
     cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
@@ -268,7 +208,7 @@ function solve(ν, interpolation_u, interpolation_p)
                          "_linear"
     vtk_grid(filename, dh) do vtkfile
         vtk_point_data(vtkfile, dh, u)
-        vtk_partitioning(vtkfile, grid)
+        FerritePartitionedArrays.vtk_partitioning(vtkfile, grid)
     end
     return u
 end
@@ -279,11 +219,8 @@ u1 = solve(0.4999999, linear, linear);
 u2 = solve(0.4999999, quadratic, linear);
 
 ## test the result                 #src
-using Test                         #src
+# using Test                         #src
 # @test norm(u2) ≈ 919.2122668839389 #src
-
-# Finally, we gracefully shutdown MPI
-MPI.Finalize()
 
 #md # ## [Plain program](@id distributed-assembly-plain-program)
 #md #

@@ -121,12 +121,12 @@ function face_dofs(dh::AbstractDofHandler, field_idx::Int, face::FaceIndex)
     fdim = getfielddim(dh, field_idx)
     cell,local_face_index = face
     cell_geo = getcells(getgrid(dh), cell)
-    nedges_on_cell = length(Ferrite.edges(cell_geo))
     nfaces_on_cell = length(Ferrite.faces(cell_geo))
     nvertices_on_cell = length(Ferrite.vertices(cell_geo))
     nentitydofs = fdim*Ferrite.nfacedofs(ip)*nfaces_on_cell
     offset = fdim*nvdofs*nvertices_on_cell
     if dim > 2
+        nedges_on_cell = length(Ferrite.edges(cell_geo))
         nedofs = Ferrite.nedgedofs(ip)
         offset += fdim*nedofs*nedges_on_cell
     end

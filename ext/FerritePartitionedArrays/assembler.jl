@@ -81,8 +81,6 @@ struct COOAssembler{T}
         # We decide for row (i.e. test function) ownership, because it the image of
         # SpMV is process local.
         row_indices = PartitionedArrays.IndexSet(my_rank, ldof_to_gdof, Int32.(ldof_to_rank))
-        #FIXME: This below must be fixed before we can assemble to HYPRE IJ. Problem seems to be that rows and cols must be continuously assigned.
-        #row_indices = PartitionedArrays.IndexRange(my_rank, length(ltdof_indices), ltdof_to_gdof[1], ldof_to_gdof[.!ltdof_indices], Int32.(ldof_to_rank[.!ltdof_indices]))
         row_data = MPIData(row_indices, comm, (np,))
         row_exchanger = Exchanger(row_data)
         rows = PRange(ngdofs,row_data,row_exchanger)
@@ -259,8 +257,6 @@ struct COOAssembler{T}
         Ferrite.@debug println("all_local_col_ranks $all_local_col_ranks (R$my_rank)")
 
         col_indices = PartitionedArrays.IndexSet(my_rank, all_local_cols, all_local_col_ranks)
-        #FIXME: This below must be fixed before we can assemble to HYPRE IJ. Problem seems to be that rows and cols must be continuously assigned.
-        #col_indices = PartitionedArrays.IndexRange(my_rank, length(ltdof_indices), ltdof_to_gdof[1], all_local_cols[all_local_col_ranks .!= my_rank], Int32.(all_local_col_ranks[all_local_col_ranks .!= my_rank]))
         col_data = MPIData(col_indices, comm, (np,))
         col_exchanger = Exchanger(col_data)
         cols = PRange(ngdofs,col_data,col_exchanger)

@@ -75,6 +75,9 @@ end
 
 Ferrite.renumber!(dh::DistributedDofHandler, perm::AbstractVector{<:Integer}) = error("Not implemented.")
 
+"""
+TODO fix for shells
+"""
 function compute_dof_ownership(dh)
     dgrid = getglobalgrid(dh)
     my_rank = global_rank(dgrid)
