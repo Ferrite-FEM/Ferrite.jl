@@ -267,20 +267,20 @@ function __close!(dh::AbstractDofHandler)
 
     # `vertexdict` keeps track of the visited vertices. We store the global vertex
     # number and the first dof we added to that vertex.
-    vertexdicts = [Dict{Int,Int}() for _ in 1:nfields(dh)]
+    vertexdicts = [Dict{Int,Int}() for _ in 1:num_fields(dh)]
 
     # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem
     # An edge is determined from two vertices, but we also need to store the direction
     # of the first edge we encounter and add dofs too. When we encounter the same edge
     # the next time we check if the direction is the same, otherwise we reuse the dofs
     # in the reverse order
-    edgedicts = [Dict{Tuple{Int,Int},Tuple{Int,Bool}}() for _ in 1:nfields(dh)]
+    edgedicts = [Dict{Tuple{Int,Int},Tuple{Int,Bool}}() for _ in 1:num_fields(dh)]
 
     # `facedict` keeps track of the visited faces. We only need to store the first dof we
     # added to the face; if we encounter the same face again we *always* reverse the order
     # In 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a
     # face (i.e. a surface) is uniquely determined by 3 vertices.
-    facedicts = [Dict{NTuple{dim,Int},Int}() for _ in 1:nfields(dh)]
+    facedicts = [Dict{NTuple{dim,Int},Int}() for _ in 1:num_fields(dh)]
 
     # celldofs are never shared between different cells so there is no need
     # for a `celldict` to keep track of which cells we have added dofs too.
@@ -460,7 +460,7 @@ with stored values in the correct places.
 
 The keyword argument `coupling` can be used to specify how fields (or components) in the dof
 handler couple to each other. `coupling` should be a square matrix of booleans with
-`nfields` (or `ncomponents`) rows/columns with `true` if fields are coupled and `false` if
+`num_fields` (or `ncomponents`) rows/columns with `true` if fields are coupled and `false` if
 not. By default full coupling is assumed.
 
 See the [Sparsity Pattern](@ref) section of the manual.
