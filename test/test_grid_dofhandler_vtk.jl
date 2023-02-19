@@ -235,7 +235,7 @@ end
     @test topology.vertex_neighbor[4,4] == Ferrite.EntityNeighborhood(VertexIndex(5,2))
     @test topology.vertex_neighbor[5,2] == Ferrite.EntityNeighborhood(VertexIndex(4,4))
     @test topology.vertex_neighbor[6,1] == Ferrite.EntityNeighborhood(VertexIndex(3,3))
-    #test face neighbor maps cellid and local face id to neighbor id and neighbor local face id 
+    #test face neighbor maps cellid and local face id to neighbor id and neighbor local face id
     @test topology.face_neighbor[1,2] == Ferrite.EntityNeighborhood(FaceIndex(2,4))
     @test topology.face_neighbor[1,3] == Ferrite.EntityNeighborhood(FaceIndex(3,1))
     @test topology.face_neighbor[2,3] == Ferrite.EntityNeighborhood(FaceIndex(4,1))
@@ -268,7 +268,7 @@ end
 #                    |  1  |  2  |
 #               (10) +-----+-----+(12)
 #                        (11)
-    hexgrid = generate_grid(Hexahedron,(2,2,1)) 
+    hexgrid = generate_grid(Hexahedron,(2,2,1))
     topology = ExclusiveTopology(hexgrid)
     @test topology.edge_neighbor[1,11] == Ferrite.EntityNeighborhood(EdgeIndex(4,9))
     @test getneighborhood(topology,hexgrid,EdgeIndex(1,11),true) == [EdgeIndex(4,9),EdgeIndex(2,12),EdgeIndex(3,10),EdgeIndex(1,11)]
@@ -276,15 +276,15 @@ end
     @test getneighborhood(topology,hexgrid,EdgeIndex(2,12),true) == [EdgeIndex(3,10),EdgeIndex(1,11),EdgeIndex(4,9),EdgeIndex(2,12)]
     @test topology.edge_neighbor[3,10] == Ferrite.EntityNeighborhood(EdgeIndex(2,12))
     @test topology.edge_neighbor[4,9] == Ferrite.EntityNeighborhood(EdgeIndex(1,11))
-    @test topology.face_neighbor[1,3] == Ferrite.EntityNeighborhood(FaceIndex(2,5))
-    @test topology.face_neighbor[1,4] == Ferrite.EntityNeighborhood(FaceIndex(3,2))
-    @test topology.face_neighbor[2,4] == Ferrite.EntityNeighborhood(FaceIndex(4,2))
-    @test topology.face_neighbor[2,5] == Ferrite.EntityNeighborhood(FaceIndex(1,3))
-    @test topology.face_neighbor[3,2] == Ferrite.EntityNeighborhood(FaceIndex(1,4))
-    @test topology.face_neighbor[3,3] == Ferrite.EntityNeighborhood(FaceIndex(4,5))
-    @test topology.face_neighbor[4,2] == Ferrite.EntityNeighborhood(FaceIndex(2,4))
-    @test topology.face_neighbor[4,5] == Ferrite.EntityNeighborhood(FaceIndex(3,3))
-    serendipitygrid = generate_grid(Cell{3,20,6},(2,2,1)) 
+    @test getneighborhood(topology,hexgrid,FaceIndex((1,3))) == [FaceIndex((2,5))]
+    @test getneighborhood(topology,hexgrid,FaceIndex((1,4))) == [FaceIndex((3,2))]
+    @test getneighborhood(topology,hexgrid,FaceIndex((2,4))) == [FaceIndex((4,2))]
+    @test getneighborhood(topology,hexgrid,FaceIndex((2,5))) == [FaceIndex((1,3))]
+    @test getneighborhood(topology,hexgrid,FaceIndex((3,2))) == [FaceIndex((1,4))]
+    @test getneighborhood(topology,hexgrid,FaceIndex((3,3))) == [FaceIndex((4,5))]
+    @test getneighborhood(topology,hexgrid,FaceIndex((4,2))) == [FaceIndex((2,4))]
+    @test getneighborhood(topology,hexgrid,FaceIndex((4,5))) == [FaceIndex((3,3))]
+    serendipitygrid = generate_grid(Cell{3,20,6},(2,2,1))
     stopology = ExclusiveTopology(serendipitygrid)
     # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
     @test all(stopology.face_neighbor .== topology.face_neighbor)
@@ -327,7 +327,7 @@ end
     @test topology.edge_neighbor[1,1] == topology.edge_neighbor[1,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
     @test topology.face_neighbor[3,1] == topology.face_neighbor[3,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
     @test topology.face_neighbor[4,1] == topology.face_neighbor[4,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
-#                           
+#
 #                   +-----+-----+-----+
 #                   |  7  |  8  |  9  |
 #                   +-----+-----+-----+
@@ -335,7 +335,7 @@ end
 #                   +-----+-----+-----+
 #                   |  1  |  2  |  3  |
 #                   +-----+-----+-----+
-# test application: form level 1 neighborhood patches of elements 
+# test application: form level 1 neighborhood patches of elements
     quadgrid = generate_grid(Quadrilateral,(3,3))
     topology = ExclusiveTopology(quadgrid)
     patches = Vector{Int}[Ferrite.getneighborhood(topology, quadgrid, CellIndex(i)) for i in 1:getncells(quadgrid)]
@@ -349,7 +349,7 @@ end
     @test issubset([4,5,8], patches[7])
     @test issubset([7,4,5,6,9], patches[8])
     @test issubset([8,5,6], patches[9])
-    
+
     @test Ferrite.getneighborhood(topology, quadgrid, VertexIndex(1,1)) == [VertexIndex(1,2), VertexIndex(1,4)]
     @test Ferrite.getneighborhood(topology, quadgrid, VertexIndex(2,1)) == [VertexIndex(1,1), VertexIndex(1,3), VertexIndex(2,2), VertexIndex(2,4)]
     @test Ferrite.getneighborhood(topology, quadgrid, VertexIndex(5,4)) == [VertexIndex(4,2), VertexIndex(4,4), VertexIndex(5,1), VertexIndex(5,3), VertexIndex(7,1), VertexIndex(7,3), VertexIndex(8,2), VertexIndex(8,4)]
@@ -359,7 +359,7 @@ end
     @test Ferrite.toglobal(quadgrid, Ferrite.getneighborhood(topology, quadgrid, VertexIndex(1,1))) == [2,5]
     @test Ferrite.toglobal(quadgrid, Ferrite.getneighborhood(topology, quadgrid, VertexIndex(2,1))) == [1,6,3]
     @test Ferrite.toglobal(quadgrid, Ferrite.getneighborhood(topology, quadgrid, VertexIndex(5,4))) == [6,9,11,14]
-    
+
     @test topology.face_skeleton == [FaceIndex(1,1),FaceIndex(1,2),FaceIndex(1,3),FaceIndex(1,4),
                                           FaceIndex(2,1),FaceIndex(2,2),FaceIndex(2,3),
                                           FaceIndex(3,1),FaceIndex(3,2),FaceIndex(3,3),
@@ -377,7 +377,7 @@ end
     @test all(quadgrid_topology.vertex_neighbor .== topology.vertex_neighbor)
     quadratic_patches = Vector{Int}[Ferrite.getneighborhood(quadgrid_topology, quadratic_quadgrid, CellIndex(i)) for i in 1:getncells(quadratic_quadgrid)]
     @test all(patches .== quadratic_patches)
-#                           
+#
 #                   +-----+-----+-----+
 #                   |  7  |  8  |  9  |
 #                   +-----+-----+-----+
@@ -391,7 +391,7 @@ end
         Ferrite.reinit!(fv, coords, faceid)
     end
     reinit!(fv::FaceValues, faceid::FaceIndex, grid) = reinit!(fv,faceid[1],faceid[2],grid) # wrapper for reinit!(fv,cellid,faceid,grid)
-    face_neighbors_ele5 = nonzeros(topology.face_neighbor[5,:]) 
+    face_neighbors_ele5 = nonzeros(topology.face_neighbor[5,:])
     ip = Lagrange{2, RefCube, 1}()
     qr_face = QuadratureRule{1, RefCube}(2)
     fv_ele = FaceVectorValues(qr_face, ip)
@@ -408,11 +408,11 @@ end
             u_5_n = function_value(fv_ele, q_point, u_ele5) ⋅ normal_5
             for neighbor_entity in face_neighbors_ele5[ele_faceid].neighbor_info # only one entity can be changed to get rid of the for loop
                 reinit!(fv_neighbor, neighbor_entity, quadgrid)
-                normal_neighbor = getnormal(fv_neighbor, q_point) 
+                normal_neighbor = getnormal(fv_neighbor, q_point)
                 u_neighbor = function_value(fv_neighbor, q_point, u_neighbors) ⋅ normal_neighbor
                 jump_int += (u_5_n + u_neighbor) * dΩ
                 jump_abs += abs(u_5_n + u_neighbor) * dΩ
-            end 
+            end
         end
     end
     @test isapprox(jump_abs, 2/3*2*4,atol=1e-6) # 2*4*0.66666, jump is always 2, 4 sides, length =0.66
