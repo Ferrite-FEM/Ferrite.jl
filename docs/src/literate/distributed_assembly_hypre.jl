@@ -79,7 +79,7 @@ FerritePartitionedArrays = Base.get_extension(Ferrite, :FerritePartitionedArrays
 # and distribute it across our processors using `generate_distributed_grid`. 
 # dgrid = FerritePartitionedArrays.generate_distributed_grid(QuadraticQuadrilateral, (3, 1));
 # dgrid = FerritePartitionedArrays.generate_distributed_grid(Tetrahedron, (2, 2, 2));
-dgrid = FerritePartitionedArrays.generate_distributed_grid(Hexahedron, (2, 2, 2)); #src
+dgrid = FerritePartitionedArrays.generate_distributed_grid(Hexahedron, (10, 10, 10)); #src
 # dgrid = FerritePartitionedArrays.generate_distributed_grid(Tetrahedron, (3, 3, 3)); #src
 
 # ### Trial and test functions
@@ -102,7 +102,8 @@ dh = FerritePartitionedArrays.DistributedDofHandler(dgrid)
 push!(dh, :u, 1, ip)
 close!(dh);
 # Hypre needs locally continuous indices.
-FerritePartitionedArrays.hypre_reorder!(dh);
+#TODO I think we can eliminate this one easily.
+# FerritePartitionedArrays.hypre_reorder!(dh);
 
 # ### Boundary conditions
 # Nothing has to be changed here either.
@@ -116,7 +117,7 @@ add!(ch, dbc);
 close!(ch)
 # update!(ch, 0.0);
 
-my_rank = MPI.Comm_rank(MPI.COMM_WORLD)
+my_rank = MPI.Comm_rank(MPI.COMM_WORLD)+1
 # println("R$my_rank: prescribing $(ch.prescribed_dofs) on $∂Ω")
 
 # ### Assembling the linear system
@@ -128,8 +129,11 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::FerritePartitionedArr
 
     # comm = global_comm(getglobalgrid(dh))
     comm = MPI.COMM_WORLD
-    ilower = dh.ldof_to_gdof[1]
-    iupper = dh.ldof_to_gdof[1]+FerritePartitionedArrays.num_local_true_dofs(dh)-1
+    ltdofs = dh.ldof_to_gdof[dh.ldof_to_rank .== my_rank]
+    ilower = minimum(ltdofs)
+    iupper = maximum(ltdofs)
+    # ilower = dh.ldof_to_gdof[1]
+    # iupper = dh.ldof_to_gdof[1]+FerritePartitionedArrays.num_local_true_dofs(dh)-1
     @show ilower, iupper
     K = HYPREMatrix(comm, ilower, iupper)
     f = HYPREVector(comm, ilower, iupper)
@@ -186,55 +190,43 @@ K, f = doassemble(cellvalues, dh, ch);
 
 precond = HYPRE.BoomerAMG()
 solver = HYPRE.PCG(; Precond = precond)
-xh = HYPRE.solve(solver, K, f)
+uh = HYPRE.solve(solver, K, f)
 
 # Copy solution from HYPRE to Julia
-x = Vector{Float64}(undef, FerritePartitionedArrays.num_local_true_dofs(dh))
-copy!(x, xh)
+uj = Vector{Float64}(undef, FerritePartitionedArrays.num_local_true_dofs(dh))
+copy!(uj, uh)
 
-# Collect to root rank
-# if my_rank == 1
-#     X = Vector{Float64}(undef, 45)
-#     counts = [27+9,27-9]
-#     MPI.Gatherv!(x, VBuffer(X, [counts]), MPI.COMM_WORLD)
-#     @show norm(X)
-# else
-#     MPI.Gatherv!(x, nothing, MPI.COMM_WORLD)
-# end
-@show x
+# And convert from HYPRE to Ferrite
+u_local = Vector{Float64}(undef, FerritePartitionedArrays.num_local_dofs(dh))
+FerritePartitionedArrays.hypre_to_ferrite!(u_local, uj, dh)
 
 # # ### Exporting via PVTK
 # # To visualize the result we export the grid and our field `u`
 # # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
-# vtk_grid("heat_equation_distributed", dh) do vtk
-#     vtk_point_data(vtk, dh, u)
-#     # For debugging purposes it can be helpful to enrich 
-#     # the visualization with some meta  information about 
-#     # the grid and its partitioning
-#     FerritePartitionedArrays.vtk_shared_vertices(vtk, dgrid)
-#     FerritePartitionedArrays.vtk_shared_faces(vtk, dgrid)
-#     FerritePartitionedArrays.vtk_shared_edges(vtk, dgrid) #src
-#     FerritePartitionedArrays.vtk_partitioning(vtk, dgrid)
-# end
+vtk_grid("heat_equation_distributed", dh) do vtk
+    vtk_point_data(vtk, dh, u_local)
+    # For debugging purposes it can be helpful to enrich 
+    # the visualization with some meta  information about 
+    # the grid and its partitioning
+    FerritePartitionedArrays.vtk_shared_vertices(vtk, dgrid)
+    FerritePartitionedArrays.vtk_shared_faces(vtk, dgrid)
+    FerritePartitionedArrays.vtk_shared_edges(vtk, dgrid) #src
+    FerritePartitionedArrays.vtk_partitioning(vtk, dgrid)
+end
 
-# ## Test the result against the manufactured solution                    #src
-# using Test                                                              #src
-# for cell in CellIterator(dh)                                            #src
-#     reinit!(cellvalues, cell)                                           #src
-#     n_basefuncs = getnbasefunctions(cellvalues)                         #src
-#     coords = getcoordinates(cell)                                       #src
-#     map_parts(local_view(u, u.rows)) do u_local                         #src
-#         uₑ = u_local[celldofs(cell)]                                    #src
-#         for q_point in 1:getnquadpoints(cellvalues)                     #src
-#             x = spatial_coordinate(cellvalues, q_point, coords)         #src
-#             for i in 1:n_basefuncs                                      #src
-#                 uₐₙₐ    = prod(cos, x*π/2)+dbc_val                      #src
-#                 uₐₚₚᵣₒₓ = function_value(cellvalues, q_point, uₑ)       #src
-#                 @test isapprox(uₐₙₐ, uₐₚₚᵣₒₓ; atol=1e-1)                #src
-#             end                                                         #src
-#         end                                                             #src
-#     end                                                                 #src
-# end                                                                     #src
-
-# Finally, we gracefully shutdown MPI
-# MPI.Finalize()
+## Test the result against the manufactured solution                    #src
+using Test                                                              #src
+for cell in CellIterator(dh)                                            #src
+    reinit!(cellvalues, cell)                                           #src
+    n_basefuncs = getnbasefunctions(cellvalues)                         #src
+    coords = getcoordinates(cell)                                       #src
+    uₑ = u_local[celldofs(cell)]                                        #src
+    for q_point in 1:getnquadpoints(cellvalues)                         #src
+        x = spatial_coordinate(cellvalues, q_point, coords)             #src
+        for i in 1:n_basefuncs                                          #src
+            uₐₙₐ    = prod(cos, x*π/2)+dbc_val                          #src
+            uₐₚₚᵣₒₓ = function_value(cellvalues, q_point, uₑ)           #src
+            @test isapprox(uₐₙₐ, uₐₚₚᵣₒₓ; atol=1e-1)                    #src
+        end                                                             #src
+    end                                                                 #src
+end                                                                     #src

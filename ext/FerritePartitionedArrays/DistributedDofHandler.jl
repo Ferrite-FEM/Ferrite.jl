@@ -85,8 +85,8 @@ function compute_dof_ownership(dh)
     for (lvi, sv) ∈ get_shared_vertices(dgrid)
         for field_idx in 1:num_fields(dh)
             if Ferrite.has_vertex_dofs(dh, field_idx, lvi)
-                local_dof_indices = Ferrite.vertex_dofs(dh, field_idx, lvi)
-                dof_owner[local_dof_indices] .= compute_owner(dgrid, sv)
+                local_dofs = Ferrite.vertex_dofs(dh, field_idx, lvi)
+                dof_owner[local_dofs] .= compute_owner(dgrid, sv)
             end
         end
     end
@@ -94,8 +94,8 @@ function compute_dof_ownership(dh)
     for (lfi, sf) ∈ get_shared_faces(dgrid)
         for field_idx in 1:num_fields(dh)
             if Ferrite.has_face_dofs(dh, field_idx, lfi)
-                local_dof_indices = Ferrite.face_dofs(dh, field_idx, lfi)
-                dof_owner[local_dof_indices] .= compute_owner(dgrid, sf)
+                local_dofs = Ferrite.face_dofs(dh, field_idx, lfi)
+                dof_owner[local_dofs] .= compute_owner(dgrid, sf)
             end
         end
     end
@@ -103,8 +103,8 @@ function compute_dof_ownership(dh)
     for (lei, se) ∈ get_shared_edges(dgrid)
         for field_idx in 1:num_fields(dh)
             if Ferrite.has_edge_dofs(dh, field_idx, lei)
-                local_dof_indices = Ferrite.edge_dofs(dh, field_idx, lei)
-                dof_owner[local_dof_indices] .= compute_owner(dgrid, se)
+                local_dofs = Ferrite.edge_dofs(dh, field_idx, lei)
+                dof_owner[local_dofs] .= compute_owner(dgrid, se)
             end
         end
     end
@@ -604,31 +604,120 @@ function Ferrite.close!(dh::DistributedDofHandler)
 end
 
 
-function hypre_reorder!(dh::DistributedDofHandler)
-    # Reorder to make local dofs continuous
-    next_local_dof = 1
-    next_nonlocal_dof = num_local_true_dofs(dh)+1
+# Hypre to Ferrite vector
+function hypre_to_ferrite!(u, x, dh)
     my_rank = global_rank(getglobalgrid(dh))
-    permutation = Vector{Int}(undef, dh.ndofs.x)
-    for i ∈ 1:dh.ndofs.x
-        if dh.ldof_to_rank[i] == my_rank
-            permutation[next_local_dof] = i
-            next_local_dof += 1
-        else
-            permutation[next_nonlocal_dof] = i
-            next_nonlocal_dof += 1
+
+    # Helper to gather which global dof and values have to be send to which process
+    gdof_value_send = [Dict{Int,Float64}() for i ∈ 1:MPI.Comm_size(MPI.COMM_WORLD)]
+    # Helper to get the global dof to local dof mapping
+    rank_recv_count = [0 for i∈1:MPI.Comm_size(MPI.COMM_WORLD)]
+    gdof_to_ldof = Dict{Int,Int}()
+
+    next_dof = 1
+    for (ldof,rank) ∈ enumerate(dh.ldof_to_rank)
+        if rank == my_rank
+            u[ldof] = x[next_dof]
+            next_dof += 1
+        else 
+            # We have to sync these later.
+            gdof_to_ldof[dh.ldof_to_gdof[ldof]] = ldof
+            rank_recv_count[rank] += 1
         end
     end
-    cell_dofs = dh.cell_dofs
-    for i in eachindex(cell_dofs)
-        cell_dofs[i] = permutation[cell_dofs[i]]
+
+    # TODO speed this up and better API
+    dgrid = FerritePartitionedArrays.getglobalgrid(dh)
+    for (lvi, sv) ∈ get_shared_vertices(dgrid)
+        my_rank != FerritePartitionedArrays.compute_owner(dgrid, sv) && continue
+        for field_idx in 1:num_fields(dh)
+            if Ferrite.has_vertex_dofs(dh, field_idx, lvi)
+                local_dofs = Ferrite.vertex_dofs(dh, field_idx, lvi)
+                global_dofs = dh.ldof_to_gdof[local_dofs]
+                for receiver_rank ∈ keys(FerritePartitionedArrays.remote_entities(sv))
+                    for i ∈ 1:length(global_dofs)
+                        # Note that u already has the correct values for all locally owned dofs due to the loop above!
+                        gdof_value_send[receiver_rank][global_dofs[i]] = u[local_dofs[i]]
+                    end
+                end
+            end
+        end
     end
 
-    dh.ldof_to_rank .= dh.ldof_to_rank[permutation]  
-    Ferrite.@debug println("Updated dof ranks: $(dh.ldof_to_rank) (R$my_rank)")
-    dh.ldof_to_gdof .= dh.ldof_to_gdof[permutation]
-    Ferrite.@debug println("Updated local to global: $(dh.ldof_to_gdof) (R$my_rank)")
+    for (lvi, se) ∈ get_shared_edges(dgrid)
+        my_rank != FerritePartitionedArrays.compute_owner(dgrid, se) && continue
+        for field_idx in 1:num_fields(dh)
+            if Ferrite.has_edge_dofs(dh, field_idx, lvi)
+                local_dofs = Ferrite.edge_dofs(dh, field_idx, lvi)
+                global_dofs = dh.ldof_to_gdof[local_dofs]
+                for receiver_rank ∈ keys(FerritePartitionedArrays.remote_entities(se))
+                    for i ∈ 1:length(global_dofs)
+                        # Note that u already has the correct values for all locally owned dofs due to the loop above!
+                        gdof_value_send[receiver_rank][global_dofs[i]] = u[local_dofs[i]]
+                    end
+                end
+            end
+        end
+    end
+    
+    for (lvi, sf) ∈ get_shared_faces(dgrid)
+        my_rank != FerritePartitionedArrays.compute_owner(dgrid, sf) && continue
+        for field_idx in 1:num_fields(dh)
+            if Ferrite.has_face_dofs(dh, field_idx, lvi)
+                local_dofs = Ferrite.face_dofs(dh, field_idx, lvi)
+                global_dofs = dh.ldof_to_gdof[local_dofs]
+                for receiver_rank ∈ keys(FerritePartitionedArrays.remote_entities(sf))
+                    for i ∈ 1:length(global_dofs)
+                        # Note that u already has the correct values for all locally owned dofs due to the loop above!
+                        gdof_value_send[receiver_rank][global_dofs[i]] = u[local_dofs[i]]
+                    end
+                end
+            end
+        end
+    end
+
+    Ferrite.@debug println("preparing to distribute $gdof_value_send (R$my_rank)")
+
+    # TODO precompute graph at it is static
+    graph_source   = Cint[my_rank-1]
+    graph_dest   = Cint[]
+    for r ∈ 1:MPI.Comm_size(MPI.COMM_WORLD)
+        !isempty(gdof_value_send[r]) && push!(graph_dest, r-1)
+    end
+
+    graph_degree = Cint[length(graph_dest)]
+    graph_comm = MPI.Dist_graph_create(MPI.COMM_WORLD, graph_source, graph_degree, graph_dest)
+    indegree, outdegree, _ = MPI.Dist_graph_neighbors_count(graph_comm)
+
+    inranks = Vector{Cint}(undef, indegree)
+    outranks = Vector{Cint}(undef, outdegree)
+    MPI.Dist_graph_neighbors!(graph_comm, inranks, outranks)
+
+    send_count = [length(gdof_value_send[outrank+1]) for outrank ∈ outranks]
+    recv_count = [rank_recv_count[inrank+1] for inrank ∈ inranks]
+
+    send_gdof = Cint[]
+    for outrank ∈ outranks
+        append!(send_gdof, Cint.(keys(gdof_value_send[outrank+1])))
+    end
+    recv_gdof = Vector{Cint}(undef, sum(recv_count))
+    MPI.Neighbor_alltoallv!(VBuffer(send_gdof,send_count), VBuffer(recv_gdof,recv_count), graph_comm)
+
+    send_val = Cdouble[]
+    for outrank ∈ outranks
+        append!(send_val, Cdouble.(values(gdof_value_send[outrank+1])))
+    end
+    recv_val = Vector{Cdouble}(undef, sum(recv_count))
+    MPI.Neighbor_alltoallv!(VBuffer(send_val,send_count), VBuffer(recv_val,recv_count), graph_comm)
+
+    for (gdof, val) ∈ zip(recv_gdof, recv_val)
+        u[gdof_to_ldof[gdof]] = val
+    end
+
+    return u
 end
+
+
 
 function WriteVTK.vtk_grid(filename::AbstractString, dh::DistributedDofHandler; compress::Bool=true)
     vtk_grid(filename, getglobalgrid(dh); compress=compress)
