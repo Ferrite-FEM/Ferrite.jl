@@ -1,3 +1,6 @@
+function Ferrite.create_sparsity_pattern(::Type{<:PSparseMatrix}, dh::Ferrite.AbstractDofHandler, ch::Union{ConstraintHandler,Nothing}=nothing; kwargs...)
+    error("Not implemented.")
+end
 
 """
 Simplest partitioned assembler in COO format to obtain a PSparseMatrix and a PVector.

@@ -7,7 +7,7 @@ struct SharedVertex <: Ferrite.SharedEntity
     remote_vertices::Dict{Int,Vector{VertexIndex}}
 end
 
-@inline remote_entities(sv::SharedVertex) = sv.remote_vertices
+@inline Ferrite.remote_entities(sv::SharedVertex) = sv.remote_vertices
 
 """
 """
@@ -16,7 +16,7 @@ struct SharedFace <: Ferrite.SharedEntity
     remote_faces::Dict{Int,Vector{FaceIndex}}
 end
 
-@inline remote_entities(sf::SharedFace) = sf.remote_faces
+@inline Ferrite.remote_entities(sf::SharedFace) = sf.remote_faces
 
 """
 """
@@ -25,7 +25,7 @@ struct SharedEdge <: Ferrite.SharedEntity
     remote_edges::Dict{Int,Vector{EdgeIndex}}
 end
 
-@inline remote_entities(se::SharedEdge) = se.remote_edges
+@inline Ferrite.remote_entities(se::SharedEdge) = se.remote_edges
 
 """
 @TODO docs

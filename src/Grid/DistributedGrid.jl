@@ -2,17 +2,19 @@
 """
 abstract type AbstractDistributedGrid{sdim} <: AbstractGrid{sdim} end
 
+"""
+"""
+abstract type SharedEntity end
+
 #TODO remove. This is a temporary workaround to make the transient extensions work.
 global_comm(::AbstractDistributedGrid) = error("Not implemented.")
 interface_comm(::AbstractDistributedGrid) = error("Not implemented.")
 global_rank(::AbstractDistributedGrid) = error("Not implemented.")
 compute_owner(::AbstractDistributedGrid) = error("Not implemented.")
-
+remote_entities(::SharedEntity) = error("Not implemented.")
 
 """
 """
-abstract type SharedEntity end
-
 @inline get_shared_vertices(dgrid::AbstractDistributedGrid) = dgrid.shared_vertices
 @inline get_shared_edges(dgrid::AbstractDistributedGrid) = dgrid.shared_edges
 @inline get_shared_faces(dgrid::AbstractDistributedGrid) = dgrid.shared_faces
