@@ -150,6 +150,13 @@ getfielddim(dh::AbstractDofHandler, field_idx::Int) = dh.field_dims[field_idx]
 getbcvalue(dh::AbstractDofHandler, field_idx::Int) = dh.bc_values[field_idx]
 getgrid(dh::AbstractDofHandler) = dh.grid
 
+# INTERNAL API - MIGHT BE MOVED IN THE FUTURE
+num_local_true_dofs(dh::AbstractDofHandler) = dh.ndofs
+num_local_dofs(dh::AbstractDofHandler) = dh.ndofs
+num_global_dofs(dh::AbstractDofHandler) = error("Not implemented.")
+getglobalgrid(dh::AbstractDofHandler) = error("Not implemented.")
+local_dof_range(dh::AbstractDofHandler) = error("Not implemented.")
+
 function find_field(dh::AbstractDofHandler, field_name::Symbol)
     j = findfirst(i->i == field_name, dh.field_names)
     j === nothing && error("could not find field :$field_name in DofHandler (existing fields: $(getfieldnames(dh)))")

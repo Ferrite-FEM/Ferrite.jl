@@ -4,6 +4,8 @@ Module containing the code for a non-overlapping grid and the corresponding dof 
 module FerriteMPI
 
 using Ferrite
+# TODO remove me. These are merely hotfixes to split the extensions trasiently via an internal API.
+import Ferrite: getglobalgrid, num_global_dofs, num_global_dofs, num_local_dofs, num_local_true_dofs, global_comm, interface_comm, global_rank, compute_owner, local_dof_range
 using Metis
 using MPI
 using Base: @propagate_inbounds

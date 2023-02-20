@@ -29,7 +29,7 @@ end
 """
 Compute the global dof range of the dofs owned by the calling process. It is guaranteed to be continuous.
 """
-function local_dof_range(dh::DistributedDofHandler)
+function Ferrite.local_dof_range(dh::DistributedDofHandler)
     my_rank = global_rank(getglobalgrid(dh))
     ltdofs = dh.ldof_to_gdof[dh.ldof_to_rank .== my_rank]
     return minimum(ltdofs):maximum(ltdofs)
@@ -60,7 +60,7 @@ end
 Ferrite.getdim(dh::DistributedDofHandler{dim}) where {dim} = dim 
 
 Ferrite.getlocalgrid(dh::DistributedDofHandler) = Ferrite.getlocalgrid(dh.grid)
-getglobalgrid(dh::DistributedDofHandler) = dh.grid
+Ferrite.getglobalgrid(dh::DistributedDofHandler) = dh.grid
 
 # Compat layer against serial code
 Ferrite.getgrid(dh::DistributedDofHandler) = getlocalgrid(dh)
@@ -112,17 +112,17 @@ end
 """
 Compute the number of dofs owned by the current process.
 """
-num_local_true_dofs(dh::DistributedDofHandler) = sum(dh.ldof_to_rank .== global_rank(getglobalgrid(dh)))
+Ferrite.num_local_true_dofs(dh::DistributedDofHandler) = sum(dh.ldof_to_rank .== global_rank(getglobalgrid(dh)))
 
 """
 Compute the number of dofs visible to the current process.
 """
-num_local_dofs(dh::DistributedDofHandler) = length(dh.ldof_to_gdof)
+Ferrite.num_local_dofs(dh::DistributedDofHandler) = length(dh.ldof_to_gdof)
 
 """
 Compute the number of dofs in the global system.
 """
-num_global_dofs(dh::DistributedDofHandler) = MPI.Allreduce(num_local_true_dofs(dh), MPI.SUM, global_comm(getglobalgrid(dh)))
+Ferrite.num_global_dofs(dh::DistributedDofHandler) = MPI.Allreduce(num_local_true_dofs(dh), MPI.SUM, global_comm(getglobalgrid(dh)))
 
 """
 Renumber the dofs in local ordering to their corresponding global numbering.
@@ -625,14 +625,14 @@ function hypre_to_ferrite!(u, x, dh)
     end
 
     # TODO speed this up and better API
-    dgrid = FerritePartitionedArrays.getglobalgrid(dh)
+    dgrid = getglobalgrid(dh)
     for (lvi, sv) ∈ get_shared_vertices(dgrid)
-        my_rank != FerritePartitionedArrays.compute_owner(dgrid, sv) && continue
+        my_rank != compute_owner(dgrid, sv) && continue
         for field_idx in 1:num_fields(dh)
             if Ferrite.has_vertex_dofs(dh, field_idx, lvi)
                 local_dofs = Ferrite.vertex_dofs(dh, field_idx, lvi)
                 global_dofs = dh.ldof_to_gdof[local_dofs]
-                for receiver_rank ∈ keys(FerritePartitionedArrays.remote_entities(sv))
+                for receiver_rank ∈ keys(remote_entities(sv))
                     for i ∈ 1:length(global_dofs)
                         # Note that u already has the correct values for all locally owned dofs due to the loop above!
                         gdof_value_send[receiver_rank][global_dofs[i]] = u[local_dofs[i]]
@@ -643,12 +643,12 @@ function hypre_to_ferrite!(u, x, dh)
     end
 
     for (lvi, se) ∈ get_shared_edges(dgrid)
-        my_rank != FerritePartitionedArrays.compute_owner(dgrid, se) && continue
+        my_rank != compute_owner(dgrid, se) && continue
         for field_idx in 1:num_fields(dh)
             if Ferrite.has_edge_dofs(dh, field_idx, lvi)
                 local_dofs = Ferrite.edge_dofs(dh, field_idx, lvi)
                 global_dofs = dh.ldof_to_gdof[local_dofs]
-                for receiver_rank ∈ keys(FerritePartitionedArrays.remote_entities(se))
+                for receiver_rank ∈ keys(remote_entities(se))
                     for i ∈ 1:length(global_dofs)
                         # Note that u already has the correct values for all locally owned dofs due to the loop above!
                         gdof_value_send[receiver_rank][global_dofs[i]] = u[local_dofs[i]]
@@ -659,12 +659,12 @@ function hypre_to_ferrite!(u, x, dh)
     end
     
     for (lvi, sf) ∈ get_shared_faces(dgrid)
-        my_rank != FerritePartitionedArrays.compute_owner(dgrid, sf) && continue
+        my_rank != compute_owner(dgrid, sf) && continue
         for field_idx in 1:num_fields(dh)
             if Ferrite.has_face_dofs(dh, field_idx, lvi)
                 local_dofs = Ferrite.face_dofs(dh, field_idx, lvi)
                 global_dofs = dh.ldof_to_gdof[local_dofs]
-                for receiver_rank ∈ keys(FerritePartitionedArrays.remote_entities(sf))
+                for receiver_rank ∈ keys(remote_entities(sf))
                     for i ∈ 1:length(global_dofs)
                         # Note that u already has the correct values for all locally owned dofs due to the loop above!
                         gdof_value_send[receiver_rank][global_dofs[i]] = u[local_dofs[i]]
@@ -713,10 +713,4 @@ function hypre_to_ferrite!(u, x, dh)
     end
 
     return u
-end
-
-
-
-function WriteVTK.vtk_grid(filename::AbstractString, dh::DistributedDofHandler; compress::Bool=true)
-    vtk_grid(filename, getglobalgrid(dh); compress=compress)
 end

@@ -2,6 +2,13 @@
 """
 abstract type AbstractDistributedGrid{sdim} <: AbstractGrid{sdim} end
 
+#TODO remove. This is a temporary workaround to make the transient extensions work.
+global_comm(::AbstractDistributedGrid) = error("Not implemented.")
+interface_comm(::AbstractDistributedGrid) = error("Not implemented.")
+global_rank(::AbstractDistributedGrid) = error("Not implemented.")
+compute_owner(::AbstractDistributedGrid) = error("Not implemented.")
+
+
 """
 """
 abstract type SharedEntity end

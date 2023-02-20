@@ -49,18 +49,18 @@ end
 """
 Global dense communicator of the distributed grid.
 """
-@inline global_comm(dgrid::DistributedGrid) = dgrid.grid_comm
+@inline Ferrite.global_comm(dgrid::DistributedGrid) = dgrid.grid_comm
 
 """
 Graph communicator for shared vertices. Guaranteed to be derived from the communicator 
 returned by @global_comm .
 """
-@inline interface_comm(dgrid::DistributedGrid) = dgrid.interface_comm
+@inline Ferrite.interface_comm(dgrid::DistributedGrid) = dgrid.interface_comm
 
 """
 Get the rank on the global communicator of the distributed grid.
 """
-@inline global_rank(dgrid::DistributedGrid) =  MPI.Comm_rank(global_comm(dgrid))+1
+@inline Ferrite.global_rank(dgrid::DistributedGrid) =  MPI.Comm_rank(global_comm(dgrid))+1
 
 """
 """
@@ -332,7 +332,7 @@ end
 
 
 # Here we define the entity ownership by the process sharing an entity with lowest rank in the grid communicator.
-function compute_owner(dgrid::Ferrite.AbstractDistributedGrid, shared_entity::Ferrite.SharedEntity)::Int32
+function Ferrite.compute_owner(dgrid::Ferrite.AbstractDistributedGrid, shared_entity::Ferrite.SharedEntity)::Int32
     my_rank = MPI.Comm_rank(global_comm(dgrid))+1 # Shift rank up by 1 to match Julia's indexing convention
     return minimum([my_rank; [remote_rank for (remote_rank, _) ∈ remote_entities(shared_entity)]])
 end

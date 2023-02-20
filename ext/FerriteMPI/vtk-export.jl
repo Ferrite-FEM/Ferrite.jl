@@ -1,5 +1,12 @@
 """
 """
+function WriteVTK.vtk_grid(filename::AbstractString, dh::DistributedDofHandler; compress::Bool=true)
+    vtk_grid(filename, getglobalgrid(dh); compress=compress)
+end
+
+
+"""
+"""
 function WriteVTK.vtk_grid(filename::AbstractString, dgrid::DistributedGrid{dim,C,T}; compress::Bool=true) where {dim,C,T}
     part   = MPI.Comm_rank(global_comm(dgrid))+1
     nparts = MPI.Comm_size(global_comm(dgrid))
@@ -10,14 +17,6 @@ function WriteVTK.vtk_grid(filename::AbstractString, dgrid::DistributedGrid{dim,
     end
     coords = reshape(reinterpret(T, getnodes(dgrid)), (dim, getnnodes(dgrid)))
     return pvtk_grid(filename, coords, cls; part=part, nparts=nparts, compress=compress)
-end
-
-"""
-"""
-function WriteVTK.vtk_point_data(vtk, dh::Ferrite.AbstractDofHandler, u::PVector)
-    map_parts(local_view(u, u.rows)) do u_local
-        vtk_point_data(Ferrite.pvtkwrapper(vtk), dh, u_local)
-    end
 end
 
 """
