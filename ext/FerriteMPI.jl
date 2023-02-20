@@ -10,7 +10,7 @@ using Metis
 using MPI
 using Base: @propagate_inbounds
 
-include("FerriteMPI/grid.jl")
+include("FerriteMPI/DistributedGrid.jl")
 include("FerriteMPI/DistributedDofHandler.jl")
 include("FerriteMPI/iterators.jl")
 include("FerriteMPI/vtk-export.jl")
