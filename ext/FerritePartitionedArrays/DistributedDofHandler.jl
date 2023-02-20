@@ -26,7 +26,19 @@ struct DistributedDofHandler{dim,T,G<:Ferrite.AbstractDistributedGrid{dim}} <: F
     ldof_to_rank::Vector{Int32}
 end
 
-function DistributedDofHandler(grid::Ferrite.AbstractDistributedGrid{dim}) where {dim}
+"""
+Compute the global dof range of the dofs owned by the calling process. It is guaranteed to be continuous.
+"""
+function local_dof_range(dh::DistributedDofHandler)
+    my_rank = global_rank(getglobalgrid(dh))
+    ltdofs = dh.ldof_to_gdof[dh.ldof_to_rank .== my_rank]
+    return minimum(ltdofs):maximum(ltdofs)
+end
+
+"""
+Construct the correct distributed dof handler from a given distributed grid.
+"""
+function Ferrite.DofHandler(grid::Ferrite.AbstractDistributedGrid{dim}) where {dim}
     isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. DistributedMixedDofHandler not implemented yet.")
     DistributedDofHandler(Symbol[], Int[], Interpolation[], Ferrite.BCValues{Float64}[], Int[], Int[], Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1), Int[], Int32[])
 end
@@ -53,32 +65,14 @@ getglobalgrid(dh::DistributedDofHandler) = dh.grid
 # Compat layer against serial code
 Ferrite.getgrid(dh::DistributedDofHandler) = getlocalgrid(dh)
 
-# TODO this is copy pasta from DofHandler.jl
-function Ferrite.celldofs!(global_dofs::Vector{Int}, dh::DistributedDofHandler, i::Int)
-    @assert Ferrite.isclosed(dh)
-    @assert length(global_dofs) == ndofs_per_cell(dh, i)
-    unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
-    return global_dofs
-end
-
-# TODO this is copy pasta from DofHandler.jl
-Ferrite.cellcoords!(global_coords::Vector{<:Vec}, dh::DistributedDofHandler, i::Int) = cellcoords!(global_coords, getgrid(dh), i)
-
-# TODO this is copy pasta from DofHandler.jl
-function Ferrite.celldofs(dh::DistributedDofHandler, i::Int)
-    @assert Ferrite.isclosed(dh)
-    n = ndofs_per_cell(dh, i)
-    global_dofs = zeros(Int, n)
-    unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], n)
-    return global_dofs
-end
-
+# TODO problem here is that the reorder has to be synchronized. We also cannot arbitrary reorder dofs, 
+# because some distributed matrix data structures have strict requirements on the orderings.
 Ferrite.renumber!(dh::DistributedDofHandler, perm::AbstractVector{<:Integer}) = error("Not implemented.")
 
 """
 TODO fix for shells
 """
-function compute_dof_ownership(dh)
+function compute_dof_ownership(dh::DistributedDofHandler)
     dgrid = getglobalgrid(dh)
     my_rank = global_rank(dgrid)
 
@@ -600,6 +594,7 @@ function local_to_global_numbering(dh::DistributedDofHandler)
 end
 
 function Ferrite.close!(dh::DistributedDofHandler)
+    # We could merge these functions into an optimized one if we want.
     Ferrite.__close!(dh)
     append!(dh.ldof_to_rank, compute_dof_ownership(dh))
     append!(dh.ldof_to_gdof, local_to_global_numbering(dh))

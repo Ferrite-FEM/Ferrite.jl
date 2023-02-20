@@ -55,8 +55,11 @@ Global dense communicator of the distributed grid.
 Graph communicator for shared vertices. Guaranteed to be derived from the communicator 
 returned by @global_comm .
 """
-@inline vertex_comm(dgrid::DistributedGrid) = dgrid.interface_comm
+@inline interface_comm(dgrid::DistributedGrid) = dgrid.interface_comm
 
+"""
+Get the rank on the global communicator of the distributed grid.
+"""
 @inline global_rank(dgrid::DistributedGrid) =  MPI.Comm_rank(global_comm(dgrid))+1
 
 """

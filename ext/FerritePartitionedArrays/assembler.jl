@@ -15,9 +15,6 @@ struct COOAssembler{T}
     dh
 
     # TODO PartitionedArrays backend as additional input arg
-    COOAssembler(dh::DistributedDofHandler) = COOAssembler{Float64}(dh)
-
-    # TODO PartitionedArrays backend as additional input arg
     function COOAssembler{T}(dh::DistributedDofHandler) where {T}
         ldof_to_gdof = dh.ldof_to_gdof
         ldof_to_rank = dh.ldof_to_rank
@@ -43,10 +40,10 @@ struct COOAssembler{T}
 
         # Neighborhood graph
         # @TODO cleanup old code below and use graph primitives instead.
-        (source_len, destination_len, _) = MPI.Dist_graph_neighbors_count(vertex_comm(dgrid))
+        (source_len, destination_len, _) = MPI.Dist_graph_neighbors_count(interface_comm(dgrid))
         sources = Vector{Cint}(undef, source_len)
         destinations = Vector{Cint}(undef, destination_len)
-        MPI.Dist_graph_neighbors!(vertex_comm(dgrid), sources, destinations)
+        MPI.Dist_graph_neighbors!(interface_comm(dgrid), sources, destinations)
 
         # Adjust to Julia index convention
         sources .+= 1
@@ -210,7 +207,7 @@ struct COOAssembler{T}
 
         ghost_send_buffer_lengths = Int[length(i) for i ∈ ghost_dof_to_send]
         ghost_recv_buffer_lengths = zeros(Int, destination_len)
-        MPI.Neighbor_alltoall!(UBuffer(ghost_send_buffer_lengths,1), UBuffer(ghost_recv_buffer_lengths,1), vertex_comm(dgrid));
+        MPI.Neighbor_alltoall!(UBuffer(ghost_send_buffer_lengths,1), UBuffer(ghost_recv_buffer_lengths,1), interface_comm(dgrid));
         Ferrite.@debug for (i,ghost_recv_buffer_length) ∈ enumerate(ghost_recv_buffer_lengths)
             println("receiving $ghost_recv_buffer_length ghosts from $(sources[i])  (R$my_rank)")
         end
@@ -219,19 +216,19 @@ struct COOAssembler{T}
         # @TODO coalesce communication
         ghost_send_buffer_dofs = vcat(ghost_dof_to_send...)
         ghost_recv_buffer_dofs = zeros(Int, sum(ghost_recv_buffer_lengths))
-        MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_dofs,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_dofs,ghost_recv_buffer_lengths), vertex_comm(dgrid))
+        MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_dofs,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_dofs,ghost_recv_buffer_lengths), interface_comm(dgrid))
 
         ghost_send_buffer_fields = vcat(ghost_dof_field_index_to_send...)
         ghost_recv_buffer_fields = zeros(Int, sum(ghost_recv_buffer_lengths))
-        MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_fields,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_fields,ghost_recv_buffer_lengths), vertex_comm(dgrid))
+        MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_fields,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_fields,ghost_recv_buffer_lengths), interface_comm(dgrid))
 
         ghost_send_buffer_ranks = vcat(ghost_rank_to_send...)
         ghost_recv_buffer_ranks = zeros(Int, sum(ghost_recv_buffer_lengths))
-        MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_ranks,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_ranks,ghost_recv_buffer_lengths), vertex_comm(dgrid))
+        MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_ranks,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_ranks,ghost_recv_buffer_lengths), interface_comm(dgrid))
 
         ghost_send_buffer_dofs_piv = vcat(ghost_dof_pivot_to_send...)
         ghost_recv_buffer_dofs_piv = zeros(Int, sum(ghost_recv_buffer_lengths))
-        MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_dofs_piv,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_dofs_piv,ghost_recv_buffer_lengths), vertex_comm(dgrid))
+        MPI.Neighbor_alltoallv!(VBuffer(ghost_send_buffer_dofs_piv,ghost_send_buffer_lengths), VBuffer(ghost_recv_buffer_dofs_piv,ghost_recv_buffer_lengths), interface_comm(dgrid))
 
         # Reconstruct source ranks
         ghost_recv_buffer_source_ranks = Int[]
@@ -272,6 +269,8 @@ struct COOAssembler{T}
     end
 end
 
+Ferrite.start_assemble(dh::DistributedDofHandler, _::MPIBackend) = COOAssembler{Float64}(dh)
+    
 @propagate_inbounds function Ferrite.assemble!(a::COOAssembler{T}, edof::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
     n_dofs = length(edof)
     append!(a.V, Ke)

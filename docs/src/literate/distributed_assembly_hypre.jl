@@ -23,7 +23,6 @@ MPI.Init()
 HYPRE.Init()
 
 function Ferrite.create_sparsity_pattern(::Type{<:HYPREMatrix}, dh::DofHandler, ch::Union{ConstraintHandler,Nothing}=nothing; kwargs...)
-    println("Ferrite.create_sparsity_pattern")
     K = create_sparsity_pattern(dh, ch; kwargs...)
     fill!(K.nzval, 1)
     return HYPREMatrix(K)
@@ -41,20 +40,20 @@ Ferrite.matrix_handle(a::HYPREAssembler) = a.A.A.A # :)
 Ferrite.vector_handle(a::HYPREAssembler) = a.A.b.b # :)
 
 function Ferrite.start_assemble(K::HYPREMatrix, f::HYPREVector)
-    println("Ferrite.start_assemble")
     return HYPREAssembler(HYPRE.start_assemble!(K, f))
 end
 
 function Ferrite.assemble!(a::HYPREAssembler, dofs::AbstractVector{<:Integer}, ke::AbstractMatrix, fe::AbstractVector)
-    println("Ferrite.assemble!")
     HYPRE.assemble!(a.A, dofs, ke, fe)
 end
 
+function Ferrite.end_assemble(a::HYPREAssembler)
+    HYPRE.finish_assemble!(a.A)
+end
 
 ## Methods for arrayutils.jl ##
 
 function Ferrite.addindex!(A::HYPREMatrix, v, i::Int, j::Int)
-    println("Ferrite.addindex!")
     nrows = HYPRE_Int(1)
     ncols = Ref{HYPRE_Int}(1)
     rows = Ref{HYPRE_BigInt}(i)
@@ -65,7 +64,6 @@ function Ferrite.addindex!(A::HYPREMatrix, v, i::Int, j::Int)
 end
 
 function Ferrite.addindex!(b::HYPREVector, v, i::Int)
-    println("Ferrite.addindex!")
     nvalues = HYPRE_Int(1)
     indices = Ref{HYPRE_BigInt}(i)
     values = Ref{HYPRE_Complex}(v)
@@ -98,12 +96,9 @@ cellvalues = CellScalarValues(qr, ip, ip_geo);
 # ### Degrees of freedom
 # To handle the dofs correctly we now utilize the `DistributedDofHandle` 
 # instead of the `DofHandler`. For the user the interface is the same.
-dh = FerritePartitionedArrays.DistributedDofHandler(dgrid)
+dh = DofHandler(dgrid)
 push!(dh, :u, 1, ip)
 close!(dh);
-# Hypre needs locally continuous indices.
-#TODO I think we can eliminate this one easily.
-# FerritePartitionedArrays.hypre_reorder!(dh);
 
 # ### Boundary conditions
 # Nothing has to be changed here either.
@@ -115,10 +110,6 @@ dbc_val = 0 #src
 dbc = Dirichlet(:u, ∂Ω, (x, t) -> dbc_val) #src
 add!(ch, dbc);
 close!(ch)
-# update!(ch, 0.0);
-
-my_rank = MPI.Comm_rank(MPI.COMM_WORLD)+1
-# println("R$my_rank: prescribing $(ch.prescribed_dofs) on $∂Ω")
 
 # ### Assembling the linear system
 # Assembling the system works also mostly analogue.
@@ -127,24 +118,19 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::FerritePartitionedArr
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
 
-    # comm = global_comm(getglobalgrid(dh))
-    comm = MPI.COMM_WORLD
-    ltdofs = dh.ldof_to_gdof[dh.ldof_to_rank .== my_rank]
-    ilower = minimum(ltdofs)
-    iupper = maximum(ltdofs)
-    # ilower = dh.ldof_to_gdof[1]
-    # iupper = dh.ldof_to_gdof[1]+FerritePartitionedArrays.num_local_true_dofs(dh)-1
-    @show ilower, iupper
-    K = HYPREMatrix(comm, ilower, iupper)
-    f = HYPREVector(comm, ilower, iupper)
-
     # --------------------- Distributed assembly --------------------
     # The synchronization with the global sparse matrix is handled by 
     # an assembler again. You can choose from different backends, which
     # are described in the docs and will be expaned over time. This call
     # may trigger a large amount of communication.
-    # NOTE: At the time of writing the only backend available is a COO 
-    #       assembly via PartitionedArrays.jl .
+
+    # TODO how to put this into an interface.
+    dgrid = FerritePartitionedArrays.getglobalgrid(dh)
+    comm = FerritePartitionedArrays.global_comm(dgrid)
+    ldofrange = FerritePartitionedArrays.local_dof_range(dh)
+    K = HYPREMatrix(comm, first(ldofrange), last(ldofrange))
+    f = HYPREVector(comm, first(ldofrange), last(ldofrange))
+
     assembler = start_assemble(K, f)
 
     # For the local assembly nothing changes
@@ -173,13 +159,16 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::FerritePartitionedArr
         end
 
         apply_local!(Ke, fe, celldofs(cell), ch)
+        
+        # TODO how to put this into an interface.
         Ferrite.assemble!(assembler, dh.ldof_to_gdof[celldofs(cell)], fe, Ke)
     end
 
-    # Finally, for the `PartitionedArraysCOOAssembler` we have to call
+    # Finally, for the `HYPREAssembler` we have to call
     # `end_assemble` to construct the global sparse matrix and the global
     # right hand side vector.
-    HYPRE.finish_assemble!(assembler.A)
+    end_assemble(assembler)
+
     return K, f
 end
 #md nothing # hide
@@ -192,6 +181,7 @@ precond = HYPRE.BoomerAMG()
 solver = HYPRE.PCG(; Precond = precond)
 uh = HYPRE.solve(solver, K, f)
 
+# TODO how to put this into an interface.
 # Copy solution from HYPRE to Julia
 uj = Vector{Float64}(undef, FerritePartitionedArrays.num_local_true_dofs(dh))
 copy!(uj, uh)

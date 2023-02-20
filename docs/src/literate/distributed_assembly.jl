@@ -46,7 +46,7 @@ cellvalues = CellScalarValues(qr, ip, ip_geo);
 # ### Degrees of freedom
 # To handle the dofs correctly we now utilize the `DistributedDofHandle` 
 # instead of the `DofHandler`. For the user the interface is the same.
-dh = FerritePartitionedArrays.DistributedDofHandler(dgrid)
+dh = DofHandler(dgrid)
 add!(dh, :u, 1, ip)
 close!(dh);
 
@@ -63,7 +63,6 @@ close!(ch)
 update!(ch, 0.0);
 
 my_rank = MPI.Comm_rank(MPI.COMM_WORLD)
-println("R$my_rank: prescribing $(ch.prescribed_dofs) on $∂Ω")
 
 # ### Assembling the linear system
 # Assembling the system works also mostly analogue.
@@ -79,7 +78,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::FerritePartitionedArr
     # may trigger a large amount of communication.
     # NOTE: At the time of writing the only backend available is a COO 
     #       assembly via PartitionedArrays.jl .
-    assembler = FerritePartitionedArrays.COOAssembler{Float64}(dh)
+    assembler = start_assemble(dh, MPIBackend())
 
     # For the local assembly nothing changes
     for cell in CellIterator(dh)
@@ -127,22 +126,6 @@ apply!(K, f, ch)
 # Additional note: At the moment of writing this we have no good preconditioners for PSparseMatrix in Julia, 
 # partly due to unimplemented multiplication operators for the matrix data type.
 u = cg(K, f)
-
-#FIXME #src
-# Compute the solution with HYPRE (needs the hotfix in https://github.com/fredrikekre/HYPRE.jl/pull/4 to function partially) #src
-# u_ = HYPRE.solve(                         #src
-#     HYPRE.PCG(                            #src
-#         global_comm(dgrid);               #src
-#         Precond = HYPRE.BoomerAMG()       #src
-#     ),                                    #src
-#     HYPRE.HYPREMatrix(K),                 #src
-#     HYPRE.HYPREVector(f)                  #src
-# )
-
-# Convert back to PartitionedArrays vector #src
-# u = PVector(0.0, K.cols) #src
-# copy!(u, u_) #src
-# PartitionedArrays.assemble!(u) #src
 
 # ### Exporting via PVTK
 # To visualize the result we export the grid and our field `u`
