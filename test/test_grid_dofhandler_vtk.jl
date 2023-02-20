@@ -424,6 +424,10 @@ end
     test_coloring(generate_grid(Hexahedron, (5, 5, 5)), Set{Int}(1:3^3))
     # unconnected subset
     test_coloring(generate_grid(Triangle, (10, 10)), union(Set(1:10), Set(70:80)))
+
+    #Special case with zero or one element in the sets
+    test_coloring(generate_grid(Quadrilateral, (2, 2)), [1])
+    test_coloring(generate_grid(Quadrilateral, (2, 2)), [])
 end
 
 @testset "DoF distribution" begin
