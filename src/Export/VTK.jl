@@ -130,3 +130,8 @@ function WriteVTK.vtk_point_data(vtkfile, dh::AbstractDofHandler, u::Vector, suf
 
     return vtkfile
 end
+
+vtk_shared_vertices(vtk, ::AbstractDistributedGrid) = error("Not implemented.")
+vtk_shared_faces(vtk, ::AbstractDistributedGrid) = error("Not implemented.")
+vtk_shared_edges(vtk, ::AbstractDistributedGrid) = error("Not implemented.")
+vtk_partitioning(vtk, ::AbstractDistributedGrid) = error("Not implemented.")

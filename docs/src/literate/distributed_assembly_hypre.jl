@@ -198,10 +198,10 @@ vtk_grid("heat_equation_distributed", dh) do vtk
     # For debugging purposes it can be helpful to enrich 
     # the visualization with some meta  information about 
     # the grid and its partitioning
-    FerritePartitionedArrays.vtk_shared_vertices(vtk, dgrid)
-    FerritePartitionedArrays.vtk_shared_faces(vtk, dgrid)
-    FerritePartitionedArrays.vtk_shared_edges(vtk, dgrid) #src
-    FerritePartitionedArrays.vtk_partitioning(vtk, dgrid)
+    vtk_shared_vertices(vtk, dgrid)
+    vtk_shared_faces(vtk, dgrid)
+    vtk_shared_edges(vtk, dgrid) #src
+    vtk_partitioning(vtk, dgrid)
 end
 
 ## Test the result against the manufactured solution                    #src

@@ -23,7 +23,7 @@ end
 """
 Enrich the VTK file with meta information about shared vertices.
 """
-function vtk_shared_vertices(vtk, dgrid::DistributedGrid)
+function Ferrite.vtk_shared_vertices(vtk, dgrid::DistributedGrid)
     u = Vector{Float64}(undef, getnnodes(dgrid))
     my_rank = MPI.Comm_rank(global_comm(dgrid))+1
     for rank ∈ 1:MPI.Comm_size(global_comm(dgrid))
@@ -43,7 +43,7 @@ end
 """
 Enrich the VTK file with meta information about shared faces.
 """
-function vtk_shared_faces(vtk, dgrid::DistributedGrid)
+function Ferrite.vtk_shared_faces(vtk, dgrid::DistributedGrid)
     u = Vector{Float64}(undef, getnnodes(dgrid))
     my_rank = MPI.Comm_rank(global_comm(dgrid))+1
     for rank ∈ 1:MPI.Comm_size(global_comm(dgrid))
@@ -64,7 +64,7 @@ end
 """
 Enrich the VTK file with meta information about shared edges.
 """
-function vtk_shared_edges(vtk, dgrid::DistributedGrid)
+function Ferrite.vtk_shared_edges(vtk, dgrid::DistributedGrid)
     u = Vector{Float64}(undef, getnnodes(dgrid))
     my_rank = MPI.Comm_rank(global_comm(dgrid))+1
     for rank ∈ 1:MPI.Comm_size(global_comm(dgrid))
@@ -84,7 +84,7 @@ end
 """
 Enrich the VTK file with partitioning meta information.
 """
-function vtk_partitioning(vtk, dgrid::DistributedGrid)
+function Ferrite.vtk_partitioning(vtk, dgrid::DistributedGrid)
     u  = Vector{Float64}(undef, getncells(dgrid))
     u .= MPI.Comm_rank(global_comm(dgrid))+1
     vtk_cell_data(Ferrite.pvtkwrapper(vtk), u, "partitioning")

@@ -60,7 +60,7 @@ end;
 # We create a DofHandler, with two fields, `:u` and `:p`,
 # with possibly different interpolations
 function create_dofhandler(grid, ipu, ipp)
-    dh = FerritePartitionedArrays.DistributedDofHandler(grid)
+    dh = DofHandler(grid)
     push!(dh, :u, 2, ipu) # displacement
     push!(dh, :p, 1, ipp) # pressure
     close!(dh)
@@ -91,7 +91,7 @@ function doassemble(cellvalues_u::CellVectorValues{dim}, cellvalues_p::CellScala
                     facevalues_u::FaceVectorValues{dim}, grid::FerritePartitionedArrays.DistributedGrid,
                     dh::FerritePartitionedArrays.DistributedDofHandler, mp::LinearElasticity) where {dim}
 
-    assembler = FerritePartitionedArrays.COOAssembler{Float64}(dh)
+    assembler = start_assemble(dh, MPIBackend())
     nu = getnbasefunctions(cellvalues_u)
     np = getnbasefunctions(cellvalues_p)
 
@@ -193,7 +193,7 @@ function solve(ν, interpolation_u, interpolation_p)
     dh = create_dofhandler(grid, interpolation_u, interpolation_p)
     dbc = create_bc(dh)
     vtk_grid("cook_dgrid", dh) do vtk
-        FerritePartitionedArrays.vtk_partitioning(vtk, grid)
+        vtk_partitioning(vtk, grid)
     end
     ## cellvalues
     cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
@@ -208,7 +208,7 @@ function solve(ν, interpolation_u, interpolation_p)
                          "_linear"
     vtk_grid(filename, dh) do vtkfile
         vtk_point_data(vtkfile, dh, u)
-        FerritePartitionedArrays.vtk_partitioning(vtkfile, grid)
+        vtk_partitioning(vtkfile, grid)
     end
     return u
 end
