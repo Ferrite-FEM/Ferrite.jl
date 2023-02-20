@@ -71,14 +71,14 @@ function Ferrite.addindex!(b::HYPREVector, v, i::Int)
     return b
 end
 
-FerritePartitionedArrays = Base.get_extension(Ferrite, :FerritePartitionedArrays)
+FerriteMPI = Base.get_extension(Ferrite, :FerriteMPI)
 
 # We start generating a simple grid with 20x20 quadrilateral elements
 # and distribute it across our processors using `generate_distributed_grid`. 
-# dgrid = FerritePartitionedArrays.generate_distributed_grid(QuadraticQuadrilateral, (3, 1));
-# dgrid = FerritePartitionedArrays.generate_distributed_grid(Tetrahedron, (2, 2, 2));
-dgrid = FerritePartitionedArrays.generate_distributed_grid(Hexahedron, (10, 10, 10)); #src
-# dgrid = FerritePartitionedArrays.generate_distributed_grid(Tetrahedron, (3, 3, 3)); #src
+# dgrid = FerriteMPI.generate_distributed_grid(QuadraticQuadrilateral, (3, 1));
+# dgrid = FerriteMPI.generate_distributed_grid(Tetrahedron, (2, 2, 2));
+dgrid = FerriteMPI.generate_distributed_grid(Hexahedron, (10, 10, 10)); #src
+# dgrid = FerriteMPI.generate_distributed_grid(Tetrahedron, (3, 3, 3)); #src
 
 # ### Trial and test functions
 # Nothing changes here.
@@ -113,7 +113,7 @@ close!(ch)
 
 # ### Assembling the linear system
 # Assembling the system works also mostly analogue.
-function doassemble(cellvalues::CellScalarValues{dim}, dh::FerritePartitionedArrays.DistributedDofHandler, ch::ConstraintHandler) where {dim}
+function doassemble(cellvalues::CellScalarValues{dim}, dh::FerriteMPI.DistributedDofHandler, ch::ConstraintHandler) where {dim}
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
@@ -125,9 +125,9 @@ function doassemble(cellvalues::CellScalarValues{dim}, dh::FerritePartitionedArr
     # may trigger a large amount of communication.
 
     # TODO how to put this into an interface.
-    dgrid = FerritePartitionedArrays.getglobalgrid(dh)
-    comm = FerritePartitionedArrays.global_comm(dgrid)
-    ldofrange = FerritePartitionedArrays.local_dof_range(dh)
+    dgrid = FerriteMPI.getglobalgrid(dh)
+    comm = FerriteMPI.global_comm(dgrid)
+    ldofrange = FerriteMPI.local_dof_range(dh)
     K = HYPREMatrix(comm, first(ldofrange), last(ldofrange))
     f = HYPREVector(comm, first(ldofrange), last(ldofrange))
 
@@ -183,12 +183,12 @@ uh = HYPRE.solve(solver, K, f)
 
 # TODO how to put this into an interface.
 # Copy solution from HYPRE to Julia
-uj = Vector{Float64}(undef, FerritePartitionedArrays.num_local_true_dofs(dh))
+uj = Vector{Float64}(undef, FerriteMPI.num_local_true_dofs(dh))
 copy!(uj, uh)
 
 # And convert from HYPRE to Ferrite
-u_local = Vector{Float64}(undef, FerritePartitionedArrays.num_local_dofs(dh))
-FerritePartitionedArrays.hypre_to_ferrite!(u_local, uj, dh)
+u_local = Vector{Float64}(undef, FerriteMPI.num_local_dofs(dh))
+FerriteMPI.hypre_to_ferrite!(u_local, uj, dh)
 
 # # ### Exporting via PVTK
 # # To visualize the result we export the grid and our field `u`

@@ -18,17 +18,17 @@ using Ferrite, MPI
 using IterativeSolvers #, HYPRE
 using PartitionedArrays, Metis #src
 
-FerritePartitionedArrays = Base.get_extension(Ferrite, :FerritePartitionedArrays)
+FerriteMPI = Base.get_extension(Ferrite, :FerriteMPI)
 
 # Launch MPI
 MPI.Init()
 
 # We start generating a simple grid with 20x20 quadrilateral elements
 # and distribute it across our processors using `generate_distributed_grid`. 
-# dgrid = FerritePartitionedArrays.generate_distributed_grid(QuadraticQuadrilateral, (3, 1));
-# dgrid = FerritePartitionedArrays.generate_distributed_grid(Tetrahedron, (2, 2, 2));
-dgrid = FerritePartitionedArrays.generate_distributed_grid(Hexahedron, (2, 2, 2)); #src
-# dgrid = FerritePartitionedArrays.generate_distributed_grid(Tetrahedron, (3, 3, 3)); #src
+# dgrid = FerriteMPI.generate_distributed_grid(QuadraticQuadrilateral, (3, 1));
+# dgrid = FerriteMPI.generate_distributed_grid(Tetrahedron, (2, 2, 2));
+dgrid = FerriteMPI.generate_distributed_grid(Hexahedron, (2, 2, 2)); #src
+# dgrid = FerriteMPI.generate_distributed_grid(Tetrahedron, (3, 3, 3)); #src
 
 # ### Trial and test functions
 # Nothing changes here.
@@ -66,7 +66,7 @@ my_rank = MPI.Comm_rank(MPI.COMM_WORLD)
 
 # ### Assembling the linear system
 # Assembling the system works also mostly analogue. Note that the dof handler type changed.
-function doassemble(cellvalues::CellScalarValues{dim}, dh::FerritePartitionedArrays.DistributedDofHandler) where {dim}
+function doassemble(cellvalues::CellScalarValues{dim}, dh::FerriteMPI.DistributedDofHandler) where {dim}
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)

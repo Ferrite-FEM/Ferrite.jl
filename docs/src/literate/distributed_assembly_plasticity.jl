@@ -19,7 +19,7 @@ using IterativeSolvers
 using PartitionedArrays, Metis
 using SparseArrays, BlockArrays
 
-FerritePartitionedArrays = Base.get_extension(Ferrite, :FerritePartitionedArrays)
+FerriteMPI = Base.get_extension(Ferrite, :FerriteMPI)
 
 # Launch MPI
 MPI.Init()
@@ -34,7 +34,7 @@ function create_cook_grid(nx, ny)
     ## facesets for boundary conditions
     addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0);
     addfaceset!(grid, "traction", x -> norm(x[1]) ≈ 48.0);
-    return FerritePartitionedArrays.DistributedGrid(grid)
+    return FerriteMPI.DistributedGrid(grid)
 end;
 
 # Next we define a function to set up our cell- and facevalues.
@@ -88,8 +88,8 @@ end
 # element matrix. Since Ferrite does not force us to use any particular matrix type we will
 # use a `PseudoBlockArray` from `BlockArrays.jl`.
 function doassemble(cellvalues_u::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim},
-                    facevalues_u::FaceVectorValues{dim}, grid::FerritePartitionedArrays.DistributedGrid,
-                    dh::FerritePartitionedArrays.DistributedDofHandler, mp::LinearElasticity) where {dim}
+                    facevalues_u::FaceVectorValues{dim}, grid::FerriteMPI.DistributedGrid,
+                    dh::FerriteMPI.DistributedDofHandler, mp::LinearElasticity) where {dim}
 
     assembler = start_assemble(dh, MPIBackend())
     nu = getnbasefunctions(cellvalues_u)

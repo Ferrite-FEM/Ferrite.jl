@@ -15,7 +15,9 @@ struct COOAssembler{T}
     dh
 
     # TODO PartitionedArrays backend as additional input arg
-    function COOAssembler{T}(dh::DistributedDofHandler) where {T}
+    # TODO fix type
+    #function COOAssembler{T}(dh::FerriteMPI.DistributedDofHandler) where {T}
+    function COOAssembler{T}(dh) where {T}
         ldof_to_gdof = dh.ldof_to_gdof
         ldof_to_rank = dh.ldof_to_rank
         nldofs = num_local_dofs(dh)
@@ -269,7 +271,9 @@ struct COOAssembler{T}
     end
 end
 
-Ferrite.start_assemble(dh::DistributedDofHandler, _::MPIBackend) = COOAssembler{Float64}(dh)
+# TODO fix type
+# Ferrite.start_assemble(dh::FerriteMPI.DistributedDofHandler, _::MPIBackend) = COOAssembler{Float64}(dh)
+Ferrite.start_assemble(dh, _::MPIBackend) = COOAssembler{Float64}(dh)
     
 @propagate_inbounds function Ferrite.assemble!(a::COOAssembler{T}, edof::AbstractVector{Int}, Ke::AbstractMatrix{T}) where {T}
     n_dofs = length(edof)
