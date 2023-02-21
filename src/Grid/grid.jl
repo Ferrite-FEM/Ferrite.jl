@@ -323,12 +323,9 @@ function _face_neighbor!(V_face::Vector{EntityNeighborhood}, I_face::Vector{Int}
     if getdim(neighbor_cell) == getdim(cell)
         neighbor_face_id = findfirst(x->issubset(x,neighbor_face), faces(neighbor_cell))
         face_neighbor = FaceIndex((neighborid, neighbor_face_id))
-    elseif getdim(neighbor_cell) == 2 && getdim(cell) == 3
+    else
         neighbor_face_id = findfirst(x->issubset(x,neighbor_face), edges(neighbor_cell))
         face_neighbor = EdgeIndex((neighborid, neighbor_face_id))
-    elseif getdim(neighbor_cell) == 1 && getdim(cell) == 3
-        neighbor_face_id = findfirst(x->issubset(x,neighbor_face), edges(neighbor_cell))
-        face_neighbor = VertexIndex((neighborid, neighbor_face_id))
     end
     cell_face_id = findfirst(x->issubset(x,neighbor_face),faces(cell))
     push!(V_face, EntityNeighborhood(face_neighbor))
