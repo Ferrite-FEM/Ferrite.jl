@@ -70,7 +70,13 @@ end
 
 # See Appendix A in https://www.math.colostate.edu/%7Ebangerth/publications/2013-pattern.pdf
 function workstream_coloring(incidence_matrix, cellset)
-       
+     
+    if length(cellset) == 0
+        return Vector{Int}[]
+    elseif length(cellset) == 1
+        return Vector{Int}[Int[first(cellset)]]
+    end
+
     ###################
     # 1. Partitioning #
     ###################
@@ -190,13 +196,6 @@ The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
     ```
 """
 function create_coloring(g::Grid, cellset=1:getncells(g); alg::ColoringAlgorithm.T=ColoringAlgorithm.WorkStream)
-    
-    if length(cellset) == 0
-        return Vector{Int}[Int[]]
-    elseif length(cellset) == 1
-        return Vector{Int}[Int[first(cellset)]]
-    end
-
     incidence_matrix = create_incidence_matrix(g, cellset)
     if alg === ColoringAlgorithm.WorkStream
         return workstream_coloring(incidence_matrix, cellset)
