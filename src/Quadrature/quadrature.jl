@@ -87,6 +87,7 @@ getpoints(qr::QuadratureRule) = qr.points
 
 QuadratureRule{dim,shape}(order::Int) where {dim,shape} = QuadratureRule{dim,shape}(:legendre, order)
 QuadratureRule{3,RefPrism}(order::Int) = QuadratureRule{3,RefPrism}(:polyquad, order) # No legendre rule available yet for prism...
+QuadratureRule{3,RefPyramid}(order::Int) = QuadratureRule{3,RefPyramid}(:polyquad, order) # No legendre rule available yet for prism...
 
 # Special case for face integration of 1D problems
 function (::Type{QuadratureRule{0, RefCube}})(quad_type::Symbol, order::Int)
