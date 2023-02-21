@@ -26,7 +26,8 @@ function hypre_to_ferrite!(u::Vector{T}, uh::HYPREVector, dh::Ferrite.AbstractDo
 
     # TODO speed this up and better API
     dgrid = getglobalgrid(dh)
-    for (lvi, sv) ∈ get_shared_vertices(dgrid)
+    for sv ∈ get_shared_vertices(dgrid)
+        lvi = sv.local_idx
         my_rank != compute_owner(dgrid, sv) && continue
         for field_idx in 1:num_fields(dh)
             if Ferrite.has_vertex_dofs(dh, field_idx, lvi)
@@ -42,11 +43,12 @@ function hypre_to_ferrite!(u::Vector{T}, uh::HYPREVector, dh::Ferrite.AbstractDo
         end
     end
 
-    for (lvi, se) ∈ get_shared_edges(dgrid)
+    for se ∈ get_shared_edges(dgrid)
+        lei = se.local_idx
         my_rank != compute_owner(dgrid, se) && continue
         for field_idx in 1:num_fields(dh)
-            if Ferrite.has_edge_dofs(dh, field_idx, lvi)
-                local_dofs = Ferrite.edge_dofs(dh, field_idx, lvi)
+            if Ferrite.has_edge_dofs(dh, field_idx, lei)
+                local_dofs = Ferrite.edge_dofs(dh, field_idx, lei)
                 global_dofs = dh.ldof_to_gdof[local_dofs]
                 for receiver_rank ∈ keys(remote_entities(se))
                     for i ∈ 1:length(global_dofs)
@@ -58,11 +60,12 @@ function hypre_to_ferrite!(u::Vector{T}, uh::HYPREVector, dh::Ferrite.AbstractDo
         end
     end
     
-    for (lvi, sf) ∈ get_shared_faces(dgrid)
+    for sf ∈ get_shared_faces(dgrid)
+        lfi = sf.local_idx
         my_rank != compute_owner(dgrid, sf) && continue
         for field_idx in 1:num_fields(dh)
-            if Ferrite.has_face_dofs(dh, field_idx, lvi)
-                local_dofs = Ferrite.face_dofs(dh, field_idx, lvi)
+            if Ferrite.has_face_dofs(dh, field_idx, lfi)
+                local_dofs = Ferrite.face_dofs(dh, field_idx, lfi)
                 global_dofs = dh.ldof_to_gdof[local_dofs]
                 for receiver_rank ∈ keys(remote_entities(sf))
                     for i ∈ 1:length(global_dofs)

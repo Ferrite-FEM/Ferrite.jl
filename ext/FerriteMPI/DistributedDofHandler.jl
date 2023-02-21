@@ -79,7 +79,8 @@ function compute_dof_ownership(dh::DistributedDofHandler)
     dof_owner = Vector{Int}(undef,ndofs(dh))
     fill!(dof_owner, my_rank)
 
-    for (lvi, sv) ∈ get_shared_vertices(dgrid)
+    for sv ∈ get_shared_vertices(dgrid)
+        lvi = sv.local_idx
         for field_idx in 1:num_fields(dh)
             if Ferrite.has_vertex_dofs(dh, field_idx, lvi)
                 local_dofs = Ferrite.vertex_dofs(dh, field_idx, lvi)
@@ -88,7 +89,8 @@ function compute_dof_ownership(dh::DistributedDofHandler)
         end
     end
 
-    for (lfi, sf) ∈ get_shared_faces(dgrid)
+    for sf ∈ get_shared_faces(dgrid)
+        lfi = sf.local_idx
         for field_idx in 1:num_fields(dh)
             if Ferrite.has_face_dofs(dh, field_idx, lfi)
                 local_dofs = Ferrite.face_dofs(dh, field_idx, lfi)
@@ -97,7 +99,8 @@ function compute_dof_ownership(dh::DistributedDofHandler)
         end
     end
 
-    for (lei, se) ∈ get_shared_edges(dgrid)
+    for se ∈ get_shared_edges(dgrid)
+        lei = se.local_idx
         for field_idx in 1:num_fields(dh)
             if Ferrite.has_edge_dofs(dh, field_idx, lei)
                 local_dofs = Ferrite.edge_dofs(dh, field_idx, lei)

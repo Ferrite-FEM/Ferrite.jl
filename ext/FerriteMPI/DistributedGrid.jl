@@ -65,11 +65,11 @@ Get the rank on the global communicator of the distributed grid.
 """
 """
 function DistributedGrid(grid_to_distribute::Grid{dim,C,T}; grid_comm::MPI.Comm = MPI.COMM_WORLD, partition_alg = :RECURSIVE) where {dim,C,T}
-    grid_topology = ExclusiveTopology(grid_to_distribute)
+    grid_topology = CoverTopology(grid_to_distribute)
     return DistributedGrid(grid_to_distribute, grid_topology, grid_comm; partition_alg=partition_alg)
 end
 
-function create_partitioning(grid::Grid{dim,C,T}, grid_topology::ExclusiveTopology, n_partitions, partition_alg) where {dim,C,T}
+function create_partitioning(grid::Grid{dim,C,T}, grid_topology::CoverTopology, n_partitions, partition_alg) where {dim,C,T}
     n_cells_global = getncells(grid)
     @assert n_cells_global > 0
     
@@ -104,18 +104,18 @@ end
 
 """
 """
-function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::ExclusiveTopology, grid_comm::MPI.Comm; partition_alg = :RECURSIVE) where {dim,C,T}
+function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::CoverTopology, grid_comm::MPI.Comm; partition_alg = :RECURSIVE) where {dim,C,T}
     n_cells_global = getncells(grid_to_distribute)
     @assert n_cells_global > 0
 
     parts = create_partitioning(grid_to_distribute, grid_topology, MPI.Comm_size(grid_comm), partition_alg)
 
-    DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::ExclusiveTopology, grid_comm::MPI.Comm, parts)
+    DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::CoverTopology, grid_comm::MPI.Comm, parts)
 end
 
 """
 """    
-function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::ExclusiveTopology, grid_comm::MPI.Comm, parts::Vector{Int32}) where {dim,C,T}
+function DistributedGrid(grid_to_distribute::Grid{dim,C,T}, grid_topology::CoverTopology, grid_comm::MPI.Comm, parts::Vector{Int32}) where {dim,C,T}
     n_cells_global = getncells(grid_to_distribute)
     @assert n_cells_global > 0 # Empty input mesh...
 

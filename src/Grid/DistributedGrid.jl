@@ -15,9 +15,9 @@ remote_entities(::SharedEntity) = error("Not implemented.")
 
 """
 """
-@inline get_shared_vertices(dgrid::AbstractDistributedGrid) = dgrid.shared_vertices
-@inline get_shared_edges(dgrid::AbstractDistributedGrid) = dgrid.shared_edges
-@inline get_shared_faces(dgrid::AbstractDistributedGrid) = dgrid.shared_faces
+@inline get_shared_vertices(dgrid::AbstractDistributedGrid) = values(dgrid.shared_vertices)
+@inline get_shared_edges(dgrid::AbstractDistributedGrid) = values(dgrid.shared_edges)
+@inline get_shared_faces(dgrid::AbstractDistributedGrid) = values(dgrid.shared_faces)
 
 @inline get_shared_vertex(dgrid::AbstractDistributedGrid, vi::VertexIndex) = dgrid.shared_vertices[vi]
 @inline get_shared_edge(dgrid::AbstractDistributedGrid, ei::EdgeIndex) = dgrid.shared_edges[ei]

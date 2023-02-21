@@ -27,7 +27,7 @@ function Ferrite.vtk_shared_vertices(vtk, dgrid::DistributedGrid)
     my_rank = MPI.Comm_rank(global_comm(dgrid))+1
     for rank ∈ 1:MPI.Comm_size(global_comm(dgrid))
         fill!(u, 0.0)
-        for sv ∈ values(get_shared_vertices(dgrid))
+        for sv ∈ get_shared_vertices(dgrid)
             if haskey(sv.remote_vertices, rank)
                 (cellidx, i) = sv.local_idx
                 cell = getcells(dgrid, cellidx)
@@ -47,7 +47,7 @@ function Ferrite.vtk_shared_faces(vtk, dgrid::DistributedGrid)
     my_rank = MPI.Comm_rank(global_comm(dgrid))+1
     for rank ∈ 1:MPI.Comm_size(global_comm(dgrid))
         fill!(u, 0.0)
-        for sf ∈ values(get_shared_faces(dgrid))
+        for sf ∈ get_shared_faces(dgrid)
             if haskey(sf.remote_faces, rank)
                 (cellidx, i) = sf.local_idx
                 cell = getcells(dgrid, cellidx)
@@ -68,7 +68,7 @@ function Ferrite.vtk_shared_edges(vtk, dgrid::DistributedGrid)
     my_rank = MPI.Comm_rank(global_comm(dgrid))+1
     for rank ∈ 1:MPI.Comm_size(global_comm(dgrid))
         fill!(u, 0.0)
-        for se ∈ values(get_shared_edges(dgrid))
+        for se ∈ get_shared_edges(dgrid)
             if haskey(se.remote_edges, rank)
                 (cellidx, i) = se.local_idx
                 cell = getcells(dgrid, cellidx)
