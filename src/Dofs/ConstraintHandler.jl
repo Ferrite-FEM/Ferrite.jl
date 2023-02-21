@@ -56,9 +56,11 @@ end
 
 const DofCoefficients{T} = Vector{Pair{Int,T}}
 """
-    AffineConstraint(constrained_dofs::Int, master_dofs::Vector{Int}, coeffs::Vector{T}, b::T) where T
+    AffineConstraint(constrained_dof::Int, entires::Vector{Pair{Int,T}}, b::T) where T
 
-Define an affine/linear constraint to constrain dofs of the form `u_i = ∑(u[j] * a[j]) + b`.
+Define an affine/linear constraint to constrain one degree of freedom, `u[i]`, 
+such that `u[i] = ∑(u[j] * a[j]) + b`, 
+where `i=constrained_dof` and each element in `entries` are `j => a[j]`
 """
 struct AffineConstraint{T}
     constrained_dof::Int
@@ -544,9 +546,18 @@ end
 Adjust the matrix `K` and right hand side `rhs` to account for the Dirichlet boundary
 conditions specified in `ch` such that `K \\ rhs` gives the expected solution.
 
+!!! note
+    `apply!(K, rhs, ch)` essentially calculates
+
+    `rhs[free_dofs] = rhs[free_dofs] - K[free_dofs, constrained_dofs] * a[constrained]`
+    
+    where `a[constrained]` are the inhomogeneities. 
+    Consequently, the sign of `rhs` matters (in contrast to for `apply_zero!`).
+
+
     apply!(v::AbstractVector, ch::ConstraintHandler)
 
-Apply Dirichlet boundary conditions, specified in `ch`, to the solution vector `v`.
+Apply Dirichlet boundary conditions and affine constraints, specified in `ch`, to the solution vector `v`.
 
 # Examples
 ```julia
@@ -568,12 +579,14 @@ apply!
     apply_zero!(K::SparseMatrixCSC, rhs::AbstractVector, ch::ConstraintHandler)
 
 Adjust the matrix `K` and the right hand side `rhs` to account for prescribed Dirichlet
-boundary conditions such that `du = K \\ rhs` give the expected result (e.g. with `du` zero
-for all prescribed degrees of freedom).
+boundary conditions and affine constraints such that `du = K \\ rhs` gives the expected 
+result (e.g. `du` zero for all prescribed degrees of freedom).
 
     apply_zero!(v::AbstractVector, ch::ConstraintHandler)
 
-Zero-out values in `v` corresponding to prescribed degrees of freedom.
+Zero-out values in `v` corresponding to prescribed degrees of freedom and update values 
+prescribed by affine constraints, such that if `a` fullfills the constraints,
+`a ± v` also will.
 
 These methods are typically used in e.g. a Newton solver where the increment, `du`, should
 be prescribed to zero even for non-homogeneouos boundary conditions.
@@ -585,15 +598,16 @@ See also: [`apply!`](@ref).
 u = un + Δu                 # Current guess
 K, g = assemble_system(...) # Assemble residual and tangent for current guess
 apply_zero!(K, g, ch)       # Adjust tangent and residual to take prescribed values into account
-ΔΔu = - K \\ g               # Compute the increment, prescribed values are "approximately" zero
+ΔΔu = K \\ g                # Compute the (negative) increment, prescribed values are "approximately" zero
 apply_zero!(ΔΔu, ch)        # Make sure values are exactly zero
-Δu .+= ΔΔu                  # Update current guess
+Δu .-= ΔΔu                  # Update current guess
 ```
 
 !!! note
-    The last call to `apply_zero!` is not strictly necessary since the boundary conditions
-    should already be fulfilled after `apply!(K, g, ch)`. However, solvers of linear
-    systems are not exact, and thus `apply!(ΔΔu, ch)` can be used to make sure the values
+    The last call to `apply_zero!` is only strictly necessary for affine constraints. 
+    However, even if the Dirichlet boundary conditions should be fulfilled after 
+    `apply!(K, g, ch)`, solvers of linear systems are not exact. 
+    `apply!(ΔΔu, ch)` can be used to make sure the values
     for the prescribed degrees of freedom are fulfilled exactly.
 """
 apply_zero!
@@ -608,7 +622,7 @@ function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
     for (dof, dofcoef, h) in zip(ch.prescribed_dofs, ch.dofcoefficients, ch.affine_inhomogeneities)
         dofcoef === nothing && continue
         @assert h !== nothing
-        v[dof] = h
+        v[dof] = apply_zero ? 0.0 : h
         for (d, s) in dofcoef
             v[dof] += s * v[d]
         end
@@ -631,7 +645,8 @@ const APPLY_INPLACE = ApplyStrategy.Inplace
 
 function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false;
                 strategy::ApplyStrategy.T=ApplyStrategy.Transpose)
-    K = isa(KK, Symmetric) ? KK.data : KK
+    sym = isa(KK, Symmetric)
+    K = sym ? KK.data : KK
     @assert length(f) == 0 || length(f) == size(K, 1)
     @boundscheck checkbounds(K, ch.prescribed_dofs, ch.prescribed_dofs)
     @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
@@ -645,14 +660,33 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
             v = ch.inhomogeneities[i]
             if v != 0
                 for j in nzrange(K, d)
-                    f[K.rowval[j]] -= v * K.nzval[j]
+                    r = K.rowval[j]
+                    sym && r > d && break # don't look below diagonal
+                    f[r] -= v * K.nzval[j]
+                end
+            end
+        end
+        if sym
+            # In the symmetric case, for a constrained dof `d`, we handle the contribution
+            # from `K[1:d, d]` in the loop above, but we are still missing the contribution
+            # from `K[(d+1):size(K,1), d]`. These values are not stored, but since the
+            # matrix is symmetric we can instead use `K[d, (d+1):size(K,1)]`. Looping over
+            # rows is slow, so loop over all columns again, and check if the row is a
+            # constrained row.
+            @inbounds for col in 1:size(K, 2)
+                for ri in nzrange(K, col)
+                    row = K.rowval[ri]
+                    row >= col && break
+                    if (i = get(ch.dofmapping, row, 0); i != 0)
+                        f[col] -= ch.inhomogeneities[i] * K.nzval[ri]
+                    end
                 end
             end
         end
     end
 
     # Condense K (C' * K * C) and f (C' * f)
-    _condense!(K, f, ch.dofcoefficients, ch.dofmapping)
+    _condense!(K, f, ch.dofcoefficients, ch.dofmapping, sym)
 
     # Remove constrained dofs from the matrix
     zero_out_columns!(K, ch.prescribed_dofs)
@@ -741,7 +775,7 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
 end
 
 # Condenses K and f: C'*K*C, C'*f, in-place assuming the sparsity pattern is correct
-function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int,Int}) where T
+function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int,Int}, sym::Bool=false) where T
 
     ndofs = size(K, 1)
     condense_f = !(length(f) == 0)
@@ -749,6 +783,11 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
 
     # Return early if there are no non-trivial affine constraints
     any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
+
+    # TODO: The rest of this method can't handle K::Symmetric
+    if sym
+        error("condensation of ::Symmetric matrix not supported")
+    end
 
     for col in 1:ndofs
         col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
@@ -873,8 +912,28 @@ end
 
 
 #Function for adding constraint when using multiple celltypes
-function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
-    _check_cellset_dirichlet(ch.dh.grid, fh.cellset, dbc.faces)
+function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
+    dbc_added = false
+    for fh in ch.dh.fieldhandlers
+        if dbc.field_name in getfieldnames(fh) && _in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=false)
+            # Dofs in `dbc` not in `fh` will be removed, hence `dbc.faces` must be copied.
+            # Recreating the `dbc` will create a copy of `dbc.faces`.
+            # In this case, add! will warn, unless `warn_not_in_cellset=false`
+            dbc_ = Dirichlet(dbc.field_name, dbc.faces, dbc.f, 
+                isempty(dbc.components) ? nothing : dbc.components) 
+                # Check for empty already done when user created `dbc`
+            add!(ch, fh, dbc_, warn_not_in_cellset=false)
+            dbc_added = true
+        end
+    end
+    dbc_added || @warn("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's MixedDofHandler")
+    return ch
+end
+
+function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_not_in_cellset=true)
+    if warn_not_in_cellset && !(_in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=true))
+        @warn("You are trying to add a constraint a face/edge/node that is not in the cellset of the fieldhandler. This location will be skipped")
+    end
 
     celltype = getcelltype(ch.dh.grid, first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
 
@@ -900,15 +959,20 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet)
     return ch
 end
 
-function _check_cellset_dirichlet(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex})
+# If all==true, return true only if all items in faceset/nodeset are in the cellset
+# If all==false, return true if some items in faceset/nodeset are in the cellset
+function _in_cellset(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex}; all=true)
     for (cellid,faceid) in faceset
-        if !(cellid in cellset)
-            @warn("You are trying to add a constraint to a face that is not in the cellset of the fieldhandler. The face will be skipped.")
+        if cellid in cellset
+            all || return true
+        else
+            all && return false
         end
     end
+    return all # if not returned by now and all==false, then no `cellid`s where in cellset
 end
 
-function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int})
+function _in_cellset(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int}; all=true)
     nodes = Set{Int}()
     for cellid in cellset
         for nodeid in grid.cells[cellid].nodes
@@ -917,16 +981,31 @@ function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset
     end
 
     for nodeid in nodeset
-        if !(nodeid ∈ nodes)
-            @warn("You are trying to add a constraint to a node that is not in the cellset of the fieldhandler. The node will be skipped.")
+        if nodeid ∈ nodes
+            all || return true 
+        else
+            all && return false
         end
     end
+    return all # if not returned by now and all==false, then no `cellid`s where in cellset
 end
 
+"""
+    create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler, coupling)
+
+Create a symmetric sparsity pattern accounting for affine constraints in `ch`. See 
+the Affine Constraints section of the manual for further details. 
+"""
 function create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
         keep_constrained::Bool=true, coupling=nothing)
     return Symmetric(_create_sparsity_pattern(dh, ch, true, keep_constrained, coupling), :U)
 end
+"""
+    create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling)
+
+Create a sparsity pattern accounting for affine constraints in `ch`. See 
+the Affine Constraints section of the manual for further details. 
+"""
 function create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
         keep_constrained::Bool=true, coupling=nothing)
     return _create_sparsity_pattern(dh, ch, false, keep_constrained, coupling)

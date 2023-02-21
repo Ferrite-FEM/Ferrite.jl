@@ -61,7 +61,7 @@ cellvalues = CellScalarValues(qr, ip);
 facevalues = FaceScalarValues(qr_face, ip);
 
 dh = DofHandler(grid)
-push!(dh, :u, 1)
+add!(dh, :u, 1)
 close!(dh)
 
 # We will set things up, so that a known analytic solution is approximately reproduced.

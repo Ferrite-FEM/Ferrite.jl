@@ -218,7 +218,7 @@ cellvalues = CellVectorValues(qr, ip);
 
 # We define a dof handler with a displacement field `:u`:
 dh = DofHandler(grid)
-push!(dh, :u, 2)
+add!(dh, :u, 2)
 close!(dh);
 
 # Now we need to define boundary conditions. As discussed earlier we will solve the problem
@@ -257,7 +257,7 @@ update!(ch_periodic, 0.0)
 
 # This will now constrain any degrees of freedom located on the mirror boundaries to
 # the matching degree of freedom on the image boundaries. Internally this will create
-# a number of [`AffineConstraint`](@ref)s of the form `u_i = 1 * u_j + 0`:
+# a number of `AffineConstraint`s of the form `u_i = 1 * u_j + 0`:
 # ```julia
 # a = AffineConstraint(u_m, [u_i => 1], 0)
 # ```

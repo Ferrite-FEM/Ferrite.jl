@@ -62,8 +62,8 @@ end;
 # with possibly different interpolations
 function create_dofhandler(grid, ipu, ipp)
     dh = DofHandler(grid)
-    push!(dh, :u, 2, ipu) # displacement
-    push!(dh, :p, 1, ipp) # pressure
+    add!(dh, :u, 2, ipu) # displacement
+    add!(dh, :p, 1, ipp) # pressure
     close!(dh)
     return dh
 end;

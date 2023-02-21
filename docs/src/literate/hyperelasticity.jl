@@ -233,7 +233,7 @@ function assemble_element!(ke, ge, cell, cv, fv, mp, ue, ΓN)
         ## Compute deformation gradient F and right Cauchy-Green tensor C
         ∇u = function_gradient(cv, qp, ue)
         F = one(∇u) + ∇u
-        C = tdot(F)
+        C = tdot(F) # F' ⋅ F
         ## Compute stress and tangent
         S, ∂S∂C = constitutive_driver(C, mp)
         P = F ⋅ S
@@ -277,13 +277,13 @@ end;
 # the elements, call the element routine and assemble in the the global matrix K and
 # residual g.
 
-function assemble_global!(K, f, dh, cv, fv, mp, u, ΓN)
+function assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
     n = ndofs_per_cell(dh)
     ke = zeros(n, n)
     ge = zeros(n)
 
-    ## start_assemble resets K and f
-    assembler = start_assemble(K, f)
+    ## start_assemble resets K and g
+    assembler = start_assemble(K, g)
 
     ## Loop over all cells in the grid
     @timeit "assemble" for cell in CellIterator(dh)
@@ -323,16 +323,17 @@ function solve()
 
     ## DofHandler
     dh = DofHandler(grid)
-    push!(dh, :u, 3) # Add a displacement field
+    add!(dh, :u, 3) # Add a displacement field
     close!(dh)
 
-    function rotation(X, t, θ = deg2rad(60.0))
+    function rotation(X, t)
+        θ = pi / 3 # 60°
         x, y, z = X
-        return t * Vec{3}(
-            (0.0,
+        return t * Vec{3}((
+            0.0,
             L/2 - y + (y-L/2)*cos(θ) - (z-L/2)*sin(θ),
             L/2 - z + (y-L/2)*sin(θ) + (z-L/2)*cos(θ)
-            ))
+        ))
     end
 
     dbcs = ConstraintHandler(dh)
@@ -372,12 +373,15 @@ function solve()
     prog = ProgressMeter.ProgressThresh(NEWTON_TOL, "Solving:")
 
     while true; newton_itr += 1
-        u .= un .+ Δu # Current guess
+        ## Construct the current guess
+        u .= un .+ Δu
+        ## Compute residual and tangent for current guess
         assemble_global!(K, g, dh, cv, fv, mp, u, ΓN)
-        normg = norm(g[Ferrite.free_dofs(dbcs)])
+        ## Apply boundary conditions
         apply_zero!(K, g, dbcs)
+        ## Compute the residual norm and compare with tolerance
+        normg = norm(g)
         ProgressMeter.update!(prog, normg; showvalues = [(:iter, newton_itr)])
-
         if normg < NEWTON_TOL
             break
         elseif newton_itr > NEWTON_MAXITER
@@ -385,7 +389,7 @@ function solve()
         end
 
         ## Compute increment using conjugate gradients
-        @timeit "linear solve (IterativeSolvers.cg!)" IterativeSolvers.cg!(ΔΔu, K, g; maxiter=1000)
+        @timeit "linear solve" IterativeSolvers.cg!(ΔΔu, K, g; maxiter=1000)
 
         apply_zero!(ΔΔu, dbcs)
         Δu .-= ΔΔu

@@ -11,8 +11,8 @@ MixedDofHandler
 
 ## Adding fields to the DofHandlers
 ```@docs
-push!(::DofHandler, ::Symbol, ::Int, ::Interpolation)
-push!(::MixedDofHandler, ::FieldHandler)
+add!(::DofHandler, ::Symbol, ::Int, ::Interpolation)
+add!(::MixedDofHandler, ::FieldHandler)
 Field
 FieldHandler
 close!(::MixedDofHandler)
