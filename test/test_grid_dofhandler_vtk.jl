@@ -425,7 +425,7 @@ end
     # unconnected subset
     test_coloring(generate_grid(Triangle, (10, 10)), union(Set(1:10), Set(70:80)))
 
-    #Special case with one element in the sets
+    #Special case with one and zero elements in the sets
     test_coloring(generate_grid(Quadrilateral, (2, 2)), [1])
     test_coloring(generate_grid(Quadrilateral, (2, 2)), [])
 end
