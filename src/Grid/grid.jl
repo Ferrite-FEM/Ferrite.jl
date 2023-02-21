@@ -16,6 +16,7 @@ Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
 getcoordinates(n::Node) = n.x
 get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 
+abstract type AbstractGrid{dim} end
 abstract type AbstractCell{dim,N,M} end
 """
     Cell{dim,N,M} <: AbstractCell{dim,N,M}
@@ -115,6 +116,11 @@ function Base.show(io::IO, ::MIME"text/plain", n::EntityNeighborhood)
     end
 end
 
+getcells(neighbor::EntityNeighborhood{T}) where T <: BoundaryIndex = first.(neighbor.neighbor_info)
+getcells(neighbor::EntityNeighborhood{CellIndex}) = getproperty.(neighbor.neighbor_info, :idx)
+getcells(neighbors::Vector{T}) where T <: EntityNeighborhood = reduce(vcat, getcells.(neighbors))
+getcells(neighbors::Vector{T}) where T <: BoundaryIndex = getindex.(neighbors,1)
+
 """
     face_npoints(::AbstractCell{dim,N,M)
 Specifies for each subtype of AbstractCell how many nodes form a face
@@ -199,17 +205,17 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
             cell_local_ids = findall(x->x in cell_vertices_table[neighbor], cell_vertices_table[cellid])
             # vertex neighbor
             if length(cell_local_ids) == 1
-                _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
+               _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
             # face neighbor
             elseif length(cell_local_ids) == face_npoints(cell)
-                _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
+               _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
             # edge neighbor
             elseif getdim(cell) > 2 && length(cell_local_ids) == edge_npoints(cell)
-                _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
+               _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
             end
         end
     end
-    
+
     celltype = eltype(cells)
     if isconcretetype(celltype)
         dim = getdim(cells[1])
@@ -287,7 +293,9 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_neighbor,vertex_neighbor,edge_neighbor,vertex_vertex_table,face_skeleton_local)
 end
 
-function _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor, neighborid, neighbor_cell)
+ExclusiveTopology(grid::AbstractGrid) = ExclusiveTopology(getcells(grid))
+
+function _vertex_neighbor!(V_vertex::Vector{EntityNeighborhood}, I_vertex::Vector{Int}, J_vertex::Vector{Int}, cellid::Int, cell::AbstractCell, neighbor::Vector{Int}, neighborid::Int, neighbor_cell::AbstractCell)
     vertex_neighbor = VertexIndex((neighborid, neighbor[1]))
     cell_vertex_id = findfirst(x->x==neighbor_cell.nodes[neighbor[1]], cell.nodes)
     push!(V_vertex,EntityNeighborhood(vertex_neighbor))
@@ -295,29 +303,32 @@ function _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor,
     push!(J_vertex,cell_vertex_id)
 end
 
-function _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor, neighborid, neighbor_cell)
-    neighbor_edge = neighbor_cell.nodes[neighbor]
+function _edge_neighbor!(V_edge::Vector{EntityNeighborhood}, I_edge::Vector{Int}, J_edge::Vector{Int}, cellid::Int, cell::AbstractCell, neighbor::Vector{Int}, neighborid::Int, neighbor_cell::AbstractCell)
+    neighbor_edge_nodes = neighbor_cell.nodes[neighbor]
     if getdim(neighbor_cell) < 3
-        neighbor_edge_id = findfirst(x->issubset(x,neighbor_edge), faces(neighbor_cell))
+        neighbor_edge_id = findfirst(x->issubset(x,neighbor_edge_nodes), faces(neighbor_cell))
         edge_neighbor = FaceIndex((neighborid, neighbor_edge_id))
     else
-        neighbor_edge_id = findfirst(x->issubset(x,neighbor_edge), edges(neighbor_cell))
+        neighbor_edge_id = findfirst(x->issubset(x,neighbor_edge_nodes), edges(neighbor_cell))
         edge_neighbor = EdgeIndex((neighborid, neighbor_edge_id))
     end
-    cell_edge_id = findfirst(x->issubset(x,neighbor_edge),edges(cell))
+    cell_edge_id = findfirst(x->issubset(x,neighbor_edge_nodes), edges(cell))
     push!(V_edge, EntityNeighborhood(edge_neighbor))
     push!(I_edge, cellid)
     push!(J_edge, cell_edge_id)
 end
 
-function _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor, neighborid, neighbor_cell)
+function _face_neighbor!(V_face::Vector{EntityNeighborhood}, I_face::Vector{Int}, J_face::Vector{Int}, cellid::Int, cell::AbstractCell, neighbor::Vector{Int}, neighborid::Int, neighbor_cell::AbstractCell)
     neighbor_face = neighbor_cell.nodes[neighbor]
     if getdim(neighbor_cell) == getdim(cell)
         neighbor_face_id = findfirst(x->issubset(x,neighbor_face), faces(neighbor_cell))
         face_neighbor = FaceIndex((neighborid, neighbor_face_id))
-    else
+    elseif getdim(neighbor_cell) == 2 && getdim(cell) == 3
         neighbor_face_id = findfirst(x->issubset(x,neighbor_face), edges(neighbor_cell))
         face_neighbor = EdgeIndex((neighborid, neighbor_face_id))
+    elseif getdim(neighbor_cell) == 1 && getdim(cell) == 3
+        neighbor_face_id = findfirst(x->issubset(x,neighbor_face), edges(neighbor_cell))
+        face_neighbor = VertexIndex((neighborid, neighbor_face_id))
     end
     cell_face_id = findfirst(x->issubset(x,neighbor_face),faces(cell))
     push!(V_face, EntityNeighborhood(face_neighbor))
@@ -325,14 +336,114 @@ function _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor, neighbo
     push!(J_face, cell_face_id)
 end
 
-getcells(neighbor::EntityNeighborhood{T}) where T <: BoundaryIndex = first.(neighbor.neighbor_info)
-getcells(neighbor::EntityNeighborhood{CellIndex}) = getproperty.(neighbor.neighbor_info, :idx)
-getcells(neighbors::Vector{T}) where T <: EntityNeighborhood = reduce(vcat, getcells.(neighbors))
-getcells(neighbors::Vector{T}) where T <: BoundaryIndex = getindex.(neighbors,1)
+"""
+    CoverTopology(cells::Vector{C}) where C <: AbstractCell
 
-abstract type AbstractGrid{dim} end
+`CoverTopology` stores the intuitive neighborhood information of a grid. Here the 
+neighborhood is a set of similar entities which fully cover each other.
+"""
+struct CoverTopology <: AbstractTopology
+    # maps a global vertex id to all cells containing the vertex
+    vertex_to_cell::Dict{Int,Vector{Int}}
+    # index of the vector = cell id ->  all other connected cells
+    cell_neighbor::Vector{EntityNeighborhood{CellIndex}}
+    # face_neighbor[cellid,local_face_id] -> exclusive connected entities (not restricted to one entity)
+    face_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
+    # vertex_neighbor[cellid,local_vertex_id] -> exclusive connected entities to the given vertex
+    vertex_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
+    # edge_neighbor[cellid,local_edge_id] -> exclusive connected entities of the given edge
+    edge_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
+    # list of unique faces in the grid given as FaceIndex
+    face_skeleton::Vector{FaceIndex}
+end
 
-ExclusiveTopology(grid::AbstractGrid) = ExclusiveTopology(getcells(grid))
+"""
+"""
+function CoverTopology(cells::Vector{C}) where C <: AbstractCell
+    cell_vertices_table = vertices.(cells) #needs generic interface for <: AbstractCell
+    vertex_cell_table = Dict{Int,Vector{Int}}()
+
+    for (cellid, cell_nodes) in enumerate(cell_vertices_table)
+       for node in cell_nodes
+            if haskey(vertex_cell_table, node)
+                push!(vertex_cell_table[node], cellid)
+            else
+                vertex_cell_table[node] = [cellid]
+            end
+        end
+    end
+
+    I_face = Int[]; J_face = Int[]; V_face = EntityNeighborhood[]
+    I_edge = Int[]; J_edge = Int[]; V_edge = EntityNeighborhood[]
+    I_vertex = Int[]; J_vertex = Int[]; V_vertex = EntityNeighborhood[]
+    cell_neighbor_table = Vector{EntityNeighborhood{CellIndex}}(undef, length(cells))
+
+    for (cellid, cell) in enumerate(cells)
+        #cell neighborhood
+        cell_neighbors = getindex.((vertex_cell_table,), cell_vertices_table[cellid]) # cell -> vertex -> cell
+        cell_neighbors = unique(reduce(vcat,cell_neighbors)) # non unique list initially
+        filter!(x->x!=cellid, cell_neighbors) # get rid of self neighborhood
+        cell_neighbor_table[cellid] = EntityNeighborhood(CellIndex.(cell_neighbors))
+
+        for neighbor in cell_neighbors
+            neighbor_local_ids = findall(x->x in cell.nodes, cells[neighbor].nodes)
+            cell_local_ids = findall(x->x in cells[neighbor].nodes, cell.nodes)
+            # cells are connected via exactly one vertex
+            if length(cell_local_ids) == 1
+                _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
+            # cells are only connected via exactly one face
+            elseif length(cell_local_ids) == face_npoints(cell)
+                _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
+                # Add edges on face
+                if getdim(cell) > 2
+                    for cell_edge_nodes ∈ edges(cell)
+                        neighbor_edge_local_ids = findall(x->x ∈ cell_edge_nodes, cells[neighbor].nodes)
+                        if length(neighbor_edge_local_ids) == edge_npoints(cell)
+                            _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor_edge_local_ids, neighbor, cells[neighbor])
+                        end
+                    end
+                end
+                # Add vertices on face
+                for cell_vertex_node ∈ vertices(cell)
+                    neighbor_vertex_local_id = findall(x->x == cell_vertex_node, cells[neighbor].nodes)
+                    if length(neighbor_vertex_local_id) == 1
+                        _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor_vertex_local_id, neighbor, cells[neighbor])
+                    end
+                end
+            # cells are only connected via exactly one edge
+            elseif getdim(cell) > 2 && length(cell_local_ids) == edge_npoints(cell)
+                _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
+                # Add vertices on edge
+                for cell_vertex_nodes ∈ vertices(cell)
+                    neighbor_vertex_local_id = findall(x->x == cell_vertex_nodes, cells[neighbor].nodes)
+                    if length(neighbor_vertex_local_id) == 1
+                        _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor_vertex_local_id, neighbor, cells[neighbor])
+                    end
+                end
+            end
+        end
+    end
+
+    face_neighbor = sparse(I_face,J_face,V_face)
+    vertex_neighbor = sparse(I_vertex,J_vertex,V_vertex)
+    edge_neighbor = sparse(I_edge,J_edge,V_edge)
+
+    # Face Skeleton
+    face_skeleton_global = Set{NTuple}()
+    face_skeleton_local = Vector{FaceIndex}()
+    fs_length = length(face_skeleton_global)
+    for (cellid,cell) in enumerate(cells)
+        for (local_face_id,face) in enumerate(faces(cell))
+            push!(face_skeleton_global, sortface(face))
+            fs_length_new = length(face_skeleton_global)
+            if fs_length != fs_length_new
+                push!(face_skeleton_local, FaceIndex(cellid,local_face_id))
+                fs_length = fs_length_new
+            end
+        end
+    end
+    return CoverTopology(vertex_cell_table,cell_neighbor_table,face_neighbor,vertex_neighbor,edge_neighbor,face_skeleton_local)
+end
 
 """
     Grid{dim, C<:AbstractCell, T<:Real} <: AbstractGrid}
@@ -379,10 +490,10 @@ end
 # Grid utility functions #
 ##########################
 """
-    getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
-    getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
-    getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
-    getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self=false)
+    getneighborhood(top::CoverTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
+    getneighborhood(top::CoverTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
+    getneighborhood(top::CoverTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
+    getneighborhood(top::CoverTopology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self=false)
 
 Returns all directly connected entities of the same type, i.e. calling the function with a `VertexIndex` will return
 a list of directly connected vertices (connected via face/edge). If `include_self` is true, the given `*Index` is included
@@ -391,7 +502,7 @@ in the returned list.
 !!! warning
     This feature is highly experimental and very likely subjected to interface changes in the future.
 """
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
+function getneighborhood(top::CoverTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
     patch = getcells(top.cell_neighbor[cellidx.idx])
     if include_self
         return [patch; cellidx.idx]
@@ -400,8 +511,7 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::Ce
     end
 end
 
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
-    # TODO cleaner solution...
+function getneighborhood(top::CoverTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
     data = faceidx[2] <= size(top.face_neighbor, 2) ? top.face_neighbor[faceidx[1],faceidx[2]].neighbor_info : []
     if include_self
         return [data; faceidx]
@@ -410,49 +520,32 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::Fa
     end
 end
 
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
-    cellid, local_vertexid = vertexidx[1], vertexidx[2]
-    cell_vertices = vertices(getcells(grid,cellid))
-    global_vertexid = cell_vertices[local_vertexid]
+function getneighborhood(top::CoverTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
     if include_self
-        vertex_to_cell = top.vertex_to_cell[global_vertexid]
-        self_reference_local = Vector{VertexIndex}(undef,length(vertex_to_cell))
-        for (i,cellid) in enumerate(vertex_to_cell)
-            local_vertex = VertexIndex(cellid,findfirst(x->x==global_vertexid,vertices(getcells(grid,cellid))))
-            self_reference_local[i] = local_vertex
-        end
-        return [top.vertex_vertex_neighbor[global_vertexid].neighbor_info; self_reference_local]
+        return [top.vertex_neighbor[vertexidx[1], vertexidx[2]].neighbor_info; vertexidx]
     else
-        return top.vertex_vertex_neighbor[global_vertexid].neighbor_info
+        return top.vertex_neighbor[vertexidx[1], vertexidx[2]].neighbor_info
     end
 end
 
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx::EdgeIndex, include_self=false)
-    cellid, local_edgeidx = edgeidx[1], edgeidx[2]
-    cell_edges = edges(getcells(grid,cellid))
-    nonlocal_edgeid = cell_edges[local_edgeidx] 
-    cell_neighbors = getneighborhood(top,grid,CellIndex(cellid))
-    self_reference_local = EdgeIndex[]
-    for cellid in cell_neighbors
-        local_neighbor_edgeid = findfirst(x->issubset(x,nonlocal_edgeid),edges(getcells(grid,cellid)))
-        local_neighbor_edgeid === nothing && continue
-        local_edge = EdgeIndex(cellid,local_neighbor_edgeid)
-        push!(self_reference_local, local_edge)
-    end
-    if include_self  
-        return unique([top.edge_neighbor[cellid, local_edgeidx].neighbor_info; self_reference_local; edgeidx])
+function getneighborhood(top::CoverTopology, grid::AbstractGrid{3}, edgeidx::EdgeIndex, include_self=false)
+    if include_self
+        return [top.edge_neighbor[edgeidx[1], edgeidx[2]].neighbor_info; edgeidx]
     else
-        return unique([top.edge_neighbor[cellid, local_edgeidx].neighbor_info; self_reference_local])
+        return top.edge_neighbor[edgeidx[1], edgeidx[2]].neighbor_info
     end
 end
+
+
+CoverTopology(grid::AbstractGrid) = CoverTopology(getcells(grid))
 
 
 """
-    faceskeleton(grid) -> Vector{FaceIndex}
+    faceskeleton(topology, grid) -> Vector{FaceIndex}
 Returns an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit`
 `FaceValues`.
 """
-faceskeleton(top::ExclusiveTopology, grid::AbstractGrid) =  top.face_skeleton
+faceskeleton(top::AbstractTopology, grid::AbstractGrid) =  top.face_skeleton
 
 """
     toglobal(grid::AbstractGrid, vertexidx::VertexIndex) -> Int
