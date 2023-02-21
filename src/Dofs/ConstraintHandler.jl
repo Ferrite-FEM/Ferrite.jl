@@ -513,7 +513,7 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
     unique!(unique_fields)
 
     for field in unique_fields
-        nd = ndim(ch.dh, field)
+        nd = getfielddim(ch.dh, field)
         data = zeros(Float64, nd, getnnodes(getgrid(ch.dh)))
         for dbc in ch.dbcs
             dbc.field_name != field && continue

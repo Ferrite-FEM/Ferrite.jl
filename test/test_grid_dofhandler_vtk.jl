@@ -484,10 +484,10 @@ end
     # Consistency check for dof computation.
     grid = generate_grid(Hexahedron, (2, 2, 2))
     dh = DofHandler(grid)
-    push!(dh, :u, 3, Lagrange{3,RefCube,2}())
-    push!(dh, :v, 1, Lagrange{3,RefCube,2}())
-    push!(dh, :w, 3, Lagrange{3,RefCube,1}())
-    push!(dh, :x, 3, Lagrange{3,RefCube,2}())
+    add!(dh, :u, 3, Lagrange{3,RefCube,2}())
+    add!(dh, :v, 1, Lagrange{3,RefCube,2}())
+    add!(dh, :w, 3, Lagrange{3,RefCube,1}())
+    add!(dh, :x, 3, Lagrange{3,RefCube,2}())
     _, vertexdicts, edgedicts, facedicts = Ferrite.__close!(dh)
     @test Ferrite.find_field(dh, :u) == 1
     @test Ferrite.find_field(dh, :v) == 2
