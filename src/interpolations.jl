@@ -437,8 +437,19 @@ end
 getnbasefunctions(::Lagrange{3,RefTetrahedron,1}) = 4
 nvertexdofs(::Lagrange{3,RefTetrahedron,1}) = 1
 
-faces(::Lagrange{3,RefTetrahedron,1}) = ((1,3,2), (1,2,4), (2,3,4), (1,4,3))
-edges(::Lagrange{3,RefTetrahedron,1}) = ((1,2), (2,3), (3,1), (1,4), (2,4), (3,4))
+faces(::Lagrange{3,RefTetrahedron,1}) = (
+    (1,3,2),
+    (1,2,4),
+    (2,3,4),
+    (1,4,3))
+edges(::Lagrange{3,RefTetrahedron,1}) = (
+    (1,2),
+    (2,3),
+    (3,1),
+    (1,4),
+    (2,4),
+    (3,4)
+)
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,1})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
@@ -465,8 +476,20 @@ getnbasefunctions(::Lagrange{3,RefTetrahedron,2}) = 10
 nvertexdofs(::Lagrange{3,RefTetrahedron,2}) = 1
 nedgedofs(::Lagrange{3,RefTetrahedron,2}) = 1
 
-faces(::Lagrange{3,RefTetrahedron,2}) = ((1,3,2,7,6,5), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
-edges(::Lagrange{3,RefTetrahedron,2}) = ((1,2,5), (2,3,6), (3,1,7), (1,4,8), (2,4,9), (3,4,10))
+faces(::Lagrange{3,RefTetrahedron,2}) = (
+    (1,3,2, 7, 6,5),
+    (1,2,4, 5, 9,8),
+    (2,3,4, 6,10,9),
+    (1,4,3, 8,10,7)
+)
+edges(::Lagrange{3,RefTetrahedron,2}) = (
+    (1,2,  5),
+    (2,3,  6),
+    (3,1,  7),
+    (1,4,  8),
+    (2,4,  9),
+    (3,4, 10)
+)
 
 function reference_coordinates(::Lagrange{3,RefTetrahedron,2})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
@@ -506,8 +529,29 @@ end
 getnbasefunctions(::Lagrange{3,RefCube,1}) = 8
 nvertexdofs(::Lagrange{3,RefCube,1}) = 1
 
-faces(::Lagrange{3,RefCube,1}) = ((1,4,3,2), (1,2,6,5), (2,3,7,6), (3,4,8,7), (1,5,8,4), (5,6,7,8))
-edges(::Lagrange{3,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1), (1,5), (2,6), (3,7), (4,8), (5,6), (6,7), (7,8), (8,5))
+faces(::Lagrange{3,RefCube,1}) = (
+    (1,4,3,2), # Local face index 1
+    (1,2,6,5),
+    (2,3,7,6),
+    (3,4,8,7),
+    (1,5,8,4),
+    (5,6,7,8)  # Local face index 6
+)
+
+edges(::Lagrange{3,RefCube,1}) = (
+    (1,2),  # Local edge index 1
+    (2,3), 
+    (3,4),
+    (4,1),
+    (5,6),
+    (6,7),
+    (7,8),
+    (8,5),
+    (1,5),
+    (2,6),
+    (3,7),
+    (4,8)   # Local edge index 12
+)
 
 function reference_coordinates(::Lagrange{3,RefCube,1})
     return [Vec{3, Float64}((-1.0, -1.0, -1.0)),
@@ -547,14 +591,27 @@ nfacedofs(::Lagrange{3,RefCube,2}) = 1
 ncelldofs(::Lagrange{3,RefCube,2}) = 1
 
 faces(::Lagrange{3,RefCube,2}) = (
-    (1,4,3,2, 12,11,10,9, 21),
+    (1,4,3,2, 12,11,10,9, 21),  # Local face index 1
     (1,2,6,5, 9,18,13,17, 22),
     (2,3,7,6, 10,19,14,18, 23),
     (3,4,8,7, 11,20,15,19, 24),
     (1,5,8,4, 17,16,20,12, 25),
-    (5,6,7,8, 13,14,15,16, 26),
+    (5,6,7,8, 13,14,15,16, 26), # Local face index 6
 )
-edges(::Lagrange{3,RefCube,2}) = ((1,2, 9), (2,3, 10), (3,4, 11), (4,1, 12), (1,5, 17), (2,6, 18), (3,7, 19), (4,8, 20), (5,6, 13), (6,7, 14), (7,8, 15), (8,5, 16))
+edges(::Lagrange{3,RefCube,2}) = (
+    (1,2,  9), # Local edge index 1
+    (2,3, 10),
+    (3,4, 11),
+    (4,1, 12),
+    (5,6, 13),
+    (6,7, 14),
+    (7,8, 15),
+    (8,5, 16),
+    (1,5, 17),
+    (2,6, 18),
+    (3,7, 19),
+    (4,8, 20)  # Local edge index 12
+)
 
 function reference_coordinates(::Lagrange{3,RefCube,2})
            # vertex
@@ -716,7 +773,28 @@ getlowerorder(::Serendipity{3,RefCube,2}) = Lagrange{3,RefCube,1}()
 nvertexdofs(::Serendipity{3,RefCube,2}) = 1
 nedgedofs(::Serendipity{3,RefCube,2}) = 1
 
-faces(::Serendipity{3,RefCube,2}) = ((1,4,3,2,12,11,10,9), (1,2,6,5,9,18,13,17), (2,3,7,6,10,19,14,18), (3,4,8,7,11,20,15,19), (1,5,8,4,17,16,20,12), (5,6,7,8,13,14,15,16))
+faces(::Serendipity{3,RefCube,2}) = (
+    (1,4,3,2, 12,11,10, 9),
+    (1,2,6,5,  9,18,13,17),
+    (2,3,7,6, 10,19,14,18),
+    (3,4,8,7, 11,20,15,19),
+    (1,5,8,4, 17,16,20,12),
+    (5,6,7,8, 13,14,15,16)
+)
+edges(::Serendipity{3,RefCube,2}) = (
+    (1,2,  9), # Local edge index 1
+    (2,3, 10),
+    (3,4, 11),
+    (4,1, 12),
+    (5,6, 13),
+    (6,7, 14),
+    (7,8, 15),
+    (8,5, 16),
+    (1,5, 17),
+    (2,6, 18),
+    (3,7, 19),
+    (4,8, 20)  # Local edge index 12
+)
 
 function reference_coordinates(::Serendipity{3,RefCube,2})
     return [Vec{3, Float64}((-1.0, -1.0, -1.0)),

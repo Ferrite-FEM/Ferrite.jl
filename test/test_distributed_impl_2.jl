@@ -24,9 +24,9 @@ FerriteMPI = Base.get_extension(Ferrite, :FerriteMPI)
             @test Ferrite.remote_entities(se) == Dict(2 => [idx_nonlocal])
         end
         check_edge_correctly_shared_1(EdgeIndex(1,4), EdgeIndex(1,2))
-        check_edge_correctly_shared_1(EdgeIndex(1,12), EdgeIndex(1,10))
-        check_edge_correctly_shared_1(EdgeIndex(1,8), EdgeIndex(1,7))
-        check_edge_correctly_shared_1(EdgeIndex(1,5), EdgeIndex(1,6))
+        check_edge_correctly_shared_1(EdgeIndex(1,12), EdgeIndex(1,11))
+        check_edge_correctly_shared_1(EdgeIndex(1,9), EdgeIndex(1,10))
+        check_edge_correctly_shared_1(EdgeIndex(1,8), EdgeIndex(1,6))
 
         # Faces
         @test length(Ferrite.get_shared_faces(dgrid)) == 1
@@ -40,9 +40,9 @@ FerriteMPI = Base.get_extension(Ferrite, :FerriteMPI)
             @test Ferrite.remote_entities(se) == Dict(1 => [idx_nonlocal])
         end
         check_edge_correctly_shared_2(EdgeIndex(1,4), EdgeIndex(1,2))
-        check_edge_correctly_shared_2(EdgeIndex(1,12), EdgeIndex(1,10))
-        check_edge_correctly_shared_2(EdgeIndex(1,8), EdgeIndex(1,7))
-        check_edge_correctly_shared_2(EdgeIndex(1,5), EdgeIndex(1,6))
+        check_edge_correctly_shared_2(EdgeIndex(1,12), EdgeIndex(1,11))
+        check_edge_correctly_shared_2(EdgeIndex(1,9), EdgeIndex(1,10))
+        check_edge_correctly_shared_2(EdgeIndex(1,8), EdgeIndex(1,6))
 
         # Faces
         @test length(Ferrite.get_shared_faces(dgrid)) == 1

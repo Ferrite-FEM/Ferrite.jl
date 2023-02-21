@@ -23,7 +23,7 @@ FerriteMPI = Base.get_extension(Ferrite, :FerriteMPI)
     my_rank = Ferrite.global_rank(dgrid)
     
     dh = DofHandler(dgrid)
-    push!(dh, :u, 1, ip)
+    add!(dh, :u, 1, ip)
     close!(dh);
 
     @test length(dh.ldof_to_gdof) == length(dh.ldof_to_rank)

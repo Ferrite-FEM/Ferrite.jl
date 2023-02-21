@@ -971,6 +971,7 @@ end
 # Functions to uniquely identify vertices, edges and faces, used when distributing
 # dofs over a mesh. For this we can ignore the nodes on edged, faces and inside cells,
 # we only need to use the nodes that are vertices.
+# NOTE: These are required to be consistent with the corresponding geometric default interpolation.
 # 1D: vertices
 faces(c::Union{Line,QuadraticLine}) = (c.nodes[1], c.nodes[2])
 vertices(c::Union{Line,Line2D,Line3D,QuadraticLine}) = (c.nodes[1], c.nodes[2])
@@ -983,11 +984,46 @@ faces(c::Union{Quadrilateral,QuadraticQuadrilateral}) = ((c.nodes[1],c.nodes[2])
 # 3D: vertices, edges, faces
 edges(c::Line3D) = ((c.nodes[1],c.nodes[2]),)
 vertices(c::Union{Tetrahedron,QuadraticTetrahedron}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
-edges(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]), (c.nodes[1],c.nodes[4]), (c.nodes[2],c.nodes[4]), (c.nodes[3],c.nodes[4]))
-faces(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[4]), (c.nodes[2],c.nodes[3],c.nodes[4]), (c.nodes[1],c.nodes[4],c.nodes[3]))
+edges(c::Union{Tetrahedron,QuadraticTetrahedron}) = (
+    (c.nodes[1],c.nodes[2]), # Local edge index 1
+    (c.nodes[2],c.nodes[3]),
+    (c.nodes[3],c.nodes[1]),
+    (c.nodes[1],c.nodes[4]),
+    (c.nodes[2],c.nodes[4]),
+    (c.nodes[3],c.nodes[4])  # Local edge index 6
+)
+faces(c::Union{Tetrahedron,QuadraticTetrahedron}) = (
+    (c.nodes[1],c.nodes[3],c.nodes[2]), # Local face index 1
+    (c.nodes[1],c.nodes[2],c.nodes[4]),
+    (c.nodes[2],c.nodes[3],c.nodes[4]),
+    (c.nodes[1],c.nodes[4],c.nodes[3])  # Local face index 4
+)
+
+
 vertices(c::Union{Hexahedron,Cell{3,20,6}}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[5], c.nodes[6], c.nodes[7], c.nodes[8])
-edges(c::Union{Hexahedron,Cell{3,20,6}}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]), (c.nodes[5],c.nodes[6]), (c.nodes[6],c.nodes[7]), (c.nodes[7],c.nodes[8]), (c.nodes[8],c.nodes[5]), (c.nodes[1],c.nodes[5]), (c.nodes[2],c.nodes[6]), (c.nodes[3],c.nodes[7]), (c.nodes[4],c.nodes[8]))
-faces(c::Union{Hexahedron,Cell{3,20,6}}) = ((c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))
+edges(c::Union{Hexahedron,Cell{3,20,6}}) = (
+    (c.nodes[1],c.nodes[2]), # Local edge index 1
+    (c.nodes[2],c.nodes[3]),
+    (c.nodes[3],c.nodes[4]),
+    (c.nodes[4],c.nodes[1]),
+    (c.nodes[5],c.nodes[6]),
+    (c.nodes[6],c.nodes[7]),
+    (c.nodes[7],c.nodes[8]),
+    (c.nodes[8],c.nodes[5]),
+    (c.nodes[1],c.nodes[5]),
+    (c.nodes[2],c.nodes[6]),
+    (c.nodes[3],c.nodes[7]),
+    (c.nodes[4],c.nodes[8])  # Local edge index 12
+)
+faces(c::Union{Hexahedron,Cell{3,20,6}}) = (
+    (c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), # Local face index 1
+    (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]),
+    (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]),
+    (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]),
+    (c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]),
+    (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8])  # Local face index 6
+)
+
 edges(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
 faces(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2],c.nodes[3],c.nodes[4]),)
 

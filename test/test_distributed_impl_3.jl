@@ -120,19 +120,19 @@ FerriteMPI = Base.get_extension(Ferrite, :FerriteMPI)
             @test getncells(lgrid) == 1
             non_shared_vertices = [VertexIndex(1,1), VertexIndex(1,5)]
             non_shared_faces    = [FaceIndex(1,1), FaceIndex(1,6), FaceIndex(1,2), FaceIndex(1,5)]
-            non_shared_edges    = [EdgeIndex(1,1), EdgeIndex(1,4), EdgeIndex(1,5), EdgeIndex(1,9), EdgeIndex(1,12)]
+            non_shared_edges    = [EdgeIndex(1,1), EdgeIndex(1,4), EdgeIndex(1,5), EdgeIndex(1,8), EdgeIndex(1,9)]
         elseif my_rank == 2
             lgrid = getlocalgrid(dgrid)
             @test getncells(lgrid) == 1
             non_shared_vertices = [VertexIndex(1,3), VertexIndex(1,7)]
             non_shared_faces    = [FaceIndex(1,1), FaceIndex(1,6), FaceIndex(1,3), FaceIndex(1,4)]
-            non_shared_edges    = [EdgeIndex(1,2), EdgeIndex(1,10), EdgeIndex(1,3), EdgeIndex(1,11), EdgeIndex(1,7)]
+            non_shared_edges    = [EdgeIndex(1,2), EdgeIndex(1,6), EdgeIndex(1,3), EdgeIndex(1,7), EdgeIndex(1,11)]
         elseif my_rank == 3
             lgrid = getlocalgrid(dgrid)
             @test getncells(lgrid) == 2
             non_shared_vertices = [VertexIndex(1,2), VertexIndex(1,6), VertexIndex(2,4), VertexIndex(2,8)]
             non_shared_faces    = [FaceIndex(1,1), FaceIndex(1,6), FaceIndex(1,2), FaceIndex(1,3), FaceIndex(2,1), FaceIndex(2,6), FaceIndex(2,5), FaceIndex(2,4)]
-            non_shared_edges    = [EdgeIndex(1,1), EdgeIndex(1,9), EdgeIndex(1,6), EdgeIndex(1,2), EdgeIndex(1,10), EdgeIndex(2,4), EdgeIndex(2,12), EdgeIndex(2,8), EdgeIndex(2,3), EdgeIndex(2,11)]
+            non_shared_edges    = [EdgeIndex(1,1), EdgeIndex(1,5), EdgeIndex(1,2), EdgeIndex(1,6), EdgeIndex(1,10), EdgeIndex(2,4), EdgeIndex(2,8), EdgeIndex(2,3), EdgeIndex(2,7), EdgeIndex(2,12)]
         else
             # Abstract machine or memory corruption during exectution above.
             @test false
