@@ -490,6 +490,70 @@ end
 # Grid utility functions #
 ##########################
 """
+    getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
+    getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
+    getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
+    getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, edgeidx::EdgeIndex, include_self=false)
+Returns all directly connected entities of the same type, i.e. calling the function with a `VertexIndex` will return
+a list of directly connected vertices (connected via face/edge). If `include_self` is true, the given `*Index` is included 
+in the returned list.
+!!! warning
+    This feature is highly experimental and very likely subjected to interface changes in the future.
+"""
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
+    patch = getcells(top.cell_neighbor[cellidx.idx])
+    if include_self
+        return [patch; cellidx.idx]
+    else 
+        return patch
+    end
+end
+
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
+    if include_self 
+        return [top.face_neighbor[faceidx[1],faceidx[2]].neighbor_info; faceidx]
+    else
+        return top.face_neighbor[faceidx[1],faceidx[2]].neighbor_info
+    end
+end
+
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
+    cellid, local_vertexid = vertexidx[1], vertexidx[2]
+    cell_vertices = vertices(getcells(grid,cellid))
+    global_vertexid = cell_vertices[local_vertexid]
+    if include_self
+        vertex_to_cell = top.vertex_to_cell[global_vertexid]
+        self_reference_local = Vector{VertexIndex}(undef,length(vertex_to_cell))
+        for (i,cellid) in enumerate(vertex_to_cell)
+            local_vertex = VertexIndex(cellid,findfirst(x->x==global_vertexid,vertices(getcells(grid,cellid))))
+            self_reference_local[i] = local_vertex
+        end
+        return [top.vertex_vertex_neighbor[global_vertexid].neighbor_info; self_reference_local]
+    else
+        return top.vertex_vertex_neighbor[global_vertexid].neighbor_info
+    end
+end
+
+function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx::EdgeIndex, include_self=false)
+    cellid, local_edgeidx = edgeidx[1], edgeidx[2]
+    cell_edges = edges(getcells(grid,cellid))
+    nonlocal_edgeid = cell_edges[local_edgeidx] 
+    cell_neighbors = getneighborhood(top,grid,CellIndex(cellid))
+    self_reference_local = EdgeIndex[]
+    for cellid in cell_neighbors
+        local_neighbor_edgeid = findfirst(x->issubset(x,nonlocal_edgeid),edges(getcells(grid,cellid)))
+        local_neighbor_edgeid === nothing && continue
+        local_edge = EdgeIndex(cellid,local_neighbor_edgeid)
+        push!(self_reference_local, local_edge)
+    end
+    if include_self  
+        return unique([top.edge_neighbor[cellid, local_edgeidx].neighbor_info; self_reference_local; edgeidx])
+    else
+        return unique([top.edge_neighbor[cellid, local_edgeidx].neighbor_info; self_reference_local])
+    end
+end
+
+"""
     getneighborhood(top::CoverTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
     getneighborhood(top::CoverTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
     getneighborhood(top::CoverTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
