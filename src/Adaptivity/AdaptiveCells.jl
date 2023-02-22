@@ -211,7 +211,7 @@ function find_range_boundaries(f::OctantBWG{dim,N,M,T}, l::OctantBWG{dim,N,M,T},
         idxset_match_j = find_range_boundaries(f,lj,kidz[j],idxset_match_j,b)
     end
     idxset_match_k = setdiff(setdiff((idxset ∩ boundary_j),idxset_match),idxset_match_j)
-    fk, lk = descendants(kidz[k])
+    fk, lk = descendants(kidz[k],b)
     if lk != l
         idxset_match_k = find_range_boundaries(fk,l,kidz[k],idxset_match_k,b)
     end
