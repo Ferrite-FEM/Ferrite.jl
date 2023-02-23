@@ -280,8 +280,8 @@ A Differential Algebraic Equations (DAE) is an equation of the form
 which usually cannot be expressed as a true ODE. They occur often,
 but not always, in forms where some time derivatives are missing
 ```math
-u_1'(t) = f(\boldsymbol{u}(t),t)
-0 = g(\boldsymbol{u}(t),t)`
+u_1'(t) = f(\boldsymbol{u}(t),t)\\
+0 = g(\boldsymbol{u}(t),t)
 ```
 In for such equations, it is usually necessary to specify initial conditions 
 for both ``\boldsymbol{u}(0)`` and ``\boldsymbol{u}'(0)``, and these must be consistent,
