@@ -112,23 +112,25 @@ end
 abstract type OctantIndex{T<:Integer} end
 Base.isequal(i1::T,i2::T) where T<:OctantIndex = i1.idx == i2.idx #same type
 Base.isequal(i1::T1,i2::T2) where {T1<:OctantIndex,T2<:OctantIndex} = false #different type
-Base.hash(idx::OctantIndex) = Base.hash(idx.idx)
 
 struct OctantCornerIndex{T} <: OctantIndex{T}
     idx::T
 end
+Base.hash(idx::OctantCornerIndex) = Base.hash((0,idx.idx))
 Base.show(io::IO, ::MIME"text/plain", c::OctantCornerIndex) = print(io, "O-Corner $(c.idx)")
 Base.show(io::IO, c::OctantCornerIndex) = print(io, "O-Corner $(c.idx)")
 
 struct OctantEdgeIndex{T} <: OctantIndex{T}
     idx::T
 end
+Base.hash(idx::OctantEdgeIndex) = Base.hash((1,idx.idx))
 Base.show(io::IO, ::MIME"text/plain", e::OctantEdgeIndex) = print(io, "O-Edge $(e.idx)")
 Base.show(io::IO, e::OctantEdgeIndex) = print(io, "O-Edge $(e.idx)")
 
 struct OctantFaceIndex{T} <: OctantIndex{T}
     idx::T
 end
+Base.hash(idx::OctantFaceIndex) = Base.hash((2,idx.idx))
 Base.show(io::IO, ::MIME"text/plain", f::OctantFaceIndex) = print(io, "O-Face $(f.idx)")
 Base.show(io::IO, f::OctantFaceIndex) = print(io, "O-Face $(f.idx)")
 
@@ -226,7 +228,7 @@ function find_range_boundaries(f::OctantBWG{dim,N,M,T}, l::OctantBWG{dim,N,M,T},
     if j==k
         return find_range_boundaries(f,l,kidz[j],idxset ∩ boundary_j,b)
     end
-    idxset_match = boundarysettype(s)()
+    idxset_match = Set{OctantIndex{T}}()
     for i in j:k
         idxset_match = idxset_match ∪ (idxset ∩ boundaryset(s,i,b))
     end
