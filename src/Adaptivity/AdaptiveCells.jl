@@ -68,7 +68,7 @@ function morton(octant::OctantBWG{dim,N,M,T},l::T,b::T) where {dim,N,M,T<:Intege
     loop_length = (sizeof(typeof(id))*T(8)) ÷ dim - o
     for i in z:loop_length
         for d in z:dim-o
-            # first shift extract i-th bit and second shift inserts it at interleaved index 
+            # first shift extract i-th bit and second shift inserts it at interleaved index
             id = id | ((octant.xyz[d+o] & (o << i)) << ((dim-o)*i+d))
         end
     end
@@ -109,6 +109,30 @@ function children(octant::OctantBWG{dim,N,M,T}, b::Integer) where {dim,N,M,T}
     return ntuple(i->OctantBWG(dim,octant.l+o,(startid:endid)[i],b),_nchilds)
 end
 
+abstract type OctantIndex{T<:Integer} end
+Base.isequal(i1::T,i2::T) where T<:OctantIndex = i1.idx == i2.idx #same type
+Base.isequal(i1::T1,i2::T2) where {T1<:OctantIndex,T2<:OctantIndex} = false #different type
+Base.hash(idx::OctantIndex) = Base.hash(idx.idx)
+
+struct OctantCornerIndex{T} <: OctantIndex{T}
+    idx::T
+end
+Base.show(io::IO, ::MIME"text/plain", c::OctantCornerIndex) = print(io, "O-Corner $(c.idx)")
+Base.show(io::IO, c::OctantCornerIndex) = print(io, "O-Corner $(c.idx)")
+
+struct OctantEdgeIndex{T} <: OctantIndex{T}
+    idx::T
+end
+Base.show(io::IO, ::MIME"text/plain", e::OctantEdgeIndex) = print(io, "O-Edge $(e.idx)")
+Base.show(io::IO, e::OctantEdgeIndex) = print(io, "O-Edge $(e.idx)")
+
+struct OctantFaceIndex{T} <: OctantIndex{T}
+    idx::T
+end
+Base.show(io::IO, ::MIME"text/plain", f::OctantFaceIndex) = print(io, "O-Face $(f.idx)")
+Base.show(io::IO, f::OctantFaceIndex) = print(io, "O-Face $(f.idx)")
+
+vertex(octant::OctantBWG, c::OctantCornerIndex, b::Integer) = vertex(octant,c.idx,b)
 function vertex(octant::OctantBWG{dim,N,M,T}, c::Integer, b::Integer) where {dim,N,M,T}
     h = T(_compute_size(b,octant.l))
     return ntuple(d->((c-1) & (2^(d-1))) == 0 ? octant.xyz[d] : octant.xyz[d] + h ,dim)
@@ -119,6 +143,7 @@ function vertices(octant::OctantBWG{dim},b::Integer) where {dim}
     return ntuple(i->vertex(octant,i,b),_nvertices)
 end
 
+vertex(octant::OctantBWG, f::OctantFaceIndex, b::Integer) = vertex(octant,f.idx,b)
 function face(octant::OctantBWG{2}, f::Integer, b::Integer)
     cornerid = view(𝒱₂,f,:)
     return ntuple(i->vertex(octant, cornerid[i], b),2)
@@ -129,6 +154,7 @@ function face(octant::OctantBWG{3}, f::Integer, b::Integer)
     return ntuple(i->vertex(octant, cornerid[i], b),4)
 end
 
+vertex(octant::OctantBWG, e::OctantEdgeIndex, b::Integer) = vertex(octant,e.idx,b)
 function edge(octant::OctantBWG{3}, e::Integer, b::Integer)
     cornerid = view(𝒰,e,:)
     return ntuple(i->vertex(octant,cornerid[i], b),2)
@@ -142,13 +168,13 @@ TODO: could be done little bit less ugly
 function boundaryset(o::OctantBWG{2,N,M,T}, i::Integer, b::Integer) where {N,M,T}
     settype = boundarysettype(o)
     if i==1
-        return settype((vertex(o,1,b),face(o,1,b),face(o,3,b)))
+        return Set((OctantCornerIndex(1),OctantFaceIndex(1),OctantFaceIndex(3)))
     elseif i==2
-        return settype((vertex(o,2,b),face(o,2,b),face(o,3,b)))
+        return Set((OctantCornerIndex(2),OctantFaceIndex(2),OctantFaceIndex(3)))
     elseif i==3
-        return settype((vertex(o,3,b),face(o,1,b),face(o,4,b)))
+        return Set((OctantCornerIndex(3),OctantFaceIndex(1),OctantFaceIndex(4)))
     elseif i==4
-        return settype((vertex(o,4,b),face(o,2,b),face(o,4,b)))
+        return Set((OctantCornerIndex(4),OctantFaceIndex(2),OctantFaceIndex(4)))
     else
         throw("no boundary")
     end
@@ -162,21 +188,21 @@ TODO: could be done little bit less ugly
 function boundaryset(o::OctantBWG{3,N,M,T}, i::Integer, b::Integer) where {N,M,T}
     settype = boundarysettype(o)
     if i==1
-        return settype((vertex(o,1,b),edge(o,1,b),edge(o,5,b),edge(o,9,b), face(o,1,b),face(o,3,b),face(o,5,b)))
+        return Set((OctantCornerIndex(1),OctantEdgeIndex(1),OctantEdgeIndex(5),OctantEdgeIndex(9), OctantFaceIndex(1),OctantFaceIndex(3),OctantFaceIndex(5)))
     elseif i==2
-        return settype((vertex(o,2,b),edge(o,1,b),edge(o,6,b),edge(o,10,b),face(o,2,b),face(o,3,b),face(o,5,b)))
+        return Set((OctantCornerIndex(2),OctantEdgeIndex(1),OctantEdgeIndex(6),OctantEdgeIndex(10),OctantFaceIndex(2),OctantFaceIndex(3),OctantFaceIndex(5)))
     elseif i==3
-        return settype((vertex(o,3,b),edge(o,2,b),edge(o,5,b),edge(o,11,b),face(o,1,b),face(o,4,b),face(o,5,b)))
+        return Set((OctantCornerIndex(3),OctantEdgeIndex(2),OctantEdgeIndex(5),OctantEdgeIndex(11),OctantFaceIndex(1),OctantFaceIndex(4),OctantFaceIndex(5)))
     elseif i==4
-        return settype((vertex(o,4,b),edge(o,2,b),edge(o,6,b),edge(o,12,b),face(o,2,b),face(o,4,b),face(o,5,b)))
+        return Set((OctantCornerIndex(4),OctantEdgeIndex(2),OctantEdgeIndex(6),OctantEdgeIndex(12),OctantFaceIndex(2),OctantFaceIndex(4),OctantFaceIndex(5)))
     elseif i==5
-        return settype((vertex(o,5,b),edge(o,3,b),edge(o,7,b),edge(o,9,b), face(o,1,b),face(o,3,b),face(o,6,b)))
+        return Set((OctantCornerIndex(5),OctantEdgeIndex(3),OctantEdgeIndex(7),OctantEdgeIndex(9), OctantFaceIndex(1),OctantFaceIndex(3),OctantFaceIndex(6)))
     elseif i==6
-        return settype((vertex(o,6,b),edge(o,3,b),edge(o,8,b),edge(o,10,b),face(o,2,b),face(o,3,b),face(o,6,b)))
+        return Set((OctantCornerIndex(6),OctantEdgeIndex(3),OctantEdgeIndex(8),OctantEdgeIndex(10),OctantFaceIndex(2),OctantFaceIndex(3),OctantFaceIndex(6)))
     elseif i==7
-        return settype((vertex(o,7,b),edge(o,4,b),edge(o,7,b),edge(o,11,b),face(o,1,b),face(o,4,b),face(o,6,b)))
+        return Set((OctantCornerIndex(7),OctantEdgeIndex(4),OctantEdgeIndex(7),OctantEdgeIndex(11),OctantFaceIndex(1),OctantFaceIndex(4),OctantFaceIndex(6)))
     elseif i==8
-        return settype((vertex(o,8,b),edge(o,4,b),edge(o,8,b),edge(o,12,b),face(o,2,b),face(o,4,b),face(o,6,b)))
+        return Set((OctantCornerIndex(8),OctantEdgeIndex(4),OctantEdgeIndex(8),OctantEdgeIndex(12),OctantFaceIndex(2),OctantFaceIndex(4),OctantFaceIndex(6)))
     else
         throw("no boundary")
     end
@@ -186,7 +212,7 @@ end
     find_range_boundaries(f::OctantBWG{dim,N,M,T}, l::OctantBWG{dim,N,M,T}, s::OctantBWG{dim,N,M,T}, idxset, b)
     find_range_boundaries(s::OctantBWG{dim,N,M,T}, idxset, b)
 Algorithm 4.2 of IBWG 2015
-TODO against what to test? Seems to work in the sense that if idxset has elements in the set 
+TODO against what to test? Seems to work in the sense that if idxset has elements in the set
 that are not part of the boundary, they are not returned
 """
 function find_range_boundaries(f::OctantBWG{dim,N,M,T}, l::OctantBWG{dim,N,M,T}, s::OctantBWG{dim,N,M,T}, idxset, b) where {dim,N,M,T}
@@ -415,40 +441,13 @@ getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same 
 
 #TODO: this function should wrap the LNodes Iterator of IBWG2015
 function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
-    nodes = Vector{Node{dim,Int32}}()
-    sizehint!(nodes,getncells(forest)*2^dim)
+    nodes = Dict{Tuple{Int,NTuple{dim,Int32}},NTuple{dim,Int32}}()
     for (k,tree) in enumerate(forest.cells)
         for leaf in tree.leaves
-            for c in 1:ncorners(leaf)
-                #below doesn't work since I need to check and loop for supp(c), see IBWG 2015
-                neighbor = corner_neighbor(leaf,c,tree.b)
-                if inside(tree,neighbor) # checks if neighbor is in boundary of tree (w.r.t. octree coordinates)
-                    # I think the below is valid
-                    neighbor_morton = morton(neighbor,neighbor.l,tree.b)
-                    leaf_morton = morton(leaf,leaf.l,tree.b)
-                    # If the participating neighbor has higher morton id assign new node
-                    if leaf_morton < neighbor_morton
-                        push!(nodes, Node(transform_corner(forest,k,c,leaf).xyz))
-                    end
-                else
-                    #TODO I don't know how to handle the other case, the below doesn't work
-                    lowest_octree = true
-                    for f in corner_face_participation(dim,c)
-                        k′ = getneighborhood(forest,FaceIndex(k,f))
-                        if isempty(k′)
-                            continue
-                        else
-                            k′ = k′[1][1] # always half face, ugly TODO
-                        end
-                        if k′ < k
-                            lowest_octree = false
-                            break
-                        end
-                    end
-                    if lowest_octree
-                        #transform needs the neighbor c
-                       push!(nodes,Node(transform_corner(forest,k,c,leaf).xyz))
-                    end
+            _vertices = vertices(leaf,tree.b)
+            for v in _vertices
+                if !haskey(nodes,(k,v))
+                    nodes[(k,v)] = v
                 end
             end
         end
