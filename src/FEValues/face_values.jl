@@ -246,7 +246,7 @@ function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_in
 
     qrs = QuadratureRule{dim,refshape,T}[]
     faces = boundaryfunction(boundary_type) # faces, edges or vertices
-    for face in faces(func_interpol)
+    for face in facedof_indices(func_interpol)
         dofcoords = Vec{dim,T}[]
         for facedof in face
             push!(dofcoords, interpolation_coords[facedof])

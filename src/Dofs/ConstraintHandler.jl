@@ -1302,7 +1302,7 @@ end
 function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{2,<:Union{RefCube,RefTetrahedron}}, n::Int)
     # For 2D we always permute since Ferrite defines dofs counter-clockwise
     ret = collect(1:length(local_face_dofs))
-    for (i, f) in enumerate(faces(ip))
+    for (i, f) in enumerate(facedof_indices(ip))
         this_offset = local_face_dofs_offset[i]
         other_offset = this_offset + n
         for d in 1:n
@@ -1323,7 +1323,7 @@ function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange
     ret = collect(1:length(local_face_dofs))
 
     # Mirror by changing from counter-clockwise to clockwise
-    for (i, f) in enumerate(faces(ip))
+    for (i, f) in enumerate(facedof_indices(ip))
         r = local_face_dofs_offset[i]:(local_face_dofs_offset[i+1] - 1)
         # 1. Rotate the corners
         vertex_range = r[1:(N*n)]
