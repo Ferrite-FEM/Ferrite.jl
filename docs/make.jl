@@ -52,7 +52,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
         "Manual" => [
             "manual/degrees_of_freedom.md",
             "manual/assembly.md",
-            "manual/boundary_conditions.md",
+            "manual/initial_and_boundary_conditions.md",
             "manual/constraints.md",
             "manual/grid.md",
             "manual/export.md"
@@ -64,7 +64,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
             "reference/fevalues.md",
             "reference/dofhandler.md",
             "reference/assembly.md",
-            "reference/boundary_conditions.md",
+            "reference/initial_and_boundary_conditions.md",
             "reference/grid.md",
             "reference/export.md",
             "reference/utils.md",
