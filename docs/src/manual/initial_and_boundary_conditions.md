@@ -272,32 +272,11 @@ u = zeros(ndofs(dh))
 apply_analytical!(u, dh, :p, x -> ρ * g * x[2])
 ```
 
-!!! note "Initialization of Differential-Algebraic Systems"
-    Differential-algebraic systems of equations (DAEs) need extra care during initialization, which is 
-    currently not automatized by the function `apply_analytical!`.
-    Skipping the formal definition, you can identify DAEs for example by 
-    * Multiple time derivatives in the equation
-    * The equations cannot be formulated such that the variable with the time-derivative 
-      is the only term on the right hand side
-    * Missing time derivatives
-    To give concrete example of a "DAE" (formally a PDAE, which becomes a DAE by spatial discretization), consider following
-    abstract problem on some domain with ``u(t,\boldsymbol{x})`` and ``s(t,\boldsymbol{x})`` being the unknown variables:
-    ```math
-        \partial_t u(t,\boldsymbol{x})) = f(u(t,\boldsymbol{x}), \nabla u(t,\boldsymbol{x}), s(t,\boldsymbol{x})) \\
-        0 = g(u(t,\boldsymbol{x}), \nabla u(t,\boldsymbol{x}), s(t,\boldsymbol{x}))
-    ```
-    Here ``s`` might be some internal state variable, e.g. describing hardening, failure or some electrical
-    state and ``u`` could be a displacement field or some potential field. This form is quite common in mechanics,
-    for example in quasi-static analysis of plastic materials.
-    For DAEs need to assert that the hidden constraints of the problem are not violated by the choice
-    of initial conditions.
-    What the exact hidden constraints are have to be worked out on the specific DAE.
-    For the example above it is sometimes possible to just solve the second equation for ``s``, i.e.
-    ```math
-    0 = g(u(t,\boldsymbol{x}), \nabla u(t,\boldsymbol{x}), s(t,\boldsymbol{x}))
-    ```
-    given some fixed choice of ``u``.
-    We refer to the paper ["Consistent Initial Condition Calculation for Differential-Algebraic Systems" 
-    by Brown et al.](dx.doi.org/10.1137/S1064827595289996) for more details on this matter and some possible solutions.
+!!! note "Consistency "
+    `apply_analytical!` does not enforce consistency of the applied solution with the system of 
+    equations. Some problems, like for example differential-algebraic systems of equations (DAEs)
+    need extra care during initialization. We refer to the paper ["Consistent Initial Condition 
+    Calculation for Differential-Algebraic Systems"  by Brown et al.](dx.doi.org/10.1137/S1064827595289996) 
+    for more details on this matter.
 
 See also [Time Dependent Problems](@ref) for one example.
