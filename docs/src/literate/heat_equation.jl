@@ -265,12 +265,17 @@ end
 uanalytical = similar(u)
 apply_analytical!(uanalytical, dh, :u, x->prod(cos, x*π/2))
 
+ucheck = ones(Float64, length(u))
+apply_zero!(ucheck, ch)
+
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
 vtk_grid("heat_equation", dh) do vtk
     vtk_point_data(vtk, dh, u)
     vtk_point_data(vtk, dh, uanalytical, "analytical")
+    vtk_point_data(vtk, dh, uanalytical-u, "error")
+    vtk_point_data(vtk, dh, ucheck, "ucheck")
 end
 
 ## test the result                #src
