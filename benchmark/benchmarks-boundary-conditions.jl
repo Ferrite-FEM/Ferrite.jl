@@ -1,8 +1,10 @@
 #----------------------------------------------------------------------#
 # Boundary condition benchmarks
 #----------------------------------------------------------------------#
-SUITE["assembly"]["Dirichlet"] = BenchmarkGroup()
-DIRICHLET_SUITE = SUITE["assembly"]["Dirichlet"]
+SUITE["boundary-conditions"] = BenchmarkGroup()
+
+SUITE["boundary-conditions"]["Dirichlet"] = BenchmarkGroup()
+DIRICHLET_SUITE = SUITE["boundary-conditions"]["Dirichlet"]
 # span artifical scope...
 for spatial_dim ∈ [2]
     # Benchmark application on global system
