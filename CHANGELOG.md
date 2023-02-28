@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.3.12] - 2023-02-28
 ### Added
  - Added a basic `show` method for assemblers. ([#598][github-598])
 ### Fixed
@@ -335,7 +337,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-602]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/602
 [github-604]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/604
 
-[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.11...HEAD
+[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.12...HEAD
+[0.3.12]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.11...v0.3.12
 [0.3.11]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.10...v0.3.11
 [0.3.10]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.8...v0.3.9
