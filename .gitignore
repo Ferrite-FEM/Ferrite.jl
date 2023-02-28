@@ -2,6 +2,8 @@
 *.jl.*.cov
 *.jl.mem
 *.vtu
+*.vtk
+*.pvtu
 *.pvd
 examples/.ipynb_checkpoints/
 docs/build/
@@ -10,3 +12,18 @@ docs/src/examples/
 *.DS_Store
 /Manifest.toml
 /test/coverage/Manifest.toml
+/benchmark/Manifest.toml
+
+LocalPreferences.toml
+docs/LocalPreferences.toml
+benchmark/tune.json
+
+# TODO remove me
+.gitignore
+pexample-better.jl
+pexample-global.jl
+pexample.jl
+pamg-1proc.jl
+untitled.geo
+*new
+*bak
