@@ -4,6 +4,7 @@
 *.vtu
 *.vtk
 *.pvtu
+*.pvtk
 *.pvd
 examples/.ipynb_checkpoints/
 docs/build/
@@ -17,13 +18,3 @@ docs/src/examples/
 LocalPreferences.toml
 docs/LocalPreferences.toml
 benchmark/tune.json
-
-# TODO remove me
-.gitignore
-pexample-better.jl
-pexample-global.jl
-pexample.jl
-pamg-1proc.jl
-untitled.geo
-*new
-*bak
