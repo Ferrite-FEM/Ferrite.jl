@@ -2,7 +2,7 @@
 DocTestSetup = :(using Ferrite)
 ```
 
-# Boundary Conditions
+# Initial and Boundary Conditions
 
 Every PDE is accompanied with boundary conditions. There are different types of boundary
 conditions, and they need to be handled in different ways. Below we discuss how to handle
@@ -256,7 +256,7 @@ pdbc = PeriodicDirichlet(
     )
     ```
 
-# Initial Conditions
+## Initial Conditions
 
 When solving time-dependent problems, initial conditions, different from zero, may be required. 
 For finite element formulations of ODE-type, 
@@ -273,3 +273,9 @@ apply_analytical!(u, dh, :p, x -> ρ * g * x[2])
 ```
 
 See also [Time Dependent Problems](@ref) for one example.
+
+!!! note "Consistency"
+    `apply_analytical!` does not enforce consistency of the applied solution with the system of 
+    equations. Some problems, like for example differential-algebraic systems of equations (DAEs)
+    need extra care during initialization. We refer to the paper ["Consistent Initial Condition Calculation for Differential-Algebraic Systems"  by Brown et al.](dx.doi.org/10.1137/S1064827595289996) for more details on this matter.
+
