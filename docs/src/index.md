@@ -94,3 +94,20 @@ JULIA_CMD=<path-to-julia-executable> make compare target=<target-commit> baselin
     For the performance comparison between two commits you must not have any uncommited
     or untracked files in your Ferrite.jl folder! Otherwise the `PkgBenchmark.jl` will 
     fail to setup the comparison.
+
+For more fine grained control you can run subsets of the benchmarks via by appending `-<subset>`
+to compare or benchmark, e.g.
+
+```
+make benchmark-mesh
+```
+
+to benchmark only the mesh functionality. Here `subset` is either
+* assembly
+* boundary-conditions
+* dofs
+* mesh
+
+!!! note
+    It is recommended to run all benchmarks before running subsets to get the
+    correct tuning parameters for each benchmark.
