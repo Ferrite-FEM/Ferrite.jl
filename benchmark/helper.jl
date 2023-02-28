@@ -10,6 +10,10 @@ end
 
 default_refshape(t::Type{C}) where {C <: Ferrite.AbstractCell} = typeof(Ferrite.default_interpolation(t)).parameters[2]
 
+end
+
+
+module FerriteAssemblyHelper
 
 using Ferrite
 

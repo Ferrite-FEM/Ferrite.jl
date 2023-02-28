@@ -1,3 +1,8 @@
+if length(ARGS) != 1
+    @error "Usage: runbenchmarks.jl <script>"
+    exit(-1)
+end
+
 using PkgBenchmark
 
 benchmarkpkg(
@@ -10,5 +15,6 @@ benchmarkpkg(
             "OMP_NUM_THREADS" => "1",
         )
     ),
-    resultfile = joinpath(@__DIR__, "result.json"),
+    resultfile = joinpath(@__DIR__, "result.json");
+    script=ARGS[1]
 )
