@@ -35,29 +35,43 @@ abstract type Interpolation{dim,shape,order} end
 Base.copy(ip::Interpolation) = ip
 
 """
-Return the dimension of an `Interpolation`
+    Ferrite.getdim(ip::Interpolation)
+
+Return the interpolation dimension type parameter of `ip`.
 """
-@inline getdim(ip::Interpolation{dim}) where {dim} = dim
+@inline getdim(::Interpolation{dim}) where {dim} = dim
 
 """
-Return the reference shape of an `Interpolation`
+    Ferrite.getrefshape(ip::Interpolation)
+
+Return the interpolation reference shape type parameter of `ip`.
 """
-@inline getrefshape(ip::Interpolation{dim,shape}) where {dim,shape} = shape
+@inline getrefshape(::Interpolation{dim,shape}) where {dim,shape} = shape
 
 """
-Return the polynomial order of the `Interpolation`
+    Ferrite.getorder(ip::Interpolation)
+
+Return the interpolation order type parameter of `ip`.
 """
-@inline getorder(ip::Interpolation{dim,shape,order}) where {dim,shape,order} = order
+@inline getorder(::Interpolation{dim,shape,order}) where {dim,shape,order} = order
 
 """
-Compute the value of the shape functions at a point ξ for a given interpolation
+    Ferrite.value(ip::Interpolation, ξ::Vec)
+
+Return a vector, of length `getnbasefunctions(ip)`, with the value of each shape functions
+of `ip`, evaluated in the reference coordinate `ξ`. This calls `value(ip, i, ξ)`, where `i`
+is the shape function number, which each concrete interpolation should implement.
 """
 function value(ip::Interpolation{dim}, ξ::Vec{dim,T}) where {dim,T}
     [value(ip, i, ξ) for i in 1:getnbasefunctions(ip)]
 end
 
 """
-Compute the gradients of the shape functions at a point ξ for a given interpolation
+    Ferrite.derivative(ip::Interpolation, ξ::Vec)
+
+Return a vector, of length `getnbasefunctions(ip)`, with the derivative (w.r.t. the
+reference coordinate) of each shape functions of `ip`, evaluated in the reference coordinate
+`ξ`. This uses automatic differentiation and uses `ip`s implementation of `value(ip, i, ξ)`.
 """
 function derivative(ip::Interpolation{dim}, ξ::Vec{dim,T}) where {dim,T}
     [gradient(ξ -> value(ip, i, ξ), ξ) for i in 1:getnbasefunctions(ip)]
@@ -68,9 +82,11 @@ end
 #####################
 
 """
-Return the number of base functions for an [`Interpolation`](@ref) or `Values` object.
+    Ferrite.getnbasefunctions(ip::Interpolation)
+
+Return the number of (scalar) base/shape functions for the interpolation `ip`.
 """
-getnbasefunctions
+getnbasefunctions(::Interpolation)
 
 # struct that gathers all the information needed to distribute
 # dofs for a given interpolation.
