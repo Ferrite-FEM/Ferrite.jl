@@ -1,9 +1,9 @@
 """
-    Interpolation{dim, ref_shape, order}()
+    Interpolation{ref_dim, ref_shape, order}()
 
-Return an `Interpolation` of given dimension `dim`, reference shape
-(see see [`AbstractRefShape`](@ref)) `ref_shape` and order `order`.
-`order` corresponds to the highest order term in the polynomial.
+Return an `Interpolation` on a `ref_dim`-dimensional reference shape
+(see [`AbstractRefShape`](@ref)) `ref_shape` and order `order`.
+`order` corresponds to the order of the interpolation.
 The interpolation is used to define shape functions to interpolate
 a function between nodes.
 
@@ -15,11 +15,17 @@ The following interpolations are implemented:
 * `Lagrange{2,RefCube,2}`
 * `Lagrange{2,RefTetrahedron,1}`
 * `Lagrange{2,RefTetrahedron,2}`
+* `Lagrange{2,RefTetrahedron,3}`
+* `Lagrange{2,RefTetrahedron,4}`
+* `Lagrange{2,RefTetrahedron,5}`
+* `BubbleEnrichedLagrange{2,RefTetrahedron,1}`
+* `CrouzeixRaviart{2,1}`
 * `Lagrange{3,RefCube,1}`
-* `Serendipity{2,RefCube,2}`
-* `Serendipity{3,RefCube,2}`
+* `Lagrange{3,RefCube,2}`
 * `Lagrange{3,RefTetrahedron,1}`
 * `Lagrange{3,RefTetrahedron,2}`
+* `Serendipity{2,RefCube,2}`
+* `Serendipity{3,RefCube,2}`
 
 # Examples
 ```jldoctest
@@ -35,31 +41,31 @@ abstract type Interpolation{dim,shape,order} end
 Base.copy(ip::Interpolation) = ip
 
 """
-    Ferrite.getdim(ip::Interpolation)
+    Ferrite.getdim(::Interpolation)
 
-Return the interpolation dimension type parameter of `ip`.
+Return the dimension of the reference element for a given interpolation.
 """
 @inline getdim(::Interpolation{dim}) where {dim} = dim
 
 """
-    Ferrite.getrefshape(ip::Interpolation)
+    Ferrite.getrefshape(::Interpolation)::AbstractRefShape
 
-Return the interpolation reference shape type parameter of `ip`.
+Return the reference element shape of the interpolation.
 """
 @inline getrefshape(::Interpolation{dim,shape}) where {dim,shape} = shape
 
 """
-    Ferrite.getorder(ip::Interpolation)
+    Ferrite.getorder(::Interpolation)
 
-Return the interpolation order type parameter of `ip`.
+Return order of the interpolation.
 """
 @inline getorder(::Interpolation{dim,shape,order}) where {dim,shape,order} = order
 
 """
     Ferrite.value(ip::Interpolation, ξ::Vec)
 
-Return a vector, of length `getnbasefunctions(ip)`, with the value of each shape functions
-of `ip`, evaluated in the reference coordinate `ξ`. This calls `value(ip, i, ξ)`, where `i`
+Return a vector, of length [`getnbasefunctions(ip::Interpolation)`](@ref), with the value of each shape functions
+of `ip`, evaluated in the reference coordinate `ξ`. This calls [`Ferrite.value(ip::Interpolation, i::Int, ξ::Vec)`](@ref), where `i`
 is the shape function number, which each concrete interpolation should implement.
 """
 function value(ip::Interpolation{dim}, ξ::Vec{dim,T}) where {dim,T}
@@ -69,9 +75,9 @@ end
 """
     Ferrite.derivative(ip::Interpolation, ξ::Vec)
 
-Return a vector, of length `getnbasefunctions(ip)`, with the derivative (w.r.t. the
+Return a vector, of length [`getnbasefunctions(ip::Interpolation)`](@ref), with the derivative (w.r.t. the
 reference coordinate) of each shape functions of `ip`, evaluated in the reference coordinate
-`ξ`. This uses automatic differentiation and uses `ip`s implementation of `value(ip, i, ξ)`.
+`ξ`. This uses automatic differentiation and uses `ip`s implementation of [`Ferrite.value(ip::Interpolation, i::Int, ξ::Vec)`](@ref).
 """
 function derivative(ip::Interpolation{dim}, ξ::Vec{dim,T}) where {dim,T}
     [gradient(ξ -> value(ip, i, ξ), ξ) for i in 1:getnbasefunctions(ip)]
@@ -84,7 +90,7 @@ end
 """
     Ferrite.getnbasefunctions(ip::Interpolation)
 
-Return the number of (scalar) base/shape functions for the interpolation `ip`.
+Return the number of base functions for the interpolation `ip`.
 """
 getnbasefunctions(::Interpolation)
 
@@ -108,33 +114,91 @@ end
 #   edgedof: dof on a line between 2 vertices (i.e. "corners") (3D only)
 #   celldof: dof that is local to the element
 
-# Fallbacks for the interpolations which are used to distribute the dofs correctly
+# Necessary for correct distribution of dofs.
 """
-Number of dofs per vertex
+    Ferrite.nvertexdofs(::Interpolation)
+
+Number of dofs per vertex.
 """
 nvertexdofs(::Interpolation) = 0
 """
-Number of dofs per edge
+    Ferrite.nedgedofs(::Interpolation)
+
+Number of dofs on the *interior* of a single edge.
 """
 nedgedofs(::Interpolation)   = 0
 """
-Number of dofs per face
+    Ferrite.nfacedofs(::Interpolation)
+
+Number of dofs on the *interior* of a single face.
 """
 nfacedofs(::Interpolation)   = 0
 """
-Total number of dofs in the interior
+    Ferrite.ncelldofs(::Interpolation)
+
+Total number of dofs in the interior of the element.
 """
 ncelldofs(::Interpolation)   = 0
+
+"""
+    value(ip::Interpolation, i::Int, ξ::Vec)
+
+Evaluates the `i`'th basis function of the interpolation `ip` 
+at a point `ξ` on the reference element. The index `i` must 
+match the index in [`vertices(::Interpolation)`](@ref), [`faces(::Interpolation)`](@ref) and
+[`edges(::Interpolation)`](@ref).
+
+For nodal interpolations the indices also must match the 
+indices of [`reference_coordinates(::Interpolation)`](@ref).
+"""
+value(ip::Interpolation, i::Int, ξ::Vec)
+
+"""
+    reference_coordinates(::Interpolation)
+
+Returns a vector of coordinates with length [`getnbasefunctions(::Interpolation)`](@ref) 
+and indices corresponding to the indices of a dof in [`vertices`](@ref), [`faces`](@ref) and
+[`edges`](@ref).
+
+    Only required for nodal interpolations.
+    
+    TODO: Separate nodal and non-nodal interpolations.
+"""
+reference_coordinates(ip::Interpolation)
+
+"""
+    vertices(::Interpolation)
+
+A tuple containing tuples of local dof indices for the respective 
+vertex in local enumeration on a cell. The vertex enumeration must 
+match the vertex enumeration of the corresponding geometrical cell.
+Also, the length of each tuple must be exactly [`nvertexdofs(::Interpolation)`](@ref).
+"""
+vertices(::Interpolation)
+"""
+    edges(::Interpolation)
+
+A tuple containing tuples of local dof indices for the respective 
+edge in local enumeration on a cell. The edge enumeration must 
+match the edge enumeration of the corresponding geometrical cell.
+Note that the vertex dofs are included here. Also, the length of 
+each tuple must be exactly [`nvertexdofs(::Interpolation)`](@ref)+[`nedgedofs(::Interpolation)`](@ref).
+"""
+edges(::Interpolation)
+"""
+    faces(::Interpolation)
+
+A tuple containing tuples of all local dof indices for the respective 
+face in local enumeration on a cell. The face enumeration must 
+match the face enumeration of the corresponding geometrical cell.
+Note that the vertex and edge dofs are included here. Also, the
+length of each tuple must be exactly [`nvertexdofs(::Interpolation)`](@ref)+[`nedgedofs(::Interpolation)`](@ref)+[`nfacedofs(::Interpolation)`](@ref).
+"""
+faces(::Interpolation)
 
 # Needed for distributing dofs on shells correctly (face in 2d is edge in 3d)
 edges(ip::Interpolation{2}) = faces(ip)
 nedgedofs(ip::Interpolation{2}) = nfacedofs(ip)
-
-# Fallbacks for vertices
-vertices(::Interpolation{2,RefCube}) = (1,2,3,4)
-vertices(::Interpolation{3,RefCube}) = (1,2,3,4,5,6,7,8)
-vertices(::Interpolation{2,RefTetrahedron}) = (1,2,3)
-vertices(::Interpolation{3,RefTetrahedron}) = (1,2,3,4)
 
 #########################
 # DiscontinuousLagrange #
@@ -190,6 +254,12 @@ end
 ############
 struct Lagrange{dim,shape,order} <: Interpolation{dim,shape,order} end
 
+# Vertices for all Lagrange interpolations are the same
+vertices(::Lagrange{2,RefCube,order}) where {order} = ((1,),(2,),(3,),(4,))
+vertices(::Lagrange{3,RefCube,order}) where {order} = ((1,),(2,),(3,),(4,),(5,),(6,),(7,),(8,))
+vertices(::Lagrange{2,RefTetrahedron,order}) where {order} = ((1,),(2,),(3,))
+vertices(::Lagrange{3,RefTetrahedron,order}) where {order} = ((1,),(2,),(3,),(4,))
+
 getlowerdim(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim-1,shape,order}()
 getlowerorder(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim,shape,order-1}()
 getlowerorder(::Lagrange{dim,shape,1}) where {dim,shape} = DiscontinuousLagrange{dim,shape,0}()
@@ -198,7 +268,6 @@ getlowerorder(::Lagrange{dim,shape,1}) where {dim,shape} = DiscontinuousLagrange
 # Lagrange dim 1 RefCube order 1 #
 ##################################
 getnbasefunctions(::Lagrange{1,RefCube,1}) = 2
-nvertexdofs(::Lagrange{1,RefCube,1}) = 1
 
 faces(::Lagrange{1,RefCube,1}) = ((1,), (2,))
 
@@ -218,7 +287,6 @@ end
 # Lagrange dim 1 RefCube order 2 #
 ##################################
 getnbasefunctions(::Lagrange{1,RefCube,2}) = 3
-nvertexdofs(::Lagrange{1,RefCube,2}) = 1
 ncelldofs(::Lagrange{1,RefCube,2}) = 1
 
 faces(::Lagrange{1,RefCube,2}) = ((1,), (2,))
@@ -241,7 +309,6 @@ end
 # Lagrange dim 2 RefCube order 1 #
 ##################################
 getnbasefunctions(::Lagrange{2,RefCube,1}) = 4
-nvertexdofs(::Lagrange{2,RefCube,1}) = 1
 
 faces(::Lagrange{2,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1))
 
@@ -266,7 +333,6 @@ end
 # Lagrange dim 2 RefCube order 2 #
 ##################################
 getnbasefunctions(::Lagrange{2,RefCube,2}) = 9
-nvertexdofs(::Lagrange{2,RefCube,2}) = 1
 nfacedofs(::Lagrange{2,RefCube,2}) = 1
 ncelldofs(::Lagrange{2,RefCube,2}) = 1
 
@@ -304,7 +370,6 @@ end
 #########################################
 getnbasefunctions(::Lagrange{2,RefTetrahedron,1}) = 3
 getlowerdim(::Lagrange{2, RefTetrahedron, order}) where {order} = Lagrange{1, RefCube, order}()
-nvertexdofs(::Lagrange{2,RefTetrahedron,1}) = 1
 
 vertices(::Lagrange{2,RefTetrahedron,1}) = (1,2,3)
 faces(::Lagrange{2,RefTetrahedron,1}) = ((1,2), (2,3), (3,1))
@@ -328,7 +393,6 @@ end
 # Lagrange dim 2 RefTetrahedron order 2 #
 #########################################
 getnbasefunctions(::Lagrange{2,RefTetrahedron,2}) = 6
-nvertexdofs(::Lagrange{2,RefTetrahedron,2}) = 1
 nfacedofs(::Lagrange{2,RefTetrahedron,2}) = 1
 
 vertices(::Lagrange{2,RefTetrahedron,2}) = (1,2,3)
@@ -451,7 +515,6 @@ end
 # Lagrange dim 3 RefTetrahedron order 1 #
 #########################################
 getnbasefunctions(::Lagrange{3,RefTetrahedron,1}) = 4
-nvertexdofs(::Lagrange{3,RefTetrahedron,1}) = 1
 
 faces(::Lagrange{3,RefTetrahedron,1}) = ((1,3,2), (1,2,4), (2,3,4), (1,4,3))
 edges(::Lagrange{3,RefTetrahedron,1}) = ((1,2), (2,3), (3,1), (1,4), (2,4), (3,4))
@@ -478,7 +541,6 @@ end
 # Lagrange dim 3 RefTetrahedron order 2 #
 #########################################
 getnbasefunctions(::Lagrange{3,RefTetrahedron,2}) = 10
-nvertexdofs(::Lagrange{3,RefTetrahedron,2}) = 1
 nedgedofs(::Lagrange{3,RefTetrahedron,2}) = 1
 
 faces(::Lagrange{3,RefTetrahedron,2}) = ((1,3,2,7,6,5), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
@@ -520,7 +582,6 @@ end
 # Lagrange dim 3 RefCube order 1 #
 ##################################
 getnbasefunctions(::Lagrange{3,RefCube,1}) = 8
-nvertexdofs(::Lagrange{3,RefCube,1}) = 1
 
 faces(::Lagrange{3,RefCube,1}) = ((1,4,3,2), (1,2,6,5), (2,3,7,6), (3,4,8,7), (1,5,8,4), (5,6,7,8))
 edges(::Lagrange{3,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1), (1,5), (2,6), (3,7), (4,8), (5,6), (6,7), (7,8), (8,5))
@@ -557,7 +618,6 @@ end
 ##################################
 # Based on vtkTriQuadraticHexahedron (see https://kitware.github.io/vtk-examples/site/Cxx/GeometricObjects/IsoparametricCellsDemo/)
 getnbasefunctions(::Lagrange{3,RefCube,2}) = 27
-nvertexdofs(::Lagrange{3,RefCube,2}) = 1
 nedgedofs(::Lagrange{3,RefCube,2}) = 1
 nfacedofs(::Lagrange{3,RefCube,2}) = 1
 ncelldofs(::Lagrange{3,RefCube,2}) = 1
@@ -655,12 +715,15 @@ Lagrange element with bubble stabilization.
 struct BubbleEnrichedLagrange{dim,ref_shape,order} <: Interpolation{dim,ref_shape,order} end
 getlowerdim(ip::BubbleEnrichedLagrange{dim,ref_shape,order}) where {dim,ref_shape,order} = Lagrange{dim-1,ref_shape,order}()
 
+# Vertices for all Bubble interpolations are the same
+vertices(::BubbleEnrichedLagrange{2,RefTetrahedron,order}) where {order} = ((1,),(2,),(3,))
+nvertexdofs(::BubbleEnrichedLagrange{ref_dim,ref_shape,order}) where {ref_dim,ref_shape, order} = 1
+
 ################################################
 # Lagrange-Bubble dim 2 RefTetrahedron order 1 #
 ################################################
 # Taken from https://defelement.com/elements/bubble-enriched-lagrange.html
 getnbasefunctions(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = 4
-nvertexdofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = 1
 ncelldofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = 1
 
 faces(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = ((1,2), (2,3), (3,1))
@@ -687,13 +750,17 @@ end
 ###############
 struct Serendipity{dim,shape,order} <: Interpolation{dim,shape,order} end
 
+# Vertices for all Serendipity interpolations are the same
+vertices(::Serendipity{2,RefCube,order}) where {order} = ((1,),(2,),(3,),(4,))
+vertices(::Serendipity{3,RefCube,order}) where {order} = ((1,),(2,),(3,),(4,),(5,),(6,),(7,),(8,))
+nvertexdofs(::Serendipity{ref_dim,ref_shape,order}) where {ref_dim,ref_shape, order} = 1
+
 #####################################
 # Serendipity dim 2 RefCube order 2 #
 #####################################
 getnbasefunctions(::Serendipity{2,RefCube,2}) = 8
 getlowerdim(::Serendipity{2,RefCube,2}) = Lagrange{1,RefCube,2}()
 getlowerorder(::Serendipity{2,RefCube,2}) = Lagrange{2,RefCube,1}()
-nvertexdofs(::Serendipity{2,RefCube,2}) = 1
 nfacedofs(::Serendipity{2,RefCube,2}) = 1
 
 faces(::Serendipity{2,RefCube,2}) = ((1,2,5), (2,3,6), (3,4,7), (4,1,8))
@@ -729,7 +796,6 @@ end
 getnbasefunctions(::Serendipity{3,RefCube,2}) = 20
 getlowerdim(::Serendipity{3,RefCube,2}) = Serendipity{2,RefCube,2}()
 getlowerorder(::Serendipity{3,RefCube,2}) = Lagrange{3,RefCube,1}()
-nvertexdofs(::Serendipity{3,RefCube,2}) = 1
 nedgedofs(::Serendipity{3,RefCube,2}) = 1
 
 faces(::Serendipity{3,RefCube,2}) = ((1,4,3,2,12,11,10,9), (1,2,6,5,9,18,13,17), (2,3,7,6,10,19,14,18), (3,4,8,7,11,20,15,19), (1,5,8,4,17,16,20,12), (5,6,7,8,13,14,15,16))
@@ -800,8 +866,6 @@ struct CrouzeixRaviart{dim,order} <: Interpolation{dim,RefTetrahedron,order} end
 
 getnbasefunctions(::CrouzeixRaviart{2,1}) = 3
 nfacedofs(::CrouzeixRaviart{2,1}) = 1
-
-vertices(::CrouzeixRaviart{2,1}) = ()
 faces(::CrouzeixRaviart{2,1}) = ((1,), (2,), (3,))
 
 function reference_coordinates(::CrouzeixRaviart{2,1})
