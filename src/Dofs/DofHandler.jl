@@ -122,12 +122,29 @@ function add!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_
     return dh
 end
 
-# sort and return true (was already sorted) or false (if we had to sort)
+"""
+    sortedge(edge::Tuple{Int,Int})
+
+Returns the unique representation of an edge and its orientation.
+Here the unique representation is the sorted node index tuple. The
+orientation is `true` if the edge is not flipped, where it is `false`
+if the edge is flipped.
+"""
 function sortedge(edge::Tuple{Int,Int})
     a, b = edge
     a < b ? (return (edge, true)) : (return ((b, a), false))
 end
 
+"""
+    sortface(face::Tuple{Int,Int}) 
+    sortface(face::Tuple{Int,Int,Int})
+    sortface(face::Tuple{Int,Int,Int,Int})
+
+Returns the unique representation of a face.
+Here the unique representation is the sorted node index tuple.
+Note that in 3D we only need indices to uniquely identify a face,
+so the unique representation is always a tuple length 3.
+"""
 sortface(face::Tuple{Int,Int}) = minmax(face[1], face[2])
 function sortface(face::Tuple{Int,Int,Int})
     a, b, c = face
@@ -136,7 +153,6 @@ function sortface(face::Tuple{Int,Int,Int})
     a, b = minmax(a, b)
     return (a, b, c)
 end
-
 function sortface(face::Tuple{Int,Int,Int,Int})
     a, b, c, d = face
     c, d = minmax(c, d)

@@ -124,13 +124,13 @@ nvertexdofs(::Interpolation) = 0
 """
     Ferrite.nedgedofs(::Interpolation)
 
-Number of dofs on the *interior* of a single edge.
+Number of dofs on the interior of a single edge.
 """
 nedgedofs(::Interpolation)   = 0
 """
     Ferrite.nfacedofs(::Interpolation)
 
-Number of dofs on the *interior* of a single face.
+Number of dofs on the interior of a single face.
 """
 nfacedofs(::Interpolation)   = 0
 """
@@ -170,18 +170,18 @@ reference_coordinates(ip::Interpolation)
     vertices(::Interpolation)
 
 A tuple containing tuples of local dof indices for the respective 
-vertex in local enumeration on a cell. The vertex enumeration must 
+vertex in local enumeration on a cell defined by [`vertices(::Cell)`](@ref). The vertex enumeration must 
 match the vertex enumeration of the corresponding geometrical cell.
-Also, the length of each tuple must be exactly [`nvertexdofs(::Interpolation)`](@ref).
+The length of each tuple must be exactly [`nvertexdofs(::Interpolation)`](@ref).
 """
 vertices(::Interpolation)
 """
     edges(::Interpolation)
 
 A tuple containing tuples of local dof indices for the respective 
-edge in local enumeration on a cell. The edge enumeration must 
+edge in local enumeration on a cell defined by [`edges(::Cell)`](@ref). The edge enumeration must 
 match the edge enumeration of the corresponding geometrical cell.
-Note that the vertex dofs are included here. Also, the length of 
+Note that the vertex dofs are included here. The length of 
 each tuple must be exactly [`nvertexdofs(::Interpolation)`](@ref)+[`nedgedofs(::Interpolation)`](@ref).
 """
 edges(::Interpolation)
@@ -189,9 +189,9 @@ edges(::Interpolation)
     faces(::Interpolation)
 
 A tuple containing tuples of all local dof indices for the respective 
-face in local enumeration on a cell. The face enumeration must 
+face in local enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration must 
 match the face enumeration of the corresponding geometrical cell.
-Note that the vertex and edge dofs are included here. Also, the
+Note that the vertex and edge dofs are included here. The
 length of each tuple must be exactly [`nvertexdofs(::Interpolation)`](@ref)+[`nedgedofs(::Interpolation)`](@ref)+[`nfacedofs(::Interpolation)`](@ref).
 """
 faces(::Interpolation)

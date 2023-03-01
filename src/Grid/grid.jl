@@ -14,15 +14,21 @@ struct Node{dim,T}
 end
 Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
 getcoordinates(n::Node) = n.x
+
+"""
+    Ferrite.get_coordinate_eltype(::Node)
+
+Get the data type of 
+"""
 get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 
 abstract type AbstractCell{dim,N,M} end
 """
     Cell{dim,N,M} <: AbstractCell{dim,N,M}
-A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
-However, a `cell` is not defined by the nodes but rather by the global node ids.
-The parameter `dim` refers here to the geometrical/ambient dimension, i.e. the dimension of the `nodes` in the grid and **not** the topological dimension of the cell.
+A `Cell` is a subdomain defined by a collection of `Node`s.
+The parameter `dim` refers here to the geometrical/ambient dimension, i.e. the dimension of the `nodes` in the grid and **not** the topological dimension of the cell (i.e. the dimension of the reference element obtained by default_interpolation).
 A `Cell` has `N` nodes and `M` faces.
+Note that a `Cell` is not defined geometrically by node coordinates, but rather topologically by node indices into the node vector of some grid.
 
 # Fields
 - `nodes::Ntuple{N,Int}`: N-tuple that stores the node ids. The ordering defines a cell's and its subentities' orientations.
@@ -36,6 +42,41 @@ nedges(c::C) where {C<:AbstractCell} = length(edges(c))
 nvertices(c::C) where {C<:AbstractCell} = length(vertices(c))
 nnodes(c::C) where {C<:AbstractCell} = nnodes(typeof(c))
 nnodes(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = N
+
+"""
+    Ferrite.vertices(::AbstractCell)
+
+Returns a tuple with the node indices (of the nodes in a grid) for each vertex in a given cell.
+This function induces the [`VertexIndex`](@ref), where the second index 
+corresponds to the local index into this tuple.
+"""
+vertices(::Ferrite.AbstractCell)
+"""
+    Ferrite.edges(::AbstractCell)
+
+Returns a tuple of 2-tuples containing the ordered node indices (of the nodes in a grid) corresponding to
+the vertices that define an *oriented edge*. This function induces the 
+[`EdgeIndex`](@ref), where the second index corresponds to the local index into this tuple.
+
+Note that the vertices are sufficient to define an edge uniquely.
+"""
+edges(::Ferrite.AbstractCell)
+"""
+    Ferrite.faces(::AbstractCell)
+
+Returns a tuple of n-tuples containing the ordered node indices (of the nodes in a grid) corresponding to
+the vertices that define an *oriented face*. This function induces the 
+[`FaceIndex`](@ref), where the second index corresponds to the local index into this tuple.
+
+Note that the vertices are sufficient to define a face uniquely.
+"""
+faces(::Ferrite.AbstractCell)
+"""
+    Ferrite.default_interpolation(::AbstractCell)::Interpolation
+
+Returns the interpolation which defines the geometry of a given cell.
+"""
+default_interpolation(::Ferrite.AbstractCell)
 
 # Typealias for commonly used cells
 const implemented_celltypes = (
@@ -818,7 +859,6 @@ faces(c::Union{Hexahedron,Cell{3,20,6}}) = ((c.nodes[1],c.nodes[4],c.nodes[3],c.
 edges(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
 faces(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2],c.nodes[3],c.nodes[4]),)
 
-# random stuff
 default_interpolation(::Union{Type{Line},Type{Line2D},Type{Line3D}}) = Lagrange{1,RefCube,1}()
 default_interpolation(::Type{QuadraticLine}) = Lagrange{1,RefCube,2}()
 default_interpolation(::Type{Triangle}) = Lagrange{2,RefTetrahedron,1}()
@@ -829,6 +869,13 @@ default_interpolation(::Type{Tetrahedron}) = Lagrange{3,RefTetrahedron,1}()
 default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{3,RefTetrahedron,2}()
 default_interpolation(::Type{Hexahedron}) = Lagrange{3,RefCube,1}()
 default_interpolation(::Type{Cell{3,20,6}}) = Serendipity{3,RefCube,2}()
+
+"""
+    boundaryfunction(::Type{<:BoundaryIndex})
+
+Helper function to dispatch on the correct entity from a given boundary index.
+"""
+boundaryfunction(::Type{<:BoundaryIndex})
 
 boundaryfunction(::Type{FaceIndex}) = Ferrite.faces
 boundaryfunction(::Type{EdgeIndex}) = Ferrite.edges
