@@ -304,11 +304,10 @@ function __close!(dh::DofHandler{dim}) where {dim}
         # push! the first index of the next cell to the offset vector
         push!(dh.cell_dofs_offset, length(dh.cell_dofs)+1)
     end # cell loop
-    dh.ndofs[] = maximum(dh.cell_dofs)
+    dh.ndofs[] = maximum(dh.cell_dofs, init=0)
     dh.closed[] = true
 
     return dh, vertexdicts, edgedicts, facedicts
-
 end
 
 function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
