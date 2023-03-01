@@ -259,6 +259,7 @@ vertices(::Lagrange{2,RefCube,order}) where {order} = ((1,),(2,),(3,),(4,))
 vertices(::Lagrange{3,RefCube,order}) where {order} = ((1,),(2,),(3,),(4,),(5,),(6,),(7,),(8,))
 vertices(::Lagrange{2,RefTetrahedron,order}) where {order} = ((1,),(2,),(3,))
 vertices(::Lagrange{3,RefTetrahedron,order}) where {order} = ((1,),(2,),(3,),(4,))
+nvertexdofs(::Lagrange{dim,shape,order}) where {dim,shape,order} = 1
 
 getlowerdim(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim-1,shape,order}()
 getlowerorder(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim,shape,order-1}()
