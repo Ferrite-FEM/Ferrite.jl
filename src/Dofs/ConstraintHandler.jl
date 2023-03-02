@@ -442,28 +442,31 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
     return nothing
 end
 
-# for faces
-function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
-                  components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
+# for vertices, faces and edges
+function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+                  components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where {T}
 
     cc = CellCache(dh, UpdateFlags(; nodes=false, coords=true, dofs=true))
-    for (cellidx, faceidx) in faces
+    for (cellidx, entityidx) in boundary_entities
         reinit!(cc, cellidx)
+        @show cc.dofs
 
-        # no need to reinit!, enough to update current_face since we only need geometric shape functions M
-        facevalues.current_face[] = faceidx
+        # no need to reinit!, enough to update current_entity since we only need geometric shape functions M
+        boundaryvalues.current_entity[] = entityidx
 
         # local dof-range for this face
-        r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
+        r = local_face_dofs_offset[entityidx]:(local_face_dofs_offset[entityidx+1]-1)
         counter = 1
-
-        for location in 1:getnquadpoints(facevalues)
-            x = spatial_coordinate(facevalues, location, cc.coords)
+        @show r
+        for location in 1:getnquadpoints(boundaryvalues)
+            @show location
+            x = spatial_coordinate(boundaryvalues, location, cc.coords)
             bc_value = f(x, time)
             @assert length(bc_value) == length(components)
 
             for i in 1:length(components)
+                @show i
                 # find the global dof
                 globaldof = cc.dofs[local_face_dofs[r[counter]]]
                 counter += 1
