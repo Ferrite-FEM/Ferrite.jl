@@ -1,8 +1,8 @@
-# [Elements](@id devdocs-elements)
+# [Elements and cells](@id devdocs-elements)
 
 ## Type definitions
 
-Elements are subtypes of `AbstractCell{dim,N,M}`. They are parametrized by
+Elements or cells are subtypes of `AbstractCell{dim,N,M}`. They are parametrized by
 the dimension of their nodes via `dim`, the number of nodes `N` and the number
 of faces `M`.
 

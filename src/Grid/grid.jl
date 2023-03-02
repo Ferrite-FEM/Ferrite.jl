@@ -18,13 +18,14 @@ getcoordinates(n::Node) = n.x
 """
     Ferrite.get_coordinate_eltype(::Node)
 
-Get the data type of 
+Get the data type of the components of the nodes coordinate.
 """
 get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 
 abstract type AbstractCell{dim,N,M} end
 """
     Cell{dim,N,M} <: AbstractCell{dim,N,M}
+
 A `Cell` is a subdomain defined by a collection of `Node`s.
 The parameter `dim` refers here to the geometrical/ambient dimension, i.e. the dimension of the `nodes` in the grid and **not** the topological dimension of the cell (i.e. the dimension of the reference element obtained by default_interpolation).
 A `Cell` has `N` nodes and `M` faces.
@@ -51,6 +52,7 @@ This function induces the [`VertexIndex`](@ref), where the second index
 corresponds to the local index into this tuple.
 """
 vertices(::Ferrite.AbstractCell)
+
 """
     Ferrite.edges(::AbstractCell)
 
@@ -61,6 +63,7 @@ the vertices that define an *oriented edge*. This function induces the
 Note that the vertices are sufficient to define an edge uniquely.
 """
 edges(::Ferrite.AbstractCell)
+
 """
     Ferrite.faces(::AbstractCell)
 
@@ -71,6 +74,7 @@ the vertices that define an *oriented face*. This function induces the
 Note that the vertices are sufficient to define a face uniquely.
 """
 faces(::Ferrite.AbstractCell)
+
 """
     Ferrite.default_interpolation(::AbstractCell)::Interpolation
 
