@@ -24,6 +24,8 @@ The following interpolations are implemented:
 * `Lagrange{3,RefCube,2}`
 * `Lagrange{3,RefTetrahedron,1}`
 * `Lagrange{3,RefTetrahedron,2}`
+* `Lagrange{3,RefPrism,1}`
+* `Lagrange{3,RefPrism,2}`
 * `Serendipity{2,RefCube,2}`
 * `Serendipity{3,RefCube,2}`
 
