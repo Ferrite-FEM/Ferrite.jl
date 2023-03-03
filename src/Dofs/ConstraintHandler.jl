@@ -450,7 +450,6 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entiti
     cc = CellCache(dh, UpdateFlags(; nodes=false, coords=true, dofs=true))
     for (cellidx, entityidx) in boundary_entities
         reinit!(cc, cellidx)
-        @show cc.dofs
 
         # no need to reinit!, enough to update current_entity since we only need geometric shape functions M
         boundaryvalues.current_entity[] = entityidx
@@ -458,15 +457,12 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entiti
         # local dof-range for this face
         r = local_face_dofs_offset[entityidx]:(local_face_dofs_offset[entityidx+1]-1)
         counter = 1
-        @show r
         for location in 1:getnquadpoints(boundaryvalues)
-            @show location
             x = spatial_coordinate(boundaryvalues, location, cc.coords)
             bc_value = f(x, time)
             @assert length(bc_value) == length(components)
 
             for i in 1:length(components)
-                @show i
                 # find the global dof
                 globaldof = cc.dofs[local_face_dofs[r[counter]]]
                 counter += 1

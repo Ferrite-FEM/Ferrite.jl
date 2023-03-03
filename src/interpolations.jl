@@ -40,6 +40,13 @@ julia> getnbasefunctions(ip)
 """
 abstract type Interpolation{dim,shape,order} end
 
+"""
+    REMOVEME! This is a hotfix to apply constraints to embedded elements.
+"""
+edges(ip::Interpolation{2}) = faces(ip)
+edgedof_indices(ip::Interpolation{2}) = facedof_indices(ip)
+edgedof_interior_indices(ip::Interpolation{2}) = facedof_interior_indices(ip)
+
 # struct that gathers all the information needed to distribute
 # dofs for a given interpolation.
 struct InterpolationInfo
