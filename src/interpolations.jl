@@ -266,7 +266,7 @@ getnbasefunctions(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,ord
 getnbasefunctions(::DiscontinuousLagrange{dim,shape,0}) where {dim,shape} = 1
 
 # This just moves all dofs into the interior of the element.
-celldof_interior_indices(ip::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = (collect(1:getnbasefunctions(ip))...,)
+celldof_interior_indices(ip::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = ntuple(i->i, getnbasefunctions(ip))
 
 # Mirror the Lagrange element for now.
 function reference_coordinates(ip::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order}
@@ -522,7 +522,7 @@ function celldof_interior_indices(ip::Lagrange2Tri345)
     order = getorder(ip)
     ncellintdofs = (order + 1) * (order + 2) ÷ 2 - 3 * order
     totaldofs = getnbasefunctions(ip)
-    return (collect((totaldofs-ncellintdofs+1):totaldofs)...,)
+    return ntuple(i->totaldofs-ncellintdofs+i, ncellintdofs)
 end
 
 function reference_coordinates(ip::Lagrange2Tri345)
