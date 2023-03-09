@@ -462,7 +462,7 @@ function main()
     vtk_grid("stokes-flow", grid) do vtk
         vtk_point_data(vtk, dh, u)
     end
-    Sys.isapple() || @test norm(u) ≈ 0.322804206709586 #src
+    @test norm(u) ≈ 0.322804206709586 #src
     return
 end
 #md nothing #hide
