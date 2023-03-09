@@ -434,6 +434,35 @@ end
 # We now have all the puzzle pieces, and just need to define the main function, which puts
 # them all together.
 
+function check_mean_constraint(dh, fvp, u)                                  #src
+    ## All external boundaries                                              #src
+    set = union(                                                            #src
+        getfaceset(dh.grid, "Γ1"),                                          #src
+        getfaceset(dh.grid, "Γ2"),                                          #src
+        getfaceset(dh.grid, "Γ3"),                                          #src
+        getfaceset(dh.grid, "Γ4"),                                          #src
+    )                                                                       #src
+    ## Allocate buffers                                                     #src
+    range_p = dof_range(dh, :p)                                             #src
+    element_dofs = zeros(Int, ndofs_per_cell(dh))                           #src
+    element_dofs_p = view(element_dofs, range_p)                            #src
+    element_coords = zeros(Vec{2}, 3)                                       #src
+    p_val = 0.0                                                             #src
+    ## Loop over all the boundaries                                         #src
+    for (ci, fi) in set                                                     #src
+        getcoordinates!(element_coords, dh.grid, ci)                        #src
+        reinit!(fvp, element_coords, fi)                                    #src
+        celldofs!(element_dofs, dh, ci)                                     #src
+        for qp in 1:getnquadpoints(fvp)                                     #src
+            dΓ = getdetJdV(fvp, qp)                                         #src
+            for i in 1:getnbasefunctions(fvp)                               #src
+                p_val += u[element_dofs_p[i]]*shape_value(fvp, qp, i) * dΓ  #src
+            end                                                             #src
+        end                                                                 #src
+    end                                                                     #src
+    @test p_val ≈ 0.0 atol=1e-16                                            #src
+end                                                                         #src
+
 function main()
     ## Grid
     h = 0.05 # approximate element size
@@ -462,7 +491,8 @@ function main()
     vtk_grid("stokes-flow", grid) do vtk
         vtk_point_data(vtk, dh, u)
     end
-    @test norm(u) ≈ 0.322804206709586 #src
+    check_mean_constraint(dh, fvp, u)  #src
+    @test norm(u) ≈ 0.322804206709586  #src
     return
 end
 #md nothing #hide
