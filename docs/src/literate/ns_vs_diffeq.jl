@@ -38,12 +38,8 @@
 # where $v$ is the unknown velocity field, $p$ the unknown pressure field,
 # $\nu$ the dynamic viscosity and $\Delta$ the Laplacian. In the derivation we assumed
 # a constant density of 1 for the fluid and negligible coupling between the velocity components.
-# Finally we see that the pressure term appears only in combination with the gradient
-# operator, so for any solution $p$ the function $p + c$ is also an admissible solution, if
-# we do not impose Dirichlet conditions on the pressure. To resolve this we introduce the
-# implicit constraint that $ \int_\Omega p = 0 $.
 #
-# Our setup is derived from [Turek's DFG benchmark](http://www.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/flow/dfg_benchmark1_re20.html).
+# Our setup is derived from [Turek's DFG benchmark](http://www.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/flow/dfg_benchmark2_re100.html).
 # We model a channel with size $0.41 \times 2.2$ and a hole of radius $0.05$ centered at $(0.2, 0.2)$.
 # The left side has a parabolic inflow profile, which is ramped up over time, modeled as the time dependent
 # Dirichlet condition
@@ -55,7 +51,7 @@
 #      0
 #  \end{bmatrix}
 # ```
-# where $v_{in}(t) = \text{clamp}(t, 0.0, 1.0)$. With a dynamic viscosity of $\nu = 0.001$
+# where $v_{in}(t) = \text{clamp}(t, 0.0, 1.5)$. With a dynamic viscosity of $\nu = 0.001$
 # this is enough to induce turbulence behind the cylinder which leads to vortex shedding. The top and bottom of our
 # channel have no-slip conditions, i.e. $v = [0,0]^{\textrm{T}}$, while the right boundary has the do-nothing boundary condtion
 # $\nu \partial_{\textrm{n}} v - p n = 0$ to model outflow. With these boundary conditions we can choose the zero solution as a
@@ -148,11 +144,11 @@ gmsh.model.model.add_physical_group(dim,[1],11,"domain");
 # Since we want a quad mesh, we specify the meshing algorithm to the quasi structured quad one.
 # For a complete list, [see the Gmsh docs](https://gmsh.info/doc/texinfo/gmsh.html#Mesh-options-list).
 gmsh.option.setNumber("Mesh.Algorithm",11)
-gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",200)
-gmsh.option.setNumber("Mesh.MeshSizeMax",0.005)
-# remove fine mesh settings for CI                      #src
-gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",4)   #hide
-gmsh.option.setNumber("Mesh.MeshSizeMax",0.1)           #hide
+gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",20)
+gmsh.option.setNumber("Mesh.MeshSizeMax",0.05)
+# remove fine mesh settings for CI. These settings also work to produce a vortex steet.              #src
+gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",20)                                               #hide
+gmsh.option.setNumber("Mesh.MeshSizeMax",0.1)                                                        #hide
 # In the next step, the mesh is generated and finally translated.
 gmsh.model.mesh.generate(dim)
 grid = togrid()
@@ -191,16 +187,17 @@ nosplip_face_names = ["top", "bottom"]                                  #hide
 noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> [0,0], [1,2])
 add!(ch, noslip_bc);
 
-# The left boundary has a parabolic inflow with peak velocity of 1.0. This
+# The left boundary has a parabolic inflow with peak velocity of 1.5. This
 # ensures that for the given geometry the Reynolds number is 100, which
 # is already enough to obtain some simple vortex streets. By increasing the
 # velocity further we can obtain stronger vortices - which may need additional
-# refinement of the grid.
+# refinement of the grid. Note that we have to smoothly ramp up the velocity,
+# because the Dirichlet constraints cannot be properly enforced yet, causing
+# convergence issues.
 ∂Ω_inflow = getfaceset(grid, "left");
 
-vᵢₙ(t) = clamp(t, 0.0, 1.0)*1.0 #inflow velocity
-vᵢₙ(t) = clamp(t, 0.0, 1.0)*0.3 #hide
-parabolic_inflow_profile((x,y),t) = [4*vᵢₙ(t)*y*(0.41-y)/0.41^2,0]
+vᵢₙ(t) = 1.5/(1+exp(-2.0*(t-2.0)))  #inflow velocity
+parabolic_inflow_profile((x,y),t) = [4*vᵢₙ(t)*y*(0.41-y)/0.41^2, 0.0]
 inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1,2])
 add!(ch, inflow_bc);
 
@@ -236,6 +233,7 @@ function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p:
         for q_point in 1:getnquadpoints(cellvalues_v)
             dΩ = getdetJdV(cellvalues_v, q_point)
             ## Remember that we assemble a vector mass term, hence the dot product.
+            ## There is only one time derivative on the left hand side, so only one mass block is non-zero.
             for i in 1:n_basefuncs_v
                 φᵢ = shape_value(cellvalues_v, q_point, i)
                 for j in 1:n_basefuncs_v
@@ -250,7 +248,7 @@ function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p:
     return M
 end;
 
-# Next we discuss the assembly of the Stokes matrix.
+# Next we discuss the assembly of the Stokes matrix appearing on the right hand side.
 # Remember that we use the same function spaces for trial and test, hence the
 # matrix has the following block form
 # ```math
@@ -313,7 +311,7 @@ end;
 # assumed to be constant over time.
 T = 10.0
 Δt₀ = 0.01
-Δt_save = 0.1
+Δt_save = 0.025
 
 M = create_sparsity_pattern(dh);
 M = assemble_mass_matrix(cellvalues_v, cellvalues_p, M, dh);
@@ -410,7 +408,7 @@ function navierstokes!(du,u_uc,p,t)
         end
     end
 
-    # For now we have to ingore the evolution of the Dirichlet BCs.
+    # For now we have to ingore the evolution of the Dirichlet BCs. Note that these constraints
     # The DBC dofs in the solution vector will be corrected in a post-processing step.
     #+
     apply_zero!(du, ch)
@@ -420,6 +418,17 @@ end;
 rhs = ODEFunction(navierstokes!, mass_matrix=M; jac_prototype=jac_sparsity)
 problem = ODEProblem(rhs, u₀, (0.0,T), p);
 
+# All norms must not depend on constrained dofs. A problem with the presented implementation
+# is that we are currently unable to strictly enforce constraint everywhere in the internal
+# time integration process of [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl),
+# hence the values might differ, resulting in worse error estimates.
+# We try to resolve this issue in the future. Volunteers are also welcome to take a look into this!
+struct FreeDofErrorNorm
+    ch::ConstraintHandler
+end
+(fe_norm::FreeDofErrorNorm)(u::Union{AbstractFloat, Complex}, t) = DiffEqBase.ODE_DEFAULT_NORM(u, t)
+(fe_norm::FreeDofErrorNorm)(u::AbstractArray, t) = DiffEqBase.ODE_DEFAULT_NORM(u[fe_norm.ch.free_dofs], t)
+
 # Now we can put everything together by specifying how to solve the problem.
 # We want to use the adaptive implicit Euler method with our custom linear
 # solver, which helps in the enforcement of the Dirichlet BCs. Further we
@@ -427,17 +436,32 @@ problem = ODEProblem(rhs, u₀, (0.0,T), p);
 # Finally we have to communicate the time step length and initialization
 # algorithm. Since we start with a valid initial state we do not use one of
 # DifferentialEquations.jl initialization algorithms.
-# NOTE: At the time of writing this [no Hessenberg index 2 initialization is implemented](https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019).
+# !!! note "DAE initialization" 
+#          At the time of writing this [no Hessenberg index 2 initialization is implemented](https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019).
 #
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
 timestepper = ImplicitEuler(linsolve = UMFPACKFactorization(reuse_symbolic=false))
+
+#NOTE!   This is left for future reference                                 #src
+# function algebraicmultigrid(W,du,u,p,t,newW,Plprev,Prprev,solverdata)   #src
+#     if newW === nothing || newW                                         #src
+#         Pl = aspreconditioner(ruge_stuben(convert(AbstractMatrix,W)))   #src
+#     else                                                                #src
+#         Pl = Plprev                                                     #src
+#     end                                                                 #src
+#     Pl,nothing                                                          #src
+# end                                                                     #src
+# timestepper = ImplicitEuler(linsolve = IterativeSolversJL_GMRES(; abstol=1e-8, reltol=1e-6), precs=algebraicmultigrid, concrete_jac=true) #src
+
 integrator = init(
     problem, timestepper, initializealg=NoInit(), dt=Δt₀,
-    adaptive=true, abstol=1e-3, reltol=1e-3,
+    adaptive=true, abstol=1e-5, reltol=1e-4,
     progress=true, progress_steps=1,
-    saveat=Δt_save);
+    saveat=Δt_save, verbose=true,
+    internalnorm=FreeDofErrorNorm(ch)
+);
 
 pvd = paraview_collection("vortex-street.pvd");
 integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
