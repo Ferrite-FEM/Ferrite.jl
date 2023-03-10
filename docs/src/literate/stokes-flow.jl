@@ -315,12 +315,12 @@ function setup_mean_constraint(dh, fvp)
     C = end_assemble(assembler)
     ## Create an AffineConstraint from the C-matrix
     _, J, V = findnz(C)
-    _, constrained_dof_index = findmax(abs2, V)
-    constrained_dof = J[constrained_dof_index]
-    V ./= V[constrained_dof_index]
+    _, constrained_dof_idx = findmax(abs2, V)
+    constrained_dof = J[constrained_dof_idx]
+    V ./= V[constrained_dof_idx]
     mean_value_constraint = AffineConstraint(
         constrained_dof,
-        Pair{Int,Float64}[J[i] => -V[i] for i in 1:length(J) if J[i] != constrained_dof],
+        Pair{Int,Float64}[J[i] => -V[i] for i in 1:length(J) if i != constrained_dof_idx],
         0.0,
     )
     return mean_value_constraint
@@ -437,62 +437,46 @@ end
 function check_mean_constraint(dh, fvp, u)                                  #src
     ## All external boundaries                                              #src
     set = union(                                                            #src
-        getfaceset(dh.grid, "Γ1"),                                          #src
-        getfaceset(dh.grid, "Γ2"),                                          #src
-        getfaceset(dh.grid, "Γ3"),                                          #src
-        getfaceset(dh.grid, "Γ4"),                                          #src
+        getfaceset(dh.grid, "Γ1"), getfaceset(dh.grid, "Γ2"),               #src
+        getfaceset(dh.grid, "Γ3"), getfaceset(dh.grid, "Γ4"),               #src
     )                                                                       #src
-    ## Allocate buffers                                                     #src
     range_p = dof_range(dh, :p)                                             #src
-    element_dofs = zeros(Int, ndofs_per_cell(dh))                           #src
-    element_dofs_p = view(element_dofs, range_p)                            #src
-    element_coords = zeros(Vec{2}, 3)                                       #src
-    p_val = 0.0                                                             #src
-    ## Loop over all the boundaries                                         #src
+    cc = CellCache(dh)                                                      #src
+    ## Loop over all the boundaries and compute the integrated pressure     #src
+    ∫pdΓ, Γ= 0.0, 0.0                                                       #src
     for (ci, fi) in set                                                     #src
-        getcoordinates!(element_coords, dh.grid, ci)                        #src
-        reinit!(fvp, element_coords, fi)                                    #src
-        celldofs!(element_dofs, dh, ci)                                     #src
+        reinit!(cc, ci)                                                     #src
+        reinit!(fvp, cc.coords, fi)                                         #src
+        ue = u[cc.dofs]                                                     #src
         for qp in 1:getnquadpoints(fvp)                                     #src
             dΓ = getdetJdV(fvp, qp)                                         #src
-            for i in 1:getnbasefunctions(fvp)                               #src
-                p_val += u[element_dofs_p[i]]*shape_value(fvp, qp, i) * dΓ  #src
-            end                                                             #src
+            ∫pdΓ += function_value(fvp, qp, ue, range_p) * dΓ               #src
+            Γ    += dΓ                                                      #src
         end                                                                 #src
     end                                                                     #src
-    @test p_val ≈ 0.0 atol=1e-16                                            #src
+    @test ∫pdΓ / Γ ≈ 0.0 atol=1e-16                                         #src
 end                                                                         #src
 
 function check_L2(dh, cvu, cvp, u)                                          #src
-    ## Allocate buffers                                                     #src
     range_u = dof_range(dh, :u)                                             #src
-    ndofs_u = length(range_u)                                               #src
     range_p = dof_range(dh, :p)                                             #src
-    ndofs_p = length(range_p)                                               #src
-    element_dofs = zeros(Int, ndofs_per_cell(dh))                           #src
-    element_dofs_u = view(element_dofs, range_u)                            #src
-    element_dofs_p = view(element_dofs, range_p)                            #src
-    element_coords = zeros(Vec{2}, 3)                                       #src
-    u_val = 0.0                                                             #src
-    p_val = 0.0                                                             #src
-    ## Loop over all the boundaries                                         #src
+    ## Loop over the domain and compute the integrals                       #src
+    ∫udΩ, ∫pdΩ, Ω = 0.0, 0.0, 0.0                                           #src
     for cell in CellIterator(dh)                                            #src
-        celldofs!(element_dofs, cell)                                       #src
         reinit!(cvu, cell)                                                  #src
+        reinit!(cvp, cell)                                                  #src
+        ue = u[cell.dofs]                                                   #src
         for qp in 1:getnquadpoints(cvu)                                     #src
             dΩ = getdetJdV(cvu, qp)                                         #src
-            u_eval = function_value(cvu, qp, u[element_dofs_u])             #src
-            u_val += u_eval⋅u_eval*dΩ                                        #src
-        end                                                                 #src
-        reinit!(cvp, cell)                                                  #src
-        for qp in 1:getnquadpoints(cvp)                                     #src
-            dΩ = getdetJdV(cvp, qp)                                         #src
-            p_eval = function_value(cvp, qp, u[element_dofs_p])             #src
-            p_val += p_eval*p_eval*dΩ                                       #src
+            uh = function_value(cvu, qp, ue, range_u)                       #src
+            ph = function_value(cvp, qp, ue, range_p)                       #src
+            ∫udΩ += (uh ⋅ uh) * dΩ                                          #src
+            ∫pdΩ += (ph * ph) * dΩ                                          #src
+            Ω    += dΩ                                                      #src
         end                                                                 #src
     end                                                                     #src
-    @test u_val ≈ 1.826817853019345e-7 atol=1e-10                           #src
-    @test p_val ≈ 0.000163340833084074 atol=1e-6                            #src
+    @test √(∫udΩ) / Ω ≈ 0.0007255988117907926 atol=1e-10                    #src
+    @test √(∫pdΩ) / Ω ≈ 0.02169683180923709   atol=1e-6                     #src
 end                                                                         #src
 
 function main()
@@ -523,6 +507,8 @@ function main()
     vtk_grid("stokes-flow", grid) do vtk
         vtk_point_data(vtk, dh, u)
     end
+
+    ## Check the result                #src
     check_L2(dh, cvu, cvp, u)          #src
     check_mean_constraint(dh, fvp, u)  #src
 
