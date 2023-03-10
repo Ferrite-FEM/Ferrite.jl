@@ -711,7 +711,7 @@ Facesets are used to initialize `Dirichlet` structs, that are needed to specify 
 should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 
 ```julia
-addfaceset!(gird, "right", Set(((2,2),(4,2))) #see grid manual example for reference
+addfaceset!(grid, "right", Set(((2,2),(4,2))) #see grid manual example for reference
 addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
 ```
 """
