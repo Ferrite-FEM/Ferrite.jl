@@ -475,10 +475,10 @@ function check_L2(dh, cvu, cvp, u)                                          #src
             Ω    += dΩ                                                      #src
         end                                                                 #src
     end                                                                     #src
-    @test √(∫uudΩ) / Ω ≈ 0.0007255988117907926 atol=1e-10                   #src
-    @test √(∫ppdΩ) / Ω ≈ 0.02169683180923709   atol=1e-6                    #src
     @show √(∫uudΩ) / Ω
     @show √(∫ppdΩ) / Ω
+    @test √(∫uudΩ) / Ω ≈ 0.0007255988117907926 atol=1e-10                   #src
+    @test √(∫ppdΩ) / Ω ≈ 0.02169683180923709   atol=1e-6                    #src
 end                                                                         #src
 
 function main()
