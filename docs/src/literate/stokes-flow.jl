@@ -461,7 +461,7 @@ function check_L2(dh, cvu, cvp, u)                                          #src
     range_u = dof_range(dh, :u)                                             #src
     range_p = dof_range(dh, :p)                                             #src
     ## Loop over the domain and compute the integrals                       #src
-    ∫udΩ, ∫pdΩ, Ω = 0.0, 0.0, 0.0                                           #src
+    ∫uudΩ, ∫ppdΩ, Ω = 0.0, 0.0, 0.0                                         #src
     for cell in CellIterator(dh)                                            #src
         reinit!(cvu, cell)                                                  #src
         reinit!(cvp, cell)                                                  #src
@@ -470,13 +470,13 @@ function check_L2(dh, cvu, cvp, u)                                          #src
             dΩ = getdetJdV(cvu, qp)                                         #src
             uh = function_value(cvu, qp, ue, range_u)                       #src
             ph = function_value(cvp, qp, ue, range_p)                       #src
-            ∫udΩ += (uh ⋅ uh) * dΩ                                          #src
-            ∫pdΩ += (ph * ph) * dΩ                                          #src
+            ∫uudΩ += (uh ⋅ uh) * dΩ                                         #src
+            ∫ppdΩ += (ph * ph) * dΩ                                         #src
             Ω    += dΩ                                                      #src
         end                                                                 #src
     end                                                                     #src
-    @test √(∫udΩ) / Ω ≈ 0.0007255988117907926 atol=1e-10                    #src
-    @test √(∫pdΩ) / Ω ≈ 0.02169683180923709   atol=1e-6                     #src
+    @test √(∫uudΩ) / Ω ≈ 0.0007255988117907926 atol=1e-10                   #src
+    @test √(∫ppdΩ) / Ω ≈ 0.02169683180923709   atol=1e-6                    #src
 end                                                                         #src
 
 function main()
