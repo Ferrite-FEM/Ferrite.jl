@@ -320,7 +320,7 @@ function setup_mean_constraint(dh, fvp)
     V ./= V[constrained_dof_idx]
     mean_value_constraint = AffineConstraint(
         constrained_dof,
-        Pair{Int,Float64}[J[i] => -V[i] for i in 1:length(J) if i != constrained_dof_idx],
+        Pair{Int,Float64}[J[i] => -V[i] for i in 1:length(J) if J[i] != constrained_dof],
         0.0,
     )
     return mean_value_constraint
