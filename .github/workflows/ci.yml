@@ -41,6 +41,13 @@ jobs:
       - uses: julia-actions/setup-julia@v1
         with:
           version: '1'
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.julia/artifacts
+            ~/.julia/packages
+            ~/.julia/registries
+          key: .julia-docs-${{ hashFiles('docs/Project.toml', 'docs/Manifest.toml') }}
       - name: Install dependencies
         run: julia --project=docs -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
       - name: Build and deploy
