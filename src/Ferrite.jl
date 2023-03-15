@@ -20,6 +20,7 @@ abstract type AbstractRefShape end
 
 struct RefTetrahedron <: AbstractRefShape end
 struct RefCube <: AbstractRefShape end
+struct RefPrism <: AbstractRefShape end
 
 """
 Abstract type which has `CellValues` and `FaceValues` as subtypes

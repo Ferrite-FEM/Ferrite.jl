@@ -100,7 +100,9 @@ const implemented_celltypes = (
     (const QuadraticTetrahedron = Cell{3,10,4}),
     
     (const Hexahedron = Cell{3,8,6}),
-    (Cell{2,20,6})
+    (Cell{2,20,6}),
+
+    (const Wedge = Cell{3,6,5})
 )
 
 """
