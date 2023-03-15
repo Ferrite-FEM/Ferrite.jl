@@ -17,15 +17,22 @@ Ferrite.derivative(::Interpolation{dim}, ::Vec{dim}) where {dim}
 
 ### Required methods to implement for all subtypes of `Interpolation` to define a new finite element
 
+Depending on the dimension of the reference element the following functions have to be implemented
+
 ```@docs
 Ferrite.value(::Interpolation, ::Int, ::Vec)
-Ferrite.vertices(::Interpolation)
-Ferrite.nvertexdofs(::Interpolation)
-Ferrite.faces(::Interpolation)
-Ferrite.nfacedofs(::Interpolation)
-Ferrite.edges(::Interpolation)
-Ferrite.nedgedofs(::Interpolation)
-Ferrite.ncelldofs(::Interpolation)
+Ferrite.vertexdof_indices(::Interpolation)
+Ferrite.facedof_indices(::Interpolation)
+Ferrite.facedof_interior_indices(::Interpolation)
+Ferrite.edgedof_indices(::Interpolation)
+Ferrite.edgedof_interior_indices(::Interpolation)
+Ferrite.celldof_interior_indices(::Interpolation)
 Ferrite.getnbasefunctions(::Interpolation)
 Ferrite.reference_coordinates(::Interpolation)
 ```
+
+for all entities which exist on that reference element. The dof functions default to having no
+dofs defined on a specific entity. Hence, not overloading of the dof functions will result in an 
+element with zero dofs. Also, it should always be double checked that everything is consistent as 
+specified in the docstring of the corresponding function, as inconsistent implementations can
+lead to bugs which are really difficult to track down.
