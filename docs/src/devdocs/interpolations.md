@@ -13,6 +13,7 @@ Ferrite.getrefshape(::Interpolation)
 Ferrite.getorder(::Interpolation)
 Ferrite.value(::Interpolation{dim}, ::Vec{dim,T}) where {dim,T}
 Ferrite.derivative(::Interpolation{dim}, ::Vec{dim}) where {dim}
+Ferrite.boundarydof_indices
 ```
 
 ### Required methods to implement for all subtypes of `Interpolation` to define a new finite element

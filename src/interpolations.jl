@@ -191,7 +191,7 @@ and indices corresponding to the indices of a dof in [`vertices`](@ref), [`faces
     
     TODO: Separate nodal and non-nodal interpolations.
 """
-reference_coordinates(ip::Interpolation)
+reference_coordinates(::Interpolation)
 
 """
     vertexdof_indices(ip::Interpolation)
@@ -207,7 +207,7 @@ A tuple containing tuples of local dof indices for the respective
 edge in local enumeration on a cell defined by [`edges(::Cell)`](@ref). The edge enumeration must 
 match the edge enumeration of the corresponding geometrical cell.
 """
-edgedof_indices(ip::Interpolation{3}) = ntuple(_ -> (), nedges(ip))
+edgedof_indices(::Interpolation)
 
 """
     edgedof_interior_indices(ip::Interpolation)
@@ -216,7 +216,7 @@ edge in local enumeration on a cell defined by [`edges(::Cell)`](@ref). The edge
 match the edge enumeration of the corresponding geometrical cell.
 Note that the vertex dofs are included here.
 """
-edgedof_interior_indices(ip::Interpolation{3}) = ntuple(_ -> (), nedges(ip))
+edgedof_interior_indices(::Interpolation)
 
 """
     facedof_indices(ip::Interpolation)
@@ -224,7 +224,7 @@ A tuple containing tuples of all local dof indices for the respective
 face in local enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration must 
 match the face enumeration of the corresponding geometrical cell.
 """
-facedof_indices(ip::Union{Interpolation{2}, Interpolation{3}}) =  ntuple(_ -> (), nfaces(ip))
+facedof_indices(::Interpolation)
 
 """
     facedof_interior_indices(ip::Interpolation)
@@ -233,13 +233,19 @@ face in local enumeration on a cell defined by [`faces(::Cell)`](@ref). The face
 match the face enumeration of the corresponding geometrical cell.
 Note that the vertex and edge dofs are included here.
 """
-facedof_interior_indices(ip::Union{Interpolation{2}, Interpolation{3}}) = ntuple(_ -> (), nfaces(ip))
+facedof_interior_indices(::Interpolation) 
 
 """
     celldof_interior_indices(ip::Interpolation)
 Tuple containing the dof indices associated with the interior of the cell.
 """
 celldof_interior_indices(::Interpolation) = ()
+
+# Some helpers to skip boilerplate
+edgedof_indices(ip::Interpolation{3}) = ntuple(_ -> (), nedges(ip))
+edgedof_interior_indices(ip::Interpolation{3}) = ntuple(_ -> (), nedges(ip))
+facedof_indices(ip::Union{Interpolation{2}, Interpolation{3}}) =  ntuple(_ -> (), nfaces(ip))
+facedof_interior_indices(ip::Union{Interpolation{2}, Interpolation{3}}) =  ntuple(_ -> (), nfaces(ip))
 
 """
     boundarydof_indices(::Type{<:BoundaryIndex})
