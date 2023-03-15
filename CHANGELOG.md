@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+ - Support for classical trilinear and triquadratic wedge elements. 
+   ([#581][github-581])
+ - Symmetric quadrature rules up to order 10 for prismatic elements. ([#581][github-581])
+ - Finer granulation of dof distribution, allowing to distribute different amounts of dofs
+   per entity. ([#581][github-581])
+
+### Fixed
+ - Dof distribution for embedded elements ([#581][github-581]).
+
+### Other improvements
+ - To clarify the dof management `vertices(ip)`, `edges(ip)` and `faces(ip)` has been
+   deprecated in favor of `vertexdof_indices(ip)`, `edgedof_indices(ip)` and 
+   `facedof_indices(ip)`. ([#578][github-578])
+
 ## [0.3.12] - 2023-02-28
 ### Added
  - Added a basic `show` method for assemblers. ([#598][github-598])
@@ -69,6 +84,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - The elements of a `CellIterator` are now `CellCache` instead of the iterator itself,
    which was confusing in some cases. This change does not affect typical user code.
    ([#546][github-546])
+
+### Fixed
+ - Fix `apply_zero!(Δa, ch)` when using inhomogeneous affine constraints ([#575][github-575])
+
 ### Deprecated
  - Adding fields to a DoF handler with `push!(dh, ...)` has been deprecated in favor of
    `add!(dh, ...)`. This is to make it consistent with how constraints are added to a
@@ -324,6 +343,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-574]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/574
 [github-575]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/575
 [github-578]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/578
+[github-581]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/581
 [github-583]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/583
 [github-588]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/588
 [github-591]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/591
