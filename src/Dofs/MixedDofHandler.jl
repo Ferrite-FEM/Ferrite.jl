@@ -214,7 +214,7 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
     # Each key should uniquely identify the given type
     vertexdicts = [Dict{Int, UnitRange{Int}}() for _ in 1:numfields]
     edgedicts = [Dict{Tuple{Int,Int}, UnitRange{Int}}() for _ in 1:numfields]
-    facedicts = [Dict{Tuple{Int,Int}, UnitRange{Int}}() for _ in 1:numfields]
+    facedicts = [Dict{NTuple{dim,Int}, UnitRange{Int}}() for _ in 1:numfields]
     celldicts = [Dict{Int, UnitRange{Int}}() for _ in 1:numfields]
 
     # Set initial values
