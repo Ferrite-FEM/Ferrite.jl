@@ -21,6 +21,6 @@ compare: Manifest.toml
 	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runcomparison.jl ${target} ${baseline} benchmark/benchmarks.jl
 
 compare-%: Manifest.toml
-	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runcomparison.jl ${target} ${baseline} benchmark/benchmark.jl ${@:benchmark-%=%}
+	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runcomparison.jl ${target} ${baseline} benchmark/benchmarks.jl ${@:benchmark-%=%}
 
 .PHONY: default clean benchmark benchmark-% compare compare-%
