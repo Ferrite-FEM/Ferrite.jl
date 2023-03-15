@@ -5,19 +5,22 @@ BENCHMARK_DIR := $(shell dirname $(abspath $(firstword $(MAKEFILE_LIST))))
 
 default: benchmark
 
-setup-dev:
+clean:
+	rm Manifest.toml
+
+Manifest.toml:
 	${JULIA_CMD} --project=${BENCHMARK_DIR} -e 'using Pkg; Pkg.develop(path=".."); Pkg.instantiate(); Pkg.precompile();'
 
-benchmark: setup-dev
-	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runbenchmarks.jl benchmark/benchmarks-main.jl
+benchmark: Manifest.toml
+	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runbenchmarks.jl benchmark/benchmarks.jl
 
-benchmark-%: setup-dev
-	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runbenchmarks.jl benchmark/${@}-main.jl
+benchmark-%: Manifest.toml
+	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runbenchmarks.jl benchmark/benchmarks.jl ${@:benchmark-%=%}
 
-compare: setup-dev
-	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runcomparison.jl ${target} ${baseline} benchmark/benchmarks-main.jl
+compare: Manifest.toml
+	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runcomparison.jl ${target} ${baseline} benchmark/benchmarks.jl
 
-compare-%: setup-dev
-	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runcomparison.jl ${target} ${baseline} "benchmark/benchmark-${@:compare-%=%}-main.jl"
+compare-%: Manifest.toml
+	${JULIA_CMD} --project=${BENCHMARK_DIR} ${BENCHMARK_DIR}/runcomparison.jl ${target} ${baseline} benchmark/benchmark.jl ${@:benchmark-%=%}
 
-.PHONY: default benchmark benchmark-% compare compare-%
+.PHONY: default clean benchmark benchmark-% compare compare-%
