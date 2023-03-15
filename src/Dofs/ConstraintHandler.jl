@@ -308,7 +308,7 @@ end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where {Index<:BoundaryIndex}
     local_face_dofs, local_face_dofs_offset =
-        _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundaryfunction(eltype(bcfaces)))
+        _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundarydof_indices(eltype(bcfaces)))
     copy!(dbc.local_face_dofs, local_face_dofs)
     copy!(dbc.local_face_dofs_offset, local_face_dofs_offset)
 
@@ -337,7 +337,7 @@ end
 
 # Calculate which local dof index live on each face:
 # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
-function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F=faces) where F
+function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F=facedof_indices) where F
     @assert issorted(components)
     local_face_dofs = Int[]
     local_face_dofs_offset = Int[1]

@@ -220,9 +220,16 @@ Tuple containing the dof indices associated with the interior of the cell.
 """
 celldof_interior_indices(::Interpolation) = ()
 
-# Needed for distributing dofs on shells correctly (face in 2d is edge in 3d)
-# Ferrite.edgedof_indices(ip::Interpolation{2}) = Ferrite.facedof_indices(ip)
-# Ferrite.edgedof_interior_indices(ip::Interpolation{2}) = Ferrite.facedof_interior_indices(ip)
+"""
+    boundarydof_indices(::Type{<:BoundaryIndex})
+
+Helper function to generically dispatch on the correct dof sets of a boundary entity.
+"""
+boundarydof_indices(::Type{<:BoundaryIndex})
+
+boundarydof_indices(::Type{FaceIndex}) = Ferrite.facedof_indices
+boundarydof_indices(::Type{EdgeIndex}) = Ferrite.edgedof_indices
+boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
 
 #########################
 # DiscontinuousLagrange #

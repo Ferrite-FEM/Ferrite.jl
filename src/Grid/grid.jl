@@ -105,34 +105,6 @@ const implemented_celltypes = (
     (const Wedge = Cell{3,6,5})
 )
 
-"""
-A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh
-"""
-struct CellIndex
-    idx::Int
-end
-
-"""
-A `FaceIndex` wraps an (Int, Int) and defines a local face by pointing to a (cell, face).
-"""
-struct FaceIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
-end
-
-"""
-A `EdgeIndex` wraps an (Int, Int) and defines a local edge by pointing to a (cell, edge).
-"""
-struct EdgeIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
-end
-
-"""
-A `VertexIndex` wraps an (Int, Int) and defines a local vertex by pointing to a (cell, vert).
-"""
-struct VertexIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
-end
-
 struct EntityNeighborhood{T<:Union{BoundaryIndex,CellIndex}}
     neighbor_info::Vector{T}
 end
