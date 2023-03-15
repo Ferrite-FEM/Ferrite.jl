@@ -13,7 +13,8 @@ const env = Dict(
     "OMP_NUM_THREADS" => "1",
 )
 
-BenchmarkTools.judge("..",
+BenchmarkTools.judge(
+    dirname(@__DIR__),
     BenchmarkConfig(; id = ARGS[1], env = env),
     BenchmarkConfig(; id = ARGS[2], env = env);
     script = ARGS[3],
