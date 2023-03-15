@@ -171,10 +171,6 @@ function calculate_volume(::Lagrange{0, RefCube, order}, ::Vector{Vec{1, T}}) wh
     return one(T)
 end
 
-getnfaces(::Interpolation{dim, RefCube}) where {dim} = 2*dim
-getnfaces(::Interpolation{2, RefTetrahedron}) = 3
-getnfaces(::Interpolation{3, RefTetrahedron}) = 4
-
 coords_on_faces(x, ::Lagrange{1, RefCube, 1}) = ([x[1]], [x[2]])
 coords_on_faces(x, ::Lagrange{1, RefCube, 2}) = ([x[1]], [x[2]])
 coords_on_faces(x, ::Lagrange{2, RefCube, 1}) =
