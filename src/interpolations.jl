@@ -183,7 +183,6 @@ vertexdof_indices(ip::Interpolation) = ntuple(_ -> (), nvertices(ip))
 A tuple containing tuples of local dof indices for the respective 
 edge in local enumeration on a cell defined by [`edges(::Cell)`](@ref). The edge enumeration must 
 match the edge enumeration of the corresponding geometrical cell.
-Note that the vertex dofs are included here.
 """
 edgedof_indices(ip::Interpolation{3}) = ntuple(_ -> (), nedges(ip))
 
@@ -192,6 +191,7 @@ edgedof_indices(ip::Interpolation{3}) = ntuple(_ -> (), nedges(ip))
 A tuple containing tuples of the local dof indices on the interior of the respective
 edge in local enumeration on a cell defined by [`edges(::Cell)`](@ref). The edge enumeration must 
 match the edge enumeration of the corresponding geometrical cell.
+Note that the vertex dofs are included here.
 """
 edgedof_interior_indices(ip::Interpolation{3}) = ntuple(_ -> (), nedges(ip))
 
@@ -200,7 +200,6 @@ edgedof_interior_indices(ip::Interpolation{3}) = ntuple(_ -> (), nedges(ip))
 A tuple containing tuples of all local dof indices for the respective 
 face in local enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration must 
 match the face enumeration of the corresponding geometrical cell.
-Note that the vertex and edge dofs are included here.
 """
 facedof_indices(ip::Union{Interpolation{2}, Interpolation{3}}) =  ntuple(_ -> (), nfaces(ip))
 
