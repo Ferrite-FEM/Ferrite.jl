@@ -36,19 +36,19 @@
     )
 
     # Test of utility functions
-    ndim = Ferrite.getdim(interpolation)
-    r_shape = Ferrite.getrefshape(interpolation)
+    ref_dim = Ferrite.getdim(interpolation)
+    ref_shape = Ferrite.getrefshape(interpolation)
     func_order = Ferrite.getorder(interpolation)
-    @test typeof(interpolation) <: Interpolation{ndim,r_shape,func_order}
+    @test typeof(interpolation) <: Interpolation{ref_dim,ref_shape,func_order}
 
     # Note that not every element formulation exists for every order and dimension.
-    applicable(Ferrite.getlowerdim, interpolation) && @test typeof(Ferrite.getlowerdim(interpolation)) <: Interpolation{ndim-1}
-    applicable(Ferrite.getlowerorder, interpolation) && @test typeof(Ferrite.getlowerorder(interpolation)) <: Interpolation{ndim,r_shape,func_order-1}
+    applicable(Ferrite.getlowerdim, interpolation) && @test typeof(Ferrite.getlowerdim(interpolation)) <: Interpolation{ref_dim-1}
+    applicable(Ferrite.getlowerorder, interpolation) && @test typeof(Ferrite.getlowerorder(interpolation)) <: Interpolation{ref_dim,ref_shape,func_order-1}
 
     # Check partition of unity at random point.
     n_basefuncs = getnbasefunctions(interpolation)
-    x = rand(Tensor{1, ndim})
-    f = (x) -> Ferrite.value(interpolation, Tensor{1, ndim}(x))
+    x = rand(Tensor{1, ref_dim})
+    f = (x) -> Ferrite.value(interpolation, Tensor{1, ref_dim}(x))
     @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
            reinterpret(Float64, Ferrite.derivative(interpolation, x))
     @test sum(Ferrite.value(interpolation, x)) ≈ 1.0
@@ -61,24 +61,39 @@
 
     # Test whether we have for each entity corresponding dof indices (possibly empty)
     @test length(Ferrite.vertexdof_indices(interpolation)) == Ferrite.nvertices(interpolation)
-    @test length(Ferrite.edgedof_indices(interpolation)) == Ferrite.nedges(interpolation)
-    @test length(Ferrite.edgedof_interior_indices(interpolation)) == Ferrite.nedges(interpolation)
-    @test length(Ferrite.facedof_indices(interpolation)) == Ferrite.nfaces(interpolation)
-    @test length(Ferrite.facedof_interior_indices(interpolation)) == Ferrite.nfaces(interpolation)
-
+    if ref_dim > 1
+        @test length(Ferrite.facedof_indices(interpolation)) == Ferrite.nfaces(interpolation)
+        @test length(Ferrite.facedof_interior_indices(interpolation)) == Ferrite.nfaces(interpolation)
+    elseif ref_dim > 2
+        @test length(Ferrite.edgedof_indices(interpolation)) == Ferrite.nedges(interpolation)
+        @test length(Ferrite.edgedof_interior_indices(interpolation)) == Ferrite.nedges(interpolation)
+    end
     # We have at least as many edge/face dofs as we have edge/face interior dofs
-    @test all(length.(Ferrite.edgedof_interior_indices(interpolation)) .<= length.(Ferrite.edgedof_indices(interpolation)))
-    @test all(length.(Ferrite.facedof_interior_indices(interpolation)) .<= length.(Ferrite.facedof_indices(interpolation)))
-
+    if ref_dim > 1
+        @test all(length.(Ferrite.facedof_interior_indices(interpolation)) .<= length.(Ferrite.facedof_indices(interpolation)))
+    elseif ref_dim > 2
+        @test all(length.(Ferrite.edgedof_interior_indices(interpolation)) .<= length.(Ferrite.edgedof_indices(interpolation)))
+    end
     # The total number of dofs must match the number of base functions
-    @test sum(length.(Ferrite.vertexdof_indices(interpolation));init=0) + sum(length.(Ferrite.edgedof_interior_indices(interpolation));init=0) + sum(length.(Ferrite.facedof_interior_indices(interpolation));init=0) + sum(length.(Ferrite.celldof_interior_indices(interpolation));init=0) == n_basefuncs
+    totaldofs = sum(length.(Ferrite.vertexdof_indices(interpolation));init=0)
+    if ref_dim > 1
+        totaldofs += sum(length.(Ferrite.facedof_interior_indices(interpolation));init=0)
+    end
+    if ref_dim > 2
+        totaldofs += sum(length.(Ferrite.edgedof_interior_indices(interpolation));init=0) 
+    end
+    totaldofs += length(Ferrite.celldof_interior_indices(interpolation))
+    @test totaldofs == n_basefuncs
 
     # The dof indices are valid.
     @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.vertexdof_indices(interpolation)])
-    @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.facedof_indices(interpolation)])
-    @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.edgedof_indices(interpolation)])
-    @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.facedof_interior_indices(interpolation)])
-    @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.edgedof_interior_indices(interpolation)])
+    if ref_dim > 1
+        @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.facedof_indices(interpolation)])
+        @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.facedof_interior_indices(interpolation)])
+    elseif ref_dim > 2
+        @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.edgedof_indices(interpolation)])
+        @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.edgedof_interior_indices(interpolation)])
+    end
     @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.celldof_interior_indices(interpolation)])
 
     # Check for dirac delta property of interpolation
@@ -120,13 +135,13 @@
     # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
     interpolation_type = typeof(interpolation).name.wrapper
     if func_order > 1 && interpolation_type != Ferrite.Serendipity
-        first_order = interpolation_type{ndim,r_shape,1}() 
+        first_order = interpolation_type{ref_dim,ref_shape,1}() 
         for (highorderface, firstorderface) in zip(Ferrite.facedof_indices(interpolation), Ferrite.facedof_indices(first_order))
             for (h_node, f_node) in zip(highorderface, firstorderface)
                 @test h_node == f_node
             end
         end
-        if ndim > 2
+        if ref_dim > 2
             for (highorderedge, firstorderedge) in zip(Ferrite.edgedof_indices(interpolation), Ferrite.edgedof_indices(first_order))
                 for (h_node, f_node) in zip(highorderedge, firstorderedge)
                     @test h_node == f_node

@@ -40,12 +40,6 @@ julia> getnbasefunctions(ip)
 """
 abstract type Interpolation{dim,shape,order} end
 
-
-"""
-    REMOVEME! This is a hotfix to apply constraints to embedded elements.
-"""
-edges(ip::Interpolation{2}) = faces(ip)
-
 # struct that gathers all the information needed to distribute
 # dofs for a given interpolation.
 struct InterpolationInfo
@@ -54,13 +48,31 @@ struct InterpolationInfo
     nfacedofs::Vector{Int}
     ncelldofs::Int
     dim::Int
-    function InterpolationInfo(interpolation::Interpolation{dim}) where {dim}
+    function InterpolationInfo(interpolation::Interpolation{3})
         new(
             [length(i) for i ∈ vertexdof_indices(interpolation)],
             [length(i) for i ∈ edgedof_interior_indices(interpolation)],
             [length(i) for i ∈ facedof_interior_indices(interpolation)],
             length(celldof_interior_indices(interpolation)),
-            dim,
+            3,
+        )
+    end
+    function InterpolationInfo(interpolation::Interpolation{2})
+        new(
+            [length(i) for i ∈ vertexdof_indices(interpolation)],
+            Int[],
+            [length(i) for i ∈ facedof_interior_indices(interpolation)],
+            length(celldof_interior_indices(interpolation)),
+            2,
+        )
+    end
+    function InterpolationInfo(interpolation::Interpolation{1})
+        new(
+            [length(i) for i ∈ vertexdof_indices(interpolation)],
+            Int[],
+            [0, 0], # Well. Apparently vertices are also faces. :)
+            length(celldof_interior_indices(interpolation)),
+            1,
         )
     end
 end
@@ -160,7 +172,7 @@ indices of [`reference_coordinates(::Interpolation)`](@ref).
 value(ip::Interpolation, i::Int, ξ::Vec)
 
 """
-    reference_coordinates(::Interpolation)
+    reference_coordinates(ip::Interpolation)
 
 Returns a vector of coordinates with length [`getnbasefunctions(::Interpolation)`](@ref) 
 and indices corresponding to the indices of a dof in [`vertices`](@ref), [`faces`](@ref) and
@@ -181,7 +193,7 @@ match the vertex enumeration of the corresponding geometrical cell.
 vertexdof_indices(ip::Interpolation) = ntuple(_ -> (), nvertices(ip))
 
 """
-    edgedof_indices(::Interpolation)
+    edgedof_indices(ip::Interpolation)
 A tuple containing tuples of local dof indices for the respective 
 edge in local enumeration on a cell defined by [`edges(::Cell)`](@ref). The edge enumeration must 
 match the edge enumeration of the corresponding geometrical cell.
@@ -198,7 +210,7 @@ Note that the vertex dofs are included here.
 edgedof_interior_indices(ip::Interpolation{3}) = ntuple(_ -> (), nedges(ip))
 
 """
-    facedof_indices(::Interpolation)
+    facedof_indices(ip::Interpolation)
 A tuple containing tuples of all local dof indices for the respective 
 face in local enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration must 
 match the face enumeration of the corresponding geometrical cell.
@@ -215,7 +227,7 @@ Note that the vertex and edge dofs are included here.
 facedof_interior_indices(ip::Union{Interpolation{2}, Interpolation{3}}) = ntuple(_ -> (), nfaces(ip))
 
 """
-    celldof_interior_indices(::Interpolation)
+    celldof_interior_indices(ip::Interpolation)
 Tuple containing the dof indices associated with the interior of the cell.
 """
 celldof_interior_indices(::Interpolation) = ()
