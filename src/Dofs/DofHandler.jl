@@ -9,13 +9,13 @@ Operates slightly faster than [`MixedDofHandler`](@ref). Supports:
 - `Grid`s with a single concrete cell type.
 - One or several fields on the whole domaine.
 """
-struct DofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
+# struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
+struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     field_names::Vector{Symbol}
     field_dims::Vector{Int}
     # TODO: field_interpolations can probably be better typed: We should at least require
     #       all the interpolations to have the same dimension and reference shape
     field_interpolations::Vector{Interpolation}
-    bc_values::Vector{BCValues{T}} # TODO: BcValues is created/handeld by the constrainthandler, so this can be removed
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
     closed::ScalarWrapper{Bool}
@@ -25,7 +25,7 @@ end
 
 function DofHandler(grid::AbstractGrid)
     isconcretetype(getcelltype(grid)) || error("Grid includes different celltypes. Use MixedDofHandler instead of DofHandler")
-    DofHandler(Symbol[], Int[], Interpolation[], BCValues{Float64}[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
+    DofHandler(Symbol[], Int[], Interpolation[], Int[], Int[], ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
@@ -70,7 +70,6 @@ end
 
 getfieldinterpolation(dh::DofHandler, field_idx::Int) = dh.field_interpolations[field_idx]
 getfielddim(dh::DofHandler, field_idx::Int) = dh.field_dims[field_idx]
-getbcvalue(dh::DofHandler, field_idx::Int) = dh.bc_values[field_idx]
 
 function getfielddim(dh::DofHandler, name::Symbol)
     field_pos = findfirst(i->i == name, getfieldnames(dh))
@@ -118,7 +117,6 @@ function add!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_
     push!(dh.field_names, name)
     push!(dh.field_dims, dim)
     push!(dh.field_interpolations, ip)
-    push!(dh.bc_values, BCValues(ip, default_interpolation(getcelltype(dh.grid))))
     return dh
 end
 
