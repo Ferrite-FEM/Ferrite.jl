@@ -307,10 +307,6 @@ end
 # Lagrange dim 1 RefCube order 2 #
 ##################################
 getnbasefunctions(::Lagrange{1,RefCube,2}) = 3
-<<<<<<< HEAD
-ncelldofs(::Lagrange{1,RefCube,2}) = 1
-=======
->>>>>>> 8b971b38f (Introduce new dof api and extend tests to capture the most important invariants.)
 
 vertexdof_indices(::Lagrange{1,RefCube,2}) = ((1,), (2,))
 facedof_indices(::Lagrange{1,RefCube,2}) = ((1,), (2,))
@@ -359,11 +355,6 @@ end
 # Lagrange dim 2 RefCube order 2 #
 ##################################
 getnbasefunctions(::Lagrange{2,RefCube,2}) = 9
-<<<<<<< HEAD
-nfacedofs(::Lagrange{2,RefCube,2}) = 1
-ncelldofs(::Lagrange{2,RefCube,2}) = 1
-=======
->>>>>>> 8b971b38f (Introduce new dof api and extend tests to capture the most important invariants.)
 
 vertexdof_indices(::Lagrange{2,RefCube,2}) = ((1,), (2,), (3,), (4,))
 facedof_indices(::Lagrange{2,RefCube,2}) = ((1,2, 5), (2,3, 6), (3,4, 7), (4,1, 8))
@@ -425,10 +416,6 @@ end
 # Lagrange dim 2 RefTetrahedron order 2 #
 #########################################
 getnbasefunctions(::Lagrange{2,RefTetrahedron,2}) = 6
-<<<<<<< HEAD
-nfacedofs(::Lagrange{2,RefTetrahedron,2}) = 1
-=======
->>>>>>> 8b971b38f (Introduce new dof api and extend tests to capture the most important invariants.)
 
 vertexdof_indices(::Lagrange{2,RefTetrahedron,2}) = (1,2,3)
 facedof_indices(::Lagrange{2,RefTetrahedron,2}) = ((1,2,4), (2,3,5), (3,1,6))
@@ -582,10 +569,6 @@ end
 # Lagrange dim 3 RefTetrahedron order 2 #
 #########################################
 getnbasefunctions(::Lagrange{3,RefTetrahedron,2}) = 10
-<<<<<<< HEAD
-nedgedofs(::Lagrange{3,RefTetrahedron,2}) = 1
-=======
->>>>>>> 8b971b38f (Introduce new dof api and extend tests to capture the most important invariants.)
 
 vertexdof_indices(::Lagrange{3,RefTetrahedron,2}) = ((1,), (2,), (3,), (4,))
 facedof_indices(::Lagrange{3,RefTetrahedron,2}) = ((1,3,2,7,6,5), (1,2,4,5,9,8), (2,3,4,6,10,9), (1,4,3,8,10,7))
@@ -665,12 +648,6 @@ end
 ##################################
 # Based on vtkTriQuadraticHexahedron (see https://kitware.github.io/vtk-examples/site/Cxx/GeometricObjects/IsoparametricCellsDemo/)
 getnbasefunctions(::Lagrange{3,RefCube,2}) = 27
-<<<<<<< HEAD
-nedgedofs(::Lagrange{3,RefCube,2}) = 1
-nfacedofs(::Lagrange{3,RefCube,2}) = 1
-ncelldofs(::Lagrange{3,RefCube,2}) = 1
-=======
->>>>>>> 8b971b38f (Introduce new dof api and extend tests to capture the most important invariants.)
 
 vertexdof_indices(::Lagrange{3,RefCube,2}) = ((1,), (2,), (3,), (4,), (5,), (6,), (7,), (8,))
 facedof_indices(::Lagrange{3,RefCube,2}) = (
@@ -924,10 +901,6 @@ nvertexdofs(::BubbleEnrichedLagrange{ref_dim,ref_shape,order}) where {ref_dim,re
 ################################################
 # Taken from https://defelement.com/elements/bubble-enriched-lagrange.html
 getnbasefunctions(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = 4
-<<<<<<< HEAD
-ncelldofs(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = 1
-=======
->>>>>>> 8b971b38f (Introduce new dof api and extend tests to capture the most important invariants.)
 
 vertexdof_indices(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = ((1,), (2,), (3,))
 facedof_indices(::BubbleEnrichedLagrange{2,RefTetrahedron,1}) = ((1,2), (2,3), (3,1))
@@ -966,10 +939,6 @@ nvertexdofs(::Serendipity{ref_dim,ref_shape,order}) where {ref_dim,ref_shape, or
 getnbasefunctions(::Serendipity{2,RefCube,2}) = 8
 getlowerdim(::Serendipity{2,RefCube,2}) = Lagrange{1,RefCube,2}()
 getlowerorder(::Serendipity{2,RefCube,2}) = Lagrange{2,RefCube,1}()
-<<<<<<< HEAD
-nfacedofs(::Serendipity{2,RefCube,2}) = 1
-=======
->>>>>>> 8b971b38f (Introduce new dof api and extend tests to capture the most important invariants.)
 
 vertexdof_indices(::Serendipity{2,RefCube,2}) = ((1,), (2,), (3,), (4,))
 facedof_indices(::Serendipity{2,RefCube,2}) = ((1,2,5), (2,3,6), (3,4,7), (4,1,8))
@@ -1007,10 +976,6 @@ end
 getnbasefunctions(::Serendipity{3,RefCube,2}) = 20
 getlowerdim(::Serendipity{3,RefCube,2}) = Serendipity{2,RefCube,2}()
 getlowerorder(::Serendipity{3,RefCube,2}) = Lagrange{3,RefCube,1}()
-<<<<<<< HEAD
-nedgedofs(::Serendipity{3,RefCube,2}) = 1
-=======
->>>>>>> 8b971b38f (Introduce new dof api and extend tests to capture the most important invariants.)
 
 vertexdof_indices(::Serendipity{3,RefCube,2}) = ((1,), (2,), (3,), (4,), (5,), (6,), (7,), (8,))
 facedof_indices(::Serendipity{3,RefCube,2}) = (
@@ -1105,14 +1070,9 @@ and Numerical Analysis-Modélisation Mathématique et Analyse Numérique 7.R3 (1
 struct CrouzeixRaviart{dim,order} <: Interpolation{dim,RefTetrahedron,order} end
 
 getnbasefunctions(::CrouzeixRaviart{2,1}) = 3
-<<<<<<< HEAD
-nfacedofs(::CrouzeixRaviart{2,1}) = 1
-faces(::CrouzeixRaviart{2,1}) = ((1,), (2,), (3,))
-=======
 
 facedof_indices(::CrouzeixRaviart{2,1}) = ((1,), (2,), (3,))
 facedof_interior_indices(::CrouzeixRaviart{2,1}) = ((1,), (2,), (3,))
->>>>>>> 8b971b38f (Introduce new dof api and extend tests to capture the most important invariants.)
 
 function reference_coordinates(::CrouzeixRaviart{2,1})
     return [Vec{2, Float64}((0.5, 0.5)),
