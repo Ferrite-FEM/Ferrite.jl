@@ -308,7 +308,7 @@ end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where {Index<:BoundaryIndex}
     local_face_dofs, local_face_dofs_offset =
-        _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundaryfunction(eltype(bcfaces)))
+        _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundarydof_indices(eltype(bcfaces)))
     copy!(dbc.local_face_dofs, local_face_dofs)
     copy!(dbc.local_face_dofs_offset, local_face_dofs_offset)
 
@@ -337,7 +337,7 @@ end
 
 # Calculate which local dof index live on each face:
 # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
-function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F=faces) where F
+function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F=facedof_indices) where F
     @assert issorted(components)
     local_face_dofs = Int[]
     local_face_dofs_offset = Int[1]
@@ -442,24 +442,23 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
     return nothing
 end
 
-# for faces
-function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
-                  components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
+# for vertices, faces and edges
+function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+                  components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where {T}
 
     cc = CellCache(dh, UpdateFlags(; nodes=false, coords=true, dofs=true))
-    for (cellidx, faceidx) in faces
+    for (cellidx, entityidx) in boundary_entities
         reinit!(cc, cellidx)
 
-        # no need to reinit!, enough to update current_face since we only need geometric shape functions M
-        facevalues.current_face[] = faceidx
+        # no need to reinit!, enough to update current_entity since we only need geometric shape functions M
+        boundaryvalues.current_entity[] = entityidx
 
         # local dof-range for this face
-        r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
+        r = local_face_dofs_offset[entityidx]:(local_face_dofs_offset[entityidx+1]-1)
         counter = 1
-
-        for location in 1:getnquadpoints(facevalues)
-            x = spatial_coordinate(facevalues, location, cc.coords)
+        for location in 1:getnquadpoints(boundaryvalues)
+            x = spatial_coordinate(boundaryvalues, location, cc.coords)
             bc_value = f(x, time)
             @assert length(bc_value) == length(components)
 
@@ -1302,7 +1301,7 @@ end
 function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{2,<:Union{RefCube,RefTetrahedron}}, n::Int)
     # For 2D we always permute since Ferrite defines dofs counter-clockwise
     ret = collect(1:length(local_face_dofs))
-    for (i, f) in enumerate(faces(ip))
+    for (i, f) in enumerate(facedof_indices(ip))
         this_offset = local_face_dofs_offset[i]
         other_offset = this_offset + n
         for d in 1:n
@@ -1323,7 +1322,7 @@ function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange
     ret = collect(1:length(local_face_dofs))
 
     # Mirror by changing from counter-clockwise to clockwise
-    for (i, f) in enumerate(faces(ip))
+    for (i, f) in enumerate(facedof_indices(ip))
         r = local_face_dofs_offset[i]:(local_face_dofs_offset[i+1] - 1)
         # 1. Rotate the corners
         vertex_range = r[1:(N*n)]

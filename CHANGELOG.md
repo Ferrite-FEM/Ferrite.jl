@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+ - Support for classical trilinear and triquadratic wedge elements. ([#581][github-581])
+ - Symmetric quadrature rules up to order 10 for prismatic elements. ([#581][github-581])
+ - Finer granulation of dof distribution, allowing to distribute different amounts of dofs
+   per entity. ([#581][github-581])
+### Fixed
+ - Dof distribution for embedded elements. ([#581][github-581])
+### Other improvements
+ - To clarify the dof management `vertices(ip)`, `edges(ip)` and `faces(ip)` has been
+   deprecated in favor of `vertexdof_indices(ip)`, `edgedof_indices(ip)` and
+   `facedof_indices(ip)`. ([#578][github-578])
 
 ## [0.3.12] - 2023-02-28
 ### Added
@@ -324,6 +335,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-574]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/574
 [github-575]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/575
 [github-578]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/578
+[github-581]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/581
 [github-583]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/583
 [github-588]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/588
 [github-591]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/591
