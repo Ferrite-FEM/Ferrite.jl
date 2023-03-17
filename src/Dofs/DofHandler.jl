@@ -102,31 +102,13 @@ function dof_range(dh::DofHandler, field_name::Symbol)
 end
 
 """
-    add!(dh::AbstractDofHandler, name::Symbol[, ip::Interpolation])
-
-Add a `Field` called `name` which is approximated by `ip` to `dh`.
-
-The field is added to all cells of the underlying grid. In case no interpolation `ip` is given,
-the default interpolation of the grid's celltype is used. 
-If the grid uses several celltypes, [`add!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
-"""
-function add!(dh::DofHandler, name::Symbol, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
-    @assert !isclosed(dh)
-    @assert !in(name, dh.field_names)
-    push!(dh.field_names, name)
-    push!(dh.field_dims, 1)
-    push!(dh.field_interpolations, ip)
-    return dh
-end
-
-"""
     add!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
 
-Add a `dim`-dimensional `Field` called `name` which is approximated by a vectorization of `ip` to `dh`.
+Add a `dim`-dimensional `Field` called `name` which is approximated by `ip` to `dh`.
 
-The field is added to all cells of the underlying grid. In case no interpolation `ip` is given,
-the default interpolation of the grid's celltype is used. 
-If the grid uses several celltypes, [`add!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
+The field is added to all cells of the underlying grid. In case no interpolation `ip` is
+given, the default interpolation of the grid's celltype is used. If the grid uses several
+celltypes, [`add!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
 """
 function add!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
     @assert !isclosed(dh)
@@ -135,6 +117,11 @@ function add!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_
     push!(dh.field_dims, dim)
     push!(dh.field_interpolations, ip)
     return dh
+end
+
+# Method for supporting dim=1 default
+function add!(dh::DofHandler, name::Symbol, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
+    return add!(dh, name, 1, ip)
 end
 
 """
