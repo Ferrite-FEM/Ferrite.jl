@@ -545,6 +545,9 @@ function reference_coordinates(ip::Lagrange2Tri345)
 end
 
 function value(ip::Lagrange2Tri345, i::Int, ξ::Vec{2})
+    if !(0 < i <= getnbasefunctions(ip))
+        throw(ArgumentError("no shape function $i for interpolation $ip"))
+    end
     order = getorder(ip)
     i = permdof2DLagrange2Tri345[order][i]
     ξ_x = ξ[1]
