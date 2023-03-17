@@ -84,10 +84,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - The elements of a `CellIterator` are now `CellCache` instead of the iterator itself,
    which was confusing in some cases. This change does not affect typical user code.
    ([#546][github-546])
-
-### Fixed
- - Fix `apply_zero!(Δa, ch)` when using inhomogeneous affine constraints ([#575][github-575])
-
 ### Deprecated
  - Adding fields to a DoF handler with `push!(dh, ...)` has been deprecated in favor of
    `add!(dh, ...)`. This is to make it consistent with how constraints are added to a
