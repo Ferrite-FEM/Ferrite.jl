@@ -6,20 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-
 ### Added
- - Support for classical trilinear and triquadratic wedge elements. 
-   ([#581][github-581])
+ - Support for classical trilinear and triquadratic wedge elements. ([#581][github-581])
  - Symmetric quadrature rules up to order 10 for prismatic elements. ([#581][github-581])
  - Finer granulation of dof distribution, allowing to distribute different amounts of dofs
    per entity. ([#581][github-581])
-
 ### Fixed
- - Dof distribution for embedded elements ([#581][github-581]).
-
+ - Dof distribution for embedded elements. ([#581][github-581])
 ### Other improvements
  - To clarify the dof management `vertices(ip)`, `edges(ip)` and `faces(ip)` has been
-   deprecated in favor of `vertexdof_indices(ip)`, `edgedof_indices(ip)` and 
+   deprecated in favor of `vertexdof_indices(ip)`, `edgedof_indices(ip)` and
    `facedof_indices(ip)`. ([#578][github-578])
 
 ## [0.3.12] - 2023-02-28
