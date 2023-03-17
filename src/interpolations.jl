@@ -40,16 +40,18 @@ julia> getnbasefunctions(ip)
 """
 abstract type Interpolation{dim,shape,order} end
 
-"""
-    REMOVEME! This is a hotfix to apply constraints to embedded elements.
-"""
+# TODO: Remove: this is a hotfix to apply constraints to embedded elements.
 edges(ip::Interpolation{2}) = faces(ip)
 edgedof_indices(ip::Interpolation{2}) = facedof_indices(ip)
 edgedof_interior_indices(ip::Interpolation{2}) = facedof_interior_indices(ip)
 facedof_indices(ip::Interpolation{1}) = vertexdof_indices(ip)
 
 """
-Gathers all the information needed to distribute dofs for a given interpolation.
+    InterpolationInfo
+
+Gathers all the information needed to distribute dofs for a given interpolation. Note that
+this cache is of the same type no matter the interpolation: the purpose is to make
+dof-distribution type-stable.
 """
 struct InterpolationInfo
     nvertexdofs::Vector{Int}
@@ -166,7 +168,6 @@ getnbasefunctions(::Interpolation)
 #   edgedof: dof on a line between 2 vertices (i.e. "corners") (3D only)
 #   celldof: dof that is local to the element
 
-# Necessary for correct distribution of dofs.
 """
     value(ip::Interpolation, i::Int, ξ::Vec)
 
@@ -183,7 +184,7 @@ value(ip::Interpolation, i::Int, ξ::Vec)
 """
     reference_coordinates(ip::Interpolation)
 
-Returns a vector of coordinates with length [`getnbasefunctions(::Interpolation)`](@ref) 
+Returns a vector of coordinates with length [`getnbasefunctions(::Interpolation)`](@ref)
 and indices corresponding to the indices of a dof in [`vertices`](@ref), [`faces`](@ref) and
 [`edges`](@ref).
 
@@ -195,48 +196,54 @@ reference_coordinates(::Interpolation)
 
 """
     vertexdof_indices(ip::Interpolation)
-A tuple containing tuples of local dof indices for the respective 
-vertex in local enumeration on a cell defined by [`vertices(::Cell)`](@ref). The vertex enumeration must 
+
+A tuple containing tuples of local dof indices for the respective vertex in local
+enumeration on a cell defined by [`vertices(::Cell)`](@ref). The vertex enumeration must
 match the vertex enumeration of the corresponding geometrical cell.
 """
 vertexdof_indices(ip::Interpolation) = ntuple(_ -> (), nvertices(ip))
 
 """
     edgedof_indices(ip::Interpolation)
-A tuple containing tuples of local dof indices for the respective 
-edge in local enumeration on a cell defined by [`edges(::Cell)`](@ref). The edge enumeration must 
-match the edge enumeration of the corresponding geometrical cell.
+
+A tuple containing tuples of local dof indices for the respective edge in local enumeration
+on a cell defined by [`edges(::Cell)`](@ref). The edge enumeration must match the edge
+enumeration of the corresponding geometrical cell.
 """
 edgedof_indices(::Interpolation)
 
 """
     edgedof_interior_indices(ip::Interpolation)
-A tuple containing tuples of the local dof indices on the interior of the respective
-edge in local enumeration on a cell defined by [`edges(::Cell)`](@ref). The edge enumeration must 
-match the edge enumeration of the corresponding geometrical cell.
-Note that the vertex dofs are included here.
+
+A tuple containing tuples of the local dof indices on the interior of the respective edge in
+local enumeration on a cell defined by [`edges(::Cell)`](@ref). The edge enumeration must
+match the edge enumeration of the corresponding geometrical cell. Note that the vertex dofs
+are included here.
 """
 edgedof_interior_indices(::Interpolation)
 
 """
     facedof_indices(ip::Interpolation)
-A tuple containing tuples of all local dof indices for the respective 
-face in local enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration must 
-match the face enumeration of the corresponding geometrical cell.
+
+A tuple containing tuples of all local dof indices for the respective face in local
+enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration must match
+the face enumeration of the corresponding geometrical cell.
 """
 facedof_indices(::Interpolation)
 
 """
     facedof_interior_indices(ip::Interpolation)
-A tuple containing tuples of the local dof indices on the interior of the respective 
-face in local enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration must 
-match the face enumeration of the corresponding geometrical cell.
-Note that the vertex and edge dofs are included here.
+
+A tuple containing tuples of the local dof indices on the interior of the respective face in
+local enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration must
+match the face enumeration of the corresponding geometrical cell. Note that the vertex and
+edge dofs are included here.
 """
 facedof_interior_indices(::Interpolation) 
 
 """
     celldof_interior_indices(ip::Interpolation)
+
 Tuple containing the dof indices associated with the interior of the cell.
 """
 celldof_interior_indices(::Interpolation) = ()
@@ -298,7 +305,7 @@ function reference_coordinates(ip::DiscontinuousLagrange{3,RefTetrahedron,0})
 end
 
 function value(ip::DiscontinuousLagrange{dim,shape,0}, i::Int, ξ::Vec{dim}) where {dim,shape}
-    i > 1 && throw(BoundsError("no shape function $i for interpolation $ip"))
+    i > 1 && throw(ArgumentError("no shape function $i for interpolation $ip"))
     return 1.0
 end
 
@@ -333,7 +340,7 @@ function value(ip::Lagrange{1,RefCube,1}, i::Int, ξ::Vec{1})
     ξ_x = ξ[1]
     i == 1 && return (1 - ξ_x) * 0.5
     i == 2 && return (1 + ξ_x) * 0.5
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ##################################
@@ -355,7 +362,7 @@ function value(ip::Lagrange{1,RefCube,2}, i::Int, ξ::Vec{1})
     i == 1 && return ξ_x * (ξ_x - 1) * 0.5
     i == 2 && return ξ_x * (ξ_x + 1) * 0.5
     i == 3 && return 1 - ξ_x^2
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ##################################
@@ -379,7 +386,7 @@ function value(ip::Lagrange{2,RefCube,1}, i::Int, ξ::Vec{2})
     i == 2 && return (1 + ξ_x) * (1 - ξ_y) * 0.25
     i == 3 && return (1 + ξ_x) * (1 + ξ_y) * 0.25
     i == 4 && return (1 - ξ_x) * (1 + ξ_y) * 0.25
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ##################################
@@ -415,7 +422,7 @@ function value(ip::Lagrange{2,RefCube,2}, i::Int, ξ::Vec{2})
     i == 7 && return (1 - ξ_x^2) * (ξ_y^2 + ξ_y) * 0.5
     i == 8 && return (ξ_x^2 - ξ_x) * (1 - ξ_y^2) * 0.5
     i == 9 && return (1 - ξ_x^2) * (1 - ξ_y^2)
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 #########################################
@@ -438,7 +445,7 @@ function value(ip::Lagrange{2,RefTetrahedron,1}, i::Int, ξ::Vec{2})
     i == 1 && return ξ_x
     i == 2 && return ξ_y
     i == 3 && return 1. - ξ_x - ξ_y
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 #########################################
@@ -468,7 +475,7 @@ function value(ip::Lagrange{2,RefTetrahedron,2}, i::Int, ξ::Vec{2})
     i == 4 && return 4ξ_x * ξ_y
     i == 5 && return 4ξ_y * γ
     i == 6 && return 4ξ_x * γ
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 ###############################################
 # Lagrange dim 2 RefTetrahedron order 3, 4, 5 #
@@ -589,7 +596,7 @@ function value(ip::Lagrange{3,RefTetrahedron,1}, i::Int, ξ::Vec{3})
     i == 2 && return ξ_x
     i == 3 && return ξ_y
     i == 4 && return ξ_z
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 #########################################
@@ -630,7 +637,7 @@ function value(ip::Lagrange{3,RefTetrahedron,2}, i::Int, ξ::Vec{3})
     i == 8  && return ξ_z * (-4 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4)
     i == 9  && return 4 * ξ_x * ξ_z
     i == 10 && return 4 * ξ_y * ξ_z
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ##################################
@@ -664,7 +671,7 @@ function value(ip::Lagrange{3,RefCube,1}, i::Int, ξ::Vec{3})
     i == 6 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z)
     i == 7 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z)
     i == 8 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z)
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 
@@ -777,7 +784,7 @@ function value(ip::Lagrange{3,RefCube,2}, i::Int, ξ::Vec{3, T}) where {T}
     i == 26 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₃(ξ_z)
     # interior
     i == 27 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 
@@ -807,7 +814,7 @@ function value(ip::Lagrange{3,RefPrism,1}, i::Int, ξ::Vec{3})
     i == 4 && return z*(1-x-y)
     i == 5 && return x*z
     i == 6 && return y*z
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ###################################
@@ -902,7 +909,7 @@ function value(ip::Lagrange{3,RefPrism,2}, i::Int, ξ::Vec{3})
     i == 16 && return 16x*z*(x*z -x +y*z -y -z +1)
     i == 17 && return 16y*z*(x*z -x +y*z -y -z +1)
     i == 18 && return 16x*y*z*(1 -z)
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ###################
@@ -938,7 +945,7 @@ function value(ip::BubbleEnrichedLagrange{2,RefTetrahedron,1}, i::Int, ξ::Vec{2
     i == 2 && return ξ_y*(9ξ_x^2 + 9ξ_x*ξ_y - 9ξ_x + 1)
     i == 3 && return 9ξ_x^2*ξ_y + 9ξ_x*ξ_y^2 - 9ξ_x*ξ_y - ξ_x - ξ_y + 1
     i == 4 && return 27ξ_x*ξ_y*(1 - ξ_x - ξ_y)
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ###############
@@ -982,7 +989,7 @@ function value(ip::Serendipity{2,RefCube,2}, i::Int, ξ::Vec{2})
     i == 6 && return 0.5(1 + ξ_x) * (1 - ξ_y * ξ_y)
     i == 7 && return 0.5(1 - ξ_x * ξ_x) * (1 + ξ_y)
     i == 8 && return 0.5(1 - ξ_x) * (1 - ξ_y * ξ_y)
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 #####################################
@@ -1067,7 +1074,7 @@ function value(ip::Serendipity{3,RefCube,2}, i::Int, ξ::Vec{3})
     i == 18 && return 0.25(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z^2)
     i == 19 && return 0.25(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z^2)
     i == 20 && return 0.25(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z^2)
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 
@@ -1101,5 +1108,5 @@ function value(ip::CrouzeixRaviart{2,1}, i::Int, ξ::Vec{2})
     i == 1 && return 2*ξ_x + 2*ξ_y - 1.0
     i == 2 && return 1.0 - 2*ξ_x
     i == 3 && return 1.0 - 2*ξ_y
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
