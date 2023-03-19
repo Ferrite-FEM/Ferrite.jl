@@ -256,7 +256,7 @@ end
     end
 
     # Metis ordering
-    if HAS_EXTENSIONS
+    if HAS_EXTENSIONS && MODULE_CAN_BE_TYPE_PARAMETER
         # TODO: Should probably test that the new order result in less fill-in
         dh, ch = testdhch()
         renumber!(dh, DofOrder.Ext{Metis}())

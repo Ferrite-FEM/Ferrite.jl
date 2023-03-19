@@ -78,7 +78,7 @@
 # and a third equation ``\delta\lambda \int_{\Gamma} p\ \mathrm{d}\Gamma = 0`` so that we
 # can solve for ``\lambda``. However, since we in this case are not interested in computing
 # ``\lambda``, and since the constraint is linear, we can directly embed this constraint
-# using an [`AffineConstraint`](@ref) in Ferrite.
+# using an `AffineConstraint` in Ferrite.
 #
 # After FE discretization we obtain a linear system of the form
 # ``\underline{\underline{K}}\ \underline{a} = \underline{f}``, where
@@ -315,8 +315,9 @@ function setup_mean_constraint(dh, fvp)
     C = end_assemble(assembler)
     ## Create an AffineConstraint from the C-matrix
     _, J, V = findnz(C)
-    _, constrained_dof = findmax(abs2, V)
-    V ./= V[constrained_dof]
+    _, constrained_dof_idx = findmax(abs2, V)
+    constrained_dof = J[constrained_dof_idx]
+    V ./= V[constrained_dof_idx]
     mean_value_constraint = AffineConstraint(
         constrained_dof,
         Pair{Int,Float64}[J[i] => -V[i] for i in 1:length(J) if J[i] != constrained_dof],
@@ -433,6 +434,51 @@ end
 # We now have all the puzzle pieces, and just need to define the main function, which puts
 # them all together.
 
+function check_mean_constraint(dh, fvp, u)                                  #src
+    ## All external boundaries                                              #src
+    set = union(                                                            #src
+        getfaceset(dh.grid, "Γ1"), getfaceset(dh.grid, "Γ2"),               #src
+        getfaceset(dh.grid, "Γ3"), getfaceset(dh.grid, "Γ4"),               #src
+    )                                                                       #src
+    range_p = dof_range(dh, :p)                                             #src
+    cc = CellCache(dh)                                                      #src
+    ## Loop over all the boundaries and compute the integrated pressure     #src
+    ∫pdΓ, Γ= 0.0, 0.0                                                       #src
+    for (ci, fi) in set                                                     #src
+        reinit!(cc, ci)                                                     #src
+        reinit!(fvp, cc.coords, fi)                                         #src
+        ue = u[cc.dofs]                                                     #src
+        for qp in 1:getnquadpoints(fvp)                                     #src
+            dΓ = getdetJdV(fvp, qp)                                         #src
+            ∫pdΓ += function_value(fvp, qp, ue, range_p) * dΓ               #src
+            Γ    += dΓ                                                      #src
+        end                                                                 #src
+    end                                                                     #src
+    @test ∫pdΓ / Γ ≈ 0.0 atol=1e-16                                         #src
+end                                                                         #src
+
+function check_L2(dh, cvu, cvp, u)                                          #src
+    range_u = dof_range(dh, :u)                                             #src
+    range_p = dof_range(dh, :p)                                             #src
+    ## Loop over the domain and compute the integrals                       #src
+    ∫uudΩ, ∫ppdΩ, Ω = 0.0, 0.0, 0.0                                         #src
+    for cell in CellIterator(dh)                                            #src
+        reinit!(cvu, cell)                                                  #src
+        reinit!(cvp, cell)                                                  #src
+        ue = u[cell.dofs]                                                   #src
+        for qp in 1:getnquadpoints(cvu)                                     #src
+            dΩ = getdetJdV(cvu, qp)                                         #src
+            uh = function_value(cvu, qp, ue, range_u)                       #src
+            ph = function_value(cvp, qp, ue, range_p)                       #src
+            ∫uudΩ += (uh ⋅ uh) * dΩ                                         #src
+            ∫ppdΩ += (ph * ph) * dΩ                                         #src
+            Ω    += dΩ                                                      #src
+        end                                                                 #src
+    end                                                                     #src
+    @test √(∫uudΩ) / Ω ≈ 0.0007255988117907926 atol=1e-7                    #src
+    @test √(∫ppdΩ) / Ω ≈ 0.02169683180923709   atol=1e-5                    #src
+end                                                                         #src
+
 function main()
     ## Grid
     h = 0.05 # approximate element size
@@ -461,7 +507,11 @@ function main()
     vtk_grid("stokes-flow", grid) do vtk
         vtk_point_data(vtk, dh, u)
     end
-    Sys.isapple() || @test norm(u) ≈ 0.32254330524111213 #src
+
+    ## Check the result                #src
+    check_L2(dh, cvu, cvp, u)          #src
+    check_mean_constraint(dh, fvp, u)  #src
+
     return
 end
 #md nothing #hide

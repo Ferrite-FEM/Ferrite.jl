@@ -39,6 +39,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
 @timeit dto "makedocs" makedocs(
     format = Documenter.HTML(
         assets = ["assets/custom.css", "assets/favicon.ico"],
+        canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
     ),
     sitename = "Ferrite.jl",
     doctest = false,
@@ -67,7 +68,8 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
             "reference/grid.md",
             "reference/export.md",
             "reference/utils.md",
-            ]
+            ],
+        "Developer documentation" => "devdocs/index.md",
         ],
 )
 

@@ -7,8 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+ - Support for classical trilinear and triquadratic wedge elements. ([#581][github-581])
+ - Symmetric quadrature rules up to order 10 for prismatic elements. ([#581][github-581])
+ - Finer granulation of dof distribution, allowing to distribute different amounts of dofs
+   per entity. ([#581][github-581])
+### Fixed
+ - Dof distribution for embedded elements. ([#581][github-581])
+### Other improvements
+ - To clarify the dof management `vertices(ip)`, `edges(ip)` and `faces(ip)` has been
+   deprecated in favor of `vertexdof_indices(ip)`, `edgedof_indices(ip)` and
+   `facedof_indices(ip)`. ([#578][github-578])
+
+## [0.3.12] - 2023-02-28
+### Added
+ - Added a basic `show` method for assemblers. ([#598][github-598])
+### Fixed
+ - Fix an issue in constraint application of `Symmetric`-wrapped sparse matrices (i.e.
+   obtained from `create_symmatric_sparsity_pattern`). In particular, `apply!(K::Symmetric,
+   f, ch)` would incorrectly modify `f` if any of the constraints were inhomogeneous.
+   ([#592][github-592])
+ - Properly disable the Metis extension on Julia 1.9 instead of causing precompilation
+   errors. ([#588][github-588])
+ - Fix adding Dirichlet boundary conditions on nodes when using MixedDofHandler.
+   ([#593][github-593], [#594][github-594])
+ - Fix accidentally slow implementation of `show` for `Grid`s. ([#599][github-599])
+ - Fixes to topology functionality. ([#453][github-453], [#518][github-518],
+   [#455][github-455])
+ - Fix grid coloring for cell sets with 0 or 1 cells. ([#600][github-600])
+### Other improvements
+ - Documentation improvements:
+    - Simplications and clarifications to hyperelasticity example. ([#591][github-591])
+    - Remove duplicate docstring entry for `vtk_point_data`. ([#602][github-602])
+    - Update documentation about initial conditions. ([#601][github-601],
+      [#604][github-604])
+
+## [0.3.11] - 2023-01-17
+### Added
  - [Metis.jl](https://github.com/JuliaSparse/Metis.jl) extension for fill-reducing DoF
-   permutation. This uses Julias new package extension mechanism (requires Julia 1.9) to
+   permutation. This uses Julias new package extension mechanism (requires Julia 1.10) to
    support a new DoF renumbering order `DofOrder.Ext{Metis}()` that can be passed to
    `renumber!` to renumber DoFs using the Metis.jl library. ([#393][github-393],
    [#549][github-549])
@@ -43,7 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    time. ([#459][github-459])
  - The elements of a `CellIterator` are now `CellCache` instead of the iterator itself,
    which was confusing in some cases. This change does not affect typical user code.
-   [#546][github-546])
+   ([#546][github-546])
 ### Deprecated
  - Adding fields to a DoF handler with `push!(dh, ...)` has been deprecated in favor of
    `add!(dh, ...)`. This is to make it consistent with how constraints are added to a
@@ -67,6 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Added an overview of the Examples section. ([#531][github-531])
     - Added an example showing topology optimization. ([#531][github-531])
     - Various typo fixes. ([#574][github-574])
+    - Fix broken links. ([#583][github-583])
 
 ## [0.3.10] - 2022-12-11
 ### Added
@@ -231,6 +268,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-428]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/428
 [github-431]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/431
 [github-436]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/436
+[github-453]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/453
+[github-455]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/455
 [github-456]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/456
 [github-458]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/458
 [github-459]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/459
@@ -260,6 +299,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-509]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/509
 [github-512]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/512
 [github-514]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/514
+[github-518]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
 [github-520]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
 [github-523]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/523
 [github-524]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/524
@@ -295,8 +335,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-574]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/574
 [github-575]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/575
 [github-578]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/578
+[github-581]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/581
+[github-583]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/583
+[github-588]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/588
+[github-591]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/591
+[github-592]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/592
+[github-593]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/593
+[github-594]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/594
+[github-598]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/598
+[github-599]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/599
+[github-600]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/600
+[github-601]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/601
+[github-602]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/602
+[github-604]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/604
 
-[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.10...HEAD
+[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.12...HEAD
+[0.3.12]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.11...v0.3.12
+[0.3.11]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.10...v0.3.11
 [0.3.10]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.7...v0.3.8
