@@ -120,7 +120,8 @@ end
     getfieldnames(dh::MixedDofHandler)
     getfieldnames(fh::FieldHandler)
 
-Returns a vector with the names of all fields. Can be used as an iterable over all the fields in the problem.
+Return a vector with the names of all fields. Can be used as an iterable over all the fields
+in the problem.
 """
 function getfieldnames(dh::MixedDofHandler)
     fieldnames = Vector{Symbol}()
@@ -162,7 +163,7 @@ nfields(dh::MixedDofHandler) = length(getfieldnames(dh))
 Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
 """
 function add!(dh::MixedDofHandler, fh::FieldHandler)
-    #TODO: perhaps check that a field with the same name is the same field?
+    # TODO: perhaps check that a field with the same name is the same field?
     @assert !isclosed(dh)
     _check_same_celltype(dh.grid, collect(fh.cellset))
     _check_cellset_intersections(dh, fh)
@@ -404,23 +405,22 @@ end
 """
     find_field(dh::MixedDofHandler, field_name::Symbol)::NTuple{2,Int}
 
-Return the index of the field with name `field_name` in a `MixedDofHandler`.
-The index is a `NTuple{2,Int}`, where the 1st entry is the index of the `FieldHandler`
-within which the field was found and the 2nd entry is the index of the field within the 
-`FieldHandler`.
+Return the index of the field with name `field_name` in a `MixedDofHandler`. The index is a
+`NTuple{2,Int}`, where the 1st entry is the index of the `FieldHandler` within which the
+field was found and the 2nd entry is the index of the field within the `FieldHandler`.
 
 !!! note
     Always finds the 1st occurence of a field within `MixedDofHandler`.
 
-See also: [`find_field(fh::FieldHandler, field_name::Symbol)`](@ref), [`_find_field(fh::FieldHandler, field_name::Symbol)`](@ref).
+See also: [`find_field(fh::FieldHandler, field_name::Symbol)`](@ref),
+[`_find_field(fh::FieldHandler, field_name::Symbol)`](@ref).
 """
 function find_field(dh::MixedDofHandler, field_name::Symbol)
     for (fh_idx, fh) in pairs(dh.fieldhandlers)
         field_idx = _find_field(fh, field_name)
         !isnothing(field_idx) && return (fh_idx, field_idx)
     end
-    error("Did not find field :$field_name
-          (existing fields: $(getfieldnames(dh))).")
+    error("Did not find field :$field_name (existing fields: $(getfieldnames(dh))).")
 end
 
 """
@@ -433,7 +433,9 @@ See also: [`find_field(dh::MixedDofHandler, field_name::Symbol)`](@ref), [`_find
 """
 function find_field(fh::FieldHandler, field_name::Symbol)
     field_idx = _find_field(fh, field_name)
-    isnothing(field_idx) && error("Did not find field :$field_name in FieldHandler (existing fields: $(getfieldnames(fh)))")
+    if field_idx === nothing
+        error("Did not find field :$field_name in FieldHandler (existing fields: $(getfieldnames(fh)))")
+    end
     return field_idx
 end
 
@@ -477,14 +479,15 @@ end
     dof_range(dh:MixedDofHandler, field_idxs::NTuple{2,Int})
     dof_range(dh:MixedDofHandler, field_name::Symbol)
 
-Return the local dof range for a given field. The field can be specified by its name or index,
-where `field_idx` represents the index of a field within a `FieldHandler` and `field_idxs` is
-a tuple of the `FieldHandler`-index within the `MixedDofHandler` and the `field_idx`.
+Return the local dof range for a given field. The field can be specified by its name or
+index, where `field_idx` represents the index of a field within a `FieldHandler` and
+`field_idxs` is a tuple of the `FieldHandler`-index within the `MixedDofHandler` and the
+`field_idx`.
 
 !!! note
-    The `dof_range` of a field can vary between different `FieldHandler`s. Therefore, it is 
+    The `dof_range` of a field can vary between different `FieldHandler`s. Therefore, it is
     advised to use the `field_idxs` or refer to a given `FieldHandler` directly in case
-    several `FieldHandler`s exist. Using the `field_name` will always refer to the first 
+    several `FieldHandler`s exist. Using the `field_name` will always refer to the first
     occurence of `field` within the `MixedDofHandler`.
 
 Example:
@@ -507,8 +510,8 @@ julia> dof_range(dh.fieldhandlers[1], 2) # field :p
 10:12
 ```
 """
-function Ferrite.dof_range(fh::FieldHandler, field_idx::Int)
-    offset = Ferrite.field_offset(fh, field_idx)
+function dof_range(fh::FieldHandler, field_idx::Int)
+    offset = field_offset(fh, field_idx)
     field_interpolation = fh.fields[field_idx].interpolation
     field_dim = fh.fields[field_idx].dim
     n_field_dofs = getnbasefunctions(field_interpolation)::Int * field_dim
@@ -516,10 +519,12 @@ function Ferrite.dof_range(fh::FieldHandler, field_idx::Int)
 end
 dof_range(fh::FieldHandler, field_name::Symbol) = dof_range(fh, find_field(fh, field_name))
 
+# TODO: Perhaps this method should be removed in favor of dof_range(::SubDofHandler, :s)
 function dof_range(dh::MixedDofHandler, field_idxs::Tuple{Int,Int})
     fh_idx, field_idx = field_idxs
     dof_range(dh.fieldhandlers[fh_idx], field_idx)
 end
+# TODO: Make this error in case of multiple SubDofHandlers
 dof_range(dh::MixedDofHandler, field_name::Symbol) = dof_range(dh, find_field(dh, field_name))
 
 """
