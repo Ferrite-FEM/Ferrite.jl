@@ -476,7 +476,6 @@ end
 """
     dof_range(fh::FieldHandler, field_idx::Int)
     dof_range(fh::FieldHandler, field_name::Symbol)
-    dof_range(dh:MixedDofHandler, field_idxs::NTuple{2,Int})
     dof_range(dh:MixedDofHandler, field_name::Symbol)
 
 Return the local dof range for a given field. The field can be specified by its name or
