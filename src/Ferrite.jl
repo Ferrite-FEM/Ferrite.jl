@@ -31,6 +31,7 @@ const RefHexahedron    = RefHypercube{3}
 const RefTriangle      = RefSimplex{2}
 const RefTetrahedron   = RefSimplex{3}
 struct RefPrism         <: AbstractRefShape{3} end
+struct RefPyramid       <: AbstractRefShape{3} end
 
 abstract type AbstractValues end
 abstract type AbstractCellValues <: AbstractValues end

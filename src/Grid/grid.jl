@@ -198,6 +198,26 @@ function faces(c::AbstractCell{RefPrism})
     )
 end
 
+# RefPyramid (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
+function vertices(c::AbstractCell{RefPyramid})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2], ns[3], ns[4], ns[5],) # v1, ..., v5
+end
+function edges(c::AbstractCell{RefPyramid})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), 
+        (ns[1], ns[5]), (ns[2], ns[5]), (ns[3], ns[5]), (ns[4], ns[5]), 
+    )
+end
+function faces(c::AbstractCell{RefPyramid})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[4], ns[3], ns[2]), (ns[1], ns[2], ns[5]), 
+        (ns[2], ns[3], ns[5]), (ns[3], ns[4], ns[5]), 
+        (ns[4], ns[1], ns[5]),                                      
+    )
+end
 
 ######################################################
 # Concrete implementations of AbstractCell interface #
@@ -215,6 +235,7 @@ struct QuadraticTetrahedron   <: AbstractCell{RefTetrahedron}   nodes::NTuple{10
 struct Hexahedron             <: AbstractCell{RefHexahedron}    nodes::NTuple{ 8, Int} end
 struct QuadraticHexahedron    <: AbstractCell{RefHexahedron}    nodes::NTuple{27, Int} end
 struct Wedge                  <: AbstractCell{RefPrism}         nodes::NTuple{ 6, Int} end
+struct Pyramid                <: AbstractCell{RefPyramid}       nodes::NTuple{ 5, Int} end
 
 default_interpolation(::Type{Line})                   = Lagrange{RefLine,          1}()
 default_interpolation(::Type{QuadraticLine})          = Lagrange{RefLine,          2}()
@@ -227,6 +248,7 @@ default_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{RefTetrahedron,
 default_interpolation(::Type{Hexahedron})             = Lagrange{RefHexahedron,    1}()
 default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron,    2}()
 default_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
+default_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,         1}()
 
 # TODO: Remove this, used for Quadrilateral3D
 edges(c::Quadrilateral#=3D=#) = faces(c)

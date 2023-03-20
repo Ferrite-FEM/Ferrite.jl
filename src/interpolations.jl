@@ -27,6 +27,7 @@ The following interpolations are implemented:
 * `Lagrange{RefTetrahedron,2}`
 * `Lagrange{RefPrism,1}`
 * `Lagrange{RefPrism,2}`
+* `Lagrange{RefPyramid,1}`
 * `Serendipity{RefQuadrilateral,2}`
 * `Serendipity{RefHexahedron,2}`
 
@@ -141,6 +142,7 @@ nfaces(::Interpolation{RefHypercube{dim}}) where {dim} = 2*dim
 nfaces(::Interpolation{RefTriangle}) = 3
 nfaces(::Interpolation{RefTetrahedron}) = 4
 nfaces(::Interpolation{RefPrism}) = 5
+nfaces(::Interpolation{RefPyramid})           = 5
 
 nedges(::Interpolation{RefLine}) = 0
 nedges(::Interpolation{RefQuadrilateral}) = 0
@@ -148,11 +150,13 @@ nedges(::Interpolation{RefHexahedron}) = 12
 nedges(::Interpolation{RefTriangle}) = 0
 nedges(::Interpolation{RefTetrahedron}) = 6
 nedges(::Interpolation{RefPrism}) = 9
+nedges(::Interpolation{RefPyramid})       =  8
 
 nvertices(::Interpolation{RefHypercube{dim}}) where {dim} = 2^dim
 nvertices(::Interpolation{RefTriangle}) = 3
 nvertices(::Interpolation{RefTetrahedron}) = 4
 nvertices(::Interpolation{RefPrism}) = 6
+nvertices(::Interpolation{RefPyramid}) = 5
 
 Base.copy(ip::Interpolation) = ip
 
@@ -1088,6 +1092,37 @@ function shape_value(ip::Lagrange{RefPrism, 2}, ξ::Vec{3}, i::Int)
     i == 17 && return 16y*z*(x*z -x +y*z -y -z +1)
     i == 18 && return 16x*y*z*(1 -z)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+
+#####################################
+# Lagrange dim 3 RefPyramid order 1 #
+#####################################
+# Build on https://defelement.com/elements/examples/pyramid-Lagrange-1.html
+
+getnbasefunctions(::Lagrange{RefPyramid,1}) = 5
+
+vertexdof_indices(::Lagrange{RefPyramid,1}) = ((1,), (2,), (3,), (4,), (5,),)
+facedof_indices(::Lagrange{RefPyramid,1}) = ((1,4,3,2), (1,2,5), (2,3,5), (3,4,5), (4,1,5), )
+edgedof_indices(::Lagrange{RefPyramid,1}) = ((1,2), (2,3), (3,4), (4,1), (1,5), (2,5), (3,5), (4,5))
+
+function reference_coordinates(::Lagrange{RefPyramid,1})
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, .0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0))]
+end
+
+function shape_value(ip::Lagrange{RefPyramid,1}, ξ::Vec{3}, i::Int)
+    (x,y,z) = ξ
+    zzero = z ≈ 1.0
+    i == 1 && return zzero ? 0.0 : (-x*y+(z-1)*(-x-y-z+1))/(z-1)
+    i == 2 && return zzero ? 0.0 : x*(y+z-1)/(z-1)
+    i == 3 && return zzero ? 0.0 : -x*y/(z-1)
+    i == 4 && return zzero ? 0.0 : y*(x+z-1)/(z-1)
+    i == 5 && return zzero ? 1.0 : z
+    throw(BoundsError("no shape function $i for interpolation $ip"))
 end
 
 ###################
