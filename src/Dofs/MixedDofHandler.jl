@@ -519,13 +519,15 @@ function dof_range(fh::FieldHandler, field_idx::Int)
 end
 dof_range(fh::FieldHandler, field_name::Symbol) = dof_range(fh, find_field(fh, field_name))
 
-# TODO: Perhaps this method should be removed in favor of dof_range(::SubDofHandler, :s)
-function dof_range(dh::MixedDofHandler, field_idxs::Tuple{Int,Int})
-    fh_idx, field_idx = field_idxs
-    dof_range(dh.fieldhandlers[fh_idx], field_idx)
+function dof_range(dh::MixedDofHandler, field_name::Symbol)
+    if length(dh.fieldhandlers) > 1
+        error("The given MixedDofHandler has $(length(dh.fieldhandlers)) FieldHandlers.
+              Extracting the dof range based on the fieldname might not be a unique problem
+              in this case. Use `dof_range(fh::FieldHandler, field_name)` instead.")
+    end
+    fh_idx, field_idx = find_field(dh, field_name)
+    return dof_range(dh.fieldhandlers[fh_idx], field_idx)
 end
-# TODO: Make this error in case of multiple SubDofHandlers
-dof_range(dh::MixedDofHandler, field_name::Symbol) = dof_range(dh, find_field(dh, field_name))
 
 """
     getfieldinterpolation(dh::MixedDofHandler, field_idxs::NTuple{2,Int})
