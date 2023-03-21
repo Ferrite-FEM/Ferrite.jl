@@ -911,7 +911,7 @@ end
 
 
 #Function for adding constraint when using multiple celltypes
-function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
+function add!(ch::ConstraintHandler{<:Union{MixedDofHandler, NewDofHandler}}, dbc::Dirichlet)
     dbc_added = false
     for fh in ch.dh.fieldhandlers
         if dbc.field_name in getfieldnames(fh) && _in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=false)
@@ -929,7 +929,7 @@ function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
     return ch
 end
 
-function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_not_in_cellset=true)
+function add!(ch::ConstraintHandler, fh::Union{FieldHandler, SubDofHandler}, dbc::Dirichlet; warn_not_in_cellset=true)
     if warn_not_in_cellset && !(_in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=true))
         @warn("You are trying to add a constraint a face/edge/node that is not in the cellset of the fieldhandler. This location will be skipped")
     end

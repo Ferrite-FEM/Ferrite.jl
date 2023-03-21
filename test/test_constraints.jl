@@ -99,14 +99,17 @@ end
    addcellset!(mesh, "set2", Set(2))
    addnodeset!(mesh, "bottom", Set(1:5))
 
-   dh  = MixedDofHandler(mesh)
+   dh  = NewDofHandler(mesh)
 
    ip_quadratic = Lagrange{dim, RefCube, 2}()
    ip_linear = Lagrange{dim, RefCube, 1}()
-   field_u = Field(:u, ip_quadratic, dim)
-   field_c = Field(:c, ip_linear, 1)
-   add!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set1")))
-   add!(dh, FieldHandler([field_u], getcellset(mesh, "set2")))
+
+   sub_dh_set1 = SubDofHandler(dh, getcellset(mesh, "set1"))
+   add!(sub_dh_set1, :u, dim, ip_quadratic)
+   add!(sub_dh_set1, :c, 1, ip_linear)
+
+   sub_dh_set2 = SubDofHandler(dh, getcellset(mesh, "set2"))
+   add!(sub_dh_set2, :u, dim, ip_quadratic)
 
    close!(dh)
 
@@ -120,19 +123,22 @@ end
    @test ch.prescribed_dofs == [1,3,9,19,20,23,27]
    @test ch.inhomogeneities == [1.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0]
 
-   ## MixedDofHandler: let first FieldHandler not have all fields
+   ## NewDofHandler: let first FieldHandler not have all fields
    dim = 2
    mesh = generate_grid(Quadrilateral, (2,1))
    addcellset!(mesh, "set1", Set(1))
    addcellset!(mesh, "set2", Set(2))
 
    ip = Lagrange{dim, RefCube, 1}()
-   field_u = Field(:u, ip, dim)
-   field_c = Field(:c, ip, 1)
 
-   dh = MixedDofHandler(mesh)
-   add!(dh, FieldHandler([field_u], getcellset(mesh, "set1")))
-   add!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set2")))
+   dh = NewDofHandler(mesh)
+
+   sub_dh_set1 = SubDofHandler(dh, getcellset(mesh, "set1"))
+   add!(sub_dh_set1, :u, dim, ip)
+   sub_dh_set2 = SubDofHandler(dh, getcellset(mesh, "set2"))
+   add!(sub_dh_set2, :u, dim, ip)
+   add!(sub_dh_set2, :c, 1, ip)
+
    close!(dh)
 
    ch = ConstraintHandler(dh)
@@ -216,21 +222,32 @@ end
                     "C" => Set((FaceIndex(3,1), FaceIndex(4,1))))
     grid = Grid(cells, nodes, cellsets=cellsets, facesets=facesets)
 
-    # Create MixedDofHandler based on grid
+    # Create NewDofHandler based on grid
     dim = Ferrite.getdim(grid)  # 2
     ip_quad = Lagrange{dim,RefCube,1}()
     ip_tria = Lagrange{dim,RefTetrahedron,1}()
-    dh = MixedDofHandler(grid)
+    dh = NewDofHandler(grid)
     field_uT = Field(:u, ip_tria, 1)
     field_uQ = Field(:u, ip_quad, 1)
     field_vT = Field(:v, ip_tria, 1)
     field_vQ = Field(:v, ip_quad, 1)
 
+
     # Order important for test to ensure consistent dof ordering
-    add!(dh, FieldHandler([field_uQ, field_vQ], getcellset(grid, "uandvQ")))
-    add!(dh, FieldHandler([field_uT, field_vT], getcellset(grid, "uandvT")))
-    add!(dh, FieldHandler([field_uT], getcellset(grid, "onlyuT")))
-    add!(dh, FieldHandler([field_uQ], getcellset(grid, "onlyuQ")))
+    sub_dh_uandvQ = SubDofHandler(dh, getcellset(grid, "uandvQ"))
+    add!(sub_dh_uandvQ, :u, 1, ip_quad)
+    add!(sub_dh_uandvQ, :v, 1, ip_quad)
+
+    sub_dh_uandvT = SubDofHandler(dh, getcellset(grid, "uandvT"))
+    add!(sub_dh_uandvT, :u, 1, ip_tria)
+    add!(sub_dh_uandvT, :v, 1, ip_tria)
+
+    sub_dh_onlyuT = SubDofHandler(dh, getcellset(grid, "onlyuT"))
+    add!(sub_dh_onlyuT, :u, 1, ip_tria)
+    
+    sub_dh_onlyuQ = SubDofHandler(dh, getcellset(grid, "onlyuQ"))
+    add!(sub_dh_onlyuQ, :u, 1, ip_quad)
+
     close!(dh)
 
     # Add constraints 

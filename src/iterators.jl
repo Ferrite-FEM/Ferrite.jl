@@ -57,7 +57,7 @@ function CellCache(grid::Grid{dim,C,T}, flags::UpdateFlags=UpdateFlags()) where 
     return CellCache(flags, grid, ScalarWrapper(-1), nodes, coords, nothing, Int[])
 end
 
-function CellCache(dh::Union{DofHandler{dim},MixedDofHandler{dim}}, flags::UpdateFlags=UpdateFlags()) where {dim}
+function CellCache(dh::Union{DofHandler{dim},MixedDofHandler{dim},NewDofHandler{dim}}, flags::UpdateFlags=UpdateFlags()) where {dim}
     N = nnodes_per_cell(dh.grid)
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, get_coordinate_eltype(dh.grid)}, N)
@@ -81,8 +81,8 @@ function reinit!(cc::CellCache, i::Int)
     end
     return cc
 end
-function reinit!(cc::CellCache{<:Any,<:AbstractGrid,<:MixedDofHandler}, i::Int)
-    @assert cc.dh isa MixedDofHandler
+function reinit!(cc::CellCache{<:Any,<:AbstractGrid,<:Union{MixedDofHandler,NewDofHandler}}, i::Int)
+    @assert cc.dh isa MixedDofHandler || cc.dh isa NewDofHandler
     cc.cellid[] = i
     if cc.flags.nodes
         resize!(cc.nodes, nnodes_per_cell(cc.dh, i))
@@ -157,7 +157,7 @@ function CellIterator(gridordh::Union{Grid,AbstractDofHandler},
         grid = gridordh isa AbstractDofHandler ? gridordh.grid : gridordh
         set = 1:getncells(grid)
     end
-    if gridordh isa MixedDofHandler
+    if gridordh isa MixedDofHandler || gridordh isa NewDofHandler
         # TODO: Since the CellCache is resizeable this is not really necessary to check
         #       here, but might be useful to catch slow code paths?
         _check_same_celltype(gridordh.grid, set)
