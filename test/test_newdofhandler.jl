@@ -13,28 +13,6 @@ function get_2d_grid()
     return Grid(cells,nodes)
 end
 
-function test_create_newdofhandler()
-    grid = get_2d_grid()
-    dh = NewDofHandler(grid)
-    # subdomain 1
-    set1 = Set((1,))
-    sub_dh1 = SubDofHandler(dh, set1)
-    add!(sub_dh1, :u, 2, Lagrange{2,RefCube,1}())
-
-    # subdomain 2
-    set2 = Set((2,))
-    sub_dh2 = SubDofHandler(dh, set2)
-    add!(sub_dh2, :u, 2, Lagrange{2,RefTetrahedron,1}())
-    add!(sub_dh2, :s, 1, Lagrange{2,RefTetrahedron,1}())
-
-
-    # or without subdomains
-    grid = generate_grid(Quadrilateral, (2,1))
-    dh = NewDofHandler(grid)
-    add!(dh, :u, 2, Lagrange{2,RefCube, 1}())
-end
-
-#=
 function test_1d_bar_beam()
     # Something like a truss and a Timoshenko beam.
     # two line-cells with 2 dofs/node -> "bars"
@@ -47,13 +25,19 @@ function test_1d_bar_beam()
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 3)]
     grid = Grid(cells, nodes)
 
-    field1 = create_field(name=:u, spatial_dim=1, field_dim=2, order=1, cellshape=RefCube)
-    field2 = create_field(name=:u, spatial_dim=1, field_dim=2, order=1, cellshape=RefCube)
-    field3 = create_field(name=:θ, spatial_dim=1, field_dim=1, order=1, cellshape=RefCube)
+    ip_u = Lagrange{1, RefCube, 1}()
+    ip_θ = Lagrange{1, RefCube, 1}()
 
-    dh = MixedDofHandler(grid);
-    add!(dh, FieldHandler([field2, field3], Set(3)));
-    add!(dh, FieldHandler([field1], Set((1, 2))));
+    dh = NewDofHandler(grid)
+    # domain 1
+    sub_dh1 = SubDofHandler(dh, Set(3))
+    add!(sub_dh1, :u, 2, ip_u)
+    add!(sub_dh1, :θ, 1, ip_θ)
+
+    # domain 2
+    sub_dh2 = SubDofHandler(dh, Set((1,2)))
+    add!(sub_dh2, :u, 2, ip_u)
+
     close!(dh)
     @test ndofs(dh) == 8
     @test celldofs(dh, 3) == collect(1:6)
@@ -71,11 +55,17 @@ function test_2d_scalar()
 
     grid = get_2d_grid()
     # WHEN: adding a scalar field for each cell and generating dofs
-    field1 = create_field(name=:u, spatial_dim=2, field_dim=1, order=1, cellshape=RefCube)
-    field2 = create_field(name=:u, spatial_dim=2, field_dim=1, order=1, cellshape=RefTetrahedron)
-    dh = MixedDofHandler(grid);
-    add!(dh, FieldHandler([field1], Set(1)));
-    add!(dh, FieldHandler([field2], Set(2)));
+    ip_quad = Lagrange{2, RefCube, 1}()
+    ip_tri = Lagrange{2, RefTetrahedron, 1}()
+
+    dh = NewDofHandler(grid)
+    # quad
+    sub_dh_quad = SubDofHandler(dh, Set(1))
+    add!(sub_dh_quad, :u, 1, ip_quad)
+    # tri
+    sub_dh_tri = SubDofHandler(dh, Set(2))
+    add!(sub_dh_tri, :u, 1, ip_tri)
+
     close!(dh)
 
     # THEN: we expect 5 dofs and dof 2 and 3 being shared
@@ -86,28 +76,39 @@ function test_2d_scalar()
 end
 
 function test_2d_error()
-
     grid = get_2d_grid()
-    # the refshape of the field must be the same as the refshape of the elements it is added to
-    field1 = create_field(name=:u, spatial_dim=2, field_dim=1, order=1, cellshape=RefTetrahedron)
-    field2 = create_field(name=:u, spatial_dim=2, field_dim=1, order=1, cellshape=RefCube)
-    dh = MixedDofHandler(grid);
-    @test_throws ErrorException add!(dh, FieldHandler([field1], Set(1)));
-    @test_throws ErrorException add!(dh, FieldHandler([field2], Set(2)));
-    # all cells within a FieldHandler should be of the same celltype
-    @test_throws ErrorException add!(dh, FieldHandler([field1], Set([1,2])));
 
+    ip_quad = Lagrange{2, RefCube, 1}()
+    ip_tri = Lagrange{2, RefTetrahedron, 1}()
+
+    dh = NewDofHandler(grid)
+    # the refshape of the field must be the same as the refshape of the elements it is added to
+    # quad
+    sub_dh_quad = SubDofHandler(dh, Set(1))
+    @test_throws AssertionError add!(sub_dh_quad, :u, 2, ip_tri)
+    # tri
+    sub_dh_tri = SubDofHandler(dh, Set(2))
+    @test_throws AssertionError add!(sub_dh_tri, :u, 2, ip_quad)
+
+    # all cells within a FieldHandler should be of the same celltype
+    @test_throws ErrorException SubDofHandler(dh, Set((1,2)))
 end
 
 function test_2d_vector()
 
     grid = get_2d_grid()
+
+    ip_quad = Lagrange{2, RefCube, 1}()
+    ip_tri = Lagrange{2, RefTetrahedron, 1}()
+
     ## vector field
-    field1 = create_field(name = :u, spatial_dim=2, field_dim = 2, order = 1, cellshape = RefCube)
-    field2 = create_field(name = :u, spatial_dim=2, field_dim = 2, order = 1, cellshape = RefTetrahedron)
-    dh = MixedDofHandler(grid);
-    add!(dh, FieldHandler([field1], Set(1)));
-    add!(dh, FieldHandler([field2], Set(2)));
+    dh = NewDofHandler(grid)
+    # quad
+    sub_dh_quad = SubDofHandler(dh, Set(1))
+    add!(sub_dh_quad, :u, 2, ip_quad)
+    # tri
+    sub_dh_tri = SubDofHandler(dh, Set(2))
+    add!(sub_dh_tri, :u, 2, ip_tri)
     close!(dh)
 
     # THEN: we expect 10 dofs and dof 3-6 being shared
@@ -120,10 +121,15 @@ end
 function test_2d_mixed_1_el()
     grid = get_2d_grid()
     ## mixed field of same order
-    field1 = create_field(name = :u, spatial_dim=2, field_dim = 2, order = 1, cellshape = RefCube)
-    field2 = create_field(name = :p, spatial_dim=2, field_dim = 1, order = 1, cellshape = RefCube)
-    dh = MixedDofHandler(grid);
-    add!(dh, FieldHandler([field1, field2], Set(1)));
+    
+    ip_u = Lagrange{2, RefCube, 1}()
+    ip_p = Lagrange{2, RefCube, 1}()
+
+    dh = NewDofHandler(grid)
+    sub_dh = SubDofHandler(dh, Set(1))
+    add!(sub_dh, :u, 2, ip_u)
+    add!(sub_dh, :p, 1, ip_p)
+
     close!(dh)
 
     # THEN: we expect 12 dofs
@@ -135,14 +141,24 @@ end
 function test_2d_mixed_2_el()
 
     grid = get_2d_grid()
+
+    ip_u_quad = Lagrange{2, RefCube, 1}()
+    ip_u_tri = Lagrange{2, RefTetrahedron, 1}()
+
+    ip_p_quad = Lagrange{2, RefCube, 1}()
+    ip_p_tri = Lagrange{2, RefTetrahedron, 1}()
+
     ## mixed field of same order
-    field1_quad = create_field(name = :u, spatial_dim=2, field_dim = 2, order = 1, cellshape = RefCube)
-    field2_quad = create_field(name = :p, spatial_dim=2, field_dim = 1, order = 1, cellshape = RefCube)
-    field1_tri = create_field(name = :u, spatial_dim=2, field_dim = 2, order = 1, cellshape = RefTetrahedron)
-    field2_tri = create_field(name = :p, spatial_dim=2, field_dim = 1, order = 1, cellshape = RefTetrahedron)
-    dh = MixedDofHandler(grid);
-    add!(dh, FieldHandler([field1_quad, field2_quad], Set(1)));
-    add!(dh, FieldHandler([field1_tri, field2_tri], Set(2)));
+    dh = NewDofHandler(grid)
+    # quad
+    sub_dh_quad = SubDofHandler(dh, Set(1))
+    add!(sub_dh_quad, :u, 2, ip_u_quad)
+    add!(sub_dh_quad, :p, 1, ip_p_quad)
+    # tri
+    sub_dh_tri = SubDofHandler(dh, Set(2))
+    add!(sub_dh_tri, :u, 2, ip_u_tri)
+    add!(sub_dh_tri, :p, 1, ip_p_tri)
+
     close!(dh)
 
     # THEN: we expect 15 dofs
@@ -159,11 +175,12 @@ function test_face_dofs_2_tri()
         Triangle((2, 4, 3))
         ]
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 4)]
-    grid = Grid(cells, nodes);
-    field1 = create_field(name = :u, spatial_dim = 2, field_dim = 2, order = 2, cellshape = RefTetrahedron)
-    dh = MixedDofHandler(grid);
-    add!(dh, FieldHandler([field1], Set((1, 2))));
-    #add!(dh, FieldHandler([field2], Set(2)));
+    grid = Grid(cells, nodes)
+
+    ip = Lagrange{2, RefTetrahedron, 2}()
+
+    dh = NewDofHandler(grid)
+    add!(dh, :u, 2, ip)
     close!(dh)
 
     # THEN:
@@ -183,9 +200,11 @@ function test_3d_tetrahedrons()
         ]
     nodes = [Node(coord) for coord in zeros(Vec{3,Float64}, 8)]
     grid = Grid(cells, nodes)
-    field = create_field(name = :u, spatial_dim=3,  field_dim = 3, order = 2, cellshape = RefTetrahedron)
-    dh = MixedDofHandler(grid);
-    add!(dh, FieldHandler([field], Set((1, 2, 3, 4, 5, 6))));
+
+    ip = Lagrange{3, RefTetrahedron, 2}()
+
+    dh = NewDofHandler(grid)
+    add!(dh, :u, 3, ip)
     close!(dh)
 
     # reference using the regular DofHandler
@@ -199,6 +218,7 @@ function test_3d_tetrahedrons()
     end
 end
 
+#=
 function test_face_dofs_quad_tri()
     # quadratic quad and quadratic triangle
     grid = get_2d_grid()
@@ -609,8 +629,6 @@ end
 
 @testset "NewDofHandler" begin
 
-    test_
-    #=
     test_1d_bar_beam();
     test_2d_scalar();
     test_2d_error();
@@ -618,9 +636,10 @@ end
     test_2d_mixed_1_el();
     test_2d_mixed_2_el();
     test_face_dofs_2_tri();
+    test_3d_tetrahedrons();
+    #=
     test_face_dofs_quad_tri();
     test_serendipity_quad_tri();
-    test_3d_tetrahedrons();
     test_2d_mixed_field_triangles();
     test_2d_mixed_field_mixed_celltypes();
     test_3d_mixed_field_mixed_celltypes();
