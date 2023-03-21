@@ -114,6 +114,8 @@ export
     Field,
     reshape_to_nodes,
     apply_analytical!,
+    NewDofHandler,
+    SubDofHandler,
 
 # Constraints
     ConstraintHandler,

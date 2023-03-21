@@ -5,9 +5,9 @@ Construct `dim`-dimensional `Field` called `name` which is approximated by `inte
 
 The interpolation is used for distributing the degrees of freedom.
 """
-struct Field
+struct NewField{I<:Interpolation}
     name::Symbol
-    interpolation::Interpolation
+    interpolation::I
     dim::Int
 end
 
@@ -19,15 +19,19 @@ Construct a `SubDofHandler` based on an array of [`Field`](@ref)s and assigns it
 A `SubDofHandler` must fullfill the following requirements:
 - All [`Cell`](@ref)s in `cellset` are of the same type.
 - Each field only uses a single interpolation on the `cellset`.
-- Each cell belongs only to a single `SubDofHandler`, i.e. all fields on a cell must be added within the same `FieldHandler`.
+- Each cell belongs only to a single `SubDofHandler`, i.e. all fields on a cell must be added within the same `SubDofHandler`.
 
 Notice that a `SubDofHandler` can hold several fields.
 """
-mutable struct SubDofHandler
-    fields::Vector{Field}
+mutable struct SubDofHandler{refshape, DH<:AbstractDofHandler} <: AbstractDofHandler
+    fields::Vector{NewField}
     cellset::Set{Int}
+    dh::DH
 end
 
+isclosed(sub_dh::SubDofHandler) = isclosed(sub_dh.dh)
+
+#= defined in MixedDofHandler.jl for now
 struct CellVector{T}
     values::Vector{T}
     offset::Vector{Int}
@@ -38,6 +42,7 @@ function Base.getindex(elvec::CellVector, el::Int)
     offset = elvec.offset[el]
     return elvec.values[offset:offset + elvec.length[el]-1]
  end
+=#
 
 """
     NewDofHandler(grid::Grid)
@@ -57,6 +62,20 @@ end
 function NewDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
     ncells = getncells(grid)
     NewDofHandler{dim,T,typeof(grid)}(SubDofHandler[], CellVector(Int[],zeros(Int,ncells),zeros(Int,ncells)), ScalarWrapper(false), grid, ScalarWrapper(-1))
+end
+
+function SubDofHandler(dh::DH, cellset::Set{Int}) where DH <: NewDofHandler
+    @assert !isclosed(dh)
+    _check_same_celltype(dh.grid, cellset)
+
+    celltype = typeof(getcells(dh.grid, first(cellset)))
+    refshape = getrefshape(default_interpolation(celltype))
+
+    sub_dh = SubDofHandler{refshape,DH}(NewField[], cellset, dh)
+
+    _check_cellset_intersections(dh, sub_dh)
+    push!(dh.fieldhandlers, sub_dh)
+    return sub_dh
 end
 
 getfieldnames(fh::SubDofHandler) = [field.name for field in fh.fields]
@@ -149,29 +168,6 @@ Returns the number of unique fields defined.
 """
 nfields(dh::NewDofHandler) = length(getfieldnames(dh))
 
-"""
-    add!(dh::NewDofHandler, fh::SubDofHandler)
-
-Add all fields of the [`SubDofHandler`](@ref) `fh` to `dh`.
-"""
-function add!(dh::NewDofHandler, fh::SubDofHandler)
-    # TODO: perhaps check that a field with the same name is the same field?
-    @assert !isclosed(dh)
-    _check_same_celltype(dh.grid, collect(fh.cellset))
-    _check_cellset_intersections(dh, fh)
-    # the field interpolations should have the same refshape as the cells they are applied to
-    refshapes_fh = getrefshape.(getfieldinterpolations(fh))
-    # extract the celltype from the first cell as the celltypes are all equal
-    cell_type = typeof(dh.grid.cells[first(fh.cellset)])
-    refshape_cellset = getrefshape(default_interpolation(cell_type))
-    for refshape in refshapes_fh
-        refshape_cellset == refshape || error("The RefShapes of the fieldhandlers interpolations must correspond to the RefShape of the cells it is applied to.")
-    end
-
-    push!(dh.fieldhandlers, fh)
-    return dh
-end
-
 function _check_cellset_intersections(dh::NewDofHandler, fh::SubDofHandler)
     for _fh in dh.fieldhandlers
         isdisjoint(_fh.cellset, fh.cellset) || error("Each cell can only belong to a single SubDofHandler.")
@@ -184,25 +180,37 @@ function add!(dh::NewDofHandler, name::Symbol, dim::Int)
     add!(dh, name, dim, default_interpolation(celltype))
 end
 
+function add!(sub_dh::SubDofHandler{refshape}, name::Symbol, dim::Int, ip::Interpolation) where refshape
+    @assert !isclosed(sub_dh) 
+    @assert getrefshape(ip) == refshape # TODO: perhaps custom error message?
+
+    field = NewField(name, ip, dim)
+    push!(sub_dh.fields, field)
+
+    return sub_dh
+end
+
+function add!(sub_dh::SubDofHandler, name::Symbol, dim::Int)
+    ip = default_interpolation(getcells(sub_dh.dh.grid, first(sub_dh.cellset)))
+    add!(sub_dh, name, dim, ip)
+end
+
 function add!(dh::NewDofHandler, name::Symbol, dim::Int, ip::Interpolation)
-    @assert !isclosed(dh)
-
-    celltype = getcelltype(dh.grid)
-    @assert isconcretetype(celltype)
-
-    if length(dh.fieldhandlers) == 0
-        cellset = Set(1:getncells(dh.grid))
-        push!(dh.fieldhandlers, SubDofHandler(Field[], cellset))
-    elseif length(dh.fieldhandlers) > 1
-        error("If you have more than one SubDofHandler, you must specify field")
+    if length(dh.fieldhandlers) > 1
+        error("The given NewDofHandler has $(length(dh.fieldhandlers)) SubDofHandlers.
+              Adding a field is ambiguous in this case.
+              Use `add(sub_dh::SubDofHandler, name, dim[, ip])` instead.")
     end
-    fh = first(dh.fieldhandlers)
 
-    field = Field(name,ip,dim)
-
-    push!(fh.fields, field)
+    add!(first(dh.fieldhandlers), name, dim, ip)
 
     return dh
+end
+
+function add!(dh::NewDofHandler, name::Symbol, dim::Int)
+    cellid = first(first(dh.fieldhandlers).cellset)
+    ip = default_interpolation(getcells(dh.grid, cellid))
+    add!(dh, name, dim, ip)
 end
 
 """
