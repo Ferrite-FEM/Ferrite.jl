@@ -12,18 +12,18 @@ struct Field
 end
 
 """
-    SubDofHandler(fields::Vector{Field}, cellset::Set{Int})
+    FieldHandler(fields::Vector{Field}, cellset::Set{Int})
 
-Construct a `SubDofHandler` based on an array of [`Field`](@ref)s and assigns it a set of cells.
+Construct a `FieldHandler` based on an array of [`Field`](@ref)s and assigns it a set of cells.
 
-A `SubDofHandler` must fullfill the following requirements:
+A `FieldHandler` must fullfill the following requirements:
 - All [`Cell`](@ref)s in `cellset` are of the same type.
 - Each field only uses a single interpolation on the `cellset`.
-- Each cell belongs only to a single `SubDofHandler`, i.e. all fields on a cell must be added within the same `FieldHandler`.
+- Each cell belongs only to a single `FieldHandler`, i.e. all fields on a cell must be added within the same `FieldHandler`.
 
-Notice that a `SubDofHandler` can hold several fields.
+Notice that a `FieldHandler` can hold several fields.
 """
-mutable struct SubDofHandler
+mutable struct FieldHandler
     fields::Vector{Field}
     cellset::Set{Int}
 end
@@ -40,28 +40,28 @@ function Base.getindex(elvec::CellVector, el::Int)
  end
 
 """
-    NewDofHandler(grid::Grid)
+    MixedDofHandler(grid::Grid)
 
-Construct a `NewDofHandler` based on `grid`. Supports:
+Construct a `MixedDofHandler` based on `grid`. Supports:
 - `Grid`s with or without concrete element type (E.g. "mixed" grids with several different element types.)
 - One or several fields, which can live on the whole domain or on subsets of the `Grid`.
 """
-struct NewDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
-    fieldhandlers::Vector{SubDofHandler}
+struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
+    fieldhandlers::Vector{FieldHandler}
     cell_dofs::CellVector{Int}
     closed::ScalarWrapper{Bool}
     grid::G
     ndofs::ScalarWrapper{Int}
 end
 
-function NewDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
+function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
     ncells = getncells(grid)
-    NewDofHandler{dim,T,typeof(grid)}(SubDofHandler[], CellVector(Int[],zeros(Int,ncells),zeros(Int,ncells)), ScalarWrapper(false), grid, ScalarWrapper(-1))
+    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],zeros(Int,ncells),zeros(Int,ncells)), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
-getfieldnames(fh::SubDofHandler) = [field.name for field in fh.fields]
-getfielddims(fh::SubDofHandler) = [field.dim for field in fh.fields]
-getfieldinterpolations(fh::SubDofHandler) = [field.interpolation for field in fh.fields]
+getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
+getfielddims(fh::FieldHandler) = [field.dim for field in fh.fields]
+getfieldinterpolations(fh::FieldHandler) = [field.interpolation for field in fh.fields]
 
 """
     ndofs_per_cell(dh::AbstractDofHandler[, cell::Int=1])
@@ -70,8 +70,8 @@ Return the number of degrees of freedom for the cell with index `cell`.
 
 See also [`ndofs`](@ref).
 """
-ndofs_per_cell(dh::NewDofHandler, cell::Int=1) = dh.cell_dofs.length[cell]
-nnodes_per_cell(dh::NewDofHandler, cell::Int=1) = nnodes_per_cell(dh.grid, cell) # TODO: deprecate, shouldn't belong to MixedDofHandler any longer
+ndofs_per_cell(dh::MixedDofHandler, cell::Int=1) = dh.cell_dofs.length[cell]
+nnodes_per_cell(dh::MixedDofHandler, cell::Int=1) = nnodes_per_cell(dh.grid, cell) # TODO: deprecate, shouldn't belong to MixedDofHandler any longer
 
 """
     celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
@@ -80,7 +80,7 @@ Store the degrees of freedom that belong to cell `i` in `global_dofs`.
 
 See also [`celldofs`](@ref).
 """
-function celldofs!(global_dofs::Vector{Int}, dh::NewDofHandler, i::Int)
+function celldofs!(global_dofs::Vector{Int}, dh::MixedDofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
     unsafe_copyto!(global_dofs, 1, dh.cell_dofs.values, dh.cell_dofs.offset[i], length(global_dofs))
@@ -94,28 +94,28 @@ Return a vector with the degrees of freedom that belong to cell `i`.
 
 See also [`celldofs!`](@ref).
 """
-function celldofs(dh::NewDofHandler, i::Int)
+function celldofs(dh::MixedDofHandler, i::Int)
     @assert isclosed(dh)
     return dh.cell_dofs[i]
 end
 
 #TODO: perspectively remove in favor of `getcoordinates!(global_coords, grid, i)`?
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::NewDofHandler, i::Union{Int, <:AbstractCell}) where {dim,T}
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::MixedDofHandler, i::Union{Int, <:AbstractCell}) where {dim,T}
     cellcoords!(global_coords, dh.grid, i)
 end
 
-function cellnodes!(global_nodes::Vector{Int}, dh::NewDofHandler, i::Union{Int, <:AbstractCell})
+function cellnodes!(global_nodes::Vector{Int}, dh::MixedDofHandler, i::Union{Int, <:AbstractCell})
     cellnodes!(global_nodes, dh.grid, i)
 end
 
 """
-    getfieldnames(dh::NewDofHandler)
-    getfieldnames(fh::SubDofHandler)
+    getfieldnames(dh::MixedDofHandler)
+    getfieldnames(fh::FieldHandler)
 
 Return a vector with the names of all fields. Can be used as an iterable over all the fields
 in the problem.
 """
-function getfieldnames(dh::NewDofHandler)
+function getfieldnames(dh::MixedDofHandler)
     fieldnames = Vector{Symbol}()
     for fh in dh.fieldhandlers
         append!(fieldnames, getfieldnames(fh))
@@ -123,38 +123,38 @@ function getfieldnames(dh::NewDofHandler)
     return unique!(fieldnames)
 end
 
-getfielddim(fh::SubDofHandler, field_idx::Int) = fh.fields[field_idx].dim
-getfielddim(fh::SubDofHandler, field_name::Symbol) = getfielddim(fh, find_field(fh, field_name))
+getfielddim(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].dim
+getfielddim(fh::FieldHandler, field_name::Symbol) = getfielddim(fh, find_field(fh, field_name))
 
 """
-    getfielddim(dh::NewDofHandler, field_idxs::NTuple{2,Int})
-    getfielddim(dh::NewDofHandler, field_name::Symbol)
-    getfielddim(dh::SubDofHandler, field_idx::Int)
-    getfielddim(dh::SubDofHandler, field_name::Symbol)
+    getfielddim(dh::MixedDofHandler, field_idxs::NTuple{2,Int})
+    getfielddim(dh::MixedDofHandler, field_name::Symbol)
+    getfielddim(dh::FieldHandler, field_idx::Int)
+    getfielddim(dh::FieldHandler, field_name::Symbol)
 
 Return the dimension of a given field. The field can be specified by its index (see
 [`find_field`](@ref)) or its name.
 """
-function getfielddim(dh::NewDofHandler, field_idxs::NTuple{2, Int})
+function getfielddim(dh::MixedDofHandler, field_idxs::NTuple{2, Int})
     fh_idx, field_idx = field_idxs
     fielddim = getfielddim(dh.fieldhandlers[fh_idx], field_idx)
     return fielddim
 end
-getfielddim(dh::NewDofHandler, name::Symbol) = getfielddim(dh, find_field(dh, name))
+getfielddim(dh::MixedDofHandler, name::Symbol) = getfielddim(dh, find_field(dh, name))
 
 """
-    nfields(dh::NewDofHandler)
+    nfields(dh::MixedDofHandler)
 
 Returns the number of unique fields defined.
 """
-nfields(dh::NewDofHandler) = length(getfieldnames(dh))
+nfields(dh::MixedDofHandler) = length(getfieldnames(dh))
 
 """
-    add!(dh::NewDofHandler, fh::SubDofHandler)
+    add!(dh::MixedDofHandler, fh::FieldHandler)
 
-Add all fields of the [`SubDofHandler`](@ref) `fh` to `dh`.
+Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
 """
-function add!(dh::NewDofHandler, fh::SubDofHandler)
+function add!(dh::MixedDofHandler, fh::FieldHandler)
     # TODO: perhaps check that a field with the same name is the same field?
     @assert !isclosed(dh)
     _check_same_celltype(dh.grid, collect(fh.cellset))
@@ -172,19 +172,19 @@ function add!(dh::NewDofHandler, fh::SubDofHandler)
     return dh
 end
 
-function _check_cellset_intersections(dh::NewDofHandler, fh::SubDofHandler)
+function _check_cellset_intersections(dh::MixedDofHandler, fh::FieldHandler)
     for _fh in dh.fieldhandlers
-        isdisjoint(_fh.cellset, fh.cellset) || error("Each cell can only belong to a single SubDofHandler.")
+        isdisjoint(_fh.cellset, fh.cellset) || error("Each cell can only belong to a single FieldHandler.")
     end
 end
 
-function add!(dh::NewDofHandler, name::Symbol, dim::Int)
+function add!(dh::MixedDofHandler, name::Symbol, dim::Int)
     celltype = getcelltype(dh.grid)
-    isconcretetype(celltype) || error("If you have more than one celltype in Grid, you must use add!(dh::NewDofHandler, fh::SubDofHandler)")
+    isconcretetype(celltype) || error("If you have more than one celltype in Grid, you must use add!(dh::MixedDofHandler, fh::FieldHandler)")
     add!(dh, name, dim, default_interpolation(celltype))
 end
 
-function add!(dh::NewDofHandler, name::Symbol, dim::Int, ip::Interpolation)
+function add!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolation)
     @assert !isclosed(dh)
 
     celltype = getcelltype(dh.grid)
@@ -192,9 +192,9 @@ function add!(dh::NewDofHandler, name::Symbol, dim::Int, ip::Interpolation)
 
     if length(dh.fieldhandlers) == 0
         cellset = Set(1:getncells(dh.grid))
-        push!(dh.fieldhandlers, SubDofHandler(Field[], cellset))
+        push!(dh.fieldhandlers, FieldHandler(Field[], cellset))
     elseif length(dh.fieldhandlers) > 1
-        error("If you have more than one SubDofHandler, you must specify field")
+        error("If you have more than one FieldHandler, you must specify field")
     end
     fh = first(dh.fieldhandlers)
 
@@ -211,18 +211,18 @@ end
 Closes `dh` and creates degrees of freedom for each cell.
 
 If there are several fields, the dofs are added in the following order:
-For a `NewDofHandler`, go through each `SubDofHandler` in the order they were added.
-For each field in the `SubDofHandler` or in the `DofHandler` (again, in the order the fields were added),
+For a `MixedDofHandler`, go through each `FieldHandler` in the order they were added.
+For each field in the `FieldHandler` or in the `DofHandler` (again, in the order the fields were added),
 create dofs for the cell.
 This means that dofs on a particular cell, the dofs will be numbered according to the fields;
 first dofs for field 1, then field 2, etc.
 """
-function close!(dh::NewDofHandler)
+function close!(dh::MixedDofHandler)
     dh, _, _, _ = __close!(dh)
     return dh
 end
 
-function __close!(dh::NewDofHandler{dim}) where {dim}
+function __close!(dh::MixedDofHandler{dim}) where {dim}
     @assert !isclosed(dh)
     field_names = getfieldnames(dh)  # all the fields in the problem
     numfields =  length(field_names)
@@ -261,7 +261,7 @@ function __close!(dh::NewDofHandler{dim}) where {dim}
 
 end
 
-function _close!(dh::NewDofHandler{dim}, cellnumbers, global_field_names, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
+function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
     ip_infos = InterpolationInfo[]
     for interpolation in field_interpolations
         ip_info = InterpolationInfo(interpolation)
@@ -381,19 +381,19 @@ function add_cell_dofs(cell_dofs, cell, celldict, field_dim, ncelldofs, nextdof)
 end
 
 """
-    find_field(dh::NewDofHandler, field_name::Symbol)::NTuple{2,Int}
+    find_field(dh::MixedDofHandler, field_name::Symbol)::NTuple{2,Int}
 
-Return the index of the field with name `field_name` in a `NewDofHandler`. The index is a
-`NTuple{2,Int}`, where the 1st entry is the index of the `SubDofHandler` within which the
-field was found and the 2nd entry is the index of the field within the `SubDofHandler`.
+Return the index of the field with name `field_name` in a `MixedDofHandler`. The index is a
+`NTuple{2,Int}`, where the 1st entry is the index of the `FieldHandler` within which the
+field was found and the 2nd entry is the index of the field within the `FieldHandler`.
 
 !!! note
-    Always finds the 1st occurence of a field within `NewDofHandler`.
+    Always finds the 1st occurence of a field within `MixedDofHandler`.
 
-See also: [`find_field(fh::SubDofHandler, field_name::Symbol)`](@ref),
-[`_find_field(fh::SubDofHandler, field_name::Symbol)`](@ref).
+See also: [`find_field(fh::FieldHandler, field_name::Symbol)`](@ref),
+[`_find_field(fh::FieldHandler, field_name::Symbol)`](@ref).
 """
-function find_field(dh::NewDofHandler, field_name::Symbol)
+function find_field(dh::MixedDofHandler, field_name::Symbol)
     for (fh_idx, fh) in pairs(dh.fieldhandlers)
         field_idx = _find_field(fh, field_name)
         !isnothing(field_idx) && return (fh_idx, field_idx)
@@ -402,31 +402,31 @@ function find_field(dh::NewDofHandler, field_name::Symbol)
 end
 
 """
-    find_field(fh::SubDofHandler, field_name::Symbol)::Int
+    find_field(fh::FieldHandler, field_name::Symbol)::Int
 
-Return the index of the field with name `field_name` in a `SubDofHandler`. Throw an
+Return the index of the field with name `field_name` in a `FieldHandler`. Throw an
 error if the field is not found.
 
-See also: [`find_field(dh::NewDofHandler, field_name::Symbol)`](@ref), [`_find_field(fh::SubDofHandler, field_name::Symbol)`](@ref).
+See also: [`find_field(dh::MixedDofHandler, field_name::Symbol)`](@ref), [`_find_field(fh::FieldHandler, field_name::Symbol)`](@ref).
 """
-function find_field(fh::SubDofHandler, field_name::Symbol)
+function find_field(fh::FieldHandler, field_name::Symbol)
     field_idx = _find_field(fh, field_name)
     if field_idx === nothing
-        error("Did not find field :$field_name in SubDofHandler (existing fields: $(getfieldnames(fh)))")
+        error("Did not find field :$field_name in FieldHandler (existing fields: $(getfieldnames(fh)))")
     end
     return field_idx
 end
 
 # No error if field not found
 """
-    _find_field(fh::SubDofHandler, field_name::Symbol)::Int
+    _find_field(fh::FieldHandler, field_name::Symbol)::Int
 
-Return the index of the field with name `field_name` in the `SubDofHandler` `fh`. Return 
+Return the index of the field with name `field_name` in the `FieldHandler` `fh`. Return 
 `nothing` if the field is not found.
 
-See also: [`find_field(dh::NewDofHandler, field_name::Symbol)`](@ref), [`find_field(fh::SubDofHandler, field_name::Symbol)`](@ref).
+See also: [`find_field(dh::MixedDofHandler, field_name::Symbol)`](@ref), [`find_field(fh::FieldHandler, field_name::Symbol)`](@ref).
 """
-function _find_field(fh::SubDofHandler, field_name::Symbol)
+function _find_field(fh::FieldHandler, field_name::Symbol)
     for (field_idx, field) in pairs(fh.fields)
         if field.name == field_name
             return field_idx
@@ -436,43 +436,43 @@ function _find_field(fh::SubDofHandler, field_name::Symbol)
 end
 
 # Calculate the offset to the first local dof of a field
-function field_offset(fh::SubDofHandler, field_idx::Int)
+function field_offset(fh::FieldHandler, field_idx::Int)
     offset = 0
     for i in 1:(field_idx-1)
         offset += getnbasefunctions(fh.fields[i].interpolation)::Int * fh.fields[i].dim
     end
     return offset
 end
-field_offset(fh::SubDofHandler, field_name::Symbol) = field_offset(fh, find_field(fh, field_name))
+field_offset(fh::FieldHandler, field_name::Symbol) = field_offset(fh, find_field(fh, field_name))
 
-field_offset(dh::NewDofHandler, field_name::Symbol) = field_offset(dh, find_field(dh, field_name))
-function field_offset(dh::NewDofHandler, field_idxs::Tuple{Int, Int})
+field_offset(dh::MixedDofHandler, field_name::Symbol) = field_offset(dh, find_field(dh, field_name))
+function field_offset(dh::MixedDofHandler, field_idxs::Tuple{Int, Int})
     fh_idx, field_idx = field_idxs
     field_offset(dh.fieldhandlers[fh_idx], field_idx)
 end
 
 """
-    dof_range(fh::SubDofHandler, field_idx::Int)
-    dof_range(fh::SubDofHandler, field_name::Symbol)
-    dof_range(dh:NewDofHandler, field_name::Symbol)
+    dof_range(fh::FieldHandler, field_idx::Int)
+    dof_range(fh::FieldHandler, field_name::Symbol)
+    dof_range(dh:MixedDofHandler, field_name::Symbol)
 
 Return the local dof range for a given field. The field can be specified by its name or
-index, where `field_idx` represents the index of a field within a `SubDofHandler` and
-`field_idxs` is a tuple of the `SubDofHandler`-index within the `NewDofHandler` and the
+index, where `field_idx` represents the index of a field within a `FieldHandler` and
+`field_idxs` is a tuple of the `FieldHandler`-index within the `MixedDofHandler` and the
 `field_idx`.
 
 !!! note
-    The `dof_range` of a field can vary between different `SubDofHandler`s. Therefore, it is
-    advised to use the `field_idxs` or refer to a given `SubDofHandler` directly in case
-    several `SubDofHandler`s exist. Using the `field_name` will always refer to the first
-    occurence of `field` within the `NewDofHandler`.
+    The `dof_range` of a field can vary between different `FieldHandler`s. Therefore, it is
+    advised to use the `field_idxs` or refer to a given `FieldHandler` directly in case
+    several `FieldHandler`s exist. Using the `field_name` will always refer to the first
+    occurence of `field` within the `MixedDofHandler`.
 
 Example:
 ```jldoctest
 julia> grid = generate_grid(Triangle, (3, 3))
 Grid{2, Triangle, Float64} with 18 Triangle cells and 16 nodes
 
-julia> dh = NewDofHandler(grid); add!(dh, :u, 3); add!(dh, :p, 1); close!(dh);
+julia> dh = MixedDofHandler(grid); add!(dh, :u, 3); add!(dh, :p, 1); close!(dh);
 
 julia> dof_range(dh, :u)
 1:9
@@ -487,42 +487,42 @@ julia> dof_range(dh.fieldhandlers[1], 2) # field :p
 10:12
 ```
 """
-function dof_range(fh::SubDofHandler, field_idx::Int)
+function dof_range(fh::FieldHandler, field_idx::Int)
     offset = field_offset(fh, field_idx)
     field_interpolation = fh.fields[field_idx].interpolation
     field_dim = fh.fields[field_idx].dim
     n_field_dofs = getnbasefunctions(field_interpolation)::Int * field_dim
     return (offset+1):(offset+n_field_dofs)
 end
-dof_range(fh::SubDofHandler, field_name::Symbol) = dof_range(fh, find_field(fh, field_name))
+dof_range(fh::FieldHandler, field_name::Symbol) = dof_range(fh, find_field(fh, field_name))
 
-function dof_range(dh::NewDofHandler, field_name::Symbol)
+function dof_range(dh::MixedDofHandler, field_name::Symbol)
     if length(dh.fieldhandlers) > 1
-        error("The given NewDofHandler has $(length(dh.fieldhandlers)) SubDofHandlers.
+        error("The given MixedDofHandler has $(length(dh.fieldhandlers)) FieldHandlers.
               Extracting the dof range based on the fieldname might not be a unique problem
-              in this case. Use `dof_range(fh::SubDofHandler, field_name)` instead.")
+              in this case. Use `dof_range(fh::FieldHandler, field_name)` instead.")
     end
     fh_idx, field_idx = find_field(dh, field_name)
     return dof_range(dh.fieldhandlers[fh_idx], field_idx)
 end
 
 """
-    getfieldinterpolation(dh::NewDofHandler, field_idxs::NTuple{2,Int})
-    getfieldinterpolation(dh::SubDofHandler, field_idx::Int)
-    getfieldinterpolation(dh::SubDofHandler, field_name::Symbol)
+    getfieldinterpolation(dh::MixedDofHandler, field_idxs::NTuple{2,Int})
+    getfieldinterpolation(dh::FieldHandler, field_idx::Int)
+    getfieldinterpolation(dh::FieldHandler, field_name::Symbol)
 
 Return the interpolation of a given field. The field can be specified by its index (see
 [`find_field`](@ref) or its name.
 """
-function getfieldinterpolation(dh::NewDofHandler, field_idxs::NTuple{2,Int})
+function getfieldinterpolation(dh::MixedDofHandler, field_idxs::NTuple{2,Int})
     fh_idx, field_idx = field_idxs
     ip = dh.fieldhandlers[fh_idx].fields[field_idx].interpolation
     return ip
 end
-getfieldinterpolation(fh::SubDofHandler, field_idx::Int) = fh.fields[field_idx].interpolation
-getfieldinterpolation(fh::SubDofHandler, field_name::Symbol) = getfieldinterpolation(fh, find_field(fh, field_name))
+getfieldinterpolation(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].interpolation
+getfieldinterpolation(fh::FieldHandler, field_name::Symbol) = getfieldinterpolation(fh, find_field(fh, field_name))
 
-function reshape_to_nodes(dh::NewDofHandler, u::Vector{T}, fieldname::Symbol) where T
+function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) where T
     # make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
 
