@@ -202,6 +202,10 @@ function add!(dh::NewDofHandler, name::Symbol, dim::Int, ip::Interpolation)
               Use `add(sub_dh::SubDofHandler, name, dim[, ip])` instead.")
     end
 
+    if length(dh.fieldhandlers) == 0
+        cellset = Set(1:getncells(dh.grid))
+        sub_dh = SubDofHandler(dh, cellset)
+    end
     add!(first(dh.fieldhandlers), name, dim, ip)
 
     return dh

@@ -26,6 +26,12 @@ function test_create_newdofhandler()
     sub_dh2 = SubDofHandler(dh, set2)
     add!(sub_dh2, :u, 2, Lagrange{2,RefTetrahedron,1}())
     add!(sub_dh2, :s, 1, Lagrange{2,RefTetrahedron,1}())
+
+
+    # or without subdomains
+    grid = generate_grid(Quadrilateral, (2,1))
+    dh = NewDofHandler(grid)
+    add!(dh, :u, 2, Lagrange{2,RefCube, 1}())
 end
 
 #=
