@@ -227,10 +227,10 @@ end
     field_vQ = Field(:v, ip_quad, 1)
 
     # Order important for test to ensure consistent dof ordering
-    add!(dh, FieldHandler([field_uQ, field_vQ], getcellset(grid, "uandvQ")))
-    add!(dh, FieldHandler([field_uT, field_vT], getcellset(grid, "uandvT")))
-    add!(dh, FieldHandler([field_uT], getcellset(grid, "onlyuT")))
-    add!(dh, FieldHandler([field_uQ], getcellset(grid, "onlyuQ")))
+    add!(dh, FieldHandler([field_uQ, field_vQ], sort(collect(getcellset(grid, "uandvQ")))))
+    add!(dh, FieldHandler([field_uT, field_vT], sort(collect(getcellset(grid, "uandvT")))))
+    add!(dh, FieldHandler([field_uT], sort(collect(getcellset(grid, "onlyuT")))))
+    add!(dh, FieldHandler([field_uQ], sort(collect(getcellset(grid, "onlyuQ")))))
     close!(dh)
 
     # Add constraints 
@@ -249,16 +249,44 @@ end
     @test_logs (:warn,) add!(ch, dC_v)  # Warn about :v not in cells connected with dC_v's faceset
     @test_logs min_level=Logging.Warn add!(ch, dN_u)    # No warning should be issued (add to node)
     close!(ch)
+
+    # Same test again for ranges
+    grid2 = Grid(cells, nodes, facesets=facesets)
+    dh2 = MixedDofHandler(grid)
+
+    # Order important for test to ensure consistent dof ordering
+    add!(dh2, FieldHandler([field_uQ, field_vQ], 1:1))
+    add!(dh2, FieldHandler([field_uT, field_vT], 2:2))
+    add!(dh2, FieldHandler([field_uT], 3:3))
+    add!(dh2, FieldHandler([field_uQ], 4:5))
+    close!(dh2)
+
+    ch2 = ConstraintHandler(dh2)
+    dA_u = Dirichlet(:u, getfaceset(grid, "A"), (x,t) -> 1.0)
+    dA_v = Dirichlet(:v, getfaceset(grid, "A"), (x,t) -> 2.0)
+    dB_u = Dirichlet(:u, getfaceset(grid, "B"), (x,t) -> 3.0)  # Note, overwrites dA_u on node 3 
+    dB_v = Dirichlet(:v, getfaceset(grid, "B"), (x,t) -> 4.0)  # :v not on cells with "B"-faces
+    dC_v = Dirichlet(:v, getfaceset(grid, "C"), (x,t) -> 5.0)  # :v not on cells with "C"-faces
+    dN_u = Dirichlet(:u, Set(10), (x,t) -> 6.0)                # Add on node 10
+    
+    @test_logs min_level=Logging.Warn add!(ch2, dA_u)    # No warning should be issued
+    @test_logs min_level=Logging.Warn add!(ch2, dA_v)    # No warning should be issued
+    @test_logs min_level=Logging.Warn add!(ch2, dB_u)    # No warning should be issued
+    @test_logs (:warn,) add!(ch2, dB_v)  # Warn about :v not in cells connected with dB_v's faceset
+    @test_logs (:warn,) add!(ch2, dC_v)  # Warn about :v not in cells connected with dC_v's faceset
+    @test_logs min_level=Logging.Warn add!(ch2, dN_u)    # No warning should be issued (add to node)
+    close!(ch2)
     
     # The full bottom part of the mesh has been prescribed
-    @test sort(ch.prescribed_dofs) == sort(push!([nd[i] for nd in nodedofs[1:5] for i in 1:length(nd)], 15))
+    @test sort(ch.prescribed_dofs) == sort(ch2.prescribed_dofs) == sort(push!([nd[i] for nd in nodedofs[1:5] for i in 1:length(nd)], 15))
 
     # Test that the correct dofs have been prescribed
     update!(ch, 0.0)
+    update!(ch2, 0.0)
     #                 nodes       N1,  N2,  N1,  N2,  N3,  N4,  N5   N10
     #                 field       :u,  :u,  :v,  :v,  :u,  :u,  :u   :u
     #                   dof        1,   2,   5,   6,  11,  12,  14   15
-    @test ch.inhomogeneities == [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 6.0]
+    @test ch.inhomogeneities == ch2.inhomogeneities == [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 6.0]
     # Note that dB_u overwrite dA_u @ N3, hence the value 3.0 there
 end
 

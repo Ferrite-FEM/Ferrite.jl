@@ -23,9 +23,9 @@ A `FieldHandler` must fullfill the following requirements:
 
 Notice that a `FieldHandler` can hold several fields.
 """
-mutable struct FieldHandler
+struct FieldHandler{TCS}
     fields::Vector{Field}
-    cellset::Set{Int}
+    cellset::TCS
 end
 
 struct CellVector{T}
@@ -157,7 +157,7 @@ Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
 function add!(dh::MixedDofHandler, fh::FieldHandler)
     # TODO: perhaps check that a field with the same name is the same field?
     @assert !isclosed(dh)
-    _check_same_celltype(dh.grid, collect(fh.cellset))
+    _check_same_celltype(dh.grid, fh.cellset)
     _check_cellset_intersections(dh, fh)
     # the field interpolations should have the same refshape as the cells they are applied to
     refshapes_fh = getrefshape.(getfieldinterpolations(fh))
@@ -240,10 +240,10 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
     @debug "\n\nCreating dofs\n"
     for fh in dh.fieldhandlers
         # sort the cellset since we want to loop through the cells in a fixed order
-        cellnumbers = sort(collect(fh.cellset))
+        # cellnumbers = issorted(fh.cellset) ? sort(collect(fh.cellset)) : fh.cellset
         nextdof = _close!(
             dh,
-            cellnumbers,
+            fh.cellset,
             field_names,
             getfieldnames(fh),
             getfielddims(fh),

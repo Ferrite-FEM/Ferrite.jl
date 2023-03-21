@@ -37,7 +37,7 @@ function test_1d_bar_beam()
 
     dh = MixedDofHandler(grid);
     add!(dh, FieldHandler([field2, field3], Set(3)));
-    add!(dh, FieldHandler([field1], Set((1, 2))));
+    add!(dh, FieldHandler([field1], 1:2));
     close!(dh)
     @test ndofs(dh) == 8
     @test celldofs(dh, 3) == collect(1:6)
@@ -146,7 +146,7 @@ function test_face_dofs_2_tri()
     grid = Grid(cells, nodes);
     field1 = create_field(name = :u, spatial_dim = 2, field_dim = 2, order = 2, cellshape = RefTetrahedron)
     dh = MixedDofHandler(grid);
-    add!(dh, FieldHandler([field1], Set((1, 2))));
+    add!(dh, FieldHandler([field1], 1:2));
     #add!(dh, FieldHandler([field2], Set(2)));
     close!(dh)
 
@@ -169,7 +169,7 @@ function test_3d_tetrahedrons()
     grid = Grid(cells, nodes)
     field = create_field(name = :u, spatial_dim=3,  field_dim = 3, order = 2, cellshape = RefTetrahedron)
     dh = MixedDofHandler(grid);
-    add!(dh, FieldHandler([field], Set((1, 2, 3, 4, 5, 6))));
+    add!(dh, FieldHandler([field], 1:6));
     close!(dh)
 
     # reference using the regular DofHandler
@@ -229,7 +229,7 @@ function test_2d_mixed_field_triangles()
     field1 = create_field(name=:u, spatial_dim=2, field_dim=2, order=2, cellshape=RefTetrahedron)
     field2 = create_field(name=:p, spatial_dim=2, field_dim=1, order=1, cellshape=RefTetrahedron)
     dh = MixedDofHandler(grid);
-    add!(dh, FieldHandler([field1, field2], Set((1, 2))));
+    add!(dh, FieldHandler([field1, field2], 1:2));
     close!(dh)
     @test ndofs(dh) == 22
     @test celldofs(dh, 1) == collect(1:15)
@@ -394,7 +394,7 @@ function test_element_order()
 
     dh = MixedDofHandler(grid);
     # Note the jump in cell numbers
-    add!(dh, FieldHandler([field1_tri], Set((1, 3))));
+    add!(dh, FieldHandler([field1_tri], [1,3]));
     add!(dh, FieldHandler([field1_quad], Set(2)));
     # Dofs are first created for cell 1 and 3, thereafter cell 2
     close!(dh)
@@ -519,7 +519,7 @@ function test_subparametric_triangle()
     ip = Lagrange{2,RefTetrahedron,2}()
     
     field = Field(:u, ip, 2)
-    fh = FieldHandler([field], Set(1:getncells(grid)))
+    fh = FieldHandler([field], 1:getncells(grid))
     
     dh = MixedDofHandler(grid)
     add!(dh, fh)
