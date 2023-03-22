@@ -311,7 +311,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcentities::Set{Index}, in
     return _add!(ch, dbc, bcentities, interpolation, field_dim, offset, bcvalue, Set(cellset))
 end
     
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset=1:getncells(ch.dh.grid)) where {Index<:BoundaryIndex}
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Union{UnitRange{Int},Set{Int},Vector{Int}}=1:getncells(ch.dh.grid)) where {Index<:BoundaryIndex}
     local_face_dofs, local_face_dofs_offset =
         _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundarydof_indices(eltype(bcfaces)))
     copy!(dbc.local_face_dofs, local_face_dofs)
@@ -357,7 +357,7 @@ function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, b
     return local_face_dofs, local_face_dofs_offset
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset=1:getncells(ch.dh.grid))
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Union{UnitRange{Int},Set{Int},Vector{Int}}=1:getncells(ch.dh.grid))
     if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
@@ -934,7 +934,7 @@ function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
     return ch
 end
 
-function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_not_in_cellset=true)
+function add!(ch::ConstraintHandler, fh::FieldHandler{T}, dbc::Dirichlet; warn_not_in_cellset=true) where {T}
     if warn_not_in_cellset && !(_in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=true))
         @warn("You are trying to add a constraint a face/edge/node that is not in the cellset of the fieldhandler. This location will be skipped")
     end
@@ -959,7 +959,7 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_not_
         bcvalue = BCValues(interpolation, default_interpolation(celltype), eltype(dbc.faces))
     end
 
-    Ferrite._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue, fh.cellset)
+    _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue, fh.cellset)
     return ch
 end
 
