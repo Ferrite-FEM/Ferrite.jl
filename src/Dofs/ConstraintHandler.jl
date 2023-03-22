@@ -306,6 +306,11 @@ function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomo
     return ch
 end
 
+# Lookup into an array is rather slow, so we construct a Set to speedup the lookup operation.
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcentities::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::AbstractVector{Int}) where {Index<:BoundaryIndex}
+    return _add!(ch, dbc, bcentities, interpolation, field_dim, offset, bcvalue, Set(cellset))
+end
+    
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset=1:getncells(ch.dh.grid)) where {Index<:BoundaryIndex}
     local_face_dofs, local_face_dofs_offset =
         _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundarydof_indices(eltype(bcfaces)))
