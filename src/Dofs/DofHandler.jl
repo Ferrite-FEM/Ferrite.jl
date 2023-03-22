@@ -124,6 +124,44 @@ function add!(dh::DofHandler, name::Symbol, ip::Interpolation=default_interpolat
     return add!(dh, name, 1, ip)
 end
 
+dof_correction(dofs::StepRange{Int}) = collect(first(dofs):(last(dofs)+step(dofs)-1))
+
+"""
+Orientation information for 1D entities.
+"""
+struct PathOrientationInfo
+    regular::Bool # Indicator whether the orientation is regular or inverted.
+end
+Base.:(==)(a::PathOrientationInfo, b::PathOrientationInfo) = a.regular == b.regular
+function Base.show(io::IO, ::MIME"text/plain", orientation::PathOrientationInfo)
+    print("Path is ")
+    print(io, orientation.regular ? "regular" : "inverted")
+end
+"""
+For interpolations with more than one interior dof an some edge the interor dofs will 
+have the  wrong order on some elements, so we have to adjust. Think e.g. about the 
+following example with two edges with three interior dofs on each edge:
++-----------+
+|     A     |
++--1--2--3->+    local edge on element A
+
+ ---------->     global edge
+
++<-3--2--1--+    local edge on element B
+|     B     |
++-----------+
+Here the dofs will be locally assigned as indicated by 1,2,3 and we see a mismatch
+between the dofs 1 and 3. In our implementation we compensate for this by reverting
+the dof assignment on the edge interior.
+
+In addition, we also have to preverse the ordering at each dof.
+"""
+function dof_correction(dofs::StepRange{Int}, orientation::PathOrientationInfo)
+    orientation.regular && return dof_correction(dofs)
+    rdofs = reverse(dofs)
+    return [dof+i-1 for dof ∈ first(rdofs):step(rdofs):last(rdofs) for i ∈1:step(dofs) ]
+end
+
 """
     sortedge(edge::Tuple{Int,Int})
 
@@ -134,7 +172,7 @@ if the edge is flipped.
 """
 function sortedge(edge::Tuple{Int,Int})
     a, b = edge
-    a < b ? (return (edge, true)) : (return ((b, a), false))
+    a < b ? (return (edge, PathOrientationInfo(true))) : (return ((b, a), PathOrientationInfo(false)))
 end
 
 """
@@ -147,13 +185,44 @@ Here the unique representation is the sorted node index tuple.
 Note that in 3D we only need indices to uniquely identify a face,
 so the unique representation is always a tuple length 3.
 """
-sortface(face::Tuple{Int,Int}) = minmax(face[1], face[2])
+sortface(face::Tuple{Int,Int}) = sortedge(face) # Face in 2D is the same as edge in 3D.
+
+"""
+Orientation information for 2D entities. Such an entity can be 
+possibly flipped (i.e. the defining vertex order is reverse to the 
+spanning vertex order) and the vertices can be rotated against each other.
+Take for example the faces
+    1---2 2---3
+    | A | | B |
+    4---3 1---4
+which are rotated against each other by 90° (shift index is 1) or the faces
+    1---2 2---1
+    | A | | B |
+    4---3 4---3
+which are flipped against each other. Any combination of these can happen. 
+The combination to map this local face to the defining face is encoded with
+this data structure via ``rotate \\circ flip`` where the rotation is indiced by
+the shift index. 
+    !!!NOTE TODO implement me.
+"""
+struct SurfaceOrientationInfo
+    #flipped::Bool
+    #shift_index::Int
+end
+"""
+    !!!NOTE TODO implement me.
+"""
+function dof_correction(dofs::StepRange{Int}, orientation::SurfaceOrientationInfo)
+    (last(dofs)+step(dofs)-1)/step(dofs) > 1 && error("Dof distribution on faces not implemented for multiple dof locations.")
+    return dof_correction(dofs)
+end
+
 function sortface(face::Tuple{Int,Int,Int})
     a, b, c = face
     b, c = minmax(b, c)
     a, c = minmax(a, c)
     a, b = minmax(a, b)
-    return (a, b, c)
+    return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
 end
 function sortface(face::Tuple{Int,Int,Int,Int})
     a, b, c, d = face
@@ -163,7 +232,7 @@ function sortface(face::Tuple{Int,Int,Int,Int})
     b, c = minmax(b, c)
     a, c = minmax(a, c)
     a, b = minmax(a, b)
-    return (a, b, c)
+    return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
 end
 
 function close!(dh::DofHandler)
@@ -184,7 +253,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     # of the first edge we encounter and add dofs too. When we encounter the same edge
     # the next time we check if the direction is the same, otherwise we reuse the dofs
     # in the reverse order
-    edgedicts = [Dict{Tuple{Int,Int},Tuple{Int,Bool}}() for _ in 1:nfields(dh)]
+    edgedicts = [Dict{Tuple{Int,Int},Tuple{Int,PathOrientationInfo}}() for _ in 1:nfields(dh)]
 
     # `facedict` keeps track of the visited faces. We only need to store the first dof we
     # added to the face; if we encounter the same face again we *always* reverse the order
@@ -291,7 +360,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
             end
             for (fi, face) in enumerate(faces(cell))
                 if interpolation_info.nfacedofs[fi] > 0 && (interpolation_info.dim == dim)
-                    sface = sortface(face)
+                    sface, _ = sortface(face)
                     @debug println("    face#$sface")
                     token = Base.ht_keyindex2!(facedicts[field_idx], sface)
                     if token > 0 # haskey(facedicts[field_idx], sface), reuse dofs

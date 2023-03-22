@@ -229,15 +229,15 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
 
     # Create dicts that store created dofs
     # Each key should uniquely identify the given type
-    vertexdicts = [Dict{Int, UnitRange{Int}}() for _ in 1:numfields]
-    edgedicts = [Dict{Tuple{Int,Int}, UnitRange{Int}}() for _ in 1:numfields]
-    facedicts = [Dict{NTuple{dim,Int}, UnitRange{Int}}() for _ in 1:numfields]
-    celldicts = [Dict{Int, UnitRange{Int}}() for _ in 1:numfields]
+    vertexdicts = [Dict{Int, StepRange{Int}}() for _ in 1:numfields]
+    edgedicts = [Dict{Tuple{Int,Int}, StepRange{Int}}() for _ in 1:numfields]
+    facedicts = [Dict{NTuple{dim,Int}, StepRange{Int}}() for _ in 1:numfields]
+    celldicts = [Dict{Int, StepRange{Int}}() for _ in 1:numfields]
 
     # Set initial values
     nextdof = 1  # next free dof to distribute
 
-    @debug "\n\nCreating dofs\n"
+    @debug println("\n\nCreating dofs\n")
     for fh in dh.fieldhandlers
         # sort the cellset since we want to loop through the cells in a fixed order
         cellnumbers = sort(collect(fh.cellset))
@@ -263,11 +263,10 @@ end
 
 function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
     ip_infos = InterpolationInfo[]
-    for interpolation in field_interpolations
+    for (interpolation, field_dim) in zip(field_interpolations, field_dims)
         ip_info = InterpolationInfo(interpolation)
         # these are not implemented yet (or have not been tested)
-        @assert(all(ip_info.nedgedofs .<= 1))
-        @assert(all(ip_info.nfacedofs .<= 1))
+        @assert(dim < 3 || all(ip_info.nfacedofs .<= 1))
         push!(ip_infos, ip_info)
     end
 
@@ -278,38 +277,42 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
 
         cell = dh.grid.cells[ci]
         empty!(cell_dofs)
-        @debug "Creating dofs for cell #$ci"
+        @debug println("Creating dofs for cell #$ci")
 
         for (local_num, field_name) in enumerate(field_names)
             fi = findfirst(i->i == field_name, global_field_names)
-            @debug "\tfield: $(field_name)"
+            @debug println("\tfield: $(field_name)")
             ip_info = ip_infos[local_num]
 
+            # TODO we need a cleaner solution for this as this is only true for vectorizations of scalar-valued interpolations.
+            vdim = field_dims[local_num]
+
             # We first distribute the vertex dofs
-            nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[local_num], ip_info.nvertexdofs, nextdof)
+            nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], ip_info.nvertexdofs, vdim, nextdof)
 
             # Then the edge dofs
             if dim == 3
                 if ip_info.dim == 3 # Regular 3D element
-                    nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[local_num], ip_info.nedgedofs, nextdof)
+                    nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], ip_info.nedgedofs, vdim, nextdof)
                 elseif ip_info.dim == 2 # 2D embedded element in 3D
-                    nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[local_num], ip_info.nfacedofs, nextdof)
+                    nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], ip_info.nfacedofs, vdim, nextdof)
                 end
             end
 
             # Then the face dofs
             if ip_info.dim == dim # Regular 3D element
-                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[local_num], ip_info.nfacedofs, nextdof)
+                # TODO field dim × ndofs should only happen for scalar-valued interpolations to vectorize them!
+                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], ip_info.nfacedofs, vdim, nextdof)
             end
 
             # And finally the celldofs
-            nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[local_num], ip_info.ncelldofs, nextdof)
+            nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], ip_info.ncelldofs, vdim, nextdof)
         end
         # after done creating dofs for the cell, push them to the global list
         append!(dh.cell_dofs.values, cell_dofs)
         dh.cell_dofs.length[ci] = length(cell_dofs)
 
-        @debug "Dofs for cell #$ci:\n\t$cell_dofs"
+        @debug println("Dofs for cell #$ci:\n\t$cell_dofs")
     end # cell loop
     return nextdof
 end
@@ -318,64 +321,62 @@ end
 Returns the next global dof number and an array of dofs.
 If dofs have already been created for the object (vertex, face) then simply return those, otherwise create new dofs.
 """
-function get_or_create_dofs!(nextdof, field_dim; dict, key)
+function get_or_create_dofs!(nextdof, ndofs, vdim; dict, key)
     token = Base.ht_keyindex2!(dict, key)
     if token > 0  # vertex, face etc. visited before
         # reuse stored dofs (TODO unless field is discontinuous)
-        @debug "\t\tkey: $key dofs: $(dict[key])  (reused dofs)"
+        @debug println("\t\t\tkey: $key dofs: $(dict[key])  (reused dofs)")
         return nextdof, dict[key]
     else  # create new dofs
-        dofs = nextdof : (nextdof + field_dim-1)
-        @debug "\t\tkey: $key dofs: $dofs"
+        dofs = nextdof : vdim : (nextdof + vdim*ndofs-1)
+        @debug println("\t\t\tkey: $key dofs: $dofs")
         Base._setindex!(dict, dofs, key, -token) #
-        nextdof += field_dim
+        nextdof += ndofs*vdim
         return nextdof, dofs
     end
 end
 
-function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, nextdof)
+function add_vertex_dofs(cell_dofs, cell, vertexdict, nvertexdofs, vdim, nextdof)
     for (vi, vertex) in enumerate(vertices(cell))
         if nvertexdofs[vi] > 0
-            @debug "\tvertex #$vertex"
-            nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=vertexdict, key=vertex)
-            append!(cell_dofs, dofs)
+            @debug println("\t\tvertex #$vertex")
+            nextdof, dofs = get_or_create_dofs!(nextdof, nvertexdofs[vi], vdim, dict=vertexdict, key=vertex)
+            append!(cell_dofs, dof_correction(dofs))
         end
     end
     return nextdof
 end
 
-function add_face_dofs(cell_dofs, cell, facedict, field_dim, nfacedofs, nextdof)
-    @debug @assert all(nfacedofs .<= 1) "Currently only supports interpolations with less that 2 dofs per face"
-
+function add_face_dofs(cell_dofs, cell, facedict, nfacedofs, vdim, nextdof)
     for (fi,face) in enumerate(faces(cell))
         if nfacedofs[fi] > 0
-            sface = sortface(face)
-            @debug "\tface #$sface"
-            nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=facedict, key=sface)
-            # TODO permutate dofs according to face orientation
-            append!(cell_dofs, dofs)
+            sface, orientation = sortface(face)
+            @debug println("\t\tface #$sface, $orientation")
+            nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], vdim, dict=facedict, key=sface)
+            @debug println("\t\t\tadjusted dofs #$(dof_correction(dofs, orientation))")
+            append!(cell_dofs, dof_correction(dofs, orientation))
         end
     end
     return nextdof
 end
 
-function add_edge_dofs(cell_dofs, cell, edgedict, field_dim, nedgedofs, nextdof)
+function add_edge_dofs(cell_dofs, cell, edgedict, nedgedofs, vdim, nextdof)
     for (ei,edge) in enumerate(edges(cell))
         if nedgedofs[ei] > 0
-            sedge, dir = sortedge(edge)
-            @debug "\tedge #$sedge"
-            nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=edgedict, key=sedge)
-            append!(cell_dofs, dofs)
+            sedge, orientation = sortedge(edge)
+            @debug println("\t\tedge #$sedge, $orientation")
+            nextdof, dofs = get_or_create_dofs!(nextdof, nedgedofs[ei], vdim, dict=edgedict, key=sedge)
+            append!(cell_dofs, dof_correction(dofs, orientation))
         end
     end
     return nextdof
 end
 
-function add_cell_dofs(cell_dofs, cell, celldict, field_dim, ncelldofs, nextdof)
-    for celldof in 1:ncelldofs
-        @debug "\tcell #$cell"
-        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=celldict, key=cell)
-        append!(cell_dofs, dofs)
+function add_cell_dofs(cell_dofs, cell, celldict, ncelldofs, vdim, nextdof)
+    if ncelldofs > 0
+        @debug println("\t\tcell #$cell")
+        nextdof, dofs = get_or_create_dofs!(nextdof, ncelldofs, vdim, dict=celldict, key=cell)
+        append!(cell_dofs, dof_correction(dofs))
     end
     return nextdof
 end
