@@ -239,8 +239,6 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
 
     @debug "\n\nCreating dofs\n"
     for fh in dh.fieldhandlers
-        # sort the cellset since we want to loop through the cells in a fixed order
-        # cellnumbers = issorted(fh.cellset) ? sort(collect(fh.cellset)) : fh.cellset
         nextdof = _close!(
             dh,
             fh.cellset,
@@ -261,6 +259,26 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
 
 end
 
+"""
+Slow path if the FieldHandler has Sets to describe the subdomain. 
+Here we convert the Set to a Vector to make it sortable because we want different collections to give the exact same dof distribution.
+Note that a Set is in general not sortable.
+"""
+function _close!(dh::MixedDofHandler{dim}, cellnumbers::AbstractSet{Int}, global_field_names, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
+    return _close!(
+            dh,
+            collect(cellnumbers),
+            global_field_names,
+            field_names,
+            field_dims,
+            field_interpolations,
+            nextdof,
+            vertexdicts,
+            edgedicts,
+            facedicts,
+            celldicts)
+end
+
 function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
     ip_infos = InterpolationInfo[]
     for interpolation in field_interpolations
@@ -270,7 +288,10 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
         @assert(all(ip_info.nfacedofs .<= 1))
         push!(ip_infos, ip_info)
     end
-
+    
+    # We have to ensure that the cell numbering is sorted in ascending order to allow the same dof distribution across different collections.
+    sort!(cellnumbers)
+    
     # loop over all the cells, and distribute dofs for all the fields
     cell_dofs = Int[]  # list of global dofs for each cell
     for ci in cellnumbers
