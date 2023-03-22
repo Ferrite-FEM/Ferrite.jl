@@ -178,29 +178,19 @@ function _check_cellset_intersections(dh::MixedDofHandler, fh::FieldHandler)
     end
 end
 
-function add!(dh::MixedDofHandler, name::Symbol, dim::Int)
-    celltype = getcelltype(dh.grid)
-    isconcretetype(celltype) || error("If you have more than one celltype in Grid, you must use add!(dh::MixedDofHandler, fh::FieldHandler)")
-    add!(dh, name, dim, default_interpolation(celltype))
-end
-
-function add!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolation)
+function add!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(celltype))
     @assert !isclosed(dh)
-
-    celltype = getcelltype(dh.grid)
-    @assert isconcretetype(celltype)
+    @assert isconcretetype(getcelltype(dh.grid)) "If you have more than one celltype in Grid, you must use add!(dh::MixedDofHandler, fh::FieldHandler)"
 
     if length(dh.fieldhandlers) == 0
-        cellset = Set(1:getncells(dh.grid))
-        push!(dh.fieldhandlers, FieldHandler(Field[], cellset))
-    elseif length(dh.fieldhandlers) > 1
+        push!(dh.fieldhandlers, FieldHandler{UnitRange{Int}}(Field[Field(name,ip,dim)], 1:getncells(dh.grid)))
+    elseif length(dh.fieldhandlers) == 1
+        fh = first(dh.fieldhandlers)
+        @assert name ∉ [field.name for field ∈ fh.fields]
+        push!(fh.fields, Field(name,ip,dim))
+    else
         error("If you have more than one FieldHandler, you must specify field")
     end
-    fh = first(dh.fieldhandlers)
-
-    field = Field(name,ip,dim)
-
-    push!(fh.fields, field)
 
     return dh
 end
