@@ -540,3 +540,32 @@ function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) 
     end
     return data
 end
+
+function _coupling_to_local_dof_coupling(dh::MixedDofHandler, coupling::AbstractMatrix{Bool}, sym::Bool)
+    @assert length(dh.fieldhandlers) == 1 "Subdomains not supported yet."
+    fh = first(dh.fieldhandlers)
+    out = zeros(Bool, ndofs_per_cell(dh), ndofs_per_cell(dh))
+    sz = size(coupling, 1)
+    sz == size(coupling, 2) || error("coupling not square")
+    sym && (issymmetric(coupling) || error("coupling not symmetric"))
+    dof_ranges = [dof_range(dh, f.name) for f in fh.fields]
+    if sz == length(fh.fields) # Coupling given by fields
+        for (j, jrange) in pairs(dof_ranges), (i, irange) in pairs(dof_ranges)
+            out[irange, jrange] .= coupling[i, j]
+        end
+    elseif sz == sum([field.dim for field ∈ fh.fields]) # Coupling given by components
+        component_offsets = pushfirst!(cumsum(dh.field_dims), 0)
+        for (jf, jrange) in pairs(dof_ranges), (j, J) in pairs(jrange)
+            jc = mod1(j, dh.field_dims[jf]) + component_offsets[jf]
+            for (i_f, irange) in pairs(dof_ranges), (i, I) in pairs(irange)
+                ic = mod1(i, dh.field_dims[i_f]) + component_offsets[i_f]
+                out[I, J] = coupling[ic, jc]
+            end
+        end
+    elseif sz == ndofs_per_cell(dh) # Coupling given by template local matrix
+        out .= coupling
+    else
+        error("could not create coupling")
+    end
+    return out
+end
