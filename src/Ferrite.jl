@@ -96,7 +96,7 @@ include("iterators.jl")
 
 # Assembly
 include("assembler.jl")
-include("pattern.jl")
+include("Dofs/SparsityPatterns.jl")
 
 # Projection
 include("L2_projection.jl")

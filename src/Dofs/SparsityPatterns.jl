@@ -1,4 +1,4 @@
-struct IJAssembler <: Ferrite.AbstractSparseAssembler
+struct IJAssembler <: AbstractSparseAssembler
     I::Vector{Int}
     J::Vector{Int}
 end
@@ -20,7 +20,7 @@ end
 struct BlackHole end
 addindex!(::BlackHole, _, ::Int) = nothing
 
-function create_sparsity_pattern2(dh::AbstractDofHandler, ch::ConstraintHandler; coupling=nothing, keep_constrained::Bool=true)
+function create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling=nothing, keep_constrained::Bool=true)
     @assert isclosed(dh)
     @assert isclosed(ch)
     @assert ch.dh === dh
@@ -34,14 +34,13 @@ function create_sparsity_pattern2(dh::AbstractDofHandler, ch::ConstraintHandler;
     # Create a cache of the matrices for MixedDofHandler where the element sizes might differ
     matrix_cache = Dict{Int,NTuple{2,Matrix{Bool}}}(n => (copy(template), template))
     local_vector = zeros(Float64, n) # dummy vector
-    assembler = Ferrite.IJAssembler(Int[], Int[])
+    assembler = IJAssembler(Int[], Int[])
     for cc in CellIterator(dh)
         n = ndofs_per_cell(dh, cellid(cc))
         local_matrix, template_local_matrix = get!(matrix_cache, n) do
             @assert dh isa MixedDofHandler
             (ones(Bool, n, n), ones(Bool, n, n))
         end
-        #
         # Reset local matrix to the template matrix
         copy!(local_matrix, template_local_matrix)
         # Assemble the local matrix *before* constraints if constrained entries are kept
@@ -61,5 +60,3 @@ function create_sparsity_pattern2(dh::AbstractDofHandler, ch::ConstraintHandler;
     end
     return spzeros!!(Float64, assembler.I, assembler.J, ndofs(dh), ndofs(dh))
 end
-
-export create_sparsity_pattern2
