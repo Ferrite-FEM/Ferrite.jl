@@ -13,10 +13,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    per entity. ([#581][github-581])
 ### Fixed
  - Dof distribution for embedded elements. ([#581][github-581])
+ - Improve numerical accuracy in shape function evaluation for the
+   `Lagrange{2,Tetrahedron,(3|4|5)}` interpolations. ([#582][github-582],
+   [#633][github-633])
 ### Other improvements
+ - Documentation:
+    - New "Developer documentation" section in the manual for documenting Ferrite.jl
+      internals and developer tools. ([#611][github-611])
+    - Fix a bug in constraint computation in Stoke's flow example. ([#614][github-614])
+ - Performance:
+    - Benchmarking infrastructure to help tracking performance changes. ([#388][github-388])
+    - Performance improvements for various accessor functions for `MixedDofHandler`.
+      ([#621][github-621])
+### Internal changes
  - To clarify the dof management `vertices(ip)`, `edges(ip)` and `faces(ip)` has been
    deprecated in favor of `vertexdof_indices(ip)`, `edgedof_indices(ip)` and
-   `facedof_indices(ip)`. ([#578][github-578])
+   `facedof_indices(ip)`. ([#581][github-581])
+ - Duplicate grid representation has been removed from the `MixedDofHandler`.
+   ([#577][github-577])
 
 ## [0.3.12] - 2023-02-28
 ### Added
@@ -254,6 +268,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-378]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/378
 [github-385]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/385
 [github-386]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/386
+[github-388]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/388
 [github-390]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/390
 [github-392]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/392
 [github-393]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/393
@@ -334,8 +349,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-571]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/571
 [github-574]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/574
 [github-575]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/575
+[github-577]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/577
 [github-578]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/578
 [github-581]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/581
+[github-582]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/582
 [github-583]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/583
 [github-588]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/588
 [github-591]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/591
@@ -348,6 +365,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-601]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/601
 [github-602]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/602
 [github-604]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/604
+[github-611]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/611
+[github-614]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/614
+[github-621]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/621
+[github-633]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/633
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.12...HEAD
 [0.3.12]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.11...v0.3.12
