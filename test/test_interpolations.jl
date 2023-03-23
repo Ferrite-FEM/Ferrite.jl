@@ -9,7 +9,7 @@
                       Lagrange{2, RefTetrahedron, 2}(),
                       Lagrange{2, RefTetrahedron, 3}(),
                       Lagrange{2, RefTetrahedron, 4}(),
-                      #Lagrange{2, RefTetrahedron, 5}(),
+                      Lagrange{2, RefTetrahedron, 5}(),
                       Lagrange{3, RefCube, 1}(),
                       Lagrange{3, RefCube, 2}(),
                       Serendipity{2, RefCube, 2}(),
