@@ -64,7 +64,7 @@ function test_2d_scalar()
 
     # THEN: we expect 5 dofs and dof 2 and 3 being shared
     @test ndofs(dh) == 5
-    @test dh.cell_dofs.values == [1, 2, 3, 4, 3, 2, 5]
+    @test dh.cell_dofs == [1, 2, 3, 4, 3, 2, 5]
     @test celldofs(dh, 1) == [1, 2, 3, 4]
     @test celldofs(dh, 2) == [3, 2, 5]
 end

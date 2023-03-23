@@ -344,14 +344,6 @@ end
 
 cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, dh.grid, i)
 
-function celldofs(dh::DofHandler, i::Int)
-    @assert isclosed(dh)
-    n = ndofs_per_cell(dh, i)
-    global_dofs = zeros(Int, n)
-    unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], n)
-    return global_dofs
-end
-
 # Compute a coupling matrix of size (ndofs_per_cell × ndofs_per_cell) based on the input
 # coupling which can be of size i) (nfields × nfields) specifying coupling between fields,
 # ii) (ncomponents × ncomponents) specifying coupling between components, or iii)
