@@ -554,7 +554,7 @@ function value(ip::Lagrange2Tri345, i::Int, ξ::Vec{2})
     ξ_y = ξ[2]
     i1, i2, i3 = _numlin_basis2D(i, order)
     val = one(ξ_y)
-    i1 ≥ 1 && (val *= prod((order*1-order*( ξ_x +  ξ_y )-j) / (j + 1) for j = 0:(i1 - 1)))
+    i1 ≥ 1 && (val *= prod((order - order * (ξ_x + ξ_y ) - j) / (j + 1) for j = 0:(i1 - 1)))
     i2 ≥ 1 && (val *= prod((order * ξ_x - j) / (j + 1) for j = 0:(i2 - 1)))
     i3 ≥ 1 && (val *= prod((order * ξ_y - j) / (j + 1) for j = 0:(i3 - 1)))
     return val
