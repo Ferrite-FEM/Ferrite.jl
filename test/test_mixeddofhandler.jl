@@ -590,6 +590,18 @@ function test_unique_cellsets()
     @test_throws ErrorException push!(dh, FieldHandler([Field(:v, ip, 1)], set_v))
 end
 
+function test_show()
+    grid = get_2d_grid()
+    # WHEN: adding a scalar field for each cell and generating dofs
+    field1 = create_field(name=:u, spatial_dim=2, field_dim=2, order=1, cellshape=RefCube)
+    field2 = create_field(name=:u, spatial_dim=2, field_dim=2, order=1, cellshape=RefTetrahedron)
+    dh = MixedDofHandler(grid);
+    push!(dh, FieldHandler([field1], Set(1)));
+    push!(dh, FieldHandler([field2], Set(2)));
+    close!(dh)
+    @test repr("text/plain", dh) == "MixedDofHandler{2, Float64, Grid{2, Cell{2}, Float64}}\n  Fields:\n    :u, dim: 2\n  Total dofs: 10"
+end
+
 @testset "MixedDofHandler" begin
 
     test_1d_bar_beam();
@@ -615,4 +627,5 @@ end
     test_mixed_grid_show()
     test_separate_fields_on_separate_domains();
     test_unique_cellsets()
+    test_show()
 end
