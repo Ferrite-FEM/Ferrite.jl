@@ -129,10 +129,10 @@ end
     renumber!(dh, perm)
     renumber!(dh, iperm)
     @test original_dofs == dh.cell_dofs
-    original_dofs_mdh = copy(mdh.cell_dofs.values)
+    original_dofs_mdh = copy(mdh.cell_dofs)
     renumber!(mdh, perm)
     renumber!(mdh, iperm)
-    @test original_dofs_mdh == mdh.cell_dofs.values
+    @test original_dofs_mdh == mdh.cell_dofs
     original_prescribed = copy(ch.prescribed_dofs)
     original_inhomogeneities = copy(ch.inhomogeneities)
     original_affine_inhomogeneities = copy(ch.affine_inhomogeneities)

@@ -28,17 +28,6 @@ mutable struct FieldHandler
     cellset::Set{Int}
 end
 
-struct CellVector{T}
-    values::Vector{T}
-    offset::Vector{Int}
-    length::Vector{Int}
-end
-
-function Base.getindex(elvec::CellVector, el::Int)
-    offset = elvec.offset[el]
-    return elvec.values[offset:offset + elvec.length[el]-1]
- end
-
 """
     MixedDofHandler(grid::Grid)
 
@@ -48,7 +37,15 @@ Construct a `MixedDofHandler` based on `grid`. Supports:
 """
 struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
-    cell_dofs::CellVector{Int}
+    # Dofs for cell i are stored in cell_dofs[cell_dofs_offset[i]:(cell_dofs_offset[i]+length[i]-1)].
+    # Note that explicitly keeping track of ndofs_per_cell is necessary since dofs are *not*
+    # distributed in cell order like for the DofHandler (where the length can be determined
+    # by cell_dofs_offset[i+1]-cell_dofs_offset[i]).
+    # TODO: ndofs_per_cell should probably be replaced by ndofs_per_fieldhandler, since all
+    #       cells in a FieldHandler have the same number of dofs.
+    cell_dofs::Vector{Int}
+    cell_dofs_offset::Vector{Int}
+    ndofs_per_cell::Vector{Int}
     closed::ScalarWrapper{Bool}
     grid::G
     ndofs::ScalarWrapper{Int}
@@ -56,7 +53,7 @@ end
 
 function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
     ncells = getncells(grid)
-    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],zeros(Int,ncells),zeros(Int,ncells)), ScalarWrapper(false), grid, ScalarWrapper(-1))
+    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
 getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
@@ -70,7 +67,7 @@ Return the number of degrees of freedom for the cell with index `cell`.
 
 See also [`ndofs`](@ref).
 """
-ndofs_per_cell(dh::MixedDofHandler, cell::Int=1) = dh.cell_dofs.length[cell]
+ndofs_per_cell(dh::MixedDofHandler, cell::Int=1) = dh.ndofs_per_cell[cell]
 nnodes_per_cell(dh::MixedDofHandler, cell::Int=1) = nnodes_per_cell(dh.grid, cell) # TODO: deprecate, shouldn't belong to MixedDofHandler any longer
 
 """
@@ -83,7 +80,7 @@ See also [`celldofs`](@ref).
 function celldofs!(global_dofs::Vector{Int}, dh::MixedDofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
-    unsafe_copyto!(global_dofs, 1, dh.cell_dofs.values, dh.cell_dofs.offset[i], length(global_dofs))
+    unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
     return global_dofs
 end
 
@@ -94,9 +91,8 @@ Return a vector with the degrees of freedom that belong to cell `i`.
 
 See also [`celldofs!`](@ref).
 """
-function celldofs(dh::MixedDofHandler, i::Int)
-    @assert isclosed(dh)
-    return dh.cell_dofs[i]
+function celldofs(dh::AbstractDofHandler, i::Int)
+    return celldofs!(zeros(Int, ndofs_per_cell(dh, i)), dh, i)
 end
 
 #TODO: perspectively remove in favor of `getcoordinates!(global_coords, grid, i)`?
@@ -254,7 +250,7 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
             facedicts,
             celldicts)
     end
-    dh.ndofs[] = maximum(dh.cell_dofs.values)
+    dh.ndofs[] = maximum(dh.cell_dofs; init=0)
     dh.closed[] = true
 
     return dh, vertexdicts, edgedicts, facedicts
@@ -274,7 +270,6 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
     # loop over all the cells, and distribute dofs for all the fields
     cell_dofs = Int[]  # list of global dofs for each cell
     for ci in cellnumbers
-        dh.cell_dofs.offset[ci] = length(dh.cell_dofs.values)+1
 
         cell = dh.grid.cells[ci]
         empty!(cell_dofs)
@@ -306,8 +301,9 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
             nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[local_num], ip_info.ncelldofs, nextdof)
         end
         # after done creating dofs for the cell, push them to the global list
-        append!(dh.cell_dofs.values, cell_dofs)
-        dh.cell_dofs.length[ci] = length(cell_dofs)
+        dh.cell_dofs_offset[ci] = length(dh.cell_dofs) + 1
+        append!(dh.cell_dofs, cell_dofs)
+        dh.ndofs_per_cell[ci] = length(cell_dofs)
 
         @debug "Dofs for cell #$ci:\n\t$cell_dofs"
     end # cell loop

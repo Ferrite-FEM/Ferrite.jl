@@ -81,10 +81,8 @@ end
 
 function _renumber!(dh::Union{DofHandler, MixedDofHandler}, perm::AbstractVector{<:Integer})
     @assert isclosed(dh)
-    cell_dofs = dh isa DofHandler ? dh.cell_dofs :
-                #= dh isa MixedDofHandler ? =# dh.cell_dofs.values
-    for i in eachindex(cell_dofs)
-        cell_dofs[i] = perm[cell_dofs[i]]
+    for i in eachindex(dh.cell_dofs)
+        dh.cell_dofs[i] = perm[dh.cell_dofs[i]]
     end
     return dh
 end
