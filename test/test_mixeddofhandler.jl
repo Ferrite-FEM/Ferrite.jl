@@ -599,7 +599,7 @@ function test_show()
     push!(dh, FieldHandler([field1], Set(1)));
     push!(dh, FieldHandler([field2], Set(2)));
     close!(dh)
-    @test repr("text/plain", dh) == "MixedDofHandler{2, Float64, Grid{2, Cell{2}, Float64}}\n  Fields:\n    :u, dim: 2\n  Total dofs: 10"
+    @test repr("text/plain", dh) == repr(typeof(dh)) * "\n  Fields:\n    :u, dim: 2\n  Total dofs: 10"
 end
 
 @testset "MixedDofHandler" begin
