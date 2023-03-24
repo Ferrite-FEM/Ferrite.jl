@@ -61,10 +61,10 @@ function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::MixedDofHandler)
-    println(io, "MixedDofHandler")
+    println(io, typeof(dh))
     println(io, "  Fields:")
     for fieldname in getfieldnames(dh)
-        println(io, "    ", fieldname, ", dim: ", getfielddim(dh, fieldname))
+        println(io, "    ", repr(fieldname), ", dim: ", getfielddim(dh, fieldname))
     end
     if !isclosed(dh)
         print(io, "  Not closed!")

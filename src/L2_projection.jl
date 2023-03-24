@@ -103,7 +103,7 @@ function _mass_qr(::Lagrange{dim, RefTetrahedron, 2}) where {dim}
 end
 
 function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
-    println(io, "L2Projector")
+    println(io, typeof(proj))
     println(io, "  projection on:           ", length(proj.set), "/", getncells(proj.dh.grid), " cells in grid")
     println(io, "  function interpolation:  ", proj.func_ip)
     println(io, "  geometric interpolation: ", proj.geom_ip)
