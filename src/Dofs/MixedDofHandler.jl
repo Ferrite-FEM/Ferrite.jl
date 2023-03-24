@@ -268,12 +268,12 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
     end
 
     # loop over all the cells, and distribute dofs for all the fields
-    cell_dofs = Int[]  # list of global dofs for each cell
     for ci in cellnumbers
+        @debug "Creating dofs for cell #$ci"
 
         cell = dh.grid.cells[ci]
-        empty!(cell_dofs)
-        @debug "Creating dofs for cell #$ci"
+        len_cell_dofs = length(dh.cell_dofs)
+        dh.cell_dofs_offset[ci] = len_cell_dofs + 1
 
         for (local_num, field_name) in enumerate(field_names)
             fi = findfirst(i->i == field_name, global_field_names)
@@ -281,31 +281,30 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
             ip_info = ip_infos[local_num]
 
             # We first distribute the vertex dofs
-            nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[local_num], ip_info.nvertexdofs, nextdof)
+            nextdof = add_vertex_dofs(dh.cell_dofs, cell, vertexdicts[fi], field_dims[local_num], ip_info.nvertexdofs, nextdof)
 
             # Then the edge dofs
             if dim == 3
                 if ip_info.dim == 3 # Regular 3D element
-                    nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[local_num], ip_info.nedgedofs, nextdof)
+                    nextdof = add_edge_dofs(dh.cell_dofs, cell, edgedicts[fi], field_dims[local_num], ip_info.nedgedofs, nextdof)
                 elseif ip_info.dim == 2 # 2D embedded element in 3D
-                    nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[local_num], ip_info.nfacedofs, nextdof)
+                    nextdof = add_edge_dofs(dh.cell_dofs, cell, edgedicts[fi], field_dims[local_num], ip_info.nfacedofs, nextdof)
                 end
             end
 
             # Then the face dofs
             if ip_info.dim == dim # Regular 3D element
-                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[local_num], ip_info.nfacedofs, nextdof)
+                nextdof = add_face_dofs(dh.cell_dofs, cell, facedicts[fi], field_dims[local_num], ip_info.nfacedofs, nextdof)
             end
 
             # And finally the celldofs
-            nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[local_num], ip_info.ncelldofs, nextdof)
+            nextdof = add_cell_dofs(dh.cell_dofs, ci, celldicts[fi], field_dims[local_num], ip_info.ncelldofs, nextdof)
         end
-        # after done creating dofs for the cell, push them to the global list
-        dh.cell_dofs_offset[ci] = length(dh.cell_dofs) + 1
-        append!(dh.cell_dofs, cell_dofs)
-        dh.ndofs_per_cell[ci] = length(cell_dofs)
 
-        @debug "Dofs for cell #$ci:\n\t$cell_dofs"
+        # Store number of dofs that were added
+        dh.ndofs_per_cell[ci] = length(dh.cell_dofs) - len_cell_dofs
+
+        # @debug "Dofs for cell #$ci:\n\t$cell_dofs"
     end # cell loop
     return nextdof
 end
@@ -314,12 +313,12 @@ end
 Returns the next global dof number and an array of dofs.
 If dofs have already been created for the object (vertex, face) then simply return those, otherwise create new dofs.
 """
-function get_or_create_dofs!(nextdof, field_dim; dict, key)
+function get_or_create_dofs!(nextdof, field_dim, dict, key)
     token = Base.ht_keyindex2!(dict, key)
     if token > 0  # vertex, face etc. visited before
         # reuse stored dofs (TODO unless field is discontinuous)
         @debug "\t\tkey: $key dofs: $(dict[key])  (reused dofs)"
-        return nextdof, dict[key]
+        return nextdof, dict.vals[token]
     else  # create new dofs
         dofs = nextdof : (nextdof + field_dim-1)
         @debug "\t\tkey: $key dofs: $dofs"
@@ -333,7 +332,7 @@ function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, ne
     for (vi, vertex) in enumerate(vertices(cell))
         if nvertexdofs[vi] > 0
             @debug "\tvertex #$vertex"
-            nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=vertexdict, key=vertex)
+            nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, vertexdict, vertex)
             append!(cell_dofs, dofs)
         end
     end
@@ -347,7 +346,7 @@ function add_face_dofs(cell_dofs, cell, facedict, field_dim, nfacedofs, nextdof)
         if nfacedofs[fi] > 0
             sface = sortface(face)
             @debug "\tface #$sface"
-            nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=facedict, key=sface)
+            nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, facedict, sface)
             # TODO permutate dofs according to face orientation
             append!(cell_dofs, dofs)
         end
@@ -360,7 +359,7 @@ function add_edge_dofs(cell_dofs, cell, edgedict, field_dim, nedgedofs, nextdof)
         if nedgedofs[ei] > 0
             sedge, dir = sortedge(edge)
             @debug "\tedge #$sedge"
-            nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=edgedict, key=sedge)
+            nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, edgedict, sedge)
             append!(cell_dofs, dofs)
         end
     end
@@ -370,7 +369,7 @@ end
 function add_cell_dofs(cell_dofs, cell, celldict, field_dim, ncelldofs, nextdof)
     for celldof in 1:ncelldofs
         @debug "\tcell #$cell"
-        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=celldict, key=cell)
+        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, celldict, cell)
         append!(cell_dofs, dofs)
     end
     return nextdof
