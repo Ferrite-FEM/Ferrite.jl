@@ -228,7 +228,6 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
     vertexdicts = [Dict{Int, UnitRange{Int}}() for _ in 1:numfields]
     edgedicts = [Dict{Tuple{Int,Int}, UnitRange{Int}}() for _ in 1:numfields]
     facedicts = [Dict{NTuple{dim,Int}, UnitRange{Int}}() for _ in 1:numfields]
-    celldicts = [Dict{Int, UnitRange{Int}}() for _ in 1:numfields]
 
     # Set initial values
     nextdof = 1  # next free dof to distribute
@@ -248,7 +247,7 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
             vertexdicts,
             edgedicts,
             facedicts,
-            celldicts)
+        )
     end
     dh.ndofs[] = maximum(dh.cell_dofs; init=0)
     dh.closed[] = true
@@ -257,7 +256,7 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
 
 end
 
-function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
+function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts) where {dim}
     ip_infos = InterpolationInfo[]
     for interpolation in field_interpolations
         ip_info = InterpolationInfo(interpolation)
@@ -298,7 +297,7 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
             end
 
             # And finally the celldofs
-            nextdof = add_cell_dofs(dh.cell_dofs, ci, celldicts[fi], field_dims[local_num], ip_info.ncelldofs, nextdof)
+            nextdof = add_cell_dofs(dh.cell_dofs, field_dims[local_num], ip_info.ncelldofs, nextdof)
         end
 
         # Store number of dofs that were added
@@ -366,11 +365,10 @@ function add_edge_dofs(cell_dofs, cell, edgedict, field_dim, nedgedofs, nextdof)
     return nextdof
 end
 
-function add_cell_dofs(cell_dofs, cell, celldict, field_dim, ncelldofs, nextdof)
-    for celldof in 1:ncelldofs
-        @debug "\tcell #$cell"
-        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, celldict, cell)
-        append!(cell_dofs, dofs)
+function add_cell_dofs(cell_dofs, field_dim, ncelldofs, nextdof)
+    for _ in 1:ncelldofs, _ in 1:field_dim
+        push!(cell_dofs, nextdof)
+        nextdof += 1
     end
     return nextdof
 end
