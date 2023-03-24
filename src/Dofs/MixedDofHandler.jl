@@ -56,6 +56,19 @@ function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
     MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
+function Base.show(io::IO, ::MIME"text/plain", dh::MixedDofHandler)
+    println(io, typeof(dh))
+    println(io, "  Fields:")
+    for fieldname in getfieldnames(dh)
+        println(io, "    ", repr(fieldname), ", dim: ", getfielddim(dh, fieldname))
+    end
+    if !isclosed(dh)
+        print(io, "  Not closed!")
+    else
+        print(io, "  Total dofs: ", ndofs(dh))
+    end
+end
+
 getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
 getfielddims(fh::FieldHandler) = [field.dim for field in fh.fields]
 getfieldinterpolations(fh::FieldHandler) = [field.interpolation for field in fh.fields]

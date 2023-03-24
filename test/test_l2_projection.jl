@@ -313,6 +313,13 @@ function test_export(;subset::Bool)
     end
 end
 
+function test_show()
+    grid = generate_grid(Triangle, (2,2))
+    ip = Lagrange{2,RefTetrahedron,1}()
+    proj = L2Projector(ip, grid)
+    @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{2, RefTetrahedron, 1}()\n  geometric interpolation: Lagrange{2, RefTetrahedron, 1}()\n"
+end
+
 @testset "Test L2-Projection" begin
     test_projection(1, RefCube)
     test_projection(1, RefTetrahedron)
@@ -322,4 +329,5 @@ end
     test_node_reordering()
     test_export(subset=false)
     test_export(subset=true)
+    test_show()
 end
