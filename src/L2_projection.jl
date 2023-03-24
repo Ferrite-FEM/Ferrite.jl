@@ -7,7 +7,7 @@ struct L2Projector <: AbstractProjector
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::MixedDofHandler
     set::Vector{Int}
-    node2dof_map::Dict{Int64, Array{Int64,N} where N}
+    node2dof_map::Dict{Int,Int}
     fe_values::Union{CellValues,Nothing} # only used for deprecated constructor
     qr_rhs::Union{QuadratureRule,Nothing}    # only used for deprecated constructor
 end
@@ -217,8 +217,7 @@ function project(proj::L2Projector,
         reordered_vals = fill(convert(T, NaN * zero(T)), nnodes)
         for node = 1:nnodes
             if (k = get(proj.node2dof_map, node, nothing); k !== nothing)
-                @assert length(k) == 1
-                reordered_vals[node] = projected_vals[k[1]]
+                reordered_vals[node] = projected_vals[k]
             end
         end
         return reordered_vals
