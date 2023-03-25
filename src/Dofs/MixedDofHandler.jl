@@ -28,6 +28,12 @@ mutable struct FieldHandler
     cellset::Set{Int}
 end
 
+function FieldHandler(cellset::Set{Int})
+    # if grid was an argument, could _check_same_celltype,
+    # this way the check happens only during MixedDofHandler construction
+    return FieldHandler(Field[], cellset)
+end
+
 """
     MixedDofHandler(grid::Grid)
 
@@ -51,9 +57,22 @@ struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     ndofs::ScalarWrapper{Int}
 end
 
-function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
+function MixedDofHandler(grid::Grid{dim, C, T}, fieldhandlers...) where {dim, C, T}
+    @assert isa(fieldhandlers, NTuple{N, FieldHandler} where N) # TODO: can that be specified in the function signature?
+    
+    # construct MixedDofHandler 
     ncells = getncells(grid)
-    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
+    dh = MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
+
+    # add fields
+    for fh in fieldhandlers
+        add!(dh, fh) # Checks celltypes, disjoint cellsets, interpolation refshapes
+    end
+
+    # old constructor if no fieldhandlers are given, new constructor (including close!) with fieldhandlers
+    isempty(fieldhandlers) || close!(dh) 
+
+    return dh
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::MixedDofHandler)
@@ -185,6 +204,16 @@ function _check_cellset_intersections(dh::MixedDofHandler, fh::FieldHandler)
     for _fh in dh.fieldhandlers
         isdisjoint(_fh.cellset, fh.cellset) || error("Each cell can only belong to a single FieldHandler.")
     end
+end
+
+function add!(fh::FieldHandler, name::Symbol, dim::Int, ip::Interpolation)
+    # can't check if ip is compatible with celltype here without type parameter on FieldHandler
+    # can't support add!(fh, name, dim) without type parameter 
+    
+    field = Field(name, ip, dim)
+    push!(fh.fields, field)
+    
+    return fh
 end
 
 function add!(dh::MixedDofHandler, name::Symbol, dim::Int)
