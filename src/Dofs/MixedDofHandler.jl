@@ -23,15 +23,16 @@ A `FieldHandler` must fullfill the following requirements:
 
 Notice that a `FieldHandler` can hold several fields.
 """
-mutable struct FieldHandler{C}
+mutable struct FieldHandler{C, G}
     fields::Vector{Field}
     cellset::Set{Int}
+    grid::G
 end
 
-function FieldHandler(grid::Grid, cellset::Set{Int})
+function FieldHandler(grid::G, cellset::Set{Int}) where G<:AbstractGrid
     _check_same_celltype(grid, cellset)
     celltype = typeof(getcells(grid, first(cellset)))
-    return FieldHandler{celltype}(Field[], cellset)
+    return FieldHandler{celltype, G}(Field[], cellset, grid)
 end
 
 """
@@ -57,20 +58,28 @@ struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     ndofs::ScalarWrapper{Int}
 end
 
-function MixedDofHandler(grid::Grid{dim, C, T}, fieldhandlers...) where {dim, C, T}
-    @assert isa(fieldhandlers, NTuple{N, FieldHandler} where N) # TODO: can that be specified in the function signature?
-    
-    # construct MixedDofHandler 
+function MixedDofHandler(grid::Grid{dim, C, T}) where {dim, C, T}
     ncells = getncells(grid)
     dh = MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
+    return dh
+end
 
+function MixedDofHandler(fieldhandlers...)     
+    @assert isa(fieldhandlers, NTuple{N, FieldHandler} where N) # TODO: can that be specified in the function signature?
+    @assert length(fieldhandlers) >= 1 "No fieldhandlers given."
+
+    grid = first(fieldhandlers).grid
+    for (i, fh) in enumerate(fieldhandlers)
+        i == 1 && continue
+        fh.grid === grid || error("All FieldHandlers must be based on the same grid.")
+    end
+
+    dh = MixedDofHandler(grid)
     # add fields
     for fh in fieldhandlers
         add!(dh, fh) # Checks celltypes, disjoint cellsets, interpolation refshapes
     end
-
-    # old constructor if no fieldhandlers are given, new constructor (including close!) with fieldhandlers
-    isempty(fieldhandlers) || close!(dh) 
+    close!(dh) 
 
     return dh
 end
