@@ -23,15 +23,15 @@ A `FieldHandler` must fullfill the following requirements:
 
 Notice that a `FieldHandler` can hold several fields.
 """
-mutable struct FieldHandler
+mutable struct FieldHandler{C}
     fields::Vector{Field}
     cellset::Set{Int}
 end
 
-function FieldHandler(cellset::Set{Int})
-    # if grid was an argument, could _check_same_celltype,
-    # this way the check happens only during MixedDofHandler construction
-    return FieldHandler(Field[], cellset)
+function FieldHandler(grid::Grid, cellset::Set{Int})
+    _check_same_celltype(grid, cellset)
+    celltype = typeof(getcells(grid, first(cellset)))
+    return FieldHandler{celltype}(Field[], cellset)
 end
 
 """
@@ -185,17 +185,7 @@ Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
 function add!(dh::MixedDofHandler, fh::FieldHandler)
     # TODO: perhaps check that a field with the same name is the same field?
     @assert !isclosed(dh)
-    _check_same_celltype(dh.grid, collect(fh.cellset))
-    _check_cellset_intersections(dh, fh)
-    # the field interpolations should have the same refshape as the cells they are applied to
-    refshapes_fh = getrefshape.(getfieldinterpolations(fh))
-    # extract the celltype from the first cell as the celltypes are all equal
-    cell_type = typeof(dh.grid.cells[first(fh.cellset)])
-    refshape_cellset = getrefshape(default_interpolation(cell_type))
-    for refshape in refshapes_fh
-        refshape_cellset == refshape || error("The RefShapes of the fieldhandlers interpolations must correspond to the RefShape of the cells it is applied to.")
-    end
-
+    _check_cellset_intersections(dh, fh) 
     push!(dh.fieldhandlers, fh)
     return dh
 end
@@ -206,10 +196,10 @@ function _check_cellset_intersections(dh::MixedDofHandler, fh::FieldHandler)
     end
 end
 
-function add!(fh::FieldHandler, name::Symbol, dim::Int, ip::Interpolation)
-    # can't check if ip is compatible with celltype here without type parameter on FieldHandler
-    # can't support add!(fh, name, dim) without type parameter 
-    
+function add!(fh::FieldHandler{C}, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(C)) where C
+    refshape_fieldhandler = getrefshape(default_interpolation(C))
+    @assert getrefshape(ip) == refshape_fieldhandler "RefShape of interpolation incompatible with RefShape of FieldHandler."
+
     field = Field(name, ip, dim)
     push!(fh.fields, field)
     
@@ -218,7 +208,7 @@ end
 
 function add!(dh::MixedDofHandler, name::Symbol, dim::Int)
     celltype = getcelltype(dh.grid)
-    isconcretetype(celltype) || error("If you have more than one celltype in Grid, you must use add!(dh::MixedDofHandler, fh::FieldHandler)")
+    isconcretetype(celltype) || error("If you have more than one celltype in Grid, you must use add!(fh::FieldHandler, name, dim[, ip]).")
     add!(dh, name, dim, default_interpolation(celltype))
 end
 
@@ -230,15 +220,12 @@ function add!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolation)
 
     if length(dh.fieldhandlers) == 0
         cellset = Set(1:getncells(dh.grid))
-        push!(dh.fieldhandlers, FieldHandler(Field[], cellset))
+        push!(dh.fieldhandlers, FieldHandler{celltype}(Field[], cellset))
     elseif length(dh.fieldhandlers) > 1
-        error("If you have more than one FieldHandler, you must specify field")
+        error("If you have more than one FieldHandler, you must use add!(fh::FieldHandler, name, dim[, ip]).")
     end
     fh = first(dh.fieldhandlers)
-
-    field = Field(name,ip,dim)
-
-    push!(fh.fields, field)
+    add!(fh, name, dim, ip)
 
     return dh
 end
