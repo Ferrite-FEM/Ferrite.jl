@@ -143,14 +143,16 @@ target block is maintained.
 """
 DofOrder.FieldWise
 
-function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.FieldWise)
+function compute_renumber_permutation(dh::Union{DofHandler, MixedDofHandler}, _, order::DofOrder.FieldWise)
+    field_names = getfieldnames(dh)
+    field_dims = map(fieldname -> getfielddim(dh, fieldname), dh.field_names)
     target_blocks = if isempty(order.target_blocks)
-        Int[i for (i, dim) in pairs(dh.field_dims) for _ in 1:dim]
+        Int[i for (i, dim) in pairs(field_dims) for _ in 1:dim]
     else
-        if length(order.target_blocks) != length(dh.field_names)
+        if length(order.target_blocks) != length(field_names)
             error("length of target block vector does not match number of fields in DofHandler")
         end
-        Int[order.target_blocks[i] for (i, dim) in pairs(dh.field_dims) for _ in 1:dim]
+        Int[order.target_blocks[i] for (i, dim) in pairs(field_dims) for _ in 1:dim]
     end
     return compute_renumber_permutation(dh, nothing, DofOrder.ComponentWise(target_blocks))
 end
@@ -172,33 +174,40 @@ target block is maintained.
 """
 DofOrder.ComponentWise
 
-function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.ComponentWise)
+function compute_renumber_permutation(dh::Union{DofHandler,MixedDofHandler}, _, order::DofOrder.ComponentWise)
+    # Note: This assumes fields have the same dimension regardless of subdomain
+    field_dims = map(fieldname -> getfielddim(dh, fieldname), dh.field_names)
     target_blocks = if isempty(order.target_blocks)
-        collect(Int, 1:sum(dh.field_dims))
+        collect(Int, 1:sum(field_dims))
     else
-        if length(order.target_blocks) != sum(dh.field_dims)
+        if length(order.target_blocks) != sum(field_dims)
             error("length of target block vector does not match number of components in DofHandler")
         end
         order.target_blocks
     end
-    @assert length(target_blocks) == sum(dh.field_dims)
+    @assert length(target_blocks) == sum(field_dims)
     @assert sort!(unique(target_blocks)) == 1:maximum(target_blocks)
     # Collect all dofs into the corresponding block according to target_blocks
     nblocks = maximum(target_blocks)
     dofs_for_blocks = [Set{Int}() for _ in 1:nblocks]
-    dof_ranges = [dof_range(dh, f) for f in dh.field_names]
-    component_offsets = pushfirst!(cumsum(dh.field_dims), 0)
+    component_offsets = pushfirst!(cumsum(field_dims), 0)
     flags = UpdateFlags(nodes=false, coords=false, dofs=true)
-    @inbounds for cell in CellIterator(dh, flags)
-        cdofs = celldofs(cell)
-        for i in eachindex(dh.field_names)
-            rng = dof_ranges[i]
-            fdim = dh.field_dims[i]
-            component_offset = component_offsets[i]
-            for (j, J) in pairs(rng)
-                comp = mod1(j, fdim) + component_offset
-                block = target_blocks[comp]
-                push!(dofs_for_blocks[block], cdofs[J])
+    for fh in (dh isa DofHandler ? (dh,) : dh.fieldhandlers)
+        field_names = fh isa DofHandler ? fh.field_names : [f.name for f in fh.fields]
+        dof_ranges = [dof_range(fh, f) for f in field_names]
+        global_idxs = [findfirst(x -> x === f, dh.field_names) for f in field_names]
+        set = dh isa DofHandler ? nothing : fh.cellset
+        for cell in CellIterator(dh, set, flags)
+            cdofs = celldofs(cell)
+            for (local_idx, global_idx) in pairs(global_idxs)
+                rng = dof_ranges[local_idx]
+                fdim = field_dims[global_idx]
+                component_offset = component_offsets[global_idx]
+                for (j, J) in pairs(rng)
+                    comp = mod1(j, fdim) + component_offset
+                    block = target_blocks[comp]
+                    push!(dofs_for_blocks[block], cdofs[J])
+                end
             end
         end
     end

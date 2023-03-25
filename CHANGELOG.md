@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-<!-- ## [Unreleased] -->
+## [Unreleased]
+### Added
+ - Support reordering dofs of a `MixedDofHandler` by the built-in orderings `FieldWise` and
+   `ComponentWise`. This includes support for reordering dofs of fields on subdomains.
+   ([#645][github-645])
 
 ## [0.3.13] - 2023-03-23
 ### Added
@@ -371,6 +375,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-614]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/614
 [github-621]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/621
 [github-633]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/633
+[github-645]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/645
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.13...HEAD
 [0.3.13]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.12...v0.3.13
