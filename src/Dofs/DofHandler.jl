@@ -175,9 +175,10 @@ end
 function __close!(dh::DofHandler{dim}) where {dim}
     @assert !isclosed(dh)
 
-    # `vertexdict` keeps track of the visited vertices. We store the global vertex
-    # number and the first dof we added to that vertex.
-    vertexdicts = [Dict{Int,Int}() for _ in 1:nfields(dh)]
+    # `vertexdict` keeps track of the visited vertices. The first dof added to vertex v is
+    # stored in vertexdict[v]
+    # TODO: No need to allocate this vector for fields that don't have vertex dofs
+    vertexdicts = [zeros(Int, getnnodes(dh.grid)) for _ in 1:nfields(dh)]
 
     # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem
     # An edge is determined from two vertices, but we also need to store the direction
@@ -219,16 +220,15 @@ function __close!(dh::DofHandler{dim}) where {dim}
             for (vi, vertex) in enumerate(vertices(cell))
                 if interpolation_info.nvertexdofs[vi] > 0
                     @debug println("    vertex#$vertex")
-                    token = Base.ht_keyindex2!(vertexdicts[field_idx], vertex)
-                    if token > 0 # haskey(vertexdicts[fi], vertex) # reuse dofs
-                        reuse_dof = vertexdicts[field_idx].vals[token] # vertexdicts[fi][vertex]
+                    reuse_dof = vertexdicts[field_idx][vertex]
+                    if reuse_dof > 0 # reuse dofs
                         for d in 1:dh.field_dims[field_idx]
                             @debug println("      reusing dof #$(reuse_dof + (d-1))")
                             push!(dh.cell_dofs, reuse_dof + (d-1))
                         end
-                    else # token <= 0, distribute new dofs
+                    else # distribute new dofs
                         for vertexdof in 1:interpolation_info.nvertexdofs[vi]
-                            Base._setindex!(vertexdicts[field_idx], nextdof, vertex, -token) # vertexdicts[field_idx][vertex] = nextdof
+                            vertexdicts[field_idx][vertex] = nextdof
                             for d in 1:dh.field_dims[field_idx]
                                 @debug println("      adding dof#$nextdof")
                                 push!(dh.cell_dofs, nextdof)

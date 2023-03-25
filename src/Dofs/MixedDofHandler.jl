@@ -236,9 +236,10 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
     field_names = getfieldnames(dh)  # all the fields in the problem
     numfields =  length(field_names)
 
-    # `vertexdict` keeps track of the visited vertices. We store the global
-    # vertex number mapped to the first dof we added to that vertex.
-    vertexdicts = [Dict{Int,Int}() for _ in 1:numfields]
+    # `vertexdict` keeps track of the visited vertices. The first dof added to vertex v is
+    # stored in vertexdict[v]
+    # TODO: No need to allocate this vector for fields that don't have vertex dofs
+    vertexdicts = [zeros(Int, getnnodes(dh.grid)) for _ in 1:numfields]
 
     # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem.
     # An edge is uniquely determined by two vertices, but we also need to store the
@@ -347,15 +348,14 @@ function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, ne
     for (vi, vertex) in pairs(vertices(cell))
         nvertexdofs[vi] > 0 || continue # skip if no dof on this vertex
         @assert nvertexdofs[vi] == 1
-        token = Base.ht_keyindex2!(vertexdict, vertex)
-        if token > 0 # haskey(vertexdict, vertex) -> reuse dof
-            first_dof = vertexdict.vals[token] # vertexdict[vertex]
+        first_dof = vertexdict[vertex]
+        if first_dof > 0 # reuse dof
             for d in 1:field_dim
                 reuse_dof = first_dof + (d-1)
                 push!(cell_dofs, reuse_dof)
             end
-        else # !haskey(vertexdict, vertex) -> create dofs
-            Base._setindex!(vertexdict, nextdof, vertex, -token) # vertexdict[vertex] = nextdof
+        else # create dofs
+            vertexdict[vertex] = nextdof
             for _ in 1:field_dim
                 push!(cell_dofs, nextdof)
                 nextdof += 1
