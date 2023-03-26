@@ -349,26 +349,54 @@ cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(
 # ii) (ncomponents × ncomponents) specifying coupling between components, or iii)
 # (ndofs_per_cell × ndofs_per_cell) specifying coupling between all local dofs, i.e. a
 # "template" local matrix.
-function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatrix{Bool}, sym::Bool)
-    out = zeros(Bool, ndofs_per_cell(dh), ndofs_per_cell(dh))
+function _coupling_to_local_dof_coupling(dh::DofHandler, _, coupling::AbstractMatrix{Bool}, sym::Bool)
+    ndofs_cell = ndofs_per_cell(dh)
+    global_field_names = getfieldnames(dh)
+    global_field_dims = getfielddims(dh)
+    dof_ranges = [dof_range(dh, fieldname) for _ in global_field_names]
+    _coupling_to_local_dof_coupling(coupling, sym, ndofs_cell, dof_ranges, global_field_names, global_field_dims, global_field_names)
+end
+
+function _coupling_to_local_dof_coupling(dh::MixedDofHandler, fh::FieldHandler, coupling::AbstractMatrix{Bool}, sym::Bool)
+    ndofs_cell = ndofs_per_cell(dh, first(fh.cellset))
+    global_field_names = getfieldnames(dh)
+    global_field_dims = [getfielddim(dh, name) for name in global_field_names]
+    dof_ranges = [dof_range(fh, field.name) for field in fh.fields]
+    local_field_names = [field.name for field in fh.fields]
+    _coupling_to_local_dof_coupling(coupling, sym, ndofs_cell, dof_ranges, local_field_names, global_field_dims, global_field_names)
+end
+
+function _coupling_to_local_dof_coupling(coupling::AbstractMatrix{Bool}, sym::Bool, ndofs_cell, dof_ranges, local_field_names, global_field_dims, global_field_names)
+    out = zeros(Bool, ndofs_cell, ndofs_cell)
     sz = size(coupling, 1)
     sz == size(coupling, 2) || error("coupling not square")
     sym && (issymmetric(coupling) || error("coupling not symmetric"))
-    dof_ranges = [dof_range(dh, f) for f in dh.field_names]
-    if sz == length(dh.field_names) # Coupling given by fields
-        for (j, jrange) in pairs(dof_ranges), (i, irange) in pairs(dof_ranges)
+    if sz == length(global_field_names) # Coupling given by fields
+        for (j, jname) in pairs(global_field_names), (i, iname) in pairs(global_field_names)
+            j_local = findfirst(isequal(jname), global_field_names)
+            jrange = dof_ranges[j_local]
+            i_local = findfirst(isequal(iname), global_field_names)
+            irange = dof_ranges[i_local]
             out[irange, jrange] .= coupling[i, j]
         end
-    elseif sz == sum(dh.field_dims) # Coupling given by components
-        component_offsets = pushfirst!(cumsum(dh.field_dims), 0)
-        for (jf, jrange) in pairs(dof_ranges), (j, J) in pairs(jrange)
-            jc = mod1(j, dh.field_dims[jf]) + component_offsets[jf]
-            for (i_f, irange) in pairs(dof_ranges), (i, I) in pairs(irange)
-                ic = mod1(i, dh.field_dims[i_f]) + component_offsets[i_f]
-                out[I, J] = coupling[ic, jc]
+    elseif sz == sum(global_field_dims) # Coupling given by components
+        component_offsets = pushfirst!(cumsum(global_field_dims), 0)
+        for (j_global, j_name) in pairs(global_field_names)
+            j_local = findfirst(isequal(jname), global_field_names)
+            jrange = dof_ranges[j_local]
+            for (j, J) in paris(jrange)
+                jc = mod1(j, global_field_dims[j_global]) + component_offsets[j_global]
+                for (i_global, i_name) in paris(global_field_names)
+                    i_local = findfirst(isequal(iname), global_field_names)
+                    irange = dof_ranges[i_local]
+                    for (i, I) in pairs(irange)
+                        ic = mod1(i, global_field_dims[i_global]) + component_offsets[i_global]
+                        out[I, J] = coupling[ic, jc]
+                    end
+                end
             end
         end
-    elseif sz == ndofs_per_cell(dh) # Coupling given by template local matrix
+    elseif sz == ndofs_cell # Coupling given by template local matrix
         out .= coupling
     else
         error("could not create coupling")
@@ -417,7 +445,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     ncells = getncells(dh.grid)
     if coupling !== nothing
         # Extend coupling to be of size (ndofs_per_cell × ndofs_per_cell)
-        coupling = _coupling_to_local_dof_coupling(dh, coupling, sym)
+        coupling = _coupling_to_local_dof_coupling(dh, coupling, sym) # FIXME
     end
     # Compute approximate size for the buffers using the dofs in the first element
     n = ndofs_per_cell(dh)
@@ -427,26 +455,10 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     J = Int[]; resize!(J, N)
     global_dofs = zeros(Int, n)
     cnt = 0
-    for element_id in 1:ncells
-        # MixedDofHandler might have varying number of dofs per element
-        resize!(global_dofs, ndofs_per_cell(dh, element_id))
-        celldofs!(global_dofs, dh, element_id)
-        @inbounds for j in eachindex(global_dofs), i in eachindex(global_dofs)
-            coupling === nothing || coupling[i, j] || continue
-            dofi = global_dofs[i]
-            dofj = global_dofs[j]
-            sym && (dofi > dofj && continue)
-            !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
-            cnt += 1
-            if cnt > length(J)
-                resize!(I, trunc(Int, length(I) * 1.5))
-                resize!(J, trunc(Int, length(J) * 1.5))
-            end
-            I[cnt] = dofi
-            J[cnt] = dofj
-
-        end
-    end
+    
+    
+    __create_sparsity_pattern!(I, J, global_dofs, dh, element_id, coupling, sym, keep_constained, ch, cnt)
+    
     @inbounds for d in 1:ndofs(dh)
         cnt += 1
         if cnt > length(J)
@@ -471,6 +483,43 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     end
 
     return K
+end
+
+function __create_sparsity_pattern!(I, J, global_dofs, dh::DofHandler, element_id, coupling, sym, keep_constained, ch, cnt)
+    resize!(global_dofs, ndofs_per_cell(dh, element_id))
+    for element_id in 1:ncells
+            cnt = _cell_sparsity_pattern!(I, J, global_dofs, dh, element_id, coupling, sym, keep_constrained, ch, cnt)
+    end
+    return cnt
+end
+
+function __create_sparsity_pattern!(I, J, global_dofs, dh::MixedDofHandler, element_id, coupling, sym, keep_constained, ch, cnt)
+    for fh in dh.fieldhandlers
+        resize!(global_dofs, ndofs_per_cell(dh, first(fh.cellset)))
+        for element_id in fh.cellset
+            cnt = _cell_sparsity_pattern!(I, J, global_dofs, dh, element_id, coupling, sym, keep_constrained, ch, cnt)
+        end
+    end
+    return cnt
+end
+
+function _cell_sparsity_pattern!(I, J, global_dofs, dh, element_id, coupling, sym, keep_constrained, ch, cnt)
+    celldofs!(global_dofs, dh, element_id)
+    @inbounds for j in eachindex(global_dofs), i in eachindex(global_dofs)
+        coupling === nothing || coupling[i, j] || continue
+        dofi = global_dofs[i]
+        dofj = global_dofs[j]
+        sym && (dofi > dofj && continue)
+        !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
+        cnt += 1
+        if cnt > length(J)
+            resize!(I, trunc(Int, length(I) * 1.5))
+            resize!(J, trunc(Int, length(J) * 1.5))
+        end
+        I[cnt] = dofi
+        J[cnt] = dofj
+    end
+    return cnt
 end
 
 function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
