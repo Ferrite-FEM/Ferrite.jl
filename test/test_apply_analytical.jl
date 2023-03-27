@@ -68,7 +68,7 @@
     function _global_dof_range(dh::MixedDofHandler, field_name::Symbol)
         dofs = Set{Int}()
         for fh in dh.fieldhandlers
-            if field_name ∈ Ferrite.getfieldnames(fh)
+            if !isnothing(Ferrite._find_field(fh, field_name))
                 _global_dof_range!(dofs, dh, fh, field_name, fh.cellset)
             end
         end

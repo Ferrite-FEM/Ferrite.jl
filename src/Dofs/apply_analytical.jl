@@ -51,7 +51,7 @@ function apply_analytical!(
     ip_geos = _default_interpolations(dh)
 
     for (fh, ip_geo) in zip(dh.fieldhandlers, ip_geos)
-        fieldname ∈ getfieldnames(fh) || continue
+        isnothing(_find_field(fh, fieldname)) && continue
         field_idx = find_field(fh, fieldname)
         ip_fun = getfieldinterpolation(fh, field_idx)
         field_dim = getfielddim(fh, field_idx)
