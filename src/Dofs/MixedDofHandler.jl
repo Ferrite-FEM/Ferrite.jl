@@ -70,10 +70,6 @@ function Base.show(io::IO, ::MIME"text/plain", dh::MixedDofHandler)
     end
 end
 
-getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
-getfielddims(fh::FieldHandler) = [field.dim for field in fh.fields]
-getfieldinterpolations(fh::FieldHandler) = [field.interpolation for field in fh.fields]
-
 """
     ndofs_per_cell(dh::AbstractDofHandler[, cell::Int=1])
 
@@ -120,7 +116,6 @@ end
 
 """
     getfieldnames(dh::MixedDofHandler)
-    getfieldnames(fh::FieldHandler)
 
 Return a vector with the names of all fields. Can be used as an iterable over all the fields
 in the problem.
