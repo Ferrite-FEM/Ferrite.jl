@@ -296,7 +296,7 @@ get_func_interpolations(dh::DH, fieldname) where DH<:DofHandler = [getfieldinter
 function get_func_interpolations(dh::DH, fieldname) where DH<:MixedDofHandler
     func_interpolations = Union{Interpolation,Nothing}[]
     for fh in dh.fieldhandlers
-        j = findfirst(i -> i === fieldname, getfieldnames(fh))
+        j = _find_field(fh, fieldname)
         if j === nothing
             push!(func_interpolations, missing)
         else

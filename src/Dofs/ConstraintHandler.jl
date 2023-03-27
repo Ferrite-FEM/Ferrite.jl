@@ -914,7 +914,7 @@ end
 function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
     dbc_added = false
     for fh in ch.dh.fieldhandlers
-        if dbc.field_name in getfieldnames(fh) && _in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=false)
+        if !isnothing(_find_field(fh, dbc.field_name)) && _in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=false)
             # Dofs in `dbc` not in `fh` will be removed, hence `dbc.faces` must be copied.
             # Recreating the `dbc` will create a copy of `dbc.faces`.
             # In this case, add! will warn, unless `warn_not_in_cellset=false`
@@ -938,8 +938,8 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_not_
 
     # Extract stuff for the field
     field_idx = find_field(fh, dbc.field_name)
-    interpolation = getfieldinterpolations(fh)[field_idx]
-    field_dim = getfielddims(fh)[field_idx]
+    interpolation = getfieldinterpolation(fh, field_idx)
+    field_dim = getfielddim(fh, field_idx)
 
     if !all(c -> 0 < c <= field_dim, dbc.components)
         error("components $(dbc.components) not within range of field :$(dbc.field_name) ($(field_dim) dimension(s))")
