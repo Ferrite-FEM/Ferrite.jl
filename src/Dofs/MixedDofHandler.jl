@@ -37,6 +37,7 @@ Construct a `MixedDofHandler` based on `grid`. Supports:
 """
 struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
+    field_names::Vector{Symbol}
     # Dofs for cell i are stored in cell_dofs[cell_dofs_offset[i]:(cell_dofs_offset[i]+length[i]-1)].
     # Note that explicitly keeping track of ndofs_per_cell is necessary since dofs are *not*
     # distributed in cell order like for the DofHandler (where the length can be determined
@@ -53,7 +54,7 @@ end
 
 function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
     ncells = getncells(grid)
-    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
+    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::MixedDofHandler)
@@ -124,13 +125,7 @@ end
 Return a vector with the names of all fields. Can be used as an iterable over all the fields
 in the problem.
 """
-function getfieldnames(dh::MixedDofHandler)
-    fieldnames = Vector{Symbol}()
-    for fh in dh.fieldhandlers
-        append!(fieldnames, getfieldnames(fh))
-    end
-    return unique!(fieldnames)
-end
+getfieldnames(dh::MixedDofHandler) = dh.field_names
 
 getfielddim(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].dim
 getfielddim(fh::FieldHandler, field_name::Symbol) = getfielddim(fh, find_field(fh, field_name))
@@ -233,8 +228,13 @@ end
 
 function __close!(dh::MixedDofHandler{dim}) where {dim}
     @assert !isclosed(dh)
-    field_names = getfieldnames(dh)  # all the fields in the problem
-    numfields =  length(field_names)
+
+    # Collect the global field names
+    empty!(dh.field_names)
+    for fh in dh.fieldhandlers, f in fh.fields
+        f.name in dh.field_names || push!(dh.field_names, f.name)
+    end
+    numfields = length(dh.field_names)
 
     # `vertexdict` keeps track of the visited vertices. The first dof added to vertex v is
     # stored in vertexdict[v]
@@ -264,7 +264,7 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
         nextdof = _close!(
             dh,
             cellnumbers,
-            field_names,
+            dh.field_names,
             getfieldnames(fh),
             getfielddims(fh),
             getfieldinterpolations(fh),
