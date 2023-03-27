@@ -164,11 +164,11 @@ function add!(dh::MixedDofHandler, fh::FieldHandler)
     _check_same_celltype(dh.grid, collect(fh.cellset))
     _check_cellset_intersections(dh, fh)
     # the field interpolations should have the same refshape as the cells they are applied to
-    refshapes_fh = getrefshape.(getfieldinterpolations(fh))
     # extract the celltype from the first cell as the celltypes are all equal
     cell_type = typeof(dh.grid.cells[first(fh.cellset)])
     refshape_cellset = getrefshape(default_interpolation(cell_type))
-    for refshape in refshapes_fh
+    for field_idx  in eachindex(fh.fields)
+        refshape = getrefshape(getfieldinterpolation(fh, field_idx))
         refshape_cellset == refshape || error("The RefShapes of the fieldhandlers interpolations must correspond to the RefShape of the cells it is applied to.")
     end
 
@@ -265,9 +265,7 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
             dh,
             cellnumbers,
             dh.field_names,
-            getfieldnames(fh),
-            getfielddims(fh),
-            getfieldinterpolations(fh),
+            fh.fields,
             nextdof,
             vertexdicts,
             edgedicts,
@@ -281,9 +279,10 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
 
 end
 
-function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts) where {dim}
+function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fields, nextdof, vertexdicts, edgedicts, facedicts) where {dim}
     ip_infos = InterpolationInfo[]
-    for interpolation in field_interpolations
+    for field in fields
+        interpolation = field.interpolation
         ip_info = InterpolationInfo(interpolation)
         push!(ip_infos, ip_info)
         # TODO: More than one face dof per face in 3D are not implemented yet. This requires
@@ -300,14 +299,15 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
         len_cell_dofs = length(dh.cell_dofs)
         dh.cell_dofs_offset[ci] = len_cell_dofs + 1
 
-        for (local_num, field_name) in enumerate(field_names)
-            fi = findfirst(i->i == field_name, global_field_names)
-            @debug "\tfield: $(field_name)"
+        for (local_num, field) in pairs(fields)
+        # for (local_num, field_name) in enumerate(field_names)
+            fi = findfirst(i->i == field.name, global_field_names)
+            @debug "\tfield: $(field.name)"
             ip_info = ip_infos[local_num]
 
             # Distribute dofs for vertices
             nextdof = add_vertex_dofs(
-                dh.cell_dofs, cell, vertexdicts[fi], field_dims[local_num],
+                dh.cell_dofs, cell, vertexdicts[fi], field.dim,
                 ip_info.nvertexdofs, nextdof
             )
 
@@ -316,7 +316,7 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
                 # Regular 3D element or 2D interpolation embedded in 3D space
                 nentitydofs = ip_info.dim == 3 ? ip_info.nedgedofs : ip_info.nfacedofs
                 nextdof = add_edge_dofs(
-                    dh.cell_dofs, cell, edgedicts[fi], field_dims[local_num],
+                    dh.cell_dofs, cell, edgedicts[fi], field.dim,
                     nentitydofs, nextdof
                 )
             end
@@ -325,14 +325,14 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
             # they are added above as edge dofs.
             if ip_info.dim == dim
                 nextdof = add_face_dofs(
-                    dh.cell_dofs, cell, facedicts[fi], field_dims[local_num],
+                    dh.cell_dofs, cell, facedicts[fi], field.dim,
                     ip_info.nfacedofs, nextdof
                 )
             end
 
             # Distribute internal dofs for cells
             nextdof = add_cell_dofs(
-                dh.cell_dofs, field_dims[local_num], ip_info.ncelldofs, nextdof
+                dh.cell_dofs, field.dim, ip_info.ncelldofs, nextdof
             )
         end
 
@@ -460,7 +460,7 @@ See also: [`find_field(dh::MixedDofHandler, field_name::Symbol)`](@ref), [`_find
 function find_field(fh::FieldHandler, field_name::Symbol)
     field_idx = _find_field(fh, field_name)
     if field_idx === nothing
-        error("Did not find field :$field_name in FieldHandler (existing fields: $(getfieldnames(fh)))")
+        error("Did not find field :$field_name in FieldHandler (existing fields: $([field.name for field in fh.fields]))")
     end
     return field_idx
 end
@@ -580,9 +580,9 @@ function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) 
 
     for fh in dh.fieldhandlers
         # check if this fh contains this field, otherwise continue to the next
-        field_pos = findfirst(i->i == fieldname, getfieldnames(fh))
-        field_pos === nothing && continue
-        offset = field_offset(fh, fieldname)
+        field_idx = _find_field(fh, fieldname)
+        field_idx === nothing && continue
+        offset = field_offset(fh, field_idx)
 
         reshape_field_data!(data, dh, u, offset, field_dim, fh.cellset)
     end
