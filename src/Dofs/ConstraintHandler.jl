@@ -914,7 +914,7 @@ end
 function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
     dbc_added = false
     for fh in ch.dh.fieldhandlers
-        if !isnothing(_find_field(fh, dbc.field_name)) && _in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=false)
+        if hasfieldname(fh, dbc.field_name) && _in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=false)
             # Dofs in `dbc` not in `fh` will be removed, hence `dbc.faces` must be copied.
             # Recreating the `dbc` will create a copy of `dbc.faces`.
             # In this case, add! will warn, unless `warn_not_in_cellset=false`

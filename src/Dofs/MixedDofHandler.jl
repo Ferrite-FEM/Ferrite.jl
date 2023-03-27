@@ -478,6 +478,8 @@ function _find_field(fh::FieldHandler, field_name::Symbol)
     return nothing
 end
 
+hasfieldname(fh::FieldHandler, field_name::Symbol) = !isnothing(_find_field(fh, field_name))
+
 # Calculate the offset to the first local dof of a field
 function field_offset(fh::FieldHandler, field_idx::Int)
     offset = 0

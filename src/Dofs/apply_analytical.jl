@@ -34,7 +34,7 @@ function apply_analytical!(
     a::AbstractVector, dh::DofHandler, fieldname::Symbol, f::Function,
     cellset = 1:getncells(dh.grid))
 
-    fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
+    hasfieldname(dh, fieldname) || error("The fieldname $fieldname was not found in the dof handler")
     ip_geo = _default_interpolation(dh)
     field_idx = find_field(dh, fieldname)
     ip_fun = getfieldinterpolation(dh, field_idx)
@@ -47,11 +47,11 @@ function apply_analytical!(
     a::AbstractVector, dh::MixedDofHandler, fieldname::Symbol, f::Function,
     cellset = 1:getncells(dh.grid))
 
-    fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
+    hasfieldname(dh, fieldname) || error("The fieldname $fieldname was not found in the dof handler")
     ip_geos = _default_interpolations(dh)
 
     for (fh, ip_geo) in zip(dh.fieldhandlers, ip_geos)
-        isnothing(_find_field(fh, fieldname)) && continue
+        hasfieldname(fh, fieldname) || continue
         field_idx = find_field(fh, fieldname)
         ip_fun = getfieldinterpolation(fh, field_idx)
         field_dim = getfielddim(fh, field_idx)

@@ -58,6 +58,13 @@ function find_field(dh::DofHandler, field_name::Symbol)
     return j
 end
 
+"""
+    hasfieldname(dh::AbstractDofHandler, field_name::Symbol)
+
+Check if `field_name` is the name of a field in `dh`
+"""
+hasfieldname(dh::AbstractDofHandler, field_name::Symbol) = field_name ∈ getfieldnames(dh)
+
 # Calculate the offset to the first local dof of a field
 function field_offset(dh::DofHandler, field_name::Symbol)
     offset = 0
