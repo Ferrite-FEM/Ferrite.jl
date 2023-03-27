@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
- - `hasfieldname` method added for checking if a fieldname exists in an `AbstractDofHandler`/`FieldHandler`. 
+ - `hasfieldname` method added for checking if a fieldname exists in an `AbstractDofHandler`/`FieldHandler` ([#648][github-648])
 
 ### Internal changes
  - `getfielddims(::FieldHandler)`, `getfieldinterpolations(::FieldHandler)`, and `getfieldnames(::FieldHandler)` removed ([#647][github-647])
@@ -376,6 +376,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-614]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/614
 [github-621]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/621
 [github-633]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/633
+[github-647]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/647
+[github-648]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/648
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.13...HEAD
 [0.3.13]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.12...v0.3.13
