@@ -1,7 +1,7 @@
 # Optimized version of PointScalarValues which avoids i) recomputation of dNdξ and
 # ii) recomputation of dNdx. Only allows function evaluation (no gradients) which is
 # what is used in get_point_values.
-struct PointScalarValuesInternal{dim,T<:Real,refshape<:AbstractRefShape} <: CellValues{dim,T,refshape}
+struct PointScalarValuesInternal{dim,T<:Real,refshape<:AbstractRefShape} <: CellValues{dim,dim,T,refshape}
     N::Vector{T}
 end
 
@@ -49,30 +49,30 @@ function reinit!(pv::PointScalarValuesInternal{dim,T,refshape}, coord::Vec{dim,T
     return pv
 end
 
-struct PointScalarValues{D,T,R,CV,IP} <: CellValues{D,T,R}
+struct PointScalarValues{D,T,R,CV,IP} <: CellValues{D,D,T,R}
     cv::CV
     ip::IP
 end
-function PointScalarValues(cv::CV, ip::IP) where {D,T,R,CV<:CellValues{D,T,R},IP<:Interpolation{D,R}}
+function PointScalarValues(cv::CV, ip::IP) where {D,T,R,CV<:CellValues{D,D,T,R},IP<:Interpolation{D,R}}
     return PointScalarValues{D,T,R,CV,IP}(cv, ip)
 end
 PointScalarValues(ip::Interpolation, ipg::Interpolation=ip) = PointScalarValues(Float64, ip, ipg)
-PointScalarValues(cv::CellValues{D,T}) where {D,T} = PointScalarValues(T, cv.func_interp, cv.geo_interp)
+PointScalarValues(cv::CellValues{D,D,T}) where {D,T} = PointScalarValues(T, cv.func_interp, cv.geo_interp)
 function PointScalarValues(::Type{T}, ip::Interpolation{D,R}, ipg::Interpolation = ip) where {T,D,R}
     qr = QuadratureRule{D,R,T}([one(T)], [zero(Vec{D,T})])
     cv = CellScalarValues(qr, ip, ipg)
     return PointScalarValues(cv, ip)
 end
 
-struct PointVectorValues{D,T,R,CV,IP} <: CellValues{D,T,R}
+struct PointVectorValues{D,T,R,CV,IP} <: CellValues{D,D,T,R}
     cv::CV
     ip::IP
 end
-function PointVectorValues(cv::CV, ip::IP) where {D,T,R,CV<:CellValues{D,T,R},IP<:Interpolation{D,R}}
+function PointVectorValues(cv::CV, ip::IP) where {D,T,R,CV<:CellValues{D,D,T,R},IP<:Interpolation{D,R}}
     return PointVectorValues{D,T,R,CV,IP}(cv, ip)
 end
 PointVectorValues(ip::Interpolation, ipg::Interpolation=ip) = PointVectorValues(Float64, ip, ipg)
-PointVectorValues(cv::CellValues{D,T}) where {D,T} = PointVectorValues(T, cv.func_interp, cv.geo_interp)
+PointVectorValues(cv::CellValues{D,D,T}) where {D,T} = PointVectorValues(T, cv.func_interp, cv.geo_interp)
 function PointVectorValues(::Type{T}, ip::Interpolation{D,R}, ipg = ip) where {T,D,R}
     qr = QuadratureRule{D,R,T}([one(T)], [zero(Vec{D,T})])
     cv = CellVectorValues(qr, ip, ipg)

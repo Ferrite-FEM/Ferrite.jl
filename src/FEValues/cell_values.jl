@@ -34,42 +34,42 @@ utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape 
 CellValues, CellScalarValues, CellVectorValues
 
 # CellScalarValues
-struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: CellValues{dim,T,refshape}
+struct CellScalarValues{sdim,rdim,T<:Real,refshape<:AbstractRefShape} <: CellValues{sdim,rdim,T,refshape}
     N::Matrix{T}
-    dNdx::Matrix{Vec{dim,T}}
-    dNdξ::Matrix{Vec{dim,T}}
+    dNdx::Matrix{Vec{sdim,T}}
+    dNdξ::Matrix{Vec{rdim,T}}
     detJdV::Vector{T}
     M::Matrix{T}
-    dMdξ::Matrix{Vec{dim,T}}
-    qr::QuadratureRule{dim,refshape,T}
+    dMdξ::Matrix{Vec{rdim,T}}
+    qr::QuadratureRule{rdim,refshape,T}
     # The following fields are deliberately abstract -- they are never used in
     # performance critical code, just stored here for convenience.
-    func_interp::Interpolation{dim,refshape}
-    geo_interp::Interpolation{dim,refshape}
+    func_interp::Interpolation{rdim,refshape}
+    geo_interp::Interpolation{rdim,refshape}
 end
 
+# FIXME sdim should be something like `getdim(value(geo_interpol))``
 function CellScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol)
-    CellScalarValues(Float64, quad_rule, func_interpol, geom_interpol)
+        geom_interpol::Interpolation=func_interpol, sdim::Int=getdim(func_interpol))
+    CellScalarValues(Float64, quad_rule, func_interpol, geom_interpol, sdim)
 end
 
-function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol) where {dim,T,shape<:AbstractRefShape}
+# FIXME sdim should be something like `getdim(value(geo_interpol))`
+function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{rdim,shape}, func_interpol::Interpolation{rdim,shape},
+        geom_interpol::Interpolation{rdim,shape}=func_interpol, sdim::Int=getdim(func_interpol)) where {rdim,T,shape<:AbstractRefShape}
 
-    @assert getdim(func_interpol) == getdim(geom_interpol)
-    @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
     n_qpoints = length(getweights(quad_rule))
 
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(func_interpol)
     N    = fill(zero(T)          * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdx = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdξ = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdx = fill(zero(Vec{sdim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdξ = fill(zero(Vec{rdim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
     M    = fill(zero(T)          * T(NaN), n_geom_basefuncs, n_qpoints)
-    dMdξ = fill(zero(Vec{dim,T}) * T(NaN), n_geom_basefuncs, n_qpoints)
+    dMdξ = fill(zero(Vec{rdim,T}) * T(NaN), n_geom_basefuncs, n_qpoints)
 
     for (qp, ξ) in enumerate(quad_rule.points)
         for i in 1:n_func_basefuncs
@@ -82,22 +82,26 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_
 
     detJdV = fill(T(NaN), n_qpoints)
 
-    CellScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule, func_interpol, geom_interpol)
+    CellScalarValues{sdim,rdim,T,shape}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule, func_interpol, geom_interpol)
 end
 
 # CellVectorValues
-struct CellVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: CellValues{dim,T,refshape}
-    N::Matrix{Vec{dim,T}}
-    dNdx::Matrix{Tensor{2,dim,T,M}}
-    dNdξ::Matrix{Tensor{2,dim,T,M}}
+# TODO remove the assumption that all dimensions have to match.
+#   rdim = reference element dimension
+#   sdim = spatial dimension
+#   vdim = vector dimension (i.e. dimension of evaluation of what value should return)
+struct CellVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: CellValues{dim,dim,T,refshape}
+    N::Matrix{Vec{dim,T}} # vdim
+    dNdx::Matrix{Tensor{2,dim,T,M}} # vdim × sdim
+    dNdξ::Matrix{Tensor{2,dim,T,M}} # vdim × rdim
     detJdV::Vector{T}
     M::Matrix{T}
-    dMdξ::Matrix{Vec{dim,T}}
-    qr::QuadratureRule{dim,refshape,T}
+    dMdξ::Matrix{Vec{dim,T}} # rdim
+    qr::QuadratureRule{dim,refshape,T} #rdim
     # The following fields are deliberately abstract -- they are never used in
     # performance critical code, just stored here for convenience.
-    func_interp::Interpolation{dim,refshape}
-    geo_interp::Interpolation{dim,refshape}
+    func_interp::Interpolation{dim,refshape} # rdim
+    geo_interp::Interpolation{dim,refshape} # rdim
 end
 
 function CellVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
@@ -165,6 +169,100 @@ function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,
         Jinv = inv(fecv_J)
         for j in 1:n_func_basefuncs
             cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
+        end
+    end
+end
+
+# Reinit for embedded surfaces.
+#
+# The transformation theorem for some function f on a 2D surface in 3D space leads to
+#   ∫ f ⋅ dS = ∫ f ⋅ (∂x/∂ξ₁ × ∂x/∂ξ₂) dξ₁dξ₂ = ∫ f ⋅ n ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂ dξ₁dξ₂
+# where ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂ is "detJ" and n is the unit normal.
+# See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
+# For more details see e.g. the doctoral thesis by Mirza Cenanovic **Finite element methods for surface problems* (2017), Ch. 2 **Trangential Calculus**.
+function reinit!(cv::CellValues{3,2}, x::AbstractVector{Vec{3,T}}) where {T}
+    n_geom_basefuncs = getngeobasefunctions(cv)
+    n_func_basefuncs = getnbasefunctions(cv)
+    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+
+    @inbounds for i in 1:length(cv.qr.weights)
+        w = cv.qr.weights[i]
+        fecv_J = zeros(Float64,3,2) # TODO replace with MixedTensor (see https://github.com/Ferrite-FEM/Tensors.jl/pull/188)
+        for j in 1:n_geom_basefuncs
+            #fecv_J += x[j] ⊗ cv.dMdξ[j, i] # TODO via Tensors.jl
+            for k in 1:3, l in 1:2
+                fecv_J[k,l] += x[j][k] * cv.dMdξ[j, i][l]
+            end
+        end
+        # "det(J) =" ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂
+        detJ = norm(fecv_J[:,1] × fecv_J[:,2])
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
+        cv.detJdV[i] = detJ * w
+        # Compute left inverse of J
+        Jinv = pinv(fecv_J)
+        for j in 1:n_func_basefuncs
+            #cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv # TODO via Tensors.jl
+            cv.dNdx[j, i] = Vec{3}(Jinv' * cv.dNdξ[j, i])
+        end
+    end
+end
+
+# Reinit for embedded curves.
+#
+# The transformation theorem for some function f on a 1D curve in 2D and 3D space leads to
+#   ∫ f ⋅ dE = ∫ f ⋅ ∂x/∂ξ dξ = ∫ f ⋅ t ||∂x/∂ξ||₂ dξ
+# where ||∂x/∂ξ||₂ is "detJ" and t is "the unit tangent".
+# See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
+function reinit!(cv::CellValues{2,1}, x::AbstractVector{Vec{2,T}}) where {T}
+    n_geom_basefuncs = getngeobasefunctions(cv)
+    n_func_basefuncs = getnbasefunctions(cv)
+    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+
+    @inbounds for i in 1:length(cv.qr.weights)
+        w = cv.qr.weights[i]
+        fecv_J = zeros(Float64,2,1) # TODO replace with MixedTensor (see https://github.com/Ferrite-FEM/Tensors.jl/pull/188)
+        for j in 1:n_geom_basefuncs
+            #fecv_J += x[j] ⊗ cv.dMdξ[j, i] # TODO via Tensors.jl
+            for k in 1:2, l in 1:1
+                fecv_J[k,l] += x[j][k] * cv.dMdξ[j, i][l]
+            end
+        end
+        # "det(J) =" ||∂x/∂ξ||₂
+        detJ = norm(fecv_J)
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
+        cv.detJdV[i] = detJ * w
+        # Compute left inverse of J
+        Jinv = pinv(fecv_J)
+        for j in 1:n_func_basefuncs
+            #cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv # TODO via Tensors.jl
+            cv.dNdx[j, i] = Vec{2}(Jinv' * cv.dNdξ[j, i])
+        end
+    end
+end
+
+function reinit!(cv::CellValues{3,1}, x::AbstractVector{Vec{3,T}}) where {T}
+    n_geom_basefuncs = getngeobasefunctions(cv)
+    n_func_basefuncs = getnbasefunctions(cv)
+    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+
+    @inbounds for i in 1:length(cv.qr.weights)
+        w = cv.qr.weights[i]
+        fecv_J = zeros(Float64,3,1) # TODO replace with MixedTensor (see https://github.com/Ferrite-FEM/Tensors.jl/pull/188)
+        for j in 1:n_geom_basefuncs
+            #fecv_J += x[j] ⊗ cv.dMdξ[j, i] # TODO via Tensors.jl
+            for k in 1:3, l in 1:1
+                fecv_J[k,l] += x[j][k] * cv.dMdξ[j, i][l]
+            end
+        end
+        # "det(J) =" ||∂x/∂ξ||₂
+        detJ = norm(fecv_J)
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
+        cv.detJdV[i] = detJ * w
+        # Compute left inverse of J
+        Jinv = pinv(fecv_J)
+        for j in 1:n_func_basefuncs
+            #cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv # TODO via Tensors.jl
+            cv.dNdx[j, i] = Vec{3}(Jinv' * cv.dNdξ[j, i])
         end
     end
 end

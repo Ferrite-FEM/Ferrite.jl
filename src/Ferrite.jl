@@ -25,9 +25,9 @@ struct RefPrism <: AbstractRefShape end
 """
 Abstract type which has `CellValues` and `FaceValues` as subtypes
 """
-abstract type Values{dim,T,refshape} end
-abstract type CellValues{dim,T,refshape} <: Values{dim,T,refshape} end
-abstract type FaceValues{dim,T,refshape} <: Values{dim,T,refshape} end
+abstract type Values{sdim,rdim,T,refshape} end
+abstract type CellValues{sdim,rdim,T,refshape} <: Values{sdim,rdim,T,refshape} end
+abstract type FaceValues{sdim,rdim,T,refshape} <: Values{sdim,rdim,T,refshape} end
 
 """
 Abstract type which is used as identifier for faces, edges and verices

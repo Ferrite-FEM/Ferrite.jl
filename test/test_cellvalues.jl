@@ -160,4 +160,93 @@ end
     @test_throws ArgumentError function_divergence(cvv, qp, ue)
 end
 
+@testset "Embedded elements" begin
+    @testset "Scalar on curves" begin
+        ue = [-1.5, 2.0]
+        ip = Lagrange{1,RefCube,1}()
+        qr = QuadratureRule{1,RefCube}(1)
+        # Reference values
+        csv1 = CellScalarValues(qr, ip)
+        reinit!(csv1, [Vec((0.0,)), Vec((1.0,))])
+
+        ## Consistency with 1D
+        csv2 = CellScalarValues(qr, ip, ip, 2)
+        reinit!(csv2, [Vec((0.0, 0.0)), Vec((1.0, 0.0))])
+        # Test spatial interpolation
+        @test spatial_coordinate(csv2, 1, [Vec((0.0, 0.0)), Vec((1.0, 0.0))]) == Vec{2}((0.5, 0.0))
+        # Test volume
+        @test getdetJdV(csv1, 1) == getdetJdV(csv2, 1)
+        # Test flip
+        @test shape_value(csv1, 1, 1) == shape_value(csv2, 1, 1)
+        @test shape_value(csv1, 1, 2) == shape_value(csv2, 1, 2)
+        # Test evals
+        @test function_value(csv1, 1, ue) == function_value(csv2, 1, ue)
+        @test function_gradient(csv1, 1, ue)[1] == function_gradient(csv2, 1, ue)[1]
+        @test 0.0 == function_gradient(csv2, 1, ue)[2]
+
+        ## Consistency with 1D
+        csv3 = CellScalarValues(qr, ip, ip, 3)
+        reinit!(csv3, [Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0))])
+        # Test spatial interpolation
+        @test spatial_coordinate(csv3, 1, [Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0))]) == Vec{3}((0.5, 0.0, 0.0))
+        # Test volume
+        @test getdetJdV(csv1, 1) == getdetJdV(csv3, 1)
+        # Test flip
+        @test shape_value(csv1, 1, 1) == shape_value(csv3, 1, 1)
+        @test shape_value(csv1, 1, 2) == shape_value(csv3, 1, 2)
+        # Test evals
+        @test function_value(csv1, 1, ue) == function_value(csv3, 1, ue)
+        @test function_gradient(csv1, 1, ue)[1] == function_gradient(csv3, 1, ue)[1]
+        @test 0.0 == function_gradient(csv3, 1, ue)[2]
+        @test 0.0 == function_gradient(csv3, 1, ue)[3]
+
+        ## Consistency in 2D
+        reinit!(csv2, [Vec((-1.0, 2.0)), Vec((3.0, -4.0))])
+        reinit!(csv3, [Vec((-1.0, 2.0, 0.0)), Vec((3.0, -4.0, 0.0))])
+        # Test spatial interpolation
+        @test spatial_coordinate(csv2, 1, [Vec((-1.0, 2.0)), Vec((3.0, -4.0))]) == Vec{2}((1.0, -1.0))
+        @test spatial_coordinate(csv3, 1, [Vec((-1.0, 2.0, 0.0)), Vec((3.0, -4.0, 0.0))]) == Vec{3}((1.0, -1.0, 0.0))
+        # Test volume
+        @test getdetJdV(csv2, 1) == getdetJdV(csv3, 1)
+        # Test evals
+        @test function_value(csv2, 1, ue) == function_value(csv3, 1, ue)
+        @test function_gradient(csv2, 1, ue)[1] == function_gradient(csv3, 1, ue)[1]
+        @test function_gradient(csv2, 1, ue)[2] == function_gradient(csv3, 1, ue)[2]
+        @test                               0.0 == function_gradient(csv3, 1, ue)[3]
+        ## Change plane
+        reinit!(csv3, [Vec((-1.0, 0.0, 2.0)), Vec((3.0, 0.0, -4.0))])
+        # Test spatial interpolation
+        @test spatial_coordinate(csv3, 1, [Vec((-1.0, 0.0, 2.0)), Vec((3.0, 0.0, -4.0))]) == Vec{3}((1.0, 0.0, -1.0))        
+        # Test volume
+        @test getdetJdV(csv2, 1) == getdetJdV(csv3, 1)
+        # Test evals
+        @test function_value(csv2, 1, ue) == function_value(csv3, 1, ue)
+        @test function_gradient(csv2, 1, ue)[1] == function_gradient(csv3, 1, ue)[1]
+        @test                               0.0 == function_gradient(csv3, 1, ue)[2]
+        @test function_gradient(csv2, 1, ue)[2] == function_gradient(csv3, 1, ue)[3]
+    end
+
+    @testset "Scalar on surface" begin
+        ue = [-1.5, 2.0, 3.0, -1.0]
+        rdim = 2
+        qp = 1
+        ip = Lagrange{rdim,RefCube,1}()
+        qr = QuadratureRule{rdim,RefCube}(1)
+        csv2 = CellScalarValues(qr, ip, ip, 2)
+        csv3 = CellScalarValues(qr, ip, ip, 3)
+        reinit!(csv2, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))])
+        reinit!(csv3, [Vec((-1.0,-1.0,0.0)), Vec((1.0,-1.0,0.0)), Vec((1.0,1.0,0.0)), Vec((-1.0,1.0,0.0))])
+        # Test spatial interpolation
+        @test spatial_coordinate(csv2, 1, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))]) == Vec{2}((0.0, 0.0))
+        @test spatial_coordinate(csv3, 1, [Vec((-1.0,-1.0,0.0)), Vec((1.0,-1.0,0.0)), Vec((1.0,1.0,0.0)), Vec((-1.0,1.0,0.0))]) == Vec{3}((0.0, 0.0, 0.0))
+        # Test volume
+        @test getdetJdV(csv2, 1) == getdetJdV(csv3, 1)
+        # Test evals
+        @test function_value(csv2, 1, ue) == function_value(csv3, 1, ue)
+        @test function_gradient(csv2, 1, ue)[1] == function_gradient(csv3, 1, ue)[1]
+        @test function_gradient(csv2, 1, ue)[2] == function_gradient(csv3, 1, ue)[2]
+        @test                               0.0 == function_gradient(csv3, 1, ue)[3]
+    end
+end
+
 end # of testset

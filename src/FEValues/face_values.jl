@@ -40,14 +40,14 @@ For a scalar field, the `FaceScalarValues` type should be used. For vector field
 FaceValues, FaceScalarValues, FaceVectorValues
 
 # FaceScalarValues
-struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{dim,T,refshape}
+struct FaceScalarValues{sdim,rdim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{sdim,rdim,T,refshape}
     N::Array{T,3}
-    dNdx::Array{Vec{dim,T},3}
-    dNdξ::Array{Vec{dim,T},3}
+    dNdx::Array{Vec{sdim,T},3}
+    dNdξ::Array{Vec{rdim,T},3}
     detJdV::Matrix{T}
-    normals::Vector{Vec{dim,T}}
+    normals::Vector{Vec{sdim,T}}
     M::Array{T,3}
-    dMdξ::Array{Vec{dim,T},3}
+    dMdξ::Array{Vec{rdim,T},3}
     # 'Any' is 'dim-1' here -- this is deliberately abstractly typed. Only qr.weights is
     # accessed in performance critical code so this doesn't seem to be a problem in
     # practice since qr.weights is correctly inferred as Vector{T}, and T is a parameter
@@ -56,39 +56,38 @@ struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{di
     current_face::ScalarWrapper{Int}
     # The following fields are deliberately abstract -- they are never used in
     # performance critical code, just stored here for convenience.
-    func_interp::Interpolation{dim,refshape}
-    geo_interp::Interpolation{dim,refshape}
+    func_interp::Interpolation{rdim,refshape}
+    geo_interp::Interpolation{rdim,refshape}
 end
 
+# FIXME sdim should be something like `getdim(value(geo_interpol))``
 function FaceScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
-                          geom_interpol::Interpolation=func_interpol)
+                          geom_interpol::Interpolation=func_interpol,sdim::Int=getdim(func_interpol))
     FaceScalarValues(Float64, quad_rule, func_interpol, geom_interpol)
 end
+# FIXME sdim should be something like `getdim(value(geo_interpol))``
+function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{rdim_qr,shape}, func_interpol::Interpolation{rdim},
+        geom_interpol::Interpolation{rdim,shape}=func_interpol,sdim::Int=getdim(func_interpol)) where {rdim_qr,rdim,T,shape<:AbstractRefShape}
 
-function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol) where {dim_qr,T,shape<:AbstractRefShape}
-
-    @assert getdim(func_interpol) == getdim(geom_interpol)
-    @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
     n_qpoints = length(getweights(quad_rule))
-    dim = dim_qr + 1
+    @assert rdim == rdim_qr + 1
 
     face_quad_rule = create_face_quad_rule(quad_rule, func_interpol)
     n_faces = length(face_quad_rule)
 
     # Normals
-    normals = zeros(Vec{dim,T}, n_qpoints)
+    normals = zeros(Vec{sdim,T}, n_qpoints)
 
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(func_interpol)
     N =    fill(zero(T)          * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
-    dNdx = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
-    dNdξ = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    dNdx = fill(zero(Vec{sdim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    dNdξ = fill(zero(Vec{rdim,T}) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
     M =    fill(zero(T)          * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
-    dMdξ = fill(zero(Vec{dim,T}) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
+    dMdξ = fill(zero(Vec{rdim,T}) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
 
     for face in 1:n_faces, (qp, ξ) in enumerate(face_quad_rule[face].points)
         for i in 1:n_func_basefuncs
@@ -101,11 +100,11 @@ function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, fu
 
     detJdV = fill(T(NaN), n_qpoints, n_faces)
 
-    FaceScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule, ScalarWrapper(0), func_interpol, geom_interpol)
+    FaceScalarValues{sdim,rdim,T,shape}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, quad_rule, ScalarWrapper(0), func_interpol, geom_interpol)
 end
 
 # FaceVectorValues
-struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: FaceValues{dim,T,refshape}
+struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: FaceValues{dim,dim,T,refshape}
     N::Array{Vec{dim,T},3}
     dNdx::Array{Tensor{2,dim,T,M},3}
     dNdξ::Array{Tensor{2,dim,T,M},3}
