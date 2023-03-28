@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Support reordering dofs of a `MixedDofHandler` by the built-in orderings `FieldWise` and
    `ComponentWise`. This includes support for reordering dofs of fields on subdomains.
    ([#645][github-645])
+ - Support specifying the coupling between fields in a `MixedDofHandler` when creating the
+   sparsity pattern. ([#650][github-650])
+ - Support Metis dof reordering with coupling information for `MixedDofHandler`.
+   ([#650][github-650])
 
 ## [0.3.13] - 2023-03-23
 ### Added
@@ -376,6 +380,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-621]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/621
 [github-633]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/633
 [github-645]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/645
+[github-650]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/650
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.13...HEAD
 [0.3.13]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.12...v0.3.13
