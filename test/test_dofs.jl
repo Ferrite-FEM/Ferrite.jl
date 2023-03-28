@@ -397,6 +397,11 @@ end
         @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}())
         renumber!(dh, DofOrder.Ext{Metis}(coupling=[true true; true false]))
         @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}(coupling=[true true; true false]))
+        dh, ch = testdhch(MixedDofHandler)
+        renumber!(dh, DofOrder.Ext{Metis}())
+        @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}())
+        renumber!(dh, DofOrder.Ext{Metis}(coupling=[true true; true false]))
+        @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}(coupling=[true true; true false]))
     end
 end
 
@@ -492,4 +497,42 @@ end
     @test_throws ErrorException("coupling not square") create_sparsity_pattern(dh; coupling=[true true])
     @test_throws ErrorException("coupling not symmetric") create_symmetric_sparsity_pattern(dh; coupling=[true true; false true])
     @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
+
+    # Test coupling with subdomains
+    grid = generate_grid(Quadrilateral, (1, 2))
+    dh = MixedDofHandler(grid)
+    fh1 = FieldHandler(
+        [Field(:u, Lagrange{2,RefCube,1}(), 2), Field(:p, Lagrange{2,RefCube,1}(), 2)],
+        Set(1)
+    )
+    add!(dh, fh1)
+    fh2 = FieldHandler(
+        [Field(:u, Lagrange{2,RefCube,1}(), 2)],
+        Set(2)
+    )
+    add!(dh, fh2)
+    close!(dh)
+    K = create_sparsity_pattern(dh; coupling = [true true; true false])
+    KS = create_symmetric_sparsity_pattern(dh; coupling = [true true; true false])
+    # Subdomain 1: u and p
+    udofs = celldofs(dh, 1)[dof_range(fh1, :u)]
+    pdofs = celldofs(dh, 1)[dof_range(fh1, :p)]
+    for j in udofs, i in Iterators.flatten((udofs, pdofs))
+        @test is_stored(K, i, j)
+        @test is_stored(KS, i, j) == (i <= j)
+    end
+    for j in pdofs, i in udofs
+        @test is_stored(K, i, j)
+        @test is_stored(KS, i, j)
+    end
+    for j in pdofs, i in pdofs
+        @test is_stored(K, i, j) == (i == j)
+        @test is_stored(KS, i, j) == (i == j)
+    end
+    # Subdomain 2: u
+    udofs = celldofs(dh, 2)[dof_range(fh2, :u)]
+    for j in udofs, i in udofs
+        @test is_stored(K, i, j)
+        @test is_stored(KS, i, j) == (i <= j)
+    end
 end

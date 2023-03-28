@@ -5,7 +5,6 @@ module FerriteMetis
 if VERSION >= v"1.10.0-DEV.90"
 
 using Ferrite
-using Ferrite: AbstractDofHandler
 using Metis.LibMetis: idx_t
 using Metis: Metis
 using SparseArrays: sparse
@@ -30,42 +29,51 @@ function DofOrder.Ext{Metis}(;
 end
 
 function Ferrite.compute_renumber_permutation(
-    dh::AbstractDofHandler,
+    dh::Union{DofHandler,MixedDofHandler},
     ch::Union{ConstraintHandler,Nothing},
     order::DofOrder.Ext{Metis}
 )
 
     # Expand the coupling matrix to size ndofs_per_cell × ndofs_per_cell
     coupling = order.coupling
-    if coupling === nothing
-        n = ndofs_per_cell(dh)
-        entries_per_cell = n * (n - 1)
-    else # coupling !== nothing
+    if coupling !== nothing
         # Set sym = true since Metis.permutation requires a symmetric graph.
         # TODO: Perhaps just symmetrize it: coupling = coupling' .| coupling
-        coupling = Ferrite._coupling_to_local_dof_coupling(dh, coupling, #= sym =# true)
-        # Compute entries per cell, subtract diagonal elements
-        entries_per_cell =
-            count(coupling[i, j] for i in axes(coupling, 1), j in axes(coupling, 2) if i != j)
+        couplings = Ferrite._coupling_to_local_dof_coupling(dh, coupling, #= sym =# true)
     end
 
     # Create the CSR (CSC, but pattern is symmetric so equivalent) using
     # Metis.idx_t as the integer type
-    L = entries_per_cell * getncells(dh.grid)
-    I = Vector{idx_t}(undef, L)
-    J = Vector{idx_t}(undef, L)
+    buffer_length = 0
+    for (fhi, fh) in pairs(dh isa DofHandler ? (dh, ) : dh.fieldhandlers)
+        set = fh isa DofHandler ? (1:getncells(dh.grid)) : fh.cellset
+        n = ndofs_per_cell(dh, first(set)) # TODO: ndofs_per_cell(fh)
+        entries_per_cell = if coupling === nothing
+            n * (n - 1)
+        else
+            count(couplings[fhi][i, j] for i in 1:n, j in 1:n if i != j)
+        end
+        buffer_length += entries_per_cell * length(set)
+    end
+    I = Vector{idx_t}(undef, buffer_length)
+    J = Vector{idx_t}(undef, buffer_length)
     idx = 0
-    @inbounds for cc in CellIterator(dh)
-        dofs = celldofs(cc)
-        for (i, dofi) in pairs(dofs), (j, dofj) in pairs(dofs)
-            dofi == dofj && continue # Metis doesn't want the diagonal
-            coupling === nothing || coupling[i, j] || continue
-            idx += 1
-            I[idx] = dofi
-            J[idx] = dofj
+
+    for (fhi, fh) in pairs(dh isa DofHandler ? (dh, ) : dh.fieldhandlers)
+        coupling === nothing || (coupling_fh = couplings[fhi])
+        set = fh isa DofHandler ? (1:getncells(dh.grid)) : fh.cellset
+        for cc in CellIterator(dh, set)
+            dofs = celldofs(cc)
+            for (j, dofj) in pairs(dofs), (i, dofi) in pairs(dofs)
+                dofi == dofj && continue # Metis doesn't want the diagonal
+                coupling === nothing || coupling_fh[i, j] || continue
+                idx += 1
+                I[idx] = dofi
+                J[idx] = dofj
+            end
         end
     end
-    @assert idx == L
+    @assert length(I) == length(J) == idx
     N = ndofs(dh)
     # TODO: Use spzeros! in Julia 1.10.
     S = sparse(I, J, zeros(Float32, length(I)), N, N)

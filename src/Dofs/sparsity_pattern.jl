@@ -56,31 +56,45 @@ end
 # ii) (ncomponents × ncomponents) specifying coupling between components, or iii)
 # (ndofs_per_cell × ndofs_per_cell) specifying coupling between all local dofs, i.e. a
 # "template" local matrix.
-function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatrix{Bool}, sym::Bool)
-    out = zeros(Bool, ndofs_per_cell(dh), ndofs_per_cell(dh))
+function _coupling_to_local_dof_coupling(dh::Union{DofHandler,MixedDofHandler}, coupling::AbstractMatrix{Bool}, sym::Bool)
     sz = size(coupling, 1)
     sz == size(coupling, 2) || error("coupling not square")
     sym && (issymmetric(coupling) || error("coupling not symmetric"))
-    dof_ranges = [dof_range(dh, f) for f in dh.field_names]
-    if sz == length(dh.field_names) # Coupling given by fields
-        for (j, jrange) in pairs(dof_ranges), (i, irange) in pairs(dof_ranges)
-            out[irange, jrange] .= coupling[i, j]
-        end
-    elseif sz == sum(dh.field_dims) # Coupling given by components
-        component_offsets = pushfirst!(cumsum(dh.field_dims), 0)
-        for (jf, jrange) in pairs(dof_ranges), (j, J) in pairs(jrange)
-            jc = mod1(j, dh.field_dims[jf]) + component_offsets[jf]
-            for (i_f, irange) in pairs(dof_ranges), (i, I) in pairs(irange)
-                ic = mod1(i, dh.field_dims[i_f]) + component_offsets[i_f]
-                out[I, J] = coupling[ic, jc]
+
+    # Return one matrix per (potential) sub-domain
+    outs = Matrix{Bool}[]
+    field_dims = map(fieldname -> getfielddim(dh, fieldname), dh.field_names)
+
+    for fh in (dh isa DofHandler ? (dh,) : dh.fieldhandlers)
+        ci = dh isa DofHandler ? 1 : first(fh.cellset)
+        out = zeros(Bool, ndofs_per_cell(dh, ci), ndofs_per_cell(dh, ci))
+        push!(outs, out)
+
+        field_names = fh isa DofHandler ? fh.field_names : (f.name for f in fh.fields)
+        dof_ranges = [dof_range(fh, f) for f in field_names]
+        global_idxs = [findfirst(x -> x === f, dh.field_names) for f in field_names]
+
+        if sz == length(dh.field_names) # Coupling given by fields
+            for (j, jrange) in pairs(dof_ranges), (i, irange) in pairs(dof_ranges)
+                out[irange, jrange] .= coupling[global_idxs[i], global_idxs[j]]
             end
+        elseif sz == sum(field_dims) # Coupling given by components
+            component_offsets = pushfirst!(cumsum(field_dims), 0)
+            for (jf, jrange) in pairs(dof_ranges), (j, J) in pairs(jrange)
+                jc = mod1(j, field_dims[global_idxs[jf]]) + component_offsets[global_idxs[jf]]
+                for (i_f, irange) in pairs(dof_ranges), (i, I) in pairs(irange)
+                    ic = mod1(i, field_dims[global_idxs[i_f]]) + component_offsets[global_idxs[i_f]]
+                    out[I, J] = coupling[ic, jc]
+                end
+            end
+        elseif sz == ndofs_per_cell(dh, ci) # Coupling given by template local matrix
+            # TODO: coupling[fieldhandler_idx] if different template per subddomain
+            out .= coupling
+        else
+            error("could not create coupling")
         end
-    elseif sz == ndofs_per_cell(dh) # Coupling given by template local matrix
-        out .= coupling
-    else
-        error("could not create coupling")
     end
-    return out
+    return outs
 end
 
 function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool, keep_constrained::Bool, coupling::Union{AbstractMatrix{Bool},Nothing})
@@ -88,51 +102,60 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     if !keep_constrained
         @assert ch !== nothing && isclosed(ch)
     end
-    ncells = getncells(dh.grid)
     if coupling !== nothing
         # Extend coupling to be of size (ndofs_per_cell × ndofs_per_cell)
-        coupling = _coupling_to_local_dof_coupling(dh, coupling, sym)
+        couplings = _coupling_to_local_dof_coupling(dh, coupling, sym)
     end
-    # Compute approximate size for the buffers using the dofs in the first element
-    n = ndofs_per_cell(dh)
-    N = (coupling === nothing ? (sym ? div(n*(n+1), 2) : n^2) : count(coupling)) * ncells
-    N += ndofs(dh) # always add the diagonal elements
-    I = Int[]; resize!(I, N)
-    J = Int[]; resize!(J, N)
-    global_dofs = zeros(Int, n)
-    cnt = 0
-    for element_id in 1:ncells
-        # MixedDofHandler might have varying number of dofs per element
-        resize!(global_dofs, ndofs_per_cell(dh, element_id))
-        celldofs!(global_dofs, dh, element_id)
-        @inbounds for j in eachindex(global_dofs), i in eachindex(global_dofs)
-            coupling === nothing || coupling[i, j] || continue
-            dofi = global_dofs[i]
-            dofj = global_dofs[j]
-            sym && (dofi > dofj && continue)
-            !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
-            cnt += 1
-            if cnt > length(J)
-                resize!(I, trunc(Int, length(I) * 1.5))
-                resize!(J, trunc(Int, length(J) * 1.5))
-            end
-            I[cnt] = dofi
-            J[cnt] = dofj
 
+    # Allocate buffers. Compute an upper bound for the buffer length and allocate it all up
+    # front since they will become large and expensive to re-allocate. The bound is exact
+    # when keeping constrained dofs (default) and if not it only over-estimates with number
+    # of entries eliminated by constraints.
+    max_buffer_length = ndofs(dh) # diagonal elements
+    for (fhi, fh) in pairs(dh isa DofHandler ? (dh, ) : dh.fieldhandlers)
+        set = fh isa DofHandler ? (1:getncells(dh.grid)) : fh.cellset
+        n = ndofs_per_cell(dh, first(set)) # TODO: ndofs_per_cell(fh)
+        entries_per_cell = if coupling === nothing
+            sym ? div(n * (n + 1), 2) : n^2
+        else
+            count(couplings[fhi][i, j] for i in 1:n for j in (sym ? i : 1):n)
+        end
+        max_buffer_length += entries_per_cell * length(set)
+    end
+    I = Vector{Int}(undef, max_buffer_length)
+    J = Vector{Int}(undef, max_buffer_length)
+    global_dofs = Int[]
+    cnt = 0
+
+    for (fhi, fh) in pairs(dh isa DofHandler ? (dh, ) : dh.fieldhandlers)
+        coupling === nothing || (coupling_fh = couplings[fhi])
+        set = fh isa DofHandler ? (1:getncells(dh.grid)) : fh.cellset
+        n = ndofs_per_cell(dh, first(set)) # TODO: ndofs_per_cell(fh)
+        resize!(global_dofs, n)
+        @inbounds for element_id in set
+            celldofs!(global_dofs, dh, element_id)
+            for j in eachindex(global_dofs), i in eachindex(global_dofs)
+                coupling === nothing || coupling_fh[i, j] || continue
+                dofi = global_dofs[i]
+                dofj = global_dofs[j]
+                sym && (dofi > dofj && continue)
+                !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
+                cnt += 1
+                I[cnt] = dofi
+                J[cnt] = dofj
+            end
         end
     end
+
+    # Always add diagonal entries
+    resize!(I, cnt + ndofs(dh))
+    resize!(J, cnt + ndofs(dh))
     @inbounds for d in 1:ndofs(dh)
         cnt += 1
-        if cnt > length(J)
-            resize!(I, trunc(Int, length(I) + ndofs(dh)))
-            resize!(J, trunc(Int, length(J) + ndofs(dh)))
-        end
         I[cnt] = d
         J[cnt] = d
     end
-
-    resize!(I, cnt)
-    resize!(J, cnt)
+    @assert length(I) == length(J) == cnt
 
     K = spzeros!!(Float64, I, J, ndofs(dh), ndofs(dh))
 
