@@ -710,69 +710,6 @@ end
     return dofcoeffs[idx]
 end
 
-# Similar to Ferrite._condense!(K, ch), but only add the non-zero entries to K (that arises from the condensation process)
-function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, dofmapping::Dict{Int,Int}, keep_constrained::Bool) where T
-    ndofs = size(K, 1)
-
-    # Return early if there are no non-trivial affine constraints
-    any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
-
-    # Adding new entries to K is extremely slow, so create a new sparsity triplet for the
-    # condensed sparsity pattern
-    N = 2 * length(dofcoefficients) # TODO: Better size estimate for additional condensed sparsity pattern.
-    I = Int[]; resize!(I, N)
-    J = Int[]; resize!(J, N)
-
-    cnt = 0
-    for col in 1:ndofs
-        col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
-        if col_coeffs === nothing
-            !keep_constrained && haskey(dofmapping, col) && continue
-            for ri in nzrange(K, col)
-                row = K.rowval[ri]
-                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
-                row_coeffs === nothing && continue
-                for (d, _) in row_coeffs
-                    cnt += 1
-                    _add_or_grow(cnt, I, J, d, col)
-                end
-            end
-        else
-            for ri in nzrange(K, col)
-                row = K.rowval[ri]
-                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
-                if row_coeffs === nothing
-                    !keep_constrained && haskey(dofmapping, row) && continue
-                    for (d, _) in col_coeffs
-                        cnt += 1
-                        _add_or_grow(cnt, I, J, row, d)
-                    end
-                else
-                    for (d1, _) in col_coeffs
-                        !keep_constrained && haskey(dofmapping, d1) && continue
-                        for (d2, _) in row_coeffs
-                            !keep_constrained && haskey(dofmapping, d2) && continue
-                            cnt += 1
-                            _add_or_grow(cnt, I, J, d1, d2)
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    resize!(I, cnt)
-    resize!(J, cnt)
-
-    # Fill the sparse matrix with a non-zero value so that :+ operation does not remove entries with value zero.
-    K2 = spzeros!!(Float64, I, J, ndofs, ndofs)
-    fill!(K2.nzval, 1)
-
-    K .+= K2
-
-    return nothing
-end
-
 # Condenses K and f: C'*K*C, C'*f, in-place assuming the sparsity pattern is correct
 function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int,Int}, sym::Bool=false) where T
 
@@ -987,27 +924,6 @@ function _in_cellset(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int}; a
         end
     end
     return all # if not returned by now and all==false, then no `cellid`s where in cellset
-end
-
-"""
-    create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler, coupling)
-
-Create a symmetric sparsity pattern accounting for affine constraints in `ch`. See 
-the Affine Constraints section of the manual for further details. 
-"""
-function create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
-        keep_constrained::Bool=true, coupling=nothing)
-    return Symmetric(_create_sparsity_pattern(dh, ch, true, keep_constrained, coupling), :U)
-end
-"""
-    create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling)
-
-Create a sparsity pattern accounting for affine constraints in `ch`. See 
-the Affine Constraints section of the manual for further details. 
-"""
-function create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
-        keep_constrained::Bool=true, coupling=nothing)
-    return _create_sparsity_pattern(dh, ch, false, keep_constrained, coupling)
 end
 
 struct PeriodicFacePair
