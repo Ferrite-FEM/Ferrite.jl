@@ -306,7 +306,7 @@ function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomo
     return ch
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where {Index<:BoundaryIndex}
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::IntSet=1:getncells(ch.dh.grid)) where {Index<:BoundaryIndex}
     local_face_dofs, local_face_dofs_offset =
         _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundarydof_indices(eltype(bcfaces)))
     copy!(dbc.local_face_dofs, local_face_dofs)
@@ -352,7 +352,7 @@ function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, b
     return local_face_dofs, local_face_dofs_offset
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::IntSet=1:getncells(ch.dh.grid))
     if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
@@ -897,7 +897,7 @@ end
 
 # If all==true, return true only if all items in faceset/nodeset are in the cellset
 # If all==false, return true if some items in faceset/nodeset are in the cellset
-function _in_cellset(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex}; all=true)
+function _in_cellset(::AbstractGrid, cellset::IntSet, faceset::Set{<:BoundaryIndex}; all=true)
     for (cellid,faceid) in faceset
         if cellid in cellset
             all || return true
@@ -908,7 +908,7 @@ function _in_cellset(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryI
     return all # if not returned by now and all==false, then no `cellid`s where in cellset
 end
 
-function _in_cellset(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int}; all=true)
+function _in_cellset(grid::AbstractGrid, cellset::IntSet, nodeset::Set{Int}; all=true)
     nodes = Set{Int}()
     for cellid in cellset
         for nodeid in grid.cells[cellid].nodes

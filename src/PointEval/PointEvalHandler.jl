@@ -258,7 +258,7 @@ function _get_point_values!(
     ph::PointEvalHandler,
     dh::AbstractDofHandler,
     ip::Interpolation,
-    cellset::Union{Nothing, Set{Int}},
+    cellset::Union{Nothing, IntSet},
     fdim::Val{fielddim},
     dofrange::AbstractRange{Int},
     ) where {T2,T,fielddim}

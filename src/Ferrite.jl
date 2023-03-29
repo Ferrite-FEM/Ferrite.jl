@@ -62,6 +62,9 @@ struct VertexIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
 
+# Integer collections with unique entries
+const IntSet = Union{AbstractSet{<:Integer}, UnitRange{<:Integer}}
+
 include("utils.jl")
 
 # Matrix/Vector utilities
