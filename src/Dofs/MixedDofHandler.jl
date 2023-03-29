@@ -1,3 +1,5 @@
+abstract type AbstractDofHandler end
+
 """
     Field(name::Symbol, interpolation::Interpolation, dim::Int)
 
@@ -69,6 +71,15 @@ function Base.show(io::IO, ::MIME"text/plain", dh::MixedDofHandler)
         print(io, "  Total dofs: ", ndofs(dh))
     end
 end
+
+isclosed(dh::AbstractDofHandler) = dh.closed[]
+
+"""
+    ndofs(dh::AbstractDofHandler)
+
+Return the number of degrees of freedom in `dh`
+"""
+ndofs(dh::AbstractDofHandler) = dh.ndofs[]
 
 """
     ndofs_per_cell(dh::AbstractDofHandler[, cell::Int=1])
@@ -424,6 +435,49 @@ function add_cell_dofs(cell_dofs, field_dim, ncelldofs, nextdof)
 end
 
 """
+    sortedge(edge::Tuple{Int,Int})
+
+Returns the unique representation of an edge and its orientation.
+Here the unique representation is the sorted node index tuple. The
+orientation is `true` if the edge is not flipped, where it is `false`
+if the edge is flipped.
+"""
+function sortedge(edge::Tuple{Int,Int})
+    a, b = edge
+    a < b ? (return (edge, true)) : (return ((b, a), false))
+end
+
+"""
+    sortface(face::Tuple{Int,Int}) 
+    sortface(face::Tuple{Int,Int,Int})
+    sortface(face::Tuple{Int,Int,Int,Int})
+
+Returns the unique representation of a face.
+Here the unique representation is the sorted node index tuple.
+Note that in 3D we only need indices to uniquely identify a face,
+so the unique representation is always a tuple length 3.
+"""
+sortface(face::Tuple{Int,Int}) = minmax(face[1], face[2])
+function sortface(face::Tuple{Int,Int,Int})
+    a, b, c = face
+    b, c = minmax(b, c)
+    a, c = minmax(a, c)
+    a, b = minmax(a, b)
+    return (a, b, c)
+end
+function sortface(face::Tuple{Int,Int,Int,Int})
+    a, b, c, d = face
+    c, d = minmax(c, d)
+    b, d = minmax(b, d)
+    a, d = minmax(a, d)
+    b, c = minmax(b, c)
+    a, c = minmax(a, c)
+    a, b = minmax(a, b)
+    return (a, b, c)
+end
+
+
+"""
     find_field(dh::MixedDofHandler, field_name::Symbol)::NTuple{2,Int}
 
 Return the index of the field with name `field_name` in a `MixedDofHandler`. The index is a
@@ -565,6 +619,13 @@ end
 getfieldinterpolation(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].interpolation
 getfieldinterpolation(fh::FieldHandler, field_name::Symbol) = getfieldinterpolation(fh, find_field(fh, field_name))
 
+"""
+    reshape_to_nodes(dh::AbstractDofHandler, u::Vector{T}, fieldname::Symbol) where T
+
+Reshape the entries of the dof-vector `u` which correspond to the field `fieldname` in nodal order.
+Return a matrix with a column for every node and a row for every dimension of the field.
+For superparametric fields only the entries corresponding to nodes of the grid will be returned. Do not use this function for subparametric approximations.
+"""
 function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) where T
     # make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
@@ -580,6 +641,26 @@ function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) 
         offset = field_offset(fh, field_idx)
 
         reshape_field_data!(data, dh, u, offset, field_dim, fh.cellset)
+    end
+    return data
+end
+
+function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=1:getncells(dh.grid)) where T
+
+    for cell in CellIterator(dh, cellset, UpdateFlags(; nodes=true, coords=false, dofs=true))
+        _celldofs = celldofs(cell)
+        counter = 1
+        for node in getnodes(cell)
+            for d in 1:field_dim
+                data[d, node] = u[_celldofs[counter + field_offset]]
+                @debug println("  exporting $(u[_celldofs[counter + field_offset]]) for dof#$(_celldofs[counter + field_offset])")
+                counter += 1
+            end
+            if field_dim == 2
+                # paraview requires 3D-data so pad with zero
+                data[3, node] = 0
+            end
+        end
     end
     return data
 end
