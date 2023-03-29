@@ -8,6 +8,7 @@ using SparseArrays
 using Base: @propagate_inbounds
 using NearestNeighbors
 using EnumX
+using OrderedCollections: OrderedSet
 
 include("exports.jl")
 

@@ -23,7 +23,7 @@ function L2Projector(fe_values::Ferrite.Values, interp::Interpolation,
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
     dh = MixedDofHandler(grid)
     field = Field(:_, interp, 1)
-    fh = FieldHandler([field], Set(set))
+    fh = FieldHandler([field], set)
     add!(dh, fh)
     _, vertex_dict, _, _ = __close!(dh)
 
@@ -80,7 +80,7 @@ function L2Projector(
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
     dh = MixedDofHandler(grid)
     field = Field(:_, func_ip, 1) # we need to create the field, but the interpolation is not used here
-    fh = FieldHandler([field], Set(set))
+    fh = FieldHandler([field], set)
     add!(dh, fh)
     _, vertex_dict, _, _ = __close!(dh)
 
