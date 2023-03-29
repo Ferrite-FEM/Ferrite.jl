@@ -293,10 +293,6 @@ end
 
 cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, dh.grid, i)
 
-function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
-    vtk_grid(filename, dh.grid; compress=compress)
-end
-
 function reshape_to_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol) where T
     # make sure the field exists
     fieldname ∈ Ferrite.getfieldnames(dh) || error("Field $fieldname not found.")
