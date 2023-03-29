@@ -608,6 +608,13 @@ end
 getfieldinterpolation(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].interpolation
 getfieldinterpolation(fh::FieldHandler, field_name::Symbol) = getfieldinterpolation(fh, find_field(fh, field_name))
 
+"""
+    reshape_to_nodes(dh::AbstractDofHandler, u::Vector{T}, fieldname::Symbol) where T
+
+Reshape the entries of the dof-vector `u` which correspond to the field `fieldname` in nodal order.
+Return a matrix with a column for every node and a row for every dimension of the field.
+For superparametric fields only the entries corresponding to nodes of the grid will be returned. Do not use this function for subparametric approximations.
+"""
 function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) where T
     # make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
