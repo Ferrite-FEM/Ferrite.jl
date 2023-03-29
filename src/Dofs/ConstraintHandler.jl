@@ -1098,7 +1098,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
                      "Dirichlet boundary condition on the relevant nodeset.",
                      :PeriodicDirichlet)
         all_node_idxs = Set{Int}()
-        Tx = get_coordinate_type(getnodes(grid, getnodes(getcells(grid, first(face_map).mirror[1]), 1)))
+        Tx = get_coordinate_type(getnodes(grid, getcells(grid, 1).nodes[1]))
         min_x = Tx(i -> typemax(eltype(Tx)))
         max_x = Tx(i -> typemin(eltype(Tx)))
         for facepair in face_map, faceidx in (facepair.mirror, facepair.image)
