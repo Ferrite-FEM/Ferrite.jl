@@ -75,6 +75,13 @@ end
 isclosed(dh::AbstractDofHandler) = dh.closed[]
 
 """
+    getgrid(dh::AbstractDofHandler)
+
+Return the grid on which the dof handler acts.
+"""
+getgrid(dh::AbstractDofHandler) = dh.grid
+
+"""
     ndofs(dh::AbstractDofHandler)
 
 Return the number of degrees of freedom in `dh`

@@ -1106,14 +1106,14 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
             nodes = faces(grid.cells[cellidx])[faceidx]
             union!(all_node_idxs, nodes)
             for n in nodes
-                x = grid.nodes[n].x
+                x = getcoordinates(getnodes(grid, n))
                 min_x = Tx(i -> min(min_x[i], x[i]))
                 max_x = Tx(i -> max(max_x[i], x[i]))
             end
         end
         all_node_idxs_v = collect(all_node_idxs)
         points = construct_cornerish(min_x, max_x)
-        tree = KDTree(Tx[grid.nodes[i].x for i in all_node_idxs_v])
+        tree = KDTree(Tx[getcoordinates(getnodes(grid, i)) for i in all_node_idxs_v])
         idxs, _ = NearestNeighbors.nn(tree, points)
         corner_set = Set{Int}(all_node_idxs_v[i] for i in idxs)
 
@@ -1387,12 +1387,12 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
     if length(mset) != length(mset)
         error("different number of faces in mirror and image set")
     end
-    Tx = typeof(first(grid.nodes).x)
+    Tx = typeof(getcoordinates(first(getnodes(grid))))
 
     mirror_mean_x = Tx[]
     for (c, f) in mset
         fn = faces(grid.cells[c])[f]
-        push!(mirror_mean_x, sum(grid.nodes[i].x for i in fn) / length(fn))
+        push!(mirror_mean_x, sum(getcoordinates(getnodes(grid,i)) for i in fn) / length(fn))
     end
 
     # Same dance for the image
@@ -1400,7 +1400,7 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
     for (c, f) in iset
         fn = faces(grid.cells[c])[f]
         # Apply transformation to all coordinates
-        push!(image_mean_x, sum(transformation(grid.nodes[i].x)::Tx for i in fn) / length(fn))
+        push!(image_mean_x, sum(transformation(getcoordinates(getnodes(grid,i)))::Tx for i in fn) / length(fn))
     end
 
     # Use KDTree to find closest face
@@ -1477,16 +1477,16 @@ function __periodic_options(::T) where T <: Vec{3}
 end
 
 function __outward_normal(grid::Grid{2}, nodes, transformation::F=identity) where F <: Function
-    n1::Vec{2} = transformation(grid.nodes[nodes[1]].x)
-    n2::Vec{2} = transformation(grid.nodes[nodes[2]].x)
+    n1::Vec{2} = transformation(getcoordinates(getnodes(grid, nodes[1])))
+    n2::Vec{2} = transformation(getcoordinates(getnodes(grid, nodes[2])))
     n = Vec{2}((n2[2] - n1[2], - n2[1] + n1[1]))
     return n / norm(n)
 end
 
 function __outward_normal(grid::Grid{3}, nodes, transformation::F=identity) where F <: Function
-    n1::Vec{3} = transformation(grid.nodes[nodes[1]].x)
-    n2::Vec{3} = transformation(grid.nodes[nodes[2]].x)
-    n3::Vec{3} = transformation(grid.nodes[nodes[3]].x)
+    n1::Vec{3} = transformation(transformation(getcoordinates(getnodes(grid, nodes[1]))))
+    n2::Vec{3} = transformation(transformation(getcoordinates(getnodes(grid, nodes[2]))))
+    n3::Vec{3} = transformation(transformation(getcoordinates(getnodes(grid, nodes[3]))))
     n = (n3 - n2) × (n1 - n2)
     return n / norm(n)
 end
@@ -1512,10 +1512,10 @@ function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_
     end
 
     # 2. Find the periodic direction using the vector between the midpoint of the faces
-    xmi = sum(grid.nodes[i].x for i in nodes_i) / length(nodes_i)
-    xmj = sum(grid.nodes[i].x for i in nodes_j) / length(nodes_j)
+    xmi = sum(getcoordinates(getnodes(grid, i)) for i in nodes_i) / length(nodes_i)
+    xmj = sum(getcoordinates(getnodes(grid, i)) for i in nodes_j) / length(nodes_j)
     xmij = xmj - xmi
-    h = 2 * norm(xmj - grid.nodes[nodes_j[1]].x) # Approximate element size
+    h = 2 * norm(xmj - getcoordinates(getnodes(grid, nodes_j[1]))) # Approximate element size
     TOLh = TOL * h
     found = false
     local len
@@ -1531,11 +1531,11 @@ function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_
     # 3. Check that the first node of fj have a corresponding node in fi
     #    In this method faces are mirrored (opposite normal vectors) so reverse the nodes
     nodes_i = circshift_tuple(reverse(nodes_i), 1)
-    xj = grid.nodes[nodes_j[1]].x
+    xj = getcoordinates(getnodes(grid, nodes_j[1]))
     node_rot = 0
     found = false
     for i in eachindex(nodes_i)
-        xi = grid.nodes[nodes_i[i]].x
+        xi = getcoordinates(getnodes(grid, nodes_i[1]))
         xij = xj - xi
         if norm(xij - xmij) < TOLh
             found = true
@@ -1547,8 +1547,8 @@ function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_
 
     # 4. Check the remaining nodes for the same criteria, now with known node_rot
     for j in 2:length(nodes_j)
-        xi = grid.nodes[nodes_i[mod1(j + node_rot, end)]].x
-        xj = grid.nodes[nodes_j[j]].x
+        xi = getcoordinates(getnodes(grid, nodes_i[mod1(j + node_rot, end)]))
+        xj = getcoordinates(getnodes(grid, nodes_j[j]))
         xij = xj - xi
         if norm(xij - xmij) >= TOLh
             return nothing
@@ -1594,14 +1594,14 @@ function __check_periodic_faces_f(grid::Grid, fi::FaceIndex, fj::FaceIndex, xmi,
 
     # 2. Compute the relative rotation
     xmij = xmj - xmi
-    h = 2 * norm(xmj - grid.nodes[nodes_j[1]].x) # Approximate element size
+    h = 2 * norm(xmj - getcoordinates(getnodes(grid, nodes_j[1]))) # Approximate element size
     TOLh = TOL * h
     nodes_i = mirror ? circshift_tuple(reverse(nodes_i), 1) : nodes_i # reverse if necessary
-    xj = transformation(grid.nodes[nodes_j[1]].x)
+    xj = transformation(getcoordinates(getnodes(grid, nodes_j[1])))
     node_rot = 0
     found = false
     for i in eachindex(nodes_i)
-        xi = grid.nodes[nodes_i[i]].x
+        xi = getcoordinates(getnodes(grid, nodes_i[i]))
         xij = xj - xi
         if norm(xij - xmij) < TOLh
             found = true

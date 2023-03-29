@@ -26,7 +26,7 @@ getcoordinates(n::Node) = n.x
 
 Get the data type of the the node coordinate.
 """
-get_coordinate_type(::Node{dim,T}) = Vec{dim,T}
+get_coordinate_type(::Node{dim,T}) where {dim,T}  = Vec{dim,T}
 
 """
     get_coordinate_eltype(::Node)
