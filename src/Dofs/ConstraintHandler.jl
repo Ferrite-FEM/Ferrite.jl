@@ -1387,7 +1387,7 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
     if length(mset) != length(mset)
         error("different number of faces in mirror and image set")
     end
-    Tx = typeof(getcoordinates(first(getnodes(grid))))
+    Tx = get_coordinate_type(first(getnodes(grid)))
 
     mirror_mean_x = Tx[]
     for (c, f) in mset
@@ -1484,9 +1484,9 @@ function __outward_normal(grid::Grid{2}, nodes, transformation::F=identity) wher
 end
 
 function __outward_normal(grid::Grid{3}, nodes, transformation::F=identity) where F <: Function
-    n1::Vec{3} = transformation(transformation(getcoordinates(getnodes(grid, nodes[1]))))
-    n2::Vec{3} = transformation(transformation(getcoordinates(getnodes(grid, nodes[2]))))
-    n3::Vec{3} = transformation(transformation(getcoordinates(getnodes(grid, nodes[3]))))
+    n1::Vec{3} = transformation(getcoordinates(getnodes(grid, nodes[1])))
+    n2::Vec{3} = transformation(getcoordinates(getnodes(grid, nodes[2])))
+    n3::Vec{3} = transformation(getcoordinates(getnodes(grid, nodes[3])))
     n = (n3 - n2) × (n1 - n2)
     return n / norm(n)
 end
@@ -1513,7 +1513,7 @@ function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_
 
     # 2. Find the periodic direction using the vector between the midpoint of the faces
     xmi = sum(getcoordinates(getnodes(grid, i)) for i in nodes_i) / length(nodes_i)
-    xmj = sum(getcoordinates(getnodes(grid, i)) for i in nodes_j) / length(nodes_j)
+    xmj = sum(getcoordinates(getnodes(grid, j)) for j in nodes_j) / length(nodes_j)
     xmij = xmj - xmi
     h = 2 * norm(xmj - getcoordinates(getnodes(grid, nodes_j[1]))) # Approximate element size
     TOLh = TOL * h
@@ -1535,7 +1535,7 @@ function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_
     node_rot = 0
     found = false
     for i in eachindex(nodes_i)
-        xi = getcoordinates(getnodes(grid, nodes_i[1]))
+        xi = getcoordinates(getnodes(grid, nodes_i[i]))
         xij = xj - xi
         if norm(xij - xmij) < TOLh
             found = true
