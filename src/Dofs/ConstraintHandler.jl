@@ -242,7 +242,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
     if length(dbc.faces) == 0
         @warn("adding Dirichlet Boundary Condition to set containing 0 entities")
     end
-    celltype = getcelltype(ch.dh.grid)
+    celltype = getcelltype(getgrid(ch.dh))
     @assert isconcretetype(celltype)
 
     # Extract stuff for the field
@@ -306,7 +306,7 @@ function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomo
     return ch
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where {Index<:BoundaryIndex}
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(getgrid(ch.dh)))) where {Index<:BoundaryIndex}
     local_face_dofs, local_face_dofs_offset =
         _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundarydof_indices(eltype(bcfaces)))
     copy!(dbc.local_face_dofs, local_face_dofs)
@@ -352,13 +352,14 @@ function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, b
     return local_face_dofs, local_face_dofs_offset
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
-    if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(getgrid(ch.dh))))
+    grid = getgrid(ch.dh)
+    if interpolation !== default_interpolation(typeof(getcells(grid, first(cellset))))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
 
     ncomps = length(dbc.components)
-    nnodes = getnnodes(ch.dh.grid)
+    nnodes = getnnodes(grid)
     interpol_points = getnbasefunctions(interpolation)
     node_dofs = zeros(Int, ncomps, nnodes)
     visited = falses(nnodes)
@@ -485,7 +486,7 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, nodes::Set{Int}
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where T
     counter = 1
     for (idx, nodenumber) in enumerate(nodeidxs)
-        x = dh.grid.nodes[nodenumber].x
+        x = getcoordinates(getnodes(getgrid(dh), nodenumber))
         bc_value = f(x, time)
         @assert length(bc_value) == length(components)
         for v in bc_value
@@ -513,13 +514,13 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
 
     for field in unique_fields
         nd = ndim(ch.dh, field)
-        data = zeros(Float64, nd, getnnodes(ch.dh.grid))
+        data = zeros(Float64, nd, getnnodes(getgrid(ch.dh)))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
             if eltype(dbc.faces) <: BoundaryIndex
                 functype = boundaryfunction(eltype(dbc.faces))
                 for (cellidx, faceidx) in dbc.faces
-                    for facenode in functype(ch.dh.grid.cells[cellidx])[faceidx]
+                    for facenode in functype(getcells(getgrid(ch.dh), cellidx))[faceidx]
                         for component in dbc.components
                             data[component, facenode] = 1
                         end
@@ -851,7 +852,7 @@ end
 function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
     dbc_added = false
     for fh in ch.dh.fieldhandlers
-        if !isnothing(_find_field(fh, dbc.field_name)) && _in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=false)
+        if !isnothing(_find_field(fh, dbc.field_name)) && _in_cellset(getgrid(ch.dh), fh.cellset, dbc.faces; all=false)
             # Dofs in `dbc` not in `fh` will be removed, hence `dbc.faces` must be copied.
             # Recreating the `dbc` will create a copy of `dbc.faces`.
             # In this case, add! will warn, unless `warn_not_in_cellset=false`
@@ -867,11 +868,11 @@ function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
 end
 
 function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_not_in_cellset=true)
-    if warn_not_in_cellset && !(_in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=true))
+    if warn_not_in_cellset && !(_in_cellset(getgrid(ch.dh), fh.cellset, dbc.faces; all=true))
         @warn("You are trying to add a constraint a face/edge/node that is not in the cellset of the fieldhandler. This location will be skipped")
     end
 
-    celltype = getcelltype(ch.dh.grid, first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
+    celltype = getcelltype(getgrid(ch.dh), first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
 
     # Extract stuff for the field
     field_idx = find_field(fh, dbc.field_name)
@@ -986,7 +987,7 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     is_legacy = !isempty(pdbc.face_pairs) && isempty(pdbc.face_map)
     if is_legacy
         for (mset, iset) in pdbc.face_pairs
-            collect_periodic_faces!(pdbc.face_map, ch.dh.grid, mset, iset, identity) # TODO: Better transform
+            collect_periodic_faces!(pdbc.face_map, getgrid(ch.dh), mset, iset, identity) # TODO: Better transform
         end
     end
     field_idx = find_field(ch.dh, pdbc.field_name)
@@ -1024,9 +1025,8 @@ end
 
 function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::Interpolation,
                field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T},Nothing}, ::Type{dof_map_t}, iterator_f::F) where {T, dof_map_t, F <: Function}
-    grid = ch.dh.grid
+    grid = getgrid(ch.dh)
     face_map = pdbc.face_map
-    Tx = typeof(first(ch.dh.grid.nodes).x) # Vec{D,T}
 
     # Indices of the local dofs for the faces
     local_face_dofs, local_face_dofs_offset =
@@ -1098,6 +1098,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
                      "Dirichlet boundary condition on the relevant nodeset.",
                      :PeriodicDirichlet)
         all_node_idxs = Set{Int}()
+        Tx = get_coordinate_type(getnodes(grid, getnodes(getcells(grid, first(face_map).mirror[1]), 1)))
         min_x = Tx(i -> typemax(eltype(Tx)))
         max_x = Tx(i -> typemin(eltype(Tx)))
         for facepair in face_map, faceidx in (facepair.mirror, facepair.image)

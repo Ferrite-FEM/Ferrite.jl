@@ -1,18 +1,18 @@
 
 function _default_interpolations(dh::MixedDofHandler)
     fhs = dh.fieldhandlers
-    getcelltype(i) = typeof(getcells(dh.grid, first(fhs[i].cellset)))
+    getcelltype(i) = typeof(getcells(getgrid(dh), first(fhs[i].cellset)))
     ntuple(i -> default_interpolation(getcelltype(i)), length(fhs))
 end
 
 function _default_interpolation(dh::DofHandler)
-    return default_interpolation(typeof(getcells(dh.grid, 1)))
+    return default_interpolation(typeof(getcells(getgrid(dh), 1)))
 end
 
 """
     apply_analytical!(
         a::AbstractVector, dh::AbstractDofHandler, fieldname::Symbol, 
-        f::Function, cellset=1:getncells(dh.grid))
+        f::Function, cellset=1:getncells(getgrid(dh)))
 
 Apply a solution `f(x)` by modifying the values in the degree of freedom vector `a`
 pertaining to the field `fieldname` for all cells in `cellset`.
@@ -32,7 +32,7 @@ This function can be used to apply initial conditions for time dependent problem
 """
 function apply_analytical!(
     a::AbstractVector, dh::DofHandler, fieldname::Symbol, f::Function,
-    cellset = 1:getncells(dh.grid))
+    cellset = 1:getncells(getgrid(dh)))
 
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
     ip_geo = _default_interpolation(dh)
@@ -45,7 +45,7 @@ end
 
 function apply_analytical!(
     a::AbstractVector, dh::MixedDofHandler, fieldname::Symbol, f::Function,
-    cellset = 1:getncells(dh.grid))
+    cellset = 1:getncells(getgrid(dh)))
 
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
     ip_geos = _default_interpolations(dh)
@@ -65,7 +65,7 @@ function _apply_analytical!(
     a::Vector, dh::AbstractDofHandler, celldofinds, field_dim,
     ip_fun::Interpolation{dim,RefShape}, ip_geo::Interpolation, f::Function, cellset) where {dim, RefShape}
 
-    coords = getcoordinates(dh.grid, first(cellset))
+    coords = getcoordinates(getgrid(dh), first(cellset))
     ref_points = reference_coordinates(ip_fun)
     dummy_weights = zeros(length(ref_points))
     qr = QuadratureRule{dim, RefShape}(dummy_weights, ref_points)
@@ -77,7 +77,7 @@ function _apply_analytical!(
     length(f(first(coords))) == field_dim || error("length(f(x)) must be equal to dimension of the field ($field_dim)")
 
     for cellnr in cellset
-        getcoordinates!(coords, dh.grid, cellnr)
+        getcoordinates!(coords, getgrid(dh), cellnr)
         celldofs!(c_dofs, dh, cellnr)
         for (i, celldofind) in enumerate(celldofinds)
             f_dofs[i] = c_dofs[celldofind]

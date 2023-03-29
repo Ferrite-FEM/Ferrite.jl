@@ -13,10 +13,23 @@ struct Node{dim,T}
     x::Vec{dim,T}
 end
 Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
+
+"""
+    getcoordinates(::Node)
+    
+Get the value of the node coordinate.
+"""
 getcoordinates(n::Node) = n.x
 
 """
-    Ferrite.get_coordinate_eltype(::Node)
+    get_coordinate_type(::Node)
+
+Get the data type of the the node coordinate.
+"""
+get_coordinate_type(::Node{dim,T}) = Vec{dim,T}
+
+"""
+    get_coordinate_eltype(::Node)
 
 Get the data type of the components of the nodes coordinate.
 """

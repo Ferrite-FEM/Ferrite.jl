@@ -101,7 +101,7 @@ The field is added to all cells of the underlying grid. In case no interpolation
 given, the default interpolation of the grid's celltype is used. If the grid uses several
 celltypes, [`add!(dh::MixedDofHandler, fh::FieldHandler)`](@ref) must be used instead.
 """
-function add!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
+function add!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_interpolation(getcelltype(getgrid(dh))))
     @assert !isclosed(dh)
     @assert !in(name, dh.field_names)
     push!(dh.field_names, name)
@@ -111,7 +111,7 @@ function add!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation=default_
 end
 
 # Method for supporting dim=1 default
-function add!(dh::DofHandler, name::Symbol, ip::Interpolation=default_interpolation(getcelltype(dh.grid)))
+function add!(dh::DofHandler, name::Symbol, ip::Interpolation=default_interpolation(getcelltype(getgrid(dh))))
     return add!(dh, name, 1, ip)
 end
 
@@ -127,7 +127,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     # `vertexdict` keeps track of the visited vertices. The first dof added to vertex v is
     # stored in vertexdict[v]
     # TODO: No need to allocate this vector for fields that don't have vertex dofs
-    vertexdicts = [zeros(Int, getnnodes(dh.grid)) for _ in 1:nfields(dh)]
+    vertexdicts = [zeros(Int, getnnodes(getgrid(dh))) for _ in 1:nfields(dh)]
 
     # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem
     # An edge is determined from two vertices, but we also need to store the direction
@@ -161,7 +161,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     push!(dh.cell_dofs_offset, 1) # dofs for the first cell start at 1
 
     # loop over all the cells, and distribute dofs for all the fields
-    for (ci, cell) in enumerate(getcells(dh.grid))
+    for (ci, cell) in enumerate(getcells(getgrid(dh)))
         @debug println("cell #$ci")
         for field_idx in 1:nfields(dh)
             interpolation_info = interpolation_infos[field_idx]
@@ -291,7 +291,7 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     return global_dofs
 end
 
-cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, dh.grid, i)
+cellcoords!(global_coords::Vector{<:Vec}, dh::DofHandler, i::Int) = cellcoords!(global_coords, getgrid(dh), i)
 
 function reshape_to_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol) where T
     # make sure the field exists
@@ -302,7 +302,7 @@ function reshape_to_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol) where
     field_dim = getfielddim(dh, field_idx)
 
     space_dim = field_dim == 2 ? 3 : field_dim
-    data = fill(zero(T), space_dim, getnnodes(dh.grid))
+    data = fill(zero(T), space_dim, getnnodes(getgrid(dh)))
 
     reshape_field_data!(data, dh, u, offset, field_dim)
 

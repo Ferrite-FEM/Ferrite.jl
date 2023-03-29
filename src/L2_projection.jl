@@ -104,7 +104,7 @@ end
 
 function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
     println(io, typeof(proj))
-    println(io, "  projection on:           ", length(proj.set), "/", getncells(proj.dh.grid), " cells in grid")
+    println(io, "  projection on:           ", length(proj.set), "/", getncells(getgrid(proj.dh)), " cells in grid")
     println(io, "  function interpolation:  ", proj.func_ip)
     println(io, "  geometric interpolation: ", proj.geom_ip)
 end
@@ -131,7 +131,7 @@ function _assemble_L2_matrix(fe_values, set, dh)
         celldofs!(cell_dofs, dh, cellnum)
 
         fill!(Me, 0)
-        Xe = getcoordinates(dh.grid, cellnum)
+        Xe = getcoordinates(getgrid(dh), cellnum)
         reinit!(fe_values, Xe)
 
         ## ∭( v ⋅ u )dΩ
@@ -213,7 +213,7 @@ function project(proj::L2Projector,
     projected_vals = _project(vars, proj, fe_values, M, T)::Vector{T}
     if project_to_nodes
         # NOTE we may have more projected values than verticies in the mesh => not all values are returned
-        nnodes = getnnodes(proj.dh.grid)
+        nnodes = getnnodes(getgrid(proj.dh))
         reordered_vals = fill(convert(T, NaN * zero(T)), nnodes)
         for node = 1:nnodes
             if (k = proj.node2dof_map[node]; k != 0)
@@ -248,7 +248,7 @@ function _project(vars, proj::L2Projector, fe_values::Values, M::Integer, ::Type
     for (ic,cellnum) in enumerate(proj.set)
         celldofs!(cell_dofs, proj.dh, cellnum)
         fill!(fe, 0)
-        Xe = getcoordinates(proj.dh.grid, cellnum)
+        Xe = getcoordinates(getgrid(proj.dh), cellnum)
         cell_vars = vars[ic]
         reinit!(fe_values, Xe)
 
@@ -279,7 +279,7 @@ end
 
 function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, proj::L2Projector, vals::Vector{T}, name::AbstractString) where T
     data = reshape_to_nodes(proj, vals)
-    @assert size(data, 2) == getnnodes(proj.dh.grid)
+    @assert size(data, 2) == getnnodes(getgrid(proj.dh))
     vtk_point_data(vtk, data, name; component_names=component_names(T))
     return vtk
 end
@@ -295,7 +295,7 @@ function reshape_to_nodes(proj::L2Projector, vals::AbstractVector{S}) where {ord
     # can be any tensor field, however, the number of dofs should always match the length of vals
     @assert ndofs(dh) == length(vals)
     nout = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
-    data = fill(T(NaN), nout, getnnodes(dh.grid))
+    data = fill(T(NaN), nout, getnnodes(getgrid(dh)))
     for cell in CellIterator(dh, proj.set)
         _celldofs = celldofs(cell)
         @assert length(getnodes(cell)) == length(_celldofs)

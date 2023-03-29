@@ -109,7 +109,7 @@ vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellset::String) =
     vtk_cellset(vtk, grid, [cellset])
 
 function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
-    vtk_grid(filename, dh.grid; compress=compress)
+    vtk_grid(filename, getgrid(dh); compress=compress)
 end
 
 function WriteVTK.vtk_point_data(vtkfile, dh::AbstractDofHandler, u::Vector, suffix="")

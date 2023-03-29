@@ -113,7 +113,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     # of entries eliminated by constraints.
     max_buffer_length = ndofs(dh) # diagonal elements
     for (fhi, fh) in pairs(dh isa DofHandler ? (dh, ) : dh.fieldhandlers)
-        set = fh isa DofHandler ? (1:getncells(dh.grid)) : fh.cellset
+        set = fh isa DofHandler ? (1:getncells(getgrid(dh))) : fh.cellset
         n = ndofs_per_cell(dh, first(set)) # TODO: ndofs_per_cell(fh)
         entries_per_cell = if coupling === nothing
             sym ? div(n * (n + 1), 2) : n^2
@@ -130,7 +130,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
 
     for (fhi, fh) in pairs(dh isa DofHandler ? (dh, ) : dh.fieldhandlers)
         coupling === nothing || (coupling_fh = couplings[fhi])
-        set = fh isa DofHandler ? (1:getncells(dh.grid)) : fh.cellset
+        set = fh isa DofHandler ? (1:getncells(getgrid(dh))) : fh.cellset
         n = ndofs_per_cell(dh, first(set)) # TODO: ndofs_per_cell(fh)
         resize!(global_dofs, n)
         @inbounds for element_id in set

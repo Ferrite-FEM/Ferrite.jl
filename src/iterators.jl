@@ -58,12 +58,12 @@ function CellCache(grid::Grid{dim,C,T}, flags::UpdateFlags=UpdateFlags()) where 
 end
 
 function CellCache(dh::Union{DofHandler{dim},MixedDofHandler{dim}}, flags::UpdateFlags=UpdateFlags()) where {dim}
-    N = nnodes_per_cell(dh.grid)
+    N = nnodes_per_cell(getgrid(dh))
     nodes = zeros(Int, N)
-    coords = zeros(Vec{dim, get_coordinate_eltype(dh.grid)}, N)
+    coords = zeros(Vec{dim, get_coordinate_eltype(getgrid(dh))}, N)
     n = ndofs_per_cell(dh)
     celldofs = zeros(Int, n)
-    return CellCache(flags, dh.grid, ScalarWrapper(-1), nodes, coords, dh, celldofs)
+    return CellCache(flags, getgrid(dh), ScalarWrapper(-1), nodes, coords, dh, celldofs)
 end
 
 # TODO: Can always resize and combine the two reinit! methods maybe?
@@ -154,13 +154,13 @@ function CellIterator(gridordh::Union{Grid,AbstractDofHandler},
                       set::Union{IntegerCollection,Nothing}=nothing,
                       flags::UpdateFlags=UpdateFlags())
     if set === nothing
-        grid = gridordh isa AbstractDofHandler ? gridordh.grid : gridordh
+        grid = gridordh isa AbstractDofHandler ? getgrid(gridordh) : gridordh
         set = 1:getncells(grid)
     end
     if gridordh isa MixedDofHandler
         # TODO: Since the CellCache is resizeable this is not really necessary to check
         #       here, but might be useful to catch slow code paths?
-        _check_same_celltype(gridordh.grid, set)
+        _check_same_celltype(getgrid(gridordh), set)
     end
     return CellIterator(CellCache(gridordh, flags), set)
 end
