@@ -12,7 +12,7 @@ struct Field
 end
 
 """
-    FieldHandler(fields::Vector{Field}, cellset::Set{Int})
+    FieldHandler(fields::Vector{Field}, cellset)
 
 Construct a `FieldHandler` based on an array of [`Field`](@ref)s and assigns it a set of cells.
 
@@ -25,7 +25,14 @@ Notice that a `FieldHandler` can hold several fields.
 """
 mutable struct FieldHandler
     fields::Vector{Field}
-    cellset::Set{Int}
+    cellset::OrderedSet{Int}
+    function FieldHandler(fields::Vector{Field}, cellset::OrderedSet{Int})
+        return new(fields, sort!(cellset))
+    end
+end
+function FieldHandler(fields::Vector{Field}, set)
+    oset = OrderedSet{Int}(set)
+    return FieldHandler(fields, oset)
 end
 
 """
@@ -190,7 +197,7 @@ function add!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolation)
     @assert isconcretetype(celltype)
 
     if length(dh.fieldhandlers) == 0
-        cellset = Set(1:getncells(dh.grid))
+        cellset = 1:getncells(dh.grid)
         push!(dh.fieldhandlers, FieldHandler(Field[], cellset))
     elseif length(dh.fieldhandlers) > 1
         error("If you have more than one FieldHandler, you must specify field")
@@ -254,11 +261,9 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
 
     @debug "\n\nCreating dofs\n"
     for fh in dh.fieldhandlers
-        # sort the cellset since we want to loop through the cells in a fixed order
-        cellnumbers = sort(collect(fh.cellset))
         nextdof = _close!(
             dh,
-            cellnumbers,
+            fh.cellset,
             dh.field_names,
             fh.fields,
             nextdof,
