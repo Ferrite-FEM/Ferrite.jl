@@ -1,5 +1,3 @@
-abstract type AbstractDofHandler end
-
 """
     DofHandler(grid::Grid)
 

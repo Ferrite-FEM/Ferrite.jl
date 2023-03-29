@@ -1,3 +1,5 @@
+abstract type AbstractDofHandler end
+
 """
     Field(name::Symbol, interpolation::Interpolation, dim::Int)
 
