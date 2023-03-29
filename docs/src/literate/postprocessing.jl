@@ -46,7 +46,7 @@ include("heat_equation.jl");
 # Next we define a function that computes the heat flux for each integration point in the domain.
 # Fourier's law is adopted, where the conductivity tensor is assumed to be isotropic with unit
 # conductivity ``\lambda = 1 ⇒ q = - \nabla u``, where ``u`` is the temperature.
-function compute_heat_fluxes(cellvalues::CellScalarValues{dim,T}, dh::DofHandler, a) where {dim,T}
+function compute_heat_fluxes(cellvalues::CellScalarValues{dim,dim,T}, dh::DofHandler, a) where {dim,T}
 
     n = getnbasefunctions(cellvalues)
     cell_dofs = zeros(Int, n)
