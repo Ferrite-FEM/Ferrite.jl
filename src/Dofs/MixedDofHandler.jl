@@ -72,6 +72,8 @@ function Base.show(io::IO, ::MIME"text/plain", dh::MixedDofHandler)
     end
 end
 
+isclosed(dh::AbstractDofHandler) = dh.closed[]
+
 """
     ndofs(dh::AbstractDofHandler)
 
