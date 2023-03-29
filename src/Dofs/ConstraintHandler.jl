@@ -1098,7 +1098,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
                      "Dirichlet boundary condition on the relevant nodeset.",
                      :PeriodicDirichlet)
         all_node_idxs = Set{Int}()
-        Tx = get_coordinate_type(getnodes(grid, getcells(grid, 1).nodes[1]))
+        Tx = get_coordinate_type(grid)
         min_x = Tx(i -> typemax(eltype(Tx)))
         max_x = Tx(i -> typemin(eltype(Tx)))
         for facepair in face_map, faceidx in (facepair.mirror, facepair.image)
@@ -1387,7 +1387,7 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
     if length(mset) != length(mset)
         error("different number of faces in mirror and image set")
     end
-    Tx = get_coordinate_type(first(getnodes(grid)))
+    Tx = get_coordinate_type(grid)
 
     mirror_mean_x = Tx[]
     for (c, f) in mset

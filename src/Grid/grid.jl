@@ -411,6 +411,13 @@ end
 # Grid utility functions #
 ##########################
 """
+    get_coordinate_type(::AbstractGrid)
+
+Get the datatype for a single point in the grid.
+"""
+get_coordinate_type(grid::Grid{dim,C,T}) where {dim,C,T} = Vec{dim,T} # Node is baked into the mesh type.
+
+"""
     getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
     getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
     getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
