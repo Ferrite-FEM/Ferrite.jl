@@ -73,6 +73,13 @@ function Base.show(io::IO, ::MIME"text/plain", dh::MixedDofHandler)
 end
 
 """
+    ndofs(dh::AbstractDofHandler)
+
+Return the number of degrees of freedom in `dh`
+"""
+ndofs(dh::AbstractDofHandler) = dh.ndofs[]
+
+"""
     ndofs_per_cell(dh::AbstractDofHandler[, cell::Int=1])
 
 Return the number of degrees of freedom for the cell with index `cell`.
