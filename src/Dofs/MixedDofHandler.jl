@@ -633,3 +633,23 @@ function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) 
     end
     return data
 end
+
+function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=1:getncells(dh.grid)) where T
+
+    for cell in CellIterator(dh, cellset, UpdateFlags(; nodes=true, coords=false, dofs=true))
+        _celldofs = celldofs(cell)
+        counter = 1
+        for node in getnodes(cell)
+            for d in 1:field_dim
+                data[d, node] = u[_celldofs[counter + field_offset]]
+                @debug println("  exporting $(u[_celldofs[counter + field_offset]]) for dof#$(_celldofs[counter + field_offset])")
+                counter += 1
+            end
+            if field_dim == 2
+                # paraview requires 3D-data so pad with zero
+                data[3, node] = 0
+            end
+        end
+    end
+    return data
+end
