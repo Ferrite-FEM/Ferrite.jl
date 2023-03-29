@@ -60,7 +60,7 @@ struct ThreadCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: Hessia
     gradconf         ::GC
     hessconf         ::HC
 end
-function ThreadCache(dpc::Int, nodespercell, cvP::CellValues{DIM, T}, modelparams, elpotential) where {DIM, T}
+function ThreadCache(dpc::Int, nodespercell, cvP::CellValues{DIM, DIM, T}, modelparams, elpotential) where {DIM, T}
     element_indices  = zeros(Int, dpc)
     element_dofs     = zeros(dpc)
     element_gradient = zeros(dpc)
