@@ -118,7 +118,8 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
         entries_per_cell = if coupling === nothing
             sym ? div(n * (n + 1), 2) : n^2
         else
-            count(couplings[fhi][i, j] for i in 1:n for j in (sym ? i : 1):n)
+            coupling_fh = couplings[fhi]
+            count(coupling_fh[i, j] for i in 1:n for j in (sym ? i : 1):n)
         end
         max_buffer_length += entries_per_cell * length(set)
     end
