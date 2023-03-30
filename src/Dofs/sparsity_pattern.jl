@@ -130,7 +130,8 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
 
     for (fhi, fh) in pairs(dh isa DofHandler ? (dh, ) : dh.fieldhandlers)
         coupling === nothing || (coupling_fh = couplings[fhi])
-        set = fh isa DofHandler ? (1:getncells(dh.grid)) : fh.cellset
+        # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
+        set = fh isa DofHandler ? (1:getncells(dh.grid)) : BitSet(fh.cellset)
         n = ndofs_per_cell(dh, first(set)) # TODO: ndofs_per_cell(fh)
         resize!(global_dofs, n)
         @inbounds for element_id in set
