@@ -354,7 +354,7 @@ end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(getgrid(ch.dh))))
     grid = getgrid(ch.dh)
-    if interpolation !== default_interpolation(typeof(getcells(grid, first(cellset))))
+    if interpolation !== default_interpolation(getcelltype(grid, first(cellset)))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
 
