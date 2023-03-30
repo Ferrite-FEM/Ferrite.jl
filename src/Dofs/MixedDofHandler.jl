@@ -265,8 +265,8 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
 
     @debug "\n\nCreating dofs\n"
     for fh in dh.fieldhandlers
-        # sort the cellset since we want to loop through the cells in a fixed order
-        cellnumbers = sort(collect(fh.cellset))
+        # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
+        cellnumbers = BitSet(fh.cellset)
         nextdof = _close!(
             dh,
             cellnumbers,
