@@ -600,7 +600,7 @@ Returns all vertex sets of the grid.
 """
 @inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
 
-n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
+n_faces_per_cell(grid::Grid) = nfaces(getcelltype(grid))
 
 """
     function compute_vertex_values(grid::AbstractGrid, f::Function)

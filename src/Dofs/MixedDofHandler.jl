@@ -96,7 +96,14 @@ Return the number of degrees of freedom for the cell with index `cell`.
 See also [`ndofs`](@ref).
 """
 ndofs_per_cell(dh::MixedDofHandler, cell::Int=1) = dh.ndofs_per_cell[cell]
-nnodes_per_cell(dh::MixedDofHandler, cell::Int=1) = nnodes_per_cell(dh.grid, cell) # TODO: deprecate, shouldn't belong to MixedDofHandler any longer
+nnodes_per_cell(dh::MixedDofHandler, cell::Int=1) = nnodes_per_cell(getgrid(dh), cell) # TODO: deprecate, shouldn't belong to MixedDofHandler any longer
+
+"""
+    getcelltype(dh::MixedDofHandler, fh::FieldHandler)
+
+Shortcut to get the cell type of the field handler.
+"""
+getcelltype(dh::MixedDofHandler, fh::FieldHandler) = getcelltype(getgrid(dh), first(fh.cellset))
 
 """
     celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
@@ -125,11 +132,11 @@ end
 
 #TODO: perspectively remove in favor of `getcoordinates!(global_coords, grid, i)`?
 function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::MixedDofHandler, i::Union{Int, <:AbstractCell}) where {dim,T}
-    cellcoords!(global_coords, dh.grid, i)
+    cellcoords!(global_coords, getgrid(dh), i)
 end
 
 function cellnodes!(global_nodes::Vector{Int}, dh::MixedDofHandler, i::Union{Int, <:AbstractCell})
-    cellnodes!(global_nodes, dh.grid, i)
+    cellnodes!(global_nodes, getgrid(dh), i)
 end
 
 """
@@ -174,11 +181,11 @@ Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
 function add!(dh::MixedDofHandler, fh::FieldHandler)
     # TODO: perhaps check that a field with the same name is the same field?
     @assert !isclosed(dh)
-    _check_same_celltype(dh.grid, collect(fh.cellset))
+    _check_same_celltype(getgrid(dh), collect(fh.cellset))
     _check_cellset_intersections(dh, fh)
     # the field interpolations should have the same refshape as the cells they are applied to
     # extract the celltype from the first cell as the celltypes are all equal
-    cell_type = typeof(dh.grid.cells[first(fh.cellset)])
+    cell_type = getcelltype(getgrid(dh), first(fh.cellset))
     refshape_cellset = getrefshape(default_interpolation(cell_type))
     for field_idx  in eachindex(fh.fields)
         refshape = getrefshape(getfieldinterpolation(fh, field_idx))
@@ -196,7 +203,7 @@ function _check_cellset_intersections(dh::MixedDofHandler, fh::FieldHandler)
 end
 
 function add!(dh::MixedDofHandler, name::Symbol, dim::Int)
-    celltype = getcelltype(dh.grid)
+    celltype = getcelltype(getgrid(dh))
     isconcretetype(celltype) || error("If you have more than one celltype in Grid, you must use add!(dh::MixedDofHandler, fh::FieldHandler)")
     add!(dh, name, dim, default_interpolation(celltype))
 end
@@ -204,11 +211,11 @@ end
 function add!(dh::MixedDofHandler, name::Symbol, dim::Int, ip::Interpolation)
     @assert !isclosed(dh)
 
-    celltype = getcelltype(dh.grid)
+    celltype = getcelltype(getgrid(dh))
     @assert isconcretetype(celltype)
 
     if length(dh.fieldhandlers) == 0
-        cellset = Set(1:getncells(dh.grid))
+        cellset = Set(1:getncells(getgrid(dh)))
         push!(dh.fieldhandlers, FieldHandler(Field[], cellset))
     elseif length(dh.fieldhandlers) > 1
         error("If you have more than one FieldHandler, you must specify field")
@@ -252,7 +259,7 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
     # `vertexdict` keeps track of the visited vertices. The first dof added to vertex v is
     # stored in vertexdict[v]
     # TODO: No need to allocate this vector for fields that don't have vertex dofs
-    vertexdicts = [zeros(Int, getnnodes(dh.grid)) for _ in 1:numfields]
+    vertexdicts = [zeros(Int, getnnodes(getgrid(dh))) for _ in 1:numfields]
 
     # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem.
     # An edge is uniquely determined by two vertices, but we also need to store the
@@ -308,7 +315,7 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
     for ci in cellnumbers
         @debug "Creating dofs for cell #$ci"
 
-        cell = dh.grid.cells[ci]
+        cell = getcells(getgrid(dh), ci)
         len_cell_dofs = length(dh.cell_dofs)
         dh.cell_dofs_offset[ci] = len_cell_dofs + 1
 
@@ -639,7 +646,7 @@ function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) 
 
     field_dim = getfielddim(dh, fieldname)
     space_dim = field_dim == 2 ? 3 : field_dim
-    data = fill(T(NaN), space_dim, getnnodes(dh.grid))  # set default value
+    data = fill(T(NaN), space_dim, getnnodes(getgrid(dh)))  # set default value
 
     for fh in dh.fieldhandlers
         # check if this fh contains this field, otherwise continue to the next

@@ -1,12 +1,11 @@
 
 function _default_interpolations(dh::MixedDofHandler)
     fhs = dh.fieldhandlers
-    getcelltype(i) = getcelltype(getgrid(dh), first(fhs[i].cellset))
-    ntuple(i -> default_interpolation(getcelltype(i)), length(fhs))
+    ntuple(i -> default_interpolation(getcelltype(dh, fhs[i])), length(fhs))
 end
 
 function _default_interpolation(dh::DofHandler)
-    return default_interpolation(getcelltype(getgrid(dh), 1))
+    return default_interpolation(getcelltype(getgrid(dh)))
 end
 
 """
