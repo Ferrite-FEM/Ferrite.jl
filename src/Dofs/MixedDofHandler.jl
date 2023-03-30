@@ -28,6 +28,10 @@ Notice that a `FieldHandler` can hold several fields.
 mutable struct FieldHandler
     fields::Vector{Field}
     cellset::Set{Int}
+    ndofs_per_cell::Int # set in close(::DofHandler)
+    function FieldHandler(fields, cellset)
+        return new(fields, cellset, -1)
+    end
 end
 
 """
@@ -48,7 +52,7 @@ struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     #       cells in a FieldHandler have the same number of dofs.
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
-    ndofs_per_cell::Vector{Int}
+    cell_to_fieldhandler::Vector{Int} # maps cell id -> fieldhandler id
     closed::ScalarWrapper{Bool}
     grid::G
     ndofs::ScalarWrapper{Int}
@@ -88,7 +92,10 @@ Return the number of degrees of freedom for the cell with index `cell`.
 
 See also [`ndofs`](@ref).
 """
-ndofs_per_cell(dh::MixedDofHandler, cell::Int=1) = dh.ndofs_per_cell[cell]
+function ndofs_per_cell(dh::MixedDofHandler, cell::Int=1)
+    @boundscheck 1 <= cell <= getncells(dh.grid)
+    return @inbounds dh.fieldhandlers[dh.cell_to_fieldhandler[cell]].ndofs_per_cell
+end
 nnodes_per_cell(dh::MixedDofHandler, cell::Int=1) = nnodes_per_cell(dh.grid, cell) # TODO: deprecate, shouldn't belong to MixedDofHandler any longer
 
 """
@@ -264,10 +271,10 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
     nextdof = 1  # next free dof to distribute
 
     @debug "\n\nCreating dofs\n"
-    for fh in dh.fieldhandlers
+    for (fhi, fh) in pairs(dh.fieldhandlers)
         # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
         cellnumbers = BitSet(fh.cellset)
-        nextdof = _close!(
+        nextdof, ndofs_per_cell = _close!(
             dh,
             cellnumbers,
             dh.field_names,
@@ -277,6 +284,13 @@ function __close!(dh::MixedDofHandler{dim}) where {dim}
             edgedicts,
             facedicts,
         )
+        fh.ndofs_per_cell = ndofs_per_cell
+        # TODO: This could be done in the loop inside _close!(...)
+        for i in cellnumbers
+            # TODO: _check_cellset_intersections can be removed in favor of this assertion
+            @assert dh.cell_to_fieldhandler[i] == 0
+            dh.cell_to_fieldhandler[i] = fhi
+        end
     end
     dh.ndofs[] = maximum(dh.cell_dofs; init=0)
     dh.closed[] = true
@@ -297,13 +311,20 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
         dim == 3 && @assert !any(x -> x > 1, ip_info.nfacedofs)
     end
 
+    # TODO: Given the InterpolationInfo it should be possible to compute ndofs_per_cell, but
+    # doesn't quite work for embedded elements right now (they don't distribute all dofs
+    # "promised" by InterpolationInfo). Instead we compute it based on the number of dofs
+    # added for the first cell in the set.
+    first_cell = true
+    ndofs_per_cell = -1
+
     # loop over all the cells, and distribute dofs for all the fields
     for ci in cellnumbers
         @debug "Creating dofs for cell #$ci"
 
         cell = dh.grid.cells[ci]
-        len_cell_dofs = length(dh.cell_dofs)
-        dh.cell_dofs_offset[ci] = len_cell_dofs + 1
+        len_cell_dofs_start = length(dh.cell_dofs)
+        dh.cell_dofs_offset[ci] = len_cell_dofs_start + 1
 
         for (local_num, field) in pairs(fields)
         # for (local_num, field_name) in enumerate(field_names)
@@ -342,12 +363,16 @@ function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fiel
             )
         end
 
-        # Store number of dofs that were added
-        dh.ndofs_per_cell[ci] = length(dh.cell_dofs) - len_cell_dofs
+        if first_cell
+            ndofs_per_cell = length(dh.cell_dofs) - len_cell_dofs_start
+            first_cell = false
+        else
+            @assert ndofs_per_cell == length(dh.cell_dofs) - len_cell_dofs_start
+        end
 
         # @debug "Dofs for cell #$ci:\n\t$cell_dofs"
     end # cell loop
-    return nextdof
+    return nextdof, ndofs_per_cell
 end
 
 function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, nextdof)
