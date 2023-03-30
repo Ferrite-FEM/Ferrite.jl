@@ -308,7 +308,7 @@ end
 
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where {Index<:BoundaryIndex}
     local_face_dofs, local_face_dofs_offset =
-        _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundaryfunction(eltype(bcfaces)))
+        _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundarydof_indices(eltype(bcfaces)))
     copy!(dbc.local_face_dofs, local_face_dofs)
     copy!(dbc.local_face_dofs_offset, local_face_dofs_offset)
 
@@ -337,7 +337,7 @@ end
 
 # Calculate which local dof index live on each face:
 # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
-function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F=faces) where F
+function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F=facedof_indices) where F
     @assert issorted(components)
     local_face_dofs = Int[]
     local_face_dofs_offset = Int[1]
@@ -442,24 +442,23 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
     return nothing
 end
 
-# for faces
-function _update!(inhomogeneities::Vector{Float64}, f::Function, faces::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
-                  components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
+# for vertices, faces and edges
+function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+                  components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where {T}
 
     cc = CellCache(dh, UpdateFlags(; nodes=false, coords=true, dofs=true))
-    for (cellidx, faceidx) in faces
+    for (cellidx, entityidx) in boundary_entities
         reinit!(cc, cellidx)
 
-        # no need to reinit!, enough to update current_face since we only need geometric shape functions M
-        facevalues.current_face[] = faceidx
+        # no need to reinit!, enough to update current_entity since we only need geometric shape functions M
+        boundaryvalues.current_entity[] = entityidx
 
         # local dof-range for this face
-        r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
+        r = local_face_dofs_offset[entityidx]:(local_face_dofs_offset[entityidx+1]-1)
         counter = 1
-
-        for location in 1:getnquadpoints(facevalues)
-            x = spatial_coordinate(facevalues, location, cc.coords)
+        for location in 1:getnquadpoints(boundaryvalues)
+            x = spatial_coordinate(boundaryvalues, location, cc.coords)
             bc_value = f(x, time)
             @assert length(bc_value) == length(components)
 
@@ -645,7 +644,8 @@ const APPLY_INPLACE = ApplyStrategy.Inplace
 
 function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false;
                 strategy::ApplyStrategy.T=ApplyStrategy.Transpose)
-    K = isa(KK, Symmetric) ? KK.data : KK
+    sym = isa(KK, Symmetric)
+    K = sym ? KK.data : KK
     @assert length(f) == 0 || length(f) == size(K, 1)
     @boundscheck checkbounds(K, ch.prescribed_dofs, ch.prescribed_dofs)
     @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
@@ -659,14 +659,33 @@ function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::Con
             v = ch.inhomogeneities[i]
             if v != 0
                 for j in nzrange(K, d)
-                    f[K.rowval[j]] -= v * K.nzval[j]
+                    r = K.rowval[j]
+                    sym && r > d && break # don't look below diagonal
+                    f[r] -= v * K.nzval[j]
+                end
+            end
+        end
+        if sym
+            # In the symmetric case, for a constrained dof `d`, we handle the contribution
+            # from `K[1:d, d]` in the loop above, but we are still missing the contribution
+            # from `K[(d+1):size(K,1), d]`. These values are not stored, but since the
+            # matrix is symmetric we can instead use `K[d, (d+1):size(K,1)]`. Looping over
+            # rows is slow, so loop over all columns again, and check if the row is a
+            # constrained row.
+            @inbounds for col in 1:size(K, 2)
+                for ri in nzrange(K, col)
+                    row = K.rowval[ri]
+                    row >= col && break
+                    if (i = get(ch.dofmapping, row, 0); i != 0)
+                        f[col] -= ch.inhomogeneities[i] * K.nzval[ri]
+                    end
                 end
             end
         end
     end
 
     # Condense K (C' * K * C) and f (C' * f)
-    _condense!(K, f, ch.dofcoefficients, ch.dofmapping)
+    _condense!(K, f, ch.dofcoefficients, ch.dofmapping, sym)
 
     # Remove constrained dofs from the matrix
     zero_out_columns!(K, ch.prescribed_dofs)
@@ -691,71 +710,8 @@ end
     return dofcoeffs[idx]
 end
 
-# Similar to Ferrite._condense!(K, ch), but only add the non-zero entries to K (that arises from the condensation process)
-function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, dofmapping::Dict{Int,Int}, keep_constrained::Bool) where T
-    ndofs = size(K, 1)
-
-    # Return early if there are no non-trivial affine constraints
-    any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
-
-    # Adding new entries to K is extremely slow, so create a new sparsity triplet for the
-    # condensed sparsity pattern
-    N = 2 * length(dofcoefficients) # TODO: Better size estimate for additional condensed sparsity pattern.
-    I = Int[]; resize!(I, N)
-    J = Int[]; resize!(J, N)
-
-    cnt = 0
-    for col in 1:ndofs
-        col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
-        if col_coeffs === nothing
-            !keep_constrained && haskey(dofmapping, col) && continue
-            for ri in nzrange(K, col)
-                row = K.rowval[ri]
-                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
-                row_coeffs === nothing && continue
-                for (d, _) in row_coeffs
-                    cnt += 1
-                    _add_or_grow(cnt, I, J, d, col)
-                end
-            end
-        else
-            for ri in nzrange(K, col)
-                row = K.rowval[ri]
-                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
-                if row_coeffs === nothing
-                    !keep_constrained && haskey(dofmapping, row) && continue
-                    for (d, _) in col_coeffs
-                        cnt += 1
-                        _add_or_grow(cnt, I, J, row, d)
-                    end
-                else
-                    for (d1, _) in col_coeffs
-                        !keep_constrained && haskey(dofmapping, d1) && continue
-                        for (d2, _) in row_coeffs
-                            !keep_constrained && haskey(dofmapping, d2) && continue
-                            cnt += 1
-                            _add_or_grow(cnt, I, J, d1, d2)
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    resize!(I, cnt)
-    resize!(J, cnt)
-
-    # Fill the sparse matrix with a non-zero value so that :+ operation does not remove entries with value zero.
-    K2 = spzeros!!(Float64, I, J, ndofs, ndofs)
-    fill!(K2.nzval, 1)
-
-    K .+= K2
-
-    return nothing
-end
-
 # Condenses K and f: C'*K*C, C'*f, in-place assuming the sparsity pattern is correct
-function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int,Int}) where T
+function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{Int,Int}, sym::Bool=false) where T
 
     ndofs = size(K, 1)
     condense_f = !(length(f) == 0)
@@ -763,6 +719,11 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
 
     # Return early if there are no non-trivial affine constraints
     any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
+
+    # TODO: The rest of this method can't handle K::Symmetric
+    if sym
+        error("condensation of ::Symmetric matrix not supported")
+    end
 
     for col in 1:ndofs
         col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
@@ -890,15 +851,14 @@ end
 function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
     dbc_added = false
     for fh in ch.dh.fieldhandlers
-        if overlaps(fh, dbc)
-            # Recreating the `dbc` will create a copy of `dbc.faces`. 
-            # If `dbc` have dofs not in `fh`, these will be removed from `dbc`, 
-            # thus the need to copy `dbc.faces`.
-            # In this case, add! will warn, unless warn_check_cellset=false
+        if !isnothing(_find_field(fh, dbc.field_name)) && _in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=false)
+            # Dofs in `dbc` not in `fh` will be removed, hence `dbc.faces` must be copied.
+            # Recreating the `dbc` will create a copy of `dbc.faces`.
+            # In this case, add! will warn, unless `warn_not_in_cellset=false`
             dbc_ = Dirichlet(dbc.field_name, dbc.faces, dbc.f, 
                 isempty(dbc.components) ? nothing : dbc.components) 
                 # Check for empty already done when user created `dbc`
-            add!(ch, fh, dbc_, warn_check_cellset=false)
+            add!(ch, fh, dbc_, warn_not_in_cellset=false)
             dbc_added = true
         end
     end
@@ -906,23 +866,17 @@ function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
     return ch
 end
 
-function overlaps(fh::FieldHandler, dbc::Dirichlet)
-    dbc.field_name in getfieldnames(fh) || return false # Must contain the correct field
-    for (cellid, _) in dbc.faces
-        cellid in fh.cellset && return true
+function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_not_in_cellset=true)
+    if warn_not_in_cellset && !(_in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=true))
+        @warn("You are trying to add a constraint a face/edge/node that is not in the cellset of the fieldhandler. This location will be skipped")
     end
-    return false
-end
-
-function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_check_cellset=true)
-    warn_check_cellset && _check_cellset_dirichlet(ch.dh.grid, fh.cellset, dbc.faces)
 
     celltype = getcelltype(ch.dh.grid, first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
 
     # Extract stuff for the field
     field_idx = find_field(fh, dbc.field_name)
-    interpolation = getfieldinterpolations(fh)[field_idx]
-    field_dim = getfielddims(fh)[field_idx]
+    interpolation = getfieldinterpolation(fh, field_idx)
+    field_dim = getfielddim(fh, field_idx)
 
     if !all(c -> 0 < c <= field_dim, dbc.components)
         error("components $(dbc.components) not within range of field :$(dbc.field_name) ($(field_dim) dimension(s))")
@@ -941,15 +895,20 @@ function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_chec
     return ch
 end
 
-function _check_cellset_dirichlet(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex})
+# If all==true, return true only if all items in faceset/nodeset are in the cellset
+# If all==false, return true if some items in faceset/nodeset are in the cellset
+function _in_cellset(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex}; all=true)
     for (cellid,faceid) in faceset
-        if !(cellid in cellset)
-            @warn("You are trying to add a constraint to a face that is not in the cellset of the fieldhandler. The face will be skipped.")
+        if cellid in cellset
+            all || return true
+        else
+            all && return false
         end
     end
+    return all # if not returned by now and all==false, then no `cellid`s where in cellset
 end
 
-function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int})
+function _in_cellset(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int}; all=true)
     nodes = Set{Int}()
     for cellid in cellset
         for nodeid in getcells(grid, cellid).nodes
@@ -958,31 +917,13 @@ function _check_cellset_dirichlet(grid::AbstractGrid, cellset::Set{Int}, nodeset
     end
 
     for nodeid in nodeset
-        if !(nodeid ∈ nodes)
-            @warn("You are trying to add a constraint to a node that is not in the cellset of the fieldhandler. The node will be skipped.")
+        if nodeid ∈ nodes
+            all || return true 
+        else
+            all && return false
         end
     end
-end
-
-"""
-    create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler, coupling)
-
-Create a symmetric sparsity pattern accounting for affine constraints in `ch`. See 
-the Affine Constraints section of the manual for further details. 
-"""
-function create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
-        keep_constrained::Bool=true, coupling=nothing)
-    return Symmetric(_create_sparsity_pattern(dh, ch, true, keep_constrained, coupling), :U)
-end
-"""
-    create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling)
-
-Create a sparsity pattern accounting for affine constraints in `ch`. See 
-the Affine Constraints section of the manual for further details. 
-"""
-function create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
-        keep_constrained::Bool=true, coupling=nothing)
-    return _create_sparsity_pattern(dh, ch, false, keep_constrained, coupling)
+    return all # if not returned by now and all==false, then no `cellid`s where in cellset
 end
 
 struct PeriodicFacePair
@@ -1276,7 +1217,7 @@ end
 function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{2,<:Union{RefCube,RefTetrahedron}}, n::Int)
     # For 2D we always permute since Ferrite defines dofs counter-clockwise
     ret = collect(1:length(local_face_dofs))
-    for (i, f) in enumerate(faces(ip))
+    for (i, f) in enumerate(facedof_indices(ip))
         this_offset = local_face_dofs_offset[i]
         other_offset = this_offset + n
         for d in 1:n
@@ -1297,7 +1238,7 @@ function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange
     ret = collect(1:length(local_face_dofs))
 
     # Mirror by changing from counter-clockwise to clockwise
-    for (i, f) in enumerate(faces(ip))
+    for (i, f) in enumerate(facedof_indices(ip))
         r = local_face_dofs_offset[i]:(local_face_dofs_offset[i+1] - 1)
         # 1. Rotate the corners
         vertex_range = r[1:(N*n)]

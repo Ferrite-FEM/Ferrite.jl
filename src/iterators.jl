@@ -57,10 +57,10 @@ function CellCache(grid::Grid{dim,C,T}, flags::UpdateFlags=UpdateFlags()) where 
     return CellCache(flags, grid, ScalarWrapper(-1), nodes, coords, nothing, Int[])
 end
 
-function CellCache(dh::Union{DofHandler{dim,T},MixedDofHandler{dim,T}}, flags::UpdateFlags=UpdateFlags()) where {dim,T}
+function CellCache(dh::Union{DofHandler{dim},MixedDofHandler{dim}}, flags::UpdateFlags=UpdateFlags()) where {dim}
     N = nnodes_per_cell(dh.grid)
     nodes = zeros(Int, N)
-    coords = zeros(Vec{dim,T}, N)
+    coords = zeros(Vec{dim, get_coordinate_eltype(dh.grid)}, N)
     n = ndofs_per_cell(dh)
     celldofs = zeros(Int, n)
     return CellCache(flags, dh.grid, ScalarWrapper(-1), nodes, coords, dh, celldofs)

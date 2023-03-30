@@ -64,7 +64,7 @@ function test_2d_scalar()
 
     # THEN: we expect 5 dofs and dof 2 and 3 being shared
     @test ndofs(dh) == 5
-    @test dh.cell_dofs.values == [1, 2, 3, 4, 3, 2, 5]
+    @test dh.cell_dofs == [1, 2, 3, 4, 3, 2, 5]
     @test celldofs(dh, 1) == [1, 2, 3, 4]
     @test celldofs(dh, 2) == [3, 2, 5]
 end
@@ -508,7 +508,7 @@ function test_subparametric_quad()
     add!(ch, dbc1)
     close!(ch)
     update!(ch, 1.0)
-    @test getnbasefunctions(Ferrite.getfieldinterpolation(dh,1)) == 9 # algebraic nbasefunctions
+    @test getnbasefunctions(Ferrite.getfieldinterpolation(fh,1)) == 9 # algebraic nbasefunctions
     @test celldofs(dh, 1) == [i for i in 1:18]
 end
 
@@ -530,7 +530,7 @@ function test_subparametric_triangle()
     add!(ch, dbc1)
     close!(ch)
     update!(ch, 1.0)
-    @test getnbasefunctions(Ferrite.getfieldinterpolation(dh,1)) == 6 # algebraic nbasefunctions
+    @test getnbasefunctions(Ferrite.getfieldinterpolation(fh,1)) == 6 # algebraic nbasefunctions
     @test celldofs(dh, 1) == [i for i in 1:12]
 end
 
@@ -590,6 +590,18 @@ function test_unique_cellsets()
     @test_throws ErrorException add!(dh, FieldHandler([Field(:v, ip, 1)], set_v))
 end
 
+function test_show()
+    grid = get_2d_grid()
+    # WHEN: adding a scalar field for each cell and generating dofs
+    field1 = create_field(name=:u, spatial_dim=2, field_dim=2, order=1, cellshape=RefCube)
+    field2 = create_field(name=:u, spatial_dim=2, field_dim=2, order=1, cellshape=RefTetrahedron)
+    dh = MixedDofHandler(grid);
+    push!(dh, FieldHandler([field1], Set(1)));
+    push!(dh, FieldHandler([field2], Set(2)));
+    close!(dh)
+    @test repr("text/plain", dh) == repr(typeof(dh)) * "\n  Fields:\n    :u, dim: 2\n  Total dofs: 10"
+end
+
 @testset "MixedDofHandler" begin
 
     test_1d_bar_beam();
@@ -615,4 +627,5 @@ end
     test_mixed_grid_show()
     test_separate_fields_on_separate_domains();
     test_unique_cellsets()
+    test_show()
 end

@@ -103,7 +103,7 @@ end
 
 function create_dofhandler(grid)
     dh = DofHandler(grid)
-    add!(dh, :u, 2, Lagrange{2,RefCube,1}()) ## displacement
+    add!(dh, :u, 2, Lagrange{2,RefCube,1}()) # displacement
     close!(dh)
     return dh
 end
@@ -132,10 +132,10 @@ end
 #md nothing # hide
 
 function MaterialParameters(E, ν, χ_min, p, β, η) 
-    δ(i,j) = i == j ? 1.0 : 0.0 ## helper function
+    δ(i,j) = i == j ? 1.0 : 0.0 # helper function
 
-    G = E / 2(1 + ν) ## =μ
-    λ = E*ν/(1-ν^2) ## correction for plane stress included
+    G = E / 2(1 + ν) # =μ
+    λ = E*ν/(1-ν^2) # correction for plane stress included
 
     C = SymmetricTensor{4, 2}((i,j,k,l) -> λ * δ(i,j)*δ(k,l) + G* (δ(i,k)*δ(j,l) + δ(i,l)*δ(j,k)))
     return MaterialParameters(C, χ_min, p, β, η)
@@ -143,12 +143,12 @@ end
 #md nothing # hide
 
 # To store the density and the strain required to calculate the driving forces, we create the struct
-# `MaterialState`. We add a constructor to initialize the struct. The function `UpdateMaterialStates!`
+# `MaterialState`. We add a constructor to initialize the struct. The function `update_material_states!`
 # updates the density values once we calculated the new values.
 
 mutable struct MaterialState{T, S <: AbstractArray{SymmetricTensor{2, 2, T}, 1}} 
-    χ::T ## density
-    ε::S ## strain in each quadrature point
+    χ::T # density
+    ε::S # strain in each quadrature point
 end
 
 function MaterialState(ρ, n_qp)
@@ -165,17 +165,25 @@ end
 # Next, we define a function to calculate the driving forces for all elements.
 # For this purpose, we iterate through all elements and calculate the average strain in each
 # element. Then, we compute the driving force from the formula introduced at the beginning.
+# We create a second function to collect the density in each element. 
 
-function compute_driving_forces(states, mp, dh)
+function compute_driving_forces(states, mp, dh, χn)
     pΨ = zeros(length(states))
+    for (element, state) in zip(CellIterator(dh), states)
+        i = cellid(element)
+        ε = sum(state.ε)/length(state.ε) # average element strain
+        pΨ[i] = 1/2 * mp.p * χn[i]^(mp.p-1) * (ε ⊡ mp.C ⊡ ε)
+    end
+    return pΨ
+end
+
+function compute_densities(states, dh)
     χn = zeros(length(states))
     for (element, state) in zip(CellIterator(dh), states)
         i = cellid(element)
-        ε = sum(state.ε)/length(state.ε) ## average element strain
-        pΨ[i] = 1/2 * mp.p * state.χ^(mp.p-1) * (ε ⊡ mp.C ⊡ ε)
         χn[i] = state.χ
     end
-    return pΨ, χn 
+    return χn
 end
 #md nothing # hide
 
@@ -196,8 +204,8 @@ function approximate_laplacian(dh, topology, χn, Δh)
         for j in 1:_nfaces
             nbg_cellid = getcells(getneighborhood(topology, dh.grid, FaceIndex(i,j)))
             if(!isempty(nbg_cellid))
-                nbg[j] = first(nbg_cellid) ## assuming only one face neighbor per cell
-            else ## boundary face
+                nbg[j] = first(nbg_cellid) # assuming only one face neighbor per cell
+            else # boundary face
                 nbg[j] = first(getcells(getneighborhood(topology, dh.grid, FaceIndex(i,opp[j]))))
             end
         end
@@ -248,19 +256,45 @@ function compute_χn1(χn, Δχ, ρ, ηs, χ_min)
 end
 #md nothing # hide
 
-# Finally, we put everything together to update the density. We weight our numerical parameters 
-# $\eta$ and $\beta$ by the average driving forces to make the choice of the parameters independent
-# from the specific problem. 
+# Lastly, we use the following helper function to compute the average driving force, which is later
+# used to normalize the driving forces. This makes the used material parameters and numerical parameters independent
+# of the problem. 
 
-function update_density(dh, states, mp, ρ, topology, Δh)   
-    pΨ, χn = compute_driving_forces(states, mp, dh) ## driving forces, old density field
-    ∇²χ = approximate_laplacian(dh, topology, χn, Δh) ## Laplacian
-
-    p_Ω = sum(pΨ)/length(pΨ) ## average driving force
-
-    Δχ = pΨ + mp.β*p_Ω*∇²χ
+function compute_average_driving_force(mp, pΨ, χn)
+    n = length(pΨ)
+    w = zeros(n)
     
-    χn1 = compute_χn1(χn, Δχ, ρ, mp.η*p_Ω, mp.χ_min)
+    for i in 1:n
+        w[i] = (χn[i]-mp.χ_min)*(1-χn[i])
+    end
+    
+    p_Ω = sum(w.*pΨ)/sum(w) # average driving force
+    
+    return p_Ω
+end
+#md nothing # hide
+
+# Finally, we put everything together to update the density. The loop ensures the stability of the 
+# updated solution.
+
+function update_density(dh, states, mp, ρ, topology, Δh)
+    n_j = Int(ceil(6*mp.β/(mp.η*Δh^2))) # iterations needed for stability
+    χn = compute_densities(states, dh) # old density field    
+    χn1 = zeros(length(χn))
+    
+    for j in 1:n_j
+        ∇²χ = approximate_laplacian(dh, topology, χn, Δh) # Laplacian
+        pΨ = compute_driving_forces(states, mp, dh, χn) # driving forces
+        p_Ω = compute_average_driving_force(mp, pΨ, χn) # average driving force
+    
+        Δχ = pΨ/p_Ω + mp.β*∇²χ 
+
+        χn1 = compute_χn1(χn, Δχ, ρ, mp.η, mp.χ_min) 
+
+        if(j<n_j)
+            χn[:] = χn1[:]
+        end
+    end
     
     return χn1
 end
@@ -273,8 +307,8 @@ function doassemble!(cellvalues::CellVectorValues{dim}, facevalues::FaceVectorVa
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)
     
-    re = zeros(nu) ## local residual vector
-    Ke = zeros(nu,nu) ## local stiffness matrix
+    re = zeros(nu) # local residual vector
+    Ke = zeros(nu,nu) # local stiffness matrix
 
     for (element, state) in zip(CellIterator(dh), states)
         fill!(Ke, 0)
@@ -321,7 +355,7 @@ function elmt!(Ke, re, element, cellvalues, facevalues, grid, mp, ue, state)
     @inbounds for face in 1:nfaces(element) 
         if onboundary(element, face) && (cellid(element), face) ∈ getfaceset(grid, "traction")
             reinit!(facevalues, element, face)
-            t = Vec((0.0, -1.0)) ## force pointing downwards
+            t = Vec((0.0, -1.0)) # force pointing downwards
             for q_point in 1:getnquadpoints(facevalues)
                 dΓ = getdetJdV(facevalues, q_point)
                 for i in 1:n_basefuncs
@@ -343,8 +377,8 @@ function symmetrize_lower!(K)
 end
 #md nothing # hide
 
-# We put everything together in the main function. Here the user may choose the regularization
-# parameter, the starting density, the number of elements in vertical direction and finally the
+# We put everything together in the main function. Here the user may choose the radius parameter, which
+# is related to the regularization parameter as $\beta = ra^2$, the starting density, the number of elements in vertical direction and finally the
 # name of the output. Addtionally, the user may choose whether only the final design (default)
 # or every iteration step is saved.
 #
@@ -358,34 +392,34 @@ end
 # Finally, we output the results in paraview and calculate the relative stiffness of the final design, i.e. how much how
 # the stiffness increased compared to the starting point.
 
-function topopt(β,ρ,n,filename; output=:false) 
+function topopt(ra,ρ,n,filename; output=:false) 
     ## material
-    mp = MaterialParameters(210.e3, 0.3, 1.e-3, 3.0, β, 20.0) 
+    mp = MaterialParameters(210.e3, 0.3, 1.e-3, 3.0, ra^2, 15.0) 
 
     ## grid, dofhandler, boundary condition
     grid = create_grid(n)
     dh = create_dofhandler(grid)
-    Δh = 1/n ## element edge length
+    Δh = 1/n # element edge length
     dbc = create_bc(dh)
     
     ## cellvalues
     cellvalues, facevalues = create_values()
     
     ## Pre-allocate solution vectors, etc.
-    n_dofs = ndofs(dh) ## total number of dofs
-    u  = zeros(n_dofs) ## solution vector
-    un = zeros(n_dofs) ## previous solution vector
+    n_dofs = ndofs(dh) # total number of dofs
+    u  = zeros(n_dofs) # solution vector
+    un = zeros(n_dofs) # previous solution vector
     
-    Δu = zeros(n_dofs)  ## previous displacement correction
-    ΔΔu = zeros(n_dofs) ## new displacement correction
+    Δu = zeros(n_dofs)  # previous displacement correction
+    ΔΔu = zeros(n_dofs) # new displacement correction
     
     ## create material states  
     states = [MaterialState(ρ, getnquadpoints(cellvalues)) for _ in 1:getncells(dh.grid)]
     
     χ = zeros(getncells(dh.grid))
         
-    r = zeros(n_dofs) ## residual
-    K = create_sparsity_pattern(dh) ## stiffness matrix
+    r = zeros(n_dofs) # residual
+    K = create_sparsity_pattern(dh) # stiffness matrix
     
     i_max = 300 ## maximum number of iteration steps
     tol = 1e-4
@@ -425,7 +459,7 @@ function topopt(β,ρ,n,filename; output=:false)
             
             apply_zero!(ΔΔu, dbc)
             Δu .+= ΔΔu
-        end ## of loop while NR-Iteration    
+        end # of loop while NR-Iteration    
 
         ## calculate compliance
         compliance = 1/2 * u' * K * u
@@ -482,12 +516,12 @@ end
 # complete output with all iteration steps, it is possible to set the output 
 # parameter to `true`.
 
-topopt(0.5*1e-3, 0.5, 60, "betasmall"; output=:false);
-topopt(1.0*1e-3, 0.5, 60, "betalarge"; output=:false);
-## topopt(1.0*1e-3, 0.5, 60, "topopt_animation"; output=:true); # can be used to create animations
+topopt(0.02, 0.5, 60, "small_radius"; output=:false);
+topopt(0.03, 0.5, 60, "large_radius"; output=:false);
+##topopt(0.02, 0.5, 60, "topopt_animation"; output=:true); # can be used to create animations
 
-# We observe, that the stiffness for the lower value of $\beta$ is higher,
-# but also requires finer structures to be manufactured, as can be seen in Figure 2:
+# We observe, that the stiffness for the lower value of $ra$ is higher,
+# but also requires more iterations until convergence and finer structures to be manufactured, as can be seen in Figure 2:
 #
 # ![](bending.png)
 #

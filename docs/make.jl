@@ -68,7 +68,8 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
             "reference/grid.md",
             "reference/export.md",
             "reference/utils.md",
-            ]
+            ],
+        "Developer documentation" => "devdocs/index.md",
         ],
 )
 

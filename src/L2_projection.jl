@@ -7,7 +7,7 @@ struct L2Projector <: AbstractProjector
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::MixedDofHandler
     set::Vector{Int}
-    node2dof_map::Dict{Int64, Array{Int64,N} where N}
+    node2dof_map::Vector{Int}
     fe_values::Union{CellValues,Nothing} # only used for deprecated constructor
     qr_rhs::Union{QuadratureRule,Nothing}    # only used for deprecated constructor
 end
@@ -100,6 +100,13 @@ function _mass_qr(::Lagrange{dim, shape, order}) where {dim, shape, order}
 end
 function _mass_qr(::Lagrange{dim, RefTetrahedron, 2}) where {dim}
     return QuadratureRule{dim,RefTetrahedron}(4)
+end
+
+function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
+    println(io, typeof(proj))
+    println(io, "  projection on:           ", length(proj.set), "/", getncells(proj.dh.grid), " cells in grid")
+    println(io, "  function interpolation:  ", proj.func_ip)
+    println(io, "  geometric interpolation: ", proj.geom_ip)
 end
 
 function _assemble_L2_matrix(fe_values, set, dh)
@@ -209,9 +216,8 @@ function project(proj::L2Projector,
         nnodes = getnnodes(proj.dh.grid)
         reordered_vals = fill(convert(T, NaN * zero(T)), nnodes)
         for node = 1:nnodes
-            if (k = get(proj.node2dof_map, node, nothing); k !== nothing)
-                @assert length(k) == 1
-                reordered_vals[node] = projected_vals[k[1]]
+            if (k = proj.node2dof_map[node]; k != 0)
+                reordered_vals[node] = projected_vals[k]
             end
         end
         return reordered_vals

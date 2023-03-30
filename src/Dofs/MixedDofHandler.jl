@@ -1,3 +1,5 @@
+abstract type AbstractDofHandler end
+
 """
     Field(name::Symbol, interpolation::Interpolation, dim::Int)
 
@@ -28,17 +30,6 @@ mutable struct FieldHandler
     cellset::Set{Int}
 end
 
-struct CellVector{T}
-    values::Vector{T}
-    offset::Vector{Int}
-    length::Vector{Int}
-end
-
-function Base.getindex(elvec::CellVector, el::Int)
-    offset = elvec.offset[el]
-    return elvec.values[offset:offset + elvec.length[el]-1]
- end
-
 """
     MixedDofHandler(grid::Grid)
 
@@ -48,9 +39,16 @@ Construct a `MixedDofHandler` based on `grid`. Supports:
 """
 struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
-    cell_dofs::CellVector{Int}
-    cell_nodes::CellVector{Int}
-    cell_coords::CellVector{Vec{dim,T}}
+    field_names::Vector{Symbol}
+    # Dofs for cell i are stored in cell_dofs[cell_dofs_offset[i]:(cell_dofs_offset[i]+length[i]-1)].
+    # Note that explicitly keeping track of ndofs_per_cell is necessary since dofs are *not*
+    # distributed in cell order like for the DofHandler (where the length can be determined
+    # by cell_dofs_offset[i+1]-cell_dofs_offset[i]).
+    # TODO: ndofs_per_cell should probably be replaced by ndofs_per_fieldhandler, since all
+    #       cells in a FieldHandler have the same number of dofs.
+    cell_dofs::Vector{Int}
+    cell_dofs_offset::Vector{Int}
+    ndofs_per_cell::Vector{Int}
     closed::ScalarWrapper{Bool}
     grid::G
     ndofs::ScalarWrapper{Int}
@@ -58,72 +56,101 @@ end
 
 function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
     ncells = getncells(grid)
-    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], CellVector(Int[],zeros(Int,ncells),zeros(Int,ncells)), CellVector(Int[],Int[],Int[]), CellVector(Vec{dim,T}[],Int[],Int[]), Ferrite.ScalarWrapper(false), grid, Ferrite.ScalarWrapper(-1))
+    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
-getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
-getfielddims(fh::FieldHandler) = [field.dim for field in fh.fields]
-getfieldinterpolations(fh::FieldHandler) = [field.interpolation for field in fh.fields]
-ndofs_per_cell(dh::MixedDofHandler, cell::Int=1) = dh.cell_dofs.length[cell]
-nnodes_per_cell(dh::MixedDofHandler, cell::Int=1) = dh.cell_nodes.length[cell]
+function Base.show(io::IO, ::MIME"text/plain", dh::MixedDofHandler)
+    println(io, typeof(dh))
+    println(io, "  Fields:")
+    for fieldname in getfieldnames(dh)
+        println(io, "    ", repr(fieldname), ", dim: ", getfielddim(dh, fieldname))
+    end
+    if !isclosed(dh)
+        print(io, "  Not closed!")
+    else
+        print(io, "  Total dofs: ", ndofs(dh))
+    end
+end
 
+isclosed(dh::AbstractDofHandler) = dh.closed[]
 
+"""
+    ndofs(dh::AbstractDofHandler)
+
+Return the number of degrees of freedom in `dh`
+"""
+ndofs(dh::AbstractDofHandler) = dh.ndofs[]
+
+"""
+    ndofs_per_cell(dh::AbstractDofHandler[, cell::Int=1])
+
+Return the number of degrees of freedom for the cell with index `cell`.
+
+See also [`ndofs`](@ref).
+"""
+ndofs_per_cell(dh::MixedDofHandler, cell::Int=1) = dh.ndofs_per_cell[cell]
+nnodes_per_cell(dh::MixedDofHandler, cell::Int=1) = nnodes_per_cell(dh.grid, cell) # TODO: deprecate, shouldn't belong to MixedDofHandler any longer
+
+"""
+    celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
+
+Store the degrees of freedom that belong to cell `i` in `global_dofs`.
+
+See also [`celldofs`](@ref).
+"""
 function celldofs!(global_dofs::Vector{Int}, dh::MixedDofHandler, i::Int)
     @assert isclosed(dh)
     @assert length(global_dofs) == ndofs_per_cell(dh, i)
-    unsafe_copyto!(global_dofs, 1, dh.cell_dofs.values, dh.cell_dofs.offset[i], length(global_dofs))
+    unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
     return global_dofs
 end
 
-function celldofs(dh::MixedDofHandler, i::Int)
-    @assert isclosed(dh)
-    return dh.cell_dofs[i]
+"""
+    celldofs(dh::AbstractDofHandler, i::Int)
+
+Return a vector with the degrees of freedom that belong to cell `i`.
+
+See also [`celldofs!`](@ref).
+"""
+function celldofs(dh::AbstractDofHandler, i::Int)
+    return celldofs!(zeros(Int, ndofs_per_cell(dh, i)), dh, i)
 end
 
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::MixedDofHandler, i::Int) where {dim,T}
-    @assert isclosed(dh)
-    @assert length(global_coords) == nnodes_per_cell(dh, i)
-    unsafe_copyto!(global_coords, 1, dh.cell_coords.values, dh.cell_coords.offset[i], length(global_coords))
-    return global_coords
+#TODO: perspectively remove in favor of `getcoordinates!(global_coords, grid, i)`?
+function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::MixedDofHandler, i::Union{Int, <:AbstractCell}) where {dim,T}
+    cellcoords!(global_coords, dh.grid, i)
 end
 
-function cellnodes!(global_nodes::Vector{Int}, dh::MixedDofHandler, i::Int)
-    @assert isclosed(dh)
-    @assert length(global_nodes) == nnodes_per_cell(dh, i)
-    unsafe_copyto!(global_nodes, 1, dh.cell_nodes.values, dh.cell_nodes.offset[i], length(global_nodes))
-    return global_nodes
+function cellnodes!(global_nodes::Vector{Int}, dh::MixedDofHandler, i::Union{Int, <:AbstractCell})
+    cellnodes!(global_nodes, dh.grid, i)
 end
-
 
 """
     getfieldnames(dh::MixedDofHandler)
 
-Returns the union of all the fields. Can be used as an iterable over all the fields in the problem.
+Return a vector with the names of all fields. Can be used as an iterable over all the fields
+in the problem.
 """
-function getfieldnames(dh::MixedDofHandler)
-    fieldnames = Vector{Symbol}()
-    for fh in dh.fieldhandlers
-        append!(fieldnames, getfieldnames(fh))
-    end
-    return unique!(fieldnames)
+getfieldnames(dh::MixedDofHandler) = dh.field_names
+
+getfielddim(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].dim
+getfielddim(fh::FieldHandler, field_name::Symbol) = getfielddim(fh, find_field(fh, field_name))
+
+"""
+    getfielddim(dh::MixedDofHandler, field_idxs::NTuple{2,Int})
+    getfielddim(dh::MixedDofHandler, field_name::Symbol)
+    getfielddim(dh::FieldHandler, field_idx::Int)
+    getfielddim(dh::FieldHandler, field_name::Symbol)
+
+Return the dimension of a given field. The field can be specified by its index (see
+[`find_field`](@ref)) or its name.
+"""
+function getfielddim(dh::MixedDofHandler, field_idxs::NTuple{2, Int})
+    fh_idx, field_idx = field_idxs
+    fielddim = getfielddim(dh.fieldhandlers[fh_idx], field_idx)
+    return fielddim
 end
-
-"""
-    getfielddim(dh::MixedDofHandler, name::Symbol)
-
-Returns the dimension of a specific field, given by name. Note that it will return the dimension of the first field found among the `FieldHandler`s.
-"""
-function getfielddim(dh::MixedDofHandler, name::Symbol)
-
-    for fh in dh.fieldhandlers
-        field_pos = findfirst(i->i == name, getfieldnames(fh))
-        if field_pos !== nothing
-            return fh.fields[field_pos].dim
-        end
-    end
-    error("did not find field $name")
-end
-
+getfielddim(dh::MixedDofHandler, name::Symbol) = getfielddim(dh, find_field(dh, name))
 
 """
     nfields(dh::MixedDofHandler)
@@ -138,15 +165,16 @@ nfields(dh::MixedDofHandler) = length(getfieldnames(dh))
 Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
 """
 function add!(dh::MixedDofHandler, fh::FieldHandler)
+    # TODO: perhaps check that a field with the same name is the same field?
     @assert !isclosed(dh)
     _check_same_celltype(dh.grid, collect(fh.cellset))
     _check_cellset_intersections(dh, fh)
     # the field interpolations should have the same refshape as the cells they are applied to
-    refshapes_fh = getrefshape.(getfieldinterpolations(fh))
     # extract the celltype from the first cell as the celltypes are all equal
     cell_type = getcelltype(dh.grid, first(fh.cellset))
     refshape_cellset = getrefshape(default_interpolation(cell_type))
-    for refshape in refshapes_fh
+    for field_idx  in eachindex(fh.fields)
+        refshape = getrefshape(getfieldinterpolation(fh, field_idx))
         refshape_cellset == refshape || error("The RefShapes of the fieldhandlers interpolations must correspond to the RefShape of the cells it is applied to.")
     end
 
@@ -205,210 +233,402 @@ function close!(dh::MixedDofHandler)
 end
 
 function __close!(dh::MixedDofHandler{dim}) where {dim}
+    @assert !isclosed(dh)
 
-    @assert !Ferrite.isclosed(dh)
-    field_names = Ferrite.getfieldnames(dh)  # all the fields in the problem
-    numfields =  length(field_names)
+    # Collect the global field names
+    empty!(dh.field_names)
+    for fh in dh.fieldhandlers, f in fh.fields
+        f.name in dh.field_names || push!(dh.field_names, f.name)
+    end
+    numfields = length(dh.field_names)
 
-    # Create dicts that store created dofs
-    # Each key should uniquely identify the given type
-    vertexdicts = [Dict{Int, UnitRange{Int}}() for _ in 1:numfields]
-    edgedicts = [Dict{Tuple{Int,Int}, UnitRange{Int}}() for _ in 1:numfields]
-    facedicts = [Dict{Tuple{Int,Int}, UnitRange{Int}}() for _ in 1:numfields]
-    celldicts = [Dict{Int, UnitRange{Int}}() for _ in 1:numfields]
+    # `vertexdict` keeps track of the visited vertices. The first dof added to vertex v is
+    # stored in vertexdict[v]
+    # TODO: No need to allocate this vector for fields that don't have vertex dofs
+    vertexdicts = [zeros(Int, getnnodes(dh.grid)) for _ in 1:numfields]
+
+    # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem.
+    # An edge is uniquely determined by two vertices, but we also need to store the
+    # direction of the first edge we encounter and add dofs too. When we encounter the same
+    # edge the next time we check if the direction is the same, otherwise we reuse the dofs
+    # in the reverse order.
+    edgedicts = [Dict{Tuple{Int,Int},Tuple{Int,Bool}}() for _ in 1:numfields]
+
+    # `facedict` keeps track of the visited faces. We only need to store the first dof we
+    # add to the face; if we encounter the same face again we *always* reverse the order. In
+    # 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a face (i.e. a
+    # surface) is uniquely determined by 3 vertices.
+    facedicts = [Dict{NTuple{dim,Int},Int}() for _ in 1:numfields]
 
     # Set initial values
     nextdof = 1  # next free dof to distribute
 
     @debug "\n\nCreating dofs\n"
     for fh in dh.fieldhandlers
-        # sort the cellset since we want to loop through the cells in a fixed order
-        cellnumbers = sort(collect(fh.cellset))
+        # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
+        cellnumbers = BitSet(fh.cellset)
         nextdof = _close!(
             dh,
             cellnumbers,
-            field_names,
-            Ferrite.getfieldnames(fh),
-            Ferrite.getfielddims(fh),
-            Ferrite.getfieldinterpolations(fh),
+            dh.field_names,
+            fh.fields,
             nextdof,
             vertexdicts,
             edgedicts,
             facedicts,
-            celldicts)
+        )
     end
-    dh.ndofs[] = maximum(dh.cell_dofs.values)
+    dh.ndofs[] = maximum(dh.cell_dofs; init=0)
     dh.closed[] = true
-
-    #Create cell_nodes and cell_coords (similar to cell_dofs)
-    push!(dh.cell_nodes.offset, 1)
-    push!(dh.cell_coords.offset, 1)
-    for cell in dh.grid.cells
-        for nodeid in cell.nodes
-            push!(dh.cell_nodes.values, nodeid)
-            push!(dh.cell_coords.values, dh.grid.nodes[nodeid].x)
-        end
-        push!(dh.cell_nodes.offset, length(dh.cell_nodes.values)+1)
-        push!(dh.cell_coords.offset, length(dh.cell_coords.values)+1)
-        push!(dh.cell_nodes.length, length(cell.nodes))
-        push!(dh.cell_coords.length, length(cell.nodes))
-    end
 
     return dh, vertexdicts, edgedicts, facedicts
 
 end
 
-function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, field_names, field_dims, field_interpolations, nextdof, vertexdicts, edgedicts, facedicts, celldicts) where {dim}
-
-    ip_infos = Ferrite.InterpolationInfo[]
-    for interpolation in field_interpolations
-        ip_info = Ferrite.InterpolationInfo(interpolation)
-        # these are not implemented yet (or have not been tested)
-        @assert(ip_info.nvertexdofs <= 1)
-        @assert(ip_info.nedgedofs <= 1)
-        @assert(ip_info.nfacedofs <= 1)
-        @assert(ip_info.ncelldofs <= 1)  # not tested but probably works
+function _close!(dh::MixedDofHandler{dim}, cellnumbers, global_field_names, fields, nextdof, vertexdicts, edgedicts, facedicts) where {dim}
+    ip_infos = InterpolationInfo[]
+    for field in fields
+        interpolation = field.interpolation
+        ip_info = InterpolationInfo(interpolation)
         push!(ip_infos, ip_info)
+        # TODO: More than one face dof per face in 3D are not implemented yet. This requires
+        #       keeping track of the relative rotation between the faces, not just the
+        #       direction as for faces (i.e. edges) in 2D.
+        dim == 3 && @assert !any(x -> x > 1, ip_info.nfacedofs)
     end
 
     # loop over all the cells, and distribute dofs for all the fields
-    cell_dofs = Int[]  # list of global dofs for each cell
     for ci in cellnumbers
-        dh.cell_dofs.offset[ci] = length(dh.cell_dofs.values)+1
-
-        cell = dh.grid.cells[ci]
-        empty!(cell_dofs)
         @debug "Creating dofs for cell #$ci"
 
-        for (local_num, field_name) in enumerate(field_names)
-            fi = findfirst(i->i == field_name, global_field_names)
-            @debug "\tfield: $(field_name)"
+        cell = dh.grid.cells[ci]
+        len_cell_dofs = length(dh.cell_dofs)
+        dh.cell_dofs_offset[ci] = len_cell_dofs + 1
+
+        for (local_num, field) in pairs(fields)
+        # for (local_num, field_name) in enumerate(field_names)
+            fi = findfirst(i->i == field.name, global_field_names)
+            @debug "\tfield: $(field.name)"
             ip_info = ip_infos[local_num]
 
-            if ip_info.nvertexdofs > 0
-                nextdof = add_vertex_dofs(cell_dofs, cell, vertexdicts[fi], field_dims[local_num], ip_info.nvertexdofs, nextdof)
+            # Distribute dofs for vertices
+            nextdof = add_vertex_dofs(
+                dh.cell_dofs, cell, vertexdicts[fi], field.dim,
+                ip_info.nvertexdofs, nextdof
+            )
+
+            # Distribute dofs for edges (only applicable when dim is 3)
+            if dim == 3 && (ip_info.dim == 3 || ip_info.dim == 2)
+                # Regular 3D element or 2D interpolation embedded in 3D space
+                nentitydofs = ip_info.dim == 3 ? ip_info.nedgedofs : ip_info.nfacedofs
+                nextdof = add_edge_dofs(
+                    dh.cell_dofs, cell, edgedicts[fi], field.dim,
+                    nentitydofs, nextdof
+                )
             end
 
-            if ip_info.nedgedofs > 0 && dim == 3 #Edges only in 3d
-                nextdof = add_edge_dofs(cell_dofs, cell, edgedicts[fi], field_dims[local_num], ip_info.nedgedofs, nextdof)
+            # Distribute dofs for faces. Filter out 2D interpolations in 3D space, since
+            # they are added above as edge dofs.
+            if ip_info.dim == dim
+                nextdof = add_face_dofs(
+                    dh.cell_dofs, cell, facedicts[fi], field.dim,
+                    ip_info.nfacedofs, nextdof
+                )
             end
 
-            if ip_info.nfacedofs > 0 && (ip_info.dim == dim)
-                nextdof = add_face_dofs(cell_dofs, cell, facedicts[fi], field_dims[local_num], ip_info.nfacedofs, nextdof)
-            end
-
-            if ip_info.ncelldofs > 0
-                nextdof = add_cell_dofs(cell_dofs, ci, celldicts[fi], field_dims[local_num], ip_info.ncelldofs, nextdof)
-            end
-
+            # Distribute internal dofs for cells
+            nextdof = add_cell_dofs(
+                dh.cell_dofs, field.dim, ip_info.ncelldofs, nextdof
+            )
         end
-        # after done creating dofs for the cell, push them to the global list
-        append!(dh.cell_dofs.values, cell_dofs)
-        dh.cell_dofs.length[ci] = length(cell_dofs)
 
-        @debug "Dofs for cell #$ci:\n\t$cell_dofs"
+        # Store number of dofs that were added
+        dh.ndofs_per_cell[ci] = length(dh.cell_dofs) - len_cell_dofs
+
+        # @debug "Dofs for cell #$ci:\n\t$cell_dofs"
     end # cell loop
     return nextdof
 end
 
-"""
-Returns the next global dof number and an array of dofs.
-If dofs have already been created for the object (vertex, face) then simply return those, otherwise create new dofs.
-"""
-function get_or_create_dofs!(nextdof, field_dim; dict, key)
-
-    token = Base.ht_keyindex2!(dict, key)
-    if token > 0  # vertex, face etc. visited before
-        # reuse stored dofs (TODO unless field is discontinuous)
-        @debug "\t\tkey: $key dofs: $(dict[key])  (reused dofs)"
-        return nextdof, dict[key]
-
-    else  # create new dofs
-        dofs = nextdof : (nextdof + field_dim-1)
-        @debug "\t\tkey: $key dofs: $dofs"
-        Base._setindex!(dict, dofs, key, -token) #
-        nextdof += field_dim
-        return nextdof, dofs
-    end
-end
-
 function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, nextdof)
-    for vertex in Ferrite.vertices(cell)
-        @debug "\tvertex #$vertex"
-        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=vertexdict, key=vertex)
-        append!(cell_dofs, dofs)
+    for (vi, vertex) in pairs(vertices(cell))
+        nvertexdofs[vi] > 0 || continue # skip if no dof on this vertex
+        @assert nvertexdofs[vi] == 1
+        first_dof = vertexdict[vertex]
+        if first_dof > 0 # reuse dof
+            for d in 1:field_dim
+                reuse_dof = first_dof + (d-1)
+                push!(cell_dofs, reuse_dof)
+            end
+        else # create dofs
+            vertexdict[vertex] = nextdof
+            for _ in 1:field_dim
+                push!(cell_dofs, nextdof)
+                nextdof += 1
+            end
+        end
     end
     return nextdof
 end
 
 function add_face_dofs(cell_dofs, cell, facedict, field_dim, nfacedofs, nextdof)
-    @assert nfacedofs == 1 "Currently only supports interpolations with nfacedofs = 1"
-
-    for face in Ferrite.faces(cell)
-        sface = Ferrite.sortface(face)
-        @debug "\tface #$sface"
-        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=facedict, key=sface)
-        append!(cell_dofs, dofs)
+    @debug @assert all(nfacedofs .<= 1) "Currently only supports interpolations with less that 2 dofs per face"
+    for (fi, face) in pairs(faces(cell))
+        nfacedofs[fi] > 0 || continue # skip if no dof on this face
+        sface = sortface(face)
+        token = Base.ht_keyindex2!(facedict, sface)
+        if token > 0 # haskey(facedict, sface) -> reuse dofs
+            first_dof = facedict.vals[token] # facedict[sface]
+            for dof_loc in nfacedofs[fi]:-1:1 # always reverse
+                for d in 1:field_dim
+                    reuse_dof = first_dof + (d-1) + (dof_loc-1)*field_dim
+                    push!(cell_dofs, reuse_dof)
+                end
+            end
+        else # !haskey(facedict, sface) -> create dofs
+            Base._setindex!(facedict, nextdof, sface, -token) # facedict[sface] = nextdof
+            for _ in 1:nfacedofs[fi], _ in 1:field_dim
+                push!(cell_dofs, nextdof)
+                nextdof += 1
+            end
+        end
     end
     return nextdof
 end
 
 function add_edge_dofs(cell_dofs, cell, edgedict, field_dim, nedgedofs, nextdof)
-    @assert nedgedofs == 1 "Currently only supports interpolations with nedgedofs = 1"
-    for edge in Ferrite.edges(cell)
-        sedge, dir = Ferrite.sortedge(edge)
-        @debug "\tedge #$sedge"
-        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=edgedict, key=sedge)
-        append!(cell_dofs, dofs)
+    for (ei, edge) in pairs(edges(cell))
+        nedgedofs[ei] > 0 || continue # skip if no dof on this edge
+        sedge, this_dir = sortedge(edge)
+        token = Base.ht_keyindex2!(edgedict, sedge)
+        if token > 0 # haskey(edgedict, sedge) -> reuse dofs
+            first_dof, prev_dir = edgedict.vals[token] # edgedict[sedge]
+            # For an edge between vertices v1 and v2 with "dof locations" l1 and l2 and
+            # already distributed dofs d1-d6: v1 --- l1(d1,d2,d3) --- l2(d4,d5,d6) --- v2:
+            #  - this_dir == prev_dir: first_dof is d1 and we loop as usual over dof
+            #    locations then over field dims
+            #  - this_dir != prev_dir: first_dof is d4 and we need to reverse the loop over
+            #    the dof locations but *not* the field dims
+            for dof_loc in (this_dir == prev_dir ? (1:nedgedofs[ei]) : (nedgedofs[ei]:-1:1))
+                for d in 1:field_dim
+                    reuse_dof = first_dof + (d-1) + (dof_loc-1)*field_dim
+                    push!(cell_dofs, reuse_dof)
+                end
+            end
+        else # !haskey(edgedict, sedge) -> create dofs
+            Base._setindex!(edgedict, (nextdof, this_dir), sedge, -token) # edgedict[sedge] = (nextdof, this_dir)
+            for _ in 1:nedgedofs[ei], _ in 1:field_dim
+                push!(cell_dofs, nextdof)
+                nextdof += 1
+            end
+        end
     end
     return nextdof
 end
 
-function add_cell_dofs(cell_dofs, cell, celldict, field_dim, ncelldofs, nextdof)
-    for celldof in 1:ncelldofs
-        @debug "\tcell #$cell"
-        nextdof, dofs = get_or_create_dofs!(nextdof, field_dim, dict=celldict, key=cell)
-        append!(cell_dofs, dofs)
+function add_cell_dofs(cell_dofs, field_dim, ncelldofs, nextdof)
+    for _ in 1:ncelldofs, _ in 1:field_dim
+        push!(cell_dofs, nextdof)
+        nextdof += 1
     end
     return nextdof
 end
 
+"""
+    sortedge(edge::Tuple{Int,Int})
 
+Returns the unique representation of an edge and its orientation.
+Here the unique representation is the sorted node index tuple. The
+orientation is `true` if the edge is not flipped, where it is `false`
+if the edge is flipped.
+"""
+function sortedge(edge::Tuple{Int,Int})
+    a, b = edge
+    a < b ? (return (edge, true)) : (return ((b, a), false))
+end
+
+"""
+    sortface(face::Tuple{Int,Int}) 
+    sortface(face::Tuple{Int,Int,Int})
+    sortface(face::Tuple{Int,Int,Int,Int})
+
+Returns the unique representation of a face.
+Here the unique representation is the sorted node index tuple.
+Note that in 3D we only need indices to uniquely identify a face,
+so the unique representation is always a tuple length 3.
+"""
+sortface(face::Tuple{Int,Int}) = minmax(face[1], face[2])
+function sortface(face::Tuple{Int,Int,Int})
+    a, b, c = face
+    b, c = minmax(b, c)
+    a, c = minmax(a, c)
+    a, b = minmax(a, b)
+    return (a, b, c)
+end
+function sortface(face::Tuple{Int,Int,Int,Int})
+    a, b, c, d = face
+    c, d = minmax(c, d)
+    b, d = minmax(b, d)
+    a, d = minmax(a, d)
+    b, c = minmax(b, c)
+    a, c = minmax(a, c)
+    a, b = minmax(a, b)
+    return (a, b, c)
+end
+
+
+"""
+    find_field(dh::MixedDofHandler, field_name::Symbol)::NTuple{2,Int}
+
+Return the index of the field with name `field_name` in a `MixedDofHandler`. The index is a
+`NTuple{2,Int}`, where the 1st entry is the index of the `FieldHandler` within which the
+field was found and the 2nd entry is the index of the field within the `FieldHandler`.
+
+!!! note
+    Always finds the 1st occurence of a field within `MixedDofHandler`.
+
+See also: [`find_field(fh::FieldHandler, field_name::Symbol)`](@ref),
+[`_find_field(fh::FieldHandler, field_name::Symbol)`](@ref).
+"""
+function find_field(dh::MixedDofHandler, field_name::Symbol)
+    for (fh_idx, fh) in pairs(dh.fieldhandlers)
+        field_idx = _find_field(fh, field_name)
+        !isnothing(field_idx) && return (fh_idx, field_idx)
+    end
+    error("Did not find field :$field_name (existing fields: $(getfieldnames(dh))).")
+end
+
+"""
+    find_field(fh::FieldHandler, field_name::Symbol)::Int
+
+Return the index of the field with name `field_name` in a `FieldHandler`. Throw an
+error if the field is not found.
+
+See also: [`find_field(dh::MixedDofHandler, field_name::Symbol)`](@ref), [`_find_field(fh::FieldHandler, field_name::Symbol)`](@ref).
+"""
 function find_field(fh::FieldHandler, field_name::Symbol)
-    j = findfirst(i->i == field_name, getfieldnames(fh))
-    j === nothing && error("could not find field :$field_name in FieldHandler (existing fields: $(getfieldnames(fh)))")
-    return j
+    field_idx = _find_field(fh, field_name)
+    if field_idx === nothing
+        error("Did not find field :$field_name in FieldHandler (existing fields: $([field.name for field in fh.fields]))")
+    end
+    return field_idx
+end
+
+# No error if field not found
+"""
+    _find_field(fh::FieldHandler, field_name::Symbol)::Int
+
+Return the index of the field with name `field_name` in the `FieldHandler` `fh`. Return 
+`nothing` if the field is not found.
+
+See also: [`find_field(dh::MixedDofHandler, field_name::Symbol)`](@ref), [`find_field(fh::FieldHandler, field_name::Symbol)`](@ref).
+"""
+function _find_field(fh::FieldHandler, field_name::Symbol)
+    for (field_idx, field) in pairs(fh.fields)
+        if field.name == field_name
+            return field_idx
+        end
+    end
+    return nothing
 end
 
 # Calculate the offset to the first local dof of a field
-function field_offset(fh::FieldHandler, field_name::Symbol)
+function field_offset(fh::FieldHandler, field_idx::Int)
     offset = 0
-    for i in 1:find_field(fh, field_name)-1
-        offset += getnbasefunctions(getfieldinterpolations(fh)[i])::Int * getfielddims(fh)[i]
+    for i in 1:(field_idx-1)
+        offset += getnbasefunctions(fh.fields[i].interpolation)::Int * fh.fields[i].dim
     end
     return offset
 end
+field_offset(fh::FieldHandler, field_name::Symbol) = field_offset(fh, find_field(fh, field_name))
 
-function Ferrite.dof_range(fh::FieldHandler, field_name::Symbol)
-    f = Ferrite.find_field(fh, field_name)
-    offset = Ferrite.field_offset(fh, field_name)
-    field_interpolation = fh.fields[f].interpolation
-    field_dim = fh.fields[f].dim
+field_offset(dh::MixedDofHandler, field_name::Symbol) = field_offset(dh, find_field(dh, field_name))
+function field_offset(dh::MixedDofHandler, field_idxs::Tuple{Int, Int})
+    fh_idx, field_idx = field_idxs
+    field_offset(dh.fieldhandlers[fh_idx], field_idx)
+end
+
+"""
+    dof_range(fh::FieldHandler, field_idx::Int)
+    dof_range(fh::FieldHandler, field_name::Symbol)
+    dof_range(dh:MixedDofHandler, field_name::Symbol)
+
+Return the local dof range for a given field. The field can be specified by its name or
+index, where `field_idx` represents the index of a field within a `FieldHandler` and
+`field_idxs` is a tuple of the `FieldHandler`-index within the `MixedDofHandler` and the
+`field_idx`.
+
+!!! note
+    The `dof_range` of a field can vary between different `FieldHandler`s. Therefore, it is
+    advised to use the `field_idxs` or refer to a given `FieldHandler` directly in case
+    several `FieldHandler`s exist. Using the `field_name` will always refer to the first
+    occurence of `field` within the `MixedDofHandler`.
+
+Example:
+```jldoctest
+julia> grid = generate_grid(Triangle, (3, 3))
+Grid{2, Triangle, Float64} with 18 Triangle cells and 16 nodes
+
+julia> dh = MixedDofHandler(grid); add!(dh, :u, 3); add!(dh, :p, 1); close!(dh);
+
+julia> dof_range(dh, :u)
+1:9
+
+julia> dof_range(dh, :p)
+10:12
+
+julia> dof_range(dh, (1,1)) # field :u
+1:9
+
+julia> dof_range(dh.fieldhandlers[1], 2) # field :p
+10:12
+```
+"""
+function dof_range(fh::FieldHandler, field_idx::Int)
+    offset = field_offset(fh, field_idx)
+    field_interpolation = fh.fields[field_idx].interpolation
+    field_dim = fh.fields[field_idx].dim
     n_field_dofs = getnbasefunctions(field_interpolation)::Int * field_dim
     return (offset+1):(offset+n_field_dofs)
 end
+dof_range(fh::FieldHandler, field_name::Symbol) = dof_range(fh, find_field(fh, field_name))
 
-find_field(dh::MixedDofHandler, field_name::Symbol) = find_field(first(dh.fieldhandlers), field_name)
-field_offset(dh::MixedDofHandler, field_name::Symbol) = field_offset(first(dh.fieldhandlers), field_name)
+function dof_range(dh::MixedDofHandler, field_name::Symbol)
+    if length(dh.fieldhandlers) > 1
+        error("The given MixedDofHandler has $(length(dh.fieldhandlers)) FieldHandlers.
+              Extracting the dof range based on the fieldname might not be a unique problem
+              in this case. Use `dof_range(fh::FieldHandler, field_name)` instead.")
+    end
+    fh_idx, field_idx = find_field(dh, field_name)
+    return dof_range(dh.fieldhandlers[fh_idx], field_idx)
+end
+
+"""
+    getfieldinterpolation(dh::MixedDofHandler, field_idxs::NTuple{2,Int})
+    getfieldinterpolation(dh::FieldHandler, field_idx::Int)
+    getfieldinterpolation(dh::FieldHandler, field_name::Symbol)
+
+Return the interpolation of a given field. The field can be specified by its index (see
+[`find_field`](@ref) or its name.
+"""
+function getfieldinterpolation(dh::MixedDofHandler, field_idxs::NTuple{2,Int})
+    fh_idx, field_idx = field_idxs
+    ip = dh.fieldhandlers[fh_idx].fields[field_idx].interpolation
+    return ip
+end
 getfieldinterpolation(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].interpolation
-getfieldinterpolation(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].interpolation
-getfielddim(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].dim
-getfielddim(dh::MixedDofHandler, field_idx::Int) = dh.fieldhandlers[1].fields[field_idx].dim
+getfieldinterpolation(fh::FieldHandler, field_name::Symbol) = getfieldinterpolation(fh, find_field(fh, field_name))
 
+"""
+    reshape_to_nodes(dh::AbstractDofHandler, u::Vector{T}, fieldname::Symbol) where T
+
+Reshape the entries of the dof-vector `u` which correspond to the field `fieldname` in nodal order.
+Return a matrix with a column for every node and a row for every dimension of the field.
+For superparametric fields only the entries corresponding to nodes of the grid will be returned. Do not use this function for subparametric approximations.
+"""
 function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) where T
-
     # make sure the field exists
-    fieldname ∈ Ferrite.getfieldnames(dh) || error("Field $fieldname not found.")
+    fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
 
     field_dim = getfielddim(dh, fieldname)
     space_dim = field_dim == 2 ? 3 : field_dim
@@ -416,11 +636,31 @@ function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) 
 
     for fh in dh.fieldhandlers
         # check if this fh contains this field, otherwise continue to the next
-        field_pos = findfirst(i->i == fieldname, getfieldnames(fh))
-        field_pos === nothing && continue
-        offset = field_offset(fh, fieldname)
+        field_idx = _find_field(fh, fieldname)
+        field_idx === nothing && continue
+        offset = field_offset(fh, field_idx)
 
         reshape_field_data!(data, dh, u, offset, field_dim, fh.cellset)
+    end
+    return data
+end
+
+function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=1:getncells(dh.grid)) where T
+
+    for cell in CellIterator(dh, cellset, UpdateFlags(; nodes=true, coords=false, dofs=true))
+        _celldofs = celldofs(cell)
+        counter = 1
+        for node in getnodes(cell)
+            for d in 1:field_dim
+                data[d, node] = u[_celldofs[counter + field_offset]]
+                @debug println("  exporting $(u[_celldofs[counter + field_offset]]) for dof#$(_celldofs[counter + field_offset])")
+                counter += 1
+            end
+            if field_dim == 2
+                # paraview requires 3D-data so pad with zero
+                data[3, node] = 0
+            end
+        end
     end
     return data
 end

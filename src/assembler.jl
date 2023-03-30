@@ -109,6 +109,15 @@ struct AssemblerSymmetricSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
     sorteddofs::Vector{Int}
 end
 
+function Base.show(io::IO, ::MIME"text/plain", a::Union{AssemblerSparsityPattern,AssemblerSymmetricSparsityPattern})
+    print(io, typeof(a), " for assembling into:\n - ")
+    summary(io, a.K)
+    if !isempty(a.f)
+        print(io, "\n - ")
+        summary(io, a.f)
+    end
+end
+
 matrix_handle(a::AssemblerSparsityPattern) = a.K
 matrix_handle(a::AssemblerSymmetricSparsityPattern) = a.K.data
 vector_handle(a::Union{AssemblerSparsityPattern, AssemblerSymmetricSparsityPattern}) = a.f

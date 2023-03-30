@@ -76,6 +76,28 @@
     @test_throws AssertionError assemble!(assembler, [11, 1, 2, 3], rand(4, 4), rand(3))
 end
 
+@testset "Base.show for assemblers" begin
+    A = sparse(rand(10, 10))
+    S = Symmetric(A)
+    b = rand(10)
+    @test occursin(
+        r"for assembling into:\n - 10×10 SparseMatrix",
+        sprint(show, MIME"text/plain"(), start_assemble(A)),
+    )
+    @test occursin(
+        r"for assembling into:\n - 10×10 SparseMatrix.*\n - 10-element Vector",
+        sprint(show, MIME"text/plain"(), start_assemble(A, b)),
+    )
+    @test occursin(
+        r"for assembling into:\n - 10×10 Symmetric.*SparseMatrix",
+        sprint(show, MIME"text/plain"(), start_assemble(S)),
+    )
+    @test occursin(
+        r"for assembling into:\n - 10×10 Symmetric.*SparseMatrix.*\n - 10-element Vector",
+        sprint(show, MIME"text/plain"(), start_assemble(S, b)),
+    )
+end
+
 struct IgnoreMeIfZero
     x::Float64
 end

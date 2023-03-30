@@ -227,10 +227,10 @@ end
     field_vQ = Field(:v, ip_quad, 1)
 
     # Order important for test to ensure consistent dof ordering
-    push!(dh, FieldHandler([field_uQ, field_vQ], getcellset(grid, "uandvQ")))
-    push!(dh, FieldHandler([field_uT, field_vT], getcellset(grid, "uandvT")))
-    push!(dh, FieldHandler([field_uT], getcellset(grid, "onlyuT")))
-    push!(dh, FieldHandler([field_uQ], getcellset(grid, "onlyuQ")))
+    add!(dh, FieldHandler([field_uQ, field_vQ], getcellset(grid, "uandvQ")))
+    add!(dh, FieldHandler([field_uT, field_vT], getcellset(grid, "uandvT")))
+    add!(dh, FieldHandler([field_uT], getcellset(grid, "onlyuT")))
+    add!(dh, FieldHandler([field_uQ], getcellset(grid, "onlyuQ")))
     close!(dh)
 
     # Add constraints 
@@ -240,23 +240,25 @@ end
     dB_u = Dirichlet(:u, getfaceset(grid, "B"), (x,t) -> 3.0)  # Note, overwrites dA_u on node 3 
     dB_v = Dirichlet(:v, getfaceset(grid, "B"), (x,t) -> 4.0)  # :v not on cells with "B"-faces
     dC_v = Dirichlet(:v, getfaceset(grid, "C"), (x,t) -> 5.0)  # :v not on cells with "C"-faces
+    dN_u = Dirichlet(:u, Set(10), (x,t) -> 6.0)                # Add on node 10
     
     @test_logs min_level=Logging.Warn add!(ch, dA_u)    # No warning should be issued
     @test_logs min_level=Logging.Warn add!(ch, dA_v)    # No warning should be issued
     @test_logs min_level=Logging.Warn add!(ch, dB_u)    # No warning should be issued
     @test_logs (:warn,) add!(ch, dB_v)  # Warn about :v not in cells connected with dB_v's faceset
     @test_logs (:warn,) add!(ch, dC_v)  # Warn about :v not in cells connected with dC_v's faceset
+    @test_logs min_level=Logging.Warn add!(ch, dN_u)    # No warning should be issued (add to node)
     close!(ch)
     
     # The full bottom part of the mesh has been prescribed
-    @test sort(ch.prescribed_dofs) == sort([nd[i] for nd in nodedofs[1:5] for i in 1:length(nd)])
+    @test sort(ch.prescribed_dofs) == sort(push!([nd[i] for nd in nodedofs[1:5] for i in 1:length(nd)], 15))
 
     # Test that the correct dofs have been prescribed
     update!(ch, 0.0)
-    #                 nodes       N1,  N2,  N1,  N2,  N3,  N4,  N5
-    #                 field       :u,  :u,  :v,  :v,  :u,  :u,  :u
-    #                   dof        1,   2,   5,   6,  11,  12,  14
-    @test ch.inhomogeneities == [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 3.0]
+    #                 nodes       N1,  N2,  N1,  N2,  N3,  N4,  N5   N10
+    #                 field       :u,  :u,  :v,  :v,  :u,  :u,  :u   :u
+    #                   dof        1,   2,   5,   6,  11,  12,  14   15
+    @test ch.inhomogeneities == [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 6.0]
     # Note that dB_u overwrite dA_u @ N3, hence the value 3.0 there
 end
 
@@ -1554,3 +1556,29 @@ end # testset
     end
     @test K ≈ Kc ≈ Kfull
 end # testset
+
+@testset "apply!(::Symmetric, ...)" begin
+    # Specifically this test that values below the diagonal of K2::Symmetric aren't touched
+    # and that the missing values are instead taken from above the diagonal.
+    grid = generate_grid(Line, (2,))
+    dh = DofHandler(grid)
+    add!(dh, :u, 1)
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:u, getfaceset(grid, "left"), x -> 1))
+    close!(ch)
+    K1 = rand(3, 3); K1 = sparse(K1'K1)
+    K2 = copy(K1); K2[2:3, 1] .= 42; K2[3, 2] = NaN; K2 = Symmetric(K2)
+    @test K1 == K2
+    f1 = Float64[1, 2, 3]
+    f2 = copy(f1)
+    apply!(K1, f1, ch)
+    apply!(K2, f2, ch)
+    @test K1 == K2
+    @test f1 == f2
+    # Error for affine constraints
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint(1, [3 => 1.0], 1.0))
+    close!(ch)
+    @test_throws ErrorException("condensation of ::Symmetric matrix not supported") apply!(K2, f2, ch)
+end

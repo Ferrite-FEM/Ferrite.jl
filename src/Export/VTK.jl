@@ -14,6 +14,7 @@ cell_to_vtkcell(::Type{Hexahedron}) = VTKCellTypes.VTK_HEXAHEDRON
 cell_to_vtkcell(::Type{Cell{3,20,6}}) = VTKCellTypes.VTK_QUADRATIC_HEXAHEDRON
 cell_to_vtkcell(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
 cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
+cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
 
 nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
 
@@ -106,6 +107,10 @@ the cell is in the set and 0 otherwise.
 """
 vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellset::String) =
     vtk_cellset(vtk, grid, [cellset])
+
+function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
+    vtk_grid(filename, dh.grid; compress=compress)
+end
 
 function WriteVTK.vtk_point_data(vtkfile, dh::AbstractDofHandler, u::Vector, suffix="")
 
