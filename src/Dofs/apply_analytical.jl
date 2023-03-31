@@ -1,12 +1,7 @@
-
-function _default_interpolations(dh::MixedDofHandler)
+function _default_interpolations(dh::DofHandler)
     fhs = dh.fieldhandlers
     getcelltype(i) = typeof(getcells(dh.grid, first(fhs[i].cellset)))
     ntuple(i -> default_interpolation(getcelltype(i)), length(fhs))
-end
-
-function _default_interpolation(dh::DofHandler)
-    return default_interpolation(typeof(getcells(dh.grid, 1)))
 end
 
 """
@@ -32,19 +27,6 @@ This function can be used to apply initial conditions for time dependent problem
 """
 function apply_analytical!(
     a::AbstractVector, dh::DofHandler, fieldname::Symbol, f::Function,
-    cellset = 1:getncells(dh.grid))
-
-    fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
-    ip_geo = _default_interpolation(dh)
-    field_idx = find_field(dh, fieldname)
-    ip_fun = getfieldinterpolation(dh, field_idx)
-    celldofinds = dof_range(dh, fieldname)
-    field_dim = getfielddim(dh, field_idx)
-    _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, cellset)
-end
-
-function apply_analytical!(
-    a::AbstractVector, dh::MixedDofHandler, fieldname::Symbol, f::Function,
     cellset = 1:getncells(dh.grid))
 
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
