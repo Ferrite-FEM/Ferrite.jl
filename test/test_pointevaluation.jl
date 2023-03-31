@@ -271,7 +271,7 @@ function mixed_grid()
 
 
     # second alternative: assume a vector field :v
-    dh = MixedDofHandler(mesh)
+    dh = DofHandler(mesh)
     field = Field(:v, ip_quad, 2)
     fh_quad = FieldHandler([field], getcellset(mesh, "quads"))
     add!(dh, fh_quad)
