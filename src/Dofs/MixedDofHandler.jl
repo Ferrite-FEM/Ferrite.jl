@@ -58,7 +58,7 @@ struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     ndofs::ScalarWrapper{Int}
 end
 
-function DofHandler(grid::Grid{dim,C}) where {dim,C}
+function DofHandler(grid::AbstractGrid{dim}) where dim
     ncells = getncells(grid)
     DofHandler{dim,typeof(grid)}(FieldHandler[], Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
@@ -317,7 +317,7 @@ function _close!(dh::DofHandler{dim}, cellnumbers, global_field_names, fields, n
     for ci in cellnumbers
         @debug "Creating dofs for cell #$ci"
 
-        cell = dh.grid.cells[ci]
+        cell = getcells(dh.grid, ci)
         len_cell_dofs_start = length(dh.cell_dofs)
         dh.cell_dofs_offset[ci] = len_cell_dofs_start + 1
 
