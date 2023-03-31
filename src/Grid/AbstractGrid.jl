@@ -171,6 +171,38 @@ function Base.show(io::IO, ::MIME"text/plain", grid::AbstractGrid)
     print(io, " cells and $(getnnodes(grid)) nodes")
 end
 
+"""
+    function compute_vertex_values(grid::AbstractGrid, f::Function)
+    function compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function)    
+    function compute_vertex_values(grid::AbstractGrid, set::String, f::Function)
+
+Given a `grid` and some function `f`, `compute_vertex_values` computes all nodal values,
+ i.e. values at the nodes,  of the function `f`. 
+The function implements two dispatches, where only a subset of the grid's node is used.
+
+```julia
+    compute_vertex_values(grid, x -> sin(x[1]) + cos([2]))
+    compute_vertex_values(grid, [9, 6, 3], x -> sin(x[1]) + cos([2])) #compute function values at nodes with id 9,6,3
+    compute_vertex_values(grid, "right", x -> sin(x[1]) + cos([2])) #compute function values at nodes belonging to nodeset right
+```
+
+"""
+@inline function compute_vertex_values(nodes::Vector{Node{dim,T}}, f::Function) where{dim,T}
+    map(n -> f(get_node_coordinate(n)), nodes)
+end
+
+@inline function compute_vertex_values(grid::AbstractGrid, f::Function)
+    compute_vertex_values(getnodes(grid), f::Function)
+end
+
+@inline function compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function)
+    compute_vertex_values(getnodes(grid, v), f::Function)
+end
+
+@inline function compute_vertex_values(grid::AbstractGrid, set::String, f::Function)
+    compute_vertex_values(getnodes(grid, set), f::Function)
+end
+
 abstract type AbstractTopology end
 # AbstractTopology is only used as supertype for ExclusiveTopology as of now
 # Exact interface to be designed. 
