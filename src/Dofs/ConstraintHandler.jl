@@ -831,7 +831,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
             dbc_added = true
         end
     end
-    dbc_added || @warn("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's DofHandler")
+    dbc_added || error("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's DofHandler")
     return ch
 end
 
