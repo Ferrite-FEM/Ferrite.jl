@@ -187,7 +187,7 @@ The function implements two dispatches, where only a subset of the grid's node i
 ```
 
 """
-@inline function compute_vertex_values(nodes::Vector{Node{dim,T}}, f::Function) where{dim,T}
+@inline function compute_vertex_values(nodes::Vector, f::Function)
     map(n -> f(get_node_coordinate(n)), nodes)
 end
 
@@ -197,10 +197,6 @@ end
 
 @inline function compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function)
     compute_vertex_values(getnodes(grid, v), f::Function)
-end
-
-@inline function compute_vertex_values(grid::AbstractGrid, set::String, f::Function)
-    compute_vertex_values(getnodes(grid, set), f::Function)
 end
 
 abstract type AbstractTopology end

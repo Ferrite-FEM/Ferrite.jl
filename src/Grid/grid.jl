@@ -211,7 +211,9 @@ Returns all vertex sets of the grid.
 
 n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
 
-
+@inline function compute_vertex_values(grid::AbstractGrid, set::String, f::Function)
+    compute_vertex_values(getnodes(grid, set), f::Function)
+end
 
 # Transformations
 """
