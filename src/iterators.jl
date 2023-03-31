@@ -66,17 +66,17 @@ function CellCache(dh::DofHandler{dim}, flags::UpdateFlags=UpdateFlags()) where 
     return CellCache(flags, dh.grid, ScalarWrapper(-1), nodes, coords, dh, celldofs)
 end
 
-function reinit!(cc::CellCache{<:Any,<:AbstractGrid,<:DofHandler}, i::Int)
+function reinit!(cc::CellCache, i::Int)
     cc.cellid[] = i
     if cc.flags.nodes
-        resize!(cc.nodes, nnodes_per_cell(cc.dh, i))
-        cellnodes!(cc.nodes, cc.dh, i)
+        resize!(cc.nodes, nnodes_per_cell(cc.grid, i))
+        cellnodes!(cc.nodes, cc.grid, i)
     end
     if cc.flags.coords
-        resize!(cc.coords, nnodes_per_cell(cc.dh, i))
-        cellcoords!(cc.coords, cc.dh, i)
+        resize!(cc.coords, nnodes_per_cell(cc.grid, i))
+        cellcoords!(cc.coords, cc.grid, i)
     end
-    if cc.flags.dofs
+    if cc.dh !== nothing && cc.flags.dofs
         resize!(cc.dofs, ndofs_per_cell(cc.dh, i))
         celldofs!(cc.dofs, cc.dh, i)
     end
