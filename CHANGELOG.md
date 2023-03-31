@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Internal changes
 - `Ferrite.ndim(dh, fieldname)` has been removed, use `Ferrite.getfielddim(dh,
   fieldname)` instead. ([#658][github-658])
+ - `getfielddims(::FieldHandler)` and `getfieldinterpolations(::FieldHandler)` removed ([#647][github-647]) (Note that `getfieldnames(::FieldHandler)` was re-introduced in [#659][github-659])
 
 ## [0.3.13] - 2023-03-23
 ### Added
@@ -385,6 +386,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-645]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/645
 [github-650]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/650
 [github-658]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/658
+[github-647]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/647
+[github-659]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/659
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.13...HEAD
 [0.3.13]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.12...v0.3.13
