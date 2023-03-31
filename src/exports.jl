@@ -109,7 +109,6 @@ export
     dof_range,
     renumber!,
     DofOrder,
-    MixedDofHandler,
     FieldHandler,
     Field,
     reshape_to_nodes,
