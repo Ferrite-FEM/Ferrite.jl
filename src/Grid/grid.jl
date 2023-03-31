@@ -141,7 +141,7 @@ toglobal(grid::AbstractGrid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((
 
 @inline getcells(grid::Grid) = grid.cells
 
-@inline getnodes(grid::AbstractGrid) = grid.nodes
+@inline getnodes(grid::Grid) = grid.nodes
 
 
 """
@@ -379,17 +379,6 @@ function addnodeset!(grid::Grid, name::String, f::Function)
     grid.nodesets[name] = nodes
     _warn_emptyset(grid.nodesets[name], name)
     grid
-end
-
-function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
-    print(io, "$(typeof(grid)) with $(getncells(grid)) ")
-    if isconcretetype(eltype(grid.cells))
-        typestrs = [repr(eltype(grid.cells))]
-    else
-        typestrs = sort!(repr.(Set(typeof(x) for x in grid.cells)))
-    end
-    join(io, typestrs, '/')
-    print(io, " cells and $(getnnodes(grid)) nodes")
 end
 
 # Functions to uniquely identify vertices, edges and faces, used when distributing

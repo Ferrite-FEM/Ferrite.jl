@@ -77,7 +77,7 @@ function getcells end
 @inline getncells(grid::AbstractGrid) = length(getcells(grid))
 
 "Returns the celltype of the `<:AbstractGrid`."
-@inline getcelltype(grid::AbstractGrid) = eltype(grid.cells)
+@inline getcelltype(grid::AbstractGrid) = eltype(getcells(grid))
 @inline getcelltype(grid::AbstractGrid, i::Int) = typeof(getcells(grid, i))
 
 """
@@ -158,6 +158,17 @@ function _cellnodes!(global_nodes::Vector{Int}, cell::AbstractCell)
         global_nodes[i] = getnodeidxs(cell, i)
     end
     return global_nodes
+end
+
+function Base.show(io::IO, ::MIME"text/plain", grid::AbstractGrid)
+    print(io, "$(typeof(grid)) with $(getncells(grid)) ")
+    if isconcretetype(getcelltype(grid))
+        typestrs = [repr(getcelltype(grid))]
+    else
+        typestrs = sort!(repr.(Set(typeof(x) for x in getcells(grid))))
+    end
+    join(io, typestrs, '/')
+    print(io, " cells and $(getnnodes(grid)) nodes")
 end
 
 abstract type AbstractTopology end
