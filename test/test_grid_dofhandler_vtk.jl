@@ -162,7 +162,7 @@ end
 
     @test length(getnodes(grid, "node_set")) == 9
 
-    @test collect(getcoordinates(getnodes(grid, 5)).data) ≈ [0.5, 0.5]
+    @test collect(get_node_coordinate(grid, 5).data) ≈ [0.5, 0.5]
 
     @test getcells(grid, "cell_set") == [getcells(grid, 1)]
 

@@ -81,6 +81,8 @@ include("FEValues/common_values.jl")
 include("FEValues/face_integrals.jl")
 
 # Grid
+include("Grid/AbstractGrid.jl")
+include("Grid/ExclusiveTopology.jl")
 include("Grid/grid.jl")
 include("Grid/grid_generators.jl")
 include("Grid/coloring.jl")
