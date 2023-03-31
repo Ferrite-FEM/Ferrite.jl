@@ -667,7 +667,7 @@ function reshape_to_nodes(dh::MixedDofHandler, u::Vector{T}, fieldname::Symbol) 
         field_idx === nothing && continue
         offset = field_offset(fh, field_idx)
 
-        reshape_field_data!(data, dh, u, offset, field_dim, fh.cellset)
+        reshape_field_data!(data, dh, u, offset, field_dim, BitSet(fh.cellset))
     end
     return data
 end

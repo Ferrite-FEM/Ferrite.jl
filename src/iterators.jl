@@ -120,7 +120,7 @@ onboundary(cc::CellCache, face::Int) = cc.grid.boundary_matrix[face, cc.cellid[]
 ## CellIterator ##
 ##################
 
-const IntegerCollection = Union{Set{<:Integer}, AbstractVector{<:Integer}}
+const IntegerCollection = Union{AbstractSet{<:Integer}, AbstractVector{<:Integer}}
 
 """
     CellIterator(grid::Grid, cellset=1:getncells(grid))
