@@ -515,7 +515,7 @@ function find_field(dh::DofHandler, field_name::Symbol)
         field_idx = _find_field(fh, field_name)
         !isnothing(field_idx) && return (fh_idx, field_idx)
     end
-    error("Did not find field :$field_name (existing fields: $(getfieldnames(dh))).")
+    error("Did not find field :$field_name in DofHandler (existing fields: $(getfieldnames(dh))).")
 end
 
 """
