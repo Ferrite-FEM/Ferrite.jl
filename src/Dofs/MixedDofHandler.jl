@@ -134,11 +134,13 @@ end
 
 """
     getfieldnames(dh::MixedDofHandler)
+    getfieldnames(fh::FieldHandler)
 
 Return a vector with the names of all fields. Can be used as an iterable over all the fields
 in the problem.
 """
 getfieldnames(dh::MixedDofHandler) = dh.field_names
+getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
 
 getfielddim(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].dim
 getfielddim(fh::FieldHandler, field_name::Symbol) = getfielddim(fh, find_field(fh, field_name))
