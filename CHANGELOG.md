@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    ([#650][github-650])
 ### Internal changes
 - `Ferrite.ndim(dh, fieldname)` has been removed, use `Ferrite.getfielddim(dh,
-  fieldname)` instead.
+  fieldname)` instead. ([#658][github-658])
 
 ## [0.3.13] - 2023-03-23
 ### Added
@@ -384,6 +384,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-633]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/633
 [github-645]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/645
 [github-650]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/650
+[github-658]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/658
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.13...HEAD
 [0.3.13]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.12...v0.3.13
