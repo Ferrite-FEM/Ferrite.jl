@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    sparsity pattern. ([#650][github-650])
  - Support Metis dof reordering with coupling information for `MixedDofHandler`.
    ([#650][github-650])
+### Internal changes
+- `Ferrite.ndim(dh, fieldname)` has been removed, use `Ferrite.getfielddim(dh,
+  fieldname)` instead.
 
 ## [0.3.13] - 2023-03-23
 ### Added
