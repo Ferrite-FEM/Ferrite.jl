@@ -37,8 +37,8 @@ getvertexset
 getvertexsets
 compute_vertex_values
 transform!
-getcoordinates
-getcoordinates!
+get_cell_coordinates
+get_cell_coordinates!
 ```
 
 ### Topology

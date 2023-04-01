@@ -98,7 +98,7 @@ for cellid in 1:getncells(grid)
     fill!(ke, 0.0)
 
     celldofs!(celldofs, dh, cellid)
-    getcoordinates!(cellcoords, grid, cellid)
+    get_cell_coordinates!(cellcoords, grid, cellid)
 
     #Call the element routine
     integrate_shell!(ke, cv, qr_ooplane, cellcoords, data)

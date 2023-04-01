@@ -9,3 +9,5 @@ import Base: push!
 @deprecate edges(ip::Interpolation) edgedof_indices(ip) false
 @deprecate nfields(dh::AbstractDofHandler) length(getfieldnames(dh)) false
 @deprecate getcoordinates(node::Node) get_node_coordinate(node) false
+@deprecate getcoordinates(args...) get_cell_coordinates(args...) false
+@deprecate getcoordinates!(args...) get_cell_coordinates!(args...) false

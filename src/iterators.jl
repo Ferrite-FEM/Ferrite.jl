@@ -31,7 +31,7 @@ cell. The cache is updated for a new cell by calling `reinit!(cache, cellid)` wh
  - `reinit!(cc, i)`: reinitialize the cache for cell `i`
  - `cellid(cc)`: get the cell id of the currently cached cell
  - `getnodes(cc)`: get the global node ids of the cell
- - `getcoordinates(cc)`: get the coordinates of the cell
+ - `get_cell_coordinates(cc)`: get the coordinates of the cell
  - `celldofs(cc)`: get the global dof ids of the cell
  - `reinit!(fev, cc)`: reinitialize [`CellValues`](@ref) or [`FaceValues`](@ref)
 
@@ -105,7 +105,7 @@ reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
 getnodes(cc::CellCache) = cc.nodes
-getcoordinates(cc::CellCache) = cc.coords
+get_cell_coordinates(cc::CellCache) = cc.coords
 celldofs(cc::CellCache) = cc.dofs
 cellid(cc::CellCache) = cc.cellid[]
 

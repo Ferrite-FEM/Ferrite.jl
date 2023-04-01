@@ -69,7 +69,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
                 possible_cells = get(node_cell_dict, node, nothing)
                 possible_cells === nothing && continue # if node is not part of the fieldhandler, try the next node
                 for cell in possible_cells
-                    cell_coords = getcoordinates(grid, cell)
+                    cell_coords = get_cell_coordinates(grid, cell)
                     is_in_cell, local_coord = point_in_cell(geom_interpol, cell_coords, points[point_idx])
                     if is_in_cell
                         cell_found = true

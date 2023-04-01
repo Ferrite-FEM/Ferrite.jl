@@ -77,6 +77,8 @@ export
     getcoordinates,
     getcoordinates!,
     get_node_coordinate,
+    get_cell_coordinates,
+    get_cell_coordinates!,
     getcellsets,
     getnodesets,
     getfacesets,

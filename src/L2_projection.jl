@@ -131,7 +131,7 @@ function _assemble_L2_matrix(fe_values, set, dh)
         celldofs!(cell_dofs, dh, cellnum)
 
         fill!(Me, 0)
-        Xe = getcoordinates(dh.grid, cellnum)
+        Xe = get_cell_coordinates(dh.grid, cellnum)
         reinit!(fe_values, Xe)
 
         ## ∭( v ⋅ u )dΩ
@@ -248,7 +248,7 @@ function _project(vars, proj::L2Projector, fe_values::Values, M::Integer, ::Type
     for (ic,cellnum) in enumerate(proj.set)
         celldofs!(cell_dofs, proj.dh, cellnum)
         fill!(fe, 0)
-        Xe = getcoordinates(proj.dh.grid, cellnum)
+        Xe = get_cell_coordinates(proj.dh.grid, cellnum)
         cell_vars = vars[ic]
         reinit!(fe_values, Xe)
 

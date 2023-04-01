@@ -184,7 +184,7 @@ end
     ci = CellIterator(grid)
     @test length(ci) == getncells(grid)
     for c in ci
-        getcoordinates(c)
+        get_cell_coordinates(c)
         getnodes(c)
         n += cellid(c)
     end
@@ -387,7 +387,7 @@ end
 #                   +-----+-----+-----+
 # test application: integrate jump across element boundary 5
     function reinit!(fv::FaceValues, cellid::Int, faceid::Int, grid)
-        coords = getcoordinates(grid, cellid)
+        coords = get_cell_coordinates(grid, cellid)
         Ferrite.reinit!(fv, coords, faceid)
     end
     reinit!(fv::FaceValues, faceid::FaceIndex, grid) = reinit!(fv,faceid[1],faceid[2],grid) # wrapper for reinit!(fv,cellid,faceid,grid)

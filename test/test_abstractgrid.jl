@@ -43,7 +43,7 @@
         for cellid in 1:getncells(dh.grid)
             fill!(Ke, 0)
             fill!(fe, 0)
-            coords = getcoordinates(dh.grid, cellid)
+            coords = get_cell_coordinates(dh.grid, cellid)
             reinit!(cellvalues, coords)
             for q_point in 1:getnquadpoints(cellvalues)
                 dΩ = getdetJdV(cellvalues, q_point)

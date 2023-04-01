@@ -70,7 +70,7 @@ function _apply_analytical!(
     a::Vector, dh::AbstractDofHandler, celldofinds, field_dim,
     ip_fun::Interpolation{dim,RefShape}, ip_geo::Interpolation, f::Function, cellset) where {dim, RefShape}
 
-    coords = getcoordinates(dh.grid, first(cellset))
+    coords = get_cell_coordinates(dh.grid, first(cellset))
     ref_points = reference_coordinates(ip_fun)
     dummy_weights = zeros(length(ref_points))
     qr = QuadratureRule{dim, RefShape}(dummy_weights, ref_points)
@@ -82,7 +82,7 @@ function _apply_analytical!(
     length(f(first(coords))) == field_dim || error("length(f(x)) must be equal to dimension of the field ($field_dim)")
 
     for cellnr in cellset
-        getcoordinates!(coords, dh.grid, cellnr)
+        get_cell_coordinates!(coords, dh.grid, cellnr)
         celldofs!(c_dofs, dh, cellnr)
         for (i, celldofind) in enumerate(celldofinds)
             f_dofs[i] = c_dofs[celldofind]
