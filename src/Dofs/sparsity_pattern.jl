@@ -7,7 +7,8 @@ with stored values in the correct places.
 
 The keyword argument `coupling` can be used to specify how fields (or components) in the dof
 handler couple to each other. `coupling` should be a square matrix of booleans with
-`nfields` (or `ncomponents`) rows/columns with `true` if fields are coupled and `false` if
+number of rows/columns equal to the total number of fields, or total number of components,
+in the DofHandler with `true` if fields are coupled and `false` if
 not. By default full coupling is assumed.
 
 See the [Sparsity Pattern](@ref) section of the manual.

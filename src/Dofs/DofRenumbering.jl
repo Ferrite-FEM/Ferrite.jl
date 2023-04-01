@@ -133,7 +133,8 @@ Dof order passed to [`renumber!`](@ref) to renumber global dofs field wise resul
 globally blocked system.
 
 The default behavior is to group dofs of each field into their own block, with the same
-order as in the DofHandler. This can be customized by passing a vector of length `nfields`
+order as in the DofHandler. This can be customized by passing a vector of the same length
+as the total number of fields in the DofHandler (see `getfieldnames(dh)`)
 that maps each field to a "target block": to renumber a DofHandler with three fields `:u`,
 `:v`, `:w` such that dofs for `:u` and `:w` end up in the first global block, and dofs for
 `:v` in the second global block use `DofOrder.FieldWise([1, 2, 1])`.

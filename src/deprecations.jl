@@ -7,3 +7,4 @@ import Base: push!
 @deprecate vertices(ip::Interpolation) vertexdof_indices(ip) false
 @deprecate faces(ip::Interpolation) facedof_indices(ip) false
 @deprecate edges(ip::Interpolation) edgedof_indices(ip) false
+@deprecate nfields(dh::AbstractDofHandler) length(getfieldnames(dh)) false

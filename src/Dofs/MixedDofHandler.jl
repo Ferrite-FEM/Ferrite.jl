@@ -162,13 +162,6 @@ end
 getfielddim(dh::MixedDofHandler, name::Symbol) = getfielddim(dh, find_field(dh, name))
 
 """
-    nfields(dh::MixedDofHandler)
-
-Returns the number of unique fields defined.
-"""
-nfields(dh::MixedDofHandler) = length(getfieldnames(dh))
-
-"""
     add!(dh::MixedDofHandler, fh::FieldHandler)
 
 Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
