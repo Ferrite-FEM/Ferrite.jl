@@ -212,7 +212,7 @@ function project(proj::L2Projector,
 
     projected_vals = _project(vars, proj, fe_values, M, T)::Vector{T}
     if project_to_nodes
-        # NOTE we may have more projected values than verticies in the mesh => not all values are returned
+        # NOTE we may have more projected values than vertices in the mesh => not all values are returned
         nnodes = getnnodes(proj.dh.grid)
         reordered_vals = fill(convert(T, NaN * zero(T)), nnodes)
         for node = 1:nnodes

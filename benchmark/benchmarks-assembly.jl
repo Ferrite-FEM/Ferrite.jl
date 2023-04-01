@@ -25,7 +25,7 @@ for spatial_dim ∈ 1:3
 
             qr = QuadratureRule{spatial_dim, ref_type}(2*order-1)
 
-            # Currenlty we just benchmark nodal Lagrange bases.
+            # Currently we just benchmark nodal Lagrange bases.
             COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)][string(ip_type),string(order)] = BenchmarkGroup()
             LAGRANGE_SUITE = COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)][string(ip_type),string(order)]
             LAGRANGE_SUITE["fe-values"] = BenchmarkGroup()

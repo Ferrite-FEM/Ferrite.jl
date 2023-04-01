@@ -73,7 +73,7 @@
 # step-11](https://www.dealii.org/current/doxygen/deal.II/step_11.html) for some more
 # discussion around this). In particular, we will enforce the mean value of the pressure on
 # the boundary to be 0, i.e. ``\int_{\Gamma} p\ \mathrm{d}\Gamma = 0``. One option is to
-# enforce this using a Lagrange multipler. This would give a contribution ``\lambda
+# enforce this using a Lagrange multiplier. This would give a contribution ``\lambda
 # \int_{\Gamma} \delta p\ \mathrm{d}\Gamma`` to the second equation in the weak form above,
 # and a third equation ``\delta\lambda \int_{\Gamma} p\ \mathrm{d}\Gamma = 0`` so that we
 # can solve for ``\lambda``. However, since we in this case are not interested in computing

@@ -18,7 +18,7 @@ end
 
 Construct a `FieldHandler` based on an array of [`Field`](@ref)s and assigns it a set of cells.
 
-A `FieldHandler` must fullfill the following requirements:
+A `FieldHandler` must fulfill the following requirements:
 - All [`Cell`](@ref)s in `cellset` are of the same type.
 - Each field only uses a single interpolation on the `cellset`.
 - Each cell belongs only to a single `FieldHandler`, i.e. all fields on a cell must be added within the same `FieldHandler`.
@@ -512,7 +512,7 @@ Return the index of the field with name `field_name` in a `MixedDofHandler`. The
 field was found and the 2nd entry is the index of the field within the `FieldHandler`.
 
 !!! note
-    Always finds the 1st occurence of a field within `MixedDofHandler`.
+    Always finds the 1st occurrence of a field within `MixedDofHandler`.
 
 See also: [`find_field(fh::FieldHandler, field_name::Symbol)`](@ref),
 [`_find_field(fh::FieldHandler, field_name::Symbol)`](@ref).
@@ -589,7 +589,7 @@ index, where `field_idx` represents the index of a field within a `FieldHandler`
     The `dof_range` of a field can vary between different `FieldHandler`s. Therefore, it is
     advised to use the `field_idxs` or refer to a given `FieldHandler` directly in case
     several `FieldHandler`s exist. Using the `field_name` will always refer to the first
-    occurence of `field` within the `MixedDofHandler`.
+    occurrence of `field` within the `MixedDofHandler`.
 
 Example:
 ```jldoctest

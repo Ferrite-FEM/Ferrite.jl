@@ -95,7 +95,7 @@ function workstream_coloring(incidence_matrix, cellset)
         ## Zone N: All elements with connection to elements in Zone N-1
         while true
             s = Set{Int}()
-            # Loop over all elements in previous zone and add their neigbouring elements
+            # Loop over all elements in previous zone and add their neighbouring elements
             # unless they are in any of the previous 2 zones.
             empty_zone = true
             for c in get(zones, Z-1, Z0)

@@ -270,7 +270,7 @@ boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
 #########################
 # TODO generalize to arbitrary basis positionings.
 """
-Piecewise discontinous Lagrange basis via Gauss-Lobatto points.
+Piecewise discontinuous Lagrange basis via Gauss-Lobatto points.
 """
 struct DiscontinuousLagrange{dim,shape,order} <: Interpolation{dim,shape,order} end
 
@@ -1086,7 +1086,7 @@ end
 """
 Classical non-conforming Crouzeix–Raviart element.
 
-For details we refer ot the original paper:
+For details we refer to the original paper:
 M. Crouzeix and P. Raviart. "Conforming and nonconforming finite element 
 methods for solving the stationary Stokes equations I." ESAIM: Mathematical Modelling 
 and Numerical Analysis-Modélisation Mathématique et Analyse Numérique 7.R3 (1973): 33-75.

@@ -56,7 +56,7 @@ end
 
 const DofCoefficients{T} = Vector{Pair{Int,T}}
 """
-    AffineConstraint(constrained_dof::Int, entires::Vector{Pair{Int,T}}, b::T) where T
+    AffineConstraint(constrained_dof::Int, entries::Vector{Pair{Int,T}}, b::T) where T
 
 Define an affine/linear constraint to constrain one degree of freedom, `u[i]`, 
 such that `u[i] = ∑(u[j] * a[j]) + b`, 
@@ -584,7 +584,7 @@ result (e.g. `du` zero for all prescribed degrees of freedom).
     apply_zero!(v::AbstractVector, ch::ConstraintHandler)
 
 Zero-out values in `v` corresponding to prescribed degrees of freedom and update values 
-prescribed by affine constraints, such that if `a` fullfills the constraints,
+prescribed by affine constraints, such that if `a` fulfills the constraints,
 `a ± v` also will.
 
 These methods are typically used in e.g. a Newton solver where the increment, `du`, should
