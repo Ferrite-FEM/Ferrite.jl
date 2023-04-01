@@ -378,7 +378,7 @@ end
 
 
 function test_element_order()
-    # Check that one can have non-contigous ordering of cells in a Grid
+    # Check that one can have non-contiguous ordering of cells in a Grid
     # Something like this:
     #        ______
     #      /|     |\

@@ -332,7 +332,7 @@ function solve()
     end
 
     ## ## Postprocessing
-    ## Only a vtu-file corrsponding to the last time-step is exported.
+    ## Only a vtu-file corresponding to the last time-step is exported.
     ##
     ## The following is a quick (and dirty) way of extracting average cell data for export.
     mises_values = zeros(getncells(grid))

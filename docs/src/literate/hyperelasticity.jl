@@ -36,13 +36,13 @@
 # ``\Omega`` denotes the reference (sometimes also called *initial* or *material*) domain.
 # Gradients are defined with respect to the reference domain, here denoted with  an ``\mathbf{X}``.
 # Formally this is expressed as ``(\nabla_{\mathbf{X}} \bullet)_{ij} := \frac{\partial(\bullet)_i}{\partial X_j}``.
-# Note that for large deformation problems it is also possibile that gradients and integrals
+# Note that for large deformation problems it is also possible that gradients and integrals
 # are defined on the deformed (sometimes also called *current* or *spatial*) domain, depending
 # on the specific formulation.
 #
 # The specific problem we will solve in this example is the cube from Figure 1: On one side
 # we apply a rotation using Dirichlet boundary conditions, on the opposite side we fix the
-# displacement with a homogenous Dirichlet boundary condition, and on the remaining four
+# displacement with a homogeneous Dirichlet boundary condition, and on the remaining four
 # sides we apply a traction in the normal direction of the surface. In addition, a body
 # force is applied in one direction.
 #
@@ -337,7 +337,7 @@ function solve()
     end
 
     dbcs = ConstraintHandler(dh)
-    ## Add a homogenous boundary condition on the "clamped" edge
+    ## Add a homogeneous boundary condition on the "clamped" edge
     dbc = Dirichlet(:u, getfaceset(grid, "right"), (x,t) -> [0.0, 0.0, 0.0], [1, 2, 3])
     add!(dbcs, dbc)
     dbc = Dirichlet(:u, getfaceset(grid, "left"), (x,t) -> rotation(x, t), [1, 2, 3])
