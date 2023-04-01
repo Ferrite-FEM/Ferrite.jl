@@ -8,3 +8,4 @@ import Base: push!
 @deprecate faces(ip::Interpolation) facedof_indices(ip) false
 @deprecate edges(ip::Interpolation) edgedof_indices(ip) false
 @deprecate nfields(dh::AbstractDofHandler) length(getfieldnames(dh)) false
+@deprecate getcoordinates(node::Node) get_node_coordinate(node) false

@@ -13,7 +13,7 @@ struct Node{dim,T}
     x::Vec{dim,T}
 end
 Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
-getcoordinates(n::Node) = n.x
+get_node_coordinate(n::Node) = n.x
 
 """
     Ferrite.get_coordinate_eltype(::Node)
@@ -512,6 +512,8 @@ to a Node.
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
 "Returns the number of nodes of the `i`-th cell."
 @inline nnodes_per_cell(grid::AbstractGrid, i::Int=1) = nnodes(grid.cells[i])
+
+get_node_coordinate(grid, nodeid) = get_node_coordinate(getnodes(grid, nodeid))
 "Return the number type of the nodal coordinates."
 @inline get_coordinate_eltype(grid::AbstractGrid) = get_coordinate_eltype(first(getnodes(grid)))
 
@@ -599,7 +601,7 @@ The function implements two dispatches, where only a subset of the grid's node i
 
 """
 @inline function compute_vertex_values(nodes::Vector{Node{dim,T}}, f::Function) where{dim,T}
-    map(n -> f(getcoordinates(n)), nodes)
+    map(n -> f(get_node_coordinate(n)), nodes)
 end
 
 @inline function compute_vertex_values(grid::AbstractGrid, f::Function)
@@ -765,7 +767,7 @@ end
 
 @inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim,T}
     @inbounds for i in 1:length(x)
-        x[i] = getcoordinates(getnodes(grid, cell.nodes[i]))
+        x[i] = get_node_coordinate(grid, cell.nodes[i])
     end
     return x
 end

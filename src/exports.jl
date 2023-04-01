@@ -76,6 +76,7 @@ export
     getvertexset,
     getcoordinates,
     getcoordinates!,
+    get_node_coordinate,
     getcellsets,
     getnodesets,
     getfacesets,
