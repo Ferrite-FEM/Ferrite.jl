@@ -29,7 +29,7 @@ function DofOrder.Ext{Metis}(;
 end
 
 function Ferrite.compute_renumber_permutation(
-    dh::Union{DofHandler,MixedDofHandler},
+    dh::DofHandler,
     ch::Union{ConstraintHandler,Nothing},
     order::DofOrder.Ext{Metis}
 )
