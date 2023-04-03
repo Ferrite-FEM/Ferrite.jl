@@ -598,8 +598,8 @@ function test_show()
     field1 = create_field(name=:u, spatial_dim=2, field_dim=2, order=1, cellshape=RefCube)
     field2 = create_field(name=:u, spatial_dim=2, field_dim=2, order=1, cellshape=RefTetrahedron)
     dh = DofHandler(grid);
-    push!(dh, FieldHandler([field1], Set(1)));
-    push!(dh, FieldHandler([field2], Set(2)));
+    add!(dh, FieldHandler([field1], Set(1)));
+    add!(dh, FieldHandler([field2], Set(2)));
     close!(dh)
     @test repr("text/plain", dh) == repr(typeof(dh)) * "\n  Fields:\n    :u, dim: 2\n  Total dofs: 10"
 end
