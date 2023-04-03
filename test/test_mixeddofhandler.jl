@@ -349,7 +349,7 @@ function test_2_element_heat_eq()
     # Use the same assemble function since it is the same weak form for both cell-types
     for fh in dh.fieldhandlers
         qr = QuadratureRule{2, RefCube}(2)
-        interp = fh.fields[1].interpolation
+        interp = fh.field_interpolations[1]
         cellvalues = CellScalarValues(qr, interp)
         doassemble(fh.cellset, cellvalues, assembler, dh)
     end

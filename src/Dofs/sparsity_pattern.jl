@@ -71,9 +71,8 @@ function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatri
         out = zeros(Bool, ndofs_per_cell(dh, ci), ndofs_per_cell(dh, ci))
         push!(outs, out)
 
-        field_names = (f.name for f in fh.fields)
-        dof_ranges = [dof_range(fh, f) for f in field_names]
-        global_idxs = [findfirst(x -> x === f, dh.field_names) for f in field_names]
+        dof_ranges = [dof_range(fh, f) for f in fh.field_names]
+        global_idxs = [findfirst(x -> x === f, dh.field_names) for f in fh.field_names]
 
         if sz == length(dh.field_names) # Coupling given by fields
             for (j, jrange) in pairs(dof_ranges), (i, irange) in pairs(dof_ranges)
