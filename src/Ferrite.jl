@@ -86,7 +86,7 @@ include("Grid/grid_generators.jl")
 include("Grid/coloring.jl")
 
 # Dofs
-include("Dofs/MixedDofHandler.jl")
+include("Dofs/DofHandler.jl")
 include("Dofs/ConstraintHandler.jl")
 include("Dofs/apply_analytical.jl")
 include("Dofs/sparsity_pattern.jl")
