@@ -196,6 +196,13 @@ function add!(dh::DofHandler, name::Symbol, dim::Int)
     add!(dh, name, dim, default_interpolation(celltype))
 end
 
+"""
+    add!(dh::AbstractDofHandler, name::Symbol, dim::Int[, ip::Interpolation])
+Add a `dim`-dimensional `Field` called `name` which is approximated by `ip` to `dh`.
+The field is added to all cells of the underlying grid. In case no interpolation `ip` is
+given, the default interpolation of the grid's celltype is used. If the grid uses several
+celltypes, [`add!(dh::DofHandler, fh::FieldHandler)`](@ref) must be used instead.
+"""
 function add!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation)
     @assert !isclosed(dh)
 
