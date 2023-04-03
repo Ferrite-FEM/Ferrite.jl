@@ -234,40 +234,6 @@ function close!(ch::ConstraintHandler)
 end
 
 """
-    add!(ch::ConstraintHandler, dbc::Dirichlet)
-
-Add a `Dirichlet` boundary condition to the `ConstraintHandler`.
-"""
-function add!(ch::ConstraintHandler, dbc::Dirichlet)
-    if length(dbc.faces) == 0
-        @warn("adding Dirichlet Boundary Condition to set containing 0 entities")
-    end
-    celltype = getcelltype(ch.dh.grid)
-    @assert isconcretetype(celltype)
-
-    # Extract stuff for the field
-    field_idx = find_field(ch.dh, dbc.field_name) # throws if name not found
-    interpolation = getfieldinterpolation(ch.dh, field_idx)
-    field_dim = getfielddim(ch.dh, field_idx)
-
-    if !all(c -> 0 < c <= field_dim, dbc.components)
-        error("components $(dbc.components) not within range of field :$(dbc.field_name) ($(field_dim) dimension(s))")
-    end
-
-    # Empty components means constrain them all
-    isempty(dbc.components) && append!(dbc.components, 1:field_dim)
-
-    if eltype(dbc.faces)==Int #Special case when dbc.faces is a nodeset
-        bcvalue = BCValues(interpolation, default_interpolation(celltype), FaceIndex) #Not used by node bcs, but still have to pass it as an argument
-    else
-        bcvalue = BCValues(interpolation, default_interpolation(celltype), eltype(dbc.faces))
-    end
-    _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue)
-
-    return ch
-end
-
-"""
     add!(ch::ConstraintHandler, ac::AffineConstraint)
 
 Add the `AffineConstraint` to the `ConstraintHandler`.
@@ -846,9 +812,12 @@ function meandiag(K::AbstractMatrix)
     return z / size(K, 1)
 end
 
+"""
+    add!(ch::ConstraintHandler, dbc::Dirichlet)
 
-#Function for adding constraint when using multiple celltypes
-function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
+Add a `Dirichlet` boundary condition to the `ConstraintHandler`.
+"""
+function add!(ch::ConstraintHandler, dbc::Dirichlet)
     dbc_added = false
     for fh in ch.dh.fieldhandlers
         if !isnothing(_find_field(fh, dbc.field_name)) && _in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=false)
@@ -862,7 +831,7 @@ function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
             dbc_added = true
         end
     end
-    dbc_added || @warn("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's MixedDofHandler")
+    dbc_added || error("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's DofHandler")
     return ch
 end
 

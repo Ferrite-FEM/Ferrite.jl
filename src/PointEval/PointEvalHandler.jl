@@ -212,7 +212,7 @@ end
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
 function get_point_values!(out_vals::Vector{T2},
     ph::PointEvalHandler,
-    dh::MixedDofHandler,
+    dh::DofHandler,
     dof_vals::Vector{T},
     fname::Symbol,
     func_interpolations
@@ -231,23 +231,6 @@ function get_point_values!(out_vals::Vector{T2},
             _get_point_values!(out_vals, dof_vals, ph, dh, ip, cellset, Val(fdim), dofrange)
         end
     end
-    return out_vals
-end
-
-function get_point_values!(out_vals::Vector{T2},
-    ph::PointEvalHandler,
-    dh::DofHandler,
-    dof_vals::Vector{T},
-    fname::Symbol,
-    func_interpolations
-    ) where {T2, T} 
-
-    # TODO: I don't think this is correct??
-    length(dof_vals) == ndofs(dh) || error("You must supply values for all $(ndofs(dh)) dofs.")
-
-    fdim = getfielddim(dh, fname)
-    dofrange = dof_range(dh, fname)
-    _get_point_values!(out_vals, dof_vals, ph, dh, func_interpolations[1], nothing, Val(fdim), dofrange)
     return out_vals
 end
 
@@ -292,8 +275,7 @@ end
 _change_format(::Val{1}, dof_values::AbstractVector{T}) where T = dof_values
 _change_format(::Val{fielddim}, dof_values::AbstractVector{T}) where {fielddim, T} = reinterpret(Vec{fielddim, T}, dof_values)
 
-get_func_interpolations(dh::DH, fieldname) where DH<:DofHandler = [getfieldinterpolation(dh, find_field(dh, fieldname))]
-function get_func_interpolations(dh::DH, fieldname) where DH<:MixedDofHandler
+function get_func_interpolations(dh::DofHandler, fieldname)
     func_interpolations = Union{Interpolation,Nothing}[]
     for fh in dh.fieldhandlers
         j = _find_field(fh, fieldname)

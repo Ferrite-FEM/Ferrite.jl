@@ -54,37 +54,22 @@ for spatial_dim ∈ [3]# 1:3
                     LAGRANGE_SUITE["DofHandler"]["two-fields"] = @benchmarkable $close_helper($grid, $ip, $ip2)
 
 
-                    LAGRANGE_SUITE["MixedDofHandler"] = BenchmarkGroup()
                     f1 = Field(:u, ip, field_dim)
                     f2 = Field(:p, ip2, 1)
 
                     close_helper = function(grid, f1)
-                        dh = MixedDofHandler(grid)
-                        push!(dh, FieldHandler([f1], Set(1:getncells(grid))))
-                        close!(dh)
-                    end
-                    LAGRANGE_SUITE["MixedDofHandler"]["one-field"] = @benchmarkable $close_helper($grid, $f1)
-
-                    close_helper = function(grid, f1)
-                        dh = MixedDofHandler(grid)
+                        dh = DofHandler(grid)
                         push!(dh, FieldHandler([f1], Set(1:Int(round(getncells(grid)/2)))))
                         close!(dh)
                     end
-                    LAGRANGE_SUITE["MixedDofHandler"]["one-field-subdomain"] = @benchmarkable $close_helper($grid, $f1)
+                    LAGRANGE_SUITE["DofHandler"]["one-field-subdomain"] = @benchmarkable $close_helper($grid, $f1)
 
                     close_helper = function(grid, f1, f2)
-                        dh = MixedDofHandler(grid)
-                        push!(dh, FieldHandler([f1, f2], Set(1:getncells(grid))))
-                        close!(dh)
-                    end
-                    LAGRANGE_SUITE["MixedDofHandler"]["two-fields"] = @benchmarkable $close_helper($grid, $f1, $f2)
-
-                    close_helper = function(grid, f1, f2)
-                        dh = MixedDofHandler(grid)
+                        dh = DofHandler(grid)
                         push!(dh, FieldHandler([f1, f2], Set(1:Int(round(getncells(grid)/2)))))
                         close!(dh)
                     end
-                    LAGRANGE_SUITE["MixedDofHandler"]["two-fields-subdomain"] = @benchmarkable $close_helper($grid, $f1, $f2)
+                    LAGRANGE_SUITE["DofHandler"]["two-fields-subdomain"] = @benchmarkable $close_helper($grid, $f1, $f2)
                 end
             end
         end
