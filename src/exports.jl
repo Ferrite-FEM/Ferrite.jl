@@ -99,6 +99,7 @@ export
 
 # Dofs
     DofHandler,
+    MixedDofHandler, # only for getting an error message redirecting to DofHandler
     close!,
     ndofs,
     ndofs_per_cell,

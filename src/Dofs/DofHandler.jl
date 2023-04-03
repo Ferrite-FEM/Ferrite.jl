@@ -63,6 +63,11 @@ function DofHandler(grid::AbstractGrid{dim}) where dim
     DofHandler{dim,typeof(grid)}(FieldHandler[], Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
+function MixedDofHandler(::AbstractGrid)
+    error("MixedDofHandler is the standard DofHandler in Ferrite now and has been renamed to DofHandler.
+Use DofHandler even for mixed grids and fields on subdomains.")
+end
+
 function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
     println(io, typeof(dh))
     println(io, "  Fields:")
