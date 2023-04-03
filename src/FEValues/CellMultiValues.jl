@@ -80,6 +80,8 @@ getdetJdV(cv::CellMultiValues, args...) = getdetJdV(cv.geo_values, args...)
 geometric_value(cv::CellMultiValues, args...) = geometric_value(cv.geo_values, args...)
 
 # FunctionValues functions: call like with CellValues, but foo(cv[:name], args...)
+Base.getindex(cmv::CellMultiValues, key::Symbol) = getindex(cmv.fun_values, key)
+# Note: Need to add tests that checks that type is inferred (this seems to work for mwe)
 
 function _update_dNdx!(fv::FunctionValues{dim}, i::Int, Jinv::Tensor{2,dim}) where dim
     @inbounds for j in 1:getnbasefunctions(fv)
