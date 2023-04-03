@@ -20,8 +20,8 @@ getnbasefunctions(cv::Values) = size(cv.N, 1)
 getngeobasefunctions(cv::Values) = size(cv.M, 1)
 
 getn_scalarbasefunctions(cv::T) where T = getn_scalarbasefunctions(FieldTrait(T), cv)
-getn_scalarbasefunctions(::ScalarValued, cv::Values) = size(cv.N, 1)
-getn_scalarbasefunctions(::VectorValued, cv::Values{dim}) where {dim} = size(cv.N, 1) ÷ dim
+getn_scalarbasefunctions(::ScalarValued, cv::Values) = getnbasefunctions(cv)
+getn_scalarbasefunctions(::VectorValued, cv::Values{dim}) where {dim} = getnbasefunctions(cv) ÷ dim
 
 function checkquadpoint(cv::Union{CellScalarValues,FaceScalarValues,CellVectorValues,FaceVectorValues,PointScalarValues}, qp::Int)
     0 < qp <= getnquadpoints(cv) || error("quadrature point out of range")
