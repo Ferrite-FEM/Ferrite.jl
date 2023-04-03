@@ -26,14 +26,15 @@ A `FieldHandler` must fulfill the following requirements:
 Notice that a `FieldHandler` can hold several fields.
 """
 mutable struct FieldHandler
-    fields::Vector{Field} # Should not be used, kept for compatibility for now
+    # fields::Vector{Field} # Should not be used, kept for compatibility for now
     field_names::Vector{Symbol}
     field_dims::Vector{Int}
     field_interpolations::Vector{Interpolation}
     cellset::Set{Int}
     ndofs_per_cell::Int # set in close(::DofHandler)
     function FieldHandler(fields, cellset)
-        fh = new(fields, Symbol[], Int[], Interpolation[], cellset, -1)
+        # fh = new(fields, Symbol[], Int[], Interpolation[], cellset, -1)
+        fh = new(Symbol[], Int[], Interpolation[], cellset, -1)
         for f in fields
             push!(fh.field_names, f.name)
             push!(fh.field_dims, f.dim)
@@ -235,8 +236,8 @@ function add!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation)
     push!(fh.field_dims, dim)
     push!(fh.field_interpolations, ip)
 
-    field = Field(name,ip,dim)
-    push!(fh.fields, field)
+    # field = Field(name,ip,dim)
+    # push!(fh.fields, field)
 
     return dh
 end
