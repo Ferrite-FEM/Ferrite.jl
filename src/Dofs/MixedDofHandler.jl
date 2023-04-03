@@ -41,7 +41,7 @@ Construct a `MixedDofHandler` based on `grid`. Supports:
 - `Grid`s with or without concrete element type (E.g. "mixed" grids with several different element types.)
 - One or several fields, which can live on the whole domain or on subsets of the `Grid`.
 """
-struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
+struct MixedDofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
     field_names::Vector{Symbol}
     # Dofs for cell i are stored in cell_dofs[cell_dofs_offset[i]:(cell_dofs_offset[i]+length[i]-1)].
@@ -58,9 +58,9 @@ struct MixedDofHandler{dim,T,G<:AbstractGrid{dim}} <: AbstractDofHandler
     ndofs::ScalarWrapper{Int}
 end
 
-function MixedDofHandler(grid::Grid{dim,C,T}) where {dim,C,T}
+function MixedDofHandler(grid::Grid{dim,C}) where {dim,C}
     ncells = getncells(grid)
-    MixedDofHandler{dim,T,typeof(grid)}(FieldHandler[], Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
+    MixedDofHandler{dim,typeof(grid)}(FieldHandler[], Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::MixedDofHandler)
