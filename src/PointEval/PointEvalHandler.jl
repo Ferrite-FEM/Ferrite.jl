@@ -282,7 +282,7 @@ function get_func_interpolations(dh::DofHandler, fieldname)
         if j === nothing
             push!(func_interpolations, missing)
         else
-            push!(func_interpolations, fh.fields[j].interpolation)
+            push!(func_interpolations, fh.field_interpolations[j])
         end
     end
     return func_interpolations

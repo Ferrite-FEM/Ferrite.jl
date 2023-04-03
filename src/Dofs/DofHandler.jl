@@ -26,11 +26,20 @@ A `FieldHandler` must fulfill the following requirements:
 Notice that a `FieldHandler` can hold several fields.
 """
 mutable struct FieldHandler
-    fields::Vector{Field}
+    fields::Vector{Field} # Should not be used, kept for compatibility for now
+    field_names::Vector{Symbol}
+    field_dims::Vector{Int}
+    field_interpolations::Vector{Interpolation}
     cellset::Set{Int}
     ndofs_per_cell::Int # set in close(::DofHandler)
     function FieldHandler(fields, cellset)
-        return new(fields, cellset, -1)
+        fh = new(fields, Symbol[], Int[], Interpolation[], cellset, -1)
+        for f in fields
+            push!(fh.field_names, f.name)
+            push!(fh.field_dims, f.dim)
+            push!(fh.field_interpolations, f.interpolation)
+        end
+        return fh
     end
 end
 
@@ -145,9 +154,9 @@ Return a vector with the names of all fields. Can be used as an iterable over al
 in the problem.
 """
 getfieldnames(dh::DofHandler) = dh.field_names
-getfieldnames(fh::FieldHandler) = [field.name for field in fh.fields]
+getfieldnames(fh::FieldHandler) = fh.field_names
 
-getfielddim(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].dim
+getfielddim(fh::FieldHandler, field_idx::Int) = fh.field_dims[field_idx]
 getfielddim(fh::FieldHandler, field_name::Symbol) = getfielddim(fh, find_field(fh, field_name))
 
 """
@@ -180,8 +189,8 @@ function add!(dh::DofHandler, fh::FieldHandler)
     # extract the celltype from the first cell as the celltypes are all equal
     cell_type = typeof(dh.grid.cells[first(fh.cellset)])
     refshape_cellset = getrefshape(default_interpolation(cell_type))
-    for field_idx  in eachindex(fh.fields)
-        refshape = getrefshape(getfieldinterpolation(fh, field_idx))
+    for interpolation in fh.field_interpolations
+        refshape = getrefshape(interpolation)
         refshape_cellset == refshape || error("The RefShapes of the fieldhandlers interpolations must correspond to the RefShape of the cells it is applied to.")
     end
 
@@ -222,8 +231,11 @@ function add!(dh::DofHandler, name::Symbol, dim::Int, ip::Interpolation)
     end
     fh = first(dh.fieldhandlers)
 
-    field = Field(name,ip,dim)
+    push!(fh.field_names, name)
+    push!(fh.field_dims, dim)
+    push!(fh.field_interpolations, ip)
 
+    field = Field(name,ip,dim)
     push!(fh.fields, field)
 
     return dh
@@ -251,8 +263,8 @@ function __close!(dh::DofHandler{dim}) where {dim}
 
     # Collect the global field names
     empty!(dh.field_names)
-    for fh in dh.fieldhandlers, f in fh.fields
-        f.name in dh.field_names || push!(dh.field_names, f.name)
+    for fh in dh.fieldhandlers, name in fh.field_names
+        name in dh.field_names || push!(dh.field_names, name)
     end
     numfields = length(dh.field_names)
 
@@ -279,25 +291,15 @@ function __close!(dh::DofHandler{dim}) where {dim}
 
     @debug "\n\nCreating dofs\n"
     for (fhi, fh) in pairs(dh.fieldhandlers)
-        # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
-        cellnumbers = BitSet(fh.cellset)
-        nextdof, ndofs_per_cell = _close!(
+        nextdof = _close!(
             dh,
-            cellnumbers,
-            dh.field_names,
-            fh.fields,
+            fh,
+            fhi, # TODO: Store in the FieldHandler?
             nextdof,
             vertexdicts,
             edgedicts,
             facedicts,
         )
-        fh.ndofs_per_cell = ndofs_per_cell
-        # TODO: This could be done in the loop inside _close!(...)
-        for i in cellnumbers
-            # TODO: _check_cellset_intersections can be removed in favor of this assertion
-            @assert dh.cell_to_fieldhandler[i] == 0
-            dh.cell_to_fieldhandler[i] = fhi
-        end
     end
     dh.ndofs[] = maximum(dh.cell_dofs; init=0)
     dh.closed[] = true
@@ -306,10 +308,9 @@ function __close!(dh::DofHandler{dim}) where {dim}
 
 end
 
-function _close!(dh::DofHandler{dim}, cellnumbers, global_field_names, fields, nextdof, vertexdicts, edgedicts, facedicts) where {dim}
+function _close!(dh::DofHandler{dim}, fh::FieldHandler, fh_index::Int, nextdof, vertexdicts, edgedicts, facedicts) where {dim}
     ip_infos = InterpolationInfo[]
-    for field in fields
-        interpolation = field.interpolation
+    for interpolation in fh.field_interpolations
         ip_info = InterpolationInfo(interpolation)
         push!(ip_infos, ip_info)
         # TODO: More than one face dof per face in 3D are not implemented yet. This requires
@@ -325,23 +326,31 @@ function _close!(dh::DofHandler{dim}, cellnumbers, global_field_names, fields, n
     first_cell = true
     ndofs_per_cell = -1
 
+    # Mapping between the local field index and the global field index
+    global_fidxs = Int[findfirst(gname -> gname === lname, dh.field_names) for lname in fh.field_names]
+
     # loop over all the cells, and distribute dofs for all the fields
-    for ci in cellnumbers
+    # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
+    for ci in BitSet(fh.cellset)
         @debug "Creating dofs for cell #$ci"
+
+        # TODO: _check_cellset_intersections can be removed in favor of this assertion
+        @assert dh.cell_to_fieldhandler[ci] == 0
+        dh.cell_to_fieldhandler[ci] = fh_index
 
         cell = getcells(dh.grid, ci)
         len_cell_dofs_start = length(dh.cell_dofs)
         dh.cell_dofs_offset[ci] = len_cell_dofs_start + 1
 
-        for (local_num, field) in pairs(fields)
-        # for (local_num, field_name) in enumerate(field_names)
-            fi = findfirst(i->i == field.name, global_field_names)
-            @debug "\tfield: $(field.name)"
-            ip_info = ip_infos[local_num]
+        for (lidx, gidx) in pairs(global_fidxs)
+            @debug "\tfield: $(fh.field_names[lidx])"
+
+            fdim = fh.field_dims[lidx]
+            ip_info = ip_infos[lidx]
 
             # Distribute dofs for vertices
             nextdof = add_vertex_dofs(
-                dh.cell_dofs, cell, vertexdicts[fi], field.dim,
+                dh.cell_dofs, cell, vertexdicts[gidx], fdim,
                 ip_info.nvertexdofs, nextdof
             )
 
@@ -350,7 +359,7 @@ function _close!(dh::DofHandler{dim}, cellnumbers, global_field_names, fields, n
                 # Regular 3D element or 2D interpolation embedded in 3D space
                 nentitydofs = ip_info.dim == 3 ? ip_info.nedgedofs : ip_info.nfacedofs
                 nextdof = add_edge_dofs(
-                    dh.cell_dofs, cell, edgedicts[fi], field.dim,
+                    dh.cell_dofs, cell, edgedicts[gidx], fdim,
                     nentitydofs, nextdof
                 )
             end
@@ -359,19 +368,20 @@ function _close!(dh::DofHandler{dim}, cellnumbers, global_field_names, fields, n
             # they are added above as edge dofs.
             if ip_info.dim == dim
                 nextdof = add_face_dofs(
-                    dh.cell_dofs, cell, facedicts[fi], field.dim,
+                    dh.cell_dofs, cell, facedicts[gidx], fdim,
                     ip_info.nfacedofs, nextdof
                 )
             end
 
             # Distribute internal dofs for cells
             nextdof = add_cell_dofs(
-                dh.cell_dofs, field.dim, ip_info.ncelldofs, nextdof
+                dh.cell_dofs, fdim, ip_info.ncelldofs, nextdof
             )
         end
 
         if first_cell
             ndofs_per_cell = length(dh.cell_dofs) - len_cell_dofs_start
+            fh.ndofs_per_cell = ndofs_per_cell
             first_cell = false
         else
             @assert ndofs_per_cell == length(dh.cell_dofs) - len_cell_dofs_start
@@ -379,7 +389,7 @@ function _close!(dh::DofHandler{dim}, cellnumbers, global_field_names, fields, n
 
         # @debug "Dofs for cell #$ci:\n\t$cell_dofs"
     end # cell loop
-    return nextdof, ndofs_per_cell
+    return nextdof
 end
 
 function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, nextdof)
@@ -541,7 +551,7 @@ See also: [`find_field(dh::DofHandler, field_name::Symbol)`](@ref), [`_find_fiel
 function find_field(fh::FieldHandler, field_name::Symbol)
     field_idx = _find_field(fh, field_name)
     if field_idx === nothing
-        error("Did not find field :$field_name in FieldHandler (existing fields: $([field.name for field in fh.fields]))")
+        error("Did not find field :$field_name in FieldHandler (existing fields: $(fh.field_names))")
     end
     return field_idx
 end
@@ -556,19 +566,14 @@ Return the index of the field with name `field_name` in the `FieldHandler` `fh`.
 See also: [`find_field(dh::DofHandler, field_name::Symbol)`](@ref), [`find_field(fh::FieldHandler, field_name::Symbol)`](@ref).
 """
 function _find_field(fh::FieldHandler, field_name::Symbol)
-    for (field_idx, field) in pairs(fh.fields)
-        if field.name == field_name
-            return field_idx
-        end
-    end
-    return nothing
+    return findfirst(x -> x === field_name, fh.field_names)
 end
 
 # Calculate the offset to the first local dof of a field
 function field_offset(fh::FieldHandler, field_idx::Int)
     offset = 0
     for i in 1:(field_idx-1)
-        offset += getnbasefunctions(fh.fields[i].interpolation)::Int * fh.fields[i].dim
+        offset += getnbasefunctions(fh.field_interpolations[i])::Int * fh.field_dims[i]
     end
     return offset
 end
@@ -618,8 +623,8 @@ julia> dof_range(dh.fieldhandlers[1], 2) # field :p
 """
 function dof_range(fh::FieldHandler, field_idx::Int)
     offset = field_offset(fh, field_idx)
-    field_interpolation = fh.fields[field_idx].interpolation
-    field_dim = fh.fields[field_idx].dim
+    field_interpolation = fh.field_interpolations[field_idx]
+    field_dim = fh.field_dims[field_idx]
     n_field_dofs = getnbasefunctions(field_interpolation)::Int * field_dim
     return (offset+1):(offset+n_field_dofs)
 end
@@ -645,10 +650,10 @@ Return the interpolation of a given field. The field can be specified by its ind
 """
 function getfieldinterpolation(dh::DofHandler, field_idxs::NTuple{2,Int})
     fh_idx, field_idx = field_idxs
-    ip = dh.fieldhandlers[fh_idx].fields[field_idx].interpolation
+    ip = dh.fieldhandlers[fh_idx].field_interpolations[field_idx]
     return ip
 end
-getfieldinterpolation(fh::FieldHandler, field_idx::Int) = fh.fields[field_idx].interpolation
+getfieldinterpolation(fh::FieldHandler, field_idx::Int) = fh.field_interpolations[field_idx]
 getfieldinterpolation(fh::FieldHandler, field_name::Symbol) = getfieldinterpolation(fh, find_field(fh, field_name))
 
 """
