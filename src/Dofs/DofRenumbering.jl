@@ -79,7 +79,7 @@ function _renumber!(dh::AbstractDofHandler, ch::Union{ConstraintHandler,Nothing}
     return
 end
 
-function _renumber!(dh::Union{DofHandler, MixedDofHandler}, perm::AbstractVector{<:Integer})
+function _renumber!(dh::DofHandler, perm::AbstractVector{<:Integer})
     @assert isclosed(dh)
     for i in eachindex(dh.cell_dofs)
         dh.cell_dofs[i] = perm[dh.cell_dofs[i]]
@@ -144,7 +144,7 @@ target block is maintained.
 """
 DofOrder.FieldWise
 
-function compute_renumber_permutation(dh::Union{DofHandler, MixedDofHandler}, _, order::DofOrder.FieldWise)
+function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.FieldWise)
     field_names = getfieldnames(dh)
     field_dims = map(fieldname -> getfielddim(dh, fieldname), dh.field_names)
     target_blocks = if isempty(order.target_blocks)
@@ -175,7 +175,7 @@ target block is maintained.
 """
 DofOrder.ComponentWise
 
-function compute_renumber_permutation(dh::Union{DofHandler,MixedDofHandler}, _, order::DofOrder.ComponentWise)
+function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.ComponentWise)
     # Note: This assumes fields have the same dimension regardless of subdomain
     field_dims = map(fieldname -> getfielddim(dh, fieldname), dh.field_names)
     target_blocks = if isempty(order.target_blocks)
@@ -193,12 +193,10 @@ function compute_renumber_permutation(dh::Union{DofHandler,MixedDofHandler}, _, 
     dofs_for_blocks = [Set{Int}() for _ in 1:nblocks]
     component_offsets = pushfirst!(cumsum(field_dims), 0)
     flags = UpdateFlags(nodes=false, coords=false, dofs=true)
-    for fh in (dh isa DofHandler ? (dh,) : dh.fieldhandlers)
-        field_names = fh isa DofHandler ? fh.field_names : [f.name for f in fh.fields]
-        dof_ranges = [dof_range(fh, f) for f in field_names]
-        global_idxs = [findfirst(x -> x === f, dh.field_names) for f in field_names]
-        set = dh isa DofHandler ? nothing : fh.cellset
-        for cell in CellIterator(dh, set, flags)
+    for fh in dh.fieldhandlers
+        dof_ranges = [dof_range(fh, f) for f in fh.field_names]
+        global_idxs = [findfirst(x -> x === f, dh.field_names) for f in fh.field_names]
+        for cell in CellIterator(dh, fh.cellset, flags)
             cdofs = celldofs(cell)
             for (local_idx, global_idx) in pairs(global_idxs)
                 rng = dof_ranges[local_idx]
