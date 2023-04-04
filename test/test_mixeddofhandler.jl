@@ -307,8 +307,8 @@ function test_2_element_heat_eq()
     ∂Ω2 = getfaceset(grid, "right")
     dbc1 = Dirichlet(:u, ∂Ω1, (x, t) -> 0)
     dbc2 = Dirichlet(:u, ∂Ω2, (x, t) -> 0)
-    add!(ch, dh.fieldhandlers[1], dbc1);
-    add!(ch, dh.fieldhandlers[2], dbc2);
+    add!(ch, dbc1);
+    add!(ch, dbc2);
     close!(ch)
 
     function doassemble(cellset, cellvalues, assembler, dh)
