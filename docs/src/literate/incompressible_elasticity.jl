@@ -24,6 +24,7 @@
 #md # [section](@ref incompressible_elasticity-plain-program).
 using Ferrite
 using BlockArrays, SparseArrays, LinearAlgebra
+import Ferrite: CellMultiValues
 
 # First we generate a simple grid, specifying the 4 corners of Cooks membrane.
 function create_cook_grid(nx, ny)
@@ -54,7 +55,10 @@ function create_values(interpolation_u, interpolation_p)
     ## cellvalues for p
     cellvalues_p = CellScalarValues(qr, interpolation_p, interpolation_geom)
 
-    return cellvalues_u, cellvalues_p, facevalues_u
+    # Combine into multivalues
+    cellvalues = CellMultiValues(;u=cellvalues_u, p=cellvalues_p)
+
+    return cellvalues, facevalues_u
 end;
 
 
@@ -88,14 +92,14 @@ end
 # Now to the assembling of the stiffness matrix. This mixed formulation leads to a blocked
 # element matrix. Since Ferrite does not force us to use any particular matrix type we will
 # use a `PseudoBlockArray` from `BlockArrays.jl`.
-function doassemble(cellvalues_u::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim},
-                    facevalues_u::FaceVectorValues{dim}, K::SparseMatrixCSC, grid::Grid,
+function doassemble(cellvalues::CellMultiValues{dim}, facevalues_u::FaceVectorValues{dim}, 
+                    K::SparseMatrixCSC, grid::Grid,
                     dh::DofHandler, mp::LinearElasticity) where {dim}
 
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
-    nu = getnbasefunctions(cellvalues_u)
-    np = getnbasefunctions(cellvalues_p)
+    nu = getnbasefunctions(cellvalues[:u])
+    np = getnbasefunctions(cellvalues[:p])
 
     fe = PseudoBlockArray(zeros(nu + np), [nu, np]) # local force vector
     ke = PseudoBlockArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
@@ -103,12 +107,12 @@ function doassemble(cellvalues_u::CellVectorValues{dim}, cellvalues_p::CellScala
     ## traction vector
     t = Vec{2}((0.0, 1/16))
     ## cache ɛdev outside the element routine to avoid some unnecessary allocations
-    ɛdev = [zero(SymmetricTensor{2, dim}) for i in 1:getnbasefunctions(cellvalues_u)]
+    ɛdev = [zero(SymmetricTensor{2, dim}) for i in 1:getnbasefunctions(cellvalues[:u])]
 
     for cell in CellIterator(dh)
         fill!(ke, 0)
         fill!(fe, 0)
-        assemble_up!(ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, grid, mp, ɛdev, t)
+        assemble_up!(ke, fe, cell, cellvalues, facevalues_u, grid, mp, ɛdev, t)
         assemble!(assembler, celldofs(cell), fe, ke)
     end
 
@@ -118,36 +122,35 @@ end;
 # The element routine integrates the local stiffness and force vector for all elements.
 # Since the problem results in a symmetric matrix we choose to only assemble the lower part,
 # and then symmetrize it after the loop over the quadrature points.
-function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, grid, mp, ɛdev, t)
+function assemble_up!(Ke, fe, cell, cellvalues, facevalues_u, grid, mp, ɛdev, t)
 
-    n_basefuncs_u = getnbasefunctions(cellvalues_u)
-    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    n_basefuncs_u = getnbasefunctions(cellvalues[:u])
+    n_basefuncs_p = getnbasefunctions(cellvalues[:p])
     u▄, p▄ = 1, 2
-    reinit!(cellvalues_u, cell)
-    reinit!(cellvalues_p, cell)
+    reinit!(cellvalues, cell)
 
     ## We only assemble lower half triangle of the stiffness matrix and then symmetrize it.
-    for q_point in 1:getnquadpoints(cellvalues_u)
+    for q_point in 1:getnquadpoints(cellvalues)
         for i in 1:n_basefuncs_u
-            ɛdev[i] = dev(symmetric(shape_gradient(cellvalues_u, q_point, i)))
+            ɛdev[i] = dev(symmetric(shape_gradient(cellvalues[:u], q_point, i)))
         end
-        dΩ = getdetJdV(cellvalues_u, q_point)
+        dΩ = getdetJdV(cellvalues, q_point)
         for i in 1:n_basefuncs_u
-            divδu = shape_divergence(cellvalues_u, q_point, i)
-            δu = shape_value(cellvalues_u, q_point, i)
+            divδu = shape_divergence(cellvalues[:u], q_point, i)
+            δu = shape_value(cellvalues[:u], q_point, i)
             for j in 1:i
                 Ke[BlockIndex((u▄, u▄), (i, j))] += 2 * mp.G * ɛdev[i] ⊡ ɛdev[j] * dΩ
             end
         end
 
         for i in 1:n_basefuncs_p
-            δp = shape_value(cellvalues_p, q_point, i)
+            δp = shape_value(cellvalues[:p], q_point, i)
             for j in 1:n_basefuncs_u
-                divδu = shape_divergence(cellvalues_u, q_point, j)
+                divδu = shape_divergence(cellvalues[:u], q_point, j)
                 Ke[BlockIndex((p▄, u▄), (i, j))] += -δp * divδu * dΩ
             end
             for j in 1:i
-                p = shape_value(cellvalues_p, q_point, j)
+                p = shape_value(cellvalues[:p], q_point, j)
                 Ke[BlockIndex((p▄, p▄), (i, j))] += - 1/mp.K * δp * p * dΩ
             end
 
@@ -198,11 +201,11 @@ function solve(ν, interpolation_u, interpolation_p)
     dbc = create_bc(dh)
 
     ## cellvalues
-    cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
+    cellvalues, facevalues_u = create_values(interpolation_u, interpolation_p)
 
     ## assembly and solve
     K = create_sparsity_pattern(dh);
-    K, f = doassemble(cellvalues_u, cellvalues_p, facevalues_u, K, grid, dh, mp);
+    K, f = doassemble(cellvalues, facevalues_u, K, grid, dh, mp);
     apply!(K, f, dbc)
     u = Symmetric(K) \ f;
 
