@@ -68,7 +68,7 @@ end
             add!(ch, dbc)
         end
         close!(ch)
-        Ferrite.update!(ch, 0.0)
+        update!(ch, 0.0)
         rng = StableRNG(1234)
         u = rand(rng, ndofs(dofhandler))
         apply!(u, ch)
