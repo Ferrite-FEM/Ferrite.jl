@@ -134,7 +134,9 @@ function test_2d_mixed_2_el()
     # THEN: we expect 15 dofs
     @test ndofs(dh) == 15
     @test ndofs_per_cell(dh, 1) == 12
+    @test ndofs_per_cell(dh.fieldhandlers[1]) == 12
     @test ndofs_per_cell(dh, 2) == 9
+    @test ndofs_per_cell(dh.fieldhandlers[2]) == 9
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     @test celldofs(dh, 2) == [5, 6, 3, 4, 13, 14, 11, 10, 15]
 end
