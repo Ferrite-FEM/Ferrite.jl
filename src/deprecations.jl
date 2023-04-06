@@ -8,6 +8,7 @@ import Base: push!
 @deprecate faces(ip::Interpolation) facedof_indices(ip) false
 @deprecate edges(ip::Interpolation) edgedof_indices(ip) false
 @deprecate nfields(dh::AbstractDofHandler) length(getfieldnames(dh)) false
+@deprecate add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet) add!(ch, dbc)
 @deprecate getcoordinates(node::Node) get_node_coordinate(node) true
 @deprecate getcoordinates(args...) get_cell_coordinates(args...) true
 @deprecate getcoordinates!(args...) get_cell_coordinates!(args...) true

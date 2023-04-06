@@ -111,9 +111,8 @@ end
    close!(dh)
 
    ch = ConstraintHandler(dh)
-   add!(ch, dh.fieldhandlers[1], Dirichlet(:u, getnodeset(mesh, "bottom"), (x,t)->1.0, 1))
-   add!(ch, dh.fieldhandlers[2], Dirichlet(:u, getnodeset(mesh, "bottom"), (x,t)->1.0, 1))
-   add!(ch, dh.fieldhandlers[1], Dirichlet(:c, getnodeset(mesh, "bottom"), (x,t)->2.0, 1))
+   add!(ch, Dirichlet(:u, getnodeset(mesh, "bottom"), (x,t)->1.0, 1))
+   add!(ch, Dirichlet(:c, getnodeset(mesh, "bottom"), (x,t)->2.0, 1))
    close!(ch)
    update!(ch)
 
@@ -136,9 +135,8 @@ end
    close!(dh)
 
    ch = ConstraintHandler(dh)
-   add!(ch, dh.fieldhandlers[1], Dirichlet(:u, getfaceset(mesh, "bottom"), (x,t)->1.0, 1))
-   add!(ch, dh.fieldhandlers[2], Dirichlet(:u, getfaceset(mesh, "bottom"), (x,t)->1.0, 1))
-   add!(ch, dh.fieldhandlers[2], Dirichlet(:c, getfaceset(mesh, "bottom"), (x,t)->2.0, 1))
+   add!(ch, Dirichlet(:u, getfaceset(mesh, "bottom"), (x,t)->1.0, 1))
+   add!(ch, Dirichlet(:c, getfaceset(mesh, "bottom"), (x,t)->2.0, 1))
    close!(ch)
    update!(ch)
 

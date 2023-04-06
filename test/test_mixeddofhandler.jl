@@ -134,7 +134,9 @@ function test_2d_mixed_2_el()
     # THEN: we expect 15 dofs
     @test ndofs(dh) == 15
     @test ndofs_per_cell(dh, 1) == 12
+    @test ndofs_per_cell(dh.fieldhandlers[1]) == 12
     @test ndofs_per_cell(dh, 2) == 9
+    @test ndofs_per_cell(dh.fieldhandlers[2]) == 9
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     @test celldofs(dh, 2) == [5, 6, 3, 4, 13, 14, 11, 10, 15]
 end
@@ -307,8 +309,8 @@ function test_2_element_heat_eq()
     ∂Ω2 = getfaceset(grid, "right")
     dbc1 = Dirichlet(:u, ∂Ω1, (x, t) -> 0)
     dbc2 = Dirichlet(:u, ∂Ω2, (x, t) -> 0)
-    add!(ch, dh.fieldhandlers[1], dbc1);
-    add!(ch, dh.fieldhandlers[2], dbc2);
+    add!(ch, dbc1);
+    add!(ch, dbc2);
     close!(ch)
 
     function doassemble(cellset, cellvalues, assembler, dh)
@@ -598,8 +600,8 @@ function test_show()
     field1 = create_field(name=:u, spatial_dim=2, field_dim=2, order=1, cellshape=RefCube)
     field2 = create_field(name=:u, spatial_dim=2, field_dim=2, order=1, cellshape=RefTetrahedron)
     dh = DofHandler(grid);
-    push!(dh, FieldHandler([field1], Set(1)));
-    push!(dh, FieldHandler([field2], Set(2)));
+    add!(dh, FieldHandler([field1], Set(1)));
+    add!(dh, FieldHandler([field2], Set(2)));
     close!(dh)
     @test repr("text/plain", dh) == repr(typeof(dh)) * "\n  Fields:\n    :u, dim: 2\n  Total dofs: 10"
 end
