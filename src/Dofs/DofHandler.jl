@@ -137,9 +137,9 @@ function celldofs(dh::AbstractDofHandler, i::Int)
     return celldofs!(zeros(Int, ndofs_per_cell(dh, i)), dh, i)
 end
 
-function get_cell_coordinates!(global_coords::Vector{Vec{dim,T}}, dh::DofHandler, i::Union{Int, <:AbstractCell})
-    get_cell_coordinates!(global_coords, dh.grid, i)
-end
+#function get_cell_coordinates!(global_coords::Vector{Vec{dim,T}}, dh::DofHandler, i::Union{Int, <:AbstractCell})
+#    get_cell_coordinates!(global_coords, dh.grid, i)
+#end
 
 function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler, i::Union{Int, <:AbstractCell})
     cellnodes!(global_nodes, dh.grid, i)

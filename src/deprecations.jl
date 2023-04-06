@@ -11,4 +11,4 @@ import Base: push!
 @deprecate getcoordinates(node::Node) get_node_coordinate(node) true
 @deprecate getcoordinates(args...) get_cell_coordinates(args...) true
 @deprecate getcoordinates!(args...) get_cell_coordinates!(args...) true
-@deprecate cellcoords!(args...) get_cell_coordinates!(args...) false
+@deprecate cellcoords!(x::Vector, dh::DofHandler, args...) get_cell_coordinates!(x, dh.grid, args...) false
