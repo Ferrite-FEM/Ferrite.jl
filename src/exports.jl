@@ -122,6 +122,7 @@ export
     DofOrder,
     evaluate_at_grid_nodes,
     apply_analytical!,
+    collect_dofs,
 
 # Sparsity pattern
     # AbstractSparsityPattern,
