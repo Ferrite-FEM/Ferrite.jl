@@ -53,12 +53,8 @@ Construct a `DofHandler` based on `grid`. Supports:
 struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     fieldhandlers::Vector{FieldHandler}
     field_names::Vector{Symbol}
-    # Dofs for cell i are stored in cell_dofs[cell_dofs_offset[i]:(cell_dofs_offset[i]+length[i]-1)].
-    # Note that explicitly keeping track of ndofs_per_cell is necessary since dofs are *not*
-    # distributed in cell order like for the DofHandler (where the length can be determined
-    # by cell_dofs_offset[i+1]-cell_dofs_offset[i]).
-    # TODO: ndofs_per_cell should probably be replaced by ndofs_per_fieldhandler, since all
-    #       cells in a FieldHandler have the same number of dofs.
+    # Dofs for cell i are stored in cell_dofs at the range:
+    #     cell_dofs_offset[i]:(cell_dofs_offset[i]+ndofs_per_cell(dh, i)-1)
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
     cell_to_fieldhandler::Vector{Int} # maps cell id -> fieldhandler id
@@ -108,8 +104,9 @@ See also [`ndofs`](@ref).
 """
 function ndofs_per_cell(dh::DofHandler, cell::Int=1)
     @boundscheck 1 <= cell <= getncells(dh.grid)
-    return @inbounds dh.fieldhandlers[dh.cell_to_fieldhandler[cell]].ndofs_per_cell
+    return @inbounds ndofs_per_cell(dh.fieldhandlers[dh.cell_to_fieldhandler[cell]])
 end
+ndofs_per_cell(fh::FieldHandler) = fh.ndofs_per_cell
 nnodes_per_cell(dh::DofHandler, cell::Int=1) = nnodes_per_cell(dh.grid, cell) # TODO: deprecate, shouldn't belong to DofHandler any longer
 
 """

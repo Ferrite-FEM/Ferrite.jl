@@ -45,24 +45,22 @@ function Ferrite.compute_renumber_permutation(
     # Create the CSR (CSC, but pattern is symmetric so equivalent) using
     # Metis.idx_t as the integer type
     buffer_length = 0
-    for (fhi, fh) in pairs(dh isa DofHandler ? (dh, ) : dh.fieldhandlers)
-        set = fh isa DofHandler ? (1:getncells(dh.grid)) : fh.cellset
-        n = ndofs_per_cell(dh, first(set)) # TODO: ndofs_per_cell(fh)
+    for (fhi, fh) in pairs(dh.fieldhandlers)
+        n = ndofs_per_cell(fh)
         entries_per_cell = if coupling === nothing
             n * (n - 1)
         else
             count(couplings[fhi][i, j] for i in 1:n, j in 1:n if i != j)
         end
-        buffer_length += entries_per_cell * length(set)
+        buffer_length += entries_per_cell * length(fh.cellset)
     end
     I = Vector{idx_t}(undef, buffer_length)
     J = Vector{idx_t}(undef, buffer_length)
     idx = 0
 
-    for (fhi, fh) in pairs(dh isa DofHandler ? (dh, ) : dh.fieldhandlers)
+    for (fhi, fh) in pairs(dh.fieldhandlers)
         coupling === nothing || (coupling_fh = couplings[fhi])
-        set = fh isa DofHandler ? (1:getncells(dh.grid)) : fh.cellset
-        for cc in CellIterator(dh, set)
+        for cc in CellIterator(dh, fh.cellset)
             dofs = celldofs(cc)
             for (j, dofj) in pairs(dofs), (i, dofi) in pairs(dofs)
                 dofi == dofj && continue # Metis doesn't want the diagonal
