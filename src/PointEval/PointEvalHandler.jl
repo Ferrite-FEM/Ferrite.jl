@@ -347,7 +347,7 @@ function Base.iterate(p::PointIterator, state = 1)
         cid = (p.ph.cells[state])::Int
         local_coord = (p.ph.local_coords[state])::Vec
         n = nnodes_per_cell(p.ph.grid, cid)
-        cellcoords!(resize!(p.coords, n), p.ph.grid, cid)
+        get_cell_coordinates!(resize!(p.coords, n), p.ph.grid, cid)
         point = PointLocation(cid, local_coord, p.coords)
         return (point, state + 1)
     end

@@ -775,8 +775,6 @@ end
 @inline get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = get_cell_coordinates!(x, grid, cell.idx)
 @inline get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, face::FaceIndex) where {dim, T} = get_cell_coordinates!(x, grid, face.idx[1])
 
-# TODO: Deprecate one of `cellcoords!` and `get_cell_coordinates!`, as they do the same thing
-cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,T} = get_cell_coordinates!(global_coords, grid, i) 
 
 """
     get_cell_coordinates(grid::AbstractGrid, cell)

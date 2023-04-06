@@ -74,7 +74,7 @@ function reinit!(cc::CellCache, i::Int)
     end
     if cc.flags.coords
         resize!(cc.coords, nnodes_per_cell(cc.grid, i))
-        cellcoords!(cc.coords, cc.grid, i)
+        get_cell_coordinates!(cc.coords, cc.grid, i)
     end
     if cc.dh !== nothing && cc.flags.dofs
         resize!(cc.dofs, ndofs_per_cell(cc.dh, i))
