@@ -32,17 +32,17 @@ for (CT, dim) in ((Triangle,2), (QuadraticTriangle,2), (Hexahedron,3), (Tetrahed
     print("1 CellValues: : "); @btime reinit!($cv_p, $x);
     print("1 MultiValues : "); @btime reinit!($cv1_p, $x);
     print("1 SingleValues: "); @btime reinit!($csv_p, $x);
-    print("1 CellValues* : "); @btime reinit_multiple!($x, $cv_p)
+    print("1 Tuple{CV}   : "); @btime reinit_multiple!($x, $cv_p)
     print("1 ValuesGroup : "); @btime reinit!($cvg1, $x);
     println()
     print("2 CellValues  : "); @btime reinit2!($cv_u, $cv_p, $x)
     print("2 MultiValues : "); @btime reinit!($cv2, $x)
-    print("2 CellValues* : "); @btime reinit_multiple!($x, $cv_u, $cv_p)
+    print("2 Tuple{CV}   : "); @btime reinit_multiple!($x, $cv_u, $cv_p)
     print("2 ValuesGroup : "); @btime reinit!($cvg2, $x);
     println()
-    print("4 CellValues : "); @btime reinit4!($cv_u, $cv_p, $cv_u2, $cv_p2, $x)
-    print("4 MultiValues: "); @btime reinit!($cv4, $x)
-    print("4 CellValues*: "); @btime reinit_multiple!($x, $cv_u, $cv_p, $cv_u2, $cv_p2)
-    print("4 ValuesGroup: "); @btime reinit!($cvg4, $x);
+    print("4 CellValues  : "); @btime reinit4!($cv_u, $cv_p, $cv_u2, $cv_p2, $x)
+    print("4 MultiValues : "); @btime reinit!($cv4, $x)
+    print("4 Tuple{CV}   : "); @btime reinit_multiple!($x, $cv_u, $cv_p, $cv_u2, $cv_p2)
+    print("4 ValuesGroup : "); @btime reinit!($cvg4, $x);
     println()
 end

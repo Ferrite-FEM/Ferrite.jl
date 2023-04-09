@@ -179,8 +179,10 @@ end
 
 
 # Temporary test for seeing the influence of just reusing the geometry calculation
-# Currently, the args... approach seems to allocate
+# Currently, the args... approach seems to allocate, 
+# hence just implementing specific cases for 1, 2, and 4 values for testing.
 
+# This function is also used by CellValuesGroup later. 
 function update_dNdX_and_detJdV!(cv, i, detJ_w, Jinv)
     @inbounds cv.detJdV[i] = detJ_w
     @inbounds for j in 1:getnbasefunctions(cv)
