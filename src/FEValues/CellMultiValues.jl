@@ -84,40 +84,200 @@ geometric_value(cv::CellMultiValues, q_point::Int, base_func::Int) = geometric_v
 # FunctionValues functions: call like with CellValues, but foo(cv[:name], args...)
 Base.getindex(cmv::CellMultiValues, key::Symbol) = getindex(cmv.fun_values, key)
 
-# This function can be specialized for different mappings, 
-# see https://defelement.com/ciarlet.html ("Mapping finite elements")
-function map_functions!(funvals::FunctionValues{dim}, i::Int, detJ, J, Jinv::Tensor{2,dim}) where dim
+# Standard identity mapping (scalar function / lagrange vector)
+function apply_mapping!(funvals::FunctionValues{dim}, q_point::Int, Jinv::Tensor{2,dim}) where dim
     @inbounds for j in 1:getnbasefunctions(funvals)
-        funvals.dNdx[j, i] = funvals.dNdξ[j, i] ⋅ Jinv
+        funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Jinv
     end
     return nothing
 end
 
+#= TODO: This function could be generalized as follows, but does not make sense before we 
+   implement other mappings (i.e. Piola-mappings)
+"""
+    apply_mapping!(funvals::FunctionValues, q_point::Int, detJ, J, Jinv, geo_values)
+
+Apply the appropriate mapping for `funvals` for quadrature point `q_point`,
+given the jacobian `J` (as well as its determinant, `detJ`, and inverse, `Jinv`)
+and `geo_values::GeometricValues`. 
+See (DefElement)[https://defelement.com/ciarlet.html], "Mapping finite elements"
+for an overview of different mappings. 
+
+Note that this function should only be called from `reinit!`. 
+There, q_point < getnquadpoints(qr::QuadratureRule) is checked.
+During construction of `CellMultiValues`, sizes of buffers are checked to match `qr`.
+Hence, it is allowed to use `@inbounds` in this function.
+"""
+function apply_mapping! end  
+=#
+
 # Note that this function is "unsafe", as it applies inbounds. Checks in reinit!
 function calculate_mapping(geo_values::GeometryValues{dim}, q_point, x) where dim
-    fecv_J = zero(Tensor{2,dim})
-    @inbounds for j in 1:getngeobasefunctions(geo_values)
+    @inbounds fecv_J = x[1] ⊗ geo_values.dMdξ[1, q_point]
+    @inbounds for j in 2:getngeobasefunctions(geo_values)
         fecv_J += x[j] ⊗ geo_values.dMdξ[j, q_point]
     end
     detJ = det(fecv_J)
     detJ > 0.0 || throw_detJ_not_pos(detJ)
-    return detJ, fecv_J, inv(fecv_J)
+    return detJ, inv(fecv_J)
 end
 
 function reinit!(cv::CellMultiValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,T}
-    checkbounds(Bool, x, 1:getngeobasefunctions(cv)) || throw_incompatible_coord_length(length(x), getngeobasefunctions(cv))
-    @inbounds for (q_point, w) in pairs(getweights(cv.qr))
-        detJ, J, Jinv = calculate_mapping(cv.geo_values, q_point, x)
-        cv.detJdV[q_point] = detJ * w # Do it here instead to avoid making calculate_mapping mutating. 
-        
-        # `map` required for performance, `foreach` allocates due to method lookup. 
-        # `values(cv.fun_values)` returns a tuple of the content.
-        # This ensures that `map` specializes for number of elements, see how Base/tuple.jl
-        map(funvals->map_functions!(funvals, q_point, detJ, J, Jinv), values(cv.fun_values)) 
+    geo_values = cv.geo_values
+    checkbounds(Bool, x, 1:getngeobasefunctions(geo_values)) || throw_incompatible_coord_length(length(x), getngeobasefunctions(geo_values))
+    @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
+        detJ, Jinv = calculate_mapping(geo_values, q_point, x)
+        cv.detJdV[q_point] = detJ*w
+        # `fun_values::Tuple` makes `map` specialize for number of elements, see Base/tuple.jl vs Base/named_tuple.jl
+        map(funvals->apply_mapping!(funvals, q_point, Jinv), values(cv.fun_values)) 
     end
     return nothing
 end
 
 function Base.show(io::IO, ::MIME"text/plain", fe_v::CellMultiValues)
     print(io, "$(typeof(fe_v))")
+end
+
+# ==== The remaining code is just temporary ==== #
+# Temporary and incomplete implementation of CellSingleValues: Uses GeometricValues and FunctionValues internally
+# If successful, could be used internally in CellScalarValues and CellVectorValues
+struct CellSingleValues{dim,T,RefShape,FV<:FunctionValues{dim,T,RefShape}} <: CellValues{dim,T,RefShape}
+    geo_values::GeometryValues{dim,T,RefShape}
+    fun_values::FV
+    detJdV::Vector{T}
+    qr::QuadratureRule{dim,RefShape,T}
+end
+function CellSingleValues(cv)
+    geo_values = GeometryValues(cv)
+    fun_values = create_function_values(cv)
+    return CellSingleValues(geo_values, fun_values, cv.detJdV, cv.qr)
+end
+
+getnquadpoints(cv::CellSingleValues) = length(cv.qr.weights)
+
+getngeobasefunctions(cv::CellSingleValues) = getngeobasefunctions(cv.geo_values)
+getdetJdV(cv::CellSingleValues, q_point::Int) = cv.detJdV[q_point]
+geometric_value(cv::CellSingleValues, q_point::Int, base_func::Int) = geometric_value(cv.geo_values, q_point, base_func)
+
+function reinit!(cv::CellSingleValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,T}
+    qr = cv.qr 
+    geo_values = cv.geo_values
+    fun_values = cv.fun_values
+    detJdV = cv.detJdV
+    checkbounds(Bool, x, 1:getngeobasefunctions(geo_values)) || throw_incompatible_coord_length(length(x), getngeobasefunctions(geo_values))
+    @inbounds for (q_point, w) in enumerate(getweights(qr))
+        detJ, Jinv = calculate_mapping(geo_values, q_point, x)
+        detJdV[q_point] = detJ*w
+        apply_mapping!(fun_values, q_point, Jinv)
+    end
+    return nothing
+end
+
+function Base.show(io::IO, ::MIME"text/plain", fe_v::CellSingleValues)
+    print(io, "$(typeof(fe_v))")
+end
+
+
+# Temporary test for seeing the influence of just reusing the geometry calculation
+# Currently, the args... approach seems to allocate
+
+function update_dNdX_and_detJdV!(cv, i, detJ_w, Jinv)
+    @inbounds cv.detJdV[i] = detJ_w
+    @inbounds for j in 1:getnbasefunctions(cv)
+        cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
+    end
+    return nothing
+end
+
+function reinit_multiple!(x, cv::CellValues{dim}) where dim
+    n_geom_basefuncs = getngeobasefunctions(cv)
+    #n_func_basefuncs = getnbasefunctions(cv)
+    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+
+    @inbounds for i in 1:length(cv.qr.weights)
+        w = cv.qr.weights[i]
+        fecv_J = zero(Tensor{2,dim})
+        for j in 1:n_geom_basefuncs
+            fecv_J += x[j] ⊗ cv.dMdξ[j, i]
+        end
+        detJ = det(fecv_J)
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
+        Jinv = inv(fecv_J)
+        detJ_w = detJ*w
+        update_dNdX_and_detJdV!(cv, i, detJ_w, Jinv)
+    end
+end
+
+function reinit_multiple!(x, cv::CellValues{dim}, cv2::CellValues{dim}) where dim
+    n_geom_basefuncs = getngeobasefunctions(cv)
+    #n_func_basefuncs = getnbasefunctions(cv)
+    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+
+    @inbounds for i in 1:length(cv.qr.weights)
+        w = cv.qr.weights[i]
+        fecv_J = zero(Tensor{2,dim})
+        for j in 1:n_geom_basefuncs
+            fecv_J += x[j] ⊗ cv.dMdξ[j, i]
+        end
+        detJ = det(fecv_J)
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
+        Jinv = inv(fecv_J)
+        detJ_w = detJ*w
+        update_dNdX_and_detJdV!(cv, i, detJ_w, Jinv)
+        update_dNdX_and_detJdV!(cv2, i, detJ_w, Jinv)
+    end
+end
+
+function reinit_multiple!(x, cv::CellValues{dim}, cv2::CellValues{dim}, cv3::CellValues{dim}, cv4::CellValues{dim}) where dim
+    n_geom_basefuncs = getngeobasefunctions(cv)
+    #n_func_basefuncs = getnbasefunctions(cv)
+    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+
+    @inbounds for i in 1:length(cv.qr.weights)
+        w = cv.qr.weights[i]
+        fecv_J = zero(Tensor{2,dim})
+        for j in 1:n_geom_basefuncs
+            fecv_J += x[j] ⊗ cv.dMdξ[j, i]
+        end
+        detJ = det(fecv_J)
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
+        Jinv = inv(fecv_J)
+        detJ_w = detJ*w
+        update_dNdX_and_detJdV!(cv, i, detJ_w, Jinv)
+        update_dNdX_and_detJdV!(cv2, i, detJ_w, Jinv)
+        update_dNdX_and_detJdV!(cv3, i, detJ_w, Jinv)
+        update_dNdX_and_detJdV!(cv4, i, detJ_w, Jinv)
+    end
+end
+
+#struct CellValuesGroup{dim,T,RefShape,NT<:NamedTuple{Any,CellValues{dim,T,RefShape}}}
+struct CellValuesGroup{dim, N, NT<:NamedTuple{<:Any, <:NTuple{N,CellValues{dim}}}}
+    cvs::NT
+end
+function CellValuesGroup(;cvs...)
+    # cvs::Pairs{Symbol, CellValues, Tuple, NamedTuple}, cf. foo(;kwargs...) = kwargs
+    @assert allequal(typeof(cv.qr) for (_, cv) in cvs)
+    @assert allequal(length(getweights(cv.qr)) for (_, cv) in cvs)
+    return CellValuesGroup(NamedTuple(cvs))
+end
+
+function reinit!(cvs::CellValuesGroup{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,T}
+    cvs_tuple = values(cvs.cvs)
+    cv = first(cvs_tuple)
+    n_geom_basefuncs = getngeobasefunctions(cv)
+    #n_func_basefuncs = getnbasefunctions(cv)
+    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+
+    @inbounds for i in 1:length(cv.qr.weights)
+        w = cv.qr.weights[i]
+        fecv_J = zero(Tensor{2,dim})
+        for j in 1:n_geom_basefuncs
+            fecv_J += x[j] ⊗ cv.dMdξ[j, i]
+        end
+        detJ = det(fecv_J)
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
+        Jinv = inv(fecv_J)
+        detJ_w = detJ*w
+        map(cvi -> update_dNdX_and_detJdV!(cvi, i, detJ_w, Jinv), cvs_tuple)
+    end
 end
