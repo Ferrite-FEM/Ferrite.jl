@@ -55,7 +55,7 @@ function create_values(interpolation_u, interpolation_p)
     ## cellvalues for p
     cellvalues_p = CellScalarValues(qr, interpolation_p, interpolation_geom)
 
-    # Combine into multivalues
+    ## Combine into multivalues
     cellvalues = CellMultiValues(;u=cellvalues_u, p=cellvalues_p)
 
     return cellvalues, facevalues_u

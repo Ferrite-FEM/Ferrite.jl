@@ -64,9 +64,12 @@ struct CellMultiValues{dim,T,RefShape,FVS<:NamedTuple} <: CellValues{dim,T,RefSh
 end
 function CellMultiValues(;cvs...)
     # cvs::Pairs{Symbol, CellValues, Tuple, NamedTuple}, cf. foo(;kwargs...) = kwargs
-    @assert allequal(typeof(cv.qr) for (_, cv) in cvs)
-    @assert allequal(length(getweights(cv.qr)) for (_, cv) in cvs)
+    #@assert allequal(typeof(cv.qr) for (_, cv) in cvs)
+    #@assert allequal(length(getweights(cv.qr)) for (_, cv) in cvs)
     cv1 = first(values(cvs))
+    @assert all(==(typeof(cv1.qr)), typeof(cv.qr) for (_, cv) in cvs)
+    @assert all(==(length(getweights(cv1.qr))), length(getweights(cv.qr)) for (_, cv) in cvs)
+    
     geo_values = GeometryValues(cv1)
     fun_values = NamedTuple(key=>create_function_values(cv) for (key, cv) in cvs)
     return CellMultiValues(geo_values, fun_values, cv1.detJdV, cv1.qr)
