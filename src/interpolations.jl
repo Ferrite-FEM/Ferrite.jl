@@ -1127,6 +1127,10 @@ struct Nedelec{dim,refshape,order} <: VectorInterpolation{dim,refshape,order} en
 # https://defelement.com/elements/examples/triangle-N1curl-1.html #
 ###################################################################
 
+getnbasefunctions(::Nedelec{2,RefTetrahedron,1}) = 3
+
+facedof_interior_indices(::Nedelec{2,RefTetrahedron,1}) = ((1,), (2,), (3,))
+
 function value(ip::Nedelec{2,RefTetrahedron,1}, i::Int, ξ::Vec{2,T}) where T
     x, y = ξ
     i == 1 && return Vec{2,T}((   - y,     x ))
@@ -1135,30 +1139,64 @@ function value(ip::Nedelec{2,RefTetrahedron,1}, i::Int, ξ::Vec{2,T}) where T
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
-facedof_interior_indices(::Nedelec{2,RefTetrahedron,1}) = ((1,), (2,), (3,))
 
 ###################################################################
 # Nédélec dim 2 RefTetrahedron order 2                            #
 # https://defelement.com/elements/examples/triangle-N1curl-2.html #
 ###################################################################
 
-function value(ip::Nedelec{2,RefTetrahedron,2}, i::Int, ξ::Vec{2,T}) where T
-    x, y = ξ
-
-    i == 1 && return Vec{2}((              2y * (1 - 4x),              4x * (2x - 1) ))
-    i == 2 && return Vec{2}((              4y * (1 - 2y),              2x * (4y - 1) ))
-
-    i == 3 && return Vec{2}((         2y * (3 - 4x - 4y), 8x^2 + 8x*y - 12x - 6y + 4 ))
-    i == 4 && return Vec{2}((              4y * (2y - 1),        -8x*y + 2x + 6y - 2 ))
-
-    i == 5 && return Vec{2}(( 8x*y - 6x + 8y^2 - 12y + 4,         2x * (3 - 4x - 4y) ))
-    i == 6 && return Vec{2}((       - 8x*y + 6x + 2y - 2,              4x * (2x - 1) ))
-
-    i == 7 && return Vec{2}(( 8y * (-x - 2y + 2), 8x * (x + 2y - 1) ))
-    i == 8 && return Vec{2}(( 8y * (-x - 2y + 2), 8x * (x + 2y - 1) ))
-
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
-end
+getnbasefunctions(::Nedelec{2,RefTetrahedron,2}) = 8
 
 facedof_interior_indices(::Nedelec{2,RefTetrahedron,2}) = ((1, 2), (3, 4), (5, 6))
 celldof_interior_indices(::Nedelec{2,RefTetrahedron,2}) = (7, 8)
+
+function value(ip::Nedelec{2,RefTetrahedron,2}, i::Int, ξ::Vec{2,T}) where T
+    x, y = ξ
+    i == 1 && return Vec{2}((              2y * (1 - 4x),              4x * (2x - 1) ))
+    i == 2 && return Vec{2}((              4y * (1 - 2y),              2x * (4y - 1) ))
+    i == 3 && return Vec{2}((        2y * (-4x - 4y + 3), 8x^2 + 8x*y - 12x - 6y + 4 ))
+    i == 4 && return Vec{2}((              4y * (2y - 1),        -8x*y + 2x + 6y - 2 ))
+    i == 5 && return Vec{2}(( 8x*y - 6x + 8y^2 - 12y + 4,        2x * (-4x - 4y + 3) ))
+    i == 6 && return Vec{2}((       - 8x*y + 6x + 2y - 2,              4x * (2x - 1) ))
+    i == 7 && return Vec{2}((         8y * (-x - 2y + 2),          8x * (x + 2y - 1) ))
+    i == 8 && return Vec{2}((          8y * (2x + y - 1),         8x * (-2x - y + 2) ))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+#######################################################################
+# Nédélec dim 2 RefCube order 1                                       #
+# https://defelement.com/elements/examples/quadrilateral-Qcurl-1.html #
+#######################################################################
+
+getnbasefunctions(::Nedelec{2,RefCube,1}) = 4
+
+facedof_interior_indices(::Nedelec{2,RefCube,1}) = ((1,), (2,), (3,), (4,))
+
+function value(ip::Nedelec{2,RefCube,1}, i::Int, ξ::Vec{2,T}) where T
+    x, y = ξ
+    i == 1 && return Vec{2,T}(( 1 - y,     0 ))
+    i == 2 && return Vec{2,T}((     0, 1 - x ))
+    i == 3 && return Vec{2,T}((     0,     x ))
+    i == 4 && return Vec{2,T}((     y,     0 ))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+#######################################################################
+# Nédélec dim 2 RefCube order 2                                       #
+# https://defelement.com/elements/examples/quadrilateral-Qcurl-2.html #
+#######################################################################
+
+getnbasefunctions(::Nedelec{2,RefCube,2}) = 12
+
+facedof_interior_indices(::Nedelec{2,RefCube,2}) = ((1, 2), (3, 4), (5, 6), (7, 8))
+celldof_interior_indices(::Nedelec{2,RefCube,2}) = (9, 10, 11, 12)
+
+function value(ip::Nedelec{2,RefCube,2}, i::Int, ξ::Vec{2,T}) where T
+    x, y = ξ
+    i == 1 && return Vec{2,T}(( -18x*y^2 + 24x*y - 6x + 12y^2 - 16y + 4, 0 ))
+    i == 2 && return Vec{2,T}((  18x*y^2 - 24x*y + 6x - 6y^2 + 8y - 2, 0 ))
+    i == 3 && return Vec{2,T}(( 0, -18x^2*y + 12x^2 + 24x*y - 16x - 6y + 4 ))
+    i == 4 && return Vec{2,T}(( 0,  18x^2*y - 6x^2 - 24x*y + 8x + 6y - 2 ))
+    # TODO...
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
