@@ -620,13 +620,9 @@ end
 
 Transform all nodes of the `grid` based on some transformation function `f`.
 """
-function transform!(g::AbstractGrid, f::Function)
-    c = similar(g.nodes)
-    for i in 1:length(c)
-        c[i] = Node(f(g.nodes[i].x))
-    end
-    copyto!(g.nodes, c)
-    g
+function transform!(g::Grid, f::Function)
+    map!(n -> Node(f(getcoordinates(n))), g.nodes, g.nodes)
+    return g
 end
 
 # Sets
