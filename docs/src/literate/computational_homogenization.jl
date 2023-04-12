@@ -196,17 +196,17 @@ using FerriteGmsh
 #src notebook: use coarse mesh to decrease build time
 #src   script: use the fine mesh
 #src markdown: use the coarse mesh to decrease build time, but make it look like the fine
-#nb ## grid = saved_file_to_grid("periodic-rve.msh")
-#nb grid = saved_file_to_grid("periodic-rve-coarse.msh")
-#jl ## grid = saved_file_to_grid("periodic-rve-coarse.msh")
-#jl grid = saved_file_to_grid("periodic-rve.msh")
-#md grid = saved_file_to_grid("periodic-rve.msh")
+#nb ## grid = togrid("periodic-rve.msh")
+#nb grid = togrid("periodic-rve-coarse.msh")
+#jl ## grid = togrid("periodic-rve-coarse.msh")
+#jl grid = togrid("periodic-rve.msh")
+#md grid = togrid("periodic-rve.msh")
 #-
 #md grid = redirect_stdout(devnull) do                #hide
-#md     saved_file_to_grid("periodic-rve-coarse.msh") #hide
+#md     togrid("periodic-rve-coarse.msh") #hide
 #md end                                               #hide
 
-grid = saved_file_to_grid("periodic-rve.msh") #src
+grid = togrid("periodic-rve.msh") #src
 
 # Next we construct the interpolation and quadrature rule, and combining them into
 # cellvalues as usual:

@@ -5,7 +5,7 @@ struct L2Projector <: AbstractProjector
     func_ip::Interpolation
     geom_ip::Interpolation
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
-    dh::MixedDofHandler
+    dh::DofHandler
     set::Vector{Int}
     node2dof_map::Vector{Int}
     fe_values::Union{CellValues,Nothing} # only used for deprecated constructor
@@ -21,7 +21,7 @@ function L2Projector(fe_values::Ferrite.Values, interp::Interpolation,
     dim, T, shape = typeof(fe_values).parameters
 
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
-    dh = MixedDofHandler(grid)
+    dh = DofHandler(grid)
     field = Field(:_, interp, 1)
     fh = FieldHandler([field], Set(set))
     add!(dh, fh)
@@ -78,7 +78,7 @@ function L2Projector(
     fe_values_mass = CellScalarValues(qr_lhs, func_ip, geom_ip)
 
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
-    dh = MixedDofHandler(grid)
+    dh = DofHandler(grid)
     field = Field(:_, func_ip, 1) # we need to create the field, but the interpolation is not used here
     fh = FieldHandler([field], Set(set))
     add!(dh, fh)
@@ -212,7 +212,7 @@ function project(proj::L2Projector,
 
     projected_vals = _project(vars, proj, fe_values, M, T)::Vector{T}
     if project_to_nodes
-        # NOTE we may have more projected values than verticies in the mesh => not all values are returned
+        # NOTE we may have more projected values than vertices in the mesh => not all values are returned
         nnodes = getnnodes(proj.dh.grid)
         reordered_vals = fill(convert(T, NaN * zero(T)), nnodes)
         for node = 1:nnodes
@@ -284,7 +284,7 @@ function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, proj::L2Projector, v
     return vtk
 end
 
-# Numbers can be handled by the method for MixedDofHandler
+# Numbers can be handled by the method for DofHandler
 reshape_to_nodes(proj::L2Projector, vals::AbstractVector{<:Number}) =
     reshape_to_nodes(proj.dh, vals, only(getfieldnames(proj.dh)))
 

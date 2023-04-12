@@ -620,13 +620,9 @@ end
 
 Transform all nodes of the `grid` based on some transformation function `f`.
 """
-function transform!(g::AbstractGrid, f::Function)
-    c = similar(g.nodes)
-    for i in 1:length(c)
-        c[i] = Node(f(g.nodes[i].x))
-    end
-    copyto!(g.nodes, c)
-    g
+function transform!(g::Grid, f::Function)
+    map!(n -> Node(f(getcoordinates(n))), g.nodes, g.nodes)
+    return g
 end
 
 # Sets
@@ -640,7 +636,7 @@ _warn_emptyset(set, name) = length(set) == 0 && @warn("no entities added to the 
 
 Adds a cellset to the grid with key `name`.
 Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
-The `MixedDofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
+The `DofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
 `all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` in the cell if the cell
 should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 

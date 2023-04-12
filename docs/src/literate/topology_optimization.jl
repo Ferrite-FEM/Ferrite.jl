@@ -45,7 +45,7 @@
 # We obtain the mechanical displacement field by applying the Finite Element Method to the weak form
 # of the Gibbs energy using Ferrite. In contrast, we use the evolution equation (i.e. the strong form) to calculate
 # the value of the density field $\chi$. The advantage of this "split" approach is the very high computation speed.
-# The evolution equation consists of the driving force, the damping paramter $\eta$, the regularization parameter $\beta$ times the Laplacian,
+# The evolution equation consists of the driving force, the damping parameter $\eta$, the regularization parameter $\beta$ times the Laplacian,
 # which is necessary to avoid numerical issues like mesh dependence or checkerboarding, and the constraint parameters $\lambda$, to keep the mass constant,
 # and $\gamma$, to avoid leaving the set $[\chi_{\text{min}}, 1]$. By including gradient regularization, it becomes necessary to calculate the Laplacian.
 # The Finite Difference Method for square meshes with the edge length $\Delta h$ approximates the Laplacian as follows:
@@ -379,7 +379,7 @@ end
 
 # We put everything together in the main function. Here the user may choose the radius parameter, which
 # is related to the regularization parameter as $\beta = ra^2$, the starting density, the number of elements in vertical direction and finally the
-# name of the output. Addtionally, the user may choose whether only the final design (default)
+# name of the output. Additionally, the user may choose whether only the final design (default)
 # or every iteration step is saved.
 #
 # First, we compute the material parameters and create the grid, DofHandler, boundary condition and FE values.
