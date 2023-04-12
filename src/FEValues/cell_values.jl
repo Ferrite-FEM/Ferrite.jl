@@ -166,6 +166,9 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{rdim,shape}, func
     CellVectorValues{sdim,rdim,T,shape,vdim,M1,M2}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule, func_interpol, geo_interpol)
 end
 
+"""
+Reinit for volumetric elements, i.e. elements whose reference dimension match the spatial dimension.
+"""
 function reinit!(cv::CellValues{sdim,sdim}, x::AbstractVector{Vec{sdim,T}}) where {sdim,T}
     n_geom_basefuncs = getngeobasefunctions(cv)
     n_func_basefuncs = getnbasefunctions(cv)
@@ -175,114 +178,70 @@ function reinit!(cv::CellValues{sdim,sdim}, x::AbstractVector{Vec{sdim,T}}) wher
     @inbounds for i in 1:length(cv.qr.weights)
         w = cv.qr.weights[i]
         fecv_J = zero(Tensor{2,sdim,T})
-        # fecv_J = zero(MMatrix{sdim,sdim,T})
         for j in 1:n_geom_basefuncs
-            fecv_J += x[j] ⊗ tensor_cast(cv.dMdξ[j, i])
-            # for k in 1:sdim, l in 1:sdim
-            #     fecv_J[k,l] += x[j][k] * cv.dMdξ[j, i][l]
-            # end
+            fecv_J += x[j] ⊗ tensor_cast(cv.dMdξ[j, i]) # TODO cleanup?
         end
         detJ = det(fecv_J)
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         cv.detJdV[i] = detJ * w
         Jinv = inv(fecv_J)
         for j in 1:n_func_basefuncs
-            cv.dNdx[j, i] = TdNdx((tensor_cast(cv.dNdξ[j, i]) ⋅ Jinv).data) # TODO via Tensors.jl
-            # cv.dNdx[j, i] = Jinv' * cv.dNdξ[j, i]'
+            cv.dNdx[j, i] = TdNdx((tensor_cast(cv.dNdξ[j, i]) ⋅ Jinv).data) # TODO cleanup?
         end
     end
 end
 
-# Reinit for embedded surfaces.
-#
-# The transformation theorem for some function f on a 2D surface in 3D space leads to
-#   ∫ f ⋅ dS = ∫ f ⋅ (∂x/∂ξ₁ × ∂x/∂ξ₂) dξ₁dξ₂ = ∫ f ⋅ n ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂ dξ₁dξ₂
-# where ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂ is "detJ" and n is the unit normal.
-# See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
-# For more details see e.g. the doctoral thesis by Mirza Cenanovic **Finite element methods for surface problems* (2017), Ch. 2 **Trangential Calculus**.
-function reinit!(cv::CellValues{3,2}, x::AbstractVector{Vec{3,T}}) where {T}
-    n_geom_basefuncs = getngeobasefunctions(cv)
-    n_func_basefuncs = getnbasefunctions(cv)
-    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
-
-    @inbounds for i in 1:length(cv.qr.weights)
-        w = cv.qr.weights[i]
-        fecv_J = zero(MMatrix{3,2,T}) # TODO replace with MixedTensor (see https://github.com/Ferrite-FEM/Tensors.jl/pull/188)
-        for j in 1:n_geom_basefuncs
-            #fecv_J += x[j] ⊗ cv.dMdξ[j, i] # TODO via Tensors.jl
-            for k in 1:3, l in 1:2
-                fecv_J[k,l] += x[j][k] * cv.dMdξ[j, i][l]
-            end
-        end
-        # "det(J) =" ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂
-        detJ = norm(fecv_J[:,1] × fecv_J[:,2])
-        detJ > 0.0 || throw_detJ_not_pos(detJ)
-        cv.detJdV[i] = detJ * w
-        # Compute left inverse of J
-        Jinv = pinv(fecv_J)
-        for j in 1:n_func_basefuncs
-            #cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv # TODO via Tensors.jl
-            cv.dNdx[j, i] = dothelper(cv.dNdξ[j, i], Jinv)
-        end
-    end
-end
-
-# Hotfix to get the dots right.
+# Hotfix to get the dots right for embedded elements.
 @inline dothelper(x::V,A::M) where {V<:SVector,M<:Union{SMatrix,MMatrix}} = A'*x
 @inline dothelper(B::M1,A::M2) where {M1<:SMatrix,M2<:Union{SMatrix,MMatrix}} = B*A
 
-# Reinit for embedded curves.
-#
-# The transformation theorem for some function f on a 1D curve in 2D and 3D space leads to
-#   ∫ f ⋅ dE = ∫ f ⋅ ∂x/∂ξ dξ = ∫ f ⋅ t ||∂x/∂ξ||₂ dξ
-# where ||∂x/∂ξ||₂ is "detJ" and t is "the unit tangent".
-# See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
-function reinit!(cv::CellValues{2,1}, x::AbstractVector{Vec{2,T}}) where {T}
+"""
+Embedding determinant for surfaces in 3D.
+
+TLDR: "det(J) =" ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂
+
+The transformation theorem for some function f on a 2D surface in 3D space leads to
+  ∫ f ⋅ dS = ∫ f ⋅ (∂x/∂ξ₁ × ∂x/∂ξ₂) dξ₁dξ₂ = ∫ f ⋅ n ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂ dξ₁dξ₂
+where ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂ is "detJ" and n is the unit normal.
+See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
+For more details see e.g. the doctoral thesis by Mirza Cenanovic **Finite element methods for surface problems* (2017), Ch. 2 **Trangential Calculus**.
+"""
+edet(J::MMatrix{3,2,T}) where {T} = norm(J[:,1] × J[:,2])
+
+"""
+Embedding determinant for curves in 2D and 3D.
+
+TLDR: "det(J) =" ||∂x/∂ξ||₂
+
+The transformation theorem for some function f on a 1D curve in 2D and 3D space leads to
+  ∫ f ⋅ dE = ∫ f ⋅ ∂x/∂ξ dξ = ∫ f ⋅ t ||∂x/∂ξ||₂ dξ
+where ||∂x/∂ξ||₂ is "detJ" and t is "the unit tangent".
+See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
+"""
+edet(J::Union{MMatrix{2,1,T},MMatrix{3,1,T}}) where {T} = norm(J)
+
+"""
+Reinit for embedded elements, i.e. elements whose reference dimension is smaller than the spatial dimension.
+"""
+function reinit!(cv::CellValues{sdim,rdim}, x::AbstractVector{Vec{sdim,T}}) where {sdim,rdim,T}
+    @assert sdim > rdim "This reinit only works for embedded elements. Maybe you swapped the reference and spatial dimensions?"
     n_geom_basefuncs = getngeobasefunctions(cv)
     n_func_basefuncs = getnbasefunctions(cv)
     length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
 
     @inbounds for i in 1:length(cv.qr.weights)
         w = cv.qr.weights[i]
-        fecv_J = zero(MMatrix{2,1,T}) # TODO replace with MixedTensor (see https://github.com/Ferrite-FEM/Tensors.jl/pull/188)
+        fecv_J = zero(MMatrix{sdim,rdim,T}) # TODO replace with MixedTensor (see https://github.com/Ferrite-FEM/Tensors.jl/pull/188)
         for j in 1:n_geom_basefuncs
             #fecv_J += x[j] ⊗ cv.dMdξ[j, i] # TODO via Tensors.jl
-            for k in 1:2, l in 1:1
+            for k in 1:sdim, l in 1:rdim
                 fecv_J[k,l] += x[j][k] * cv.dMdξ[j, i][l]
             end
         end
-        # "det(J) =" ||∂x/∂ξ||₂
-        detJ = norm(fecv_J)
+        detJ = edet(fecv_J)
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         cv.detJdV[i] = detJ * w
-        # Compute left inverse of J
-        Jinv = pinv(fecv_J)
-        for j in 1:n_func_basefuncs
-            #cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv # TODO via Tensors.jl
-            cv.dNdx[j, i] = dothelper(cv.dNdξ[j, i], Jinv)
-        end
-    end
-end
-
-function reinit!(cv::CellValues{3,1}, x::AbstractVector{Vec{3,T}}) where {T}
-    n_geom_basefuncs = getngeobasefunctions(cv)
-    n_func_basefuncs = getnbasefunctions(cv)
-    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
-
-    @inbounds for i in 1:length(cv.qr.weights)
-        w = cv.qr.weights[i]
-        fecv_J = zero(MMatrix{3,1,T}) # TODO replace with MixedTensor (see https://github.com/Ferrite-FEM/Tensors.jl/pull/188)
-        for j in 1:n_geom_basefuncs
-            #fecv_J += x[j] ⊗ cv.dMdξ[j, i] # TODO via Tensors.jl
-            for k in 1:3, l in 1:1
-                fecv_J[k,l] += x[j][k] * cv.dMdξ[j, i][l]
-            end
-        end
-        # "det(J) =" ||∂x/∂ξ||₂
-        detJ = norm(fecv_J)
-        detJ > 0.0 || throw_detJ_not_pos(detJ)
-        cv.detJdV[i] = detJ * w
-        # Compute left inverse of J
+        # Compute "left inverse" of J
         Jinv = pinv(fecv_J)
         for j in 1:n_func_basefuncs
             #cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv # TODO via Tensors.jl
