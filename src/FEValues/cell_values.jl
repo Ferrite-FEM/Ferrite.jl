@@ -50,11 +50,16 @@ end
 
 # FIXME sdim should be something like `getdim(value(geo_interpol))``
 function CellScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
-        geo_interpol::Interpolation=func_interpol, sdim::Int=getdim(func_interpol))
+        geo_interpol::Interpolation=func_interpol; sdim::Int=getdim(func_interpol))
     CellScalarValues(Float64, quad_rule, func_interpol, geo_interpol, Val(sdim))
 end
 
 # FIXME sdim should be something like `length(value(geo_interpol))`
+function CellScalarValues(valtype::Type{T}, quad_rule::QuadratureRule, func_interpol::Interpolation,
+        geo_interpol::Interpolation=func_interpol; sdim::Int=getdim(func_interpol))  where {T}
+    CellScalarValues(valtype, quad_rule, func_interpol, geo_interpol, Val(sdim))
+end
+
 function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{rdim,shape}, func_interpol::Interpolation{rdim,shape},
         geo_interpol::Interpolation{rdim,shape}, ::Val{sdim}) where {rdim,T,shape<:AbstractRefShape,sdim}
 
@@ -103,12 +108,20 @@ struct CellVectorValues{sdim,rdim,T<:Real,refshape<:AbstractRefShape,vdim,M1,M2}
     geo_interp::Interpolation{rdim,refshape} # rdim
 end
 
-function CellVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geo_interpol::Interpolation=func_interpol; sdim::Int=getdim(geo_interpol), vdim::Int=getdim(func_interpol))
+# FIXME sdim should be something like `length(value(geo_interpol))`
+# FIXME vdim should be something like `length(value(func_interpol))`
+function CellVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, 
+        geo_interpol::Interpolation=func_interpol; sdim::Int=getdim(geo_interpol), vdim::Int=getdim(func_interpol))
     CellVectorValues(Float64, quad_rule, func_interpol, geo_interpol, Val(sdim), Val(vdim))
 end
 
 # FIXME sdim should be something like `length(value(geo_interpol))`
 # FIXME vdim should be something like `length(value(func_interpol))`
+function CellVectorValues(valuetype::Type{T}, quad_rule::QuadratureRule, func_interpol::Interpolation, 
+        geo_interpol::Interpolation=func_interpol; sdim::Int=getdim(geo_interpol), vdim::Int=getdim(func_interpol)) where {T}
+    CellVectorValues(valuetype, quad_rule, func_interpol, geo_interpol, Val(sdim), Val(vdim))
+end
+
 function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{rdim,shape}, func_interpol::Interpolation,
         geo_interpol::Interpolation, ::Val{sdim}, ::Val{vdim}) where {rdim,T,shape<:AbstractRefShape,sdim,vdim}
     @assert getrefshape(func_interpol) == getrefshape(geo_interpol) == shape
