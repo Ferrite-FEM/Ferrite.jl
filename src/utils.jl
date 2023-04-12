@@ -42,3 +42,15 @@ end
 @inline Base.getindex(s::ScalarWrapper) = s.x
 @inline Base.setindex!(s::ScalarWrapper, v) = s.x = v
 Base.copy(s::ScalarWrapper{T}) where {T} = ScalarWrapper{T}(copy(s.x))
+
+# Cast to Tensors.(Vec|Tensor) when possible
+for dim in 1:3 @eval begin
+    @inline function tensor_cast(v::SVector{$dim,T}) where T
+        return Vec{$dim,T}(Tuple(v))
+    end
+    @inline function tensor_cast(v::SMatrix{$dim,$dim,T,M}) where {T,M}
+        return Tensor{2,$dim,T,M}(Tuple(v))
+    end
+end end
+
+@inline tensor_cast(x) = x # Fallback
