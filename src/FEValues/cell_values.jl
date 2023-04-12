@@ -34,6 +34,8 @@ utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape 
 CellValues, CellScalarValues, CellVectorValues
 
 # CellScalarValues
+#   rdim = reference element dimension
+#   sdim = spatial dimension
 struct CellScalarValues{sdim,rdim,T<:Real,refshape<:AbstractRefShape} <: CellValues{sdim,rdim,T,refshape}
     N::Matrix{T}
     dNdx::Matrix{SVector{sdim,T}}
@@ -94,6 +96,8 @@ end
 #   rdim = reference element dimension
 #   sdim = spatial dimension
 #   vdim = vector dimension (i.e. dimension of evaluation of what `value` should return)
+#   M1   = number of elements in the matrix dNdx (should be vdim × sdim)
+#   M2   = number of elements in the matrix dNdξ (should be vdim × rdim)
 struct CellVectorValues{sdim,rdim,T<:Real,refshape<:AbstractRefShape,vdim,M1,M2} <: CellValues{sdim,rdim,T,refshape}
     N::Matrix{SVector{vdim,T}} # vdim
     dNdx::Matrix{SMatrix{vdim,sdim,T,M1}} # vdim × sdim

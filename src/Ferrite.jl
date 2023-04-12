@@ -24,7 +24,9 @@ struct RefCube <: AbstractRefShape end
 struct RefPrism <: AbstractRefShape end
 
 """
-Abstract type which has `CellValues` and `FaceValues` as subtypes
+Abstract type which has `CellValues` and `FaceValues` as subtypes. Each Value type is
+equipped with the spatial dimension `sdim` of the grid, the reference elements' dimension
+`rdim`, the data type for the values `T` and the reference element's geometry `refshape`.
 """
 abstract type Values{sdim,rdim,T,refshape} end
 abstract type CellValues{sdim,rdim,T,refshape} <: Values{sdim,rdim,T,refshape} end
