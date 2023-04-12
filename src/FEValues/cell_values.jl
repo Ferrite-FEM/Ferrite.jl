@@ -51,12 +51,12 @@ end
 # FIXME sdim should be something like `getdim(value(geo_interpol))``
 function CellScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
         geo_interpol::Interpolation=func_interpol, sdim::Int=getdim(func_interpol))
-    CellScalarValues(Float64, quad_rule, func_interpol, geo_interpol, sdim)
+    CellScalarValues(Float64, quad_rule, func_interpol, geo_interpol, Val(sdim))
 end
 
 # FIXME sdim should be something like `length(value(geo_interpol))`
 function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{rdim,shape}, func_interpol::Interpolation{rdim,shape},
-        geo_interpol::Interpolation{rdim,shape}=func_interpol, sdim::Int=getdim(func_interpol)) where {rdim,T,shape<:AbstractRefShape}
+        geo_interpol::Interpolation{rdim,shape}, ::Val{sdim}) where {rdim,T,shape<:AbstractRefShape,sdim}
 
     n_qpoints = length(getweights(quad_rule))
 
@@ -86,14 +86,13 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{rdim,shape}, func
 end
 
 # CellVectorValues
-# TODO remove the assumption that all dimensions have to match.
 #   rdim = reference element dimension
 #   sdim = spatial dimension
 #   vdim = vector dimension (i.e. dimension of evaluation of what `value` should return)
-struct CellVectorValues{sdim,rdim,T<:Real,refshape<:AbstractRefShape,vdim} <: CellValues{sdim,rdim,T,refshape}
+struct CellVectorValues{sdim,rdim,T<:Real,refshape<:AbstractRefShape,vdim,M1,M2} <: CellValues{sdim,rdim,T,refshape}
     N::Matrix{SVector{vdim,T}} # vdim
-    dNdx::Matrix{SMatrix{vdim,sdim,T}} # vdim × sdim
-    dNdξ::Matrix{SMatrix{vdim,rdim,T}} # vdim × rdim
+    dNdx::Matrix{SMatrix{vdim,sdim,T,M1}} # vdim × sdim
+    dNdξ::Matrix{SMatrix{vdim,rdim,T,M2}} # vdim × rdim
     detJdV::Vector{T}
     M::Matrix{T}
     dMdξ::Matrix{SVector{rdim,T}} # rdim
@@ -105,21 +104,24 @@ struct CellVectorValues{sdim,rdim,T<:Real,refshape<:AbstractRefShape,vdim} <: Ce
 end
 
 function CellVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geo_interpol::Interpolation=func_interpol; sdim::Int=getdim(geo_interpol), vdim::Int=getdim(func_interpol))
-    CellVectorValues(Float64, quad_rule, func_interpol, geo_interpol, sdim, vdim)
+    CellVectorValues(Float64, quad_rule, func_interpol, geo_interpol, Val(sdim), Val(vdim))
 end
 
 # FIXME sdim should be something like `length(value(geo_interpol))`
 # FIXME vdim should be something like `length(value(func_interpol))`
 function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{rdim,shape}, func_interpol::Interpolation,
-        geo_interpol::Interpolation=func_interpol, sdim::Int=getdim(geo_interpol), vdim::Int=getdim(func_interpol)) where {rdim,T,shape<:AbstractRefShape}
+        geo_interpol::Interpolation, ::Val{sdim}, ::Val{vdim}) where {rdim,T,shape<:AbstractRefShape,sdim,vdim}
     @assert getrefshape(func_interpol) == getrefshape(geo_interpol) == shape
     n_qpoints = length(getweights(quad_rule))
+
+    M1 = vdim*sdim
+    M2 = vdim*rdim
 
     # Function interpolation
     n_func_basefuncs = getnbasefunctions(func_interpol) * vdim
     N    = fill(zero(SVector{vdim,T})      * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdx = fill(zero(SMatrix{vdim,sdim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdξ = fill(zero(SMatrix{vdim,rdim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdx = fill(zero(SMatrix{vdim,sdim,T,M1}) * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdξ = fill(zero(SMatrix{vdim,rdim,T,M2}) * T(NaN), n_func_basefuncs, n_qpoints)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(geo_interpol)
@@ -148,7 +150,7 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{rdim,shape}, func
 
     detJdV = fill(T(NaN), n_qpoints)
 
-    CellVectorValues{sdim,rdim,T,shape,vdim}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule, func_interpol, geo_interpol)
+    CellVectorValues{sdim,rdim,T,shape,vdim,M1,M2}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule, func_interpol, geo_interpol)
 end
 
 function reinit!(cv::CellValues{sdim,sdim}, x::AbstractVector{Vec{sdim,T}}) where {sdim,T}

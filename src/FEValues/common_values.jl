@@ -96,6 +96,7 @@ Return the gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
 @propagate_inbounds shape_gradient(cv::CellValues, q_point::Int, base_func::Int) = tensor_cast(cv.dNdx[base_func, q_point])
+@propagate_inbounds shape_gradient(cv::CVV, q_point::Int, base_func::Int) where {CVV<:CellVectorValues} = tensor_cast(cv.dNdx[base_func, q_point])
 @propagate_inbounds shape_gradient(bv::FaceValues, q_point::Int, base_func::Int) = tensor_cast(bv.dNdx[base_func, q_point, bv.current_face[]])
 
 """
