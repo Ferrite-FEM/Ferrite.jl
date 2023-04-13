@@ -34,8 +34,8 @@ utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape 
 CellValues, CellScalarValues, CellVectorValues
 
 # CellScalarValues
-#   rdim = reference element dimension
 #   sdim = spatial dimension
+#   rdim = reference element dimension
 struct CellScalarValues{sdim,rdim,T<:Real,refshape<:AbstractRefShape} <: CellValues{sdim,rdim,T,refshape}
     N::Matrix{T}
     dNdx::Matrix{SVector{sdim,T}}
@@ -93,12 +93,12 @@ function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{rdim,shape}, func
 end
 
 # CellVectorValues
-#   rdim = reference element dimension
-#   sdim = spatial dimension
 #   vdim = vector dimension (i.e. dimension of evaluation of what `value` should return)
+#   sdim = spatial dimension
+#   rdim = reference element dimension
 #   M1   = number of elements in the matrix dNdx (should be vdim × sdim)
 #   M2   = number of elements in the matrix dNdξ (should be vdim × rdim)
-struct CellVectorValues{sdim,rdim,T<:Real,refshape<:AbstractRefShape,vdim,M1,M2} <: CellValues{sdim,rdim,T,refshape}
+struct CellVectorValues{vdim,sdim,rdim,T<:Real,refshape<:AbstractRefShape,M1,M2} <: CellValues{sdim,rdim,T,refshape}
     N::Matrix{SVector{vdim,T}} # vdim
     dNdx::Matrix{SMatrix{vdim,sdim,T,M1}} # vdim × sdim
     dNdξ::Matrix{SMatrix{vdim,rdim,T,M2}} # vdim × rdim
@@ -167,7 +167,7 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{rdim,shape}, func
 
     detJdV = fill(T(NaN), n_qpoints)
 
-    CellVectorValues{sdim,rdim,T,shape,vdim,M1,M2}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule, func_interpol, geo_interpol)
+    CellVectorValues{vdim,sdim,rdim,T,shape,M1,M2}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule, func_interpol, geo_interpol)
 end
 
 """
