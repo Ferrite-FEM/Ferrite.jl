@@ -202,7 +202,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     cell_neighbor_table = Vector{EntityNeighborhood{CellIndex}}(undef, length(cells)) 
 
     for (cellid, cell) in enumerate(cells)
-        cell_neighbors = union([Set{Int}(vertex_cell_table[vertex]) for vertex ∈ vertices(cell) if vertex_cell_table[vertex] != cellid]...)
+        cell_neighbors = reduce(union!, [Set{Int}(vertex_cell_table[vertex]) for vertex ∈ vertices(cell) if vertex_cell_table[vertex] != cellid])
         cell_neighbor_table[cellid] = EntityNeighborhood(CellIndex.(collect(cell_neighbors)))
 
         face_neighbors = Set{Int}()
