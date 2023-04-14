@@ -118,7 +118,7 @@ using OrdinaryDiffEq
 ν = 1.0/1000.0; #dynamic viscosity
 
 # Next a rectangular grid with a cylinder in it has to be generated.
-# We use `Gmsh` for the creation of the mesh and `FerriteGmsh` to translate it to a `Ferrite.Grid`
+# We use `Gmsh` for the creation of the mesh and `FerriteGmsh` to translate it to a `Ferrite.Grid`.
 # Note that the mesh is pretty fine, leading to a high memory consumption when
 # feeding the equation system to direct solvers.
 using FerriteGmsh
@@ -127,15 +127,22 @@ Gmsh.initialize()
 gmsh.option.set_number("General.Verbosity", 2)
 dim = 2;
 # We specify first the rectangle, the cylinder, the surface spanned by the cylinder and the boolean difference of rectangle and cylinder.
+# We check for laminar flow development in the CI #src
+if false #hide
 rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 2.2, 0.41)
 circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
 circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
 circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
+else #hide
+rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 0.55, 0.41) #hide
+end #hide
 gmsh.model.occ.cut([(dim,rect_tag)],[(dim,circle_surf_tag)]);
 # Now, the geometrical entities need to be synchronized in order to be available outside of `gmsh.model.occ`
 gmsh.model.occ.synchronize()
 # In the next lines, we add the physical groups needed to define boundary conditions.
+if false #hide
 gmsh.model.model.add_physical_group(dim-1,[5],6,"hole")
+end #hide
 gmsh.model.model.add_physical_group(dim-1,[2],7,"left")
 gmsh.model.model.add_physical_group(dim-1,[4],8,"top")
 gmsh.model.model.add_physical_group(dim-1,[3],9,"right")
@@ -154,8 +161,6 @@ gmsh.model.mesh.generate(dim)
 grid = togrid()
 Gmsh.finalize()
 
-# We test against full development of the flow - so regenerate the grid                              #src
-grid = generate_grid(Quadrilateral, (55÷3, 41÷3), Vec{2}((0.0, 0.0)), Vec{2}((0.55, 0.41)));         #hide
 
 # ### Function Space
 # To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
@@ -408,7 +413,7 @@ function navierstokes!(du,u_uc,p,t)
         end
     end
 
-    # For now we have to ingore the evolution of the Dirichlet BCs. Note that these constraints
+    # For now we have to ingore the evolution of the Dirichlet BCs.
     # The DBC dofs in the solution vector will be corrected in a post-processing step.
     #+
     apply_zero!(du, ch)
