@@ -133,10 +133,10 @@ rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 2.2, 0.41)
 circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
 circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
 circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
+gmsh.model.occ.cut([(dim,rect_tag)],[(dim,circle_surf_tag)]);
 else #hide
 rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 0.55, 0.41) #hide
 end #hide
-gmsh.model.occ.cut([(dim,rect_tag)],[(dim,circle_surf_tag)]);
 # Now, the geometrical entities need to be synchronized in order to be available outside of `gmsh.model.occ`
 gmsh.model.occ.synchronize()
 # In the next lines, we add the physical groups needed to define boundary conditions.
