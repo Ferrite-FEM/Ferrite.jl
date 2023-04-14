@@ -11,7 +11,7 @@ close!(dh)
 # dof_range
 @test (@inferred dof_range(dh, :u)) == 1:12
 @test (@inferred dof_range(dh, :p)) == 13:15
-# dof_range for FieldHandler (use with MixedDofHandler)
+# dof_range for FieldHandler
 ip = Lagrange{2, RefTetrahedron, 1}()
 field_u = Field(:u, ip, 2)
 field_c = Field(:c, ip, 1)
@@ -106,7 +106,8 @@ end
         dh = DofHandler(grid)
         add!(dh, :u, 1)
         close!(dh)
-        mdh = MixedDofHandler(grid)
+        # subdomains
+        mdh = DofHandler(grid)
         add!(mdh, FieldHandler([Field(:u, Lagrange{2,RefTetrahedron,1}(), 1)], Set(1:getncells(grid)÷2)))
         add!(mdh, FieldHandler([Field(:u, Lagrange{2,RefTetrahedron,1}(), 1)], Set((getncells(grid)÷2+1):getncells(grid))))
         close!(mdh)
@@ -129,10 +130,10 @@ end
     renumber!(dh, perm)
     renumber!(dh, iperm)
     @test original_dofs == dh.cell_dofs
-    original_dofs_mdh = copy(mdh.cell_dofs.values)
+    original_dofs_mdh = copy(mdh.cell_dofs)
     renumber!(mdh, perm)
     renumber!(mdh, iperm)
-    @test original_dofs_mdh == mdh.cell_dofs.values
+    @test original_dofs_mdh == mdh.cell_dofs
     original_prescribed = copy(ch.prescribed_dofs)
     original_inhomogeneities = copy(ch.inhomogeneities)
     original_affine_inhomogeneities = copy(ch.affine_inhomogeneities)
@@ -173,10 +174,10 @@ end
     # Renumbering by field/components #
     ###################################
 
-    function testdhch()
+    function testdhch(DHT=DofHandler)
         local grid, dh, ch
         grid = generate_grid(Quadrilateral, (2, 1))
-        dh = DofHandler(grid)
+        dh = DHT(grid)
         add!(dh, :v, 2)
         add!(dh, :s, 1)
         close!(dh)
@@ -253,6 +254,112 @@ end
     @test ch.prescribed_dofs == sort!([1, 4, 7, 10, 17])
     for el in 1:2, r in [dof_range(dh, :v)[1:2:end], dof_range(dh, :v)[2:2:end], dof_range(dh, :s)]
         @test sign.(diff(celldofs(dh, el)[r])) == sign.(diff(celldofs(dho, el)[r]))
+    end
+
+    #######################################
+    # Field on subdomain #
+    #######################################
+
+    function test_dhch_subdomain()
+        local grid, dh, ch
+        grid = generate_grid(Quadrilateral, (2, 1))
+        ip = Lagrange{2,RefCube,1}()
+        dh = DofHandler(grid)
+        add!(dh, FieldHandler([Field(:v, ip, 2), Field(:s, ip, 1)], Set(1)))
+        add!(dh, FieldHandler([Field(:v, ip, 2)], Set(2)))
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:v, getfaceset(grid, "left"), (x, t) -> 0, [2]))
+        add!(ch, Dirichlet(:s, getfaceset(grid, "left"), (x, t) -> 0))
+        add!(ch, AffineConstraint(13, [15 => 0.5, 16 => 0.5], 0.0))
+        close!(ch)
+        return dh, ch
+    end
+
+    # Original numbering
+    dho, cho = test_dhch_subdomain()
+    #        :v                :s
+    #  7,8───5,6──15,16  12────11────
+    #   │  1  │  2  │     │  1  │  2  │
+    #  1,2───3,4──13,14   9────10────
+    @test celldofs(dho, 1) == 1:12
+    @test celldofs(dho, 2) == [3, 4, 13, 14, 15, 16, 5, 6]
+    @test cho.prescribed_dofs == [2, 8, 9, 12, 13]
+
+    # By field
+    dh, ch = test_dhch_subdomain()
+    renumber!(dh, ch, DofOrder.FieldWise())
+    #        :v                :s
+    #  7,8───5,6──11,12  16────15────
+    #   │  1  │  2  │     │  1  │  2  │
+    #  1,2───3,4───9,10  13────14────
+    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 16]
+    @test celldofs(dh, 2) == [3, 4, 9, 10, 11, 12, 5, 6]
+    @test ch.prescribed_dofs == sort!([2, 8, 13, 16, 9])
+    for r in [dof_range(dh.fieldhandlers[1], :v), dof_range(dh.fieldhandlers[1], :s)]
+        # Test stability within each block: i < j -> p(i) < p(j), i > j -> p(i) > p(j)
+        @test sign.(diff(celldofs(dh, 1)[r])) == sign.(diff(celldofs(dho, 1)[r]))
+    end
+    r = dof_range(dh.fieldhandlers[2], :v)
+    @test sign.(diff(celldofs(dh, 2)[r])) == sign.(diff(celldofs(dho, 2)[r]))
+
+    # By field, reordered
+    dh, ch = test_dhch_subdomain()
+    renumber!(dh, ch, DofOrder.FieldWise([2, 1]))
+    #        :v                :s
+    # 11,12──9,10─15,16   4─────3─────
+    #   │  1  │  2  │     │  1  │  2  │
+    #  5,6───7,8──13,14   1─────2─────
+    @test celldofs(dh, 1) == [5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4]
+    @test celldofs(dh, 2) == [7, 8, 13, 14, 15, 16, 9, 10]
+    @test ch.prescribed_dofs == sort!([6, 12, 1, 4, 13])
+    for r in [dof_range(dh.fieldhandlers[1], :v), dof_range(dh.fieldhandlers[1], :s)]
+        # Test stability within each block: i < j -> p(i) < p(j), i > j -> p(i) > p(j)
+        @test sign.(diff(celldofs(dh, 1)[r])) == sign.(diff(celldofs(dho, 1)[r]))
+    end
+    r = dof_range(dh.fieldhandlers[2], :v)
+    @test sign.(diff(celldofs(dh, 2)[r])) == sign.(diff(celldofs(dho, 2)[r]))
+
+    # By component
+    dh, ch = test_dhch_subdomain()
+    renumber!(dh, ch, DofOrder.ComponentWise())
+    #        :v                :s
+    #  4,10──3,9───6,12  16────15────
+    #   │  1  │  2  │     │  1  │  2  │
+    #  1,7───2,8───5,11  13────14────
+    @test celldofs(dh, 1) == [1, 7, 2, 8, 3, 9, 4, 10, 13, 14, 15, 16]
+    @test celldofs(dh, 2) == [2, 8, 5, 11, 6, 12, 3, 9]
+    @test ch.prescribed_dofs == sort!([7, 10, 13, 16, 5])
+    dof_range_v1 = dof_range(dh.fieldhandlers[1], :v)
+    dof_range_s1 = dof_range(dh.fieldhandlers[1], :s)
+    for r in [dof_range_v1[1:2:end], dof_range_v1[2:2:end], dof_range_s1]
+        # Test stability within each block: i < j -> p(i) < p(j), i > j -> p(i) > p(j)
+        @test sign.(diff(celldofs(dh, 1)[r])) == sign.(diff(celldofs(dho, 1)[r]))
+    end
+    dof_range_v2 = dof_range(dh.fieldhandlers[2], :v)
+    for r in [dof_range_v2[1:2:end], dof_range_v2[2:2:end]]
+        @test sign.(diff(celldofs(dh, 2)[r])) == sign.(diff(celldofs(dho, 2)[r]))
+    end
+
+    # By component, reordered
+    dh, ch = test_dhch_subdomain()
+    renumber!(dh, ch, DofOrder.ComponentWise([3, 1, 2]))
+    #        :v                :s
+    # 14,4──13,3──16,6   10─────9────
+    #   │  1  │  2  │     │  1  │  2  │
+    # 11,1──12,2──15,5    7─────8────
+    @test celldofs(dh, 1) == [11, 1, 12, 2, 13, 3, 14, 4, 7, 8, 9, 10]
+    @test celldofs(dh, 2) == [12, 2, 15, 5, 16, 6, 13, 3, ]
+    @test ch.prescribed_dofs == sort!([1, 4, 7, 10, 15])
+    dof_range_v1 = dof_range(dh.fieldhandlers[1], :v)
+    dof_range_s1 = dof_range(dh.fieldhandlers[1], :s)
+    for r in [dof_range_v1[1:2:end], dof_range_v1[2:2:end], dof_range_s1]
+        # Test stability within each block: i < j -> p(i) < p(j), i > j -> p(i) > p(j)
+        @test sign.(diff(celldofs(dh, 1)[r])) == sign.(diff(celldofs(dho, 1)[r]))
+    end
+    dof_range_v2 = dof_range(dh.fieldhandlers[2], :v)
+    for r in [dof_range_v2[1:2:end], dof_range_v2[2:2:end]]
+        @test sign.(diff(celldofs(dh, 2)[r])) == sign.(diff(celldofs(dho, 2)[r]))
     end
 
     # Metis ordering
@@ -358,4 +465,42 @@ end
     @test_throws ErrorException("coupling not square") create_sparsity_pattern(dh; coupling=[true true])
     @test_throws ErrorException("coupling not symmetric") create_symmetric_sparsity_pattern(dh; coupling=[true true; false true])
     @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
+
+    # Test coupling with subdomains
+    grid = generate_grid(Quadrilateral, (1, 2))
+    dh = DofHandler(grid)
+    fh1 = FieldHandler(
+        [Field(:u, Lagrange{2,RefCube,1}(), 2), Field(:p, Lagrange{2,RefCube,1}(), 2)],
+        Set(1)
+    )
+    add!(dh, fh1)
+    fh2 = FieldHandler(
+        [Field(:u, Lagrange{2,RefCube,1}(), 2)],
+        Set(2)
+    )
+    add!(dh, fh2)
+    close!(dh)
+    K = create_sparsity_pattern(dh; coupling = [true true; true false])
+    KS = create_symmetric_sparsity_pattern(dh; coupling = [true true; true false])
+    # Subdomain 1: u and p
+    udofs = celldofs(dh, 1)[dof_range(fh1, :u)]
+    pdofs = celldofs(dh, 1)[dof_range(fh1, :p)]
+    for j in udofs, i in Iterators.flatten((udofs, pdofs))
+        @test is_stored(K, i, j)
+        @test is_stored(KS, i, j) == (i <= j)
+    end
+    for j in pdofs, i in udofs
+        @test is_stored(K, i, j)
+        @test is_stored(KS, i, j)
+    end
+    for j in pdofs, i in pdofs
+        @test is_stored(K, i, j) == (i == j)
+        @test is_stored(KS, i, j) == (i == j)
+    end
+    # Subdomain 2: u
+    udofs = celldofs(dh, 2)[dof_range(fh2, :u)]
+    for j in udofs, i in udofs
+        @test is_stored(K, i, j)
+        @test is_stored(KS, i, j) == (i <= j)
+    end
 end

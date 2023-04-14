@@ -100,36 +100,10 @@ const implemented_celltypes = (
     (const QuadraticTetrahedron = Cell{3,10,4}),
     
     (const Hexahedron = Cell{3,8,6}),
-    (Cell{2,20,6})
+    (Cell{2,20,6}),
+
+    (const Wedge = Cell{3,6,5})
 )
-
-"""
-A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh
-"""
-struct CellIndex
-    idx::Int
-end
-
-"""
-A `FaceIndex` wraps an (Int, Int) and defines a local face by pointing to a (cell, face).
-"""
-struct FaceIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
-end
-
-"""
-A `EdgeIndex` wraps an (Int, Int) and defines a local edge by pointing to a (cell, edge).
-"""
-struct EdgeIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
-end
-
-"""
-A `VertexIndex` wraps an (Int, Int) and defines a local vertex by pointing to a (cell, vert).
-"""
-struct VertexIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
-end
 
 struct EntityNeighborhood{T<:Union{BoundaryIndex,CellIndex}}
     neighbor_info::Vector{T}
@@ -646,13 +620,9 @@ end
 
 Transform all nodes of the `grid` based on some transformation function `f`.
 """
-function transform!(g::AbstractGrid, f::Function)
-    c = similar(g.nodes)
-    for i in 1:length(c)
-        c[i] = Node(f(g.nodes[i].x))
-    end
-    copyto!(g.nodes, c)
-    g
+function transform!(g::Grid, f::Function)
+    map!(n -> Node(f(getcoordinates(n))), g.nodes, g.nodes)
+    return g
 end
 
 # Sets
@@ -666,7 +636,7 @@ _warn_emptyset(set, name) = length(set) == 0 && @warn("no entities added to the 
 
 Adds a cellset to the grid with key `name`.
 Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
-The `MixedDofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
+The `DofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
 `all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` in the cell if the cell
 should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 
@@ -711,7 +681,7 @@ Facesets are used to initialize `Dirichlet` structs, that are needed to specify 
 should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 
 ```julia
-addfaceset!(gird, "right", Set(((2,2),(4,2))) #see grid manual example for reference
+addfaceset!(grid, "right", Set(((2,2),(4,2))) #see grid manual example for reference
 addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
 ```
 """
@@ -863,6 +833,11 @@ faces(c::Union{Hexahedron,Cell{3,20,6}}) = ((c.nodes[1],c.nodes[4],c.nodes[3],c.
 edges(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
 faces(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2],c.nodes[3],c.nodes[4]),)
 
+vertices(c::Wedge) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[5], c.nodes[6])
+edges(c::Wedge) = ((c.nodes[2],c.nodes[1]), (c.nodes[1],c.nodes[3]), (c.nodes[1],c.nodes[4]), (c.nodes[3],c.nodes[2]), (c.nodes[2],c.nodes[5]), (c.nodes[3],c.nodes[6]), (c.nodes[4],c.nodes[5]), (c.nodes[4],c.nodes[6]), (c.nodes[6],c.nodes[5]))
+faces(c::Wedge) = ((c.nodes[1],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[5],c.nodes[4]), (c.nodes[3],c.nodes[1],c.nodes[4],c.nodes[6]), (c.nodes[2],c.nodes[3],c.nodes[6],c.nodes[5]), (c.nodes[4],c.nodes[5],c.nodes[6]))
+
+# random stuff
 default_interpolation(::Union{Type{Line},Type{Line2D},Type{Line3D}}) = Lagrange{1,RefCube,1}()
 default_interpolation(::Type{QuadraticLine}) = Lagrange{1,RefCube,2}()
 default_interpolation(::Type{Triangle}) = Lagrange{2,RefTetrahedron,1}()
@@ -873,6 +848,7 @@ default_interpolation(::Type{Tetrahedron}) = Lagrange{3,RefTetrahedron,1}()
 default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{3,RefTetrahedron,2}()
 default_interpolation(::Type{Hexahedron}) = Lagrange{3,RefCube,1}()
 default_interpolation(::Type{Cell{3,20,6}}) = Serendipity{3,RefCube,2}()
+default_interpolation(::Type{Wedge}) = Lagrange{3,RefPrism,1}()
 
 """
     boundaryfunction(::Type{<:BoundaryIndex})

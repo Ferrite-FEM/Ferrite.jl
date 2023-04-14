@@ -53,7 +53,7 @@
 # ```
 # where $v_{in}(t) = \text{clamp}(t, 0.0, 1.5)$. With a dynamic viscosity of $\nu = 0.001$
 # this is enough to induce turbulence behind the cylinder which leads to vortex shedding. The top and bottom of our
-# channel have no-slip conditions, i.e. $v = [0,0]^{\textrm{T}}$, while the right boundary has the do-nothing boundary condtion
+# channel have no-slip conditions, i.e. $v = [0,0]^{\textrm{T}}$, while the right boundary has the do-nothing boundary condition
 # $\nu \partial_{\textrm{n}} v - p n = 0$ to model outflow. With these boundary conditions we can choose the zero solution as a
 # feasible initial condition.
 #
@@ -160,7 +160,6 @@ gmsh.option.setNumber("Mesh.MeshSizeMax",0.1)                                   
 gmsh.model.mesh.generate(dim)
 grid = togrid()
 Gmsh.finalize()
-
 
 # ### Function Space
 # To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
@@ -413,7 +412,7 @@ function navierstokes!(du,u_uc,p,t)
         end
     end
 
-    # For now we have to ingore the evolution of the Dirichlet BCs.
+    # For now we have to ignore the evolution of the Dirichlet BCs.
     # The DBC dofs in the solution vector will be corrected in a post-processing step.
     #+
     apply_zero!(du, ch)
@@ -437,7 +436,7 @@ end
 # Now we can put everything together by specifying how to solve the problem.
 # We want to use the adaptive implicit Euler method with our custom linear
 # solver, which helps in the enforcement of the Dirichlet BCs. Further we
-# enable the progress bar with the `progess` and `progress_steps` arguments.
+# enable the progress bar with the `progress` and `progress_steps` arguments.
 # Finally we have to communicate the time step length and initialization
 # algorithm. Since we start with a valid initial state we do not use one of
 # DifferentialEquations.jl initialization algorithms.

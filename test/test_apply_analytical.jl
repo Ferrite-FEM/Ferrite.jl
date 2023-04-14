@@ -37,7 +37,7 @@
         return dh
     end
 
-    function testmdh(dim, ip_order_u, ip_order_p)
+    function testdh_subdomains(dim, ip_order_u, ip_order_p)
         if dim == 1
             nodes = Node.([Vec{1}((x,)) for x in 0.0:1.0:3.0])
             cell1 = Cell{1,2,2}((1,2))
@@ -52,7 +52,7 @@
         else
             error("Only dim=1 & 2 supported")
         end
-        mdh = MixedDofHandler(grid)
+        mdh = DofHandler(grid)
         default_ip_A = Ferrite.default_interpolation(getcelltype(grid, first(getcellset(grid,"A"))))
         default_ip_B = Ferrite.default_interpolation(getcelltype(grid, first(getcellset(grid,"B"))))
         ufield_A = Field(:u, change_ip_order(default_ip_A, ip_order_u), dim)
@@ -65,19 +65,13 @@
     end
 
     # The following can be removed after #457 is merged if that will include the MixedDofHandler
-    function _global_dof_range(dh::MixedDofHandler, field_name::Symbol)
+    function _global_dof_range(dh::DofHandler, field_name::Symbol)
         dofs = Set{Int}()
         for fh in dh.fieldhandlers
-            if field_name ∈ Ferrite.getfieldnames(fh)
+            if !isnothing(Ferrite._find_field(fh, field_name))
                 _global_dof_range!(dofs, dh, fh, field_name, fh.cellset)
             end
         end
-        return sort!(collect(Int, dofs))
-    end
-
-    function _global_dof_range(dh::DofHandler, field_name::Symbol)
-        dofs = Set{Int}()
-        _global_dof_range!(dofs, dh, dh, field_name, 1:getncells(dh.grid))
         return sort!(collect(Int, dofs))
     end
 
@@ -133,11 +127,11 @@
         end
     end
 
-    @testset "MixedDofHandler" begin
+    @testset "DofHandler with subdomains" begin
         for dim in 1:2
             for ip_order_u in 1:2
                 for ip_order_p in 1:2
-                    dh = testmdh(dim, ip_order_u, ip_order_p)
+                    dh = testdh_subdomains(dim, ip_order_u, ip_order_p)
                     num_udofs = length(_global_dof_range(dh, :u))
                     num_pdofs = length(_global_dof_range(dh, :p))
 
@@ -156,7 +150,7 @@
         @test_throws ErrorException apply_analytical!(zeros(ndofs(dh)), dh, :v, x->0.0)    # Missing field
         @test_throws ErrorException apply_analytical!(zeros(ndofs(dh)), dh, :u, x->0.0)    # Should be f(x)::Vec{2}
 
-        mdh = testmdh(2, 1, 1)
+        mdh = testdh_subdomains(2, 1, 1)
         @test_throws ErrorException apply_analytical!(zeros(ndofs(mdh)), mdh, :v, x->0.0)  # Missing field
         @test_throws ErrorException apply_analytical!(zeros(ndofs(mdh)), mdh, :u, x->0.0)  # Should be f(x)::Vec{2}
     end

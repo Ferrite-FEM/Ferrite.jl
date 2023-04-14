@@ -73,7 +73,7 @@ for iter in 1:maxiter
     check_convergence(r, ...) && break # Only check convergence after `apply_zero!(K, r, ch)`
     Δa = K \ r              # Calculate the (negative) update
     apply_zero!(Δa, ch)     # Change the constrained values in `Δa` such that `a-Δa`
-                            # fullfills constraints if `a` did.
+                            # fulfills constraints if `a` did.
     a .-= Δa
 end
 ```

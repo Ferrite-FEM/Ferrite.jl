@@ -5,6 +5,7 @@
 #####################################
 reference_volume(::Interpolation{dim, RefCube}) where {dim} = 2^dim
 reference_volume(::Interpolation{dim, RefTetrahedron}) where {dim} = 1 / factorial(dim)
+reference_volume(::Interpolation{  3, RefPrism}) = 1/2
 # For faces
 reference_volume(fs::Interpolation, ::Int) = reference_volume(Ferrite.getlowerdim(fs))
 reference_volume(fs::Interpolation{2, RefTetrahedron}, face::Int) = face == 1 ? sqrt(2) : 1.0
@@ -50,6 +51,15 @@ function reference_normals(::Lagrange{3, RefCube})
             Vec{3, Float64}(( 1.0,  0.0,  0.0)),
             Vec{3, Float64}(( 0.0,  1.0,  0.0)),
             Vec{3, Float64}((-1.0,  0.0,  0.0)),
+            Vec{3, Float64}(( 0.0,  0.0,  1.0))]
+end
+
+# Lagrange{3, Wedge}
+function reference_normals(::Lagrange{3, RefPrism})
+    return [Vec{3, Float64}(( 0.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0, -1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  0.0,  0.0)),
+            Vec{3, Float64}((1/√2, 1/√2,  0.0)),
             Vec{3, Float64}(( 0.0,  0.0,  1.0))]
 end
 
@@ -160,10 +170,6 @@ end
 function calculate_volume(::Lagrange{0, RefCube, order}, ::Vector{Vec{1, T}}) where {order, T}
     return one(T)
 end
-
-getnfaces(::Interpolation{dim, RefCube}) where {dim} = 2*dim
-getnfaces(::Interpolation{2, RefTetrahedron}) = 3
-getnfaces(::Interpolation{3, RefTetrahedron}) = 4
 
 coords_on_faces(x, ::Lagrange{1, RefCube, 1}) = ([x[1]], [x[2]])
 coords_on_faces(x, ::Lagrange{1, RefCube, 2}) = ([x[1]], [x[2]])
