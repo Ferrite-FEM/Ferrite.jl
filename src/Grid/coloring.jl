@@ -25,7 +25,7 @@ function create_incidence_matrix(g::Grid, cellset=1:getncells(g))
         end
     end
 
-    incidence_matrix = sparse(I, J, V)
+    incidence_matrix = sparse(I, J, V, getncells(g), getncells(g))
     return incidence_matrix
 end
 
@@ -70,6 +70,13 @@ end
 
 # See Appendix A in https://www.math.colostate.edu/%7Ebangerth/publications/2013-pattern.pdf
 function workstream_coloring(incidence_matrix, cellset)
+     
+    if length(cellset) == 0
+        return Vector{Int}[]
+    elseif length(cellset) == 1
+        return Vector{Int}[Int[first(cellset)]]
+    end
+
     ###################
     # 1. Partitioning #
     ###################
@@ -88,7 +95,7 @@ function workstream_coloring(incidence_matrix, cellset)
         ## Zone N: All elements with connection to elements in Zone N-1
         while true
             s = Set{Int}()
-            # Loop over all elements in previous zone and add their neigbouring elements
+            # Loop over all elements in previous zone and add their neighbouring elements
             # unless they are in any of the previous 2 zones.
             empty_zone = true
             for c in get(zones, Z-1, Z0)

@@ -39,10 +39,14 @@ compute_vertex_values
 transform!
 getcoordinates
 getcoordinates!
+```
+
+### Topology
+
+```@docs
 Ferrite.ExclusiveTopology
 Ferrite.getneighborhood
 Ferrite.faceskeleton
-Ferrite.toglobal
 ```
 
 ### Grid Sets Utility

@@ -2,7 +2,7 @@
 DocTestSetup = :(using Ferrite)
 ```
 
-# Boundary Conditions
+# Initial and Boundary Conditions
 
 Every PDE is accompanied with boundary conditions. There are different types of boundary
 conditions, and they need to be handled in different ways. Below we discuss how to handle
@@ -256,7 +256,7 @@ pdbc = PeriodicDirichlet(
     )
     ```
 
-# Initial Conditions
+## Initial Conditions
 
 When solving time-dependent problems, initial conditions, different from zero, may be required. 
 For finite element formulations of ODE-type, 
@@ -272,17 +272,10 @@ u = zeros(ndofs(dh))
 apply_analytical!(u, dh, :p, x -> ρ * g * x[2])
 ```
 
-See also [Time Dependent Problems](@ref) for one example. 
+See also [Time Dependent Problems](@ref) for one example.
 
-*Note about solving DAE:* 
-A Differential Algebraic Equations (DAE) is an equation of the form
-``\boldsymbol{r}(\boldsymbol{u}(t),\boldsymbol{u}'(t),t)=\boldsymbol{0}``,
-which usually cannot be expressed as a true ODE. They occur often,
-but not always, in forms where some time derivatives are missing
-```math
-u_1'(t) = f(\boldsymbol{u}(t),t)
-0 = g(\boldsymbol{u}(t),t)`
-```
-In for such equations, it is usually necessary to specify initial conditions 
-for both ``\boldsymbol{u}(0)`` and ``\boldsymbol{u}'(0)``, and these must be consistent,
-i.e. ``\boldsymbol{r}(\boldsymbol{u}(0),\boldsymbol{u}'(0),0)=\boldsymbol{0}``.
+!!! note "Consistency"
+    `apply_analytical!` does not enforce consistency of the applied solution with the system of 
+    equations. Some problems, like for example differential-algebraic systems of equations (DAEs)
+    need extra care during initialization. We refer to the paper ["Consistent Initial Condition Calculation for Differential-Algebraic Systems"  by Brown et al.](dx.doi.org/10.1137/S1064827595289996) for more details on this matter.
+

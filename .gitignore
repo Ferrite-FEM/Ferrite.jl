@@ -2,6 +2,9 @@
 *.jl.*.cov
 *.jl.mem
 *.vtu
+*.vtk
+*.pvtu
+*.pvtk
 *.pvd
 examples/.ipynb_checkpoints/
 docs/build/
@@ -10,3 +13,8 @@ docs/src/examples/
 *.DS_Store
 /Manifest.toml
 /test/coverage/Manifest.toml
+/benchmark/Manifest.toml
+
+LocalPreferences.toml
+docs/LocalPreferences.toml
+benchmark/tune.json

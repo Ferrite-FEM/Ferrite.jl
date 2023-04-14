@@ -423,8 +423,8 @@ end
     function test_coloring(grid, cellset=1:getncells(grid))
         for alg in (ColoringAlgorithm.Greedy, ColoringAlgorithm.WorkStream)
             color_vectors = create_coloring(grid, cellset; alg=alg)
-            @test sum(length, color_vectors) == length(cellset)
-            @test union(Set.(color_vectors)...) == Set(cellset)
+            @test sum(length, color_vectors, init=0) == length(cellset)
+            @test union!(Set{Int}(), color_vectors...)  == Set(cellset)
             conn = Ferrite.create_incidence_matrix(grid, cellset)
             for color in color_vectors, c1 in color, c2 in color
                 @test !conn[c1, c2]
@@ -450,6 +450,10 @@ end
     test_coloring(generate_grid(Hexahedron, (5, 5, 5)), Set{Int}(1:3^3))
     # unconnected subset
     test_coloring(generate_grid(Triangle, (10, 10)), union(Set(1:10), Set(70:80)))
+
+    #Special case with one and zero elements in the sets
+    test_coloring(generate_grid(Quadrilateral, (2, 2)), [1])
+    test_coloring(generate_grid(Quadrilateral, (2, 2)), [])
 end
 
 @testset "DoF distribution" begin

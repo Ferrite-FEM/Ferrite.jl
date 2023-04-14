@@ -3,21 +3,21 @@ DocTestSetup = :(using Ferrite)
 ```
 
 # Degrees of Freedom
-Degrees of freedom (dofs) are distributed by the [`DofHandler`](@ref) or the [`MixedDofHandler`](@ref).
+Degrees of freedom (dofs) are distributed by the [`DofHandler`](@ref).
 ```@docs
 DofHandler
-MixedDofHandler
 ```
 
 ## Adding fields to the DofHandlers
 ```@docs
 add!(::DofHandler, ::Symbol, ::Int, ::Interpolation)
-add!(::MixedDofHandler, ::FieldHandler)
+add!(::DofHandler, ::FieldHandler)
 Field
 FieldHandler
-close!(::MixedDofHandler)
+close!(::DofHandler)
 ```
 
+## Dof renumbering
 ```@docs
 renumber!
 DofOrder.FieldWise
@@ -27,10 +27,10 @@ DofOrder.ComponentWise
 ## Common methods
 ```@docs
 ndofs
+ndofs_per_cell
 dof_range
-Ferrite.nfields(::MixedDofHandler)
-Ferrite.getfieldnames(::MixedDofHandler)
-Ferrite.getfielddim(::MixedDofHandler, ::Symbol)
+celldofs
+celldofs!
 ```
 
 # CellIterator

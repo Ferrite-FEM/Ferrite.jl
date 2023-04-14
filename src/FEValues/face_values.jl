@@ -232,48 +232,50 @@ for each dof-position determined by the `func_interpol`. Used mainly by the `Con
 """
 struct BCValues{T}
     M::Array{T,3}
-    current_face::ScalarWrapper{Int}
+    nqp::Array{Int}
+    current_entity::ScalarWrapper{Int}
 end
 
 BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex} = Ferrite.FaceIndex) =
     BCValues(Float64, func_interpol, geom_interpol, boundary_type)
 
 function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_interpol::Interpolation{dim,refshape}, boundary_type::Type{<:BoundaryIndex} = Ferrite.FaceIndex) where {T,dim,refshape}
-    # set up quadrature rules for each face with dof-positions
+    # set up quadrature rules for each boundary entity with dof-positions
     # (determined by func_interpol) as the quadrature points
     interpolation_coords = reference_coordinates(func_interpol)
 
     qrs = QuadratureRule{dim,refshape,T}[]
-    faces = boundaryfunction(boundary_type) # faces, edges or vertices
-    for face in faces(func_interpol)
+    for boundarydofs in boundarydof_indices(boundary_type)(func_interpol)
         dofcoords = Vec{dim,T}[]
-        for facedof in face
-            push!(dofcoords, interpolation_coords[facedof])
+        for boundarydof in boundarydofs
+            push!(dofcoords, interpolation_coords[boundarydof])
         end
         qrf = QuadratureRule{dim,refshape,T}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used
         push!(qrs, qrf)
     end
 
-    n_faces = length(qrs)
-    n_qpoints = n_faces == 0 ? 0 : length(getweights(qrs[1])) # assume same in all
+    n_boundary_entities = length(qrs)
+    n_qpoints = n_boundary_entities == 0 ? 0 : maximum(qr->length(getweights(qr)), qrs) # Bound number of qps correctly.
     n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M =    fill(zero(T)           * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
+    M   = fill(zero(T) * T(NaN), n_geom_basefuncs, n_qpoints, n_boundary_entities)
+    nqp = zeros(Int,n_boundary_entities)
 
-    for face in 1:n_faces, (qp, ξ) in enumerate(qrs[face].points)
-        for i in 1:n_geom_basefuncs
-            M[i, qp, face] = value(geom_interpol, i, ξ)
+    for n_boundary_entity in 1:n_boundary_entities
+        for (qp, ξ) in enumerate(qrs[n_boundary_entity].points), i in 1:n_geom_basefuncs
+            M[i, qp, n_boundary_entity] = value(geom_interpol, i, ξ)
         end
+        nqp[n_boundary_entity] = length(qrs[n_boundary_entity].points)
     end
 
-    BCValues{T}(M, ScalarWrapper(0))
+    BCValues{T}(M, nqp, ScalarWrapper(0))
 end
 
-getnquadpoints(bcv::BCValues) = size(bcv.M, 2)
+getnquadpoints(bcv::BCValues) = bcv.nqp[bcv.current_entity.x]
 function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = size(bcv.M, 1)
     length(xh) == n_base_funcs || throw_incompatible_coord_length(length(xh), n_base_funcs)
     x = zero(Vec{dim,T})
-    face = bcv.current_face[]
+    face = bcv.current_entity[]
     @inbounds for i in 1:n_base_funcs
         x += bcv.M[i,q_point,face] * xh[i] # geometric_value(fe_v, q_point, i) * xh[i]
     end

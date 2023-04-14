@@ -14,15 +14,22 @@ struct Node{dim,T}
 end
 Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
 getcoordinates(n::Node) = n.x
+
+"""
+    Ferrite.get_coordinate_eltype(::Node)
+
+Get the data type of the components of the nodes coordinate.
+"""
 get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 
 abstract type AbstractCell{dim,N,M} end
 """
     Cell{dim,N,M} <: AbstractCell{dim,N,M}
-A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
-However, a `cell` is not defined by the nodes but rather by the global node ids.
-The parameter `dim` refers here to the geometrical/ambient dimension, i.e. the dimension of the `nodes` in the grid and **not** the topological dimension of the cell.
+
+A `Cell` is a subdomain defined by a collection of `Node`s.
+The parameter `dim` refers here to the geometrical/ambient dimension, i.e. the dimension of the `nodes` in the grid and **not** the topological dimension of the cell (i.e. the dimension of the reference element obtained by default_interpolation).
 A `Cell` has `N` nodes and `M` faces.
+Note that a `Cell` is not defined geometrically by node coordinates, but rather topologically by node indices into the node vector of some grid.
 
 # Fields
 - `nodes::Ntuple{N,Int}`: N-tuple that stores the node ids. The ordering defines a cell's and its subentities' orientations.
@@ -36,6 +43,44 @@ nedges(c::C) where {C<:AbstractCell} = length(edges(c))
 nvertices(c::C) where {C<:AbstractCell} = length(vertices(c))
 nnodes(c::C) where {C<:AbstractCell} = nnodes(typeof(c))
 nnodes(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = N
+
+"""
+    Ferrite.vertices(::AbstractCell)
+
+Returns a tuple with the node indices (of the nodes in a grid) for each vertex in a given cell.
+This function induces the [`VertexIndex`](@ref), where the second index 
+corresponds to the local index into this tuple.
+"""
+vertices(::Ferrite.AbstractCell)
+
+"""
+    Ferrite.edges(::AbstractCell)
+
+Returns a tuple of 2-tuples containing the ordered node indices (of the nodes in a grid) corresponding to
+the vertices that define an *oriented edge*. This function induces the 
+[`EdgeIndex`](@ref), where the second index corresponds to the local index into this tuple.
+
+Note that the vertices are sufficient to define an edge uniquely.
+"""
+edges(::Ferrite.AbstractCell)
+
+"""
+    Ferrite.faces(::AbstractCell)
+
+Returns a tuple of n-tuples containing the ordered node indices (of the nodes in a grid) corresponding to
+the vertices that define an *oriented face*. This function induces the 
+[`FaceIndex`](@ref), where the second index corresponds to the local index into this tuple.
+
+Note that the vertices are sufficient to define a face uniquely.
+"""
+faces(::Ferrite.AbstractCell)
+
+"""
+    Ferrite.default_interpolation(::AbstractCell)::Interpolation
+
+Returns the interpolation which defines the geometry of a given cell.
+"""
+default_interpolation(::Ferrite.AbstractCell)
 
 # Typealias for commonly used cells
 const implemented_celltypes = (
@@ -55,36 +100,10 @@ const implemented_celltypes = (
     (const QuadraticTetrahedron = Cell{3,10,4}),
     
     (const Hexahedron = Cell{3,8,6}),
-    (Cell{2,20,6})
+    (Cell{2,20,6}),
+
+    (const Wedge = Cell{3,6,5})
 )
-
-"""
-A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh
-"""
-struct CellIndex
-    idx::Int
-end
-
-"""
-A `FaceIndex` wraps an (Int, Int) and defines a local face by pointing to a (cell, face).
-"""
-struct FaceIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
-end
-
-"""
-A `EdgeIndex` wraps an (Int, Int) and defines a local edge by pointing to a (cell, edge).
-"""
-struct EdgeIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
-end
-
-"""
-A `VertexIndex` wraps an (Int, Int) and defines a local vertex by pointing to a (cell, vert).
-"""
-struct VertexIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
-end
 
 struct EntityNeighborhood{T<:Union{BoundaryIndex,CellIndex}}
     neighbor_info::Vector{T}
@@ -601,13 +620,9 @@ end
 
 Transform all nodes of the `grid` based on some transformation function `f`.
 """
-function transform!(g::AbstractGrid, f::Function)
-    c = similar(g.nodes)
-    for i in 1:length(c)
-        c[i] = Node(f(g.nodes[i].x))
-    end
-    copyto!(g.nodes, c)
-    g
+function transform!(g::Grid, f::Function)
+    map!(n -> Node(f(getcoordinates(n))), g.nodes, g.nodes)
+    return g
 end
 
 # Sets
@@ -621,7 +636,7 @@ _warn_emptyset(set, name) = length(set) == 0 && @warn("no entities added to the 
 
 Adds a cellset to the grid with key `name`.
 Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
-The `MixedDofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
+The `DofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
 `all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` in the cell if the cell
 should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 
@@ -666,7 +681,7 @@ Facesets are used to initialize `Dirichlet` structs, that are needed to specify 
 should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 
 ```julia
-addfaceset!(gird, "right", Set(((2,2),(4,2))) #see grid manual example for reference
+addfaceset!(grid, "right", Set(((2,2),(4,2))) #see grid manual example for reference
 addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
 ```
 """
@@ -818,6 +833,10 @@ faces(c::Union{Hexahedron,Cell{3,20,6}}) = ((c.nodes[1],c.nodes[4],c.nodes[3],c.
 edges(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
 faces(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2],c.nodes[3],c.nodes[4]),)
 
+vertices(c::Wedge) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[5], c.nodes[6])
+edges(c::Wedge) = ((c.nodes[2],c.nodes[1]), (c.nodes[1],c.nodes[3]), (c.nodes[1],c.nodes[4]), (c.nodes[3],c.nodes[2]), (c.nodes[2],c.nodes[5]), (c.nodes[3],c.nodes[6]), (c.nodes[4],c.nodes[5]), (c.nodes[4],c.nodes[6]), (c.nodes[6],c.nodes[5]))
+faces(c::Wedge) = ((c.nodes[1],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[5],c.nodes[4]), (c.nodes[3],c.nodes[1],c.nodes[4],c.nodes[6]), (c.nodes[2],c.nodes[3],c.nodes[6],c.nodes[5]), (c.nodes[4],c.nodes[5],c.nodes[6]))
+
 # random stuff
 default_interpolation(::Union{Type{Line},Type{Line2D},Type{Line3D}}) = Lagrange{1,RefCube,1}()
 default_interpolation(::Type{QuadraticLine}) = Lagrange{1,RefCube,2}()
@@ -829,6 +848,14 @@ default_interpolation(::Type{Tetrahedron}) = Lagrange{3,RefTetrahedron,1}()
 default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{3,RefTetrahedron,2}()
 default_interpolation(::Type{Hexahedron}) = Lagrange{3,RefCube,1}()
 default_interpolation(::Type{Cell{3,20,6}}) = Serendipity{3,RefCube,2}()
+default_interpolation(::Type{Wedge}) = Lagrange{3,RefPrism,1}()
+
+"""
+    boundaryfunction(::Type{<:BoundaryIndex})
+
+Helper function to dispatch on the correct entity from a given boundary index.
+"""
+boundaryfunction(::Type{<:BoundaryIndex})
 
 boundaryfunction(::Type{FaceIndex}) = Ferrite.faces
 boundaryfunction(::Type{EdgeIndex}) = Ferrite.edges
