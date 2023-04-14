@@ -168,7 +168,6 @@ implements two dimensional boundaryset table from Fig.4.1 IBWG 2015
 TODO: could be done little bit less ugly
 """
 function boundaryset(o::OctantBWG{2,N,M,T}, i::Integer, b::Integer) where {N,M,T}
-    settype = boundarysettype(o)
     if i==1
         return Set((OctantCornerIndex(1),OctantFaceIndex(1),OctantFaceIndex(3)))
     elseif i==2
@@ -188,7 +187,6 @@ implements three dimensional boundaryset table from Fig.4.1 IBWG 2015
 TODO: could be done little bit less ugly
 """
 function boundaryset(o::OctantBWG{3,N,M,T}, i::Integer, b::Integer) where {N,M,T}
-    settype = boundarysettype(o)
     if i==1
         return Set((OctantCornerIndex(1),OctantEdgeIndex(1),OctantEdgeIndex(5),OctantEdgeIndex(9), OctantFaceIndex(1),OctantFaceIndex(3),OctantFaceIndex(5)))
     elseif i==2
@@ -217,8 +215,8 @@ Algorithm 4.2 of IBWG 2015
 TODO against what to test? Seems to work in the sense that if idxset has elements in the set
 that are not part of the boundary, they are not returned
 """
-function find_range_boundaries(f::OctantBWG{dim,N,M,T}, l::OctantBWG{dim,N,M,T}, s::OctantBWG{dim,N,M,T}, idxset, b) where {dim,N,M,T}
-    o = one(T)
+function find_range_boundaries(f::OctantBWG{dim,N,M,T1}, l::OctantBWG{dim,N,M,T1}, s::OctantBWG{dim,N,M,T1}, idxset::Set{OctantIndex{T2}}, b) where {dim,N,M,T1,T2}
+    o = one(T1)
     if isempty(idxset) || s.l == b
         return idxset
     end
@@ -228,9 +226,9 @@ function find_range_boundaries(f::OctantBWG{dim,N,M,T}, l::OctantBWG{dim,N,M,T},
     if j==k
         return find_range_boundaries(f,l,kidz[j],idxset ∩ boundary_j,b)
     end
-    idxset_match = Set{OctantIndex{T}}()
+    idxset_match = Set{OctantIndex{T2}}()
     for i in j:k
-        idxset_match = idxset_match ∪ (idxset ∩ boundaryset(s,i,b))
+        union!(idxset_match,idxset ∩ boundaryset(s,i,b))
     end
     boundary_k = boundaryset(s,k,b)
     idxset_match_j = setdiff((idxset ∩ boundary_j),idxset_match)
@@ -246,14 +244,11 @@ function find_range_boundaries(f::OctantBWG{dim,N,M,T}, l::OctantBWG{dim,N,M,T},
     return idxset_match ∪ idxset_match_j ∪ idxset_match_k
 end
 
-#for convenience
+#for convenience, should probably changed to parent(s) until parent(s)==root and then descendants(root)
 function find_range_boundaries(s::OctantBWG, idxset, b)
     f,l = descendants(s,b)
     return find_range_boundaries(f,l,s,idxset,b)
 end
-
-boundarysettype(::OctantBWG{3,N,M,T}) where {N,M,T} = Set{Union{Tuple{T,T,T},NTuple{2,Tuple{T,T,T}},NTuple{4,Tuple{T,T,T}}}}
-boundarysettype(::OctantBWG{2,N,M,T}) where {N,M,T} = Set{Union{Tuple{T,T},NTuple{2,Tuple{T,T}}}}
 
 struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{dim,N,M}
     leaves::Vector{OctantBWG{dim,N,M,T}}
