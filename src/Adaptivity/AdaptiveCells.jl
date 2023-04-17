@@ -250,6 +250,18 @@ function find_range_boundaries(s::OctantBWG, idxset, b)
     return find_range_boundaries(f,l,s,idxset,b)
 end
 
+function isrelevant(xyz::NTuple{dim,T},leafsuppₚ::Set{<:OctantBWG}) where {dim,T}
+    ###### only relevant for distributed
+    #for all s in leafsuppₚ
+    #    if s in 𝒪ₚ
+    #        return true
+    #    else
+    #        check stuff Algorithm 5.1 line 4-5
+    #    end
+    #end
+    return true
+end
+
 struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{dim,N,M}
     leaves::Vector{OctantBWG{dim,N,M,T}}
     #maximum refinement level
