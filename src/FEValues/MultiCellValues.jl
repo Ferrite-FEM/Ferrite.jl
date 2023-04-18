@@ -1,8 +1,9 @@
-struct MultiCellValues{CVS<:Tuple,NV<:NamedTuple}
+
+struct MultiCellValues{dim,T,RefShape,CVS<:Tuple,NV<:NamedTuple} <: CellValues{dim,T,RefShape}
     values::CVS         # Points only to unique values
     named_values::NV    # Can point to the same value in values multiple times
 end
-
+MultiCellValues(;cvs...) = MultiCellValues(NamedTuple(cvs))
 function MultiCellValues(named_values::NamedTuple)
     # Check that all are compatible 
     @assert allequal(typeof(cv.qr) for cv in named_values)
@@ -19,7 +20,11 @@ function MultiCellValues(named_values::NamedTuple)
     end
 
     tuple_values = get_unique_values(values(named_values))
-    return MultiCellValues(tuple_values, named_values)
+    # return MultiCellValues(tuple_values, named_values)
+    # Temp until CellValues gets different parameterization...
+    get_type_params(::CellValues{dim,T,RefShape}) where {dim,T,RefShape} = (dim,T,RefShape)
+    dim,T,RefShape = get_type_params(first(tuple_values))
+    return MultiCellValues{dim,T,RefShape,typeof(tuple_values),typeof(named_values)}(tuple_values, named_values)
 end
 
 # Convenience
@@ -74,7 +79,7 @@ function _unsafe_apply_mapping!(cv, q_point, detJ_w, Jinv)
     return nothing
 end
 
-function reinit!(cvs::MultiCellValues, x::AbstractVector{<:Vec})
+function reinit!(cvs::MultiCellValues, x::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_geom_basefuncs = getngeobasefunctions(cvs)
     length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
 
