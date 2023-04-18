@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-<!-- ## [Unreleased] -->
+## [Unreleased]
+### Added
+- `DofHandler` now supports fields on subdomains and mixed grids. ([#667][github-667])
+### Removed
+- **BREAKING**: `MixedDofHandler` has been renamed to `DofHandler`. Update by replacing 
+`MixedDofHandler` to `DofHandler`. ([#667][github-667])
+
 
 ## [0.3.14] - 2023-04-03
 ### Added
@@ -413,6 +419,7 @@ poking into Ferrite internals:
 [github-658]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/658
 [github-659]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/659
 [github-660]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/660
+[github-667]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/667
 
 [Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.14...HEAD
 [0.3.14]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.13...v0.3.14

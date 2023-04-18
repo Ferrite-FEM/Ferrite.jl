@@ -11,7 +11,7 @@ close!(dh)
 # dof_range
 @test (@inferred dof_range(dh, :u)) == 1:12
 @test (@inferred dof_range(dh, :p)) == 13:15
-# dof_range for FieldHandler (use with MixedDofHandler)
+# dof_range for FieldHandler
 ip = Lagrange{2, RefTetrahedron, 1}()
 field_u = Field(:u, ip, 2)
 field_c = Field(:c, ip, 1)
@@ -106,7 +106,8 @@ end
         dh = DofHandler(grid)
         add!(dh, :u, 1)
         close!(dh)
-        mdh = MixedDofHandler(grid)
+        # subdomains
+        mdh = DofHandler(grid)
         add!(mdh, FieldHandler([Field(:u, Lagrange{2,RefTetrahedron,1}(), 1)], Set(1:getncells(grid)÷2)))
         add!(mdh, FieldHandler([Field(:u, Lagrange{2,RefTetrahedron,1}(), 1)], Set((getncells(grid)÷2+1):getncells(grid))))
         close!(mdh)
@@ -190,108 +191,80 @@ end
 
     # Original numbering
     dho, cho = testdhch()
-    mdho, mcho = testdhch(MixedDofHandler)
     #        :v                :s
     #  7,8───5,6──15,16  12────11────18
     #   │  1  │  2  │     │  1  │  2  │
     #  1,2───3,4──13,14   9────10────17
     @test celldofs(dho, 1) == 1:12
-    @test celldofs(mdho, 1) == 1:12
     @test celldofs(dho, 2) == [3, 4, 13, 14, 15, 16, 5, 6, 10, 17, 18, 11]
-    @test celldofs(mdho, 2) == [3, 4, 13, 14, 15, 16, 5, 6, 10, 17, 18, 11]
     @test cho.prescribed_dofs == [2, 8, 9, 12, 13]
-    @test mcho.prescribed_dofs == [2, 8, 9, 12, 13]
 
     # By field
     dh, ch = testdhch()
-    mdh, mch = testdhch(MixedDofHandler)
     renumber!(dh, ch, DofOrder.FieldWise())
-    renumber!(mdh, mch, DofOrder.FieldWise())
     #        :v                :s
     #  7,8───5,6──11,12  16────15────18
     #   │  1  │  2  │     │  1  │  2  │
     #  1,2───3,4───9,10  13────14────17
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 16]
-    @test celldofs(mdh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 16]
     @test celldofs(dh, 2) == [3, 4, 9, 10, 11, 12, 5, 6, 14, 17, 18, 15]
-    @test celldofs(mdh, 2) == [3, 4, 9, 10, 11, 12, 5, 6, 14, 17, 18, 15]
     @test ch.prescribed_dofs == sort!([2, 8, 13, 16, 9])
-    @test mch.prescribed_dofs == sort!([2, 8, 13, 16, 9])
     for el in 1:2, r in [dof_range(dh, :v), dof_range(dh, :s)]
         # Test stability within each block: i < j -> p(i) < p(j), i > j -> p(i) > p(j)
         @test sign.(diff(celldofs(dh, el)[r])) == sign.(diff(celldofs(dho, el)[r]))
-        @test sign.(diff(celldofs(mdh, el)[r])) == sign.(diff(celldofs(mdho, el)[r]))
     end
 
     # By field, reordered
     dh, ch = testdhch()
-    mdh, mch = testdhch(MixedDofHandler)
     renumber!(dh, ch, DofOrder.FieldWise([2, 1]))
-    renumber!(mdh, mch, DofOrder.FieldWise([2, 1]))
     #        :v                :s
     # 13,14─11,12─17,18   4─────3─────6
     #   │  1  │  2  │     │  1  │  2  │
     #  7,8───9,10─15,16   1─────2─────5
     @test celldofs(dh, 1) == [7, 8, 9, 10, 11, 12, 13, 14, 1, 2, 3, 4]
-    @test celldofs(mdh, 1) == [7, 8, 9, 10, 11, 12, 13, 14, 1, 2, 3, 4]
     @test celldofs(dh, 2) == [9, 10, 15, 16, 17, 18, 11, 12, 2, 5, 6, 3]
-    @test celldofs(mdh, 2) == [9, 10, 15, 16, 17, 18, 11, 12, 2, 5, 6, 3]
     @test ch.prescribed_dofs == sort!([8, 14, 1, 4, 15])
-    @test mch.prescribed_dofs == sort!([8, 14, 1, 4, 15])
     for el in 1:2, r in [dof_range(dh, :v), dof_range(dh, :s)]
         @test sign.(diff(celldofs(dh, el)[r])) == sign.(diff(celldofs(dho, el)[r]))
-        @test sign.(diff(celldofs(mdh, el)[r])) == sign.(diff(celldofs(mdho, el)[r]))
     end
 
     # By component
     dh, ch = testdhch()
-    mdh, mch = testdhch(MixedDofHandler)
     renumber!(dh, ch, DofOrder.ComponentWise())
-    renumber!(mdh, mch, DofOrder.ComponentWise())
     #        :v                :s
     #  4,10──3,9───6,12  16────15────18
     #   │  1  │  2  │     │  1  │  2  │
     #  1,7───2,8───5,11  13────14────17
     @test celldofs(dh, 1) == [1, 7, 2, 8, 3, 9, 4, 10, 13, 14, 15, 16]
-    @test celldofs(mdh, 1) == [1, 7, 2, 8, 3, 9, 4, 10, 13, 14, 15, 16]
     @test celldofs(dh, 2) == [2, 8, 5, 11, 6, 12, 3, 9, 14, 17, 18, 15]
-    @test celldofs(mdh, 2) == [2, 8, 5, 11, 6, 12, 3, 9, 14, 17, 18, 15]
     @test ch.prescribed_dofs == sort!([7, 10, 13, 16, 5])
-    @test mch.prescribed_dofs == sort!([7, 10, 13, 16, 5])
     for el in 1:2, r in [dof_range(dh, :v)[1:2:end], dof_range(dh, :v)[2:2:end], dof_range(dh, :s)]
         @test sign.(diff(celldofs(dh, el)[r])) == sign.(diff(celldofs(dho, el)[r]))
-        @test sign.(diff(celldofs(mdh, el)[r])) == sign.(diff(celldofs(mdho, el)[r]))
     end
 
     # By component, reordered
     dh, ch = testdhch()
-    mdh, mch = testdhch(MixedDofHandler)
     renumber!(dh, ch, DofOrder.ComponentWise([3, 1, 2]))
-    renumber!(mdh, mch, DofOrder.ComponentWise([3, 1, 2]))
     #        :v                :s
     # 16,4──15,3──18,6   10─────9────12
     #   │  1  │  2  │     │  1  │  2  │
     # 13,1──14,2──17,5    7─────8────11
     @test celldofs(dh, 1) == [13, 1, 14, 2, 15, 3, 16, 4, 7, 8, 9, 10]
-    @test celldofs(mdh, 1) == [13, 1, 14, 2, 15, 3, 16, 4, 7, 8, 9, 10]
     @test celldofs(dh, 2) == [14, 2, 17, 5, 18, 6, 15, 3, 8, 11, 12, 9]
-    @test celldofs(mdh, 2) == [14, 2, 17, 5, 18, 6, 15, 3, 8, 11, 12, 9]
     @test ch.prescribed_dofs == sort!([1, 4, 7, 10, 17])
-    @test mch.prescribed_dofs == sort!([1, 4, 7, 10, 17])
     for el in 1:2, r in [dof_range(dh, :v)[1:2:end], dof_range(dh, :v)[2:2:end], dof_range(dh, :s)]
         @test sign.(diff(celldofs(dh, el)[r])) == sign.(diff(celldofs(dho, el)[r]))
-        @test sign.(diff(celldofs(mdh, el)[r])) == sign.(diff(celldofs(mdho, el)[r]))
     end
 
     #######################################
-    # MixedDofHandler: Field on subdomain #
+    # Field on subdomain #
     #######################################
 
-    function test_mixed_dhch_subdomain()
+    function test_dhch_subdomain()
         local grid, dh, ch
         grid = generate_grid(Quadrilateral, (2, 1))
         ip = Lagrange{2,RefCube,1}()
-        dh = MixedDofHandler(grid)
+        dh = DofHandler(grid)
         add!(dh, FieldHandler([Field(:v, ip, 2), Field(:s, ip, 1)], Set(1)))
         add!(dh, FieldHandler([Field(:v, ip, 2)], Set(2)))
         close!(dh)
@@ -304,7 +277,7 @@ end
     end
 
     # Original numbering
-    dho, cho = test_mixed_dhch_subdomain()
+    dho, cho = test_dhch_subdomain()
     #        :v                :s
     #  7,8───5,6──15,16  12────11────
     #   │  1  │  2  │     │  1  │  2  │
@@ -314,7 +287,7 @@ end
     @test cho.prescribed_dofs == [2, 8, 9, 12, 13]
 
     # By field
-    dh, ch = test_mixed_dhch_subdomain()
+    dh, ch = test_dhch_subdomain()
     renumber!(dh, ch, DofOrder.FieldWise())
     #        :v                :s
     #  7,8───5,6──11,12  16────15────
@@ -331,7 +304,7 @@ end
     @test sign.(diff(celldofs(dh, 2)[r])) == sign.(diff(celldofs(dho, 2)[r]))
 
     # By field, reordered
-    dh, ch = test_mixed_dhch_subdomain()
+    dh, ch = test_dhch_subdomain()
     renumber!(dh, ch, DofOrder.FieldWise([2, 1]))
     #        :v                :s
     # 11,12──9,10─15,16   4─────3─────
@@ -348,7 +321,7 @@ end
     @test sign.(diff(celldofs(dh, 2)[r])) == sign.(diff(celldofs(dho, 2)[r]))
 
     # By component
-    dh, ch = test_mixed_dhch_subdomain()
+    dh, ch = test_dhch_subdomain()
     renumber!(dh, ch, DofOrder.ComponentWise())
     #        :v                :s
     #  4,10──3,9───6,12  16────15────
@@ -369,7 +342,7 @@ end
     end
 
     # By component, reordered
-    dh, ch = test_mixed_dhch_subdomain()
+    dh, ch = test_dhch_subdomain()
     renumber!(dh, ch, DofOrder.ComponentWise([3, 1, 2]))
     #        :v                :s
     # 14,4──13,3──16,6   10─────9────
@@ -393,11 +366,6 @@ end
     if HAS_EXTENSIONS && MODULE_CAN_BE_TYPE_PARAMETER
         # TODO: Should probably test that the new order result in less fill-in
         dh, ch = testdhch()
-        renumber!(dh, DofOrder.Ext{Metis}())
-        @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}())
-        renumber!(dh, DofOrder.Ext{Metis}(coupling=[true true; true false]))
-        @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}(coupling=[true true; true false]))
-        dh, ch = testdhch(MixedDofHandler)
         renumber!(dh, DofOrder.Ext{Metis}())
         @test_throws ErrorException renumber!(dh, ch, DofOrder.Ext{Metis}())
         renumber!(dh, DofOrder.Ext{Metis}(coupling=[true true; true false]))
@@ -500,7 +468,7 @@ end
 
     # Test coupling with subdomains
     grid = generate_grid(Quadrilateral, (1, 2))
-    dh = MixedDofHandler(grid)
+    dh = DofHandler(grid)
     fh1 = FieldHandler(
         [Field(:u, Lagrange{2,RefCube,1}(), 2), Field(:p, Lagrange{2,RefCube,1}(), 2)],
         Set(1)
