@@ -309,6 +309,8 @@ function value(ip::DiscontinuousLagrange{dim,shape,0}, i::Int, ξ::Vec{dim}) whe
     return 1.0
 end
 
+get_continuous_interpolation(::DiscontinuousLagrange{dim,ref_shape,order}) where {dim, ref_shape, order} = Lagrange{dim,ref_shape,order}()
+
 ############
 # Lagrange #
 ############
