@@ -1,4 +1,3 @@
-
 struct MultiCellValues{dim,T,RefShape,CVS<:Tuple,NV<:NamedTuple} <: CellValues{dim,T,RefShape}
     values::CVS         # Points only to unique values
     named_values::NV    # Can point to the same value in values multiple times
@@ -36,17 +35,17 @@ function MultiCellValues(dh::DofHandler; kwargs...)
     return MultiCellValues(first(dh.fieldhandlers), getcelltype(dh.grid); kwargs...)
 end
 function MultiCellValues(fh::FieldHandler, CT; qr=2)
-    # After SubDofHandler is fixed, CT should not be required anymore. 
+    # TODO: With new SubDofHandler, CT should not be required anymore. 
     ip_geo = default_interpolation(CT)
     @assert getdim(ip_geo) > 1 # For 1-dimensional problems we cannot differentiate vector vs scalar values
     qr_actual = create_qr_rule(qr, ip_geo)
     ip_funs = [name=>getfieldinterpolation(fh, name) for name in getfieldnames(fh)]
     val_type = Dict(name=> 1==getfielddim(fh, name) ? CellScalarValues : CellVectorValues for name in getfieldnames(fh))
+    # TODO: Create only the minimum required unique values: I.e. if ip_fun is the same, we can use the same value 
     return MultiCellValues(NamedTuple(key=> val_type[key](qr_actual, ip_fun, ip_geo) for (key, ip_fun) in ip_funs))
 end
 
-
-# Not sure if aggressive constprop is required, but is intended so should be used to make sure?
+# Not sure if aggressive constprop is required, but is intended so use to ensure?
 Base.@constprop :aggressive Base.getindex(mcv::MultiCellValues, key::Symbol) = getindex(mcv.named_values, key)
 
 # Geometric values should all be equal and hence can be queried from ::MultiCellValues
@@ -80,6 +79,10 @@ function _unsafe_apply_mapping!(cv, q_point, detJ_w, Jinv)
 end
 
 function reinit!(cvs::MultiCellValues, x::AbstractVector{Vec{dim,T}}) where {dim,T}
+    if length(cvs.values) == 1
+        # Short-circuit when all cellvalues are the same
+        return reinit!(first(cvs.values), x)
+    end 
     n_geom_basefuncs = getngeobasefunctions(cvs)
     length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
 
