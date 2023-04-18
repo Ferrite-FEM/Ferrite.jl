@@ -102,13 +102,12 @@ function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
     end
 end
 
-
-function generate_grid(C::Type{Cell{2,M,N}}, nel::NTuple{2,Int}, X::Vector{Vec{2,T}}) where {M,N,T}
+function generate_grid(C::Type{<:AbstractCell{2}}, nel::NTuple{2,Int}, X::Vector{Vec{2,T}}) where {T}
     @assert length(X) == 4
     generate_grid(C, nel, X[1], X[2], X[3], X[4])
 end
 
-function generate_grid(C::Type{Cell{2,M,N}}, nel::NTuple{2,Int}, left::Vec{2,T}=Vec{2}((-1.0,-1.0)), right::Vec{2,T}=Vec{2}((1.0,1.0))) where {M,N,T}
+function generate_grid(C::Type{<:AbstractCell{2}}, nel::NTuple{2,Int}, left::Vec{2,T}=Vec{2}((-1.0,-1.0)), right::Vec{2,T}=Vec{2}((1.0,1.0))) where {T}
     LL = left
     UR = right
     LR = Vec{2}((UR[1], LL[2]))
@@ -288,7 +287,7 @@ function generate_grid(::Type{Wedge}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}(
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end 
 
-function Ferrite.generate_grid(::Type{Cell{3,20,6}}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
+function Ferrite.generate_grid(::Type{SerendipityQuadraticHexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]; nel_tot = nel_x*nel_y*nel_z
     nnode_x = 2nel_x + 1; nnode_y = 2nel_y + 1; nnode_z = 2nel_z + 1 #Note: not the actually number of nodes in x/y/z, just a temporary variables
 
@@ -311,9 +310,9 @@ function Ferrite.generate_grid(::Type{Cell{3,20,6}}, nel::NTuple{3,Int}, left::V
 
 
     # Generate cells
-    cells = Cell{3,20,6}[]
+    cells = SerendipityQuadraticHexahedron[]
     for k in 1:2:2nel_z, j in 1:2:2nel_y, i in 1:2:2nel_x     
-        push!(cells, Cell{3,20,6}((
+        push!(cells, SerendipityQuadraticHexahedron((
                 node_array[i,j,k], node_array[i+2,j,k], node_array[i+2,j+2,k], node_array[i,j+2,k], # vertices bot 
                 node_array[i,j,k+2], node_array[i+2,j,k+2], node_array[i+2,j+2,k+2], node_array[i,j+2,k+2], # vertices top
                 node_array[i+1,j,k], node_array[i+2,j+1,k], node_array[i+1,j+2,k], node_array[i,j+1,k], # edges horizontal bottom
