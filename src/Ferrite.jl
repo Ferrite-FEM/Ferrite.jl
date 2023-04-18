@@ -79,7 +79,6 @@ include("FEValues/face_values.jl")
 include("PointEval/point_values.jl")
 include("FEValues/common_values.jl")
 include("FEValues/face_integrals.jl")
-include("FEValues/CellMultiValues.jl")
 
 # Grid
 include("Grid/grid.jl")
@@ -108,6 +107,7 @@ include("Export/VTK.jl")
 include("PointEval/PointEvalHandler.jl")
 
 # Other
+include("FEValues/MultiCellValues.jl")
 include("deprecations.jl")
 
 end # module
