@@ -5,8 +5,9 @@ end
 MultiCellValues(;cvs...) = MultiCellValues(NamedTuple(cvs))
 function MultiCellValues(named_values::NamedTuple)
     # Check that all are compatible 
-    @assert allequal(typeof(cv.qr) for cv in named_values)
-    @assert allequal(length(getweights(cv.qr)) for cv in named_values)
+    # allequal julia>=1.8
+    @assert all(typeof(cv.qr)==typeof(first(named_values).qr) for cv in named_values)
+    @assert all(length(getweights(cv.qr))==length(getweights(first(named_values).qr)) for cv in named_values)
     # Should also check the geometric interpolation...
     
     function get_unique_values(values_all)
