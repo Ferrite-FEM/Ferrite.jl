@@ -39,28 +39,6 @@ function create_cook_grid(nx, ny)
     return grid
 end;
 
-# Next we define a function to set up our cell- and facevalues.
-function create_values(interpolation_u, interpolation_p)
-    ## quadrature rules
-    qr      = QuadratureRule{2,RefTetrahedron}(3)
-    face_qr = QuadratureRule{1,RefTetrahedron}(3)
-
-    ## geometric interpolation
-    interpolation_geom = Lagrange{2,RefTetrahedron,1}()
-
-    ## cell and facevalues for u
-    cellvalues_u = CellVectorValues(qr, interpolation_u, interpolation_geom)
-    facevalues_u = FaceVectorValues(face_qr, interpolation_u, interpolation_geom)
-
-    ## cellvalues for p
-    cellvalues_p = CellScalarValues(qr, interpolation_p, interpolation_geom)
-
-    ## Combine into multivalues
-    cellvalues = MultiCellValues(;u=cellvalues_u, p=cellvalues_p)
-
-    return cellvalues, facevalues_u
-end;
-
 
 # We create a DofHandler, with two fields, `:u` and `:p`,
 # with possibly different interpolations
@@ -200,8 +178,12 @@ function solve(ν, interpolation_u, interpolation_p)
     dh = create_dofhandler(grid, interpolation_u, interpolation_p)
     dbc = create_bc(dh)
 
+    ## facevalues (for Neumann boundary conditions)
+    interpolation_geom = Lagrange{2,RefTetrahedron,1}()
+    facevalues_u = FaceVectorValues(QuadratureRule{1,RefTetrahedron}(3), interpolation_u, interpolation_geom)
+    
     ## cellvalues
-    cellvalues, facevalues_u = create_values(interpolation_u, interpolation_p)
+    cellvalues = MultiCellValues(dh; qr=3)
 
     ## assembly and solve
     K = create_sparsity_pattern(dh);
