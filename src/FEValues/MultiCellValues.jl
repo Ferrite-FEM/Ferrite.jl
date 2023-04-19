@@ -60,8 +60,9 @@ function MultiCellValues(fh::FieldHandler, CT; qr=2)
     return MultiCellValues(NamedTuple(name=>values[(ip_fun, getfielddim(fh, name))] for (name, ip_fun) in ip_funs))
 end
 
-# Not sure if aggressive constprop is required, but is intended so use to ensure?
-Base.@constprop :aggressive Base.getindex(mcv::MultiCellValues, key::Symbol) = getindex(mcv.named_values, key)
+# Not sure if aggressive constprop is required, but is intended so use to ensure? (Not supported on v1.6)
+# Base.@constprop :aggressive Base.getindex(mcv::MultiCellValues, key::Symbol) = getindex(mcv.named_values, key)
+Base.getindex(mcv::MultiCellValues, key::Symbol) = getindex(mcv.named_values, key)
 
 # Geometric values should all be equal and hence can be queried from ::MultiCellValues
 @propagate_inbounds getngeobasefunctions(mcv::MultiCellValues) = getngeobasefunctions(first(mcv.values))
