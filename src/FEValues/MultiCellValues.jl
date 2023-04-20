@@ -77,12 +77,10 @@ getnquadpoints(mcv::MultiCellValues) = getnquadpoints(first(mcv.values))
 getdetJdV(mcv::MultiCellValues, q_point::Int) = getdetJdV(first(mcv.values), q_point)
 
 @inline function _unsafe_calculate_mapping(cv::CellValues{dim,T}, q_point, x) where {dim,T}
-    #@inbounds fecv_J = x[1] ⊗ cv.dMdξ[1, q_point]
     fecv_J = zero(Tensor{2,dim,T})
     @inbounds for j in 1:getngeobasefunctions(cv)
         fecv_J += x[j] ⊗ cv.dMdξ[j, q_point]
     end
-    #return fecv_J
     detJ = det(fecv_J)
     detJ > 0.0 || throw_detJ_not_pos(detJ)
     Jinv = inv(fecv_J)
