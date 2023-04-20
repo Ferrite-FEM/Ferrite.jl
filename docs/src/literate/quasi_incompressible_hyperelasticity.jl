@@ -137,8 +137,8 @@ end;
 
 function create_dofhandler(grid, ipu, ipp)
     dh = DofHandler(grid)
-    push!(dh, :u, 3, ipu) # displacement dim = 3
-    push!(dh, :p, 1, ipp) # pressure dim = 1
+    add!(dh, :u, 3, ipu) # displacement dim = 3
+    add!(dh, :p, 1, ipp) # pressure dim = 1
     close!(dh)
     return dh
 end;
@@ -162,7 +162,7 @@ end;
 function calculate_element_volume(cell, cellvalues_u, ue)
     reinit!(cellvalues_u, cell)
     evol::Float64=0.0;
-    @inbounds for qp in 1:getnquadpoints(cellvalues_u)
+    for qp in 1:getnquadpoints(cellvalues_u)
         dΩ = getdetJdV(cellvalues_u, qp)
         ∇u = function_gradient(cellvalues_u, qp, ue)
         F = one(∇u) + ∇u
@@ -175,7 +175,7 @@ end;
 # and then assembled over all the cells (elements)
 function calculate_volume_deformed_mesh(w, dh::DofHandler, cellvalues_u)
     evol::Float64 = 0.0;
-    @inbounds for cell in CellIterator(dh)
+    for cell in CellIterator(dh)
         global_dofs = celldofs(cell)
         nu = getnbasefunctions(cellvalues_u)
         global_dofs_u = global_dofs[1:nu]
@@ -199,7 +199,7 @@ function assemble_element!(Ke, fe, cell, cellvalues_u, cellvalues_p, mp, ue, pe)
     n_basefuncs_u = getnbasefunctions(cellvalues_u)
     n_basefuncs_p = getnbasefunctions(cellvalues_p)
 
-    @inbounds for qp in 1:getnquadpoints(cellvalues_u)
+    for qp in 1:getnquadpoints(cellvalues_u)
         dΩ = getdetJdV(cellvalues_u, qp)
         ## Compute deformation gradient F
         ∇u = function_gradient(cellvalues_u, qp, ue)

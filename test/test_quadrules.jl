@@ -33,7 +33,7 @@
     # Tetrahedron
     g = (x) -> sqrt(sum(x))
     dim = 2
-    for order in (1,2,3,4,5,6,7,8)
+    for order in 1:15
         qr = QuadratureRule{dim, RefTetrahedron}(:legendre, order)
         # http://www.wolframalpha.com/input/?i=integrate+sqrt(x%2By)+from+x+%3D+0+to+1,+y+%3D+0+to+1-x
         @test integrate(qr, g) - 0.4 < 0.01

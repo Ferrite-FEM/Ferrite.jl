@@ -1,8 +1,13 @@
 """
-    PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim,T}}) where {dim, T}
+    PointEvalHandler(grid::Grid, points::AbstractVector{Vec{dim,T}}; kwargs...) where {dim, T}
 
 The `PointEvalHandler` can be used for function evaluation in *arbitrary points* in the
 domain -- not just in quadrature points or nodes.
+
+The `PointEvalHandler` takes the following keyword arguments:
+ - `search_nneighbors`: How many nodes should be found in the nearest neighbor search for each
+   point. Usually there is no need to change this setting. Default value: `3`.
+ - `warn`: Show a warning if a point is not found. Default value: `true`.
 
 The constructor takes a grid and a vector of coordinates for the points. The
 `PointEvalHandler` computes i) the corresponding cell, and ii) the (local) coordinate
@@ -40,17 +45,17 @@ function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
     end
 end
 
-function PointEvalHandler(grid::AbstractGrid, points::AbstractVector{Vec{dim,T}}) where {dim, T}
+function PointEvalHandler(grid::AbstractGrid, points::AbstractVector{Vec{dim,T}}; search_nneighbors=3, warn=true) where {dim, T}
     node_cell_dicts = _get_node_cell_map(grid)
-    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts)
+    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn)
     return PointEvalHandler(grid, cells, local_coords)
 end
 
-function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}) where {dim, T<:Real, C}
+function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}, search_nneighbors, warn) where {dim, T<:Real, C}
 
     # set up tree structure for finding nearest nodes to points
     kdtree = KDTree(reinterpret(Vec{dim,T}, getnodes(grid)))
-    nearest_nodes, _ = knn(kdtree, points, 3, true) #TODO 3 is a random value, it shouldn't matter because likely the nearest node is the one we want
+    nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true) 
 
     cells = Vector{Union{Nothing, Int}}(nothing, length(points))
     local_coords = Vector{Union{Nothing, Vec{dim, T}}}(nothing, length(points))
@@ -77,7 +82,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
             end
             cell_found && break
         end
-        if !cell_found
+        if !cell_found && warn
             @warn("No cell found for point number $point_idx, coordinate: $(points[point_idx]).")
         end
     end
@@ -207,7 +212,7 @@ end
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
 function get_point_values!(out_vals::Vector{T2},
     ph::PointEvalHandler,
-    dh::MixedDofHandler,
+    dh::DofHandler,
     dof_vals::Vector{T},
     fname::Symbol,
     func_interpolations
@@ -229,23 +234,6 @@ function get_point_values!(out_vals::Vector{T2},
     return out_vals
 end
 
-function get_point_values!(out_vals::Vector{T2},
-    ph::PointEvalHandler,
-    dh::DofHandler,
-    dof_vals::Vector{T},
-    fname::Symbol,
-    func_interpolations
-    ) where {T2, T} 
-
-    # TODO: I don't think this is correct??
-    length(dof_vals) == ndofs(dh) || error("You must supply values for all $(ndofs(dh)) dofs.")
-
-    fdim = getfielddim(dh, fname)
-    dofrange = dof_range(dh, fname)
-    _get_point_values!(out_vals, dof_vals, ph, dh, func_interpolations[1], nothing, Val(fdim), dofrange)
-    return out_vals
-end
-
 # function barrier with concrete type of interpolation
 function _get_point_values!(
     out_vals::Vector{T2},
@@ -261,7 +249,9 @@ function _get_point_values!(
     # extract variables
     local_coords = ph.local_coords
     # preallocate some stuff specific to this cellset
-    pv = PointScalarValuesInternal(first(local_coords), ip)
+    idx = findfirst(!isnothing, local_coords)
+    idx === nothing && return out_vals
+    pv = PointScalarValuesInternal(local_coords[idx], ip)
     first_cell = cellset === nothing ? 1 : first(cellset)
     cell_dofs = Vector{Int}(undef, ndofs_per_cell(dh, first_cell))
 
@@ -285,15 +275,14 @@ end
 _change_format(::Val{1}, dof_values::AbstractVector{T}) where T = dof_values
 _change_format(::Val{fielddim}, dof_values::AbstractVector{T}) where {fielddim, T} = reinterpret(Vec{fielddim, T}, dof_values)
 
-get_func_interpolations(dh::DH, fieldname) where DH<:DofHandler = [getfieldinterpolation(dh, find_field(dh, fieldname))]
-function get_func_interpolations(dh::DH, fieldname) where DH<:MixedDofHandler
+function get_func_interpolations(dh::DofHandler, fieldname)
     func_interpolations = Union{Interpolation,Nothing}[]
     for fh in dh.fieldhandlers
-        j = findfirst(i -> i === fieldname, getfieldnames(fh))
+        j = _find_field(fh, fieldname)
         if j === nothing
             push!(func_interpolations, missing)
         else
-            push!(func_interpolations, fh.fields[j].interpolation)
+            push!(func_interpolations, fh.field_interpolations[j])
         end
     end
     return func_interpolations
@@ -307,7 +296,7 @@ Create an iterator over the points in the [`PointEvalHandler`](@ref).
 The elements of the iterator are either a [`PointLocation`](@ref), if the corresponding
 point could be found in the grid, or `nothing`, if the point was not found.
 
-A `PointLocation` can be used to query the cell ID with [`cellid`](@ref), and can be used
+A `PointLocation` can be used to query the cell ID with the `cellid` function, and can be used
 to reinitialize [`PointValues`](@ref) with [`reinit!`](@ref).
 
 # Examples

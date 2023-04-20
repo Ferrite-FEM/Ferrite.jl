@@ -1,5 +1,6 @@
 include("gaussquad_tri_table.jl")
 include("gaussquad_tet_table.jl")
+include("gaussquad_prism_table.jl")
 include("generate_quadrature.jl")
 
 import Base.Cartesian: @nloops, @nref, @ntuple, @nexprs
@@ -38,6 +39,11 @@ Ferrite.QuadratureRule{1,Ferrite.RefCube,Float64}([1.0, 1.0], Tensors.Tensor{1,1
 struct QuadratureRule{dim,shape,T}
     weights::Vector{T}
     points::Vector{Vec{dim,T}}
+end
+
+function QuadratureRule{dim, shape}(weights::AbstractVector{Tw}, points::AbstractVector{Vec{dim,Tp}}) where {dim, shape, Tw, Tp}
+    T = promote_type(Tw, Tp)
+    QuadratureRule{dim,shape,T}(weights, points)
 end
 
 Base.copy(qr::QuadratureRule) = qr # TODO: Is it ever useful to get an actual copy?
@@ -80,6 +86,7 @@ julia> getpoints(qr)
 getpoints(qr::QuadratureRule) = qr.points
 
 QuadratureRule{dim,shape}(order::Int) where {dim,shape} = QuadratureRule{dim,shape}(:legendre, order)
+QuadratureRule{3,RefPrism}(order::Int) = QuadratureRule{3,RefPrism}(:polyquad, order) # No legendre rule available yet for prism...
 
 # Special case for face integration of 1D problems
 function (::Type{QuadratureRule{0, RefCube}})(quad_type::Symbol, order::Int)
@@ -156,4 +163,21 @@ function (::Type{QuadratureRule{1,RefTetrahedron}})(quad_type::Symbol, order::In
         points[i] = Vec{1,Float64}((p[i],))
     end
     return QuadratureRule{1,RefTetrahedron,Float64}(weights, points)
+end
+
+# Grab prism quadrature rule from table
+function (::Type{QuadratureRule{3, RefPrism}})(quad_type::Symbol, order::Int)
+    if quad_type == :polyquad
+        data = _get_gauss_prismdata_polyquad(order)
+    else
+        throw(ArgumentError("unsupported quadrature rule"))
+    end
+    n_points = size(data,1)
+    points = Vector{Vec{3,Float64}}(undef, n_points)
+
+    for p in 1:size(data, 1)
+        points[p] = Vec{3,Float64}(@ntuple 3 i -> data[p, i])
+    end
+    weights = data[:, 4]
+    QuadratureRule{3,RefPrism,Float64}(weights, points)
 end

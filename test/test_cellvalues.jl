@@ -6,6 +6,9 @@ for (func_interpol, quad_rule) in  (
                                     (Lagrange{2, RefCube, 2}(), QuadratureRule{2, RefCube}(2)),
                                     (Lagrange{2, RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2)),
                                     (Lagrange{2, RefTetrahedron, 2}(), QuadratureRule{2, RefTetrahedron}(2)),
+                                    (Lagrange{2, RefTetrahedron, 3}(), QuadratureRule{2, RefTetrahedron}(2)),
+                                    (Lagrange{2, RefTetrahedron, 4}(), QuadratureRule{2, RefTetrahedron}(2)),
+                                    (Lagrange{2, RefTetrahedron, 5}(), QuadratureRule{2, RefTetrahedron}(2)),
                                     (Lagrange{3, RefCube, 1}(), QuadratureRule{3, RefCube}(2)),
                                     (Serendipity{2, RefCube, 2}(), QuadratureRule{2, RefCube}(2)),
                                     (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{3, RefTetrahedron}(2)),
@@ -88,23 +91,73 @@ for (func_interpol, quad_rule) in  (
     end
 end
 
-@testset "#265" begin
+@testset "#265: error message for incompatible geometric interpolation" begin
     dim = 1
     deg = 1
     grid = generate_grid(Line, (2,))
     ip_fe = Lagrange{dim, RefCube, deg}()
     dh = DofHandler(grid)
-    push!(dh, :u, 1, ip_fe)
+    add!(dh, :u, 1, ip_fe)
     close!(dh);
     cell = first(CellIterator(dh))
     ip_geo = Lagrange{dim, RefCube, 2}()
     qr = QuadratureRule{dim, RefCube}(deg+1)
     cv = CellScalarValues(qr, ip_fe, ip_geo)
     res = @test_throws ArgumentError reinit!(cv, cell)
-    @test occursin("#265", res.value.msg)
+    @test occursin("265", res.value.msg)
     ip_geo = Lagrange{dim, RefCube, 1}()
     cv = CellScalarValues(qr, ip_fe, ip_geo)
     reinit!(cv, cell)
+end
+
+@testset "error paths in function_* and reinit!" begin
+    dim = 2
+    qp = 1
+    ip = Lagrange{dim,RefTetrahedron,1}()
+    qr = QuadratureRule{dim,RefTetrahedron}(1)
+    qr_f = QuadratureRule{1,RefTetrahedron}(1)
+    csv = CellScalarValues(qr, ip)
+    cvv = CellVectorValues(qr, ip)
+    fsv = FaceScalarValues(qr_f, ip)
+    fvv = FaceVectorValues(qr_f, ip)
+    x, n = valid_coordinates_and_normals(ip)
+    reinit!(csv, x)
+    reinit!(cvv, x)
+    reinit!(fsv, x, 1)
+    reinit!(fvv, x, 1)
+
+    # Wrong number of coordinates
+    xx = [x; x]
+    @test_throws ArgumentError reinit!(csv, xx)
+    @test_throws ArgumentError reinit!(cvv, xx)
+    @test_throws ArgumentError reinit!(fsv, xx, 1)
+    @test_throws ArgumentError reinit!(fvv, xx, 1)
+
+    @test_throws ArgumentError spatial_coordinate(csv, qp, xx)
+    @test_throws ArgumentError spatial_coordinate(cvv, qp, xx)
+    @test_throws ArgumentError spatial_coordinate(fsv, qp, xx)
+    @test_throws ArgumentError spatial_coordinate(fvv, qp, xx)
+
+    # Wrong number of (local) dofs
+    # Scalar values, scalar dofs
+    ue = rand(getnbasefunctions(csv) + 1)
+    @test_throws ArgumentError function_value(csv, qp, ue)
+    @test_throws ArgumentError function_gradient(csv, qp, ue)
+    # Vector values, scalar dofs
+    ue = rand(getnbasefunctions(cvv) + 1)
+    @test_throws ArgumentError function_value(cvv, qp, ue)
+    @test_throws ArgumentError function_gradient(cvv, qp, ue)
+    @test_throws ArgumentError function_divergence(cvv, qp, ue)
+    # Scalar values, vector dofs
+    ue = [rand(Vec{dim}) for _ in 1:(getnbasefunctions(csv) + 1)]
+    @test_throws ArgumentError function_value(csv, qp, ue)
+    @test_throws ArgumentError function_gradient(csv, qp, ue)
+    @test_throws ArgumentError function_divergence(csv, qp, ue)
+    # Vector values, vector dofs
+    ue = [rand(Vec{dim}) for _ in 1:(getnbasefunctions(cvv) ÷ dim + 1)]
+    @test_throws ArgumentError function_value(cvv, qp, ue)
+    @test_throws ArgumentError function_gradient(cvv, qp, ue)
+    @test_throws ArgumentError function_divergence(cvv, qp, ue)
 end
 
 end # of testset

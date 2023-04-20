@@ -239,6 +239,55 @@ function generate_grid(::Type{Hexahedron}, nel::NTuple{3,Int}, left::Vec{3,T}=Ve
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end 
 
+# Wedge
+function generate_grid(::Type{Wedge}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
+    nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]; nel_tot = nel_x*nel_y*nel_z
+    n_nodes_x = nel_x + 1; n_nodes_y = nel_y + 1; n_nodes_z = nel_z + 1
+    n_nodes = n_nodes_x * n_nodes_y * n_nodes_z
+
+    # Generate nodes
+    coords_x = range(left[1], stop=right[1], length=n_nodes_x)
+    coords_y = range(left[2], stop=right[2], length=n_nodes_y)
+    coords_z = range(left[3], stop=right[3], length=n_nodes_z)
+    nodes = Node{3,T}[]
+    for k in 1:n_nodes_z, j in 1:n_nodes_y, i in 1:n_nodes_x
+        push!(nodes, Node((coords_x[i], coords_y[j], coords_z[k])))
+    end
+
+    # Generate cells
+    node_array = reshape(collect(1:n_nodes), (n_nodes_x, n_nodes_y, n_nodes_z))
+    cells = Wedge[]
+    for k in 1:nel_z, j in 1:nel_y, i in 1:nel_x
+        push!(cells, Wedge((node_array[i,j,k], node_array[i+1,j,k], node_array[i,j+1,k], 
+                            node_array[i,j,k+1], node_array[i+1,j,k+1], node_array[i,j+1,k+1]))) # ◺
+        push!(cells, Wedge((node_array[i+1,j,k], node_array[i+1,j+1,k], node_array[i,j+1,k], 
+                            node_array[i+1,j,k+1], node_array[i+1,j+1,k+1], node_array[i,j+1,k+1]))) # ◹
+    end
+
+    # Order the cells as c_nxyz[2, x, y, z] such that we can look up boundary cells
+    c_nxyz = reshape(1:length(cells), (2, nel...))
+
+    @views le = map(x -> FaceIndex(x,3), c_nxyz[1,   1, :, :][:])
+    @views ri = map(x -> FaceIndex(x,2), c_nxyz[2, end, :, :][:])
+    @views fr = map(x -> FaceIndex(x,2), c_nxyz[1, :, 1, :][:])  
+    @views ba = map(x -> FaceIndex(x,4), c_nxyz[2, :, end, :][:])
+    @views bo = [map(x -> FaceIndex(x,1), c_nxyz[1, :, :, 1][:])   ; map(x -> FaceIndex(x,1), c_nxyz[2, :, :, 1][:])]
+    @views to = [map(x -> FaceIndex(x,5), c_nxyz[1, :, :, end][:]) ; map(x -> FaceIndex(x,5), c_nxyz[2, :, :, end][:])]
+
+    boundary_matrix = boundaries_to_sparse([le; ri; bo; to; fr; ba])
+
+    facesets = Dict(
+        "left" => Set(le),
+        "right" => Set(ri),
+        "front" => Set(fr),
+        "back" => Set(ba),
+        "bottom" => Set(bo),
+        "top" => Set(to),
+    )
+
+    return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
+end 
+
 function Ferrite.generate_grid(::Type{Cell{3,20,6}}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3}((-1.0,-1.0,-1.0)), right::Vec{3,T}=Vec{3}((1.0,1.0,1.0))) where {T}
     nel_x = nel[1]; nel_y = nel[2]; nel_z = nel[3]; nel_tot = nel_x*nel_y*nel_z
     nnode_x = 2nel_x + 1; nnode_y = 2nel_y + 1; nnode_z = 2nel_z + 1 #Note: not the actually number of nodes in x/y/z, just a temporary variables
