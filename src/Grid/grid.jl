@@ -22,27 +22,16 @@ Get the data type of the components of the nodes coordinate.
 """
 get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 
-abstract type AbstractCell{dim,N,M} end
-"""
-    Cell{dim,N,M} <: AbstractCell{dim,N,M}
+##########################
+# AbstractCell interface #
+##########################
 
-A `Cell` is a subdomain defined by a collection of `Node`s.
-The parameter `dim` refers here to the geometrical/ambient dimension, i.e. the dimension of the `nodes` in the grid and **not** the topological dimension of the cell (i.e. the dimension of the reference element obtained by default_interpolation).
-A `Cell` has `N` nodes and `M` faces.
-Note that a `Cell` is not defined geometrically by node coordinates, but rather topologically by node indices into the node vector of some grid.
+abstract type AbstractCell{refdim, refshape <: AbstractRefShape{refdim}} end
 
-# Fields
-- `nodes::Ntuple{N,Int}`: N-tuple that stores the node ids. The ordering defines a cell's and its subentities' orientations.
-"""
-struct Cell{dim,N,M} <: AbstractCell{dim,N,M}
-    nodes::NTuple{N,Int}
-end
-nfaces(c::C) where {C<:AbstractCell} = nfaces(typeof(c))
-nfaces(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = M
-nedges(c::C) where {C<:AbstractCell} = length(edges(c))
-nvertices(c::C) where {C<:AbstractCell} = length(vertices(c))
-nnodes(c::C) where {C<:AbstractCell} = nnodes(typeof(c))
-nnodes(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = N
+nvertices(c::AbstractCell) = length(vertices(c))
+nedges(   c::AbstractCell) = length(edges(c))
+nfaces(   c::AbstractCell) = length(faces(c))
+nnodes(   c::AbstractCell) = length(get_node_ids(c))
 
 """
     Ferrite.vertices(::AbstractCell)
@@ -51,7 +40,7 @@ Returns a tuple with the node indices (of the nodes in a grid) for each vertex i
 This function induces the [`VertexIndex`](@ref), where the second index 
 corresponds to the local index into this tuple.
 """
-vertices(::Ferrite.AbstractCell)
+vertices(::AbstractCell)
 
 """
     Ferrite.edges(::AbstractCell)
@@ -62,7 +51,7 @@ the vertices that define an *oriented edge*. This function induces the
 
 Note that the vertices are sufficient to define an edge uniquely.
 """
-edges(::Ferrite.AbstractCell)
+edges(::AbstractCell)
 
 """
     Ferrite.faces(::AbstractCell)
@@ -73,37 +62,172 @@ the vertices that define an *oriented face*. This function induces the
 
 Note that the vertices are sufficient to define a face uniquely.
 """
-faces(::Ferrite.AbstractCell)
+faces(::AbstractCell)
 
 """
     Ferrite.default_interpolation(::AbstractCell)::Interpolation
 
 Returns the interpolation which defines the geometry of a given cell.
 """
-default_interpolation(::Ferrite.AbstractCell)
+default_interpolation(::AbstractCell)
 
-# Typealias for commonly used cells
-const implemented_celltypes = (
-    (const Line  = Cell{1,2,2}),
-    (const Line2D = Cell{2,2,1}),
-    (const Line3D = Cell{3,2,0}),
-    (const QuadraticLine = Cell{1,3,2}),
-    
-    (const Triangle = Cell{2,3,3}),
-    (const QuadraticTriangle = Cell{2,6,3}),
-    
-    (const Quadrilateral = Cell{2,4,4}),
-    (const Quadrilateral3D = Cell{3,4,1}),
-    (const QuadraticQuadrilateral = Cell{2,9,4}),
-    
-    (const Tetrahedron = Cell{3,4,4}),
-    (const QuadraticTetrahedron = Cell{3,10,4}),
-    
-    (const Hexahedron = Cell{3,8,6}),
-    (Cell{2,20,6}),
+"""
+    Ferrite.get_node_ids(c::AbstractCell)
 
-    (const Wedge = Cell{3,6,5})
-)
+Return the node id's for cell `c` in the order determined by the cell's reference cell.
+
+Default implementation: `c.nodes`.
+"""
+get_node_ids(c::AbstractCell) = c.nodes
+
+# Default implementations of vertices/edges/faces that work as long as get_node_ids is
+# correctly implemented for the cell.
+
+# RefLine (refdim = 1): vertices for vertexdofs, faces for BC
+function vertices(c::AbstractCell{1, RefLine})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2]) # v1, v2
+end
+function faces(c::AbstractCell{1, RefLine})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2]) # f1, f2
+end
+
+# RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
+function vertices(c::AbstractCell{2, RefTriangle})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2], ns[3]) # v1, v2, v3
+end
+function faces(c::AbstractCell{2, RefTriangle})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # f1, f2, f3
+    )
+end
+
+# RefQuadrilateral (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
+function vertices(c::AbstractCell{2, RefQuadrilateral})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
+end
+function faces(c::AbstractCell{2, RefQuadrilateral})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # f1, f2, f3, f4
+    )
+end
+
+# RefTetrahedron (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
+function vertices(c::AbstractCell{3, RefTetrahedron})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
+end
+function edges(c::AbstractCell{3, RefTetrahedron})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # e1, e2, e3
+        (ns[1], ns[4]), (ns[2], ns[4]), (ns[3], ns[4]), # e4, e5, e6
+    )
+end
+function faces(c::AbstractCell{3, RefTetrahedron})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[3], ns[2]), (ns[1], ns[2], ns[4]), # f1, f2
+        (ns[2], ns[3], ns[4]), (ns[1], ns[4], ns[3]), # f3, f4
+    )
+end
+
+# RefHexahedron (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
+function vertices(c::AbstractCell{3, RefHexahedron})
+    ns = get_node_ids(c)
+    return (
+        ns[1], ns[2], ns[3], ns[4], ns[5], ns[6], ns[7], ns[8], # v1, ..., v8
+    )
+end
+function edges(c::AbstractCell{3, RefHexahedron})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # e1, e2, e3, e4
+        (ns[5], ns[6]), (ns[6], ns[7]), (ns[7], ns[8]), (ns[8], ns[5]), # e5, e6, e7, e8
+        (ns[1], ns[5]), (ns[2], ns[6]), (ns[3], ns[7]), (ns[4], ns[8]), # e9, e10, e11, e12
+    )
+end
+function faces(c::AbstractCell{3, RefHexahedron})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[4], ns[3], ns[2]), (ns[1], ns[2], ns[6], ns[5]), # f1, f2
+        (ns[2], ns[3], ns[7], ns[6]), (ns[3], ns[4], ns[8], ns[7]), # f3, f4
+        (ns[1], ns[5], ns[8], ns[4]), (ns[5], ns[6], ns[7], ns[8]), # f5, f6
+    )
+end
+
+# RefPrism (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
+function vertices(c::AbstractCell{3, RefPrism})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2], ns[3], ns[4], ns[5], ns[6]) # v1, ..., v6
+end
+function edges(c::AbstractCell{3, RefPrism})
+    ns = get_node_ids(c)
+    return (
+        (ns[2], ns[1]), (ns[1], ns[3]), (ns[1], ns[4]), (ns[3], ns[2]), # e1, e2, e3, e4
+        (ns[2], ns[5]), (ns[3], ns[6]), (ns[4], ns[5]), (ns[4], ns[6]), # e5, e6, e7, e8
+        (ns[6], ns[5]),                                                 # e9
+    )
+end
+function faces(c::AbstractCell{3, RefPrism})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[3], ns[2]),        (ns[1], ns[2], ns[5], ns[4]), # f1, f2
+        (ns[3], ns[1], ns[4], ns[6]), (ns[2], ns[3], ns[6], ns[5]), # f3, f4
+        (ns[4], ns[5], ns[6]),                                      # f5
+    )
+end
+
+
+######################################################
+# Concrete implementations of AbstractCell interface #
+######################################################
+
+# Lagrange interpolation based cells
+struct Line                   <: AbstractCell{1, RefLine}          nodes::NTuple{ 2, Int} end
+struct QuadraticLine          <: AbstractCell{1, RefLine}          nodes::NTuple{ 3, Int} end
+struct Triangle               <: AbstractCell{2, RefTriangle}      nodes::NTuple{ 3, Int} end
+struct QuadraticTriangle      <: AbstractCell{2, RefTriangle}      nodes::NTuple{ 6, Int} end
+struct Quadrilateral          <: AbstractCell{2, RefQuadrilateral} nodes::NTuple{ 4, Int} end
+struct QuadraticQuadrilateral <: AbstractCell{2, RefQuadrilateral} nodes::NTuple{ 9, Int} end
+struct Tetrahedron            <: AbstractCell{3, RefTetrahedron}   nodes::NTuple{ 4, Int} end
+struct QuadraticTetrahedron   <: AbstractCell{3, RefTetrahedron}   nodes::NTuple{10, Int} end
+struct Hexahedron             <: AbstractCell{3, RefHexahedron}    nodes::NTuple{ 8, Int} end
+struct QuadraticHexahedron    <: AbstractCell{3, RefHexahedron}    nodes::NTuple{27, Int} end
+struct Wedge                  <: AbstractCell{3, RefPrism}         nodes::NTuple{ 6, Int} end
+
+default_interpolation(::Type{Line})                   = Lagrange{1, RefCube,        1}()
+default_interpolation(::Type{QuadraticLine})          = Lagrange{1, RefCube,        2}()
+default_interpolation(::Type{Triangle})               = Lagrange{2, RefTetrahedron, 1}()
+default_interpolation(::Type{QuadraticTriangle})      = Lagrange{2, RefTetrahedron, 2}()
+default_interpolation(::Type{Quadrilateral})          = Lagrange{2, RefCube,        1}()
+default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2, RefCube,        2}()
+default_interpolation(::Type{Tetrahedron})            = Lagrange{3, RefTetrahedron, 1}()
+default_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{3, RefTetrahedron, 2}()
+default_interpolation(::Type{Hexahedron})             = Lagrange{3, RefCube,        1}()
+default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{3, RefCube,        2}()
+default_interpolation(::Type{Wedge})                  = Lagrange{3, RefPrism,       1}()
+
+# TODO: Remove this, used for Quadrilateral3D
+edges(c::Quadrilateral#=3D=#) = faces(c)
+
+# Serendipity interpolation based cells
+struct SerendipityQuadraticQuadrilateral <: AbstractCell{2, RefQuadrilateral} nodes::NTuple{ 8, Int} end
+struct SerendipityQuadraticHexahedron    <: AbstractCell{3, RefHexahedron}    nodes::NTuple{20, Int} end
+
+default_interpolation(::Type{SerendipityQuadraticQuadrilateral}) = Serendipity{2, RefCube, 2}()
+default_interpolation(::Type{SerendipityQuadraticHexahedron})    = Serendipity{3, RefCube, 2}()
+
+
+############
+# Topology #
+############
+# TODO: Move topology stuff to src/Grid/Topology.jl or something
 
 struct EntityNeighborhood{T<:Union{BoundaryIndex,CellIndex}}
     neighbor_info::Vector{T}
@@ -135,21 +259,21 @@ function Base.show(io::IO, ::MIME"text/plain", n::EntityNeighborhood)
 end
 
 """
-    face_npoints(::AbstractCell{dim,N,M)
+    face_npoints(::AbstractCell)
 Specifies for each subtype of AbstractCell how many nodes form a face
 """
-face_npoints(::Cell{2,N,M}) where {N,M} = 2
-face_npoints(::Cell{3,4,1}) = 4 #not sure how to handle embedded cells e.g. Quadrilateral3D
+face_npoints(::AbstractCell{2}) = 2
+# face_npoints(::Cell{3,4,1}) = 4 #not sure how to handle embedded cells e.g. Quadrilateral3D
 """
-    edge_npoints(::AbstractCell{dim,N,M)
+    edge_npoints(::AbstractCell)
 Specifies for each subtype of AbstractCell how many nodes form an edge
 """
-edge_npoints(::Cell{3,4,1}) = 2 #not sure how to handle embedded cells e.g. Quadrilateral3D
-face_npoints(::Cell{3,N,6}) where N = 4
-face_npoints(::Cell{3,N,4}) where N = 3
-edge_npoints(::Cell{3,N,M}) where {N,M} = 2
+# edge_npoints(::Cell{3,4,1}) = 2 #not sure how to handle embedded cells e.g. Quadrilateral3D
+face_npoints(::AbstractCell{3, RefHexahedron}) = 4
+face_npoints(::AbstractCell{3, RefTetrahedron}) = 3
+edge_npoints(::AbstractCell{3}) = 2
 
-getdim(::Cell{dim}) where dim = dim
+getdim(::AbstractCell{refdim}) where {refdim} = refdim
 
 abstract type AbstractTopology end
 
@@ -809,46 +933,6 @@ function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
     join(io, typestrs, '/')
     print(io, " cells and $(getnnodes(grid)) nodes")
 end
-
-# Functions to uniquely identify vertices, edges and faces, used when distributing
-# dofs over a mesh. For this we can ignore the nodes on edged, faces and inside cells,
-# we only need to use the nodes that are vertices.
-# 1D: vertices
-faces(c::Union{Line,QuadraticLine}) = (c.nodes[1], c.nodes[2])
-vertices(c::Union{Line,Line2D,Line3D,QuadraticLine}) = (c.nodes[1], c.nodes[2])
-# 2D: vertices, faces
-faces(c::Line2D) = ((c.nodes[1],c.nodes[2]),)
-vertices(c::Union{Triangle,QuadraticTriangle}) = (c.nodes[1], c.nodes[2], c.nodes[3])
-faces(c::Union{Triangle,QuadraticTriangle}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]))
-vertices(c::Union{Quadrilateral,Quadrilateral3D,QuadraticQuadrilateral}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
-faces(c::Union{Quadrilateral,QuadraticQuadrilateral}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
-# 3D: vertices, edges, faces
-edges(c::Line3D) = ((c.nodes[1],c.nodes[2]),)
-vertices(c::Union{Tetrahedron,QuadraticTetrahedron}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
-edges(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]), (c.nodes[1],c.nodes[4]), (c.nodes[2],c.nodes[4]), (c.nodes[3],c.nodes[4]))
-faces(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[4]), (c.nodes[2],c.nodes[3],c.nodes[4]), (c.nodes[1],c.nodes[4],c.nodes[3]))
-vertices(c::Union{Hexahedron,Cell{3,20,6}}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[5], c.nodes[6], c.nodes[7], c.nodes[8])
-edges(c::Union{Hexahedron,Cell{3,20,6}}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]), (c.nodes[5],c.nodes[6]), (c.nodes[6],c.nodes[7]), (c.nodes[7],c.nodes[8]), (c.nodes[8],c.nodes[5]), (c.nodes[1],c.nodes[5]), (c.nodes[2],c.nodes[6]), (c.nodes[3],c.nodes[7]), (c.nodes[4],c.nodes[8]))
-faces(c::Union{Hexahedron,Cell{3,20,6}}) = ((c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))
-edges(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
-faces(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2],c.nodes[3],c.nodes[4]),)
-
-vertices(c::Wedge) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[5], c.nodes[6])
-edges(c::Wedge) = ((c.nodes[2],c.nodes[1]), (c.nodes[1],c.nodes[3]), (c.nodes[1],c.nodes[4]), (c.nodes[3],c.nodes[2]), (c.nodes[2],c.nodes[5]), (c.nodes[3],c.nodes[6]), (c.nodes[4],c.nodes[5]), (c.nodes[4],c.nodes[6]), (c.nodes[6],c.nodes[5]))
-faces(c::Wedge) = ((c.nodes[1],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[5],c.nodes[4]), (c.nodes[3],c.nodes[1],c.nodes[4],c.nodes[6]), (c.nodes[2],c.nodes[3],c.nodes[6],c.nodes[5]), (c.nodes[4],c.nodes[5],c.nodes[6]))
-
-# random stuff
-default_interpolation(::Union{Type{Line},Type{Line2D},Type{Line3D}}) = Lagrange{1,RefCube,1}()
-default_interpolation(::Type{QuadraticLine}) = Lagrange{1,RefCube,2}()
-default_interpolation(::Type{Triangle}) = Lagrange{2,RefTetrahedron,1}()
-default_interpolation(::Type{QuadraticTriangle}) = Lagrange{2,RefTetrahedron,2}()
-default_interpolation(::Union{Type{Quadrilateral},Type{Quadrilateral3D}}) = Lagrange{2,RefCube,1}()
-default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2,RefCube,2}()
-default_interpolation(::Type{Tetrahedron}) = Lagrange{3,RefTetrahedron,1}()
-default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{3,RefTetrahedron,2}()
-default_interpolation(::Type{Hexahedron}) = Lagrange{3,RefCube,1}()
-default_interpolation(::Type{Cell{3,20,6}}) = Serendipity{3,RefCube,2}()
-default_interpolation(::Type{Wedge}) = Lagrange{3,RefPrism,1}()
 
 """
     boundaryfunction(::Type{<:BoundaryIndex})
