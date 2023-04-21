@@ -1,64 +1,24 @@
 struct MultiCellValues{dim,T,RefShape,CVS<:Tuple,NV<:NamedTuple} <: CellValues{dim,T,RefShape}
-    values::CVS         # Points only to unique values
-    named_values::NV    # Can point to the same value in values multiple times
+    values::CVS         # Points only to unique CellValues
+    named_values::NV    # Can point to the same CellValues in values multiple times
 end
 MultiCellValues(;cvs...) = MultiCellValues(NamedTuple(cvs))
 function MultiCellValues(named_values::NamedTuple)
-    # Check that all are compatible 
+    # Extract the unique CellValues checked by ===
+    tuple_values = tuple(unique(objectid, values(named_values))...)
+
+    # Check that all values are compatible with eachother
     # allequal julia>=1.8
-    @assert all(typeof(cv.qr)==typeof(first(named_values).qr) for cv in named_values)
-    @assert all(length(getweights(cv.qr))==length(getweights(first(named_values).qr)) for cv in named_values)
-    # Should also check the geometric interpolation...
-    
-    function get_unique_values(values_all)
-        # Quick and dirty for testing
-        tmp = []
-        for value in values_all
-            any(x===value for x in tmp) || push!(tmp, value)
-        end
-        return tuple(tmp...)
-    end
+    cv_ref = first(named_values)
+    @assert all( getpoints(cv.qr) ==  getpoints(cv_ref.qr) for cv in tuple_values)
+    @assert all(getweights(cv.qr) == getweights(cv_ref.qr) for cv in tuple_values)
+    # Note: The following only works while isbitstype(Interpolation)
+    @assert all(cv.geo_interp == cv_ref.geo_interp for cv in tuple_values) 
 
-    tuple_values = get_unique_values(values(named_values))
-    # return MultiCellValues(tuple_values, named_values)
-    # Temp until CellValues gets different parameterization...
+    # getrefshape only defined for ip, and ip is type-unstable with current parameterization
     get_type_params(::CellValues{dim,T,RefShape}) where {dim,T,RefShape} = (dim,T,RefShape)
-    dim,T,RefShape = get_type_params(first(tuple_values))
+    dim,T,RefShape = get_type_params(cv_ref)
     return MultiCellValues{dim,T,RefShape,typeof(tuple_values),typeof(named_values)}(tuple_values, named_values)
-end
-
-# Convenience constructors (Reason for including this file later)
-create_qr_rule(qr::QuadratureRule, args...) = qr 
-create_qr_rule(qr::Int, ::Interpolation{Dim,RefShape}) where {Dim,RefShape} = QuadratureRule{Dim,RefShape}(qr)
-
-function MultiCellValues(dh::DofHandler; kwargs...)
-    @assert length(dh.fieldhandlers)==1
-    return MultiCellValues(first(dh.fieldhandlers), getcelltype(dh.grid); kwargs...)
-end
-function MultiCellValues(fh::FieldHandler, CT; qr=2)
-    # TODO: With new SubDofHandler, CT should not be required anymore. 
-    ip_geo = default_interpolation(CT)
-
-    qr_actual = create_qr_rule(qr, ip_geo)
-
-    # TODO: For 1-dimensional problems we cannot differentiate vector vs scalar values
-    #       This can be solved with the new vectorized interpolations discussin in 
-    #       Then, we also only need ip_fun as key to the dict below
-    @assert getdim(ip_geo) > 1
-    ip_funs = [name=>getfieldinterpolation(fh, name) for name in getfieldnames(fh)]
-    values = Dict{}()
-    for (name, ip_fun) in ip_funs
-        dim = getfielddim(fh, name)
-        if !(haskey(values, (ip_fun,dim)))
-            if dim == 1
-                values[(ip_fun,dim)] = CellScalarValues(qr_actual, ip_fun, ip_geo)
-            else
-                values[(ip_fun,dim)] = CellVectorValues(qr_actual, ip_fun, ip_geo)
-            end
-        end
-    end
-
-    return MultiCellValues(NamedTuple(name=>values[(ip_fun, getfielddim(fh, name))] for (name, ip_fun) in ip_funs))
 end
 
 # Not sure if aggressive constprop is required, but is intended so use to ensure? (Not supported on v1.6)
