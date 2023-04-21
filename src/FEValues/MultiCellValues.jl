@@ -59,14 +59,10 @@ end
 function apply_mapping!(cvs_values, q_point, detJ_w, Jinv)
     map(cvi -> _unsafe_apply_mapping!(cvi, q_point, detJ_w, Jinv), cvs_values)
 end
-
-# Specialized, should probably do with generated function for the cases below.
-# For performance, it is mostly relevant for the length(cvs_values)=1 though...
-#@generated function apply_mapping!(cvs_values::NTuple{N,CellValues}, q_point, detJ_w, Jinv) where N
-#    Base.Cartesian.@nexprs N i -> _unsafe_apply_mapping!(cvs_values[i], q_point, detJ_w, Jinv)
-#end
-
-function apply_mapping!(cvs_values::Tuple{<:CellValues}, q_point, detJ_w, Jinv)
+# Specialized, versions for 1-3 values: Not often more than 3 unique values,
+# and also not that much to gain for those problem sizes. Only 1s really important.
+# Alternative would be @generated + Base.Cartesian.@nexprs
+function apply_mapping!(cvs_values::NTuple{1,CellValues}, q_point, detJ_w, Jinv)
     _unsafe_apply_mapping!(cvs_values[1], q_point, detJ_w, Jinv)
 end
 function apply_mapping!(cvs_values::NTuple{2,CellValues}, q_point, detJ_w, Jinv)
