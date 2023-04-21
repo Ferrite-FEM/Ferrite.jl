@@ -102,7 +102,7 @@ end
 
 # Specialized, should probably do with generated function for the cases below.
 # For performance, it is mostly relevant for the length(cvs_values)=1 though...
-#@generated function apply_mapping!(cvs_values::NTuple{CellValues,N}, q_point, detJ_w, Jinv) where N
+#@generated function apply_mapping!(cvs_values::NTuple{N,CellValues}, q_point, detJ_w, Jinv) where N
 #    Base.Cartesian.@nexprs N i -> _unsafe_apply_mapping!(cvs_values[i], q_point, detJ_w, Jinv)
 #end
 
