@@ -20,6 +20,7 @@ export
     CellValues,
     CellScalarValues,
     CellVectorValues,
+    MultiCellValues,
     FaceValues,
     FaceScalarValues,
     FaceVectorValues,

@@ -1,3 +1,19 @@
+"""
+    MultiCellValues(;kwargs...)
+
+Create `MultiCellValues` that contains the cellvalues supplied via keyword arguments
+
+```
+cv_vector = CellVectorValues(...)
+cv_scalar = CellScalarValues(...)
+cvs = MultiCellValues(;u=cv_vector, p=cv_scalar, T=cv_scalar)
+```
+
+`cvs` is `reinit!`:ed as regular cellvalues. 
+Functions for getting information about quadrature points and geometric interpolation 
+accept `cvs` directly. Functions to access the specific function interpolation values 
+are called as `foo(cvs[:u], args...)` for `u`, and equivalent for other keys. 
+"""
 struct MultiCellValues{dim,T,RefShape,CVS<:Tuple,NV<:NamedTuple} <: CellValues{dim,T,RefShape}
     values::CVS         # Points only to unique CellValues
     named_values::NV    # Can point to the same CellValues in values multiple times
