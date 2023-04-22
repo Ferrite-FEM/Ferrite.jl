@@ -477,20 +477,9 @@ end
 dof_correction(dofs::StepRange{Int}) = collect(first(dofs):(last(dofs)+step(dofs)-1))
 
 """
-Orientation information for 1D entities.
-"""
-struct PathOrientationInfo
-    regular::Bool # Indicator whether the orientation is regular or inverted.
-end
-Base.:(==)(a::PathOrientationInfo, b::PathOrientationInfo) = a.regular == b.regular
-function Base.show(io::IO, ::MIME"text/plain", orientation::PathOrientationInfo)
-    print("Path is ")
-    print(io, orientation.regular ? "regular" : "inverted")
-end
-"""
-For interpolations with more than one interior dof an some edge the interor dofs will 
-have the  wrong order on some elements, so we have to adjust. Think e.g. about the 
-following example with two edges with three interior dofs on each edge:
+For interpolations with more than one interior dof and some dofs associated with the edge will 
+have non-matching evaluations on these edges if the orientations do not match. Think e.g. about the 
+following nodal interpolation example with two edges with three interior dofs on each edge:
 +-----------+
 |     A     |
 +--1--2--3->+    local edge on element A
@@ -501,10 +490,19 @@ following example with two edges with three interior dofs on each edge:
 |     B     |
 +-----------+
 Here the dofs will be locally assigned as indicated by 1,2,3 and we see a mismatch
-between the dofs 1 and 3. In our implementation we compensate for this by reverting
-the dof assignment on the edge interior.
+between the dofs 1 and 3. For most scalar-valued interpolations we can simply compensate 
+this by reverting the dof assignment on the edge interior.
 
-In addition, we also have to preverse the ordering at each dof.
+In addition, we also have to preverse the ordering at each dof location.
+
+For more details we refer to [1] as we follow the methodology described therein.
+
+[1] Scroggs, M. W., Dokken, J. S., Richardson, C. N., & Wells, G. N. (2022). 
+    Construction of arbitrary order finite element degree-of-freedom maps on 
+    polygonal and polyhedral cell meshes. ACM Transactions on Mathematical 
+    Software (TOMS), 48(2), 1-23.
+
+TODO citation via software.
 """
 function dof_correction(dofs::StepRange{Int}, orientation::PathOrientationInfo)
     orientation.regular && return dof_correction(dofs)
@@ -537,28 +535,6 @@ so the unique representation is always a tuple length 3.
 """
 sortface(face::Tuple{Int,Int}) = sortedge(face) # Face in 2D is the same as edge in 3D.
 
-"""
-Orientation information for 2D entities. Such an entity can be 
-possibly flipped (i.e. the defining vertex order is reverse to the 
-spanning vertex order) and the vertices can be rotated against each other.
-Take for example the faces
-    1---2 2---3
-    | A | | B |
-    4---3 1---4
-which are rotated against each other by 90° (shift index is 1) or the faces
-    1---2 2---1
-    | A | | B |
-    4---3 4---3
-which are flipped against each other. Any combination of these can happen. 
-The combination to map this local face to the defining face is encoded with
-this data structure via ``rotate \\circ flip`` where the rotation is indiced by
-the shift index. 
-    !!!NOTE TODO implement me.
-"""
-struct SurfaceOrientationInfo
-    #flipped::Bool
-    #shift_index::Int
-end
 """
     !!!NOTE TODO implement me.
 """

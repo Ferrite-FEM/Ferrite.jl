@@ -959,3 +959,53 @@ for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
         Base.in(v::Tuple{Int, Int}, s::Set{$INDEX}) = in($INDEX(v), s)
     end
 end
+
+#################################
+#### Orientation of Entities ####
+#################################
+
+"""
+Orientation information for 1D entities.
+    
+The orientation for 1D entities is defined by the indices of the grid nodes
+associated to the vertices. To give an example, the oriented path
+    1 ---> 2
+is called *regular*, indicated by `regular=true`, while the oriented path
+    2 ---> 1
+is called *inverted*, indicated by `regular=false`.
+"""
+struct PathOrientationInfo
+    regular::Bool # Indicator whether the orientation is regular or inverted.
+end
+Base.:(==)(a::PathOrientationInfo, b::PathOrientationInfo) = a.regular == b.regular
+function Base.show(io::IO, ::MIME"text/plain", orientation::PathOrientationInfo)
+    print("Path is ")
+    print(io, orientation.regular ? "regular" : "inverted")
+    print(".")
+end
+
+"""
+Orientation information for 2D entities. Such an entity can be 
+possibly flipped (i.e. the defining vertex order is reverse to the 
+spanning vertex order) and the vertices can be rotated against each other.
+Take for example the faces
+    1---2 2---3
+    | A | | B |
+    4---3 1---4
+which are rotated against each other by 90° (shift index is 1) or the faces
+    1---2 2---1
+    | A | | B |
+    4---3 4---3
+which are flipped against each other. Any combination of these can happen. 
+The combination to map this local face to the defining face is encoded with
+this data structure via ``rotate \\circ flip`` where the rotation is indiced by
+the shift index. 
+    !!!NOTE TODO implement me.
+"""
+struct SurfaceOrientationInfo
+    #flipped::Bool
+    #shift_index::Int
+end
+function Base.show(io::IO, ::MIME"text/plain", orientation::SurfaceOrientationInfo)
+    @warn "Surface orientation is not implemented yet!"
+end
