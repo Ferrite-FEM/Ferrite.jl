@@ -594,47 +594,6 @@ function test_unique_cellsets()
     @test_throws ErrorException add!(dh, FieldHandler([Field(:v, ip, 1)], set_v))
 end
 
-function test_mdh_ho_dof_distribution()
-    # 3-----4
-    # | \   |
-    # |  \  |
-    # |   \ |
-    # 1-----2
-    grid = generate_grid(Triangle, (1, 1))
-
-    ## Lagrange{2,RefTetrahedron,3}
-    # Dofs per position per triangle
-    # 3      3-14-15-11
-    # | \     \      |
-    # 9  7     7  16 13
-    # |   \     \    |
-    # |    \     \   |
-    # 8  10 6     6  12
-    # |      \     \ |
-    # 1-4---5-2      2
-    dh = DofHandler(grid)
-    add!(dh, :u, 1, Lagrange{2,RefTetrahedron,3}())
-    close!(dh)
-    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 9, 8, 10]
-    @test celldofs(dh, 2) == [2, 11, 3, 12, 13, 15, 14, 7, 6, 16]
-
-    ## Lagrange{2,RefTetrahedron,3}
-    # First dof per position per triangle
-    # 5      5-27-29-21
-    # | \     \      |
-    # 17 13   13  31 25
-    # |   \     \    |
-    # |    \     \   |
-    # 15 19 11   11  23
-    # |      \     \ |
-    # 1-7---9-3      3
-    dh = DofHandler(grid)
-    add!(dh, :u, 2, Lagrange{2,RefTetrahedron,3}())
-    close!(dh)
-    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 15, 16, 19, 20]
-    @test celldofs(dh, 2) == [3, 4, 21, 22, 5, 6, 23, 24, 25, 26, 29, 30, 27, 28, 13, 14, 11, 12, 31, 32]
-end
-
 function test_show()
     grid = get_2d_grid()
     # WHEN: adding a scalar field for each cell and generating dofs
@@ -671,6 +630,5 @@ end
     test_mixed_grid_show()
     test_separate_fields_on_separate_domains();
     test_unique_cellsets()
-    test_mdh_ho_dof_distribution()
     test_show()
 end

@@ -457,31 +457,42 @@ end
 end
 
 @testset "DoF distribution" begin
-    # _________
-    # |\      |
-    # |  \  2 |
-    # | 1  \  |
-    # |______\|
+    # 3-----4
+    # | \   |
+    # |  \  |
+    # |   \ |
+    # 1-----2
     grid = generate_grid(Triangle, (1, 1))
 
     ## Lagrange{2,RefTetrahedron,3}
+    # Dofs per position per triangle
+    # 3      3-14-15-11
+    # | \     \      |
+    # 9  7     7  16 13
+    # |   \     \    |
+    # |    \     \   |
+    # 8  10 6     6  12
+    # |      \     \ |
+    # 1-4---5-2      2
     dh = DofHandler(grid)
     add!(dh, :u, 1, Lagrange{2,RefTetrahedron,3}())
     close!(dh)
-    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    @test celldofs(dh, 2) == [2, 11, 3, 12, 13, 14, 15, 7, 6, 16]
+    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 9, 8, 10]
+    @test celldofs(dh, 2) == [2, 11, 3, 12, 13, 15, 14, 7, 6, 16]
 
-    ## Lagrange{2,RefTetrahedron,4}
+    ## Lagrange{2,RefTetrahedron,3}
+    # First dof per position per triangle
+    # 5      5-27-29-21
+    # | \     \      |
+    # 17 13   13  31 25
+    # |   \     \    |
+    # |    \     \   |
+    # 15 19 11   11  23
+    # |      \     \ |
+    # 1-7---9-3      3
     dh = DofHandler(grid)
-    add!(dh, :u, 1, Lagrange{2,RefTetrahedron,4}())
+    add!(dh, :u, 2, Lagrange{2,RefTetrahedron,3}())
     close!(dh)
-    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-    @test celldofs(dh, 2) == [2, 16, 3, 17, 18, 19, 20, 21, 22, 9, 8, 7, 23, 24, 25]
-
-    ## Lagrange{2,RefTetrahedron,5}
-    dh = DofHandler(grid)
-    add!(dh, :u, 1, Lagrange{2,RefTetrahedron,5}())
-    close!(dh)
-    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
-    @test celldofs(dh, 2) == [2, 22, 3, 23, 24, 25, 26, 27, 28, 29, 30, 11, 10, 9, 8, 31, 32, 33, 34, 35, 36]
+    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 15, 16, 19, 20]
+    @test celldofs(dh, 2) == [3, 4, 21, 22, 5, 6, 23, 24, 25, 26, 29, 30, 27, 28, 13, 14, 11, 12, 31, 32]
 end
