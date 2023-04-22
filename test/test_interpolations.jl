@@ -9,7 +9,7 @@
                       Lagrange{2, RefTetrahedron, 2}(),
                       Lagrange{2, RefTetrahedron, 3}(),
                       Lagrange{2, RefTetrahedron, 4}(),
-                      #Lagrange{2, RefTetrahedron, 5}(),
+                      Lagrange{2, RefTetrahedron, 5}(),
                       Lagrange{3, RefCube, 1}(),
                       Lagrange{3, RefCube, 2}(),
                       Serendipity{2, RefCube, 2}(),
@@ -53,7 +53,7 @@
            reinterpret(Float64, Ferrite.derivative(interpolation, x))
     @test sum(Ferrite.value(interpolation, x)) ≈ 1.0
 
-    # Check if the important functions are consistens
+    # Check if the important functions are consistent
     coords = Ferrite.reference_coordinates(interpolation)
     @test length(coords) == n_basefuncs
     @test Ferrite.value(interpolation, length(coords), x) == Ferrite.value(interpolation, length(coords), x)

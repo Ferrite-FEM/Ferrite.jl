@@ -7,7 +7,7 @@ SUITE["mesh"] = BenchmarkGroup()
 # Generator benchmarks
 SUITE["mesh"]["generator"] = BenchmarkGroup()
 
-# Strucutred hyperrectangle generators
+# Structured hyperrectangle generators
 SUITE["mesh"]["generator"]["hyperrectangle"] = BenchmarkGroup()
 HYPERRECTANGLE_GENERATOR = SUITE["mesh"]["generator"]["hyperrectangle"]
 for spatial_dim ∈ 1:3

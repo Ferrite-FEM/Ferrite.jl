@@ -24,7 +24,7 @@ JULIA_CMD=<path-to-julia-executable> make compare target=<target-commit> baselin
 ```
 
 !!! note
-    For the performance comparison between two commits you must not have any uncommited
+    For the performance comparison between two commits you must not have any uncommitted
     or untracked files in your Ferrite.jl folder! Otherwise the `PkgBenchmark.jl` will
     fail to setup the comparison.
 

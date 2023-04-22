@@ -5,7 +5,7 @@ using BlockArrays: BlockArray, BlockIndex, BlockMatrix, BlockVector, block, bloc
 using Ferrite
 using Ferrite: addindex!, fillzero!
 
-# TODO: Move into Ferrite and enable for MixedDofHandler
+# TODO: Move into Ferrite and enable for mixed grids / subdomains
 function global_dof_range(dh::DofHandler, f::Symbol)
     set = Set{Int}()
     frange = dof_range(dh, f)

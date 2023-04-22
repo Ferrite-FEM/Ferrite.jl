@@ -344,7 +344,5 @@ function _get_gauss_prismdata_polyquad(n::Int)
     #w
     xw[:,4] ./= 2^3
 
-    @show xw[:,3]
-
     return xw
 end

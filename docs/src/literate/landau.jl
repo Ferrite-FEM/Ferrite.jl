@@ -18,7 +18,7 @@
 # The key to using a method like this for minimizing a free energy function directly,
 # rather than the weak form, as is usually done with FEM, is to split up the
 # gradient and Hessian calculations.
-# This means that they are performed for each cell seperately instead of for the
+# This means that they are performed for each cell separately instead of for the
 # grid as a whole.
 
 using ForwardDiff

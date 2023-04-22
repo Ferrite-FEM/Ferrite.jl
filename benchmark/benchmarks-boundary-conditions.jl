@@ -5,7 +5,7 @@ SUITE["boundary-conditions"] = BenchmarkGroup()
 
 SUITE["boundary-conditions"]["Dirichlet"] = BenchmarkGroup()
 DIRICHLET_SUITE = SUITE["boundary-conditions"]["Dirichlet"]
-# span artifical scope...
+# span artificial scope...
 for spatial_dim ∈ [2]
     # Benchmark application on global system
     DIRICHLET_SUITE["global"] = BenchmarkGroup()

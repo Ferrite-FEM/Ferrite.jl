@@ -270,7 +270,7 @@ boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
 #########################
 # TODO generalize to arbitrary basis positionings.
 """
-Piecewise discontinous Lagrange basis via Gauss-Lobatto points.
+Piecewise discontinuous Lagrange basis via Gauss-Lobatto points.
 """
 struct DiscontinuousLagrange{dim,shape,order} <: Interpolation{dim,shape,order} end
 
@@ -552,10 +552,9 @@ function value(ip::Lagrange2Tri345, i::Int, ξ::Vec{2})
     i = permdof2DLagrange2Tri345[order][i]
     ξ_x = ξ[1]
     ξ_y = ξ[2]
-    γ = 1. - ξ_x - ξ_y
     i1, i2, i3 = _numlin_basis2D(i, order)
-    val = one(γ)
-    i1 ≥ 1 && (val *= prod((order * γ - j) / (j + 1) for j = 0:(i1 - 1)))
+    val = one(ξ_y)
+    i1 ≥ 1 && (val *= prod((order - order * (ξ_x + ξ_y ) - j) / (j + 1) for j = 0:(i1 - 1)))
     i2 ≥ 1 && (val *= prod((order * ξ_x - j) / (j + 1) for j = 0:(i2 - 1)))
     i3 ≥ 1 && (val *= prod((order * ξ_y - j) / (j + 1) for j = 0:(i3 - 1)))
     return val
@@ -1087,7 +1086,7 @@ end
 """
 Classical non-conforming Crouzeix–Raviart element.
 
-For details we refer ot the original paper:
+For details we refer to the original paper:
 M. Crouzeix and P. Raviart. "Conforming and nonconforming finite element 
 methods for solving the stationary Stokes equations I." ESAIM: Mathematical Modelling 
 and Numerical Analysis-Modélisation Mathématique et Analyse Numérique 7.R3 (1973): 33-75.

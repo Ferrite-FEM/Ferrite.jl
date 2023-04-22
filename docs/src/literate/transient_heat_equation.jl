@@ -180,7 +180,7 @@ K, f = doassemble_K!(K, f, cellvalues, dh)
 M = doassemble_M!(M, cellvalues, dh)
 A = (Δt .* K) + M;
 # Now, we need to save all boundary condition related values of the unaltered system matrix `A`, which is done
-# by `get_rhs_data`. The function returns a `RHSData` struct, which contains all needed informations to apply
+# by `get_rhs_data`. The function returns a `RHSData` struct, which contains all needed information to apply
 # the boundary conditions solely on the right-hand-side vector of the problem.
 rhsdata = get_rhs_data(ch, A);
 # We set the values at initial time step, denoted by uₙ, to a bubble-shape described by 
