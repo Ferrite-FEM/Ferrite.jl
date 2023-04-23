@@ -963,6 +963,7 @@ end
 #################################
 #### Orientation of Entities ####
 #################################
+# @TODO merge this code with into the logic in `ConstraintHandler`.
 
 """
 Orientation information for 1D entities.
