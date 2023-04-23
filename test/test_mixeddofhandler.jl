@@ -393,8 +393,8 @@ function test_element_order()
         ]
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 6)]
     grid = Grid(cells, nodes)
-    field1_tri = create_field(name=:u, reference_dim=3, field_dim=2, order=1, cellshape=RefTetrahedron)
-    field1_quad = create_field(name=:u, reference_dim=3, field_dim=2, order=1, cellshape=RefCube)
+    field1_tri = create_field(name=:u, reference_dim=2, field_dim=2, order=1, cellshape=RefTetrahedron)
+    field1_quad = create_field(name=:u, reference_dim=2, field_dim=2, order=1, cellshape=RefCube)
 
     dh = DofHandler(grid);
     # Note the jump in cell numbers
@@ -407,7 +407,6 @@ function test_element_order()
     @test celldofs(dh, 1) == collect(1:6)
     @test celldofs(dh, 2) == [3, 4, 7, 8, 11, 12, 5, 6]
     @test celldofs(dh, 3) == [7,8, 9, 10, 11, 12]
-
 end
 
 function test_field_on_subdomain()
