@@ -345,19 +345,23 @@ function _close!(dh::DofHandler{dim}, fh::FieldHandler, fh_index::Int, nextdof, 
             @debug println("\tfdim: $fdim")
             ip_info = ip_infos[lidx]
 
+            # TODO via view to get rid of allocations
+            cell_dofs = Vector{Int}(undef, fdim*(sum(ip_info.nvertexdofs)+sum(ip_info.nedgedofs)+sum(ip_info.nfacedofs)+sum(ip_info.ncelldofs)))
+
             # Distribute dofs for vertices
             nextdof = add_vertex_dofs(
-                dh.cell_dofs, cell, vertexdicts[gidx], fdim,
-                ip_info.nvertexdofs, nextdof
+                cell_dofs, cell, vertexdicts[gidx], fdim,
+                ip_info.nvertexdofs, ip_info.vertexdofs, nextdof
             )
 
             # Distribute dofs for edges (only applicable when dim is 3)
             if dim == 3 && (ip_info.dim == 3 || ip_info.dim == 2)
                 # Regular 3D element or 2D interpolation embedded in 3D space
                 nentitydofs = ip_info.dim == 3 ? ip_info.nedgedofs : ip_info.nfacedofs
+                entitydofs = ip_info.dim == 3 ? ip_info.edgedofs : ip_info.facedofs
                 nextdof = add_edge_dofs(
-                    dh.cell_dofs, cell, edgedicts[gidx], fdim,
-                    nentitydofs, nextdof
+                    cell_dofs, cell, edgedicts[gidx], fdim,
+                    nentitydofs, entitydofs, nextdof
                 )
             end
 
@@ -365,15 +369,18 @@ function _close!(dh::DofHandler{dim}, fh::FieldHandler, fh_index::Int, nextdof, 
             # they are added above as edge dofs.
             if ip_info.dim == dim && dim > 1
                 nextdof = add_face_dofs(
-                    dh.cell_dofs, cell, facedicts[gidx], fdim,
-                    ip_info.nfacedofs, nextdof
+                    cell_dofs, cell, facedicts[gidx], fdim,
+                    ip_info.nfacedofs, ip_info.facedofs, nextdof
                 )
             end
 
             # Distribute internal dofs for cells
             nextdof = add_cell_dofs(
-                dh.cell_dofs, fdim, ip_info.ncelldofs, nextdof
+                cell_dofs, fdim, ip_info.ncelldofs, ip_info.celldofs, nextdof
             )
+
+            @debug println("\tDofs for cell #$ci:\t$cell_dofs")
+            append!(dh.cell_dofs, cell_dofs)
         end
 
         if first_cell
@@ -383,31 +390,29 @@ function _close!(dh::DofHandler{dim}, fh::FieldHandler, fh_index::Int, nextdof, 
         else
             @assert ndofs_per_cell == length(dh.cell_dofs) - len_cell_dofs_start
         end
-
-        # @debug println("Dofs for cell #$ci:\n\t$cell_dofs")
     end # cell loop
     return nextdof
 end
 
-function add_vertex_dofs(cell_dofs, cell, vertexdict, field_dim, nvertexdofs, nextdof)
+function add_vertex_dofs(cell_dofs, cell, vertexdict, vdim, nvertexdofs, vertexdofs, nextdof)
     for (vi, vertex) in pairs(vertices(cell))
         nvertexdofs[vi] > 0 || continue # skip if no dof on this vertex
         @assert nvertexdofs[vi] == 1
         @debug println("\t\tvertex #$vertex")
         first_dof = vertexdict[vertex]
         if first_dof > 0 # reuse dof
-            for d in 1:field_dim
+            for d in 1:vdim
                 reuse_dof = first_dof + (d-1)
-                push!(cell_dofs, reuse_dof)
+                cell_dofs[vdim*(vertexdofs[vi][1]-1)+d] = reuse_dof
             end
         else # create dofs
             vertexdict[vertex] = nextdof
-            for _ in 1:field_dim
-                push!(cell_dofs, nextdof)
+            for d in 1:vdim
+                cell_dofs[vdim*(vertexdofs[vi][1]-1)+d] = nextdof
                 nextdof += 1
             end
         end
-        # @debug println("\t\tdofs dofs #$cell_dofs")
+        @debug println("\t\t\tdofs: $(cell_dofs[[(vertexdofs[vi])...]])")
     end
     return nextdof
 end
@@ -430,37 +435,50 @@ function get_or_create_dofs!(nextdof, ndofs, vdim; dict, key)
     end
 end
 
-function add_face_dofs(cell_dofs, cell, facedict, vdim, nfacedofs, nextdof)
+function add_face_dofs(cell_dofs, cell, facedict, vdim, nfacedofs, facedofs, nextdof)
     for (fi,face) in enumerate(faces(cell))
         if nfacedofs[fi] > 0
+            @assert nfacedofs[fi] == 1
             sface, orientation = sortface(face)
             @debug println("\t\tface #$sface, $orientation")
             nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], vdim, dict=facedict, key=sface)
-            @debug println("\t\t\tadjusted dofs #$(dof_correction(dofs, orientation))")
-            append!(cell_dofs, dof_correction(dofs, orientation))
+            dofs2 = dof_correction(dofs, orientation)
+            @debug println("\t\t\tadjusted dofs: $(dofs2)")
+            for (idx, idx2) ∈ enumerate(facedofs[fi])
+                for d ∈ 1:vdim
+                    cell_dofs[vdim*(idx2-1)+d] = dofs2[vdim*(idx-1)+d]
+                end
+            end
         end
     end
     return nextdof
 end
 
-function add_edge_dofs(cell_dofs, cell, edgedict, vdim, nedgedofs, nextdof)
+function add_edge_dofs(cell_dofs, cell, edgedict, vdim, nedgedofs, edgedofs, nextdof)
     for (ei,edge) in enumerate(edges(cell))
         if nedgedofs[ei] > 0
             sedge, orientation = sortedge(edge)
             @debug println("\t\tedge #$sedge, $orientation")
             nextdof, dofs = get_or_create_dofs!(nextdof, nedgedofs[ei], vdim, dict=edgedict, key=sedge)
-            @debug println("\t\t\tadjusted dofs #$(dof_correction(dofs, orientation))")
-            append!(cell_dofs, dof_correction(dofs, orientation))
+            dofs2 = dof_correction(dofs, orientation)
+            @debug println("\t\t\tadjusted dofs: $(dofs2)")
+            for (idx, idx2) ∈ enumerate(edgedofs[ei])
+                for d ∈ 1:vdim
+                    cell_dofs[vdim*(idx2-1)+d] = dofs2[vdim*(idx-1)+d]
+                end
+            end
         end
     end
     return nextdof
 end
 
-function add_cell_dofs(cell_dofs, vdim, ncelldofs, nextdof)
+function add_cell_dofs(cell_dofs, vdim, ncelldofs, celldofs, nextdof)
     @debug println("\t\tcelldofs #$nextdof:$(ncelldofs*vdim)")
-    for _ in 1:ncelldofs, _ in 1:vdim
-        push!(cell_dofs, nextdof)
-        nextdof += 1
+    for i in 1:ncelldofs
+        for d in 1:vdim
+            cell_dofs[vdim*(celldofs[i]-1)+d] = nextdof
+            nextdof += 1
+        end
     end
     return nextdof
 end
