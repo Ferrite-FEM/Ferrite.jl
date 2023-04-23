@@ -227,7 +227,7 @@ function find_range_boundaries(f::OctantBWG{dim,N,M,T1}, l::OctantBWG{dim,N,M,T1
         return find_range_boundaries(f,l,kidz[j],idxset ∩ boundary_j,b)
     end
     idxset_match = Set{OctantIndex{T2}}()
-    for i in (j+1):(k-1)
+    for i in (j+o):(k-o)
         union!(idxset_match,idxset ∩ boundaryset(s,i,b))
     end
     boundary_k = boundaryset(s,k,b)
