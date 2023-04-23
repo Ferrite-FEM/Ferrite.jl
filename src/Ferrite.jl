@@ -98,6 +98,8 @@ include("Dofs/apply_analytical.jl")
 include("Dofs/sparsity_pattern.jl")
 include("Dofs/DofRenumbering.jl")
 
+include("FEValues/interface_values.jl")
+
 include("iterators.jl")
 
 # Assembly
