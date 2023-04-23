@@ -341,17 +341,19 @@ function _close!(dh::DofHandler{dim}, fh::FieldHandler, fh_index::Int, nextdof, 
         for (lidx, gidx) in pairs(global_fidxs)
             @debug println("\tfield: $(fh.field_names[lidx])")
 
-            fdim = fh.field_dims[lidx]
-            @debug println("\tfdim: $fdim")
+            vdim = fh.field_dims[lidx] # TODO remove me here. This will be a property of the interpolation.
+            @debug println("\tvdim: $vdim")
             ip_info = ip_infos[lidx]
+            fip = fh.field_interpolations[lidx]
 
             # TODO via view to get rid of allocations
-            cell_dofs = Vector{Int}(undef, fdim*(sum(ip_info.nvertexdofs)+sum(ip_info.nedgedofs)+sum(ip_info.nfacedofs)+sum(ip_info.ncelldofs)))
+            cell_dofs = Vector{Int}(undef, vdim*(sum(ip_info.nvertexdofs)+sum(ip_info.nedgedofs)+sum(ip_info.nfacedofs)+sum(ip_info.ncelldofs)))
 
             # Distribute dofs for vertices
             nextdof = add_vertex_dofs(
-                cell_dofs, cell, vertexdicts[gidx], fdim,
-                ip_info.nvertexdofs, ip_info.vertexdofs, nextdof
+                cell_dofs, cell, vertexdicts[gidx],
+                ip_info.nvertexdofs, ip_info.vertexdofs, nextdof,
+                fip, vdim
             )
 
             # Distribute dofs for edges (only applicable when dim is 3)
@@ -360,8 +362,9 @@ function _close!(dh::DofHandler{dim}, fh::FieldHandler, fh_index::Int, nextdof, 
                 nentitydofs = ip_info.dim == 3 ? ip_info.nedgedofs : ip_info.nfacedofs
                 entitydofs = ip_info.dim == 3 ? ip_info.edgedofs : ip_info.facedofs
                 nextdof = add_edge_dofs(
-                    cell_dofs, cell, edgedicts[gidx], fdim,
-                    nentitydofs, entitydofs, nextdof
+                    cell_dofs, cell, edgedicts[gidx],
+                    nentitydofs, entitydofs, nextdof,
+                    fip, vdim
                 )
             end
 
@@ -369,14 +372,15 @@ function _close!(dh::DofHandler{dim}, fh::FieldHandler, fh_index::Int, nextdof, 
             # they are added above as edge dofs.
             if ip_info.dim == dim && dim > 1
                 nextdof = add_face_dofs(
-                    cell_dofs, cell, facedicts[gidx], fdim,
-                    ip_info.nfacedofs, ip_info.facedofs, nextdof
+                    cell_dofs, cell, facedicts[gidx],
+                    ip_info.nfacedofs, ip_info.facedofs, nextdof,
+                    fip, vdim
                 )
             end
 
             # Distribute internal dofs for cells
             nextdof = add_cell_dofs(
-                cell_dofs, fdim, ip_info.ncelldofs, ip_info.celldofs, nextdof
+                cell_dofs, ip_info.ncelldofs, ip_info.celldofs, nextdof, fip, vdim
             )
 
             @debug println("\tDofs for cell #$ci:\t$cell_dofs")
@@ -394,7 +398,7 @@ function _close!(dh::DofHandler{dim}, fh::FieldHandler, fh_index::Int, nextdof, 
     return nextdof
 end
 
-function add_vertex_dofs(cell_dofs, cell, vertexdict, vdim, nvertexdofs, vertexdofs, nextdof)
+function add_vertex_dofs(cell_dofs, cell, vertexdict, nvertexdofs, vertexdofs, nextdof, ip, vdim)
     for (vi, vertex) in pairs(vertices(cell))
         nvertexdofs[vi] > 0 || continue # skip if no dof on this vertex
         @assert nvertexdofs[vi] == 1
@@ -435,14 +439,14 @@ function get_or_create_dofs!(nextdof, ndofs, vdim; dict, key)
     end
 end
 
-function add_face_dofs(cell_dofs, cell, facedict, vdim, nfacedofs, facedofs, nextdof)
+function add_face_dofs(cell_dofs, cell, facedict, nfacedofs, facedofs, nextdof, ip, vdim)
     for (fi,face) in enumerate(faces(cell))
         if nfacedofs[fi] > 0
             @assert nfacedofs[fi] == 1
             sface, orientation = sortface(face)
             @debug println("\t\tface #$sface, $orientation")
             nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], vdim, dict=facedict, key=sface)
-            dofs2 = dof_correction(dofs, orientation)
+            dofs2 = dof_correction(dofs, orientation, ip)
             @debug println("\t\t\tadjusted dofs: $(dofs2)")
             for (idx, idx2) ∈ enumerate(facedofs[fi])
                 for d ∈ 1:vdim
@@ -454,13 +458,13 @@ function add_face_dofs(cell_dofs, cell, facedict, vdim, nfacedofs, facedofs, nex
     return nextdof
 end
 
-function add_edge_dofs(cell_dofs, cell, edgedict, vdim, nedgedofs, edgedofs, nextdof)
+function add_edge_dofs(cell_dofs, cell, edgedict, nedgedofs, edgedofs, nextdof, ip, vdim)
     for (ei,edge) in enumerate(edges(cell))
         if nedgedofs[ei] > 0
             sedge, orientation = sortedge(edge)
             @debug println("\t\tedge #$sedge, $orientation")
             nextdof, dofs = get_or_create_dofs!(nextdof, nedgedofs[ei], vdim, dict=edgedict, key=sedge)
-            dofs2 = dof_correction(dofs, orientation)
+            dofs2 = dof_correction(dofs, orientation, ip)
             @debug println("\t\t\tadjusted dofs: $(dofs2)")
             for (idx, idx2) ∈ enumerate(edgedofs[ei])
                 for d ∈ 1:vdim
@@ -472,7 +476,7 @@ function add_edge_dofs(cell_dofs, cell, edgedict, vdim, nedgedofs, edgedofs, nex
     return nextdof
 end
 
-function add_cell_dofs(cell_dofs, vdim, ncelldofs, celldofs, nextdof)
+function add_cell_dofs(cell_dofs, ncelldofs, celldofs, nextdof, fip, vdim)
     @debug println("\t\tcelldofs #$nextdof:$(ncelldofs*vdim)")
     for i in 1:ncelldofs
         for d in 1:vdim
@@ -513,7 +517,7 @@ For more details we refer to [1] as we follow the methodology described therein.
 
 TODO citation via software.
 """
-function dof_correction(dofs::StepRange{Int}, orientation::PathOrientationInfo)
+function dof_correction(dofs::StepRange{Int}, orientation::PathOrientationInfo, ip::IP) where {IP}
     orientation.regular && return dof_correction(dofs)
     rdofs = reverse(dofs)
     return [dof+i-1 for dof ∈ first(rdofs):step(rdofs):last(rdofs) for i ∈1:step(dofs) ]
@@ -556,7 +560,7 @@ For more details we refer to [1] as we follow the methodology described therein.
 
 TODO citation via software.
 """
-function dof_correction(dofs::StepRange{Int}, orientation::SurfaceOrientationInfo)
+function dof_correction(dofs::StepRange{Int}, orientation::SurfaceOrientationInfo, ip::IP) where {IP}
     (last(dofs)-first(dofs)+1)/step(dofs) > 1 && error("Dof distribution on faces not implemented for multiple dof locations.")
     return dof_correction(dofs)
 end
