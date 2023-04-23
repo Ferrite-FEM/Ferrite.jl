@@ -62,7 +62,7 @@ struct InterpolationInfo{TV,EV,FV,CV}
     facedofs::FV
     ncelldofs::Int
     celldofs::CV
-    dim::Int
+    reference_dim::Int
     function InterpolationInfo(interpolation::Interpolation{3})
         new{typeof(vertexdof_indices(interpolation)),
             typeof(edgedof_interior_indices(interpolation)),

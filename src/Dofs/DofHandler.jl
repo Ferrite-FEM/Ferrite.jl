@@ -304,7 +304,8 @@ function __close!(dh::DofHandler{dim}) where {dim}
     return dh, vertexdicts, edgedicts, facedicts
 end
 
-function _close!(dh::DofHandler{dim}, fh::FieldHandler, fh_index::Int, nextdof, vertexdicts, edgedicts, facedicts) where {dim}
+# sdim = spatial dimension
+function _close!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::Int, nextdof, vertexdicts, edgedicts, facedicts) where {sdim}
     ip_infos = InterpolationInfo[]
     for interpolation in fh.field_interpolations
         ip_info = InterpolationInfo(interpolation)
@@ -312,7 +313,7 @@ function _close!(dh::DofHandler{dim}, fh::FieldHandler, fh_index::Int, nextdof, 
         # TODO: More than one face dof per face in 3D are not implemented yet. This requires
         #       keeping track of the relative rotation between the faces, not just the
         #       direction as for faces (i.e. edges) in 2D.
-        dim == 3 && @assert !any(x -> x > 1, ip_info.nfacedofs)
+        sdim == 3 && @assert !any(x -> x > 1, ip_info.nfacedofs)
     end
 
     # TODO: Given the InterpolationInfo it should be possible to compute ndofs_per_cell, but
@@ -357,10 +358,10 @@ function _close!(dh::DofHandler{dim}, fh::FieldHandler, fh_index::Int, nextdof, 
             )
 
             # Distribute dofs for edges (only applicable when dim is 3)
-            if dim == 3 && (ip_info.dim == 3 || ip_info.dim == 2)
+            if sdim == 3 && (ip_info.reference_dim == 3 || ip_info.reference_dim == 2)
                 # Regular 3D element or 2D interpolation embedded in 3D space
-                nentitydofs = ip_info.dim == 3 ? ip_info.nedgedofs : ip_info.nfacedofs
-                entitydofs = ip_info.dim == 3 ? ip_info.edgedofs : ip_info.facedofs
+                nentitydofs = ip_info.reference_dim == 3 ? ip_info.nedgedofs : ip_info.nfacedofs
+                entitydofs = ip_info.reference_dim == 3 ? ip_info.edgedofs : ip_info.facedofs
                 nextdof = add_edge_dofs(
                     cell_dofs, cell, edgedicts[gidx],
                     nentitydofs, entitydofs, nextdof,
@@ -370,7 +371,7 @@ function _close!(dh::DofHandler{dim}, fh::FieldHandler, fh_index::Int, nextdof, 
 
             # Distribute dofs for faces. Filter out 2D interpolations in 3D space, since
             # they are added above as edge dofs.
-            if ip_info.dim == dim && dim > 1
+            if ip_info.reference_dim == sdim && sdim > 1
                 nextdof = add_face_dofs(
                     cell_dofs, cell, facedicts[gidx],
                     ip_info.nfacedofs, ip_info.facedofs, nextdof,
