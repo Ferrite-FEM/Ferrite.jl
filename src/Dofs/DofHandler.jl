@@ -442,7 +442,6 @@ end
 function add_face_dofs(cell_dofs, cell, facedict, nfacedofs, facedofs, nextdof, ip, vdim)
     for (fi,face) in enumerate(faces(cell))
         if nfacedofs[fi] > 0
-            @assert nfacedofs[fi] == 1
             sface, orientation = sortface(face)
             @debug println("\t\tface #$sface, $orientation")
             nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], vdim, dict=facedict, key=sface)
