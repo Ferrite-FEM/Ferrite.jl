@@ -22,7 +22,8 @@ Ferrite.find_field(dh::DofHandler, field_name::Symbol)
 Ferrite.find_field(fh::FieldHandler, field_name::Symbol)::Int
 Ferrite._find_field(fh::FieldHandler, field_name::Symbol)
 Ferrite.__close(::DofHandler)
-Ferrite._close_field
+Ferrite._close_fieldhandler!
+Ferrite._close_fieldhandler_on_cell!
 Ferrite._check_cellset_intersections
 Ferrite.dof_correction!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::PathOrientationInfo, correction_info::Bool)
 Ferrite.dof_correction!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::SurfaceOrientationInfo, correction_info::Bool)
