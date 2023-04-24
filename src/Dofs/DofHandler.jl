@@ -277,13 +277,13 @@ function __close!(dh::DofHandler{dim}) where {dim}
     # direction of the first edge we encounter and add dofs too. When we encounter the same
     # edge the next time we check if the direction is the same, otherwise we reuse the dofs
     # in the reverse order.
-    edgedicts = [Dict{Tuple{Int,Int}, StepRange{Int}}() for _ in 1:numfields]
+    edgedicts = [Dict{Tuple{Int,Int}, Int}() for _ in 1:numfields]
 
     # `facedict` keeps track of the visited faces. We only need to store the first dof we
     # add to the face; if we encounter the same face again we *always* reverse the order. In
     # 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a face (i.e. a
     # surface) is uniquely determined by 3 vertices.
-    facedicts = [Dict{NTuple{dim,Int}, StepRange{Int}}() for _ in 1:numfields]
+    facedicts = [Dict{NTuple{dim,Int}, Int}() for _ in 1:numfields]
 
     # Set initial values
     nextdof = 1  # next free dof to distribute
@@ -435,11 +435,12 @@ function get_or_create_dofs!(nextdof::Int, ndofs::Int, vdim::Int; dict::DT, key:
     token = Base.ht_keyindex2!(dict, key)
     if token > 0  # vertex, face etc. visited before
         @debug println("\t\t\tkey: $key dofs: $(dict[key])  (reused dofs)")
-        return nextdof, dict[key]
+        basedof = dict[key]
+        return nextdof, basedof : vdim : (basedof + vdim*ndofs-1)
     else  # create new dofs
         dofs = nextdof : vdim : (nextdof + vdim*ndofs-1)
         @debug println("\t\t\tkey: $key dofs: $dofs")
-        Base._setindex!(dict, dofs, key, -token) #
+        Base._setindex!(dict, nextdof, key, -token) #
         nextdof += ndofs*vdim
         return nextdof, dofs
     end
