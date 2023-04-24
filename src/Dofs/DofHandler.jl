@@ -242,19 +242,26 @@ end
     close!(dh::AbstractDofHandler)
 
 Closes `dh` and creates degrees of freedom for each cell.
-
-If there are several fields, the dofs are added in the following order:
-For a `DofHandler`, go through each `FieldHandler` in the order they were added.
-For each field in the `FieldHandler` or in the `DofHandler` (again, in the order the fields were added),
-create dofs for the cell.
-This means that dofs on a particular cell, the dofs will be numbered according to the fields;
-first dofs for field 1, then field 2, etc.
 """
 function close!(dh::DofHandler)
     dh, _, _, _ = __close!(dh)
     return dh
 end
 
+"""
+    __close!(dh::DofHandler)
+
+Internal entry point for dof distribution.
+    
+Dofs are distributed as follows:
+For the `DofHandler` each `FieldHandler` is visited in the order they were added.
+For each field in the `FieldHandler` create dofs for the cell.
+This means that dofs on a particular cell will be numbered in groups for each field,
+so first the dofs for field 1 are distributed, then field 2, etc.
+For each cell dofs are first distributed on its vertices, then on the interior of edges (if applicable), then on the 
+interior of faces (if applicable), and finally on the cell interior.
+The entity ordering follows the geometrical ordering found in [`vertices`](@ref), [`faces`](@ref) and [`edges`](@ref).
+"""
 function __close!(dh::DofHandler{dim}) where {dim}
     @assert !isclosed(dh)
 
@@ -289,8 +296,8 @@ function __close!(dh::DofHandler{dim}) where {dim}
     nextdof = 1  # next free dof to distribute
 
     @debug println("\n\nCreating dofs\n")
-    for (fhi, fh) in pairs(dh.fieldhandlers)        
-        nextdof = _close!(
+    for (fhi, fh) in pairs(dh.fieldhandlers)     
+        nextdof = _close_fieldhandler!(
             dh,
             fh,
             fhi, # TODO: Store in the FieldHandler?
@@ -306,8 +313,12 @@ function __close!(dh::DofHandler{dim}) where {dim}
     return dh, vertexdicts, edgedicts, facedicts
 end
 
-# sdim = spatial dimension
-function _close!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::Int, nextdof::Int, vertexdicts::VD, edgedicts::ED, facedicts::FD) where {sdim, VD, ED, FD}
+"""
+    _close_fieldhandler!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::Int, nextdof::Int, vertexdicts::VD, edgedicts::ED, facedicts::FD)
+
+Main entry point to distribute dofs for a single [`FieldHandler`](@ref) on its subdomain.
+"""
+function _close_fieldhandler!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::Int, nextdof::Int, vertexdicts::VD, edgedicts::ED, facedicts::FD) where {sdim, VD, ED, FD}
     ip_infos = InterpolationInfo[]
     for interpolation in fh.field_interpolations
         ip_info = InterpolationInfo(interpolation)
@@ -343,7 +354,7 @@ function _close!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::Int, nextdof:
 
         # Distribute dofs per field
         for (lidx, gidx) in pairs(global_fidxs)
-            nextdof = _close_field_on_cell!(
+            nextdof = _close_fieldhandler_on_cell!(
                 dh,
                 cell,
                 fh,
@@ -367,7 +378,12 @@ function _close!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::Int, nextdof:
     return nextdof
 end
 
-function _close_field_on_cell!(dh::DofHandler{sdim}, cell::C, fh::FieldHandler, vdim::Int, ip_info::InterpolationInfo, nextdof::Int, vertexdict, edgedict, facedict) where {sdim, C}
+"""
+    _close_fieldhandler_on_cell!(dh::DofHandler{sdim}, cell::C, fh::FieldHandler, vdim::Int, ip_info::InterpolationInfo, nextdof::Int, vertexdict::VD, edgedict::ED, facedict::FD)
+
+Main entry point to distribute dofs for a single [`FieldHandler`](@ref) on a given cell.
+"""
+function _close_fieldhandler_on_cell!(dh::DofHandler{sdim}, cell::C, fh::FieldHandler, vdim::Int, ip_info::InterpolationInfo, nextdof::Int, vertexdict::VD, edgedict::ED, facedict::FD) where {sdim, C, VD, ED, FD}
     @debug println("\tfield: $(fh.field_names[lidx])")
     @debug println("\tvdim: $vdim")
     @debug cell_dofs_first_idx = length(cell_dofs)
@@ -439,6 +455,8 @@ function add_vertex_dofs(cell_dofs::CD, cell::CG, vertexdict::VD, nvertexdofs::V
 end
 
 """
+    get_or_create_dofs!(nextdof::Int, ndofs::Int, vdim::Int, dict::DT, key::KT)::Tuple{Int64, StepRange{Int64, Int64}}
+
 Returns the next global dof number and an array of dofs.
 If dofs have already been created for the object (vertex, face) then simply return those, otherwise create new dofs.
 """
@@ -530,7 +548,7 @@ For more details we refer to [1] as we follow the methodology described therein.
     Software (TOMS), 48(2), 1-23.
 
     !!!TODO Citation via DocumenterCitations.jl.
-    
+
     !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
 """
 function dof_correction!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::PathOrientationInfo, correction_info::Bool)
