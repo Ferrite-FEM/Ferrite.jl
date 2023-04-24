@@ -456,7 +456,7 @@ end
     test_coloring(generate_grid(Quadrilateral, (2, 2)), [])
 end
 
-@testset "DoF distribution" begin
+@testset "High order dof distribution" begin
     # 3-----4
     # | \   |
     # |  \  |
@@ -498,48 +498,49 @@ end
 end
 
 @testset "vectorization layer compat" begin
-    struct VectorLagrange{dim,shape,order,vdim} <: Ferrite.Interpolation{dim,shape,order} end
+    struct VectorLagrangeTest{dim,shape,order,vdim} <: Ferrite.Interpolation{dim,shape,order} end
 
-    @testset "vertices" begin
-        Ferrite.vertexdof_indices(::VectorLagrange{1,Ferrite.RefLine,1,2}) = ((1,2),(3,4))
-        Ferrite.vertexdof_indices(::VectorLagrange{1,Ferrite.RefLine,1,3}) = ((1,2,3),(4,5,6))
-
+    @testset "1d" begin
         grid = generate_grid(Line, (2,))
-        dh = DofHandler(grid)
-        add!(dh, :u, 1, VectorLagrange{1,Ferrite.RefLine,1,2}())
-        close!(dh)
-
-        dh = DofHandler(grid)
-        add!(dh, :u, 1, VectorLagrange{1,Ferrite.RefLine,1,3}())
-        close!(dh)
-
-        Ferrite.vertexdof_indices(::VectorLagrange{2,Ferrite.RefCube,1,2}) = ((1,2),(3,4),(5,6),(7,8))
-        Ferrite.facedof_indices(::VectorLagrange{2,Ferrite.RefCube,1,2}) = ((1,2,3,4), (3,4,5,6), (5,6,7,8), (7,8,1,2))
-
-        grid = generate_grid(Quadrilateral, (2,2))
+        
+        Ferrite.vertexdof_indices(::VectorLagrangeTest{1,Ferrite.RefLine,1,2}) = ((1,2),(3,4))
         dh1 = DofHandler(grid)
-        add!(dh1, :u, 1, VectorLagrange{2,Ferrite.RefCube,1,2}())
+        add!(dh1, :u, 1, VectorLagrangeTest{1,Ferrite.RefLine,1,2}())
         close!(dh1)
-
-        grid = generate_grid(Quadrilateral, (2,2))
         dh2 = DofHandler(grid)
         add!(dh2, :u, 2, Lagrange{2,Ferrite.RefCube,1}())
         close!(dh2)
-
         @test dh1.cell_dofs == dh2.cell_dofs
 
-
-        Ferrite.vertexdof_indices(::VectorLagrange{2,Ferrite.RefCube,1,3}) = ((1,2,3),(4,5,6),(7,8,9),(10,11,12))
-        Ferrite.facedof_indices(::VectorLagrange{2,Ferrite.RefCube,1,3}) = ((1,2,3,4,5,6), (4,5,6,7,8,9), (7,8,9,10,11,12), (10,11,12,1,2,3))
-
+        Ferrite.vertexdof_indices(::VectorLagrangeTest{1,Ferrite.RefLine,1,3}) = ((1,2,3),(4,5,6))
         dh1 = DofHandler(grid)
-        add!(dh1, :u, 1, VectorLagrange{2,Ferrite.RefCube,1,3}())
+        add!(dh1, :u, 1, VectorLagrangeTest{1,Ferrite.RefLine,1,3}())
         close!(dh1)
-
         dh2 = DofHandler(grid)
         add!(dh2, :u, 3, Lagrange{2,Ferrite.RefCube,1}())
         close!(dh2)
+        @test dh1.cell_dofs == dh2.cell_dofs
+    end
 
+    @testset "2d" begin
+        grid = generate_grid(Quadrilateral, (2,2))
+        Ferrite.vertexdof_indices(::VectorLagrangeTest{2,Ferrite.RefCube,1,2}) = ((1,2),(3,4),(5,6),(7,8))
+        dh1 = DofHandler(grid)
+        add!(dh1, :u, 1, VectorLagrangeTest{2,Ferrite.RefCube,1,2}())
+        close!(dh1)
+        dh2 = DofHandler(grid)
+        add!(dh2, :u, 2, Lagrange{2,Ferrite.RefCube,1}())
+        close!(dh2)
+        @test dh1.cell_dofs == dh2.cell_dofs
+
+        Ferrite.vertexdof_indices(::VectorLagrangeTest{2,Ferrite.RefCube,1,3}) = ((1,2,3),(4,5,6),(7,8,9),(10,11,12))
+        Ferrite.facedof_indices(::VectorLagrangeTest{2,Ferrite.RefCube,1,3}) = ((1,2,3,4,5,6), (4,5,6,7,8,9), (7,8,9,10,11,12), (10,11,12,1,2,3))
+        dh1 = DofHandler(grid)
+        add!(dh1, :u, 1, VectorLagrangeTest{2,Ferrite.RefCube,1,3}())
+        close!(dh1)
+        dh2 = DofHandler(grid)
+        add!(dh2, :u, 3, Lagrange{2,Ferrite.RefCube,1}())
+        close!(dh2)
         @test dh1.cell_dofs == dh2.cell_dofs
     end
 end
