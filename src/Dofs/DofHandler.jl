@@ -399,7 +399,7 @@ function _close!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::Int, nextdof,
     return nextdof
 end
 
-function add_vertex_dofs(cell_dofs, cell, vertexdict, nvertexdofs, vertexdofs, nextdof, ip, vdim)
+function add_vertex_dofs(cell_dofs::CD, cell::CG, vertexdict::VD, nvertexdofs::Vector{Int}, vertexdofs::VD2, nextdof::Int, ip::IP, vdim::Int) where {CD, CG, VD, VD2, IP}
     for (vi, vertex) in pairs(vertices(cell))
         nvertexdofs[vi] > 0 || continue # skip if no dof on this vertex
         @assert nvertexdofs[vi] == 1
@@ -426,7 +426,7 @@ end
 Returns the next global dof number and an array of dofs.
 If dofs have already been created for the object (vertex, face) then simply return those, otherwise create new dofs.
 """
-function get_or_create_dofs!(nextdof, ndofs, vdim; dict, key)
+function get_or_create_dofs!(nextdof::Int, ndofs::Int, vdim::Int; dict::DT, key::KT) where {DT, KT}
     token = Base.ht_keyindex2!(dict, key)
     if token > 0  # vertex, face etc. visited before
         @debug println("\t\t\tkey: $key dofs: $(dict[key])  (reused dofs)")
@@ -440,7 +440,7 @@ function get_or_create_dofs!(nextdof, ndofs, vdim; dict, key)
     end
 end
 
-function add_face_dofs(cell_dofs, cell, facedict, nfacedofs, facedofs, nextdof, ip, vdim)
+function add_face_dofs(cell_dofs::CD, cell::CG, facedict::FD, nfacedofs::Vector{Int}, facedofs::FD2, nextdof::Int, ip::IP, vdim::Int) where {CD, CG, FD, FD2, IP}
     for (fi,face) in enumerate(faces(cell))
         if nfacedofs[fi] > 0
             sface, orientation = sortface(face)
@@ -458,7 +458,7 @@ function add_face_dofs(cell_dofs, cell, facedict, nfacedofs, facedofs, nextdof, 
     return nextdof
 end
 
-function add_edge_dofs(cell_dofs, cell, edgedict, nedgedofs, edgedofs, nextdof, ip, vdim)
+function add_edge_dofs(cell_dofs::CD, cell::CG, edgedict::ED, nedgedofs::Vector{Int}, edgedofs::ED2, nextdof::Int, ip::IP, vdim::Int)  where {CD, CG, ED, ED2, IP}
     for (ei,edge) in enumerate(edges(cell))
         if nedgedofs[ei] > 0
             sedge, orientation = sortedge(edge)
@@ -476,7 +476,7 @@ function add_edge_dofs(cell_dofs, cell, edgedict, nedgedofs, edgedofs, nextdof, 
     return nextdof
 end
 
-function add_cell_dofs(cell_dofs, ncelldofs, celldofs, nextdof, fip, vdim)
+function add_cell_dofs(cell_dofs::CD, ncelldofs::Int, celldofs::CD2, nextdof::Int, ip::IP, vdim::Int) where {CD, CD2, IP}
     @debug println("\t\tcelldofs #$nextdof:$(ncelldofs*vdim)")
     for i in 1:ncelldofs
         for d in 1:vdim
