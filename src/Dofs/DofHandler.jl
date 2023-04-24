@@ -519,7 +519,7 @@ end
 
 Insert dofs in order.
 """
-_dof_correction!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}) = append!(cell_dofs, first(dofs):(last(dofs)+step(dofs)-1))
+@inline _dof_correction!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}) = append!(cell_dofs, first(dofs):(last(dofs)+step(dofs)-1))
 
 """
 For interpolations with more than one interior dof and some dofs associated with the edge will 
@@ -551,7 +551,7 @@ For more details we refer to [1] as we follow the methodology described therein.
 
     !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
 """
-function dof_correction!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::PathOrientationInfo, correction_info::Bool)
+@inline function dof_correction!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::PathOrientationInfo, correction_info::Bool)
     if orientation.regular || correction_info == false 
         _dof_correction!(cell_dofs, dofs)
         return nothing
@@ -606,7 +606,7 @@ For more details we refer to [1] as we follow the methodology described therein.
 
     !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
 """
-function dof_correction!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::SurfaceOrientationInfo, correction_info::Bool)
+@inline function dof_correction!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::SurfaceOrientationInfo, correction_info::Bool)
     correction_info == true && (last(dofs)-first(dofs)+1)/step(dofs) > 1 && error("Dof distribution on faces not implemented for multiple dof locations.")
     return _dof_correction!(cell_dofs, dofs)
 end
