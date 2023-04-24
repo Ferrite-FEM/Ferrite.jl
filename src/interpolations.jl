@@ -47,71 +47,55 @@ edgedof_interior_indices(ip::Interpolation{2}) = facedof_interior_indices(ip)
 facedof_indices(ip::Interpolation{1}) = vertexdof_indices(ip)
 
 """
+    adjust_dofs_during_distribution(::Interpolation)
+
+This function must return true if the dofs should be adjusted during dof distribution.
+This is in contrast to adjusting the dofs during [`reinit!`](@ref) in the assembly loop.
+"""
+adjust_dofs_during_distribution(::Interpolation) = false
+
+"""
     InterpolationInfo
 
 Gathers all the information needed to distribute dofs for a given interpolation. Note that
 this cache is of the same type no matter the interpolation: the purpose is to make
 dof-distribution type-stable.
 """
-struct InterpolationInfo{TV,EV,FV,CV}
+struct InterpolationInfo
     nvertexdofs::Vector{Int}
-    vertexdofs::TV
     nedgedofs::Vector{Int}
-    edgedofs::EV
     nfacedofs::Vector{Int}
-    facedofs::FV
     ncelldofs::Int
-    celldofs::CV
     reference_dim::Int
+    dof_correction_info::Bool
     function InterpolationInfo(interpolation::Interpolation{3})
-        new{typeof(vertexdof_indices(interpolation)),
-            typeof(edgedof_interior_indices(interpolation)),
-            typeof(facedof_interior_indices(interpolation)),
-            typeof(celldof_interior_indices(interpolation))
-        }(
+        new(
             [length(i) for i ∈ vertexdof_indices(interpolation)],
-            vertexdof_indices(interpolation),
             [length(i) for i ∈ edgedof_interior_indices(interpolation)],
-            edgedof_interior_indices(interpolation),
             [length(i) for i ∈ facedof_interior_indices(interpolation)],
-            facedof_interior_indices(interpolation),
             length(celldof_interior_indices(interpolation)),
-            celldof_interior_indices(interpolation),
             3,
+            adjust_dofs_during_distribution(interpolation)
         )
     end
     function InterpolationInfo(interpolation::Interpolation{2})
-        new{typeof(vertexdof_indices(interpolation)),
-            Nothing,
-            typeof(facedof_interior_indices(interpolation)),
-            typeof(celldof_interior_indices(interpolation))
-        }(
+        new(
             [length(i) for i ∈ vertexdof_indices(interpolation)],
-            vertexdof_indices(interpolation),
             Int[],
-            nothing,
             [length(i) for i ∈ facedof_interior_indices(interpolation)],
-            facedof_interior_indices(interpolation),
             length(celldof_interior_indices(interpolation)),
-            celldof_interior_indices(interpolation),
             2,
+            adjust_dofs_during_distribution(interpolation)
         )
     end
     function InterpolationInfo(interpolation::Interpolation{1})
-        new{typeof(vertexdof_indices(interpolation)),
-            Nothing,
-            Nothing,
-            typeof(celldof_interior_indices(interpolation))
-        }(
+        new(
             [length(i) for i ∈ vertexdof_indices(interpolation)],
-            vertexdof_indices(interpolation),
             Int[],
-            nothing,
             Int[],
-            nothing,
             length(celldof_interior_indices(interpolation)),
-            celldof_interior_indices(interpolation),
             1,
+            adjust_dofs_during_distribution(interpolation)
         )
     end
 end
@@ -341,6 +325,8 @@ end
 # Lagrange #
 ############
 struct Lagrange{dim,shape,order} <: Interpolation{dim,shape,order} end
+
+adjust_dofs_during_distribution(::Lagrange) = true
 
 # Vertices for all Lagrange interpolations are the same
 vertexdof_indices(::Lagrange{1,RefCube,order}) where {order} = ((1,),(2,))

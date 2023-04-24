@@ -289,7 +289,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     nextdof = 1  # next free dof to distribute
 
     @debug println("\n\nCreating dofs\n")
-    for (fhi, fh) in pairs(dh.fieldhandlers)
+    for (fhi, fh) in pairs(dh.fieldhandlers)        
         nextdof = _close!(
             dh,
             fh,
@@ -307,7 +307,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
 end
 
 # sdim = spatial dimension
-function _close!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::Int, nextdof, vertexdicts, edgedicts, facedicts) where {sdim}
+function _close!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::Int, nextdof::Int, vertexdicts::VD, edgedicts::ED, facedicts::FD) where {sdim, VD, ED, FD}
     ip_infos = InterpolationInfo[]
     for interpolation in fh.field_interpolations
         ip_info = InterpolationInfo(interpolation)
@@ -341,53 +341,19 @@ function _close!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::Int, nextdof,
         len_cell_dofs_start = length(dh.cell_dofs)
         dh.cell_dofs_offset[ci] = len_cell_dofs_start + 1
 
+        # Distribute dofs per field
         for (lidx, gidx) in pairs(global_fidxs)
-            @debug println("\tfield: $(fh.field_names[lidx])")
-
-            vdim = fh.field_dims[lidx] # TODO remove me here. This will be a property of the interpolation.
-            @debug println("\tvdim: $vdim")
-            ip_info = ip_infos[lidx]
-            fip = fh.field_interpolations[lidx]
-
-            # TODO via view to get rid of allocations
-            cell_dofs = Vector{Int}(undef, vdim*(sum(ip_info.nvertexdofs)+sum(ip_info.nedgedofs)+sum(ip_info.nfacedofs)+sum(ip_info.ncelldofs)))
-
-            # Distribute dofs for vertices
-            nextdof = add_vertex_dofs(
-                cell_dofs, cell, vertexdicts[gidx],
-                ip_info.nvertexdofs, ip_info.vertexdofs, nextdof,
-                fip, vdim
+            nextdof = _close_field_on_cell!(
+                dh,
+                cell,
+                fh,
+                fh.field_dims[lidx],
+                ip_infos[lidx],
+                nextdof,
+                vertexdicts[gidx],
+                edgedicts[gidx],
+                facedicts[gidx]
             )
-
-            # Distribute dofs for edges (only applicable when dim is 3)
-            if sdim == 3 && (ip_info.reference_dim == 3 || ip_info.reference_dim == 2)
-                # Regular 3D element or 2D interpolation embedded in 3D space
-                nentitydofs = ip_info.reference_dim == 3 ? ip_info.nedgedofs : ip_info.nfacedofs
-                entitydofs = ip_info.reference_dim == 3 ? ip_info.edgedofs : ip_info.facedofs
-                nextdof = add_edge_dofs(
-                    cell_dofs, cell, edgedicts[gidx],
-                    nentitydofs, entitydofs, nextdof,
-                    fip, vdim
-                )
-            end
-
-            # Distribute dofs for faces. Filter out 2D interpolations in 3D space, since
-            # they are added above as edge dofs.
-            if ip_info.reference_dim == sdim && sdim > 1
-                nextdof = add_face_dofs(
-                    cell_dofs, cell, facedicts[gidx],
-                    ip_info.nfacedofs, ip_info.facedofs, nextdof,
-                    fip, vdim
-                )
-            end
-
-            # Distribute internal dofs for cells
-            nextdof = add_cell_dofs(
-                cell_dofs, ip_info.ncelldofs, ip_info.celldofs, nextdof, fip, vdim
-            )
-
-            @debug println("\tDofs for cell #$ci:\t$cell_dofs")
-            append!(dh.cell_dofs, cell_dofs)
         end
 
         if first_cell
@@ -401,23 +367,68 @@ function _close!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::Int, nextdof,
     return nextdof
 end
 
-function add_vertex_dofs(cell_dofs::CD, cell::CG, vertexdict::VD, nvertexdofs::Vector{Int}, vertexdofs::VD2, nextdof::Int, ip::IP, vdim::Int) where {CD, CG, VD, VD2, IP}
+function _close_field_on_cell!(dh::DofHandler{sdim}, cell::C, fh::FieldHandler, vdim::Int, ip_info::InterpolationInfo, nextdof::Int, vertexdict, edgedict, facedict) where {sdim, C}
+    @debug println("\tfield: $(fh.field_names[lidx])")
+    @debug println("\tvdim: $vdim")
+    @debug cell_dofs_first_idx = length(cell_dofs)
+
+    # Distribute dofs for vertices
+    nextdof = add_vertex_dofs(
+        dh.cell_dofs, cell, vertexdict,
+        ip_info.nvertexdofs, nextdof, vdim
+    )
+
+    # Distribute dofs for edges (only applicable when dim is 3)
+    if sdim == 3 && (ip_info.reference_dim == 3 || ip_info.reference_dim == 2)
+        # Regular 3D element or 2D interpolation embedded in 3D space
+        nentitydofs = ip_info.reference_dim == 3 ? ip_info.nedgedofs : ip_info.nfacedofs
+        nextdof = add_edge_dofs(
+            dh.cell_dofs, cell, edgedict,
+            nentitydofs, nextdof,
+            ip_info.dof_correction_info, vdim
+        )
+    end
+
+    # Distribute dofs for faces. Filter out 2D interpolations in 3D space, since
+    # they are added above as edge dofs.
+    if ip_info.reference_dim == sdim && sdim > 1
+        nextdof = add_face_dofs(
+            dh.cell_dofs, cell, facedict,
+            ip_info.nfacedofs, nextdof,
+            ip_info.dof_correction_info, vdim
+        )
+    end
+
+    # Distribute internal dofs for cells
+    nextdof = add_cell_dofs(
+        dh.cell_dofs, ip_info.ncelldofs, nextdof, vdim
+    )
+
+    @debug println("\tDofs for cell #$ci:\t$(cell_dofs[cell_dofs_first_idx:end])")
+    
+    return nextdof
+end
+
+function add_vertex_dofs(cell_dofs::CD, cell::CG, vertexdict::VD, nvertexdofs::Vector{Int}, nextdof::Int, vdim::Int) where {CD, CG, VD}
     for (vi, vertex) in pairs(vertices(cell))
         nvertexdofs[vi] > 0 || continue # skip if no dof on this vertex
         @debug println("\t\tvertex #$vertex")
         first_dof = vertexdict[vertex]
         if first_dof > 0 # reuse dof
-            for (lvi,vd) ∈ enumerate(vertexdofs[vi])
+            # for (lvi,vd) ∈ enumerate(vertexdofs[vi])
+            for lvi ∈ 1:nvertexdofs[vi]
                 for d in 1:vdim
                     reuse_dof = (lvi-1)*vdim + first_dof + (d-1)
-                    cell_dofs[vdim*(vd-1)+d] = reuse_dof
+                    # cell_dofs[vdim*(vd-1)+d] = reuse_dof
+                    push!(cell_dofs, reuse_dof)
                 end
             end
         else # create dofs
             vertexdict[vertex] = nextdof
-            for vd ∈ vertexdofs[vi]
+            for lvi ∈ 1:nvertexdofs[vi]
                 for d in 1:vdim
-                    cell_dofs[vdim*(vd-1)+d] = nextdof
+                    # cell_dofs[vdim*(vd-1)+d] = nextdof
+                    push!(cell_dofs, nextdof)
                     nextdof += 1
                 end
             end
@@ -431,11 +442,11 @@ end
 Returns the next global dof number and an array of dofs.
 If dofs have already been created for the object (vertex, face) then simply return those, otherwise create new dofs.
 """
-function get_or_create_dofs!(nextdof::Int, ndofs::Int, vdim::Int; dict::DT, key::KT) where {DT, KT}
+@inline function get_or_create_dofs!(nextdof::Int, ndofs::Int, vdim::Int, dict::DT, key::KT)::Tuple{Int64, StepRange{Int64, Int64}} where {DT, KT}
     token = Base.ht_keyindex2!(dict, key)
     if token > 0  # vertex, face etc. visited before
         @debug println("\t\t\tkey: $key dofs: $(dict[key])  (reused dofs)")
-        basedof = dict[key]
+        basedof = dict.vals[token]
         return nextdof, basedof : vdim : (basedof + vdim*ndofs-1)
     else  # create new dofs
         dofs = nextdof : vdim : (nextdof + vdim*ndofs-1)
@@ -446,54 +457,51 @@ function get_or_create_dofs!(nextdof::Int, ndofs::Int, vdim::Int; dict::DT, key:
     end
 end
 
-function add_face_dofs(cell_dofs::CD, cell::CG, facedict::FD, nfacedofs::Vector{Int}, facedofs::FD2, nextdof::Int, ip::IP, vdim::Int) where {CD, CG, FD, FD2, IP}
+function add_face_dofs(cell_dofs::CD, cell::CG, facedict::FD, nfacedofs::Vector{Int}, nextdof::Int, should_correct::Bool, vdim::Int) where {CD, CG, FD}
     for (fi,face) in enumerate(faces(cell))
         if nfacedofs[fi] > 0
             sface, orientation = sortface(face)
             @debug println("\t\tface #$sface, $orientation")
-            nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], vdim, dict=facedict, key=sface)
-            dofs2 = dof_correction(dofs, orientation, ip)
-            @debug println("\t\t\tadjusted dofs: $(dofs2)")
-            for (idx, idx2) ∈ enumerate(facedofs[fi])
-                for d ∈ 1:vdim
-                    cell_dofs[vdim*(idx2-1)+d] = dofs2[vdim*(idx-1)+d]
-                end
-            end
+            @debug dof_offset = length(cell_dofs)
+            nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], vdim, facedict, sface)
+            dof_correction!(cell_dofs, dofs, orientation, should_correct)
+            @debug println("\t\t\tadjusted dofs: $(cell_dofs[dof_offset:end])")
         end
     end
     return nextdof
 end
 
-function add_edge_dofs(cell_dofs::CD, cell::CG, edgedict::ED, nedgedofs::Vector{Int}, edgedofs::ED2, nextdof::Int, ip::IP, vdim::Int)  where {CD, CG, ED, ED2, IP}
+function add_edge_dofs(cell_dofs::CD, cell::CG, edgedict::ED, nedgedofs::Vector{Int}, nextdof::Int, should_correct::Bool, vdim::Int)  where {CD, CG, ED}
     for (ei,edge) in enumerate(edges(cell))
         if nedgedofs[ei] > 0
             sedge, orientation = sortedge(edge)
             @debug println("\t\tedge #$sedge, $orientation")
-            nextdof, dofs = get_or_create_dofs!(nextdof, nedgedofs[ei], vdim, dict=edgedict, key=sedge)
-            dofs2 = dof_correction(dofs, orientation, ip)
-            @debug println("\t\t\tadjusted dofs: $(dofs2)")
-            for (idx, idx2) ∈ enumerate(edgedofs[ei])
-                for d ∈ 1:vdim
-                    cell_dofs[vdim*(idx2-1)+d] = dofs2[vdim*(idx-1)+d]
-                end
-            end
+            @debug dof_offset = length(cell_dofs)
+            nextdof, dofs = get_or_create_dofs!(nextdof, nedgedofs[ei], vdim, edgedict, sedge)
+            dof_correction!(cell_dofs, dofs, orientation, should_correct)
+            @debug println("\t\t\tadjusted dofs: $(cell_dofs[dof_offset:end])")
         end
     end
     return nextdof
 end
 
-function add_cell_dofs(cell_dofs::CD, ncelldofs::Int, celldofs::CD2, nextdof::Int, ip::IP, vdim::Int) where {CD, CD2, IP}
+function add_cell_dofs(cell_dofs::CD, ncelldofs::Int, nextdof::Int, vdim::Int) where {CD}
     @debug println("\t\tcelldofs #$nextdof:$(ncelldofs*vdim)")
     for i in 1:ncelldofs
         for d in 1:vdim
-            cell_dofs[vdim*(celldofs[i]-1)+d] = nextdof
+            push!(cell_dofs, nextdof)
             nextdof += 1
         end
     end
     return nextdof
 end
 
-dof_correction(dofs::StepRange{Int}) = collect(first(dofs):(last(dofs)+step(dofs)-1))
+"""
+    _dof_correction!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int})
+
+Insert dofs in order.
+"""
+_dof_correction!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}) = append!(cell_dofs, first(dofs):(last(dofs)+step(dofs)-1))
 
 """
 For interpolations with more than one interior dof and some dofs associated with the edge will 
@@ -521,12 +529,24 @@ For more details we refer to [1] as we follow the methodology described therein.
     polygonal and polyhedral cell meshes. ACM Transactions on Mathematical 
     Software (TOMS), 48(2), 1-23.
 
-TODO citation via software.
+    !!!TODO Citation via DocumenterCitations.jl.
+    
+    !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
 """
-function dof_correction(dofs::StepRange{Int}, orientation::PathOrientationInfo, ip::IP) where {IP}
-    orientation.regular && return dof_correction(dofs)
+function dof_correction!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::PathOrientationInfo, correction_info::Bool)
+    if orientation.regular || correction_info == false 
+        _dof_correction!(cell_dofs, dofs)
+        return nothing
+    end
+    # Insert dofs in reverse order
     rdofs = reverse(dofs)
-    return [dof+i-1 for dof ∈ first(rdofs):step(rdofs):last(rdofs) for i ∈1:step(dofs) ]
+    vdim = step(dofs)
+    for dof ∈ rdofs
+        for i∈1:step(dofs)
+            push!(cell_dofs, dof+i-1)
+        end
+    end
+    return nothing
 end
 
 """
@@ -564,11 +584,13 @@ For more details we refer to [1] as we follow the methodology described therein.
     polygonal and polyhedral cell meshes. ACM Transactions on Mathematical 
     Software (TOMS), 48(2), 1-23.
 
-TODO citation via software.
+    !!!TODO citation via software.
+
+    !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
 """
-function dof_correction(dofs::StepRange{Int}, orientation::SurfaceOrientationInfo, ip::IP) where {IP}
-    (last(dofs)-first(dofs)+1)/step(dofs) > 1 && error("Dof distribution on faces not implemented for multiple dof locations.")
-    return dof_correction(dofs)
+function dof_correction!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::SurfaceOrientationInfo, correction_info::Bool)
+    correction_info == true && (last(dofs)-first(dofs)+1)/step(dofs) > 1 && error("Dof distribution on faces not implemented for multiple dof locations.")
+    return _dof_correction!(cell_dofs, dofs)
 end
 
 function sortface(face::Tuple{Int,Int,Int})
@@ -578,6 +600,7 @@ function sortface(face::Tuple{Int,Int,Int})
     a, b = minmax(a, b)
     return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
 end
+
 function sortface(face::Tuple{Int,Int,Int,Int})
     a, b, c, d = face
     c, d = minmax(c, d)
