@@ -265,6 +265,8 @@ function __close!(dh::DofHandler{dim}) where {dim}
     end
     numfields = length(dh.field_names)
 
+    # NOTE: Maybe it makes sense to store *Index in the dicts instead.
+
     # `vertexdict` keeps track of the visited vertices. The first dof added to vertex v is
     # stored in vertexdict[v]
     # TODO: No need to allocate this vector for fields that don't have vertex dofs
@@ -402,19 +404,22 @@ end
 function add_vertex_dofs(cell_dofs::CD, cell::CG, vertexdict::VD, nvertexdofs::Vector{Int}, vertexdofs::VD2, nextdof::Int, ip::IP, vdim::Int) where {CD, CG, VD, VD2, IP}
     for (vi, vertex) in pairs(vertices(cell))
         nvertexdofs[vi] > 0 || continue # skip if no dof on this vertex
-        @assert nvertexdofs[vi] == 1
         @debug println("\t\tvertex #$vertex")
         first_dof = vertexdict[vertex]
         if first_dof > 0 # reuse dof
-            for d in 1:vdim
-                reuse_dof = first_dof + (d-1)
-                cell_dofs[vdim*(vertexdofs[vi][1]-1)+d] = reuse_dof
+            for (lvi,vd) ∈ enumerate(vertexdofs[vi])
+                for d in 1:vdim
+                    reuse_dof = (lvi-1)*vdim + first_dof + (d-1)
+                    cell_dofs[vdim*(vd-1)+d] = reuse_dof
+                end
             end
         else # create dofs
             vertexdict[vertex] = nextdof
-            for d in 1:vdim
-                cell_dofs[vdim*(vertexdofs[vi][1]-1)+d] = nextdof
-                nextdof += 1
+            for vd ∈ vertexdofs[vi]
+                for d in 1:vdim
+                    cell_dofs[vdim*(vd-1)+d] = nextdof
+                    nextdof += 1
+                end
             end
         end
         @debug println("\t\t\tdofs: $(cell_dofs[[(vertexdofs[vi])...]])")
