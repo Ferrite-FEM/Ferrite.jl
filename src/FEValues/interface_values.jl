@@ -36,15 +36,31 @@ function reinit!(iv::InterfaceValues, dh::AbstractDofHandler, cidx::Int, coords:
         iv.dofmap[idx] = dofs_pair[2]
     end
 end
-function shape_value(iv::InterfaceValues, qp::Int, base_func::Int, here::Bool)
-    dof_pair = iv.dofmap[base_func]
-    here && !isnothing(dof_pair[1]) && return shape_value(iv.face_values, qp, base_func)
-    !here && !isnothing(dof_pair[2]) && return shape_value(iv.face_values_neighbor, qp, base_func)
+shape_value(iv::InterfaceValues, qp::Int, base_func::Int, here::Bool) = f_value_(iv, qp, base_func, here, shape_value) 
+shape_value_jump(iv::InterfaceValues, qp::Int, base_func::Int) = f_jump_(iv, qp, base_func, shape_value) 
+shape_value_average(iv::InterfaceValues, qp::Int, base_func::Int) = f_average(iv, qp, base_func, shape_value) 
+
+shape_gradient(iv::InterfaceValues, qp::Int, base_func::Int, here::Bool) = f_value_(iv, qp, base_func, here, shape_gradient) 
+shape_gradient_jump(iv::InterfaceValues, qp::Int, base_func::Int) = f_jump_(iv, qp, base_func, shape_gradient) 
+shape_gradient_average(iv::InterfaceValues, qp::Int, base_func::Int) = f_average(iv, qp, base_func, shape_gradient) 
+
+function f_value_(iv::InterfaceValues, qp::Int, base_func::Int, here::Bool, f_::Function)
+    dofs = iv.dofmap[base_func]
+    here && !isnothing(dofs[1]) && return f_(iv.face_values, qp, base_func)
+    !here && !isnothing(dofs[2]) && return f_(iv.face_values_neighbor, qp, base_func)
     return 0.0
 end
-function shape_value(iv::InterfaceValues, qp::Int, base_func::Int, here::Bool)
-    dof_pair = iv.dofmap[base_func]
-    here && !isnothing(dof_pair[1]) && return shape_value(iv.face_values, qp, base_func)
-    !here && !isnothing(dof_pair[2]) && return shape_value(iv.face_values_neighbor, qp, base_func)
-    return 0.0
+function f_jump_(iv::InterfaceValues, qp::Int, base_func::Int, f_::Function)
+    dofs = iv.dofmap[base_func]
+    jump = 0.0
+    !isnothing(dofs[1]) && jump += f_(iv.face_values, qp, base_func) ⋅ getnormal(iv.face_values, qp)
+    !isnothing(dofs[2]) && jump += f_(iv.face_values_neighbor, qp, base_func) ⋅ getnormal(iv.face_values_neighbor, qp)
+    return jump
+end
+function f_average_(iv::InterfaceValues, qp::Int, base_func::Int, f_::Function)
+    dofs = iv.dofmap[base_func]
+    average = 0.0
+    !isnothing(dofs[1]) && jump += 0.5 * f_(iv.face_values, qp, base_func)
+    !isnothing(dofs[2]) && jump += 0.5 * f_(iv.face_values_neighbor, qp, base_func)
+    return average
 end
