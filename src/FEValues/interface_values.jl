@@ -53,14 +53,14 @@ end
 function f_jump_(iv::InterfaceValues, qp::Int, base_func::Int, f_::Function)
     dofs = iv.dofmap[base_func]
     jump = 0.0
-    !isnothing(dofs[1]) && jump += f_(iv.face_values, qp, base_func) ⋅ getnormal(iv.face_values, qp)
-    !isnothing(dofs[2]) && jump += f_(iv.face_values_neighbor, qp, base_func) ⋅ getnormal(iv.face_values_neighbor, qp)
+    jump += !isnothing(dofs[1]) ? f_(iv.face_values, qp, base_func) ⋅ getnormal(iv.face_values, qp) : 0
+    jump += !isnothing(dofs[2]) ?  f_(iv.face_values_neighbor, qp, base_func) ⋅ getnormal(iv.face_values_neighbor, qp) : 0
     return jump
 end
 function f_average_(iv::InterfaceValues, qp::Int, base_func::Int, f_::Function)
     dofs = iv.dofmap[base_func]
     average = 0.0
-    !isnothing(dofs[1]) && jump += 0.5 * f_(iv.face_values, qp, base_func)
-    !isnothing(dofs[2]) && jump += 0.5 * f_(iv.face_values_neighbor, qp, base_func)
+    average += !isnothing(dofs[1]) ?  0.5 * f_(iv.face_values, qp, base_func) : 0
+    average += !isnothing(dofs[2]) ?  0.5 * f_(iv.face_values_neighbor, qp, base_func) : 0
     return average
 end
