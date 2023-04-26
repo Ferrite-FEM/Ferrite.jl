@@ -16,11 +16,17 @@ Represents a reference shape which quadrature rules and interpolations are defin
 Currently, the only concrete types that subtype this type are `RefCube` in 1, 2 and 3 dimensions,
 and `RefTetrahedron` in 2 and 3 dimensions.
 """
-abstract type AbstractRefShape end
+abstract type AbstractRefShape{refdim} end
 
-struct RefTetrahedron <: AbstractRefShape end
-struct RefCube <: AbstractRefShape end
-struct RefPrism <: AbstractRefShape end
+struct RefLine          <: AbstractRefShape{1} end
+struct RefTriangle      <: AbstractRefShape{2} end
+struct RefQuadrilateral <: AbstractRefShape{2} end
+struct RefTetrahedron   <: AbstractRefShape{3} end
+struct RefHexahedron    <: AbstractRefShape{3} end
+struct RefPrism         <: AbstractRefShape{3} end
+
+# TODO: Update interpolation definitions and enable deprecation
+const RefCube = RefHexahedron
 
 """
 Abstract type which has `CellValues` and `FaceValues` as subtypes

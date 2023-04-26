@@ -11,7 +11,7 @@
         return B{Dim,RefShape,order}()
     end
     getcellorder(CT) = Ferrite.getorder(Ferrite.default_interpolation(CT))
-    getcelltypedim(::Type{<:Cell{dim}}) where dim = dim
+    getcelltypedim(::Type{<:Ferrite.AbstractCell{dim}}) where dim = dim
 
     # Functions to create dof handlers for testing
     function testdh(CT, ip_order_u, ip_order_p)
@@ -40,14 +40,14 @@
     function testdh_subdomains(dim, ip_order_u, ip_order_p)
         if dim == 1
             nodes = Node.([Vec{1}((x,)) for x in 0.0:1.0:3.0])
-            cell1 = Cell{1,2,2}((1,2))
-            cell2 = Cell{1,3,2}((2,3,4))
+            cell1 = Line((1,2))
+            cell2 = QuadraticLine((2,3,4))
             grid = Grid([cell1, cell2], nodes; cellsets=Dict("A"=>Set(1:1), "B"=>Set(2:2)))
         elseif dim == 2
             nodes = Node.([Vec{2}((x,y)) for y in 0.0:2 for x in 0.0:1])
-            cell1 = Cell{2,3,3}((1,2,3))
-            cell2 = Cell{2,3,3}((2,4,3))
-            cell3 = Cell{2,4,4}((3,4,6,5))
+            cell1 = Triangle((1,2,3))
+            cell2 = Triangle((2,4,3))
+            cell3 = Quadrilateral((3,4,6,5))
             grid = Grid([cell1,cell2,cell3], nodes; cellsets=Dict("A"=>Set(1:2), "B"=>Set(3:3)))
         else
             error("Only dim=1 & 2 supported")
@@ -88,7 +88,14 @@
     end
 
     @testset "DofHandler" begin
-        for CT in Ferrite.implemented_celltypes
+        for CT in (
+            Line, QuadraticLine,
+            Triangle, QuadraticTriangle,
+            Quadrilateral, QuadraticQuadrilateral,
+            Tetrahedron, QuadraticTetrahedron,
+            Hexahedron, # SerendipityQuadraticHexahedron,
+            Wedge,
+        )
             for ip_order_u in 1:2
                 for ip_order_p in 1:2
                     dh = testdh(CT, ip_order_u, ip_order_p)

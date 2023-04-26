@@ -97,7 +97,7 @@ cellid(cc::CellCache) = cc.cellid[]
 celldofs!(v::Vector, cc::CellCache) = copyto!(v, cc.dofs) # celldofs!(v, cc.dh, cc.cellid[])
 
 # TODO: These should really be replaced with something better...
-nfaces(cc::CellCache) = nfaces(eltype(cc.grid.cells))
+nfaces(cc::CellCache) = nfaces(cc.grid.cells[cc.cellid[]])
 onboundary(cc::CellCache, face::Int) = cc.grid.boundary_matrix[face, cc.cellid[]]
 
 ##################
