@@ -17,9 +17,11 @@ nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
 
 """
     vtk_grid(filename::AbstractString, grid::Grid)
+    vtk_grid(filename::AbstractString, dh::DofHandler)
 
-Create a unstructured VTK grid from a `Grid`. Return a `DatasetFile`
-which data can be appended to, see `vtk_point_data` and `vtk_cell_data`.
+Create a unstructured VTK grid from `grid` (alternatively from the `grid` stored in `dh`). 
+Return a `DatasetFile` that data can be appended to, see 
+[`vtk_point_data`](@ref) and [`vtk_cell_data`](@ref).
 """
 function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compress::Bool=true) where {dim,C,T}
     cls = MeshCell[]
@@ -29,6 +31,9 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compre
     end
     coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
     return vtk_grid(filename, coords, cls; compress=compress)
+end
+function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
+    vtk_grid(filename, dh.grid; compress=compress)
 end
 
 function toparaview!(v, x::Vec{D}) where D
@@ -105,9 +110,6 @@ the cell is in the set and 0 otherwise.
 vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellset::String) =
     vtk_cellset(vtk, grid, [cellset])
 
-function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
-    vtk_grid(filename, dh.grid; compress=compress)
-end
 
 function WriteVTK.vtk_point_data(vtkfile, dh::AbstractDofHandler, u::Vector, suffix="")
 
