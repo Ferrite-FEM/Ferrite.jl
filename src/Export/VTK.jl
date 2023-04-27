@@ -16,24 +16,26 @@ cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
 nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
 
 """
-    vtk_grid(filename::AbstractString, grid::Grid)
-    vtk_grid(filename::AbstractString, dh::DofHandler)
+    vtk_grid(filename::AbstractString, grid::Grid; kwargs...)
+    vtk_grid(filename::AbstractString, dh::DofHandler; kwargs...)
 
 Create a unstructured VTK grid from `grid` (alternatively from the `grid` stored in `dh`). 
 Return a `DatasetFile` that data can be appended to, see 
 [`vtk_point_data`](@ref) and [`vtk_cell_data`](@ref).
+The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see 
+[Data Formatting Options](https://juliavtk.github.io/WriteVTK.jl/stable/grids/syntax/#Data-formatting-options)
 """
-function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compress::Bool=true) where {dim,C,T}
+function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; kwargs...) where {dim,C,T}
     cls = MeshCell[]
     for cell in grid.cells
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
         push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
     end
     coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
-    return vtk_grid(filename, coords, cls; compress=compress)
+    return vtk_grid(filename, coords, cls; kwargs...)
 end
-function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
-    vtk_grid(filename, dh.grid; compress=compress)
+function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; kwargs...)
+    vtk_grid(filename, dh.grid; kwargs...)
 end
 
 function toparaview!(v, x::Vec{D}) where D
