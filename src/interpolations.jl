@@ -49,10 +49,12 @@ facedof_indices(ip::Interpolation{1}) = vertexdof_indices(ip)
 """
     adjust_dofs_during_distribution(::Interpolation)
 
-This function must return true if the dofs should be adjusted during dof distribution.
-This is in contrast to adjusting the dofs during [`reinit!`](@ref) in the assembly loop.
+This function must return `true` if the dofs should be adjusted (permuted) during dof
+distribution. This is in contrast to i) adjusting the dofs during [`reinit!`](@ref) in the
+assembly loop, or ii) not adjusting at all (which is not needed for low order
+interpolations, generally).
 """
-adjust_dofs_during_distribution(::Interpolation) = false
+adjust_dofs_during_distribution(::Interpolation) = false # TODO: Add a fallback that errors instead.
 
 """
     InterpolationInfo
@@ -67,7 +69,7 @@ struct InterpolationInfo
     nfacedofs::Vector{Int}
     ncelldofs::Int
     reference_dim::Int
-    dof_correction_info::Bool
+    adjust_during_distribution::Bool
     function InterpolationInfo(interpolation::Interpolation{3})
         new(
             [length(i) for i ∈ vertexdof_indices(interpolation)],
@@ -341,8 +343,6 @@ end
 ############
 struct Lagrange{dim,shape,order} <: Interpolation{dim,shape,order} end
 
-adjust_dofs_during_distribution(::Lagrange) = true
-
 # Vertices for all Lagrange interpolations are the same
 vertexdof_indices(::Lagrange{1,RefCube,order}) where {order} = ((1,),(2,))
 vertexdof_indices(::Lagrange{2,RefCube,order}) where {order} = ((1,),(2,),(3,),(4,))
@@ -516,6 +516,8 @@ const Lagrange2Tri345 = Union{
     Lagrange{2,RefTetrahedron,4},
     Lagrange{2,RefTetrahedron,5},
 }
+
+adjust_dofs_during_distribution(::Lagrange2Tri345) = true
 
 function getnbasefunctions(ip::Lagrange2Tri345)
     order = getorder(ip)
