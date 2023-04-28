@@ -12,12 +12,16 @@ using EnumX
 include("exports.jl")
 
 """
-Represents a reference shape which quadrature rules and interpolations are defined on.
-Currently, the only concrete types that subtype this type are `RefCube` in 1, 2 and 3 dimensions,
-and `RefTetrahedron` in 2 and 3 dimensions.
+    AbstractRefShape{refdim}
+
+Supertype for all reference shapes, with reference dimension `refdim`. Reference shapes are
+used to define grid cells, shape functions, and quadrature rules. Currently existing
+reference shapes are: [`RefLine`](@ref), [`RefTriangle`](@ref), [`RefQuadrilateral`](@ref),
+[`RefTetrahedron`](@ref), [`RefHexahedron`](@ref), [`RefPrism`](@ref).
 """
 abstract type AbstractRefShape{refdim} end
 
+# See src/docs.jl for detailed documentation
 struct RefLine          <: AbstractRefShape{1} end
 struct RefTriangle      <: AbstractRefShape{2} end
 struct RefQuadrilateral <: AbstractRefShape{2} end
@@ -114,5 +118,6 @@ include("PointEval/PointEvalHandler.jl")
 
 # Other
 include("deprecations.jl")
+include("docs.jl")
 
 end # module
