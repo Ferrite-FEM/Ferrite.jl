@@ -14,6 +14,11 @@ using Documenter, Ferrite, FerriteGmsh, FerriteMeshParser
 
 const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 
+using DocumenterCitations
+
+bib = CitationBibliography("references.bib", sorting = :nyt)
+# makedocs(bib)
+
 # Generate examples
 include("generate.jl")
 
@@ -36,7 +41,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     )]
 
 # Build documentation.
-@timeit dto "makedocs" makedocs(
+@timeit dto "makedocs" makedocs(bib,
     format = Documenter.HTML(
         assets = ["assets/custom.css", "assets/favicon.ico"],
         canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",

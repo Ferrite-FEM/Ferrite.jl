@@ -38,6 +38,7 @@ function L2Projector(qr::QuadratureRule, func_ip::Interpolation,
     geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(set)])))
     Base.depwarn("L2Projector(qr, func_ip, grid) is deprecated, " *
                  "use L2Projector(func_ip, grid) instead.", :L2Projector)
+    
     return L2Projector(func_ip, grid; qr_lhs=qr_mass, set=set, geom_ip=geom_ip, qr_rhs=qr)
 end
 
