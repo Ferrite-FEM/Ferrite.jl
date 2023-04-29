@@ -505,7 +505,7 @@ function main()
     apply!(u, ch)
     ## Export the solution
     vtk_grid("stokes-flow", grid) do vtk
-        vtk_point_data(vtk, dh, u)
+        vtk_node_data(vtk, dh, u)
     end
 
     ## Check the result                #src

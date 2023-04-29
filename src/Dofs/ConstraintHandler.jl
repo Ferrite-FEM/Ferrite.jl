@@ -468,7 +468,7 @@ end
 
 # Saves the dirichlet boundary conditions to a vtkfile.
 # Values will have a 1 where bcs are active and 0 otherwise
-function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
+function vtk_node_data(vtkfile, ch::ConstraintHandler)
     unique_fields = []
     for dbc in ch.dbcs
         push!(unique_fields, dbc.field_name)

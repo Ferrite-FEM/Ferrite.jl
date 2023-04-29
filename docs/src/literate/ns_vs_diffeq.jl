@@ -442,7 +442,7 @@ for (u_uc,t) in integrator
     u = copy(u_uc)
     apply!(u, ch)
     vtk_grid("vortex-street-$t.vtu", dh) do vtk
-        vtk_point_data(vtk,dh,u)
+        vtk_node_data(vtk, dh,u)
         vtk_save(vtk)
         pvd[t] = vtk
     end

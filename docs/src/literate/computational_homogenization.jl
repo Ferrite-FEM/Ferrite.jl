@@ -523,11 +523,11 @@ vtk_grid("homogenization", dh) do vtk
         ## Compute macroscopic solution
         apply_analytical!(uM, dh, :u, x -> εᴹ[i] ⋅ x)
         ## Dirichlet
-        vtk_point_data(vtk, dh, uM + u.dirichlet[i], "_dirichlet_$i")
-        vtk_point_data(vtk, projector, σ.dirichlet[i], "σvM_dirichlet_$i")
+        vtk_node_data(vtk, dh, uM + u.dirichlet[i], "_dirichlet_$i")
+        vtk_node_data(vtk, projector, σ.dirichlet[i], "σvM_dirichlet_$i")
         ## Periodic
-        vtk_point_data(vtk, dh, uM + u.periodic[i], "_periodic_$i")
-        vtk_point_data(vtk, projector, σ.periodic[i], "σvM_periodic_$i")
+        vtk_node_data(vtk, dh, uM + u.periodic[i], "_periodic_$i")
+        vtk_node_data(vtk, projector, σ.periodic[i], "σvM_periodic_$i")
     end
 end;
 

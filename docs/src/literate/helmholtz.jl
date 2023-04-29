@@ -164,7 +164,7 @@ apply!(K, f, dbcs)
 u = Symmetric(K) \ f;
 
 vtkfile = vtk_grid("helmholtz", dh)
-vtk_point_data(vtkfile, dh, u)
+vtk_node_data(vtkfile, dh, u)
 vtk_save(vtkfile)
 using Test #src
 #src this test catches unexpected changes in the result over time.

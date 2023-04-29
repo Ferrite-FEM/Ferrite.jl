@@ -370,7 +370,7 @@ function test_2_element_heat_eq()
     vtk_grid(gridfilename, grid) do vtk
         vtk_cellset(vtk, grid, "cell-1")
         vtk_cellset(vtk, grid, "cell-2")
-        vtk_point_data(vtk, dh, u)
+        vtk_node_data(vtk, dh, u)
         # vtk_point_data(vtk, ch)  #FIXME
     end
     sha = bytes2hex(open(SHA.sha1, gridfilename*".vtu"))

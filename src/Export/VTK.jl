@@ -22,7 +22,7 @@ nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
     vtk_grid(filename::AbstractString, grid::Grid)
 
 Create a unstructured VTK grid from a `Grid`. Return a `DatasetFile`
-which data can be appended to, see `vtk_point_data` and `vtk_cell_data`.
+which data can be appended to, see [`vtk_node_data`](@ref) and [`vtk_cell_data`](@ref).
 """
 function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compress::Bool=true) where {dim,C,T}
     cls = MeshCell[]
@@ -44,10 +44,15 @@ end
 """
     vtk_point_data(vtk, data::Vector{<:AbstractTensor}, name)
 
-Write the tensor field `data` to the vtk file. Two-dimensional tensors are padded with zeros.
+Write the `data` that is ordered by the nodes in the grid to the vtk file, 
+with one entry for each component. 
+The components of two-dimensional tensors are padded with zeros.
 
 For second order tensors the following indexing ordering is used:
 `[11, 22, 33, 23, 13, 12, 32, 31, 21]`. This is the default Voigt order in Tensors.jl.
+
+(Note that `WriteVTK.jl` already defines this function for scalar elements in `data`,
+and this is reexported by `Ferrite.jl`.)
 """
 function WriteVTK.vtk_point_data(
     vtk::WriteVTK.DatasetFile,
@@ -112,8 +117,20 @@ function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; com
     vtk_grid(filename, dh.grid; compress=compress)
 end
 
-function WriteVTK.vtk_point_data(vtkfile, dh::AbstractDofHandler, u::Vector, suffix="")
 
+"""
+    vtk_node_data(vtkfile, dh::AbstractDofHandler, u::Vector, suffix="")
+
+Save the values at the nodes in the degree of freedom vector `u` to a 
+the `vtkfile` for each field in `dh`. `suffix` can be used to append to the fieldname.
+The `vtkfile` is typically created by the [`vtk_grid`](@ref) function. 
+
+`u` can also contain tensorial values, but each entry in `u` must correspond to a degree of freedom in `dh`,
+see [`vtk_point_data`](@ref) for details. This function should be used directly when exporting values already 
+sorted by the nodes in the grid. 
+"""
+function vtk_node_data(vtkfile, dh::AbstractDofHandler, u::Vector, suffix="")
+    
     fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
 
     for name in fieldnames

@@ -346,7 +346,7 @@ function solve()
         κ_values[el] /= length(cell_states)     # average drag stress
     end
     vtk_grid("plasticity", dh) do vtkfile
-        vtk_point_data(vtkfile, dh, u) # displacement field
+        vtk_node_data(vtkfile, dh, u) # displacement field
         vtk_cell_data(vtkfile, mises_values, "von Mises [Pa]")
         vtk_cell_data(vtkfile, κ_values, "Drag stress [Pa]")
     end

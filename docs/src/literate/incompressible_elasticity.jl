@@ -210,7 +210,7 @@ function solve(ν, interpolation_u, interpolation_p)
     filename = "cook_" * (isa(interpolation_u, Lagrange{2,RefTetrahedron,1}) ? "linear" : "quadratic") *
                          "_linear"
     vtk_grid(filename, dh) do vtkfile
-        vtk_point_data(vtkfile, dh, u)
+        vtk_node_data(vtkfile, dh, u)
     end
     return u
 end

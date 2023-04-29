@@ -75,8 +75,8 @@ end
 
         dofhandlerfilename = "dofhandler-$(repr(celltype))"
         vtk_grid(dofhandlerfilename, dofhandler) do vtk
-            vtk_point_data(vtk, ch)
-            vtk_point_data(vtk, dofhandler, u)
+            vtk_node_data(vtk, ch)
+            vtk_node_data(vtk, dofhandler, u)
         end
 
         # test the sha of the file

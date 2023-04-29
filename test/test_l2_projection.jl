@@ -301,10 +301,10 @@ function test_export(;subset::Bool)
 
     mktempdir() do tmp
         fname = vtk_grid(joinpath(tmp, "projected"), grid) do vtk
-            vtk_point_data(vtk, p, p_scalar, "p_scalar")
-            vtk_point_data(vtk, p, p_vec, "p_vec")
-            vtk_point_data(vtk, p, p_tens, "p_tens")
-            vtk_point_data(vtk, p, p_stens, "p_stens")
+            vtk_node_data(vtk, p, p_scalar, "p_scalar")
+            vtk_node_data(vtk, p, p_vec, "p_vec")
+            vtk_node_data(vtk, p, p_tens, "p_tens")
+            vtk_node_data(vtk, p, p_stens, "p_stens")
         end
         @test bytes2hex(open(SHA.sha1, fname[1], "r")) in (
             subset ? ("261cfe21de7a478e14f455e783694651a91eeb60", "b3fef3de9f38ca9ddd92f2f67a1606d07ca56d67") :

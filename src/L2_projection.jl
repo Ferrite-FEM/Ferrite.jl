@@ -277,7 +277,7 @@ function _project(vars, proj::L2Projector, fe_values::Values, M::Integer, ::Type
     return T[make_T(x) for x in eachrow(projected_vals)]
 end
 
-function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, proj::L2Projector, vals::Vector{T}, name::AbstractString) where T
+function vtk_node_data(vtk::WriteVTK.DatasetFile, proj::L2Projector, vals::Vector{T}, name::AbstractString) where T
     data = reshape_to_nodes(proj, vals)
     @assert size(data, 2) == getnnodes(proj.dh.grid)
     vtk_point_data(vtk, data, name; component_names=component_names(T))

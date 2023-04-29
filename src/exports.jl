@@ -148,6 +148,7 @@ export
 # VTK export
     vtk_grid,
     vtk_point_data,
+    vtk_node_data,
     vtk_cell_data,
     vtk_nodeset,
     vtk_cellset,
