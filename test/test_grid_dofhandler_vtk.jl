@@ -16,7 +16,7 @@ end
                             (Triangle,               2),
                             (QuadraticTriangle,      2),
                             (Hexahedron,             3),
-                            (Cell{3,20,6},           3),
+                            (SerendipityQuadraticHexahedron, 3),
                             (Tetrahedron,            3))
 
         # create test grid, do some operations on it and then test
@@ -284,7 +284,7 @@ end
     @test getneighborhood(topology,hexgrid,FaceIndex((3,3))) == [FaceIndex((4,5))]
     @test getneighborhood(topology,hexgrid,FaceIndex((4,2))) == [FaceIndex((2,4))]
     @test getneighborhood(topology,hexgrid,FaceIndex((4,5))) == [FaceIndex((3,3))]
-    serendipitygrid = generate_grid(Cell{3,20,6},(2,2,1))
+    serendipitygrid = generate_grid(SerendipityQuadraticHexahedron,(2,2,1))
     stopology = ExclusiveTopology(serendipitygrid)
     # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
     @test all(stopology.face_neighbor .== topology.face_neighbor)

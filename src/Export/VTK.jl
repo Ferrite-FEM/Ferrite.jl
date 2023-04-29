@@ -1,17 +1,14 @@
 cell_to_vtkcell(::Type{Line}) = VTKCellTypes.VTK_LINE
-cell_to_vtkcell(::Type{Line2D}) = VTKCellTypes.VTK_LINE
-cell_to_vtkcell(::Type{Line3D}) = VTKCellTypes.VTK_LINE
 cell_to_vtkcell(::Type{QuadraticLine}) = VTKCellTypes.VTK_QUADRATIC_EDGE
 
 cell_to_vtkcell(::Type{Quadrilateral}) = VTKCellTypes.VTK_QUAD
-cell_to_vtkcell(::Type{Quadrilateral3D}) = VTKCellTypes.VTK_QUAD
 cell_to_vtkcell(::Type{QuadraticQuadrilateral}) = VTKCellTypes.VTK_BIQUADRATIC_QUAD
 cell_to_vtkcell(::Type{Triangle}) = VTKCellTypes.VTK_TRIANGLE
 cell_to_vtkcell(::Type{QuadraticTriangle}) = VTKCellTypes.VTK_QUADRATIC_TRIANGLE
-cell_to_vtkcell(::Type{Cell{2,8,4}}) = VTKCellTypes.VTK_QUADRATIC_QUAD
+cell_to_vtkcell(::Type{SerendipityQuadraticQuadrilateral}) = VTKCellTypes.VTK_QUADRATIC_QUAD
 
 cell_to_vtkcell(::Type{Hexahedron}) = VTKCellTypes.VTK_HEXAHEDRON
-cell_to_vtkcell(::Type{Cell{3,20,6}}) = VTKCellTypes.VTK_QUADRATIC_HEXAHEDRON
+cell_to_vtkcell(::Type{SerendipityQuadraticHexahedron}) = VTKCellTypes.VTK_QUADRATIC_HEXAHEDRON
 cell_to_vtkcell(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
 cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
@@ -19,19 +16,26 @@ cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
 nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
 
 """
-    vtk_grid(filename::AbstractString, grid::Grid)
+    vtk_grid(filename::AbstractString, grid::Grid; kwargs...)
+    vtk_grid(filename::AbstractString, dh::DofHandler; kwargs...)
 
-Create a unstructured VTK grid from a `Grid`. Return a `DatasetFile`
-which data can be appended to, see [`vtk_node_data`](@ref) and [`vtk_cell_data`](@ref).
+Create a unstructured VTK grid from `grid` (alternatively from the `grid` stored in `dh`). 
+Return a `DatasetFile` that data can be appended to, see 
+[`vtk_node_data`](@ref), [`vtk_point_data`](@ref), and [`vtk_cell_data`](@ref).
+The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see 
+[Data Formatting Options](https://juliavtk.github.io/WriteVTK.jl/stable/grids/syntax/#Data-formatting-options)
 """
-function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compress::Bool=true) where {dim,C,T}
+function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; kwargs...) where {dim,C,T}
     cls = MeshCell[]
     for cell in grid.cells
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
         push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
     end
     coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
-    return vtk_grid(filename, coords, cls; compress=compress)
+    return vtk_grid(filename, coords, cls; kwargs...)
+end
+function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; kwargs...)
+    vtk_grid(filename, dh.grid; kwargs...)
 end
 
 function toparaview!(v, x::Vec{D}) where D
@@ -113,9 +117,6 @@ the cell is in the set and 0 otherwise.
 vtk_cellset(vtk::WriteVTK.DatasetFile, grid::AbstractGrid, cellset::String) =
     vtk_cellset(vtk, grid, [cellset])
 
-function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; compress::Bool=true)
-    vtk_grid(filename, dh.grid; compress=compress)
-end
 
 
 """
