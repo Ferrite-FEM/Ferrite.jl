@@ -17,6 +17,7 @@ Create a `Ferrite.VTKStream` that contains an unstructured VTK grid from
 a `DofHandler` (limited functionality if only a `Grid` is given). 
 This stream can be used to to write data with 
 [`write_solution`](@ref), [`write_celldata`](@ref), [`write_nodedata`](@ref),
+[`write_projected`](@ref), 
 [`write_cellset`](@ref), [`write_nodeset`](@ref), and [`write_constraints`](@ref).
 
 The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see 
