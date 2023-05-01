@@ -194,7 +194,7 @@ apply!(A, ch);
 pvd = paraview_collection("transient-heat.pvd");
 t = 0
 vtk_grid("transient-heat-$t", dh) do vtk
-    vtk_node_data(vtk, dh, uₙ)
+    vtk_point_data(vtk, dh, uₙ)
     vtk_save(vtk)
     pvd[t] = vtk
 end
@@ -213,7 +213,7 @@ for t in Δt:Δt:T
     u = A \ b
 
     vtk_grid("transient-heat-$t", dh) do vtk
-        vtk_node_data(vtk, dh, u)
+        vtk_point_data(vtk, dh, u)
         vtk_save(vtk)
         pvd[t] = vtk
     end

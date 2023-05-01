@@ -88,7 +88,7 @@ q_projected = project(projector, q_gp, qr; project_to_nodes=false); # TODO: this
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
 # The result is also visualized in *Figure 1*.
 vtk_grid("heat_equation_flux", grid) do vtk
-    vtk_node_data(vtk, projector, q_projected, "q")
+    vtk_point_data(vtk, projector, q_projected, "q")
 end;
 
 # ## Point Evaluation

@@ -71,7 +71,7 @@ vector `u`:
 
 ```@example export
 vtk = vtk_grid("my-solution", dh)
-vtk_node_data(vtk, dh, u)
+vtk_point_data(vtk, dh, u)
 vtk_save(vtk)
 rm("my-solution.vtu") # hide
 ```
@@ -80,26 +80,26 @@ or with a `do`-block:
 
 ```@example export
 vtk_grid("my-solution", dh) do vtk
-    vtk_node_data(vtk, dh, u)
+    vtk_point_data(vtk, dh, u)
     vtk_cell_data(vtk, σ, "my-cell-data")
 end
 rm("my-solution.vtu") # hide
 ```
 
-When `vtk_node_data` is used with a `DofHandler` all of the fields will be
+When `vtk_point_data` is used with a `DofHandler` all of the fields will be
 written to the VTK file, and the names will be determined by the fieldname
 symbol that was used when the field was added to the `DofHandler`.
 
 ## Exporting Boundary Conditions
 
-There is also a `vtk_node_data` which accepts a `ConstraintHandler`.
+There is also a `vtk_point_data` which accepts a `ConstraintHandler`.
 This method is useful to verify that the boundary conditions are
 applied where they are supposed to. For a `ConstraintHandler` `ch`
 we can export the boundary conditions as
 
 ```julia
 vtk_grid("boundary-conditions", grid) do vtk
-    vtk_node_data(vtk, ch)
+    vtk_point_data(vtk, ch)
 end
 ```
 

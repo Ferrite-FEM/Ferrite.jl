@@ -114,7 +114,7 @@ end
 # utility to quickly save a model
 function Ferrite.vtk_save(path, model, dofs=model.dofs)
     vtkfile = vtk_grid(path, model.dofhandler)
-    vtk_node_data(vtkfile, model.dofhandler, dofs)
+    vtk_point_data(vtkfile, model.dofhandler, dofs)
     vtk_save(vtkfile)
 end
 
