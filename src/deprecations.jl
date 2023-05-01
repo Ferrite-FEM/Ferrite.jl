@@ -58,8 +58,6 @@ Base.@deprecate_binding Line3D Line
 Base.@deprecate_binding Quadrilateral3D Quadrilateral
 export Line2D, Line3D, Quadrilateral3D
 
-# REMOVE ME! (the following is just to avoid renaming back to vtk_point_data before new renaming again)
-@deprecate vtk_node_data(args...; kwargs...) vtk_point_data(args...; kwargs...) 
 
 import WriteVTK: vtk_grid, vtk_cell_data, vtk_point_data, vtk_save
 
