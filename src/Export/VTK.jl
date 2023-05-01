@@ -116,10 +116,7 @@ function _vtk_write_nodedata(
     end
     return WriteVTK.vtk_point_data(vtk, out, name; component_names=component_names(S))
 end
-function _vtk_write_nodedata(vtk::WriteVTK.DatasetFile, nodedata::Vector{<:Real}, name::AbstractString)
-    return WriteVTK.vtk_point_data(vtk, nodedata, name)
-end
-function _vtk_write_nodedata(vtk::WriteVTK.DatasetFile, nodedata::Matrix{<:Real}, name::AbstractString)
+function _vtk_write_nodedata(vtk::WriteVTK.DatasetFile, nodedata::Union{Vector{<:Real},Matrix{<:Real}}, name::AbstractString)
     return WriteVTK.vtk_point_data(vtk, nodedata, name)
 end
 
@@ -152,7 +149,7 @@ end
     write_solution(vtks::VTKStream, u::Vector, suffix="")
 
 Save the values at the nodes in the degree of freedom vector `u` to a 
-the `vtkfile` for each field in `DofHandler` in `vtks`. 
+the a vtk file for each field in `DofHandler` in `vtks`. 
 `suffix` can be used to append to the fieldname.
 `vtks` is typically created by the [`open_vtk`](@ref) function. 
 
@@ -162,6 +159,21 @@ sorted by the nodes in the grid.
 """
 function write_solution(vtks::VTKStream, u, suffix="")
     _vtk_write_solution(vtks.vtk, vtks.grid_or_dh, u, suffix)
+    return vtks
+end
+
+"""
+    write_projection(vtks::VTKStream, proj::L2Projector, vals::Vector, name::AbstractString)
+
+Write `vals` that have been projected with `proj` to the vtk file in `vtks`
+"""
+function write_projection(vtks::VTKStream, proj::L2Projector, vals, name)
+    if getgrid(vtks) !== proj.dh.grid
+        @warn("The grid saved in VTKStream and L2Projector are not aliased, no checks are performed to ensure that they are equal")
+    end
+    nodedata = reshape_to_nodes(proj, vals)
+    @assert size(nodedata, 2) == getnnodes(proj.dh.grid)
+    _vtk_write_nodedata(vtks.vtk, nodedata, name)
     return vtks
 end
 
@@ -223,7 +235,7 @@ function write_cellset(vtks::VTKStream, cellsets=keys(grid.cellsets))
     end
     return vtks
 end
-write_cellset(vtks::VTKStream, cellset::String) = vtk_cellset(vtks, [cellset])
+write_cellset(vtks::VTKStream, cellset::String) = write_cellset(vtks, [cellset])
 
 """
     write_dirichlet(vtks::VTKStream, ch::ConstraintHandler)

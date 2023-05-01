@@ -217,6 +217,9 @@ u = K \ f;
 Ferrite.open_vtk("heat_equation_new", dh) do vtk
     Ferrite.write_solution(vtk, u)
 end
+vtk_grid("heat_equation_old", dh) do vtk
+    vtk_point_data(vtk, dh, u)
+end
 
 ## test the result                #src
 using Test                        #src

@@ -57,3 +57,19 @@ Base.@deprecate_binding Line2D Line
 Base.@deprecate_binding Line3D Line
 Base.@deprecate_binding Quadrilateral3D Quadrilateral
 export Line2D, Line3D, Quadrilateral3D
+
+# REMOVE ME! (the following is just to avoid renaming back to vtk_point_data before new renaming again)
+@deprecate vtk_node_data(args...; kwargs...) vtk_point_data(args...; kwargs...) 
+
+import WriteVTK: vtk_grid, vtk_cell_data, vtk_point_data, vtk_save
+
+@deprecate vtk_grid(filename::String, grid::AbstractGrid; kwargs...) open_vtk(filename, grid; kwargs...)
+@deprecate vtk_grid(filename::String, dh::DofHandler; kwargs...) open_vtk(filename, dh; kwargs...)
+@deprecate vtk_cell_data(vtks::VTKStream, args...) write_celldata(vtks, args...)
+@deprecate vtk_point_data(vtks::VTKStream, dh::DofHandler, u, suffix="") (_vtk_write_solution(vtks.vtk, dh, u, suffix); vtks)
+@deprecate vtk_point_data(vtks::VTKStream, data::Vector, args...) write_nodedata(vtks, data, args...)
+@deprecate vtk_point_data(vtks::VTKStream, proj::L2Projector, args...) write_projection(vtks, proj, args...)
+@deprecate vtk_point_data(vtks::VTKStream, ch::ConstraintHandler) write_dirichlet(vtks, ch)
+@deprecate vtk_cellset(vtks::VTKStream, grid::AbstractGrid, args...) write_cellset(vtks, args...)
+@deprecate vtk_nodeset(vtks::VTKStream, grid::AbstractGrid, args...) write_nodeset(vtks, args...)
+@deprecate vtk_save(vtks::VTKStream) close(vtks)
