@@ -62,6 +62,9 @@ getgrid(vtks::VTKStream{<:Any,<:DofHandler}) = vtks.grid_or_dh.grid
 getgrid(vtks::VTKStream{<:Any,<:Grid}) = vtks.grid_or_dh
 
 # Support ParaviewCollection
+function Base.setindex!(pvd::WriteVTK.CollectionFile, vtks::VTKStream, time::Real)
+    WriteVTK.collection_add_timestep(pvd, vtks, time)
+end
 function WriteVTK.collection_add_timestep(pvd::WriteVTK.CollectionFile, vtks::VTKStream, time::Real)
     WriteVTK.collection_add_timestep(pvd, vtks.vtk, time)
 end
@@ -114,13 +117,16 @@ function _vtk_write_nodedata(
     for i in 1:npoints
         toparaview!(@view(out[:, i]), nodedata[i])
     end
-    return WriteVTK.vtk_point_data(vtk, out, name; component_names=component_names(S))
+    return WriteVTK.vtk_point_data(vtk, out, name; component_names=get_component_names(S))
 end
-function _vtk_write_nodedata(vtk::WriteVTK.DatasetFile, nodedata::Union{Vector{<:Real},Matrix{<:Real}}, name::AbstractString)
+function _vtk_write_nodedata(vtk::WriteVTK.DatasetFile, nodedata::Vector{<:Real}, name::AbstractString)
     return WriteVTK.vtk_point_data(vtk, nodedata, name)
 end
+function _vtk_write_nodedata(vtk::WriteVTK.DatasetFile, nodedata::Matrix{<:Real}, name::AbstractString; component_names=nothing)
+    return WriteVTK.vtk_point_data(vtk, nodedata, name; component_names=component_names)
+end
 
-function component_names(::Type{S}) where S
+function get_component_names(::Type{S}) where S
     names =
         S <:             Vec{1}   ? ["x"] :
         S <:             Vec      ? ["x", "y", "z"] : # Pad 2D Vec to 3D
@@ -163,17 +169,17 @@ function write_solution(vtks::VTKStream, u, suffix="")
 end
 
 """
-    write_projection(vtks::VTKStream, proj::L2Projector, vals::Vector, name::AbstractString)
+    write_projected(vtks::VTKStream, proj::L2Projector, vals::Vector, name::AbstractString)
 
 Write `vals` that have been projected with `proj` to the vtk file in `vtks`
 """
-function write_projection(vtks::VTKStream, proj::L2Projector, vals, name)
+function write_projected(vtks::VTKStream, proj::L2Projector, vals, name)
     if getgrid(vtks) !== proj.dh.grid
         @warn("The grid saved in VTKStream and L2Projector are not aliased, no checks are performed to ensure that they are equal")
     end
     nodedata = reshape_to_nodes(proj, vals)
     @assert size(nodedata, 2) == getnnodes(proj.dh.grid)
-    _vtk_write_nodedata(vtks.vtk, nodedata, name)
+    _vtk_write_nodedata(vtks.vtk, nodedata, name; component_names=get_component_names(eltype(vals)))
     return vtks
 end
 
