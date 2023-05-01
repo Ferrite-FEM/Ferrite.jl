@@ -214,8 +214,8 @@ u = K \ f;
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
-vtk_grid("heat_equation", dh) do vtk
-    vtk_node_data(vtk, dh, u)
+Ferrite.open_vtk("heat_equation_new", dh) do vtk
+    Ferrite.write_solution(vtk, u)
 end
 
 ## test the result                #src
