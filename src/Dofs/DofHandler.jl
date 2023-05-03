@@ -285,7 +285,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     edgedicts = [Dict{Tuple{Int,Int}, Int}() for _ in 1:numfields]
 
     # `facedict` keeps track of the visited faces. We only need to store the first dof we
-    # add to the face; if we encounter the same face again we *always* reverse the order. In
+    # add to the face since currently more dofs per face isn't supported. In
     # 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a face (i.e. a
     # surface) is uniquely determined by 3 vertices.
     facedicts = [Dict{NTuple{dim,Int}, Int}() for _ in 1:numfields]
@@ -358,7 +358,6 @@ function _close_fieldhandler!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::
             nextdof = _distribute_dofs_for_cell!(
                 dh,
                 cell,
-                fh,
                 fh.field_dims[lidx],
                 ip_infos[lidx],
                 nextdof,
@@ -381,11 +380,11 @@ function _close_fieldhandler!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::
 end
 
 """
-    _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, fh::FieldHandler, vdim::Int, ip_info::InterpolationInfo, nextdof::Int, vertexdict, edgedict, facedict) where {sdim}
+    _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, vdim::Int, ip_info::InterpolationInfo, nextdof::Int, vertexdict, edgedict, facedict) where {sdim}
 
 Main entry point to distribute dofs for a single cell.
 """
-function _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, fh::FieldHandler, vdim::Int, ip_info::InterpolationInfo, nextdof::Int, vertexdict, edgedict, facedict) where {sdim}
+function _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, vdim::Int, ip_info::InterpolationInfo, nextdof::Int, vertexdict, edgedict, facedict) where {sdim}
 
     # Distribute dofs for vertices
     nextdof = add_vertex_dofs(
@@ -437,7 +436,7 @@ function add_vertex_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, vertexdict,
             end
         else # create dofs
             vertexdict[vertex] = nextdof
-            for _ ∈ 1:nvertexdofs[vi], _ in 1:vdim
+            for _ in 1:nvertexdofs[vi], _ in 1:vdim
                 push!(cell_dofs, nextdof)
                 nextdof += 1
             end
@@ -448,10 +447,10 @@ function add_vertex_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, vertexdict,
 end
 
 """
-    get_or_create_dofs!(nextdof::Int, ndofs::Int, vdim::Int, dict::DT, key::KT)::Tuple{Int64, StepRange{Int64, Int64}}
+    get_or_create_dofs!(nextdof::Int, ndofs::Int, vdim::Int, dict::Dict, key::Tuple)::Tuple{Int64, StepRange{Int64, Int64}}
 
-Returns the next global dof number and an array of dofs.
-If dofs have already been created for the object (vertex, face) then simply return those, otherwise create new dofs.
+Returns the next global dof number and an array of dofs. If dofs have already been created
+for the object (vertex, face) then simply return those, otherwise create new dofs.
 """
 @inline function get_or_create_dofs!(nextdof::Int, ndofs::Int, vdim::Int, dict::Dict, key::Tuple)
     token = Base.ht_keyindex2!(dict, key)
@@ -462,31 +461,31 @@ If dofs have already been created for the object (vertex, face) then simply retu
     else  # create new dofs
         dofs = nextdof : vdim : (nextdof + vdim*ndofs-1)
         @debug println("\t\t\tkey: $key dofs: $dofs")
-        Base._setindex!(dict, nextdof, key, -token) #
+        Base._setindex!(dict, nextdof, key, -token)
         nextdof += ndofs*vdim
     end
     return nextdof, dofs
 end
 
-function add_face_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, facedict::Dict, nfacedofs::Vector{Int}, nextdof::Int, should_correct::Bool, vdim::Int)
+function add_face_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, facedict::Dict, nfacedofs::Vector{Int}, nextdof::Int, adjust_during_distribution::Bool, vdim::Int)
     for (fi,face) in pairs(faces(cell))
         nfacedofs[fi] > 0 || continue # skip if no dof on this vertex
         sface, orientation = sortface(face)
         @debug println("\t\tface #$sface, $orientation")
         nextdof, dofs = get_or_create_dofs!(nextdof, nfacedofs[fi], vdim, facedict, sface)
-        permute_and_push!(cell_dofs, dofs, orientation, should_correct)
+        permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution)
         @debug println("\t\t\tadjusted dofs: $(cell_dofs[(end - nfacedofs[fi]*vdim + 1):end])")
     end
     return nextdof
 end
 
-function add_edge_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, edgedict::Dict, nedgedofs::Vector{Int}, nextdof::Int, should_correct::Bool, vdim::Int)
+function add_edge_dofs(cell_dofs::Vector{Int}, cell::AbstractCell, edgedict::Dict, nedgedofs::Vector{Int}, nextdof::Int, adjust_during_distribution::Bool, vdim::Int)
     for (ei, edge) in pairs(edges(cell))
         if nedgedofs[ei] > 0
             sedge, orientation = sortedge(edge)
             @debug println("\t\tedge #$sedge, $orientation")
             nextdof, dofs = get_or_create_dofs!(nextdof, nedgedofs[ei], vdim, edgedict, sedge)
-            permute_and_push!(cell_dofs, dofs, orientation, should_correct)
+            permute_and_push!(cell_dofs, dofs, orientation, adjust_during_distribution)
             @debug println("\t\t\tadjusted dofs: $(cell_dofs[(end - nedgedofs[ei]*vdim + 1):end])")
         end
     end
@@ -542,6 +541,7 @@ For more details we refer to [1] as we follow the methodology described therein.
 """
 @inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::PathOrientationInfo, adjust_during_distribution::Bool)
     vdim = step(dofs)
+    @assert vdim > 0
     if adjust_during_distribution && !orientation.regular
         # Reverse the dofs for the path
         dofs = reverse(dofs)
@@ -598,6 +598,7 @@ For more details we refer to [1] as we follow the methodology described therein.
         error("Dof distribution for interpolations with multiple dofs per face not implemented yet.")
     end
     vdim = step(dofs)
+    @assert vdim > 0
     for dof in dofs
         for i in 1:vdim
             push!(cell_dofs, dof+(i-1))

@@ -46,15 +46,17 @@ edgedof_indices(ip::Interpolation{2}) = facedof_indices(ip)
 edgedof_interior_indices(ip::Interpolation{2}) = facedof_interior_indices(ip)
 facedof_indices(ip::Interpolation{1}) = vertexdof_indices(ip)
 
+# TODO: Add a fallback that errors if there are multiple dofs per edge/face instead to force
+#       interpolations to opt-out instead of silently do nothing.
 """
     adjust_dofs_during_distribution(::Interpolation)
 
-This function must return `true` if the dofs should be adjusted (permuted) during dof
+This function must return `true` if the dofs should be adjusted (i.e. permuted) during dof
 distribution. This is in contrast to i) adjusting the dofs during [`reinit!`](@ref) in the
 assembly loop, or ii) not adjusting at all (which is not needed for low order
 interpolations, generally).
 """
-adjust_dofs_during_distribution(::Interpolation) = false # TODO: Add a fallback that errors instead.
+adjust_dofs_during_distribution(::Interpolation) = false
 
 """
     InterpolationInfo
@@ -215,8 +217,9 @@ A tuple containing tuples of local dof indices for the respective vertex in loca
 enumeration on a cell defined by [`vertices(::Cell)`](@ref). The vertex enumeration must
 match the vertex enumeration of the corresponding geometrical cell.
 
-    !!!NOTE The dofs appearing in the tuple must be continuous and increasing! The first dof
-            must be the 1, as vertex dofs are enumerated first.
+!!! note
+    The dofs appearing in the tuple must be continuous and increasing! The first dof must be
+    the 1, as vertex dofs are enumerated first.
 """
 vertexdof_indices(ip::Interpolation) = ntuple(_ -> (), nvertices(ip))
 
@@ -240,8 +243,9 @@ local enumeration on a cell defined by [`edges(::Cell)`](@ref). The edge enumera
 match the edge enumeration of the corresponding geometrical cell. Note that the vertex dofs
 are included here.
 
-    !!!NOTE The dofs appearing in the tuple must be continuous and increasing! The first dof
-            must be the computed via "last vertex index + 1", if edges exist.
+!!! note
+    The dofs appearing in the tuple must be continuous and increasing! The first dof must be
+    computed via "last vertex dof index + 1", if edge dofs exist.
 """
 edgedof_interior_indices(::Interpolation)
 
@@ -262,8 +266,9 @@ local enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumera
 match the face enumeration of the corresponding geometrical cell. Note that the vertex and
 edge dofs are included here.
 
-    !!!NOTE The dofs appearing in the tuple must be continuous and increasing! The first dof
-            must be the computed via "last edge interior index + 1", if faces exist.
+!!! note
+    The dofs appearing in the tuple must be continuous and increasing! The first dof must be
+    the computed via "last edge interior dof index + 1", if face dofs exist.
 """
 facedof_interior_indices(::Interpolation) 
 
@@ -272,8 +277,9 @@ facedof_interior_indices(::Interpolation)
 
 Tuple containing the dof indices associated with the interior of the cell.
 
-    !!!NOTE The dofs appearing in the tuple must be continuous and increasing! Celldofs are 
-            enumerated last.
+!!! note
+    The dofs appearing in the tuple must be continuous and increasing! Celldofs are
+    enumerated last.
 """
 celldof_interior_indices(::Interpolation) = ()
 
