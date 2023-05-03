@@ -419,7 +419,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     fs_length = length(face_skeleton_global)
     for (cellid,cell) in enumerate(cells)
         for (local_face_id,face) in enumerate(faces(cell))
-            push!(face_skeleton_global, sortface(face))
+            push!(face_skeleton_global, first(sortface(face)))
             fs_length_new = length(face_skeleton_global)
             if fs_length != fs_length_new
                 push!(face_skeleton_local, FaceIndex(cellid,local_face_id)) 
@@ -958,4 +958,58 @@ for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
         #For (cellid, faceidx) in faceset
         Base.in(v::Tuple{Int, Int}, s::Set{$INDEX}) = in($INDEX(v), s)
     end
+end
+
+#################################
+#### Orientation of Entities ####
+#################################
+# @TODO merge this code with into the logic in `ConstraintHandler`.
+
+"""
+    PathOrientationInfo
+
+Orientation information for 1D entities.
+
+The orientation for 1D entities is defined by the indices of the grid nodes
+associated to the vertices. To give an example, the oriented path
+```
+1 ---> 2
+```
+is called *regular*, indicated by `regular=true`, while the oriented path
+```
+2 ---> 1
+```
+is called *inverted*, indicated by `regular=false`.
+"""
+struct PathOrientationInfo
+    regular::Bool # Indicator whether the orientation is regular or inverted.
+end
+
+"""
+    SurfaceOrientationInfo
+
+Orientation information for 2D entities. Such an entity can be 
+possibly flipped (i.e. the defining vertex order is reverse to the 
+spanning vertex order) and the vertices can be rotated against each other.
+Take for example the faces
+```
+1---2 2---3
+| A | | B |
+4---3 1---4
+```
+which are rotated against each other by 90° (shift index is 1) or the faces
+```
+1---2 2---1
+| A | | B |
+4---3 3---4
+```
+which are flipped against each other. Any combination of these can happen. 
+The combination to map this local face to the defining face is encoded with
+this data structure via ``rotate \\circ flip`` where the rotation is indiced by
+the shift index.
+    !!!NOTE TODO implement me.
+"""
+struct SurfaceOrientationInfo
+    #flipped::Bool
+    #shift_index::Int
 end

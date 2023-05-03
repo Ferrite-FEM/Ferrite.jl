@@ -46,6 +46,18 @@ edgedof_indices(ip::Interpolation{2}) = facedof_indices(ip)
 edgedof_interior_indices(ip::Interpolation{2}) = facedof_interior_indices(ip)
 facedof_indices(ip::Interpolation{1}) = vertexdof_indices(ip)
 
+# TODO: Add a fallback that errors if there are multiple dofs per edge/face instead to force
+#       interpolations to opt-out instead of silently do nothing.
+"""
+    adjust_dofs_during_distribution(::Interpolation)
+
+This function must return `true` if the dofs should be adjusted (i.e. permuted) during dof
+distribution. This is in contrast to i) adjusting the dofs during [`reinit!`](@ref) in the
+assembly loop, or ii) not adjusting at all (which is not needed for low order
+interpolations, generally).
+"""
+adjust_dofs_during_distribution(::Interpolation) = false
+
 """
     InterpolationInfo
 
@@ -58,7 +70,8 @@ struct InterpolationInfo
     nedgedofs::Vector{Int}
     nfacedofs::Vector{Int}
     ncelldofs::Int
-    dim::Int
+    reference_dim::Int
+    adjust_during_distribution::Bool
     function InterpolationInfo(interpolation::Interpolation{3})
         new(
             [length(i) for i ∈ vertexdof_indices(interpolation)],
@@ -66,6 +79,7 @@ struct InterpolationInfo
             [length(i) for i ∈ facedof_interior_indices(interpolation)],
             length(celldof_interior_indices(interpolation)),
             3,
+            adjust_dofs_during_distribution(interpolation)
         )
     end
     function InterpolationInfo(interpolation::Interpolation{2})
@@ -75,15 +89,17 @@ struct InterpolationInfo
             [length(i) for i ∈ facedof_interior_indices(interpolation)],
             length(celldof_interior_indices(interpolation)),
             2,
+            adjust_dofs_during_distribution(interpolation)
         )
     end
     function InterpolationInfo(interpolation::Interpolation{1})
         new(
             [length(i) for i ∈ vertexdof_indices(interpolation)],
             Int[],
-            [0, 0], # Well. Apparently vertices are also faces. :)
+            Int[],
             length(celldof_interior_indices(interpolation)),
             1,
+            adjust_dofs_during_distribution(interpolation)
         )
     end
 end
@@ -200,6 +216,10 @@ reference_coordinates(::Interpolation)
 A tuple containing tuples of local dof indices for the respective vertex in local
 enumeration on a cell defined by [`vertices(::Cell)`](@ref). The vertex enumeration must
 match the vertex enumeration of the corresponding geometrical cell.
+
+!!! note
+    The dofs appearing in the tuple must be continuous and increasing! The first dof must be
+    the 1, as vertex dofs are enumerated first.
 """
 vertexdof_indices(ip::Interpolation) = ntuple(_ -> (), nvertices(ip))
 
@@ -209,6 +229,9 @@ vertexdof_indices(ip::Interpolation) = ntuple(_ -> (), nvertices(ip))
 A tuple containing tuples of local dof indices for the respective edge in local enumeration
 on a cell defined by [`edges(::Cell)`](@ref). The edge enumeration must match the edge
 enumeration of the corresponding geometrical cell.
+
+The dofs are guaranteed to be aligned with the local ordering of the entities on the oriented edge.
+Here the first entries are the vertex dofs, followed by the edge interior dofs.
 """
 edgedof_indices(::Interpolation)
 
@@ -219,6 +242,10 @@ A tuple containing tuples of the local dof indices on the interior of the respec
 local enumeration on a cell defined by [`edges(::Cell)`](@ref). The edge enumeration must
 match the edge enumeration of the corresponding geometrical cell. Note that the vertex dofs
 are included here.
+
+!!! note
+    The dofs appearing in the tuple must be continuous and increasing! The first dof must be
+    computed via "last vertex dof index + 1", if edge dofs exist.
 """
 edgedof_interior_indices(::Interpolation)
 
@@ -238,6 +265,10 @@ A tuple containing tuples of the local dof indices on the interior of the respec
 local enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration must
 match the face enumeration of the corresponding geometrical cell. Note that the vertex and
 edge dofs are included here.
+
+!!! note
+    The dofs appearing in the tuple must be continuous and increasing! The first dof must be
+    the computed via "last edge interior dof index + 1", if face dofs exist.
 """
 facedof_interior_indices(::Interpolation) 
 
@@ -245,6 +276,10 @@ facedof_interior_indices(::Interpolation)
     celldof_interior_indices(ip::Interpolation)
 
 Tuple containing the dof indices associated with the interior of the cell.
+
+!!! note
+    The dofs appearing in the tuple must be continuous and increasing! Celldofs are
+    enumerated last.
 """
 celldof_interior_indices(::Interpolation) = ()
 
@@ -488,6 +523,8 @@ const Lagrange2Tri345 = Union{
     Lagrange{2,RefTetrahedron,5},
 }
 
+adjust_dofs_during_distribution(::Lagrange2Tri345) = true
+
 function getnbasefunctions(ip::Lagrange2Tri345)
     order = getorder(ip)
     return (order + 1) * (order + 2) ÷ 2
@@ -646,7 +683,7 @@ end
 getnbasefunctions(::Lagrange{3,RefCube,1}) = 8
 
 facedof_indices(::Lagrange{3,RefCube,1}) = ((1,4,3,2), (1,2,6,5), (2,3,7,6), (3,4,8,7), (1,5,8,4), (5,6,7,8))
-edgedof_indices(::Lagrange{3,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1), (1,5), (2,6), (3,7), (4,8), (5,6), (6,7), (7,8), (8,5))
+edgedof_indices(::Lagrange{3,RefCube,1}) = ((1,2), (2,3), (3,4), (4,1), (5,6), (6,7), (7,8), (8,5), (1,5), (2,6), (3,7), (4,8))
 
 function reference_coordinates(::Lagrange{3,RefCube,1})
     return [Vec{3, Float64}((-1.0, -1.0, -1.0)),
@@ -698,17 +735,17 @@ edgedof_indices(::Lagrange{3,RefCube,2}) = (
     (2,3, 10),
     (3,4, 11),
     (4,1, 12),
+    (5,6, 13),
+    (6,7, 14),
+    (7,8, 15),
+    (8,5, 16),
     (1,5, 17),
     (2,6, 18),
     (3,7, 19),
     (4,8, 20),
-    (5,6, 13),
-    (6,7, 14),
-    (7,8, 15),
-    (8,5, 16)
 )
 edgedof_interior_indices(::Lagrange{3,RefCube,2}) = (
-    (9,), (10,), (11,), (12,), (17), (18,), (19,), (20,), (13,), (14,), (15,), (16,)
+    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,)
 )
 
 celldof_interior_indices(::Lagrange{3,RefCube,2}) = (27,)
@@ -1013,18 +1050,18 @@ edgedof_indices(::Serendipity{3,RefCube,2}) = (
     (2,3, 10),
     (3,4, 11),
     (4,1, 12),
+    (5,6, 13),
+    (6,7, 14),
+    (7,8, 15),
+    (8,5, 16),
     (1,5, 17),
     (2,6, 18),
     (3,7, 19),
     (4,8, 20),
-    (5,6, 13),
-    (6,7, 14),
-    (7,8, 15),
-    (8,5, 16)
 )
 
 edgedof_interior_indices(::Serendipity{3,RefCube,2}) = (
-    (9,), (10,), (11,), (12,), (17), (18,), (19,), (20,), (13,), (14,), (15,), (16,)
+    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,)
 )
 
 function reference_coordinates(::Serendipity{3,RefCube,2})

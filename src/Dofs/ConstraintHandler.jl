@@ -1320,11 +1320,11 @@ function __collect_boundary_faces(grid::Grid)
     candidates = Dict{Tuple, FaceIndex}()
     for (ci, c) in enumerate(grid.cells)
         for (fi, fn) in enumerate(faces(c))
-            fn = sortface(fn)
-            if haskey(candidates, fn)
-                delete!(candidates, fn)
+            face = first(sortface(fn))
+            if haskey(candidates, face)
+                delete!(candidates, face)
             else
-                candidates[fn] = FaceIndex(ci, fi)
+                candidates[face] = FaceIndex(ci, fi)
             end
         end
     end

@@ -456,32 +456,91 @@ end
     test_coloring(generate_grid(Quadrilateral, (2, 2)), [])
 end
 
-@testset "DoF distribution" begin
-    # _________
-    # |\      |
-    # |  \  2 |
-    # | 1  \  |
-    # |______\|
+@testset "High order dof distribution" begin
+    # 3-----4
+    # | \   |
+    # |  \  |
+    # |   \ |
+    # 1-----2
     grid = generate_grid(Triangle, (1, 1))
 
     ## Lagrange{2,RefTetrahedron,3}
+    # Dofs per position per triangle
+    # 3      3-14-15-11
+    # | \     \      |
+    # 9  7     7  16 13
+    # |   \     \    |
+    # |    \     \   |
+    # 8  10 6     6  12
+    # |      \     \ |
+    # 1-4---5-2      2
     dh = DofHandler(grid)
     add!(dh, :u, 1, Lagrange{2,RefTetrahedron,3}())
     close!(dh)
-    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    @test celldofs(dh, 2) == [2, 11, 3, 12, 13, 14, 15, 7, 6, 16]
+    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 9, 8, 10]
+    @test celldofs(dh, 2) == [2, 11, 3, 12, 13, 15, 14, 7, 6, 16]
 
-    ## Lagrange{2,RefTetrahedron,4}
+    ## Lagrange{2,RefTetrahedron,3}
+    # First dof per position per triangle
+    # 5      5-27-29-21
+    # | \     \      |
+    # 17 13   13  31 25
+    # |   \     \    |
+    # |    \     \   |
+    # 15 19 11   11  23
+    # |      \     \ |
+    # 1-7---9-3      3
     dh = DofHandler(grid)
-    add!(dh, :u, 1, Lagrange{2,RefTetrahedron,4}())
+    add!(dh, :u, 2, Lagrange{2,RefTetrahedron,3}())
     close!(dh)
-    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-    @test celldofs(dh, 2) == [2, 16, 3, 17, 18, 19, 20, 21, 22, 9, 8, 7, 23, 24, 25]
+    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 15, 16, 19, 20]
+    @test celldofs(dh, 2) == [3, 4, 21, 22, 5, 6, 23, 24, 25, 26, 29, 30, 27, 28, 13, 14, 11, 12, 31, 32]
+end
 
-    ## Lagrange{2,RefTetrahedron,5}
-    dh = DofHandler(grid)
-    add!(dh, :u, 1, Lagrange{2,RefTetrahedron,5}())
-    close!(dh)
-    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
-    @test celldofs(dh, 2) == [2, 22, 3, 23, 24, 25, 26, 27, 28, 29, 30, 11, 10, 9, 8, 31, 32, 33, 34, 35, 36]
+@testset "vectorization layer compat" begin
+    struct VectorLagrangeTest{dim,shape,order,vdim} <: Ferrite.Interpolation{dim,shape,order} end
+
+    @testset "1d" begin
+        grid = generate_grid(Line, (2,))
+        
+        Ferrite.vertexdof_indices(::VectorLagrangeTest{1,Ferrite.RefLine,1,2}) = ((1,2),(3,4))
+        dh1 = DofHandler(grid)
+        add!(dh1, :u, 1, VectorLagrangeTest{1,Ferrite.RefLine,1,2}())
+        close!(dh1)
+        dh2 = DofHandler(grid)
+        add!(dh2, :u, 2, Lagrange{2,Ferrite.RefCube,1}())
+        close!(dh2)
+        @test dh1.cell_dofs == dh2.cell_dofs
+
+        Ferrite.vertexdof_indices(::VectorLagrangeTest{1,Ferrite.RefLine,1,3}) = ((1,2,3),(4,5,6))
+        dh1 = DofHandler(grid)
+        add!(dh1, :u, 1, VectorLagrangeTest{1,Ferrite.RefLine,1,3}())
+        close!(dh1)
+        dh2 = DofHandler(grid)
+        add!(dh2, :u, 3, Lagrange{2,Ferrite.RefCube,1}())
+        close!(dh2)
+        @test dh1.cell_dofs == dh2.cell_dofs
+    end
+
+    @testset "2d" begin
+        grid = generate_grid(Quadrilateral, (2,2))
+        Ferrite.vertexdof_indices(::VectorLagrangeTest{2,Ferrite.RefCube,1,2}) = ((1,2),(3,4),(5,6),(7,8))
+        dh1 = DofHandler(grid)
+        add!(dh1, :u, 1, VectorLagrangeTest{2,Ferrite.RefCube,1,2}())
+        close!(dh1)
+        dh2 = DofHandler(grid)
+        add!(dh2, :u, 2, Lagrange{2,Ferrite.RefCube,1}())
+        close!(dh2)
+        @test dh1.cell_dofs == dh2.cell_dofs
+
+        Ferrite.vertexdof_indices(::VectorLagrangeTest{2,Ferrite.RefCube,1,3}) = ((1,2,3),(4,5,6),(7,8,9),(10,11,12))
+        Ferrite.facedof_indices(::VectorLagrangeTest{2,Ferrite.RefCube,1,3}) = ((1,2,3,4,5,6), (4,5,6,7,8,9), (7,8,9,10,11,12), (10,11,12,1,2,3))
+        dh1 = DofHandler(grid)
+        add!(dh1, :u, 1, VectorLagrangeTest{2,Ferrite.RefCube,1,3}())
+        close!(dh1)
+        dh2 = DofHandler(grid)
+        add!(dh2, :u, 3, Lagrange{2,Ferrite.RefCube,1}())
+        close!(dh2)
+        @test dh1.cell_dofs == dh2.cell_dofs
+    end
 end
