@@ -207,7 +207,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
 
         face_neighbors = Set{Int}()
         for (face_idx,face) ∈ enumerate(faces(cell))
-            neighbor_candidates = Set{Int}([c for c ∈ vertex_cell_table[face[1]] if c != cellid])
+            neighbor_candidates = Set{Int}(c for c ∈ vertex_cell_table[face[1]] if c != cellid)
             for face_vertex ∈ face[2:end]
                 intersect!(neighbor_candidates, vertex_cell_table[face_vertex])
             end
@@ -217,7 +217,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
         if getdim(cell) > 2
             edge_neighbors = Set{Int}()
             for (edge_idx,edge) ∈ enumerate(edges(cell))
-                neighbor_candidates = Set{Int}([c for c ∈ vertex_cell_table[edge[1]] if c != cellid])
+                neighbor_candidates = Set{Int}(c for c ∈ vertex_cell_table[edge[1]] if c != cellid)
                 for edge_vertex ∈ edge[2:end]
                     edge_neighbor = vertex_cell_table[edge_vertex]
                     if edge_neighbor != cellid && edge_neighbor ∉ face_neighbors
