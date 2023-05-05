@@ -437,7 +437,6 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     face_skeleton_local = Vector{FaceIndex}()
     fs_length = length(face_skeleton_global)
     for (cellid,cell) in enumerate(cells)
-        getdim(cell) == 1 && continue
         for (local_face_id,face) in enumerate(faces(cell))
             push!(face_skeleton_global, first(sortface(face)))
             fs_length_new = length(face_skeleton_global)

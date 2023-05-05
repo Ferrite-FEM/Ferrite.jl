@@ -568,7 +568,8 @@ function sortedge(edge::Tuple{Int,Int})
 end
 
 """
-    sortface(face::Tuple{Int,Int}) 
+    sortface(face::Tuple{Int})
+    sortface(face::Tuple{Int,Int})
     sortface(face::Tuple{Int,Int,Int})
     sortface(face::Tuple{Int,Int,Int,Int})
 
@@ -626,6 +627,7 @@ function sortface(face::Tuple{Int,Int,Int,Int})
     return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
 end
 
+sortface(face::Tuple{Int}) = face, nothing
 
 """
     find_field(dh::DofHandler, field_name::Symbol)::NTuple{2,Int}
