@@ -90,7 +90,7 @@ function vertices(c::AbstractCell{1, RefLine})
 end
 function faces(c::AbstractCell{1, RefLine})
     ns = get_node_ids(c)
-    return (ns[1], ns[2]) # f1, f2
+    return ((ns[1],), (ns[2],)) # f1, f2
 end
 
 # RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
@@ -419,9 +419,11 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
         vertex_neighbors_local = VertexIndex[]
         vertex_neighbors_global = Int[]
         for cell in cellset
-            neighbor_boundary = getdim(cells[cell]) == 2 ? [faces(cells[cell])...] : [edges(cells[cell])...] #get lowest dimension boundary
+            neighbor_boundary = getdim(cells[cell]) > 2 ? [edges(cells[cell])...] : [faces(cells[cell])...] #get lowest dimension boundary
             neighbor_connected_faces = neighbor_boundary[findall(x->global_vertexid in x, neighbor_boundary)]
-            neighbor_vertices_global = getindex.(neighbor_connected_faces, findfirst.(x->x!=global_vertexid,neighbor_connected_faces))
+            other_vertices = findfirst.(x->x!=global_vertexid,neighbor_connected_faces)
+            any(other_vertices .=== nothing) && continue 
+            neighbor_vertices_global = getindex.(neighbor_connected_faces, other_vertices)
             neighbor_vertices_local= [VertexIndex(cell,local_vertex) for local_vertex in findall(x->x in neighbor_vertices_global, vertices(cells[cell]))]
             append!(vertex_neighbors_local, neighbor_vertices_local)
             append!(vertex_neighbors_global, neighbor_vertices_global)
@@ -435,6 +437,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     face_skeleton_local = Vector{FaceIndex}()
     fs_length = length(face_skeleton_global)
     for (cellid,cell) in enumerate(cells)
+        getdim(cell) == 1 && continue
         for (local_face_id,face) in enumerate(faces(cell))
             push!(face_skeleton_global, first(sortface(face)))
             fs_length_new = length(face_skeleton_global)
