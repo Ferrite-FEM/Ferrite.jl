@@ -183,10 +183,10 @@ struct ExclusiveTopology <: AbstractTopology
 end
 
 function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
-    cell_vertex_table = vertices.(cells) #needs generic interface for <: AbstractCell
+    cell_vertices_table = vertices.(cells) #needs generic interface for <: AbstractCell
     vertex_cell_table = Dict{Int,Set{Int}}() 
 
-    for (cellid, cell_vertices) in enumerate(cell_vertex_table)
+    for (cellid, cell_vertices) in enumerate(cell_vertices_table)
        for vertex in cell_vertices
             if haskey(vertex_cell_table, vertex)
                 push!(vertex_cell_table[vertex], cellid)
@@ -229,18 +229,18 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
         end
 
         for neighbor_cellid in cell_neighbors
-            cell_local_ids = findall(x->x in cell_vertex_table[neighbor_cellid], cell_vertex_table[cellid])
+            cell_local_ids = findall(x->x in cell_vertices_table[neighbor_cellid], cell_vertices_table[cellid])
             # vertex neighbor
             if length(cell_local_ids) == 1
-                neighbor_local_ids = findall(x->x in cell_vertex_table[cellid], cell_vertex_table[neighbor_cellid])
+                neighbor_local_ids = findall(x->x in cell_vertices_table[cellid], cell_vertices_table[neighbor_cellid])
                 _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor_local_ids, neighbor_cellid, cells[neighbor_cellid])
             # face neighbor
             elseif neighbor_cellid ∈ face_neighbors
-                neighbor_local_ids = findall(x->x in cell_vertex_table[cellid], cell_vertex_table[neighbor_cellid])
+                neighbor_local_ids = findall(x->x in cell_vertices_table[cellid], cell_vertices_table[neighbor_cellid])
                 _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor_local_ids, neighbor_cellid, cells[neighbor_cellid]) 
             # edge neighbor
             elseif getdim(cell) > 2 && neighbor_cellid ∈ edge_neighbors
-                neighbor_local_ids = findall(x->x in cell_vertex_table[cellid], cell_vertex_table[neighbor_cellid])
+                neighbor_local_ids = findall(x->x in cell_vertices_table[cellid], cell_vertices_table[neighbor_cellid])
                 _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor_local_ids, neighbor_cellid, cells[neighbor_cellid])
             end
         end   
