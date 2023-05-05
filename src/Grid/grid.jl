@@ -419,7 +419,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
         vertex_neighbors_local = VertexIndex[]
         vertex_neighbors_global = Int[]
         for cell in cellset
-            neighbor_boundary = getdim(cells[cell]) > 2 ? [edges(cells[cell])...] : [faces(cells[cell])...] #get lowest dimension boundary
+            neighbor_boundary = getdim(cells[cell]) > 2 ? collect(edges(cells[cell])) : collect(faces(cells[cell])) #get lowest dimension boundary
             neighbor_connected_faces = neighbor_boundary[findall(x->global_vertexid in x, neighbor_boundary)]
             other_vertices = findfirst.(x->x!=global_vertexid,neighbor_connected_faces)
             any(other_vertices .=== nothing) && continue 
