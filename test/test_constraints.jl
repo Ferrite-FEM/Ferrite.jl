@@ -17,21 +17,21 @@
     ## Scalar
     dbc = Dirichlet(:s, Γ, (x, t) -> 0)
     add!(ch, dbc)
-    @test dbc.components == [1]
+    @test ch.dbcs[end].components == [1]
     dbc = Dirichlet(:s, Γ, (x, t) -> 0, [1])
     add!(ch, dbc)
-    @test dbc.components == [1]
+    @test ch.dbcs[end].components == [1]
     dbc = Dirichlet(:s, Γ, (x, t) -> 0, [1, 2])
     @test_throws ErrorException("components [1, 2] not within range of field :s (1 dimension(s))") add!(ch, dbc)
     dbc = Dirichlet(:p, Γ, (x, t) -> 0)
-    @test_throws ErrorException("could not find field :p in DofHandler (existing fields: [:s, :v])") add!(ch, dbc)
-    ## Vector
+    @test_throws ErrorException("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's DofHandler") add!(ch, dbc)
+    #    ## Vector
     dbc = Dirichlet(:v, Γ, (x, t) -> 0)
     add!(ch, dbc)
-    @test dbc.components == [1, 2]
+    @test ch.dbcs[end].components == [1, 2]
     dbc = Dirichlet(:v, Γ, (x, t) -> 0, [1])
     add!(ch, dbc)
-    @test dbc.components == [1]
+    @test ch.dbcs[end].components == [1]
     dbc = Dirichlet(:v, Γ, (x, t) -> 0, [2, 3])
     @test_throws ErrorException("components [2, 3] not within range of field :v (2 dimension(s))") add!(ch, dbc)
 
@@ -52,7 +52,7 @@
     pdbc = PeriodicDirichlet(:s, face_map, [1, 2])
     @test_throws ErrorException("components [1, 2] not within range of field :s (1 dimension(s))") add!(ConstraintHandler(dh), pdbc)
     pdbc = PeriodicDirichlet(:p, face_map)
-    @test_throws ErrorException("could not find field :p in DofHandler (existing fields: [:s, :v])") add!(ConstraintHandler(dh), pdbc)
+    @test_throws ErrorException("Did not find field :p in DofHandler (existing fields: [:s, :v]).") add!(ConstraintHandler(dh), pdbc)
     ## Vector
     pdbc = PeriodicDirichlet(:v, face_map)
     add!(ConstraintHandler(dh), pdbc)
@@ -92,14 +92,14 @@ end
     @test ch.prescribed_dofs == collect(1:9)
     @test ch.inhomogeneities == [-1, -1, 1, -1, -1, 1, 0, 0, 0]
 
-    ## test node bc with mixed dof handler
+    ## test node bc with subsets
    dim = 2
    mesh = generate_grid(QuadraticQuadrilateral, (2,1))
    addcellset!(mesh, "set1", Set(1))
    addcellset!(mesh, "set2", Set(2))
    addnodeset!(mesh, "bottom", Set(1:5))
 
-   dh  = MixedDofHandler(mesh)
+   dh  = DofHandler(mesh)
 
    ip_quadratic = Lagrange{dim, RefCube, 2}()
    ip_linear = Lagrange{dim, RefCube, 1}()
@@ -111,16 +111,15 @@ end
    close!(dh)
 
    ch = ConstraintHandler(dh)
-   add!(ch, dh.fieldhandlers[1], Dirichlet(:u, getnodeset(mesh, "bottom"), (x,t)->1.0, 1))
-   add!(ch, dh.fieldhandlers[2], Dirichlet(:u, getnodeset(mesh, "bottom"), (x,t)->1.0, 1))
-   add!(ch, dh.fieldhandlers[1], Dirichlet(:c, getnodeset(mesh, "bottom"), (x,t)->2.0, 1))
+   add!(ch, Dirichlet(:u, getnodeset(mesh, "bottom"), (x,t)->1.0, 1))
+   add!(ch, Dirichlet(:c, getnodeset(mesh, "bottom"), (x,t)->2.0, 1))
    close!(ch)
    update!(ch)
 
    @test ch.prescribed_dofs == [1,3,9,19,20,23,27]
    @test ch.inhomogeneities == [1.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0]
 
-   ## MixedDofHandler: let first FieldHandler not have all fields
+   ## Fields on subdomain
    dim = 2
    mesh = generate_grid(Quadrilateral, (2,1))
    addcellset!(mesh, "set1", Set(1))
@@ -130,15 +129,14 @@ end
    field_u = Field(:u, ip, dim)
    field_c = Field(:c, ip, 1)
 
-   dh = MixedDofHandler(mesh)
+   dh = DofHandler(mesh)
    add!(dh, FieldHandler([field_u], getcellset(mesh, "set1")))
    add!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set2")))
    close!(dh)
 
    ch = ConstraintHandler(dh)
-   add!(ch, dh.fieldhandlers[1], Dirichlet(:u, getfaceset(mesh, "bottom"), (x,t)->1.0, 1))
-   add!(ch, dh.fieldhandlers[2], Dirichlet(:u, getfaceset(mesh, "bottom"), (x,t)->1.0, 1))
-   add!(ch, dh.fieldhandlers[2], Dirichlet(:c, getfaceset(mesh, "bottom"), (x,t)->2.0, 1))
+   add!(ch, Dirichlet(:u, getfaceset(mesh, "bottom"), (x,t)->1.0, 1))
+   add!(ch, Dirichlet(:c, getfaceset(mesh, "bottom"), (x,t)->2.0, 1))
    close!(ch)
    update!(ch)
 
@@ -170,7 +168,7 @@ end
              Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(0.0,1.0,0.0)),
              Node{3,Float64}(Vec(2.0,0.0,0.0)), Node{3,Float64}(Vec(2.0,2.0,0.0))]
 
-    cells = [Quadrilateral3D((1,2,3,4)), Quadrilateral3D((2,5,6,3))]
+    cells = [Quadrilateral((1,2,3,4)), Quadrilateral((2,5,6,3))]
     grid = Grid(cells,nodes)
 
     #3d quad with 1st order 2d interpolation
@@ -216,11 +214,11 @@ end
                     "C" => Set((FaceIndex(3,1), FaceIndex(4,1))))
     grid = Grid(cells, nodes, cellsets=cellsets, facesets=facesets)
 
-    # Create MixedDofHandler based on grid
+    # Create DofHandler based on grid
     dim = Ferrite.getdim(grid)  # 2
     ip_quad = Lagrange{dim,RefCube,1}()
     ip_tria = Lagrange{dim,RefTetrahedron,1}()
-    dh = MixedDofHandler(grid)
+    dh = DofHandler(grid)
     field_uT = Field(:u, ip_tria, 1)
     field_uQ = Field(:u, ip_quad, 1)
     field_vT = Field(:v, ip_tria, 1)
@@ -245,8 +243,8 @@ end
     @test_logs min_level=Logging.Warn add!(ch, dA_u)    # No warning should be issued
     @test_logs min_level=Logging.Warn add!(ch, dA_v)    # No warning should be issued
     @test_logs min_level=Logging.Warn add!(ch, dB_u)    # No warning should be issued
-    @test_logs (:warn,) add!(ch, dB_v)  # Warn about :v not in cells connected with dB_v's faceset
-    @test_logs (:warn,) add!(ch, dC_v)  # Warn about :v not in cells connected with dC_v's faceset
+    @test_throws ErrorException add!(ch, dB_v)  # Warn about :v not in cells connected with dB_v's faceset
+    @test_throws ErrorException add!(ch, dC_v)  # Warn about :v not in cells connected with dC_v's faceset
     @test_logs min_level=Logging.Warn add!(ch, dN_u)    # No warning should be issued (add to node)
     close!(ch)
     

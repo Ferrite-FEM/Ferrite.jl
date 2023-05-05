@@ -14,6 +14,7 @@ Ferrite.getorder(::Interpolation)
 Ferrite.value(::Interpolation{dim}, ::Vec{dim,T}) where {dim,T}
 Ferrite.derivative(::Interpolation{dim}, ::Vec{dim}) where {dim}
 Ferrite.boundarydof_indices
+Ferrite.adjust_dofs_during_distribution(::Interpolation)
 ```
 
 ### Required methods to implement for all subtypes of `Interpolation` to define a new finite element
