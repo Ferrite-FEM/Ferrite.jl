@@ -214,6 +214,18 @@ end
 end
 
 @testset "Grid topology" begin
+#
+#      (1) (2) (3) (4)
+#       +---+---+---+
+#
+    linegrid = generate_grid(Line,(3,))
+    linetopo = ExclusiveTopology(linegrid)
+    @test linetopo.vertex_neighbor[1,2] == Ferrite.EntityNeighborhood(VertexIndex(2,1))
+    @test linetopo.vertex_neighbor[2,1] == Ferrite.EntityNeighborhood(VertexIndex(1,2))
+    @test linetopo.vertex_neighbor[2,2] == Ferrite.EntityNeighborhood(VertexIndex(3,1))
+    @test linetopo.vertex_neighbor[3,1] == Ferrite.EntityNeighborhood(VertexIndex(2,2))
+    @test length(linetopo.face_skeleton) == 4
+
 #                           (11)
 #                   (10)+-----+-----+(12)
 #                       |  5  |  6  |
