@@ -10,7 +10,7 @@ jobs:
   test:
     name: Julia ${{ matrix.julia-version }} - ${{ matrix.os }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 1
+    timeout-minutes: 40
     continue-on-error: ${{ matrix.julia-version == 'nightly' }}
     strategy:
       matrix:
@@ -37,7 +37,7 @@ jobs:
   docs:
     name: Documentation
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
