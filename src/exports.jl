@@ -1,6 +1,7 @@
 export
 # Interpolations
     Interpolation,
+    VectorizedInterpolation,
     RefCube,
     RefTetrahedron,
     RefPrism,

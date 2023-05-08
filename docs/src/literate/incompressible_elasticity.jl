@@ -59,8 +59,8 @@ end;
 # with possibly different interpolations
 function create_dofhandler(grid, ipu, ipp)
     dh = DofHandler(grid)
-    add!(dh, :u, 2, ipu) # displacement
-    add!(dh, :p, 1, ipp) # pressure
+    add!(dh, :u, ipu) # displacement
+    add!(dh, :p, ipp) # pressure
     close!(dh)
     return dh
 end;
@@ -212,15 +212,22 @@ function solve(ν, interpolation_u, interpolation_p)
     return u
 end
 
+# We now define the interpolation for displacement and pressure. We use (scalar) Lagrange
+# interpolation as a basis for both, and for the displacement, which is a vector, we
+# vectorize it to 2 dimensions such that we obtain vector shape functions (and 2nd order
+# tensors for the gradients).
+
+linear_p    = Lagrange{2,RefTetrahedron,1}()
+linear_u    = Lagrange{2,RefTetrahedron,1}()^2
+quadratic_u = Lagrange{2,RefTetrahedron,2}()^2
+
 # All that is left is to solve the problem. We choose a value of Poissons
 # ratio that is near incompressibility -- $ν = 0.5$ -- and thus expect the
 # linear/linear approximation to return garbage, and the quadratic/linear
 # approximation to be stable.
-linear    = Lagrange{2,RefTetrahedron,1}()
-quadratic = Lagrange{2,RefTetrahedron,2}()
 
-u1 = solve(0.4999999, linear, linear)
-u2 = solve(0.4999999, quadratic, linear);
+u1 = solve(0.4999999, linear_u,    linear_p)
+u2 = solve(0.4999999, quadratic_u, linear_p);
 
 ## test the result                 #src
 using Test                         #src

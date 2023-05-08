@@ -56,7 +56,8 @@ function _apply_analytical!(
     ref_points = reference_coordinates(ip_fun)
     dummy_weights = zeros(length(ref_points))
     qr = QuadratureRule{dim, RefShape}(dummy_weights, ref_points)
-    cv = CellScalarValues(qr, ip_fun, ip_geo)
+    # Note: Passing ip_geo as the function interpolation here, it is just a dummy.
+    cv = CellScalarValues(qr, ip_geo, ip_geo)
     c_dofs = celldofs(dh, first(cellset))
     f_dofs = zeros(Int, length(celldofinds))
 
