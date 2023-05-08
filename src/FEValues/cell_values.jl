@@ -13,7 +13,8 @@ utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape 
 * `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
 * `quad_rule`: an instance of a [`QuadratureRule`](@ref)
 * `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
-* `geom_interpol`: an optional instance of a [`Interpolation`](@ref) which is used to interpolate the geometry
+* `geom_interpol`: an optional instance of a [`Interpolation`](@ref) which is used to interpolate the geometry.
+  By default linear Lagrange interpolation is used.
 
 **Common methods:**
 * [`reinit!`](@ref)
@@ -33,6 +34,10 @@ utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape 
 """
 CellValues, CellScalarValues, CellVectorValues
 
+function default_geometric_interpolation(::Interpolation{dim,shape}) where {dim, shape}
+    return Lagrange{dim,shape,1}()
+end
+
 # CellScalarValues
 struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: CellValues{dim,T,refshape}
     N::Matrix{T}
@@ -49,12 +54,12 @@ struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: CellValues{di
 end
 
 function CellScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol)
+        geom_interpol::Interpolation=default_geometric_interpolation(func_interpol))
     CellScalarValues(Float64, quad_rule, func_interpol, geom_interpol)
 end
 
 function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol) where {dim,T,shape<:AbstractRefShape}
+        geom_interpol::Interpolation=default_geometric_interpolation(func_interpol)) where {dim,T,shape<:AbstractRefShape}
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
@@ -100,12 +105,12 @@ struct CellVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: CellValues{
     geo_interp::Interpolation{dim,refshape}
 end
 
-function CellVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
+function CellVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=default_geometric_interpolation(func_interpol))
     CellVectorValues(Float64, quad_rule, func_interpol, geom_interpol)
 end
 
 function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol) where {dim,T,shape<:AbstractRefShape}
+        geom_interpol::Interpolation=default_geometric_interpolation(func_interpol)) where {dim,T,shape<:AbstractRefShape}
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape

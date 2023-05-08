@@ -16,7 +16,8 @@ for (func_interpol, quad_rule) in  (
                                    )
 
     for fe_valtype in (CellScalarValues, CellVectorValues)
-        cv = fe_valtype(quad_rule, func_interpol)
+        geom_interpol = func_interpol # Tests below assume this
+        cv = fe_valtype(quad_rule, func_interpol, geom_interpol)
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 

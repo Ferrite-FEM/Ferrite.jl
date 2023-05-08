@@ -220,9 +220,10 @@ end
 # As mentioned in the introduction we will use a quadratic approximation for the velocity
 # field and a linear approximation for the pressure to ensure that we fulfill the LBB
 # condition. We create the corresponding FE values with interpolations `ipu` for the
-# velocity and `ipp` for the pressure. Note that we use linear geometric interpolation
-# (`ipg`) for both the velocity and pressure, this is because our grid contains linear
-# triangles. We also construct face-values for the pressure since we need to integrate along
+# velocity and `ipp` for the pressure. Note that we specify linear geometric mapping
+# (`ipg`) for both the velocity and pressure because our grid contains linear
+# triangles. However, since linear mapping is default this could have been skipped.
+# We also construct face-values for the pressure since we need to integrate along
 # the boundary when assembling the constraint matrix ``\underline{\underline{C}}``.
 
 function setup_fevalues(ipu, ipp, ipg)
