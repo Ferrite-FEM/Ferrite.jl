@@ -100,15 +100,12 @@ function create_values(interpolation_u, interpolation_p)
     qr      = QuadratureRule{3,RefTetrahedron}(4)
     face_qr = QuadratureRule{2,RefTetrahedron}(4)
 
-    ## geometric interpolation
-    interpolation_geom = Lagrange{3,RefTetrahedron,1}()
-
     ## cell and facevalues for u
-    cellvalues_u = CellVectorValues(qr, interpolation_u, interpolation_geom)
-    facevalues_u = FaceVectorValues(face_qr, interpolation_u, interpolation_geom)
+    cellvalues_u = CellVectorValues(qr, interpolation_u)
+    facevalues_u = FaceVectorValues(face_qr, interpolation_u)
 
     ## cellvalues for p
-    cellvalues_p = CellScalarValues(qr, interpolation_p, interpolation_geom)
+    cellvalues_p = CellScalarValues(qr, interpolation_p)
 
     return cellvalues_u, cellvalues_p, facevalues_u
 end;

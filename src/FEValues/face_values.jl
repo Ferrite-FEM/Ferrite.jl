@@ -18,7 +18,8 @@ For a scalar field, the `FaceScalarValues` type should be used. For vector field
 * `T`: an optional argument to determine the type the internal data is stored as.
 * `quad_rule`: an instance of a [`QuadratureRule`](@ref)
 * `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
-* `geom_interpol`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry
+* `geom_interpol`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry.
+  By default linear Lagrange interpolation is used.
 
 **Common methods:**
 
@@ -61,12 +62,12 @@ struct FaceScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: FaceValues{di
 end
 
 function FaceScalarValues(quad_rule::QuadratureRule, func_interpol::Interpolation,
-                          geom_interpol::Interpolation=func_interpol)
+                          geom_interpol::Interpolation=default_geometric_interpolation(func_interpol))
     FaceScalarValues(Float64, quad_rule, func_interpol, geom_interpol)
 end
 
 function FaceScalarValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol) where {dim_qr,T,shape<:AbstractRefShape}
+        geom_interpol::Interpolation=default_geometric_interpolation(func_interpol)) where {dim_qr,T,shape<:AbstractRefShape}
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
@@ -125,12 +126,12 @@ struct FaceVectorValues{dim,T<:Real,refshape<:AbstractRefShape,M} <: FaceValues{
     geo_interp::Interpolation{dim,refshape}
 end
 
-function FaceVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=func_interpol)
+function FaceVectorValues(quad_rule::QuadratureRule, func_interpol::Interpolation, geom_interpol::Interpolation=default_geometric_interpolation(func_interpol))
     FaceVectorValues(Float64, quad_rule, func_interpol, geom_interpol)
 end
 
 function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule{dim_qr,shape}, func_interpol::Interpolation,
-        geom_interpol::Interpolation=func_interpol) where {dim_qr,T,shape<:AbstractRefShape}
+        geom_interpol::Interpolation=default_geometric_interpolation(func_interpol)) where {dim_qr,T,shape<:AbstractRefShape}
 
     @assert getdim(func_interpol) == getdim(geom_interpol)
     @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape

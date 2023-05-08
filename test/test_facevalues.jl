@@ -13,7 +13,8 @@ for (func_interpol, quad_rule) in  (
                                    )
 
     for fe_valtype in (FaceScalarValues, FaceVectorValues)
-        fv = fe_valtype(quad_rule, func_interpol)
+        geom_interpol = func_interpol # Tests below assume this
+        fv = fe_valtype(quad_rule, func_interpol, geom_interpol)
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
