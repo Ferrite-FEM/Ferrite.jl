@@ -121,3 +121,9 @@ end
 @deprecate function_divergence(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(fe_v, q_point, reinterpret(T, u))
 @deprecate function_divergence(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(vv, fe_v, q_point, reinterpret(T, u))
 @deprecate function_curl(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{3, T}}) where T function_curl(fe_v::Values, q_point::Int, reinterpret(T, u))
+
+# Deprecation of compute_vertex_values
+@deprecate compute_vertex_values(nodes::Vector{<:Node}, f::Function) map(n -> f(n.x), nodes)
+@deprecate compute_vertex_values(grid::AbstractGrid, f::Function) map(n -> f(n.x), getnodes(grid))
+@deprecate compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function) map(n -> f(n.x), getnodes(grid, v))
+@deprecate compute_vertex_values(grid::AbstractGrid, set::String, f::Function) map(n -> f(n.x), getnodes(grid, set))
