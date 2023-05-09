@@ -16,9 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - **BREAKING**: `MixedDofHandler` has been renamed to `DofHandler`. Update by replacing 
 `MixedDofHandler` to `DofHandler`. ([#667][github-667])
+
+### Other improvements
 - **BREAKING**: All `CellValues` have a finer granularity on the different types of
-  dimensions used. Custom `CellValues` must be updated to respect the new type 
-  parameters. ([#651][github-651])
+  dimensions used. Custom `CellValues` and dispatches on their type parameters must be 
+  updated to respect the new type. ([#651][github-651])
 
 ## [0.3.14] - 2023-04-03
 ### Added
