@@ -90,7 +90,7 @@ function vertices(c::AbstractCell{1, RefLine})
 end
 function faces(c::AbstractCell{1, RefLine})
     ns = get_node_ids(c)
-    return (ns[1], ns[2]) # f1, f2
+    return ((ns[1],), (ns[2],)) # f1, f2
 end
 
 # RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
@@ -259,19 +259,15 @@ function Base.show(io::IO, ::MIME"text/plain", n::EntityNeighborhood)
 end
 
 """
-    face_npoints(::AbstractCell)
-Specifies for each subtype of AbstractCell how many nodes form a face
+    nvertices_on_face(cell::AbstractCell, local_face_index::Int)
+Specifies for each subtype of AbstractCell how many nodes form a face.
 """
-face_npoints(::AbstractCell{2}) = 2
-# face_npoints(::Cell{3,4,1}) = 4 #not sure how to handle embedded cells e.g. Quadrilateral3D
+nvertices_on_face(cell::AbstractCell, local_face_index::Int) = length(faces(cell)[local_face_index])
 """
-    edge_npoints(::AbstractCell)
-Specifies for each subtype of AbstractCell how many nodes form an edge
+    nvertices_on_edge(::AbstractCell, local_edge_index::Int)
+Specifies for each subtype of AbstractCell how many nodes form an edge.
 """
-# edge_npoints(::Cell{3,4,1}) = 2 #not sure how to handle embedded cells e.g. Quadrilateral3D
-face_npoints(::AbstractCell{3, RefHexahedron}) = 4
-face_npoints(::AbstractCell{3, RefTetrahedron}) = 3
-edge_npoints(::AbstractCell{3}) = 2
+nvertices_on_edge(cell::AbstractCell, local_edge_index::Int) = length(edges(cell)[local_edge_index])
 
 getdim(::Union{AbstractCell{refdim},Type{<:AbstractCell{refdim}}}) where {refdim} = refdim
 
@@ -280,8 +276,7 @@ abstract type AbstractTopology end
 """
     ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
 `ExclusiveTopology` saves topological (connectivity) data of the grid. The constructor works with an `AbstractCell`
-vector for all cells that dispatch `vertices`, `faces` and in 3D `edges` as well as the utility functions
-`face_npoints` and `edge_npoints`.
+vector for all cells that dispatch `vertices`, `faces` and in 3D `edges`.
 The struct saves the highest dimensional neighborhood, i.e. if something is connected by a face and an
  edge only the face neighborhood is saved. The lower dimensional neighborhood is recomputed, if needed.
 
@@ -296,7 +291,7 @@ The struct saves the highest dimensional neighborhood, i.e. if something is conn
 """
 struct ExclusiveTopology <: AbstractTopology
     # maps a global vertex id to all cells containing the vertex
-    vertex_to_cell::Dict{Int,Vector{Int}}
+    vertex_to_cell::Dict{Int,Set{Int}}
     # index of the vector = cell id ->  all other connected cells
     cell_neighbor::Vector{EntityNeighborhood{CellIndex}}
     # face_neighbor[cellid,local_face_id] -> exclusive connected entities (not restricted to one entity)
@@ -313,14 +308,14 @@ end
 
 function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     cell_vertices_table = vertices.(cells) #needs generic interface for <: AbstractCell
-    vertex_cell_table = Dict{Int,Vector{Int}}() 
-    
-    for (cellid, cell_nodes) in enumerate(cell_vertices_table)
-       for node in cell_nodes
-            if haskey(vertex_cell_table, node)
-                push!(vertex_cell_table[node], cellid)
+    vertex_cell_table = Dict{Int,Set{Int}}() 
+
+    for (cellid, cell_vertices) in enumerate(cell_vertices_table)
+       for vertex in cell_vertices
+            if haskey(vertex_cell_table, vertex)
+                push!(vertex_cell_table[vertex], cellid)
             else
-                vertex_cell_table[node] = [cellid]
+                vertex_cell_table[vertex] = Set([cellid])
             end
         end 
     end
@@ -330,29 +325,51 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     I_vertex = Int[]; J_vertex = Int[]; V_vertex = EntityNeighborhood[]   
     cell_neighbor_table = Vector{EntityNeighborhood{CellIndex}}(undef, length(cells)) 
 
-    for (cellid, cell) in enumerate(cells)    
-        #cell neighborhood
-        cell_neighbors = getindex.((vertex_cell_table,), cell_vertices_table[cellid]) # cell -> vertex -> cell
-        cell_neighbors = unique(reduce(vcat,cell_neighbors)) # non unique list initially 
-        filter!(x->x!=cellid, cell_neighbors) # get rid of self neighborhood
-        cell_neighbor_table[cellid] = EntityNeighborhood(CellIndex.(cell_neighbors)) 
+    for (cellid, cell) in enumerate(cells)
+        cell_neighbors = reduce(union!, [Set{Int}(vertex_cell_table[vertex]) for vertex ∈ vertices(cell) if vertex_cell_table[vertex] != cellid])
+        cell_neighbor_table[cellid] = EntityNeighborhood(CellIndex.(collect(cell_neighbors)))
 
-        for neighbor in cell_neighbors
-            neighbor_local_ids = findall(x->x in cell_vertices_table[cellid], cell_vertices_table[neighbor])
-            cell_local_ids = findall(x->x in cell_vertices_table[neighbor], cell_vertices_table[cellid])
+        face_neighbors = Set{Int}()
+        for (face_idx,face) ∈ enumerate(faces(cell))
+            neighbor_candidates = Set{Int}(c for c ∈ vertex_cell_table[face[1]] if c != cellid)
+            for face_vertex ∈ face[2:end]
+                intersect!(neighbor_candidates, vertex_cell_table[face_vertex])
+            end
+            union!(face_neighbors, neighbor_candidates)
+        end
+
+        if getdim(cell) > 2
+            edge_neighbors = Set{Int}()
+            for (edge_idx,edge) ∈ enumerate(edges(cell))
+                neighbor_candidates = Set{Int}(c for c ∈ vertex_cell_table[edge[1]] if c != cellid)
+                for edge_vertex ∈ edge[2:end]
+                    edge_neighbor = vertex_cell_table[edge_vertex]
+                    if edge_neighbor != cellid && edge_neighbor ∉ face_neighbors
+                        intersect!(neighbor_candidates, edge_neighbor)
+                    end
+                end
+                union!(edge_neighbors, neighbor_candidates)
+            end
+        end
+
+        for neighbor_cellid in cell_neighbors
+            cell_local_ids = findall(x->x in cell_vertices_table[neighbor_cellid], cell_vertices_table[cellid])
             # vertex neighbor
             if length(cell_local_ids) == 1
-                _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
+                neighbor_local_ids = findall(x->x in cell_vertices_table[cellid], cell_vertices_table[neighbor_cellid])
+                _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor_local_ids, neighbor_cellid, cells[neighbor_cellid])
             # face neighbor
-            elseif length(cell_local_ids) == face_npoints(cell)
-                _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor]) 
+            elseif neighbor_cellid ∈ face_neighbors
+                neighbor_local_ids = findall(x->x in cell_vertices_table[cellid], cell_vertices_table[neighbor_cellid])
+                _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor_local_ids, neighbor_cellid, cells[neighbor_cellid]) 
             # edge neighbor
-            elseif getdim(cell) > 2 && length(cell_local_ids) == edge_npoints(cell)
-                _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
+            elseif getdim(cell) > 2 && neighbor_cellid ∈ edge_neighbors
+                neighbor_local_ids = findall(x->x in cell_vertices_table[cellid], cell_vertices_table[neighbor_cellid])
+                _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor_local_ids, neighbor_cellid, cells[neighbor_cellid])
             end
-        end       
+        end   
     end
-    
+
     celltype = eltype(cells)
     if isconcretetype(celltype)
         dim = getdim(cells[1])
@@ -402,9 +419,11 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
         vertex_neighbors_local = VertexIndex[]
         vertex_neighbors_global = Int[]
         for cell in cellset
-            neighbor_boundary = getdim(cells[cell]) == 2 ? [faces(cells[cell])...] : [edges(cells[cell])...] #get lowest dimension boundary
+            neighbor_boundary = getdim(cells[cell]) > 2 ? collect(edges(cells[cell])) : collect(faces(cells[cell])) #get lowest dimension boundary
             neighbor_connected_faces = neighbor_boundary[findall(x->global_vertexid in x, neighbor_boundary)]
-            neighbor_vertices_global = getindex.(neighbor_connected_faces, findfirst.(x->x!=global_vertexid,neighbor_connected_faces))
+            other_vertices = findfirst.(x->x!=global_vertexid,neighbor_connected_faces)
+            any(other_vertices .=== nothing) && continue 
+            neighbor_vertices_global = getindex.(neighbor_connected_faces, other_vertices)
             neighbor_vertices_local= [VertexIndex(cell,local_vertex) for local_vertex in findall(x->x in neighbor_vertices_global, vertices(cells[cell]))]
             append!(vertex_neighbors_local, neighbor_vertices_local)
             append!(vertex_neighbors_global, neighbor_vertices_global)
