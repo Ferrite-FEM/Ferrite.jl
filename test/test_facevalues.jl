@@ -44,19 +44,26 @@ for (func_interpol, quad_rule) in  (
 
             for i in 1:length(getnquadpoints(fv))
                 @test getnormal(fv, i) ≈ n[face]
-                @test function_gradient(fv, i, u) ≈ H
-                @test function_symmetric_gradient(fv, i, u) ≈ 0.5(H + H')
-                @test function_divergence(fv, i, u) ≈ tr(H)
-                ndim == 3 && @test function_curl(fv, i, u) ≈ Ferrite.curl_from_gradient(H)
-                function_value(fv, i, u)
                 if isa(fv, FaceScalarValues)
+                    @test function_gradient(fv, i, u) ≈ H
+                    @test function_symmetric_gradient(fv, i, u) ≈ 0.5(H + H')
+                    @test function_divergence(fv, i, u) ≈ tr(H)
                     @test function_gradient(fv, i, u_scal) ≈ V
+                    ndim == 3 && @test function_curl(fv, i, u) ≈ Ferrite.curl_from_gradient(H)
+                    function_value(fv, i, u)
                     function_value(fv, i, u_scal)
                 elseif isa(fv, FaceVectorValues)
-                    @test function_gradient(fv, i, u_vector) ≈ function_gradient(fv, i, u) ≈ H
-                    @test function_value(fv, i, u_vector) ≈ function_value(fv, i, u)
-                    @test function_divergence(fv, i, u_vector) ≈ function_divergence(fv, i, u) ≈ tr(H)
-                    ndim == 3 && @test function_curl(fv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
+                    @test function_gradient(fv, i, u_vector) ≈ H
+                    @test (@test_deprecated function_gradient(fv, i, u)) ≈ H
+                    @test function_symmetric_gradient(fv, i, u_vector) ≈ 0.5(H + H')
+                    @test (@test_deprecated function_symmetric_gradient(fv, i, u)) ≈ 0.5(H + H')
+                    @test function_divergence(fv, i, u_vector) ≈ tr(H)
+                    @test (@test_deprecated function_divergence(fv, i, u)) ≈ tr(H)
+                    if ndim == 3
+                        @test function_curl(fv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
+                        @test (@test_deprecated function_curl(fv, i, u)) ≈ Ferrite.curl_from_gradient(H)
+                    end
+                    @test function_value(fv, i, u_vector) ≈ (@test_deprecated function_value(fv, i, u))
                 end
             end
 

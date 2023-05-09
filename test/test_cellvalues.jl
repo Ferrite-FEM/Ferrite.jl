@@ -44,19 +44,26 @@ for (func_interpol, quad_rule) in  (
         u_vector = reinterpret(Float64, u)
 
         for i in 1:length(getpoints(quad_rule))
-            @test function_gradient(cv, i, u) ≈ H
-            @test function_symmetric_gradient(cv, i, u) ≈ 0.5(H + H')
-            @test function_divergence(cv, i, u) ≈ tr(H)
-            ndim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl_from_gradient(H)
-            function_value(cv, i, u)
             if isa(cv, CellScalarValues)
+                @test function_gradient(cv, i, u) ≈ H
+                @test function_symmetric_gradient(cv, i, u) ≈ 0.5(H + H')
+                @test function_divergence(cv, i, u) ≈ tr(H)
                 @test function_gradient(cv, i, u_scal) ≈ V
+                ndim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl_from_gradient(H)
+                function_value(cv, i, u)
                 function_value(cv, i, u_scal)
             elseif isa(cv, CellVectorValues)
-                @test function_gradient(cv, i, u_vector) ≈ function_gradient(cv, i, u) ≈ H
-                @test function_value(cv, i, u_vector) ≈ function_value(cv, i, u)
-                @test function_divergence(cv, i, u_vector) ≈ function_divergence(cv, i, u) ≈ tr(H)
-                ndim == 3 && @test function_curl(cv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
+                @test function_gradient(cv, i, u_vector)  ≈ H
+                @test (@test_deprecated function_gradient(cv, i, u)) ≈ H
+                @test function_symmetric_gradient(cv, i, u_vector) ≈ 0.5(H + H')
+                @test (@test_deprecated function_symmetric_gradient(cv, i, u)) ≈ 0.5(H + H')
+                @test function_divergence(cv, i, u_vector) ≈ tr(H)
+                @test (@test_deprecated function_divergence(cv, i, u)) ≈ tr(H)
+                if ndim == 3
+                    @test function_curl(cv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
+                    @test (@test_deprecated function_curl(cv, i, u)) ≈ Ferrite.curl_from_gradient(H)
+                end
+                function_value(cv, i, u_vector) ≈ (@test_deprecated function_value(cv, i, u))
             end
         end
 
@@ -157,11 +164,6 @@ end
     @test_throws ArgumentError function_value(csv, qp, ue)
     @test_throws ArgumentError function_gradient(csv, qp, ue)
     @test_throws ArgumentError function_divergence(csv, qp, ue)
-    # Vector values, vector dofs
-    ue = [rand(Vec{dim}) for _ in 1:(getnbasefunctions(cvv) ÷ dim + 1)]
-    @test_throws ArgumentError function_value(cvv, qp, ue)
-    @test_throws ArgumentError function_gradient(cvv, qp, ue)
-    @test_throws ArgumentError function_divergence(cvv, qp, ue)
 end
 
 @testset "Embedded elements" begin
