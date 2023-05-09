@@ -3,12 +3,7 @@
 # determined from the function y = 1 + x[1]^2 + (2x[2])^2
 function test_projection(order, refshape)
     element = refshape == RefCube ? Quadrilateral : Triangle
-    if order == 1
-        grid = generate_grid(element, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
-    elseif order == 2
-        # grid = generate_grid(QuadraticQuadrilateral, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
-        grid = generate_grid(element, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
-    end
+    grid = generate_grid(element, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
 
     dim = 2
     ip = Lagrange{dim, refshape, order}()
@@ -20,7 +15,7 @@ function test_projection(order, refshape)
     f(x) = 1 + x[1]^2 + (2x[2])^2
     # Nodal approximations for this simple grid when using linear interpolation
     f_approx(i) = refshape == RefCube ?
-        [0.1666666666666664, 1.166666666666667, 4.166666666666666, 5.166666666666667][i] :
+        [0.1666666666666664, 1.166666666666667, 5.166666666666667, 4.166666666666666][i] :
         [0.444444444444465, 1.0277777777778005, 4.027777777777753, 5.444444444444435][i]
 
     # analytical values
@@ -41,17 +36,16 @@ function test_projection(order, refshape)
     point_vars = project(proj, qp_values, qr)
     qp_values_matrix = reduce(hcat, qp_values)
     point_vars_2 = project(proj, qp_values_matrix, qr)
-    @test point_vars ≈ point_vars_2
-
     if order == 1
         # A linear approximation can not recover a quadratic solution,
         # so projected values will be different from the analytical ones
         ae = [f_approx(i) for i in 1:4]
     elseif order == 2
         # For a quadratic approximation the analytical solution is recovered
-        ae = compute_vertex_values(grid, f)
+        ae = zeros(length(point_vars))
+        apply_analytical!(ae, proj.dh, :_, f)
     end
-    @test point_vars[1:4] ≈ ae
+    @test point_vars ≈ point_vars_2 ≈ ae
 
     # Vec
     f_vector(x) = Vec{1,Float64}((f(x),))
@@ -60,9 +54,11 @@ function test_projection(order, refshape)
     if order == 1
         ae = [Vec{1,Float64}((f_approx(j),)) for j in 1:4]
     elseif order == 2
-        ae = compute_vertex_values(grid, f_vector)
+        ae = zeros(length(point_vars))
+        apply_analytical!(ae, proj.dh, :_, x -> f_vector(x)[1])
+        ae = reinterpret(Vec{1,Float64}, ae)
     end
-    @test point_vars[1:4] ≈ ae
+    @test point_vars ≈ ae
 
     # Tensor
     f_tensor(x) = Tensor{2,2,Float64}((f(x),2*f(x),3*f(x),4*f(x)))
@@ -70,15 +66,16 @@ function test_projection(order, refshape)
     qp_values_matrix = reduce(hcat, qp_values)::Matrix
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
-
-    @test point_vars ≈ point_vars_2
-
     if order == 1
         ae = [Tensor{2,2,Float64}((f_approx(i),2*f_approx(i),3*f_approx(i),4*f_approx(i))) for i in 1:4]
     elseif order == 2
-        ae = compute_vertex_values(grid, f_tensor)
+        ae = zeros(4, length(point_vars))
+        for i in 1:4
+            apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f_tensor(x)[i])
+        end
+        ae = reinterpret(reshape, Tensor{2,2,Float64,4}, ae)
     end
-    @test point_vars[1:4] ≈ ae
+    @test point_vars ≈ point_vars_2 ≈ ae
 
     # SymmetricTensor
     f_stensor(x) = SymmetricTensor{2,2,Float64}((f(x),2*f(x),3*f(x)))
@@ -86,15 +83,16 @@ function test_projection(order, refshape)
     qp_values_matrix = reduce(hcat, qp_values)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
-
-    @test point_vars ≈ point_vars_2
-
     if order == 1
         ae = [SymmetricTensor{2,2,Float64}((f_approx(i),2*f_approx(i),3*f_approx(i))) for i in 1:4]
     elseif order == 2
-        ae = compute_vertex_values(grid, f_stensor)
+        ae = zeros(3, length(point_vars))
+        for i in 1:3
+            apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f_stensor(x).data[i])
+        end
+        ae = reinterpret(reshape, SymmetricTensor{2,2,Float64,3}, ae)
     end
-    @test point_vars[1:4] ≈ ae
+    @test point_vars ≈ point_vars_2 ≈ ae
 
     # Test error-path with bad qr
     if refshape == RefTetrahedron && order == 2
@@ -136,7 +134,6 @@ function test_projection_mixedgrid()
     # use a SymmetricTensor here for testing the symmetric version of project
     f(x) = SymmetricTensor{2,2,Float64}((1 + x[1]^2, 2x[2]^2, x[1]*x[2]))
     xe = getcoordinates(mesh, 1)
-    ae = compute_vertex_values(mesh, f)
     # analytical values
     qp_values = [[f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
     qp_values_matrix = reduce(hcat, qp_values)
@@ -145,27 +142,19 @@ function test_projection_mixedgrid()
     # Assume f would only exist on the first cell, we project it to the nodes of the
     # 1st cell while ignoring the rest of the domain. NaNs should be stored in all
     # nodes that do not belong to the 1st cell
-    proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=1:1)
+    proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=quadset)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
 
-    # In the nodes of the 1st cell we should recover the field
-    for node in mesh.cells[1].nodes
-        @test ae[node] ≈ point_vars[node] ≈ point_vars_2[node]
+    # ae = compute_vertex_values(mesh, f)
+    ae = zeros(3, length(point_vars))
+    for i in 1:3
+        apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f(x).data[i], quadset)
     end
+    ae = reinterpret(reshape, SymmetricTensor{2,2,Float64,3}, ae)
+    @test point_vars ≈ point_vars_2 ≈ ae
 
-    # in all other nodes we should have NaNs
-    for node in setdiff(1:getnnodes(mesh), mesh.cells[1].nodes)
-        for d1 = 1:dim, d2 = 1:dim
-             @test isnan(point_vars[node][d1, d2])
-             @test isnan(point_vars_2[node][d1, d2])
-         end
-    end
-
-
-    #
-    #Do the same thing but for the triangle set
-    #
+    # Do the same thing but for the triangle set
     order = 2
     ip = Lagrange{dim, RefTetrahedron, order}()
     ip_geom = Lagrange{dim, RefTetrahedron, 1}()
@@ -177,7 +166,6 @@ function test_projection_mixedgrid()
     qp_values_matrix_tria = [zero(SymmetricTensor{2,2}) for _ in 1:nqp, _ in triaset]
     for (ic, cellid) in enumerate(triaset)
         xe = getcoordinates(mesh, cellid)
-        ae = compute_vertex_values(mesh, f)
         # analytical values
         qp_values = [f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]
         qp_values_tria[ic] = qp_values
@@ -188,33 +176,12 @@ function test_projection_mixedgrid()
     proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=triaset)
     point_vars = project(proj, qp_values_tria, qr)
     point_vars_2 = project(proj, qp_values_matrix_tria, qr)
-    for cellid in triaset
-        for node in mesh.cells[cellid].nodes
-            @test ae[node] ≈ point_vars[node] ≈ point_vars_2[node]
-        end
+    ae = zeros(3, length(point_vars))
+    for i in 1:3
+        apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f(x).data[i], triaset)
     end
-
-end
-
-function test_node_reordering()
-    grid = generate_grid(Quadrilateral, (1, 1), Vec((0.,0.)), Vec((2.,2.)))
-    dim = 2
-    ip = Lagrange{dim, RefCube, 2}()
-    ip_geo = Lagrange{dim, RefCube,1}()
-    qr = QuadratureRule{dim, RefCube}(3)
-    cv = CellScalarValues(qr, ip, ip_geo)
-
-    f(x) = x[1]+x[2]
-
-    qp_values = [[f(spatial_coordinate(cv, qp, getcoordinates(cell))) for qp in 1:getnquadpoints(cv)] for cell in CellIterator(grid)]
-
-    projector = L2Projector(ip, grid)
-    projected_vals_nodes = project(projector, qp_values, qr)
-    projected_vals_dofs = project(projector, qp_values, qr; project_to_nodes=false)
-
-    tol = 1e-12
-    @test all(projected_vals_nodes - [0.0, 2.0, 2.0, 4.0] .< tol)
-    @test all(projected_vals_dofs - [0., 2., 4., 2., 1., 3., 3., 1., 2.] .< tol)
+    ae = reinterpret(reshape, SymmetricTensor{2,2,Float64,3}, ae)
+    @test point_vars ≈ point_vars_2 ≈ ae
 end
 
 function test_export(;subset::Bool)
@@ -246,10 +213,10 @@ function test_export(;subset::Bool)
         end
     end
     p = subset ? L2Projector(ip, grid; set=1:1) : L2Projector(ip, grid)
-    p_scalar = project(p, qpdata_scalar, qr; project_to_nodes=false)::Vector{Float64}
-    p_vec = project(p, qpdata_vec, qr; project_to_nodes=false)::Vector{<:Vec{2}}
-    p_tens = project(p, qpdata_tens, qr; project_to_nodes=false)::Vector{<:Tensor{2,2}}
-    p_stens = project(p, qpdata_stens, qr; project_to_nodes=false)::Vector{<:SymmetricTensor{2,2}}
+    p_scalar = project(p, qpdata_scalar, qr)::Vector{Float64}
+    p_vec = project(p, qpdata_vec, qr)::Vector{<:Vec{2}}
+    p_tens = project(p, qpdata_tens, qr)::Vector{<:Tensor{2,2}}
+    p_stens = project(p, qpdata_stens, qr)::Vector{<:SymmetricTensor{2,2}}
 
     # reshaping for export with reshape_to_nodes
     fnodes = [f(x.x) for x in grid.nodes]
@@ -310,7 +277,6 @@ end
     test_projection(2, RefCube)
     test_projection(2, RefTetrahedron)
     test_projection_mixedgrid()
-    test_node_reordering()
     test_export(subset=false)
     test_export(subset=true)
     test_show()

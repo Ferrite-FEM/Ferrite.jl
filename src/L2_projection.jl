@@ -7,7 +7,6 @@ struct L2Projector <: AbstractProjector
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::DofHandler
     set::Vector{Int}
-    node2dof_map::Vector{Int}
 end
 
 """
@@ -55,12 +54,12 @@ function L2Projector(
     field = Field(:_, func_ip) # we need to create the field, but the interpolation is not used here
     fh = FieldHandler([field], Set(set))
     add!(dh, fh)
-    _, vertex_dict, _, _ = __close!(dh)
+    close!(dh)
 
     M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
     M_cholesky = cholesky(M)
 
-    return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set), vertex_dict[1])
+    return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set))
 end
 
 # Quadrature sufficient for integrating a mass matrix
@@ -123,7 +122,7 @@ end
 
 
 """
-    project(proj::L2Projector, vals, qr_rhs::QuadratureRule; project_to_nodes=true)
+    project(proj::L2Projector, vals, qr_rhs::QuadratureRule)
 
 Makes a L2 projection of data `vals` to the nodes of the grid using the projector `proj`
 (see [`L2Projector`](@ref)).
@@ -157,14 +156,12 @@ vals = [
 ```
 Supported data types to project are `Number`s and `AbstractTensor`s.
 
-If the parameter `project_to_nodes` is `true`, then the projection returns the values in the order of the mesh nodes
-(suitable format for exporting). If `false`, it returns the values corresponding to the degrees of freedom for a scalar
-field over the domain, which is useful if one wants to interpolate the projected values.
+The order of the returned data correspond to the order of the `L2Projector`s internal
+`DofHandler`. To export the result, use `vtk_point_data(vtk, proj, projected_data)`.
 """
 function project(proj::L2Projector,
                  vars::AbstractVector{<:AbstractVector{T}},
-                 qr_rhs::QuadratureRule;
-                 project_to_nodes::Bool=true) where T <: Union{Number, AbstractTensor}
+                 qr_rhs::QuadratureRule) where T <: Union{Number, AbstractTensor}
 
     # For using the deprecated API
     fe_values = CellScalarValues(qr_rhs, proj.func_ip, proj.geom_ip)
@@ -172,23 +169,12 @@ function project(proj::L2Projector,
     M = T <: AbstractTensor ? length(vars[1][1].data) : 1
 
     projected_vals = _project(vars, proj, fe_values, M, T)::Vector{T}
-    if project_to_nodes
-        # NOTE we may have more projected values than vertices in the mesh => not all values are returned
-        nnodes = getnnodes(proj.dh.grid)
-        reordered_vals = fill(convert(T, NaN * zero(T)), nnodes)
-        for node = 1:nnodes
-            if (k = proj.node2dof_map[node]; k != 0)
-                reordered_vals[node] = projected_vals[k]
-            end
-        end
-        return reordered_vals
-    else
-        return projected_vals
-    end
+
+    return projected_vals
 end
-function project(p::L2Projector, vars::AbstractMatrix, qr_rhs::QuadratureRule; project_to_nodes=true)
+function project(p::L2Projector, vars::AbstractMatrix, qr_rhs::QuadratureRule)
     # TODO: Random access into vars is required for now, hence the collect
-    return project(p, collect(eachcol(vars)), qr_rhs; project_to_nodes=project_to_nodes)
+    return project(p, collect(eachcol(vars)), qr_rhs)
 end
 
 function _project(vars, proj::L2Projector, fe_values::Values, M::Integer, ::Type{T}) where {T}
