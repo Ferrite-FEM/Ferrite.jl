@@ -64,11 +64,12 @@ cellvalues = CellScalarValues(qr, ip);
 # ### Degrees of freedom
 # Next we need to define a `DofHandler`, which will take care of numbering
 # and distribution of degrees of freedom for our approximated fields.
-# We create the `DofHandler` and then add a single scalar field called `:u`.
+# We create the `DofHandler` and then add a single scalar field called `:u` based on
+# our interpolation `ip` defined above.
 # Lastly we `close!` the `DofHandler`, it is now that the dofs are distributed
 # for all the elements.
 dh = DofHandler(grid)
-add!(dh, :u, 1)
+add!(dh, :u, ip)
 close!(dh);
 
 # Now that we have distributed all our dofs we can create our tangent matrix,

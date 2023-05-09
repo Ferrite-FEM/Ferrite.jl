@@ -22,7 +22,7 @@ function L2Projector(fe_values::Ferrite.Values, interp::Interpolation,
 
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
     dh = DofHandler(grid)
-    field = Field(:_, interp, 1)
+    field = Field(:_, interp)
     fh = FieldHandler([field], Set(set))
     add!(dh, fh)
     _, vertex_dict, _, _ = __close!(dh)
@@ -73,13 +73,18 @@ function L2Projector(
         qr_rhs::Union{QuadratureRule,Nothing}=nothing, # deprecated
     )
 
+    # TODO: Maybe this should not be allowed? We always assume to project scalar entries.
+    if func_ip isa VectorizedInterpolation
+        func_ip = func_ip.ip
+    end
+
     _check_same_celltype(grid, collect(set)) # TODO this does the right thing, but gives the wrong error message if it fails
 
     fe_values_mass = CellScalarValues(qr_lhs, func_ip, geom_ip)
 
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
     dh = DofHandler(grid)
-    field = Field(:_, func_ip, 1) # we need to create the field, but the interpolation is not used here
+    field = Field(:_, func_ip) # we need to create the field, but the interpolation is not used here
     fh = FieldHandler([field], Set(set))
     add!(dh, fh)
     _, vertex_dict, _, _ = __close!(dh)
@@ -101,6 +106,7 @@ end
 function _mass_qr(::Lagrange{dim, RefTetrahedron, 2}) where {dim}
     return QuadratureRule{dim,RefTetrahedron}(4)
 end
+_mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
 function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
     println(io, typeof(proj))

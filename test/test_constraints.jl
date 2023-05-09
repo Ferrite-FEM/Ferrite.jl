@@ -5,8 +5,8 @@
     Γ = getfaceset(grid, "left")
     face_map = collect_periodic_faces(grid, "left", "right")
     dh = DofHandler(grid)
-    add!(dh, :s, 1)
-    add!(dh, :v, 2)
+    add!(dh, :s, Lagrange{2,RefTetrahedron,1}())
+    add!(dh, :v, Lagrange{2,RefTetrahedron,1}()^2)
     close!(dh)
     ch = ConstraintHandler(dh)
 
@@ -78,8 +78,8 @@ end
     grid = generate_grid(Triangle, (1, 1))
     addnodeset!(grid, "nodeset", x-> x[2] == -1 || x[1] == -1)
     dh = DofHandler(grid)
-    add!(dh, :u, 2)
-    add!(dh, :p, 1)
+    add!(dh, :u, Lagrange{2,RefTetrahedron,1}()^2)
+    add!(dh, :p, Lagrange{2,RefTetrahedron,1}())
     close!(dh)
     ch = ConstraintHandler(dh)
     dbc1 = Dirichlet(:u, getnodeset(grid, "nodeset"), (x,t) -> x, [1, 2])
@@ -101,10 +101,10 @@ end
 
    dh  = DofHandler(mesh)
 
-   ip_quadratic = Lagrange{dim, RefCube, 2}()
+   ip_quadratic = Lagrange{dim, RefCube, 2}()^dim
    ip_linear = Lagrange{dim, RefCube, 1}()
-   field_u = Field(:u, ip_quadratic, dim)
-   field_c = Field(:c, ip_linear, 1)
+   field_u = Field(:u, ip_quadratic)
+   field_c = Field(:c, ip_linear)
    add!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set1")))
    add!(dh, FieldHandler([field_u], getcellset(mesh, "set2")))
 
@@ -126,8 +126,8 @@ end
    addcellset!(mesh, "set2", Set(2))
 
    ip = Lagrange{dim, RefCube, 1}()
-   field_u = Field(:u, ip, dim)
-   field_c = Field(:c, ip, 1)
+   field_u = Field(:u, ip^dim)
+   field_c = Field(:c, ip)
 
    dh = DofHandler(mesh)
    add!(dh, FieldHandler([field_u], getcellset(mesh, "set1")))
@@ -149,8 +149,8 @@ end
     addedgeset!(grid, "edge", x-> x[1] ≈ -1.0 && x[3] ≈ -1.0)
 
     dh = DofHandler(grid)
-    add!(dh, :u, 3)
-    add!(dh, :p, 1)
+    add!(dh, :u, Lagrange{3,RefCube,1}()^3)
+    add!(dh, :p, Lagrange{3,RefCube,1}())
     close!(dh)
 
     ch = ConstraintHandler(dh)
@@ -173,8 +173,8 @@ end
 
     #3d quad with 1st order 2d interpolation
     dh = DofHandler(grid)
-    add!(dh, :u, 1, Lagrange{2,RefCube,2}())
-    add!(dh, :θ, 1, Lagrange{2,RefCube,2}())
+    add!(dh, :u, Lagrange{2,RefCube,2}())
+    add!(dh, :θ, Lagrange{2,RefCube,2}())
     close!(dh)
 
     addedgeset!(grid, "edge", x -> x[2] ≈ 0.0) #bottom edge
@@ -219,10 +219,10 @@ end
     ip_quad = Lagrange{dim,RefCube,1}()
     ip_tria = Lagrange{dim,RefTetrahedron,1}()
     dh = DofHandler(grid)
-    field_uT = Field(:u, ip_tria, 1)
-    field_uQ = Field(:u, ip_quad, 1)
-    field_vT = Field(:v, ip_tria, 1)
-    field_vQ = Field(:v, ip_quad, 1)
+    field_uT = Field(:u, ip_tria)
+    field_uQ = Field(:u, ip_quad)
+    field_vT = Field(:v, ip_tria)
+    field_vQ = Field(:v, ip_quad)
 
     # Order important for test to ensure consistent dof ordering
     add!(dh, FieldHandler([field_uQ, field_vQ], getcellset(grid, "uandvQ")))
@@ -264,7 +264,7 @@ end
 
     grid = generate_grid(Line, (10,))
     dh = DofHandler(grid)
-    add!(dh, :u, 1)
+    add!(dh, :u, Lagrange{1,RefCube,1}())
     close!(dh)
 
     test_acs = [
@@ -337,7 +337,7 @@ end
     @testset "nonlinear" begin
         params = (k=1.0, f=1.0, a=1.0, b=0.2, tol=1e-10, maxiter=2)
         grid = generate_grid(Line, (2,)); addfaceset!(grid, "center", x->x[1]≈0.0)
-        dh = DofHandler(grid); add!(dh, :u, 1); close!(dh)
+        dh = DofHandler(grid); add!(dh, :u, Lagrange{1,RefCube,1}()); close!(dh)
 
         function doassemble!(K, r, dh, a, params)
             # Spring elements 
@@ -716,7 +716,7 @@ end # testset
 
     # Scalar
     dh = DofHandler(grid)
-    add!(dh, :s, 1)
+    add!(dh, :s, Lagrange{2,RefCube,1}())
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
@@ -755,7 +755,7 @@ end # testset
 
     # Vector
     dh = DofHandler(grid)
-    add!(dh, :v, 2)
+    add!(dh, :v, Lagrange{2,RefCube,1}()^2)
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
@@ -841,7 +841,7 @@ end # testset
     #  │       │       │
     #  1───5───2───12──10
     dh = DofHandler(grid)
-    add!(dh, :s, 1, Lagrange{2,RefCube,2}())
+    add!(dh, :s, Lagrange{2,RefCube,2}())
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
@@ -901,7 +901,7 @@ end # testset
     #   │             │             │
     #  1,2────9,10───3,4───23,24──19,20
     dh = DofHandler(grid)
-    add!(dh, :v, 2, Lagrange{2,RefCube,2}())
+    add!(dh, :v, Lagrange{2,RefCube,2}()^2)
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
@@ -932,8 +932,8 @@ end # testset
     grid = generate_grid(Hexahedron, (1, 1, 1))
     face_map = collect_periodic_faces(grid)
     dh = DofHandler(grid)
-    add!(dh, :s, 1)
-    add!(dh, :v, 2)
+    add!(dh, :s, Lagrange{3,RefCube,1}())
+    add!(dh, :v, Lagrange{3,RefCube,1}()^2)
     close!(dh)
 
     ch = ConstraintHandler(dh)
@@ -982,8 +982,8 @@ end # testset
     # Quadratic interpolation
     grid = generate_grid(Hexahedron, (5, 5, 5))
     dh = DofHandler(grid)
-    add!(dh, :s, 1, Lagrange{3,RefCube,2}())
-    add!(dh, :v, 2, Lagrange{3,RefCube,2}())
+    add!(dh, :s, Lagrange{3,RefCube,2}())
+    add!(dh, :v, Lagrange{3,RefCube,2}()^2)
     close!(dh)
 
     compare_by_dbc(
@@ -1010,7 +1010,7 @@ end # testset
     # 3D tetra scalar
     grid = generate_grid(Tetrahedron, (1, 1, 1))
     dh = DofHandler(grid)
-    add!(dh, :s, 1)
+    add!(dh, :s, Lagrange{3,RefTetrahedron,1}())
     close!(dh)
     face_map = collect_periodic_faces(grid)
     ch = ConstraintHandler(dh)
@@ -1024,7 +1024,7 @@ end # testset
     # 3D tetra vector
     grid = generate_grid(Tetrahedron, (2, 1, 1))
     dh = DofHandler(grid)
-    add!(dh, :v, 2)
+    add!(dh, :v, Lagrange{3,RefTetrahedron,1}()^2)
     close!(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
     ch = ConstraintHandler(dh)
@@ -1045,7 +1045,7 @@ end # testset
     # 3D hex vector with dof rotation
     grid = generate_grid(Hexahedron, (1, 1, 1))
     dh = DofHandler(grid)
-    add!(dh, :v, 3)
+    add!(dh, :v, Lagrange{3,RefCube,1}()^3)
     close!(dh)
     rot = rotation_tensor(Vec{3}((0., 1., 0.)), π/2)
     face_map = collect_periodic_faces(grid, "left", "bottom", x -> rot ⋅ x)
@@ -1087,8 +1087,8 @@ end # testset
     )
         grid = generate_grid(CT, ntuple(i -> 5, D))
         dh = DofHandler(grid)
-        add!(dh, :s, 1, IT)
-        add!(dh, :v, D, IT)
+        add!(dh, :s, IT)
+        add!(dh, :v, IT^D)
         close!(dh)
 
         # Scalar
@@ -1176,7 +1176,7 @@ end # testset
 
 @testset "Affine constraints with master dofs that are prescribed" begin
     grid = generate_grid(Quadrilateral, (2, 2))
-    dh = DofHandler(grid); add!(dh, :u, 1); close!(dh)
+    dh = DofHandler(grid); add!(dh, :u, Lagrange{2,RefCube,1}()); close!(dh)
 
     #  8───7───9
     #  │   │   │
@@ -1310,7 +1310,7 @@ end # testset
 @testset "local application of bc" begin
     grid = generate_grid(Quadrilateral, (5,5))
     dh = DofHandler(grid)
-    add!(dh, :u, 1)
+    add!(dh, :u, Lagrange{2,RefCube,1}())
     close!(dh)
     # Dirichlet BC
     ch_dbc = ConstraintHandler(dh)
@@ -1507,7 +1507,7 @@ end # testset
 @testset "Sparsity pattern without constrained dofs" begin
     grid = generate_grid(Triangle, (5, 5))
     dh = DofHandler(grid)
-    add!(dh, :u, 1)
+    add!(dh, :u, Lagrange{2,RefTetrahedron,1}())
     close!(dh)
     ch = ConstraintHandler(dh)
     add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0))
@@ -1560,7 +1560,7 @@ end # testset
     # and that the missing values are instead taken from above the diagonal.
     grid = generate_grid(Line, (2,))
     dh = DofHandler(grid)
-    add!(dh, :u, 1)
+    add!(dh, :u, Lagrange{1,RefCube,1}())
     close!(dh)
     ch = ConstraintHandler(dh)
     add!(ch, Dirichlet(:u, getfaceset(grid, "left"), x -> 1))

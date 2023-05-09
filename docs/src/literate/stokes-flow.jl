@@ -242,8 +242,8 @@ end
 
 function setup_dofs(grid, ipu, ipp)
     dh = DofHandler(grid)
-    add!(dh, :u, 2, ipu)
-    add!(dh, :p, 1, ipp)
+    add!(dh, :u, ipu)
+    add!(dh, :p, ipp)
     close!(dh)
     return dh
 end
@@ -485,8 +485,8 @@ function main()
     h = 0.05 # approximate element size
     grid = setup_grid(h)
     ## Interpolations
-    ipu = Lagrange{2,RefTetrahedron,2}() # quadratic
-    ipp = Lagrange{2,RefTetrahedron,1}() # linear
+    ipu = Lagrange{2,RefTetrahedron,2}() ^ 2 # quadratic
+    ipp = Lagrange{2,RefTetrahedron,1}()     # linear
     ## Dofs
     dh = setup_dofs(grid, ipu, ipp)
     ## FE values

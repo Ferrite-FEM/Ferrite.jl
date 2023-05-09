@@ -40,6 +40,16 @@ julia> getnbasefunctions(ip)
 """
 abstract type Interpolation{dim,shape,order} end
 
+abstract type ScalarInterpolation{      refdim, refshape, order} <: Interpolation{refdim, refshape, order} end
+abstract type VectorInterpolation{vdim, refdim, refshape, order} <: Interpolation{refdim, refshape, order} end
+
+# Number of components for the interpolation.
+n_components(::ScalarInterpolation)                    = 1
+n_components(::VectorInterpolation{vdim}) where {vdim} = vdim
+# Number of components that are allowed to prescribe in e.g. Dirichlet BC
+n_dbc_components(ip::Interpolation) = n_components(ip)
+# n_dbc_components(::Union{RaviartThomas,Nedelec}) = 1
+
 # TODO: Remove: this is a hotfix to apply constraints to embedded elements.
 edges(ip::Interpolation{2}) = faces(ip)
 edgedof_indices(ip::Interpolation{2}) = facedof_indices(ip)
@@ -72,34 +82,53 @@ struct InterpolationInfo
     ncelldofs::Int
     reference_dim::Int
     adjust_during_distribution::Bool
+    n_copies::Int
     function InterpolationInfo(interpolation::Interpolation{3})
+        n_copies = 1
+        if interpolation isa VectorizedInterpolation
+            n_copies = get_n_copies(interpolation)
+            interpolation = interpolation.ip
+        end
         new(
             [length(i) for i ∈ vertexdof_indices(interpolation)],
             [length(i) for i ∈ edgedof_interior_indices(interpolation)],
             [length(i) for i ∈ facedof_interior_indices(interpolation)],
             length(celldof_interior_indices(interpolation)),
             3,
-            adjust_dofs_during_distribution(interpolation)
+            adjust_dofs_during_distribution(interpolation),
+            n_copies,
         )
     end
     function InterpolationInfo(interpolation::Interpolation{2})
+        n_copies = 1
+        if interpolation isa VectorizedInterpolation
+            n_copies = get_n_copies(interpolation)
+            interpolation = interpolation.ip
+        end
         new(
             [length(i) for i ∈ vertexdof_indices(interpolation)],
             Int[],
             [length(i) for i ∈ facedof_interior_indices(interpolation)],
             length(celldof_interior_indices(interpolation)),
             2,
-            adjust_dofs_during_distribution(interpolation)
+            adjust_dofs_during_distribution(interpolation),
+            n_copies,
         )
     end
     function InterpolationInfo(interpolation::Interpolation{1})
+        n_copies = 1
+        if interpolation isa VectorizedInterpolation
+            n_copies = get_n_copies(interpolation)
+            interpolation = interpolation.ip
+        end
         new(
             [length(i) for i ∈ vertexdof_indices(interpolation)],
             Int[],
             Int[],
             length(celldof_interior_indices(interpolation)),
             1,
-            adjust_dofs_during_distribution(interpolation)
+            adjust_dofs_during_distribution(interpolation),
+            n_copies
         )
     end
 end
@@ -307,7 +336,7 @@ boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
 """
 Piecewise discontinuous Lagrange basis via Gauss-Lobatto points.
 """
-struct DiscontinuousLagrange{dim,shape,order} <: Interpolation{dim,shape,order} end
+struct DiscontinuousLagrange{dim,shape,order} <: ScalarInterpolation{dim,shape,order} end
 
 getlowerdim(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = DiscontinuousLagrange{dim-1,shape,order}()
 getlowerorder(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = DiscontinuousLagrange{dim,shape,order-1}()
@@ -347,7 +376,7 @@ end
 ############
 # Lagrange #
 ############
-struct Lagrange{dim,shape,order} <: Interpolation{dim,shape,order} end
+struct Lagrange{dim,shape,order} <: ScalarInterpolation{dim,shape,order} end
 
 # Vertices for all Lagrange interpolations are the same
 vertexdof_indices(::Lagrange{1,RefCube,order}) where {order} = ((1,),(2,))
@@ -955,7 +984,7 @@ end
 """
 Lagrange element with bubble stabilization.
 """
-struct BubbleEnrichedLagrange{dim,ref_shape,order} <: Interpolation{dim,ref_shape,order} end
+struct BubbleEnrichedLagrange{dim,ref_shape,order} <: ScalarInterpolation{dim,ref_shape,order} end
 getlowerdim(ip::BubbleEnrichedLagrange{dim,ref_shape,order}) where {dim,ref_shape,order} = Lagrange{dim-1,ref_shape,order}()
 
 ################################################
@@ -988,7 +1017,7 @@ end
 ###############
 # Serendipity #
 ###############
-struct Serendipity{dim,shape,order} <: Interpolation{dim,shape,order} end
+struct Serendipity{dim,shape,order} <: ScalarInterpolation{dim,shape,order} end
 
 # Vertices for all Serendipity interpolations are the same
 vertexdof_indices(::Serendipity{2,RefCube,order}) where {order} = ((1,),(2,),(3,),(4,))
@@ -1126,7 +1155,7 @@ M. Crouzeix and P. Raviart. "Conforming and nonconforming finite element
 methods for solving the stationary Stokes equations I." ESAIM: Mathematical Modelling 
 and Numerical Analysis-Modélisation Mathématique et Analyse Numérique 7.R3 (1973): 33-75.
 """
-struct CrouzeixRaviart{dim,order} <: Interpolation{dim,RefTetrahedron,order} end
+struct CrouzeixRaviart{dim,order} <: ScalarInterpolation{dim,RefTetrahedron,order} end
 
 getnbasefunctions(::CrouzeixRaviart{2,1}) = 3
 
@@ -1147,3 +1176,46 @@ function value(ip::CrouzeixRaviart{2,1}, i::Int, ξ::Vec{2})
     i == 3 && return 1.0 - 2*ξ_y
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
+
+##################################################
+# VectorizedInterpolation{<:ScalarInterpolation} #
+##################################################
+
+struct VectorizedInterpolation{vdim, refdim, refshape, order, SI <: ScalarInterpolation{refdim, refshape, order}} <: VectorInterpolation{vdim, refdim, refshape,order}
+    ip::SI
+    function VectorizedInterpolation{vdim}(ip::SI) where {vdim, refdim, refshape, order, SI <: ScalarInterpolation{refdim, refshape, order}}
+        if vdim != refdim
+            # For now this is required, since e.g.
+            #     Tensors.gradient(y -> Ferrite.value(ip, i, y), ξ)
+            # errors when extracting the gradient etc.
+            # error("embedded elements not supported yet, see https://github.com/Ferrite-FEM/Ferrite.jl/pull/651")
+        end
+        return new{vdim, refdim, refshape, order, SI}(ip)
+    end
+end
+
+# Vectorize to reference dimension by default
+function VectorizedInterpolation(ip::ScalarInterpolation{refdim}) where refdim
+    return VectorizedInterpolation{refdim}(ip)
+end
+
+Base.:(^)(ip::ScalarInterpolation, vdim::Int) = VectorizedInterpolation{vdim}(ip)
+function Base.literal_pow(::typeof(^), ip::ScalarInterpolation, ::Val{vdim}) where vdim
+    return VectorizedInterpolation{vdim}(ip)
+end
+
+# Helper to get number of copies for DoF distribution
+get_n_copies(::VectorizedInterpolation{vdim}) where vdim = vdim
+
+function getnbasefunctions(ipv::VectorizedInterpolation{vdim}) where vdim
+    return vdim * getnbasefunctions(ipv.ip)
+end
+function value(ipv::VectorizedInterpolation{vdim, refdim}, I::Int, ξ::Vec{refdim, T}) where {vdim, refdim, T}
+    i0, c0 = divrem(I - 1, vdim)
+    i = i0 + 1
+    c = c0 + 1
+    v = value(ipv.ip, i, ξ)
+    return Vec{vdim, T}(j -> j == c ? v : zero(v))
+end
+
+reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
