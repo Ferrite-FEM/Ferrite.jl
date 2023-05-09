@@ -1,13 +1,15 @@
 cff-version: 1.2.0
-message: "If you use Ferrite.jl, please cite it as below."
+title: "Ferrite.jl"
+message: "If you use Ferrite.jl, please cite it using the metadata from this file."
+type: software
 authors:
 - family-names: "Carlsson"
   given-names: "Kristoffer"
+  orcid: "https://orcid.org/0000-0001-9092-3092"
 - family-names: "Ekre"
   given-names: "Fredrik"
-- family-names: "Contributors"
-  given-names: " "
-title: "Ferrite.jl"
-version: 0.3.0
-date-released: 2021-03-25
-url: "https://github.com/Ferrite-FEM/Ferrite.jl"
+  orcid: "https://orcid.org/0000-0003-2476-5406"
+- name: "Ferrite.jl contributors"
+repository-code: 'https://github.com/Ferrite-FEM/Ferrite.jl'
+url: 'https://github.com/Ferrite-FEM/Ferrite.jl'
+license: MIT

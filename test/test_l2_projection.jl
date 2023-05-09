@@ -41,14 +41,7 @@ function test_projection(order, refshape)
     point_vars = project(proj, qp_values, qr)
     qp_values_matrix = reduce(hcat, qp_values)
     point_vars_2 = project(proj, qp_values_matrix, qr)
-    ## Old API with fe values as first arg
-    proj2 = @test_deprecated L2Projector(cv, ip, grid)
-    point_vars_3 = @test_deprecated project(qp_values, proj2)
-    ## Old API with qr as first arg
-    proj3 = @test_deprecated L2Projector(qr, ip, grid)
-    point_vars_4 = @test_deprecated project(qp_values, proj3)
-
-    @test point_vars ≈ point_vars_2 ≈ point_vars_3 ≈ point_vars_4
+    @test point_vars ≈ point_vars_2
 
     if order == 1
         # A linear approximation can not recover a quadratic solution,
@@ -155,17 +148,10 @@ function test_projection_mixedgrid()
     proj = L2Projector(ip, mesh; geom_ip=ip_geom, set=1:1)
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
-    ## Old API with fe values as first arg
-    proj = @test_deprecated L2Projector(cv, ip, mesh, 1:1)
-    point_vars_3 = @test_deprecated project(qp_values, proj)
-    ## Old API with qr as first arg
-    proj = @test_deprecated L2Projector(qr, ip, mesh, 1:1)
-    point_vars_4 = @test_deprecated project(qp_values, proj)
 
     # In the nodes of the 1st cell we should recover the field
     for node in mesh.cells[1].nodes
-        @test ae[node] ≈ point_vars[node] ≈ point_vars_2[node] ≈ point_vars_3[node] ≈
-                         point_vars_4[node]
+        @test ae[node] ≈ point_vars[node] ≈ point_vars_2[node]
     end
 
     # in all other nodes we should have NaNs
@@ -173,8 +159,6 @@ function test_projection_mixedgrid()
         for d1 = 1:dim, d2 = 1:dim
              @test isnan(point_vars[node][d1, d2])
              @test isnan(point_vars_2[node][d1, d2])
-             @test isnan(point_vars_3[node][d1, d2])
-             @test isnan(point_vars_4[node][d1, d2])
          end
     end
 
