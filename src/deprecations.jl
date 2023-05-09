@@ -96,7 +96,6 @@ function CellVectorValues(::Type{T}, quad_rule::QuadratureRule, func_interpol::S
         "See CHANGELOG for more details.",
         :CellVectorValues
     )
-    Base.depwarn("", :CellVectorValues)
     return CellVectorValues(T, quad_rule, VectorizedInterpolation(func_interpol), geom_interpol)
 end
 function FaceVectorValues(quad_rule::QuadratureRule, func_interpol::ScalarInterpolation,
@@ -113,3 +112,12 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule, func_interpol::S
     )
     return FaceVectorValues(T, quad_rule, VectorizedInterpolation(func_interpol), geom_interpol)
 end
+
+# (Cell|Face)VectorValues with vector dofs
+@deprecate function_value(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_value(fe_v, q_point, reinterpret(T, u))
+@deprecate function_value(vv::VectorValued, fe_v::Values, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_value(vv, fe_v, q_point, reinterpret(T, u))
+@deprecate function_gradient(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_gradient(fe_v, q_point, reinterpret(T, u))
+@deprecate function_gradient(vv::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_gradient(vv, fe_v, q_point, reinterpret(T, u))
+@deprecate function_divergence(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(fe_v, q_point, reinterpret(T, u))
+@deprecate function_divergence(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(vv, fe_v, q_point, reinterpret(T, u))
+@deprecate function_curl(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{3, T}}) where T function_curl(fe_v::Values, q_point::Int, reinterpret(T, u))
