@@ -212,13 +212,13 @@ grid = togrid("periodic-rve.msh") #src
 # cellvalues as usual:
 
 dim = 2
-ip = Lagrange{dim, RefTetrahedron, 1}()
+ip = Lagrange{dim, RefTetrahedron, 1}()^dim
 qr = QuadratureRule{dim, RefTetrahedron}(2)
 cellvalues = CellVectorValues(qr, ip);
 
 # We define a dof handler with a displacement field `:u`:
 dh = DofHandler(grid)
-add!(dh, :u, 2)
+add!(dh, :u, ip)
 close!(dh);
 
 # Now we need to define boundary conditions. As discussed earlier we will solve the problem

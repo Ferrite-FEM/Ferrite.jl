@@ -7,6 +7,7 @@ reference_volume(::Interpolation{dim, RefCube}) where {dim} = 2^dim
 reference_volume(::Interpolation{dim, RefTetrahedron}) where {dim} = 1 / factorial(dim)
 reference_volume(::Interpolation{  3, RefPrism}) = 1/2
 # For faces
+reference_volume(fs::VectorizedInterpolation, f::Int) = reference_volume(fs.ip, f)
 reference_volume(fs::Interpolation, ::Int) = reference_volume(Ferrite.getlowerdim(fs))
 reference_volume(fs::Interpolation{2, RefTetrahedron}, face::Int) = face == 1 ? sqrt(2) : 1.0
 reference_volume(fs::Interpolation{3, RefTetrahedron}, face::Int) = face == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
@@ -14,6 +15,8 @@ reference_volume(fs::Interpolation{3, RefTetrahedron}, face::Int) = face == 3 ? 
 ######################################################
 # Coordinates and normals for the reference elements #
 ######################################################
+
+reference_normals(ip::VectorizedInterpolation) = reference_normals(ip.ip)
 
 # Lagrange{1, RefCube}
 function reference_normals(::Lagrange{1, RefCube})
@@ -95,6 +98,9 @@ end
 #######################################
 # Volume of cells (with planar edges) #
 #######################################
+
+calculate_volume(ip::VectorizedInterpolation, x) = calculate_volume(ip.ip, x)
+
 function calculate_volume(::Lagrange{1, RefCube, 1}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm(x[2] - x[1])
     return vol

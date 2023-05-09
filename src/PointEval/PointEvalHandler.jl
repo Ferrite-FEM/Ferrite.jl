@@ -251,9 +251,10 @@ function _get_point_values!(
     # preallocate some stuff specific to this cellset
     idx = findfirst(!isnothing, local_coords)
     idx === nothing && return out_vals
-    pv = PointScalarValuesInternal(local_coords[idx], ip)
+    pv = PointValuesInternal(local_coords[idx], ip)
     first_cell = cellset === nothing ? 1 : first(cellset)
     cell_dofs = Vector{Int}(undef, ndofs_per_cell(dh, first_cell))
+    u_e = Vector{T}(undef, ndofs_per_cell(dh, first_cell))
 
     # compute point values
     for pointid in eachindex(ph.cells)
@@ -261,9 +262,11 @@ function _get_point_values!(
         cellid === nothing && continue # next point if no cell was found for this one
         cellset !== nothing && (cellid ∈ cellset || continue) # no need to check the cellset for a regular DofHandler
         celldofs!(cell_dofs, dh, ph.cells[pointid])
+        for (i, I) in pairs(cell_dofs)
+            u_e[i] = dof_vals[I]
+        end
         reinit!(pv, local_coords[pointid], ip)
-        @inbounds @views dof_vals_reshaped = _change_format(fdim, dof_vals[cell_dofs[dofrange]])
-        out_vals[pointid] = function_value(pv, 1, dof_vals_reshaped)
+        out_vals[pointid] = function_value(pv, 1, u_e, dofrange)
     end
     return out_vals
 end

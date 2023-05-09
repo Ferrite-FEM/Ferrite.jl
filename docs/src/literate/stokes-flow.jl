@@ -220,9 +220,10 @@ end
 # As mentioned in the introduction we will use a quadratic approximation for the velocity
 # field and a linear approximation for the pressure to ensure that we fulfill the LBB
 # condition. We create the corresponding FE values with interpolations `ipu` for the
-# velocity and `ipp` for the pressure. Note that we use linear geometric interpolation
-# (`ipg`) for both the velocity and pressure, this is because our grid contains linear
-# triangles. We also construct face-values for the pressure since we need to integrate along
+# velocity and `ipp` for the pressure. Note that we specify linear geometric mapping
+# (`ipg`) for both the velocity and pressure because our grid contains linear
+# triangles. However, since linear mapping is default this could have been skipped.
+# We also construct face-values for the pressure since we need to integrate along
 # the boundary when assembling the constraint matrix ``\underline{\underline{C}}``.
 
 function setup_fevalues(ipu, ipp, ipg)
@@ -241,8 +242,8 @@ end
 
 function setup_dofs(grid, ipu, ipp)
     dh = DofHandler(grid)
-    add!(dh, :u, 2, ipu)
-    add!(dh, :p, 1, ipp)
+    add!(dh, :u, ipu)
+    add!(dh, :p, ipp)
     close!(dh)
     return dh
 end
@@ -484,8 +485,8 @@ function main()
     h = 0.05 # approximate element size
     grid = setup_grid(h)
     ## Interpolations
-    ipu = Lagrange{2,RefTetrahedron,2}() # quadratic
-    ipp = Lagrange{2,RefTetrahedron,1}() # linear
+    ipu = Lagrange{2,RefTetrahedron,2}() ^ 2 # quadratic
+    ipp = Lagrange{2,RefTetrahedron,1}()     # linear
     ## Dofs
     dh = setup_dofs(grid, ipu, ipp)
     ## FE values

@@ -91,12 +91,9 @@ function create_values()
     qr      = QuadratureRule{2,RefCube}(2)
     face_qr = QuadratureRule{1,RefCube}(2)
 
-    ## geometric interpolation
-    interpolation_geom = Lagrange{2,RefCube,1}()
-
     ## cell and facevalues for u
-    cellvalues = CellVectorValues(qr, Lagrange{2,RefCube,1}(), Lagrange{2,RefCube,1}())
-    facevalues = FaceVectorValues(face_qr, Lagrange{2,RefCube,1}(), Lagrange{2,RefCube,1}())
+    cellvalues = CellVectorValues(qr, Lagrange{2,RefCube,1}())
+    facevalues = FaceVectorValues(face_qr, Lagrange{2,RefCube,1}())
     
     return cellvalues, facevalues
 end
