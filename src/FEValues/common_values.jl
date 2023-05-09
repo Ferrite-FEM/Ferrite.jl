@@ -153,11 +153,6 @@ function function_value(::FieldTrait, fe_v::Values{dim}, q_point::Int, u::Abstra
     return val
 end
 
-# TODO: Deprecate this, nobody is using this in practice...
-function function_value(vv::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
-    return function_value(vv, fe_v, q_point, reinterpret(T, u))
-end
-
 _valuetype(t::T, v) where T = _valuetype(FieldTrait(T), t, v)
 _valuetype(::ScalarValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = T
 _valuetype(::ScalarValued, ::Values{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Vec{dim,T}
@@ -210,12 +205,6 @@ function function_gradient(::ScalarValued, fe_v::Values{dim}, q_point::Int, u::A
     return grad
 end
 
-# TODO: Deprecate this, nobody is using this in practice...
-function function_gradient(vv::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
-    return function_gradient(vv, fe_v, q_point, reinterpret(T, u))
-end
-
-
 const function_derivative = function_gradient
 
 """
@@ -264,13 +253,11 @@ end
 function_divergence(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T} =
     tr(function_gradient(fe_v, q_point, u, dof_range))
 
-function_divergence(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} =
-    tr(function_gradient(fe_v, q_point, u))
-
 function_curl(fe_v::Values, q_point::Int, u::AbstractVector, dof_range = eachindex(u)) =
     curl_from_gradient(function_gradient(fe_v, q_point, u, dof_range))
 
-function_curl(fe_v::Values, q_point::Int, u::AbstractVector{Vec{3, T}}) where T =
+# TODO: Deprecate this, nobody is using this in practice...
+function_curl(fe_v::Union{CellScalarValues,FaceScalarValues}, q_point::Int, u::AbstractVector{Vec{3, T}}) where T =
     curl_from_gradient(function_gradient(fe_v, q_point, u))
 
 """
