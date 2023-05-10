@@ -20,7 +20,7 @@ function scalar_field()
 
     # do a L2Projection for getting values in dofs
     projector = L2Projector(ip_f, mesh)
-    projector_vals = project(projector, qp_vals, qr; project_to_nodes=false)
+    projector_vals = project(projector, qp_vals, qr)
 
     # points where we want to retrieve field values
     points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
@@ -59,8 +59,7 @@ function vector_field()
 
     # do a L2Projection for getting values in dofs
     projector = L2Projector(ip_f, mesh)
-    projector_vals = project(projector, qp_vals, qr; project_to_nodes=false)
-    # TODO: project_to_nodes should probably return dof values and not Vecs for vector fields
+    projector_vals = project(projector, qp_vals, qr)
     # projector_vals = convert(Vector{Float64}, reinterpret(Float64, projector_vals))
 
     # points where we want to retrieve field values
@@ -97,7 +96,7 @@ function superparametric()
 
     # do a L2Projection for getting values in dofs
     projector = L2Projector(ip_f, mesh)
-    projector_vals = project(projector, qp_vals, qr; project_to_nodes=false)
+    projector_vals = project(projector, qp_vals, qr)
 
     # points where we want to retrieve field values
     points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
@@ -258,18 +257,11 @@ function mixed_grid()
     points = [Vec((x, 2x)) for x in range(0.0; stop=1.0, length=10)]
 
     # first alternative: L2Projection to dofs
-    projector_values = project(projector, qp_vals_quads, qr; project_to_nodes = false)
+    projector_values = project(projector, qp_vals_quads, qr)
     ph = PointEvalHandler(mesh, points)
     vals = get_point_values(ph, projector, projector_values)
     @test vals[1:5] ≈ f.(points[1:5])
     @test all(isnan, vals[6:end])
-    # TODO
-    # # second alternative: L2Projection to nodes
-    # nodal_vals = project(projector, qp_vals_quads, qr; project_to_nodes = true)
-    # vals = get_point_values(ph, nodal_vals)
-    # @test vals[1:5] ≈ f.(points[1:5])
-    # @test all(isnan.(vals[6:end]))
-
 
     # second alternative: assume a vector field :v
     dh = DofHandler(mesh)
@@ -311,7 +303,7 @@ function oneD()
 
     # do a L2Projection for getting values in dofs
     projector = L2Projector(ip_f, mesh)
-    projector_values = project(projector, qp_vals, qr; project_to_nodes=false)
+    projector_values = project(projector, qp_vals, qr)
 
     # points where we want to retrieve field values
     points = [Vec((x,)) for x in range(-1.0; stop=1.0, length=5)]

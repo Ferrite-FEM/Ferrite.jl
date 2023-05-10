@@ -80,7 +80,7 @@ q_gp = compute_heat_fluxes(cellvalues, dh, u);
 projector = L2Projector(ip, grid);
 
 # Project the integration point values to the nodal values
-q_projected = project(projector, q_gp, qr; project_to_nodes=false); # TODO: this should be default.
+q_projected = project(projector, q_gp, qr);
 
 
 # ## Exporting to VTK

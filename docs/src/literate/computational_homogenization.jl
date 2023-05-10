@@ -434,14 +434,14 @@ projector = L2Projector(ip, grid)
 
 for i in 1:3
     σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.dirichlet[i], εᴹ[i])
-    proj = project(projector, σ_qp, qr; project_to_nodes=false)
+    proj = project(projector, σ_qp, qr)
     push!(σ.dirichlet, proj)
     push!(σ̄.dirichlet, σ̄_i)
 end
 
 for i in 1:3
     σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.periodic[i], εᴹ[i])
-    proj = project(projector, σ_qp, qr; project_to_nodes=false)
+    proj = project(projector, σ_qp, qr)
     push!(σ.periodic, proj)
     push!(σ̄.periodic, σ̄_i)
 end
