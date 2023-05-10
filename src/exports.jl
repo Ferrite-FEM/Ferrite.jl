@@ -113,7 +113,7 @@ export
     DofOrder,
     FieldHandler,
     Field,
-    reshape_to_nodes,
+    evaluate_at_grid_nodes,
     apply_analytical!,
 
 # Constraints

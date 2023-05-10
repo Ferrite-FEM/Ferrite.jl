@@ -1,5 +1,4 @@
 # to test vtk-files
-using StableRNGs
 OVERWRITE_CHECKSUMS = false
 checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")
 if OVERWRITE_CHECKSUMS
@@ -57,12 +56,12 @@ end
         dofhandler = DofHandler(grid)
         ip = Ferrite.default_interpolation(celltype)
         add!(dofhandler, :temperature, ip)
-        add!(dofhandler, :displacement, ip^3)
+        add!(dofhandler, :displacement, ip^dim)
         close!(dofhandler)
         ch = ConstraintHandler(dofhandler)
-        dbc = Dirichlet(:temperature, union(getfaceset(grid, "left"), getfaceset(grid, "right-faceset")), (x,t)->1)
+        dbc = Dirichlet(:temperature, getfaceset(grid, "right-faceset"), (x,t)->1)
         add!(ch, dbc)
-        dbc = Dirichlet(:temperature, getfaceset(grid, "middle-faceset"), (x,t)->4)
+        dbc = Dirichlet(:temperature, getfaceset(grid, "left"), (x,t)->4)
         add!(ch, dbc)
         for d in 1:dim
             dbc = Dirichlet(:displacement, union(getfaceset(grid, "left")), (x,t) -> d, d)
@@ -70,8 +69,9 @@ end
         end
         close!(ch)
         update!(ch, 0.0)
-        rng = StableRNG(1234)
-        u = rand(rng, ndofs(dofhandler))
+        u = zeros(ndofs(dofhandler))
+        apply_analytical!(u, dofhandler, :temperature, x -> 2x[1])
+        apply_analytical!(u, dofhandler, :displacement, x -> -2x)
         apply!(u, ch)
 
         dofhandlerfilename = "dofhandler-$(repr(celltype))"
@@ -99,7 +99,7 @@ close(csio)
     # open files
     checksums_file_tensors = joinpath(dirname(@__FILE__), "checksums2.sha1")
     if OVERWRITE_CHECKSUMS
-        csio = open(checksums_file_tensors, "a")
+        csio = open(checksums_file_tensors, "w")
     else
         csio = open(checksums_file_tensors, "r")
     end

@@ -217,36 +217,53 @@ function test_export(;subset::Bool)
     p_tens = project(p, qpdata_tens, qr)::Vector{<:Tensor{2,2}}
     p_stens = project(p, qpdata_stens, qr)::Vector{<:SymmetricTensor{2,2}}
 
-    # reshaping for export with reshape_to_nodes
+    # reshaping for export with evaluate_at_grid_nodes
     fnodes = [f(x.x) for x in grid.nodes]
     nindex = isnan.(fnodes)
     findex = (!isnan).(fnodes)
-    let r = reshape_to_nodes(p, p_scalar)
-        @test size(r) == (1, 6)
+    let r = evaluate_at_grid_nodes(p, p_scalar),
+        rv = Ferrite._evaluate_at_grid_nodes(p, p_scalar, Val(true))
+        @test size(r) == (6,)
         @test all(isnan, r[nindex])
+        @test all(isnan, rv[nindex])
         @test r[findex] ≈ fnodes[findex]
+        @test rv isa Matrix{Float64}
+        @test r isa Vector{Float64}
+        @test r[findex] == vec(rv)[findex]
     end
-    let r = reshape_to_nodes(p, p_vec)
-        @test size(r) == (3, getnnodes(grid))
-        @test r[1, findex] ≈  fnodes[findex]
-        @test r[2, findex] ≈ 2fnodes[findex]
-        @test r[3, findex] ≈ 0fnodes[findex]
-        @test all(isnan, r[:, nindex])
+    let r = evaluate_at_grid_nodes(p, p_vec),
+        rv = Ferrite._evaluate_at_grid_nodes(p, p_vec, Val(true))
+        @test size(r) == (6,)
+        @test getindex.(r[findex], 1) ≈  fnodes[findex]
+        @test getindex.(r[findex], 2) ≈ 2fnodes[findex]
+        @test all(y -> all(isnan, y), r[nindex])
+        @test rv[1:2, findex] ≈ reshape(reinterpret(Float64, r), (2, 6))[:, findex]
+        @test all(iszero, rv[3:3, findex])
+        @test all(isnan, rv[:, nindex])
     end
-    let r = reshape_to_nodes(p, p_tens)
-        @test size(r) == (4, getnnodes(grid))
-        @test r[1, findex] ≈  fnodes[findex] # 11-components
-        @test r[2, findex] ≈ 4fnodes[findex] # 22-components
-        @test r[3, findex] ≈ 2fnodes[findex] # 12-components
-        @test r[4, findex] ≈ 2fnodes[findex] # 21-components
-        @test all(isnan, r[:, nindex])
+    let r = evaluate_at_grid_nodes(p, p_tens),
+        rv = Ferrite._evaluate_at_grid_nodes(p, p_tens, Val(true))
+        @test size(r) == (6,)
+        @test getindex.(r[findex], 1) ≈  fnodes[findex] # 11-components
+        @test getindex.(r[findex], 2) ≈ 2fnodes[findex] # 12-components
+        @test getindex.(r[findex], 3) ≈ 2fnodes[findex] # 21-components
+        @test getindex.(r[findex], 4) ≈ 4fnodes[findex] # 22-components
+        @test all(y -> all(isnan, y), r[nindex])
+        voigt_perm = [1, 4, 3, 2]
+        @test rv[voigt_perm, findex] ≈ reshape(reinterpret(Float64, r), (4, 6))[:, findex]
+        @test all(isnan, rv[:, nindex])
     end
-    let r = reshape_to_nodes(p, p_stens)
-        @test size(r) == (3, getnnodes(grid))
-        @test r[1, findex] ≈  fnodes[findex] # 11-components
-        @test r[2, findex] ≈ 4fnodes[findex] # 22-components
-        @test r[3, findex] ≈ 2fnodes[findex] # 12-components
-        @test all(isnan, r[:, nindex])
+    let r = evaluate_at_grid_nodes(p, p_stens),
+        rv = Ferrite._evaluate_at_grid_nodes(p, p_stens, Val(true))
+        @test size(r) == (6,)
+        @test getindex.(r[findex], 1) ≈  fnodes[findex] # 11-components
+        @test getindex.(r[findex], 2) ≈ 2fnodes[findex] # 21-components
+        @test getindex.(r[findex], 3) ≈ 2fnodes[findex] # 12-components
+        @test getindex.(r[findex], 4) ≈ 4fnodes[findex] # 22-components
+        @test all(y -> all(isnan, y), r[nindex])
+        voigt_perm = [1, 3, 2]
+        @test rv[voigt_perm, findex] ≈ reshape(reinterpret(Float64, r), (3, 6))[:, findex]
+        @test all(isnan, rv[:, nindex])
     end
 
     mktempdir() do tmp
