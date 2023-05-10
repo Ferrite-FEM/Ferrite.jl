@@ -1,6 +1,7 @@
 export
 # Interpolations
     Interpolation,
+    VectorizedInterpolation,
     RefCube,
     RefTetrahedron,
     RefPrism,
@@ -83,8 +84,11 @@ export
     nfaces,
     addnodeset!,
     addfaceset!,
+    addboundaryfaceset!,
     addedgeset!,
+    addboundaryedgeset!,
     addvertexset!,
+    addboundaryvertexset!,
     addcellset!,
     transform!,
     generate_grid,

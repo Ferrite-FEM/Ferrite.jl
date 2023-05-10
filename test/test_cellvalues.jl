@@ -16,12 +16,16 @@ for (func_interpol, quad_rule) in  (
                                    )
 
     for fe_valtype in (CellScalarValues, CellVectorValues)
-        cv = fe_valtype(quad_rule, func_interpol)
+        geom_interpol = func_interpol # Tests below assume this
+        n_basefunc_base = getnbasefunctions(func_interpol)
+        if fe_valtype == CellVectorValues
+            func_interpol = VectorizedInterpolation(func_interpol)
+        end
+        cv = fe_valtype(quad_rule, func_interpol, geom_interpol)
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
-        fe_valtype == CellScalarValues && @test getnbasefunctions(cv) == n_basefuncs
-        fe_valtype == CellVectorValues && @test getnbasefunctions(cv) == n_basefuncs * Ferrite.getdim(func_interpol)
+        @test getnbasefunctions(cv) == n_basefuncs
 
         x, n = valid_coordinates_and_normals(func_interpol)
         reinit!(cv, x)
@@ -29,30 +33,37 @@ for (func_interpol, quad_rule) in  (
         # We test this by applying a given deformation gradient on all the nodes.
         # Since this is a linear deformation we should get back the exact values
         # from the interpolation.
-        u = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1:n_basefuncs]
-        u_scal = zeros(n_basefuncs)
+        u = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1:n_basefunc_base]
+        u_scal = zeros(n_basefunc_base)
         H = rand(Tensor{2, ndim})
         V = rand(Tensor{1, ndim})
-        for i in 1:n_basefuncs
+        for i in 1:n_basefunc_base
             u[i] = H ⋅ x[i]
             u_scal[i] = V ⋅ x[i]
         end
         u_vector = reinterpret(Float64, u)
 
         for i in 1:length(getpoints(quad_rule))
-            @test function_gradient(cv, i, u) ≈ H
-            @test function_symmetric_gradient(cv, i, u) ≈ 0.5(H + H')
-            @test function_divergence(cv, i, u) ≈ tr(H)
-            ndim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl_from_gradient(H)
-            function_value(cv, i, u)
             if isa(cv, CellScalarValues)
+                @test function_gradient(cv, i, u) ≈ H
+                @test function_symmetric_gradient(cv, i, u) ≈ 0.5(H + H')
+                @test function_divergence(cv, i, u) ≈ tr(H)
                 @test function_gradient(cv, i, u_scal) ≈ V
+                ndim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl_from_gradient(H)
+                function_value(cv, i, u)
                 function_value(cv, i, u_scal)
             elseif isa(cv, CellVectorValues)
-                @test function_gradient(cv, i, u_vector) ≈ function_gradient(cv, i, u) ≈ H
-                @test function_value(cv, i, u_vector) ≈ function_value(cv, i, u)
-                @test function_divergence(cv, i, u_vector) ≈ function_divergence(cv, i, u) ≈ tr(H)
-                ndim == 3 && @test function_curl(cv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
+                @test function_gradient(cv, i, u_vector)  ≈ H
+                @test (@test_deprecated function_gradient(cv, i, u)) ≈ H
+                @test function_symmetric_gradient(cv, i, u_vector) ≈ 0.5(H + H')
+                @test (@test_deprecated function_symmetric_gradient(cv, i, u)) ≈ 0.5(H + H')
+                @test function_divergence(cv, i, u_vector) ≈ tr(H)
+                @test (@test_deprecated function_divergence(cv, i, u)) ≈ tr(H)
+                if ndim == 3
+                    @test function_curl(cv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
+                    @test (@test_deprecated function_curl(cv, i, u)) ≈ Ferrite.curl_from_gradient(H)
+                end
+                function_value(cv, i, u_vector) ≈ (@test_deprecated function_value(cv, i, u))
             end
         end
 
@@ -97,7 +108,7 @@ end
     grid = generate_grid(Line, (2,))
     ip_fe = Lagrange{dim, RefCube, deg}()
     dh = DofHandler(grid)
-    add!(dh, :u, 1, ip_fe)
+    add!(dh, :u, ip_fe)
     close!(dh);
     cell = first(CellIterator(dh))
     ip_geo = Lagrange{dim, RefCube, 2}()
@@ -117,9 +128,9 @@ end
     qr = QuadratureRule{dim,RefTetrahedron}(1)
     qr_f = QuadratureRule{1,RefTetrahedron}(1)
     csv = CellScalarValues(qr, ip)
-    cvv = CellVectorValues(qr, ip)
+    cvv = CellVectorValues(qr, VectorizedInterpolation(ip))
     fsv = FaceScalarValues(qr_f, ip)
-    fvv = FaceVectorValues(qr_f, ip)
+    fvv = FaceVectorValues(qr_f, VectorizedInterpolation(ip))
     x, n = valid_coordinates_and_normals(ip)
     reinit!(csv, x)
     reinit!(cvv, x)
@@ -153,11 +164,6 @@ end
     @test_throws ArgumentError function_value(csv, qp, ue)
     @test_throws ArgumentError function_gradient(csv, qp, ue)
     @test_throws ArgumentError function_divergence(csv, qp, ue)
-    # Vector values, vector dofs
-    ue = [rand(Vec{dim}) for _ in 1:(getnbasefunctions(cvv) ÷ dim + 1)]
-    @test_throws ArgumentError function_value(cvv, qp, ue)
-    @test_throws ArgumentError function_gradient(cvv, qp, ue)
-    @test_throws ArgumentError function_divergence(cvv, qp, ue)
 end
 
 end # of testset

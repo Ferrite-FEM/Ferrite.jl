@@ -141,12 +141,9 @@ function create_values(interpolation)
     qr      = QuadratureRule{3,RefTetrahedron}(2)
     face_qr = QuadratureRule{2,RefTetrahedron}(3)
 
-    ## create geometric interpolation (use the same as for u)
-    interpolation_geom = Lagrange{3,RefTetrahedron,1}()
-
     ## cell and facevalues for u
-    cellvalues_u = CellVectorValues(qr, interpolation, interpolation_geom)
-    facevalues_u = FaceVectorValues(face_qr, interpolation, interpolation_geom)
+    cellvalues_u = CellVectorValues(qr, interpolation)
+    facevalues_u = FaceVectorValues(face_qr, interpolation)
 
     return cellvalues_u, facevalues_u
 end;

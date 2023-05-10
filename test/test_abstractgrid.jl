@@ -63,7 +63,7 @@
     end
 
     for (dh,u) in zip(dhs,(u1,u2))
-        add!(dh, :u, 1)
+        add!(dh, :u, ip)
         close!(dh)
         ch = ConstraintHandler(dh)
         add!(ch, dbc)

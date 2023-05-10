@@ -54,6 +54,9 @@ Ferrite.faceskeleton
 ```@docs
 addcellset!
 addfaceset!
+addboundaryfaceset!
+addboundaryedgeset!
+addboundaryvertexset!
 addnodeset!
 ```
 
