@@ -117,7 +117,7 @@ function PointVectorValues(::Type{T}, ip::ScalarInterpolation, geom_interpol::In
         "passing scalar interpolations to PointVectorValues is deprectated. Instead, " *
         "vectorize the interpolation to the appropriate vector dimension first. " *
         "See CHANGELOG for more details.",
-        :FaceVectorValues
+        :PointVectorValues
     )
     return PointVectorValues(T, VectorizedInterpolation(ip), geom_interpol)
 end
