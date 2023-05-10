@@ -112,6 +112,15 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule, func_interpol::S
     )
     return FaceVectorValues(T, quad_rule, VectorizedInterpolation(func_interpol), geom_interpol)
 end
+function PointVectorValues(::Type{T}, ip::ScalarInterpolation, geom_interpol::Interpolation=default_geometric_interpolation(ip)) where {T}
+    Base.depwarn(
+        "passing scalar interpolations to PointVectorValues is deprectated. Instead, " *
+        "vectorize the interpolation to the appropriate vector dimension first. " *
+        "See CHANGELOG for more details.",
+        :FaceVectorValues
+    )
+    return PointVectorValues(T, VectorizedInterpolation(ip), geom_interpol)
+end
 
 # (Cell|Face)VectorValues with vector dofs
 @deprecate function_value(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_value(fe_v, q_point, reinterpret(T, u))

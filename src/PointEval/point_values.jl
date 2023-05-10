@@ -52,9 +52,9 @@ end
 function PointScalarValues(cv::CV, ip::IP) where {D,T,R,CV<:CellValues{D,T,R},IP<:Interpolation{D,R}}
     return PointScalarValues{D,T,R,CV,IP}(cv, ip)
 end
-PointScalarValues(ip::Interpolation, ipg::Interpolation=ip) = PointScalarValues(Float64, ip, ipg)
+PointScalarValues(ip::Interpolation, ipg::Interpolation=default_geometric_interpolation(ip)) = PointScalarValues(Float64, ip, ipg)
 PointScalarValues(cv::CellValues{D,T}) where {D,T} = PointScalarValues(T, cv.func_interp, cv.geo_interp)
-function PointScalarValues(::Type{T}, ip::Interpolation{D,R}, ipg::Interpolation = ip) where {T,D,R}
+function PointScalarValues(::Type{T}, ip::Interpolation{D,R}, ipg::Interpolation=default_geometric_interpolation(ip)) where {T,D,R}
     qr = QuadratureRule{D,R,T}([one(T)], [zero(Vec{D,T})])
     cv = CellScalarValues(qr, ip, ipg)
     return PointScalarValues(cv, ip)
@@ -67,17 +67,12 @@ end
 function PointVectorValues(cv::CV, ip::IP) where {D,T,R,CV<:CellValues{D,T,R},IP<:Interpolation{D,R}}
     return PointVectorValues{D,T,R,CV,IP}(cv, ip)
 end
-PointVectorValues(ip::Interpolation, ipg::Interpolation=derive_geometric_interpolation(ip)) = PointVectorValues(Float64, ip, ipg)
+PointVectorValues(ip::Interpolation, ipg::Interpolation=default_geometric_interpolation(ip)) = PointVectorValues(Float64, ip, ipg)
 PointVectorValues(cv::CellValues{D,T}) where {D,T} = PointVectorValues(T, cv.func_interp, cv.geo_interp)
-function PointVectorValues(::Type{T}, ip::Interpolation{D,R}, ipg = derive_geometric_interpolation(ip)) where {T,D,R}
+function PointVectorValues(::Type{T}, ip::Interpolation{D,R}, ipg::Interpolation=default_geometric_interpolation(ip)) where {T,D,R}
     qr = QuadratureRule{D,R,T}([one(T)], [zero(Vec{D,T})])
     cv = CellVectorValues(qr, ip, ipg)
     return PointVectorValues(cv, ip)
-end
-
-# TODO: Deprecate auto-vectorized version
-function PointVectorValues(::Type{T}, ip::ScalarInterpolation, ipg = ip) where {T}
-    return PointVectorValues(T, VectorizedInterpolation(ip), ipg)
 end
 
 """
