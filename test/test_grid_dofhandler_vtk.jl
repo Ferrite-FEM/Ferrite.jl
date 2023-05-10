@@ -167,18 +167,6 @@ end
 
     @test getcells(grid, "cell_set") == [getcells(grid, 1)]
 
-    f(x) = Tensor{1,1,Float64}((1 + x[1]^2 + 2x[2]^2, ))
-
-    values = compute_vertex_values(grid, f)
-    @test f([0.0, 0.0]) == values[1]
-    @test f([0.5, 0.5]) == values[5]
-    @test f([1.0, 1.0]) == values[9]
-
-    @test compute_vertex_values(grid, collect(1:9), f) == values
-
-    # Can we test this in a better way? The set makes the order random.
-    @test length(compute_vertex_values(grid, "node_set", f)) == 9
-
     # CellIterator on a grid without DofHandler
     grid = generate_grid(Triangle, (4,4))
     n = 0

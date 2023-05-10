@@ -92,7 +92,6 @@ export
     addcellset!,
     transform!,
     generate_grid,
-    compute_vertex_values,
 
 # Grid coloring
     create_coloring,

@@ -146,7 +146,6 @@ function test_projection_mixedgrid()
     point_vars = project(proj, qp_values, qr)
     point_vars_2 = project(proj, qp_values_matrix, qr)
 
-    # ae = compute_vertex_values(mesh, f)
     ae = zeros(3, length(point_vars))
     for i in 1:3
         apply_analytical!(@view(ae[i, :]), proj.dh, :_, x -> f(x).data[i], quadset)
