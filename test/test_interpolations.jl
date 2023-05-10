@@ -149,6 +149,12 @@
             end
         end
     end
+
+    # VectorizedInterpolation
+    v_interpolation_1 = interpolation^2
+    v_interpolation_2 = (d = 2; interpolation^d)
+    @test getnbasefunctions(v_interpolation_1) == getnbasefunctions(v_interpolation_2) ==
+          getnbasefunctions(interpolation) * 2
 end
 
 @test Ferrite.reference_coordinates(DiscontinuousLagrange{2,RefTetrahedron,0}()) ≈ [Vec{2,Float64}((1/3,1/3))]

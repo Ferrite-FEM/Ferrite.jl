@@ -25,5 +25,14 @@ Ferrite.get_coordinate_eltype(::Node)
 Ferrite.toglobal
 Ferrite.sortface
 Ferrite.sortedge
+Ferrite.getfaceedges
+Ferrite.getfacevertices
+Ferrite.getedgevertices
+Ferrite.getfaceinstances
+Ferrite.getedgeinstances
+Ferrite.getvertexinstances
+Ferrite.filterfaces
+Ferrite.filteredges
+Ferrite.filtervertices
 ```
 

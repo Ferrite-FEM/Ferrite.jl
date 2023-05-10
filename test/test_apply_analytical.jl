@@ -27,8 +27,8 @@
         dh = DofHandler(grid)
         default_ip = Ferrite.default_interpolation(CT)
         try
-            add!(dh, :u, dim, change_ip_order(default_ip, ip_order_u))
-            add!(dh, :p, 1, change_ip_order(default_ip, ip_order_p))
+            add!(dh, :u, change_ip_order(default_ip, ip_order_u)^dim)
+            add!(dh, :p, change_ip_order(default_ip, ip_order_p))
         catch e
             isa(e, MethodError) && e.f == Ferrite.reference_coordinates && return nothing
             rethrow(e)
@@ -55,9 +55,9 @@
         mdh = DofHandler(grid)
         default_ip_A = Ferrite.default_interpolation(getcelltype(grid, first(getcellset(grid,"A"))))
         default_ip_B = Ferrite.default_interpolation(getcelltype(grid, first(getcellset(grid,"B"))))
-        ufield_A = Field(:u, change_ip_order(default_ip_A, ip_order_u), dim)
-        pfield_A = Field(:p, change_ip_order(default_ip_A, ip_order_p), 1)
-        ufield_B = Field(:u, change_ip_order(default_ip_B, ip_order_u), dim)
+        ufield_A = Field(:u, change_ip_order(default_ip_A, ip_order_u)^dim)
+        pfield_A = Field(:p, change_ip_order(default_ip_A, ip_order_p))
+        ufield_B = Field(:u, change_ip_order(default_ip_B, ip_order_u)^dim)
         add!(mdh, FieldHandler([ufield_A, pfield_A], getcellset(grid,"A")))
         add!(mdh, FieldHandler([ufield_B,], getcellset(grid, "B")))
         close!(mdh)

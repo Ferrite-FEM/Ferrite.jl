@@ -8,37 +8,6 @@ struct L2Projector <: AbstractProjector
     dh::DofHandler
     set::Vector{Int}
     node2dof_map::Vector{Int}
-    fe_values::Union{CellValues,Nothing} # only used for deprecated constructor
-    qr_rhs::Union{QuadratureRule,Nothing}    # only used for deprecated constructor
-end
-
-function L2Projector(fe_values::Ferrite.Values, interp::Interpolation,
-    grid::Ferrite.AbstractGrid, set=1:getncells(grid), fe_values_mass::Ferrite.Values=fe_values)
-
-    Base.depwarn("L2Projector(fe_values, interp, grid) is deprecated, " *
-                 "use L2Projector(qr, interp, grid) instead.", :L2Projector)
-
-    dim, T, shape = typeof(fe_values).parameters
-
-    # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
-    dh = DofHandler(grid)
-    field = Field(:_, interp, 1)
-    fh = FieldHandler([field], Set(set))
-    add!(dh, fh)
-    _, vertex_dict, _, _ = __close!(dh)
-
-    M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
-    M_cholesky = cholesky(M)  # TODO maybe have a lazy eval instead of precomputing? / JB
-    dummy = Lagrange{1,RefCube,1}()
-    return L2Projector(dummy, dummy, M_cholesky, dh, collect(set), vertex_dict[1], fe_values, nothing)
-end
-
-function L2Projector(qr::QuadratureRule, func_ip::Interpolation,
-    grid::Ferrite.AbstractGrid, set=1:getncells(grid), qr_mass::QuadratureRule=_mass_qr(func_ip),
-    geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(set)])))
-    Base.depwarn("L2Projector(qr, func_ip, grid) is deprecated, " *
-                 "use L2Projector(func_ip, grid) instead.", :L2Projector)
-    return L2Projector(func_ip, grid; qr_lhs=qr_mass, set=set, geom_ip=geom_ip, qr_rhs=qr)
 end
 
 """
@@ -70,16 +39,20 @@ function L2Projector(
         qr_lhs::QuadratureRule = _mass_qr(func_ip),
         set = 1:getncells(grid),
         geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(set)])),
-        qr_rhs::Union{QuadratureRule,Nothing}=nothing, # deprecated
     )
 
-    _check_same_celltype(grid, collect(set)) # TODO this does the right thing, but gives the wrong error message if it fails
+    # TODO: Maybe this should not be allowed? We always assume to project scalar entries.
+    if func_ip isa VectorizedInterpolation
+        func_ip = func_ip.ip
+    end
+
+    _check_same_celltype(grid, set)
 
     fe_values_mass = CellScalarValues(qr_lhs, func_ip, geom_ip)
 
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
     dh = DofHandler(grid)
-    field = Field(:_, func_ip, 1) # we need to create the field, but the interpolation is not used here
+    field = Field(:_, func_ip) # we need to create the field, but the interpolation is not used here
     fh = FieldHandler([field], Set(set))
     add!(dh, fh)
     _, vertex_dict, _, _ = __close!(dh)
@@ -87,11 +60,7 @@ function L2Projector(
     M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
     M_cholesky = cholesky(M)
 
-    # For deprecated API
-    fe_values = qr_rhs === nothing ? nothing :
-                CellScalarValues(qr_rhs, func_ip, geom_ip)
-
-    return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set), vertex_dict[1], fe_values, qr_rhs)
+    return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set), vertex_dict[1])
 end
 
 # Quadrature sufficient for integrating a mass matrix
@@ -101,6 +70,7 @@ end
 function _mass_qr(::Lagrange{dim, RefTetrahedron, 2}) where {dim}
     return QuadratureRule{dim,RefTetrahedron}(4)
 end
+_mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
 function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
     println(io, typeof(proj))
@@ -111,7 +81,7 @@ end
 
 function _assemble_L2_matrix(fe_values, set, dh)
 
-    n = Ferrite.getn_scalarbasefunctions(fe_values)
+    n = Ferrite.getnbasefunctions(fe_values)
     M = create_symmetric_sparsity_pattern(dh)
     assembler = start_assemble(M)
 
@@ -149,13 +119,6 @@ function _assemble_L2_matrix(fe_values, set, dh)
         assemble!(assembler, cell_dofs, Me)
     end
     return M
-end
-
-function project(vars::Vector{Vector{T}}, proj::L2Projector;
-                 project_to_nodes=true) where T <: Union{Number, AbstractTensor}
-    Base.depwarn("project(vars, proj::L2Projector) is deprecated, " *
-                 "use project(proj, vars, qr) instead.", :project)
-    return project(proj, vars; project_to_nodes=project_to_nodes)
 end
 
 
@@ -200,13 +163,11 @@ field over the domain, which is useful if one wants to interpolate the projected
 """
 function project(proj::L2Projector,
                  vars::AbstractVector{<:AbstractVector{T}},
-                 qr_rhs::Union{QuadratureRule,Nothing}=nothing;
+                 qr_rhs::QuadratureRule;
                  project_to_nodes::Bool=true) where T <: Union{Number, AbstractTensor}
 
     # For using the deprecated API
-    fe_values = qr_rhs === nothing ?
-        proj.fe_values :
-        CellScalarValues(qr_rhs, proj.func_ip, proj.geom_ip)
+    fe_values = CellScalarValues(qr_rhs, proj.func_ip, proj.geom_ip)
 
     M = T <: AbstractTensor ? length(vars[1][1].data) : 1
 

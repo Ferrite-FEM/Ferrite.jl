@@ -8,7 +8,8 @@ struct ScalarValued <: FieldTrait end
 
 FieldTrait(::Type{<:CellScalarValues}) = ScalarValued()
 FieldTrait(::Type{<:FaceScalarValues}) = ScalarValued()
-FieldTrait(::Type{<:PointScalarValuesInternal}) = ScalarValued()
+FieldTrait(::Type{<:PointValuesInternal{<:Any,<:Any,<:Any,<:Number}}) = ScalarValued()
+FieldTrait(::Type{<:PointValuesInternal{<:Any,<:Any,<:Any,<:Vec}}) = VectorValued()
 FieldTrait(::Type{<:PointScalarValues}) = ScalarValued()
 FieldTrait(::Type{<:PointVectorValues}) = VectorValued()
 FieldTrait(::Type{<:CellVectorValues}) = VectorValued()
@@ -152,21 +153,6 @@ function function_value(::FieldTrait, fe_v::Values{dim}, q_point::Int, u::Abstra
     return val
 end
 
-function function_value(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
-    n_base_funcs = getn_scalarbasefunctions(fe_v)
-    length(u) == n_base_funcs || throw_incompatible_dof_length(length(u), n_base_funcs)
-    @boundscheck checkquadpoint(fe_v, q_point)
-    val = zero(Vec{dim, T})
-    basefunc = 1
-    @inbounds for i in 1:n_base_funcs
-        for j in 1:dim
-            val += shape_value(fe_v, q_point, basefunc) * u[i][j]
-            basefunc += 1
-        end
-    end
-    return val
-end
-
 _valuetype(t::T, v) where T = _valuetype(FieldTrait(T), t, v)
 _valuetype(::ScalarValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = T
 _valuetype(::ScalarValued, ::Values{dim}, ::AbstractVector{Vec{dim,T}}) where {dim,T} = Vec{dim,T}
@@ -207,6 +193,7 @@ _gradienttype(values::T, v) where T = _gradienttype(FieldTrait(T), values, v)
  _gradienttype(::ScalarValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Vec{dim,T}
 _gradienttype(::VectorValued, ::Values{dim}, ::AbstractVector{T}) where {dim,T} = Tensor{2,dim,T}
 
+# TODO: Deprecate this, nobody is using this in practice...
 function function_gradient(::ScalarValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     length(u) == n_base_funcs || throw_incompatible_dof_length(length(u), n_base_funcs)
@@ -217,22 +204,6 @@ function function_gradient(::ScalarValued, fe_v::Values{dim}, q_point::Int, u::A
     end
     return grad
 end
-
-function function_gradient(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
-    n_base_funcs = getn_scalarbasefunctions(fe_v)
-    length(u) == n_base_funcs || throw_incompatible_dof_length(length(u), n_base_funcs)
-    @boundscheck checkquadpoint(fe_v, q_point)
-    grad = zero(Tensor{2,dim,T})
-    basefunc_count = 1
-    @inbounds for i in 1:n_base_funcs
-        for j in 1:dim
-            grad += u[i][j] * shape_gradient(fe_v, q_point, basefunc_count)
-            basefunc_count += 1
-        end
-    end
-    return grad
-end
-
 
 const function_derivative = function_gradient
 
@@ -267,6 +238,7 @@ where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
 function_divergence(fe_v::T, args...) where T <: Values = function_divergence(FieldTrait(T), fe_v, args...)
 
+# TODO: Deprecate this, nobody is using this in practice...
 function function_divergence(::ScalarValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}
     n_base_funcs = getn_scalarbasefunctions(fe_v)
     length(u) == n_base_funcs || throw_incompatible_dof_length(length(u), n_base_funcs)
@@ -281,13 +253,11 @@ end
 function_divergence(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u)) where {dim,T} =
     tr(function_gradient(fe_v, q_point, u, dof_range))
 
-function_divergence(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} =
-    tr(function_gradient(fe_v, q_point, u))
-
 function_curl(fe_v::Values, q_point::Int, u::AbstractVector, dof_range = eachindex(u)) =
     curl_from_gradient(function_gradient(fe_v, q_point, u, dof_range))
 
-function_curl(fe_v::Values, q_point::Int, u::AbstractVector{Vec{3, T}}) where T =
+# TODO: Deprecate this, nobody is using this in practice...
+function_curl(fe_v::Union{CellScalarValues,FaceScalarValues}, q_point::Int, u::AbstractVector{Vec{3, T}}) where T =
     curl_from_gradient(function_gradient(fe_v, q_point, u))
 
 """

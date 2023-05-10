@@ -57,3 +57,67 @@ Base.@deprecate_binding Line2D Line
 Base.@deprecate_binding Line3D Line
 Base.@deprecate_binding Quadrilateral3D Quadrilateral
 export Line2D, Line3D, Quadrilateral3D
+
+# Deprecation of auto-vectorized methods
+function add!(dh::DofHandler, name::Symbol, dim::Int)
+    celltype = getcelltype(dh.grid)
+    if !isconcretetype(celltype)
+        error("If you have more than one celltype in Grid, you must use add!(dh::DofHandler, fh::FieldHandler)")
+    end
+    Base.depwarn(
+        "`add!(dh::DofHandler, name::Symbol, dim::Int)` is deprecated. Instead, pass the " *
+        "interpolation explicitly, and vectorize it to `dim` for vector-valued " *
+        "fields. See CHANGELOG for more details.",
+        :add!,
+    )
+    ip = default_interpolation(celltype)
+    add!(dh, name, dim == 1 ? ip : VectorizedInterpolation{dim}(ip))
+end
+
+function add!(dh::DofHandler, name::Symbol, dim::Int, ip::ScalarInterpolation)
+    Base.depwarn(
+        "`add!(dh::DofHandler, name::Symbol, dim::Int, ip::ScalarInterpolation)` is " *
+        "deprecated. Instead, vectorize the interpolation to the appropriate dimension " *
+        "and add it (`vip = ip^dim; add!(dh, name, vip)`). See CHANGELOG for more details.",
+        :add!
+    )
+    add!(dh, name, dim == 1 ? ip : VectorizedInterpolation{dim}(ip))
+end
+
+function CellVectorValues(quad_rule::QuadratureRule, func_interpol::ScalarInterpolation,
+        geom_interpol::Interpolation=default_geometric_interpolation(func_interpol))
+    return CellVectorValues(Float64, quad_rule, func_interpol, geom_interpol)
+end
+function CellVectorValues(::Type{T}, quad_rule::QuadratureRule, func_interpol::ScalarInterpolation,
+        geom_interpol::Interpolation=func_interpol) where {T}
+    Base.depwarn(
+        "passing scalar interpolations to CellVectorValues is deprectated. Instead, " *
+        "vectorize the interpolation to the appropriate vector dimension first. " *
+        "See CHANGELOG for more details.",
+        :CellVectorValues
+    )
+    return CellVectorValues(T, quad_rule, VectorizedInterpolation(func_interpol), geom_interpol)
+end
+function FaceVectorValues(quad_rule::QuadratureRule, func_interpol::ScalarInterpolation,
+        geom_interpol::Interpolation=default_geometric_interpolation(func_interpol))
+    return FaceVectorValues(Float64, quad_rule, func_interpol, geom_interpol)
+end
+function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule, func_interpol::ScalarInterpolation,
+        geom_interpol::Interpolation=func_interpol) where {T}
+    Base.depwarn(
+        "passing scalar interpolations to FaceVectorValues is deprectated. Instead, " *
+        "vectorize the interpolation to the appropriate vector dimension first. " *
+        "See CHANGELOG for more details.",
+        :FaceVectorValues
+    )
+    return FaceVectorValues(T, quad_rule, VectorizedInterpolation(func_interpol), geom_interpol)
+end
+
+# (Cell|Face)VectorValues with vector dofs
+@deprecate function_value(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_value(fe_v, q_point, reinterpret(T, u))
+@deprecate function_value(vv::VectorValued, fe_v::Values, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_value(vv, fe_v, q_point, reinterpret(T, u))
+@deprecate function_gradient(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_gradient(fe_v, q_point, reinterpret(T, u))
+@deprecate function_gradient(vv::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_gradient(vv, fe_v, q_point, reinterpret(T, u))
+@deprecate function_divergence(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(fe_v, q_point, reinterpret(T, u))
+@deprecate function_divergence(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(vv, fe_v, q_point, reinterpret(T, u))
+@deprecate function_curl(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{3, T}}) where T function_curl(fe_v::Values, q_point::Int, reinterpret(T, u))

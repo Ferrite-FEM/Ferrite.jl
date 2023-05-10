@@ -116,7 +116,7 @@ function dofhandler()
     points = [node.x for node in mesh.nodes] # same as nodes
 
     dh = DofHandler(mesh)
-    add!(dh, :s, 1) # a scalar field
+    add!(dh, :s, Lagrange{2,RefCube,1}()) # a scalar field
     close!(dh)
 
     ph = PointEvalHandler(mesh, points)
@@ -133,13 +133,14 @@ function dofhandler2()
     # but not using L2Projector since we want the DofHandler dofs
     mesh = generate_grid(Quadrilateral, (20, 20))
     ip_f = Lagrange{2,RefCube,2}()
+    ip_f_v = ip_f^2
     ip_g = Lagrange{2,RefCube,1}()
     qr = QuadratureRule{2,RefCube}(3)
     csv = CellScalarValues(qr, ip_f, ip_g)
-    cvv = CellVectorValues(qr, ip_f, ip_g)
+    cvv = CellVectorValues(qr, ip_f_v, ip_g)
     dh = DofHandler(mesh);
-    add!(dh, :s, 1, ip_f)
-    add!(dh, :v, 2, ip_f)
+    add!(dh, :s, ip_f)
+    add!(dh, :v, ip_f_v)
     close!(dh)
     M = create_sparsity_pattern(dh)
     f = zeros(ndofs(dh))
@@ -272,10 +273,10 @@ function mixed_grid()
 
     # second alternative: assume a vector field :v
     dh = DofHandler(mesh)
-    field = Field(:v, ip_quad, 2)
+    field = Field(:v, ip_quad^2)
     fh_quad = FieldHandler([field], getcellset(mesh, "quads"))
     add!(dh, fh_quad)
-    field = Field(:v, ip_tri, 2) 
+    field = Field(:v, ip_tri^2)
     fh_tri = FieldHandler([field], getcellset(mesh, "tris"))
     add!(dh, fh_tri)
     close!(dh)
@@ -367,7 +368,7 @@ end
     @test function_gradient(psv, us) ≈ function_gradient(csv, 2, us)
 
     # PointVectorValues
-    cvv = CellVectorValues(qr, ip_f, ip_g)
+    cvv = CellVectorValues(qr, ip_f^2, ip_g)
     reinit!(cvv, x)
     pvv = PointVectorValues(cvv)
     uv = rand(2 * getnbasefunctions(ip_f)) .+ 1
