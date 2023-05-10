@@ -55,8 +55,9 @@ end
         # Create a DofHandler, add some things, write to file and
         # then check the resulting sha
         dofhandler = DofHandler(grid)
-        add!(dofhandler, :temperature, 1)
-        add!(dofhandler, :displacement, 3)
+        ip = Ferrite.default_interpolation(celltype)
+        add!(dofhandler, :temperature, ip)
+        add!(dofhandler, :displacement, ip^3)
         close!(dofhandler)
         ch = ConstraintHandler(dofhandler)
         dbc = Dirichlet(:temperature, union(getfaceset(grid, "left"), getfaceset(grid, "right-faceset")), (x,t)->1)
@@ -166,18 +167,6 @@ end
 
     @test getcells(grid, "cell_set") == [getcells(grid, 1)]
 
-    f(x) = Tensor{1,1,Float64}((1 + x[1]^2 + 2x[2]^2, ))
-
-    values = compute_vertex_values(grid, f)
-    @test f([0.0, 0.0]) == values[1]
-    @test f([0.5, 0.5]) == values[5]
-    @test f([1.0, 1.0]) == values[9]
-
-    @test compute_vertex_values(grid, collect(1:9), f) == values
-
-    # Can we test this in a better way? The set makes the order random.
-    @test length(compute_vertex_values(grid, "node_set", f)) == 9
-
     # CellIterator on a grid without DofHandler
     grid = generate_grid(Triangle, (4,4))
     n = 0
@@ -192,7 +181,6 @@ end
 end
 
 @testset "Grid sets" begin
-
     grid = Ferrite.generate_grid(Hexahedron, (1, 1, 1), Vec((0.,0., 0.)), Vec((1.,1.,1.)))
 
     #Test manual add
@@ -215,6 +203,18 @@ end
 end
 
 @testset "Grid topology" begin
+#
+#      (1) (2) (3) (4)
+#       +---+---+---+
+#
+    linegrid = generate_grid(Line,(3,))
+    linetopo = ExclusiveTopology(linegrid)
+    @test linetopo.vertex_neighbor[1,2] == Ferrite.EntityNeighborhood(VertexIndex(2,1))
+    @test linetopo.vertex_neighbor[2,1] == Ferrite.EntityNeighborhood(VertexIndex(1,2))
+    @test linetopo.vertex_neighbor[2,2] == Ferrite.EntityNeighborhood(VertexIndex(3,1))
+    @test linetopo.vertex_neighbor[3,1] == Ferrite.EntityNeighborhood(VertexIndex(2,2))
+    @test length(linetopo.face_skeleton) == 4
+
 #                           (11)
 #                   (10)+-----+-----+(12)
 #                       |  5  |  6  |
@@ -271,9 +271,9 @@ end
     hexgrid = generate_grid(Hexahedron,(2,2,1))
     topology = ExclusiveTopology(hexgrid)
     @test topology.edge_neighbor[1,11] == Ferrite.EntityNeighborhood(EdgeIndex(4,9))
-    @test getneighborhood(topology,hexgrid,EdgeIndex(1,11),true) == [EdgeIndex(4,9),EdgeIndex(2,12),EdgeIndex(3,10),EdgeIndex(1,11)]
+    @test Set(getneighborhood(topology,hexgrid,EdgeIndex(1,11),true)) == Set([EdgeIndex(4,9),EdgeIndex(2,12),EdgeIndex(3,10),EdgeIndex(1,11)])
     @test topology.edge_neighbor[2,12] == Ferrite.EntityNeighborhood(EdgeIndex(3,10))
-    @test getneighborhood(topology,hexgrid,EdgeIndex(2,12),true) == [EdgeIndex(3,10),EdgeIndex(1,11),EdgeIndex(4,9),EdgeIndex(2,12)]
+    @test Set(getneighborhood(topology,hexgrid,EdgeIndex(2,12),true)) == Set([EdgeIndex(3,10),EdgeIndex(1,11),EdgeIndex(4,9),EdgeIndex(2,12)])
     @test topology.edge_neighbor[3,10] == Ferrite.EntityNeighborhood(EdgeIndex(2,12))
     @test topology.edge_neighbor[4,9] == Ferrite.EntityNeighborhood(EdgeIndex(1,11))
     @test getneighborhood(topology,hexgrid,FaceIndex((1,3))) == [FaceIndex((2,5))]
@@ -327,6 +327,8 @@ end
     @test topology.edge_neighbor[1,1] == topology.edge_neighbor[1,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
     @test topology.face_neighbor[3,1] == topology.face_neighbor[3,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
     @test topology.face_neighbor[4,1] == topology.face_neighbor[4,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
+
+
 #
 #                   +-----+-----+-----+
 #                   |  7  |  8  |  9  |
@@ -350,23 +352,23 @@ end
     @test issubset([7,4,5,6,9], patches[8])
     @test issubset([8,5,6], patches[9])
 
-    @test Ferrite.getneighborhood(topology, quadgrid, VertexIndex(1,1)) == [VertexIndex(1,2), VertexIndex(1,4)]
-    @test Ferrite.getneighborhood(topology, quadgrid, VertexIndex(2,1)) == [VertexIndex(1,1), VertexIndex(1,3), VertexIndex(2,2), VertexIndex(2,4)]
-    @test Ferrite.getneighborhood(topology, quadgrid, VertexIndex(5,4)) == [VertexIndex(4,2), VertexIndex(4,4), VertexIndex(5,1), VertexIndex(5,3), VertexIndex(7,1), VertexIndex(7,3), VertexIndex(8,2), VertexIndex(8,4)]
-    @test Ferrite.getneighborhood(topology, quadgrid, VertexIndex(1,1),true) == [VertexIndex(1,2), VertexIndex(1,4), VertexIndex(1,1)]
-    @test Ferrite.getneighborhood(topology, quadgrid, VertexIndex(2,1),true) == [VertexIndex(1,1), VertexIndex(1,3), VertexIndex(2,2), VertexIndex(2,4), VertexIndex(1,2), VertexIndex(2,1)]
-    @test Ferrite.getneighborhood(topology, quadgrid, VertexIndex(5,4),true) == [VertexIndex(4,2), VertexIndex(4,4), VertexIndex(5,1), VertexIndex(5,3), VertexIndex(7,1), VertexIndex(7,3), VertexIndex(8,2), VertexIndex(8,4), VertexIndex(4,3), VertexIndex(5,4), VertexIndex(7,2), VertexIndex(8,1)]
-    @test Ferrite.toglobal(quadgrid, Ferrite.getneighborhood(topology, quadgrid, VertexIndex(1,1))) == [2,5]
-    @test Ferrite.toglobal(quadgrid, Ferrite.getneighborhood(topology, quadgrid, VertexIndex(2,1))) == [1,6,3]
-    @test Ferrite.toglobal(quadgrid, Ferrite.getneighborhood(topology, quadgrid, VertexIndex(5,4))) == [6,9,11,14]
+    @test Set(Ferrite.getneighborhood(topology, quadgrid, VertexIndex(1,1))) == Set([VertexIndex(1,2), VertexIndex(1,4)])
+    @test Set(Ferrite.getneighborhood(topology, quadgrid, VertexIndex(2,1))) == Set([VertexIndex(1,1), VertexIndex(1,3), VertexIndex(2,2), VertexIndex(2,4)])
+    @test Set(Ferrite.getneighborhood(topology, quadgrid, VertexIndex(5,4))) == Set([VertexIndex(4,2), VertexIndex(4,4), VertexIndex(5,1), VertexIndex(5,3), VertexIndex(7,1), VertexIndex(7,3), VertexIndex(8,2), VertexIndex(8,4)])
+    @test Set(Ferrite.getneighborhood(topology, quadgrid, VertexIndex(1,1),true)) == Set([VertexIndex(1,2), VertexIndex(1,4), VertexIndex(1,1)])
+    @test Set(Ferrite.getneighborhood(topology, quadgrid, VertexIndex(2,1),true)) == Set([VertexIndex(1,1), VertexIndex(1,3), VertexIndex(2,2), VertexIndex(2,4), VertexIndex(1,2), VertexIndex(2,1)])
+    @test Set(Ferrite.getneighborhood(topology, quadgrid, VertexIndex(5,4),true)) == Set([VertexIndex(4,2), VertexIndex(4,4), VertexIndex(5,1), VertexIndex(5,3), VertexIndex(7,1), VertexIndex(7,3), VertexIndex(8,2), VertexIndex(8,4), VertexIndex(4,3), VertexIndex(5,4), VertexIndex(7,2), VertexIndex(8,1)])
+    @test Set(Ferrite.toglobal(quadgrid, Ferrite.getneighborhood(topology, quadgrid, VertexIndex(1,1)))) == Set([2,5])
+    @test Set(Ferrite.toglobal(quadgrid, Ferrite.getneighborhood(topology, quadgrid, VertexIndex(2,1)))) == Set([1,6,3])
+    @test Set(Ferrite.toglobal(quadgrid, Ferrite.getneighborhood(topology, quadgrid, VertexIndex(5,4)))) == Set([6,9,11,14])
 
-    @test topology.face_skeleton == [FaceIndex(1,1),FaceIndex(1,2),FaceIndex(1,3),FaceIndex(1,4),
+    @test Set(topology.face_skeleton) == Set([FaceIndex(1,1),FaceIndex(1,2),FaceIndex(1,3),FaceIndex(1,4),
                                           FaceIndex(2,1),FaceIndex(2,2),FaceIndex(2,3),
                                           FaceIndex(3,1),FaceIndex(3,2),FaceIndex(3,3),
                                           FaceIndex(4,2),FaceIndex(4,3),FaceIndex(4,4),
                                           FaceIndex(5,2),FaceIndex(5,3),FaceIndex(6,2),FaceIndex(6,3),
                                           FaceIndex(7,2),FaceIndex(7,3),FaceIndex(7,4),
-                                          FaceIndex(8,2),FaceIndex(8,3),FaceIndex(9,2),FaceIndex(9,3)]
+                                          FaceIndex(8,2),FaceIndex(8,3),FaceIndex(9,2),FaceIndex(9,3)])
     @test length(topology.face_skeleton) == 4*3 + 3*4
 
     quadratic_quadgrid = generate_grid(QuadraticQuadrilateral,(3,3))
@@ -377,6 +379,7 @@ end
     @test all(quadgrid_topology.vertex_neighbor .== topology.vertex_neighbor)
     quadratic_patches = Vector{Int}[Ferrite.getneighborhood(quadgrid_topology, quadratic_quadgrid, CellIndex(i)) for i in 1:getncells(quadratic_quadgrid)]
     @test all(patches .== quadratic_patches)
+
 #
 #                   +-----+-----+-----+
 #                   |  7  |  8  |  9  |
@@ -392,7 +395,7 @@ end
     end
     reinit!(fv::FaceValues, faceid::FaceIndex, grid) = reinit!(fv,faceid[1],faceid[2],grid) # wrapper for reinit!(fv,cellid,faceid,grid)
     face_neighbors_ele5 = nonzeros(topology.face_neighbor[5,:])
-    ip = Lagrange{2, RefCube, 1}()
+    ip = Lagrange{2, RefCube, 1}()^2
     qr_face = QuadratureRule{1, RefCube}(2)
     fv_ele = FaceVectorValues(qr_face, ip)
     fv_neighbor = FaceVectorValues(qr_face, ip)
@@ -456,32 +459,91 @@ end
     test_coloring(generate_grid(Quadrilateral, (2, 2)), [])
 end
 
-@testset "DoF distribution" begin
-    # _________
-    # |\      |
-    # |  \  2 |
-    # | 1  \  |
-    # |______\|
+@testset "High order dof distribution" begin
+    # 3-----4
+    # | \   |
+    # |  \  |
+    # |   \ |
+    # 1-----2
     grid = generate_grid(Triangle, (1, 1))
 
     ## Lagrange{2,RefTetrahedron,3}
+    # Dofs per position per triangle
+    # 3      3-14-15-11
+    # | \     \      |
+    # 9  7     7  16 13
+    # |   \     \    |
+    # |    \     \   |
+    # 8  10 6     6  12
+    # |      \     \ |
+    # 1-4---5-2      2
     dh = DofHandler(grid)
-    add!(dh, :u, 1, Lagrange{2,RefTetrahedron,3}())
+    add!(dh, :u, Lagrange{2,RefTetrahedron,3}())
     close!(dh)
-    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    @test celldofs(dh, 2) == [2, 11, 3, 12, 13, 14, 15, 7, 6, 16]
+    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 9, 8, 10]
+    @test celldofs(dh, 2) == [2, 11, 3, 12, 13, 15, 14, 7, 6, 16]
 
-    ## Lagrange{2,RefTetrahedron,4}
+    ## Lagrange{2,RefTetrahedron,3}
+    # First dof per position per triangle
+    # 5      5-27-29-21
+    # | \     \      |
+    # 17 13   13  31 25
+    # |   \     \    |
+    # |    \     \   |
+    # 15 19 11   11  23
+    # |      \     \ |
+    # 1-7---9-3      3
     dh = DofHandler(grid)
-    add!(dh, :u, 1, Lagrange{2,RefTetrahedron,4}())
+    add!(dh, :u, Lagrange{2,RefTetrahedron,3}()^2)
     close!(dh)
-    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-    @test celldofs(dh, 2) == [2, 16, 3, 17, 18, 19, 20, 21, 22, 9, 8, 7, 23, 24, 25]
+    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 15, 16, 19, 20]
+    @test celldofs(dh, 2) == [3, 4, 21, 22, 5, 6, 23, 24, 25, 26, 29, 30, 27, 28, 13, 14, 11, 12, 31, 32]
+end
 
-    ## Lagrange{2,RefTetrahedron,5}
-    dh = DofHandler(grid)
-    add!(dh, :u, 1, Lagrange{2,RefTetrahedron,5}())
-    close!(dh)
-    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
-    @test celldofs(dh, 2) == [2, 22, 3, 23, 24, 25, 26, 27, 28, 29, 30, 11, 10, 9, 8, 31, 32, 33, 34, 35, 36]
+@testset "vectorization layer compat" begin
+    struct VectorLagrangeTest{dim,shape,order,vdim} <: Ferrite.ScalarInterpolation{dim,shape,order} end
+
+    @testset "1d" begin
+        grid = generate_grid(Line, (2,))
+        
+        Ferrite.vertexdof_indices(::VectorLagrangeTest{1,Ferrite.RefLine,1,2}) = ((1,2),(3,4))
+        dh1 = DofHandler(grid)
+        add!(dh1, :u, VectorLagrangeTest{1,Ferrite.RefLine,1,2}())
+        close!(dh1)
+        dh2 = DofHandler(grid)
+        add!(dh2, :u, Lagrange{2,Ferrite.RefCube,1}()^2)
+        close!(dh2)
+        @test dh1.cell_dofs == dh2.cell_dofs
+
+        Ferrite.vertexdof_indices(::VectorLagrangeTest{1,Ferrite.RefLine,1,3}) = ((1,2,3),(4,5,6))
+        dh1 = DofHandler(grid)
+        add!(dh1, :u, VectorLagrangeTest{1,Ferrite.RefLine,1,3}())
+        close!(dh1)
+        dh2 = DofHandler(grid)
+        add!(dh2, :u, Lagrange{2,Ferrite.RefCube,1}()^3)
+        close!(dh2)
+        @test dh1.cell_dofs == dh2.cell_dofs
+    end
+
+    @testset "2d" begin
+        grid = generate_grid(Quadrilateral, (2,2))
+        Ferrite.vertexdof_indices(::VectorLagrangeTest{2,Ferrite.RefCube,1,2}) = ((1,2),(3,4),(5,6),(7,8))
+        dh1 = DofHandler(grid)
+        add!(dh1, :u, VectorLagrangeTest{2,Ferrite.RefCube,1,2}())
+        close!(dh1)
+        dh2 = DofHandler(grid)
+        add!(dh2, :u, Lagrange{2,Ferrite.RefCube,1}()^2)
+        close!(dh2)
+        @test dh1.cell_dofs == dh2.cell_dofs
+
+        Ferrite.vertexdof_indices(::VectorLagrangeTest{2,Ferrite.RefCube,1,3}) = ((1,2,3),(4,5,6),(7,8,9),(10,11,12))
+        Ferrite.facedof_indices(::VectorLagrangeTest{2,Ferrite.RefCube,1,3}) = ((1,2,3,4,5,6), (4,5,6,7,8,9), (7,8,9,10,11,12), (10,11,12,1,2,3))
+        dh1 = DofHandler(grid)
+        add!(dh1, :u, VectorLagrangeTest{2,Ferrite.RefCube,1,3}())
+        close!(dh1)
+        dh2 = DofHandler(grid)
+        add!(dh2, :u, Lagrange{2,Ferrite.RefCube,1}()^3)
+        close!(dh2)
+        @test dh1.cell_dofs == dh2.cell_dofs
+    end
 end

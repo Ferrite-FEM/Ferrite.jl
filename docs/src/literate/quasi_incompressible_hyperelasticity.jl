@@ -100,15 +100,12 @@ function create_values(interpolation_u, interpolation_p)
     qr      = QuadratureRule{3,RefTetrahedron}(4)
     face_qr = QuadratureRule{2,RefTetrahedron}(4)
 
-    ## geometric interpolation
-    interpolation_geom = Lagrange{3,RefTetrahedron,1}()
-
     ## cell and facevalues for u
-    cellvalues_u = CellVectorValues(qr, interpolation_u, interpolation_geom)
-    facevalues_u = FaceVectorValues(face_qr, interpolation_u, interpolation_geom)
+    cellvalues_u = CellVectorValues(qr, interpolation_u)
+    facevalues_u = FaceVectorValues(face_qr, interpolation_u)
 
     ## cellvalues for p
-    cellvalues_p = CellScalarValues(qr, interpolation_p, interpolation_geom)
+    cellvalues_p = CellScalarValues(qr, interpolation_p)
 
     return cellvalues_u, cellvalues_p, facevalues_u
 end;
@@ -137,8 +134,8 @@ end;
 
 function create_dofhandler(grid, ipu, ipp)
     dh = DofHandler(grid)
-    add!(dh, :u, 3, ipu) # displacement dim = 3
-    add!(dh, :p, 1, ipp) # pressure dim = 1
+    add!(dh, :u, ipu) # displacement dim = 3
+    add!(dh, :p, ipp) # pressure dim = 1
     close!(dh)
     return dh
 end;
@@ -350,9 +347,9 @@ function solve(interpolation_u, interpolation_p)
 end;
 
 # We can now test the solution using the Taylor-Hood approximation
-quadratic = Lagrange{3, RefTetrahedron, 2}()
-linear = Lagrange{3, RefTetrahedron, 1}()
-vol_def = solve(quadratic, linear)
+quadratic_u = Lagrange{3, RefTetrahedron, 2}()^3
+linear_p = Lagrange{3, RefTetrahedron, 1}()
+vol_def = solve(quadratic_u, linear_p)
 
 # The deformed volume is indeed close to 1 (as should be for a nearly incompressible material).
 

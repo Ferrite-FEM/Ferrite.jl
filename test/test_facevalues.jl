@@ -13,12 +13,16 @@ for (func_interpol, quad_rule) in  (
                                    )
 
     for fe_valtype in (FaceScalarValues, FaceVectorValues)
-        fv = fe_valtype(quad_rule, func_interpol)
+        geom_interpol = func_interpol # Tests below assume this
+        n_basefunc_base = getnbasefunctions(func_interpol)
+        if fe_valtype == FaceVectorValues
+            func_interpol = VectorizedInterpolation(func_interpol)
+        end
+        fv = fe_valtype(quad_rule, func_interpol, geom_interpol)
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
-        fe_valtype == FaceScalarValues && @test getnbasefunctions(fv) == n_basefuncs
-        fe_valtype == FaceVectorValues && @test getnbasefunctions(fv) == n_basefuncs * Ferrite.getdim(func_interpol)
+        @test getnbasefunctions(fv) == n_basefuncs
 
         xs, n = valid_coordinates_and_normals(func_interpol)
         for face in 1:Ferrite.nfaces(func_interpol)
@@ -28,11 +32,11 @@ for (func_interpol, quad_rule) in  (
             # We test this by applying a given deformation gradient on all the nodes.
             # Since this is a linear deformation we should get back the exact values
             # from the interpolation.
-            u = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1:n_basefuncs]
-            u_scal = zeros(n_basefuncs)
+            u = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1:n_basefunc_base]
+            u_scal = zeros(n_basefunc_base)
             H = rand(Tensor{2, ndim})
             V = rand(Tensor{1, ndim})
-            for i in 1:n_basefuncs
+            for i in 1:n_basefunc_base
                 u[i] = H ⋅ xs[i]
                 u_scal[i] = V ⋅ xs[i]
             end
@@ -40,19 +44,26 @@ for (func_interpol, quad_rule) in  (
 
             for i in 1:length(getnquadpoints(fv))
                 @test getnormal(fv, i) ≈ n[face]
-                @test function_gradient(fv, i, u) ≈ H
-                @test function_symmetric_gradient(fv, i, u) ≈ 0.5(H + H')
-                @test function_divergence(fv, i, u) ≈ tr(H)
-                ndim == 3 && @test function_curl(fv, i, u) ≈ Ferrite.curl_from_gradient(H)
-                function_value(fv, i, u)
                 if isa(fv, FaceScalarValues)
+                    @test function_gradient(fv, i, u) ≈ H
+                    @test function_symmetric_gradient(fv, i, u) ≈ 0.5(H + H')
+                    @test function_divergence(fv, i, u) ≈ tr(H)
                     @test function_gradient(fv, i, u_scal) ≈ V
+                    ndim == 3 && @test function_curl(fv, i, u) ≈ Ferrite.curl_from_gradient(H)
+                    function_value(fv, i, u)
                     function_value(fv, i, u_scal)
                 elseif isa(fv, FaceVectorValues)
-                    @test function_gradient(fv, i, u_vector) ≈ function_gradient(fv, i, u) ≈ H
-                    @test function_value(fv, i, u_vector) ≈ function_value(fv, i, u)
-                    @test function_divergence(fv, i, u_vector) ≈ function_divergence(fv, i, u) ≈ tr(H)
-                    ndim == 3 && @test function_curl(fv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
+                    @test function_gradient(fv, i, u_vector) ≈ H
+                    @test (@test_deprecated function_gradient(fv, i, u)) ≈ H
+                    @test function_symmetric_gradient(fv, i, u_vector) ≈ 0.5(H + H')
+                    @test (@test_deprecated function_symmetric_gradient(fv, i, u)) ≈ 0.5(H + H')
+                    @test function_divergence(fv, i, u_vector) ≈ tr(H)
+                    @test (@test_deprecated function_divergence(fv, i, u)) ≈ tr(H)
+                    if ndim == 3
+                        @test function_curl(fv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
+                        @test (@test_deprecated function_curl(fv, i, u)) ≈ Ferrite.curl_from_gradient(H)
+                    end
+                    @test function_value(fv, i, u_vector) ≈ (@test_deprecated function_value(fv, i, u))
                 end
             end
 
@@ -61,8 +72,10 @@ for (func_interpol, quad_rule) in  (
             for i in 1:getnquadpoints(fv)
                 vol += getdetJdV(fv,i)
             end
-            x_face = xs[[Ferrite.facedof_indices(func_interpol)[face]...]]
-            @test vol ≈ calculate_volume(Ferrite.getlowerdim(func_interpol), x_face)
+            let ip_base = func_interpol isa VectorizedInterpolation ? func_interpol.ip : func_interpol
+                x_face = xs[[Ferrite.facedof_indices(ip_base)[face]...]]
+                @test vol ≈ calculate_volume(Ferrite.getlowerdim(ip_base), x_face)
+            end
 
             # Test quadrature rule after reinit! with ref. coords
             x = Ferrite.reference_coordinates(func_interpol)

@@ -792,11 +792,15 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         # Fetch information about the field on this FieldHandler
         field_idx = find_field(fh, dbc.field_name)
         interpolation = getfieldinterpolation(fh, field_idx)
-        field_dim = getfielddim(fh, field_idx)
+        # Internally we use the devectorized version
+        n_comp = n_dbc_components(interpolation)
+        if interpolation isa VectorizedInterpolation
+            interpolation = interpolation.ip
+        end
         # Set up components to prescribe (empty input means prescribe all components)
-        components = isempty(dbc.components) ? collect(Int, 1:field_dim) : dbc.components
-        if !all(c -> 0 < c <= field_dim, components)
-            error("components $(components) not within range of field :$(dbc.field_name) ($(field_dim) dimension(s))")
+        components = isempty(dbc.components) ? collect(Int, 1:n_comp) : dbc.components
+        if !all(c -> 0 < c <= n_comp, components)
+            error("components $(components) not within range of field :$(dbc.field_name) ($(n_comp) dimension(s))")
         end
         # Create BCValues for coordinate evalutation at dof-locations
         EntityType = eltype(dbc.faces) # (Face|Edge|Vertex)Index
@@ -809,7 +813,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
         _add!(
-            ch, filtered_dbc, filtered_dbc.faces, interpolation, field_dim,
+            ch, filtered_dbc, filtered_dbc.faces, interpolation, n_comp,
             field_offset(fh, dbc.field_name), bcvalues, fh.cellset,
         )
         dbc_added = true
@@ -904,14 +908,17 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     end
     field_idx = find_field(ch.dh, pdbc.field_name)
     interpolation = getfieldinterpolation(ch.dh, field_idx)
-    field_dim = getfielddim(ch.dh, field_idx)
+    n_comp = n_dbc_components(interpolation)
+    if interpolation isa VectorizedInterpolation
+        interpolation = interpolation.ip
+    end
 
-    if !all(c -> 0 < c <= field_dim, pdbc.components)
-        error("components $(pdbc.components) not within range of field :$(pdbc.field_name) ($(field_dim) dimension(s))")
+    if !all(c -> 0 < c <= n_comp, pdbc.components)
+        error("components $(pdbc.components) not within range of field :$(pdbc.field_name) ($(n_comp) dimension(s))")
     end
 
     # Empty components means constrain them all
-    isempty(pdbc.components) && append!(pdbc.components, 1:field_dim)
+    isempty(pdbc.components) && append!(pdbc.components, 1:n_comp)
 
     if pdbc.rotation_matrix === nothing
         dof_map_t = Int
@@ -925,13 +932,13 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
         if !(nc == size(pdbc.rotation_matrix, 1) == size(pdbc.rotation_matrix, 2))
             error("size of rotation matrix does not match the number of components")
         end
-        if nc !== field_dim
+        if nc !== n_comp
             error("rotations currently only supported when all components are periodic")
         end
         dof_map_t = Vector{Int}
         iterator_f = x -> Iterators.partition(x, nc)
     end
-    _add!(ch, pdbc, interpolation, field_dim, field_offset(ch.dh, pdbc.field_name), is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f)
+    _add!(ch, pdbc, interpolation, n_comp, field_offset(ch.dh, pdbc.field_name), is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f)
     return ch
 end
 
@@ -1284,11 +1291,11 @@ function __collect_boundary_faces(grid::Grid)
     candidates = Dict{Tuple, FaceIndex}()
     for (ci, c) in enumerate(grid.cells)
         for (fi, fn) in enumerate(faces(c))
-            fn = sortface(fn)
-            if haskey(candidates, fn)
-                delete!(candidates, fn)
+            face = first(sortface(fn))
+            if haskey(candidates, face)
+                delete!(candidates, face)
             else
-                candidates[fn] = FaceIndex(ci, fi)
+                candidates[face] = FaceIndex(ci, fi)
             end
         end
     end

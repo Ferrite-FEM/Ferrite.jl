@@ -20,7 +20,7 @@ function scalar_field()
 
     # do a L2Projection for getting values in dofs
     projector = L2Projector(ip_f, mesh)
-    projector_vals = project(projector, qp_vals, qr; project_to_nodes=false)
+    projector_vals = project(projector, qp_vals, qr)
 
     # points where we want to retrieve field values
     points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
@@ -59,8 +59,7 @@ function vector_field()
 
     # do a L2Projection for getting values in dofs
     projector = L2Projector(ip_f, mesh)
-    projector_vals = project(projector, qp_vals, qr; project_to_nodes=false)
-    # TODO: project_to_nodes should probably return dof values and not Vecs for vector fields
+    projector_vals = project(projector, qp_vals, qr)
     # projector_vals = convert(Vector{Float64}, reinterpret(Float64, projector_vals))
 
     # points where we want to retrieve field values
@@ -97,7 +96,7 @@ function superparametric()
 
     # do a L2Projection for getting values in dofs
     projector = L2Projector(ip_f, mesh)
-    projector_vals = project(projector, qp_vals, qr; project_to_nodes=false)
+    projector_vals = project(projector, qp_vals, qr)
 
     # points where we want to retrieve field values
     points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
@@ -116,7 +115,7 @@ function dofhandler()
     points = [node.x for node in mesh.nodes] # same as nodes
 
     dh = DofHandler(mesh)
-    add!(dh, :s, 1) # a scalar field
+    add!(dh, :s, Lagrange{2,RefCube,1}()) # a scalar field
     close!(dh)
 
     ph = PointEvalHandler(mesh, points)
@@ -133,13 +132,14 @@ function dofhandler2()
     # but not using L2Projector since we want the DofHandler dofs
     mesh = generate_grid(Quadrilateral, (20, 20))
     ip_f = Lagrange{2,RefCube,2}()
+    ip_f_v = ip_f^2
     ip_g = Lagrange{2,RefCube,1}()
     qr = QuadratureRule{2,RefCube}(3)
     csv = CellScalarValues(qr, ip_f, ip_g)
-    cvv = CellVectorValues(qr, ip_f, ip_g)
+    cvv = CellVectorValues(qr, ip_f_v, ip_g)
     dh = DofHandler(mesh);
-    add!(dh, :s, 1, ip_f)
-    add!(dh, :v, 2, ip_f)
+    add!(dh, :s, ip_f)
+    add!(dh, :v, ip_f_v)
     close!(dh)
     M = create_sparsity_pattern(dh)
     f = zeros(ndofs(dh))
@@ -257,25 +257,18 @@ function mixed_grid()
     points = [Vec((x, 2x)) for x in range(0.0; stop=1.0, length=10)]
 
     # first alternative: L2Projection to dofs
-    projector_values = project(projector, qp_vals_quads, qr; project_to_nodes = false)
+    projector_values = project(projector, qp_vals_quads, qr)
     ph = PointEvalHandler(mesh, points)
     vals = get_point_values(ph, projector, projector_values)
     @test vals[1:5] ≈ f.(points[1:5])
     @test all(isnan, vals[6:end])
-    # TODO
-    # # second alternative: L2Projection to nodes
-    # nodal_vals = project(projector, qp_vals_quads, qr; project_to_nodes = true)
-    # vals = get_point_values(ph, nodal_vals)
-    # @test vals[1:5] ≈ f.(points[1:5])
-    # @test all(isnan.(vals[6:end]))
-
 
     # second alternative: assume a vector field :v
     dh = DofHandler(mesh)
-    field = Field(:v, ip_quad, 2)
+    field = Field(:v, ip_quad^2)
     fh_quad = FieldHandler([field], getcellset(mesh, "quads"))
     add!(dh, fh_quad)
-    field = Field(:v, ip_tri, 2) 
+    field = Field(:v, ip_tri^2)
     fh_tri = FieldHandler([field], getcellset(mesh, "tris"))
     add!(dh, fh_tri)
     close!(dh)
@@ -310,7 +303,7 @@ function oneD()
 
     # do a L2Projection for getting values in dofs
     projector = L2Projector(ip_f, mesh)
-    projector_values = project(projector, qp_vals, qr; project_to_nodes=false)
+    projector_values = project(projector, qp_vals, qr)
 
     # points where we want to retrieve field values
     points = [Vec((x,)) for x in range(-1.0; stop=1.0, length=5)]
@@ -367,7 +360,7 @@ end
     @test function_gradient(psv, us) ≈ function_gradient(csv, 2, us)
 
     # PointVectorValues
-    cvv = CellVectorValues(qr, ip_f, ip_g)
+    cvv = CellVectorValues(qr, ip_f^2, ip_g)
     reinit!(cvv, x)
     pvv = PointVectorValues(cvv)
     uv = rand(2 * getnbasefunctions(ip_f)) .+ 1
