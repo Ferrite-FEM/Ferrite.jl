@@ -138,3 +138,5 @@ end
 @deprecate compute_vertex_values(grid::AbstractGrid, set::String, f::Function) map(n -> f(n.x), getnodes(grid, set))
 
 @deprecate reshape_to_nodes evaluate_at_grid_nodes
+
+@deprecate start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; kwargs...) = start_assemble(K, f; kwargs...)
