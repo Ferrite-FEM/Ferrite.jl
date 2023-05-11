@@ -139,4 +139,4 @@ end
 
 @deprecate reshape_to_nodes evaluate_at_grid_nodes
 
-@deprecate start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; kwargs...) = start_assemble(K, f; kwargs...)
+@deprecate start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; kwargs...) start_assemble(K, f; kwargs...)
