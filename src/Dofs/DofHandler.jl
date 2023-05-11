@@ -786,6 +786,7 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
     # Figure out the return type (scalar or vector)
     field_idx = find_field(dh, fieldname)
     ip = getfieldinterpolation(dh, field_idx)
+    RT = ip isa ScalarInterpolation ? T : Vec{n_components(ip),T}
     if vtk
         # VTK output of solution field (or L2 projected scalar data)
         n_c = n_components(ip)
@@ -793,7 +794,6 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         data = fill(NaN * zero(T), vtk_dim, getnnodes(dh.grid))
     else
         # Just evalutation at grid nodes
-        RT = ip isa ScalarInterpolation ? T : Vec{n_components(ip),T}
         data = fill(NaN * zero(RT), getnnodes(dh.grid))
     end
     # Loop over the fieldhandlers
@@ -807,26 +807,39 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         local_node_coords = reference_coordinates(ip_geo)
         qr = QuadratureRule{getdim(ip), getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
         ip = getfieldinterpolation(fh, field_idx)
-        cv = (ip isa ScalarInterpolation ? CellScalarValues : CellVectorValues)(qr, ip, ip_geo)
+        if ip isa ScalarInterpolation
+            cv = CellScalarValues(qr, ip, ip_geo)
+        elseif ip isa VectorizedInterpolation
+            # TODO: Remove this hack when embedding works...
+            cv = CellScalarValues(qr, ip.ip, ip_geo)
+        else
+            cv = CellVectorValues(qr, ip, ip_geo)
+        end
         drange = dof_range(fh, fieldname)
         # Function barrier
-        _evaluate_at_grid_nodes!(data, dh, fh, u, cv, drange)
+        _evaluate_at_grid_nodes!(data, dh, fh, u, cv, drange, RT)
     end
     return data
 end
 
 # Loop over the cells and use shape functions to compute the value
 function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, dh::DofHandler, fh::FieldHandler,
-        u::Vector, cv::CellValues, drange::UnitRange)
-    ue = zeros(ndofs_per_cell(fh))
+        u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}) where {T, RT}
+    ue = zeros(T, length(drange))
+    # TODO: Remove this hack when embedding works...
+    if RT <: Vec && cv isa CellScalarValues
+        uer = reinterpret(RT, ue)
+    else
+        uer = ue
+    end
     for cell in CellIterator(dh, fh.cellset)
         # Note: We are only using the shape functions: no reinit!(cv, cell) necessary
         @assert getnquadpoints(cv) == length(cell.nodes)
-        for (i, I) in pairs(cell.dofs)
-            ue[i] = u[I]
+        for (i, I) in pairs(drange)
+            ue[i] = u[cell.dofs[I]]
         end
         for (qp, nodeid) in pairs(cell.nodes)
-            val = function_value(cv, qp, ue, drange)
+            val = function_value(cv, qp, uer)
             if data isa Matrix # VTK
                 data[1:length(val), nodeid] .= val
                 data[(length(val)+1):end, nodeid] .= 0 # purge the NaN
