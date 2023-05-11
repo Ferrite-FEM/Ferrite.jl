@@ -81,8 +81,9 @@ Assembles the element residual `ge` into the global residual vector `g`.
 """
 @propagate_inbounds function assemble!(g::AbstractVector{T}, dofs::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
     @boundscheck checkbounds(g, dofs)
-    @inbounds for i in 1:length(dofs)
-        addindex!(g, ge[i], dofs[i])
+    @boundscheck checkbounds(ge, keys(dofs))
+    @inbounds for (i, dof) in pairs(dofs)
+        addindex!(g, ge[i], dof)
     end
 end
 
@@ -179,10 +180,9 @@ end
 
 @propagate_inbounds function _assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
     ld = length(dofs)
-    @assert size(Ke, 1) == ld
-    @assert size(Ke, 2) == ld
+    @boundscheck checkbounds(Ke, keys(dofs), keys(dofs))
     if length(fe) != 0
-        @assert length(fe) == ld
+        @boundscheck checkbounds(fe, keys(dofs))
         @boundscheck checkbounds(A.f, dofs)
         @inbounds assemble!(A.f, dofs, fe)
     end
