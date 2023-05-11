@@ -72,8 +72,8 @@
     assembler = start_assemble(Kc, fc)
     @test_throws BoundsError assemble!(assembler, [11, 1, 2, 3], rand(4, 4))
     @test_throws BoundsError assemble!(assembler, [11, 1, 2, 3], rand(4, 4), rand(4))
-    @test_throws AssertionError assemble!(assembler, [11, 1, 2], rand(4, 4))
-    @test_throws AssertionError assemble!(assembler, [11, 1, 2, 3], rand(4, 4), rand(3))
+    @test_throws BoundsError assemble!(assembler, [11, 1, 2], rand(4, 4))
+    @test_throws BoundsError assemble!(assembler, [11, 1, 2, 3], rand(4, 4), rand(3))
 end
 
 @testset "Base.show for assemblers" begin
