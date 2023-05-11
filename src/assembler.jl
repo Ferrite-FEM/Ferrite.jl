@@ -142,7 +142,6 @@ out, but instead keep their current values.
 """
 start_assemble(K::Union{SparseMatrixCSC, Symmetric{<:Any,SparseMatrixCSC}}, f::Vector; fillzero::Bool)
 
-start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; fillzero::Bool=true) = start_assemble(K, f; fillzero=fillzero)
 function start_assemble(K::SparseMatrixCSC{T}, f::Vector=T[]; fillzero::Bool=true) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
     return AssemblerSparsityPattern(K, f, Int[], Int[])
