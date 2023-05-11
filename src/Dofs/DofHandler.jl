@@ -766,45 +766,85 @@ getfieldinterpolation(fh::FieldHandler, field_idx::Int) = fh.field_interpolation
 getfieldinterpolation(fh::FieldHandler, field_name::Symbol) = getfieldinterpolation(fh, find_field(fh, field_name))
 
 """
-    reshape_to_nodes(dh::AbstractDofHandler, u::Vector{T}, fieldname::Symbol) where T
+    evaluate_at_grid_nodes(dh::AbstractDofHandler, u::Vector{T}, fieldname::Symbol) where T
 
-Reshape the entries of the dof-vector `u` which correspond to the field `fieldname` in nodal order.
-Return a matrix with a column for every node and a row for every dimension of the field.
-For superparametric fields only the entries corresponding to nodes of the grid will be returned. Do not use this function for subparametric approximations.
+Evaluate the approximated solution for field `fieldname` at the node
+coordinates of the grid given the Dof handler `dh` and the solution vector `u`.
+
+Return a vector of length `getnnodes(grid)` where entry `i` contains the evalutation of the
+approximation in the coordinate of node `i`. If the field does not live on parts of the
+grid, the corresponding values for those nodes will be returned as `NaN`s.
 """
-function reshape_to_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol) where T
-    # make sure the field exists
+function evaluate_at_grid_nodes(dh::DofHandler, u::Vector, fieldname::Symbol)
+    return _evaluate_at_grid_nodes(dh, u, fieldname)
+end
+
+# Internal method that have the vtk option to allocate the output differently
+function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol, ::Val{vtk}=Val(false)) where {T, vtk}
+    # Make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
-
-    field_dim = getfielddim(dh, fieldname)
-    space_dim = field_dim == 2 ? 3 : field_dim
-    data = fill(T(NaN), space_dim, getnnodes(dh.grid))  # set default value
-
+    # Figure out the return type (scalar or vector)
+    field_idx = find_field(dh, fieldname)
+    ip = getfieldinterpolation(dh, field_idx)
+    RT = ip isa ScalarInterpolation ? T : Vec{n_components(ip),T}
+    if vtk
+        # VTK output of solution field (or L2 projected scalar data)
+        n_c = n_components(ip)
+        vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
+        data = fill(NaN * zero(T), vtk_dim, getnnodes(dh.grid))
+    else
+        # Just evalutation at grid nodes
+        data = fill(NaN * zero(RT), getnnodes(dh.grid))
+    end
+    # Loop over the fieldhandlers
     for fh in dh.fieldhandlers
-        # check if this fh contains this field, otherwise continue to the next
+        # Check if this fh contains this field, otherwise continue to the next
         field_idx = _find_field(fh, fieldname)
         field_idx === nothing && continue
-        offset = field_offset(fh, field_idx)
-
-        reshape_field_data!(data, dh, u, offset, field_dim, BitSet(fh.cellset))
+        # Set up CellValues with the local node coords as quadrature points
+        CT = getcelltype(dh.grid, first(fh.cellset))
+        ip_geo = default_interpolation(CT)
+        local_node_coords = reference_coordinates(ip_geo)
+        qr = QuadratureRule{getdim(ip), getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
+        ip = getfieldinterpolation(fh, field_idx)
+        if ip isa ScalarInterpolation
+            cv = CellScalarValues(qr, ip, ip_geo)
+        elseif ip isa VectorizedInterpolation
+            # TODO: Remove this hack when embedding works...
+            cv = CellScalarValues(qr, ip.ip, ip_geo)
+        else
+            cv = CellVectorValues(qr, ip, ip_geo)
+        end
+        drange = dof_range(fh, fieldname)
+        # Function barrier
+        _evaluate_at_grid_nodes!(data, dh, fh, u, cv, drange, RT)
     end
     return data
 end
 
-function reshape_field_data!(data::Matrix{T}, dh::AbstractDofHandler, u::Vector{T}, field_offset::Int, field_dim::Int, cellset=1:getncells(dh.grid)) where T
-
-    for cell in CellIterator(dh, cellset, UpdateFlags(; nodes=true, coords=false, dofs=true))
-        _celldofs = celldofs(cell)
-        counter = 1
-        for node in getnodes(cell)
-            for d in 1:field_dim
-                data[d, node] = u[_celldofs[counter + field_offset]]
-                @debug println("  exporting $(u[_celldofs[counter + field_offset]]) for dof#$(_celldofs[counter + field_offset])")
-                counter += 1
-            end
-            if field_dim == 2
-                # paraview requires 3D-data so pad with zero
-                data[3, node] = 0
+# Loop over the cells and use shape functions to compute the value
+function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, dh::DofHandler, fh::FieldHandler,
+        u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}) where {T, RT}
+    ue = zeros(T, length(drange))
+    # TODO: Remove this hack when embedding works...
+    if RT <: Vec && cv isa CellScalarValues
+        uer = reinterpret(RT, ue)
+    else
+        uer = ue
+    end
+    for cell in CellIterator(dh, fh.cellset)
+        # Note: We are only using the shape functions: no reinit!(cv, cell) necessary
+        @assert getnquadpoints(cv) == length(cell.nodes)
+        for (i, I) in pairs(drange)
+            ue[i] = u[cell.dofs[I]]
+        end
+        for (qp, nodeid) in pairs(cell.nodes)
+            val = function_value(cv, qp, uer)
+            if data isa Matrix # VTK
+                data[1:length(val), nodeid] .= val
+                data[(length(val)+1):end, nodeid] .= 0 # purge the NaN
+            else
+                data[nodeid] = val
             end
         end
     end

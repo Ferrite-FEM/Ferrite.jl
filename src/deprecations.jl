@@ -136,3 +136,5 @@ end
 @deprecate compute_vertex_values(grid::AbstractGrid, f::Function) map(n -> f(n.x), getnodes(grid))
 @deprecate compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function) map(n -> f(n.x), getnodes(grid, v))
 @deprecate compute_vertex_values(grid::AbstractGrid, set::String, f::Function) map(n -> f(n.x), getnodes(grid, set))
+
+@deprecate reshape_to_nodes evaluate_at_grid_nodes

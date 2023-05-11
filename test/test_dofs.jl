@@ -83,7 +83,7 @@ close!(dh)
 @test celldofs(dh,1) == collect(1:18)
 @test celldofs(dh,2) == [2, 19, 20, 3, 21, 22, 23, 6, 24, 11, 25, 26, 12, 27, 28, 29, 15, 30]
 
-# test reshape_to_nodes
+# test evaluate_at_grid_nodes
 ## DofHandler
 mesh = generate_grid(Quadrilateral, (1,1))
 dh = DofHandler(mesh)
@@ -93,10 +93,10 @@ close!(dh)
 
 u = [1.1, 1.2, 2.1, 2.2, 4.1, 4.2, 3.1, 3.2, 1.3, 2.3, 4.3, 3.3]
 
-s_nodes = reshape_to_nodes(dh, u, :s)
-@test s_nodes ≈ [i+0.3 for i=1:4]'
-v_nodes = reshape_to_nodes(dh, u, :v)
-@test v_nodes ≈ [i==3 ? 0.0 : j+i/10 for i=1:3, j=1:4]
+s_nodes = evaluate_at_grid_nodes(dh, u, :s)
+@test s_nodes ≈ [i+0.3 for i=1:4]
+v_nodes = evaluate_at_grid_nodes(dh, u, :v)
+@test v_nodes ≈ [Vec{2,Float64}(i -> j+i/10) for j = 1:4]
 end
 
 @testset "renumber!" begin

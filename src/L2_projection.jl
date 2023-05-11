@@ -225,31 +225,62 @@ function _project(vars, proj::L2Projector, fe_values::Values, M::Integer, ::Type
 end
 
 function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, proj::L2Projector, vals::Vector{T}, name::AbstractString) where T
-    data = reshape_to_nodes(proj, vals)
+    data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
     @assert size(data, 2) == getnnodes(proj.dh.grid)
     vtk_point_data(vtk, data, name; component_names=component_names(T))
     return vtk
 end
 
+evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector) =
+    _evaluate_at_grid_nodes(proj, vals, Val(false))
+
 # Numbers can be handled by the method for DofHandler
-reshape_to_nodes(proj::L2Projector, vals::AbstractVector{<:Number}) =
-    reshape_to_nodes(proj.dh, vals, only(getfieldnames(proj.dh)))
+_evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector{<:Number}, vtk) =
+    _evaluate_at_grid_nodes(proj.dh, vals, only(getfieldnames(proj.dh)), vtk)
 
 # Deal with projected tensors
-function reshape_to_nodes(proj::L2Projector, vals::AbstractVector{S}) where {order, dim, T, M, S <: Union{Tensor{order,dim,T,M}, SymmetricTensor{order,dim,T,M}}}
+function _evaluate_at_grid_nodes(
+    proj::L2Projector, vals::AbstractVector{S}, ::Val{vtk}
+) where {order, dim, T, M, S <: Union{Tensor{order,dim,T,M}, SymmetricTensor{order,dim,T,M}}, vtk}
     dh = proj.dh
     # The internal dofhandler in the projector is a scalar field, but the values in vals
     # can be any tensor field, however, the number of dofs should always match the length of vals
     @assert ndofs(dh) == length(vals)
-    nout = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
-    data = fill(T(NaN), nout, getnnodes(dh.grid))
-    for cell in CellIterator(dh, proj.set)
-        _celldofs = celldofs(cell)
-        @assert length(getnodes(cell)) == length(_celldofs)
-        for (node, dof) in zip(getnodes(cell), _celldofs)
-            v = @view data[:, node]
-            fill!(v, 0) # remove NaNs for this node
-            toparaview!(v, vals[dof])
+    if vtk
+        nout = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
+        data = fill(T(NaN), nout, getnnodes(dh.grid))
+    else
+        data = fill(NaN * zero(S), getnnodes(dh.grid))
+    end
+    ip, gip = proj.func_ip, proj.geom_ip
+    refdim, refshape = getdim(ip), getrefshape(ip)
+    local_node_coords = reference_coordinates(gip)
+    qr = QuadratureRule{refdim,refshape}(zeros(length(local_node_coords)), local_node_coords)
+    cv = CellScalarValues(qr, ip)
+    # Function barrier
+    return _evaluate_at_grid_nodes!(data, cv, dh, proj.set, vals)
+end
+function _evaluate_at_grid_nodes!(data, cv, dh, set, u::AbstractVector{S}) where S
+    ue = zeros(S, getnbasefunctions(cv))
+    for cell in CellIterator(dh, set)
+        @assert getnquadpoints(cv) == length(cell.nodes)
+        for (i, I) in pairs(cell.dofs)
+            ue[i] = u[I]
+        end
+        for (qp, nodeid) in pairs(cell.nodes)
+            # Loop manually over the shape functions since function_value
+            # doesn't like scalar base functions with tensor dofs
+            val = zero(S)
+            for i in 1:getnbasefunctions(cv)
+                val += shape_value(cv, qp, i) * ue[i]
+            end
+            if data isa Matrix # VTK
+                dataview = @view data[:, nodeid]
+                fill!(dataview, 0) # purge the NaN
+                toparaview!(dataview, val)
+            else
+                data[nodeid] = val
+            end
         end
     end
     return data
