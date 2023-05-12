@@ -228,10 +228,10 @@ end
 
 function setup_fevalues(ipu, ipp, ipg)
     qr = QuadratureRule{2,RefTetrahedron}(2)
-    cvu = CellVectorValues(qr, ipu, ipg)
-    cvp = CellScalarValues(qr, ipp, ipg)
+    cvu = CellValues(qr, ipu, ipg)
+    cvp = CellValues(qr, ipp, ipg)
     qr_face = QuadratureRule{1,RefTetrahedron}(2)
-    fvp = FaceScalarValues(qr_face, ipp, ipg)
+    fvp = FaceValues(qr_face, ipp, ipg)
     return cvu, cvp, fvp
 end
 #md nothing #hide

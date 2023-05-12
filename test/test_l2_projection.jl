@@ -9,7 +9,7 @@ function test_projection(order, refshape)
     ip = Lagrange{dim, refshape, order}()
     ip_geom = Lagrange{dim, refshape, 1}()
     qr = Ferrite._mass_qr(ip)
-    cv = CellScalarValues(qr, ip, ip_geom)
+    cv = CellValues(qr, ip, ip_geom)
 
     # Create node values for the cell
     f(x) = 1 + x[1]^2 + (2x[2])^2
@@ -128,7 +128,7 @@ function test_projection_mixedgrid()
     ip = Lagrange{dim, RefCube, order}()
     ip_geom = Lagrange{dim, RefCube, 1}()
     qr = QuadratureRule{dim, RefCube}(order+1)
-    cv = CellScalarValues(qr, ip, ip_geom)
+    cv = CellValues(qr, ip, ip_geom)
 
     # Create node values for the 1st cell
     # use a SymmetricTensor here for testing the symmetric version of project
@@ -158,7 +158,7 @@ function test_projection_mixedgrid()
     ip = Lagrange{dim, RefTetrahedron, order}()
     ip_geom = Lagrange{dim, RefTetrahedron, 1}()
     qr = QuadratureRule{dim, RefTetrahedron}(4)
-    cv = CellScalarValues(qr, ip, ip_geom)
+    cv = CellValues(qr, ip, ip_geom)
     nqp = getnquadpoints(cv)
 
     qp_values_tria = [zeros(SymmetricTensor{2,2}, nqp) for _ in triaset]
@@ -187,7 +187,7 @@ function test_export(;subset::Bool)
     grid = generate_grid(Quadrilateral, (2, 1))
     qr = QuadratureRule{2,RefCube}(2)
     ip = Lagrange{2,RefCube,1}()
-    cv = CellScalarValues(qr, ip)
+    cv = CellValues(qr, ip)
     nqp = getnquadpoints(cv)
     qpdata_scalar = [zeros(nqp) for _ in 1:getncells(grid)]
     qpdata_vec = [zeros(Vec{2}, nqp) for _ in 1:getncells(grid)]

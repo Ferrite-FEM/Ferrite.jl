@@ -67,7 +67,7 @@ grid = generate_grid(Quadrilateral, (100, 100));
 dim = 2
 ip = Lagrange{dim, RefCube, 1}()
 qr = QuadratureRule{dim, RefCube}(2)
-cellvalues = CellScalarValues(qr, ip);
+cellvalues = CellValues(qr, ip);
 
 # ### Degrees of freedom
 # After this, we can define the `DofHandler` and distribute the DOFs of the problem.
@@ -109,7 +109,7 @@ update!(ch, 0.0);
 
 # ### Assembling the linear system
 # As in the heat equation example we define a `doassemble!` function that assembles the diffusion parts of the equation:
-function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellScalarValues{dim}, dh::DofHandler) where {dim}
+function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellValues, dh::DofHandler)
 
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -144,7 +144,7 @@ function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellScalarValu
 end
 #md nothing # hide
 # In addition to the diffusive part, we also need a function that assembles the mass matrix `M`.
-function doassemble_M!(M::SparseMatrixCSC, cellvalues::CellScalarValues{dim}, dh::DofHandler) where {dim}
+function doassemble_M!(M::SparseMatrixCSC, cellvalues::CellValues, dh::DofHandler)
 
     n_basefuncs = getnbasefunctions(cellvalues)
     Me = zeros(n_basefuncs, n_basefuncs)

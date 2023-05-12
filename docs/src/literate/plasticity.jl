@@ -142,8 +142,8 @@ function create_values(interpolation)
     face_qr = QuadratureRule{2,RefTetrahedron}(3)
 
     ## cell and facevalues for u
-    cellvalues_u = CellVectorValues(qr, interpolation)
-    facevalues_u = FaceVectorValues(face_qr, interpolation)
+    cellvalues_u = CellValues(qr, interpolation)
+    facevalues_u = FaceValues(face_qr, interpolation)
 
     return cellvalues_u, facevalues_u
 end;
@@ -172,9 +172,9 @@ end;
 #
 # * Residual vector `r`
 # * Tangent stiffness `K`
-function doassemble(cellvalues::CellVectorValues{dim},
-                    facevalues::FaceVectorValues{dim}, K::SparseMatrixCSC, grid::Grid,
-                    dh::DofHandler, material::J2Plasticity, u, states, states_old, t) where {dim}
+function doassemble(cellvalues::CellValues,
+                    facevalues::FaceValues, K::SparseMatrixCSC, grid::Grid,
+                    dh::DofHandler, material::J2Plasticity, u, states, states_old, t)
     r = zeros(ndofs(dh))
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)

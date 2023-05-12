@@ -265,7 +265,7 @@ function _get_point_values!(
         for (i, I) in pairs(cell_dofs)
             u_e[i] = dof_vals[I]
         end
-        reinit!(pv, local_coords[pointid], ip)
+        reinit!(pv, local_coords[pointid])
         out_vals[pointid] = function_value(pv, 1, u_e, dofrange)
     end
     return out_vals

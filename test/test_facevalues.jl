@@ -1,5 +1,5 @@
 @testset "FaceValues" begin
-for (func_interpol, quad_rule) in  (
+for (scalar_interpol, quad_rule) in (
                                     (Lagrange{1, RefCube, 1}(), QuadratureRule{0, RefCube}(2)),
                                     (Lagrange{1, RefCube, 2}(), QuadratureRule{0, RefCube}(2)),
                                     (Lagrange{2, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
@@ -9,16 +9,13 @@ for (func_interpol, quad_rule) in  (
                                     (Lagrange{3, RefCube, 1}(), QuadratureRule{2, RefCube}(2)),
                                     (Serendipity{2, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
                                     (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2)),
-                                    (Lagrange{3, RefTetrahedron, 2}(), QuadratureRule{2, RefTetrahedron}(2))
+                                    (Lagrange{3, RefTetrahedron, 2}(), QuadratureRule{2, RefTetrahedron}(2)),
                                    )
 
-    for fe_valtype in (FaceScalarValues, FaceVectorValues)
-        geom_interpol = func_interpol # Tests below assume this
-        n_basefunc_base = getnbasefunctions(func_interpol)
-        if fe_valtype == FaceVectorValues
-            func_interpol = VectorizedInterpolation(func_interpol)
-        end
-        fv = fe_valtype(quad_rule, func_interpol, geom_interpol)
+    for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
+        geom_interpol = scalar_interpol # Tests below assume this
+        n_basefunc_base = getnbasefunctions(scalar_interpol)
+        fv = FaceValues(quad_rule, func_interpol, geom_interpol)
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
@@ -44,15 +41,16 @@ for (func_interpol, quad_rule) in  (
 
             for i in 1:length(getnquadpoints(fv))
                 @test getnormal(fv, i) ≈ n[face]
-                if isa(fv, FaceScalarValues)
+                if func_interpol isa Ferrite.ScalarInterpolation
                     @test function_gradient(fv, i, u) ≈ H
                     @test function_symmetric_gradient(fv, i, u) ≈ 0.5(H + H')
+                    @test function_divergence(fv, i, u_scal) ≈ sum(V)
                     @test function_divergence(fv, i, u) ≈ tr(H)
                     @test function_gradient(fv, i, u_scal) ≈ V
                     ndim == 3 && @test function_curl(fv, i, u) ≈ Ferrite.curl_from_gradient(H)
                     function_value(fv, i, u)
                     function_value(fv, i, u_scal)
-                elseif isa(fv, FaceVectorValues)
+                else # func_interpol isa Ferrite.VectorInterpolation
                     @test function_gradient(fv, i, u_vector) ≈ H
                     @test (@test_deprecated function_gradient(fv, i, u)) ≈ H
                     @test function_symmetric_gradient(fv, i, u_vector) ≈ 0.5(H + H')

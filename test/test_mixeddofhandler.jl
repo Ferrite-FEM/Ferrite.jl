@@ -355,7 +355,7 @@ function test_2_element_heat_eq()
     for fh in dh.fieldhandlers
         qr = QuadratureRule{2, RefCube}(2)
         interp = fh.field_interpolations[1]
-        cellvalues = CellScalarValues(qr, interp)
+        cellvalues = CellValues(qr, interp)
         doassemble(fh.cellset, cellvalues, assembler, dh)
     end
 

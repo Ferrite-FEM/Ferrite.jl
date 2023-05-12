@@ -397,8 +397,8 @@ end
     face_neighbors_ele5 = nonzeros(topology.face_neighbor[5,:])
     ip = Lagrange{2, RefCube, 1}()^2
     qr_face = QuadratureRule{1, RefCube}(2)
-    fv_ele = FaceVectorValues(qr_face, ip)
-    fv_neighbor = FaceVectorValues(qr_face, ip)
+    fv_ele = FaceValues(qr_face, ip)
+    fv_neighbor = FaceValues(qr_face, ip)
     u_ele5 = [3.0 for _ in 1:8]
     u_neighbors = [5.0 for _ in 1:8]
     jump_int = 0.
