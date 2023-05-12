@@ -72,7 +72,7 @@ cellvalues = CellScalarValues(qr, ip);
 # ### Degrees of freedom
 # After this, we can define the `DofHandler` and distribute the DOFs of the problem.
 dh = DofHandler(grid)
-add!(dh, :u, 1)
+add!(dh, :u, ip)
 close!(dh);
 
 # By means of the `DofHandler` we can allocate the needed `SparseMatrixCSC`.
