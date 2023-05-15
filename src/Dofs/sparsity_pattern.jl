@@ -234,41 +234,38 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
     return nothing
 end
 
-function iterate_cross_element_coupling(dh::AbstractDofHandler, topology::ExclusiveTopology, coupling::Union{AbstractMatrix{Bool},Nothing}, full_cross_element::Bool, f_::Function)
-    for (fhi, fh) in pairs(dh.fieldhandlers)
-        element_dof_start = 0
-        cnt = 0
-        for fi in fh.field_interpolations
-            if(!(typeof(fi)<:DiscontinuousLagrange))
-                element_dof_start += getnbasefunctions(fi)
-                continue
-            end
-            for cell_idx in BitSet(fh.cellset)
-                current_face_neighborhood = getdim(dh.grid.cells[cell_idx]) >1 ? topology.face_neighbor[cell_idx,:] : topology.vertex_neighbor[cell_idx,:]
-                shared_faces_idx = findall(!isempty,current_face_neighborhood)
-                for face_idx in shared_faces_idx
-                    for neighbor_face in current_face_neighborhood[face_idx]
-                        cell_dofs =  full_cross_element ? celldofs(dh,cell_idx)[element_dof_start+1:getnbasefunctions(fi)] : celldofs(dh,cell_idx)[element_dof_start.+collect(facedof_indices(get_continuous_interpolation(fi))[face_idx])] 
-                        neighbour_dofs = celldofs(dh,neighbor_face[1])
-                        neighbour_unique_dofs = neighbour_dofs[.!(neighbour_dofs .∈ Ref(celldofs(dh,cell_idx)))]
-                        coupling_length = length(cell_dofs)*length(neighbour_unique_dofs)
-                        f_(coupling_length, cnt, cell_dofs, neighbour_unique_dofs)
-                        cnt+=coupling_length
+for (func,                              pre_f,                                                                                      inner_f,                                                                                                                                                                    return_values) in (
+    (:cross_element_coupling_count,     :(max_buffer_length = 0;),                                                                  :(max_buffer_length += coupling_length),                                                                                                                                    :(max_buffer_length)),
+    (:cross_element_coupling,           :(I = Vector{Int}(undef, max_buffer_length); J = Vector{Int}(undef, max_buffer_length)),    :(I[cnt+1:cnt+coupling_length] = repeat(cell_dofs,length(neighbour_unique_dofs)); J[cnt+1:cnt+coupling_length] = repeat(neighbour_unique_dofs,inner=length(cell_dofs))),    :(I, J)),
+)
+    @eval begin
+        function $(func)(dh::AbstractDofHandler, topology::ExclusiveTopology, full_cross_element::Bool; max_buffer_length::Int = 0)
+            $(pre_f)
+            for (fhi, fh) in pairs(dh.fieldhandlers)
+                element_dof_start = 0
+                cnt = 0
+                for fi in fh.field_interpolations
+                    if(!(typeof(fi)<:DiscontinuousLagrange))
+                        element_dof_start += getnbasefunctions(fi)
+                        continue
+                    end
+                    for cell_idx in BitSet(fh.cellset)
+                        current_face_neighborhood = getdim(dh.grid.cells[cell_idx]) >1 ? topology.face_neighbor[cell_idx,:] : topology.vertex_neighbor[cell_idx,:]
+                        shared_faces_idx = findall(!isempty,current_face_neighborhood)
+                        for face_idx in shared_faces_idx
+                            for neighbor_face in current_face_neighborhood[face_idx]
+                                cell_dofs =  full_cross_element ? celldofs(dh,cell_idx)[element_dof_start+1:getnbasefunctions(fi)] : celldofs(dh,cell_idx)[element_dof_start.+collect(facedof_indices(get_continuous_interpolation(fi))[face_idx])] 
+                                neighbour_dofs = celldofs(dh,neighbor_face[1])
+                                neighbour_unique_dofs = neighbour_dofs[.!(neighbour_dofs .∈ Ref(celldofs(dh,cell_idx)))]
+                                coupling_length = length(cell_dofs)*length(neighbour_unique_dofs)
+                                $(inner_f)
+                                cnt+=coupling_length
+                            end
+                        end
                     end
                 end
             end
+            return $(return_values)
         end
     end
 end
-
-cross_element_coupling_count(dh::AbstractDofHandler, topology::ExclusiveTopology, coupling::Union{AbstractMatrix{Bool},Nothing}, full_cross_element::Bool) =
-    (max_buffer_length = 0; 
-    iterate_cross_element_coupling(dh,topology,coupling,full_cross_element,(coupling_length, cnt, cell_dofs, neighbour_unique_dofs)->max_buffer_length += coupling_length);
-    return max_buffer_length)
-cross_element_coupling(dh::AbstractDofHandler, topology::ExclusiveTopology, coupling::Union{AbstractMatrix{Bool},Nothing}, full_cross_element::Bool, max_buffer_length::Int) =
-    (I = Vector{Int}(undef, max_buffer_length);
-    J = Vector{Int}(undef, max_buffer_length);
-    iterate_cross_element_coupling(dh,topology,coupling,full_cross_element,(coupling_length, cnt, cell_dofs, neighbour_unique_dofs)->
-    (I[cnt+1:cnt+coupling_length] = repeat(cell_dofs,length(neighbour_unique_dofs));
-    J[cnt+1:cnt+coupling_length] = repeat(neighbour_unique_dofs,inner=length(cell_dofs))));
-    return I, J)
