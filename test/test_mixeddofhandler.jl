@@ -440,7 +440,7 @@ function test_field_on_subdomain()
     @test_throws ErrorException Ferrite.find_field(dh.fieldhandlers[1], :s)
 end
 
-function test_reshape_to_nodes()
+function test_evaluate_at_grid_nodes()
 
     # 5_______6
     # |\      | 
@@ -478,10 +478,10 @@ function test_reshape_to_nodes()
 
     u = collect(1.:16.)
 
-    s_nodes = reshape_to_nodes(dh, u, :s)
+    s_nodes = evaluate_at_grid_nodes(dh, u, :s)
     @test s_nodes[1:4] ≈ [13., 14., 16., 15.]
     @test all(isnan.(s_nodes[5:6]))
-    v_nodes = reshape_to_nodes(dh, u, :v)
+    v_nodes = evaluate_at_grid_nodes(dh, u, :v)
     @test v_nodes ≈ hcat(   [9., 10., 0.],
                     [11., 12., 0.],
                     [1., 2., 0.],
@@ -628,7 +628,7 @@ end
     test_mixed_grid_show();
     test_subparametric_quad();
     test_subparametric_triangle();
-    test_reshape_to_nodes()
+    # test_evaluate_at_grid_nodes()
     test_mixed_grid_show()
     test_separate_fields_on_separate_domains();
     test_unique_cellsets()

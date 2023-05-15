@@ -35,7 +35,6 @@ getedgeset
 getedgesets
 getvertexset
 getvertexsets
-compute_vertex_values
 transform!
 getcoordinates
 getcoordinates!

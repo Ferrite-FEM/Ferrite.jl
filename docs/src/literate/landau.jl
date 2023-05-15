@@ -87,10 +87,11 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
     threadindices = Ferrite.create_coloring(grid)
 
     qr  = QuadratureRule{DIM, RefTetrahedron}(2)
-    cvP = CellVectorValues(qr, Lagrange{DIM, RefTetrahedron, 1}())
+    ipP = Lagrange{DIM, RefTetrahedron, 1}()^3
+    cvP = CellVectorValues(qr, ipP)
 
     dofhandler = DofHandler(grid)
-    add!(dofhandler, :P, 3)
+    add!(dofhandler, :P, ipP)
     close!(dofhandler)
 
     dofvector = zeros(ndofs(dofhandler))

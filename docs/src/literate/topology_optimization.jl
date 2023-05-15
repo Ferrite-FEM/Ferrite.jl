@@ -92,15 +92,16 @@ function create_values()
     face_qr = QuadratureRule{1,RefCube}(2)
 
     ## cell and facevalues for u
-    cellvalues = CellVectorValues(qr, Lagrange{2,RefCube,1}())
-    facevalues = FaceVectorValues(face_qr, Lagrange{2,RefCube,1}())
+    ip = Lagrange{2,RefCube,1}()^2
+    cellvalues = CellVectorValues(qr, ip)
+    facevalues = FaceVectorValues(face_qr, ip)
     
     return cellvalues, facevalues
 end
 
 function create_dofhandler(grid)
     dh = DofHandler(grid)
-    add!(dh, :u, 2, Lagrange{2,RefCube,1}()) # displacement
+    add!(dh, :u, Lagrange{2,RefCube,1}()^2) # displacement
     close!(dh)
     return dh
 end
