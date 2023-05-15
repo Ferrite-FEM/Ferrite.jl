@@ -13,8 +13,9 @@ not. By default full coupling is assumed.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-function create_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing)
-    return _create_sparsity_pattern(dh, nothing, false, true, coupling)
+function create_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing,
+    topology::Union{Nothing, AbstractTopology} = nothing, cross_element_full_coupling::Bool = true)
+    return _create_sparsity_pattern(dh, nothing, false, true, coupling; topology, cross_element_full_coupling)
 end
 
 """
@@ -26,8 +27,9 @@ triangle of the matrix. Return a `Symmetric{SparseMatrixCSC}`.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
-function create_symmetric_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing)
-    return Symmetric(_create_sparsity_pattern(dh, nothing, true, true, coupling), :U)
+function create_symmetric_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing,
+    topology::Union{Nothing, AbstractTopology} = nothing, cross_element_full_coupling::Bool = true)
+    return Symmetric(_create_sparsity_pattern(dh, nothing, true, true, coupling; topology, cross_element_full_coupling), :U)
 end
 
 """
@@ -37,8 +39,9 @@ Create a symmetric sparsity pattern accounting for affine constraints in `ch`. S
 the Affine Constraints section of the manual for further details.
 """
 function create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
-        keep_constrained::Bool=true, coupling=nothing)
-    return Symmetric(_create_sparsity_pattern(dh, ch, true, keep_constrained, coupling), :U)
+        keep_constrained::Bool=true, coupling=nothing, topology::Union{Nothing, AbstractTopology} = nothing,
+        cross_element_full_coupling::Bool = true)
+    return Symmetric(_create_sparsity_pattern(dh, ch, true, keep_constrained, coupling; topology, cross_element_full_coupling), :U)
 end
 
 """
@@ -48,8 +51,9 @@ Create a sparsity pattern accounting for affine constraints in `ch`. See
 the Affine Constraints section of the manual for further details.
 """
 function create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
-        keep_constrained::Bool=true, coupling=nothing)
-    return _create_sparsity_pattern(dh, ch, false, keep_constrained, coupling)
+        keep_constrained::Bool=true, coupling=nothing, topology::Union{Nothing, AbstractTopology} = nothing,
+        cross_element_full_coupling::Bool = true)
+    return _create_sparsity_pattern(dh, ch, false, keep_constrained, coupling; topology, cross_element_full_coupling)
 end
 
 # Compute a coupling matrix of size (ndofs_per_cell × ndofs_per_cell) based on the input
@@ -96,7 +100,8 @@ function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatri
     return outs
 end
 
-function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool, keep_constrained::Bool, coupling::Union{AbstractMatrix{Bool},Nothing})
+function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool, keep_constrained::Bool, coupling::Union{AbstractMatrix{Bool},Nothing};
+    topology::Union{Nothing, AbstractTopology} = nothing, cross_element_full_coupling::Bool = true)
     @assert isclosed(dh)
     if !keep_constrained
         @assert ch !== nothing && isclosed(ch)
@@ -111,6 +116,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     # when keeping constrained dofs (default) and if not it only over-estimates with number
     # of entries eliminated by constraints.
     max_buffer_length = ndofs(dh) # diagonal elements
+    uses_dg = false
     for (fhi, fh) in pairs(dh.fieldhandlers)
         set = fh.cellset
         n = ndofs_per_cell(fh)
@@ -120,8 +126,17 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
             coupling_fh = couplings[fhi]
             count(coupling_fh[i, j] for i in 1:n for j in (sym ? i : 1):n)
         end
+        if any(ip -> typeof(ip) <: DiscontinuousLagrange,fh.field_interpolations)
+            uses_dg = true
+        end
         max_buffer_length += entries_per_cell * length(set)
     end
+    dg_cnt = 0
+    if uses_dg
+        isnothing(topology) && (topology = ExclusiveTopology(dh.grid))
+        dg_cnt = cross_element_coupling_count(dh,topology,cross_element_full_coupling)        
+    end
+    max_buffer_length += dg_cnt
     I = Vector{Int}(undef, max_buffer_length)
     J = Vector{Int}(undef, max_buffer_length)
     global_dofs = Int[]
@@ -147,7 +162,10 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
             end
         end
     end
-
+    if uses_dg
+        I[cnt+1:cnt+dg_cnt],J[cnt+1:cnt+dg_cnt] = cross_element_coupling(dh,topology,cross_element_full_coupling,max_buffer_length = dg_cnt)
+        cnt += dg_cnt
+    end
     # Always add diagonal entries
     resize!(I, cnt + ndofs(dh))
     resize!(J, cnt + ndofs(dh))
