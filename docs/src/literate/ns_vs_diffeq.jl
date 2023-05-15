@@ -158,7 +158,7 @@ grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{
 # To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
 # We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
 # linear pressure term is tested against a quadratic function.
-ip_v = Lagrange{dim, RefCube, 2}()
+ip_v = Lagrange{dim, RefCube, 2}()^dim
 qr = QuadratureRule{dim, RefCube}(4)
 cellvalues_v = CellVectorValues(qr, ip_v);
 
@@ -166,8 +166,8 @@ ip_p = Lagrange{dim, RefCube, 1}()
 cellvalues_p = CellScalarValues(qr, ip_p);
 
 dh = DofHandler(grid)
-add!(dh, :v, dim, ip_v)
-add!(dh, :p, 1, ip_p)
+add!(dh, :v, ip_v)
+add!(dh, :p, ip_p)
 close!(dh);
 
 # ### Boundary Conditions

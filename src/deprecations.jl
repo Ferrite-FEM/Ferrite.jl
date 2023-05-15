@@ -112,6 +112,15 @@ function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule, func_interpol::S
     )
     return FaceVectorValues(T, quad_rule, VectorizedInterpolation(func_interpol), geom_interpol)
 end
+function PointVectorValues(::Type{T}, ip::ScalarInterpolation, geom_interpol::Interpolation=default_geometric_interpolation(ip)) where {T}
+    Base.depwarn(
+        "passing scalar interpolations to PointVectorValues is deprectated. Instead, " *
+        "vectorize the interpolation to the appropriate vector dimension first. " *
+        "See CHANGELOG for more details.",
+        :PointVectorValues
+    )
+    return PointVectorValues(T, VectorizedInterpolation(ip), geom_interpol)
+end
 
 # (Cell|Face)VectorValues with vector dofs
 @deprecate function_value(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_value(fe_v, q_point, reinterpret(T, u))
@@ -121,3 +130,13 @@ end
 @deprecate function_divergence(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(fe_v, q_point, reinterpret(T, u))
 @deprecate function_divergence(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(vv, fe_v, q_point, reinterpret(T, u))
 @deprecate function_curl(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{3, T}}) where T function_curl(fe_v::Values, q_point::Int, reinterpret(T, u))
+
+# Deprecation of compute_vertex_values
+@deprecate compute_vertex_values(nodes::Vector{<:Node}, f::Function) map(n -> f(n.x), nodes)
+@deprecate compute_vertex_values(grid::AbstractGrid, f::Function) map(n -> f(n.x), getnodes(grid))
+@deprecate compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function) map(n -> f(n.x), getnodes(grid, v))
+@deprecate compute_vertex_values(grid::AbstractGrid, set::String, f::Function) map(n -> f(n.x), getnodes(grid, set))
+
+@deprecate reshape_to_nodes evaluate_at_grid_nodes
+
+@deprecate start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; kwargs...) start_assemble(K, f; kwargs...)

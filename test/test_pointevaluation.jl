@@ -20,7 +20,7 @@ function scalar_field()
 
     # do a L2Projection for getting values in dofs
     projector = L2Projector(ip_f, mesh)
-    projector_vals = project(projector, qp_vals, qr; project_to_nodes=false)
+    projector_vals = project(projector, qp_vals, qr)
 
     # points where we want to retrieve field values
     points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
@@ -59,8 +59,7 @@ function vector_field()
 
     # do a L2Projection for getting values in dofs
     projector = L2Projector(ip_f, mesh)
-    projector_vals = project(projector, qp_vals, qr; project_to_nodes=false)
-    # TODO: project_to_nodes should probably return dof values and not Vecs for vector fields
+    projector_vals = project(projector, qp_vals, qr)
     # projector_vals = convert(Vector{Float64}, reinterpret(Float64, projector_vals))
 
     # points where we want to retrieve field values
@@ -81,11 +80,10 @@ function superparametric()
     mesh = generate_grid(Quadrilateral, (20, 20))
     f(x) = x*x[1]
     ip_f = Lagrange{2,RefCube,2}() # function interpolation
-    ip_g = Lagrange{2,RefCube,1}() # geometry interpolation
 
     # compute values in quadrature points
     qr = QuadratureRule{2, RefCube}(3) # exactly approximate quadratic field
-    cv = CellScalarValues(qr, ip_f, ip_g)
+    cv = CellScalarValues(qr, ip_f)
     qp_vals = [Vector{Vec{2,Float64}}(undef, getnquadpoints(cv)) for i=1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
         xe = getcoordinates(mesh, cellid)
@@ -97,7 +95,7 @@ function superparametric()
 
     # do a L2Projection for getting values in dofs
     projector = L2Projector(ip_f, mesh)
-    projector_vals = project(projector, qp_vals, qr; project_to_nodes=false)
+    projector_vals = project(projector, qp_vals, qr)
 
     # points where we want to retrieve field values
     points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
@@ -134,10 +132,9 @@ function dofhandler2()
     mesh = generate_grid(Quadrilateral, (20, 20))
     ip_f = Lagrange{2,RefCube,2}()
     ip_f_v = ip_f^2
-    ip_g = Lagrange{2,RefCube,1}()
     qr = QuadratureRule{2,RefCube}(3)
-    csv = CellScalarValues(qr, ip_f, ip_g)
-    cvv = CellVectorValues(qr, ip_f_v, ip_g)
+    csv = CellScalarValues(qr, ip_f)
+    cvv = CellVectorValues(qr, ip_f_v)
     dh = DofHandler(mesh);
     add!(dh, :s, ip_f)
     add!(dh, :v, ip_f_v)
@@ -183,8 +180,8 @@ function dofhandler2()
     points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
-    psv = PointScalarValues(ip_f, ip_g)
-    pvv = PointVectorValues(ip_f, ip_g)
+    psv = PointScalarValues(ip_f)
+    pvv = PointVectorValues(ip_f)
     for (x, point) in zip(points, PointIterator(ph))
         point === nothing && continue
         # Test scalar field
@@ -258,18 +255,11 @@ function mixed_grid()
     points = [Vec((x, 2x)) for x in range(0.0; stop=1.0, length=10)]
 
     # first alternative: L2Projection to dofs
-    projector_values = project(projector, qp_vals_quads, qr; project_to_nodes = false)
+    projector_values = project(projector, qp_vals_quads, qr)
     ph = PointEvalHandler(mesh, points)
     vals = get_point_values(ph, projector, projector_values)
     @test vals[1:5] ≈ f.(points[1:5])
     @test all(isnan, vals[6:end])
-    # TODO
-    # # second alternative: L2Projection to nodes
-    # nodal_vals = project(projector, qp_vals_quads, qr; project_to_nodes = true)
-    # vals = get_point_values(ph, nodal_vals)
-    # @test vals[1:5] ≈ f.(points[1:5])
-    # @test all(isnan.(vals[6:end]))
-
 
     # second alternative: assume a vector field :v
     dh = DofHandler(mesh)
@@ -295,11 +285,10 @@ function oneD()
     nodal_vals = [f(p.x) for p in mesh.nodes]
 
     ip_f = Lagrange{1,RefCube,1}() # function interpolation
-    ip_g = Lagrange{1,RefCube,1}() # geometry interpolation
 
     # compute values in quadrature points
     qr = QuadratureRule{1, RefCube}(2)
-    cv = CellScalarValues(qr, ip_f, ip_g)
+    cv = CellScalarValues(qr, ip_f)
     qp_vals = [Vector{Float64}(undef, getnquadpoints(cv)) for i=1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
         xe = getcoordinates(mesh, cellid)
@@ -311,7 +300,7 @@ function oneD()
 
     # do a L2Projection for getting values in dofs
     projector = L2Projector(ip_f, mesh)
-    projector_values = project(projector, qp_vals, qr; project_to_nodes=false)
+    projector_values = project(projector, qp_vals, qr)
 
     # points where we want to retrieve field values
     points = [Vec((x,)) for x in range(-1.0; stop=1.0, length=5)]
@@ -349,14 +338,13 @@ end
 
 @testset "PointValues" begin
     ip_f = Lagrange{2,RefCube,2}()
-    ip_g = Lagrange{2,RefCube,1}()
     x = Vec{2,Float64}.([(0.0, 0.0), (2.0, 0.5), (2.5, 2.5), (0.5, 2.0)])
     ξ₁ = Vec{2,Float64}((0.12, -0.34))
     ξ₂ = Vec{2,Float64}((0.56, -0.78))
     qr = QuadratureRule{2,RefCube,Float64}([2.0, 2.0], [ξ₁, ξ₂])
 
     # PointScalarValues
-    csv = CellScalarValues(qr, ip_f, ip_g)
+    csv = CellScalarValues(qr, ip_f)
     reinit!(csv, x)
     psv = PointScalarValues(csv)
     us = rand(getnbasefunctions(ip_f)) .+ 1
@@ -368,7 +356,7 @@ end
     @test function_gradient(psv, us) ≈ function_gradient(csv, 2, us)
 
     # PointVectorValues
-    cvv = CellVectorValues(qr, ip_f^2, ip_g)
+    cvv = CellVectorValues(qr, ip_f^2)
     reinit!(cvv, x)
     pvv = PointVectorValues(cvv)
     uv = rand(2 * getnbasefunctions(ip_f)) .+ 1
