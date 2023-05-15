@@ -295,9 +295,10 @@ for (func,                              pre_f,                                  
     @eval begin
         function $(func)(dh::AbstractDofHandler, topology::ExclusiveTopology, full_cross_element::Bool; max_buffer_length::Int = 0)
             $(pre_f)
+            element_dof_start = 0
+            cnt = 0
             for (fhi, fh) in pairs(dh.fieldhandlers)
-                element_dof_start = 0
-                cnt = 0
+                
                 for fi in fh.field_interpolations
                     if(!(typeof(fi)<:DiscontinuousLagrange))
                         element_dof_start += getnbasefunctions(fi)
@@ -308,7 +309,7 @@ for (func,                              pre_f,                                  
                         shared_faces_idx = findall(!isempty,current_face_neighborhood)
                         for face_idx in shared_faces_idx
                             for neighbor_face in current_face_neighborhood[face_idx]
-                                cell_dofs =  full_cross_element ? celldofs(dh,cell_idx)[element_dof_start+1:getnbasefunctions(fi)] : celldofs(dh,cell_idx)[element_dof_start.+collect(facedof_indices(get_continuous_interpolation(fi))[face_idx])] 
+                                cell_dofs =  full_cross_element ? celldofs(dh,cell_idx)[element_dof_start + 1 : element_dof_start + getnbasefunctions(fi)] : celldofs(dh,cell_idx)[element_dof_start.+collect(facedof_indices(get_continuous_interpolation(fi))[face_idx])] 
                                 neighbour_dofs = celldofs(dh,neighbor_face[1])
                                 neighbour_unique_dofs = neighbour_dofs[.!(neighbour_dofs .∈ Ref(celldofs(dh,cell_idx)))]
                                 coupling_length = length(cell_dofs)*length(neighbour_unique_dofs)
@@ -317,6 +318,7 @@ for (func,                              pre_f,                                  
                             end
                         end
                     end
+                    element_dof_start += getnbasefunctions(fi)
                 end
             end
             return $(return_values)
