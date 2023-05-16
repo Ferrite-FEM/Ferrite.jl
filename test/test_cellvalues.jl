@@ -1,5 +1,5 @@
 @testset "CellValues" begin
-for (func_interpol, quad_rule) in  (
+for (scalar_interpol, quad_rule) in  (
                                     (Lagrange{1, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
                                     (Lagrange{1, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
                                     (Lagrange{2, RefCube, 1}(), QuadratureRule{2, RefCube}(2)),
@@ -15,13 +15,10 @@ for (func_interpol, quad_rule) in  (
                                     (Lagrange{3, RefTetrahedron, 2}(), QuadratureRule{3, RefTetrahedron}(2))
                                    )
 
-    for fe_valtype in (CellScalarValues, CellVectorValues)
-        geom_interpol = func_interpol # Tests below assume this
-        n_basefunc_base = getnbasefunctions(func_interpol)
-        if fe_valtype == CellVectorValues
-            func_interpol = VectorizedInterpolation(func_interpol)
-        end
-        cv = fe_valtype(quad_rule, func_interpol, geom_interpol)
+    for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
+        geom_interpol = scalar_interpol # Tests below assume this
+        n_basefunc_base = getnbasefunctions(scalar_interpol)
+        cv = CellValues(quad_rule, func_interpol, geom_interpol)
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
@@ -44,15 +41,16 @@ for (func_interpol, quad_rule) in  (
         u_vector = reinterpret(Float64, u)
 
         for i in 1:length(getpoints(quad_rule))
-            if isa(cv, CellScalarValues)
+            if func_interpol isa Ferrite.ScalarInterpolation
                 @test function_gradient(cv, i, u) ≈ H
                 @test function_symmetric_gradient(cv, i, u) ≈ 0.5(H + H')
+                @test function_divergence(cv, i, u_scal) ≈ sum(V)
                 @test function_divergence(cv, i, u) ≈ tr(H)
                 @test function_gradient(cv, i, u_scal) ≈ V
                 ndim == 3 && @test function_curl(cv, i, u) ≈ Ferrite.curl_from_gradient(H)
                 function_value(cv, i, u)
                 function_value(cv, i, u_scal)
-            elseif isa(cv, CellVectorValues)
+            else# func_interpol isa Ferrite.VectorInterpolation
                 @test function_gradient(cv, i, u_vector)  ≈ H
                 @test (@test_deprecated function_gradient(cv, i, u)) ≈ H
                 @test function_symmetric_gradient(cv, i, u_vector) ≈ 0.5(H + H')
@@ -63,7 +61,7 @@ for (func_interpol, quad_rule) in  (
                     @test function_curl(cv, i, u_vector) ≈ Ferrite.curl_from_gradient(H)
                     @test (@test_deprecated function_curl(cv, i, u)) ≈ Ferrite.curl_from_gradient(H)
                 end
-                function_value(cv, i, u_vector) ≈ (@test_deprecated function_value(cv, i, u))
+                @test function_value(cv, i, u_vector) ≈ (@test_deprecated function_value(cv, i, u))
             end
         end
 
@@ -113,11 +111,11 @@ end
     cell = first(CellIterator(dh))
     ip_geo = Lagrange{dim, RefCube, 2}()
     qr = QuadratureRule{dim, RefCube}(deg+1)
-    cv = CellScalarValues(qr, ip_fe, ip_geo)
+    cv = CellValues(qr, ip_fe, ip_geo)
     res = @test_throws ArgumentError reinit!(cv, cell)
     @test occursin("265", res.value.msg)
     ip_geo = Lagrange{dim, RefCube, 1}()
-    cv = CellScalarValues(qr, ip_fe, ip_geo)
+    cv = CellValues(qr, ip_fe, ip_geo)
     reinit!(cv, cell)
 end
 
@@ -127,10 +125,10 @@ end
     ip = Lagrange{dim,RefTetrahedron,1}()
     qr = QuadratureRule{dim,RefTetrahedron}(1)
     qr_f = QuadratureRule{1,RefTetrahedron}(1)
-    csv = CellScalarValues(qr, ip)
-    cvv = CellVectorValues(qr, VectorizedInterpolation(ip))
-    fsv = FaceScalarValues(qr_f, ip)
-    fvv = FaceVectorValues(qr_f, VectorizedInterpolation(ip))
+    csv = CellValues(qr, ip)
+    cvv = CellValues(qr, VectorizedInterpolation(ip))
+    fsv = FaceValues(qr_f, ip)
+    fvv = FaceValues(qr_f, VectorizedInterpolation(ip))
     x, n = valid_coordinates_and_normals(ip)
     reinit!(csv, x)
     reinit!(cvv, x)
@@ -172,11 +170,11 @@ end
         ip = Lagrange{1,RefCube,1}()
         qr = QuadratureRule{1,RefCube}(1)
         # Reference values
-        csv1 = CellScalarValues(qr, ip)
+        csv1 = CellValues(qr, ip)
         reinit!(csv1, [Vec((0.0,)), Vec((1.0,))])
 
         ## Consistency with 1D
-        csv2 = CellScalarValues(qr, ip, ip; sdim=2)
+        csv2 = CellValues(2, qr, ip)
         reinit!(csv2, [Vec((0.0, 0.0)), Vec((1.0, 0.0))])
         # Test spatial interpolation
         @test spatial_coordinate(csv2, 1, [Vec((0.0, 0.0)), Vec((1.0, 0.0))]) == Vec{2}((0.5, 0.0))
@@ -191,7 +189,7 @@ end
         @test 0.0 == function_gradient(csv2, 1, ue)[2]
 
         ## Consistency with 1D
-        csv3 = CellScalarValues(qr, ip, ip; sdim=3)
+        csv3 = CellValues(3, qr, ip)
         reinit!(csv3, [Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0))])
         # Test spatial interpolation
         @test spatial_coordinate(csv3, 1, [Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0))]) == Vec{3}((0.5, 0.0, 0.0))
@@ -238,8 +236,8 @@ end
         qp = 1
         ip = Lagrange{rdim,RefCube,1}()
         qr = QuadratureRule{rdim,RefCube}(1)
-        csv2 = CellScalarValues(qr, ip, ip; sdim=2)
-        csv3 = CellScalarValues(qr, ip, ip; sdim=3)
+        csv2 = CellValues(qr, ip)
+        csv3 = CellValues(3, qr, ip)
         reinit!(csv2, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))])
         reinit!(csv3, [Vec((-1.0,-1.0,0.0)), Vec((1.0,-1.0,0.0)), Vec((1.0,1.0,0.0)), Vec((-1.0,1.0,0.0))])
         # Test spatial interpolation

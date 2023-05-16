@@ -1,7 +1,7 @@
 ```@setup export
 using Ferrite
 grid = generate_grid(Triangle, (2, 2))
-dh = DofHandler(grid); add!(dh, :u, 1); close!(dh)
+dh = DofHandler(grid); add!(dh, :u, Lagrange{2,RefTetrahedron,1}()); close!(dh)
 u = rand(ndofs(dh)); σ = rand(getncells(grid))
 ```
 

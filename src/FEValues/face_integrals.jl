@@ -1,3 +1,15 @@
+# TODO: Remove when Interpolations are ported to new system
+_get_new_refshape(::Interpolation{1, RefCube}) = RefLine
+_get_new_refshape(::Interpolation{2, RefCube}) = RefQuadrilateral
+_get_new_refshape(::Interpolation{3, RefCube}) = RefHexahedron
+_get_new_refshape(::Interpolation{2, RefTetrahedron}) = RefTriangle
+_get_new_refshape(::Interpolation{3, RefTetrahedron}) = RefTetrahedron
+
+function weighted_normal(J::AbstractTensor, fv::FaceValues, face::Int)
+    getdim(::Interpolation{dim}) where {dim} = dim
+    return weighted_normal(J, _get_new_refshape(fv.func_interp), face)
+end
+
 ##################
 # All 1D RefCube #
 ##################
@@ -15,7 +27,7 @@ function create_face_quad_rule(quad_rule::QuadratureRule{0,shape,T}, ::Interpola
     return face_quad_rule
 end
 
-function weighted_normal(::Tensor{2,1,T}, ::FaceValues{1,1,T,RefCube}, face::Int) where {T}
+function weighted_normal(::Tensor{2,1,T}, ::Type{RefLine}, face::Int) where {T}
     face == 1 && return Vec{1,T}((-one(T),))
     face == 2 && return Vec{1,T}(( one(T),))
     throw(ArgumentError("unknown face number: $face"))
@@ -46,7 +58,7 @@ function create_face_quad_rule(quad_rule::QuadratureRule{1,shape,T}, ::Interpola
     return face_quad_rule
 end
 
-function weighted_normal(J::Tensor{2,2}, ::FaceValues{2,2,T,RefCube}, face::Int) where {T}
+function weighted_normal(J::Tensor{2,2}, ::Type{RefQuadrilateral}, face::Int)
     @inbounds begin
         face == 1 && return Vec{2}(( J[2,1], -J[1,1]))
         face == 2 && return Vec{2}(( J[2,2], -J[1,2]))
@@ -78,7 +90,7 @@ function create_face_quad_rule(quad_rule::QuadratureRule{1,shape,T}, ::Interpola
     return face_quad_rule
 end
 
-function weighted_normal(J::Tensor{2,2}, ::FaceValues{2,2,T,RefTetrahedron}, face::Int) where {T}
+function weighted_normal(J::Tensor{2,2}, ::Type{RefTriangle}, face::Int)
     @inbounds begin
         face == 1 && return Vec{2}((-(J[2,1] - J[2,2]), J[1,1] - J[1,2]))
         face == 2 && return Vec{2}((-J[2,2], J[1,2]))
@@ -118,7 +130,7 @@ function create_face_quad_rule(quad_rule::QuadratureRule{2,shape,T}, ::Interpola
     return face_quad_rule
 end
 
-function weighted_normal(J::Tensor{2,3}, ::FaceValues{3,3,T,RefCube}, face::Int) where {T}
+function weighted_normal(J::Tensor{2,3}, ::Type{RefHexahedron}, face::Int)
     @inbounds begin
         face == 1 && return J[:,2] × J[:,1]
         face == 2 && return J[:,1] × J[:,3]
@@ -155,7 +167,7 @@ function create_face_quad_rule(quad_rule::QuadratureRule{2,shape,T}, ::Interpola
     return face_quad_rule
 end
 
-function weighted_normal(J::Tensor{2,3}, ::FaceValues{3,3,T,RefTetrahedron}, face::Int) where {T}
+function weighted_normal(J::Tensor{2,3}, ::Type{RefTetrahedron}, face::Int)
     @inbounds begin
         face == 1 && return J[:,2] × J[:,1]
         face == 2 && return J[:,1] × J[:,3]

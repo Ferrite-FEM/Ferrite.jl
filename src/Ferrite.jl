@@ -33,14 +33,9 @@ struct RefPrism         <: AbstractRefShape{3} end
 # TODO: Update interpolation definitions and enable deprecation
 const RefCube = RefHexahedron
 
-"""
-Abstract type which has `CellValues` and `FaceValues` as subtypes. Each Value type is
-equipped with the spatial dimension `sdim` of the grid, the reference elements' dimension
-`rdim`, the data type for the values `T` and the reference element's geometry `refshape`.
-"""
-abstract type Values{sdim,rdim,T,refshape} end
-abstract type CellValues{sdim,rdim,T,refshape} <: Values{sdim,rdim,T,refshape} end
-abstract type FaceValues{sdim,rdim,T,refshape} <: Values{sdim,rdim,T,refshape} end
+abstract type AbstractValues end
+abstract type AbstractCellValues <: AbstractValues end
+abstract type AbstractFaceValues <: AbstractValues end
 
 """
 Abstract type which is used as identifier for faces, edges and verices

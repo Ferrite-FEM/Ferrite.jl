@@ -29,13 +29,13 @@ grid = generate_shell_grid(nels, size)
 ip = Lagrange{2,RefCube,1}()
 qr_inplane = QuadratureRule{2,RefCube}(1)
 qr_ooplane = QuadratureRule{1,RefCube}(2)
-cv = CellScalarValues(qr_inplane, ip)
+cv = CellValues(qr_inplane, ip)
 
 # Next we distribute displacement dofs,`:u = (x,y,z)` and rotational dofs, `:θ = (θ₁,  θ₂)`.
 #+
 dh = DofHandler(grid)
-add!(dh, :u, 3, ip)
-add!(dh, :θ, 2, ip)
+add!(dh, :u, ip^3)
+add!(dh, :θ, ip^2)
 close!(dh)
 
 # In order to apply our boundary conditions, we first need to create some edge- and vertex-sets. This 

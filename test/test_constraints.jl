@@ -1393,7 +1393,7 @@ end # testset
 
         ke = zeros(ndofs_per_cell(dh), ndofs_per_cell(dh))
         fe = zeros(ndofs_per_cell(dh))
-        cv = CellScalarValues(QuadratureRule{2,RefCube}(2), Lagrange{2,RefCube,1}())
+        cv = CellValues(QuadratureRule{2,RefCube}(2), Lagrange{2,RefCube,1}())
 
         for cell in CellIterator(dh)
             reinit!(cv, cell)

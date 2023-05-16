@@ -1,5 +1,4 @@
 # to test vtk-files
-using StableRNGs
 OVERWRITE_CHECKSUMS = false
 checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")
 if OVERWRITE_CHECKSUMS
@@ -57,12 +56,12 @@ end
         dofhandler = DofHandler(grid)
         ip = Ferrite.default_interpolation(celltype)
         add!(dofhandler, :temperature, ip)
-        add!(dofhandler, :displacement, ip^3)
+        add!(dofhandler, :displacement, ip^dim)
         close!(dofhandler)
         ch = ConstraintHandler(dofhandler)
-        dbc = Dirichlet(:temperature, union(getfaceset(grid, "left"), getfaceset(grid, "right-faceset")), (x,t)->1)
+        dbc = Dirichlet(:temperature, getfaceset(grid, "right-faceset"), (x,t)->1)
         add!(ch, dbc)
-        dbc = Dirichlet(:temperature, getfaceset(grid, "middle-faceset"), (x,t)->4)
+        dbc = Dirichlet(:temperature, getfaceset(grid, "left"), (x,t)->4)
         add!(ch, dbc)
         for d in 1:dim
             dbc = Dirichlet(:displacement, union(getfaceset(grid, "left")), (x,t) -> d, d)
@@ -70,8 +69,9 @@ end
         end
         close!(ch)
         update!(ch, 0.0)
-        rng = StableRNG(1234)
-        u = rand(rng, ndofs(dofhandler))
+        u = zeros(ndofs(dofhandler))
+        apply_analytical!(u, dofhandler, :temperature, x -> 2x[1])
+        apply_analytical!(u, dofhandler, :displacement, x -> -2x)
         apply!(u, ch)
 
         dofhandlerfilename = "dofhandler-$(repr(celltype))"
@@ -99,7 +99,7 @@ close(csio)
     # open files
     checksums_file_tensors = joinpath(dirname(@__FILE__), "checksums2.sha1")
     if OVERWRITE_CHECKSUMS
-        csio = open(checksums_file_tensors, "a")
+        csio = open(checksums_file_tensors, "w")
     else
         csio = open(checksums_file_tensors, "r")
     end
@@ -166,18 +166,6 @@ end
     @test collect(getcoordinates(getnodes(grid, 5)).data) ≈ [0.5, 0.5]
 
     @test getcells(grid, "cell_set") == [getcells(grid, 1)]
-
-    f(x) = Tensor{1,1,Float64}((1 + x[1]^2 + 2x[2]^2, ))
-
-    values = compute_vertex_values(grid, f)
-    @test f([0.0, 0.0]) == values[1]
-    @test f([0.5, 0.5]) == values[5]
-    @test f([1.0, 1.0]) == values[9]
-
-    @test compute_vertex_values(grid, collect(1:9), f) == values
-
-    # Can we test this in a better way? The set makes the order random.
-    @test length(compute_vertex_values(grid, "node_set", f)) == 9
 
     # CellIterator on a grid without DofHandler
     grid = generate_grid(Triangle, (4,4))
@@ -409,8 +397,8 @@ end
     face_neighbors_ele5 = nonzeros(topology.face_neighbor[5,:])
     ip = Lagrange{2, RefCube, 1}()^2
     qr_face = QuadratureRule{1, RefCube}(2)
-    fv_ele = FaceVectorValues(qr_face, ip)
-    fv_neighbor = FaceVectorValues(qr_face, ip)
+    fv_ele = FaceValues(qr_face, ip)
+    fv_neighbor = FaceValues(qr_face, ip)
     u_ele5 = [3.0 for _ in 1:8]
     u_neighbors = [5.0 for _ in 1:8]
     jump_int = 0.

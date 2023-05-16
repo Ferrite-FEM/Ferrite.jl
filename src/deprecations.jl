@@ -84,33 +84,73 @@ function add!(dh::DofHandler, name::Symbol, dim::Int, ip::ScalarInterpolation)
     add!(dh, name, dim == 1 ? ip : VectorizedInterpolation{dim}(ip))
 end
 
-function CellVectorValues(quad_rule::QuadratureRule, func_interpol::ScalarInterpolation,
-        geom_interpol::Interpolation=default_geometric_interpolation(func_interpol))
-    return CellVectorValues(Float64, quad_rule, func_interpol, geom_interpol)
-end
-function CellVectorValues(::Type{T}, quad_rule::QuadratureRule, func_interpol::ScalarInterpolation,
-        geom_interpol::Interpolation=func_interpol) where {T}
-    Base.depwarn(
-        "passing scalar interpolations to CellVectorValues is deprectated. Instead, " *
-        "vectorize the interpolation to the appropriate vector dimension first. " *
-        "See CHANGELOG for more details.",
-        :CellVectorValues
-    )
-    return CellVectorValues(T, quad_rule, VectorizedInterpolation(func_interpol), geom_interpol)
-end
-function FaceVectorValues(quad_rule::QuadratureRule, func_interpol::ScalarInterpolation,
-        geom_interpol::Interpolation=default_geometric_interpolation(func_interpol))
-    return FaceVectorValues(Float64, quad_rule, func_interpol, geom_interpol)
-end
-function FaceVectorValues(::Type{T}, quad_rule::QuadratureRule, func_interpol::ScalarInterpolation,
-        geom_interpol::Interpolation=func_interpol) where {T}
-    Base.depwarn(
-        "passing scalar interpolations to FaceVectorValues is deprectated. Instead, " *
-        "vectorize the interpolation to the appropriate vector dimension first. " *
-        "See CHANGELOG for more details.",
-        :FaceVectorValues
-    )
-    return FaceVectorValues(T, quad_rule, VectorizedInterpolation(func_interpol), geom_interpol)
+# Deprecation of compute_vertex_values
+@deprecate compute_vertex_values(nodes::Vector{<:Node}, f::Function) map(n -> f(n.x), nodes)
+@deprecate compute_vertex_values(grid::AbstractGrid, f::Function) map(n -> f(n.x), getnodes(grid))
+@deprecate compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function) map(n -> f(n.x), getnodes(grid, v))
+@deprecate compute_vertex_values(grid::AbstractGrid, set::String, f::Function) map(n -> f(n.x), getnodes(grid, set))
+
+@deprecate reshape_to_nodes evaluate_at_grid_nodes
+
+@deprecate start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; kwargs...) start_assemble(K, f; kwargs...)
+
+@deprecate shape_derivative shape_gradient
+@deprecate function_derivative function_gradient
+
+# Deprecation of (Cell|Face|Point)(Scalar|Vector)Values.
+# Define dummy types so that loading old code doesn't directly error, and let
+# us print a descriptive error message in the constructor.
+for VT in (
+    :CellScalarValues, :CellVectorValues,
+    :FaceScalarValues, :FaceVectorValues,
+    :PointScalarValues, :PointVectorValues,
+)
+    str = string(VT)
+    str_scalar = replace(str, "Vector" => "Scalar")
+    str_vector = replace(str, "Scalar" => "Vector")
+    str_new = replace(str_scalar, "Scalar" => "")
+    io = IOBuffer()
+    print(io, """
+    The `$(str)` interface has been reworked for Ferrite.jl 0.4.0:
+
+     - `$(str_scalar)` and `$(str_vector)` have been merged into a single type: `$(str_new)`
+     - "Vectorization" of (scalar) interpolations should now be done on the interpolation
+       instead of implicitly in the `CellValues` constructor.
+
+    Upgrade as follows:
+     - Scalar fields: Replace usage of
+           $(str)(quad_rule, interpolation)
+       with
+           $(str_new)(quad_rule, interpolation)
+     - Vector fields: Replace usage of
+           $(str)(quad_rule, interpolation)
+       with
+           $(str_new)(quad_rule, interpolation^dim)
+       where `dim` is the dimension to vectorize to.
+
+    See CHANGELOG.md (https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/CHANGELOG.md) for more details.
+    """)
+    message = String(take!(io))
+    if occursin("Point", str)
+        message = replace(message, "quad_rule, " => "")
+        @eval begin
+            struct $(VT){D, T, R, CV, IP}
+                construct_me_if_you_can() = nothing
+            end
+        end
+    else
+        @eval begin
+            struct $(VT){D, T, R}
+                construct_me_if_you_can() = nothing
+            end
+        end
+    end
+    @eval begin
+        function $(VT)(args...)
+            error($message)
+        end
+        export $(VT)
+    end
 end
 function PointVectorValues(::Type{T}, ip::ScalarInterpolation, geom_interpol::Interpolation = default_geometric_interpolation(ip)) where {T}
     Base.depwarn(
@@ -122,11 +162,9 @@ function PointVectorValues(::Type{T}, ip::ScalarInterpolation, geom_interpol::In
     return PointVectorValues(T, VectorizedInterpolation(ip), geom_interpol)
 end
 
-# (Cell|Face)VectorValues with vector dofs
-@deprecate function_value(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_value(fe_v, q_point, reinterpret(T, u))
-@deprecate function_value(vv::VectorValued, fe_v::Values, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_value(vv, fe_v, q_point, reinterpret(T, u))
-@deprecate function_gradient(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_gradient(fe_v, q_point, reinterpret(T, u))
-@deprecate function_gradient(vv::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_gradient(vv, fe_v, q_point, reinterpret(T, u))
-@deprecate function_divergence(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(fe_v, q_point, reinterpret(T, u))
-@deprecate function_divergence(::VectorValued, fe_v::Values{dim}, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(vv, fe_v, q_point, reinterpret(T, u))
-@deprecate function_curl(fe_v::Union{CellVectorValues,FaceVectorValues}, q_point::Int, u::AbstractVector{Vec{3, T}}) where T function_curl(fe_v::Values, q_point::Int, reinterpret(T, u))
+# (Cell|Face)Values with vector dofs
+const _VectorValues = Union{CellValues{<:VectorInterpolation}, FaceValues{<:VectorInterpolation}}
+@deprecate      function_value(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}      function_value(fe_v, q_point, reinterpret(T, u))
+@deprecate   function_gradient(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}   function_gradient(fe_v, q_point, reinterpret(T, u))
+@deprecate function_divergence(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(fe_v, q_point, reinterpret(T, u))
+@deprecate       function_curl(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}       function_curl(fe_v, q_point, reinterpret(T, u))

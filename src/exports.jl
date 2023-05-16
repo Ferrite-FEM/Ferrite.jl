@@ -1,6 +1,8 @@
 export
 # Interpolations
     Interpolation,
+    VectorInterpolation,
+    ScalarInterpolation,
     VectorizedInterpolation,
     RefCube,
     RefTetrahedron,
@@ -18,12 +20,10 @@ export
     getpoints,
 
 # FEValues
+    AbstractCellValues,
+    AbstractFaceValues,
     CellValues,
-    CellScalarValues,
-    CellVectorValues,
     FaceValues,
-    FaceScalarValues,
-    FaceVectorValues,
     reinit!,
     shape_value,
     shape_gradient,
@@ -92,7 +92,6 @@ export
     addcellset!,
     transform!,
     generate_grid,
-    compute_vertex_values,
 
 # Grid coloring
     create_coloring,
@@ -114,7 +113,7 @@ export
     DofOrder,
     FieldHandler,
     Field,
-    reshape_to_nodes,
+    evaluate_at_grid_nodes,
     apply_analytical!,
 
 # Constraints
@@ -164,5 +163,4 @@ export
     get_point_values,
     PointIterator,
     PointLocation,
-    PointScalarValues,
-    PointVectorValues
+    PointValues
