@@ -214,7 +214,7 @@ grid = togrid("periodic-rve.msh") #src
 dim = 2
 ip = Lagrange{dim, RefTetrahedron, 1}()^dim
 qr = QuadratureRule{dim, RefTetrahedron}(2)
-cellvalues = CellVectorValues(qr, ip);
+cellvalues = CellValues(qr, ip);
 
 # We define a dof handler with a displacement field `:u`:
 dh = DofHandler(grid)
@@ -307,7 +307,7 @@ Ei = 10 * Em;
 # we want to solve the system 3 times, once for each macroscopic strain component, we
 # assemble 3 right-hand-sides.
 
-function doassemble!(cellvalues::CellVectorValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ)
+function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ)
 
     n_basefuncs = getnbasefunctions(cellvalues)
     ndpc = ndofs_per_cell(dh)
@@ -399,7 +399,7 @@ end
 # ``\bar{\boldsymbol{\sigma}}`` in the RVE. We define a function that does this, and also
 # returns the von Mise stress in every quadrature point for visualization.
 
-function compute_stress(cellvalues::CellVectorValues, dh::DofHandler, u, εᴹ)
+function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
     σvM_qpdata = zeros(getnquadpoints(cellvalues), getncells(dh.grid))
     σ̄Ω = zero(SymmetricTensor{2,2})
     Ω = 0.0 # Total volume

@@ -90,8 +90,8 @@ function create_values(interpolation_space::Interpolation{dim, refshape}, qr_ord
     ## Interpolations and values
     quadrature_rule = QuadratureRule{dim, refshape}(qr_order)
     face_quadrature_rule = QuadratureRule{dim-1, refshape}(qr_order)
-    cellvalues = [CellVectorValues(quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
-    facevalues = [FaceVectorValues(face_quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
+    cellvalues = [CellValues(quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
+    facevalues = [FaceValues(face_quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
     return cellvalues, facevalues
 end;
 

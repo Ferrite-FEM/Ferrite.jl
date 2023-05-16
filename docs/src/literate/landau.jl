@@ -60,12 +60,12 @@ struct ThreadCache{CV, T, DIM, F <: Function, GC <: GradientConfig, HC <: Hessia
     gradconf         ::GC
     hessconf         ::HC
 end
-function ThreadCache(dpc::Int, nodespercell, cvP::CellValues{DIM, T}, modelparams, elpotential) where {DIM, T}
+function ThreadCache(dpc::Int, nodespercell, cvP::CellValues, modelparams, elpotential)
     element_indices  = zeros(Int, dpc)
     element_dofs     = zeros(dpc)
     element_gradient = zeros(dpc)
     element_hessian  = zeros(dpc, dpc)
-    element_coords   = zeros(Vec{DIM, T}, nodespercell)
+    element_coords   = zeros(Vec{3, Float64}, nodespercell)
     potfunc          = x -> elpotential(x, cvP, modelparams)
     gradconf         = GradientConfig(potfunc, zeros(dpc), Chunk{12}())
     hessconf         = HessianConfig(potfunc, zeros(dpc), Chunk{12}())
@@ -88,7 +88,7 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
 
     qr  = QuadratureRule{DIM, RefTetrahedron}(2)
     ipP = Lagrange{DIM, RefTetrahedron, 1}()^3
-    cvP = CellVectorValues(qr, ipP)
+    cvP = CellValues(qr, ipP)
 
     dofhandler = DofHandler(grid)
     add!(dofhandler, :P, ipP)

@@ -1,6 +1,8 @@
 export
 # Interpolations
     Interpolation,
+    VectorInterpolation,
+    ScalarInterpolation,
     VectorizedInterpolation,
     RefCube,
     RefTetrahedron,
@@ -18,12 +20,10 @@ export
     getpoints,
 
 # FEValues
+    AbstractCellValues,
+    AbstractFaceValues,
     CellValues,
-    CellScalarValues,
-    CellVectorValues,
     FaceValues,
-    FaceScalarValues,
-    FaceVectorValues,
     reinit!,
     shape_value,
     shape_gradient,
@@ -163,5 +163,4 @@ export
     get_point_values,
     PointIterator,
     PointLocation,
-    PointScalarValues,
-    PointVectorValues
+    PointValues
