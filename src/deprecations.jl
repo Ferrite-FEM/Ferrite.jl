@@ -152,15 +152,6 @@ for VT in (
         export $(VT)
     end
 end
-function PointVectorValues(::Type{T}, ip::ScalarInterpolation, geom_interpol::Interpolation = default_geometric_interpolation(ip)) where {T}
-    Base.depwarn(
-        "passing scalar interpolations to PointVectorValues is deprectated. Instead, " *
-        "vectorize the interpolation to the appropriate vector dimension first. " *
-        "See CHANGELOG for more details.",
-        :FaceVectorValues
-    )
-    return PointVectorValues(T, VectorizedInterpolation(ip), geom_interpol)
-end
 
 # (Cell|Face)Values with vector dofs
 const _VectorValues = Union{CellValues{<:VectorInterpolation}, FaceValues{<:VectorInterpolation}}
