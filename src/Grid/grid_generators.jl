@@ -102,12 +102,12 @@ function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
     end
 end
 
-function generate_grid(C::Type{<:AbstractCell{2}}, nel::NTuple{2,Int}, X::Vector{Vec{2,T}}) where {T}
+function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTuple{2,Int}, X::Vector{Vec{2,T}}) where {T}
     @assert length(X) == 4
     generate_grid(C, nel, X[1], X[2], X[3], X[4])
 end
 
-function generate_grid(C::Type{<:AbstractCell{2}}, nel::NTuple{2,Int}, left::Vec{2,T}=Vec{2}((-1.0,-1.0)), right::Vec{2,T}=Vec{2}((1.0,1.0))) where {T}
+function generate_grid(C::Type{<:AbstractCell{<:AbstractRefShape{2}}}, nel::NTuple{2,Int}, left::Vec{2,T}=Vec{2}((-1.0,-1.0)), right::Vec{2,T}=Vec{2}((1.0,1.0))) where {T}
     LL = left
     UR = right
     LR = Vec{2}((UR[1], LL[2]))
