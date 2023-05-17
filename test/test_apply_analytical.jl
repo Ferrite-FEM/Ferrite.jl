@@ -10,7 +10,7 @@
         return B{RefShape,order}()
     end
     getcellorder(CT) = Ferrite.getorder(Ferrite.default_interpolation(CT))
-    getcelltypedim(::Type{<:Ferrite.AbstractCell{dim}}) where dim = dim
+    getcelltypedim(::Type{<:Ferrite.AbstractCell{shape}}) where {dim, shape <: Ferrite.AbstractRefShape{dim}} = dim
 
     # Functions to create dof handlers for testing
     function testdh(CT, ip_order_u, ip_order_p)
