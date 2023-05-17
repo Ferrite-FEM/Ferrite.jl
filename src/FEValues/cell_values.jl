@@ -191,6 +191,7 @@ end
 @inline dothelper(B::M1,A::M2) where {M1<:SMatrix,M2<:Union{SMatrix,MMatrix}} = B*A
 
 """
+    CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim})
 Generic constructor for cell values for embedded elements.
 """
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
@@ -230,6 +231,7 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
 end
 
 """
+    edet(J::MMatrix{3,2})
 Embedding determinant for surfaces in 3D.
 
 TLDR: "det(J) =" ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂
@@ -243,6 +245,7 @@ For more details see e.g. the doctoral thesis by Mirza Cenanovic **Finite elemen
 edet(J::MMatrix{3,2,T,6}) where {T} = norm(J[:,1] × J[:,2])
 
 """
+    edet(J::Union{MMatrix{2,1},MMatrix{3,1}})
 Embedding determinant for curves in 2D and 3D.
 
 TLDR: "det(J) =" ||∂x/∂ξ||₂
@@ -255,6 +258,7 @@ See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-di
 edet(J::Union{MMatrix{2,1,T,2},MMatrix{3,1,T,3}}) where {T} = norm(J)
 
 """
+    reinit!(cv::CellValues, x::AbstractVector{Vec{sdim}})
 Reinit for embedded elements, i.e. elements whose reference dimension is smaller than the spatial dimension.
 """
 function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{sdim,T}}) where {
