@@ -82,7 +82,7 @@ for (scalar_interpol, quad_rule) in (
             for i in 1:getnquadpoints(fv)
                 vol += getdetJdV(fv, i)
             end
-            @test vol ≈ reference_volume(func_interpol, face)
+            @test vol ≈ reference_face_area(func_interpol, face)
 
             # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
             # TODO: Renable somehow after quad rule is no longer stored in FaceValues

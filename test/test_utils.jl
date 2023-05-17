@@ -7,10 +7,10 @@ reference_volume(::Interpolation{dim, <:Ferrite.RefHypercube}) where {dim} = 2^d
 reference_volume(::Interpolation{dim, <:Union{RefTriangle,RefTetrahedron}}) where {dim} = 1 / factorial(dim)
 reference_volume(::Interpolation{  3, RefPrism}) = 1/2
 # For faces
-reference_volume(fs::VectorizedInterpolation, f::Int) = reference_volume(fs.ip, f)
-reference_volume(fs::Interpolation, ::Int) = reference_volume(Ferrite.getlowerdim(fs))
-reference_volume(fs::Interpolation{2, RefTriangle}, face::Int) = face == 1 ? sqrt(2) : 1.0
-reference_volume(fs::Interpolation{3, RefTetrahedron}, face::Int) = face == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
+reference_face_area(fs::VectorizedInterpolation, f::Int) = reference_face_area(fs.ip, f)
+reference_face_area(fs::Interpolation{dim, <:Ferrite.RefHypercube}, face::Int) where {dim} = 2^(dim-1)
+reference_face_area(fs::Interpolation{2, RefTriangle}, face::Int) = face == 1 ? sqrt(2) : 1.0
+reference_face_area(fs::Interpolation{3, RefTetrahedron}, face::Int) = face == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
 
 ######################################################
 # Coordinates and normals for the reference elements #

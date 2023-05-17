@@ -343,7 +343,6 @@ function (::Type{DL})() where {dim, shape <: AbstractRefShape{dim}, order, DL <:
     return DiscontinuousLagrange{dim, shape, order}()
 end
 
-getlowerdim(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = DiscontinuousLagrange{dim-1,shape,order}()
 getlowerorder(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = DiscontinuousLagrange{dim,shape,order-1}()
 
 getnbasefunctions(::DiscontinuousLagrange{dim,shape,order}) where {dim,shape,order} = getnbasefunctions(Lagrange{dim,shape,order}())
@@ -396,7 +395,6 @@ vertexdof_indices(::Lagrange{2,RefTriangle}) = ((1,),(2,),(3,))
 vertexdof_indices(::Lagrange{3,RefTetrahedron}) = ((1,),(2,),(3,),(4,))
 vertexdof_indices(::Lagrange{3,RefPrism}) = ((1,), (2,), (3,), (4,), (5,), (6,))
 
-getlowerdim(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim-1,shape,order}()
 getlowerorder(::Lagrange{dim,shape,order}) where {dim,shape,order} = Lagrange{dim,shape,order-1}()
 getlowerorder(::Lagrange{dim,shape,1}) where {dim,shape} = DiscontinuousLagrange{dim,shape,0}()
 
@@ -503,7 +501,6 @@ end
 # Lagrange dim 2 RefTriangle order 1 #
 ######################################
 getnbasefunctions(::Lagrange{2,RefTriangle,1}) = 3
-getlowerdim(::Lagrange{2, RefTriangle, order}) where {order} = Lagrange{1, RefLine, order}()
 
 facedof_indices(::Lagrange{2,RefTriangle,1}) = ((1,2), (2,3), (3,1))
 
@@ -995,7 +992,6 @@ end
 Lagrange element with bubble stabilization.
 """
 struct BubbleEnrichedLagrange{dim,ref_shape,order} <: ScalarInterpolation{dim,ref_shape,order} end
-getlowerdim(ip::BubbleEnrichedLagrange{dim,ref_shape,order}) where {dim,ref_shape,order} = Lagrange{dim-1,ref_shape,order}()
 
 #############################################
 # Lagrange-Bubble dim 2 RefTriangle order 1 #
@@ -1042,7 +1038,6 @@ vertexdof_indices(::Serendipity{3,RefHexahedron}) = ((1,),(2,),(3,),(4,),(5,),(6
 # Serendipity dim 2 RefQuadrilateral order 2 #
 ##############################################
 getnbasefunctions(::Serendipity{2,RefQuadrilateral,2}) = 8
-getlowerdim(::Serendipity{2,RefQuadrilateral,2}) = Lagrange{1,RefQuadrilateral,2}()
 getlowerorder(::Serendipity{2,RefQuadrilateral,2}) = Lagrange{2,RefQuadrilateral,1}()
 
 facedof_indices(::Serendipity{2,RefQuadrilateral,2}) = ((1,2,5), (2,3,6), (3,4,7), (4,1,8))
@@ -1078,7 +1073,6 @@ end
 ###########################################
 # Note that second order serendipity hex has no interior face indices.
 getnbasefunctions(::Serendipity{3,RefHexahedron,2}) = 20
-getlowerdim(::Serendipity{3,RefHexahedron,2}) = Serendipity{2,RefHexahedron,2}()
 getlowerorder(::Serendipity{3,RefHexahedron,2}) = Lagrange{3,RefHexahedron,1}()
 
 facedof_indices(::Serendipity{3,RefHexahedron,2}) = (
