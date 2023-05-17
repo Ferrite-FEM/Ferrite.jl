@@ -35,9 +35,6 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 """
 FaceValues
 
-"""
-TODO docstring.
-"""
 struct FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP} <: AbstractFaceValues
     N::Array{N_t, 3}
     dNdx::Array{dNdx_t, 3}
@@ -50,50 +47,45 @@ struct FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP} <: Ab
     current_face::ScalarWrapper{Int}
     func_interp::IP
     geo_interp::GIP
+end
 
-    """
-        FaceValues{N_t, dNdx_t, dNdξ_t, T, dMdξ_t, Normal_t}(qr::QR, ip::IP, gip::GIP)
-    Common initializer code for constructing cell values after the types have been determined.
-    """
-    function FaceValues{N_t, dNdx_t, dNdξ_t, T, dMdξ_t, Normal_t}(qr::QR, ip::IP, gip::GIP) where {QR, IP, GIP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, Normal_t}    
-        # Quadrature
-        @assert getdim(ip) == getdim(qr) + 1
-        n_qpoints = length(getweights(qr))
-        fqr = create_face_quad_rule(qr, ip)
-        n_faces = length(fqr)
+"""
+    FaceValues(qr::QR, ip::IP, gip::GIP, ::Type{dNdx_t}, ::Type{dNdξ_t}, ::Type{T}, ::Type{dMdξ_t}, ::Type{Normal_t})
+Common initializer code for constructing cell values after the types have been determined.
+"""
+function FaceValues(qr::QR, ip::IP, gip::GIP, ::Type{N_t}, ::Type{dNdx_t}, ::Type{dNdξ_t}, ::Type{T}, ::Type{dMdξ_t}, ::Type{Normal_t}) where {QR, IP, GIP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, Normal_t}    
+    # Quadrature
+    @assert getdim(ip) == getdim(qr) + 1
+    n_qpoints = length(getweights(qr))
+    fqr = create_face_quad_rule(qr, ip)
+    n_faces = length(fqr)
 
-        # Normals
-        normals = zeros(Normal_t, n_qpoints)
+    # Normals
+    normals = zeros(Normal_t, n_qpoints)
 
-        # Field interpolation
-        n_func_basefuncs = getnbasefunctions(ip)
-        N    = fill(zero(N_t)    * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
-        dNdx = fill(zero(dNdx_t) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
-        dNdξ = fill(zero(dNdξ_t) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    # Field interpolation
+    n_func_basefuncs = getnbasefunctions(ip)
+    N    = fill(zero(N_t)    * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    dNdx = fill(zero(dNdx_t) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    dNdξ = fill(zero(dNdξ_t) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
 
-        # Geometry interpolation
-        n_geom_basefuncs = getnbasefunctions(gip)
-        M    = fill(zero(T)    * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
-        dMdξ = fill(zero(dMdξ_t) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
-    
-        for face in 1:n_faces, (qp, ξ) in pairs(fqr[face].points)
-            for basefunc in 1:n_func_basefuncs
-                dNdξ[basefunc, qp, face], N[basefunc, qp, face] = gradient(ξ -> value(ip, basefunc, ξ), ξ, :all)
-            end
-            for basefunc in 1:n_geom_basefuncs
-                dMdξ[basefunc, qp, face], M[basefunc, qp, face] = gradient(ξ -> value(gip, basefunc, ξ), ξ, :all)
-            end
+    # Geometry interpolation
+    n_geom_basefuncs = getnbasefunctions(gip)
+    M    = fill(zero(T)    * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
+    dMdξ = fill(zero(dMdξ_t) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
+
+    for face in 1:n_faces, (qp, ξ) in pairs(fqr[face].points)
+        for basefunc in 1:n_func_basefuncs
+            dNdξ[basefunc, qp, face], N[basefunc, qp, face] = gradient(ξ -> value(ip, basefunc, ξ), ξ, :all)
         end
-
-        detJdV = fill(T(NaN), n_qpoints, n_faces)
-
-        new{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, qr, ScalarWrapper(0), ip, gip)
+        for basefunc in 1:n_geom_basefuncs
+            dMdξ[basefunc, qp, face], M[basefunc, qp, face] = gradient(ξ -> value(gip, basefunc, ξ), ξ, :all)
+        end
     end
-    
-    # hotfix for copy construction
-    function FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(N::Array{N_t, 3}, dNdx::Array{dNdx_t, 3}, dNdξ::Array{dNdξ_t, 3}, detJdV::Matrix{T}, normals::Vector{Normal_t}, M::Array{T, 3}, dMdξ::Array{dMdξ_t, 3}, qr::QR, current_face::ScalarWrapper{Int}, func_interp::IP, geo_interp::GIP) where {IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}
-        new{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, qr, current_face, func_interp, geo_interp)
-    end
+
+    detJdV = fill(T(NaN), n_qpoints, n_faces)
+
+    FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, qr, ScalarWrapper(0), ip, gip)
 end
 
 # (Scalar|Vector)Interpolation, (vdim ==) refdim == spacedim -> Tensors
@@ -119,7 +111,7 @@ function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     #M_t    = T
     dMdξ_t = Vec{dim, T}
 
-    return FaceValues{N_t, dNdx_t, dNdξ_t, T, dMdξ_t, Normal_t}(qr, ip, gip)
+    return FaceValues(qr, ip, gip, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, Normal_t)
 end
 
 function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
@@ -139,7 +131,7 @@ function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     M_t    = T
     dMdξ_t = Vec{dim, T}
 
-    return FaceValues{N_t, dNdx_t, dNdξ_t, T, dMdξ_t, Normal_t}(qr, ip, gip)
+    return FaceValues(qr, ip, gip, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, Normal_t)
 end
 
 function reinit!(fv::FaceValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T}}, face::Int) where {

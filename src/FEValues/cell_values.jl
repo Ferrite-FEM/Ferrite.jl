@@ -1,10 +1,12 @@
 """
-    CellValues([::Type{T}], quad_rule::QuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
+    CellValues([sdim::Int,] [::Type{T},] quad_rule::QuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
 
 A `CellValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
 values of nodal functions, gradients and divergences of nodal functions etc. in the finite element cell.
 
 **Arguments:**
+
+* `sdim`: an optional argument to determine the spatial dimension when using embedded elements.
 * `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
 * `quad_rule`: an instance of a [`QuadratureRule`](@ref)
 * `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
@@ -12,6 +14,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
   By default linear Lagrange interpolation is used.
 
 **Common methods:**
+
 * [`reinit!`](@ref)
 * [`getnquadpoints`](@ref)
 * [`getdetJdV`](@ref)
@@ -33,9 +36,6 @@ function default_geometric_interpolation(::Interpolation{dim,shape}) where {dim,
     return Lagrange{dim,shape,1}()
 end
 
-"""
-TODO docstring.
-"""
 struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCellValues
     N::Matrix{N_t}
     dNdx::Matrix{dNdx_t}
@@ -46,43 +46,38 @@ struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCell
     qr::QR
     ip::IP
     gip::GIP
+end
 
-    """
-        CellValues{T, N_t, dNdx_t, dNdξ_t, T, dMdξ_t}(qr::QR, ip::IP, gip::GIP)
-    Common initializer code for constructing cell values after the types have been determined.
-    """
-    function CellValues{N_t, dNdx_t, dNdξ_t, T, dMdξ_t}(qr::QR, ip::IP, gip::GIP) where {QR, IP, GIP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t}
-        n_qpoints = length(getweights(qr))
+"""
+    CellValues(qr::QR, ip::IP, gip::GIP, ::Type{N_t}, ::Type{dNdx_t}, ::Type{dNdξ_t}, ::Type{T}, ::Type{dMdξ_t})
+Common initializer code for constructing cell values after the types have been determined.
+"""
+function CellValues(qr::QR, ip::IP, gip::GIP, ::Type{N_t}, ::Type{dNdx_t}, ::Type{dNdξ_t}, ::Type{T}, ::Type{dMdξ_t}) where {QR, IP, GIP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t}
+    n_qpoints = length(getweights(qr))
 
-        # Field interpolation
-        n_func_basefuncs = getnbasefunctions(ip)
-        N    = fill(zero(N_t)    * T(NaN), n_func_basefuncs, n_qpoints)
-        dNdx = fill(zero(dNdx_t) * T(NaN), n_func_basefuncs, n_qpoints)
-        dNdξ = fill(zero(dNdξ_t) * T(NaN), n_func_basefuncs, n_qpoints)
+    # Field interpolation
+    n_func_basefuncs = getnbasefunctions(ip)
+    N    = fill(zero(N_t)    * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdx = fill(zero(dNdx_t) * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdξ = fill(zero(dNdξ_t) * T(NaN), n_func_basefuncs, n_qpoints)
 
-        # Geometry interpolation
-        n_geom_basefuncs = getnbasefunctions(gip)
-        M    = fill(zero(T)    * T(NaN), n_geom_basefuncs, n_qpoints)
-        dMdξ = fill(zero(dMdξ_t) * T(NaN), n_geom_basefuncs, n_qpoints)
+    # Geometry interpolation
+    n_geom_basefuncs = getnbasefunctions(gip)
+    M    = fill(zero(T)    * T(NaN), n_geom_basefuncs, n_qpoints)
+    dMdξ = fill(zero(dMdξ_t) * T(NaN), n_geom_basefuncs, n_qpoints)
 
-        for (qp, ξ) in pairs(getpoints(qr))
-            for basefunc in 1:n_func_basefuncs
-                dNdξ[basefunc, qp], N[basefunc, qp] = gradient(ξ -> value(ip, basefunc, ξ), ξ, :all)
-            end
-            for basefunc in 1:n_geom_basefuncs
-                dMdξ[basefunc, qp], M[basefunc, qp] = gradient(ξ -> value(gip, basefunc, ξ), ξ, :all)
-            end
+    for (qp, ξ) in pairs(getpoints(qr))
+        for basefunc in 1:n_func_basefuncs
+            dNdξ[basefunc, qp], N[basefunc, qp] = gradient(ξ -> value(ip, basefunc, ξ), ξ, :all)
         end
-
-        detJdV = fill(T(NaN), n_qpoints)
-
-        new{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(N, dNdx, dNdξ, detJdV, M, dMdξ, qr, ip, gip)
+        for basefunc in 1:n_geom_basefuncs
+            dMdξ[basefunc, qp], M[basefunc, qp] = gradient(ξ -> value(gip, basefunc, ξ), ξ, :all)
+        end
     end
 
-    # hotfix for copy construction
-    function CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(N::Matrix{N_t}, dNdx::Matrix{dNdx_t}, dNdξ::Matrix{dNdξ_t}, detJdV::Vector{T}, M::Matrix{T}, dMdξ::Matrix{dMdξ_t}, qr::QR, ip::IP, gip::GIP) where {IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}
-        new{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(N, dNdx, dNdξ, detJdV, M, dMdξ, qr, ip, gip)
-    end
+    detJdV = fill(T(NaN), n_qpoints)
+
+    CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(N, dNdx, dNdξ, detJdV, M, dMdξ, qr, ip, gip)
 end
 
 """
@@ -127,7 +122,7 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     #M_t    = T
     dMdξ_t = Vec{dim, T}
 
-    return CellValues{N_t, dNdx_t, dNdξ_t, T, dMdξ_t}(qr, ip, gip)
+    return CellValues(qr, ip, gip, N_t, dNdx_t, dNdξ_t, T, dMdξ_t)
 end
 
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
@@ -144,7 +139,7 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     #M_t    = T
     dMdξ_t = Vec{dim, T}
 
-    return CellValues{N_t, dNdx_t, dNdξ_t, T, dMdξ_t}(qr, ip, gip)
+    return CellValues(qr, ip, gip, N_t, dNdx_t, dNdξ_t, T, dMdξ_t)
 end
 
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
@@ -162,7 +157,7 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     #M_t    = T
     dMdξ_t = Vec{dim, T}
 
-    return CellValues{N_t, dNdx_t, dNdξ_t, T, dMdξ_t}(qr, ip, gip)
+    return CellValues(qr, ip, gip, N_t, dNdx_t, dNdξ_t, T, dMdξ_t)
 end
 
 function reinit!(cv::CellValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T}}) where {
@@ -213,7 +208,7 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
     #M_t    = T
     dMdξ_t = Vec{rdim, T}
 
-    return CellValues{N_t, dNdx_t, dNdξ_t, T, dMdξ_t}(qr, ip, gip)
+    return CellValues(qr, ip, gip, N_t, dNdx_t, dNdξ_t, T, dMdξ_t)
 end
 
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
@@ -231,7 +226,7 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
     #M_t    = T
     dMdξ_t = Vec{rdim, T}
 
-    return CellValues{N_t, dNdx_t, dNdξ_t, T, dMdξ_t}(qr, ip, gip)
+    return CellValues(qr, ip, gip, N_t, dNdx_t, dNdξ_t, T, dMdξ_t)
 end
 
 """
