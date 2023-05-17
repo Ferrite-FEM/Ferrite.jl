@@ -167,8 +167,8 @@ end
 @testset "Embedded elements" begin
     @testset "Scalar on curves" begin
         ue = [-1.5, 2.0]
-        ip = Lagrange{1,RefCube,1}()
-        qr = QuadratureRule{1,RefCube}(1)
+        ip = Lagrange{RefLine,1}()
+        qr = QuadratureRule{1,RefLine}(1)
         # Reference values
         csv1 = CellValues(qr, ip)
         reinit!(csv1, [Vec((0.0,)), Vec((1.0,))])
@@ -232,10 +232,8 @@ end
 
     @testset "Scalar on surface" begin
         ue = [-1.5, 2.0, 3.0, -1.0]
-        rdim = 2
-        qp = 1
-        ip = Lagrange{rdim,RefCube,1}()
-        qr = QuadratureRule{rdim,RefCube}(1)
+        ip = Lagrange{RefQuadrilateral,1}()
+        qr = QuadratureRule{2,RefQuadrilateral}(1)
         csv2 = CellValues(qr, ip)
         csv3 = CellValues(3, qr, ip)
         reinit!(csv2, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))])
