@@ -86,7 +86,7 @@ end;
 
 # Each thread need its own CellValues and FaceValues (although, for this example we don't use
 # the FaceValues)
-function create_values(interpolation_space::Interpolation{dim, refshape}, qr_order::Int) where {dim, refshape}
+function create_values(interpolation_space::Interpolation{refshape}, qr_order::Int) where {dim, refshape<:Ferrite.AbstractRefShape{dim}}
     ## Interpolations and values
     quadrature_rule = QuadratureRule{dim, refshape}(qr_order)
     face_quadrature_rule = QuadratureRule{dim-1, refshape}(qr_order)
@@ -179,7 +179,7 @@ end;
 function run_assemble()
     n = 20
     grid, colors = create_colored_cantilever_grid(Hexahedron, n);
-    ip = Lagrange{3,RefCube,1}()^3
+    ip = Lagrange{RefHexahedron,1}()^3
     dh = create_dofhandler(grid, ip);
 
     K = create_sparsity_pattern(dh);

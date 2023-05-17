@@ -6,9 +6,8 @@
     change_ip_order(ip::Interpolation, ::Nothing) = ip
     function change_ip_order(ip::Interpolation, order::Int)
         B = typebase(ip)
-        Dim = Ferrite.getdim(ip)
         RefShape = Ferrite.getrefshape(ip)
-        return B{Dim,RefShape,order}()
+        return B{RefShape,order}()
     end
     getcellorder(CT) = Ferrite.getorder(Ferrite.default_interpolation(CT))
     getcelltypedim(::Type{<:Ferrite.AbstractCell{dim}}) where dim = dim

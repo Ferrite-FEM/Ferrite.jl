@@ -29,9 +29,9 @@ function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_i
     return PointValues(Float64, ip, ipg)
 end
 function PointValues(::Type{T}, ip::IP, ipg::GIP = default_geometric_interpolation(ip)) where {
-    T, dim, shape,
-    IP  <:       Interpolation{dim, shape},
-    GIP <: ScalarInterpolation{dim, shape}
+    T, dim, shape <: AbstractRefShape{dim},
+    IP  <:       Interpolation{shape},
+    GIP <: ScalarInterpolation{shape}
 }
     qr = QuadratureRule{dim, shape, T}([one(T)], [zero(Vec{dim, T})])
     cv = CellValues(T, qr, ip, ipg)
@@ -74,7 +74,7 @@ struct PointValuesInternal{IP, N_t} <: AbstractValues
     ip::IP
 end
 
-function PointValuesInternal(ξ::Vec{dim, T}, ip::IP) where {dim, T, IP <: Interpolation{dim}}
+function PointValuesInternal(ξ::Vec{dim, T}, ip::IP) where {dim, T, shape <: AbstractRefShape{dim}, IP <: Interpolation{shape}}
     n_func_basefuncs = getnbasefunctions(ip)
     N = [value(ip, i, ξ) for i in 1:n_func_basefuncs]
     return PointValuesInternal{IP, eltype(N)}(N, ip)
@@ -85,7 +85,7 @@ shape_value_type(::PointValuesInternal{<:Any, N_t}) where {N_t} = N_t
 shape_value(pv::PointValuesInternal, qp::Int, i::Int) = (@assert qp == 1; pv.N[i])
 
 # allow on-the-fly updating
-function reinit!(pv::PointValuesInternal{IP}, coord::Vec{dim}) where {dim, IP <: Interpolation{dim}}
+function reinit!(pv::PointValuesInternal{IP}, coord::Vec{dim}) where {dim, shape <: AbstractRefShape{dim}, IP <: Interpolation{shape}}
     n_func_basefuncs = getnbasefunctions(pv.ip)
     for i in 1:n_func_basefuncs
         pv.N[i] = value(pv.ip, i, coord)

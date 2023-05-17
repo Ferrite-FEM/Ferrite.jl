@@ -269,7 +269,7 @@ function solve()
     P1 = Vec((0.0, 0.0, 0.0))  # start point for geometry
     P2 = Vec((L, w, h))        # end point for geometry
     grid = generate_grid(Tetrahedron, nels, P1, P2)
-    interpolation = Lagrange{3, RefTetrahedron, 1}()^3
+    interpolation = Lagrange{RefTetrahedron, 1}()^3
 
     dh = create_dofhandler(grid, interpolation) # JuaFEM helper function
     dbcs = create_bc(dh, grid) # create Dirichlet boundary-conditions
