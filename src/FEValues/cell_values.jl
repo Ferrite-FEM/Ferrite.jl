@@ -111,8 +111,8 @@ It is also assumed that the spatial dimension is the same as the reference dimen
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
     dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{dim, shape},
-    IP  <: ScalarInterpolation{dim, shape},
-    GIP <: ScalarInterpolation{dim, shape}
+    IP  <: ScalarInterpolation{shape},
+    GIP <: ScalarInterpolation{shape}
 }
     # Function interpolation
     N_t    = T
@@ -128,8 +128,8 @@ end
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
     dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{dim, shape},
-    IP  <: VectorInterpolation{dim, dim, shape},
-    GIP <: ScalarInterpolation{dim, shape}
+    IP  <: VectorInterpolation{dim, shape},
+    GIP <: ScalarInterpolation{shape}
 }
     # Field interpolation
     N_t    = Vec{dim, T}
@@ -145,8 +145,8 @@ end
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
     vdim, dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{dim, shape},
-    IP  <: VectorInterpolation{vdim, dim, shape},
-    GIP <: ScalarInterpolation{dim, shape}
+    IP  <: VectorInterpolation{vdim, shape},
+    GIP <: ScalarInterpolation{shape}
 }
     # Field interpolation
     N_t    = SVector{vdim, T}
@@ -194,10 +194,10 @@ end
 Generic constructor for cell values for embedded elements.
 """
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
-    sdim, rdim, shape <: AbstractRefShape#={rdim}=#, T,
+    sdim, rdim, shape <: AbstractRefShape{rdim}, T,
     QR  <: QuadratureRule{rdim, shape},
-    IP  <: ScalarInterpolation{rdim, shape},
-    GIP <: ScalarInterpolation{rdim, shape}
+    IP  <: ScalarInterpolation{shape},
+    GIP <: ScalarInterpolation{shape}
 }
     # Function interpolation
     N_t    = T
@@ -212,10 +212,10 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
 end
 
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
-    sdim, vdim, rdim, shape <: AbstractRefShape#={rdim}=#, T,
+    sdim, vdim, rdim, shape <: AbstractRefShape{rdim}, T,
     QR  <: QuadratureRule{rdim, shape},
-    IP  <: VectorInterpolation{vdim, rdim, shape},
-    GIP <: ScalarInterpolation{rdim, shape}
+    IP  <: VectorInterpolation{vdim, shape},
+    GIP <: ScalarInterpolation{shape}
 }
     # Function interpolation
     N_t    = SVector{vdim, T}

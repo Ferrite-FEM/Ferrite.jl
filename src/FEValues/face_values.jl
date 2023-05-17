@@ -97,8 +97,8 @@ end
 function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
     qdim, dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{qdim, shape},
-    IP  <: ScalarInterpolation{dim, shape},
-    GIP <: ScalarInterpolation{dim, shape}
+    IP  <: ScalarInterpolation{shape},
+    GIP <: ScalarInterpolation{shape}
 }
     # Normals
     Normal_t = Vec{dim, T}
@@ -117,8 +117,8 @@ end
 function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
     qdim, dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{qdim, shape},
-    IP  <: VectorInterpolation{dim, dim, shape},
-    GIP <: ScalarInterpolation{dim, shape}
+    IP  <: VectorInterpolation{dim, shape},
+    GIP <: ScalarInterpolation{shape}
 }
     # Normals
     Normal_t = Vec{dim, T}
