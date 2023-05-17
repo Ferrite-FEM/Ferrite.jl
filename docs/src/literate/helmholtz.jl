@@ -54,9 +54,9 @@ const Δ = Tensors.hessian;
 grid = generate_grid(Quadrilateral, (150, 150))
 
 dim = 2
-ip = Lagrange{dim, RefCube, 1}()
-qr = QuadratureRule{dim, RefCube}(2)
-qr_face = QuadratureRule{dim-1, RefCube}(2)
+ip = Lagrange{RefQuadrilateral, 1}()
+qr = QuadratureRule{dim, RefQuadrilateral}(2)
+qr_face = QuadratureRule{dim-1, RefQuadrilateral}(2)
 cellvalues = CellValues(qr, ip);
 facevalues = FaceValues(qr_face, ip);
 

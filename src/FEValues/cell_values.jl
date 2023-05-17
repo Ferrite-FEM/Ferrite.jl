@@ -32,8 +32,8 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 """
 CellValues
 
-function default_geometric_interpolation(::Interpolation{dim,shape}) where {dim, shape}
-    return Lagrange{dim,shape,1}()
+function default_geometric_interpolation(::Interpolation{shape}) where {shape}
+    return Lagrange{shape,1}()
 end
 
 struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCellValues
@@ -109,7 +109,7 @@ It is also assumed that the spatial dimension is the same as the reference dimen
             separate the geometry data type from the data type of the approximation evaluation.
 """
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
-    dim, shape <: AbstractRefShape#={dim}=#, T,
+    dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{dim, shape},
     IP  <: ScalarInterpolation{dim, shape},
     GIP <: ScalarInterpolation{dim, shape}
@@ -126,7 +126,7 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
 end
 
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
-    dim, shape <: AbstractRefShape#={dim}=#, T,
+    dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{dim, shape},
     IP  <: VectorInterpolation{dim, dim, shape},
     GIP <: ScalarInterpolation{dim, shape}
@@ -143,7 +143,7 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
 end
 
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
-    vdim, dim, shape <: AbstractRefShape#={dim}=#, T,
+    vdim, dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{dim, shape},
     IP  <: VectorInterpolation{vdim, dim, shape},
     GIP <: ScalarInterpolation{dim, shape}

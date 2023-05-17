@@ -63,11 +63,11 @@ function L2Projector(
 end
 
 # Quadrature sufficient for integrating a mass matrix
-function _mass_qr(::Lagrange{dim, shape, order}) where {dim, shape, order}
+function _mass_qr(::Lagrange{shape, order}) where {dim, shape <: AbstractRefShape{dim}, order}
     return QuadratureRule{dim,shape}(order + 1)
 end
-function _mass_qr(::Lagrange{dim, RefTetrahedron, 2}) where {dim}
-    return QuadratureRule{dim,RefTetrahedron}(4)
+function _mass_qr(::Lagrange{shape, 2}) where {dim, shape <: RefSimplex{dim}}
+    return QuadratureRule{dim,shape}(4)
 end
 _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
