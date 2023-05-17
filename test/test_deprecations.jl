@@ -12,7 +12,7 @@ using Ferrite, Test
     @test ndofs(dh) == 12
     # Deprecation of auto-vectorizing
     dh = DofHandler(grid)
-    ip = Lagrange{2,RefCube,1}()
+    ip = Lagrange{2,RefQuadrilateral,1}()
     @test_deprecated r"vectorize the interpolation" add!(dh, :u, 2, ip)
     @test_deprecated r"vectorize the interpolation" add!(dh, :p, 1, ip)
     close!(dh)
@@ -20,8 +20,8 @@ using Ferrite, Test
 end
 
 @testset "Deprecation of (Cell|Face)(Scalar|Vector)Values" begin
-    ip = Lagrange{2, RefCube, 1}()
-    qr = QuadratureRule{2, RefCube}(2)
+    ip = Lagrange{2, RefQuadrilateral, 1}()
+    qr = QuadratureRule{2, RefQuadrilateral}(2)
     for CVType in (
             CellScalarValues, CellVectorValues,
             FaceScalarValues, FaceVectorValues,
