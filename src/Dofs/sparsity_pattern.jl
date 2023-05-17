@@ -1,5 +1,5 @@
 """
-    create_sparsity_pattern(dh::DofHandler; coupling, topology::Union{Nothing, AbstractTopology} = nothing, cross_element_full_coupling::Bool = true)
+    create_sparsity_pattern(dh::DofHandler; coupling, topology::Union{Nothing, AbstractTopology} = nothing)
 
 Create the sparsity pattern corresponding to the degree of freedom
 numbering in the [`DofHandler`](@ref). Return a `SparseMatrixCSC`
@@ -32,30 +32,30 @@ julia> add!(dh, :v, 1,ipc);
 
 julia> close!(dh);;
 
-julia> K = create_sparsity_pattern(dh, topology = topology, cross_element_full_coupling = true)
-13×13 SparseMatrixCSC{Float64, Int64} with 137 stored entries:
+julia> K = create_sparsity_pattern(dh, topology = topology)
+13×13 SparseMatrixCSC{Float64, Int64} with 109 stored entries:
+ 0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0   ⋅    ⋅    ⋅    ⋅    ⋅
+ 0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0   ⋅    ⋅    ⋅    ⋅    ⋅
+ 0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0   ⋅    ⋅    ⋅    ⋅    ⋅
+ 0.0  0.0  0.0  0.0  0.0   ⋅    ⋅    ⋅    ⋅    ⋅    ⋅    ⋅    ⋅ 
  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0   ⋅    ⋅    ⋅    ⋅
- 0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0   ⋅    ⋅    ⋅    ⋅
- 0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0   ⋅    ⋅    ⋅    ⋅
- 0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0   ⋅    ⋅    ⋅    ⋅
- 0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
- 0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
- 0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
- 0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
- 0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0   ⋅   0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0   ⋅
+ 0.0  0.0  0.0   ⋅   0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0   ⋅
+ 0.0  0.0  0.0   ⋅   0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0   ⋅
   ⋅    ⋅    ⋅    ⋅   0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
-  ⋅    ⋅    ⋅    ⋅   0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
-  ⋅    ⋅    ⋅    ⋅   0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
-  ⋅    ⋅    ⋅    ⋅   0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+  ⋅    ⋅    ⋅    ⋅    ⋅   0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+  ⋅    ⋅    ⋅    ⋅    ⋅   0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+  ⋅    ⋅    ⋅    ⋅    ⋅   0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+  ⋅    ⋅    ⋅    ⋅    ⋅    ⋅    ⋅    ⋅   0.0  0.0  0.0  0.0  0.0
 ```
 """
 function create_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing,
-    topology::Union{Nothing, AbstractTopology} = nothing, cross_element_full_coupling::Bool = true)
-    return _create_sparsity_pattern(dh, nothing, false, true, coupling; topology, cross_element_full_coupling)
+    topology::Union{Nothing, AbstractTopology} = nothing)
+    return _create_sparsity_pattern(dh, nothing, false, true, coupling; topology)
 end
 
 """
-    create_symmetric_sparsity_pattern(dh::DofHandler; coupling, topology::Union{Nothing, AbstractTopology} = nothing, cross_element_full_coupling::Bool = true)
+    create_symmetric_sparsity_pattern(dh::DofHandler; coupling, topology::Union{Nothing, AbstractTopology} = nothing)
 
 Create the symmetric sparsity pattern corresponding to the degree of freedom
 numbering in the [`DofHandler`](@ref) by only considering the upper
@@ -64,32 +64,30 @@ triangle of the matrix. Return a `Symmetric{SparseMatrixCSC}`.
 See the [Sparsity Pattern](@ref) section of the manual.
 """
 function create_symmetric_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing,
-    topology::Union{Nothing, AbstractTopology} = nothing, cross_element_full_coupling::Bool = true)
-    return Symmetric(_create_sparsity_pattern(dh, nothing, true, true, coupling; topology, cross_element_full_coupling), :U)
+    topology::Union{Nothing, AbstractTopology} = nothing)
+    return Symmetric(_create_sparsity_pattern(dh, nothing, true, true, coupling; topology), :U)
 end
 
 """
-    create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler, coupling, topology::Union{Nothing, AbstractTopology} = nothing, cross_element_full_coupling::Bool = true)
+    create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler, coupling, topology::Union{Nothing, AbstractTopology} = nothing)
 
 Create a symmetric sparsity pattern accounting for affine constraints in `ch`. See
 the Affine Constraints section of the manual for further details.
 """
 function create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
-        keep_constrained::Bool=true, coupling=nothing, topology::Union{Nothing, AbstractTopology} = nothing,
-        cross_element_full_coupling::Bool = true)
-    return Symmetric(_create_sparsity_pattern(dh, ch, true, keep_constrained, coupling; topology, cross_element_full_coupling), :U)
+        keep_constrained::Bool=true, coupling=nothing, topology::Union{Nothing, AbstractTopology} = nothing)
+    return Symmetric(_create_sparsity_pattern(dh, ch, true, keep_constrained, coupling; topology), :U)
 end
 
 """
-    create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling, topology::Union{Nothing, AbstractTopology} = nothing, cross_element_full_coupling::Bool = true)
+    create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling, topology::Union{Nothing, AbstractTopology} = nothing)
 
 Create a sparsity pattern accounting for affine constraints in `ch`. See
 the Affine Constraints section of the manual for further details.
 """
 function create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
-        keep_constrained::Bool=true, coupling=nothing, topology::Union{Nothing, AbstractTopology} = nothing,
-        cross_element_full_coupling::Bool = true)
-    return _create_sparsity_pattern(dh, ch, false, keep_constrained, coupling; topology, cross_element_full_coupling)
+        keep_constrained::Bool=true, coupling=nothing, topology::Union{Nothing, AbstractTopology} = nothing)
+    return _create_sparsity_pattern(dh, ch, false, keep_constrained, coupling; topology)
 end
 
 # Compute a coupling matrix of size (ndofs_per_cell × ndofs_per_cell) based on the input
@@ -137,15 +135,13 @@ function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatri
 end
 
 function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool, keep_constrained::Bool, coupling::Union{AbstractMatrix{Bool},Nothing};
-    topology::Union{Nothing, AbstractTopology} = nothing, cross_element_full_coupling::Bool = true)
+    topology::Union{Nothing, AbstractTopology} = nothing)
     @assert isclosed(dh)
     if !keep_constrained
         @assert ch !== nothing && isclosed(ch)
     end
-    if coupling !== nothing
-        # Extend coupling to be of size (ndofs_per_cell × ndofs_per_cell)
-        couplings = _coupling_to_local_dof_coupling(dh, coupling, sym)
-    end
+
+    couplings = isnothing(coupling) ? nothing : _coupling_to_local_dof_coupling(dh, coupling, sym)
 
     # Allocate buffers. Compute an upper bound for the buffer length and allocate it all up
     # front since they will become large and expensive to re-allocate. The bound is exact
@@ -170,7 +166,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     dg_cnt = 0
     if uses_dg
         isnothing(topology) && (topology = ExclusiveTopology(dh.grid))
-        dg_cnt = cross_element_coupling_count(dh,topology,cross_element_full_coupling)        
+        dg_cnt = cross_element_coupling_count(dh,topology, sym, keep_constrained, couplings)        
     end
     max_buffer_length += dg_cnt
     I = Vector{Int}(undef, max_buffer_length)
@@ -199,7 +195,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
         end
     end
     if uses_dg
-        I[cnt+1:cnt+dg_cnt],J[cnt+1:cnt+dg_cnt] = cross_element_coupling(dh,topology,cross_element_full_coupling,max_buffer_length = dg_cnt)
+        I[cnt+1:cnt+dg_cnt],J[cnt+1:cnt+dg_cnt] = cross_element_coupling(dh,topology,sym, keep_constrained, couplings, max_buffer_length = dg_cnt)
         cnt += dg_cnt
     end
     # Always add diagonal entries
@@ -288,33 +284,40 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
     return nothing
 end
 
-for (func,                              pre_f,                                                                                      inner_f,                                                                                                                                                                    return_values) in (
-    (:cross_element_coupling_count,     :(max_buffer_length = 0;),                                                                  :(max_buffer_length += coupling_length),                                                                                                                                    :(max_buffer_length)),
-    (:cross_element_coupling,           :(I = Vector{Int}(undef, max_buffer_length); J = Vector{Int}(undef, max_buffer_length)),    :(I[cnt+1:cnt+coupling_length] = repeat(cell_dofs,length(neighbour_unique_dofs)); J[cnt+1:cnt+coupling_length] = repeat(neighbour_unique_dofs,inner=length(cell_dofs))),    :(I, J)),
+for (func,                              pre_f,                                                                                      inner_f,                                return_values) in (
+    (:cross_element_coupling_count,     :(nothing),                                                                                 :(nothing),                             :(cnt)),
+    (:cross_element_coupling,           :(I = Vector{Int}(undef, max_buffer_length); J = Vector{Int}(undef, max_buffer_length)),    :(I[cnt] = dofi; J[cnt] = dofj;),       :(I, J)),
 )
     @eval begin
-        function $(func)(dh::AbstractDofHandler, topology::ExclusiveTopology, full_cross_element::Bool; max_buffer_length::Int = 0)
+        function $(func)(dh::AbstractDofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing} ; max_buffer_length::Int = 0)
             $(pre_f)
             element_dof_start = 0
             cnt = 0
             for (fhi, fh) in pairs(dh.fieldhandlers)
-                
+                isnothing(couplings) || (coupling_fh = couplings[fhi])
                 for fi in fh.field_interpolations
-                    if(!(typeof(fi)<:DiscontinuousLagrange) && !full_cross_element)
+                    if(! (typeof(fi)<:DiscontinuousLagrange))
                         element_dof_start += getnbasefunctions(fi)
                         continue
                     end
+                    cont_fi =  get_continuous_interpolation(fi)
                     for cell_idx in BitSet(fh.cellset)
                         current_face_neighborhood = getdim(dh.grid.cells[cell_idx]) >1 ? topology.face_neighbor[cell_idx,:] : topology.vertex_neighbor[cell_idx,:]
                         shared_faces_idx = findall(!isempty,current_face_neighborhood)
                         for face_idx in shared_faces_idx
                             for neighbor_face in current_face_neighborhood[face_idx]
-                                cell_dofs =  full_cross_element ? celldofs(dh,cell_idx)[element_dof_start + 1 : element_dof_start + getnbasefunctions(fi)] : celldofs(dh,cell_idx)[element_dof_start.+collect(facedof_indices(get_continuous_interpolation(fi))[face_idx])] 
-                                neighbour_dofs = celldofs(dh,neighbor_face[1])
+                                cell_dofs = celldofs(dh,cell_idx)[element_dof_start + 1 : element_dof_start + getnbasefunctions(fi)]
+                                neighbour_dofs = celldofs(dh,neighbor_face[1])[element_dof_start + 1 : element_dof_start + getnbasefunctions(fi)]
                                 neighbour_unique_dofs = neighbour_dofs[.!(neighbour_dofs .∈ Ref(celldofs(dh,cell_idx)))]
-                                coupling_length = length(cell_dofs)*length(neighbour_unique_dofs)
-                                $(inner_f)
-                                cnt+=coupling_length
+                                for j in eachindex(neighbour_unique_dofs), i in eachindex(cell_dofs)
+                                    isnothing(couplings) || coupling_fh[i,j] || continue
+                                    dofi = cell_dofs[i]
+                                    dofj = neighbour_unique_dofs[j]
+                                    sym && (dofi > dofj && continue)
+                                    !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
+                                    cnt += 1
+                                    $(inner_f)
+                                end
                             end
                         end
                     end
