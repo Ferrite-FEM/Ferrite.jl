@@ -66,8 +66,8 @@ end
 function _mass_qr(::Lagrange{dim, shape, order}) where {dim, shape, order}
     return QuadratureRule{dim,shape}(order + 1)
 end
-function _mass_qr(::Lagrange{dim, shape<:Union{RefTriangle, RefTetrahedron}, 2}) where {dim, shape}
-    return QuadratureRule{dim,RefTetrahedron}(4)
+function _mass_qr(::Lagrange{dim, shape, 2}) where {dim, shape <: Union{RefTriangle, RefTetrahedron}}
+    return QuadratureRule{dim,shape}(4)
 end
 _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
