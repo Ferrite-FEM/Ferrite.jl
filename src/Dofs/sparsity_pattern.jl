@@ -300,10 +300,10 @@ for (func,                              pre_f,                                  
             for (fhi, fh) in pairs(dh.fieldhandlers)
                 
                 for fi in fh.field_interpolations
-                    # if(!(typeof(fi)<:DiscontinuousLagrange))
-                    #     element_dof_start += getnbasefunctions(fi)
-                    #     continue
-                    # end
+                    if(!(typeof(fi)<:DiscontinuousLagrange))
+                        # element_dof_start += getnbasefunctions(fi)
+                        continue
+                    end
                     for cell_idx in BitSet(fh.cellset)
                         current_face_neighborhood = getdim(dh.grid.cells[cell_idx]) >1 ? topology.face_neighbor[cell_idx,:] : topology.vertex_neighbor[cell_idx,:]
                         shared_faces_idx = findall(!isempty,current_face_neighborhood)
