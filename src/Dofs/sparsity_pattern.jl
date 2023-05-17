@@ -300,8 +300,8 @@ for (func,                              pre_f,                                  
             for (fhi, fh) in pairs(dh.fieldhandlers)
                 
                 for fi in fh.field_interpolations
-                    if(!(typeof(fi)<:DiscontinuousLagrange))
-                        # element_dof_start += getnbasefunctions(fi)
+                    if(!(typeof(fi)<:DiscontinuousLagrange) && !full_cross_element)
+                        element_dof_start += getnbasefunctions(fi)
                         continue
                     end
                     for cell_idx in BitSet(fh.cellset)
