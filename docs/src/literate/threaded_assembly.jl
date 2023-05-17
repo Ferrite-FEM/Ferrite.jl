@@ -179,7 +179,7 @@ end;
 function run_assemble()
     n = 20
     grid, colors = create_colored_cantilever_grid(Hexahedron, n);
-    ip = Lagrange{3,RefCube,1}()^3
+    ip = Lagrange{3,RefHexahedron,1}()^3
     dh = create_dofhandler(grid, ip);
 
     K = create_sparsity_pattern(dh);

@@ -1,13 +1,13 @@
 @testset "FaceValues" begin
 for (scalar_interpol, quad_rule) in (
-                                    (Lagrange{1, RefCube, 1}(), QuadratureRule{0, RefCube}(2)),
-                                    (Lagrange{1, RefCube, 2}(), QuadratureRule{0, RefCube}(2)),
-                                    (Lagrange{2, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
-                                    (Lagrange{2, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
-                                    (Lagrange{2, RefTetrahedron, 1}(), QuadratureRule{1, RefTetrahedron}(2)),
-                                    (Lagrange{2, RefTetrahedron, 2}(), QuadratureRule{1, RefTetrahedron}(2)),
-                                    (Lagrange{3, RefCube, 1}(), QuadratureRule{2, RefCube}(2)),
-                                    (Serendipity{2, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
+                                    (Lagrange{1, RefLine, 1}(), QuadratureRule{0, RefLine}(2)),
+                                    (Lagrange{1, RefLine, 2}(), QuadratureRule{0, RefLine}(2)),
+                                    (Lagrange{2, RefQuadrilateral, 1}(), QuadratureRule{1, RefQuadrilateral}(2)),
+                                    (Lagrange{2, RefQuadrilateral, 2}(), QuadratureRule{1, RefQuadrilateral}(2)),
+                                    (Lagrange{2, RefTriangle, 1}(), QuadratureRule{1, RefTriangle}(2)),
+                                    (Lagrange{2, RefTriangle, 2}(), QuadratureRule{1, RefTriangle}(2)),
+                                    (Lagrange{3, RefHexahedron, 1}(), QuadratureRule{2, RefHexahedron}(2)),
+                                    (Serendipity{2, RefQuadrilateral, 2}(), QuadratureRule{1, RefQuadrilateral}(2)),
                                     (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2)),
                                     (Lagrange{3, RefTetrahedron, 2}(), QuadratureRule{2, RefTetrahedron}(2)),
                                    )

@@ -227,10 +227,10 @@ end
 # the boundary when assembling the constraint matrix ``\underline{\underline{C}}``.
 
 function setup_fevalues(ipu, ipp, ipg)
-    qr = QuadratureRule{2,RefTetrahedron}(2)
+    qr = QuadratureRule{2,RefTriangle}(2)
     cvu = CellValues(qr, ipu, ipg)
     cvp = CellValues(qr, ipp, ipg)
-    qr_face = QuadratureRule{1,RefTetrahedron}(2)
+    qr_face = QuadratureRule{1,RefTriangle}(2)
     fvp = FaceValues(qr_face, ipp, ipg)
     return cvu, cvp, fvp
 end
@@ -485,12 +485,12 @@ function main()
     h = 0.05 # approximate element size
     grid = setup_grid(h)
     ## Interpolations
-    ipu = Lagrange{2,RefTetrahedron,2}() ^ 2 # quadratic
-    ipp = Lagrange{2,RefTetrahedron,1}()     # linear
+    ipu = Lagrange{2,RefTriangle,2}() ^ 2 # quadratic
+    ipp = Lagrange{2,RefTriangle,1}()     # linear
     ## Dofs
     dh = setup_dofs(grid, ipu, ipp)
     ## FE values
-    ipg = Lagrange{2,RefTetrahedron,1}() # linear geometric interpolation
+    ipg = Lagrange{2,RefTriangle,1}() # linear geometric interpolation
     cvu, cvp, fvp = setup_fevalues(ipu, ipp, ipg)
     ## Boundary conditions
     ch = setup_constraints(dh, fvp)

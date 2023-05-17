@@ -1,18 +1,18 @@
 @testset "CellValues" begin
 for (scalar_interpol, quad_rule) in  (
-                                    (Lagrange{1, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
-                                    (Lagrange{1, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
-                                    (Lagrange{2, RefCube, 1}(), QuadratureRule{2, RefCube}(2)),
-                                    (Lagrange{2, RefCube, 2}(), QuadratureRule{2, RefCube}(2)),
-                                    (Lagrange{2, RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2)),
-                                    (Lagrange{2, RefTetrahedron, 2}(), QuadratureRule{2, RefTetrahedron}(2)),
-                                    (Lagrange{2, RefTetrahedron, 3}(), QuadratureRule{2, RefTetrahedron}(2)),
-                                    (Lagrange{2, RefTetrahedron, 4}(), QuadratureRule{2, RefTetrahedron}(2)),
-                                    (Lagrange{2, RefTetrahedron, 5}(), QuadratureRule{2, RefTetrahedron}(2)),
-                                    (Lagrange{3, RefCube, 1}(), QuadratureRule{3, RefCube}(2)),
-                                    (Serendipity{2, RefCube, 2}(), QuadratureRule{2, RefCube}(2)),
-                                    (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{3, RefTetrahedron}(2)),
-                                    (Lagrange{3, RefTetrahedron, 2}(), QuadratureRule{3, RefTetrahedron}(2))
+                                    (Lagrange{RefLine, 1}(), QuadratureRule{RefLine}(2)),
+                                    (Lagrange{RefLine, 2}(), QuadratureRule{RefLine}(2)),
+                                    (Lagrange{RefQuadrilateral, 1}(), QuadratureRule{RefQuadrilateral}(2)),
+                                    (Lagrange{RefQuadrilateral, 2}(), QuadratureRule{RefQuadrilateral}(2)),
+                                    (Lagrange{RefTriangle, 1}(), QuadratureRule{RefTriangle}(2)),
+                                    (Lagrange{RefTriangle, 2}(), QuadratureRule{RefTriangle}(2)),
+                                    (Lagrange{RefTriangle, 3}(), QuadratureRule{RefTriangle}(2)),
+                                    (Lagrange{RefTriangle, 4}(), QuadratureRule{RefTriangle}(2)),
+                                    (Lagrange{RefTriangle, 5}(), QuadratureRule{RefTriangle}(2)),
+                                    (Lagrange{RefHexahedron, 1}(), QuadratureRule{RefHexahedron}(2)),
+                                    (Serendipity{RefQuadrilateral, 2}(), QuadratureRule{RefQuadrilateral}(2)),
+                                    (Lagrange{RefTriangle, 1}(), QuadratureRule{RefTriangle}(2)),
+                                    (Lagrange{RefTetrahedron, 2}(), QuadratureRule{RefTetrahedron}(2))
                                    )
 
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
@@ -104,17 +104,17 @@ end
     dim = 1
     deg = 1
     grid = generate_grid(Line, (2,))
-    ip_fe = Lagrange{dim, RefCube, deg}()
+    ip_fe = Lagrange{dim, RefLine, deg}()
     dh = DofHandler(grid)
     add!(dh, :u, ip_fe)
     close!(dh);
     cell = first(CellIterator(dh))
-    ip_geo = Lagrange{dim, RefCube, 2}()
-    qr = QuadratureRule{dim, RefCube}(deg+1)
+    ip_geo = Lagrange{dim, RefLine, 2}()
+    qr = QuadratureRule{dim, RefLine}(deg+1)
     cv = CellValues(qr, ip_fe, ip_geo)
     res = @test_throws ArgumentError reinit!(cv, cell)
     @test occursin("265", res.value.msg)
-    ip_geo = Lagrange{dim, RefCube, 1}()
+    ip_geo = Lagrange{dim, RefLine, 1}()
     cv = CellValues(qr, ip_fe, ip_geo)
     reinit!(cv, cell)
 end
@@ -122,9 +122,9 @@ end
 @testset "error paths in function_* and reinit!" begin
     dim = 2
     qp = 1
-    ip = Lagrange{dim,RefTetrahedron,1}()
-    qr = QuadratureRule{dim,RefTetrahedron}(1)
-    qr_f = QuadratureRule{1,RefTetrahedron}(1)
+    ip = Lagrange{RefTriangle,1}()
+    qr = QuadratureRule{RefTriangle}(1)
+    qr_f = QuadratureRule{dim-1, RefTriangle}(1)
     csv = CellValues(qr, ip)
     cvv = CellValues(qr, VectorizedInterpolation(ip))
     fsv = FaceValues(qr_f, ip)

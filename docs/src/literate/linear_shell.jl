@@ -26,9 +26,9 @@ grid = generate_shell_grid(nels, size)
 # We also create two quadrature rules for the in-plane and out-of-plane directions. Note that we use 
 # under integration for the inplane integration, to avoid shear locking. 
 #+
-ip = Lagrange{2,RefCube,1}()
-qr_inplane = QuadratureRule{2,RefCube}(1)
-qr_ooplane = QuadratureRule{1,RefCube}(2)
+ip = Lagrange{2,RefQuadrilateral,1}()
+qr_inplane = QuadratureRule{2,RefQuadrilateral}(1)
+qr_ooplane = QuadratureRule{1,RefLine}(2)
 cv = CellValues(qr_inplane, ip)
 
 # Next we distribute displacement dofs,`:u = (x,y,z)` and rotational dofs, `:θ = (θ₁,  θ₂)`.

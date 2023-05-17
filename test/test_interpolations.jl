@@ -1,38 +1,38 @@
 @testset "interpolations" begin
 
 @testset "$interpolation" for interpolation in (
-                      Lagrange{1, RefCube, 1}(),
-                      Lagrange{1, RefCube, 2}(),
-                      Lagrange{2, RefCube, 1}(),
-                      Lagrange{2, RefCube, 2}(),
-                      Lagrange{2, RefTetrahedron, 1}(),
-                      Lagrange{2, RefTetrahedron, 2}(),
-                      Lagrange{2, RefTetrahedron, 3}(),
-                      Lagrange{2, RefTetrahedron, 4}(),
-                      Lagrange{2, RefTetrahedron, 5}(),
-                      Lagrange{3, RefCube, 1}(),
-                      Lagrange{3, RefCube, 2}(),
-                      Serendipity{2, RefCube, 2}(),
-                      Serendipity{3, RefCube, 2}(),
+                      Lagrange{1, RefLine, 1}(),
+                      Lagrange{1, RefLine, 2}(),
+                      Lagrange{2, RefQuadrilateral, 1}(),
+                      Lagrange{2, RefQuadrilateral, 2}(),
+                      Lagrange{2, RefTriangle, 1}(),
+                      Lagrange{2, RefTriangle, 2}(),
+                      Lagrange{2, RefTriangle, 3}(),
+                      Lagrange{2, RefTriangle, 4}(),
+                      Lagrange{2, RefTriangle, 5}(),
+                      Lagrange{3, RefHexahedron, 1}(),
+                      Lagrange{3, RefHexahedron, 2}(),
+                      Serendipity{2, RefQuadrilateral, 2}(),
+                      Serendipity{3, RefHexahedron, 2}(),
                       Lagrange{3, RefTetrahedron, 1}(),
                       Lagrange{3, RefTetrahedron, 2}(),
                       Lagrange{3, RefPrism, 1}(),
                       Lagrange{3, RefPrism, 2}(),
                       #
-                      DiscontinuousLagrange{1, RefCube, 0}(),
-                      DiscontinuousLagrange{2, RefCube, 0}(),
-                      DiscontinuousLagrange{3, RefCube, 0}(),
-                      DiscontinuousLagrange{2, RefTetrahedron, 0}(),
+                      DiscontinuousLagrange{1, RefLine, 0}(),
+                      DiscontinuousLagrange{2, RefQuadrilateral, 0}(),
+                      DiscontinuousLagrange{3, RefHexahedron, 0}(),
+                      DiscontinuousLagrange{2, RefTriangle, 0}(),
                       DiscontinuousLagrange{3, RefTetrahedron, 0}(),
-                      DiscontinuousLagrange{1, RefCube, 1}(),
-                      DiscontinuousLagrange{2, RefCube, 1}(),
-                      DiscontinuousLagrange{3, RefCube, 1}(),
-                      DiscontinuousLagrange{2, RefTetrahedron, 1}(),
+                      DiscontinuousLagrange{1, RefLine, 1}(),
+                      DiscontinuousLagrange{2, RefQuadrilateral, 1}(),
+                      DiscontinuousLagrange{3, RefHexahedron, 1}(),
+                      DiscontinuousLagrange{2, RefTriangle, 1}(),
                       DiscontinuousLagrange{3, RefTetrahedron, 1}(),
                       #
-                      BubbleEnrichedLagrange{2,RefTetrahedron,1}(),
+                      BubbleEnrichedLagrange{2, RefTriangle, 1}(),
                       #
-                      CrouzeixRaviart{2,1}(),
+                      CrouzeixRaviart{2, RefTriangle, 1}(),
     )
 
     # Test of utility functions
@@ -42,7 +42,6 @@
     @test typeof(interpolation) <: Interpolation{ref_dim,ref_shape,func_order}
 
     # Note that not every element formulation exists for every order and dimension.
-    applicable(Ferrite.getlowerdim, interpolation) && @test typeof(Ferrite.getlowerdim(interpolation)) <: Interpolation{ref_dim-1}
     applicable(Ferrite.getlowerorder, interpolation) && @test typeof(Ferrite.getlowerorder(interpolation)) <: Interpolation{ref_dim,ref_shape,func_order-1}
 
     # Check partition of unity at random point.
@@ -157,9 +156,9 @@
           getnbasefunctions(interpolation) * 2
 end
 
-@test Ferrite.reference_coordinates(DiscontinuousLagrange{2,RefTetrahedron,0}()) ≈ [Vec{2,Float64}((1/3,1/3))]
-@test Ferrite.reference_coordinates(DiscontinuousLagrange{2,RefCube,0}()) ≈ [Vec{2,Float64}((0,0))]
+@test Ferrite.reference_coordinates(DiscontinuousLagrange{2,RefTriangle,0}()) ≈ [Vec{2,Float64}((1/3,1/3))]
+@test Ferrite.reference_coordinates(DiscontinuousLagrange{2,RefQuadrilateral,0}()) ≈ [Vec{2,Float64}((0,0))]
 @test Ferrite.reference_coordinates(DiscontinuousLagrange{3,RefTetrahedron,0}()) ≈ [Vec{3,Float64}((1/4,1/4,1/4))]
-@test Ferrite.reference_coordinates(DiscontinuousLagrange{3,RefCube,0}()) ≈ [Vec{3,Float64}((0,0,0))]
+@test Ferrite.reference_coordinates(DiscontinuousLagrange{3,RefHexahedron,0}()) ≈ [Vec{3,Float64}((0,0,0))]
 
 end
