@@ -102,7 +102,7 @@ end
 
 # Generate Gauss quadrature rules on cubes by doing an outer product
 # over all dimensions
-for (dim, shape) in ((1, RefLine), (2, RefQuadrilateral), (3, RefHexahedron))
+for (dim, shape) in ((1, RefLine), (2, RefQuadrilateral), (3, RefHexahedron), (1, RefQuadrilateral), (2, RefHexahedron))
     @eval begin
         function (::Type{QuadratureRule{$dim,$shape}})(quad_type::Symbol, order::Int)
             if quad_type == :legendre

@@ -201,17 +201,17 @@ struct Hexahedron             <: AbstractCell{3, RefHexahedron}    nodes::NTuple
 struct QuadraticHexahedron    <: AbstractCell{3, RefHexahedron}    nodes::NTuple{27, Int} end
 struct Wedge                  <: AbstractCell{3, RefPrism}         nodes::NTuple{ 6, Int} end
 
-default_interpolation(::Type{Line})                   = Lagrange{1, RefCube,        1}()
-default_interpolation(::Type{QuadraticLine})          = Lagrange{1, RefCube,        2}()
-default_interpolation(::Type{Triangle})               = Lagrange{2, RefTetrahedron, 1}()
-default_interpolation(::Type{QuadraticTriangle})      = Lagrange{2, RefTetrahedron, 2}()
-default_interpolation(::Type{Quadrilateral})          = Lagrange{2, RefCube,        1}()
-default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2, RefCube,        2}()
-default_interpolation(::Type{Tetrahedron})            = Lagrange{3, RefTetrahedron, 1}()
-default_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{3, RefTetrahedron, 2}()
-default_interpolation(::Type{Hexahedron})             = Lagrange{3, RefCube,        1}()
-default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{3, RefCube,        2}()
-default_interpolation(::Type{Wedge})                  = Lagrange{3, RefPrism,       1}()
+default_interpolation(::Type{Line})                   = Lagrange{1, RefLine,          1}()
+default_interpolation(::Type{QuadraticLine})          = Lagrange{1, RefLine,          2}()
+default_interpolation(::Type{Triangle})               = Lagrange{2, RefTriangle,      1}()
+default_interpolation(::Type{QuadraticTriangle})      = Lagrange{2, RefTriangle,      2}()
+default_interpolation(::Type{Quadrilateral})          = Lagrange{2, RefQuadrilateral, 1}()
+default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2, RefQuadrilateral, 2}()
+default_interpolation(::Type{Tetrahedron})            = Lagrange{3, RefTetrahedron,   1}()
+default_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{3, RefTetrahedron,   2}()
+default_interpolation(::Type{Hexahedron})             = Lagrange{3, RefHexahedron,    1}()
+default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{3, RefHexahedron,    2}()
+default_interpolation(::Type{Wedge})                  = Lagrange{3, RefPrism,         1}()
 
 # TODO: Remove this, used for Quadrilateral3D
 edges(c::Quadrilateral#=3D=#) = faces(c)
@@ -220,8 +220,8 @@ edges(c::Quadrilateral#=3D=#) = faces(c)
 struct SerendipityQuadraticQuadrilateral <: AbstractCell{2, RefQuadrilateral} nodes::NTuple{ 8, Int} end
 struct SerendipityQuadraticHexahedron    <: AbstractCell{3, RefHexahedron}    nodes::NTuple{20, Int} end
 
-default_interpolation(::Type{SerendipityQuadraticQuadrilateral}) = Serendipity{2, RefCube, 2}()
-default_interpolation(::Type{SerendipityQuadraticHexahedron})    = Serendipity{3, RefCube, 2}()
+default_interpolation(::Type{SerendipityQuadraticQuadrilateral}) = Serendipity{2, RefQuadrilateral, 2}()
+default_interpolation(::Type{SerendipityQuadraticHexahedron})    = Serendipity{3, RefHexahedron,    2}()
 
 
 ############

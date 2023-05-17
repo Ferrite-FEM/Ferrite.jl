@@ -1029,6 +1029,11 @@ end
 ###############
 struct Serendipity{dim,shape,order} <: ScalarInterpolation{dim,shape,order} end
 
+# Allow Serendipity{refshape, order}() as shorthand for Serendipity{refdim, refshape, order}()
+function (::Type{DL})() where {dim, shape <: AbstractRefShape{dim}, order, DL <: Serendipity{shape, order}}
+    return Serendipity{dim, shape, order}()
+end
+
 # Vertices for all Serendipity interpolations are the same
 vertexdof_indices(::Serendipity{2,RefQuadrilateral}) = ((1,),(2,),(3,),(4,))
 vertexdof_indices(::Serendipity{3,RefHexahedron}) = ((1,),(2,),(3,),(4,),(5,),(6,),(7,),(8,))
