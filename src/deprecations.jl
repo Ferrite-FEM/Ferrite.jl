@@ -119,11 +119,11 @@ for VT in (
 
     Upgrade as follows:
      - Scalar fields: Replace usage of
-           $(str)(quad_rule, interpolation)
+           $(str_scalar)(quad_rule, interpolation)
        with
            $(str_new)(quad_rule, interpolation)
      - Vector fields: Replace usage of
-           $(str)(quad_rule, interpolation)
+           $(str_vector)(quad_rule, interpolation)
        with
            $(str_new)(quad_rule, interpolation^dim)
        where `dim` is the dimension to vectorize to.
