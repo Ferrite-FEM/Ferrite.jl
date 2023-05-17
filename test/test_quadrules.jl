@@ -10,37 +10,37 @@
         return I
     end
 
-    # Cube
-    for dim = (1,2,3)
+    # Hypercube
+    for (dim, shape) = ((1, RefLine), (2, RefQuadrilateral), (3, RefHexahedron))
         for order in (1,2,3,4)
             f = (x, p) -> sum([x[i]^p for i in 1:length(x)])
             # Legendre
-            qr = QuadratureRule{dim, RefCube}(:legendre, order)
+            qr = QuadratureRule{dim, shape}(:legendre, order)
             @test integrate(qr, (x) -> f(x, 2*order-1)) < 1e-14
             @test sum(qr.weights) ≈ ref_square_vol(dim)
             @test sum(getweights(qr)) ≈ ref_square_vol(dim)
             # Lobatto
             if order > 1
-                qr = QuadratureRule{dim, RefCube}(:lobatto, order)
+                qr = QuadratureRule{dim, shape}(:lobatto, order)
                 @test integrate(qr, (x) -> f(x, 2*order-1)) < 1e-14
                 @test sum(qr.weights) ≈ ref_square_vol(dim)
                 @test sum(getweights(qr)) ≈ ref_square_vol(dim)
             end
         end
     end
-    @test_throws ArgumentError QuadratureRule{1, RefCube}(:einstein, 2)
+    @test_throws ArgumentError QuadratureRule{1, RefLine}(:einstein, 2)
 
     # Tetrahedron
     g = (x) -> sqrt(sum(x))
     dim = 2
     for order in 1:15
-        qr = QuadratureRule{dim, RefTetrahedron}(:legendre, order)
+        qr = QuadratureRule{dim, RefTriangle}(:legendre, order)
         # http://www.wolframalpha.com/input/?i=integrate+sqrt(x%2By)+from+x+%3D+0+to+1,+y+%3D+0+to+1-x
         @test integrate(qr, g) - 0.4 < 0.01
         @test sum(qr.weights) ≈ ref_tet_vol(dim)
     end
-    @test_throws ArgumentError QuadratureRule{dim, RefTetrahedron}(:einstein, 2)
-    @test_throws ArgumentError QuadratureRule{dim, RefTetrahedron}(0)
+    @test_throws ArgumentError QuadratureRule{dim, RefTriangle}(:einstein, 2)
+    @test_throws ArgumentError QuadratureRule{dim, RefTriangle}(0)
 
     dim = 3
     for order in (1, 2, 3, 4)

@@ -347,8 +347,8 @@ function solve(interpolation_u, interpolation_p)
 end;
 
 # We can now test the solution using the Taylor-Hood approximation
-quadratic_u = Lagrange{3, RefTetrahedron, 2}()^3
-linear_p = Lagrange{3, RefTetrahedron, 1}()
+quadratic_u = Lagrange{RefTetrahedron, 2}()^3
+linear_p = Lagrange{RefTetrahedron, 1}()
 vol_def = solve(quadratic_u, linear_p)
 
 # The deformed volume is indeed close to 1 (as should be for a nearly incompressible material).

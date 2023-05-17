@@ -50,7 +50,7 @@ end
 
 function _apply_analytical!(
     a::AbstractVector, dh::AbstractDofHandler, celldofinds, field_dim,
-    ip_fun::Interpolation{dim,RefShape}, ip_geo::Interpolation, f::Function, cellset) where {dim, RefShape}
+    ip_fun::Interpolation{RefShape}, ip_geo::Interpolation, f::Function, cellset) where {dim, RefShape<:AbstractRefShape{dim}}
 
     coords = getcoordinates(dh.grid, first(cellset))
     ref_points = reference_coordinates(ip_fun)

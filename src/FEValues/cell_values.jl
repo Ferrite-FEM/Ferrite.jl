@@ -29,8 +29,8 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 """
 CellValues
 
-function default_geometric_interpolation(::Interpolation{dim,shape}) where {dim, shape}
-    return Lagrange{dim,shape,1}()
+function default_geometric_interpolation(::Interpolation{shape}) where {shape}
+    return Lagrange{shape,1}()
 end
 
 struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCellValues
@@ -52,10 +52,10 @@ function CellValues(qr::QuadratureRule, ip::Interpolation,
 end
 # TODO: This doesn't actually work for T != Float64
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
-    dim, shape, T,
+    dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{dim, shape},
-    IP  <: Union{ScalarInterpolation{dim, shape}, VectorInterpolation{dim, dim, shape}},
-    GIP <: ScalarInterpolation{dim, shape}
+    IP  <: Union{ScalarInterpolation{shape}, VectorInterpolation{dim, shape}},
+    GIP <: ScalarInterpolation{shape}
 }
     n_qpoints = length(getweights(qr))
 

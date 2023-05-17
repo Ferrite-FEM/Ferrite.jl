@@ -90,7 +90,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
 end
 
 # check if point is inside a cell based on physical coordinate
-function point_in_cell(geom_interpol::Interpolation{dim,shape,order}, cell_coordinates, global_coordinate) where {dim, shape, order}
+function point_in_cell(geom_interpol::Interpolation{shape,order}, cell_coordinates, global_coordinate) where {shape, order}
     converged, x_local = find_local_coordinate(geom_interpol, cell_coordinates, global_coordinate)
     if converged
         return _check_isoparametric_boundaries(shape, x_local), x_local
@@ -100,14 +100,14 @@ function point_in_cell(geom_interpol::Interpolation{dim,shape,order}, cell_coord
 end
 
 # check if point is inside a cell based on isoparametric coordinate
-function _check_isoparametric_boundaries(::Type{RefCube}, x_local::Vec{dim, T}) where {dim, T}
+function _check_isoparametric_boundaries(::Type{RefHypercube{dim}}, x_local::Vec{dim, T}) where {dim, T}
     tol = sqrt(eps(T))
     # All in the range [-1, 1]
     return all(x -> abs(x) - 1 < tol, x_local)
 end
 
 # check if point is inside a cell based on isoparametric coordinate
-function _check_isoparametric_boundaries(::Type{RefTetrahedron}, x_local::Vec{dim, T}) where {dim, T}
+function _check_isoparametric_boundaries(::Type{RefSimplex{dim}}, x_local::Vec{dim, T}) where {dim, T}
     tol = sqrt(eps(T))
     # Positive and below the plane 1 - ξx - ξy - ξz
     return all(x -> x > -tol, x_local) && sum(x_local) - 1 < tol

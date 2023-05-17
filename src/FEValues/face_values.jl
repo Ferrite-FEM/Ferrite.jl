@@ -56,10 +56,10 @@ function FaceValues(qr::QuadratureRule, ip::Interpolation,
 end
 # TODO: This doesn't actually work for T != Float64
 function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
-    qdim, dim, shape, T,
+    qdim, dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{qdim, shape},
-    IP  <: Union{ScalarInterpolation{dim, shape}, VectorInterpolation{dim, dim, shape}},
-    GIP <: ScalarInterpolation{dim, shape}
+    IP  <: Union{ScalarInterpolation{shape}, VectorInterpolation{dim, shape}},
+    GIP <: ScalarInterpolation{shape}
 }
     @assert dim == qdim + 1
     n_qpoints = length(getweights(qr))
@@ -168,7 +168,7 @@ end
 BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex} = Ferrite.FaceIndex) =
     BCValues(Float64, func_interpol, geom_interpol, boundary_type)
 
-function BCValues(::Type{T}, func_interpol::Interpolation{dim,refshape}, geom_interpol::Interpolation{dim,refshape}, boundary_type::Type{<:BoundaryIndex} = Ferrite.FaceIndex) where {T,dim,refshape}
+function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex} = Ferrite.FaceIndex) where {T,dim,refshape <: AbstractRefShape{dim}}
     # set up quadrature rules for each boundary entity with dof-positions
     # (determined by func_interpol) as the quadrature points
     interpolation_coords = reference_coordinates(func_interpol)
@@ -211,7 +211,7 @@ function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{
     return x
 end
 
-nfaces(fv) = size(fv.N, 3)
+nfaces(fv::FaceValues) = size(fv.N, 3)
 
 function checkface(fv::FaceValues, face::Int)
     0 < face <= nfaces(fv) || error("Face index out of range.")
