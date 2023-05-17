@@ -72,7 +72,7 @@ for (scalar_interpol, quad_rule) in (
             end
             let ip_base = func_interpol isa VectorizedInterpolation ? func_interpol.ip : func_interpol
                 x_face = xs[[Ferrite.facedof_indices(ip_base)[face]...]]
-                @test vol ≈ calculate_volume(Ferrite.getlowerdim(ip_base), x_face)
+                @test vol ≈ calculate_face_area(ip_base, x_face, face)
             end
 
             # Test quadrature rule after reinit! with ref. coords

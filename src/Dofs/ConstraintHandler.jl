@@ -1170,7 +1170,7 @@ end
 function mirror_local_dofs(_, _, ::Lagrange{1}, ::Int)
     # For 1D there is nothing to do
 end
-function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{2,<:Union{RefCube,RefTetrahedron}}, n::Int)
+function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{2,<:Union{RefQuadrilateral,RefTriangle}}, n::Int)
     # For 2D we always permute since Ferrite defines dofs counter-clockwise
     ret = collect(1:length(local_face_dofs))
     for (i, f) in enumerate(facedof_indices(ip))
@@ -1188,9 +1188,9 @@ function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange
 end
 
 # TODO: Can probably be combined with the method above.
-function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{3,<:Union{RefCube,RefTetrahedron},O}, n::Int) where O
+function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{3,<:Union{RefHexahedron,RefTetrahedron},O}, n::Int) where O
     @assert 1 <= O <= 2
-    N = ip isa Lagrange{3,RefCube} ? 4 : 3
+    N = ip isa Lagrange{3,RefHexahedron} ? 4 : 3
     ret = collect(1:length(local_face_dofs))
 
     # Mirror by changing from counter-clockwise to clockwise
@@ -1237,9 +1237,9 @@ circshift!(args...) = Base.circshift!(args...)
 function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{2}, ncomponents)
     return collect(1:length(local_face_dofs)) # TODO: Return range?
 end
-function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{3,<:Union{RefCube,RefTetrahedron}, O}, ncomponents) where O
+function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{3,<:Union{RefHexahedron,RefTetrahedron}, O}, ncomponents) where O
     @assert 1 <= O <= 2
-    N = ip isa Lagrange{3,RefCube} ? 4 : 3
+    N = ip isa Lagrange{3,RefHexahedron} ? 4 : 3
     ret = similar(local_face_dofs, length(local_face_dofs), N)
     ret[:, :] .= 1:length(local_face_dofs)
     for f in 1:length(local_face_dofs_offset)-1

@@ -100,14 +100,14 @@ function point_in_cell(geom_interpol::Interpolation{dim,shape,order}, cell_coord
 end
 
 # check if point is inside a cell based on isoparametric coordinate
-function _check_isoparametric_boundaries(::Type{RefCube}, x_local::Vec{dim, T}) where {dim, T}
+function _check_isoparametric_boundaries(::Type{<:RefHypercube}, x_local::Vec{dim, T}) where {dim, T}
     tol = sqrt(eps(T))
     # All in the range [-1, 1]
     return all(x -> abs(x) - 1 < tol, x_local)
 end
 
 # check if point is inside a cell based on isoparametric coordinate
-function _check_isoparametric_boundaries(::Type{RefTetrahedron}, x_local::Vec{dim, T}) where {dim, T}
+function _check_isoparametric_boundaries(::Type{<:Union{RefTriangle, RefTetrahedron}}, x_local::Vec{dim, T}) where {dim, T}
     tol = sqrt(eps(T))
     # Positive and below the plane 1 - ξx - ξy - ξz
     return all(x -> x > -tol, x_local) && sum(x_local) - 1 < tol

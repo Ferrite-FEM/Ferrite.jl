@@ -284,7 +284,7 @@ function test_show()
     grid = generate_grid(Triangle, (2,2))
     ip = Lagrange{2,RefTetrahedron,1}()
     proj = L2Projector(ip, grid)
-    @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{2, RefTetrahedron, 1}()\n  geometric interpolation: Lagrange{2, RefTetrahedron, 1}()\n"
+    @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{2, RefTriangle, 1}()\n  geometric interpolation: Lagrange{2, RefTriangle, 1}()\n"
 end
 
 @testset "Test L2-Projection" begin

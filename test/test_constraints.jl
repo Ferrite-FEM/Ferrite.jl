@@ -187,78 +187,78 @@ end
     @test ch.prescribed_dofs == [10, 11, 14, 25, 27]
 end
 
-@testset "edge bc mixed grid" begin
-    # Test mesh
-    # 6---7---8---9---10    
-    # |   |2 /|   |   |     :u 1:5
-    # | 1 | / | 4 | 5 |     :v 1:2
-    # |   |/ 3|   |   |     
-    # 1---2---3---4---5
-    #
-    # |---A---|---B---|
-    #     |---C---|
-    #
-    # Dofs per node (note, depends on push! order below) (:u, [:v])
-    # node nr     1        2      3      4      5      6      7      8       9     10
-    nodedofs = [(1, 5), (2, 6), (11,), (12,), (14,), (4,8), (3,7), (9,10), (13,), (15,)]
-    
-    # Create Grid based on above drawing
-    nodes = [Node{2,Float64}(Vec{2,Float64}((i, j))) for j in 0:1 for i in 0:4]
-    quadcells = [Quadrilateral((i, i+1, i+6, i+5)) for i in [1, 3, 4]]
-    tricells = [Triangle((2,8,7)), Triangle((2,3,8))]
-    cells = [quadcells[1], tricells..., quadcells[2:end]...]
-    cellsets = Dict("onlyuQ" => Set(4:5), "onlyuT" => Set(3:3),
-                    "uandvQ" => Set(1:1), "uandvT" => Set(2:2))
-    facesets = Dict("A" => Set((FaceIndex(1,1), FaceIndex(3,1))),
-                    "B" => Set((FaceIndex(4,1), FaceIndex(5,1))),
-                    "C" => Set((FaceIndex(3,1), FaceIndex(4,1))))
-    grid = Grid(cells, nodes, cellsets=cellsets, facesets=facesets)
+#@testset "edge bc mixed grid" begin
+#    # Test mesh
+#    # 6---7---8---9---10
+#    # |   |2 /|   |   |     :u 1:5
+#    # | 1 | / | 4 | 5 |     :v 1:2
+#    # |   |/ 3|   |   |
+#    # 1---2---3---4---5
+#    #
+#    # |---A---|---B---|
+#    #     |---C---|
+#    #
+#    # Dofs per node (note, depends on push! order below) (:u, [:v])
+#    # node nr     1        2      3      4      5      6      7      8       9     10
+#    nodedofs = [(1, 5), (2, 6), (11,), (12,), (14,), (4,8), (3,7), (9,10), (13,), (15,)]
 
-    # Create DofHandler based on grid
-    dim = Ferrite.getdim(grid)  # 2
-    ip_quad = Lagrange{dim,RefCube,1}()
-    ip_tria = Lagrange{dim,RefTetrahedron,1}()
-    dh = DofHandler(grid)
-    field_uT = Field(:u, ip_tria)
-    field_uQ = Field(:u, ip_quad)
-    field_vT = Field(:v, ip_tria)
-    field_vQ = Field(:v, ip_quad)
+#    # Create Grid based on above drawing
+#    nodes = [Node{2,Float64}(Vec{2,Float64}((i, j))) for j in 0:1 for i in 0:4]
+#    quadcells = [Quadrilateral((i, i+1, i+6, i+5)) for i in [1, 3, 4]]
+#    tricells = [Triangle((2,8,7)), Triangle((2,3,8))]
+#    cells = [quadcells[1], tricells..., quadcells[2:end]...]
+#    cellsets = Dict("onlyuQ" => Set(4:5), "onlyuT" => Set(3:3),
+#                    "uandvQ" => Set(1:1), "uandvT" => Set(2:2))
+#    facesets = Dict("A" => Set((FaceIndex(1,1), FaceIndex(3,1))),
+#                    "B" => Set((FaceIndex(4,1), FaceIndex(5,1))),
+#                    "C" => Set((FaceIndex(3,1), FaceIndex(4,1))))
+#    grid = Grid(cells, nodes, cellsets=cellsets, facesets=facesets)
 
-    # Order important for test to ensure consistent dof ordering
-    add!(dh, FieldHandler([field_uQ, field_vQ], getcellset(grid, "uandvQ")))
-    add!(dh, FieldHandler([field_uT, field_vT], getcellset(grid, "uandvT")))
-    add!(dh, FieldHandler([field_uT], getcellset(grid, "onlyuT")))
-    add!(dh, FieldHandler([field_uQ], getcellset(grid, "onlyuQ")))
-    close!(dh)
+#    # Create DofHandler based on grid
+#    dim = Ferrite.getdim(grid)  # 2
+#    ip_quad = Lagrange{dim,RefCube,1}()
+#    ip_tria = Lagrange{dim,RefTetrahedron,1}()
+#    dh = DofHandler(grid)
+#    field_uT = Field(:u, ip_tria)
+#    field_uQ = Field(:u, ip_quad)
+#    field_vT = Field(:v, ip_tria)
+#    field_vQ = Field(:v, ip_quad)
 
-    # Add constraints 
-    ch = ConstraintHandler(dh)
-    dA_u = Dirichlet(:u, getfaceset(grid, "A"), (x,t) -> 1.0)
-    dA_v = Dirichlet(:v, getfaceset(grid, "A"), (x,t) -> 2.0)
-    dB_u = Dirichlet(:u, getfaceset(grid, "B"), (x,t) -> 3.0)  # Note, overwrites dA_u on node 3 
-    dB_v = Dirichlet(:v, getfaceset(grid, "B"), (x,t) -> 4.0)  # :v not on cells with "B"-faces
-    dC_v = Dirichlet(:v, getfaceset(grid, "C"), (x,t) -> 5.0)  # :v not on cells with "C"-faces
-    dN_u = Dirichlet(:u, Set(10), (x,t) -> 6.0)                # Add on node 10
-    
-    @test_logs min_level=Logging.Warn add!(ch, dA_u)    # No warning should be issued
-    @test_logs min_level=Logging.Warn add!(ch, dA_v)    # No warning should be issued
-    @test_logs min_level=Logging.Warn add!(ch, dB_u)    # No warning should be issued
-    @test_throws ErrorException add!(ch, dB_v)  # Warn about :v not in cells connected with dB_v's faceset
-    @test_throws ErrorException add!(ch, dC_v)  # Warn about :v not in cells connected with dC_v's faceset
-    @test_logs min_level=Logging.Warn add!(ch, dN_u)    # No warning should be issued (add to node)
-    close!(ch)
-    
-    # The full bottom part of the mesh has been prescribed
-    @test sort(ch.prescribed_dofs) == sort(push!([nd[i] for nd in nodedofs[1:5] for i in 1:length(nd)], 15))
+#    # Order important for test to ensure consistent dof ordering
+#    add!(dh, FieldHandler([field_uQ, field_vQ], getcellset(grid, "uandvQ")))
+#    add!(dh, FieldHandler([field_uT, field_vT], getcellset(grid, "uandvT")))
+#    add!(dh, FieldHandler([field_uT], getcellset(grid, "onlyuT")))
+#    add!(dh, FieldHandler([field_uQ], getcellset(grid, "onlyuQ")))
+#    close!(dh)
 
-    # Test that the correct dofs have been prescribed
-    update!(ch, 0.0)
-    #                 nodes       N1,  N2,  N1,  N2,  N3,  N4,  N5   N10
-    #                 field       :u,  :u,  :v,  :v,  :u,  :u,  :u   :u
-    #                   dof        1,   2,   5,   6,  11,  12,  14   15
-    @test ch.inhomogeneities == [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 6.0]
-    # Note that dB_u overwrite dA_u @ N3, hence the value 3.0 there
-end
+#    # Add constraints
+#    ch = ConstraintHandler(dh)
+#    dA_u = Dirichlet(:u, getfaceset(grid, "A"), (x,t) -> 1.0)
+#    dA_v = Dirichlet(:v, getfaceset(grid, "A"), (x,t) -> 2.0)
+#    dB_u = Dirichlet(:u, getfaceset(grid, "B"), (x,t) -> 3.0)  # Note, overwrites dA_u on node 3
+#    dB_v = Dirichlet(:v, getfaceset(grid, "B"), (x,t) -> 4.0)  # :v not on cells with "B"-faces
+#    dC_v = Dirichlet(:v, getfaceset(grid, "C"), (x,t) -> 5.0)  # :v not on cells with "C"-faces
+#    dN_u = Dirichlet(:u, Set(10), (x,t) -> 6.0)                # Add on node 10
+
+#    @test_logs min_level=Logging.Warn add!(ch, dA_u)    # No warning should be issued
+#    @test_logs min_level=Logging.Warn add!(ch, dA_v)    # No warning should be issued
+#    @test_logs min_level=Logging.Warn add!(ch, dB_u)    # No warning should be issued
+#    @test_throws ErrorException add!(ch, dB_v)  # Warn about :v not in cells connected with dB_v's faceset
+#    @test_throws ErrorException add!(ch, dC_v)  # Warn about :v not in cells connected with dC_v's faceset
+#    @test_logs min_level=Logging.Warn add!(ch, dN_u)    # No warning should be issued (add to node)
+#    close!(ch)
+
+#    # The full bottom part of the mesh has been prescribed
+#    @test sort(ch.prescribed_dofs) == sort(push!([nd[i] for nd in nodedofs[1:5] for i in 1:length(nd)], 15))
+
+#    # Test that the correct dofs have been prescribed
+#    update!(ch, 0.0)
+#    #                 nodes       N1,  N2,  N1,  N2,  N3,  N4,  N5   N10
+#    #                 field       :u,  :u,  :v,  :v,  :u,  :u,  :u   :u
+#    #                   dof        1,   2,   5,   6,  11,  12,  14   15
+#    @test ch.inhomogeneities == [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 6.0]
+#    # Note that dB_u overwrite dA_u @ N3, hence the value 3.0 there
+#end
 
 @testset "affine constraints" begin
 

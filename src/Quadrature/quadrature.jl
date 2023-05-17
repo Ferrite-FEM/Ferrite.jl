@@ -32,8 +32,8 @@ or [`FaceValues`](@ref) object.
 julia> QuadratureRule{2, RefTetrahedron}(1)
 Ferrite.QuadratureRule{2,Ferrite.RefTetrahedron,Float64}([0.5], Tensors.Tensor{1,2,Float64,2}[[0.333333, 0.333333]])
 
-julia> QuadratureRule{1, RefCube}(:lobatto, 2)
-Ferrite.QuadratureRule{1,Ferrite.RefCube,Float64}([1.0, 1.0], Tensors.Tensor{1,1,Float64,1}[[-1.0], [1.0]])
+julia> QuadratureRule{1, RefLine}(:lobatto, 2)
+Ferrite.QuadratureRule{1,Ferrite.RefLine,Float64}([1.0, 1.0], Tensors.Tensor{1,1,Float64,1}[[-1.0], [1.0]])
 ```
 """
 struct QuadratureRule{dim,shape,T}
@@ -44,6 +44,11 @@ end
 function QuadratureRule{dim, shape}(weights::AbstractVector{Tw}, points::AbstractVector{Vec{dim,Tp}}) where {dim, shape, Tw, Tp}
     T = promote_type(Tw, Tp)
     QuadratureRule{dim,shape,T}(weights, points)
+end
+
+# Default dim to refdim (i.e. for cell quadrature)
+function QuadratureRule{shape}(args...) where {dim, shape <: AbstractRefShape{dim}}
+    return QuadratureRule{dim, shape}(args...)
 end
 
 Base.copy(qr::QuadratureRule) = qr # TODO: Is it ever useful to get an actual copy?
@@ -89,17 +94,17 @@ QuadratureRule{dim,shape}(order::Int) where {dim,shape} = QuadratureRule{dim,sha
 QuadratureRule{3,RefPrism}(order::Int) = QuadratureRule{3,RefPrism}(:polyquad, order) # No legendre rule available yet for prism...
 
 # Special case for face integration of 1D problems
-function (::Type{QuadratureRule{0, RefCube}})(quad_type::Symbol, order::Int)
+function (::Type{QuadratureRule{0, RefLine}})(quad_type::Symbol, order::Int)
     w = Float64[1.0]
     p = Vec{0,Float64}[]
-    return QuadratureRule{0,RefCube,Float64}(w,p)
+    return QuadratureRule{0,RefLine,Float64}(w,p)
 end
 
 # Generate Gauss quadrature rules on cubes by doing an outer product
 # over all dimensions
-for dim in (1,2,3)
+for (dim, shape) in ((1, RefLine), (2, RefQuadrilateral), (3, RefHexahedron))
     @eval begin
-        function (::Type{QuadratureRule{$dim,RefCube}})(quad_type::Symbol, order::Int)
+        function (::Type{QuadratureRule{$dim,$shape}})(quad_type::Symbol, order::Int)
             if quad_type == :legendre
                 p, w = GaussQuadrature.legendre(Float64, order)
             elseif quad_type == :lobatto
@@ -118,14 +123,14 @@ for dim in (1,2,3)
                 weights[count] = weight
                 count += 1
             end
-            return QuadratureRule{$dim,RefCube,Float64}(weights, points)
+            return QuadratureRule{$dim,$shape,Float64}(weights, points)
         end
     end
 end
 
-for dim in (2, 3)
+for (dim, shape) in ((2, RefTriangle), (3, RefTetrahedron), (2, RefTetrahedron))
     @eval begin
-        function (::Type{QuadratureRule{$dim, RefTetrahedron}})(quad_type::Symbol, order::Int)
+        function (::Type{QuadratureRule{$dim, $shape}})(quad_type::Symbol, order::Int)
             if $dim == 2 && quad_type == :legendre
                 data = _get_gauss_tridata(order)
             elseif $dim == 3 && quad_type == :legendre
@@ -140,13 +145,13 @@ for dim in (2, 3)
                 points[p] = Vec{$dim,Float64}(@ntuple $dim i -> data[p, i])
             end
             weights = data[:, $dim + 1]
-            QuadratureRule{$dim,RefTetrahedron,Float64}(weights, points)
+            QuadratureRule{$dim,$shape,Float64}(weights, points)
         end
     end
 end
 
 # Special version for face integration of triangles
-function (::Type{QuadratureRule{1,RefTetrahedron}})(quad_type::Symbol, order::Int)
+function (::Type{QuadratureRule{1,RefTriangle}})(quad_type::Symbol, order::Int)
     if quad_type == :legendre
         p, weights = GaussQuadrature.legendre(Float64,order)
     elseif quad_type == :lobatto
@@ -162,7 +167,7 @@ function (::Type{QuadratureRule{1,RefTetrahedron}})(quad_type::Symbol, order::In
     for i in 1:length(weights)
         points[i] = Vec{1,Float64}((p[i],))
     end
-    return QuadratureRule{1,RefTetrahedron,Float64}(weights, points)
+    return QuadratureRule{1,RefTriangle,Float64}(weights, points)
 end
 
 # Grab prism quadrature rule from table

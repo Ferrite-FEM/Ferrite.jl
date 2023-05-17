@@ -159,3 +159,132 @@ const _VectorValues = Union{CellValues{<:VectorInterpolation}, FaceValues{<:Vect
 @deprecate   function_gradient(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}   function_gradient(fe_v, q_point, reinterpret(T, u))
 @deprecate function_divergence(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(fe_v, q_point, reinterpret(T, u))
 @deprecate       function_curl(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}       function_curl(fe_v, q_point, reinterpret(T, u))
+
+# New reference shapes
+struct RefCube end
+export RefCube
+
+function Lagrange{D, RefCube, O}() where {D, O}
+    shape = D == 1 ? RefLine : D == 2 ? RefQuadrilateral : RefHexahedron
+    Base.depwarn("`Lagrange{$D, RefCube, $O}()` is deprecated, use `Lagrange{$(shape), $O}()` instead.", :Lagrange)
+    return Lagrange{D, shape, O}()
+end
+function Lagrange{2, RefTetrahedron, O}() where {O}
+    Base.depwarn("`Lagrange{2, RefTetrahedron, $O}()` is deprecated, use `Lagrange{RefTriangle, $O}()` instead.", :Lagrange)
+    return Lagrange{2, RefTriangle, O}()
+end
+function DiscontinuousLagrange{D, RefCube, O}() where {D, O}
+    shape = D == 1 ? RefLine : D == 2 ? RefQuadrilateral : RefHexahedron
+    Base.depwarn("`DiscontinuousLagrange{$D, RefCube, $O}()` is deprecated, use `DiscontinuousLagrange{$(shape), $O}()` instead.", :DiscontinuousLagrange)
+    return DiscontinuousLagrange{D, shape, O}()
+end
+function BubbleEnrichedLagrange{2, RefTetrahedron, O}() where {O}
+    Base.depwarn("`BubbleEnrichedLagrange{2, RefTetrahedron, $O}()` is deprecated, use `BubbleEnrichedLagrange{RefTriangle, $O}()` instead.", :BubbleEnrichedLagrange)
+    return BubbleEnrichedLagrange{2, RefTriangle, O}()
+end
+function DiscontinuousLagrange{2, RefTetrahedron, O}() where {O}
+    Base.depwarn("`DiscontinuousLagrange{2, RefTetrahedron, $O}()` is deprecated, use `DiscontinuousLagrange{RefTriangle, $O}()` instead.", :DiscontinuousLagrange)
+    return DiscontinuousLagrange{2, RefTriangle, O}()
+end
+function Serendipity{D, RefCube, O}() where {D, O}
+    shape = D == 1 ? RefLine : D == 2 ? RefQuadrilateral : RefHexahedron
+    Base.depwarn("`Serendipity{$D, RefCube, $O}()` is deprecated, use `Serendipity{$(shape), $O}()` instead.", :Serendipity)
+    return Serendipity{D, shape, O}()
+end
+function CrouzeixRaviart{2, 1}()
+    Base.depwarn("`CrouzeixRaviart{2, 1}()` is deprecated, use `CrouzeixRaviart{RefTriangle, 1}()` instead.", :CrouzeixRaviart)
+    return CrouzeixRaviart{2, RefTriangle, 1}()
+end
+
+# For the quadrature: This will be wrong for face integration, so then we warn
+# in the FaceValue constructor...
+function QuadratureRule{D, RefCube}(order::Int) where D
+    shapes = (RefLine, RefQuadrilateral, RefHexahedron)
+    msg = "`QuadratureRule{$D, RefCube}(order::Int)` is deprecated, use `QuadratureRule{$D, $(shapes[D])}(order)` instead"
+    if D == 1 || D == 2
+        msg *= " (or `QuadratureRule{$D, $(shapes[D+1])}(order)` if this is a face quadrature rule)"
+    end
+    msg *= "."
+    Base.depwarn(msg, :QuadratureRule)
+    return QuadratureRule{D, shapes[D]}(order)
+end
+function QuadratureRule{D, RefCube}(quad_type::Symbol, order::Int) where D
+    shapes = (RefLine, RefQuadrilateral, RefHexahedron)
+    msg = "`QuadratureRule{$D, RefCube}(quad_type::Symbol, order::Int)` is deprecated, use `QuadratureRule{$D, $(shapes[D])}(quad_type, order)` instead"
+    if D == 1 || D == 2
+        msg *= " (or `QuadratureRule{$D, $(shapes[D+1])}(order)` if this is a face quadrature rule)"
+    end
+    msg *= "."
+    Base.depwarn(msg, :QuadratureRule)
+    return QuadratureRule{D, shapes[D]}(quad_type, order)
+end
+
+function QuadratureRule{D, RefCube}(weights::AbstractVector{Tw}, points::AbstractVector{Vec{D,Tp}}) where {D, Tw, Tp}
+    shapes = (RefLine, RefQuadrilateral, RefHexahedron)
+    msg = "`QuadratureRule{$D, RefCube}(weights, points)` is deprecated, use `QuadratureRule{$D, $(shapes[D])}(weights, points)` instead"
+    if D == 1 || D == 2
+        msg *= " (or `QuadratureRule{$D, $(shapes[D+1])}(weights, points)` if this is a face quadrature rule)"
+    end
+    msg *= "."
+    Base.depwarn(msg, :QuadratureRule)
+    return QuadratureRule{D, shapes[D]}(weights, points)
+end
+
+function QuadratureRule{D, RefCube, T}(weights::AbstractVector, points::AbstractVector{<:Vec}) where {D, T}
+    shapes = (RefLine, RefQuadrilateral, RefHexahedron)
+    msg = "`QuadratureRule{$D, RefCube, T}(weights, points)` is deprecated, use `QuadratureRule{$D, $(shapes[D]), T}(weights, points)` instead"
+    if D == 1 || D == 2
+        msg *= " (or `QuadratureRule{$D, $(shapes[D+1]), T}(weights, points)` if this is a face quadrature rule)"
+    end
+    msg *= "."
+    Base.depwarn(msg, :QuadratureRule)
+    return QuadratureRule{D, shapes[D], T}(weights, points)
+end
+
+# These must be for a face, warn only here.
+function QuadratureRule{0, RefCube}(order::Int)
+    msg = "`QuadratureRule{0, RefCube}(order::Int)` is deprecated, use `QuadratureRule{0, RefLine}(order)` instead."
+    Base.depwarn(msg, :QuadratureRule)
+    return QuadratureRule{0, RefLine}(order)
+end
+function QuadratureRule{0, RefCube}(quad_type::Symbol, order::Int)
+    msg = "`QuadratureRule{0, RefCube}(quad_type::Symbol, order::Int)` is deprecated, use `QuadratureRule{0, RefLine}(quad_type, order)` instead."
+    Base.depwarn(msg, :QuadratureRule)
+    return QuadratureRule{0, RefLine}(quad_type, order)
+end
+function QuadratureRule{1, RefTetrahedron}(order::Int)
+    msg = "`QuadratureRule{1, RefTetrahedron}(order::Int)` is deprecated, use `QuadratureRule{1, RefTriangle}(order)` instead."
+    Base.depwarn(msg, :QuadratureRule)
+    return QuadratureRule{1, RefTriangle}(order)
+end
+function QuadratureRule{1, RefTetrahedron}(quad_type::Symbol, order::Int)
+    msg = "`QuadratureRule{1, RefTetrahedron}(quad_type::Symbol, order::Int)` is deprecated, use `QuadratureRule{0, RefTriangle}(quad_type, order)` instead."
+    Base.depwarn(msg, :QuadratureRule)
+    return QuadratureRule{1, RefTriangle}(quad_type, order)
+end
+
+# Catch remaining cases in (Cell|Face)Value constructors
+function CellValues(
+    ::Type{T}, qr::QuadratureRule{2, RefTetrahedron, TQ}, ip::Interpolation{2, RefTriangle},
+    gip::Interpolation{2, RefTriangle} = default_geometric_interpolation(ip),
+) where {T, TQ}
+    qr′ = QuadratureRule{2, RefTriangle, T}(qr.weights, qr.points)
+    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefTetrahedron}(...)` which have been deprecated in favor of `QuadratureRule{2, RefTriangle}(...)`.", :CellValues)
+    CellValues(T, qr′, ip, gip)
+end
+function FaceValues(
+    ::Type{T}, qr::QuadratureRule{1, RefLine, TQ}, ip::Interpolation{2, RefQuadrilateral},
+    gip::Interpolation{2, RefQuadrilateral} = default_geometric_interpolation(ip),
+) where {T, TQ}
+    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{1, RefCube}(...)` which have been deprecated in favor of `QuadratureRule{1, RefQuadrilateral}(...)`.", :FaceValues)
+    qr′ = QuadratureRule{1, RefQuadrilateral, T}(qr.weights, qr.points)
+    FaceValues(T, qr′, ip, gip)
+end
+function FaceValues(
+    ::Type{T}, qr::QuadratureRule{2, RefQuadrilateral, TQ}, ip::Interpolation{3, RefHexahedron},
+    gip::Interpolation{3, RefHexahedron} = default_geometric_interpolation(ip),
+) where {T, TQ}
+    Base.depwarn("The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefCube}(...)` which have been deprecated in favor of `QuadratureRule{2, RefHexahedron}(...)`.", :FaceValues)
+    qr′ = QuadratureRule{2, RefHexahedron, T}(qr.weights, qr.points)
+    FaceValues(T, qr′, ip, gip)
+end

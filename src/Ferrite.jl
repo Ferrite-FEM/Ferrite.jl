@@ -29,8 +29,7 @@ struct RefTetrahedron   <: AbstractRefShape{3} end
 struct RefHexahedron    <: AbstractRefShape{3} end
 struct RefPrism         <: AbstractRefShape{3} end
 
-# TODO: Update interpolation definitions and enable deprecation
-const RefCube = RefHexahedron
+const RefHypercube = Union{RefLine, RefQuadrilateral, RefHexahedron}
 
 abstract type AbstractValues end
 abstract type AbstractCellValues <: AbstractValues end
