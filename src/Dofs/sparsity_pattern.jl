@@ -308,12 +308,8 @@ for (func,                              pre_f,                                  
                             for neighbor_face in current_face_neighborhood[face_idx]
                                 cell_dofs = celldofs(dh,cell_idx)[element_dof_start + 1 : element_dof_start + getnbasefunctions(fi)]
                                 neighbour_dof_start = 0
-                                for fi in fh.field_interpolations
-                                    if(!IsDiscontinuous(typeof(fi)<: VectorizedInterpolation ? typeof(fi.ip) : typeof(fi)))
-                                        neighbour_dof_start += getnbasefunctions(fi)
-                                        continue
-                                    end
-                                    neighbour_dofs = celldofs(dh,neighbor_face[1])[neighbour_dof_start + 1 : neighbour_dof_start + getnbasefunctions(fi)]
+                                for fi2 in fh.field_interpolations
+                                    neighbour_dofs = celldofs(dh,neighbor_face[1])[neighbour_dof_start + 1 : neighbour_dof_start + getnbasefunctions(fi2)]
                                     neighbour_unique_dofs = neighbour_dofs[.!(neighbour_dofs .∈ Ref(celldofs(dh,cell_idx)))]
                                     for j in eachindex(neighbour_unique_dofs), i in eachindex(cell_dofs)
                                         isnothing(couplings) || coupling_fh[i+element_dof_start,j+neighbour_dof_start] || continue
@@ -324,7 +320,7 @@ for (func,                              pre_f,                                  
                                         cnt += 1
                                         $(inner_f)
                                     end
-                                    neighbour_dof_start += getnbasefunctions(fi)
+                                    neighbour_dof_start += getnbasefunctions(fi2)
                                 end
                             end
                         end

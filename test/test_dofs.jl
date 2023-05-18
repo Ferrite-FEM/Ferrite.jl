@@ -528,7 +528,6 @@ end
             current = Ferrite.EntityNeighborhood{FaceIndex}(FaceIndex[FaceIndex((cell_idx, -1))])
             for neighbor_cell in ∪(current_face_neighborhood,(current,))
                 isempty(neighbor_cell) && continue
-                @info neighbor_cell
                 neighbor_idx = neighbor_cell[1].idx[1]
                 for (fhi, fh) in pairs(dh.fieldhandlers)
                     for (cell_field_idx, cell_field) in pairs(fh.fields) 
@@ -546,7 +545,7 @@ end
         end
         check_I = repeat(1:dh.ndofs[], dh.ndofs[])
         check_J = repeat(1:dh.ndofs[], inner = dh.ndofs[])
-        # @test is_stored.(Ref(K), check_I, check_J) == reshape(K_check,length(check_I))
+        @test is_stored.(Ref(K), check_I, check_J) == reshape(K_check,length(check_I))
     end
 
     # Full coupling (default)
@@ -568,4 +567,8 @@ end
             false  true  false  # v
             false  false  true  # p
         ]
+
+    K = create_sparsity_pattern(dh; coupling=coupling)
+    check_coupling(dh, topology, K, coupling)
+    
 end
