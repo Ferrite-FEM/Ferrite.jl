@@ -309,6 +309,10 @@ for (func,                              pre_f,                                  
                                 cell_dofs = celldofs(dh,cell_idx)[element_dof_start + 1 : element_dof_start + getnbasefunctions(fi)]
                                 neighbour_dof_start = 0
                                 for fi2 in fh.field_interpolations
+                                    if(!IsDiscontinuous(typeof(fi2)<: VectorizedInterpolation ? typeof(fi2.ip) : typeof(fi2)))
+                                        neighbour_dof_start += getnbasefunctions(fi2)
+                                        continue
+                                    end
                                     neighbour_dofs = celldofs(dh,neighbor_face[1])[neighbour_dof_start + 1 : neighbour_dof_start + getnbasefunctions(fi2)]
                                     neighbour_unique_dofs = neighbour_dofs[.!(neighbour_dofs .∈ Ref(celldofs(dh,cell_idx)))]
                                     for j in eachindex(neighbour_unique_dofs), i in eachindex(cell_dofs)

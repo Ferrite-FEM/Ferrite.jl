@@ -1225,4 +1225,4 @@ end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
 
-get_continuous_interpolation(::VectorizedInterpolation{vdim, refdim, refshape, order, <:DiscontinuousLagrange{ip_dim, ip_shape, ip_order}}) where {vdim, refdim, refshape, order, ip_dim, ip_shape, ip_order} = VectorizedInterpolation{vdim}(Lagrange{ip_dim, ip_shape, ip_order}())
+get_continuous_interpolation(ipv::VectorizedInterpolation{vdim}) where {vdim} = VectorizedInterpolation{vdim}(get_continuous_interpolation(ipv.ip))

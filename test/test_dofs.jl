@@ -533,6 +533,7 @@ end
                     for (cell_field_idx, cell_field) in pairs(fh.fields) 
                         is_discontinuous = Ferrite.IsDiscontinuous(typeof(cell_field.interpolation)<: VectorizedInterpolation ? typeof(cell_field.interpolation.ip) : typeof(cell_field.interpolation))
                         for (neighbor_field_idx, neighbor_field) in pairs(fh.fields) 
+                            is_discontinuous &= Ferrite.IsDiscontinuous(typeof(neighbor_field.interpolation)<: VectorizedInterpolation ? typeof(neighbor_field.interpolation.ip) : typeof(neighbor_field.interpolation))
                             for i in dof_range(fh,cell_field_idx), j in dof_range(fh,neighbor_field_idx)
                                 I = dh.cell_dofs[i+dh.cell_dofs_offset[cell_idx]-1]
                                 J = dh.cell_dofs[j+dh.cell_dofs_offset[neighbor_idx]-1]
