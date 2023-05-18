@@ -54,11 +54,11 @@ const Δ = Tensors.hessian;
 grid = generate_grid(Quadrilateral, (150, 150))
 
 dim = 2
-ip = Lagrange{dim, RefCube, 1}()
-qr = QuadratureRule{dim, RefCube}(2)
-qr_face = QuadratureRule{dim-1, RefCube}(2)
-cellvalues = CellScalarValues(qr, ip);
-facevalues = FaceScalarValues(qr_face, ip);
+ip = Lagrange{RefQuadrilateral, 1}()
+qr = QuadratureRule{dim, RefQuadrilateral}(2)
+qr_face = QuadratureRule{dim-1, RefQuadrilateral}(2)
+cellvalues = CellValues(qr, ip);
+facevalues = FaceValues(qr_face, ip);
 
 dh = DofHandler(grid)
 add!(dh, :u, ip)
@@ -88,8 +88,8 @@ update!(dbcs, 0.0)
 
 K = create_sparsity_pattern(dh);
 
-function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarValues{dim},
-                         K::SparseMatrixCSC, dh::DofHandler) where {dim}
+function doassemble(cellvalues::CellValues, facevalues::FaceValues,
+                         K::SparseMatrixCSC, dh::DofHandler)
     b = 1.0
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)

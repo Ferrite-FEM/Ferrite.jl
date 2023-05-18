@@ -88,20 +88,20 @@ end
 
 function create_values()
     ## quadrature rules
-    qr      = QuadratureRule{2,RefCube}(2)
-    face_qr = QuadratureRule{1,RefCube}(2)
+    qr      = QuadratureRule{2,RefQuadrilateral}(2)
+    face_qr = QuadratureRule{1,RefQuadrilateral}(2)
 
     ## cell and facevalues for u
-    ip = Lagrange{2,RefCube,1}()^2
-    cellvalues = CellVectorValues(qr, ip)
-    facevalues = FaceVectorValues(face_qr, ip)
+    ip = Lagrange{RefQuadrilateral,1}()^2
+    cellvalues = CellValues(qr, ip)
+    facevalues = FaceValues(face_qr, ip)
     
     return cellvalues, facevalues
 end
 
 function create_dofhandler(grid)
     dh = DofHandler(grid)
-    add!(dh, :u, Lagrange{2,RefCube,1}()^2) # displacement
+    add!(dh, :u, Lagrange{RefQuadrilateral,1}()^2) # displacement
     close!(dh)
     return dh
 end
@@ -300,7 +300,7 @@ end
     
 # Now, we move on to the Finite Element part of the program. We use the following function to assemble our linear system.
 
-function doassemble!(cellvalues::CellVectorValues{dim}, facevalues::FaceVectorValues{dim}, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states) where {dim}
+function doassemble!(cellvalues::CellValues, facevalues::FaceValues, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states)
     r = zeros(ndofs(dh))
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)

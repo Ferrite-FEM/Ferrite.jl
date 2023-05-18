@@ -1,13 +1,8 @@
-# Defines CellScalarValues and CellVectorValues and common methods
 """
-    CellScalarValues([::Type{T}], quad_rule::QuadratureRule, func_interpol::ScalarInterpolation, [geom_interpol::Interpolation])
-    CellVectorValues([::Type{T}], quad_rule::QuadratureRule, func_interpol::VectorInterpolation, [geom_interpol::Interpolation])
+    CellValues([::Type{T}], quad_rule::QuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
 
 A `CellValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
-values of nodal functions, gradients and divergences of nodal functions etc. in the finite element cell. There are
-two different types of `CellValues`: `CellScalarValues` and `CellVectorValues`. As the names suggest, `CellScalarValues`
-utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape functions. For a scalar field, the
-`CellScalarValues` type should be used. For vector field, both subtypes can be used.
+values of nodal functions, gradients and divergences of nodal functions etc. in the finite element cell.
 
 **Arguments:**
 * `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
@@ -32,116 +27,77 @@ utilizes scalar shape functions and `CellVectorValues` utilizes vectorial shape 
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
 """
-CellValues, CellScalarValues, CellVectorValues
+CellValues
 
-function default_geometric_interpolation(::Interpolation{dim,shape}) where {dim, shape}
-    return Lagrange{dim,shape,1}()
+function default_geometric_interpolation(::Interpolation{shape}) where {shape}
+    return Lagrange{shape,1}()
 end
 
-# CellScalarValues
-struct CellScalarValues{dim,T<:Real,refshape<:AbstractRefShape} <: CellValues{dim,T,refshape}
-    N::Matrix{T}
-    dNdx::Matrix{Vec{dim,T}}
-    dNdξ::Matrix{Vec{dim,T}}
+struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCellValues
+    N::Matrix{N_t}
+    dNdx::Matrix{dNdx_t}
+    dNdξ::Matrix{dNdξ_t}
     detJdV::Vector{T}
     M::Matrix{T}
-    dMdξ::Matrix{Vec{dim,T}}
-    qr::QuadratureRule{dim,refshape,T}
-    # The following fields are deliberately abstract -- they are never used in
-    # performance critical code, just stored here for convenience.
-    func_interp::Interpolation{dim,refshape}
-    geo_interp::Interpolation{dim,refshape}
+    dMdξ::Matrix{dMdξ_t}
+    qr::QR
+    ip::IP
+    gip::GIP
 end
 
-function CellScalarValues(quad_rule::QuadratureRule, func_interpol::ScalarInterpolation,
-        geom_interpol::Interpolation=default_geometric_interpolation(func_interpol))
-    CellScalarValues(Float64, quad_rule, func_interpol, geom_interpol)
+# (Scalar|Vector)Interpolation, (vdim ==) refdim == spacedim -> Tensors
+function CellValues(qr::QuadratureRule, ip::Interpolation,
+                    gip::Interpolation = default_geometric_interpolation(ip))
+    return CellValues(Float64, qr, ip, gip)
 end
-
-function CellScalarValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_interpol::ScalarInterpolation,
-        geom_interpol::Interpolation=default_geometric_interpolation(func_interpol)) where {dim,T,shape<:AbstractRefShape}
-
-    @assert getdim(func_interpol) == getdim(geom_interpol)
-    @assert getrefshape(func_interpol) == getrefshape(geom_interpol) == shape
-    n_qpoints = length(getweights(quad_rule))
+# TODO: This doesn't actually work for T != Float64
+function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
+    dim, shape <: AbstractRefShape{dim}, T,
+    QR  <: QuadratureRule{dim, shape},
+    IP  <: Union{ScalarInterpolation{shape}, VectorInterpolation{dim, shape}},
+    GIP <: ScalarInterpolation{shape}
+}
+    n_qpoints = length(getweights(qr))
 
     # Function interpolation
-    n_func_basefuncs = getnbasefunctions(func_interpol)
-    N    = fill(zero(T)          * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdx = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdξ = fill(zero(Vec{dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
-
-    # Geometry interpolation
-    n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M    = fill(zero(T)          * T(NaN), n_geom_basefuncs, n_qpoints)
-    dMdξ = fill(zero(Vec{dim,T}) * T(NaN), n_geom_basefuncs, n_qpoints)
-
-    for (qp, ξ) in enumerate(quad_rule.points)
-        for i in 1:n_func_basefuncs
-            dNdξ[i, qp], N[i, qp] = gradient(ξ -> value(func_interpol, i, ξ), ξ, :all)
-        end
-        for i in 1:n_geom_basefuncs
-            dMdξ[i, qp], M[i, qp] = gradient(ξ -> value(geom_interpol, i, ξ), ξ, :all)
-        end
+    if IP <: ScalarInterpolation
+        N_t    = T
+        dNdx_t = dNdξ_t = Vec{dim, T}
+    else # IP <: VectorInterpolation
+        N_t    = Vec{dim, T}
+        dNdx_t = dNdξ_t = Tensor{2, dim, T, Tensors.n_components(Tensor{2,dim})}
     end
-
-    detJdV = fill(T(NaN), n_qpoints)
-
-    CellScalarValues{dim,T,shape}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule, func_interpol, geom_interpol)
-end
-
-# CellVectorValues
-struct CellVectorValues{#=vdim,=#dim,T<:Real,refshape<:AbstractRefShape,M} <: CellValues{dim,T,refshape}
-    N::Matrix{Vec{dim,T}}
-    dNdx::Matrix{Tensor{2,dim,T,M}}
-    dNdξ::Matrix{Tensor{2,dim,T,M}}
-    detJdV::Vector{T}
-    M::Matrix{T}
-    dMdξ::Matrix{Vec{dim,T}}
-    qr::QuadratureRule{dim,refshape,T}
-    # The following fields are deliberately abstract -- they are never used in
-    # performance critical code, just stored here for convenience.
-    func_interp::#=Vector=#Interpolation{#=vdim,=#dim,refshape}
-    geo_interp::Interpolation{dim,refshape}
-end
-
-function CellVectorValues(quad_rule::QuadratureRule, func_interpol::VectorInterpolation,
-        geom_interpol::Interpolation=default_geometric_interpolation(func_interpol))
-    CellVectorValues(Float64, quad_rule, func_interpol, geom_interpol)
-end
-
-function CellVectorValues(::Type{T}, quad_rule::QuadratureRule{dim,shape}, func_interpol::VectorInterpolation{vdim,dim,shape},
-        geom_interpol::Interpolation{dim,shape}=default_geometric_interpolation(func_interpol)) where {vdim,dim,T,shape}
-
-    n_qpoints = length(getweights(quad_rule))
-
-    # Function interpolation
-    n_func_basefuncs = getnbasefunctions(func_interpol)
-    N    = fill(zero(Vec{dim,T})      * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdx = fill(zero(Tensor{2,dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdξ = fill(zero(Tensor{2,dim,T}) * T(NaN), n_func_basefuncs, n_qpoints)
+    n_func_basefuncs = getnbasefunctions(ip)
+    N    = fill(zero(N_t)    * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdx = fill(zero(dNdx_t) * T(NaN), n_func_basefuncs, n_qpoints)
+    dNdξ = fill(zero(dNdξ_t) * T(NaN), n_func_basefuncs, n_qpoints)
 
     # Geometry interpolation
-    n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M    = fill(zero(T)          * T(NaN), n_geom_basefuncs, n_qpoints)
-    dMdξ = fill(zero(Vec{dim,T}) * T(NaN), n_geom_basefuncs, n_qpoints)
+    M_t    = T
+    dMdξ_t = Vec{dim, T}
+    n_geom_basefuncs = getnbasefunctions(gip)
+    M    = fill(zero(M_t)    * T(NaN), n_geom_basefuncs, n_qpoints)
+    dMdξ = fill(zero(dMdξ_t) * T(NaN), n_geom_basefuncs, n_qpoints)
 
-    for (qp, ξ) in enumerate(quad_rule.points)
+    for (qp, ξ) in pairs(getpoints(qr))
         for basefunc in 1:n_func_basefuncs
-            dNdξ[basefunc, qp], N[basefunc, qp] = gradient(ξ -> value(func_interpol, basefunc, ξ), ξ, :all)
+            dNdξ[basefunc, qp], N[basefunc, qp] = gradient(ξ -> value(ip, basefunc, ξ), ξ, :all)
         end
         for basefunc in 1:n_geom_basefuncs
-            dMdξ[basefunc, qp], M[basefunc, qp] = gradient(ξ -> value(geom_interpol, basefunc, ξ), ξ, :all)
+            dMdξ[basefunc, qp], M[basefunc, qp] = gradient(ξ -> value(gip, basefunc, ξ), ξ, :all)
         end
     end
 
     detJdV = fill(T(NaN), n_qpoints)
-    MM = Tensors.n_components(Tensors.get_base(eltype(dNdx)))
 
-    CellVectorValues{dim,T,shape,MM}(N, dNdx, dNdξ, detJdV, M, dMdξ, quad_rule, func_interpol, geom_interpol)
+    return CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(N, dNdx, dNdξ, detJdV, M, dMdξ, qr, ip, gip)
 end
 
-function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,T}
+function reinit!(cv::CellValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T}}) where {
+    dim, T,
+    N_t    <: Union{Number,   Vec{dim}},
+    dNdx_t <: Union{Vec{dim}, Tensor{2, dim}}
+}
     n_geom_basefuncs = getngeobasefunctions(cv)
     n_func_basefuncs = getnbasefunctions(cv)
     length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
@@ -160,4 +116,5 @@ function reinit!(cv::CellValues{dim}, x::AbstractVector{Vec{dim,T}}) where {dim,
             cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
         end
     end
+    return nothing
 end

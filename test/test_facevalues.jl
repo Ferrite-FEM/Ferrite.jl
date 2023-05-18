@@ -1,24 +1,21 @@
 @testset "FaceValues" begin
-for (func_interpol, quad_rule) in  (
-                                    (Lagrange{1, RefCube, 1}(), QuadratureRule{0, RefCube}(2)),
-                                    (Lagrange{1, RefCube, 2}(), QuadratureRule{0, RefCube}(2)),
-                                    (Lagrange{2, RefCube, 1}(), QuadratureRule{1, RefCube}(2)),
-                                    (Lagrange{2, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
-                                    (Lagrange{2, RefTetrahedron, 1}(), QuadratureRule{1, RefTetrahedron}(2)),
-                                    (Lagrange{2, RefTetrahedron, 2}(), QuadratureRule{1, RefTetrahedron}(2)),
-                                    (Lagrange{3, RefCube, 1}(), QuadratureRule{2, RefCube}(2)),
-                                    (Serendipity{2, RefCube, 2}(), QuadratureRule{1, RefCube}(2)),
-                                    (Lagrange{3, RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2)),
-                                    (Lagrange{3, RefTetrahedron, 2}(), QuadratureRule{2, RefTetrahedron}(2))
+for (scalar_interpol, quad_rule) in (
+                                    (Lagrange{RefLine, 1}(), QuadratureRule{0, RefLine}(2)),
+                                    (Lagrange{RefLine, 2}(), QuadratureRule{0, RefLine}(2)),
+                                    (Lagrange{RefQuadrilateral, 1}(), QuadratureRule{1, RefQuadrilateral}(2)),
+                                    (Lagrange{RefQuadrilateral, 2}(), QuadratureRule{1, RefQuadrilateral}(2)),
+                                    (Lagrange{RefTriangle, 1}(), QuadratureRule{1, RefTriangle}(2)),
+                                    (Lagrange{RefTriangle, 2}(), QuadratureRule{1, RefTriangle}(2)),
+                                    (Lagrange{RefHexahedron, 1}(), QuadratureRule{2, RefHexahedron}(2)),
+                                    (Serendipity{RefQuadrilateral, 2}(), QuadratureRule{1, RefQuadrilateral}(2)),
+                                    (Lagrange{RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2)),
+                                    (Lagrange{RefTetrahedron, 2}(), QuadratureRule{2, RefTetrahedron}(2)),
                                    )
 
-    for fe_valtype in (FaceScalarValues, FaceVectorValues)
-        geom_interpol = func_interpol # Tests below assume this
-        n_basefunc_base = getnbasefunctions(func_interpol)
-        if fe_valtype == FaceVectorValues
-            func_interpol = VectorizedInterpolation(func_interpol)
-        end
-        fv = fe_valtype(quad_rule, func_interpol, geom_interpol)
+    for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
+        geom_interpol = scalar_interpol # Tests below assume this
+        n_basefunc_base = getnbasefunctions(scalar_interpol)
+        fv = FaceValues(quad_rule, func_interpol, geom_interpol)
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
@@ -44,15 +41,16 @@ for (func_interpol, quad_rule) in  (
 
             for i in 1:length(getnquadpoints(fv))
                 @test getnormal(fv, i) ≈ n[face]
-                if isa(fv, FaceScalarValues)
+                if func_interpol isa Ferrite.ScalarInterpolation
                     @test function_gradient(fv, i, u) ≈ H
                     @test function_symmetric_gradient(fv, i, u) ≈ 0.5(H + H')
+                    @test function_divergence(fv, i, u_scal) ≈ sum(V)
                     @test function_divergence(fv, i, u) ≈ tr(H)
                     @test function_gradient(fv, i, u_scal) ≈ V
                     ndim == 3 && @test function_curl(fv, i, u) ≈ Ferrite.curl_from_gradient(H)
                     function_value(fv, i, u)
                     function_value(fv, i, u_scal)
-                elseif isa(fv, FaceVectorValues)
+                else # func_interpol isa Ferrite.VectorInterpolation
                     @test function_gradient(fv, i, u_vector) ≈ H
                     @test (@test_deprecated function_gradient(fv, i, u)) ≈ H
                     @test function_symmetric_gradient(fv, i, u_vector) ≈ 0.5(H + H')
@@ -74,7 +72,7 @@ for (func_interpol, quad_rule) in  (
             end
             let ip_base = func_interpol isa VectorizedInterpolation ? func_interpol.ip : func_interpol
                 x_face = xs[[Ferrite.facedof_indices(ip_base)[face]...]]
-                @test vol ≈ calculate_volume(Ferrite.getlowerdim(ip_base), x_face)
+                @test vol ≈ calculate_face_area(ip_base, x_face, face)
             end
 
             # Test quadrature rule after reinit! with ref. coords
@@ -84,7 +82,7 @@ for (func_interpol, quad_rule) in  (
             for i in 1:getnquadpoints(fv)
                 vol += getdetJdV(fv, i)
             end
-            @test vol ≈ reference_volume(func_interpol, face)
+            @test vol ≈ reference_face_area(func_interpol, face)
 
             # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
             # TODO: Renable somehow after quad rule is no longer stored in FaceValues

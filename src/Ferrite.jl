@@ -22,22 +22,18 @@ reference shapes are: [`RefLine`](@ref), [`RefTriangle`](@ref), [`RefQuadrilater
 abstract type AbstractRefShape{refdim} end
 
 # See src/docs.jl for detailed documentation
-struct RefLine          <: AbstractRefShape{1} end
-struct RefTriangle      <: AbstractRefShape{2} end
-struct RefQuadrilateral <: AbstractRefShape{2} end
-struct RefTetrahedron   <: AbstractRefShape{3} end
-struct RefHexahedron    <: AbstractRefShape{3} end
+struct RefHypercube{refdim} <: AbstractRefShape{refdim} end
+struct RefSimplex{refdim}   <: AbstractRefShape{refdim} end
+const RefLine          = RefHypercube{1}
+const RefQuadrilateral = RefHypercube{2}
+const RefHexahedron    = RefHypercube{3}
+const RefTriangle      = RefSimplex{2}
+const RefTetrahedron   = RefSimplex{3}
 struct RefPrism         <: AbstractRefShape{3} end
 
-# TODO: Update interpolation definitions and enable deprecation
-const RefCube = RefHexahedron
-
-"""
-Abstract type which has `CellValues` and `FaceValues` as subtypes
-"""
-abstract type Values{dim,T,refshape} end
-abstract type CellValues{dim,T,refshape} <: Values{dim,T,refshape} end
-abstract type FaceValues{dim,T,refshape} <: Values{dim,T,refshape} end
+abstract type AbstractValues end
+abstract type AbstractCellValues <: AbstractValues end
+abstract type AbstractFaceValues <: AbstractValues end
 
 """
 Abstract type which is used as identifier for faces, edges and verices

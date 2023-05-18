@@ -24,9 +24,9 @@
     subtype_grid = SmallGrid(nodes,cells)
     reference_grid = generate_grid(Quadrilateral, (2,2))
 
-    ip = Lagrange{2, RefCube, 1}()
-    qr = QuadratureRule{2, RefCube}(2)
-    cellvalues = CellScalarValues(qr, ip);
+    ip = Lagrange{RefQuadrilateral, 1}()
+    qr = QuadratureRule{2, RefQuadrilateral}(2)
+    cellvalues = CellValues(qr, ip);
     
     dhs = [DofHandler(grid) for grid in (subtype_grid, reference_grid)]
     u1 = Vector{Float64}(undef, 9)
@@ -34,7 +34,7 @@
     ∂Ω = union(getfaceset.((reference_grid, ), ["left", "right", "top", "bottom"])...)
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
 
-    function doassemble!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler) where {dim}
+    function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler)
         n_basefuncs = getnbasefunctions(cellvalues)
         Ke = zeros(n_basefuncs, n_basefuncs)
         fe = zeros(n_basefuncs)

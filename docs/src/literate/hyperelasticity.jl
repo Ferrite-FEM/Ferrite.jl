@@ -315,11 +315,11 @@ function solve()
     mp = NeoHooke(μ, λ)
 
     ## Finite element base
-    ip = Lagrange{3, RefTetrahedron, 1}()^3
+    ip = Lagrange{RefTetrahedron, 1}()^3
     qr = QuadratureRule{3, RefTetrahedron}(1)
     qr_face = QuadratureRule{2, RefTetrahedron}(1)
-    cv = CellVectorValues(qr, ip)
-    fv = FaceVectorValues(qr_face, ip)
+    cv = CellValues(qr, ip)
+    fv = FaceValues(qr_face, ip)
 
     ## DofHandler
     dh = DofHandler(grid)

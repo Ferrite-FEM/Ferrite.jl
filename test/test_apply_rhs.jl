@@ -1,9 +1,9 @@
 function test_apply_rhs()
     grid = generate_grid(Quadrilateral, (20, 20))
     dim = 2
-    ip = Lagrange{dim,RefCube,1}()
-    qr = QuadratureRule{dim,RefCube}(2)
-    cellvalues = CellScalarValues(qr, ip)
+    ip = Lagrange{RefQuadrilateral,1}()
+    qr = QuadratureRule{dim,RefQuadrilateral}(2)
+    cellvalues = CellValues(qr, ip)
     
     dh = DofHandler(grid)
     add!(dh, :u, ip)
@@ -25,10 +25,10 @@ function test_apply_rhs()
     update!(ch, 0.0);
     
     function doassemble!(
-        cellvalues::CellScalarValues{dim},
+        cellvalues::CellValues,
         K::SparseMatrixCSC,
         dh::DofHandler,
-    ) where {dim}
+    )
     
         n_basefuncs = getnbasefunctions(cellvalues)
         Ke = zeros(n_basefuncs, n_basefuncs)
