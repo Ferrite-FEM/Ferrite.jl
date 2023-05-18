@@ -381,7 +381,7 @@ end
 
 IsDiscontinuous(::Type{<:DiscontinuousLagrange}) = true
 
-get_continuous_interpolation(::DiscontinuousLagrange{dim,ref_shape,order}) where {dim, ref_shape, order} = Lagrange{dim,ref_shape,order}()
+get_continuous_interpolation(::DiscontinuousLagrange{ref_shape,order}) where {ref_shape, order} = Lagrange{ref_shape,order}()
 
 ############
 # Lagrange #
