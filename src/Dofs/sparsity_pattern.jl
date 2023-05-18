@@ -310,7 +310,7 @@ for (func,                              pre_f,                                  
                                 neighbour_dofs = celldofs(dh,neighbor_face[1])[element_dof_start + 1 : element_dof_start + getnbasefunctions(fi)]
                                 neighbour_unique_dofs = neighbour_dofs[.!(neighbour_dofs .∈ Ref(celldofs(dh,cell_idx)))]
                                 for j in eachindex(neighbour_unique_dofs), i in eachindex(cell_dofs)
-                                    isnothing(couplings) || coupling_fh[i,j] || continue
+                                    isnothing(couplings) || coupling_fh[i+element_dof_start,j+element_dof_start] || continue
                                     dofi = cell_dofs[i]
                                     dofj = neighbour_unique_dofs[j]
                                     sym && (dofi > dofj && continue)
