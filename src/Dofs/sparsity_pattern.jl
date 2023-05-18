@@ -307,16 +307,24 @@ for (func,                              pre_f,                                  
                         for face_idx in shared_faces_idx
                             for neighbor_face in current_face_neighborhood[face_idx]
                                 cell_dofs = celldofs(dh,cell_idx)[element_dof_start + 1 : element_dof_start + getnbasefunctions(fi)]
-                                neighbour_dofs = celldofs(dh,neighbor_face[1])[element_dof_start + 1 : element_dof_start + getnbasefunctions(fi)]
-                                neighbour_unique_dofs = neighbour_dofs[.!(neighbour_dofs .∈ Ref(celldofs(dh,cell_idx)))]
-                                for j in eachindex(neighbour_unique_dofs), i in eachindex(cell_dofs)
-                                    isnothing(couplings) || coupling_fh[i+element_dof_start,j+element_dof_start] || continue
-                                    dofi = cell_dofs[i]
-                                    dofj = neighbour_unique_dofs[j]
-                                    sym && (dofi > dofj && continue)
-                                    !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
-                                    cnt += 1
-                                    $(inner_f)
+                                neighbour_dof_start = 0
+                                for fi in fh.field_interpolations
+                                    if(! (typeof(fi)<:DiscontinuousLagrange))
+                                        neighbour_dof_start += getnbasefunctions(fi)
+                                        continue
+                                    end
+                                    neighbour_dofs = celldofs(dh,neighbor_face[1])[neighbour_dof_start + 1 : neighbour_dof_start + getnbasefunctions(fi)]
+                                    neighbour_unique_dofs = neighbour_dofs[.!(neighbour_dofs .∈ Ref(celldofs(dh,cell_idx)))]
+                                    for j in eachindex(neighbour_unique_dofs), i in eachindex(cell_dofs)
+                                        isnothing(couplings) || coupling_fh[i+element_dof_start,j+neighbour_dof_start] || continue
+                                        dofi = cell_dofs[i]
+                                        dofj = neighbour_unique_dofs[j]
+                                        sym && (dofi > dofj && continue)
+                                        !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
+                                        cnt += 1
+                                        $(inner_f)
+                                    end
+                                    neighbour_dof_start += getnbasefunctions(fi)
                                 end
                             end
                         end
