@@ -504,3 +504,68 @@ end
         @test is_stored(KS, i, j) == (i <= j)
     end
 end
+
+@testset "dof cross-coupling" begin
+    grid = generate_grid(Quadrilateral, (2, 2))
+    topology = ExclusiveTopology(grid)
+    dh = DofHandler(grid)
+    add!(dh, :u, DiscontinuousLagrange{2,RefCube,1}()^2)
+    add!(dh, :p, DiscontinuousLagrange{2,RefCube,1}())
+    add!(dh, :w, Lagrange{2,RefCube,1}())
+    close!(dh)
+
+    function is_stored(A, i, j)
+        A = A isa Symmetric ? A.data : A
+        for m in nzrange(A, j)
+            A.rowval[m] == i && return true
+        end
+        return false
+    end
+    function check_coupling(dh, topology, K, coupling)
+        K_check = falses(dh.ndofs[],dh.ndofs[])
+        for cell_idx in eachindex(getcells(dh.grid))
+            current_face_neighborhood = Ferrite.getdim(dh.grid.cells[cell_idx]) >1 ? topology.face_neighbor[cell_idx,:] : topology.vertex_neighbor[cell_idx,:]
+            current = Ferrite.EntityNeighborhood{FaceIndex}(FaceIndex[FaceIndex((cell_idx, -1))])
+            for neighbor_cell in ∪(current_face_neighborhood,(current,))
+                isempty(neighbor_cell) && continue
+                @info neighbor_cell
+                neighbor_idx = neighbor_cell[1].idx[1]
+                for (fhi, fh) in pairs(dh.fieldhandlers)
+                    for (cell_field_idx, cell_field) in pairs(fh.fields) 
+                        is_discontinuous = Ferrite.IsDiscontinuous(typeof(cell_field.interpolation)<: VectorizedInterpolation ? typeof(cell_field.interpolation.ip) : typeof(cell_field.interpolation))
+                        for (neighbor_field_idx, neighbor_field) in pairs(fh.fields) 
+                            for i in dof_range(fh,cell_field_idx), j in dof_range(fh,neighbor_field_idx)
+                                I = dh.cell_dofs[i+dh.cell_dofs_offset[cell_idx]-1]
+                                J = dh.cell_dofs[j+dh.cell_dofs_offset[neighbor_idx]-1]
+                                K_check[I,J] |= (coupling[cell_field_idx, neighbor_field_idx] && (is_discontinuous || (cell_idx == neighbor_idx)))
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        check_I = repeat(1:dh.ndofs[], dh.ndofs[])
+        check_J = repeat(1:dh.ndofs[], inner = dh.ndofs[])
+        # @test is_stored.(Ref(K), check_I, check_J) == reshape(K_check,length(check_I))
+    end
+
+    # Full coupling (default)
+    coupling = [
+        #   u    v    p
+            true  true  true # u
+            true  true  true  # v
+            true  true  true  # p
+        ]
+    K = create_sparsity_pattern(dh)
+    check_coupling(dh, topology, K, coupling)
+  
+    K = create_sparsity_pattern(dh; coupling=coupling)
+    check_coupling(dh, topology, K, coupling)
+
+    coupling = [
+        #   u    v    p
+            true  false  false # u
+            false  true  false  # v
+            false  false  true  # p
+        ]
+end
