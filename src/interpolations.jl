@@ -329,6 +329,7 @@ boundarydof_indices(::Type{FaceIndex}) = Ferrite.facedof_indices
 boundarydof_indices(::Type{EdgeIndex}) = Ferrite.edgedof_indices
 boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
 
+IsDiscontinuous(::Type{<:Interpolation}) = false
 #########################
 # DiscontinuousLagrange #
 #########################
@@ -372,6 +373,8 @@ function value(ip::DiscontinuousLagrange{dim,shape,0}, i::Int, ξ::Vec{dim}) whe
     i > 1 && throw(ArgumentError("no shape function $i for interpolation $ip"))
     return 1.0
 end
+
+IsDiscontinuous(::Type{<:DiscontinuousLagrange}) = true
 
 get_continuous_interpolation(::DiscontinuousLagrange{dim,ref_shape,order}) where {dim, ref_shape, order} = Lagrange{dim,ref_shape,order}()
 

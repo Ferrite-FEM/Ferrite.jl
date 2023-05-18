@@ -158,7 +158,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
             coupling_fh = couplings[fhi]
             count(coupling_fh[i, j] for i in 1:n for j in (sym ? i : 1):n)
         end
-        if any(ip -> typeof(ip) <: DiscontinuousLagrange,fh.field_interpolations)
+        if any(ip -> IsDiscontinuous(typeof(ip)),fh.field_interpolations)
             uses_dg = true
         end
         max_buffer_length += entries_per_cell * length(set)
@@ -296,7 +296,7 @@ for (func,                              pre_f,                                  
             for (fhi, fh) in pairs(dh.fieldhandlers)
                 isnothing(couplings) || (coupling_fh = couplings[fhi])
                 for fi in fh.field_interpolations
-                    if(! (typeof(fi)<:DiscontinuousLagrange))
+                    if(!IsDiscontinuous(typeof(fi)))
                         element_dof_start += getnbasefunctions(fi)
                         continue
                     end
@@ -309,7 +309,7 @@ for (func,                              pre_f,                                  
                                 cell_dofs = celldofs(dh,cell_idx)[element_dof_start + 1 : element_dof_start + getnbasefunctions(fi)]
                                 neighbour_dof_start = 0
                                 for fi in fh.field_interpolations
-                                    if(! (typeof(fi)<:DiscontinuousLagrange))
+                                    if(!IsDiscontinuous(typeof(fi)))
                                         neighbour_dof_start += getnbasefunctions(fi)
                                         continue
                                     end
