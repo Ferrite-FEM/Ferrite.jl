@@ -240,10 +240,7 @@ See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-di
 """
 embedding_det(J::Union{SMatrix{2, 1}, SMatrix{3, 1}}) = norm(J)
 
-"""
-    reinit!(cv::CellValues, x::AbstractVector{Vec{sdim}})
-Reinit for embedded elements, i.e. elements whose reference dimension is smaller than the spatial dimension.
-"""
+# reinit! for embedded elements, rdim < sdim
 function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{sdim,T}}) where {
     rdim, sdim, vdim, T,
     N_t    <: Union{Number,           SVector{vdim}},

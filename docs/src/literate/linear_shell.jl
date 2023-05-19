@@ -29,7 +29,7 @@ grid = generate_shell_grid(nels, size)
 ip = Lagrange{RefQuadrilateral,1}()
 qr_inplane = QuadratureRule{2,RefQuadrilateral}(1)
 qr_ooplane = QuadratureRule{1,RefLine}(2)
-cv = CellValues(3, qr_inplane, ip)
+cv = CellValues(qr_inplane, ip, ip^3)
 
 # Next we distribute displacement dofs,`:u = (x,y,z)` and rotational dofs, `:θ = (θ₁,  θ₂)`.
 #+
