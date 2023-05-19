@@ -28,6 +28,7 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     "transient_heat_equation.md",
     "landau.md",
     "linear_shell.md",
+    "reactive_surface.md",
     "quasi_incompressible_hyperelasticity.md",
     "ns_vs_diffeq.md",
     "computational_homogenization.md",
