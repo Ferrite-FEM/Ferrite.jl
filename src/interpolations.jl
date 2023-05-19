@@ -1239,7 +1239,7 @@ function gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, I::Int, �
     # Load with dual numbers and compute the value
     f = x -> value(ipv, I, x)
     ξd = Tensors._load(ξ, Tensors.Tag(f, V))
-    value_grad = value(ipv, I, ξ)
+    value_grad = value(ipv, I, ξd)
     # Extract the value and gradient
     val = Vec{vdim, T}(i -> Tensors.value(value_grad[i]))
     grad = zero(MMatrix{vdim, refdim, T})

@@ -186,8 +186,13 @@ end
         @test shape_value(csv1, 1, 2) == shape_value(csv2, 1, 2)
         # Test evals
         @test function_value(csv1, 1, ue) == function_value(csv2, 1, ue)
-        @test function_gradient(csv1, 1, ue)[1] == function_gradient(csv2, 1, ue)[1]
-        @test 0.0 == function_gradient(csv2, 1, ue)[2]
+        if vdim == 0
+            @test function_gradient(csv1, 1, ue)[1] == function_gradient(csv2, 1, ue)[1]
+            @test 0.0 == function_gradient(csv2, 1, ue)[2]
+        else
+            @test function_gradient(csv1, 1, ue)[:, 1] == function_gradient(csv2, 1, ue)[:, 1]
+            @test                          zeros(vdim) == function_gradient(csv2, 1, ue)[:, 2]
+        end
 
         ## sdim = 3, Consistency with 1D
         csv3 = CellValues(qr, ip, ip_base^3)
@@ -201,9 +206,14 @@ end
         @test shape_value(csv1, 1, 2) == shape_value(csv3, 1, 2)
         # Test evals
         @test function_value(csv1, 1, ue) == function_value(csv3, 1, ue)
-        @test function_gradient(csv1, 1, ue)[1] == function_gradient(csv3, 1, ue)[1]
-        @test 0.0 == function_gradient(csv3, 1, ue)[2]
-        @test 0.0 == function_gradient(csv3, 1, ue)[3]
+        if vdim == 0
+            @test function_gradient(csv1, 1, ue)[1] == function_gradient(csv3, 1, ue)[1]
+            @test 0.0 == function_gradient(csv3, 1, ue)[2]
+            @test 0.0 == function_gradient(csv3, 1, ue)[3]
+        else
+            @test function_gradient(csv1, 1, ue)[:, 1] == function_gradient(csv3, 1, ue)[:, 1]
+            @test zeros(vdim, 2)                       == function_gradient(csv3, 1, ue)[:, 2:3]
+        end
 
         ## sdim = 3, Consistency in 2D
         reinit!(csv2, [Vec((-1.0, 2.0)), Vec((3.0, -4.0))])
@@ -215,9 +225,13 @@ end
         @test getdetJdV(csv2, 1) == getdetJdV(csv3, 1)
         # Test evals
         @test function_value(csv2, 1, ue) == function_value(csv3, 1, ue)
-        @test function_gradient(csv2, 1, ue)[1] == function_gradient(csv3, 1, ue)[1]
-        @test function_gradient(csv2, 1, ue)[2] == function_gradient(csv3, 1, ue)[2]
-        @test                               0.0 == function_gradient(csv3, 1, ue)[3]
+        if vdim == 0
+            @test function_gradient(csv2, 1, ue)[1:2] == function_gradient(csv3, 1, ue)[1:2]
+            @test                                 0.0 == function_gradient(csv3, 1, ue)[3]
+        else
+            @test function_gradient(csv2, 1, ue)[:, 1:2] == function_gradient(csv3, 1, ue)[:, 1:2]
+            @test                            zeros(vdim) == function_gradient(csv3, 1, ue)[:, 3]
+        end
         ## Change plane
         reinit!(csv3, [Vec((-1.0, 0.0, 2.0)), Vec((3.0, 0.0, -4.0))])
         # Test spatial interpolation
@@ -226,9 +240,15 @@ end
         @test getdetJdV(csv2, 1) == getdetJdV(csv3, 1)
         # Test evals
         @test function_value(csv2, 1, ue) == function_value(csv3, 1, ue)
-        @test function_gradient(csv2, 1, ue)[1] == function_gradient(csv3, 1, ue)[1]
-        @test                               0.0 == function_gradient(csv3, 1, ue)[2]
-        @test function_gradient(csv2, 1, ue)[2] == function_gradient(csv3, 1, ue)[3]
+        if vdim == 0
+            @test function_gradient(csv2, 1, ue)[1] == function_gradient(csv3, 1, ue)[1]
+            @test                               0.0 == function_gradient(csv3, 1, ue)[2]
+            @test function_gradient(csv2, 1, ue)[2] == function_gradient(csv3, 1, ue)[3]
+        else
+            @test function_gradient(csv2, 1, ue)[:, 1] == function_gradient(csv3, 1, ue)[:, 1]
+            @test                          zeros(vdim) == function_gradient(csv3, 1, ue)[:, 2]
+            @test function_gradient(csv2, 1, ue)[:, 2] == function_gradient(csv3, 1, ue)[:, 3]
+        end
     end
 
     @testset "Scalar/vector on surface (vdim = $vdim)" for vdim in (0, 1, 2, 3)
@@ -247,12 +267,12 @@ end
         @test getdetJdV(csv2, 1) == getdetJdV(csv3, 1)
         # Test evals
         @test function_value(csv2, 1, ue) == function_value(csv3, 1, ue)
-        @test function_gradient(csv2, 1, ue)[1] == function_gradient(csv3, 1, ue)[1]
-        @test function_gradient(csv2, 1, ue)[2] == function_gradient(csv3, 1, ue)[2]
-        if vdim != 2
-            @test                               0.0 == function_gradient(csv3, 1, ue)[3]
+        if vdim == 0
+            @test function_gradient(csv2, 1, ue)[1:2] == function_gradient(csv3, 1, ue)[1:2]
+            @test                                 0.0 == function_gradient(csv3, 1, ue)[3]
         else
-            @test_broken                        0.0 == function_gradient(csv3, 1, ue)[3]
+            @test function_gradient(csv2, 1, ue)[:, 1:2] == function_gradient(csv3, 1, ue)[:, 1:2]
+            @test                            zeros(vdim) == function_gradient(csv3, 1, ue)[:, 3]
         end
     end
 end
