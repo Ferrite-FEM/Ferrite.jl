@@ -76,10 +76,10 @@ function FaceValues(qr::QR, ip::IP, gip::GIP, ::Type{N_t}, ::Type{dNdx_t}, ::Typ
 
     for face in 1:n_faces, (qp, ξ) in pairs(fqr[face].points)
         for basefunc in 1:n_func_basefuncs
-            dNdξ[basefunc, qp, face], N[basefunc, qp, face] = gradient(ξ -> value(ip, basefunc, ξ), ξ, :all)
+            dNdξ[basefunc, qp, face], N[basefunc, qp, face] = gradient_and_value(ip, basefunc, ξ)
         end
         for basefunc in 1:n_geom_basefuncs
-            dMdξ[basefunc, qp, face], M[basefunc, qp, face] = gradient(ξ -> value(gip, basefunc, ξ), ξ, :all)
+            dMdξ[basefunc, qp, face], M[basefunc, qp, face] = gradient_and_value(gip, basefunc, ξ)
         end
     end
 

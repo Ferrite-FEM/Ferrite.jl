@@ -68,10 +68,10 @@ function CellValues(qr::QR, ip::IP, gip::GIP, ::Type{N_t}, ::Type{dNdx_t}, ::Typ
 
     for (qp, ξ) in pairs(getpoints(qr))
         for basefunc in 1:n_func_basefuncs
-            dNdξ[basefunc, qp], N[basefunc, qp] = gradient(ξ -> value(ip, basefunc, ξ), ξ, :all)
+            dNdξ[basefunc, qp], N[basefunc, qp] = gradient_and_value(ip, basefunc, ξ)
         end
         for basefunc in 1:n_geom_basefuncs
-            dMdξ[basefunc, qp], M[basefunc, qp] = gradient(ξ -> value(gip, basefunc, ξ), ξ, :all)
+            dMdξ[basefunc, qp], M[basefunc, qp] = gradient_and_value(gip, basefunc, ξ)
         end
     end
 
@@ -221,7 +221,7 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
     # Function interpolation
     N_t    = SVector{vdim, T}
     dNdx_t = MMatrix{vdim, sdim, T, vdim*sdim}
-    dNdξ_t = SMatrix{vdim, rdim, T, rdim*sdim}
+    dNdξ_t = SMatrix{vdim, rdim, T, vdim*rdim}
 
     # Geometry interpolation
     #M_t    = T
