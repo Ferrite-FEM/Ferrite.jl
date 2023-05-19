@@ -198,6 +198,10 @@ function derivative(ip::InterpolationByDim{dim}, ξ::Vec{dim,T}) where {dim,T}
     [gradient(ξ -> value(ip, i, ξ), ξ) for i in 1:getnbasefunctions(ip)]
 end
 
+function gradient_and_value(ip::Interpolation, i::Int, x::Vec)
+    return gradient(ξ -> value(ip, i, ξ), x, :all)
+end
+
 #####################
 # Utility functions #
 #####################
@@ -1224,6 +1228,28 @@ function value(ipv::VectorizedInterpolation{vdim, shape}, I::Int, ξ::Vec{refdim
     c = c0 + 1
     v = value(ipv.ip, i, ξ)
     return Vec{vdim, T}(j -> j == c ? v : zero(v))
+end
+
+# vdim == refdim
+function gradient_and_value(ipv::VectorizedInterpolation{dim, shape}, I::Int, ξ::Vec{dim}) where {dim, shape <: AbstractRefShape{dim}}
+    return invoke(gradient_and_value, Tuple{Interpolation, Int, Vec}, ipv, I, ξ)
+end
+# vdim != refdim
+function gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, I::Int, ξ::V) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
+    # Load with dual numbers and compute the value
+    f = x -> value(ipv, I, x)
+    ξd = Tensors._load(ξ, Tensors.Tag(f, V))
+    value_grad = value(ipv, I, ξd)
+    # Extract the value and gradient
+    val = Vec{vdim, T}(i -> Tensors.value(value_grad[i]))
+    grad = zero(MMatrix{vdim, refdim, T})
+    for (i, vi) in pairs(value_grad)
+        p = Tensors.partials(vi)
+        for (j, pj) in pairs(p)
+            grad[i, j] = pj
+        end
+    end
+    return SMatrix(grad), val
 end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)

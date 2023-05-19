@@ -5,6 +5,7 @@ using Reexport
 
 using LinearAlgebra
 using SparseArrays
+using StaticArrays
 using Base: @propagate_inbounds
 using NearestNeighbors
 using EnumX

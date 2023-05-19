@@ -8,12 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - `DofHandler` now supports fields on subdomains and mixed grids. ([#667][github-667])
+- Support for embedded elements in `CellValues`. ([#651][github-651])
+- Support for vectorized interpolations with dimension different from the spatial 
+  dimension in `CellValues`. ([#651][github-651])
 - All keyword arguments supported by `WriteVTK.jl` can be given to `vtk_grid` (only `compress` earlier) ([#687][github-687])
 
 ### Removed
 - **BREAKING**: `MixedDofHandler` has been renamed to `DofHandler`. Update by replacing 
 `MixedDofHandler` to `DofHandler`. ([#667][github-667])
 
+### Other improvements
+- **BREAKING**: All `CellValues` have a finer granularity on the different types of
+  dimensions used. Custom `CellValues` and dispatches on their type parameters must be 
+  updated to respect the new type. ([#651][github-651])
 
 ## [0.3.14] - 2023-04-03
 ### Added
@@ -416,6 +423,7 @@ poking into Ferrite internals:
 [github-645]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/645
 [github-647]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/647
 [github-650]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/650
+[github-651]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/651
 [github-653]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/653
 [github-656]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/656
 [github-658]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/658
