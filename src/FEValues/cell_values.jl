@@ -135,11 +135,12 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
 end
 
-# reinit! for regular (non-embedded) elements
-function reinit!(cv::CellValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T}}) where {
-    dim, T,
-    N_t    <: Union{Number,   Vec{dim}},
-    dNdx_t <: Union{Vec{dim}, Tensor{2, dim}}
+# reinit! for regular (non-embedded) elements (rdim == sdim)
+function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{dim,T}}) where {
+    dim, T, vdim,
+    N_t    <: Union{Number,   Vec{dim},       SVector{vdim}     },
+    dNdx_t <: Union{Vec{dim}, Tensor{2, dim}, SMatrix{vdim, dim}},
+    dNdξ_t <: Union{Vec{dim}, Tensor{2, dim}, SMatrix{vdim, dim}},
 }
     n_geom_basefuncs = getngeobasefunctions(cv)
     n_func_basefuncs = getnbasefunctions(cv)
@@ -156,14 +157,21 @@ function reinit!(cv::CellValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T
         cv.detJdV[i] = detJ * w
         Jinv = inv(fecv_J)
         for j in 1:n_func_basefuncs
-            cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
+            # cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
+            cv.dNdx[j, i] = dothelper(cv.dNdξ[j, i], Jinv)
         end
     end
 end
 
 # Hotfix to get the dots right for embedded elements until mixed tensors are merged.
-@inline dothelper(x::SVector, A::SMatrix) = A' * x
-@inline dothelper(B::SMatrix, A::SMatrix) = B * A
+# Scalar/Vector interpolations with sdim == rdim (== vdim)
+@inline dothelper(A, B) = A ⋅ B
+# Vector interpolations with sdim == rdim != vdim
+@inline dothelper(A::SMatrix{vdim, dim}, B::Tensor{2, dim}) where {vdim, dim} = A * SMatrix{dim, dim}(B)
+# Scalar interpolations with sdim > rdim
+@inline dothelper(A::SVector{rdim}, B::SMatrix{rdim, sdim}) where {rdim, sdim} = B' * A
+# Vector interpolations with sdim > rdim
+@inline dothelper(B::SMatrix{vdim, rdim}, A::SMatrix{rdim, sdim}) where {vdim, rdim, sdim} = B * A
 
 # Entrypoint for embedded `ScalarInterpolation`s (rdim < sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
@@ -238,7 +246,7 @@ Reinit for embedded elements, i.e. elements whose reference dimension is smaller
 """
 function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{sdim,T}}) where {
     rdim, sdim, vdim, T,
-    N_t    <: Union{Number,           Vec{vdim}},
+    N_t    <: Union{Number,           SVector{vdim}},
     dNdx_t <: Union{SVector{sdim, T}, SMatrix{vdim, sdim, T}},
     dNdξ_t <: Union{SVector{rdim, T}, SMatrix{vdim, rdim, T}},
 }

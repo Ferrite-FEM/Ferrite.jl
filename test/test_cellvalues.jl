@@ -165,16 +165,17 @@ end
 end
 
 @testset "Embedded elements" begin
-    @testset "Scalar on curves" begin
-        ue = [-1.5, 2.0]
-        ip = Lagrange{RefLine,1}()
+    @testset "Scalar/vector on curves (vdim = $vdim)" for vdim in (0, 1, 2, 3)
+        ip_base = Lagrange{RefLine,1}()
+        ip = vdim > 0 ? ip_base^vdim : ip_base
+        ue = 2 * rand(getnbasefunctions(ip))
         qr = QuadratureRule{1,RefLine}(1)
         # Reference values
         csv1 = CellValues(qr, ip)
         reinit!(csv1, [Vec((0.0,)), Vec((1.0,))])
 
-        ## Consistency with 1D
-        csv2 = CellValues(qr, ip, ip^2)
+        ## sdim = 2, Consistency with 1D
+        csv2 = CellValues(qr, ip, ip_base^2)
         reinit!(csv2, [Vec((0.0, 0.0)), Vec((1.0, 0.0))])
         # Test spatial interpolation
         @test spatial_coordinate(csv2, 1, [Vec((0.0, 0.0)), Vec((1.0, 0.0))]) == Vec{2}((0.5, 0.0))
@@ -188,8 +189,8 @@ end
         @test function_gradient(csv1, 1, ue)[1] == function_gradient(csv2, 1, ue)[1]
         @test 0.0 == function_gradient(csv2, 1, ue)[2]
 
-        ## Consistency with 1D
-        csv3 = CellValues(qr, ip, ip^3)
+        ## sdim = 3, Consistency with 1D
+        csv3 = CellValues(qr, ip, ip_base^3)
         reinit!(csv3, [Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0))])
         # Test spatial interpolation
         @test spatial_coordinate(csv3, 1, [Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0))]) == Vec{3}((0.5, 0.0, 0.0))
@@ -204,7 +205,7 @@ end
         @test 0.0 == function_gradient(csv3, 1, ue)[2]
         @test 0.0 == function_gradient(csv3, 1, ue)[3]
 
-        ## Consistency in 2D
+        ## sdim = 3, Consistency in 2D
         reinit!(csv2, [Vec((-1.0, 2.0)), Vec((3.0, -4.0))])
         reinit!(csv3, [Vec((-1.0, 2.0, 0.0)), Vec((3.0, -4.0, 0.0))])
         # Test spatial interpolation
@@ -230,12 +231,13 @@ end
         @test function_gradient(csv2, 1, ue)[2] == function_gradient(csv3, 1, ue)[3]
     end
 
-    @testset "Scalar on surface" begin
-        ue = [-1.5, 2.0, 3.0, -1.0]
-        ip = Lagrange{RefQuadrilateral,1}()
+    @testset "Scalar/vector on surface (vdim = $vdim)" for vdim in (0, 1, 2, 3)
+        ip_base = Lagrange{RefQuadrilateral,1}()
+        ip = vdim > 0 ? ip_base^vdim : ip_base
+        ue = rand(getnbasefunctions(ip))
         qr = QuadratureRule{2,RefQuadrilateral}(1)
         csv2 = CellValues(qr, ip)
-        csv3 = CellValues(qr, ip, ip^3)
+        csv3 = CellValues(qr, ip, ip_base^3)
         reinit!(csv2, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))])
         reinit!(csv3, [Vec((-1.0,-1.0,0.0)), Vec((1.0,-1.0,0.0)), Vec((1.0,1.0,0.0)), Vec((-1.0,1.0,0.0))])
         # Test spatial interpolation
@@ -247,7 +249,11 @@ end
         @test function_value(csv2, 1, ue) == function_value(csv3, 1, ue)
         @test function_gradient(csv2, 1, ue)[1] == function_gradient(csv3, 1, ue)[1]
         @test function_gradient(csv2, 1, ue)[2] == function_gradient(csv3, 1, ue)[2]
-        @test                               0.0 == function_gradient(csv3, 1, ue)[3]
+        if vdim != 2
+            @test                               0.0 == function_gradient(csv3, 1, ue)[3]
+        else
+            @test_broken                        0.0 == function_gradient(csv3, 1, ue)[3]
+        end
     end
 end
 
