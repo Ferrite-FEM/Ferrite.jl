@@ -49,11 +49,13 @@ struct FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP} <: Ab
     geo_interp::GIP
 end
 
-"""
-    FaceValues(qr::QR, ip::IP, gip::GIP, ::Type{dNdx_t}, ::Type{dNdξ_t}, ::Type{T}, ::Type{dMdξ_t}, ::Type{Normal_t})
-Common initializer code for constructing cell values after the types have been determined.
-"""
-function FaceValues(qr::QR, ip::IP, gip::GIP, ::Type{N_t}, ::Type{dNdx_t}, ::Type{dNdξ_t}, ::Type{T}, ::Type{dMdξ_t}, ::Type{Normal_t}) where {QR, IP, GIP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, Normal_t}    
+# Common initializer code for constructing FaceValues after the types have been determined
+function FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(qr::QR, ip::IP, gip::GIP) where {
+    IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP,
+}
+    @assert isconcretetype(IP)     && isconcretetype(N_t)      && isconcretetype(dNdx_t) &&
+            isconcretetype(dNdξ_t) && isconcretetype(T)        && isconcretetype(dMdξ_t) &&
+            isconcretetype(QR)     && isconcretetype(Normal_t) && isconcretetype(GIP)
     # Quadrature
     @assert getdim(ip) == getdim(qr) + 1
     n_qpoints = length(getweights(qr))
@@ -71,7 +73,7 @@ function FaceValues(qr::QR, ip::IP, gip::GIP, ::Type{N_t}, ::Type{dNdx_t}, ::Typ
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(gip)
-    M    = fill(zero(T)    * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
+    M    = fill(zero(T)      * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
     dMdξ = fill(zero(dMdξ_t) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
 
     for face in 1:n_faces, (qp, ξ) in pairs(fqr[face].points)
@@ -88,32 +90,31 @@ function FaceValues(qr::QR, ip::IP, gip::GIP, ::Type{N_t}, ::Type{dNdx_t}, ::Typ
     FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, qr, ScalarWrapper(0), ip, gip)
 end
 
-# (Scalar|Vector)Interpolation, (vdim ==) refdim == spacedim -> Tensors
+# Common entry point that just defaults the numeric type to Float64
 function FaceValues(qr::QuadratureRule, ip::Interpolation,
-                    gip::Interpolation = default_geometric_interpolation(ip))
+        gip::Interpolation = default_geometric_interpolation(ip))
     return FaceValues(Float64, qr, ip, gip)
 end
-# TODO: This doesn't actually work for T != Float64
+
+# Entrypoint for `ScalarInterpolation`s (rdim == sdim)
 function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
     qdim, dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{qdim, shape},
     IP  <: ScalarInterpolation{shape},
-    GIP <: ScalarInterpolation{shape}
+    GIP <: ScalarInterpolation{shape},
 }
     # Normals
     Normal_t = Vec{dim, T}
-
     # Function interpolation
     N_t = T
     dNdx_t = dNdξ_t = Vec{dim, T}
-
     # Geometry interpolation
-    #M_t    = T
+    M_t    = T
     dMdξ_t = Vec{dim, T}
-
-    return FaceValues(qr, ip, gip, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, Normal_t)
+    return FaceValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, Normal_t, GIP}(qr, ip, gip)
 end
 
+# Entrypoint for `VectorInterpolation`s (vdim == rdim == sdim)
 function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
     qdim, dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{qdim, shape},
@@ -122,16 +123,13 @@ function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
 }
     # Normals
     Normal_t = Vec{dim, T}
-
     # Function interpolation
     N_t    = Vec{dim, T}
     dNdx_t = dNdξ_t = Tensor{2, dim, T, Tensors.n_components(Tensor{2,dim})}
-
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{dim, T}
-
-    return FaceValues(qr, ip, gip, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, Normal_t)
+    return FaceValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, Normal_t, GIP}(qr, ip, gip)
 end
 
 function reinit!(fv::FaceValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T}}, face::Int) where {

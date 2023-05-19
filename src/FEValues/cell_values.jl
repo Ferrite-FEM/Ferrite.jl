@@ -48,10 +48,13 @@ struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCell
     gip::GIP
 end
 
-# Common initializer code for constructing cell values after the types have been determined
+# Common initializer code for constructing CellValues after the types have been determined
 function CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(qr::QR, ip::IP, gip::GIP) where {
-    QR, IP, GIP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t,
+    IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP,
 }
+    @assert isconcretetype(IP)     && isconcretetype(N_t) && isconcretetype(dNdx_t) &&
+            isconcretetype(dNdξ_t) && isconcretetype(T)   && isconcretetype(dMdξ_t) &&
+            isconcretetype(QR)     && isconcretetype(GIP)
     n_qpoints = length(getweights(qr))
 
     # Field interpolation
@@ -62,7 +65,7 @@ function CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(qr::QR, ip::I
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(gip)
-    M    = fill(zero(T)    * T(NaN), n_geom_basefuncs, n_qpoints)
+    M    = fill(zero(T)      * T(NaN), n_geom_basefuncs, n_qpoints)
     dMdξ = fill(zero(dMdξ_t) * T(NaN), n_geom_basefuncs, n_qpoints)
 
     for (qp, ξ) in pairs(getpoints(qr))
@@ -142,7 +145,7 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
 end
 
-# reinit! for non-embedded elements
+# reinit! for regular (non-embedded) elements
 function reinit!(cv::CellValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T}}) where {
     dim, T,
     N_t    <: Union{Number,   Vec{dim}},
