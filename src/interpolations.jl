@@ -385,6 +385,7 @@ IsDiscontinuous(::Type{<:DiscontinuousLagrange}) = true
 IsDiscontinuous(::DiscontinuousLagrange) = true
 
 get_continuous_interpolation(::DiscontinuousLagrange{ref_shape,order}) where {ref_shape, order} = Lagrange{ref_shape,order}()
+get_continuous_interpolation(::Type{<:DiscontinuousLagrange{ref_shape,order}}) where {ref_shape, order} = Lagrange{ref_shape,order}
 
 ############
 # Lagrange #
@@ -1237,6 +1238,7 @@ end
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
 
 IsDiscontinuous(ipv::VectorizedInterpolation) = IsDiscontinuous(ipv.ip)
+IsDiscontinuous(::Type{<:VectorizedInterpolation{vdim, refshape, order, ip}}) where {vdim, refshape, order, ip<:DiscontinuousLagrange}= IsDiscontinuous(ip)
 
 get_continuous_interpolation(ipv::VectorizedInterpolation{vdim}) where {vdim} = VectorizedInterpolation{vdim}(get_continuous_interpolation(ipv.ip))
 get_continuous_interpolation(::Type{<:VectorizedInterpolation{vdim, refshape, order, <:DiscontinuousLagrange{ip_shape, ip_order}}}) where {vdim, refshape, order, ip_shape, ip_order} = VectorizedInterpolation{vdim}(Lagrange{ip_shape, ip_order}())
