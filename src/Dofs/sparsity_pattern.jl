@@ -291,9 +291,9 @@ for (func,                              pre_f,                                  
     @eval begin
         function $(func)(dh::AbstractDofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing} ; max_buffer_length::Int = 0)
             $(pre_f)
-            element_dof_start = 0
             cnt = 0
             for (fhi, fh) in pairs(dh.fieldhandlers)
+                element_dof_start = 0
                 isnothing(couplings) || (coupling_fh = couplings[fhi])
                 for fi in fh.field_interpolations
                     if(!IsDiscontinuous(fi))

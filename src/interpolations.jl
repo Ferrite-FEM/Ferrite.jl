@@ -1241,4 +1241,4 @@ IsDiscontinuous(ipv::VectorizedInterpolation) = IsDiscontinuous(ipv.ip)
 IsDiscontinuous(::Type{<:VectorizedInterpolation{vdim, refshape, order, ip}}) where {vdim, refshape, order, ip<:DiscontinuousLagrange}= IsDiscontinuous(ip)
 
 get_continuous_interpolation(ipv::VectorizedInterpolation{vdim}) where {vdim} = VectorizedInterpolation{vdim}(get_continuous_interpolation(ipv.ip))
-get_continuous_interpolation(::Type{<:VectorizedInterpolation{vdim, refshape, order, <:DiscontinuousLagrange{ip_shape, ip_order}}}) where {vdim, refshape, order, ip_shape, ip_order} = VectorizedInterpolation{vdim}(Lagrange{ip_shape, ip_order}())
+get_continuous_interpolation(::Type{<:VectorizedInterpolation{vdim, refshape, order, ip}}) where {vdim, refshape, order, ip<:DiscontinuousLagrange} = VectorizedInterpolation{vdim, refshape, order, get_continuous_interpolation(ip)}

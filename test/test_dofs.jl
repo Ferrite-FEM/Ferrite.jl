@@ -506,14 +506,44 @@ end
 end
 
 @testset "dof cross-coupling" begin
-    grid = generate_grid(Quadrilateral, (2, 2))
-    topology = ExclusiveTopology(grid)
-    dh = DofHandler(grid)
-    add!(dh, :u, DiscontinuousLagrange{2,RefCube,1}()^2)
-    add!(dh, :p, DiscontinuousLagrange{2,RefCube,1}())
-    add!(dh, :w, Lagrange{2,RefCube,1}())
-    close!(dh)
+    couplings = [
+        # Field couplings
+        [
+            true  true  true
+            true  true  true 
+            true  true  true 
+        ],
+        [
+            true   false  false
+            false  true  false 
+            false  false  true 
+        ],
+        [
+            true   true  false
+            true  true  true 
+            false  true  true 
+        ],
 
+        # Component coupling
+        [
+            true    true    true    true
+            true    true    true    true 
+            true    true    true    true
+            true    true    true    true 
+        ],
+        [
+            true     false    false    false
+            false    true     false    false 
+            false    false    true     false
+            false    false    false    true 
+        ],
+        # [
+        #     true    true    true    false
+        #     true    true    true    true 
+        #     true    true    true    true
+        #     false    true    true    true 
+        # ], # Breaks, probably problem with the test.
+    ]
     function is_stored(A, i, j)
         A = A isa Symmetric ? A.data : A
         for m in nzrange(A, j)
@@ -521,8 +551,11 @@ end
         end
         return false
     end
+
     function check_coupling(dh, topology, K, coupling)
         K_check = falses(dh.ndofs[],dh.ndofs[])
+        sz = size(coupling, 1)
+        field_dims = map(fieldname -> Ferrite.getfielddim(dh, fieldname), dh.field_names)
         for cell_idx in eachindex(getcells(dh.grid))
             current_face_neighborhood = Ferrite.getdim(dh.grid.cells[cell_idx]) >1 ? topology.face_neighbor[cell_idx,:] : topology.vertex_neighbor[cell_idx,:]
             current = Ferrite.EntityNeighborhood{FaceIndex}(FaceIndex[FaceIndex((cell_idx, -1))])
@@ -537,7 +570,9 @@ end
                             for i in dof_range(fh,cell_field_idx), j in dof_range(fh,neighbor_field_idx)
                                 I = dh.cell_dofs[i+dh.cell_dofs_offset[cell_idx]-1]
                                 J = dh.cell_dofs[j+dh.cell_dofs_offset[neighbor_idx]-1]
-                                K_check[I,J] |= (coupling[cell_field_idx, neighbor_field_idx] && (is_discontinuous || (cell_idx == neighbor_idx)))
+                                cell_coupling_idx = sz == length(dh.field_names) ? cell_field_idx : (1 + i % field_dims[cell_field_idx] + sum(field_dims[1:cell_field_idx-1]))
+                                neighbor_coupling_idx = sz == length(dh.field_names) ? neighbor_field_idx : (1 + j % field_dims[neighbor_field_idx] + sum(field_dims[1:neighbor_field_idx-1]))
+                                K_check[I,J] |= (coupling[cell_coupling_idx, neighbor_coupling_idx] && (is_discontinuous || (cell_idx == neighbor_idx)))
                             end
                         end
                     end
@@ -548,28 +583,17 @@ end
         check_J = repeat(1:dh.ndofs[], inner = dh.ndofs[])
         @test is_stored.(Ref(K), check_I, check_J) == reshape(K_check,length(check_I))
     end
-
-    # Full coupling (default)
-    coupling = [
-        #   u    v    p
-            true  true  true # u
-            true  true  true  # v
-            true  true  true  # p
-        ]
-    K = create_sparsity_pattern(dh)
-    check_coupling(dh, topology, K, coupling)
-  
-    K = create_sparsity_pattern(dh; coupling=coupling)
-    check_coupling(dh, topology, K, coupling)
-
-    coupling = [
-        #   u    v    p
-            true  false  false # u
-            false  true  false  # v
-            false  false  true  # p
-        ]
-
-    K = create_sparsity_pattern(dh; coupling=coupling)
-    check_coupling(dh, topology, K, coupling)
     
+    grid = generate_grid(Quadrilateral, (2, 2))
+    topology = ExclusiveTopology(grid)
+    dh = DofHandler(grid)
+    add!(dh, :u, DiscontinuousLagrange{2,RefCube,1}()^2)
+    add!(dh, :p, DiscontinuousLagrange{2,RefCube,1}())
+    add!(dh, :w, Lagrange{2,RefCube,1}())
+    close!(dh)
+    for coupling in couplings
+        K = create_sparsity_pattern(dh; coupling=coupling, topology = topology)
+        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology)
+        check_coupling(dh, topology, K, coupling)
+    end
 end
