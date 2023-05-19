@@ -174,7 +174,7 @@ end
         reinit!(csv1, [Vec((0.0,)), Vec((1.0,))])
 
         ## Consistency with 1D
-        csv2 = CellValues(2, qr, ip)
+        csv2 = CellValues(qr, ip, ip^2)
         reinit!(csv2, [Vec((0.0, 0.0)), Vec((1.0, 0.0))])
         # Test spatial interpolation
         @test spatial_coordinate(csv2, 1, [Vec((0.0, 0.0)), Vec((1.0, 0.0))]) == Vec{2}((0.5, 0.0))
@@ -189,7 +189,7 @@ end
         @test 0.0 == function_gradient(csv2, 1, ue)[2]
 
         ## Consistency with 1D
-        csv3 = CellValues(3, qr, ip)
+        csv3 = CellValues(qr, ip, ip^3)
         reinit!(csv3, [Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0))])
         # Test spatial interpolation
         @test spatial_coordinate(csv3, 1, [Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0))]) == Vec{3}((0.5, 0.0, 0.0))
@@ -235,7 +235,7 @@ end
         ip = Lagrange{RefQuadrilateral,1}()
         qr = QuadratureRule{2,RefQuadrilateral}(1)
         csv2 = CellValues(qr, ip)
-        csv3 = CellValues(3, qr, ip)
+        csv3 = CellValues(qr, ip, ip^3)
         reinit!(csv2, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))])
         reinit!(csv3, [Vec((-1.0,-1.0,0.0)), Vec((1.0,-1.0,0.0)), Vec((1.0,1.0,0.0)), Vec((-1.0,1.0,0.0))])
         # Test spatial interpolation

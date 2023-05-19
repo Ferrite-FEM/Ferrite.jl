@@ -1,17 +1,16 @@
 """
-    CellValues([sdim::Int,] [::Type{T},] quad_rule::QuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
+    CellValues([::Type{T},] quad_rule::QuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
 
 A `CellValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
 values of nodal functions, gradients and divergences of nodal functions etc. in the finite element cell.
 
 **Arguments:**
-
-* `sdim`: an optional argument to determine the spatial dimension when using embedded elements.
 * `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
 * `quad_rule`: an instance of a [`QuadratureRule`](@ref)
 * `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
 * `geom_interpol`: an optional instance of a [`Interpolation`](@ref) which is used to interpolate the geometry.
-  By default linear Lagrange interpolation is used.
+  By default linear Lagrange interpolation is used. For embedded elements the geometric interpolations should
+  be vectorized to the spatial dimension.
 
 **Common methods:**
 
@@ -86,15 +85,6 @@ end
 function CellValues(qr::QuadratureRule, ip::Interpolation,
         gip::Interpolation = default_geometric_interpolation(ip))
     return CellValues(Float64, qr, ip, gip)
-end
-
-"""
-    CellValues(sdim::Int, qr::QuadratureRule, ip::Interpolation, gip::Interpolation = default_geometric_interpolation(ip))
-Constructs an evaluation helper for embedded elements. We will use StaticArrays.jl in this case to store everything.
-"""
-function CellValues(sdim::Int, qr::QuadratureRule, ip::Interpolation,
-        gip::Interpolation = default_geometric_interpolation(ip))
-    return CellValues(Float64, qr, ip, gip, Val(sdim))
 end
 
 # Entrypoint for `ScalarInterpolation`s (rdim == sdim)
@@ -176,11 +166,12 @@ end
 @inline dothelper(B::SMatrix, A::SMatrix) = B * A
 
 # Entrypoint for embedded `ScalarInterpolation`s (rdim < sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
+function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     sdim, rdim, shape <: AbstractRefShape{rdim}, T,
     QR  <: QuadratureRule{rdim, shape},
     IP  <: ScalarInterpolation{shape},
-    GIP <: ScalarInterpolation{shape}
+    GIP <: ScalarInterpolation{shape},
+    VGIP <: VectorizedInterpolation{sdim, shape, <:Any, GIP},
 }
     @assert sdim > rdim
     # Function interpolation
@@ -190,15 +181,16 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{rdim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
+    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
 end
 
 # Entrypoint for embedded `VectorInterpolation`s (rdim < sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
+function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     sdim, vdim, rdim, shape <: AbstractRefShape{rdim}, T,
     QR  <: QuadratureRule{rdim, shape},
     IP  <: VectorInterpolation{vdim, shape},
-    GIP <: ScalarInterpolation{shape}
+    GIP <: ScalarInterpolation{shape},
+    VGIP <: VectorizedInterpolation{sdim, shape, <:Any, GIP},
 }
     @assert sdim > rdim
     # Function interpolation
@@ -208,7 +200,7 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{rdim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
+    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
 end
 
 """
