@@ -537,12 +537,12 @@ end
             false    false    true     false
             false    false    false    true 
         ],
-        # [
-        #     true    true    true    false
-        #     true    true    true    true 
-        #     true    true    true    true
-        #     false    true    true    true 
-        # ], # Breaks, probably problem with the test.
+        [
+            true    true    true    false
+            true    true    true    true 
+            true    true    true    true
+            false    true    true    true 
+        ],
     ]
     function is_stored(A, i, j)
         A = A isa Symmetric ? A.data : A
@@ -565,14 +565,16 @@ end
                 for (fhi, fh) in pairs(dh.fieldhandlers)
                     for (cell_field_idx, cell_field) in pairs(fh.fields) 
                         is_discontinuous = Ferrite.IsDiscontinuous(cell_field.interpolation)
-                        for (neighbor_field_idx, neighbor_field) in pairs(fh.fields) 
-                            is_discontinuous &= Ferrite.IsDiscontinuous(neighbor_field.interpolation)
-                            for i in dof_range(fh,cell_field_idx), j in dof_range(fh,neighbor_field_idx)
-                                I = dh.cell_dofs[i+dh.cell_dofs_offset[cell_idx]-1]
-                                J = dh.cell_dofs[j+dh.cell_dofs_offset[neighbor_idx]-1]
-                                cell_coupling_idx = sz == length(dh.field_names) ? cell_field_idx : (1 + i % field_dims[cell_field_idx] + sum(field_dims[1:cell_field_idx-1]))
-                                neighbor_coupling_idx = sz == length(dh.field_names) ? neighbor_field_idx : (1 + j % field_dims[neighbor_field_idx] + sum(field_dims[1:neighbor_field_idx-1]))
-                                K_check[I,J] |= (coupling[cell_coupling_idx, neighbor_coupling_idx] && (is_discontinuous || (cell_idx == neighbor_idx)))
+                        for (nfhi, nfh) in pairs(dh.fieldhandlers)
+                            for (neighbor_field_idx, neighbor_field) in pairs(nfh.fields) 
+                                is_discontinuous &= Ferrite.IsDiscontinuous(neighbor_field.interpolation)
+                                for (i_idx, i) in pairs(dof_range(fh, cell_field_idx)), (j_idx, j) in pairs(dof_range(nfh,neighbor_field_idx))
+                                    I = dh.cell_dofs[i+dh.cell_dofs_offset[cell_idx]-1]
+                                    J = dh.cell_dofs[j+dh.cell_dofs_offset[neighbor_idx]-1]
+                                    cell_coupling_idx = sz == length(dh.field_names) ? cell_field_idx : (1 + (i_idx - 1) % field_dims[cell_field_idx] + sum(field_dims[1:cell_field_idx-1]))
+                                    neighbor_coupling_idx = sz == length(dh.field_names) ? neighbor_field_idx : (1 + (j_idx - 1) % field_dims[neighbor_field_idx] + sum(field_dims[1:neighbor_field_idx-1]))
+                                    K_check[I,J] |= (coupling[cell_coupling_idx, neighbor_coupling_idx] && (is_discontinuous || (cell_idx == neighbor_idx)))
+                                end
                             end
                         end
                     end
@@ -596,4 +598,30 @@ end
         all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology)
         check_coupling(dh, topology, K, coupling)
     end
+
+    # Error paths
+    @test_throws ErrorException("coupling not square") create_sparsity_pattern(dh; coupling=[true true])
+    @test_throws ErrorException("coupling not symmetric") create_symmetric_sparsity_pattern(dh; coupling=[true true; false true])
+    @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
+ 
+    # Test coupling with subdomains
+    grid = generate_grid(Quadrilateral, (2, 1))
+    topology = ExclusiveTopology(grid)
+    dh = DofHandler(grid)
+    fh1 = FieldHandler(
+        [Field(:u, DiscontinuousLagrange{RefQuadrilateral,1}()^2), Field(:y, DiscontinuousLagrange{RefQuadrilateral,1}()), Field(:p, Lagrange{RefQuadrilateral,1}())],
+        Set(1)
+    )
+    add!(dh, fh1)
+    fh2 = FieldHandler(
+        [Field(:u, DiscontinuousLagrange{RefQuadrilateral,1}()^2)],
+        Set(2)
+    )
+    add!(dh, fh2)
+    close!(dh)
+    # for coupling in couplings
+    #     K = create_sparsity_pattern(dh; coupling=coupling, topology = topology)
+    #     all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology)
+    #     check_coupling(dh, topology, K, coupling)
+    # end # Breaks, implementation error.
 end
