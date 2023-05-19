@@ -48,11 +48,10 @@ struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCell
     gip::GIP
 end
 
-"""
-    CellValues(qr::QR, ip::IP, gip::GIP, ::Type{N_t}, ::Type{dNdx_t}, ::Type{dNdξ_t}, ::Type{T}, ::Type{dMdξ_t})
-Common initializer code for constructing cell values after the types have been determined.
-"""
-function CellValues(qr::QR, ip::IP, gip::GIP, ::Type{N_t}, ::Type{dNdx_t}, ::Type{dNdξ_t}, ::Type{T}, ::Type{dMdξ_t}) where {QR, IP, GIP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t}
+# Common initializer code for constructing cell values after the types have been determined
+function CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(qr::QR, ip::IP, gip::GIP) where {
+    QR, IP, GIP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t,
+}
     n_qpoints = length(getweights(qr))
 
     # Field interpolation
@@ -80,11 +79,7 @@ function CellValues(qr::QR, ip::IP, gip::GIP, ::Type{N_t}, ::Type{dNdx_t}, ::Typ
     CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(N, dNdx, dNdξ, detJdV, M, dMdξ, qr, ip, gip)
 end
 
-"""
-    CellValues(qr::QuadratureRule, ip::Interpolation, gip::Interpolation = default_geometric_interpolation(ip))
-Constructs an evaluation helper for the most common use cases when we can use Tensors.jl for all geometric and 
-function interpolations.
-"""
+# Common entry point that just defaults the numeric type to Float64
 function CellValues(qr::QuadratureRule, ip::Interpolation,
         gip::Interpolation = default_geometric_interpolation(ip))
     return CellValues(Float64, qr, ip, gip)
@@ -99,49 +94,39 @@ function CellValues(sdim::Int, qr::QuadratureRule, ip::Interpolation,
     return CellValues(Float64, qr, ip, gip, Val(sdim))
 end
 
-"""
-    CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, gip::ScalarInterpolation = default_geometric_interpolation(ip))
-Generic constructor for cell values in the case when we either have a scalar-valued interpolation or
-a vector-valued interpolation where the vector dimension matches the reference dimension.
-It is also assumed that the spatial dimension is the same as the reference dimension.
-
-    !!!NOTE This doesn't actually work for T != Float64. We have to refactor the constructor to 
-            separate the geometry data type from the data type of the approximation evaluation.
-"""
+# Entrypoint for `ScalarInterpolation`s (rdim == sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
     dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{dim, shape},
     IP  <: ScalarInterpolation{shape},
-    GIP <: ScalarInterpolation{shape}
+    GIP <: ScalarInterpolation{shape},
 }
     # Function interpolation
     N_t    = T
     dNdx_t = dNdξ_t = Vec{dim, T}
-
     # Geometry interpolation
-    #M_t    = T
+    M_t    = T
     dMdξ_t = Vec{dim, T}
-
-    return CellValues(qr, ip, gip, N_t, dNdx_t, dNdξ_t, T, dMdξ_t)
+    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
 end
 
+# Entrypoint for `VectorInterpolation`s (vdim == rdim == sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
     dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{dim, shape},
     IP  <: VectorInterpolation{dim, shape},
-    GIP <: ScalarInterpolation{shape}
+    GIP <: ScalarInterpolation{shape},
 }
     # Field interpolation
     N_t    = Vec{dim, T}
     dNdx_t = dNdξ_t = Tensor{2, dim, T, Tensors.n_components(Tensor{2,dim})}
-
     # Geometry interpolation
-    #M_t    = T
+    M_t    = T
     dMdξ_t = Vec{dim, T}
-
-    return CellValues(qr, ip, gip, N_t, dNdx_t, dNdξ_t, T, dMdξ_t)
+    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
 end
 
+# Entrypoint for `VectorInterpolation`s (vdim != rdim == sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
     vdim, dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{dim, shape},
@@ -150,16 +135,14 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
 }
     # Field interpolation
     N_t    = SVector{vdim, T}
-    dNdx_t = MMatrix{vdim, dim, T, vdim*dim}
-    dNdξ_t = SMatrix{vdim, dim, T, vdim*dim}
-
+    dNdx_t = dNdξ_t = SMatrix{vdim, dim, T, vdim*dim}
     # Geometry interpolation
-    #M_t    = T
+    M_t    = T
     dMdξ_t = Vec{dim, T}
-
-    return CellValues(qr, ip, gip, N_t, dNdx_t, dNdξ_t, T, dMdξ_t)
+    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
 end
 
+# reinit! for non-embedded elements
 function reinit!(cv::CellValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T}}) where {
     dim, T,
     N_t    <: Union{Number,   Vec{dim}},
@@ -168,7 +151,6 @@ function reinit!(cv::CellValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T
     n_geom_basefuncs = getngeobasefunctions(cv)
     n_func_basefuncs = getnbasefunctions(cv)
     length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
-    TdNdx = typeof(cv.dNdx[1, 1])
 
     @inbounds for i in 1:length(cv.qr.weights)
         w = cv.qr.weights[i]
@@ -187,51 +169,48 @@ function reinit!(cv::CellValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T
 end
 
 # Hotfix to get the dots right for embedded elements until mixed tensors are merged.
-@inline dothelper(x::V,A::M) where {V<:SVector,M<:Union{SMatrix,MMatrix}} = A'*x
-@inline dothelper(B::M1,A::M2) where {M1<:SMatrix,M2<:Union{SMatrix,MMatrix}} = B*A
+@inline dothelper(x::SVector, A::SMatrix) = A' * x
+@inline dothelper(B::SMatrix, A::SMatrix) = B * A
 
-"""
-    CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim})
-Generic constructor for cell values for embedded elements.
-"""
+# Entrypoint for embedded `ScalarInterpolation`s (rdim < sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
     sdim, rdim, shape <: AbstractRefShape{rdim}, T,
     QR  <: QuadratureRule{rdim, shape},
     IP  <: ScalarInterpolation{shape},
     GIP <: ScalarInterpolation{shape}
 }
+    @assert sdim > rdim
     # Function interpolation
     N_t    = T
-    dNdx_t = MVector{sdim, T}
+    dNdx_t = SVector{sdim, T}
     dNdξ_t = SVector{rdim, T}
-
     # Geometry interpolation
-    #M_t    = T
+    M_t    = T
     dMdξ_t = Vec{rdim, T}
-
-    return CellValues(qr, ip, gip, N_t, dNdx_t, dNdξ_t, T, dMdξ_t)
+    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
 end
 
+# Entrypoint for embedded `VectorInterpolation`s (rdim < sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP, ::Val{sdim}) where {
     sdim, vdim, rdim, shape <: AbstractRefShape{rdim}, T,
     QR  <: QuadratureRule{rdim, shape},
     IP  <: VectorInterpolation{vdim, shape},
     GIP <: ScalarInterpolation{shape}
 }
+    @assert sdim > rdim
     # Function interpolation
     N_t    = SVector{vdim, T}
-    dNdx_t = MMatrix{vdim, sdim, T, vdim*sdim}
+    dNdx_t = SMatrix{vdim, sdim, T, vdim*sdim}
     dNdξ_t = SMatrix{vdim, rdim, T, vdim*rdim}
-
     # Geometry interpolation
-    #M_t    = T
+    M_t    = T
     dMdξ_t = Vec{rdim, T}
-
-    return CellValues(qr, ip, gip, N_t, dNdx_t, dNdξ_t, T, dMdξ_t)
+    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
 end
 
 """
-    edet(J::MMatrix{3,2})
+    embedding_det(J::SMatrix{3, 2})
+
 Embedding determinant for surfaces in 3D.
 
 TLDR: "det(J) =" ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂
@@ -242,10 +221,11 @@ where ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂ is "detJ" and n is the unit normal.
 See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
 For more details see e.g. the doctoral thesis by Mirza Cenanovic **Finite element methods for surface problems* (2017), Ch. 2 **Trangential Calculus**.
 """
-edet(J::MMatrix{3,2,T,6}) where {T} = norm(J[:,1] × J[:,2])
+embedding_det(J::SMatrix{3,2}) = norm(J[:,1] × J[:,2])
 
 """
-    edet(J::Union{MMatrix{2,1},MMatrix{3,1}})
+    embedding_det(J::Union{SMatrix{2, 1}, SMatrix{3, 1}})
+
 Embedding determinant for curves in 2D and 3D.
 
 TLDR: "det(J) =" ||∂x/∂ξ||₂
@@ -255,17 +235,17 @@ The transformation theorem for some function f on a 1D curve in 2D and 3D space 
 where ||∂x/∂ξ||₂ is "detJ" and t is "the unit tangent".
 See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
 """
-edet(J::Union{MMatrix{2,1,T,2},MMatrix{3,1,T,3}}) where {T} = norm(J)
+embedding_det(J::Union{SMatrix{2, 1}, SMatrix{3, 1}}) = norm(J)
 
 """
     reinit!(cv::CellValues, x::AbstractVector{Vec{sdim}})
 Reinit for embedded elements, i.e. elements whose reference dimension is smaller than the spatial dimension.
 """
 function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{sdim,T}}) where {
-    rdim, sdim, vdim, T, matsize1, matsize2,
-    N_t    <: Union{Number,   Vec{vdim}},
-    dNdx_t <: Union{MVector{sdim, T}, MMatrix{vdim, sdim, T, matsize1}},
-    dNdξ_t <: Union{SVector{rdim, T}, SMatrix{vdim, rdim, T, matsize2}}
+    rdim, sdim, vdim, T,
+    N_t    <: Union{Number,           Vec{vdim}},
+    dNdx_t <: Union{SVector{sdim, T}, SMatrix{vdim, sdim, T}},
+    dNdξ_t <: Union{SVector{rdim, T}, SMatrix{vdim, rdim, T}},
 }
     @assert sdim > rdim "This reinit only works for embedded elements. Maybe you swapped the reference and spatial dimensions?"
     n_geom_basefuncs = getngeobasefunctions(cv)
@@ -274,14 +254,15 @@ function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{
 
     @inbounds for i in 1:length(cv.qr.weights)
         w = cv.qr.weights[i]
-        fecv_J = zero(MMatrix{sdim,rdim,T,sdim*rdim}) # TODO replace with MixedTensor (see https://github.com/Ferrite-FEM/Tensors.jl/pull/188)
+        fecv_J = zero(MMatrix{sdim, rdim, T}) # TODO replace with MixedTensor (see https://github.com/Ferrite-FEM/Tensors.jl/pull/188)
         for j in 1:n_geom_basefuncs
             #fecv_J += x[j] ⊗ cv.dMdξ[j, i] # TODO via Tensors.jl
             for k in 1:sdim, l in 1:rdim
-                fecv_J[k,l] += x[j][k] * cv.dMdξ[j, i][l]
+                fecv_J[k, l] += x[j][k] * cv.dMdξ[j, i][l]
             end
         end
-        detJ = edet(fecv_J)
+        fecv_J = SMatrix(fecv_J)
+        detJ = embedding_det(fecv_J)
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         cv.detJdV[i] = detJ * w
         # Compute "left inverse" of J
