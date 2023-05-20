@@ -295,20 +295,24 @@ for (func,                              pre_f,                                  
             for (fhi, fh) in pairs(dh.fieldhandlers)
                 element_dof_start = 0
                 isnothing(couplings) || (coupling_fh = couplings[fhi])
-                for fi in fh.field_interpolations
+                for cell_field in fh.fields
+                    fi = cell_field.interpolation
                     if(!IsDiscontinuous(fi))
                         element_dof_start += getnbasefunctions(fi)
                         continue
                     end
                     cont_fi =  get_continuous_interpolation(fi)
-                    for cell_idx in BitSet(fh.cellset)
+                    for cell_idx in eachindex(getcells(dh.grid))
+                        cell_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[cell_idx]].fields || continue
                         current_face_neighborhood = getdim(dh.grid.cells[cell_idx]) >1 ? topology.face_neighbor[cell_idx,:] : topology.vertex_neighbor[cell_idx,:]
                         shared_faces_idx = findall(!isempty,current_face_neighborhood)
                         for face_idx in shared_faces_idx
                             for neighbor_face in current_face_neighborhood[face_idx]
                                 cell_dofs = celldofs(dh,cell_idx)[element_dof_start + 1 : element_dof_start + getnbasefunctions(fi)]
                                 neighbour_dof_start = 0
-                                for fi2 in fh.field_interpolations
+                                for neighbor_field in fh.fields
+                                    fi2 = neighbor_field.interpolation
+                                    neighbor_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[neighbor_face[1]]].fields || continue
                                     if(!IsDiscontinuous(fi2))
                                         neighbour_dof_start += getnbasefunctions(fi2)
                                         continue

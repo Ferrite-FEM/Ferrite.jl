@@ -565,16 +565,16 @@ end
                 for (fhi, fh) in pairs(dh.fieldhandlers)
                     for (cell_field_idx, cell_field) in pairs(fh.fields) 
                         is_discontinuous = Ferrite.IsDiscontinuous(cell_field.interpolation)
-                        for (nfhi, nfh) in pairs(dh.fieldhandlers)
-                            for (neighbor_field_idx, neighbor_field) in pairs(nfh.fields) 
-                                is_discontinuous &= Ferrite.IsDiscontinuous(neighbor_field.interpolation)
-                                for (i_idx, i) in pairs(dof_range(fh, cell_field_idx)), (j_idx, j) in pairs(dof_range(nfh,neighbor_field_idx))
-                                    I = dh.cell_dofs[i+dh.cell_dofs_offset[cell_idx]-1]
-                                    J = dh.cell_dofs[j+dh.cell_dofs_offset[neighbor_idx]-1]
-                                    cell_coupling_idx = sz == length(dh.field_names) ? cell_field_idx : (1 + (i_idx - 1) % field_dims[cell_field_idx] + sum(field_dims[1:cell_field_idx-1]))
-                                    neighbor_coupling_idx = sz == length(dh.field_names) ? neighbor_field_idx : (1 + (j_idx - 1) % field_dims[neighbor_field_idx] + sum(field_dims[1:neighbor_field_idx-1]))
-                                    K_check[I,J] |= (coupling[cell_coupling_idx, neighbor_coupling_idx] && (is_discontinuous || (cell_idx == neighbor_idx)))
-                                end
+                        cell_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[cell_idx]].fields || continue
+                        for (neighbor_field_idx, neighbor_field) in pairs(fh.fields) 
+                            neighbor_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[neighbor_idx]].fields || continue
+                            is_discontinuous &= Ferrite.IsDiscontinuous(neighbor_field.interpolation)
+                            for (i_idx, i) in pairs(dof_range(fh, cell_field_idx)), (j_idx, j) in pairs(dof_range(fh,neighbor_field_idx))
+                                I = dh.cell_dofs[i+dh.cell_dofs_offset[cell_idx]-1]
+                                J = dh.cell_dofs[j+dh.cell_dofs_offset[neighbor_idx]-1]
+                                cell_coupling_idx = sz == length(dh.field_names) ? cell_field_idx : (1 + (i_idx - 1) % field_dims[cell_field_idx] + sum(field_dims[1:cell_field_idx-1]))
+                                neighbor_coupling_idx = sz == length(dh.field_names) ? neighbor_field_idx : (1 + (j_idx - 1) % field_dims[neighbor_field_idx] + sum(field_dims[1:neighbor_field_idx-1]))
+                                K_check[I,J] |= (coupling[cell_coupling_idx, neighbor_coupling_idx] && (is_discontinuous || (cell_idx == neighbor_idx)))
                             end
                         end
                     end
@@ -619,9 +619,9 @@ end
     )
     add!(dh, fh2)
     close!(dh)
-    # for coupling in couplings
-    #     K = create_sparsity_pattern(dh; coupling=coupling, topology = topology)
-    #     all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology)
-    #     check_coupling(dh, topology, K, coupling)
-    # end # Breaks, implementation error.
+    for coupling in couplings
+        K = create_sparsity_pattern(dh; coupling=coupling, topology = topology)
+        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology)
+        check_coupling(dh, topology, K, coupling)
+    end
 end
