@@ -53,6 +53,8 @@ end
 
 Base.copy(qr::QuadratureRule) = qr # TODO: Is it ever useful to get an actual copy?
 
+getdim(::QuadratureRule{dim}) where {dim} = dim
+
 """
     getweights(qr::QuadratureRule)
 
