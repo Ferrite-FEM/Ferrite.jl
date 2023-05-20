@@ -19,6 +19,8 @@ export
 
 # Quadrature
     QuadratureRule,
+    FaceQuadratureRule,
+    getnquadpoints,
     getweights,
     getpoints,
 
@@ -41,7 +43,6 @@ export
     spatial_coordinate,
     getnormal,
     getdetJdV,
-    getnquadpoints,
 
 # Grid
     Grid,

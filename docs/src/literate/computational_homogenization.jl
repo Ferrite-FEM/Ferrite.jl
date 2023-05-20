@@ -213,7 +213,7 @@ grid = togrid("periodic-rve.msh") #src
 
 dim = 2
 ip = Lagrange{RefTriangle, 1}()^dim
-qr = QuadratureRule{dim, RefTriangle}(2)
+qr = QuadratureRule{RefTriangle}(2)
 cellvalues = CellValues(qr, ip);
 
 # We define a dof handler with a displacement field `:u`:
