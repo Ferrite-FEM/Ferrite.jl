@@ -284,6 +284,22 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
     return nothing
 end
 
+"""
+    cross_element_coupling_count(dh::AbstractDofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing} ; max_buffer_length::Int = 0)
+
+Returns the length of cross-elements coupling vectors `(I, J)` starting counting from `max_buffer_length` which defaults to 0.
+Used internally for `(I, J)` pre-allocation.
+"""
+function cross_element_coupling_count end
+
+"""
+    cross_element_coupling(dh::AbstractDofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing} ; max_buffer_length::Int = 0
+
+Returns vectors `(I, J)` corresponding to cross-elements coupling.
+Used internally for sparsity patterns with discontinuous interpolations.
+"""
+function cross_element_coupling end
+
 for (func,                              pre_f,                                                                                      inner_f,                                return_values) in (
     (:cross_element_coupling_count,     :(nothing),                                                                                 :(nothing),                             :(cnt)),
     (:cross_element_coupling,           :(I = Vector{Int}(undef, max_buffer_length); J = Vector{Int}(undef, max_buffer_length)),    :(I[cnt] = dofi; J[cnt] = dofj;),       :(I, J)),

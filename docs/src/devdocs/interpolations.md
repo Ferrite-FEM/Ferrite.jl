@@ -31,6 +31,8 @@ Ferrite.edgedof_interior_indices(::Interpolation)
 Ferrite.celldof_interior_indices(::Interpolation)
 Ferrite.getnbasefunctions(::Interpolation)
 Ferrite.reference_coordinates(::Interpolation)
+Ferrite.IsDiscontinuous(::Interpolation)
+Ferrite.get_continuous_interpolation(::Interpolation)
 ```
 
 for all entities which exist on that reference element. The dof functions default to having no

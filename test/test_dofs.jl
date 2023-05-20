@@ -574,7 +574,7 @@ end
                                 J = dh.cell_dofs[j+dh.cell_dofs_offset[neighbor_idx]-1]
                                 cell_coupling_idx = sz == length(dh.field_names) ? cell_field_idx : (1 + (i_idx - 1) % field_dims[cell_field_idx] + sum(field_dims[1:cell_field_idx-1]))
                                 neighbor_coupling_idx = sz == length(dh.field_names) ? neighbor_field_idx : (1 + (j_idx - 1) % field_dims[neighbor_field_idx] + sum(field_dims[1:neighbor_field_idx-1]))
-                                K_check[I,J] |= (coupling[cell_coupling_idx, neighbor_coupling_idx] && (is_discontinuous || (cell_idx == neighbor_idx)))
+                                K_check[I,J] |= (coupling[cell_coupling_idx, neighbor_coupling_idx] && (is_discontinuous || (cell_idx == neighbor_idx))) || I == J
                             end
                         end
                     end
@@ -589,9 +589,9 @@ end
     grid = generate_grid(Quadrilateral, (2, 2))
     topology = ExclusiveTopology(grid)
     dh = DofHandler(grid)
-    add!(dh, :u, DiscontinuousLagrange{2,RefCube,1}()^2)
-    add!(dh, :p, DiscontinuousLagrange{2,RefCube,1}())
-    add!(dh, :w, Lagrange{2,RefCube,1}())
+    add!(dh, :u, DiscontinuousLagrange{RefQuadrilateral,1}()^2)
+    add!(dh, :p, DiscontinuousLagrange{RefQuadrilateral,1}())
+    add!(dh, :w, Lagrange{RefQuadrilateral,1}())
     close!(dh)
     for coupling in couplings
         K = create_sparsity_pattern(dh; coupling=coupling, topology = topology)

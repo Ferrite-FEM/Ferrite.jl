@@ -331,8 +331,33 @@ boundarydof_indices(::Type{FaceIndex}) = Ferrite.facedof_indices
 boundarydof_indices(::Type{EdgeIndex}) = Ferrite.edgedof_indices
 boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
 
-IsDiscontinuous(::Type{<:Interpolation}) = false
+"""
+    IsDiscontinuous(::Interpolation)
+    IsDiscontinuous(::Type{<:Interpolation})
+
+Checks whether the interpolation is discontinuous (i.e. `DiscontinuousLagrange`)
+"""
 IsDiscontinuous(::Interpolation) = false
+IsDiscontinuous(::Type{<:Interpolation}) = false
+
+"""
+    get_continuous_interpolation(::Interpolation)
+    get_continuous_interpolation(::Type{<:Interpolation})
+
+Returns the continuous version (i.e. `Lagrange`) of a discontinuous interpolation is  (i.e. `DiscontinuousLagrange`).
+Used internally for associating `cell_dofs` with faces.
+The return type follows that of the argument.
+
+```julia-repl
+julia> Ferrite.get_continuous_interpolation(DiscontinuousLagrange{RefQuadrilateral,1}())
+Lagrange{RefQuadrilateral, 1}()
+
+julia> Ferrite.get_continuous_interpolation(DiscontinuousLagrange{RefQuadrilateral,1})
+Lagrange{RefQuadrilateral, 1}
+```
+"""
+get_continuous_interpolation(ip::Interpolation) = throw(ArgumentError("Interpolation $ip is already continuous."))
+get_continuous_interpolation(ip::Type{<:Interpolation}) = throw(ArgumentError("Interpolation $ip is already continuous."))
 
 #########################
 # DiscontinuousLagrange #
@@ -385,7 +410,7 @@ IsDiscontinuous(::Type{<:DiscontinuousLagrange}) = true
 IsDiscontinuous(::DiscontinuousLagrange) = true
 
 get_continuous_interpolation(::DiscontinuousLagrange{ref_shape,order}) where {ref_shape, order} = Lagrange{ref_shape,order}()
-get_continuous_interpolation(::Type{<:DiscontinuousLagrange{ref_shape,order}}) where {ref_shape, order} = Lagrange{ref_shape,order}
+get_continuous_interpolation(::Type{<:DiscontinuousLagrange{ref_shape,order}}) where {ref_shape, order} = Lagrange{ref_shape,order, Nothing}
 
 ############
 # Lagrange #
