@@ -60,7 +60,7 @@ function reinit!(pv::PointValues, x::AbstractVector{<:Vec{D}}, ξ::Vec{D}) where
     qp = 1 # PointValues only have a single qp
     # TODO: Does M need to be updated too?
     for i in 1:getnbasefunctions(pv.cv.ip)
-        pv.cv.dNdξ[i, qp], pv.cv.N[i, qp] = gradient(ξ -> value(pv.cv.ip, i, ξ), ξ, :all)
+        pv.cv.dNdξ[i, qp], pv.cv.N[i, qp] = gradient_and_value(pv.cv.ip, i, ξ)
     end
     reinit!(pv.cv, x)
     return nothing
