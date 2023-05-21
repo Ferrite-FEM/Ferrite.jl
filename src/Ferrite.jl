@@ -167,4 +167,6 @@ include("PointEvalHandler.jl")
 include("deprecations.jl")
 include("docs.jl")
 
+include("WorkStream.jl")
+
 end # module
