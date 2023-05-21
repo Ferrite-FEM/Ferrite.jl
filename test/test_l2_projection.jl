@@ -5,7 +5,6 @@ function test_projection(order, refshape)
     element = refshape == RefQuadrilateral ? Quadrilateral : Triangle
     grid = generate_grid(element, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
 
-    dim = 2
     ip = Lagrange{refshape, order}()
     ip_geom = Lagrange{refshape, 1}()
     qr = Ferrite._mass_qr(ip)
@@ -100,7 +99,7 @@ function test_projection(order, refshape)
     else
         bad_order = 1
     end
-    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs=QuadratureRule{dim,refshape}(bad_order), geom_ip=ip_geom)
+    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs=QuadratureRule{refshape}(bad_order), geom_ip=ip_geom)
 end
 
 # Test a mixed grid, where only a subset of the cells contains a field
@@ -127,7 +126,7 @@ function test_projection_mixedgrid()
     order = 2
     ip = Lagrange{RefQuadrilateral, order}()
     ip_geom = Lagrange{RefQuadrilateral, 1}()
-    qr = QuadratureRule{dim, RefQuadrilateral}(order+1)
+    qr = QuadratureRule{RefQuadrilateral}(order+1)
     cv = CellValues(qr, ip, ip_geom)
 
     # Create node values for the 1st cell
@@ -157,7 +156,7 @@ function test_projection_mixedgrid()
     order = 2
     ip = Lagrange{RefTriangle, order}()
     ip_geom = Lagrange{RefTriangle, 1}()
-    qr = QuadratureRule{dim, RefTriangle}(4)
+    qr = QuadratureRule{RefTriangle}(4)
     cv = CellValues(qr, ip, ip_geom)
     nqp = getnquadpoints(cv)
 
@@ -185,7 +184,7 @@ end
 
 function test_export(;subset::Bool)
     grid = generate_grid(Quadrilateral, (2, 1))
-    qr = QuadratureRule{2,RefQuadrilateral}(2)
+    qr = QuadratureRule{RefQuadrilateral}(2)
     ip = Lagrange{RefQuadrilateral,1}()
     cv = CellValues(qr, ip)
     nqp = getnquadpoints(cv)

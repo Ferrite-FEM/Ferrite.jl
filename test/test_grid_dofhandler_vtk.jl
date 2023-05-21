@@ -396,7 +396,7 @@ end
     reinit!(fv::FaceValues, faceid::FaceIndex, grid) = reinit!(fv,faceid[1],faceid[2],grid) # wrapper for reinit!(fv,cellid,faceid,grid)
     face_neighbors_ele5 = nonzeros(topology.face_neighbor[5,:])
     ip = Lagrange{RefQuadrilateral, 1}()^2
-    qr_face = QuadratureRule{1, RefQuadrilateral}(2)
+    qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
     fv_ele = FaceValues(qr_face, ip)
     fv_neighbor = FaceValues(qr_face, ip)
     u_ele5 = [3.0 for _ in 1:8]

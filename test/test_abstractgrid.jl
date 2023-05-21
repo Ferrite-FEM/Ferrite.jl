@@ -25,7 +25,7 @@
     reference_grid = generate_grid(Quadrilateral, (2,2))
 
     ip = Lagrange{RefQuadrilateral, 1}()
-    qr = QuadratureRule{2, RefQuadrilateral}(2)
+    qr = QuadratureRule{RefQuadrilateral}(2)
     cellvalues = CellValues(qr, ip);
     
     dhs = [DofHandler(grid) for grid in (subtype_grid, reference_grid)]
