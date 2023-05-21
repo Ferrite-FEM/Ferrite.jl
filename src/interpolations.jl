@@ -85,7 +85,6 @@ struct InterpolationInfo
     reference_dim::Int
     adjust_during_distribution::Bool
     n_copies::Int
-    nbasefunctions::Int
     is_discontinuous::Bool
     function InterpolationInfo(interpolation::InterpolationByDim{3})
         n_copies = 1
@@ -101,7 +100,6 @@ struct InterpolationInfo
             3,
             adjust_dofs_during_distribution(interpolation),
             n_copies,
-            n_copies * getnbasefunctions(interpolation),
             IsDiscontinuous(interpolation)
         )
     end
@@ -119,7 +117,6 @@ struct InterpolationInfo
             2,
             adjust_dofs_during_distribution(interpolation),
             n_copies,
-            n_copies * getnbasefunctions(interpolation),
             IsDiscontinuous(interpolation)
         )
     end
@@ -137,7 +134,6 @@ struct InterpolationInfo
             1,
             adjust_dofs_during_distribution(interpolation),
             n_copies,
-            n_copies * getnbasefunctions(interpolation),
             IsDiscontinuous(interpolation)
         )
     end

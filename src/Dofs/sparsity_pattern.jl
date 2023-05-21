@@ -310,16 +310,18 @@ for (func,                              pre_f,                                  
             cnt = 0
             for (fhi, fh) in pairs(dh.fieldhandlers)
                 ip_infos = InterpolationInfo[]
+                nbasefunctions = Int[]
                 for cell_field in fh.fields
                     ip_info = InterpolationInfo(cell_field.interpolation)
                     push!(ip_infos, ip_info)
+                    push!(nbasefunctions, getnbasefunctions(cell_field.interpolation))
                 end
                 element_dof_start = 0
                 isnothing(couplings) || (coupling_fh = couplings[fhi])
                 for (cell_field_i, cell_field) in enumerate(fh.fields)
                     fii = ip_infos[cell_field_i]
                     if(!fii.is_discontinuous)
-                        element_dof_start += fii.nbasefunctions
+                        element_dof_start += nbasefunctions[cell_field_i]
                         continue
                     end
                     for cell_idx in eachindex(getcells(dh.grid))
@@ -328,16 +330,16 @@ for (func,                              pre_f,                                  
                         shared_faces_idx = findall(!isempty,current_face_neighborhood)
                         for face_idx in shared_faces_idx
                             for neighbor_face in current_face_neighborhood[face_idx]
-                                cell_dofs = @view celldofs(dh,cell_idx)[element_dof_start + 1 : element_dof_start + fii.nbasefunctions]
+                                cell_dofs = @view celldofs(dh,cell_idx)[element_dof_start + 1 : element_dof_start + nbasefunctions[cell_field_i]]
                                 neighbour_dof_start = 0
                                 for (neighbor_field_i, neighbor_field) in enumerate(fh.fields)
                                     fii2 = ip_infos[neighbor_field_i]
                                     neighbor_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[neighbor_face[1]]].fields || continue
                                     if(!fii2.is_discontinuous)
-                                        neighbour_dof_start += fii2.nbasefunctions
+                                        neighbour_dof_start += nbasefunctions[neighbor_field_i]
                                         continue
                                     end
-                                    neighbour_dofs = @view celldofs(dh,neighbor_face[1])[neighbour_dof_start + 1 : neighbour_dof_start + fii2.nbasefunctions]
+                                    neighbour_dofs = @view celldofs(dh,neighbor_face[1])[neighbour_dof_start + 1 : neighbour_dof_start + nbasefunctions[neighbor_field_i]]
                                     # neighbour_unique_dofs = neighbour_dofs[.!(neighbour_dofs .∈ Ref(celldofs(dh,cell_idx)))]
                                     for j in eachindex(neighbour_dofs), i in eachindex(cell_dofs)
                                         isnothing(couplings) || coupling_fh[i+element_dof_start,j+neighbour_dof_start] || continue
@@ -348,12 +350,12 @@ for (func,                              pre_f,                                  
                                         cnt += 1
                                         $(inner_f)
                                     end
-                                    neighbour_dof_start += fii2.nbasefunctions
+                                    neighbour_dof_start += nbasefunctions[neighbor_field_i]
                                 end
                             end
                         end
                     end
-                    element_dof_start += fii.nbasefunctions
+                    element_dof_start += nbasefunctions[cell_field_i]
                 end
             end
             return $(return_values)
