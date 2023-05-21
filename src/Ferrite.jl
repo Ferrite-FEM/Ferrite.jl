@@ -169,4 +169,6 @@ using .AMR: ForestBWG,
     ConformityConstraint,
     NonConformingGrid
 
+include("WorkStream.jl")
+
 end # module
