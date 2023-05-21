@@ -55,7 +55,7 @@ function _apply_analytical!(
     coords = getcoordinates(dh.grid, first(cellset))
     ref_points = reference_coordinates(ip_fun)
     dummy_weights = zeros(length(ref_points))
-    qr = QuadratureRule{dim, RefShape}(dummy_weights, ref_points)
+    qr = QuadratureRule{RefShape}(dummy_weights, ref_points)
     # Note: Passing ip_geo as the function interpolation here, it is just a dummy.
     cv = CellValues(qr, ip_geo, ip_geo)
     c_dofs = celldofs(dh, first(cellset))

@@ -64,9 +64,8 @@ grid = generate_grid(Quadrilateral, (100, 100));
 
 # ### Trial and test functions
 # Again, we define the structs that are responsible for the `shape_value` and `shape_gradient` evaluation.
-dim = 2
 ip = Lagrange{RefQuadrilateral, 1}()
-qr = QuadratureRule{dim, RefQuadrilateral}(2)
+qr = QuadratureRule{RefQuadrilateral}(2)
 cellvalues = CellValues(qr, ip);
 
 # ### Degrees of freedom

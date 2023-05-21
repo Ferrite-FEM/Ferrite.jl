@@ -159,7 +159,7 @@ grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{
 # We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
 # linear pressure term is tested against a quadratic function.
 ip_v = Lagrange{RefQuadrilateral, 2}()^dim
-qr = QuadratureRule{dim, RefQuadrilateral}(4)
+qr = QuadratureRule{RefQuadrilateral}(4)
 cellvalues_v = CellValues(qr, ip_v);
 
 ip_p = Lagrange{RefQuadrilateral, 1}()

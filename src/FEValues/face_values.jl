@@ -1,17 +1,13 @@
 """
-    FaceValues([::Type{T}], quad_rule::QuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
+    FaceValues([::Type{T}], quad_rule::FaceQuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
 
 A `FaceValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
 values of nodal functions, gradients and divergences of nodal functions etc. on the faces of finite elements.
 
-!!! note
-    The quadrature rule for the face should be given with one dimension lower.
-    I.e. for a 3D case, the quadrature rule should be in 2D.
-
 **Arguments:**
 
 * `T`: an optional argument to determine the type the internal data is stored as.
-* `quad_rule`: an instance of a [`QuadratureRule`](@ref)
+* `quad_rule`: an instance of a [`FaceQuadratureRule`](@ref)
 * `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
 * `geom_interpol`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry.
   By default linear Lagrange interpolation is used.
@@ -57,26 +53,24 @@ function FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(qr:
             isconcretetype(dNdξ_t) && isconcretetype(T)        && isconcretetype(dMdξ_t) &&
             isconcretetype(QR)     && isconcretetype(Normal_t) && isconcretetype(GIP)
     # Quadrature
-    @assert getdim(ip) == getdim(qr) + 1
-    n_qpoints = length(getweights(qr))
-    fqr = create_face_quad_rule(qr, ip)
-    n_faces = length(fqr)
+    max_n_qpoints = maximum(getnquadpoints, qr.face_rules; init = 0)
+    n_faces = length(qr.face_rules)
 
     # Normals
-    normals = zeros(Normal_t, n_qpoints)
+    normals = zeros(Normal_t, max_n_qpoints)
 
     # Field interpolation
     n_func_basefuncs = getnbasefunctions(ip)
-    N    = fill(zero(N_t)    * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
-    dNdx = fill(zero(dNdx_t) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
-    dNdξ = fill(zero(dNdξ_t) * T(NaN), n_func_basefuncs, n_qpoints, n_faces)
+    N    = fill(zero(N_t)    * T(NaN), n_func_basefuncs, max_n_qpoints, n_faces)
+    dNdx = fill(zero(dNdx_t) * T(NaN), n_func_basefuncs, max_n_qpoints, n_faces)
+    dNdξ = fill(zero(dNdξ_t) * T(NaN), n_func_basefuncs, max_n_qpoints, n_faces)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(gip)
-    M    = fill(zero(T)      * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
-    dMdξ = fill(zero(dMdξ_t) * T(NaN), n_geom_basefuncs, n_qpoints, n_faces)
+    M    = fill(zero(T)      * T(NaN), n_geom_basefuncs, max_n_qpoints, n_faces)
+    dMdξ = fill(zero(dMdξ_t) * T(NaN), n_geom_basefuncs, max_n_qpoints, n_faces)
 
-    for face in 1:n_faces, (qp, ξ) in pairs(fqr[face].points)
+    for face in 1:n_faces, (qp, ξ) in pairs(getpoints(qr, face))
         for basefunc in 1:n_func_basefuncs
             dNdξ[basefunc, qp, face], N[basefunc, qp, face] = gradient_and_value(ip, basefunc, ξ)
         end
@@ -85,21 +79,21 @@ function FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(qr:
         end
     end
 
-    detJdV = fill(T(NaN), n_qpoints, n_faces)
+    detJdV = fill(T(NaN), max_n_qpoints, n_faces)
 
     FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, qr, ScalarWrapper(0), ip, gip)
 end
 
 # Common entry point that just defaults the numeric type to Float64
-function FaceValues(qr::QuadratureRule, ip::Interpolation,
+function FaceValues(qr::FaceQuadratureRule, ip::Interpolation,
         gip::Interpolation = default_geometric_interpolation(ip))
     return FaceValues(Float64, qr, ip, gip)
 end
 
 # Entrypoint for `ScalarInterpolation`s (rdim == sdim)
 function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
-    qdim, dim, shape <: AbstractRefShape{dim}, T,
-    QR  <: QuadratureRule{qdim, shape},
+    dim, shape <: AbstractRefShape{dim}, T,
+    QR  <: FaceQuadratureRule{shape},
     IP  <: ScalarInterpolation{shape},
     GIP <: ScalarInterpolation{shape},
 }
@@ -116,8 +110,8 @@ end
 
 # Entrypoint for `VectorInterpolation`s (vdim == rdim == sdim)
 function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
-    qdim, dim, shape <: AbstractRefShape{dim}, T,
-    QR  <: QuadratureRule{qdim, shape},
+    dim, shape <: AbstractRefShape{dim}, T,
+    QR  <: FaceQuadratureRule{shape},
     IP  <: VectorInterpolation{dim, shape},
     GIP <: ScalarInterpolation{shape}
 }
@@ -145,8 +139,7 @@ function reinit!(fv::FaceValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T
     fv.current_face[] = face
     cb = getcurrentface(fv)
 
-    @inbounds for i in 1:length(fv.qr.weights)
-        w = fv.qr.weights[i]
+    @inbounds for (i, w) in pairs(getweights(fv.qr, cb))
         fefv_J = zero(Tensor{2,dim})
         for j in 1:n_geom_basefuncs
             fefv_J += x[j] ⊗ fv.dMdξ[j, i, cb]
@@ -201,13 +194,13 @@ function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interp
     # (determined by func_interpol) as the quadrature points
     interpolation_coords = reference_coordinates(func_interpol)
 
-    qrs = QuadratureRule{dim,refshape,T}[]
+    qrs = QuadratureRule{refshape,T,dim}[]
     for boundarydofs in boundarydof_indices(boundary_type)(func_interpol)
         dofcoords = Vec{dim,T}[]
         for boundarydof in boundarydofs
             push!(dofcoords, interpolation_coords[boundarydof])
         end
-        qrf = QuadratureRule{dim,refshape,T}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used
+        qrf = QuadratureRule{refshape,T}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used
         push!(qrs, qrf)
     end
 

@@ -54,7 +54,7 @@ function CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(qr::QR, ip::I
     @assert isconcretetype(IP)     && isconcretetype(N_t) && isconcretetype(dNdx_t) &&
             isconcretetype(dNdξ_t) && isconcretetype(T)   && isconcretetype(dMdξ_t) &&
             isconcretetype(QR)     && isconcretetype(GIP)
-    n_qpoints = length(getweights(qr))
+    n_qpoints = getnquadpoints(qr)
 
     # Field interpolation
     n_func_basefuncs = getnbasefunctions(ip)
@@ -90,7 +90,7 @@ end
 # Entrypoint for `ScalarInterpolation`s (rdim == sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
     dim, shape <: AbstractRefShape{dim}, T,
-    QR  <: QuadratureRule{dim, shape},
+    QR  <: QuadratureRule{shape},
     IP  <: ScalarInterpolation{shape},
     GIP <: ScalarInterpolation{shape},
 }
@@ -106,7 +106,7 @@ end
 # Entrypoint for `VectorInterpolation`s (vdim == rdim == sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
     dim, shape <: AbstractRefShape{dim}, T,
-    QR  <: QuadratureRule{dim, shape},
+    QR  <: QuadratureRule{shape},
     IP  <: VectorInterpolation{dim, shape},
     GIP <: ScalarInterpolation{shape},
 }
@@ -122,7 +122,7 @@ end
 # Entrypoint for `VectorInterpolation`s (vdim != rdim == sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
     vdim, dim, shape <: AbstractRefShape{dim}, T,
-    QR  <: QuadratureRule{dim, shape},
+    QR  <: QuadratureRule{shape},
     IP  <: VectorInterpolation{vdim, shape},
     GIP <: ScalarInterpolation{shape}
 }
@@ -146,8 +146,7 @@ function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{
     n_func_basefuncs = getnbasefunctions(cv)
     length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
 
-    @inbounds for i in 1:length(cv.qr.weights)
-        w = cv.qr.weights[i]
+    @inbounds for (i, w) in pairs(getweights(cv.qr))
         fecv_J = zero(Tensor{2,dim,T})
         for j in 1:n_geom_basefuncs
             fecv_J += x[j] ⊗ cv.dMdξ[j, i]
@@ -176,7 +175,7 @@ end
 # Entrypoint for embedded `ScalarInterpolation`s (rdim < sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     sdim, rdim, shape <: AbstractRefShape{rdim}, T,
-    QR  <: QuadratureRule{rdim, shape},
+    QR  <: QuadratureRule{shape},
     IP  <: ScalarInterpolation{shape},
     GIP <: ScalarInterpolation{shape},
     VGIP <: VectorizedInterpolation{sdim, shape, <:Any, GIP},
@@ -195,7 +194,7 @@ end
 # Entrypoint for embedded `VectorInterpolation`s (rdim < sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     sdim, vdim, rdim, shape <: AbstractRefShape{rdim}, T,
-    QR  <: QuadratureRule{rdim, shape},
+    QR  <: QuadratureRule{shape},
     IP  <: VectorInterpolation{vdim, shape},
     GIP <: ScalarInterpolation{shape},
     VGIP <: VectorizedInterpolation{sdim, shape, <:Any, GIP},
@@ -252,8 +251,7 @@ function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{
     n_func_basefuncs = getnbasefunctions(cv)
     length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
 
-    @inbounds for i in 1:length(cv.qr.weights)
-        w = cv.qr.weights[i]
+    @inbounds for (i, w) in pairs(getweights(cv.qr))
         fecv_J = zero(MMatrix{sdim, rdim, T}) # TODO replace with MixedTensor (see https://github.com/Ferrite-FEM/Tensors.jl/pull/188)
         for j in 1:n_geom_basefuncs
             #fecv_J += x[j] ⊗ cv.dMdξ[j, i] # TODO via Tensors.jl
