@@ -309,47 +309,51 @@ for (func,                              pre_f,                                  
             $(pre_f)
             cnt = 0
             for (fhi, fh) in pairs(dh.fieldhandlers)
+                ip_infos = InterpolationInfo[]
+                for cell_field in fh.fields
+                    ip_info = InterpolationInfo(cell_field.interpolation)
+                    push!(ip_infos, ip_info)
+                end
                 element_dof_start = 0
                 isnothing(couplings) || (coupling_fh = couplings[fhi])
-                for cell_field in fh.fields
-                    fi = cell_field.interpolation
-                    if(!IsDiscontinuous(fi))
-                        element_dof_start += getnbasefunctions(fi)
+                for (cell_field_i, cell_field) in enumerate(fh.fields)
+                    fii = ip_infos[cell_field_i]
+                    if(!fii.is_discontinuous)
+                        element_dof_start += fii.nbasefunctions
                         continue
                     end
-                    cont_fi =  get_continuous_interpolation(fi)
                     for cell_idx in eachindex(getcells(dh.grid))
                         cell_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[cell_idx]].fields || continue
                         current_face_neighborhood = getdim(dh.grid.cells[cell_idx]) >1 ? topology.face_neighbor[cell_idx,:] : topology.vertex_neighbor[cell_idx,:]
                         shared_faces_idx = findall(!isempty,current_face_neighborhood)
                         for face_idx in shared_faces_idx
                             for neighbor_face in current_face_neighborhood[face_idx]
-                                cell_dofs = celldofs(dh,cell_idx)[element_dof_start + 1 : element_dof_start + getnbasefunctions(fi)]
+                                cell_dofs = @view celldofs(dh,cell_idx)[element_dof_start + 1 : element_dof_start + fii.nbasefunctions]
                                 neighbour_dof_start = 0
-                                for neighbor_field in fh.fields
-                                    fi2 = neighbor_field.interpolation
+                                for (neighbor_field_i, neighbor_field) in enumerate(fh.fields)
+                                    fii2 = ip_infos[neighbor_field_i]
                                     neighbor_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[neighbor_face[1]]].fields || continue
-                                    if(!IsDiscontinuous(fi2))
-                                        neighbour_dof_start += getnbasefunctions(fi2)
+                                    if(!fii2.is_discontinuous)
+                                        neighbour_dof_start += fii2.nbasefunctions
                                         continue
                                     end
-                                    neighbour_dofs = celldofs(dh,neighbor_face[1])[neighbour_dof_start + 1 : neighbour_dof_start + getnbasefunctions(fi2)]
-                                    neighbour_unique_dofs = neighbour_dofs[.!(neighbour_dofs .∈ Ref(celldofs(dh,cell_idx)))]
-                                    for j in eachindex(neighbour_unique_dofs), i in eachindex(cell_dofs)
+                                    neighbour_dofs = @view celldofs(dh,neighbor_face[1])[neighbour_dof_start + 1 : neighbour_dof_start + fii2.nbasefunctions]
+                                    # neighbour_unique_dofs = neighbour_dofs[.!(neighbour_dofs .∈ Ref(celldofs(dh,cell_idx)))]
+                                    for j in eachindex(neighbour_dofs), i in eachindex(cell_dofs)
                                         isnothing(couplings) || coupling_fh[i+element_dof_start,j+neighbour_dof_start] || continue
                                         dofi = cell_dofs[i]
-                                        dofj = neighbour_unique_dofs[j]
+                                        dofj = neighbour_dofs[j]
                                         sym && (dofi > dofj && continue)
                                         !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
                                         cnt += 1
                                         $(inner_f)
                                     end
-                                    neighbour_dof_start += getnbasefunctions(fi2)
+                                    neighbour_dof_start += fii2.nbasefunctions
                                 end
                             end
                         end
                     end
-                    element_dof_start += getnbasefunctions(fi)
+                    element_dof_start += fii.nbasefunctions
                 end
             end
             return $(return_values)
