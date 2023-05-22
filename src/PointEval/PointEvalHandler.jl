@@ -90,7 +90,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
 end
 
 # check if point is inside a cell based on physical coordinate
-function point_in_cell(geom_interpol::Interpolation{shape,order}, cell_coordinates, global_coordinate) where {shape, order}
+function point_in_cell(geom_interpol::Interpolation{shape}, cell_coordinates, global_coordinate) where {shape}
     converged, x_local = find_local_coordinate(geom_interpol, cell_coordinates, global_coordinate)
     if converged
         return _check_isoparametric_boundaries(shape, x_local), x_local
@@ -113,34 +113,27 @@ function _check_isoparametric_boundaries(::Type{RefSimplex{dim}}, x_local::Vec{d
     return all(x -> x > -tol, x_local) && sum(x_local) - 1 < tol
 end
 
+# See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
 # TODO: should we make iteration params optional keyword arguments?
-function find_local_coordinate(interpolation, cell_coordinates, global_coordinate)
-    """
-    currently copied verbatim from https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
-    other than to make J dim x dim rather than 2x2
-    """
-    dim = length(global_coordinate)
-    local_guess = zero(Vec{dim})
+function find_local_coordinate(interpolation, cell_coordinates::Vector{V}, global_coordinate::V) where {dim, T, V <: Vec{dim, T}}
     n_basefuncs = getnbasefunctions(interpolation)
+    @assert length(cell_coordinates) == n_basefuncs
+    local_guess = zero(V)
     max_iters = 10
     tol_norm = 1e-10
     converged = false
     for _ in 1:max_iters
-        N = Ferrite.value(interpolation, local_guess)
-
-        global_guess = zero(Vec{dim})
+        global_guess = zero(V)
+        J = zero(Tensor{2, dim, T})
         for j in 1:n_basefuncs
-            global_guess += N[j] * cell_coordinates[j]
+            dNdξ, N = gradient_and_value(interpolation, j, local_guess)
+            global_guess += N * cell_coordinates[j]
+            J += cell_coordinates[j] ⊗ dNdξ
         end
         residual = global_guess - global_coordinate
         if norm(residual) <= tol_norm
             converged = true
             break
-        end
-        dNdξ = Ferrite.derivative(interpolation, local_guess)
-        J = zero(Tensor{2, dim})
-        for j in 1:n_basefuncs
-            J += cell_coordinates[j] ⊗ dNdξ[j]
         end
         local_guess -= inv(J) ⋅ residual
     end
