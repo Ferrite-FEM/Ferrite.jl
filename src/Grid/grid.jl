@@ -214,7 +214,7 @@ default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron, 
 default_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
 
 # TODO: Remove this, used for Quadrilateral3D
-edges(c::Quadrilateral#=3D=#) = faces(c)
+edges(c::Union{Quadrilateral#=3D=#,Triangle#=3D=#,QuadraticTriangle#=3D=#}) = faces(c)
 
 # Serendipity interpolation based cells
 struct SerendipityQuadraticQuadrilateral <: AbstractCell{RefQuadrilateral} nodes::NTuple{ 8, Int} end
