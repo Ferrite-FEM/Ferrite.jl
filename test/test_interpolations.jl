@@ -47,16 +47,16 @@
     # Check partition of unity at random point.
     n_basefuncs = getnbasefunctions(interpolation)
     x = rand(Tensor{1, ref_dim})
-    f = (x) -> [Ferrite.value(interpolation, i, Tensor{1, ref_dim}(x)) for i in 1:n_basefuncs]
+    f = (x) -> [shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
     @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
-        reinterpret(Float64, [Tensors.gradient(y -> Ferrite.value(interpolation, i, y), x) for i in 1:n_basefuncs])
-    @test sum([Ferrite.value(interpolation, i, x) for i in 1:n_basefuncs]) ≈ 1.0
+        reinterpret(Float64, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
+    @test sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
 
     # Check if the important functions are consistent
     coords = Ferrite.reference_coordinates(interpolation)
     @test length(coords) == n_basefuncs
-    @test Ferrite.value(interpolation, length(coords), x) == Ferrite.value(interpolation, length(coords), x)
-    @test_throws ArgumentError Ferrite.value(interpolation, length(coords)+1, x)
+    @test shape_value(interpolation, x, n_basefuncs) == shape_value(interpolation, x, n_basefuncs)
+    @test_throws ArgumentError shape_value(interpolation, x, n_basefuncs+1)
 
     # Test whether we have for each entity corresponding dof indices (possibly empty)
     @test length(Ferrite.vertexdof_indices(interpolation)) == Ferrite.nvertices(interpolation)
@@ -98,7 +98,7 @@
     # Check for dirac delta property of interpolation
     @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
         for k in 1:n_basefuncs
-            N_dof = Ferrite.value(interpolation, k, coords[dof])
+            N_dof = shape_value(interpolation, coords[dof], k)
             if k == dof
                 @test N_dof ≈ 1.0
             else
