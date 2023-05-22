@@ -47,10 +47,10 @@
     # Check partition of unity at random point.
     n_basefuncs = getnbasefunctions(interpolation)
     x = rand(Tensor{1, ref_dim})
-    f = (x) -> Ferrite.value(interpolation, Tensor{1, ref_dim}(x))
+    f = (x) -> [Ferrite.value(interpolation, i, Tensor{1, ref_dim}(x)) for i in 1:n_basefuncs]
     @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
-           reinterpret(Float64, Ferrite.derivative(interpolation, x))
-    @test sum(Ferrite.value(interpolation, x)) ≈ 1.0
+        reinterpret(Float64, [Tensors.gradient(y -> Ferrite.value(interpolation, i, y), x) for i in 1:n_basefuncs])
+    @test sum([Ferrite.value(interpolation, i, x) for i in 1:n_basefuncs]) ≈ 1.0
 
     # Check if the important functions are consistent
     coords = Ferrite.reference_coordinates(interpolation)
@@ -97,12 +97,12 @@
 
     # Check for dirac delta property of interpolation
     @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
-        N_dof = Ferrite.value(interpolation, coords[dof])
         for k in 1:n_basefuncs
+            N_dof = Ferrite.value(interpolation, k, coords[dof])
             if k == dof
-                @test N_dof[k] ≈ 1.0
+                @test N_dof ≈ 1.0
             else
-                @test N_dof[k] ≈ 0.0 atol=4eps(Float64) #broken=typeof(interpolation)==Lagrange{2, RefTetrahedron, 5}&&dof==4&&k==18
+                @test N_dof ≈ 0.0 atol=4eps(Float64) #broken=typeof(interpolation)==Lagrange{2, RefTetrahedron, 5}&&dof==4&&k==18
             end
         end
     end

@@ -80,4 +80,11 @@ end
     @test (@test_deprecated r"RefTriangle" test_combo(FaceValues, 1, RefTetrahedron, (:legendre, 1), Lagrange{RefTriangle, 1}())) isa FaceValues
 end
 
+@testset "Ferrite.value and Ferrite.derivative" begin
+    ip = Lagrange{RefQuadrilateral, 1}()
+    ξ = zero(Vec{2})
+    @test (@test_deprecated Ferrite.value(ip, ξ)) == [Ferrite.value(ip, i, ξ) for i in 1:getnbasefunctions(ip)]
+    @test (@test_deprecated Ferrite.derivative(ip, ξ)) == [Tensors.gradient(x -> Ferrite.value(ip, i, x), ξ) for i in 1:getnbasefunctions(ip)]
+end
+
 end # testset deprecations

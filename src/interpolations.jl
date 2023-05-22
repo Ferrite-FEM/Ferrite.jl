@@ -176,27 +176,6 @@ Return order of the interpolation.
 """
 @inline getorder(::Interpolation{shape,order}) where {shape,order} = order
 
-"""
-    Ferrite.value(ip::Interpolation, ξ::Vec)
-
-Return a vector, of length [`getnbasefunctions(ip::Interpolation)`](@ref), with the value of each shape functions
-of `ip`, evaluated in the reference coordinate `ξ`. This calls [`Ferrite.value(ip::Interpolation, i::Int, ξ::Vec)`](@ref), where `i`
-is the shape function number, which each concrete interpolation should implement.
-"""
-function value(ip::InterpolationByDim{dim}, ξ::Vec{dim,T}) where {dim,T}
-    [value(ip, i, ξ) for i in 1:getnbasefunctions(ip)]
-end
-
-"""
-    Ferrite.derivative(ip::Interpolation, ξ::Vec)
-
-Return a vector, of length [`getnbasefunctions(ip::Interpolation)`](@ref), with the derivative (w.r.t. the
-reference coordinate) of each shape functions of `ip`, evaluated in the reference coordinate
-`ξ`. This uses automatic differentiation and uses `ip`s implementation of [`Ferrite.value(ip::Interpolation, i::Int, ξ::Vec)`](@ref).
-"""
-function derivative(ip::InterpolationByDim{dim}, ξ::Vec{dim,T}) where {dim,T}
-    [gradient(ξ -> value(ip, i, ξ), ξ) for i in 1:getnbasefunctions(ip)]
-end
 
 function gradient_and_value(ip::Interpolation, i::Int, x::Vec)
     return gradient(ξ -> value(ip, i, ξ), x, :all)

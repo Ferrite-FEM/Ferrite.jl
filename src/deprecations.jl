@@ -325,3 +325,6 @@ end
 function Base.show(io::IO, ::CrouzeixRaviart{shape, order}) where {shape, order}
     print(io, "CrouzeixRaviart{$(shape), $(order)}()")
 end
+
+@deprecate value(ip::Interpolation, ξ::Vec) [Ferrite.value(ip, i, ξ) for i in 1:getnbasefunctions(ip)] false
+@deprecate derivative(ip::Interpolation, ξ::Vec) [Tensors.gradient(x -> Ferrite.value(ip, i, x), ξ) for i in 1:getnbasefunctions(ip)] false
