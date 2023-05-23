@@ -179,17 +179,16 @@ function get_point_values(ph::PointEvalHandler, proj::L2Projector, dof_vals::Abs
     get_point_values(ph, proj.dh, dof_vals)
 end
 
-function get_point_values(ph::PointEvalHandler, dh::AbstractDofHandler, dof_vals::AbstractVector{T},
-                           fname::Symbol=find_single_field(dh)) where {T}
-    fdim = getfielddim(dh, fname)
+function get_point_values(ph::PointEvalHandler{<:Any, dim, T1}, dh::AbstractDofHandler, dof_vals::AbstractVector{T2},
+                           fname::Symbol=find_single_field(dh)) where {dim, T1, T2}
     npoints = length(ph.cells)
-    # for a scalar field return a Vector of Scalars, for a vector field return a Vector of Vecs
-    if fdim == 1
-        out_vals = fill!(Vector{T}(undef, npoints), NaN * zero(T))
-    else
-        nanv = convert(Vec{fdim,T}, NaN * zero(Vec{fdim,T}))
-        out_vals = fill!(Vector{Vec{fdim, T}}(undef, npoints), nanv)
-    end
+    # Figure out the value type by creating a dummy PointValuesInternal
+    ip = getfieldinterpolation(dh, find_field(dh, fname))
+    pv = PointValuesInternal(zero(Vec{dim, T1}), ip)
+    zero_val = function_value_init(pv, dof_vals)
+    # Allocate the output as NaNs
+    nanv = convert(typeof(zero_val), NaN * zero_val)
+    out_vals = fill(nanv, npoints)
     func_interpolations = get_func_interpolations(dh, fname)
     get_point_values!(out_vals, ph, dh, dof_vals, fname, func_interpolations)
     return out_vals
@@ -209,19 +208,17 @@ function get_point_values!(out_vals::Vector{T2},
     dof_vals::Vector{T},
     fname::Symbol,
     func_interpolations
-    ) where {T2, T} 
+    ) where {T2, T}
 
     # TODO: I don't think this is correct??
     length(dof_vals) == ndofs(dh) || error("You must supply values for all $(ndofs(dh)) dofs.")
 
-    fdim = getfielddim(dh, fname)
-    
     for fh_idx in eachindex(dh.fieldhandlers)
         ip = func_interpolations[fh_idx]
         if ip !== nothing
             dofrange = dof_range(dh.fieldhandlers[fh_idx], fname)
             cellset = dh.fieldhandlers[fh_idx].cellset
-            _get_point_values!(out_vals, dof_vals, ph, dh, ip, cellset, Val(fdim), dofrange)
+            _get_point_values!(out_vals, dof_vals, ph, dh, ip, cellset, dofrange)
         end
     end
     return out_vals
@@ -235,9 +232,8 @@ function _get_point_values!(
     dh::AbstractDofHandler,
     ip::Interpolation,
     cellset::Union{Nothing, Set{Int}},
-    fdim::Val{fielddim},
     dofrange::AbstractRange{Int},
-    ) where {T2,T,fielddim}
+    ) where {T2,T}
 
     # extract variables
     local_coords = ph.local_coords
@@ -264,19 +260,12 @@ function _get_point_values!(
     return out_vals
 end
 
-###################################################################################################################
-# utils 
-
-# reshape dof_values based on fielddim
-_change_format(::Val{1}, dof_values::AbstractVector{T}) where T = dof_values
-_change_format(::Val{fielddim}, dof_values::AbstractVector{T}) where {fielddim, T} = reinterpret(Vec{fielddim, T}, dof_values)
-
 function get_func_interpolations(dh::DofHandler, fieldname)
     func_interpolations = Union{Interpolation,Nothing}[]
     for fh in dh.fieldhandlers
         j = _find_field(fh, fieldname)
         if j === nothing
-            push!(func_interpolations, missing)
+            push!(func_interpolations, nothing)
         else
             push!(func_interpolations, fh.field_interpolations[j])
         end
