@@ -134,6 +134,63 @@ function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatri
     return outs
 end
 
+"""
+    cross_element_coupling!(dh::AbstractDofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
+Calculates `I, J` for cross-element coupling
+Returns the updated value of `cnt`
+Used internally for sparsity patterns with discontinuous interpolations.
+"""
+function cross_element_coupling!(dh::AbstractDofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
+    for (fhi, fh) in pairs(dh.fieldhandlers)
+        ip_infos = InterpolationInfo[]
+        nbasefunctions = Int[]
+        for cell_field in fh.fields
+            ip_info = InterpolationInfo(cell_field.interpolation)
+            push!(ip_infos, ip_info)
+            push!(nbasefunctions, getnbasefunctions(cell_field.interpolation))
+        end
+        element_dof_start = 0
+        isnothing(couplings) || (coupling_fh = couplings[fhi])
+        for (cell_field_i, cell_field) in enumerate(fh.fields)
+            fii = ip_infos[cell_field_i]
+            if(!fii.is_discontinuous)
+                element_dof_start += nbasefunctions[cell_field_i]
+                continue
+            end
+            for cell_idx in eachindex(getcells(dh.grid))
+                cell_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[cell_idx]].fields || continue
+                cell_dofs = @view dh.cell_dofs[dh.cell_dofs_offset[cell_idx] : dh.cell_dofs_offset[cell_idx] + ndofs_per_cell(dh, cell_idx) - 1]
+                cell_field_dofs = @view cell_dofs[element_dof_start + 1 : element_dof_start + nbasefunctions[cell_field_i]]
+                for neighbor_cell in topology.cell_face_neighbor[cell_idx]
+                    neighbour_dof_start = 0
+                    for (neighbor_field_i, neighbor_field) in enumerate(fh.fields)
+                        fii2 = ip_infos[neighbor_field_i]
+                        neighbor_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[neighbor_cell.idx]].fields || continue
+                        if(!fii2.is_discontinuous)
+                            neighbour_dof_start += nbasefunctions[neighbor_field_i]
+                            continue
+                        end
+                        neighbor_dofs = @view dh.cell_dofs[dh.cell_dofs_offset[neighbor_cell.idx] : dh.cell_dofs_offset[neighbor_cell.idx] + ndofs_per_cell(dh, neighbor_cell.idx) - 1]
+                        neighbor_field_dofs = @view neighbor_dofs[neighbour_dof_start + 1 : neighbour_dof_start + nbasefunctions[neighbor_field_i]]
+                        for j in eachindex(neighbor_field_dofs), i in eachindex(cell_field_dofs)
+                            isnothing(couplings) || coupling_fh[i+element_dof_start,j+neighbour_dof_start] || continue
+                            dofi = cell_field_dofs[i]
+                            dofj = neighbor_field_dofs[j]
+                            sym && (dofi > dofj && continue)
+                            !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
+                            cnt += 1
+                            _add_or_grow(cnt, I, J, dofi, dofj)
+                        end
+                        neighbour_dof_start += nbasefunctions[neighbor_field_i]
+                    end
+                end
+            end
+            element_dof_start += nbasefunctions[cell_field_i]
+        end
+    end
+    return cnt
+end
+
 function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool, keep_constrained::Bool, coupling::Union{AbstractMatrix{Bool},Nothing};
     topology::Union{Nothing, AbstractTopology} = nothing)
     @assert isclosed(dh)
@@ -148,7 +205,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     # when keeping constrained dofs (default) and if not it only over-estimates with number
     # of entries eliminated by constraints.
     max_buffer_length = ndofs(dh) # diagonal elements
-    uses_dg = false
+    has_discontinuous_ip = false
     for (fhi, fh) in pairs(dh.fieldhandlers)
         set = fh.cellset
         n = ndofs_per_cell(fh)
@@ -158,17 +215,9 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
             coupling_fh = couplings[fhi]
             count(coupling_fh[i, j] for i in 1:n for j in (sym ? i : 1):n)
         end
-        if any(ip -> IsDiscontinuous(ip),fh.field_interpolations)
-            uses_dg = true
-        end
+        has_discontinuous_ip = any(ip -> IsDiscontinuous(ip),fh.field_interpolations)
         max_buffer_length += entries_per_cell * length(set)
     end
-    dg_cnt = 0
-    if uses_dg
-        isnothing(topology) && (topology = ExclusiveTopology(dh.grid))
-        dg_cnt = cross_element_coupling_count(dh,topology, sym, keep_constrained, couplings)        
-    end
-    max_buffer_length += dg_cnt
     I = Vector{Int}(undef, max_buffer_length)
     J = Vector{Int}(undef, max_buffer_length)
     global_dofs = Int[]
@@ -194,10 +243,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
             end
         end
     end
-    if uses_dg
-        I[cnt+1:cnt+dg_cnt],J[cnt+1:cnt+dg_cnt] = cross_element_coupling(dh,topology,sym, keep_constrained, couplings, max_buffer_length = dg_cnt)
-        cnt += dg_cnt
-    end
+    has_discontinuous_ip && (cnt = cross_element_coupling!(dh,topology,sym, keep_constrained, couplings, cnt, I, J))
     # Always add diagonal entries
     resize!(I, cnt + ndofs(dh))
     resize!(J, cnt + ndofs(dh))
@@ -282,80 +328,4 @@ function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vec
     K .+= K2
 
     return nothing
-end
-
-"""
-    cross_element_coupling_count(dh::AbstractDofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing} ; max_buffer_length::Int = 0)
-
-Returns the length of cross-elements coupling vectors `(I, J)` starting counting from `max_buffer_length` which defaults to 0.
-Used internally for `(I, J)` pre-allocation.
-"""
-function cross_element_coupling_count end
-
-"""
-    cross_element_coupling(dh::AbstractDofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing} ; max_buffer_length::Int = 0
-
-Returns vectors `(I, J)` corresponding to cross-elements coupling.
-Used internally for sparsity patterns with discontinuous interpolations.
-"""
-function cross_element_coupling end
-
-for (func,                              pre_f,                                                                                      inner_f,                                return_values) in (
-    (:cross_element_coupling_count,     :(nothing),                                                                                 :(nothing),                             :(cnt)),
-    (:cross_element_coupling,           :(I = Vector{Int}(undef, max_buffer_length); J = Vector{Int}(undef, max_buffer_length)),    :(I[cnt] = dofi; J[cnt] = dofj;),       :(I, J)),
-)
-    @eval begin
-        function $(func)(dh::AbstractDofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing} ; max_buffer_length::Int = 0)
-            $(pre_f)
-            cnt = 0
-            for (fhi, fh) in pairs(dh.fieldhandlers)
-                ip_infos = InterpolationInfo[]
-                nbasefunctions = Int[]
-                for cell_field in fh.fields
-                    ip_info = InterpolationInfo(cell_field.interpolation)
-                    push!(ip_infos, ip_info)
-                    push!(nbasefunctions, getnbasefunctions(cell_field.interpolation))
-                end
-                element_dof_start = 0
-                isnothing(couplings) || (coupling_fh = couplings[fhi])
-                for (cell_field_i, cell_field) in enumerate(fh.fields)
-                    fii = ip_infos[cell_field_i]
-                    if(!fii.is_discontinuous)
-                        element_dof_start += nbasefunctions[cell_field_i]
-                        continue
-                    end
-                    for cell_idx in eachindex(getcells(dh.grid))
-                        cell_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[cell_idx]].fields || continue
-                        cell_dofs = @view dh.cell_dofs[dh.cell_dofs_offset[cell_idx] : dh.cell_dofs_offset[cell_idx] + ndofs_per_cell(dh, cell_idx) - 1]
-                        cell_field_dofs = @view cell_dofs[element_dof_start + 1 : element_dof_start + nbasefunctions[cell_field_i]]
-                        for neighbor_cell in topology.cell_face_neighbor[cell_idx]
-                            neighbour_dof_start = 0
-                            for (neighbor_field_i, neighbor_field) in enumerate(fh.fields)
-                                fii2 = ip_infos[neighbor_field_i]
-                                neighbor_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[neighbor_cell.idx]].fields || continue
-                                if(!fii2.is_discontinuous)
-                                    neighbour_dof_start += nbasefunctions[neighbor_field_i]
-                                    continue
-                                end
-                                neighbor_dofs = @view dh.cell_dofs[dh.cell_dofs_offset[neighbor_cell.idx] : dh.cell_dofs_offset[neighbor_cell.idx] + ndofs_per_cell(dh, neighbor_cell.idx) - 1]
-                                neighbor_field_dofs = @view neighbor_dofs[neighbour_dof_start + 1 : neighbour_dof_start + nbasefunctions[neighbor_field_i]]
-                                for j in eachindex(neighbor_field_dofs), i in eachindex(cell_field_dofs)
-                                    isnothing(couplings) || coupling_fh[i+element_dof_start,j+neighbour_dof_start] || continue
-                                    dofi = cell_field_dofs[i]
-                                    dofj = neighbor_field_dofs[j]
-                                    sym && (dofi > dofj && continue)
-                                    !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
-                                    cnt += 1
-                                    $(inner_f)
-                                end
-                                neighbour_dof_start += nbasefunctions[neighbor_field_i]
-                            end
-                        end
-                    end
-                    element_dof_start += nbasefunctions[cell_field_i]
-                end
-            end
-            return $(return_values)
-        end
-    end
 end
