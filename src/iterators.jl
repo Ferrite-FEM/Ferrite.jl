@@ -66,6 +66,10 @@ function CellCache(dh::DofHandler{dim}, flags::UpdateFlags=UpdateFlags()) where 
     return CellCache(flags, get_grid(dh), ScalarWrapper(-1), nodes, coords, dh, celldofs)
 end
 
+function CellCache(sdh::SubDofHandler, flags::UpdateFlags=UpdateFlags())
+    CellCache(flags, sdh.dh.grid, ScalarWrapper(-1), Int[], Vec{2,Float64}[], sdh, Int[])
+end
+
 function reinit!(cc::CellCache, i::Int)
     cc.cellid[] = i
     if cc.flags.nodes
@@ -137,11 +141,11 @@ struct CellIterator{CC<:CellCache, IC<:IntegerCollection}
     set::IC
 end
 
-function CellIterator(gridordh::Union{Grid,AbstractDofHandler},
+function CellIterator(gridordh::Union{Grid,DofHandler},
                       set::Union{IntegerCollection,Nothing}=nothing,
                       flags::UpdateFlags=UpdateFlags())
     if set === nothing
-        grid = gridordh isa AbstractDofHandler ? get_grid(gridordh) : gridordh
+        grid = gridordh isa DofHandler ? get_grid(gridordh) : gridordh
         set = 1:getncells(grid)
     end
     if gridordh isa DofHandler && !isconcretetype(getcelltype(get_grid(gridordh)))
@@ -151,8 +155,12 @@ function CellIterator(gridordh::Union{Grid,AbstractDofHandler},
     end
     return CellIterator(CellCache(gridordh, flags), set)
 end
-function CellIterator(gridordh::Union{Grid,AbstractDofHandler}, flags::UpdateFlags)
+function CellIterator(gridordh::Union{Grid,DofHandler}, flags::UpdateFlags)
     return CellIterator(gridordh, nothing, flags)
+end
+
+function CellIterator(sdh::SubDofHandler, flags::UpdateFlags=UpdateFlags())
+    CellIterator(sdh.dh, sdh.cellset, flags)
 end
 
 # Iterator interface

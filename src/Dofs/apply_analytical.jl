@@ -1,6 +1,7 @@
 function _default_interpolations(dh::DofHandler)
-    fhs = dh.fieldhandlers
-    ntuple(i -> default_interpolation(getcelltype(get_grid(dh), fhs[i])), length(fhs))
+    sdhs = dh.subdofhandlers
+    getcelltype(i) = typeof(getcells(get_grid(dh), first(sdhs[i].cellset)))
+    ntuple(i -> default_interpolation(getcelltype(i)), length(sdhs))
 end
 
 """
@@ -31,16 +32,16 @@ function apply_analytical!(
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
     ip_geos = _default_interpolations(dh)
 
-    for (fh, ip_geo) in zip(dh.fieldhandlers, ip_geos)
-        isnothing(_find_field(fh, fieldname)) && continue
-        field_idx = find_field(fh, fieldname)
-        ip_fun = getfieldinterpolation(fh, field_idx)
-        field_dim = getfielddim(fh, field_idx)
-        celldofinds = dof_range(fh, fieldname)
-        set_intersection = if length(cellset) == length(fh.cellset) == getncells(get_grid(dh))
+    for (sdh, ip_geo) in zip(dh.subdofhandlers, ip_geos)
+        isnothing(_find_field(sdh, fieldname)) && continue
+        field_idx = find_field(sdh, fieldname)
+        ip_fun = getfieldinterpolation(sdh, field_idx)
+        field_dim = getfielddim(sdh, field_idx)
+        celldofinds = dof_range(sdh, fieldname)
+        set_intersection = if length(cellset) == length(sdh.cellset) == getncells(get_grid(dh))
             BitSet(1:getncells(get_grid(dh)))
         else
-            intersect(BitSet(fh.cellset), BitSet(cellset))
+            intersect(BitSet(sdh.cellset), BitSet(cellset))
         end
         _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, set_intersection)
     end
