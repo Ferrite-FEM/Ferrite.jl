@@ -76,6 +76,14 @@ function DofHandler(grid::AbstractGrid{dim}) where dim
     DofHandler{dim,typeof(grid)}(FieldHandler[], Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
+function get_only_sdh_or_error(dh::DofHandler, func::Symbol)
+    @assert isclosed(dh)
+    if length(dh.fieldhandlers) != 1
+        error("$(func) not supported for DofHandler with multiple FieldHandlers")
+    end
+    return dh.fieldhandlers[1]
+end
+
 function MixedDofHandler(::AbstractGrid)
     error("MixedDofHandler is the standard DofHandler in Ferrite now and has been renamed to DofHandler.
 Use DofHandler even for mixed grids and fields on subdomains.")
@@ -696,57 +704,49 @@ function field_offset(dh::DofHandler, field_idxs::Tuple{Int, Int})
 end
 
 """
-    dof_range(fh::FieldHandler, field_idx::Int)
-    dof_range(fh::FieldHandler, field_name::Symbol)
     dof_range(dh:DofHandler, field_name::Symbol)
+    dof_range(fh::FieldHandler, field_name::Symbol)
 
-Return the local dof range for a given field. The field can be specified by its name or
-index, where `field_idx` represents the index of a field within a `FieldHandler` and
-`field_idxs` is a tuple of the `FieldHandler`-index within the `DofHandler` and the
-`field_idx`.
+Return the local dof range for a given field.
 
 !!! note
-    The `dof_range` of a field can vary between different `FieldHandler`s. Therefore, it is
-    advised to use the `field_idxs` or refer to a given `FieldHandler` directly in case
-    several `FieldHandler`s exist. Using the `field_name` will always refer to the first
-    occurence of `field` within the `DofHandler`.
+    The `dof_range` of a field can vary between different `FieldHandler`s. Therefore, for
+    problems involving multiple `FieldHandler`s, this method will throw an error when used
+    on the `DofHandler` directly.
 
 Example:
 ```jldoctest
-julia> grid = generate_grid(Triangle, (3, 3))
-Grid{2, Triangle, Float64} with 18 Triangle cells and 16 nodes
-
-julia> dh = DofHandler(grid); add!(dh, :u, 3); add!(dh, :p, 1); close!(dh);
+julia> dh = begin
+           grid = generate_grid(Triangle, (3, 3))
+           dh = DofHandler(grid)
+           add!(dh, :u, Lagrange{RefTriangle, 1}()^2) # vector field
+           add!(dh, :p, Lagrange{RefTriangle, 1}())   # scalar field
+           close!(dh)
+       end
 
 julia> dof_range(dh, :u)
-1:9
+1:6
 
 julia> dof_range(dh, :p)
-10:12
-
-julia> dof_range(dh, (1,1)) # field :u
-1:9
-
-julia> dof_range(dh.fieldhandlers[1], 2) # field :p
-10:12
+7:9
 ```
 """
-function dof_range(fh::FieldHandler, field_idx::Int)
+function dof_range(dh::DofHandler, field_name::Symbol)
+    sdh = get_only_sdh_or_error(dh, :dof_range)
+    return dof_range(sdh, field_name)
+end
+function dof_range(fh::FieldHandler, field_name::Symbol)
+    idx = find_field(fh, field_name)
+    if idx === nothing
+        error("field :$(field_name) not found in DofHandler/FieldHandler")
+    end
+    return _dof_range(fh, find_field(fh, field_name))
+end
+function _dof_range(fh::FieldHandler, field_idx::Int)
     offset = field_offset(fh, field_idx)
     field_interpolation = fh.field_interpolations[field_idx]
     n_field_dofs = getnbasefunctions(field_interpolation)::Int
     return (offset+1):(offset+n_field_dofs)
-end
-dof_range(fh::FieldHandler, field_name::Symbol) = dof_range(fh, find_field(fh, field_name))
-
-function dof_range(dh::DofHandler, field_name::Symbol)
-    if length(dh.fieldhandlers) > 1
-        error("The given DofHandler has $(length(dh.fieldhandlers)) FieldHandlers.
-              Extracting the dof range based on the fieldname might not be a unique problem
-              in this case. Use `dof_range(fh::FieldHandler, field_name)` instead.")
-    end
-    fh_idx, field_idx = find_field(dh, field_name)
-    return dof_range(dh.fieldhandlers[fh_idx], field_idx)
 end
 
 """
