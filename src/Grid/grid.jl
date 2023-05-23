@@ -283,6 +283,7 @@ The struct saves the highest dimensional neighborhood, i.e. if something is conn
 # Fields
 - `vertex_to_cell::Dict{Int,Vector{Int}}`: global vertex id to all cells containing the vertex
 - `cell_neighbor::Vector{EntityNeighborhood{CellIndex}}`: cellid to all connected cells
+- `cell_face_neighbor::Vector{EntityNeighborhood{CellIndex}}`: cellid to all cells connected by face
 - `face_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: `face_neighbor[cellid,local_face_id]` -> neighboring face
 - `vertex_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: `vertex_neighbor[cellid,local_vertex_id]` -> neighboring vertex
 - `edge_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: `edge_neighbor[cellid_local_vertex_id]` -> neighboring edge
@@ -294,6 +295,8 @@ struct ExclusiveTopology <: AbstractTopology
     vertex_to_cell::Dict{Int,Set{Int}}
     # index of the vector = cell id ->  all other connected cells
     cell_neighbor::Vector{EntityNeighborhood{CellIndex}}
+    # index of the vector = cell id ->  all other cells connected by faces
+    cell_face_neighbor::Vector{EntityNeighborhood{CellIndex}}
     # face_neighbor[cellid,local_face_id] -> exclusive connected entities (not restricted to one entity)
     face_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
     # vertex_neighbor[cellid,local_vertex_id] -> exclusive connected entities to the given vertex
@@ -324,11 +327,12 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     I_edge = Int[]; J_edge = Int[]; V_edge = EntityNeighborhood[]
     I_vertex = Int[]; J_vertex = Int[]; V_vertex = EntityNeighborhood[]
     cell_neighbor_table = Vector{EntityNeighborhood{CellIndex}}(undef, length(cells))
+    cell_face_neighbor_table = Vector{EntityNeighborhood{CellIndex}}(undef, length(cells))
 
     for (cellid, cell) in enumerate(cells)
         cell_neighbors = reduce(union!, [Set{Int}(vertex_cell_table[vertex]) for vertex ∈ vertices(cell) if vertex_cell_table[vertex] != cellid])
         cell_neighbor_table[cellid] = EntityNeighborhood(CellIndex.(collect(cell_neighbors)))
-
+        cell_face_neighbor_table[cellid] = EntityNeighborhood(CellIndex[])
         face_neighbors = Set{Int}()
         for (face_idx,face) ∈ enumerate(faces(cell))
             neighbor_candidates = Set{Int}(c for c ∈ vertex_cell_table[face[1]] if c != cellid)
@@ -361,7 +365,8 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
             # face neighbor
             elseif neighbor_cellid ∈ face_neighbors
                 neighbor_local_ids = findall(x->x in cell_vertices_table[cellid], cell_vertices_table[neighbor_cellid])
-                _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor_local_ids, neighbor_cellid, cells[neighbor_cellid]) 
+                _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor_local_ids, neighbor_cellid, cells[neighbor_cellid])
+                push!(cell_face_neighbor_table[cellid].neighbor_info,CellIndex(neighbor_cellid))
             # edge neighbor
             elseif getdim(cell) > 2 && neighbor_cellid ∈ edge_neighbors
                 neighbor_local_ids = findall(x->x in cell_vertices_table[cellid], cell_vertices_table[neighbor_cellid])
@@ -446,7 +451,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
             end
         end
     end
-    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_neighbor,vertex_neighbor,edge_neighbor,vertex_vertex_table,face_skeleton_local)
+    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,cell_face_neighbor_table,face_neighbor,vertex_neighbor,edge_neighbor,vertex_vertex_table,face_skeleton_local)
 end
 
 function _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor, neighborid, neighbor_cell)

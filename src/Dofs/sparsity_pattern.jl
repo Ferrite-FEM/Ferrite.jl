@@ -326,32 +326,29 @@ for (func,                              pre_f,                                  
                     end
                     for cell_idx in eachindex(getcells(dh.grid))
                         cell_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[cell_idx]].fields || continue
-                        current_face_neighborhood = getdim(dh.grid.cells[cell_idx]) >1 ? topology.face_neighbor[cell_idx,:] : topology.vertex_neighbor[cell_idx,:]
-                        shared_faces_idx = findall(!isempty,current_face_neighborhood)
-                        for face_idx in shared_faces_idx
-                            for neighbor_face in current_face_neighborhood[face_idx]
-                                cell_dofs = @view celldofs(dh,cell_idx)[element_dof_start + 1 : element_dof_start + nbasefunctions[cell_field_i]]
-                                neighbour_dof_start = 0
-                                for (neighbor_field_i, neighbor_field) in enumerate(fh.fields)
-                                    fii2 = ip_infos[neighbor_field_i]
-                                    neighbor_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[neighbor_face[1]]].fields || continue
-                                    if(!fii2.is_discontinuous)
-                                        neighbour_dof_start += nbasefunctions[neighbor_field_i]
-                                        continue
-                                    end
-                                    neighbour_dofs = @view celldofs(dh,neighbor_face[1])[neighbour_dof_start + 1 : neighbour_dof_start + nbasefunctions[neighbor_field_i]]
-                                    # neighbour_unique_dofs = neighbour_dofs[.!(neighbour_dofs .∈ Ref(celldofs(dh,cell_idx)))]
-                                    for j in eachindex(neighbour_dofs), i in eachindex(cell_dofs)
-                                        isnothing(couplings) || coupling_fh[i+element_dof_start,j+neighbour_dof_start] || continue
-                                        dofi = cell_dofs[i]
-                                        dofj = neighbour_dofs[j]
-                                        sym && (dofi > dofj && continue)
-                                        !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
-                                        cnt += 1
-                                        $(inner_f)
-                                    end
+                        cell_dofs = @view dh.cell_dofs[dh.cell_dofs_offset[cell_idx] : dh.cell_dofs_offset[cell_idx] + ndofs_per_cell(dh, cell_idx) - 1]
+                        cell_field_dofs = @view cell_dofs[element_dof_start + 1 : element_dof_start + nbasefunctions[cell_field_i]]
+                        for neighbor_cell in topology.cell_face_neighbor[cell_idx]
+                            neighbour_dof_start = 0
+                            for (neighbor_field_i, neighbor_field) in enumerate(fh.fields)
+                                fii2 = ip_infos[neighbor_field_i]
+                                neighbor_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[neighbor_cell.idx]].fields || continue
+                                if(!fii2.is_discontinuous)
                                     neighbour_dof_start += nbasefunctions[neighbor_field_i]
+                                    continue
                                 end
+                                neighbor_dofs = @view dh.cell_dofs[dh.cell_dofs_offset[neighbor_cell.idx] : dh.cell_dofs_offset[neighbor_cell.idx] + ndofs_per_cell(dh, neighbor_cell.idx) - 1]
+                                neighbor_field_dofs = @view neighbor_dofs[neighbour_dof_start + 1 : neighbour_dof_start + nbasefunctions[neighbor_field_i]]
+                                for j in eachindex(neighbor_field_dofs), i in eachindex(cell_field_dofs)
+                                    isnothing(couplings) || coupling_fh[i+element_dof_start,j+neighbour_dof_start] || continue
+                                    dofi = cell_field_dofs[i]
+                                    dofj = neighbor_field_dofs[j]
+                                    sym && (dofi > dofj && continue)
+                                    !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
+                                    cnt += 1
+                                    $(inner_f)
+                                end
+                                neighbour_dof_start += nbasefunctions[neighbor_field_i]
                             end
                         end
                     end
