@@ -84,6 +84,20 @@ if !liveserver
     @timeit dto "deploydocs" deploydocs(
         repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
         push_preview=true,
+        versions = [
+            "stable" => "v^",
+            "v#.#",
+            "v0.3.13",
+            "v0.3.12",
+            "v0.3.11",
+            "v0.3.10",
+            "v0.3.9",
+            "v0.3.8",
+            "v0.3.7",
+            "v0.3.6",
+            "v0.3.5",
+            "dev" => "dev"
+        ]
     )
 end
 

@@ -47,7 +47,7 @@ function L2Projector(
 
     _check_same_celltype(grid, set)
 
-    fe_values_mass = CellScalarValues(qr_lhs, func_ip, geom_ip)
+    fe_values_mass = CellValues(qr_lhs, func_ip, geom_ip)
 
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
     dh = DofHandler(grid)
@@ -63,11 +63,11 @@ function L2Projector(
 end
 
 # Quadrature sufficient for integrating a mass matrix
-function _mass_qr(::Lagrange{dim, shape, order}) where {dim, shape, order}
-    return QuadratureRule{dim,shape}(order + 1)
+function _mass_qr(::Lagrange{shape, order}) where {shape <: AbstractRefShape, order}
+    return QuadratureRule{shape}(order + 1)
 end
-function _mass_qr(::Lagrange{dim, RefTetrahedron, 2}) where {dim}
-    return QuadratureRule{dim,RefTetrahedron}(4)
+function _mass_qr(::Lagrange{shape, 2}) where {shape <: RefSimplex}
+    return QuadratureRule{shape}(4)
 end
 _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
@@ -164,7 +164,7 @@ function project(proj::L2Projector,
                  qr_rhs::QuadratureRule) where T <: Union{Number, AbstractTensor}
 
     # For using the deprecated API
-    fe_values = CellScalarValues(qr_rhs, proj.func_ip, proj.geom_ip)
+    fe_values = CellValues(qr_rhs, proj.func_ip, proj.geom_ip)
 
     M = T <: AbstractTensor ? length(vars[1][1].data) : 1
 
@@ -177,7 +177,7 @@ function project(p::L2Projector, vars::AbstractMatrix, qr_rhs::QuadratureRule)
     return project(p, collect(eachcol(vars)), qr_rhs)
 end
 
-function _project(vars, proj::L2Projector, fe_values::Values, M::Integer, ::Type{T}) where {T}
+function _project(vars, proj::L2Projector, fe_values::AbstractValues, M::Integer, ::Type{T}) where {T}
     # Assemble the multi-column rhs, f = ∭( v ⋅ x̂ )dΩ
     # The number of columns corresponds to the length of the data-tuple in the tensor x̂.
 
@@ -255,8 +255,8 @@ function _evaluate_at_grid_nodes(
     ip, gip = proj.func_ip, proj.geom_ip
     refdim, refshape = getdim(ip), getrefshape(ip)
     local_node_coords = reference_coordinates(gip)
-    qr = QuadratureRule{refdim,refshape}(zeros(length(local_node_coords)), local_node_coords)
-    cv = CellScalarValues(qr, ip)
+    qr = QuadratureRule{refshape}(zeros(length(local_node_coords)), local_node_coords)
+    cv = CellValues(qr, ip)
     # Function barrier
     return _evaluate_at_grid_nodes!(data, cv, dh, proj.set, vals)
 end

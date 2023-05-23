@@ -805,15 +805,13 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         CT = getcelltype(dh.grid, first(fh.cellset))
         ip_geo = default_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
-        qr = QuadratureRule{getdim(ip), getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
+        qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
         ip = getfieldinterpolation(fh, field_idx)
-        if ip isa ScalarInterpolation
-            cv = CellScalarValues(qr, ip, ip_geo)
-        elseif ip isa VectorizedInterpolation
+        if ip isa VectorizedInterpolation
             # TODO: Remove this hack when embedding works...
-            cv = CellScalarValues(qr, ip.ip, ip_geo)
+            cv = CellValues(qr, ip.ip, ip_geo)
         else
-            cv = CellVectorValues(qr, ip, ip_geo)
+            cv = CellValues(qr, ip, ip_geo)
         end
         drange = dof_range(fh, fieldname)
         # Function barrier
@@ -827,7 +825,7 @@ function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, dh::DofHandler, fh
         u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}) where {T, RT}
     ue = zeros(T, length(drange))
     # TODO: Remove this hack when embedding works...
-    if RT <: Vec && cv isa CellScalarValues
+    if RT <: Vec && cv isa CellValues{<:ScalarInterpolation}
         uer = reinterpret(RT, ue)
     else
         uer = ue

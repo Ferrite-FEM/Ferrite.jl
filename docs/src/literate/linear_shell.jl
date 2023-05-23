@@ -26,10 +26,10 @@ grid = generate_shell_grid(nels, size)
 # We also create two quadrature rules for the in-plane and out-of-plane directions. Note that we use 
 # under integration for the inplane integration, to avoid shear locking. 
 #+
-ip = Lagrange{2,RefCube,1}()
-qr_inplane = QuadratureRule{2,RefCube}(1)
-qr_ooplane = QuadratureRule{1,RefCube}(2)
-cv = CellScalarValues(qr_inplane, ip)
+ip = Lagrange{RefQuadrilateral,1}()
+qr_inplane = QuadratureRule{RefQuadrilateral}(1)
+qr_ooplane = QuadratureRule{RefLine}(2)
+cv = CellValues(qr_inplane, ip, ip^3)
 
 # Next we distribute displacement dofs,`:u = (x,y,z)` and rotational dofs, `:θ = (θ₁,  θ₂)`.
 #+
@@ -94,11 +94,12 @@ celldofs = zeros(Int, ndofs_shell)
 cellcoords = zeros(Vec{3,Float64}, nnodes)
 
 assembler = start_assemble(K, f)
-for cellid in 1:getncells(grid)
+for cell in CellIterator(grid)
     fill!(ke, 0.0)
+    reinit!(cv, cell)
 
-    celldofs!(celldofs, dh, cellid)
-    getcoordinates!(cellcoords, grid, cellid)
+    celldofs!(celldofs, dh, cellid(cell))
+    getcoordinates!(cellcoords, grid, cellid(cell))
 
     #Call the element routine
     integrate_shell!(ke, cv, qr_ooplane, cellcoords, data)
@@ -124,9 +125,8 @@ end; #end main functions
 function generate_shell_grid(nels, size)
     _grid = generate_grid(Quadrilateral, nels, Vec((0.0,0.0)), Vec(size))
     nodes = [(n.x[1], n.x[2], 0.0) |> Vec{3} |> Node  for n in _grid.nodes]
-    cells = [Quadrilateral3D(cell.nodes) for cell in _grid.cells]
 
-    grid = Grid(cells, nodes)
+    grid = Grid(_grid.cells, nodes)
 
     return grid
 end;
@@ -215,7 +215,6 @@ end;
 # J_{ij} = \frac{\partial x_i}{\partial \xi_j},
 # ```
 function getjacobian(q, N, dNdξ, ζ, X, p, h)
-
     J = zeros(3,3)
     for a in 1:length(N)
         for i in 1:3, j in 1:3
@@ -261,7 +260,6 @@ function strain(dofvec::Vector{T}, N, dNdx, ζ, dζdx, q, ef1, ef2, h) where T
     dudx = q*dudx
     ε = [dudx[1,1], dudx[2,2], dudx[1,2]+dudx[2,1], dudx[2,3]+dudx[3,2], dudx[1,3]+dudx[3,1]]
     return ε
-
 end;
 
 # ##### Main element routine
@@ -280,31 +278,27 @@ function integrate_shell!(ke, cv, qr_ooplane, X, data)
         a = Vec{3}((0.0, 0.0, 1.0))
         p[i] = a/norm(a)
     end
-    
+
     ef1, ef2, ef3 = fiber_coordsys(p)
 
     for iqp in 1:getnquadpoints(cv)
-
-        dNdξ = cv.dNdξ[:,iqp]
         N = cv.N[:,iqp]
+        dNdξ = cv.dNdξ[:,iqp]
+        dNdx = cv.dNdx[:,iqp]
 
         for oqp in 1:length(qr_ooplane.weights)
-
             ζ = qr_ooplane.points[oqp][1]
-           
             q = lamina_coordsys(dNdξ, ζ, X, p, h)
-            J = getjacobian(q, N, dNdξ, ζ, X, p, h)
-            Jinv = inv(J)  
-           
-            dζdx = Vec{3}((0.0, 0.0, 1.0)) ⋅ Jinv
-            dNdx = [Vec{3}((dNdξ[i][1], dNdξ[i][2], 0.0)) ⋅ Jinv for i in 1:nnodes]
 
-            
+            J = getjacobian(q, N, dNdξ, ζ, X, p, h)
+            Jinv = inv(J)
+            dζdx = Vec{3}((0.0, 0.0, 1.0)) ⋅ Jinv
+
             #For simplicity, use automatic differentiation to construct the B-matrix from the strain.
             B = ForwardDiff.jacobian(
                 (a) -> strain(a, N, dNdx, ζ, dζdx, q, ef1, ef2, h), zeros(Float64, ndofs) )
 
-            dV = det(J) * cv.qr.weights[iqp] * qr_ooplane.weights[oqp]
+            dV = qr_ooplane.weights[oqp] * getdetJdV(cv, iqp)
             ke .+= B'*data.C*B * dV
         end
     end

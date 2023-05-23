@@ -2,19 +2,18 @@
 # Tests a L2-projection of integration point values (to nodal values),
 # determined from the function y = 1 + x[1]^2 + (2x[2])^2
 function test_projection(order, refshape)
-    element = refshape == RefCube ? Quadrilateral : Triangle
+    element = refshape == RefQuadrilateral ? Quadrilateral : Triangle
     grid = generate_grid(element, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
 
-    dim = 2
-    ip = Lagrange{dim, refshape, order}()
-    ip_geom = Lagrange{dim, refshape, 1}()
+    ip = Lagrange{refshape, order}()
+    ip_geom = Lagrange{refshape, 1}()
     qr = Ferrite._mass_qr(ip)
-    cv = CellScalarValues(qr, ip, ip_geom)
+    cv = CellValues(qr, ip, ip_geom)
 
     # Create node values for the cell
     f(x) = 1 + x[1]^2 + (2x[2])^2
     # Nodal approximations for this simple grid when using linear interpolation
-    f_approx(i) = refshape == RefCube ?
+    f_approx(i) = refshape == RefQuadrilateral ?
         [0.1666666666666664, 1.166666666666667, 5.166666666666667, 4.166666666666666][i] :
         [0.444444444444465, 1.0277777777778005, 4.027777777777753, 5.444444444444435][i]
 
@@ -95,12 +94,12 @@ function test_projection(order, refshape)
     @test point_vars ≈ point_vars_2 ≈ ae
 
     # Test error-path with bad qr
-    if refshape == RefTetrahedron && order == 2
+    if refshape == RefTriangle && order == 2
         bad_order = 2
     else
         bad_order = 1
     end
-    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs=QuadratureRule{dim,refshape}(bad_order), geom_ip=ip_geom)
+    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs=QuadratureRule{refshape}(bad_order), geom_ip=ip_geom)
 end
 
 # Test a mixed grid, where only a subset of the cells contains a field
@@ -125,10 +124,10 @@ function test_projection_mixedgrid()
     mesh = Grid(cells, nodes)
 
     order = 2
-    ip = Lagrange{dim, RefCube, order}()
-    ip_geom = Lagrange{dim, RefCube, 1}()
-    qr = QuadratureRule{dim, RefCube}(order+1)
-    cv = CellScalarValues(qr, ip, ip_geom)
+    ip = Lagrange{RefQuadrilateral, order}()
+    ip_geom = Lagrange{RefQuadrilateral, 1}()
+    qr = QuadratureRule{RefQuadrilateral}(order+1)
+    cv = CellValues(qr, ip, ip_geom)
 
     # Create node values for the 1st cell
     # use a SymmetricTensor here for testing the symmetric version of project
@@ -155,10 +154,10 @@ function test_projection_mixedgrid()
 
     # Do the same thing but for the triangle set
     order = 2
-    ip = Lagrange{dim, RefTetrahedron, order}()
-    ip_geom = Lagrange{dim, RefTetrahedron, 1}()
-    qr = QuadratureRule{dim, RefTetrahedron}(4)
-    cv = CellScalarValues(qr, ip, ip_geom)
+    ip = Lagrange{RefTriangle, order}()
+    ip_geom = Lagrange{RefTriangle, 1}()
+    qr = QuadratureRule{RefTriangle}(4)
+    cv = CellValues(qr, ip, ip_geom)
     nqp = getnquadpoints(cv)
 
     qp_values_tria = [zeros(SymmetricTensor{2,2}, nqp) for _ in triaset]
@@ -185,9 +184,9 @@ end
 
 function test_export(;subset::Bool)
     grid = generate_grid(Quadrilateral, (2, 1))
-    qr = QuadratureRule{2,RefCube}(2)
-    ip = Lagrange{2,RefCube,1}()
-    cv = CellScalarValues(qr, ip)
+    qr = QuadratureRule{RefQuadrilateral}(2)
+    ip = Lagrange{RefQuadrilateral,1}()
+    cv = CellValues(qr, ip)
     nqp = getnquadpoints(cv)
     qpdata_scalar = [zeros(nqp) for _ in 1:getncells(grid)]
     qpdata_vec = [zeros(Vec{2}, nqp) for _ in 1:getncells(grid)]
@@ -282,16 +281,16 @@ end
 
 function test_show()
     grid = generate_grid(Triangle, (2,2))
-    ip = Lagrange{2,RefTetrahedron,1}()
+    ip = Lagrange{RefTriangle, 1}()
     proj = L2Projector(ip, grid)
-    @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{2, RefTetrahedron, 1}()\n  geometric interpolation: Lagrange{2, RefTetrahedron, 1}()\n"
+    @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{RefTriangle, 1}()\n  geometric interpolation: Lagrange{RefTriangle, 1}()\n"
 end
 
 @testset "Test L2-Projection" begin
-    test_projection(1, RefCube)
-    test_projection(1, RefTetrahedron)
-    test_projection(2, RefCube)
-    test_projection(2, RefTetrahedron)
+    test_projection(1, RefQuadrilateral)
+    test_projection(1, RefTriangle)
+    test_projection(2, RefQuadrilateral)
+    test_projection(2, RefTriangle)
     test_projection_mixedgrid()
     test_export(subset=false)
     test_export(subset=true)

@@ -26,7 +26,7 @@ get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 # AbstractCell interface #
 ##########################
 
-abstract type AbstractCell{refdim, refshape <: AbstractRefShape{refdim}} end
+abstract type AbstractCell{refshape <: AbstractRefShape} end
 
 nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))
@@ -84,21 +84,21 @@ get_node_ids(c::AbstractCell) = c.nodes
 # correctly implemented for the cell.
 
 # RefLine (refdim = 1): vertices for vertexdofs, faces for BC
-function vertices(c::AbstractCell{1, RefLine})
+function vertices(c::AbstractCell{RefLine})
     ns = get_node_ids(c)
     return (ns[1], ns[2]) # v1, v2
 end
-function faces(c::AbstractCell{1, RefLine})
+function faces(c::AbstractCell{RefLine})
     ns = get_node_ids(c)
     return ((ns[1],), (ns[2],)) # f1, f2
 end
 
 # RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
-function vertices(c::AbstractCell{2, RefTriangle})
+function vertices(c::AbstractCell{RefTriangle})
     ns = get_node_ids(c)
     return (ns[1], ns[2], ns[3]) # v1, v2, v3
 end
-function faces(c::AbstractCell{2, RefTriangle})
+function faces(c::AbstractCell{RefTriangle})
     ns = get_node_ids(c)
     return (
         (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # f1, f2, f3
@@ -106,11 +106,11 @@ function faces(c::AbstractCell{2, RefTriangle})
 end
 
 # RefQuadrilateral (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
-function vertices(c::AbstractCell{2, RefQuadrilateral})
+function vertices(c::AbstractCell{RefQuadrilateral})
     ns = get_node_ids(c)
     return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
 end
-function faces(c::AbstractCell{2, RefQuadrilateral})
+function faces(c::AbstractCell{RefQuadrilateral})
     ns = get_node_ids(c)
     return (
         (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # f1, f2, f3, f4
@@ -118,18 +118,18 @@ function faces(c::AbstractCell{2, RefQuadrilateral})
 end
 
 # RefTetrahedron (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
-function vertices(c::AbstractCell{3, RefTetrahedron})
+function vertices(c::AbstractCell{RefTetrahedron})
     ns = get_node_ids(c)
     return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
 end
-function edges(c::AbstractCell{3, RefTetrahedron})
+function edges(c::AbstractCell{RefTetrahedron})
     ns = get_node_ids(c)
     return (
         (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # e1, e2, e3
         (ns[1], ns[4]), (ns[2], ns[4]), (ns[3], ns[4]), # e4, e5, e6
     )
 end
-function faces(c::AbstractCell{3, RefTetrahedron})
+function faces(c::AbstractCell{RefTetrahedron})
     ns = get_node_ids(c)
     return (
         (ns[1], ns[3], ns[2]), (ns[1], ns[2], ns[4]), # f1, f2
@@ -138,13 +138,13 @@ function faces(c::AbstractCell{3, RefTetrahedron})
 end
 
 # RefHexahedron (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
-function vertices(c::AbstractCell{3, RefHexahedron})
+function vertices(c::AbstractCell{RefHexahedron})
     ns = get_node_ids(c)
     return (
         ns[1], ns[2], ns[3], ns[4], ns[5], ns[6], ns[7], ns[8], # v1, ..., v8
     )
 end
-function edges(c::AbstractCell{3, RefHexahedron})
+function edges(c::AbstractCell{RefHexahedron})
     ns = get_node_ids(c)
     return (
         (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # e1, e2, e3, e4
@@ -152,7 +152,7 @@ function edges(c::AbstractCell{3, RefHexahedron})
         (ns[1], ns[5]), (ns[2], ns[6]), (ns[3], ns[7]), (ns[4], ns[8]), # e9, e10, e11, e12
     )
 end
-function faces(c::AbstractCell{3, RefHexahedron})
+function faces(c::AbstractCell{RefHexahedron})
     ns = get_node_ids(c)
     return (
         (ns[1], ns[4], ns[3], ns[2]), (ns[1], ns[2], ns[6], ns[5]), # f1, f2
@@ -162,11 +162,11 @@ function faces(c::AbstractCell{3, RefHexahedron})
 end
 
 # RefPrism (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
-function vertices(c::AbstractCell{3, RefPrism})
+function vertices(c::AbstractCell{RefPrism})
     ns = get_node_ids(c)
     return (ns[1], ns[2], ns[3], ns[4], ns[5], ns[6]) # v1, ..., v6
 end
-function edges(c::AbstractCell{3, RefPrism})
+function edges(c::AbstractCell{RefPrism})
     ns = get_node_ids(c)
     return (
         (ns[2], ns[1]), (ns[1], ns[3]), (ns[1], ns[4]), (ns[3], ns[2]), # e1, e2, e3, e4
@@ -174,7 +174,7 @@ function edges(c::AbstractCell{3, RefPrism})
         (ns[6], ns[5]),                                                 # e9
     )
 end
-function faces(c::AbstractCell{3, RefPrism})
+function faces(c::AbstractCell{RefPrism})
     ns = get_node_ids(c)
     return (
         (ns[1], ns[3], ns[2]),        (ns[1], ns[2], ns[5], ns[4]), # f1, f2
@@ -189,39 +189,39 @@ end
 ######################################################
 
 # Lagrange interpolation based cells
-struct Line                   <: AbstractCell{1, RefLine}          nodes::NTuple{ 2, Int} end
-struct QuadraticLine          <: AbstractCell{1, RefLine}          nodes::NTuple{ 3, Int} end
-struct Triangle               <: AbstractCell{2, RefTriangle}      nodes::NTuple{ 3, Int} end
-struct QuadraticTriangle      <: AbstractCell{2, RefTriangle}      nodes::NTuple{ 6, Int} end
-struct Quadrilateral          <: AbstractCell{2, RefQuadrilateral} nodes::NTuple{ 4, Int} end
-struct QuadraticQuadrilateral <: AbstractCell{2, RefQuadrilateral} nodes::NTuple{ 9, Int} end
-struct Tetrahedron            <: AbstractCell{3, RefTetrahedron}   nodes::NTuple{ 4, Int} end
-struct QuadraticTetrahedron   <: AbstractCell{3, RefTetrahedron}   nodes::NTuple{10, Int} end
-struct Hexahedron             <: AbstractCell{3, RefHexahedron}    nodes::NTuple{ 8, Int} end
-struct QuadraticHexahedron    <: AbstractCell{3, RefHexahedron}    nodes::NTuple{27, Int} end
-struct Wedge                  <: AbstractCell{3, RefPrism}         nodes::NTuple{ 6, Int} end
+struct Line                   <: AbstractCell{RefLine}          nodes::NTuple{ 2, Int} end
+struct QuadraticLine          <: AbstractCell{RefLine}          nodes::NTuple{ 3, Int} end
+struct Triangle               <: AbstractCell{RefTriangle}      nodes::NTuple{ 3, Int} end
+struct QuadraticTriangle      <: AbstractCell{RefTriangle}      nodes::NTuple{ 6, Int} end
+struct Quadrilateral          <: AbstractCell{RefQuadrilateral} nodes::NTuple{ 4, Int} end
+struct QuadraticQuadrilateral <: AbstractCell{RefQuadrilateral} nodes::NTuple{ 9, Int} end
+struct Tetrahedron            <: AbstractCell{RefTetrahedron}   nodes::NTuple{ 4, Int} end
+struct QuadraticTetrahedron   <: AbstractCell{RefTetrahedron}   nodes::NTuple{10, Int} end
+struct Hexahedron             <: AbstractCell{RefHexahedron}    nodes::NTuple{ 8, Int} end
+struct QuadraticHexahedron    <: AbstractCell{RefHexahedron}    nodes::NTuple{27, Int} end
+struct Wedge                  <: AbstractCell{RefPrism}         nodes::NTuple{ 6, Int} end
 
-default_interpolation(::Type{Line})                   = Lagrange{1, RefCube,        1}()
-default_interpolation(::Type{QuadraticLine})          = Lagrange{1, RefCube,        2}()
-default_interpolation(::Type{Triangle})               = Lagrange{2, RefTetrahedron, 1}()
-default_interpolation(::Type{QuadraticTriangle})      = Lagrange{2, RefTetrahedron, 2}()
-default_interpolation(::Type{Quadrilateral})          = Lagrange{2, RefCube,        1}()
-default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2, RefCube,        2}()
-default_interpolation(::Type{Tetrahedron})            = Lagrange{3, RefTetrahedron, 1}()
-default_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{3, RefTetrahedron, 2}()
-default_interpolation(::Type{Hexahedron})             = Lagrange{3, RefCube,        1}()
-default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{3, RefCube,        2}()
-default_interpolation(::Type{Wedge})                  = Lagrange{3, RefPrism,       1}()
+default_interpolation(::Type{Line})                   = Lagrange{RefLine,          1}()
+default_interpolation(::Type{QuadraticLine})          = Lagrange{RefLine,          2}()
+default_interpolation(::Type{Triangle})               = Lagrange{RefTriangle,      1}()
+default_interpolation(::Type{QuadraticTriangle})      = Lagrange{RefTriangle,      2}()
+default_interpolation(::Type{Quadrilateral})          = Lagrange{RefQuadrilateral, 1}()
+default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{RefQuadrilateral, 2}()
+default_interpolation(::Type{Tetrahedron})            = Lagrange{RefTetrahedron,   1}()
+default_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{RefTetrahedron,   2}()
+default_interpolation(::Type{Hexahedron})             = Lagrange{RefHexahedron,    1}()
+default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron,    2}()
+default_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
 
 # TODO: Remove this, used for Quadrilateral3D
 edges(c::Quadrilateral#=3D=#) = faces(c)
 
 # Serendipity interpolation based cells
-struct SerendipityQuadraticQuadrilateral <: AbstractCell{2, RefQuadrilateral} nodes::NTuple{ 8, Int} end
-struct SerendipityQuadraticHexahedron    <: AbstractCell{3, RefHexahedron}    nodes::NTuple{20, Int} end
+struct SerendipityQuadraticQuadrilateral <: AbstractCell{RefQuadrilateral} nodes::NTuple{ 8, Int} end
+struct SerendipityQuadraticHexahedron    <: AbstractCell{RefHexahedron}    nodes::NTuple{20, Int} end
 
-default_interpolation(::Type{SerendipityQuadraticQuadrilateral}) = Serendipity{2, RefCube, 2}()
-default_interpolation(::Type{SerendipityQuadraticHexahedron})    = Serendipity{3, RefCube, 2}()
+default_interpolation(::Type{SerendipityQuadraticQuadrilateral}) = Serendipity{RefQuadrilateral, 2}()
+default_interpolation(::Type{SerendipityQuadraticHexahedron})    = Serendipity{RefHexahedron,    2}()
 
 
 ############
@@ -269,7 +269,7 @@ Specifies for each subtype of AbstractCell how many nodes form an edge.
 """
 nvertices_on_edge(cell::AbstractCell, local_edge_index::Int) = length(edges(cell)[local_edge_index])
 
-getdim(::Union{AbstractCell{refdim},Type{<:AbstractCell{refdim}}}) where {refdim} = refdim
+getdim(::Union{AbstractCell{refshape},Type{<:AbstractCell{refshape}}}) where {refdim, refshape <: AbstractRefShape{refdim}} = refdim
 
 abstract type AbstractTopology end
 
