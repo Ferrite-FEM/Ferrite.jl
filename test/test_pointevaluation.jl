@@ -263,12 +263,10 @@ function mixed_grid()
 
     # second alternative: assume a vector field :v
     dh = DofHandler(mesh)
-    field = Field(:v, ip_quad^2)
-    fh_quad = FieldHandler([field], getcellset(mesh, "quads"))
-    add!(dh, fh_quad)
-    field = Field(:v, ip_tri^2)
-    fh_tri = FieldHandler([field], getcellset(mesh, "tris"))
-    add!(dh, fh_tri)
+    sdh_quad = SubDofHandler(dh, getcellset(mesh, "quads"))
+    add!(sdh_quad, :v, ip_quad^2)
+    sdh_tri = SubDofHandler(dh, getcellset(mesh, "tris"))
+    add!(sdh_tri, :v, ip_tri^2)
     close!(dh)
 
     dof_vals = [1., 1., 2., 2., 4., 4., 3., 3., 6., 6., 5., 5.]
