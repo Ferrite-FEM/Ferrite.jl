@@ -51,9 +51,8 @@ function L2Projector(
 
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
     dh = DofHandler(grid)
-    field = Field(:_, func_ip) # we need to create the field, but the interpolation is not used here
-    fh = FieldHandler([field], Set(set))
-    add!(dh, fh)
+    sdh = SubDofHandler(dh, Set(set))
+    add!(sdh, :_, func_ip) # we need to create the field, but the interpolation is not used here
     close!(dh)
 
     M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix

@@ -11,9 +11,6 @@ DofHandler
 ## Adding fields to the DofHandlers
 ```@docs
 add!(::DofHandler, ::Symbol, ::Interpolation)
-add!(::DofHandler, ::FieldHandler)
-Field
-FieldHandler
 close!(::DofHandler)
 ```
 

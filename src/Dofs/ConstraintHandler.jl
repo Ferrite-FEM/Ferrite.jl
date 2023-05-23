@@ -326,7 +326,7 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpo
     interpol_points = getnbasefunctions(interpolation)
     node_dofs = zeros(Int, ncomps, nnodes)
     visited = falses(nnodes)
-    for cell in CellIterator(ch.dh, cellset) # only go over cells that belong to current FieldHandler
+    for cell in CellIterator(ch.dh, cellset) # only go over cells that belong to current SubDofHandler
         for idx in 1:min(interpol_points, length(cell.nodes))
             node = cell.nodes[idx]
             if !visited[node]
@@ -816,18 +816,18 @@ end
 Add a `Dirichlet` boundary condition to the `ConstraintHandler`.
 """
 function add!(ch::ConstraintHandler, dbc::Dirichlet)
-    # Duplicate the Dirichlet constraint for every FieldHandler
+    # Duplicate the Dirichlet constraint for every SubDofHandler
     dbc_added = false
-    for fh in ch.dh.fieldhandlers
+    for sdh in ch.dh.subdofhandlers
         # Skip if the constrained field does not live on this sub domain
-        dbc.field_name in fh.field_names || continue
+        dbc.field_name in sdh.field_names || continue
         # Compute the intersection between dbc.set and the cellset of this
-        # FieldHandler and skip if the set is empty
-        filtered_set = filter_dbc_set(get_grid(ch.dh), fh.cellset, dbc.faces)
+        # SubDofHandler and skip if the set is empty
+        filtered_set = filter_dbc_set(get_grid(ch.dh), sdh.cellset, dbc.faces)
         isempty(filtered_set) && continue
-        # Fetch information about the field on this FieldHandler
-        field_idx = find_field(fh, dbc.field_name)
-        interpolation = getfieldinterpolation(fh, field_idx)
+        # Fetch information about the field on this SubDofHandler
+        field_idx = find_field(sdh, dbc.field_name)
+        interpolation = getfieldinterpolation(sdh, field_idx)
         # Internally we use the devectorized version
         n_comp = n_dbc_components(interpolation)
         if interpolation isa VectorizedInterpolation
@@ -845,13 +845,13 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
             # BCValues are just dummy for nodesets so set to FaceIndex
             EntityType = FaceIndex
         end
-        CT = getcelltype(get_grid(ch.dh), fh) # Same celltype enforced in FieldHandler constructor
+        CT = getcelltype(get_grid(ch.dh), first(sdh.cellset)) # Same celltype enforced in SubDofHandler constructor
         bcvalues = BCValues(interpolation, default_interpolation(CT), EntityType)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
         _add!(
             ch, filtered_dbc, filtered_dbc.faces, interpolation, n_comp,
-            field_offset(fh, dbc.field_name), bcvalues, fh.cellset,
+            field_offset(sdh, field_idx), bcvalues, sdh.cellset,
         )
         dbc_added = true
     end
@@ -859,7 +859,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
     return ch
 end
 
-# Return the intersection of the FieldHandler set and the Dirichlet BC set
+# Return the intersection of the SubDofHandler set and the Dirichlet BC set
 function filter_dbc_set(::AbstractGrid, fhset::AbstractSet{Int}, dbcset::AbstractSet{<:BoundaryIndex})
     ret = empty(dbcset)::typeof(dbcset)
     for x in dbcset
@@ -976,7 +976,7 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
         dof_map_t = Vector{Int}
         iterator_f = x -> Iterators.partition(x, nc)
     end
-    _add!(ch, pdbc, interpolation, n_comp, field_offset(ch.dh, pdbc.field_name), is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f)
+    _add!(ch, pdbc, interpolation, n_comp, field_offset(ch.dh.subdofhandlers[field_idx[1]], field_idx[2]), is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f)
     return ch
 end
 

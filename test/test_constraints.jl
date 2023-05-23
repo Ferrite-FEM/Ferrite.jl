@@ -107,11 +107,11 @@ end
 
    ip_quadratic = Lagrange{RefQuadrilateral, 2}()^dim
    ip_linear = Lagrange{RefQuadrilateral, 1}()
-   field_u = Field(:u, ip_quadratic)
-   field_c = Field(:c, ip_linear)
-   add!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set1")))
-   add!(dh, FieldHandler([field_u], getcellset(mesh, "set2")))
-
+   sdh1 = SubDofHandler(dh, getcellset(mesh, "set1"))
+   add!(sdh1, :u, ip_quadratic)
+   add!(sdh1, :c, ip_linear)
+   sdh2 = SubDofHandler(dh, getcellset(mesh, "set2"))
+   add!(sdh2, :u, ip_quadratic)
    close!(dh)
 
    ch = ConstraintHandler(dh)
@@ -130,12 +130,13 @@ end
    addcellset!(mesh, "set2", Set(2))
 
    ip = Lagrange{RefQuadrilateral, 1}()
-   field_u = Field(:u, ip^dim)
-   field_c = Field(:c, ip)
 
    dh = DofHandler(mesh)
-   add!(dh, FieldHandler([field_u], getcellset(mesh, "set1")))
-   add!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set2")))
+   sdh1 = SubDofHandler(dh, getcellset(mesh, "set1"))
+   add!(sdh1, :u, ip^dim)
+   sdh2 = SubDofHandler(dh, getcellset(mesh, "set2"))
+   add!(sdh2, :u, ip^dim)
+   add!(sdh2, :c, ip)
    close!(dh)
 
    ch = ConstraintHandler(dh)
