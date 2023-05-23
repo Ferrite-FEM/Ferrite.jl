@@ -72,10 +72,10 @@ function FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(qr:
 
     for face in 1:n_faces, (qp, ξ) in pairs(getpoints(qr, face))
         for basefunc in 1:n_func_basefuncs
-            dNdξ[basefunc, qp, face], N[basefunc, qp, face] = gradient_and_value(ip, basefunc, ξ)
+            dNdξ[basefunc, qp, face], N[basefunc, qp, face] = shape_gradient_and_value(ip, ξ, basefunc)
         end
         for basefunc in 1:n_geom_basefuncs
-            dMdξ[basefunc, qp, face], M[basefunc, qp, face] = gradient_and_value(gip, basefunc, ξ)
+            dMdξ[basefunc, qp, face], M[basefunc, qp, face] = shape_gradient_and_value(gip, ξ, basefunc)
         end
     end
 
@@ -212,7 +212,7 @@ function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interp
 
     for n_boundary_entity in 1:n_boundary_entities
         for (qp, ξ) in enumerate(qrs[n_boundary_entity].points), i in 1:n_geom_basefuncs
-            M[i, qp, n_boundary_entity] = value(geom_interpol, i, ξ)
+            M[i, qp, n_boundary_entity] = shape_value(geom_interpol, ξ, i)
         end
         nqp[n_boundary_entity] = length(qrs[n_boundary_entity].points)
     end

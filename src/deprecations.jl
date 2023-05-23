@@ -325,3 +325,7 @@ end
 function Base.show(io::IO, ::CrouzeixRaviart{shape, order}) where {shape, order}
     print(io, "CrouzeixRaviart{$(shape), $(order)}()")
 end
+
+@deprecate value(ip::Interpolation, ξ::Vec) [shape_value(ip, ξ, i) for i in 1:getnbasefunctions(ip)] false
+@deprecate derivative(ip::Interpolation, ξ::Vec) [shape_gradient(ip, ξ, i) for i in 1:getnbasefunctions(ip)] false
+@deprecate value(ip::Interpolation, i::Int, ξ::Vec) shape_value(ip, ξ, i) false

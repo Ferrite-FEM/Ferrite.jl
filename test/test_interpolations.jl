@@ -44,19 +44,19 @@
         # Note that not every element formulation exists for every order and dimension.
         applicable(Ferrite.getlowerorder, interpolation) && @test typeof(Ferrite.getlowerorder(interpolation)) <: Interpolation{ref_shape,func_order-1}
 
-        # Check partition of unity at random point.
-        n_basefuncs = getnbasefunctions(interpolation)
-        x = rand(Tensor{1, ref_dim})
-        f = (x) -> Ferrite.value(interpolation, Tensor{1, ref_dim}(x))
-        @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
-            reinterpret(Float64, Ferrite.derivative(interpolation, x))
-        @test sum(Ferrite.value(interpolation, x)) ≈ 1.0
+    # Check partition of unity at random point.
+    n_basefuncs = getnbasefunctions(interpolation)
+    x = rand(Tensor{1, ref_dim})
+    f = (x) -> [shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
+    @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
+        reinterpret(Float64, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
+    @test sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
 
-        # Check if the important functions are consistent
-        coords = Ferrite.reference_coordinates(interpolation)
-        @test length(coords) == n_basefuncs
-        @test Ferrite.value(interpolation, length(coords), x) == Ferrite.value(interpolation, length(coords), x)
-        @test_throws ArgumentError Ferrite.value(interpolation, length(coords)+1, x)
+    # Check if the important functions are consistent
+    coords = Ferrite.reference_coordinates(interpolation)
+    @test length(coords) == n_basefuncs
+    @test shape_value(interpolation, x, n_basefuncs) == shape_value(interpolation, x, n_basefuncs)
+    @test_throws ArgumentError shape_value(interpolation, x, n_basefuncs+1)
 
         # Test whether we have for each entity corresponding dof indices (possibly empty)
         @test length(Ferrite.vertexdof_indices(interpolation)) == Ferrite.nvertices(interpolation)
@@ -95,17 +95,17 @@
         end
         @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.celldof_interior_indices(interpolation)])
 
-        # Check for dirac delta property of interpolation
-        @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
-            N_dof = Ferrite.value(interpolation, coords[dof])
-            for k in 1:n_basefuncs
-                if k == dof
-                    @test N_dof[k] ≈ 1.0
-                else
-                    @test N_dof[k] ≈ 0.0 atol=4eps(Float64) #broken=typeof(interpolation)==Lagrange{2, RefTetrahedron, 5}&&dof==4&&k==18
-                end
+    # Check for dirac delta property of interpolation
+    @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
+        for k in 1:n_basefuncs
+            N_dof = shape_value(interpolation, coords[dof], k)
+            if k == dof
+                @test N_dof ≈ 1.0
+            else
+                @test N_dof ≈ 0.0 atol=4eps(Float64) #broken=typeof(interpolation)==Lagrange{2, RefTetrahedron, 5}&&dof==4&&k==18
             end
         end
+    end
 
         # Test that facedof_indices(...) return in counter clockwise order (viewing from the outside)
         if interpolation isa Lagrange
