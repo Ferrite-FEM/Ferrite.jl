@@ -161,7 +161,7 @@ function cross_element_coupling!(dh::AbstractDofHandler, topology::ExclusiveTopo
                 cell_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[cell_idx]].fields || continue
                 cell_dofs = @view dh.cell_dofs[dh.cell_dofs_offset[cell_idx] : dh.cell_dofs_offset[cell_idx] + ndofs_per_cell(dh, cell_idx) - 1]
                 cell_field_dofs = @view cell_dofs[element_dof_start + 1 : element_dof_start + nbasefunctions[cell_field_i]]
-                for neighbor_cell in topology.cell_face_neighbor[cell_idx]
+                for neighbor_cell in (getdim(dh.grid.cells[cell_idx]) >1 ? topology.cell_face_neighbor[cell_idx] : topology.cell_neighbor[cell_idx])
                     neighbour_dof_start = 0
                     for (neighbor_field_i, neighbor_field) in enumerate(fh.fields)
                         fii2 = ip_infos[neighbor_field_i]
