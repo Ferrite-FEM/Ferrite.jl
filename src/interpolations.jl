@@ -134,7 +134,7 @@ struct InterpolationInfo
             1,
             adjust_dofs_during_distribution(interpolation),
             n_copies,
-            sDiscontinuous(interpolation)
+            IsDiscontinuous(interpolation)
         )
     end
 end
