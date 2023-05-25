@@ -85,6 +85,7 @@ struct InterpolationInfo
     reference_dim::Int
     adjust_during_distribution::Bool
     n_copies::Int
+    is_discontinuous::Bool
     function InterpolationInfo(interpolation::InterpolationByDim{3})
         n_copies = 1
         if interpolation isa VectorizedInterpolation
@@ -99,6 +100,7 @@ struct InterpolationInfo
             3,
             adjust_dofs_during_distribution(interpolation),
             n_copies,
+            IsDiscontinuous(interpolation)
         )
     end
     function InterpolationInfo(interpolation::InterpolationByDim{2})
@@ -115,6 +117,7 @@ struct InterpolationInfo
             2,
             adjust_dofs_during_distribution(interpolation),
             n_copies,
+            IsDiscontinuous(interpolation)
         )
     end
     function InterpolationInfo(interpolation::InterpolationByDim{1})
@@ -130,7 +133,8 @@ struct InterpolationInfo
             length(celldof_interior_indices(interpolation)),
             1,
             adjust_dofs_during_distribution(interpolation),
-            n_copies
+            n_copies,
+            sDiscontinuous(interpolation)
         )
     end
 end
@@ -325,6 +329,30 @@ boundarydof_indices(::Type{FaceIndex}) = Ferrite.facedof_indices
 boundarydof_indices(::Type{EdgeIndex}) = Ferrite.edgedof_indices
 boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
 
+"""
+    IsDiscontinuous(::Interpolation)
+    IsDiscontinuous(::Type{<:Interpolation})
+Checks whether the interpolation is discontinuous (i.e. `DiscontinuousLagrange`)
+"""
+IsDiscontinuous(::Interpolation) = false
+IsDiscontinuous(::Type{<:Interpolation}) = false
+
+"""
+    get_continuous_interpolation(::Interpolation)
+    get_continuous_interpolation(::Type{<:Interpolation})
+Returns the continuous version (i.e. `Lagrange`) of a discontinuous interpolation is  (i.e. `DiscontinuousLagrange`).
+Used internally for associating `cell_dofs` with faces.
+The return type follows that of the argument.
+```julia-repl
+julia> Ferrite.get_continuous_interpolation(DiscontinuousLagrange{RefQuadrilateral,1}())
+Lagrange{RefQuadrilateral, 1}()
+julia> Ferrite.get_continuous_interpolation(DiscontinuousLagrange{RefQuadrilateral,1})
+Lagrange{RefQuadrilateral, 1}
+```
+"""
+get_continuous_interpolation(ip::Interpolation) = throw(ArgumentError("Interpolation $ip is already continuous."))
+get_continuous_interpolation(ip::Type{<:Interpolation}) = throw(ArgumentError("Interpolation $ip is already continuous."))
+
 #########################
 # DiscontinuousLagrange #
 #########################
@@ -337,6 +365,12 @@ struct DiscontinuousLagrange{shape, order, unused} <: ScalarInterpolation{shape,
         new{shape, order, Nothing}()
     end
 end
+
+IsDiscontinuous(::Type{<:DiscontinuousLagrange}) = true
+IsDiscontinuous(::DiscontinuousLagrange) = true
+
+get_continuous_interpolation(::DiscontinuousLagrange{ref_shape,order}) where {ref_shape, order} = Lagrange{ref_shape,order}()
+get_continuous_interpolation(::Type{<:DiscontinuousLagrange{ref_shape,order}}) where {ref_shape, order} = Lagrange{ref_shape,order, Nothing}
 
 getlowerorder(::DiscontinuousLagrange{shape,order}) where {shape,order} = DiscontinuousLagrange{shape,order-1}()
 
@@ -1243,3 +1277,9 @@ function shape_gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, ξ:
 end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
+
+IsDiscontinuous(ipv::VectorizedInterpolation) = IsDiscontinuous(ipv.ip)
+IsDiscontinuous(::Type{<:VectorizedInterpolation{vdim, refshape, order, ip}}) where {vdim, refshape, order, ip<:DiscontinuousLagrange}= IsDiscontinuous(ip)
+
+get_continuous_interpolation(ipv::VectorizedInterpolation{vdim}) where {vdim} = VectorizedInterpolation{vdim}(get_continuous_interpolation(ipv.ip))
+get_continuous_interpolation(::Type{<:VectorizedInterpolation{vdim, refshape, order, ip}}) where {vdim, refshape, order, ip<:DiscontinuousLagrange} = VectorizedInterpolation{vdim, refshape, order, get_continuous_interpolation(ip)}
