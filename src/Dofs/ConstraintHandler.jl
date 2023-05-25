@@ -304,7 +304,7 @@ function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, b
     @assert issorted(components)
     local_face_dofs = Int[]
     local_face_dofs_offset = Int[1]
-    for (_, face) in enumerate(boundaryfunc(interpolation))
+    for (_, face) in enumerate(boundaryfunc(IsDiscontinuous(interpolation) ? get_continuous_interpolation(interpolation) : interpolation))
         for fdof in face, d in 1:field_dim
             if d in components
                 push!(local_face_dofs, (fdof-1)*field_dim + d + offset)
@@ -845,7 +845,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
             EntityType = FaceIndex
         end
         CT = getcelltype(ch.dh.grid, first(fh.cellset)) # Same celltype enforced in FieldHandler constructor
-        bcvalues = BCValues(interpolation, default_interpolation(CT), EntityType)
+        bcvalues = BCValues(IsDiscontinuous(interpolation) ? get_continuous_interpolation(interpolation) : interpolation , default_interpolation(CT), EntityType)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
         _add!(
