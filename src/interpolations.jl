@@ -497,11 +497,11 @@ end
 #####################################
 getnbasefunctions(::Lagrange{RefQuadrilateral, 3}) = 16
 
-facedof_indices(::Lagrange{2,RefCube,3}) = ((1,2, 5,6), (2,3, 7,8), (3,4, 9,10), (4,1, 11,12))
-facedof_interior_indices(::Lagrange{2,RefCube,3}) = ((5,6), (7,8), (9,10), (11,12))
-celldof_interior_indices(::Lagrange{2,RefCube,3}) = (13,14,15,16)
+facedof_indices(::Lagrange{RefQuadrilateral, 3}) = ((1,2, 5,6), (2,3, 7,8), (3,4, 9,10), (4,1, 11,12))
+facedof_interior_indices(::Lagrange{RefQuadrilateral, 3}) = ((5,6), (7,8), (9,10), (11,12))
+celldof_interior_indices(::Lagrange{RefQuadrilateral, 3}) = (13,14,15,16)
 
-function reference_coordinates(::Lagrange{2,RefCube,3})
+function reference_coordinates(::Lagrange{RefQuadrilateral, 3})
     return [Vec{2, Float64}((-1.0, -1.0)),
             Vec{2, Float64}(( 1.0, -1.0)),
             Vec{2, Float64}(( 1.0,  1.0)),
