@@ -128,6 +128,10 @@ for idx in cellset
     # ...
 end
 ```
+!!! warning
+
+    `CellIterator` is stateful and should not be used in broadcasting nor collected
+
 """
 struct CellIterator{CC<:CellCache, IC<:IntegerCollection}
     cc::CC
@@ -164,7 +168,7 @@ Base.IteratorSize(::Type{<:CellIterator}) = Base.HasLength()
 Base.IteratorEltype(::Type{<:CellIterator}) = Base.HasEltype()
 Base.eltype(::Type{<:CellIterator{CC}}) where CC = CC
 Base.length(ci::CellIterator) = length(ci.set)
-Base.collect(ci::CellIterator) = [reinit!(CellCache(ci.cc.grid), i) for i in ci.set]
+Base.collect(::CellIterator) = error("CellIterator is stateful and should not be used in broadcasting nor collected")
 
 
 function _check_same_celltype(grid::AbstractGrid, cellset)

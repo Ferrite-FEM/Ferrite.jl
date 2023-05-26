@@ -179,9 +179,7 @@ end
     end
     @test n == div(getncells(grid)*(getncells(grid) + 1), 2)
     # CellIterator broadcasting
-    @test cellid.(ci) == map(ci) do cell
-        cellid(cell)
-    end
+    @test_throws "CellIterator is stateful and should not be used in broadcasting nor collected" cellid.(ci)
 end
 
 @testset "Grid sets" begin
