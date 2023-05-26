@@ -323,6 +323,34 @@ function _close_fieldhandler!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::
     ip_infos = InterpolationInfo[]
     for interpolation in fh.field_interpolations
         ip_info = InterpolationInfo(interpolation)
+        begin
+            next_dof_index = 1
+            for vdofs ∈ vertexdof_indices(interpolation)
+                for dof_index ∈ vdofs
+                    @assert dof_index == next_dof_index "Verted dof ordering not supported. Please consult the dev docs."
+                    next_dof_index += 1
+                end
+            end
+            if getdim(interpolation) > 2
+                for vdofs ∈ edgedof_interior_indices(interpolation)
+                    for dof_index ∈ vdofs
+                        @assert dof_index == next_dof_index "Edge dof ordering not supported. Please consult the dev docs."
+                        next_dof_index += 1
+                    end
+                end
+            end
+            if getdim(interpolation) > 1
+                for vdofs ∈ facedof_interior_indices(interpolation)
+                    for dof_index ∈ vdofs
+                        @assert dof_index == next_dof_index "Face dof ordering not supported. Please consult the dev docs."
+                        next_dof_index += 1
+                    end
+                end
+            end
+            for dof_index ∈ celldof_interior_indices(interpolation)
+                @assert next_dof_index <= dof_index <= getnbasefunctions(interpolation) "Cell dof ordering not supported. Please consult the dev docs."
+            end
+        end
         push!(ip_infos, ip_info)
         # TODO: More than one face dof per face in 3D are not implemented yet. This requires
         #       keeping track of the relative rotation between the faces, not just the
