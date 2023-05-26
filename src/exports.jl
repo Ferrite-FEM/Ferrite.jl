@@ -16,6 +16,7 @@ export
     DiscontinuousLagrange,
     Serendipity,
     getnbasefunctions,
+    getrefshape,
 
 # Quadrature
     QuadratureRule,
@@ -60,6 +61,8 @@ export
     QuadraticHexahedron,
     SerendipityQuadraticHexahedron,
     Wedge,
+    getdim,
+    default_interpolation,
     CellIndex,
     FaceIndex,
     EdgeIndex,

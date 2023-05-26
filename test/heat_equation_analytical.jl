@@ -1,42 +1,32 @@
+using Ferrite, Test
+
+module ConvergenceTestHelper
+
 using Ferrite, SparseArrays, ForwardDiff, Test
 import LinearAlgebra: diag
 
-dotest = false # test pointwise convergenve
-testatol = 1e-2 # absolute tolerance for 
+get_geometry(::Ferrite.Interpolation{RefLine}) = Line
+get_geometry(::Ferrite.Interpolation{RefQuadrilateral}) = Quadrilateral
+get_geometry(::Ferrite.Interpolation{RefTriangle}) = Triangle
+get_geometry(::Ferrite.Interpolation{RefPrism}) = Wedge
+get_geometry(::Ferrite.Interpolation{RefHexahedron}) = Hexahedron
+get_geometry(::Ferrite.Interpolation{RefTetrahedron}) = Tetrahedron
 
-# Solution parameters
+get_quadrature_order(::Lagrange{shape, order}) where {shape, order} = 2*order
+get_quadrature_order(::Serendipity{shape, order}) where {shape, order} = 2*order
+get_quadrature_order(::CrouzeixRaviart{shape, order}) where {shape, order} = 2*order+1
+
+get_N(::Ferrite.Interpolation{shape, 1}) where {shape} = 19
+get_N(::Ferrite.Interpolation{shape, 2}) where {shape} = 12
+get_N(::Ferrite.Interpolation{shape, 3}) where {shape} = 8
+get_N(::Ferrite.Interpolation{shape, 4}) where {shape} = 5
+get_N(::Ferrite.Interpolation{shape, 5}) where {shape} = 3
+
 analytical_solution(x) = prod(cos, x*π/2)
-
-# Finite element approximation parameters
-element = Wedge
-N = 21
-ip_order = 1
-qe_order = 3
-
-# Get the RHS analytically
 analytical_rhs(x) = -sum(diag(ForwardDiff.hessian(analytical_solution,x)))
 
-# Construct Ferrite stuff
-ip_geo = Ferrite.default_interpolation(element)
-dim = Ferrite.getdim(ip_geo)
-grid = generate_grid(element, ntuple(x->N, dim));
-refshape = Ferrite.getrefshape(ip_geo)
-ip = Lagrange{dim, refshape, ip_order}()
-qr = QuadratureRule{dim, refshape}(qe_order)
-cellvalues = CellScalarValues(qr, ip, ip_geo);
-dh = DofHandler(grid)
-add!(dh, :u, 1, ip)
-close!(dh);
-ch = ConstraintHandler(dh);
-∂Ω = union(
-    values(getfacesets(grid))...
-);
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> analytical_solution(x))
-add!(ch, dbc);
-close!(ch)
-
 # Standard assembly copy pasta for Poisson problem
-function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellScalarValues, coords)
+function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues, coords)
     n_basefuncs = getnbasefunctions(cellvalues)
     ## Reset to 0
     fill!(Ke, 0)
@@ -60,11 +50,12 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellScalarValues,
             end
         end
     end
+    @show norm(Ke), norm(fe)
     return Ke, fe
 end
 
 # Standard assembly copy pasta for Poisson problem
-function assemble_global(cellvalues::CellScalarValues, K::SparseMatrixCSC, dh::DofHandler)
+function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler)
     ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -86,15 +77,8 @@ function assemble_global(cellvalues::CellScalarValues, K::SparseMatrixCSC, dh::D
     return K, f
 end
 
-# Assemble and solve
-function solve(dh, ch, cellvalues)
-    K, f = assemble_global(cellvalues, create_sparsity_pattern(dh), dh);
-    apply!(K, f, ch)
-    u = K \ f;
-end
-
 # Check L2 convergence
-function check_and_compute_convergence(dh, u, cellvalues)
+function check_and_compute_convergence(dh, u, cellvalues, testatol)
     L2norm = 0.0
     L∞norm = 0.0
     for cell in CellIterator(dh)
@@ -109,10 +93,76 @@ function check_and_compute_convergence(dh, u, cellvalues)
             uₐₚₚᵣₒₓ = function_value(cellvalues, q_point, uₑ)
             L2norm += norm(uₐₙₐ-uₐₚₚᵣₒₓ)*dΩ
             L∞norm = max(L∞norm, norm(uₐₙₐ-uₐₚₚᵣₒₓ))
-            dotest && @test isapprox(uₐₙₐ, uₐₚₚᵣₒₓ; atol=testatol)
+            @test isapprox(uₐₙₐ, uₐₚₚᵣₒₓ; atol=testatol)
         end
     end
     L2norm, L∞norm
 end
 
-check_and_compute_convergence(dh, solve(dh, ch, cellvalues), cellvalues)
+# Assemble and solve
+function solve(dh, ch, cellvalues)
+    K, f = assemble_global(cellvalues, create_sparsity_pattern(dh), dh);
+    apply!(K, f, ch)
+    u = K \ f;
+end
+
+function setup_poisson_problem(grid, interpolation, interpolation_geo, qr, N)
+    # Construct Ferrite stuff
+    dh = DofHandler(grid)
+    add!(dh, :u, interpolation)
+    close!(dh);
+
+    ch = ConstraintHandler(dh);
+    ∂Ω = union(
+        values(getfacesets(grid))...
+    );
+    dbc = Dirichlet(:u, ∂Ω, (x, t) -> analytical_solution(x))
+    add!(ch, dbc);
+    close!(ch);
+
+    cellvalues = CellValues(qr, interpolation, interpolation_geo);
+    
+    return dh, ch, cellvalues
+end
+
+end # module ConvergenceTestHelper
+
+@testset "convergence analysis" begin
+    @testset "$interpolation" for interpolation in (
+        Lagrange{RefLine, 1}(),
+        Lagrange{RefLine, 2}(),
+        Lagrange{RefQuadrilateral, 1}(),
+        Lagrange{RefQuadrilateral, 2}(),
+        Lagrange{RefQuadrilateral, 3}(),
+        Lagrange{RefTriangle, 1}(),
+        Lagrange{RefTriangle, 2}(),
+        Lagrange{RefTriangle, 3}(),
+        Lagrange{RefTriangle, 4}(),
+        Lagrange{RefTriangle, 5}(),
+        Lagrange{RefHexahedron, 1}(),
+        Lagrange{RefHexahedron, 2}(),
+        Serendipity{RefQuadrilateral, 2}(),
+        Serendipity{RefHexahedron, 2}(),
+        Lagrange{RefTetrahedron, 1}(),
+        Lagrange{RefTetrahedron, 2}(),
+        Lagrange{RefPrism, 1}(),
+        Lagrange{RefPrism, 2}(),
+        #
+        BubbleEnrichedLagrange{RefTriangle, 1}(),
+        #
+        CrouzeixRaviart{RefTriangle, 1}(),
+    )
+        # Generate a grid ...
+        geometry = ConvergenceTestHelper.get_geometry(interpolation)
+        interpolation_geo = default_interpolation(geometry)
+        N = ConvergenceTestHelper.get_N(interpolation)
+        grid = generate_grid(geometry, ntuple(x->N, getdim(geometry)));
+        # ... a suitable quadrature rule ...
+        qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
+        qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
+        # ... and then pray to the gods of convergence.
+        dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid, interpolation, interpolation_geo, qr, N)
+        u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
+        ConvergenceTestHelper.check_and_compute_convergence(dh, u, cellvalues, 1e-2)
+    end
+end
