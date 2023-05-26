@@ -380,6 +380,8 @@ getnbasefunctions(::DiscontinuousLagrange{shape,0}) where {shape} = 1
 # This just moves all dofs into the interior of the element.
 celldof_interior_indices(ip::DiscontinuousLagrange) = ntuple(i->i, getnbasefunctions(ip))
 
+facedof_indices(ip::DiscontinuousLagrange{shape, order}) where {shape, order} = order == 0 ? ntuple(i->(), nfaces(ip)) : facedof_indices(get_continuous_interpolation(ip))
+
 # Mirror the Lagrange element for now.
 function reference_coordinates(ip::DiscontinuousLagrange{shape, order}) where {shape, order}
     return reference_coordinates(Lagrange{shape,order}())
