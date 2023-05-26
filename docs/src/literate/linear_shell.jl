@@ -5,7 +5,7 @@
 # ## Introduction
 #
 # In this example we show how shell elements can be analyzed in Ferrite.jl. The shell implemented here comes from the book 
-# "The finite elment method - Linear static and dynamic finite element analysis" by Hughes (1987), and a brief description of it is 
+# "The finite element method - Linear static and dynamic finite element analysis" by Hughes (1987), and a brief description of it is 
 # given at the end of this tutorial.  The first part of the tutorial explains how to set up the problem.
 
 # ## Setting up the problem
@@ -26,16 +26,16 @@ grid = generate_shell_grid(nels, size)
 # We also create two quadrature rules for the in-plane and out-of-plane directions. Note that we use 
 # under integration for the inplane integration, to avoid shear locking. 
 #+
-ip = Lagrange{2,RefCube,1}()
-qr_inplane = QuadratureRule{2,RefCube}(1)
-qr_ooplane = QuadratureRule{1,RefCube}(2)
-cv = CellScalarValues(qr_inplane, ip)
+ip = Lagrange{RefQuadrilateral,1}()
+qr_inplane = QuadratureRule{RefQuadrilateral}(1)
+qr_ooplane = QuadratureRule{RefLine}(2)
+cv = CellValues(qr_inplane, ip, ip^3)
 
 # Next we distribute displacement dofs,`:u = (x,y,z)` and rotational dofs, `:θ = (θ₁,  θ₂)`.
 #+
 dh = DofHandler(grid)
-add!(dh, :u, 3, ip)
-add!(dh, :θ, 2, ip)
+add!(dh, :u, ip^3)
+add!(dh, :θ, ip^2)
 close!(dh)
 
 # In order to apply our boundary conditions, we first need to create some edge- and vertex-sets. This 
@@ -51,12 +51,12 @@ ch = ConstraintHandler(dh)
 add!(ch,  Dirichlet(:u, getedgeset(grid, "left"), (x, t) -> (0.0, 0.0), [1,3])  )
 add!(ch,  Dirichlet(:θ, getedgeset(grid, "left"), (x, t) -> (0.0, 0.0), [1,2])  )
 
-# On the right edge, we also lock the displacements in the x- and z- directions, but apply a precribed roation.
+# On the right edge, we also lock the displacements in the x- and z- directions, but apply a precribed rotation.
 #+
 add!(ch,  Dirichlet(:u, getedgeset(grid, "right"), (x, t) -> (0.0, 0.0), [1,3])  )
 add!(ch,  Dirichlet(:θ, getedgeset(grid, "right"), (x, t) -> (0.0, pi/10), [1,2])  )
 
-# In order to not get rigid body motion, we lock the y-displacement in one fo the corners.
+# In order to not get rigid body motion, we lock the y-displacement in one of the corners.
 #+
 add!(ch,  Dirichlet(:θ, getvertexset(grid, "corner"), (x, t) -> (0.0), [2])  )
 
@@ -94,11 +94,12 @@ celldofs = zeros(Int, ndofs_shell)
 cellcoords = zeros(Vec{3,Float64}, nnodes)
 
 assembler = start_assemble(K, f)
-for cellid in 1:getncells(grid)
+for cell in CellIterator(grid)
     fill!(ke, 0.0)
+    reinit!(cv, cell)
 
-    celldofs!(celldofs, dh, cellid)
-    getcoordinates!(cellcoords, grid, cellid)
+    celldofs!(celldofs, dh, cellid(cell))
+    getcoordinates!(cellcoords, grid, cellid(cell))
 
     #Call the element routine
     integrate_shell!(ke, cv, qr_ooplane, cellcoords, data)
@@ -124,25 +125,24 @@ end; #end main functions
 function generate_shell_grid(nels, size)
     _grid = generate_grid(Quadrilateral, nels, Vec((0.0,0.0)), Vec(size))
     nodes = [(n.x[1], n.x[2], 0.0) |> Vec{3} |> Node  for n in _grid.nodes]
-    cells = [Quadrilateral3D(cell.nodes) for cell in _grid.cells]
 
-    grid = Grid(cells, nodes)
+    grid = Grid(_grid.cells, nodes)
 
     return grid
 end;
 
 # ## The shell element
 #
-# The shell presented here comes from the book "The finite elment method - Linear static and dynamic finite element analysis" by Hughes (1987).
+# The shell presented here comes from the book "The finite element method - Linear static and dynamic finite element analysis" by Hughes (1987).
 # The shell is a so called degenerate shell element, meaning it is based on a continuum element.
-# A brief describtion of the shell is given here.
+# A brief description of the shell is given here.
 
 #md # !!! note
 #md #     This element might experience various locking phenomenas, and should only be seen as a proof of concept.
 
 # ##### Fiber coordinate system 
 # The element uses two coordinate systems. The first coordianate system, called the fiber system, is created for each
-# element node, and is used as a reference frame for the rotations. The function below implements an algorthim that return the
+# element node, and is used as a reference frame for the rotations. The function below implements an algorithm that return the
 # fiber directions, $\boldsymbol{e}^{f}_{a1}$, $\boldsymbol{e}^{f}_{a2}$ and $\boldsymbol{e}^{f}_{a3}$, at each node $a$.
 function fiber_coordsys(Ps::Vector{Vec{3,Float64}})
 
@@ -210,12 +210,11 @@ end;
 # where $\boldsymbol{\bar{x}}_{a}$ are nodal positions on the mid-surface, and $\boldsymbol{\bar{p}_a}$ is an vector that defines the fiber direction
 # on the reference surface. $N_a$ arethe shape functions.
 #
-# Based on the defintion of the position vector, we create an function for obtaining the Jacobian-matrix,
+# Based on the definition of the position vector, we create an function for obtaining the Jacobian-matrix,
 # ```math
 # J_{ij} = \frac{\partial x_i}{\partial \xi_j},
 # ```
 function getjacobian(q, N, dNdξ, ζ, X, p, h)
-
     J = zeros(3,3)
     for a in 1:length(N)
         for i in 1:3, j in 1:3
@@ -261,7 +260,6 @@ function strain(dofvec::Vector{T}, N, dNdx, ζ, dζdx, q, ef1, ef2, h) where T
     dudx = q*dudx
     ε = [dudx[1,1], dudx[2,2], dudx[1,2]+dudx[2,1], dudx[2,3]+dudx[3,2], dudx[1,3]+dudx[3,1]]
     return ε
-
 end;
 
 # ##### Main element routine
@@ -280,31 +278,27 @@ function integrate_shell!(ke, cv, qr_ooplane, X, data)
         a = Vec{3}((0.0, 0.0, 1.0))
         p[i] = a/norm(a)
     end
-    
+
     ef1, ef2, ef3 = fiber_coordsys(p)
 
     for iqp in 1:getnquadpoints(cv)
-
-        dNdξ = cv.dNdξ[:,iqp]
         N = cv.N[:,iqp]
+        dNdξ = cv.dNdξ[:,iqp]
+        dNdx = cv.dNdx[:,iqp]
 
         for oqp in 1:length(qr_ooplane.weights)
-
             ζ = qr_ooplane.points[oqp][1]
-           
             q = lamina_coordsys(dNdξ, ζ, X, p, h)
-            J = getjacobian(q, N, dNdξ, ζ, X, p, h)
-            Jinv = inv(J)  
-           
-            dζdx = Vec{3}((0.0, 0.0, 1.0)) ⋅ Jinv
-            dNdx = [Vec{3}((dNdξ[i][1], dNdξ[i][2], 0.0)) ⋅ Jinv for i in 1:nnodes]
 
-            
+            J = getjacobian(q, N, dNdξ, ζ, X, p, h)
+            Jinv = inv(J)
+            dζdx = Vec{3}((0.0, 0.0, 1.0)) ⋅ Jinv
+
             #For simplicity, use automatic differentiation to construct the B-matrix from the strain.
             B = ForwardDiff.jacobian(
                 (a) -> strain(a, N, dNdx, ζ, dζdx, q, ef1, ef2, h), zeros(Float64, ndofs) )
 
-            dV = det(J) * cv.qr.weights[iqp] * qr_ooplane.weights[oqp]
+            dV = qr_ooplane.weights[oqp] * getdetJdV(cv, iqp)
             ke .+= B'*data.C*B * dV
         end
     end

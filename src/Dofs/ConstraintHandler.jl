@@ -40,7 +40,7 @@ struct Dirichlet # <: Constraint
     local_face_dofs_offset::Vector{Int}
 end
 function Dirichlet(field_name::Symbol, faces::Set, f::Function, components=nothing)
-    return Dirichlet(f, copy(faces), field_name, __to_components(components), Int[], Int[])
+    return Dirichlet(f, faces, field_name, __to_components(components), Int[], Int[])
 end
 
 # components=nothing is default and means that all components should be constrained
@@ -56,7 +56,7 @@ end
 
 const DofCoefficients{T} = Vector{Pair{Int,T}}
 """
-    AffineConstraint(constrained_dof::Int, entires::Vector{Pair{Int,T}}, b::T) where T
+    AffineConstraint(constrained_dof::Int, entries::Vector{Pair{Int,T}}, b::T) where T
 
 Define an affine/linear constraint to constrain one degree of freedom, `u[i]`, 
 such that `u[i] = ∑(u[j] * a[j]) + b`, 
@@ -234,40 +234,6 @@ function close!(ch::ConstraintHandler)
 end
 
 """
-    add!(ch::ConstraintHandler, dbc::Dirichlet)
-
-Add a `Dirichlet` boundary condition to the `ConstraintHandler`.
-"""
-function add!(ch::ConstraintHandler, dbc::Dirichlet)
-    if length(dbc.faces) == 0
-        @warn("adding Dirichlet Boundary Condition to set containing 0 entities")
-    end
-    celltype = getcelltype(ch.dh.grid)
-    @assert isconcretetype(celltype)
-
-    # Extract stuff for the field
-    field_idx = find_field(ch.dh, dbc.field_name) # throws if name not found
-    interpolation = getfieldinterpolation(ch.dh, field_idx)
-    field_dim = getfielddim(ch.dh, field_idx)
-
-    if !all(c -> 0 < c <= field_dim, dbc.components)
-        error("components $(dbc.components) not within range of field :$(dbc.field_name) ($(field_dim) dimension(s))")
-    end
-
-    # Empty components means constrain them all
-    isempty(dbc.components) && append!(dbc.components, 1:field_dim)
-
-    if eltype(dbc.faces)==Int #Special case when dbc.faces is a nodeset
-        bcvalue = BCValues(interpolation, default_interpolation(celltype), FaceIndex) #Not used by node bcs, but still have to pass it as an argument
-    else
-        bcvalue = BCValues(interpolation, default_interpolation(celltype), eltype(dbc.faces))
-    end
-    _add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(ch.dh, dbc.field_name), bcvalue)
-
-    return ch
-end
-
-"""
     add!(ch::ConstraintHandler, ac::AffineConstraint)
 
 Add the `AffineConstraint` to the `ConstraintHandler`.
@@ -306,7 +272,8 @@ function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomo
     return ch
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid))) where {Index<:BoundaryIndex}
+# Dirichlet on (face|edge|vertex)set
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, _) where {Index<:BoundaryIndex}
     local_face_dofs, local_face_dofs_offset =
         _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundarydof_indices(eltype(bcfaces)))
     copy!(dbc.local_face_dofs, local_face_dofs)
@@ -316,10 +283,6 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, inter
     constrained_dofs = Int[]
     cc = CellCache(ch.dh, UpdateFlags(; nodes=false, coords=false, dofs=true))
     for (cellidx, faceidx) in bcfaces
-        if cellidx ∉ cellset
-            delete!(dbc.faces, Index(cellidx, faceidx))
-            continue # skip faces that are not part of the cellset
-        end
         reinit!(cc, cellidx)
         r = local_face_dofs_offset[faceidx]:(local_face_dofs_offset[faceidx+1]-1)
         append!(constrained_dofs, cc.dofs[local_face_dofs[r]]) # TODO: for-loop over r and simply push! to ch.prescribed_dofs
@@ -352,6 +315,7 @@ function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, b
     return local_face_dofs, local_face_dofs_offset
 end
 
+# Dirichlet on nodeset
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(ch.dh.grid)))
     if interpolation !== default_interpolation(typeof(ch.dh.grid.cells[first(cellset)]))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
@@ -480,11 +444,11 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entiti
 end
 
 # for nodes
-function _update!(inhomogeneities::Vector{Float64}, f::Function, nodes::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+function _update!(inhomogeneities::Vector{Float64}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where T
     counter = 1
-    for (idx, nodenumber) in enumerate(nodeidxs)
+    for nodenumber in nodeidxs
         x = dh.grid.nodes[nodenumber].x
         bc_value = f(x, time)
         @assert length(bc_value) == length(components)
@@ -512,7 +476,7 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
     unique!(unique_fields)
 
     for field in unique_fields
-        nd = ndim(ch.dh, field)
+        nd = getfielddim(ch.dh, field)
         data = zeros(Float64, nd, getnnodes(ch.dh.grid))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
@@ -584,7 +548,7 @@ result (e.g. `du` zero for all prescribed degrees of freedom).
     apply_zero!(v::AbstractVector, ch::ConstraintHandler)
 
 Zero-out values in `v` corresponding to prescribed degrees of freedom and update values 
-prescribed by affine constraints, such that if `a` fullfills the constraints,
+prescribed by affine constraints, such that if `a` fulfills the constraints,
 `a ± v` also will.
 
 These methods are typically used in e.g. a Newton solver where the increment, `du`, should
@@ -708,69 +672,6 @@ end
     idx = get(dofmapping, dof, 0)
     idx == 0 && return nothing
     return dofcoeffs[idx]
-end
-
-# Similar to Ferrite._condense!(K, ch), but only add the non-zero entries to K (that arises from the condensation process)
-function _condense_sparsity_pattern!(K::SparseMatrixCSC{T}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, dofmapping::Dict{Int,Int}, keep_constrained::Bool) where T
-    ndofs = size(K, 1)
-
-    # Return early if there are no non-trivial affine constraints
-    any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
-
-    # Adding new entries to K is extremely slow, so create a new sparsity triplet for the
-    # condensed sparsity pattern
-    N = 2 * length(dofcoefficients) # TODO: Better size estimate for additional condensed sparsity pattern.
-    I = Int[]; resize!(I, N)
-    J = Int[]; resize!(J, N)
-
-    cnt = 0
-    for col in 1:ndofs
-        col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
-        if col_coeffs === nothing
-            !keep_constrained && haskey(dofmapping, col) && continue
-            for ri in nzrange(K, col)
-                row = K.rowval[ri]
-                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
-                row_coeffs === nothing && continue
-                for (d, _) in row_coeffs
-                    cnt += 1
-                    _add_or_grow(cnt, I, J, d, col)
-                end
-            end
-        else
-            for ri in nzrange(K, col)
-                row = K.rowval[ri]
-                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
-                if row_coeffs === nothing
-                    !keep_constrained && haskey(dofmapping, row) && continue
-                    for (d, _) in col_coeffs
-                        cnt += 1
-                        _add_or_grow(cnt, I, J, row, d)
-                    end
-                else
-                    for (d1, _) in col_coeffs
-                        !keep_constrained && haskey(dofmapping, d1) && continue
-                        for (d2, _) in row_coeffs
-                            !keep_constrained && haskey(dofmapping, d2) && continue
-                            cnt += 1
-                            _add_or_grow(cnt, I, J, d1, d2)
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    resize!(I, cnt)
-    resize!(J, cnt)
-
-    # Fill the sparse matrix with a non-zero value so that :+ operation does not remove entries with value zero.
-    K2 = spzeros!!(Float64, I, J, ndofs, ndofs)
-    fill!(K2.nzval, 1)
-
-    K .+= K2
-
-    return nothing
 end
 
 # Condenses K and f: C'*K*C, C'*f, in-place assuming the sparsity pattern is correct
@@ -909,105 +810,73 @@ function meandiag(K::AbstractMatrix)
     return z / size(K, 1)
 end
 
+"""
+    add!(ch::ConstraintHandler, dbc::Dirichlet)
 
-#Function for adding constraint when using multiple celltypes
-function add!(ch::ConstraintHandler{<:MixedDofHandler}, dbc::Dirichlet)
+Add a `Dirichlet` boundary condition to the `ConstraintHandler`.
+"""
+function add!(ch::ConstraintHandler, dbc::Dirichlet)
+    # Duplicate the Dirichlet constraint for every FieldHandler
     dbc_added = false
     for fh in ch.dh.fieldhandlers
-        if dbc.field_name in getfieldnames(fh) && _in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=false)
-            # Dofs in `dbc` not in `fh` will be removed, hence `dbc.faces` must be copied.
-            # Recreating the `dbc` will create a copy of `dbc.faces`.
-            # In this case, add! will warn, unless `warn_not_in_cellset=false`
-            dbc_ = Dirichlet(dbc.field_name, dbc.faces, dbc.f, 
-                isempty(dbc.components) ? nothing : dbc.components) 
-                # Check for empty already done when user created `dbc`
-            add!(ch, fh, dbc_, warn_not_in_cellset=false)
-            dbc_added = true
+        # Skip if the constrained field does not live on this sub domain
+        dbc.field_name in fh.field_names || continue
+        # Compute the intersection between dbc.set and the cellset of this
+        # FieldHandler and skip if the set is empty
+        filtered_set = filter_dbc_set(ch.dh.grid, fh.cellset, dbc.faces)
+        isempty(filtered_set) && continue
+        # Fetch information about the field on this FieldHandler
+        field_idx = find_field(fh, dbc.field_name)
+        interpolation = getfieldinterpolation(fh, field_idx)
+        # Internally we use the devectorized version
+        n_comp = n_dbc_components(interpolation)
+        if interpolation isa VectorizedInterpolation
+            interpolation = interpolation.ip
         end
+        # Set up components to prescribe (empty input means prescribe all components)
+        components = isempty(dbc.components) ? collect(Int, 1:n_comp) : dbc.components
+        if !all(c -> 0 < c <= n_comp, components)
+            error("components $(components) not within range of field :$(dbc.field_name) ($(n_comp) dimension(s))")
+        end
+        # Create BCValues for coordinate evalutation at dof-locations
+        EntityType = eltype(dbc.faces) # (Face|Edge|Vertex)Index
+        if EntityType <: Integer
+            # BCValues are just dummy for nodesets so set to FaceIndex
+            EntityType = FaceIndex
+        end
+        CT = getcelltype(ch.dh.grid, first(fh.cellset)) # Same celltype enforced in FieldHandler constructor
+        bcvalues = BCValues(interpolation, default_interpolation(CT), EntityType)
+        # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
+        filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
+        _add!(
+            ch, filtered_dbc, filtered_dbc.faces, interpolation, n_comp,
+            field_offset(fh, dbc.field_name), bcvalues, fh.cellset,
+        )
+        dbc_added = true
     end
-    dbc_added || @warn("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's MixedDofHandler")
+    dbc_added || error("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's DofHandler")
     return ch
 end
 
-function add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet; warn_not_in_cellset=true)
-    if warn_not_in_cellset && !(_in_cellset(ch.dh.grid, fh.cellset, dbc.faces; all=true))
-        @warn("You are trying to add a constraint a face/edge/node that is not in the cellset of the fieldhandler. This location will be skipped")
+# Return the intersection of the FieldHandler set and the Dirichlet BC set
+function filter_dbc_set(::AbstractGrid, fhset::AbstractSet{Int}, dbcset::AbstractSet{<:BoundaryIndex})
+    ret = empty(dbcset)::typeof(dbcset)
+    for x in dbcset
+        cellid, _ = x
+        cellid in fhset && push!(ret, x)
     end
-
-    celltype = getcelltype(ch.dh.grid, first(fh.cellset)) #Assume same celltype of all cells in fh.cellset
-
-    # Extract stuff for the field
-    field_idx = find_field(fh, dbc.field_name)
-    interpolation = getfieldinterpolations(fh)[field_idx]
-    field_dim = getfielddims(fh)[field_idx]
-
-    if !all(c -> 0 < c <= field_dim, dbc.components)
-        error("components $(dbc.components) not within range of field :$(dbc.field_name) ($(field_dim) dimension(s))")
-    end
-
-    # Empty components means constrain them all
-    isempty(dbc.components) && append!(dbc.components, 1:field_dim)
-
-    if eltype(dbc.faces)==Int #Special case when dbc.faces is a nodeset
-        bcvalue = BCValues(interpolation, default_interpolation(celltype), FaceIndex) #Not used by node bcs, but still have to pass it as an argument
-    else
-        bcvalue = BCValues(interpolation, default_interpolation(celltype), eltype(dbc.faces))
-    end
-
-    Ferrite._add!(ch, dbc, dbc.faces, interpolation, field_dim, field_offset(fh, dbc.field_name), bcvalue, fh.cellset)
-    return ch
+    return ret
 end
-
-# If all==true, return true only if all items in faceset/nodeset are in the cellset
-# If all==false, return true if some items in faceset/nodeset are in the cellset
-function _in_cellset(::AbstractGrid, cellset::Set{Int}, faceset::Set{<:BoundaryIndex}; all=true)
-    for (cellid,faceid) in faceset
-        if cellid in cellset
-            all || return true
-        else
-            all && return false
-        end
+function filter_dbc_set(grid::AbstractGrid, fhset::AbstractSet{Int}, dbcset::AbstractSet{Int})
+    ret = empty(dbcset)
+    nodes_in_fhset = Set{Int}()
+    for cc in CellIterator(grid, fhset, UpdateFlags(; nodes=true, coords=false))
+        union!(nodes_in_fhset, cc.nodes)
     end
-    return all # if not returned by now and all==false, then no `cellid`s where in cellset
-end
-
-function _in_cellset(grid::AbstractGrid, cellset::Set{Int}, nodeset::Set{Int}; all=true)
-    nodes = Set{Int}()
-    for cellid in cellset
-        for nodeid in grid.cells[cellid].nodes
-            nodeid ∈ nodes || push!(nodes, nodeid)
-        end
+    for nodeid in dbcset
+        nodeid in nodes_in_fhset && push!(ret, nodeid)
     end
-
-    for nodeid in nodeset
-        if nodeid ∈ nodes
-            all || return true 
-        else
-            all && return false
-        end
-    end
-    return all # if not returned by now and all==false, then no `cellid`s where in cellset
-end
-
-"""
-    create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler, coupling)
-
-Create a symmetric sparsity pattern accounting for affine constraints in `ch`. See 
-the Affine Constraints section of the manual for further details. 
-"""
-function create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
-        keep_constrained::Bool=true, coupling=nothing)
-    return Symmetric(_create_sparsity_pattern(dh, ch, true, keep_constrained, coupling), :U)
-end
-"""
-    create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling)
-
-Create a sparsity pattern accounting for affine constraints in `ch`. See 
-the Affine Constraints section of the manual for further details. 
-"""
-function create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
-        keep_constrained::Bool=true, coupling=nothing)
-    return _create_sparsity_pattern(dh, ch, false, keep_constrained, coupling)
+    return ret
 end
 
 struct PeriodicFacePair
@@ -1075,14 +944,17 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     end
     field_idx = find_field(ch.dh, pdbc.field_name)
     interpolation = getfieldinterpolation(ch.dh, field_idx)
-    field_dim = getfielddim(ch.dh, field_idx)
+    n_comp = n_dbc_components(interpolation)
+    if interpolation isa VectorizedInterpolation
+        interpolation = interpolation.ip
+    end
 
-    if !all(c -> 0 < c <= field_dim, pdbc.components)
-        error("components $(pdbc.components) not within range of field :$(pdbc.field_name) ($(field_dim) dimension(s))")
+    if !all(c -> 0 < c <= n_comp, pdbc.components)
+        error("components $(pdbc.components) not within range of field :$(pdbc.field_name) ($(n_comp) dimension(s))")
     end
 
     # Empty components means constrain them all
-    isempty(pdbc.components) && append!(pdbc.components, 1:field_dim)
+    isempty(pdbc.components) && append!(pdbc.components, 1:n_comp)
 
     if pdbc.rotation_matrix === nothing
         dof_map_t = Int
@@ -1096,13 +968,13 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
         if !(nc == size(pdbc.rotation_matrix, 1) == size(pdbc.rotation_matrix, 2))
             error("size of rotation matrix does not match the number of components")
         end
-        if nc !== field_dim
+        if nc !== n_comp
             error("rotations currently only supported when all components are periodic")
         end
         dof_map_t = Vector{Int}
         iterator_f = x -> Iterators.partition(x, nc)
     end
-    _add!(ch, pdbc, interpolation, field_dim, field_offset(ch.dh, pdbc.field_name), is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f)
+    _add!(ch, pdbc, interpolation, n_comp, field_offset(ch.dh, pdbc.field_name), is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f)
     return ch
 end
 
@@ -1295,10 +1167,10 @@ function construct_cornerish(min_x::V, max_x::V) where {T, V <: Vec{3,T}}
     ]
 end
 
-function mirror_local_dofs(_, _, ::Lagrange{1}, ::Int)
+function mirror_local_dofs(_, _, ::Lagrange{RefLine}, ::Int)
     # For 1D there is nothing to do
 end
-function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{2,<:Union{RefCube,RefTetrahedron}}, n::Int)
+function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral,RefTriangle}}, n::Int)
     # For 2D we always permute since Ferrite defines dofs counter-clockwise
     ret = collect(1:length(local_face_dofs))
     for (i, f) in enumerate(facedof_indices(ip))
@@ -1316,9 +1188,9 @@ function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange
 end
 
 # TODO: Can probably be combined with the method above.
-function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{3,<:Union{RefCube,RefTetrahedron},O}, n::Int) where O
+function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{<:Union{RefHexahedron,RefTetrahedron},O}, n::Int) where O
     @assert 1 <= O <= 2
-    N = ip isa Lagrange{3,RefCube} ? 4 : 3
+    N = ip isa Lagrange{RefHexahedron} ? 4 : 3
     ret = collect(1:length(local_face_dofs))
 
     # Mirror by changing from counter-clockwise to clockwise
@@ -1362,12 +1234,12 @@ end
 circshift!(args...) = Base.circshift!(args...)
 
 
-function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{2}, ncomponents)
+function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral,RefTriangle}}, ncomponents)
     return collect(1:length(local_face_dofs)) # TODO: Return range?
 end
-function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{3,<:Union{RefCube,RefTetrahedron}, O}, ncomponents) where O
+function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{<:Union{RefHexahedron,RefTetrahedron}, O}, ncomponents) where O
     @assert 1 <= O <= 2
-    N = ip isa Lagrange{3,RefCube} ? 4 : 3
+    N = ip isa Lagrange{RefHexahedron} ? 4 : 3
     ret = similar(local_face_dofs, length(local_face_dofs), N)
     ret[:, :] .= 1:length(local_face_dofs)
     for f in 1:length(local_face_dofs_offset)-1
@@ -1455,11 +1327,11 @@ function __collect_boundary_faces(grid::Grid)
     candidates = Dict{Tuple, FaceIndex}()
     for (ci, c) in enumerate(grid.cells)
         for (fi, fn) in enumerate(faces(c))
-            fn = sortface(fn)
-            if haskey(candidates, fn)
-                delete!(candidates, fn)
+            face = first(sortface(fn))
+            if haskey(candidates, face)
+                delete!(candidates, face)
             else
-                candidates[fn] = FaceIndex(ci, fi)
+                candidates[face] = FaceIndex(ci, fi)
             end
         end
     end

@@ -196,29 +196,29 @@ using FerriteGmsh
 #src notebook: use coarse mesh to decrease build time
 #src   script: use the fine mesh
 #src markdown: use the coarse mesh to decrease build time, but make it look like the fine
-#nb ## grid = saved_file_to_grid("periodic-rve.msh")
-#nb grid = saved_file_to_grid("periodic-rve-coarse.msh")
-#jl ## grid = saved_file_to_grid("periodic-rve-coarse.msh")
-#jl grid = saved_file_to_grid("periodic-rve.msh")
-#md grid = saved_file_to_grid("periodic-rve.msh")
+#nb ## grid = togrid("periodic-rve.msh")
+#nb grid = togrid("periodic-rve-coarse.msh")
+#jl ## grid = togrid("periodic-rve-coarse.msh")
+#jl grid = togrid("periodic-rve.msh")
+#md grid = togrid("periodic-rve.msh")
 #-
 #md grid = redirect_stdout(devnull) do                #hide
-#md     saved_file_to_grid("periodic-rve-coarse.msh") #hide
+#md     togrid("periodic-rve-coarse.msh") #hide
 #md end                                               #hide
 
-grid = saved_file_to_grid("periodic-rve.msh") #src
+grid = togrid("periodic-rve.msh") #src
 
 # Next we construct the interpolation and quadrature rule, and combining them into
 # cellvalues as usual:
 
 dim = 2
-ip = Lagrange{dim, RefTetrahedron, 1}()
-qr = QuadratureRule{dim, RefTetrahedron}(2)
-cellvalues = CellVectorValues(qr, ip);
+ip = Lagrange{RefTriangle, 1}()^dim
+qr = QuadratureRule{RefTriangle}(2)
+cellvalues = CellValues(qr, ip);
 
 # We define a dof handler with a displacement field `:u`:
 dh = DofHandler(grid)
-add!(dh, :u, 2)
+add!(dh, :u, ip)
 close!(dh);
 
 # Now we need to define boundary conditions. As discussed earlier we will solve the problem
@@ -307,7 +307,7 @@ Ei = 10 * Em;
 # we want to solve the system 3 times, once for each macroscopic strain component, we
 # assemble 3 right-hand-sides.
 
-function doassemble!(cellvalues::CellVectorValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ)
+function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ)
 
     n_basefuncs = getnbasefunctions(cellvalues)
     ndpc = ndofs_per_cell(dh)
@@ -399,7 +399,7 @@ end
 # ``\bar{\boldsymbol{\sigma}}`` in the RVE. We define a function that does this, and also
 # returns the von Mise stress in every quadrature point for visualization.
 
-function compute_stress(cellvalues::CellVectorValues, dh::DofHandler, u, εᴹ)
+function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
     σvM_qpdata = zeros(getnquadpoints(cellvalues), getncells(dh.grid))
     σ̄Ω = zero(SymmetricTensor{2,2})
     Ω = 0.0 # Total volume
@@ -434,14 +434,14 @@ projector = L2Projector(ip, grid)
 
 for i in 1:3
     σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.dirichlet[i], εᴹ[i])
-    proj = project(projector, σ_qp, qr; project_to_nodes=false)
+    proj = project(projector, σ_qp, qr)
     push!(σ.dirichlet, proj)
     push!(σ̄.dirichlet, σ̄_i)
 end
 
 for i in 1:3
     σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.periodic[i], εᴹ[i])
-    proj = project(projector, σ_qp, qr; project_to_nodes=false)
+    proj = project(projector, σ_qp, qr)
     push!(σ.periodic, proj)
     push!(σ̄.periodic, σ̄_i)
 end

@@ -57,7 +57,7 @@
 # ```
 # where $v_{in}(t) = \text{clamp}(t, 0.0, 1.0)$. With a dynamic viscosity of $\nu = 0.001$
 # this is enough to induce turbulence behind the cylinder which leads to vortex shedding. The top and bottom of our
-# channel have no-slip conditions, i.e. $v = [0,0]^{\textrm{T}}$, while the right boundary has the do-nothing boundary condtion
+# channel have no-slip conditions, i.e. $v = [0,0]^{\textrm{T}}$, while the right boundary has the do-nothing boundary condition
 # $\nu \partial_{\textrm{n}} v - p n = 0$ to model outflow. With these boundary conditions we can choose the zero solution as a
 # feasible initial condition.
 #
@@ -134,7 +134,7 @@ y_cells = round(Int, 41/3)                  #hide
 grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((2.2, 0.41)));
 
 # Next we carve a hole $B_{0.05}(0.2,0.2)$ in the mesh by deleting the cells and update the boundary face sets.
-# This code will be replaced once a proper mesh interface is avaliable.
+# This code will be replaced once a proper mesh interface is available.
 cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05, 1:length(grid.cells))
 hole_cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))<=0.05, 1:length(grid.cells));
 hole_face_ring = Set{FaceIndex}()
@@ -158,17 +158,16 @@ grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{
 # To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
 # We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
 # linear pressure term is tested against a quadratic function.
-ip_v = Lagrange{dim, RefCube, 2}()
-ip_geom = Lagrange{dim, RefCube, 1}()
-qr = QuadratureRule{dim, RefCube}(4)
-cellvalues_v = CellVectorValues(qr, ip_v, ip_geom);
+ip_v = Lagrange{RefQuadrilateral, 2}()^dim
+qr = QuadratureRule{RefQuadrilateral}(4)
+cellvalues_v = CellValues(qr, ip_v);
 
-ip_p = Lagrange{dim, RefCube, 1}()
-cellvalues_p = CellScalarValues(qr, ip_p, ip_geom);
+ip_p = Lagrange{RefQuadrilateral, 1}()
+cellvalues_p = CellValues(qr, ip_p);
 
 dh = DofHandler(grid)
-add!(dh, :v, dim, ip_v)
-add!(dh, :p, 1, ip_p)
+add!(dh, :v, ip_v)
+add!(dh, :p, ip_p)
 close!(dh);
 
 # ### Boundary Conditions
@@ -212,7 +211,7 @@ update!(ch, 0.0);
 # For the block mass matrix $M$ we remember that only the first equation had a time derivative
 # and that the block mass matrix corresponds to the term arising from discretizing the time
 # derivatives. Hence, only the upper left block has non-zero components.
-function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, M::SparseMatrixCSC, dh::DofHandler) where {dim}
+function assemble_mass_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues, M::SparseMatrixCSC, dh::DofHandler)
     ## Allocate a buffer for the local matrix and some helpers, together with the assembler.
     n_basefuncs_v = getnbasefunctions(cellvalues_v)
     n_basefuncs_p = getnbasefunctions(cellvalues_p)
@@ -255,7 +254,7 @@ end;
 # which is also called saddle point matrix. These problems are known to have
 # a non-trivial kernel, which is a reflection of the strong form as discussed
 # in the theory portion if this example.
-function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, ν, K::SparseMatrixCSC, dh::DofHandler) where {dim}
+function assemble_stokes_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues, ν, K::SparseMatrixCSC, dh::DofHandler)
     ## Again, some buffers and helpers
     n_basefuncs_v = getnbasefunctions(cellvalues_v)
     n_basefuncs_p = getnbasefunctions(cellvalues_p)
@@ -352,7 +351,7 @@ struct RHSparams
     K::SparseMatrixCSC
     ch::ConstraintHandler
     dh::DofHandler
-    cellvalues_v::CellVectorValues
+    cellvalues_v::CellValues
 end
 p = RHSparams(K, ch, dh, cellvalues_v)
 
@@ -403,7 +402,7 @@ function navierstokes!(du,u_uc,p,t)
         end
     end
 
-    # For now we have to ingore the evolution of the Dirichlet BCs.
+    # For now we have to ignore the evolution of the Dirichlet BCs.
     # The DBC dofs in the solution vector will be corrected in a post-processing step.
     #+
     apply_zero!(du, ch)
@@ -416,7 +415,7 @@ problem = ODEProblem(rhs, u₀, (0.0,T), p);
 # Now we can put everything together by specifying how to solve the problem.
 # We want to use the adaptive implicit Euler method with our custom linear
 # solver, which helps in the enforcement of the Dirichlet BCs. Further we
-# enable the progress bar with the `progess` and `progress_steps` arguments.
+# enable the progress bar with the `progress` and `progress_steps` arguments.
 # Finally we have to communicate the time step length and initialization
 # algorithm. Since we start with a valid initial state we do not use one of
 # DifferentialEquations.jl initialization algorithms.

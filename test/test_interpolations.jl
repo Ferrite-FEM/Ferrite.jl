@@ -1,63 +1,63 @@
 @testset "interpolations" begin
 
 @testset "$interpolation" for interpolation in (
-                      Lagrange{1, RefCube, 1}(),
-                      Lagrange{1, RefCube, 2}(),
-                      Lagrange{2, RefCube, 1}(),
-                      Lagrange{2, RefCube, 2}(),
-                      Lagrange{2, RefTetrahedron, 1}(),
-                      Lagrange{2, RefTetrahedron, 2}(),
-                      Lagrange{2, RefTetrahedron, 3}(),
-                      Lagrange{2, RefTetrahedron, 4}(),
-                      Lagrange{2, RefTetrahedron, 5}(),
-                      Lagrange{3, RefCube, 1}(),
-                      Lagrange{3, RefCube, 2}(),
-                      Serendipity{2, RefCube, 2}(),
-                      Serendipity{3, RefCube, 2}(),
-                      Lagrange{3, RefTetrahedron, 1}(),
-                      Lagrange{3, RefTetrahedron, 2}(),
-                      Lagrange{3, RefPrism, 1}(),
-                      Lagrange{3, RefPrism, 2}(),
+                      Lagrange{RefLine, 1}(),
+                      Lagrange{RefLine, 2}(),
+                      Lagrange{RefQuadrilateral, 1}(),
+                      Lagrange{RefQuadrilateral, 2}(),
+                      Lagrange{RefQuadrilateral, 3}(),
+                      Lagrange{RefTriangle, 1}(),
+                      Lagrange{RefTriangle, 2}(),
+                      Lagrange{RefTriangle, 3}(),
+                      Lagrange{RefTriangle, 4}(),
+                      Lagrange{RefTriangle, 5}(),
+                      Lagrange{RefHexahedron, 1}(),
+                      Lagrange{RefHexahedron, 2}(),
+                      Serendipity{RefQuadrilateral, 2}(),
+                      Serendipity{RefHexahedron, 2}(),
+                      Lagrange{RefTetrahedron, 1}(),
+                      Lagrange{RefTetrahedron, 2}(),
+                      Lagrange{RefPrism, 1}(),
+                      Lagrange{RefPrism, 2}(),
                       #
-                      DiscontinuousLagrange{1, RefCube, 0}(),
-                      DiscontinuousLagrange{2, RefCube, 0}(),
-                      DiscontinuousLagrange{3, RefCube, 0}(),
-                      DiscontinuousLagrange{2, RefTetrahedron, 0}(),
-                      DiscontinuousLagrange{3, RefTetrahedron, 0}(),
-                      DiscontinuousLagrange{1, RefCube, 1}(),
-                      DiscontinuousLagrange{2, RefCube, 1}(),
-                      DiscontinuousLagrange{3, RefCube, 1}(),
-                      DiscontinuousLagrange{2, RefTetrahedron, 1}(),
-                      DiscontinuousLagrange{3, RefTetrahedron, 1}(),
+                      DiscontinuousLagrange{RefLine, 0}(),
+                      DiscontinuousLagrange{RefQuadrilateral, 0}(),
+                      DiscontinuousLagrange{RefHexahedron, 0}(),
+                      DiscontinuousLagrange{RefTriangle, 0}(),
+                      DiscontinuousLagrange{RefTetrahedron, 0}(),
+                      DiscontinuousLagrange{RefLine, 1}(),
+                      DiscontinuousLagrange{RefQuadrilateral, 1}(),
+                      DiscontinuousLagrange{RefHexahedron, 1}(),
+                      DiscontinuousLagrange{RefTriangle, 1}(),
+                      DiscontinuousLagrange{RefTetrahedron, 1}(),
                       #
-                      BubbleEnrichedLagrange{2,RefTetrahedron,1}(),
+                      BubbleEnrichedLagrange{RefTriangle, 1}(),
                       #
-                      CrouzeixRaviart{2,1}(),
+                      CrouzeixRaviart{RefTriangle, 1}(),
     )
 
     # Test of utility functions
     ref_dim = Ferrite.getdim(interpolation)
     ref_shape = Ferrite.getrefshape(interpolation)
     func_order = Ferrite.getorder(interpolation)
-    @test typeof(interpolation) <: Interpolation{ref_dim,ref_shape,func_order}
+    @test typeof(interpolation) <: Interpolation{ref_shape,func_order}
 
     # Note that not every element formulation exists for every order and dimension.
-    applicable(Ferrite.getlowerdim, interpolation) && @test typeof(Ferrite.getlowerdim(interpolation)) <: Interpolation{ref_dim-1}
-    applicable(Ferrite.getlowerorder, interpolation) && @test typeof(Ferrite.getlowerorder(interpolation)) <: Interpolation{ref_dim,ref_shape,func_order-1}
+    applicable(Ferrite.getlowerorder, interpolation) && @test typeof(Ferrite.getlowerorder(interpolation)) <: Interpolation{ref_shape,func_order-1}
 
     # Check partition of unity at random point.
     n_basefuncs = getnbasefunctions(interpolation)
     x = rand(Tensor{1, ref_dim})
-    f = (x) -> Ferrite.value(interpolation, Tensor{1, ref_dim}(x))
+    f = (x) -> [shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
     @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
-           reinterpret(Float64, Ferrite.derivative(interpolation, x))
-    @test sum(Ferrite.value(interpolation, x)) ≈ 1.0
+        reinterpret(Float64, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
+    @test sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
 
-    # Check if the important functions are consistens
+    # Check if the important functions are consistent
     coords = Ferrite.reference_coordinates(interpolation)
     @test length(coords) == n_basefuncs
-    @test Ferrite.value(interpolation, length(coords), x) == Ferrite.value(interpolation, length(coords), x)
-    @test_throws ArgumentError Ferrite.value(interpolation, length(coords)+1, x)
+    @test shape_value(interpolation, x, n_basefuncs) == shape_value(interpolation, x, n_basefuncs)
+    @test_throws ArgumentError shape_value(interpolation, x, n_basefuncs+1)
 
     # Test whether we have for each entity corresponding dof indices (possibly empty)
     @test length(Ferrite.vertexdof_indices(interpolation)) == Ferrite.nvertices(interpolation)
@@ -98,12 +98,13 @@
 
     # Check for dirac delta property of interpolation
     @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
-        N_dof = Ferrite.value(interpolation, coords[dof])
         for k in 1:n_basefuncs
+            N_dof = shape_value(interpolation, coords[dof], k)
             if k == dof
-                @test N_dof[k] ≈ 1.0
+                @test N_dof ≈ 1.0
             else
-                @test N_dof[k] ≈ 0.0 atol=4eps(Float64) #broken=typeof(interpolation)==Lagrange{2, RefTetrahedron, 5}&&dof==4&&k==18
+                factor = interpolation isa Lagrange{RefQuadrilateral, 3} ? 200 : 4
+                @test N_dof ≈ 0.0 atol = factor * eps(Float64)
             end
         end
     end
@@ -135,7 +136,7 @@
     # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
     interpolation_type = typeof(interpolation).name.wrapper
     if func_order > 1 && interpolation_type != Ferrite.Serendipity
-        first_order = interpolation_type{ref_dim,ref_shape,1}() 
+        first_order = interpolation_type{ref_shape,1}()
         for (highorderface, firstorderface) in zip(Ferrite.facedof_indices(interpolation), Ferrite.facedof_indices(first_order))
             for (h_node, f_node) in zip(highorderface, firstorderface)
                 @test h_node == f_node
@@ -149,11 +150,17 @@
             end
         end
     end
+
+    # VectorizedInterpolation
+    v_interpolation_1 = interpolation^2
+    v_interpolation_2 = (d = 2; interpolation^d)
+    @test getnbasefunctions(v_interpolation_1) == getnbasefunctions(v_interpolation_2) ==
+          getnbasefunctions(interpolation) * 2
 end
 
-@test Ferrite.reference_coordinates(DiscontinuousLagrange{2,RefTetrahedron,0}()) ≈ [Vec{2,Float64}((1/3,1/3))]
-@test Ferrite.reference_coordinates(DiscontinuousLagrange{2,RefCube,0}()) ≈ [Vec{2,Float64}((0,0))]
-@test Ferrite.reference_coordinates(DiscontinuousLagrange{3,RefTetrahedron,0}()) ≈ [Vec{3,Float64}((1/4,1/4,1/4))]
-@test Ferrite.reference_coordinates(DiscontinuousLagrange{3,RefCube,0}()) ≈ [Vec{3,Float64}((0,0,0))]
+@test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTriangle,0}()) ≈ [Vec{2,Float64}((1/3,1/3))]
+@test Ferrite.reference_coordinates(DiscontinuousLagrange{RefQuadrilateral,0}()) ≈ [Vec{2,Float64}((0,0))]
+@test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTetrahedron,0}()) ≈ [Vec{3,Float64}((1/4,1/4,1/4))]
+@test Ferrite.reference_coordinates(DiscontinuousLagrange{RefHexahedron,0}()) ≈ [Vec{3,Float64}((0,0,0))]
 
 end

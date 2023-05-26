@@ -1,6 +1,6 @@
 name = "Ferrite"
 uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
-version = "0.3.13"
+version = "0.3.14"
 
 [deps]
 EnumX = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
@@ -9,6 +9,7 @@ NearestNeighbors = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
 Preferences = "21216c6a-2e73-6563-6e65-726566657250"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
@@ -44,9 +45,8 @@ NBInclude = "0db19996-df87-5ea3-a455-e3a50d440464"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
-StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [targets]
-test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "IterativeSolvers", "Metis", "NBInclude", "ProgressMeter", "Random", "SHA", "StableRNGs", "Test", "TimerOutputs", "Logging"]
+test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "IterativeSolvers", "Metis", "NBInclude", "ProgressMeter", "Random", "SHA", "Test", "TimerOutputs", "Logging"]
