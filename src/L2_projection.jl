@@ -63,11 +63,11 @@ function L2Projector(
 end
 
 # Quadrature sufficient for integrating a mass matrix
-function _mass_qr(::Lagrange{shape, order}) where {dim, shape <: AbstractRefShape{dim}, order}
-    return QuadratureRule{dim,shape}(order + 1)
+function _mass_qr(::Lagrange{shape, order}) where {shape <: AbstractRefShape, order}
+    return QuadratureRule{shape}(order + 1)
 end
-function _mass_qr(::Lagrange{shape, 2}) where {dim, shape <: RefSimplex{dim}}
-    return QuadratureRule{dim,shape}(4)
+function _mass_qr(::Lagrange{shape, 2}) where {shape <: RefSimplex}
+    return QuadratureRule{shape}(4)
 end
 _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
@@ -255,7 +255,7 @@ function _evaluate_at_grid_nodes(
     ip, gip = proj.func_ip, proj.geom_ip
     refdim, refshape = getdim(ip), getrefshape(ip)
     local_node_coords = reference_coordinates(gip)
-    qr = QuadratureRule{refdim,refshape}(zeros(length(local_node_coords)), local_node_coords)
+    qr = QuadratureRule{refshape}(zeros(length(local_node_coords)), local_node_coords)
     cv = CellValues(qr, ip)
     # Function barrier
     return _evaluate_at_grid_nodes!(data, cv, dh, proj.set, vals)

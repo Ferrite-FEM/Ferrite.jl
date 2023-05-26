@@ -227,10 +227,10 @@ end
 # the boundary when assembling the constraint matrix ``\underline{\underline{C}}``.
 
 function setup_fevalues(ipu, ipp, ipg)
-    qr = QuadratureRule{2,RefTriangle}(2)
+    qr = QuadratureRule{RefTriangle}(2)
     cvu = CellValues(qr, ipu, ipg)
     cvp = CellValues(qr, ipp, ipg)
-    qr_face = QuadratureRule{1,RefTriangle}(2)
+    qr_face = FaceQuadratureRule{RefTriangle}(2)
     fvp = FaceValues(qr_face, ipp, ipg)
     return cvu, cvp, fvp
 end

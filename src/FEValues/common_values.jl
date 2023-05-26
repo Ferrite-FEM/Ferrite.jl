@@ -39,11 +39,19 @@ The derivatives of the shape functions, and the new integration weights are comp
 reinit!
 
 """
-    getnquadpoints(fe_v::AbstractValues)
+    getnquadpoints(cv::CellValues)
 
-Return the number of quadrature points for the `Values` object.
+Return the number of quadrature points in `cv`'s quadrature rule.
 """
-getnquadpoints(fe::AbstractValues) = length(fe.qr.weights)
+getnquadpoints(fe::CellValues) = getnquadpoints(fe.qr)
+
+"""
+    getnquadpoints(fv::FaceValues)
+
+Return the number of quadrature points in `fv`s quadrature for the current
+(most recently [`reinit!`](@ref)ed) face.
+"""
+getnquadpoints(fe::FaceValues) = getnquadpoints(fe.qr, fe.current_face[])
 
 """
     getdetJdV(fe_v::AbstractValues, q_point::Int)

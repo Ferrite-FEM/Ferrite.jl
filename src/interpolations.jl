@@ -13,6 +13,7 @@ The following interpolations are implemented:
 * `Lagrange{RefLine,2}`
 * `Lagrange{RefQuadrilateral,1}`
 * `Lagrange{RefQuadrilateral,2}`
+* `Lagrange{RefQuadrilateral,3}`
 * `Lagrange{RefTriangle,1}`
 * `Lagrange{RefTriangle,2}`
 * `Lagrange{RefTriangle,3}`
@@ -176,31 +177,6 @@ Return order of the interpolation.
 """
 @inline getorder(::Interpolation{shape,order}) where {shape,order} = order
 
-"""
-    Ferrite.value(ip::Interpolation, ξ::Vec)
-
-Return a vector, of length [`getnbasefunctions(ip::Interpolation)`](@ref), with the value of each shape functions
-of `ip`, evaluated in the reference coordinate `ξ`. This calls [`Ferrite.value(ip::Interpolation, i::Int, ξ::Vec)`](@ref), where `i`
-is the shape function number, which each concrete interpolation should implement.
-"""
-function value(ip::InterpolationByDim{dim}, ξ::Vec{dim,T}) where {dim,T}
-    [value(ip, i, ξ) for i in 1:getnbasefunctions(ip)]
-end
-
-"""
-    Ferrite.derivative(ip::Interpolation, ξ::Vec)
-
-Return a vector, of length [`getnbasefunctions(ip::Interpolation)`](@ref), with the derivative (w.r.t. the
-reference coordinate) of each shape functions of `ip`, evaluated in the reference coordinate
-`ξ`. This uses automatic differentiation and uses `ip`s implementation of [`Ferrite.value(ip::Interpolation, i::Int, ξ::Vec)`](@ref).
-"""
-function derivative(ip::InterpolationByDim{dim}, ξ::Vec{dim,T}) where {dim,T}
-    [gradient(ξ -> value(ip, i, ξ), ξ) for i in 1:getnbasefunctions(ip)]
-end
-
-function gradient_and_value(ip::Interpolation, i::Int, x::Vec)
-    return gradient(ξ -> value(ip, i, ξ), x, :all)
-end
 
 #####################
 # Utility functions #
@@ -220,17 +196,32 @@ getnbasefunctions(::Interpolation)
 #   celldof: dof that is local to the element
 
 """
-    value(ip::Interpolation, i::Int, ξ::Vec)
+    shape_value(ip::Interpolation, ξ::Vec, i::Int)
 
-Evaluates the `i`'th basis function of the interpolation `ip` 
-at a point `ξ` on the reference element. The index `i` must 
+Evaluate the value of the `i`th shape function of the interpolation `ip`
+at a point `ξ` on the reference element. The index `i` must
 match the index in [`vertices(::Interpolation)`](@ref), [`faces(::Interpolation)`](@ref) and
 [`edges(::Interpolation)`](@ref).
 
-For nodal interpolations the indices also must match the 
+For nodal interpolations the indices also must match the
 indices of [`reference_coordinates(::Interpolation)`](@ref).
 """
-value(ip::Interpolation, i::Int, ξ::Vec)
+shape_value(ip::Interpolation, ξ::Vec, i::Int)
+
+"""
+    shape_gradient(ip::Interpolation, ξ::Vec, i::Int)
+
+Evaluate the gradient of the `i`th shape function of the interpolation `ip` in
+reference coordinate `ξ`.
+"""
+function shape_gradient(ip::Interpolation, ξ::Vec, i::Int)
+    return Tensors.gradient(x -> shape_value(ip, x, i), ξ)
+end
+
+function shape_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
+    return gradient(x -> shape_value(ip, x, i), ξ, :all)
+end
+
 
 """
     reference_coordinates(ip::Interpolation)
@@ -360,8 +351,8 @@ celldof_interior_indices(ip::DiscontinuousLagrange) = ntuple(i->i, getnbasefunct
 function reference_coordinates(ip::DiscontinuousLagrange{shape, order}) where {shape, order}
     return reference_coordinates(Lagrange{shape,order}())
 end
-function value(ip::DiscontinuousLagrange{shape, order}, i::Int, ξ::Vec{dim}) where {dim, shape<:AbstractRefShape{dim}, order}
-    return value(Lagrange{shape, order}(), i, ξ)
+function shape_value(::DiscontinuousLagrange{shape, order}, ξ::Vec{dim}, i::Int) where {dim, shape <: AbstractRefShape{dim}, order}
+    return shape_value(Lagrange{shape, order}(), ξ, i)
 end
 
 # Excepting the L0 element.
@@ -377,9 +368,9 @@ function reference_coordinates(ip::DiscontinuousLagrange{RefTetrahedron,0})
    return [Vec{3,Float64}((1/4,1/4,1/4))]
 end
 
-function value(ip::DiscontinuousLagrange{shape,0}, i::Int, ξ::Vec{dim}) where {dim,shape<:AbstractRefShape{dim}}
+function shape_value(ip::DiscontinuousLagrange{shape, 0}, ::Vec{dim, T}, i::Int) where {dim, shape <: AbstractRefShape{dim}, T}
     i > 1 && throw(ArgumentError("no shape function $i for interpolation $ip"))
-    return 1.0
+    return one(T)
 end
 
 ############
@@ -416,7 +407,7 @@ function reference_coordinates(::Lagrange{RefLine,1})
             Vec{1, Float64}(( 1.0,))]
 end
 
-function value(ip::Lagrange{RefLine,1}, i::Int, ξ::Vec{1})
+function shape_value(ip::Lagrange{RefLine, 1}, ξ::Vec{1}, i::Int)
     ξ_x = ξ[1]
     i == 1 && return (1 - ξ_x) * 0.5
     i == 2 && return (1 + ξ_x) * 0.5
@@ -437,7 +428,7 @@ function reference_coordinates(::Lagrange{RefLine,2})
             Vec{1, Float64}(( 0.0,))]
 end
 
-function value(ip::Lagrange{RefLine,2}, i::Int, ξ::Vec{1})
+function shape_value(ip::Lagrange{RefLine, 2}, ξ::Vec{1}, i::Int)
     ξ_x = ξ[1]
     i == 1 && return ξ_x * (ξ_x - 1) * 0.5
     i == 2 && return ξ_x * (ξ_x + 1) * 0.5
@@ -459,7 +450,7 @@ function reference_coordinates(::Lagrange{RefQuadrilateral,1})
             Vec{2, Float64}((-1.0,  1.0,))]
 end
 
-function value(ip::Lagrange{RefQuadrilateral,1}, i::Int, ξ::Vec{2})
+function shape_value(ip::Lagrange{RefQuadrilateral, 1}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25
@@ -490,7 +481,7 @@ function reference_coordinates(::Lagrange{RefQuadrilateral,2})
             Vec{2, Float64}(( 0.0,  0.0))]
 end
 
-function value(ip::Lagrange{RefQuadrilateral,2}, i::Int, ξ::Vec{2})
+function shape_value(ip::Lagrange{RefQuadrilateral, 2}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return (ξ_x^2 - ξ_x) * (ξ_y^2 - ξ_y) * 0.25
@@ -502,6 +493,58 @@ function value(ip::Lagrange{RefQuadrilateral,2}, i::Int, ξ::Vec{2})
     i == 7 && return (1 - ξ_x^2) * (ξ_y^2 + ξ_y) * 0.5
     i == 8 && return (ξ_x^2 - ξ_x) * (1 - ξ_y^2) * 0.5
     i == 9 && return (1 - ξ_x^2) * (1 - ξ_y^2)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+#####################################
+# Lagrange RefQuadrilateral order 3 #
+#####################################
+getnbasefunctions(::Lagrange{RefQuadrilateral, 3}) = 16
+
+facedof_indices(::Lagrange{RefQuadrilateral, 3}) = ((1,2, 5,6), (2,3, 7,8), (3,4, 9,10), (4,1, 11,12))
+facedof_interior_indices(::Lagrange{RefQuadrilateral, 3}) = ((5,6), (7,8), (9,10), (11,12))
+celldof_interior_indices(::Lagrange{RefQuadrilateral, 3}) = (13,14,15,16)
+
+function reference_coordinates(::Lagrange{RefQuadrilateral, 3})
+    return [Vec{2, Float64}((-1.0, -1.0)),
+            Vec{2, Float64}(( 1.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  1.0)),
+            Vec{2, Float64}((-1.0,  1.0)),
+            Vec{2, Float64}((-1/3, -1.0)),
+            Vec{2, Float64}(( 1/3, -1.0)),
+            Vec{2, Float64}(( 1.0, -1/3)),
+            Vec{2, Float64}(( 1.0,  1/3)),
+            Vec{2, Float64}(( 1/3,  1.0)),
+            Vec{2, Float64}((-1/3,  1.0)),
+            Vec{2, Float64}((-1.0,  1/3)),
+            Vec{2, Float64}((-1.0, -1/3)),
+            Vec{2, Float64}((-1/3, -1/3)),
+            Vec{2, Float64}(( 1/3, -1/3)),
+            Vec{2, Float64}((-1/3,  1/3)),
+            Vec{2, Float64}(( 1/3,  1/3))]
+end
+
+function shape_value(ip::Lagrange{RefQuadrilateral, 3}, ξ::Vec{2}, i::Int)
+    # See https://defelement.com/elements/examples/quadrilateral-Q-3.html
+    # Transform domain from [-1, 1] × [-1, 1] to [0, 1] × [0, 1]
+    ξ_x = ξ[1]*0.5 + 0.5
+    ξ_y = ξ[2]*0.5 + 0.5
+    i ==  1 && return (81*ξ_x^3*ξ_y^3)/4 - (81*ξ_x^3*ξ_y^2)/2 + (99*ξ_x^3*ξ_y)/4 - (9*ξ_x^3)/2 - (81*ξ_x^2*ξ_y^3)/2 + (81*ξ_x^2*ξ_y^2) - (99*ξ_x^2*ξ_y)/2 + (9*ξ_x^2) + (99*ξ_x*ξ_y^3)/4 - (99*ξ_x*ξ_y^2)/2 + (121*ξ_x*ξ_y)/4 - (11*ξ_x)/2 - (9*ξ_y^3)/2 + 9*ξ_y^2 - (11*ξ_y)/2 + 1
+    i ==  2 && return (ξ_x*( - 81*ξ_x^2*ξ_y^3 + 162*ξ_x^2*ξ_y^2 - 99*ξ_x^2*ξ_y + 18*ξ_x^2 + 81*ξ_x*ξ_y^3 - 162*ξ_x*ξ_y^2 + 99*ξ_x*ξ_y - 18*ξ_x - 18*ξ_y^3 + 36*ξ_y^2 - 22*ξ_y + 4))/4
+    i ==  4 && return (ξ_y*( - 81*ξ_x^3*ξ_y^2 + 81*ξ_x^3*ξ_y - 18*ξ_x^3 + 162*ξ_x^2*ξ_y^2 - 162*ξ_x^2*ξ_y + 36*ξ_x^2 - 99*ξ_x*ξ_y^2 + 99*ξ_x*ξ_y - 22*ξ_x + 18*ξ_y^2 - 18*ξ_y + 4))/4
+    i ==  3 && return (ξ_x*ξ_y*(81*ξ_x^2*ξ_y^2 - 81*ξ_x^2*ξ_y + 18*ξ_x^2 - 81*ξ_x*ξ_y^2 + 81*ξ_x*ξ_y - 18*ξ_x + 18*ξ_y^2 - 18*ξ_y + 4))/4
+    i ==  5 && return (9*ξ_x*( - 27*ξ_x^2*ξ_y^3 + 54*ξ_x^2*ξ_y^2 - 33*ξ_x^2*ξ_y + 6*ξ_x^2 + 45*ξ_x*ξ_y^3 - 90*ξ_x*ξ_y^2 + 55*ξ_x*ξ_y - 10*ξ_x - 18*ξ_y^3 + 36*ξ_y^2 - 22*ξ_y + 4))/4
+    i ==  6 && return (9*ξ_x*(27*ξ_x^2*ξ_y^3 - 54*ξ_x^2*ξ_y^2 + 33*ξ_x^2*ξ_y - 6*ξ_x^2 - 36*ξ_x*ξ_y^3 + 72*ξ_x*ξ_y^2 - 44*ξ_x*ξ_y + 8*ξ_x + 9*ξ_y^3 - 18*ξ_y^2 + 11*ξ_y - 2))/4
+    i ==  12 && return (9*ξ_y*( - 27*ξ_x^3*ξ_y^2 + 45*ξ_x^3*ξ_y - 18*ξ_x^3 + 54*ξ_x^2*ξ_y^2 - 90*ξ_x^2*ξ_y + 36*ξ_x^2 - 33*ξ_x*ξ_y^2 + 55*ξ_x*ξ_y - 22*ξ_x + 6*ξ_y^2 - 10*ξ_y + 4))/4
+    i ==  11 && return (9*ξ_y*(27*ξ_x^3*ξ_y^2 - 36*ξ_x^3*ξ_y + 9*ξ_x^3 - 54*ξ_x^2*ξ_y^2 + 72*ξ_x^2*ξ_y - 18*ξ_x^2 + 33*ξ_x*ξ_y^2 - 44*ξ_x*ξ_y + 11*ξ_x - 6*ξ_y^2 + 8*ξ_y - 2))/4
+    i ==  7 && return (9*ξ_x*ξ_y*(27*ξ_x^2*ξ_y^2 - 45*ξ_x^2*ξ_y + 18*ξ_x^2 - 27*ξ_x*ξ_y^2 + 45*ξ_x*ξ_y - 18*ξ_x + 6*ξ_y^2 - 10*ξ_y + 4))/4
+    i == 8 && return (9*ξ_x*ξ_y*( - 27*ξ_x^2*ξ_y^2 + 36*ξ_x^2*ξ_y - 9*ξ_x^2 + 27*ξ_x*ξ_y^2 - 36*ξ_x*ξ_y + 9*ξ_x - 6*ξ_y^2 + 8*ξ_y - 2))/4
+    i == 10 && return (9*ξ_x*ξ_y*(27*ξ_x^2*ξ_y^2 - 27*ξ_x^2*ξ_y + 6*ξ_x^2 - 45*ξ_x*ξ_y^2 + 45*ξ_x*ξ_y - 10*ξ_x + 18*ξ_y^2 - 18*ξ_y + 4))/4
+    i == 9 && return (9*ξ_x*ξ_y*( - 27*ξ_x^2*ξ_y^2 + 27*ξ_x^2*ξ_y - 6*ξ_x^2 + 36*ξ_x*ξ_y^2 - 36*ξ_x*ξ_y + 8*ξ_x - 9*ξ_y^2 + 9*ξ_y - 2))/4
+    i == 13 && return (81*ξ_x*ξ_y*(9*ξ_x^2*ξ_y^2 - 15*ξ_x^2*ξ_y + 6*ξ_x^2 - 15*ξ_x*ξ_y^2 + 25*ξ_x*ξ_y - 10*ξ_x + 6*ξ_y^2 - 10*ξ_y + 4))/4
+    i == 14 && return (81*ξ_x*ξ_y*( - 9*ξ_x^2*ξ_y^2 + 15*ξ_x^2*ξ_y - 6*ξ_x^2 + 12*ξ_x*ξ_y^2 - 20*ξ_x*ξ_y + 8*ξ_x - 3*ξ_y^2 + 5*ξ_y - 2))/4
+    i == 15 && return (81*ξ_x*ξ_y*( - 9*ξ_x^2*ξ_y^2 + 12*ξ_x^2*ξ_y - 3*ξ_x^2 + 15*ξ_x*ξ_y^2 - 20*ξ_x*ξ_y + 5*ξ_x - 6*ξ_y^2 + 8*ξ_y - 2))/4
+    i == 16 && return (81*ξ_x*ξ_y*(9*ξ_x^2*ξ_y^2 - 12*ξ_x^2*ξ_y + 3*ξ_x^2 - 12*ξ_x*ξ_y^2 + 16*ξ_x*ξ_y - 4*ξ_x + 3*ξ_y^2 - 4*ξ_y + 1))/4
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -518,7 +561,7 @@ function reference_coordinates(::Lagrange{RefTriangle,1})
             Vec{2, Float64}((0.0, 0.0))]
 end
 
-function value(ip::Lagrange{RefTriangle,1}, i::Int, ξ::Vec{2})
+function shape_value(ip::Lagrange{RefTriangle, 1}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return ξ_x
@@ -544,7 +587,7 @@ function reference_coordinates(::Lagrange{RefTriangle,2})
             Vec{2, Float64}((0.5, 0.0))]
 end
 
-function value(ip::Lagrange{RefTriangle,2}, i::Int, ξ::Vec{2})
+function shape_value(ip::Lagrange{RefTriangle, 2}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     γ = 1. - ξ_x - ξ_y
@@ -621,7 +664,7 @@ function reference_coordinates(ip::Lagrange2Tri345)
     return permute!(coordpts, permdof2DLagrange2Tri345[order])
 end
 
-function value(ip::Lagrange2Tri345, i::Int, ξ::Vec{2})
+function shape_value(ip::Lagrange2Tri345, ξ::Vec{2}, i::Int)
     if !(0 < i <= getnbasefunctions(ip))
         throw(ArgumentError("no shape function $i for interpolation $ip"))
     end
@@ -667,7 +710,7 @@ function reference_coordinates(::Lagrange{RefTetrahedron,1})
             Vec{3, Float64}((0.0, 0.0, 1.0))]
 end
 
-function value(ip::Lagrange{RefTetrahedron,1}, i::Int, ξ::Vec{3})
+function shape_value(ip::Lagrange{RefTetrahedron, 1}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
@@ -702,7 +745,7 @@ end
 
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch09.d/AFEM.Ch09.pdf
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.pdf
-function value(ip::Lagrange{RefTetrahedron,2}, i::Int, ξ::Vec{3})
+function shape_value(ip::Lagrange{RefTetrahedron, 2}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
@@ -738,7 +781,7 @@ function reference_coordinates(::Lagrange{RefHexahedron,1})
             Vec{3, Float64}((-1.0,  1.0,  1.0))]
 end
 
-function value(ip::Lagrange{RefHexahedron,1}, i::Int, ξ::Vec{3})
+function shape_value(ip::Lagrange{RefHexahedron, 1}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
@@ -826,7 +869,7 @@ function reference_coordinates(::Lagrange{RefHexahedron,2})
             ]
 end
 
-function value(ip::Lagrange{RefHexahedron,2}, i::Int, ξ::Vec{3, T}) where {T}
+function shape_value(ip::Lagrange{RefHexahedron, 2}, ξ::Vec{3, T}, i::Int) where {T}
     # Some local helpers.
     @inline φ₁(x::T) = -0.5*x*(1-x)
     @inline φ₂(x::T) = (1+x)*(1-x)
@@ -885,7 +928,7 @@ function reference_coordinates(::Lagrange{RefPrism,1})
             Vec{3, Float64}((0.0, 1.0, 1.0))]
 end
 
-function value(ip::Lagrange{RefPrism,1}, i::Int, ξ::Vec{3})
+function shape_value(ip::Lagrange{RefPrism,1}, ξ::Vec{3}, i::Int)
     (x,y,z) = ξ
     i == 1 && return 1-x-y -z*(1-x-y)
     i == 2 && return x*(1-z)
@@ -965,7 +1008,7 @@ function reference_coordinates(::Lagrange{RefPrism,2})
             Vec{3, Float64}((1/2, 1/2, 1/2)),]
 end
 
-function value(ip::Lagrange{RefPrism,2}, i::Int, ξ::Vec{3})
+function shape_value(ip::Lagrange{RefPrism, 2}, ξ::Vec{3}, i::Int)
     (x,y,z) = ξ
     x² = x*x
     y² = y*y
@@ -1020,7 +1063,7 @@ function reference_coordinates(::BubbleEnrichedLagrange{RefTriangle,1})
             Vec{2, Float64}((1/3, 1/3)),]
 end
 
-function value(ip::BubbleEnrichedLagrange{RefTriangle,1}, i::Int, ξ::Vec{2})
+function shape_value(ip::BubbleEnrichedLagrange{RefTriangle, 1}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return ξ_x*(9ξ_y^2 + 9ξ_x*ξ_y - 9ξ_y + 1)
@@ -1067,7 +1110,7 @@ function reference_coordinates(::Serendipity{RefQuadrilateral,2})
             Vec{2, Float64}((-1.0,  0.0))]
 end
 
-function value(ip::Serendipity{RefQuadrilateral,2}, i::Int, ξ::Vec{2})
+function shape_value(ip::Serendipity{RefQuadrilateral,2}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25(-ξ_x - ξ_y - 1)
@@ -1138,18 +1181,18 @@ function reference_coordinates(::Serendipity{RefHexahedron,2})
             Vec{3, Float64}((-1.0, 1.0, 0.0)),]
 end
 
-function value(ip::Serendipity{RefHexahedron,2}, i::Int, ξ::Vec{3})
+function shape_value(ip::Serendipity{RefHexahedron, 2}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
-    i == 1 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z) - 0.5(value(ip,12,ξ) + value(ip,9,ξ) + value(ip,17,ξ))
-    i == 2 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z) - 0.5(value(ip,9,ξ) + value(ip,10,ξ) + value(ip,18,ξ))
-    i == 3 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z) - 0.5(value(ip,10,ξ) + value(ip,11,ξ) + value(ip,19,ξ))
-    i == 4 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z) - 0.5(value(ip,11,ξ) + value(ip,12,ξ) + value(ip,20,ξ))
-    i == 5 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z) - 0.5(value(ip,16,ξ) + value(ip,13,ξ) + value(ip,17,ξ))
-    i == 6 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z) - 0.5(value(ip,13,ξ) + value(ip,14,ξ) + value(ip,18,ξ))
-    i == 7 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z) - 0.5(value(ip,14,ξ) + value(ip,15,ξ) + value(ip,19,ξ))
-    i == 8 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z) - 0.5(value(ip,15,ξ) + value(ip,16,ξ) + value(ip,20,ξ))
+    i == 1 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z) - 0.5(shape_value(ip, ξ, 12) + shape_value(ip, ξ, 9) + shape_value(ip, ξ, 17))
+    i == 2 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z) - 0.5(shape_value(ip, ξ, 9) + shape_value(ip, ξ, 10) + shape_value(ip, ξ, 18))
+    i == 3 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z) - 0.5(shape_value(ip, ξ, 10) + shape_value(ip, ξ, 11) + shape_value(ip, ξ, 19))
+    i == 4 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z) - 0.5(shape_value(ip, ξ, 11) + shape_value(ip, ξ, 12) + shape_value(ip, ξ, 20))
+    i == 5 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z) - 0.5(shape_value(ip, ξ, 16) + shape_value(ip, ξ, 13) + shape_value(ip, ξ, 17))
+    i == 6 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z) - 0.5(shape_value(ip, ξ, 13) + shape_value(ip, ξ, 14) + shape_value(ip, ξ, 18))
+    i == 7 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z) - 0.5(shape_value(ip, ξ, 14) + shape_value(ip, ξ, 15) + shape_value(ip, ξ, 19))
+    i == 8 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z) - 0.5(shape_value(ip, ξ, 15) + shape_value(ip, ξ, 16) + shape_value(ip, ξ, 20))
     i == 9 && return 0.25(1 - ξ_x^2) * (1 - ξ_y) * (1 - ξ_z)
     i == 10 && return 0.25(1 + ξ_x) * (1 - ξ_y^2) * (1 - ξ_z)
     i == 11 && return 0.25(1 - ξ_x^2) * (1 + ξ_y) * (1 - ξ_z)
@@ -1195,7 +1238,7 @@ function reference_coordinates(::CrouzeixRaviart)
             Vec{2, Float64}((0.5, 0.0))]
 end
 
-function value(ip::CrouzeixRaviart, i::Int, ξ::Vec{2})
+function shape_value(ip::CrouzeixRaviart, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return 2*ξ_x + 2*ξ_y - 1.0
@@ -1232,24 +1275,24 @@ get_n_copies(::VectorizedInterpolation{vdim}) where vdim = vdim
 function getnbasefunctions(ipv::VectorizedInterpolation{vdim}) where vdim
     return vdim * getnbasefunctions(ipv.ip)
 end
-function value(ipv::VectorizedInterpolation{vdim, shape}, I::Int, ξ::Vec{refdim, T}) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T}
+function shape_value(ipv::VectorizedInterpolation{vdim, shape}, ξ::Vec{refdim, T}, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T}
     i0, c0 = divrem(I - 1, vdim)
     i = i0 + 1
     c = c0 + 1
-    v = value(ipv.ip, i, ξ)
+    v = shape_value(ipv.ip, ξ, i)
     return Vec{vdim, T}(j -> j == c ? v : zero(v))
 end
 
 # vdim == refdim
-function gradient_and_value(ipv::VectorizedInterpolation{dim, shape}, I::Int, ξ::Vec{dim}) where {dim, shape <: AbstractRefShape{dim}}
-    return invoke(gradient_and_value, Tuple{Interpolation, Int, Vec}, ipv, I, ξ)
+function shape_gradient_and_value(ipv::VectorizedInterpolation{dim, shape}, ξ::Vec{dim}, I::Int) where {dim, shape <: AbstractRefShape{dim}}
+    return invoke(shape_gradient_and_value, Tuple{Interpolation, Vec, Int}, ipv, ξ, I)
 end
 # vdim != refdim
-function gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, I::Int, ξ::V) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
+function shape_gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, ξ::V, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
     # Load with dual numbers and compute the value
-    f = x -> value(ipv, I, x)
+    f = x -> shape_value(ipv, x, I)
     ξd = Tensors._load(ξ, Tensors.Tag(f, V))
-    value_grad = value(ipv, I, ξd)
+    value_grad = f(ξd)
     # Extract the value and gradient
     val = Vec{vdim, T}(i -> Tensors.value(value_grad[i]))
     grad = zero(MMatrix{vdim, refdim, T})

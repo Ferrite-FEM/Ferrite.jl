@@ -5,6 +5,7 @@
                       Lagrange{RefLine, 2}(),
                       Lagrange{RefQuadrilateral, 1}(),
                       Lagrange{RefQuadrilateral, 2}(),
+                      Lagrange{RefQuadrilateral, 3}(),
                       Lagrange{RefTriangle, 1}(),
                       Lagrange{RefTriangle, 2}(),
                       Lagrange{RefTriangle, 3}(),
@@ -47,16 +48,16 @@
     # Check partition of unity at random point.
     n_basefuncs = getnbasefunctions(interpolation)
     x = rand(Tensor{1, ref_dim})
-    f = (x) -> Ferrite.value(interpolation, Tensor{1, ref_dim}(x))
+    f = (x) -> [shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
     @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
-           reinterpret(Float64, Ferrite.derivative(interpolation, x))
-    @test sum(Ferrite.value(interpolation, x)) ≈ 1.0
+        reinterpret(Float64, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
+    @test sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
 
     # Check if the important functions are consistent
     coords = Ferrite.reference_coordinates(interpolation)
     @test length(coords) == n_basefuncs
-    @test Ferrite.value(interpolation, length(coords), x) == Ferrite.value(interpolation, length(coords), x)
-    @test_throws ArgumentError Ferrite.value(interpolation, length(coords)+1, x)
+    @test shape_value(interpolation, x, n_basefuncs) == shape_value(interpolation, x, n_basefuncs)
+    @test_throws ArgumentError shape_value(interpolation, x, n_basefuncs+1)
 
     # Test whether we have for each entity corresponding dof indices (possibly empty)
     @test length(Ferrite.vertexdof_indices(interpolation)) == Ferrite.nvertices(interpolation)
@@ -97,12 +98,13 @@
 
     # Check for dirac delta property of interpolation
     @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
-        N_dof = Ferrite.value(interpolation, coords[dof])
         for k in 1:n_basefuncs
+            N_dof = shape_value(interpolation, coords[dof], k)
             if k == dof
-                @test N_dof[k] ≈ 1.0
+                @test N_dof ≈ 1.0
             else
-                @test N_dof[k] ≈ 0.0 atol=4eps(Float64) #broken=typeof(interpolation)==Lagrange{2, RefTetrahedron, 5}&&dof==4&&k==18
+                factor = interpolation isa Lagrange{RefQuadrilateral, 3} ? 200 : 4
+                @test N_dof ≈ 0.0 atol = factor * eps(Float64)
             end
         end
     end

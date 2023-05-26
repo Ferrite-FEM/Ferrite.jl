@@ -1,8 +1,7 @@
 function test_apply_rhs()
     grid = generate_grid(Quadrilateral, (20, 20))
-    dim = 2
     ip = Lagrange{RefQuadrilateral,1}()
-    qr = QuadratureRule{dim,RefQuadrilateral}(2)
+    qr = QuadratureRule{RefQuadrilateral}(2)
     cellvalues = CellValues(qr, ip)
     
     dh = DofHandler(grid)

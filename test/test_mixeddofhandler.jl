@@ -353,7 +353,7 @@ function test_2_element_heat_eq()
     assembler = start_assemble(K, f);
     # Use the same assemble function since it is the same weak form for both cell-types
     for fh in dh.fieldhandlers
-        qr = QuadratureRule{2, RefQuadrilateral}(2)
+        qr = QuadratureRule{RefQuadrilateral}(2)
         interp = fh.field_interpolations[1]
         cellvalues = CellValues(qr, interp)
         doassemble(fh.cellset, cellvalues, assembler, dh)

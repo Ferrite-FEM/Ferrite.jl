@@ -33,7 +33,7 @@ function PointValues(::Type{T}, ip::IP, ipg::GIP = default_geometric_interpolati
     IP  <:       Interpolation{shape},
     GIP <: ScalarInterpolation{shape}
 }
-    qr = QuadratureRule{dim, shape, T}([one(T)], [zero(Vec{dim, T})])
+    qr = QuadratureRule{shape, T}([one(T)], [zero(Vec{dim, T})])
     cv = CellValues(T, qr, ip, ipg)
     return PointValues{typeof(cv)}(cv)
 end
@@ -60,7 +60,7 @@ function reinit!(pv::PointValues, x::AbstractVector{<:Vec{D}}, ξ::Vec{D}) where
     qp = 1 # PointValues only have a single qp
     # TODO: Does M need to be updated too?
     for i in 1:getnbasefunctions(pv.cv.ip)
-        pv.cv.dNdξ[i, qp], pv.cv.N[i, qp] = gradient_and_value(pv.cv.ip, i, ξ)
+        pv.cv.dNdξ[i, qp], pv.cv.N[i, qp] = shape_gradient_and_value(pv.cv.ip, ξ, i)
     end
     reinit!(pv.cv, x)
     return nothing
@@ -76,7 +76,7 @@ end
 
 function PointValuesInternal(ξ::Vec{dim, T}, ip::IP) where {dim, T, shape <: AbstractRefShape{dim}, IP <: Interpolation{shape}}
     n_func_basefuncs = getnbasefunctions(ip)
-    N = [value(ip, i, ξ) for i in 1:n_func_basefuncs]
+    N = [shape_value(ip, ξ, i) for i in 1:n_func_basefuncs]
     return PointValuesInternal{IP, eltype(N)}(N, ip)
 end
 
@@ -88,7 +88,7 @@ shape_value(pv::PointValuesInternal, qp::Int, i::Int) = (@assert qp == 1; pv.N[i
 function reinit!(pv::PointValuesInternal{IP}, coord::Vec{dim}) where {dim, shape <: AbstractRefShape{dim}, IP <: Interpolation{shape}}
     n_func_basefuncs = getnbasefunctions(pv.ip)
     for i in 1:n_func_basefuncs
-        pv.N[i] = value(pv.ip, i, coord)
+        pv.N[i] = shape_value(pv.ip, coord, i)
     end
     return nothing
 end

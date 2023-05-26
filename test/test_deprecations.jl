@@ -21,7 +21,7 @@ end
 
 @testset "Deprecation of (Cell|Face)(Scalar|Vector)Values" begin
     ip = Lagrange{RefQuadrilateral, 1}()
-    qr = QuadratureRule{2, RefQuadrilateral}(2)
+    qr = QuadratureRule{RefQuadrilateral}(2)
     for CVType in (
             CellScalarValues, CellVectorValues,
             FaceScalarValues, FaceVectorValues,
@@ -76,10 +76,16 @@ end
     @test (@test_deprecated r"likely this comes" test_combo(FaceValues, 2, RefCube, (1,), Lagrange{RefHexahedron, 1}())) isa FaceValues
     @test (@test_deprecated r"RefQuadrilateral.*RefHexahedron" test_combo(FaceValues, 2, RefCube, (:legendre, 1), Lagrange{RefHexahedron, 1}())) isa FaceValues
     @test (@test_deprecated r"likely this comes" test_combo(FaceValues, 2, RefCube, (:legendre, 1), Lagrange{RefHexahedron, 1}())) isa FaceValues
-    @test (@test_deprecated r"likely this comes" test_combo(CellValues, 2, RefTetrahedron, (1,), Lagrange{RefTriangle, 1}())) isa CellValues
-    @test (@test_deprecated r"likely this comes" test_combo(CellValues, 2, RefTetrahedron, (:legendre, 1), Lagrange{RefTriangle, 1}())) isa CellValues
     @test (@test_deprecated r"RefTriangle" test_combo(FaceValues, 1, RefTetrahedron, (1,), Lagrange{RefTriangle, 1}())) isa FaceValues
     @test (@test_deprecated r"RefTriangle" test_combo(FaceValues, 1, RefTetrahedron, (:legendre, 1), Lagrange{RefTriangle, 1}())) isa FaceValues
+end
+
+@testset "Ferrite.value and Ferrite.derivative" begin
+    ip = Lagrange{RefQuadrilateral, 1}()
+    ξ = zero(Vec{2})
+    @test (@test_deprecated Ferrite.value(ip, ξ)) == [shape_value(ip, ξ, i) for i in 1:getnbasefunctions(ip)]
+    @test (@test_deprecated Ferrite.derivative(ip, ξ)) == [shape_gradient(ip, ξ, i) for i in 1:getnbasefunctions(ip)]
+    @test (@test_deprecated Ferrite.value(ip, 1, ξ)) == shape_value(ip, ξ, 1)
 end
 
 end # testset deprecations
