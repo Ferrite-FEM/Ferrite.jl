@@ -128,6 +128,9 @@ for idx in cellset
     # ...
 end
 ```
+!!! warning
+    `CellIterator` is stateful and should not be used for things other than `for`-looping
+    (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
 """
 struct CellIterator{CC<:CellCache, IC<:IntegerCollection}
     cc::CC
