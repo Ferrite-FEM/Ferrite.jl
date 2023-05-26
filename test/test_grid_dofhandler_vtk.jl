@@ -178,8 +178,6 @@ end
         n += cellid(c)
     end
     @test n == div(getncells(grid)*(getncells(grid) + 1), 2)
-    # CellIterator broadcasting
-    @test_throws ErrorException("CellIterator is stateful and should not be used in broadcasting nor collected") cellid.(ci)
 end
 
 @testset "Grid sets" begin
