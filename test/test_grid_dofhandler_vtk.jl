@@ -178,6 +178,10 @@ end
         n += cellid(c)
     end
     @test n == div(getncells(grid)*(getncells(grid) + 1), 2)
+    # CellIterator broadcasting
+    @test cellid.(ci) == map(ci) do cell
+        cellid(cell)
+    end
 end
 
 @testset "Grid sets" begin
