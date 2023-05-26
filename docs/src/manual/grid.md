@@ -90,30 +90,33 @@ CairoMakie.activate!(type = "svg")
 using Ferrite
 using FerriteViz
 
-fig = CairoMakie.Figure(resolution=(1000,400))
-kwargs=(markersize=8,textsize=15,facelabeloffset=(-10,-20),facelabelcolor=:orange,nodelabelcolor=:blue)
-fp1 = elementinfo(fig[1,1],Lagrange{2,RefTetrahedron,1};kwargs...)
+fig = CairoMakie.Figure(resolution = (1000, 400))
+kwargs = (
+    markersize = 8, fontsize = 15, facelabeloffset = (-10,-20),
+    facelabelcolor = :orange, nodelabelcolor = :blue,
+)
+fp1 = elementinfo(fig[1, 1], Lagrange{2, RefTetrahedron, 1}; kwargs...)
 fp1.axis.aspect = CairoMakie.AxisAspect(1) #hide
-fp1.axis.limits = (-0.3,1.3,-0.3,1.3) #hide
-CairoMakie.hidespines!(fp1.axis) #hide
-fp2 = elementinfo(fig[1,2],Lagrange{2,RefTetrahedron,2};kwargs...)
+fp1.axis.limits = (-0.3, 1.3, -0.3, 1.3)   #hide
+CairoMakie.hidespines!(fp1.axis)           #hide
+fp2 = elementinfo(fig[1, 2], Lagrange{2, RefTetrahedron, 2}; kwargs...)
 fp2.axis.aspect = CairoMakie.AxisAspect(1) #hide
-fp2.axis.yticklabelsvisible = false #hide
-fp2.axis.limits = (-0.3,1.3,-0.3,1.3) #hide
-CairoMakie.hidespines!(fp2.axis) #hide
-fp3 = elementinfo(fig[1,3],Lagrange{2,RefCube,1};kwargs...)
+fp2.axis.yticklabelsvisible = false        #hide
+fp2.axis.limits = (-0.3, 1.3, -0.3, 1.3)   #hide
+CairoMakie.hidespines!(fp2.axis)           #hide
+fp3 = elementinfo(fig[1, 3], Lagrange{2, RefCube, 1}; kwargs...)
 fp3.axis.aspect = CairoMakie.AxisAspect(1) #hide
-fp3.axis.limits = (-1.3,1.3,-1.3,1.3) #hide
-fp3.axis.xticks = [-1.0,0.0,1.0] #hide
-fp3.axis.yticks = [-1.0,0.0,1.0] #hide
-CairoMakie.hidespines!(fp3.axis) #hide
-fp4 = elementinfo(fig[1,4],Lagrange{2,RefCube,2};kwargs...)
+fp3.axis.limits = (-1.3, 1.3, -1.3, 1.3)   #hide
+fp3.axis.xticks = [-1.0, 0.0, 1.0]         #hide
+fp3.axis.yticks = [-1.0, 0.0, 1.0]         #hide
+CairoMakie.hidespines!(fp3.axis)           #hide
+fp4 = elementinfo(fig[1, 4], Lagrange{2, RefCube, 2}; kwargs...)
 fp4.axis.aspect = CairoMakie.AxisAspect(1) #hide
-fp4.axis.yticklabelsvisible = false #hide
-fp4.axis.limits = (-1.3,1.3,-1.3,1.3) #hide
-fp4.axis.xticks = [-1.0,0.0,1.0] #hide
-fp4.axis.yticks = [-1.0,0.0,1.0] #hide
-CairoMakie.hidespines!(fp4.axis) #hide
+fp4.axis.yticklabelsvisible = false        #hide
+fp4.axis.limits = (-1.3, 1.3, -1.3, 1.3)   #hide
+fp4.axis.xticks = [-1.0, 0.0, 1.0]         #hide
+fp4.axis.yticks = [-1.0, 0.0, 1.0]         #hide
+CairoMakie.hidespines!(fp4.axis)           #hide
 fig
 ```
 
