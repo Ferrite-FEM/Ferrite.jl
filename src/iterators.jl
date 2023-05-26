@@ -164,6 +164,7 @@ Base.IteratorSize(::Type{<:CellIterator}) = Base.HasLength()
 Base.IteratorEltype(::Type{<:CellIterator}) = Base.HasEltype()
 Base.eltype(::Type{<:CellIterator{CC}}) where CC = CC
 Base.length(ci::CellIterator) = length(ci.set)
+Base.collect(ci::CellIterator) = [reinit!(CellCache(ci.cc.grid), i) for i in ci.set]
 
 
 function _check_same_celltype(grid::AbstractGrid, cellset)
