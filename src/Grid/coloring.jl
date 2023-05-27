@@ -3,7 +3,7 @@ function create_incidence_matrix(g::AbstractGrid, cellset=1:getncells(g))
     cell_containing_node = Dict{Int, Set{Int}}()
     for cellid in cellset
         cell = getcells(g, cellid)
-        for v in cell.nodes
+        for v in get_node_ids(cell)
             _set = get!(Set{Int}, cell_containing_node, v)
             push!(_set, cellid)
         end
