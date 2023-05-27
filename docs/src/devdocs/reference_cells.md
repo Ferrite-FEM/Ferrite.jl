@@ -26,7 +26,7 @@ vertex number, i.e. ``(v_i, v_j, v_k, ...)`` where ``i < j, i < k, i < ...``.
 
 ```@raw html
 <figure>
-<img src="/assets/ref-line.svg" />
+<img src="../../assets/ref-line.svg" />
 <figcaption><em>
 Numbering of the vertices and the edge for the reference line. Source: <a
 href="https://defelement.com/img/ref-interval.html">DefElement</a> (<a
@@ -51,7 +51,7 @@ e_1 = (v_1, v_2)
 
 ```@raw html
 <figure>
-<img src="/assets/ref-triangle.svg" />
+<img src="../../assets/ref-triangle.svg" />
 <figcaption><em>
 Numbering of the vertices, edges, and the face for the reference triangle. Source: <a
 href="https://defelement.com/img/ref-triangle.html">DefElement</a> (<a
@@ -79,7 +79,7 @@ e_3 = (v_3, v_1)
 
 ```@raw html
 <figure>
-<img src="/assets/ref-quadrilateral.svg" />
+<img src="../../assets/ref-quadrilateral.svg" />
 <figcaption><em>
 Numbering of the vertices, edges, and the face for the reference quadrilateral. Source: <a
 href="https://defelement.com/img/ref-quadrilateral.html">DefElement</a> (<a
@@ -109,7 +109,7 @@ e_4 = (v_4, v_1)
 
 ```@raw html
 <figure>
-<img src="/assets/ref-tetrahedron.svg" />
+<img src="../../assets/ref-tetrahedron.svg" />
 <figcaption><em>
 Numbering of the vertices, edges, faces, and the cell for the reference tetrahedron. Source:
 <a href="https://defelement.com/img/ref-tetrahedron.html">DefElement</a> (<a
@@ -149,7 +149,7 @@ f_4 = (v_1, v_4, v_3)
 
 ```@raw html
 <figure>
-<img src="/assets/ref-hexahedron.svg" />
+<img src="../../assets/ref-hexahedron.svg" />
 <figcaption><em>
 Numbering of the vertices, edges, faces, and the cell for the reference hexahedron. Source:
 <a href="https://defelement.com/img/ref-hexahedron.html">DefElement</a> (<a
@@ -201,7 +201,7 @@ f_6 = (v_5, v_6, v_7, v_8)
 
 ```@raw html
 <figure>
-<img src="/assets/ref-prism.svg" />
+<img src="../../assets/ref-prism.svg" />
 <figcaption><em>
 Numbering of the vertices, edges, faces, and the cell for the reference prism. Source:
 <a href="https://defelement.com/img/ref-prism.html">DefElement</a> (<a
