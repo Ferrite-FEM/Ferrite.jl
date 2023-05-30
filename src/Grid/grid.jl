@@ -1307,8 +1307,22 @@ end
     return x
 end
 
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, (cellid, lfaceid)::FaceIndex) where {dim,T} 
+    cell = getcells(grid, cellid)
+    _getfacecoordinates!(x, grid, cell, lfaceid) #function barier for `cell`
+end
+
+@inline function _getfacecoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell, lfaceid::Int) where {dim,T}
+    ip = default_interpolation(typeof(cell))
+    faceindices = Ferrite.facedof_indices(ip)[lfaceid]
+    @assert length(x) == length(faceindices)
+    @inbounds for (j,i) in enumerate(faceindices)
+        x[j] = grid.nodes[cell.nodes[i]].x
+    end
+    return x
+end
+
 @inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
-@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, face::FaceIndex) where {dim, T} = getcoordinates!(x, grid, face.idx[1])
 
 # TODO: Deprecate one of `cellcoords!` and `getcoordinates!`, as they do the same thing
 cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,T} = getcoordinates!(global_coords, grid, i) 
@@ -1326,16 +1340,39 @@ Return a vector with the coordinates of the vertices of cell number `cell`.
     getcoordinates!(x, grid, _cell)
 end
 @inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
-@inline getcoordinates(grid::AbstractGrid, face::FaceIndex) = getcoordinates(grid, face.idx[1])
+
+@inline function getcoordinates(grid::AbstractGrid, (cellid, lfaceid)::FaceIndex)
+    dim = getdim(grid)
+    T = get_coordinate_eltype(grid)
+    _cell = getcells(grid, cellid)
+    #N = nfacenodes(cell) ??? 
+    ip = default_interpolation(typeof(_cell))
+    N = length( facedof_indices(ip)[lfaceid] )
+    x = Vector{Vec{dim, T}}(undef, N)
+    _getfacecoordinates!(x, grid, _cell, lfaceid)
+end
 
 function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
     cell = getcells(grid, i)
     _cellnodes!(global_nodes, cell)
 end
+function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, (cellid, lfaceid)::FaceIndex)
+    cell = getcells(grid, cellid)
+    _cellfacenodes!(global_nodes, cell, lfaceid)
+end
 function _cellnodes!(global_nodes::Vector{Int}, cell::AbstractCell)
     @assert length(global_nodes) == nnodes(cell)
     @inbounds for i in 1:length(global_nodes)
         global_nodes[i] = cell.nodes[i]
+    end
+    return global_nodes
+end
+function _cellfacenodes!(global_nodes::Vector{Int}, cell::AbstractCell, lfaceid::Int)
+    ip = default_interpolation(typeof(cell))
+    faceindices = Ferrite.facedof_indices(ip)[lfaceid]
+    @assert length(global_nodes) == length(faceindices)
+    @inbounds for (j,i) in enumerate(faceindices)
+        global_nodes[j] = cell.nodes[i]
     end
     return global_nodes
 end
