@@ -1,39 +1,40 @@
 @testset "interpolations" begin
 
-    @testset "$interpolation" for interpolation in (
-                        Lagrange{RefLine, 1}(),
-                        Lagrange{RefLine, 2}(),
-                        Lagrange{RefQuadrilateral, 1}(),
-                        Lagrange{RefQuadrilateral, 2}(),
-                        Lagrange{RefTriangle, 1}(),
-                        Lagrange{RefTriangle, 2}(),
-                        Lagrange{RefTriangle, 3}(),
-                        Lagrange{RefTriangle, 4}(),
-                        Lagrange{RefTriangle, 5}(),
-                        Lagrange{RefHexahedron, 1}(),
-                        Lagrange{RefHexahedron, 2}(),
-                        Serendipity{RefQuadrilateral, 2}(),
-                        Serendipity{RefHexahedron, 2}(),
-                        Lagrange{RefTetrahedron, 1}(),
-                        Lagrange{RefTetrahedron, 2}(),
-                        Lagrange{RefPrism, 1}(),
-                        Lagrange{RefPrism, 2}(),
-                        #
-                        DiscontinuousLagrange{RefLine, 0}(),
-                        DiscontinuousLagrange{RefQuadrilateral, 0}(),
-                        DiscontinuousLagrange{RefHexahedron, 0}(),
-                        DiscontinuousLagrange{RefTriangle, 0}(),
-                        DiscontinuousLagrange{RefTetrahedron, 0}(),
-                        DiscontinuousLagrange{RefLine, 1}(),
-                        DiscontinuousLagrange{RefQuadrilateral, 1}(),
-                        DiscontinuousLagrange{RefHexahedron, 1}(),
-                        DiscontinuousLagrange{RefTriangle, 1}(),
-                        DiscontinuousLagrange{RefTetrahedron, 1}(),
-                        #
-                        BubbleEnrichedLagrange{RefTriangle, 1}(),
-                        #
-                        CrouzeixRaviart{RefTriangle, 1}(),
-        )
+@testset "$interpolation" for interpolation in (
+                      Lagrange{RefLine, 1}(),
+                      Lagrange{RefLine, 2}(),
+                      Lagrange{RefQuadrilateral, 1}(),
+                      Lagrange{RefQuadrilateral, 2}(),
+                      Lagrange{RefQuadrilateral, 3}(),
+                      Lagrange{RefTriangle, 1}(),
+                      Lagrange{RefTriangle, 2}(),
+                      Lagrange{RefTriangle, 3}(),
+                      Lagrange{RefTriangle, 4}(),
+                      Lagrange{RefTriangle, 5}(),
+                      Lagrange{RefHexahedron, 1}(),
+                      Lagrange{RefHexahedron, 2}(),
+                      Serendipity{RefQuadrilateral, 2}(),
+                      Serendipity{RefHexahedron, 2}(),
+                      Lagrange{RefTetrahedron, 1}(),
+                      Lagrange{RefTetrahedron, 2}(),
+                      Lagrange{RefPrism, 1}(),
+                      Lagrange{RefPrism, 2}(),
+                      #
+                      DiscontinuousLagrange{RefLine, 0}(),
+                      DiscontinuousLagrange{RefQuadrilateral, 0}(),
+                      DiscontinuousLagrange{RefHexahedron, 0}(),
+                      DiscontinuousLagrange{RefTriangle, 0}(),
+                      DiscontinuousLagrange{RefTetrahedron, 0}(),
+                      DiscontinuousLagrange{RefLine, 1}(),
+                      DiscontinuousLagrange{RefQuadrilateral, 1}(),
+                      DiscontinuousLagrange{RefHexahedron, 1}(),
+                      DiscontinuousLagrange{RefTriangle, 1}(),
+                      DiscontinuousLagrange{RefTetrahedron, 1}(),
+                      #
+                      BubbleEnrichedLagrange{RefTriangle, 1}(),
+                      #
+                      CrouzeixRaviart{RefTriangle, 1}(),
+    )
 
         # Test of utility functions
         ref_dim = Ferrite.getdim(interpolation)
@@ -102,7 +103,8 @@
             if k == dof
                 @test N_dof ≈ 1.0
             else
-                @test N_dof ≈ 0.0 atol=4eps(Float64) #broken=typeof(interpolation)==Lagrange{2, RefTetrahedron, 5}&&dof==4&&k==18
+                factor = interpolation isa Lagrange{RefQuadrilateral, 3} ? 200 : 4
+                @test N_dof ≈ 0.0 atol = factor * eps(Float64)
             end
         end
     end
