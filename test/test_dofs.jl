@@ -508,6 +508,7 @@ end
 @testset "dof cross-coupling" begin
     couplings = [
         # Field couplings
+        # reshape.(Iterators.product(fill([true, false], 9)...) |> collect |> vec .|> collect, Ref((3,3))),
         [
             true  true  true
             true  true  true 
@@ -552,9 +553,8 @@ end
         return false
     end
 
-    function check_coupling(dh, topology, K, coupling)
+    function check_coupling(dh, topology, K, coupling, elements_coupling)
         K_check = falses(dh.ndofs[],dh.ndofs[])
-        sz = size(coupling, 1)
         field_dims = map(fieldname -> Ferrite.getfielddim(dh, fieldname), dh.field_names)
         for cell_idx in eachindex(getcells(dh.grid))
             current_face_neighborhood = Ferrite.getdim(dh.grid.cells[cell_idx]) >1 ? topology.face_neighbor[cell_idx,:] : topology.vertex_neighbor[cell_idx,:]
@@ -562,6 +562,8 @@ end
             for neighbor_cell in ∪(current_face_neighborhood,(current,))
                 isempty(neighbor_cell) && continue
                 neighbor_idx = neighbor_cell[1].idx[1]
+                used_coupling = cell_idx == neighbor_idx ? coupling : elements_coupling
+                sz = size(used_coupling, 1)
                 for (fhi, fh) in pairs(dh.fieldhandlers)
                     for (cell_field_idx, cell_field) in pairs(fh.fields) 
                         is_discontinuous = Ferrite.IsDiscontinuous(cell_field.interpolation)
@@ -574,7 +576,7 @@ end
                                 J = dh.cell_dofs[j+dh.cell_dofs_offset[neighbor_idx]-1]
                                 cell_coupling_idx = sz == length(dh.field_names) ? cell_field_idx : (1 + (i_idx - 1) % field_dims[cell_field_idx] + sum(field_dims[1:cell_field_idx-1]))
                                 neighbor_coupling_idx = sz == length(dh.field_names) ? neighbor_field_idx : (1 + (j_idx - 1) % field_dims[neighbor_field_idx] + sum(field_dims[1:neighbor_field_idx-1]))
-                                K_check[I,J] |= (coupling[cell_coupling_idx, neighbor_coupling_idx] && (is_discontinuous || (cell_idx == neighbor_idx))) || I == J
+                                K_check[I,J] |= (used_coupling[cell_coupling_idx, neighbor_coupling_idx] && (is_discontinuous || (cell_idx == neighbor_idx))) || I == J
                             end
                         end
                     end
@@ -593,10 +595,10 @@ end
     add!(dh, :p, DiscontinuousLagrange{RefQuadrilateral,1}())
     add!(dh, :w, Lagrange{RefQuadrilateral,1}())
     close!(dh)
-    for coupling in couplings
-        K = create_sparsity_pattern(dh; coupling=coupling, topology = topology)
-        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology)
-        check_coupling(dh, topology, K, coupling)
+    for coupling in couplings, elements_coupling in couplings
+        K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, elements_coupling = elements_coupling)
+        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, elements_coupling = elements_coupling) 
+        check_coupling(dh, topology, K, coupling, elements_coupling)
     end
 
     # Error paths
@@ -619,9 +621,9 @@ end
     )
     add!(dh, fh2)
     close!(dh)
-    for coupling in couplings
-        K = create_sparsity_pattern(dh; coupling=coupling, topology = topology)
-        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology)
-        check_coupling(dh, topology, K, coupling)
+    for coupling in couplings, elements_coupling in couplings
+        K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, elements_coupling = elements_coupling)
+        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, elements_coupling = elements_coupling)
+        check_coupling(dh, topology, K, coupling, elements_coupling)
     end
 end
