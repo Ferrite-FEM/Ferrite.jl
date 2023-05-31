@@ -31,8 +31,8 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 """
 CellValues
 
-function default_geometric_interpolation(::Interpolation{shape}) where {shape}
-    return Lagrange{shape,1}()
+function default_geometric_interpolation(::Interpolation{shape}) where {dim, shape <: AbstractRefShape{dim}}
+    return VectorizedInterpolation{dim}(Lagrange{shape, 1}())
 end
 
 struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCellValues
@@ -81,18 +81,29 @@ function CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(qr::QR, ip::I
     CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(N, dNdx, dNdξ, detJdV, M, dMdξ, qr, ip, gip)
 end
 
-# Common entry point that just defaults the numeric type to Float64
+# Common entry point that fills in the numeric type and geometric interpolation
 function CellValues(qr::QuadratureRule, ip::Interpolation,
         gip::Interpolation = default_geometric_interpolation(ip))
     return CellValues(Float64, qr, ip, gip)
 end
 
+# Common entry point that fills in the geometric interpolation
+function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation) where {T}
+    return CellValues(T, qr, ip, default_geometric_interpolation(ip))
+end
+
+# Common entry point that vectorizes an input scalar geometric interpolation
+function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, sgip::ScalarInterpolation) where {T}
+    return CellValues(T, qr, ip, VectorizedInterpolation(sgip))
+end
+
 # Entrypoint for `ScalarInterpolation`s (rdim == sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
+function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     dim, shape <: AbstractRefShape{dim}, T,
-    QR  <: QuadratureRule{shape},
-    IP  <: ScalarInterpolation{shape},
-    GIP <: ScalarInterpolation{shape},
+    QR   <: QuadratureRule{shape},
+    IP   <: ScalarInterpolation{shape},
+    GIP  <: ScalarInterpolation{shape},
+    VGIP <: VectorizedInterpolation{dim, shape, <:Any, GIP},
 }
     # Function interpolation
     N_t    = T
@@ -100,15 +111,16 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{dim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
+    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
 end
 
 # Entrypoint for `VectorInterpolation`s (vdim == rdim == sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
+function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{shape},
     IP  <: VectorInterpolation{dim, shape},
     GIP <: ScalarInterpolation{shape},
+    VGIP <: VectorizedInterpolation{dim, shape, <:Any, GIP},
 }
     # Field interpolation
     N_t    = Vec{dim, T}
@@ -116,15 +128,16 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{dim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
+    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
 end
 
 # Entrypoint for `VectorInterpolation`s (vdim != rdim == sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
+function CellValues(::Type{T}, qr::QR, ip::IP, vgip::VGIP) where {
     vdim, dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{shape},
     IP  <: VectorInterpolation{vdim, shape},
-    GIP <: ScalarInterpolation{shape}
+    GIP <: ScalarInterpolation{shape},
+    VGIP <: VectorizedInterpolation{dim, shape, <:Any, GIP},
 }
     # Field interpolation
     N_t    = SVector{vdim, T}
@@ -132,7 +145,7 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{dim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
+    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, vgip.ip)
 end
 
 # reinit! for regular (non-embedded) elements (rdim == sdim)
