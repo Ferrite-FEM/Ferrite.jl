@@ -1320,6 +1320,11 @@ end
     return x
 end
 
+"""
+    getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, id::FaceIndex)
+
+Fills the vector `x` with the coordinates of a face defined by `id`
+"""
 @inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, (cellid, lfaceid)::FaceIndex) where {dim,T} 
     cell = getcells(grid, cellid)
     _getfacecoordinates!(x, grid, cell, lfaceid) #function barier for `cell`
@@ -1341,7 +1346,8 @@ end
 cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,T} = getcoordinates!(global_coords, grid, i) 
 
 """
-    getcoordinates(grid::AbstractGrid, cell)
+    getcoordinates(grid::AbstractGrid, cell::Int)
+
 Return a vector with the coordinates of the vertices of cell number `cell`.
 """
 @inline function getcoordinates(grid::AbstractGrid, cell::Int)
@@ -1354,16 +1360,22 @@ Return a vector with the coordinates of the vertices of cell number `cell`.
 end
 @inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
 
-@inline function getcoordinates(grid::AbstractGrid, (cellid, lfaceid)::FaceIndex)
+"""
+    getcoordinates(grid::AbstractGrid, id::FaceIndex)
+
+Fills the vector `x` with the coordinates of a face or edge defined by `id`
+"""
+@inline function getcoordinates(grid::AbstractGrid, faceindex::FaceIndex)
+    (cellid, lfaceid) = faceindex
     dim = getdim(grid)
     T = get_coordinate_eltype(grid)
     _cell = getcells(grid, cellid)
-    #N = nfacenodes(cell) ??? 
-    ip = default_interpolation(typeof(_cell))
-    N = length( facedof_indices(ip)[lfaceid] )
+    N = _nnodes(_cell, faceindex)
     x = Vector{Vec{dim, T}}(undef, N)
     _getfacecoordinates!(x, grid, _cell, lfaceid)
 end
+#TODO: make this a more "offical" method?
+_nnodes(::CT, id::FaceIndex) where CT<:AbstractCell = length(facedof_indices(default_interpolation(CT))[id[2]])
 
 function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
     cell = getcells(grid, i)

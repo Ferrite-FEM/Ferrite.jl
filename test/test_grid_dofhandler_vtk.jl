@@ -179,6 +179,12 @@ end
     # Can we test this in a better way? The set makes the order random.
     @test length(compute_vertex_values(grid, "node_set", f)) == 9
 
+    # Extract coordinates on face
+    x = getcoordinates(grid, FaceIndex(1,1))
+    @test (x .≈ [Vec((0.0, 0.0)), Vec((1.0, 0.0)), Vec((0.5, 0.0))]) |> all
+    getcoordinates!(x, grid, FaceIndex(1,4))
+    @test (x .≈ [Vec((1.0, 0.0)), Vec((0.0, 0.0)), Vec((0.0, 0.5))]) |> all
+
     # CellIterator on a grid without DofHandler
     grid = generate_grid(Triangle, (4,4))
     n = 0
@@ -190,6 +196,7 @@ end
         n += cellid(c)
     end
     @test n == div(getncells(grid)*(getncells(grid) + 1), 2)
+
 end
 
 @testset "Grid sets" begin
