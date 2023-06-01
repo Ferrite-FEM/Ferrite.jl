@@ -80,4 +80,12 @@
     @test Ferrite.celldofs(dhs[1],3) == Ferrite.celldofs(dhs[2],3)
     @test Ferrite.ndofs(dhs[1]) == Ferrite.ndofs(dhs[2])
     @test isapprox(u1,u2,atol=1e-8)
+
+    colors1 = Ferrite.create_coloring(subtype_grid, alg = ColoringAlgorithm.WorkStream)
+    colors2 = Ferrite.create_coloring(reference_grid, alg = ColoringAlgorithm.WorkStream)
+    @test all(colors1 .== colors2)
+
+    colors1 = Ferrite.create_coloring(subtype_grid, alg = ColoringAlgorithm.Greedy)
+    colors2 = Ferrite.create_coloring(reference_grid, alg = ColoringAlgorithm.Greedy)
+    @test all(colors1 .== colors2)
 end
