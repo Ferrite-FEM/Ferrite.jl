@@ -252,6 +252,8 @@ match the vertex enumeration of the corresponding geometrical cell.
 """
 vertexdof_indices(ip::Interpolation) = ntuple(_ -> (), nvertices(ip))
 
+dirichlet_vertexdof_indices(ip::Interpolation) = vertexdof_indices(ip)
+
 """
     edgedof_indices(ip::Interpolation)
 
@@ -263,6 +265,8 @@ The dofs are guaranteed to be aligned with the local ordering of the entities on
 Here the first entries are the vertex dofs, followed by the edge interior dofs.
 """
 edgedof_indices(::Interpolation)
+
+dirichlet_edgedof_indices(ip::Interpolation) = edgedof_indices(ip)
 
 """
     edgedof_interior_indices(ip::Interpolation)
@@ -286,6 +290,8 @@ enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration m
 the face enumeration of the corresponding geometrical cell.
 """
 facedof_indices(::Interpolation)
+
+dirichlet_facedof_indices(ip::Interpolation) = facedof_indices(ip)
 
 """
     facedof_interior_indices(ip::Interpolation)
@@ -328,6 +334,10 @@ boundarydof_indices(::Type{<:BoundaryIndex})
 boundarydof_indices(::Type{FaceIndex}) = Ferrite.facedof_indices
 boundarydof_indices(::Type{EdgeIndex}) = Ferrite.edgedof_indices
 boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
+
+dirichlet_boundarydof_indices(::Type{FaceIndex}) = Ferrite.dirichlet_facedof_indices
+dirichlet_boundarydof_indices(::Type{EdgeIndex}) = Ferrite.dirichlet_edgedof_indices
+dirichlet_boundarydof_indices(::Type{VertexIndex}) = Ferrite.dirichlet_vertexdof_indices
 
 """
     IsDiscontinuous(::Interpolation)
@@ -380,7 +390,9 @@ getnbasefunctions(::DiscontinuousLagrange{shape,0}) where {shape} = 1
 # This just moves all dofs into the interior of the element.
 celldof_interior_indices(ip::DiscontinuousLagrange) = ntuple(i->i, getnbasefunctions(ip))
 
-facedof_indices(ip::DiscontinuousLagrange{shape, order}) where {shape, order} = order == 0 ? ntuple(i->(), nfaces(ip)) : facedof_indices(get_continuous_interpolation(ip))
+dirichlet_facedof_indices(ip::DiscontinuousLagrange{shape, order}) where {shape, order} = order == 0 ? ntuple(i->(), nfaces(ip)) : dirichlet_facedof_indices(get_continuous_interpolation(ip))
+dirichlet_edge_indices(ip::DiscontinuousLagrange{shape, order}) where {shape, order} = order == 0 ? ntuple(i->(), nedges(ip)) : dirichlet_edgedof_indices(get_continuous_interpolation(ip))
+dirichlet_vertex_indices(ip::DiscontinuousLagrange{shape, order}) where {shape, order} = order == 0 ? ntuple(i->(), nvertices(ip)) : dirichlet_vertex_indices(get_continuous_interpolation(ip))
 
 # Mirror the Lagrange element for now.
 function reference_coordinates(ip::DiscontinuousLagrange{shape, order}) where {shape, order}
