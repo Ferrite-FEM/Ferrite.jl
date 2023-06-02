@@ -390,9 +390,10 @@ getnbasefunctions(::DiscontinuousLagrange{shape,0}) where {shape} = 1
 # This just moves all dofs into the interior of the element.
 celldof_interior_indices(ip::DiscontinuousLagrange) = ntuple(i->i, getnbasefunctions(ip))
 
-dirichlet_facedof_indices(ip::DiscontinuousLagrange{shape, order}) where {shape, order} = order == 0 ? ntuple(i->(), nfaces(ip)) : dirichlet_facedof_indices(get_continuous_interpolation(ip))
-dirichlet_edge_indices(ip::DiscontinuousLagrange{shape, order}) where {shape, order} = order == 0 ? ntuple(i->(), nedges(ip)) : dirichlet_edgedof_indices(get_continuous_interpolation(ip))
-dirichlet_vertex_indices(ip::DiscontinuousLagrange{shape, order}) where {shape, order} = order == 0 ? ntuple(i->(), nvertices(ip)) : dirichlet_vertex_indices(get_continuous_interpolation(ip))
+# Mirror the Lagrange element for now to avoid repeating.
+dirichlet_facedof_indices(ip::DiscontinuousLagrange) = dirichlet_facedof_indices(get_continuous_interpolation(ip))
+dirichlet_edge_indices(ip::DiscontinuousLagrange) = dirichlet_edgedof_indices(get_continuous_interpolation(ip))
+dirichlet_vertex_indices(ip::DiscontinuousLagrange) = dirichlet_vertex_indices(get_continuous_interpolation(ip))
 
 # Mirror the Lagrange element for now.
 function reference_coordinates(ip::DiscontinuousLagrange{shape, order}) where {shape, order}

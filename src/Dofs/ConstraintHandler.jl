@@ -833,6 +833,13 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         if interpolation isa VectorizedInterpolation
             interpolation = interpolation.ip
         end
+
+        if getorder(interpolation) == 0 
+            @warn("No dof prescribed for order 0 interpolations")
+            dbc_added = true
+            continue
+        end
+    
         # Set up components to prescribe (empty input means prescribe all components)
         components = isempty(dbc.components) ? collect(Int, 1:n_comp) : dbc.components
         if !all(c -> 0 < c <= n_comp, components)
