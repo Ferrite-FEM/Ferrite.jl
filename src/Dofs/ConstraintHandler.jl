@@ -833,13 +833,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         if interpolation isa VectorizedInterpolation
             interpolation = interpolation.ip
         end
-
-        if getorder(interpolation) == 0 
-            @warn("No dof prescribed for order 0 interpolations")
-            dbc_added = true
-            continue
-        end
-    
+        getorder(interpolation) == 0 && error("No dof prescribed for order 0 interpolations")
         # Set up components to prescribe (empty input means prescribe all components)
         components = isempty(dbc.components) ? collect(Int, 1:n_comp) : dbc.components
         if !all(c -> 0 < c <= n_comp, components)
@@ -852,7 +846,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
             EntityType = FaceIndex
         end
         CT = getcelltype(ch.dh.grid, first(fh.cellset)) # Same celltype enforced in FieldHandler constructor
-        bcvalues = BCValues(interpolation , default_interpolation(CT), EntityType)
+        bcvalues = BCValues(interpolation, default_interpolation(CT), EntityType)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
         _add!(

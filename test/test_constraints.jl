@@ -19,7 +19,7 @@
     @test_throws ErrorException("components are empty: $(Int)[]") Dirichlet(:u, Γ, (x, t) -> 0, Int[])
     @test_throws ErrorException("components not sorted: [2, 1]") Dirichlet(:u, Γ, (x, t) -> 0, Int[2, 1])
     @test_throws ErrorException("components not unique: [2, 2]") Dirichlet(:u, Γ, (x, t) -> 0, Int[2, 2])
-    @test_logs (:warn,"No dof prescribed for order 0 interpolations") add!(ch0, Dirichlet(:w, Γ, (x, t) -> 0))
+    @test_throws ErrorException("No dof prescribed for order 0 interpolations") add!(ch0, Dirichlet(:w, Γ, (x, t) -> 0))
     ## Scalar
     dbc = Dirichlet(:s, Γ, (x, t) -> 0)
     add!(ch, dbc)

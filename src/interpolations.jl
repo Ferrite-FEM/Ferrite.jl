@@ -86,7 +86,6 @@ struct InterpolationInfo
     reference_dim::Int
     adjust_during_distribution::Bool
     n_copies::Int
-    is_discontinuous::Bool
     function InterpolationInfo(interpolation::InterpolationByDim{3})
         n_copies = 1
         if interpolation isa VectorizedInterpolation
@@ -101,7 +100,6 @@ struct InterpolationInfo
             3,
             adjust_dofs_during_distribution(interpolation),
             n_copies,
-            IsDiscontinuous(interpolation)
         )
     end
     function InterpolationInfo(interpolation::InterpolationByDim{2})
@@ -118,7 +116,6 @@ struct InterpolationInfo
             2,
             adjust_dofs_during_distribution(interpolation),
             n_copies,
-            IsDiscontinuous(interpolation)
         )
     end
     function InterpolationInfo(interpolation::InterpolationByDim{1})
@@ -134,8 +131,7 @@ struct InterpolationInfo
             length(celldof_interior_indices(interpolation)),
             1,
             adjust_dofs_during_distribution(interpolation),
-            n_copies,
-            IsDiscontinuous(interpolation)
+            n_copies
         )
     end
 end
@@ -340,30 +336,6 @@ dirichlet_boundarydof_indices(::Type{FaceIndex}) = Ferrite.dirichlet_facedof_ind
 dirichlet_boundarydof_indices(::Type{EdgeIndex}) = Ferrite.dirichlet_edgedof_indices
 dirichlet_boundarydof_indices(::Type{VertexIndex}) = Ferrite.dirichlet_vertexdof_indices
 
-"""
-    IsDiscontinuous(::Interpolation)
-    IsDiscontinuous(::Type{<:Interpolation})
-Checks whether the interpolation is discontinuous (i.e. `DiscontinuousLagrange`)
-"""
-IsDiscontinuous(::Interpolation) = false
-IsDiscontinuous(::Type{<:Interpolation}) = false
-
-"""
-    get_continuous_interpolation(::Interpolation)
-    get_continuous_interpolation(::Type{<:Interpolation})
-Returns the continuous version (i.e. `Lagrange`) of a discontinuous interpolation is  (i.e. `DiscontinuousLagrange`).
-Used internally for associating `cell_dofs` with faces.
-The return type follows that of the argument.
-```julia-repl
-julia> Ferrite.get_continuous_interpolation(DiscontinuousLagrange{RefQuadrilateral,1}())
-Lagrange{RefQuadrilateral, 1}()
-julia> Ferrite.get_continuous_interpolation(DiscontinuousLagrange{RefQuadrilateral,1})
-Lagrange{RefQuadrilateral, 1}
-```
-"""
-get_continuous_interpolation(ip::Interpolation) = throw(ArgumentError("Interpolation $ip is already continuous."))
-get_continuous_interpolation(ip::Type{<:Interpolation}) = throw(ArgumentError("Interpolation $ip is already continuous."))
-
 #########################
 # DiscontinuousLagrange #
 #########################
@@ -377,12 +349,6 @@ struct DiscontinuousLagrange{shape, order, unused} <: ScalarInterpolation{shape,
     end
 end
 
-IsDiscontinuous(::Type{<:DiscontinuousLagrange}) = true
-IsDiscontinuous(::DiscontinuousLagrange) = true
-
-get_continuous_interpolation(::DiscontinuousLagrange{ref_shape,order}) where {ref_shape, order} = Lagrange{ref_shape,order}()
-get_continuous_interpolation(::Type{<:DiscontinuousLagrange{ref_shape,order}}) where {ref_shape, order} = Lagrange{ref_shape,order, Nothing}
-
 getlowerorder(::DiscontinuousLagrange{shape,order}) where {shape,order} = DiscontinuousLagrange{shape,order-1}()
 
 getnbasefunctions(::DiscontinuousLagrange{shape,order}) where {shape,order} = getnbasefunctions(Lagrange{shape,order}())
@@ -392,9 +358,9 @@ getnbasefunctions(::DiscontinuousLagrange{shape,0}) where {shape} = 1
 celldof_interior_indices(ip::DiscontinuousLagrange) = ntuple(i->i, getnbasefunctions(ip))
 
 # Mirror the Lagrange element for now to avoid repeating.
-dirichlet_facedof_indices(ip::DiscontinuousLagrange) = dirichlet_facedof_indices(get_continuous_interpolation(ip))
-dirichlet_edge_indices(ip::DiscontinuousLagrange) = dirichlet_edgedof_indices(get_continuous_interpolation(ip))
-dirichlet_vertex_indices(ip::DiscontinuousLagrange) = dirichlet_vertex_indices(get_continuous_interpolation(ip))
+dirichlet_facedof_indices(ip::DiscontinuousLagrange{shape, order}) where {shape, order} = dirichlet_facedof_indices(Lagrange{shape, order}())
+dirichlet_edgedof_indices(ip::DiscontinuousLagrange{shape, order}) where {shape, order} = dirichlet_edgedof_indices(Lagrange{shape, order}())
+dirichlet_vertexdof_indices(ip::DiscontinuousLagrange{shape, order}) where {shape, order} = dirichlet_vertexdof_indices(Lagrange{shape, order}())
 
 # Mirror the Lagrange element for now.
 function reference_coordinates(ip::DiscontinuousLagrange{shape, order}) where {shape, order}
@@ -1345,9 +1311,3 @@ function shape_gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, ξ:
 end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
-
-IsDiscontinuous(ipv::VectorizedInterpolation) = IsDiscontinuous(ipv.ip)
-IsDiscontinuous(::Type{<:VectorizedInterpolation{vdim, refshape, order, ip}}) where {vdim, refshape, order, ip<:DiscontinuousLagrange}= IsDiscontinuous(ip)
-
-get_continuous_interpolation(ipv::VectorizedInterpolation{vdim}) where {vdim} = VectorizedInterpolation{vdim}(get_continuous_interpolation(ipv.ip))
-get_continuous_interpolation(::Type{<:VectorizedInterpolation{vdim, refshape, order, ip}}) where {vdim, refshape, order, ip<:DiscontinuousLagrange} = VectorizedInterpolation{vdim, refshape, order, get_continuous_interpolation(ip)}

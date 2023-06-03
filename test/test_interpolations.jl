@@ -163,21 +163,4 @@ end
 @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTetrahedron,0}()) ≈ [Vec{3,Float64}((1/4,1/4,1/4))]
 @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefHexahedron,0}()) ≈ [Vec{3,Float64}((0,0,0))]
 
-# Test discontinuous interpolations related functions
-d_ip = DiscontinuousLagrange{RefQuadrilateral,1}()
-d_ip_t = DiscontinuousLagrange{RefQuadrilateral,1}
-
-ip = Lagrange{RefQuadrilateral,1}()
-ip_t = Lagrange{RefQuadrilateral,1}
-
-@test Ferrite.IsDiscontinuous(ip) == false
-@test Ferrite.IsDiscontinuous(ip_t) == false
-@test Ferrite.IsDiscontinuous(d_ip) == true
-@test Ferrite.IsDiscontinuous(d_ip_t) == true
-
-@test Ferrite.get_continuous_interpolation(d_ip_t) == typeof(Ferrite.get_continuous_interpolation(d_ip))
-
-# Error paths
-@test_throws ArgumentError("Interpolation $ip is already continuous.") Ferrite.get_continuous_interpolation(ip)
-@test_throws ArgumentError("Interpolation $ip_t is already continuous.") Ferrite.get_continuous_interpolation(ip_t)
 end
