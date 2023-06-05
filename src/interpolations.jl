@@ -1259,6 +1259,10 @@ function Base.literal_pow(::typeof(^), ip::ScalarInterpolation, ::Val{vdim}) whe
     return VectorizedInterpolation{vdim}(ip)
 end
 
+function Base.show(io::IO, ::MIME"text/plain", ip::VectorizedInterpolation{vdim}) where vdim
+    print(io, ip.ip, "^", vdim)
+end
+
 # Helper to get number of copies for DoF distribution
 get_n_copies(::VectorizedInterpolation{vdim}) where vdim = vdim
 
