@@ -327,7 +327,7 @@ function _close_fieldhandler!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::
             next_dof_index = 1
             for vdofs ∈ vertexdof_indices(interpolation)
                 for dof_index ∈ vdofs
-                    @assert dof_index == next_dof_index "Verted dof ordering not supported. Please consult the dev docs."
+                    @assert dof_index == next_dof_index "Vertex dof ordering not supported. Please consult the dev docs."
                     next_dof_index += 1
                 end
             end
