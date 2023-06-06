@@ -1082,7 +1082,9 @@ struct Serendipity{shape, order, unused} <: ScalarInterpolation{shape,order}
     end
 end
 
-adjust_dofs_during_distribution(::Serendipity{refshape, order}) where {refshape, order} = true
+# Note that the edgedofs for high order serendipity elements are defined in terms of integral moments, 
+# so no permutation exists in general. See e.g. Scroggs et al. [2022] for an example.
+# adjust_dofs_during_distribution(::Serendipity{refshape, order}) where {refshape, order} = false
 adjust_dofs_during_distribution(::Serendipity{refshape, 2}) where {refshape} = false
 adjust_dofs_during_distribution(::Serendipity{refshape, 1}) where {refshape} = false
 
