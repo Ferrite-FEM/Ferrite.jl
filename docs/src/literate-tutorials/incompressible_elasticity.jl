@@ -258,7 +258,7 @@ function solve(ν, interpolation_u, interpolation_p)
     cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
 
     ## Assembly and solve
-    K = create_sparsity_pattern(dh)
+    K = create_matrix(dh)
     K, f = doassemble(cellvalues_u, cellvalues_p, facevalues_u, K, grid, dh, mp)
     apply!(K, f, dbc)
     u = K \ f

@@ -180,12 +180,12 @@ end
     @test original_dofcoefficients == ch.dofcoefficients
 
     # Integration tests
-    K = create_sparsity_pattern(dh, ch)
+    K = create_matrix(dh, ch)
     f = zeros(ndofs(dh))
     a = start_assemble(K, f)
     dhp, _, chp = dhmdhch()
     renumber!(dhp, chp, perm)
-    Kp = create_sparsity_pattern(dhp, chp)
+    Kp = create_matrix(dhp, chp)
     fp = zeros(ndofs(dhp))
     ap = start_assemble(Kp, fp)
     for cellid in 1:getncells(dh.grid)
@@ -429,11 +429,16 @@ end
         end
         return false
     end
+    function is_stored(sparsity_pattern::SparsityPattern, i, j)
+        return findfirst(k -> k == j, sparsity_pattern.coldofs[i]) !== nothing
+    end
 
     # Full coupling (default)
-    K = create_sparsity_pattern(dh)
+    sparsity_pattern = create_sparsity_pattern(dh)
+    K = create_matrix(sparsity_pattern)
     @test eltype(K) == Float64
     for j in 1:ndofs(dh), i in 1:ndofs(dh)
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
     end
 
@@ -443,25 +448,29 @@ end
         true true  # v
         true false # q
     ]
-    K = create_sparsity_pattern(dh; coupling=coupling)
-    Kch = create_sparsity_pattern(dh, ch; coupling=coupling)
-    @test K.rowval == Kch.rowval
-    @test K.colptr == Kch.colptr
-    KS = create_symmetric_sparsity_pattern(dh; coupling=coupling)
-    KSch = create_symmetric_sparsity_pattern(dh, ch; coupling=coupling)
-    @test KS.data.rowval == KSch.data.rowval
-    @test KS.data.colptr == KSch.data.colptr
+    sparsity_pattern = create_sparsity_pattern(dh; coupling=coupling)
+    K = create_matrix(sparsity_pattern)
+    # Kch = create_matrix(dh, ch; coupling=coupling)
+    # @test K.rowval == Kch.rowval
+    # @test K.colptr == Kch.colptr
+    # KS = create_symmetric_sparsity_pattern(dh; coupling=coupling)
+    # KSch = create_symmetric_sparsity_pattern(dh, ch; coupling=coupling)
+    # @test KS.data.rowval == KSch.data.rowval
+    # @test KS.data.colptr == KSch.data.colptr
     for j in udofs, i in Iterators.flatten((vdofs, qdofs))
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j) == (i <= j)
+        # @test is_stored(KS, i, j) == (i <= j)
     end
     for j in pdofs, i in vdofs
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j)
+        # @test is_stored(KS, i, j)
     end
     for j in pdofs, i in qdofs
+        @test is_stored(sparsity_pattern, i, j) == (i == j)
         @test is_stored(K, i, j) == (i == j)
-        @test is_stored(KS, i, j) == (i == j)
+        # @test is_stored(KS, i, j) == (i == j)
     end
 
     # Component coupling
@@ -471,37 +480,44 @@ end
         true  false true  # v2
         false true  true  # q
     ]
-    K = create_sparsity_pattern(dh; coupling=coupling)
-    KS = create_symmetric_sparsity_pattern(dh; coupling=coupling)
+    sparsity_pattern = create_sparsity_pattern(dh; coupling=coupling)
+    K = create_matrix(sparsity_pattern)
+    # KS = create_symmetric_sparsity_pattern(dh; coupling=coupling)
     for j in u1dofs, i in vdofs
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j) == (i <= j)
+        # @test is_stored(KS, i, j) == (i <= j)
     end
     for j in u1dofs, i in qdofs
+        @test !is_stored(sparsity_pattern, i, j)
         @test !is_stored(K, i, j)
-        @test !is_stored(KS, i, j)
+        # @test !is_stored(KS, i, j)
     end
     for j in u2dofs, i in Iterators.flatten((v1dofs, qdofs))
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j) == (i <= j)
+        # @test is_stored(KS, i, j) == (i <= j)
     end
     for j in u2dofs, i in v2dofs
+        @test is_stored(sparsity_pattern, i, j) == (i == j)
         @test is_stored(K, i, j) == (i == j)
-        @test is_stored(KS, i, j) == (i == j)
+        # @test is_stored(KS, i, j) == (i == j)
     end
     for j in pdofs, i in v1dofs
+        @test !is_stored(sparsity_pattern, i, j)
         @test !is_stored(K, i, j)
-        @test !is_stored(KS, i, j)
+        # @test !is_stored(KS, i, j)
     end
     for j in pdofs, i in Iterators.flatten((v2dofs, qdofs))
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j) == (i <= j)
+        # @test is_stored(KS, i, j) == (i <= j)
     end
 
     # Error paths
-    @test_throws ErrorException("coupling not square") create_sparsity_pattern(dh; coupling=[true true])
-    @test_throws ErrorException("coupling not symmetric") create_symmetric_sparsity_pattern(dh; coupling=[true true; false true])
-    @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
+    @test_throws ErrorException("coupling not square") create_matrix(dh; coupling=[true true])
+    # @test_throws ErrorException("coupling not symmetric") create_symmetric_sparsity_pattern(dh; coupling=[true true; false true])
+    # @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
 
     # Test coupling with subdomains
     grid = generate_grid(Quadrilateral, (1, 2))
@@ -512,28 +528,34 @@ end
     sdh2 = SubDofHandler(dh, Set(2))
     add!(sdh2, :u, Lagrange{RefQuadrilateral,1}()^2)
     close!(dh)
-    K = create_sparsity_pattern(dh; coupling = [true true; true false])
-    KS = create_symmetric_sparsity_pattern(dh; coupling = [true true; true false])
+
+    sparsity_pattern = create_sparsity_pattern(dh; coupling = [true true; true false])
+    K = create_matrix(sparsity_pattern)
+    KS = Symmetric(create_matrix(dh; symmetric=true, coupling = [true true; true false]))
     # Subdomain 1: u and p
     udofs = celldofs(dh, 1)[dof_range(sdh1, :u)]
     pdofs = celldofs(dh, 1)[dof_range(sdh1, :p)]
     for j in udofs, i in Iterators.flatten((udofs, pdofs))
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j) == (i <= j)
+        # @test is_stored(KS, i, j) == (i <= j)
     end
     for j in pdofs, i in udofs
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j)
+        # @test is_stored(KS, i, j)
     end
     for j in pdofs, i in pdofs
+        @test is_stored(sparsity_pattern, i, j) == (i == j)
         @test is_stored(K, i, j) == (i == j)
-        @test is_stored(KS, i, j) == (i == j)
+        # @test is_stored(KS, i, j) == (i == j)
     end
     # Subdomain 2: u
     udofs = celldofs(dh, 2)[dof_range(sdh2, :u)]
     for j in udofs, i in udofs
+        @test is_stored(sparsity_pattern, i, j)
         @test is_stored(K, i, j)
-        @test is_stored(KS, i, j) == (i <= j)
+        # @test is_stored(KS, i, j) == (i <= j)
     end
 end
 

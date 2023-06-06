@@ -307,10 +307,10 @@ T = 10.0
 Δt₀ = 0.01
 Δt_save = 0.1
 
-M = create_sparsity_pattern(dh);
+M = create_matrix(dh);
 M = assemble_mass_matrix(cellvalues_v, cellvalues_p, M, dh);
 
-K = create_sparsity_pattern(dh);
+K = create_matrix(dh);
 K = assemble_stokes_matrix(cellvalues_v, cellvalues_p, ν, K, dh);
 
 # These are our initial conditions. We start from the zero solution, because it

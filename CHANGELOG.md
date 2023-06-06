@@ -499,7 +499,7 @@ poking into Ferrite internals:
    `renumber!` to renumber DoFs using the Metis.jl library. ([#393][github-393],
    [#549][github-549])
  - [BlockArrays.jl](https://github.com/JuliaArrays/BlockArrays.jl) extension for creating a
-   globally blocked system matrix. `create_sparsity_pattern(BlockMatrix, dh, ch; kwargs...)`
+   globally blocked system matrix. `create_matrix(BlockMatrix, dh, ch; kwargs...)`
    return a matrix that is blocked by field (requires DoFs to be (re)numbered by field, i.e.
    `renumber!(dh, DofOrder.FieldWise())`). For custom blocking it is possible to pass an
    uninitialized `BlockMatrix` with the correct block sizes (see `BlockArrays.jl` docs).

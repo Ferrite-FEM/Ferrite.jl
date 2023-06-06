@@ -8,7 +8,7 @@ function test_apply_rhs()
     add!(dh, :u, ip)
     close!(dh)
     
-    K = create_sparsity_pattern(dh)
+    K = create_matrix(dh)
     
     ch = ConstraintHandler(dh)
     
@@ -62,7 +62,7 @@ function test_apply_rhs()
     end
     
     K, f = doassemble!(cellvalues, K, dh)
-    A = create_sparsity_pattern(dh)
+    A = create_matrix(dh)
     A, g = doassemble!(cellvalues, A, dh)
     rhsdata = get_rhs_data(ch, A)
     

@@ -276,8 +276,8 @@ ch = (dirichlet = ch_dirichlet, periodic = ch_periodic);
 # and the constraint handler.
 
 K = (
-    dirichlet = create_sparsity_pattern(dh),
-    periodic  = create_sparsity_pattern(dh, ch.periodic),
+    dirichlet = create_matrix(dh),
+    periodic  = create_matrix(dh, ch.periodic),
 );
 
 # We define the fourth order elasticity tensor for the matrix material, and define the

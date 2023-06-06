@@ -296,7 +296,7 @@ function solve(interpolation_u, interpolation_p)
     apply!(w, dbc)
 
     ## Create the sparse matrix and residual vector
-    K = create_sparsity_pattern(dh)
+    K = create_matrix(dh)
     f = zeros(_ndofs)
 
     ## We run the simulation parameterized by a time like parameter. `Tf` denotes the final value

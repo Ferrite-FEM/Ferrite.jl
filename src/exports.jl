@@ -118,13 +118,20 @@ export
     ndofs_per_cell,
     celldofs!,
     celldofs,
-    create_sparsity_pattern,
-    create_symmetric_sparsity_pattern,
     dof_range,
     renumber!,
     DofOrder,
     evaluate_at_grid_nodes,
     apply_analytical!,
+
+# Sparsity pattern
+    AbstractSparsityPattern,
+    SparsityPattern,
+    BlockSparsityPattern,
+    create_sparsity_pattern,
+    create_sparsity_pattern!,
+    condense_sparsity_pattern!,
+    create_matrix,
 
 # Constraints
     ConstraintHandler,

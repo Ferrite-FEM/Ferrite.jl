@@ -56,7 +56,7 @@ function L2Projector(
     close!(dh)
 
     M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
-    M_cholesky = cholesky(M)
+    M_cholesky = cholesky(Symmetric(M))
 
     return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set))
 end
@@ -80,13 +80,13 @@ end
 function _assemble_L2_matrix(fe_values, set, dh)
 
     n = Ferrite.getnbasefunctions(fe_values)
-    M = create_symmetric_sparsity_pattern(dh)
+    M = Symmetric(create_matrix(create_sparsity_pattern(dh; nnz_per_col = 2 * n)))
     assembler = start_assemble(M)
 
     Me = zeros(n, n)
     cell_dofs = zeros(Int, n)
 
-    function symmetrize_to_lower!(K)
+    function symmetrize_to_lower!(K::Matrix)
        for i in 1:size(K, 1)
            for j in i+1:size(K, 1)
                K[j, i] = K[i, j]

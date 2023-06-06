@@ -73,7 +73,7 @@ close!(dh);
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `create_sparsity_pattern`. This function returns a sparse matrix
 # with the correct entries stored.
-K = create_sparsity_pattern(dh)
+K = create_matrix(dh)
 
 # ### Boundary conditions
 # In Ferrite constraints like Dirichlet boundary conditions

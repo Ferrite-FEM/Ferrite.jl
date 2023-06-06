@@ -105,7 +105,7 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
 
     apply!(dofvector, boundaryconds)
 
-    hessian = create_sparsity_pattern(dofhandler)
+    hessian = create_matrix(dofhandler)
     dpc = ndofs_per_cell(dofhandler)
     cpc = length(grid.cells[1].nodes)
     caches = [ThreadCache(dpc, cpc, copy(cvP), ModelParams(α, G), elpotential) for t=1:nthreads()]
@@ -193,7 +193,7 @@ function minimize!(model; kwargs...)
     dh = model.dofhandler
     dofs = model.dofs
     ∇f = fill(0.0, length(dofs))
-    ∇²f = create_sparsity_pattern(dh)
+    ∇²f = create_matrix(dh)
     function g!(storage, x)
         ∇F!(storage, x, model)
         apply_zero!(storage, model.boundaryconds)

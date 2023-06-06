@@ -80,8 +80,8 @@ close!(dh);
 # M_{ij} = \int_{\Omega} v_i \, u_j \ \mathrm{d}\Omega,
 # ```
 # where $u_i$ and $v_j$ are trial and test functions, respectively.
-K = create_sparsity_pattern(dh);
-M = create_sparsity_pattern(dh);
+K = create_matrix(dh);
+M = create_matrix(dh);
 # We also preallocate the right hand side
 f = zeros(ndofs(dh));
 

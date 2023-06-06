@@ -19,9 +19,9 @@ using Ferrite, BlockArrays, SparseArrays, Test
     close!(ch)
     update!(ch, 0)
 
-    K = create_sparsity_pattern(dh, ch)
+    K = create_matrix(dh, ch)
     f = zeros(axes(K, 1))
-    KB = create_sparsity_pattern(BlockMatrix, dh, ch)
+    KB = create_matrix(BlockMatrix, dh, ch)
     @test KB isa BlockMatrix
     @test blocksize(KB) == (2, 2)
     @test size(KB[Block(1), Block(1)]) == (2nd, 2nd)
@@ -71,10 +71,10 @@ using Ferrite, BlockArrays, SparseArrays, Test
     renumber!(dh, ch, perm)
     nfree = length(ch.free_dofs)
     npres = length(ch.prescribed_dofs)
-    K = create_sparsity_pattern(dh, ch)
+    K = create_matrix(dh, ch)
     block_sizes = [nfree, npres]
     KBtmp = BlockArray(undef_blocks, SparseMatrixCSC{Float64, Int}, block_sizes, block_sizes)
-    KB = create_sparsity_pattern(KBtmp, dh, ch)
+    KB = create_matrix(KBtmp, dh, ch)
     @test KBtmp === KB
     @test blocksize(KB) == (2, 2)
     @test size(KB[Block(1), Block(1)]) == (nfree, nfree)

@@ -417,7 +417,7 @@ function topopt(ra,ρ,n,filename; output=:false)
     χ = zeros(getncells(dh.grid))
         
     r = zeros(n_dofs) # residual
-    K = create_sparsity_pattern(dh) # stiffness matrix
+    K = create_matrix(dh) # stiffness matrix
     
     i_max = 300 ## maximum number of iteration steps
     tol = 1e-4
