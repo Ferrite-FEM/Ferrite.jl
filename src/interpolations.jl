@@ -382,9 +382,9 @@ struct Lagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
     end
 end
 
-adjust_dofs_during_distribution(::Lagrange{refshape, order}) where {refshape, order} = true
-adjust_dofs_during_distribution(::Lagrange{refshape, 2}) where {refshape} = false
-adjust_dofs_during_distribution(::Lagrange{refshape, 1}) where {refshape} = false
+adjust_dofs_during_distribution(::Lagrange) = true
+adjust_dofs_during_distribution(::Lagrange{<:Any, 2}) = false
+adjust_dofs_during_distribution(::Lagrange{<:Any, 1}) = false
 
 # Vertices for all Lagrange interpolations are the same
 vertexdof_indices(::Lagrange{RefLine}) = ((1,),(2,))
@@ -1085,8 +1085,8 @@ end
 # Note that the edgedofs for high order serendipity elements are defined in terms of integral moments, 
 # so no permutation exists in general. See e.g. Scroggs et al. [2022] for an example.
 # adjust_dofs_during_distribution(::Serendipity{refshape, order}) where {refshape, order} = false
-adjust_dofs_during_distribution(::Serendipity{refshape, 2}) where {refshape} = false
-adjust_dofs_during_distribution(::Serendipity{refshape, 1}) where {refshape} = false
+adjust_dofs_during_distribution(::Serendipity{<:Any, 2}) = false
+adjust_dofs_during_distribution(::Serendipity{<:Any, 1}) = false
 
 # Vertices for all Serendipity interpolations are the same
 vertexdof_indices(::Serendipity{RefQuadrilateral}) = ((1,),(2,),(3,),(4,))
@@ -1226,8 +1226,8 @@ struct CrouzeixRaviart{shape, order, unused} <: ScalarInterpolation{shape, order
     CrouzeixRaviart{RefTriangle, 1}() = new{RefTriangle, 1, Nothing}()
 end
 
-adjust_dofs_during_distribution(::CrouzeixRaviart{refshape, order}) where {refshape, order} = true
-adjust_dofs_during_distribution(::CrouzeixRaviart{refshape, 1}) where {refshape} = false
+adjust_dofs_during_distribution(::CrouzeixRaviart) = true
+adjust_dofs_during_distribution(::CrouzeixRaviart{<:Any, 1}) = false
 
 getnbasefunctions(::CrouzeixRaviart) = 3
 

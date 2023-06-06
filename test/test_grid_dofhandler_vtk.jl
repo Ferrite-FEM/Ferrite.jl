@@ -502,7 +502,7 @@ end
 
 @testset "vectorization layer compat" begin
     struct VectorLagrangeTest{shape,order,vdim} <: ScalarInterpolation{shape,order} end
-    Ferrite.adjust_dofs_during_distribution(ip::VectorLagrangeTest{shape, order, vdim}) where {shape, order, vdim} = order > 2
+    Ferrite.adjust_dofs_during_distribution(ip::VectorLagrangeTest{<:Any, order}) where {order} = order > 2
 
     @testset "1d" begin
         grid = generate_grid(Line, (2,))
