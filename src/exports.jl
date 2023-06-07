@@ -120,6 +120,7 @@ export
     evaluate_at_grid_nodes,
     apply_analytical!,
     getgrid,
+    getdim,
 
 # Constraints
     ConstraintHandler,
