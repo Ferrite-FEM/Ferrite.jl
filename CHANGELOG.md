@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- `DofHandler` now supports fields on subdomains and mixed grids. ([#667][github-667])
+- Support for embedded elements in `CellValues`. ([#651][github-651])
+- Support for vectorized interpolations with dimension different from the spatial 
+  dimension in `CellValues`. ([#651][github-651])
+- All keyword arguments supported by `WriteVTK.jl` can be given to `vtk_grid` (only `compress` earlier) ([#687][github-687])
+
+### Removed
+- **BREAKING**: `MixedDofHandler` has been renamed to `DofHandler`. Update by replacing 
+`MixedDofHandler` to `DofHandler`. ([#667][github-667])
+
+### Other improvements
+- **BREAKING**: All `CellValues` have a finer granularity on the different types of
+  dimensions used. Custom `CellValues` and dispatches on their type parameters must be 
+  updated to respect the new type. ([#651][github-651])
+
+## [0.3.14] - 2023-04-03
+### Added
  - Support reordering dofs of a `MixedDofHandler` by the built-in orderings `FieldWise` and
    `ComponentWise`. This includes support for reordering dofs of fields on subdomains.
    ([#645][github-645])
@@ -14,6 +31,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    sparsity pattern. ([#650][github-650])
  - Support Metis dof reordering with coupling information for `MixedDofHandler`.
    ([#650][github-650])
+ - Pretty printing for `MixedDofHandler` and `L2Projector`. ([#465][github-465])
+### Other improvements
+ - The `MixedDofHandler` have gone through a performance review (see [#629][github-629]) and
+   now performs the same as `DofHandler`. This was part of the push to merge the two DoF
+   handlers. Since `MixedDofHandler` is strictly more flexible, and now equally performant,
+   it will replace `DofHandler` in the next breaking release. ([#637][github-637],
+   [#639][github-639], [#642][github-642], [#643][github-643], [#656][github-656],
+   [#660][github-660])
+### Internal changes
+Changes listed here should not affect regular usage, but listed here in case you have been
+poking into Ferrite internals:
+ - `Ferrite.ndim(dh, fieldname)` has been removed, use `Ferrite.getfielddim(dh, fieldname)`
+   instead. ([#658][github-658])
+ - `Ferrite.nfields(dh)` has been removed, use `length(Ferrite.getfieldnames(dh))` instead.
+   ([#444][github-444], [#653][github-653])
+ - `getfielddims(::FieldHandler)` and `getfieldinterpolations(::FieldHandler)` have been
+   removed ([#647][github-647], [#659][github-659])
 
 ## [0.3.13] - 2023-03-23
 ### Added
@@ -293,6 +327,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-428]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/428
 [github-431]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/431
 [github-436]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/436
+[github-444]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/444
 [github-453]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/453
 [github-455]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/455
 [github-456]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/456
@@ -302,6 +337,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-461]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/461
 [github-462]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/462
 [github-464]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/464
+[github-465]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/465
 [github-466]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/466
 [github-466]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/466
 [github-467]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/467
@@ -378,11 +414,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [github-611]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/611
 [github-614]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/614
 [github-621]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/621
+[github-629]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/629
 [github-633]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/633
+[github-637]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/637
+[github-639]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/639
+[github-642]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/642
+[github-643]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/643
 [github-645]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/645
+[github-647]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/647
 [github-650]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/650
+[github-651]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/651
+[github-653]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/653
+[github-656]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/656
+[github-658]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/658
+[github-659]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/659
+[github-660]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/660
+[github-667]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/667
+[github-687]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/687
 
-[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.13...HEAD
+[Unreleased]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.14...HEAD
+[0.3.14]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.13...v0.3.14
 [0.3.13]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.12...v0.3.13
 [0.3.12]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.11...v0.3.12
 [0.3.11]: https://github.com/Ferrite-FEM/Ferrite.jl/compare/v0.3.10...v0.3.11

@@ -1,11 +1,6 @@
-
-function _default_interpolations(dh::MixedDofHandler)
+function _default_interpolations(dh::DofHandler)
     fhs = dh.fieldhandlers
-    ntuple(i -> default_interpolation(getcelltype(dh, fhs[i])), length(fhs))
-end
-
-function _default_interpolation(dh::DofHandler)
-    return default_interpolation(getcelltype(getgrid(dh)))
+    ntuple(i -> default_interpolation(getcelltype(getgrid(dh), fhs[i])), length(fhs))
 end
 
 """
@@ -34,19 +29,6 @@ function apply_analytical!(
     cellset = 1:getncells(getgrid(dh)))
 
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
-    ip_geo = _default_interpolation(dh)
-    field_idx = find_field(dh, fieldname)
-    ip_fun = getfieldinterpolation(dh, field_idx)
-    celldofinds = dof_range(dh, fieldname)
-    field_dim = getfielddim(dh, field_idx)
-    _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, cellset)
-end
-
-function apply_analytical!(
-    a::AbstractVector, dh::MixedDofHandler, fieldname::Symbol, f::Function,
-    cellset = 1:getncells(getgrid(dh)))
-
-    fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
     ip_geos = _default_interpolations(dh)
 
     for (fh, ip_geo) in zip(dh.fieldhandlers, ip_geos)
@@ -55,20 +37,26 @@ function apply_analytical!(
         ip_fun = getfieldinterpolation(fh, field_idx)
         field_dim = getfielddim(fh, field_idx)
         celldofinds = dof_range(fh, fieldname)
-        _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, intersect(fh.cellset, cellset))
+        set_intersection = if length(cellset) == length(fh.cellset) == getncells(getgrid(dh))
+            BitSet(1:getncells(getgrid(dh)))
+        else
+            intersect(BitSet(fh.cellset), BitSet(cellset))
+        end
+        _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, set_intersection)
     end
     return a
 end
 
 function _apply_analytical!(
-    a::Vector, dh::AbstractDofHandler, celldofinds, field_dim,
-    ip_fun::Interpolation{dim,RefShape}, ip_geo::Interpolation, f::Function, cellset) where {dim, RefShape}
+    a::AbstractVector, dh::AbstractDofHandler, celldofinds, field_dim,
+    ip_fun::Interpolation{RefShape}, ip_geo::Interpolation, f::Function, cellset) where {dim, RefShape<:AbstractRefShape{dim}}
 
     coords = getcoordinates(getgrid(dh), first(cellset))
     ref_points = reference_coordinates(ip_fun)
     dummy_weights = zeros(length(ref_points))
-    qr = QuadratureRule{dim, RefShape}(dummy_weights, ref_points)
-    cv = CellScalarValues(qr, ip_fun, ip_geo)
+    qr = QuadratureRule{RefShape}(dummy_weights, ref_points)
+    # Note: Passing ip_geo as the function interpolation here, it is just a dummy.
+    cv = CellValues(qr, ip_geo, ip_geo)
     c_dofs = celldofs(dh, first(cellset))
     f_dofs = zeros(Int, length(celldofinds))
 
@@ -86,7 +74,7 @@ function _apply_analytical!(
     return a
 end
 
-function _apply_analytical!(a::Vector, dofs::Vector{Int}, coords::Vector{<:Vec}, field_dim, cv::CellScalarValues, f)
+function _apply_analytical!(a::AbstractVector, dofs::Vector{Int}, coords::Vector{<:Vec}, field_dim, cv::CellValues, f)
     for i_dof in 1:getnquadpoints(cv)
         x_dof = spatial_coordinate(cv, i_dof, coords)
         for (idim, icval) in enumerate(f(x_dof))

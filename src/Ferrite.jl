@@ -5,6 +5,7 @@ using Reexport
 
 using LinearAlgebra
 using SparseArrays
+using StaticArrays
 using Base: @propagate_inbounds
 using NearestNeighbors
 using EnumX
@@ -12,22 +13,28 @@ using EnumX
 include("exports.jl")
 
 """
-Represents a reference shape which quadrature rules and interpolations are defined on.
-Currently, the only concrete types that subtype this type are `RefCube` in 1, 2 and 3 dimensions,
-and `RefTetrahedron` in 2 and 3 dimensions.
-"""
-abstract type AbstractRefShape end
+    AbstractRefShape{refdim}
 
-struct RefTetrahedron <: AbstractRefShape end
-struct RefCube <: AbstractRefShape end
-struct RefPrism <: AbstractRefShape end
+Supertype for all reference shapes, with reference dimension `refdim`. Reference shapes are
+used to define grid cells, shape functions, and quadrature rules. Currently existing
+reference shapes are: [`RefLine`](@ref), [`RefTriangle`](@ref), [`RefQuadrilateral`](@ref),
+[`RefTetrahedron`](@ref), [`RefHexahedron`](@ref), [`RefPrism`](@ref).
+"""
+abstract type AbstractRefShape{refdim} end
 
-"""
-Abstract type which has `CellValues` and `FaceValues` as subtypes
-"""
-abstract type Values{dim,T,refshape} end
-abstract type CellValues{dim,T,refshape} <: Values{dim,T,refshape} end
-abstract type FaceValues{dim,T,refshape} <: Values{dim,T,refshape} end
+# See src/docs.jl for detailed documentation
+struct RefHypercube{refdim} <: AbstractRefShape{refdim} end
+struct RefSimplex{refdim}   <: AbstractRefShape{refdim} end
+const RefLine          = RefHypercube{1}
+const RefQuadrilateral = RefHypercube{2}
+const RefHexahedron    = RefHypercube{3}
+const RefTriangle      = RefSimplex{2}
+const RefTetrahedron   = RefSimplex{3}
+struct RefPrism         <: AbstractRefShape{3} end
+
+abstract type AbstractValues end
+abstract type AbstractCellValues <: AbstractValues end
+abstract type AbstractFaceValues <: AbstractValues end
 
 """
 Abstract type which is used as identifier for faces, edges and verices
@@ -86,7 +93,6 @@ include("Grid/grid_generators.jl")
 include("Grid/coloring.jl")
 
 # Dofs
-include("Dofs/MixedDofHandler.jl")
 include("Dofs/DofHandler.jl")
 include("Dofs/ConstraintHandler.jl")
 include("Dofs/apply_analytical.jl")
@@ -109,5 +115,6 @@ include("PointEval/PointEvalHandler.jl")
 
 # Other
 include("deprecations.jl")
+include("docs.jl")
 
 end # module

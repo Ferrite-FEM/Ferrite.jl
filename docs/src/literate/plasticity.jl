@@ -138,15 +138,12 @@ end
 # What follows are methods for assembling and and solving the FE-problem.
 function create_values(interpolation)
     ## setup quadrature rules
-    qr      = QuadratureRule{3,RefTetrahedron}(2)
-    face_qr = QuadratureRule{2,RefTetrahedron}(3)
-
-    ## create geometric interpolation (use the same as for u)
-    interpolation_geom = Lagrange{3,RefTetrahedron,1}()
+    qr      = QuadratureRule{RefTetrahedron}(2)
+    face_qr = FaceQuadratureRule{RefTetrahedron}(3)
 
     ## cell and facevalues for u
-    cellvalues_u = CellVectorValues(qr, interpolation, interpolation_geom)
-    facevalues_u = FaceVectorValues(face_qr, interpolation, interpolation_geom)
+    cellvalues_u = CellValues(qr, interpolation)
+    facevalues_u = FaceValues(face_qr, interpolation)
 
     return cellvalues_u, facevalues_u
 end;
@@ -154,8 +151,7 @@ end;
 # ### Add degrees of freedom
 function create_dofhandler(grid, interpolation)
     dh = DofHandler(grid)
-    dim = 3
-    add!(dh, :u, dim, interpolation) # add a displacement field with 3 components
+    add!(dh, :u, interpolation) # add a displacement field with 3 components
     close!(dh)
     return dh
 end
@@ -176,9 +172,9 @@ end;
 #
 # * Residual vector `r`
 # * Tangent stiffness `K`
-function doassemble(cellvalues::CellVectorValues{dim},
-                    facevalues::FaceVectorValues{dim}, K::SparseMatrixCSC, grid::Grid,
-                    dh::DofHandler, material::J2Plasticity, u, states, states_old, t) where {dim}
+function doassemble(cellvalues::CellValues,
+                    facevalues::FaceValues, K::SparseMatrixCSC, grid::Grid,
+                    dh::DofHandler, material::J2Plasticity, u, states, states_old, t)
     r = zeros(ndofs(dh))
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)
@@ -273,7 +269,7 @@ function solve()
     P1 = Vec((0.0, 0.0, 0.0))  # start point for geometry
     P2 = Vec((L, w, h))        # end point for geometry
     grid = generate_grid(Tetrahedron, nels, P1, P2)
-    interpolation = Lagrange{3, RefTetrahedron, 1}() # Linear tet with 3 unknowns/node
+    interpolation = Lagrange{RefTetrahedron, 1}()^3
 
     dh = create_dofhandler(grid, interpolation) # JuaFEM helper function
     dbcs = create_bc(dh, grid) # create Dirichlet boundary-conditions
@@ -332,7 +328,7 @@ function solve()
     end
 
     ## ## Postprocessing
-    ## Only a vtu-file corrsponding to the last time-step is exported.
+    ## Only a vtu-file corresponding to the last time-step is exported.
     ##
     ## The following is a quick (and dirty) way of extracting average cell data for export.
     mises_values = zeros(getncells(grid))

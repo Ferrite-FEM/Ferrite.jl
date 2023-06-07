@@ -24,9 +24,9 @@
     subtype_grid = SmallGrid(nodes,cells)
     reference_grid = generate_grid(Quadrilateral, (2,2))
 
-    ip = Lagrange{2, RefCube, 1}()
-    qr = QuadratureRule{2, RefCube}(2)
-    cellvalues = CellScalarValues(qr, ip);
+    ip = Lagrange{RefQuadrilateral, 1}()
+    qr = QuadratureRule{RefQuadrilateral}(2)
+    cellvalues = CellValues(qr, ip);
     
     dhs = [DofHandler(grid) for grid in (subtype_grid, reference_grid)]
     u1 = Vector{Float64}(undef, 9)
@@ -34,7 +34,7 @@
     ∂Ω = union(getfaceset.((reference_grid, ), ["left", "right", "top", "bottom"])...)
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
 
-    function doassemble!(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler) where {dim}
+    function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler)
         n_basefuncs = getnbasefunctions(cellvalues)
         Ke = zeros(n_basefuncs, n_basefuncs)
         fe = zeros(n_basefuncs)
@@ -63,7 +63,7 @@
     end
 
     for (dh,u) in zip(dhs,(u1,u2))
-        add!(dh, :u, 1)
+        add!(dh, :u, ip)
         close!(dh)
         ch = ConstraintHandler(dh)
         add!(ch, dbc)
@@ -80,4 +80,12 @@
     @test Ferrite.celldofs(dhs[1],3) == Ferrite.celldofs(dhs[2],3)
     @test Ferrite.ndofs(dhs[1]) == Ferrite.ndofs(dhs[2])
     @test isapprox(u1,u2,atol=1e-8)
+
+    colors1 = Ferrite.create_coloring(subtype_grid, alg = ColoringAlgorithm.WorkStream)
+    colors2 = Ferrite.create_coloring(reference_grid, alg = ColoringAlgorithm.WorkStream)
+    @test all(colors1 .== colors2)
+
+    colors1 = Ferrite.create_coloring(subtype_grid, alg = ColoringAlgorithm.Greedy)
+    colors2 = Ferrite.create_coloring(reference_grid, alg = ColoringAlgorithm.Greedy)
+    @test all(colors1 .== colors2)
 end

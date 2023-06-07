@@ -57,7 +57,7 @@ function CellCache(grid::Grid{dim,C,T}, flags::UpdateFlags=UpdateFlags()) where 
     return CellCache(flags, grid, ScalarWrapper(-1), nodes, coords, nothing, Int[])
 end
 
-function CellCache(dh::Union{DofHandler{dim},MixedDofHandler{dim}}, flags::UpdateFlags=UpdateFlags()) where {dim}
+function CellCache(dh::DofHandler{dim}, flags::UpdateFlags=UpdateFlags()) where {dim}
     N = nnodes_per_cell(getgrid(dh))
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, get_coordinate_eltype(getgrid(dh))}, N)
@@ -66,33 +66,17 @@ function CellCache(dh::Union{DofHandler{dim},MixedDofHandler{dim}}, flags::Updat
     return CellCache(flags, getgrid(dh), ScalarWrapper(-1), nodes, coords, dh, celldofs)
 end
 
-# TODO: Can always resize and combine the two reinit! methods maybe?
 function reinit!(cc::CellCache, i::Int)
     cc.cellid[] = i
     if cc.flags.nodes
+        resize!(cc.nodes, nnodes_per_cell(cc.grid, i))
         cellnodes!(cc.nodes, cc.grid, i)
     end
     if cc.flags.coords
+        resize!(cc.coords, nnodes_per_cell(cc.grid, i))
         cellcoords!(cc.coords, cc.grid, i)
     end
     if cc.dh !== nothing && cc.flags.dofs
-        @assert cc.dh isa DofHandler
-        celldofs!(cc.dofs, cc.dh, i)
-    end
-    return cc
-end
-function reinit!(cc::CellCache{<:Any,<:AbstractGrid,<:MixedDofHandler}, i::Int)
-    @assert cc.dh isa MixedDofHandler
-    cc.cellid[] = i
-    if cc.flags.nodes
-        resize!(cc.nodes, nnodes_per_cell(cc.dh, i))
-        cellnodes!(cc.nodes, cc.dh, i)
-    end
-    if cc.flags.coords
-        resize!(cc.coords, nnodes_per_cell(cc.dh, i))
-        cellcoords!(cc.coords, cc.dh, i)
-    end
-    if cc.flags.dofs
         resize!(cc.dofs, ndofs_per_cell(cc.dh, i))
         celldofs!(cc.dofs, cc.dh, i)
     end
@@ -113,14 +97,14 @@ cellid(cc::CellCache) = cc.cellid[]
 celldofs!(v::Vector, cc::CellCache) = copyto!(v, cc.dofs) # celldofs!(v, cc.dh, cc.cellid[])
 
 # TODO: These should really be replaced with something better...
-nfaces(cc::CellCache) = nfaces(getcelltype(cc.grid))
+nfaces(cc::CellCache) = nfaces(cc.grid.cells[cc.cellid[]])
 onboundary(cc::CellCache, face::Int) = cc.grid.boundary_matrix[face, cc.cellid[]]
 
 ##################
 ## CellIterator ##
 ##################
 
-const IntegerCollection = Union{Set{<:Integer}, AbstractVector{<:Integer}}
+const IntegerCollection = Union{AbstractSet{<:Integer}, AbstractVector{<:Integer}}
 
 """
     CellIterator(grid::Grid, cellset=1:getncells(grid))
@@ -144,6 +128,9 @@ for idx in cellset
     # ...
 end
 ```
+!!! warning
+    `CellIterator` is stateful and should not be used for things other than `for`-looping
+    (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
 """
 struct CellIterator{CC<:CellCache, IC<:IntegerCollection}
     cc::CC
@@ -157,7 +144,7 @@ function CellIterator(gridordh::Union{Grid,AbstractDofHandler},
         grid = gridordh isa AbstractDofHandler ? getgrid(gridordh) : gridordh
         set = 1:getncells(grid)
     end
-    if gridordh isa MixedDofHandler
+    if gridordh isa DofHandler && !isconcretetype(getcelltype(gridordh.grid))
         # TODO: Since the CellCache is resizeable this is not really necessary to check
         #       here, but might be useful to catch slow code paths?
         _check_same_celltype(getgrid(gridordh), set)

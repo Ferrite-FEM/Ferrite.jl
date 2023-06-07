@@ -45,7 +45,7 @@
 # We obtain the mechanical displacement field by applying the Finite Element Method to the weak form
 # of the Gibbs energy using Ferrite. In contrast, we use the evolution equation (i.e. the strong form) to calculate
 # the value of the density field $\chi$. The advantage of this "split" approach is the very high computation speed.
-# The evolution equation consists of the driving force, the damping paramter $\eta$, the regularization parameter $\beta$ times the Laplacian,
+# The evolution equation consists of the driving force, the damping parameter $\eta$, the regularization parameter $\beta$ times the Laplacian,
 # which is necessary to avoid numerical issues like mesh dependence or checkerboarding, and the constraint parameters $\lambda$, to keep the mass constant,
 # and $\gamma$, to avoid leaving the set $[\chi_{\text{min}}, 1]$. By including gradient regularization, it becomes necessary to calculate the Laplacian.
 # The Finite Difference Method for square meshes with the edge length $\Delta h$ approximates the Laplacian as follows:
@@ -88,22 +88,20 @@ end
 
 function create_values()
     ## quadrature rules
-    qr      = QuadratureRule{2,RefCube}(2)
-    face_qr = QuadratureRule{1,RefCube}(2)
-
-    ## geometric interpolation
-    interpolation_geom = Lagrange{2,RefCube,1}()
+    qr      = QuadratureRule{RefQuadrilateral}(2)
+    face_qr = FaceQuadratureRule{RefQuadrilateral}(2)
 
     ## cell and facevalues for u
-    cellvalues = CellVectorValues(qr, Lagrange{2,RefCube,1}(), Lagrange{2,RefCube,1}())
-    facevalues = FaceVectorValues(face_qr, Lagrange{2,RefCube,1}(), Lagrange{2,RefCube,1}())
+    ip = Lagrange{RefQuadrilateral,1}()^2
+    cellvalues = CellValues(qr, ip)
+    facevalues = FaceValues(face_qr, ip)
     
     return cellvalues, facevalues
 end
 
 function create_dofhandler(grid)
     dh = DofHandler(grid)
-    add!(dh, :u, 2, Lagrange{2,RefCube,1}()) # displacement
+    add!(dh, :u, Lagrange{RefQuadrilateral,1}()^2) # displacement
     close!(dh)
     return dh
 end
@@ -302,7 +300,7 @@ end
     
 # Now, we move on to the Finite Element part of the program. We use the following function to assemble our linear system.
 
-function doassemble!(cellvalues::CellVectorValues{dim}, facevalues::FaceVectorValues{dim}, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states) where {dim}
+function doassemble!(cellvalues::CellValues, facevalues::FaceValues, K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::MaterialParameters, u, states)
     r = zeros(ndofs(dh))
     assembler = start_assemble(K, r)
     nu = getnbasefunctions(cellvalues)
@@ -379,7 +377,7 @@ end
 
 # We put everything together in the main function. Here the user may choose the radius parameter, which
 # is related to the regularization parameter as $\beta = ra^2$, the starting density, the number of elements in vertical direction and finally the
-# name of the output. Addtionally, the user may choose whether only the final design (default)
+# name of the output. Additionally, the user may choose whether only the final design (default)
 # or every iteration step is saved.
 #
 # First, we compute the material parameters and create the grid, DofHandler, boundary condition and FE values.

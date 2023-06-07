@@ -73,7 +73,7 @@
 # step-11](https://www.dealii.org/current/doxygen/deal.II/step_11.html) for some more
 # discussion around this). In particular, we will enforce the mean value of the pressure on
 # the boundary to be 0, i.e. ``\int_{\Gamma} p\ \mathrm{d}\Gamma = 0``. One option is to
-# enforce this using a Lagrange multipler. This would give a contribution ``\lambda
+# enforce this using a Lagrange multiplier. This would give a contribution ``\lambda
 # \int_{\Gamma} \delta p\ \mathrm{d}\Gamma`` to the second equation in the weak form above,
 # and a third equation ``\delta\lambda \int_{\Gamma} p\ \mathrm{d}\Gamma = 0`` so that we
 # can solve for ``\lambda``. However, since we in this case are not interested in computing
@@ -220,17 +220,18 @@ end
 # As mentioned in the introduction we will use a quadratic approximation for the velocity
 # field and a linear approximation for the pressure to ensure that we fulfill the LBB
 # condition. We create the corresponding FE values with interpolations `ipu` for the
-# velocity and `ipp` for the pressure. Note that we use linear geometric interpolation
-# (`ipg`) for both the velocity and pressure, this is because our grid contains linear
-# triangles. We also construct face-values for the pressure since we need to integrate along
+# velocity and `ipp` for the pressure. Note that we specify linear geometric mapping
+# (`ipg`) for both the velocity and pressure because our grid contains linear
+# triangles. However, since linear mapping is default this could have been skipped.
+# We also construct face-values for the pressure since we need to integrate along
 # the boundary when assembling the constraint matrix ``\underline{\underline{C}}``.
 
 function setup_fevalues(ipu, ipp, ipg)
-    qr = QuadratureRule{2,RefTetrahedron}(2)
-    cvu = CellVectorValues(qr, ipu, ipg)
-    cvp = CellScalarValues(qr, ipp, ipg)
-    qr_face = QuadratureRule{1,RefTetrahedron}(2)
-    fvp = FaceScalarValues(qr_face, ipp, ipg)
+    qr = QuadratureRule{RefTriangle}(2)
+    cvu = CellValues(qr, ipu, ipg)
+    cvp = CellValues(qr, ipp, ipg)
+    qr_face = FaceQuadratureRule{RefTriangle}(2)
+    fvp = FaceValues(qr_face, ipp, ipg)
     return cvu, cvp, fvp
 end
 #md nothing #hide
@@ -241,8 +242,8 @@ end
 
 function setup_dofs(grid, ipu, ipp)
     dh = DofHandler(grid)
-    add!(dh, :u, 2, ipu)
-    add!(dh, :p, 1, ipp)
+    add!(dh, :u, ipu)
+    add!(dh, :p, ipp)
     close!(dh)
     return dh
 end
@@ -484,12 +485,12 @@ function main()
     h = 0.05 # approximate element size
     grid = setup_grid(h)
     ## Interpolations
-    ipu = Lagrange{2,RefTetrahedron,2}() # quadratic
-    ipp = Lagrange{2,RefTetrahedron,1}() # linear
+    ipu = Lagrange{RefTriangle,2}() ^ 2 # quadratic
+    ipp = Lagrange{RefTriangle,1}()     # linear
     ## Dofs
     dh = setup_dofs(grid, ipu, ipp)
     ## FE values
-    ipg = Lagrange{2,RefTetrahedron,1}() # linear geometric interpolation
+    ipg = Lagrange{RefTriangle,1}() # linear geometric interpolation
     cvu, cvp, fvp = setup_fevalues(ipu, ipp, ipg)
     ## Boundary conditions
     ch = setup_constraints(dh, fvp)
