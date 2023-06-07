@@ -734,7 +734,7 @@ n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
 Transform all nodes of the `grid` based on some transformation function `f`.
 """
 function transform!(g::Grid, f::Function)
-    map!(n -> Node(f(getcoordinates(n))), g.nodes, g.nodes)
+    map!(n -> Node(f(get_node_coordinate(n))), g.nodes, g.nodes)
     return g
 end
 
