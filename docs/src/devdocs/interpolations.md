@@ -30,6 +30,7 @@ Ferrite.edgedof_interior_indices(::Interpolation)
 Ferrite.celldof_interior_indices(::Interpolation)
 Ferrite.getnbasefunctions(::Interpolation)
 Ferrite.reference_coordinates(::Interpolation)
+Ferrite.adjust_dofs_during_distribution(::Interpolation)
 ```
 
 for all entities which exist on that reference element. The dof functions default to having no

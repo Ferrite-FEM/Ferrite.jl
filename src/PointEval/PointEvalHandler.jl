@@ -90,7 +90,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
 end
 
 # check if point is inside a cell based on physical coordinate
-function point_in_cell(geom_interpol::Interpolation{dim,shape,order}, cell_coordinates, global_coordinate) where {dim, shape, order}
+function point_in_cell(geom_interpol::Interpolation{shape}, cell_coordinates, global_coordinate) where {shape}
     converged, x_local = find_local_coordinate(geom_interpol, cell_coordinates, global_coordinate)
     if converged
         return _check_isoparametric_boundaries(shape, x_local), x_local
@@ -100,47 +100,40 @@ function point_in_cell(geom_interpol::Interpolation{dim,shape,order}, cell_coord
 end
 
 # check if point is inside a cell based on isoparametric coordinate
-function _check_isoparametric_boundaries(::Type{RefCube}, x_local::Vec{dim, T}) where {dim, T}
+function _check_isoparametric_boundaries(::Type{RefHypercube{dim}}, x_local::Vec{dim, T}) where {dim, T}
     tol = sqrt(eps(T))
     # All in the range [-1, 1]
     return all(x -> abs(x) - 1 < tol, x_local)
 end
 
 # check if point is inside a cell based on isoparametric coordinate
-function _check_isoparametric_boundaries(::Type{RefTetrahedron}, x_local::Vec{dim, T}) where {dim, T}
+function _check_isoparametric_boundaries(::Type{RefSimplex{dim}}, x_local::Vec{dim, T}) where {dim, T}
     tol = sqrt(eps(T))
     # Positive and below the plane 1 - ξx - ξy - ξz
     return all(x -> x > -tol, x_local) && sum(x_local) - 1 < tol
 end
 
+# See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
 # TODO: should we make iteration params optional keyword arguments?
-function find_local_coordinate(interpolation, cell_coordinates, global_coordinate)
-    """
-    currently copied verbatim from https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
-    other than to make J dim x dim rather than 2x2
-    """
-    dim = length(global_coordinate)
-    local_guess = zero(Vec{dim})
+function find_local_coordinate(interpolation, cell_coordinates::Vector{V}, global_coordinate::V) where {dim, T, V <: Vec{dim, T}}
     n_basefuncs = getnbasefunctions(interpolation)
+    @assert length(cell_coordinates) == n_basefuncs
+    local_guess = zero(V)
     max_iters = 10
     tol_norm = 1e-10
     converged = false
     for _ in 1:max_iters
-        N = Ferrite.value(interpolation, local_guess)
-
-        global_guess = zero(Vec{dim})
+        global_guess = zero(V)
+        J = zero(Tensor{2, dim, T})
         for j in 1:n_basefuncs
-            global_guess += N[j] * cell_coordinates[j]
+            dNdξ, N = shape_gradient_and_value(interpolation, local_guess, j)
+            global_guess += N * cell_coordinates[j]
+            J += cell_coordinates[j] ⊗ dNdξ
         end
         residual = global_guess - global_coordinate
         if norm(residual) <= tol_norm
             converged = true
             break
-        end
-        dNdξ = Ferrite.derivative(interpolation, local_guess)
-        J = zero(Tensor{2, dim})
-        for j in 1:n_basefuncs
-            J += cell_coordinates[j] ⊗ dNdξ[j]
         end
         local_guess -= inv(J) ⋅ residual
     end
@@ -186,17 +179,16 @@ function get_point_values(ph::PointEvalHandler, proj::L2Projector, dof_vals::Abs
     get_point_values(ph, proj.dh, dof_vals)
 end
 
-function get_point_values(ph::PointEvalHandler, dh::AbstractDofHandler, dof_vals::AbstractVector{T},
-                           fname::Symbol=find_single_field(dh)) where {T}
-    fdim = getfielddim(dh, fname)
+function get_point_values(ph::PointEvalHandler{<:Any, dim, T1}, dh::AbstractDofHandler, dof_vals::AbstractVector{T2},
+                           fname::Symbol=find_single_field(dh)) where {dim, T1, T2}
     npoints = length(ph.cells)
-    # for a scalar field return a Vector of Scalars, for a vector field return a Vector of Vecs
-    if fdim == 1
-        out_vals = fill!(Vector{T}(undef, npoints), NaN * zero(T))
-    else
-        nanv = convert(Vec{fdim,T}, NaN * zero(Vec{fdim,T}))
-        out_vals = fill!(Vector{Vec{fdim, T}}(undef, npoints), nanv)
-    end
+    # Figure out the value type by creating a dummy PointValuesInternal
+    ip = getfieldinterpolation(dh, find_field(dh, fname))
+    pv = PointValuesInternal(zero(Vec{dim, T1}), ip)
+    zero_val = function_value_init(pv, dof_vals)
+    # Allocate the output as NaNs
+    nanv = convert(typeof(zero_val), NaN * zero_val)
+    out_vals = fill(nanv, npoints)
     func_interpolations = get_func_interpolations(dh, fname)
     get_point_values!(out_vals, ph, dh, dof_vals, fname, func_interpolations)
     return out_vals
@@ -216,19 +208,17 @@ function get_point_values!(out_vals::Vector{T2},
     dof_vals::Vector{T},
     fname::Symbol,
     func_interpolations
-    ) where {T2, T} 
+    ) where {T2, T}
 
     # TODO: I don't think this is correct??
     length(dof_vals) == ndofs(dh) || error("You must supply values for all $(ndofs(dh)) dofs.")
 
-    fdim = getfielddim(dh, fname)
-    
     for fh_idx in eachindex(dh.fieldhandlers)
         ip = func_interpolations[fh_idx]
         if ip !== nothing
             dofrange = dof_range(dh.fieldhandlers[fh_idx], fname)
             cellset = dh.fieldhandlers[fh_idx].cellset
-            _get_point_values!(out_vals, dof_vals, ph, dh, ip, cellset, Val(fdim), dofrange)
+            _get_point_values!(out_vals, dof_vals, ph, dh, ip, cellset, dofrange)
         end
     end
     return out_vals
@@ -242,18 +232,18 @@ function _get_point_values!(
     dh::AbstractDofHandler,
     ip::Interpolation,
     cellset::Union{Nothing, Set{Int}},
-    fdim::Val{fielddim},
     dofrange::AbstractRange{Int},
-    ) where {T2,T,fielddim}
+    ) where {T2,T}
 
     # extract variables
     local_coords = ph.local_coords
     # preallocate some stuff specific to this cellset
     idx = findfirst(!isnothing, local_coords)
     idx === nothing && return out_vals
-    pv = PointScalarValuesInternal(local_coords[idx], ip)
+    pv = PointValuesInternal(local_coords[idx], ip)
     first_cell = cellset === nothing ? 1 : first(cellset)
     cell_dofs = Vector{Int}(undef, ndofs_per_cell(dh, first_cell))
+    u_e = Vector{T}(undef, ndofs_per_cell(dh, first_cell))
 
     # compute point values
     for pointid in eachindex(ph.cells)
@@ -261,26 +251,21 @@ function _get_point_values!(
         cellid === nothing && continue # next point if no cell was found for this one
         cellset !== nothing && (cellid ∈ cellset || continue) # no need to check the cellset for a regular DofHandler
         celldofs!(cell_dofs, dh, ph.cells[pointid])
-        reinit!(pv, local_coords[pointid], ip)
-        @inbounds @views dof_vals_reshaped = _change_format(fdim, dof_vals[cell_dofs[dofrange]])
-        out_vals[pointid] = function_value(pv, 1, dof_vals_reshaped)
+        for (i, I) in pairs(cell_dofs)
+            u_e[i] = dof_vals[I]
+        end
+        reinit!(pv, local_coords[pointid])
+        out_vals[pointid] = function_value(pv, 1, u_e, dofrange)
     end
     return out_vals
 end
-
-###################################################################################################################
-# utils 
-
-# reshape dof_values based on fielddim
-_change_format(::Val{1}, dof_values::AbstractVector{T}) where T = dof_values
-_change_format(::Val{fielddim}, dof_values::AbstractVector{T}) where {fielddim, T} = reinterpret(Vec{fielddim, T}, dof_values)
 
 function get_func_interpolations(dh::DofHandler, fieldname)
     func_interpolations = Union{Interpolation,Nothing}[]
     for fh in dh.fieldhandlers
         j = _find_field(fh, fieldname)
         if j === nothing
-            push!(func_interpolations, missing)
+            push!(func_interpolations, nothing)
         else
             push!(func_interpolations, fh.field_interpolations[j])
         end

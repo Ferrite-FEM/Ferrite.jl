@@ -4,17 +4,17 @@
 # set up a test DofHandler
 grid = generate_grid(Triangle, (10, 10))
 dh = DofHandler(grid)
-add!(dh, :u, 2, Lagrange{2,RefTetrahedron,2}())
-add!(dh, :p, 1, Lagrange{2,RefTetrahedron,1}())
+add!(dh, :u, Lagrange{RefTriangle,2}()^2)
+add!(dh, :p, Lagrange{RefTriangle,1}())
 close!(dh)
 
 # dof_range
 @test (@inferred dof_range(dh, :u)) == 1:12
 @test (@inferred dof_range(dh, :p)) == 13:15
 # dof_range for FieldHandler
-ip = Lagrange{2, RefTetrahedron, 1}()
-field_u = Field(:u, ip, 2)
-field_c = Field(:c, ip, 1)
+ip = Lagrange{RefTriangle, 1}()
+field_u = Field(:u, ip^2)
+field_c = Field(:c, ip)
 fh = FieldHandler([field_u, field_c], Set(1:getncells(grid)))
 @test dof_range(fh, :u) == 1:6
 @test dof_range(fh, :c) == 7:9
@@ -24,12 +24,12 @@ end # testset
 @testset "Dofs for Line2" begin
 
 nodes = [Node{2,Float64}(Vec(0.0,0.0)), Node{2,Float64}(Vec(1.0,1.0)), Node{2,Float64}(Vec(2.0,0.0))]
-cells = [Line2D((1,2)), Line2D((2,3))]
+cells = [Line((1,2)), Line((2,3))]
 grid = Grid(cells,nodes)
 
 #2d line with 1st order 1d interpolation
 dh = DofHandler(grid)
-add!(dh, :x, 2)
+add!(dh, :x, Lagrange{RefLine,1}()^2)
 close!(dh)
 
 @test celldofs(dh,1) == [1,2,3,4]
@@ -37,7 +37,7 @@ close!(dh)
 
 #2d line with 2nd order 1d interpolation
 dh = DofHandler(grid)
-add!(dh, :x, 2, Lagrange{1,RefCube,2}())
+add!(dh, :x, Lagrange{RefLine,2}()^2)
 close!(dh)
 
 @test celldofs(dh,1) == [1,2,3,4,5,6]
@@ -45,8 +45,8 @@ close!(dh)
 
 #3d line with 2nd order 1d interpolation
 dh = DofHandler(grid)
-add!(dh, :u, 3, Lagrange{1,RefCube,2}())
-add!(dh, :θ, 3, Lagrange{1,RefCube,2}())
+add!(dh, :u, Lagrange{RefLine,2}()^3)
+add!(dh, :θ, Lagrange{RefLine,2}()^3)
 close!(dh)
 
 @test celldofs(dh,1) == collect(1:18)
@@ -60,13 +60,13 @@ nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)),
             Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(0.0,1.0,0.0)),
             Node{3,Float64}(Vec(2.0,0.0,0.0)), Node{3,Float64}(Vec(2.0,2.0,0.0))]
 
-cells = [Quadrilateral3D((1,2,3,4)), Quadrilateral3D((2,5,6,3))]
+cells = [Quadrilateral((1,2,3,4)), Quadrilateral((2,5,6,3))]
 grid = Grid(cells,nodes)
 
 #3d quad with 1st order 2d interpolation
 dh = DofHandler(grid)
-add!(dh, :u, 3, Lagrange{2,RefCube,1}())
-add!(dh, :θ, 3, Lagrange{2,RefCube,1}())
+add!(dh, :u, Lagrange{RefQuadrilateral,1}()^3)
+add!(dh, :θ, Lagrange{RefQuadrilateral,1}()^3)
 close!(dh)
 
 @test celldofs(dh,1) == collect(1:24)
@@ -76,27 +76,27 @@ close!(dh)
 #3d quads with two quadratic interpolations fields
 #Only 1 dim per field for simplicity...
 dh = DofHandler(grid)
-add!(dh, :u, 1, Lagrange{2,RefCube,2}())
-add!(dh, :θ, 1, Lagrange{2,RefCube,2}())
+add!(dh, :u, Lagrange{RefQuadrilateral,2}())
+add!(dh, :θ, Lagrange{RefQuadrilateral,2}())
 close!(dh)
 
 @test celldofs(dh,1) == collect(1:18)
 @test celldofs(dh,2) == [2, 19, 20, 3, 21, 22, 23, 6, 24, 11, 25, 26, 12, 27, 28, 29, 15, 30]
 
-# test reshape_to_nodes
+# test evaluate_at_grid_nodes
 ## DofHandler
 mesh = generate_grid(Quadrilateral, (1,1))
 dh = DofHandler(mesh)
-add!(dh, :v, 2)
-add!(dh, :s, 1)
+add!(dh, :v, Lagrange{RefQuadrilateral,1}()^2)
+add!(dh, :s, Lagrange{RefQuadrilateral,1}())
 close!(dh)
 
 u = [1.1, 1.2, 2.1, 2.2, 4.1, 4.2, 3.1, 3.2, 1.3, 2.3, 4.3, 3.3]
 
-s_nodes = reshape_to_nodes(dh, u, :s)
-@test s_nodes ≈ [i+0.3 for i=1:4]'
-v_nodes = reshape_to_nodes(dh, u, :v)
-@test v_nodes ≈ [i==3 ? 0.0 : j+i/10 for i=1:3, j=1:4]
+s_nodes = evaluate_at_grid_nodes(dh, u, :s)
+@test s_nodes ≈ [i+0.3 for i=1:4]
+v_nodes = evaluate_at_grid_nodes(dh, u, :v)
+@test v_nodes ≈ [Vec{2,Float64}(i -> j+i/10) for j = 1:4]
 end
 
 @testset "renumber!" begin
@@ -104,12 +104,12 @@ end
         local dh, mdh, ch
         grid = generate_grid(Triangle, (10, 10))
         dh = DofHandler(grid)
-        add!(dh, :u, 1)
+        add!(dh, :u, Lagrange{RefTriangle,1}())
         close!(dh)
         # subdomains
         mdh = DofHandler(grid)
-        add!(mdh, FieldHandler([Field(:u, Lagrange{2,RefTetrahedron,1}(), 1)], Set(1:getncells(grid)÷2)))
-        add!(mdh, FieldHandler([Field(:u, Lagrange{2,RefTetrahedron,1}(), 1)], Set((getncells(grid)÷2+1):getncells(grid))))
+        add!(mdh, FieldHandler([Field(:u, Lagrange{RefTriangle,1}())], Set(1:getncells(grid)÷2)))
+        add!(mdh, FieldHandler([Field(:u, Lagrange{RefTriangle,1}())], Set((getncells(grid)÷2+1):getncells(grid))))
         close!(mdh)
         ch = ConstraintHandler(dh)
         add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0))
@@ -174,12 +174,12 @@ end
     # Renumbering by field/components #
     ###################################
 
-    function testdhch(DHT=DofHandler)
+    function testdhch()
         local grid, dh, ch
         grid = generate_grid(Quadrilateral, (2, 1))
-        dh = DHT(grid)
-        add!(dh, :v, 2)
-        add!(dh, :s, 1)
+        dh = DofHandler(grid)
+        add!(dh, :v, Lagrange{RefQuadrilateral,1}()^2)
+        add!(dh, :s, Lagrange{RefQuadrilateral,1}())
         close!(dh)
         ch = ConstraintHandler(dh)
         add!(ch, Dirichlet(:v, getfaceset(grid, "left"), (x, t) -> 0, [2]))
@@ -263,10 +263,10 @@ end
     function test_dhch_subdomain()
         local grid, dh, ch
         grid = generate_grid(Quadrilateral, (2, 1))
-        ip = Lagrange{2,RefCube,1}()
+        ip = Lagrange{RefQuadrilateral,1}()
         dh = DofHandler(grid)
-        add!(dh, FieldHandler([Field(:v, ip, 2), Field(:s, ip, 1)], Set(1)))
-        add!(dh, FieldHandler([Field(:v, ip, 2)], Set(2)))
+        add!(dh, FieldHandler([Field(:v, ip^2), Field(:s, ip)], Set(1)))
+        add!(dh, FieldHandler([Field(:v, ip^2)], Set(2)))
         close!(dh)
         ch = ConstraintHandler(dh)
         add!(ch, Dirichlet(:v, getfaceset(grid, "left"), (x, t) -> 0, [2]))
@@ -376,8 +376,8 @@ end
 @testset "dof coupling" begin
     grid = generate_grid(Quadrilateral, (1, 1))
     dh = DofHandler(grid)
-    add!(dh, :u, 2)
-    add!(dh, :p, 1)
+    add!(dh, :u, Lagrange{RefQuadrilateral,1}()^2)
+    add!(dh, :p, Lagrange{RefQuadrilateral,1}())
     close!(dh)
     ch = ConstraintHandler(dh)
     close!(ch)
@@ -470,12 +470,12 @@ end
     grid = generate_grid(Quadrilateral, (1, 2))
     dh = DofHandler(grid)
     fh1 = FieldHandler(
-        [Field(:u, Lagrange{2,RefCube,1}(), 2), Field(:p, Lagrange{2,RefCube,1}(), 2)],
+        [Field(:u, Lagrange{RefQuadrilateral,1}()^2), Field(:p, Lagrange{RefQuadrilateral,1}()^2)],
         Set(1)
     )
     add!(dh, fh1)
     fh2 = FieldHandler(
-        [Field(:u, Lagrange{2,RefCube,1}(), 2)],
+        [Field(:u, Lagrange{RefQuadrilateral,1}()^2)],
         Set(2)
     )
     add!(dh, fh2)

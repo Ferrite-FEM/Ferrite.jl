@@ -35,7 +35,6 @@ getedgeset
 getedgesets
 getvertexset
 getvertexsets
-compute_vertex_values
 transform!
 get_cell_coordinates
 get_cell_coordinates!
@@ -54,6 +53,9 @@ Ferrite.faceskeleton
 ```@docs
 addcellset!
 addfaceset!
+addboundaryfaceset!
+addboundaryedgeset!
+addboundaryvertexset!
 addnodeset!
 ```
 

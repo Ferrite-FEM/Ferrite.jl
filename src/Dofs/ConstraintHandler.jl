@@ -828,11 +828,15 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         # Fetch information about the field on this FieldHandler
         field_idx = find_field(fh, dbc.field_name)
         interpolation = getfieldinterpolation(fh, field_idx)
-        field_dim = getfielddim(fh, field_idx)
+        # Internally we use the devectorized version
+        n_comp = n_dbc_components(interpolation)
+        if interpolation isa VectorizedInterpolation
+            interpolation = interpolation.ip
+        end
         # Set up components to prescribe (empty input means prescribe all components)
-        components = isempty(dbc.components) ? collect(Int, 1:field_dim) : dbc.components
-        if !all(c -> 0 < c <= field_dim, components)
-            error("components $(components) not within range of field :$(dbc.field_name) ($(field_dim) dimension(s))")
+        components = isempty(dbc.components) ? collect(Int, 1:n_comp) : dbc.components
+        if !all(c -> 0 < c <= n_comp, components)
+            error("components $(components) not within range of field :$(dbc.field_name) ($(n_comp) dimension(s))")
         end
         # Create BCValues for coordinate evalutation at dof-locations
         EntityType = eltype(dbc.faces) # (Face|Edge|Vertex)Index
@@ -845,7 +849,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
         _add!(
-            ch, filtered_dbc, filtered_dbc.faces, interpolation, field_dim,
+            ch, filtered_dbc, filtered_dbc.faces, interpolation, n_comp,
             field_offset(fh, dbc.field_name), bcvalues, fh.cellset,
         )
         dbc_added = true
@@ -940,14 +944,17 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     end
     field_idx = find_field(ch.dh, pdbc.field_name)
     interpolation = getfieldinterpolation(ch.dh, field_idx)
-    field_dim = getfielddim(ch.dh, field_idx)
+    n_comp = n_dbc_components(interpolation)
+    if interpolation isa VectorizedInterpolation
+        interpolation = interpolation.ip
+    end
 
-    if !all(c -> 0 < c <= field_dim, pdbc.components)
-        error("components $(pdbc.components) not within range of field :$(pdbc.field_name) ($(field_dim) dimension(s))")
+    if !all(c -> 0 < c <= n_comp, pdbc.components)
+        error("components $(pdbc.components) not within range of field :$(pdbc.field_name) ($(n_comp) dimension(s))")
     end
 
     # Empty components means constrain them all
-    isempty(pdbc.components) && append!(pdbc.components, 1:field_dim)
+    isempty(pdbc.components) && append!(pdbc.components, 1:n_comp)
 
     if pdbc.rotation_matrix === nothing
         dof_map_t = Int
@@ -961,13 +968,13 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
         if !(nc == size(pdbc.rotation_matrix, 1) == size(pdbc.rotation_matrix, 2))
             error("size of rotation matrix does not match the number of components")
         end
-        if nc !== field_dim
+        if nc !== n_comp
             error("rotations currently only supported when all components are periodic")
         end
         dof_map_t = Vector{Int}
         iterator_f = x -> Iterators.partition(x, nc)
     end
-    _add!(ch, pdbc, interpolation, field_dim, field_offset(ch.dh, pdbc.field_name), is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f)
+    _add!(ch, pdbc, interpolation, n_comp, field_offset(ch.dh, pdbc.field_name), is_legacy, pdbc.rotation_matrix, dof_map_t, iterator_f)
     return ch
 end
 
@@ -1160,10 +1167,10 @@ function construct_cornerish(min_x::V, max_x::V) where {T, V <: Vec{3,T}}
     ]
 end
 
-function mirror_local_dofs(_, _, ::Lagrange{1}, ::Int)
+function mirror_local_dofs(_, _, ::Lagrange{RefLine}, ::Int)
     # For 1D there is nothing to do
 end
-function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{2,<:Union{RefCube,RefTetrahedron}}, n::Int)
+function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral,RefTriangle}}, n::Int)
     # For 2D we always permute since Ferrite defines dofs counter-clockwise
     ret = collect(1:length(local_face_dofs))
     for (i, f) in enumerate(facedof_indices(ip))
@@ -1181,9 +1188,9 @@ function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange
 end
 
 # TODO: Can probably be combined with the method above.
-function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{3,<:Union{RefCube,RefTetrahedron},O}, n::Int) where O
+function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{<:Union{RefHexahedron,RefTetrahedron},O}, n::Int) where O
     @assert 1 <= O <= 2
-    N = ip isa Lagrange{3,RefCube} ? 4 : 3
+    N = ip isa Lagrange{RefHexahedron} ? 4 : 3
     ret = collect(1:length(local_face_dofs))
 
     # Mirror by changing from counter-clockwise to clockwise
@@ -1227,12 +1234,12 @@ end
 circshift!(args...) = Base.circshift!(args...)
 
 
-function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{2}, ncomponents)
+function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral,RefTriangle}}, ncomponents)
     return collect(1:length(local_face_dofs)) # TODO: Return range?
 end
-function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{3,<:Union{RefCube,RefTetrahedron}, O}, ncomponents) where O
+function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{<:Union{RefHexahedron,RefTetrahedron}, O}, ncomponents) where O
     @assert 1 <= O <= 2
-    N = ip isa Lagrange{3,RefCube} ? 4 : 3
+    N = ip isa Lagrange{RefHexahedron} ? 4 : 3
     ret = similar(local_face_dofs, length(local_face_dofs), N)
     ret[:, :] .= 1:length(local_face_dofs)
     for f in 1:length(local_face_dofs_offset)-1
@@ -1320,11 +1327,11 @@ function __collect_boundary_faces(grid::Grid)
     candidates = Dict{Tuple, FaceIndex}()
     for (ci, c) in enumerate(grid.cells)
         for (fi, fn) in enumerate(faces(c))
-            fn = sortface(fn)
-            if haskey(candidates, fn)
-                delete!(candidates, fn)
+            face = first(sortface(fn))
+            if haskey(candidates, face)
+                delete!(candidates, face)
             else
-                candidates[fn] = FaceIndex(ci, fi)
+                candidates[face] = FaceIndex(ci, fi)
             end
         end
     end

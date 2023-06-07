@@ -97,7 +97,7 @@ cellid(cc::CellCache) = cc.cellid[]
 celldofs!(v::Vector, cc::CellCache) = copyto!(v, cc.dofs) # celldofs!(v, cc.dh, cc.cellid[])
 
 # TODO: These should really be replaced with something better...
-nfaces(cc::CellCache) = nfaces(eltype(cc.grid.cells))
+nfaces(cc::CellCache) = nfaces(cc.grid.cells[cc.cellid[]])
 onboundary(cc::CellCache, face::Int) = cc.grid.boundary_matrix[face, cc.cellid[]]
 
 ##################
@@ -128,6 +128,9 @@ for idx in cellset
     # ...
 end
 ```
+!!! warning
+    `CellIterator` is stateful and should not be used for things other than `for`-looping
+    (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
 """
 struct CellIterator{CC<:CellCache, IC<:IntegerCollection}
     cc::CC

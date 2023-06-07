@@ -20,7 +20,7 @@ PointLocation
 ```
 
 ```@docs
-reshape_to_nodes
+evaluate_at_grid_nodes
 ```
 
 ## VTK Export
