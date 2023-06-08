@@ -69,7 +69,7 @@ distribution. This is in contrast to i) adjusting the dofs during [`reinit!`](@r
 assembly loop, or ii) not adjusting at all (which is not needed for low order
 interpolations, generally).
 """
-adjust_dofs_during_distribution(::Interpolation) = false
+adjust_dofs_during_distribution(::Interpolation)
 
 """
     InterpolationInfo
@@ -397,6 +397,10 @@ struct Lagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
     end
 end
 
+adjust_dofs_during_distribution(::Lagrange) = true
+adjust_dofs_during_distribution(::Lagrange{<:Any, 2}) = false
+adjust_dofs_during_distribution(::Lagrange{<:Any, 1}) = false
+
 # Vertices for all Lagrange interpolations are the same
 vertexdof_indices(::Lagrange{RefLine}) = ((1,),(2,))
 vertexdof_indices(::Lagrange{RefQuadrilateral}) = ((1,),(2,),(3,),(4,))
@@ -621,8 +625,6 @@ const Lagrange2Tri345 = Union{
     Lagrange{RefTriangle,4},
     Lagrange{RefTriangle,5},
 }
-
-adjust_dofs_during_distribution(::Lagrange2Tri345) = true
 
 function getnbasefunctions(ip::Lagrange2Tri345)
     order = getorder(ip)
@@ -1095,6 +1097,12 @@ struct Serendipity{shape, order, unused} <: ScalarInterpolation{shape,order}
     end
 end
 
+# Note that the edgedofs for high order serendipity elements are defined in terms of integral moments, 
+# so no permutation exists in general. See e.g. Scroggs et al. [2022] for an example.
+# adjust_dofs_during_distribution(::Serendipity{refshape, order}) where {refshape, order} = false
+adjust_dofs_during_distribution(::Serendipity{<:Any, 2}) = false
+adjust_dofs_during_distribution(::Serendipity{<:Any, 1}) = false
+
 # Vertices for all Serendipity interpolations are the same
 vertexdof_indices(::Serendipity{RefQuadrilateral}) = ((1,),(2,),(3,),(4,))
 vertexdof_indices(::Serendipity{RefHexahedron}) = ((1,),(2,),(3,),(4,),(5,),(6,),(7,),(8,))
@@ -1233,6 +1241,9 @@ struct CrouzeixRaviart{shape, order, unused} <: ScalarInterpolation{shape, order
     CrouzeixRaviart{RefTriangle, 1}() = new{RefTriangle, 1, Nothing}()
 end
 
+adjust_dofs_during_distribution(::CrouzeixRaviart) = true
+adjust_dofs_during_distribution(::CrouzeixRaviart{<:Any, 1}) = false
+
 getnbasefunctions(::CrouzeixRaviart) = 3
 
 facedof_indices(::CrouzeixRaviart) = ((1,), (2,), (3,))
@@ -1256,13 +1267,14 @@ end
 ##################################################
 # VectorizedInterpolation{<:ScalarInterpolation} #
 ##################################################
-
 struct VectorizedInterpolation{vdim, refshape, order, SI <: ScalarInterpolation{refshape, order}} <: VectorInterpolation{vdim, refshape,order}
     ip::SI
     function VectorizedInterpolation{vdim}(ip::SI) where {vdim, refshape, order, SI <: ScalarInterpolation{refshape, order}}
         return new{vdim, refshape, order, SI}(ip)
     end
 end
+
+adjust_dofs_during_distribution(ip::VectorizedInterpolation) = adjust_dofs_during_distribution(ip.ip)
 
 # Vectorize to reference dimension by default
 function VectorizedInterpolation(ip::ScalarInterpolation{shape}) where {refdim, shape <: AbstractRefShape{refdim}}
@@ -1272,6 +1284,11 @@ end
 Base.:(^)(ip::ScalarInterpolation, vdim::Int) = VectorizedInterpolation{vdim}(ip)
 function Base.literal_pow(::typeof(^), ip::ScalarInterpolation, ::Val{vdim}) where vdim
     return VectorizedInterpolation{vdim}(ip)
+end
+
+function Base.show(io::IO, mime::MIME"text/plain", ip::VectorizedInterpolation{vdim}) where vdim
+    show(io, mime, ip.ip)
+    print(io, "^", vdim)
 end
 
 # Helper to get number of copies for DoF distribution
