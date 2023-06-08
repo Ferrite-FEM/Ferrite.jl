@@ -151,12 +151,14 @@
             end
         end
 
-        # VectorizedInterpolation
-        v_interpolation_1 = interpolation^2
-        v_interpolation_2 = (d = 2; interpolation^d)
-        @test getnbasefunctions(v_interpolation_1) == getnbasefunctions(v_interpolation_2) ==
-            getnbasefunctions(interpolation) * 2
-    end
+    # VectorizedInterpolation
+    v_interpolation_1 = interpolation^2
+    v_interpolation_2 = (d = 2; interpolation^d)
+    @test getnbasefunctions(v_interpolation_1) == getnbasefunctions(v_interpolation_2) ==
+          getnbasefunctions(interpolation) * 2
+    # pretty printing
+    @test repr("text/plain", v_interpolation_1) == repr(v_interpolation_1.ip) * "^2"
+end
 
     @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTriangle,0}()) ≈ [Vec{2,Float64}((1/3,1/3))]
     @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefQuadrilateral,0}()) ≈ [Vec{2,Float64}((0,0))]

@@ -14,7 +14,6 @@ Ferrite.getorder(::Interpolation)
 Ferrite.value(::Interpolation{dim}, ::Vec{dim,T}) where {dim,T}
 Ferrite.derivative(::Interpolation{dim}, ::Vec{dim}) where {dim}
 Ferrite.boundarydof_indices
-Ferrite.adjust_dofs_during_distribution(::Interpolation)
 ```
 
 ### Required methods to implement for all subtypes of `Interpolation` to define a new finite element
@@ -33,6 +32,7 @@ Ferrite.getnbasefunctions(::Interpolation)
 Ferrite.reference_coordinates(::Interpolation)
 Ferrite.IsDiscontinuous(::Interpolation)
 Ferrite.get_continuous_interpolation(::Interpolation)
+Ferrite.adjust_dofs_during_distribution(::Interpolation)
 ```
 
 for all entities which exist on that reference element. The dof functions default to having no
