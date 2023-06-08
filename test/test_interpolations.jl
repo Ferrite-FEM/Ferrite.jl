@@ -176,10 +176,4 @@ end
     @test Ferrite.IsDiscontinuous(ip_t) == false
     @test Ferrite.IsDiscontinuous(d_ip) == true
     @test Ferrite.IsDiscontinuous(d_ip_t) == true
-
-    @test Ferrite.get_continuous_interpolation(d_ip_t) == typeof(Ferrite.get_continuous_interpolation(d_ip))
-
-    # Error paths
-    @test_throws ArgumentError("Interpolation $ip is already continuous.") Ferrite.get_continuous_interpolation(ip)
-    @test_throws ArgumentError("Interpolation $ip_t is already continuous.") Ferrite.get_continuous_interpolation(ip_t)
 end
