@@ -7,40 +7,38 @@
     dh = DofHandler(grid)
     add!(dh, :s, Lagrange{RefTriangle,1}())
     add!(dh, :v, Lagrange{RefTriangle,1}()^2)
+    add!(dh, :z, DiscontinuousLagrange{RefTriangle,0}())
+    add!(dh, :sd, DiscontinuousLagrange{RefTriangle,1}())
+    add!(dh, :vd, DiscontinuousLagrange{RefTriangle,1}()^2)
     close!(dh)
     ch = ConstraintHandler(dh)
-
-    dh0 = DofHandler(grid)
-    add!(dh0, :w, DiscontinuousLagrange{RefTriangle,0}())
-    close!(dh0)
-    ch0 = ConstraintHandler(dh0)
-
     # Dirichlet
     @test_throws ErrorException("components are empty: $(Int)[]") Dirichlet(:u, Γ, (x, t) -> 0, Int[])
     @test_throws ErrorException("components not sorted: [2, 1]") Dirichlet(:u, Γ, (x, t) -> 0, Int[2, 1])
     @test_throws ErrorException("components not unique: [2, 2]") Dirichlet(:u, Γ, (x, t) -> 0, Int[2, 2])
-    @test_throws ErrorException("No dof prescribed for order 0 interpolations") add!(ch0, Dirichlet(:w, Γ, (x, t) -> 0))
-    ## Scalar
-    dbc = Dirichlet(:s, Γ, (x, t) -> 0)
-    add!(ch, dbc)
-    @test ch.dbcs[end].components == [1]
-    dbc = Dirichlet(:s, Γ, (x, t) -> 0, [1])
-    add!(ch, dbc)
-    @test ch.dbcs[end].components == [1]
-    dbc = Dirichlet(:s, Γ, (x, t) -> 0, [1, 2])
-    @test_throws ErrorException("components [1, 2] not within range of field :s (1 dimension(s))") add!(ch, dbc)
-    dbc = Dirichlet(:p, Γ, (x, t) -> 0)
-    @test_throws ErrorException("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's DofHandler") add!(ch, dbc)
-    #    ## Vector
-    dbc = Dirichlet(:v, Γ, (x, t) -> 0)
-    add!(ch, dbc)
-    @test ch.dbcs[end].components == [1, 2]
-    dbc = Dirichlet(:v, Γ, (x, t) -> 0, [1])
-    add!(ch, dbc)
-    @test ch.dbcs[end].components == [1]
-    dbc = Dirichlet(:v, Γ, (x, t) -> 0, [2, 3])
-    @test_throws ErrorException("components [2, 3] not within range of field :v (2 dimension(s))") add!(ch, dbc)
-
+    @test_throws ErrorException("No dof prescribed for order 0 interpolations") add!(ch, Dirichlet(:z, Γ, (x, t) -> 0))
+    for (s, v) in [(:s, :v), (:sd, :vd)] 
+        ## Scalar
+        dbc = Dirichlet(s, Γ, (x, t) -> 0)
+        add!(ch, dbc)
+        @test ch.dbcs[end].components == [1]
+        dbc = Dirichlet(s, Γ, (x, t) -> 0, [1])
+        add!(ch, dbc)
+        @test ch.dbcs[end].components == [1]
+        dbc = Dirichlet(s, Γ, (x, t) -> 0, [1, 2])
+        @test_throws ErrorException("components [1, 2] not within range of field :$s (1 dimension(s))") add!(ch, dbc)
+        dbc = Dirichlet(:p, Γ, (x, t) -> 0)
+        @test_throws ErrorException("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's DofHandler") add!(ch, dbc)
+        ## Vector
+        dbc = Dirichlet(v, Γ, (x, t) -> 0)
+        add!(ch, dbc)
+        @test ch.dbcs[end].components == [1, 2]
+        dbc = Dirichlet(v, Γ, (x, t) -> 0, [1])
+        add!(ch, dbc)
+        @test ch.dbcs[end].components == [1]
+        dbc = Dirichlet(v, Γ, (x, t) -> 0, [2, 3])
+        @test_throws ErrorException("components [2, 3] not within range of field :$v (2 dimension(s))") add!(ch, dbc)
+    end
     # PeriodicDirichlet
     @test_throws ErrorException("components are empty: $(Int)[]") PeriodicDirichlet(:u, face_map, Int[])
     @test_throws ErrorException("components not sorted: [2, 1]") PeriodicDirichlet(:u, face_map, Int[2, 1])
@@ -58,7 +56,7 @@
     pdbc = PeriodicDirichlet(:s, face_map, [1, 2])
     @test_throws ErrorException("components [1, 2] not within range of field :s (1 dimension(s))") add!(ConstraintHandler(dh), pdbc)
     pdbc = PeriodicDirichlet(:p, face_map)
-    @test_throws ErrorException("Did not find field :p in DofHandler (existing fields: [:s, :v]).") add!(ConstraintHandler(dh), pdbc)
+    @test_throws ErrorException("Did not find field :p in DofHandler (existing fields: [:s, :v, :z, :sd, :vd]).") add!(ConstraintHandler(dh), pdbc)
     ## Vector
     pdbc = PeriodicDirichlet(:v, face_map)
     add!(ConstraintHandler(dh), pdbc)
@@ -193,6 +191,53 @@ end
     @test ch.prescribed_dofs == [10, 11, 14, 25, 27]
 end
 
+@testset "discontinuous ip constraints" begin
+    grid = generate_grid(Hexahedron, (1, 1, 1))
+    addedgeset!(grid, "bottom", x-> x[3] ≈ -1.0)
+    dh = DofHandler(grid)
+    add!(dh, :u, DiscontinuousLagrange{RefHexahedron,1}()^3)
+    add!(dh, :p, DiscontinuousLagrange{RefHexahedron,1}())
+    close!(dh)
+
+    face_ch = ConstraintHandler(dh)
+    face_dbc = Dirichlet(:u, getfaceset(grid, "bottom"), (x,t) -> x, [1, 2, 3])
+    add!(face_ch, face_dbc)
+    close!(face_ch)
+    update!(face_ch)
+
+    edge_ch = ConstraintHandler(dh)
+    edge_dbc = Dirichlet(:u, getedgeset(grid, "bottom"), (x,t) -> x, [1, 2, 3])
+    add!(edge_ch, edge_dbc)
+    close!(edge_ch)
+    update!(edge_ch)
+
+    @test edge_ch.prescribed_dofs == face_ch.prescribed_dofs == collect(1:12)
+    @test edge_ch.inhomogeneities == face_ch.inhomogeneities == reduce(vcat, getcoordinates(grid,1)[1:4])
+
+    # This can be merged with the continuous test or removed.
+    # Shell mesh edge bcs
+    nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)), 
+             Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(0.0,1.0,0.0)),
+             Node{3,Float64}(Vec(2.0,0.0,0.0)), Node{3,Float64}(Vec(2.0,2.0,0.0))]
+
+    cells = [Quadrilateral((1,2,3,4)), Quadrilateral((2,5,6,3))]
+    grid = Grid(cells,nodes)
+
+    # 3d quad with 1st order 2d interpolation
+    dh = DofHandler(grid)
+    add!(dh, :u, DiscontinuousLagrange{RefQuadrilateral,2}())
+    add!(dh, :θ, DiscontinuousLagrange{RefQuadrilateral,2}())
+    close!(dh)
+
+    addedgeset!(grid, "bottom", x -> x[2] ≈ 0.0) #bottom edge
+    edge_ch = ConstraintHandler(dh)
+    edge_dbc = Dirichlet(:θ, getedgeset(grid, "bottom"), (x,t) -> (0.0,), [1])
+    add!(edge_ch, edge_dbc)
+    close!(edge_ch)
+    update!(edge_ch)
+
+    @test edge_ch.prescribed_dofs == [10, 11, 14, 28, 29, 32]
+end
 #@testset "edge bc mixed grid" begin
 #    # Test mesh
 #    # 6---7---8---9---10
