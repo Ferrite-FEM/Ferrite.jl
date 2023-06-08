@@ -352,6 +352,9 @@ struct DiscontinuousLagrange{shape, order, unused} <: ScalarInterpolation{shape,
     end
 end
 
+adjust_dofs_during_distribution(::DiscontinuousLagrange{shape,order}) where {shape,order} = adjust_dofs_during_distribution(Lagrange{shape,order}())
+adjust_dofs_during_distribution(::DiscontinuousLagrange{<:Any, 0}) = false
+
 getlowerorder(::DiscontinuousLagrange{shape,order}) where {shape,order} = DiscontinuousLagrange{shape,order-1}()
 
 getnbasefunctions(::DiscontinuousLagrange{shape,order}) where {shape,order} = getnbasefunctions(Lagrange{shape,order}())
