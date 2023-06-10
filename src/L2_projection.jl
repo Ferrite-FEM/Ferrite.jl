@@ -73,7 +73,7 @@ _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
 function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
     println(io, typeof(proj))
-    println(io, "  projection on:           ", length(proj.set), "/", getncells(getgrid(proj.dh)), " cells in grid")
+    println(io, "  projection on:           ", length(proj.set), "/", getncells(get_grid(proj.dh)), " cells in grid")
     println(io, "  function interpolation:  ", proj.func_ip)
     println(io, "  geometric interpolation: ", proj.geom_ip)
 end
@@ -100,7 +100,7 @@ function _assemble_L2_matrix(fe_values, set, dh)
         celldofs!(cell_dofs, dh, cellnum)
 
         fill!(Me, 0)
-        Xe = getcoordinates(getgrid(dh), cellnum)
+        Xe = getcoordinates(get_grid(dh), cellnum)
         reinit!(fe_values, Xe)
 
         ## ∭( v ⋅ u )dΩ
@@ -195,7 +195,7 @@ function _project(vars, proj::L2Projector, fe_values::AbstractValues, M::Integer
     for (ic,cellnum) in enumerate(proj.set)
         celldofs!(cell_dofs, proj.dh, cellnum)
         fill!(fe, 0)
-        Xe = getcoordinates(getgrid(proj.dh), cellnum)
+        Xe = getcoordinates(get_grid(proj.dh), cellnum)
         cell_vars = vars[ic]
         reinit!(fe_values, Xe)
 
@@ -226,7 +226,7 @@ end
 
 function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, proj::L2Projector, vals::Vector{T}, name::AbstractString) where T
     data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
-    @assert size(data, 2) == getnnodes(getgrid(proj.dh))
+    @assert size(data, 2) == getnnodes(get_grid(proj.dh))
     vtk_point_data(vtk, data, name; component_names=component_names(T))
     return vtk
 end
@@ -248,9 +248,9 @@ function _evaluate_at_grid_nodes(
     @assert ndofs(dh) == length(vals)
     if vtk
         nout = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
-        data = fill(T(NaN), nout, getnnodes(getgrid(dh)))
+        data = fill(T(NaN), nout, getnnodes(get_grid(dh)))
     else
-        data = fill(NaN * zero(S), getnnodes(getgrid(dh)))
+        data = fill(NaN * zero(S), getnnodes(get_grid(dh)))
     end
     ip, gip = proj.func_ip, proj.geom_ip
     refdim, refshape = getdim(ip), getrefshape(ip)

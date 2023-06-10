@@ -119,7 +119,7 @@ export
     Field,
     evaluate_at_grid_nodes,
     apply_analytical!,
-    getgrid,
+    get_grid,
     getdim,
 
 # Constraints

@@ -315,8 +315,8 @@ function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, b
     return local_face_dofs, local_face_dofs_offset
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(getgrid(ch.dh))))
-    grid = getgrid(ch.dh)
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(get_grid(ch.dh))))
+    grid = get_grid(ch.dh)
     if interpolation !== default_interpolation(getcelltype(grid, first(cellset)))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
     end
@@ -449,7 +449,7 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, ::Set{Int}, fie
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where T
     counter = 1
     for nodenumber in nodeidxs
-        x = getcoordinates(getnodes(getgrid(dh), nodenumber))
+        x = getcoordinates(getnodes(get_grid(dh), nodenumber))
         bc_value = f(x, time)
         @assert length(bc_value) == length(components)
         for v in bc_value
@@ -477,13 +477,13 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
 
     for field in unique_fields
         nd = getfielddim(ch.dh, field)
-        data = zeros(Float64, nd, getnnodes(getgrid(ch.dh)))
+        data = zeros(Float64, nd, getnnodes(get_grid(ch.dh)))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
             if eltype(dbc.faces) <: BoundaryIndex
                 functype = boundaryfunction(eltype(dbc.faces))
                 for (cellidx, faceidx) in dbc.faces
-                    for facenode in functype(getcells(getgrid(ch.dh), cellidx))[faceidx]
+                    for facenode in functype(getcells(get_grid(ch.dh), cellidx))[faceidx]
                         for component in dbc.components
                             data[component, facenode] = 1
                         end
@@ -823,7 +823,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         dbc.field_name in fh.field_names || continue
         # Compute the intersection between dbc.set and the cellset of this
         # FieldHandler and skip if the set is empty
-        filtered_set = filter_dbc_set(getgrid(ch.dh), fh.cellset, dbc.faces)
+        filtered_set = filter_dbc_set(get_grid(ch.dh), fh.cellset, dbc.faces)
         isempty(filtered_set) && continue
         # Fetch information about the field on this FieldHandler
         field_idx = find_field(fh, dbc.field_name)
@@ -844,7 +844,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
             # BCValues are just dummy for nodesets so set to FaceIndex
             EntityType = FaceIndex
         end
-        CT = getcelltype(getgrid(ch.dh), fh) # Same celltype enforced in FieldHandler constructor
+        CT = getcelltype(get_grid(ch.dh), fh) # Same celltype enforced in FieldHandler constructor
         bcvalues = BCValues(interpolation, default_interpolation(CT), EntityType)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
@@ -940,7 +940,7 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     is_legacy = !isempty(pdbc.face_pairs) && isempty(pdbc.face_map)
     if is_legacy
         for (mset, iset) in pdbc.face_pairs
-            collect_periodic_faces!(pdbc.face_map, getgrid(ch.dh), mset, iset, identity) # TODO: Better transform
+            collect_periodic_faces!(pdbc.face_map, get_grid(ch.dh), mset, iset, identity) # TODO: Better transform
         end
     end
     field_idx = find_field(ch.dh, pdbc.field_name)
@@ -981,7 +981,7 @@ end
 
 function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::Interpolation,
                field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T},Nothing}, ::Type{dof_map_t}, iterator_f::F) where {T, dof_map_t, F <: Function}
-    grid = getgrid(ch.dh)
+    grid = get_grid(ch.dh)
     face_map = pdbc.face_map
 
     # Indices of the local dofs for the faces

@@ -1,7 +1,7 @@
 abstract type AbstractDofHandler end
 
 """
-    getgrid(dh::AbstractDofHandler)
+    get_grid(dh::AbstractDofHandler)
 
 Access the some grid representation for the dof handler.
     
@@ -10,7 +10,7 @@ Access the some grid representation for the dof handler.
     distributed assembly and assembly on a single process, because most parts oft the
     functionality can be handled by only acting on the locally owned cell set.
 """
-getgrid(dh::AbstractDofHandler)
+get_grid(dh::AbstractDofHandler)
 
 """
     Field(name::Symbol, interpolation::Interpolation, dim::Int)
@@ -110,7 +110,7 @@ function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
 end
 
 isclosed(dh::AbstractDofHandler) = dh.closed[]
-getgrid(dh::DofHandler) = dh.grid
+get_grid(dh::DofHandler) = dh.grid
 
 """
     ndofs(dh::AbstractDofHandler)
@@ -127,11 +127,11 @@ Return the number of degrees of freedom for the cell with index `cell`.
 See also [`ndofs`](@ref).
 """
 function ndofs_per_cell(dh::DofHandler, cell::Int=1)
-    @boundscheck 1 <= cell <= getncells(getgrid(dh))
+    @boundscheck 1 <= cell <= getncells(get_grid(dh))
     return @inbounds ndofs_per_cell(dh.fieldhandlers[dh.cell_to_fieldhandler[cell]])
 end
 ndofs_per_cell(fh::FieldHandler) = fh.ndofs_per_cell
-nnodes_per_cell(dh::DofHandler, cell::Int=1) = nnodes_per_cell(getgrid(dh), cell) # TODO: deprecate, shouldn't belong to DofHandler any longer
+nnodes_per_cell(dh::DofHandler, cell::Int=1) = nnodes_per_cell(get_grid(dh), cell) # TODO: deprecate, shouldn't belong to DofHandler any longer
 
 """
     celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
@@ -160,11 +160,11 @@ end
 
 #TODO: perspectively remove in favor of `getcoordinates!(global_coords, grid, i)`?
 function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::DofHandler, i::Union{Int, <:AbstractCell}) where {dim,T}
-    cellcoords!(global_coords, getgrid(dh), i)
+    cellcoords!(global_coords, get_grid(dh), i)
 end
 
 function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler, i::Union{Int, <:AbstractCell})
-    cellnodes!(global_nodes, getgrid(dh), i)
+    cellnodes!(global_nodes, get_grid(dh), i)
 end
 
 """
@@ -204,11 +204,11 @@ Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
 function add!(dh::DofHandler, fh::FieldHandler)
     # TODO: perhaps check that a field with the same name is the same field?
     @assert !isclosed(dh)
-    _check_same_celltype(getgrid(dh), collect(fh.cellset))
+    _check_same_celltype(get_grid(dh), collect(fh.cellset))
     _check_cellset_intersections(dh, fh)
     # the field interpolations should have the same refshape as the cells they are applied to
     # extract the celltype from the first cell as the celltypes are all equal
-    cell_type = getcelltype(getgrid(dh), fh)
+    cell_type = getcelltype(get_grid(dh), fh)
     refshape_cellset = getrefshape(default_interpolation(cell_type))
     for interpolation in fh.field_interpolations
         refshape = getrefshape(interpolation)
@@ -235,11 +235,11 @@ celltypes, [`add!(dh::DofHandler, fh::FieldHandler)`](@ref) must be used instead
 function add!(dh::DofHandler, name::Symbol, ip::Interpolation)
     @assert !isclosed(dh)
 
-    celltype = getcelltype(getgrid(dh))
+    celltype = getcelltype(get_grid(dh))
     @assert isconcretetype(celltype)
 
     if length(dh.fieldhandlers) == 0
-        cellset = Set(1:getncells(getgrid(dh)))
+        cellset = Set(1:getncells(get_grid(dh)))
         push!(dh.fieldhandlers, FieldHandler(Field[], cellset))
     elseif length(dh.fieldhandlers) > 1
         error("If you have more than one FieldHandler, you must specify field")
@@ -295,7 +295,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     # `vertexdict` keeps track of the visited vertices. The first dof added to vertex v is
     # stored in vertexdict[v].
     # TODO: No need to allocate this vector for fields that don't have vertex dofs
-    vertexdicts = [zeros(Int, getnnodes(getgrid(dh))) for _ in 1:numfields]
+    vertexdicts = [zeros(Int, getnnodes(get_grid(dh))) for _ in 1:numfields]
 
     # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem.
     # An edge is uniquely determined by two global vertices, with global direction going
@@ -393,7 +393,7 @@ function _close_fieldhandler!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::
         @assert dh.cell_to_fieldhandler[ci] == 0
         dh.cell_to_fieldhandler[ci] = fh_index
 
-        cell = getcells(getgrid(dh), ci)
+        cell = getcells(get_grid(dh), ci)
         len_cell_dofs_start = length(dh.cell_dofs)
         dh.cell_dofs_offset[ci] = len_cell_dofs_start + 1
 
@@ -835,10 +835,10 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         # VTK output of solution field (or L2 projected scalar data)
         n_c = n_components(ip)
         vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
-        data = fill(NaN * zero(T), vtk_dim, getnnodes(getgrid(dh)))
+        data = fill(NaN * zero(T), vtk_dim, getnnodes(get_grid(dh)))
     else
         # Just evalutation at grid nodes
-        data = fill(NaN * zero(RT), getnnodes(getgrid(dh)))
+        data = fill(NaN * zero(RT), getnnodes(get_grid(dh)))
     end
     # Loop over the fieldhandlers
     for fh in dh.fieldhandlers
@@ -846,7 +846,7 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         field_idx = _find_field(fh, fieldname)
         field_idx === nothing && continue
         # Set up CellValues with the local node coords as quadrature points
-        CT = getcelltype(getgrid(dh), fh)
+        CT = getcelltype(get_grid(dh), fh)
         ip_geo = default_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
         qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
