@@ -19,7 +19,7 @@ Ferrite.SurfaceOrientationInfo
 The main entry point for dof distribution is [`__close!`](@ref).
 
 ```@docs
-Ferrite.getgrid
+Ferrite.get_grid
 Ferrite.find_field(dh::DofHandler, field_name::Symbol)
 Ferrite._find_field(fh::FieldHandler, field_name::Symbol)
 Ferrite._close_fieldhandler!
