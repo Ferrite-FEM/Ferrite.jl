@@ -3,11 +3,11 @@ abstract type AbstractDofHandler end
 """
     get_grid(dh::AbstractDofHandler)
 
-Access the some grid representation for the dof handler.
+Access some grid representation for the dof handler.
     
 !!! note
     This API function is currently not well-defined. It acts as the interface between 
-    distributed assembly and assembly on a single process, because most parts oft the
+    distributed assembly and assembly on a single process, because most parts of the
     functionality can be handled by only acting on the locally owned cell set.
 """
 get_grid(dh::AbstractDofHandler)
