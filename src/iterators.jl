@@ -144,7 +144,7 @@ function CellIterator(gridordh::Union{Grid,AbstractDofHandler},
         grid = gridordh isa AbstractDofHandler ? get_grid(gridordh) : gridordh
         set = 1:getncells(grid)
     end
-    if gridordh isa DofHandler && !isconcretetype(getcelltype(getgrid(gridordh)))
+    if gridordh isa DofHandler && !isconcretetype(getcelltype(get_grid(gridordh)))
         # TODO: Since the CellCache is resizeable this is not really necessary to check
         #       here, but might be useful to catch slow code paths?
         _check_same_celltype(get_grid(gridordh), set)
