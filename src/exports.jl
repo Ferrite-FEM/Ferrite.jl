@@ -119,7 +119,6 @@ export
     Field,
     evaluate_at_grid_nodes,
     apply_analytical!,
-    get_grid,
 
 # Constraints
     ConstraintHandler,
