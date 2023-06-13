@@ -13,10 +13,23 @@ struct Node{dim,T}
     x::Vec{dim,T}
 end
 Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
+
+"""
+    getcoordinates(::Node)
+    
+Get the value of the node coordinate.
+"""
 getcoordinates(n::Node) = n.x
 
 """
-    Ferrite.get_coordinate_eltype(::Node)
+    get_coordinate_type(::Node)
+
+Get the data type of the the node coordinate.
+"""
+get_coordinate_type(::Node{dim,T}) where {dim,T}  = Vec{dim,T}
+
+"""
+    get_coordinate_eltype(::Node)
 
 Get the data type of the components of the nodes coordinate.
 """
@@ -541,6 +554,13 @@ end
 # Grid utility functions #
 ##########################
 """
+    get_coordinate_type(::AbstractGrid)
+
+Get the datatype for a single point in the grid.
+"""
+get_coordinate_type(grid::Grid{dim,C,T}) where {dim,C,T} = Vec{dim,T} # Node is baked into the mesh type.
+
+"""
     getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
     getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
     getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
@@ -723,7 +743,7 @@ Returns all vertex sets of the grid.
 """
 @inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
 
-n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
+n_faces_per_cell(grid::Grid) = nfaces(getcelltype(grid))
 
 # Transformations
 """
