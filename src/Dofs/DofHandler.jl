@@ -158,11 +158,6 @@ function celldofs(dh::AbstractDofHandler, i::Int)
     return celldofs!(zeros(Int, ndofs_per_cell(dh, i)), dh, i)
 end
 
-#TODO: perspectively remove in favor of `getcoordinates!(global_coords, grid, i)`?
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::DofHandler, i::Union{Int, <:AbstractCell}) where {dim,T}
-    cellcoords!(global_coords, get_grid(dh), i)
-end
-
 function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler, i::Union{Int, <:AbstractCell})
     cellnodes!(global_nodes, get_grid(dh), i)
 end
