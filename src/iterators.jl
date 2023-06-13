@@ -58,12 +58,12 @@ function CellCache(grid::Grid{dim,C,T}, flags::UpdateFlags=UpdateFlags()) where 
 end
 
 function CellCache(dh::DofHandler{dim}, flags::UpdateFlags=UpdateFlags()) where {dim}
-    N = nnodes_per_cell(dh.grid)
+    N = nnodes_per_cell(get_grid(dh))
     nodes = zeros(Int, N)
-    coords = zeros(Vec{dim, get_coordinate_eltype(dh.grid)}, N)
+    coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)
     n = ndofs_per_cell(dh)
     celldofs = zeros(Int, n)
-    return CellCache(flags, dh.grid, ScalarWrapper(-1), nodes, coords, dh, celldofs)
+    return CellCache(flags, get_grid(dh), ScalarWrapper(-1), nodes, coords, dh, celldofs)
 end
 
 function reinit!(cc::CellCache, i::Int)
@@ -141,13 +141,13 @@ function CellIterator(gridordh::Union{Grid,AbstractDofHandler},
                       set::Union{IntegerCollection,Nothing}=nothing,
                       flags::UpdateFlags=UpdateFlags())
     if set === nothing
-        grid = gridordh isa AbstractDofHandler ? gridordh.grid : gridordh
+        grid = gridordh isa AbstractDofHandler ? get_grid(gridordh) : gridordh
         set = 1:getncells(grid)
     end
-    if gridordh isa DofHandler && !isconcretetype(getcelltype(gridordh.grid))
+    if gridordh isa DofHandler && !isconcretetype(getcelltype(get_grid(gridordh)))
         # TODO: Since the CellCache is resizeable this is not really necessary to check
         #       here, but might be useful to catch slow code paths?
-        _check_same_celltype(gridordh.grid, set)
+        _check_same_celltype(get_grid(gridordh), set)
     end
     return CellIterator(CellCache(gridordh, flags), set)
 end
@@ -170,8 +170,8 @@ Base.length(ci::CellIterator) = length(ci.set)
 
 
 function _check_same_celltype(grid::AbstractGrid, cellset)
-    celltype = typeof(grid.cells[first(cellset)])
-    if !all(typeof(grid.cells[i]) == celltype for i in cellset)
+    celltype = getcelltype(grid, first(cellset))
+    if !all(getcelltype(grid, i) == celltype for i in cellset)
         error("The cells in the cellset are not all of the same celltype.")
     end
 end
