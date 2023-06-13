@@ -1,0 +1,66 @@
+<svg width="750.0" height="200.0" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<title>quadrilateral reference element</title>
+<desc>This plot is from DefElement (https://defelement.com) and is available under a Creative Commons Attribution 4.0 International (CC BY 4.0) license: https://creativecommons.org/licenses/by/4.0/</desc>
+<metadata id="license">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://web.resource.org/cc/">
+   <cc:Work rdf:about="">
+     <dc:title>quadrilateral reference element</dc:title>
+     <dc:date>2023-05-01</dc:date>
+     <dc:creator>
+       <cc:Agent><dc:title>DefElement</dc:title></cc:Agent>
+       <cc:Agent><dc:title>Matthew Scroggs</dc:title></cc:Agent>
+     </dc:creator>
+     <dc:description>See document description</dc:description>
+     <cc:license rdf:resource="http://creativecommons.org/licenses/by/4.0/"/>
+     <dc:format>image/svg+xml</dc:format>
+     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+   </cc:Work>
+   <cc:License rdf:about="http://creativecommons.org/licenses/by/4.0/">
+     <cc:permits rdf:resource="http://web.resource.org/cc/Reproduction"/>
+     <cc:permits rdf:resource="http://web.resource.org/cc/Distribution"/>
+     <cc:permits rdf:resource="http://web.resource.org/cc/DerivativeWorks"/>
+     <cc:requires rdf:resource="http://web.resource.org/cc/Notice"/>
+     <cc:requires rdf:resource="http://web.resource.org/cc/Attribution"/>
+   </cc:License>
+ </rdf:RDF>
+</metadata>
+
+<line x1="25.0" y1="175.0" x2="75.0" y2="175.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<line x1="65.0" y1="179.0" x2="75.0" y2="175.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<line x1="65.0" y1="171.0" x2="75.0" y2="175.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<line x1="25.0" y1="175.0" x2="25.0" y2="125.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<line x1="28.999999999999993" y1="135.0" x2="25.0" y2="125.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<line x1="21.000000000000007" y1="135.0" x2="25.0" y2="125.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<text x="79.0" y="175.0" fill="#000000" font-size="35" style="dominant-baseline:middle;text-anchor:left;font-family:'CMU Serif',serif;font-style:italic">ξ<tspan dy="10" style="font-size:60%;">1</tspan></text>
+<text x="25.0" y="110.0" fill="#000000" font-size="35" style="dominant-baseline:bottom;text-anchor:middle;font-family:'CMU Serif',serif;font-style:italic">ξ<tspan dy="10" style="font-size:60%;">2</tspan></text>
+<line x1="175.0" y1="175.0" x2="325.0" y2="175.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<line x1="175.0" y1="175.0" x2="175.0" y2="25.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<line x1="325.0" y1="175.0" x2="325.0" y2="25.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<line x1="175.0" y1="25.0" x2="325.0" y2="25.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<circle cx="175.0" cy="175.0" r="20.0" stroke="#CB3C33" stroke-width="4.0" fill="#FFFFFF"/>
+<text x="175.0" y="175.0" fill="#000000" font-size="25" style="text-anchor:middle;dominant-baseline:middle;font-family:'Varela Round',sans-serif">1</text>
+<circle cx="325.0" cy="175.0" r="20.0" stroke="#CB3C33" stroke-width="4.0" fill="#FFFFFF"/>
+<text x="325.0" y="175.0" fill="#000000" font-size="25" style="text-anchor:middle;dominant-baseline:middle;font-family:'Varela Round',sans-serif">2</text>
+<circle cx="175.0" cy="25.0" r="20.0" stroke="#CB3C33" stroke-width="4.0" fill="#FFFFFF"/>
+<text x="175.0" y="25.0" fill="#000000" font-size="25" style="text-anchor:middle;dominant-baseline:middle;font-family:'Varela Round',sans-serif">4</text>
+<circle cx="325.0" cy="25.0" r="20.0" stroke="#CB3C33" stroke-width="4.0" fill="#FFFFFF"/>
+<text x="325.0" y="25.0" fill="#000000" font-size="25" style="text-anchor:middle;dominant-baseline:middle;font-family:'Varela Round',sans-serif">3</text>
+<line x1="375.0" y1="175.0" x2="525.0" y2="175.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<circle cx="450.0" cy="175.0" r="20.0" stroke="#4063D8" stroke-width="4.0" fill="#FFFFFF"/>
+<text x="450.0" y="175.0" fill="#000000" font-size="25" style="text-anchor:middle;dominant-baseline:middle;font-family:'Varela Round',sans-serif">1</text>
+<line x1="375.0" y1="175.0" x2="375.0" y2="25.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<circle cx="375.0" cy="100.0" r="20.0" stroke="#4063D8" stroke-width="4.0" fill="#FFFFFF"/>
+<text x="375.0" y="100.0" fill="#000000" font-size="25" style="text-anchor:middle;dominant-baseline:middle;font-family:'Varela Round',sans-serif">4</text>
+<line x1="525.0" y1="175.0" x2="525.0" y2="25.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<circle cx="525.0" cy="100.0" r="20.0" stroke="#4063D8" stroke-width="4.0" fill="#FFFFFF"/>
+<text x="525.0" y="100.0" fill="#000000" font-size="25" style="text-anchor:middle;dominant-baseline:middle;font-family:'Varela Round',sans-serif">2</text>
+<line x1="375.0" y1="25.0" x2="525.0" y2="25.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<circle cx="450.0" cy="25.0" r="20.0" stroke="#4063D8" stroke-width="4.0" fill="#FFFFFF"/>
+<text x="450.0" y="25.0" fill="#000000" font-size="25" style="text-anchor:middle;dominant-baseline:middle;font-family:'Varela Round',sans-serif">3</text>
+<circle cx="650.0" cy="100.0" r="20.0" stroke="#389826" stroke-width="4.0" fill="#FFFFFF"/>
+<text x="650.0" y="100.0" fill="#000000" font-size="25" style="text-anchor:middle;dominant-baseline:middle;font-family:'Varela Round',sans-serif">1</text>
+<line x1="575.0" y1="175.0" x2="725.0" y2="175.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<line x1="575.0" y1="175.0" x2="575.0" y2="25.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<line x1="725.0" y1="175.0" x2="725.0" y2="25.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+<line x1="575.0" y1="25.0" x2="725.0" y2="25.0" stroke="#000000" stroke-width="4.0" stroke-linecap="round"/>
+</svg>
