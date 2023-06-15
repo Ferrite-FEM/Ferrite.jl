@@ -553,39 +553,39 @@ end
         return false
     end
 
-    function check_coupling(dh, topology, K, coupling, elements_coupling)
-        K_check = falses(dh.ndofs[],dh.ndofs[])
-        field_dims = map(fieldname -> Ferrite.getfielddim(dh, fieldname), dh.field_names)
+    function check_coupling(dh, coupling_dofs, elements_coupling_dofs, topology, K, coupling, elements_coupling)
         for cell_idx in eachindex(getcells(dh.grid))
-            current_face_neighborhood = Ferrite.getdim(dh.grid.cells[cell_idx]) >1 ? topology.face_neighbor[cell_idx,:] : topology.vertex_neighbor[cell_idx,:]
-            current = Ferrite.EntityNeighborhood{FaceIndex}(FaceIndex[FaceIndex((cell_idx, -1))])
-            for neighbor_cell in ∪(current_face_neighborhood,(current,))
-                isempty(neighbor_cell) && continue
-                neighbor_idx = neighbor_cell[1].idx[1]
-                used_coupling = cell_idx == neighbor_idx ? coupling : elements_coupling
-                sz = size(used_coupling, 1)
-                for (fhi, fh) in pairs(dh.fieldhandlers)
-                    for (cell_field_idx, cell_field) in pairs(fh.fields) 
-                        is_discontinuous = Ferrite.IsDiscontinuous(cell_field.interpolation)
-                        cell_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[cell_idx]].fields || continue
-                        for (neighbor_field_idx, neighbor_field) in pairs(fh.fields) 
-                            neighbor_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[neighbor_idx]].fields || continue
-                            is_discontinuous &= Ferrite.IsDiscontinuous(neighbor_field.interpolation)
-                            for (i_idx, i) in pairs(dof_range(fh, cell_field_idx)), (j_idx, j) in pairs(dof_range(fh,neighbor_field_idx))
-                                I = dh.cell_dofs[i+dh.cell_dofs_offset[cell_idx]-1]
-                                J = dh.cell_dofs[j+dh.cell_dofs_offset[neighbor_idx]-1]
-                                cell_coupling_idx = sz == length(dh.field_names) ? cell_field_idx : (1 + (i_idx - 1) % field_dims[cell_field_idx] + sum(field_dims[1:cell_field_idx-1]))
-                                neighbor_coupling_idx = sz == length(dh.field_names) ? neighbor_field_idx : (1 + (j_idx - 1) % field_dims[neighbor_field_idx] + sum(field_dims[1:neighbor_field_idx-1]))
-                                K_check[I,J] |= (used_coupling[cell_coupling_idx, neighbor_coupling_idx] && (is_discontinuous || (cell_idx == neighbor_idx))) || I == J
-                            end
-                        end
+            fh = dh.fieldhandlers[dh.cell_to_fieldhandler[cell_idx]]
+            # Test in-element coupling
+            for (index, (i_dofs, j_dofs, i_name, j_name)) in pairs(coupling_dofs)
+                field1_idx = findfirst(i->i.name == i_name,fh.fields)
+                field2_idx = findfirst(i->i.name == j_name,fh.fields)
+                any(isnothing.([field1_idx, field2_idx])) && continue
+                for i_idx in i_dofs, j_idx in j_dofs
+                    i = dh.cell_dofs[i_idx + dh.cell_dofs_offset[cell_idx] - 1]
+                    j = dh.cell_dofs[j_idx + dh.cell_dofs_offset[cell_idx] - 1]
+                    @test is_stored(K, i, j) == coupling[index]
+                end
+            end
+            # test cross-element coupling
+            for neighbor_idx in topology.cell_face_neighbor[cell_idx]
+                fh_neighbor = dh.fieldhandlers[dh.cell_to_fieldhandler[neighbor_idx.idx]]
+                for (index, (i_dofs, j_dofs, i_name, j_name)) in pairs(elements_coupling_dofs)
+                    field_idx = findfirst(i->i.name == i_name,fh.fields)
+                    neighbor_field_idx = findfirst(i->i.name == j_name,fh_neighbor.fields)
+                    any(isnothing.([field_idx, neighbor_field_idx])) && continue
+                    ip = fh.fields[field_idx].interpolation
+                    ip_neighbor = fh_neighbor.fields[neighbor_field_idx].interpolation
+                    is_discontinuous =  all(Ferrite.IsDiscontinuous.([ip, ip_neighbor]))
+                    for i_idx in i_dofs, j_idx in j_dofs
+                        i = dh.cell_dofs[i_idx + dh.cell_dofs_offset[cell_idx] - 1]
+                        j = dh.cell_dofs[j_idx + dh.cell_dofs_offset[neighbor_idx.idx] - 1]
+                        !is_discontinuous && continue
+                        @test is_stored(K, i, j) == (elements_coupling[index])
                     end
                 end
             end
         end
-        check_I = repeat(1:dh.ndofs[], dh.ndofs[])
-        check_J = repeat(1:dh.ndofs[], inner = dh.ndofs[])
-        @test is_stored.(Ref(K), check_I, check_J) == reshape(K_check,length(check_I))
     end
     
     grid = generate_grid(Quadrilateral, (2, 2))
@@ -595,10 +595,24 @@ end
     add!(dh, :p, DiscontinuousLagrange{RefQuadrilateral,1}())
     add!(dh, :w, Lagrange{RefQuadrilateral,1}())
     close!(dh)
+    udofs = dof_range(dh, :u)
+    u1dofs = udofs[1:2:end]
+    u2dofs = udofs[2:2:end]
+    pdofs = dof_range(dh, :p)
+    wdofs = dof_range(dh, :w)
+    dofs4 = [   (u1dofs, u1dofs, :u, :u) (u1dofs, u2dofs, :u, :u) (u1dofs, pdofs, :u, :p) (u1dofs, wdofs, :u, :w)
+                (u2dofs, u1dofs, :u, :u) (u2dofs, u2dofs, :u, :u) (u2dofs, pdofs, :u, :p) (u2dofs, wdofs, :u, :w)
+                (pdofs, u1dofs, :p, :u) (pdofs, u2dofs, :p, :u) (pdofs, pdofs, :p, :p) (pdofs, wdofs, :p, :w)
+                (wdofs, u1dofs, :w, :u) (wdofs, u2dofs, :w, :u) (wdofs, pdofs, :w, :p) (wdofs, wdofs, :w, :w)]
+    dofs3 = [   (udofs, udofs, :u, :u)  (udofs, pdofs, :u, :p) (udofs, wdofs, :u, :w)
+                (pdofs, udofs, :p, :u)  (pdofs, pdofs, :p, :p) (pdofs, wdofs, :p, :w)
+                (wdofs, udofs, :w, :u)  (wdofs, pdofs, :w, :p) (wdofs, wdofs, :w, :w)]
     for coupling in couplings, elements_coupling in couplings
+        coupling_dofs = size(coupling)[1] == 3 ? dofs3 : dofs4
+        elements_coupling_dofs = size(elements_coupling)[1] == 3 ? dofs3 : dofs4
         K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, elements_coupling = elements_coupling)
         all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, elements_coupling = elements_coupling) 
-        check_coupling(dh, topology, K, coupling, elements_coupling)
+        check_coupling(dh, coupling_dofs, elements_coupling_dofs, topology, K, coupling, elements_coupling)
     end
 
     # Error paths
@@ -621,9 +635,23 @@ end
     )
     add!(dh, fh2)
     close!(dh)
+    udofs = dof_range(dh.fieldhandlers[1], :u)
+    u1dofs = udofs[1:2:end]
+    u2dofs = udofs[2:2:end]
+    ydofs = dof_range(dh.fieldhandlers[1], :y)
+    pdofs = dof_range(dh.fieldhandlers[1], :p)
+    dofs4 = [   (u1dofs, u1dofs, :u, :u) (u1dofs, u2dofs, :u, :u) (u1dofs, ydofs, :u, :y) (u1dofs, pdofs, :u, :p)
+                (u2dofs, u1dofs, :u, :u) (u2dofs, u2dofs, :u, :u) (u2dofs, ydofs, :u, :y) (u2dofs, pdofs, :u, :p)
+                (ydofs, u1dofs, :y, :u) (ydofs, u2dofs, :y, :u) (ydofs, ydofs, :y, :y) (ydofs, pdofs, :y, :p)
+                (pdofs, u1dofs, :p, :u) (pdofs, u2dofs, :p, :u) (pdofs, ydofs, :p, :y) (pdofs, pdofs, :p, :p)]
+    dofs3 = [   (udofs, udofs, :u, :u)  (udofs, ydofs, :u, :y) (udofs, pdofs, :u, :p)
+                (ydofs, udofs, :y, :u)  (ydofs, ydofs, :y, :y) (ydofs, pdofs, :y, :p)
+                (pdofs, udofs, :p, :u)  (pdofs, ydofs, :p, :y) (pdofs, pdofs, :p, :p)]
     for coupling in couplings, elements_coupling in couplings
+        coupling_dofs = size(coupling)[1] == 3 ? dofs3 : dofs4
+        elements_coupling_dofs = size(elements_coupling)[1] == 3 ? dofs3 : dofs4
         K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, elements_coupling = elements_coupling)
         all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, elements_coupling = elements_coupling)
-        check_coupling(dh, topology, K, coupling, elements_coupling)
+        check_coupling(dh, coupling_dofs, elements_coupling_dofs, topology, K, coupling, elements_coupling)
     end
 end
