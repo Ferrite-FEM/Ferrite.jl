@@ -125,6 +125,7 @@ function cross_element_coupling!(dh::AbstractDofHandler, topology::ExclusiveTopo
             end
             for cell_idx in eachindex(getcells(dh.grid))
                 cell_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[cell_idx]].fields || continue
+                # Not using celldofs() to avoid copying 
                 cell_dofs = @view dh.cell_dofs[dh.cell_dofs_offset[cell_idx] : dh.cell_dofs_offset[cell_idx] + ndofs_per_cell(dh, cell_idx) - 1]
                 cell_field_dofs = @view cell_dofs[element_dof_start + 1 : element_dof_start + nbasefunctions[cell_field_i]]
                 for neighbor_cell in (getdim(dh.grid.cells[cell_idx]) >1 ? topology.cell_face_neighbor[cell_idx] : topology.cell_neighbor[cell_idx])

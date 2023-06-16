@@ -552,65 +552,48 @@ end
         end
         return false
     end
-
+    function _check_dofs(K, fh, cell_idx, coupling, coupling_idx, vdim, neighbors, is_cross_element)
+        for (field1_idx, field1) in enumerate(fh.fields)
+            i_dofs = dof_range(fh, field1_idx)
+            ip1 = field1.interpolation
+            vdim[1] = typeof(ip1) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip1) : 1
+            for dim1 in 1:vdim[1] 
+                for cell2_idx in neighbors
+                    fh2 = dh.fieldhandlers[dh.cell_to_fieldhandler[cell2_idx.idx]]
+                    coupling_idx[2] = 1
+                    for (field2_idx, field2) in enumerate(fh2.fields)
+                        j_dofs = dof_range(fh2, field2_idx)
+                        ip2 = field2.interpolation
+                        vdim[2] = typeof(ip2) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip2) : 1
+                        is_cross_element && !all(Ferrite.IsDiscontinuous.([ip1, ip2])) && continue
+                        for  dim2 in 1:vdim[2]
+                            i_dofs_v = i_dofs[dim1:vdim[1]:end]
+                            j_dofs_v = j_dofs[dim2:vdim[2]:end]
+                            for i_idx in i_dofs_v, j_idx in j_dofs_v
+                                i = celldofs(dh,cell_idx)[i_idx]
+                                j = celldofs(dh,cell2_idx.idx)[j_idx]
+                                @test is_stored(K, i, j) == coupling[coupling_idx...]
+                            end
+                            coupling_idx[2] += 1
+                        end
+                    end
+                end
+                coupling_idx[1] += 1
+            end
+        end
+    end
     function check_coupling(dh, topology, K, coupling, elements_coupling)
         for cell_idx in eachindex(getcells(dh.grid))
             fh = dh.fieldhandlers[dh.cell_to_fieldhandler[cell_idx]]
             coupling_idx = [1,1]
             elements_coupling_idx = [1,1]
             vdim = [1,1]
-            for (field1_idx, field1) in enumerate(fh.fields)
-                i_dofs = dof_range(fh, field1_idx)
-                ip1 = field1.interpolation
-                vdim[1] = typeof(ip1) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip1) : 1
-                for dim1 in 1:vdim[1] 
-                    coupling_idx[2] = 1
-                    for (field2_idx, field2) in enumerate(fh.fields)
-                        j_dofs = dof_range(fh, field2_idx)
-                        ip2 = field2.interpolation
-                        vdim[2] = typeof(ip2) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip2) : 1
-                        # Test in-element coupling
-                        for  dim2 in 1:vdim[2]
-                            i_dofs_v = i_dofs[dim1:vdim[1]:end]
-                            j_dofs_v = j_dofs[dim2:vdim[2]:end]
-                            for i_idx in i_dofs_v, j_idx in j_dofs_v
-                                (i, j) = celldofs(dh,cell_idx)[[i_idx, j_idx]]
-                                @test is_stored(K, i, j) == coupling[coupling_idx...]
-                            end
-                            coupling_idx[2] += 1
-                        end
-                    end
-                    coupling_idx[1] += 1
-                end
-                vdim[1] = typeof(ip1) <: VectorizedInterpolation && size(elements_coupling)[1] == 4 ? Ferrite.get_n_copies(ip1) : 1    
-                for dim1 in 1:vdim[1]
-                    # test cross-element coupling
-                    for neighbor_idx in topology.cell_face_neighbor[cell_idx]
-                        fh_neighbor = dh.fieldhandlers[dh.cell_to_fieldhandler[neighbor_idx.idx]]
-                        elements_coupling_idx[2] = 1
-                        for (field2_idx, field2) in enumerate(fh_neighbor.fields)      
-                            j_dofs = dof_range(fh_neighbor, field2_idx)
-                            ip2 = field2.interpolation
-                            vdim[2] = typeof(ip2) <: VectorizedInterpolation && size(elements_coupling)[1] == 4 ? Ferrite.get_n_copies(ip2) : 1    
-                            !all(Ferrite.IsDiscontinuous.([ip1, ip2])) && continue
-                            for  dim2 in 1:vdim[2]
-                                i_dofs_v = i_dofs[dim1:vdim[1]:end]
-                                j_dofs_v = j_dofs[dim2:vdim[2]:end]
-                                for i_idx in i_dofs_v, j_idx in j_dofs_v
-                                    i = celldofs(dh,cell_idx)[i_idx]
-                                    j = celldofs(dh,neighbor_idx.idx)[j_idx]
-                                    @test is_stored(K, i, j) == elements_coupling[elements_coupling_idx...]
-                                end
-                                elements_coupling_idx[2] += 1
-                            end
-                        end
-                    end
-                    elements_coupling_idx[1] += 1
-                end
-            end
+            # test inner coupling
+            _check_dofs(K, fh, cell_idx, coupling, coupling_idx, vdim, [CellIndex(cell_idx)], false)
+            # test cross-element coupling
+            _check_dofs(K, fh, cell_idx, elements_coupling, elements_coupling_idx, vdim, topology.cell_face_neighbor[cell_idx], true)
         end
     end
-    
     grid = generate_grid(Quadrilateral, (2, 2))
     topology = ExclusiveTopology(grid)
     dh = DofHandler(grid)
