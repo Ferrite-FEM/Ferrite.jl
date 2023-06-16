@@ -613,6 +613,7 @@ end
     @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
  
     # Test coupling with subdomains
+    # Note: `check_coupling` works for this case only because the second domain has dofs from the first domain in order. Otherwise tests like in continuous ip are required.
     grid = generate_grid(Quadrilateral, (2, 1))
     topology = ExclusiveTopology(grid)
     dh = DofHandler(grid)
