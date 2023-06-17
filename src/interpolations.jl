@@ -249,6 +249,18 @@ match the vertex enumeration of the corresponding geometrical cell.
 """
 vertexdof_indices(ip::Interpolation) = ntuple(_ -> (), nvertices(ip))
 
+"""
+    dirichlet_vertexdof_indices(ip::Interpolation)
+
+A tuple containing tuples of local dof indices for the respective vertex in local
+enumeration on a cell defined by [`vertices(::Cell)`](@ref). The vertex enumeration must
+match the vertex enumeration of the corresponding geometrical cell.
+Used internally in [`ConstraintHandler`](@ref) and defaults to [`vertexdof_indices(ip::Interpolation)`](@ref) for continuous interpolation.
+
+!!! note
+    The dofs appearing in the tuple must be continuous and increasing! The first dof must be
+    the 1, as vertex dofs are enumerated first.
+"""
 dirichlet_vertexdof_indices(ip::Interpolation) = vertexdof_indices(ip)
 
 """
@@ -263,6 +275,17 @@ Here the first entries are the vertex dofs, followed by the edge interior dofs.
 """
 edgedof_indices(::Interpolation)
 
+"""
+    dirichlet_edgedof_indices(ip::Interpolation)
+
+A tuple containing tuples of local dof indices for the respective edge in local enumeration
+on a cell defined by [`edges(::Cell)`](@ref). The edge enumeration must match the edge
+enumeration of the corresponding geometrical cell.
+Used internally in [`ConstraintHandler`](@ref) and defaults to [`edgedof_indices(ip::Interpolation)`](@ref) for continuous interpolation.
+
+The dofs are guaranteed to be aligned with the local ordering of the entities on the oriented edge.
+Here the first entries are the vertex dofs, followed by the edge interior dofs.
+"""
 dirichlet_edgedof_indices(ip::Interpolation) = edgedof_indices(ip)
 
 """
@@ -288,6 +311,14 @@ the face enumeration of the corresponding geometrical cell.
 """
 facedof_indices(::Interpolation)
 
+"""
+    dirichlet_facedof_indices(ip::Interpolation)
+
+A tuple containing tuples of all local dof indices for the respective face in local
+enumeration on a cell defined by [`faces(::Cell)`](@ref). The face enumeration must match
+the face enumeration of the corresponding geometrical cell.
+Used internally in [`ConstraintHandler`](@ref) and defaults to [`facedof_indices(ip::Interpolation)`](@ref) for continuous interpolation.
+"""
 dirichlet_facedof_indices(ip::Interpolation) = facedof_indices(ip)
 
 """
@@ -331,6 +362,14 @@ boundarydof_indices(::Type{<:BoundaryIndex})
 boundarydof_indices(::Type{FaceIndex}) = Ferrite.facedof_indices
 boundarydof_indices(::Type{EdgeIndex}) = Ferrite.edgedof_indices
 boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
+
+"""
+    dirichlet_boundarydof_indices(::Type{<:BoundaryIndex})
+
+Helper function to generically dispatch on the correct dof sets of a boundary entity.
+Used internally in [`ConstraintHandler`](@ref) and defaults to [`boundarydof_indices(ip::Interpolation)`](@ref) for continuous interpolation.
+"""
+dirichlet_boundarydof_indices(::Type{<:BoundaryIndex})
 
 dirichlet_boundarydof_indices(::Type{FaceIndex}) = Ferrite.dirichlet_facedof_indices
 dirichlet_boundarydof_indices(::Type{EdgeIndex}) = Ferrite.dirichlet_edgedof_indices
