@@ -10,6 +10,7 @@ examples/.ipynb_checkpoints/
 docs/build/
 docs/site/
 docs/src/examples/
+docs/src/tutorials/
 *.DS_Store
 /Manifest.toml
 /test/coverage/Manifest.toml

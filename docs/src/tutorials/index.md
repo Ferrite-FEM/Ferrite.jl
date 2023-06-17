@@ -2,9 +2,9 @@
 DocTestSetup = :(using Ferrite)
 ```
 
-# Documentation of examples
+# Tutorials
 
-On this page, you find a documentation for each example currently available for `Ferrite`. The collection contains programs displaying different aspects and techniques of the `Ferrite` toolbox. 
+On this page, you find an overview of Ferrite tutorials. The collection contains programs displaying different aspects and techniques of the `Ferrite` toolbox.
 The programs are sorted as
 
 * A complete list shortly summarizing the topic, what they teach and which keywords related to the task they contain

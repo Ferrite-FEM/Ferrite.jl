@@ -69,7 +69,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
                 possible_cells = get(node_cell_dict, node, nothing)
                 possible_cells === nothing && continue # if node is not part of the fieldhandler, try the next node
                 for cell in possible_cells
-                    cell_coords = getcoordinates(grid, cell)
+                    cell_coords = get_cell_coordinates(grid, cell)
                     is_in_cell, local_coord = point_in_cell(geom_interpol, cell_coords, points[point_idx])
                     if is_in_cell
                         cell_found = true
@@ -332,7 +332,7 @@ function Base.iterate(p::PointIterator, state = 1)
         cid = (p.ph.cells[state])::Int
         local_coord = (p.ph.local_coords[state])::Vec
         n = nnodes_per_cell(p.ph.grid, cid)
-        cellcoords!(resize!(p.coords, n), p.ph.grid, cid)
+        get_cell_coordinates!(resize!(p.coords, n), p.ph.grid, cid)
         point = PointLocation(cid, local_coord, p.coords)
         return (point, state + 1)
     end

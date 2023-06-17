@@ -30,8 +30,8 @@ function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_i
 end
 function PointValues(::Type{T}, ip::IP, ipg::GIP = default_geometric_interpolation(ip)) where {
     T, dim, shape <: AbstractRefShape{dim},
-    IP  <:       Interpolation{shape},
-    GIP <: ScalarInterpolation{shape}
+    IP  <: Interpolation{shape},
+    GIP <: Interpolation{shape}
 }
     qr = QuadratureRule{shape, T}([one(T)], [zero(Vec{dim, T})])
     cv = CellValues(T, qr, ip, ipg)

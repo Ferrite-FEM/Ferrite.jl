@@ -1,13 +1,11 @@
 # Incidence matrix for element connections in the grid
-function create_incidence_matrix(g::Grid, cellset=1:getncells(g))
+function create_incidence_matrix(g::AbstractGrid, cellset=1:getncells(g))
     cell_containing_node = Dict{Int, Set{Int}}()
     for cellid in cellset
         cell = getcells(g, cellid)
-        for v in cell.nodes
-            if !haskey(cell_containing_node, v)
-                cell_containing_node[v] = Set{Int}()
-            end
-            push!(cell_containing_node[v], cellid)
+        for v in get_node_ids(cell)
+            _set = get!(Set{Int}, cell_containing_node, v)
+            push!(_set, cellid)
         end
     end
 
@@ -195,7 +193,7 @@ The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
     )
     ```
 """
-function create_coloring(g::Grid, cellset=1:getncells(g); alg::ColoringAlgorithm.T=ColoringAlgorithm.WorkStream)
+function create_coloring(g::AbstractGrid, cellset=1:getncells(g); alg::ColoringAlgorithm.T=ColoringAlgorithm.WorkStream)
     incidence_matrix = create_incidence_matrix(g, cellset)
     if alg === ColoringAlgorithm.WorkStream
         return workstream_coloring(incidence_matrix, cellset)

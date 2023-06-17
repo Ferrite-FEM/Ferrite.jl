@@ -163,7 +163,7 @@ end
 
     @test length(getnodes(grid, "node_set")) == 9
 
-    @test collect(getcoordinates(getnodes(grid, 5)).data) ≈ [0.5, 0.5]
+    @test collect(get_node_coordinate(getnodes(grid, 5)).data) ≈ [0.5, 0.5]
 
     @test getcells(grid, "cell_set") == [getcells(grid, 1)]
 
@@ -173,7 +173,7 @@ end
     ci = CellIterator(grid)
     @test length(ci) == getncells(grid)
     for c in ci
-        getcoordinates(c)
+        get_cell_coordinates(c)
         getnodes(c)
         n += cellid(c)
     end
@@ -390,7 +390,7 @@ end
 #                   +-----+-----+-----+
 # test application: integrate jump across element boundary 5
     function reinit!(fv::FaceValues, cellid::Int, faceid::Int, grid)
-        coords = getcoordinates(grid, cellid)
+        coords = get_cell_coordinates(grid, cellid)
         Ferrite.reinit!(fv, coords, faceid)
     end
     reinit!(fv::FaceValues, faceid::FaceIndex, grid) = reinit!(fv,faceid[1],faceid[2],grid) # wrapper for reinit!(fv,cellid,faceid,grid)
@@ -502,6 +502,7 @@ end
 
 @testset "vectorization layer compat" begin
     struct VectorLagrangeTest{shape,order,vdim} <: ScalarInterpolation{shape,order} end
+    Ferrite.adjust_dofs_during_distribution(ip::VectorLagrangeTest{<:Any, order}) where {order} = order > 2
 
     @testset "1d" begin
         grid = generate_grid(Line, (2,))
