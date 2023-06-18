@@ -54,6 +54,14 @@ Return the number of quadrature points in `fv`s quadrature for the current
 getnquadpoints(fe::FaceValues) = getnquadpoints(fe.qr, fe.current_face[])
 
 """
+    getnquadpoints(iv::InterfaceValues)
+
+Return double the number of quadrature points in `iv`s current [`FaceValues`](@ref)' quadrature for the current
+(most recently [`reinit!`](@ref)ed) interface.
+"""
+getnquadpoints(iv::InterfaceValues) = 2 * getnquadpoints(iv.face_values.qr, iv.face_values.current_face[])
+
+"""
     getdetJdV(fe_v::AbstractValues, q_point::Int)
 
 Return the product between the determinant of the Jacobian and the quadrature
@@ -68,6 +76,7 @@ finite element cell or face as
 """
 @propagate_inbounds getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 @propagate_inbounds getdetJdV(bv::FaceValues, q_point::Int) = bv.detJdV[q_point, bv.current_face[]]
+@propagate_inbounds getdetJdV(iv::InterfaceValues, q_point::Int, here::Bool) = getdetJdV(here ? iv.face_values : iv.face_values_neighbor, q_point) #Should this be the same for both facets?
 
 """
     shape_value(fe_v::AbstractValues, q_point::Int, base_function::Int)

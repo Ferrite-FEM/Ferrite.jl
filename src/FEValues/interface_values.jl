@@ -1,6 +1,32 @@
-# Defines InterfaceScalarValues and InterfaceVectorValues and common methods
-# InterfaceValues
-struct InterfaceValues{FV<:FaceValues}
+# Defines InterfaceValues and common methods
+"""
+    InterfaceValues(quad_rule::FaceQuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
+
+An `InterfaceValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
+values of nodal functions, gradients and divergences of nodal functions etc. on the interfaces of finite elements.
+
+**Arguments:**
+
+* `quad_rule`: an instance of a [`FaceQuadratureRule`](@ref)
+* `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
+* `geom_interpol`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry.
+  By default linear Lagrange interpolation is used.
+
+**Common methods:**
+
+* [`reinit!`](@ref)
+* [`getnquadpoints`](@ref)
+* [`getdetJdV`](@ref)
+
+* [`shape_value`](@ref)
+* [`shape_gradient`](@ref)
+* [`shape_divergence`](@ref)
+* [`shape_curl`](@ref)
+
+"""
+InterfaceValues
+
+struct InterfaceValues{FV<:FaceValues} <: AbstractValues
     face_values::FV
     face_values_neighbor::FV
 end
