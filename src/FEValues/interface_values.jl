@@ -15,40 +15,26 @@ function reinit!(iv::InterfaceValues, coords::AbstractVector{Vec{dim,T}}, f::Int
     reinit!(iv.face_values_neighbor,ncoords,nf)
     @assert getnquadpoints(iv.face_values) == getnquadpoints(iv.face_values_neighbor)
 end
-shape_value(iv::InterfaceValues, qp::Int, base_func::Int) = f_value_(iv, qp, base_func, shape_value) 
-shape_value_jump(iv::InterfaceValues, qp::Int, base_func::Int) = f_jump_(iv, qp, base_func, shape_value) 
-shape_value_average(iv::InterfaceValues, qp::Int, base_func::Int) = f_average(iv, qp, base_func, shape_value) 
 
-shape_gradient(iv::InterfaceValues, qp::Int, base_func::Int) = f_value_(iv, qp, base_func, shape_gradient) 
-shape_gradient_jump(iv::InterfaceValues, qp::Int, base_func::Int) = f_jump_(iv, qp, base_func, shape_gradient) 
-shape_gradient_average(iv::InterfaceValues, qp::Int, base_func::Int) = f_average(iv, qp, base_func, shape_gradient) 
-
-function f_value_(iv::InterfaceValues, qp::Int, i::Int, f_::Function)
-    nbf = getnbasefunctions(iv.face_values)
-    if i <= nqp
-        return f_(iv.face_values, qp, i)
-    else 
-        return f_(iv.face_values_neighbor, qp, i - nbf)
+for (func,                      f_,                 multiplier,             operator) in (
+    (:shape_value,              :shape_value,       :(1),                   :*),
+    (:shape_value_average,      :shape_value,       :(0.5),                 :*),
+    (:shape_value_jump,         :shape_value,       :(getnormal(fv, qp)),   :*),
+    (:shape_gradient,           :shape_gradient,    :(1),                   :*),
+    (:shape_gradient_average,   :shape_gradient,    :(0.5),                 :*),
+    (:shape_gradient_jump,      :shape_gradient,    :(getnormal(fv, qp)),   :⋅),
+)
+    @eval begin
+        function $(func)(iv::InterfaceValues, qp::Int, i::Int)
+            nbf = getnbasefunctions(iv.face_values)
+            if i <= nqp
+                fv = iv.face_values
+                return operator(multiplier, f_(fv, qp, i))
+            else 
+                fv = iv.face_values_neighbor
+                return operator(multiplier, f_(fv, qp, i - nbf))
+            end
+            error("Invalid base function $i. Interface has only $(2*nbf) base functions")
+        end
     end
-    error("Invalid base function $i. Interface has only $(2*nbf) base functions")
-end
-function f_jump_(iv::InterfaceValues, qp::Int, i::Int, f_::Function)
-    nbf = getnbasefunctions(iv.face_values)
-    if i <= nqp
-        jump_mag = f_(iv.face_values, qp, i)
-        return jump_mag isa Number ? jump_mag * getnormal(iv.face_values, qp) :  jump_mag ⋅ getnormal(iv.face_values, qp)
-    else 
-        jump_mag = f_(iv.face_values_neighbor, qp, i - nbf)
-        return jump_mag isa Number ? jump_mag * getnormal(iv.face_values_neighbor, qp) :  jump_mag ⋅ getnormal(iv.face_values_neighbor, qp)
-    end
-    error("Invalid base function $i. Interface has only $(2*nbf) base functions")
-end
-function f_average_(iv::InterfaceValues, qp::Int, base_func::Int, f_::Function)
-    nbf = getnbasefunctions(iv.face_values)
-    if i <= nqp
-        return 0.5 * f_(iv.face_values, qp, i)
-    else 
-        return 0.5 * f_(iv.face_values_neighbor, qp, i - nbf)
-    end
-    error("Invalid base function $i. Interface has only $(2*nbf) base functions")
 end
