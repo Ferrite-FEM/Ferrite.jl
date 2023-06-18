@@ -86,7 +86,7 @@ end
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
-reinit!(iv::InterfaceValues, dh::AbstractDofHandler, cc::CellCache, f::Int, ncc::CellCache, nf::Int) = reinit!(iv, dh, cc.cellid[], cc.coords, f, ncc.cellid[], ncc.coords, nf)
+reinit!(iv::InterfaceValues, cc::CellCache, f::Int, ncc::CellCache, nf::Int) = reinit!(iv, cc.coords, f, ncc.coords, nf)
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
 getnodes(cc::CellCache) = cc.nodes
