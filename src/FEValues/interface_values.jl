@@ -41,7 +41,7 @@ function reinit!(iv::InterfaceValues, coords::AbstractVector{Vec{dim,T}}, f::Int
     reinit!(iv.face_values_neighbor,ncoords,nf)
     @assert getnquadpoints(iv.face_values) == getnquadpoints(iv.face_values_neighbor)
 end
-
+# Maybe move this to common_values.jl?
 for (func,                      f_,                 multiplier,             operator) in (
     (:shape_value,              :shape_value,       :(1),                   :*),
     (:shape_value_average,      :shape_value,       :(0.5),                 :*),
