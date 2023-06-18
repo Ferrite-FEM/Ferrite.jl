@@ -44,7 +44,7 @@ module TestComputationalHomogenization
     include(joinpath(@__DIR__, "../docs/download_resources.jl"))
     mktempdir() do dir
         cd(dir) do
-            cp(joinpath(@__DIR__, "../docs/src/examples/periodic-rve.msh"),
+            cp(joinpath(@__DIR__, "../docs/src/tutorials/periodic-rve.msh"),
                joinpath(dir, "periodic-rve.msh")
             )
             include(joinpath(@__DIR__, "../docs/src/literate/computational_homogenization.jl"))

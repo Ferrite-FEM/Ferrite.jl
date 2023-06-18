@@ -478,7 +478,7 @@ end                                                                         #hid
         all_celldofs = celldofs(cell)                                       #hide
         v_celldofs = all_celldofs[dof_range(dh, :v)]                        #hide
         v_cell = u[v_celldofs]                                              #hide
-        coords = getcoordinates(cell)                                       #hide
+        coords = get_cell_coordinates(cell)                                       #hide
         for q_point in 1:getnquadpoints(cellvalues_v)                       #hide
             dΩ = getdetJdV(cellvalues_v, q_point)                           #hide
             coords_qp = spatial_coordinate(cellvalues_v, q_point, coords)   #hide

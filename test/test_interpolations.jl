@@ -5,6 +5,7 @@
                       Lagrange{RefLine, 2}(),
                       Lagrange{RefQuadrilateral, 1}(),
                       Lagrange{RefQuadrilateral, 2}(),
+                      Lagrange{RefQuadrilateral, 3}(),
                       Lagrange{RefTriangle, 1}(),
                       Lagrange{RefTriangle, 2}(),
                       Lagrange{RefTriangle, 3}(),
@@ -102,7 +103,8 @@
             if k == dof
                 @test N_dof ≈ 1.0
             else
-                @test N_dof ≈ 0.0 atol=4eps(Float64) #broken=typeof(interpolation)==Lagrange{2, RefTetrahedron, 5}&&dof==4&&k==18
+                factor = interpolation isa Lagrange{RefQuadrilateral, 3} ? 200 : 4
+                @test N_dof ≈ 0.0 atol = factor * eps(Float64)
             end
         end
     end
@@ -154,6 +156,8 @@
     v_interpolation_2 = (d = 2; interpolation^d)
     @test getnbasefunctions(v_interpolation_1) == getnbasefunctions(v_interpolation_2) ==
           getnbasefunctions(interpolation) * 2
+    # pretty printing
+    @test repr("text/plain", v_interpolation_1) == repr(v_interpolation_1.ip) * "^2"
 end
 
 @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTriangle,0}()) ≈ [Vec{2,Float64}((1/3,1/3))]

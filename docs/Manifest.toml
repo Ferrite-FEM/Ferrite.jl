@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.9.0"
+julia_version = "1.9.1"
 manifest_format = "2.0"
 project_hash = "36aa80ebfd72e2016135d6d7b3122eb6efdc74ea"
 
@@ -801,9 +801,9 @@ version = "2.14.0"
 
 [[deps.LiveServer]]
 deps = ["HTTP", "MIMEs", "Pkg", "Sockets"]
-git-tree-sha1 = "b0db05c042a7c54bb858f9846a4ca39ac15f8c44"
+git-tree-sha1 = "494010f12dd98fa0d558cb7679b7c21d3a0a430a"
 uuid = "16fef848-5104-11e9-1b77-fb7a48bbb589"
-version = "1.1.1"
+version = "1.2.0"
 
 [[deps.LogExpFunctions]]
 deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
@@ -1733,7 +1733,7 @@ version = "0.15.1+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.7.0+0"
+version = "5.8.0+0"
 
 [[deps.libfdk_aac_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]

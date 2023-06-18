@@ -13,6 +13,7 @@ The following interpolations are implemented:
 * `Lagrange{RefLine,2}`
 * `Lagrange{RefQuadrilateral,1}`
 * `Lagrange{RefQuadrilateral,2}`
+* `Lagrange{RefQuadrilateral,3}`
 * `Lagrange{RefTriangle,1}`
 * `Lagrange{RefTriangle,2}`
 * `Lagrange{RefTriangle,3}`
@@ -68,7 +69,7 @@ distribution. This is in contrast to i) adjusting the dofs during [`reinit!`](@r
 assembly loop, or ii) not adjusting at all (which is not needed for low order
 interpolations, generally).
 """
-adjust_dofs_during_distribution(::Interpolation) = false
+adjust_dofs_during_distribution(::Interpolation)
 
 """
     InterpolationInfo
@@ -381,6 +382,10 @@ struct Lagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
     end
 end
 
+adjust_dofs_during_distribution(::Lagrange) = true
+adjust_dofs_during_distribution(::Lagrange{<:Any, 2}) = false
+adjust_dofs_during_distribution(::Lagrange{<:Any, 1}) = false
+
 # Vertices for all Lagrange interpolations are the same
 vertexdof_indices(::Lagrange{RefLine}) = ((1,),(2,))
 vertexdof_indices(::Lagrange{RefQuadrilateral}) = ((1,),(2,),(3,),(4,))
@@ -491,6 +496,58 @@ function shape_value(ip::Lagrange{RefQuadrilateral, 2}, ξ::Vec{2}, i::Int)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
+#####################################
+# Lagrange RefQuadrilateral order 3 #
+#####################################
+getnbasefunctions(::Lagrange{RefQuadrilateral, 3}) = 16
+
+facedof_indices(::Lagrange{RefQuadrilateral, 3}) = ((1,2, 5,6), (2,3, 7,8), (3,4, 9,10), (4,1, 11,12))
+facedof_interior_indices(::Lagrange{RefQuadrilateral, 3}) = ((5,6), (7,8), (9,10), (11,12))
+celldof_interior_indices(::Lagrange{RefQuadrilateral, 3}) = (13,14,15,16)
+
+function reference_coordinates(::Lagrange{RefQuadrilateral, 3})
+    return [Vec{2, Float64}((-1.0, -1.0)),
+            Vec{2, Float64}(( 1.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  1.0)),
+            Vec{2, Float64}((-1.0,  1.0)),
+            Vec{2, Float64}((-1/3, -1.0)),
+            Vec{2, Float64}(( 1/3, -1.0)),
+            Vec{2, Float64}(( 1.0, -1/3)),
+            Vec{2, Float64}(( 1.0,  1/3)),
+            Vec{2, Float64}(( 1/3,  1.0)),
+            Vec{2, Float64}((-1/3,  1.0)),
+            Vec{2, Float64}((-1.0,  1/3)),
+            Vec{2, Float64}((-1.0, -1/3)),
+            Vec{2, Float64}((-1/3, -1/3)),
+            Vec{2, Float64}(( 1/3, -1/3)),
+            Vec{2, Float64}((-1/3,  1/3)),
+            Vec{2, Float64}(( 1/3,  1/3))]
+end
+
+function shape_value(ip::Lagrange{RefQuadrilateral, 3}, ξ::Vec{2}, i::Int)
+    # See https://defelement.com/elements/examples/quadrilateral-Q-3.html
+    # Transform domain from [-1, 1] × [-1, 1] to [0, 1] × [0, 1]
+    ξ_x = ξ[1]*0.5 + 0.5
+    ξ_y = ξ[2]*0.5 + 0.5
+    i ==  1 && return (81*ξ_x^3*ξ_y^3)/4 - (81*ξ_x^3*ξ_y^2)/2 + (99*ξ_x^3*ξ_y)/4 - (9*ξ_x^3)/2 - (81*ξ_x^2*ξ_y^3)/2 + (81*ξ_x^2*ξ_y^2) - (99*ξ_x^2*ξ_y)/2 + (9*ξ_x^2) + (99*ξ_x*ξ_y^3)/4 - (99*ξ_x*ξ_y^2)/2 + (121*ξ_x*ξ_y)/4 - (11*ξ_x)/2 - (9*ξ_y^3)/2 + 9*ξ_y^2 - (11*ξ_y)/2 + 1
+    i ==  2 && return (ξ_x*( - 81*ξ_x^2*ξ_y^3 + 162*ξ_x^2*ξ_y^2 - 99*ξ_x^2*ξ_y + 18*ξ_x^2 + 81*ξ_x*ξ_y^3 - 162*ξ_x*ξ_y^2 + 99*ξ_x*ξ_y - 18*ξ_x - 18*ξ_y^3 + 36*ξ_y^2 - 22*ξ_y + 4))/4
+    i ==  4 && return (ξ_y*( - 81*ξ_x^3*ξ_y^2 + 81*ξ_x^3*ξ_y - 18*ξ_x^3 + 162*ξ_x^2*ξ_y^2 - 162*ξ_x^2*ξ_y + 36*ξ_x^2 - 99*ξ_x*ξ_y^2 + 99*ξ_x*ξ_y - 22*ξ_x + 18*ξ_y^2 - 18*ξ_y + 4))/4
+    i ==  3 && return (ξ_x*ξ_y*(81*ξ_x^2*ξ_y^2 - 81*ξ_x^2*ξ_y + 18*ξ_x^2 - 81*ξ_x*ξ_y^2 + 81*ξ_x*ξ_y - 18*ξ_x + 18*ξ_y^2 - 18*ξ_y + 4))/4
+    i ==  5 && return (9*ξ_x*( - 27*ξ_x^2*ξ_y^3 + 54*ξ_x^2*ξ_y^2 - 33*ξ_x^2*ξ_y + 6*ξ_x^2 + 45*ξ_x*ξ_y^3 - 90*ξ_x*ξ_y^2 + 55*ξ_x*ξ_y - 10*ξ_x - 18*ξ_y^3 + 36*ξ_y^2 - 22*ξ_y + 4))/4
+    i ==  6 && return (9*ξ_x*(27*ξ_x^2*ξ_y^3 - 54*ξ_x^2*ξ_y^2 + 33*ξ_x^2*ξ_y - 6*ξ_x^2 - 36*ξ_x*ξ_y^3 + 72*ξ_x*ξ_y^2 - 44*ξ_x*ξ_y + 8*ξ_x + 9*ξ_y^3 - 18*ξ_y^2 + 11*ξ_y - 2))/4
+    i ==  12 && return (9*ξ_y*( - 27*ξ_x^3*ξ_y^2 + 45*ξ_x^3*ξ_y - 18*ξ_x^3 + 54*ξ_x^2*ξ_y^2 - 90*ξ_x^2*ξ_y + 36*ξ_x^2 - 33*ξ_x*ξ_y^2 + 55*ξ_x*ξ_y - 22*ξ_x + 6*ξ_y^2 - 10*ξ_y + 4))/4
+    i ==  11 && return (9*ξ_y*(27*ξ_x^3*ξ_y^2 - 36*ξ_x^3*ξ_y + 9*ξ_x^3 - 54*ξ_x^2*ξ_y^2 + 72*ξ_x^2*ξ_y - 18*ξ_x^2 + 33*ξ_x*ξ_y^2 - 44*ξ_x*ξ_y + 11*ξ_x - 6*ξ_y^2 + 8*ξ_y - 2))/4
+    i ==  7 && return (9*ξ_x*ξ_y*(27*ξ_x^2*ξ_y^2 - 45*ξ_x^2*ξ_y + 18*ξ_x^2 - 27*ξ_x*ξ_y^2 + 45*ξ_x*ξ_y - 18*ξ_x + 6*ξ_y^2 - 10*ξ_y + 4))/4
+    i == 8 && return (9*ξ_x*ξ_y*( - 27*ξ_x^2*ξ_y^2 + 36*ξ_x^2*ξ_y - 9*ξ_x^2 + 27*ξ_x*ξ_y^2 - 36*ξ_x*ξ_y + 9*ξ_x - 6*ξ_y^2 + 8*ξ_y - 2))/4
+    i == 10 && return (9*ξ_x*ξ_y*(27*ξ_x^2*ξ_y^2 - 27*ξ_x^2*ξ_y + 6*ξ_x^2 - 45*ξ_x*ξ_y^2 + 45*ξ_x*ξ_y - 10*ξ_x + 18*ξ_y^2 - 18*ξ_y + 4))/4
+    i == 9 && return (9*ξ_x*ξ_y*( - 27*ξ_x^2*ξ_y^2 + 27*ξ_x^2*ξ_y - 6*ξ_x^2 + 36*ξ_x*ξ_y^2 - 36*ξ_x*ξ_y + 8*ξ_x - 9*ξ_y^2 + 9*ξ_y - 2))/4
+    i == 13 && return (81*ξ_x*ξ_y*(9*ξ_x^2*ξ_y^2 - 15*ξ_x^2*ξ_y + 6*ξ_x^2 - 15*ξ_x*ξ_y^2 + 25*ξ_x*ξ_y - 10*ξ_x + 6*ξ_y^2 - 10*ξ_y + 4))/4
+    i == 14 && return (81*ξ_x*ξ_y*( - 9*ξ_x^2*ξ_y^2 + 15*ξ_x^2*ξ_y - 6*ξ_x^2 + 12*ξ_x*ξ_y^2 - 20*ξ_x*ξ_y + 8*ξ_x - 3*ξ_y^2 + 5*ξ_y - 2))/4
+    i == 15 && return (81*ξ_x*ξ_y*( - 9*ξ_x^2*ξ_y^2 + 12*ξ_x^2*ξ_y - 3*ξ_x^2 + 15*ξ_x*ξ_y^2 - 20*ξ_x*ξ_y + 5*ξ_x - 6*ξ_y^2 + 8*ξ_y - 2))/4
+    i == 16 && return (81*ξ_x*ξ_y*(9*ξ_x^2*ξ_y^2 - 12*ξ_x^2*ξ_y + 3*ξ_x^2 - 12*ξ_x*ξ_y^2 + 16*ξ_x*ξ_y - 4*ξ_x + 3*ξ_y^2 - 4*ξ_y + 1))/4
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
 ################################
 # Lagrange RefTriangle order 1 #
 ################################
@@ -553,8 +610,6 @@ const Lagrange2Tri345 = Union{
     Lagrange{RefTriangle,4},
     Lagrange{RefTriangle,5},
 }
-
-adjust_dofs_during_distribution(::Lagrange2Tri345) = true
 
 function getnbasefunctions(ip::Lagrange2Tri345)
     order = getorder(ip)
@@ -1027,6 +1082,12 @@ struct Serendipity{shape, order, unused} <: ScalarInterpolation{shape,order}
     end
 end
 
+# Note that the edgedofs for high order serendipity elements are defined in terms of integral moments, 
+# so no permutation exists in general. See e.g. Scroggs et al. [2022] for an example.
+# adjust_dofs_during_distribution(::Serendipity{refshape, order}) where {refshape, order} = false
+adjust_dofs_during_distribution(::Serendipity{<:Any, 2}) = false
+adjust_dofs_during_distribution(::Serendipity{<:Any, 1}) = false
+
 # Vertices for all Serendipity interpolations are the same
 vertexdof_indices(::Serendipity{RefQuadrilateral}) = ((1,),(2,),(3,),(4,))
 vertexdof_indices(::Serendipity{RefHexahedron}) = ((1,),(2,),(3,),(4,),(5,),(6,),(7,),(8,))
@@ -1165,6 +1226,9 @@ struct CrouzeixRaviart{shape, order, unused} <: ScalarInterpolation{shape, order
     CrouzeixRaviart{RefTriangle, 1}() = new{RefTriangle, 1, Nothing}()
 end
 
+adjust_dofs_during_distribution(::CrouzeixRaviart) = true
+adjust_dofs_during_distribution(::CrouzeixRaviart{<:Any, 1}) = false
+
 getnbasefunctions(::CrouzeixRaviart) = 3
 
 facedof_indices(::CrouzeixRaviart) = ((1,), (2,), (3,))
@@ -1188,13 +1252,14 @@ end
 ##################################################
 # VectorizedInterpolation{<:ScalarInterpolation} #
 ##################################################
-
 struct VectorizedInterpolation{vdim, refshape, order, SI <: ScalarInterpolation{refshape, order}} <: VectorInterpolation{vdim, refshape,order}
     ip::SI
     function VectorizedInterpolation{vdim}(ip::SI) where {vdim, refshape, order, SI <: ScalarInterpolation{refshape, order}}
         return new{vdim, refshape, order, SI}(ip)
     end
 end
+
+adjust_dofs_during_distribution(ip::VectorizedInterpolation) = adjust_dofs_during_distribution(ip.ip)
 
 # Vectorize to reference dimension by default
 function VectorizedInterpolation(ip::ScalarInterpolation{shape}) where {refdim, shape <: AbstractRefShape{refdim}}
@@ -1204,6 +1269,11 @@ end
 Base.:(^)(ip::ScalarInterpolation, vdim::Int) = VectorizedInterpolation{vdim}(ip)
 function Base.literal_pow(::typeof(^), ip::ScalarInterpolation, ::Val{vdim}) where vdim
     return VectorizedInterpolation{vdim}(ip)
+end
+
+function Base.show(io::IO, mime::MIME"text/plain", ip::VectorizedInterpolation{vdim}) where vdim
+    show(io, mime, ip.ip)
+    print(io, "^", vdim)
 end
 
 # Helper to get number of copies for DoF distribution
