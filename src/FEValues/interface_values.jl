@@ -34,7 +34,7 @@ function InterfaceValues(quad_rule::FaceQuadratureRule, func_interpol::Interpola
     geom_interpol::Interpolation = func_interpol)
     face_values = FaceValues(quad_rule, func_interpol, geom_interpol)
     face_values_neighbor = copy(face_values)
-    return InterfaceValues{FaceScalarValues}(face_values,face_values_neighbor)
+    return InterfaceValues{FaceValues}(face_values,face_values_neighbor)
 end
 function reinit!(iv::InterfaceValues, coords::AbstractVector{Vec{dim,T}}, f::Int, ncoords::AbstractVector{Vec{dim,T}}, nf::Int) where {dim,T}
     reinit!(iv.face_values,coords,f)
