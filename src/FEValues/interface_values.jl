@@ -45,6 +45,7 @@ struct InterfaceValues{FV<:FaceValues} <: AbstractValues
 end
 function InterfaceValues(quad_rule::FaceQuadratureRule, func_interpol::Interpolation,
     geom_interpol::Interpolation = func_interpol)
+    #@assert isDiscontinuous(func_interpol) "`InterfaceValues` is designed for discontinuous interpolations. a continuous interpolation is passed" TODO: add this when sparsity_pattern is merged
     face_values = FaceValues(quad_rule, func_interpol, geom_interpol)
     face_values_neighbor = copy(face_values)
     return InterfaceValues{FaceValues}(face_values,face_values_neighbor)
