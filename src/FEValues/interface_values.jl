@@ -105,7 +105,7 @@ for (func,                      f_,                 multiplier,             oper
                 fv = iv.face_values_neighbor
                 return operator(multiplier, f_(fv, qp, i - nbf/2))
             end
-            error("Invalid base function $i. Interface has only $(2*nbf) base functions")
+            error("Invalid base function $i. Interface has only $(nbf) base functions")
         end
     end
 end
@@ -119,5 +119,5 @@ function geometric_value(iv::InterfaceValues, q_point::Int, i::Int)
         fv = iv.face_values_neighbor
         return fv.M[i - nbf/2, q_point, fv.current_face[]]
     end
-    error("Invalid geometric base function $i. Interface has only $(2*nbf) base functions")
+    error("Invalid geometric base function $i. Interface has only $(nbf) base functions")
 end
