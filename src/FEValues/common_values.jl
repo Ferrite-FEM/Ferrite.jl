@@ -5,6 +5,7 @@ using Base: @propagate_inbounds
 @noinline throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
 
 getnbasefunctions(cv::AbstractValues) = size(cv.N, 1)
+getnbasefunctions(iv::InterfaceValues) = 2 * getnbasefunctions(iv.face_values)
 getngeobasefunctions(cv::AbstractValues) = size(cv.M, 1)
 getngeobasefunctions(iv::InterfaceValues) = 2 * getngeobasefunctions(iv.face_values)
 
@@ -61,7 +62,7 @@ getnquadpoints(fe::FaceValues) = getnquadpoints(fe.qr, fe.current_face[])
 Return double the number of quadrature points in `iv`s current [`FaceValues`](@ref)' quadrature for the current
 (most recently [`reinit!`](@ref)ed) interface.
 """
-getnquadpoints(iv::InterfaceValues) = 2 * getnquadpoints(iv.face_values.qr, iv.face_values.current_face[])
+getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.face_values.qr, iv.face_values.current_face[])
 
 """
     getdetJdV(fe_v::AbstractValues, q_point::Int)
