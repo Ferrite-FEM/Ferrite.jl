@@ -59,7 +59,7 @@ getnquadpoints(fe::FaceValues) = getnquadpoints(fe.qr, fe.current_face[])
 """
     getnquadpoints(iv::InterfaceValues)
 
-Return double the number of quadrature points in `iv`s current [`FaceValues`](@ref)' quadrature for the current
+Return the number of quadrature points in `iv`s current [`FaceValues`](@ref)' quadrature for the current
 (most recently [`reinit!`](@ref)ed) interface.
 """
 getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.face_values.qr, iv.face_values.current_face[])
