@@ -112,6 +112,11 @@ for (func,                      f_nbf,                  f_,                 mult
     end
 end
 
+"""
+    get_neighbor_quadp(iv::InterfaceValues, qpoint::Int)
+
+Find quadrature point index in the neighbor facet.
+"""
 function get_neighbor_quadp(iv::InterfaceValues, qpoint::Int)
     qpcoord = getpoints(iv.face_values.qr, iv.face_values.current_face[])[qpoint]
     neighbor_qp_coords = getpoints(iv.face_values_neighbor.qr, iv.face_values_neighbor.current_face[])
