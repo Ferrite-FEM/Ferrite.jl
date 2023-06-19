@@ -1450,3 +1450,43 @@ struct SurfaceOrientationInfo
     #flipped::Bool
     #shift_index::Int
 end
+# This one is the same as `SurfaceOrientationInfo` but used in interfaces. It is calculated for neighbor facet relative to current facet
+struct InterfaceOrientationInfo
+    flipped::Bool
+    shift_index::Int
+end
+# TODO: make this `SurfaceOrientationInfo`?
+"""
+    InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, neighbor_face::FaceIndex)
+
+Orientation information for 2D interfaces. Such an interface can be 
+possibly flipped (i.e. the defining vertex order is reverse to the 
+spanning vertex order) and the vertices can be rotated against each other.
+Take for example the faces
+```
+1---2 2---3
+| A | | B |
+4---3 1---4
+```
+which are rotated against each other by 90° (shift index is 1) or the faces
+```
+1---2 2---1
+| A | | B |
+4---3 3---4
+```
+which are flipped against each other. Any combination of these can happen. 
+The combination to map neighbor facet to current facet is encoded with
+this data structure via ``rotate \\circ flip`` where the rotation is indiced by
+the shift index.
+"""
+function InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, neighbor_face::FaceIndex)
+    face_nodes = faces(getcells(grid)[this_face[1]])[this_face[2]]
+    neighbor_face_nodes = faces(getcells(grid)[neighbor_face[1]])[neighbor_face[2]]
+    !all([i ∈ face_nodes for i in neighbor_face_nodes]) && error("Passed faces do not use the same nodes")
+    first_node_idx = findfirst(i -> i == face_nodes[1],neighbor_face_nodes)
+    nfacenodes = length(neighbor_face_nodes)
+    flipped = !(face_nodes[2] == neighbor_face_nodes[first_node_idx < nfacenodes ? first_node_idx + 1 : 1])
+    shift_index = first_node_idx - 1
+    flipped && (shift_index = nfacenodes - shift_index - 1)
+    return InterfaceOrientationInfo(flipped, shift_index)
+end

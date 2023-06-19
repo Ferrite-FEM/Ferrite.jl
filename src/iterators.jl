@@ -100,6 +100,8 @@ interface. The cache is updated for a new cell by calling `reinit!(cache, this_f
  - `ic.neighbor_coords :: Vector{<:Vec}`: neighbor cell node coordinates
  - `ic.this_face :: Vector{<:Vec}`: local face index for current cell
  - `ic.neighbor_face :: Vector{<:Vec}`: local face index for neighbor cell
+ - `ic.orientation_info :: InterfaceOrientationInfo`: whether the neighbor orientation info relative to current face
+ - `ic.grid :: AbstractGrid`: grid information used in iteration
  - `ic.topology :: ExclusiveTopology`: topology information used in iteration
 
 **Methods with `InterfaceCache`**
@@ -112,6 +114,7 @@ struct InterfaceCache{X,G<:AbstractGrid}
     neighbor_coords::Vector{X}
     this_face::ScalarWrapper{Int}
     neighbor_face::ScalarWrapper{Int}
+    orientation_info::InterfaceOrientationInfo
     # grid and topology information needed for iteration
     grid::G
     topology::ExclusiveTopology
@@ -121,14 +124,14 @@ function InterfaceCache(grid::Grid{dim,C,T}, topology::ExclusiveTopology) where 
     N = nnodes_per_cell(grid)
     this_coords = zeros(Vec{dim,T}, N)
     neighbor_coords = zeros(Vec{dim,T}, N)
-    return InterfaceCache(this_coords, neighbor_coords, ScalarWrapper(-1), ScalarWrapper(-1), topology)
+    return InterfaceCache(this_coords, neighbor_coords, ScalarWrapper(-1), ScalarWrapper(-1), InterfaceOrientationInfo(false, 0), grid, topology)
 end
 
 function InterfaceCache(dh::DofHandler{dim}, topology::ExclusiveTopology) where {dim}
     N = nnodes_per_cell(get_grid(dh))
     this_coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)
     neighbor_coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)
-    return InterfaceCache(this_coords, neighbor_coords, ScalarWrapper(-1), ScalarWrapper(-1), topology)
+    return InterfaceCache(this_coords, neighbor_coords, ScalarWrapper(-1), ScalarWrapper(-1), InterfaceOrientationInfo(false, 0), get_grid(dh), topology)
 end
 
 function reinit!(cache::InterfaceCache, this_face::FaceIndex, neighbor_face::FaceIndex)
@@ -138,6 +141,7 @@ function reinit!(cache::InterfaceCache, this_face::FaceIndex, neighbor_face::Fac
     get_cell_coordinates!(cache.neighbor_coords, cache.grid, neighbor_face[1])
     cache.this_face[] = this_face[2]
     cache.neighbor_face[] = neighbor_face[2]
+    cache.orientation_info = InterfaceOrientationInfo(cache.grid, this_face, neighbor_face)
     return cache
 end
 
