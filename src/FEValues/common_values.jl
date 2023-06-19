@@ -6,6 +6,7 @@ using Base: @propagate_inbounds
 
 getnbasefunctions(cv::AbstractValues) = size(cv.N, 1)
 getngeobasefunctions(cv::AbstractValues) = size(cv.M, 1)
+getngeobasefunctions(iv::InterfaceValues) = 2 * getngeobasefunctions(iv.face_values)
 
 function checkquadpoint(cv::Union{CellValues, FaceValues, PointValues}, qp::Int)
     0 < qp <= getnquadpoints(cv) || error("quadrature point out of range")
@@ -32,8 +33,9 @@ end
 """
     reinit!(cv::CellValues, x::Vector)
     reinit!(bv::FaceValues, x::Vector, face::Int)
+    reinit!(iv::InterfaceValues, coords::Vector, f::Int, ncoords::Vector, nf::Int)
 
-Update the `CellValues`/`FaceValues` object for a cell or face with coordinates `x`.
+Update the `CellValues`/`FaceValues`/`InterfaceValues` object for a cell or face with coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
 """
 reinit!
@@ -63,6 +65,7 @@ getnquadpoints(iv::InterfaceValues) = 2 * getnquadpoints(iv.face_values.qr, iv.f
 
 """
     getdetJdV(fe_v::AbstractValues, q_point::Int)
+    getdetJdV(iv::InterfaceValues, q_point::Int, here::Bool)
 
 Return the product between the determinant of the Jacobian and the quadrature
 point weight for the given quadrature point: ``\\det(J(\\mathbf{x})) w_q``
@@ -87,6 +90,12 @@ quadrature point `q_point`.
 @propagate_inbounds shape_value(cv::CellValues, q_point::Int, base_func::Int) = cv.N[base_func, q_point]
 @propagate_inbounds shape_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.N[base_func, q_point, bv.current_face[]]
 
+"""
+    geometric_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
+
+Return the value of shape function `base_function` evaluated in
+quadrature point `q_point`.
+"""
 @propagate_inbounds geometric_value(cv::CellValues, q_point::Int, base_func::Int) = cv.M[base_func, q_point]
 @propagate_inbounds geometric_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_face[]]
 
@@ -152,6 +161,7 @@ end
 # TODO: Implement fallback or require this to be defined?
 #       Alt: shape_value_type(cv) = typeof(shape_value(cv, qp=1, i=1))
 shape_value_type(::Union{CellValues{<:Any, N_t}, FaceValues{<:Any, N_t}}) where N_t = N_t
+shape_value_type(iv::InterfaceValues) = eltype(iv.face_values.N)
 function_value_init(cv::AbstractValues, ::AbstractVector{T}) where {T} = zero(shape_value_type(cv)) * zero(T)
 
 """
@@ -197,6 +207,7 @@ end
 # TODO: Implement fallback or require this to be defined?
 #       Alt: shape_gradient_type(cv) = typeof(shape_gradient(cv, qp=1, i=1))
 shape_gradient_type(::Union{CellValues{<:Any, <:Any, dNdx_t}, FaceValues{<:Any, <:Any, dNdx_t}}) where dNdx_t = dNdx_t
+shape_gradient_type(iv::InterfaceValues) = eltype(iv.face_values.dNdx)
 function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {T}
     return zero(shape_gradient_type(cv)) * zero(T)
 end
