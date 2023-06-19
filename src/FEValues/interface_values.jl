@@ -87,38 +87,26 @@ The jump of the gradient vector is a scalar.
 """
 shape_gradient_jump
 
-for (func,                      f_,                 multiplier,             operator) in (
-    (:shape_value,              :shape_value,       :(1),                   :*),
-    (:shape_value_average,      :shape_value,       :(0.5),                 :*),
-    (:shape_value_jump,         :shape_value,       :(getnormal(fv, qp)),   :*),
-    (:shape_gradient,           :shape_gradient,    :(1),                   :*),
-    (:shape_gradient_average,   :shape_gradient,    :(0.5),                 :*),
-    (:shape_gradient_jump,      :shape_gradient,    :(getnormal(fv, qp)),   :⋅),
-    (:geometric_value,          :geometric_value,   :(1),                   :*),
+for (func,                      f_nbf,                  f_,                 multiplier,             operator) in (
+    (:shape_value,              :getnbasefunctions,     :shape_value,       :(1),                   :*),
+    (:shape_value_average,      :getnbasefunctions,     :shape_value,       :(0.5),                 :*),
+    (:shape_value_jump,         :getnbasefunctions,     :shape_value,       :(getnormal(fv, qp)),   :*),
+    (:shape_gradient,           :getnbasefunctions,     :shape_gradient,    :(1),                   :*),
+    (:shape_gradient_average,   :getnbasefunctions,     :shape_gradient,    :(0.5),                 :*),
+    (:shape_gradient_jump,      :getnbasefunctions,     :shape_gradient,    :(getnormal(fv, qp)),   :⋅),
+    (:geometric_value,          :getngeobasefunctions,  :geometric_value,   :(1),                   :*),
 )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, i::Int)
-            nbf = getnbasefunctions(iv)
+            nbf = $(f_nbf)(iv)
             if i <= nbf/2
                 fv = iv.face_values
-                return operator(multiplier, f_(fv, qp, i))
+                return $(operator)($(multiplier), $(f_)(fv, qp, i))
             elseif i <= nbf
                 fv = iv.face_values_neighbor
-                return operator(multiplier, f_(fv, qp, i - nbf/2))
+                return $(operator)($(multiplier), $(f_)(fv, qp, i - nbf/2))
             end
             error("Invalid base function $i. Interface has only $(nbf) base functions")
         end
     end
-end
-
-function geometric_value(iv::InterfaceValues, q_point::Int, i::Int)
-    nbf = getngeobasefunctions(iv)
-    if i <= nbf/2
-        fv = iv.face_values
-        return fv.M[i, q_point, fv.current_face[]]
-    elseif i <= nbf
-        fv = iv.face_values_neighbor
-        return fv.M[i - nbf/2, q_point, fv.current_face[]]
-    end
-    error("Invalid geometric base function $i. Interface has only $(nbf) base functions")
 end
