@@ -83,10 +83,68 @@ function reinit!(cc::CellCache, i::Int)
     return cc
 end
 
+####################
+## InterfaceCache ##
+####################
+
+"""
+    InterfaceCache(grid::Grid, topology::ExclusiveTopology)
+    InterfaceCache(dh::AbstractDofHandler, topology::ExclusiveTopology)
+
+Create a cache object with pre-allocated memory for the coordinates and facets of an
+interface. The cache is updated for a new cell by calling `reinit!(cache, this_face, neighbor_face)` where
+`this_face::FaceIndex` and `neighbor_face::FaceIndex` are the interface facets.
+
+**Struct fields of `InterfaceCache`**
+ - `ic.this_coords :: Vector{<:Vec}`: current cell node coordinates
+ - `ic.neighbor_coords :: Vector{<:Vec}`: neighbor cell node coordinates
+ - `ic.this_face :: Vector{<:Vec}`: local face index for current cell
+ - `ic.neighbor_face :: Vector{<:Vec}`: local face index for neighbor cell
+ - `ic.topology :: ExclusiveTopology`: topology information used in iteration
+
+**Methods with `InterfaceCache`**
+ - `reinit!(cache::InterfaceCache, this_face::FaceIndex, neighbor_face::FaceIndex)`: reinitialize [`InterfaceCache`](@ref)
+
+See also [`InterfaceIterator`](@ref).
+"""
+struct InterfaceCache{X,G<:AbstractGrid}
+    this_coords::Vector{X}
+    neighbor_coords::Vector{X}
+    this_face::ScalarWrapper{Int}
+    neighbor_face::ScalarWrapper{Int}
+    # grid and topology information needed for iteration
+    grid::G
+    topology::ExclusiveTopology
+end
+
+function InterfaceCache(grid::Grid{dim,C,T}, topology::ExclusiveTopology) where {dim,C,T}
+    N = nnodes_per_cell(grid)
+    this_coords = zeros(Vec{dim,T}, N)
+    neighbor_coords = zeros(Vec{dim,T}, N)
+    return InterfaceCache(this_coords, neighbor_coords, ScalarWrapper(-1), ScalarWrapper(-1), topology)
+end
+
+function InterfaceCache(dh::DofHandler{dim}, topology::ExclusiveTopology) where {dim}
+    N = nnodes_per_cell(get_grid(dh))
+    this_coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)
+    neighbor_coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)
+    return InterfaceCache(this_coords, neighbor_coords, ScalarWrapper(-1), ScalarWrapper(-1), topology)
+end
+
+function reinit!(cache::InterfaceCache, this_face::FaceIndex, neighbor_face::FaceIndex)
+    resize!(cache.this_coords, nnodes_per_cell(cache.grid, this_face[1]))
+    get_cell_coordinates!(cache.this_coords, cache.grid, this_face[1])
+    resize!(cache.neighbor_coords, nnodes_per_cell(cache.grid, neighbor_face[1]))
+    get_cell_coordinates!(cache.neighbor_coords, cache.grid, neighbor_face[1])
+    cache.this_face[] = this_face[2]
+    cache.neighbor_face[] = neighbor_face[2]
+    return cache
+end
+
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
-reinit!(iv::InterfaceValues, cc::CellCache, f::Int, ncc::CellCache, nf::Int) = reinit!(iv, cc.coords, f, ncc.coords, nf)
+reinit!(iv::InterfaceValues, ic::InterfaceCache) = reinit!(iv, ic.this_coords, ic.this_face, ic.neighbor_coords, ic.neighbor_face)
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
 getnodes(cc::CellCache) = cc.nodes
@@ -168,6 +226,69 @@ Base.IteratorSize(::Type{<:CellIterator}) = Base.HasLength()
 Base.IteratorEltype(::Type{<:CellIterator}) = Base.HasEltype()
 Base.eltype(::Type{<:CellIterator{CC}}) where CC = CC
 Base.length(ci::CellIterator) = length(ci.set)
+
+#######################
+## InterfaceIterator ##
+#######################
+
+"""
+    InterfaceIterator(grid::Grid, interfaces_set=1:length(topology.face_skeleton), topology::ExclusiveTopology)
+    InterfaceIterator(dh::AbstractDofHandler, interfaces_set=1:length(topology.face_skeleton), topology::ExclusiveTopology)
+
+Create an `InterfaceIterator` to conveniently iterate over all, or a subset, of the interfaces in a
+grid. The elements of the iterator are [`InterfaceCache`](@ref)s which are properly
+`reinit!`ialized. See [`InterfaceCache`](@ref) for more details.
+
+Looping over an `InterfaceIterator`, i.e.:
+```julia
+for ic in InterfaceIterator(grid, cellset, topology)
+    # ...
+end
+```
+is thus simply convenience for the following equivalent snippet:
+```julia
+ic = InterfaceCache(grid, topology)
+for face in topology.face_skeleton
+    neighbor_face = topology.face_neighbor[face[1], face[2]][1]
+    reinit!(ic, face, neighbor_face)
+    # ...
+end
+```
+!!! warning
+    `InterfaceIterator` is stateful and should not be used for things other than `for`-looping
+    (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
+"""
+struct InterfaceIterator{Cache<:InterfaceCache, IC<:IntegerCollection}
+    cache::Cache
+    set::IC
+end
+
+function InterfaceIterator(gridordh::Union{Grid,AbstractDofHandler},
+                      set::Union{IntegerCollection,Nothing},
+                      topology::ExclusiveTopology)
+    if set === nothing
+        set = 1:length(topology.face_skeleton)
+    end
+    return InterfaceIterator(InterfaceCache(gridordh, topology), set)
+end
+function InterfaceIterator(gridordh::Union{Grid,AbstractDofHandler}, topology::ExclusiveTopology)
+    return InterfaceIterator(gridordh, nothing, topology)
+end
+
+# Iterator interface
+function Base.iterate(ii::InterfaceIterator, state_in...)
+    it = iterate(ii.set, state_in...)
+    it === nothing && return nothing
+    interface_id, state_out = it
+    this_face = ii.cache.topology.face_skeleton[interface_id]
+    neighbor_face = ii.cache.topology.face_neighbor[this_face[1], this_face[2]][1]
+    reinit!(ii.cache, this_face, neighbor_face)
+    return (ii.cache, state_out)
+end
+Base.IteratorSize(::Type{<:InterfaceIterator}) = Base.HasLength()
+Base.IteratorEltype(::Type{<:InterfaceIterator}) = Base.HasEltype()
+Base.eltype(::Type{<:InterfaceIterator{Cache}}) where Cache = Cache
+Base.length(ii::InterfaceIterator) = length(ii.set)
 
 
 function _check_same_celltype(grid::AbstractGrid, cellset)
