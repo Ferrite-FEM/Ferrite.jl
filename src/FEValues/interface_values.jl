@@ -2,8 +2,8 @@
 """
     InterfaceValues(quad_rule::FaceQuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
 
-An `InterfaceValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
-values of nodal functions, gradients and divergences of nodal functions etc. on the interfaces of finite elements.
+An `InterfaceValues` object facilitates the process of evaluating values, averages, jumps and gradients of shape functions
+and nodal functions on the interfaces of finite elements.
 
 **Arguments:**
 
