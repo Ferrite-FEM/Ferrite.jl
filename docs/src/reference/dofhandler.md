@@ -38,9 +38,3 @@ celldofs!
 CellCache
 CellIterator
 ```
-
-# InterfaceIterator
-```@docs
-InterfaceCache
-InterfaceIterator
-```
