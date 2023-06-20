@@ -39,8 +39,8 @@ CellCache
 CellIterator
 ```
 
-# FaceIterator
+# InterfaceIterator
 ```@docs
-FaceCache
-FaceIterator
+InterfaceCache
+InterfaceIterator
 ```
