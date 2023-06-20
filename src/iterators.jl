@@ -119,7 +119,7 @@ struct InterfaceCache{CC<:CellCache}
     topology::ExclusiveTopology
 end
 
-function InterfaceCache(gridordh::Uinion{AbstractGrid, AbstractDofHandler}, topology::ExclusiveTopology)
+function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler}, topology::ExclusiveTopology)
     this_cell = CellCache(gridordh)
     neighbor_cell = CellCache(gridordh)
     return InterfaceCache(this_cell, neighbor_cell, ScalarWrapper(0), ScalarWrapper(0), InterfaceOrientationInfo(false, 0), topology)
@@ -161,7 +161,7 @@ onboundary(cc::CellCache, face::Int) = cc.grid.boundary_matrix[face, cc.cellid[]
 ##################
 
 const IntegerCollection = Union{AbstractSet{<:Integer}, AbstractVector{<:Integer}}
-const GridIterators{C} = Union{CellIterator{C},InterfaceIterator{C}}
+
 """
     CellIterator(grid::Grid, cellset=1:getncells(grid))
     CellIterator(dh::AbstractDofHandler, cellset=1:getncells(dh))
@@ -219,10 +219,6 @@ function Base.iterate(ci::CellIterator, state_in...)
     reinit!(ci.cc, cellid)
     return (ci.cc, state_out)
 end
-Base.IteratorSize(::Type{<:GridIterators}) = Base.HasLength()
-Base.IteratorEltype(::Type{<:GridIterators}) = Base.HasEltype()
-Base.eltype(::Type{<:GridIterators{CC}}) where CC = CC
-Base.length(gi::GridIterators) = length(gi.set)
 
 #######################
 ## InterfaceIterator ##
@@ -274,6 +270,8 @@ function InterfaceIterator(gridordh::Union{Grid,AbstractDofHandler}, topology::E
     return InterfaceIterator(gridordh, nothing, topology)
 end
 
+const GridIterators{C} = Union{CellIterator{C},InterfaceIterator{C}}
+
 # Iterator interface
 function Base.iterate(ii::InterfaceIterator, state_in...)
     it = iterate(ii.set, state_in...)
@@ -284,6 +282,10 @@ function Base.iterate(ii::InterfaceIterator, state_in...)
     reinit!(ii.cache, this_face, neighbor_face)
     return (ii.cache, state_out)
 end
+Base.IteratorSize(::Type{<:GridIterators}) = Base.HasLength()
+Base.IteratorEltype(::Type{<:GridIterators}) = Base.HasEltype()
+Base.eltype(::Type{<:GridIterators{CC}}) where CC = CC
+Base.length(gi::GridIterators) = length(gi.set)
 
 function _check_same_celltype(grid::AbstractGrid, cellset)
     celltype = getcelltype(grid, first(cellset))
