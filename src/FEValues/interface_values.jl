@@ -99,7 +99,7 @@ for (func,                      f_nbf,                  f_,                 mult
             elseif i <= nbf
                 fv = iv.face_values_neighbor
                 qp = get_neighbor_quadp(iv, qp)
-                return $(operator)($(multiplier), $(f_)(fv, qp, i - nbf/2))
+                return $(operator)($(multiplier), $(f_)(fv, qp, i - nbf ÷ 2))
             end
             error("Invalid base function $i. Interface has only $(nbf) base functions")
         end
@@ -113,6 +113,7 @@ Find quadrature point index in the neighbor facet.
 """
 function get_neighbor_quadp(iv::InterfaceValues, qpoint::Int)
     qpcoord = getpoints(iv.face_values.qr, iv.face_values.current_face[])[qpoint]
+    # TODO: transform using orientation_info
     neighbor_qp_coords = getpoints(iv.face_values_neighbor.qr, iv.face_values_neighbor.current_face[])
     return findfirst(i->i == qpcoord, neighbor_qp_coords)
 end

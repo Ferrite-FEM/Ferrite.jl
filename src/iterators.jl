@@ -100,7 +100,7 @@ interface. The cache is updated for a new cell by calling `reinit!(cache, this_f
  - `ic.neighbor_coords :: Vector{<:Vec}`: neighbor cell node coordinates
  - `ic.this_face :: Vector{<:Vec}`: local face index for current cell
  - `ic.neighbor_face :: Vector{<:Vec}`: local face index for neighbor cell
- - `ic.orientation_info :: InterfaceOrientationInfo`: whether the neighbor orientation info relative to current face
+ - `ic.orientation_info :: ScalarWrapper{InterfaceOrientationInfo}`: whether the neighbor orientation info relative to current face
  - `ic.grid :: AbstractGrid`: grid information used in iteration
  - `ic.topology :: ExclusiveTopology`: topology information used in iteration
 
@@ -114,7 +114,7 @@ struct InterfaceCache{CC<:CellCache}
     neighbor_cell::CC
     this_face::ScalarWrapper{Int}
     neighbor_face::ScalarWrapper{Int}
-    orientation_info::InterfaceOrientationInfo
+    orientation_info::ScalarWrapper{InterfaceOrientationInfo}
     # Topology information needed for iteration
     topology::ExclusiveTopology
 end
@@ -122,7 +122,7 @@ end
 function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler}, topology::ExclusiveTopology)
     this_cell = CellCache(gridordh)
     neighbor_cell = CellCache(gridordh)
-    return InterfaceCache(this_cell, neighbor_cell, ScalarWrapper(0), ScalarWrapper(0), InterfaceOrientationInfo(false, 0), topology)
+    return InterfaceCache(this_cell, neighbor_cell, ScalarWrapper(0), ScalarWrapper(0), ScalarWrapper(InterfaceOrientationInfo(false, 0)), topology)
 end
 
 function reinit!(cache::InterfaceCache, this_face::FaceIndex, neighbor_face::FaceIndex)
@@ -130,7 +130,7 @@ function reinit!(cache::InterfaceCache, this_face::FaceIndex, neighbor_face::Fac
     reinit!(cache.neighbor_cell,neighbor_face[1])
     cache.this_face[] = this_face[2]
     cache.neighbor_face[] = neighbor_face[2]
-    cache.orientation_info = InterfaceOrientationInfo(cache.grid, this_face, neighbor_face)
+    cache.orientation_info[] = InterfaceOrientationInfo(cache.this_cell.grid, this_face, neighbor_face)
     return cache
 end
 
@@ -138,8 +138,8 @@ end
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
 reinit!(iv::InterfaceValues, ic::InterfaceCache) = begin
-    reinit!(iv.face_values,ic.this_cell.coords,ic.this_face)
-    reinit!(iv.face_values_neighbor,ic.neighbor_cell.coords,ic.neighbor_face)
+    reinit!(iv.face_values, ic.this_cell, ic.this_face[])
+    reinit!(iv.face_values_neighbor, ic.neighbor_cell, ic.neighbor_face[])
     @assert getnquadpoints(iv.face_values) == getnquadpoints(iv.face_values_neighbor)
 end
 
