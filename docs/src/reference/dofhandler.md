@@ -38,3 +38,9 @@ celldofs!
 CellCache
 CellIterator
 ```
+
+# FaceIterator
+```@docs
+FaceCache
+FaceIterator
+```
