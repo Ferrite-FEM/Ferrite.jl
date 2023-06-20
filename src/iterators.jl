@@ -271,7 +271,9 @@ function InterfaceIterator(gridordh::Union{Grid,AbstractDofHandler},
                       set::Union{IntegerCollection,Nothing},
                       topology::ExclusiveTopology)
     if set === nothing
-        set = 1:length(topology.face_skeleton)
+        set = findall(face -> !isempty(topology.face_neighbor[face[1], face[2]]), topology.face_skeleton)
+    elseif !isempty(findall(face -> isempty(topology.face_neighbor[face[1], face[2]]), topology.face_skeleton[set]))
+        error("set passed to InterfaceIterator contains boundary faces")
     end
     return InterfaceIterator(InterfaceCache(gridordh, topology), set)
 end
