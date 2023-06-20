@@ -109,36 +109,25 @@ interface. The cache is updated for a new cell by calling `reinit!(cache, this_f
 
 See also [`InterfaceIterator`](@ref).
 """
-struct InterfaceCache{X,G<:AbstractGrid}
-    this_coords::Vector{X}
-    neighbor_coords::Vector{X}
+struct InterfaceCache{CC<:CellCache}
+    this_cell::CC
+    neighbor_cell::CC
     this_face::ScalarWrapper{Int}
     neighbor_face::ScalarWrapper{Int}
     orientation_info::InterfaceOrientationInfo
-    # grid and topology information needed for iteration
-    grid::G
+    # Topology information needed for iteration
     topology::ExclusiveTopology
 end
 
-function InterfaceCache(grid::Grid{dim,C,T}, topology::ExclusiveTopology) where {dim,C,T}
-    N = nnodes_per_cell(grid)
-    this_coords = zeros(Vec{dim,T}, N)
-    neighbor_coords = zeros(Vec{dim,T}, N)
-    return InterfaceCache(this_coords, neighbor_coords, ScalarWrapper(-1), ScalarWrapper(-1), InterfaceOrientationInfo(false, 0), grid, topology)
-end
-
-function InterfaceCache(dh::DofHandler{dim}, topology::ExclusiveTopology) where {dim}
-    N = nnodes_per_cell(get_grid(dh))
-    this_coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)
-    neighbor_coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)
-    return InterfaceCache(this_coords, neighbor_coords, ScalarWrapper(-1), ScalarWrapper(-1), InterfaceOrientationInfo(false, 0), get_grid(dh), topology)
+function InterfaceCache(gridordh::Uinion{AbstractGrid, AbstractDofHandler}, topology::ExclusiveTopology)
+    this_cell = CellCache(gridordh)
+    neighbor_cell = CellCache(gridordh)
+    return InterfaceCache(this_cell, neighbor_cell, ScalarWrapper(0), ScalarWrapper(0), InterfaceOrientationInfo(false, 0), topology)
 end
 
 function reinit!(cache::InterfaceCache, this_face::FaceIndex, neighbor_face::FaceIndex)
-    resize!(cache.this_coords, nnodes_per_cell(cache.grid, this_face[1]))
-    get_cell_coordinates!(cache.this_coords, cache.grid, this_face[1])
-    resize!(cache.neighbor_coords, nnodes_per_cell(cache.grid, neighbor_face[1]))
-    get_cell_coordinates!(cache.neighbor_coords, cache.grid, neighbor_face[1])
+    reinit!(cache.this_cell,this_face[1])
+    reinit!(cache.neighbor_cell,neighbor_face[1])
     cache.this_face[] = this_face[2]
     cache.neighbor_face[] = neighbor_face[2]
     cache.orientation_info = InterfaceOrientationInfo(cache.grid, this_face, neighbor_face)
@@ -148,7 +137,11 @@ end
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
-reinit!(iv::InterfaceValues, ic::InterfaceCache) = reinit!(iv, ic.this_coords, ic.this_face, ic.neighbor_coords, ic.neighbor_face)
+reinit!(iv::InterfaceValues, ic::InterfaceCache) = begin
+    reinit!(iv.face_values,ic.this_cell.coords,ic.this_face)
+    reinit!(iv.face_values_neighbor,ic.neighbor_cell.coords,ic.neighbor_face)
+    @assert getnquadpoints(iv.face_values) == getnquadpoints(iv.face_values_neighbor)
+end
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
 getnodes(cc::CellCache) = cc.nodes
@@ -168,7 +161,7 @@ onboundary(cc::CellCache, face::Int) = cc.grid.boundary_matrix[face, cc.cellid[]
 ##################
 
 const IntegerCollection = Union{AbstractSet{<:Integer}, AbstractVector{<:Integer}}
-
+const GridIterators{C} = Union{CellIterator{C},InterfaceIterator{C}}
 """
     CellIterator(grid::Grid, cellset=1:getncells(grid))
     CellIterator(dh::AbstractDofHandler, cellset=1:getncells(dh))
@@ -226,10 +219,10 @@ function Base.iterate(ci::CellIterator, state_in...)
     reinit!(ci.cc, cellid)
     return (ci.cc, state_out)
 end
-Base.IteratorSize(::Type{<:CellIterator}) = Base.HasLength()
-Base.IteratorEltype(::Type{<:CellIterator}) = Base.HasEltype()
-Base.eltype(::Type{<:CellIterator{CC}}) where CC = CC
-Base.length(ci::CellIterator) = length(ci.set)
+Base.IteratorSize(::Type{<:GridIterators}) = Base.HasLength()
+Base.IteratorEltype(::Type{<:GridIterators}) = Base.HasEltype()
+Base.eltype(::Type{<:GridIterators{CC}}) where CC = CC
+Base.length(gi::GridIterators) = length(gi.set)
 
 #######################
 ## InterfaceIterator ##
@@ -291,11 +284,6 @@ function Base.iterate(ii::InterfaceIterator, state_in...)
     reinit!(ii.cache, this_face, neighbor_face)
     return (ii.cache, state_out)
 end
-Base.IteratorSize(::Type{<:InterfaceIterator}) = Base.HasLength()
-Base.IteratorEltype(::Type{<:InterfaceIterator}) = Base.HasEltype()
-Base.eltype(::Type{<:InterfaceIterator{Cache}}) where Cache = Cache
-Base.length(ii::InterfaceIterator) = length(ii.set)
-
 
 function _check_same_celltype(grid::AbstractGrid, cellset)
     celltype = getcelltype(grid, first(cellset))

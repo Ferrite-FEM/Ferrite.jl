@@ -50,13 +50,7 @@ function InterfaceValues(quad_rule::FaceQuadratureRule, func_interpol::Interpola
     face_values_neighbor = copy(face_values)
     return InterfaceValues{FaceValues}(face_values,face_values_neighbor)
 end
-function reinit!(iv::InterfaceValues, coords::AbstractVector{Vec{dim,T}}, f::Int, ncoords::AbstractVector{Vec{dim,T}}, nf::Int) where {dim,T}
-    reinit!(iv.face_values,coords,f)
-    reinit!(iv.face_values_neighbor,ncoords,nf)
-    @assert getnquadpoints(iv.face_values) == getnquadpoints(iv.face_values_neighbor)
-end
 # Maybe move this to common_values.jl?
-
 """
     shape_value_average(iv::InterfaceValues, qp::Int, base_function::Int)
 
