@@ -7,7 +7,7 @@ using Base: @propagate_inbounds
 getnbasefunctions(cv::AbstractValues) = size(cv.N, 1)
 getnbasefunctions(iv::InterfaceValues) = 2 * getnbasefunctions(iv.face_values)
 getngeobasefunctions(cv::AbstractValues) = size(cv.M, 1)
-getngeobasefunctions(iv::InterfaceValues) = 2 * getngeobasefunctions(iv.face_values)
+getngeobasefunctions(iv::InterfaceValues) = getngeobasefunctions(iv.face_values)
 
 function checkquadpoint(cv::Union{CellValues, FaceValues, PointValues}, qp::Int)
     0 < qp <= getnquadpoints(cv) || error("quadrature point out of range")
@@ -288,6 +288,8 @@ function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVecto
     end
     return vec
 end
+spatial_coordinate(iv::InterfaceValues, q_point::Int, x::AbstractVector{Vec{dim,T}}) where {dim,T} =
+    spatial_coordinate(iv.face_values, q_point, x)
 
 function Base.show(io::IO, ::MIME"text/plain", fe_v::AbstractValues)
     print(io, "$(typeof(fe_v)) with $(getnbasefunctions(fe_v)) shape functions and $(getnquadpoints(fe_v)) quadrature points")
