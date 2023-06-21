@@ -1481,6 +1481,7 @@ the shift index.
 """
 function InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, neighbor_face::FaceIndex)
     face_nodes = faces(getcells(grid)[this_face[1]])[this_face[2]]
+    length(face_nodes) == 1 && return InterfaceOrientationInfo(false, 0)
     neighbor_face_nodes = faces(getcells(grid)[neighbor_face[1]])[neighbor_face[2]]
     !all([i ∈ face_nodes for i in neighbor_face_nodes]) && error("Passed faces do not use the same nodes")
     first_node_idx = findfirst(i -> i == face_nodes[1],neighbor_face_nodes)
