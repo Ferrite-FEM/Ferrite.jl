@@ -53,7 +53,6 @@ Return the number of quadrature points in `fv`s quadrature for the current
 """
 getnquadpoints(fe::FaceValues) = getnquadpoints(fe.qr, fe.current_face[])
 
-
 """
     getdetJdV(fe_v::AbstractValues, q_point::Int)
 
@@ -79,12 +78,6 @@ quadrature point `q_point`.
 @propagate_inbounds shape_value(cv::CellValues, q_point::Int, base_func::Int) = cv.N[base_func, q_point]
 @propagate_inbounds shape_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.N[base_func, q_point, bv.current_face[]]
 
-"""
-    geometric_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
-
-Return the value of shape function `base_function` evaluated in
-quadrature point `q_point`.
-"""
 @propagate_inbounds geometric_value(cv::CellValues, q_point::Int, base_func::Int) = cv.M[base_func, q_point]
 @propagate_inbounds geometric_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_face[]]
 
