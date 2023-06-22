@@ -275,7 +275,7 @@ end
 # Dirichlet on (face|edge|vertex)set
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, _) where {Index<:BoundaryIndex}
     local_face_dofs, local_face_dofs_offset =
-        _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, boundarydof_indices(eltype(bcfaces)))
+        _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, dirichlet_boundarydof_indices(eltype(bcfaces)))
     copy!(dbc.local_face_dofs, local_face_dofs)
     copy!(dbc.local_face_dofs_offset, local_face_dofs_offset)
 
@@ -300,7 +300,7 @@ end
 
 # Calculate which local dof index live on each face:
 # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
-function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F=facedof_indices) where F
+function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F=dirichlet_facedof_indices) where F
     @assert issorted(components)
     local_face_dofs = Int[]
     local_face_dofs_offset = Int[1]
@@ -833,6 +833,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         if interpolation isa VectorizedInterpolation
             interpolation = interpolation.ip
         end
+        getorder(interpolation) == 0 && error("No dof prescribed for order 0 interpolations")
         # Set up components to prescribe (empty input means prescribe all components)
         components = isempty(dbc.components) ? collect(Int, 1:n_comp) : dbc.components
         if !all(c -> 0 < c <= n_comp, components)
@@ -1174,7 +1175,7 @@ end
 function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral,RefTriangle}}, n::Int)
     # For 2D we always permute since Ferrite defines dofs counter-clockwise
     ret = collect(1:length(local_face_dofs))
-    for (i, f) in enumerate(facedof_indices(ip))
+    for (i, f) in enumerate(dirichlet_facedof_indices(ip))
         this_offset = local_face_dofs_offset[i]
         other_offset = this_offset + n
         for d in 1:n
@@ -1195,7 +1196,7 @@ function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange
     ret = collect(1:length(local_face_dofs))
 
     # Mirror by changing from counter-clockwise to clockwise
-    for (i, f) in enumerate(facedof_indices(ip))
+    for (i, f) in enumerate(dirichlet_facedof_indices(ip))
         r = local_face_dofs_offset[i]:(local_face_dofs_offset[i+1] - 1)
         # 1. Rotate the corners
         vertex_range = r[1:(N*n)]
