@@ -5,9 +5,7 @@ using Base: @propagate_inbounds
 @noinline throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
 
 getnbasefunctions(cv::AbstractValues) = size(cv.N, 1)
-getnbasefunctions(iv::InterfaceValues) = 2 * getnbasefunctions(iv.face_values)
 getngeobasefunctions(cv::AbstractValues) = size(cv.M, 1)
-getngeobasefunctions(iv::InterfaceValues) = 2 * getngeobasefunctions(iv.face_values)
 
 function checkquadpoint(cv::Union{CellValues, FaceValues, PointValues}, qp::Int)
     0 < qp <= getnquadpoints(cv) || error("quadrature point out of range")
@@ -34,9 +32,8 @@ end
 """
     reinit!(cv::CellValues, x::Vector)
     reinit!(bv::FaceValues, x::Vector, face::Int)
-    reinit!(iv::InterfaceValues, coords::Vector, f::Int, ncoords::Vector, nf::Int)
 
-Update the `CellValues`/`FaceValues`/`InterfaceValues` object for a cell or face with coordinates `x`.
+Update the `CellValues`/`FaceValues` object for a cell or face with coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
 """
 reinit!
@@ -56,17 +53,9 @@ Return the number of quadrature points in `fv`s quadrature for the current
 """
 getnquadpoints(fe::FaceValues) = getnquadpoints(fe.qr, fe.current_face[])
 
-"""
-    getnquadpoints(iv::InterfaceValues)
-
-Return the number of quadrature points in `iv`s current [`FaceValues`](@ref)' quadrature for the current
-(most recently [`reinit!`](@ref)ed) interface.
-"""
-getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.face_values.qr, iv.face_values.current_face[])
 
 """
     getdetJdV(fe_v::AbstractValues, q_point::Int)
-    getdetJdV(iv::InterfaceValues, q_point::Int, here::Bool)
 
 Return the product between the determinant of the Jacobian and the quadrature
 point weight for the given quadrature point: ``\\det(J(\\mathbf{x})) w_q``
@@ -80,7 +69,6 @@ finite element cell or face as
 """
 @propagate_inbounds getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 @propagate_inbounds getdetJdV(bv::FaceValues, q_point::Int) = bv.detJdV[q_point, bv.current_face[]]
-@propagate_inbounds getdetJdV(iv::InterfaceValues, q_point::Int, here::Bool) = here ? getdetJdV(iv.face_values, q_point) : getdetJdV(iv.face_values_neighbor, get_neighbor_quadp(q_point))
 
 """
     shape_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -162,7 +150,6 @@ end
 # TODO: Implement fallback or require this to be defined?
 #       Alt: shape_value_type(cv) = typeof(shape_value(cv, qp=1, i=1))
 shape_value_type(::Union{CellValues{<:Any, N_t}, FaceValues{<:Any, N_t}}) where N_t = N_t
-shape_value_type(iv::InterfaceValues) = eltype(iv.face_values.N)
 function_value_init(cv::AbstractValues, ::AbstractVector{T}) where {T} = zero(shape_value_type(cv)) * zero(T)
 
 """
@@ -208,7 +195,6 @@ end
 # TODO: Implement fallback or require this to be defined?
 #       Alt: shape_gradient_type(cv) = typeof(shape_gradient(cv, qp=1, i=1))
 shape_gradient_type(::Union{CellValues{<:Any, <:Any, dNdx_t}, FaceValues{<:Any, <:Any, dNdx_t}}) where dNdx_t = dNdx_t
-shape_gradient_type(iv::InterfaceValues) = eltype(iv.face_values.dNdx)
 function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {T}
     return zero(shape_gradient_type(cv)) * zero(T)
 end

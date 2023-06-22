@@ -29,7 +29,6 @@ export
     AbstractFaceValues,
     CellValues,
     FaceValues,
-    InterfaceValues,
     reinit!,
     shape_value,
     shape_gradient,

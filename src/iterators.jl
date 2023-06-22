@@ -137,11 +137,12 @@ end
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
-reinit!(iv::InterfaceValues, ic::InterfaceCache) = begin
-    reinit!(iv.face_values,ic.this_cell.coords,ic.this_face)
-    reinit!(iv.face_values_neighbor,ic.neighbor_cell.coords,ic.neighbor_face)
-    @assert getnquadpoints(iv.face_values) == getnquadpoints(iv.face_values_neighbor)
-end
+# TODOL enable this after InterfaceValues are merges
+# reinit!(iv::InterfaceValues, ic::InterfaceCache) = begin
+#     reinit!(iv.face_values,ic.this_cell.coords,ic.this_face)
+#     reinit!(iv.face_values_neighbor,ic.neighbor_cell.coords,ic.neighbor_face)
+#     @assert getnquadpoints(iv.face_values) == getnquadpoints(iv.face_values_neighbor)
+# end
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
 getnodes(cc::CellCache) = cc.nodes
