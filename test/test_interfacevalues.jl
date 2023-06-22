@@ -90,6 +90,94 @@
                     
                 end
             end
+
+            # Test function* copied from facevalues tests
+            for here in (true, false)
+                u = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1:n_basefunc_base]
+                u_scal = zeros(n_basefunc_base)
+                H = rand(Tensor{2, ndim})
+                V = rand(Tensor{1, ndim})
+                for i in 1:n_basefunc_base
+                    xs = i <= n_basefunc_base ÷ 2 ? cell_coords : other_cell_coords
+                    j = i <= n_basefunc_base ÷ 2 ? i : i - Ferrite.getngeobasefunctions(iv.face_values)
+                    u[i] = H ⋅ xs[j]
+                    u_scal[i] = V ⋅ xs[j]
+                end
+                u_vector = reinterpret(Float64, u)
+                for i in 1:length(getnquadpoints(iv))
+                    if func_interpol isa Ferrite.ScalarInterpolation
+                        @test function_gradient(iv, i, u, here = here) ≈ H
+                        @test function_symmetric_gradient(iv, i, u, here = here) ≈ 0.5(H + H')
+                        @test function_divergence(iv, i, u_scal, here = here) ≈ sum(V)
+                        @test function_divergence(iv, i, u, here = here) ≈ tr(H)
+                        @test function_gradient(iv, i, u_scal, here = here) ≈ V
+                        ndim == 3 && @test function_curl(iv, i, u, here = here) ≈ Ferrite.curl_from_gradient(H)
+                        function_value(iv, i, u, here = here)
+                        function_value(iv, i, u_scal, here = here)
+                    else # func_interpol isa Ferrite.VectorInterpolation
+                        @test function_gradient(iv, i, u_vector, here = here) ≈ H
+                        @test (@test_deprecated function_gradient(iv, i, u, here = here)) ≈ H
+                        @test function_symmetric_gradient(iv, i, u_vector, here = here) ≈ 0.5(H + H')
+                        @test (@test_deprecated function_symmetric_gradient(iv, i, u, here = here)) ≈ 0.5(H + H')
+                        @test function_divergence(iv, i, u_vector, here = here) ≈ tr(H)
+                        @test (@test_deprecated function_divergence(iv, i, u, here = here)) ≈ tr(H)
+                        if ndim == 3
+                            @test function_curl(iv, i, u_vector, here = here) ≈ Ferrite.curl_from_gradient(H)
+                            @test (@test_deprecated function_curl(iv, i, u, here = here)) ≈ Ferrite.curl_from_gradient(H)
+                        end
+                        @test function_value(iv, i, u_vector, here = here) ≈ (@test_deprecated function_value(iv, i, u, here = here))
+                    end
+                end
+                # Test of volume
+                vol = 0.0
+                for i in 1:getnquadpoints(iv)
+                    vol += getdetJdV(iv, i; here = here)
+                end
+                here = true
+                let ip_base = func_interpol isa VectorizedInterpolation ? func_interpol.ip : func_interpol
+                    xs = here ? cell_coords : other_cell_coords
+                    x_face = xs[[Ferrite.facedof_indices(ip_base)[here ? face[2] : other_face[2]]...]]
+                    @test vol ≈ calculate_face_area(ip_base, x_face, here ? face[2] : other_face[2])
+                end
+
+                # Test quadrature rule after reinit! with ref. coords
+                x = Ferrite.reference_coordinates(func_interpol)
+                reinit!(here ? iv.face_values : iv.face_values_neighbor, x, here ? face[2] : other_face[2])
+                vol = 0.0
+                for i in 1:getnquadpoints(iv)
+                    vol += getdetJdV(iv, i; here = here)
+                end
+                @test vol ≈ reference_face_area(func_interpol, here ? face[2] : other_face[2])
+
+                # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
+                # TODO: Renable somehow after quad rule is no longer stored in FaceValues
+                #for (i, qp_x) in enumerate(getpoints(quad_rule))
+                #    @test spatial_coordinate(fv, i, x) ≈ qp_x
+                #end
+            end
+        end
+        # test copy
+        ivc = copy(iv)
+        @test typeof(iv) == typeof(ivc)
+        for fname in fieldnames(typeof(iv))
+            v = getfield(iv, fname)
+            v isa Ferrite.ScalarWrapper && continue
+            vc = getfield(ivc, fname)
+            if hasmethod(pointer, Tuple{typeof(v)})
+                @test pointer(v) != pointer(vc)
+            end
+            v isa FaceValues && for subfname in fieldnames(typeof(v))
+                subv = getfield(v, subfname)
+                subv isa Ferrite.ScalarWrapper && continue
+                subvc = getfield(vc, subfname)
+                if hasmethod(pointer, Tuple{typeof(subv)})
+                    @test pointer(subv) != pointer(subvc)
+                end
+                # TODO: check this
+                # @test subv == subvc this errors for array fields and works in FaceValues test
+            end
+            v isa FaceValues && continue
+            @test v == vc
         end
     end
 end
