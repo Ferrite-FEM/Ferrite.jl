@@ -207,7 +207,7 @@ function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interp
     interpolation_coords = reference_coordinates(func_interpol)
 
     qrs = QuadratureRule{refshape,T,dim}[]
-    for boundarydofs in boundarydof_indices(boundary_type)(func_interpol)
+    for boundarydofs in dirichlet_boundarydof_indices(boundary_type)(func_interpol)
         dofcoords = Vec{dim,T}[]
         for boundarydof in boundarydofs
             push!(dofcoords, interpolation_coords[boundarydof])
