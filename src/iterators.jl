@@ -114,7 +114,7 @@ struct InterfaceCache{CC<:CellCache}
     neighbor_cell::CC
     this_face::ScalarWrapper{Int}
     neighbor_face::ScalarWrapper{Int}
-    orientation_info::InterfaceOrientationInfo
+    # orientation_info::InterfaceOrientationInfo
     # Topology information needed for iteration
     topology::ExclusiveTopology
 end
@@ -122,7 +122,7 @@ end
 function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler}, topology::ExclusiveTopology)
     this_cell = CellCache(gridordh)
     neighbor_cell = CellCache(gridordh)
-    return InterfaceCache(this_cell, neighbor_cell, ScalarWrapper(0), ScalarWrapper(0), InterfaceOrientationInfo(false, 0), topology)
+    return InterfaceCache(this_cell, neighbor_cell, ScalarWrapper(0), ScalarWrapper(0)#=, InterfaceOrientationInfo(false, 0)=#, topology)
 end
 
 function reinit!(cache::InterfaceCache, this_face::FaceIndex, neighbor_face::FaceIndex)
@@ -130,7 +130,7 @@ function reinit!(cache::InterfaceCache, this_face::FaceIndex, neighbor_face::Fac
     reinit!(cache.neighbor_cell,neighbor_face[1])
     cache.this_face[] = this_face[2]
     cache.neighbor_face[] = neighbor_face[2]
-    cache.orientation_info = InterfaceOrientationInfo(cache.grid, this_face, neighbor_face)
+    #cache.orientation_info = InterfaceOrientationInfo(cache.grid, this_face, neighbor_face)
     return cache
 end
 
