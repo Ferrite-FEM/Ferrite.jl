@@ -39,7 +39,7 @@ and nodal functions on the interfaces of finite elements.
 """
 InterfaceValues
 
-struct InterfaceValues{FV<:FaceValues} <: AbstractValues
+struct InterfaceValues{IP, FV<:FaceValues} <: AbstractValues
     face_values::FV
     face_values_neighbor::FV
     # used for quadrature point syncing
@@ -52,7 +52,7 @@ function InterfaceValues(grid::AbstractGrid, quad_rule::FaceQuadratureRule, func
     #@assert isDiscontinuous(func_interpol) "`InterfaceValues` is designed for discontinuous interpolations. a continuous interpolation is passed" TODO: add this when sparsity_pattern is merged
     face_values = FaceValues(quad_rule, func_interpol, geom_interpol)
     face_values_neighbor = copy(face_values)
-    return InterfaceValues{FaceValues}(face_values, face_values_neighbor, grid, ScalarWrapper(0), ScalarWrapper(0))
+    return InterfaceValues{typeof(func_interpol), FaceValues}(face_values, face_values_neighbor, grid, ScalarWrapper(0), ScalarWrapper(0))
 end
 # Maybe move this to common_values.jl?
 """
