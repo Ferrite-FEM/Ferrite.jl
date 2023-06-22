@@ -43,10 +43,6 @@ export
     spatial_coordinate,
     getnormal,
     getdetJdV,
-    shape_value_average,
-    shape_value_jump,
-    shape_gradient_average,
-    shape_gradient_jump,
 
 # Grid
     Grid,
