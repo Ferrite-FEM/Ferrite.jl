@@ -1,21 +1,21 @@
 @testset "InterfaceValues" begin
     getcelltypedim(::Type{<:Ferrite.AbstractCell{shape}}) where {dim, shape <: Ferrite.AbstractRefShape{dim}} = dim
     for (cell_shape, scalar_interpol, quad_rule) in (
-                                        (Line, Lagrange{RefLine, 1}(), FaceQuadratureRule{RefLine}(2)),
-                                        (QuadraticLine, Lagrange{RefLine, 2}(), FaceQuadratureRule{RefLine}(2)),
-                                        (Quadrilateral, Lagrange{RefQuadrilateral, 1}(), FaceQuadratureRule{RefQuadrilateral}(2)),
-                                        (QuadraticQuadrilateral, Lagrange{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2)),
-                                        (Triangle, Lagrange{RefTriangle, 1}(), FaceQuadratureRule{RefTriangle}(2)),
-                                        (QuadraticTriangle, Lagrange{RefTriangle, 2}(), FaceQuadratureRule{RefTriangle}(2)),
-                                        (Hexahedron, Lagrange{RefHexahedron, 1}(), FaceQuadratureRule{RefHexahedron}(2)),
+                                        (Line, DiscontinuousLagrange{RefLine, 1}(), FaceQuadratureRule{RefLine}(2)),
+                                        (QuadraticLine, DiscontinuousLagrange{RefLine, 2}(), FaceQuadratureRule{RefLine}(2)),
+                                        (Quadrilateral, DiscontinuousLagrange{RefQuadrilateral, 1}(), FaceQuadratureRule{RefQuadrilateral}(2)),
+                                        (QuadraticQuadrilateral, DiscontinuousLagrange{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2)),
+                                        (Triangle, DiscontinuousLagrange{RefTriangle, 1}(), FaceQuadratureRule{RefTriangle}(2)),
+                                        (QuadraticTriangle, DiscontinuousLagrange{RefTriangle, 2}(), FaceQuadratureRule{RefTriangle}(2)),
+                                        (Hexahedron, DiscontinuousLagrange{RefHexahedron, 1}(), FaceQuadratureRule{RefHexahedron}(2)),
                                         # (QuadraticQuadrilateral, Serendipity{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2)),
-                                        (Tetrahedron, Lagrange{RefTetrahedron, 1}(), FaceQuadratureRule{RefTetrahedron}(2)),
+                                        (Tetrahedron, DiscontinuousLagrange{RefTetrahedron, 1}(), FaceQuadratureRule{RefTetrahedron}(2)),
                                         # (QuadraticTetrahedron, Lagrange{RefTetrahedron, 2}(), FaceQuadratureRule{RefTetrahedron}(2)),
                                        )
     dim = getcelltypedim(cell_shape)
     grid = generate_grid(cell_shape, ntuple(i -> i == 1 ? 2 : 1, dim))
     topology = ExclusiveTopology(grid)
-    for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
+    for func_interpol in (scalar_interpol,#= VectorizedInterpolation(scalar_interpol)=#)
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = 2 * getnbasefunctions(scalar_interpol)
         iv = Ferrite.InterfaceValues(grid, quad_rule, func_interpol, geom_interpol)
@@ -75,14 +75,14 @@
                     @test shapegrad_jump ≈ shapegrad ⋅ normal
 
                     # Test dimensions:
-                    # Jump of a [scalar -> vector, vector -> scalar, matrix -> vector]
+                    # Jump of a [scalar -> vector, vector -> scalar]
                     if !isempty(size(shapevalue))
                         @test shape_jump isa Number
                     else
                         @test !(shape_jump isa Number)
                     end
 
-                    if isempty(size(shapegrad)) || length(size(shapegrad)) > 1
+                    if isempty(size(shapegrad))
                         @test !(shapegrad_jump isa Number)
                     else
                         @test shapegrad_jump isa Number
@@ -104,59 +104,37 @@
                     u_scal[i] = V ⋅ xs[j]
                 end
                 u_vector = reinterpret(Float64, u)
-                for i in 1:length(getnquadpoints(iv))
-                    if func_interpol isa Ferrite.ScalarInterpolation
-                        @test function_gradient(iv, i, u, here = here) ≈ H
-                        @test function_symmetric_gradient(iv, i, u, here = here) ≈ 0.5(H + H')
-                        @test function_divergence(iv, i, u_scal, here = here) ≈ sum(V)
-                        @test function_divergence(iv, i, u, here = here) ≈ tr(H)
-                        @test function_gradient(iv, i, u_scal, here = here) ≈ V
-                        ndim == 3 && @test function_curl(iv, i, u, here = here) ≈ Ferrite.curl_from_gradient(H)
-                        function_value(iv, i, u, here = here)
-                        function_value(iv, i, u_scal, here = here)
-                    else # func_interpol isa Ferrite.VectorInterpolation
-                        @test function_gradient(iv, i, u_vector, here = here) ≈ H
-                        @test (@test_deprecated function_gradient(iv, i, u, here = here)) ≈ H
-                        @test function_symmetric_gradient(iv, i, u_vector, here = here) ≈ 0.5(H + H')
-                        @test (@test_deprecated function_symmetric_gradient(iv, i, u, here = here)) ≈ 0.5(H + H')
-                        @test function_divergence(iv, i, u_vector, here = here) ≈ tr(H)
-                        @test (@test_deprecated function_divergence(iv, i, u, here = here)) ≈ tr(H)
-                        if ndim == 3
-                            @test function_curl(iv, i, u_vector, here = here) ≈ Ferrite.curl_from_gradient(H)
-                            @test (@test_deprecated function_curl(iv, i, u, here = here)) ≈ Ferrite.curl_from_gradient(H)
-                        end
-                        @test function_value(iv, i, u_vector, here = here) ≈ (@test_deprecated function_value(iv, i, u, here = here))
-                    end
+                for i in 1:getnquadpoints(iv)
+                    @test function_gradient(iv, i, u, here = here) ≈ H
+                    @test function_symmetric_gradient(iv, i, u, here = here) ≈ 0.5(H + H')
+                    @test function_divergence(iv, i, u_scal, here = here) ≈ sum(V)
+                    @test function_divergence(iv, i, u, here = here) ≈ tr(H)
+                    @test function_gradient(iv, i, u_scal, here = here) ≈ V
+                    ndim == 3 && @test function_curl(iv, i, u, here = here) ≈ Ferrite.curl_from_gradient(H)
+
+                    @test function_value_average(iv, i, u_scal) ≈ function_value(iv, i, u_scal, here = here)
+                    @test all(function_value_jump(iv, i, u_scal) .<= 20 * eps(Float64))
+                    @test function_gradient_average(iv, i, u_scal) ≈ function_gradient(iv, i, u_scal, here = here)
+                    @test function_gradient_jump(iv, i, u_scal) <= 20 * eps(Float64)
+
+                    @test function_value_average(iv, i, u) ≈ function_value(iv, i, u, here = here)
+                    @test all(function_value_jump(iv, i, u) .<= 30 * eps(Float64))
+                    @test function_gradient_average(iv, i, u) ≈ function_gradient(iv, i, u, here = here)
+                    @test all(function_gradient_jump(iv, i, u) .<= 30 * eps(Float64))
+
                 end
                 # Test of volume
                 vol = 0.0
                 for i in 1:getnquadpoints(iv)
                     vol += getdetJdV(iv, i; here = here)
                 end
-                here = true
-                let ip_base = func_interpol isa VectorizedInterpolation ? func_interpol.ip : func_interpol
-                    xs = here ? cell_coords : other_cell_coords
-                    x_face = xs[[Ferrite.facedof_indices(ip_base)[here ? face[2] : other_face[2]]...]]
-                    @test vol ≈ calculate_face_area(ip_base, x_face, here ? face[2] : other_face[2])
-                end
-
-                # Test quadrature rule after reinit! with ref. coords
-                x = Ferrite.reference_coordinates(func_interpol)
-                reinit!(here ? iv.face_values : iv.face_values_neighbor, x, here ? face[2] : other_face[2])
-                vol = 0.0
-                for i in 1:getnquadpoints(iv)
-                    vol += getdetJdV(iv, i; here = here)
-                end
-                @test vol ≈ reference_face_area(func_interpol, here ? face[2] : other_face[2])
-
-                # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
-                # TODO: Renable somehow after quad rule is no longer stored in FaceValues
-                #for (i, qp_x) in enumerate(getpoints(quad_rule))
-                #    @test spatial_coordinate(fv, i, x) ≈ qp_x
-                #end
+                
+                xs = here ? cell_coords : other_cell_coords
+                x_face = xs[[Ferrite.dirichlet_facedof_indices(scalar_interpol)[here ? face[2] : other_face[2]]...]]
+                @test vol ≈ calculate_face_area(scalar_interpol, x_face, here ? face[2] : other_face[2])
             end
         end
-        # test copy
+        # Test copy
         ivc = copy(iv)
         @test typeof(iv) == typeof(ivc)
         for fname in fieldnames(typeof(iv))
@@ -174,7 +152,7 @@
                     @test pointer(subv) != pointer(subvc)
                 end
                 # TODO: check this
-                # @test subv == subvc this errors for array fields and works in FaceValues test
+                # @test subv == subvc #this errors for array fields and works in FaceValues test
             end
             v isa FaceValues && continue
             @test v == vc

@@ -111,6 +111,36 @@ for (func,                      f_,                 multiplier,             ) in
     end
 end
 
+for (func,                          f_,                 multiplier,             ) in (
+    (:function_value_average,       :function_value,       :(0.5),                 ),
+    (:function_value_jump,          :function_value,       :(getnormal(fv, qp)),   ),
+    (:function_gradient_average,    :function_gradient,    :(0.5),                 ),
+    (:function_gradient_jump,       :function_gradient,    :(getnormal(fv, qp)),   ),
+)
+    @eval begin
+        function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector, dof_range = eachindex(u))
+            dof_range_here = dof_range[dof_range .<= length(eachindex(u)) ÷ 2]
+            dof_range_there = dof_range[dof_range .> length(eachindex(u)) ÷ 2]
+            f_value_here = $(f_)(iv, qp, u, dof_range_here; here = true)
+            f_value_there = $(f_)(iv, qp, u, dof_range_there; here = false)
+            fv = iv.face_values
+            result = f_value_here isa Number || $(multiplier) isa Number ? $(multiplier) * f_value_here : f_value_here ⋅ $(multiplier)
+            fv = iv.face_values_neighbor
+            result += f_value_there isa Number || $(multiplier) isa Number ? $(multiplier) * f_value_there : f_value_there ⋅ $(multiplier)
+            return result
+        end
+        # TODO: Deprecate this, nobody is using this in practice...
+        function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector{<:Vec})
+            f_value_here = $(f_)(iv, qp, u; here = true)
+            f_value_there = $(f_)(iv, qp, u; here = false)
+            fv = iv.face_values
+            result = f_value_here isa Number || $(multiplier) isa Number ? $(multiplier) * f_value_here : f_value_here ⋅ $(multiplier)
+            fv = iv.face_values_neighbor
+            result += f_value_there isa Number || $(multiplier) isa Number ? $(multiplier) * f_value_there : f_value_there ⋅ $(multiplier)
+            return result
+        end
+    end
+end
 """
     get_neighbor_quadp(iv::InterfaceValues, qpoint::Int)
 

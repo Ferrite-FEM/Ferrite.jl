@@ -163,11 +163,6 @@ const _VectorValues = Union{CellValues{<:VectorInterpolation}, FaceValues{<:Vect
 @deprecate function_divergence(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(fe_v, q_point, reinterpret(T, u))
 @deprecate       function_curl(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}       function_curl(fe_v, q_point, reinterpret(T, u))
 
-@deprecate      function_value(fe_v::InterfaceValues{<:VectorInterpolation}, q_point::Int, u::AbstractVector{Vec{dim,T}}; here::Bool = true) where {dim,T}      function_value(fe_v, q_point, reinterpret(T, u), here = here)
-@deprecate   function_gradient(fe_v::InterfaceValues{<:VectorInterpolation}, q_point::Int, u::AbstractVector{Vec{dim,T}}; here::Bool = true) where {dim,T}   function_gradient(fe_v, q_point, reinterpret(T, u), here = here)
-@deprecate function_divergence(fe_v::InterfaceValues{<:VectorInterpolation}, q_point::Int, u::AbstractVector{Vec{dim,T}}; here::Bool = true) where {dim,T} function_divergence(fe_v, q_point, reinterpret(T, u), here = here)
-@deprecate       function_curl(fe_v::InterfaceValues{<:VectorInterpolation}, q_point::Int, u::AbstractVector{Vec{dim,T}}; here::Bool = true) where {dim,T}       function_curl(fe_v, q_point, reinterpret(T, u), here = here)
-
 # New reference shapes
 struct RefCube end
 export RefCube

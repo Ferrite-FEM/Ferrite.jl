@@ -161,9 +161,10 @@ function function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, d
 end
 function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) = begin
     fv = here ? iv.face_values : iv.face_values_neighbor
+    here || (q_point = get_neighbor_quadp(iv, q_point))
     if dof_range != eachindex(u)
-        here && any(dof_range .> eachindex(u) ÷ 2) && error("dof_range contains dof on the other face of the interface")
-        here || any(dof_range .<= eachindex(u) ÷ 2) && error("dof_range contains dof on the other face of the interface")
+        here && any(dof_range .> length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
+        here || any(dof_range .<= length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
     else
         dof_range = here ? dof_range[1 : end ÷ 2] : dof_range[end ÷ 2 + 1 : end]
     end
@@ -173,9 +174,7 @@ end
 # TODO: Implement fallback or require this to be defined?
 #       Alt: shape_value_type(cv) = typeof(shape_value(cv, qp=1, i=1))
 shape_value_type(::Union{CellValues{<:Any, N_t}, FaceValues{<:Any, N_t}, InterfaceValues{<:Any, <:FaceValues{<:Any, N_t}}}) where N_t = N_t
-function_value_init(cv::AbstractValues, ::AbstractVector{T}) where {T} = begin
-    zero(shape_value_type(cv)) * zero(T)
-end
+function_value_init(cv::AbstractValues, ::AbstractVector{T}) where {T} = zero(shape_value_type(cv)) * zero(T)
 
 """
     function_gradient(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector)
@@ -206,6 +205,7 @@ function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector
 end
 function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) = begin
     fv = here ? iv.face_values : iv.face_values_neighbor
+    here || (q_point = get_neighbor_quadp(iv, q_point))
     if dof_range != eachindex(u)
         here && any(dof_range .> length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
         here || any(dof_range .<= length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
@@ -214,6 +214,7 @@ function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_rang
     end
     function_gradient(fv, q_point, u, dof_range)
 end
+
 # TODO: Deprecate this, nobody is using this in practice...
 function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec})
     n_base_funcs = getnbasefunctions(fe_v)
@@ -225,9 +226,10 @@ function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector
     end
     return grad
 end
-function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true) = begin
+function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true) = begin
     fv = here ? iv.face_values : iv.face_values_neighbor
     u = here ? u[1 : end ÷ 2] : u[end ÷ 2 + 1 : end]
+    here || (q_point = get_neighbor_quadp(iv, q_point))
     function_gradient(fv, q_point, u)
 end
 
@@ -258,6 +260,7 @@ function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::Abst
 end
 function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) = begin
     fv = here ? iv.face_values : iv.face_values_neighbor
+    here || (q_point = get_neighbor_quadp(iv, q_point))
     if dof_range != eachindex(u)
         here && any(dof_range .> length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
         here || any(dof_range .<= length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
@@ -266,16 +269,19 @@ function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector
     end
     function_symmetric_gradient(fv, q_point, u, dof_range)
 end
+
 # TODO: Deprecate this, nobody is using this in practice...
 function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec})
     grad = function_gradient(fe_v, q_point, u)
     return symmetric(grad)
 end
-function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true) = begin
+function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true) = begin
     fv = here ? iv.face_values : iv.face_values_neighbor
     u = here ? u[1 : end ÷ 2] : u[end ÷ 2 + 1 : end]
+    here || (q_point = get_neighbor_quadp(iv, q_point))
     function_symmetric_gradient(fv, q_point, u)
 end
+
 """
     function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVector)
 
@@ -289,7 +295,7 @@ function function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVect
     return divergence_from_gradient(function_gradient(fe_v, q_point, u, dof_range))
 end
 function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) =
-    function_divergence(here ? iv.face_values : iv.face_values_neighbor, q_point, u, dof_range)
+    divergence_from_gradient(function_gradient(iv, q_point, u, dof_range; here = here))
 
 # TODO: Deprecate this, nobody is using this in practice...
 function function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec})
@@ -302,9 +308,10 @@ function function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVect
     end
     return diverg
 end
-function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true) = begin
+function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true) = begin
     fv = here ? iv.face_values : iv.face_values_neighbor
     u = here ? u[1 : end ÷ 2] : u[end ÷ 2 + 1 : end]
+    here || (q_point = get_neighbor_quadp(iv, q_point))
     function_divergence(fv, q_point, u)
 end
 
@@ -317,7 +324,7 @@ function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = 
 # TODO: Deprecate this, nobody is using this in practice...
 function_curl(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec}) =
     curl_from_gradient(function_gradient(fe_v, q_point, u))
-function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) =
+function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true) =
     curl_from_gradient(function_gradient(iv, q_point, u; here))
 
 """
