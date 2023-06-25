@@ -364,5 +364,5 @@ for ValueType in (CellValues, FaceValues#= InterfaceValues=#)
 end
 # TODO: delete this once grid is moved to InterfaceCache
 function Base.copy(iv::InterfaceValues)
-    return InterfaceValues{typeof(iv.face_values.func_interp), FaceValues}(copy(iv.face_values), copy(iv.face_values_neighbor), iv.grid, copy(iv.cell_idx), copy(iv.cell_idx_neighbor))
+    return InterfaceValues{typeof(iv.face_values.func_interp), FaceValues}(copy(iv.face_values), copy(iv.face_values_neighbor), iv.grid, copy(iv.cell_idx), copy(iv.cell_idx_neighbor), iv.ioi)
 end

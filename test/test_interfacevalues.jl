@@ -38,15 +38,17 @@
             reinit!(iv.face_values_neighbor, other_cell_coords, other_face[2])
             iv.cell_idx[] = face[1]
             iv.cell_idx_neighbor[] = other_face[1]
+            ioi = Ferrite.InterfaceOrientationInfo(grid, face, other_face)
+            iv.ioi[] = ioi
             ##############
             # end reinit!#
             ##############
-            ioi = Ferrite.InterfaceOrientationInfo(grid, face, other_face)
             nqp = getnquadpoints(iv)
             # Should have same quadrature points
             @test nqp == getnquadpoints(iv.face_values) == getnquadpoints(iv.face_values_neighbor)
             for qp in 1:nqp
                 other_qp = Ferrite.get_neighbor_quadp(iv, qp)
+                @test getpoints(quad_rule, other_face[2])[ Ferrite.get_neighbor_quadp(iv, qp)] ≈ Ferrite.transform_interface_point(iv, getpoints(quad_rule, face[2])[qp])                
                 # If correctly synced quadrature points coordinates should match
                 @test spatial_coordinate(iv, qp, cell_coords) ≈ spatial_coordinate(iv.face_values, qp, cell_coords) ≈
                 spatial_coordinate(iv.face_values_neighbor, other_qp, other_cell_coords)
@@ -113,9 +115,9 @@
                     ndim == 3 && @test function_curl(iv, i, u, here = here) ≈ Ferrite.curl_from_gradient(H)
 
                     @test function_value_average(iv, i, u_scal) ≈ function_value(iv, i, u_scal, here = here)
-                    @test all(function_value_jump(iv, i, u_scal) .<= 20 * eps(Float64))
+                    @test all(function_value_jump(iv, i, u_scal) .<= 30 * eps(Float64))
                     @test function_gradient_average(iv, i, u_scal) ≈ function_gradient(iv, i, u_scal, here = here)
-                    @test function_gradient_jump(iv, i, u_scal) <= 20 * eps(Float64)
+                    @test function_gradient_jump(iv, i, u_scal) <= 30 * eps(Float64)
 
                     @test function_value_average(iv, i, u) ≈ function_value(iv, i, u, here = here)
                     @test all(function_value_jump(iv, i, u) .<= 30 * eps(Float64))

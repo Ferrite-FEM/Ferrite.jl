@@ -105,6 +105,9 @@ function faces(c::AbstractCell{RefLine})
     ns = get_node_ids(c)
     return ((ns[1],), (ns[2],)) # f1, f2
 end
+function faces(::Type{RefLine})
+    return ((1), (2,)) # f1, f2
+end
 
 # RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
 function vertices(c::AbstractCell{RefTriangle})
@@ -117,6 +120,11 @@ function faces(c::AbstractCell{RefTriangle})
         (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # f1, f2, f3
     )
 end
+function faces(::Type{RefTriangle})
+    return (
+        (1, 2), (2, 3), (3, 1), # f1, f2, f3
+    )
+end
 
 # RefQuadrilateral (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
 function vertices(c::AbstractCell{RefQuadrilateral})
@@ -127,6 +135,11 @@ function faces(c::AbstractCell{RefQuadrilateral})
     ns = get_node_ids(c)
     return (
         (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # f1, f2, f3, f4
+    )
+end
+function faces(::Type{RefQuadrilateral})
+    return (
+        (1, 2), (2, 3), (3, 4), (4, 1), # f1, f2, f3, f4
     )
 end
 
@@ -147,6 +160,12 @@ function faces(c::AbstractCell{RefTetrahedron})
     return (
         (ns[1], ns[3], ns[2]), (ns[1], ns[2], ns[4]), # f1, f2
         (ns[2], ns[3], ns[4]), (ns[1], ns[4], ns[3]), # f3, f4
+    )
+end
+function faces(::Type{RefTetrahedron})
+    return (
+        (1, 3, 2), (1, 2, 4), # f1, f2
+        (2, 3, 4), (1, 4, 3), # f3, f4
     )
 end
 
@@ -173,6 +192,13 @@ function faces(c::AbstractCell{RefHexahedron})
         (ns[1], ns[5], ns[8], ns[4]), (ns[5], ns[6], ns[7], ns[8]), # f5, f6
     )
 end
+function faces(::Type{RefHexahedron})
+    return (
+        (1, 4, 3, 2), (1, 2, 6, 5), # f1, f2
+        (2, 3, 7, 6), (3, 4, 8, 7), # f3, f4
+        (1, 5, 8, 4), (5, 6, 7, 8), # f5, f6
+    )
+end
 
 # RefPrism (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
 function vertices(c::AbstractCell{RefPrism})
@@ -195,7 +221,13 @@ function faces(c::AbstractCell{RefPrism})
         (ns[4], ns[5], ns[6]),                                      # f5
     )
 end
-
+function faces(::Type{RefPrism})
+    return (
+        (1, 3, 2),        (1, 2, 5, 4), # f1, f2
+        (3, 1, 4, 6), (2, 3, 6, 5), # f3, f4
+        (4, 5, 6),                                      # f5
+    )
+end
 
 ######################################################
 # Concrete implementations of AbstractCell interface #
@@ -1397,6 +1429,114 @@ for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
     end
 end
 
+"""
+Mapping from 1D line to point.
+"""
+function transfer_point_cell_to_face(point::AbstractVector, cell::AbstractCell{RefLine}, face::Int)
+    x = point[]
+    face == 1 && return [ -x]
+    face == 2 && return [ x]
+end
+
+"""
+Mapping from 2D face of a quadrilateral to 1D line.
+"""
+function transfer_point_cell_to_face(point::AbstractVector, cell::AbstractCell{RefQuadrilateral}, face::Int)
+    x, y = point
+    face == 1 && return [ x]
+    face == 2 && return [ y]
+    face == 3 && return [ x]
+    face == 4 && return [ y]
+end
+
+"""
+Mapping from 2D face of a triangle to 1D line.
+"""
+function transfer_point_cell_to_face(point::AbstractVector, cell::AbstractCell{RefTriangle}, face::Int)
+    x, y = point
+    face == 1 && return [ x]
+    face == 2 && return [ y]
+    face == 3 && return [ x]
+end
+
+"""
+Mapping from 3D face of a tetrahedon to 2D triangle.
+"""
+function transfer_point_cell_to_face(point::AbstractVector, cell::AbstractCell{RefTetrahedron}, face::Int)
+    x, y, z = point
+    face == 1 && return [ x,  y]
+    face == 2 && return [ x,  z]
+    face == 3 && return [ x,  y]
+    face == 4 && return [ y,  z]
+end
+
+"""
+Mapping from 3D face of a hexahedron to 2D quadrilateral.
+"""
+function transfer_point_cell_to_face(point::AbstractVector, cell::AbstractCell{RefHexahedron}, face::Int)
+    x, y, z = point
+    face == 1 && return [ x, y]
+    face == 2 && return [ x, z]
+    face == 3 && return [ y,  z]
+    face == 4 && return [-x,  z]
+    face == 5 && return [ z,  y]
+    face == 6 && return [ x,  y]
+end
+
+
+"""
+Mapping from to 0D node to 1D line vertex.
+"""
+function transfer_point_face_to_cell(point::AbstractVector, cell::AbstractCell{RefLine}, face::Int)
+    face == 1 && return [ -1.0]
+    face == 2 && return [ 1.0]
+end
+
+"""
+Mapping from 1D line to 2D face of a quadrilateral.
+"""
+function transfer_point_face_to_cell(point::AbstractVector, cell::AbstractCell{RefQuadrilateral}, face::Int)
+    x = point[]
+    face == 1 && return [ x, -1]
+    face == 2 && return [ 1, x]
+    face == 3 && return [ x, 1]
+    face == 4 && return [ -1, x]
+end
+
+"""
+Mapping from 1D line to 2D face of a triangle.
+"""
+function transfer_point_face_to_cell(point::AbstractVector, cell::AbstractCell{RefTriangle}, face::Int)
+    x = point[]
+    face == 1 && return [ x, 1 - x]
+    face == 2 && return [ 0, x]
+    face == 3 && return [ x, 0]
+end
+
+"""
+Mapping from 2D triangle to 3D face of a tetrahedon.
+"""
+function transfer_point_face_to_cell(point::AbstractVector, cell::AbstractCell{RefTetrahedron}, face::Int)
+    x,y = point
+    face == 1 && return [ x,  y,  0]
+    face == 2 && return [ x,  0,  y]
+    face == 3 && return [ x,  y,  1-x-y]
+    face == 4 && return [ 0,  x,  y]
+end
+
+"""
+Mapping from 2D quadrilateral to 3D face of a hexahedron.
+"""
+function transfer_point_face_to_cell(point::AbstractVector, cell::AbstractCell{RefHexahedron}, face::Int)
+    x,y = point
+    face == 1 && return [ y,  x, -1]
+    face == 2 && return [ x, -1,  y]
+    face == 3 && return [ 1,  x,  y]
+    face == 4 && return [ x,  1,  y]
+    face == 5 && return [-1,  y,  x]
+    face == 6 && return [ x,  y,  1]
+end
+
 #################################
 #### Orientation of Entities ####
 #################################
@@ -1453,7 +1593,20 @@ end
 # This one is the same as `SurfaceOrientationInfo` but used in interfaces. It is calculated for neighbor facet relative to current facet
 struct InterfaceOrientationInfo
     flipped::Bool
-    shift_index::Int
+    transformation::Union{Nothing, AbstractArray}
+end
+
+function transform_coordinates(src::Vector{Vector{Float64}}, dst::Vector{Vector{Float64}})
+    # Calculate the transformation matrix
+    src_matrix = [  src[1][1]   src[2][1]   src[3][1]
+                    src[1][2]   src[2][2]   src[3][2]
+                    1           1           1       ]
+    dst_matrix = [  dst[1][1]   dst[2][1]   dst[3][1]
+                    dst[1][2]   dst[2][2]   dst[3][2]
+                    1           1           1       ]
+    transform_matrix = dst_matrix * inv(src_matrix)
+
+    return transform_matrix
 end
 # TODO: make this `SurfaceOrientationInfo`?
 """
@@ -1480,14 +1633,28 @@ this data structure via ``rotate \\circ flip`` where the rotation is indiced by
 the shift index.
 """
 function InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, neighbor_face::FaceIndex)
-    face_nodes = faces(getcells(grid)[this_face[1]])[this_face[2]]
-    length(face_nodes) == 1 && return InterfaceOrientationInfo(false, 0)
+    cell = getcells(grid)[this_face[1]]
+    other_cell = getcells(grid)[neighbor_face[1]]
+    face_nodes = faces(cell)[this_face[2]]
     neighbor_face_nodes = faces(getcells(grid)[neighbor_face[1]])[neighbor_face[2]]
     !all([i ∈ face_nodes for i in neighbor_face_nodes]) && error("Passed faces do not use the same nodes")
-    first_node_idx = findfirst(i -> i == face_nodes[1],neighbor_face_nodes)
-    nfacenodes = length(neighbor_face_nodes)
-    flipped = !(face_nodes[2] == neighbor_face_nodes[first_node_idx < nfacenodes ? first_node_idx + 1 : 1])
-    shift_index = first_node_idx - 1
-    flipped && (shift_index = nfacenodes - shift_index - 1)
-    return InterfaceOrientationInfo(flipped, shift_index)
+    getdim(cell) == 1 && return(InterfaceOrientationInfo(false, nothing)) # this may change for embedded elements?
+
+    cell_coords = reference_coordinates(default_interpolation(typeof(cell)))
+    nodes_coord = cell_coords[[((cell|>typeof|>default_interpolation|>getrefshape|>faces)[this_face[2]])...]]
+    nodes_coord = transfer_point_cell_to_face.(nodes_coord, Ref(cell), Ref(this_face[2]))
+
+    other_nodes_coord = cell_coords[[((other_cell|>typeof|>default_interpolation|>getrefshape|>faces)[neighbor_face[2]])...]]
+    other_nodes_coord = transfer_point_cell_to_face.(other_nodes_coord, Ref(getcells(grid)[neighbor_face[1]]), Ref(neighbor_face[2]))
+
+    getdim(cell) == 2 && return(InterfaceOrientationInfo(nodes_coord[1] == -other_nodes_coord[1], nothing))
+
+    flipped = ([(nodes_coord[2] - nodes_coord[1])..., 0] × [(nodes_coord[3] - nodes_coord[2])..., 0])[3] > 0
+    flipped = flipped == (([(other_nodes_coord[2] - other_nodes_coord[1])..., 0] × [(other_nodes_coord[3] - other_nodes_coord[2])..., 0])[3] < 0)
+    if !flipped
+        for i in 1:3
+            nodes_coord[i][2], nodes_coord[i][1] = nodes_coord[i]
+        end
+    end
+    return InterfaceOrientationInfo(flipped, transform_coordinates(nodes_coord[1:3],other_nodes_coord[1:3]))
 end
