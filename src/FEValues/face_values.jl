@@ -138,7 +138,7 @@ function FaceValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     return FaceValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, Normal_t, GIP}(qr, ip, gip.ip)
 end
 
-function reinit!(fv::FaceValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T}}, face::Int) where {
+function reinit!(fv::FaceValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T}}, face::Int, reinit_values::Bool = false) where {
     dim, T,
     N_t    <: Union{Number,   Vec{dim}},
     dNdx_t <: Union{Vec{dim}, Tensor{2,dim}}
@@ -150,7 +150,17 @@ function reinit!(fv::FaceValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T
 
     fv.current_face[] = face
     cb = getcurrentface(fv)
-
+    if reinit_values
+        n_faces = length(fv.qr.face_rules)
+        for face in 1:n_faces, (qp, ξ) in pairs(getpoints(fv.qr, face))
+            for basefunc in 1:n_func_basefuncs
+                fv.dNdξ[basefunc, qp, face], fv.N[basefunc, qp, face] = shape_gradient_and_value(fv.func_interp, ξ, basefunc)
+            end
+            for basefunc in 1:n_geom_basefuncs
+                fv.dMdξ[basefunc, qp, face], fv.M[basefunc, qp, face] = shape_gradient_and_value(fv.geo_interp, ξ, basefunc)
+            end
+        end
+    end
     @inbounds for (i, w) in pairs(getweights(fv.qr, cb))
         fefv_J = zero(Tensor{2,dim})
         for j in 1:n_geom_basefuncs

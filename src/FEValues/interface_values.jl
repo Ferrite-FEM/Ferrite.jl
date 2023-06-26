@@ -52,7 +52,7 @@ function InterfaceValues(grid::AbstractGrid, quad_rule::FaceQuadratureRule, func
     geom_interpol::Interpolation = func_interpol)
     #@assert isDiscontinuous(func_interpol) "`InterfaceValues` is designed for discontinuous interpolations. a continuous interpolation is passed" TODO: add this when sparsity_pattern is merged
     face_values = FaceValues(quad_rule, func_interpol, geom_interpol)
-    face_values_neighbor = copy(face_values)
+    face_values_neighbor = FaceValues(deepcopy(quad_rule), func_interpol, geom_interpol)
     return InterfaceValues{typeof(func_interpol), FaceValues}(face_values, face_values_neighbor, grid, ScalarWrapper(0), ScalarWrapper(0), ScalarWrapper(InterfaceOrientationInfo(false, nothing)))
 end
 # Maybe move this to common_values.jl?
@@ -103,7 +103,6 @@ for (func,                      f_,                 multiplier,             ) in
                 return f_value isa Number || $(multiplier) isa Number ? $(multiplier) * f_value : f_value ⋅ $(multiplier) 
             elseif i <= nbf
                 fv = iv.face_values_neighbor
-                qp = get_neighbor_quadp(iv, qp)
                 f_value = $(f_)(fv, qp, i - nbf ÷ 2)
                 return f_value isa Number || $(multiplier) isa Number ? $(multiplier) * f_value : f_value ⋅ $(multiplier) 
             end
@@ -141,19 +140,6 @@ for (func,                          f_,                 multiplier,             
             return result
         end
     end
-end
-"""
-    get_neighbor_quadp(iv::InterfaceValues, qpoint::Int)
-
-Find quadrature point index in the neighbor facet.
-"""
-function get_neighbor_quadp(iv::InterfaceValues, qpoint::Int)
-    # TODO: figure out how to use InterfaceOrientationInfo here
-    c1 = get_cell_coordinates(iv.grid, iv.cell_idx[])
-    c2 = get_cell_coordinates(iv.grid, iv.cell_idx_neighbor[])
-    qpcoord = spatial_coordinate(iv.face_values, qpoint, c1)
-    neighbor_qp_coords = spatial_coordinate.(Ref(iv.face_values_neighbor), 1:getnquadpoints(iv.face_values_neighbor), Ref(c2))
-    return findfirst(i->i ≈ qpcoord, neighbor_qp_coords)
 end
 
 function transform_interface_point(iv::InterfaceValues, point::AbstractArray)

@@ -43,7 +43,6 @@ In addition, there are some methods that are unique for `InterfaceValues`:
 
 ```@docs
 InterfaceValues
-get_neighbor_quadp
 shape_value_average
 shape_value_jump
 shape_gradient_average

@@ -35,11 +35,13 @@
             #   reinit!  #
             ##############
             reinit!(iv.face_values, cell_coords, face[2])
-            reinit!(iv.face_values_neighbor, other_cell_coords, other_face[2])
+            iv.face_values_neighbor.current_face[] = other_face[2]
             iv.cell_idx[] = face[1]
             iv.cell_idx_neighbor[] = other_face[1]
             ioi = Ferrite.InterfaceOrientationInfo(grid, face, other_face)
             iv.ioi[] = ioi
+            getpoints(iv.face_values_neighbor.qr, other_face[2]) .= Vec{dim}.(Ferrite.transform_interface_point.(Ref(iv), getpoints(quad_rule, face[2])))  
+            reinit!(iv.face_values_neighbor, other_cell_coords, other_face[2], true)
             ##############
             # end reinit!#
             ##############
@@ -47,11 +49,9 @@
             # Should have same quadrature points
             @test nqp == getnquadpoints(iv.face_values) == getnquadpoints(iv.face_values_neighbor)
             for qp in 1:nqp
-                other_qp = Ferrite.get_neighbor_quadp(iv, qp)
-                @test getpoints(quad_rule, other_face[2])[ Ferrite.get_neighbor_quadp(iv, qp)] ≈ Ferrite.transform_interface_point(iv, getpoints(quad_rule, face[2])[qp])                
                 # If correctly synced quadrature points coordinates should match
                 @test spatial_coordinate(iv, qp, cell_coords) ≈ spatial_coordinate(iv.face_values, qp, cell_coords) ≈
-                spatial_coordinate(iv.face_values_neighbor, other_qp, other_cell_coords)
+                spatial_coordinate(iv.face_values_neighbor, qp, other_cell_coords)
                 for i in 1:getnbasefunctions(iv)
                     shapevalue = shape_value(iv, qp, i)
                     shape_avg = shape_value_average(iv, qp, i)
@@ -60,11 +60,11 @@
                     shapegrad = shape_gradient(iv, qp, i)
                     shapegrad_avg = shape_gradient_average(iv, qp, i)
                     shapegrad_jump = shape_gradient_jump(iv, qp, i)
-                    normal = getnormal(iv.face_values_neighbor, other_qp)
+                    normal = getnormal(iv.face_values_neighbor, qp)
                     # Test values (May be removed as it mirrors implementation)
                     if i > getnbasefunctions(iv.face_values)
-                        @test shapevalue ≈ shape_value(iv.face_values_neighbor, other_qp, i - getnbasefunctions(iv.face_values))
-                        @test shapegrad ≈ shape_gradient(iv.face_values_neighbor, other_qp, i - getnbasefunctions(iv.face_values))
+                        @test shapevalue ≈ shape_value(iv.face_values_neighbor, qp, i - getnbasefunctions(iv.face_values))
+                        @test shapegrad ≈ shape_gradient(iv.face_values_neighbor, qp, i - getnbasefunctions(iv.face_values))
                     else
                         normal = getnormal(iv.face_values, qp)
                         @test shapevalue ≈ shape_value(iv.face_values, qp, i)

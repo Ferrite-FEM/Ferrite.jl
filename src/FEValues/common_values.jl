@@ -80,7 +80,7 @@ finite element cell or face as
 """
 @propagate_inbounds getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 @propagate_inbounds getdetJdV(bv::FaceValues, q_point::Int) = bv.detJdV[q_point, bv.current_face[]]
-@propagate_inbounds getdetJdV(iv::InterfaceValues, q_point::Int; here::Bool = true) = here ? getdetJdV(iv.face_values, q_point) : getdetJdV(iv.face_values_neighbor, get_neighbor_quadp(iv, q_point))
+@propagate_inbounds getdetJdV(iv::InterfaceValues, q_point::Int; here::Bool = true) = here ? getdetJdV(iv.face_values, q_point) : getdetJdV(iv.face_values_neighbor, q_point)
 
 """
     shape_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -161,7 +161,6 @@ function function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, d
 end
 function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) = begin
     fv = here ? iv.face_values : iv.face_values_neighbor
-    here || (q_point = get_neighbor_quadp(iv, q_point))
     if dof_range != eachindex(u)
         here && any(dof_range .> length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
         here || any(dof_range .<= length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
@@ -205,7 +204,6 @@ function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector
 end
 function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) = begin
     fv = here ? iv.face_values : iv.face_values_neighbor
-    here || (q_point = get_neighbor_quadp(iv, q_point))
     if dof_range != eachindex(u)
         here && any(dof_range .> length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
         here || any(dof_range .<= length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
@@ -229,7 +227,6 @@ end
 function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true) = begin
     fv = here ? iv.face_values : iv.face_values_neighbor
     u = here ? u[1 : end ÷ 2] : u[end ÷ 2 + 1 : end]
-    here || (q_point = get_neighbor_quadp(iv, q_point))
     function_gradient(fv, q_point, u)
 end
 
@@ -260,7 +257,6 @@ function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::Abst
 end
 function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) = begin
     fv = here ? iv.face_values : iv.face_values_neighbor
-    here || (q_point = get_neighbor_quadp(iv, q_point))
     if dof_range != eachindex(u)
         here && any(dof_range .> length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
         here || any(dof_range .<= length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
@@ -278,7 +274,6 @@ end
 function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true) = begin
     fv = here ? iv.face_values : iv.face_values_neighbor
     u = here ? u[1 : end ÷ 2] : u[end ÷ 2 + 1 : end]
-    here || (q_point = get_neighbor_quadp(iv, q_point))
     function_symmetric_gradient(fv, q_point, u)
 end
 
@@ -311,7 +306,6 @@ end
 function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true) = begin
     fv = here ? iv.face_values : iv.face_values_neighbor
     u = here ? u[1 : end ÷ 2] : u[end ÷ 2 + 1 : end]
-    here || (q_point = get_neighbor_quadp(iv, q_point))
     function_divergence(fv, q_point, u)
 end
 
