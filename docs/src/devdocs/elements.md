@@ -34,6 +34,7 @@ Ferrite.getvertexinstances
 Ferrite.filterfaces
 Ferrite.filteredges
 Ferrite.filtervertices
+Ferrite.transfer_point_cell_to_face
+Ferrite.transfer_point_face_to_cell
 Ferrite.InterfaceOrientationInfo
 ```
-

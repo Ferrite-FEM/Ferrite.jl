@@ -68,8 +68,9 @@ edges(::AbstractCell)
 
 """
     Ferrite.faces(::AbstractCell)
+    Ferrite.faces(::Type{AbstractRefShape})
 
-Returns a tuple of n-tuples containing the ordered node indices (of the nodes in a grid) corresponding to
+Returns a tuple of n-tuples containing the ordered node indices (of the nodes in a grid, or reference element if `AbstractRefShape` is passed) corresponding to
 the vertices that define an *oriented face*. This function induces the 
 [`FaceIndex`](@ref), where the second index corresponds to the local index into this tuple.
 
@@ -1428,6 +1429,20 @@ for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
         Base.in(v::Tuple{Int, Int}, s::Set{$INDEX}) = in($INDEX(v), s)
     end
 end
+
+"""
+    transfer_point_cell_to_face(point::AbstractVector, cell::AbstractCell{AbstractRefShape}, face::Int)
+
+Transform point on a N-D cell face to the face's reference (N-1)D coordinates.
+"""
+transfer_point_cell_to_face
+
+"""
+    transfer_point_cell_to_face(point::AbstractVector, cell::AbstractCell{AbstractRefShape}, face::Int) 
+
+Transform point from face's reference (N-1)D coordinates to ND coordinates on the cell's face.
+"""
+transfer_point_face_to_cell
 
 """
 Mapping from 1D line to point.

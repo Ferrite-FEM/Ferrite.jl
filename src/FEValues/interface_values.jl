@@ -59,40 +59,48 @@ end
 """
     shape_value_average(iv::InterfaceValues, qp::Int, base_function::Int)
 
-Compute the average of the shape function value at the quadrature point from both sides of the interface.
+Compute the average of the shape function value at the quadrature point over interface.
 """
 shape_value_average
 
 """
-    shape_value_jump(iv::InterfaceValues, qp::Int, base_function::Int)
+    shape_value_jump(iv::InterfaceValues, qp::Int, base_function::Int, normal_dotted::Bool = true)
 
 Compute the jump of the shape function value at the quadrature point over the interface.
-The jump of scalar shape values is a vector.
+
+`normal_dotted::Bool` determines whether to use the definition ``\\llbracket v \\rrbracket=v^- -v^+`` if it's `false`, or
+ the definition  ``\\llbracket v \\rrbracket=v^- ⋅ \\vec{n}^- + v^+ ⋅ \\vec{n}^+`` if it's `true`, which is the default.
+
+!!! note
+    If `normal_dotted == true` then the jump of scalar shape values is a vector.
 """
 shape_value_jump
 
 """
     shape_gradient_average(iv::InterfaceValues, qp::Int, base_function::Int)
 
-Compute the average of the shape function gradient at the quadrature point from both sides of the interface.
+Compute the average of the shape function gradient at the quadrature point over the interface.
 """
 shape_gradient_average
 
 """
-    shape_gradient_jump(iv::InterfaceValues, qp::Int, base_function::Int)
+    shape_gradient_jump(iv::InterfaceValues, qp::Int, base_function::Int, normal_dotted::Bool = true)
 
 Compute the jump of the shape function gradient at the quadrature point over the interface.
-The jump of the gradient vector is a scalar.
+
+`normal_dotted::Bool` determines whether to use the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+`` if it's `false`, or
+ the definition  ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- ⋅ \\vec{n}^- + \\vec{v}^+ ⋅ \\vec{n}^+`` if it's `true`, which is the default.
+
+!!! note
+    If `normal_dotted == true` then the jump of the gradient vector is a scalar.
 """
 shape_gradient_jump
 
-for (func,                      f_,                 multiplier,             ) in (
-    (:shape_value,              :shape_value,       :(1),                   ),
-    (:shape_value_average,      :shape_value,       :(0.5),                 ),
-    (:shape_value_jump,         :shape_value,       :(getnormal(fv, qp)),   ),
-    (:shape_gradient,           :shape_gradient,    :(1),                   ),
-    (:shape_gradient_average,   :shape_gradient,    :(0.5),                 ),
-    (:shape_gradient_jump,      :shape_gradient,    :(getnormal(fv, qp)),   ),
+for (func,                      f_,                 multiplier  ) in (
+    (:shape_value,              :shape_value,       :(1),       ),
+    (:shape_value_average,      :shape_value,       :(0.5),     ),
+    (:shape_gradient,           :shape_gradient,    :(1),       ),
+    (:shape_gradient_average,   :shape_gradient,    :(0.5),     ),
 )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, i::Int)
@@ -100,22 +108,85 @@ for (func,                      f_,                 multiplier,             ) in
             if i <= nbf/2
                 fv = iv.face_values
                 f_value = $(f_)(fv, qp, i)
-                return f_value isa Number || $(multiplier) isa Number ? $(multiplier) * f_value : f_value ⋅ $(multiplier) 
+                return $(multiplier) * f_value
             elseif i <= nbf
                 fv = iv.face_values_neighbor
                 f_value = $(f_)(fv, qp, i - nbf ÷ 2)
-                return f_value isa Number || $(multiplier) isa Number ? $(multiplier) * f_value : f_value ⋅ $(multiplier) 
+                return $(multiplier) * f_value
             end
             error("Invalid base function $i. Interface has only $(nbf) base functions")
         end
     end
 end
 
-for (func,                          f_,                 multiplier,             ) in (
-    (:function_value_average,       :function_value,       :(0.5),                 ),
-    (:function_value_jump,          :function_value,       :(getnormal(fv, qp)),   ),
-    (:function_gradient_average,    :function_gradient,    :(0.5),                 ),
-    (:function_gradient_jump,       :function_gradient,    :(getnormal(fv, qp)),   ),
+for (func,                      f_,             ) in (
+    (:shape_value_jump,         :shape_value,   ),
+    (:shape_gradient_jump,      :shape_gradient,),
+)
+    @eval begin
+        function $(func)(iv::InterfaceValues, qp::Int, i::Int, normal_dotted::Bool = true)
+            nbf = getnbasefunctions(iv)
+            if i <= nbf/2
+                fv = iv.face_values
+                f_value = $(f_)(fv, qp, i)
+                normal_dotted || return f_value
+                multiplier = getnormal(fv, qp)
+                return f_value isa Number ? f_value * multiplier : f_value ⋅ multiplier
+            elseif i <= nbf
+                fv = iv.face_values_neighbor
+                f_value = $(f_)(fv, qp, i - nbf ÷ 2)
+                normal_dotted || return -f_value
+                multiplier = getnormal(fv, qp)
+                return f_value isa Number ? f_value * multiplier : f_value ⋅ multiplier
+            end
+            error("Invalid base function $i. Interface has only $(nbf) base functions")
+        end
+    end
+end
+
+"""
+    function_value_average(iv::InterfaceValues, qp::Int, u::AbstractVector, dof_range = eachindex(u))
+
+Compute the average of the function value at the quadrature point over interface.
+"""
+function_value_average
+
+"""
+    function_value_jump(iv::InterfaceValues, qp::Int, u::AbstractVector, dof_range = eachindex(u), normal_dotted::Bool = true)
+
+Compute the jump of the function value at the quadrature point over the interface.
+
+`normal_dotted::Bool` determines whether to use the definition ``\\llbracket v \\rrbracket=v^- -v^+`` if it's `false`, or
+ the definition  ``\\llbracket v \\rrbracket=v^- ⋅ \\vec{n}^- + v^+ ⋅ \\vec{n}^+`` if it's `true`, which is the default.
+
+!!! note
+    If `normal_dotted == true` then the jump of scalar function values is a vector.
+"""
+function_value_jump
+
+"""
+    function_gradient_average(iv::InterfaceValues, qp::Int, u::AbstractVector, dof_range = eachindex(u))
+
+Compute the average of the function gradient at the quadrature point over the interface.
+"""
+function_gradient_average
+
+"""
+    function_gradient_jump(iv::InterfaceValues, qp::Int, u::AbstractVector, dof_range = eachindex(u), normal_dotted::Bool = true)
+
+Compute the jump of the function gradient at the quadrature point over the interface.
+
+`normal_dotted::Bool` determines whether to use the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+`` if it's `false`, or
+ the definition  ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- ⋅ \\vec{n}^- + \\vec{v}^+ ⋅ \\vec{n}^+`` if it's `true`, which is the default.
+
+!!! note
+    If `normal_dotted == true` then the jump of the gradient vector is a scalar.
+"""
+function_gradient_jump
+
+for (func,                          f_,                 ) in (
+    (:function_value_average,       :function_value,    ),
+    (:function_gradient_average,    :function_gradient, ),
 )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector, dof_range = eachindex(u))
@@ -124,9 +195,9 @@ for (func,                          f_,                 multiplier,             
             f_value_here = $(f_)(iv, qp, u, dof_range_here; here = true)
             f_value_there = $(f_)(iv, qp, u, dof_range_there; here = false)
             fv = iv.face_values
-            result = f_value_here isa Number || $(multiplier) isa Number ? $(multiplier) * f_value_here : f_value_here ⋅ $(multiplier)
+            result = 0.5 * f_value_here 
             fv = iv.face_values_neighbor
-            result += f_value_there isa Number || $(multiplier) isa Number ? $(multiplier) * f_value_there : f_value_there ⋅ $(multiplier)
+            result += 0.5 * f_value_there
             return result
         end
         # TODO: Deprecate this, nobody is using this in practice...
@@ -134,14 +205,54 @@ for (func,                          f_,                 multiplier,             
             f_value_here = $(f_)(iv, qp, u; here = true)
             f_value_there = $(f_)(iv, qp, u; here = false)
             fv = iv.face_values
-            result = f_value_here isa Number || $(multiplier) isa Number ? $(multiplier) * f_value_here : f_value_here ⋅ $(multiplier)
+            result = 0.5 * f_value_here
             fv = iv.face_values_neighbor
-            result += f_value_there isa Number || $(multiplier) isa Number ? $(multiplier) * f_value_there : f_value_there ⋅ $(multiplier)
+            result += 0.5 * f_value_there
             return result
         end
     end
 end
 
+for (func,                          f_,                 ) in (
+    (:function_value_jump,          :function_value,    ),
+    (:function_gradient_jump,       :function_gradient, ),
+)
+    @eval begin
+        function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector, dof_range = eachindex(u), normal_dotted::Bool = true)
+            dof_range_here = dof_range[dof_range .<= length(eachindex(u)) ÷ 2]
+            dof_range_there = dof_range[dof_range .> length(eachindex(u)) ÷ 2]
+            f_value_here = $(f_)(iv, qp, u, dof_range_here; here = true)
+            f_value_there = $(f_)(iv, qp, u, dof_range_there; here = false)
+            fv = iv.face_values
+            multiplier = getnormal(fv, qp)
+            result = f_value_here isa Number || multiplier isa Number ? f_value_here * multiplier : f_value_here ⋅ multiplier
+            fv = iv.face_values_neighbor
+            multiplier = getnormal(fv, qp)
+            result += f_value_there isa Number || multiplier isa Number ? f_value_there * multiplier : f_value_there ⋅ multiplier
+            normal_dotted || (result = result ⋅ getnormal(fv, qp))
+            return result
+        end
+        # TODO: Deprecate this, nobody is using this in practice...
+        function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector{<:Vec}, normal_dotted::Bool = true)
+            f_value_here = $(f_)(iv, qp, u; here = true)
+            f_value_there = $(f_)(iv, qp, u; here = false)
+            fv = iv.face_values
+            multiplier = getnormal(fv, qp)
+            result = f_value_here isa Number || multiplier isa Number ? f_value_here * multiplier : f_value_here ⋅ multiplier
+            fv = iv.face_values_neighbor
+            multiplier = getnormal(fv, qp)
+            result += f_value_there isa Number || multiplier isa Number ? f_value_there * multiplier : f_value_there ⋅ multiplier
+            normal_dotted || (result = result ⋅ getnormal(fv, qp))
+            return result
+        end
+    end
+end
+
+"""
+    transform_interface_point(iv::InterfaceValues, point::AbstractArray)
+
+Transform point from current face in the interface reference coordinates to the neighbor face reference coordinates.
+"""
 function transform_interface_point(iv::InterfaceValues, point::AbstractArray)
     ioi = iv.ioi[]
     cell = getcells(iv.grid)[iv.cell_idx[]]
