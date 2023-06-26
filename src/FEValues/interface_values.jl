@@ -162,8 +162,6 @@ function transform_interface_point(iv::InterfaceValues, point::AbstractArray)
     face = iv.face_values.current_face[]
     point = transfer_point_cell_to_face(point, cell, face)
     isnothing(ioi.transformation) || (point = (ioi.transformation * [point..., 1])[1:2])
-    if ioi.flipped && !isnothing(ioi.transformation)
-        point[2], point[1] = (point[1], point[2])
-    end
+    ioi.flipped && reverse!(point)
     return transfer_point_face_to_cell(point, getcells(iv.grid)[iv.cell_idx_neighbor[]], iv.face_values_neighbor.current_face[])
 end

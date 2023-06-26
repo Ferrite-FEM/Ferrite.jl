@@ -1604,7 +1604,7 @@ function transform_coordinates(src::Vector{Vector{Float64}}, dst::Vector{Vector{
     dst_matrix = [  dst[1][1]   dst[2][1]   dst[3][1]
                     dst[1][2]   dst[2][2]   dst[3][2]
                     1           1           1       ]
-    transform_matrix = dst_matrix * inv(src_matrix)
+    transform_matrix = dst_matrix / src_matrix
 
     return transform_matrix
 end
@@ -1636,25 +1636,25 @@ function InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, neig
     cell = getcells(grid)[this_face[1]]
     other_cell = getcells(grid)[neighbor_face[1]]
     face_nodes = faces(cell)[this_face[2]]
-    neighbor_face_nodes = faces(getcells(grid)[neighbor_face[1]])[neighbor_face[2]]
+    neighbor_face_nodes = faces(other_cell)[neighbor_face[2]]
+
     !all([i ∈ face_nodes for i in neighbor_face_nodes]) && error("Passed faces do not use the same nodes")
     getdim(cell) == 1 && return(InterfaceOrientationInfo(false, nothing)) # this may change for embedded elements?
 
-    cell_coords = reference_coordinates(default_interpolation(typeof(cell)))
-    nodes_coord = cell_coords[[((cell|>typeof|>default_interpolation|>getrefshape|>faces)[this_face[2]])...]]
+    cell_ip = cell|> typeof|> default_interpolation
+    cell_coords = cell_ip|> reference_coordinates
+    nodes_coord = cell_coords[[((cell_ip |>getrefshape|> faces)[this_face[2]])...]]
     nodes_coord = transfer_point_cell_to_face.(nodes_coord, Ref(cell), Ref(this_face[2]))
 
-    other_nodes_coord = cell_coords[[((other_cell|>typeof|>default_interpolation|>getrefshape|>faces)[neighbor_face[2]])...]]
-    other_nodes_coord = transfer_point_cell_to_face.(other_nodes_coord, Ref(getcells(grid)[neighbor_face[1]]), Ref(neighbor_face[2]))
+    other_cell_ip = other_cell|> typeof|> default_interpolation
+    other_cell_coords = other_cell_ip|> reference_coordinates
+    other_nodes_coord = other_cell_coords[[((other_cell_ip|> getrefshape|> faces)[neighbor_face[2]])...]]
+    other_nodes_coord = transfer_point_cell_to_face.(other_nodes_coord, Ref(other_cell), Ref(neighbor_face[2]))
 
     getdim(cell) == 2 && return(InterfaceOrientationInfo(nodes_coord[1] == -other_nodes_coord[1], nothing))
 
     flipped = ([(nodes_coord[2] - nodes_coord[1])..., 0] × [(nodes_coord[3] - nodes_coord[2])..., 0])[3] > 0
     flipped = flipped == (([(other_nodes_coord[2] - other_nodes_coord[1])..., 0] × [(other_nodes_coord[3] - other_nodes_coord[2])..., 0])[3] < 0)
-    if !flipped
-        for i in 1:3
-            nodes_coord[i][2], nodes_coord[i][1] = (nodes_coord[i][1],nodes_coord[i][2])
-        end
-    end
+    flipped || reverse!.(nodes_coord)
     return InterfaceOrientationInfo(flipped, transform_coordinates(nodes_coord[1:3],other_nodes_coord[1:3]))
 end
