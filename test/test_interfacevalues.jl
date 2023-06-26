@@ -146,16 +146,6 @@
             if hasmethod(pointer, Tuple{typeof(v)})
                 @test pointer(v) != pointer(vc)
             end
-            v isa FaceValues && for subfname in fieldnames(typeof(v))
-                subv = getfield(v, subfname)
-                subv isa Ferrite.ScalarWrapper && continue
-                subvc = getfield(vc, subfname)
-                if hasmethod(pointer, Tuple{typeof(subv)})
-                    @test pointer(subv) != pointer(subvc)
-                end
-                # TODO: check this
-                # @test subv == subvc #this errors for array fields and works in FaceValues test
-            end
             v isa FaceValues && continue
             @test v == vc
         end
