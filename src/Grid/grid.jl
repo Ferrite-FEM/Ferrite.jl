@@ -1653,7 +1653,7 @@ function InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, neig
     flipped = flipped == (([(other_nodes_coord[2] - other_nodes_coord[1])..., 0] × [(other_nodes_coord[3] - other_nodes_coord[2])..., 0])[3] < 0)
     if !flipped
         for i in 1:3
-            nodes_coord[i][2], nodes_coord[i][1] = nodes_coord[i]
+            nodes_coord[i][2], nodes_coord[i][1] = (nodes_coord[i][1],nodes_coord[i][2])
         end
     end
     return InterfaceOrientationInfo(flipped, transform_coordinates(nodes_coord[1:3],other_nodes_coord[1:3]))
