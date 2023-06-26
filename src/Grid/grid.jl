@@ -1604,7 +1604,8 @@ function transform_coordinates(src::Vector{Vector{Float64}}, dst::Vector{Vector{
     dst_matrix = [  dst[1][1]   dst[2][1]   dst[3][1]
                     dst[1][2]   dst[2][2]   dst[3][2]
                     1           1           1       ]
-    transform_matrix = dst_matrix * inv(src_matrix)
+    rank(src_matrix) == 1 && @info src_matrix
+    transform_matrix = dst_matrix / src_matrix
 
     return transform_matrix
 end
