@@ -1627,25 +1627,30 @@ end
 """
     InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, neighbor_face::FaceIndex)
 
-Orientation information for 2D interfaces. Such an interface can be 
+Orientation information for interfaces. Such an interface can be 
 possibly flipped (i.e. the defining vertex order is reverse to the 
-spanning vertex order) and the vertices can be rotated against each other.
+spanning vertex order) and the vertices can be rotated skewed against each other, and skewed in the case of triangles.
 Take for example the faces
 ```
-1---2 2---3
-| A | | B |
-4---3 1---4
+1           3
+| \\         | \\
+|  \\        |  \\
+| A \\       | B \\ 
+|    \\      |    \\
+2-----3     1-----2  
 ```
-which are rotated against each other by 90° (shift index is 1) or the faces
+which are skewed and rotated against each other by 90° or the faces
 ```
-1---2 2---1
-| A | | B |
-4---3 3---4
+1           3
+| \\         | \\
+|  \\        |  \\
+| A \\       | B \\ 
+|    \\      |    \\
+2-----3     2-----1  
 ```
-which are flipped against each other. Any combination of these can happen. 
+which are flipped about the centroid vector. Any combination of these can happen. 
 The combination to map neighbor facet to current facet is encoded with
-this data structure via ``rotate \\circ flip`` where the rotation is indiced by
-the shift index.
+this data structure via ``\\vec{p}_{\\text{there}} = [T] \\vec{p}_{\\text{here}}`` where ``[T]`` is `InterfaceOrientationInfo.transformation`.
 """
 function InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, neighbor_face::FaceIndex)
     cell = getcells(grid)[this_face[1]]
