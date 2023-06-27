@@ -80,7 +80,7 @@ finite element cell or face as
 """
 @propagate_inbounds getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 @propagate_inbounds getdetJdV(bv::FaceValues, q_point::Int) = bv.detJdV[q_point, bv.current_face[]]
-@propagate_inbounds getdetJdV(iv::InterfaceValues, q_point::Int; here::Bool = true) = here ? getdetJdV(iv.face_values, q_point) : getdetJdV(iv.face_values_neighbor, q_point)
+@propagate_inbounds getdetJdV(iv::InterfaceValues, q_point::Int; here::Bool = true) = here ? getdetJdV(iv.face_values, q_point) : getdetJdV(iv.other_face_values, q_point)
 
 """
     shape_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -160,7 +160,7 @@ function function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, d
     return val
 end
 function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) = begin
-    fv = here ? iv.face_values : iv.face_values_neighbor
+    fv = here ? iv.face_values : iv.other_face_values
     if dof_range != eachindex(u)
         here && any(dof_range .> length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
         here || any(dof_range .<= length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
@@ -203,7 +203,7 @@ function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector
     return grad
 end
 function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) = begin
-    fv = here ? iv.face_values : iv.face_values_neighbor
+    fv = here ? iv.face_values : iv.other_face_values
     if dof_range != eachindex(u)
         here && any(dof_range .> length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
         here || any(dof_range .<= length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
@@ -225,7 +225,7 @@ function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector
     return grad
 end
 function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true) = begin
-    fv = here ? iv.face_values : iv.face_values_neighbor
+    fv = here ? iv.face_values : iv.other_face_values
     u = here ? u[1 : end ÷ 2] : u[end ÷ 2 + 1 : end]
     function_gradient(fv, q_point, u)
 end
@@ -256,7 +256,7 @@ function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::Abst
     return symmetric(grad)
 end
 function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) = begin
-    fv = here ? iv.face_values : iv.face_values_neighbor
+    fv = here ? iv.face_values : iv.other_face_values
     if dof_range != eachindex(u)
         here && any(dof_range .> length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
         here || any(dof_range .<= length(eachindex(u)) ÷ 2) && error("dof_range contains dof on the other face of the interface")
@@ -272,7 +272,7 @@ function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::Abst
     return symmetric(grad)
 end
 function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true) = begin
-    fv = here ? iv.face_values : iv.face_values_neighbor
+    fv = here ? iv.face_values : iv.other_face_values
     u = here ? u[1 : end ÷ 2] : u[end ÷ 2 + 1 : end]
     function_symmetric_gradient(fv, q_point, u)
 end
@@ -304,7 +304,7 @@ function function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVect
     return diverg
 end
 function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true) = begin
-    fv = here ? iv.face_values : iv.face_values_neighbor
+    fv = here ? iv.face_values : iv.other_face_values
     u = here ? u[1 : end ÷ 2] : u[end ÷ 2 + 1 : end]
     function_divergence(fv, q_point, u)
 end
@@ -358,5 +358,5 @@ for ValueType in (CellValues, FaceValues#= InterfaceValues=#)
 end
 # TODO: delete this once grid is moved to InterfaceCache
 function Base.copy(iv::InterfaceValues)
-    return InterfaceValues{typeof(iv.face_values.func_interp), FaceValues}(copy(iv.face_values), copy(iv.face_values_neighbor), iv.grid, copy(iv.cell_idx), copy(iv.cell_idx_neighbor), iv.ioi)
+    return InterfaceValues{typeof(iv.face_values.func_interp), FaceValues}(copy(iv.face_values), copy(iv.other_face_values), iv.grid, copy(iv.cell_idx), copy(iv.other_cell_idx), iv.ioi)
 end

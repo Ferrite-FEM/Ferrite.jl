@@ -1605,7 +1605,7 @@ struct SurfaceOrientationInfo
     #flipped::Bool
     #shift_index::Int
 end
-# This one is the same as `SurfaceOrientationInfo` but used in interfaces. It is calculated for neighbor facet relative to current facet
+# This one is the same as `SurfaceOrientationInfo` but used in interfaces. It is calculated for the other facet relative to current facet
 struct InterfaceOrientationInfo
     flipped::Bool
     transformation::Union{Nothing, AbstractArray}
@@ -1625,7 +1625,7 @@ function transform_coordinates(src::Vector{Vector{Float64}}, dst::Vector{Vector{
 end
 # TODO: make this `SurfaceOrientationInfo`?
 """
-    InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, neighbor_face::FaceIndex)
+    InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, other_face::FaceIndex)
 
 Orientation information for interfaces. Such an interface can be 
 possibly flipped (i.e. the defining vertex order is reverse to the 
@@ -1649,16 +1649,16 @@ which are skewed and rotated against each other by 90° or the faces
 2-----3     2-----1  
 ```
 which are flipped about the centroid vector. Any combination of these can happen. 
-The combination to map neighbor facet to current facet is encoded with
+The combination to map other facet to current facet is encoded with
 this data structure via ``\\vec{p}_{\\text{there}} = [T] \\vec{p}_{\\text{here}}`` where ``[T]`` is `InterfaceOrientationInfo.transformation`.
 """
-function InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, neighbor_face::FaceIndex)
+function InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, other_face::FaceIndex)
     cell = getcells(grid)[this_face[1]]
-    other_cell = getcells(grid)[neighbor_face[1]]
+    other_cell = getcells(grid)[other_face[1]]
     face_nodes = faces(cell)[this_face[2]]
-    neighbor_face_nodes = faces(other_cell)[neighbor_face[2]]
+    other_face_nodes = faces(other_cell)[other_face[2]]
 
-    !all([i ∈ face_nodes for i in neighbor_face_nodes]) && error("Passed faces do not use the same nodes")
+    !all([i ∈ face_nodes for i in other_face_nodes]) && error("Passed faces do not use the same nodes")
     getdim(cell) == 1 && return(InterfaceOrientationInfo(false, nothing)) # this may change for embedded elements?
 
     cell_ip = cell|> typeof|> default_interpolation
@@ -1668,8 +1668,8 @@ function InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, neig
 
     other_cell_ip = other_cell|> typeof|> default_interpolation
     other_cell_coords = other_cell_ip|> reference_coordinates
-    other_nodes_coord = other_cell_coords[[((other_cell_ip|> getrefshape|> faces)[neighbor_face[2]])...]]
-    other_nodes_coord = transfer_point_cell_to_face.(other_nodes_coord, Ref(other_cell), Ref(neighbor_face[2]))
+    other_nodes_coord = other_cell_coords[[((other_cell_ip|> getrefshape|> faces)[other_face[2]])...]]
+    other_nodes_coord = transfer_point_cell_to_face.(other_nodes_coord, Ref(other_cell), Ref(other_face[2]))
 
     getdim(cell) == 2 && return(InterfaceOrientationInfo(nodes_coord[1] == -other_nodes_coord[1], nothing))
 

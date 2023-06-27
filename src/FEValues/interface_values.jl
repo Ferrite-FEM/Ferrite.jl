@@ -41,19 +41,19 @@ InterfaceValues
 
 struct InterfaceValues{IP, FV<:FaceValues} <: AbstractValues
     face_values::FV
-    face_values_neighbor::FV
+    other_face_values::FV
     # used for quadrature point syncing
     grid::Grid
     cell_idx::ScalarWrapper{Int}
-    cell_idx_neighbor::ScalarWrapper{Int}
+    other_cell_idx::ScalarWrapper{Int}
     ioi::ScalarWrapper{InterfaceOrientationInfo}
 end
 function InterfaceValues(grid::AbstractGrid, quad_rule::FaceQuadratureRule, func_interpol::Interpolation,
     geom_interpol::Interpolation = func_interpol)
     #@assert isDiscontinuous(func_interpol) "`InterfaceValues` is designed for discontinuous interpolations. a continuous interpolation is passed" TODO: add this when sparsity_pattern is merged
     face_values = FaceValues(quad_rule, func_interpol, geom_interpol)
-    face_values_neighbor = FaceValues(deepcopy(quad_rule), func_interpol, geom_interpol)
-    return InterfaceValues{typeof(func_interpol), FaceValues}(face_values, face_values_neighbor, grid, ScalarWrapper(0), ScalarWrapper(0), ScalarWrapper(InterfaceOrientationInfo(false, nothing)))
+    other_face_values = FaceValues(deepcopy(quad_rule), func_interpol, geom_interpol)
+    return InterfaceValues{typeof(func_interpol), FaceValues}(face_values, other_face_values, grid, ScalarWrapper(0), ScalarWrapper(0), ScalarWrapper(InterfaceOrientationInfo(false, nothing)))
 end
 # Maybe move this to common_values.jl?
 
@@ -61,9 +61,9 @@ end
     getnormal(iv::InterfaceValues, qp::Int, here::Bool = true)
 
 Return the normal at the quadrature point `qp` for the interface. 
-If `here == true` it uses the current facet, wich is the default, otherwise it uses the neighbor's facet.
+If `here == true` it uses the current facet, wich is the default, otherwise it uses the other's facet.
 """
-getnormal(iv::InterfaceValues, qp::Int, here::Bool = true) = here ? iv.face_values.normals[qp] : iv.face_values_neighbor.normals[qp]
+getnormal(iv::InterfaceValues, qp::Int, here::Bool = true) = here ? iv.face_values.normals[qp] : iv.other_face_values.normals[qp]
 
 """
     shape_value_average(iv::InterfaceValues, qp::Int, base_function::Int)
@@ -119,7 +119,7 @@ for (func,                      f_,                 multiplier  ) in (
                 f_value = $(f_)(fv, qp, i)
                 return $(multiplier) * f_value
             elseif i <= nbf
-                fv = iv.face_values_neighbor
+                fv = iv.other_face_values
                 f_value = $(f_)(fv, qp, i - nbf ÷ 2)
                 return $(multiplier) * f_value
             end
@@ -201,7 +201,7 @@ for (func,                          f_,                 ) in (
             f_value_there = $(f_)(iv, qp, u, dof_range_there; here = false)
             fv = iv.face_values
             result = 0.5 * f_value_here 
-            fv = iv.face_values_neighbor
+            fv = iv.other_face_values
             result += 0.5 * f_value_there
             return result
         end
@@ -211,7 +211,7 @@ for (func,                          f_,                 ) in (
             f_value_there = $(f_)(iv, qp, u; here = false)
             fv = iv.face_values
             result = 0.5 * f_value_here
-            fv = iv.face_values_neighbor
+            fv = iv.other_face_values
             result += 0.5 * f_value_there
             return result
         end
@@ -252,7 +252,7 @@ end
 """
     transform_interface_point(iv::InterfaceValues, point::AbstractArray)
 
-Transform point from current face in the interface reference coordinates to the neighbor face reference coordinates.
+Transform point from current face in the interface reference coordinates to the other face reference coordinates.
 """
 function transform_interface_point(iv::InterfaceValues, point::AbstractArray)
     ioi = iv.ioi[]
@@ -261,5 +261,5 @@ function transform_interface_point(iv::InterfaceValues, point::AbstractArray)
     point = transfer_point_cell_to_face(point, cell, face)
     isnothing(ioi.transformation) || (point = (ioi.transformation * [point..., 1])[1:2])
     ioi.flipped && reverse!(point)
-    return transfer_point_face_to_cell(point, getcells(iv.grid)[iv.cell_idx_neighbor[]], iv.face_values_neighbor.current_face[])
+    return transfer_point_face_to_cell(point, getcells(iv.grid)[iv.other_cell_idx[]], iv.other_face_values.current_face[])
 end
