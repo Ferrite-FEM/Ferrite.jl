@@ -56,6 +56,15 @@ function InterfaceValues(grid::AbstractGrid, quad_rule::FaceQuadratureRule, func
     return InterfaceValues{typeof(func_interpol), FaceValues}(face_values, face_values_neighbor, grid, ScalarWrapper(0), ScalarWrapper(0), ScalarWrapper(InterfaceOrientationInfo(false, nothing)))
 end
 # Maybe move this to common_values.jl?
+
+"""
+    getnormal(iv::InterfaceValues, qp::Int, here::Bool = true)
+
+Return the normal at the quadrature point `qp` for the interface. 
+If `here == true` it uses the current facet, wich is the default, otherwise it uses the neighbor's facet.
+"""
+getnormal(iv::InterfaceValues, qp::Int, here::Bool = true) = here ? iv.face_values.normals[qp] : iv.face_values_neighbor.normals[qp]
+
 """
     shape_value_average(iv::InterfaceValues, qp::Int, base_function::Int)
 
@@ -125,21 +134,17 @@ for (func,                      f_,             ) in (
 )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, i::Int, normal_dotted::Bool = true)
+            f_value = $(f_)(iv, qp, i)
             nbf = getnbasefunctions(iv)
             if i <= nbf/2
-                fv = iv.face_values
-                f_value = $(f_)(fv, qp, i)
                 normal_dotted || return f_value
-                multiplier = getnormal(fv, qp)
+                multiplier = getnormal(iv, qp, true)
                 return f_value isa Number ? f_value * multiplier : f_value ⋅ multiplier
-            elseif i <= nbf
-                fv = iv.face_values_neighbor
-                f_value = $(f_)(fv, qp, i - nbf ÷ 2)
+            else
                 normal_dotted || return -f_value
-                multiplier = getnormal(fv, qp)
+                multiplier = getnormal(iv, qp, false)
                 return f_value isa Number ? f_value * multiplier : f_value ⋅ multiplier
             end
-            error("Invalid base function $i. Interface has only $(nbf) base functions")
         end
     end
 end
@@ -223,26 +228,22 @@ for (func,                          f_,                 ) in (
             dof_range_there = dof_range[dof_range .> length(eachindex(u)) ÷ 2]
             f_value_here = $(f_)(iv, qp, u, dof_range_here; here = true)
             f_value_there = $(f_)(iv, qp, u, dof_range_there; here = false)
-            fv = iv.face_values
-            multiplier = getnormal(fv, qp)
+            multiplier = getnormal(iv, qp, true)
             result = f_value_here isa Number || multiplier isa Number ? f_value_here * multiplier : f_value_here ⋅ multiplier
-            fv = iv.face_values_neighbor
-            multiplier = getnormal(fv, qp)
+            multiplier = getnormal(iv, qp, false)
             result += f_value_there isa Number || multiplier isa Number ? f_value_there * multiplier : f_value_there ⋅ multiplier
-            normal_dotted || (result = result ⋅ getnormal(fv, qp))
+            normal_dotted || (result = result ⋅ getnormal(iv, qp))
             return result
         end
         # TODO: Deprecate this, nobody is using this in practice...
         function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector{<:Vec}, normal_dotted::Bool = true)
             f_value_here = $(f_)(iv, qp, u; here = true)
             f_value_there = $(f_)(iv, qp, u; here = false)
-            fv = iv.face_values
-            multiplier = getnormal(fv, qp)
+            multiplier = getnormal(iv, qp, true)
             result = f_value_here isa Number || multiplier isa Number ? f_value_here * multiplier : f_value_here ⋅ multiplier
-            fv = iv.face_values_neighbor
-            multiplier = getnormal(fv, qp)
+            multiplier = getnormal(iv, qp, false)
             result += f_value_there isa Number || multiplier isa Number ? f_value_there * multiplier : f_value_there ⋅ multiplier
-            normal_dotted || (result = result ⋅ getnormal(fv, qp))
+            normal_dotted || (result = result ⋅ getnormal(iv, qp))
             return result
         end
     end

@@ -62,21 +62,21 @@
                         shapegrad_avg = shape_gradient_average(iv, qp, i)
                         shapegrad_jump = shape_gradient_jump(iv, qp, i)
                         shapegrad_jump_no_normal = shape_gradient_jump(iv, qp, i, false)
-                        normal = getnormal(iv.face_values_neighbor, qp)
+                        normal = getnormal(iv, qp, false)
                         # Test values (May be removed as it mirrors implementation)
                         if i > getnbasefunctions(iv.face_values)
                             @test shapevalue ≈ shape_value(iv.face_values_neighbor, qp, i - getnbasefunctions(iv.face_values))
                             @test shapegrad ≈ shape_gradient(iv.face_values_neighbor, qp, i - getnbasefunctions(iv.face_values))
                         else
-                            normal = getnormal(iv.face_values, qp)
+                            normal = getnormal(iv, qp)
                             @test shapevalue ≈ shape_value(iv.face_values, qp, i)
                             @test shapegrad ≈ shape_gradient(iv.face_values, qp, i)
                         end
 
                         @test shape_avg ≈ 0.5 * shapevalue
-                        @test shape_jump ≈ shapevalue * normal ≈ shape_jump_no_normal * getnormal(iv.face_values, qp)
+                        @test shape_jump ≈ shapevalue * normal ≈ shape_jump_no_normal * getnormal(iv, qp)
                         @test shapegrad_avg ≈ 0.5 * shapegrad
-                        @test shapegrad_jump ≈ shapegrad ⋅ normal ≈ shapegrad_jump_no_normal ⋅ getnormal(iv.face_values, qp)
+                        @test shapegrad_jump ≈ shapegrad ⋅ normal ≈ shapegrad_jump_no_normal ⋅ getnormal(iv, qp)
 
                         # Test dimensions:
                         # Jump of a [scalar -> vector, vector -> scalar]
@@ -91,9 +91,10 @@
                         else
                             @test shapegrad_jump isa Number
                         end
-                        
                     end
                 end
+                @test_throws ErrorException("Invalid base function $(n_basefuncs + 1). Interface has only $(n_basefuncs) base functions") shape_value_jump(iv, 1, n_basefuncs + 1)
+                @test_throws ErrorException("Invalid base function $(n_basefuncs + 1). Interface has only $(n_basefuncs) base functions") shape_gradient_average(iv, 1, n_basefuncs + 1)
 
                 # Test function* copied from facevalues tests
                 for here in (true, false)
