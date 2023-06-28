@@ -13,6 +13,7 @@ A simple finite element toolbox written in Julia.
 
 ## Documentation
 
+[![][docs-stable-img]][docs-stable-url]
 [![][docs-dev-img]][docs-dev-url]
 
 ## Installation
@@ -42,8 +43,10 @@ Please keep in mind that we are part of the Julia community and adhere to the
 [Julia Community Standards][standards].
 
 
-[docs-dev-img]: https://img.shields.io/badge/docs-latest%20release-blue
-[docs-dev-url]: http://ferrite-fem.github.io/Ferrite.jl/
+[docs-stable-img]: https://img.shields.io/badge/docs-latest%20release-blue
+[docs-stable-url]: http://ferrite-fem.github.io/Ferrite.jl/stable/
+[docs-dev-img]: https://img.shields.io/badge/docs-dev-blue
+[docs-dev-url]: http://ferrite-fem.github.io/Ferrite.jl/dev/
 
 [standards]: https://julialang.org/community/standards/
 [julia-slack]: https://julialang.org/slack/
