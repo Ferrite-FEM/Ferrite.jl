@@ -11,7 +11,7 @@ for (scalar_interpol, quad_rule) in (
                                     (Lagrange{RefTetrahedron, 1}(), FaceQuadratureRule{RefTetrahedron}(2)),
                                     (Lagrange{RefTetrahedron, 2}(), FaceQuadratureRule{RefTetrahedron}(2)),
                                    )
-
+  
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
@@ -39,7 +39,7 @@ for (scalar_interpol, quad_rule) in (
             end
             u_vector = reinterpret(Float64, u)
 
-            for i in 1:length(getnquadpoints(fv))
+            for i in 1:getnquadpoints(fv)
                 @test getnormal(fv, i) ≈ n[face]
                 if func_interpol isa Ferrite.ScalarInterpolation
                     @test function_gradient(fv, i, u) ≈ H
