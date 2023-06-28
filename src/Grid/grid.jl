@@ -107,7 +107,7 @@ function faces(c::AbstractCell{RefLine})
     return ((ns[1],), (ns[2],)) # f1, f2
 end
 function faces(::Type{RefLine})
-    return ((1), (2,)) # f1, f2
+    return ((1,), (2,)) # f1, f2
 end
 
 # RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
@@ -1469,9 +1469,9 @@ Mapping from 2D face of a triangle to 1D line.
 """
 function transfer_point_cell_to_face(point::AbstractVector, cell::AbstractCell{RefTriangle}, face::Int)
     x, y = point
-    face == 1 && return [ x]
-    face == 2 && return [ y]
-    face == 3 && return [ x]
+    face == 1 && return [ x * 2 - 1]
+    face == 2 && return [ y * 2 - 1]
+    face == 3 && return [ x * 2 - 1]
 end
 
 """
@@ -1522,7 +1522,7 @@ end
 Mapping from 1D line to 2D face of a triangle.
 """
 function transfer_point_face_to_cell(point::AbstractVector, cell::AbstractCell{RefTriangle}, face::Int)
-    x = point[]
+    x = (point[] + 1) / 2
     face == 1 && return [ x, 1 - x]
     face == 2 && return [ 0, x]
     face == 3 && return [ x, 0]
@@ -1605,25 +1605,7 @@ struct SurfaceOrientationInfo
     #flipped::Bool
     #shift_index::Int
 end
-# This one is the same as `SurfaceOrientationInfo` but used in interfaces. It is calculated for the other facet relative to current facet
-struct InterfaceOrientationInfo
-    flipped::Bool
-    transformation::Union{Nothing, AbstractArray}
-end
 
-function transform_coordinates(src::Vector{Vector{Float64}}, dst::Vector{Vector{Float64}})
-    # Calculate the transformation matrix
-    src_matrix = [  src[1][1]   src[2][1]   src[3][1]
-                    src[1][2]   src[2][2]   src[3][2]
-                    1           1           1       ]
-    dst_matrix = [  dst[1][1]   dst[2][1]   dst[3][1]
-                    dst[1][2]   dst[2][2]   dst[3][2]
-                    1           1           1       ]
-    transform_matrix = dst_matrix / src_matrix
-
-    return transform_matrix
-end
-# TODO: make this `SurfaceOrientationInfo`?
 """
     InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, other_face::FaceIndex)
 
@@ -1652,6 +1634,11 @@ which are flipped about the centroid vector. Any combination of these can happen
 The combination to map other facet to current facet is encoded with
 this data structure via ``\\vec{p}_{\\text{there}} = [T] \\vec{p}_{\\text{here}}`` where ``[T]`` is `InterfaceOrientationInfo.transformation`.
 """
+struct InterfaceOrientationInfo
+    flipped::Bool
+    transformation::Union{Nothing, AbstractMatrix}
+end
+
 function InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, other_face::FaceIndex)
     cell = getcells(grid)[this_face[1]]
     other_cell = getcells(grid)[other_face[1]]
@@ -1664,17 +1651,17 @@ function InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, othe
     cell_ip = cell|> typeof|> default_interpolation
     cell_coords = cell_ip|> reference_coordinates
     nodes_coord = cell_coords[[((cell_ip |>getrefshape|> faces)[this_face[2]])...]]
-    nodes_coord = transfer_point_cell_to_face.(nodes_coord, Ref(cell), Ref(this_face[2]))
+    nodes_coord = hcat(transfer_point_cell_to_face.(nodes_coord, Ref(cell), Ref(this_face[2]))...)
 
     other_cell_ip = other_cell|> typeof|> default_interpolation
     other_cell_coords = other_cell_ip|> reference_coordinates
     other_nodes_coord = other_cell_coords[[((other_cell_ip|> getrefshape|> faces)[other_face[2]])...]]
-    other_nodes_coord = transfer_point_cell_to_face.(other_nodes_coord, Ref(other_cell), Ref(other_face[2]))
+    other_nodes_coord = hcat(transfer_point_cell_to_face.(other_nodes_coord, Ref(other_cell), Ref(other_face[2]))...)
 
     getdim(cell) == 2 && return(InterfaceOrientationInfo(nodes_coord[1] == -other_nodes_coord[1], nothing))
-
-    flipped = ([(nodes_coord[2] - nodes_coord[1])..., 0] × [(nodes_coord[3] - nodes_coord[2])..., 0])[3] > 0
-    flipped = flipped == (([(other_nodes_coord[2] - other_nodes_coord[1])..., 0] × [(other_nodes_coord[3] - other_nodes_coord[2])..., 0])[3] < 0)
-    flipped || reverse!.(nodes_coord)
-    return InterfaceOrientationInfo(flipped, transform_coordinates(nodes_coord[1:3],other_nodes_coord[1:3]))
+    flipped = ([(nodes_coord[:,2] - nodes_coord[:,1])..., 0] × [(nodes_coord[:,3] - nodes_coord[:,2])..., 0])[3] > 0
+    flipped = flipped == (([(other_nodes_coord[:,2] - other_nodes_coord[:,1])..., 0] × [(other_nodes_coord[:,3] - other_nodes_coord[:,2])..., 0])[3] < 0)
+    flipped || reverse!(nodes_coord, dims = 1)
+    (nodes_coord, other_nodes_coord) = vcat.((nodes_coord, other_nodes_coord), Ref(ones(1, length(face_nodes))))
+    return InterfaceOrientationInfo(flipped, other_nodes_coord[:, 1:3] / nodes_coord[:, 1:3])
 end

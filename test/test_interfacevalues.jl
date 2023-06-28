@@ -1,4 +1,132 @@
 @testset "InterfaceValues" begin
+    function test_interfacevalues(grid, topology, dim, ip_a, qr_a, ip_b = ip_a, qr_b = deepcopy(qr_a))
+        n_basefunc_base = getnbasefunctions(ip_a) + getnbasefunctions(ip_b)
+        iv = Ferrite.InterfaceValues(grid, qr_a, ip_a; quad_rule_b = qr_b, func_interpol_b = ip_b)
+        ndim = Ferrite.getdim(ip_a)
+        n_basefuncs = getnbasefunctions(ip_a) + getnbasefunctions(ip_b)
+
+        @test getnbasefunctions(iv) == n_basefuncs
+
+        for face_a in topology.face_skeleton
+            neighbors = dim > 1 ? topology.face_neighbor[face_a[1], face_a[2]] : topology.vertex_neighbor[face_a[1], face_a[2]]
+            isempty(neighbors) && continue
+            face_b = neighbors[1]
+            dim == 1 && (face_b = FaceIndex(face_b[1], face_b[2]))
+            cell_a_coords = get_cell_coordinates(grid, face_a[1])
+            cell_b_coords = get_cell_coordinates(grid, face_b[1])
+            ##############
+            #   reinit!  #
+            ##############
+            reinit!(iv, face_a, face_b, cell_a_coords, cell_b_coords, grid)
+            ##############
+            # end reinit!#
+            ##############
+            nqp = getnquadpoints(iv)
+            # Should have same quadrature points
+            @test nqp == getnquadpoints(iv.face_values_a) == getnquadpoints(iv.face_values_b)
+            for qp in 1:nqp
+                # If correctly synced quadrature points coordinates should match
+                @test spatial_coordinate(iv, qp, cell_a_coords) ≈ spatial_coordinate(iv.face_values_a, qp, cell_a_coords) ≈
+                spatial_coordinate(iv.face_values_b, qp, cell_b_coords)
+                for i in 1:getnbasefunctions(iv)
+                    shapevalue = shape_value(iv, qp, i)
+                    shape_avg = shape_value_average(iv, qp, i)
+                    shape_jump = shape_value_jump(iv, qp, i)
+                    shape_jump_no_normal = shape_value_jump(iv, qp, i, false)
+                    
+                    shapegrad = shape_gradient(iv, qp, i)
+                    shapegrad_avg = shape_gradient_average(iv, qp, i)
+                    shapegrad_jump = shape_gradient_jump(iv, qp, i)
+                    shapegrad_jump_no_normal = shape_gradient_jump(iv, qp, i, false)
+
+                    geomvalue = Ferrite.geometric_value(iv, qp, i)
+                    geomvalue_avg = Ferrite.geometric_value_average(iv, qp, i)
+                    geomvalue_jump = Ferrite.geometric_value_jump(iv, qp, i)
+                    geomvalue_jump_no_normal = Ferrite.geometric_value_jump(iv, qp, i, false)
+
+                    normal = getnormal(iv, qp, false)
+                    # Test values (May be removed as it mirrors implementation)
+                    if i > getnbasefunctions(iv.face_values_a)
+                        @test shapevalue ≈ shape_value(iv.face_values_b, qp, i - getnbasefunctions(iv.face_values_a))
+                        @test shapegrad ≈ shape_gradient(iv.face_values_b, qp, i - getnbasefunctions(iv.face_values_a))
+                        @test geomvalue ≈ Ferrite.geometric_value(iv.face_values_b, qp, i - getnbasefunctions(iv.face_values_a))
+                    else
+                        normal = getnormal(iv, qp)
+                        @test shapevalue ≈ shape_value(iv.face_values_a, qp, i)
+                        @test shapegrad ≈ shape_gradient(iv.face_values_a, qp, i)
+                        @test geomvalue ≈ Ferrite.geometric_value(iv.face_values_a, qp, i)
+                    end
+
+                    @test shape_avg ≈ 0.5 * shapevalue
+                    @test shape_jump ≈ shapevalue * normal ≈ shape_jump_no_normal * getnormal(iv, qp)
+                    @test shapegrad_avg ≈ 0.5 * shapegrad
+                    @test shapegrad_jump ≈ shapegrad ⋅ normal ≈ shapegrad_jump_no_normal ⋅ getnormal(iv, qp)
+                    @test geomvalue_avg ≈ 0.5 * geomvalue
+                    @test geomvalue_jump ≈ geomvalue * normal ≈ geomvalue_jump_no_normal * getnormal(iv, qp)
+
+                    # Test dimensions:
+                    # Jump of a [scalar -> vector, vector -> scalar]
+                    if !isempty(size(shapevalue))
+                        @test shape_jump isa Number
+                    else
+                        @test !(shape_jump isa Number)
+                    end
+
+                    if isempty(size(shapegrad))
+                        @test !(shapegrad_jump isa Number)
+                    else
+                        @test shapegrad_jump isa Number
+                    end
+                end
+            end
+            @test_throws ErrorException("Invalid base function $(n_basefuncs + 1). Interface has only $(n_basefuncs) base functions") shape_value_jump(iv, 1, n_basefuncs + 1)
+            @test_throws ErrorException("Invalid base function $(n_basefuncs + 1). Interface has only $(n_basefuncs) base functions") shape_gradient_average(iv, 1, n_basefuncs + 1)
+
+            # Test function* copied from facevalues tests
+            nbf_a = getnbasefunctions(iv.face_values_a)
+            for use_element_a in (true, false)
+                u = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1:n_basefunc_base]
+                u_scal = zeros(n_basefunc_base)
+                H = rand(Tensor{2, ndim})
+                V = rand(Tensor{1, ndim})
+                for i in 1:n_basefunc_base
+                    xs = i <= nbf_a ? cell_a_coords : cell_b_coords
+                    j = i <= nbf_a ? i : i -nbf_a
+                    u[i] = H ⋅ xs[j]
+                    u_scal[i] = V ⋅ xs[j]
+                end
+                u_vector = reinterpret(Float64, u)
+                for i in 1:getnquadpoints(iv)
+                    @test function_gradient(iv, i, u, use_element_a = use_element_a) ≈ H
+                    @test function_symmetric_gradient(iv, i, u, use_element_a = use_element_a) ≈ 0.5(H + H')
+                    @test function_divergence(iv, i, u_scal, use_element_a = use_element_a) ≈ sum(V)
+                    @test function_divergence(iv, i, u, use_element_a = use_element_a) ≈ tr(H)
+                    @test function_gradient(iv, i, u_scal, use_element_a = use_element_a) ≈ V
+                    ndim == 3 && @test function_curl(iv, i, u, use_element_a = use_element_a) ≈ Ferrite.curl_from_gradient(H)
+
+                    @test function_value_average(iv, i, u_scal) ≈ function_value(iv, i, u_scal, use_element_a = use_element_a)
+                    @test all(function_value_jump(iv, i, u_scal) .<= 30 * eps(Float64))
+                    @test function_gradient_average(iv, i, u_scal) ≈ function_gradient(iv, i, u_scal, use_element_a = use_element_a)
+                    @test function_gradient_jump(iv, i, u_scal) <= 30 * eps(Float64)
+
+                    @test function_value_average(iv, i, u) ≈ function_value(iv, i, u, use_element_a = use_element_a)
+                    @test all(function_value_jump(iv, i, u) .<= 30 * eps(Float64))
+                    @test function_gradient_average(iv, i, u) ≈ function_gradient(iv, i, u, use_element_a = use_element_a)
+                    @test all(function_gradient_jump(iv, i, u) .<= 30 * eps(Float64))
+
+                end
+                # Test of volume
+                vol = 0.0
+                for i in 1:getnquadpoints(iv)
+                    vol += getdetJdV(iv, i; use_element_a = use_element_a)
+                end
+                
+                xs = use_element_a ? cell_a_coords : cell_b_coords
+                x_face = xs[[Ferrite.dirichlet_facedof_indices(use_element_a ? ip_a : ip_b)[use_element_a ? face_a[2] : face_b[2]]...]]
+                @test vol ≈ calculate_face_area(use_element_a ? ip_a : ip_b, x_face, use_element_a ? face_a[2] : face_b[2])
+            end
+        end
+    end
     getcelltypedim(::Type{<:Ferrite.AbstractCell{shape}}) where {dim, shape <: Ferrite.AbstractRefShape{dim}} = dim
     for (cell_shape, scalar_interpol, quad_rule) in (
                                         (Line, DiscontinuousLagrange{RefLine, 1}(), FaceQuadratureRule{RefLine}(2)),
@@ -15,144 +143,47 @@
         dim = getcelltypedim(cell_shape)
         grid = generate_grid(cell_shape, ntuple(i -> i == 1 ? 2 : 1, dim))
         topology = ExclusiveTopology(grid)
-        for func_interpol in (scalar_interpol,#= VectorizedInterpolation(scalar_interpol)=#)
-            geom_interpol = scalar_interpol # Tests below assume this
-            n_basefunc_base = 2 * getnbasefunctions(scalar_interpol)
-            iv = Ferrite.InterfaceValues(grid, quad_rule, func_interpol, geom_interpol)
-            ndim = Ferrite.getdim(func_interpol)
-            n_basefuncs = 2 * getnbasefunctions(func_interpol)
-
-            @test getnbasefunctions(iv) == n_basefuncs
-
-            for face in topology.face_skeleton
-                neighbors = dim > 1 ? topology.face_neighbor[face[1], face[2]] : topology.vertex_neighbor[face[1], face[2]]
-                isempty(neighbors) && continue
-                other_face = neighbors[1]
-                dim == 1 && (other_face = FaceIndex(other_face[1], other_face[2]))
-                cell_coords = get_cell_coordinates(grid, face[1])
-                other_cell_coords = get_cell_coordinates(grid, other_face[1])
-                ##############
-                #   reinit!  #
-                ##############
-                reinit!(iv.face_values, cell_coords, face[2])
-                iv.other_face_values.current_face[] = other_face[2]
-                iv.cell_idx[] = face[1]
-                iv.other_cell_idx[] = other_face[1]
-                ioi = Ferrite.InterfaceOrientationInfo(grid, face, other_face)
-                iv.ioi[] = ioi
-                getpoints(iv.other_face_values.qr, other_face[2]) .= Vec{dim}.(Ferrite.transform_interface_point.(Ref(iv), getpoints(quad_rule, face[2])))  
-                reinit!(iv.other_face_values, other_cell_coords, other_face[2], true)
-                ##############
-                # end reinit!#
-                ##############
-                nqp = getnquadpoints(iv)
-                # Should have same quadrature points
-                @test nqp == getnquadpoints(iv.face_values) == getnquadpoints(iv.other_face_values)
-                for qp in 1:nqp
-                    # If correctly synced quadrature points coordinates should match
-                    @test spatial_coordinate(iv, qp, cell_coords) ≈ spatial_coordinate(iv.face_values, qp, cell_coords) ≈
-                    spatial_coordinate(iv.other_face_values, qp, other_cell_coords)
-                    for i in 1:getnbasefunctions(iv)
-                        shapevalue = shape_value(iv, qp, i)
-                        shape_avg = shape_value_average(iv, qp, i)
-                        shape_jump = shape_value_jump(iv, qp, i)
-                        shape_jump_no_normal = shape_value_jump(iv, qp, i, false)
-                        
-                        shapegrad = shape_gradient(iv, qp, i)
-                        shapegrad_avg = shape_gradient_average(iv, qp, i)
-                        shapegrad_jump = shape_gradient_jump(iv, qp, i)
-                        shapegrad_jump_no_normal = shape_gradient_jump(iv, qp, i, false)
-                        normal = getnormal(iv, qp, false)
-                        # Test values (May be removed as it mirrors implementation)
-                        if i > getnbasefunctions(iv.face_values)
-                            @test shapevalue ≈ shape_value(iv.other_face_values, qp, i - getnbasefunctions(iv.face_values))
-                            @test shapegrad ≈ shape_gradient(iv.other_face_values, qp, i - getnbasefunctions(iv.face_values))
-                        else
-                            normal = getnormal(iv, qp)
-                            @test shapevalue ≈ shape_value(iv.face_values, qp, i)
-                            @test shapegrad ≈ shape_gradient(iv.face_values, qp, i)
-                        end
-
-                        @test shape_avg ≈ 0.5 * shapevalue
-                        @test shape_jump ≈ shapevalue * normal ≈ shape_jump_no_normal * getnormal(iv, qp)
-                        @test shapegrad_avg ≈ 0.5 * shapegrad
-                        @test shapegrad_jump ≈ shapegrad ⋅ normal ≈ shapegrad_jump_no_normal ⋅ getnormal(iv, qp)
-
-                        # Test dimensions:
-                        # Jump of a [scalar -> vector, vector -> scalar]
-                        if !isempty(size(shapevalue))
-                            @test shape_jump isa Number
-                        else
-                            @test !(shape_jump isa Number)
-                        end
-
-                        if isempty(size(shapegrad))
-                            @test !(shapegrad_jump isa Number)
-                        else
-                            @test shapegrad_jump isa Number
-                        end
-                    end
-                end
-                @test_throws ErrorException("Invalid base function $(n_basefuncs + 1). Interface has only $(n_basefuncs) base functions") shape_value_jump(iv, 1, n_basefuncs + 1)
-                @test_throws ErrorException("Invalid base function $(n_basefuncs + 1). Interface has only $(n_basefuncs) base functions") shape_gradient_average(iv, 1, n_basefuncs + 1)
-
-                # Test function* copied from facevalues tests
-                for here in (true, false)
-                    u = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1:n_basefunc_base]
-                    u_scal = zeros(n_basefunc_base)
-                    H = rand(Tensor{2, ndim})
-                    V = rand(Tensor{1, ndim})
-                    for i in 1:n_basefunc_base
-                        xs = i <= n_basefunc_base ÷ 2 ? cell_coords : other_cell_coords
-                        j = i <= n_basefunc_base ÷ 2 ? i : i - Ferrite.getngeobasefunctions(iv.face_values)
-                        u[i] = H ⋅ xs[j]
-                        u_scal[i] = V ⋅ xs[j]
-                    end
-                    u_vector = reinterpret(Float64, u)
-                    for i in 1:getnquadpoints(iv)
-                        @test function_gradient(iv, i, u, here = here) ≈ H
-                        @test function_symmetric_gradient(iv, i, u, here = here) ≈ 0.5(H + H')
-                        @test function_divergence(iv, i, u_scal, here = here) ≈ sum(V)
-                        @test function_divergence(iv, i, u, here = here) ≈ tr(H)
-                        @test function_gradient(iv, i, u_scal, here = here) ≈ V
-                        ndim == 3 && @test function_curl(iv, i, u, here = here) ≈ Ferrite.curl_from_gradient(H)
-
-                        @test function_value_average(iv, i, u_scal) ≈ function_value(iv, i, u_scal, here = here)
-                        @test all(function_value_jump(iv, i, u_scal) .<= 30 * eps(Float64))
-                        @test function_gradient_average(iv, i, u_scal) ≈ function_gradient(iv, i, u_scal, here = here)
-                        @test function_gradient_jump(iv, i, u_scal) <= 30 * eps(Float64)
-
-                        @test function_value_average(iv, i, u) ≈ function_value(iv, i, u, here = here)
-                        @test all(function_value_jump(iv, i, u) .<= 30 * eps(Float64))
-                        @test function_gradient_average(iv, i, u) ≈ function_gradient(iv, i, u, here = here)
-                        @test all(function_gradient_jump(iv, i, u) .<= 30 * eps(Float64))
-
-                    end
-                    # Test of volume
-                    vol = 0.0
-                    for i in 1:getnquadpoints(iv)
-                        vol += getdetJdV(iv, i; here = here)
-                    end
-                    
-                    xs = here ? cell_coords : other_cell_coords
-                    x_face = xs[[Ferrite.dirichlet_facedof_indices(scalar_interpol)[here ? face[2] : other_face[2]]...]]
-                    @test vol ≈ calculate_face_area(scalar_interpol, x_face, here ? face[2] : other_face[2])
-                end
-            end
-            # Test copy
-            ivc = copy(iv)
-            @test typeof(iv) == typeof(ivc)
-            for fname in fieldnames(typeof(iv))
-                v = getfield(iv, fname)
-                v isa Ferrite.ScalarWrapper && continue
-                vc = getfield(ivc, fname)
-                if hasmethod(pointer, Tuple{typeof(v)})
-                    @test pointer(v) != pointer(vc)
-                end
-                v isa FaceValues && continue
-                @test v == vc
-            end
+        @testset "faces nodes indicies" begin
+            ip = scalar_interpol isa DiscontinuousLagrange ? Lagrange{Ferrite.getrefshape(scalar_interpol), Ferrite.getorder(scalar_interpol)}() : scalar_interpol
+            cell = getcells(grid, 1)
+            geom_ip_faces_indices = Ferrite.facedof_indices(ip)
+            Ferrite.getdim(ip) > 1 && (geom_ip_faces_indices = Tuple([face[collect(face .∉ Ref(interior))] for (face, interior) in [(geom_ip_faces_indices[i], Ferrite.facedof_interior_indices(ip)[i]) for i in 1:nfaces(ip)]]))
+            faces_indicies = Ferrite.faces(cell |> typeof|> Ferrite.default_interpolation |> Ferrite.getrefshape)
+            node_ids = Ferrite.get_node_ids(cell)
+            @test getindex.(Ref(node_ids), collect.(faces_indicies)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
         end
+        for func_interpol in (scalar_interpol,#= VectorizedInterpolation(scalar_interpol)=#)
+            test_interfacevalues(grid, topology, dim, scalar_interpol, quad_rule)
+        end
+    end
+    @testset "Mixed elements 2D grids" begin
+        dim = 2
+        nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, -1.0)), Node((0.0, 1.0))]
+        cells = [
+                    Quadrilateral((1,2,5,4)),
+                    Triangle((3,5,2)),
+                ]
+
+        grid = Grid(cells, nodes)
+        topology = ExclusiveTopology(grid)
+        test_interfacevalues(grid, topology, dim,
+        DiscontinuousLagrange{RefQuadrilateral, 1}(), FaceQuadratureRule{RefQuadrilateral}(2),
+        DiscontinuousLagrange{RefTriangle, 1}(), FaceQuadratureRule{RefTriangle}(2))
+    end
+
+    # Test copy
+    iv = Ferrite.InterfaceValues(generate_grid(Quadrilateral,(2,2)), FaceQuadratureRule{RefQuadrilateral}(2), DiscontinuousLagrange{RefQuadrilateral, 1}())
+    ivc = copy(iv)
+    @test typeof(iv) == typeof(ivc)
+    for fname in fieldnames(typeof(iv))
+        v = getfield(iv, fname)
+        v isa Ferrite.ScalarWrapper && continue
+        vc = getfield(ivc, fname)
+        if hasmethod(pointer, Tuple{typeof(v)})
+            @test pointer(v) != pointer(vc)
+        end
+        v isa FaceValues && continue
+        @test v == vc
     end
 end # of testset
                                 
