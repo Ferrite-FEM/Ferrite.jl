@@ -1,4 +1,4 @@
-# # Nearly Incompressible Hyperelasticity
+# # [Nearly Incompressible Hyperelasticity](@id tutorial-nearly-incompressible-hyperelasticity)
 #
 # ![](quasi_incompressible_hyperelasticity.gif)
 #-
