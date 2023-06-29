@@ -115,32 +115,25 @@ function cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sy
             push!(ip_infos, ip_info)
             push!(nbasefunctions, getnbasefunctions(ip))
         end
-        element_dof_start = 0
         isnothing(couplings) || (coupling_fh = couplings[sdh_idx])
         for (cell_field_i, cell_field) in enumerate(sdh.field_names)
             fii = ip_infos[cell_field_i]
-            if(!fii.is_discontinuous)
-                element_dof_start += nbasefunctions[cell_field_i]
-                continue
-            end
+            fii.is_discontinuous || continue
             for cell_idx in eachindex(getcells(dh.grid))
                 cell_field ∈ dh.subdofhandlers[dh.cell_to_subdofhandler[cell_idx]].field_names || continue
-                # Not using celldofs() to avoid copying 
+                dofrange1 = dof_range(sdh, cell_field)
                 cell_dofs = celldofs(dh, cell_idx)
-                cell_field_dofs = @view cell_dofs[element_dof_start + 1 : element_dof_start + nbasefunctions[cell_field_i]]
+                cell_field_dofs = @view cell_dofs[dofrange1]
                 for neighbor_cell in (getdim(dh.grid.cells[cell_idx]) >1 ? topology.cell_face_neighbor[cell_idx] : topology.cell_neighbor[cell_idx])
-                    neighbour_dof_start = 0
                     for (neighbor_field_i, neighbor_field) in enumerate(sdh.field_names)
                         fii2 = ip_infos[neighbor_field_i]
-                        neighbor_field ∈ dh.subdofhandlers[dh.cell_to_subdofhandler[neighbor_cell.idx]].field_names || continue
-                        if(!fii2.is_discontinuous)
-                            neighbour_dof_start += nbasefunctions[neighbor_field_i]
-                            continue
-                        end
+                        sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[neighbor_cell.idx]]
+                        neighbor_field ∈ sdh2.field_names && fii2.is_discontinuous || continue
+                        dofrange2 = dof_range(sdh2, neighbor_field)
                         neighbor_dofs = celldofs(dh, neighbor_cell.idx)
-                        neighbor_field_dofs = @view neighbor_dofs[neighbour_dof_start + 1 : neighbour_dof_start + nbasefunctions[neighbor_field_i]]
-                        for j in eachindex(neighbor_field_dofs), i in eachindex(cell_field_dofs)
-                            isnothing(couplings) || coupling_fh[i+element_dof_start,j+neighbour_dof_start] || continue
+                        neighbor_field_dofs = @view neighbor_dofs[dofrange2]
+                        for (j, dof_j) in enumerate(dofrange2), (i, dof_i) in enumerate(dofrange1)
+                            isnothing(couplings) || coupling_fh[dof_i, dof_j] || continue
                             dofi = cell_field_dofs[i]
                             dofj = neighbor_field_dofs[j]
                             sym && (dofi > dofj && continue)
@@ -148,11 +141,9 @@ function cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sy
                             cnt += 1
                             _add_or_grow(cnt, I, J, dofi, dofj)
                         end
-                        neighbour_dof_start += nbasefunctions[neighbor_field_i]
                     end
                 end
             end
-            element_dof_start += nbasefunctions[cell_field_i]
         end
     end
     return cnt
