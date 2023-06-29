@@ -1,5 +1,5 @@
 # Incidence matrix for element connections in the grid
-function create_incidence_matrix(g::Grid, cellset::Set{Int}=Set{Int}(1:getncells(g)))
+function create_incidence_matrix(g::Grid, cellset=1:getncells(g))
     cell_containing_node = Dict{Int, Set{Int}}()
     for cellid in cellset
         cell = getcells(g, cellid)
@@ -25,7 +25,7 @@ function create_incidence_matrix(g::Grid, cellset::Set{Int}=Set{Int}(1:getncells
         end
     end
 
-    incidence_matrix = sparse(I, J, V)
+    incidence_matrix = sparse(I, J, V, getncells(g), getncells(g))
     return incidence_matrix
 end
 
@@ -69,7 +69,14 @@ function greedy_coloring(incidence_matrix, cells=1:size(incidence_matrix, 1))
 end
 
 # See Appendix A in https://www.math.colostate.edu/%7Ebangerth/publications/2013-pattern.pdf
-function workstream_coloring(incidence_matrix, cellset::Set{Int})
+function workstream_coloring(incidence_matrix, cellset)
+     
+    if length(cellset) == 0
+        return Vector{Int}[]
+    elseif length(cellset) == 1
+        return Vector{Int}[Int[first(cellset)]]
+    end
+
     ###################
     # 1. Partitioning #
     ###################
@@ -77,16 +84,18 @@ function workstream_coloring(incidence_matrix, cellset::Set{Int})
     n_visited = 0
     Z = 1
     Z0 = Set{Int}() # Dummy zone
+    remaining_cells = Set{Int}(cellset)
     while n_visited < length(cellset)
-        remaining_cellset = setdiff(cellset, zones...)
+        setdiff!(remaining_cells, zones...)
         ## Zone 1: Just the first element
-        push!(zones, Set{Int}(first(remaining_cellset)))
+        @assert length(remaining_cells) > 0
+        push!(zones, Set{Int}(first(remaining_cells)))
         Z += 1
         n_visited += 1
         ## Zone N: All elements with connection to elements in Zone N-1
         while true
             s = Set{Int}()
-            # Loop over all elements in previous zone and add their neigbouring elements
+            # Loop over all elements in previous zone and add their neighbouring elements
             # unless they are in any of the previous 2 zones.
             empty_zone = true
             for c in get(zones, Z-1, Z0)
@@ -145,10 +154,13 @@ function workstream_coloring(incidence_matrix, cellset::Set{Int})
     return final_colors
 end
 
-@enum ColoringAlgorithm GREEDY WORKSTREAM
+@enumx ColoringAlgorithm Greedy WorkStream
+# For backwards compatibility
+const GREEDY = ColoringAlgorithm.Greedy
+const WORKSTREAM = ColoringAlgorithm.WorkStream
 
 """
-    create_coloring(g::Grid, cellset::Set{Int}=Set(1:getncells(g)); alg::ColoringAlgorithm)
+    create_coloring(g::Grid, cellset=1:getncells(g); alg::ColoringAlgorithm)
 
 Create a coloring of the cells in grid `g` such that no neighboring cells
 have the same color. If only a subset of cells should be colored, the cells to color can be specified by `cellset`.
@@ -163,11 +175,11 @@ ret = [
 ```
 
 Two different algorithms are available, specified with the `alg` keyword argument:
- - `alg = Ferrite.WORKSTREAM` (default): Three step algorithm from
+ - `alg = ColoringAlgorithm.WorkStream` (default): Three step algorithm from
    [*WorkStream*](https://www.math.colostate.edu/%7Ebangerth/publications/2013-pattern.pdf)
-   , albeit with a greedy coloring in the second step. Generally results in more colors than `Ferrite.GREEDY`,
-   however the cells are more equally distributed among the colors.
- - `alg = Ferrite.GREEDY`: greedy algorithm that works well for structured quadrilateral grids such as
+   , albeit with a greedy coloring in the second step. Generally results in more colors than
+   `ColoringAlgorithm.Greedy`, however the cells are more equally distributed among the colors.
+ - `alg = ColoringAlgorithm.Greedy`: greedy algorithm that works well for structured quadrilateral grids such as
    e.g. quadrilateral grids from `generate_grid`.
 
 The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
@@ -183,11 +195,11 @@ The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
     )
     ```
 """
-function create_coloring(g::Grid, cellset::Set{Int}=Set{Int}(1:getncells(g)); alg::ColoringAlgorithm=WORKSTREAM)
+function create_coloring(g::Grid, cellset=1:getncells(g); alg::ColoringAlgorithm.T=ColoringAlgorithm.WorkStream)
     incidence_matrix = create_incidence_matrix(g, cellset)
-    if alg === WORKSTREAM
+    if alg === ColoringAlgorithm.WorkStream
         return workstream_coloring(incidence_matrix, cellset)
-    elseif alg === GREEDY
+    elseif alg === ColoringAlgorithm.Greedy
         return greedy_coloring(incidence_matrix, cellset)
     else
         error("impossible")

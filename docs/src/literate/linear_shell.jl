@@ -5,7 +5,7 @@
 # ## Introduction
 #
 # In this example we show how shell elements can be analyzed in Ferrite.jl. The shell implemented here comes from the book 
-# "The finite elment method - Linear static and dynamic finite element analysis" by Hughes (1987), and a brief description of it is 
+# "The finite element method - Linear static and dynamic finite element analysis" by Hughes (1987), and a brief description of it is 
 # given at the end of this tutorial.  The first part of the tutorial explains how to set up the problem.
 
 # ## Setting up the problem
@@ -34,8 +34,8 @@ cv = CellScalarValues(qr_inplane, ip)
 # Next we distribute displacement dofs,`:u = (x,y,z)` and rotational dofs, `:θ = (θ₁,  θ₂)`.
 #+
 dh = DofHandler(grid)
-push!(dh, :u, 3, ip)
-push!(dh, :θ, 2, ip)
+add!(dh, :u, 3, ip)
+add!(dh, :θ, 2, ip)
 close!(dh)
 
 # In order to apply our boundary conditions, we first need to create some edge- and vertex-sets. This 
@@ -51,12 +51,12 @@ ch = ConstraintHandler(dh)
 add!(ch,  Dirichlet(:u, getedgeset(grid, "left"), (x, t) -> (0.0, 0.0), [1,3])  )
 add!(ch,  Dirichlet(:θ, getedgeset(grid, "left"), (x, t) -> (0.0, 0.0), [1,2])  )
 
-# On the right edge, we also lock the displacements in the x- and z- directions, but apply a precribed roation.
+# On the right edge, we also lock the displacements in the x- and z- directions, but apply a precribed rotation.
 #+
 add!(ch,  Dirichlet(:u, getedgeset(grid, "right"), (x, t) -> (0.0, 0.0), [1,3])  )
 add!(ch,  Dirichlet(:θ, getedgeset(grid, "right"), (x, t) -> (0.0, pi/10), [1,2])  )
 
-# In order to not get rigid body motion, we lock the y-displacement in one fo the corners.
+# In order to not get rigid body motion, we lock the y-displacement in one of the corners.
 #+
 add!(ch,  Dirichlet(:θ, getvertexset(grid, "corner"), (x, t) -> (0.0), [2])  )
 
@@ -64,7 +64,7 @@ close!(ch)
 update!(ch, 0.0)
 
 # Next we define relevant data for the shell, such as shear correction factor and stiffness matrix for the material. 
-# In this linear shell, plane stress is assumed, ie $\\sigma_{zz} = 0 $. Therefor, the stiffness matrix is 5x5 (opposed to the normal 6x6).
+# In this linear shell, plane stress is assumed, ie $\\sigma_{zz} = 0$. Therefor, the stiffness matrix is 5x5 (opposed to the normal 6x6).
 #+
 κ = 5/6 # Shear correction factor
 E = 210.0
@@ -133,16 +133,16 @@ end;
 
 # ## The shell element
 #
-# The shell presented here comes from the book "The finite elment method - Linear static and dynamic finite element analysis" by Hughes (1987).
+# The shell presented here comes from the book "The finite element method - Linear static and dynamic finite element analysis" by Hughes (1987).
 # The shell is a so called degenerate shell element, meaning it is based on a continuum element.
-# A brief describtion of the shell is given here.
+# A brief description of the shell is given here.
 
 #md # !!! note
 #md #     This element might experience various locking phenomenas, and should only be seen as a proof of concept.
 
 # ##### Fiber coordinate system 
 # The element uses two coordinate systems. The first coordianate system, called the fiber system, is created for each
-# element node, and is used as a reference frame for the rotations. The function below implements an algorthim that return the
+# element node, and is used as a reference frame for the rotations. The function below implements an algorithm that return the
 # fiber directions, $\boldsymbol{e}^{f}_{a1}$, $\boldsymbol{e}^{f}_{a2}$ and $\boldsymbol{e}^{f}_{a3}$, at each node $a$.
 function fiber_coordsys(Ps::Vector{Vec{3,Float64}})
 
@@ -210,7 +210,7 @@ end;
 # where $\boldsymbol{\bar{x}}_{a}$ are nodal positions on the mid-surface, and $\boldsymbol{\bar{p}_a}$ is an vector that defines the fiber direction
 # on the reference surface. $N_a$ arethe shape functions.
 #
-# Based on the defintion of the position vector, we create an function for obtaining the Jacobian-matrix,
+# Based on the definition of the position vector, we create an function for obtaining the Jacobian-matrix,
 # ```math
 # J_{ij} = \frac{\partial x_i}{\partial \xi_j},
 # ```

@@ -155,7 +155,7 @@ end;
 function create_dofhandler(grid, interpolation)
     dh = DofHandler(grid)
     dim = 3
-    push!(dh, :u, dim, interpolation) # add a displacement field with 3 components
+    add!(dh, :u, dim, interpolation) # add a displacement field with 3 components
     close!(dh)
     return dh
 end
@@ -328,11 +328,11 @@ function solve()
         ## Update the old states with the converged values for next timestep
         states_old .= states
 
-        u_max[timestep] = max(abs.(u)...) # maximum displacement in current timestep
+        u_max[timestep] = maximum(abs.(u)) # maximum displacement in current timestep
     end
 
     ## ## Postprocessing
-    ## Only a vtu-file corrsponding to the last time-step is exported.
+    ## Only a vtu-file corresponding to the last time-step is exported.
     ##
     ## The following is a quick (and dirty) way of extracting average cell data for export.
     mises_values = zeros(getncells(grid))

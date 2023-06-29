@@ -8,6 +8,8 @@ for (file, url) in [
         "periodic-rve.msh" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/periodic-rve.msh",
         "periodic-rve-coarse.msh" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/periodic-rve-coarse.msh",
         "porous_media_0p25.inp" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/kam/MixedDofHandlerExample/docs/src/literate/porous_media_0p25.inp",
+        "transient_heat.gif" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/transient_heat.gif",
+        "transient_heat_colorbar.svg" => "https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/transient_heat_colorbar.svg",
     ]
     afile = joinpath(directory, file)
     if !isfile(afile)

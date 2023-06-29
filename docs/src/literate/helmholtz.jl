@@ -23,10 +23,10 @@
 #
 # We will use the following weak formulation:
 # ```math
-# \int \nabla δu \cdot \nabla u d\Omega
-# + \int δu \cdot u d\Omega
-# - \int δu \cdot f d\Omega
-# - \int δu g_2 d\Gamma_2 = 0 \forall δu
+# \int_\Omega \nabla δu \cdot \nabla u \, d\Omega
+# + \int_\Omega δu \cdot u \, d\Omega
+# - \int_\Omega δu \cdot f \, d\Omega
+# - \int_{\Gamma_2} δu g_2 \, d\Gamma = 0 \quad \forall δu
 # ```
 #
 # where $δu$ is a suitable test function that satisfies:
@@ -61,7 +61,7 @@ cellvalues = CellScalarValues(qr, ip);
 facevalues = FaceScalarValues(qr_face, ip);
 
 dh = DofHandler(grid)
-push!(dh, :u, 1)
+add!(dh, :u, 1)
 close!(dh)
 
 # We will set things up, so that a known analytic solution is approximately reproduced.
@@ -93,14 +93,14 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
     b = 1.0
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
-    
+
     n_basefuncs = getnbasefunctions(cellvalues)
     global_dofs = zeros(Int, ndofs_per_cell(dh))
 
     fe = zeros(n_basefuncs) # Local force vector
     Ke = zeros(n_basefuncs, n_basefuncs) # Local stiffness mastrix
 
-    @inbounds for (cellcount, cell) in enumerate(CellIterator(dh))
+    for (cellcount, cell) in enumerate(CellIterator(dh))
         fill!(Ke, 0)
         fill!(fe, 0)
         coords = getcoordinates(cell)
@@ -108,9 +108,9 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
         reinit!(cellvalues, cell)
         # First we derive the non boundary part of the variation problem from the destined solution `u_ana`
         # ```math
-        # \int \nabla δu \cdot \nabla u d\Omega
-        # + \int δu \cdot u d\Omega
-        # - \int δu \cdot f d\Omega
+        # \int_\Omega \nabla δu \cdot \nabla u \, d\Omega
+        # + \int_\Omega δu \cdot u \, d\Omega
+        # - \int_\Omega δu \cdot f \, d\Omega
         # ```
         #+
 
@@ -132,7 +132,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
 
         # Now we manually add the von Neumann boundary terms
         # ```math
-        # \int δu g_2 d\Gamma_2
+        # \int_{\Gamma_2} δu g_2 \, d\Gamma
         # ```
         #+
         for face in 1:nfaces(cell)

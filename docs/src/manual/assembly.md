@@ -2,7 +2,7 @@
 DocTestSetup = :(using Ferrite)
 ```
 
-# Assembly
+# [Assembly](@id man-assembly)
 
 When the local stiffness matrix and force vector have been calculated
 they should be assembled into the global stiffness matrix and the

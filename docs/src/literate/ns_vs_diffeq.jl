@@ -57,7 +57,7 @@
 # ```
 # where $v_{in}(t) = \text{clamp}(t, 0.0, 1.0)$. With a dynamic viscosity of $\nu = 0.001$
 # this is enough to induce turbulence behind the cylinder which leads to vortex shedding. The top and bottom of our
-# channel have no-slip conditions, i.e. $v = [0,0]^{\textrm{T}}$, while the right boundary has the do-nothing boundary condtion
+# channel have no-slip conditions, i.e. $v = [0,0]^{\textrm{T}}$, while the right boundary has the do-nothing boundary condition
 # $\nu \partial_{\textrm{n}} v - p n = 0$ to model outflow. With these boundary conditions we can choose the zero solution as a
 # feasible initial condition.
 #
@@ -113,7 +113,7 @@
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 #
 # First we load Ferrite and some other packages we need
-using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack
+using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack, LinearSolve
 # Since we do not need the complete DifferentialEquations suite, we just load the required ODE infrastructure, which can also handle
 # DAEs in mass matrix form.
 using OrdinaryDiffEq
@@ -134,7 +134,7 @@ y_cells = round(Int, 41/3)                  #hide
 grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((2.2, 0.41)));
 
 # Next we carve a hole $B_{0.05}(0.2,0.2)$ in the mesh by deleting the cells and update the boundary face sets.
-# This code will be replaced once a proper mesh interface is avaliable.
+# This code will be replaced once a proper mesh interface is available.
 cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05, 1:length(grid.cells))
 hole_cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))<=0.05, 1:length(grid.cells));
 hole_face_ring = Set{FaceIndex}()
@@ -167,8 +167,8 @@ ip_p = Lagrange{dim, RefCube, 1}()
 cellvalues_p = CellScalarValues(qr, ip_p, ip_geom);
 
 dh = DofHandler(grid)
-push!(dh, :v, dim, ip_v)
-push!(dh, :p, 1, ip_p)
+add!(dh, :v, dim, ip_v)
+add!(dh, :p, 1, ip_p)
 close!(dh);
 
 # ### Boundary Conditions
@@ -222,7 +222,7 @@ function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p:
 
     ## It follows the assembly loop as explained in the basic tutorials.
     mass_assembler = start_assemble(M)
-    @inbounds for cell in CellIterator(dh)
+    for cell in CellIterator(dh)
         fill!(Mₑ, 0)
         Ferrite.reinit!(cellvalues_v, cell)
 
@@ -265,7 +265,7 @@ function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_
 
     ## Assembly loop
     stiffness_assembler = start_assemble(K)
-    @inbounds for cell in CellIterator(dh)
+    for cell in CellIterator(dh)
         ## Don't forget to initialize everything
         fill!(Kₑ, 0)
 
@@ -403,7 +403,7 @@ function navierstokes!(du,u_uc,p,t)
         end
     end
 
-    # For now we have to ingore the evolution of the Dirichlet BCs.
+    # For now we have to ignore the evolution of the Dirichlet BCs.
     # The DBC dofs in the solution vector will be corrected in a post-processing step.
     #+
     apply_zero!(du, ch)
@@ -416,7 +416,7 @@ problem = ODEProblem(rhs, u₀, (0.0,T), p);
 # Now we can put everything together by specifying how to solve the problem.
 # We want to use the adaptive implicit Euler method with our custom linear
 # solver, which helps in the enforcement of the Dirichlet BCs. Further we
-# enable the progress bar with the `progess` and `progress_steps` arguments.
+# enable the progress bar with the `progress` and `progress_steps` arguments.
 # Finally we have to communicate the time step length and initialization
 # algorithm. Since we start with a valid initial state we do not use one of
 # DifferentialEquations.jl initialization algorithms.
@@ -425,7 +425,7 @@ problem = ODEProblem(rhs, u₀, (0.0,T), p);
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
-timestepper = ImplicitEuler()
+timestepper = ImplicitEuler(linsolve = UMFPACKFactorization(reuse_symbolic=false))
 integrator = init(
     problem, timestepper, initializealg=NoInit(), dt=Δt₀,
     adaptive=true, abstol=1e-3, reltol=1e-3,
@@ -453,7 +453,7 @@ vtk_save(pvd);
 using Test                                                                  #hide
 function compute_divergence(dh, u, cellvalues_v)                            #hide
     divv = 0.0                                                              #hide
-    @inbounds for (i,cell) in enumerate(CellIterator(dh))                   #hide
+    for cell in CellIterator(dh)                                            #hide
         Ferrite.reinit!(cellvalues_v, cell)                                 #hide
         for q_point in 1:getnquadpoints(cellvalues_v)                       #hide
             dΩ = getdetJdV(cellvalues_v, q_point)                           #hide
