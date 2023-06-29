@@ -17,9 +17,9 @@ for spatial_dim ∈ [2]
     order = 2
 
     # assemble a mass matrix to apply BCs on (because its cheap)
-    ip = Lagrange{spatial_dim, ref_type, order}()
-    qr = QuadratureRule{spatial_dim, ref_type}(2*order-1)
-    cellvalues = CellScalarValues(qr, ip, ip_geo);
+    ip = Lagrange{ref_type, order}()
+    qr = QuadratureRule{ref_type}(2*order-1)
+    cellvalues = CellValues(qr, ip, ip_geo);
     dh = DofHandler(grid)
     push!(dh, :u, 1, ip)
     close!(dh);

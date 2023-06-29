@@ -24,7 +24,7 @@ for spatial_dim ∈ [3]# 1:3
                 NUMBERING_FIELD_DIM_SUITE = NUMBERING_SUITE["spatial-dim",spatial_dim][string(geo_type)]["grid-size-",grid_size]["field-dim-", field_dim]
                 # Lagrange tests
                 for order ∈ 1:2
-                    ip = Lagrange{spatial_dim, ref_type, order}()
+                    ip = Lagrange{ref_type, order}()
 
                     # Skip over elements which are not implemented
                     ξ_dummy = Vec{spatial_dim}(ntuple(x->0.0, spatial_dim))
@@ -34,7 +34,7 @@ for spatial_dim ∈ [3]# 1:3
                     NUMBERING_FIELD_DIM_SUITE["Lagrange",order] = BenchmarkGroup()
                     LAGRANGE_SUITE = NUMBERING_FIELD_DIM_SUITE["Lagrange",order]
                     order2 = max(order-1, 1)
-                    ip2 = Lagrange{spatial_dim, ref_type, order2}()
+                    ip2 = Lagrange{ref_type, order2}()
 
                     LAGRANGE_SUITE["DofHandler"] = BenchmarkGroup()
 
