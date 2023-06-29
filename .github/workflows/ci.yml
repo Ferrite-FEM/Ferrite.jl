@@ -36,7 +36,7 @@ jobs:
           file: lcov.info
   docs:
     name: Documentation
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v2
