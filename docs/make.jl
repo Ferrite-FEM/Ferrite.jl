@@ -46,7 +46,7 @@ include("generate.jl")
             "tutorials/quasi_incompressible_hyperelasticity.md",
             "tutorials/ns_vs_diffeq.md",
             "tutorials/computational_homogenization.md",
-            "tutorials/stokes-flow.md",
+            # "tutorials/stokes-flow.md",
             "tutorials/topology_optimization.md",
             "tutorials/porous_media.md",
         ],

@@ -17,6 +17,7 @@ include("download_resources.jl")
 @timeit dto "Literate." for tutorial in readdir(TUTORIALS_IN; join=true)
     name = basename(tutorial)
     if endswith(tutorial, ".jl")
+        name == "stokes-flow.jl" && Sys.iswindows() && continue
         if !liveserver
             script = @timeit dto "script()" @timeit dto name Literate.script(tutorial, TUTORIALS_OUT)
             code = strip(read(script, String))
