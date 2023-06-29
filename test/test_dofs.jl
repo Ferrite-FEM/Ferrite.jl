@@ -583,18 +583,18 @@ end
         end
         return false
     end
-    function _check_dofs(K, fh, cell_idx, coupling, coupling_idx, vdim, neighbors, is_cross_element)
-        for (field1_idx, field1) in enumerate(fh.fields)
-            i_dofs = dof_range(fh, field1_idx)
-            ip1 = field1.interpolation
+    function _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, neighbors, is_cross_element)
+        for field1_idx in eachindex(sdh.field_names)
+            i_dofs = dof_range(sdh, field1_idx)
+            ip1 = sdh.field_interpolations[field1_idx]
             vdim[1] = typeof(ip1) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip1) : 1
             for dim1 in 1:vdim[1] 
                 for cell2_idx in neighbors
-                    fh2 = dh.fieldhandlers[dh.cell_to_fieldhandler[cell2_idx.idx]]
+                    sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[cell2_idx.idx]]
                     coupling_idx[2] = 1
-                    for (field2_idx, field2) in enumerate(fh2.fields)
-                        j_dofs = dof_range(fh2, field2_idx)
-                        ip2 = field2.interpolation
+                    for field2_idx in eachindex(sdh2.field_names)
+                        j_dofs = dof_range(sdh2, field2_idx)
+                        ip2 = sdh2.field_interpolations[field2_idx]
                         vdim[2] = typeof(ip2) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip2) : 1
                         is_cross_element && !all(Ferrite.is_discontinuous.([ip1, ip2])) && continue
                         for  dim2 in 1:vdim[2]
@@ -615,14 +615,14 @@ end
     end
     function check_coupling(dh, topology, K, coupling, elements_coupling)
         for cell_idx in eachindex(getcells(dh.grid))
-            fh = dh.fieldhandlers[dh.cell_to_fieldhandler[cell_idx]]
+            sdh = dh.subdofhandlers[dh.cell_to_subdofhandler[cell_idx]]
             coupling_idx = [1,1]
             elements_coupling_idx = [1,1]
             vdim = [1,1]
             # test inner coupling
-            _check_dofs(K, fh, cell_idx, coupling, coupling_idx, vdim, [CellIndex(cell_idx)], false)
+            _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, [CellIndex(cell_idx)], false)
             # test cross-element coupling
-            _check_dofs(K, fh, cell_idx, elements_coupling, elements_coupling_idx, vdim, topology.cell_face_neighbor[cell_idx], true)
+            _check_dofs(K, dh, sdh, cell_idx, elements_coupling, elements_coupling_idx, vdim, topology.cell_face_neighbor[cell_idx], true)
         end
     end
     grid = generate_grid(Quadrilateral, (2, 2))
@@ -647,18 +647,16 @@ end
     # Note: `check_coupling` works for this case only because the second domain has dofs from the first domain in order. Otherwise tests like in continuous ip are required.
     grid = generate_grid(Quadrilateral, (2, 1))
     topology = ExclusiveTopology(grid)
+
     dh = DofHandler(grid)
-    fh1 = FieldHandler(
-        [Field(:u, DiscontinuousLagrange{RefQuadrilateral,1}()^2), Field(:y, DiscontinuousLagrange{RefQuadrilateral,1}()), Field(:p, Lagrange{RefQuadrilateral,1}())],
-        Set(1)
-    )
-    add!(dh, fh1)
-    fh2 = FieldHandler(
-        [Field(:u, DiscontinuousLagrange{RefQuadrilateral,1}()^2)],
-        Set(2)
-    )
-    add!(dh, fh2)
+    sdh1 = SubDofHandler(dh, Set(1))
+    add!(sdh1, :u, DiscontinuousLagrange{RefQuadrilateral,1}()^2)
+    add!(sdh1, :y, DiscontinuousLagrange{RefQuadrilateral,1}())
+    add!(sdh1, :p, Lagrange{RefQuadrilateral,1}())
+    sdh2 = SubDofHandler(dh, Set(2))
+    add!(sdh2, :u, DiscontinuousLagrange{RefQuadrilateral,1}()^2)
     close!(dh)
+
     for coupling in couplings, elements_coupling in couplings
         K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, elements_coupling = elements_coupling)
         all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, elements_coupling = elements_coupling)

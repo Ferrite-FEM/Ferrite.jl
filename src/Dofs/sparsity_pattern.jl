@@ -106,33 +106,33 @@ Calculates `I, J` for cross-element coupling
 Returns the updated value of `cnt`
 Used internally for sparsity patterns with discontinuous interpolations.
 """
-function cross_element_coupling!(dh::tDofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
-    for (fhi, fh) in pairs(dh.fieldhandlers)
+function cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
+    for (sdh_idx, sdh) in pairs(dh.subdofhandlers)
         ip_infos = InterpolationInfo[]
         nbasefunctions = Int[]
-        for cell_field in fh.fields
-            ip_info = InterpolationInfo(cell_field.interpolation)
+        for ip in sdh.field_interpolations
+            ip_info = InterpolationInfo(ip)
             push!(ip_infos, ip_info)
-            push!(nbasefunctions, getnbasefunctions(cell_field.interpolation))
+            push!(nbasefunctions, getnbasefunctions(ip))
         end
         element_dof_start = 0
-        isnothing(couplings) || (coupling_fh = couplings[fhi])
-        for (cell_field_i, cell_field) in enumerate(fh.fields)
+        isnothing(couplings) || (coupling_fh = couplings[sdh_idx])
+        for (cell_field_i, cell_field) in enumerate(sdh.field_names)
             fii = ip_infos[cell_field_i]
             if(!fii.is_discontinuous)
                 element_dof_start += nbasefunctions[cell_field_i]
                 continue
             end
             for cell_idx in eachindex(getcells(dh.grid))
-                cell_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[cell_idx]].fields || continue
+                cell_field ∈ dh.subdofhandlers[dh.cell_to_subdofhandler[cell_idx]].field_names || continue
                 # Not using celldofs() to avoid copying 
                 cell_dofs = @view dh.cell_dofs[dh.cell_dofs_offset[cell_idx] : dh.cell_dofs_offset[cell_idx] + ndofs_per_cell(dh, cell_idx) - 1]
                 cell_field_dofs = @view cell_dofs[element_dof_start + 1 : element_dof_start + nbasefunctions[cell_field_i]]
                 for neighbor_cell in (getdim(dh.grid.cells[cell_idx]) >1 ? topology.cell_face_neighbor[cell_idx] : topology.cell_neighbor[cell_idx])
                     neighbour_dof_start = 0
-                    for (neighbor_field_i, neighbor_field) in enumerate(fh.fields)
+                    for (neighbor_field_i, neighbor_field) in enumerate(sdh.field_names)
                         fii2 = ip_infos[neighbor_field_i]
-                        neighbor_field ∈ dh.fieldhandlers[dh.cell_to_fieldhandler[neighbor_cell.idx]].fields || continue
+                        neighbor_field ∈ dh.subdofhandlers[dh.cell_to_subdofhandler[neighbor_cell.idx]].field_names || continue
                         if(!fii2.is_discontinuous)
                             neighbour_dof_start += nbasefunctions[neighbor_field_i]
                             continue
@@ -183,7 +183,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
             coupling_sdh = couplings[sdh_idx]
             count(coupling_sdh[i, j] for i in 1:n for j in (sym ? i : 1):n)
         end
-        has_discontinuous_ip = any(ip -> is_discontinuous(ip),fh.field_interpolations)
+        has_discontinuous_ip = any(ip -> is_discontinuous(ip),sdh.field_interpolations)
         max_buffer_length += entries_per_cell * length(set)
     end
     I = Vector{Int}(undef, max_buffer_length)
