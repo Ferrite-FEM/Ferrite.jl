@@ -66,7 +66,7 @@ function reference_normals(::Lagrange{RefPrism})
             Vec{3, Float64}(( 0.0,  0.0,  1.0))]
 end
 
-# Lagrange{3, Wedge}
+# Lagrange{3, RefPyramid}
 function reference_normals(::Lagrange{RefPyramid})
     return [Vec{3, Float64}(( 0.0,  0.0, -1.0)),
             Vec{3, Float64}(( 0.0, -1.0,  0.0)),

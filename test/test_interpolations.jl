@@ -130,9 +130,6 @@
             return n / norm(n)
         end
         for (facenodes, normal) in zip(Ferrite.facedof_indices(interpolation), reference_normals(interpolation))
-            if ref_shape == Ferrite.RefPyramid
-                 @show normal, __outward_normal(coords, facenodes)
-            end
             @test __outward_normal(coords, facenodes) ≈ normal
         end
     end
