@@ -43,7 +43,7 @@ Please keep in mind that we are part of the Julia community and adhere to the
 
 
 [docs-stable-img]: https://img.shields.io/badge/docs-latest%20release-blue
-[docs-stable-url]: http://ferrite-fem.github.io/Ferrite.jl/stable/
+[docs-stable-url]: http://ferrite-fem.github.io/Ferrite.jl/
 
 [standards]: https://julialang.org/community/standards/
 [julia-slack]: https://julialang.org/slack/
