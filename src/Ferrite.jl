@@ -90,6 +90,7 @@ include("FEValues/face_integrals.jl")
 # Grid
 include("Grid/grid.jl")
 include("Grid/topology.jl")
+include("Grid/utils.jl")
 include("Grid/grid_generators.jl")
 include("Grid/coloring.jl")
 
