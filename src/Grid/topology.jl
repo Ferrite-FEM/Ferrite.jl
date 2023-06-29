@@ -103,13 +103,19 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     cell_neighbor_table = Vector{EntityNeighborhood{CellIndex}}(undef, length(cells))
 
     for (cell_id, cell) in enumerate(cells)
-        cell_neighbor_ids = reduce(union!, [Set{Int}(vertex_cell_table[vertex]) for vertex ∈ vertices(cell) if vertex_cell_table[vertex] != cell_id])
+        # Gather all cells which are connected via vertices
+        cell_neighbor_ids = Set{Int}()
+        for vertex ∈ vertices(cell)
+            for vertex_cell_id ∈ vertex_cell_table[vertex]
+                if vertex_cell_id != cell_id
+                    push!(cell_neighbor_ids, vertex_cell_id)
+                end
+            end
+        end
         cell_neighbor_table[cell_id] = EntityNeighborhood(CellIndex.(collect(cell_neighbor_ids)))
 
         # Any of the neighbors is now sorted in the respective categories
         for cell_neighbor_id ∈ cell_neighbor_ids
-            # Skip self
-            cell_id == cell_neighbor_id && continue
             # Buffer neighbor
             cell_neighbor = cells[cell_neighbor_id]
             # TODO handle mixed-dimensional case
