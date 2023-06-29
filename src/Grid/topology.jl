@@ -73,6 +73,13 @@ struct ExclusiveTopology <: AbstractTopology
     # TODO reintroduce the codimensional connectivity, e.g. 3D edge to 2D face
 end
 
+function Base.show(io::IO, ::MIME"text/plain", topology::ExclusiveTopology)
+    print(io, "ExclusiveTopology\n")
+    print(io, "  Vertex neighbors: $(length(nonzeros(topology.vertex_vertex_neighbor)))\n")
+    print(io, "  Face neighbors: $(length(nonzeros(topology.face_face_neighbor)))\n")
+    println(io, "  Edge neighbors: $(length(nonzeros(topology.edge_edge_neighbor)))")
+end
+
 function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     cell_vertices_table = vertices.(cells) #needs generic interface for <: AbstractCell
     vertex_cell_table = Dict{Int,Set{Int}}()
