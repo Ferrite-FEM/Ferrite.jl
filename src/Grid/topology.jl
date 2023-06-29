@@ -61,7 +61,7 @@ The struct saves the highest dimensional neighborhood, i.e. if something is conn
 """
 struct ExclusiveTopology <: AbstractTopology
     # maps a global vertex id to all cells containing the vertex
-    vertex_to_cell::Dict{Int,Set{Int}}
+    vertex_to_cell::Vector{Set{Int}}
     # index of the vector = cell id ->  all other connected cells
     cell_neighbor::Vector{EntityNeighborhood{CellIndex}}
     # face_neighbor[cellid,local_face_id] -> exclusive connected entities (not restricted to one entity)
@@ -83,16 +83,17 @@ end
 function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     # Setup the cell to vertex table
     cell_vertices_table = vertices.(cells) #needs generic interface for <: AbstractCell
-    vertex_cell_table = Dict{Int,Set{Int}}()
+    vertex_cell_table = [Set{Int}() for _ ∈ 1:maximum(maximum.(cell_vertices_table))]
 
     # Setup vertex to cell connectivity by flipping the cell to vertex table
     for (cellid, cell_vertices) in enumerate(cell_vertices_table)
-       for vertex in cell_vertices
-            if haskey(vertex_cell_table, vertex)
-                push!(vertex_cell_table[vertex], cellid)
-            else
-                vertex_cell_table[vertex] = Set([cellid])
-            end
+        for vertex in cell_vertices
+            # if haskey(vertex_cell_table, vertex)
+            #     push!(vertex_cell_table[vertex], cellid)
+            # else
+            #     vertex_cell_table[vertex] = Set([cellid])
+            # end
+            push!(vertex_cell_table[vertex], cellid)
         end
     end
 
