@@ -238,6 +238,23 @@ struct SerendipityQuadraticHexahedron    <: AbstractCell{RefHexahedron}    nodes
 default_interpolation(::Type{SerendipityQuadraticQuadrilateral}) = Serendipity{RefQuadrilateral, 2}()
 default_interpolation(::Type{SerendipityQuadraticHexahedron})    = Serendipity{RefHexahedron,    2}()
 
+"""
+    nvertices_on_face(cell::AbstractCell, local_face_index::Int)
+Specifies for each subtype of AbstractCell how many nodes form a face.
+"""
+nvertices_on_face(cell::AbstractCell, local_face_index::Int) = length(faces(cell)[local_face_index])
+"""
+    nvertices_on_edge(::AbstractCell, local_edge_index::Int)
+Specifies for each subtype of AbstractCell how many nodes form an edge.
+"""
+nvertices_on_edge(cell::AbstractCell, local_edge_index::Int) = length(edges(cell)[local_edge_index])
+
+getdim(::Union{AbstractCell{refshape},Type{<:AbstractCell{refshape}}}) where {refdim, refshape <: AbstractRefShape{refdim}} = refdim
+
+
+######################
+### Mesh interface ###
+######################
 abstract type AbstractGrid{dim} end
 
 """
