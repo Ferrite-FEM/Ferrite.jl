@@ -108,6 +108,7 @@ Used internally for sparsity patterns with discontinuous interpolations.
 """
 function cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
     for (sdh_idx, sdh) in pairs(dh.subdofhandlers)
+        # Buffering interpolation information for type stability/better allocations
         ip_infos = InterpolationInfo[]
         nbasefunctions = Int[]
         for ip in sdh.field_interpolations
@@ -115,15 +116,18 @@ function cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sy
             push!(ip_infos, ip_info)
             push!(nbasefunctions, getnbasefunctions(ip))
         end
-        isnothing(couplings) || (coupling_fh = couplings[sdh_idx])
+        isnothing(couplings) || (coupling_sdh = couplings[sdh_idx])
         for (cell_field_i, cell_field) in enumerate(sdh.field_names)
             fii = ip_infos[cell_field_i]
+            # Couple element for discontinuous interpolations only
             fii.is_discontinuous || continue
             for cell_idx in eachindex(getcells(dh.grid))
+                # Making sure current field is defined for current cell
                 cell_field ∈ dh.subdofhandlers[dh.cell_to_subdofhandler[cell_idx]].field_names || continue
                 dofrange1 = dof_range(sdh, cell_field)
                 cell_dofs = celldofs(dh, cell_idx)
                 cell_field_dofs = @view cell_dofs[dofrange1]
+                # For 1D case, cells must share faces to be neighbors. Otherwise use cell_face_neighbor for higher dimensions
                 for neighbor_cell in (getdim(dh.grid.cells[cell_idx]) >1 ? topology.cell_face_neighbor[cell_idx] : topology.cell_neighbor[cell_idx])
                     for (neighbor_field_i, neighbor_field) in enumerate(sdh.field_names)
                         fii2 = ip_infos[neighbor_field_i]
@@ -132,8 +136,9 @@ function cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sy
                         dofrange2 = dof_range(sdh2, neighbor_field)
                         neighbor_dofs = celldofs(dh, neighbor_cell.idx)
                         neighbor_field_dofs = @view neighbor_dofs[dofrange2]
+                        # Typical coupling procedure
                         for (j, dof_j) in enumerate(dofrange2), (i, dof_i) in enumerate(dofrange1)
-                            isnothing(couplings) || coupling_fh[dof_i, dof_j] || continue
+                            isnothing(couplings) || coupling_sdh[dof_i, dof_j] || continue
                             dofi = cell_field_dofs[i]
                             dofj = neighbor_field_dofs[j]
                             sym && (dofi > dofj && continue)
