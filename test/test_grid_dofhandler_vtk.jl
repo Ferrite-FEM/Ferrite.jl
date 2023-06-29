@@ -389,32 +389,23 @@ end
 #                   |  1  |  2  |  3  |
 #                   +-----+-----+-----+
 # test application: integrate jump across element boundary 5
-    function reinit!(fv::FaceValues, cellid::Int, faceid::Int, grid)
-        coords = get_cell_coordinates(grid, cellid)
-        Ferrite.reinit!(fv, coords, faceid)
-    end
-    reinit!(fv::FaceValues, faceid::FaceIndex, grid) = reinit!(fv,faceid[1],faceid[2],grid) # wrapper for reinit!(fv,cellid,faceid,grid)
-    face_neighbors_ele5 = nonzeros(topology.face_neighbor[5,:])
     ip = Lagrange{RefQuadrilateral, 1}()^2
     qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
-    fv_ele = FaceValues(qr_face, ip)
-    fv_neighbor = FaceValues(qr_face, ip)
+    iv = InterfaceValues(quadgrid, qr_face, ip)
     u_ele5 = [3.0 for _ in 1:8]
     u_neighbors = [5.0 for _ in 1:8]
     jump_int = 0.
     jump_abs = 0.
+    cell_a_coords = get_cell_coordinates(quadgrid, 5)
     for ele_faceid in 1:nfaces(quadgrid.cells[5])
-        reinit!(fv_ele, 5, ele_faceid, quadgrid)
-        for q_point in 1:getnquadpoints(fv_ele)
-            dΩ = getdetJdV(fv_ele, q_point)
-            normal_5 = getnormal(fv_ele, q_point)
-            u_5_n = function_value(fv_ele, q_point, u_ele5) ⋅ normal_5
-            for neighbor_entity in face_neighbors_ele5[ele_faceid].neighbor_info # only one entity can be changed to get rid of the for loop
-                reinit!(fv_neighbor, neighbor_entity, quadgrid)
-                normal_neighbor = getnormal(fv_neighbor, q_point)
-                u_neighbor = function_value(fv_neighbor, q_point, u_neighbors) ⋅ normal_neighbor
-                jump_int += (u_5_n + u_neighbor) * dΩ
-                jump_abs += abs(u_5_n + u_neighbor) * dΩ
+        face_a = FaceIndex(5, ele_faceid)
+        for face_b in topology.face_neighbor[5,face_a[2]]
+            cell_b_coords = get_cell_coordinates(quadgrid, face_b[1])
+            reinit!(iv, face_a, face_b, cell_a_coords, cell_b_coords, quadgrid)
+            for q_point in 1:getnquadpoints(iv)
+                dΩ = getdetJdV(iv, q_point)
+                jump_int += function_value_jump(iv, q_point, vcat(u_ele5, u_neighbors)) * dΩ
+                jump_abs += abs(function_value_jump(iv, q_point, vcat(u_ele5, u_neighbors))) * dΩ
             end
         end
     end
