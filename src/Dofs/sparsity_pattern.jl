@@ -127,7 +127,7 @@ function cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sy
                 # Making sure current field is defined for current cell
                 cell_field ∈ dh.subdofhandlers[dh.cell_to_subdofhandler[cell_idx]].field_names || continue
                 dofrange1 = dof_range(sdh, cell_field)
-                cell_dofs = celldofs(dh, cell_idx)
+                cell_dofs = celldofsview(dh, cell_idx)
                 cell_field_dofs = @view cell_dofs[dofrange1]
                 # For 1D case, cells must share faces to be neighbors. Otherwise use cell_face_neighbor for higher dimensions
                 for neighbor_cell in (getdim(dh.grid.cells[cell_idx]) >1 ? topology.cell_face_neighbor[cell_idx] : topology.cell_neighbor[cell_idx])
@@ -136,7 +136,7 @@ function cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sy
                         sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[neighbor_cell.idx]]
                         neighbor_field ∈ sdh2.field_names && fii2.is_discontinuous || continue
                         dofrange2 = dof_range(sdh2, neighbor_field)
-                        neighbor_dofs = celldofs(dh, neighbor_cell.idx)
+                        neighbor_dofs = celldofsview(dh, neighbor_cell.idx)
                         neighbor_field_dofs = @view neighbor_dofs[dofrange2]
                         # Typical coupling procedure
                         for (j, dof_j) in enumerate(dofrange2), (i, dof_i) in enumerate(dofrange1)

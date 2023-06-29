@@ -138,7 +138,7 @@ ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell[]
 
 Store the degrees of freedom that belong to cell `i` in `global_dofs`.
 
-See also [`celldofs`](@ref).
+See also [`celldofs`](@ref) and [`celldofsview`](@ref).
 """
 function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     @assert isclosed(dh)
@@ -156,9 +156,20 @@ end
 
 Return a vector with the degrees of freedom that belong to cell `i`.
 
-See also [`celldofs!`](@ref).
+See also [`celldofs!`](@ref) and [`celldofsview`](@ref).
 """
-celldofs(dh::AbstractDofHandler, i::Int) = @view dh.cell_dofs[dh.cell_dofs_offset[i] : dh.cell_dofs_offset[i] + ndofs_per_cell(dh, i) - 1]
+function celldofs(dh::AbstractDofHandler, i::Int)
+    return celldofs!(zeros(Int, ndofs_per_cell(dh, i)), dh, i)
+end
+
+"""
+    celldofsview(dh::AbstractDofHandler, i::Int)
+
+Return a view (SubArray) with the degrees of freedom that belong to cell `i`.
+
+See also [`celldofs!`](@ref) and [`celldofs`](@ref).
+"""
+celldofsview(dh::AbstractDofHandler, i::Int) = @view dh.cell_dofs[dh.cell_dofs_offset[i] : dh.cell_dofs_offset[i] + ndofs_per_cell(dh, i) - 1]
 
 function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler, i::Union{Int, <:AbstractCell})
     cellnodes!(global_nodes, get_grid(dh), i)

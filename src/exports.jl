@@ -111,6 +111,7 @@ export
     ndofs_per_cell,
     celldofs!,
     celldofs,
+    celldofsview,
     create_sparsity_pattern,
     create_symmetric_sparsity_pattern,
     dof_range,

@@ -28,6 +28,7 @@ ndofs_per_cell
 dof_range
 celldofs
 celldofs!
+celldofsview
 ```
 
 # CellIterator
