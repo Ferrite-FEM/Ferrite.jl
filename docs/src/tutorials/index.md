@@ -8,104 +8,104 @@ On this page, you find an overview of Ferrite tutorials. The collection contains
 The programs are sorted as
 
 * A complete list shortly summarizing the topic, what they teach and which keywords related to the task they contain
-* Grouped by topic 
+* Grouped by topic
 
 ## List of examples (sequential order)
-1.	[Heat Equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/heat_equation/)  
+1. [Heat Equation](@ref tutorial-heat-equation)
 
- This example presents the easiest way to get started. The heat equation is solved on a unit square. For this purpose, a program is set up containing the core aspects of finite element computation: weak and strong forms, trial and test functions, degrees of freedom, boundary conditions, element routine, global assembly, solving the system and visualizing the results.
- 
- Keywords: Fundamentals, heat equation, weak and strong form, Dirichlet boundary condition, assembly
+   This example presents the easiest way to get started. The heat equation is solved on a unit square. For this purpose, a program is set up containing the core aspects of finite element computation: weak and strong forms, trial and test functions, degrees of freedom, boundary conditions, element routine, global assembly, solving the system and visualizing the results.
 
-2.	[Postprocessing](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/postprocessing/)  
+   Keywords: Fundamentals, heat equation, weak and strong form, Dirichlet boundary condition, assembly
 
- Based on example 1, visualization of the flux variable is done via the L2Projector. Additionally, the point evaluation along a line is shown.  
-	
- Keywords: Fundamentals, postprocessing, heat equation, flux, L2-projection, point evaluation
+2. [Postprocessing](@ref tutorial-postprocessing)
 
-3.	[Helmholtz equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/helmholtz/)  
+   Based on example 1, visualization of the flux variable is done via the L2Projector. Additionally, the point evaluation along a line is shown.
 
- The Helmholtz equation is solved on a unit square. Dirichlet and Neumann boundary conditions are applied at different parts of the boundary. A known analytical solution is approximately reproduced to verify the finite element solution.  
-	
- Keywords: Fundamentals, Helmholtz equation, Dirichlet boundary condition, Neumann boundary condition, verification, boundary integrals
+   Keywords: Fundamentals, postprocessing, heat equation, flux, L2-projection, point evaluation
 
-4.	[Incompressible Elasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/incompressible_elasticity/)  
+3. [Helmholtz Equation](@ref tutorial-helmholtz)
 
- A mixed element for solving unidirectional displacement-pressure coupling is constructed. The solution for nearly incompressible materials is compared for different interpolations.  
-	
- Keywords: Mixed elements, multiple fields, unidirectional coupling, displacement-pressure equation, incompressibility, stability
+   The Helmholtz equation is solved on a unit square. Dirichlet and Neumann boundary conditions are applied at different parts of the boundary. A known analytical solution is approximately reproduced to verify the finite element solution.
 
-5.	[Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/hyperelasticity/)  
+   Keywords: Fundamentals, Helmholtz equation, Dirichlet boundary condition, Neumann boundary condition, verification, boundary integrals
 
- A hyperelastic material model is solved in a finite strain setting. Stress and material tangent are recovered by using automatic differentiation. Newton’s method is used to iteratively solve the resulting non-linear system.
-	
- Keywords: Non-linear problem, hyperelasticity, finite strain, large deformations, Newton's method, conjugate gradient, automatic differentiation
+4. [Incompressible Elasticity](@ref tutorial-incompressible-elasticity)
 
-6.	[Threaded Assembly](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/threaded_assembly/)  
+   A mixed element for solving unidirectional displacement-pressure coupling is constructed. The solution for nearly incompressible materials is compared for different interpolations.
 
- This example shows the threaded assembly of a finite element stiffness matrix, i.e. the calculation is speed up by using parallelization. Different colorings of two-dimensional meshes are shown to visualize the split of the mesh in such a way that no threads interfere with each other.  
-	
- Keywords: Parallelization, performance, threads, coloring
+   Keywords: Mixed elements, multiple fields, unidirectional coupling, displacement-pressure equation, incompressibility, stability
 
-7.	[von Mises Plasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/plasticity/)  
+5. [Hyperelasticity](@ref tutorial-hyperelasticity)
 
- A cantilever beam is solved applying a plasticity material model, requiring a constitutive driver. Handling of state, flux and internal variables within elements is shown. Newton’s method is used to iteratively solve the non-linear system.  
-	
- Keywords: Plasticity, 3D, material modeling, material state, non-linear problem, Newton’s method, 
+   A hyperelastic material model is solved in a finite strain setting. Stress and material tangent are recovered by using automatic differentiation. Newton’s method is used to iteratively solve the resulting non-linear system.
 
-8.	[Time Dependent Problems](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/transient_heat_equation/)
-  
- The transient heat equation is solved on a rectangular plate. The time discretization is done by using the implicit Euler scheme.  
-	
- Keywords: Time dependent problem, transient heat equation, implicit Euler scheme
+   Keywords: Non-linear problem, hyperelasticity, finite strain, large deformations, Newton's method, conjugate gradient, automatic differentiation
 
-9.	[Ginzburg-Landau model energy minimization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/landau/)  
-  
- A basic Ginzburg-Landau model is solved by combining `Ferrite` with `ForwardDiff`. Using threads, the calculation time is optimized.  
-	
- Keywords: Ginzburg-Landau, ForwardDiff.jl, parallelization, optimization, performance
+6. [Threaded Assembly](@ref tutorial-threaded-assembly)
 
-10.	[Linear shell](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/linear_shell/)  
+   This example shows the threaded assembly of a finite element stiffness matrix, i.e. the calculation is speed up by using parallelization. Different colorings of two-dimensional meshes are shown to visualize the split of the mesh in such a way that no threads interfere with each other.
 
- A program for the use of linear shell elements is set up. The theoretical background is introduced as well.  
-	
- Keywords: Shell elements, displacements, rotations, multiple fields, ForwardDiff.jl, reduced integration
- 
-11.	[Nearly Incompressible Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/quasi_incompressible_hyperelasticity/)  
+   Keywords: Parallelization, performance, threads, coloring
 
- This program combines ideas from the examples Incompressible Elasticity and Hyperelasticity to construct a mixed element solving three-dimensional displacement-pressure equations.
-	
- Keywords: Non-linear problem, hyperelasticity, finite strain, large deformations, Newton's method, automatic differentiation, coupled problem, mixed elements, multiple fields, displacement-pressure equation, incompressibility
+7. [von Mises Plasticity](@ref tutorial-plasticity)
 
-12.	[Computational homogenization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/computational_homogenization/)  
+   A cantilever beam is solved applying a plasticity material model, requiring a constitutive driver. Handling of state, flux and internal variables within elements is shown. Newton’s method is used to iteratively solve the non-linear system.
 
- A two-dimensional representative volume element (RVE) is loaded in shear. Dirichlet and periodic boundary conditions are applied and the results from the homogenization are compared to the Voigt and Reuss bounds.  
-	
- Keywords: homogenization, periodic boundary conditions, representative volume element (RVE), microscale, Voigt and Reuss bound
+   Keywords: Plasticity, 3D, material modeling, material state, non-linear problem, Newton’s method,
 
-13.	[Stokes flow](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/stokes-flow/)  
+8. [Time Dependent Problems](@ref tutorial-transient-heat-equation)
 
- Stokes flow on a quarter circle is solved by applying periodic boundary conditions. The weak and strong form of the problem are discussed including constrains. Mesh generation is done directly via the Gmsh API.  
-	
- Keywords: Periodic boundary conditions, multiple fields, mean value constraint, mesh generation with Gmsh, coupled problem, weak and strong form
- 
-14.	[Topology Optimization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/topology_optimization/)  
+   The transient heat equation is solved on a rectangular plate. The time discretization is done by using the implicit Euler scheme.
 
- Topology optimization is shown for the bending problem by using a SIMP material model. To avoid numerical instabilities, a regularization scheme requiring the calculation of the Laplacian is imposed, which is done by using the grid topology functionalities.  
-	
- Keywords: Topology optimization, weak and strong form, non-linear problem, Laplacian, grid topology
+   Keywords: Time dependent problem, transient heat equation, implicit Euler scheme
+
+9. [Ginzburg-Landau model energy minimization](@ref tutorial-ginzburg-landau-minimizer)
+
+   A basic Ginzburg-Landau model is solved by combining `Ferrite` with `ForwardDiff`. Using threads, the calculation time is optimized.
+
+   Keywords: Ginzburg-Landau, ForwardDiff.jl, parallelization, optimization, performance
+
+10. [Linear shell](@ref tutorial-linear-shell)
+
+   A program for the use of linear shell elements is set up. The theoretical background is introduced as well.
+
+   Keywords: Shell elements, displacements, rotations, multiple fields, ForwardDiff.jl, reduced integration
+
+11. [Nearly Incompressible Hyperelasticity](@ref tutorial-nearly-incompressible-hyperelasticity)
+
+   This program combines ideas from the examples Incompressible Elasticity and Hyperelasticity to construct a mixed element solving three-dimensional displacement-pressure equations.
+
+   Keywords: Non-linear problem, hyperelasticity, finite strain, large deformations, Newton's method, automatic differentiation, coupled problem, mixed elements, multiple fields, displacement-pressure equation, incompressibility
+
+12. [Computational homogenization](@ref tutorial-computational-homogenization)
+
+   A two-dimensional representative volume element (RVE) is loaded in shear. Dirichlet and periodic boundary conditions are applied and the results from the homogenization are compared to the Voigt and Reuss bounds.
+
+   Keywords: homogenization, periodic boundary conditions, representative volume element (RVE), microscale, Voigt and Reuss bound
+
+13. [Stokes flow](@ref tutorial-stokes-flow)
+
+   Stokes flow on a quarter circle is solved by applying periodic boundary conditions. The weak and strong form of the problem are discussed including constrains. Mesh generation is done directly via the Gmsh API.
+
+   Keywords: Periodic boundary conditions, multiple fields, mean value constraint, mesh generation with Gmsh, coupled problem, weak and strong form
+
+14. [Topology Optimization](@ref tutorial-topology-optimization)
+
+   Topology optimization is shown for the bending problem by using a SIMP material model. To avoid numerical instabilities, a regularization scheme requiring the calculation of the Laplacian is imposed, which is done by using the grid topology functionalities.
+
+   Keywords: Topology optimization, weak and strong form, non-linear problem, Laplacian, grid topology
 
 ## Other examples
-1.	[Incompressible Navier-Stokes Equations via DifferentialEquations.jl](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/ns_vs_diffeq/)  
+1. [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](@ref tutorial-ins-ordinarydiffeq)
 
- The weak form of the semi-discretized incompressible Navier-Stokes equations are derived from the strong form and implemented in the finite element code. Then, the time-dependent solution is calculated by using the DifferentialEquations.jl package. For this purpose, the PDE is required in a specific form.  
-	
- Keywords: Fluid dynamics, weak and strong form, solver, incompressibility, time-dependent problem
+   The weak form of the semi-discretized incompressible Navier-Stokes equations are derived from the strong form and implemented in the finite element code. Then, the time-dependent solution is calculated by using the DifferentialEquations.jl package. For this purpose, the PDE is required in a specific form.
+
+   Keywords: Fluid dynamics, weak and strong form, solver, incompressibility, time-dependent problem
 
 ## Grouped by topic
-* Fundamentals: [Heat Equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/heat_equation/), [Postprocessing](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/postprocessing/), [Helmholtz Equation](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/helmholtz/), [Incompressible Elasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/incompressible_elasticity/)
-* Non-linear Problems: [Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/hyperelasticity/), [von Mises Plasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/plasticity/), [Nearly Incompressible Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/quasi_incompressible_hyperelasticity/), [Computational homogenization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/computational_homogenization/), [Topology Optimization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/topology_optimization/)
-* Time dependent problems: [Time Dependent Problems](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/transient_heat_equation/), [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/ns_vs_diffeq/)
-* Multiple fields: [Incompressible Elasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/incompressible_elasticity/), [Linear shell](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/linear_shell/), [Nearly Incompressible Hyperelasticity](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/quasi_incompressible_hyperelasticity/), [Stokes flow](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/stokes-flow/)     
-* Periodic problems: [Computational homogenization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/computational_homogenization/), [Stokes flow](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/stokes-flow/)
-* Advanced: [Threaded Assembly](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/threaded_assembly/), [Ginzburg-Landau model energy minimization](https://ferrite-fem.github.io/Ferrite.jl/dev/examples/landau/)
+* Fundamentals: [Heat Equation](@ref tutorial-heat-equation), [Postprocessing](@ref tutorial-postprocessing), [Helmholtz Equation](@ref tutorial-helmholtz), [Incompressible Elasticity](@ref tutorial-incompressible-elasticity)
+* Non-linear Problems: [Hyperelasticity](@ref tutorial-hyperelasticity), [von Mises Plasticity](@ref tutorial-plasticity), [Nearly Incompressible Hyperelasticity](@ref tutorial-nealy-incompressibly-hyperelasticity), [Computational homogenization](@ref tutorial-computational-homogenization), [Topology Optimization](@ref tutorial-topology-optimization)
+* Time dependent problems: [Time Dependent Problems](@ref tutorial-transient-heat-equation), [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](@ref tutorial-ins-ordinarydiffeq)
+* Multiple fields: [Incompressible Elasticity](@ref tutorial-incompressible-elasticity), [Linear shell](@ref tutorial-linear-shell), [Nearly Incompressible Hyperelasticity](tutorial-nearly-incompressible-hyperelasticity), [Stokes flow](@ref tutorial-stokes-flow)
+* Periodic problems: [Computational homogenization](@ref tutorial-computational-homogenization), [Stokes flow](@ref tutorial-stokes-flow)
+* Advanced: [Threaded Assembly](@ref tutorial-threaded-assembly), [Ginzburg-Landau model energy minimization](@ref tutorial-ginzburg-landau-minimizer)

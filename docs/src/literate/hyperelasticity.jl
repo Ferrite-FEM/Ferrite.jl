@@ -1,4 +1,4 @@
-# # Hyperelasticity
+# # [Hyperelasticity](@id tutorial-hyperelasticity)
 #
 # **Keywords**: *hyperelasticity*, *finite strain*, *large deformations*, *Newton's method*,
 # *conjugate gradient*, *automatic differentiation*
