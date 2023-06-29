@@ -1098,10 +1098,7 @@ end
 #####################################
 # Lagrange dim 3 RefPyramid order 1 #
 #####################################
-# Build on https://defelement.com/elements/examples/pyramid-Lagrange-1.html
-
 getnbasefunctions(::Lagrange{RefPyramid,1}) = 5
-
 vertexdof_indices(::Lagrange{RefPyramid,1}) = ((1,), (2,), (3,), (4,), (5,),)
 facedof_indices(::Lagrange{RefPyramid,1}) = ((1,4,3,2), (1,2,5), (2,3,5), (3,4,5), (4,1,5), )
 edgedof_indices(::Lagrange{RefPyramid,1}) = ((1,2), (2,3), (3,4), (4,1), (1,5), (2,5), (3,5), (4,5))
@@ -1110,7 +1107,7 @@ function reference_coordinates(::Lagrange{RefPyramid,1})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
             Vec{3, Float64}((1.0, 0.0, 0.0)),
             Vec{3, Float64}((1.0, 1.0, 0.0)),
-            Vec{3, Float64}((0.0, 1.0, .0)),
+            Vec{3, Float64}((0.0, 1.0, 0.0)),
             Vec{3, Float64}((0.0, 0.0, 1.0))]
 end
 
@@ -1121,8 +1118,8 @@ function shape_value(ip::Lagrange{RefPyramid,1}, ξ::Vec{3}, i::Int)
     i == 2 && return zzero ? 0.0 : x*(y+z-1)/(z-1)
     i == 3 && return zzero ? 0.0 : -x*y/(z-1)
     i == 4 && return zzero ? 0.0 : y*(x+z-1)/(z-1)
-    i == 5 && return zzero ? 1.0 : z
-    throw(BoundsError("no shape function $i for interpolation $ip"))
+    i == 5 && return z
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
 ###################

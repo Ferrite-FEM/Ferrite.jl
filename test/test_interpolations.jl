@@ -19,6 +19,7 @@
                       Lagrange{RefTetrahedron, 2}(),
                       Lagrange{RefPrism, 1}(),
                       Lagrange{RefPrism, 2}(),
+                      Lagrange{RefPyramid, 1}(),
                       #
                       DiscontinuousLagrange{RefLine, 0}(),
                       DiscontinuousLagrange{RefQuadrilateral, 0}(),
@@ -129,6 +130,9 @@
             return n / norm(n)
         end
         for (facenodes, normal) in zip(Ferrite.facedof_indices(interpolation), reference_normals(interpolation))
+            if ref_shape == Ferrite.RefPyramid
+                 @show normal, __outward_normal(coords, facenodes)
+            end
             @test __outward_normal(coords, facenodes) ≈ normal
         end
     end
