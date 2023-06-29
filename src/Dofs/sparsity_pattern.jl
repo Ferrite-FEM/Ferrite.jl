@@ -9,7 +9,7 @@ The keyword arguments `coupling` and `elements_coupling` can be used to specify 
 handler couple to each other. `coupling` and `elements_coupling` should be square matrices of booleans with
 number of rows/columns equal to the total number of fields, or total number of components,
 in the DofHandler with `true` if fields are coupled and `false` if
-not. By default full coupling is assumed inside the element with no elements coupling.
+not. By default full coupling is assumed inside the element with no coupling between elements.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
@@ -102,8 +102,10 @@ end
 
 """
     cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
-Calculates `I, J` for cross-element coupling
-Returns the updated value of `cnt`
+
+Mutates `I, J` to account for cross-element coupling in fields with discontinuous interpolations.
+Returns the updated value of `cnt`.
+
 Used internally for sparsity patterns with discontinuous interpolations.
 """
 function cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
