@@ -65,19 +65,19 @@ struct ExclusiveTopology <: AbstractTopology
     # index of the vector = cell id ->  all other connected cells
     cell_neighbor::Vector{EntityNeighborhood{CellIndex}}
     # face_neighbor[cellid,local_face_id] -> exclusive connected entities (not restricted to one entity)
-    face_face_neighbor::SparseMatrixCSC{EntityNeighborhood{FaceIndex},Int}
+    face_face_neighbor::Matrix{EntityNeighborhood{FaceIndex}}
     # vertex_neighbor[cellid,local_vertex_id] -> exclusive connected entities to the given vertex
-    vertex_vertex_neighbor::SparseMatrixCSC{EntityNeighborhood{VertexIndex},Int}
+    vertex_vertex_neighbor::Matrix{EntityNeighborhood{VertexIndex}}
     # edge_neighbor[cellid,local_edge_id] -> exclusive connected entities of the given edge
-    edge_edge_neighbor::SparseMatrixCSC{EntityNeighborhood{EdgeIndex},Int}
+    edge_edge_neighbor::Matrix{EntityNeighborhood{EdgeIndex}}
     # TODO reintroduce the codimensional connectivity, e.g. 3D edge to 2D face
 end
 
 function Base.show(io::IO, ::MIME"text/plain", topology::ExclusiveTopology)
-    print(io, "ExclusiveTopology\n")
-    print(io, "  Vertex neighbors: $(length(nonzeros(topology.vertex_vertex_neighbor)))\n")
-    print(io, "  Face neighbors: $(length(nonzeros(topology.face_face_neighbor)))\n")
-    println(io, "  Edge neighbors: $(length(nonzeros(topology.edge_edge_neighbor)))")
+    println(io, "ExclusiveTopology\n")
+    print(io, "  Vertex neighbors: $(size(topology.vertex_vertex_neighbor))\n")
+    print(io, "  Face neighbors: $(size(topology.face_face_neighbor))\n")
+    println(io, "  Edge neighbors: $(size(topology.edge_edge_neighbor))")
 end
 
 function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
@@ -96,10 +96,33 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
         end
     end
 
-    # Setup the remaining neighborhoos
-    I_face = Int[]; J_face = Int[]; V_face = EntityNeighborhood{FaceIndex}[]
-    I_edge = Int[]; J_edge = Int[]; V_edge = EntityNeighborhood{EdgeIndex}[]
-    I_vertex = Int[]; J_vertex = Int[]; V_vertex = EntityNeighborhood{VertexIndex}[]
+    # Compute correct matrix size
+    celltype = eltype(cells)
+    max_vertices = 0
+    max_faces = 0
+    max_edges = 0
+    if isconcretetype(celltype)
+        dim = getdim(cells[1])
+
+        max_vertices = nvertices(cells[1])
+        dim > 1 && (max_faces = nfaces(cells[1]))
+        dim > 2 && (max_edges = nedges(cells[1]))
+    else
+        celltypes = Set(typeof.(cells))
+        for celltype in celltypes
+            celltypeidx = findfirst(x->typeof(x)==celltype,cells)
+            dim = getdim(cells[celltypeidx])
+
+            max_vertices = max(max_vertices,nvertices(cells[celltypeidx]))
+            dim > 1 && (max_faces = max(max_faces, nfaces(cells[celltypeidx])))
+            dim > 2 && (max_edges = max(max_edges, nedges(cells[celltypeidx])))
+        end
+    end
+
+    # Setup matrices
+    vertex_table = zeros(EntityNeighborhood{VertexIndex}, length(cells), max_vertices)
+    face_table   = zeros(EntityNeighborhood{FaceIndex}, length(cells), max_faces)
+    edge_table   = zeros(EntityNeighborhood{EdgeIndex}, length(cells), max_edges)
     cell_neighbor_table = Vector{EntityNeighborhood{CellIndex}}(undef, length(cells))
 
     for (cell_id, cell) in enumerate(cells)
@@ -136,9 +159,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
                 for (lvi, vertex) ∈ enumerate(vertices(cell))
                     for (lvi2, vertex_neighbor) ∈ enumerate(vertices(cell_neighbor))
                         if vertex_neighbor == vertex
-                            push!(I_vertex, cell_id)
-                            push!(J_vertex, lvi)
-                            push!(V_vertex, EntityNeighborhood(VertexIndex(cell_neighbor_id, lvi2)))
+                            push!(vertex_table[cell_id, lvi].neighbor_info, VertexIndex(cell_neighbor_id, lvi2))
                             break
                         end
                     end
@@ -146,76 +167,44 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
             # Shared path
             elseif num_shared_vertices == 2
                 if getdim(cell) == 2
-                    _add_single_face_neighbor!(I_face, J_face, V_face, cell, cell_id, cell_neighbor, cell_neighbor_id)
+                    _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
                 elseif getdim(cell) == 3
-                    _add_single_edge_neighbor!(I_edge, J_edge, V_edge, cell, cell_id, cell_neighbor, cell_neighbor_id)
+                    _add_single_edge_neighbor!(edge_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
                 else
                     @error "Case not implemented."
                 end
             # Shared surface
             elseif num_shared_vertices >= 3
-                _add_single_face_neighbor!(I_face, J_face, V_face, cell, cell_id, cell_neighbor, cell_neighbor_id)
+                _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
             else
                 @error "Found connected elements without shared vertex... Mesh broken?"
             end
         end
     end
 
-    # Compute correct sparse matrix size
-    celltype = eltype(cells)
-    max_vertices = 0
-    max_faces = 0
-    max_edges = 0
-    if isconcretetype(celltype)
-        dim = getdim(cells[1])
-
-        max_vertices = nvertices(cells[1])
-        dim > 1 && (max_faces = nfaces(cells[1]))
-        dim > 2 && (max_edges = nedges(cells[1]))
-    else
-        celltypes = typeof.(cells)
-        for celltype in celltypes
-            celltypeidx = findfirst(x->typeof(x)==celltype,cells)
-            dim = getdim(cells[celltypeidx])
-
-            max_vertices = max(max_vertices,nvertices(cells[celltypeidx]))
-            dim > 1 && (max_faces = max(max_faces, nfaces(cells[celltypeidx])))
-            dim > 2 && (max_edges = max(max_edges, nedges(cells[celltypeidx])))
-        end
-    end
-
-    # Setup matrices
-    vertex_neighbor = sparse(I_vertex,J_vertex,V_vertex, length(cells), max_vertices)
-    face_neighbor = sparse(I_face,J_face,V_face, length(cells), max_faces)
-    edge_neighbor = sparse(I_edge,J_edge,V_edge, length(cells), max_edges)
-
-    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_neighbor,vertex_neighbor,edge_neighbor)
+    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_table,vertex_table,edge_table)
 end
 
-function _add_single_face_neighbor!(I_face, J_face, V_face, cell, cell_id, cell_neighbor, cell_neighbor_id)
+function _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
     for (lfi, face) ∈ enumerate(faces(cell))
         uniqueface,_ = sortface(face)
         for (lfi2, face_neighbor) ∈ enumerate(faces(cell_neighbor))
             uniqueface2,_ = sortface(face_neighbor)
             if uniqueface == uniqueface2
-                push!(I_face, cell_id)
-                push!(J_face, lfi)
-                push!(V_face, EntityNeighborhood(FaceIndex(cell_neighbor_id, lfi2)))
+                push!(face_table[cell_id, lfi].neighbor_info, FaceIndex(cell_neighbor_id, lfi2))
                 return
             end
         end
     end
 end
 
-function _add_single_edge_neighbor!(I_edge, J_edge, V_edge, cell, cell_id, cell_neighbor, cell_neighbor_id)
+function _add_single_edge_neighbor!(edge_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
     for (lei, edge) ∈ enumerate(edges(cell))
         uniqueedge,_ = sortedge(edge)
         for (lei2, edge_neighbor) ∈ enumerate(edges(cell_neighbor))
             uniqueedge2,_ = sortedge(edge_neighbor)
             if uniqueedge == uniqueedge2
-                push!(I_edge, cell_id)
-                push!(J_edge, lei)
-                push!(V_edge, EntityNeighborhood(EdgeIndex(cell_neighbor_id, lei2)))
+                push!(edge_table[cell_id, lei].neighbor_info, EdgeIndex(cell_neighbor_id, lei2))
                 return
             end
         end
