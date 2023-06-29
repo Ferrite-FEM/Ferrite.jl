@@ -15,6 +15,79 @@
 # ![Pressure evolution.](porous_media.gif)
 #
 # ## Theory of porous media
+# The strong forms are given as
+# ```math
+# \begin{aligned}
+# \boldsymbol{\sigma}(\boldsymbol{\epsilon}, p) \cdot \boldsymbol{\nabla} &= \boldsymbol{0} \\
+# \dot{\Phi}(\boldsymbol{\epsilon}, p) + \boldsymbol{w}(p) \cdot \boldsymbol{\nabla} &= 0
+# \end{aligned}
+# ```
+# where 
+# ``\boldsymbol{\epsilon} = \left[\boldsymbol{u}\otimes\boldsymbol{\nabla}\right]^\mathrm{sym}`` 
+# The constitutive relationships are 
+# ```math
+# \begin{aligned}
+# \boldsymbol{\sigma} &= \boldsymbol{\mathsf{E}}:\boldsymbol{\epsilon} - \alpha p \boldsymbol{I} \\
+# \boldsymbol{w} &= - k \boldsymbol{\nabla} p \\
+# \Phi &= \phi + \alpha \mathrm{tr}(\boldsymbol{\epsilon}) + \beta p
+# \end{aligned}
+# ``` 
+# with 
+# ``\boldsymbol{\mathsf{E}}=2G \boldsymbol{\mathsf{I}}^\mathrm{dev} + 3K \boldsymbol{I}\otimes\boldsymbol{I}``.
+# The material parameters are then the 
+# shear modulus, ``G``, 
+# bulk modulus, ``K``, 
+# permeability, ``k``,  
+# Biot's coefficient, ``\alpha``, and
+# liquid compressibility, ``\beta``.
+# The porosity, ``\phi``, doesn't enter into the equations 
+# (A different porosity leads to different skeleton stiffness and permeability).
+#
+# 
+# The variational (weak) form can then be derived for the variations ``\boldsymbol{\delta u}``
+# and ``\delta p`` as
+# ```math
+# \begin{aligned}
+# \int_\Omega \left[\left[\boldsymbol{\delta u}\otimes\boldsymbol{\nabla}\right]^\mathrm{sym}:
+# \boldsymbol{\mathsf{E}}:\boldsymbol{\epsilon} - \boldsymbol{\delta u} \cdot \boldsymbol{\nabla} \alpha p\right] \mathrm{d}\Omega 
+# &= \int_\Gamma \boldsymbol{\delta u} \cdot \boldsymbol{t} \mathrm{d} \Gamma \\
+# \int_\Omega \left[\delta p \left[\alpha \dot{\boldsymbol{u}} \cdot \boldsymbol{\nabla} + \beta \dot{p}\right] + 
+# \boldsymbol{\nabla}(\delta p) \cdot [k \boldsymbol{\nabla}]\right] \mathrm{d}\Omega 
+# &= \int_\Gamma \delta p w_\mathrm{n} \mathrm{d} \Gamma 
+# \end{aligned}
+# ```
+# where ``\boldsymbol{t}=\boldsymbol{n}\cdot\boldsymbol{\sigma}`` is the traction and 
+# ``w_\mathrm{n} = \boldsymbol{n}\cdot\boldsymbol{w}`` is the normal flux.  
+# 
+# ### Finite element form
+# Discretizing in space using finite elements, we obtain the vector equation 
+# ``r_i = f_i^\mathrm{int} - f_{i}^\mathrm{ext}`` where ``f^\mathrm{ext}`` are the external 
+# "forces", and ``f_i^\mathrm{int}`` are the internal "forces". We split this into the 
+# displacement part ``r_i^\mathrm{u} = f_i^\mathrm{int,u} - f_{i}^\mathrm{ext,u}`` and 
+# pressure part ``r_i^\mathrm{p} = f_i^\mathrm{int,p} - f_{i}^\mathrm{ext,p}``
+# to obtain the discretized equation system 
+# ```math
+# \begin{aligned}
+# f_i^\mathrm{int,u} &= \int_\Omega [\boldsymbol{\delta N}^\mathrm{u}_i\otimes\boldsymbol{\nabla}]^\mathrm{sym} : \boldsymbol{\mathsf{E}} : [\boldsymbol{u}\otimes\boldsymbol{\nabla}]^\mathrm{sym} \ 
+# - [\boldsymbol{\delta N}^\mathrm{u}_i \cdot \boldsymbol{\nabla}] \alpha p \mathrm{d}\Omega 
+# &= \int_\Gamma \boldsymbol{\delta N}^\mathrm{u}_i \cdot \boldsymbol{t} \mathrm{d} \Gamma \\
+# f_i^\mathrm{int,p} &= \int_\Omega \delta N_i^\mathrm{p} [\alpha [\dot{\boldsymbol{u}}\cdot\boldsymbol{\nabla}]  + \beta\dot{p}] + \boldsymbol{\nabla}(\delta N_i^\mathrm{p}) \cdot [k \boldsymbol{\nabla}(p)] \mathrm{d}\Omega 
+# &= \int_\Gamma \delta N_i^\mathrm{p} w_\mathrm{n} \mathrm{d} \Gamma
+# \end{aligned}
+# ```
+# Approximating the time-derivatives, ``\dot{\boldsymbol{u}}\approx \left[\boldsymbol{u}-{}^n\boldsymbol{u}\right]/\Delta t``
+# and ``\dot{p}\approx \left[p-{}^np\right]/\Delta t``, we can implement the finite element equations in the residual form 
+# ``r_i(\boldsymbol{a}(t), t) = 0`` where the vector ``\boldsymbol{a}`` contains all unknown displacements ``u_i`` and pressures ``p_i``. 
+#
+# The jacobian, ``K_{ij} = \partial r_i/\partial a_j``, is then split into four parts,
+# \begin{aligned}
+# K_{ij}^\mathrm{uu} = \frac{\partial r_i^\mathrm{u}}{\partial u_j}} = \int_\Omega [\boldsymbol{\delta N}^\mathrm{u}_i\otimes\boldsymbol{\nabla}]^\mathrm{sym} : \boldsymbol{\mathsf{E}} : [\boldsymbol{N}_j^\mathrm{u}\otimes\boldsymbol{\nabla}]^\mathrm{sym}\ \mathrm{d}\Omega \\
+# K_{ij}^\mathrm{up} = \frac{\partial r_i^\mathrm{u}}{\partial p_j}} = - \int_\Omega [\boldsymbol{\delta N}^\mathrm{u}_i \cdot \boldsymbol{\nabla}] \alpha N_j^\mathrm{p}\ \mathrm{d}\Omega \\
+# K_{ij}^\mathrm{pu} = \frac{\partial r_i^\mathrm{p}}{\partial u_j}} = \int_\Omega \delta N_i^\mathrm{p} \frac{\alpha}{\Delta t} [\boldsymbol{N}_j^\mathrm{u} \cdot\boldsymbol{\nabla}]\ \mathrm{d}\Omega\\
+# K_{ij}^\mathrm{pp} = \frac{\partial r_i^\mathrm{p}}{\partial p_j}} = \int_\Omega \delta N_i^\mathrm{p} \frac{N_j^\mathrm{p}}{\Delta t} + \boldsymbol{\nabla}(\delta N_i^\mathrm{p}) \cdot [k \boldsymbol{\nabla}(N_j^\mathrm{p})] \mathrm{d}\Omega
+# \end{aligned}
+#
+# ## Theory of porous media
 # The strong forms for the mass balance of the liquid is given as
 # ```math
 #    \frac{\mathrm{d}_\mathrm{s} n \rho_\mathrm{l}}{\mathrm{d}t} 
