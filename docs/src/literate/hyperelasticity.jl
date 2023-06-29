@@ -315,15 +315,15 @@ function solve()
     mp = NeoHooke(μ, λ)
 
     ## Finite element base
-    ip = Lagrange{3, RefTetrahedron, 1}()
-    qr = QuadratureRule{3, RefTetrahedron}(1)
-    qr_face = QuadratureRule{2, RefTetrahedron}(1)
-    cv = CellVectorValues(qr, ip)
-    fv = FaceVectorValues(qr_face, ip)
+    ip = Lagrange{RefTetrahedron, 1}()^3
+    qr = QuadratureRule{RefTetrahedron}(1)
+    qr_face = FaceQuadratureRule{RefTetrahedron}(1)
+    cv = CellValues(qr, ip)
+    fv = FaceValues(qr_face, ip)
 
     ## DofHandler
     dh = DofHandler(grid)
-    add!(dh, :u, 3) # Add a displacement field
+    add!(dh, :u, ip) # Add a displacement field
     close!(dh)
 
     function rotation(X, t)

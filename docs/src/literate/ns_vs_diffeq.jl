@@ -158,17 +158,16 @@ grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{
 # To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
 # We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
 # linear pressure term is tested against a quadratic function.
-ip_v = Lagrange{dim, RefCube, 2}()
-ip_geom = Lagrange{dim, RefCube, 1}()
-qr = QuadratureRule{dim, RefCube}(4)
-cellvalues_v = CellVectorValues(qr, ip_v, ip_geom);
+ip_v = Lagrange{RefQuadrilateral, 2}()^dim
+qr = QuadratureRule{RefQuadrilateral}(4)
+cellvalues_v = CellValues(qr, ip_v);
 
-ip_p = Lagrange{dim, RefCube, 1}()
-cellvalues_p = CellScalarValues(qr, ip_p, ip_geom);
+ip_p = Lagrange{RefQuadrilateral, 1}()
+cellvalues_p = CellValues(qr, ip_p);
 
 dh = DofHandler(grid)
-add!(dh, :v, dim, ip_v)
-add!(dh, :p, 1, ip_p)
+add!(dh, :v, ip_v)
+add!(dh, :p, ip_p)
 close!(dh);
 
 # ### Boundary Conditions
@@ -212,7 +211,7 @@ update!(ch, 0.0);
 # For the block mass matrix $M$ we remember that only the first equation had a time derivative
 # and that the block mass matrix corresponds to the term arising from discretizing the time
 # derivatives. Hence, only the upper left block has non-zero components.
-function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, M::SparseMatrixCSC, dh::DofHandler) where {dim}
+function assemble_mass_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues, M::SparseMatrixCSC, dh::DofHandler)
     ## Allocate a buffer for the local matrix and some helpers, together with the assembler.
     n_basefuncs_v = getnbasefunctions(cellvalues_v)
     n_basefuncs_p = getnbasefunctions(cellvalues_p)
@@ -255,7 +254,7 @@ end;
 # which is also called saddle point matrix. These problems are known to have
 # a non-trivial kernel, which is a reflection of the strong form as discussed
 # in the theory portion if this example.
-function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, ν, K::SparseMatrixCSC, dh::DofHandler) where {dim}
+function assemble_stokes_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues, ν, K::SparseMatrixCSC, dh::DofHandler)
     ## Again, some buffers and helpers
     n_basefuncs_v = getnbasefunctions(cellvalues_v)
     n_basefuncs_p = getnbasefunctions(cellvalues_p)
@@ -352,7 +351,7 @@ struct RHSparams
     K::SparseMatrixCSC
     ch::ConstraintHandler
     dh::DofHandler
-    cellvalues_v::CellVectorValues
+    cellvalues_v::CellValues
 end
 p = RHSparams(K, ch, dh, cellvalues_v)
 
@@ -479,7 +478,7 @@ end                                                                         #hid
         all_celldofs = celldofs(cell)                                       #hide
         v_celldofs = all_celldofs[dof_range(dh, :v)]                        #hide
         v_cell = u[v_celldofs]                                              #hide
-        coords = getcoordinates(cell)                                       #hide
+        coords = get_cell_coordinates(cell)                                       #hide
         for q_point in 1:getnquadpoints(cellvalues_v)                       #hide
             dΩ = getdetJdV(cellvalues_v, q_point)                           #hide
             coords_qp = spatial_coordinate(cellvalues_v, q_point, coords)   #hide

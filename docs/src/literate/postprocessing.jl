@@ -46,7 +46,7 @@ include("heat_equation.jl");
 # Next we define a function that computes the heat flux for each integration point in the domain.
 # Fourier's law is adopted, where the conductivity tensor is assumed to be isotropic with unit
 # conductivity ``\lambda = 1 ⇒ q = - \nabla u``, where ``u`` is the temperature.
-function compute_heat_fluxes(cellvalues::CellScalarValues{dim,T}, dh::DofHandler, a) where {dim,T}
+function compute_heat_fluxes(cellvalues::CellValues{<:ScalarInterpolation}, dh::DofHandler, a::AbstractVector{T}) where T
 
     n = getnbasefunctions(cellvalues)
     cell_dofs = zeros(Int, n)
@@ -80,7 +80,7 @@ q_gp = compute_heat_fluxes(cellvalues, dh, u);
 projector = L2Projector(ip, grid);
 
 # Project the integration point values to the nodal values
-q_projected = project(projector, q_gp, qr; project_to_nodes=false); # TODO: this should be default.
+q_projected = project(projector, q_gp, qr);
 
 
 # ## Exporting to VTK

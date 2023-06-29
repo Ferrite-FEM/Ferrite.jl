@@ -27,7 +27,7 @@ The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see
 """
 function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; kwargs...) where {dim,C,T}
     cls = MeshCell[]
-    for cell in grid.cells
+    for cell in getcells(grid)
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
         push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
     end
@@ -35,7 +35,7 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; kwargs
     return vtk_grid(filename, coords, cls; kwargs...)
 end
 function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; kwargs...)
-    vtk_grid(filename, dh.grid; kwargs...)
+    vtk_grid(filename, get_grid(dh); kwargs...)
 end
 
 function toparaview!(v, x::Vec{D}) where D
@@ -118,7 +118,7 @@ function WriteVTK.vtk_point_data(vtkfile, dh::AbstractDofHandler, u::Vector, suf
     fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
 
     for name in fieldnames
-        data = reshape_to_nodes(dh, u, name)
+        data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
         vtk_point_data(vtkfile, data, string(name, suffix))
     end
 

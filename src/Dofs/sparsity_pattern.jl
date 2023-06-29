@@ -66,12 +66,12 @@ function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatri
     outs = Matrix{Bool}[]
     field_dims = map(fieldname -> getfielddim(dh, fieldname), dh.field_names)
 
-    for fh in dh.fieldhandlers
-        out = zeros(Bool, ndofs_per_cell(fh), ndofs_per_cell(fh))
+    for sdh in dh.subdofhandlers
+        out = zeros(Bool, ndofs_per_cell(sdh), ndofs_per_cell(sdh))
         push!(outs, out)
 
-        dof_ranges = [dof_range(fh, f) for f in fh.field_names]
-        global_idxs = [findfirst(x -> x === f, dh.field_names) for f in fh.field_names]
+        dof_ranges = [dof_range(sdh, f) for f in sdh.field_names]
+        global_idxs = [findfirst(x -> x === f, dh.field_names) for f in sdh.field_names]
 
         if sz == length(dh.field_names) # Coupling given by fields
             for (j, jrange) in pairs(dof_ranges), (i, irange) in pairs(dof_ranges)
@@ -86,7 +86,7 @@ function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatri
                     out[I, J] = coupling[ic, jc]
                 end
             end
-        elseif sz == ndofs_per_cell(fh) # Coupling given by template local matrix
+        elseif sz == ndofs_per_cell(sdh) # Coupling given by template local matrix
             # TODO: coupling[fieldhandler_idx] if different template per subddomain
             out .= coupling
         else
@@ -111,14 +111,14 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     # when keeping constrained dofs (default) and if not it only over-estimates with number
     # of entries eliminated by constraints.
     max_buffer_length = ndofs(dh) # diagonal elements
-    for (fhi, fh) in pairs(dh.fieldhandlers)
-        set = fh.cellset
-        n = ndofs_per_cell(fh)
+    for (sdh_idx, sdh) in pairs(dh.subdofhandlers)
+        set = sdh.cellset
+        n = ndofs_per_cell(sdh)
         entries_per_cell = if coupling === nothing
             sym ? div(n * (n + 1), 2) : n^2
         else
-            coupling_fh = couplings[fhi]
-            count(coupling_fh[i, j] for i in 1:n for j in (sym ? i : 1):n)
+            coupling_sdh = couplings[sdh_idx]
+            count(coupling_sdh[i, j] for i in 1:n for j in (sym ? i : 1):n)
         end
         max_buffer_length += entries_per_cell * length(set)
     end
@@ -127,16 +127,16 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     global_dofs = Int[]
     cnt = 0
 
-    for (fhi, fh) in pairs(dh.fieldhandlers)
-        coupling === nothing || (coupling_fh = couplings[fhi])
+    for (sdh_idx, sdh) in pairs(dh.subdofhandlers)
+        coupling === nothing || (coupling_sdh = couplings[sdh_idx])
         # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
-        set = BitSet(fh.cellset)
-        n = ndofs_per_cell(fh)
+        set = BitSet(sdh.cellset)
+        n = ndofs_per_cell(sdh)
         resize!(global_dofs, n)
         @inbounds for element_id in set
             celldofs!(global_dofs, dh, element_id)
             for j in eachindex(global_dofs), i in eachindex(global_dofs)
-                coupling === nothing || coupling_fh[i, j] || continue
+                coupling === nothing || coupling_sdh[i, j] || continue
                 dofi = global_dofs[i]
                 dofj = global_dofs[j]
                 sym && (dofi > dofj && continue)

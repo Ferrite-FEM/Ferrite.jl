@@ -1,7 +1,7 @@
 # Download some assets necessary for docs/testing not stored in the repo
 import Downloads
 
-const directory = joinpath(@__DIR__, "src", "examples")
+const directory = joinpath(@__DIR__, "src", "tutorials")
 mkpath(directory)
 
 for (file, url) in [

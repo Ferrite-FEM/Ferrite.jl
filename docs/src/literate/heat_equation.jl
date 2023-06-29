@@ -49,26 +49,25 @@ grid = generate_grid(Quadrilateral, (20, 20));
 
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
-# test and trial functions (among other things). Since the problem
-# is a scalar problem we will use a `CellScalarValues` object. To define
+# test and trial functions (among other things). To define
 # this we need to specify an interpolation space for the shape functions.
-# We use Lagrange functions (both for interpolating the function and the geometry)
-# based on the two-dimensional reference "cube". We also define a quadrature rule based on
-# the same reference cube. We combine the interpolation and the quadrature rule
-# to a `CellScalarValues` object.
-dim = 2
-ip = Lagrange{dim, RefCube, 1}()
-qr = QuadratureRule{dim, RefCube}(2)
-cellvalues = CellScalarValues(qr, ip);
+# We use Lagrange functions
+# based on the two-dimensional reference quadrilateral. We also define a quadrature rule based on
+# the same reference element. We combine the interpolation and the quadrature rule
+# to a `CellValues` object.
+ip = Lagrange{RefQuadrilateral, 1}()
+qr = QuadratureRule{RefQuadrilateral}(2)
+cellvalues = CellValues(qr, ip);
 
 # ### Degrees of freedom
 # Next we need to define a `DofHandler`, which will take care of numbering
 # and distribution of degrees of freedom for our approximated fields.
-# We create the `DofHandler` and then add a single scalar field called `:u`.
+# We create the `DofHandler` and then add a single scalar field called `:u` based on
+# our interpolation `ip` defined above.
 # Lastly we `close!` the `DofHandler`, it is now that the dofs are distributed
 # for all the elements.
 dh = DofHandler(grid)
-add!(dh, :u, 1)
+add!(dh, :u, ip)
 close!(dh);
 
 # Now that we have distributed all our dofs we can create our tangent matrix,
@@ -134,7 +133,7 @@ close!(ch)
 #     underline the strong parallel between the weak form and the implementation, this
 #     example uses the symbols appearing in the weak form.
 
-function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellScalarValues)
+function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
     ## Reset to 0
     fill!(Ke, 0)
@@ -178,7 +177,7 @@ end
 #     versions. However, through the code we use `f` and `u` instead to reflect the strong
 #     connection between the weak form and the Ferrite implementation.
 
-function assemble_global(cellvalues::CellScalarValues, K::SparseMatrixCSC, dh::DofHandler)
+function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler)
     ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)

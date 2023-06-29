@@ -220,17 +220,18 @@ end
 # As mentioned in the introduction we will use a quadratic approximation for the velocity
 # field and a linear approximation for the pressure to ensure that we fulfill the LBB
 # condition. We create the corresponding FE values with interpolations `ipu` for the
-# velocity and `ipp` for the pressure. Note that we use linear geometric interpolation
-# (`ipg`) for both the velocity and pressure, this is because our grid contains linear
-# triangles. We also construct face-values for the pressure since we need to integrate along
+# velocity and `ipp` for the pressure. Note that we specify linear geometric mapping
+# (`ipg`) for both the velocity and pressure because our grid contains linear
+# triangles. However, since linear mapping is default this could have been skipped.
+# We also construct face-values for the pressure since we need to integrate along
 # the boundary when assembling the constraint matrix ``\underline{\underline{C}}``.
 
 function setup_fevalues(ipu, ipp, ipg)
-    qr = QuadratureRule{2,RefTetrahedron}(2)
-    cvu = CellVectorValues(qr, ipu, ipg)
-    cvp = CellScalarValues(qr, ipp, ipg)
-    qr_face = QuadratureRule{1,RefTetrahedron}(2)
-    fvp = FaceScalarValues(qr_face, ipp, ipg)
+    qr = QuadratureRule{RefTriangle}(2)
+    cvu = CellValues(qr, ipu, ipg)
+    cvp = CellValues(qr, ipp, ipg)
+    qr_face = FaceQuadratureRule{RefTriangle}(2)
+    fvp = FaceValues(qr_face, ipp, ipg)
     return cvu, cvp, fvp
 end
 #md nothing #hide
@@ -241,8 +242,8 @@ end
 
 function setup_dofs(grid, ipu, ipp)
     dh = DofHandler(grid)
-    add!(dh, :u, 2, ipu)
-    add!(dh, :p, 1, ipp)
+    add!(dh, :u, ipu)
+    add!(dh, :p, ipp)
     close!(dh)
     return dh
 end
@@ -300,7 +301,7 @@ function setup_mean_constraint(dh, fvp)
     ## Loop over all the boundaries
     for (ci, fi) in set
         Ce .= 0
-        getcoordinates!(element_coords, dh.grid, ci)
+        get_cell_coordinates!(element_coords, dh.grid, ci)
         reinit!(fvp, element_coords, fi)
         celldofs!(element_dofs, dh, ci)
         for qp in 1:getnquadpoints(fvp)
@@ -417,7 +418,7 @@ function assemble_system!(K, f, dh, cvu, cvp)
             end
             ## rhs
             for (i, I) in pairs(range_u)
-                x = spatial_coordinate(cvu, qp, getcoordinates(cell))
+                x = spatial_coordinate(cvu, qp, get_cell_coordinates(cell))
                 b = exp(-100 * norm(x - Vec{2}((0.75, 0.1)))^2)
                 bv = Vec{2}((b, 0.0))
                 fe[I] += (ϕᵤ[i] ⋅ bv) * dΩ
@@ -484,12 +485,12 @@ function main()
     h = 0.05 # approximate element size
     grid = setup_grid(h)
     ## Interpolations
-    ipu = Lagrange{2,RefTetrahedron,2}() # quadratic
-    ipp = Lagrange{2,RefTetrahedron,1}() # linear
+    ipu = Lagrange{RefTriangle,2}() ^ 2 # quadratic
+    ipp = Lagrange{RefTriangle,1}()     # linear
     ## Dofs
     dh = setup_dofs(grid, ipu, ipp)
     ## FE values
-    ipg = Lagrange{2,RefTetrahedron,1}() # linear geometric interpolation
+    ipg = Lagrange{RefTriangle,1}() # linear geometric interpolation
     cvu, cvp, fvp = setup_fevalues(ipu, ipp, ipg)
     ## Boundary conditions
     ch = setup_constraints(dh, fvp)

@@ -6,12 +6,11 @@
     change_ip_order(ip::Interpolation, ::Nothing) = ip
     function change_ip_order(ip::Interpolation, order::Int)
         B = typebase(ip)
-        Dim = Ferrite.getdim(ip)
         RefShape = Ferrite.getrefshape(ip)
-        return B{Dim,RefShape,order}()
+        return B{RefShape,order}()
     end
     getcellorder(CT) = Ferrite.getorder(Ferrite.default_interpolation(CT))
-    getcelltypedim(::Type{<:Ferrite.AbstractCell{dim}}) where dim = dim
+    getcelltypedim(::Type{<:Ferrite.AbstractCell{shape}}) where {dim, shape <: Ferrite.AbstractRefShape{dim}} = dim
 
     # Functions to create dof handlers for testing
     function testdh(CT, ip_order_u, ip_order_p)
@@ -27,8 +26,8 @@
         dh = DofHandler(grid)
         default_ip = Ferrite.default_interpolation(CT)
         try
-            add!(dh, :u, dim, change_ip_order(default_ip, ip_order_u))
-            add!(dh, :p, 1, change_ip_order(default_ip, ip_order_p))
+            add!(dh, :u, change_ip_order(default_ip, ip_order_u)^dim)
+            add!(dh, :p, change_ip_order(default_ip, ip_order_p))
         catch e
             isa(e, MethodError) && e.f == Ferrite.reference_coordinates && return nothing
             rethrow(e)
@@ -52,34 +51,34 @@
         else
             error("Only dim=1 & 2 supported")
         end
-        mdh = DofHandler(grid)
         default_ip_A = Ferrite.default_interpolation(getcelltype(grid, first(getcellset(grid,"A"))))
         default_ip_B = Ferrite.default_interpolation(getcelltype(grid, first(getcellset(grid,"B"))))
-        ufield_A = Field(:u, change_ip_order(default_ip_A, ip_order_u), dim)
-        pfield_A = Field(:p, change_ip_order(default_ip_A, ip_order_p), 1)
-        ufield_B = Field(:u, change_ip_order(default_ip_B, ip_order_u), dim)
-        add!(mdh, FieldHandler([ufield_A, pfield_A], getcellset(grid,"A")))
-        add!(mdh, FieldHandler([ufield_B,], getcellset(grid, "B")))
-        close!(mdh)
-        return mdh
+        dh = DofHandler(grid)
+        sdh_A = SubDofHandler(dh, getcellset(grid, "A"))
+        add!(sdh_A, :u, change_ip_order(default_ip_A, ip_order_u)^dim)
+        add!(sdh_A, :p, change_ip_order(default_ip_A, ip_order_p))
+        sdh_B = SubDofHandler(dh, getcellset(grid, "B"))
+        add!(sdh_B, :u, change_ip_order(default_ip_B, ip_order_u)^dim)
+        close!(dh)
+        return dh
     end
 
     # The following can be removed after #457 is merged if that will include the MixedDofHandler
     function _global_dof_range(dh::DofHandler, field_name::Symbol)
         dofs = Set{Int}()
-        for fh in dh.fieldhandlers
-            if !isnothing(Ferrite._find_field(fh, field_name))
-                _global_dof_range!(dofs, dh, fh, field_name, fh.cellset)
+        for sdh in dh.subdofhandlers
+            if !isnothing(Ferrite._find_field(sdh, field_name))
+                _global_dof_range!(dofs, sdh, field_name, sdh.cellset)
             end
         end
         return sort!(collect(Int, dofs))
     end
 
-    function _global_dof_range!(dofs, dh, dh_fh, field_name, cellset)
-        eldofs = celldofs(dh, first(cellset))
-        field_range = dof_range(dh_fh, field_name)
+    function _global_dof_range!(dofs, sdh, field_name, cellset)
+        eldofs = celldofs(sdh.dh, first(cellset))
+        field_range = dof_range(sdh, field_name)
         for i in cellset
-            celldofs!(eldofs, dh, i)
+            celldofs!(eldofs, sdh.dh, i)
             for j in field_range
                 @inbounds d = eldofs[j]
                 d in dofs || push!(dofs, d)

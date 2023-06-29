@@ -53,15 +53,14 @@ const Δ = Tensors.hessian;
 
 grid = generate_grid(Quadrilateral, (150, 150))
 
-dim = 2
-ip = Lagrange{dim, RefCube, 1}()
-qr = QuadratureRule{dim, RefCube}(2)
-qr_face = QuadratureRule{dim-1, RefCube}(2)
-cellvalues = CellScalarValues(qr, ip);
-facevalues = FaceScalarValues(qr_face, ip);
+ip = Lagrange{RefQuadrilateral, 1}()
+qr = QuadratureRule{RefQuadrilateral}(2)
+qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
+cellvalues = CellValues(qr, ip);
+facevalues = FaceValues(qr_face, ip);
 
 dh = DofHandler(grid)
-add!(dh, :u, 1)
+add!(dh, :u, ip)
 close!(dh)
 
 # We will set things up, so that a known analytic solution is approximately reproduced.
@@ -88,8 +87,8 @@ update!(dbcs, 0.0)
 
 K = create_sparsity_pattern(dh);
 
-function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarValues{dim},
-                         K::SparseMatrixCSC, dh::DofHandler) where {dim}
+function doassemble(cellvalues::CellValues, facevalues::FaceValues,
+                         K::SparseMatrixCSC, dh::DofHandler)
     b = 1.0
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
@@ -103,7 +102,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
     for (cellcount, cell) in enumerate(CellIterator(dh))
         fill!(Ke, 0)
         fill!(fe, 0)
-        coords = getcoordinates(cell)
+        coords = get_cell_coordinates(cell)
 
         reinit!(cellvalues, cell)
         # First we derive the non boundary part of the variation problem from the destined solution `u_ana`
