@@ -36,8 +36,8 @@ getedgesets
 getvertexset
 getvertexsets
 transform!
-getcoordinates
-getcoordinates!
+get_cell_coordinates
+get_cell_coordinates!
 ```
 
 ### Topology

@@ -67,9 +67,9 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
             # loop over points
             for node in nearest_nodes[point_idx]
                 possible_cells = get(node_cell_dict, node, nothing)
-                possible_cells === nothing && continue # if node is not part of the fieldhandler, try the next node
+                possible_cells === nothing && continue # if node is not part of the subdofhandler, try the next node
                 for cell in possible_cells
-                    cell_coords = getcoordinates(grid, cell)
+                    cell_coords = get_cell_coordinates(grid, cell)
                     is_in_cell, local_coord = point_in_cell(geom_interpol, cell_coords, points[point_idx])
                     if is_in_cell
                         cell_found = true
@@ -213,11 +213,11 @@ function get_point_values!(out_vals::Vector{T2},
     # TODO: I don't think this is correct??
     length(dof_vals) == ndofs(dh) || error("You must supply values for all $(ndofs(dh)) dofs.")
 
-    for fh_idx in eachindex(dh.fieldhandlers)
-        ip = func_interpolations[fh_idx]
+    for (sdh_idx, sdh) in pairs(dh.subdofhandlers)
+        ip = func_interpolations[sdh_idx]
         if ip !== nothing
-            dofrange = dof_range(dh.fieldhandlers[fh_idx], fname)
-            cellset = dh.fieldhandlers[fh_idx].cellset
+            dofrange = dof_range(sdh, fname)
+            cellset = sdh.cellset
             _get_point_values!(out_vals, dof_vals, ph, dh, ip, cellset, dofrange)
         end
     end
@@ -262,12 +262,12 @@ end
 
 function get_func_interpolations(dh::DofHandler, fieldname)
     func_interpolations = Union{Interpolation,Nothing}[]
-    for fh in dh.fieldhandlers
-        j = _find_field(fh, fieldname)
+    for sdh in dh.subdofhandlers
+        j = _find_field(sdh, fieldname)
         if j === nothing
             push!(func_interpolations, nothing)
         else
-            push!(func_interpolations, fh.field_interpolations[j])
+            push!(func_interpolations, sdh.field_interpolations[j])
         end
     end
     return func_interpolations
@@ -332,7 +332,7 @@ function Base.iterate(p::PointIterator, state = 1)
         cid = (p.ph.cells[state])::Int
         local_coord = (p.ph.local_coords[state])::Vec
         n = nnodes_per_cell(p.ph.grid, cid)
-        cellcoords!(resize!(p.coords, n), p.ph.grid, cid)
+        get_cell_coordinates!(resize!(p.coords, n), p.ph.grid, cid)
         point = PointLocation(cid, local_coord, p.coords)
         return (point, state + 1)
     end

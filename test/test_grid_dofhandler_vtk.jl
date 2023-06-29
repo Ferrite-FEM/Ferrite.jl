@@ -163,7 +163,7 @@ end
 
     @test length(getnodes(grid, "node_set")) == 9
 
-    @test collect(getcoordinates(getnodes(grid, 5)).data) ≈ [0.5, 0.5]
+    @test collect(get_node_coordinate(getnodes(grid, 5)).data) ≈ [0.5, 0.5]
 
     @test getcells(grid, "cell_set") == [getcells(grid, 1)]
 
@@ -173,7 +173,7 @@ end
     ci = CellIterator(grid)
     @test length(ci) == getncells(grid)
     for c in ci
-        getcoordinates(c)
+        get_cell_coordinates(c)
         getnodes(c)
         n += cellid(c)
     end
@@ -390,7 +390,7 @@ end
 #                   +-----+-----+-----+
 # test application: integrate jump across element boundary 5
     function reinit!(fv::FaceValues, cellid::Int, faceid::Int, grid)
-        coords = getcoordinates(grid, cellid)
+        coords = get_cell_coordinates(grid, cellid)
         Ferrite.reinit!(fv, coords, faceid)
     end
     reinit!(fv::FaceValues, faceid::FaceIndex, grid) = reinit!(fv,faceid[1],faceid[2],grid) # wrapper for reinit!(fv,cellid,faceid,grid)
@@ -512,7 +512,8 @@ end
         add!(dh1, :u, VectorLagrangeTest{RefLine,1,2}())
         close!(dh1)
         dh2 = DofHandler(grid)
-        add!(dh2, :u, Lagrange{RefQuadrilateral,1}()^2)
+        # TODO: Why was this RefQuadrilateral? Check it is correct to test with RefLine
+        add!(dh2, :u, Lagrange{RefLine,1}()^2)
         close!(dh2)
         @test dh1.cell_dofs == dh2.cell_dofs
 
@@ -521,7 +522,8 @@ end
         add!(dh1, :u, VectorLagrangeTest{RefLine,1,3}())
         close!(dh1)
         dh2 = DofHandler(grid)
-        add!(dh2, :u, Lagrange{RefQuadrilateral,1}()^3)
+        # TODO: Why was this RefQuadrilateral? Check it is correct to test with RefLine
+        add!(dh2, :u, Lagrange{RefLine,1}()^3)
         close!(dh2)
         @test dh1.cell_dofs == dh2.cell_dofs
     end

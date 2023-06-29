@@ -1,13 +1,13 @@
 function _default_interpolations(dh::DofHandler)
-    fhs = dh.fieldhandlers
-    getcelltype(i) = typeof(getcells(dh.grid, first(fhs[i].cellset)))
-    ntuple(i -> default_interpolation(getcelltype(i)), length(fhs))
+    sdhs = dh.subdofhandlers
+    getcelltype(i) = typeof(getcells(get_grid(dh), first(sdhs[i].cellset)))
+    ntuple(i -> default_interpolation(getcelltype(i)), length(sdhs))
 end
 
 """
     apply_analytical!(
         a::AbstractVector, dh::AbstractDofHandler, fieldname::Symbol, 
-        f::Function, cellset=1:getncells(dh.grid))
+        f::Function, cellset=1:getncells(get_grid(dh)))
 
 Apply a solution `f(x)` by modifying the values in the degree of freedom vector `a`
 pertaining to the field `fieldname` for all cells in `cellset`.
@@ -27,21 +27,21 @@ This function can be used to apply initial conditions for time dependent problem
 """
 function apply_analytical!(
     a::AbstractVector, dh::DofHandler, fieldname::Symbol, f::Function,
-    cellset = 1:getncells(dh.grid))
+    cellset = 1:getncells(get_grid(dh)))
 
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
     ip_geos = _default_interpolations(dh)
 
-    for (fh, ip_geo) in zip(dh.fieldhandlers, ip_geos)
-        isnothing(_find_field(fh, fieldname)) && continue
-        field_idx = find_field(fh, fieldname)
-        ip_fun = getfieldinterpolation(fh, field_idx)
-        field_dim = getfielddim(fh, field_idx)
-        celldofinds = dof_range(fh, fieldname)
-        set_intersection = if length(cellset) == length(fh.cellset) == getncells(dh.grid)
-            BitSet(1:getncells(dh.grid))
+    for (sdh, ip_geo) in zip(dh.subdofhandlers, ip_geos)
+        isnothing(_find_field(sdh, fieldname)) && continue
+        field_idx = find_field(sdh, fieldname)
+        ip_fun = getfieldinterpolation(sdh, field_idx)
+        field_dim = getfielddim(sdh, field_idx)
+        celldofinds = dof_range(sdh, fieldname)
+        set_intersection = if length(cellset) == length(sdh.cellset) == getncells(get_grid(dh))
+            BitSet(1:getncells(get_grid(dh)))
         else
-            intersect(BitSet(fh.cellset), BitSet(cellset))
+            intersect(BitSet(sdh.cellset), BitSet(cellset))
         end
         _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, set_intersection)
     end
@@ -52,7 +52,7 @@ function _apply_analytical!(
     a::AbstractVector, dh::AbstractDofHandler, celldofinds, field_dim,
     ip_fun::Interpolation{RefShape}, ip_geo::Interpolation, f::Function, cellset) where {dim, RefShape<:AbstractRefShape{dim}}
 
-    coords = getcoordinates(dh.grid, first(cellset))
+    coords = get_cell_coordinates(get_grid(dh), first(cellset))
     ref_points = reference_coordinates(ip_fun)
     dummy_weights = zeros(length(ref_points))
     qr = QuadratureRule{RefShape}(dummy_weights, ref_points)
@@ -65,7 +65,7 @@ function _apply_analytical!(
     length(f(first(coords))) == field_dim || error("length(f(x)) must be equal to dimension of the field ($field_dim)")
 
     for cellnr in cellset
-        getcoordinates!(coords, dh.grid, cellnr)
+        get_cell_coordinates!(coords, get_grid(dh), cellnr)
         celldofs!(c_dofs, dh, cellnr)
         for (i, celldofind) in enumerate(celldofinds)
             f_dofs[i] = c_dofs[celldofind]

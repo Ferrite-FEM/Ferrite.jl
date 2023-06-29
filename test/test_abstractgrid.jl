@@ -10,7 +10,7 @@
     Ferrite.getncells(grid::SmallGrid{dim,N}) where {dim,N} = N
     Ferrite.getcelltype(grid::SmallGrid) = eltype(grid.cells_test)
     Ferrite.getcelltype(grid::SmallGrid, i::Int) = typeof(grid.cells_test[i])
-    Ferrite.getcoordinates(x::NTuple{dim,Float64}) where dim = Vec{dim,Float64}(x)
+    Ferrite.get_node_coordinate(x::NTuple{dim,Float64}) where dim = Vec{dim,Float64}(x)
 
     Ferrite.getnodes(grid::SmallGrid) = grid.nodes_test
     Ferrite.getnodes(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.nodes_test[v]
@@ -43,7 +43,7 @@
         for cellid in 1:getncells(dh.grid)
             fill!(Ke, 0)
             fill!(fe, 0)
-            coords = getcoordinates(dh.grid, cellid)
+            coords = get_cell_coordinates(dh.grid, cellid)
             reinit!(cellvalues, coords)
             for q_point in 1:getnquadpoints(cellvalues)
                 dΩ = getdetJdV(cellvalues, q_point)
