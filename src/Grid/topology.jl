@@ -2,7 +2,6 @@
 ############
 # Topology #
 ############
-# TODO: Move topology stuff to src/Grid/Topology.jl or something
 
 struct EntityNeighborhood{T<:Union{BoundaryIndex,CellIndex}}
     neighbor_info::Vector{T}
