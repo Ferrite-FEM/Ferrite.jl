@@ -17,28 +17,6 @@ const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 # Generate tutorials and how-to guides
 include("generate.jl")
 
-<<<<<<< HEAD
-=======
-GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
-    "heat_equation.md",
-    "postprocessing.md",
-    "helmholtz.md",
-    "incompressible_elasticity.md",
-    "hyperelasticity.md",
-    "threaded_assembly.md",
-    "plasticity.md",
-    "transient_heat_equation.md",
-    "landau.md",
-    "linear_shell.md",
-    "quasi_incompressible_hyperelasticity.md",
-    "ns_vs_diffeq.md",
-    "computational_homogenization.md",
-    "stokes-flow.md",
-    "porous_media.md",
-	  "topology_optimization.md",
-    )]
-
->>>>>>> f8406fffda50e821e54bfb00d5effb899977dd6e
 # Build documentation.
 @timeit dto "makedocs" makedocs(
     format = Documenter.HTML(

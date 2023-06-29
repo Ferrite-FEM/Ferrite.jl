@@ -393,15 +393,6 @@ version = "0.1.6"
 [[deps.FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 
-<<<<<<< HEAD
-=======
-[[deps.FerriteMeshParser]]
-deps = ["Ferrite"]
-git-tree-sha1 = "71992742ab168aff5e86c5ccbc7b8657a2b67587"
-uuid = "0f8c756f-80dd-4a75-85c6-b0a5ab9d4620"
-version = "0.1.2"
-
->>>>>>> f8406fffda50e821e54bfb00d5effb899977dd6e
 [[deps.FillArrays]]
 deps = ["LinearAlgebra", "Random", "SparseArrays", "Statistics"]
 git-tree-sha1 = "0b3b52afd0f87b0a3f5ada0466352d125c9db458"
