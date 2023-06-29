@@ -126,7 +126,7 @@ function cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sy
             for cell_idx in eachindex(getcells(dh.grid))
                 cell_field ∈ dh.subdofhandlers[dh.cell_to_subdofhandler[cell_idx]].field_names || continue
                 # Not using celldofs() to avoid copying 
-                cell_dofs = @view dh.cell_dofs[dh.cell_dofs_offset[cell_idx] : dh.cell_dofs_offset[cell_idx] + ndofs_per_cell(dh, cell_idx) - 1]
+                cell_dofs = celldofs(dh, cell_idx)
                 cell_field_dofs = @view cell_dofs[element_dof_start + 1 : element_dof_start + nbasefunctions[cell_field_i]]
                 for neighbor_cell in (getdim(dh.grid.cells[cell_idx]) >1 ? topology.cell_face_neighbor[cell_idx] : topology.cell_neighbor[cell_idx])
                     neighbour_dof_start = 0
@@ -137,7 +137,7 @@ function cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sy
                             neighbour_dof_start += nbasefunctions[neighbor_field_i]
                             continue
                         end
-                        neighbor_dofs = @view dh.cell_dofs[dh.cell_dofs_offset[neighbor_cell.idx] : dh.cell_dofs_offset[neighbor_cell.idx] + ndofs_per_cell(dh, neighbor_cell.idx) - 1]
+                        neighbor_dofs = celldofs(dh, neighbor_cell.idx)
                         neighbor_field_dofs = @view neighbor_dofs[neighbour_dof_start + 1 : neighbour_dof_start + nbasefunctions[neighbor_field_i]]
                         for j in eachindex(neighbor_field_dofs), i in eachindex(cell_field_dofs)
                             isnothing(couplings) || coupling_fh[i+element_dof_start,j+neighbour_dof_start] || continue

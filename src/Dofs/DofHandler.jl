@@ -158,9 +158,7 @@ Return a vector with the degrees of freedom that belong to cell `i`.
 
 See also [`celldofs!`](@ref).
 """
-function celldofs(dh::AbstractDofHandler, i::Int)
-    return celldofs!(zeros(Int, ndofs_per_cell(dh, i)), dh, i)
-end
+celldofs(dh::AbstractDofHandler, i::Int) = @view dh.cell_dofs[dh.cell_dofs_offset[i] : dh.cell_dofs_offset[i] + ndofs_per_cell(dh, i) - 1]
 
 function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler, i::Union{Int, <:AbstractCell})
     cellnodes!(global_nodes, get_grid(dh), i)
