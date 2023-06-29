@@ -88,11 +88,6 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     # Setup vertex to cell connectivity by flipping the cell to vertex table
     for (cellid, cell_vertices) in enumerate(cell_vertices_table)
         for vertex in cell_vertices
-            # if haskey(vertex_cell_table, vertex)
-            #     push!(vertex_cell_table[vertex], cellid)
-            # else
-            #     vertex_cell_table[vertex] = Set([cellid])
-            # end
             push!(vertex_cell_table[vertex], cellid)
         end
     end
@@ -121,9 +116,24 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     end
 
     # Setup matrices
-    vertex_table = zeros(EntityNeighborhood{VertexIndex}, length(cells), max_vertices)
-    face_table   = zeros(EntityNeighborhood{FaceIndex}, length(cells), max_faces)
-    edge_table   = zeros(EntityNeighborhood{EdgeIndex}, length(cells), max_edges)
+    vertex_table = Matrix{EntityNeighborhood{VertexIndex}}(undef, length(cells), max_vertices)
+    for j = 1:size(vertex_table,2)
+        for i = 1:size(vertex_table,1)
+            vertex_table[i,j] = EntityNeighborhood{VertexIndex}([])
+        end
+    end
+    face_table   = Matrix{EntityNeighborhood{FaceIndex}}(undef, length(cells), max_faces)
+    for j = 1:size(face_table,2)
+        for i = 1:size(face_table,1)
+            face_table[i,j] = EntityNeighborhood{FaceIndex}([])
+        end
+    end
+    edge_table   = Matrix{EntityNeighborhood{EdgeIndex}}(undef, length(cells), max_edges)
+    for j = 1:size(edge_table,2)
+        for i = 1:size(edge_table,1)
+            edge_table[i,j] = EntityNeighborhood{EdgeIndex}([])
+        end
+    end
     cell_neighbor_table = Vector{EntityNeighborhood{CellIndex}}(undef, length(cells))
 
     for (cell_id, cell) in enumerate(cells)
@@ -279,9 +289,9 @@ Computes the stencils induced by the edge connectivity of the vertices.
 """
 function compute_vertex_star_stencils(top::ExclusiveTopology, grid::Grid)
     cells = grid.cells
-    vertex_vertex_table = Dict{Int,EntityNeighborhood{VertexIndex}}()
+    stencil_table = Dict{Int,EntityNeighborhood{VertexIndex}}()
     # Vertex Connectivity
-    for (global_vertexid,cellset) ∈ top.vertex_to_cell
+    for (global_vertexid,cellset) ∈ enumerate(top.vertex_to_cell)
         vertex_neighbors_local = VertexIndex[]
         for cell ∈ cellset
             neighbor_boundary = getdim(cells[cell]) > 2 ? collect(edges(cells[cell])) : collect(faces(cells[cell])) #get lowest dimension boundary
@@ -294,9 +304,9 @@ function compute_vertex_star_stencils(top::ExclusiveTopology, grid::Grid)
             neighbor_vertices_local = [VertexIndex(cell,local_vertex) for local_vertex ∈ findall(x->x ∈ neighbor_vertices_global, vertices(cells[cell]))]
             append!(vertex_neighbors_local, neighbor_vertices_local)
         end
-        vertex_vertex_table[global_vertexid] =  EntityNeighborhood(vertex_neighbors_local)
+        stencil_table[global_vertexid] =  EntityNeighborhood(vertex_neighbors_local)
     end
-    return vertex_vertex_table
+    return stencil_table
 end
 
 """
