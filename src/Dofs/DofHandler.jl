@@ -823,18 +823,49 @@ function evaluate_at_grid_nodes(dh::DofHandler, u::Vector, fieldname::Symbol)
     return _evaluate_at_grid_nodes(dh, u, fieldname)
 end
 
+function n_components(dh::DofHandler, fieldname::Symbol)
+    field_idx = find_field(dh, fieldname)
+    n = n_components(getfieldinterpolation(dh, field_idx))
+    # The following check should/could have been done already at close!
+    for sdh in dh.subdofhandlers
+        field_idx = _find_field(sdh, fieldname)
+        isnothing(field_idx) && continue
+        if n != n_components(getfieldinterpolation(sdh, fieldname))
+            error("$fieldname has different number of components in different subdofhandlers")
+        end
+    end
+    return n
+end
+
+physical_field_type(::ScalarInterpolation, T=Float64) = T
+physical_field_type(ip::VectorInterpolation, T=Float64) = Vec{n_components(ip),T}
+
+function physical_field_type(dh::DofHandler, fieldname::Symbol, T=Float64)
+    field_idx = find_field(dh, fieldname)
+    PFT = physical_field_type(getfieldinterpolation(dh, field_idx), T)
+    # The following check should/could have been done already at close!
+    for sdh in dh.subdofhandlers
+        field_idx = _find_field(sdh, fieldname)
+        isnothing(field_idx) && continue
+        this_PFT = physical_field_type(getfieldinterpolation(sdh, field_idx), T)
+        if PFT != this_PFT
+            error("$fieldname has different physical field type, $this_PFT, than other subdofhandlers ($PFT)")
+        end
+    end
+    return PFT
+end
+
 # Internal method that have the vtk option to allocate the output differently
 function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol, ::Val{vtk}=Val(false)) where {T, vtk}
     # Make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
     field_idx = find_field(dh, fieldname)
-    ip = getfieldinterpolation(dh, field_idx)
-    RT = ip isa ScalarInterpolation ? T : Vec{n_components(ip),T}
+    n_comp = n_components(dh, fieldname)
+    RT = physical_field_type(dh, fieldname, T)
     if vtk
         # VTK output of solution field (or L2 projected scalar data)
-        n_c = n_components(ip)
-        vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
+        vtk_dim = n_comp == 2 ? 3 : n_comp # VTK wants vectors padded to 3D
         data = fill(NaN * zero(T), vtk_dim, getnnodes(get_grid(dh)))
     else
         # Just evalutation at grid nodes
@@ -849,8 +880,8 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         CT = getcelltype(get_grid(dh), first(sdh.cellset))
         ip_geo = default_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
-        qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
         ip = getfieldinterpolation(sdh, field_idx)
+        qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
         if ip isa VectorizedInterpolation
             # TODO: Remove this hack when embedding works...
             cv = CellValues(qr, ip.ip, ip_geo)

@@ -164,13 +164,7 @@ function element_routine!(Ke, fext, m::PoroElastic, cvs::Tuple, cell, a_old, Δt
     ## Check that cellvalues are compatible with each other (should have same quadrature rule)
     @assert getnquadpoints(cv_u) == getnquadpoints(cv_p)
 
-    ## Material parameters
-    μ = 1.e-4       # [Ns/mm^2] Dynamic viscosity
-    k = 5.0e-6      # [mm^2] Intrinsic permeability
-    k_darcy = k/μ
-    n = 0.8         # [-] Porosity
-    K_liquid = 2.e3 # [MPa] Liquid bulk modulus
-    dσdϵ = elastic_stiffness()
+    C_el = m.elastic.C ## Elastic stiffness 
 
     ## Assemble stiffness and force vectors
     for q_point in 1:getnquadpoints(cv_u)    
@@ -181,7 +175,7 @@ function element_routine!(Ke, fext, m::PoroElastic, cvs::Tuple, cell, a_old, Δt
             div_δNu = shape_divergence(cv_u, q_point, iᵤ)
             for (jᵤ, Jᵤ) in pairs(dof_range(sdh, :u))
                 ∇Nu = shape_symmetric_gradient(cv_u, q_point, jᵤ)
-                Ke[Iᵤ, Jᵤ] -= ∇δNu ⊡ dσdϵ ⊡ ∇Nu * dΩ
+                Ke[Iᵤ, Jᵤ] -= ∇δNu ⊡ C_el ⊡ ∇Nu * dΩ
             end
             for (jₚ, Jₚ) in pairs(dof_range(sdh, :p))
                 Np = shape_value(cv_p, q_point, jₚ)
@@ -201,8 +195,8 @@ function element_routine!(Ke, fext, m::PoroElastic, cvs::Tuple, cell, a_old, Δt
             for (jₚ, Jₚ) in pairs(dof_range(sdh, :p))
                 ∇Np = shape_gradient(cv_p, q_point, jₚ)
                 Np = shape_value(cv_p, q_point, jₚ)
-                Kpp_ij = (k_darcy/n) * ∇δNp ⋅ ∇Np * dΩ
-                Lpp_ij = δNp*Np/K_liquid
+                Kpp_ij = (m.k/m.ϕ) * ∇δNp ⋅ ∇Np * dΩ
+                Lpp_ij = δNp*Np/m.K_liquid
                 Ke[Iₚ,Jₚ] += Δt*Kpp_ij + Lpp_ij
                 fext[Iₚ] += Lpp_ij*a_old[Jₚ]
             end 
@@ -277,19 +271,19 @@ function setup_problem(;t_rise=0.1, p_max=100.0)
 
     ## Setup the interpolation and integration rules
     dim=Ferrite.getdim(grid)
-    ipu_quad = Lagrange{dim,RefSquare,2}()^2
-    ipu_tri  = Lagrange{dim,RefTriangle,2}()^2
-    ipp_quad = Lagrange{dim,RefSquare,1}()
-    ipp_tri  = Lagrange{dim,RefTriangle,1}()
+    ipu_quad = Lagrange{RefQuadrilateral,2}()^2
+    ipu_tri  = Lagrange{RefTriangle,2}()^2
+    ipp_quad = Lagrange{RefQuadrilateral,1}()
+    ipp_tri  = Lagrange{RefTriangle,1}()
     
-    qr_quad = QuadratureRule{dim, RefSquare}(2)
-    qr_tri  = QuadratureRule{dim, RefTriangle}(2)
+    qr_quad = QuadratureRule{RefQuadrilateral}(2)
+    qr_tri  = QuadratureRule{RefTriangle}(2)
 
     ## CellValues
-    cvu_quad = CellVectorValues(qr_quad, ipu_quad)
-    cvu_tri = CellVectorValues(qr_tri, ipu_tri)
-    cvp_quad = CellScalarValues(qr_quad, ipp_quad)
-    cvp_tri = CellScalarValues(qr_tri, ipp_tri)
+    cvu_quad = CellValues(qr_quad, ipu_quad)
+    cvu_tri = CellValues(qr_tri, ipu_tri)
+    cvp_quad = CellValues(qr_quad, ipp_quad)
+    cvp_tri = CellValues(qr_tri, ipp_tri)
 
     ## Setup the DofHandler
     dh = DofHandler(grid)
