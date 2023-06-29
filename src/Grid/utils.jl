@@ -327,7 +327,7 @@ for (func,                   entity_f,            entity_t,     filter_f,       
     function $(func)(grid::AbstractGrid, topology::ExclusiveTopology, name::String, f::Function; all::Bool=true)
         _check_setname($(destination), name)
         _set = Set{$(entity_t)}()
-        for (face_idx, neighborhood) in pairs(topology.face_neighbor)
+        for (face_idx, neighborhood) in pairs(topology.face_face_neighbor)
             isempty(neighborhood) || continue # Skip any faces with neighbors (not on boundary)
             entities =  $(entity_f)(grid, FaceIndex((face_idx[1], face_idx[2])))
             for entity in $(filter_f)(grid, entities, f; all=all)
