@@ -45,8 +45,13 @@ include("download_resources.jl")
                 Literate.notebook(tutorial, TUTORIALS_OUT, preprocess = nbpre, execute = is_ci) # Don't execute locally
             end
         end
+<<<<<<< HEAD
     elseif any(endswith.(tutorial, [".png", ".jpg", ".gif"]))
         cp(tutorial, joinpath(TUTORIALS_OUT, name); force=true)
+=======
+    elseif any(endswith.(example, [".png", ".jpg", ".gif", ".svg"]))
+        cp(joinpath(EXAMPLEDIR, example), joinpath(GENERATEDDIR, example); force=true)
+>>>>>>> f8406fffda50e821e54bfb00d5effb899977dd6e
     else
         @warn "ignoring $tutorial"
     end
