@@ -172,8 +172,8 @@ end
     ip = Lagrange{RefQuadrilateral,1}()
     ip_t = Lagrange{RefQuadrilateral,1}
 
-    @test Ferrite.IsDiscontinuous(ip) == false
-    @test Ferrite.IsDiscontinuous(ip_t) == false
-    @test Ferrite.IsDiscontinuous(d_ip) == true
-    @test Ferrite.IsDiscontinuous(d_ip_t) == true
+    @test Ferrite.is_discontinuous(ip) == false
+    @test Ferrite.is_discontinuous(ip_t) == false
+    @test Ferrite.is_discontinuous(d_ip) == true
+    @test Ferrite.is_discontinuous(d_ip_t) == true
 end

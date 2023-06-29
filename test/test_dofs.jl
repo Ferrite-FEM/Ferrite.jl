@@ -596,7 +596,7 @@ end
                         j_dofs = dof_range(fh2, field2_idx)
                         ip2 = field2.interpolation
                         vdim[2] = typeof(ip2) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip2) : 1
-                        is_cross_element && !all(Ferrite.IsDiscontinuous.([ip1, ip2])) && continue
+                        is_cross_element && !all(Ferrite.is_discontinuous.([ip1, ip2])) && continue
                         for  dim2 in 1:vdim[2]
                             i_dofs_v = i_dofs[dim1:vdim[1]:end]
                             j_dofs_v = j_dofs[dim2:vdim[2]:end]

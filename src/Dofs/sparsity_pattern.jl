@@ -101,12 +101,12 @@ function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatri
 end
 
 """
-    cross_element_coupling!(dh::AbstractDofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
+    cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
 Calculates `I, J` for cross-element coupling
 Returns the updated value of `cnt`
 Used internally for sparsity patterns with discontinuous interpolations.
 """
-function cross_element_coupling!(dh::AbstractDofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
+function cross_element_coupling!(dh::tDofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
     for (fhi, fh) in pairs(dh.fieldhandlers)
         ip_infos = InterpolationInfo[]
         nbasefunctions = Int[]
@@ -183,7 +183,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
             coupling_sdh = couplings[sdh_idx]
             count(coupling_sdh[i, j] for i in 1:n for j in (sym ? i : 1):n)
         end
-        has_discontinuous_ip = any(ip -> IsDiscontinuous(ip),fh.field_interpolations)
+        has_discontinuous_ip = any(ip -> is_discontinuous(ip),fh.field_interpolations)
         max_buffer_length += entries_per_cell * length(set)
     end
     I = Vector{Int}(undef, max_buffer_length)

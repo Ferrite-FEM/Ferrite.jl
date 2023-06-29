@@ -34,7 +34,7 @@ Ferrite.edgedof_interior_indices(::Interpolation)
 Ferrite.celldof_interior_indices(::Interpolation)
 Ferrite.getnbasefunctions(::Interpolation)
 Ferrite.reference_coordinates(::Interpolation)
-Ferrite.IsDiscontinuous(::Interpolation)
+Ferrite.is_discontinuous(::Interpolation)
 Ferrite.adjust_dofs_during_distribution(::Interpolation)
 ```
 
