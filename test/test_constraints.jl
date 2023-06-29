@@ -657,6 +657,15 @@ end
         PeriodicFacePair(FaceIndex(6, 2), FaceIndex(7, 5), 0x00, true),
     ])
 
+    # Test with keyword TOL
+    grid = generate_grid(Hexahedron, (2, 2, 2))
+    face_map     = collect_periodic_faces(grid, "bottom", "top")
+    face_map_TOL = collect_periodic_faces(grid, "bottom", "top"; TOL=1e-10)
+    @test face_map == face_map_TOL
+    collect_periodic_faces!(face_map, grid, "right", "left")
+    collect_periodic_faces!(face_map_TOL, grid, "right", "left"; TOL=1e-10)
+    @test face_map == face_map_TOL
+
     ####################################################################
 
     # 3D tetra grid

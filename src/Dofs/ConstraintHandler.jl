@@ -1261,7 +1261,7 @@ function rotate_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange
 end
 
 """
-    collect_periodic_faces(grid::Grid, mset, iset, transform::Union{Function,Nothing}=nothing)
+    collect_periodic_faces(grid::Grid, mset, iset, transform::Union{Function,Nothing}=nothing; TOL=1e-12)
 
 Match all mirror faces in `mset` with a corresponding image face in `iset`. Return a
 dictionary which maps each mirror face to a image face. The result can then be passed to
@@ -1275,14 +1275,17 @@ system. For other types of periodicities the `transform` function can be used. T
 `transform` function is applied on the coordinates of the image face, and is expected to
 transform the coordinates to the matching locations in the mirror set.
 
+The keyword `TOL` specifies the tolerence (i.e. distance and deviation in face-normals) 
+between a image-face and mirror-face, for them to be considered matched.
+
 See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
 """
-function collect_periodic_faces(grid::Grid, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing)
-    return collect_periodic_faces!(PeriodicFacePair[], grid, mset, iset, transform)
+function collect_periodic_faces(grid::Grid, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing; TOL::Float64=1e-12)
+    return collect_periodic_faces!(PeriodicFacePair[], grid, mset, iset, transform; TOL)
 end
 
 """
-    collect_periodic_faces(grid::Grid, all_faces::Union{Set{FaceIndex},String,Nothing}=nothing)
+    collect_periodic_faces(grid::Grid, all_faces::Union{Set{FaceIndex},String,Nothing}=nothing; TOL=1e-12)
 
 Split all faces in `all_faces` into image and mirror sets. For each matching pair, the face
 located further along the vector `(1, 1, 1)` becomes the image face.
@@ -1292,35 +1295,35 @@ have a neighbor) is used.
 
 See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
 """
-function collect_periodic_faces(grid::Grid, all_faces::Union{Set{FaceIndex},String,Nothing}=nothing)
-    return collect_periodic_faces!(PeriodicFacePair[], grid, all_faces)
+function collect_periodic_faces(grid::Grid, all_faces::Union{Set{FaceIndex},String,Nothing}=nothing; TOL::Float64=1e-12)
+    return collect_periodic_faces!(PeriodicFacePair[], grid, all_faces; TOL)
 end
 
 
 """
-    collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset, iset, transform::Union{Function,Nothing})
+    collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset, iset, transform::Union{Function,Nothing}; TOL=1e-12)
 
 Same as [`collect_periodic_faces`](@ref) but adds all matches to the existing `face_map`.
 """
-function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing)
+function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing; TOL::Float64=1e-12)
     mset = __to_faceset(grid, mset)
     iset = __to_faceset(grid, iset)
     if transform === nothing
         # This method is destructive, hence the copy
-        __collect_periodic_faces_bruteforce!(face_map, grid, copy(mset), copy(iset), #=known_order=#true)
+        __collect_periodic_faces_bruteforce!(face_map, grid, copy(mset), copy(iset), #=known_order=#true, TOL)
     else
         # This method relies on ordering, hence the collect
-        __collect_periodic_faces_tree!(face_map, grid, collect(mset), collect(iset), transform)
+        __collect_periodic_faces_tree!(face_map, grid, collect(mset), collect(iset), transform, TOL)
     end
     return face_map
 end
 
-function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, faceset::Union{Set{FaceIndex},String,Nothing})
+function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, faceset::Union{Set{FaceIndex},String,Nothing}; TOL::Float64=1e-12)
     faceset = faceset === nothing ? __collect_boundary_faces(grid) : copy(__to_faceset(grid, faceset))
     if mod(length(faceset), 2) != 0
         error("uneven number of faces")
     end
-    return __collect_periodic_faces_bruteforce!(face_map, grid, faceset, faceset, #=known_order=#false)
+    return __collect_periodic_faces_bruteforce!(face_map, grid, faceset, faceset, #=known_order=#false, TOL)
 end
 
 __to_faceset(_, set::Set{FaceIndex}) = set
@@ -1340,7 +1343,7 @@ function __collect_boundary_faces(grid::Grid)
     return Set{FaceIndex}(values(candidates))
 end
 
-function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Vector{FaceIndex}, iset::Vector{FaceIndex}, transformation::F) where F <: Function
+function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Vector{FaceIndex}, iset::Vector{FaceIndex}, transformation::F, TOL::Float64) where F <: Function
     if length(mset) != length(mset)
         error("different number of faces in mirror and image set")
     end
@@ -1364,7 +1367,7 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
     tree = KDTree(image_mean_x)
     idxs, _ = NearestNeighbors.nn(tree, mirror_mean_x)
     for (midx, iidx) in zip(eachindex(mset), idxs)
-        r = __check_periodic_faces_f(grid, mset[midx], iset[iidx], mirror_mean_x[midx], image_mean_x[iidx], transformation)
+        r = __check_periodic_faces_f(grid, mset[midx], iset[iidx], mirror_mean_x[midx], image_mean_x[iidx], transformation, TOL)
         if r === nothing
             error("Could not find matching face for $(mset[midx])")
         end
@@ -1382,7 +1385,7 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
 end
 
 # This method empties mset and iset
-function __collect_periodic_faces_bruteforce!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Set{FaceIndex}, iset::Set{FaceIndex}, known_order::Bool)
+function __collect_periodic_faces_bruteforce!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Set{FaceIndex}, iset::Set{FaceIndex}, known_order::Bool, TOL::Float64)
     if length(mset) != length(iset)
         error("different faces in mirror and image")
     end
@@ -1391,7 +1394,7 @@ function __collect_periodic_faces_bruteforce!(face_map::Vector{PeriodicFacePair}
         found = false
         for fj in iset
             fi == fj && continue
-            r = __check_periodic_faces(grid, fi, fj, known_order)
+            r = __check_periodic_faces(grid, fi, fj, known_order, TOL)
             r === nothing && continue
             push!(face_map, r)
             delete!(mset, fi)
@@ -1454,7 +1457,7 @@ end
 
 # Check if two faces are periodic. This method assumes that the faces are mirrored and thus
 # have opposing normal vectors
-function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_order::Bool)
+function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_order::Bool, TOL::Float64)
     cii, fii = fi
     nodes_i = faces(grid.cells[cii])[fii]
     cij, fij = fj
@@ -1463,7 +1466,6 @@ function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_
     # 1. Check that normals are opposite TODO: Should use FaceValues here
     ni = __outward_normal(grid, nodes_i)
     nj = __outward_normal(grid, nodes_j)
-    TOL = 1e-12
     if norm(ni + nj) >= TOL
         return nothing
     end
@@ -1531,7 +1533,7 @@ end
 # a transformation function and we have then used the KDTree to find the matching pair of
 # faces. This function only need to i) check whether faces have aligned or opposite normal
 # vectors, and ii) compute the relative rotation.
-function __check_periodic_faces_f(grid::Grid, fi::FaceIndex, fj::FaceIndex, xmi, xmj, transformation::F) where F
+function __check_periodic_faces_f(grid::Grid, fi::FaceIndex, fj::FaceIndex, xmi, xmj, transformation::F, TOL::Float64) where F
     cii, fii = fi
     nodes_i = faces(grid.cells[cii])[fii]
     cij, fij = fj
@@ -1540,7 +1542,6 @@ function __check_periodic_faces_f(grid::Grid, fi::FaceIndex, fj::FaceIndex, xmi,
     # 1. Check if normals are aligned or opposite TODO: Should use FaceValues here
     ni = __outward_normal(grid, nodes_i)
     nj = __outward_normal(grid, nodes_j, transformation)
-    TOL = 1e-12
     if norm(ni + nj) < TOL
         mirror = true
     elseif norm(ni - nj) < TOL
