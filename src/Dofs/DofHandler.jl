@@ -110,6 +110,14 @@ function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
     end
 end
 
+function get_only_sdh_or_error(dh::DofHandler, func::Symbol)
+    @assert isclosed(dh)
+    if length(dh.subdofhandlers) != 1
+        error("$(func) not supported for DofHandler with multiple SubDofHandlers")
+    end
+    return dh.subdofhandlers[1]
+end
+
 isclosed(dh::AbstractDofHandler) = dh.closed[]
 get_grid(dh::DofHandler) = dh.grid
 
@@ -177,24 +185,36 @@ the fields.
 getfieldnames(dh::DofHandler) = dh.field_names
 getfieldnames(sdh::SubDofHandler) = sdh.field_names
 
-getfielddim(sdh::SubDofHandler, field_idx::Int) = n_components(sdh.field_interpolations[field_idx])::Int
-getfielddim(sdh::SubDofHandler, field_name::Symbol) = getfielddim(sdh, find_field(sdh, field_name))
-
-"""
-    getfielddim(dh::DofHandler, field_idxs::NTuple{2,Int})
-    getfielddim(dh::DofHandler, field_name::Symbol)
-    getfielddim(sdh::SubDofHandler, field_idx::Int)
-    getfielddim(sdh::SubDofHandler, field_name::Symbol)
-
-Return the dimension (number of components) of a given field. The field can be specified by
-its index (see [`find_field`](@ref)) or its name.
-"""
-function getfielddim(dh::DofHandler, field_idxs::NTuple{2, Int})
-    sdh_idx, field_idx = field_idxs
-    fielddim = getfielddim(dh.subdofhandlers[sdh_idx], field_idx)
-    return fielddim
+@noinline function throw_field_not_found(field_name)
+    throw(ArgumentError("field :$(field_name) not found"))
 end
-getfielddim(dh::DofHandler, name::Symbol) = getfielddim(dh, find_field(dh, name))
+
+"""
+    getfielddim(dh::DofHandler,     field_name::Symbol)
+    getfielddim(sdh::SubDofHandler, field_name::Symbol)
+    getfielddim(sdh::SubDofHandler, field_idx::Int)
+
+Return the dimension (number of components) of a given field.
+"""
+getfielddim
+
+# Since fields must have the same field dim on all subdomains it is
+# fine to return the first occurance when called on a DofHandler.
+function getfielddim(dh::DofHandler, field_name::Symbol)
+    idx = find_field(dh, field_name)
+    idx === nothing && throw_field_not_found(field_name)
+    sdh_idx, field_idx = idx
+    return getfielddim(dh.subdofhandlers[sdh_idx], field_idx)
+end
+function getfielddim(sdh::SubDofHandler, field_name::Symbol)
+    i = find_field(sdh, field_name)
+    i === nothing && throw_field_not_found(field_name)
+    return getfielddim(sdh, i)
+end
+function getfielddim(sdh::SubDofHandler, field_idx::Int)
+    # Type assertion required because sdh.field_interpolations is abstractly typed
+    return n_components(sdh.field_interpolations[field_idx])::Int
+end
 
 """
     add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
@@ -688,47 +708,27 @@ sortface(face::Tuple{Int}) = face, nothing
 Return the index of the field with name `field_name` in a `DofHandler`. The index is a
 `NTuple{2,Int}`, where the 1st entry is the index of the `SubDofHandler` within which the
 field was found and the 2nd entry is the index of the field within the `SubDofHandler`.
+Return `nothing` if the field is not found.
 
 !!! note
     Always finds the 1st occurence of a field within `DofHandler`.
-
-See also: [`find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref),
-[`_find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref).
 """
 function find_field(dh::DofHandler, field_name::Symbol)
     for (sdh_idx, sdh) in pairs(dh.subdofhandlers)
-        field_idx = _find_field(sdh, field_name)
-        !isnothing(field_idx) && return (sdh_idx, field_idx)
+        field_idx = find_field(sdh, field_name)
+        field_idx === nothing && continue
+        return (sdh_idx, field_idx)
     end
-    error("Did not find field :$field_name in DofHandler (existing fields: $(getfieldnames(dh))).")
+    return nothing
 end
 
 """
     find_field(sdh::SubDofHandler, field_name::Symbol)::Int
 
-Return the index of the field with name `field_name` in a `SubDofHandler`. Throw an
-error if the field is not found.
-
-See also: [`find_field(dh::DofHandler, field_name::Symbol)`](@ref), [`_find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref).
+Return the index of the field with name `field_name` in the `SubDofHandler` `sdh`.
+Return `nothing` if the field is not found.
 """
 function find_field(sdh::SubDofHandler, field_name::Symbol)
-    field_idx = _find_field(sdh, field_name)
-    if field_idx === nothing
-        error("Did not find field :$field_name in SubDofHandler (existing fields: $(sdh.field_names))")
-    end
-    return field_idx
-end
-
-# No error if field not found
-"""
-    _find_field(sdh::SubDofHandler, field_name::Symbol)::Int
-
-Return the index of the field with name `field_name` in the `SubDofHandler` `sdh`. Return 
-`nothing` if the field is not found.
-
-See also: [`find_field(dh::DofHandler, field_name::Symbol)`](@ref), [`find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref).
-"""
-function _find_field(sdh::SubDofHandler, field_name::Symbol)
     return findfirst(x -> x === field_name, sdh.field_names)
 end
 
@@ -742,72 +742,61 @@ function field_offset(sdh::SubDofHandler, field_idx::Int)
 end
 
 """
-    dof_range(sdh::SubDofHandler, field_idx::Int)
-    dof_range(sdh::SubDofHandler, field_name::Symbol)
     dof_range(dh:DofHandler, field_name::Symbol)
+    dof_range(sdh::SubDofHandler, field_name::Symbol)
 
-Return the local dof range for a given field. The field can be specified by its name or
-index, where `field_idx` represents the index of a field within a `SubDofHandler` and
-`field_idxs` is a tuple of the `SubDofHandler`-index within the `DofHandler` and the
-`field_idx`.
+Return the local dof range for a given field.
 
 !!! note
-    The `dof_range` of a field can vary between different `SubDofHandler`s. Therefore, it is
-    advised to use the `field_idxs` or refer to a given `SubDofHandler` directly in case
-    several `SubDofHandler`s exist. Using the `field_name` will always refer to the first
-    occurence of `field` within the `DofHandler`.
+    The `dof_range` of a field can vary between different `SubDofHandler`s. Therefore, for
+    problems involving multiple `SubDofHandler`s, this method will throw an error when used
+    on the `DofHandler` directly. In this case `dof_range` should be called on the
+    respective `SubDofHandler`s instead.
 
 Example:
 ```jldoctest
-julia> grid = generate_grid(Triangle, (3, 3))
-Grid{2, Triangle, Float64} with 18 Triangle cells and 16 nodes
-
-julia> dh = DofHandler(grid); add!(dh, :u, 3); add!(dh, :p, 1); close!(dh);
+julia> dh = begin
+           grid = generate_grid(Triangle, (3, 3))
+           dh = DofHandler(grid)
+           add!(dh, :u, Lagrange{RefTriangle, 1}()^2) # vector field
+           add!(dh, :p, Lagrange{RefTriangle, 1}())   # scalar field
+           close!(dh)
+       end
 
 julia> dof_range(dh, :u)
-1:9
+1:6
 
 julia> dof_range(dh, :p)
-10:12
-
-julia> dof_range(dh, (1,1)) # field :u
-1:9
-
-julia> dof_range(dh.subdofhandlers[1], 2) # field :p
-10:12
+7:9
 ```
 """
-function dof_range(sdh::SubDofHandler, field_idx::Int)
-    offset = field_offset(sdh, field_idx)
-    field_interpolation = sdh.field_interpolations[field_idx]
-    n_field_dofs = getnbasefunctions(field_interpolation)::Int
+function dof_range(sdh::SubDofHandler, field_name::Symbol)
+    i = find_field(sdh, field_name)
+    i === nothing && throw_field_not_found(field_name)
+    offset = field_offset(sdh, i)
+    n_field_dofs = getnbasefunctions(sdh.field_interpolations[i])::Int
     return (offset+1):(offset+n_field_dofs)
 end
-dof_range(sdh::SubDofHandler, field_name::Symbol) = dof_range(sdh, find_field(sdh, field_name))
 
 function dof_range(dh::DofHandler, field_name::Symbol)
-    if length(dh.subdofhandlers) > 1
-        error("The given DofHandler has $(length(dh.subdofhandlers)) SubDofHandlers. Extracting the dof range based on the fieldname might not be a unique problem in this case. Use `dof_range(sdh::SubDofHandler, field_name)` instead.")
-    end
-    sdh_idx, field_idx = find_field(dh, field_name)
-    return dof_range(dh.subdofhandlers[sdh_idx], field_idx)
+    sdh = get_only_sdh_or_error(dh, :dof_range)
+    return dof_range(sdh, field_name)
 end
 
 """
-    getfieldinterpolation(dh::DofHandler, field_idxs::NTuple{2,Int})
     getfieldinterpolation(sdh::SubDofHandler, field_idx::Int)
     getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol)
 
-Return the interpolation of a given field. The field can be specified by its index (see
-[`find_field`](@ref) or its name.
+Return the interpolation of a given field. Throws an error if the field is not found.
 """
-function getfieldinterpolation(dh::DofHandler, field_idxs::NTuple{2,Int})
-    sdh_idx, field_idx = field_idxs
-    ip = dh.subdofhandlers[sdh_idx].field_interpolations[field_idx]
-    return ip
+function getfieldinterpolation(sdh::SubDofHandler, field_idx::Int)
+    return sdh.field_interpolations[field_idx]
 end
-getfieldinterpolation(sdh::SubDofHandler, field_idx::Int) = sdh.field_interpolations[field_idx]
-getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol) = getfieldinterpolation(sdh, find_field(sdh, field_name))
+function getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol)
+    i = find_field(sdh, field_name)
+    i === nothing && throw_field_not_found(field_name)
+    return getfieldinterpolation(sdh, i)
+end
 
 """
     evaluate_at_grid_nodes(dh::AbstractDofHandler, u::Vector{T}, fieldname::Symbol) where T
@@ -825,11 +814,10 @@ end
 
 # Internal method that have the vtk option to allocate the output differently
 function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol, ::Val{vtk}=Val(false)) where {T, vtk}
-    # Make sure the field exists
-    fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
     field_idx = find_field(dh, fieldname)
-    ip = getfieldinterpolation(dh, field_idx)
+    field_idx === nothing && throw_field_not_found(fieldname)
+    ip = getfieldinterpolation(dh.subdofhandlers[field_idx[1]], field_idx[2])
     RT = ip isa ScalarInterpolation ? T : Vec{n_components(ip),T}
     if vtk
         # VTK output of solution field (or L2 projected scalar data)
@@ -843,7 +831,7 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
     # Loop over the subdofhandlers
     for sdh in dh.subdofhandlers
         # Check if this sdh contains this field, otherwise continue to the next
-        field_idx = _find_field(sdh, fieldname)
+        field_idx = find_field(sdh, fieldname)
         field_idx === nothing && continue
         # Set up CellValues with the local node coords as quadrature points
         CT = getcelltype(get_grid(dh), first(sdh.cellset))
@@ -857,7 +845,7 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         else
             cv = CellValues(qr, ip, ip_geo)
         end
-        drange = dof_range(sdh, field_idx)
+        drange = dof_range(sdh, fieldname)
         # Function barrier
         _evaluate_at_grid_nodes!(data, sdh, u, cv, drange, RT)
     end

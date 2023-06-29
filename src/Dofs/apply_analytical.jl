@@ -33,7 +33,7 @@ function apply_analytical!(
     ip_geos = _default_interpolations(dh)
 
     for (sdh, ip_geo) in zip(dh.subdofhandlers, ip_geos)
-        isnothing(_find_field(sdh, fieldname)) && continue
+        find_field(sdh, fieldname) === nothing && continue
         field_idx = find_field(sdh, fieldname)
         ip_fun = getfieldinterpolation(sdh, field_idx)
         field_dim = getfielddim(sdh, field_idx)

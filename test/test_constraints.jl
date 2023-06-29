@@ -56,7 +56,7 @@
     pdbc = PeriodicDirichlet(:s, face_map, [1, 2])
     @test_throws ErrorException("components [1, 2] not within range of field :s (1 dimension(s))") add!(ConstraintHandler(dh), pdbc)
     pdbc = PeriodicDirichlet(:p, face_map)
-    @test_throws ErrorException("Did not find field :p in DofHandler (existing fields: [:s, :v, :z, :sd, :vd]).") add!(ConstraintHandler(dh), pdbc)
+    @test_throws ArgumentError("field :p not found") add!(ConstraintHandler(dh), pdbc)
     ## Vector
     pdbc = PeriodicDirichlet(:v, face_map)
     add!(ConstraintHandler(dh), pdbc)

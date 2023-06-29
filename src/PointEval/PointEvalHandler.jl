@@ -183,7 +183,9 @@ function get_point_values(ph::PointEvalHandler{<:Any, dim, T1}, dh::AbstractDofH
                            fname::Symbol=find_single_field(dh)) where {dim, T1, T2}
     npoints = length(ph.cells)
     # Figure out the value type by creating a dummy PointValuesInternal
-    ip = getfieldinterpolation(dh, find_field(dh, fname))
+    idx = find_field(dh, fname)
+    idx === nothing && throw_field_not_found(fname)
+    ip = getfieldinterpolation(dh.subdofhandlers[idx[1]], idx[2])
     pv = PointValuesInternal(zero(Vec{dim, T1}), ip)
     zero_val = function_value_init(pv, dof_vals)
     # Allocate the output as NaNs
@@ -263,7 +265,7 @@ end
 function get_func_interpolations(dh::DofHandler, fieldname)
     func_interpolations = Union{Interpolation,Nothing}[]
     for sdh in dh.subdofhandlers
-        j = _find_field(sdh, fieldname)
+        j = find_field(sdh, fieldname)
         if j === nothing
             push!(func_interpolations, nothing)
         else

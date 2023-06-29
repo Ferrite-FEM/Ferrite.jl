@@ -945,7 +945,8 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
         end
     end
     field_idx = find_field(ch.dh, pdbc.field_name)
-    interpolation = getfieldinterpolation(ch.dh, field_idx)
+    field_idx === nothing && throw_field_not_found(pdbc.field_name)
+    interpolation = getfieldinterpolation(ch.dh.subdofhandlers[field_idx[1]], field_idx[2])
     n_comp = n_dbc_components(interpolation)
     if interpolation isa VectorizedInterpolation
         interpolation = interpolation.ip
