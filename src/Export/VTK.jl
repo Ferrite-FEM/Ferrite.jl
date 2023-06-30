@@ -15,6 +15,7 @@ cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
 cell_to_vtkcell(::Type{Pyramid}) = VTKCellTypes.VTK_PYRAMID
 
 nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
+nodes_to_vtkorder(cell::Pyramid) = cell.nodes[[1,2,4,3,5]]
 
 """
     vtk_grid(filename::AbstractString, grid::Grid; kwargs...)

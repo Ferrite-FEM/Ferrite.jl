@@ -70,9 +70,9 @@ end
 function reference_normals(::Lagrange{RefPyramid})
     return [Vec{3, Float64}(( 0.0,  0.0, -1.0)),
             Vec{3, Float64}(( 0.0, -1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  0.0,  0.0)),
             Vec{3, Float64}((1/√2, 0.0,  1/√2)),
-            Vec{3, Float64}((0.0, 1/√2,  1/√2)),
-            Vec{3, Float64}((-1.0,  0.0,  0.0)),]
+            Vec{3, Float64}((0.0, 1/√2,  1/√2)),]
 end
 
 # Serendipity{2, RefQuadrilateral}

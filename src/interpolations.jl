@@ -28,6 +28,7 @@ The following interpolations are implemented:
 * `Lagrange{RefPrism,1}`
 * `Lagrange{RefPrism,2}`
 * `Lagrange{RefPyramid,1}`
+* `Lagrange{RefPyramid,2}`
 * `Serendipity{RefQuadrilateral,2}`
 * `Serendipity{RefHexahedron,2}`
 
@@ -142,7 +143,7 @@ nfaces(::Interpolation{RefHypercube{dim}}) where {dim} = 2*dim
 nfaces(::Interpolation{RefTriangle}) = 3
 nfaces(::Interpolation{RefTetrahedron}) = 4
 nfaces(::Interpolation{RefPrism}) = 5
-nfaces(::Interpolation{RefPyramid})           = 5
+nfaces(::Interpolation{RefPyramid}) = 5
 
 nedges(::Interpolation{RefLine}) = 0
 nedges(::Interpolation{RefQuadrilateral}) = 0
@@ -453,6 +454,7 @@ vertexdof_indices(::Lagrange{RefHexahedron}) = ((1,),(2,),(3,),(4,),(5,),(6,),(7
 vertexdof_indices(::Lagrange{RefTriangle}) = ((1,),(2,),(3,))
 vertexdof_indices(::Lagrange{RefTetrahedron}) = ((1,),(2,),(3,),(4,))
 vertexdof_indices(::Lagrange{RefPrism}) = ((1,), (2,), (3,), (4,), (5,), (6,))
+vertexdof_indices(::Lagrange{RefPyramid}) = ((1,), (2,), (3,), (4,), (5,),)
 
 getlowerorder(::Lagrange{shape,order}) where {shape,order} = Lagrange{shape,order-1}()
 getlowerorder(::Lagrange{shape,1}) where {shape} = DiscontinuousLagrange{shape,0}()
@@ -1099,15 +1101,14 @@ end
 # Lagrange dim 3 RefPyramid order 1 #
 #####################################
 getnbasefunctions(::Lagrange{RefPyramid,1}) = 5
-vertexdof_indices(::Lagrange{RefPyramid,1}) = ((1,), (2,), (3,), (4,), (5,),)
-facedof_indices(::Lagrange{RefPyramid,1}) = ((1,4,3,2), (1,2,5), (2,3,5), (3,4,5), (4,1,5), )
-edgedof_indices(::Lagrange{RefPyramid,1}) = ((1,2), (2,3), (3,4), (4,1), (1,5), (2,5), (3,5), (4,5))
-
+facedof_indices(::Lagrange{RefPyramid,1}) = ((1,3,4,2), (1,2,5), (1,5,3), (2,4,5), (3,5,4), )
+edgedof_indices(::Lagrange{RefPyramid,1}) = ((1,2), (1,3), (1,5), (2,4), (2,5), (4,3), (3,5), (4,5))
+ 
 function reference_coordinates(::Lagrange{RefPyramid,1})
     return [Vec{3, Float64}((0.0, 0.0, 0.0)),
             Vec{3, Float64}((1.0, 0.0, 0.0)),
-            Vec{3, Float64}((1.0, 1.0, 0.0)),
             Vec{3, Float64}((0.0, 1.0, 0.0)),
+            Vec{3, Float64}((1.0, 1.0, 0.0)),
             Vec{3, Float64}((0.0, 0.0, 1.0))]
 end
 
@@ -1116,9 +1117,90 @@ function shape_value(ip::Lagrange{RefPyramid,1}, ξ::Vec{3}, i::Int)
     zzero = z ≈ 1.0
     i == 1 && return zzero ? 0.0 : (-x*y+(z-1)*(-x-y-z+1))/(z-1)
     i == 2 && return zzero ? 0.0 : x*(y+z-1)/(z-1)
-    i == 3 && return zzero ? 0.0 : -x*y/(z-1)
-    i == 4 && return zzero ? 0.0 : y*(x+z-1)/(z-1)
+    i == 3 && return zzero ? 0.0 : y*(x+z-1)/(z-1)
+    i == 4 && return zzero ? 0.0 : -x*y/(z-1)
     i == 5 && return z
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+#####################################
+# Lagrange dim 3 RefPyramid order 2 #
+#####################################
+getnbasefunctions(::Lagrange{RefPyramid,2}) = 14
+
+facedof_indices(::Lagrange{RefPyramid,2}) = (
+    (1,3,4,2, 7,11,9,6, 14), 
+    (1,2,5,   6,10,8), 
+    (1,5,3,   7,12,8), 
+    (2,4,5,   9,13,10), 
+    (3,5,4,   12,13,11), 
+)
+facedof_interior_indices(::Lagrange{RefPyramid,2}) = (
+    (14,), 
+    (), 
+    (), 
+    (), 
+    (),
+)
+edgedof_indices(::Lagrange{RefPyramid,2}) = (
+    (1,2,6), 
+    (1,3,7), 
+    (1,5,8), 
+    (2,4,9), 
+    (2,5,10), 
+    (4,3,11), 
+    (3,5,12), 
+    (4,5,13)
+)
+edgedof_interior_indices(::Lagrange{RefPyramid,2}) = (
+    (6,),
+    (7,),
+    (8,),
+    (9,),
+    (10,),
+    (11,),
+    (12,),
+    (13,),
+)
+function reference_coordinates(::Lagrange{RefPyramid,2})
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, 0.0)),
+            Vec{3, Float64}((1.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0)),
+            # edges
+            Vec{3, Float64}((0.5, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.5, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 0.5)),
+            Vec{3, Float64}((1.0, 0.5, 0.0)),
+            Vec{3, Float64}((0.5, 0.0, 0.5)),
+            Vec{3, Float64}((0.5, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.5, 0.5)),
+            Vec{3, Float64}((0.5, 0.5, 0.5)),
+            # faces
+            Vec{3, Float64}((0.5, 0.5, 0.0))]
+end
+
+function shape_value(ip::Lagrange{RefPyramid,2}, ξ::Vec{3}, i::Int)
+    (x,y,z) = ξ
+    x² = x*x
+    y² = y*y
+    z² = z*z
+    zzero = z ≈ 1.0
+    i == 1 && return zzero ? 0.0 : (4*x²*y²*(z-1) + x*y*(6x+6y+z)*(z²-2z+1) + (z-1)*(z² - 2z + 1)*(2x² + 9*x*y + 4*x*z - 3x + 2y² + 4*y*z - 3y + 2z² - 3z + 1)) / ((z-1)*(z²-2z+1))
+    i == 2 && return zzero ? 0.0 : x*(4x*y²*(z-1) + y*(6x+2y-z)*(z²-2z+1) + (z-1)*(2x+3y-1)*(z²-2z+1))/((z-1)*(z²-2z+1))
+    i == 3 && return zzero ? 0.0 : y*(4x²*y*(z-1) + x*(2x+6y-z)*(z²-2z+1) + (z-1)*(3x+2y-1)*(z²-2z+1))/((z-1)*(z²-2z+1))
+    i == 4 && return zzero ? 0.0 : x*y*(4*x*y + 2x*z - 2x + 2y*z - 2y + 2z² - 3z + 1)/(z²-2z+1)
+    i == 5 && return               z*(2z-1)
+    i == 6 && return zzero ? 0.0 : 4x*(2x*y²*(1-z) - y*(3x+2y)*(z²-2z+1) + (z-1)*(z²-2z+1)*(-x-3y-z+1))/((z-1)*(z²-2z+1))
+    i == 7 && return zzero ? 0.0 : 4y*(2x²*y*(1-z) - x*(2x+3y)*(z²-2z+1) + (z-1)*(z²-2z+1)*(-3x-y-z+1))/((z-1)*(z²-2z+1))
+    i == 8 && return zzero ? 0.0 : 4z*(-x*y+(z-1)*(-x-y-z+1))/(z-1)
+    i == 9 && return zzero ? 0.0 : 4*x*y*(-2x*y - 2x*z + 2x - y*z + y - z² + 2*z - 1)/(z²-2z+1)
+    i == 10 && return zzero ? 0.0 : 4x*z*(y + z - 1)/(z-1)
+    i == 11 && return zzero ? 0.0 : 4*x*y*(-2x*y - x*z + x - 2y*z + 2y - z² + 2z -1)/(z²-2z+1)
+    i == 12 && return zzero ? 0.0 : 4y*z*(x + z -1)/(z-1)
+    i == 13 && return zzero ? 0.0 : -4x*y*z/(z-1)
+    i == 14 && return zzero ? 0.0 : 16x*y*(x*y + x*z - x + y*z - y + z² - 2z + 1)/(z²-2z+1)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 

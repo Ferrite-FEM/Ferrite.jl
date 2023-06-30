@@ -316,12 +316,12 @@ function generate_grid(::Type{Pyramid}, nel::NTuple{3,Int}, left::Vec{3,T}=Vec{3
     midnodecounter = n_nodes_x*n_nodes_y*n_nodes_z 
     for k in 1:nel_z, j in 1:nel_y, i in 1:nel_x
         midnodecounter += 1
-        pyramid1 = Pyramid((node_array[i,j,k], node_array[i+1,j,k], node_array[i+1,j+1,k], node_array[i,j+1,k], midnodecounter )) # bottom
-        pyramid2 = Pyramid((node_array[i,j,k], node_array[i,j,k+1], node_array[i+1,j,k+1], node_array[i+1,j,k], midnodecounter )) # front 
-        pyramid3 = Pyramid((node_array[i+1,j,k], node_array[i+1,j,k+1], node_array[i+1,j+1,k+1], node_array[i+1,j+1,k], midnodecounter )) # right
-        pyramid4 = Pyramid((node_array[i,j+1,k], node_array[i+1,j+1,k], node_array[i+1,j+1,k+1], node_array[i,j+1,k+1], midnodecounter )) # back
-        pyramid5 = Pyramid((node_array[i,j,k], node_array[i,j+1,k], node_array[i,j+1,k+1], node_array[i,j,k+1], midnodecounter )) # left 
-        pyramid6 = Pyramid((node_array[i,j,k+1], node_array[i,j+1,k+1], node_array[i+1,j+1,k+1], node_array[i+1,j,k+1], midnodecounter )) # top 
+        pyramid1 = Pyramid((node_array[i,j,k], node_array[i+1,j,k], node_array[i,j+1,k], node_array[i+1,j+1,k], midnodecounter )) # bottom
+        pyramid2 = Pyramid((node_array[i,j,k], node_array[i,j,k+1], node_array[i+1,j,k], node_array[i+1,j,k+1], midnodecounter )) # front 
+        pyramid3 = Pyramid((node_array[i+1,j,k], node_array[i+1,j,k+1], node_array[i+1,j+1,k], node_array[i+1,j+1,k+1], midnodecounter )) # right
+        pyramid4 = Pyramid((node_array[i,j+1,k], node_array[i+1,j+1,k], node_array[i,j+1,k+1], node_array[i+1,j+1,k+1], midnodecounter )) # back
+        pyramid5 = Pyramid((node_array[i,j,k], node_array[i,j+1,k], node_array[i,j,k+1], node_array[i,j+1,k+1], midnodecounter )) # left 
+        pyramid6 = Pyramid((node_array[i,j,k+1], node_array[i,j+1,k+1], node_array[i+1,j,k+1], node_array[i+1,j+1,k+1], midnodecounter )) # top 
         push!(cells, pyramid1, pyramid2, pyramid3, pyramid4, pyramid5, pyramid6)
     end
 
