@@ -150,7 +150,7 @@ nedges(::Interpolation{RefHexahedron}) = 12
 nedges(::Interpolation{RefTriangle}) = 0
 nedges(::Interpolation{RefTetrahedron}) = 6
 nedges(::Interpolation{RefPrism}) = 9
-nedges(::Interpolation{RefPyramid})       =  8
+nedges(::Interpolation{RefPyramid}) =  8
 
 nvertices(::Interpolation{RefHypercube{dim}}) where {dim} = 2^dim
 nvertices(::Interpolation{RefTriangle}) = 3

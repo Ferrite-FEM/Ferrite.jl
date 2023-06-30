@@ -248,7 +248,7 @@ default_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{RefTetrahedron,
 default_interpolation(::Type{Hexahedron})             = Lagrange{RefHexahedron,    1}()
 default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron,    2}()
 default_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
-default_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,         1}()
+default_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,       1}()
 
 # TODO: Remove this, used for Quadrilateral3D
 edges(c::Quadrilateral#=3D=#) = faces(c)

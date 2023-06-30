@@ -45,47 +45,18 @@ using Ferrite, SparseArrays
 # We start by generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Pyramid, (20,20,20));
-
-#=
-nodes = Node.([
-    Vec((0.0,0.0,0.0)),
-    Vec((1.0,0.0,0.0)),
-    Vec((1.0,1.0,0.0)),
-    Vec((0.0,1.0,0.0)),
-    Vec((0.0,0.0,2.0)),
-    Vec((1.0,0.0,2.0)),
-    Vec((1.0,1.0,2.0)),
-    Vec((0.0,1.0,2.0)),
-    Vec((0.5,0.5,1.0))]
-)
-Pyramid = Ferrite.Pyramid
-cells = Pyramid[
-    Pyramid((1,2,3,4,9)),
-    Pyramid((1,5,6,2,9)),
-    Pyramid((2,6,7,3,9)),
-    Pyramid((4,3,7,8,9)),
-    Pyramid((1,4,8,5,9)),
-    Pyramid((5,8,7,6,9))
-]
-grid = Grid(cells,nodes)
-
-addfaceset!(grid, "left", x->x[1]≈0.0)
-=#
-
+grid = generate_grid(Quadrilateral, (20, 20));
 
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
 # test and trial functions (among other things). To define
 # this we need to specify an interpolation space for the shape functions.
-# We use Lagrange functions (both for interpolating the function and the geometry)
-# based on the two-dimensional reference "cube". We also define a quadrature rule based on
-# the same reference cube. We combine the interpolation and the quadrature rule
-# to a `CellScalarValues` object.
-dim = 3
-ip = Ferrite.default_interpolation(getcelltype(grid))
-refshape = Ferrite.getrefshape(ip)
-qr = QuadratureRule{refshape}(4)
+# We use Lagrange functions
+# based on the two-dimensional reference quadrilateral. We also define a quadrature rule based on
+# the same reference element. We combine the interpolation and the quadrature rule
+# to a `CellValues` object.
+ip = Lagrange{RefQuadrilateral, 1}()
+qr = QuadratureRule{RefQuadrilateral}(2)
 cellvalues = CellValues(qr, ip);
 
 # ### Degrees of freedom
@@ -117,9 +88,8 @@ ch = ConstraintHandler(dh);
     getfaceset(grid, "right"),
     getfaceset(grid, "top"),
     getfaceset(grid, "bottom"),
-    getfaceset(grid, "front"),
-    getfaceset(grid, "back")
 );
+
 # Now we are set up to define our constraint. We specify which field
 # the condition is for, and our combined face set `∂Ω`. The last
 # argument is a function of the form $f(\textbf{x})$ or $f(\textbf{x}, t)$,
@@ -163,7 +133,7 @@ close!(ch)
 #     underline the strong parallel between the weak form and the implementation, this
 #     example uses the symbols appearing in the weak form.
 
-function assemble_element!(Ke::Matrix, fe::Vector, cellvalues, coords, rhs)
+function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
     ## Reset to 0
     fill!(Ke, 0)
@@ -172,13 +142,12 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues, coords, rhs)
     for q_point in 1:getnquadpoints(cellvalues)
         ## Get the quadrature weight
         dΩ = getdetJdV(cellvalues, q_point)
-        x = spatial_coordinate(cellvalues, q_point, coords)
         ## Loop over test shape functions
         for i in 1:n_basefuncs
             δu  = shape_value(cellvalues, q_point, i)
             ∇δu = shape_gradient(cellvalues, q_point, i)
             ## Add contribution to fe
-            fe[i]  += rhs(x) * δu * dΩ
+            fe[i] += δu * dΩ
             ## Loop over trial shape functions
             for j in 1:n_basefuncs
                 ∇u = shape_gradient(cellvalues, q_point, j)
@@ -215,17 +184,14 @@ function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHand
     fe = zeros(n_basefuncs)
     ## Allocate global force vector f
     f = zeros(ndofs(dh))
-    ## Right hand side
-    rhs(x) = (π/2)^2 * dim * prod(cos, x*π/2)
     ## Create an assembler
     assembler = start_assemble(K, f)
     ## Loop over all cels
     for cell in CellIterator(dh)
-        coords = getcoordinates(cell)
         ## Reinitialize cellvalues for this cell
         reinit!(cellvalues, cell)
         ## Compute element contribution
-        assemble_element!(Ke, fe, cellvalues, coords, rhs)
+        assemble_element!(Ke, fe, cellvalues)
         ## Assemble Ke and fe into K and f
         assemble!(assembler, celldofs(cell), Ke, fe)
     end
@@ -244,43 +210,16 @@ K, f = assemble_global(cellvalues, K, dh);
 apply!(K, f, ch)
 u = K \ f;
 
-nequals = 0
-ntests = 0
-for cell in CellIterator(dh)
-    reinit!(cellvalues, cell)
-    n_basefuncs = getnbasefunctions(cellvalues)
-    coords = getcoordinates(cell)
-    uₑ = u[celldofs(cell)]
-    for q_point in 1:getnquadpoints(cellvalues)
-        x = spatial_coordinate(cellvalues, q_point, coords)
-        uₐₙₐ    = prod(cos, x*π/2)
-        uₐₚₚᵣₒₓ = function_value(cellvalues, q_point, uₑ)
-        global ntests += 1
-        if isapprox(uₐₙₐ, uₐₚₚᵣₒₓ; atol=1e-2)
-            global nequals +=1
-        end
-    end
-end
-@show nequals/ntests
-uanalytical = similar(u)
-apply_analytical!(uanalytical, dh, :u, x->prod(cos, x*π/2))
-
-ucheck = ones(Float64, length(u))
-apply_zero!(ucheck, ch)
-
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
 vtk_grid("heat_equation", dh) do vtk
     vtk_point_data(vtk, dh, u)
-    vtk_point_data(vtk, dh, uanalytical, "analytical")
-    vtk_point_data(vtk, dh, uanalytical-u, "error")
-    vtk_point_data(vtk, dh, ucheck, "ucheck")
 end
 
 ## test the result                #src
-#using Test                        #src
-#@test norm(u) ≈ 3.307743912641305 #src
+using Test                        #src
+@test norm(u) ≈ 3.307743912641305 #src
 
 #md # ## [Plain program](@id heat_equation-plain-program)
 #md #
