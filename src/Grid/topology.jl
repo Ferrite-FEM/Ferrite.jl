@@ -47,6 +47,8 @@ abstract type AbstractTopology end
 
 """
     ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
+    ExclusiveTopology(grid::Grid)
+
 `ExclusiveTopology` saves topological (connectivity/neighborhood) data of the grid. The constructor works with an `AbstractCell`
 vector for all cells that dispatch `vertices`, `faces` and in 3D `edges`.
 The struct saves the highest dimensional neighborhood, i.e. if something is connected by a face and an
@@ -58,6 +60,8 @@ The struct saves the highest dimensional neighborhood, i.e. if something is conn
 - `face_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: `face_neighbor[cellid,local_face_id]` -> neighboring face
 - `vertex_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: `vertex_neighbor[cellid,local_vertex_id]` -> neighboring vertex
 - `edge_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: `edge_neighbor[cellid_local_vertex_id]` -> neighboring edge
+
+!!! note Currently mixed-dimensional queries do not work at the moment. They will be added back later.
 """
 struct ExclusiveTopology <: AbstractTopology
     # maps a global vertex id to all cells containing the vertex
