@@ -60,10 +60,11 @@ The struct saves the highest dimensional neighborhood, i.e. if something is conn
 - `face_neighbor::Matrix{EntityNeighborhood,Int}`: `face_neighbor[cellid,local_face_id]` -> neighboring face
 - `vertex_neighbor::Matrix{EntityNeighborhood,Int}`: `vertex_neighbor[cellid,local_vertex_id]` -> neighboring vertex
 - `edge_neighbor::Matrix{EntityNeighborhood,Int}`: `edge_neighbor[cellid_local_vertex_id]` -> neighboring edge
+- `face_skeleton::Union{Vector{FaceIndex}, Nothing}`: 
 
 !!! note Currently mixed-dimensional queries do not work at the moment. They will be added back later.
 """
-struct ExclusiveTopology <: AbstractTopology
+mutable struct ExclusiveTopology <: AbstractTopology
     # maps a global vertex id to all cells containing the vertex
     vertex_to_cell::Vector{Set{Int}}
     # index of the vector = cell id ->  all other connected cells
@@ -74,6 +75,8 @@ struct ExclusiveTopology <: AbstractTopology
     vertex_vertex_neighbor::Matrix{EntityNeighborhood{VertexIndex}}
     # edge_neighbor[cellid,local_edge_id] -> exclusive connected entities of the given edge
     edge_edge_neighbor::Matrix{EntityNeighborhood{EdgeIndex}}
+    # lazy constructed face topology
+    face_skeleton::Union{Vector{FaceIndex}, Nothing}
     # TODO reintroduce the codimensional connectivity, e.g. 3D edge to 2D face
 end
 
@@ -197,7 +200,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
         end
     end
 
-    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_table,vertex_table,edge_table)
+    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_table,vertex_table,edge_table,nothing)
 end
 
 function _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
@@ -342,4 +345,16 @@ function compute_face_skeleton(top::ExclusiveTopology, grid::Grid)
         end
     end
     return face_skeleton_local
+end
+
+"""
+    face_skeletontop::ExclusiveTopology, grid::Grid) -> Vector{FaceIndex}
+Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit`
+`FaceValues`.
+"""
+function faceskeleton(top::ExclusiveTopology, grid::Grid)
+    if top.face_skeleton === nothing
+        top.face_skeleton = compute_face_skeleton(top, grid)
+    end
+    return top.face_skeleton
 end
