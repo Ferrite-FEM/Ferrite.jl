@@ -206,16 +206,16 @@ end
 function edges(c::AbstractCell{RefPyramid})
     ns = get_node_ids(c)
     return (
-        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), 
-        (ns[1], ns[5]), (ns[2], ns[5]), (ns[3], ns[5]), (ns[4], ns[5]), 
+        (ns[1], ns[2]), (ns[1], ns[3]), (ns[1], ns[5]), (ns[2], ns[4]), 
+        (ns[2], ns[5]), (ns[4], ns[3]), (ns[3], ns[5]), (ns[4], ns[5]), 
     )
 end
 function faces(c::AbstractCell{RefPyramid})
     ns = get_node_ids(c)
     return (
-        (ns[1], ns[4], ns[3], ns[2]), (ns[1], ns[2], ns[5]), 
-        (ns[2], ns[3], ns[5]), (ns[3], ns[4], ns[5]), 
-        (ns[4], ns[1], ns[5]),                                      
+        (ns[1], ns[3], ns[4], ns[2]), (ns[1], ns[2], ns[5]), 
+        (ns[1], ns[5], ns[3]), (ns[2], ns[4], ns[5]), 
+        (ns[3], ns[5], ns[4]),                                      
     )
 end
 
