@@ -348,7 +348,7 @@ function compute_face_skeleton(top::ExclusiveTopology, grid::Grid)
 end
 
 """
-    face_skeletontop::ExclusiveTopology, grid::Grid) -> Vector{FaceIndex}
+    face_skeleton(top::ExclusiveTopology, grid::Grid) -> Vector{FaceIndex}
 Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit`
 `FaceValues`.
 """
