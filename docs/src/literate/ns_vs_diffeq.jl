@@ -38,12 +38,8 @@
 # where $v$ is the unknown velocity field, $p$ the unknown pressure field,
 # $\nu$ the dynamic viscosity and $\Delta$ the Laplacian. In the derivation we assumed
 # a constant density of 1 for the fluid and negligible coupling between the velocity components.
-# Finally we see that the pressure term appears only in combination with the gradient
-# operator, so for any solution $p$ the function $p + c$ is also an admissible solution, if
-# we do not impose Dirichlet conditions on the pressure. To resolve this we introduce the
-# implicit constraint that $ \int_\Omega p = 0 $.
 #
-# Our setup is derived from [Turek's DFG benchmark](http://www.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/flow/dfg_benchmark1_re20.html).
+# Our setup is derived from [Turek's DFG benchmark](http://www.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/flow/dfg_benchmark2_re100.html).
 # We model a channel with size $0.41 \times 2.2$ and a hole of radius $0.05$ centered at $(0.2, 0.2)$.
 # The left side has a parabolic inflow profile, which is ramped up over time, modeled as the time dependent
 # Dirichlet condition
@@ -55,7 +51,7 @@
 #      0
 #  \end{bmatrix}
 # ```
-# where $v_{in}(t) = \text{clamp}(t, 0.0, 1.0)$. With a dynamic viscosity of $\nu = 0.001$
+# where $v_{in}(t) = \text{clamp}(t, 0.0, 1.5)$. With a dynamic viscosity of $\nu = 0.001$
 # this is enough to induce turbulence behind the cylinder which leads to vortex shedding. The top and bottom of our
 # channel have no-slip conditions, i.e. $v = [0,0]^{\textrm{T}}$, while the right boundary has the do-nothing boundary condition
 # $\nu \partial_{\textrm{n}} v - p n = 0$ to model outflow. With these boundary conditions we can choose the zero solution as a
@@ -121,38 +117,49 @@ using OrdinaryDiffEq
 # We start off by defining our only material parameter.
 ν = 1.0/1000.0; #dynamic viscosity
 
-# Next a fine 2D rectangular grid has to be generated. We leave the cell size parametric for flexibility when
-# playing around with the code. Note that the mesh is pretty fine, leading to a high memory consumption when
+# Next a rectangular grid with a cylinder in it has to be generated.
+# We use `Gmsh` for the creation of the mesh and `FerriteGmsh` to translate it to a `Ferrite.Grid`.
+# Note that the mesh is pretty fine, leading to a high memory consumption when
 # feeding the equation system to direct solvers.
-dim = 2
-cell_scale_factor = 2.0
-x_cells = round(Int, cell_scale_factor*220)
-y_cells = round(Int, cell_scale_factor*41)
-# CI chokes if the grid is too fine. :)     #src
-x_cells = round(Int, 55/3)                  #hide
-y_cells = round(Int, 41/3)                  #hide
-grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((2.2, 0.41)));
-
-# Next we carve a hole $B_{0.05}(0.2,0.2)$ in the mesh by deleting the cells and update the boundary face sets.
-# This code will be replaced once a proper mesh interface is available.
-cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05, 1:length(grid.cells))
-hole_cell_indices = filter(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))<=0.05, 1:length(grid.cells));
-hole_face_ring = Set{FaceIndex}()
-for hci ∈ hole_cell_indices
-    push!(hole_face_ring, FaceIndex((hci+1, 4)))
-    push!(hole_face_ring, FaceIndex((hci-1, 2)))
-    push!(hole_face_ring, FaceIndex((hci-x_cells, 3)))
-    push!(hole_face_ring, FaceIndex((hci+x_cells, 1)))
-end
-grid.facesets["hole"] = Set(filter(x->x.idx[1] ∉ hole_cell_indices, collect(hole_face_ring)));
-cell_indices_map = map(ci->norm(mean(map(i->grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))>0.05 ? indexin([ci], cell_indices)[1] : 0, 1:length(grid.cells))
-grid.cells = grid.cells[cell_indices]
-for facesetname in keys(grid.facesets)
-    grid.facesets[facesetname] = Set(map(fi -> FaceIndex( cell_indices_map[fi.idx[1]] ,fi.idx[2]), collect(grid.facesets[facesetname])))
-end;
-
-# We test against full development of the flow - so regenerate the grid                              #src
-grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((0.55, 0.41)));   #hide
+using FerriteGmsh
+using FerriteGmsh: Gmsh
+Gmsh.initialize()
+gmsh.option.set_number("General.Verbosity", 2)
+dim = 2;
+# We specify first the rectangle, the cylinder, the surface spanned by the cylinder and the boolean difference of rectangle and cylinder.
+# We check for laminar flow development in the CI #src
+if false #hide
+rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 2.2, 0.41)
+circle_tag = gmsh.model.occ.add_circle(0.2, 0.2, 0, 0.05)
+circle_curve_tag = gmsh.model.occ.add_curve_loop([circle_tag])
+circle_surf_tag = gmsh.model.occ.add_plane_surface([circle_curve_tag])
+gmsh.model.occ.cut([(dim,rect_tag)],[(dim,circle_surf_tag)]);
+else #hide
+rect_tag = gmsh.model.occ.add_rectangle(0, 0, 0, 0.55, 0.41) #hide
+end #hide
+# Now, the geometrical entities need to be synchronized in order to be available outside of `gmsh.model.occ`
+gmsh.model.occ.synchronize()
+# In the next lines, we add the physical groups needed to define boundary conditions.
+if false #hide
+gmsh.model.model.add_physical_group(dim-1,[5],6,"hole")
+end #hide
+gmsh.model.model.add_physical_group(dim-1,[2],7,"left")
+gmsh.model.model.add_physical_group(dim-1,[4],8,"top")
+gmsh.model.model.add_physical_group(dim-1,[3],9,"right")
+gmsh.model.model.add_physical_group(dim-1,[1],10,"bottom")
+gmsh.model.model.add_physical_group(dim,[1],11,"domain");
+# Since we want a quad mesh, we specify the meshing algorithm to the quasi structured quad one.
+# For a complete list, [see the Gmsh docs](https://gmsh.info/doc/texinfo/gmsh.html#Mesh-options-list).
+gmsh.option.setNumber("Mesh.Algorithm",11)
+gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",20)
+gmsh.option.setNumber("Mesh.MeshSizeMax",0.05)
+# remove fine mesh settings for CI. These settings also work to produce a vortex steet.              #src
+gmsh.option.setNumber("Mesh.MeshSizeFromCurvature",20)                                               #hide
+gmsh.option.setNumber("Mesh.MeshSizeMax",0.1)                                                        #hide
+# In the next step, the mesh is generated and finally translated.
+gmsh.model.mesh.generate(dim)
+grid = togrid()
+Gmsh.finalize()
 
 # ### Function Space
 # To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
@@ -183,16 +190,17 @@ nosplip_face_names = ["top", "bottom"]                                  #hide
 noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -> [0,0], [1,2])
 add!(ch, noslip_bc);
 
-# The left boundary has a parabolic inflow with peak velocity of 1.0. This
+# The left boundary has a parabolic inflow with peak velocity of 1.5. This
 # ensures that for the given geometry the Reynolds number is 100, which
 # is already enough to obtain some simple vortex streets. By increasing the
 # velocity further we can obtain stronger vortices - which may need additional
-# refinement of the grid.
+# refinement of the grid. Note that we have to smoothly ramp up the velocity,
+# because the Dirichlet constraints cannot be properly enforced yet, causing
+# convergence issues.
 ∂Ω_inflow = getfaceset(grid, "left");
 
-vᵢₙ(t) = clamp(t, 0.0, 1.0)*1.0 #inflow velocity
-vᵢₙ(t) = clamp(t, 0.0, 1.0)*0.3 #hide
-parabolic_inflow_profile((x,y),t) = [4*vᵢₙ(t)*y*(0.41-y)/0.41^2,0]
+vᵢₙ(t) = 1.5/(1+exp(-2.0*(t-2.0)))  #inflow velocity
+parabolic_inflow_profile((x,y),t) = [4*vᵢₙ(t)*y*(0.41-y)/0.41^2, 0.0]
 inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1,2])
 add!(ch, inflow_bc);
 
@@ -228,6 +236,7 @@ function assemble_mass_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues
         for q_point in 1:getnquadpoints(cellvalues_v)
             dΩ = getdetJdV(cellvalues_v, q_point)
             ## Remember that we assemble a vector mass term, hence the dot product.
+            ## There is only one time derivative on the left hand side, so only one mass block is non-zero.
             for i in 1:n_basefuncs_v
                 φᵢ = shape_value(cellvalues_v, q_point, i)
                 for j in 1:n_basefuncs_v
@@ -242,7 +251,7 @@ function assemble_mass_matrix(cellvalues_v::CellValues, cellvalues_p::CellValues
     return M
 end;
 
-# Next we discuss the assembly of the Stokes matrix.
+# Next we discuss the assembly of the Stokes matrix appearing on the right hand side.
 # Remember that we use the same function spaces for trial and test, hence the
 # matrix has the following block form
 # ```math
@@ -305,7 +314,7 @@ end;
 # assumed to be constant over time.
 T = 10.0
 Δt₀ = 0.01
-Δt_save = 0.1
+Δt_save = 0.025
 
 M = create_sparsity_pattern(dh);
 M = assemble_mass_matrix(cellvalues_v, cellvalues_p, M, dh);
@@ -412,6 +421,17 @@ end;
 rhs = ODEFunction(navierstokes!, mass_matrix=M; jac_prototype=jac_sparsity)
 problem = ODEProblem(rhs, u₀, (0.0,T), p);
 
+# All norms must not depend on constrained dofs. A problem with the presented implementation
+# is that we are currently unable to strictly enforce constraint everywhere in the internal
+# time integration process of [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl),
+# hence the values might differ, resulting in worse error estimates.
+# We try to resolve this issue in the future. Volunteers are also welcome to take a look into this!
+struct FreeDofErrorNorm
+    ch::ConstraintHandler
+end
+(fe_norm::FreeDofErrorNorm)(u::Union{AbstractFloat, Complex}, t) = DiffEqBase.ODE_DEFAULT_NORM(u, t)
+(fe_norm::FreeDofErrorNorm)(u::AbstractArray, t) = DiffEqBase.ODE_DEFAULT_NORM(u[fe_norm.ch.free_dofs], t)
+
 # Now we can put everything together by specifying how to solve the problem.
 # We want to use the adaptive implicit Euler method with our custom linear
 # solver, which helps in the enforcement of the Dirichlet BCs. Further we
@@ -419,17 +439,32 @@ problem = ODEProblem(rhs, u₀, (0.0,T), p);
 # Finally we have to communicate the time step length and initialization
 # algorithm. Since we start with a valid initial state we do not use one of
 # DifferentialEquations.jl initialization algorithms.
-# NOTE: At the time of writing this [no Hessenberg index 2 initialization is implemented](https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019).
+# !!! note "DAE initialization" 
+#          At the time of writing this [no Hessenberg index 2 initialization is implemented](https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019).
 #
 # To visualize the result we export the grid and our fields
 # to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
 # by utilizing the corresponding pvd file.
 timestepper = ImplicitEuler(linsolve = UMFPACKFactorization(reuse_symbolic=false))
+
+#NOTE!   This is left for future reference                                 #src
+# function algebraicmultigrid(W,du,u,p,t,newW,Plprev,Prprev,solverdata)   #src
+#     if newW === nothing || newW                                         #src
+#         Pl = aspreconditioner(ruge_stuben(convert(AbstractMatrix,W)))   #src
+#     else                                                                #src
+#         Pl = Plprev                                                     #src
+#     end                                                                 #src
+#     Pl,nothing                                                          #src
+# end                                                                     #src
+# timestepper = ImplicitEuler(linsolve = IterativeSolversJL_GMRES(; abstol=1e-8, reltol=1e-6), precs=algebraicmultigrid, concrete_jac=true) #src
+
 integrator = init(
     problem, timestepper, initializealg=NoInit(), dt=Δt₀,
-    adaptive=true, abstol=1e-3, reltol=1e-3,
+    adaptive=true, abstol=1e-5, reltol=1e-4,
     progress=true, progress_steps=1,
-    saveat=Δt_save);
+    saveat=Δt_save, verbose=true,
+    internalnorm=FreeDofErrorNorm(ch)
+);
 
 pvd = paraview_collection("vortex-street.pvd");
 integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
