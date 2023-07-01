@@ -26,7 +26,7 @@ end
         left = -right
         grid = generate_grid(celltype, nels, left, right)
 
-        transform!(grid, x-> 2x)
+        transform_coordinates!(grid, x-> 2x)
 
         radius = 2*1.5
         addcellset!(grid, "cell-1", [1,])
