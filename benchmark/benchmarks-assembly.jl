@@ -13,6 +13,7 @@ for spatial_dim ∈ 1:3
         COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)] = BenchmarkGroup()
 
         grid = generate_grid(geo_type, tuple(repeat([1], spatial_dim)...));
+        topology = ExclusiveTopology(grid)
         ref_type = FerriteBenchmarkHelper.default_refshape(geo_type)
         ip_geo = Ferrite.default_interpolation(geo_type)
 
@@ -64,6 +65,15 @@ for spatial_dim ∈ 1:3
 
                 LAGRANGE_SUITE["ritz-galerkin"]["face-flux"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $fsv, shape_gradient, shape_value, *)
                 LAGRANGE_SUITE["petrov-galerkin"]["face-flux"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $fsv, shape_gradient, $fsv2, shape_value, *)
+                ip = DiscontinuousLagrange{ref_type, order}()
+                isv = InterfaceValues(grid, qr_face, ip, ip_geo; geom_interpol_b = ip_geo);
+                isv2 = InterfaceValues(grid, qr_face, ip, ip_geo; geom_interpol_b = ip_geo);
+                LAGRANGE_SUITE["ritz-galerkin"]["interface-{grad}⋅[[val]]"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $topology, $isv, shape_gradient_average, shape_value_jump, ⋅)
+                LAGRANGE_SUITE["petrov-galerkin"]["interface-{grad}⋅[[val]]"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $topology, $isv, shape_gradient_average, $isv2, shape_value_jump, ⋅)
+    
+                LAGRANGE_SUITE["ritz-galerkin"]["interface-interior-penalty"] = @benchmarkable FerriteAssemblyHelper._generalized_ritz_galerkin_assemble_local_matrix($grid, $topology, $isv, shape_value_jump, shape_value_jump, ⋅)
+                LAGRANGE_SUITE["petrov-galerkin"]["interface-interior-penalty"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $topology, $isv, shape_value_jump, $isv2, shape_value_jump, ⋅)
+    
             end
         end
     end

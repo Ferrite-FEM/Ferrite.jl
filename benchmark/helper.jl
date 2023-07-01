@@ -65,6 +65,33 @@ function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.Abstract
     f
 end
 
+function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, topology::ExclusiveTopology, interfacevalues::InterfaceValues{<: Ferrite.InterpolationByDim{dim}}, f_shape, f_test, op) where {dim}
+    n_basefuncs = getnbasefunctions(interfacevalues)
+
+    Ke = zeros(n_basefuncs, n_basefuncs)
+
+    cell_a_coords = get_cell_coordinates(grid, 1)
+    for face in 1:nfaces(getcells(grid)[1])
+        face_a = FaceIndex(1, face)
+        for face_b in topology.face_neighbor[1, face]
+            cell_b_coords = get_cell_coordinates(grid, face_b[1])
+            reinit!(interfacevalues, face_a, face_b, cell_a_coords, cell_b_coords, grid)
+            for q_point in 1:getnquadpoints(interfacevalues)
+                dΓ = getdetJdV(interfacevalues, q_point)
+                for i in 1:n_basefuncs
+                    test = f_test(interfacevalues, q_point, i)
+                    for j in 1:n_basefuncs
+                        shape = f_shape(interfacevalues, q_point, j)
+                        Ke[i, j] += op(test, shape) * dΓ
+                    end
+                end
+            end
+        end
+    end
+
+    Ke
+end
+
 # Minimal Petrov-Galerkin type local assembly loop. We assume that both function spaces share the same integration rule. Test is applied from the left.
 function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, cellvalues_shape::CellValues{dim,T,refshape}, f_shape, cellvalues_test::CellValues{dim,T,refshape}, f_test, op) where {dim,T,refshape}
     n_basefuncs_shape = getnbasefunctions(cellvalues_shape)
@@ -121,6 +148,35 @@ function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.Abstra
     end
 
     f
+end
+
+function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, topology::ExclusiveTopology,  interfacevalues_shape::InterfaceValues{<: Ferrite.InterpolationByDim{dim}}, f_shape, interfacevalues_test::InterfaceValues{<: Ferrite.InterpolationByDim{dim}}, f_test, op) where {dim}
+    n_basefuncs_shape = getnbasefunctions(interfacevalues_shape)
+    n_basefuncs_test = getnbasefunctions(interfacevalues_test)
+
+    Ke = zeros(n_basefuncs_test, n_basefuncs_shape)
+
+    cell_a_coords = get_cell_coordinates(grid, 1)
+    for face in 1:nfaces(getcells(grid)[1])
+        face_a = FaceIndex(1, face)
+        for face_b in topology.face_neighbor[1, face]
+            cell_b_coords = get_cell_coordinates(grid, face_b[1])
+            reinit!(interfacevalues_shape, face_a, face_b, cell_a_coords, cell_b_coords, grid)
+            reinit!(interfacevalues_test, face_a, face_b, cell_a_coords, cell_b_coords, grid)
+            for q_point in 1:getnquadpoints(interfacevalues_shape)
+                dΓ = getdetJdV(interfacevalues_test, q_point)
+                for i in 1:n_basefuncs_test
+                    test = f_test(interfacevalues_test, q_point, i)
+                    for j in 1:n_basefuncs_shape
+                        shape = f_shape(interfacevalues_shape, q_point, j)
+                        Ke[i, j] += op(test, shape) * dΓ
+                    end
+                end
+            end
+        end
+    end
+
+    Ke
 end
 
 function _assemble_mass(dh, cellvalues, sym)
