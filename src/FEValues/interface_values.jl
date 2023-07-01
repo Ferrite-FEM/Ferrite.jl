@@ -44,11 +44,13 @@ and function on the interfaces of finite elements.
 """
 InterfaceValues
 
-struct InterfaceValues{IP, FV<:FaceValues} <: AbstractValues
-    face_values_a::FV
-    face_values_b::FV
+struct InterfaceValues{IP_a, N_t_a, dNdx_t_a, dNdξ_t_a, T_a, dMdξ_t_a, QR_a, Normal_t_a, GIP_a,
+    IP_b, N_t_b, dNdx_t_b, dNdξ_t_b, T_b, dMdξ_t_b, QR_b, Normal_t_b, GIP_b,
+    dim, C} <: AbstractValues
+    face_values_a::FaceValues{IP_a, N_t_a, dNdx_t_a, dNdξ_t_a, T_a, dMdξ_t_a, QR_a, Normal_t_a, GIP_a}
+    face_values_b::FaceValues{IP_b, N_t_b, dNdx_t_b, dNdξ_t_b, T_b, dMdξ_t_b, QR_b, Normal_t_b, GIP_b}
     # used for quadrature point syncing
-    grid::Grid
+    grid::Grid{dim, C, Float64}
     cell_a_idx::ScalarWrapper{Int}
     cell_b_idx::ScalarWrapper{Int}
     ioi::ScalarWrapper{InterfaceOrientationInfo}
@@ -58,7 +60,7 @@ function InterfaceValues(grid::AbstractGrid, quad_rule_a::FaceQuadratureRule, fu
     func_interpol_b::Interpolation = func_interpol_a, geom_interpol_b::Interpolation = func_interpol_b)
     face_values_a = FaceValues(quad_rule_a, func_interpol_a, geom_interpol_a)
     face_values_b = FaceValues(quad_rule_b, func_interpol_b, geom_interpol_b)
-    return InterfaceValues{typeof(func_interpol_a), FaceValues}(face_values_a, face_values_b, grid, ScalarWrapper(0), ScalarWrapper(0), ScalarWrapper(InterfaceOrientationInfo(false, nothing)))
+    return InterfaceValues{typeof(face_values_a).parameters..., typeof(face_values_b).parameters..., getdim(grid), getcelltype(grid)}(face_values_a, face_values_b, grid, ScalarWrapper(0), ScalarWrapper(0), ScalarWrapper(InterfaceOrientationInfo(false, Float64.(I(1)))))
 end
 
 """
@@ -74,19 +76,18 @@ function reinit!(iv::InterfaceValues, face_a::FaceIndex, face_b::FaceIndex, cell
     iv.face_values_b.current_face[] = face_b[2]
     ioi = Ferrite.InterfaceOrientationInfo(grid, face_a, face_b)
     iv.ioi[] = ioi
-    getpoints(iv.face_values_b.qr, face_b[2]) .= Vec{dim}.(Ferrite.transform_interface_point.(Ref(iv), getpoints(iv.face_values_a.qr, face_a[2])))  
+    getpoints(iv.face_values_b.qr, face_b[2]) .= Vec{dim}.(Ferrite.transform_interface_point.(Ref(iv), getpoints(iv.face_values_a.qr, face_a[2])))
     # Reinit face_b facevalues after the quadrature rule points are mutated
     n_geom_basefuncs = getngeobasefunctions(iv.face_values_b)
     n_func_basefuncs = getnbasefunctions(iv.face_values_b)
     @boundscheck checkface(iv.face_values_b, face_b[2])
 
-    n_faces = length(iv.face_values_b.qr.face_rules)
-    for face in 1:n_faces, (qp, ξ) in pairs(getpoints(iv.face_values_b.qr, face_b[2]))
+    for (qp, ξ) in pairs(getpoints(iv.face_values_b.qr, face_b[2]))
         for basefunc in 1:n_func_basefuncs
-            iv.face_values_b.dNdξ[basefunc, qp, face], iv.face_values_b.N[basefunc, qp, face] = shape_gradient_and_value(iv.face_values_b.func_interp, ξ, basefunc)
+            iv.face_values_b.dNdξ[basefunc, qp, face_b[2]], iv.face_values_b.N[basefunc, qp, face_b[2]] = shape_gradient_and_value(iv.face_values_b.func_interp, ξ, basefunc)
         end
         for basefunc in 1:n_geom_basefuncs
-            iv.face_values_b.dMdξ[basefunc, qp, face], iv.face_values_b.M[basefunc, qp, face] = shape_gradient_and_value(iv.face_values_b.geo_interp, ξ, basefunc)
+            iv.face_values_b.dMdξ[basefunc, qp, face_b[2]], iv.face_values_b.M[basefunc, qp, face_b[2]] = shape_gradient_and_value(iv.face_values_b.geo_interp, ξ, basefunc)
         end
     end
     reinit!(iv.face_values_b, cell_b_coords, face_b[2])
@@ -316,12 +317,27 @@ end
 
 Transform point from element A's face reference coordinates to element B's face reference coordinates.
 """
-function transform_interface_point(iv::InterfaceValues, point::AbstractArray)
+function transform_interface_point(iv::InterfaceValues, point::Vec{N, Float64}) where {N}
     ioi = iv.ioi[]
     cell = getcells(iv.grid)[iv.cell_a_idx[]]
     face = iv.face_values_a.current_face[]
     point = transfer_point_cell_to_face(point, cell, face)
-    isnothing(ioi.transformation) || (point = (ioi.transformation * [point..., 1])[1:2])
-    ioi.flipped && reverse!(point)
-    return transfer_point_face_to_cell(point, getcells(iv.grid)[iv.cell_b_idx[]], iv.face_values_b.current_face[])
+    N == 3 && (point = (ioi.transformation * Vec(point[1],point[2], 1.0))[1:2])
+    ioi.flipped && (point = reverse(point))
+    N == 3 && return transfer_point_face_to_cell(Vec(point[1],point[2]), getcells(iv.grid)[iv.cell_b_idx[]], iv.face_values_b.current_face[])
+    return transfer_point_face_to_cell(Vec(point[1]), getcells(iv.grid)[iv.cell_b_idx[]], iv.face_values_b.current_face[])
+end
+
+function transform_interface_point(iv::InterfaceValues, point::Vector{Vec{N, Float64}}) where {N}
+    ioi = iv.ioi[]
+    cell = getcells(iv.grid)[iv.cell_a_idx[]]
+    face = iv.face_values_a.current_face[]
+    point2 = transfer_point_cell_to_face.(point, Ref(cell), Ref(face))
+    if N == 3
+        M = ioi.transformation * vcat(reduce(hcat, point2), ones(Float64, 1, length(point)))
+        point2 = [(M[1:2,i]) for i in 1:length(point)]
+    end
+    ioi.flipped && (point2 .= reverse.(point2))
+    N == 3 && return transfer_point_face_to_cell.(point2, Ref(getcells(iv.grid)[iv.cell_b_idx[]]), Ref(iv.face_values_b.current_face[]))
+    return transfer_point_face_to_cell.(point2, getcells(iv.grid)[iv.cell_b_idx[]], iv.face_values_b.current_face[])
 end
