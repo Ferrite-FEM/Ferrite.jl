@@ -79,12 +79,14 @@
 # ``r_i(\boldsymbol{a}(t), t) = 0`` where the vector ``\boldsymbol{a}`` contains all unknown displacements ``u_i`` and pressures ``p_i``. 
 #
 # The jacobian, ``K_{ij} = \partial r_i/\partial a_j``, is then split into four parts,
+# ```math
 # \begin{aligned}
-# K_{ij}^\mathrm{uu} = \frac{\partial r_i^\mathrm{u}}{\partial u_j} = \int_\Omega [\boldsymbol{\delta N}^\mathrm{u}_i\otimes\boldsymbol{\nabla}]^\mathrm{sym} : \boldsymbol{\mathsf{C}} : [\boldsymbol{N}_j^\mathrm{u}\otimes\boldsymbol{\nabla}]^\mathrm{sym}\ \mathrm{d}\Omega \\
-# K_{ij}^\mathrm{up} = \frac{\partial r_i^\mathrm{u}}{\partial p_j} = - \int_\Omega [\boldsymbol{\delta N}^\mathrm{u}_i \cdot \boldsymbol{\nabla}] \alpha N_j^\mathrm{p}\ \mathrm{d}\Omega \\
-# K_{ij}^\mathrm{pu} = \frac{\partial r_i^\mathrm{p}}{\partial u_j} = \int_\Omega \delta N_i^\mathrm{p} \frac{\alpha}{\Delta t} [\boldsymbol{N}_j^\mathrm{u} \cdot\boldsymbol{\nabla}]\ \mathrm{d}\Omega\\
-# K_{ij}^\mathrm{pp} = \frac{\partial r_i^\mathrm{p}}{\partial p_j} = \int_\Omega \delta N_i^\mathrm{p} \frac{N_j^\mathrm{p}}{\Delta t} + \boldsymbol{\nabla}(\delta N_i^\mathrm{p}) \cdot [k \boldsymbol{\nabla}(N_j^\mathrm{p})] \mathrm{d}\Omega
+# K_{ij}^\mathrm{uu} &= \frac{\partial r_i^\mathrm{u}}{\partial u_j} = \int_\Omega [\boldsymbol{\delta N}^\mathrm{u}_i\otimes\boldsymbol{\nabla}]^\mathrm{sym} : \boldsymbol{\mathsf{C}} : [\boldsymbol{N}_j^\mathrm{u}\otimes\boldsymbol{\nabla}]^\mathrm{sym}\ \mathrm{d}\Omega \\
+# K_{ij}^\mathrm{up} &= \frac{\partial r_i^\mathrm{u}}{\partial p_j} = - \int_\Omega [\boldsymbol{\delta N}^\mathrm{u}_i \cdot \boldsymbol{\nabla}] \alpha N_j^\mathrm{p}\ \mathrm{d}\Omega \\
+# K_{ij}^\mathrm{pu} &= \frac{\partial r_i^\mathrm{p}}{\partial u_j} = \int_\Omega \delta N_i^\mathrm{p} \frac{\alpha}{\Delta t} [\boldsymbol{N}_j^\mathrm{u} \cdot\boldsymbol{\nabla}]\ \mathrm{d}\Omega\\
+# K_{ij}^\mathrm{pp} &= \frac{\partial r_i^\mathrm{p}}{\partial p_j} = \int_\Omega \delta N_i^\mathrm{p} \frac{N_j^\mathrm{p}}{\Delta t} + \boldsymbol{\nabla}(\delta N_i^\mathrm{p}) \cdot [k \boldsymbol{\nabla}(N_j^\mathrm{p})] \mathrm{d}\Omega
 # \end{aligned}
+# ```
 # 
 # We could assemble one stiffness matrix and one mass matrix, which would be constant, but for simplicity we only consider a single 
 # system matrix that depends on the time step, and assemble this for each step. The equations are still linear, so no iterations are required. 
@@ -109,7 +111,7 @@ function Elastic(;E=20.e3, ν=0.3)
     I4vol = I2⊗I2
     I4dev = minorsymmetric(otimesu(I2,I2)) - I4vol / 3
     return Elastic(2G*I4dev + K*I4vol)
-end
+end;
 
 # Next, we define the element routine for the solid aggregates, where we dispatch on the 
 # `Elastic` material struct. Note that the unused inputs here are used for the porous matrix below. 
@@ -130,7 +132,7 @@ function element_routine!(Ke, re, material::Elastic, cv, cell, a, args...)
             end
         end
     end
-end
+end;
 
 # ### PoroElasticity
 # To define the poroelastic material, we re-use the elastic part from above for 
@@ -142,7 +144,7 @@ struct PoroElastic{T}
     α::T     ## Biot's coefficient       [-]
     β::T     ## Liquid compressibility   [1/MPa]
 end
-PoroElastic(;elastic, k, ϕ, α, β) = PoroElastic(elastic, k, ϕ, α, β)
+PoroElastic(;elastic, k, ϕ, α, β) = PoroElastic(elastic, k, ϕ, α, β);
 
 # The element routine requires a few more inputs since we have two fields, as well 
 # as the dependence on the rates of the displacements and pressure. 
@@ -197,7 +199,7 @@ function element_routine!(Ke, re, m::PoroElastic, cvs::Tuple, cell, a, a_old, Δ
             end 
         end
     end
-end
+end;
 
 # ### Assembly
 # To organize the different domains, we'll first define a container type
@@ -205,7 +207,7 @@ struct FEDomain{M,CV,SDH<:SubDofHandler}
     material::M
     cellvalues::CV
     sdh::SDH
-end
+end;
 
 # And then we can loop over a vector of such domains, allowing us to 
 # loop over each domain, to assemble the contributions from each 
@@ -215,7 +217,7 @@ function doassemble!(K, r, domains::Vector{<:FEDomain}, a, a_old, Δt)
     for domain in domains
         doassemble!(assembler, domain, a, a_old, Δt)
     end
-end
+end;
 
 # For one domain (corresponding to a specific SubDofHandler),
 # we can then loop over all cells in its cellset. This ensures
@@ -238,7 +240,7 @@ function doassemble!(assembler, domain::FEDomain, a, a_old, Δt)
         element_routine!(Ke, re, material, cv, cell, ae, ae_old, Δt, sdh)
         assemble!(assembler, celldofs(cell), Ke, re)
     end
-end
+end;
 
 # ### Mesh import
 # In this example, we import the mesh from the Abaqus input file, [`porous_media_0p25.inp`](porous_media_0p25.inp) using `FerriteMeshParser`'s 
@@ -254,7 +256,7 @@ function get_grid()
     addcellset!(grid, "porous3", intersect(getcellset(grid, "porous"), getcellset(grid, "CPS3")))
     addcellset!(grid, "porous4", intersect(getcellset(grid, "porous"), getcellset(grid, "CPS4R")))
     return grid
-end
+end;
 
 # ### Problem setup
 # Define the finite element interpolation, integration, and boundary conditions. 
@@ -321,7 +323,7 @@ function setup_problem(;t_rise=0.1, u_max=-0.1)
     close!(ch)
 
     return dh, ch, domains
-end
+end;
 
 # ### Solving
 # Given the `MixedDofHandler`, `ConstraintHandler`, and `CellValues`, 
@@ -350,11 +352,11 @@ function solve(dh, ch, domains; Δt=0.025, t_total=1.0)
         end
     end
     vtk_save(pvd);
-end
+end;
 
 # Finally we call the functions to actually run the code
 dh, ch, domains = setup_problem()
-solve(dh, ch, domains)
+solve(dh, ch, domains);
 
 #md # ## [Plain program](@id porous-media-plain-program)
 #md #
