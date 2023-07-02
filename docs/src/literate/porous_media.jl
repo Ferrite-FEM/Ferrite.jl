@@ -80,10 +80,10 @@
 #
 # The jacobian, ``K_{ij} = \partial r_i/\partial a_j``, is then split into four parts,
 # \begin{aligned}
-# K_{ij}^\mathrm{uu} = \frac{\partial r_i^\mathrm{u}}{\partial u_j}} = \int_\Omega [\boldsymbol{\delta N}^\mathrm{u}_i\otimes\boldsymbol{\nabla}]^\mathrm{sym} : \boldsymbol{\mathsf{C}} : [\boldsymbol{N}_j^\mathrm{u}\otimes\boldsymbol{\nabla}]^\mathrm{sym}\ \mathrm{d}\Omega \\
-# K_{ij}^\mathrm{up} = \frac{\partial r_i^\mathrm{u}}{\partial p_j}} = - \int_\Omega [\boldsymbol{\delta N}^\mathrm{u}_i \cdot \boldsymbol{\nabla}] \alpha N_j^\mathrm{p}\ \mathrm{d}\Omega \\
-# K_{ij}^\mathrm{pu} = \frac{\partial r_i^\mathrm{p}}{\partial u_j}} = \int_\Omega \delta N_i^\mathrm{p} \frac{\alpha}{\Delta t} [\boldsymbol{N}_j^\mathrm{u} \cdot\boldsymbol{\nabla}]\ \mathrm{d}\Omega\\
-# K_{ij}^\mathrm{pp} = \frac{\partial r_i^\mathrm{p}}{\partial p_j}} = \int_\Omega \delta N_i^\mathrm{p} \frac{N_j^\mathrm{p}}{\Delta t} + \boldsymbol{\nabla}(\delta N_i^\mathrm{p}) \cdot [k \boldsymbol{\nabla}(N_j^\mathrm{p})] \mathrm{d}\Omega
+# K_{ij}^\mathrm{uu} = \frac{\partial r_i^\mathrm{u}}{\partial u_j} = \int_\Omega [\boldsymbol{\delta N}^\mathrm{u}_i\otimes\boldsymbol{\nabla}]^\mathrm{sym} : \boldsymbol{\mathsf{C}} : [\boldsymbol{N}_j^\mathrm{u}\otimes\boldsymbol{\nabla}]^\mathrm{sym}\ \mathrm{d}\Omega \\
+# K_{ij}^\mathrm{up} = \frac{\partial r_i^\mathrm{u}}{\partial p_j} = - \int_\Omega [\boldsymbol{\delta N}^\mathrm{u}_i \cdot \boldsymbol{\nabla}] \alpha N_j^\mathrm{p}\ \mathrm{d}\Omega \\
+# K_{ij}^\mathrm{pu} = \frac{\partial r_i^\mathrm{p}}{\partial u_j} = \int_\Omega \delta N_i^\mathrm{p} \frac{\alpha}{\Delta t} [\boldsymbol{N}_j^\mathrm{u} \cdot\boldsymbol{\nabla}]\ \mathrm{d}\Omega\\
+# K_{ij}^\mathrm{pp} = \frac{\partial r_i^\mathrm{p}}{\partial p_j} = \int_\Omega \delta N_i^\mathrm{p} \frac{N_j^\mathrm{p}}{\Delta t} + \boldsymbol{\nabla}(\delta N_i^\mathrm{p}) \cdot [k \boldsymbol{\nabla}(N_j^\mathrm{p})] \mathrm{d}\Omega
 # \end{aligned}
 # 
 # We could assemble one stiffness matrix and one mass matrix, which would be constant, but for simplicity we only consider a single 
