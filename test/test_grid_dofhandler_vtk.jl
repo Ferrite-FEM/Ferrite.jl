@@ -213,7 +213,7 @@ end
     @test linetopo.vertex_vertex_neighbor[2,1] == Ferrite.EntityNeighborhood(VertexIndex(1,2))
     @test linetopo.vertex_vertex_neighbor[2,2] == Ferrite.EntityNeighborhood(VertexIndex(3,1))
     @test linetopo.vertex_vertex_neighbor[3,1] == Ferrite.EntityNeighborhood(VertexIndex(2,2))
-    linefaceskeleton = Ferrite.compute_face_skeleton(linetopo, linegrid)
+    linefaceskeleton = Ferrite.faceskeleton(linetopo, linegrid)
     @test length(linefaceskeleton) == 4
 
 #                           (11)
@@ -363,7 +363,7 @@ end
     @test Set(Ferrite.toglobal(quadgrid, Ferrite.getstencil(stars, quadgrid, VertexIndex(2,1)))) == Set([2,1,6,3])
     @test Set(Ferrite.toglobal(quadgrid, Ferrite.getstencil(stars, quadgrid, VertexIndex(5,4)))) == Set([10,6,9,11,14])
 
-    face_skeleton = Ferrite.compute_face_skeleton(topology, quadgrid)
+    face_skeleton = Ferrite.faceskeleton(topology, quadgrid)
     @test Set(face_skeleton) == Set([FaceIndex(1,1),FaceIndex(1,2),FaceIndex(1,3),FaceIndex(1,4),
                                           FaceIndex(2,1),FaceIndex(2,2),FaceIndex(2,3),
                                           FaceIndex(3,1),FaceIndex(3,2),FaceIndex(3,3),
@@ -375,7 +375,7 @@ end
 
     quadratic_quadgrid = generate_grid(QuadraticQuadrilateral,(3,3))
     quadgrid_topology = ExclusiveTopology(quadratic_quadgrid)
-    quadface_skeleton = Ferrite.compute_face_skeleton(topology, quadgrid)
+    quadface_skeleton = Ferrite.faceskeleton(topology, quadgrid)
     @test quadface_skeleton == face_skeleton
     # add more regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
     @test all(quadgrid_topology.face_face_neighbor .== topology.face_face_neighbor)
