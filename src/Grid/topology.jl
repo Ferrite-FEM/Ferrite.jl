@@ -141,7 +141,6 @@ function _exclusive_topology_ctor(cells::Vector{C}, vertex_cell_table::Array{Set
                 else
                     @error "Case not implemented."
                 end
-            end
             # Shared surface
             elseif num_shared_vertices >= 3
                 _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
