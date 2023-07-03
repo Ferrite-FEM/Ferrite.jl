@@ -456,11 +456,13 @@ getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same 
 function transform_pointBWG(forest::ForestBWG{dim}, k::Integer, vertex::NTuple{dim,T}) where {dim,T}
     tree = forest.cells[k]
     cellnodes = getnodes(forest,collect(tree.nodes)) .|> get_node_coordinate 
+    vertex = vertex .* (2/(2^tree.b)) .- 1
     octant_physical_coordinates = sum(j-> cellnodes[j] * Ferrite.shape_value(Lagrange{Ferrite.RefHypercube{dim},1}(),Vec{dim}(vertex),j),1:length(cellnodes)) 
-    return Vec{dim}(octant_physical_coordinates .* 2/(2^tree.b) .- 1)
+    return Vec{dim}(octant_physical_coordinates)
 end
 
 #TODO: this function should wrap the LNodes Iterator of IBWG2015
+#TODO: need 𝒱₃ perm tables
 function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     nodes = Set{Tuple{Int,NTuple{dim,Int32}}}()
     for (k,tree) in enumerate(forest.cells)
@@ -475,23 +477,49 @@ function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
         _vertices = vertices(root(dim),tree.b)
         for (vi,v) in enumerate(_vertices)
             vertex_neighbor =  forest.topology.vertex_neighbor[k,vi]
-            if k > vertex_neighbor[1]
+            if length(vertex_neighbor) == 0
+                continue
+            end
+            if k > vertex_neighbor[1][1]
                 delete!(nodes,(k,v))
             end 
         end
         _faces = faces(root(dim),tree.b)
-        for (fi,f) in enumerate(_faces)
-            face_neighbor =  forest.topology.face_neighbor[k,fi]
-            if k > face_neighbor[1]
+        for (fi,f) in enumerate(_faces) # fi in p4est notation
+            face_neighbor =  forest.topology.face_neighbor[k,𝒱₂_perm[fi]]
+            if length(face_neighbor) == 0
+                continue
+            end
+            k′ = face_neighbor[1][1]
+            if k > k′
                 for leaf in tree.leaves
                     for v in vertices(leaf,tree.b)
                         if fi < 3
                             if v[1] == f[1][1] == f[2][1]
-                                
-                                delete!(nodes,(k,v))
+                                cache_octant = OctantBWG(leaf.l,v)           
+                                cache_octant = transform_face(forest,k′,𝒱₂_perm_inv[face_neighbor[1][2]],cache_octant) # after transform
+                                if (k′,cache_octant.xyz) ∈ nodes
+                                    delete!(nodes,(k,v))
+                                end
+                            end
+                        elseif fi < 5
+                            if v[2] == f[1][2] == f[2][2]
+                                cache_octant = OctantBWG(leaf.l,v)           
+                                cache_octant = transform_face(forest,k′,𝒱₂_perm_inv[face_neighbor[1][2]],cache_octant) # after transform
+                                if (k′,cache_octant.xyz) ∈ nodes
+                                    delete!(nodes,(k,v))
+                                end
+                            end
+                        else
+                            @error "help"
+                            if v[3] == f[1][3] == f[2][3]
+                                cache_octant = OctantBWG(leaf.l,v)           
+                                cache_octant = transform_face(forest,k′,𝒱₂_perm_inv[face_neighbor[1][2]],cache_octant) # after transform
+                                if (k′,cache_octant.xyz) ∈ nodes
+                                    delete!(nodes,(k,v))
+                                end
                             end
                         end
-                        delete!(nodes,(k,v))
                     end
                 end
             end 
@@ -815,11 +843,13 @@ const 𝒱₃ = [1  3  5  7
             1  2  3  4
             5  6  7  8]
 
+# Face indices permutation from p4est idx to Ferrite idx
 const 𝒱₂_perm = [4
                  2
                  1
                  3]
 
+# Face indices permutation from Ferrite idx to p4est idx
 const 𝒱₂_perm_inv = [3
                      2
                      4
