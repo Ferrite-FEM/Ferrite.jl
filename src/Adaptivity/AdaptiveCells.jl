@@ -156,6 +156,11 @@ function face(octant::OctantBWG{3}, f::Integer, b::Integer)
     return ntuple(i->vertex(octant, cornerid[i], b),4)
 end
 
+function faces(octant::OctantBWG{dim}, b::Integer) where dim
+    _nfaces = 2*dim
+    return ntuple(i->face(octant,i,b),_nfaces)
+end
+
 vertex(octant::OctantBWG, e::OctantEdgeIndex, b::Integer) = vertex(octant,e.idx,b)
 function edge(octant::OctantBWG{3}, e::Integer, b::Integer)
     cornerid = view(𝒰,e,:)
@@ -212,8 +217,7 @@ end
     find_range_boundaries(f::OctantBWG{dim,N,M,T}, l::OctantBWG{dim,N,M,T}, s::OctantBWG{dim,N,M,T}, idxset, b)
     find_range_boundaries(s::OctantBWG{dim,N,M,T}, idxset, b)
 Algorithm 4.2 of IBWG 2015
-TODO against what to test? Seems to work in the sense that if idxset has elements in the set
-that are not part of the boundary, they are not returned
+TODO: write tests
 """
 function find_range_boundaries(f::OctantBWG{dim,N,M,T1}, l::OctantBWG{dim,N,M,T1}, s::OctantBWG{dim,N,M,T1}, idxset::Set{OctantIndex{T2}}, b) where {dim,N,M,T1,T2}
     o = one(T1)
@@ -270,6 +274,7 @@ struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{RefHypercube{dim}}
 end
 
 function refine!(octree::OctreeBWG{dim,N,M,T}, pivot_octant::OctantBWG{dim,N,M,T}) where {dim,N,M,T<:Integer}
+    @assert pivot_octant.l + 1 <= octree.b
     o = one(T)
     # TODO replace this with recursive search function
     leave_idx = findfirst(x->x==pivot_octant,octree.leaves)
@@ -447,17 +452,21 @@ end
 
 getcelltype(grid::ForestBWG) = eltype(grid.cells)
 getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same cell type TODO
+function transform_pointBWG(forest::ForestBWG{dim}, k::Integer, vertex::NTuple{dim,T}) where {dim,T}
+    tree = forest.cells[k]
+    cellnodes = getnodes(forest,collect(tree.nodes)) .|> get_node_coordinate 
+    octant_physical_coordinates = sum(j-> cellnodes[j] * Ferrite.shape_value(Lagrange{Ferrite.RefHypercube{dim},1}(),Vec{dim}(vertex),j),1:length(cellnodes)) 
+    return Vec{dim}(octant_physical_coordinates .* 2/(2^tree.b) .- 1)
+end
 
 #TODO: this function should wrap the LNodes Iterator of IBWG2015
 function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
-    nodes = Dict{Tuple{Int,NTuple{dim,Int32}},NTuple{dim,Int32}}()
+    nodes = Set{Tuple{Int,NTuple{dim,Int32}}}()
     for (k,tree) in enumerate(forest.cells)
         for leaf in tree.leaves
             _vertices = vertices(leaf,tree.b)
             for v in _vertices
-                if !haskey(nodes,(k,v))
-                    nodes[(k,v)] = v
-                end
+                push!(nodes,(k,v))
             end
         end
     end
@@ -530,14 +539,22 @@ function descendants(octant::OctantBWG{dim,N,M,T}, b::Integer=_maxlevel[dim-1]) 
     return OctantBWG(l1,octant.xyz), OctantBWG(l2,octant.xyz .+ (h-one(T)))
 end
 
-function face_neighbor(octant::OctantBWG{dim,N,M,T}, f::T, b::T=_maxlevel[dim-1]) where {dim,N,M,T<:Integer}
+function face_neighbor(octant::OctantBWG{3,N,M,T}, f::T, b::T=_maxlevel[2]) where {N,M,T<:Integer}
     l = octant.l
     h = T(_compute_size(b,octant.l))
     x,y,z = octant.xyz
     x += ((f == T(1)) ? -h : ((f == T(2)) ? h : zero(T)))
     y += ((f == T(3)) ? -h : ((f == T(4)) ? h : zero(T)))
     z += ((f == T(5)) ? -h : ((f == T(6)) ? h : zero(T)))
-    dim == 2 ? OctantBWG(l,(x,y)) : OctantBWG(l,(x,y,z))
+    return OctantBWG(l,(x,y,z))
+end
+function face_neighbor(octant::OctantBWG{2,N,M,T}, f::T, b::T=_maxlevel[1]) where {N,M,T<:Integer}
+    l = octant.l
+    h = T(_compute_size(b,octant.l))
+    x,y = octant.xyz
+    x += ((f == T(1)) ? -h : ((f == T(2)) ? h : zero(T)))
+    y += ((f == T(3)) ? -h : ((f == T(4)) ? h : zero(T)))
+    return OctantBWG(l,(x,y))
 end
 face_neighbor(o::OctantBWG{dim,N,M,T1}, f::T2, b::T3) where {dim,N,M,T1<:Integer,T2<:Integer,T3<:Integer} = face_neighbor(o,T1(f),T1(b))
 
