@@ -46,6 +46,8 @@ get_cell_coordinates!
 Ferrite.ExclusiveTopology
 Ferrite.getneighborhood
 Ferrite.faceskeleton
+Ferrite.compute_vertex_star_stencils
+Ferrite.getstencil
 ```
 
 ### Grid Sets Utility

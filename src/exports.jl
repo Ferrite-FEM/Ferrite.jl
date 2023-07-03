@@ -66,7 +66,7 @@ export
     VertexIndex,
     ExclusiveTopology,
     getneighborhood,
-    compute_face_skeleton,
+    faceskeleton,
     compute_vertex_star_stencils,
     getstencil,
     getcells,
