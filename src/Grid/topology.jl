@@ -163,7 +163,6 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
             push!(vertex_cell_table[vertex], cellid)
         end
     end
-    end
 
     # Compute correct matrix size
     celltype = eltype(cells)
@@ -302,10 +301,10 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx:
 end
 
 """
-    compute_vertex_star_stencils(top, grid) -> StencilType
+    vertex_star_stencils(top::ExclusiveTopology, grid::Grid) -> Vector{Int, EntityNeighborhood{VertexIndex}}()
 Computes the stencils induced by the edge connectivity of the vertices.
 """
-function compute_vertex_star_stencils(top::ExclusiveTopology, grid::Grid)
+function vertex_star_stencils(top::ExclusiveTopology, grid::Grid)
     cells = grid.cells
     stencil_table = Dict{Int,EntityNeighborhood{VertexIndex}}()
     # Vertex Connectivity
@@ -328,19 +327,19 @@ function compute_vertex_star_stencils(top::ExclusiveTopology, grid::Grid)
 end
 
 """
-    getstencil(top::StencilType, grid::AbstractGrid, vertex_idx::VertexIndex) -> Iterable{EntityNeighborhood}
+    getstencil(top::Dict{Int, EntityNeighborhood{VertexIndex}}, grid::AbstractGrid, vertex_idx::VertexIndex) -> EntityNeighborhood{VertexIndex}
 Get an iterateable over the stencil members for a given local entity.
 """
-function getstencil(top::Dict{Int,EntityNeighborhood{VertexIndex}}, grid::AbstractGrid, vertex_idx::VertexIndex)
+function getstencil(top::Dict{Int, EntityNeighborhood{VertexIndex}}, grid::Grid, vertex_idx::VertexIndex)
     return top[toglobal(grid, vertex_idx)].neighbor_info
 end
 
 """
-    compute_face_skeleton(topology, grid) -> Iterable{FaceIndex}
+    _faceskeleton(topology::ExclusiveTopology, grid::Grid) -> Iterable{FaceIndex}
 Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit`
 `FaceValues`.
 """
-function compute_face_skeleton(top::ExclusiveTopology, grid::Grid)
+function _faceskeleton(top::ExclusiveTopology, grid::Grid)
     face_skeleton_global = Set{NTuple}()
     face_skeleton_local = Vector{FaceIndex}()
     fs_length = length(face_skeleton_global)
@@ -365,7 +364,7 @@ Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that 
 """
 function faceskeleton(top::ExclusiveTopology, grid::Grid)
     if top.face_skeleton === nothing
-        top.face_skeleton = compute_face_skeleton(top, grid)
+        top.face_skeleton = _faceskeleton(top, grid)
     end
     return top.face_skeleton
 end
