@@ -79,6 +79,7 @@ morton(octant::OctantBWG{dim,N,M,T1},l::T2,b::T3) where {dim,N,M,T1<:Integer,T2<
 
 Base.zero(::Type{OctantBWG{3, 8, 6}}) = OctantBWG(3, 0, 1)
 Base.zero(::Type{OctantBWG{2, 4, 4}}) = OctantBWG(2, 0, 1)
+root(dim::T) where T<:Integer = zero(OctantBWG{dim,dim^2,2*dim})
 
 ncorners(::Type{OctantBWG{dim,N,M,T}}) where {dim,N,M,T} = N
 ncorners(o::OctantBWG) = ncorners(typeof(o))
@@ -470,6 +471,32 @@ function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             end
         end
     end
+    for (k,tree) in enumerate(forest.cells) 
+        _vertices = vertices(root(dim),tree.b)
+        for (vi,v) in enumerate(_vertices)
+            vertex_neighbor =  forest.topology.vertex_neighbor[k,vi]
+            if k > vertex_neighbor[1]
+                delete!(nodes,(k,v))
+            end 
+        end
+        _faces = faces(root(dim),tree.b)
+        for (fi,f) in enumerate(_faces)
+            face_neighbor =  forest.topology.face_neighbor[k,fi]
+            if k > face_neighbor[1]
+                for leaf in tree.leaves
+                    for v in vertices(leaf,tree.b)
+                        if fi < 3
+                            if v[1] == f[1][1] == f[2][1]
+                                
+                                delete!(nodes,(k,v))
+                            end
+                        end
+                        delete!(nodes,(k,v))
+                    end
+                end
+            end 
+        end
+    end
     return nodes
 end
 
@@ -558,35 +585,39 @@ function face_neighbor(octant::OctantBWG{2,N,M,T}, f::T, b::T=_maxlevel[1]) wher
 end
 face_neighbor(o::OctantBWG{dim,N,M,T1}, f::T2, b::T3) where {dim,N,M,T1<:Integer,T2<:Integer,T3<:Integer} = face_neighbor(o,T1(f),T1(b))
 
-#TODO: this is not working in 2d as of now, indices used in the paper confuse me
+#TODO: this is working for 2D except rotation, 3D I don't know
 function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) where {dim,N,M,T1<:Integer,T2<:Integer}
     _one = one(T2)
     _two = T2(2)
     #currently rotation not encoded
-    kprime, fprime = getneighborhood(forest,FaceIndex(k,f))[1]
-    a₂ = f ÷ 2; b₂ = fprime ÷ 2
-    sprime = _one - ((f & _one) ⊻ (fprime & _one))
-    s = zeros(T2,2)
+    perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
+    kprime, fprime = getneighborhood(forest,FaceIndex(k,perm[f]))[1]
+    fprime = 𝒱₂_perm_inv[fprime]
+    sprime = _one - (((f - _one) & _one) ⊻ ((fprime - _one) & _one))
+    s = zeros(T2,3)
     b = zeros(T2,3)
-    r = 0 #no rotation information in face_neighbor currently
+    a = zeros(T2,3)
+    r = zero(T2)  #no rotation information in face_neighbor currently
+    a[3] = (f-_one) ÷ 2; b[3] = (fprime-_one) ÷ 2
     if dim == 2
-        a₀ = 1 - a₂; b₀ = 1 - b₂; s[1] = r #no rotation as of now
+        a[1] = 1 - a[3]; b[1] = 1 - b[3]; s[1] = r #no rotation as of now
     else
-        a₀ = (f < 3) ? 1 : 0; a₁ = (f < 5) ? 2 : 1
+        a[1] = (f < 3) ? 1 : 0; a[2] = (f < 5) ? 2 : 1
         #u = ℛ[1,f] ⊻ ℛ[1,fprime] ⊻ T2((r == 1) | (r == 3))
-        b[1] = (fprime < 3) ? 1 : 0; b[2] = (fprime < 5) ? 2 : 1
+        b[1] = (fprime < 3) ? 1 : 0; b[2] = (fprime < 5) ? 2 : 1 # r = 0 -> index 1
         #v = T2(ℛ[f,fprime] == 1)
-        s[1] = r & 2; s[2] = r & 3
+        s[1] = r & 1; s[2] = r & 2
     end
-    b = forest.cells[1].b
-    l = o.l; g = 2^b - 2^(b-l)
-    x = T2((s[1] == 1) ? o.xyz[1] : g - o.xyz[1])
-    y = T2((s[2] == 1) ? o.xyz[2] : g - o.xyz[2])
-    z = T2((_two*(fprime & 1) - 1)*2^b + sprime*g + (1-2*sprime)*o.xyz[2])
+    maxlevel = forest.cells[1].b
+    l = o.l; g = 2^maxlevel - 2^(maxlevel-l)
+    xyz = zeros(T2,dim)
+    xyz[b[1] + 1] = T2((s[1] == 0) ? o.xyz[a[1] + 1] : g - o.xyz[a[1] + 1])
+    xyz[b[3] + 1] = T2((_two*(fprime & 1) - 1)*2^maxlevel + sprime*g + (1-2*sprime)*o.xyz[a[3] + 1])
     if dim == 2
-        return OctantBWG(l,(x,z))
+        return OctantBWG(l,(xyz[1],xyz[2]))
     else
-        return OctantBWG(l,(x,y,z))
+        xyz[b[2] + 1] = T2((s[2] == 0) ? o.xyz[a[1] + 1] : g - o.xyz[a[2] + 1])
+        return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
     end
 end
 
@@ -788,6 +819,11 @@ const 𝒱₂_perm = [4
                  2
                  1
                  3]
+
+const 𝒱₂_perm_inv = [3
+                     2
+                     4
+                     1]
 
 const 𝒱₃_perm = [2
                  4
