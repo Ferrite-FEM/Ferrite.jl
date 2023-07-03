@@ -1,7 +1,13 @@
 export
 # Interpolations
     Interpolation,
-    RefCube,
+    VectorInterpolation,
+    ScalarInterpolation,
+    VectorizedInterpolation,
+    RefLine,
+    RefQuadrilateral,
+    RefHexahedron,
+    RefTriangle,
     RefTetrahedron,
     RefPrism,
     BubbleEnrichedLagrange,
@@ -13,16 +19,16 @@ export
 
 # Quadrature
     QuadratureRule,
+    FaceQuadratureRule,
+    getnquadpoints,
     getweights,
     getpoints,
 
 # FEValues
+    AbstractCellValues,
+    AbstractFaceValues,
     CellValues,
-    CellScalarValues,
-    CellVectorValues,
     FaceValues,
-    FaceScalarValues,
-    FaceVectorValues,
     reinit!,
     shape_value,
     shape_gradient,
@@ -37,25 +43,22 @@ export
     spatial_coordinate,
     getnormal,
     getdetJdV,
-    getnquadpoints,
 
 # Grid
     Grid,
     Node,
-    Cell,
     Line,
-    Line2D,
-    Line3D,
     QuadraticLine,
     Triangle,
     QuadraticTriangle,
     Quadrilateral,
-    Quadrilateral3D,
     QuadraticQuadrilateral,
+    SerendipityQuadraticQuadrilateral,
     Tetrahedron,
     QuadraticTetrahedron,
     Hexahedron,
-    #QuadraticHexahedron,
+    QuadraticHexahedron,
+    SerendipityQuadraticHexahedron,
     Wedge,
     CellIndex,
     FaceIndex,
@@ -74,8 +77,9 @@ export
     getfaceset,
     getedgeset,
     getvertexset,
-    getcoordinates,
-    getcoordinates!,
+    get_node_coordinate,
+    get_cell_coordinates,
+    get_cell_coordinates!,
     getcellsets,
     getnodesets,
     getfacesets,
@@ -85,12 +89,14 @@ export
     nfaces,
     addnodeset!,
     addfaceset!,
+    addboundaryfaceset!,
     addedgeset!,
+    addboundaryedgeset!,
     addvertexset!,
+    addboundaryvertexset!,
     addcellset!,
     transform!,
     generate_grid,
-    compute_vertex_values,
 # AdaptiveGrid
     ForestBWG,
     OctreeBWG,
@@ -103,7 +109,7 @@ export
 
 # Dofs
     DofHandler,
-    MixedDofHandler, # only for getting an error message redirecting to DofHandler
+    SubDofHandler,
     close!,
     ndofs,
     ndofs_per_cell,
@@ -114,9 +120,7 @@ export
     dof_range,
     renumber!,
     DofOrder,
-    FieldHandler,
-    Field,
-    reshape_to_nodes,
+    evaluate_at_grid_nodes,
     apply_analytical!,
 
 # Constraints
@@ -166,5 +170,4 @@ export
     get_point_values,
     PointIterator,
     PointLocation,
-    PointScalarValues,
-    PointVectorValues
+    PointValues

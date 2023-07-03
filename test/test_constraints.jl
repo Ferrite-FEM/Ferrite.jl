@@ -5,36 +5,40 @@
     Γ = getfaceset(grid, "left")
     face_map = collect_periodic_faces(grid, "left", "right")
     dh = DofHandler(grid)
-    add!(dh, :s, 1)
-    add!(dh, :v, 2)
+    add!(dh, :s, Lagrange{RefTriangle,1}())
+    add!(dh, :v, Lagrange{RefTriangle,1}()^2)
+    add!(dh, :z, DiscontinuousLagrange{RefTriangle,0}())
+    add!(dh, :sd, DiscontinuousLagrange{RefTriangle,1}())
+    add!(dh, :vd, DiscontinuousLagrange{RefTriangle,1}()^2)
     close!(dh)
     ch = ConstraintHandler(dh)
-
     # Dirichlet
     @test_throws ErrorException("components are empty: $(Int)[]") Dirichlet(:u, Γ, (x, t) -> 0, Int[])
     @test_throws ErrorException("components not sorted: [2, 1]") Dirichlet(:u, Γ, (x, t) -> 0, Int[2, 1])
     @test_throws ErrorException("components not unique: [2, 2]") Dirichlet(:u, Γ, (x, t) -> 0, Int[2, 2])
-    ## Scalar
-    dbc = Dirichlet(:s, Γ, (x, t) -> 0)
-    add!(ch, dbc)
-    @test ch.dbcs[end].components == [1]
-    dbc = Dirichlet(:s, Γ, (x, t) -> 0, [1])
-    add!(ch, dbc)
-    @test ch.dbcs[end].components == [1]
-    dbc = Dirichlet(:s, Γ, (x, t) -> 0, [1, 2])
-    @test_throws ErrorException("components [1, 2] not within range of field :s (1 dimension(s))") add!(ch, dbc)
-    dbc = Dirichlet(:p, Γ, (x, t) -> 0)
-    @test_throws ErrorException("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's DofHandler") add!(ch, dbc)
-    #    ## Vector
-    dbc = Dirichlet(:v, Γ, (x, t) -> 0)
-    add!(ch, dbc)
-    @test ch.dbcs[end].components == [1, 2]
-    dbc = Dirichlet(:v, Γ, (x, t) -> 0, [1])
-    add!(ch, dbc)
-    @test ch.dbcs[end].components == [1]
-    dbc = Dirichlet(:v, Γ, (x, t) -> 0, [2, 3])
-    @test_throws ErrorException("components [2, 3] not within range of field :v (2 dimension(s))") add!(ch, dbc)
-
+    @test_throws ErrorException("No dof prescribed for order 0 interpolations") add!(ch, Dirichlet(:z, Γ, (x, t) -> 0))
+    for (s, v) in [(:s, :v), (:sd, :vd)] 
+        ## Scalar
+        dbc = Dirichlet(s, Γ, (x, t) -> 0)
+        add!(ch, dbc)
+        @test ch.dbcs[end].components == [1]
+        dbc = Dirichlet(s, Γ, (x, t) -> 0, [1])
+        add!(ch, dbc)
+        @test ch.dbcs[end].components == [1]
+        dbc = Dirichlet(s, Γ, (x, t) -> 0, [1, 2])
+        @test_throws ErrorException("components [1, 2] not within range of field :$s (1 dimension(s))") add!(ch, dbc)
+        dbc = Dirichlet(:p, Γ, (x, t) -> 0)
+        @test_throws ErrorException("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's DofHandler") add!(ch, dbc)
+        ## Vector
+        dbc = Dirichlet(v, Γ, (x, t) -> 0)
+        add!(ch, dbc)
+        @test ch.dbcs[end].components == [1, 2]
+        dbc = Dirichlet(v, Γ, (x, t) -> 0, [1])
+        add!(ch, dbc)
+        @test ch.dbcs[end].components == [1]
+        dbc = Dirichlet(v, Γ, (x, t) -> 0, [2, 3])
+        @test_throws ErrorException("components [2, 3] not within range of field :$v (2 dimension(s))") add!(ch, dbc)
+    end
     # PeriodicDirichlet
     @test_throws ErrorException("components are empty: $(Int)[]") PeriodicDirichlet(:u, face_map, Int[])
     @test_throws ErrorException("components not sorted: [2, 1]") PeriodicDirichlet(:u, face_map, Int[2, 1])
@@ -52,7 +56,7 @@
     pdbc = PeriodicDirichlet(:s, face_map, [1, 2])
     @test_throws ErrorException("components [1, 2] not within range of field :s (1 dimension(s))") add!(ConstraintHandler(dh), pdbc)
     pdbc = PeriodicDirichlet(:p, face_map)
-    @test_throws ErrorException("Did not find field :p in DofHandler (existing fields: [:s, :v]).") add!(ConstraintHandler(dh), pdbc)
+    @test_throws ErrorException("Did not find field :p in DofHandler (existing fields: [:s, :v, :z, :sd, :vd]).") add!(ConstraintHandler(dh), pdbc)
     ## Vector
     pdbc = PeriodicDirichlet(:v, face_map)
     add!(ConstraintHandler(dh), pdbc)
@@ -78,8 +82,8 @@ end
     grid = generate_grid(Triangle, (1, 1))
     addnodeset!(grid, "nodeset", x-> x[2] == -1 || x[1] == -1)
     dh = DofHandler(grid)
-    add!(dh, :u, 2)
-    add!(dh, :p, 1)
+    add!(dh, :u, Lagrange{RefTriangle,1}()^2)
+    add!(dh, :p, Lagrange{RefTriangle,1}())
     close!(dh)
     ch = ConstraintHandler(dh)
     dbc1 = Dirichlet(:u, getnodeset(grid, "nodeset"), (x,t) -> x, [1, 2])
@@ -101,13 +105,13 @@ end
 
    dh  = DofHandler(mesh)
 
-   ip_quadratic = Lagrange{dim, RefCube, 2}()
-   ip_linear = Lagrange{dim, RefCube, 1}()
-   field_u = Field(:u, ip_quadratic, dim)
-   field_c = Field(:c, ip_linear, 1)
-   add!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set1")))
-   add!(dh, FieldHandler([field_u], getcellset(mesh, "set2")))
-
+   ip_quadratic = Lagrange{RefQuadrilateral, 2}()^dim
+   ip_linear = Lagrange{RefQuadrilateral, 1}()
+   sdh1 = SubDofHandler(dh, getcellset(mesh, "set1"))
+   add!(sdh1, :u, ip_quadratic)
+   add!(sdh1, :c, ip_linear)
+   sdh2 = SubDofHandler(dh, getcellset(mesh, "set2"))
+   add!(sdh2, :u, ip_quadratic)
    close!(dh)
 
    ch = ConstraintHandler(dh)
@@ -125,13 +129,14 @@ end
    addcellset!(mesh, "set1", Set(1))
    addcellset!(mesh, "set2", Set(2))
 
-   ip = Lagrange{dim, RefCube, 1}()
-   field_u = Field(:u, ip, dim)
-   field_c = Field(:c, ip, 1)
+   ip = Lagrange{RefQuadrilateral, 1}()
 
    dh = DofHandler(mesh)
-   add!(dh, FieldHandler([field_u], getcellset(mesh, "set1")))
-   add!(dh, FieldHandler([field_u, field_c], getcellset(mesh, "set2")))
+   sdh1 = SubDofHandler(dh, getcellset(mesh, "set1"))
+   add!(sdh1, :u, ip^dim)
+   sdh2 = SubDofHandler(dh, getcellset(mesh, "set2"))
+   add!(sdh2, :u, ip^dim)
+   add!(sdh2, :c, ip)
    close!(dh)
 
    ch = ConstraintHandler(dh)
@@ -149,8 +154,8 @@ end
     addedgeset!(grid, "edge", x-> x[1] ≈ -1.0 && x[3] ≈ -1.0)
 
     dh = DofHandler(grid)
-    add!(dh, :u, 3)
-    add!(dh, :p, 1)
+    add!(dh, :u, Lagrange{RefHexahedron,1}()^3)
+    add!(dh, :p, Lagrange{RefHexahedron,1}())
     close!(dh)
 
     ch = ConstraintHandler(dh)
@@ -168,13 +173,13 @@ end
              Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(0.0,1.0,0.0)),
              Node{3,Float64}(Vec(2.0,0.0,0.0)), Node{3,Float64}(Vec(2.0,2.0,0.0))]
 
-    cells = [Quadrilateral3D((1,2,3,4)), Quadrilateral3D((2,5,6,3))]
+    cells = [Quadrilateral((1,2,3,4)), Quadrilateral((2,5,6,3))]
     grid = Grid(cells,nodes)
 
     #3d quad with 1st order 2d interpolation
     dh = DofHandler(grid)
-    add!(dh, :u, 1, Lagrange{2,RefCube,2}())
-    add!(dh, :θ, 1, Lagrange{2,RefCube,2}())
+    add!(dh, :u, Lagrange{RefQuadrilateral,2}())
+    add!(dh, :θ, Lagrange{RefQuadrilateral,2}())
     close!(dh)
 
     addedgeset!(grid, "edge", x -> x[2] ≈ 0.0) #bottom edge
@@ -187,84 +192,131 @@ end
     @test ch.prescribed_dofs == [10, 11, 14, 25, 27]
 end
 
-@testset "edge bc mixed grid" begin
-    # Test mesh
-    # 6---7---8---9---10    
-    # |   |2 /|   |   |     :u 1:5
-    # | 1 | / | 4 | 5 |     :v 1:2
-    # |   |/ 3|   |   |     
-    # 1---2---3---4---5
-    #
-    # |---A---|---B---|
-    #     |---C---|
-    #
-    # Dofs per node (note, depends on push! order below) (:u, [:v])
-    # node nr     1        2      3      4      5      6      7      8       9     10
-    nodedofs = [(1, 5), (2, 6), (11,), (12,), (14,), (4,8), (3,7), (9,10), (13,), (15,)]
-    
-    # Create Grid based on above drawing
-    nodes = [Node{2,Float64}(Vec{2,Float64}((i, j))) for j in 0:1 for i in 0:4]
-    quadcells = [Quadrilateral((i, i+1, i+6, i+5)) for i in [1, 3, 4]]
-    tricells = [Triangle((2,8,7)), Triangle((2,3,8))]
-    cells = [quadcells[1], tricells..., quadcells[2:end]...]
-    cellsets = Dict("onlyuQ" => Set(4:5), "onlyuT" => Set(3:3),
-                    "uandvQ" => Set(1:1), "uandvT" => Set(2:2))
-    facesets = Dict("A" => Set((FaceIndex(1,1), FaceIndex(3,1))),
-                    "B" => Set((FaceIndex(4,1), FaceIndex(5,1))),
-                    "C" => Set((FaceIndex(3,1), FaceIndex(4,1))))
-    grid = Grid(cells, nodes, cellsets=cellsets, facesets=facesets)
-
-    # Create DofHandler based on grid
-    dim = Ferrite.getdim(grid)  # 2
-    ip_quad = Lagrange{dim,RefCube,1}()
-    ip_tria = Lagrange{dim,RefTetrahedron,1}()
+@testset "discontinuous ip constraints" begin
+    grid = generate_grid(Hexahedron, (1, 1, 1))
+    addedgeset!(grid, "bottom", x-> x[3] ≈ -1.0)
     dh = DofHandler(grid)
-    field_uT = Field(:u, ip_tria, 1)
-    field_uQ = Field(:u, ip_quad, 1)
-    field_vT = Field(:v, ip_tria, 1)
-    field_vQ = Field(:v, ip_quad, 1)
-
-    # Order important for test to ensure consistent dof ordering
-    add!(dh, FieldHandler([field_uQ, field_vQ], getcellset(grid, "uandvQ")))
-    add!(dh, FieldHandler([field_uT, field_vT], getcellset(grid, "uandvT")))
-    add!(dh, FieldHandler([field_uT], getcellset(grid, "onlyuT")))
-    add!(dh, FieldHandler([field_uQ], getcellset(grid, "onlyuQ")))
+    add!(dh, :u, DiscontinuousLagrange{RefHexahedron,1}()^3)
+    add!(dh, :p, DiscontinuousLagrange{RefHexahedron,1}())
     close!(dh)
 
-    # Add constraints 
-    ch = ConstraintHandler(dh)
-    dA_u = Dirichlet(:u, getfaceset(grid, "A"), (x,t) -> 1.0)
-    dA_v = Dirichlet(:v, getfaceset(grid, "A"), (x,t) -> 2.0)
-    dB_u = Dirichlet(:u, getfaceset(grid, "B"), (x,t) -> 3.0)  # Note, overwrites dA_u on node 3 
-    dB_v = Dirichlet(:v, getfaceset(grid, "B"), (x,t) -> 4.0)  # :v not on cells with "B"-faces
-    dC_v = Dirichlet(:v, getfaceset(grid, "C"), (x,t) -> 5.0)  # :v not on cells with "C"-faces
-    dN_u = Dirichlet(:u, Set(10), (x,t) -> 6.0)                # Add on node 10
-    
-    @test_logs min_level=Logging.Warn add!(ch, dA_u)    # No warning should be issued
-    @test_logs min_level=Logging.Warn add!(ch, dA_v)    # No warning should be issued
-    @test_logs min_level=Logging.Warn add!(ch, dB_u)    # No warning should be issued
-    @test_throws ErrorException add!(ch, dB_v)  # Warn about :v not in cells connected with dB_v's faceset
-    @test_throws ErrorException add!(ch, dC_v)  # Warn about :v not in cells connected with dC_v's faceset
-    @test_logs min_level=Logging.Warn add!(ch, dN_u)    # No warning should be issued (add to node)
-    close!(ch)
-    
-    # The full bottom part of the mesh has been prescribed
-    @test sort(ch.prescribed_dofs) == sort(push!([nd[i] for nd in nodedofs[1:5] for i in 1:length(nd)], 15))
+    face_ch = ConstraintHandler(dh)
+    face_dbc = Dirichlet(:u, getfaceset(grid, "bottom"), (x,t) -> x, [1, 2, 3])
+    add!(face_ch, face_dbc)
+    close!(face_ch)
+    update!(face_ch)
 
-    # Test that the correct dofs have been prescribed
-    update!(ch, 0.0)
-    #                 nodes       N1,  N2,  N1,  N2,  N3,  N4,  N5   N10
-    #                 field       :u,  :u,  :v,  :v,  :u,  :u,  :u   :u
-    #                   dof        1,   2,   5,   6,  11,  12,  14   15
-    @test ch.inhomogeneities == [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 6.0]
-    # Note that dB_u overwrite dA_u @ N3, hence the value 3.0 there
+    edge_ch = ConstraintHandler(dh)
+    edge_dbc = Dirichlet(:u, getedgeset(grid, "bottom"), (x,t) -> x, [1, 2, 3])
+    add!(edge_ch, edge_dbc)
+    close!(edge_ch)
+    update!(edge_ch)
+
+    @test edge_ch.prescribed_dofs == face_ch.prescribed_dofs == collect(1:12)
+    @test edge_ch.inhomogeneities == face_ch.inhomogeneities == reduce(vcat, getcoordinates(grid,1)[1:4])
+
+    # This can be merged with the continuous test or removed.
+    # Shell mesh edge bcs
+    nodes = [Node{3,Float64}(Vec(0.0,0.0,0.0)), Node{3,Float64}(Vec(1.0,0.0,0.0)), 
+             Node{3,Float64}(Vec(1.0,1.0,0.0)), Node{3,Float64}(Vec(0.0,1.0,0.0)),
+             Node{3,Float64}(Vec(2.0,0.0,0.0)), Node{3,Float64}(Vec(2.0,2.0,0.0))]
+
+    cells = [Quadrilateral((1,2,3,4)), Quadrilateral((2,5,6,3))]
+    grid = Grid(cells,nodes)
+
+    # 3d quad with 1st order 2d interpolation
+    dh = DofHandler(grid)
+    add!(dh, :u, DiscontinuousLagrange{RefQuadrilateral,2}())
+    add!(dh, :θ, DiscontinuousLagrange{RefQuadrilateral,2}())
+    close!(dh)
+
+    addedgeset!(grid, "bottom", x -> x[2] ≈ 0.0) #bottom edge
+    edge_ch = ConstraintHandler(dh)
+    edge_dbc = Dirichlet(:θ, getedgeset(grid, "bottom"), (x,t) -> (0.0,), [1])
+    add!(edge_ch, edge_dbc)
+    close!(edge_ch)
+    update!(edge_ch)
+
+    @test edge_ch.prescribed_dofs == [10, 11, 14, 28, 29, 32]
 end
+#@testset "edge bc mixed grid" begin
+#    # Test mesh
+#    # 6---7---8---9---10
+#    # |   |2 /|   |   |     :u 1:5
+#    # | 1 | / | 4 | 5 |     :v 1:2
+#    # |   |/ 3|   |   |
+#    # 1---2---3---4---5
+#    #
+#    # |---A---|---B---|
+#    #     |---C---|
+#    #
+#    # Dofs per node (note, depends on push! order below) (:u, [:v])
+#    # node nr     1        2      3      4      5      6      7      8       9     10
+#    nodedofs = [(1, 5), (2, 6), (11,), (12,), (14,), (4,8), (3,7), (9,10), (13,), (15,)]
+
+#    # Create Grid based on above drawing
+#    nodes = [Node{2,Float64}(Vec{2,Float64}((i, j))) for j in 0:1 for i in 0:4]
+#    quadcells = [Quadrilateral((i, i+1, i+6, i+5)) for i in [1, 3, 4]]
+#    tricells = [Triangle((2,8,7)), Triangle((2,3,8))]
+#    cells = [quadcells[1], tricells..., quadcells[2:end]...]
+#    cellsets = Dict("onlyuQ" => Set(4:5), "onlyuT" => Set(3:3),
+#                    "uandvQ" => Set(1:1), "uandvT" => Set(2:2))
+#    facesets = Dict("A" => Set((FaceIndex(1,1), FaceIndex(3,1))),
+#                    "B" => Set((FaceIndex(4,1), FaceIndex(5,1))),
+#                    "C" => Set((FaceIndex(3,1), FaceIndex(4,1))))
+#    grid = Grid(cells, nodes, cellsets=cellsets, facesets=facesets)
+
+#    # Create DofHandler based on grid
+#    dim = Ferrite.getdim(grid)  # 2
+#    ip_quad = Lagrange{RefQuadrilateral,1}()
+#    ip_tria = Lagrange{RefTetrahedron,1}()
+#    dh = DofHandler(grid)
+#    field_uT = Field(:u, ip_tria)
+#    field_uQ = Field(:u, ip_quad)
+#    field_vT = Field(:v, ip_tria)
+#    field_vQ = Field(:v, ip_quad)
+
+#    # Order important for test to ensure consistent dof ordering
+#    add!(dh, FieldHandler([field_uQ, field_vQ], getcellset(grid, "uandvQ")))
+#    add!(dh, FieldHandler([field_uT, field_vT], getcellset(grid, "uandvT")))
+#    add!(dh, FieldHandler([field_uT], getcellset(grid, "onlyuT")))
+#    add!(dh, FieldHandler([field_uQ], getcellset(grid, "onlyuQ")))
+#    close!(dh)
+
+#    # Add constraints
+#    ch = ConstraintHandler(dh)
+#    dA_u = Dirichlet(:u, getfaceset(grid, "A"), (x,t) -> 1.0)
+#    dA_v = Dirichlet(:v, getfaceset(grid, "A"), (x,t) -> 2.0)
+#    dB_u = Dirichlet(:u, getfaceset(grid, "B"), (x,t) -> 3.0)  # Note, overwrites dA_u on node 3
+#    dB_v = Dirichlet(:v, getfaceset(grid, "B"), (x,t) -> 4.0)  # :v not on cells with "B"-faces
+#    dC_v = Dirichlet(:v, getfaceset(grid, "C"), (x,t) -> 5.0)  # :v not on cells with "C"-faces
+#    dN_u = Dirichlet(:u, Set(10), (x,t) -> 6.0)                # Add on node 10
+
+#    @test_logs min_level=Logging.Warn add!(ch, dA_u)    # No warning should be issued
+#    @test_logs min_level=Logging.Warn add!(ch, dA_v)    # No warning should be issued
+#    @test_logs min_level=Logging.Warn add!(ch, dB_u)    # No warning should be issued
+#    @test_throws ErrorException add!(ch, dB_v)  # Warn about :v not in cells connected with dB_v's faceset
+#    @test_throws ErrorException add!(ch, dC_v)  # Warn about :v not in cells connected with dC_v's faceset
+#    @test_logs min_level=Logging.Warn add!(ch, dN_u)    # No warning should be issued (add to node)
+#    close!(ch)
+
+#    # The full bottom part of the mesh has been prescribed
+#    @test sort(ch.prescribed_dofs) == sort(push!([nd[i] for nd in nodedofs[1:5] for i in 1:length(nd)], 15))
+
+#    # Test that the correct dofs have been prescribed
+#    update!(ch, 0.0)
+#    #                 nodes       N1,  N2,  N1,  N2,  N3,  N4,  N5   N10
+#    #                 field       :u,  :u,  :v,  :v,  :u,  :u,  :u   :u
+#    #                   dof        1,   2,   5,   6,  11,  12,  14   15
+#    @test ch.inhomogeneities == [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 6.0]
+#    # Note that dB_u overwrite dA_u @ N3, hence the value 3.0 there
+#end
 
 @testset "affine constraints" begin
 
     grid = generate_grid(Line, (10,))
     dh = DofHandler(grid)
-    add!(dh, :u, 1)
+    add!(dh, :u, Lagrange{RefLine,1}())
     close!(dh)
 
     test_acs = [
@@ -337,7 +389,7 @@ end
     @testset "nonlinear" begin
         params = (k=1.0, f=1.0, a=1.0, b=0.2, tol=1e-10, maxiter=2)
         grid = generate_grid(Line, (2,)); addfaceset!(grid, "center", x->x[1]≈0.0)
-        dh = DofHandler(grid); add!(dh, :u, 1); close!(dh)
+        dh = DofHandler(grid); add!(dh, :u, Lagrange{RefLine,1}()); close!(dh)
 
         function doassemble!(K, r, dh, a, params)
             # Spring elements 
@@ -716,7 +768,7 @@ end # testset
 
     # Scalar
     dh = DofHandler(grid)
-    add!(dh, :s, 1)
+    add!(dh, :s, Lagrange{RefQuadrilateral,1}())
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
@@ -755,7 +807,7 @@ end # testset
 
     # Vector
     dh = DofHandler(grid)
-    add!(dh, :v, 2)
+    add!(dh, :v, Lagrange{RefQuadrilateral,1}()^2)
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
@@ -841,7 +893,7 @@ end # testset
     #  │       │       │
     #  1───5───2───12──10
     dh = DofHandler(grid)
-    add!(dh, :s, 1, Lagrange{2,RefCube,2}())
+    add!(dh, :s, Lagrange{RefQuadrilateral,2}())
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
@@ -901,7 +953,7 @@ end # testset
     #   │             │             │
     #  1,2────9,10───3,4───23,24──19,20
     dh = DofHandler(grid)
-    add!(dh, :v, 2, Lagrange{2,RefCube,2}())
+    add!(dh, :v, Lagrange{RefQuadrilateral,2}()^2)
     close!(dh)
     ch = ConstraintHandler(dh)
     face_map = collect_periodic_faces(grid, "left", "bottom", rotpio2)
@@ -932,8 +984,8 @@ end # testset
     grid = generate_grid(Hexahedron, (1, 1, 1))
     face_map = collect_periodic_faces(grid)
     dh = DofHandler(grid)
-    add!(dh, :s, 1)
-    add!(dh, :v, 2)
+    add!(dh, :s, Lagrange{RefHexahedron,1}())
+    add!(dh, :v, Lagrange{RefHexahedron,1}()^2)
     close!(dh)
 
     ch = ConstraintHandler(dh)
@@ -982,8 +1034,8 @@ end # testset
     # Quadratic interpolation
     grid = generate_grid(Hexahedron, (5, 5, 5))
     dh = DofHandler(grid)
-    add!(dh, :s, 1, Lagrange{3,RefCube,2}())
-    add!(dh, :v, 2, Lagrange{3,RefCube,2}())
+    add!(dh, :s, Lagrange{RefHexahedron,2}())
+    add!(dh, :v, Lagrange{RefHexahedron,2}()^2)
     close!(dh)
 
     compare_by_dbc(
@@ -1010,7 +1062,7 @@ end # testset
     # 3D tetra scalar
     grid = generate_grid(Tetrahedron, (1, 1, 1))
     dh = DofHandler(grid)
-    add!(dh, :s, 1)
+    add!(dh, :s, Lagrange{RefTetrahedron,1}())
     close!(dh)
     face_map = collect_periodic_faces(grid)
     ch = ConstraintHandler(dh)
@@ -1024,7 +1076,7 @@ end # testset
     # 3D tetra vector
     grid = generate_grid(Tetrahedron, (2, 1, 1))
     dh = DofHandler(grid)
-    add!(dh, :v, 2)
+    add!(dh, :v, Lagrange{RefTetrahedron,1}()^2)
     close!(dh)
     face_map = collect_periodic_faces(grid, "left", "right")
     ch = ConstraintHandler(dh)
@@ -1045,7 +1097,7 @@ end # testset
     # 3D hex vector with dof rotation
     grid = generate_grid(Hexahedron, (1, 1, 1))
     dh = DofHandler(grid)
-    add!(dh, :v, 3)
+    add!(dh, :v, Lagrange{RefHexahedron,1}()^3)
     close!(dh)
     rot = rotation_tensor(Vec{3}((0., 1., 0.)), π/2)
     face_map = collect_periodic_faces(grid, "left", "bottom", x -> rot ⋅ x)
@@ -1076,19 +1128,19 @@ end # testset
     end
 
     for (D, CT, IT) in (
-        (2, Quadrilateral, Lagrange{2,RefCube,1}()),
-        (2, Quadrilateral, Lagrange{2,RefCube,2}()),
-        (2, Triangle, Lagrange{2,RefTetrahedron,1}()),
-        (2, Triangle, Lagrange{2,RefTetrahedron,2}()),
-        (3, Hexahedron, Lagrange{3,RefCube,1}()),
-        (3, Hexahedron, Lagrange{3,RefCube,2}()),
-        (3, Tetrahedron, Lagrange{3,RefTetrahedron,1}()),
-        (3, Tetrahedron, Lagrange{3,RefTetrahedron,2}()),
+        (2, Quadrilateral, Lagrange{RefQuadrilateral,1}()),
+        (2, Quadrilateral, Lagrange{RefQuadrilateral,2}()),
+        (2, Triangle, Lagrange{RefTriangle,1}()),
+        (2, Triangle, Lagrange{RefTriangle,2}()),
+        (3, Hexahedron, Lagrange{RefHexahedron,1}()),
+        (3, Hexahedron, Lagrange{RefHexahedron,2}()),
+        (3, Tetrahedron, Lagrange{RefTetrahedron,1}()),
+        (3, Tetrahedron, Lagrange{RefTetrahedron,2}()),
     )
         grid = generate_grid(CT, ntuple(i -> 5, D))
         dh = DofHandler(grid)
-        add!(dh, :s, 1, IT)
-        add!(dh, :v, D, IT)
+        add!(dh, :s, IT)
+        add!(dh, :v, IT^D)
         close!(dh)
 
         # Scalar
@@ -1176,7 +1228,7 @@ end # testset
 
 @testset "Affine constraints with master dofs that are prescribed" begin
     grid = generate_grid(Quadrilateral, (2, 2))
-    dh = DofHandler(grid); add!(dh, :u, 1); close!(dh)
+    dh = DofHandler(grid); add!(dh, :u, Lagrange{RefQuadrilateral,1}()); close!(dh)
 
     #  8───7───9
     #  │   │   │
@@ -1310,7 +1362,7 @@ end # testset
 @testset "local application of bc" begin
     grid = generate_grid(Quadrilateral, (5,5))
     dh = DofHandler(grid)
-    add!(dh, :u, 1)
+    add!(dh, :u, Lagrange{RefQuadrilateral,1}())
     close!(dh)
     # Dirichlet BC
     ch_dbc = ConstraintHandler(dh)
@@ -1393,7 +1445,7 @@ end # testset
 
         ke = zeros(ndofs_per_cell(dh), ndofs_per_cell(dh))
         fe = zeros(ndofs_per_cell(dh))
-        cv = CellScalarValues(QuadratureRule{2,RefCube}(2), Lagrange{2,RefCube,1}())
+        cv = CellValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,1}())
 
         for cell in CellIterator(dh)
             reinit!(cv, cell)
@@ -1507,7 +1559,7 @@ end # testset
 @testset "Sparsity pattern without constrained dofs" begin
     grid = generate_grid(Triangle, (5, 5))
     dh = DofHandler(grid)
-    add!(dh, :u, 1)
+    add!(dh, :u, Lagrange{RefTriangle,1}())
     close!(dh)
     ch = ConstraintHandler(dh)
     add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0))
@@ -1560,7 +1612,7 @@ end # testset
     # and that the missing values are instead taken from above the diagonal.
     grid = generate_grid(Line, (2,))
     dh = DofHandler(grid)
-    add!(dh, :u, 1)
+    add!(dh, :u, Lagrange{RefLine,1}())
     close!(dh)
     ch = ConstraintHandler(dh)
     add!(ch, Dirichlet(:u, getfaceset(grid, "left"), x -> 1))

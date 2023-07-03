@@ -7,38 +7,6 @@ struct L2Projector <: AbstractProjector
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::DofHandler
     set::Vector{Int}
-    node2dof_map::Vector{Int}
-    fe_values::Union{CellValues,Nothing} # only used for deprecated constructor
-    qr_rhs::Union{QuadratureRule,Nothing}    # only used for deprecated constructor
-end
-
-function L2Projector(fe_values::Ferrite.Values, interp::Interpolation,
-    grid::Ferrite.AbstractGrid, set=1:getncells(grid), fe_values_mass::Ferrite.Values=fe_values)
-
-    Base.depwarn("L2Projector(fe_values, interp, grid) is deprecated, " *
-                 "use L2Projector(qr, interp, grid) instead.", :L2Projector)
-
-    dim, T, shape = typeof(fe_values).parameters
-
-    # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
-    dh = DofHandler(grid)
-    field = Field(:_, interp, 1)
-    fh = FieldHandler([field], Set(set))
-    add!(dh, fh)
-    _, vertex_dict, _, _ = __close!(dh)
-
-    M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
-    M_cholesky = cholesky(M)  # TODO maybe have a lazy eval instead of precomputing? / JB
-    dummy = Lagrange{1,RefCube,1}()
-    return L2Projector(dummy, dummy, M_cholesky, dh, collect(set), vertex_dict[1], fe_values, nothing)
-end
-
-function L2Projector(qr::QuadratureRule, func_ip::Interpolation,
-    grid::Ferrite.AbstractGrid, set=1:getncells(grid), qr_mass::QuadratureRule=_mass_qr(func_ip),
-    geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(set)])))
-    Base.depwarn("L2Projector(qr, func_ip, grid) is deprecated, " *
-                 "use L2Projector(func_ip, grid) instead.", :L2Projector)
-    return L2Projector(func_ip, grid; qr_lhs=qr_mass, set=set, geom_ip=geom_ip, qr_rhs=qr)
 end
 
 """
@@ -69,49 +37,49 @@ function L2Projector(
         grid::AbstractGrid;
         qr_lhs::QuadratureRule = _mass_qr(func_ip),
         set = 1:getncells(grid),
-        geom_ip::Interpolation = default_interpolation(typeof(grid.cells[first(set)])),
-        qr_rhs::Union{QuadratureRule,Nothing}=nothing, # deprecated
+        geom_ip::Interpolation = default_interpolation(getcelltype(grid, first(set))),
     )
 
-    _check_same_celltype(grid, collect(set)) # TODO this does the right thing, but gives the wrong error message if it fails
+    # TODO: Maybe this should not be allowed? We always assume to project scalar entries.
+    if func_ip isa VectorizedInterpolation
+        func_ip = func_ip.ip
+    end
 
-    fe_values_mass = CellScalarValues(qr_lhs, func_ip, geom_ip)
+    _check_same_celltype(grid, set)
+
+    fe_values_mass = CellValues(qr_lhs, func_ip, geom_ip)
 
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
     dh = DofHandler(grid)
-    field = Field(:_, func_ip, 1) # we need to create the field, but the interpolation is not used here
-    fh = FieldHandler([field], Set(set))
-    add!(dh, fh)
-    _, vertex_dict, _, _ = __close!(dh)
+    sdh = SubDofHandler(dh, Set(set))
+    add!(sdh, :_, func_ip) # we need to create the field, but the interpolation is not used here
+    close!(dh)
 
     M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
     M_cholesky = cholesky(M)
 
-    # For deprecated API
-    fe_values = qr_rhs === nothing ? nothing :
-                CellScalarValues(qr_rhs, func_ip, geom_ip)
-
-    return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set), vertex_dict[1], fe_values, qr_rhs)
+    return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set))
 end
 
 # Quadrature sufficient for integrating a mass matrix
-function _mass_qr(::Lagrange{dim, shape, order}) where {dim, shape, order}
-    return QuadratureRule{dim,shape}(order + 1)
+function _mass_qr(::Lagrange{shape, order}) where {shape <: AbstractRefShape, order}
+    return QuadratureRule{shape}(order + 1)
 end
-function _mass_qr(::Lagrange{dim, RefTetrahedron, 2}) where {dim}
-    return QuadratureRule{dim,RefTetrahedron}(4)
+function _mass_qr(::Lagrange{shape, 2}) where {shape <: RefSimplex}
+    return QuadratureRule{shape}(4)
 end
+_mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
 function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
     println(io, typeof(proj))
-    println(io, "  projection on:           ", length(proj.set), "/", getncells(proj.dh.grid), " cells in grid")
+    println(io, "  projection on:           ", length(proj.set), "/", getncells(get_grid(proj.dh)), " cells in grid")
     println(io, "  function interpolation:  ", proj.func_ip)
     println(io, "  geometric interpolation: ", proj.geom_ip)
 end
 
 function _assemble_L2_matrix(fe_values, set, dh)
 
-    n = Ferrite.getn_scalarbasefunctions(fe_values)
+    n = Ferrite.getnbasefunctions(fe_values)
     M = create_symmetric_sparsity_pattern(dh)
     assembler = start_assemble(M)
 
@@ -131,7 +99,7 @@ function _assemble_L2_matrix(fe_values, set, dh)
         celldofs!(cell_dofs, dh, cellnum)
 
         fill!(Me, 0)
-        Xe = getcoordinates(dh.grid, cellnum)
+        Xe = get_cell_coordinates(get_grid(dh), cellnum)
         reinit!(fe_values, Xe)
 
         ## ∭( v ⋅ u )dΩ
@@ -151,16 +119,9 @@ function _assemble_L2_matrix(fe_values, set, dh)
     return M
 end
 
-function project(vars::Vector{Vector{T}}, proj::L2Projector;
-                 project_to_nodes=true) where T <: Union{Number, AbstractTensor}
-    Base.depwarn("project(vars, proj::L2Projector) is deprecated, " *
-                 "use project(proj, vars, qr) instead.", :project)
-    return project(proj, vars; project_to_nodes=project_to_nodes)
-end
-
 
 """
-    project(proj::L2Projector, vals, qr_rhs::QuadratureRule; project_to_nodes=true)
+    project(proj::L2Projector, vals, qr_rhs::QuadratureRule)
 
 Makes a L2 projection of data `vals` to the nodes of the grid using the projector `proj`
 (see [`L2Projector`](@ref)).
@@ -194,43 +155,28 @@ vals = [
 ```
 Supported data types to project are `Number`s and `AbstractTensor`s.
 
-If the parameter `project_to_nodes` is `true`, then the projection returns the values in the order of the mesh nodes
-(suitable format for exporting). If `false`, it returns the values corresponding to the degrees of freedom for a scalar
-field over the domain, which is useful if one wants to interpolate the projected values.
+The order of the returned data correspond to the order of the `L2Projector`s internal
+`DofHandler`. To export the result, use `vtk_point_data(vtk, proj, projected_data)`.
 """
 function project(proj::L2Projector,
                  vars::AbstractVector{<:AbstractVector{T}},
-                 qr_rhs::Union{QuadratureRule,Nothing}=nothing;
-                 project_to_nodes::Bool=true) where T <: Union{Number, AbstractTensor}
+                 qr_rhs::QuadratureRule) where T <: Union{Number, AbstractTensor}
 
     # For using the deprecated API
-    fe_values = qr_rhs === nothing ?
-        proj.fe_values :
-        CellScalarValues(qr_rhs, proj.func_ip, proj.geom_ip)
+    fe_values = CellValues(qr_rhs, proj.func_ip, proj.geom_ip)
 
     M = T <: AbstractTensor ? length(vars[1][1].data) : 1
 
     projected_vals = _project(vars, proj, fe_values, M, T)::Vector{T}
-    if project_to_nodes
-        # NOTE we may have more projected values than vertices in the mesh => not all values are returned
-        nnodes = getnnodes(proj.dh.grid)
-        reordered_vals = fill(convert(T, NaN * zero(T)), nnodes)
-        for node = 1:nnodes
-            if (k = proj.node2dof_map[node]; k != 0)
-                reordered_vals[node] = projected_vals[k]
-            end
-        end
-        return reordered_vals
-    else
-        return projected_vals
-    end
+
+    return projected_vals
 end
-function project(p::L2Projector, vars::AbstractMatrix, qr_rhs::QuadratureRule; project_to_nodes=true)
+function project(p::L2Projector, vars::AbstractMatrix, qr_rhs::QuadratureRule)
     # TODO: Random access into vars is required for now, hence the collect
-    return project(p, collect(eachcol(vars)), qr_rhs; project_to_nodes=project_to_nodes)
+    return project(p, collect(eachcol(vars)), qr_rhs)
 end
 
-function _project(vars, proj::L2Projector, fe_values::Values, M::Integer, ::Type{T}) where {T}
+function _project(vars, proj::L2Projector, fe_values::AbstractValues, M::Integer, ::Type{T}) where {T}
     # Assemble the multi-column rhs, f = ∭( v ⋅ x̂ )dΩ
     # The number of columns corresponds to the length of the data-tuple in the tensor x̂.
 
@@ -248,7 +194,7 @@ function _project(vars, proj::L2Projector, fe_values::Values, M::Integer, ::Type
     for (ic,cellnum) in enumerate(proj.set)
         celldofs!(cell_dofs, proj.dh, cellnum)
         fill!(fe, 0)
-        Xe = getcoordinates(proj.dh.grid, cellnum)
+        Xe = get_cell_coordinates(get_grid(proj.dh), cellnum)
         cell_vars = vars[ic]
         reinit!(fe_values, Xe)
 
@@ -278,31 +224,62 @@ function _project(vars, proj::L2Projector, fe_values::Values, M::Integer, ::Type
 end
 
 function WriteVTK.vtk_point_data(vtk::WriteVTK.DatasetFile, proj::L2Projector, vals::Vector{T}, name::AbstractString) where T
-    data = reshape_to_nodes(proj, vals)
-    @assert size(data, 2) == getnnodes(proj.dh.grid)
+    data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
+    @assert size(data, 2) == getnnodes(get_grid(proj.dh))
     vtk_point_data(vtk, data, name; component_names=component_names(T))
     return vtk
 end
 
+evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector) =
+    _evaluate_at_grid_nodes(proj, vals, Val(false))
+
 # Numbers can be handled by the method for DofHandler
-reshape_to_nodes(proj::L2Projector, vals::AbstractVector{<:Number}) =
-    reshape_to_nodes(proj.dh, vals, only(getfieldnames(proj.dh)))
+_evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector{<:Number}, vtk) =
+    _evaluate_at_grid_nodes(proj.dh, vals, only(getfieldnames(proj.dh)), vtk)
 
 # Deal with projected tensors
-function reshape_to_nodes(proj::L2Projector, vals::AbstractVector{S}) where {order, dim, T, M, S <: Union{Tensor{order,dim,T,M}, SymmetricTensor{order,dim,T,M}}}
+function _evaluate_at_grid_nodes(
+    proj::L2Projector, vals::AbstractVector{S}, ::Val{vtk}
+) where {order, dim, T, M, S <: Union{Tensor{order,dim,T,M}, SymmetricTensor{order,dim,T,M}}, vtk}
     dh = proj.dh
     # The internal dofhandler in the projector is a scalar field, but the values in vals
     # can be any tensor field, however, the number of dofs should always match the length of vals
     @assert ndofs(dh) == length(vals)
-    nout = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
-    data = fill(T(NaN), nout, getnnodes(dh.grid))
-    for cell in CellIterator(dh, proj.set)
-        _celldofs = celldofs(cell)
-        @assert length(getnodes(cell)) == length(_celldofs)
-        for (node, dof) in zip(getnodes(cell), _celldofs)
-            v = @view data[:, node]
-            fill!(v, 0) # remove NaNs for this node
-            toparaview!(v, vals[dof])
+    if vtk
+        nout = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
+        data = fill(T(NaN), nout, getnnodes(get_grid(dh)))
+    else
+        data = fill(NaN * zero(S), getnnodes(get_grid(dh)))
+    end
+    ip, gip = proj.func_ip, proj.geom_ip
+    refdim, refshape = getdim(ip), getrefshape(ip)
+    local_node_coords = reference_coordinates(gip)
+    qr = QuadratureRule{refshape}(zeros(length(local_node_coords)), local_node_coords)
+    cv = CellValues(qr, ip)
+    # Function barrier
+    return _evaluate_at_grid_nodes!(data, cv, dh, proj.set, vals)
+end
+function _evaluate_at_grid_nodes!(data, cv, dh, set, u::AbstractVector{S}) where S
+    ue = zeros(S, getnbasefunctions(cv))
+    for cell in CellIterator(dh, set)
+        @assert getnquadpoints(cv) == length(cell.nodes)
+        for (i, I) in pairs(cell.dofs)
+            ue[i] = u[I]
+        end
+        for (qp, nodeid) in pairs(cell.nodes)
+            # Loop manually over the shape functions since function_value
+            # doesn't like scalar base functions with tensor dofs
+            val = zero(S)
+            for i in 1:getnbasefunctions(cv)
+                val += shape_value(cv, qp, i) * ue[i]
+            end
+            if data isa Matrix # VTK
+                dataview = @view data[:, nodeid]
+                fill!(dataview, 0) # purge the NaN
+                toparaview!(dataview, val)
+            else
+                data[nodeid] = val
+            end
         end
     end
     return data

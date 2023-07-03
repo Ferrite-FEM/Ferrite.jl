@@ -10,10 +10,7 @@ DofHandler
 
 ## Adding fields to the DofHandlers
 ```@docs
-add!(::DofHandler, ::Symbol, ::Int, ::Interpolation)
-add!(::DofHandler, ::FieldHandler)
-Field
-FieldHandler
+add!(::DofHandler, ::Symbol, ::Interpolation)
 close!(::DofHandler)
 ```
 

@@ -1,4 +1,4 @@
-# # Time Dependent Problems
+# # [Time Dependent Problems](@id tutorial-transient-heat-equation)
 #
 # ![](transient_heat.gif)
 # ![](transient_heat_colorbar.svg)
@@ -64,15 +64,14 @@ grid = generate_grid(Quadrilateral, (100, 100));
 
 # ### Trial and test functions
 # Again, we define the structs that are responsible for the `shape_value` and `shape_gradient` evaluation.
-dim = 2
-ip = Lagrange{dim, RefCube, 1}()
-qr = QuadratureRule{dim, RefCube}(2)
-cellvalues = CellScalarValues(qr, ip);
+ip = Lagrange{RefQuadrilateral, 1}()
+qr = QuadratureRule{RefQuadrilateral}(2)
+cellvalues = CellValues(qr, ip);
 
 # ### Degrees of freedom
 # After this, we can define the `DofHandler` and distribute the DOFs of the problem.
 dh = DofHandler(grid)
-add!(dh, :u, 1)
+add!(dh, :u, ip)
 close!(dh);
 
 # By means of the `DofHandler` we can allocate the needed `SparseMatrixCSC`.
@@ -109,7 +108,7 @@ update!(ch, 0.0);
 
 # ### Assembling the linear system
 # As in the heat equation example we define a `doassemble!` function that assembles the diffusion parts of the equation:
-function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellScalarValues{dim}, dh::DofHandler) where {dim}
+function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellValues, dh::DofHandler)
 
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -144,7 +143,7 @@ function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellScalarValu
 end
 #md nothing # hide
 # In addition to the diffusive part, we also need a function that assembles the mass matrix `M`.
-function doassemble_M!(M::SparseMatrixCSC, cellvalues::CellScalarValues{dim}, dh::DofHandler) where {dim}
+function doassemble_M!(M::SparseMatrixCSC, cellvalues::CellValues, dh::DofHandler)
 
     n_basefuncs = getnbasefunctions(cellvalues)
     Me = zeros(n_basefuncs, n_basefuncs)

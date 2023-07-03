@@ -1,5 +1,5 @@
 abstract type AbstractAdaptiveGrid{dim} <: AbstractGrid{dim} end
-abstract type AbstractAdaptiveCell{dim,N,M} <: AbstractCell{dim,N,M} end
+abstract type AbstractAdaptiveCell{refshape <: AbstractRefShape} <: AbstractCell{refshape} end
 
 _maxlevel = [30,19]
 
@@ -7,7 +7,7 @@ function set_maxlevel(dim::Integer,maxlevel::Integer)
     _maxlevel[dim-1] = maxlevel
 end
 
-struct OctantBWG{dim, N, M, T} <: AbstractCell{dim,N,M}
+struct OctantBWG{dim, N, M, T} <: AbstractCell{RefHypercube{dim}}
     #Refinement level
     l::T
     #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)}
@@ -262,7 +262,7 @@ function isrelevant(xyz::NTuple{dim,T},leafsuppₚ::Set{<:OctantBWG}) where {dim
     return true
 end
 
-struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{dim,N,M}
+struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{RefHypercube{dim}}
     leaves::Vector{OctantBWG{dim,N,M,T}}
     #maximum refinement level
     b::T
