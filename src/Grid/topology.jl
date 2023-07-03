@@ -80,16 +80,82 @@ function Base.show(io::IO, ::MIME"text/plain", topology::ExclusiveTopology)
     println(io, "  Edge neighbors: $(size(topology.edge_edge_neighbor))")
 end
 
+function _num_shared_vertices(cell_a::C1, cell_b::C2) where {C1, C2}
+    num_shared_vertices = 0
+    for vertex ∈ vertices(cell_a)
+        for vertex_neighbor ∈ vertices(cell_b)
+            if vertex_neighbor == vertex
+                num_shared_vertices += 1
+                continue
+            end
+        end
+    end
+    return num_shared_vertices
+end
+
+function _exclusive_topology_ctor(cells::Vector{C}, vertex_cell_table::Array{Set{Int}}, vertex_table, face_table, edge_table, cell_neighbor_table) where C <: AbstractCell
+    for (cell_id, cell) in enumerate(cells)
+        # Gather all cells which are connected via vertices
+        cell_neighbor_ids = Set{Int}()
+        for vertex ∈ vertices(cell)
+            for vertex_cell_id ∈ vertex_cell_table[vertex]
+                if vertex_cell_id != cell_id
+                    push!(cell_neighbor_ids, vertex_cell_id)
+                end
+            end
+        end
+        cell_neighbor_table[cell_id] = EntityNeighborhood(CellIndex.(collect(cell_neighbor_ids)))
+
+        # Any of the neighbors is now sorted in the respective categories
+        for cell_neighbor_id ∈ cell_neighbor_ids
+            # Buffer neighbor
+            cell_neighbor = cells[cell_neighbor_id]
+            # TODO handle mixed-dimensional case
+            getdim(cell_neighbor) == getdim(cell) || continue
+
+            num_shared_vertices = _num_shared_vertices(cell, cell_neighbor)
+
+            # Simplest case: Only one vertex is shared => Vertex neighbor
+            if num_shared_vertices == 1
+                for (lvi, vertex) ∈ enumerate(vertices(cell))
+                    for (lvi2, vertex_neighbor) ∈ enumerate(vertices(cell_neighbor))
+                        if vertex_neighbor == vertex
+                            push!(vertex_table[cell_id, lvi].neighbor_info, VertexIndex(cell_neighbor_id, lvi2))
+                            break
+                        end
+                    end
+                end
+            # Shared path
+            elseif num_shared_vertices == 2
+                if getdim(cell) == 2
+                    _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
+                elseif getdim(cell) == 3
+                    _add_single_edge_neighbor!(edge_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
+                else
+                    @error "Case not implemented."
+                end
+            end
+            # Shared surface
+            elseif num_shared_vertices >= 3
+                _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
+            else
+                @error "Found connected elements without shared vertex... Mesh broken?"
+            end
+        end
+    end
+end
+
 function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     # Setup the cell to vertex table
     cell_vertices_table = vertices.(cells) #needs generic interface for <: AbstractCell
-    vertex_cell_table = [Set{Int}() for _ ∈ 1:maximum(maximum.(cell_vertices_table))]
+    vertex_cell_table = Set{Int}[Set{Int}() for _ ∈ 1:maximum(maximum.(cell_vertices_table))]
 
     # Setup vertex to cell connectivity by flipping the cell to vertex table
     for (cellid, cell_vertices) in enumerate(cell_vertices_table)
         for vertex in cell_vertices
             push!(vertex_cell_table[vertex], cellid)
         end
+    end
     end
 
     # Compute correct matrix size
@@ -119,88 +185,33 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
     vertex_table = Matrix{EntityNeighborhood{VertexIndex}}(undef, length(cells), max_vertices)
     for j = 1:size(vertex_table,2)
         for i = 1:size(vertex_table,1)
-            vertex_table[i,j] = EntityNeighborhood{VertexIndex}([])
+            vertex_table[i,j] = EntityNeighborhood{VertexIndex}(VertexIndex[])
         end
     end
     face_table   = Matrix{EntityNeighborhood{FaceIndex}}(undef, length(cells), max_faces)
     for j = 1:size(face_table,2)
         for i = 1:size(face_table,1)
-            face_table[i,j] = EntityNeighborhood{FaceIndex}([])
+            face_table[i,j] = EntityNeighborhood{FaceIndex}(FaceIndex[])
         end
     end
     edge_table   = Matrix{EntityNeighborhood{EdgeIndex}}(undef, length(cells), max_edges)
     for j = 1:size(edge_table,2)
         for i = 1:size(edge_table,1)
-            edge_table[i,j] = EntityNeighborhood{EdgeIndex}([])
+            edge_table[i,j] = EntityNeighborhood{EdgeIndex}(EdgeIndex[])
         end
     end
     cell_neighbor_table = Vector{EntityNeighborhood{CellIndex}}(undef, length(cells))
 
-    for (cell_id, cell) in enumerate(cells)
-        # Gather all cells which are connected via vertices
-        cell_neighbor_ids = Set{Int}()
-        for vertex ∈ vertices(cell)
-            for vertex_cell_id ∈ vertex_cell_table[vertex]
-                if vertex_cell_id != cell_id
-                    push!(cell_neighbor_ids, vertex_cell_id)
-                end
-            end
-        end
-        cell_neighbor_table[cell_id] = EntityNeighborhood(CellIndex.(collect(cell_neighbor_ids)))
-
-        # Any of the neighbors is now sorted in the respective categories
-        for cell_neighbor_id ∈ cell_neighbor_ids
-            # Buffer neighbor
-            cell_neighbor = cells[cell_neighbor_id]
-            # TODO handle mixed-dimensional case
-            getdim(cell_neighbor) == getdim(cell) || continue
-
-            num_shared_vertices = 0
-            for vertex ∈ vertices(cell)
-                for vertex_neighbor ∈ vertices(cell_neighbor)
-                    if vertex_neighbor == vertex
-                        num_shared_vertices += 1
-                        continue
-                    end
-                end
-            end
-
-            # Simplest case: Only one vertex is shared => Vertex neighbor
-            if num_shared_vertices == 1
-                for (lvi, vertex) ∈ enumerate(vertices(cell))
-                    for (lvi2, vertex_neighbor) ∈ enumerate(vertices(cell_neighbor))
-                        if vertex_neighbor == vertex
-                            push!(vertex_table[cell_id, lvi].neighbor_info, VertexIndex(cell_neighbor_id, lvi2))
-                            break
-                        end
-                    end
-                end
-            # Shared path
-            elseif num_shared_vertices == 2
-                if getdim(cell) == 2
-                    _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
-                elseif getdim(cell) == 3
-                    _add_single_edge_neighbor!(edge_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
-                else
-                    @error "Case not implemented."
-                end
-            # Shared surface
-            elseif num_shared_vertices >= 3
-                _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
-            else
-                @error "Found connected elements without shared vertex... Mesh broken?"
-            end
-        end
-    end
-
+    _exclusive_topology_ctor(cells, vertex_cell_table, vertex_table, face_table, edge_table, cell_neighbor_table)
+    
     return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_table,vertex_table,edge_table)
 end
 
-function _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
+function _add_single_face_neighbor!(face_table, cell::C1, cell_id, cell_neighbor::C2, cell_neighbor_id) where {C1, C2}
     for (lfi, face) ∈ enumerate(faces(cell))
-        uniqueface,_ = sortface(face)
+        uniqueface = sortface_fast(face)
         for (lfi2, face_neighbor) ∈ enumerate(faces(cell_neighbor))
-            uniqueface2,_ = sortface(face_neighbor)
+            uniqueface2 = sortface_fast(face_neighbor)
             if uniqueface == uniqueface2
                 push!(face_table[cell_id, lfi].neighbor_info, FaceIndex(cell_neighbor_id, lfi2))
                 return
@@ -209,11 +220,11 @@ function _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, ce
     end
 end
 
-function _add_single_edge_neighbor!(edge_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
+function _add_single_edge_neighbor!(edge_table, cell::C1, cell_id, cell_neighbor::C2, cell_neighbor_id) where {C1, C2}
     for (lei, edge) ∈ enumerate(edges(cell))
-        uniqueedge,_ = sortedge(edge)
+        uniqueedge = sortedge_fast(edge)
         for (lei2, edge_neighbor) ∈ enumerate(edges(cell_neighbor))
-            uniqueedge2,_ = sortedge(edge_neighbor)
+            uniqueedge2 = sortedge_fast(edge_neighbor)
             if uniqueedge == uniqueedge2
                 push!(edge_table[cell_id, lei].neighbor_info, EdgeIndex(cell_neighbor_id, lei2))
                 return
@@ -329,7 +340,7 @@ function compute_face_skeleton(top::ExclusiveTopology, grid::Grid)
     # TODO use topology to speed up :)
     for (cellid,cell) ∈ enumerate(grid.cells)
         for (local_face_id,face) ∈ enumerate(faces(cell))
-            push!(face_skeleton_global, first(sortface(face)))
+            push!(face_skeleton_global, sortface_fast(face))
             fs_length_new = length(face_skeleton_global)
             if fs_length != fs_length_new
                 push!(face_skeleton_local, FaceIndex(cellid,local_face_id))
