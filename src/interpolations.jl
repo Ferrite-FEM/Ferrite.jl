@@ -1129,11 +1129,12 @@ end
 getnbasefunctions(::Lagrange{RefPyramid,2}) = 14
 
 facedof_indices(::Lagrange{RefPyramid,2}) = (
+    #Vertices | Edges  | Face 
     (1,3,4,2, 7,11,9,6, 14), 
-    (1,2,5,   6,10,8), 
-    (1,5,3,   7,12,8), 
-    (2,4,5,   9,13,10), 
-    (3,5,4,   12,13,11), 
+    (1,2,5  , 6,10,8      ), 
+    (1,5,3  , 7,12,8      ), 
+    (2,4,5  , 9,13,10     ), 
+    (3,5,4  , 12,13,11    ), 
 )
 facedof_interior_indices(::Lagrange{RefPyramid,2}) = (
     (14,), 
@@ -1194,11 +1195,11 @@ function shape_value(ip::Lagrange{RefPyramid,2}, ξ::Vec{3}, i::Int)
     i == 5 && return               z*(2z-1)
     i == 6 && return zzero ? 0.0 : 4x*(2x*y²*(1-z) - y*(3x+2y)*(z²-2z+1) + (z-1)*(z²-2z+1)*(-x-3y-z+1))/((z-1)*(z²-2z+1))
     i == 7 && return zzero ? 0.0 : 4y*(2x²*y*(1-z) - x*(2x+3y)*(z²-2z+1) + (z-1)*(z²-2z+1)*(-3x-y-z+1))/((z-1)*(z²-2z+1))
-    i == 8 && return zzero ? 0.0 : 4z*(-x*y+(z-1)*(-x-y-z+1))/(z-1)
+    i == 8 && return zzero ? 0.0 : 4z*(-x*y + (z-1)*(-x-y-z+1))/(z-1)
     i == 9 && return zzero ? 0.0 : 4*x*y*(-2x*y - 2x*z + 2x - y*z + y - z² + 2*z - 1)/(z²-2z+1)
     i == 10 && return zzero ? 0.0 : 4x*z*(y + z - 1)/(z-1)
     i == 11 && return zzero ? 0.0 : 4*x*y*(-2x*y - x*z + x - 2y*z + 2y - z² + 2z -1)/(z²-2z+1)
-    i == 12 && return zzero ? 0.0 : 4y*z*(x + z -1)/(z-1)
+    i == 12 && return zzero ? 0.0 : 4y*z*(x + z - 1)/(z-1)
     i == 13 && return zzero ? 0.0 : -4x*y*z/(z-1)
     i == 14 && return zzero ? 0.0 : 16x*y*(x*y + x*z - x + y*z - y + z² - 2z + 1)/(z²-2z+1)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
