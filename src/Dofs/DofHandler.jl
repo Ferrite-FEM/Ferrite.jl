@@ -715,6 +715,7 @@ function sortface(face::Tuple{Int,Int,Int,Int})
     return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
 end
 
+
 function sortface_fast(face::Tuple{Int,Int,Int,Int})
     a, b, c, d = face
     c, d = minmax(c, d)
@@ -728,6 +729,7 @@ end
 
 
 sortface(face::Tuple{Int}) = face, nothing
+sortface_fast(face::Tuple{Int}) = face
 
 """
     find_field(dh::DofHandler, field_name::Symbol)::NTuple{2,Int}
