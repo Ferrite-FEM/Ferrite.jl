@@ -287,6 +287,18 @@ function refine!(octree::OctreeBWG{dim,N,M,T}, pivot_octant::OctantBWG{dim,N,M,T
     end
 end
 
+function refine_all(forest::ForestBWG,l)
+   for tree in forest.cells
+      for leaf in tree.leaves
+          if leaf.l != l-1 #maxlevel
+              continue
+          else
+              refine!(tree,leaf)
+          end
+      end
+   end
+end
+
 function coarsen!(octree::OctreeBWG{dim,N,M,T}, o::OctantBWG{dim,N,M,T}) where {dim,N,M,T<:Integer}
     _two = T(2)
     leave_idx = findfirst(x->x==o,octree.leaves)
@@ -455,11 +467,13 @@ getcelltype(grid::ForestBWG) = eltype(grid.cells)
 getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same cell type TODO
 function transform_pointBWG(forest::ForestBWG{dim}, k::Integer, vertex::NTuple{dim,T}) where {dim,T}
     tree = forest.cells[k]
-    cellnodes = getnodes(forest,collect(tree.nodes)) .|> get_node_coordinate 
+    cellnodes = getnodes(forest,collect(tree.nodes)) .|> get_node_coordinate
     vertex = vertex .* (2/(2^tree.b)) .- 1
     octant_physical_coordinates = sum(j-> cellnodes[j] * Ferrite.shape_value(Lagrange{Ferrite.RefHypercube{dim},1}(),Vec{dim}(vertex),j),1:length(cellnodes)) 
     return Vec{dim}(octant_physical_coordinates)
 end
+
+transform_pointBWG(forest, vertices) = transform_pointBWG.((forest,), first.(vertices), last.(vertices))
 
 #TODO: this function should wrap the LNodes Iterator of IBWG2015
 #TODO: need 𝒱₃ perm tables
@@ -473,7 +487,7 @@ function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             end
         end
     end
-    for (k,tree) in enumerate(forest.cells) 
+    for (k,tree) in enumerate(forest.cells)
         _vertices = vertices(root(dim),tree.b)
         for (vi,v) in enumerate(_vertices)
             vertex_neighbor =  forest.topology.vertex_neighbor[k,vi]
@@ -482,7 +496,7 @@ function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             end
             if k > vertex_neighbor[1][1]
                 delete!(nodes,(k,v))
-            end 
+            end
         end
         _faces = faces(root(dim),tree.b)
         for (fi,f) in enumerate(_faces) # fi in p4est notation
@@ -496,7 +510,7 @@ function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                     for v in vertices(leaf,tree.b)
                         if fi < 3
                             if v[1] == f[1][1] == f[2][1]
-                                cache_octant = OctantBWG(leaf.l,v)           
+                                cache_octant = OctantBWG(leaf.l,v)
                                 cache_octant = transform_face(forest,k′,𝒱₂_perm_inv[face_neighbor[1][2]],cache_octant) # after transform
                                 if (k′,cache_octant.xyz) ∈ nodes
                                     delete!(nodes,(k,v))
@@ -504,7 +518,7 @@ function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                             end
                         elseif fi < 5
                             if v[2] == f[1][2] == f[2][2]
-                                cache_octant = OctantBWG(leaf.l,v)           
+                                cache_octant = OctantBWG(leaf.l,v)
                                 cache_octant = transform_face(forest,k′,𝒱₂_perm_inv[face_neighbor[1][2]],cache_octant) # after transform
                                 if (k′,cache_octant.xyz) ∈ nodes
                                     delete!(nodes,(k,v))
@@ -513,7 +527,7 @@ function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                         else
                             @error "help"
                             if v[3] == f[1][3] == f[2][3]
-                                cache_octant = OctantBWG(leaf.l,v)           
+                                cache_octant = OctantBWG(leaf.l,v)
                                 cache_octant = transform_face(forest,k′,𝒱₂_perm_inv[face_neighbor[1][2]],cache_octant) # after transform
                                 if (k′,cache_octant.xyz) ∈ nodes
                                     delete!(nodes,(k,v))
@@ -522,7 +536,7 @@ function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                         end
                     end
                 end
-            end 
+            end
         end
     end
     return nodes
