@@ -3,47 +3,57 @@
 
 # MultiCellValues
 create_qr_rule(qr::QuadratureRule, args...) = qr 
-create_qr_rule(qr::Int, ::Interpolation{Dim,RefShape}) where {Dim,RefShape} = QuadratureRule{Dim,RefShape}(qr)
-
+create_qr_rule(qr::Int, ::Interpolation{RefShape}) where {RefShape} = QuadratureRule{RefShape}(qr)
 
 """
-    MultiCellValues(dh::DofHandler; qr::Union{Int,QuadratureRule}=2)
-    MultiCellValues(fh::FieldHandler, CT::Type{<:AbstractCell}; qr::Union{Int,QuadratureRule}=2)
+    MultiCellValues(dh::DofHandler; qr::Union{Int,QuadratureRule})
+    MultiCellValues(sdh::SubDofHandler; qr::Union{Int,QuadratureRule})
 
 Automatically create MultiCellValues where the values are accessed by the fieldname.
-If `qr::Int` is given, create `QuadratureRule{dim,RefShape}(qr)` where `dim` and `RefShape` 
-is taken from `dh` or `fh`. 
-If fields have the same interpolation, only one `CellValues` object will be created for these fields,
-but this value can be accessed by each of the fields' names.
+Giving a `DofHandler` is only possible when there is only one `SubDofHandler` in `dh`.
 
-Note: 1D cases are currently not supported as it is not possible to differentiate between 
-scalar and vectorial fields in this case. 
+The quadrature rule is created automatically as `QuadratureRule{dim,RefShape}(qr)`,
+where `dim` and `RefShape` are taken from `dh` or `sdh`, if `qr::Int` is given. 
+
+For fields that have the same interpolation, only one `CellValues` object will be 
+created, but this object can be accessed by the names of all of those fields.
 """
 function MultiCellValues(dh::DofHandler; kwargs...)
-    @assert length(dh.fieldhandlers)==1
-    return MultiCellValues(first(dh.fieldhandlers), getcelltype(dh.grid); kwargs...)
+    length(dh.subdofhandlers)==1 || throw(ArgumentError("Multiple SubDofHandlers are not supported, give a single SubDofHandler instead"))
+    return MultiCellValues(first(dh.subdofhandlers); kwargs...)
 end
-function MultiCellValues(fh::FieldHandler, CT; qr=2)
-    # TODO: With new SubDofHandler, CT should not be required anymore. 
+function MultiCellValues(sdh::SubDofHandler; qr)
+    CT = getcelltype(get_grid(sdh.dh), sdh)
     ip_geo = default_interpolation(CT)
 
     qr_actual = create_qr_rule(qr, ip_geo)
 
-    # TODO: For 1-dimensional problems we cannot differentiate vector vs scalar values
-    #       This can be solved with the new vectorized interpolations discussin in 
-    #       Then, we also only need ip_fun as key to the dict below
-    @assert getdim(ip_geo) > 1
-    ip_funs = [name=>getfieldinterpolation(fh, name) for name in getfieldnames(fh)]
-    values = Dict{}()
-    for (name, ip_fun) in ip_funs
-        dim = getfielddim(fh, name)
-        if !(haskey(values, (ip_fun,dim)))
-            if dim == 1
-                values[(ip_fun,dim)] = CellScalarValues(qr_actual, ip_fun, ip_geo)
-            else
-                values[(ip_fun,dim)] = CellVectorValues(qr_actual, ip_fun, ip_geo)
-            end
-        end
+    ip_funs = [name=>getfieldinterpolation(sdh, name) for name in getfieldnames(sdh)]
+    values = Dict{Interpolation,CellValues}()
+    for (_, ip_fun) in ip_funs
+        haskey(values, ip_fun) || (values[ip_fun] = CellValues(qr_actual, ip_fun, ip_geo))
     end
-    return MultiCellValues(NamedTuple(name=>values[(ip_fun, getfielddim(fh, name))] for (name, ip_fun) in ip_funs))
+    return MultiCellValues(NamedTuple(name=>values[ip_fun] for (name, ip_fun) in ip_funs))
+end
+
+"""
+    CellValues(dh::DofHandler, fieldname::Symbol; qr::Union{Int,QuadratureRule})
+    CellValues(sdh::SubDofHandler, fieldname::Symbol; qr::Union{Int,QuadratureRule})
+
+Automatically create a CellValues, using the interpolation of `fieldname` in `dh` or `sdh`.
+Giving a `DofHandler` is only possible when there is only one `SubDofHandler` in `dh`.
+
+The quadrature rule is created automatically as `QuadratureRule{dim,RefShape}(qr)`,
+where `dim` and `RefShape` are taken from `dh` or `sdh`, if `qr::Int` is given. 
+"""
+function CellValues(dh::DofHandler, fieldname::Symbol; kwargs...)
+    length(dh.subdofhandlers)==1 || throw(ArgumentError("Multiple SubDofHandlers are not supported, give a single SubDofHandler instead"))
+    return CellValues(first(dh.subdofhandlers), fieldname; kwargs...)
+end
+function CellValues(sdh::SubDofHandler, fieldname::Symbol; qr)
+    CT = getcelltype(get_grid(sdh.dh), sdh)
+    ip_geo = default_interpolation(CT)
+    qr_actual = create_qr_rule(qr, ip_geo)
+    ip = getfieldinterpolation(sdh, fieldname)
+    return CellValues(qr_actual, ip, ip_geo)
 end

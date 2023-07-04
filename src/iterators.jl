@@ -88,8 +88,8 @@ function reinit!(cc::CellCache, i::Int)
 end
 
 # reinit! FEValues with CellCache
-reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
-reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
+reinit!(cv::AbstractCellValues, cc::CellCache) = reinit!(cv, cc.coords)
+reinit!(fv::AbstractFaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
 getnodes(cc::CellCache) = cc.nodes

@@ -180,8 +180,8 @@ function solve(ν, interpolation_u, interpolation_p)
     dbc = create_bc(dh)
 
     ## facevalues (for Neumann boundary conditions)
-    interpolation_geom = Lagrange{2,RefTetrahedron,1}()
-    facevalues_u = FaceVectorValues(QuadratureRule{1,RefTetrahedron}(3), interpolation_u, interpolation_geom)
+    interpolation_geom = Lagrange{RefTriangle,1}()^2
+    facevalues_u = FaceValues(FaceQuadratureRule{RefTriangle}(3), interpolation_u, interpolation_geom)
     
     ## cellvalues
     cellvalues = MultiCellValues(dh; qr=3)

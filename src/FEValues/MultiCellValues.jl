@@ -4,8 +4,11 @@
 Create `MultiCellValues` that contains the cellvalues supplied via keyword arguments
 
 ```
-cv_vector = CellVectorValues(...)
-cv_scalar = CellScalarValues(...)
+qr = QuadratureRule{RefTriangle}(2)
+ip_vector = Lagrange{RefTriangle,2}()^2
+ip_scalar = Lagrange{RefTriangle,1}()
+cv_vector = CellValues(qr, ip_vector)
+cv_scalar = CellValues(qr, ip_scalar)
 cvs = MultiCellValues(;u=cv_vector, p=cv_scalar, T=cv_scalar)
 ```
 
@@ -14,7 +17,7 @@ Functions for getting information about quadrature points and geometric interpol
 accept `cvs` directly. Functions to access the specific function interpolation values 
 are called as `foo(cvs[:u], args...)` for `u`, and equivalent for other keys. 
 """
-struct MultiCellValues{dim,T,RefShape,CVS<:Tuple,NV<:NamedTuple} <: CellValues{dim,T,RefShape}
+struct MultiCellValues{CVS<:Tuple,NV<:NamedTuple} <: AbstractCellValues
     values::CVS         # Points only to unique CellValues
     named_values::NV    # Can point to the same CellValues in values multiple times
 end
@@ -29,12 +32,9 @@ function MultiCellValues(named_values::NamedTuple)
     @assert all( getpoints(cv.qr) ==  getpoints(cv_ref.qr) for cv in tuple_values)
     @assert all(getweights(cv.qr) == getweights(cv_ref.qr) for cv in tuple_values)
     # Note: The following only works while isbitstype(Interpolation)
-    @assert all(cv.geo_interp == cv_ref.geo_interp for cv in tuple_values) 
+    @assert all(cv.gip == cv_ref.gip for cv in tuple_values) 
 
-    # getrefshape only defined for ip, and ip is type-unstable with current parameterization
-    get_type_params(::CellValues{dim,T,RefShape}) where {dim,T,RefShape} = (dim,T,RefShape)
-    dim,T,RefShape = get_type_params(cv_ref)
-    return MultiCellValues{dim,T,RefShape,typeof(tuple_values),typeof(named_values)}(tuple_values, named_values)
+    return MultiCellValues{typeof(tuple_values),typeof(named_values)}(tuple_values, named_values)
 end
 
 # Not sure if aggressive constprop is required, but is intended so use to ensure? (Not supported on v1.6)
@@ -52,7 +52,7 @@ getnquadpoints(mcv::MultiCellValues) = getnquadpoints(first(mcv.values))
 # @propagate_inbounds getdetJdV ? 
 getdetJdV(mcv::MultiCellValues, q_point::Int) = getdetJdV(first(mcv.values), q_point)
 
-@inline function _unsafe_calculate_mapping(cv::CellValues{dim,T}, q_point, x) where {dim,T}
+@inline function _unsafe_calculate_mapping(cv::CellValues, q_point, x::AbstractVector{Vec{dim,T}}) where {dim,T}
     fecv_J = zero(Tensor{2,dim,T})
     @inbounds for j in 1:getngeobasefunctions(cv)
         fecv_J += x[j] ⊗ cv.dMdξ[j, q_point]
