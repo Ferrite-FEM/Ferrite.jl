@@ -1,20 +1,24 @@
 # generate examples
 import Literate
 
-EXAMPLEDIR = joinpath(@__DIR__, "src", "literate")
-GENERATEDDIR = joinpath(@__DIR__, "src", "examples")
-mkpath(GENERATEDDIR)
+TUTORIALS_IN = joinpath(@__DIR__, "src", "literate")
+TUTORIALS_OUT = joinpath(@__DIR__, "src", "tutorials")
+mkpath(TUTORIALS_OUT)
+
+HOWTO_IN = joinpath(@__DIR__, "src", "literate-howto")
+HOWTO_OUT = joinpath(@__DIR__, "src", "howto")
+mkpath(HOWTO_IN)
+mkpath(HOWTO_OUT)
 
 # Download some assets
 include("download_resources.jl")
 
 # Run Literate on all examples
-@timeit dto "Literate." for example in readdir(EXAMPLEDIR)
-    if endswith(example, ".jl")
-        input = abspath(joinpath(EXAMPLEDIR, example))
-        name = basename(input)
+@timeit dto "Literate." for tutorial in readdir(TUTORIALS_IN; join=true)
+    name = basename(tutorial)
+    if endswith(tutorial, ".jl")
         if !liveserver
-            script = @timeit dto "script()" @timeit dto name Literate.script(input, GENERATEDDIR)
+            script = @timeit dto "script()" @timeit dto name Literate.script(tutorial, TUTORIALS_OUT)
             code = strip(read(script, String))
         else
             code = "<< no script output when building as draft >>"
@@ -34,22 +38,22 @@ include("download_resources.jl")
         end
 
         @timeit dto "markdown()" @timeit dto name begin
-            Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
+            Literate.markdown(tutorial, TUTORIALS_OUT, postprocess = mdpost)
         end
         if !liveserver
             @timeit dto "notebook()"  @timeit dto name begin
-                Literate.notebook(input, GENERATEDDIR, preprocess = nbpre, execute = is_ci) # Don't execute locally
+                Literate.notebook(tutorial, TUTORIALS_OUT, preprocess = nbpre, execute = is_ci) # Don't execute locally
             end
         end
-    elseif any(endswith.(example, [".png", ".jpg", ".gif"]))
-        cp(joinpath(EXAMPLEDIR, example), joinpath(GENERATEDDIR, example); force=true)
+    elseif any(endswith.(tutorial, [".png", ".jpg", ".gif"]))
+        cp(tutorial, joinpath(TUTORIALS_OUT, name); force=true)
     else
-        @warn "ignoring $example"
+        @warn "ignoring $tutorial"
     end
 end
 
 # remove any .vtu files in the generated dir (should not be deployed)
-@timeit dto "remove vtk files" cd(GENERATEDDIR) do
+@timeit dto "remove vtk files" cd(TUTORIALS_OUT) do
     foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
     foreach(file -> endswith(file, ".pvd") && rm(file), readdir())
 end

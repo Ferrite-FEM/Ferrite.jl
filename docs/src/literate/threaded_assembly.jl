@@ -1,4 +1,4 @@
-# # Threaded Assembly
+# # [Threaded Assembly](@id tutorial-threaded-assembly)
 #
 #-
 #md # !!! tip
@@ -51,9 +51,9 @@ function create_colored_cantilever_grid(celltype, n)
 end;
 
 # #### DofHandler
-function create_dofhandler(grid::Grid{dim}) where {dim}
+function create_dofhandler(grid::Grid{dim}, ip) where {dim}
     dh = DofHandler(grid)
-    add!(dh, :u, dim) # Add a displacement field
+    add!(dh, :u, ip) # Add a displacement field
     close!(dh)
 end;
 
@@ -86,21 +86,20 @@ end;
 
 # Each thread need its own CellValues and FaceValues (although, for this example we don't use
 # the FaceValues)
-function create_values(refshape, dim, order::Int)
+function create_values(interpolation_space::Interpolation{refshape}, qr_order::Int) where {dim, refshape<:Ferrite.AbstractRefShape{dim}}
     ## Interpolations and values
-    interpolation_space = Lagrange{dim, refshape, 1}()
-    quadrature_rule = QuadratureRule{dim, refshape}(order)
-    face_quadrature_rule = QuadratureRule{dim-1, refshape}(order)
-    cellvalues = [CellVectorValues(quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
-    facevalues = [FaceVectorValues(face_quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
+    quadrature_rule = QuadratureRule{refshape}(qr_order)
+    face_quadrature_rule = FaceQuadratureRule{refshape}(qr_order)
+    cellvalues = [CellValues(quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
+    facevalues = [FaceValues(face_quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
     return cellvalues, facevalues
 end;
 
 # Create a `ScratchValues` for each thread with the thread local data
-function create_scratchvalues(K, f, dh::DofHandler{dim}) where {dim}
+function create_scratchvalues(K, f, dh::DofHandler{dim}, ip) where {dim}
     nthreads = Threads.nthreads()
     assemblers = [start_assemble(K, f) for i in 1:nthreads]
-    cellvalues, facevalues = create_values(RefCube, dim, 2)
+    cellvalues, facevalues = create_values(ip, 2)
 
     n_basefuncs = getnbasefunctions(cellvalues[1])
     global_dofs = [zeros(Int, ndofs_per_cell(dh)) for i in 1:nthreads]
@@ -119,10 +118,10 @@ end;
 # ## Threaded assemble
 
 # The assembly function loops over each color and does a threaded assembly for that color
-function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}) where {dim}
+function doassemble(K::SparseMatrixCSC, colors, grid::Grid, dh::DofHandler, C::SymmetricTensor{4, dim}, ip) where {dim}
 
     f = zeros(ndofs(dh))
-    scratches = create_scratchvalues(K, f, dh)
+    scratches = create_scratchvalues(K, f, dh, ip)
     b = Vec{3}((0.0, 0.0, 0.0)) # Body force
 
     for color in colors
@@ -178,18 +177,16 @@ function assemble_cell!(scratch::ScratchValues, cell::Int, K::SparseMatrixCSC,
 end;
 
 function run_assemble()
-    refshape = RefCube
-    quadrature_order = 2
-    dim = 3
     n = 20
     grid, colors = create_colored_cantilever_grid(Hexahedron, n);
-    dh = create_dofhandler(grid);
+    ip = Lagrange{RefHexahedron,1}()^3
+    dh = create_dofhandler(grid, ip);
 
     K = create_sparsity_pattern(dh);
     C = create_stiffness(Val{3}());
     ## compilation
-    doassemble(K, colors, grid, dh, C);
-    b = @elapsed @time K, f = doassemble(K, colors, grid, dh, C);
+    doassemble(K, colors, grid, dh, C, ip);
+    b = @elapsed @time K, f = doassemble(K, colors, grid, dh, C, ip);
     return b
 end
 

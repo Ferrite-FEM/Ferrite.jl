@@ -11,7 +11,7 @@ for spatial_dim ∈ [3]# 1:3
     for geo_type ∈ FerriteBenchmarkHelper.geo_types_for_spatial_dim(spatial_dim)
         NUMBERING_SUITE["spatial-dim",spatial_dim][string(geo_type)] = BenchmarkGroup()
 
-        ref_type = FerriteBenchmarkHelper.default_refshape(geo_type)
+        ref_type = FerriteBenchmarkHelper.getrefshape(geo_type)
 
         for grid_size ∈ [2]#[3, 6, 9] #multiple grid sized to estimate computational complexity...
             NUMBERING_SUITE["spatial-dim",spatial_dim][string(geo_type)]["grid-size-",grid_size] = BenchmarkGroup()
@@ -24,17 +24,16 @@ for spatial_dim ∈ [3]# 1:3
                 NUMBERING_FIELD_DIM_SUITE = NUMBERING_SUITE["spatial-dim",spatial_dim][string(geo_type)]["grid-size-",grid_size]["field-dim-", field_dim]
                 # Lagrange tests
                 for order ∈ 1:2
-                    ip = Lagrange{spatial_dim, ref_type, order}()
+                    ip = Lagrange{ref_type, order}()
 
                     # Skip over elements which are not implemented
                     ξ_dummy = Vec{spatial_dim}(ntuple(x->0.0, spatial_dim))
-                    !applicable(Ferrite.value, ip, 1, ξ_dummy) && continue
-                    !applicable(Ferrite.value, ip, 1, ξ_dummy) && continue
+                    !applicable(Ferrite.shape_value, ip, ξ_dummy, 1) && continue
 
                     NUMBERING_FIELD_DIM_SUITE["Lagrange",order] = BenchmarkGroup()
                     LAGRANGE_SUITE = NUMBERING_FIELD_DIM_SUITE["Lagrange",order]
                     order2 = max(order-1, 1)
-                    ip2 = Lagrange{spatial_dim, ref_type, order2}()
+                    ip2 = Lagrange{ref_type, order2}()
 
                     LAGRANGE_SUITE["DofHandler"] = BenchmarkGroup()
 
@@ -53,23 +52,22 @@ for spatial_dim ∈ [3]# 1:3
                     end
                     LAGRANGE_SUITE["DofHandler"]["two-fields"] = @benchmarkable $close_helper($grid, $ip, $ip2)
 
-
-                    f1 = Field(:u, ip, field_dim)
-                    f2 = Field(:p, ip2, 1)
-
-                    close_helper = function(grid, f1)
+                    close_helper = function(grid)
                         dh = DofHandler(grid)
-                        push!(dh, FieldHandler([f1], Set(1:Int(round(getncells(grid)/2)))))
+                        sdh = SubDofHandler(dh, Set(1:Int(round(getncells(grid)/2))))
+                        add!(sdh, :u, ip^field_dim)
                         close!(dh)
                     end
-                    LAGRANGE_SUITE["DofHandler"]["one-field-subdomain"] = @benchmarkable $close_helper($grid, $f1)
+                    LAGRANGE_SUITE["DofHandler"]["one-field-subdomain"] = @benchmarkable $close_helper($grid)
 
-                    close_helper = function(grid, f1, f2)
+                    close_helper = function(grid)
                         dh = DofHandler(grid)
-                        push!(dh, FieldHandler([f1, f2], Set(1:Int(round(getncells(grid)/2)))))
+                        sdh = SubDofHandler(dh, Set(1:Int(round(getncells(grid)/2))))
+                        add!(sdh, :u, ip^field_dim)
+                        add!(sdh, :p, ip2)
                         close!(dh)
                     end
-                    LAGRANGE_SUITE["DofHandler"]["two-fields-subdomain"] = @benchmarkable $close_helper($grid, $f1, $f2)
+                    LAGRANGE_SUITE["DofHandler"]["two-fields-subdomain"] = @benchmarkable $close_helper($grid)
                 end
             end
         end

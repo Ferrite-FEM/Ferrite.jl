@@ -2,8 +2,8 @@
 
 ## Type definitions
 
-Interpolations are subtypes of `Interpolation{dim, shape, order}`, i.e. they are
-parametrized by the (reference element) dimension, reference shape and order.
+Interpolations are subtypes of `Interpolation{shape, order}`, i.e. they are
+parametrized by the reference element and its characteristic order.
 
 ### Fallback methods applicable for all subtypes of `Interpolation`
 
@@ -11,9 +11,10 @@ parametrized by the (reference element) dimension, reference shape and order.
 Ferrite.getdim(::Interpolation)
 Ferrite.getrefshape(::Interpolation)
 Ferrite.getorder(::Interpolation)
-Ferrite.value(::Interpolation{dim}, ::Vec{dim,T}) where {dim,T}
-Ferrite.derivative(::Interpolation{dim}, ::Vec{dim}) where {dim}
+Ferrite.shape_gradient(::Interpolation, ::Vec, ::Int)
+Ferrite.shape_gradient_and_value
 Ferrite.boundarydof_indices
+Ferrite.dirichlet_boundarydof_indices
 ```
 
 ### Required methods to implement for all subtypes of `Interpolation` to define a new finite element
@@ -21,15 +22,19 @@ Ferrite.boundarydof_indices
 Depending on the dimension of the reference element the following functions have to be implemented
 
 ```@docs
-Ferrite.value(::Interpolation, ::Int, ::Vec)
+Ferrite.shape_value(::Interpolation, ::Vec, ::Int)
 Ferrite.vertexdof_indices(::Interpolation)
+Ferrite.dirichlet_vertexdof_indices(::Interpolation)
 Ferrite.facedof_indices(::Interpolation)
+Ferrite.dirichlet_facedof_indices(::Interpolation)
 Ferrite.facedof_interior_indices(::Interpolation)
 Ferrite.edgedof_indices(::Interpolation)
+Ferrite.dirichlet_edgedof_indices(::Interpolation)
 Ferrite.edgedof_interior_indices(::Interpolation)
 Ferrite.celldof_interior_indices(::Interpolation)
 Ferrite.getnbasefunctions(::Interpolation)
 Ferrite.reference_coordinates(::Interpolation)
+Ferrite.adjust_dofs_during_distribution(::Interpolation)
 ```
 
 for all entities which exist on that reference element. The dof functions default to having no
