@@ -1,4 +1,4 @@
-# # Stokes flow
+# # [Stokes flow](@id tutorial-stokes-flow)
 #
 # **Keywords**: *periodic boundary conditions, multiple fields, mean value constraint*
 #-
@@ -227,10 +227,10 @@ end
 # the boundary when assembling the constraint matrix ``\underline{\underline{C}}``.
 
 function setup_fevalues(ipu, ipp, ipg)
-    qr = QuadratureRule{2,RefTriangle}(2)
+    qr = QuadratureRule{RefTriangle}(2)
     cvu = CellValues(qr, ipu, ipg)
     cvp = CellValues(qr, ipp, ipg)
-    qr_face = QuadratureRule{1,RefTriangle}(2)
+    qr_face = FaceQuadratureRule{RefTriangle}(2)
     fvp = FaceValues(qr_face, ipp, ipg)
     return cvu, cvp, fvp
 end
@@ -301,7 +301,7 @@ function setup_mean_constraint(dh, fvp)
     ## Loop over all the boundaries
     for (ci, fi) in set
         Ce .= 0
-        getcoordinates!(element_coords, dh.grid, ci)
+        get_cell_coordinates!(element_coords, dh.grid, ci)
         reinit!(fvp, element_coords, fi)
         celldofs!(element_dofs, dh, ci)
         for qp in 1:getnquadpoints(fvp)
@@ -418,7 +418,7 @@ function assemble_system!(K, f, dh, cvu, cvp)
             end
             ## rhs
             for (i, I) in pairs(range_u)
-                x = spatial_coordinate(cvu, qp, getcoordinates(cell))
+                x = spatial_coordinate(cvu, qp, get_cell_coordinates(cell))
                 b = exp(-100 * norm(x - Vec{2}((0.75, 0.1)))^2)
                 bv = Vec{2}((b, 0.0))
                 fe[I] += (ϕᵤ[i] ⋅ bv) * dΩ

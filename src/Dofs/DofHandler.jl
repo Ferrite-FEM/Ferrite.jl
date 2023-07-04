@@ -1,53 +1,69 @@
 abstract type AbstractDofHandler end
 
 """
-    Field(name::Symbol, interpolation::Interpolation, dim::Int)
+    get_grid(dh::AbstractDofHandler)
 
-Construct `dim`-dimensional `Field` called `name` which is approximated by `interpolation`.
+Access some grid representation for the dof handler.
 
-The interpolation is used for distributing the degrees of freedom.
+!!! note
+    This API function is currently not well-defined. It acts as the interface between 
+    distributed assembly and assembly on a single process, because most parts of the
+    functionality can be handled by only acting on the locally owned cell set.
 """
-struct Field
-    name::Symbol
-    interpolation::Interpolation
-end
+get_grid(dh::AbstractDofHandler)
 
-# TODO: Deprecate after DofHandler rework.
-function Field(name, interpolation::ScalarInterpolation, dim)
-    if dim == 1 # Presumably scalar and not 1D vector
-        return Field(name, interpolation)
-    else
-        return Field(name, VectorizedInterpolation{dim}(interpolation))
-    end
-end
 
-"""
-    FieldHandler(fields::Vector{Field}, cellset::Set{Int})
-
-Construct a `FieldHandler` based on an array of [`Field`](@ref)s and assigns it a set of cells.
-
-A `FieldHandler` must fulfill the following requirements:
-- All [`Cell`](@ref)s in `cellset` are of the same type.
-- Each field only uses a single interpolation on the `cellset`.
-- Each cell belongs only to a single `FieldHandler`, i.e. all fields on a cell must be added within the same `FieldHandler`.
-
-Notice that a `FieldHandler` can hold several fields.
-"""
-mutable struct FieldHandler
-    fields::Vector{Field} # Should not be used, kept for compatibility for now
-    field_names::Vector{Symbol}
-    field_dims::Vector{Int}
-    field_interpolations::Vector{Interpolation}
+struct SubDofHandler{DH} <: AbstractDofHandler
+    # From constructor
+    dh::DH
     cellset::Set{Int}
-    ndofs_per_cell::Int # set in close(::DofHandler)
-    function FieldHandler(fields, cellset)
-        fh = new(fields, Symbol[], Int[], Interpolation[], cellset, -1)
-        for f in fields
-            push!(fh.field_names, f.name)
-            push!(fh.field_dims, n_components(f.interpolation))
-            push!(fh.field_interpolations, f.interpolation)
+    # Populated in add!
+    field_names::Vector{Symbol}
+    field_interpolations::Vector{Interpolation}
+    field_n_components::Vector{Int} # Redundant with interpolations, remove?
+    # Computed in close!
+    ndofs_per_cell::ScalarWrapper{Int}
+    # const dof_ranges::Vector{UnitRange{Int}} # TODO: Why not?
+end
+
+# TODO: Should be an inner constructor.
+function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
+    isclosed(dh) && error("DofHandler already closed")
+    # Compute the celltype and make sure all elements have the same one
+    CT = getcelltype(dh.grid, first(cellset))
+    if any(x -> getcelltype(dh.grid, x) !== CT, cellset)
+        error("all cells in a SubDofHandler must be of the same type")
+    end
+    # Make sure this set is disjoint with all other existing
+    for sdh in dh.subdofhandlers
+        if !isdisjoint(cellset, sdh.cellset)
+            error("cellset not disjoint with sets in existing SubDofHandlers")
         end
-        return fh
+    end
+    # Construct and insert into the parent dh
+    sdh = SubDofHandler{typeof(dh)}(dh, cellset, Symbol[], Interpolation[], Int[], ScalarWrapper(-1))
+    push!(dh.subdofhandlers, sdh)
+    return sdh
+end
+
+# Shortcut
+@inline getcelltype(grid::AbstractGrid, sdh::SubDofHandler) = getcelltype(grid, first(sdh.cellset))
+
+function Base.show(io::IO, ::MIME"text/plain", sdh::SubDofHandler)
+    println(io, typeof(sdh))
+    println(io, "  Cell type: ", getcelltype(sdh.dh.grid, first(sdh.cellset)))
+    _print_field_information(io, sdh)
+end
+
+function _print_field_information(io::IO, sdh::SubDofHandler)
+    println(io, "  Fields:")
+    for (i, fieldname) in pairs(sdh.field_names)
+        println(io, "    ", repr(fieldname), ", ", sdh.field_interpolations[i])
+    end
+    if !isclosed(sdh.dh)
+        print(io, "  Not closed!")
+    else
+        println(io, "  Dofs per cell: ", ndofs_per_cell(sdh))
     end
 end
 
@@ -59,33 +75,33 @@ Construct a `DofHandler` based on `grid`. Supports:
 - One or several fields, which can live on the whole domain or on subsets of the `Grid`.
 """
 struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
-    fieldhandlers::Vector{FieldHandler}
+    subdofhandlers::Vector{SubDofHandler{DofHandler{dim, G}}}
     field_names::Vector{Symbol}
     # Dofs for cell i are stored in cell_dofs at the range:
     #     cell_dofs_offset[i]:(cell_dofs_offset[i]+ndofs_per_cell(dh, i)-1)
     cell_dofs::Vector{Int}
     cell_dofs_offset::Vector{Int}
-    cell_to_fieldhandler::Vector{Int} # maps cell id -> fieldhandler id
+    cell_to_subdofhandler::Vector{Int} # maps cell id -> SubDofHandler id
     closed::ScalarWrapper{Bool}
     grid::G
     ndofs::ScalarWrapper{Int}
 end
 
-function DofHandler(grid::AbstractGrid{dim}) where dim
+function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
-    DofHandler{dim,typeof(grid)}(FieldHandler[], Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
-end
-
-function MixedDofHandler(::AbstractGrid)
-    error("MixedDofHandler is the standard DofHandler in Ferrite now and has been renamed to DofHandler.
-Use DofHandler even for mixed grids and fields on subdomains.")
+    sdhs = SubDofHandler{DofHandler{dim, G}}[]
+    DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
     println(io, typeof(dh))
-    println(io, "  Fields:")
-    for fieldname in getfieldnames(dh)
-        println(io, "    ", repr(fieldname), ", dim: ", getfielddim(dh, fieldname))
+    if length(dh.subdofhandlers) == 1
+        _print_field_information(io, dh.subdofhandlers[1])
+    else
+        println(io, "  Fields:")
+        for fieldname in getfieldnames(dh)
+            println(io, "    ", repr(fieldname), ", dim: ", getfielddim(dh, fieldname))
+        end
     end
     if !isclosed(dh)
         print(io, "  Not closed!")
@@ -95,6 +111,7 @@ function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
 end
 
 isclosed(dh::AbstractDofHandler) = dh.closed[]
+get_grid(dh::DofHandler) = dh.grid
 
 """
     ndofs(dh::AbstractDofHandler)
@@ -111,11 +128,10 @@ Return the number of degrees of freedom for the cell with index `cell`.
 See also [`ndofs`](@ref).
 """
 function ndofs_per_cell(dh::DofHandler, cell::Int=1)
-    @boundscheck 1 <= cell <= getncells(dh.grid)
-    return @inbounds ndofs_per_cell(dh.fieldhandlers[dh.cell_to_fieldhandler[cell]])
+    @boundscheck 1 <= cell <= getncells(get_grid(dh))
+    return @inbounds ndofs_per_cell(dh.subdofhandlers[dh.cell_to_subdofhandler[cell]])
 end
-ndofs_per_cell(fh::FieldHandler) = fh.ndofs_per_cell
-nnodes_per_cell(dh::DofHandler, cell::Int=1) = nnodes_per_cell(dh.grid, cell) # TODO: deprecate, shouldn't belong to DofHandler any longer
+ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell[]
 
 """
     celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
@@ -130,6 +146,10 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     unsafe_copyto!(global_dofs, 1, dh.cell_dofs, dh.cell_dofs_offset[i], length(global_dofs))
     return global_dofs
 end
+function celldofs!(global_dofs::Vector{Int}, sdh::SubDofHandler, i::Int)
+    @assert i in sdh.cellset
+    return celldofs!(global_dofs, sdh.dh, i)
+end
 
 """
     celldofs(dh::AbstractDofHandler, i::Int)
@@ -142,101 +162,106 @@ function celldofs(dh::AbstractDofHandler, i::Int)
     return celldofs!(zeros(Int, ndofs_per_cell(dh, i)), dh, i)
 end
 
-#TODO: perspectively remove in favor of `getcoordinates!(global_coords, grid, i)`?
-function cellcoords!(global_coords::Vector{Vec{dim,T}}, dh::DofHandler, i::Union{Int, <:AbstractCell}) where {dim,T}
-    cellcoords!(global_coords, dh.grid, i)
-end
-
 function cellnodes!(global_nodes::Vector{Int}, dh::DofHandler, i::Union{Int, <:AbstractCell})
-    cellnodes!(global_nodes, dh.grid, i)
+    cellnodes!(global_nodes, get_grid(dh), i)
 end
 
 """
     getfieldnames(dh::DofHandler)
-    getfieldnames(fh::FieldHandler)
+    getfieldnames(sdh::SubDofHandler)
 
-Return a vector with the names of all fields. Can be used as an iterable over all the fields
-in the problem.
+Return a vector with the unique names of all fields. The order is the sam eas the order in
+which they were originally added to the (Sub)DofHandler. Can be used as an iterable over all
+the fields.
 """
 getfieldnames(dh::DofHandler) = dh.field_names
-getfieldnames(fh::FieldHandler) = fh.field_names
+getfieldnames(sdh::SubDofHandler) = sdh.field_names
 
-getfielddim(fh::FieldHandler, field_idx::Int) = fh.field_dims[field_idx]
-getfielddim(fh::FieldHandler, field_name::Symbol) = getfielddim(fh, find_field(fh, field_name))
+getfielddim(sdh::SubDofHandler, field_idx::Int) = n_components(sdh.field_interpolations[field_idx])::Int
+getfielddim(sdh::SubDofHandler, field_name::Symbol) = getfielddim(sdh, find_field(sdh, field_name))
 
 """
     getfielddim(dh::DofHandler, field_idxs::NTuple{2,Int})
     getfielddim(dh::DofHandler, field_name::Symbol)
-    getfielddim(dh::FieldHandler, field_idx::Int)
-    getfielddim(dh::FieldHandler, field_name::Symbol)
+    getfielddim(sdh::SubDofHandler, field_idx::Int)
+    getfielddim(sdh::SubDofHandler, field_name::Symbol)
 
-Return the dimension of a given field. The field can be specified by its index (see
-[`find_field`](@ref)) or its name.
+Return the dimension (number of components) of a given field. The field can be specified by
+its index (see [`find_field`](@ref)) or its name.
 """
 function getfielddim(dh::DofHandler, field_idxs::NTuple{2, Int})
-    fh_idx, field_idx = field_idxs
-    fielddim = getfielddim(dh.fieldhandlers[fh_idx], field_idx)
+    sdh_idx, field_idx = field_idxs
+    fielddim = getfielddim(dh.subdofhandlers[sdh_idx], field_idx)
     return fielddim
 end
 getfielddim(dh::DofHandler, name::Symbol) = getfielddim(dh, find_field(dh, name))
 
 """
-    add!(dh::DofHandler, fh::FieldHandler)
+    add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
 
-Add all fields of the [`FieldHandler`](@ref) `fh` to `dh`.
+Add a field called `name` approximated by `ip` to the SubDofHandler `sdh`.
 """
-function add!(dh::DofHandler, fh::FieldHandler)
-    # TODO: perhaps check that a field with the same name is the same field?
-    @assert !isclosed(dh)
-    _check_same_celltype(dh.grid, collect(fh.cellset))
-    _check_cellset_intersections(dh, fh)
-    # the field interpolations should have the same refshape as the cells they are applied to
-    # extract the celltype from the first cell as the celltypes are all equal
-    cell_type = typeof(dh.grid.cells[first(fh.cellset)])
-    refshape_cellset = getrefshape(default_interpolation(cell_type))
-    for interpolation in fh.field_interpolations
-        refshape = getrefshape(interpolation)
-        refshape_cellset == refshape || error("The RefShapes of the fieldhandlers interpolations must correspond to the RefShape of the cells it is applied to.")
+function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
+    @assert !isclosed(sdh.dh)
+    # Verify that name doesn't exist
+    if name in sdh.field_names
+        error("field already exist")
+    end
+    # Verify that fields with the same name in other SubDofHandler have compatible
+    # interpolation
+    for _sdh in sdh.dh.subdofhandlers
+        for (_name, _ip) in zip(_sdh.field_names, _sdh.field_interpolations)
+            _name != name && continue
+            # same field name, check for same field dimension
+            if n_components(ip) != n_components(_ip)
+                error("Field :$name has a different number of components in another SubDofHandler. Use a different field name.")
+            end
+            if getorder(ip) != getorder(_ip)
+                @warn "Field :$name uses a different interpolation order in another SubDofHandler."
+            end
+            # TODO: warn if interpolation type is not the same?
+        end
+    end
+    
+    # Check that interpolation is compatible with cells it it added to
+    refshape_sdh = getrefshape(getcells(sdh.dh.grid, first(sdh.cellset)))
+    if refshape_sdh !== getrefshape(ip)
+        error("The refshape of the interpolation $(getrefshape(ip)) is incompatible with the refshape $refshape_sdh of the cells.")
     end
 
-    push!(dh.fieldhandlers, fh)
-    return dh
-end
-
-function _check_cellset_intersections(dh::DofHandler, fh::FieldHandler)
-    for _fh in dh.fieldhandlers
-        isdisjoint(_fh.cellset, fh.cellset) || error("Each cell can only belong to a single FieldHandler.")
-    end
+    # Store in the SubDofHandler, it is collected to the parent DofHandler in close!.
+    push!(sdh.field_names, name)
+    push!(sdh.field_interpolations, ip)
+    return sdh
 end
 
 """
-    add!(dh::AbstractDofHandler, name::Symbol, ip::Interpolation)
+    add!(dh::DofHandler, name::Symbol, ip::Interpolation)
 
-Add a field called `name` which is approximated by `ip` to `dh`.
-The field is added to all cells of the underlying grid. If the grid uses several
-celltypes, [`add!(dh::DofHandler, fh::FieldHandler)`](@ref) must be used instead.
+Add a field called `name` approximated by `ip` to the DofHandler `dh`.
+
+The field is added to all cells of the underlying grid, use
+[`SubDofHandler`](@ref)s if the grid contains multiple cell types, or to add
+the field to subset of all the cells.
 """
 function add!(dh::DofHandler, name::Symbol, ip::Interpolation)
     @assert !isclosed(dh)
-
-    celltype = getcelltype(dh.grid)
+    celltype = getcelltype(get_grid(dh))
     @assert isconcretetype(celltype)
-
-    if length(dh.fieldhandlers) == 0
-        cellset = Set(1:getncells(dh.grid))
-        push!(dh.fieldhandlers, FieldHandler(Field[], cellset))
-    elseif length(dh.fieldhandlers) > 1
-        error("If you have more than one FieldHandler, you must specify field")
+    if isempty(dh.subdofhandlers)
+        # Create a new SubDofHandler for all cells
+        sdh = SubDofHandler(dh, Set(1:getncells(get_grid(dh))))
+    elseif length(dh.subdofhandlers) == 1
+        # Add to existing SubDofHandler (if it covers all cells)
+        sdh = dh.subdofhandlers[1]
+        if length(sdh.cellset) != getncells(get_grid(dh))
+            error("can not add field to DofHandler with a SubDofHandler for a subregion")
+        end
+    else # length(dh.subdofhandlers) > 1
+        error("can not add field to DofHandler with multiple SubDofHandlers")
     end
-    fh = first(dh.fieldhandlers)
-
-    push!(fh.field_names, name)
-    push!(fh.field_dims, n_components(ip))
-    push!(fh.field_interpolations, ip)
-
-    field = Field(name, ip)
-    push!(fh.fields, field)
-
+    # Add to SubDofHandler
+    add!(sdh, name, ip)
     return dh
 end
 
@@ -256,8 +281,8 @@ end
 Internal entry point for dof distribution.
 
 Dofs are distributed as follows:
-For the `DofHandler` each `FieldHandler` is visited in the order they were added.
-For each field in the `FieldHandler` create dofs for the cell.
+For the `DofHandler` each `SubDofHandler` is visited in the order they were added.
+For each field in the `SubDofHandler` create dofs for the cell.
 This means that dofs on a particular cell will be numbered in groups for each field,
 so first the dofs for field 1 are distributed, then field 2, etc.
 For each cell dofs are first distributed on its vertices, then on the interior of edges (if applicable), then on the 
@@ -269,7 +294,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
 
     # Collect the global field names
     empty!(dh.field_names)
-    for fh in dh.fieldhandlers, name in fh.field_names
+    for sdh in dh.subdofhandlers, name in sdh.field_names
         name in dh.field_names || push!(dh.field_names, name)
     end
     numfields = length(dh.field_names)
@@ -279,7 +304,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     # `vertexdict` keeps track of the visited vertices. The first dof added to vertex v is
     # stored in vertexdict[v].
     # TODO: No need to allocate this vector for fields that don't have vertex dofs
-    vertexdicts = [zeros(Int, getnnodes(dh.grid)) for _ in 1:numfields]
+    vertexdicts = [zeros(Int, getnnodes(get_grid(dh))) for _ in 1:numfields]
 
     # `edgedict` keeps track of the visited edges, this will only be used for a 3D problem.
     # An edge is uniquely determined by two global vertices, with global direction going
@@ -296,11 +321,11 @@ function __close!(dh::DofHandler{dim}) where {dim}
     nextdof = 1  # next free dof to distribute
 
     @debug println("\n\nCreating dofs\n")
-    for (fhi, fh) in pairs(dh.fieldhandlers)
-        nextdof = _close_fieldhandler!(
+    for (sdhi, sdh) in pairs(dh.subdofhandlers)
+        nextdof = _close_subdofhandler!(
             dh,
-            fh,
-            fhi, # TODO: Store in the FieldHandler?
+            sdh,
+            sdhi, # TODO: Store in the SubDofHandler?
             nextdof,
             vertexdicts,
             edgedicts,
@@ -315,14 +340,42 @@ function __close!(dh::DofHandler{dim}) where {dim}
 end
 
 """
-    _close_fieldhandler!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts)
+    _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts) where {sdim}
 
-Main entry point to distribute dofs for a single [`FieldHandler`](@ref) on its subdomain.
+Main entry point to distribute dofs for a single [`SubDofHandler`](@ref) on its subdomain.
 """
-function _close_fieldhandler!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts) where {sdim}
+function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts) where {sdim}
     ip_infos = InterpolationInfo[]
-    for interpolation in fh.field_interpolations
+    for interpolation in sdh.field_interpolations
         ip_info = InterpolationInfo(interpolation)
+        begin
+            next_dof_index = 1
+            for vdofs ∈ vertexdof_indices(interpolation)
+                for dof_index ∈ vdofs
+                    @assert dof_index == next_dof_index "Vertex dof ordering not supported. Please consult the dev docs."
+                    next_dof_index += 1
+                end
+            end
+            if getdim(interpolation) > 2
+                for vdofs ∈ edgedof_interior_indices(interpolation)
+                    for dof_index ∈ vdofs
+                        @assert dof_index == next_dof_index "Edge dof ordering not supported. Please consult the dev docs."
+                        next_dof_index += 1
+                    end
+                end
+            end
+            if getdim(interpolation) > 1
+                for vdofs ∈ facedof_interior_indices(interpolation)
+                    for dof_index ∈ vdofs
+                        @assert dof_index == next_dof_index "Face dof ordering not supported. Please consult the dev docs."
+                        next_dof_index += 1
+                    end
+                end
+            end
+            for dof_index ∈ celldof_interior_indices(interpolation)
+                @assert next_dof_index <= dof_index <= getnbasefunctions(interpolation) "Cell dof ordering not supported. Please consult the dev docs."
+            end
+        end
         push!(ip_infos, ip_info)
         # TODO: More than one face dof per face in 3D are not implemented yet. This requires
         #       keeping track of the relative rotation between the faces, not just the
@@ -338,24 +391,24 @@ function _close_fieldhandler!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::
     ndofs_per_cell = -1
 
     # Mapping between the local field index and the global field index
-    global_fidxs = Int[findfirst(gname -> gname === lname, dh.field_names) for lname in fh.field_names]
+    global_fidxs = Int[findfirst(gname -> gname === lname, dh.field_names) for lname in sdh.field_names]
 
     # loop over all the cells, and distribute dofs for all the fields
     # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
-    for ci in BitSet(fh.cellset)
+    for ci in BitSet(sdh.cellset)
         @debug println("Creating dofs for cell #$ci")
 
         # TODO: _check_cellset_intersections can be removed in favor of this assertion
-        @assert dh.cell_to_fieldhandler[ci] == 0
-        dh.cell_to_fieldhandler[ci] = fh_index
+        @assert dh.cell_to_subdofhandler[ci] == 0
+        dh.cell_to_subdofhandler[ci] = sdh_index
 
-        cell = getcells(dh.grid, ci)
+        cell = getcells(get_grid(dh), ci)
         len_cell_dofs_start = length(dh.cell_dofs)
         dh.cell_dofs_offset[ci] = len_cell_dofs_start + 1
 
         # Distribute dofs per field
         for (lidx, gidx) in pairs(global_fidxs)
-            @debug println("\tfield: $(fh.field_names[lidx])")
+            @debug println("\tfield: $(sdh.field_names[lidx])")
             nextdof = _distribute_dofs_for_cell!(
                 dh,
                 cell,
@@ -369,7 +422,7 @@ function _close_fieldhandler!(dh::DofHandler{sdim}, fh::FieldHandler, fh_index::
 
         if first_cell
             ndofs_per_cell = length(dh.cell_dofs) - len_cell_dofs_start
-            fh.ndofs_per_cell = ndofs_per_cell
+            sdh.ndofs_per_cell[] = ndofs_per_cell
             first_cell = false
         else
             @assert ndofs_per_cell == length(dh.cell_dofs) - len_cell_dofs_start
@@ -633,82 +686,75 @@ sortface(face::Tuple{Int}) = face, nothing
     find_field(dh::DofHandler, field_name::Symbol)::NTuple{2,Int}
 
 Return the index of the field with name `field_name` in a `DofHandler`. The index is a
-`NTuple{2,Int}`, where the 1st entry is the index of the `FieldHandler` within which the
-field was found and the 2nd entry is the index of the field within the `FieldHandler`.
+`NTuple{2,Int}`, where the 1st entry is the index of the `SubDofHandler` within which the
+field was found and the 2nd entry is the index of the field within the `SubDofHandler`.
 
 !!! note
     Always finds the 1st occurence of a field within `DofHandler`.
 
-See also: [`find_field(fh::FieldHandler, field_name::Symbol)`](@ref),
-[`_find_field(fh::FieldHandler, field_name::Symbol)`](@ref).
+See also: [`find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref),
+[`_find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref).
 """
 function find_field(dh::DofHandler, field_name::Symbol)
-    for (fh_idx, fh) in pairs(dh.fieldhandlers)
-        field_idx = _find_field(fh, field_name)
-        !isnothing(field_idx) && return (fh_idx, field_idx)
+    for (sdh_idx, sdh) in pairs(dh.subdofhandlers)
+        field_idx = _find_field(sdh, field_name)
+        !isnothing(field_idx) && return (sdh_idx, field_idx)
     end
     error("Did not find field :$field_name in DofHandler (existing fields: $(getfieldnames(dh))).")
 end
 
 """
-    find_field(fh::FieldHandler, field_name::Symbol)::Int
+    find_field(sdh::SubDofHandler, field_name::Symbol)::Int
 
-Return the index of the field with name `field_name` in a `FieldHandler`. Throw an
+Return the index of the field with name `field_name` in a `SubDofHandler`. Throw an
 error if the field is not found.
 
-See also: [`find_field(dh::DofHandler, field_name::Symbol)`](@ref), [`_find_field(fh::FieldHandler, field_name::Symbol)`](@ref).
+See also: [`find_field(dh::DofHandler, field_name::Symbol)`](@ref), [`_find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref).
 """
-function find_field(fh::FieldHandler, field_name::Symbol)
-    field_idx = _find_field(fh, field_name)
+function find_field(sdh::SubDofHandler, field_name::Symbol)
+    field_idx = _find_field(sdh, field_name)
     if field_idx === nothing
-        error("Did not find field :$field_name in FieldHandler (existing fields: $(fh.field_names))")
+        error("Did not find field :$field_name in SubDofHandler (existing fields: $(sdh.field_names))")
     end
     return field_idx
 end
 
 # No error if field not found
 """
-    _find_field(fh::FieldHandler, field_name::Symbol)::Int
+    _find_field(sdh::SubDofHandler, field_name::Symbol)::Int
 
-Return the index of the field with name `field_name` in the `FieldHandler` `fh`. Return 
+Return the index of the field with name `field_name` in the `SubDofHandler` `sdh`. Return 
 `nothing` if the field is not found.
 
-See also: [`find_field(dh::DofHandler, field_name::Symbol)`](@ref), [`find_field(fh::FieldHandler, field_name::Symbol)`](@ref).
+See also: [`find_field(dh::DofHandler, field_name::Symbol)`](@ref), [`find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref).
 """
-function _find_field(fh::FieldHandler, field_name::Symbol)
-    return findfirst(x -> x === field_name, fh.field_names)
+function _find_field(sdh::SubDofHandler, field_name::Symbol)
+    return findfirst(x -> x === field_name, sdh.field_names)
 end
 
 # Calculate the offset to the first local dof of a field
-function field_offset(fh::FieldHandler, field_idx::Int)
+function field_offset(sdh::SubDofHandler, field_idx::Int)
     offset = 0
     for i in 1:(field_idx-1)
-        offset += getnbasefunctions(fh.field_interpolations[i])::Int
+        offset += getnbasefunctions(sdh.field_interpolations[i])::Int
     end
     return offset
 end
-field_offset(fh::FieldHandler, field_name::Symbol) = field_offset(fh, find_field(fh, field_name))
-
-field_offset(dh::DofHandler, field_name::Symbol) = field_offset(dh, find_field(dh, field_name))
-function field_offset(dh::DofHandler, field_idxs::Tuple{Int, Int})
-    fh_idx, field_idx = field_idxs
-    field_offset(dh.fieldhandlers[fh_idx], field_idx)
-end
 
 """
-    dof_range(fh::FieldHandler, field_idx::Int)
-    dof_range(fh::FieldHandler, field_name::Symbol)
+    dof_range(sdh::SubDofHandler, field_idx::Int)
+    dof_range(sdh::SubDofHandler, field_name::Symbol)
     dof_range(dh:DofHandler, field_name::Symbol)
 
 Return the local dof range for a given field. The field can be specified by its name or
-index, where `field_idx` represents the index of a field within a `FieldHandler` and
-`field_idxs` is a tuple of the `FieldHandler`-index within the `DofHandler` and the
+index, where `field_idx` represents the index of a field within a `SubDofHandler` and
+`field_idxs` is a tuple of the `SubDofHandler`-index within the `DofHandler` and the
 `field_idx`.
 
 !!! note
-    The `dof_range` of a field can vary between different `FieldHandler`s. Therefore, it is
-    advised to use the `field_idxs` or refer to a given `FieldHandler` directly in case
-    several `FieldHandler`s exist. Using the `field_name` will always refer to the first
+    The `dof_range` of a field can vary between different `SubDofHandler`s. Therefore, it is
+    advised to use the `field_idxs` or refer to a given `SubDofHandler` directly in case
+    several `SubDofHandler`s exist. Using the `field_name` will always refer to the first
     occurence of `field` within the `DofHandler`.
 
 Example:
@@ -727,43 +773,41 @@ julia> dof_range(dh, :p)
 julia> dof_range(dh, (1,1)) # field :u
 1:9
 
-julia> dof_range(dh.fieldhandlers[1], 2) # field :p
+julia> dof_range(dh.subdofhandlers[1], 2) # field :p
 10:12
 ```
 """
-function dof_range(fh::FieldHandler, field_idx::Int)
-    offset = field_offset(fh, field_idx)
-    field_interpolation = fh.field_interpolations[field_idx]
+function dof_range(sdh::SubDofHandler, field_idx::Int)
+    offset = field_offset(sdh, field_idx)
+    field_interpolation = sdh.field_interpolations[field_idx]
     n_field_dofs = getnbasefunctions(field_interpolation)::Int
     return (offset+1):(offset+n_field_dofs)
 end
-dof_range(fh::FieldHandler, field_name::Symbol) = dof_range(fh, find_field(fh, field_name))
+dof_range(sdh::SubDofHandler, field_name::Symbol) = dof_range(sdh, find_field(sdh, field_name))
 
 function dof_range(dh::DofHandler, field_name::Symbol)
-    if length(dh.fieldhandlers) > 1
-        error("The given DofHandler has $(length(dh.fieldhandlers)) FieldHandlers.
-              Extracting the dof range based on the fieldname might not be a unique problem
-              in this case. Use `dof_range(fh::FieldHandler, field_name)` instead.")
+    if length(dh.subdofhandlers) > 1
+        error("The given DofHandler has $(length(dh.subdofhandlers)) SubDofHandlers. Extracting the dof range based on the fieldname might not be a unique problem in this case. Use `dof_range(sdh::SubDofHandler, field_name)` instead.")
     end
-    fh_idx, field_idx = find_field(dh, field_name)
-    return dof_range(dh.fieldhandlers[fh_idx], field_idx)
+    sdh_idx, field_idx = find_field(dh, field_name)
+    return dof_range(dh.subdofhandlers[sdh_idx], field_idx)
 end
 
 """
     getfieldinterpolation(dh::DofHandler, field_idxs::NTuple{2,Int})
-    getfieldinterpolation(dh::FieldHandler, field_idx::Int)
-    getfieldinterpolation(dh::FieldHandler, field_name::Symbol)
+    getfieldinterpolation(sdh::SubDofHandler, field_idx::Int)
+    getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol)
 
 Return the interpolation of a given field. The field can be specified by its index (see
 [`find_field`](@ref) or its name.
 """
 function getfieldinterpolation(dh::DofHandler, field_idxs::NTuple{2,Int})
-    fh_idx, field_idx = field_idxs
-    ip = dh.fieldhandlers[fh_idx].field_interpolations[field_idx]
+    sdh_idx, field_idx = field_idxs
+    ip = dh.subdofhandlers[sdh_idx].field_interpolations[field_idx]
     return ip
 end
-getfieldinterpolation(fh::FieldHandler, field_idx::Int) = fh.field_interpolations[field_idx]
-getfieldinterpolation(fh::FieldHandler, field_name::Symbol) = getfieldinterpolation(fh, find_field(fh, field_name))
+getfieldinterpolation(sdh::SubDofHandler, field_idx::Int) = sdh.field_interpolations[field_idx]
+getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol) = getfieldinterpolation(sdh, find_field(sdh, field_name))
 
 """
     evaluate_at_grid_nodes(dh::AbstractDofHandler, u::Vector{T}, fieldname::Symbol) where T
@@ -791,37 +835,37 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         # VTK output of solution field (or L2 projected scalar data)
         n_c = n_components(ip)
         vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
-        data = fill(NaN * zero(T), vtk_dim, getnnodes(dh.grid))
+        data = fill(NaN * zero(T), vtk_dim, getnnodes(get_grid(dh)))
     else
         # Just evalutation at grid nodes
-        data = fill(NaN * zero(RT), getnnodes(dh.grid))
+        data = fill(NaN * zero(RT), getnnodes(get_grid(dh)))
     end
-    # Loop over the fieldhandlers
-    for fh in dh.fieldhandlers
-        # Check if this fh contains this field, otherwise continue to the next
-        field_idx = _find_field(fh, fieldname)
+    # Loop over the subdofhandlers
+    for sdh in dh.subdofhandlers
+        # Check if this sdh contains this field, otherwise continue to the next
+        field_idx = _find_field(sdh, fieldname)
         field_idx === nothing && continue
         # Set up CellValues with the local node coords as quadrature points
-        CT = getcelltype(dh.grid, first(fh.cellset))
+        CT = getcelltype(get_grid(dh), first(sdh.cellset))
         ip_geo = default_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
-        qr = QuadratureRule{getdim(ip), getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
-        ip = getfieldinterpolation(fh, field_idx)
+        qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
+        ip = getfieldinterpolation(sdh, field_idx)
         if ip isa VectorizedInterpolation
             # TODO: Remove this hack when embedding works...
             cv = CellValues(qr, ip.ip, ip_geo)
         else
             cv = CellValues(qr, ip, ip_geo)
         end
-        drange = dof_range(fh, fieldname)
+        drange = dof_range(sdh, field_idx)
         # Function barrier
-        _evaluate_at_grid_nodes!(data, dh, fh, u, cv, drange, RT)
+        _evaluate_at_grid_nodes!(data, sdh, u, cv, drange, RT)
     end
     return data
 end
 
 # Loop over the cells and use shape functions to compute the value
-function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, dh::DofHandler, fh::FieldHandler,
+function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, sdh::SubDofHandler,
         u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}) where {T, RT}
     ue = zeros(T, length(drange))
     # TODO: Remove this hack when embedding works...
@@ -830,7 +874,7 @@ function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, dh::DofHandler, fh
     else
         uer = ue
     end
-    for cell in CellIterator(dh, fh.cellset)
+    for cell in CellIterator(sdh)
         # Note: We are only using the shape functions: no reinit!(cv, cell) necessary
         @assert getnquadpoints(cv) == length(cell.nodes)
         for (i, I) in pairs(drange)

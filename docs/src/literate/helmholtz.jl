@@ -1,4 +1,4 @@
-# # Helmholtz equation
+# # [Helmholtz equation](@id tutorial-helmholtz)
 #
 # In this example, we want to solve a (variant of) of the [Helmholtz equation](https://en.wikipedia.org/wiki/Helmholtz_equation).
 # The example is inspired by an [dealii step_7](https://www.dealii.org/8.4.1/doxygen/deal.II/step_7.html) on the standard square.
@@ -53,10 +53,9 @@ const Δ = Tensors.hessian;
 
 grid = generate_grid(Quadrilateral, (150, 150))
 
-dim = 2
 ip = Lagrange{RefQuadrilateral, 1}()
-qr = QuadratureRule{dim, RefQuadrilateral}(2)
-qr_face = QuadratureRule{dim-1, RefQuadrilateral}(2)
+qr = QuadratureRule{RefQuadrilateral}(2)
+qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
 cellvalues = CellValues(qr, ip);
 facevalues = FaceValues(qr_face, ip);
 
@@ -103,7 +102,7 @@ function doassemble(cellvalues::CellValues, facevalues::FaceValues,
     for (cellcount, cell) in enumerate(CellIterator(dh))
         fill!(Ke, 0)
         fill!(fe, 0)
-        coords = getcoordinates(cell)
+        coords = get_cell_coordinates(cell)
 
         reinit!(cellvalues, cell)
         # First we derive the non boundary part of the variation problem from the destined solution `u_ana`

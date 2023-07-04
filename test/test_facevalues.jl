@@ -1,15 +1,15 @@
 @testset "FaceValues" begin
 for (scalar_interpol, quad_rule) in (
-                                    (Lagrange{RefLine, 1}(), QuadratureRule{0, RefLine}(2)),
-                                    (Lagrange{RefLine, 2}(), QuadratureRule{0, RefLine}(2)),
-                                    (Lagrange{RefQuadrilateral, 1}(), QuadratureRule{1, RefQuadrilateral}(2)),
-                                    (Lagrange{RefQuadrilateral, 2}(), QuadratureRule{1, RefQuadrilateral}(2)),
-                                    (Lagrange{RefTriangle, 1}(), QuadratureRule{1, RefTriangle}(2)),
-                                    (Lagrange{RefTriangle, 2}(), QuadratureRule{1, RefTriangle}(2)),
-                                    (Lagrange{RefHexahedron, 1}(), QuadratureRule{2, RefHexahedron}(2)),
-                                    (Serendipity{RefQuadrilateral, 2}(), QuadratureRule{1, RefQuadrilateral}(2)),
-                                    (Lagrange{RefTetrahedron, 1}(), QuadratureRule{2, RefTetrahedron}(2)),
-                                    (Lagrange{RefTetrahedron, 2}(), QuadratureRule{2, RefTetrahedron}(2)),
+                                    (Lagrange{RefLine, 1}(), FaceQuadratureRule{RefLine}(2)),
+                                    (Lagrange{RefLine, 2}(), FaceQuadratureRule{RefLine}(2)),
+                                    (Lagrange{RefQuadrilateral, 1}(), FaceQuadratureRule{RefQuadrilateral}(2)),
+                                    (Lagrange{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2)),
+                                    (Lagrange{RefTriangle, 1}(), FaceQuadratureRule{RefTriangle}(2)),
+                                    (Lagrange{RefTriangle, 2}(), FaceQuadratureRule{RefTriangle}(2)),
+                                    (Lagrange{RefHexahedron, 1}(), FaceQuadratureRule{RefHexahedron}(2)),
+                                    (Serendipity{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2)),
+                                    (Lagrange{RefTetrahedron, 1}(), FaceQuadratureRule{RefTetrahedron}(2)),
+                                    (Lagrange{RefTetrahedron, 2}(), FaceQuadratureRule{RefTetrahedron}(2)),
                                    )
 
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))

@@ -5,7 +5,6 @@ function test_projection(order, refshape)
     element = refshape == RefQuadrilateral ? Quadrilateral : Triangle
     grid = generate_grid(element, (1, 1), Vec((0.,0.)), Vec((1.,1.)))
 
-    dim = 2
     ip = Lagrange{refshape, order}()
     ip_geom = Lagrange{refshape, 1}()
     qr = Ferrite._mass_qr(ip)
@@ -23,7 +22,7 @@ function test_projection(order, refshape)
         qp_values = []
         for cell in CellIterator(grid)
             reinit!(cv, cell)
-            r = [f(spatial_coordinate(cv, qp, getcoordinates(cell))) for qp in 1:getnquadpoints(cv)]
+            r = [f(spatial_coordinate(cv, qp, get_cell_coordinates(cell))) for qp in 1:getnquadpoints(cv)]
             push!(qp_values, r)
         end
         return identity.(qp_values) # Tighten the type
@@ -100,7 +99,7 @@ function test_projection(order, refshape)
     else
         bad_order = 1
     end
-    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs=QuadratureRule{dim,refshape}(bad_order), geom_ip=ip_geom)
+    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs=QuadratureRule{refshape}(bad_order), geom_ip=ip_geom)
 end
 
 # Test a mixed grid, where only a subset of the cells contains a field
@@ -127,13 +126,14 @@ function test_projection_mixedgrid()
     order = 2
     ip = Lagrange{RefQuadrilateral, order}()
     ip_geom = Lagrange{RefQuadrilateral, 1}()
-    qr = QuadratureRule{dim, RefQuadrilateral}(order+1)
+    qr = QuadratureRule{RefQuadrilateral}(order+1)
     cv = CellValues(qr, ip, ip_geom)
 
     # Create node values for the 1st cell
     # use a SymmetricTensor here for testing the symmetric version of project
     f(x) = SymmetricTensor{2,2,Float64}((1 + x[1]^2, 2x[2]^2, x[1]*x[2]))
-    xe = getcoordinates(mesh, 1)
+    xe = get_cell_coordinates(mesh, 1)
+    
     # analytical values
     qp_values = [[f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
     qp_values_matrix = reduce(hcat, qp_values)
@@ -157,14 +157,14 @@ function test_projection_mixedgrid()
     order = 2
     ip = Lagrange{RefTriangle, order}()
     ip_geom = Lagrange{RefTriangle, 1}()
-    qr = QuadratureRule{dim, RefTriangle}(4)
+    qr = QuadratureRule{RefTriangle}(4)
     cv = CellValues(qr, ip, ip_geom)
     nqp = getnquadpoints(cv)
 
     qp_values_tria = [zeros(SymmetricTensor{2,2}, nqp) for _ in triaset]
     qp_values_matrix_tria = [zero(SymmetricTensor{2,2}) for _ in 1:nqp, _ in triaset]
     for (ic, cellid) in enumerate(triaset)
-        xe = getcoordinates(mesh, cellid)
+        xe = get_cell_coordinates(mesh, cellid)
         # analytical values
         qp_values = [f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]
         qp_values_tria[ic] = qp_values
@@ -185,7 +185,7 @@ end
 
 function test_export(;subset::Bool)
     grid = generate_grid(Quadrilateral, (2, 1))
-    qr = QuadratureRule{2,RefQuadrilateral}(2)
+    qr = QuadratureRule{RefQuadrilateral}(2)
     ip = Lagrange{RefQuadrilateral,1}()
     cv = CellValues(qr, ip)
     nqp = getnquadpoints(cv)
@@ -202,7 +202,7 @@ function test_export(;subset::Bool)
     end
     for cell in CellIterator(grid)
         reinit!(cv, cell)
-        xh = getcoordinates(cell)
+        xh = get_cell_coordinates(cell)
         for qp in 1:getnquadpoints(cv)
             x = spatial_coordinate(cv, qp, xh)
             qpdata_scalar[cellid(cell)][qp] = f(x)

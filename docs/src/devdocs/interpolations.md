@@ -14,7 +14,7 @@ Ferrite.getorder(::Interpolation)
 Ferrite.value(::Interpolation{dim}, ::Vec{dim,T}) where {dim,T}
 Ferrite.derivative(::Interpolation{dim}, ::Vec{dim}) where {dim}
 Ferrite.boundarydof_indices
-Ferrite.adjust_dofs_during_distribution(::Interpolation)
+Ferrite.dirichlet_boundarydof_indices
 ```
 
 ### Required methods to implement for all subtypes of `Interpolation` to define a new finite element
@@ -24,13 +24,17 @@ Depending on the dimension of the reference element the following functions have
 ```@docs
 Ferrite.value(::Interpolation, ::Int, ::Vec)
 Ferrite.vertexdof_indices(::Interpolation)
+Ferrite.dirichlet_vertexdof_indices(::Interpolation)
 Ferrite.facedof_indices(::Interpolation)
+Ferrite.dirichlet_facedof_indices(::Interpolation)
 Ferrite.facedof_interior_indices(::Interpolation)
 Ferrite.edgedof_indices(::Interpolation)
+Ferrite.dirichlet_edgedof_indices(::Interpolation)
 Ferrite.edgedof_interior_indices(::Interpolation)
 Ferrite.celldof_interior_indices(::Interpolation)
 Ferrite.getnbasefunctions(::Interpolation)
 Ferrite.reference_coordinates(::Interpolation)
+Ferrite.adjust_dofs_during_distribution(::Interpolation)
 ```
 
 for all entities which exist on that reference element. The dof functions default to having no

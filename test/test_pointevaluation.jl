@@ -7,11 +7,11 @@ function scalar_field()
     ip_g = Lagrange{RefQuadrilateral,2}() # geometry interpolation
 
     # compute values in quadrature points
-    qr = QuadratureRule{2, RefQuadrilateral}(3) # exactly approximate quadratic field
+    qr = QuadratureRule{RefQuadrilateral}(3) # exactly approximate quadratic field
     cv = CellValues(qr, ip_f, ip_g)
     qp_vals = [Vector{Float64}(undef, getnquadpoints(cv)) for _ in 1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
-        xe = getcoordinates(mesh, cellid)
+        xe = get_cell_coordinates(mesh, cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
             qp_vals[cellid][qp] = f(spatial_coordinate(cv, qp, xe))
@@ -46,11 +46,11 @@ function vector_field()
     ip_g = Lagrange{RefQuadrilateral,2}() # geometry interpolation
 
     # compute values in quadrature points
-    qr = QuadratureRule{2, RefQuadrilateral}(3) # exactly approximate quadratic field
+    qr = QuadratureRule{RefQuadrilateral}(3) # exactly approximate quadratic field
     cv = CellValues(qr, ip_f, ip_g)
     qp_vals = [Vector{Vec{2,Float64}}(undef, getnquadpoints(cv)) for i=1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
-        xe = getcoordinates(mesh, cellid)
+        xe = get_cell_coordinates(mesh, cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
             qp_vals[cellid][qp] = f(spatial_coordinate(cv, qp, xe))
@@ -82,11 +82,11 @@ function superparametric()
     ip_f = Lagrange{RefQuadrilateral,2}() # function interpolation
 
     # compute values in quadrature points
-    qr = QuadratureRule{2, RefQuadrilateral}(3) # exactly approximate quadratic field
+    qr = QuadratureRule{RefQuadrilateral}(3) # exactly approximate quadratic field
     cv = CellValues(qr, ip_f)
     qp_vals = [Vector{Vec{2,Float64}}(undef, getnquadpoints(cv)) for i=1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
-        xe = getcoordinates(mesh, cellid)
+        xe = get_cell_coordinates(mesh, cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
             qp_vals[cellid][qp] = f(spatial_coordinate(cv, qp, xe))
@@ -132,7 +132,7 @@ function dofhandler2()
     mesh = generate_grid(Quadrilateral, (20, 20))
     ip_f = Lagrange{RefQuadrilateral,2}()
     ip_f_v = ip_f^2
-    qr = QuadratureRule{2,RefQuadrilateral}(3)
+    qr = QuadratureRule{RefQuadrilateral}(3)
     csv = CellValues(qr, ip_f)
     cvv = CellValues(qr, ip_f_v)
     dh = DofHandler(mesh);
@@ -155,7 +155,7 @@ function dofhandler2()
         reinit!(cvv, cell)
         for qp in 1:getnquadpoints(csv)
             dΩ = getdetJdV(csv, qp)
-            x = spatial_coordinate(csv, qp, getcoordinates(cell))
+            x = spatial_coordinate(csv, qp, get_cell_coordinates(cell))
             for i in 1:getnbasefunctions(csv)
                 δui = shape_value(csv, qp, i)
                 fe[s_dofs[i]] += ( δui * f_s(x) ) * dΩ
@@ -238,11 +238,11 @@ function mixed_grid()
     f(x) = x[1]
 
     # compute values in quadrature points for quad
-    qr = QuadratureRule{2, RefQuadrilateral}(2)
+    qr = QuadratureRule{RefQuadrilateral}(2)
     cv = CellValues(qr, ip_quad)
     qp_vals_quads = [Vector{Float64}(undef, getnquadpoints(cv)) for cell in getcellset(mesh, "quads")]
     for (local_cellid, global_cellid) in enumerate(getcellset(mesh, "quads"))
-        xe = getcoordinates(mesh, global_cellid)
+        xe = get_cell_coordinates(mesh, global_cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
             qp_vals_quads[local_cellid][qp] = f(spatial_coordinate(cv, qp, xe))
@@ -263,12 +263,10 @@ function mixed_grid()
 
     # second alternative: assume a vector field :v
     dh = DofHandler(mesh)
-    field = Field(:v, ip_quad^2)
-    fh_quad = FieldHandler([field], getcellset(mesh, "quads"))
-    add!(dh, fh_quad)
-    field = Field(:v, ip_tri^2)
-    fh_tri = FieldHandler([field], getcellset(mesh, "tris"))
-    add!(dh, fh_tri)
+    sdh_quad = SubDofHandler(dh, getcellset(mesh, "quads"))
+    add!(sdh_quad, :v, ip_quad^2)
+    sdh_tri = SubDofHandler(dh, getcellset(mesh, "tris"))
+    add!(sdh_tri, :v, ip_tri^2)
     close!(dh)
 
     dof_vals = [1., 1., 2., 2., 4., 4., 3., 3., 6., 6., 5., 5.]
@@ -287,11 +285,11 @@ function oneD()
     ip_f = Lagrange{RefLine,1}() # function interpolation
 
     # compute values in quadrature points
-    qr = QuadratureRule{1, RefLine}(2)
+    qr = QuadratureRule{RefLine}(2)
     cv = CellValues(qr, ip_f)
     qp_vals = [Vector{Float64}(undef, getnquadpoints(cv)) for i=1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
-        xe = getcoordinates(mesh, cellid)
+        xe = get_cell_coordinates(mesh, cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
             qp_vals[cellid][qp] = f(spatial_coordinate(cv, qp, xe))
@@ -341,7 +339,7 @@ end
     x = Vec{2,Float64}.([(0.0, 0.0), (2.0, 0.5), (2.5, 2.5), (0.5, 2.0)])
     ξ₁ = Vec{2,Float64}((0.12, -0.34))
     ξ₂ = Vec{2,Float64}((0.56, -0.78))
-    qr = QuadratureRule{2,RefQuadrilateral,Float64}([2.0, 2.0], [ξ₁, ξ₂])
+    qr = QuadratureRule{RefQuadrilateral,Float64}([2.0, 2.0], [ξ₁, ξ₂])
 
     # PointScalarValues
     csv = CellValues(qr, ip_f)

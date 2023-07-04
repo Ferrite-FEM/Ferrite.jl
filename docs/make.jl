@@ -14,33 +14,15 @@ using Documenter, Ferrite, FerriteGmsh, FerriteMeshParser
 
 const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 
-# Generate examples
+# Generate tutorials and how-to guides
 include("generate.jl")
-
-GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
-    "heat_equation.md",
-    "postprocessing.md",
-    "helmholtz.md",
-    "incompressible_elasticity.md",
-    "hyperelasticity.md",
-    "threaded_assembly.md",
-    "plasticity.md",
-    "transient_heat_equation.md",
-    "landau.md",
-    "linear_shell.md",
-    "reactive_surface.md",
-    "quasi_incompressible_hyperelasticity.md",
-    "ns_vs_diffeq.md",
-    "computational_homogenization.md",
-    "stokes-flow.md",
-	"topology_optimization.md",
-    )]
 
 # Build documentation.
 @timeit dto "makedocs" makedocs(
     format = Documenter.HTML(
         assets = ["assets/custom.css", "assets/favicon.ico"],
         canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
+        collapselevel = 1,
     ),
     sitename = "Ferrite.jl",
     doctest = false,
@@ -49,17 +31,37 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
     draft = liveserver,
     pages = Any[
         "Home" => "index.md",
-        "manual/fe_intro.md",
-        "Manual" => [
-            "manual/degrees_of_freedom.md",
-            "manual/assembly.md",
-            "manual/boundary_conditions.md",
-            "manual/constraints.md",
-            "manual/grid.md",
-            "manual/export.md"
-            ],
-        "Examples" => ["overview.md";GENERATEDEXAMPLES],
-        "API Reference" => [
+        "Tutorials" => [
+            "Tutorials overview" => "tutorials/index.md",
+            "tutorials/heat_equation.md",
+            "tutorials/postprocessing.md",
+            "tutorials/helmholtz.md",
+            "tutorials/incompressible_elasticity.md",
+            "tutorials/hyperelasticity.md",
+            "tutorials/threaded_assembly.md",
+            "tutorials/plasticity.md",
+            "tutorials/transient_heat_equation.md",
+            "tutorials/landau.md",
+            "tutorials/reactive_surface.md",
+            "tutorials/linear_shell.md",
+            "tutorials/quasi_incompressible_hyperelasticity.md",
+            "tutorials/ns_vs_diffeq.md",
+            "tutorials/computational_homogenization.md",
+            "tutorials/stokes-flow.md",
+            "tutorials/topology_optimization.md",
+        ],
+        "Topic guides" => [
+            "Topic guide overview" => "topics/index.md",
+            "topics/fe_intro.md",
+            "topics/degrees_of_freedom.md",
+            "topics/assembly.md",
+            "topics/boundary_conditions.md",
+            "topics/constraints.md",
+            "topics/grid.md",
+            "topics/export.md"
+        ],
+        "Reference" => [
+            "Reference overview" => "reference/index.md",
             "reference/quadrature.md",
             "reference/interpolations.md",
             "reference/fevalues.md",
@@ -69,13 +71,16 @@ GENERATEDEXAMPLES = [joinpath("examples", f) for f in (
             "reference/grid.md",
             "reference/export.md",
             "reference/utils.md",
-            ],
-        "Developer documentation" => "devdocs/index.md",
+        ],
+        "How-to guides" => [
+            "How-to guide overview" => "howto/index.md",
+        ],
+        "devdocs/index.md",
         ],
 )
 
 # make sure there are no *.vtu files left around from the build
-@timeit dto "remove vtk files" cd(joinpath(@__DIR__, "build", "examples")) do
+@timeit dto "remove vtk files" cd(joinpath(@__DIR__, "build", "tutorials")) do
     foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
 end
 
@@ -85,6 +90,20 @@ if !liveserver
     @timeit dto "deploydocs" deploydocs(
         repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
         push_preview=true,
+        versions = [
+            "stable" => "v^",
+            "v#.#",
+            "v0.3.13",
+            "v0.3.12",
+            "v0.3.11",
+            "v0.3.10",
+            "v0.3.9",
+            "v0.3.8",
+            "v0.3.7",
+            "v0.3.6",
+            "v0.3.5",
+            "dev" => "dev"
+        ]
     )
 end
 

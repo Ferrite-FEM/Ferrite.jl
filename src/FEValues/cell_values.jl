@@ -31,8 +31,8 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 """
 CellValues
 
-function default_geometric_interpolation(::Interpolation{shape}) where {shape}
-    return Lagrange{shape,1}()
+function default_geometric_interpolation(::Interpolation{shape}) where {dim, shape <: AbstractRefShape{dim}}
+    return VectorizedInterpolation{dim}(Lagrange{shape, 1}())
 end
 
 struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCellValues
@@ -54,7 +54,7 @@ function CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(qr::QR, ip::I
     @assert isconcretetype(IP)     && isconcretetype(N_t) && isconcretetype(dNdx_t) &&
             isconcretetype(dNdξ_t) && isconcretetype(T)   && isconcretetype(dMdξ_t) &&
             isconcretetype(QR)     && isconcretetype(GIP)
-    n_qpoints = length(getweights(qr))
+    n_qpoints = getnquadpoints(qr)
 
     # Field interpolation
     n_func_basefuncs = getnbasefunctions(ip)
@@ -69,10 +69,10 @@ function CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(qr::QR, ip::I
 
     for (qp, ξ) in pairs(getpoints(qr))
         for basefunc in 1:n_func_basefuncs
-            dNdξ[basefunc, qp], N[basefunc, qp] = gradient_and_value(ip, basefunc, ξ)
+            dNdξ[basefunc, qp], N[basefunc, qp] = shape_gradient_and_value(ip, ξ, basefunc)
         end
         for basefunc in 1:n_geom_basefuncs
-            dMdξ[basefunc, qp], M[basefunc, qp] = gradient_and_value(gip, basefunc, ξ)
+            dMdξ[basefunc, qp], M[basefunc, qp] = shape_gradient_and_value(gip, ξ, basefunc)
         end
     end
 
@@ -81,18 +81,29 @@ function CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(qr::QR, ip::I
     CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(N, dNdx, dNdξ, detJdV, M, dMdξ, qr, ip, gip)
 end
 
-# Common entry point that just defaults the numeric type to Float64
+# Common entry point that fills in the numeric type and geometric interpolation
 function CellValues(qr::QuadratureRule, ip::Interpolation,
         gip::Interpolation = default_geometric_interpolation(ip))
     return CellValues(Float64, qr, ip, gip)
 end
 
+# Common entry point that fills in the geometric interpolation
+function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation) where {T}
+    return CellValues(T, qr, ip, default_geometric_interpolation(ip))
+end
+
+# Common entry point that vectorizes an input scalar geometric interpolation
+function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, sgip::ScalarInterpolation) where {T}
+    return CellValues(T, qr, ip, VectorizedInterpolation(sgip))
+end
+
 # Entrypoint for `ScalarInterpolation`s (rdim == sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
+function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     dim, shape <: AbstractRefShape{dim}, T,
-    QR  <: QuadratureRule{dim, shape},
-    IP  <: ScalarInterpolation{shape},
-    GIP <: ScalarInterpolation{shape},
+    QR   <: QuadratureRule{shape},
+    IP   <: ScalarInterpolation{shape},
+    GIP  <: ScalarInterpolation{shape},
+    VGIP <: VectorizedInterpolation{dim, shape, <:Any, GIP},
 }
     # Function interpolation
     N_t    = T
@@ -100,15 +111,16 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{dim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
+    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
 end
 
 # Entrypoint for `VectorInterpolation`s (vdim == rdim == sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
+function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     dim, shape <: AbstractRefShape{dim}, T,
-    QR  <: QuadratureRule{dim, shape},
+    QR  <: QuadratureRule{shape},
     IP  <: VectorInterpolation{dim, shape},
     GIP <: ScalarInterpolation{shape},
+    VGIP <: VectorizedInterpolation{dim, shape, <:Any, GIP},
 }
     # Field interpolation
     N_t    = Vec{dim, T}
@@ -116,15 +128,16 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{dim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
+    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
 end
 
 # Entrypoint for `VectorInterpolation`s (vdim != rdim == sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
+function CellValues(::Type{T}, qr::QR, ip::IP, vgip::VGIP) where {
     vdim, dim, shape <: AbstractRefShape{dim}, T,
-    QR  <: QuadratureRule{dim, shape},
+    QR  <: QuadratureRule{shape},
     IP  <: VectorInterpolation{vdim, shape},
-    GIP <: ScalarInterpolation{shape}
+    GIP <: ScalarInterpolation{shape},
+    VGIP <: VectorizedInterpolation{dim, shape, <:Any, GIP},
 }
     # Field interpolation
     N_t    = SVector{vdim, T}
@@ -132,7 +145,7 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{dim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip)
+    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, vgip.ip)
 end
 
 # reinit! for regular (non-embedded) elements (rdim == sdim)
@@ -146,8 +159,7 @@ function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{
     n_func_basefuncs = getnbasefunctions(cv)
     length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
 
-    @inbounds for i in 1:length(cv.qr.weights)
-        w = cv.qr.weights[i]
+    @inbounds for (i, w) in pairs(getweights(cv.qr))
         fecv_J = zero(Tensor{2,dim,T})
         for j in 1:n_geom_basefuncs
             fecv_J += x[j] ⊗ cv.dMdξ[j, i]
@@ -176,7 +188,7 @@ end
 # Entrypoint for embedded `ScalarInterpolation`s (rdim < sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     sdim, rdim, shape <: AbstractRefShape{rdim}, T,
-    QR  <: QuadratureRule{rdim, shape},
+    QR  <: QuadratureRule{shape},
     IP  <: ScalarInterpolation{shape},
     GIP <: ScalarInterpolation{shape},
     VGIP <: VectorizedInterpolation{sdim, shape, <:Any, GIP},
@@ -195,7 +207,7 @@ end
 # Entrypoint for embedded `VectorInterpolation`s (rdim < sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     sdim, vdim, rdim, shape <: AbstractRefShape{rdim}, T,
-    QR  <: QuadratureRule{rdim, shape},
+    QR  <: QuadratureRule{shape},
     IP  <: VectorInterpolation{vdim, shape},
     GIP <: ScalarInterpolation{shape},
     VGIP <: VectorizedInterpolation{sdim, shape, <:Any, GIP},
@@ -252,8 +264,7 @@ function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{
     n_func_basefuncs = getnbasefunctions(cv)
     length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
 
-    @inbounds for i in 1:length(cv.qr.weights)
-        w = cv.qr.weights[i]
+    @inbounds for (i, w) in pairs(getweights(cv.qr))
         fecv_J = zero(MMatrix{sdim, rdim, T}) # TODO replace with MixedTensor (see https://github.com/Ferrite-FEM/Tensors.jl/pull/188)
         for j in 1:n_geom_basefuncs
             #fecv_J += x[j] ⊗ cv.dMdξ[j, i] # TODO via Tensors.jl

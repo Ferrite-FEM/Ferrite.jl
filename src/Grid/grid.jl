@@ -13,10 +13,23 @@ struct Node{dim,T}
     x::Vec{dim,T}
 end
 Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
-getcoordinates(n::Node) = n.x
 
 """
-    Ferrite.get_coordinate_eltype(::Node)
+    get_node_coordinate(::Node)
+    
+Get the value of the node coordinate.
+"""
+get_node_coordinate(n::Node) = n.x
+
+"""
+    get_coordinate_type(::Node)
+
+Get the data type of the the node coordinate.
+"""
+get_coordinate_type(::Node{dim,T}) where {dim,T}  = Vec{dim,T}
+
+"""
+    get_coordinate_eltype(::Node)
 
 Get the data type of the components of the nodes coordinate.
 """
@@ -27,6 +40,8 @@ get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 ##########################
 
 abstract type AbstractCell{refshape <: AbstractRefShape} end
+
+getrefshape(::AbstractCell{refshape}) where refshape = refshape
 
 nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))
@@ -541,6 +556,13 @@ end
 # Grid utility functions #
 ##########################
 """
+    get_coordinate_type(::AbstractGrid)
+
+Get the datatype for a single point in the grid.
+"""
+get_coordinate_type(grid::Grid{dim,C,T}) where {dim,C,T} = Vec{dim,T} # Node is baked into the mesh type.
+
+"""
     getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
     getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
     getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
@@ -655,6 +677,8 @@ to a Node.
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
 "Returns the number of nodes of the `i`-th cell."
 @inline nnodes_per_cell(grid::AbstractGrid, i::Int=1) = nnodes(grid.cells[i])
+
+get_node_coordinate(grid, nodeid) = get_node_coordinate(getnodes(grid, nodeid))
 "Return the number type of the nodal coordinates."
 @inline get_coordinate_eltype(grid::AbstractGrid) = get_coordinate_eltype(first(getnodes(grid)))
 
@@ -723,7 +747,7 @@ Returns all vertex sets of the grid.
 """
 @inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
 
-n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
+n_faces_per_cell(grid::Grid) = nfaces(getcelltype(grid))
 
 # Transformations
 """
@@ -732,7 +756,7 @@ n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
 Transform all nodes of the `grid` based on some transformation function `f`.
 """
 function transform!(g::Grid, f::Function)
-    map!(n -> Node(f(getcoordinates(n))), g.nodes, g.nodes)
+    map!(n -> Node(f(get_node_coordinate(n))), g.nodes, g.nodes)
     return g
 end
 
@@ -796,11 +820,11 @@ addfaceset!(grid, "right", Set(((2,2),(4,2))) #see grid manual example for refer
 addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
 ```
 """
-addfaceset!(grid::Grid, name::String, set::Union{Set{FaceIndex},Vector{FaceIndex}}) = 
+addfaceset!(grid::AbstractGrid, name::String, set::Union{Set{FaceIndex},Vector{FaceIndex}}) = 
     _addset!(grid, name, set, grid.facesets)
-addedgeset!(grid::Grid, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) = 
+addedgeset!(grid::AbstractGrid, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) = 
     _addset!(grid, name, set, grid.edgesets)
-addvertexset!(grid::Grid, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) = 
+addvertexset!(grid::AbstractGrid, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) = 
     _addset!(grid, name, set, grid.vertexsets)
 function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
     _check_setname(dict, name)
@@ -1290,43 +1314,41 @@ function addnodeset!(grid::AbstractGrid, name::String, f::Function)
 end
 
 """
-    getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::Int)
-    getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::AbstractCell)
+    get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::Int)
+    get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::AbstractCell)
 
 Fills the vector `x` with the coordinates of a cell defined by either its cellid or the cell object itself.
 """
-@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T} 
+@inline function get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T} 
     cell = getcells(grid, cellid)
-    getcoordinates!(x, grid, cell)
+    get_cell_coordinates!(x, grid, cell)
 end
 
-@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim,T}
+@inline function get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim,T}
     @inbounds for i in 1:length(x)
-        x[i] = getcoordinates(getnodes(grid, cell.nodes[i]))
+        x[i] = get_node_coordinate(grid, cell.nodes[i])
     end
     return x
 end
 
-@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
-@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, face::FaceIndex) where {dim, T} = getcoordinates!(x, grid, face.idx[1])
+@inline get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = get_cell_coordinates!(x, grid, cell.idx)
+@inline get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, face::FaceIndex) where {dim, T} = get_cell_coordinates!(x, grid, face.idx[1])
 
-# TODO: Deprecate one of `cellcoords!` and `getcoordinates!`, as they do the same thing
-cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,T} = getcoordinates!(global_coords, grid, i) 
 
 """
-    getcoordinates(grid::AbstractGrid, cell)
+    get_cell_coordinates(grid::AbstractGrid, cell)
 Return a vector with the coordinates of the vertices of cell number `cell`.
 """
-@inline function getcoordinates(grid::AbstractGrid, cell::Int)
+@inline function get_cell_coordinates(grid::AbstractGrid, cell::Int)
     dim = getdim(grid)
     T = get_coordinate_eltype(grid)
     _cell = getcells(grid, cell)
     N = nnodes(_cell)
     x = Vector{Vec{dim, T}}(undef, N)
-    getcoordinates!(x, grid, _cell)
+    get_cell_coordinates!(x, grid, _cell)
 end
-@inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
-@inline getcoordinates(grid::AbstractGrid, face::FaceIndex) = getcoordinates(grid, face.idx[1])
+@inline get_cell_coordinates(grid::AbstractGrid, cell::CellIndex) = get_cell_coordinates(grid, cell.idx)
+@inline get_cell_coordinates(grid::AbstractGrid, face::FaceIndex) = get_cell_coordinates(grid, face.idx[1])
 
 function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
     cell = getcells(grid, i)

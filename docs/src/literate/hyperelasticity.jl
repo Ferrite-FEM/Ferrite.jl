@@ -1,4 +1,4 @@
-# # Hyperelasticity
+# # [Hyperelasticity](@id tutorial-hyperelasticity)
 #
 # **Keywords**: *hyperelasticity*, *finite strain*, *large deformations*, *Newton's method*,
 # *conjugate gradient*, *automatic differentiation*
@@ -316,8 +316,8 @@ function solve()
 
     ## Finite element base
     ip = Lagrange{RefTetrahedron, 1}()^3
-    qr = QuadratureRule{3, RefTetrahedron}(1)
-    qr_face = QuadratureRule{2, RefTetrahedron}(1)
+    qr = QuadratureRule{RefTetrahedron}(1)
+    qr_face = FaceQuadratureRule{RefTetrahedron}(1)
     cv = CellValues(qr, ip)
     fv = FaceValues(qr_face, ip)
 

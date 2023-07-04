@@ -10,7 +10,7 @@
     Ferrite.getncells(grid::SmallGrid{dim,N}) where {dim,N} = N
     Ferrite.getcelltype(grid::SmallGrid) = eltype(grid.cells_test)
     Ferrite.getcelltype(grid::SmallGrid, i::Int) = typeof(grid.cells_test[i])
-    Ferrite.getcoordinates(x::NTuple{dim,Float64}) where dim = Vec{dim,Float64}(x)
+    Ferrite.get_node_coordinate(x::NTuple{dim,Float64}) where dim = Vec{dim,Float64}(x)
 
     Ferrite.getnodes(grid::SmallGrid) = grid.nodes_test
     Ferrite.getnodes(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.nodes_test[v]
@@ -25,7 +25,7 @@
     reference_grid = generate_grid(Quadrilateral, (2,2))
 
     ip = Lagrange{RefQuadrilateral, 1}()
-    qr = QuadratureRule{2, RefQuadrilateral}(2)
+    qr = QuadratureRule{RefQuadrilateral}(2)
     cellvalues = CellValues(qr, ip);
     
     dhs = [DofHandler(grid) for grid in (subtype_grid, reference_grid)]
@@ -43,7 +43,7 @@
         for cellid in 1:getncells(dh.grid)
             fill!(Ke, 0)
             fill!(fe, 0)
-            coords = getcoordinates(dh.grid, cellid)
+            coords = get_cell_coordinates(dh.grid, cellid)
             reinit!(cellvalues, coords)
             for q_point in 1:getnquadpoints(cellvalues)
                 dΩ = getdetJdV(cellvalues, q_point)
@@ -80,4 +80,12 @@
     @test Ferrite.celldofs(dhs[1],3) == Ferrite.celldofs(dhs[2],3)
     @test Ferrite.ndofs(dhs[1]) == Ferrite.ndofs(dhs[2])
     @test isapprox(u1,u2,atol=1e-8)
+
+    colors1 = Ferrite.create_coloring(subtype_grid, alg = ColoringAlgorithm.WorkStream)
+    colors2 = Ferrite.create_coloring(reference_grid, alg = ColoringAlgorithm.WorkStream)
+    @test all(colors1 .== colors2)
+
+    colors1 = Ferrite.create_coloring(subtype_grid, alg = ColoringAlgorithm.Greedy)
+    colors2 = Ferrite.create_coloring(reference_grid, alg = ColoringAlgorithm.Greedy)
+    @test all(colors1 .== colors2)
 end

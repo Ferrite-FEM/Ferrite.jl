@@ -1,4 +1,4 @@
-# # Threaded Assembly
+# # [Threaded Assembly](@id tutorial-threaded-assembly)
 #
 #-
 #md # !!! tip
@@ -88,8 +88,8 @@ end;
 # the FaceValues)
 function create_values(interpolation_space::Interpolation{refshape}, qr_order::Int) where {dim, refshape<:Ferrite.AbstractRefShape{dim}}
     ## Interpolations and values
-    quadrature_rule = QuadratureRule{dim, refshape}(qr_order)
-    face_quadrature_rule = QuadratureRule{dim-1, refshape}(qr_order)
+    quadrature_rule = QuadratureRule{refshape}(qr_order)
+    face_quadrature_rule = FaceQuadratureRule{refshape}(qr_order)
     cellvalues = [CellValues(quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
     facevalues = [FaceValues(face_quadrature_rule, interpolation_space) for i in 1:Threads.nthreads()];
     return cellvalues, facevalues

@@ -110,7 +110,7 @@ end
     close!(dh);
     cell = first(CellIterator(dh))
     ip_geo = Lagrange{RefLine, 2}()
-    qr = QuadratureRule{dim, RefLine}(deg+1)
+    qr = QuadratureRule{RefLine}(deg+1)
     cv = CellValues(qr, ip_fe, ip_geo)
     res = @test_throws ArgumentError reinit!(cv, cell)
     @test occursin("265", res.value.msg)
@@ -124,7 +124,7 @@ end
     qp = 1
     ip = Lagrange{RefTriangle,1}()
     qr = QuadratureRule{RefTriangle}(1)
-    qr_f = QuadratureRule{dim-1, RefTriangle}(1)
+    qr_f = FaceQuadratureRule{RefTriangle}(1)
     csv = CellValues(qr, ip)
     cvv = CellValues(qr, VectorizedInterpolation(ip))
     fsv = FaceValues(qr_f, ip)
@@ -169,7 +169,7 @@ end
         ip_base = Lagrange{RefLine,1}()
         ip = vdim > 0 ? ip_base^vdim : ip_base
         ue = 2 * rand(getnbasefunctions(ip))
-        qr = QuadratureRule{1,RefLine}(1)
+        qr = QuadratureRule{RefLine}(1)
         # Reference values
         csv1 = CellValues(qr, ip)
         reinit!(csv1, [Vec((0.0,)), Vec((1.0,))])
@@ -255,7 +255,7 @@ end
         ip_base = Lagrange{RefQuadrilateral,1}()
         ip = vdim > 0 ? ip_base^vdim : ip_base
         ue = rand(getnbasefunctions(ip))
-        qr = QuadratureRule{2,RefQuadrilateral}(1)
+        qr = QuadratureRule{RefQuadrilateral}(1)
         csv2 = CellValues(qr, ip)
         csv3 = CellValues(qr, ip, ip_base^3)
         reinit!(csv2, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))])
@@ -273,6 +273,37 @@ end
         else
             @test function_gradient(csv2, 1, ue)[:, 1:2] == function_gradient(csv3, 1, ue)[:, 1:2]
             @test                            zeros(vdim) == function_gradient(csv3, 1, ue)[:, 3]
+        end
+    end
+end
+
+@testset "CellValues constructor entry points" begin
+    qr = QuadratureRule{RefTriangle}(1)
+    for fun_ip in (Lagrange{RefTriangle, 1}(), Lagrange{RefTriangle, 2}()^2)
+        value_type(T) = fun_ip isa ScalarInterpolation ? T : Vec{2, T}
+        grad_type(T) = fun_ip isa ScalarInterpolation ? Vec{2, T} : Tensor{2, 2, T, 4}
+        # Quadrature + scalar function
+        cv = CellValues(qr, fun_ip)
+        @test Ferrite.shape_value_type(cv) == value_type(Float64)
+        @test Ferrite.shape_gradient_type(cv) == grad_type(Float64)
+        @test cv.gip == Lagrange{RefTriangle, 1}()
+        # Numeric type + quadrature + scalar function
+        cv = CellValues(Float32, qr, fun_ip)
+        @test Ferrite.shape_value_type(cv) == value_type(Float32)
+        @test Ferrite.shape_gradient_type(cv) == grad_type(Float32)
+        @test cv.gip == Lagrange{RefTriangle, 1}()
+        for geo_ip in (Lagrange{RefTriangle, 2}(), Lagrange{RefTriangle, 2}()^2)
+            scalar_ip(ip) = ip isa VectorizedInterpolation ? ip.ip : ip
+            # Quadrature + scalar function + geo
+            cv = CellValues(qr, fun_ip, geo_ip)
+            @test Ferrite.shape_value_type(cv) == value_type(Float64)
+            @test Ferrite.shape_gradient_type(cv) == grad_type(Float64)
+            @test cv.gip == scalar_ip(geo_ip)
+            # Numeric type + quadrature + scalar function + scalar geo
+            cv = CellValues(Float32, qr, fun_ip, geo_ip)
+            @test Ferrite.shape_value_type(cv) == value_type(Float32)
+            @test Ferrite.shape_gradient_type(cv) == grad_type(Float32)
+            @test cv.gip == scalar_ip(geo_ip)
         end
     end
 end

@@ -1,4 +1,4 @@
-# # Incompressible Navier-Stokes Equations via DifferentialEquations.jl
+# # [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](@id tutorial-ins-ordinarydiffeq)
 #
 # ![](https://user-images.githubusercontent.com/9196588/134514213-76d91d34-19ab-47c2-957e-16bb0c8669e1.gif)
 #
@@ -159,7 +159,7 @@ grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{
 # We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
 # linear pressure term is tested against a quadratic function.
 ip_v = Lagrange{RefQuadrilateral, 2}()^dim
-qr = QuadratureRule{dim, RefQuadrilateral}(4)
+qr = QuadratureRule{RefQuadrilateral}(4)
 cellvalues_v = CellValues(qr, ip_v);
 
 ip_p = Lagrange{RefQuadrilateral, 1}()
@@ -478,7 +478,7 @@ end                                                                         #hid
         all_celldofs = celldofs(cell)                                       #hide
         v_celldofs = all_celldofs[dof_range(dh, :v)]                        #hide
         v_cell = u[v_celldofs]                                              #hide
-        coords = getcoordinates(cell)                                       #hide
+        coords = get_cell_coordinates(cell)                                       #hide
         for q_point in 1:getnquadpoints(cellvalues_v)                       #hide
             dΩ = getdetJdV(cellvalues_v, q_point)                           #hide
             coords_qp = spatial_coordinate(cellvalues_v, q_point, coords)   #hide

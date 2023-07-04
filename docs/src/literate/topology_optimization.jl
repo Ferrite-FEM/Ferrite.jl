@@ -1,4 +1,4 @@
-# # Topology optimization
+# # [Topology optimization](@id tutorial-topology-optimization)
 #
 # **Keywords**: *Topology optimization*, *weak and strong form*, *non-linear problem*, *Laplacian*, *grid topology*
 #
@@ -88,8 +88,8 @@ end
 
 function create_values()
     ## quadrature rules
-    qr      = QuadratureRule{2,RefQuadrilateral}(2)
-    face_qr = QuadratureRule{1,RefQuadrilateral}(2)
+    qr      = QuadratureRule{RefQuadrilateral}(2)
+    face_qr = FaceQuadratureRule{RefQuadrilateral}(2)
 
     ## cell and facevalues for u
     ip = Lagrange{RefQuadrilateral,1}()^2

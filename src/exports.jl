@@ -19,6 +19,8 @@ export
 
 # Quadrature
     QuadratureRule,
+    FaceQuadratureRule,
+    getnquadpoints,
     getweights,
     getpoints,
 
@@ -41,7 +43,6 @@ export
     spatial_coordinate,
     getnormal,
     getdetJdV,
-    getnquadpoints,
 
 # Grid
     Grid,
@@ -76,8 +77,9 @@ export
     getfaceset,
     getedgeset,
     getvertexset,
-    getcoordinates,
-    getcoordinates!,
+    get_node_coordinate,
+    get_cell_coordinates,
+    get_cell_coordinates!,
     getcellsets,
     getnodesets,
     getfacesets,
@@ -103,7 +105,7 @@ export
 
 # Dofs
     DofHandler,
-    MixedDofHandler, # only for getting an error message redirecting to DofHandler
+    SubDofHandler,
     close!,
     ndofs,
     ndofs_per_cell,
@@ -114,8 +116,6 @@ export
     dof_range,
     renumber!,
     DofOrder,
-    FieldHandler,
-    Field,
     evaluate_at_grid_nodes,
     apply_analytical!,
 

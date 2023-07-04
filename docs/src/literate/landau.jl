@@ -1,4 +1,4 @@
-# # Ginzburg-Landau model energy minimization
+# # [Ginzburg-Landau model energy minimization](@id tutorial-ginzburg-landau-minimizer)
 
 # ![landau_orig.png](landau_orig.png)
 
@@ -86,7 +86,7 @@ function LandauModel(α, G, gridsize, left::Vec{DIM, T}, right::Vec{DIM, T}, elp
     grid = generate_grid(Tetrahedron, gridsize, left, right)
     threadindices = Ferrite.create_coloring(grid)
 
-    qr  = QuadratureRule{DIM, RefTetrahedron}(2)
+    qr  = QuadratureRule{RefTetrahedron}(2)
     ipP = Lagrange{RefTetrahedron, 1}()^3
     cvP = CellValues(qr, ipP)
 
