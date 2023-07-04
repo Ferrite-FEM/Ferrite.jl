@@ -134,11 +134,22 @@ for the time-integration.
 
 ---
 
-#### [Tutorial 10: Linear shell](@ref tutorial-linear-shell)
+#### [Tutorial 10: Reactive Surface](@ref tutorial-reactive-surface)
+
+In this tutorial a reaction diffusion system on a sphere surface embedded in 3D is solved.
+Ferrite is used to assemble the diffusion operators and the mass matrices. The problem is
+solved by using the usual first order reaction diffusion operator splitting.
+
+**Keywords**: embedded elements, operator splitting
+
+
+---
+
+#### [Tutorial 11: Linear shell](@ref tutorial-linear-shell)
 
 In this tutorial a linear shell element formulation is set up as a two-dimensional domain
 embedded in three-dimensional space. This will teach, and perhaps inspire, you on how
 Ferrite can be used for non-standard things and how to add "hacks" that build on top of
 Ferrite.
 
-**Keywords**: embedding, automatic differentiation
+**Keywords**: shell elements, automatic differentiation
