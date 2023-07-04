@@ -2,6 +2,8 @@
 #   Witherden, Freddie D., and Peter E. Vincent. "On the identification of 
 #   symmetric quadrature rules for finite element methods." Computers & 
 #   Mathematics with Applications 69.10 (2015): 1232-1241.
+# TODO: Implement quadrature data from: 
+# https://www.sciencedirect.com/science/article/pii/S0168874X1200203X?via%3Dihub#s0065
 function _get_gauss_pyramiddata_polyquad(n::Int)
   if n == 1
       xw = [0 0  -0.5  2.6666666666666666666666666666666666667]
@@ -83,15 +85,17 @@ function _get_gauss_pyramiddata_polyquad(n::Int)
   else
       throw(ArgumentError("unsupported order for prism polyquad integration"))
   end
-    # Transform from [-1,1] × [-1,1] × [-1,1] pyramid with volume 8/3 and with 5th node in center
-    # to pyramid [0,1] × [0,1] × [0,1] with volume 1/3 and with 5th node in corner
-    f1 = (x,y,z) -> (0.5(x+1.0), 0.5(y+1.0), 0.5(z+1.0))
-    f2 = (x,y,z) -> (2x-z, 2y-z, z)
+    # 
+    # The above quadrature rule is defined for a pyramid spanning [-1,1] × [-1,1] × [-1,1], with volume 8/3 and with 5th node in center.
+    # The reference pyramid in ferrite spans [0,1] × [0,1] × [0,1], with volume 1/3 and with 5th node in corner.
+    # Here we map thequadrature points to the pyramid defined in Ferrite.
+    f1(x,y,z) = (0.5(x+1.0), 0.5(y+1.0), 0.5(z+1.0)) #Shrink pyramid and translate
+    f2(x,y,z) = (x-0.5z, y-0.5z, z)                  #Skew 5th node to be above first node
+    f3(x,y,z) = f2(f1(x,y,z)...)
 
     for i in axes(xw, 1)
         x,y,z,w = xw[i,:]
-        x,y,z = f1(x,y,z)
-        x,y,z = f2(x,y,z)
+        x,y,z = f3(x,y,z)
 
         xw[i, 1] = x
         xw[i, 2] = y
