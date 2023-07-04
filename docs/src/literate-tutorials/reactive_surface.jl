@@ -235,7 +235,11 @@ vtk_save(pvd);
 end
 
 ## This parametrization gives the spot pattern shown in the gif above.
+if false #src
 gray_scott_sphere(0.06, 0.062, 10.0, 32000.0)
+else #src
+gray_scott_sphere(0.06, 0.062, 10.0, 20.0)
+end #src
 
 #md # ## [Plain program](@id reactive_surface-plain-program)
 #md #
