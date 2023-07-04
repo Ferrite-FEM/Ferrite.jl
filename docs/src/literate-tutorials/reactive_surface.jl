@@ -226,7 +226,7 @@ end
 if false #src
 gray_scott_sphere(0.06, 0.062, 10.0, 32000.0)
 else #src
-gray_scott_sphere(0.06, 0.062, 10.0, 20.0)
+gray_scott_sphere(0.06, 0.062, 10.0, 20.0) #src
 end #src
 
 #md # ## [Plain program](@id reactive_surface-plain-program)
