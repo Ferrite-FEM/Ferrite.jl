@@ -36,6 +36,8 @@ for. The document is organized as follows[^1]:
 
 [^1]: The organization of the document follows the [Diátaxis Framework](https://diataxis.fr).
 
+In addition there is a [**Code gallery**](gallery/), with user contributed example programs,
+and the [**Developer documentation**](devdocs/), for documentation of Ferrite internal code.
 
 ## Getting started
 

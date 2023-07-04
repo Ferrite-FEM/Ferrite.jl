@@ -34,20 +34,15 @@ include("generate.jl")
         "Tutorials" => [
             "Tutorials overview" => "tutorials/index.md",
             "tutorials/heat_equation.md",
-            "tutorials/postprocessing.md",
-            "tutorials/helmholtz.md",
+            "tutorials/linear_elasticity.md",
             "tutorials/incompressible_elasticity.md",
             "tutorials/hyperelasticity.md",
-            "tutorials/threaded_assembly.md",
             "tutorials/plasticity.md",
             "tutorials/transient_heat_equation.md",
-            "tutorials/landau.md",
-            "tutorials/linear_shell.md",
-            "tutorials/quasi_incompressible_hyperelasticity.md",
-            "tutorials/ns_vs_diffeq.md",
             "tutorials/computational_homogenization.md",
             "tutorials/stokes-flow.md",
-            "tutorials/topology_optimization.md",
+            "tutorials/ns_vs_diffeq.md",
+            "tutorials/linear_shell.md",
         ],
         "Topic guides" => [
             "Topic guide overview" => "topics/index.md",
@@ -73,7 +68,17 @@ include("generate.jl")
         ],
         "How-to guides" => [
             "How-to guide overview" => "howto/index.md",
+            "howto/postprocessing.md",
+            "howto/threaded_assembly.md",
         ],
+        "gallery/index.md",
+        # "Code gallery" => [
+        #     "Code gallery overview" => "gallery/index.md",
+        #     "gallery/helmholtz.md",
+        #     "gallery/quasi_incompressible_hyperelasticity.md",
+        #     "gallery/landau.md",
+        #     "gallery/topology_optimization.md",
+        # ],
         "devdocs/index.md",
         ],
 )
@@ -81,6 +86,15 @@ include("generate.jl")
 # make sure there are no *.vtu files left around from the build
 @timeit dto "remove vtk files" cd(joinpath(@__DIR__, "build", "tutorials")) do
     foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
+end
+
+# Insert some <br> in the side menu
+for (root, _, files) in walkdir(joinpath(@__DIR__, "build")), file in joinpath.(root, files)
+    endswith(file, ".html") || continue
+    str = read(file, String)
+    # Insert <br> after "Reference" (before "Code gallery")
+    str = replace(str, r"""(<li(?: class="is-active")?><a class="tocitem" href(?:="[\./\w]+")?>Code gallery</a></li>)""" => s"<br>\1")
+    write(file, str)
 end
 
 
