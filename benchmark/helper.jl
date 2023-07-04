@@ -8,6 +8,8 @@ function geo_types_for_spatial_dim(spatial_dim)
     spatial_dim == 3 && return [Tetrahedron, Hexahedron] # Quadratic* not yet functional in 3D. 3D triangle missing. Embedded also missing.
 end
 
+getrefshape(::Type{T}) where {refshape, T <: Ferrite.AbstractCell{refshape}} = refshape
+
 end
 
 
@@ -16,7 +18,7 @@ module FerriteAssemblyHelper
 using Ferrite
 
 # Minimal Ritz-Galerkin type local assembly loop.
-function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, cellvalues::CellValues{<: Ferrite.InterpolationByDim{dim}}, f_shape, f_test, op) where {dim}
+function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, cellvalues::CellValues, f_shape, f_test, op)
     n_basefuncs = getnbasefunctions(cellvalues)
 
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -38,7 +40,7 @@ function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.Abstract
     Ke
 end
 
-function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, facevalues::FaceValues{<: Ferrite.InterpolationByDim{dim}}, f_shape, f_test, op) where {dim}
+function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, facevalues::FaceValues, f_shape, f_test, op)
     n_basefuncs = getnbasefunctions(facevalues)
 
     f = zeros(n_basefuncs)
@@ -92,7 +94,7 @@ function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.Abstra
     Ke
 end
 
-function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, facevalues_shape::FaceValues{<: Ferrite.InterpolationByDim{dim}}, f_shape, facevalues_test::FaceValues{<: Ferrite.InterpolationByDim{dim}}, f_test, op) where {dim}
+function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, facevalues_shape::FaceValues, f_shape, facevalues_test::FaceValues, f_test, op)
     n_basefuncs_shape = getnbasefunctions(facevalues_shape)
     n_basefuncs_test = getnbasefunctions(facevalues_test)
 

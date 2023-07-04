@@ -11,7 +11,7 @@ for spatial_dim ∈ [3]# 1:3
     for geo_type ∈ FerriteBenchmarkHelper.geo_types_for_spatial_dim(spatial_dim)
         NUMBERING_SUITE["spatial-dim",spatial_dim][string(geo_type)] = BenchmarkGroup()
 
-        ref_type = geo_type.super.parameters[1]
+        ref_type = FerriteBenchmarkHelper.getrefshape(geo_type)
 
         for grid_size ∈ [2]#[3, 6, 9] #multiple grid sized to estimate computational complexity...
             NUMBERING_SUITE["spatial-dim",spatial_dim][string(geo_type)]["grid-size-",grid_size] = BenchmarkGroup()
@@ -28,7 +28,6 @@ for spatial_dim ∈ [3]# 1:3
 
                     # Skip over elements which are not implemented
                     ξ_dummy = Vec{spatial_dim}(ntuple(x->0.0, spatial_dim))
-                    !applicable(Ferrite.shape_value, ip, ξ_dummy, 1) && continue
                     !applicable(Ferrite.shape_value, ip, ξ_dummy, 1) && continue
 
                     NUMBERING_FIELD_DIM_SUITE["Lagrange",order] = BenchmarkGroup()
