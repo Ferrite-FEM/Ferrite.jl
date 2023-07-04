@@ -1,4 +1,4 @@
-# # [Time Dependent Problems](@id tutorial-transient-heat-equation)
+# # [Transient heat equation](@id tutorial-transient-heat-equation)
 #
 # ![](transient_heat.gif)
 # ![](transient_heat_colorbar.svg)

@@ -168,7 +168,7 @@ function constitutive_driver(C, mp::NeoHooke)
     return S, ∂S∂C
 end;
 
-# ## Newton's Method
+# ## Newton's method
 #
 # As mentioned above, to deal with the non-linear weak form we first linearize
 # the problem such that we can apply Newton's method, and then apply the FEM to

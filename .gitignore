@@ -11,6 +11,8 @@ docs/build/
 docs/site/
 docs/src/examples/
 docs/src/tutorials/
+docs/src/howto/
+docs/src/gallery/
 *.DS_Store
 /Manifest.toml
 /test/coverage/Manifest.toml
