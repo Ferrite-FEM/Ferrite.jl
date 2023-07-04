@@ -682,6 +682,29 @@ function addnodeset!(grid::AbstractGrid, name::String, f::Function)
 end
 
 """
+    getcoordinates(grid::AbstractGrid, idx::Union{Int,CellIndex,FaceIndex})
+    getcoordinates(cache::CellCache)
+    
+Get a vector with the coordinates of the *cell* corresponding to `idx` or `cache`
+"""
+function getcoordinates end
+
+"""
+    getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, idx_or_cell::Union{Int,CellIndex,FaceIndex,AbstractCell})
+    
+Mutate `x` to the coordinates of the *cell* corresponding to `idx_or_cell` or `cache`
+"""
+function getcoordinates! end
+
+"""
+    get_node_coordinate(grid::AbstractGrid, n::Int)
+    get_node_coordinate(node::Node)
+
+Return the coordinate of `node`, or the `n`th node in `grid`
+"""
+function get_node_coordinate end
+
+"""
     get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::Int)
     get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::AbstractCell)
 
