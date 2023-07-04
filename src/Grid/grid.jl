@@ -1451,7 +1451,7 @@ function transfer_point_cell_to_face(point::Union{Vec{1, Float64}, Vector{Float6
     x = point[]
     face == 1 && return Vec(-x)
     face == 2 && return Vec( x)
-    error("NO")
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 """
@@ -1463,7 +1463,7 @@ function transfer_point_cell_to_face(point::Union{Vec{2, Float64}, Vector{Float6
     face == 2 && return Vec( y)
     face == 3 && return Vec( x)
     face == 4 && return Vec( y)
-    error("NO")
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 """
@@ -1474,7 +1474,7 @@ function transfer_point_cell_to_face(point::Union{Vec{2, Float64}, Vector{Float6
     face == 1 && return Vec( x * 2 - 1.0)
     face == 2 && return Vec( y * 2 - 1.0)
     face == 3 && return Vec( x * 2 - 1.0)
-    error("NO")
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 """
@@ -1486,7 +1486,7 @@ function transfer_point_cell_to_face(point::Union{Vec{3, Float64}, Vector{Float6
     face == 2 && return Vec( x,  z)
     face == 3 && return Vec( x,  y)
     face == 4 && return Vec( y,  z)
-    error("NO")
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 """
@@ -1500,7 +1500,7 @@ function transfer_point_cell_to_face(point::Union{Vec{3, Float64}, Vector{Float6
     face == 4 && return Vec(-x,  z)
     face == 5 && return Vec( z,  y)
     face == 6 && return Vec( x,  y)
-    error("NO")
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 
@@ -1510,7 +1510,7 @@ Mapping from to 0D node to 1D line vertex.
 function transfer_point_face_to_cell(point::Union{Vec{1, Float64}, Vector{Float64}}, cell::AbstractCell{RefLine}, face::Int)
     face == 1 && return Vec( -1.0)
     face == 2 && return Vec( 1.0)
-    error("NO")
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 """
@@ -1522,7 +1522,7 @@ function transfer_point_face_to_cell(point::Union{Vec{1, Float64}, Vector{Float6
     face == 2 && return Vec( 1.0, x)
     face == 3 && return Vec( x, 1.0)
     face == 4 && return Vec( -1.0, x)
-    error("NO")
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 """
@@ -1533,7 +1533,7 @@ function transfer_point_face_to_cell(point::Union{Vec{1, Float64}, Vector{Float6
     face == 1 && return Vec( x, 1.0 - x)
     face == 2 && return Vec( 0.0, x)
     face == 3 && return Vec( x, 0.0)
-    error("NO")
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 """
@@ -1545,7 +1545,7 @@ function transfer_point_face_to_cell(point::Union{Vec{2, Float64}, Vector{Float6
     face == 2 && return Vec( x,  0.0,  y)
     face == 3 && return Vec( x,  y,  1.0-x-y)
     face == 4 && return Vec( 0.0,  x,  y)
-    error("NO")
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 """
@@ -1559,7 +1559,7 @@ function transfer_point_face_to_cell(point::Union{Vec{2, Float64}, Vector{Float6
     face == 4 && return Vec( x,  1.0,  y)
     face == 5 && return Vec(-1.0,  y,  x)
     face == 6 && return Vec( x,  y,  1.0)
-    error("NO")
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 #################################
