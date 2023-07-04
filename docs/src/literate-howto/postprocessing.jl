@@ -1,4 +1,4 @@
-# # [Postprocessing](@id tutorial-postprocessing)
+# # [Post processing and visualization](@id howto-postprocessing)
 #
 # ![](heat_square_fluxes.png)
 #
@@ -40,7 +40,7 @@
 # ## Implementation
 #
 # Start by simply running the Heat equation example to solve the problem
-include("heat_equation.jl");
+include("../tutorials/heat_equation.jl");
 
 
 # Next we define a function that computes the heat flux for each integration point in the domain.

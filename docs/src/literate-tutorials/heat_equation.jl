@@ -1,4 +1,4 @@
-# # [Heat Equation](@id tutorial-heat-equation)
+# # [Heat equation](@id tutorial-heat-equation)
 #
 # ![](heat_square.png)
 #

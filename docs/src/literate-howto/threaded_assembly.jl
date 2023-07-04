@@ -1,4 +1,4 @@
-# # [Threaded Assembly](@id tutorial-threaded-assembly)
+# # [Multi-threaded assembly](@id tutorial-threaded-assembly)
 #
 #-
 #md # !!! tip
