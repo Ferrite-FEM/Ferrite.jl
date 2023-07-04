@@ -12,7 +12,7 @@ for spatial_dim ∈ [2]
 
     geo_type = Quadrilateral
     grid = generate_grid(geo_type, ntuple(x->2, spatial_dim));
-    ref_type = FerriteBenchmarkHelper.default_refshape(geo_type)
+    ref_type = geo_type.super.parameters[1]
     ip_geo = Ferrite.default_interpolation(geo_type)
     order = 2
 

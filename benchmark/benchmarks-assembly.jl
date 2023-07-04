@@ -13,8 +13,8 @@ for spatial_dim ∈ 1:3
         COMMON_LOCAL_ASSEMBLY["spatial-dim",spatial_dim][string(geo_type)] = BenchmarkGroup()
 
         grid = generate_grid(geo_type, tuple(repeat([1], spatial_dim)...));
-        ref_type = FerriteBenchmarkHelper.default_refshape(geo_type)
         ip_geo = Ferrite.default_interpolation(geo_type)
+        ref_type = geo_type.super.parameters[1]
 
         # Nodal interpolation tests
         for order ∈ 1:2, ip_type ∈ [Lagrange, Serendipity]
@@ -23,7 +23,7 @@ for spatial_dim ∈ 1:3
             ip_vectorized = ip^spatial_dim
 
             # Skip over elements which are not implemented
-            !applicable(Ferrite.value, ip, 1, ξ_dummy) && continue
+            !applicable(Ferrite.shape_value, ip, ξ_dummy, 1) && continue
 
             qr = QuadratureRule{ref_type}(2*order-1)
 
@@ -33,7 +33,7 @@ for spatial_dim ∈ 1:3
             LAGRANGE_SUITE["fe-values"] = BenchmarkGroup()
             LAGRANGE_SUITE["ritz-galerkin"] = BenchmarkGroup()
             LAGRANGE_SUITE["petrov-galerkin"] = BenchmarkGroup()
-            
+
             # Note: at the time of writing this PR the ctor makes the heavy lifting and caches important values.
             LAGRANGE_SUITE["fe-values"]["scalar"] = @benchmarkable CellValues($qr, $ip, $ip_geo);
             LAGRANGE_SUITE["fe-values"]["vector"] = @benchmarkable CellValues($qr, $ip_vectorized, $ip_geo);

@@ -8,8 +8,6 @@ function geo_types_for_spatial_dim(spatial_dim)
     spatial_dim == 3 && return [Tetrahedron, Hexahedron] # Quadratic* not yet functional in 3D. 3D triangle missing. Embedded also missing.
 end
 
-default_refshape(t::Type{C}) where {C <: Ferrite.AbstractCell} = typeof(Ferrite.default_interpolation(t)).parameters[1]
-
 end
 
 
