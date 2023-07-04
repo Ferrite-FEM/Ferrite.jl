@@ -1,4 +1,4 @@
-# # Ginzburg-Landau model energy minimization
+# # [Ginzburg-Landau model energy minimization](@id tutorial-ginzburg-landau-minimizer)
 
 # ![landau_orig.png](landau_orig.png)
 
