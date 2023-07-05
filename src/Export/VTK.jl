@@ -254,21 +254,21 @@ function write_nodeset(vtks::VTKStream, nodeset::String)
 end
 
 """
-    write_cellset(vtk)
-    write_cellset(vtk, cellset::String)
-    write_cellset(vtk, cellsets::Union{AbstractVector{String},AbstractSet{String})
+    write_cellset(vtks)
+    write_cellset(vtks, cellset::String)
+    write_cellset(vtks, cellsets::Union{AbstractVector{String},AbstractSet{String})
 
 Export all cell sets in the grid with name according to their keys and 
 celldata 1 if the cell is in the set, and 0 otherwise. It is also possible to 
 only export a single `cellset`, or multiple `cellsets`. 
 """
-function write_cellset(vtks::VTKStream, cellsets=keys(grid.cellsets))
+function write_cellset(vtks, cellsets=keys(getcellsets(getgrid(vtks))))
     grid = getgrid(vtks)
     z = zeros(getncells(grid))
     for cellset in cellsets
         z .= 0.0
         z[collect(getcellset(grid, cellset))] .= 1.0
-        vtk_cell_data(vtks.vtk, z, cellset)
+        write_celldata(vtks, z, cellset)
     end
     return vtks
 end
@@ -280,13 +280,12 @@ write_cellset(vtks::VTKStream, cellset::String) = write_cellset(vtks, [cellset])
 Saves the dirichlet boundary conditions to a vtkfile.
 Values will have a 1 where bcs are active and 0 otherwise
 """
-function write_dirichlet(vtks::VTKStream, ch::ConstraintHandler)
+function write_dirichlet(vtks, ch::ConstraintHandler)
     
     if getgrid(vtks) !== ch.dh.grid 
-        @warn("The grid saved in VTKStream and ConstraintHandler are not aliased, no checks are performed to ensure that they are equal")
+        @warn("The grid saved in $(typeof(vtks)) and ConstraintHandler are not aliased, no checks are performed to ensure that they are equal")
     end
-    vtkfile = vtks.vtk
-
+    
     unique_fields = []
     for dbc in ch.dbcs
         push!(unique_fields, dbc.field_name)
@@ -315,7 +314,24 @@ function write_dirichlet(vtks::VTKStream, ch::ConstraintHandler)
                 end
             end
         end
-        WriteVTK.vtk_point_data(vtkfile, data, string(field, "_bc"))
+        write_nodedata(vtks, data, string(field, "_bc"))
     end
     return vtks
+end
+
+"""
+    write_cell_colors(vtks::VTKStream, cell_colors, name="coloring")
+
+Write cell colors (see [`create_coloring`](@ref)) to a VTK file for visualization.
+
+In case of coloring a subset, the cells which are not part of the subset are represented as color 0.
+"""
+function write_cell_colors(vtks, cell_colors::AbstractVector{<:AbstractVector{<:Integer}}, name="coloring")
+    color_vector = zeros(Int, getncells(getgrid(vtks)))
+    for (i, cells_color) in enumerate(cell_colors)
+        for cell in cells_color
+            color_vector[cell] = i
+        end
+    end
+    write_celldata(vtks, color_vector, name)
 end

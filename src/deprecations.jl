@@ -71,6 +71,7 @@ import WriteVTK: vtk_grid, vtk_cell_data, vtk_point_data, vtk_save
 @deprecate vtk_point_data(vtks::VTKStream, ch::ConstraintHandler) write_dirichlet(vtks, ch)
 @deprecate vtk_cellset(vtks::VTKStream, grid::AbstractGrid, args...) write_cellset(vtks, args...)
 @deprecate vtk_nodeset(vtks::VTKStream, grid::AbstractGrid, args...) write_nodeset(vtks, args...)
+@deprecate vtk_cell_data_colors(vtks::VTKStream, args...) write_cell_colors(vtks, args...)
 @deprecate vtk_save(vtks::VTKStream) close(vtks)
 
 # Give better warning than produced by the @deprecate alternative
