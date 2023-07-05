@@ -19,19 +19,12 @@ struct EntityNeighborhood{T<:Union{BoundaryIndex,CellIndex}}
 end
 
 EntityNeighborhood(info::T) where T <: BoundaryIndex = EntityNeighborhood([info])
-Base.zero(::Type{EntityNeighborhood{T}}) where T = EntityNeighborhood(T[])
-Base.zero(::Type{EntityNeighborhood}) = EntityNeighborhood(BoundaryIndex[])
 Base.length(n::EntityNeighborhood) = length(n.neighbor_info)
 Base.getindex(n::EntityNeighborhood,i) = getindex(n.neighbor_info,i)
 Base.firstindex(n::EntityNeighborhood) = 1
 Base.lastindex(n::EntityNeighborhood) = length(n.neighbor_info)
 Base.:(==)(n1::EntityNeighborhood, n2::EntityNeighborhood) = n1.neighbor_info == n2.neighbor_info
 Base.iterate(n::EntityNeighborhood, state=1) = iterate(n.neighbor_info,state)
-
-function Base.:+(n1::EntityNeighborhood{T1}, n2::EntityNeighborhood{T2}) where {T1 <:Union{BoundaryIndex,CellIndex}, T2 <:Union{BoundaryIndex,CellIndex}}
-    neighbor_info = [n1.neighbor_info; n2.neighbor_info]
-    return EntityNeighborhood(neighbor_info)
-end
 
 function Base.show(io::IO, ::MIME"text/plain", n::EntityNeighborhood)
     if length(n) == 0
