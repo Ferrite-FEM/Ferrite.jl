@@ -1,5 +1,5 @@
 """
-    create_sparsity_pattern(dh::DofHandler; coupling, topology::Union{Nothing, AbstractTopology}, elements_coupling)
+    create_sparsity_pattern(dh::DofHandler; coupling, [topology::Union{Nothing, AbstractTopology}], [elements_coupling])
 
 Create the sparsity pattern corresponding to the degree of freedom
 numbering in the [`DofHandler`](@ref). Return a `SparseMatrixCSC`
@@ -10,6 +10,8 @@ handler couple to each other. `coupling` and `elements_coupling` should be squar
 number of rows/columns equal to the total number of fields, or total number of components,
 in the DofHandler with `true` if fields are coupled and `false` if
 not. By default full coupling is assumed inside the element with no coupling between elements.
+
+If `topology` and `elements_coupling` are passed, dof of fields with discontinuous interpolations are coupled between elements according to `elements_coupling`.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
@@ -101,52 +103,62 @@ function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatri
 end
 
 """
+    _add_elements_coupling(coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, sym, keep_constrained, ch, cnt, I, J)
+
+Helper function used to mutate `I` and `J` to add cross-element coupling.
+"""
+function _add_elements_coupling(coupling_sdh::Matrix{Bool}, dof_i::Int, dof_j::Int,
+        cell_field_dofs::Union{Vector{Int}, SubArray}, neighbor_field_dofs::Union{Vector{Int}, SubArray},
+        i::Int, j::Int, sym::Bool, keep_constrained::Bool, ch::Union{ConstraintHandler, Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
+
+    coupling_sdh[dof_i, dof_j] || return cnt
+    dofi = cell_field_dofs[i]
+    dofj = neighbor_field_dofs[j]
+    sym && (dofj > dofi && return cnt)
+    !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && return cnt
+    cnt += 1
+    _add_or_grow(cnt, I, J, dofi, dofj) 
+    return cnt
+end
+
+"""
     cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
 
-Mutates `I, J` to account for cross-element coupling in fields with discontinuous interpolations.
+Mutates `I, J` to account for cross-element coupling in fields with discontinuous interpolations by calling [`_add_elements_coupling`](@ref).
 Returns the updated value of `cnt`.
 
 Used internally for sparsity patterns with discontinuous interpolations.
 """
-function cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
+function cross_element_coupling!(dh::DofHandler, ch::Union{ConstraintHandler, Nothing}, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::AbstractVector{<:AbstractMatrix{Bool}}, cnt::Int, I::Vector{Int}, J::Vector{Int})
+    cc1 = CellCache(dh, UpdateFlags(false, false, true))
+    cc2 = CellCache(dh, UpdateFlags(false, false, true))
+    neighborhood = getdim(dh.grid.cells[1]) > 1 ? topology.cell_face_neighbor : topology.cell_neighbor
     for (sdh_idx, sdh) in pairs(dh.subdofhandlers)
         # Buffering interpolation information for type stability/better allocations
-        ip_infos = InterpolationInfo[]
-        nbasefunctions = Int[]
-        for ip in sdh.field_interpolations
-            ip_info = InterpolationInfo(ip)
-            push!(ip_infos, ip_info)
-            push!(nbasefunctions, getnbasefunctions(ip))
-        end
-        isnothing(couplings) || (coupling_sdh = couplings[sdh_idx])
-        for (cell_field_i, cell_field) in enumerate(sdh.field_names)
+        ip_infos = [InterpolationInfo(ip) for ip in sdh.field_interpolations]
+        coupling_sdh = couplings[sdh_idx]
+        for (cell_field_i, cell_field) in pairs(sdh.field_names)
             fii = ip_infos[cell_field_i]
             # Couple element for discontinuous interpolations only
             fii.is_discontinuous || continue
-            for cell_idx in eachindex(getcells(dh.grid))
+            for cell_idx in BitSet(sdh.cellset)
                 # Making sure current field is defined for current cell
-                cell_field ∈ dh.subdofhandlers[dh.cell_to_subdofhandler[cell_idx]].field_names || continue
                 dofrange1 = dof_range(sdh, cell_field)
-                cell_dofs = celldofsview(dh, cell_idx)
-                cell_field_dofs = @view cell_dofs[dofrange1]
+                reinit!(cc1, cell_idx)
+                cell_field_dofs = @view cc1.dofs[dofrange1]
                 # For 1D case, cells must share faces to be neighbors. Otherwise use cell_face_neighbor for higher dimensions
-                for neighbor_cell in (getdim(dh.grid.cells[cell_idx]) >1 ? topology.cell_face_neighbor[cell_idx] : topology.cell_neighbor[cell_idx])
+                for neighbor_cell in neighborhood[cell_idx]
+                    sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[neighbor_cell.idx]]
                     for (neighbor_field_i, neighbor_field) in enumerate(sdh.field_names)
                         fii2 = ip_infos[neighbor_field_i]
-                        sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[neighbor_cell.idx]]
                         neighbor_field ∈ sdh2.field_names && fii2.is_discontinuous || continue
                         dofrange2 = dof_range(sdh2, neighbor_field)
-                        neighbor_dofs = celldofsview(dh, neighbor_cell.idx)
-                        neighbor_field_dofs = @view neighbor_dofs[dofrange2]
+                        reinit!(cc2, neighbor_cell.idx)
+                        neighbor_field_dofs = @view cc2.dofs[dofrange2]
                         # Typical coupling procedure
-                        for (j, dof_j) in enumerate(dofrange2), (i, dof_i) in enumerate(dofrange1)
-                            isnothing(couplings) || coupling_sdh[dof_i, dof_j] || continue
-                            dofi = cell_field_dofs[i]
-                            dofj = neighbor_field_dofs[j]
-                            sym && (dofi > dofj && continue)
-                            !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && continue
-                            cnt += 1
-                            _add_or_grow(cnt, I, J, dofi, dofj)
+                        for (j, dof_j) in pairs(dofrange2), (i, dof_i) in pairs(dofrange1)
+                            cnt = _add_elements_coupling(coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, sym, keep_constrained, ch, cnt, I, J)
+                            cnt = _add_elements_coupling(coupling_sdh, dof_j, dof_i, neighbor_field_dofs, cell_field_dofs, j, i, sym, keep_constrained, ch, cnt, I, J)
                         end
                     end
                 end
@@ -181,7 +193,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
             coupling_sdh = couplings[sdh_idx]
             count(coupling_sdh[i, j] for i in 1:n for j in (sym ? i : 1):n)
         end
-        has_discontinuous_ip = any(ip -> is_discontinuous(ip),sdh.field_interpolations)
+        has_discontinuous_ip = has_discontinuous_ip || any(ip -> is_discontinuous(ip),sdh.field_interpolations)
         max_buffer_length += entries_per_cell * length(set)
     end
     I = Vector{Int}(undef, max_buffer_length)
@@ -209,7 +221,9 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
             end
         end
     end
-    has_discontinuous_ip && !isnothing(elements_coupling) && any(elements_coupling, dims=[1,2])[] && (cnt = cross_element_coupling!(dh,topology,sym, keep_constrained, elements_couplings, cnt, I, J))
+    if has_discontinuous_ip && !isnothing(topology) && !isnothing(elements_coupling) && any(elements_coupling)
+       cnt = cross_element_coupling!(dh, ch, topology, sym, keep_constrained, elements_couplings, cnt, I, J)
+    end
     # Always add diagonal entries
     resize!(I, cnt + ndofs(dh))
     resize!(J, cnt + ndofs(dh))
