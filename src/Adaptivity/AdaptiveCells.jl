@@ -287,18 +287,6 @@ function refine!(octree::OctreeBWG{dim,N,M,T}, pivot_octant::OctantBWG{dim,N,M,T
     end
 end
 
-function refine_all(forest::ForestBWG,l)
-   for tree in forest.cells
-      for leaf in tree.leaves
-          if leaf.l != l-1 #maxlevel
-              continue
-          else
-              refine!(tree,leaf)
-          end
-      end
-   end
-end
-
 function coarsen!(octree::OctreeBWG{dim,N,M,T}, o::OctantBWG{dim,N,M,T}) where {dim,N,M,T<:Integer}
     _two = T(2)
     leave_idx = findfirst(x->x==o,octree.leaves)
@@ -396,6 +384,10 @@ end
     ForestBWG{dim, C<:AbstractAdaptiveCell, T<:Real} <: AbstractAdaptiveGrid{dim}
 `p4est` adaptive grid implementation based on Burstedde, Wilcox, Ghattas [2011]
 and Isaac, Burstedde, Wilcox, Ghattas [2015]
+
+## Constructor
+    ForestBWG(grid::AbstractGrid{dim}, b=_maxlevel[dim-1]) where dim
+Builds an adaptive grid based on a non-adaptive one `grid` and a given max refinement level `b`.
 """
 struct ForestBWG{dim, C<:OctreeBWG, T<:Real} <: AbstractAdaptiveGrid{dim}
     cells::Vector{C}
@@ -424,6 +416,28 @@ function ForestBWG(grid::AbstractGrid{dim},b=_maxlevel[dim-1]) where dim
     edgesets = getedgesets(grid)
     vertexsets = getvertexsets(grid)
     return ForestBWG(cells,nodes,cellsets,nodesets,facesets,edgesets,vertexsets,topology)
+end
+
+function refine_all(forest::ForestBWG,l)
+   for tree in forest.cells
+      for leaf in tree.leaves
+          if leaf.l != l-1 #maxlevel
+              continue
+          else
+              refine!(tree,leaf)
+          end
+      end
+   end
+end
+
+function coarsen_all(forest::ForestBWG)
+    for tree in forest.cells
+        for leaf in tree.leaves
+            if child_id(leaf,tree.b) == 1
+                coarsen!(tree,leaf)
+            end
+        end
+    end
 end
 
 getneighborhood(forest::ForestBWG,idx) = getneighborhood(forest.topology,forest,idx)
@@ -465,6 +479,13 @@ end
 
 getcelltype(grid::ForestBWG) = eltype(grid.cells)
 getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells) # assume for now same cell type TODO
+
+"""
+    transform_pointBWG(forest, vertices) -> Vector{Vec{dim}}
+    transform_pointBWG(forest::ForestBWG{dim}, k::Integer, vertex::NTuple{dim,T}) where {dim,T} -> Vec{dim}
+
+Transformation of a octree coordinate system point `vertex` (or a collection `vertices`) to the corresponding physical coordinate system.
+"""
 function transform_pointBWG(forest::ForestBWG{dim}, k::Integer, vertex::NTuple{dim,T}) where {dim,T}
     tree = forest.cells[k]
     cellnodes = getnodes(forest,collect(tree.nodes)) .|> get_node_coordinate
@@ -608,6 +629,26 @@ function descendants(octant::OctantBWG{dim,N,M,T}, b::Integer=_maxlevel[dim-1]) 
     return OctantBWG(l1,octant.xyz), OctantBWG(l2,octant.xyz .+ (h-one(T)))
 end
 
+"""
+    face_neighbor(octant::OctantBWG{dim,N,M,T}, f::T, b::T=_maxlevel[2]) -> OctantBWG{3,N,M,T}
+Intraoctree face neighbor for a given faceindex `f` (in p4est, i.e. z order convention) and specified maximum refinement level `b`.
+Implements Algorithm 5 of BWG p4est paper.
+
+    x-------x-------x
+    |       |       |
+    |   3   |   4   |
+    |       |       |
+    x-------x-------x
+    |       |       |
+    o   1   *   2   |
+    |       |       |
+    x-------x-------x
+
+Consider octant 1 at `xyz=(0,0)`, a maximum refinement level of 1 and faceindex 2 (marked as `*`).
+Then, the computed face neighbor will be octant 2 with `xyz=(1,0)`.
+Note that the function is not sensitive in terms of leaving the octree boundaries.
+For the above example, a query for face index 1 (marked as `o`) will return an octant outside of the octree with `xyz=(-1,0)`.
+"""
 function face_neighbor(octant::OctantBWG{3,N,M,T}, f::T, b::T=_maxlevel[2]) where {N,M,T<:Integer}
     l = octant.l
     h = T(_compute_size(b,octant.l))
@@ -627,7 +668,26 @@ function face_neighbor(octant::OctantBWG{2,N,M,T}, f::T, b::T=_maxlevel[1]) wher
 end
 face_neighbor(o::OctantBWG{dim,N,M,T1}, f::T2, b::T3) where {dim,N,M,T1<:Integer,T2<:Integer,T3<:Integer} = face_neighbor(o,T1(f),T1(b))
 
-#TODO: this is working for 2D except rotation, 3D I don't know
+"""
+    transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) -> OctantBWG{dim,N,M,T2}
+Interoctree coordinate transformation of an given octant `o` to the octree `k` coordinate system by virtually pushing `o`s coordinate system through `k`'s face `f`.
+Implements Algorithm 8 of BWG p4est paper.
+
+    x-------x-------x
+    |       |       |
+    |   3   |   4   |
+    |       |       |
+    x-------x-------x
+    |       |       |
+    |   1   *   2   |
+    |       |       |
+    x-------x-------x
+
+Consider 4 octrees with a single leaf each and a maximum refinement level of 1
+This function transforms octant 1 into the coordinate system of octant 2 by specifying `k=2` and `f=1`.
+While in the own octree coordinate system octant 1 is at `xyz=(0,0)`, the returned and transformed octant is located at `xyz=(-2,0)`
+TODO: this is working for 2D except rotation, 3D I don't know
+"""
 function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) where {dim,N,M,T1<:Integer,T2<:Integer}
     _one = one(T2)
     _two = T2(2)

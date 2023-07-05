@@ -191,28 +191,8 @@ end
     ####uniform refinement and coarsening for all cells and levels####
     ##################################################################
     adaptive_grid = ForestBWG(grid,8)
-    function refine_all(grid::ForestBWG,l)
-        for tree in adaptive_grid.cells
-           for leaf in tree.leaves
-               if leaf.l != l-1 #maxlevel
-                   continue
-               else
-                   Ferrite.refine!(tree,leaf)
-               end
-           end
-        end
-    end
-    function coarsen_all(adaptive_grid)
-        for tree in adaptive_grid.cells
-            for leaf in tree.leaves
-                if Ferrite.child_id(leaf,tree.b) == 1
-                    Ferrite.coarsen!(tree,leaf)
-                end
-            end
-        end
-    end
     for l in 1:8
-        refine_all(adaptive_grid,l)
+        Ferrite.refine_all(adaptive_grid,l)
         for tree in adaptive_grid.cells
             @test all(Ferrite.morton.(tree.leaves,l,8) == collect(1:2^(2*l)))
         end
@@ -224,7 +204,7 @@ end
     end
     #now go back from finest to coarsest
     for l in 7:-1:0
-        coarsen_all(adaptive_grid)
+        Ferrite.coarsen_all(adaptive_grid)
         for tree in adaptive_grid.cells
             @test all(Ferrite.morton.(tree.leaves,l,8) == collect(1:2^(2*l)))
         end
@@ -255,14 +235,14 @@ end
     adaptive_grid = ForestBWG(grid,5)
     #go from coarsest to finest uniformly
     for l in 1:5
-        refine_all(adaptive_grid,l)
+        Ferrite.refine_all(adaptive_grid,l)
         for tree in adaptive_grid.cells
             @test all(Ferrite.morton.(tree.leaves,l,5) == collect(1:2^(3*l)))
         end
     end
     #now go back from finest to coarsest
     for l in 4:-1:0
-        coarsen_all(adaptive_grid)
+        Ferrite.coarsen_all(adaptive_grid)
         for tree in adaptive_grid.cells
             @test all(Ferrite.morton.(tree.leaves,l,5) == collect(1:2^(3*l)))
         end
@@ -270,22 +250,11 @@ end
 end
 
 @testset "ForestBWG AbstractGrid Interfacing" begin
-    function refine_all(grid::ForestBWG,l)
-        for tree in adaptive_grid.cells
-           for leaf in tree.leaves
-               if leaf.l != l-1 #maxlevel
-                   continue
-               else
-                   Ferrite.refine!(tree,leaf)
-               end
-           end
-        end
-    end
     maxlevel = 3
     grid = generate_grid(Quadrilateral,(2,2))
     adaptive_grid = ForestBWG(grid,maxlevel)
     for l in 1:maxlevel
-        refine_all(adaptive_grid,l)
+        Ferrite.refine_all(adaptive_grid,l)
         @test getncells(adaptive_grid) == 2^(2*l) * 4 == length(getcells(adaptive_grid))
     end
 end
