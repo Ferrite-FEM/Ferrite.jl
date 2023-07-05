@@ -31,12 +31,10 @@ function OctantBWG(dim::Integer, l::T, m::T, b::T=_maxlevel[dim-1]) where T <: I
         y = y | (h*((m-_one) & _two^(dim*i+_one))÷_two^((dim-_one)*i+_one))
         z = z | (h*((m-_one) & _two^(dim*i+_two))÷_two^((dim-_one)*i+_two))
     end
-    if dim == 2
-        OctantBWG{dim,4,4,T}(l,(x,y))
-    elseif dim == 3
-        OctantBWG{dim,8,6,T}(l,(x,y,z))
+    if dim < 3
+        OctantBWG{2,4,4,T}(l,(x,y))
     else
-        error("$dim Dimension not supported")
+        OctantBWG{3,8,6,T}(l,(x,y,z))
     end
 end
 
@@ -45,9 +43,7 @@ OctantBWG(dim::Int,l::Int,m::Int,b::Int32) = OctantBWG(dim,Int32(l),Int32(m),b)
 OctantBWG(dim::Int,l::Int32,m::Int,b::Int32) = OctantBWG(dim,l,Int32(m),b)
 OctantBWG(level::Int,coords::NTuple) = OctantBWG(Int32(level),Int32.(coords))
 OctantBWG(level::Int32,coords::NTuple) = OctantBWG(level,Int32.(coords))
-function OctantBWG(level::Int32, coords::NTuple{dim,Int32}) where dim
-    dim == 2 ? OctantBWG{2,4,4,Int32}(level,coords) : OctantBWG{3,8,6,Int32}(level,coords)
-end
+OctantBWG(level::Int32, coords::NTuple{dim,Int32}) where dim = OctantBWG{dim,2^dim,2*dim,Int32}(level,coords)
 
 # From BWG 2011
 # > The octant coordinates are stored as integers of a fixed number b of bits,
@@ -79,10 +75,12 @@ morton(octant::OctantBWG{dim,N,M,T1},l::T2,b::T3) where {dim,N,M,T1<:Integer,T2<
 
 Base.zero(::Type{OctantBWG{3, 8, 6}}) = OctantBWG(3, 0, 1)
 Base.zero(::Type{OctantBWG{2, 4, 4}}) = OctantBWG(2, 0, 1)
-root(dim::T) where T<:Integer = zero(OctantBWG{dim,dim^2,2*dim})
+root(dim::T) where T<:Integer = zero(OctantBWG{dim,2^dim,2*dim})
 
-ncorners(::Type{OctantBWG{dim,N,M,T}}) where {dim,N,M,T} = N
+ncorners(::Type{OctantBWG{dim,N,M,T}}) where {dim,N,M,T} = N # TODO change to how many corners
 ncorners(o::OctantBWG) = ncorners(typeof(o))
+nnodes(::Type{OctantBWG{dim,N,M,T}}) where {dim,N,M,T} = N
+nnodes(o::OctantBWG) = ncorners(typeof(o))
 nchilds(::Type{OctantBWG{dim,N,M,T}}) where {dim,N,M,T} = N
 nchilds(o::OctantBWG) = nchilds(typeof(o))# Follow z order, x before y before z for faces, edges and corners
 
@@ -146,7 +144,7 @@ function vertices(octant::OctantBWG{dim},b::Integer) where {dim}
     return ntuple(i->vertex(octant,i,b),_nvertices)
 end
 
-vertex(octant::OctantBWG, f::OctantFaceIndex, b::Integer) = vertex(octant,f.idx,b)
+face(octant::OctantBWG, f::OctantFaceIndex, b::Integer) = face(octant,f.idx,b)
 function face(octant::OctantBWG{2}, f::Integer, b::Integer)
     cornerid = view(𝒱₂,f,:)
     return ntuple(i->vertex(octant, cornerid[i], b),2)
@@ -162,7 +160,7 @@ function faces(octant::OctantBWG{dim}, b::Integer) where dim
     return ntuple(i->face(octant,i,b),_nfaces)
 end
 
-vertex(octant::OctantBWG, e::OctantEdgeIndex, b::Integer) = vertex(octant,e.idx,b)
+edge(octant::OctantBWG, e::OctantEdgeIndex, b::Integer) = edge(octant,e.idx,b)
 function edge(octant::OctantBWG{3}, e::Integer, b::Integer)
     cornerid = view(𝒰,e,:)
     return ntuple(i->vertex(octant,cornerid[i], b),2)
@@ -418,7 +416,7 @@ function ForestBWG(grid::AbstractGrid{dim},b=_maxlevel[dim-1]) where dim
     return ForestBWG(cells,nodes,cellsets,nodesets,facesets,edgesets,vertexsets,topology)
 end
 
-function refine_all(forest::ForestBWG,l)
+function refine_all!(forest::ForestBWG,l)
    for tree in forest.cells
       for leaf in tree.leaves
           if leaf.l != l-1 #maxlevel
@@ -430,7 +428,7 @@ function refine_all(forest::ForestBWG,l)
    end
 end
 
-function coarsen_all(forest::ForestBWG)
+function coarsen_all!(forest::ForestBWG)
     for tree in forest.cells
         for leaf in tree.leaves
             if child_id(leaf,tree.b) == 1
@@ -497,9 +495,10 @@ end
 transform_pointBWG(forest, vertices) = transform_pointBWG.((forest,), first.(vertices), last.(vertices))
 
 #TODO: this function should wrap the LNodes Iterator of IBWG2015
-#TODO: need 𝒱₃ perm tables
-function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
+function createsnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     nodes = Set{Tuple{Int,NTuple{dim,Int32}}}()
+    _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
+    _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     for (k,tree) in enumerate(forest.cells)
         for leaf in tree.leaves
             _vertices = vertices(leaf,tree.b)
@@ -521,7 +520,7 @@ function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
         end
         _faces = faces(root(dim),tree.b)
         for (fi,f) in enumerate(_faces) # fi in p4est notation
-            face_neighbor =  forest.topology.face_neighbor[k,𝒱₂_perm[fi]]
+            face_neighbor =  forest.topology.face_neighbor[k,_perm[fi]]
             if length(face_neighbor) == 0
                 continue
             end
@@ -532,7 +531,7 @@ function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                         if fi < 3
                             if v[1] == f[1][1] == f[2][1]
                                 cache_octant = OctantBWG(leaf.l,v)
-                                cache_octant = transform_face(forest,k′,𝒱₂_perm_inv[face_neighbor[1][2]],cache_octant) # after transform
+                                cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
                                 if (k′,cache_octant.xyz) ∈ nodes
                                     delete!(nodes,(k,v))
                                 end
@@ -540,16 +539,15 @@ function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                         elseif fi < 5
                             if v[2] == f[1][2] == f[2][2]
                                 cache_octant = OctantBWG(leaf.l,v)
-                                cache_octant = transform_face(forest,k′,𝒱₂_perm_inv[face_neighbor[1][2]],cache_octant) # after transform
+                                cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
                                 if (k′,cache_octant.xyz) ∈ nodes
                                     delete!(nodes,(k,v))
                                 end
                             end
                         else
-                            @error "help"
                             if v[3] == f[1][3] == f[2][3]
                                 cache_octant = OctantBWG(leaf.l,v)
-                                cache_octant = transform_face(forest,k′,𝒱₂_perm_inv[face_neighbor[1][2]],cache_octant) # after transform
+                                cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
                                 if (k′,cache_octant.xyz) ∈ nodes
                                     delete!(nodes,(k,v))
                                 end
@@ -559,8 +557,138 @@ function getnodes(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                 end
             end
         end
+        if dim > 2
+            #TODO add egede dupplication check
+        end
     end
-    return nodes
+    return collect(nodes)
+end
+
+#TODO unfinished, isreplaced logic fails
+function creategridFB23(forest::ForestBWG{dim}) where dim
+    celltype = dim < 3 ? Quadrilateral : Hexahedron
+    opposite_corner = dim < 3 ? opposite_corner_2 : opposite_corner_3
+    opposite_face = dim < 3 ? opposite_face_2 : opposite_face_3
+    leaves = [Dict{Tuple{Int,Int},celltype}() for i in 1:length(forest.cells)]
+    isreplaced = zeros(Bool,getncells(forest)*nnodes(forest.cells[1]))
+    pivot_nodeid = 1
+    for (k,tree) in enumerate(forest.cells)
+        for leaf in tree.leaves
+            mortonid = morton(leaf,tree.b,tree.b)
+            _nnodes = nnodes(leaf)
+            leaves[k][(leaf.l,mortonid)] = celltype(ntuple(i->pivot_nodeid+i-1,_nnodes))
+            pivot_nodeid += _nnodes
+        end
+    end
+    for (k,tree) in enumerate(forest.cells)
+        for leaf in tree.leaves
+            leaf_mortonid = morton(leaf,tree.b,tree.b)
+            leaf_vertices = vertices(leaf,tree.b)
+            leaf_faces = faces(leaf,tree.b)
+            leaf_nodes = leaves[k][(leaf.l,leaf_mortonid)].nodes
+            for local_nodeid in 1:nnodes(leaf)
+                node_neighbor = corner_neighbor(leaf, local_nodeid, tree.b)
+                if !inside(tree,node_neighbor)
+                    #TODO interoctree :)
+                    continue
+                end
+                if node_neighbor.l == tree.b
+                    candidates = (parent(node_neighbor,tree.b), node_neighbor)
+                elseif node_neighbor.l == 0
+                    continue
+                else
+                    candidates = (parent(node_neighbor,tree.b), node_neighbor, children(node_neighbor,tree.b)[opposite_corner[local_nodeid]])
+                end
+                for candidate in candidates
+                    candidate_mortonid = morton(candidate,tree.b,tree.b)
+                    owner = leaf_mortonid < candidate_mortonid
+                    if !owner
+                        continue
+                    end
+                    if haskey(leaves[k],(candidate.l,candidate_mortonid))
+                        v = vertex(candidate, opposite_corner[local_nodeid], tree.b)
+                        if v == leaf_vertices[local_nodeid]
+                            candidate_nodes = leaves[k][(candidate.l,candidate_mortonid)].nodes
+                            isreplaced[candidate_nodes[opposite_corner[local_nodeid]]] = true
+                            altered_nodetuple = replace(candidate_nodes,candidate_nodes[opposite_corner[local_nodeid]] => leaf_nodes[local_nodeid])
+                            leaves[k][(candidate.l,candidate_mortonid)] = celltype(altered_nodetuple)
+                        end
+                    end
+                end
+            end
+            for local_faceid in 1:2*dim #true for all hypercubes
+                _face_neighbor = face_neighbor(leaf, local_faceid, tree.b)
+                if !inside(tree, _face_neighbor)
+                    #TODO interoctree :)
+                    continue
+                end
+                if _face_neighbor.l == tree.b
+                    candidates = (parent(_face_neighbor,tree.b), _face_neighbor)
+                elseif _face_neighbor.l == 0
+                    continue
+                else
+                    kidz = children(_face_neighbor,tree.b)
+                    if local_faceid < 3
+                        small_c1 = kidz[opposite_face[local_faceid]]
+                        small_c2 = OctantBWG(dim,small_c1.l,morton(small_c1,small_c1.l,tree.b)+2,tree.b)
+                    else #TODO add 3D case
+                        small_c1 = kidz[opposite_face[local_faceid]]
+                        small_c2 = OctantBWG(dim,small_c1.l,morton(small_c1,small_c1.l,tree.b)+1,tree.b)
+                    end
+                    if _face_neighbor.l - 1 != 0
+                        candidates = (parent(_face_neighbor,tree.b), _face_neighbor, small_c1, small_c2)
+                    else
+                        candidates = (_face_neighbor, small_c1, small_c2)
+                    end
+                end
+                for candidate in candidates
+                    candidate_mortonid = morton(candidate,tree.b,tree.b)
+                    owner = leaf_mortonid < candidate_mortonid
+                    if !owner
+                        continue
+                    end
+                    if haskey(leaves[k],(candidate.l,candidate_mortonid))
+                        neighbor_face = face(candidate, opposite_face[local_faceid], tree.b)
+                        pivot_face = leaf_faces[local_faceid]
+                        contributing_nodes = @view 𝒱₂[local_faceid,:]
+                        contributing_nodes_opposite = @view 𝒱₂[opposite_face[local_faceid],:]
+                        if neighbor_face[1] == pivot_face[1] && neighbor_face[2] == pivot_face[2]
+                            candidate_nodes = leaves[k][(candidate.l,candidate_mortonid)].nodes
+                            altered_nodetuple = candidate_nodes
+                            if candidate_nodes[contributing_nodes_opposite[1]] != leaf_nodes[contributing_nodes[1]]
+                                #isreplaced[candidate_nodes[contributing_nodes_opposite[1]]] = true
+                                altered_nodetuple = replace(altered_nodetuple,candidate_nodes[contributing_nodes_opposite[1]] => leaf_nodes[contributing_nodes[1]])
+                            end
+                            if candidate_nodes[contributing_nodes_opposite[2]] != leaf_nodes[contributing_nodes[2]]
+                                #isreplaced[candidate_nodes[contributing_nodes_opposite[2]]] = true
+                                altered_nodetuple = replace(altered_nodetuple,candidate_nodes[contributing_nodes_opposite[2]] => leaf_nodes[contributing_nodes[2]])
+                            end
+                            leaves[k][(candidate.l,candidate_mortonid)] = celltype(altered_nodetuple)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    shift = zeros(Int,length(isreplaced))
+    for (id,r) in enumerate(isreplaced)
+        if id == 1
+            continue
+        end
+        if r
+            shift[id] = shift[id-1] + 1
+        else
+            shift[id] = shift[id-1]
+        end
+    end
+    for k in 1:length(leaves)
+        for ((l,m),cell) in leaves[k]
+            old_nodes = cell.nodes
+            new_nodes = ntuple(n->old_nodes[n]-shift[old_nodes[n]],length(old_nodes))
+            leaves[k][(l,m)] = celltype(new_nodes)
+        end
+    end
+    return leaves
 end
 
 function Base.show(io::IO, ::MIME"text/plain", agrid::ForestBWG)
@@ -693,8 +821,9 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2
     _two = T2(2)
     #currently rotation not encoded
     perm = (dim == 2 ? 𝒱₂_perm : 𝒱₃_perm)
+    _perminv = (dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv)
     kprime, fprime = getneighborhood(forest,FaceIndex(k,perm[f]))[1]
-    fprime = 𝒱₂_perm_inv[fprime]
+    fprime = _perminv[fprime]
     sprime = _one - (((f - _one) & _one) ⊻ ((fprime - _one) & _one))
     s = zeros(T2,3)
     b = zeros(T2,3)
@@ -936,6 +1065,13 @@ const 𝒱₃_perm = [2
                  1
                  6]
 
+const 𝒱₃_perm_inv = [5
+                     1
+                     3
+                     2
+                     4
+                     6]
+
 const ℛ = [1  2  2  1  1  2
            3  1  1  2  2  1
            3  1  1  2  2  1
@@ -955,3 +1091,29 @@ const 𝒫 = [1  2  3  4
            3  4  1  2
            4  2  3  1
            4  3  2  1]
+
+const opposite_corner_2 = [4,
+                           3,
+                           2,
+                           1]
+
+const opposite_corner_3 = [8,
+                           7,
+                           6,
+                           5,
+                           4,
+                           3,
+                           2,
+                           1]
+
+const opposite_face_2 = [2,
+                         1,
+                         4,
+                         3]
+
+const opposite_face_3 = [2,
+                         1,
+                         4,
+                         3,
+                         6,
+                         5,]

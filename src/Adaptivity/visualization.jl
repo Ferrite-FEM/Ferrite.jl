@@ -1,6 +1,6 @@
 function visualize_grid(forest::ForestBWG{dim}) where dim
     fig = GLMakie.Figure()
-    ax = GLMakie.Axis(fig[1,1])
+    ax = dim < 3 ? GLMakie.Axis(fig[1,1]) : GLMakie.LScene(fig[1,1])
     for tree in forest.cells
         for leaf in tree.leaves
             cellnodes = getnodes(forest,collect(tree.nodes)) .|> get_node_coordinate |> collect
@@ -16,10 +16,18 @@ function visualize_grid(forest::ForestBWG{dim}) where dim
             center = sum(octant_physical_coordinates,dims=1) ./ 4
             #GLMakie.scatter!(ax,center,color=:black,markersize=25)
             facetable = dim == 2 ? Ferrite.𝒱₂ : Ferrite.𝒱₃
-            for faceids in eachrow(facetable)                
-                x = octant_physical_coordinates[faceids,1] + (octant_physical_coordinates[faceids,1] .- center[1])*0.02
-                y = octant_physical_coordinates[faceids,2] + (octant_physical_coordinates[faceids,2] .- center[2])*0.02
-                GLMakie.lines!(ax,x,y,color=:black)
+            for faceids in eachrow(facetable)
+                if dim < 3
+                    x = octant_physical_coordinates[faceids,1] + (octant_physical_coordinates[faceids,1] .- center[1])*0.02
+                    y = octant_physical_coordinates[faceids,2] + (octant_physical_coordinates[faceids,2] .- center[2])*0.02
+                    GLMakie.lines!(ax,x,y,color=:black)
+                else
+                    faceids = [faceids[1], faceids[2], faceids[4], faceids[3]]
+                    x = octant_physical_coordinates[faceids,1] + (octant_physical_coordinates[faceids,1] .- center[1])*0.02
+                    y = octant_physical_coordinates[faceids,2] + (octant_physical_coordinates[faceids,2] .- center[2])*0.02
+                    z = octant_physical_coordinates[faceids,3] + (octant_physical_coordinates[faceids,3] .- center[3])*0.02
+                    GLMakie.lines!(ax,x,y,z,color=:black)
+                end
             end
         end
     end
