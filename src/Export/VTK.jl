@@ -47,7 +47,7 @@ end
 
 isopen(vtks::VTKStream) = WriteVTK.isopen(vtks.vtk)
 
-function show(io::IO, ::MIME"text/plain", vtks::VTKStream)
+function Base.show(io::IO, ::MIME"text/plain", vtks::VTKStream)
     open_str = isopen(vtk) ? "open" : "closed"
     if isa(vtks.grid_or_dh, DofHandler)
         dh_string = "DofHandler"
