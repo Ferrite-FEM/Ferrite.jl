@@ -81,15 +81,45 @@ cell_to_vtkcell(::Type{SerendipityQuadraticQuadrilateral}) = VTKCellTypes.VTK_QU
 
 cell_to_vtkcell(::Type{Hexahedron}) = VTKCellTypes.VTK_HEXAHEDRON
 cell_to_vtkcell(::Type{SerendipityQuadraticHexahedron}) = VTKCellTypes.VTK_QUADRATIC_HEXAHEDRON
+cell_to_vtkcell(::Type{QuadraticHexahedron}) = VTKCellTypes.VTK_TRIQUADRATIC_HEXAHEDRON
 cell_to_vtkcell(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
 cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
 
 nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
+nodes_to_vtkorder(cell::QuadraticHexahedron) = [
+    cell.nodes[1], # faces
+    cell.nodes[2],
+    cell.nodes[3],
+    cell.nodes[4],
+    cell.nodes[5],
+    cell.nodes[6],
+    cell.nodes[7],
+    cell.nodes[8],
+    cell.nodes[9], # edges
+    cell.nodes[10],
+    cell.nodes[11],
+    cell.nodes[12],
+    cell.nodes[13],
+    cell.nodes[14],
+    cell.nodes[15],
+    cell.nodes[16],
+    cell.nodes[17],
+    cell.nodes[18],
+    cell.nodes[19],
+    cell.nodes[20],
+    cell.nodes[25], # faces
+    cell.nodes[23],
+    cell.nodes[22],
+    cell.nodes[24],
+    cell.nodes[21],
+    cell.nodes[26],
+    cell.nodes[27], # interior
+]
 
 function create_vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; kwargs...) where {dim,C,T}
     cls = MeshCell[]
-    for cell in grid.cells
+    for cell in getcells(grid)
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
         push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
     end
@@ -97,7 +127,7 @@ function create_vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; kwargs..
     return vtk_grid(filename, coords, cls; kwargs...)
 end
 function create_vtk_grid(filename::AbstractString, dh::AbstractDofHandler; kwargs...)
-    create_vtk_grid(filename, dh.grid; kwargs...)
+    create_vtk_grid(filename, get_grid(dh); kwargs...)
 end
 
 function toparaview!(v, x::Vec{D}) where D
@@ -146,7 +176,7 @@ function _vtk_write_solution(vtkfile, dh, u::Vector, suffix)
     fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
 
     for name in fieldnames
-        data = reshape_to_nodes(dh, u, name)
+        data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
         _vtk_write_nodedata(vtkfile, data, string(name, suffix))
     end
     return nothing
@@ -175,12 +205,12 @@ end
 Write `vals` that have been projected with `proj` to the vtk file in `vtks`
 """
 function write_projected(vtks::VTKStream, proj::L2Projector, vals, name)
-    if getgrid(vtks) !== proj.dh.grid
+    if getgrid(vtks) !== get_grid(proj.dh)
         @warn("The grid saved in VTKStream and L2Projector are not aliased, no checks are performed to ensure that they are equal")
     end
-    nodedata = reshape_to_nodes(proj, vals)
-    @assert size(nodedata, 2) == getnnodes(proj.dh.grid)
-    _vtk_write_nodedata(vtks.vtk, nodedata, name; component_names=get_component_names(eltype(vals)))
+    data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
+    @assert size(data, 2) == getnnodes(get_grid(proj.dh))
+    _vtk_write_nodedata(vtks.vtk, data, name; component_names=get_component_names(eltype(vals)))
     return vtks
 end
 
@@ -265,13 +295,13 @@ function write_dirichlet(vtks::VTKStream, ch::ConstraintHandler)
 
     for field in unique_fields
         nd = getfielddim(ch.dh, field)
-        data = zeros(Float64, nd, getnnodes(ch.dh.grid))
+        data = zeros(Float64, nd, getnnodes(get_grid(ch.dh)))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
             if eltype(dbc.faces) <: BoundaryIndex
                 functype = boundaryfunction(eltype(dbc.faces))
                 for (cellidx, faceidx) in dbc.faces
-                    for facenode in functype(ch.dh.grid.cells[cellidx])[faceidx]
+                    for facenode in functype(getcells(get_grid(ch.dh), cellidx))[faceidx]
                         for component in dbc.components
                             data[component, facenode] = 1
                         end
@@ -287,5 +317,5 @@ function write_dirichlet(vtks::VTKStream, ch::ConstraintHandler)
         end
         WriteVTK.vtk_point_data(vtkfile, data, string(field, "_bc"))
     end
-    return vtkfile
+    return vtks
 end

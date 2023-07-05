@@ -1,20 +1,30 @@
 # generate examples
 import Literate
 
-EXAMPLEDIR = joinpath(@__DIR__, "src", "literate")
-GENERATEDDIR = joinpath(@__DIR__, "src", "examples")
-mkpath(GENERATEDDIR)
+# Tutorials
+TUTORIALS_IN = joinpath(@__DIR__, "src", "literate-tutorials")
+TUTORIALS_OUT = joinpath(@__DIR__, "src", "tutorials")
+mkpath(TUTORIALS_OUT)
+
+# How-to guides
+HOWTO_IN = joinpath(@__DIR__, "src", "literate-howto")
+HOWTO_OUT = joinpath(@__DIR__, "src", "howto")
+mkpath(HOWTO_OUT)
+
+# Code gallery
+GALLERY_IN = joinpath(@__DIR__, "src", "literate-gallery")
+GALLERY_OUT = joinpath(@__DIR__, "src", "gallery")
+mkpath(GALLERY_OUT)
 
 # Download some assets
 include("download_resources.jl")
 
 # Run Literate on all examples
-@timeit dto "Literate." for example in readdir(EXAMPLEDIR)
-    if endswith(example, ".jl")
-        input = abspath(joinpath(EXAMPLEDIR, example))
-        name = basename(input)
+@timeit dto "Literate." for (IN, OUT) in [(TUTORIALS_IN, TUTORIALS_OUT), (HOWTO_IN, HOWTO_OUT), (GALLERY_IN, GALLERY_OUT)], program in readdir(IN; join=true)
+    name = basename(program)
+    if endswith(program, ".jl")
         if !liveserver
-            script = @timeit dto "script()" @timeit dto name Literate.script(input, GENERATEDDIR)
+            script = @timeit dto "script()" @timeit dto name Literate.script(program, OUT)
             code = strip(read(script, String))
         else
             code = "<< no script output when building as draft >>"
@@ -34,22 +44,24 @@ include("download_resources.jl")
         end
 
         @timeit dto "markdown()" @timeit dto name begin
-            Literate.markdown(input, GENERATEDDIR, postprocess = mdpost)
+            Literate.markdown(program, OUT, postprocess = mdpost)
         end
         if !liveserver
             @timeit dto "notebook()"  @timeit dto name begin
-                Literate.notebook(input, GENERATEDDIR, preprocess = nbpre, execute = is_ci) # Don't execute locally
+                Literate.notebook(program, OUT, preprocess = nbpre, execute = is_ci) # Don't execute locally
             end
         end
-    elseif any(endswith.(example, [".png", ".jpg", ".gif"]))
-        cp(joinpath(EXAMPLEDIR, example), joinpath(GENERATEDDIR, example); force=true)
+    elseif any(endswith.(program, [".png", ".jpg", ".gif"]))
+        cp(program, joinpath(OUT, name); force=true)
     else
-        @warn "ignoring $example"
+        @warn "ignoring $program"
     end
 end
 
 # remove any .vtu files in the generated dir (should not be deployed)
-@timeit dto "remove vtk files" cd(GENERATEDDIR) do
-    foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
-    foreach(file -> endswith(file, ".pvd") && rm(file), readdir())
+@timeit dto "remove vtk files" for dir in [TUTORIALS_OUT, HOWTO_OUT, GALLERY_OUT]
+    cd(dir) do
+        foreach(file -> endswith(file, ".vtu") && rm(file), readdir())
+        foreach(file -> endswith(file, ".pvd") && rm(file), readdir())
+    end
 end

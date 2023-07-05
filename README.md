@@ -13,7 +13,7 @@ A simple finite element toolbox written in Julia.
 
 ## Documentation
 
-[![][docs-dev-img]][docs-dev-url]
+[![][docs-stable-img]][docs-stable-url]
 
 ## Installation
 You can install Ferrite from the Pkg REPL:
@@ -28,11 +28,10 @@ welcome. See [CONTRIBUTING](CONTRIBUTING.md) for more details.
 
 ## Questions
 
-If you have questions about Ferrite.jl you're welcome to reach out to us on the Julia Slack
-under `#ferrite-fem` or on Zulip under `#Ferrite.jl` ([links to Slack and
-Zulip][community]). Alternatively you can start a [new discussion][gh-discussion] in the
-discussion forum on the repository. Feel free to ask us even if you are not sure the problem
-is with Ferrite.jl.
+If you have questions about Ferrite.jl you're welcome to reach out to us on the [Julia
+Slack][julia-slack] under `#ferrite-fem` or on [Zulip][julia-zulip] under `#Ferrite.jl`.
+Alternatively you can start a [new discussion][gh-discussion] in the discussion forum on the
+repository. Feel free to ask us even if you are not sure the problem is with Ferrite.jl.
 
 If you encounter what you think is a bug please report it, see
 [CONTRIBUTING.md](CONTRIBUTING.md#reporting-issues) for more information.
@@ -43,9 +42,10 @@ Please keep in mind that we are part of the Julia community and adhere to the
 [Julia Community Standards][standards].
 
 
-[docs-dev-img]: https://img.shields.io/badge/docs-latest%20release-blue
-[docs-dev-url]: http://ferrite-fem.github.io/Ferrite.jl/
+[docs-stable-img]: https://img.shields.io/badge/docs-latest%20release-blue
+[docs-stable-url]: http://ferrite-fem.github.io/Ferrite.jl/
 
 [standards]: https://julialang.org/community/standards/
-[community]: https://julialang.org/community/
+[julia-slack]: https://julialang.org/slack/
+[julia-zulip]: https://julialang.zulipchat.com/
 [gh-discussion]: https://github.com/Ferrite-FEM/Ferrite.jl/discussions/new
