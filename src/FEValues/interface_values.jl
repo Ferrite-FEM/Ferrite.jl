@@ -255,12 +255,9 @@ for (func,                          f_,                 ) in (
     (:function_gradient_average,    :function_gradient, ),
 )
     @eval begin
-        function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector, dof_range = eachindex(u))
-            nbf_a = getnbasefunctions(iv.face_values_a)
-            dof_range_here = dof_range[dof_range .<= nbf_a]
-            dof_range_there = dof_range[dof_range .> nbf_a]
-            f_value_here = $(f_)(iv, qp, u, dof_range_here; use_element_a = true)
-            f_value_there = $(f_)(iv, qp, u, dof_range_there; use_element_a = false)
+        function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
+            f_value_here = $(f_)(iv, qp, u_a, dof_range_a, use_element_a = true)
+            f_value_there = $(f_)(iv, qp, u_b, dof_range_b, use_element_a = false)
             fv = iv.face_values_a
             result = 0.5 * f_value_here 
             fv = iv.face_values_b
@@ -268,9 +265,9 @@ for (func,                          f_,                 ) in (
             return result
         end
         # TODO: Deprecate this, nobody is using this in practice...
-        function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector{<:Vec})
-            f_value_here = $(f_)(iv, qp, u; use_element_a = true)
-            f_value_there = $(f_)(iv, qp, u; use_element_a = false)
+        function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector{<:Vec}, u_b::AbstractVector{<:Vec})
+            f_value_here = $(f_)(iv, qp, u_a, use_element_a = true)
+            f_value_there = $(f_)(iv, qp, u_b, use_element_a = false)
             fv = iv.face_values_a
             result = 0.5 * f_value_here
             fv = iv.face_values_b
@@ -285,12 +282,9 @@ for (func,                          f_,                 ) in (
     (:function_gradient_jump,       :function_gradient, ),
 )
     @eval begin
-        function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector, dof_range = eachindex(u), normal_dotted::Bool = true)
-            nbf_a = getnbasefunctions(iv.face_values_a)
-            dof_range_here = dof_range[dof_range .<= nbf_a]
-            dof_range_there = dof_range[dof_range .> nbf_a]
-            f_value_here = $(f_)(iv, qp, u, dof_range_here; use_element_a = true)
-            f_value_there = $(f_)(iv, qp, u, dof_range_there; use_element_a = false)
+        function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b), normal_dotted::Bool = true)
+            f_value_here = $(f_)(iv, qp, u_a, dof_range_a, use_element_a = true)
+            f_value_there = $(f_)(iv, qp, u_b, dof_range_b, use_element_a = false)
             multiplier = getnormal(iv, qp, true)
             result = f_value_here isa Number || multiplier isa Number ? f_value_here * multiplier : f_value_here ⋅ multiplier
             multiplier = getnormal(iv, qp, false)
@@ -299,9 +293,9 @@ for (func,                          f_,                 ) in (
             return result
         end
         # TODO: Deprecate this, nobody is using this in practice...
-        function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector{<:Vec}, normal_dotted::Bool = true)
-            f_value_here = $(f_)(iv, qp, u; use_element_a = true)
-            f_value_there = $(f_)(iv, qp, u; use_element_a = false)
+        function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector{<:Vec}, u_b::AbstractVector{<:Vec}, normal_dotted::Bool = true)
+            f_value_here = $(f_)(iv, qp, u_a, use_element_a = true)
+            f_value_there = $(f_)(iv, qp, u_b, use_element_a = false)
             multiplier = getnormal(iv, qp, true)
             result = f_value_here isa Number || multiplier isa Number ? f_value_here * multiplier : f_value_here ⋅ multiplier
             multiplier = getnormal(iv, qp, false)

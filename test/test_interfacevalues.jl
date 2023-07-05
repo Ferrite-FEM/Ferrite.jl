@@ -83,19 +83,27 @@
             @test_throws ErrorException("Invalid base function $(n_basefuncs + 1). Interface has only $(n_basefuncs) base functions") shape_gradient_average(iv, 1, n_basefuncs + 1)
 
             # Test function* copied from facevalues tests
-            nbf_a = getnbasefunctions(iv.face_values_a)
+            nbf_a = Ferrite.getngeobasefunctions(iv.face_values_a)
+            nbf_b = Ferrite.getngeobasefunctions(iv.face_values_b)
             for use_element_a in (true, false)
-                u = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1:n_basefunc_base]
-                u_scal = zeros(n_basefunc_base)
+                u_a = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1: nbf_a]
+                u_b = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1: nbf_b]
+                u_scal_a = zeros(nbf_a)
+                u_scal_b = zeros(nbf_b)
                 H = rand(Tensor{2, ndim})
                 V = rand(Tensor{1, ndim})
-                for i in 1:n_basefunc_base
-                    xs = i <= nbf_a ? cell_a_coords : cell_b_coords
-                    j = i <= nbf_a ? i : i -nbf_a
-                    u[i] = H ⋅ xs[j]
-                    u_scal[i] = V ⋅ xs[j]
+                for i in 1:nbf_a
+                    xs = cell_a_coords
+                    u_a[i] = H ⋅ xs[i]
+                    u_scal_a[i] = V ⋅ xs[i]
                 end
-                u_vector = reinterpret(Float64, u)
+                for i in 1:nbf_b
+                    xs = cell_b_coords
+                    u_b[i] = H ⋅ xs[i]
+                    u_scal_b[i] = V ⋅ xs[i]
+                end
+                u = use_element_a ? u_a : u_b
+                u_scal = use_element_a ? u_scal_a : u_scal_b
                 for i in 1:getnquadpoints(iv)
                     @test function_gradient(iv, i, u, use_element_a = use_element_a) ≈ H
                     @test function_symmetric_gradient(iv, i, u, use_element_a = use_element_a) ≈ 0.5(H + H')
@@ -104,21 +112,21 @@
                     @test function_gradient(iv, i, u_scal, use_element_a = use_element_a) ≈ V
                     ndim == 3 && @test function_curl(iv, i, u, use_element_a = use_element_a) ≈ Ferrite.curl_from_gradient(H)
 
-                    @test function_value_average(iv, i, u_scal) ≈ function_value(iv, i, u_scal, use_element_a = use_element_a)
-                    @test all(function_value_jump(iv, i, u_scal) .<= 30 * eps(Float64))
-                    @test function_gradient_average(iv, i, u_scal) ≈ function_gradient(iv, i, u_scal, use_element_a = use_element_a)
-                    @test function_gradient_jump(iv, i, u_scal) <= 30 * eps(Float64)
+                    @test function_value_average(iv, i, u_scal_a, u_scal_b) ≈ function_value(iv, i, u_scal, use_element_a = use_element_a)
+                    @test all(function_value_jump(iv, i, u_scal_a, u_scal_b) .<= 30 * eps(Float64))
+                    @test function_gradient_average(iv, i, u_scal_a, u_scal_b) ≈ function_gradient(iv, i, u_scal, use_element_a = use_element_a)
+                    @test function_gradient_jump(iv, i, u_scal_a, u_scal_b) <= 30 * eps(Float64)
 
-                    @test function_value_average(iv, i, u) ≈ function_value(iv, i, u, use_element_a = use_element_a)
-                    @test all(function_value_jump(iv, i, u) .<= 30 * eps(Float64))
-                    @test function_gradient_average(iv, i, u) ≈ function_gradient(iv, i, u, use_element_a = use_element_a)
-                    @test all(function_gradient_jump(iv, i, u) .<= 30 * eps(Float64))
+                    @test function_value_average(iv, i, u_a, u_b) ≈ function_value(iv, i, u, use_element_a = use_element_a)
+                    @test all(function_value_jump(iv, i, u_a, u_b) .<= 30 * eps(Float64))
+                    @test function_gradient_average(iv, i, u_a, u_b) ≈ function_gradient(iv, i, u, use_element_a = use_element_a)
+                    @test all(function_gradient_jump(iv, i, u_a, u_b) .<= 30 * eps(Float64))
 
                 end
                 # Test of volume
                 vol = 0.0
                 for i in 1:getnquadpoints(iv)
-                    vol += getdetJdV(iv, i; use_element_a = use_element_a)
+                    vol += getdetJdV(iv, i)
                 end
                 
                 xs = use_element_a ? cell_a_coords : cell_b_coords
