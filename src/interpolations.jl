@@ -373,7 +373,7 @@ boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
 
 Checks whether the interpolation is discontinuous (i.e. `DiscontinuousLagrange`)
 """
-is_discontinuous(::Interpolation) = false
+is_discontinuous(ip::Interpolation) = is_discontinuous(typeof(ip))
 is_discontinuous(::Type{<:Interpolation}) = false
 
 """
@@ -443,7 +443,6 @@ function shape_value(ip::DiscontinuousLagrange{shape, 0}, ::Vec{dim, T}, i::Int)
 end
 
 is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
-is_discontinuous(::DiscontinuousLagrange) = true
 
 ############
 # Lagrange #
@@ -1321,6 +1320,8 @@ function shape_value(ip::CrouzeixRaviart, ξ::Vec{2}, i::Int)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
+is_discontinuous(::Type{<:CrouzeixRaviart}) = true
+
 ##################################################
 # VectorizedInterpolation{<:ScalarInterpolation} #
 ##################################################
@@ -1386,5 +1387,4 @@ end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
 
-is_discontinuous(ipv::VectorizedInterpolation) = is_discontinuous(ipv.ip)
-is_discontinuous(::Type{<:VectorizedInterpolation{vdim, refshape, order, ip}}) where {vdim, refshape, order, ip<:DiscontinuousLagrange}= is_discontinuous(ip)
+is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)

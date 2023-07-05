@@ -662,4 +662,11 @@ end
         all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, elements_coupling = elements_coupling)
         check_coupling(dh, topology, K, coupling, elements_coupling)
     end
+
+    # Testing Crouzeix-Raviart coupling
+    grid = generate_grid(Triangle, (2, 1))
+    topology = ExclusiveTopology(grid)
+    dh = DofHandler(grid)
+    add!(dh, :u, CrouzeixRaviart{RefTriangle,1}())
+    close!(dh)
 end
