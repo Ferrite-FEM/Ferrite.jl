@@ -1,6 +1,5 @@
 @testset "InterfaceValues" begin
     function test_interfacevalues(grid, topology, dim, ip_a, qr_a, ip_b = ip_a, qr_b = deepcopy(qr_a))
-        n_basefunc_base = getnbasefunctions(ip_a) + getnbasefunctions(ip_b)
         iv = Ferrite.InterfaceValues(grid, qr_a, ip_a; quad_rule_b = qr_b, func_interpol_b = ip_b)
         ndim = Ferrite.getdim(ip_a)
         n_basefuncs = getnbasefunctions(ip_a) + getnbasefunctions(ip_b)
@@ -148,6 +147,11 @@
             faces_indicies = Ferrite.faces(cell |> typeof|> Ferrite.default_interpolation |> Ferrite.getrefshape)
             node_ids = Ferrite.get_node_ids(cell)
             @test getindex.(Ref(node_ids), collect.(faces_indicies)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
+        end
+        @testset "error paths" begin
+            cell = getcells(grid, 1)
+            @test_throws "Face index 100 exceeds the number of faces for a cell of type $(typeof(cell))" Ferrite.transfer_point_cell_to_face([0.0 for _ in 1 : dim], cell, 100)
+            @test_throws "Face index 100 exceeds the number of faces for a cell of type $(typeof(cell))" Ferrite.transfer_point_face_to_cell([0.0 for _ in 1 : (dim > 1 ? dim-1 : 1)], cell, 100)
         end
         for func_interpol in (scalar_interpol,#= VectorizedInterpolation(scalar_interpol)=#)
             test_interfacevalues(grid, topology, dim, scalar_interpol, quad_rule)
