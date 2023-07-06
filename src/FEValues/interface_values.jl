@@ -44,11 +44,9 @@ and function on the interfaces of finite elements.
 """
 InterfaceValues
 
-struct InterfaceValues{IP_a, N_t_a, dNdx_t_a, dNdξ_t_a, T_a, dMdξ_t_a, QR_a, Normal_t_a, GIP_a,
-    IP_b, N_t_b, dNdx_t_b, dNdξ_t_b, T_b, dMdξ_t_b, QR_b, Normal_t_b, GIP_b,
-    dim, C} <: AbstractValues
-    face_values_a::FaceValues{IP_a, N_t_a, dNdx_t_a, dNdξ_t_a, T_a, dMdξ_t_a, QR_a, Normal_t_a, GIP_a}
-    face_values_b::FaceValues{IP_b, N_t_b, dNdx_t_b, dNdξ_t_b, T_b, dMdξ_t_b, QR_b, Normal_t_b, GIP_b}
+struct InterfaceValues{FVA, FVB, dim, C} <: AbstractValues
+    face_values_a::FVA
+    face_values_b::FVB
     # used for quadrature point syncing
     grid::Grid{dim, C, Float64}
     cell_a_idx::ScalarWrapper{Int}
@@ -60,7 +58,7 @@ function InterfaceValues(grid::AbstractGrid, quad_rule_a::FaceQuadratureRule, fu
     func_interpol_b::Interpolation = func_interpol_a, geom_interpol_b::Interpolation = func_interpol_b)
     face_values_a = FaceValues(quad_rule_a, func_interpol_a, geom_interpol_a)
     face_values_b = FaceValues(quad_rule_b, func_interpol_b, geom_interpol_b)
-    return InterfaceValues{typeof(face_values_a).parameters..., typeof(face_values_b).parameters..., getdim(grid), getcelltype(grid)}(face_values_a, face_values_b, grid, ScalarWrapper(0), ScalarWrapper(0), ScalarWrapper(InterfaceOrientationInfo(false, Float64.(I(1)))))
+    return InterfaceValues{typeof(face_values_a), typeof(face_values_b), getdim(grid), getcelltype(grid)}(face_values_a, face_values_b, grid, ScalarWrapper(0), ScalarWrapper(0), ScalarWrapper(InterfaceOrientationInfo(false, Float64.(I(1)))))
 end
 
 """

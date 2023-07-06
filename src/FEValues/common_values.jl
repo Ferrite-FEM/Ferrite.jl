@@ -187,7 +187,7 @@ end
 
 # TODO: Implement fallback or require this to be defined?
 #       Alt: shape_value_type(cv) = typeof(shape_value(cv, qp=1, i=1))
-shape_value_type(::Union{CellValues{<:Any, N_t}, FaceValues{<:Any, N_t}, InterfaceValues{<:Any, <:FaceValues{<:Any, N_t}}}) where N_t = N_t
+shape_value_type(::Union{CellValues{<:Any, N_t}, FaceValues{<:Any, N_t}, InterfaceValues{<:FaceValues{<:Any, N_t}}}) where N_t = N_t
 function_value_init(cv::AbstractValues, ::AbstractVector{T}) where {T} = zero(shape_value_type(cv)) * zero(T)
 
 """
@@ -425,6 +425,6 @@ for ValueType in (CellValues, FaceValues#= InterfaceValues=#)
 end
 # TODO: delete this once grid is moved to InterfaceCache
 function Base.copy(iv::InterfaceValues)
-    params = [typeof(iv.face_values_a).parameters..., typeof(iv.face_values_b).parameters..., getdim(iv.grid), getcelltype(iv.grid)]
+    params = [typeof(iv.face_values_a), typeof(iv.face_values_b), getdim(iv.grid), getcelltype(iv.grid)]
     return InterfaceValues{params...}(copy(iv.face_values_a), copy(iv.face_values_b), iv.grid, copy(iv.cell_a_idx), copy(iv.cell_b_idx), iv.ioi)
 end
