@@ -1,4 +1,4 @@
-# # von Mises plasticity
+# # [Von Mises plasticity](@id tutorial-plasticity)
 #
 # ![Shows the von Mises stress distribution in a cantilever beam.](plasticity.png)
 #

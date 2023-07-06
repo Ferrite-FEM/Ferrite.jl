@@ -1,4 +1,4 @@
-# # Stokes flow
+# # [Stokes flow](@id tutorial-stokes-flow)
 #
 # **Keywords**: *periodic boundary conditions, multiple fields, mean value constraint*
 #-
