@@ -1,4 +1,4 @@
-# # Incompressible Navier-Stokes Equations via DifferentialEquations.jl
+# # [Incompressible Navier-Stokes equations via DifferentialEquations.jl](@id tutorial-ins-ordinarydiffeq)
 #
 # ![](https://user-images.githubusercontent.com/9196588/134514213-76d91d34-19ab-47c2-957e-16bb0c8669e1.gif)
 #
@@ -24,9 +24,9 @@
 # the spatial discretization of all linear and nonlinear operators depending on $u$ and $t$,
 # but not on the time derivative of $u$.
 #
-# ## Some Theory on the Incompressible Navier-Stokes Equations
+# ## Some theory on the incompressible Navier-Stokes equations
 #
-# ### Problem Description in Strong Form
+# ### Problem description in strong form
 #
 # The incompressible Navier-Stokes equations can be stated as the system
 # ```math
@@ -107,7 +107,7 @@
 # in the implementation and only stated for clarity in this section.
 #
 #
-# ## Commented Implementation
+# ## Commented implementation
 #
 # Now we solve the problem with Ferrite and [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl). What follows is a program spliced with comments.
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).

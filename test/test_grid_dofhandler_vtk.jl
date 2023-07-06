@@ -504,7 +504,8 @@ end
         add!(dh1, :u, VectorLagrangeTest{RefLine,1,2}())
         close!(dh1)
         dh2 = DofHandler(grid)
-        add!(dh2, :u, Lagrange{RefQuadrilateral,1}()^2)
+        # TODO: Why was this RefQuadrilateral? Check it is correct to test with RefLine
+        add!(dh2, :u, Lagrange{RefLine,1}()^2)
         close!(dh2)
         @test dh1.cell_dofs == dh2.cell_dofs
 
@@ -513,7 +514,8 @@ end
         add!(dh1, :u, VectorLagrangeTest{RefLine,1,3}())
         close!(dh1)
         dh2 = DofHandler(grid)
-        add!(dh2, :u, Lagrange{RefQuadrilateral,1}()^3)
+        # TODO: Why was this RefQuadrilateral? Check it is correct to test with RefLine
+        add!(dh2, :u, Lagrange{RefLine,1}()^3)
         close!(dh2)
         @test dh1.cell_dofs == dh2.cell_dofs
     end

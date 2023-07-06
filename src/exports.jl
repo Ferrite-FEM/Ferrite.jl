@@ -114,7 +114,7 @@ export
 
 # Dofs
     DofHandler,
-    MixedDofHandler, # only for getting an error message redirecting to DofHandler
+    SubDofHandler,
     close!,
     ndofs,
     ndofs_per_cell,
@@ -125,8 +125,6 @@ export
     dof_range,
     renumber!,
     DofOrder,
-    FieldHandler,
-    Field,
     evaluate_at_grid_nodes,
     apply_analytical!,
 

@@ -1,4 +1,4 @@
-# # Incompressible Elasticity
+# # [Incompressible elasticity](@id tutorial-incompressible-elasticity)
 #
 #-
 #md # !!! tip
