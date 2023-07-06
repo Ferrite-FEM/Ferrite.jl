@@ -76,6 +76,8 @@ export
     ExclusiveTopology,
     getneighborhood,
     faceskeleton,
+    vertex_star_stencils,
+    getstencil,
     getcells,
     getncells,
     getnodes,
