@@ -495,8 +495,9 @@ end
 transform_pointBWG(forest, vertices) = transform_pointBWG.((forest,), first.(vertices), last.(vertices))
 
 #TODO: this function should wrap the LNodes Iterator of IBWG2015
-function createnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
-    nodes = Set{Tuple{Int,NTuple{dim,Int32}}}()
+function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
+    nodes = Vector{Tuple{Int,NTuple{dim,Int32}}}()
+    sizehint!(nodes,getncells(forest)*2^dim)
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     nodeids = Dict{Tuple{Int,NTuple{dim,Int32}},Int}()
@@ -516,12 +517,12 @@ function createnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     for (k,tree) in enumerate(forest.cells)
         _vertices = vertices(root(dim),tree.b)
         for (vi,v) in enumerate(_vertices)
-            vertex_neighbor =  forest.topology.vertex_neighbor[k,vi]
+            vertex_neighbor =  forest.topology.vertex_vertex_neighbor[k,vi]
             if length(vertex_neighbor) == 0
                 continue
             end
             if k > vertex_neighbor[1][1]
-                delete!(nodes,(k,v))
+                #delete!(nodes,(k,v))
                 new_v = vertex(root(dim),vertex_neighbor[1][2],tree.b)
                 new_k = vertex_neighbor[1][1]
                 nodeids[(k,v)] = nodeids[(new_k,new_v)]
@@ -530,7 +531,7 @@ function createnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
         end
         _faces = faces(root(dim),tree.b)
         for (fi,f) in enumerate(_faces) # fi in p4est notation
-            face_neighbor =  forest.topology.face_neighbor[k,_perm[fi]]
+            face_neighbor =  forest.topology.face_face_neighbor[k,_perm[fi]]
             if length(face_neighbor) == 0
                 continue
             end
@@ -543,7 +544,7 @@ function createnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                                 cache_octant = OctantBWG(leaf.l,v)
                                 cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
                                 if (k′,cache_octant.xyz) ∈ nodes
-                                    delete!(nodes,(k,v))
+                                    #delete!(nodes,(k,v))
                                     nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
                                     nodeowners[(k,v)] = (k′,cache_octant.xyz)
                                 end
@@ -553,7 +554,7 @@ function createnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                                 cache_octant = OctantBWG(leaf.l,v)
                                 cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
                                 if (k′,cache_octant.xyz) ∈ nodes
-                                    delete!(nodes,(k,v))
+                                    #delete!(nodes,(k,v))
                                     nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
                                     nodeowners[(k,v)] = (k′,cache_octant.xyz)
                                 end
@@ -563,7 +564,7 @@ function createnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                                 cache_octant = OctantBWG(leaf.l,v)
                                 cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
                                 if (k′,cache_octant.xyz) ∈ nodes
-                                    delete!(nodes,(k,v))
+                                    #delete!(nodes,(k,v))
                                     nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
                                     nodeowners[(k,v)] = (k′,cache_octant.xyz)
                                 end
@@ -577,7 +578,18 @@ function createnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             #TODO add egede dupplication check
         end
     end
-    return collect(nodes), nodeids, nodeowners
+    celltype = dim < 3 ? Quadrilateral : Hexahedron
+    cells = celltype[]
+    cellnodes = zeros(Int,2^dim)
+    node_map = dim < 3 ? node_map₂ : node_map₃
+    for (k,tree) in enumerate(forest.cells)
+        for leaf in tree.leaves
+            _vertices = vertices(leaf,tree.b)
+            cellnodes = ntuple(i-> nodeids[nodeowners[(k,_vertices[i])]],length(_vertices))
+            push!(cells,celltype(ntuple(i->cellnodes[node_map[i]],length(cellnodes))))
+        end
+    end
+    return Grid(cells,transform_pointBWG(forest,nodes) .|> Node)
 end
 
 #TODO unfinished, isreplaced logic fails
@@ -1132,4 +1144,18 @@ const opposite_face_3 = [2,
                          4,
                          3,
                          6,
-                         5,]
+                         5]
+
+const node_map₂ = [1,
+                   2,
+                   4,
+                   3]
+
+const node_map₃ = [1,
+                   2,
+                   4,
+                   3,
+                   5,
+                   6,
+                   8,
+                   7]
