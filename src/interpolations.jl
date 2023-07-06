@@ -1320,8 +1320,6 @@ function shape_value(ip::CrouzeixRaviart, ξ::Vec{2}, i::Int)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
-is_discontinuous(::Type{<:CrouzeixRaviart}) = true
-
 ##################################################
 # VectorizedInterpolation{<:ScalarInterpolation} #
 ##################################################

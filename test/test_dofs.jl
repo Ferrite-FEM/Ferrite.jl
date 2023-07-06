@@ -669,4 +669,9 @@ end
     dh = DofHandler(grid)
     add!(dh, :u, CrouzeixRaviart{RefTriangle,1}())
     close!(dh)
+    coupling = trues(3,3)
+    K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, elements_coupling = coupling)
+    K_cont = create_sparsity_pattern(dh; coupling=coupling, topology = topology, elements_coupling = falses(3,3))
+    K_default = create_sparsity_pattern(dh)
+    @test K == K_cont == K_default
 end
