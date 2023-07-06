@@ -425,6 +425,5 @@ for ValueType in (CellValues, FaceValues#= InterfaceValues=#)
 end
 # TODO: delete this once grid is moved to InterfaceCache
 function Base.copy(iv::InterfaceValues)
-    params = [typeof(iv.face_values_a), typeof(iv.face_values_b), getdim(iv.grid), getcelltype(iv.grid)]
-    return InterfaceValues{params...}(copy(iv.face_values_a), copy(iv.face_values_b), iv.grid, copy(iv.cell_a_idx), copy(iv.cell_b_idx), iv.ioi)
+    return InterfaceValues{typeof(iv.face_values_a), typeof(iv.face_values_b)}(copy(iv.face_values_a), copy(iv.face_values_b))
 end

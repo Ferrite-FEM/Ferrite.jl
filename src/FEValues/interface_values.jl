@@ -7,7 +7,6 @@ and function on the interfaces of finite elements.
 
 **Arguments:**
 
-* `grid` : instance of the current grid.
 * `quad_rule_a`: an instance of a [`FaceQuadratureRule`](@ref) for element A.
 * `quad_rule_b`: an instance of a [`FaceQuadratureRule`](@ref) for element B.
 * `func_interpol_a`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function for element A.
@@ -44,21 +43,16 @@ and function on the interfaces of finite elements.
 """
 InterfaceValues
 
-struct InterfaceValues{FVA, FVB, dim, C} <: AbstractValues
+struct InterfaceValues{FVA, FVB} <: AbstractValues
     face_values_a::FVA
     face_values_b::FVB
-    # used for quadrature point syncing
-    grid::Grid{dim, C, Float64}
-    cell_a_idx::ScalarWrapper{Int}
-    cell_b_idx::ScalarWrapper{Int}
-    ioi::ScalarWrapper{InterfaceOrientationInfo}
 end
-function InterfaceValues(grid::AbstractGrid, quad_rule_a::FaceQuadratureRule, func_interpol_a::Interpolation,
+function InterfaceValues(quad_rule_a::FaceQuadratureRule, func_interpol_a::Interpolation,
     geom_interpol_a::Interpolation = func_interpol_a; quad_rule_b::FaceQuadratureRule = deepcopy(quad_rule_a),
     func_interpol_b::Interpolation = func_interpol_a, geom_interpol_b::Interpolation = func_interpol_b)
     face_values_a = FaceValues(quad_rule_a, func_interpol_a, geom_interpol_a)
     face_values_b = FaceValues(quad_rule_b, func_interpol_b, geom_interpol_b)
-    return InterfaceValues{typeof(face_values_a), typeof(face_values_b), getdim(grid), getcelltype(grid)}(face_values_a, face_values_b, grid, ScalarWrapper(0), ScalarWrapper(0), ScalarWrapper(InterfaceOrientationInfo(false, Float64.(I(1)))))
+    return InterfaceValues{typeof(face_values_a), typeof(face_values_b)}(face_values_a, face_values_b)
 end
 
 """
@@ -69,12 +63,9 @@ and mutating element B's quadrature points and its [`FaceValues`](@ref) `M, N, d
 """
 function reinit!(iv::InterfaceValues, face_a::FaceIndex, face_b::FaceIndex, cell_a_coords::AbstractVector{Vec{dim, T}}, cell_b_coords::AbstractVector{Vec{dim, T}}, grid::AbstractGrid) where {dim, T}
     reinit!(iv.face_values_a, cell_a_coords, face_a[2])
-    iv.cell_a_idx[] = face_a[1]
-    iv.cell_b_idx[] = face_b[1]
     iv.face_values_b.current_face[] = face_b[2]
     ioi = Ferrite.InterfaceOrientationInfo(grid, face_a, face_b)
-    iv.ioi[] = ioi
-    getpoints(iv.face_values_b.qr, face_b[2]) .= Vec{dim}.(Ferrite.transform_interface_point.(Ref(iv), getpoints(iv.face_values_a.qr, face_a[2])))
+    getpoints(iv.face_values_b.qr, face_b[2]) .= Vec{dim}.(Ferrite.transform_interface_point(iv, getpoints(iv.face_values_a.qr, face_a[2]), grid, ioi, face_a[1], face_b[1]))
     # Reinit face_b facevalues after the quadrature rule points are mutated
     n_geom_basefuncs = getngeobasefunctions(iv.face_values_b)
     n_func_basefuncs = getnbasefunctions(iv.face_values_b)
@@ -279,27 +270,24 @@ end
 
 Transform point from element A's face reference coordinates to element B's face reference coordinates.
 """
-function transform_interface_point(iv::InterfaceValues, point::Vec{N, Float64}) where {N}
-    ioi = iv.ioi[]
-    cell = getcells(iv.grid)[iv.cell_a_idx[]]
+function transform_interface_point(iv::InterfaceValues, point::Vec{N, Float64}, grid::AbstractGrid, ioi::InterfaceOrientationInfo, cell_a_idx::Int, cell_b_idx::Int) where {N}
+    cell = getcells(grid)[cell_a_idx]
     face = iv.face_values_a.current_face[]
     point = transfer_point_cell_to_face(point, cell, face)
     N == 3 && (point = (ioi.transformation * Vec(point[1],point[2], 1.0))[1:2])
     ioi.flipped && (point = reverse(point))
-    N == 3 && return transfer_point_face_to_cell(Vec(point[1],point[2]), getcells(iv.grid)[iv.cell_b_idx[]], iv.face_values_b.current_face[])
-    return transfer_point_face_to_cell(Vec(point[1]), getcells(iv.grid)[iv.cell_b_idx[]], iv.face_values_b.current_face[])
+    N == 3 && return transfer_point_face_to_cell(Vec(point[1],point[2]), getcells(grid)[cell_b_idx], iv.face_values_b.current_face[])
+    return transfer_point_face_to_cell(Vec(point[1]), getcells(grid)[cell_b_idx], iv.face_values_b.current_face[])
 end
 
-function transform_interface_point(iv::InterfaceValues, point::Vector{Vec{N, Float64}}) where {N}
-    ioi = iv.ioi[]
-    cell = getcells(iv.grid)[iv.cell_a_idx[]]
+function transform_interface_point(iv::InterfaceValues, point::Vector{Vec{N, Float64}}, grid::AbstractGrid, ioi::InterfaceOrientationInfo, cell_a_idx::Int, cell_b_idx::Int) where {N}
+    cell = getcells(grid)[cell_a_idx]
     face = iv.face_values_a.current_face[]
     point2 = transfer_point_cell_to_face.(point, Ref(cell), Ref(face))
     if N == 3
         M = ioi.transformation * vcat(reduce(hcat, point2), ones(Float64, 1, length(point)))
-        point2 = [(M[1:2,i]) for i in 1:length(point)]
+        point2 = ioi.flipped ? [(M[[2,1],i]) for i in 1:length(point)] : [(M[1:2,i]) for i in 1:length(point)]
     end
-    ioi.flipped && (point2 .= reverse.(point2))
-    N == 3 && return transfer_point_face_to_cell.(point2, Ref(getcells(iv.grid)[iv.cell_b_idx[]]), Ref(iv.face_values_b.current_face[]))
-    return transfer_point_face_to_cell.(point2, getcells(iv.grid)[iv.cell_b_idx[]], iv.face_values_b.current_face[])
+    N == 3 && return transfer_point_face_to_cell.(point2, Ref(getcells(grid)[cell_b_idx]), Ref(iv.face_values_b.current_face[]))
+    return transfer_point_face_to_cell.(point2, Ref(getcells(grid)[cell_b_idx]), Ref(iv.face_values_b.current_face[]))
 end

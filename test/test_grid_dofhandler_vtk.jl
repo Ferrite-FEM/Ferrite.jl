@@ -394,7 +394,7 @@ end
 # test application: integrate jump across element boundary 5
     ip = Lagrange{RefQuadrilateral, 1}()^2
     qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
-    iv = InterfaceValues(quadgrid, qr_face, ip)
+    iv = InterfaceValues(qr_face, ip)
     u_ele5 = [3.0 for _ in 1:8]
     u_neighbors = [5.0 for _ in 1:8]
     jump_int = 0.

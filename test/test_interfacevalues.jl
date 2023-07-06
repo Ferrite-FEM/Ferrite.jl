@@ -1,13 +1,14 @@
 @testset "InterfaceValues" begin
     function test_interfacevalues(grid, topology, dim, ip_a, qr_a, ip_b = ip_a, qr_b = deepcopy(qr_a))
-        iv = Ferrite.InterfaceValues(grid, qr_a, ip_a; quad_rule_b = qr_b, func_interpol_b = ip_b)
+        iv = Ferrite.InterfaceValues(qr_a, ip_a; quad_rule_b = qr_b, func_interpol_b = ip_b)
         ndim = Ferrite.getdim(ip_a)
         n_basefuncs = getnbasefunctions(ip_a) + getnbasefunctions(ip_b)
 
         @test getnbasefunctions(iv) == n_basefuncs
 
         for face_a in faceskeleton(topology, grid)
-            neighbors = dim > 1 ? topology.face_face_neighbor[face_a[1], face_a[2]] : topology.vertex_vertex_neighbor[face_a[1], face_a[2]]
+            # TODO: Use interface here once getneighborhood is fixed for vertices
+            neighbors = dim > 1 ? getneighborhood(topology, grid, face_a) : topology.vertex_vertex_neighbor[face_a[1], face_a[2]]
             isempty(neighbors) && continue
             face_b = neighbors[1]
             dim == 1 && (face_b = FaceIndex(face_b[1], face_b[2]))
@@ -173,7 +174,7 @@
     end
 
     # Test copy
-    iv = Ferrite.InterfaceValues(generate_grid(Quadrilateral,(2,2)), FaceQuadratureRule{RefQuadrilateral}(2), DiscontinuousLagrange{RefQuadrilateral, 1}())
+    iv = Ferrite.InterfaceValues(FaceQuadratureRule{RefQuadrilateral}(2), DiscontinuousLagrange{RefQuadrilateral, 1}())
     ivc = copy(iv)
     @test typeof(iv) == typeof(ivc)
     for fname in fieldnames(typeof(iv))
