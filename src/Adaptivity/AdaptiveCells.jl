@@ -495,15 +495,21 @@ end
 transform_pointBWG(forest, vertices) = transform_pointBWG.((forest,), first.(vertices), last.(vertices))
 
 #TODO: this function should wrap the LNodes Iterator of IBWG2015
-function createsnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
+function createnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     nodes = Set{Tuple{Int,NTuple{dim,Int32}}}()
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
+    nodeids = Dict{Tuple{Int,NTuple{dim,Int32}},Int}()
+    nodeowners = Dict{Tuple{Int,NTuple{dim,Int32}},Tuple{Int,NTuple{dim,Int32}}}()
+    pivot_nodeid = 1
     for (k,tree) in enumerate(forest.cells)
         for leaf in tree.leaves
             _vertices = vertices(leaf,tree.b)
             for v in _vertices
                 push!(nodes,(k,v))
+                nodeids[(k,v)] = pivot_nodeid
+                pivot_nodeid += 1
+                nodeowners[(k,v)] = (k,v)
             end
         end
     end
@@ -516,6 +522,10 @@ function createsnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             end
             if k > vertex_neighbor[1][1]
                 delete!(nodes,(k,v))
+                new_v = vertex(root(dim),vertex_neighbor[1][2],tree.b)
+                new_k = vertex_neighbor[1][1]
+                nodeids[(k,v)] = nodeids[(new_k,new_v)]
+                nodeowners[(k,v)] = (new_k,new_v)
             end
         end
         _faces = faces(root(dim),tree.b)
@@ -534,6 +544,8 @@ function createsnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                                 cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
                                 if (k′,cache_octant.xyz) ∈ nodes
                                     delete!(nodes,(k,v))
+                                    nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
+                                    nodeowners[(k,v)] = (k′,cache_octant.xyz)
                                 end
                             end
                         elseif fi < 5
@@ -542,6 +554,8 @@ function createsnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                                 cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
                                 if (k′,cache_octant.xyz) ∈ nodes
                                     delete!(nodes,(k,v))
+                                    nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
+                                    nodeowners[(k,v)] = (k′,cache_octant.xyz)
                                 end
                             end
                         else
@@ -550,6 +564,8 @@ function createsnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                                 cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
                                 if (k′,cache_octant.xyz) ∈ nodes
                                     delete!(nodes,(k,v))
+                                    nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
+                                    nodeowners[(k,v)] = (k′,cache_octant.xyz)
                                 end
                             end
                         end
@@ -561,7 +577,7 @@ function createsnodes1(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             #TODO add egede dupplication check
         end
     end
-    return collect(nodes)
+    return collect(nodes), nodeids, nodeowners
 end
 
 #TODO unfinished, isreplaced logic fails
