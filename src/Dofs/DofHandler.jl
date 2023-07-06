@@ -621,6 +621,17 @@ function sortedge(edge::Tuple{Int,Int})
 end
 
 """
+sortedge_fast(edge::Tuple{Int,Int})
+
+Returns the unique representation of an edge.
+Here the unique representation is the sorted node index tuple.
+"""
+function sortedge_fast(edge::Tuple{Int,Int})
+    a, b = edge
+    a < b ? (return edge) : (return (b, a))
+end
+
+"""
     sortface(face::Tuple{Int})
     sortface(face::Tuple{Int,Int})
     sortface(face::Tuple{Int,Int,Int})
@@ -632,6 +643,20 @@ Note that in 3D we only need indices to uniquely identify a face,
 so the unique representation is always a tuple length 3.
 """
 sortface(face::Tuple{Int,Int}) = sortedge(face) # Face in 2D is the same as edge in 3D.
+
+
+"""
+    sortface_fast(face::Tuple{Int})
+    sortface_fast(face::Tuple{Int,Int})
+    sortface_fast(face::Tuple{Int,Int,Int})
+    sortface_fast(face::Tuple{Int,Int,Int,Int})
+
+Returns the unique representation of a face.
+Here the unique representation is the sorted node index tuple.
+Note that in 3D we only need indices to uniquely identify a face,
+so the unique representation is always a tuple length 3.
+"""
+sortface_fast(face::Tuple{Int,Int}) = sortedge_fast(face) # Face in 2D is the same as edge in 3D.
 
 """
     !!!NOTE TODO implement me.
@@ -669,6 +694,16 @@ function sortface(face::Tuple{Int,Int,Int})
     return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
 end
 
+
+function sortface_fast(face::Tuple{Int,Int,Int})
+    a, b, c = face
+    b, c = minmax(b, c)
+    a, c = minmax(a, c)
+    a, b = minmax(a, b)
+    return (a, b, c)
+end
+
+
 function sortface(face::Tuple{Int,Int,Int,Int})
     a, b, c, d = face
     c, d = minmax(c, d)
@@ -680,7 +715,21 @@ function sortface(face::Tuple{Int,Int,Int,Int})
     return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
 end
 
+
+function sortface_fast(face::Tuple{Int,Int,Int,Int})
+    a, b, c, d = face
+    c, d = minmax(c, d)
+    b, d = minmax(b, d)
+    a, d = minmax(a, d)
+    b, c = minmax(b, c)
+    a, c = minmax(a, c)
+    a, b = minmax(a, b)
+    return (a, b, c)
+end
+
+
 sortface(face::Tuple{Int}) = face, nothing
+sortface_fast(face::Tuple{Int}) = face
 
 """
     find_field(dh::DofHandler, field_name::Symbol)::NTuple{2,Int}
