@@ -222,10 +222,15 @@ function shape_gradient(ip::Interpolation, ξ::Vec, i::Int)
     return Tensors.gradient(x -> shape_value(ip, x, i), ξ)
 end
 
+"""
+    shape_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
+
+Optimized version combining the evaluation [`Ferrite.shape_value(::Interpolation)`](@ref)
+and [`Ferrite.shape_gradient(::Interpolation)`](@ref).
+"""
 function shape_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
     return gradient(x -> shape_value(ip, x, i), ξ, :all)
 end
-
 
 """
     reference_coordinates(ip::Interpolation)

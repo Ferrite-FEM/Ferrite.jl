@@ -9,11 +9,41 @@ cell_to_vtkcell(::Type{SerendipityQuadraticQuadrilateral}) = VTKCellTypes.VTK_QU
 
 cell_to_vtkcell(::Type{Hexahedron}) = VTKCellTypes.VTK_HEXAHEDRON
 cell_to_vtkcell(::Type{SerendipityQuadraticHexahedron}) = VTKCellTypes.VTK_QUADRATIC_HEXAHEDRON
+cell_to_vtkcell(::Type{QuadraticHexahedron}) = VTKCellTypes.VTK_TRIQUADRATIC_HEXAHEDRON
 cell_to_vtkcell(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
 cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
 
 nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
+nodes_to_vtkorder(cell::QuadraticHexahedron) = [
+    cell.nodes[1], # faces
+    cell.nodes[2],
+    cell.nodes[3],
+    cell.nodes[4],
+    cell.nodes[5],
+    cell.nodes[6],
+    cell.nodes[7],
+    cell.nodes[8],
+    cell.nodes[9], # edges
+    cell.nodes[10],
+    cell.nodes[11],
+    cell.nodes[12],
+    cell.nodes[13],
+    cell.nodes[14],
+    cell.nodes[15],
+    cell.nodes[16],
+    cell.nodes[17],
+    cell.nodes[18],
+    cell.nodes[19],
+    cell.nodes[20],
+    cell.nodes[25], # faces
+    cell.nodes[23],
+    cell.nodes[22],
+    cell.nodes[24],
+    cell.nodes[21],
+    cell.nodes[26],
+    cell.nodes[27], # interior
+]
 
 """
     vtk_grid(filename::AbstractString, grid::Grid; kwargs...)
