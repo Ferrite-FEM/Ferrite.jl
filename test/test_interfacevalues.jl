@@ -6,8 +6,8 @@
 
         @test getnbasefunctions(iv) == n_basefuncs
 
-        for face_a in topology.face_skeleton
-            neighbors = dim > 1 ? topology.face_neighbor[face_a[1], face_a[2]] : topology.vertex_neighbor[face_a[1], face_a[2]]
+        for face_a in faceskeleton(topology, grid)
+            neighbors = dim > 1 ? topology.face_face_neighbor[face_a[1], face_a[2]] : topology.vertex_vertex_neighbor[face_a[1], face_a[2]]
             isempty(neighbors) && continue
             face_b = neighbors[1]
             dim == 1 && (face_b = FaceIndex(face_b[1], face_b[2]))
