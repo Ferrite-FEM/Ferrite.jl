@@ -502,14 +502,14 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     nodeids = Dict{Tuple{Int,NTuple{dim,Int32}},Int}()
     nodeowners = Dict{Tuple{Int,NTuple{dim,Int32}},Tuple{Int,NTuple{dim,Int32}}}()
-    pivot_nodeid = 1
-    for (k,tree) in enumerate(forest.cells)
-        for leaf in tree.leaves
+    pivot_nodeid = getncells(forest)*2^dim
+    for (k,tree) in enumerate(Iterators.reverse(forest.cells))# reverse for smallest k ownership policy in nodeids
+        for leaf in Iterators.reverse(tree.leaves)# reverse for smallest k ownership policy in nodeids
             _vertices = vertices(leaf,tree.b)
-            for v in _vertices
+            for v in Iterators.reverse(_vertices)# reverse for smallest k ownership policy in nodeids
                 push!(nodes,(k,v))
                 nodeids[(k,v)] = pivot_nodeid
-                pivot_nodeid += 1
+                pivot_nodeid -= 1
                 nodeowners[(k,v)] = (k,v)
             end
         end
