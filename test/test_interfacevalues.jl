@@ -32,17 +32,14 @@
                     shapevalue = shape_value(iv, qp, i)
                     shape_avg = shape_value_average(iv, qp, i)
                     shape_jump = shape_value_jump(iv, qp, i)
-                    shape_jump_no_normal = shape_value_jump(iv, qp, i, false)
                     
                     shapegrad = shape_gradient(iv, qp, i)
                     shapegrad_avg = shape_gradient_average(iv, qp, i)
                     shapegrad_jump = shape_gradient_jump(iv, qp, i)
-                    shapegrad_jump_no_normal = shape_gradient_jump(iv, qp, i, false)
 
                     geomvalue = Ferrite.geometric_value(iv, qp, i)
                     geomvalue_avg = Ferrite.geometric_value_average(iv, qp, i)
                     geomvalue_jump = Ferrite.geometric_value_jump(iv, qp, i)
-                    geomvalue_jump_no_normal = Ferrite.geometric_value_jump(iv, qp, i, false)
 
                     normal = getnormal(iv, qp, false)
                     # Test values (May be removed as it mirrors implementation)
@@ -50,33 +47,25 @@
                         @test shapevalue ≈ shape_value(iv.face_values_b, qp, i - getnbasefunctions(iv.face_values_a))
                         @test shapegrad ≈ shape_gradient(iv.face_values_b, qp, i - getnbasefunctions(iv.face_values_a))
                         @test geomvalue ≈ Ferrite.geometric_value(iv.face_values_b, qp, i - getnbasefunctions(iv.face_values_a))
+
+                        @test shape_jump ≈ -shapevalue
+                        @test shapegrad_jump ≈ -shapegrad
+                        @test geomvalue_jump ≈ -geomvalue
                     else
                         normal = getnormal(iv, qp)
                         @test shapevalue ≈ shape_value(iv.face_values_a, qp, i)
                         @test shapegrad ≈ shape_gradient(iv.face_values_a, qp, i)
                         @test geomvalue ≈ Ferrite.geometric_value(iv.face_values_a, qp, i)
+
+                        @test shape_jump ≈ shapevalue
+                        @test shapegrad_jump ≈ shapegrad
+                        @test geomvalue_jump ≈ geomvalue
                     end
 
                     @test shape_avg ≈ 0.5 * shapevalue
-                    @test shape_jump ≈ shapevalue * normal ≈ shape_jump_no_normal * getnormal(iv, qp)
                     @test shapegrad_avg ≈ 0.5 * shapegrad
-                    @test shapegrad_jump ≈ shapegrad ⋅ normal ≈ shapegrad_jump_no_normal ⋅ getnormal(iv, qp)
                     @test geomvalue_avg ≈ 0.5 * geomvalue
-                    @test geomvalue_jump ≈ geomvalue * normal ≈ geomvalue_jump_no_normal * getnormal(iv, qp)
 
-                    # Test dimensions:
-                    # Jump of a [scalar -> vector, vector -> scalar]
-                    if !isempty(size(shapevalue))
-                        @test shape_jump isa Number
-                    else
-                        @test !(shape_jump isa Number)
-                    end
-
-                    if isempty(size(shapegrad))
-                        @test !(shapegrad_jump isa Number)
-                    else
-                        @test shapegrad_jump isa Number
-                    end
                 end
             end
             @test_throws ErrorException("Invalid base function $(n_basefuncs + 1). Interface has only $(n_basefuncs) base functions") shape_value_jump(iv, 1, n_basefuncs + 1)
@@ -115,7 +104,7 @@
                     @test function_value_average(iv, i, u_scal_a, u_scal_b) ≈ function_value(iv, i, u_scal, use_element_a = use_element_a)
                     @test all(function_value_jump(iv, i, u_scal_a, u_scal_b) .<= 30 * eps(Float64))
                     @test function_gradient_average(iv, i, u_scal_a, u_scal_b) ≈ function_gradient(iv, i, u_scal, use_element_a = use_element_a)
-                    @test function_gradient_jump(iv, i, u_scal_a, u_scal_b) <= 30 * eps(Float64)
+                    @test all(function_gradient_jump(iv, i, u_scal_a, u_scal_b) .<= 30 * eps(Float64))
 
                     @test function_value_average(iv, i, u_a, u_b) ≈ function_value(iv, i, u, use_element_a = use_element_a)
                     @test all(function_value_jump(iv, i, u_a, u_b) .<= 30 * eps(Float64))

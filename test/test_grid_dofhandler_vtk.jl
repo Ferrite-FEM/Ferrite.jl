@@ -403,9 +403,10 @@ end
             cell_b_coords = get_cell_coordinates(quadgrid, face_b[1])
             reinit!(iv, face_a, face_b, cell_a_coords, cell_b_coords, quadgrid)
             for q_point in 1:getnquadpoints(iv)
+                normal_5 = getnormal(iv, q_point)
                 dΩ = getdetJdV(iv, q_point)
-                jump_int += function_value_jump(iv, q_point, vcat(u_ele5, u_neighbors)) * dΩ
-                jump_abs += abs(function_value_jump(iv, q_point, vcat(u_ele5, u_neighbors))) * dΩ
+                jump_int += function_value_jump(iv, q_point, u_ele5, u_neighbors) ⋅ normal_5 * dΩ
+                jump_abs += abs(function_value_jump(iv, q_point, u_ele5, u_neighbors) ⋅ normal_5) * dΩ
             end
         end
     end
