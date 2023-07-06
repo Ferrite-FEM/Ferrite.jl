@@ -590,7 +590,7 @@ end
             vdim[1] = typeof(ip1) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip1) : 1
             for dim1 in 1:vdim[1] 
                 for cell2_idx in neighbors
-                    sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[cell2_idx.idx]]
+                    sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[cell2_idx]]
                     coupling_idx[2] = 1
                     for field2_idx in eachindex(sdh2.field_names)
                         j_dofs = dof_range(sdh2, field2_idx)
@@ -602,7 +602,7 @@ end
                             j_dofs_v = j_dofs[dim2:vdim[2]:end]
                             for i_idx in i_dofs_v, j_idx in j_dofs_v
                                 i = celldofs(dh,cell_idx)[i_idx]
-                                j = celldofs(dh,cell2_idx.idx)[j_idx]
+                                j = celldofs(dh,cell2_idx)[j_idx]
                                 @test is_stored(K, i, j) == coupling[coupling_idx...]
                             end
                             coupling_idx[2] += 1
@@ -620,9 +620,11 @@ end
             elements_coupling_idx = [1,1]
             vdim = [1,1]
             # test inner coupling
-            _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, [CellIndex(cell_idx)], false)
+            _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, [cell_idx], false)
             # test cross-element coupling
-            _check_dofs(K, dh, sdh, cell_idx, elements_coupling, elements_coupling_idx, vdim, topology.cell_face_neighbor[cell_idx], true)
+            neighborhood = Ferrite.getdim(dh.grid.cells[1]) > 1 ? topology.face_face_neighbor : topology.vertex_vertex_neighbor
+            neighbors = neighborhood[cell_idx, :]
+            _check_dofs(K, dh, sdh, cell_idx, elements_coupling, elements_coupling_idx, vdim, [i[1][1] for i in  neighbors[.!isempty.(neighbors)]], true)
         end
     end
     grid = generate_grid(Quadrilateral, (2, 2))
