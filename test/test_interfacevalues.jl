@@ -150,8 +150,8 @@
         end
         @testset "error paths" begin
             cell = getcells(grid, 1)
-            @test_throws "Face index 100 exceeds the number of faces for a cell of type $(typeof(cell))" Ferrite.transfer_point_cell_to_face([0.0 for _ in 1 : dim], cell, 100)
-            @test_throws "Face index 100 exceeds the number of faces for a cell of type $(typeof(cell))" Ferrite.transfer_point_face_to_cell([0.0 for _ in 1 : (dim > 1 ? dim-1 : 1)], cell, 100)
+            @test_throws ErrorException("Face index 100 exceeds the number of faces for a cell of type $(typeof(cell))") Ferrite.transfer_point_cell_to_face([0.0 for _ in 1 : dim], cell, 100)
+            @test_throws ErrorException("Face index 100 exceeds the number of faces for a cell of type $(typeof(cell))") Ferrite.transfer_point_face_to_cell([0.0 for _ in 1 : (dim > 1 ? dim-1 : 1)], cell, 100)
         end
         for func_interpol in (scalar_interpol,#= VectorizedInterpolation(scalar_interpol)=#)
             test_interfacevalues(grid, topology, dim, scalar_interpol, quad_rule)
