@@ -332,21 +332,24 @@ Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that 
 `FaceValues`.
 """
 function _faceskeleton(top::ExclusiveTopology, grid::Grid)
-    face_skeleton_global = Set{NTuple}()
-    face_skeleton_local = Vector{FaceIndex}()
-    fs_length = length(face_skeleton_global)
-    # TODO use topology to speed up :)
-    for (cellid,cell) ∈ enumerate(grid.cells)
-        for (local_face_id,face) ∈ enumerate(faces(cell))
-            push!(face_skeleton_global, sortface_fast(face))
-            fs_length_new = length(face_skeleton_global)
-            if fs_length != fs_length_new
-                push!(face_skeleton_local, FaceIndex(cellid,local_face_id))
-                fs_length = fs_length_new
-            end
+    i = 1;
+    if isempty(top.face_face_neighbor)
+        face_skeleton_local = Array{FaceIndex}(undef, count(pair -> isempty(pair[2]) || pair[2].neighbor_info[][1] > pair[1][1], pairs(top.vertex_vertex_neighbor)))
+        for (idx, face) in pairs(top.vertex_vertex_neighbor)
+            isempty(face.neighbor_info) || face.neighbor_info[][1] > idx[1] || continue
+            face_skeleton_local[i] = FaceIndex(idx[1], idx[2])
+            i+=1
         end
+        return face_skeleton_local
+    else
+        face_skeleton_local = Array{FaceIndex}(undef, count(pair -> isempty(pair[2]) || pair[2].neighbor_info[][1] > pair[1][1], pairs(top.face_face_neighbor)))
+        for (idx, face) in pairs(top.face_face_neighbor)
+            isempty(face.neighbor_info) || face.neighbor_info[][1] > idx[1] || continue
+            face_skeleton_local[i] = FaceIndex(idx[1], idx[2])
+            i+=1
+        end
+        return face_skeleton_local
     end
-    return face_skeleton_local
 end
 
 """
