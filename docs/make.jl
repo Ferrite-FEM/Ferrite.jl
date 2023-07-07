@@ -36,6 +36,7 @@ include("generate.jl")
             "tutorials/heat_equation.md",
             "tutorials/linear_elasticity.md",
             "tutorials/incompressible_elasticity.md",
+            "tutorials/incompressible_elasticity_convenience.md", # TEMP: REMOVE ME!
             "tutorials/hyperelasticity.md",
             "tutorials/plasticity.md",
             "tutorials/transient_heat_equation.md",
