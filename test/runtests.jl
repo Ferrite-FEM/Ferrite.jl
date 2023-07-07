@@ -38,4 +38,5 @@ end
 #HAS_EXTENSIONS && include("blockarrays.jl")
 #include("test_examples.jl")
 include("test_p4est.jl")
+include("test_p4est_example.jl")
 @test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined

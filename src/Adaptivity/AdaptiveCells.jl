@@ -589,7 +589,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             push!(cells,celltype(ntuple(i->cellnodes[node_map[i]],length(cellnodes))))
         end
     end
-    return Grid(cells,transform_pointBWG(forest,nodes) .|> Node)
+    return Grid(cells,transform_pointBWG(forest,nodes) .|> Node, cellsets=forest.cellsets, nodesets=forest.nodesets, facesets=forest.facesets, edgesets=forest.edgesets, vertexsets=forest.vertexsets)
 end
 
 #TODO unfinished, isreplaced logic fails

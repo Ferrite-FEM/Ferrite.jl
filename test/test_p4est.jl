@@ -192,7 +192,7 @@ end
     ##################################################################
     adaptive_grid = ForestBWG(grid,8)
     for l in 1:8
-        Ferrite.refine_all(adaptive_grid,l)
+        Ferrite.refine_all!(adaptive_grid,l)
         for tree in adaptive_grid.cells
             @test all(Ferrite.morton.(tree.leaves,l,8) == collect(1:2^(2*l)))
         end
@@ -204,7 +204,7 @@ end
     end
     #now go back from finest to coarsest
     for l in 7:-1:0
-        Ferrite.coarsen_all(adaptive_grid)
+        Ferrite.coarsen_all!(adaptive_grid)
         for tree in adaptive_grid.cells
             @test all(Ferrite.morton.(tree.leaves,l,8) == collect(1:2^(2*l)))
         end
@@ -235,14 +235,14 @@ end
     adaptive_grid = ForestBWG(grid,5)
     #go from coarsest to finest uniformly
     for l in 1:5
-        Ferrite.refine_all(adaptive_grid,l)
+        Ferrite.refine_all!(adaptive_grid,l)
         for tree in adaptive_grid.cells
             @test all(Ferrite.morton.(tree.leaves,l,5) == collect(1:2^(3*l)))
         end
     end
     #now go back from finest to coarsest
     for l in 4:-1:0
-        Ferrite.coarsen_all(adaptive_grid)
+        Ferrite.coarsen_all!(adaptive_grid)
         for tree in adaptive_grid.cells
             @test all(Ferrite.morton.(tree.leaves,l,5) == collect(1:2^(3*l)))
         end
@@ -254,7 +254,7 @@ end
     grid = generate_grid(Quadrilateral,(2,2))
     adaptive_grid = ForestBWG(grid,maxlevel)
     for l in 1:maxlevel
-        Ferrite.refine_all(adaptive_grid,l)
+        Ferrite.refine_all!(adaptive_grid,l)
         @test getncells(adaptive_grid) == 2^(2*l) * 4 == length(getcells(adaptive_grid))
     end
 end
