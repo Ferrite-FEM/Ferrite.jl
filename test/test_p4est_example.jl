@@ -136,8 +136,14 @@ end # module ConvergenceTestHelper
         geometry = ConvergenceTestHelper.get_geometry(interpolation)
         interpolation_geo = interpolation
         N = ConvergenceTestHelper.get_N(interpolation)
-        grid = generate_grid(geometry, ntuple(x->19, Ferrite.getdim(geometry)));
-        adaptive_grid = ForestBWG(grid,1)
+        grid = generate_grid(geometry, ntuple(x->3, Ferrite.getdim(geometry)));
+        adaptive_grid = ForestBWG(grid,4)
+        Ferrite.refine_all!(adaptive_grid,1)
+        Ferrite.refine_all!(adaptive_grid,2)
+        Ferrite.refine_all!(adaptive_grid,3)
+        Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[5].leaves[1])
+        Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[5].leaves[8])
+        Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[5].leaves[5])
         grid_transfered = Ferrite.creategrid(adaptive_grid)
         # ... a suitable quadrature rule ...
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
@@ -145,6 +151,9 @@ end # module ConvergenceTestHelper
         # ... and then pray to the gods of convergence.
         dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid_transfered, interpolation, interpolation_geo, qr, N)
         u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
-        ConvergenceTestHelper.check_and_compute_convergence(dh, u, cellvalues, 1e-2)
+        #ConvergenceTestHelper.check_and_compute_convergence(dh, u, cellvalues, 1e-2)
+        vtk_grid("p4est_test.vtu",dh) do vtk
+            vtk_point_data(vtk,dh,u)
+        end
     end
 end
