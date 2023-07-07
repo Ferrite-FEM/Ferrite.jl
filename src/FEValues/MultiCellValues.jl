@@ -52,56 +52,8 @@ getnquadpoints(mcv::MultiCellValues) = getnquadpoints(first(mcv.values))
 # @propagate_inbounds getdetJdV ? 
 getdetJdV(mcv::MultiCellValues, q_point::Int) = getdetJdV(first(mcv.values), q_point)
 
-@inline function _unsafe_calculate_mapping(cv::CellValues, q_point, x::AbstractVector{Vec{dim,T}}) where {dim,T}
-    fecv_J = zero(Tensor{2,dim,T})
-    @inbounds for j in 1:getngeobasefunctions(cv)
-        fecv_J += x[j] ⊗ cv.dMdξ[j, q_point]
-    end
-    detJ = det(fecv_J)
-    detJ > 0.0 || throw_detJ_not_pos(detJ)
-    Jinv = inv(fecv_J)
-    return detJ, Jinv 
-end
-
-@inline function _unsafe_apply_mapping!(cv, q_point, detJ_w, Jinv)
-    @inbounds cv.detJdV[q_point] = detJ_w
-    @inbounds for j in 1:getnbasefunctions(cv)
-        cv.dNdx[j, q_point] = cv.dNdξ[j, q_point] ⋅ Jinv
-    end
-    return nothing
-end
-
-# The following is quite fast, a few percent is saved by specialized versions below
-function apply_mapping!(cvs_values, q_point, detJ_w, Jinv)
-    map(cvi -> _unsafe_apply_mapping!(cvi, q_point, detJ_w, Jinv), cvs_values)
-end
-# Specialized, versions for 1-3 values: Not often more than 3 unique values,
-# and also not that much to gain for those problem sizes. Only 1s really important.
-# Alternative would be @generated + Base.Cartesian.@nexprs
-function apply_mapping!(cvs_values::NTuple{1,CellValues}, q_point, detJ_w, Jinv)
-    _unsafe_apply_mapping!(cvs_values[1], q_point, detJ_w, Jinv)
-end
-function apply_mapping!(cvs_values::NTuple{2,CellValues}, q_point, detJ_w, Jinv)
-    _unsafe_apply_mapping!(cvs_values[1], q_point, detJ_w, Jinv)
-    _unsafe_apply_mapping!(cvs_values[2], q_point, detJ_w, Jinv)
-end
-function apply_mapping!(cvs_values::NTuple{3,CellValues}, q_point, detJ_w, Jinv)
-    _unsafe_apply_mapping!(cvs_values[1], q_point, detJ_w, Jinv)
-    _unsafe_apply_mapping!(cvs_values[2], q_point, detJ_w, Jinv)
-    _unsafe_apply_mapping!(cvs_values[3], q_point, detJ_w, Jinv)
-end
-
-function reinit!(cvs::MultiCellValues, x::AbstractVector{Vec{dim,T}}) where {dim,T}
-    n_geom_basefuncs = getngeobasefunctions(cvs)
-    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
-    
-    cv_ref = first(cvs.values) # Reference value for geometric interpolation and quadrature
-    @inbounds for (q_point, w) in pairs(cv_ref.qr.weights)
-        detJ, Jinv = _unsafe_calculate_mapping(cv_ref, q_point, x)
-        detJ > 0.0 || throw_detJ_not_pos(detJ)
-        detJ_w = detJ*w
-        apply_mapping!(cvs.values, q_point, detJ_w, Jinv)
-    end
+function reinit!(cv::MultiCellValues, x::AbstractVector, args...)
+    map(v -> reinit!(v, x, args...), cv.values)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", fe_v::MultiCellValues)
