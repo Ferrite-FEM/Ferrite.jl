@@ -19,11 +19,13 @@
 # system to study pattern formation. The strong form is given by
 #
 # ```math
-#  \partial_t r_1 = \nabla \cdot (D_1 \nabla r_1) - r₁*r₂^2 + F *(1 - r₁) \quad \textbf{x} \in \Omega,
-#  \partial_t r_2 = \nabla \cdot (D_2 \nabla r_2) + r₁*r₂^2 - r₂*(F + k ) \quad \textbf{x} \in \Omega,
+#  \begin{aligned}
+#    \partial_t r_1 &= \nabla \cdot (D_1 \nabla r_1) - r₁*r₂^2 + F *(1 - r₁) \quad \textbf{x} \in \Omega, \\
+#    \partial_t r_2 &= \nabla \cdot (D_2 \nabla r_2) + r₁*r₂^2 - r₂*(F + k ) \quad \textbf{x} \in \Omega,
+#  \end{aligned}
 # ```
 #
-# where $r_1$ and $r_2 are the reaction fields, $D_1$ and $D_2$ the diffusion tensors,
+# where $r_1$ and $r_2$ are the reaction fields, $D_1$ and $D_2$ the diffusion tensors,
 # $k$ is the conversion rate, $F$ is the feed rate and $\Omega$ the domain. Depending on the choice of
 # parameters a different pattern can be observed. Please also note that the domain does not have a 
 # boundary. The corresponding weak form can be derived as usual.
