@@ -1,5 +1,4 @@
 struct VTKStream{VTK<:WriteVTK.DatasetFile, DH<:Union{DofHandler,Grid}}
-    filename::String # Just to allow easy printing
     vtk::VTK
     grid_or_dh::DH
 end
@@ -33,7 +32,7 @@ end
 """
 function open_vtk(filename::String, grid_or_dh; kwargs...)
     vtk = create_vtk_grid(filename, grid_or_dh; kwargs...)
-    return VTKStream(filename, vtk, grid_or_dh)
+    return VTKStream(vtk, grid_or_dh)
 end
 # Makes it possible to use the `do`-block syntax
 function open_vtk(f::Function, args...; kwargs...)
@@ -48,7 +47,7 @@ end
 isopen(vtks::VTKStream) = WriteVTK.isopen(vtks.vtk)
 
 function Base.show(io::IO, ::MIME"text/plain", vtks::VTKStream)
-    open_str = isopen(vtk) ? "open" : "closed"
+    open_str = isopen(vtks) ? "open" : "closed"
     if isa(vtks.grid_or_dh, DofHandler)
         dh_string = "DofHandler"
     elseif isa(vtks.grid_or_dh, Grid) 
@@ -56,7 +55,8 @@ function Base.show(io::IO, ::MIME"text/plain", vtks::VTKStream)
     else
         dh_string = string(typeof(vtks.grid_or_dh))
     end
-    print(io, "VTKStream for the $open_str file \"$(vtk.path)\" based on a $dh_string")
+    filename = vtks.vtk.path
+    print(io, "VTKStream for the $open_str file \"$(filename)\" based on a $dh_string")
 end
 
 getgrid(vtks::VTKStream{<:Any,<:DofHandler}) = vtks.grid_or_dh.grid
