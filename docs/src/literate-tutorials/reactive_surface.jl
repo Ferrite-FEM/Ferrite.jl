@@ -20,8 +20,8 @@
 #
 # ```math
 #  \begin{aligned}
-#    \partial_t r_1 &= \nabla \cdot (D_1 \nabla r_1) - r₁*r₂^2 + F *(1 - r₁) \quad \textbf{x} \in \Omega, \\
-#    \partial_t r_2 &= \nabla \cdot (D_2 \nabla r_2) + r₁*r₂^2 - r₂*(F + k ) \quad \textbf{x} \in \Omega,
+#    \partial_t r_1 &= \nabla \cdot (D_1 \nabla r_1) - r_1*r_2^2 + F *(1 - r_1) \quad \textbf{x} \in \Omega, \\
+#    \partial_t r_2 &= \nabla \cdot (D_2 \nabla r_2) + r_1*r_2^2 - r_2*(F + k ) \quad \textbf{x} \in \Omega,
 #  \end{aligned}
 # ```
 #
