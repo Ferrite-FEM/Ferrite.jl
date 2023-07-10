@@ -143,6 +143,8 @@ export
 # iterators
     CellCache,
     CellIterator,
+    FaceCache,
+    FaceIterator,
     UpdateFlags,
     cellid,
 
