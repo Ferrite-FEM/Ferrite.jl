@@ -178,6 +178,53 @@ end
         n += cellid(c)
     end
     @test n == div(getncells(grid)*(getncells(grid) + 1), 2)
+
+    # FaceCache
+    grid = generate_grid(Triangle, (3,3))
+    fc = FaceCache(grid)
+    faceindex = first(getfaceset(grid, "left"))
+    cell_id, face_id = faceindex
+    reinit!(fc, faceindex)
+    # @test Ferrite.faceindex(fc) == faceindex
+    @test cellid(fc) == cell_id
+    # @test Ferrite.faceid(fc) == face_id
+    @test getnodes(fc) == collect(getcells(grid, cell_id).nodes)
+    @test get_cell_coordinates(fc) == get_cell_coordinates(grid, cell_id)
+    @test length(celldofs(fc)) == 0 # Empty because no DofHandler given
+
+    # FaceIterator, also tests `reinit!(fv::FaceValues, fc::FaceCache)`
+    for (dim, celltype) in ((1, Line), (2, Quadrilateral), (3, Hexahedron))
+        grid = generate_grid(celltype, ntuple(_ -> 3, dim))
+        ip = Lagrange{Ferrite.RefHypercube{dim}, 1}()^dim
+        fqr = FaceQuadratureRule{Ferrite.RefHypercube{dim}}(2)
+        fv = FaceValues(fqr, ip)
+        dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
+        faceset = getfaceset(grid, "right")
+        for dh_or_grid in (grid, dh)
+            @test first(FaceIterator(dh_or_grid, faceset)) isa FaceCache
+            area = 0.0
+            for face in FaceIterator(dh_or_grid, faceset)
+                reinit!(fv, face)
+                for q_point in 1:getnquadpoints(fv)
+                    area += getdetJdV(fv, q_point)
+                end
+            end
+            dim == 1 && @test area ≈ 1.0
+            dim == 2 && @test area ≈ 2.0
+            dim == 3 && @test area ≈ 4.0
+        end
+    end
+
+    # Unit test of some utilities
+    mixed_grid = Grid([Quadrilateral((1, 2, 3, 4)),Triangle((3, 2, 5))],
+                      [Node(coord) for coord in zeros(Vec{2,Float64}, 5)])
+    cellset = Set(1:getncells(mixed_grid))
+    faceset = Set(FaceIndex(i, 1) for i in 1:getncells(mixed_grid))
+    @test_throws ErrorException Ferrite._check_same_celltype(mixed_grid, cellset)
+    @test_throws ErrorException Ferrite._check_same_celltype(mixed_grid, faceset)
+    std_grid = generate_grid(Quadrilateral, (getncells(mixed_grid),1))
+    @test Ferrite._check_same_celltype(std_grid, cellset) === nothing
+    @test Ferrite._check_same_celltype(std_grid, faceset) === nothing
 end
 
 @testset "Grid sets" begin
