@@ -140,13 +140,7 @@ end
 
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
-reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f)
-# TODOL enable this after InterfaceValues are merges
-# reinit!(iv::InterfaceValues, ic::InterfaceCache) = begin
-#     reinit!(iv.face_values,ic.this_cell.coords,ic.this_face)
-#     reinit!(iv.face_values_neighbor,ic.neighbor_cell.coords,ic.neighbor_face)
-#     @assert getnquadpoints(iv.face_values) == getnquadpoints(iv.face_values_neighbor)
-# end
+reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
 getnodes(cc::CellCache) = cc.nodes
@@ -161,11 +155,65 @@ celldofs!(v::Vector, cc::CellCache) = copyto!(v, cc.dofs) # celldofs!(v, cc.dh, 
 nfaces(cc::CellCache) = nfaces(cc.grid.cells[cc.cellid[]])
 onboundary(cc::CellCache, face::Int) = cc.grid.boundary_matrix[face, cc.cellid[]]
 
-##################
-## CellIterator ##
-##################
 
-const IntegerCollection = Union{AbstractSet{<:Integer}, AbstractVector{<:Integer}}
+# TODO: Currently excluded from the docstring below. Should they be public?
+# - `Ferrite.faceindex(fc)`: get the `FaceIndex` of the currently cached face
+# - `Ferrite.faceid(fc)`: get the current faceid (`faceindex(fc)[2]`)
+
+"""
+    FaceCache(grid::Grid)
+    FaceCache(dh::AbstractDofHandler)
+
+Create a cache object with pre-allocated memory for the nodes, coordinates, and dofs of a
+cell suitable for looping over *faces* in a grid. The cache is updated for a new face by
+calling `reinit!(cache, fi::FaceIndex)`.
+
+**Methods with `fc::FaceCache`**
+ - `reinit!(fc, fi)`: reinitialize the cache for face `fi::FaceIndex`
+ - `cellid(fc)`: get the current cellid (`faceindex(fc)[1]`)
+ - `getnodes(fc)`: get the global node ids of the *cell*
+ - `get_cell_coordinates(fc)`: get the coordinates of the *cell*
+ - `celldofs(fc)`: get the global dof ids of the *cell*
+ - `reinit!(fv, fc)`: reinitialize [`FaceValues`](@ref)
+
+See also [`FaceIterator`](@ref).
+"""
+struct FaceCache{CC<:CellCache}
+    cc::CC  # const for julia > 1.8
+    current_faceid::ScalarWrapper{Int}
+end
+FaceCache(args...) = FaceCache(CellCache(args...), ScalarWrapper(0))
+
+function reinit!(fc::FaceCache, face::FaceIndex)
+    cellid, faceid = face
+    reinit!(fc.cc, cellid)
+    fc.current_faceid[] = faceid
+    return nothing
+end
+
+# Delegate methods to the cell cache
+for op = (:getnodes, :get_cell_coordinates, :cellid, :celldofs)
+    @eval begin
+        function Ferrite.$op(fc::FaceCache, args...)
+            return Ferrite.$op(fc.cc, args...)
+        end
+    end
+end
+# @inline faceid(fc::FaceCache) = fc.current_faceid[]
+@inline celldofs!(v::Vector, fc::FaceCache) = celldofs!(v, fc.cc)
+# @inline onboundary(fc::FaceCache) = onboundary(fc.cc, faceid(fc))
+# @inline faceindex(fc::FaceCache) = FaceIndex(cellid(fc), faceid(fc))
+@inline function reinit!(fv::FaceValues, fc::FaceCache)
+    reinit!(fv, fc.cc, fc.current_faceid[])
+end
+
+####################
+## Grid iterators ##
+####################
+
+## CellIterator ##
+
+const IntegerCollection = Union{Set{<:Integer}, AbstractVector{<:Integer}}
 
 """
     CellIterator(grid::Grid, cellset=1:getncells(grid))
@@ -205,7 +253,7 @@ function CellIterator(gridordh::Union{Grid,DofHandler},
         grid = gridordh isa DofHandler ? get_grid(gridordh) : gridordh
         set = 1:getncells(grid)
     end
-    if gridordh isa DofHandler && !isconcretetype(getcelltype(get_grid(gridordh)))
+    if gridordh isa DofHandler
         # TODO: Since the CellCache is resizeable this is not really necessary to check
         #       here, but might be useful to catch slow code paths?
         _check_same_celltype(get_grid(gridordh), set)
@@ -215,71 +263,71 @@ end
 function CellIterator(gridordh::Union{Grid,DofHandler}, flags::UpdateFlags)
     return CellIterator(gridordh, nothing, flags)
 end
-
 function CellIterator(sdh::SubDofHandler, flags::UpdateFlags=UpdateFlags())
     CellIterator(sdh.dh, sdh.cellset, flags)
 end
 
-# Iterator interface
-function Base.iterate(ci::CellIterator, state_in...)
-    it = iterate(ci.set, state_in...)
-    it === nothing && return nothing
-    cellid, state_out = it
-    reinit!(ci.cc, cellid)
-    return (ci.cc, state_out)
-end
+@inline _getset(ci::CellIterator) = ci.set
+@inline _getcache(ci::CellIterator) = ci.cc
 
-#######################
-## InterfaceIterator ##
-#######################
 
+## FaceIterator ##
+
+# Leaving flags undocumented as for CellIterator
 """
-    InterfaceIterator(grid::Grid, interfaces_set=1:length(topology.face_skeleton), topology::ExclusiveTopology)
-    InterfaceIterator(dh::AbstractDofHandler, interfaces_set=1:length(topology.face_skeleton), topology::ExclusiveTopology)
+    FaceIterator(gridordh::Union{Grid,AbstractDofHandler}, faceset::Set{FaceIndex})
 
-Create an `InterfaceIterator` to conveniently iterate over all, or a subset, of the interfaces in a
-grid. The elements of the iterator are [`InterfaceCache`](@ref)s which are properly
-`reinit!`ialized. See [`InterfaceCache`](@ref) for more details.
+Create a `FaceIterator` to conveniently iterate over the faces in `faceset`. The elements of
+the iterator are [`FaceCache`](@ref)s which are properly `reinit!`ialized. See
+[`FaceCache`](@ref) for more details.
 
-Looping over an `InterfaceIterator`, i.e.:
+Looping over a `FaceIterator`, i.e.:
 ```julia
-for ic in InterfaceIterator(grid, cellset, topology)
+for fc in FaceIterator(grid, faceset)
     # ...
 end
 ```
 is thus simply convenience for the following equivalent snippet:
 ```julia
-ic = InterfaceCache(grid, topology)
-for face in topology.face_skeleton
-    neighbor_face = topology.face_neighbor[face[1], face[2]][1]
-    reinit!(ic, face, neighbor_face)
+fc = FaceCache(grid)
+for faceindex in faceset
+    reinit!(fc, faceindex)
     # ...
 end
-```
-!!! warning
-    `InterfaceIterator` is stateful and should not be used for things other than `for`-looping
-    (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
 """
-struct InterfaceIterator{Cache<:InterfaceCache, IC<:IntegerCollection}
-    cache::Cache
-    set::IC
+struct FaceIterator{FC<:FaceCache}
+    fc::FC
+    set::Set{FaceIndex}
 end
 
-function InterfaceIterator(gridordh::Union{Grid,AbstractDofHandler},
-                      set::Union{IntegerCollection,Nothing},
-                      topology::ExclusiveTopology)
-    if set === nothing
-        set = findall(face -> !isempty(topology.face_neighbor[face[1], face[2]]), topology.face_skeleton)
-    elseif !isempty(findall(face -> isempty(topology.face_neighbor[face[1], face[2]]), topology.face_skeleton[set]))
-        error("set passed to InterfaceIterator contains boundary faces")
+function FaceIterator(gridordh::Union{Grid,AbstractDofHandler},
+                      set, flags::UpdateFlags=UpdateFlags())
+    if gridordh isa DofHandler
+        # Keep here to maintain same settings as for CellIterator
+        _check_same_celltype(get_grid(gridordh), set)
     end
-    return InterfaceIterator(InterfaceCache(gridordh, topology), set)
-end
-function InterfaceIterator(gridordh::Union{Grid,AbstractDofHandler}, topology::ExclusiveTopology)
-    return InterfaceIterator(gridordh, nothing, topology)
+    return FaceIterator(FaceCache(gridordh, flags), set)
 end
 
-const GridIterators{C} = Union{CellIterator{C},InterfaceIterator{C}}
+@inline _getcache(fi::FaceIterator) = fi.fc
+@inline _getset(fi::FaceIterator) = fi.set
+
+
+# Iterator interface for CellIterator/FaceIterator
+const GridIterators{C} = Union{CellIterator{C}, FaceIterator{C}}
+
+function Base.iterate(iterator::GridIterators, state_in...)
+    it = iterate(_getset(iterator), state_in...)
+    it === nothing && return nothing
+    item, state_out = it
+    cache = _getcache(iterator)
+    reinit!(cache, item)
+    return (cache, state_out)
+end
+Base.IteratorSize(::Type{<:GridIterators{C}}) where C = Base.IteratorSize(C)
+Base.IteratorEltype(::Type{<:GridIterators}) = Base.HasEltype()
+Base.eltype(::Type{<:GridIterators{C}}) where C = C
+Base.length(iterator::GridIterators) = length(_getset(iterator))
 
 # Iterator interface
 function Base.iterate(ii::InterfaceIterator, state_in...)
@@ -296,9 +344,18 @@ Base.IteratorEltype(::Type{<:GridIterators}) = Base.HasEltype()
 Base.eltype(::Type{<:GridIterators{CC}}) where CC = CC
 Base.length(gi::GridIterators) = length(gi.set)
 
-function _check_same_celltype(grid::AbstractGrid, cellset)
+function _check_same_celltype(grid::AbstractGrid, cellset::IntegerCollection)
+    isconcretetype(getcelltype(grid)) && return nothing # Short circuit check
     celltype = getcelltype(grid, first(cellset))
     if !all(getcelltype(grid, i) == celltype for i in cellset)
         error("The cells in the cellset are not all of the same celltype.")
+    end
+end
+
+function _check_same_celltype(grid::AbstractGrid, faceset::Set{FaceIndex})
+    isconcretetype(getcelltype(grid)) && return nothing # Short circuit check
+    celltype = getcelltype(grid, first(faceset)[1])
+    if !all(getcelltype(grid, face[1]) == celltype for face in faceset)
+        error("The cells in the faceset are not all of the same celltype.")
     end
 end

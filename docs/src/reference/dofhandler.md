@@ -30,14 +30,8 @@ celldofs
 celldofs!
 ```
 
-# CellIterator
+# Grid iterators
 ```@docs
 CellCache
 CellIterator
-```
-
-# InterfaceIterator
-```@docs
-InterfaceCache
-InterfaceIterator
 ```
