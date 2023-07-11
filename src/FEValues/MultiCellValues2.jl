@@ -98,7 +98,7 @@ function reinit!(cv::MultiCellValues2, x::AbstractVector{<:Vec})
     geo_values = cv.geo_values
     checkbounds(Bool, x, 1:getngeobasefunctions(geo_values)) || throw_incompatible_coord_length(length(x), getngeobasefunctions(geo_values))
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
-        detJ, Jinv = calculate_mapping(geo_values, q_point, x)
+        @inline detJ, Jinv = calculate_mapping(geo_values, q_point, x)
         cv.detJdV[q_point] = detJ*w
         # `fun_values::Tuple` makes `map` specialize for number of elements, see Base/tuple.jl vs Base/named_tuple.jl
         map(funvals->apply_mapping!(funvals, q_point, Jinv), values(cv.fun_values)) 

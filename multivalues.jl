@@ -1,6 +1,28 @@
 using Ferrite, BenchmarkTools, StaticArrays
 import Ferrite: MultiCellValues, MultiCellValues2, SingleCellValues
 
+function _reinit!(cv::CellValues, x::AbstractVector{Vec{dim,T}}) where {dim,T}
+    n_geom_basefuncs = getngeobasefunctions(cv)
+    n_func_basefuncs = getnbasefunctions(cv)
+    #length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+    checkbounds(Bool, x, 1:getngeobasefunctions(geo_values)) || throw_incompatible_coord_length(length(x), getngeobasefunctions(geo_values))
+    @inbounds for (i, w) in pairs(getweights(cv.qr))
+        w = cv.qr.weights[i]
+        fecv_J = zero(Tensor{2,dim,T})
+        for j in 1:n_geom_basefuncs
+            fecv_J += x[j] ⊗ cv.dMdξ[j, i]
+        end
+        detJ = det(fecv_J)
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
+        cv.detJdV[i] = detJ * w
+        Jinv = inv(fecv_J)
+        for j in 1:n_func_basefuncs
+            # cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
+            cv.dNdx[j, i] = dothelper(cv.dNdξ[j, i], Jinv)
+        end
+    end
+end
+
 function reinit_master!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{dim,T}}) where {
     dim, T, vdim,
     N_t    <: Union{Number,   Vec{dim},       SVector{vdim}     },
@@ -52,14 +74,14 @@ for (CT, dim) in ((Triangle,2),)
 
     #cv_u2 = deepcopy(cv_u); cv_p2 = deepcopy(cv_p)
     #cv4 = MultiCellValues2(a=cv_u, b=cv_p, c=cv_u2, d=cv_p2)
-
+    
     println("$CT in $(dim)D")
     print("1 CellValues        : "); @btime reinit!($cv_p, $x);
     print("1 CellValues(master): "); @btime reinit_master!($cv_p, $x);
     print("1 MultiCellValues   : "); @btime reinit!($mcv_p, $x);
     print("1 MultiCellValues2  : "); @btime reinit!($mcv2_p, $x);
     print("1 SingleCellValues  : "); @btime reinit!($scv_p, $x);
-    
+    # =#
     #=
     println()
     print("2 CellValues       : "); @btime reinit2!($cv_u, $cv_p, $x)

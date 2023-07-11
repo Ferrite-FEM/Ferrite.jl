@@ -16,8 +16,9 @@ end
 function reinit!(cv::SingleCellValues, x::AbstractVector{<:Vec})
     geo_values = cv.geo_values
     checkbounds(Bool, x, 1:getngeobasefunctions(geo_values)) || throw_incompatible_coord_length(length(x), getngeobasefunctions(geo_values))
+
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
-        detJ, Jinv = calculate_mapping(geo_values, q_point, x)
+        @inline detJ, Jinv = calculate_mapping(geo_values, q_point, x)
         cv.detJdV[q_point] = detJ*w
         apply_mapping!(cv.fun_values, q_point, Jinv)
     end
