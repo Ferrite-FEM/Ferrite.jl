@@ -87,57 +87,6 @@ function reinit!(cc::CellCache, i::Int)
     return cc
 end
 
-####################
-## InterfaceCache ##
-####################
-
-"""
-    InterfaceCache(grid::Grid, topology::ExclusiveTopology)
-    InterfaceCache(dh::AbstractDofHandler, topology::ExclusiveTopology)
-
-Create a cache object with pre-allocated memory for the coordinates and facets of an
-interface. The cache is updated for a new cell by calling `reinit!(cache, this_face, neighbor_face)` where
-`this_face::FaceIndex` and `neighbor_face::FaceIndex` are the interface facets.
-
-**Struct fields of `InterfaceCache`**
- - `ic.this_coords :: Vector{<:Vec}`: current cell node coordinates
- - `ic.neighbor_coords :: Vector{<:Vec}`: neighbor cell node coordinates
- - `ic.this_face :: Vector{<:Vec}`: local face index for current cell
- - `ic.neighbor_face :: Vector{<:Vec}`: local face index for neighbor cell
- - `ic.orientation_info :: InterfaceOrientationInfo`: whether the neighbor orientation info relative to current face
- - `ic.grid :: AbstractGrid`: grid information used in iteration
- - `ic.topology :: ExclusiveTopology`: topology information used in iteration
-
-**Methods with `InterfaceCache`**
- - `reinit!(cache::InterfaceCache, this_face::FaceIndex, neighbor_face::FaceIndex)`: reinitialize [`InterfaceCache`](@ref)
-
-See also [`InterfaceIterator`](@ref).
-"""
-struct InterfaceCache{CC<:CellCache}
-    this_cell::CC
-    neighbor_cell::CC
-    this_face::ScalarWrapper{Int}
-    neighbor_face::ScalarWrapper{Int}
-    # orientation_info::InterfaceOrientationInfo
-    # Topology information needed for iteration
-    topology::ExclusiveTopology
-end
-
-function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler}, topology::ExclusiveTopology)
-    this_cell = CellCache(gridordh)
-    neighbor_cell = CellCache(gridordh)
-    return InterfaceCache(this_cell, neighbor_cell, ScalarWrapper(0), ScalarWrapper(0)#=, InterfaceOrientationInfo(false, 0)=#, topology)
-end
-
-function reinit!(cache::InterfaceCache, this_face::FaceIndex, neighbor_face::FaceIndex)
-    reinit!(cache.this_cell,this_face[1])
-    reinit!(cache.neighbor_cell,neighbor_face[1])
-    cache.this_face[] = this_face[2]
-    cache.neighbor_face[] = neighbor_face[2]
-    #cache.orientation_info = InterfaceOrientationInfo(cache.grid, this_face, neighbor_face)
-    return cache
-end
-
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
@@ -440,21 +389,6 @@ Base.IteratorSize(::Type{<:GridIterators{C}}) where C = Base.IteratorSize(C)
 Base.IteratorEltype(::Type{<:GridIterators}) = Base.HasEltype()
 Base.eltype(::Type{<:GridIterators{C}}) where C = C
 Base.length(iterator::GridIterators) = length(_getset(iterator))
-
-# Iterator interface
-function Base.iterate(ii::InterfaceIterator, state_in...)
-    it = iterate(ii.set, state_in...)
-    it === nothing && return nothing
-    interface_id, state_out = it
-    this_face = ii.cache.topology.face_skeleton[interface_id]
-    neighbor_face = ii.cache.topology.face_neighbor[this_face[1], this_face[2]][1]
-    reinit!(ii.cache, this_face, neighbor_face)
-    return (ii.cache, state_out)
-end
-Base.IteratorSize(::Type{<:GridIterators}) = Base.HasLength()
-Base.IteratorEltype(::Type{<:GridIterators}) = Base.HasEltype()
-Base.eltype(::Type{<:GridIterators{CC}}) where CC = CC
-Base.length(gi::GridIterators) = length(gi.set)
 
 function _check_same_celltype(grid::AbstractGrid, cellset::IntegerCollection)
     isconcretetype(getcelltype(grid)) && return nothing # Short circuit check
