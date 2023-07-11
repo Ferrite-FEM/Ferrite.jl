@@ -143,8 +143,14 @@ export
 # iterators
     CellCache,
     CellIterator,
+    FaceCache,
+    FaceIterator,
+    InterfaceCache,
+    InterfaceIterator,
     UpdateFlags,
     cellid,
+    interfacedofs,
+    interfacedofranges,
 
 # assembly
     start_assemble,

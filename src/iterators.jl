@@ -141,6 +141,9 @@ end
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
+# TODOL enable this after InterfaceValues are merges
+# reinit!(iv::InterfaceValues, ic::InterfaceCache) = reinit!(iv, FaceIndex(cellid(ic.face_a), ic.face_a.current_faceid[]), get_cell_coordinates(ic.face_a),
+#     FaceIndex(cellid(ic.face_b), ic.face_b.current_faceid[]), get_cell_coordinates(ic.face_b), ic.face_a.cc.grid)
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
 getnodes(cc::CellCache) = cc.nodes
@@ -206,6 +209,47 @@ end
 @inline function reinit!(fv::FaceValues, fc::FaceCache)
     reinit!(fv, fc.cc, fc.current_faceid[])
 end
+
+"""
+    InterfaceCache(grid::Grid)
+    InterfaceCache(dh::AbstractDofHandler)
+Create a cache object with pre-allocated memory for the coordinates and faces of an
+interface. The cache is updated for a new cell by calling `reinit!(cache, face_a, face_b)` where
+`face_a::FaceIndex` and `face_b::FaceIndex` are the interface faces.
+**Struct fields of `InterfaceCache`**
+ - `ic.face_a :: FaceCache`: current cell node coordinates
+ - `ic.face_b :: FaceCache`: neighbor cell node coordinates
+**Methods with `InterfaceCache`**
+ - `reinit!(cache::InterfaceCache, face_a::FaceIndex, face_b::FaceIndex)`: reinitialize [`InterfaceCache`](@ref)
+ - `cellid(ic)`: get cell ids of the current interface
+ - `getnodes(ic, use_cell_a = true)`: get the global node ids of cell A or cell B of the interface
+ - `get_cell_coordinates(ic, use_cell_a = true)`: get the coordinates of cell A or cell B of the interface
+ - `interfacedofs(ic)`: get the global dof ids of the interface cells
+ - `interfacedofranges(ic)`: get the interface dof ranges of the interface cells
+See also [`InterfaceIterator`](@ref).
+"""
+struct InterfaceCache{FC<:FaceCache}
+    face_a::FC
+    face_b::FC
+end
+
+function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler})
+    face_a = FaceCache(gridordh)
+    face_b = FaceCache(gridordh)
+    return InterfaceCache(face_a, face_b)
+end
+
+function reinit!(cache::InterfaceCache, face_a::FaceIndex, face_b::FaceIndex)
+    reinit!(cache.face_a, face_a)
+    reinit!(cache.face_b, face_b)
+    return cache
+end
+
+getnodes(ic::InterfaceCache, use_cell_a::Bool = true) = getnodes(use_cell_a ? ic.face_a : ic.face_b)
+get_cell_coordinates(ic::InterfaceCache, use_cell_a::Bool = true) = get_cell_coordinates(use_cell_a ? ic.face_a : ic.face_b)
+cellid(ic::InterfaceCache) = (cellid(ic.face_a), cellid(ic.face_b))
+interfacedofs(ic::InterfaceCache) = vcat(celldofs(ic.face_a), celldofs(ic.face_b))
+interfacedofranges(ic::InterfaceCache) = (1 : length(celldofs(ic.face_a)), length(celldofs(ic.face_a)) + 1 : length(celldofs(ic.face_a))  + length(celldofs(ic.face_b)))
 
 ####################
 ## Grid iterators ##
@@ -312,9 +356,77 @@ end
 @inline _getcache(fi::FaceIterator) = fi.fc
 @inline _getset(fi::FaceIterator) = fi.set
 
+"""
+    InterfaceIterator(grid::Grid, interfaces_set=1:length(topology.face_skeleton), topology::ExclusiveTopology)
+    InterfaceIterator(dh::AbstractDofHandler, interfaces_set=1:length(topology.face_skeleton), topology::ExclusiveTopology)
+Create an `InterfaceIterator` to conveniently iterate over all, or a subset, of the interfaces in a
+grid. The elements of the iterator are [`InterfaceCache`](@ref)s which are properly
+`reinit!`ialized. See [`InterfaceCache`](@ref) for more details.
+Looping over an `InterfaceIterator`, i.e.:
+```julia
+for ic in InterfaceIterator(grid, cellset)
+    # ...
+end
+```
+is thus simply convenience for the following equivalent snippet for grids of dimensions > 1:
+```julia
+ic = InterfaceCache(grid, topology)
+for face in topology.face_skeleton
+    neighborhood = topology.face_face_neighbor[face[1], face[2]]
+    isempty(neighborhood) && continue
+    neighbor_face = neighborhood[1]
+    reinit!(ic, face, neighbor_face)
+    # ...
+end
+```
+!!! warning
+    `InterfaceIterator` is stateful and should not be used for things other than `for`-looping
+    (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
+"""
+struct InterfaceIterator{Cache<:InterfaceCache}
+    cache::Cache
+    set::Set{NTuple{2, FaceIndex}}
+end
+
+function InterfaceIterator(gridordh::Union{Grid,AbstractDofHandler},
+                      set::Union{Set{NTuple{2, FaceIndex}},Nothing},
+                      topology::ExclusiveTopology = ExclusiveTopology(gridordh))
+    
+    if isnothing(set)
+        # Maybe move this to faceskeleton and buffer it in topology?
+        grid = gridordh isa Grid ? gridordh : get_grid(gridordh)
+        i = 1;
+        grid_dim = getdim(grid)
+        neighborhood = grid_dim == 1 ? pairs(topology.vertex_vertex_neighbor) : pairs(topology.face_face_neighbor)
+        interface_skeleton = Array{NTuple{2, FaceIndex}}(undef, count(pair -> !isempty(pair[2]) && pair[2].neighbor_info[][1] > pair[1][1], neighborhood))
+        for (idx, face) in neighborhood
+            !isempty(face.neighbor_info) && face.neighbor_info[][1] > idx[1] || continue
+            interface_skeleton[i] = (face.neighbor_info[], FaceIndex(idx[1], idx[2])) #Assumes one neighbor only
+            i+=1
+        end
+        set = Set(interface_skeleton)
+    end
+    return InterfaceIterator(InterfaceCache(gridordh), set)
+end
+
+function InterfaceIterator(gridordh::Union{Grid,AbstractDofHandler}, topology::ExclusiveTopology = ExclusiveTopology(gridordh))
+    return InterfaceIterator(gridordh, nothing, topology)
+end
+
+# Iterator interface
+function Base.iterate(ii::InterfaceIterator, state_in...)
+    it = iterate(ii.set, state_in...)
+    it === nothing && return nothing
+    interface, state_out = it
+    face_a = interface[1]
+    face_b = interface[2]
+    reinit!(ii.cache, face_a, face_b)
+    return (ii.cache, state_out)
+end
+
 
 # Iterator interface for CellIterator/FaceIterator
-const GridIterators{C} = Union{CellIterator{C}, FaceIterator{C}}
+const GridIterators{C} = Union{CellIterator{C}, FaceIterator{C}, InterfaceIterator{C}}
 
 function Base.iterate(iterator::GridIterators, state_in...)
     it = iterate(_getset(iterator), state_in...)

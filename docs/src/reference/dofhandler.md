@@ -34,4 +34,8 @@ celldofs!
 ```@docs
 CellCache
 CellIterator
+FaceCache
+FaceIterator
+InterfaceCache
+InterfaceIterator
 ```
