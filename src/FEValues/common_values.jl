@@ -4,17 +4,8 @@ using Base: @propagate_inbounds
 
 @noinline throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
 
-<<<<<<< HEAD
-getnbasefunctions(cv::Values) = size(cv.N, 1)
-getngeobasefunctions(cv::Values) = size(cv.M, 1)
-
-getn_scalarbasefunctions(cv::T) where T = getn_scalarbasefunctions(FieldTrait(T), cv)
-getn_scalarbasefunctions(::ScalarValued, cv::Values) = getnbasefunctions(cv)
-getn_scalarbasefunctions(::VectorValued, cv::Values{dim}) where {dim} = getnbasefunctions(cv) ÷ dim
-=======
 getnbasefunctions(cv::AbstractValues) = size(cv.N, 1)
 getngeobasefunctions(cv::AbstractValues) = size(cv.M, 1)
->>>>>>> master
 
 function checkquadpoint(cv::Union{CellValues, FaceValues, PointValues}, qp::Int)
     0 < qp <= getnquadpoints(cv) || error("quadrature point out of range")

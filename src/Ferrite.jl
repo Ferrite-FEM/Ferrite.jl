@@ -86,7 +86,9 @@ include("FEValues/face_values.jl")
 include("PointEval/point_values.jl")
 include("FEValues/common_values.jl")
 include("FEValues/face_integrals.jl")
-include("FEValues/CellMultiValues.jl")
+include("FEValues/MultiCellValues.jl")
+include("FEValues/MultiCellValues2.jl")
+include("FEValues/SingleCellValues.jl")
 
 # Grid
 include("Grid/grid.jl")

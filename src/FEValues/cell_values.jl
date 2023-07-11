@@ -149,17 +149,17 @@ function CellValues(::Type{T}, qr::QR, ip::IP, vgip::VGIP) where {
 end
 
 # reinit! for regular (non-embedded) elements (rdim == sdim)
-function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{dim,T}}) where {
-    dim, T, vdim,
-    N_t    <: Union{Number,   Vec{dim},       SVector{vdim}     },
-    dNdx_t <: Union{Vec{dim}, Tensor{2, dim}, SMatrix{vdim, dim}},
-    dNdξ_t <: Union{Vec{dim}, Tensor{2, dim}, SMatrix{vdim, dim}},
-}
+is_embedded(::CellValues, x::AbstractVector{<:Vec}) = false # Default
+is_embedded(::CellValues{<:Any, <:Any, <:Any, <:Union{SVector{rdim},<:SMatrix{<:Any,rdim}}}, ::AbstractVector{<:Vec{sdim}}) where {rdim, sdim} = rdim != sdim
+
+function reinit!(cv::CellValues, x::AbstractVector{Vec{dim,T}}) where {dim,T}
+    is_embedded(cv, x) && return reinit_embedded!(cv, x) # Tested to be compile time inferrable
     n_geom_basefuncs = getngeobasefunctions(cv)
     n_func_basefuncs = getnbasefunctions(cv)
     length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
-
+    
     @inbounds for (i, w) in pairs(getweights(cv.qr))
+        w = cv.qr.weights[i]
         fecv_J = zero(Tensor{2,dim,T})
         for j in 1:n_geom_basefuncs
             fecv_J += x[j] ⊗ cv.dMdξ[j, i]
@@ -252,8 +252,8 @@ See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-di
 """
 embedding_det(J::Union{SMatrix{2, 1}, SMatrix{3, 1}}) = norm(J)
 
-# reinit! for embedded elements, rdim < sdim
-function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{sdim,T}}) where {
+# reinit! for embedded elements, rdim < sdim (called from the standard reinit)
+function reinit_embedded!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{sdim,T}}) where {
     rdim, sdim, vdim, T,
     N_t    <: Union{Number,           SVector{vdim}},
     dNdx_t <: Union{SVector{sdim, T}, SMatrix{vdim, sdim, T}},

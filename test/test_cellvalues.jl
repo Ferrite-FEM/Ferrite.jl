@@ -258,7 +258,10 @@ end
         qr = QuadratureRule{RefQuadrilateral}(1)
         csv2 = CellValues(qr, ip)
         csv3 = CellValues(qr, ip, ip_base^3)
+        _getval(cv, x) = Val(Ferrite.is_embedded(cv, x))
+        @test (@inferred _getval(csv2, zeros(Vec{2}, 3))) isa Val{false}
         reinit!(csv2, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))])
+        @test (@inferred _getval(csv3, zeros(Vec{3}, 3))) isa Val{true}
         reinit!(csv3, [Vec((-1.0,-1.0,0.0)), Vec((1.0,-1.0,0.0)), Vec((1.0,1.0,0.0)), Vec((-1.0,1.0,0.0))])
         # Test spatial interpolation
         @test spatial_coordinate(csv2, 1, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))]) == Vec{2}((0.0, 0.0))
