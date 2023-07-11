@@ -8,7 +8,7 @@ function geo_types_for_spatial_dim(spatial_dim)
     spatial_dim == 3 && return [Tetrahedron, Hexahedron] # Quadratic* not yet functional in 3D. 3D triangle missing. Embedded also missing.
 end
 
-default_refshape(t::Type{C}) where {C <: Ferrite.AbstractCell} = typeof(Ferrite.default_interpolation(t)).parameters[2]
+getrefshape(::Type{T}) where {refshape, T <: Ferrite.AbstractCell{refshape}} = refshape
 
 end
 
@@ -18,12 +18,12 @@ module FerriteAssemblyHelper
 using Ferrite
 
 # Minimal Ritz-Galerkin type local assembly loop.
-function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, cellvalues::CellValues{dim,T,refshape}, f_shape, f_test, op) where {dim,T,refshape}
+function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, cellvalues::CellValues, f_shape, f_test, op)
     n_basefuncs = getnbasefunctions(cellvalues)
 
     Ke = zeros(n_basefuncs, n_basefuncs)
 
-    X = getcoordinates(grid, 1)
+    X = get_cell_coordinates(grid, 1)
     reinit!(cellvalues, X)
 
     for q_point in 1:getnquadpoints(cellvalues)
@@ -40,12 +40,12 @@ function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.Abstract
     Ke
 end
 
-function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, facevalues::FaceValues{dim,T,refshape}, f_shape, f_test, op) where {dim,T,refshape}
+function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, facevalues::FaceValues, f_shape, f_test, op)
     n_basefuncs = getnbasefunctions(facevalues)
 
     f = zeros(n_basefuncs)
 
-    X = getcoordinates(grid, 1)
+    X = get_cell_coordinates(grid, 1)
     for face in 1:nfaces(getcells(grid)[1])
         reinit!(facevalues, X, face)
 
@@ -66,19 +66,18 @@ function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.Abstract
 end
 
 # Minimal Petrov-Galerkin type local assembly loop. We assume that both function spaces share the same integration rule. Test is applied from the left.
-function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, cellvalues_shape::CellValues{dim,T,refshape}, f_shape, cellvalues_test::CellValues{dim,T,refshape}, f_test, op) where {dim,T,refshape}
+function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, cellvalues_shape::CellValues{<: Ferrite.InterpolationByDim{dim}}, f_shape, cellvalues_test::CellValues{<: Ferrite.InterpolationByDim{dim}}, f_test, op) where {dim}
     n_basefuncs_shape = getnbasefunctions(cellvalues_shape)
     n_basefuncs_test = getnbasefunctions(cellvalues_test)
-
     Ke = zeros(n_basefuncs_test, n_basefuncs_shape)
 
     #implicit assumption: Same geometry!
     X_shape = zeros(Vec{dim,Float64}, Ferrite.getngeobasefunctions(cellvalues_shape))
-    getcoordinates!(X_shape, grid, 1)
+    get_cell_coordinates!(X_shape, grid, 1)
     reinit!(cellvalues_shape, X_shape)
 
     X_test = zeros(Vec{dim,Float64}, Ferrite.getngeobasefunctions(cellvalues_test))
-    getcoordinates!(X_test, grid, 1)
+    get_cell_coordinates!(X_test, grid, 1)
     reinit!(cellvalues_test, X_test)
 
     for q_point in 1:getnquadpoints(cellvalues_test) #assume same quadrature rule
@@ -95,14 +94,14 @@ function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.Abstra
     Ke
 end
 
-function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, facevalues_shape::FaceValues{dim,T,refshape}, f_shape, facevalues_test::FaceValues{dim,T,refshape}, f_test, op) where {dim,T,refshape}
+function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, facevalues_shape::FaceValues, f_shape, facevalues_test::FaceValues, f_test, op)
     n_basefuncs_shape = getnbasefunctions(facevalues_shape)
     n_basefuncs_test = getnbasefunctions(facevalues_test)
 
     f = zeros(n_basefuncs_test)
 
-    X_shape = getcoordinates(grid, 1)
-    X_test = getcoordinates(grid, 1)
+    X_shape = get_cell_coordinates(grid, 1)
+    X_test = get_cell_coordinates(grid, 1)
     for face in 1:nfaces(getcells(grid)[1])
         reinit!(facevalues_shape, X_shape, face)
         reinit!(facevalues_test, X_test, face)

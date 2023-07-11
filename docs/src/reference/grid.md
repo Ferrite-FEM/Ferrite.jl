@@ -35,10 +35,9 @@ getedgeset
 getedgesets
 getvertexset
 getvertexsets
-compute_vertex_values
 transform!
-getcoordinates
-getcoordinates!
+get_cell_coordinates
+get_cell_coordinates!
 ```
 
 ### Topology
@@ -47,6 +46,8 @@ getcoordinates!
 Ferrite.ExclusiveTopology
 Ferrite.getneighborhood
 Ferrite.faceskeleton
+Ferrite.vertex_star_stencils
+Ferrite.getstencil
 ```
 
 ### Grid Sets Utility
@@ -54,6 +55,9 @@ Ferrite.faceskeleton
 ```@docs
 addcellset!
 addfaceset!
+addboundaryfaceset!
+addboundaryedgeset!
+addboundaryvertexset!
 addnodeset!
 ```
 
