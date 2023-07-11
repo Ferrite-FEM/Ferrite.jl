@@ -1,28 +1,6 @@
 using Ferrite, BenchmarkTools, StaticArrays
 import Ferrite: MultiCellValues, MultiCellValues2, SingleCellValues
 
-function old_reinit!(cv::CellValues, x::AbstractVector)
-    n_geom_basefuncs = Ferrite.getngeobasefunctions(cv)
-    n_func_basefuncs = getnbasefunctions(cv)
-    length(x) == n_geom_basefuncs || Ferrite.throw_incompatible_coord_length(length(x), n_geom_basefuncs)
-
-    @inbounds for i in 1:length(cv.qr.weights)
-        w = cv.qr.weights[i]
-        #fecv_J = zero(Tensor{2,dim})
-        fecv_J = zero(Tensors.getreturntype(⊗, eltype(x), eltype(cv.dMdξ)))
-        for j in 1:n_geom_basefuncs
-            fecv_J += x[j] ⊗ cv.dMdξ[j, i]
-        end
-        detJ = det(fecv_J)
-        detJ > 0.0 || Ferrite.throw_detJ_not_pos(detJ)
-        cv.detJdV[i] = detJ * w
-        Jinv = inv(fecv_J)
-        for j in 1:n_func_basefuncs
-            cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
-        end
-    end
-end
-
 function reinit_master!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{dim,T}}) where {
     dim, T, vdim,
     N_t    <: Union{Number,   Vec{dim},       SVector{vdim}     },
@@ -70,15 +48,17 @@ for (CT, dim) in ((Triangle,2),)
     mcv2_p = MultiCellValues2(;a=cv_p)
     mcv_pu = MultiCellValues(;a=cv_p, b=cv_u)
     mcv2_pu = MultiCellValues2(;a=cv_p, b=cv_u)
+    scv_p = SingleCellValues(cv_p)
+
     #cv_u2 = deepcopy(cv_u); cv_p2 = deepcopy(cv_p)
     #cv4 = MultiCellValues2(a=cv_u, b=cv_p, c=cv_u2, d=cv_p2)
 
     println("$CT in $(dim)D")
-    print("1 CellValues       : "); @btime reinit!($cv_p, $x);
-    print("1 CellValues (old) : "); @btime old_reinit!($cv_p, $x);
+    print("1 CellValues        : "); @btime reinit!($cv_p, $x);
     print("1 CellValues(master): "); @btime reinit_master!($cv_p, $x);
-    print("1 MultiCellValues  : "); @btime reinit!($mcv_p, $x);
-    print("1 MultiCellValues2 : "); @btime reinit!($mcv2_p, $x);
+    print("1 MultiCellValues   : "); @btime reinit!($mcv_p, $x);
+    print("1 MultiCellValues2  : "); @btime reinit!($mcv2_p, $x);
+    print("1 SingleCellValues  : "); @btime reinit!($scv_p, $x);
     
     #=
     println()

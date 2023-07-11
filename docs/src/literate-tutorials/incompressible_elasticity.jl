@@ -24,7 +24,7 @@
 #md # [section](@ref incompressible_elasticity-plain-program).
 using Ferrite
 using BlockArrays, SparseArrays, LinearAlgebra
-import Ferrite: CellMultiValues
+import Ferrite: MultiCellValues
 
 # First we generate a simple grid, specifying the 4 corners of Cooks membrane.
 function create_cook_grid(nx, ny)
@@ -53,7 +53,7 @@ function create_values(interpolation_u, interpolation_p)
     cellvalues_p = CellValues(qr, interpolation_p)
 
     ## Combine into multivalues
-    cellvalues = CellMultiValues(;u=cellvalues_u, p=cellvalues_p)
+    cellvalues = MultiCellValues(;u=cellvalues_u, p=cellvalues_p)
 
     return cellvalues, facevalues_u
 end;
@@ -89,9 +89,9 @@ end
 # Now to the assembling of the stiffness matrix. This mixed formulation leads to a blocked
 # element matrix. Since Ferrite does not force us to use any particular matrix type we will
 # use a `PseudoBlockArray` from `BlockArrays.jl`.
-function doassemble(cellvalues::CellMultiValues{dim}, facevalues_u::FaceValues{<:VectorInterpolation},
+function doassemble(cellvalues::MultiCellValues, facevalues_u::FaceValues{<:VectorInterpolation},
                     K::SparseMatrixCSC, grid::Grid,
-                    dh::DofHandler, mp::LinearElasticity) where {dim}
+                    dh::DofHandler, mp::LinearElasticity)
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
     nu = getnbasefunctions(cellvalues[:u])
