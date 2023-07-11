@@ -333,23 +333,16 @@ Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that 
 """
 function _faceskeleton(top::ExclusiveTopology, grid::Grid)
     i = 1;
-    if isempty(top.face_face_neighbor)
-        face_skeleton_local = Array{FaceIndex}(undef, count(pair -> isempty(pair[2]) || pair[2].neighbor_info[][1] > pair[1][1], pairs(top.vertex_vertex_neighbor)))
-        for (idx, face) in pairs(top.vertex_vertex_neighbor)
-            isempty(face.neighbor_info) || face.neighbor_info[][1] > idx[1] || continue
-            face_skeleton_local[i] = FaceIndex(idx[1], idx[2])
-            i+=1
-        end
-        return face_skeleton_local
-    else
-        face_skeleton_local = Array{FaceIndex}(undef, count(pair -> isempty(pair[2]) || pair[2].neighbor_info[][1] > pair[1][1], pairs(top.face_face_neighbor)))
-        for (idx, face) in pairs(top.face_face_neighbor)
-            isempty(face.neighbor_info) || face.neighbor_info[][1] > idx[1] || continue
-            face_skeleton_local[i] = FaceIndex(idx[1], idx[2])
-            i+=1
-        end
-        return face_skeleton_local
+    grid_dim = getdim(grid)
+    any(cell -> getdim(cell) != grid_dim, getcells(grid)) && error("Some elements of the $(grid_dim)D grid are not $(grid_dim)D")
+    neighborhood = grid_dim == 1 ? pairs(top.vertex_vertex_neighbor) : pairs(top.face_face_neighbor)
+    face_skeleton_local = Array{FaceIndex}(undef, count(pair -> isempty(pair[2]) || pair[2].neighbor_info[][1] > pair[1][1], neighborhood))
+    for (idx, face) in neighborhood
+        isempty(face.neighbor_info) || face.neighbor_info[][1] > idx[1] || continue
+        face_skeleton_local[i] = FaceIndex(idx[1], idx[2])
+        i+=1
     end
+    return face_skeleton_local
 end
 
 """

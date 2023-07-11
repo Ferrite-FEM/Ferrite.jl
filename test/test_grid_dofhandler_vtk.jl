@@ -368,16 +368,17 @@ end
         FaceIndex(6,1),                 FaceIndex(6,3),
     ])
 # test mixed grid
-    # cells = [
-    #     Hexahedron((1, 2, 3, 4, 5, 6, 7, 8)),
-    #     Hexahedron((11, 13, 14, 12, 15, 16, 17, 18)),
-    #     Quadrilateral((2, 9, 10, 3)),
-    #     Quadrilateral((9, 11, 12, 10)),
-    #     ]
-    # nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 18)]
-    # grid = Grid(cells, nodes)
-    # topology = ExclusiveTopology(grid)
+    cells = [
+        Hexahedron((1, 2, 3, 4, 5, 6, 7, 8)),
+        Hexahedron((11, 13, 14, 12, 15, 16, 17, 18)),
+        Quadrilateral((2, 9, 10, 3)),
+        Quadrilateral((9, 11, 12, 10)),
+        ]
+    nodes = [Node(coord) for coord in zeros(Vec{3,Float64}, 18)]
+    grid = Grid(cells, nodes)
+    topology = ExclusiveTopology(grid)
 
+    @test_throws ErrorException("Some elements of the 3D grid are not 3D") Ferrite.faceskeleton(topology, grid)
     # @test topology.face_face_neighbor[3,4] == Ferrite.EntityNeighborhood(EdgeIndex(1,2))
     # @test topology.edge_edge_neighbor[1,2] == Ferrite.EntityNeighborhood(FaceIndex(3,4))
     # # regression that it doesn't error for boundary faces, see https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
@@ -385,6 +386,17 @@ end
     # @test topology.edge_edge_neighbor[1,1] == topology.edge_edge_neighbor[1,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
     # @test topology.face_face_neighbor[3,1] == topology.face_face_neighbor[3,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
     # @test topology.face_face_neighbor[4,1] == topology.face_face_neighbor[4,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
+
+    cells = [
+        Quadrilateral((1, 2, 6, 5)),
+        Quadrilateral((3, 4, 8, 7)),
+        Line((2, 3)),
+        Line((6, 7)),
+        ]
+    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 18)]
+    grid = Grid(cells, nodes)
+    topology = ExclusiveTopology(grid)
+    @test_throws ErrorException("Some elements of the 2D grid are not 2D") Ferrite.faceskeleton(topology, grid)
 
 #
 #                   +-----+-----+-----+
