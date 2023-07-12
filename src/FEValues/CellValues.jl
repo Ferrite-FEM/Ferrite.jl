@@ -45,7 +45,7 @@ function reinit!(cv::CellValues, x::AbstractVector{<:Vec})
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     end
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
-        @inline Jinv = calculate_mapping(geo_values, q_point, w, x)
+        Jinv = @inline calculate_mapping(geo_values, q_point, w, x)
         @inline apply_mapping!(cv.fun_values, q_point, Jinv)
     end
     return nothing
