@@ -61,13 +61,13 @@ getnbasefunctions(funvals::FunctionValues) = size(funvals.N, 1)
 
 # Hotfix to get the dots right for embedded elements until mixed tensors are merged.
 # Scalar/Vector interpolations with sdim == rdim (== vdim)
-dothelper(A, B) = A ⋅ B
+@inline dothelper(A, B) = A ⋅ B
 # Vector interpolations with sdim == rdim != vdim
-dothelper(A::SMatrix{vdim, dim}, B::Tensor{2, dim}) where {vdim, dim} = A * SMatrix{dim, dim}(B)
+@inline dothelper(A::SMatrix{vdim, dim}, B::Tensor{2, dim}) where {vdim, dim} = A * SMatrix{dim, dim}(B)
 # Scalar interpolations with sdim > rdim
-dothelper(A::SVector{rdim}, B::SMatrix{rdim, sdim}) where {rdim, sdim} = B' * A
+@inline dothelper(A::SVector{rdim}, B::SMatrix{rdim, sdim}) where {rdim, sdim} = B' * A
 # Vector interpolations with sdim > rdim
-dothelper(B::SMatrix{vdim, rdim}, A::SMatrix{rdim, sdim}) where {vdim, rdim, sdim} = B * A
+@inline dothelper(B::SMatrix{vdim, rdim}, A::SMatrix{rdim, sdim}) where {vdim, rdim, sdim} = B * A
 
 function apply_mapping!(funvals::FunctionValues, q_point::Int, Jinv)
     @inbounds for j in 1:getnbasefunctions(funvals)

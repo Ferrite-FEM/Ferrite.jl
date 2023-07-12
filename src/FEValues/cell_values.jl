@@ -1,7 +1,7 @@
 """
-    CellValues([::Type{T},] quad_rule::QuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
+    OldCellValues([::Type{T},] quad_rule::QuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
 
-A `CellValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
+A `OldCellValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
 values of nodal functions, gradients and divergences of nodal functions etc. in the finite element cell.
 
 **Arguments:**
@@ -29,13 +29,13 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
 """
-CellValues
+OldCellValues
 
 function default_geometric_interpolation(::Interpolation{shape}) where {dim, shape <: AbstractRefShape{dim}}
     return VectorizedInterpolation{dim}(Lagrange{shape, 1}())
 end
 
-struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCellValues
+struct OldCellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCellValues
     N::Matrix{N_t}
     dNdx::Matrix{dNdx_t}
     dNdξ::Matrix{dNdξ_t}
@@ -47,8 +47,8 @@ struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCell
     gip::GIP
 end
 
-# Common initializer code for constructing CellValues after the types have been determined
-function CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(qr::QR, ip::IP, gip::GIP) where {
+# Common initializer code for constructing OldCellValues after the types have been determined
+function OldCellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(qr::QR, ip::IP, gip::GIP) where {
     IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP,
 }
     @assert isconcretetype(IP)     && isconcretetype(N_t) && isconcretetype(dNdx_t) &&
@@ -78,27 +78,27 @@ function CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(qr::QR, ip::I
 
     detJdV = fill(T(NaN), n_qpoints)
 
-    CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(N, dNdx, dNdξ, detJdV, M, dMdξ, qr, ip, gip)
+    OldCellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(N, dNdx, dNdξ, detJdV, M, dMdξ, qr, ip, gip)
 end
 
 # Common entry point that fills in the numeric type and geometric interpolation
-function CellValues(qr::QuadratureRule, ip::Interpolation,
+function OldCellValues(qr::QuadratureRule, ip::Interpolation,
         gip::Interpolation = default_geometric_interpolation(ip))
-    return CellValues(Float64, qr, ip, gip)
+    return OldCellValues(Float64, qr, ip, gip)
 end
 
 # Common entry point that fills in the geometric interpolation
-function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation) where {T}
-    return CellValues(T, qr, ip, default_geometric_interpolation(ip))
+function OldCellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation) where {T}
+    return OldCellValues(T, qr, ip, default_geometric_interpolation(ip))
 end
 
 # Common entry point that vectorizes an input scalar geometric interpolation
-function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, sgip::ScalarInterpolation) where {T}
-    return CellValues(T, qr, ip, VectorizedInterpolation(sgip))
+function OldCellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, sgip::ScalarInterpolation) where {T}
+    return OldCellValues(T, qr, ip, VectorizedInterpolation(sgip))
 end
 
 # Entrypoint for `ScalarInterpolation`s (rdim == sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
+function OldCellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     dim, shape <: AbstractRefShape{dim}, T,
     QR   <: QuadratureRule{shape},
     IP   <: ScalarInterpolation{shape},
@@ -111,11 +111,11 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{dim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
+    return OldCellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
 end
 
 # Entrypoint for `VectorInterpolation`s (vdim == rdim == sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
+function OldCellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{shape},
     IP  <: VectorInterpolation{dim, shape},
@@ -128,11 +128,11 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{dim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
+    return OldCellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
 end
 
 # Entrypoint for `VectorInterpolation`s (vdim != rdim == sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, vgip::VGIP) where {
+function OldCellValues(::Type{T}, qr::QR, ip::IP, vgip::VGIP) where {
     vdim, dim, shape <: AbstractRefShape{dim}, T,
     QR  <: QuadratureRule{shape},
     IP  <: VectorInterpolation{vdim, shape},
@@ -145,11 +145,11 @@ function CellValues(::Type{T}, qr::QR, ip::IP, vgip::VGIP) where {
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{dim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, vgip.ip)
+    return OldCellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, vgip.ip)
 end
 
 # reinit! for regular (non-embedded) elements (rdim == sdim)
-function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{dim,T}}) where {
+function reinit!(cv::OldCellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{dim,T}}) where {
     dim, T, vdim,
     N_t    <: Union{Number,   Vec{dim},       SVector{vdim}     },
     dNdx_t <: Union{Vec{dim}, Tensor{2, dim}, SMatrix{vdim, dim}},
@@ -175,18 +175,8 @@ function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{
     end
 end
 
-# Hotfix to get the dots right for embedded elements until mixed tensors are merged.
-# Scalar/Vector interpolations with sdim == rdim (== vdim)
-@inline dothelper(A, B) = A ⋅ B
-# Vector interpolations with sdim == rdim != vdim
-@inline dothelper(A::SMatrix{vdim, dim}, B::Tensor{2, dim}) where {vdim, dim} = A * SMatrix{dim, dim}(B)
-# Scalar interpolations with sdim > rdim
-@inline dothelper(A::SVector{rdim}, B::SMatrix{rdim, sdim}) where {rdim, sdim} = B' * A
-# Vector interpolations with sdim > rdim
-@inline dothelper(B::SMatrix{vdim, rdim}, A::SMatrix{rdim, sdim}) where {vdim, rdim, sdim} = B * A
-
 # Entrypoint for embedded `ScalarInterpolation`s (rdim < sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
+function OldCellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     sdim, rdim, shape <: AbstractRefShape{rdim}, T,
     QR  <: QuadratureRule{shape},
     IP  <: ScalarInterpolation{shape},
@@ -201,11 +191,11 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{rdim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
+    return OldCellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
 end
 
 # Entrypoint for embedded `VectorInterpolation`s (rdim < sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
+function OldCellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     sdim, vdim, rdim, shape <: AbstractRefShape{rdim}, T,
     QR  <: QuadratureRule{shape},
     IP  <: VectorInterpolation{vdim, shape},
@@ -220,40 +210,11 @@ function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{rdim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
+    return OldCellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
 end
 
-"""
-    embedding_det(J::SMatrix{3, 2})
-
-Embedding determinant for surfaces in 3D.
-
-TLDR: "det(J) =" ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂
-
-The transformation theorem for some function f on a 2D surface in 3D space leads to
-  ∫ f ⋅ dS = ∫ f ⋅ (∂x/∂ξ₁ × ∂x/∂ξ₂) dξ₁dξ₂ = ∫ f ⋅ n ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂ dξ₁dξ₂
-where ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂ is "detJ" and n is the unit normal.
-See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
-For more details see e.g. the doctoral thesis by Mirza Cenanovic **Finite element methods for surface problems* (2017), Ch. 2 **Trangential Calculus**.
-"""
-embedding_det(J::SMatrix{3,2}) = norm(J[:,1] × J[:,2])
-
-"""
-    embedding_det(J::Union{SMatrix{2, 1}, SMatrix{3, 1}})
-
-Embedding determinant for curves in 2D and 3D.
-
-TLDR: "det(J) =" ||∂x/∂ξ||₂
-
-The transformation theorem for some function f on a 1D curve in 2D and 3D space leads to
-  ∫ f ⋅ dE = ∫ f ⋅ ∂x/∂ξ dξ = ∫ f ⋅ t ||∂x/∂ξ||₂ dξ
-where ||∂x/∂ξ||₂ is "detJ" and t is "the unit tangent".
-See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
-"""
-embedding_det(J::Union{SMatrix{2, 1}, SMatrix{3, 1}}) = norm(J)
-
 # reinit! for embedded elements, rdim < sdim
-function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{sdim,T}}) where {
+function reinit!(cv::OldCellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{sdim,T}}) where {
     rdim, sdim, vdim, T,
     N_t    <: Union{Number,           SVector{vdim}},
     dNdx_t <: Union{SVector{sdim, T}, SMatrix{vdim, sdim, T}},

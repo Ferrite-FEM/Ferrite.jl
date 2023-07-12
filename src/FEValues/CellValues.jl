@@ -46,7 +46,7 @@ function reinit!(cv::CellValues, x::AbstractVector{<:Vec})
     end
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
         @inline Jinv = calculate_mapping(geo_values, q_point, w, x)
-        apply_mapping!(cv.fun_values, q_point, Jinv)
+        @inline apply_mapping!(cv.fun_values, q_point, Jinv)
     end
     return nothing
 end
@@ -60,4 +60,13 @@ function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     print(io, getnquadpoints(cv), " quadrature points")
     print(io, "\n Function interpolation: "); show(io, d, cv.fun_values.ip)
     print(io, "\nGeometric interpolation: "); show(io, d, cv.geo_values.ip^sdim)
+end
+
+# Temporary for benchmark/test
+include("cell_values.jl")
+function OldCellValues(cv::CellValues)
+    ip = cv.fun_values.ip 
+    sdim = length(shape_gradient(cv, 1, 1)) ÷ length(shape_value(cv, 1, 1))
+    ip_geo = cv.geo_values.ip^sdim
+    return OldCellValues(cv.qr, ip, ip_geo)
 end
