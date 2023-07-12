@@ -44,7 +44,7 @@ reinit!
 Return the number of quadrature points in `fv`s quadrature for the current
 (most recently [`reinit!`](@ref)ed) face.
 """
-getnquadpoints(fe::FaceValues) = getnquadpoints(fe.qr, fe.current_face[])
+function getnquadpoints end
 
 """
     getdetJdV(fe_v::AbstractValues, q_point::Int)
@@ -59,7 +59,7 @@ finite element cell or face as
 ``\\int\\limits_\\Gamma f(\\mathbf{x}) d \\Gamma \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 
 """
-@propagate_inbounds getdetJdV(bv::FaceValues, q_point::Int) = bv.detJdV[q_point, bv.current_face[]]
+#@propagate_inbounds getdetJdV(bv::FaceValues, q_point::Int) = bv.detJdV[q_point, bv.current_face[]]
 
 """
     shape_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -67,9 +67,9 @@ finite element cell or face as
 Return the value of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-@propagate_inbounds shape_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.N[base_func, q_point, bv.current_face[]]
+#@propagate_inbounds shape_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.N[base_func, q_point, bv.current_face[]]
 
-@propagate_inbounds geometric_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_face[]]
+#@propagate_inbounds geometric_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_face[]]
 
 """
     shape_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -77,7 +77,7 @@ quadrature point `q_point`.
 Return the gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-@propagate_inbounds shape_gradient(bv::FaceValues, q_point::Int, base_func::Int) = bv.dNdx[base_func, q_point, bv.current_face[]]
+#@propagate_inbounds shape_gradient(bv::FaceValues, q_point::Int, base_func::Int) = bv.dNdx[base_func, q_point, bv.current_face[]]
 
 """
     shape_symmetric_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)

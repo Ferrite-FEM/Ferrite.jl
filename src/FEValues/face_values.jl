@@ -31,7 +31,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 """
 FaceValues
 
-struct FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP} <: AbstractFaceValues
+struct OldFaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP} <: AbstractFaceValues
     N::Array{N_t, 3}
     dNdx::Array{dNdx_t, 3}
     dNdξ::Array{dNdξ_t, 3}
@@ -45,8 +45,8 @@ struct FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP} <: Ab
     geo_interp::GIP
 end
 
-# Common initializer code for constructing FaceValues after the types have been determined
-function FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(qr::QR, ip::IP, gip::GIP) where {
+# Common initializer code for constructing OldFaceValues after the types have been determined
+function OldFaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(qr::QR, ip::IP, gip::GIP) where {
     IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP,
 }
     @assert isconcretetype(IP)     && isconcretetype(N_t)      && isconcretetype(dNdx_t) &&
@@ -81,27 +81,27 @@ function FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(qr:
 
     detJdV = fill(T(NaN), max_n_qpoints, n_faces)
 
-    FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, qr, ScalarWrapper(0), ip, gip)
+    OldFaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, qr, ScalarWrapper(0), ip, gip)
 end
 
 # Common entry point that fills in the numeric type and geometric interpolation
-function FaceValues(qr::FaceQuadratureRule, ip::Interpolation,
+function OldFaceValues(qr::FaceQuadratureRule, ip::Interpolation,
         gip::Interpolation = default_geometric_interpolation(ip))
-    return FaceValues(Float64, qr, ip, gip)
+    return OldFaceValues(Float64, qr, ip, gip)
 end
 
 # Common entry point that fills in the geometric interpolation
-function FaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation) where {T}
-    return FaceValues(T, qr, ip, default_geometric_interpolation(ip))
+function OldFaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation) where {T}
+    return OldFaceValues(T, qr, ip, default_geometric_interpolation(ip))
 end
 
 # Common entry point that vectorizes an input scalar geometric interpolation
-function FaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation, sgip::ScalarInterpolation) where {T}
-    return FaceValues(T, qr, ip, VectorizedInterpolation(sgip))
+function OldFaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation, sgip::ScalarInterpolation) where {T}
+    return OldFaceValues(T, qr, ip, VectorizedInterpolation(sgip))
 end
 
 # Entrypoint for `ScalarInterpolation`s (rdim == sdim)
-function FaceValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
+function OldFaceValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     dim, shape <: AbstractRefShape{dim}, T,
     QR  <: FaceQuadratureRule{shape},
     IP  <: ScalarInterpolation{shape},
@@ -116,11 +116,11 @@ function FaceValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{dim, T}
-    return FaceValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, Normal_t, GIP}(qr, ip, gip.ip)
+    return OldFaceValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, Normal_t, GIP}(qr, ip, gip.ip)
 end
 
 # Entrypoint for `VectorInterpolation`s (vdim == rdim == sdim)
-function FaceValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
+function OldFaceValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     dim, shape <: AbstractRefShape{dim}, T,
     QR  <: FaceQuadratureRule{shape},
     IP  <: VectorInterpolation{dim, shape},
@@ -135,10 +135,10 @@ function FaceValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{dim, T}
-    return FaceValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, Normal_t, GIP}(qr, ip, gip.ip)
+    return OldFaceValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, Normal_t, GIP}(qr, ip, gip.ip)
 end
 
-function reinit!(fv::FaceValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T}}, face::Int) where {
+function reinit!(fv::OldFaceValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T}}, face::Int) where {
     dim, T,
     N_t    <: Union{Number,   Vec{dim}},
     dNdx_t <: Union{Vec{dim}, Tensor{2,dim}}
@@ -171,21 +171,21 @@ function reinit!(fv::FaceValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T
 end
 
 """
-    getcurrentface(fv::FaceValues)
+    getcurrentface(fv::OldFaceValues)
 
-Return the current active face of the `FaceValues` object (from last `reinit!`).
-
-"""
-getcurrentface(fv::FaceValues) = fv.current_face[]
+Return the current active face of the `OldFaceValues` object (from last `reinit!`).
 
 """
-    getnormal(fv::FaceValues, qp::Int)
+getcurrentface(fv::OldFaceValues) = fv.current_face[]
+
+"""
+    getnormal(fv::OldFaceValues, qp::Int)
 
 Return the normal at the quadrature point `qp` for the active face of the
-`FaceValues` object(from last `reinit!`).
+`OldFaceValues` object(from last `reinit!`).
 """
-getnormal(fv::FaceValues, qp::Int) = fv.normals[qp]
-
+getnormal(fv::OldFaceValues, qp::Int) = fv.normals[qp]
+#= Moved to FaceValues.jl
 """
     BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}})
 
@@ -250,3 +250,4 @@ function checkface(fv::FaceValues, face::Int)
     0 < face <= nfaces(fv) || error("Face index out of range.")
     return nothing
 end
+=#
