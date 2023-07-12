@@ -150,7 +150,6 @@ export
     UpdateFlags,
     cellid,
     interfacedofs,
-    interfacedofranges,
 
 # assembly
     start_assemble,

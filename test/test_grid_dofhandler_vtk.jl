@@ -219,18 +219,12 @@ end
     grid = generate_grid(Quadrilateral, (2,1))
     ic = InterfaceCache(grid)
     reinit!(ic, FaceIndex(1,2), FaceIndex(2,4))
-    @test cellid(ic) == (1,2)
-    @test getnodes(ic) == collect(getcells(grid, 1).nodes)
-    @test getnodes(ic, false) == collect(getcells(grid, 2).nodes)
-    @test get_cell_coordinates(ic) == get_cell_coordinates(grid, 1)
-    @test get_cell_coordinates(ic, false) == get_cell_coordinates(grid, 2)
-    @test length.(interfacedofs(ic)) == Int[] # Empty because no DofHandler given
+    @test interfacedofs(ic) == Int[] # Empty because no DofHandler given
     ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
     dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
     ic = InterfaceCache(dh)
     reinit!(ic, FaceIndex(1,2), FaceIndex(2,4))
     @test interfacedofs(ic) == collect(1:8)
-    @test interfacedofranges(ic) == (1:4, 5:8)
     # Mixed Elements
     dim = 2
     nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, -1.0)), Node((0.0, 1.0))]
@@ -248,7 +242,6 @@ end
     ic = InterfaceCache(dh)
     reinit!(ic, FaceIndex(1,2), FaceIndex(2,3))
     @test interfacedofs(ic) == collect(1:7)
-    @test interfacedofranges(ic) == (1:4, 5:7)
     # Unit test of some utilities
     mixed_grid = Grid([Quadrilateral((1, 2, 3, 4)),Triangle((3, 2, 5))],
                       [Node(coord) for coord in zeros(Vec{2,Float64}, 5)])
@@ -483,15 +476,15 @@ end
     jump_abs = 0.
     # Test interface Iterator
     for ic in InterfaceIterator(quadgrid)
-        any(cellid(ic) .== 5) || continue
-        reinit!(fv_ele, ic.face_a.cc, ic.face_a.current_faceid[])
+        any(cellid.([ic.a, ic.b]) .== 5) || continue
+        reinit!(fv_ele, ic.a.cc, ic.a.current_faceid[])
         for q_point in 1:getnquadpoints(fv_ele)
             dΩ = getdetJdV(fv_ele, q_point)
             normal_a = getnormal(fv_ele, q_point)
-            u_5_n = function_value(fv_ele, q_point, cellid(ic)[1] == 5 ? u_ele5 : u_neighbors) ⋅ normal_a
-            reinit!(fv_neighbor, ic.face_b.cc, ic.face_b.current_faceid[])
+            u_5_n = function_value(fv_ele, q_point, cellid(ic.a) == 5 ? u_ele5 : u_neighbors) ⋅ normal_a
+            reinit!(fv_neighbor, ic.b.cc, ic.b.current_faceid[])
             normal_b = getnormal(fv_neighbor, q_point)
-            u_neighbor = function_value(fv_neighbor, q_point, cellid(ic)[1] == 5 ? u_neighbors : u_ele5) ⋅ normal_b
+            u_neighbor = function_value(fv_neighbor, q_point, cellid(ic.a) == 5 ? u_neighbors : u_ele5) ⋅ normal_b
             jump_int += (u_5_n + u_neighbor) * dΩ
             jump_abs += abs(u_5_n + u_neighbor) * dΩ
         end
