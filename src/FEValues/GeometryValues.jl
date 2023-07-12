@@ -23,7 +23,7 @@ getngeobasefunctions(geovals::GeometryValues) = size(geovals.M, 1)
 @propagate_inbounds geometric_value(geovals::GeometryValues, q_point::Int, base_func::Int) = geovals.M[base_func, q_point]
 @propagate_inbounds getdetJdV(geovals::GeometryValues, q_point::Int) = geovals.detJdV[q_point]
 
-function calculate_mapping(geo_values::GeometryValues{<:Vec{dim,T}}, q_point, w, x::AbstractVector{<:Vec{dim,T}}) where {dim,T}
+@inline function calculate_mapping(geo_values::GeometryValues{<:Vec{dim,T}}, q_point, w, x::AbstractVector{<:Vec{dim,T}}) where {dim,T}
     fecv_J = zero(Tensor{2,dim,T}) # zero(Tensors.getreturntype(⊗, eltype(x), eltype(geo_values.dMdξ)))
     @inbounds for j in 1:getngeobasefunctions(geo_values)
         fecv_J += x[j] ⊗ geo_values.dMdξ[j, q_point]
@@ -66,7 +66,7 @@ See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-di
 """
 embedding_det(J::Union{SMatrix{2, 1}, SMatrix{3, 1}}) = norm(J)
 
-function calculate_mapping(geo_values::GeometryValues{<:Vec{rdim,T}}, q_point, w, x::AbstractVector{<:Vec{sdim,T}}) where {rdim,sdim,T}
+@inline function calculate_mapping(geo_values::GeometryValues{<:Vec{rdim,T}}, q_point, w, x::AbstractVector{<:Vec{sdim,T}}) where {rdim,sdim,T}
     n_geom_basefuncs = getngeobasefunctions(geo_values)
     fecv_J = zero(MMatrix{sdim, rdim, T}) # TODO replace with MixedTensor (see https://github.com/Ferrite-FEM/Tensors.jl/pull/188)
     for j in 1:n_geom_basefuncs

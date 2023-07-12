@@ -1,7 +1,7 @@
 using Ferrite, BenchmarkTools, StaticArrays
 
 function get_values(CellType, ::Val{dim}, q_order=2) where dim 
-    grid = generate_grid(CellType, ntuple(Returns(2), dim))
+    grid = generate_grid(CellType, ntuple(_->2, dim))
     ip = Ferrite.default_interpolation(getcelltype(grid))
     RefShape = Ferrite.getrefshape(ip)
     qr = QuadratureRule{RefShape}(q_order)

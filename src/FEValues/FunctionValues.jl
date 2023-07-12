@@ -69,7 +69,7 @@ getnbasefunctions(funvals::FunctionValues) = size(funvals.N, 1)
 # Vector interpolations with sdim > rdim
 @inline dothelper(B::SMatrix{vdim, rdim}, A::SMatrix{rdim, sdim}) where {vdim, rdim, sdim} = B * A
 
-function apply_mapping!(funvals::FunctionValues, q_point::Int, Jinv)
+@inline function apply_mapping!(funvals::FunctionValues, q_point::Int, Jinv)
     @inbounds for j in 1:getnbasefunctions(funvals)
         #funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Jinv # TODO via Tensors.jl
         funvals.dNdx[j, q_point] = dothelper(funvals.dNdξ[j, q_point], Jinv)

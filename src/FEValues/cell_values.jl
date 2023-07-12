@@ -31,10 +31,6 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 """
 OldCellValues
 
-function default_geometric_interpolation(::Interpolation{shape}) where {dim, shape <: AbstractRefShape{dim}}
-    return VectorizedInterpolation{dim}(Lagrange{shape, 1}())
-end
-
 struct OldCellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCellValues
     N::Matrix{N_t}
     dNdx::Matrix{dNdx_t}
