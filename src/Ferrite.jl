@@ -81,7 +81,8 @@ include("interpolations.jl")
 include("Quadrature/quadrature.jl")
 
 # FEValues
-include("FEValues/cell_values.jl")
+#include("FEValues/cell_values.jl")
+include("FEValues/CellValues.jl")
 include("FEValues/face_values.jl")
 include("PointEval/point_values.jl")
 include("FEValues/common_values.jl")

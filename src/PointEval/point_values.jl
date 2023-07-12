@@ -24,7 +24,7 @@ struct PointValues{CV} <: AbstractValues
     PointValues{CV}(cv::CV) where {CV} = new{CV}(cv)
 end
 
-PointValues(cv::CellValues) = PointValues(eltype(cv.M), cv.ip, cv.gip)
+PointValues(cv::CellValues) = PointValues(eltype(shape_value(cv,1,1)), cv.fun_values.ip, cv.geo_values.ip)
 function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_interpolation(ip))
     return PointValues(Float64, ip, ipg)
 end
@@ -57,11 +57,11 @@ function_symmetric_gradient(pv::PointValues, u::AbstractVector, args...) =
 # reinit! on PointValues must first update N and dNdξ for the new "quadrature point"
 # and then call the regular reinit! for the wrapped CellValues to update dNdx
 function reinit!(pv::PointValues, x::AbstractVector{<:Vec{D}}, ξ::Vec{D}) where {D}
-    qp = 1 # PointValues only have a single qp
-    # TODO: Does M need to be updated too?
-    for i in 1:getnbasefunctions(pv.cv.ip)
-        pv.cv.dNdξ[i, qp], pv.cv.N[i, qp] = shape_gradient_and_value(pv.cv.ip, ξ, i)
-    end
+    # Update the quadrature point location
+    qr_points = getpoints(pv.cv.qr)
+    qr_points[1] = ξ
+    precompute_values!(pv.cv.fun_values, pv.cv.qr) # See Issue #763, should also update dMdξ!, but separate issue
+    # Regular reinit
     reinit!(pv.cv, x)
     return nothing
 end

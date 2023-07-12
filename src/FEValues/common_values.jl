@@ -39,13 +39,6 @@ The derivatives of the shape functions, and the new integration weights are comp
 reinit!
 
 """
-    getnquadpoints(cv::CellValues)
-
-Return the number of quadrature points in `cv`'s quadrature rule.
-"""
-getnquadpoints(fe::CellValues) = getnquadpoints(fe.qr)
-
-"""
     getnquadpoints(fv::FaceValues)
 
 Return the number of quadrature points in `fv`s quadrature for the current
@@ -66,7 +59,6 @@ finite element cell or face as
 ``\\int\\limits_\\Gamma f(\\mathbf{x}) d \\Gamma \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 
 """
-@propagate_inbounds getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 @propagate_inbounds getdetJdV(bv::FaceValues, q_point::Int) = bv.detJdV[q_point, bv.current_face[]]
 
 """
@@ -75,10 +67,8 @@ finite element cell or face as
 Return the value of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-@propagate_inbounds shape_value(cv::CellValues, q_point::Int, base_func::Int) = cv.N[base_func, q_point]
 @propagate_inbounds shape_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.N[base_func, q_point, bv.current_face[]]
 
-@propagate_inbounds geometric_value(cv::CellValues, q_point::Int, base_func::Int) = cv.M[base_func, q_point]
 @propagate_inbounds geometric_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_face[]]
 
 """
@@ -87,7 +77,6 @@ quadrature point `q_point`.
 Return the gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-@propagate_inbounds shape_gradient(cv::CellValues, q_point::Int, base_func::Int) = cv.dNdx[base_func, q_point]
 @propagate_inbounds shape_gradient(bv::FaceValues, q_point::Int, base_func::Int) = bv.dNdx[base_func, q_point, bv.current_face[]]
 
 """
@@ -96,7 +85,7 @@ quadrature point `q_point`.
 Return the symmetric gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-@propagate_inbounds shape_symmetric_gradient(cv::CellValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(cv, q_point, base_func))
+function shape_symmetric_gradient end
 
 """
     shape_divergence(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -273,7 +262,7 @@ function Base.show(io::IO, ::MIME"text/plain", fe_v::AbstractValues)
 end
 
 # copy
-for ValueType in (CellValues, FaceValues)
+for ValueType in (GeometryValues, FunctionValues, CellValues, FaceValues)
     args = [:(copy(cv.$fname)) for fname in fieldnames(ValueType)]
     @eval begin
         function Base.copy(cv::$ValueType)
