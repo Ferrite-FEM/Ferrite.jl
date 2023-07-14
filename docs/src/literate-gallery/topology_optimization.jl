@@ -18,8 +18,8 @@
 # In this example we cover the bending beam, where we specify a load, boundary conditions and the total mass. Then, our
 # objective is to find the most suitable geometry within the design space minimizing the compliance (i.e. the inverse stiffness) of the structure.
 # We shortly introduce our simplified model for regular meshes. A detailed derivation of the method and advanced techniques 
-# can be found in [Article 1](https://onlinelibrary.wiley.com/doi/full/10.1002/nme.5988) and
-# [Article 2](https://www.sciencedirect.com/science/article/abs/pii/S0045782522000755?via%3Dihub). 
+# can be found in [JanHacJun2019regularizedthermotopopt](@cite) and
+# [BlaJanJun2022taylorwlsthermotopopt](@cite).
 #
 # We start by introducing the local, elementwise density $\chi \in [\chi_{\text{min}}, 1]$ of the material, where we choose
 # $\chi_{\text{min}}$ slightly above zero to prevent numerical instabilities. Here, $\chi = \chi_{\text{min}}$ means void and $\chi=1$
@@ -526,6 +526,12 @@ topopt(0.03, 0.5, 60, "large_radius"; output=:false);
 # *Figure 2*: Optimization results of the bending beam for smaller (left) and larger (right) value of the regularization parameter $\beta$.
 #
 # To prove mesh independence, the user could vary the mesh resolution and compare the results.
+
+
+```@bibliography
+Pages = ["topology_optimization.md"]
+Canonical = false
+```
 
 #md # ## [Plain program](@id topology_optimization-plain-program)
 #md #

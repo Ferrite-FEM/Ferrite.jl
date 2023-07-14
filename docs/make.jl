@@ -10,7 +10,7 @@ if liveserver
     @timeit dto "Revise.revise()" Revise.revise()
 end
 
-using Documenter, Ferrite, FerriteGmsh, FerriteMeshParser
+using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser
 
 const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 
@@ -23,11 +23,17 @@ create_documenter_changelog()
 
 # Build documentation.
 @timeit dto "makedocs" makedocs(
+    CitationBibliography(
+        joinpath(@__DIR__, "src", "assets", "references.bib"),
+        style=:authoryear
+    ),
     format = Documenter.HTML(
         assets = ["assets/custom.css", "assets/favicon.ico"],
         canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
         collapselevel = 1,
     ),
+    debug = true,
+    clean = true,
     sitename = "Ferrite.jl",
     doctest = false,
     # strict = VERSION.minor == 6 && sizeof(Int) == 8, # only strict mode on 0.6 and Int64
@@ -85,6 +91,7 @@ create_documenter_changelog()
         #     "gallery/topology_optimization.md",
         # ],
         "devdocs/index.md",
+        "bibliography.md",
         ],
 )
 
