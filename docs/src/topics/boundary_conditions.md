@@ -293,6 +293,10 @@ pdbc = PeriodicDirichlet(
     )
     ```
 
+
+## Robin Boundary Conditions
+Robin boundary condition, also known as mixed boundary condition, is a type of boundary condition used in mathematical and physical models to describe the behavior of a system at the boundary.In the context of partial differential equations (PDEs), which are equations involving multiple variables and their partial derivatives, a Robin boundary condition combines elements of both Dirichlet and Neumann boundary conditions.
+
 ## Initial Conditions
 
 When solving time-dependent problems, initial conditions, different from zero, may be required. 
