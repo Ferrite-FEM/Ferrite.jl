@@ -347,7 +347,7 @@ function InterfaceIterator(gridordh::Union{Grid,AbstractDofHandler},
     for face_a in faceskeleton(topology, grid)
         !isempty(neighborhood[face_a[1], face_a[2]]) || continue
         neighbor = neighborhood[face_a[1], face_a[2]].neighbor_info[]
-        face_b = neighbor isa VertexIndex ? FaceIndex(neighbor[1], neighbor[2]) : neighbor
+        face_b = grid_dim == 1 ? FaceIndex(neighbor[1], neighbor[2]) : neighbor
         interface_skeleton[i] = (face_a, face_b) #Assumes one neighbor only
         i+=1
     end
