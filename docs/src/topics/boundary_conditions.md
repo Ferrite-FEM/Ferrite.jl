@@ -295,7 +295,28 @@ pdbc = PeriodicDirichlet(
 
 
 ## Robin Boundary Conditions
-Robin boundary condition, also known as mixed boundary condition, is a type of boundary condition used in mathematical and physical models to describe the behavior of a system at the boundary.In the context of partial differential equations (PDEs), which are equations involving multiple variables and their partial derivatives, a Robin boundary condition combines elements of both Dirichlet and Neumann boundary conditions.
+Robin boundary condition, also known as mixed boundary condition, is a type of boundary condition used in mathematical and physical models to describe the behavior of a system at the boundary.In the context of partial differential equations (PDEs), which are equations involving multiple variables and their partial derivatives, a Robin boundary condition combines elements of both Dirichlet and Neumann boundary conditions. From the standard form of KU = F, the additional Robin boundary modifies the element assembly as follows:
+
+```julia
+for face in 1:nfaces(cell) # Robin BC
+        if (cellid(cell), face) ∈ getfaceset(grid, "flux_right")
+            reinit!(facevalues, cell, face)
+            for q_point in 1:getnquadpoints(facevalues)
+                dΓ = getdetJdV(facevalues, q_point)
+                for i in 1:n_basefuncs
+                    δu = shape_value(facevalues, q_point, i)
+                    for j in 1:n_basefuncs
+                        u = shape_value(facevalues, q_point, j)
+                        Ke[i, j] += K_robin * (δu ⋅ u) * dΓ
+                    end
+                    # Give the value of q we need. 
+                    fe[i] += (δu * K_robin * u_robin) * dΓ # RHS contribution of Robin BC
+                end
+            end
+        end
+    end
+
+```
 
 ## Initial Conditions
 
