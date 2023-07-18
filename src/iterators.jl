@@ -162,15 +162,20 @@ end
 """
     InterfaceCache(grid::Grid)
     InterfaceCache(dh::AbstractDofHandler)
-Create a cache object with pre-allocated memory for the coordinates and faces of an
+
+Create a cache object with pre-allocated memory for the nodes, coordinates, and dofs of an
 interface. The cache is updated for a new cell by calling `reinit!(cache, face_a, face_b)` where
-`face_a::FaceIndex` and `face_b::FaceIndex` are the interface faces.
+`face_a::FaceIndex` and `face_b::FaceIndex` are the two interface faces.
+
 **Struct fields of `InterfaceCache`**
- - `ic.a :: FaceCache`: current cell node coordinates
- - `ic.b :: FaceCache`: neighbor cell node coordinates
+ - `ic.a :: FaceCache`: face cache for the first face of the interface
+ - `ic.b :: FaceCache`: face cache for the second face of the interface
+ - `ic.dofs :: Vector{Int}`: global dof ids for the interface (union of `ic.a.dofs` and `ic.b.dofs`)
+
 **Methods with `InterfaceCache`**
- - `reinit!(cache::InterfaceCache, face_a::FaceIndex, face_b::FaceIndex)`: reinitialize [`InterfaceCache`](@ref)
- - `interfacedofs(ic)`: get the global dof ids of the interface cells
+ - `reinit!(cache::InterfaceCache, face_a::FaceIndex, face_b::FaceIndex)`: reinitialize the cache for a new interface
+ - `interfacedofs(ic)`: get the global dof ids of the interface
+ 
 See also [`InterfaceIterator`](@ref).
 """
 struct InterfaceCache{FC<:FaceCache}
