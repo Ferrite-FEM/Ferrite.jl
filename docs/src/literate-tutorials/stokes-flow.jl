@@ -313,7 +313,7 @@ function setup_mean_constraint(dh, fvp)
         ## Assemble to row 1
         assemble!(assembler, [1], element_dofs_p, Ce)
     end
-    C = end_assemble(assembler)
+    C = finish_assemble(assembler)
     ## Create an AffineConstraint from the C-matrix
     _, J, V = findnz(C)
     _, constrained_dof_idx = findmax(abs2, V)
