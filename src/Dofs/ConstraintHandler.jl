@@ -579,6 +579,7 @@ apply_zero!(v::AbstractVector, ch::ConstraintHandler) = _apply_v(v, ch, true)
 apply!(     v::AbstractVector, ch::ConstraintHandler) = _apply_v(v, ch, false)
 
 function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
+    @assert isclosed(ch)
     @assert length(v) >= ndofs(ch.dh)
     v[ch.prescribed_dofs] .= apply_zero ? 0.0 : ch.inhomogeneities
     # Apply affine constraints, e.g u2 = s6*u6 + s3*u3 + h2
@@ -608,6 +609,7 @@ const APPLY_INPLACE = ApplyStrategy.Inplace
 
 function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false;
                 strategy::ApplyStrategy.T=ApplyStrategy.Transpose)
+    @assert isclosed(ch)
     sym = isa(KK, Symmetric)
     K = sym ? KK.data : KK
     @assert length(f) == 0 || length(f) == size(K, 1)
@@ -1618,6 +1620,7 @@ end
 function _apply_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
                        global_dofs::AbstractVector, ch::ConstraintHandler, apply_zero::Bool,
                        global_matrix, global_vector)
+    @assert isclosed(ch)
     # TODO: With apply_zero it shouldn't be required to pass the vector.
     length(global_dofs) == size(local_matrix, 1) == size(local_matrix, 2) == length(local_vector) || error("?")
     # First pass over the dofs check whether there are any constrained dofs at all
