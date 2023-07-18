@@ -63,27 +63,23 @@ export Line2D, Line3D, Quadrilateral3D
 
 import WriteVTK: vtk_grid, vtk_cell_data, vtk_point_data, vtk_save
 
-@deprecate vtk_grid(filename::String, grid::AbstractGrid; kwargs...) open_vtk(filename, grid; kwargs...)
-@deprecate vtk_grid(filename::String, dh::DofHandler; kwargs...) open_vtk(filename, dh; kwargs...)
-@deprecate vtk_cell_data(vtks::VTKStream, args...) write_celldata(vtks, args...)
-@deprecate vtk_point_data(vtks::VTKStream, data::Vector, args...) write_nodedata(vtks, data, args...)
+@deprecate vtk_grid(filename::String, grid::AbstractGrid; kwargs...) VTKStream(filename, grid; kwargs...)
+@deprecate vtk_grid(filename::String, dh::DofHandler; kwargs...) VTKStream(filename, get_grid(dh); kwargs...)
+struct _DummyGrid{D} <: AbstractGrid{D}
+    ncells::Int
+end
+_DummyGrid(ncells=1) = _DummyGrid{1}(ncells)
+getncells(g::_DummyGrid) = g.ncells
+
+@deprecate vtk_cell_data(vtks::VTKStream, args...) write_celldata(vtks, _DummyGrid(), args...)
+@deprecate vtk_point_data(vtks::VTKStream, data::Vector, args...) write_nodedata(vtks, _DummyGrid(), data, args...)
 @deprecate vtk_point_data(vtks::VTKStream, proj::L2Projector, args...) write_projected(vtks, proj, args...)
 @deprecate vtk_point_data(vtks::VTKStream, ch::ConstraintHandler) write_dirichlet(vtks, ch)
-@deprecate vtk_cellset(vtks::VTKStream, grid::AbstractGrid, args...) write_cellset(vtks, args...)
-@deprecate vtk_nodeset(vtks::VTKStream, grid::AbstractGrid, args...) write_nodeset(vtks, args...)
-@deprecate vtk_cell_data_colors(vtks::VTKStream, args...) write_cell_colors(vtks, args...)
+@deprecate vtk_cellset(vtks::VTKStream, grid::AbstractGrid, args...) write_cellset(vtks, grid, args...)
+@deprecate vtk_nodeset(vtks::VTKStream, grid::AbstractGrid, args...) write_nodeset(vtks, grid, args...)
+@deprecate vtk_cell_data_colors(vtks::VTKStream, args...) write_cell_colors(vtks, _DummyGrid(vtks.vtk.Ncls), args...)
 @deprecate vtk_save(vtks::VTKStream) close(vtks)
-
-# Give better warning than produced by the @deprecate alternative
-# @deprecate vtk_point_data(vtks::VTKStream, dh::DofHandler, u, suffix="") (_vtk_write_solution(vtks.vtk, dh, u, suffix); vtks)
-function vtk_point_data(vtks::VTKStream, dh::DofHandler, u, suffix="")
-    msg = "vtk_point_data(vtk, dh::DofHandler, args...) is deprecated. Use write_solution(::VTKStream, args...) instead"
-    Base.depwarn(msg, :vtk_point_data)
-    _vtk_write_solution(vtks.vtk, dh, u, suffix)
-    return vtks
-end
-
-@deprecate component_names(T) get_component_names(T) false # Internal function
+@deprecate vtk_point_data(vtks::VTKStream, dh::DofHandler, args...) write_solution(vtks, dh, args...)
 
 # Deprecation of auto-vectorized methods
 function add!(dh::DofHandler, name::Symbol, dim::Int)
