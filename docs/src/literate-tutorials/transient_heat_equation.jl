@@ -192,10 +192,9 @@ apply!(A, ch);
 # To store the solution, we initialize a `paraview_collection` (.pvd) file.
 pvd = paraview_collection("transient-heat.pvd");
 t = 0
-vtk_grid("transient-heat-$t", dh) do vtk
-    vtk_point_data(vtk, dh, uₙ)
-    vtk_save(vtk)
-    pvd[t] = vtk
+VTKStream("transient-heat-$t", grid) do vtks
+    write_solution(vtks, dh, uₙ)
+    pvd[t] = vtks
 end
 
 # At this point everything is set up and we can finally approach the time loop.
@@ -211,10 +210,9 @@ for t in Δt:Δt:T
     #Finally, we can solve the time step and save the solution afterwards.
     u = A \ b
 
-    vtk_grid("transient-heat-$t", dh) do vtk
-        vtk_point_data(vtk, dh, u)
-        vtk_save(vtk)
-        pvd[t] = vtk
+    VTKStream("transient-heat-$t", grid) do vtks
+        write_solution(vtks, dh, u)
+        pvd[t] = vtks
     end
     #At the end of the time loop, we set the previous solution to the current one and go to the next time step.
     uₙ .= u

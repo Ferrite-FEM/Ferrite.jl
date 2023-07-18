@@ -209,8 +209,8 @@ function solve(ν, interpolation_u, interpolation_p)
     ## export
     filename = "cook_" * (isa(interpolation_u, Lagrange{RefTriangle,1}) ? "linear" : "quadratic") *
                          "_linear"
-    vtk_grid(filename, dh) do vtkfile
-        vtk_point_data(vtkfile, dh, u)
+    VTKStream(filename, grid) do vtks
+        write_solution(vtks, dh, u)
     end
     return u
 end

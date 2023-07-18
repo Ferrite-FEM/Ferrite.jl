@@ -505,8 +505,8 @@ function main()
     u = K \ f
     apply!(u, ch)
     ## Export the solution
-    vtk_grid("stokes-flow", grid) do vtk
-        vtk_point_data(vtk, dh, u)
+    VTKStream("stokes-flow", grid) do vtks
+        write_solution(vtks, dh, u)
     end
 
     ## Check the result                #src

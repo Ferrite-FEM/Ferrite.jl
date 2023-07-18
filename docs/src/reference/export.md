@@ -26,8 +26,13 @@ evaluate_at_grid_nodes
 ## VTK Export
 
 ```@docs
-vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; compress::Bool) where {dim,C,T} 
-vtk_point_data
-vtk_cellset
-vtk_cell_data_colors
+VTKStream
+write_solution
+write_projected
+write_celldata
+write_nodedata
+write_cellset
+write_nodeset
+write_dirichlet
+write_cell_colors
 ```

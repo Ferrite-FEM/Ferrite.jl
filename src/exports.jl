@@ -146,8 +146,17 @@ export
     assemble!,
     finish_assemble,
 
-# VTK export
-
+# (VTK) export stream
+    VTKStream,
+    write_solution,
+    write_celldata,
+    write_nodedata,
+    write_projected,
+    write_nodeset,
+    write_cellset,
+    write_cell_colors,
+    write_dirichlet,
+    
 # L2 Projection
     project,
     L2Projector,

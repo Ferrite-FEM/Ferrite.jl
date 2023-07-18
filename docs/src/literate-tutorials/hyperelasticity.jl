@@ -397,8 +397,8 @@ function solve()
 
     ## Save the solution
     @timeit "export" begin
-        vtk_grid("hyperelasticity", dh) do vtkfile
-            vtk_point_data(vtkfile, dh, u)
+        VTKStream("hyperelasticity", grid) do vtks
+            write_solution(vtks, dh, u)
         end
     end
 
