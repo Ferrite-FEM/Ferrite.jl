@@ -16,7 +16,7 @@ the exporting.
 
 The following structure can be used to write various output to a vtk-file:
 
-```@example export
+```julia
 VTKStream("my_solution", grid) do vtks
     write_<x>(vtks, args...)
 end
