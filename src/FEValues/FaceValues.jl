@@ -89,7 +89,7 @@ getcurrentface(fv::FaceValues) = fv.current_face[]
 Return the normal at the quadrature point `qp` for the active face of the
 `FaceValues` object(from last `reinit!`).
 """
-getnormal(fv::FaceValues, qp::Int) = getnormal(fv.geo_values[getcurrentface(fv)], qp)
+getnormal(fv::FaceValues, qp::Int) = getnormal(get_geo_values(fv), qp)
 
 nfaces(fv::FaceValues) = length(fv.geo_values)
 
@@ -102,11 +102,11 @@ function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int) wh
     @boundscheck checkface(fv, face_nr)
     n_geom_basefuncs = getngeobasefunctions(fv)
     length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
-    @inbounds geo_values = fv.geo_values[face_nr]
-    @inbounds fun_values = fv.fun_values[face_nr]
-
-    fv.current_face[] = face_nr
     
+    fv.current_face[] = face_nr
+
+    geo_values = get_geo_values(fv)
+    fun_values = get_fun_values(fv)
     @inbounds for (q_point, w) in pairs(getweights(fv.qr, face_nr))
         Jinv = calculate_mapping(geo_values, face_nr, q_point, w, x)
         apply_mapping!(fun_values, q_point, Jinv)
