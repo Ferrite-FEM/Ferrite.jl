@@ -27,11 +27,11 @@ function scalar_field()
 
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(mesh, points)
-    vals = get_point_values(ph, projector, projector_vals)
+    vals = evaluate_at_points(ph, projector, projector_vals)
     @test f.(points) ≈ vals
 
     # alternatively retrieve vals from nodal values TODO: make this work?
-    # vals = get_point_values(ph, nodal_vals)
+    # vals = evaluate_at_points(ph, nodal_vals)
     # @test f.(points) ≈ vals
 end
 
@@ -67,11 +67,11 @@ function vector_field()
 
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(mesh, points)
-    vals = get_point_values(ph, projector, projector_vals)
+    vals = evaluate_at_points(ph, projector, projector_vals)
     @test f.(points) ≈ vals
 
     # alternatively retrieve vals from nodal values# TODO
-    # vals = get_point_values(ph, nodal_vals)
+    # vals = evaluate_at_points(ph, nodal_vals)
     # @test f.(points) ≈ vals
 end
 
@@ -102,7 +102,7 @@ function superparametric()
 
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(mesh, points)
-    vals = get_point_values(ph, projector, projector_vals)
+    vals = evaluate_at_points(ph, projector, projector_vals)
 
     # can recover a quadratic field by a quadratic approximation
     @test f.(points) ≈ vals
@@ -118,11 +118,11 @@ function dofhandler()
     close!(dh)
 
     ph = PointEvalHandler(mesh, points)
-    vals = get_point_values(ph, dh, dof_vals, :s)
+    vals = evaluate_at_points(ph, dh, dof_vals, :s)
     @test vals ≈ 1.0:9.0
 
     # TODO
-    # vals = get_point_values(ph, collect(1.0:9.0))
+    # vals = evaluate_at_points(ph, collect(1.0:9.0))
     # @test vals ≈ 1.0:9.0
 end
 
@@ -257,7 +257,7 @@ function mixed_grid()
     # first alternative: L2Projection to dofs
     projector_values = project(projector, qp_vals_quads, qr)
     ph = PointEvalHandler(mesh, points)
-    vals = get_point_values(ph, projector, projector_values)
+    vals = evaluate_at_points(ph, projector, projector_values)
     @test vals[1:5] ≈ f.(points[1:5])
     @test all(isnan, vals[6:end])
 
@@ -272,7 +272,7 @@ function mixed_grid()
     dof_vals = [1., 1., 2., 2., 4., 4., 3., 3., 6., 6., 5., 5.]
     points = [node.x for node in mesh.nodes]
     ph = PointEvalHandler(mesh, points)
-    vals = get_point_values(ph, dh, dof_vals, :v)
+    vals = evaluate_at_points(ph, dh, dof_vals, :v)
     @test vals == [Vec((i, i)) for i=1.0:6.0]
 end
 
@@ -305,12 +305,12 @@ function oneD()
 
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(mesh, points)
-    vals = get_point_values(ph, projector, projector_values)
+    vals = evaluate_at_points(ph, projector, projector_values)
     @test f.(points) ≈ vals
 
     # alternatively retrieve vals from nodal values
     # TODO
-    # vals = get_point_values(ph, nodal_vals)
+    # vals = evaluate_at_points(ph, nodal_vals)
     # @test f.(points) ≈ vals
 end
 

@@ -331,6 +331,14 @@ more discussion).
 - `start_assemble(f, K)` have been deprecated in favor of the "canonical" `start_assemble(K,
   f)`. ([#707][github-707])
 
+- `end_assemble` have been deprecated in favor of `finish_assemble`. ([#754][github-754])
+
+- `get_point_values` have been deprecated in favor of `evaluate_at_points`.
+  ([#754][github-754])
+
+- `transform!` have been deprecated in favor of `transform_coordinates!`.
+  ([#754][github-754])
+
 ### Removed
 
 - `MixedDofHandler` + `FieldHandler` have been removed in favor of `DofHandler` +
@@ -348,6 +356,11 @@ more discussion).
   ([#699][github-699])
 
 - The function `compute_vertex_values` have been removed. ([#700][github-700])
+
+- The names `getweights`, `getpoints`, `getcellsets`, `getnodesets`, `getfacesets`,
+  `getedgesets`, and `getvertexsets` have been removed from the list of exported names. (For
+  now you can still use them by prefixing `Ferrite.`, e.g. `Ferrite.getweights`.)
+  ([#754][github-754])
 
 ### Fixed
 

@@ -21,8 +21,6 @@ export
     QuadratureRule,
     FaceQuadratureRule,
     getnquadpoints,
-    getweights,
-    getpoints,
 
 # FEValues
     AbstractCellValues,
@@ -82,11 +80,6 @@ export
     get_node_coordinate,
     get_cell_coordinates,
     get_cell_coordinates!,
-    getcellsets,
-    getnodesets,
-    getfacesets,
-    getedgesets,
-    getvertexsets,
     onboundary,
     nfaces,
     addnodeset!,
@@ -97,7 +90,7 @@ export
     addvertexset!,
     addboundaryvertexset!,
     addcellset!,
-    transform!,
+    transform_coordinates!,
     generate_grid,
 
 # Grid coloring
@@ -151,7 +144,7 @@ export
 # assembly
     start_assemble,
     assemble!,
-    end_assemble,
+    finish_assemble,
 
 # VTK export
     vtk_grid,
@@ -167,7 +160,7 @@ export
 
 # Point Evaluation
     PointEvalHandler,
-    get_point_values,
+    evaluate_at_points,
     PointIterator,
     PointLocation,
     PointValues

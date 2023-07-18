@@ -26,7 +26,7 @@ end
         left = -right
         grid = generate_grid(celltype, nels, left, right)
 
-        transform!(grid, x-> 2x)
+        transform_coordinates!(grid, x-> 2x)
 
         radius = 2*1.5
         addcellset!(grid, "cell-1", [1,])
@@ -157,7 +157,7 @@ end
     node_set = Set(1:getnnodes(grid))
     addnodeset!(grid, "node_set", node_set)
 
-    @test getnodesets(grid) == Dict("node_set" => node_set)
+    @test Ferrite.getnodesets(grid) == Dict("node_set" => node_set)
 
     @test getnodes(grid, [1]) == [getnodes(grid, 1)] # untested
 
