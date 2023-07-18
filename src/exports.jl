@@ -170,4 +170,14 @@ export
     get_point_values,
     PointIterator,
     PointLocation,
-    PointValues
+    PointValues,
+
+# Interface elements
+    InterfaceCell,
+    InterfaceCellInterpolation,
+    InterfaceCellValues,
+    get_side_and_baseindex,
+    shape_value_average,
+    shape_gradient_average,
+    shape_value_jump,
+    shape_gradient_jump
