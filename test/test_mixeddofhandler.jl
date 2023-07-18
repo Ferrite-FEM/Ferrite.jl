@@ -355,11 +355,11 @@ function test_2_element_heat_eq()
     gridfilename = "mixed_grid"
     addcellset!(grid, "cell-1", [1,])
     addcellset!(grid, "cell-2", [2,])
-    vtk_grid(gridfilename, grid) do vtk
-        vtk_cellset(vtk, grid, "cell-1")
-        vtk_cellset(vtk, grid, "cell-2")
-        vtk_point_data(vtk, dh, u)
-        # vtk_point_data(vtk, ch)  #FIXME
+    VTKStream(gridfilename, grid) do vtks
+        write_cellset(vtks, grid, "cell-1")
+        write_cellset(vtks, grid, "cell-2")
+        write_solution(vtks, dh, u)
+        # write_dirichlet(vtks, ch)  #FIXME
     end
     sha = bytes2hex(open(SHA.sha1, gridfilename*".vtu"))
     @test sha in ("e96732c000b0b385db7444f002461468b60b3b2c", "7b26edc27b5e59a2f60907374cd5a5790cc37a6a")

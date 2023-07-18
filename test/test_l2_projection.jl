@@ -267,13 +267,14 @@ function test_export(;subset::Bool)
     end
 
     mktempdir() do tmp
-        fname = vtk_grid(joinpath(tmp, "projected"), grid) do vtk
-            vtk_point_data(vtk, p, p_scalar, "p_scalar")
-            vtk_point_data(vtk, p, p_vec, "p_vec")
-            vtk_point_data(vtk, p, p_tens, "p_tens")
-            vtk_point_data(vtk, p, p_stens, "p_stens")
+        fname = joinpath(tmp, "projected")
+        VTKStream(fname, grid) do vtks
+            write_projected(vtks, p, p_scalar, "p_scalar")
+            write_projected(vtks, p, p_vec, "p_vec")
+            write_projected(vtks, p, p_tens, "p_tens")
+            write_projected(vtks, p, p_stens, "p_stens")
         end
-        @test bytes2hex(open(SHA.sha1, fname[1], "r")) in (
+        @test bytes2hex(open(SHA.sha1, fname*".vtu", "r")) in (
             subset ? ("261cfe21de7a478e14f455e783694651a91eeb60", "b3fef3de9f38ca9ddd92f2f67a1606d07ca56d67") :
                      ("3b8ffb444db1b4cee1246a751da88136116fe49b", "bc2ec8f648f9b8bccccf172c1fc48bf03340329b")
         )
