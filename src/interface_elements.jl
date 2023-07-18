@@ -241,6 +241,9 @@ function default_geometric_interpolation(ip::VectorizedInterpolation{<:Any, <:An
     return ip
 end
 
+getorder(ip::InterfaceCellInterpolation) = getorder(ip.here) == getorder(ip.there) ? getorder(ip.here) : (getorder(ip.here), getorder(ip.there))
+getorder(ip::VectorizedInterpolation{<:Any,<:Any,<:Any,<:InterfaceCellInterpolation}) = getorder(ip.ip)
+
 Base.:(^)(ip::InterfaceCellInterpolation, vdim::Int) = VectorizedInterpolation{vdim}(ip)
 
 

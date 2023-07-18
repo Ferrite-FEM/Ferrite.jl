@@ -152,9 +152,23 @@ end
               right = CellValues(QuadratureRule{RefHexahedron}(4), ip.right, ip.right))
 
         dh = DofHandler(grid)
-        sdh = (left = begin s = SubDofHandler(dh, Set{Int}([cellid.left])); add!(s, :c, ip.left)  end,
-               interface = begin s = SubDofHandler(dh, Set{Int}([cellid.interface])); add!(s, :c, ip.interface)  end,
-               right = begin s = SubDofHandler(dh, Set{Int}([cellid.right])); add!(s, :c, ip.right)  end)
+        function prepare_sub_dof_handler(key::Symbol)
+            s = SubDofHandler(dh, Set{Int}([cellid[key]]))
+            if order[1] == order[2] || key == :left
+                add!(s, :c, ip[key])
+            else
+                warntext = "Field :c uses a different interpolation order in another SubDofHandler."
+                if key == :interface
+                    @test_logs (:warn, warntext) add!(s, :c, ip[key])
+                else
+                    @test_logs (:warn, warntext) (:warn, warntext) add!(s, :c, ip[key])
+                end
+            end
+            return s
+        end
+        sdh = (left = prepare_sub_dof_handler(:left),
+               interface = prepare_sub_dof_handler(:interface),
+               right = prepare_sub_dof_handler(:right))
         close!(dh)
 
         ch = ConstraintHandler(dh)
@@ -272,9 +286,23 @@ end
               right = CellValues(QuadratureRule{RefHexahedron}(4), ip.right, ip.right))
 
         dh = DofHandler(grid)
-        sdh = (left = begin s = SubDofHandler(dh, Set{Int}([cellid.left])); add!(s, :u, ip.left)  end,
-               interface = begin s = SubDofHandler(dh, Set{Int}([cellid.interface])); add!(s, :u, ip.interface)  end,
-               right = begin s = SubDofHandler(dh, Set{Int}([cellid.right])); add!(s, :u, ip.right)  end)
+        function prepare_sub_dof_handler(key::Symbol)
+            s = SubDofHandler(dh, Set{Int}([cellid[key]]))
+            if order[1] == order[2] || key == :left
+                add!(s, :u, ip[key])
+            else
+                warntext = "Field :u uses a different interpolation order in another SubDofHandler."
+                if key == :interface
+                    @test_logs (:warn, warntext) add!(s, :u, ip[key])
+                else
+                    @test_logs (:warn, warntext) (:warn, warntext) add!(s, :u, ip[key])
+                end
+            end
+            return s
+        end
+        sdh = (left = prepare_sub_dof_handler(:left),
+               interface = prepare_sub_dof_handler(:interface),
+               right = prepare_sub_dof_handler(:right))
         close!(dh)
 
         ch = ConstraintHandler(dh)
