@@ -22,13 +22,13 @@
         @test InterfaceCell(here, there) isa InterfaceCell{sdim, rdim, shape, rshape, Chere, Cthere}
         cell = InterfaceCell(here, there)
 
-        @test nvertices(cell) == nvertices(here) + nvertices(there)
-        @test nfaces(cell) == 2
-        @test nnodes(cell) == nnodes(here) + nnodes(there)
+        @test Ferrite.nvertices(cell) == Ferrite.nvertices(here) + Ferrite.nvertices(there)
+        @test Ferrite.nfaces(cell) == 2
+        @test Ferrite.nnodes(cell) == Ferrite.nnodes(here) + Ferrite.nnodes(there)
         
-        @test get_node_ids(cell) == collect(1:nnodes(cell))
-        @test vertices(cell) == (vertices(here)..., vertices(there)...)
-        @test faces(cell) == (vertices(here), vertices(there))
+        @test Ferrite.get_node_ids(cell) == collect(1:Ferrite.nnodes(cell))
+        @test Ferrite.vertices(cell) == (Ferrite.vertices(here)..., Ferrite.vertices(there)...)
+        @test Ferrite.faces(cell) == (Ferrite.vertices(here), Ferrite.vertices(there))
     end
 end
 
@@ -47,8 +47,8 @@ end
         @test InterfaceCellInterpolation(iphere, ipthere) isa InterfaceCellInterpolation{sdim, rdim, shape, rshape, IPhere, IPthere}
         @test InterfaceCellInterpolation(iphere) isa InterfaceCellInterpolation{sdim, rdim, shape, rshape, IPhere, IPhere}
         ip = InterfaceCellInterpolation(iphere, ipthere)
-        @test nvertices(ip) == nvertices(iphere) + nvertices(ipthere)
-        @test all(Ferrite.vertexdof_indices(ip) .== collect( (v,) for v in 1:nvertices(ip) ))
+        @test Ferrite.nvertices(ip) == Ferrite.nvertices(iphere) + Ferrite.nvertices(ipthere)
+        @test all(Ferrite.vertexdof_indices(ip) .== collect( (v,) for v in 1:Ferrite.nvertices(ip) ))
     end
 end
 
@@ -174,7 +174,7 @@ end
             if side == :here
                 @test shape_value(icv, qp, i, true) == shape_value(icv.here, qp, bi)
                 @test shape_value(icv, qp, i, false) == 0
-                @tests hape_value_average(icv, qp, i) == 0.5*shape_value(icv.here, qp, bi)
+                @test shape_value_average(icv, qp, i) == 0.5*shape_value(icv.here, qp, bi)
                 @test shape_gradient_average(icv, qp, i) == 0.5*shape_gradient(icv.here, qp, bi)
                 @test shape_value_jump(icv, qp, i) == -shape_value(icv.here, qp, bi)
                 @test shape_gradient_jump(icv, qp, i) == -shape_gradient(icv.here, qp, bi)
