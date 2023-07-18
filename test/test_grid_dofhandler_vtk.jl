@@ -157,7 +157,7 @@ end
     node_set = Set(1:getnnodes(grid))
     addnodeset!(grid, "node_set", node_set)
 
-    @test getnodesets(grid) == Dict("node_set" => node_set)
+    @test Ferrite.getnodesets(grid) == Dict("node_set" => node_set)
 
     @test getnodes(grid, [1]) == [getnodes(grid, 1)] # untested
 
