@@ -115,7 +115,7 @@ q_points = evaluate_at_points(ph, projector, q_projected);
 # our initial DofHandler so the input is not the `PointEvalHandler`, the original `DofHandler`,
 # the dof-vector `u`, and (optionally for single-field problems) the name of the field.
 # From the `L2Projection`, the values are stored in the order of the degrees of freedom.
-u_points = Ferrite.evaluate_at_points(ph, dh, u, :u);
+u_points = evaluate_at_points(ph, dh, u, :u);
 
 # Now, we can plot the temperature and flux values with the help of any plotting library, e.g. Plots.jl.
 # To do this, we need to import the package:
