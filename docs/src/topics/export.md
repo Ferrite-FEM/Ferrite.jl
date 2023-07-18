@@ -41,3 +41,17 @@ close(vtks)
 ```
 
 The data written by `write_solution`, `write_celldata`, `write_nodedata`, and `write_projected` may be either scalar (`Vector{<:Number}`) or tensor (`Vector{<:AbstractTensor}`) data. 
+
+To save time-dependent data, `WriteVTK.jl`'s, `paraview_collection` may be used
+
+```@example pvdexport 
+pvd = paraview_collection("my_results.pvd");
+for i in 1:5
+    # Do calculations to update u
+    VTKStream("my_results_$i", grid) do vtks
+        write_solution(vtks, dh, u)
+        pvd[i] = vtk
+    end
+end
+```
+See [Transient heat equation](@ref tutorial-transient-heat-equation) for an example

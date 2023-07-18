@@ -5,18 +5,22 @@ end
 """
     VTKStream(filename::AbstractString, grid::AbstractGrid; kwargs...)
 
-Create a `Ferrite.VTKStream` that contains an unstructured VTK grid from
-a `DofHandler` (limited functionality if only a `Grid` is given). 
-This stream can be used to to write data with 
-[`write_solution`](@ref), [`write_celldata`](@ref), [`write_nodedata`](@ref),
-[`write_projected`](@ref), 
-[`write_cellset`](@ref), [`write_nodeset`](@ref), and [`write_constraints`](@ref).
-
+Create a `Ferrite.VTKStream` that contains an unstructured VTK grid. 
 The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see 
 [Data Formatting Options](https://juliavtk.github.io/WriteVTK.jl/stable/grids/syntax/#Data-formatting-options)
 
-It is necessary to call [`close`](@ref) to save the data after writing to the stream, 
-or alternatively use the `do`-block syntax which does this implicitly, e.g.,
+This stream can be used to to write data with
+
+* [`write_solution`](@ref)
+* [`write_celldata`](@ref)
+* [`write_nodedata`](@ref).
+* [`write_projected`](@ref)
+* [`write_cellset`](@ref)
+* [`write_nodeset`](@ref)
+* [`write_constraints`](@ref)
+
+It is necessary to call `close(::VTKStream)` to save the data after writing to the stream, 
+Alternatively, the `do`-block syntax that does this implicitly is supported:
 ```julia
 VTKStream(filename, grid) do vtks
     write_solution(vtks, dh, u)
@@ -37,11 +41,6 @@ function VTKStream(f::Function, args...; kwargs...)
     end
 end
 
-"""
-    Base.close(vtks::VTKStream)
-
-Close the vtk stream and save the data to disk. 
-"""
 Base.close(vtks::VTKStream) = WriteVTK.vtk_save(vtks.vtk)
 
 function Base.show(io::IO, ::MIME"text/plain", vtks::VTKStream)
@@ -159,12 +158,13 @@ end
 """
     write_solution(vtks::VTKStream, dh::AbstractDofHandler, u::Vector, suffix="")
 
-Save the values at the nodes in the degree of freedom vector `u` to a 
-the a vtk file for each field in `DofHandler` in `vtks`. 
-`suffix` can be used to append to the fieldname.
+Save the values at the nodes in the degree of freedom vector `u` to the stream.
+Each field in `dh` will be saved separately, and `suffix` can be used to append 
+to the fieldname.
 
-`u` can also contain tensorial values, but each entry in `u` must correspond to a degree of freedom in `dh`,
-see [`write_nodedata`](@ref) for details. This function should be used directly when exporting values already 
+`u` can also contain tensorial values, but each entry in `u` must correspond to a 
+degree of freedom in `dh`, see [`write_nodedata`](@ref) for details. 
+Use `write_nodedata` directly when exporting values that are already 
 sorted by the nodes in the grid. 
 """
 function write_solution(vtks::VTKStream, dh::AbstractDofHandler, u::Vector, suffix="")
@@ -179,7 +179,7 @@ end
 """
     write_projected(vtks::VTKStream, proj::L2Projector, vals::Vector, name::AbstractString)
 
-Write `vals` that have been projected with `proj` to the vtk file in `vtks`
+Project `vals` to the grid nodes with `proj` and save to the stream.
 """
 function write_projected(vtks::VTKStream, proj::L2Projector, vals, name)
     data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
@@ -189,7 +189,7 @@ function write_projected(vtks::VTKStream, proj::L2Projector, vals, name)
 end
 
 """
-    write_celldata(vtks::VTKStream, celldata, name)
+    write_celldata(vtks::VTKStream, grid::AbstractGrid, celldata::AbstractVector, name::String)
 
 Write the `celldata` that is ordered by the cells in the grid to the vtk file.
 """
@@ -198,10 +198,10 @@ function write_celldata(vtks::VTKStream, ::AbstractGrid, celldata, name)
 end
 
 """
-    write_nodedata(vtks::VTKStream, nodedata::Vector{Real}, name)
-    write_nodedata(vtks::VTKStream, nodedata::Vector{<:AbstractTensor}, name)
+    write_nodedata(vtks::VTKStream, grid::AbstractGrid, nodedata::Vector{Real}, name)
+    write_nodedata(vtks::VTKStream, grid::AbstractGrid, nodedata::Vector{<:AbstractTensor}, name)
     
-Write the `nodedata` that is ordered by the nodes in the grid to the vtk file.
+Write the `nodedata` that is ordered by the nodes in the grid to the vtk stream.
 
 When `nodedata` contains `Tensors.Vec`s, each component is exported. 
 Two-dimensional vectors are padded with zeros.
@@ -217,7 +217,7 @@ end
 """
     write_nodeset(vtks::VTKStream, grid::AbstractGrid, nodeset::String)
 
-Export nodal values of 1 for nodes in `nodeset`, and 0 otherwise
+Write nodal values of 1 for nodes in `nodeset`, and 0 otherwise
 """
 function write_nodeset(vtks, grid::AbstractGrid, nodeset::String)
     z = zeros(getnnodes(grid))
@@ -231,7 +231,7 @@ end
     write_cellset(vtks, grid::AbstractGrid, cellset::String)
     write_cellset(vtks, grid::AbstractGrid, cellsets::Union{AbstractVector{String},AbstractSet{String})
 
-Export all cell sets in the grid with name according to their keys and 
+Write all cell sets in the grid with name according to their keys and 
 celldata 1 if the cell is in the set, and 0 otherwise. It is also possible to 
 only export a single `cellset`, or multiple `cellsets`. 
 """
