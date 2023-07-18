@@ -313,7 +313,8 @@ end
 """
     InterfaceIterator(grid::Grid, [topology::ExclusiveTopology])
     InterfaceIterator(dh::AbstractDofHandler, [topology::ExclusiveTopology])
-Create an `InterfaceIterator` to conveniently iterate over all, or a subset, of the interfaces in a
+    
+Create an `InterfaceIterator` to conveniently iterate over all the interfaces in a
 grid. The elements of the iterator are [`InterfaceCache`](@ref)s which are properly
 `reinit!`ialized. See [`InterfaceCache`](@ref) for more details.
 Looping over an `InterfaceIterator`, i.e.:
