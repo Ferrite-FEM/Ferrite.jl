@@ -16,12 +16,12 @@ the exporting.
 
 The following structure can be used to write various output to a vtk-file:
 
-```julia
+```@example export
 VTKStream("my_solution", grid) do vtks
-    write_<x>(vtks, args...)
+    write_solution(vtks, dh, u)
 end
 ```
-where `write_<x>` can be 
+where `write_solution` is just one example of the following functions that can be used 
 
 * [`write_solution`](@ref)
 * [`write_celldata`](@ref)
@@ -35,8 +35,8 @@ where `write_<x>` can be
 Instead of using the `do`-block, it is also possible to do
 ```@example export
 vtks = VTKStream("my_solution", grid)
-write_<x>(vtks, args...)
-# ...
+write_solution(vtks, dh, u)
+# etc.
 close(vtks)
 ```
 
