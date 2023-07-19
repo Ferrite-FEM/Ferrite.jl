@@ -30,7 +30,7 @@ where `write_solution` is just one example of the following functions that can b
 * [`Ferrite.write_cellset`](@ref)
 * [`Ferrite.write_nodeset`](@ref)
 * [`Ferrite.write_dirichlet`](@ref)
-* [`write_cell_colors`](@ref)
+* [`Ferrite.write_cell_colors`](@ref)
 
 Instead of using the `do`-block, it is also possible to do
 ```@example export

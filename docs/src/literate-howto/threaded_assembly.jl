@@ -26,8 +26,8 @@ function create_example_2d_grid()
     colors_workstream = create_coloring(grid; alg=ColoringAlgorithm.WorkStream)
     colors_greedy = create_coloring(grid; alg=ColoringAlgorithm.Greedy)
     Ferrite.VTKFile("colored", grid) do vtk
-        write_cell_colors(vtk, grid, colors_workstream, "workstream-coloring")
-        write_cell_colors(vtk, grid, colors_greedy, "greedy-coloring")
+        Ferrite.write_cell_colors(vtk, grid, colors_workstream, "workstream-coloring")
+        Ferrite.write_cell_colors(vtk, grid, colors_greedy, "greedy-coloring")
     end
 end
 
