@@ -334,36 +334,34 @@ end
 """
 struct InterfaceIterator{Cache<:InterfaceCache}
     cache::Cache
-    set::Set{NTuple{2, FaceIndex}}
+    grid::Grid
+    topology::ExclusiveTopology
 end
 
 function InterfaceIterator(gridordh::Union{Grid,AbstractDofHandler},
                       topology::ExclusiveTopology = ExclusiveTopology(gridordh))
     grid = gridordh isa Grid ? gridordh : get_grid(gridordh)
-    i = 1;
-    grid_dim = getdim(grid)
-    neighborhood = grid_dim == 1 ? topology.vertex_vertex_neighbor : topology.face_face_neighbor
-    interface_skeleton = Array{NTuple{2, FaceIndex}}(undef, count(face -> !isempty(neighborhood[face[1], face[2]]), faceskeleton(topology, grid)))
-    for face_a in faceskeleton(topology, grid)
-        !isempty(neighborhood[face_a[1], face_a[2]]) || continue
-        neighbor = neighborhood[face_a[1], face_a[2]].neighbor_info[]
-        face_b = grid_dim == 1 ? FaceIndex(neighbor[1], neighbor[2]) : neighbor
-        interface_skeleton[i] = (face_a, face_b) #Assumes one neighbor only
-        i+=1
-    end
-    set = Set(interface_skeleton)
-    return InterfaceIterator(InterfaceCache(gridordh), set)
+    return InterfaceIterator(InterfaceCache(gridordh), grid, topology)
 end
 
 # Iterator interface
 function Base.iterate(ii::InterfaceIterator, state_in...)
-    it = iterate(ii.set, state_in...)
-    it === nothing && return nothing
-    interface, state_out = it
-    face_a = interface[1]
-    face_b = interface[2]
-    reinit!(ii.cache, face_a, face_b)
-    return (ii.cache, state_out)
+    state = state_in
+    grid_dim = getdim(ii.grid)
+    neighborhood = grid_dim == 1 ? ii.topology.vertex_vertex_neighbor : ii.topology.face_face_neighbor 
+    while true
+        it = iterate(faceskeleton(ii.topology, ii.grid), state...)
+        it === nothing && return nothing
+        face_a, state_out = it  
+        if isempty(neighborhood[face_a[1], face_a[2]])
+            state = state_out
+            continue
+        end
+        neighbor = neighborhood[face_a[1], face_a[2]].neighbor_info[]
+        face_b = grid_dim == 1 ? FaceIndex(neighbor[1], neighbor[2]) : neighbor
+        reinit!(ii.cache, face_a, face_b)
+        return (ii.cache, state_out)
+    end
 end
 
 
