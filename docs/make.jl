@@ -17,6 +17,10 @@ const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 # Generate tutorials and how-to guides
 include("generate.jl")
 
+# Changelog
+include("changelog.jl")
+create_documenter_changelog()
+
 # Build documentation.
 @timeit dto "makedocs" makedocs(
     format = Documenter.HTML(
@@ -31,6 +35,7 @@ include("generate.jl")
     draft = liveserver,
     pages = Any[
         "Home" => "index.md",
+        # hide("Changelog" => "changelog.md"),
         "Tutorials" => [
             "Tutorials overview" => "tutorials/index.md",
             "tutorials/heat_equation.md",

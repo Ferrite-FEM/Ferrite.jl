@@ -338,3 +338,7 @@ function MixedDofHandler(::AbstractGrid)
     error("MixedDofHandler is the standard DofHandler in Ferrite now and has been renamed to DofHandler.
 Use DofHandler even for mixed grids and fields on subdomains.")
 end
+
+@deprecate end_assemble finish_assemble
+@deprecate get_point_values evaluate_at_points
+@deprecate transform! transform_coordinates!
