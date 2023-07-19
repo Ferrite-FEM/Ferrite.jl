@@ -130,38 +130,30 @@ Returns the updated value of `cnt`.
 Used internally for sparsity patterns with discontinuous interpolations.
 """
 function cross_element_coupling!(dh::DofHandler, ch::Union{ConstraintHandler, Nothing}, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::AbstractVector{<:AbstractMatrix{Bool}}, cnt::Int, I::Vector{Int}, J::Vector{Int})
-    cc1 = CellCache(dh, UpdateFlags(false, false, true))
-    cc2 = CellCache(dh, UpdateFlags(false, false, true))
-    neighborhood = getdim(dh.grid.cells[1]) > 1 ? topology.face_face_neighbor : topology.vertex_vertex_neighbor
-    for (sdh_idx, sdh) in pairs(dh.subdofhandlers)
-        # Buffering interpolation information for type stability/better allocations
-        ip_infos = [InterpolationInfo(ip) for ip in sdh.field_interpolations]
-        coupling_sdh = couplings[sdh_idx]
-        for (cell_field_i, cell_field) in pairs(sdh.field_names)
-            fii = ip_infos[cell_field_i]
-            # Couple element for discontinuous interpolations only
-            fii.is_discontinuous || continue
-            for cell_idx in BitSet(sdh.cellset)
-                # Making sure current field is defined for current cell
+    fca = FaceCache(CellCache(dh, UpdateFlags(false, false, true)), ScalarWrapper(0))
+    fcb = FaceCache(CellCache(dh, UpdateFlags(false, false, true)), ScalarWrapper(0))
+    ic = InterfaceCache(fca, fcb, Int[])
+    for ic in InterfaceIterator(ic, dh.grid, topology)
+        sdhs = dh.subdofhandlers[dh.cell_to_subdofhandler[cellid.([fca, fcb])]]
+        for (sdh_idx, sdh) in pairs(sdhs)
+            ip_infos = [InterpolationInfo(ip) for ip in sdh.field_interpolations]
+            coupling_sdh = couplings[sdh_idx]
+
+            for (cell_field_i, cell_field) in pairs(sdh.field_names)
+                fii = ip_infos[cell_field_i]
+                # Couple element for discontinuous interpolations only
+                fii.is_discontinuous || continue
                 dofrange1 = dof_range(sdh, cell_field)
-                reinit!(cc1, cell_idx)
-                cell_field_dofs = @view cc1.dofs[dofrange1]
-                neighbors = neighborhood[cell_idx, :]
-                for neighbor in neighbors[.!isempty.(neighbors)]
-                    # TODO: Change this for non-conforming mesh
-                    neighbor_cell = neighbor[1][1]
-                    sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[neighbor_cell]]
-                    for (neighbor_field_i, neighbor_field) in enumerate(sdh.field_names)
-                        fii2 = ip_infos[neighbor_field_i]
-                        neighbor_field ∈ sdh2.field_names && fii2.is_discontinuous || continue
-                        dofrange2 = dof_range(sdh2, neighbor_field)
-                        reinit!(cc2, neighbor_cell)
-                        neighbor_field_dofs = @view cc2.dofs[dofrange2]
-                        # Typical coupling procedure
-                        for (j, dof_j) in pairs(dofrange2), (i, dof_i) in pairs(dofrange1)
-                            cnt = _add_elements_coupling(coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, sym, keep_constrained, ch, cnt, I, J)
-                            cnt = _add_elements_coupling(coupling_sdh, dof_j, dof_i, neighbor_field_dofs, cell_field_dofs, j, i, sym, keep_constrained, ch, cnt, I, J)
-                        end
+                cell_field_dofs = @view interfacedofs(ic)[sdh_idx == 1 ? dofrange1 : length(celldofs(fca)) + dofrange1]
+                for (neighbor_field_i, neighbor_field) in pairs(sdh.field_names)
+                    fii2 = ip_infos[neighbor_field_i]
+                    fii2.is_discontinuous || continue
+                    dofrange2 = dof_range(sdh, neighbor_field)
+                    neighbor_field_dofs = @view interfacedofs(ic)[sdh_idx == 2 ? dofrange2 : length(celldofs(fca)) + dofrange2]
+                    # Typical coupling procedure
+                    for (j, dof_j) in pairs(dofrange2), (i, dof_i) in pairs(dofrange1)
+                        cnt = _add_elements_coupling(coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, sym, keep_constrained, ch, cnt, I, J)
+                        cnt = _add_elements_coupling(coupling_sdh, dof_j, dof_i, neighbor_field_dofs, cell_field_dofs, j, i, sym, keep_constrained, ch, cnt, I, J)
                     end
                 end
             end
