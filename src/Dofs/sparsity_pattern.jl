@@ -134,22 +134,24 @@ function cross_element_coupling!(dh::DofHandler, ch::Union{ConstraintHandler, No
     fcb = FaceCache(CellCache(dh, UpdateFlags(false, false, true)), ScalarWrapper(0))
     ic = InterfaceCache(fca, fcb, Int[])
     for ic in InterfaceIterator(ic, dh.grid, topology)
-        sdhs = dh.subdofhandlers[dh.cell_to_subdofhandler[cellid.([fca, fcb])]]
-        for (sdh_idx, sdh) in pairs(sdhs)
+        sdhs_idx = dh.cell_to_subdofhandler[cellid.([ic.a, ic.b])]
+        sdhs = dh.subdofhandlers[sdhs_idx]
+        for (i, sdh) in pairs(sdhs)
+            sdh_idx = sdhs_idx[i]
             ip_infos = [InterpolationInfo(ip) for ip in sdh.field_interpolations]
             coupling_sdh = couplings[sdh_idx]
-
             for (cell_field_i, cell_field) in pairs(sdh.field_names)
                 fii = ip_infos[cell_field_i]
                 # Couple element for discontinuous interpolations only
                 fii.is_discontinuous || continue
                 dofrange1 = dof_range(sdh, cell_field)
-                cell_field_dofs = @view interfacedofs(ic)[sdh_idx == 1 ? dofrange1 : length(celldofs(fca)) + dofrange1]
+                cell_field_dofs = @view interfacedofs(ic)[sdh_idx == 1 ? dofrange1 : length(celldofs(ic.a)) .+ dofrange1]
                 for (neighbor_field_i, neighbor_field) in pairs(sdh.field_names)
                     fii2 = ip_infos[neighbor_field_i]
-                    fii2.is_discontinuous || continue
-                    dofrange2 = dof_range(sdh, neighbor_field)
-                    neighbor_field_dofs = @view interfacedofs(ic)[sdh_idx == 2 ? dofrange2 : length(celldofs(fca)) + dofrange2]
+                    sdh2 = sdhs[i==1 ? 2 : 1]
+                    neighbor_field ∈ sdh2.field_names && fii2.is_discontinuous || continue
+                    dofrange2 = dof_range(sdh2, neighbor_field)
+                    neighbor_field_dofs = @view interfacedofs(ic)[sdh_idx == 2 ? dofrange2 : length(celldofs(ic.a)) .+ dofrange2]
                     # Typical coupling procedure
                     for (j, dof_j) in pairs(dofrange2), (i, dof_i) in pairs(dofrange1)
                         cnt = _add_elements_coupling(coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, sym, keep_constrained, ch, cnt, I, J)
