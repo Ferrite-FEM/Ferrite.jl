@@ -275,9 +275,9 @@ function solve(ν, interpolation_u, interpolation_p)
         write_solution(vtk, dh, u)
         for i in 1:3, j in 1:3
             σij = [x[i, j] for x in σ]
-            write_celldata(vtk, σij, "sigma_$(i)$(j)")
+            write_celldata(vtk, grid, σij, "sigma_$(i)$(j)")
         end
-        write_celldata(vtk, σvM, "sigma von Mises")
+        write_celldata(vtk, grid, σvM, "sigma von Mises")
     end
     return u
 end

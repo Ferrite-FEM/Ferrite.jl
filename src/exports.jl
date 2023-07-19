@@ -96,7 +96,6 @@ export
 # Grid coloring
     create_coloring,
     ColoringAlgorithm,
-    vtk_cell_data_colors,
 
 # Dofs
     DofHandler,
@@ -153,7 +152,9 @@ export
     write_solution,
     write_celldata,
     write_projection,
-    paraview_collection, # Reexport from WriteVTK.jl
+    # Reexports from WriteVTK.jl for collections
+    paraview_collection, 
+    vtk_save,           
     
 # L2 Projection
     project,

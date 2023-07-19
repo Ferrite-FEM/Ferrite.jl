@@ -53,5 +53,6 @@ for i in 1:5
         pvd[i] = vtk
     end
 end
+vtk_save(pvd)
 ```
 See [Transient heat equation](@ref tutorial-transient-heat-equation) for an example
