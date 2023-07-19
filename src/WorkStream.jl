@@ -11,9 +11,11 @@ function mesh_loop(
     sample_copy_data;
     queue_length = 2 * Threads.nthreads(),
     chunk_size = 8,
+    ntasks = Threads.nthreads(),
    ) where {CW<:Function, CC<:Function}
 
-    return Main.@descend mesh_loop(dh, colors, cell_worker, copier, sample_scratch_data, sample_copy_data, queue_length, Val(chunk_size))
+    # return mesh_loop(dh, colors, cell_worker, copier, sample_scratch_data, sample_copy_data, queue_length, Val(chunk_size), ntasks)
+    return mesh_loop(dh, colors, cell_worker, copier, sample_scratch_data, sample_copy_data, queue_length, chunk_size, ntasks)
 end
 
 function mesh_loop(
@@ -21,45 +23,55 @@ function mesh_loop(
     colors::Vector{Vector{Int}},
     cell_worker::CW,
     copier::CC,
-    sample_scratch_data,
-    sample_copy_data,
+    sample_scratch_data::SSD,
+    sample_copy_data::SCD,
     queue_length,
-    ::Val{chunk_size},
-   ) where {CW<:Function, CC<:Function, chunk_size}
+    chunk_size,
+    ntasks
+   ) where {CW<:Function, CC<:Function, SSD, SCD}
 
-    ntasks = Threads.nthreads()
-    scratch_datas = [copy(sample_scratch_data) for _ in 1:ntasks]
-    copy_datas = [copy(sample_copy_data) for _ in 1:ntasks]
+    # ntasks = Threads.nthreads()
+    scratch_datas = SSD[copy(sample_scratch_data)::SSD for _ in 1:ntasks]
+    copy_datas = SCD[copy(sample_copy_data)::SCD for _ in 1:ntasks]
     cell_caches = [CellCache(dh) for _ in 1:ntasks]
 
     for color in colors
+        # @info "New color"
 
-        chunks = Channel{SVector{chunk_size,Int}}(queue_length)
+        # chunks = Channel{SVector{chunk_size,Int}}(queue_length)
+        # TODO: Reuse the vectors?
+        chunks = Channel{Vector{Int}}(queue_length)
 
-        Base.Experimental.@sync begin
+        # Base.Experimental.@sync begin
+        @sync begin
             # Spawn the job producer
             Threads.@spawn begin
                 idx = 0
-                mv = zero(MVector{chunk_size,Int})
+                # mv = zero(MVector{chunk_size,Int})
+                mv = zeros(Int, chunk_size)
                 for cid in color
                     idx += 1
                     mv[idx] = cid
                     if idx == chunk_size
-                        put!(chunks, SVector(mv))
+                        # put!(chunks, SVector(mv))
+                        put!(chunks, mv)
+                        mv = zeros(Int, chunk_size)
                         idx = 0
                     end
                 end
                 # Finalize
-                if idx != 0
-                    for i in (idx+1):chunk_size
-                        mv[i] = 0
-                    end
-                    put!(chunks, SVector(mv))
-                end
+                # if idx != 0
+                #     for i in (idx+1):chunk_size
+                #         mv[i] = 0
+                #     end
+                #     put!(chunks, SVector(mv))
+                #     put!(chunks, mv)
+                # end
+                put!(chunks, mv)
                 close(chunks)
             end
             # Spawn the workers
-            for taskid in 1:Threads.nthreads()
+            for taskid in 1:ntasks
                 scratch_data = scratch_datas[taskid]
                 copy_data = copy_datas[taskid]
                 cc = cell_caches[taskid]
@@ -77,6 +89,5 @@ function mesh_loop(
         end # @sync
     end # colors
 end
-
 
 # end # module WorkStream
