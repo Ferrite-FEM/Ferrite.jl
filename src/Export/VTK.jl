@@ -105,13 +105,13 @@ nodes_to_vtkorder(cell::QuadraticHexahedron) = [
 ]
 
 function create_vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; kwargs...) where {dim,C,T}
-    cls = MeshCell[]
+    cls = WriteVTK.MeshCell[]
     for cell in getcells(grid)
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
-        push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
+        push!(cls, WriteVTK.MeshCell(celltype, nodes_to_vtkorder(cell)))
     end
     coords = reshape(reinterpret(T, getnodes(grid)), (dim, getnnodes(grid)))
-    return vtk_grid(filename, coords, cls; kwargs...)
+    return WriteVTK.vtk_grid(filename, coords, cls; kwargs...)
 end
 
 function toparaview!(v, x::Vec{D}) where D

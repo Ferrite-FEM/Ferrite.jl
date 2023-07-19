@@ -8,7 +8,7 @@ using StaticArrays
 using Base: @propagate_inbounds
 using NearestNeighbors
 using EnumX
-import WriteVTK: paraview_collection
+import WriteVTK: WriteVTK, paraview_collection, VTKCellTypes
 
 include("exports.jl")
 
