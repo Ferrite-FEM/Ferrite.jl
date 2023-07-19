@@ -150,6 +150,7 @@ export
     write_solution,
     write_celldata,
     write_projection,
+    paraview_collection, # Reexport from WriteVTK.jl
     
 # L2 Projection
     project,

@@ -1,7 +1,6 @@
 module Ferrite
 using Reexport
 @reexport using Tensors
-@reexport using WriteVTK
 
 using LinearAlgebra
 using SparseArrays
@@ -9,6 +8,7 @@ using StaticArrays
 using Base: @propagate_inbounds
 using NearestNeighbors
 using EnumX
+import WriteVTK: paraview_collection
 
 include("exports.jl")
 

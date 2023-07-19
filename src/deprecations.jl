@@ -61,25 +61,13 @@ Base.@deprecate_binding Line3D Line
 Base.@deprecate_binding Quadrilateral3D Quadrilateral
 export Line2D, Line3D, Quadrilateral3D
 
-import WriteVTK: vtk_grid, vtk_cell_data, vtk_point_data, vtk_save
-
-@deprecate vtk_grid(filename::String, grid::AbstractGrid; kwargs...) VTKFile(filename, grid; kwargs...)
-@deprecate vtk_grid(filename::String, dh::DofHandler; kwargs...) VTKFile(filename, get_grid(dh); kwargs...)
-struct _DummyGrid{D} <: AbstractGrid{D}
-    ncells::Int
+function WriteVTK.vtk_grid(::String, ::Union{AbstractGrid,AbstractDofHandler}; kwargs...)
+    error(join(("The vtk interface has been updated in Ferrite v1.0.",
+                "See https://github.com/Ferrite-FEM/Ferrite.jl/pull/679.",
+                "Use Ferrite.VTKFile to open a vtk file, and the functions",
+                "write_solution, write_celldata, and write_projection to save data."), 
+            "\n"))
 end
-_DummyGrid(ncells=1) = _DummyGrid{1}(ncells)
-getncells(g::_DummyGrid) = g.ncells
-
-@deprecate vtk_cell_data(vtk::VTKFile, args...) write_celldata(vtk, _DummyGrid(), args...)
-@deprecate vtk_point_data(vtk::VTKFile, data::Vector, args...) write_nodedata(vtk, _DummyGrid(), data, args...)
-@deprecate vtk_point_data(vtk::VTKFile, proj::L2Projector, args...) write_projection(vtk, proj, args...)
-@deprecate vtk_point_data(vtk::VTKFile, ch::ConstraintHandler) write_dirichlet(vtk, ch)
-@deprecate vtk_cellset(vtk::VTKFile, grid::AbstractGrid, args...) write_cellset(vtk, grid, args...)
-@deprecate vtk_nodeset(vtk::VTKFile, grid::AbstractGrid, args...) write_nodeset(vtk, grid, args...)
-@deprecate vtk_cell_data_colors(vtk::VTKFile, args...) write_cell_colors(vtk, _DummyGrid(vtk.vtk.Ncls), args...)
-@deprecate vtk_save(vtk::VTKFile) close(vtk)
-@deprecate vtk_point_data(vtk::VTKFile, dh::DofHandler, args...) write_solution(vtk, dh, args...)
 
 # Deprecation of auto-vectorized methods
 function add!(dh::DofHandler, name::Symbol, dim::Int)
