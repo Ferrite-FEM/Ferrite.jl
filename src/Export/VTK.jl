@@ -13,7 +13,7 @@ This file handler can be used to to write data with
 
 * [`write_solution`](@ref)
 * [`write_celldata`](@ref)
-* [`write_projected`](@ref)
+* [`write_projection`](@ref)
 * [`Ferrite.write_nodedata`](@ref).
 * [`Ferrite.write_cellset`](@ref)
 * [`Ferrite.write_nodeset`](@ref)
@@ -177,11 +177,11 @@ function write_solution(vtk::VTKFile, dh::AbstractDofHandler, u::Vector, suffix=
 end
 
 """
-    write_projected(vtk::VTKFile, proj::L2Projector, vals::Vector, name::AbstractString)
+    write_projection(vtk::VTKFile, proj::L2Projector, vals::Vector, name::AbstractString)
 
 Project `vals` to the grid nodes with `proj` and save to the stream.
 """
-function write_projected(vtk::VTKFile, proj::L2Projector, vals, name)
+function write_projection(vtk::VTKFile, proj::L2Projector, vals, name)
     data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
     @assert size(data, 2) == getnnodes(get_grid(proj.dh))
     _vtk_write_nodedata(vtk.vtk, data, name; component_names=component_names(eltype(vals)))

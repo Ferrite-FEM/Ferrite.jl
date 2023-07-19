@@ -492,7 +492,7 @@ function topopt(ra,ρ,n,filename; output=:false)
             i = @sprintf("%3.3i", it)
             filename_it = string(filename, "_", i)
 
-            VTKFile(filename_it, grid) do vtk
+            Ferrite.VTKFile(filename_it, grid) do vtk
                 write_celldata(vtk, grid, χ, "density")
             end
         end
@@ -500,7 +500,7 @@ function topopt(ra,ρ,n,filename; output=:false)
 
     ## export converged results
     if(!output)
-        VTKFile(filename, grid) do vtk
+        Ferrite.VTKFile(filename, grid) do vtk
             write_celldata(vtk, grid, χ, "density")
         end
     end

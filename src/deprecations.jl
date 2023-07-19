@@ -73,7 +73,7 @@ getncells(g::_DummyGrid) = g.ncells
 
 @deprecate vtk_cell_data(vtk::VTKFile, args...) write_celldata(vtk, _DummyGrid(), args...)
 @deprecate vtk_point_data(vtk::VTKFile, data::Vector, args...) write_nodedata(vtk, _DummyGrid(), data, args...)
-@deprecate vtk_point_data(vtk::VTKFile, proj::L2Projector, args...) write_projected(vtk, proj, args...)
+@deprecate vtk_point_data(vtk::VTKFile, proj::L2Projector, args...) write_projection(vtk, proj, args...)
 @deprecate vtk_point_data(vtk::VTKFile, ch::ConstraintHandler) write_dirichlet(vtk, ch)
 @deprecate vtk_cellset(vtk::VTKFile, grid::AbstractGrid, args...) write_cellset(vtk, grid, args...)
 @deprecate vtk_nodeset(vtk::VTKFile, grid::AbstractGrid, args...) write_nodeset(vtk, grid, args...)

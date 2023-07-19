@@ -149,7 +149,7 @@ export
 # export data (using e.g. Ferrite.VTKFile)
     write_solution,
     write_celldata,
-    write_projected,
+    write_projection,
     
 # L2 Projection
     project,

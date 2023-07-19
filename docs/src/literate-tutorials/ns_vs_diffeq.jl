@@ -440,7 +440,7 @@ for (u_uc,t) in integrator
     update!(ch, t)
     u = copy(u_uc)
     apply!(u, ch)
-    VTKFile("vortex-street-$t.vtu", grid) do vtk
+    Ferrite.VTKFile("vortex-street-$t.vtu", grid) do vtk
         write_solution(vtk, dh, u)
         pvd[t] = vtk
     end

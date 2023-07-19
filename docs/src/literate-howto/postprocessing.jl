@@ -87,8 +87,8 @@ q_projected = project(projector, q_gp, qr);
 # To visualize the heat flux, we export the projected field `q_projected`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
 # The result is also visualized in *Figure 1*.
-VTKFile("heat_equation_flux", grid) do vtk
-    write_projected(vtk, projector, q_projected, "q")
+Ferrite.VTKFile("heat_equation_flux", grid) do vtk
+    write_projection(vtk, projector, q_projected, "q")
 end;
 
 # ## Point Evaluation

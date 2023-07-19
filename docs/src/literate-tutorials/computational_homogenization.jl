@@ -518,16 +518,16 @@ round.(ev; digits=-8)
 
 uM = zeros(ndofs(dh))
 
-VTKFile("homogenization", grid) do vtk
+Ferrite.VTKFile("homogenization", grid) do vtk
     for i in 1:3
         ## Compute macroscopic solution
         apply_analytical!(uM, dh, :u, x -> εᴹ[i] ⋅ x)
         ## Dirichlet
         write_solution(vtk, dh, uM + u.dirichlet[i], "_dirichlet_$i")
-        write_projected(vtk, projector, σ.dirichlet[i], "σvM_dirichlet_$i")
+        write_projection(vtk, projector, σ.dirichlet[i], "σvM_dirichlet_$i")
         ## Periodic
         write_solution(vtk, dh, uM + u.periodic[i], "_periodic_$i")
-        write_projected(vtk, projector, σ.periodic[i], "σvM_periodic_$i")
+        write_projection(vtk, projector, σ.periodic[i], "σvM_periodic_$i")
     end
 end;
 

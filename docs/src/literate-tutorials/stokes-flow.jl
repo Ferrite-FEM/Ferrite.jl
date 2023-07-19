@@ -505,7 +505,7 @@ function main()
     u = K \ f
     apply!(u, ch)
     ## Export the solution
-    VTKFile("stokes-flow", grid) do vtk
+    Ferrite.VTKFile("stokes-flow", grid) do vtk
         write_solution(vtk, dh, u)
     end
 

@@ -192,7 +192,7 @@ apply!(A, ch);
 # To store the solution, we initialize a `paraview_collection` (.pvd) file.
 pvd = paraview_collection("transient-heat.pvd");
 t = 0
-VTKFile("transient-heat-$t", grid) do vtk
+Ferrite.VTKFile("transient-heat-$t", grid) do vtk
     write_solution(vtk, dh, uₙ)
     pvd[t] = vtk
 end
@@ -210,7 +210,7 @@ for t in Δt:Δt:T
     #Finally, we can solve the time step and save the solution afterwards.
     u = A \ b
 
-    VTKFile("transient-heat-$t", grid) do vtk
+    Ferrite.VTKFile("transient-heat-$t", grid) do vtk
         write_solution(vtk, dh, u)
         pvd[t] = vtk
     end

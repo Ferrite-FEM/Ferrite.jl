@@ -25,7 +25,7 @@ function create_example_2d_grid()
     grid = generate_grid(Quadrilateral, (10, 10), Vec{2}((0.0, 0.0)), Vec{2}((10.0, 10.0)))
     colors_workstream = create_coloring(grid; alg=ColoringAlgorithm.WorkStream)
     colors_greedy = create_coloring(grid; alg=ColoringAlgorithm.Greedy)
-    VTKFile("colored", grid) do vtk
+    Ferrite.VTKFile("colored", grid) do vtk
         write_cell_colors(vtk, grid, colors_workstream, "workstream-coloring")
         write_cell_colors(vtk, grid, colors_greedy, "greedy-coloring")
     end

@@ -209,7 +209,7 @@ function solve(ν, interpolation_u, interpolation_p)
     ## export
     filename = "cook_" * (isa(interpolation_u, Lagrange{RefTriangle,1}) ? "linear" : "quadratic") *
                          "_linear"
-    VTKFile(filename, grid) do vtk
+    Ferrite.VTKFile(filename, grid) do vtk
         write_solution(vtk, dh, u)
     end
     return u
