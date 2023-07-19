@@ -13,6 +13,7 @@ docs/src/examples/
 docs/src/tutorials/
 docs/src/howto/
 docs/src/gallery/
+docs/src/changelog.md
 *.DS_Store
 /Manifest.toml
 /test/coverage/Manifest.toml
