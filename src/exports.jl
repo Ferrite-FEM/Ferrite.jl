@@ -138,8 +138,11 @@ export
     CellIterator,
     FaceCache,
     FaceIterator,
+    InterfaceCache,
+    InterfaceIterator,
     UpdateFlags,
     cellid,
+    interfacedofs,
 
 # assembly
     start_assemble,

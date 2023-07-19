@@ -36,4 +36,6 @@ CellCache
 CellIterator
 FaceCache
 FaceIterator
+InterfaceCache
+InterfaceIterator
 ```
