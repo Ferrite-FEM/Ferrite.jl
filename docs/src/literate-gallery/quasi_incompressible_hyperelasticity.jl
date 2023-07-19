@@ -334,9 +334,9 @@ function solve(interpolation_u, interpolation_p)
         end;
 
         ## Save the solution fields
-        VTKStream("hyperelasticity_incomp_mixed_$t.vtu", grid) do vtks
-            write_solution(vtks, dh, w)
-            pvd[t] = vtks
+        VTKFile("hyperelasticity_incomp_mixed_$t.vtu", grid) do vtk
+            write_solution(vtk, dh, w)
+            pvd[t] = vtk
         end
     end;
     vtk_save(pvd);

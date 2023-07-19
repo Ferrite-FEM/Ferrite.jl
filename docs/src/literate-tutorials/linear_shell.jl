@@ -113,8 +113,8 @@ a = K\f
 
 # Output results.
 #+
-VTKStream("linear_shell", grid) do vtks
-    write_solution(vtks, dh, a)
+VTKFile("linear_shell", grid) do vtk
+    write_solution(vtk, dh, a)
 end
 
 end; #end main functions

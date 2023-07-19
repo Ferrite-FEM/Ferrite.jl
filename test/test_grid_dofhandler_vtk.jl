@@ -36,10 +36,10 @@ end
         addnodeset!(grid, "middle-nodes", x -> norm(x) < radius)
 
         gridfilename = "grid-$(repr(celltype))"
-        VTKStream(gridfilename, grid) do vtks
-            write_cellset(vtks, grid, "cell-1")
-            write_cellset(vtks, grid, "middle-cells")
-            write_nodeset(vtks, grid, "middle-nodes")
+        VTKFile(gridfilename, grid) do vtk
+            Ferrite.write_cellset(vtk, grid, "cell-1")
+            Ferrite.write_cellset(vtk, grid, "middle-cells")
+            Ferrite.write_nodeset(vtk, grid, "middle-nodes")
         end
 
         # test the sha of the file
@@ -75,9 +75,9 @@ end
         apply!(u, ch)
 
         dofhandlerfilename = "dofhandler-$(repr(celltype))"
-        VTKStream(dofhandlerfilename, grid) do vtks
-            write_dirichlet(vtks, ch)
-            write_solution(vtks, dofhandler, u)
+        VTKFile(dofhandlerfilename, grid) do vtk
+            Ferrite.write_dirichlet(vtk, ch)
+            write_solution(vtk, dofhandler, u)
         end
 
         # test the sha of the file
@@ -112,10 +112,10 @@ close(csio)
     vector_data = [Vec{3}(ntuple(i->i, 3)) for j=1:8]
 
     filename_3d = "test_vtk_3d"
-    VTKStream(filename_3d, grid) do vtks
-        write_nodedata(vtks, grid, sym_tensor_data, "symmetric tensor")
-        write_nodedata(vtks, grid, tensor_data, "tensor")
-        write_nodedata(vtks, grid, vector_data, "vector")
+    VTKFile(filename_3d, grid) do vtk
+        Ferrite.write_nodedata(vtk, grid, sym_tensor_data, "symmetric tensor")
+        Ferrite.write_nodedata(vtk, grid, tensor_data, "tensor")
+        Ferrite.write_nodedata(vtk, grid, vector_data, "vector")
     end
 
     # 2D grid
@@ -127,11 +127,11 @@ close(csio)
     vector_data = [Vec{2}(ntuple(i->i, 2)) for j=1:4]
 
     filename_2d = "test_vtk_2d"
-    VTKStream(filename_2d, grid) do vtks
-        write_nodedata(vtks, grid, sym_tensor_data, "symmetric tensor")
-        write_nodedata(vtks, grid, tensor_data, "tensor")
-        write_nodedata(vtks, grid, tensor_data_1D, "tensor_1d")
-        write_nodedata(vtks, grid, vector_data, "vector")
+    VTKFile(filename_2d, grid) do vtk
+        Ferrite.write_nodedata(vtk, grid, sym_tensor_data, "symmetric tensor")
+        Ferrite.write_nodedata(vtk, grid, tensor_data, "tensor")
+        Ferrite.write_nodedata(vtk, grid, tensor_data_1D, "tensor_1d")
+        Ferrite.write_nodedata(vtk, grid, vector_data, "vector")
     end
 
     # test the shas of the files

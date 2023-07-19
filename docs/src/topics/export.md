@@ -17,30 +17,30 @@ the exporting.
 The following structure can be used to write various output to a vtk-file:
 
 ```@example export
-VTKStream("my_solution", grid) do vtks
-    write_solution(vtks, dh, u)
+VTKFile("my_solution", grid) do vtk
+    write_solution(vtk, dh, u)
 end
 ```
 where `write_solution` is just one example of the following functions that can be used 
 
 * [`write_solution`](@ref)
 * [`write_celldata`](@ref)
-* [`write_nodedata`](@ref)
+* [`Ferrite.write_nodedata`](@ref)
 * [`write_projected`](@ref)
-* [`write_cellset`](@ref)
-* [`write_nodeset`](@ref)
-* [`write_dirichlet`](@ref)
+* [`Ferrite.write_cellset`](@ref)
+* [`Ferrite.write_nodeset`](@ref)
+* [`Ferrite.write_dirichlet`](@ref)
 * [`write_cell_colors`](@ref)
 
 Instead of using the `do`-block, it is also possible to do
 ```@example export
-vtks = VTKStream("my_solution", grid)
-write_solution(vtks, dh, u)
+vtk = VTKFile("my_solution", grid)
+write_solution(vtk, dh, u)
 # etc.
-close(vtks)
+close(vtk)
 ```
 
-The data written by `write_solution`, `write_celldata`, `write_nodedata`, and `write_projected` may be either scalar (`Vector{<:Number}`) or tensor (`Vector{<:AbstractTensor}`) data. 
+The data written by `write_solution`, `write_celldata`, `Ferrite.write_nodedata`, and `write_projected` may be either scalar (`Vector{<:Number}`) or tensor (`Vector{<:AbstractTensor}`) data. 
 
 To save time-dependent data, `WriteVTK.jl`'s, `paraview_collection` may be used
 
@@ -48,8 +48,8 @@ To save time-dependent data, `WriteVTK.jl`'s, `paraview_collection` may be used
 pvd = paraview_collection("my_results.pvd");
 for i in 1:5
     # Do calculations to update u
-    VTKStream("my_results_$i", grid) do vtks
-        write_solution(vtks, dh, u)
+    VTKFile("my_results_$i", grid) do vtk
+        write_solution(vtk, dh, u)
         pvd[i] = vtk
     end
 end

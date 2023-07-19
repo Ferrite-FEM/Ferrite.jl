@@ -440,9 +440,9 @@ for (u_uc,t) in integrator
     update!(ch, t)
     u = copy(u_uc)
     apply!(u, ch)
-    VTKStream("vortex-street-$t.vtu", grid) do vtks
-        write_solution(vtks, dh, u)
-        pvd[t] = vtks
+    VTKFile("vortex-street-$t.vtu", grid) do vtk
+        write_solution(vtk, dh, u)
+        pvd[t] = vtk
     end
 end
 vtk_save(pvd);

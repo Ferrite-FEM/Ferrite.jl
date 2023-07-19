@@ -1,60 +1,60 @@
-struct VTKStream{VTK<:WriteVTK.DatasetFile}
+struct VTKFile{VTK<:WriteVTK.DatasetFile}
     vtk::VTK
 end
 
 """
-    VTKStream(filename::AbstractString, grid::AbstractGrid; kwargs...)
+    Ferrite.VTKFile(filename::AbstractString, grid::AbstractGrid; kwargs...)
 
-Create a `Ferrite.VTKStream` that contains an unstructured VTK grid. 
+Create a `Ferrite.VTKFile` that contains an unstructured VTK grid. 
 The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see 
 [Data Formatting Options](https://juliavtk.github.io/WriteVTK.jl/stable/grids/syntax/#Data-formatting-options)
 
-This stream can be used to to write data with
+This file handler can be used to to write data with
 
 * [`write_solution`](@ref)
 * [`write_celldata`](@ref)
-* [`write_nodedata`](@ref).
 * [`write_projected`](@ref)
-* [`write_cellset`](@ref)
-* [`write_nodeset`](@ref)
-* [`write_constraints`](@ref)
+* [`Ferrite.write_nodedata`](@ref).
+* [`Ferrite.write_cellset`](@ref)
+* [`Ferrite.write_nodeset`](@ref)
+* [`Ferrite.write_dirichlet`](@ref)
 
-It is necessary to call `close(::VTKStream)` to save the data after writing to the stream, 
-Alternatively, the `do`-block syntax that does this implicitly is supported:
+It is necessary to call `close(::VTKFile)` to save the data after writing 
+to the file handler. Using the supported `do`-block does this automatically:
 ```julia
-VTKStream(filename, grid) do vtks
-    write_solution(vtks, dh, u)
-    write_celldata(vtks, grid, celldata)
+VTKFile(filename, grid) do vtk
+    write_solution(vtk, dh, u)
+    write_celldata(vtk, grid, celldata)
 end
 """
-function VTKStream(filename::String, grid::AbstractGrid; kwargs...)
+function VTKFile(filename::String, grid::AbstractGrid; kwargs...)
     vtk = create_vtk_grid(filename, grid; kwargs...)
-    return VTKStream(vtk)
+    return VTKFile(vtk)
 end
 # Makes it possible to use the `do`-block syntax
-function VTKStream(f::Function, args...; kwargs...)
-    vtks = VTKStream(args...; kwargs...)
+function VTKFile(f::Function, args...; kwargs...)
+    vtk = VTKFile(args...; kwargs...)
     try
-        f(vtks)
+        f(vtk)
     finally
-        close(vtks)
+        close(vtk)
     end
 end
 
-Base.close(vtks::VTKStream) = WriteVTK.vtk_save(vtks.vtk)
+Base.close(vtk::VTKFile) = WriteVTK.vtk_save(vtk.vtk)
 
-function Base.show(io::IO, ::MIME"text/plain", vtks::VTKStream)
-    open_str = WriteVTK.isopen(vtks.vtk) ? "open" : "closed"
-    filename = vtks.vtk.path
-    print(io, "VTKStream for the $open_str file \"$(filename)\".")
+function Base.show(io::IO, ::MIME"text/plain", vtk::VTKFile)
+    open_str = WriteVTK.isopen(vtk.vtk) ? "open" : "closed"
+    filename = vtk.vtk.path
+    print(io, "VTKFile for the $open_str file \"$(filename)\".")
 end
 
 # Support ParaviewCollection
-function Base.setindex!(pvd::WriteVTK.CollectionFile, vtks::VTKStream, time::Real)
-    WriteVTK.collection_add_timestep(pvd, vtks, time)
+function Base.setindex!(pvd::WriteVTK.CollectionFile, vtk::VTKFile, time::Real)
+    WriteVTK.collection_add_timestep(pvd, vtk, time)
 end
-function WriteVTK.collection_add_timestep(pvd::WriteVTK.CollectionFile, vtks::VTKStream, time::Real)
-    WriteVTK.collection_add_timestep(pvd, vtks.vtk, time)
+function WriteVTK.collection_add_timestep(pvd::WriteVTK.CollectionFile, vtk::VTKFile, time::Real)
+    WriteVTK.collection_add_timestep(pvd, vtk.vtk, time)
 end
 
 cell_to_vtkcell(::Type{Line}) = VTKCellTypes.VTK_LINE
@@ -156,50 +156,50 @@ function component_names(::Type{S}) where S
 end
 
 """
-    write_solution(vtks::VTKStream, dh::AbstractDofHandler, u::Vector, suffix="")
+    write_solution(vtk::VTKFile, dh::AbstractDofHandler, u::Vector, suffix="")
 
 Save the values at the nodes in the degree of freedom vector `u` to the stream.
 Each field in `dh` will be saved separately, and `suffix` can be used to append 
 to the fieldname.
 
 `u` can also contain tensorial values, but each entry in `u` must correspond to a 
-degree of freedom in `dh`, see [`write_nodedata`](@ref) for details. 
+degree of freedom in `dh`, see [`write_nodedata`](@ref Ferrite.write_nodedata) for details. 
 Use `write_nodedata` directly when exporting values that are already 
 sorted by the nodes in the grid. 
 """
-function write_solution(vtks::VTKStream, dh::AbstractDofHandler, u::Vector, suffix="")
+function write_solution(vtk::VTKFile, dh::AbstractDofHandler, u::Vector, suffix="")
     fieldnames = Ferrite.getfieldnames(dh)  # all primary fields
     for name in fieldnames
         data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
-        _vtk_write_nodedata(vtks.vtk, data, string(name, suffix))
+        _vtk_write_nodedata(vtk.vtk, data, string(name, suffix))
     end
-    return vtks
+    return vtk
 end
 
 """
-    write_projected(vtks::VTKStream, proj::L2Projector, vals::Vector, name::AbstractString)
+    write_projected(vtk::VTKFile, proj::L2Projector, vals::Vector, name::AbstractString)
 
 Project `vals` to the grid nodes with `proj` and save to the stream.
 """
-function write_projected(vtks::VTKStream, proj::L2Projector, vals, name)
+function write_projected(vtk::VTKFile, proj::L2Projector, vals, name)
     data = _evaluate_at_grid_nodes(proj, vals, #=vtk=# Val(true))::Matrix
     @assert size(data, 2) == getnnodes(get_grid(proj.dh))
-    _vtk_write_nodedata(vtks.vtk, data, name; component_names=component_names(eltype(vals)))
-    return vtks
+    _vtk_write_nodedata(vtk.vtk, data, name; component_names=component_names(eltype(vals)))
+    return vtk
 end
 
 """
-    write_celldata(vtks::VTKStream, grid::AbstractGrid, celldata::AbstractVector, name::String)
+    write_celldata(vtk::VTKFile, grid::AbstractGrid, celldata::AbstractVector, name::String)
 
 Write the `celldata` that is ordered by the cells in the grid to the vtk file.
 """
-function write_celldata(vtks::VTKStream, ::AbstractGrid, celldata, name)
-    WriteVTK.vtk_cell_data(vtks.vtk, celldata, name)
+function write_celldata(vtk::VTKFile, ::AbstractGrid, celldata, name)
+    WriteVTK.vtk_cell_data(vtk.vtk, celldata, name)
 end
 
 """
-    write_nodedata(vtks::VTKStream, grid::AbstractGrid, nodedata::Vector{Real}, name)
-    write_nodedata(vtks::VTKStream, grid::AbstractGrid, nodedata::Vector{<:AbstractTensor}, name)
+    write_nodedata(vtk::VTKFile, grid::AbstractGrid, nodedata::Vector{Real}, name)
+    write_nodedata(vtk::VTKFile, grid::AbstractGrid, nodedata::Vector{<:AbstractTensor}, name)
     
 Write the `nodedata` that is ordered by the nodes in the grid to the vtk stream.
 
@@ -209,50 +209,50 @@ Two-dimensional vectors are padded with zeros.
 When `nodedata` contains second order tensors, the index order, 
 `[11, 22, 33, 23, 13, 12, 32, 31, 21]`, follows the default Voigt order in Tensors.jl.
 """
-function write_nodedata(vtks::VTKStream, ::AbstractGrid, nodedata, name)
-    _vtk_write_nodedata(vtks.vtk, nodedata, name)
+function write_nodedata(vtk::VTKFile, ::AbstractGrid, nodedata, name)
+    _vtk_write_nodedata(vtk.vtk, nodedata, name)
 end
 
 
 """
-    write_nodeset(vtks::VTKStream, grid::AbstractGrid, nodeset::String)
+    write_nodeset(vtk::VTKFile, grid::AbstractGrid, nodeset::String)
 
 Write nodal values of 1 for nodes in `nodeset`, and 0 otherwise
 """
-function write_nodeset(vtks, grid::AbstractGrid, nodeset::String)
+function write_nodeset(vtk, grid::AbstractGrid, nodeset::String)
     z = zeros(getnnodes(grid))
     z[collect(getnodeset(grid, nodeset))] .= 1.0
-    write_nodedata(vtks, grid, z, nodeset)
-    return vtks
+    write_nodedata(vtk, grid, z, nodeset)
+    return vtk
 end
 
 """
-    write_cellset(vtks, grid::AbstractGrid)
-    write_cellset(vtks, grid::AbstractGrid, cellset::String)
-    write_cellset(vtks, grid::AbstractGrid, cellsets::Union{AbstractVector{String},AbstractSet{String})
+    write_cellset(vtk, grid::AbstractGrid)
+    write_cellset(vtk, grid::AbstractGrid, cellset::String)
+    write_cellset(vtk, grid::AbstractGrid, cellsets::Union{AbstractVector{String},AbstractSet{String})
 
 Write all cell sets in the grid with name according to their keys and 
 celldata 1 if the cell is in the set, and 0 otherwise. It is also possible to 
 only export a single `cellset`, or multiple `cellsets`. 
 """
-function write_cellset(vtks, grid::AbstractGrid, cellsets=keys(getcellsets(getgrid(vtks))))
+function write_cellset(vtk, grid::AbstractGrid, cellsets=keys(getcellsets(getgrid(vtk))))
     z = zeros(getncells(grid))
     for cellset in cellsets
         fill!(z, 0)
         z[collect(getcellset(grid, cellset))] .= 1.0
-        write_celldata(vtks, grid, z, cellset)
+        write_celldata(vtk, grid, z, cellset)
     end
-    return vtks
+    return vtk
 end
-write_cellset(vtks, grid::AbstractGrid, cellset::String) = write_cellset(vtks, grid, [cellset])
+write_cellset(vtk, grid::AbstractGrid, cellset::String) = write_cellset(vtk, grid, [cellset])
 
 """
-    write_dirichlet(vtks::VTKStream, ch::ConstraintHandler)
+    write_dirichlet(vtk::VTKFile, ch::ConstraintHandler)
 
 Saves the dirichlet boundary conditions to a vtkfile.
 Values will have a 1 where bcs are active and 0 otherwise
 """
-function write_dirichlet(vtks, ch::ConstraintHandler)    
+function write_dirichlet(vtk, ch::ConstraintHandler)    
     unique_fields = []
     for dbc in ch.dbcs
         push!(unique_fields, dbc.field_name)
@@ -281,24 +281,24 @@ function write_dirichlet(vtks, ch::ConstraintHandler)
                 end
             end
         end
-        write_nodedata(vtks, get_grid(ch.dh), data, string(field, "_bc"))
+        write_nodedata(vtk, get_grid(ch.dh), data, string(field, "_bc"))
     end
-    return vtks
+    return vtk
 end
 
 """
-    write_cell_colors(vtks::VTKStream, grid::AbstractGrid, cell_colors, name="coloring")
+    write_cell_colors(vtk::VTKFile, grid::AbstractGrid, cell_colors, name="coloring")
 
 Write cell colors (see [`create_coloring`](@ref)) to a VTK file for visualization.
 
 In case of coloring a subset, the cells which are not part of the subset are represented as color 0.
 """
-function write_cell_colors(vtks, grid::AbstractGrid, cell_colors::AbstractVector{<:AbstractVector{<:Integer}}, name="coloring")
+function write_cell_colors(vtk, grid::AbstractGrid, cell_colors::AbstractVector{<:AbstractVector{<:Integer}}, name="coloring")
     color_vector = zeros(Int, getncells(grid))
     for (i, cells_color) in enumerate(cell_colors)
         for cell in cells_color
             color_vector[cell] = i
         end
     end
-    write_celldata(vtks, grid, color_vector, name)
+    write_celldata(vtk, grid, color_vector, name)
 end

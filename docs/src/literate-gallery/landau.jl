@@ -114,8 +114,8 @@ end
 
 # utility to quickly save a model
 function save_landau(path, model, dofs=model.dofs)
-    VTKStream(path, model.dofhandler.grid) do vtks
-        write_solution(vtks, model.dofhandler, dofs)
+    VTKFile(path, model.dofhandler.grid) do vtk
+        write_solution(vtk, model.dofhandler, dofs)
     end
 end
 

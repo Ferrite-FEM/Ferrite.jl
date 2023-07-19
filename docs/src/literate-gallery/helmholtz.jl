@@ -162,9 +162,9 @@ K, f = doassemble(cellvalues, facevalues, K, dh);
 apply!(K, f, dbcs)
 u = Symmetric(K) \ f;
 
-vtks = VTKStream("helmholtz", grid)
-write_solution(vtks, dh, u)
-close(vtks)
+vtk = VTKFile("helmholtz", grid)
+write_solution(vtk, dh, u)
+close(vtk)
 using Test #src
 #src this test catches unexpected changes in the result over time.
 #src the true maximum is slightly bigger then 1.0

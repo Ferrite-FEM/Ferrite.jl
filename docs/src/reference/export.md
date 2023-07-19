@@ -26,13 +26,13 @@ evaluate_at_grid_nodes
 ## VTK Export
 
 ```@docs
-VTKStream
+VTKFile
 write_solution
 write_projected
 write_celldata
-write_nodedata
-write_cellset
-write_nodeset
-write_dirichlet
+Ferrite.write_nodedata
+Ferrite.write_cellset
+Ferrite.write_nodeset
+Ferrite.write_dirichlet
 write_cell_colors
 ```
