@@ -1,27 +1,27 @@
 """
-    create_sparsity_pattern(dh::DofHandler; coupling, [topology::Union{Nothing, AbstractTopology}], [elements_coupling])
+    create_sparsity_pattern(dh::DofHandler; coupling, [topology::Union{Nothing, AbstractTopology}], [cross_coupling])
 
 Create the sparsity pattern corresponding to the degree of freedom
 numbering in the [`DofHandler`](@ref). Return a `SparseMatrixCSC`
 with stored values in the correct places.
 
-The keyword arguments `coupling` and `elements_coupling` can be used to specify how fields (or components) in the dof
-handler couple to each other. `coupling` and `elements_coupling` should be square matrices of booleans with
+The keyword arguments `coupling` and `cross_coupling` can be used to specify how fields (or components) in the dof
+handler couple to each other. `coupling` and `cross_coupling` should be square matrices of booleans with
 number of rows/columns equal to the total number of fields, or total number of components,
 in the DofHandler with `true` if fields are coupled and `false` if
 not. By default full coupling is assumed inside the element with no coupling between elements.
 
-If `topology` and `elements_coupling` are passed, dof of fields with discontinuous interpolations are coupled between elements according to `elements_coupling`.
+If `topology` and `cross_coupling` are passed, dof of fields with discontinuous interpolations are coupled between elements according to `cross_coupling`.
 
 See the [Sparsity Pattern](@ref) section of the manual.
 """
 function create_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing,
-    topology::Union{Nothing, AbstractTopology} = nothing, elements_coupling = nothing)
-    return _create_sparsity_pattern(dh, nothing, false, true, coupling, topology, elements_coupling)
+    topology::Union{Nothing, AbstractTopology} = nothing, cross_coupling = nothing)
+    return _create_sparsity_pattern(dh, nothing, false, true, coupling, topology, cross_coupling)
 end
 
 """
-    create_symmetric_sparsity_pattern(dh::DofHandler; coupling, topology::Union{Nothing, AbstractTopology}, elements_coupling)
+    create_symmetric_sparsity_pattern(dh::DofHandler; coupling, topology::Union{Nothing, AbstractTopology}, cross_coupling)
 
 Create the symmetric sparsity pattern corresponding to the degree of freedom
 numbering in the [`DofHandler`](@ref) by only considering the upper
@@ -30,20 +30,20 @@ triangle of the matrix. Return a `Symmetric{SparseMatrixCSC}`.
 See the [Sparsity Pattern](@ref) section of the manual.
 """
 function create_symmetric_sparsity_pattern(dh::AbstractDofHandler; coupling=nothing,
-    topology::Union{Nothing, AbstractTopology} = nothing, elements_coupling = nothing)
-    return Symmetric(_create_sparsity_pattern(dh, nothing, true, true, coupling, topology, elements_coupling), :U)
+    topology::Union{Nothing, AbstractTopology} = nothing, cross_coupling = nothing)
+    return Symmetric(_create_sparsity_pattern(dh, nothing, true, true, coupling, topology, cross_coupling), :U)
 end
 
 """
-    create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling, topology::Union{Nothing, AbstractTopology}, elements_coupling)
+    create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler; coupling, topology::Union{Nothing, AbstractTopology}, cross_coupling)
 
 Create a symmetric sparsity pattern accounting for affine constraints in `ch`. See
 the Affine Constraints section of the manual for further details.
 """
 function create_symmetric_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
         keep_constrained::Bool=true, coupling=nothing, topology::Union{Nothing, AbstractTopology} = nothing,
-        elements_coupling = nothing)
-    return Symmetric(_create_sparsity_pattern(dh, ch, true, keep_constrained, coupling, topology, elements_coupling), :U)
+        cross_coupling = nothing)
+    return Symmetric(_create_sparsity_pattern(dh, ch, true, keep_constrained, coupling, topology, cross_coupling), :U)
 end
 
 """
@@ -54,8 +54,8 @@ the Affine Constraints section of the manual for further details.
 """
 function create_sparsity_pattern(dh::AbstractDofHandler, ch::ConstraintHandler;
         keep_constrained::Bool=true, coupling=nothing, topology::Union{Nothing, AbstractTopology} = nothing,
-        elements_coupling = nothing)
-    return _create_sparsity_pattern(dh, ch, false, keep_constrained, coupling, topology, elements_coupling)
+        cross_coupling = nothing)
+    return _create_sparsity_pattern(dh, ch, false, keep_constrained, coupling, topology, cross_coupling)
 end
 
 # Compute a coupling matrix of size (ndofs_per_cell × ndofs_per_cell) based on the input
@@ -103,11 +103,11 @@ function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatri
 end
 
 """
-    _add_elements_coupling(coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, sym, keep_constrained, ch, cnt, I, J)
+    _add_cross_coupling(coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, sym, keep_constrained, ch, cnt, I, J)
 
 Helper function used to mutate `I` and `J` to add cross-element coupling.
 """
-function _add_elements_coupling(coupling_sdh::Matrix{Bool}, dof_i::Int, dof_j::Int,
+function _add_cross_coupling(coupling_sdh::Matrix{Bool}, dof_i::Int, dof_j::Int,
         cell_field_dofs::Union{Vector{Int}, SubArray}, neighbor_field_dofs::Union{Vector{Int}, SubArray},
         i::Int, j::Int, sym::Bool, keep_constrained::Bool, ch::Union{ConstraintHandler, Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
 
@@ -117,14 +117,14 @@ function _add_elements_coupling(coupling_sdh::Matrix{Bool}, dof_i::Int, dof_j::I
     sym && (dofj > dofi && return cnt)
     !keep_constrained && (haskey(ch.dofmapping, dofi) || haskey(ch.dofmapping, dofj)) && return cnt
     cnt += 1
-    _add_or_grow(cnt, I, J, dofi, dofj) 
+    _add_or_grow(cnt, I, J, dofi, dofj)
     return cnt
 end
 
 """
     cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
 
-Mutates `I, J` to account for cross-element coupling in fields with discontinuous interpolations by calling [`_add_elements_coupling`](@ref).
+Mutates `I, J` to account for cross-element coupling in fields with discontinuous interpolations by calling [`_add_cross_coupling`](@ref).
 Returns the updated value of `cnt`.
 
 Used internally for sparsity patterns with discontinuous interpolations.
@@ -154,8 +154,8 @@ function cross_element_coupling!(dh::DofHandler, ch::Union{ConstraintHandler, No
                     neighbor_field_dofs = @view interfacedofs(ic)[sdh_idx == 2 ? dofrange2 : length(celldofs(ic.a)) .+ dofrange2]
                     # Typical coupling procedure
                     for (j, dof_j) in pairs(dofrange2), (i, dof_i) in pairs(dofrange1)
-                        cnt = _add_elements_coupling(coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, sym, keep_constrained, ch, cnt, I, J)
-                        cnt = _add_elements_coupling(coupling_sdh, dof_j, dof_i, neighbor_field_dofs, cell_field_dofs, j, i, sym, keep_constrained, ch, cnt, I, J)
+                        cnt = _add_cross_coupling(coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, sym, keep_constrained, ch, cnt, I, J)
+                        cnt = _add_cross_coupling(coupling_sdh, dof_j, dof_i, neighbor_field_dofs, cell_field_dofs, j, i, sym, keep_constrained, ch, cnt, I, J)
                     end
                 end
             end
@@ -165,14 +165,14 @@ function cross_element_coupling!(dh::DofHandler, ch::Union{ConstraintHandler, No
 end
 
 function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{ConstraintHandler, Nothing}=#, sym::Bool, keep_constrained::Bool, coupling::Union{AbstractMatrix{Bool},Nothing},
-    topology::Union{Nothing, AbstractTopology}, elements_coupling::Union{AbstractMatrix{Bool},Nothing})
+    topology::Union{Nothing, AbstractTopology}, cross_coupling::Union{AbstractMatrix{Bool},Nothing})
     @assert isclosed(dh)
     if !keep_constrained
         @assert ch !== nothing && isclosed(ch)
     end
 
     couplings = isnothing(coupling) ? nothing : _coupling_to_local_dof_coupling(dh, coupling, sym)
-    elements_couplings = isnothing(elements_coupling) ? nothing : _coupling_to_local_dof_coupling(dh, elements_coupling, sym)
+    cross_couplings = isnothing(cross_coupling) ? nothing : _coupling_to_local_dof_coupling(dh, cross_coupling, sym)
 
     # Allocate buffers. Compute an upper bound for the buffer length and allocate it all up
     # front since they will become large and expensive to re-allocate. The bound is exact
@@ -217,8 +217,8 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
             end
         end
     end
-    if has_discontinuous_ip && !isnothing(topology) && !isnothing(elements_coupling) && any(elements_coupling)
-       cnt = cross_element_coupling!(dh, ch, topology, sym, keep_constrained, elements_couplings, cnt, I, J)
+    if has_discontinuous_ip && !isnothing(topology) && !isnothing(cross_coupling) && any(cross_coupling)
+       cnt = cross_element_coupling!(dh, ch, topology, sym, keep_constrained, cross_couplings, cnt, I, J)
     end
     # Always add diagonal entries
     resize!(I, cnt + ndofs(dh))

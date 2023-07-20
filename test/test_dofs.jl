@@ -613,18 +613,18 @@ end
             end
         end
     end
-    function check_coupling(dh, topology, K, coupling, elements_coupling)
+    function check_coupling(dh, topology, K, coupling, cross_coupling)
         for cell_idx in eachindex(getcells(dh.grid))
             sdh = dh.subdofhandlers[dh.cell_to_subdofhandler[cell_idx]]
             coupling_idx = [1,1]
-            elements_coupling_idx = [1,1]
+            cross_coupling_idx = [1,1]
             vdim = [1,1]
             # test inner coupling
             _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, [cell_idx], false)
             # test cross-element coupling
             neighborhood = Ferrite.getdim(dh.grid.cells[1]) > 1 ? topology.face_face_neighbor : topology.vertex_vertex_neighbor
             neighbors = neighborhood[cell_idx, :]
-            _check_dofs(K, dh, sdh, cell_idx, elements_coupling, elements_coupling_idx, vdim, [i[1][1] for i in  neighbors[.!isempty.(neighbors)]], true)
+            _check_dofs(K, dh, sdh, cell_idx, cross_coupling, cross_coupling_idx, vdim, [i[1][1] for i in  neighbors[.!isempty.(neighbors)]], true)
         end
     end
     grid = generate_grid(Quadrilateral, (2, 2))
@@ -634,10 +634,10 @@ end
     add!(dh, :p, DiscontinuousLagrange{RefQuadrilateral,1}())
     add!(dh, :w, Lagrange{RefQuadrilateral,1}())
     close!(dh)
-    for coupling in couplings, elements_coupling in couplings
-        K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, elements_coupling = elements_coupling)
-        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, elements_coupling = elements_coupling) 
-        check_coupling(dh, topology, K, coupling, elements_coupling)
+    for coupling in couplings, cross_coupling in couplings
+        K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = cross_coupling)
+        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, cross_coupling = cross_coupling) 
+        check_coupling(dh, topology, K, coupling, cross_coupling)
     end
 
     # Error paths
@@ -659,10 +659,10 @@ end
     add!(sdh2, :u, DiscontinuousLagrange{RefQuadrilateral,1}()^2)
     close!(dh)
 
-    for coupling in couplings, elements_coupling in couplings
-        K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, elements_coupling = elements_coupling)
-        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, elements_coupling = elements_coupling)
-        check_coupling(dh, topology, K, coupling, elements_coupling)
+    for coupling in couplings, cross_coupling in couplings
+        K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = cross_coupling)
+        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, cross_coupling = cross_coupling)
+        check_coupling(dh, topology, K, coupling, cross_coupling)
     end
 
     # Testing Crouzeix-Raviart coupling
@@ -672,8 +672,8 @@ end
     add!(dh, :u, CrouzeixRaviart{RefTriangle,1}())
     close!(dh)
     coupling = trues(3,3)
-    K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, elements_coupling = coupling)
-    K_cont = create_sparsity_pattern(dh; coupling=coupling, topology = topology, elements_coupling = falses(3,3))
+    K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = coupling)
+    K_cont = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = falses(3,3))
     K_default = create_sparsity_pattern(dh)
     @test K == K_cont == K_default
 end
