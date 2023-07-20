@@ -17,7 +17,7 @@ the exporting.
 The following structure can be used to write various output to a vtk-file:
 
 ```@example export
-Ferrite.VTKFile("my_solution", grid) do vtk
+VTKFile("my_solution", grid) do vtk
     write_solution(vtk, dh, u)
 end
 ```
@@ -34,7 +34,7 @@ where `write_solution` is just one example of the following functions that can b
 
 Instead of using the `do`-block, it is also possible to do
 ```@example export
-vtk = Ferrite.VTKFile("my_solution", grid)
+vtk = VTKFile("my_solution", grid)
 write_solution(vtk, dh, u)
 # etc.
 close(vtk)
@@ -48,7 +48,7 @@ To save time-dependent data, `WriteVTK.jl`'s, `paraview_collection` may be used
 pvd = paraview_collection("my_results.pvd");
 for i in 1:5
     # Do calculations to update u
-    Ferrite.VTKFile("my_results_$i", grid) do vtk
+    VTKFile("my_results_$i", grid) do vtk
         write_solution(vtk, dh, u)
         pvd[i] = vtk
     end

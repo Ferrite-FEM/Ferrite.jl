@@ -397,7 +397,7 @@ function solve()
 
     ## Save the solution
     @timeit "export" begin
-        Ferrite.VTKFile("hyperelasticity", grid) do vtk
+        VTKFile("hyperelasticity", grid) do vtk
             write_solution(vtk, dh, u)
         end
     end

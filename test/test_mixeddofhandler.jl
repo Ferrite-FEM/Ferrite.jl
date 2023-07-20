@@ -355,7 +355,7 @@ function test_2_element_heat_eq()
     gridfilename = "mixed_grid"
     addcellset!(grid, "cell-1", [1,])
     addcellset!(grid, "cell-2", [2,])
-    Ferrite.VTKFile(gridfilename, grid) do vtk
+    VTKFile(gridfilename, grid) do vtk
         Ferrite.write_cellset(vtk, grid, "cell-1")
         Ferrite.write_cellset(vtk, grid, "cell-2")
         write_solution(vtk, dh, u)

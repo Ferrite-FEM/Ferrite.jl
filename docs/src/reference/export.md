@@ -26,7 +26,7 @@ evaluate_at_grid_nodes
 ## VTK Export
 
 ```@docs
-Ferrite.VTKFile
+VTKFile
 write_solution
 write_projection
 write_celldata

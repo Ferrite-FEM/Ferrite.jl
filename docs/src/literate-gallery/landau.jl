@@ -114,7 +114,7 @@ end
 
 # utility to quickly save a model
 function save_landau(path, model, dofs=model.dofs)
-    Ferrite.VTKFile(path, model.dofhandler.grid) do vtk
+    VTKFile(path, model.dofhandler.grid) do vtk
         write_solution(vtk, model.dofhandler, dofs)
     end
 end

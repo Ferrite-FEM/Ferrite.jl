@@ -268,7 +268,7 @@ function test_export(;subset::Bool)
 
     mktempdir() do tmp
         fname = joinpath(tmp, "projected")
-        Ferrite.VTKFile(fname, grid) do vtk
+        VTKFile(fname, grid) do vtk
             write_projection(vtk, p, p_scalar, "p_scalar")
             write_projection(vtk, p, p_vec, "p_vec")
             write_projection(vtk, p, p_tens, "p_tens")

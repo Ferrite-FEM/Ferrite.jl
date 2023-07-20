@@ -3,9 +3,9 @@ struct VTKFile{VTK<:WriteVTK.DatasetFile}
 end
 
 """
-    Ferrite.VTKFile(filename::AbstractString, grid::AbstractGrid; kwargs...)
+    VTKFile(filename::AbstractString, grid::AbstractGrid; kwargs...)
 
-Create a `Ferrite.VTKFile` that contains an unstructured VTK grid. 
+Create a `VTKFile` that contains an unstructured VTK grid. 
 The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see 
 [Data Formatting Options](https://juliavtk.github.io/WriteVTK.jl/stable/grids/syntax/#Data-formatting-options)
 

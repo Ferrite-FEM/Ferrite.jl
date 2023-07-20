@@ -344,7 +344,7 @@ function solve()
         mises_values[el] /= length(cell_states) # average von Mises stress
         κ_values[el] /= length(cell_states)     # average drag stress
     end
-    Ferrite.VTKFile("plasticity", grid) do vtk
+    VTKFile("plasticity", grid) do vtk
         write_solution(vtk, dh, u) # displacement field
         write_celldata(vtk, grid, mises_values, "von Mises [Pa]")
         write_celldata(vtk, grid, κ_values, "Drag stress [Pa]")

@@ -334,7 +334,7 @@ function solve(interpolation_u, interpolation_p)
         end;
 
         ## Save the solution fields
-        Ferrite.VTKFile("hyperelasticity_incomp_mixed_$t.vtu", grid) do vtk
+        VTKFile("hyperelasticity_incomp_mixed_$t.vtu", grid) do vtk
             write_solution(vtk, dh, w)
             pvd[t] = vtk
         end

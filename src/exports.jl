@@ -148,7 +148,8 @@ export
     assemble!,
     finish_assemble,
 
-# export data (using e.g. Ferrite.VTKFile)
+# exporting data
+    VTKFile,
     write_solution,
     write_celldata,
     write_projection,
