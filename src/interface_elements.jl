@@ -330,8 +330,8 @@ reinit!(cv::InterfaceCellValues, cc::CellCache) = reinit!(cv, cc.coords)
 
 function reinit!(cv::InterfaceCellValues, x::AbstractVector{Vec{sdim,T}}) where {sdim, T}
     nsplit = getngeobasefunctions(cv.here)
-    reinit!(cv.here, x[1:nsplit])
-    reinit!(cv.there, x[nsplit+1:end])
+    reinit!(cv.here, @view(x[1:nsplit]))
+    reinit!(cv.there, @view(x[nsplit+1:end]))
     return nothing
 end
 
