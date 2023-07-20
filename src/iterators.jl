@@ -197,7 +197,7 @@ end
 function reinit!(cache::InterfaceCache, face_a::FaceIndex, face_b::FaceIndex)
     reinit!(cache.a, face_a)
     reinit!(cache.b, face_b)
-    resize!(cache.dofs, length(cache.a.dofs) + length(cache.b.dofs))
+    resize!(cache.dofs, length(celldofs(cache.a)) + length(celldofs(cache.b)))
     for (i, d) in pairs(cache.a.dofs)
         cache.dofs[i] = d
     end
