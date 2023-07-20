@@ -124,10 +124,10 @@ end
 """
     cross_element_coupling!(dh::DofHandler, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::Union{AbstractVector{<:AbstractMatrix{Bool}},Nothing}, cnt::Int, I::Vector{Int}, J::Vector{Int})
 
-Mutates `I, J` to account for cross-element coupling in fields with discontinuous interpolations by calling [`_add_cross_coupling`](@ref).
+Mutates `I, J` to account for cross-element coupling by calling [`_add_cross_coupling`](@ref).
 Returns the updated value of `cnt`.
 
-Used internally for sparsity patterns with discontinuous interpolations.
+Used internally for sparsity patterns with cross-element coupling.
 """
 function cross_element_coupling!(dh::DofHandler, ch::Union{ConstraintHandler, Nothing}, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::AbstractVector{<:AbstractMatrix{Bool}}, cnt::Int, I::Vector{Int}, J::Vector{Int})
     fca = FaceCache(CellCache(dh, UpdateFlags(false, false, true)), ScalarWrapper(0))
@@ -138,22 +138,20 @@ function cross_element_coupling!(dh::DofHandler, ch::Union{ConstraintHandler, No
         sdhs = dh.subdofhandlers[sdhs_idx]
         for (i, sdh) in pairs(sdhs)
             sdh_idx = sdhs_idx[i]
-            ip_infos = [InterpolationInfo(ip) for ip in sdh.field_interpolations]
             coupling_sdh = couplings[sdh_idx]
-            for (cell_field_i, cell_field) in pairs(sdh.field_names)
-                fii = ip_infos[cell_field_i]
-                # Couple element for discontinuous interpolations only
-                fii.is_discontinuous || continue
+            for cell_field in sdh.field_names
                 dofrange1 = dof_range(sdh, cell_field)
-                cell_field_dofs = @view interfacedofs(ic)[sdh_idx == 1 ? dofrange1 : length(celldofs(ic.a)) .+ dofrange1]
-                for (neighbor_field_i, neighbor_field) in pairs(sdh.field_names)
-                    fii2 = ip_infos[neighbor_field_i]
+                cell_dofs = @view interfacedofs(ic)[sdh_idx == 1 ? (1 : length(celldofs(ic.a))) : (length(celldofs(ic.a)) + 1 : end)]
+                cell_field_dofs = @view cell_dofs[dofrange1]
+                for neighbor_field in sdh.field_names
                     sdh2 = sdhs[i==1 ? 2 : 1]
-                    neighbor_field ∈ sdh2.field_names && fii2.is_discontinuous || continue
+                    neighbor_field ∈ sdh2.field_names || continue
                     dofrange2 = dof_range(sdh2, neighbor_field)
-                    neighbor_field_dofs = @view interfacedofs(ic)[sdh_idx == 2 ? dofrange2 : length(celldofs(ic.a)) .+ dofrange2]
+                    neighbor_dofs = @view interfacedofs(ic)[sdh_idx == 2 ? (1 : length(celldofs(ic.a))) : (length(celldofs(ic.a)) + 1 : end)]
+                    neighbor_field_dofs = @view neighbor_dofs[dofrange2]
                     # Typical coupling procedure
                     for (j, dof_j) in pairs(dofrange2), (i, dof_i) in pairs(dofrange1)
+                        (cell_field_dofs[i] ∈ neighbor_dofs || neighbor_field_dofs[j] ∈ cell_dofs) && continue
                         cnt = _add_cross_coupling(coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, sym, keep_constrained, ch, cnt, I, J)
                         cnt = _add_cross_coupling(coupling_sdh, dof_j, dof_i, neighbor_field_dofs, cell_field_dofs, j, i, sym, keep_constrained, ch, cnt, I, J)
                     end
@@ -179,7 +177,6 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     # when keeping constrained dofs (default) and if not it only over-estimates with number
     # of entries eliminated by constraints.
     max_buffer_length = ndofs(dh) # diagonal elements
-    has_discontinuous_ip = false
     for (sdh_idx, sdh) in pairs(dh.subdofhandlers)
         set = sdh.cellset
         n = ndofs_per_cell(sdh)
@@ -189,7 +186,6 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
             coupling_sdh = couplings[sdh_idx]
             count(coupling_sdh[i, j] for i in 1:n for j in (sym ? i : 1):n)
         end
-        has_discontinuous_ip = has_discontinuous_ip || any(ip -> is_discontinuous(ip),sdh.field_interpolations)
         max_buffer_length += entries_per_cell * length(set)
     end
     I = Vector{Int}(undef, max_buffer_length)
@@ -217,7 +213,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
             end
         end
     end
-    if has_discontinuous_ip && !isnothing(topology) && !isnothing(cross_coupling) && any(cross_coupling)
+    if !isnothing(topology) && !isnothing(cross_coupling) && any(cross_coupling)
        cnt = cross_element_coupling!(dh, ch, topology, sym, keep_constrained, cross_couplings, cnt, I, J)
     end
     # Always add diagonal entries

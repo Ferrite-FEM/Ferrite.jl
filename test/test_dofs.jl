@@ -596,13 +596,14 @@ end
                         j_dofs = dof_range(sdh2, field2_idx)
                         ip2 = sdh2.field_interpolations[field2_idx]
                         vdim[2] = typeof(ip2) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip2) : 1
-                        is_cross_element && !all(Ferrite.is_discontinuous.([ip1, ip2])) && continue
+                        # is_cross_element && !all(Ferrite.is_discontinuous.([ip1, ip2])) && continue
                         for  dim2 in 1:vdim[2]
                             i_dofs_v = i_dofs[dim1:vdim[1]:end]
                             j_dofs_v = j_dofs[dim2:vdim[2]:end]
                             for i_idx in i_dofs_v, j_idx in j_dofs_v
                                 i = celldofs(dh,cell_idx)[i_idx]
                                 j = celldofs(dh,cell2_idx)[j_idx]
+                                is_cross_element && (i ∈ celldofs(dh,cell2_idx) || j ∈ celldofs(dh,cell_idx)) && continue
                                 @test is_stored(K, i, j) == coupling[coupling_idx...]
                             end
                             coupling_idx[2] += 1
