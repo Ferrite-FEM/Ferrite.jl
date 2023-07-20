@@ -151,6 +151,7 @@ function cross_element_coupling!(dh::DofHandler, ch::Union{ConstraintHandler, No
                     neighbor_field_dofs = @view neighbor_dofs[dofrange2]
                     # Typical coupling procedure
                     for (j, dof_j) in pairs(dofrange2), (i, dof_i) in pairs(dofrange1)
+                        # This line to avoid coupling the shared dof in continuous interpolations as cross-element. They're coupled in the local coupling matrix.
                         (cell_field_dofs[i] ∈ neighbor_dofs || neighbor_field_dofs[j] ∈ cell_dofs) && continue
                         cnt = _add_cross_coupling(coupling_sdh, dof_i, dof_j, cell_field_dofs, neighbor_field_dofs, i, j, sym, keep_constrained, ch, cnt, I, J)
                         cnt = _add_cross_coupling(coupling_sdh, dof_j, dof_i, neighbor_field_dofs, cell_field_dofs, j, i, sym, keep_constrained, ch, cnt, I, J)
