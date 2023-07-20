@@ -130,8 +130,8 @@ Returns the updated value of `cnt`.
 Used internally for sparsity patterns with cross-element coupling.
 """
 function cross_element_coupling!(dh::DofHandler, ch::Union{ConstraintHandler, Nothing}, topology::ExclusiveTopology, sym::Bool, keep_constrained::Bool, couplings::AbstractVector{<:AbstractMatrix{Bool}}, cnt::Int, I::Vector{Int}, J::Vector{Int})
-    fca = FaceCache(CellCache(dh, UpdateFlags(false, false, true)), ScalarWrapper(0))
-    fcb = FaceCache(CellCache(dh, UpdateFlags(false, false, true)), ScalarWrapper(0))
+    fca = FaceCache(CellCache(dh, UpdateFlags(false, false, true)), Int[], ScalarWrapper(0))
+    fcb = FaceCache(CellCache(dh, UpdateFlags(false, false, true)), Int[], ScalarWrapper(0))
     ic = InterfaceCache(fca, fcb, Int[])
     for ic in InterfaceIterator(ic, dh.grid, topology)
         sdhs_idx = dh.cell_to_subdofhandler[cellid.([ic.a, ic.b])]
@@ -141,13 +141,13 @@ function cross_element_coupling!(dh::DofHandler, ch::Union{ConstraintHandler, No
             coupling_sdh = couplings[sdh_idx]
             for cell_field in sdh.field_names
                 dofrange1 = dof_range(sdh, cell_field)
-                cell_dofs = @view interfacedofs(ic)[sdh_idx == 1 ? (1 : length(celldofs(ic.a))) : (length(celldofs(ic.a)) + 1 : end)]
+                cell_dofs = celldofs(sdh_idx == 1 ? ic.a : ic.b)
                 cell_field_dofs = @view cell_dofs[dofrange1]
                 for neighbor_field in sdh.field_names
                     sdh2 = sdhs[i==1 ? 2 : 1]
                     neighbor_field ∈ sdh2.field_names || continue
                     dofrange2 = dof_range(sdh2, neighbor_field)
-                    neighbor_dofs = @view interfacedofs(ic)[sdh_idx == 2 ? (1 : length(celldofs(ic.a))) : (length(celldofs(ic.a)) + 1 : end)]
+                    neighbor_dofs = celldofs(sdh_idx == 2 ? ic.a : ic.b)
                     neighbor_field_dofs = @view neighbor_dofs[dofrange2]
                     # Typical coupling procedure
                     for (j, dof_j) in pairs(dofrange2), (i, dof_i) in pairs(dofrange1)
