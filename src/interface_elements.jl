@@ -261,8 +261,8 @@ An `InterfaceCellValues` wraps two `CellValues`, one for each face of an `Interf
 - `ip::InterfaceCellInterpolation`: interpolation on the interface
 - `here::CellValues`:  values on face "here"
 - `there::CellValues`: values on face "there"
-- `basefunctionshere::Vector{Int}`: indices for face "here" (used to extract coordinates for base `CellValues`)
-- `basefunctionsthere::Vector{Int}`: indices for face "there"
+- `basefunctionshere::Vector{Int}`: base function indices on face "here"
+- `basefunctionsthere::Vector{Int}`: base function indices on face "there"
 """
 struct InterfaceCellValues{IP, IPhere, IPthere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPhere, GIPthere} <: AbstractCellValues
     ip::IP
