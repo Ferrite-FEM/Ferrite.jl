@@ -88,7 +88,7 @@ end
 
 function Base.getproperty(c::InterfaceCell, s::Symbol)
     if s == :nodes
-        return (c.here.nodes..., c.there.nodes...) # Order used to reinit InterfaceCellValues
+        return get_node_ids(c)
     else
         return getfield(c,s)
     end
@@ -259,18 +259,25 @@ An `InterfaceCellValues` wraps two `CellValues`, one for each face of an `Interf
 
 # Fields
 - `ip::InterfaceCellInterpolation`: interpolation on the interface
-- `here::CellValues`: values on the face "here"
-- `there::CellValues`: values on the face "there"
+- `here::CellValues`:  values on face "here"
+- `there::CellValues`: values on face "there"
+- `basefunctionshere::Vector{Int}`: indices for face "here" (used to extract coordinates for base `CellValues`)
+- `basefunctionsthere::Vector{Int}`: indices for face "there"
 """
 struct InterfaceCellValues{IP, IPhere, IPthere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPhere, GIPthere} <: AbstractCellValues
     ip::IP
     here::CellValues{IPhere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPhere}
     there::CellValues{IPthere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPthere}
+    basefunctionshere::Vector{Int}
+    basefunctionsthere::Vector{Int}
 
     function InterfaceCellValues(ip::IP, here::CVhere, there::CVthere) where {IP, IPhere, IPthere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPhere, GIPthere, 
             CVhere<:CellValues{IPhere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPhere},
             CVthere<:CellValues{IPthere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPthere}}
-        return new{IP, IPhere, IPthere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPhere, GIPthere}(ip, here, there)
+        ip isa VectorizedInterpolation ? sip = ip.ip : sip = ip
+        basefunctionshere = collect( get_interface_index(sip, :here, i) for i in 1:getnbasefunctions(sip.here))
+        basefunctionsthere = collect( get_interface_index(sip, :there, i) for i in 1:getnbasefunctions(sip.there))
+        return new{IP, IPhere, IPthere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPhere, GIPthere}(ip, here, there, basefunctionshere, basefunctionsthere)
     end
 end
 
@@ -329,9 +336,9 @@ end
 reinit!(cv::InterfaceCellValues, cc::CellCache) = reinit!(cv, cc.coords)
 
 function reinit!(cv::InterfaceCellValues, x::AbstractVector{Vec{sdim,T}}) where {sdim, T}
-    nsplit = getngeobasefunctions(cv.here)
-    reinit!(cv.here, x[1:nsplit])
-    reinit!(cv.there, x[nsplit+1:end])
+    #nsplit = getngeobasefunctions(cv.here)
+    reinit!(cv.here, @view x[cv.basefunctionshere])
+    reinit!(cv.there, @view x[cv.basefunctionsthere])
     return nothing
 end
 
