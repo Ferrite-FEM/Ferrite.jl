@@ -96,7 +96,7 @@ end
 
 
 ####################################################################################
-# Interoplation
+# Interpolation
 ####################################################################################
 
 
@@ -419,7 +419,7 @@ for computing the average value on an interface.
 """
 function shape_value_average(cv::InterfaceCellValues, qp::Int, i::Int)
     side, baseindex = get_side_and_baseindex(cv, i)
-    return side == :here ? 0.5*shape_value(cv.here, qp, baseindex) : 0.5*shape_value(cv.there, qp, baseindex)
+    return side == :here ? shape_value(cv.here, qp, baseindex) / 2 : shape_value(cv.there, qp, baseindex) / 2
 end
 
 """
@@ -430,7 +430,7 @@ for computing the average gradient on an interface.
 """
 function shape_gradient_average(cv::InterfaceCellValues, qp::Int, i::Int)
     side, baseindex = get_side_and_baseindex(cv, i)
-    return side == :here ? 0.5*shape_gradient(cv.here, qp, baseindex) : 0.5*shape_gradient(cv.there, qp, baseindex)
+    return side == :here ? shape_gradient(cv.here, qp, baseindex) / 2 : shape_gradient(cv.there, qp, baseindex) / 2
 end
 
 """
