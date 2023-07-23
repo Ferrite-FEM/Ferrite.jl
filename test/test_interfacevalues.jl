@@ -138,7 +138,37 @@
                                         # (QuadraticTetrahedron, Lagrange{RefTetrahedron, 2}(), FaceQuadratureRule{RefTetrahedron}(2)),
                                        )
         dim = getcelltypedim(cell_shape)
-        grid = generate_grid(cell_shape, ntuple(i -> i == 1 ? 2 : 1, dim))
+        grid = generate_grid(cell_shape, ntuple(i -> 2, dim))
+        topology = ExclusiveTopology(grid)
+        @testset "faces nodes indicies" begin
+            ip = scalar_interpol isa DiscontinuousLagrange ? Lagrange{Ferrite.getrefshape(scalar_interpol), Ferrite.getorder(scalar_interpol)}() : scalar_interpol
+            cell = getcells(grid, 1)
+            geom_ip_faces_indices = Ferrite.facedof_indices(ip)
+            Ferrite.getdim(ip) > 1 && (geom_ip_faces_indices = Tuple([face[collect(face .∉ Ref(interior))] for (face, interior) in [(geom_ip_faces_indices[i], Ferrite.facedof_interior_indices(ip)[i]) for i in 1:nfaces(ip)]]))
+            faces_indicies = Ferrite.faces(cell |> typeof|> Ferrite.default_interpolation |> Ferrite.getrefshape)
+            node_ids = Ferrite.get_node_ids(cell)
+            @test getindex.(Ref(node_ids), collect.(faces_indicies)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
+        end
+        @testset "error paths" begin
+            cell = getcells(grid, 1)
+            @test_throws ErrorException("Face index 100 exceeds the number of faces for a cell of type $(typeof(cell))") Ferrite.transfer_point_cell_to_face([0.0 for _ in 1 : dim], cell, 100)
+            @test_throws ErrorException("Face index 100 exceeds the number of faces for a cell of type $(typeof(cell))") Ferrite.transfer_point_face_to_cell([0.0 for _ in 1 : (dim > 1 ? dim-1 : 1)], cell, 100)
+        end
+        for func_interpol in (scalar_interpol,#= VectorizedInterpolation(scalar_interpol)=#)
+            test_interfacevalues(grid, topology, dim, scalar_interpol, quad_rule)
+        end
+    end
+    # Custom quadrature
+    @testset "Custom quadrature interface values" begin
+        cell_shape = Tetrahedron
+        scalar_interpol = DiscontinuousLagrange{RefTetrahedron, 1}()
+        # From https://www.researchgate.net/publication/258241862_Application_of_Composite_Numerical_Integrations_Using_Gauss-Radau_and_Gauss-Lobatto_Quadrature_Rules?enrichId=rgreq-a5675bf95a198061d6e153e39f856f53-XXX&enrichSource=Y292ZXJQYWdlOzI1ODI0MTg2MjtBUzo5ODgzMzU0MzQ2NzAxOUAxNDAwNTc1MTYxNjA2&el=1_x_2&_esc=publicationCoverPdf
+        points = Vec{2, Float64}.([[0.0, 0.844948974278318], [0.205051025721682, 0.694948974278318], [0.487979589711327, 0.487979589711327], [0.0, 0.355051025721682], [0.29202041028867254, 0.29202041028867254], [0.694948974278318, 0.205051025721682], [0.0, 0.0], [0.355051025721682, 0.0], [0.844948974278318, 0.0]])
+        # Weights resulted in 4 times the volume [-1, 1] -> so /4 to get [0, 1]
+        weights = [0.096614387479324, 0.308641975308642, 0.087870061825481, 0.187336229804627, 0.677562036939952, 0.308641975308642, 0.049382716049383, 0.187336229804627, 0.096614387479324] / 4
+        quad_rule = Ferrite.create_face_quad_rule(RefTetrahedron, weights, points)
+        dim = getcelltypedim(cell_shape)
+        grid = generate_grid(cell_shape, ntuple(i -> 2, dim))
         topology = ExclusiveTopology(grid)
         @testset "faces nodes indicies" begin
             ip = scalar_interpol isa DiscontinuousLagrange ? Lagrange{Ferrite.getrefshape(scalar_interpol), Ferrite.getorder(scalar_interpol)}() : scalar_interpol

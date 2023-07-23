@@ -793,8 +793,8 @@ function transfer_point_cell_to_face(point::Union{Vec{2, Float64}, Vector{Float6
     x, y = point
     face == 1 && return Vec( x)
     face == 2 && return Vec( y)
-    face == 3 && return Vec( x)
-    face == 4 && return Vec( y)
+    face == 3 && return Vec( -x)
+    face == 4 && return Vec( -y)
     error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
@@ -803,8 +803,8 @@ Mapping from 2D face of a triangle to 1D line.
 """
 function transfer_point_cell_to_face(point::Union{Vec{2, Float64}, Vector{Float64}}, cell::AbstractCell{RefTriangle}, face::Int)
     x, y = point
-    face == 1 && return Vec( x * 2 - 1.0)
-    face == 2 && return Vec( y * 2 - 1.0)
+    face == 1 && return Vec( 1.0 - x * 2)
+    face == 2 && return Vec( 1.0 - y * 2 )
     face == 3 && return Vec( x * 2 - 1.0)
     error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
@@ -814,10 +814,10 @@ Mapping from 3D face of a tetrahedon to 2D triangle.
 """
 function transfer_point_cell_to_face(point::Union{Vec{3, Float64}, Vector{Float64}}, cell::AbstractCell{RefTetrahedron}, face::Int)
     x, y, z = point
-    face == 1 && return Vec( x,  y)
-    face == 2 && return Vec( x,  z)
+    face == 1 && return Vec( 1.0-x-y,  y)
+    face == 2 && return Vec( 1.0-z-x,  x)
     face == 3 && return Vec( x,  y)
-    face == 4 && return Vec( y,  z)
+    face == 4 && return Vec( 1.0-y-z,  z)
     error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
@@ -826,10 +826,10 @@ Mapping from 3D face of a hexahedron to 2D quadrilateral.
 """
 function transfer_point_cell_to_face(point::Union{Vec{3, Float64}, Vector{Float64}}, cell::AbstractCell{RefHexahedron}, face::Int)
     x, y, z = point
-    face == 1 && return Vec( x, y)
+    face == 1 && return Vec( y, x)
     face == 2 && return Vec( x, z)
     face == 3 && return Vec( y,  z)
-    face == 4 && return Vec(-x,  z)
+    face == 4 && return Vec( -x,  z)
     face == 5 && return Vec( z,  y)
     face == 6 && return Vec( x,  y)
     error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
@@ -852,8 +852,8 @@ function transfer_point_face_to_cell(point::Union{Vec{1, Float64}, Vector{Float6
     x = point[]
     face == 1 && return Vec( x, -1.0)
     face == 2 && return Vec( 1.0, x)
-    face == 3 && return Vec( x, 1.0)
-    face == 4 && return Vec( -1.0, x)
+    face == 3 && return Vec( -x, 1.0)
+    face == 4 && return Vec( -1.0, -x)
     error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
@@ -862,8 +862,8 @@ Mapping from 1D line to 2D face of a triangle.
 """
 function transfer_point_face_to_cell(point::Union{Vec{1, Float64}, Vector{Float64}}, cell::AbstractCell{RefTriangle}, face::Int)
     x = (point[] + 1) / 2
-    face == 1 && return Vec( x, 1.0 - x)
-    face == 2 && return Vec( 0.0, x)
+    face == 1 && return Vec( 1.0 - x, x )
+    face == 2 && return Vec( 0.0, 1.0 -x)
     face == 3 && return Vec( x, 0.0)
     error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
@@ -873,10 +873,10 @@ Mapping from 2D triangle to 3D face of a tetrahedon.
 """
 function transfer_point_face_to_cell(point::Union{Vec{2, Float64}, Vector{Float64}}, cell::AbstractCell{RefTetrahedron}, face::Int)
     x,y = point
-    face == 1 && return Vec( x,  y,  0.0)
-    face == 2 && return Vec( x,  0.0,  y)
-    face == 3 && return Vec( x,  y,  1.0-x-y)
-    face == 4 && return Vec( 0.0,  x,  y)
+    face == 1 && return Vec( 1.0-x-y,   y,          0.0)
+    face == 2 && return Vec( y,         0.0,        1.0-x-y)
+    face == 3 && return Vec( x,         y,          1.0-x-y)
+    face == 4 && return Vec( 0.0,       1.0-x-y,    y)
     error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
@@ -888,7 +888,7 @@ function transfer_point_face_to_cell(point::Union{Vec{2, Float64}, Vector{Float6
     face == 1 && return Vec( y,  x, -1.0)
     face == 2 && return Vec( x, -1.0,  y)
     face == 3 && return Vec( 1.0,  x,  y)
-    face == 4 && return Vec( x,  1.0,  y)
+    face == 4 && return Vec( -x,  1.0,  y)
     face == 5 && return Vec(-1.0,  y,  x)
     face == 6 && return Vec( x,  y,  1.0)
     error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
@@ -948,88 +948,3 @@ struct SurfaceOrientationInfo
     #shift_index::Int
 end
 
-"""
-    InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, other_face::FaceIndex)
-
-Orientation information for interfaces. Such an interface can be 
-possibly flipped (i.e. the defining vertex order is reverse to the 
-spanning vertex order) and the vertices can be rotated skewed against each other, and skewed in the case of triangles.
-Take for example the faces
-```
-1           3
-| \\         | \\
-|  \\        |  \\
-| A \\       | B \\ 
-|    \\      |    \\
-2-----3     1-----2  
-```
-which are skewed and rotated against each other by 90° or the faces
-```
-1           3
-| \\         | \\
-|  \\        |  \\
-| A \\       | B \\ 
-|    \\      |    \\
-2-----3     2-----1  
-```
-which are flipped about the centroid vector. Any combination of these can happen. 
-The combination to map other facet to current facet is encoded with
-this data structure via ``\\vec{p}_{\\text{there}} = [T] \\vec{p}_{\\text{here}}`` where ``[T]`` is `InterfaceOrientationInfo.transformation`.
-"""
-struct InterfaceOrientationInfo
-    flipped::Bool
-    transformation::Matrix{Float64}
-end
-
-function InterfaceOrientationInfo(grid::AbstractGrid, this_face::FaceIndex, other_face::FaceIndex)
-    cell = getcells(grid)[this_face[1]]
-    other_cell = getcells(grid)[other_face[1]]
-    face_nodes = faces(cell)[this_face[2]]
-    other_face_nodes = faces(other_cell)[other_face[2]]
-
-    !all([i ∈ face_nodes for i in other_face_nodes]) && error("Passed faces do not use the same nodes")
-    getdim(cell) == 1 && return(InterfaceOrientationInfo(false, Float64.(I(1)))) # this may change for embedded elements?
-
-    cell_ip = cell|> typeof|> default_interpolation
-    cell_coords = cell_ip|> reference_coordinates
-    nodes_coord = view(cell_coords, SVector((cell_ip |>getrefshape|> faces)[this_face[2]]))
-    nodes_coord = transfer_point_cell_to_face.(nodes_coord, Ref(cell), Ref(this_face[2]))
-
-    other_cell_ip = other_cell|> typeof|> default_interpolation
-    other_cell_coords = other_cell_ip|> reference_coordinates
-    other_nodes_coord = view(other_cell_coords, SVector((cell_ip |>getrefshape|> faces)[other_face[2]]))
-    other_nodes_coord = transfer_point_cell_to_face.(other_nodes_coord, Ref(other_cell), Ref(other_face[2]))
-
-    getdim(cell) == 2 && return(InterfaceOrientationInfo(nodes_coord[1] == -other_nodes_coord[1], Float64.(I(1))))
-    flipped = ([(nodes_coord[2] - nodes_coord[1])..., 0] × [(nodes_coord[3] - nodes_coord[2])..., 0.0])[3] > 0
-    flipped = flipped == (([(other_nodes_coord[2] - other_nodes_coord[1])..., 0.0] × [(other_nodes_coord[3] - other_nodes_coord[2])..., 0.0])[3] < 0)
-
-    θ = acos(((nodes_coord[2]-nodes_coord[1])) ⋅ (other_nodes_coord[2]-other_nodes_coord[1]) /  norm(nodes_coord[2]-nodes_coord[1])/ norm( other_nodes_coord[2]-other_nodes_coord[1]))
-    flipped && (θ = acos((reverse(nodes_coord[2]-nodes_coord[1])) ⋅ (other_nodes_coord[2]-other_nodes_coord[1]) /  norm(nodes_coord[2]-nodes_coord[1])/ norm( other_nodes_coord[2]-other_nodes_coord[1])))
-    τ = [0.0, 0.0] # Shear triangles only
-    d = [0.0, 0.0] # Translate triangles only
-    # If it's a rotated triangle use one of these transformations based on the flipping conditions
-    if other_cell_ip|> getrefshape <: RefTetrahedron && abs(cos(θ)) ≈ cos(π/4)
-        if flipped
-            θ = π/2
-            τ = [-1.0, 0.0]
-            d = [0.0, 1.0]
-        else
-            θ = -π/2
-            τ = [1.0, 0.0]
-            d = [1.0, 0.0]
-        end
-    end
-    shear = [
-        1.0     τ[2]    0.0
-        τ[1]    1.0     0.0
-        0.0     0.0     1.0
-    ]
-    M = [   cos(θ)      sin(θ)      d[1]
-            -sin(θ)     cos(θ)      d[2]
-            0.0         0.0         1.0 ]
-    # We apply shear first if it's flipped
-    M = flipped ? shear * M : M * shear
-    M[1:2,:] = reverse(M[1:2,:], dims = 1)
-    return InterfaceOrientationInfo(flipped, M)
-end
