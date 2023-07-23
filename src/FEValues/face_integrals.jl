@@ -35,10 +35,10 @@ function create_face_quad_rule(::Type{RefQuadrilateral}, w::Vector{T}, p::Vector
     new_points = [Vec{2,T}((one(T), p[i][1])) for i in 1:n_points] # ξ = 1, η = t
     push!(face_quad_rule, QuadratureRule{RefQuadrilateral, T}(w, new_points))
     # Face 3
-    new_points = [Vec{2,T}((p[i][1], one(T))) for i in 1:n_points] # ξ = t, η = 1
+    new_points = [Vec{2,T}((-p[i][1], one(T))) for i in 1:n_points] # ξ = -t, η = 1
     push!(face_quad_rule, QuadratureRule{RefQuadrilateral, T}(w, new_points))
     # Face 4
-    new_points = [Vec{2,T}((-one(T), p[i][1])) for i in 1:n_points] # ξ = -1, η = t
+    new_points = [Vec{2,T}((-one(T), -p[i][1])) for i in 1:n_points] # ξ = -1, η = -t
     push!(face_quad_rule, QuadratureRule{RefQuadrilateral, T}(w, new_points))
     return FaceQuadratureRule(face_quad_rule)
 end
@@ -60,10 +60,10 @@ function create_face_quad_rule(::Type{RefTriangle}, w::Vector{T}, p::Vector{Vec{
     n_points = length(w)
     face_quad_rule = QuadratureRule{RefTriangle, T, 2}[]
     # Face 1
-    new_points = [Vec{2,T}((p[i][1], one(T)-p[i][1])) for i in 1:n_points] # ξ = t, η = 1-t
+    new_points = [Vec{2,T}((one(T) - p[i][1], p[i][1])) for i in 1:n_points] # ξ = 1-t, η = t
     push!(face_quad_rule, QuadratureRule{RefTriangle, T}(w, new_points))
     # Face 2
-    new_points = [Vec{2,T}((zero(T), p[i][1])) for i in 1:n_points] # ξ = 0, η = t
+    new_points = [Vec{2,T}((zero(T), one(T) - p[i][1])) for i in 1:n_points] # ξ = 0, η = 1-t
     push!(face_quad_rule, QuadratureRule{RefTriangle, T}(w, new_points))
     # Face 3
     new_points = [Vec{2,T}((p[i][1], zero(T))) for i in 1:n_points] # ξ = t, η = 0
@@ -87,7 +87,7 @@ function create_face_quad_rule(::Type{RefHexahedron}, w::Vector{T}, p::Vector{Ve
     n_points = length(w)
     face_quad_rule = QuadratureRule{RefHexahedron, T, 3}[]
     # Face 1
-    new_points = [Vec{3,T}((p[i][1], p[i][2], -one(T))) for i in 1:n_points] # ξ = t, η = s, ζ = -1
+    new_points = [Vec{3,T}((p[i][2], p[i][1], -one(T))) for i in 1:n_points] # ξ = s, η = t, ζ = -1
     push!(face_quad_rule, QuadratureRule{RefHexahedron, T}(w, new_points))
     # Face 2
     new_points = [Vec{3,T}((p[i][1], -one(T), p[i][2])) for i in 1:n_points] # ξ = t, η = -1, ζ = s
@@ -96,10 +96,10 @@ function create_face_quad_rule(::Type{RefHexahedron}, w::Vector{T}, p::Vector{Ve
     new_points = [Vec{3,T}((one(T), p[i][1], p[i][2])) for i in 1:n_points] # ξ = 1, η = t, ζ = s
     push!(face_quad_rule, QuadratureRule{RefHexahedron, T}(w, new_points))
     # Face 4
-    new_points = [Vec{3,T}((p[i][1], one(T), p[i][2])) for i in 1:n_points] # ξ = t, η = 1, ζ = s
+    new_points = [Vec{3,T}((-p[i][1], one(T), p[i][2])) for i in 1:n_points] # ξ = -t, η = 1, ζ = s
     push!(face_quad_rule, QuadratureRule{RefHexahedron, T}(w, new_points))
     # Face 5
-    new_points = [Vec{3,T}((-one(T), p[i][1], p[i][2])) for i in 1:n_points] # ξ = -1, η = t, ζ = s
+    new_points = [Vec{3,T}((-one(T), p[i][2], p[i][1])) for i in 1:n_points] # ξ = -1, η = s, ζ = t
     push!(face_quad_rule, QuadratureRule{RefHexahedron, T}(w, new_points))
     # Face 6
     new_points = [Vec{3,T}((p[i][1], p[i][2], one(T))) for i in 1:n_points] # ξ = t, η = s, ζ = 1
@@ -126,16 +126,16 @@ function create_face_quad_rule(::Type{RefTetrahedron}, w::Vector{T}, p::Vector{V
     n_points = length(w)
     face_quad_rule = QuadratureRule{RefTetrahedron, T, 3}[]
     # Face 1
-    new_points = [Vec{3,T}((p[i][1], p[i][2], zero(T))) for i in 1:n_points] # ξ = t, η = s, ζ = 0
+    new_points = [Vec{3,T}((one(T) - p[i][1] - p[i][2], p[i][2], zero(T))) for i in 1:n_points] # ξ = 1-t-s, η = s, ζ = 0
     push!(face_quad_rule, QuadratureRule{RefTetrahedron, T}(w, new_points))
     # Face 2
-    new_points = [Vec{3,T}((p[i][1], zero(T), p[i][2])) for i in 1:n_points] # ξ = t, η = 0, ζ = s
+    new_points = [Vec{3,T}((p[i][2], zero(T), one(T) - p[i][1] - p[i][2])) for i in 1:n_points] # ξ = s, η = 0, ζ = 1-t-s
     push!(face_quad_rule, QuadratureRule{RefTetrahedron, T}(w, new_points))
     # Face 3
-    new_points = [Vec{3,T}((p[i][1], p[i][2], one(T)-p[i][1]-p[i][2])) for i in 1:n_points] # ξ = t, η = s, ζ = 1-t-s
+    new_points = [Vec{3,T}((p[i][1], p[i][2], one(T) - p[i][1] - p[i][2])) for i in 1:n_points] # ξ = t, η = s, ζ = 1-t-s
     push!(face_quad_rule, QuadratureRule{RefTetrahedron, T}(w, new_points))
     # Face 4
-    new_points = [Vec{3,T}((zero(T), p[i][1], p[i][2])) for i in 1:n_points] # ξ = 0, η = t, ζ = s
+    new_points = [Vec{3,T}((zero(T), one(T) - p[i][1] - p[i][2], p[i][2])) for i in 1:n_points] # ξ = 0, η = 1-t-s, ζ = s
     push!(face_quad_rule, QuadratureRule{RefTetrahedron, T}(w, new_points))
     return FaceQuadratureRule(face_quad_rule)
 end
