@@ -63,6 +63,7 @@ for t in range(0, 2, 4)
         write_celldata(io, grid, σeff, "Effective stress")
     end
 end
+close(pvd)
 ```
 """
 mutable struct PVDFile{P<:WriteVTK.CollectionFile,G<:AbstractGrid}
@@ -75,6 +76,7 @@ function PVDFile(name::String, grid::AbstractGrid)
     pvd = WriteVTK.paraview_collection(name)
     return PVDFile(pvd, grid, name, 0)
 end
+Base.close(pvd::PVDFile) = WriteVTK.vtk_save(pvd.pvd)
 
 function addstep!(f::Function, pvd::PVDFile, t, grid=pvd.grid)
     pvd.step += 1
