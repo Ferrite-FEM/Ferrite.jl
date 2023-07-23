@@ -58,7 +58,7 @@ save multiple vtk file. Example,
 pvd = PVDFile("test", grid)
 for t in range(0, 2, 4)
     # Solve the timestep to find u and σeff 
-    Ferrite.addstep!(pvd, t) do io 
+    addstep!(pvd, t) do io 
         write_solution(io, dh, u)
         write_celldata(io, grid, σeff, "Effective stress")
     end
