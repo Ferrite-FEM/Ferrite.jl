@@ -46,14 +46,15 @@ InterfaceValues
 struct InterfaceValues{FVA, FVB} <: AbstractValues
     face_values_a::FVA
     face_values_b::FVB
-    transformation::MMatrix{3,3,Float64,9}
+    transformation::Vector{MMatrix{3,3,Float64,9}}
+    update_quadrature_points::ScalarWrapper{Bool}
 end
 function InterfaceValues(quad_rule_a::FaceQuadratureRule, func_interpol_a::Interpolation,
     geom_interpol_a::Interpolation = func_interpol_a; quad_rule_b::FaceQuadratureRule = deepcopy(quad_rule_a),
     func_interpol_b::Interpolation = func_interpol_a, geom_interpol_b::Interpolation = func_interpol_b)
     face_values_a = FaceValues(quad_rule_a, func_interpol_a, geom_interpol_a)
     face_values_b = FaceValues(quad_rule_b, func_interpol_b, geom_interpol_b)
-    return InterfaceValues{typeof(face_values_a), typeof(face_values_b)}(face_values_a, face_values_b, MMatrix{3,3}(Float64.(I(3))))
+    return InterfaceValues{typeof(face_values_a), typeof(face_values_b)}(face_values_a, face_values_b, [MMatrix{3,3}(Float64.(I(3))) for _ in 1:nfaces(face_values_b)], ScalarWrapper(true))
 end
 
 """
@@ -67,17 +68,19 @@ function reinit!(iv::InterfaceValues, face_a::FaceIndex, face_b::FaceIndex, cell
     iv.face_values_b.current_face[] = face_b[2]
     InterfaceTransformationMatrix(iv, grid, face_a, face_b)
     qps = getpoints(iv.face_values_b.qr, face_b[2])
-    qps2 = transform_interface_point.(Ref(iv), getpoints(iv.face_values_a.qr, face_a[2]), Ref(grid), Ref(face_a[1]), Ref(face_b[1]))
+    qps2 = transform_interface_point.(Ref(iv), getpoints(iv.face_values_a.qr, face_a[2]), Ref(grid), Ref(face_a), Ref(face_b))
     qps .= qps2
     # Reinit face_b facevalues after the quadrature rule points are mutated
     @boundscheck checkface(iv.face_values_b, face_b[2])
     # This is the bottleneck, cache it?
-    for idx in eachindex(IndexCartesian(), @view iv.face_values_b.N[:, :, face_b[2]])
-        iv.face_values_b.dNdξ[idx, face_b[2]], iv.face_values_b.N[idx, face_b[2]] = shape_gradient_and_value(iv.face_values_b.func_interp, qps[idx[2]], idx[1])
+    if iv.update_quadrature_points[]
+        for idx in eachindex(IndexCartesian(), @view iv.face_values_b.N[:, :, face_b[2]])
+            iv.face_values_b.dNdξ[idx, face_b[2]], iv.face_values_b.N[idx, face_b[2]] = shape_gradient_and_value(iv.face_values_b.func_interp, qps[idx[2]], idx[1])
+        end
+        for idx in eachindex(IndexCartesian(), @view iv.face_values_b.M[:, :, face_b[2]])
+            iv.face_values_b.dMdξ[idx, face_b[2]], iv.face_values_b.M[idx, face_b[2]] = shape_gradient_and_value(iv.face_values_b.geo_interp, qps[idx[2]], idx[1])
+        end  
     end
-    for idx in eachindex(IndexCartesian(), @view iv.face_values_b.M[:, :, face_b[2]])
-        iv.face_values_b.dMdξ[idx, face_b[2]], iv.face_values_b.M[idx, face_b[2]] = shape_gradient_and_value(iv.face_values_b.geo_interp, qps[idx[2]], idx[1])
-    end  
     reinit!(iv.face_values_b, cell_b_coords, face_b[2])
 end
 
@@ -343,7 +346,8 @@ function InterfaceTransformationMatrix(iv::InterfaceValues, grid::AbstractGrid, 
     else # Hexahedron
         M = SMatrix{3,3}(-sin(θ), cos(θ), 0.0, cos(θ), sin(θ), 0.0, 0.0, 0.0, 1.0)
     end
-    iv.transformation .= M
+    iv.update_quadrature_points[] = iv.transformation[other_face[2]] != M
+    iv.transformation[other_face[2]] .= M
     return nothing
 end
 
@@ -352,15 +356,15 @@ end
 
 Transform point from element A's face reference coordinates to element B's face reference coordinates.
 """
-function transform_interface_point(iv::InterfaceValues, point::Vec{N, Float64}, grid::AbstractGrid, cell_a_idx::Int, cell_b_idx::Int) where {N}
-    cell = getcells(grid)[cell_a_idx]
+function transform_interface_point(iv::InterfaceValues, point::Vec{N, Float64}, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex) where {N}
+    cell = getcells(grid)[face_a[1]]
     face = iv.face_values_a.current_face[]
     point = transfer_point_cell_to_face(point, cell, face)
     if N == 3
-        point = (iv.transformation * Vec(point[1],point[2], 1.0))
-        return transfer_point_face_to_cell(Vec(point[1],point[2]), getcells(grid)[cell_b_idx], iv.face_values_b.current_face[])
+        point = (iv.transformation[face_b[2]] * Vec(point[1],point[2], 1.0))
+        return transfer_point_face_to_cell(Vec(point[1],point[2]), getcells(grid)[face_b[1]], iv.face_values_b.current_face[])
     elseif N == 2
         point *= -1 # Reversing as it's defined [-1, 1]
     end
-    return transfer_point_face_to_cell(point, getcells(grid)[cell_b_idx], iv.face_values_b.current_face[])
+    return transfer_point_face_to_cell(point, getcells(grid)[face_b[1]], iv.face_values_b.current_face[])
 end
