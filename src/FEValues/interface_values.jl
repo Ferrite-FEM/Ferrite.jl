@@ -324,6 +324,7 @@ Accounting for mirroring (switching X and Y before transformation)
 """
 function InterfaceTransformationMatrix(iv::InterfaceValues, grid::AbstractGrid, this_face::FaceIndex, other_face::FaceIndex)
     cell = getcells(grid, this_face[1])
+    iv.update_quadrature_points[] = true
     getdim(cell) != 3 && return nothing # No need to transform, just reverse the points
     other_cell = getcells(grid, other_face[1])
 
