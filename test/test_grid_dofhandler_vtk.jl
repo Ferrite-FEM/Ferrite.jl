@@ -26,7 +26,7 @@ end
         left = -right
         grid = generate_grid(celltype, nels, left, right)
 
-        transform!(grid, x-> 2x)
+        transform_coordinates!(grid, x-> 2x)
 
         radius = 2*1.5
         addcellset!(grid, "cell-1", [1,])
@@ -157,7 +157,7 @@ end
     node_set = Set(1:getnnodes(grid))
     addnodeset!(grid, "node_set", node_set)
 
-    @test getnodesets(grid) == Dict("node_set" => node_set)
+    @test Ferrite.getnodesets(grid) == Dict("node_set" => node_set)
 
     @test getnodes(grid, [1]) == [getnodes(grid, 1)] # untested
 
@@ -178,6 +178,80 @@ end
         n += cellid(c)
     end
     @test n == div(getncells(grid)*(getncells(grid) + 1), 2)
+
+    # FaceCache
+    grid = generate_grid(Triangle, (3,3))
+    fc = FaceCache(grid)
+    faceindex = first(getfaceset(grid, "left"))
+    cell_id, face_id = faceindex
+    reinit!(fc, faceindex)
+    # @test Ferrite.faceindex(fc) == faceindex
+    @test cellid(fc) == cell_id
+    # @test Ferrite.faceid(fc) == face_id
+    @test getnodes(fc) == collect(getcells(grid, cell_id).nodes)
+    @test get_cell_coordinates(fc) == get_cell_coordinates(grid, cell_id)
+    @test length(celldofs(fc)) == 0 # Empty because no DofHandler given
+
+    # FaceIterator, also tests `reinit!(fv::FaceValues, fc::FaceCache)`
+    for (dim, celltype) in ((1, Line), (2, Quadrilateral), (3, Hexahedron))
+        grid = generate_grid(celltype, ntuple(_ -> 3, dim))
+        ip = Lagrange{Ferrite.RefHypercube{dim}, 1}()^dim
+        fqr = FaceQuadratureRule{Ferrite.RefHypercube{dim}}(2)
+        fv = FaceValues(fqr, ip)
+        dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
+        faceset = getfaceset(grid, "right")
+        for dh_or_grid in (grid, dh)
+            @test first(FaceIterator(dh_or_grid, faceset)) isa FaceCache
+            area = 0.0
+            for face in FaceIterator(dh_or_grid, faceset)
+                reinit!(fv, face)
+                for q_point in 1:getnquadpoints(fv)
+                    area += getdetJdV(fv, q_point)
+                end
+            end
+            dim == 1 && @test area ≈ 1.0
+            dim == 2 && @test area ≈ 2.0
+            dim == 3 && @test area ≈ 4.0
+        end
+    end
+
+    # InterfaceCache
+    grid = generate_grid(Quadrilateral, (2,1))
+    ic = InterfaceCache(grid)
+    reinit!(ic, FaceIndex(1,2), FaceIndex(2,4))
+    @test interfacedofs(ic) == Int[] # Empty because no DofHandler given
+    ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
+    dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
+    ic = InterfaceCache(dh)
+    reinit!(ic, FaceIndex(1,2), FaceIndex(2,4))
+    @test interfacedofs(ic) == collect(1:8)
+    # Mixed Elements
+    dim = 2
+    nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, -1.0)), Node((0.0, 1.0))]
+    cells = [
+                Quadrilateral((1,2,5,4)),
+                Triangle((3,5,2)),
+            ]
+    grid = Grid(cells, nodes)
+    ip1 = DiscontinuousLagrange{RefQuadrilateral, 1}()
+    ip2 = DiscontinuousLagrange{RefTriangle, 1}()
+    dh = DofHandler(grid); 
+    sdh1 = SubDofHandler(dh, Set([1])); add!(sdh1, :u, ip1);
+    sdh2 = SubDofHandler(dh, Set([2])); add!(sdh2, :u, ip2);
+    close!(dh)
+    ic = InterfaceCache(dh)
+    reinit!(ic, FaceIndex(1,2), FaceIndex(2,3))
+    @test interfacedofs(ic) == collect(1:7)
+    # Unit test of some utilities
+    mixed_grid = Grid([Quadrilateral((1, 2, 3, 4)),Triangle((3, 2, 5))],
+                      [Node(coord) for coord in zeros(Vec{2,Float64}, 5)])
+    cellset = Set(1:getncells(mixed_grid))
+    faceset = Set(FaceIndex(i, 1) for i in 1:getncells(mixed_grid))
+    @test_throws ErrorException Ferrite._check_same_celltype(mixed_grid, cellset)
+    @test_throws ErrorException Ferrite._check_same_celltype(mixed_grid, faceset)
+    std_grid = generate_grid(Quadrilateral, (getncells(mixed_grid),1))
+    @test Ferrite._check_same_celltype(std_grid, cellset) === nothing
+    @test Ferrite._check_same_celltype(std_grid, faceset) === nothing
 end
 
 @testset "Grid sets" begin
@@ -399,18 +473,19 @@ end
     u_neighbors = [5.0 for _ in 1:8]
     jump_int = 0.
     jump_abs = 0.
-    cell_a_coords = get_cell_coordinates(quadgrid, 5)
-    for ele_faceid in 1:nfaces(quadgrid.cells[5])
-        face_a = FaceIndex(5, ele_faceid)
-        for face_b in getneighborhood(topology, quadgrid, FaceIndex(5, ele_faceid))
-            cell_b_coords = get_cell_coordinates(quadgrid, face_b[1])
-            reinit!(iv, face_a, face_b, cell_a_coords, cell_b_coords, quadgrid)
-            for q_point in 1:getnquadpoints(iv)
-                normal_5 = getnormal(iv, q_point)
-                dΩ = getdetJdV(iv, q_point)
-                jump_int += function_value_jump(iv, q_point, u_ele5, u_neighbors) ⋅ normal_5 * dΩ
-                jump_abs += abs(function_value_jump(iv, q_point, u_ele5, u_neighbors) ⋅ normal_5) * dΩ
-            end
+    # Test interface Iterator
+    for ic in InterfaceIterator(quadgrid)
+        any(cellid.([ic.a, ic.b]) .== 5) || continue
+        reinit!(fv_ele, ic.a.cc, ic.a.current_faceid[])
+        for q_point in 1:getnquadpoints(fv_ele)
+            dΩ = getdetJdV(fv_ele, q_point)
+            normal_a = getnormal(fv_ele, q_point)
+            u_5_n = function_value(fv_ele, q_point, cellid(ic.a) == 5 ? u_ele5 : u_neighbors) ⋅ normal_a
+            reinit!(fv_neighbor, ic.b.cc, ic.b.current_faceid[])
+            normal_b = getnormal(fv_neighbor, q_point)
+            u_neighbor = function_value(fv_neighbor, q_point, cellid(ic.a) == 5 ? u_neighbors : u_ele5) ⋅ normal_b
+            jump_int += (u_5_n + u_neighbor) * dΩ
+            jump_abs += abs(u_5_n + u_neighbor) * dΩ
         end
     end
     @test isapprox(jump_abs, 2/3*2*4,atol=1e-6) # 2*4*0.66666, jump is always 2, 4 sides, length =0.66

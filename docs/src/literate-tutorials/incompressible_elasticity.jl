@@ -22,19 +22,19 @@
 # What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next
 #md # [section](@ref incompressible_elasticity-plain-program).
-using Ferrite
+using Ferrite, Tensors
 using BlockArrays, SparseArrays, LinearAlgebra
 
 # First we generate a simple grid, specifying the 4 corners of Cooks membrane.
 function create_cook_grid(nx, ny)
-    corners = [Vec{2}((0.0,   0.0)),
+    corners = [Vec{2}(( 0.0,  0.0)),
                Vec{2}((48.0, 44.0)),
                Vec{2}((48.0, 60.0)),
-               Vec{2}((0.0,  44.0))]
-    grid = generate_grid(Triangle, (nx, ny), corners);
+               Vec{2}(( 0.0, 44.0))]
+    grid = generate_grid(Triangle, (nx, ny), corners)
     ## facesets for boundary conditions
-    addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0);
-    addfaceset!(grid, "traction", x -> norm(x[1]) ≈ 48.0);
+    addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0)
+    addfaceset!(grid, "traction", x -> norm(x[1]) ≈ 48.0)
     return grid
 end;
 
@@ -69,10 +69,8 @@ end;
 # We specify a homogeneous Dirichlet bc on the displacement field, `:u`.
 function create_bc(dh)
     dbc = ConstraintHandler(dh)
-    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, "clamped"), (x,t) -> zero(Vec{2}), [1,2]))
+    add!(dbc, Dirichlet(:u, getfaceset(dh.grid, "clamped"), x -> zero(x), [1, 2]))
     close!(dbc)
-    t = 0.0
-    update!(dbc, t)
     return dbc
 end;
 
@@ -101,7 +99,7 @@ function doassemble(
     ke = PseudoBlockArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
 
     ## traction vector
-    t = Vec{2}((0.0, 1/16))
+    t = Vec{2}((0.0, 1 / 16))
     ## cache ɛdev outside the element routine to avoid some unnecessary allocations
     ɛdev = [zero(SymmetricTensor{2, 2}) for i in 1:getnbasefunctions(cellvalues_u)]
 
@@ -148,7 +146,7 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, gr
             end
             for j in 1:i
                 p = shape_value(cellvalues_p, q_point, j)
-                Ke[BlockIndex((p▄, p▄), (i, j))] += - 1/mp.K * δp * p * dΩ
+                Ke[BlockIndex((p▄, p▄), (i, j))] += - 1 / mp.K * δp * p * dΩ
             end
 
         end
@@ -173,12 +171,71 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, gr
     end
 end
 
-function symmetrize_lower!(K)
-    for i in 1:size(K,1)
-        for j in i+1:size(K,1)
-            K[i,j] = K[j,i]
+function symmetrize_lower!(Ke)
+    for i in 1:size(Ke, 1)
+        for j in i+1:size(Ke, 1)
+            Ke[i, j] = Ke[j, i]
         end
     end
+end;
+
+# To evaluate the stresses after solving the problem we once again loop over the cells in
+# the grid. Stresses are evaluated in the quadrature points, however, for
+# export/visualization you typically want values in the nodes of the mesh, or as single data
+# points per cell. For the former you can project the quadrature point data to a finite
+# element space (see the example with the `L2Projector` in [Post processing and
+# visualization](@ref howto-postprocessing)). In this example we choose to compute the mean
+# value of the stress within each cell, and thus end up with one data point per cell. The
+# mean value is computed as
+# ```math
+# \bar{\boldsymbol{\sigma}}_i = \frac{1}{ |\Omega_i|}
+# \int_{\Omega_i} \boldsymbol{\sigma}\, \mathrm{d}\Omega, \quad
+# |\Omega_i| = \int_{\Omega_i} 1\, \mathrm{d}\Omega
+# ```
+# where $\Omega_i$ is the domain occupied by cell number $i$, and $|\Omega_i|$ the volume
+# (area) of the cell. The integrals are evaluated using numerical quadrature with the help
+# of cellvalues for u and p, just like in the assembly procedure.
+#
+# Note that even though all strain components in the out-of-plane direction are zero (plane
+# strain) the stress components are not. Specifically, $\sigma_{33}$ will be non-zero in
+# this formulation. Therefore we expand the strain to a 3D tensor, and then compute the (3D)
+# stress tensor.
+
+function compute_stresses(cellvalues_u::CellValues, cellvalues_p::CellValues,
+                          dh::DofHandler, mp::LinearElasticity, a::Vector)
+    ae = zeros(ndofs_per_cell(dh)) # local solution vector
+    u_range = dof_range(dh, :u)    # local range of dofs corresponding to u
+    p_range = dof_range(dh, :p)    # local range of dofs corresponding to p
+    ## Allocate storage for the stresses
+    σ = zeros(SymmetricTensor{2, 3}, getncells(dh.grid))
+    ## Loop over the cells and compute the cell-average stress
+    for cc in CellIterator(dh)
+        ## Update cellvalues
+        reinit!(cellvalues_u, cc)
+        reinit!(cellvalues_p, cc)
+        ## Extract the cell local part of the solution
+        for (i, I) in pairs(cc.dofs)
+            ae[i] = a[I]
+        end
+        ## Loop over the quadrature points
+        σΩi = zero(SymmetricTensor{2, 3}) # stress integrated over the cell
+        Ωi = 0.0                          # cell volume (area)
+        for qp in 1:getnquadpoints(cellvalues_u)
+            dΩ = getdetJdV(cellvalues_u, qp)
+            ## Evaluate the strain and the pressure
+            ε = function_symmetric_gradient(cellvalues_u, qp, ae, u_range)
+            p = function_value(cellvalues_p, qp, ae, p_range)
+            ## Expand strain to 3D
+            ε3D = SymmetricTensor{2, 3}((i, j) -> i < 3 && j < 3 ? ε[i, j] : 0.0)
+            ## Compute the stress in this quadrature point
+            σqp  = 2 * mp.G * dev(ε3D) - one(ε3D) * p
+            σΩi += σqp * dΩ
+            Ωi  += dΩ
+        end
+        ## Store the value
+        σ[cellid(cc)] = σΩi / Ωi
+    end
+    return σ
 end;
 
 # Now we have constructed all the necessary components, we just need a function
@@ -186,34 +243,44 @@ end;
 
 function solve(ν, interpolation_u, interpolation_p)
     ## material
-    Emod = 1.
+    Emod = 1.0
     Gmod = Emod / 2(1 + ν)
-    Kmod = Emod * ν / ((1+ν) * (1-2ν))
+    Kmod = Emod * ν / ((1 + ν) * (1 - 2ν))
     mp = LinearElasticity(Gmod, Kmod)
 
-    ## grid, dofhandler, boundary condition
+    ## Grid, dofhandler, boundary condition
     n = 50
     grid = create_cook_grid(n, n)
     dh = create_dofhandler(grid, interpolation_u, interpolation_p)
     dbc = create_bc(dh)
 
-    ## cellvalues
+    ## CellValues
     cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
 
-    ## assembly and solve
-    K = create_sparsity_pattern(dh);
-    K, f = doassemble(cellvalues_u, cellvalues_p, facevalues_u, K, grid, dh, mp);
+    ## Assembly and solve
+    K = create_sparsity_pattern(dh)
+    K, f = doassemble(cellvalues_u, cellvalues_p, facevalues_u, K, grid, dh, mp)
     apply!(K, f, dbc)
-    u = Symmetric(K) \ f;
+    u = K \ f
 
-    ## export
-    filename = "cook_" * (isa(interpolation_u, Lagrange{RefTriangle,1}) ? "linear" : "quadratic") *
+    ## Compute the stress
+    σ = compute_stresses(cellvalues_u, cellvalues_p, dh, mp, u)
+    σvM = map(x -> √(3/2 * dev(x) ⊡ dev(x)), σ) # von Mise effective stress
+
+    ## Export the solution and the stress
+    filename = "cook_" * (interpolation_u == Lagrange{RefTriangle, 1}()^2 ? "linear" : "quadratic") *
                          "_linear"
     vtk_grid(filename, dh) do vtkfile
         vtk_point_data(vtkfile, dh, u)
+        for i in 1:3, j in 1:3
+            σij = [x[i, j] for x in σ]
+            vtk_cell_data(vtkfile, σij, "sigma_$(i)$(j)")
+        end
+        vtk_cell_data(vtkfile, σvM, "sigma von Mise")
     end
     return u
 end
+#md nothing # hide
 
 # We now define the interpolation for displacement and pressure. We use (scalar) Lagrange
 # interpolation as a basis for both, and for the displacement, which is a vector, we
@@ -223,18 +290,19 @@ end
 linear_p    = Lagrange{RefTriangle,1}()
 linear_u    = Lagrange{RefTriangle,1}()^2
 quadratic_u = Lagrange{RefTriangle,2}()^2
+#md nothing # hide
 
 # All that is left is to solve the problem. We choose a value of Poissons
-# ratio that is near incompressibility -- $ν = 0.5$ -- and thus expect the
+# ratio that results in incompressibility ($ν = 0.5$) and thus expect the
 # linear/linear approximation to return garbage, and the quadratic/linear
 # approximation to be stable.
 
-u1 = solve(0.4999999, linear_u,    linear_p)
-u2 = solve(0.4999999, quadratic_u, linear_p);
+u1 = solve(0.5, linear_u,    linear_p);
+u2 = solve(0.5, quadratic_u, linear_p);
 
 ## test the result                 #src
 using Test                         #src
-@test norm(u2) ≈ 919.2122668839389 #src
+@test norm(u2) ≈ 919.2121476140703 #src
 
 #md # ## [Plain program](@id incompressible_elasticity-plain-program)
 #md #

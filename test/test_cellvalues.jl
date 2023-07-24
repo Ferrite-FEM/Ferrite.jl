@@ -40,7 +40,7 @@ for (scalar_interpol, quad_rule) in  (
         end
         u_vector = reinterpret(Float64, u)
 
-        for i in 1:length(getpoints(quad_rule))
+        for i in 1:getnquadpoints(cv)
             if func_interpol isa Ferrite.ScalarInterpolation
                 @test function_gradient(cv, i, u) ≈ H
                 @test function_symmetric_gradient(cv, i, u) ≈ 0.5(H + H')
@@ -82,7 +82,7 @@ for (scalar_interpol, quad_rule) in  (
         @test vol ≈ reference_volume(func_interpol)
 
         # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
-        for (i, qp_x) in enumerate(getpoints(quad_rule))
+        for (i, qp_x) in pairs(Ferrite.getpoints(quad_rule))
             @test spatial_coordinate(cv, i, x) ≈ qp_x
         end
 
