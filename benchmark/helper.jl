@@ -80,8 +80,10 @@ function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.Abstract
                 dΓ = getdetJdV(interfacevalues, q_point)
                 for i in 1:n_basefuncs
                     test = f_test(interfacevalues, q_point, i)
+                    f_test == shape_value_jump && (test *= getnormal(interfacevalues, q_point))
                     for j in 1:n_basefuncs
                         shape = f_shape(interfacevalues, q_point, j)
+                        f_shape == shape_value_jump && (shape *= getnormal(interfacevalues, q_point))
                         Ke[i, j] += op(test, shape) * dΓ
                     end
                 end
@@ -166,8 +168,10 @@ function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.Abstra
                 dΓ = getdetJdV(interfacevalues_test, q_point)
                 for i in 1:n_basefuncs_test
                     test = f_test(interfacevalues_test, q_point, i)
+                    f_test == shape_value_jump && (test *= getnormal(interfacevalues_test, q_point))
                     for j in 1:n_basefuncs_shape
                         shape = f_shape(interfacevalues_shape, q_point, j)
+                        f_shape == shape_value_jump && (shape *= getnormal(interfacevalues_shape, q_point))
                         Ke[i, j] += op(test, shape) * dΓ
                     end
                 end
