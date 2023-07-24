@@ -188,14 +188,14 @@ for (func,                      f_,                 ) in (
 end
 
 """
-    function_value_average(iv::InterfaceValues, qp::Int, u::AbstractVector, dof_range = eachindex(u))
+    function_value_average(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
 
 Compute the average of the function value at the quadrature point on interface.
 """
 function_value_average
 
 """
-    function_value_jump(iv::InterfaceValues, qp::Int, u::AbstractVector, dof_range = eachindex(u))
+    function_value_jump(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
 
 Compute the jump of the function value at the quadrature point over the interface.
 
@@ -205,14 +205,14 @@ This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- 
 function_value_jump
 
 """
-    function_gradient_average(iv::InterfaceValues, qp::Int, u::AbstractVector, dof_range = eachindex(u))
+    function_gradient_average(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
 
 Compute the average of the function gradient at the quadrature point on the interface.
 """
 function_gradient_average
 
 """
-    function_gradient_jump(iv::InterfaceValues, qp::Int, u::AbstractVector, dof_range = eachindex(u))
+    function_gradient_jump(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
 
 Compute the jump of the function gradient at the quadrature point over the interface.
 
