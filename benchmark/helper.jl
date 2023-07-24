@@ -65,33 +65,28 @@ function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.Abstract
     f
 end
 
-function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, topology::ExclusiveTopology, interfacevalues::InterfaceValues{<: FaceValues{<: Ferrite.InterpolationByDim{dim}}}, f_shape, f_test, op) where {dim}
+function _generalized_ritz_galerkin_assemble_interfaces(dh::Ferrite.AbstractDofHandler, interfacevalues::InterfaceValues{<: FaceValues{<: Ferrite.InterpolationByDim{dim}}}, f_shape, f_test, op) where {dim}
     n_basefuncs = getnbasefunctions(interfacevalues)
 
-    Ke = zeros(n_basefuncs, n_basefuncs)
+    K = zeros(ndofs(dh), ndofs(dh))
 
-    cell_a_coords = get_cell_coordinates(grid, 1)
-    for face in 1:nfaces(getcells(grid)[1])
-        face_a = FaceIndex(1, face)
-        for face_b in getneighborhood(topology, grid, face_a)
-            cell_b_coords = get_cell_coordinates(grid, face_b[1])
-            reinit!(interfacevalues, face_a, face_b, cell_a_coords, cell_b_coords, grid)
-            for q_point in 1:getnquadpoints(interfacevalues)
-                dΓ = getdetJdV(interfacevalues, q_point)
-                for i in 1:n_basefuncs
-                    test = f_test(interfacevalues, q_point, i)
-                    f_test == shape_value_jump && (test *= getnormal(interfacevalues, q_point))
-                    for j in 1:n_basefuncs
-                        shape = f_shape(interfacevalues, q_point, j)
-                        f_shape == shape_value_jump && (shape *= getnormal(interfacevalues, q_point))
-                        Ke[i, j] += op(test, shape) * dΓ
-                    end
+    for ic in InterfaceIterator(dh)
+        reinit!(interfacevalues, ic)
+        for q_point in 1:getnquadpoints(interfacevalues)
+            dΓ = getdetJdV(interfacevalues, q_point)
+            for i in 1:n_basefuncs
+                test = f_test(interfacevalues, q_point, i)
+                f_test == shape_value_jump && (test *= getnormal(interfacevalues, q_point))
+                for j in 1:n_basefuncs
+                    shape = f_shape(interfacevalues, q_point, j)
+                    f_shape == shape_value_jump && (shape *= getnormal(interfacevalues, q_point))
+                    K[interfacedofs(ic)[i], interfacedofs(ic)[j]] += op(test, shape) * dΓ
                 end
             end
         end
     end
 
-    Ke
+    K
 end
 
 # Minimal Petrov-Galerkin type local assembly loop. We assume that both function spaces share the same integration rule. Test is applied from the left.
@@ -151,35 +146,30 @@ function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.Abstra
     f
 end
 
-function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, topology::ExclusiveTopology,  interfacevalues_shape::InterfaceValues{<: FaceValues{<: Ferrite.InterpolationByDim{dim}}}, f_shape, interfacevalues_test::InterfaceValues{<: FaceValues{<: Ferrite.InterpolationByDim{dim}}}, f_test, op) where {dim}
+function _generalized_petrov_galerkin_assemble_interfaces(dh::Ferrite.AbstractDofHandler, interfacevalues_shape::InterfaceValues{<: FaceValues{<: Ferrite.InterpolationByDim{dim}}}, f_shape, interfacevalues_test::InterfaceValues{<: FaceValues{<: Ferrite.InterpolationByDim{dim}}}, f_test, op) where {dim}
     n_basefuncs_shape = getnbasefunctions(interfacevalues_shape)
     n_basefuncs_test = getnbasefunctions(interfacevalues_test)
 
-    Ke = zeros(n_basefuncs_test, n_basefuncs_shape)
+    K = zeros(ndofs(dh), ndofs(dh))
 
-    cell_a_coords = get_cell_coordinates(grid, 1)
-    for face in 1:nfaces(getcells(grid)[1])
-        face_a = FaceIndex(1, face)
-        for face_b in getneighborhood(topology, grid, face_a)
-            cell_b_coords = get_cell_coordinates(grid, face_b[1])
-            reinit!(interfacevalues_shape, face_a, face_b, cell_a_coords, cell_b_coords, grid)
-            reinit!(interfacevalues_test, face_a, face_b, cell_a_coords, cell_b_coords, grid)
-            for q_point in 1:getnquadpoints(interfacevalues_shape)
-                dΓ = getdetJdV(interfacevalues_test, q_point)
-                for i in 1:n_basefuncs_test
-                    test = f_test(interfacevalues_test, q_point, i)
-                    f_test == shape_value_jump && (test *= getnormal(interfacevalues_test, q_point))
-                    for j in 1:n_basefuncs_shape
-                        shape = f_shape(interfacevalues_shape, q_point, j)
-                        f_shape == shape_value_jump && (shape *= getnormal(interfacevalues_shape, q_point))
-                        Ke[i, j] += op(test, shape) * dΓ
-                    end
+    for ic in InterfaceIterator(dh)
+        reinit!(interfacevalues_shape, ic)
+        reinit!(interfacevalues_test, ic)
+        for q_point in 1:getnquadpoints(interfacevalues_shape)
+            dΓ = getdetJdV(interfacevalues_test, q_point)
+            for i in 1:n_basefuncs_test
+                test = f_test(interfacevalues_test, q_point, i)
+                f_test == shape_value_jump && (test *= getnormal(interfacevalues_test, q_point))
+                for j in 1:n_basefuncs_shape
+                    shape = f_shape(interfacevalues_shape, q_point, j)
+                    f_shape == shape_value_jump && (shape *= getnormal(interfacevalues_shape, q_point))
+                    K[interfacedofs(ic)[i], interfacedofs(ic)[j]] += op(test, shape) * dΓ
                 end
             end
         end
     end
 
-    Ke
+    K
 end
 
 function _assemble_mass(dh, cellvalues, sym)

@@ -1,26 +1,16 @@
 @testset "InterfaceValues" begin
-    function test_interfacevalues(grid, topology, dim, ip_a, qr_a, ip_b = ip_a, qr_b = deepcopy(qr_a))
+    function test_interfacevalues(grid, ip_a, qr_a, ip_b = ip_a, qr_b = deepcopy(qr_a))
         iv = Ferrite.InterfaceValues(qr_a, ip_a; quad_rule_b = qr_b, func_interpol_b = ip_b)
         ndim = Ferrite.getdim(ip_a)
         n_basefuncs = getnbasefunctions(ip_a) + getnbasefunctions(ip_b)
 
         @test getnbasefunctions(iv) == n_basefuncs
 
-        for face_a in faceskeleton(topology, grid)
-            # TODO: Use interface here once getneighborhood is fixed for vertices
-            neighbors = dim > 1 ? getneighborhood(topology, grid, face_a) : topology.vertex_vertex_neighbor[face_a[1], face_a[2]]
-            isempty(neighbors) && continue
-            face_b = neighbors[1]
-            dim == 1 && (face_b = FaceIndex(face_b[1], face_b[2]))
-            cell_a_coords = get_cell_coordinates(grid, face_a[1])
-            cell_b_coords = get_cell_coordinates(grid, face_b[1])
-            ##############
-            #   reinit!  #
-            ##############
-            reinit!(iv, face_a, face_b, cell_a_coords, cell_b_coords, grid)
-            ##############
-            # end reinit!#
-            ##############
+        for ic in InterfaceIterator(grid)
+            reinit!(iv, ic)
+            cell_a_coords = get_cell_coordinates(ic.a.cc)
+            cell_b_coords = get_cell_coordinates(ic.b.cc)
+            
             nqp = getnquadpoints(iv)
             # Should have same quadrature points
             @test nqp == getnquadpoints(iv.face_values_a) == getnquadpoints(iv.face_values_b)
@@ -119,8 +109,8 @@
                 end
                 
                 xs = use_element_a ? cell_a_coords : cell_b_coords
-                x_face = xs[[Ferrite.dirichlet_facedof_indices(use_element_a ? ip_a : ip_b)[use_element_a ? face_a[2] : face_b[2]]...]]
-                @test vol ≈ calculate_face_area(use_element_a ? ip_a : ip_b, x_face, use_element_a ? face_a[2] : face_b[2])
+                x_face = xs[[Ferrite.dirichlet_facedof_indices(use_element_a ? ip_a : ip_b)[use_element_a ? Ferrite.getcurrentface(iv.face_values_a) : Ferrite.getcurrentface(iv.face_values_b)]...]]
+                @test vol ≈ calculate_face_area(use_element_a ? ip_a : ip_b, x_face, use_element_a ? Ferrite.getcurrentface(iv.face_values_a) : Ferrite.getcurrentface(iv.face_values_b))
             end
         end
     end
@@ -155,7 +145,7 @@
             @test_throws ErrorException("Face index 100 exceeds the number of faces for a cell of type $(typeof(cell))") Ferrite.transfer_point_face_to_cell([0.0 for _ in 1 : (dim > 1 ? dim-1 : 1)], cell, 100)
         end
         for func_interpol in (scalar_interpol,#= VectorizedInterpolation(scalar_interpol)=#)
-            test_interfacevalues(grid, topology, dim, scalar_interpol, quad_rule)
+            test_interfacevalues(grid, scalar_interpol, quad_rule)
         end
     end
     # Custom quadrature
@@ -185,7 +175,7 @@
             @test_throws ErrorException("Face index 100 exceeds the number of faces for a cell of type $(typeof(cell))") Ferrite.transfer_point_face_to_cell([0.0 for _ in 1 : (dim > 1 ? dim-1 : 1)], cell, 100)
         end
         for func_interpol in (scalar_interpol,#= VectorizedInterpolation(scalar_interpol)=#)
-            test_interfacevalues(grid, topology, dim, scalar_interpol, quad_rule)
+            test_interfacevalues(grid, scalar_interpol, quad_rule)
         end
     end
     @testset "Mixed elements 2D grids" begin
@@ -198,7 +188,7 @@
 
         grid = Grid(cells, nodes)
         topology = ExclusiveTopology(grid)
-        test_interfacevalues(grid, topology, dim,
+        test_interfacevalues(grid,
         DiscontinuousLagrange{RefQuadrilateral, 1}(), FaceQuadratureRule{RefQuadrilateral}(2),
         DiscontinuousLagrange{RefTriangle, 1}(), FaceQuadratureRule{RefTriangle}(2))
     end

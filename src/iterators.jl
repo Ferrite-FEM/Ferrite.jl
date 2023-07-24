@@ -90,9 +90,6 @@ end
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
-# TODOL enable this after InterfaceValues are merges
-# reinit!(iv::InterfaceValues, ic::InterfaceCache) = reinit!(iv, FaceIndex(cellid(ic.face_a), ic.face_a.current_faceid[]), get_cell_coordinates(ic.face_a),
-#     FaceIndex(cellid(ic.face_b), ic.face_b.current_faceid[]), get_cell_coordinates(ic.face_b), ic.face_a.cc.grid)
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
 getnodes(cc::CellCache) = cc.nodes
@@ -206,6 +203,9 @@ function reinit!(cache::InterfaceCache, face_a::FaceIndex, face_b::FaceIndex)
     end
     return cache
 end
+
+reinit!(iv::InterfaceValues, ic::InterfaceCache) = reinit!(iv, FaceIndex(cellid(ic.a), ic.a.current_faceid[]),
+    FaceIndex(cellid(ic.b), ic.b.current_faceid[]), get_cell_coordinates(ic.a), get_cell_coordinates(ic.b), ic.a.cc.grid)
 
 interfacedofs(ic::InterfaceCache) = ic.dofs
 
