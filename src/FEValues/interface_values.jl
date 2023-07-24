@@ -268,7 +268,7 @@ for (func,                          f_,                 ) in (
 end
 
 """
-    InterfaceTransformationMatrix(grid::AbstractGrid, this_face::FaceIndex, other_face::FaceIndex)
+    InterfaceTransformationMatrix(iv::InterfaceValues, grid::AbstractGrid, this_face::FaceIndex, other_face::FaceIndex)
 
 Transformation matrix for interfaces. Such an interface can be 
 possibly rotated and skewed in the case of triangles.
@@ -312,7 +312,7 @@ Skewing it with shear values [-1.0, 0.0]
 |  \\        |  \\
 | A \\       | B \\ 
 |    \\      |    \\
-1-----2     2-----1  
+1-----2     1-----2  
 ```
 This makes the transformation matrix
 ```
@@ -353,7 +353,7 @@ function InterfaceTransformationMatrix(iv::InterfaceValues, grid::AbstractGrid, 
 end
 
 """
-    transform_interface_point(iv::InterfaceValues, point::AbstractArray)
+    transform_interface_point(iv::InterfaceValues, point::Vec{N, Float64}, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex)
 
 Transform point from element A's face reference coordinates to element B's face reference coordinates.
 """
