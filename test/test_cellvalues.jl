@@ -308,4 +308,10 @@ end
     end
 end
 
+@testset "show" begin
+    # Just smoke test
+    cv = CellValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
+    show(stdout, MIME"text/plain"(), cv)
+end
+
 end # of testset
