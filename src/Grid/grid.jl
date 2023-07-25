@@ -262,7 +262,7 @@ abstract type AbstractGrid{dim} end
 
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 There are multiple helper structures to apply boundary conditions or define subdomains. They are gathered in the `cellsets`, `nodesets`,
-`facesets`, `edgesets` and `vertexsets`. 
+`facesets`, `edgesets` and `vertexsets`.
 
 # Fields
 - `cells::Vector{C}`: stores all cells of the grid
@@ -270,7 +270,7 @@ There are multiple helper structures to apply boundary conditions or define subd
 - `cellsets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of cell ids
 - `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
 - `facesets::Dict{String,Set{FaceIndex}}`: maps a `String` to a `Set` of `Set{FaceIndex} (global_cell_id, local_face_id)`
-- `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id` 
+- `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id`
 - `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
 - `boundary_matrix::SparseMatrixCSC{Bool,Int}`: optional, only needed by `onboundary` to check if a cell is on the boundary, see, e.g. Helmholtz example
 """
@@ -280,9 +280,9 @@ mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     # Sets
     cellsets::Dict{String,Set{Int}}
     nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{FaceIndex}} 
-    edgesets::Dict{String,Set{EdgeIndex}} 
-    vertexsets::Dict{String,Set{VertexIndex}} 
+    facesets::Dict{String,Set{FaceIndex}}
+    edgesets::Dict{String,Set{EdgeIndex}}
+    vertexsets::Dict{String,Set{VertexIndex}}
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool,Int}
 end
@@ -318,8 +318,8 @@ toglobal(grid::AbstractGrid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((
 
 @inline getdim(::AbstractGrid{dim}) where {dim} = dim
 """
-    getcells(grid::AbstractGrid) 
-    getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}} 
+    getcells(grid::AbstractGrid)
+    getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}}
     getcells(grid::AbstractGrid, setname::String)
 
 Returns either all `cells::Collection{C<:AbstractCell}` of a `<:AbstractGrid` or a subset based on an `Int`, `Vector{Int}` or `String`.
@@ -335,7 +335,7 @@ Whereas the last option tries to call a `cellset` of the `grid`. `Collection` ca
 @inline getcelltype(grid::AbstractGrid, i::Int) = typeof(grid.cells[i])
 
 """
-    getnodes(grid::AbstractGrid) 
+    getnodes(grid::AbstractGrid)
     getnodes(grid::AbstractGrid, v::Union{Int,Vector{Int}}
     getnodes(grid::AbstractGrid, setname::String)
 

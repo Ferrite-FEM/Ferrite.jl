@@ -86,6 +86,7 @@ struct InterpolationInfo
     reference_dim::Int
     adjust_during_distribution::Bool
     n_copies::Int
+    is_discontinuous::Bool
     function InterpolationInfo(interpolation::InterpolationByDim{3})
         n_copies = 1
         if interpolation isa VectorizedInterpolation
@@ -100,6 +101,7 @@ struct InterpolationInfo
             3,
             adjust_dofs_during_distribution(interpolation),
             n_copies,
+            is_discontinuous(interpolation)
         )
     end
     function InterpolationInfo(interpolation::InterpolationByDim{2})
@@ -116,6 +118,7 @@ struct InterpolationInfo
             2,
             adjust_dofs_during_distribution(interpolation),
             n_copies,
+            is_discontinuous(interpolation)
         )
     end
     function InterpolationInfo(interpolation::InterpolationByDim{1})
@@ -131,7 +134,8 @@ struct InterpolationInfo
             length(celldof_interior_indices(interpolation)),
             1,
             adjust_dofs_during_distribution(interpolation),
-            n_copies
+            n_copies,
+            is_discontinuous(interpolation)
         )
     end
 end
@@ -369,6 +373,15 @@ boundarydof_indices(::Type{EdgeIndex}) = Ferrite.edgedof_indices
 boundarydof_indices(::Type{VertexIndex}) = Ferrite.vertexdof_indices
 
 """
+    is_discontinuous(::Interpolation)
+    is_discontinuous(::Type{<:Interpolation})
+
+Checks whether the interpolation is discontinuous (i.e. `DiscontinuousLagrange`)
+"""
+is_discontinuous(ip::Interpolation) = is_discontinuous(typeof(ip))
+is_discontinuous(::Type{<:Interpolation}) = false
+
+"""
     dirichlet_boundarydof_indices(::Type{<:BoundaryIndex})
 
 Helper function to generically dispatch on the correct dof sets of a boundary entity.
@@ -433,6 +446,8 @@ function shape_value(ip::DiscontinuousLagrange{shape, 0}, ::Vec{dim, T}, i::Int)
     i > 1 && throw(ArgumentError("no shape function $i for interpolation $ip"))
     return one(T)
 end
+
+is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
 
 ############
 # Lagrange #
@@ -1374,3 +1389,5 @@ function shape_gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, ξ:
 end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
+
+is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
