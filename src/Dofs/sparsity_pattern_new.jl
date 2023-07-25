@@ -31,8 +31,8 @@ Add an entry to the sparsity pattern `sp` at row `row` and column `col`.
 """
 add_entry!(sp::AbstractSparsityPattern, row::Int, col::Int)
 
-# Necessary to avoid warning about not importing Base.eachrow when adding docstring before
-# the definitions further down.
+# This is necessary to avoid warning about not importing Base.eachrow when
+# adding docstring before the definitions further down.
 function eachrow end
 
 """
@@ -340,7 +340,7 @@ function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatri
     outs = Matrix{Bool}[]
     field_dims = map(fieldname -> getfielddim(dh, fieldname), dh.field_names)
 
-    for fh in dh.fieldhandlers
+    for fh in dh.subdofhandlers
         out = zeros(Bool, ndofs_per_cell(fh), ndofs_per_cell(fh))
         push!(outs, out)
 
@@ -378,7 +378,7 @@ function _create_sparsity_pattern!(
     # 1. Add all connections between dofs for every cell while filtering based
     #    on a) constraints, and b) field/dof coupling.
     cc = CellCache(dh)
-    for (sdhi, sdh) in pairs(dh.fieldhandlers)
+    for (sdhi, sdh) in pairs(dh.subdofhandlers)
         set = BitSet(sdh.cellset)
         coupling === nothing || (coupling_sdh = coupling[sdhi])
         for cell_id in set
