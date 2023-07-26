@@ -86,15 +86,15 @@ end
 
 !!! note "Examples"
     Most examples make use of Dirichlet boundary conditions, for example [Heat
-    Equation](@ref).
+    Equation](@ref tutorial-heat-equation).
 
 
 ## Neumann Boundary Conditions
 At the Neumann part of the boundary we know something about the gradient of the solution.
 Two different methods for applying these are described below.
 For complete examples that use Neumann boundary conditions, please see
-- [von-Mises-plasticity](@ref)
-- [Hyperelasticity](@ref)
+- [von-Mises-plasticity](@ref tutorial-plasticity)
+- [Hyperelasticity](@ref tutorial-hyperelasticity)
 
 ### Using the `FaceIterator`
 A Neumann boundary contribution can be added by iterating over
@@ -242,7 +242,9 @@ close!(ch)
 
 !!! note "Examples"
     Periodic boundary conditions are used in the following examples [Computational
-    homogenization](@ref), [Stokes flow](@ref).
+    homogenization](@ref tutorial-computational-homogenization), [Stokes flow](@ref
+    tutorial-stokes-flow).
+
 
 #### Heterogeneous "periodic" constraint
 
@@ -309,7 +311,7 @@ u = zeros(ndofs(dh))
 apply_analytical!(u, dh, :p, x -> ρ * g * x[2])
 ```
 
-See also [Time Dependent Problems](@ref) for one example.
+See also [Transient heat equation](@ref tutorial-transient-heat-equation) for one example.
 
 !!! note "Consistency"
     `apply_analytical!` does not enforce consistency of the applied solution with the system of 
