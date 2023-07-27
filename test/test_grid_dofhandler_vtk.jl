@@ -16,7 +16,9 @@ end
                             (QuadraticTriangle,      2),
                             (Hexahedron,             3),
                             (SerendipityQuadraticHexahedron, 3),
-                            (Tetrahedron,            3))
+                            (Tetrahedron,            3),
+                            (Wedge,                  3),
+                            (Pyramid,                3))
 
         # create test grid, do some operations on it and then test
         # the resulting sha1 of the stored vtk file

@@ -19,6 +19,8 @@
                       Lagrange{RefTetrahedron, 2}(),
                       Lagrange{RefPrism, 1}(),
                       Lagrange{RefPrism, 2}(),
+                      Lagrange{RefPyramid, 1}(),
+                      Lagrange{RefPyramid, 2}(),
                       #
                       DiscontinuousLagrange{RefLine, 0}(),
                       DiscontinuousLagrange{RefQuadrilateral, 0}(),
