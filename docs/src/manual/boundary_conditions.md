@@ -260,6 +260,22 @@ pdbc = PeriodicDirichlet(
 ## Robin Boundary Conditions
 Robin boundary condition, also known as mixed boundary condition, is a type of boundary condition used in mathematical and physical models to describe the behavior of a system at the boundary.In the context of partial differential equations (PDEs), which are equations involving multiple variables and their partial derivatives, a Robin boundary condition combines elements of both Dirichlet and Neumann boundary conditions. From the standard form of KU = F, the additional Robin boundary modifies the element assembly as follows:
 
+[//]: # (Equation 1)
+\llbracket u \rrbracket = \llbracket f \rrbracket
+\quad \Leftrightarrow \quad
+u(\boldsymbol{x}^+) - u(\boldsymbol{x}^-) = f(\boldsymbol{x}^+) - f(\boldsymbol{x}^-),
+
+[//]: # (Equation 2)
+\begin{subequations}
+\begin{align}
+    \dot{\Phi}(u) + \grad \cdot \ta{q}(\grad u) &= f \quad &\forall \ta{x} \in \Omega \\
+    u &= g_\mathrm{D} \quad &\forall \ta{x} \in \Gamma_\mathrm{D} \\
+    q_\mathrm{n} \defeq \ta{q} \cdot \ta{n} &= g_\mathrm{N} \quad &\forall \ta{x} \in \Gamma_\mathrm{N}\\
+    a\,u + b\, q_\mathrm{n} = a\,u + b\, \ta{q} \cdot \ta{n} &= g_\mathrm{R} \quad &\forall \ta{x} \in \Gamma_\mathrm{R}
+\end{align}
+\end{subequations}
+
+
 ```julia
 for face in 1:nfaces(cell) # Robin BC
         if (cellid(cell), face) ∈ getfaceset(grid, "flux_right")
