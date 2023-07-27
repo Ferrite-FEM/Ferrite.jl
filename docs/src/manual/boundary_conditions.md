@@ -265,15 +265,28 @@ Robin boundary condition, also known as mixed boundary condition, is a type of b
 a\,u + b\, q_\mathrm{n} = a\,u + b\, \mathbf{q} \cdot \mathbf{n} = g_\mathrm{R} \quad \text{for all } \mathbf{x} \in \Gamma_\mathrm{R}
 
 ```
+Robin BC can be described as:
 
-
-To compare this equation with \(q_\mathrm{n} = -k_\mathrm{robin} \cdot (u_\mathrm{robin} - u)\), we can express the given equation in terms of \(q_\mathrm{n}\). Rearranging the equation, we have:
+```math
+\(q_\mathrm{n} = -k_\mathrm{robin} \cdot (u_\mathrm{robin} - u)\)
+```
 
 ```math
 b\,q_\mathrm{n} = g_\mathrm{R} - a\,u
 ```
 
+We can equate the coefficients of \(u\) on both sides:
 
+```math
+\frac{a}{b} = -k_\mathrm{robin}
+```
+
+
+And the constant terms on both sides:
+
+```math
+\frac{g_\mathrm{R}}{b} = -k_\mathrm{robin} \cdot u_\mathrm{robin}
+```
 
 
 ```julia
