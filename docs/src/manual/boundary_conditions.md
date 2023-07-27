@@ -262,14 +262,20 @@ Robin boundary condition, also known as mixed boundary condition, is a type of b
 
 ```math
 \dot{\Phi}(u) + \mathrm{div} \cdot \mathbf{q}(\mathrm{grad} u) = f \quad \text{for all } \mathbf{x} \in \Omega
-
-u = g_\mathrm{D} \quad \text{for all } \mathbf{x} \in \Gamma_\mathrm{D}
-
-q_\mathrm{n} \equiv \mathbf{q} \cdot \mathbf{n} = g_\mathrm{N} \quad \text{for all } \mathbf{x} \in \Gamma_\mathrm{N}
-
-a\,u + b\, q_\mathrm{n} = a\,u + b\, \mathbf{q} \cdot \mathbf{n} = g_\mathrm{R} \quad \text{for all } \mathbf{x} \in \Gamma_\mathrm{R}
 ```
 
+```math
+u = g_\mathrm{D} \quad \text{for all } \mathbf{x} \in \Gamma_\mathrm{D}
+```
+
+```math
+q_\mathrm{n} \equiv \mathbf{q} \cdot \mathbf{n} = g_\mathrm{N} \quad \text{for all } \mathbf{x} \in \Gamma_\mathrm{N}
+```
+
+```math
+a\,u + b\, q_\mathrm{n} = a\,u + b\, \mathbf{q} \cdot \mathbf{n} = g_\mathrm{R} \quad \text{for all } \mathbf{x} \in \Gamma_\mathrm{R}
+
+```
 
 
 ```julia
