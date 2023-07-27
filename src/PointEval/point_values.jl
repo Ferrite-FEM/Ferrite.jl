@@ -68,7 +68,7 @@ end
 
 # Optimized version of PointScalarValues which avoids i) recomputation of dNdξ and
 # ii) recomputation of dNdx. Only allows function evaluation (no gradients) which is
-# what is used in get_point_values.
+# what is used in evaluate_at_points.
 struct PointValuesInternal{IP, N_t} <: AbstractValues
     N::Vector{N_t}
     ip::IP

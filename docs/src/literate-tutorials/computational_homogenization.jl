@@ -1,4 +1,4 @@
-# # Computational homogenization
+# # [Computational homogenization](@id tutorial-computational-homogenization)
 #
 # ![](rve_homogenization.png)
 #

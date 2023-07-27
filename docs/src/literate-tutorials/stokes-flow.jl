@@ -1,4 +1,4 @@
-# # Stokes flow
+# # [Stokes flow](@id tutorial-stokes-flow)
 #
 # **Keywords**: *periodic boundary conditions, multiple fields, mean value constraint*
 #-
@@ -62,7 +62,8 @@
 # where ``\mathbb{U}`` is a suitable function space, that, in particular, enforces the
 # Dirichlet boundary conditions, and the periodicity constraints.
 # This formulation is a saddle point problem, and, just like the example with
-# [Incompressible Elasticity](@ref), we need our formulation to fulfill the [LBB
+# [Incompressible Elasticity](@ref tutorial-incompressible-elasticity), we need
+# our formulation to fulfill the [LBB
 # condition](https://en.wikipedia.org/wiki/Ladyzhenskaya%E2%80%93Babu%C5%A1ka%E2%80%93Brezzi_condition).
 # We ensure this by using a quadratic approximation for the velocity field, and a linear
 # approximation for the pressure.
@@ -313,7 +314,7 @@ function setup_mean_constraint(dh, fvp)
         ## Assemble to row 1
         assemble!(assembler, [1], element_dofs_p, Ce)
     end
-    C = end_assemble(assembler)
+    C = finish_assemble(assembler)
     ## Create an AffineConstraint from the C-matrix
     _, J, V = findnz(C)
     _, constrained_dof_idx = findmax(abs2, V)

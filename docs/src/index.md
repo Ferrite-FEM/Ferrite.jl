@@ -36,13 +36,15 @@ for. The document is organized as follows[^1]:
 
 [^1]: The organization of the document follows the [Diátaxis Framework](https://diataxis.fr).
 
+In addition there is a [**Code gallery**](gallery/), with user contributed example programs,
+and the [**Developer documentation**](devdocs/), for documentation of Ferrite internal code.
 
 ## Getting started
 
 As a new user of Ferrite it is suggested to start working with the tutorials before using
 Ferrite to tackle the specific equation you ultimately want to solve. The tutorials start
 with explaining the basic concepts and then increase in complexity. Understanding the first
-tutorial program, [solving the heat equation](@ref Heat-Equation), is essential in order to
+tutorial program, [solving the heat equation](@ref tutorial-heat-equation), is essential in order to
 understand how Ferrite works. Already this rather simple program discusses many of the
 important concepts. See the [tutorials overview](@ref Tutorials) for suggestion on how to
 progress to more advanced usage.

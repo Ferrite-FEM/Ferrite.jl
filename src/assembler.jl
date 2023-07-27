@@ -19,7 +19,7 @@ end
     start_assemble([N=0]) -> Assembler
 
 Create an `Assembler` object which can be used to assemble element contributions to the
-global sparse matrix. Use [`assemble!`](@ref) for each element, and [`end_assemble`](@ref),
+global sparse matrix. Use [`assemble!`](@ref) for each element, and [`finish_assemble`](@ref),
 to finalize the assembly and return the sparse matrix.
 
 Note that giving a sparse matrix as input can be more efficient. See below and 
@@ -65,12 +65,12 @@ function assemble!(a::Ferrite.Assembler{T}, rowdofs::AbstractVector{Int}, coldof
 end
 
 """
-    end_assemble(a::Assembler) -> K
+    finish_assemble(a::Assembler) -> K
 
 Finalizes an assembly. Returns a sparse matrix with the
 assembled values. Note that this step is not necessary for `AbstractSparseAssembler`s.
 """
-function end_assemble(a::Assembler)
+function finish_assemble(a::Assembler)
     return sparse(a.I, a.J, a.V)
 end
 

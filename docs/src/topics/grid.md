@@ -31,7 +31,7 @@ In case only a part of the mesh is the domain, the domain can be specified by pr
 If you want to read another, not yet supported cell from gmsh, consider to open a PR at `FerriteGmsh` that extends the [`gmshtoferritecell` dict](https://github.com/Ferrite-FEM/FerriteGmsh.jl/blob/c9de4f64b3ad3c73fcb36758855a6e517c6d0d95/src/FerriteGmsh.jl#L6-L15)
 and if needed, reorder the element nodes by dispatching [`FerriteGmsh.translate_elements`](https://github.com/Ferrite-FEM/FerriteGmsh.jl/blob/c9de4f64b3ad3c73fcb36758855a6e517c6d0d95/src/FerriteGmsh.jl#L17-L63).
 The reordering of nodes is necessary if the Gmsh ordering doesn't match the one from Ferrite. Gmsh ordering is documented [here](https://gmsh.info/doc/texinfo/gmsh.html#Node-ordering).
-For an exemplary usage of `Gmsh.jl` and `FerriteGmsh.jl`, consider the [Stokes flow](@ref) and [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](@ref) example.
+For an exemplary usage of `Gmsh.jl` and `FerriteGmsh.jl`, consider the [Stokes flow](@ref tutorial-stokes-flow) and [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](@ref tutorial-ins-ordinarydiffeq) example.
 
 ### FerriteMeshParser
 
