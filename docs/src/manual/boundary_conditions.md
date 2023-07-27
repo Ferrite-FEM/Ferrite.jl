@@ -260,22 +260,20 @@ pdbc = PeriodicDirichlet(
 ## Robin Boundary Conditions
 Robin boundary condition, also known as mixed boundary condition, is a type of boundary condition used in mathematical and physical models to describe the behavior of a system at the boundary.In the context of partial differential equations (PDEs), which are equations involving multiple variables and their partial derivatives, a Robin boundary condition combines elements of both Dirichlet and Neumann boundary conditions. From the standard form of KU = F, the additional Robin boundary modifies the element assembly as follows:
 
-```math
-\dot{\Phi}(u) + \mathrm{div} \cdot \mathbf{q}(\mathrm{grad} u) = f \quad \text{for all } \mathbf{x} \in \Omega
-```
-
-```math
-u = g_\mathrm{D} \quad \text{for all } \mathbf{x} \in \Gamma_\mathrm{D}
-```
-
-```math
-q_\mathrm{n} \equiv \mathbf{q} \cdot \mathbf{n} = g_\mathrm{N} \quad \text{for all } \mathbf{x} \in \Gamma_\mathrm{N}
-```
 
 ```math
 a\,u + b\, q_\mathrm{n} = a\,u + b\, \mathbf{q} \cdot \mathbf{n} = g_\mathrm{R} \quad \text{for all } \mathbf{x} \in \Gamma_\mathrm{R}
 
 ```
+
+
+To compare this equation with \(q_\mathrm{n} = -k_\mathrm{robin} \cdot (u_\mathrm{robin} - u)\), we can express the given equation in terms of \(q_\mathrm{n}\). Rearranging the equation, we have:
+
+```math
+b\,q_\mathrm{n} = g_\mathrm{R} - a\,u
+```
+
+
 
 
 ```julia
