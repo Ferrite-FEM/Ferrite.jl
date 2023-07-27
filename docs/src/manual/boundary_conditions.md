@@ -260,6 +260,7 @@ pdbc = PeriodicDirichlet(
 ## Robin Boundary Conditions
 Robin boundary condition, also known as mixed boundary condition, is a type of boundary condition used in mathematical and physical models to describe the behavior of a system at the boundary.In the context of partial differential equations (PDEs), which are equations involving multiple variables and their partial derivatives, a Robin boundary condition combines elements of both Dirichlet and Neumann boundary conditions. From the standard form of KU = F, the additional Robin boundary modifies the element assembly as follows:
 
+```math
 [//]: # (Equation 1)
 \llbracket u \rrbracket = \llbracket f \rrbracket
 \quad \Leftrightarrow \quad
@@ -274,6 +275,9 @@ u(\boldsymbol{x}^+) - u(\boldsymbol{x}^-) = f(\boldsymbol{x}^+) - f(\boldsymbol{
     a\,u + b\, q_\mathrm{n} = a\,u + b\, \ta{q} \cdot \ta{n} &= g_\mathrm{R} \quad &\forall \ta{x} \in \Gamma_\mathrm{R}
 \end{align}
 \end{subequations}
+
+```
+
 
 
 ```julia
