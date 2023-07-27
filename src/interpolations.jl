@@ -1112,13 +1112,13 @@ function reference_coordinates(::Lagrange{RefPyramid,1})
             Vec{3, Float64}((0.0, 0.0, 1.0))]
 end
 
-function shape_value(ip::Lagrange{RefPyramid,1}, ξ::Vec{3}, i::Int)
+function shape_value(ip::Lagrange{RefPyramid,1}, ξ::Vec{3,T}, i::Int) where T
     (x,y,z) = ξ
-    zzero = z ≈ 1.0
-    i == 1 && return zzero ? 0.0 : (-x*y+(z-1)*(-x-y-z+1))/(z-1)
-    i == 2 && return zzero ? 0.0 : x*(y+z-1)/(z-1)
-    i == 3 && return zzero ? 0.0 : y*(x+z-1)/(z-1)
-    i == 4 && return zzero ? 0.0 : -x*y/(z-1)
+    zzero = z ≈ one(T)
+    i == 1 && return zzero ? zero(T) : (-x*y+(z-1)*(-x-y-z+1))/(z-1)
+    i == 2 && return zzero ? zero(T) : x*(y+z-1)/(z-1)
+    i == 3 && return zzero ? zero(T) : y*(x+z-1)/(z-1)
+    i == 4 && return zzero ? zero(T) : -x*y/(z-1)
     i == 5 && return z
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
@@ -1182,26 +1182,26 @@ function reference_coordinates(::Lagrange{RefPyramid,2})
             Vec{3, Float64}((0.5, 0.5, 0.0))]
 end
 
-function shape_value(ip::Lagrange{RefPyramid,2}, ξ::Vec{3}, i::Int)
+function shape_value(ip::Lagrange{RefPyramid,2}, ξ::Vec{3,T}, i::Int) where T
     (x,y,z) = ξ
     x² = x*x
     y² = y*y
     z² = z*z
-    zzero = z ≈ 1.0
-    i == 1 && return zzero ? 0.0 : (4*x²*y²*(z-1) + x*y*(6x+6y+z)*(z²-2z+1) + (z-1)*(z² - 2z + 1)*(2x² + 9*x*y + 4*x*z - 3x + 2y² + 4*y*z - 3y + 2z² - 3z + 1)) / ((z-1)*(z²-2z+1))
-    i == 2 && return zzero ? 0.0 : x*(4x*y²*(z-1) + y*(6x+2y-z)*(z²-2z+1) + (z-1)*(2x+3y-1)*(z²-2z+1))/((z-1)*(z²-2z+1))
-    i == 3 && return zzero ? 0.0 : y*(4x²*y*(z-1) + x*(2x+6y-z)*(z²-2z+1) + (z-1)*(3x+2y-1)*(z²-2z+1))/((z-1)*(z²-2z+1))
-    i == 4 && return zzero ? 0.0 : x*y*(4*x*y + 2x*z - 2x + 2y*z - 2y + 2z² - 3z + 1)/(z²-2z+1)
-    i == 5 && return               z*(2z-1)
-    i == 6 && return zzero ? 0.0 : 4x*(2x*y²*(1-z) - y*(3x+2y)*(z²-2z+1) + (z-1)*(z²-2z+1)*(-x-3y-z+1))/((z-1)*(z²-2z+1))
-    i == 7 && return zzero ? 0.0 : 4y*(2x²*y*(1-z) - x*(2x+3y)*(z²-2z+1) + (z-1)*(z²-2z+1)*(-3x-y-z+1))/((z-1)*(z²-2z+1))
-    i == 8 && return zzero ? 0.0 : 4z*(-x*y + (z-1)*(-x-y-z+1))/(z-1)
-    i == 9 && return zzero ? 0.0 : 4*x*y*(-2x*y - 2x*z + 2x - y*z + y - z² + 2*z - 1)/(z²-2z+1)
-    i == 10 && return zzero ? 0.0 : 4x*z*(y + z - 1)/(z-1)
-    i == 11 && return zzero ? 0.0 : 4*x*y*(-2x*y - x*z + x - 2y*z + 2y - z² + 2z -1)/(z²-2z+1)
-    i == 12 && return zzero ? 0.0 : 4y*z*(x + z - 1)/(z-1)
-    i == 13 && return zzero ? 0.0 : -4x*y*z/(z-1)
-    i == 14 && return zzero ? 0.0 : 16x*y*(x*y + x*z - x + y*z - y + z² - 2z + 1)/(z²-2z+1)
+    zzero = z ≈ one(T)
+    i == 1 && return zzero ? zero(T) : (4*x²*y²*(z-1) + x*y*(6x+6y+z)*(z²-2z+1) + (z-1)*(z² - 2z + 1)*(2x² + 9*x*y + 4*x*z - 3x + 2y² + 4*y*z - 3y + 2z² - 3z + 1)) / ((z-1)*(z²-2z+1))
+    i == 2 && return zzero ? zero(T) : x*(4x*y²*(z-1) + y*(6x+2y-z)*(z²-2z+1) + (z-1)*(2x+3y-1)*(z²-2z+1))/((z-1)*(z²-2z+1))
+    i == 3 && return zzero ? zero(T) : y*(4x²*y*(z-1) + x*(2x+6y-z)*(z²-2z+1) + (z-1)*(3x+2y-1)*(z²-2z+1))/((z-1)*(z²-2z+1))
+    i == 4 && return zzero ? zero(T) : x*y*(4*x*y + 2x*z - 2x + 2y*z - 2y + 2z² - 3z + 1)/(z²-2z+1)
+    i == 5 && return                   z*(2z-1)
+    i == 6 && return zzero ? zero(T) : 4x*(2x*y²*(1-z) - y*(3x+2y)*(z²-2z+1) + (z-1)*(z²-2z+1)*(-x-3y-z+1))/((z-1)*(z²-2z+1))
+    i == 7 && return zzero ? zero(T) : 4y*(2x²*y*(1-z) - x*(2x+3y)*(z²-2z+1) + (z-1)*(z²-2z+1)*(-3x-y-z+1))/((z-1)*(z²-2z+1))
+    i == 8 && return zzero ? zero(T) : 4z*(-x*y + (z-1)*(-x-y-z+1))/(z-1)
+    i == 9 && return zzero ? zero(T) : 4*x*y*(-2x*y - 2x*z + 2x - y*z + y - z² + 2*z - 1)/(z²-2z+1)
+    i == 10 && return zzero ? zero(T) : 4x*z*(y + z - 1)/(z-1)
+    i == 11 && return zzero ? zero(T) : 4*x*y*(-2x*y - x*z + x - 2y*z + 2y - z² + 2z -1)/(z²-2z+1)
+    i == 12 && return zzero ? zero(T) : 4y*z*(x + z - 1)/(z-1)
+    i == 13 && return zzero ? zero(T) : -4x*y*z/(z-1)
+    i == 14 && return zzero ? zero(T) : 16x*y*(x*y + x*z - x + y*z - y + z² - 2z + 1)/(z²-2z+1)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
