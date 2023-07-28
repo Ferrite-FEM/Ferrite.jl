@@ -178,9 +178,9 @@
             test_interfacevalues(grid, scalar_interpol, quad_rule)
         end
     end
-    @testset "Mixed elements 2D grids" begin
+    @testset "Mixed elements 2D grids" begin # TODO: this shouldn't work because it should change the FaceValues object
         dim = 2
-        nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, -1.0)), Node((0.0, 1.0))]
+        nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, 1.0)), Node((0.0, 1.0))]
         cells = [
                     Quadrilateral((1,2,5,4)),
                     Triangle((3,5,2)),
@@ -205,7 +205,15 @@
             @test pointer(v) != pointer(vc)
         end
         v isa FaceValues && continue
-        @test v == vc
+        for fname in fieldnames(typeof(vc))
+            v2 = getfield(v, fname)
+            v2 isa Ferrite.ScalarWrapper && continue
+            vc2 = getfield(vc, fname)
+            if hasmethod(pointer, Tuple{typeof(v2)})
+                @test pointer(v2) != pointer(vc2)
+            end
+            @test v2 == vc2
+        end
     end
 end # of testset
                                 

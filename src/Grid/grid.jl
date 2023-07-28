@@ -948,3 +948,38 @@ struct SurfaceOrientationInfo
     #shift_index::Int
 end
 
+
+"""
+#TODO: Docs
+
+"""
+struct InterfaceTransformation
+    flipped::ScalarWrapper{Bool}
+    shift_index::ScalarWrapper{Int}
+end
+
+InterfaceTransformation() = InterfaceTransformation(ScalarWrapper(false), ScalarWrapper(0))
+
+function Base.copy(it::InterfaceTransformation)
+    return InterfaceTransformation(copy(it.flipped), copy(it.shift_index))
+end
+
+function update!(interface_transformation::InterfaceTransformation, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex)
+    cell_a = getcells(grid, face_a[1])
+    getdim(cell_a) == 1 && return nothing # No need to transform
+    cell_b = getcells(grid, face_b[1])
+
+    nodes_a = faces(cell_a)[face_a[2]]
+    nodes_b = faces(cell_b)[face_b[2]]
+
+    min_idx_a = argmin(nodes_a)
+    min_idx_b = argmin(nodes_b)
+
+    shift_index = min_idx_b - min_idx_a
+    flipped = getdim(cell_a) == 2 ? shift_index != 0 : nodes_a[min_idx_a != 1 ? min_idx_a - 1 : end] != nodes_b[min_idx_b != 1 ? min_idx_b - 1 : end]
+        
+    interface_transformation.flipped[] =  flipped  
+    interface_transformation.shift_index[] = shift_index
+
+    return nothing
+end

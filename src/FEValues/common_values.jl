@@ -415,15 +415,11 @@ function Base.show(io::IO, ::MIME"text/plain", fe_v::AbstractValues)
 end
 
 # copy
-for ValueType in (CellValues, FaceValues#= InterfaceValues=#)
+for ValueType in (CellValues, FaceValues, InterfaceValues)
     args = [:(copy(cv.$fname)) for fname in fieldnames(ValueType)]
     @eval begin
         function Base.copy(cv::$ValueType)
             return typeof(cv)($(args...))
         end
     end
-end
-# TODO: delete this once grid is moved to InterfaceCache
-function Base.copy(iv::InterfaceValues)
-    return InterfaceValues{typeof(iv.face_values_a), typeof(iv.face_values_b)}(copy(iv.face_values_a), copy(iv.face_values_b), copy(iv.transformation), copy(iv.update_quadrature_points))
 end
