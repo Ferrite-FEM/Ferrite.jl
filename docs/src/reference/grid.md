@@ -9,7 +9,6 @@ DocTestSetup = :(using Ferrite)
 ```@docs
 generate_grid
 Node
-Cell
 CellIndex
 VertexIndex
 EdgeIndex
@@ -26,15 +25,10 @@ getnodes
 getnnodes
 Ferrite.nnodes_per_cell
 getcellset
-getcellsets
 getnodeset
-getnodesets
 getfaceset
-getfacesets
 getedgeset
-getedgesets
 getvertexset
-getvertexsets
 transform_coordinates!
 get_cell_coordinates
 get_cell_coordinates!
