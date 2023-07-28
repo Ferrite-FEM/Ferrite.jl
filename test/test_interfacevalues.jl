@@ -201,7 +201,7 @@
                 ]
         cells = [
                     Hexahedron((1,2,5,4,7,8,11,10)),
-                    Hexahedron((11,12,9,8,5,6,3,2)),
+                    Hexahedron((5,6,12,11,2,3,9,8)),
                 ]
 
         grid = Grid(cells, nodes)
