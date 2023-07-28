@@ -178,21 +178,37 @@
             test_interfacevalues(grid, scalar_interpol, quad_rule)
         end
     end
-    @testset "Mixed elements 2D grids" begin # TODO: this shouldn't work because it should change the FaceValues object
+    # @testset "Mixed elements 2D grids" begin # TODO: this shouldn't work because it should change the FaceValues object
+    #     dim = 2
+    #     nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, 1.0)), Node((0.0, 1.0))]
+    #     cells = [
+    #                 Quadrilateral((1,2,5,4)),
+    #                 Triangle((3,5,2)),
+    #             ]
+
+    #     grid = Grid(cells, nodes)
+    #     topology = ExclusiveTopology(grid)
+    #     test_interfacevalues(grid,
+    #     DiscontinuousLagrange{RefQuadrilateral, 1}(), FaceQuadratureRule{RefQuadrilateral}(2),
+    #     DiscontinuousLagrange{RefTriangle, 1}(), FaceQuadratureRule{RefTriangle}(2))
+    # end
+    @testset "Unordered nodes 3D" begin # TODO: this shouldn't work because it should change the FaceValues object
         dim = 2
-        nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, 1.0)), Node((0.0, 1.0))]
+        nodes = [Node((-1.0, 0.0, 0.0)), Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)), 
+                Node((-1.0, 1.0, 0.0)), Node((0.0, 1.0, 0.0)), Node((1.0, 1.0, 0.0)), 
+                Node((-1.0, 0.0, 1.0)), Node((0.0, 0.0, 1.0)), Node((1.0, 0.0, 1.0)), 
+                Node((-1.0, 1.0, 1.0)), Node((0.0, 1.0, 1.0)), Node((1.0, 1.0, 1.0)), 
+                ]
         cells = [
-                    Quadrilateral((1,2,5,4)),
-                    Triangle((3,5,2)),
+                    Hexahedron((1,2,5,4,7,8,11,10)),
+                    Hexahedron((11,12,9,8,5,6,3,2)),
                 ]
 
         grid = Grid(cells, nodes)
         topology = ExclusiveTopology(grid)
         test_interfacevalues(grid,
-        DiscontinuousLagrange{RefQuadrilateral, 1}(), FaceQuadratureRule{RefQuadrilateral}(2),
-        DiscontinuousLagrange{RefTriangle, 1}(), FaceQuadratureRule{RefTriangle}(2))
+        DiscontinuousLagrange{RefHexahedron, 1}(), FaceQuadratureRule{RefHexahedron}(2))
     end
-
     # Test copy
     iv = Ferrite.InterfaceValues(FaceQuadratureRule{RefQuadrilateral}(2), DiscontinuousLagrange{RefQuadrilateral, 1}())
     ivc = copy(iv)
