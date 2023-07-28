@@ -979,12 +979,13 @@ end
 struct InterfaceTransformation
     flipped::ScalarWrapper{Bool}
     shift_index::ScalarWrapper{Int}
+    lowest_node_shift_index::ScalarWrapper{Int}
 end
 
-InterfaceTransformation() = InterfaceTransformation(ScalarWrapper(false), ScalarWrapper(0))
+InterfaceTransformation() = InterfaceTransformation(ScalarWrapper(false), ScalarWrapper(0), ScalarWrapper(0))
 
 function Base.copy(it::InterfaceTransformation)
-    return InterfaceTransformation(copy(it.flipped), copy(it.shift_index))
+    return InterfaceTransformation(copy(it.flipped), copy(it.shift_index), copy(it.lowest_node_shift_index))
 end
 
 function update!(interface_transformation::InterfaceTransformation, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex)
@@ -1003,6 +1004,11 @@ function update!(interface_transformation::InterfaceTransformation, grid::Abstra
         
     interface_transformation.flipped[] =  flipped  
     interface_transformation.shift_index[] = shift_index
+    interface_transformation.lowest_node_shift_index[] = 1 - min_idx_b
 
     return nothing
+end
+
+function rotation_matrix_pi(θ::Float64)
+    return SMatrix{3,3}(cospi(θ), sinpi(θ), 0.0, -sinpi(θ), cospi(θ), 0.0, 0.0, 0.0, 1.0)
 end

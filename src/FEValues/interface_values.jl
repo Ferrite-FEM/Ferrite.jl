@@ -271,10 +271,12 @@ function transform_interface_point!(dst::Vector{Vec{N, Float64}}, iv::InterfaceV
     face = iv.face_values_a.current_face[]
     flipped = iv.interface_transformation.flipped[]
     shift_index = iv.interface_transformation.shift_index[]
+    lowest_node_shift_index = iv.interface_transformation.lowest_node_shift_index[]
     if N == 3
         if cell isa Tetrahedron
             θ = 2/3 * shift_index
-            rotation = SMatrix{3,3}(cospi(θ), sinpi(θ), 0.0, -sinpi(θ), cospi(θ), 0.0, 0.0, 0.0, 1.0)
+            θpre = 2/3 * lowest_node_shift_index
+            
             flipping = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0)
     
             translate_1 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2/3)/3, -0.5, 1.0) 
@@ -283,12 +285,12 @@ function transform_interface_point!(dst::Vector{Vec{N, Float64}}, iv::InterfaceV
             translate_2 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2/3)/3, 0.5, 1.0) 
             stretch_2 = SMatrix{3,3}(1/sinpi(2/3), -1/2/sinpi(2/3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0) 
     
-            M = flipped ? stretch_2 * translate_2 * flipping * rotation * translate_1 * stretch_1 : stretch_2 * translate_2 * rotation * translate_1 * stretch_1
+            M = flipped ? stretch_2 * translate_2 * rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) * translate_1 * stretch_1 : stretch_2 * translate_2 * rotation_matrix_pi(θ) * translate_1 * stretch_1
         else # cell isa Hexahedron
             θ = shift_index/2
-            rotation = SMatrix{3,3}(cospi(θ), sinpi(θ), 0.0, -sinpi(θ), cospi(θ), 0.0, 0.0, 0.0, 1.0)
+            θpre = lowest_node_shift_index/2
             flipping = SMatrix{3,3}(0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
-            M = flipped ? flipping * rotation :  rotation 
+            M = flipped ? rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) :  rotation_matrix_pi(θ) 
         end
         for (idx, point) in pairs(points)
             point = transfer_point_cell_to_face(point, cell, face)
