@@ -135,7 +135,7 @@
             cell = getcells(grid, 1)
             geom_ip_faces_indices = Ferrite.facedof_indices(ip)
             Ferrite.getdim(ip) > 1 && (geom_ip_faces_indices = Tuple([face[collect(face .∉ Ref(interior))] for (face, interior) in [(geom_ip_faces_indices[i], Ferrite.facedof_interior_indices(ip)[i]) for i in 1:nfaces(ip)]]))
-            faces_indicies = Ferrite.faces(cell |> typeof|> Ferrite.default_interpolation |> Ferrite.getrefshape)
+            faces_indicies = Ferrite.faces(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
             @test getindex.(Ref(node_ids), collect.(faces_indicies)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
         end
@@ -165,7 +165,7 @@
             cell = getcells(grid, 1)
             geom_ip_faces_indices = Ferrite.facedof_indices(ip)
             Ferrite.getdim(ip) > 1 && (geom_ip_faces_indices = Tuple([face[collect(face .∉ Ref(interior))] for (face, interior) in [(geom_ip_faces_indices[i], Ferrite.facedof_interior_indices(ip)[i]) for i in 1:nfaces(ip)]]))
-            faces_indicies = Ferrite.faces(cell |> typeof|> Ferrite.default_interpolation |> Ferrite.getrefshape)
+            faces_indicies = Ferrite.faces(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
             @test getindex.(Ref(node_ids), collect.(faces_indicies)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
         end
