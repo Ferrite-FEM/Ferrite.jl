@@ -73,13 +73,13 @@ function reinit!(iv::InterfaceValues, face_a::FaceIndex, face_b::FaceIndex, cell
     # This is the bottleneck, cache it?
     for (idx, qp) in pairs(quad_points_b)
         gradients_and_values = shape_gradients_and_values(iv.face_values_b.func_interp, qp)
-        iv.face_values_b.dNdξ[:,idx, face_b[2]] .= gradients_and_values.(temp,1)
-        iv.face_values_b.N[:, idx, face_b[2]] .= gradients_and_values.(temp,2)
+        iv.face_values_b.dNdξ[:,idx, face_b[2]] .= getindex.(gradients_and_values,1)
+        iv.face_values_b.N[:, idx, face_b[2]] .= getindex.(gradients_and_values,2)
     end
     for (idx, qp) in pairs(quad_points_b)
         gradients_and_values = shape_gradients_and_values(iv.face_values_b.geo_interp, qp)
-        iv.face_values_b.dMdξ[:,idx, face_b[2]] .= gradients_and_values.(temp,1)
-        iv.face_values_b.M[:, idx, face_b[2]] .= gradients_and_values.(temp,2)
+        iv.face_values_b.dMdξ[:,idx, face_b[2]] .= getindex.(gradients_and_values,1)
+        iv.face_values_b.M[:, idx, face_b[2]] .= getindex.(gradients_and_values,2)
     end
     reinit!(iv.face_values_b, cell_b_coords, face_b[2])
 end
