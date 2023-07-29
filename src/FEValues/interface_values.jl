@@ -266,14 +266,14 @@ end
 """
 #TODO: Docs
 """
-function transform_interface_point!(dst::Vector{Vec{N, Float64}}, iv::InterfaceValues, points::Vector{Vec{N, Float64}}, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex) where {N}
+function transform_interface_point!(dst::Vector{Vec{dim, Float64}}, iv::InterfaceValues, points::Vector{Vec{dim, Float64}}, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex) where {dim}
     cell = getcells(grid)[face_a[1]]
     face = iv.face_values_a.current_face[]
     flipped = iv.interface_transformation.flipped[]
     shift_index = iv.interface_transformation.shift_index[]
     lowest_node_shift_index = iv.interface_transformation.lowest_node_shift_index[]
-    if N == 3
-        if cell isa Tetrahedron
+    if dim == 3
+        if length(faces(cell)[face]) == 3
             θ = 2/3 * shift_index
             θpre = 2/3 * lowest_node_shift_index
             
@@ -286,7 +286,7 @@ function transform_interface_point!(dst::Vector{Vec{N, Float64}}, iv::InterfaceV
             stretch_2 = SMatrix{3,3}(1/sinpi(2/3), -1/2/sinpi(2/3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0) 
     
             M = flipped ? stretch_2 * translate_2 * rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) * translate_1 * stretch_1 : stretch_2 * translate_2 * rotation_matrix_pi(θ) * translate_1 * stretch_1
-        else # cell isa Hexahedron
+        else # length(faces(cell)[face]) == 4
             θ = shift_index/2
             θpre = lowest_node_shift_index/2
             flipping = SMatrix{3,3}(0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
@@ -300,7 +300,7 @@ function transform_interface_point!(dst::Vector{Vec{N, Float64}}, iv::InterfaceV
     else
         for (idx, point) in pairs(points)
             point = transfer_point_cell_to_face(point, cell, face)
-            N == 2 && flipped && (point *= -1) 
+            dim == 2 && flipped && (point *= -1) 
             dst[idx] = transfer_point_face_to_cell(point, getcells(grid)[face_b[1]], iv.face_values_b.current_face[])
         end
     end
