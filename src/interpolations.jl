@@ -218,6 +218,15 @@ indices of [`reference_coordinates(::Interpolation)`](@ref).
 shape_value(ip::Interpolation, ξ::Vec, i::Int)
 
 """
+    shape_values(ip::Interpolation, ξ::Vec)
+
+Evaluate the values of the interpolation's shape functions
+at a point `ξ` on the reference element. See["shape_value"](@ref)
+
+"""
+shape_values(ip::Interpolation, ξ::Vec) = SVector{getnbasefunctions(ip)}(shape_value(ip, ξ, i) for i in 1:getnbasefunctions(ip))
+
+"""
     shape_gradient(ip::Interpolation, ξ::Vec, i::Int)
 
 Evaluate the gradient of the `i`th shape function of the interpolation `ip` in
@@ -228,6 +237,15 @@ function shape_gradient(ip::Interpolation, ξ::Vec, i::Int)
 end
 
 """
+    shape_gradients(ip::Interpolation, ξ::Vec)
+
+Evaluate the gradients of the interpolation's shape functions in
+reference coordinate `ξ`. See["shape_gradient"](@ref)
+
+"""
+shape_gradients(ip::Interpolation, ξ::Vec) = SVector{getnbasefunctions(ip)}(shape_gradient(ip, ξ, i) for i in 1:getnbasefunctions(ip))
+
+"""
     shape_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
 
 Optimized version combining the evaluation [`Ferrite.shape_value(::Interpolation)`](@ref)
@@ -236,6 +254,14 @@ and [`Ferrite.shape_gradient(::Interpolation)`](@ref).
 function shape_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
     return gradient(x -> shape_value(ip, x, i), ξ, :all)
 end
+
+"""
+    shape_gradients_and_values(ip::Interpolation, ξ::Vec)
+
+Optimized version combining the evaluation [`Ferrite.shape_value(::Interpolation)`](@ref)
+and [`Ferrite.shape_gradient(::Interpolation)`](@ref) for all shape function of the interpolation. See["shape_gradient_and_value"](@ref)
+"""
+shape_gradients_and_values(ip::Interpolation, ξ::Vec) = SVector{getnbasefunctions(ip)}(shape_gradient_and_value(ip, ξ, i) for i in 1:getnbasefunctions(ip))
 
 """
     reference_coordinates(ip::Interpolation)
