@@ -973,8 +973,40 @@ end
 
 
 """
-#TODO: Docs
+    InterfaceTransformation
 
+Orientation information for 1D and 2D interfaces in 2D and 3D elements respectively. 
+This information is used to construct the transformation matrix to
+transform the quadrature points from face_a to face_b achieving synced
+spatial coordinates. Face B's orientation relative to Face A's can
+possibly flipped (i.e. the vertices indices order is reversed)
+and the vertices can be rotated against each other. 
+The reference orientation of face B is such that the first node
+has the lowest vertex index. Thus, this structure also stores the
+shift of the lowest vertex index which is used to reorient the face in
+case of flipping ["transform_interface_point!"](@ref).
+Take for example the faces
+```
+2           3
+| \\         | \\
+|  \\        |  \\
+| A \\       | B \\ 
+|    \\      |    \\
+3-----1     1-----2  
+```
+which are rotated against each other by 240° after tranfroming to an
+equilateral triangle (shift index is 2) or the faces
+```
+2           3
+| \\         | \\
+|  \\        |  \\
+| A \\       | B \\ 
+|    \\      |    \\
+1-----3     1-----2  
+```
+which are flipped against each other, note that face B has its reference node shifted by 2 indices
+so the face is tranformed into an equilateral triangle then rotated 120°, flipped about the x axis then
+rotated -120° and tranformed back to the reference triangle.Any combination of these can happen. 
 """
 struct InterfaceTransformation
     flipped::ScalarWrapper{Bool}
@@ -988,6 +1020,11 @@ function Base.copy(it::InterfaceTransformation)
     return InterfaceTransformation(copy(it.flipped), copy(it.shift_index), copy(it.lowest_node_shift_index))
 end
 
+"""
+    update!(interface_transformation::InterfaceTransformation, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex)
+
+Update the orientation info for the interface defined by face A and face B.
+"""
 function update!(interface_transformation::InterfaceTransformation, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex)
     cell_a = getcells(grid, face_a[1])
     getdim(cell_a) == 1 && return nothing # No need to transform
@@ -1009,6 +1046,12 @@ function update!(interface_transformation::InterfaceTransformation, grid::Abstra
     return nothing
 end
 
+# This looks out of place, move it to Tensors.jl or use the one defined there with higher error? *Using sinpi and cospi makes tetrahedon custom quadrature points interface values test pass
+"""
+    rotation_matrix_pi(x::Float64)
+
+Construct thr 1D 3x3 rotation matrix for θ = xπ more accurately using sinpi and cospi, especially for large x
+"""
 function rotation_matrix_pi(θ::Float64)
     return SMatrix{3,3}(cospi(θ), sinpi(θ), 0.0, -sinpi(θ), cospi(θ), 0.0, 0.0, 0.0, 1.0)
 end

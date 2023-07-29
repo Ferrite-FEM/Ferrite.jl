@@ -68,7 +68,7 @@ function reinit!(iv::InterfaceValues, face_a::FaceIndex, face_b::FaceIndex, cell
     update!(iv.interface_transformation, grid, face_a, face_b)
     quad_points_a = getpoints(iv.face_values_a.qr, face_a[2])
     quad_points_b = getpoints(iv.face_values_b.qr, face_b[2])
-    transform_interface_point!(quad_points_b, iv, quad_points_a, grid, face_a, face_b)
+    transform_interface_points!(quad_points_b, iv, quad_points_a, grid, face_a, face_b)
     @boundscheck checkface(iv.face_values_b, face_b[2])
     # This is the bottleneck, cache it?
     for idx in eachindex(IndexCartesian(), @view iv.face_values_b.N[:, :, face_b[2]])
@@ -264,9 +264,68 @@ for (func,                          f_,                 ) in (
 end
 
 """
-#TODO: Docs
+    transform_interface_points!(dst::Vector{Vec{dim, Float64}}, iv::InterfaceValues, points::Vector{Vec{dim, Float64}}, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex)
+
+Transform the points from face A to face B using the orientation information of the interface and store it in the vecotr dst.
+For 3D, the faces are transformed to regular polygons such that the rotation angle is the shift in reference node index × 2π ÷ number of edges in face.
+If the face is flipped then the flipping is about the axis that perserves the position of the first node (which is the reference node after being rotated to be in the first position,
+it's rotated back in the opposite direction after flipping).
+Take for example the interface
+```
+        2           3
+        | \\         | \\
+        |  \\        |  \\
+y       | A \\       | B \\ 
+↑       |    \\      |    \\
+→  x    1-----3     1-----2  
+```
+Transforming A to a equilateral triangle and translating it such that {0,0} is equidistant to all nodes
+```
+        3
+        +
+       / \\         
+      /   \\
+     /  x  \\                          
+    /   ↑   \\                        
+   /  ←      \\                          
+  /  y        \\                            
+2+-------------+1                     
+```
+Rotating it -270° (or 120°) such that the reference node (the node with smallest index) is at index 1
+```
+        1
+        +
+       / \\         
+      /   \\
+     /  x  \\                          
+    /   ↑   \\                        
+   /  ←      \\                          
+  /  y        \\                            
+3+-------------+2                     
+```
+Flipping about the x axis (such that the position of the reference node doesn't change) and rotating 270° (or -120°)
+```
+        2
+        +
+       / \\         
+      /   \\
+     /  x  \\                          
+    /   ↑   \\                        
+   /  ←      \\                          
+  /  y        \\                            
+3+-------------+1                     
+```
+Transforming back to the reference trianle
+```
+       3           
+       | \\
+       |  \\
+y      |   \\ 
+↑      |    \\
+→ x    1-----2  
+```
 """
-function transform_interface_point!(dst::Vector{Vec{dim, Float64}}, iv::InterfaceValues, points::Vector{Vec{dim, Float64}}, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex) where {dim}
+function transform_interface_points!(dst::Vector{Vec{dim, Float64}}, iv::InterfaceValues, points::Vector{Vec{dim, Float64}}, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex) where {dim}
     cell = getcells(grid)[face_a[1]]
     face = iv.face_values_a.current_face[]
     flipped = iv.interface_transformation.flipped[]
