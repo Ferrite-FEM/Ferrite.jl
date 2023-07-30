@@ -6,11 +6,22 @@
 reference_volume(::Interpolation{Ferrite.RefHypercube{dim}}) where {dim} = 2^dim
 reference_volume(::Interpolation{Ferrite.RefSimplex{dim}}) where {dim} = 1 / factorial(dim)
 reference_volume(::Interpolation{RefPrism}) = 1/2
+reference_volume(::Interpolation{RefPyramid}) = 1/3
 # For faces
 reference_face_area(fs::VectorizedInterpolation, f::Int) = reference_face_area(fs.ip, f)
 reference_face_area(fs::Interpolation{Ferrite.RefHypercube{dim}}, face::Int) where {dim} = 2^(dim-1)
 reference_face_area(fs::Interpolation{RefTriangle}, face::Int) = face == 1 ? sqrt(2) : 1.0
 reference_face_area(fs::Interpolation{RefTetrahedron}, face::Int) = face == 3 ? sqrt(2 * 1.5) / 2.0 : 0.5
+function reference_face_area(fs::Interpolation{RefPrism}, face::Int) 
+    face == 4 && return √2
+    face ∈ [1,5] && return 0.5
+    face ∈ [2,3] && return 1.0
+end
+function reference_face_area(fs::Interpolation{RefPyramid}, face::Int) 
+    face == 1 && return 1.0
+    face ∈ [2,3] && return 0.5
+    face ∈ [4,5] && return sqrt(2)/2
+end
 
 ######################################################
 # Coordinates and normals for the reference elements #
@@ -171,6 +182,16 @@ function calculate_volume(::Lagrange{RefHexahedron, 1}, x::Vector{Vec{3, T}}) wh
     return vol
 end
 
+function calculate_volume(::Lagrange{RefPrism, order}, x::Vector{Vec{3, T}}) where {T, order}
+    vol = norm((x[4] - x[1]) ⋅ ((x[2] - x[1]) × (x[3] - x[1]))) / 2.0 
+    return vol
+end
+
+function calculate_volume(::Lagrange{RefPyramid, order}, x::Vector{Vec{3, T}}) where {T, order}
+    vol = norm((x[5] - x[1]) ⋅ ((x[2] - x[1]) × (x[3] - x[1]))) / 3.0
+    return vol
+end
+
 function calculate_volume(::Serendipity{RefQuadrilateral, 2}, x::Vector{Vec{2, T}}) where T
     vol = norm((x[5] - x[1]) × (x[8] - x[1])) * 0.5 +
           norm((x[6] - x[2]) × (x[5] - x[2])) * 0.5 +
@@ -198,6 +219,14 @@ function calculate_face_area(ip::Serendipity{RefQuadrilateral, order}, x::Vector
 end
 function calculate_face_area(ip::Lagrange{RefTetrahedron, order}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefTriangle, order}(), x)
+end
+function calculate_face_area(p::Union{Lagrange{RefPrism, order}, DiscontinuousLagrange{RefPrism, order}}, x::Vector{<:Vec}, faceindex::Int) where order
+    faceindex ∈ [1,5] && return calculate_volume(Lagrange{RefTriangle, order}(), x)
+    return calculate_volume(Lagrange{RefQuadrilateral, order}(), x)
+end
+function calculate_face_area(p::Union{Lagrange{RefPyramid, order}, DiscontinuousLagrange{RefPyramid, order}}, x::Vector{<:Vec}, faceindex::Int) where order
+    faceindex != 1 && return calculate_volume(Lagrange{RefTriangle, order}(), x)
+    return calculate_volume(Lagrange{RefQuadrilateral, order}(), x)
 end
 
 coords_on_faces(x, ::Lagrange{RefLine, 1}) = ([x[1]], [x[2]])

@@ -209,21 +209,28 @@ end
 function FaceQuadratureRule{RefTriangle, T}(quad_type::Symbol, order::Int) where T
     qr = QuadratureRule{RefLine, T}(quad_type, order)
     # Shift interval from (-1,1) to (0,1)
-    for i in eachindex(qr.weights, qr.points)
-        qr.weights[i] /= 2
-        qr.points[i] = (qr.points[i] + Vec{1,T}((1,))) / 2
-    end
-    return create_face_quad_rule(RefTriangle, qr.weights, qr.points)
+    # for i in eachindex(qr.weights, qr.points)
+    #     qr.weights[i] /= 2
+    #     qr.points[i] = (qr.points[i] + Vec{1,T}((1,))) / 2
+    # end
+    return create_face_quad_rule(RefTriangle, qr.weights/2, qr.points)
 end
 function FaceQuadratureRule{RefTetrahedron, T}(quad_type::Symbol, order::Int) where T
     qr = QuadratureRule{RefTriangle, T}(quad_type, order)
     return create_face_quad_rule(RefTetrahedron, qr.weights, qr.points)
 end
 function FaceQuadratureRule{RefPrism, T}(quad_type::Symbol, order::Int) where T
-    # TODO: Generate 2 RefTriangle, 3 RefQuadrilateral and transform them
-    error("FaceQuadratureRule for RefPrism not implemented")
+    qr_quad = QuadratureRule{RefQuadrilateral, T}(quad_type, order)
+    qr_tri = QuadratureRule{RefTriangle, T}(quad_type, order)
+    return create_face_quad_rule(RefPrism, [2,3,4], qr_quad.weights/4, qr_quad.points,
+        [1,5], qr_tri.weights, qr_tri.points)
 end
-
+function FaceQuadratureRule{RefPyramid, T}(quad_type::Symbol, order::Int) where T
+    qr_quad = QuadratureRule{RefQuadrilateral, T}(quad_type, order)
+    qr_tri = QuadratureRule{RefTriangle, T}(quad_type, order)
+    return create_face_quad_rule(RefPyramid, [1], qr_quad.weights/4, qr_quad.points,
+        [2,3,4,5], qr_tri.weights, qr_tri.points)
+end
 
 ##################
 # Common methods #

@@ -46,6 +46,7 @@ getrefshape(::AbstractCell{refshape}) where refshape = refshape
 nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))
 nfaces(   c::AbstractCell) = length(faces(c))
+nfaces(   T::Type{<:AbstractRefShape}) = length(faces(T))
 nnodes(   c::AbstractCell) = length(get_node_ids(c))
 
 """
@@ -107,6 +108,9 @@ function faces(c::AbstractCell{RefLine})
     ns = get_node_ids(c)
     return ((ns[1],), (ns[2],)) # f1, f2
 end
+function faces(::Type{RefLine})
+    return ((1,), (2,)) # f1, f2
+end
 
 # RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
 function vertices(c::AbstractCell{RefTriangle})
@@ -119,6 +123,11 @@ function faces(c::AbstractCell{RefTriangle})
         (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # f1, f2, f3
     )
 end
+function faces(::Type{RefTriangle})
+    return (
+        (1, 2), (2, 3), (3, 1), # f1, f2, f3
+    )
+end
 
 # RefQuadrilateral (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
 function vertices(c::AbstractCell{RefQuadrilateral})
@@ -129,6 +138,11 @@ function faces(c::AbstractCell{RefQuadrilateral})
     ns = get_node_ids(c)
     return (
         (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # f1, f2, f3, f4
+    )
+end
+function faces(::Type{RefQuadrilateral})
+    return (
+        (1, 2), (2, 3), (3, 4), (4, 1), # f1, f2, f3, f4
     )
 end
 
@@ -149,6 +163,12 @@ function faces(c::AbstractCell{RefTetrahedron})
     return (
         (ns[1], ns[3], ns[2]), (ns[1], ns[2], ns[4]), # f1, f2
         (ns[2], ns[3], ns[4]), (ns[1], ns[4], ns[3]), # f3, f4
+    )
+end
+function faces(::Type{RefTetrahedron})
+    return (
+        (1, 3, 2), (1, 2, 4), # f1, f2
+        (2, 3, 4), (1, 4, 3), # f3, f4
     )
 end
 
@@ -175,6 +195,13 @@ function faces(c::AbstractCell{RefHexahedron})
         (ns[1], ns[5], ns[8], ns[4]), (ns[5], ns[6], ns[7], ns[8]), # f5, f6
     )
 end
+function faces(::Type{RefHexahedron})
+    return (
+        (1, 4, 3, 2), (1, 2, 6, 5), # f1, f2
+        (2, 3, 7, 6), (3, 4, 8, 7), # f3, f4
+        (1, 5, 8, 4), (5, 6, 7, 8), # f5, f6
+    )
+end
 
 # RefPrism (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
 function vertices(c::AbstractCell{RefPrism})
@@ -197,6 +224,13 @@ function faces(c::AbstractCell{RefPrism})
         (ns[4], ns[5], ns[6]),                                      # f5
     )
 end
+function faces(::Type{RefPrism})
+    return (
+        (1, 3, 2),        (1, 2, 5, 4), # f1, f2
+        (3, 1, 4, 6), (2, 3, 6, 5), # f3, f4
+        (4, 5, 6),                                      # f5
+    )
+end
 
 # RefPyramid (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
 function vertices(c::AbstractCell{RefPyramid})
@@ -216,6 +250,13 @@ function faces(c::AbstractCell{RefPyramid})
         (ns[1], ns[3], ns[4], ns[2]), (ns[1], ns[2], ns[5]), 
         (ns[1], ns[5], ns[3]), (ns[2], ns[4], ns[5]), 
         (ns[3], ns[5], ns[4]),                                      
+    )
+end
+function faces(::Type{RefPyramid})
+    return (
+        (1, 3, 4, 2), (1, 2, 5), 
+        (1, 5, 3), (2, 4, 5), 
+        (3, 5, 4),                                      
     )
 end
 
@@ -749,6 +790,190 @@ for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
         #For (cellid, faceidx) in faceset
         Base.in(v::Tuple{Int, Int}, s::Set{$INDEX}) = in($INDEX(v), s)
     end
+end
+
+
+"""
+    transfer_point_cell_to_face(point::AbstractVector, cell::AbstractCell{AbstractRefShape}, face::Int)
+
+Transform point on a N-D cell face to the face's reference (N-1)D coordinates.
+"""
+transfer_point_cell_to_face
+
+"""
+    transfer_point_cell_to_face(point::AbstractVector, cell::AbstractCell{AbstractRefShape}, face::Int) 
+
+Transform point from face's reference (N-1)D coordinates to ND coordinates on the cell's face.
+"""
+transfer_point_face_to_cell
+
+"""
+Mapping from 1D line to point.
+"""
+function transfer_point_cell_to_face(point::Union{Vec{1, T}, Vector{T}}, cell::Union{AbstractCell{RefLine}, Type{RefLine}}, face::Int) where T
+    x = point[]
+    face == 1 && return Vec{1, T}((-x,))
+    face == 2 && return Vec{1, T}(( x,))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
+"""
+Mapping from 2D face of a quadrilateral to 1D line.
+"""
+function transfer_point_cell_to_face(point::Union{Vec{2, T}, Vector{T}}, cell::Union{AbstractCell{RefQuadrilateral}, Type{RefQuadrilateral}}, face::Int) where T
+    x, y = point
+    face == 1 && return Vec{1, T}((x,))
+    face == 2 && return Vec{1, T}(( y,))
+    face == 3 && return Vec{1, T}(( -x,))
+    face == 4 && return Vec{1, T}(( -y,))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
+"""
+Mapping from 2D face of a triangle to 1D line.
+"""
+function transfer_point_cell_to_face(point::Union{Vec{2, T}, Vector{T}}, cell::Union{AbstractCell{RefTriangle}, Type{RefTriangle}}, face::Int) where T
+    x, y = point
+    face == 1 && return Vec{1, T}(( one(T) - x * 2,))
+    face == 2 && return Vec{1, T}(( one(T)- y * 2 ,))
+    face == 3 && return Vec{1, T}(( x * 2 - one(T),))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
+"""
+Mapping from 3D face of a tetrahedon to 2D triangle.
+"""
+function transfer_point_cell_to_face(point::Union{Vec{3, T}, Vector{T}}, cell::Union{AbstractCell{RefTetrahedron}, Type{RefTetrahedron}}, face::Int) where T
+    x, y, z = point
+    face == 1 && return Vec{2, T}(( one(T)-x-y,  y))
+    face == 2 && return Vec{2, T}(( one(T)-z-x,  x))
+    face == 3 && return Vec{2, T}(( x,  y))
+    face == 4 && return Vec{2, T}(( one(T)-y-z,  z))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
+"""
+Mapping from 3D face of a hexahedron to 2D quadrilateral.
+"""
+function transfer_point_cell_to_face(point::Union{Vec{3, T}, Vector{T}}, cell::Union{AbstractCell{RefHexahedron}, Type{RefHexahedron}}, face::Int) where T
+    x, y, z = point
+    face == 1 && return Vec{2, T}(( y, x))
+    face == 2 && return Vec{2, T}(( x, z))
+    face == 3 && return Vec{2, T}(( y,  z))
+    face == 4 && return Vec{2, T}(( -x,  z))
+    face == 5 && return Vec{2, T}(( z,  y))
+    face == 6 && return Vec{2, T}(( x,  y))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
+"""
+Mapping from 3D face of a prism to 2D.
+"""
+function transfer_point_cell_to_face(point::Union{Vec{3, T}, Vector{T}}, cell::Union{AbstractCell{RefPrism}, Type{RefPrism}}, face::Int) where T
+    x, y, z = point
+    face == 1 && return Vec{2, T}( (one(T)-x-y,     y))
+    face == 2 && return Vec{2, T}( (2*x-one(T),     2*z-one(T)))
+    face == 3 && return Vec{2, T}( ((one(T)-y)*2-one(T), 2*z-one(T)))
+    face == 4 && return Vec{2, T}( (2*y-one(T),     2*z-one(T)))
+    face == 5 && return Vec{2, T}( (one(T)-x-y,     x))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
+"""
+Mapping from 3D face of a pyramid to 2D.
+"""
+function transfer_point_cell_to_face(point::Union{Vec{3, T}, Vector{T}}, cell::Union{AbstractCell{RefPyramid}, Type{RefPyramid}}, face::Int) where T
+    x, y, z = point
+    face == 1 && return Vec{2, T}(( 2*y-one(T), 2*x-one(T)))
+    face == 2 && return Vec{2, T}(( one(T)-x-z, x))
+    face == 3 && return Vec{2, T}(( one(T)-y-z,  z))
+    face == 4 && return Vec{2, T}(( one(T)-y-z,  y))
+    face == 5 && return Vec{2, T}(( one(T)-x-z,  z))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
+"""
+Mapping from to 0D node to 1D line vertex.
+"""
+function transfer_point_face_to_cell(point::Union{Vec{N, T}, Vector{T}}, cell::Union{AbstractCell{RefLine}, Type{RefLine}}, face::Int) where {N, T}
+    face == 1 && return Vec{1, T}(( -one(T),))
+    face == 2 && return Vec{1, T}(( one(T),))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
+"""
+Mapping from 1D line to 2D face of a quadrilateral.
+"""
+function transfer_point_face_to_cell(point::Union{Vec{1, T}, Vector{T}}, cell::Union{AbstractCell{RefQuadrilateral}, Type{RefQuadrilateral}}, face::Int) where T
+    x = point[]
+    face == 1 && return Vec{2, T}(( x, -one(T)))
+    face == 2 && return Vec{2, T}(( one(T), x))
+    face == 3 && return Vec{2, T}(( -x, one(T)))
+    face == 4 && return Vec{2, T}(( -one(T), -x))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
+"""
+Mapping from 1D line to 2D face of a triangle.
+"""
+function transfer_point_face_to_cell(point::Union{Vec{1, T}, Vector{T}},  cell::Union{AbstractCell{RefTriangle}, Type{RefTriangle}}, face::Int) where T
+    x = (point[] + one(T)) / 2
+    face == 1 && return Vec{2, T}(( one(T) - x, x ))
+    face == 2 && return Vec{2, T}(( zero(T), one(T) -x))
+    face == 3 && return Vec{2, T}(( x, zero(T)))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
+"""
+Mapping from 2D triangle to 3D face of a tetrahedon.
+"""
+function transfer_point_face_to_cell(point::Union{Vec{2, T}, Vector{T}}, cell::Union{AbstractCell{RefTetrahedron}, Type{RefTetrahedron}}, face::Int) where T
+    x,y = point
+    face == 1 && return Vec{3, T}( (one(T)-x-y,   y,          zero(T)))
+    face == 2 && return Vec{3, T}( (y,         zero(T),        one(T)-x-y))
+    face == 3 && return Vec{3, T}( (x,         y,          one(T)-x-y))
+    face == 4 && return Vec{3, T}( (zero(T),       one(T)-x-y,    y))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
+"""
+Mapping from 2D quadrilateral to 3D face of a hexahedron.
+"""
+function transfer_point_face_to_cell(point::Union{Vec{2, T}, Vector{T}}, cell::Union{AbstractCell{RefHexahedron}, Type{RefHexahedron}}, face::Int) where T
+    x,y = point
+    face == 1 && return Vec{3, T}(( y,  x, -one(T)))
+    face == 2 && return Vec{3, T}(( x, -one(T),  y))
+    face == 3 && return Vec{3, T}(( one(T),  x,  y))
+    face == 4 && return Vec{3, T}(( -x,  one(T),  y))
+    face == 5 && return Vec{3, T}((-one(T),  y,  x))
+    face == 6 && return Vec{3, T}(( x,  y,  one(T)))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
+"""
+Mapping from 2D quadrilateral/triangle to 3D face of a wedge.
+"""
+function transfer_point_face_to_cell(point::Union{Vec{2, T}, Vector{T}}, cell::Union{AbstractCell{RefPrism}, Type{RefPrism}}, face::Int) where T
+    # Note that for quadrilaterals the domain is [-1, 1]² but for triangles it is [0, 1]²
+    x,y = point
+    face == 1 && return Vec{3, T}((    one(T)-x-y,         y,                zero(T)))
+    face == 2 && return Vec{3, T}((  (one(T)+x)/2,         zero(T),      (one(T)+y)/2))
+    face == 3 && return Vec{3, T}((  zero(T),    one(T)-(one(T)+x)/2,    (one(T)+y)/2))
+    face == 4 && return Vec{3, T}((one(T)-(one(T)+x)/2,   (one(T)+x)/2, (one(T)+y)/2))
+    face == 5 && return Vec{3, T}((        y,        one(T)-x-y,                one(T)))
+end
+
+"""
+Mapping from 2D face to 3D face of a pyramid.
+"""
+function transfer_point_face_to_cell(point::Union{Vec{2, T}, Vector{T}}, cell::Union{AbstractCell{RefPyramid}, Type{RefPyramid}}, face::Int) where T
+    x,y = point
+    face == 1 && return Vec{3, T}(( (y+one(T))/2,   (x+one(T))/2,    zero(T)))
+    face == 2 && return Vec{3, T}(( y,         zero(T),          one(T)-x-y))
+    face == 3 && return Vec{3, T}(( zero(T),       one(T)-x-y,             y))
+    face == 4 && return Vec{3, T}(( x+y,       y,                 one(T)-x-y))
+    face == 5 && return Vec{3, T}(( one(T)-x-y,     one(T)-y,              y))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 #################################

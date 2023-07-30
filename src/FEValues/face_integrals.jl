@@ -2,19 +2,35 @@ function weighted_normal(J::AbstractTensor, fv::FaceValues, face::Int)
     return weighted_normal(J, getrefshape(fv.func_interp), face)
 end
 
+function create_face_quad_rule(cell_T::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, T}}) where {N, T, RefShape <: AbstractRefShape}
+    n_points = length(w)
+    face_quad_rule = QuadratureRule{RefShape, T, getdim(AbstractCell{cell_T})}[]
+    for face in 1:nfaces(cell_T)
+        new_points = [transfer_point_face_to_cell(N != 0 ? p[i] : T[], cell_T, face) for i in 1:n_points] # ξ = 1-t-s, η = s, ζ = 0
+        push!(face_quad_rule, QuadratureRule{RefShape, T}(w, new_points))    
+    end
+    return FaceQuadratureRule(face_quad_rule)
+end
+
+# For cells with mixed faces
+function create_face_quad_rule(cell_T::Type{RefShape}, quad_faces::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}}, tri_faces::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}) where {N, T, RefShape <: AbstractRefShape}
+    n_points_quad = length(w_quad)
+    n_points_tri = length(w_tri)
+    face_quad_rule = Array{QuadratureRule{RefShape, T, getdim(AbstractCell{cell_T})}}(undef, nfaces(cell_T))
+    for face in quad_faces
+        new_points = [transfer_point_face_to_cell(N != 0 ? p_quad[i] : T[], cell_T, face) for i in 1:n_points_quad]
+        face_quad_rule[face] = QuadratureRule{RefShape, T}(w_quad, new_points)
+    end
+    for face in tri_faces
+        new_points = [transfer_point_face_to_cell(N != 0 ? p_tri[i] : T[], cell_T, face) for i in 1:n_points_tri]
+        face_quad_rule[face] = QuadratureRule{RefShape, T}(w_tri, new_points)
+    end
+    return FaceQuadratureRule(face_quad_rule)
+end
+
 ##################
 # All 1D RefLine #
 ##################
-function create_face_quad_rule(::Type{RefLine}, w::Vector{T}, ::Vector{Vec{0, T}}) where {T}
-    face_quad_rule = QuadratureRule{RefLine, T, 1}[]
-    # Face 1
-    new_points = [Vec{1,T}((-one(T),))] # ξ = -1
-    push!(face_quad_rule, QuadratureRule{RefLine, T}(w, new_points))
-    # Face 2
-    new_points = [Vec{1,T}((one(T),))] # ξ = 1
-    push!(face_quad_rule, QuadratureRule{RefLine, T}(w, new_points))
-    return FaceQuadratureRule(face_quad_rule)
-end
 
 function weighted_normal(::Tensor{2,1,T}, ::Type{RefLine}, face::Int) where {T}
     face == 1 && return Vec{1,T}((-one(T),))
@@ -25,23 +41,6 @@ end
 ###########################
 # All 2D RefQuadrilateral #
 ###########################
-function create_face_quad_rule(::Type{RefQuadrilateral}, w::Vector{T}, p::Vector{Vec{1, T}}) where {T}
-    n_points = length(w)
-    face_quad_rule = QuadratureRule{RefQuadrilateral, T, 2}[]
-    # Face 1
-    new_points = [Vec{2,T}((p[i][1], -one(T))) for i in 1:n_points] # ξ = t, η = -1
-    push!(face_quad_rule, QuadratureRule{RefQuadrilateral, T}(w, new_points))
-    # Face 2
-    new_points = [Vec{2,T}((one(T), p[i][1])) for i in 1:n_points] # ξ = 1, η = t
-    push!(face_quad_rule, QuadratureRule{RefQuadrilateral, T}(w, new_points))
-    # Face 3
-    new_points = [Vec{2,T}((p[i][1], one(T))) for i in 1:n_points] # ξ = t, η = 1
-    push!(face_quad_rule, QuadratureRule{RefQuadrilateral, T}(w, new_points))
-    # Face 4
-    new_points = [Vec{2,T}((-one(T), p[i][1])) for i in 1:n_points] # ξ = -1, η = t
-    push!(face_quad_rule, QuadratureRule{RefQuadrilateral, T}(w, new_points))
-    return FaceQuadratureRule(face_quad_rule)
-end
 
 function weighted_normal(J::Tensor{2,2}, ::Type{RefQuadrilateral}, face::Int)
     @inbounds begin
@@ -56,20 +55,6 @@ end
 ######################
 # All RefTriangle 2D #
 ######################
-function create_face_quad_rule(::Type{RefTriangle}, w::Vector{T}, p::Vector{Vec{1, T}}) where {T}
-    n_points = length(w)
-    face_quad_rule = QuadratureRule{RefTriangle, T, 2}[]
-    # Face 1
-    new_points = [Vec{2,T}((p[i][1], one(T)-p[i][1])) for i in 1:n_points] # ξ = t, η = 1-t
-    push!(face_quad_rule, QuadratureRule{RefTriangle, T}(w, new_points))
-    # Face 2
-    new_points = [Vec{2,T}((zero(T), p[i][1])) for i in 1:n_points] # ξ = 0, η = t
-    push!(face_quad_rule, QuadratureRule{RefTriangle, T}(w, new_points))
-    # Face 3
-    new_points = [Vec{2,T}((p[i][1], zero(T))) for i in 1:n_points] # ξ = t, η = 0
-    push!(face_quad_rule, QuadratureRule{RefTriangle, T}(w, new_points))
-    return FaceQuadratureRule(face_quad_rule)
-end
 
 function weighted_normal(J::Tensor{2,2}, ::Type{RefTriangle}, face::Int)
     @inbounds begin
@@ -83,29 +68,6 @@ end
 ########################
 # All RefHexahedron 3D #
 ########################
-function create_face_quad_rule(::Type{RefHexahedron}, w::Vector{T}, p::Vector{Vec{2, T}}) where {T}
-    n_points = length(w)
-    face_quad_rule = QuadratureRule{RefHexahedron, T, 3}[]
-    # Face 1
-    new_points = [Vec{3,T}((p[i][1], p[i][2], -one(T))) for i in 1:n_points] # ξ = t, η = s, ζ = -1
-    push!(face_quad_rule, QuadratureRule{RefHexahedron, T}(w, new_points))
-    # Face 2
-    new_points = [Vec{3,T}((p[i][1], -one(T), p[i][2])) for i in 1:n_points] # ξ = t, η = -1, ζ = s
-    push!(face_quad_rule, QuadratureRule{RefHexahedron, T}(w, new_points))
-    # Face 3
-    new_points = [Vec{3,T}((one(T), p[i][1], p[i][2])) for i in 1:n_points] # ξ = 1, η = t, ζ = s
-    push!(face_quad_rule, QuadratureRule{RefHexahedron, T}(w, new_points))
-    # Face 4
-    new_points = [Vec{3,T}((p[i][1], one(T), p[i][2])) for i in 1:n_points] # ξ = t, η = 1, ζ = s
-    push!(face_quad_rule, QuadratureRule{RefHexahedron, T}(w, new_points))
-    # Face 5
-    new_points = [Vec{3,T}((-one(T), p[i][1], p[i][2])) for i in 1:n_points] # ξ = -1, η = t, ζ = s
-    push!(face_quad_rule, QuadratureRule{RefHexahedron, T}(w, new_points))
-    # Face 6
-    new_points = [Vec{3,T}((p[i][1], p[i][2], one(T))) for i in 1:n_points] # ξ = t, η = s, ζ = 1
-    push!(face_quad_rule, QuadratureRule{RefHexahedron, T}(w, new_points))
-    return FaceQuadratureRule(face_quad_rule)
-end
 
 function weighted_normal(J::Tensor{2,3}, ::Type{RefHexahedron}, face::Int)
     @inbounds begin
@@ -122,23 +84,6 @@ end
 #########################
 # All RefTetrahedron 3D #
 #########################
-function create_face_quad_rule(::Type{RefTetrahedron}, w::Vector{T}, p::Vector{Vec{2, T}}) where {T}
-    n_points = length(w)
-    face_quad_rule = QuadratureRule{RefTetrahedron, T, 3}[]
-    # Face 1
-    new_points = [Vec{3,T}((p[i][1], p[i][2], zero(T))) for i in 1:n_points] # ξ = t, η = s, ζ = 0
-    push!(face_quad_rule, QuadratureRule{RefTetrahedron, T}(w, new_points))
-    # Face 2
-    new_points = [Vec{3,T}((p[i][1], zero(T), p[i][2])) for i in 1:n_points] # ξ = t, η = 0, ζ = s
-    push!(face_quad_rule, QuadratureRule{RefTetrahedron, T}(w, new_points))
-    # Face 3
-    new_points = [Vec{3,T}((p[i][1], p[i][2], one(T)-p[i][1]-p[i][2])) for i in 1:n_points] # ξ = t, η = s, ζ = 1-t-s
-    push!(face_quad_rule, QuadratureRule{RefTetrahedron, T}(w, new_points))
-    # Face 4
-    new_points = [Vec{3,T}((zero(T), p[i][1], p[i][2])) for i in 1:n_points] # ξ = 0, η = t, ζ = s
-    push!(face_quad_rule, QuadratureRule{RefTetrahedron, T}(w, new_points))
-    return FaceQuadratureRule(face_quad_rule)
-end
 
 function weighted_normal(J::Tensor{2,3}, ::Type{RefTetrahedron}, face::Int)
     @inbounds begin
@@ -149,3 +94,34 @@ function weighted_normal(J::Tensor{2,3}, ::Type{RefTetrahedron}, face::Int)
     end
     throw(ArgumentError("unknown face number: $face"))
 end
+
+###################
+# All RefPrism 3D #
+###################
+
+function weighted_normal(J::Tensor{2,3}, ::Type{RefPrism}, face::Int)
+    @inbounds begin
+        face == 1 && return J[:,2] × J[:,1]
+        face == 2 && return J[:,1] × J[:,3]
+        face == 3 && return J[:,3] × J[:,2]
+        face == 4 && return (J[:,2]-J[:,1]) × J[:,3]
+        face == 5 && return J[:,1] × J[:,2]
+    end
+    throw(ArgumentError("unknown face number: $face"))
+end
+
+#####################
+# All RefPyramid 3D #
+#####################
+
+function weighted_normal(J::Tensor{2,3}, ::Type{RefPyramid}, face::Int)
+    @inbounds begin
+        face == 1 && return J[:,2] × J[:,1]
+        face == 2 && return J[:,1] × J[:,3]
+        face == 3 && return J[:,3] × J[:,2]
+        face == 4 && return J[:,2] × (J[:,3]-J[:,1])
+        face == 5 && return (J[:,3]-J[:,2]) × J[:,1]
+    end
+    throw(ArgumentError("unknown face number: $face"))
+end
+
