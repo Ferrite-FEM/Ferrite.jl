@@ -504,7 +504,7 @@ function reference_coordinates(::Lagrange{RefLine,1})
 end
 
 # Mapping from 1D line to point.
-function transfer_point_cell_to_face(point::Union{Vec{1, T}, Vector{T}}, cell::Type{RefLine}, face::Int) where T
+function transfer_point_cell_to_face(point::Vec{1, T}, cell::Type{RefLine}, face::Int) where T
     x = point[]
     face == 1 && return Vec{1, T}((-x,))
     face == 2 && return Vec{1, T}(( x,))
