@@ -93,18 +93,18 @@ for (scalar_interpol, quad_rule) in (
 
         end
 
-    #     # test copy
-    #     fvc = copy(fv)
-    #     @test typeof(fv) == typeof(fvc)
-    #     for fname in fieldnames(typeof(fv))
-    #         v = getfield(fv, fname)
-    #         v isa Ferrite.ScalarWrapper && continue
-    #         vc = getfield(fvc, fname)
-    #         if hasmethod(pointer, Tuple{typeof(v)})
-    #             @test pointer(v) != pointer(vc)
-    #         end
-    #         @test v == vc
-    #     end
+        # test copy
+        fvc = copy(fv)
+        @test typeof(fv) == typeof(fvc)
+        for fname in fieldnames(typeof(fv))
+            v = getfield(fv, fname)
+            v isa Ferrite.ScalarWrapper && continue
+            vc = getfield(fvc, fname)
+            if hasmethod(pointer, Tuple{typeof(v)})
+                @test pointer(v) != pointer(vc)
+            end
+            @test v == vc
+        end
     end
 end
 
