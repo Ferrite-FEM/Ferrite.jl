@@ -589,13 +589,43 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             push!(cells,celltype(ntuple(i->cellnodes[node_map[i]],length(cellnodes))))
         end
     end
-    #Grid(cells,transform_pointBWG(forest,nodes) .|> Node, cellsets=forest.cellsets, nodesets=forest.nodesets, facesets=forest.facesets, edgesets=forest.edgesets, vertexsets=forest.vertexsets)
-    grid = Grid(cells,transform_pointBWG(forest,nodes) .|> Node)
-    addfaceset!(grid,"top", x->x[2] == 1)
-    addfaceset!(grid,"bottom", x->x[2] == -1)
-    addfaceset!(grid,"left", x->x[1] == -1)
-    addfaceset!(grid,"right", x->x[1] == 1)
+    facesets = reconstruct_facesets(forest) #TODO edge, node and cellsets
+    grid = Grid(cells,transform_pointBWG(forest,nodes) .|> Node, facesets=facesets)
     return grid
+end
+
+function reconstruct_facesets(forest::ForestBWG{dim}) where dim
+    new_facesets = typeof(forest.facesets)()
+    for (facesetname, faceset) in forest.facesets
+        new_faceset = typeof(faceset)()
+        for faceidx in faceset
+            pivot_tree = forest.cells[faceidx[1]]
+            last_cellid = faceidx[1] != 1 ? sum(length,@view(forest.cells[1:(faceidx[1]-1)])) : 0
+            pivot_faceid = faceidx[2]
+            pivot_face = faces(root(dim),pivot_tree.b)[𝒱₂_perm_inv[pivot_faceid]]
+            for (leaf_idx,leaf) in enumerate(pivot_tree.leaves)
+                for (leaf_face_idx,leaf_face) in enumerate(faces(leaf,pivot_tree.b))
+                    if contains_face(pivot_face,leaf_face)
+                        ferrite_leaf_face_idx = 𝒱₂_perm[leaf_face_idx]
+                        push!(new_faceset,FaceIndex(last_cellid+leaf_idx,ferrite_leaf_face_idx))
+                    end
+                end
+            end
+        end
+       new_facesets[facesetname] = new_faceset
+    end
+    return new_facesets
+end
+
+# TODO verify and generalize
+function contains_face(mface::Tuple{Tuple{T,T},Tuple{T,T}},sface::Tuple{Tuple{T,T},Tuple{T,T}}) where T
+    if mface[1][1] == sface[1][1] && mface[2][1] == sface[2][1] # vertical
+        return mface[1][2] ≤ sface[1][2] ≤ sface[2][2] ≤ mface[2][2]
+    elseif mface[1][2] == sface[1][2] && mface[2][2] == sface[2][2] # horizontal
+        return mface[1][1] ≤ sface[1][1] ≤ sface[2][1] ≤ mface[2][1]
+    else
+        return false
+    end
 end
 
 #TODO unfinished, isreplaced logic fails
