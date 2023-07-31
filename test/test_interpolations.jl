@@ -50,7 +50,7 @@
         # Test both center point and random points on the face
         ref_coord = Ferrite.reference_coordinates(Lagrange{ref_shape, 1}())
         for face in 1:nfaces(interpolation)
-            face_nodes = Ferrite.faces(ref_shape)[face]
+            face_nodes = Ferrite.reference_faces(ref_shape)[face]
             center_coord = [0.0 for _ in 1:ref_dim]
             rand_coord = [0.0 for _ in 1:ref_dim]
             rand_weights = rand(length(face_nodes))
