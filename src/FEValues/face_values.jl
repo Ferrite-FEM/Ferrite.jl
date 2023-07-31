@@ -61,14 +61,14 @@ function FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(qr:
 
     # Field interpolation
     n_func_basefuncs = getnbasefunctions(ip)
-    N    = fill(zero(N_t)    * T(NaN), n_func_basefuncs, max_n_qpoints, n_faces)
-    dNdx = fill(zero(dNdx_t) * T(NaN), n_func_basefuncs, max_n_qpoints, n_faces)
-    dNdξ = fill(zero(dNdξ_t) * T(NaN), n_func_basefuncs, max_n_qpoints, n_faces)
+    N    = fill(zero(N_t)   , n_func_basefuncs, max_n_qpoints, n_faces)
+    dNdx = fill(zero(dNdx_t), n_func_basefuncs, max_n_qpoints, n_faces)
+    dNdξ = fill(zero(dNdξ_t), n_func_basefuncs, max_n_qpoints, n_faces)
 
     # Geometry interpolation
     n_geom_basefuncs = getnbasefunctions(gip)
-    M    = fill(zero(T)      * T(NaN), n_geom_basefuncs, max_n_qpoints, n_faces)
-    dMdξ = fill(zero(dMdξ_t) * T(NaN), n_geom_basefuncs, max_n_qpoints, n_faces)
+    M    = fill(zero(T)     , n_geom_basefuncs, max_n_qpoints, n_faces)
+    dMdξ = fill(zero(dMdξ_t), n_geom_basefuncs, max_n_qpoints, n_faces)
 
     for face in 1:n_faces, (qp, ξ) in pairs(getpoints(qr, face))
         for basefunc in 1:n_func_basefuncs
@@ -79,7 +79,7 @@ function FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(qr:
         end
     end
 
-    detJdV = fill(T(NaN), max_n_qpoints, n_faces)
+    detJdV = fill(zero(T), max_n_qpoints, n_faces)
 
     FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, qr, ScalarWrapper(0), ip, gip)
 end
