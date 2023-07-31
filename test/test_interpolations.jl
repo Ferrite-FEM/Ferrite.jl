@@ -46,7 +46,18 @@
 
         # Note that not every element formulation exists for every order and dimension.
         applicable(Ferrite.getlowerorder, interpolation) && @test typeof(Ferrite.getlowerorder(interpolation)) <: Interpolation{ref_shape,func_order-1}
-
+    @testset "transform face points" begin
+        ref_coord = Ferrite.reference_coordinates(Lagrange{ref_shape, 1}())
+        for face in 1:nfaces(interpolation)
+            face_nodes = Ferrite.faces(ref_shape)[face]
+            for node in face_nodes
+                coord = ref_coord[node]
+                cell_to_face = Ferrite.transfer_point_cell_to_face(coord, ref_shape, face)
+                face_to_cell = Ferrite.transfer_point_face_to_cell(cell_to_face, ref_shape, face)
+                @test coord ≈ face_to_cell
+            end
+        end
+    end
     # Check partition of unity at random point.
     n_basefuncs = getnbasefunctions(interpolation)
     x = rand(Tensor{1, ref_dim})
