@@ -66,6 +66,15 @@ function reference_normals(::Lagrange{RefPrism})
             Vec{3, Float64}(( 0.0,  0.0,  1.0))]
 end
 
+# Lagrange{3, RefPyramid}
+function reference_normals(::Lagrange{RefPyramid})
+    return [Vec{3, Float64}(( 0.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0, -1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  0.0,  0.0)),
+            Vec{3, Float64}((1/√2, 0.0,  1/√2)),
+            Vec{3, Float64}((0.0, 1/√2,  1/√2)),]
+end
+
 # Serendipity{2, RefQuadrilateral}
 reference_normals(::Serendipity{RefQuadrilateral, 2}) = reference_normals(Lagrange{RefQuadrilateral, 1}())
 

@@ -1,6 +1,7 @@
 include("gaussquad_tri_table.jl")
 include("gaussquad_tet_table.jl")
 include("gaussquad_prism_table.jl")
+include("gaussquad_pyramid_table.jl")
 include("generate_quadrature.jl")
 
 import Base.Cartesian: @nloops, @nref, @ntuple, @nexprs
@@ -62,7 +63,7 @@ function QuadratureRule{shape}(order::Int) where {shape <: AbstractRefShape}
     return QuadratureRule{shape, Float64}(order)
 end
 function QuadratureRule{shape, T}(order::Int) where {shape <: AbstractRefShape, T}
-    quad_type = shape === RefPrism ? (:polyquad) : (:legendre)
+    quad_type = (shape === RefPrism || shape === RefPyramid) ? (:polyquad) : (:legendre)
     return QuadratureRule{shape, T}(quad_type, order)
 end
 function QuadratureRule{shape}(quad_type::Symbol, order::Int) where {shape <: AbstractRefShape}
@@ -134,6 +135,23 @@ function QuadratureRule{RefPrism, T}(quad_type::Symbol, order::Int) where T
     end
     weights = data[:, 4]
     QuadratureRule{RefPrism,T}(weights, points)
+end
+
+# Grab pyramid quadrature rule from table
+function QuadratureRule{RefPyramid, T}(quad_type::Symbol, order::Int) where T
+    if quad_type == :polyquad
+        data = _get_gauss_pyramiddata_polyquad(order)
+    else
+        throw(ArgumentError("unsupported quadrature rule"))
+    end
+    n_points = size(data,1)
+    points = Vector{Vec{3,T}}(undef, n_points)
+
+    for p in 1:size(data, 1)
+        points[p] = Vec{3,T}(@ntuple 3 i -> data[p, i])
+    end
+    weights = data[:, 4]
+    QuadratureRule{RefPyramid,T}(weights, points)
 end
 
 ######################

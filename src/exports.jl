@@ -10,6 +10,7 @@ export
     RefTriangle,
     RefTetrahedron,
     RefPrism,
+    RefPyramid,
     BubbleEnrichedLagrange,
     CrouzeixRaviart,
     Lagrange,
@@ -58,6 +59,7 @@ export
     QuadraticHexahedron,
     SerendipityQuadraticHexahedron,
     Wedge,
+    Pyramid,
     CellIndex,
     FaceIndex,
     EdgeIndex,
@@ -142,8 +144,11 @@ export
     CellIterator,
     FaceCache,
     FaceIterator,
+    InterfaceCache,
+    InterfaceIterator,
     UpdateFlags,
     cellid,
+    interfacedofs,
 
 # assembly
     start_assemble,

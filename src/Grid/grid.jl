@@ -198,6 +198,26 @@ function faces(c::AbstractCell{RefPrism})
     )
 end
 
+# RefPyramid (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
+function vertices(c::AbstractCell{RefPyramid})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2], ns[3], ns[4], ns[5],) # v1, ..., v5
+end
+function edges(c::AbstractCell{RefPyramid})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2]), (ns[1], ns[3]), (ns[1], ns[5]), (ns[2], ns[4]), 
+        (ns[2], ns[5]), (ns[4], ns[3]), (ns[3], ns[5]), (ns[4], ns[5]), 
+    )
+end
+function faces(c::AbstractCell{RefPyramid})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[3], ns[4], ns[2]), (ns[1], ns[2], ns[5]), 
+        (ns[1], ns[5], ns[3]), (ns[2], ns[4], ns[5]), 
+        (ns[3], ns[5], ns[4]),                                      
+    )
+end
 
 ######################################################
 # Concrete implementations of AbstractCell interface #
@@ -215,6 +235,7 @@ struct QuadraticTetrahedron   <: AbstractCell{RefTetrahedron}   nodes::NTuple{10
 struct Hexahedron             <: AbstractCell{RefHexahedron}    nodes::NTuple{ 8, Int} end
 struct QuadraticHexahedron    <: AbstractCell{RefHexahedron}    nodes::NTuple{27, Int} end
 struct Wedge                  <: AbstractCell{RefPrism}         nodes::NTuple{ 6, Int} end
+struct Pyramid                <: AbstractCell{RefPyramid}       nodes::NTuple{ 5, Int} end
 
 default_interpolation(::Type{Line})                   = Lagrange{RefLine,          1}()
 default_interpolation(::Type{QuadraticLine})          = Lagrange{RefLine,          2}()
@@ -227,6 +248,7 @@ default_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{RefTetrahedron,
 default_interpolation(::Type{Hexahedron})             = Lagrange{RefHexahedron,    1}()
 default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron,    2}()
 default_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
+default_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,       1}()
 
 # TODO: Remove this, used for Quadrilateral3D
 edges(c::Quadrilateral#=3D=#) = faces(c)
@@ -262,7 +284,7 @@ abstract type AbstractGrid{dim} end
 
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 There are multiple helper structures to apply boundary conditions or define subdomains. They are gathered in the `cellsets`, `nodesets`,
-`facesets`, `edgesets` and `vertexsets`. 
+`facesets`, `edgesets` and `vertexsets`.
 
 # Fields
 - `cells::Vector{C}`: stores all cells of the grid
@@ -270,7 +292,7 @@ There are multiple helper structures to apply boundary conditions or define subd
 - `cellsets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of cell ids
 - `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
 - `facesets::Dict{String,Set{FaceIndex}}`: maps a `String` to a `Set` of `Set{FaceIndex} (global_cell_id, local_face_id)`
-- `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id` 
+- `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id`
 - `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
 - `boundary_matrix::SparseMatrixCSC{Bool,Int}`: optional, only needed by `onboundary` to check if a cell is on the boundary, see, e.g. Helmholtz example
 """
@@ -280,9 +302,9 @@ mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     # Sets
     cellsets::Dict{String,Set{Int}}
     nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{FaceIndex}} 
-    edgesets::Dict{String,Set{EdgeIndex}} 
-    vertexsets::Dict{String,Set{VertexIndex}} 
+    facesets::Dict{String,Set{FaceIndex}}
+    edgesets::Dict{String,Set{EdgeIndex}}
+    vertexsets::Dict{String,Set{VertexIndex}}
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool,Int}
 end
@@ -318,8 +340,8 @@ toglobal(grid::AbstractGrid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((
 
 @inline getdim(::AbstractGrid{dim}) where {dim} = dim
 """
-    getcells(grid::AbstractGrid) 
-    getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}} 
+    getcells(grid::AbstractGrid)
+    getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}}
     getcells(grid::AbstractGrid, setname::String)
 
 Returns either all `cells::Collection{C<:AbstractCell}` of a `<:AbstractGrid` or a subset based on an `Int`, `Vector{Int}` or `String`.
@@ -335,7 +357,7 @@ Whereas the last option tries to call a `cellset` of the `grid`. `Collection` ca
 @inline getcelltype(grid::AbstractGrid, i::Int) = typeof(grid.cells[i])
 
 """
-    getnodes(grid::AbstractGrid) 
+    getnodes(grid::AbstractGrid)
     getnodes(grid::AbstractGrid, v::Union{Int,Vector{Int}}
     getnodes(grid::AbstractGrid, setname::String)
 
