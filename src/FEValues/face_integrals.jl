@@ -6,7 +6,7 @@ function create_face_quad_rule(cell_T::Type{RefShape}, w::Vector{T}, p::Vector{V
     n_points = length(w)
     face_quad_rule = QuadratureRule{RefShape, T, getdim(AbstractCell{cell_T})}[]
     for face in 1:nfaces(cell_T)
-        new_points = [transfer_point_face_to_cell(N != 0 ? p[i] : T[], cell_T, face) for i in 1:n_points] # ξ = 1-t-s, η = s, ζ = 0
+        new_points = [transfer_point_face_to_cell(N != 0 ? p[i] : Vec(zero(T)), cell_T, face) for i in 1:n_points] # ξ = 1-t-s, η = s, ζ = 0
         push!(face_quad_rule, QuadratureRule{RefShape, T}(w, new_points))    
     end
     return FaceQuadratureRule(face_quad_rule)
@@ -18,7 +18,7 @@ function create_face_quad_rule(cell_T::Type{RefShape}, quad_faces::Vector{Int}, 
     n_points_tri = length(w_tri)
     face_quad_rule = Array{QuadratureRule{RefShape, T, getdim(AbstractCell{cell_T})}}(undef, nfaces(cell_T))
     for face in quad_faces
-        new_points = [transfer_point_face_to_cell(N != 0 ? p_quad[i] : T[], cell_T, face) for i in 1:n_points_quad]
+        new_points = [transfer_point_face_to_cell(N != 0 ? p_quad[i] : Vec(zero(T)), cell_T, face) for i in 1:n_points_quad]
         face_quad_rule[face] = QuadratureRule{RefShape, T}(w_quad, new_points)
     end
     for face in tri_faces
