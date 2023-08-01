@@ -251,13 +251,6 @@ and indices corresponding to the indices of a dof in [`vertices`](@ref), [`faces
 reference_coordinates(::Interpolation)
 
 """
-    transfer_point_cell_to_face(point::Vec{N, T}, ref_shape::Type{<:AbstractRefShape}, face::Int)
-
-Transform point on a N-D cell face to the face's reference (N-1)D coordinates.
-"""
-transfer_point_cell_to_face
-
-"""
     transfer_point_face_to_cell(point::Vec{N, T}, ref_shape::Type{<:AbstractRefShape}, face::Int) 
 
 Transform point from face's reference (N-1)D coordinates to ND coordinates on the cell's face.
@@ -503,14 +496,6 @@ function reference_coordinates(::Lagrange{RefLine,1})
             Vec{1, Float64}(( 1.0,))]
 end
 
-# Mapping from 1D line to point.
-function transfer_point_cell_to_face(point::Vec{1, T}, cell::Type{RefLine}, face::Int) where T
-    x = point[]
-    face == 1 && return Vec{1, T}((-x,))
-    face == 2 && return Vec{1, T}(( x,))
-    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
-end
-
 # Mapping from to 0D node to 1D line vertex.
 function transfer_point_face_to_cell(point::Vec{N, T}, cell::Type{RefLine}, face::Int) where {N, T}
     face == 1 && return Vec{1, T}(( -one(T),))
@@ -559,16 +544,6 @@ function reference_coordinates(::Lagrange{RefQuadrilateral,1})
             Vec{2, Float64}(( 1.0, -1.0)),
             Vec{2, Float64}(( 1.0,  1.0,)),
             Vec{2, Float64}((-1.0,  1.0,))]
-end
-
-# Mapping from 2D face of a quadrilateral to 1D line.
-function transfer_point_cell_to_face(point::Vec{2, T}, cell::Type{RefQuadrilateral}, face::Int) where T
-    x, y = point
-    face == 1 && return Vec{1, T}((  x,))
-    face == 2 && return Vec{1, T}((  y,))
-    face == 3 && return Vec{1, T}(( -x,))
-    face == 4 && return Vec{1, T}(( -y,))
-    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 # Mapping from 1D line to 2D face of a quadrilateral.
@@ -690,15 +665,6 @@ function reference_coordinates(::Lagrange{RefTriangle,1})
     return [Vec{2, Float64}((1.0, 0.0)),
             Vec{2, Float64}((0.0, 1.0)),
             Vec{2, Float64}((0.0, 0.0))]
-end
-
-# Mapping from 2D face of a triangle to 1D line.
-function transfer_point_cell_to_face(point::Vec{2, T}, cell::Type{RefTriangle}, face::Int) where T
-    x, y = point
-    face == 1 && return Vec{1, T}(( one(T) - x * 2,))
-    face == 2 && return Vec{1, T}(( one(T)- y * 2 ,))
-    face == 3 && return Vec{1, T}(( x * 2 - one(T),))
-    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 # Mapping from 1D line to 2D face of a triangle.
@@ -859,16 +825,6 @@ function reference_coordinates(::Lagrange{RefTetrahedron,1})
             Vec{3, Float64}((0.0, 0.0, 1.0))]
 end
 
-# Mapping from 3D face of a tetrahedon to 2D triangle.
-function transfer_point_cell_to_face(point::Vec{3, T}, cell::Type{RefTetrahedron}, face::Int) where T
-    x, y, z = point
-    face == 1 && return Vec{2, T}(( one(T)-x-y,  y))
-    face == 2 && return Vec{2, T}(( one(T)-z-x,  x))
-    face == 3 && return Vec{2, T}(( x,           y))
-    face == 4 && return Vec{2, T}(( one(T)-y-z,  z))
-    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
-end
-
 # Mapping from 2D triangle to 3D face of a tetrahedon.
 function transfer_point_face_to_cell(point::Vec{2, T}, cell::Type{RefTetrahedron}, face::Int) where T
     x,y = point
@@ -948,18 +904,6 @@ function reference_coordinates(::Lagrange{RefHexahedron,1})
             Vec{3, Float64}(( 1.0, -1.0,  1.0)),
             Vec{3, Float64}(( 1.0,  1.0,  1.0)),
             Vec{3, Float64}((-1.0,  1.0,  1.0))]
-end
-
-# Mapping from 3D face of a hexahedron to 2D quadrilateral.
-function transfer_point_cell_to_face(point::Vec{3, T}, cell::Type{RefHexahedron}, face::Int) where T
-    x, y, z = point
-    face == 1 && return Vec{2, T}(( y,  x))
-    face == 2 && return Vec{2, T}(( x,  z))
-    face == 3 && return Vec{2, T}(( y,  z))
-    face == 4 && return Vec{2, T}((-x,  z))
-    face == 5 && return Vec{2, T}(( z,  y))
-    face == 6 && return Vec{2, T}(( x,  y))
-    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 # Mapping from 2D quadrilateral to 3D face of a hexahedron.
@@ -1121,17 +1065,6 @@ function reference_coordinates(::Lagrange{RefPrism,1})
             Vec{3, Float64}((0.0, 1.0, 1.0))]
 end
 
-# Mapping from 3D face of a prism to 2D.
-function transfer_point_cell_to_face(point::Vec{3, T}, cell::Type{RefPrism}, face::Int) where T
-    x, y, z = point
-    face == 1 && return Vec{2, T}( (one(T)-x-y,             y))
-    face == 2 && return Vec{2, T}( (2*x-one(T),             2*z-one(T)))
-    face == 3 && return Vec{2, T}( ((one(T)-y)*2-one(T),    2*z-one(T)))
-    face == 4 && return Vec{2, T}( (2*y-one(T),             2*z-one(T)))
-    face == 5 && return Vec{2, T}( (one(T)-x-y,             x))
-    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
-end
-
 # Mapping from 2D quadrilateral/triangle to 3D face of a wedge.
 function transfer_point_face_to_cell(point::Vec{2, T}, cell::Type{RefPrism}, face::Int) where T
     # Note that for quadrilaterals the domain is [-1, 1]² but for triangles it is [0, 1]²
@@ -1264,17 +1197,6 @@ function reference_coordinates(::Lagrange{RefPyramid,1})
             Vec{3, Float64}((0.0, 1.0, 0.0)),
             Vec{3, Float64}((1.0, 1.0, 0.0)),
             Vec{3, Float64}((0.0, 0.0, 1.0))]
-end
-
-# Mapping from 3D face of a pyramid to 2D.
-function transfer_point_cell_to_face(point::Vec{3, T}, cell::Type{RefPyramid}, face::Int) where T
-    x, y, z = point
-    face == 1 && return Vec{2, T}(( 2*y-one(T),  2*x-one(T)))
-    face == 2 && return Vec{2, T}(( one(T)-x-z,  x))
-    face == 3 && return Vec{2, T}(( one(T)-y-z,  z))
-    face == 4 && return Vec{2, T}(( one(T)-y-z,  y))
-    face == 5 && return Vec{2, T}(( one(T)-x-z,  z))
-    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 # Mapping from 2D face to 3D face of a pyramid.

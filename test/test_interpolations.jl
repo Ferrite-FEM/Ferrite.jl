@@ -46,27 +46,7 @@
 
         # Note that not every element formulation exists for every order and dimension.
         applicable(Ferrite.getlowerorder, interpolation) && @test typeof(Ferrite.getlowerorder(interpolation)) <: Interpolation{ref_shape,func_order-1}
-    @testset "transform face points" begin
-        # Test both center point and random points on the face
-        ref_coord = Ferrite.reference_coordinates(Lagrange{ref_shape, 1}())
-        for face in 1:nfaces(interpolation)
-            face_nodes = Ferrite.reference_faces(ref_shape)[face]
-            center_coord = [0.0 for _ in 1:ref_dim]
-            rand_coord = [0.0 for _ in 1:ref_dim]
-            rand_weights = rand(length(face_nodes))
-            rand_weights /= sum(rand_weights)
-            for (i, node) in pairs(face_nodes)
-                center_coord += ref_coord[node] / length(face_nodes)
-                rand_coord += rand_weights[i] .* ref_coord[node]
-            end
-            for point in (center_coord, rand_coord)
-                vec_point = Vec{ref_dim}(point)
-                cell_to_face = Ferrite.transfer_point_cell_to_face(vec_point, ref_shape, face)
-                face_to_cell = Ferrite.transfer_point_face_to_cell(cell_to_face, ref_shape, face)
-                @test vec_point ≈ face_to_cell
-            end
-        end
-    end
+    
     # Check partition of unity at random point.
     n_basefuncs = getnbasefunctions(interpolation)
     x = rand(Tensor{1, ref_dim})
