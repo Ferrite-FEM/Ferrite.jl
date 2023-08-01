@@ -53,4 +53,16 @@
     @test_throws ArgumentError QuadratureRule{RefTetrahedron}(:einstein, 2)
     @test_throws ArgumentError QuadratureRule{RefTetrahedron}(0)
 
+    @testset "$ref_shape weighted normal error path" for ref_shape in (
+        RefLine,
+        RefQuadrilateral,
+        RefTriangle,
+        RefHexahedron,
+        RefTetrahedron,
+        RefPrism,
+        RefPyramid)
+        dim = ref_shape.super.parameters[1]
+        err = ArgumentError("unknown face number: 100")
+        @test_throws err Ferrite.weighted_normal(Tensor{2,dim}(zeros(dim^2)), ref_shape, 100)
+    end
 end
