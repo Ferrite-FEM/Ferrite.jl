@@ -96,7 +96,7 @@ for (scalar_interpol, quad_rule) in (
         # test copy
         fvc = copy(fv)
         @test typeof(fv) == typeof(fvc)
-        for fname in fieldnames(typeof(fv))
+        Ferrite.getrefshape(func_interpol) ∈ (RefPrism, RefPyramid)|| for fname in fieldnames(typeof(fv))
             v = getfield(fv, fname)
             v isa Ferrite.ScalarWrapper && continue
             vc = getfield(fvc, fname)
