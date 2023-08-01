@@ -1,7 +1,21 @@
+"""
+    weighted_normal(J::AbstractTensor, fv::FaceValues, face::Int)
+    weighted_normal(J::AbstractTensor, ::Type{<:AbstractRefShape}, face::Int)
+
+Compute the vector normal to the face weighted by the area ration between the face and the reference face.
+This is computed by taking cross product of the jacobian compenets that align to the face local axis.
+"""
 function weighted_normal(J::AbstractTensor, fv::FaceValues, face::Int)
     return weighted_normal(J, getrefshape(fv.func_interp), face)
 end
 
+"""
+    create_face_quad_rule(cell_T::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, T}}
+    create_face_quad_rule(cell_T::Type{RefShape}, quad_faces::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}}, tri_faces::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}) 
+
+Creates ["FaceQuadratureRule"](@ref) with the given cell type, weights and points. If the cell has faces of different shapes
+(i.e. quadrilaterals and triangles) then each shape's faces indices, weights and points are passed separately.
+"""
 function create_face_quad_rule(cell_T::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, T}}) where {N, T, RefShape <: AbstractRefShape}
     n_points = length(w)
     face_quad_rule = QuadratureRule{RefShape, T, getdim(AbstractCell{cell_T})}[]
