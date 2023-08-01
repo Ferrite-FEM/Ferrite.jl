@@ -251,13 +251,6 @@ and indices corresponding to the indices of a dof in [`vertices`](@ref), [`faces
 reference_coordinates(::Interpolation)
 
 """
-    reference_face_to_face(point::Vec{N, T}, ref_shape::Type{<:AbstractRefShape}, face::Int) 
-
-Transform point from face's reference (N-1)D coordinates to ND coordinates on the cell's face.
-"""
-reference_face_to_face
-
-"""
     vertexdof_indices(ip::Interpolation)
 
 A tuple containing tuples of local dof indices for the respective vertex in local
@@ -496,13 +489,6 @@ function reference_coordinates(::Lagrange{RefLine,1})
             Vec{1, Float64}(( 1.0,))]
 end
 
-# Mapping from to 0D node to 1D line vertex.
-function reference_face_to_face(point::Vec{N, T}, cell::Type{RefLine}, face::Int) where {N, T}
-    face == 1 && return Vec{1, T}(( -one(T),))
-    face == 2 && return Vec{1, T}((  one(T),))
-    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
-end
-
 function shape_value(ip::Lagrange{RefLine, 1}, ξ::Vec{1}, i::Int)
     ξ_x = ξ[1]
     i == 1 && return (1 - ξ_x) * 0.5
@@ -544,16 +530,6 @@ function reference_coordinates(::Lagrange{RefQuadrilateral,1})
             Vec{2, Float64}(( 1.0, -1.0)),
             Vec{2, Float64}(( 1.0,  1.0,)),
             Vec{2, Float64}((-1.0,  1.0,))]
-end
-
-# Mapping from 1D line to 2D face of a quadrilateral.
-function reference_face_to_face(point::Vec{1, T}, cell::Type{RefQuadrilateral}, face::Int) where T
-    x = point[]
-    face == 1 && return Vec{2, T}(( x,          -one(T)))
-    face == 2 && return Vec{2, T}(( one(T),     x))
-    face == 3 && return Vec{2, T}(( -x,         one(T)))
-    face == 4 && return Vec{2, T}(( -one(T),    -x))
-    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 function shape_value(ip::Lagrange{RefQuadrilateral, 1}, ξ::Vec{2}, i::Int)
@@ -665,15 +641,6 @@ function reference_coordinates(::Lagrange{RefTriangle,1})
     return [Vec{2, Float64}((1.0, 0.0)),
             Vec{2, Float64}((0.0, 1.0)),
             Vec{2, Float64}((0.0, 0.0))]
-end
-
-# Mapping from 1D line to 2D face of a triangle.
-function reference_face_to_face(point::Vec{1, T},  cell::Type{RefTriangle}, face::Int) where T
-    x = (point[] + one(T)) / 2
-    face == 1 && return Vec{2, T}(( one(T) - x,     x ))
-    face == 2 && return Vec{2, T}(( zero(T),        one(T) -x))
-    face == 3 && return Vec{2, T}(( x,              zero(T)))
-    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 function shape_value(ip::Lagrange{RefTriangle, 1}, ξ::Vec{2}, i::Int)
@@ -825,16 +792,6 @@ function reference_coordinates(::Lagrange{RefTetrahedron,1})
             Vec{3, Float64}((0.0, 0.0, 1.0))]
 end
 
-# Mapping from 2D triangle to 3D face of a tetrahedon.
-function reference_face_to_face(point::Vec{2, T}, cell::Type{RefTetrahedron}, face::Int) where T
-    x,y = point
-    face == 1 && return Vec{3, T}( (one(T)-x-y,     y,              zero(T)))
-    face == 2 && return Vec{3, T}( (y,              zero(T),        one(T)-x-y))
-    face == 3 && return Vec{3, T}( (x,              y,              one(T)-x-y))
-    face == 4 && return Vec{3, T}( (zero(T),        one(T)-x-y,     y))
-    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
-end
-
 function shape_value(ip::Lagrange{RefTetrahedron, 1}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
@@ -904,18 +861,6 @@ function reference_coordinates(::Lagrange{RefHexahedron,1})
             Vec{3, Float64}(( 1.0, -1.0,  1.0)),
             Vec{3, Float64}(( 1.0,  1.0,  1.0)),
             Vec{3, Float64}((-1.0,  1.0,  1.0))]
-end
-
-# Mapping from 2D quadrilateral to 3D face of a hexahedron.
-function reference_face_to_face(point::Vec{2, T}, cell::Type{RefHexahedron}, face::Int) where T
-    x,y = point
-    face == 1 && return Vec{3, T}(( y,      x,          -one(T)))
-    face == 2 && return Vec{3, T}(( x,      -one(T),    y))
-    face == 3 && return Vec{3, T}(( one(T), x,          y))
-    face == 4 && return Vec{3, T}(( -x,     one(T),     y))
-    face == 5 && return Vec{3, T}((-one(T), y,          x))
-    face == 6 && return Vec{3, T}(( x,      y,          one(T)))
-    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 function shape_value(ip::Lagrange{RefHexahedron, 1}, ξ::Vec{3}, i::Int)
@@ -1065,18 +1010,6 @@ function reference_coordinates(::Lagrange{RefPrism,1})
             Vec{3, Float64}((0.0, 1.0, 1.0))]
 end
 
-# Mapping from 2D quadrilateral/triangle to 3D face of a wedge.
-function reference_face_to_face(point::Vec{2, T}, cell::Type{RefPrism}, face::Int) where T
-    # Note that for quadrilaterals the domain is [-1, 1]² but for triangles it is [0, 1]²
-    x,y = point
-    face == 1 && return Vec{3, T}(( one(T)-x-y,             y,                      zero(T)))
-    face == 2 && return Vec{3, T}(( (one(T)+x)/2,           zero(T),                (one(T)+y)/2))
-    face == 3 && return Vec{3, T}(( zero(T),                one(T)-(one(T)+x)/2,    (one(T)+y)/2))
-    face == 4 && return Vec{3, T}(( one(T)-(one(T)+x)/2,   (one(T)+x)/2,            (one(T)+y)/2))
-    face == 5 && return Vec{3, T}(( y,                      one(T)-x-y,             one(T)))
-    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
-end
-
 function shape_value(ip::Lagrange{RefPrism,1}, ξ::Vec{3}, i::Int)
     (x,y,z) = ξ
     i == 1 && return 1-x-y -z*(1-x-y)
@@ -1197,17 +1130,6 @@ function reference_coordinates(::Lagrange{RefPyramid,1})
             Vec{3, Float64}((0.0, 1.0, 0.0)),
             Vec{3, Float64}((1.0, 1.0, 0.0)),
             Vec{3, Float64}((0.0, 0.0, 1.0))]
-end
-
-# Mapping from 2D face to 3D face of a pyramid.
-function reference_face_to_face(point::Vec{2, T}, cell::Type{RefPyramid}, face::Int) where T
-    x,y = point
-    face == 1 && return Vec{3, T}(( (y+one(T))/2,   (x+one(T))/2,       zero(T)))
-    face == 2 && return Vec{3, T}(( y,              zero(T),            one(T)-x-y))
-    face == 3 && return Vec{3, T}(( zero(T),        one(T)-x-y,         y))
-    face == 4 && return Vec{3, T}(( x+y,            y,                  one(T)-x-y))
-    face == 5 && return Vec{3, T}(( one(T)-x-y,     one(T)-y,           y))
-    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
 end
 
 function shape_value(ip::Lagrange{RefPyramid,1}, ξ::Vec{3,T}, i::Int) where T

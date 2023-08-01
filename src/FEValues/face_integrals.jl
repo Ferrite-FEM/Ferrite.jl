@@ -1,4 +1,11 @@
 """
+    reference_face_to_face(point::Vec{N, T}, ref_shape::Type{<:AbstractRefShape}, face::Int) 
+
+Transform point from face's reference (N-1)D coordinates to ND coordinates on the cell's face.
+"""
+reference_face_to_face
+
+"""
     weighted_normal(J::AbstractTensor, fv::FaceValues, face::Int)
     weighted_normal(J::AbstractTensor, ::Type{<:AbstractRefShape}, face::Int)
 
@@ -46,6 +53,13 @@ end
 # All 1D RefLine #
 ##################
 
+# Mapping from to 0D node to 1D line vertex.
+function reference_face_to_face(::Vec{N, T}, cell::Type{RefLine}, face::Int) where {N, T}
+    face == 1 && return Vec{1, T}(( -one(T),))
+    face == 2 && return Vec{1, T}((  one(T),))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
 function weighted_normal(::Tensor{2,1,T}, ::Type{RefLine}, face::Int) where {T}
     face == 1 && return Vec{1,T}((-one(T),))
     face == 2 && return Vec{1,T}(( one(T),))
@@ -55,6 +69,16 @@ end
 ###########################
 # All 2D RefQuadrilateral #
 ###########################
+
+# Mapping from 1D line to 2D face of a quadrilateral.
+function reference_face_to_face(point::Vec{1, T}, cell::Type{RefQuadrilateral}, face::Int) where T
+    x = point[]
+    face == 1 && return Vec{2, T}(( x,          -one(T)))
+    face == 2 && return Vec{2, T}(( one(T),     x))
+    face == 3 && return Vec{2, T}(( -x,         one(T)))
+    face == 4 && return Vec{2, T}(( -one(T),    -x))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
 
 function weighted_normal(J::Tensor{2,2}, ::Type{RefQuadrilateral}, face::Int)
     @inbounds begin
@@ -70,6 +94,15 @@ end
 # All RefTriangle 2D #
 ######################
 
+# Mapping from 1D line to 2D face of a triangle.
+function reference_face_to_face(point::Vec{1, T},  cell::Type{RefTriangle}, face::Int) where T
+    x = (point[] + one(T)) / 2
+    face == 1 && return Vec{2, T}(( one(T) - x,     x ))
+    face == 2 && return Vec{2, T}(( zero(T),        one(T) -x))
+    face == 3 && return Vec{2, T}(( x,              zero(T)))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
 function weighted_normal(J::Tensor{2,2}, ::Type{RefTriangle}, face::Int)
     @inbounds begin
         face == 1 && return Vec{2}((-(J[2,1] - J[2,2]), J[1,1] - J[1,2]))
@@ -82,6 +115,18 @@ end
 ########################
 # All RefHexahedron 3D #
 ########################
+
+# Mapping from 2D quadrilateral to 3D face of a hexahedron.
+function reference_face_to_face(point::Vec{2, T}, cell::Type{RefHexahedron}, face::Int) where T
+    x,y = point
+    face == 1 && return Vec{3, T}(( y,      x,          -one(T)))
+    face == 2 && return Vec{3, T}(( x,      -one(T),    y))
+    face == 3 && return Vec{3, T}(( one(T), x,          y))
+    face == 4 && return Vec{3, T}(( -x,     one(T),     y))
+    face == 5 && return Vec{3, T}((-one(T), y,          x))
+    face == 6 && return Vec{3, T}(( x,      y,          one(T)))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
 
 function weighted_normal(J::Tensor{2,3}, ::Type{RefHexahedron}, face::Int)
     @inbounds begin
@@ -99,6 +144,16 @@ end
 # All RefTetrahedron 3D #
 #########################
 
+# Mapping from 2D triangle to 3D face of a tetrahedon.
+function reference_face_to_face(point::Vec{2, T}, cell::Type{RefTetrahedron}, face::Int) where T
+    x,y = point
+    face == 1 && return Vec{3, T}( (one(T)-x-y,     y,              zero(T)))
+    face == 2 && return Vec{3, T}( (y,              zero(T),        one(T)-x-y))
+    face == 3 && return Vec{3, T}( (x,              y,              one(T)-x-y))
+    face == 4 && return Vec{3, T}( (zero(T),        one(T)-x-y,     y))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
+
 function weighted_normal(J::Tensor{2,3}, ::Type{RefTetrahedron}, face::Int)
     @inbounds begin
         face == 1 && return J[:,2] × J[:,1]
@@ -112,6 +167,18 @@ end
 ###################
 # All RefPrism 3D #
 ###################
+
+# Mapping from 2D quadrilateral/triangle to 3D face of a wedge.
+function reference_face_to_face(point::Vec{2, T}, cell::Type{RefPrism}, face::Int) where T
+    # Note that for quadrilaterals the domain is [-1, 1]² but for triangles it is [0, 1]²
+    x,y = point
+    face == 1 && return Vec{3, T}(( one(T)-x-y,             y,                      zero(T)))
+    face == 2 && return Vec{3, T}(( (one(T)+x)/2,           zero(T),                (one(T)+y)/2))
+    face == 3 && return Vec{3, T}(( zero(T),                one(T)-(one(T)+x)/2,    (one(T)+y)/2))
+    face == 4 && return Vec{3, T}(( one(T)-(one(T)+x)/2,   (one(T)+x)/2,            (one(T)+y)/2))
+    face == 5 && return Vec{3, T}(( y,                      one(T)-x-y,             one(T)))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
 
 function weighted_normal(J::Tensor{2,3}, ::Type{RefPrism}, face::Int)
     @inbounds begin
@@ -127,6 +194,17 @@ end
 #####################
 # All RefPyramid 3D #
 #####################
+
+# Mapping from 2D face to 3D face of a pyramid.
+function reference_face_to_face(point::Vec{2, T}, cell::Type{RefPyramid}, face::Int) where T
+    x,y = point
+    face == 1 && return Vec{3, T}(( (y+one(T))/2,   (x+one(T))/2,       zero(T)))
+    face == 2 && return Vec{3, T}(( y,              zero(T),            one(T)-x-y))
+    face == 3 && return Vec{3, T}(( zero(T),        one(T)-x-y,         y))
+    face == 4 && return Vec{3, T}(( x+y,            y,                  one(T)-x-y))
+    face == 5 && return Vec{3, T}(( one(T)-x-y,     one(T)-y,           y))
+    error("Face index $face exceeds the number of faces for a cell of type $(typeof(cell))")
+end
 
 function weighted_normal(J::Tensor{2,3}, ::Type{RefPyramid}, face::Int)
     @inbounds begin
