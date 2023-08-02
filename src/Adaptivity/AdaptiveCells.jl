@@ -537,41 +537,24 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
             end
             k′ = face_neighbor[1][1]
             if k < k′
+                if fi < 3
+                    parallel_axis = 1
+                elseif 3 ≤ fi < 5
+                    parallel_axis = 2
+                elseif 5 ≤ fi < 7
+                    parallel_axis = 3
+                end
                 for leaf in tree.leaves
                     for v in vertices(leaf,tree.b)
-                        if fi < 3
-                            if v[1] == f[1][1] == f[2][1]
-                                cache_octant = OctantBWG(leaf.l,v)
-                                cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
-                                #TODO check if its worth to change this comparison from ∈ nodes to ∈ all nodes of k'
-                                #if (k′,cache_octant.xyz) ∈ nodes
-                                if any((cache_octant.xyz,) .∈ vertices.(forest.cells[k′].leaves,forest.cells[k′].b))
-                                    #delete!(nodes,(k,v))
-                                    nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
-                                    nodeowners[(k,v)] = (k′,cache_octant.xyz)
-                                end
-                            end
-                        elseif fi < 5
-                            if v[2] == f[1][2] == f[2][2]
-                                cache_octant = OctantBWG(leaf.l,v)
-                                cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
-                                #if (k′,cache_octant.xyz) ∈ nodes
-                                if any((cache_octant.xyz,) .∈ vertices.(forest.cells[k′].leaves,forest.cells[k′].b))
-                                    #delete!(nodes,(k,v))
-                                    nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
-                                    nodeowners[(k,v)] = (k′,cache_octant.xyz)
-                                end
-                            end
-                        else
-                            if v[3] == f[1][3] == f[2][3]
-                                cache_octant = OctantBWG(leaf.l,v)
-                                cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
-                                #if (k′,cache_octant.xyz) ∈ nodes
-                                if any((cache_octant.xyz,) .∈ vertices.(forest.cells[k′].leaves,forest.cells[k′].b))
-                                    #delete!(nodes,(k,v))
-                                    nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
-                                    nodeowners[(k,v)] = (k′,cache_octant.xyz)
-                                end
+                        if v[parallel_axis] == f[1][parallel_axis] == f[2][parallel_axis]
+                            cache_octant = OctantBWG(leaf.l,v)
+                            cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
+                            #TODO check if its worth to change this comparison from ∈ nodes to ∈ all nodes of k'
+                            #if (k′,cache_octant.xyz) ∈ nodes
+                            if any((cache_octant.xyz,) .∈ vertices.(forest.cells[k′].leaves,forest.cells[k′].b))
+                                #delete!(nodes,(k,v))
+                                nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
+                                nodeowners[(k,v)] = (k′,cache_octant.xyz)
                             end
                         end
                     end
