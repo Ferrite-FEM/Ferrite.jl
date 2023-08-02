@@ -543,7 +543,9 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                             if v[1] == f[1][1] == f[2][1]
                                 cache_octant = OctantBWG(leaf.l,v)
                                 cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
-                                if (k′,cache_octant.xyz) ∈ nodes
+                                #TODO check if its worth to change this comparison from ∈ nodes to ∈ all nodes of k'
+                                #if (k′,cache_octant.xyz) ∈ nodes
+                                if any((cache_octant.xyz,) .∈ vertices.(forest.cells[k′].leaves,forest.cells[k′].b))
                                     #delete!(nodes,(k,v))
                                     nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
                                     nodeowners[(k,v)] = (k′,cache_octant.xyz)
@@ -553,7 +555,8 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                             if v[2] == f[1][2] == f[2][2]
                                 cache_octant = OctantBWG(leaf.l,v)
                                 cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
-                                if (k′,cache_octant.xyz) ∈ nodes
+                                #if (k′,cache_octant.xyz) ∈ nodes
+                                if any((cache_octant.xyz,) .∈ vertices.(forest.cells[k′].leaves,forest.cells[k′].b))
                                     #delete!(nodes,(k,v))
                                     nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
                                     nodeowners[(k,v)] = (k′,cache_octant.xyz)
@@ -563,7 +566,8 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                             if v[3] == f[1][3] == f[2][3]
                                 cache_octant = OctantBWG(leaf.l,v)
                                 cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
-                                if (k′,cache_octant.xyz) ∈ nodes
+                                #if (k′,cache_octant.xyz) ∈ nodes
+                                if any((cache_octant.xyz,) .∈ vertices.(forest.cells[k′].leaves,forest.cells[k′].b))
                                     #delete!(nodes,(k,v))
                                     nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
                                     nodeowners[(k,v)] = (k′,cache_octant.xyz)
