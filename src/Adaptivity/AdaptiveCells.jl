@@ -623,7 +623,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                 parentfaces = faces(parent_,tree.b)
                 for (pface_i, pface) in enumerate(parentfaces)
                     if iscenter(c,pface) #hanging node candidate
-                        #interoctree branch
+                        #intraoctree branch
                         inter_neighbor = face_neighbor(parent_, pface_i, tree.b)
                         inter_neighbor_idx = findfirst(x->x==inter_neighbor,tree.leaves)
                         if inter_neighbor_idx !== nothing
@@ -631,7 +631,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                             nf = findfirst(x->x==pface,inter_neighbor_faces)
                             hnodes[(k,c)] = [(k,nc) for nc in inter_neighbor_faces[nf]]
                         end
-                        #intraoctree branch
+                        #interoctree branch
                     end
                 end
             end
