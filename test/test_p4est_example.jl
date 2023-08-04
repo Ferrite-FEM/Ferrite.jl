@@ -101,23 +101,28 @@ end
 
 # Assemble and solve
 function solve(dh, ch, cellvalues)
-    K, f = assemble_global(cellvalues, create_sparsity_pattern(dh), dh);
+    K, f = assemble_global(cellvalues, create_sparsity_pattern(dh,ch), dh);
     apply!(K, f, ch)
     u = K \ f;
+    apply!(u,ch)
 end
 
-function setup_poisson_problem(grid, interpolation, interpolation_geo, qr, N)
+function setup_poisson_problem(grid, interpolation, interpolation_geo, qr, N, hnodes)
     # Construct Ferrite stuff
     dh = DofHandler(grid)
     add!(dh, :u, interpolation)
-    close!(dh);
-
+    dh, vdict, edict, fdict = Ferrite.__close!(dh);
+    
     ch = ConstraintHandler(dh);
     ∂Ω = union(
         values(Ferrite.getfacesets(grid))...
     );
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> analytical_solution(x))
     add!(ch, dbc);
+    for (hdof,mdof) in hnodes
+        lc = AffineConstraint(vdict[1][hdof],[vdict[1][m] => 0.5 for m in mdof],0.0)
+        add!(ch,lc)
+    end
     close!(ch);
 
     cellvalues = CellValues(qr, interpolation, interpolation_geo);
@@ -141,16 +146,15 @@ end # module ConvergenceTestHelper
         Ferrite.refine_all!(adaptive_grid,1)
         Ferrite.refine_all!(adaptive_grid,2)
         Ferrite.refine_all!(adaptive_grid,3)
-        Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[5].leaves[1])
+        Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[1].leaves[1])
         Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[5].leaves[8])
         Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[5].leaves[5])
         grid_transfered, hnodes = Ferrite.creategrid(adaptive_grid)
-        @show hnodes
         # ... a suitable quadrature rule ...
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
         qr = QuadratureRule{Ferrite.getrefshape(interpolation)}(qr_order)
         # ... and then pray to the gods of convergence.
-        dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid_transfered, interpolation, interpolation_geo, qr, N)
+        dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid_transfered, interpolation, interpolation_geo, qr, N, hnodes)
         u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
         #ConvergenceTestHelper.check_and_compute_convergence(dh, u, cellvalues, 1e-2)
         vtk_grid("p4est_test.vtu",dh) do vtk

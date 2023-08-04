@@ -610,9 +610,8 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     opposite_face = dim == 2 ? opposite_face_2 : opposite_face_3
-    candidate_octants = eltype(forest.cells)[]
-    neighbor_octants = eltype(forest.cells)[]
-    hnodes = Dict{Tuple{Int,NTuple{dim,Int32}},Vector{Tuple{Int,NTuple{dim,Int32}}}}()
+    #hnodes = Dict{Tuple{Int,NTuple{dim,Int32}},Vector{Tuple{Int,NTuple{dim,Int32}}}}()
+    hnodes = Dict{Int,Vector{Int}}()
     for (k,tree) in enumerate(forest.cells)
         rootfaces = faces(root(dim),tree.b)
         for (l,leaf) in enumerate(tree.leaves)
@@ -630,7 +629,8 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                             if neighbor_candidate_idx !== nothing
                                 neighbor_candidate_faces = faces(neighbor_candidate,tree.b)
                                 nf = findfirst(x->x==pface,neighbor_candidate_faces)
-                                hnodes[(k,c)] = [(k,nc) for nc in neighbor_candidate_faces[nf]]
+                                #hnodes[(k,c)] = [(k,nc) for nc in neighbor_candidate_faces[nf]]
+                                hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k,nc)]] for nc in neighbor_candidate_faces[nf]]
                                 break
                             end
                         else #interoctree branch
@@ -648,7 +648,8 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                                         neighbor_candidate_faces = faces(neighbor_candidate,forest.cells[k′].b)
                                         transformed_neighbor_faces = faces(interoctree_neighbor,forest.cells[k′].b)
                                         nf = findfirst(x->x==pface,neighbor_candidate_faces)
-                                        hnodes[(k,c)] = [(k′,nc) for nc in transformed_neighbor_faces[nf]]
+                                        #hnodes[(k,c)] = [(k′,nc) for nc in transformed_neighbor_faces[nf]]
+                                        hnodes[nodeids[nodeowners[(k,c)]]] = [nodeids[nodeowners[(k′,nc)]] for nc in transformed_neighbor_faces[nf]]
                                         break
                                     end
                                 end
