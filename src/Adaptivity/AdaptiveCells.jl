@@ -536,6 +536,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                 continue
             end
             k′ = face_neighbor[1][1]
+            neighbor_vertices = vertices.(forest.cells[k′].leaves,forest.cells[k′].b)
             if k < k′
                 if fi < 3
                     parallel_axis = 1
@@ -551,7 +552,7 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
                             cache_octant = transform_face(forest,k′,_perminv[face_neighbor[1][2]],cache_octant) # after transform
                             #TODO check if its worth to change this comparison from ∈ nodes to ∈ all nodes of k'
                             #if (k′,cache_octant.xyz) ∈ nodes
-                            if any((cache_octant.xyz,) .∈ vertices.(forest.cells[k′].leaves,forest.cells[k′].b))
+                            if any((cache_octant.xyz,) .∈ neighbor_vertices)
                                 #delete!(nodes,(k,v))
                                 nodeids[(k,v)] = nodeids[(k′,cache_octant.xyz)]
                                 nodeowners[(k,v)] = (k′,cache_octant.xyz)
@@ -578,7 +579,8 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     end
     facesets = reconstruct_facesets(forest) #TODO edge, node and cellsets
     grid = Grid(cells,transform_pointBWG(forest,nodes) .|> Node, facesets=facesets)
-    return grid
+    #hnodes = hangingnodes(forest)
+    return grid#, hnodes
 end
 
 function reconstruct_facesets(forest::ForestBWG{dim}) where dim
@@ -602,6 +604,28 @@ function reconstruct_facesets(forest::ForestBWG{dim}) where dim
        new_facesets[facesetname] = new_faceset
     end
     return new_facesets
+end
+
+function hangingnodes(forest::ForestBWG{dim}) where dim
+    _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
+    _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
+    for (k,tree) in forest.cells
+        rootfaces = faces(root(dim),tree.b)
+        for (l,leaf) in enumerate(tree.leaves) 
+            for (root_fi,root_f) in enumerate(rootfaces) # fi in p4est notation
+                face_neighbor =  forest.topology.face_face_neighbor[k,_perm[root_fi]]
+                if length(face_neighbor) == 0
+                    continue
+                end 
+                for (leaf_face_idx,leaf_face) in enumerate(faces(leaf,tree.b))
+                    if contains_face(root_f,leaf_face)
+                    end
+                end
+                root_k′ = face_neighbor[1][1]
+                root_fi′ = face_neighbor[1][2]
+            end
+        end
+    end
 end
 
 # TODO verify and generalize
