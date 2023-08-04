@@ -144,7 +144,8 @@ end # module ConvergenceTestHelper
         Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[5].leaves[1])
         Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[5].leaves[8])
         Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[5].leaves[5])
-        grid_transfered = Ferrite.creategrid(adaptive_grid)
+        grid_transfered, hnodes = Ferrite.creategrid(adaptive_grid)
+        @show hnodes
         # ... a suitable quadrature rule ...
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
         qr = QuadratureRule{Ferrite.getrefshape(interpolation)}(qr_order)

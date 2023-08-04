@@ -609,6 +609,7 @@ end
 function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
+    opposite_face = dim == 2 ? opposite_face_2 : opposite_face_3
     candidate_octants = eltype(forest.cells)[]
     neighbor_octants = eltype(forest.cells)[]
     hnodes = Dict{Tuple{Int,NTuple{dim,Int32}},Vector{Tuple{Int,NTuple{dim,Int32}}}}()
@@ -623,15 +624,36 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
                 parentfaces = faces(parent_,tree.b)
                 for (pface_i, pface) in enumerate(parentfaces)
                     if iscenter(c,pface) #hanging node candidate
-                        #intraoctree branch
-                        inter_neighbor = face_neighbor(parent_, pface_i, tree.b)
-                        inter_neighbor_idx = findfirst(x->x==inter_neighbor,tree.leaves)
-                        if inter_neighbor_idx !== nothing
-                            inter_neighbor_faces = faces(inter_neighbor,tree.b)
-                            nf = findfirst(x->x==pface,inter_neighbor_faces)
-                            hnodes[(k,c)] = [(k,nc) for nc in inter_neighbor_faces[nf]]
+                        neighbor_candidate = face_neighbor(parent_, pface_i, tree.b)
+                        if inside(tree,neighbor_candidate) #intraoctree branch
+                            neighbor_candidate_idx = findfirst(x->x==neighbor_candidate,tree.leaves)
+                            if neighbor_candidate_idx !== nothing
+                                neighbor_candidate_faces = faces(neighbor_candidate,tree.b)
+                                nf = findfirst(x->x==pface,neighbor_candidate_faces)
+                                hnodes[(k,c)] = [(k,nc) for nc in neighbor_candidate_faces[nf]]
+                                break
+                            end
+                        else #interoctree branch
+                            for (ri,rf) in enumerate(rootfaces)
+                                face_neighbor =  forest.topology.face_face_neighbor[k,_perm[ri]]
+                                if length(face_neighbor) == 0
+                                    continue
+                                end
+                                if contains_face(rf, pface)
+                                    k′ = face_neighbor[1][1]
+                                    ri′ = _perminv[face_neighbor[1][2]]
+                                    interoctree_neighbor = transform_face(forest, k′, ri′, neighbor_candidate)
+                                    interoctree_neighbor_candidate_idx = findfirst(x->x==interoctree_neighbor,forest.cells[k′].leaves)
+                                    if interoctree_neighbor_candidate_idx !== nothing
+                                        neighbor_candidate_faces = faces(neighbor_candidate,forest.cells[k′].b)
+                                        transformed_neighbor_faces = faces(interoctree_neighbor,forest.cells[k′].b)
+                                        nf = findfirst(x->x==pface,neighbor_candidate_faces)
+                                        hnodes[(k,c)] = [(k′,nc) for nc in transformed_neighbor_faces[nf]]
+                                        break
+                                    end
+                                end
+                            end
                         end
-                        #interoctree branch
                     end
                 end
             end
