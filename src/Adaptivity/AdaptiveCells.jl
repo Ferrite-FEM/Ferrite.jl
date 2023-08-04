@@ -579,8 +579,8 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     end
     facesets = reconstruct_facesets(forest) #TODO edge, node and cellsets
     grid = Grid(cells,transform_pointBWG(forest,nodes) .|> Node, facesets=facesets)
-    #hnodes = hangingnodes(forest)
-    return grid#, hnodes
+    hnodes = hangingnodes(forest, nodeids, nodeowners)
+    return grid, hnodes
 end
 
 function reconstruct_facesets(forest::ForestBWG{dim}) where dim
@@ -606,26 +606,38 @@ function reconstruct_facesets(forest::ForestBWG{dim}) where dim
     return new_facesets
 end
 
-function hangingnodes(forest::ForestBWG{dim}) where dim
+function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
-    for (k,tree) in forest.cells
+    candidate_octants = eltype(forest.cells)[]
+    neighbor_octants = eltype(forest.cells)[]
+    hnodes = Dict{Tuple{Int,NTuple{dim,Int32}},Vector{Tuple{Int,NTuple{dim,Int32}}}}()
+    for (k,tree) in enumerate(forest.cells)
         rootfaces = faces(root(dim),tree.b)
-        for (l,leaf) in enumerate(tree.leaves) 
-            for (root_fi,root_f) in enumerate(rootfaces) # fi in p4est notation
-                face_neighbor =  forest.topology.face_face_neighbor[k,_perm[root_fi]]
-                if length(face_neighbor) == 0
-                    continue
-                end 
-                for (leaf_face_idx,leaf_face) in enumerate(faces(leaf,tree.b))
-                    if contains_face(root_f,leaf_face)
+        for (l,leaf) in enumerate(tree.leaves)
+            if leaf == root(dim)
+                continue
+            end
+            for (ci,c) in enumerate(vertices(leaf,tree.b))
+                parent_ = parent(leaf,tree.b)
+                parentfaces = faces(parent_,tree.b)
+                for (pface_i, pface) in enumerate(parentfaces)
+                    if iscenter(c,pface) #hanging node candidate
+                        #interoctree branch
+                        inter_neighbor = face_neighbor(parent_, pface_i, tree.b)
+                        inter_neighbor_idx = findfirst(x->x==inter_neighbor,tree.leaves)
+                        if inter_neighbor_idx !== nothing
+                            inter_neighbor_faces = faces(inter_neighbor,tree.b)
+                            nf = findfirst(x->x==pface,inter_neighbor_faces)
+                            hnodes[(k,c)] = [(k,nc) for nc in inter_neighbor_faces[nf]]
+                        end
+                        #intraoctree branch
                     end
                 end
-                root_k′ = face_neighbor[1][1]
-                root_fi′ = face_neighbor[1][2]
             end
         end
     end
+    return hnodes
 end
 
 # TODO verify and generalize
@@ -638,6 +650,16 @@ function contains_face(mface::Tuple{Tuple{T,T},Tuple{T,T}},sface::Tuple{Tuple{T,
         return false
     end
 end
+
+function center(pivot_face)
+    centerpoint = ntuple(i->0,length(pivot_face[1]))
+    for c in pivot_face
+        centerpoint = c .+ centerpoint
+    end
+    return centerpoint .÷ length(pivot_face)
+end
+
+iscenter(c,f) = c == center(f)
 
 #TODO unfinished, isreplaced logic fails
 function creategridFB23(forest::ForestBWG{dim}) where dim
