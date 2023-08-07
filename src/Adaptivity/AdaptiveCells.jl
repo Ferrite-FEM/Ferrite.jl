@@ -307,11 +307,13 @@ OctreeBWG(cell::Hexahedron,b=_maxlevel[1]) = OctreeBWG{3,8,6}(cell.nodes,b)
 
 Base.length(tree::OctreeBWG) = length(tree.leaves)
 
-function inside(tree::OctreeBWG{dim},oct::OctantBWG{dim}) where dim
-    maxsize = _maximum_size(tree.b)
+function inside(oct::OctantBWG{dim},b) where dim
+    maxsize = _maximum_size(b)
     outside = any(xyz -> xyz >= maxsize, oct.xyz) || any(xyz -> xyz < 0, oct.xyz)
     return !outside
 end
+
+inside(tree::OctreeBWG{dim},oct::OctantBWG{dim}) where dim = inside(oct,tree.b)
 
 """
     split_array(octree::OctreeBWG, a::OctantBWG)
@@ -661,6 +663,89 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
         end
     end
     return hnodes
+end
+
+# Algorithm 7 of preprint Sundar, Sampath, Biros
+# https://padas.oden.utexas.edu/static/papers/OctreeBalance21.pdf
+function balancetree(tree::OctreeBWG)
+    W = copy(tree.leaves); P = eltype(tree.leaves)[]; R = eltype(tree.leaves)[]
+    for l in tree.b:-1:1 #TODO verify to do this until level 1
+        Q = [o for o in tree.leaves if o.l == l]
+        sort!(Q,by=x->morton(x,tree.b,tree.b))
+        #construct T
+        T = eltype(Q)[]
+        for x in Q
+            if isempty(T)
+                push!(T,x)
+                continue
+            end
+            p = parent(x,tree.b)
+            if p ∉  parent.(T,(tree.b,))
+                push!(T,x)
+            end
+        end
+        for t in T
+            push!(R,t,siblings(t,tree.b)...)
+            push!(P,possibleneighbors(parent(t,tree.b),l-1,tree.b)...)
+        end
+        append!(P,x for x in W if x.l == l-1)
+        filter!(x->x.l !== l-1, W)
+        unique!(P)
+        append!(W,P)
+        empty!(P)
+    end
+    sort!(R,by=x->morton(x,tree.b,tree.b))
+    linearise!(R,tree.b)
+    return OctreeBWG(R,tree.b,tree.nodes)
+end
+
+# Algorithm 8 of preprint Sundar, Sampath, Biros
+# inverted the algorithm to delete! instead of add incrementally to a new array
+function linearise!(leaves::Vector{T},b) where T<:OctantBWG
+    i = 1
+    while i <= length(leaves)-1
+        if isancestor(leaves[i],leaves[i+1],b) # if i isancestor of i+1
+            deleteat!(leaves,i)
+        end
+        i += 1
+    end
+end
+
+function siblings(o::OctantBWG,b;include_self=false)
+    siblings = children(parent(o,b),b)
+    if !include_self
+        siblings = filter(x-> x !== o, siblings)
+    end
+    return siblings
+end
+
+# TODO make dimension agnostic
+function possibleneighbors(o::OctantBWG{2},l,b)
+    neighbors = ntuple(8) do i
+        if i > 4
+            j = i - 4
+            face_neighbor(o,j,b)
+        else
+            corner_neighbor(o,i,b) 
+        end
+    end
+    neighbors = filter(x->inside(x,b),neighbors)
+    return neighbors
+end
+
+function isancestor(o1,o2,b)
+    ancestor = false
+    l = o2.l - 1
+    p = parent(o2,b)
+    while l > 0
+        if p == o1
+            ancestor = true
+            break
+        end 
+        l -= 1
+        p = parent(p,b)
+    end
+    return ancestor
 end
 
 # TODO verify and generalize
