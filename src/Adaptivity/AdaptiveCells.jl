@@ -668,6 +668,7 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
 end
 
 # Algorithm 17 of BWG Paper
+# TODO need further work for dimension agnostic case
 function balanceforest!(forest::ForestBWG{dim}) where dim
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
