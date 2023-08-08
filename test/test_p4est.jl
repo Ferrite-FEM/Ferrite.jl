@@ -268,4 +268,16 @@ end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[6])
     balanced = Ferrite.balancetree(adaptive_grid.cells[1])
     @test length(balanced.leaves) == 16
+
+    adaptive_grid = ForestBWG(grid,5)
+    Ferrite.refine_all!(adaptive_grid,1)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[2])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[4])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[7])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[12])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[12])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[15])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[16])
+    balanced = Ferrite.balancetree(adaptive_grid.cells[1])
+    @test length(balanced.leaves) == 64
 end

@@ -672,7 +672,7 @@ function balancetree(tree::OctreeBWG)
     W = copy(tree.leaves); P = eltype(tree.leaves)[]; R = eltype(tree.leaves)[]
     for l in tree.b:-1:1 #TODO verify to do this until level 1
         Q = [o for o in W if o.l == l]
-        sort!(Q,by=x->morton(x,tree.b,tree.b))
+        sort!(Q)
         #construct T
         T = eltype(Q)[]
         for x in Q
@@ -695,7 +695,7 @@ function balancetree(tree::OctreeBWG)
         append!(W,P)
         empty!(P)
     end
-    sort!(R,by=x->morton(x,tree.b,tree.b))
+    sort!(R) # be careful with sort, by=morton doesn't work due to ambuigity at max depth level
     linearise!(R,tree.b)
     return OctreeBWG(R,tree.b,tree.nodes)
 end
@@ -735,10 +735,10 @@ Is o2 an ancestor of o1
 """
 function isancestor(o1,o2,b)
     ancestor = false
-    l = o1.l - 1
-    p = parent(o1,b)
+    l = o2.l - 1
+    p = parent(o2,b)
     while l > 0
-        if p == o2
+        if p == o1
             ancestor = true
             break
         end
