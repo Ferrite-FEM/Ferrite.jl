@@ -670,8 +670,10 @@ end
 # Algorithm 17 of BWG Paper
 # TODO need further work for dimension agnostic case
 function balanceforest!(forest::ForestBWG{dim}) where dim
-    _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
-    _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
+    perm_face = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
+    perm_face_inv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
+    perm_corner = dim == 2 ? node_map₂ : node_map₃
+    perm_corner_inv = dim == 2 ? node_map₂_inv : node_map₃_inv
     for k in 1:length(forest.cells)
         tree = forest.cells[k]
         balanced = balancetree(tree)
@@ -685,33 +687,34 @@ function balanceforest!(forest::ForestBWG{dim}) where dim
                 for s_i in notinsideidx
                     s = ss[s_i]
                     if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
-                        cc = forest.topology.vertex_vertex_neighbor[k,s_i]
+                        cc = forest.topology.vertex_vertex_neighbor[k,perm_corner[s_i]]
                         isempty(cc) && continue
                         cc = cc[1]
-                        o′ = transform_corner(forest,cc,o)
-                        s′ = transform_corner(forest,cc,s)
+                        k′, c′ = cc[1], perm_corner_inv[cc[2]]
+                        o′ = transform_corner(forest,k′,c′,o)
+                        s′ = transform_corner(forest,k′,c′,s)
                         neighbor_tree = forest.cells[cc[1]]
-                        if s′ ∉ neighbor_tree.leaves && parent(s', neighbor_tree.b) ∉ neighbor_tree.leaves
+                        if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
                             if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
                                 refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                            else
-                                refine!(tree,s)
+                            #else
+                            #    refine!(tree,o)
                             end
                         end
                     else # face neighbor, only true for 2D
                         s_i -= 4
-                        fc = forest.topology.face_face_neighbor[k,_perm[s_i]]
+                        fc = forest.topology.face_face_neighbor[k,perm_face[s_i]]
                         isempty(fc) && continue
                         fc = fc[1]
-                        k′, f′ = fc[1], _perminv[fc[2]]
+                        k′, f′ = fc[1], perm_face_inv[fc[2]]
                         o′ = transform_corner(forest,k′,f′,o)
                         s′ = transform_corner(forest,k′,f′,s)
                         neighbor_tree = forest.cells[fc[1]]
                         if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
                             if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
                                 refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
-                            else
-                                refine!(tree,o)
+                            #else
+                            #    refine!(tree,o)
                             end
                         end
                     end
@@ -1397,6 +1400,11 @@ const node_map₂ = [1,
                    4,
                    3]
 
+const node_map₂_inv = [1,
+                       2,
+                       4,
+                       3]
+
 const node_map₃ = [1,
                    2,
                    4,
@@ -1405,3 +1413,12 @@ const node_map₃ = [1,
                    6,
                    8,
                    7]
+
+const node_map₃_inv = [1,
+                       2,
+                       4,
+                       3,
+                       5,
+                       6,
+                       8,
+                       7]

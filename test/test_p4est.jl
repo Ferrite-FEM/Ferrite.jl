@@ -288,4 +288,11 @@ end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[2])
     Ferrite.balanceforest!(adaptive_grid)
     @test Ferrite.getncells(adaptive_grid) == 11
+
+    grid = generate_grid(Quadrilateral,(2,2))
+    adaptive_grid = ForestBWG(grid,2)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[4])
+    Ferrite.balanceforest!(adaptive_grid)
+    @test Ferrite.getncells(adaptive_grid) == 19
 end
