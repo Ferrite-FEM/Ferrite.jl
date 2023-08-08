@@ -43,12 +43,12 @@ end
     @test Ferrite.child_id(o,b) == 5
     @test Ferrite.child_id(Ferrite.parent(o,b),b) == 3
     @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.OctantBWG(3,0,1,b)
-    @test_throws ErrorException Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b)
+    @test Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b) == Ferrite.root(3)
     o = Ferrite.OctantBWG(3,2,4,3)
     @test Ferrite.child_id(o,b) == 4
     @test Ferrite.child_id(Ferrite.parent(o,b),b) == 1
     @test Ferrite.parent(Ferrite.parent(o,b),b) == Ferrite.OctantBWG(3,0,1,b)
-    @test_throws ErrorException Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b)
+    @test Ferrite.parent(Ferrite.parent(Ferrite.parent(o,b),b),b) == Ferrite.root(3)
 
     @test Ferrite.child_id(Ferrite.OctantBWG(2,1,1,3),3) == 1
     @test Ferrite.child_id(Ferrite.OctantBWG(2,1,2,3),3) == 2
@@ -280,4 +280,12 @@ end
     Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[16])
     balanced = Ferrite.balancetree(adaptive_grid.cells[1])
     @test length(balanced.leaves) == 64
+
+
+    grid = generate_grid(Quadrilateral,(2,1))
+    adaptive_grid = ForestBWG(grid,2)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[1])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[2])
+    Ferrite.balanceforest!(adaptive_grid)
+    @test Ferrite.getncells(adaptive_grid) == 11
 end

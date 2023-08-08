@@ -273,7 +273,9 @@ struct OctreeBWG{dim,N,M,T} <: AbstractAdaptiveCell{RefHypercube{dim}}
 end
 
 function refine!(octree::OctreeBWG{dim,N,M,T}, pivot_octant::OctantBWG{dim,N,M,T}) where {dim,N,M,T<:Integer}
-    @assert pivot_octant.l + 1 <= octree.b
+    if !(pivot_octant.l + 1 <= octree.b)
+        return
+    end
     o = one(T)
     # TODO replace this with recursive search function
     leave_idx = findfirst(x->x==pivot_octant,octree.leaves)
@@ -665,10 +667,71 @@ function hangingnodes(forest::ForestBWG{dim}, nodeids, nodeowners) where dim
     return hnodes
 end
 
+# Algorithm 17 of BWG Paper
+function balanceforest!(forest::ForestBWG{dim}) where dim
+    _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
+    _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
+    for k in 1:length(forest.cells)
+        tree = forest.cells[k]
+        balanced = balancetree(tree)
+        forest.cells[k] = balanced
+        root_ = root(dim)
+        for (o_i, o) in enumerate(forest.cells[k].leaves)
+            ss = possibleneighbors(o,o.l,tree.b,;insidetree=false)
+            isinside = inside.(ss,(tree.b,))
+            notinsideidx = findall(.! isinside)
+            if !isempty(notinsideidx)
+                for s_i in notinsideidx
+                    s = ss[s_i]
+                    if s_i <= 4 #corner neighbor, only true for 2D see possibleneighbors
+                        cc = forest.topology.vertex_vertex_neighbor[k,s_i]
+                        isempty(cc) && continue
+                        cc = cc[1]
+                        o′ = transform_corner(forest,cc,o)
+                        s′ = transform_corner(forest,cc,s)
+                        neighbor_tree = forest.cells[cc[1]]
+                        if s′ ∉ neighbor_tree.leaves && parent(s', neighbor_tree.b) ∉ neighbor_tree.leaves
+                            if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
+                                refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
+                            else
+                                refine!(tree,s)
+                            end
+                        end
+                    else # face neighbor, only true for 2D
+                        s_i -= 4
+                        fc = forest.topology.face_face_neighbor[k,_perm[s_i]]
+                        isempty(fc) && continue
+                        fc = fc[1]
+                        k′, f′ = fc[1], _perminv[fc[2]]
+                        o′ = transform_corner(forest,k′,f′,o)
+                        s′ = transform_corner(forest,k′,f′,s)
+                        neighbor_tree = forest.cells[fc[1]]
+                        if s′ ∉ neighbor_tree.leaves && parent(s′, neighbor_tree.b) ∉ neighbor_tree.leaves
+                            if parent(parent(s′,neighbor_tree.b),neighbor_tree.b) ∈ neighbor_tree.leaves
+                                refine!(neighbor_tree,parent(parent(s′,neighbor_tree.b),neighbor_tree.b))
+                            else
+                                refine!(tree,o)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    #for k in 1:length(forest.cells)
+    #    tree = forest.cells[k]
+    #    balanced = balancetree(tree)
+    #    forest.cells[k] = balanced
+    #end
+end
+
 # Algorithm 7 of preprint Sundar, Sampath, Biros
 # https://padas.oden.utexas.edu/static/papers/OctreeBalance21.pdf
 # TODO optimise the unnecessary allocations
 function balancetree(tree::OctreeBWG)
+    if length(tree.leaves) == 1
+        return tree
+    end
     W = copy(tree.leaves); P = eltype(tree.leaves)[]; R = eltype(tree.leaves)[]
     for l in tree.b:-1:1 #TODO verify to do this until level 1
         Q = [o for o in W if o.l == l]
@@ -716,7 +779,7 @@ function siblings(o::OctantBWG,b;include_self=false)
 end
 
 # TODO make dimension agnostic
-function possibleneighbors(o::OctantBWG{2},l,b)
+function possibleneighbors(o::OctantBWG{2},l,b;insidetree=true)
     neighbors = ntuple(8) do i
         if i > 4
             j = i - 4
@@ -725,7 +788,9 @@ function possibleneighbors(o::OctantBWG{2},l,b)
             corner_neighbor(o,i,b)
         end
     end
-    neighbors = filter(x->inside(x,b),neighbors)
+    if insidetree
+        neighbors = filter(x->inside(x,b),neighbors)
+    end
     return neighbors
 end
 
@@ -946,7 +1011,7 @@ function parent(octant::OctantBWG{dim,N,M,T}, b::Integer=_maxlevel[dim-1]) where
         l = octant.l - one(T)
         return OctantBWG(l,octant.xyz .& ~h)
     else
-        error("root has no parent")
+        root(dim)
     end
 end
 
@@ -1002,7 +1067,8 @@ end
 face_neighbor(o::OctantBWG{dim,N,M,T1}, f::T2, b::T3) where {dim,N,M,T1<:Integer,T2<:Integer,T3<:Integer} = face_neighbor(o,T1(f),T1(b))
 
 """
-    transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) -> OctantBWG{dim,N,M,T2}
+    transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2}) -> OctantBWG{dim,N,M,T1,T2}
+    transform_face(forest::ForestBWG, f::FaceIndex, o::OctantBWG{dim,N,M,T2}) -> OctantBWG{dim,N,M,T2}
 Interoctree coordinate transformation of an given octant `o` to the octree `k` coordinate system by virtually pushing `o`s coordinate system through `k`'s face `f`.
 Implements Algorithm 8 of BWG p4est paper.
 
@@ -1056,6 +1122,8 @@ function transform_face(forest::ForestBWG, k::T1, f::T1, o::OctantBWG{dim,N,M,T2
         return OctantBWG(l,(xyz[1],xyz[2],xyz[3]))
     end
 end
+
+transform_face(forest::ForestBWG,f::FaceIndex,oct::OctantBWG) = transform_face(forest,f[1],f[2],oct)
 
 """
     transform_corner(forest,k,c',oct)
