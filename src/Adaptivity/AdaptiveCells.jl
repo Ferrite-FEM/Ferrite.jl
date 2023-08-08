@@ -432,6 +432,18 @@ function refine_all!(forest::ForestBWG,l)
    end
 end
 
+function refine!(forest::ForestBWG, cellid::Integer)
+    nleaves_k = length(forest.cells[1].leaves)
+    prev_nleaves_k = 0
+    k = 1
+    while nleaves_k < cellid
+        k += 1
+        prev_nleaves_k = nleaves_k
+        nleaves_k += length(forest.cells[k].leaves)
+    end
+    refine!(forest.cells[k],forest.cells[k].leaves[cellid-prev_nleaves_k])
+end
+
 function coarsen_all!(forest::ForestBWG)
     for tree in forest.cells
         for leaf in tree.leaves

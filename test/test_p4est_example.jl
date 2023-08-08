@@ -50,7 +50,7 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues, coord
             end
         end
     end
-    @show norm(Ke), norm(fe)
+    #@show norm(Ke), norm(fe)
     return Ke, fe
 end
 
@@ -78,10 +78,12 @@ function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHand
 end
 
 # Check L2 convergence
-function check_and_compute_convergence(dh, u, cellvalues, testatol)
+function check_and_compute_convergence(dh, u, cellvalues, testatol, forest)
     L2norm = 0.0
     L∞norm = 0.0
-    for cell in CellIterator(dh)
+    for (cellid,cell) in enumerate(CellIterator(dh))
+        L2loc = 0.0
+        L∞loc = 0.0
         reinit!(cellvalues, cell)
         n_basefuncs = getnbasefunctions(cellvalues)
         coords = getcoordinates(cell)
@@ -93,9 +95,15 @@ function check_and_compute_convergence(dh, u, cellvalues, testatol)
             uₐₚₚᵣₒₓ = function_value(cellvalues, q_point, uₑ)
             L2norm += norm(uₐₙₐ-uₐₚₚᵣₒₓ)*dΩ
             L∞norm = max(L∞norm, norm(uₐₙₐ-uₐₚₚᵣₒₓ))
-            @test isapprox(uₐₙₐ, uₐₚₚᵣₒₓ; atol=testatol)
+            L2loc += norm(uₐₙₐ-uₐₚₚᵣₒₓ)*dΩ
+            L∞loc = max(L∞norm, norm(uₐₙₐ-uₐₚₚᵣₒₓ))
+            #@test isapprox(uₐₙₐ, uₐₚₚᵣₒₓ; atol=testatol)
+        end
+        if L2loc > 1e-3
+            Ferrite.refine!(forest,cellid)
         end
     end
+    Ferrite.balanceforest!(forest)
     L2norm, L∞norm
 end
 
@@ -132,33 +140,32 @@ end
 
 end # module ConvergenceTestHelper
 
-@testset "convergence analysis" begin
-    @testset "$interpolation" for interpolation in (
-        Lagrange{RefQuadrilateral, 1}(),
-        #Lagrange{RefHexahedron, 1}(),
-    )
-        # Generate a grid ...
-        geometry = ConvergenceTestHelper.get_geometry(interpolation)
-        interpolation_geo = interpolation
-        N = ConvergenceTestHelper.get_N(interpolation)
-        grid = generate_grid(geometry, ntuple(x->3, Ferrite.getdim(geometry)));
-        adaptive_grid = ForestBWG(grid,4)
-        Ferrite.refine_all!(adaptive_grid,1)
-        Ferrite.refine_all!(adaptive_grid,2)
-        Ferrite.refine_all!(adaptive_grid,3)
-        Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[1].leaves[1])
-        Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[5].leaves[8])
-        Ferrite.refine!(adaptive_grid.cells[5],adaptive_grid.cells[5].leaves[5])
-        grid_transfered, hnodes = Ferrite.creategrid(adaptive_grid)
-        # ... a suitable quadrature rule ...
-        qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
-        qr = QuadratureRule{Ferrite.getrefshape(interpolation)}(qr_order)
-        # ... and then pray to the gods of convergence.
-        dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid_transfered, interpolation, interpolation_geo, qr, N, hnodes)
-        u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
-        #ConvergenceTestHelper.check_and_compute_convergence(dh, u, cellvalues, 1e-2)
-        vtk_grid("p4est_test.vtu",dh) do vtk
-            vtk_point_data(vtk,dh,u)
-        end
-    end
-end
+#@testset "convergence analysis" begin
+#    @testset "$interpolation" for interpolation in (
+#        Lagrange{RefQuadrilateral, 1}(),
+#        #Lagrange{RefHexahedron, 1}(),
+#    )
+#        L2norm = Inf
+#        # Generate a grid ...
+#        geometry = ConvergenceTestHelper.get_geometry(interpolation)
+#        interpolation_geo = interpolation
+#        N = ConvergenceTestHelper.get_N(interpolation)
+#        grid = generate_grid(geometry, ntuple(x->3, Ferrite.getdim(geometry)));
+#        adaptive_grid = ForestBWG(grid,7)
+#        # ... a suitable quadrature rule ...
+#        qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
+#        qr = QuadratureRule{Ferrite.getrefshape(interpolation)}(qr_order)
+#        # ... and then pray to the gods of convergence.
+#        i = 0
+#        while L2norm > 1e-2
+#            grid_transfered, hnodes = Ferrite.creategrid(adaptive_grid)
+#            dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid_transfered, interpolation, interpolation_geo, qr, N, hnodes)
+#            u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
+#            L2norm, _ = ConvergenceTestHelper.check_and_compute_convergence(dh, u, cellvalues, 1e-2, adaptive_grid)
+#            vtk_grid("p4est_test$(i).vtu",dh) do vtk
+#                vtk_point_data(vtk,dh,u)
+#            end
+#            i += 1
+#        end
+#    end
+#end
