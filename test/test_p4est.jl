@@ -258,3 +258,14 @@ end
         @test getncells(adaptive_grid) == 2^(2*l) * 4 == length(getcells(adaptive_grid))
     end
 end
+
+@testset "Balancing" begin
+    grid = generate_grid(Quadrilateral,(1,1))
+    adaptive_grid = ForestBWG(grid,3)
+    Ferrite.refine_all!(adaptive_grid,1)
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[2])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[6])
+    Ferrite.refine!(adaptive_grid.cells[1],adaptive_grid.cells[1].leaves[6])
+    balanced = Ferrite.balancetree(adaptive_grid.cells[1])
+    @test length(balanced.leaves) == 16
+end

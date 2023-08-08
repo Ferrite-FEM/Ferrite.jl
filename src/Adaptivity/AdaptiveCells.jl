@@ -667,10 +667,11 @@ end
 
 # Algorithm 7 of preprint Sundar, Sampath, Biros
 # https://padas.oden.utexas.edu/static/papers/OctreeBalance21.pdf
+# TODO optimise the unnecessary allocations
 function balancetree(tree::OctreeBWG)
     W = copy(tree.leaves); P = eltype(tree.leaves)[]; R = eltype(tree.leaves)[]
     for l in tree.b:-1:1 #TODO verify to do this until level 1
-        Q = [o for o in tree.leaves if o.l == l]
+        Q = [o for o in W if o.l == l]
         sort!(Q,by=x->morton(x,tree.b,tree.b))
         #construct T
         T = eltype(Q)[]
@@ -689,7 +690,7 @@ function balancetree(tree::OctreeBWG)
             push!(P,possibleneighbors(parent(t,tree.b),l-1,tree.b)...)
         end
         append!(P,x for x in W if x.l == l-1)
-        filter!(x->x.l !== l-1, W)
+        filter!(x->!(x.l == l-1), W) #don't know why I have to negotiate like this, otherwise behaves weird
         unique!(P)
         append!(W,P)
         empty!(P)
@@ -702,13 +703,8 @@ end
 # Algorithm 8 of preprint Sundar, Sampath, Biros
 # inverted the algorithm to delete! instead of add incrementally to a new array
 function linearise!(leaves::Vector{T},b) where T<:OctantBWG
-    i = 1
-    while i <= length(leaves)-1
-        if isancestor(leaves[i],leaves[i+1],b) # if i isancestor of i+1
-            deleteat!(leaves,i)
-        end
-        i += 1
-    end
+    inds = [i for i in 1:length(leaves)-1 if isancestor(leaves[i],leaves[i+1],b)]
+    deleteat!(leaves,inds)
 end
 
 function siblings(o::OctantBWG,b;include_self=false)
@@ -726,22 +722,26 @@ function possibleneighbors(o::OctantBWG{2},l,b)
             j = i - 4
             face_neighbor(o,j,b)
         else
-            corner_neighbor(o,i,b) 
+            corner_neighbor(o,i,b)
         end
     end
     neighbors = filter(x->inside(x,b),neighbors)
     return neighbors
 end
 
+"""
+    isancestor(o1,o2,b) -> Bool
+Is o2 an ancestor of o1
+"""
 function isancestor(o1,o2,b)
     ancestor = false
-    l = o2.l - 1
-    p = parent(o2,b)
+    l = o1.l - 1
+    p = parent(o1,b)
     while l > 0
-        if p == o1
+        if p == o2
             ancestor = true
             break
-        end 
+        end
         l -= 1
         p = parent(p,b)
     end
