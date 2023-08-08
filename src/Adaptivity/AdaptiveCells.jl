@@ -444,6 +444,16 @@ function refine!(forest::ForestBWG, cellid::Integer)
     refine!(forest.cells[k],forest.cells[k].leaves[cellid-prev_nleaves_k])
 end
 
+function refine!(forest::ForestBWG, cellids::Vector{<:Integer})
+    ncells = getncells(forest)
+    shift = 0
+    for cellid in cellids
+        refine!(forest,cellid+shift)
+        shift += getncells(forest) - ncells
+        ncells = getncells(forest)
+    end
+end
+
 function coarsen_all!(forest::ForestBWG)
     for tree in forest.cells
         for leaf in tree.leaves

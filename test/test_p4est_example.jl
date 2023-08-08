@@ -22,7 +22,7 @@ get_N(::Ferrite.Interpolation{shape, 3}) where {shape} = 8
 get_N(::Ferrite.Interpolation{shape, 4}) where {shape} = 5
 get_N(::Ferrite.Interpolation{shape, 5}) where {shape} = 3
 
-analytical_solution(x) = prod(cos, x*π/2)
+analytical_solution(x) = cot(norm(x))
 analytical_rhs(x) = -sum(diag(ForwardDiff.hessian(analytical_solution,x)))
 
 # Standard assembly copy pasta for Poisson problem
@@ -81,6 +81,7 @@ end
 function check_and_compute_convergence(dh, u, cellvalues, testatol, forest)
     L2norm = 0.0
     L∞norm = 0.0
+    marked_cells = Int[]
     for (cellid,cell) in enumerate(CellIterator(dh))
         L2loc = 0.0
         L∞loc = 0.0
@@ -99,11 +100,12 @@ function check_and_compute_convergence(dh, u, cellvalues, testatol, forest)
             L∞loc = max(L∞norm, norm(uₐₙₐ-uₐₚₚᵣₒₓ))
             #@test isapprox(uₐₙₐ, uₐₚₚᵣₒₓ; atol=testatol)
         end
-        if L2loc > 1e-3
-            Ferrite.refine!(forest,cellid)
+        if L2loc > 2e-1
+            push!(marked_cells,cellid)
         end
     end
-    Ferrite.balanceforest!(forest)
+    Ferrite.refine!(forest,marked_cells)
+    #Ferrite.balanceforest!(forest)
     L2norm, L∞norm
 end
 
@@ -140,32 +142,32 @@ end
 
 end # module ConvergenceTestHelper
 
-#@testset "convergence analysis" begin
-#    @testset "$interpolation" for interpolation in (
-#        Lagrange{RefQuadrilateral, 1}(),
-#        #Lagrange{RefHexahedron, 1}(),
-#    )
-#        L2norm = Inf
-#        # Generate a grid ...
-#        geometry = ConvergenceTestHelper.get_geometry(interpolation)
-#        interpolation_geo = interpolation
-#        N = ConvergenceTestHelper.get_N(interpolation)
-#        grid = generate_grid(geometry, ntuple(x->3, Ferrite.getdim(geometry)));
-#        adaptive_grid = ForestBWG(grid,7)
-#        # ... a suitable quadrature rule ...
-#        qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
-#        qr = QuadratureRule{Ferrite.getrefshape(interpolation)}(qr_order)
-#        # ... and then pray to the gods of convergence.
-#        i = 0
-#        while L2norm > 1e-2
-#            grid_transfered, hnodes = Ferrite.creategrid(adaptive_grid)
-#            dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid_transfered, interpolation, interpolation_geo, qr, N, hnodes)
-#            u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
-#            L2norm, _ = ConvergenceTestHelper.check_and_compute_convergence(dh, u, cellvalues, 1e-2, adaptive_grid)
-#            vtk_grid("p4est_test$(i).vtu",dh) do vtk
-#                vtk_point_data(vtk,dh,u)
-#            end
-#            i += 1
-#        end
-#    end
-#end
+@testset "convergence analysis" begin
+    @testset "$interpolation" for interpolation in (
+        Lagrange{RefQuadrilateral, 1}(),
+        #Lagrange{RefHexahedron, 1}(),
+    )
+        L2norm = Inf
+        # Generate a grid ...
+        geometry = ConvergenceTestHelper.get_geometry(interpolation)
+        interpolation_geo = interpolation
+        N = ConvergenceTestHelper.get_N(interpolation)
+        grid = generate_grid(geometry, ntuple(x->10, Ferrite.getdim(geometry)));
+        adaptive_grid = ForestBWG(grid,7)
+        # ... a suitable quadrature rule ...
+        qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
+        qr = QuadratureRule{Ferrite.getrefshape(interpolation)}(qr_order)
+        # ... and then pray to the gods of convergence.
+        i = 0
+        while L2norm > 1e-3 && i < 8
+            grid_transfered, hnodes = Ferrite.creategrid(adaptive_grid)
+            dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid_transfered, interpolation, interpolation_geo, qr, N, hnodes)
+            u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
+            L2norm, _ = ConvergenceTestHelper.check_and_compute_convergence(dh, u, cellvalues, 1e-2, adaptive_grid)
+            vtk_grid("p4est_test$(i).vtu",dh) do vtk
+                vtk_point_data(vtk,dh,u)
+            end
+            i += 1
+        end
+    end
+end
