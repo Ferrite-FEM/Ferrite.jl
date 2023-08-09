@@ -103,6 +103,18 @@ function faces(c::AbstractCell{refshape}) where refshape
     return ntuple(i -> getindex.(Ref(ns), rfs[i]), nfaces(refshape))::typeof(rfs)
 end
 
+function edges(c::AbstractCell{refshape}) where refshape
+    ns = get_node_ids(c)
+    rfs = reference_edges(refshape)
+    return ntuple(i -> getindex.(Ref(ns), rfs[i]), nedges(refshape))::typeof(rfs)
+end
+
+function vertices(c::AbstractCell{refshape}) where refshape
+    ns = get_node_ids(c)
+    rfs = reference_vertices(refshape)
+    return ntuple(i -> getindex.(Ref(ns), rfs[i]), nvertices(refshape))::typeof(rfs)
+end
+
 """
     Ferrite.default_interpolation(::AbstractCell)::Interpolation
 
@@ -119,50 +131,61 @@ Default implementation: `c.nodes`.
 """
 get_node_ids(c::AbstractCell) = c.nodes
 
+refernce_facets(c::AbstractCell{<:AbstractRefShape{1}}) = reference_vertices(c)
+refernce_facets(c::AbstractCell{<:AbstractRefShape{2}}) = reference_edges(c)
+refernce_facets(c::AbstractCell{<:AbstractRefShape{3}}) = reference_faces(c)
+
 # Default implementations of vertices/edges/faces that work as long as get_node_ids is
 # correctly implemented for the cell.
 
 # RefLine (refdim = 1): vertices for vertexdofs, faces for BC
-function vertices(c::AbstractCell{RefLine})
-    ns = get_node_ids(c)
-    return (ns[1], ns[2]) # v1, v2
+function reference_vertices(c::AbstractCell{RefLine})
+    return (1, 2) # v1, v2
 end
-function reference_faces(::Type{RefLine})
-    return ((1,), (2,)) # f1, f2
+function reference_edges(::Type{RefLine})
+    return ((1, 2),)
+end
+function reference_faces(c::AbstractCell{RefLine})
+    return () 
 end
 
 # RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
-function vertices(c::AbstractCell{RefTriangle})
-    ns = get_node_ids(c)
-    return (ns[1], ns[2], ns[3]) # v1, v2, v3
+function reference_vertices(c::AbstractCell{RefTriangle})
+    return (1,2,3) # v1, v2, v3
 end
-function reference_faces(::Type{RefTriangle})
+function reference_edges(::Type{RefTriangle})
     return (
         (1, 2), (2, 3), (3, 1), # f1, f2, f3
     )
 end
+function reference_faces(c::AbstractCell{RefTriangle})
+    return ((1, 2, 3),) 
+end
 
 # RefQuadrilateral (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
-function vertices(c::AbstractCell{RefQuadrilateral})
-    ns = get_node_ids(c)
-    return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
+function reference_vertices(c::AbstractCell{RefQuadrilateral})
+    return (1, 2, 3, 4) # v1, v2, v3, v4
 end
-function reference_faces(::Type{RefQuadrilateral})
+function reference_edges(::Type{RefQuadrilateral})
     return (
         (1, 2), (2, 3), (3, 4), (4, 1), # f1, f2, f3, f4
     )
 end
+function references_faces(c::AbstractCell{RefQuadrilateral})
+    return (
+        (1, 2, 3, 4), 
+    )
+end
 
 # RefTetrahedron (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
-function vertices(c::AbstractCell{RefTetrahedron})
+function references_vertices(c::AbstractCell{RefTetrahedron})
     ns = get_node_ids(c)
-    return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
+    return (1,2,3,4)# v1, v2, v3, v4
 end
-function edges(c::AbstractCell{RefTetrahedron})
-    ns = get_node_ids(c)
+function reference_edges(c::AbstractCell{RefTetrahedron})
     return (
-        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # e1, e2, e3
-        (ns[1], ns[4]), (ns[2], ns[4]), (ns[3], ns[4]), # e4, e5, e6
+        (1, 2), (2, 3), (3, 1), # e1, e2, e3
+        (1, 4), (2, 4), (3, 4), # e4, e5, e6
     )
 end
 function reference_faces(::Type{RefTetrahedron})
@@ -173,10 +196,10 @@ function reference_faces(::Type{RefTetrahedron})
 end
 
 # RefHexahedron (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
-function vertices(c::AbstractCell{RefHexahedron})
+function references_vertices(c::AbstractCell{RefHexahedron})
     ns = get_node_ids(c)
     return (
-        ns[1], ns[2], ns[3], ns[4], ns[5], ns[6], ns[7], ns[8], # v1, ..., v8
+       1, 2, 3, 4, 5, 6, 7, 8, # v1, ..., v8
     )
 end
 function edges(c::AbstractCell{RefHexahedron})
@@ -266,9 +289,6 @@ default_interpolation(::Type{Hexahedron})             = Lagrange{RefHexahedron, 
 default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron,    2}()
 default_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
 default_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,       1}()
-
-# TODO: Remove this, used for Quadrilateral3D
-edges(c::Quadrilateral#=3D=#) = faces(c)
 
 # Serendipity interpolation based cells
 struct SerendipityQuadraticQuadrilateral <: AbstractCell{RefQuadrilateral} nodes::NTuple{ 8, Int} end
@@ -465,6 +485,38 @@ Returns all vertex sets of the grid.
 @inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
 
 n_faces_per_cell(grid::Grid) = nfaces(getcelltype(grid))
+
+
+"""
+    getfacetset(grid::AbstractGrid, setname::String)
+
+Returns all facets in a `Set` of a given `setname`. 
+"""
+getfacetset(grid::AbstractGrid{sdim}, setname::String) where sdim = getfacetsets(grid)[setname]
+
+"""
+    getfacetsets(grid::AbstractGrid)
+
+Returns all facet sets of the grid.
+"""
+getfacetsets(grid::AbstractGrid{1}) = grid.vertexsets
+getfacetsets(grid::AbstractGrid{2}) = grid.edgesets
+getfacetsets(grid::AbstractGrid{3}) = grid.facesets
+
+#Backwards compat
+@inline getfacesets(grid::AbstractGrid{2}) = grid.edgesets
+@inline getfaceset(grid::AbstractGrid{2}, setname::String) = grid.edgesets[setname]
+@inline addfaceset!(grid::AbstractGrid{2}, name::String, f::Function; all::Bool=true) = addedgeset!(grid, name, f; all)
+@inline addfaceset!(grid::AbstractGrid{2}, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) = addedgeset!(grid, name, set)
+
+@inline getfacesets(grid::AbstractGrid{1}) = grid.vertexsets
+@inline getfaceset(grid::AbstractGrid{1}, setname::String) = grid.vertexsets[setname]
+@inline addfaceset!(grid::AbstractGrid{1}, name::String, f::Function; all::Bool=true) = addvertexset!(grid, name, f; all)
+@inline addfaceset!(grid::AbstractGrid{1}, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) = addvertexset!(grid, name, set)
+
+@inline facets(c::AbstractCell{<:AbstractRefShape{1}}) = vertices(c)
+@inline facets(c::AbstractCell{<:AbstractRefShape{2}}) = edges(c)
+@inline facets(c::AbstractCell{<:AbstractRefShape{3}}) = faces(c)
 
 # Transformations
 """

@@ -320,7 +320,7 @@ end
 
 # Calculate which local dof index live on each face:
 # face `i` have dofs `local_face_dofs[local_face_dofs_offset[i]:local_face_dofs_offset[i+1]-1]
-function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F=dirichlet_facedof_indices) where F
+function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F=dirichlet_facetdof_indices) where F
     @assert issorted(components)
     local_face_dofs = Int[]
     local_face_dofs_offset = Int[1]
@@ -906,12 +906,12 @@ function filter_dbc_set(grid::AbstractGrid, fhset::AbstractSet{Int}, dbcset::Abs
 end
 
 struct PeriodicFacePair
-    mirror::FaceIndex
-    image::FaceIndex
+    mirror::Tuple{Int,Int}
+    image::Tuple{Int,Int}
     rotation::UInt8 # relative rotation of the mirror face counter-clockwise the *image* normal (only relevant in 3D)
     mirrored::Bool  # mirrored => opposite normal vectors
 end
-
+PeriodicFacePair(a::BoundaryIndex, b::BoundaryIndex, rotation, mirrored) = PeriodicFacePair(a.idx, b.idx, rotation, mirrored)
 """
     PeriodicDirichlet(u::Symbol, face_mapping, components=nothing)
     PeriodicDirichlet(u::Symbol, face_mapping, R::AbstractMatrix, components=nothing)
@@ -1085,7 +1085,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
         max_x = Tx(i -> typemin(eltype(Tx)))
         for facepair in face_map, faceidx in (facepair.mirror, facepair.image)
             cellidx, faceidx = faceidx
-            nodes = faces(grid.cells[cellidx])[faceidx]
+            nodes = facets(grid.cells[cellidx])[faceidx]
             union!(all_node_idxs, nodes)
             for n in nodes
                 x = get_node_coordinate(grid, n)
@@ -1124,9 +1124,11 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
     if pdbc.func !== nothing
         # Create another temp constraint handler if we need to compute inhomogeneities
         chtmp2 = ConstraintHandler(ch.dh)
-        all_faces = Set{FaceIndex}()
-        union!(all_faces, (x.mirror for x in face_map))
-        union!(all_faces, (x.image for x in face_map))
+        dim = getdim(ch.dh.grid)
+        BIndex = (dim==1 ? VertexIndex : (dim==2 ? EdgeIndex : FaceIndex)) #TODO
+        all_faces = Set{BIndex}()
+        union!(all_faces, (BIndex(x.mirror) for x in face_map))
+        union!(all_faces, (BIndex(x.image) for x in face_map))
         dbc_all = Dirichlet(pdbc.field_name, all_faces, pdbc.func, pdbc.components)
         add!(chtmp2, dbc_all); close!(chtmp2)
         # Call update! here since we need it to construct the affine constraints...
@@ -1200,7 +1202,7 @@ end
 function mirror_local_dofs(local_face_dofs, local_face_dofs_offset, ip::Lagrange{<:Union{RefQuadrilateral,RefTriangle}}, n::Int)
     # For 2D we always permute since Ferrite defines dofs counter-clockwise
     ret = collect(1:length(local_face_dofs))
-    for (i, f) in enumerate(dirichlet_facedof_indices(ip))
+    for (i, f) in enumerate(dirichlet_edgedof_indices(ip))
         this_offset = local_face_dofs_offset[i]
         other_offset = this_offset + n
         for d in 1:n
@@ -1305,7 +1307,7 @@ between a image-face and mirror-face, for them to be considered matched.
 
 See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
 """
-function collect_periodic_faces(grid::Grid, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
+function collect_periodic_faces(grid::Grid, mset::Union{Set{BIndex},String}, iset::Union{Set{BIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12) where BIndex <: BoundaryIndex
     return collect_periodic_faces!(PeriodicFacePair[], grid, mset, iset, transform; tol)
 end
 
@@ -1320,7 +1322,7 @@ have a neighbor) is used.
 
 See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
 """
-function collect_periodic_faces(grid::Grid, all_faces::Union{Set{FaceIndex},String,Nothing}=nothing; tol::Float64=1e-12)
+function collect_periodic_faces(grid::Grid, all_faces::Union{Set{BIndex},String,Nothing}=nothing; tol::Float64=1e-12) where BIndex <: BoundaryIndex
     return collect_periodic_faces!(PeriodicFacePair[], grid, all_faces; tol)
 end
 
@@ -1330,7 +1332,7 @@ end
 
 Same as [`collect_periodic_faces`](@ref) but adds all matches to the existing `face_map`.
 """
-function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
+function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Union{Set{<:BoundaryIndex},String}, iset::Union{Set{<:BoundaryIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
     mset = __to_faceset(grid, mset)
     iset = __to_faceset(grid, iset)
     if transform === nothing
@@ -1343,7 +1345,7 @@ function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid,
     return face_map
 end
 
-function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, faceset::Union{Set{FaceIndex},String,Nothing}; tol::Float64=1e-12)
+function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, faceset::Union{Set{<:BoundaryIndex},String,Nothing}; tol::Float64=1e-12)
     faceset = faceset === nothing ? __collect_boundary_faces(grid) : copy(__to_faceset(grid, faceset))
     if mod(length(faceset), 2) != 0
         error("uneven number of faces")
@@ -1351,24 +1353,25 @@ function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid,
     return __collect_periodic_faces_bruteforce!(face_map, grid, faceset, faceset, #=known_order=#false, tol)
 end
 
-__to_faceset(_, set::Set{FaceIndex}) = set
+__to_faceset(_, set::Set{<:BoundaryIndex}) = set
 __to_faceset(grid, set::String) = getfaceset(grid, set)
-function __collect_boundary_faces(grid::Grid)
-    candidates = Dict{Tuple, FaceIndex}()
+function __collect_boundary_faces(grid::Grid{dim}) where dim
+    BIndex = (dim==1 ? VertexIndex : (dim==2 ? EdgeIndex : FaceIndex)) #TODO
+    candidates = Dict{Tuple, BIndex}()
     for (ci, c) in enumerate(grid.cells)
-        for (fi, fn) in enumerate(faces(c))
+        for (fi, fn) in enumerate(facets(c))
             face = first(sortface(fn))
             if haskey(candidates, face)
                 delete!(candidates, face)
             else
-                candidates[face] = FaceIndex(ci, fi)
+                candidates[face] = BIndex(ci, fi)
             end
         end
     end
-    return Set{FaceIndex}(values(candidates))
+    return Set{BIndex}(values(candidates))
 end
 
-function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Vector{FaceIndex}, iset::Vector{FaceIndex}, transformation::F, tol::Float64) where F <: Function
+function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Vector{BIndex}, iset::Vector{BIndex}, transformation::F, tol::Float64) where F <: Function where BIndex <: BoundaryIndex
     if length(mset) != length(mset)
         error("different number of faces in mirror and image set")
     end
@@ -1376,14 +1379,14 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
 
     mirror_mean_x = Tx[]
     for (c, f) in mset
-        fn = faces(grid.cells[c])[f]
+        fn = facets(grid.cells[c])[f]
         push!(mirror_mean_x, sum(get_node_coordinate(grid,i) for i in fn) / length(fn))
     end
 
     # Same dance for the image
     image_mean_x = Tx[]
     for (c, f) in iset
-        fn = faces(grid.cells[c])[f]
+        fn = facets(grid.cells[c])[f]
         # Apply transformation to all coordinates
         push!(image_mean_x, sum(transformation(get_node_coordinate(grid,i))::Tx for i in fn) / length(fn))
     end
@@ -1400,9 +1403,9 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
     end
 
     # Make sure the mapping is unique
-    @assert all(x -> in(x, Set{FaceIndex}(p.mirror for p in face_map)), mset)
-    @assert all(x -> in(x, Set{FaceIndex}(p.image for p in face_map)), iset)
-    if !allunique(Set{FaceIndex}(p.image for p in face_map))
+    @assert all(x -> in(x, Set{BIndex}(BIndex(p.mirror) for p in face_map)), mset)
+    @assert all(x -> in(x, Set{BIndex}(BIndex(p.image) for p in face_map)), iset)
+    if !allunique(Set{BIndex}(BIndex(p.image) for p in face_map))
         error("did not find a unique mapping between faces")
     end
 
@@ -1410,7 +1413,7 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
 end
 
 # This method empties mset and iset
-function __collect_periodic_faces_bruteforce!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Set{FaceIndex}, iset::Set{FaceIndex}, known_order::Bool, tol::Float64)
+function __collect_periodic_faces_bruteforce!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Set{BIndex}, iset::Set{BIndex}, known_order::Bool, tol::Float64) where BIndex <: BoundaryIndex
     if length(mset) != length(iset)
         error("different faces in mirror and image")
     end
@@ -1482,11 +1485,11 @@ end
 
 # Check if two faces are periodic. This method assumes that the faces are mirrored and thus
 # have opposing normal vectors
-function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_order::Bool, tol::Float64)
+function __check_periodic_faces(grid::Grid, fi::BIndex, fj::BIndex, known_order::Bool, tol::Float64) where BIndex
     cii, fii = fi
-    nodes_i = faces(grid.cells[cii])[fii]
+    nodes_i = facets(grid.cells[cii])[fii]
     cij, fij = fj
-    nodes_j = faces(grid.cells[cij])[fij]
+    nodes_j = facets(grid.cells[cij])[fij]
 
     # 1. Check that normals are opposite TODO: Should use FaceValues here
     ni = __outward_normal(grid, nodes_i)
@@ -1558,11 +1561,11 @@ end
 # a transformation function and we have then used the KDTree to find the matching pair of
 # faces. This function only need to i) check whether faces have aligned or opposite normal
 # vectors, and ii) compute the relative rotation.
-function __check_periodic_faces_f(grid::Grid, fi::FaceIndex, fj::FaceIndex, xmi, xmj, transformation::F, tol::Float64) where F
+function __check_periodic_faces_f(grid::Grid, fi::BIndex, fj::BIndex, xmi, xmj, transformation::F, tol::Float64) where F where BIndex<:BoundaryIndex
     cii, fii = fi
-    nodes_i = faces(grid.cells[cii])[fii]
+    nodes_i = facets(grid.cells[cii])[fii]
     cij, fij = fj
-    nodes_j = faces(grid.cells[cij])[fij]
+    nodes_j = facets(grid.cells[cij])[fij]
 
     # 1. Check if normals are aligned or opposite TODO: Should use FaceValues here
     ni = __outward_normal(grid, nodes_i)

@@ -138,7 +138,7 @@ function FaceCache(args...)
     FaceCache(cc, cc.dofs, ScalarWrapper(0))
 end
 
-function reinit!(fc::FaceCache, face::FaceIndex)
+function reinit!(fc::FaceCache, face::BoundaryIndex)
     cellid, faceid = face
     reinit!(fc.cc, cellid)
     fc.current_faceid[] = faceid
@@ -192,7 +192,7 @@ function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler})
     return InterfaceCache(fc_a, fc_b, Int[])
 end
 
-function reinit!(cache::InterfaceCache, face_a::FaceIndex, face_b::FaceIndex)
+function reinit!(cache::InterfaceCache, face_a::BoundaryIndex, face_b::BoundaryIndex)
     reinit!(cache.a, face_a)
     reinit!(cache.b, face_b)
     resize!(cache.dofs, length(celldofs(cache.a)) + length(celldofs(cache.b)))
@@ -314,7 +314,7 @@ struct FaceIterator{FC<:FaceCache}
 end
 
 function FaceIterator(gridordh::Union{Grid,AbstractDofHandler},
-                      set, flags::UpdateFlags=UpdateFlags())
+                      set::Set{FaceIndex}, flags::UpdateFlags=UpdateFlags())
     if gridordh isa DofHandler
         # Keep here to maintain same settings as for CellIterator
         _check_same_celltype(get_grid(gridordh), set)
@@ -324,6 +324,46 @@ end
 
 @inline _getcache(fi::FaceIterator) = fi.fc
 @inline _getset(fi::FaceIterator) = fi.set
+
+struct EdgeIterator{FC<:FaceCache}
+    fc::FC
+    set::Set{EdgeIndex}
+end
+
+function EdgeIterator(gridordh::Union{Grid,AbstractDofHandler},
+                      set::Set{EdgeIndex}, flags::UpdateFlags=UpdateFlags())
+    if gridordh isa DofHandler
+        # Keep here to maintain same settings as for CellIterator
+        _check_same_celltype(get_grid(gridordh), set)
+    end
+    return EdgeIterator(FaceCache(gridordh, flags), set)
+end
+
+@inline _getcache(fi::EdgeIterator) = fi.fc
+@inline _getset(fi::EdgeIterator) = fi.set
+
+struct VertexIterator{FC<:FaceCache}
+    fc::FC
+    set::Set{VertexIndex}
+end
+
+function VertexIterator(gridordh::Union{Grid,AbstractDofHandler},
+                      set::Set{VertexIndex}, flags::UpdateFlags=UpdateFlags())
+    if gridordh isa DofHandler
+        # Keep here to maintain same settings as for CellIterator
+        _check_same_celltype(get_grid(gridordh), set)
+    end
+    return VertexIterator(FaceCache(gridordh, flags), set)
+end
+
+@inline _getcache(fi::VertexIterator) = fi.fc
+@inline _getset(fi::VertexIterator) = fi.set
+
+FaceIterator(gridordh::Union{Grid,AbstractDofHandler}, set::Set{EdgeIndex}, flags::UpdateFlags=UpdateFlags()) = 
+    EdgeIterator(gridordh, set, flags)
+
+FaceIterator(gridordh::Union{Grid,AbstractDofHandler}, set::Set{VertexIndex}, flags::UpdateFlags=UpdateFlags()) = 
+    VertexIterator(gridordh, set, flags)
 
 """
     InterfaceIterator(grid::Grid, [topology::ExclusiveTopology])
@@ -368,9 +408,9 @@ end
 # Iterator interface
 function Base.iterate(ii::InterfaceIterator, state...)
     grid_dim = getdim(ii.grid)
-    neighborhood = grid_dim == 1 ? ii.topology.vertex_vertex_neighbor : ii.topology.face_face_neighbor
+    neighborhood = get_facet_facet_neighbor(ii.topology, Val(grid_dim)) #TODO: typestable
     while true
-        it = iterate(faceskeleton(ii.topology, ii.grid), state...)
+        it = iterate(facetskeleton(ii.topology, ii.grid), state...)
         it === nothing && return nothing
         face_a, state = it
         if isempty(neighborhood[face_a[1], face_a[2]])
@@ -387,7 +427,7 @@ end
 
 
 # Iterator interface for CellIterator/FaceIterator
-const GridIterators{C} = Union{CellIterator{C}, FaceIterator{C}, InterfaceIterator{C}}
+const GridIterators{C} = Union{CellIterator{C}, FaceIterator{C}, EdgeIterator{C}, VertexIterator{C}, InterfaceIterator{C}}
 
 function Base.iterate(iterator::GridIterators, state_in...)
     it = iterate(_getset(iterator), state_in...)
@@ -410,10 +450,10 @@ function _check_same_celltype(grid::AbstractGrid, cellset::IntegerCollection)
     end
 end
 
-function _check_same_celltype(grid::AbstractGrid, faceset::Set{FaceIndex})
+function _check_same_celltype(grid::AbstractGrid, faceset::Set{<:BoundaryIndex})
     isconcretetype(getcelltype(grid)) && return nothing # Short circuit check
     celltype = getcelltype(grid, first(faceset)[1])
     if !all(getcelltype(grid, face[1]) == celltype for face in faceset)
-        error("The cells in the faceset are not all of the same celltype.")
+        error("The cells in the set (set of $(eltype(faceset))) are not all of the same celltype.")
     end
 end

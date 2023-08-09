@@ -70,8 +70,13 @@ mutable struct ExclusiveTopology <: AbstractTopology
     edge_edge_neighbor::Matrix{EntityNeighborhood{EdgeIndex}}
     # lazy constructed face topology
     face_skeleton::Union{Vector{FaceIndex}, Nothing}
+    edge_skeleton::Union{Vector{EdgeIndex}, Nothing}
     # TODO reintroduce the codimensional connectivity, e.g. 3D edge to 2D face
 end
+
+get_facet_facet_neighbor(t::ExclusiveTopology, dim::Val{3}) = t.face_face_neighbor
+get_facet_facet_neighbor(t::ExclusiveTopology, dim::Val{2}) = t.edge_edge_neighbor
+get_facet_facet_neighbor(t::ExclusiveTopology, dim::Val{1}) = t.vertex_vertex_neighbor
 
 function Base.show(io::IO, ::MIME"text/plain", topology::ExclusiveTopology)
     println(io, "ExclusiveTopology\n")
@@ -127,13 +132,7 @@ function _exclusive_topology_ctor(cells::Vector{C}, vertex_cell_table::Array{Set
                 end
             # Shared path
             elseif num_shared_vertices == 2
-                if getdim(cell) == 2
-                    _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
-                elseif getdim(cell) == 3
-                    _add_single_edge_neighbor!(edge_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
-                else
-                    @error "Case not implemented."
-                end
+                _add_single_edge_neighbor!(edge_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
             # Shared surface
             elseif num_shared_vertices >= 3
                 _add_single_face_neighbor!(face_table, cell, cell_id, cell_neighbor, cell_neighbor_id)
@@ -165,8 +164,8 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
         dim = getdim(cells[1])
 
         max_vertices = nvertices(cells[1])
-        dim > 1 && (max_faces = nfaces(cells[1]))
-        dim > 2 && (max_edges = nedges(cells[1]))
+        max_faces = nfaces(cells[1])
+        max_edges = nedges(cells[1])
     else
         celltypes = Set(typeof.(cells))
         for celltype in celltypes
@@ -174,8 +173,8 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
             dim = getdim(cells[celltypeidx])
 
             max_vertices = max(max_vertices,nvertices(cells[celltypeidx]))
-            dim > 1 && (max_faces = max(max_faces, nfaces(cells[celltypeidx])))
-            dim > 2 && (max_edges = max(max_edges, nedges(cells[celltypeidx])))
+            max_faces = max(max_faces, nfaces(cells[celltypeidx]))
+            max_edges = max(max_edges, nedges(cells[celltypeidx]))
         end
     end
 
@@ -202,7 +201,7 @@ function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
 
     _exclusive_topology_ctor(cells, vertex_cell_table, vertex_table, face_table, edge_table, cell_neighbor_table)
 
-    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_table,vertex_table,edge_table,nothing)
+    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_table,vertex_table,edge_table,nothing,nothing)
 end
 
 function _add_single_face_neighbor!(face_table, cell::C1, cell_id, cell_neighbor::C2, cell_neighbor_id) where {C1, C2}
@@ -301,7 +300,7 @@ function vertex_star_stencils(top::ExclusiveTopology, grid::Grid)
     for (global_vertexid,cellset) ∈ enumerate(top.vertex_to_cell)
         vertex_neighbors_local = VertexIndex[]
         for cell ∈ cellset
-            neighbor_boundary = getdim(cells[cell]) > 2 ? collect(edges(cells[cell])) : collect(faces(cells[cell])) #get lowest dimension boundary
+            neighbor_boundary = edges(cells[cell])
             neighbor_connected_faces = neighbor_boundary[findall(x->global_vertexid ∈ x, neighbor_boundary)]
             this_local_vertex = findfirst(i->toglobal(grid, VertexIndex(cell, i)) == global_vertexid, 1:nvertices(cells[cell]))
             push!(vertex_neighbors_local, VertexIndex(cell, this_local_vertex))
@@ -329,7 +328,7 @@ end
 Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit`
 `FaceValues`.
 """
-function _faceskeleton(top::ExclusiveTopology, grid::Grid)
+function _faceskeleton(top::ExclusiveTopology, grid::Grid{3})
     cells = getcells(grid)
     cell_dim = getdim(first(cells))
     @assert all(cell -> getdim(cell) == cell_dim, cells) "Face skeleton construction requires all the elements to be of the same dimensionality"
@@ -344,14 +343,32 @@ function _faceskeleton(top::ExclusiveTopology, grid::Grid)
     return face_skeleton_local
 end
 
+function _edgeskeleton(top::ExclusiveTopology, grid::Grid{2})
+    face_skeleton_global = Set{NTuple}()
+    face_skeleton_local = Vector{EdgeIndex}()
+    fs_length = length(face_skeleton_global)
+    # TODO use topology to speed up :)
+    for (cellid,cell) ∈ enumerate(grid.cells)
+        for (local_face_id,face) ∈ enumerate(edges(cell))
+            push!(face_skeleton_global, sortedge_fast(face))
+            fs_length_new = length(face_skeleton_global)
+            if fs_length != fs_length_new
+                push!(face_skeleton_local, EdgeIndex(cellid,local_face_id))
+                fs_length = fs_length_new
+            end
+        end
+    end
+    return face_skeleton_local
+end
+
 """
     face_skeleton(top::ExclusiveTopology, grid::Grid) -> Vector{FaceIndex}
 Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit`
 `FaceValues`.
 """
-function faceskeleton(top::ExclusiveTopology, grid::Grid)
-    if top.face_skeleton === nothing
-        top.face_skeleton = _faceskeleton(top, grid)
+function facetskeleton(top::ExclusiveTopology, grid::Grid{2})
+    if top.edge_skeleton === nothing
+        top.edge_skeleton = _edgeskeleton(top, grid)
     end
-    return top.face_skeleton
+    return top.edge_skeleton
 end

@@ -363,7 +363,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
     # add to the face since currently more dofs per face isn't supported. In
     # 2D a face (i.e. a line) is uniquely determined by 2 vertices, and in 3D a face (i.e. a
     # surface) is uniquely determined by 3 vertices.
-    facedicts = [Dict{NTuple{dim,Int}, Int}() for _ in 1:numfields]
+    facedicts = [Dict{Tuple{Int,Int,Int}, Int}() for _ in 1:numfields]
 
     # Set initial values
     nextdof = 1  # next free dof to distribute
@@ -404,20 +404,16 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
                     next_dof_index += 1
                 end
             end
-            if getdim(interpolation) > 2
-                for vdofs ∈ edgedof_interior_indices(interpolation)
-                    for dof_index ∈ vdofs
-                        @assert dof_index == next_dof_index "Edge dof ordering not supported. Please consult the dev docs."
-                        next_dof_index += 1
-                    end
+            for vdofs ∈ edgedof_interior_indices(interpolation)
+                for dof_index ∈ vdofs
+                    @assert dof_index == next_dof_index "Edge dof ordering not supported. Please consult the dev docs."
+                    next_dof_index += 1
                 end
             end
-            if getdim(interpolation) > 1
-                for vdofs ∈ facedof_interior_indices(interpolation)
-                    for dof_index ∈ vdofs
-                        @assert dof_index == next_dof_index "Face dof ordering not supported. Please consult the dev docs."
-                        next_dof_index += 1
-                    end
+            for vdofs ∈ facedof_interior_indices(interpolation)
+                for dof_index ∈ vdofs
+                    @assert dof_index == next_dof_index "Face dof ordering not supported. Please consult the dev docs."
+                    next_dof_index += 1
                 end
             end
             for dof_index ∈ celldof_interior_indices(interpolation)
@@ -493,26 +489,19 @@ function _distribute_dofs_for_cell!(dh::DofHandler{sdim}, cell::AbstractCell, ip
         ip_info.nvertexdofs, nextdof, ip_info.n_copies,
     )
 
-    # Distribute dofs for edges (only applicable when dim is 3)
-    if sdim == 3 && (ip_info.reference_dim == 3 || ip_info.reference_dim == 2)
-        # Regular 3D element or 2D interpolation embedded in 3D space
-        nentitydofs = ip_info.reference_dim == 3 ? ip_info.nedgedofs : ip_info.nfacedofs
-        nextdof = add_edge_dofs(
-            dh.cell_dofs, cell, edgedict,
-            nentitydofs, nextdof,
-            ip_info.adjust_during_distribution, ip_info.n_copies,
-        )
-    end
+    # Distribute dofs for edges 
+    nextdof = add_edge_dofs(
+        dh.cell_dofs, cell, edgedict,
+        ip_info.nedgedofs, nextdof,
+        ip_info.adjust_during_distribution, ip_info.n_copies,
+    )
 
-    # Distribute dofs for faces. Filter out 2D interpolations in 3D space, since
-    # they are added above as edge dofs.
-    if ip_info.reference_dim == sdim && sdim > 1
-        nextdof = add_face_dofs(
-            dh.cell_dofs, cell, facedict,
-            ip_info.nfacedofs, nextdof,
-            ip_info.adjust_during_distribution, ip_info.n_copies,
-        )
-    end
+    # Distribute dofs for faces. 
+    nextdof = add_face_dofs(
+        dh.cell_dofs, cell, facedict,
+        ip_info.nfacedofs, nextdof,
+        ip_info.adjust_during_distribution, ip_info.n_copies,
+    )
 
     # Distribute internal dofs for cells
     nextdof = add_cell_dofs(

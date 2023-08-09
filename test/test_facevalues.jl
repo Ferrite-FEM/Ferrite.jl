@@ -28,7 +28,7 @@ for (scalar_interpol, quad_rule) in (
         @test getnbasefunctions(fv) == n_basefuncs
 
         xs, n = valid_coordinates_and_normals(func_interpol)
-        for face in 1:Ferrite.nfaces(func_interpol)
+        for face in 1:Ferrite.nfacets(func_interpol)
             reinit!(fv, xs, face)
             @test Ferrite.getcurrentface(fv) == face
 
@@ -76,8 +76,8 @@ for (scalar_interpol, quad_rule) in (
                 vol += getdetJdV(fv,i)
             end
             let ip_base = func_interpol isa VectorizedInterpolation ? func_interpol.ip : func_interpol
-                x_face = xs[[Ferrite.facedof_indices(ip_base)[face]...]]
-                @test vol ≈ calculate_face_area(ip_base, x_face, face)
+                x_face = xs[[Ferrite.facetdof_indices(ip_base)[face]...]]
+                @test vol ≈ calculate_facet_area(ip_base, x_face, face)
             end
 
             # Test quadrature rule after reinit! with ref. coords
