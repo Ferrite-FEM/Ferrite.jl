@@ -4,8 +4,8 @@
 * `AbstractValues`
   * `AbstractCellValues`
     * [`CellValues`](@ref)
-  * `AbstractFaceValues`
-    * [`FaceValues`](@ref)
+  * `AbstractFacetValues`
+    * [`FacetValues`](@ref)
     * [`BCValues`](@ref)
   * [`PointValues`](@ref)
   

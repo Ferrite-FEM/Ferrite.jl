@@ -138,21 +138,21 @@ grid = generate_grid(Quadrilateral, ntuple(_ -> 20, dim));
 topology = ExclusiveTopology(grid);
 
 # ### Trial and test functions
-# `CellValues`, `FaceValues`, and `InterfaceValues` facilitate the process of evaluating values and gradients of
+# `CellValues`, `FacetValues`, and `InterfaceValues` facilitate the process of evaluating values and gradients of
 # test and trial functions (among other things). To define
 # these we need to specify an interpolation space for the shape functions.
 # We use `DiscontinuousLagrange` functions
 # based on the two-dimensional reference quadrilateral. We also define a quadrature rule based on
 # the same reference element. We combine the interpolation and the quadrature rule
-# to `CellValues` and `InterfaceValues` object. Note that `InterfaceValues` object contains two `FaceValues` objects which can be used individually.
+# to `CellValues` and `InterfaceValues` object. Note that `InterfaceValues` object contains two `FacetValues` objects which can be used individually.
 order = 1;
 ip = DiscontinuousLagrange{RefQuadrilateral, order}();
 qr = QuadratureRule{RefQuadrilateral}(2);
-# For `FaceValues` and `InterfaceValues` we use `FaceQuadratureRule`
-face_qr = FaceQuadratureRule{RefQuadrilateral}(2);
+# For `FacetValues` and `InterfaceValues` we use `FacetQuadratureRule`
+facet_qr = FacetQuadratureRule{RefQuadrilateral}(2);
 cellvalues = CellValues(qr, ip);
-facevalues = FaceValues(face_qr, ip);
-interfacevalues = InterfaceValues(face_qr, ip);
+facetvalues = FacetValues(facet_qr, ip);
+interfacevalues = InterfaceValues(facet_qr, ip);
 # ### Penalty term parameters
 # We define functions to calculate the diameter of a set of points, used to calculate the characteristic size $h_e$ in the assembly routine.
 getdistance(p1::Vec{N, T},p2::Vec{N, T}) where {N, T} = norm(p1-p2);
@@ -173,14 +173,14 @@ K = create_sparsity_pattern(dh, topology = topology, cross_coupling = trues(1,1)
 # The Dirichlet boundary conditions are treated 
 # as usual by a `ConstraintHandler`.
 ch = ConstraintHandler(dh)
-add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 1.0))
-add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> -1.0))
+add!(ch, Dirichlet(:u, getfacetset(grid, "right"), (x, t) -> 1.0))
+add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> -1.0))
 close!(ch);
 
 # Furthermore, we define $\partial \Omega_N$ as the `union` of the face sets with Neumann boundary conditions for later use
 ∂Ωₙ = union(
-    getfaceset(grid, "top"),
-    getfaceset(grid, "bottom"),
+    getfacetset(grid, "top"),
+    getfacetset(grid, "bottom"),
 );
 
 
@@ -200,7 +200,7 @@ close!(ch);
 # * `assemble_interface!` to compute the contribution ``K_i`` of surface integrals over an
 #   interface using `interfacevalues`.
 # * `assemble_boundary!` to compute the contribution ``f_e`` of surface integrals over a
-#   boundary face using `facevalues`.
+#   boundary face using `FacetValues`.
 
 function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
@@ -255,7 +255,7 @@ function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
     return Ki
 end
 
-function assemble_boundary!(fe::Vector, fv::FaceValues)
+function assemble_boundary!(fe::Vector, fv::FacetValues)
     ## Reset to 0
     fill!(fe, 0)
     ## Loop over quadrature points
@@ -280,7 +280,7 @@ end
 # We define the function `assemble_global` to loop over all elements and internal faces
 # (interfaces), as well as the external faces involved in Neumann boundary conditions.
 
-function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, order::Int, dim::Int)
+function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, order::Int, dim::Int)
     ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -314,17 +314,17 @@ function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfa
         assemble!(assembler, interfacedofs(ic), Ki)
     end
     ## Loop over domain boundaries with Neumann boundary conditions
-    for fc in FaceIterator(dh, ∂Ωₙ)
+    for fc in FacetIterator(dh, ∂Ωₙ)
         ## Reinitialize face_values_a for this boundary face
-        reinit!(facevalues, fc)
+        reinit!(facetvalues, fc)
         ## Compute boundary face surface integrals contribution
-        assemble_boundary!(fe, facevalues)
+        assemble_boundary!(fe, facetvalues)
         ## Assemble fe into f
         assemble!(f, celldofs(fc), fe)
     end
     return K, f
 end
-K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh, order, dim);
+K, f = assemble_global(cellvalues, facetvalues, interfacevalues, K, dh, order, dim);
 #md nothing # hide
 
 # ### Solution of the system

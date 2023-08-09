@@ -146,6 +146,19 @@
 using Ferrite, FerriteGmsh, Gmsh, Tensors, LinearAlgebra, SparseArrays
 using Test #src
 
+# Overload for specific elements in this tutorial.
+function FerriteGmsh.tofacesets(boundarydict::Dict{String,Vector}, elements::Vector{Triangle})
+    faces = Ferrite.facets.(elements)
+    facesets = Dict{String,Set{FaceIndex}}()
+    for (boundaryname, boundaryfaces) in boundarydict
+        facesettuple = Set{FaceIndex}()
+        for boundaryface in boundaryfaces
+            FerriteGmsh._add_to_facesettuple!(facesettuple, boundaryface, faces)
+        end
+        facesets[boundaryname] = facesettuple
+    end
+    return facesets
+end
 
 # ### Geometry and mesh generation with `Gmsh.jl`
 #
@@ -212,6 +225,15 @@ function setup_grid(h=0.05)
     ## Finalize the Gmsh library
     Gmsh.finalize()
 
+    ## Temp fix for FerriteGmsh
+    ## for setname in ["Γ1", "Γ2", "Γ3", "Γ4"]
+    ##    faceset = grid.facesets[setname]
+    ##    edgeset = Set([EdgeIndex(f[1], f[2]) for f in faceset])
+    ##    grid.edgesets[setname] = edgeset
+    ##    delete!(grid.facesets, setname)
+    ## end
+    ## =#
+
     return grid
 end
 #md nothing #hide
@@ -231,8 +253,8 @@ function setup_fevalues(ipu, ipp, ipg)
     qr = QuadratureRule{RefTriangle}(2)
     cvu = CellValues(qr, ipu, ipg)
     cvp = CellValues(qr, ipp, ipg)
-    qr_face = FaceQuadratureRule{RefTriangle}(2)
-    fvp = FaceValues(qr_face, ipp, ipg)
+    qr_facet = FacetQuadratureRule{RefTriangle}(2)
+    fvp = FacetValues(qr_facet, ipp, ipg)
     return cvu, cvp, fvp
 end
 #md nothing #hide
@@ -288,10 +310,10 @@ function setup_mean_constraint(dh, fvp)
     assembler = start_assemble()
     ## All external boundaries
     set = union(
-        getfaceset(dh.grid, "Γ1"),
-        getfaceset(dh.grid, "Γ2"),
-        getfaceset(dh.grid, "Γ3"),
-        getfaceset(dh.grid, "Γ4"),
+        getfacetset(dh.grid, "Γ1"),
+        getfacetset(dh.grid, "Γ2"),
+        getfacetset(dh.grid, "Γ3"),
+        getfacetset(dh.grid, "Γ4"),
     )
     ## Allocate buffers
     range_p = dof_range(dh, :p)
@@ -339,7 +361,7 @@ end
 # outlet ``\Gamma_3`` to be the mirror. The necessary transformation to apply then becomes a
 # rotation of ``\pi/2`` radians around the out-of-plane axis. We set up the rotation matrix
 # `R`, and then compute the mapping between mirror and image faces using
-# [`collect_periodic_faces`](@ref) where the rotation is applied to the coordinates. In the
+# [`collect_periodic_facets`](@ref) where the rotation is applied to the coordinates. In the
 # next step we construct the constraint using the [`PeriodicDirichlet`](@ref) constructor.
 # We pass the constructor the computed mapping, and also the rotation matrix. This matrix is
 # used to rotate the dofs on the mirror surface such that we properly constrain
@@ -354,11 +376,11 @@ function setup_constraints(dh, fvp)
     ch = ConstraintHandler(dh)
     ## Periodic BC
     R = rotation_tensor(π / 2)
-    periodic_faces = collect_periodic_faces(dh.grid, "Γ3", "Γ1", x -> R ⋅ x)
+    periodic_faces = collect_periodic_facets(dh.grid, "Γ3", "Γ1", x -> R ⋅ x)
     periodic = PeriodicDirichlet(:u, periodic_faces, R, [1, 2])
     add!(ch, periodic)
     ## Dirichlet BC
-    Γ24 = union(getfaceset(dh.grid, "Γ2"), getfaceset(dh.grid, "Γ4"))
+    Γ24 = union(getfacetset(dh.grid, "Γ2"), getfacetset(dh.grid, "Γ4"))
     dbc = Dirichlet(:u, Γ24, (x, t) -> [0, 0], [1, 2])
     add!(ch, dbc)
     ## Compute mean value constraint and add it
@@ -439,8 +461,8 @@ end
 function check_mean_constraint(dh, fvp, u)                                  #src
     ## All external boundaries                                              #src
     set = union(                                                            #src
-        getfaceset(dh.grid, "Γ1"), getfaceset(dh.grid, "Γ2"),               #src
-        getfaceset(dh.grid, "Γ3"), getfaceset(dh.grid, "Γ4"),               #src
+        getfacetset(dh.grid, "Γ1"), getfacetset(dh.grid, "Γ2"),             #src
+        getfacetset(dh.grid, "Γ3"), getfacetset(dh.grid, "Γ4"),             #src
     )                                                                       #src
     range_p = dof_range(dh, :p)                                             #src
     cc = CellCache(dh)                                                      #src

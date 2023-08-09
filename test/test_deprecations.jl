@@ -66,18 +66,18 @@ end
     @test (@test_deprecated r"RefQuadrilateral.*RefHexahedron" test_combo(CellValues, 2, RefCube, (:legendre, 1), Lagrange{RefQuadrilateral, 1}())) isa CellValues
     @test (@test_deprecated r"RefHexahedron" test_combo(CellValues, 3, RefCube, (1,), Lagrange{RefHexahedron, 1}())) isa CellValues
     @test (@test_deprecated r"RefHexahedron" test_combo(CellValues, 3, RefCube, (:legendre, 1), Lagrange{RefHexahedron, 1}())) isa CellValues
-    @test (@test_deprecated r"RefLine" test_combo(FaceValues, 0, RefCube, (1,), Lagrange{RefLine, 1}())) isa FaceValues
-    @test (@test_deprecated r"RefLine" test_combo(FaceValues, 0, RefCube, (:legendre, 1), Lagrange{RefLine, 1}())) isa FaceValues
-    @test (@test_deprecated r"(RefLine.*RefQuadrilateral)" test_combo(FaceValues, 1, RefCube, (1,), Lagrange{RefQuadrilateral, 1}())) isa FaceValues
-    @test (@test_deprecated r"likely this comes" test_combo(FaceValues, 1, RefCube, (1,), Lagrange{RefQuadrilateral, 1}())) isa FaceValues
-    @test (@test_deprecated r"(RefLine.*RefQuadrilateral)" test_combo(FaceValues, 1, RefCube, (:legendre, 1), Lagrange{RefQuadrilateral, 1}())) isa FaceValues
-    @test (@test_deprecated r"likely this comes" test_combo(FaceValues, 1, RefCube, (:legendre, 1), Lagrange{RefQuadrilateral, 1}())) isa FaceValues
-    @test (@test_deprecated r"RefQuadrilateral.*RefHexahedron" test_combo(FaceValues, 2, RefCube, (1,), Lagrange{RefHexahedron, 1}())) isa FaceValues
-    @test (@test_deprecated r"likely this comes" test_combo(FaceValues, 2, RefCube, (1,), Lagrange{RefHexahedron, 1}())) isa FaceValues
-    @test (@test_deprecated r"RefQuadrilateral.*RefHexahedron" test_combo(FaceValues, 2, RefCube, (:legendre, 1), Lagrange{RefHexahedron, 1}())) isa FaceValues
-    @test (@test_deprecated r"likely this comes" test_combo(FaceValues, 2, RefCube, (:legendre, 1), Lagrange{RefHexahedron, 1}())) isa FaceValues
-    @test (@test_deprecated r"RefTriangle" test_combo(FaceValues, 1, RefTetrahedron, (1,), Lagrange{RefTriangle, 1}())) isa FaceValues
-    @test (@test_deprecated r"RefTriangle" test_combo(FaceValues, 1, RefTetrahedron, (:legendre, 1), Lagrange{RefTriangle, 1}())) isa FaceValues
+    @test (@test_deprecated r"RefLine" test_combo(FacetValues, 0, RefCube, (1,), Lagrange{RefLine, 1}())) isa FacetValues
+    @test (@test_deprecated r"RefLine" test_combo(FacetValues, 0, RefCube, (:legendre, 1), Lagrange{RefLine, 1}())) isa FacetValues
+    @test (@test_deprecated r"(RefLine.*RefQuadrilateral)" test_combo(FacetValues, 1, RefCube, (1,), Lagrange{RefQuadrilateral, 1}())) isa FacetValues
+    @test (@test_deprecated r"likely this comes" test_combo(FacetValues, 1, RefCube, (1,), Lagrange{RefQuadrilateral, 1}())) isa FacetValues
+    @test (@test_deprecated r"(RefLine.*RefQuadrilateral)" test_combo(FacetValues, 1, RefCube, (:legendre, 1), Lagrange{RefQuadrilateral, 1}())) isa FacetValues
+    @test (@test_deprecated r"likely this comes" test_combo(FacetValues, 1, RefCube, (:legendre, 1), Lagrange{RefQuadrilateral, 1}())) isa FacetValues
+    @test (@test_deprecated r"RefQuadrilateral.*RefHexahedron" test_combo(FacetValues, 2, RefCube, (1,), Lagrange{RefHexahedron, 1}())) isa FacetValues
+    @test (@test_deprecated r"likely this comes" test_combo(FacetValues, 2, RefCube, (1,), Lagrange{RefHexahedron, 1}())) isa FacetValues
+    @test (@test_deprecated r"RefQuadrilateral.*RefHexahedron" test_combo(FacetValues, 2, RefCube, (:legendre, 1), Lagrange{RefHexahedron, 1}())) isa FacetValues
+    @test (@test_deprecated r"likely this comes" test_combo(FacetValues, 2, RefCube, (:legendre, 1), Lagrange{RefHexahedron, 1}())) isa FacetValues
+    @test (@test_deprecated r"RefTriangle" test_combo(FacetValues, 1, RefTetrahedron, (1,), Lagrange{RefTriangle, 1}())) isa FacetValues
+    @test (@test_deprecated r"RefTriangle" test_combo(FacetValues, 1, RefTetrahedron, (:legendre, 1), Lagrange{RefTriangle, 1}())) isa FacetValues
 end
 
 @testset "Ferrite.value and Ferrite.derivative" begin
@@ -86,6 +86,14 @@ end
     @test (@test_deprecated Ferrite.value(ip, ξ)) == [shape_value(ip, ξ, i) for i in 1:getnbasefunctions(ip)]
     @test (@test_deprecated Ferrite.derivative(ip, ξ)) == [shape_gradient(ip, ξ, i) for i in 1:getnbasefunctions(ip)]
     @test (@test_deprecated Ferrite.value(ip, 1, ξ)) == shape_value(ip, ξ, 1)
+end
+
+@testset "facesets" begin
+grid = generate_grid(Quadrilateral, (2,2))
+addfaceset!(grid, "right_face", x -> x[1] ≈ 1)
+@test getfacetset(grid, "right_face") == getfacetset(grid, "right")
+addfaceset!(grid, "right_face_explicit", Set(Ferrite.FaceIndex(fi[1], fi[2]) for fi in getfacetset(grid, "right")))
+@test getfacetset(grid, "right_face_explicit") == getfacetset(grid, "right")
 end
 
 end # testset deprecations

@@ -55,9 +55,9 @@ grid = generate_grid(Quadrilateral, (150, 150))
 
 ip = Lagrange{RefQuadrilateral, 1}()
 qr = QuadratureRule{RefQuadrilateral}(2)
-qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
+qr_facet = FacetQuadratureRule{RefQuadrilateral}(2)
 cellvalues = CellValues(qr, ip);
-facevalues = FaceValues(qr_face, ip);
+facetvalues = FacetValues(qr_facet, ip);
 
 dh = DofHandler(grid)
 add!(dh, :u, ip)
@@ -80,14 +80,14 @@ end;
 
 dbcs = ConstraintHandler(dh)
 # The (strong) Dirichlet boundary condition can be handled automatically by the Ferrite library.
-dbc = Dirichlet(:u, union(getfaceset(grid, "top"), getfaceset(grid, "right")), (x,t) -> u_ana(x))
+dbc = Dirichlet(:u, union(getfacetset(grid, "top"), getfacetset(grid, "right")), (x,t) -> u_ana(x))
 add!(dbcs, dbc)
 close!(dbcs)
 update!(dbcs, 0.0)
 
 K = create_sparsity_pattern(dh);
 
-function doassemble(cellvalues::CellValues, facevalues::FaceValues,
+function doassemble(cellvalues::CellValues, facetvalues::FacetValues,
                          K::SparseMatrixCSC, dh::DofHandler)
     b = 1.0
     f = zeros(ndofs(dh))
@@ -134,18 +134,18 @@ function doassemble(cellvalues::CellValues, facevalues::FaceValues,
         # \int_{\Gamma_2} δu g_2 \, d\Gamma
         # ```
         #+
-        for face in 1:nfaces(cell)
-            if onboundary(cell, face) && 
-                   ((cellcount, face) ∈ getfaceset(grid, "left") || 
-                    (cellcount, face) ∈ getfaceset(grid, "bottom"))
-                reinit!(facevalues, cell, face)
-                for q_point in 1:getnquadpoints(facevalues)
-                    coords_qp = spatial_coordinate(facevalues, q_point, coords)
-                    n = getnormal(facevalues, q_point)
+        for facet in 1:nfacets(cell)
+            if onboundary(cell, facet) && 
+                   ((cellcount, facet) ∈ getfacetset(grid, "left") || 
+                    (cellcount, facet) ∈ getfacetset(grid, "bottom"))
+                reinit!(facetvalues, cell, facet)
+                for q_point in 1:getnquadpoints(facetvalues)
+                    coords_qp = spatial_coordinate(facetvalues, q_point, coords)
+                    n = getnormal(facetvalues, q_point)
                     g_2 = gradient(u_ana, coords_qp) ⋅ n
-                    dΓ = getdetJdV(facevalues, q_point)
+                    dΓ = getdetJdV(facetvalues, q_point)
                     for i in 1:n_basefuncs
-                        δu = shape_value(facevalues, q_point, i)
+                        δu = shape_value(facetvalues, q_point, i)
                         fe[i] += (δu * g_2) * dΓ
                     end
                 end
@@ -158,7 +158,7 @@ function doassemble(cellvalues::CellValues, facevalues::FaceValues,
     return K, f
 end;
 
-K, f = doassemble(cellvalues, facevalues, K, dh);
+K, f = doassemble(cellvalues, facetvalues, K, dh);
 apply!(K, f, dbcs)
 u = Symmetric(K) \ f;
 

@@ -12,11 +12,11 @@ function test_apply_rhs()
     
     ch = ConstraintHandler(dh)
     
-    ∂Ω = union(getfaceset.((grid,), ["left", "right"])...)
+    ∂Ω = union(getfacetset.((grid,), ["left", "right"])...)
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
     add!(ch, dbc);
 
-    ∂Ω = union(getfaceset.((grid,), ["top", "bottom"])...)
+    ∂Ω = union(getfacetset.((grid,), ["top", "bottom"])...)
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> 2)
     add!(ch, dbc);
     
