@@ -1,9 +1,9 @@
 """
-    element_face_transformation(point::Vec{N, T}, cell_T::Type{<:AbstractRefShape}, face::Int) 
+    face_to_element_transformation(point::Vec{N, T}, cell_T::Type{<:AbstractRefShape}, face::Int) 
 
 Transform point from face's reference (N-1)D coordinates to ND coordinates on the cell's face.
 """
-element_face_transformation
+face_to_element_transformation
 
 """
     weighted_normal(J::AbstractTensor, fv::FaceValues, face::Int)
@@ -27,7 +27,7 @@ function create_face_quad_rule(cell_T::Type{RefShape}, w::Vector{T}, p::Vector{V
     n_points = length(w)
     face_quad_rule = QuadratureRule{RefShape, T, getdim(AbstractCell{cell_T})}[]
     for face in 1:nfaces(cell_T)
-        new_points = [element_face_transformation(N != 0 ? p[i] : Vec(zero(T)), cell_T, face) for i in 1:n_points] # ξ = 1-t-s, η = s, ζ = 0
+        new_points = [face_to_element_transformation(N != 0 ? p[i] : Vec(zero(T)), cell_T, face) for i in 1:n_points] # ξ = 1-t-s, η = s, ζ = 0
         push!(face_quad_rule, QuadratureRule{RefShape, T}(w, new_points))    
     end
     return FaceQuadratureRule(face_quad_rule)
@@ -39,11 +39,11 @@ function create_face_quad_rule(cell_T::Type{RefShape}, quad_faces::Vector{Int}, 
     n_points_tri = length(w_tri)
     face_quad_rule = Array{QuadratureRule{RefShape, T, getdim(AbstractCell{cell_T})}}(undef, nfaces(cell_T))
     for face in quad_faces
-        new_points = [element_face_transformation(N != 0 ? p_quad[i] : Vec(zero(T)), cell_T, face) for i in 1:n_points_quad]
+        new_points = [face_to_element_transformation(N != 0 ? p_quad[i] : Vec(zero(T)), cell_T, face) for i in 1:n_points_quad]
         face_quad_rule[face] = QuadratureRule{RefShape, T}(w_quad, new_points)
     end
     for face in tri_faces
-        new_points = [element_face_transformation(N != 0 ? p_tri[i] : T[], cell_T, face) for i in 1:n_points_tri]
+        new_points = [face_to_element_transformation(N != 0 ? p_tri[i] : T[], cell_T, face) for i in 1:n_points_tri]
         face_quad_rule[face] = QuadratureRule{RefShape, T}(w_tri, new_points)
     end
     return FaceQuadratureRule(face_quad_rule)
@@ -54,7 +54,7 @@ end
 ##################
 
 # Mapping from to 0D node to 1D line vertex.
-function element_face_transformation(::Vec{N, T}, cell_T::Type{RefLine}, face::Int) where {N, T}
+function face_to_element_transformation(::Vec{N, T}, cell_T::Type{RefLine}, face::Int) where {N, T}
     face == 1 && return Vec{1, T}(( -one(T),))
     face == 2 && return Vec{1, T}((  one(T),))
     throw(ArgumentError("unknown face number"))
@@ -71,7 +71,7 @@ end
 ###########################
 
 # Mapping from 1D line to 2D face of a quadrilateral.
-function element_face_transformation(point::Vec{1, T}, cell_T::Type{RefQuadrilateral}, face::Int) where T
+function face_to_element_transformation(point::Vec{1, T}, cell_T::Type{RefQuadrilateral}, face::Int) where T
     x = point[]
     face == 1 && return Vec{2, T}(( x,          -one(T)))
     face == 2 && return Vec{2, T}(( one(T),     x))
@@ -95,7 +95,7 @@ end
 ######################
 
 # Mapping from 1D line to 2D face of a triangle.
-function element_face_transformation(point::Vec{1, T},  cell_T::Type{RefTriangle}, face::Int) where T
+function face_to_element_transformation(point::Vec{1, T},  cell_T::Type{RefTriangle}, face::Int) where T
     x = (point[] + one(T)) / 2
     face == 1 && return Vec{2, T}(( one(T) - x,     x ))
     face == 2 && return Vec{2, T}(( zero(T),        one(T) -x))
@@ -117,7 +117,7 @@ end
 ########################
 
 # Mapping from 2D quadrilateral to 3D face of a hexahedron.
-function element_face_transformation(point::Vec{2, T}, cell_T::Type{RefHexahedron}, face::Int) where T
+function face_to_element_transformation(point::Vec{2, T}, cell_T::Type{RefHexahedron}, face::Int) where T
     x,y = point
     face == 1 && return Vec{3, T}(( y,      x,          -one(T)))
     face == 2 && return Vec{3, T}(( x,      -one(T),    y))
@@ -145,7 +145,7 @@ end
 #########################
 
 # Mapping from 2D triangle to 3D face of a tetrahedon.
-function element_face_transformation(point::Vec{2, T}, cell_T::Type{RefTetrahedron}, face::Int) where T
+function face_to_element_transformation(point::Vec{2, T}, cell_T::Type{RefTetrahedron}, face::Int) where T
     x,y = point
     face == 1 && return Vec{3, T}( (one(T)-x-y,     y,              zero(T)))
     face == 2 && return Vec{3, T}( (y,              zero(T),        one(T)-x-y))
@@ -169,7 +169,7 @@ end
 ###################
 
 # Mapping from 2D quadrilateral/triangle to 3D face of a wedge.
-function element_face_transformation(point::Vec{2, T}, cell_T::Type{RefPrism}, face::Int) where T
+function face_to_element_transformation(point::Vec{2, T}, cell_T::Type{RefPrism}, face::Int) where T
     # Note that for quadrilaterals the domain is [-1, 1]² but for triangles it is [0, 1]²
     x,y = point
     face == 1 && return Vec{3, T}(( one(T)-x-y,             y,                      zero(T)))
@@ -196,7 +196,7 @@ end
 #####################
 
 # Mapping from 2D face to 3D face of a pyramid.
-function element_face_transformation(point::Vec{2, T}, cell_T::Type{RefPyramid}, face::Int) where T
+function face_to_element_transformation(point::Vec{2, T}, cell_T::Type{RefPyramid}, face::Int) where T
     x,y = point
     face == 1 && return Vec{3, T}(( (y+one(T))/2,   (x+one(T))/2,       zero(T)))
     face == 2 && return Vec{3, T}(( y,              zero(T),            one(T)-x-y))
