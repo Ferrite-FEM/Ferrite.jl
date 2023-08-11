@@ -247,3 +247,6 @@ coords_on_faces(x, ::Lagrange{RefHexahedron, 1}) =
     ([x[1],x[2],x[3],x[4]], [x[1],x[2],x[5],x[6]], [x[2],x[3],x[6],x[7]],[x[3],x[4],x[7],x[8]],[x[1],x[4],x[5],x[8]],[x[5],x[6],x[7],x[8]])
 coords_on_faces(x, ::Serendipity{RefHexahedron, 2}) =
     ([x[1],x[2],x[5]], [x[2],x[3],x[6]], [x[3],x[4],x[7]], [x[1],x[4],x[8]])
+
+check_equal_or_nan(a::Any, b::Any) = a==b || (isnan(a) && isnan(b))
+check_equal_or_nan(a::Union{Tensor, Array}, b::Union{Tensor, Array}) = all(check_equal_or_nan.(a, b))

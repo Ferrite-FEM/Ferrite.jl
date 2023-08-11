@@ -96,14 +96,14 @@ for (scalar_interpol, quad_rule) in (
         # test copy
         fvc = copy(fv)
         @test typeof(fv) == typeof(fvc)
-        Ferrite.getrefshape(func_interpol) ∈ (RefPrism, RefPyramid)|| for fname in fieldnames(typeof(fv))
+        for fname in fieldnames(typeof(fv))
             v = getfield(fv, fname)
             v isa Ferrite.ScalarWrapper && continue
             vc = getfield(fvc, fname)
             if hasmethod(pointer, Tuple{typeof(v)})
                 @test pointer(v) != pointer(vc)
             end
-            @test v == vc
+            @test check_equal_or_nan(v, vc)
         end
     end
 end

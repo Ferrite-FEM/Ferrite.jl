@@ -63,7 +63,7 @@
         RefPyramid)
         dim = ref_shape.super.parameters[1]
         for face in (-1, 0, 100) 
-            err = ArgumentError("unknown face number: $face for a cell of type $ref_shape")
+            err = ArgumentError("unknown face number")
             @test_throws err Ferrite.weighted_normal(Tensor{2,dim}(zeros(dim^2)), ref_shape, face)
             @test_throws err Ferrite.reference_face_to_face(Vec{dim>1 ? dim-1 : 1}(zeros(dim>1 ? dim-1 : 1)), ref_shape, face)
         end
