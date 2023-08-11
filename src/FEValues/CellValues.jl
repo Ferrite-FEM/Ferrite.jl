@@ -1,3 +1,4 @@
+
 include("GeometryValues.jl")
 include("FunctionValues.jl")
 
@@ -7,13 +8,15 @@ end
 
 struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCellValues
     geo_values::GeometryValues{dMdξ_t, GIP, T}
+    detJdV::Vector{T}
     fun_values::FunctionValues{IP, N_t, dNdx_t, dNdξ_t}
     qr::QR
 end
 function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation) where T 
     geo_values = GeometryValues(T, ip_geo.ip, qr)
     fun_values = FunctionValues(T, ip_fun, qr, ip_geo)
-    return CellValues(geo_values, fun_values, qr)
+    detJdV = fill(T(NaN), length(getweights(qr)))
+    return CellValues(geo_values, detJdV, fun_values, qr)
 end
 
 CellValues(qr::QuadratureRule, ip::Interpolation, args...) = CellValues(Float64, qr, ip, args...)
@@ -22,11 +25,12 @@ function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolatio
 end
 
 # Access geometry values
-for op = (:getdetJdV, :getngeobasefunctions, :geometric_value)
+for op = (:getngeobasefunctions, :geometric_value)
     eval(quote
         @propagate_inbounds $op(cv::CellValues, args...) = $op(cv.geo_values, args...)
     end)
 end
+getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 
 # Accessors for function values 
 getnbasefunctions(cv::CellValues) = getnbasefunctions(cv.fun_values)
@@ -45,8 +49,11 @@ function reinit!(cv::CellValues, x::AbstractVector{<:Vec})
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     end
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
-        Jinv = calculate_mapping(geo_values, q_point, w, x)
-        apply_mapping!(cv.fun_values, q_point, Jinv)
+        mapping = calculate_mapping(geo_values, q_point, x)
+        detJ = calculate_detJ(getjacobian(mapping))
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
+        @inbounds cv.detJdV[q_point] = detJ*w
+        apply_mapping!(cv.fun_values, q_point, mapping)
     end
     return nothing
 end

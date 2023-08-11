@@ -102,6 +102,7 @@ for (scalar_interpol, quad_rule) in (
             if hasmethod(pointer, Tuple{typeof(v)})
                 @test pointer(v) != pointer(vc)
             end
+            v != vc && println(typeof(fv))
             @test v == vc
         end
     end

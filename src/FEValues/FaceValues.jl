@@ -1,55 +1,18 @@
-struct FaceGeometryValues{dMdξ_t, GIP, T, Normal_t}
-    M::Matrix{T}
-    dMdξ::Matrix{dMdξ_t}
+struct FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP} <: AbstractFaceValues
+    geo_values::Vector{GeometryValues{dMdξ_t, GIP, T}}
     detJdV::Vector{T}
     normals::Vector{Normal_t}
-    ip::GIP
-end
-function FaceGeometryValues(::Type{T}, ip_vec::VectorizedInterpolation{sdim}, qr::QuadratureRule) where {T,sdim}
-    ip = ip_vec.ip
-    n_shape = getnbasefunctions(ip)
-    n_qpoints = getnquadpoints(qr)
-    M    = zeros(T,  n_shape, n_qpoints)
-    dMdξ = zeros(Vec{getdim(ip),T}, n_shape, n_qpoints)
-    for (qp, ξ) in pairs(getpoints(qr))
-        for i in 1:n_shape
-            dMdξ[i, qp], M[i, qp] = shape_gradient_and_value(ip, ξ, i)
-        end
-    end
-    normals = fill(zero(Vec{sdim,T})*T(NaN), n_qpoints)
-    detJdV = fill(T(NaN), n_qpoints)
-    return FaceGeometryValues(M, dMdξ, detJdV, normals, ip)
-end
-
-getngeobasefunctions(geovals::FaceGeometryValues) = size(geovals.M, 1)
-@propagate_inbounds geometric_value(geovals::FaceGeometryValues, q_point::Int, base_func::Int) = geovals.M[base_func, q_point]
-@propagate_inbounds getdetJdV(geovals::FaceGeometryValues, q_point::Int) = geovals.detJdV[q_point]
-@propagate_inbounds getnormal(geovals::FaceGeometryValues, q_point::Int) = geovals.normals[q_point]
-
-@inline function calculate_mapping(geo_values::FaceGeometryValues{<:Vec{dim,T}}, face_nr::Int, q_point, w, x::AbstractVector{<:Vec{dim,T}}) where {dim,T}
-    fefv_J = zero(Tensor{2,dim,T}) # zero(Tensors.getreturntype(⊗, eltype(x), eltype(geo_values.dMdξ)))
-    @inbounds for j in 1:getngeobasefunctions(geo_values)
-        fefv_J += x[j] ⊗ geo_values.dMdξ[j, q_point]
-    end
-    weight_norm = weighted_normal(fefv_J, getrefshape(geo_values.ip), face_nr)
-    detJ = norm(weight_norm)
-    detJ > 0.0 || throw_detJ_not_pos(detJ)
-    @inbounds geo_values.detJdV[q_point] = detJ*w
-    @inbounds geo_values.normals[q_point] = weight_norm / norm(weight_norm)
-    return inv(fefv_J)
-end
-
-struct FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP} <: AbstractFaceValues
-    geo_values::Vector{FaceGeometryValues{dMdξ_t, GIP, T, Normal_t}}
     fun_values::Vector{FunctionValues{IP, N_t, dNdx_t, dNdξ_t}}
     qr::QR # FaceQuadratureRule
     current_face::ScalarWrapper{Int}
 end
 
-function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation=default_geometric_interpolation(ip_fun)) where T 
-    geo_values = [FaceGeometryValues(T, ip_geo, qr) for qr in fqr.face_rules]
+function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}=default_geometric_interpolation(ip_fun)) where {T,sdim} 
+    geo_values = [GeometryValues(T, ip_geo.ip, qr) for qr in fqr.face_rules]
     fun_values = [FunctionValues(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
-    return FaceValues(geo_values, fun_values, fqr, ScalarWrapper(1))
+    detJdV = fill(T(NaN), maximum(qr->length(getweights(qr)), fqr.face_rules))
+    normals = fill(zero(Vec{sdim,T})*T(NaN), length(geo_values))
+    return FaceValues(geo_values, detJdV, normals, fun_values, fqr, ScalarWrapper(1))
 end
 
 FaceValues(qr::FaceQuadratureRule, ip::Interpolation, args...) = FaceValues(Float64, qr, ip, args...)
@@ -60,9 +23,10 @@ end
 getngeobasefunctions(fv::FaceValues) = getngeobasefunctions(get_geo_values(fv))
 getnbasefunctions(fv::FaceValues) = getnbasefunctions(get_fun_values(fv))
 getnquadpoints(fv::FaceValues) = getnquadpoints(fv.qr, getcurrentface(fv))
+getdetJdV(fv::FaceValues, q_point) = fv.detJdV[q_point] 
 
 get_geo_values(fv::FaceValues) = @inbounds fv.geo_values[getcurrentface(fv)]
-for op = (:getdetJdV, :getngeobasefunctions, :geometric_value)
+for op = (:getngeobasefunctions, :geometric_value)
     eval(quote
         @propagate_inbounds $op(fv::FaceValues, args...) = $op(get_geo_values(fv), args...)
     end)
@@ -89,7 +53,7 @@ getcurrentface(fv::FaceValues) = fv.current_face[]
 Return the normal at the quadrature point `qp` for the active face of the
 `FaceValues` object(from last `reinit!`).
 """
-getnormal(fv::FaceValues, qp::Int) = getnormal(get_geo_values(fv), qp)
+getnormal(fv::FaceValues, qp::Int) = fv.normals[qp]
 
 nfaces(fv::FaceValues) = length(fv.geo_values)
 
@@ -108,8 +72,14 @@ function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int) wh
     geo_values = get_geo_values(fv)
     fun_values = get_fun_values(fv)
     @inbounds for (q_point, w) in pairs(getweights(fv.qr, face_nr))
-        Jinv = calculate_mapping(geo_values, face_nr, q_point, w, x)
-        apply_mapping!(fun_values, q_point, Jinv)
+        mapping = calculate_mapping(geo_values, q_point, x)
+        J = getjacobian(mapping)
+        weight_norm = weighted_normal(J, getrefshape(geo_values.ip), face_nr)
+        detJ = norm(weight_norm)
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
+        @inbounds fv.detJdV[q_point] = detJ*w
+        @inbounds fv.normals[q_point] = weight_norm / norm(weight_norm)       
+        apply_mapping!(fun_values, q_point, mapping)
     end
 end
 

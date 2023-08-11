@@ -58,6 +58,26 @@ getnbasefunctions(funvals::FunctionValues) = size(funvals.N, 1)
 @propagate_inbounds shape_gradient(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.dNdx[base_func, q_point]
 @propagate_inbounds shape_symmetric_gradient(funvals::FunctionValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(funvals, q_point, base_func))
 
+# Mapping types 
+struct IdentityMapping end 
+struct CovariantPiolaMapping end 
+struct ContravariantPiolaMapping end 
+# Not yet implemented:
+# struct DoubleCovariantPiolaMapping end 
+# struct DoubleContravariantPiolaMapping end 
+
+get_mapping_type(::FunctionValues{<:ScalarInterpolation}) = IdentityMapping()
+get_mapping_type(::FunctionValues{<:VectorizedInterpolation}) = IdentityMapping()
+#get_mapping_type(::FunctionValues{<:HdivIP}) = ContravariantPiolaMapping()
+#get_mapping_type(::FunctionValues{<:HcurlIP}) = CovariantPiolaMapping()
+
+requires_hessian(::IdentityMapping) = false
+requires_hessian(::ContravariantPiolaMapping) = true
+requires_hessian(::CovariantPiolaMapping) = true
+
+
+calculate_Jinv(J::Tensor{2}) = inv(J)
+calculate_Jinv(J::SMatrix) = pinv(J)
 
 # Hotfix to get the dots right for embedded elements until mixed tensors are merged.
 # Scalar/Vector interpolations with sdim == rdim (== vdim)
@@ -69,10 +89,25 @@ getnbasefunctions(funvals::FunctionValues) = size(funvals.N, 1)
 # Vector interpolations with sdim > rdim
 @inline dothelper(B::SMatrix{vdim, rdim}, A::SMatrix{rdim, sdim}) where {vdim, rdim, sdim} = B * A
 
-@inline function apply_mapping!(funvals::FunctionValues, q_point::Int, Jinv)
+@inline function apply_mapping!(funvals::FunctionValues, args...)
+    return apply_mapping!(funvals, get_mapping_type(funvals), args...)
+end
+
+@inline function apply_mapping!(funvals::FunctionValues, ::IdentityMapping, q_point::Int, mapping_values)
+    Jinv = calculate_Jinv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
         #funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Jinv # TODO via Tensors.jl
         funvals.dNdx[j, q_point] = dothelper(funvals.dNdξ[j, q_point], Jinv)
     end
     return nothing
 end
+#=
+@inline function apply_mapping!(funvals::FunctionValues, ::IdentityMapping, q_point::Int, mapping_values)
+    Jinv = inv(getjacobian(mapping_values))
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        #funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Jinv # TODO via Tensors.jl
+        funvals.dNdx[j, q_point] = dothelper(funvals.dNdξ[j, q_point], Jinv)
+    end
+    return nothing
+end
+=#
