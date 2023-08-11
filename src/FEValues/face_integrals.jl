@@ -34,7 +34,7 @@ function create_face_quad_rule(cell_T::Type{RefShape}, w::Vector{T}, p::Vector{V
 end
 
 # For cells with mixed faces
-function create_face_quad_rule(cell_T::Type{RefShape}, quad_faces::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}}, tri_faces::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}) where {N, T, RefShape <: AbstractRefShape}
+function create_face_quad_rule(cell_T::Type{RefShape}, quad_faces::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}}, tri_faces::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}) where {N, T, RefShape <: Union{RefPrism, RefPyramid}}
     n_points_quad = length(w_quad)
     n_points_tri = length(w_tri)
     face_quad_rule = Array{QuadratureRule{RefShape, T, getdim(AbstractCell{cell_T})}}(undef, nfaces(cell_T))
@@ -57,13 +57,13 @@ end
 function reference_face_to_face(::Vec{N, T}, cell_T::Type{RefLine}, face::Int) where {N, T}
     face == 1 && return Vec{1, T}(( -one(T),))
     face == 2 && return Vec{1, T}((  one(T),))
-    throw(ArgumentError("unknown face number: $face for a cell of type $(cell_T)"))
+    throw(ArgumentError("unknown face number"))
 end
 
 function weighted_normal(::Tensor{2,1,T}, cell_T::Type{RefLine}, face::Int) where {T}
     face == 1 && return Vec{1,T}((-one(T),))
     face == 2 && return Vec{1,T}(( one(T),))
-    throw(ArgumentError("unknown face number: $face for a cell of type $(cell_T)"))
+    throw(ArgumentError("unknown face number"))
 end
 
 ###########################
@@ -77,7 +77,7 @@ function reference_face_to_face(point::Vec{1, T}, cell_T::Type{RefQuadrilateral}
     face == 2 && return Vec{2, T}(( one(T),     x))
     face == 3 && return Vec{2, T}(( -x,         one(T)))
     face == 4 && return Vec{2, T}(( -one(T),    -x))
-    throw(ArgumentError("unknown face number: $face for a cell of type $(cell_T)"))
+    throw(ArgumentError("unknown face number"))
 end
 
 function weighted_normal(J::Tensor{2,2}, cell_T::Type{RefQuadrilateral}, face::Int)
@@ -87,7 +87,7 @@ function weighted_normal(J::Tensor{2,2}, cell_T::Type{RefQuadrilateral}, face::I
         face == 3 && return Vec{2}((-J[2,1],  J[1,1]))
         face == 4 && return Vec{2}((-J[2,2],  J[1,2]))
     end
-    throw(ArgumentError("unknown face number: $face for a cell of type $(cell_T)"))
+    throw(ArgumentError("unknown face number"))
 end
 
 ######################
@@ -100,7 +100,7 @@ function reference_face_to_face(point::Vec{1, T},  cell_T::Type{RefTriangle}, fa
     face == 1 && return Vec{2, T}(( one(T) - x,     x ))
     face == 2 && return Vec{2, T}(( zero(T),        one(T) -x))
     face == 3 && return Vec{2, T}(( x,              zero(T)))
-    throw(ArgumentError("unknown face number: $face for a cell of type $(cell_T)"))
+    throw(ArgumentError("unknown face number"))
 end
 
 function weighted_normal(J::Tensor{2,2}, cell_T::Type{RefTriangle}, face::Int)
@@ -109,7 +109,7 @@ function weighted_normal(J::Tensor{2,2}, cell_T::Type{RefTriangle}, face::Int)
         face == 2 && return Vec{2}((-J[2,2], J[1,2]))
         face == 3 && return Vec{2}((J[2,1], -J[1,1]))
     end
-    throw(ArgumentError("unknown face number: $face for a cell of type $(cell_T)"))
+    throw(ArgumentError("unknown face number"))
 end
 
 ########################
@@ -125,7 +125,7 @@ function reference_face_to_face(point::Vec{2, T}, cell_T::Type{RefHexahedron}, f
     face == 4 && return Vec{3, T}(( -x,     one(T),     y))
     face == 5 && return Vec{3, T}((-one(T), y,          x))
     face == 6 && return Vec{3, T}(( x,      y,          one(T)))
-    throw(ArgumentError("unknown face number: $face for a cell of type $(cell_T)"))
+    throw(ArgumentError("unknown face number"))
 end
 
 function weighted_normal(J::Tensor{2,3}, cell_T::Type{RefHexahedron}, face::Int)
@@ -137,7 +137,7 @@ function weighted_normal(J::Tensor{2,3}, cell_T::Type{RefHexahedron}, face::Int)
         face == 5 && return J[:,3] × J[:,2]
         face == 6 && return J[:,1] × J[:,2]
     end
-    throw(ArgumentError("unknown face number: $face for a cell of type $(cell_T)"))
+    throw(ArgumentError("unknown face number"))
 end
 
 #########################
@@ -151,7 +151,7 @@ function reference_face_to_face(point::Vec{2, T}, cell_T::Type{RefTetrahedron}, 
     face == 2 && return Vec{3, T}( (y,              zero(T),        one(T)-x-y))
     face == 3 && return Vec{3, T}( (x,              y,              one(T)-x-y))
     face == 4 && return Vec{3, T}( (zero(T),        one(T)-x-y,     y))
-    throw(ArgumentError("unknown face number: $face for a cell of type $(cell_T)"))
+    throw(ArgumentError("unknown face number"))
 end
 
 function weighted_normal(J::Tensor{2,3}, cell_T::Type{RefTetrahedron}, face::Int)
@@ -161,7 +161,7 @@ function weighted_normal(J::Tensor{2,3}, cell_T::Type{RefTetrahedron}, face::Int
         face == 3 && return (J[:,1]-J[:,3]) × (J[:,2]-J[:,3])
         face == 4 && return J[:,3] × J[:,2]
     end
-    throw(ArgumentError("unknown face number: $face for a cell of type $(cell_T)"))
+    throw(ArgumentError("unknown face number"))
 end
 
 ###################
@@ -177,7 +177,7 @@ function reference_face_to_face(point::Vec{2, T}, cell_T::Type{RefPrism}, face::
     face == 3 && return Vec{3, T}(( zero(T),                one(T)-(one(T)+x)/2,    (one(T)+y)/2))
     face == 4 && return Vec{3, T}(( one(T)-(one(T)+x)/2,   (one(T)+x)/2,            (one(T)+y)/2))
     face == 5 && return Vec{3, T}(( y,                      one(T)-x-y,             one(T)))
-    throw(ArgumentError("unknown face number: $face for a cell of type $(cell_T)"))
+    throw(ArgumentError("unknown face number"))
 end
 
 function weighted_normal(J::Tensor{2,3}, cell_T::Type{RefPrism}, face::Int)
@@ -188,7 +188,7 @@ function weighted_normal(J::Tensor{2,3}, cell_T::Type{RefPrism}, face::Int)
         face == 4 && return (J[:,2]-J[:,1]) × J[:,3]
         face == 5 && return J[:,1] × J[:,2]
     end
-    throw(ArgumentError("unknown face number: $face for a cell of type $(cell_T)"))
+    throw(ArgumentError("unknown face number"))
 end
 
 #####################
@@ -203,7 +203,7 @@ function reference_face_to_face(point::Vec{2, T}, cell_T::Type{RefPyramid}, face
     face == 3 && return Vec{3, T}(( zero(T),        one(T)-x-y,         y))
     face == 4 && return Vec{3, T}(( x+y,            y,                  one(T)-x-y))
     face == 5 && return Vec{3, T}(( one(T)-x-y,     one(T)-y,           y))
-    throw(ArgumentError("unknown face number: $face for a cell of type $(cell_T)"))
+    throw(ArgumentError("unknown face number"))
 end
 
 function weighted_normal(J::Tensor{2,3}, cell_T::Type{RefPyramid}, face::Int)
@@ -214,6 +214,6 @@ function weighted_normal(J::Tensor{2,3}, cell_T::Type{RefPyramid}, face::Int)
         face == 4 && return J[:,2] × (J[:,3]-J[:,1])
         face == 5 && return (J[:,3]-J[:,2]) × J[:,1]
     end
-    throw(ArgumentError("unknown face number: $face for a cell of type $(cell_T)"))
+    throw(ArgumentError("unknown face number"))
 end
 
