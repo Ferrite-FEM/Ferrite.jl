@@ -75,6 +75,9 @@ edges(::AbstractCell)
 Returns a tuple of n-tuples containing the ordered local node indices corresponding to
 the vertices that define an *oriented face*.
 
+An *oriented face* is a face with the first node having the local index and the other
+nodes spanning such that the normal to the face is pointing outwards.
+
 Note that the vertices are sufficient to define a face uniquely.
 """
 reference_faces(::AbstractRefShape)
@@ -85,6 +88,9 @@ reference_faces(::AbstractRefShape)
 Returns a tuple of n-tuples containing the ordered node indices (of the nodes in a grid) corresponding to
 the vertices that define an *oriented face*. This function induces the 
 [`FaceIndex`](@ref), where the second index corresponds to the local index into this tuple.
+
+An *oriented face* is a face with the first node having the local index and the other
+nodes spanning such that the normal to the face is pointing outwards.
 
 Note that the vertices are sufficient to define a face uniquely.
 """
