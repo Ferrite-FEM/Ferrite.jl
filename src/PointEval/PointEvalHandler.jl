@@ -297,7 +297,7 @@ end
 """
 PointIterator
 
-struct PointIterator{PH<:PointEvalHandler, V <: Vector{<: Vec}}
+struct PointIterator{PH<:PointEvalHandler, V <: Vec}
     ph::PH
     coords::V
 end
