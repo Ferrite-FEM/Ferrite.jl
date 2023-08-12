@@ -126,13 +126,27 @@ function dofhandler()
     # @test vals ≈ 1.0:9.0
 end
 
-function dofhandler2()
+function dofhandler2(;three_dimensional=true)
     # Computes the L2 projection of a quadratic field exactly
     # but not using L2Projector since we want the DofHandler dofs
-    mesh = generate_grid(Quadrilateral, (20, 20))
-    ip_f = Lagrange{RefQuadrilateral,2}()
-    ip_f_v = ip_f^2
-    qr = QuadratureRule{RefQuadrilateral}(3)
+    if (three_dimensional)
+        mesh = generate_grid(Hexahedron, (10, 10, 10))
+        f_s = x -> 1.0 + x[1] + x[2] + x[1] * x[2] + x[2] * x[3]
+        f_v = x ->  Vec{3}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2], 4.0 + x[1] - x[2] + x[3] - x[1] * x[3] - x[2] * x[3]))
+        points = [Vec((x, x, x)) for x in range(0; stop=1, length=100)]
+        ip_f = Lagrange{RefHexahedron,2}()
+        ip_f_v = ip_f^3
+        qr = QuadratureRule{RefHexahedron}(3)
+    else 
+        mesh = generate_grid(Quadrilateral, (20, 20))
+        f_s = x ->  1.0 + x[1] + x[2] + x[1] * x[2]
+        f_v = x -> Vec{2}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2]))
+        points = [Vec((x, x, )) for x in range(0; stop=1, length=100)]
+        ip_f = Lagrange{RefQuadrilateral,2}()
+        ip_f_v = ip_f^2
+        qr = QuadratureRule{RefQuadrilateral}(3)       
+    end
+   
     csv = CellValues(qr, ip_f)
     cvv = CellValues(qr, ip_f_v)
     dh = DofHandler(mesh);
@@ -146,8 +160,7 @@ function dofhandler2()
     fe = zeros(ndofs_per_cell(dh))
     s_dofs = dof_range(dh, :s)
     v_dofs = dof_range(dh, :v)
-    f_s(x) = 1.0 + x[1] + x[2] + x[1] * x[2]
-    f_v(x) = Vec{2}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2]))
+    
     for cell in CellIterator(dh)
         fill!(me, 0)
         fill!(fe, 0)
@@ -177,7 +190,6 @@ function dofhandler2()
     end
     uh = M \ f
 
-    points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
     psv = PointValues(ip_f)
@@ -327,7 +339,8 @@ end
     scalar_field()
     vector_field()
     dofhandler()
-    dofhandler2()
+    dofhandler2(;three_dimensional=false)
+    dofhandler2(;three_dimensional=true)
     superparametric()
     mixed_grid()
     oneD()

@@ -297,9 +297,9 @@ end
 """
 PointIterator
 
-struct PointIterator{PH<:PointEvalHandler}
+struct PointIterator{PH<:PointEvalHandler, V <: Vec}
     ph::PH
-    coords::Vector{Vec{2,Float64}}
+    coords::Vector{V}
 end
 
 function PointIterator(ph::PointEvalHandler{G}) where {D,C,T,G<:Grid{D,C,T}}
