@@ -129,15 +129,15 @@ end
 function dofhandler2()
     # Computes the L2 projection of a quadratic field exactly
     # but not using L2Projector since we want the DofHandler dofs
-    mesh = generate_grid(Quadrilateral, (20, 20))
-    ip_f = Lagrange{RefQuadrilateral,2}()
-    ip_f_v = ip_f^2
-    qr = QuadratureRule{RefQuadrilateral}(3)
-    csv = CellValues(qr, ip_f)
-    cvv = CellValues(qr, ip_f_v)
+    mesh = generate_grid(Hexahedron, (10, 10, 10))
+    ip_f = Lagrange{3,RefCube,2}()
+    ip_g = Lagrange{3,RefCube,1}()
+    qr = QuadratureRule{3,RefCube}(3)
+    csv = CellScalarValues(qr, ip_f, ip_g)
+    cvv = CellVectorValues(qr, ip_f, ip_g)
     dh = DofHandler(mesh);
-    add!(dh, :s, ip_f)
-    add!(dh, :v, ip_f_v)
+    add!(dh, :s, 1, ip_f)
+    add!(dh, :v, 3, ip_f)
     close!(dh)
     M = create_sparsity_pattern(dh)
     f = zeros(ndofs(dh))
@@ -146,8 +146,8 @@ function dofhandler2()
     fe = zeros(ndofs_per_cell(dh))
     s_dofs = dof_range(dh, :s)
     v_dofs = dof_range(dh, :v)
-    f_s(x) = 1.0 + x[1] + x[2] + x[1] * x[2]
-    f_v(x) = Vec{2}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2]))
+    f_s(x) = 1.0 + x[1] + x[2] + x[1] * x[2] + x[2] * x[3]
+    f_v(x) = Vec{3}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2], 3.0 + x[1] - x[2] + x[3] - x[1] * x[3] - x[2] * x[3]))
     for cell in CellIterator(dh)
         fill!(me, 0)
         fill!(fe, 0)
@@ -155,7 +155,7 @@ function dofhandler2()
         reinit!(cvv, cell)
         for qp in 1:getnquadpoints(csv)
             dΩ = getdetJdV(csv, qp)
-            x = spatial_coordinate(csv, qp, get_cell_coordinates(cell))
+            x = spatial_coordinate(csv, qp, getcoordinates(cell))
             for i in 1:getnbasefunctions(csv)
                 δui = shape_value(csv, qp, i)
                 fe[s_dofs[i]] += ( δui * f_s(x) ) * dΩ
@@ -177,11 +177,11 @@ function dofhandler2()
     end
     uh = M \ f
 
-    points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
+    points = [Vec((2*x, x, 0.52,)) for x in range(-0.5; stop=0.5, length=100)]
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
-    psv = PointValues(ip_f)
-    pvv = PointValues(ip_f_v)
+    psv = PointScalarValues(ip_f, ip_g)
+    pvv = PointVectorValues(ip_f, ip_g)
     for (x, point) in zip(points, PointIterator(ph))
         point === nothing && continue
         # Test scalar field
