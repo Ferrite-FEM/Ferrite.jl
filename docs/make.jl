@@ -48,6 +48,7 @@ create_documenter_changelog()
             "tutorials/stokes-flow.md",
             "tutorials/ns_vs_diffeq.md",
             "tutorials/linear_shell.md",
+            "tutorials/dg_heat_equation.md",
         ],
         "Topic guides" => [
             "Topic guide overview" => "topics/index.md",

@@ -142,3 +142,13 @@ Ferrite can be used for non-standard things and how to add "hacks" that build on
 Ferrite.
 
 **Keywords**: embedding, automatic differentiation
+
+---
+
+#### [Tutorial 11: Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation)
+
+This tutorial guides you through the process of solving the linear stationary heat equation
+(i.e. Poisson's equation) on a unit square with homogeneous Dirichlet boundary conditions
+using the interior penalty discontinuous galerkin method. This tutorial follows the [heat equation tutorial](@ref tutorial-heat-equation), introducting face and interface iterators, jump and average operators, and corss-element coupling in sparsity patterns.
+
+**Keywords**: scalar-valued solution, Dirichlet boundary conditions, Discontinuous Galerkin, Interior penalty.
