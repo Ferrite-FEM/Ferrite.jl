@@ -10,8 +10,9 @@ end
 function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}=default_geometric_interpolation(ip_fun)) where {T,sdim} 
     geo_values = [GeometryValues(T, ip_geo.ip, qr) for qr in fqr.face_rules]
     fun_values = [FunctionValues(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
-    detJdV = fill(T(NaN), maximum(qr->length(getweights(qr)), fqr.face_rules))
-    normals = fill(zero(Vec{sdim,T})*T(NaN), length(geo_values))
+    max_nquadpoints = maximum(qr->length(getweights(qr)), fqr.face_rules)
+    detJdV = fill(T(NaN), max_nquadpoints)
+    normals = fill(zero(Vec{sdim,T})*T(NaN), max_nquadpoints)
     return FaceValues(geo_values, detJdV, normals, fun_values, fqr, ScalarWrapper(1))
 end
 
