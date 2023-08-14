@@ -14,6 +14,7 @@ export
     BubbleEnrichedLagrange,
     CrouzeixRaviart,
     Lagrange,
+    ArbitraryOrderLagrange,
     DiscontinuousLagrange,
     Serendipity,
     getnbasefunctions,
