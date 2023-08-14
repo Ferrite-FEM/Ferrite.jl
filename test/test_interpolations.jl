@@ -1,59 +1,51 @@
 @testset "interpolations" begin
 
-@testset "$(Ferrite.getorder(interpolation))" for interpolation in (
-                    #   Lagrange{RefLine, 1}(),
-                    #   Lagrange{RefLine, 2}(),
-                    ArbitraryOrderLagrange{RefLine, 3}(),
-                    ArbitraryOrderLagrange{RefLine, 4}(),
-                    ArbitraryOrderLagrange{RefLine, 5}(),
-                    ArbitraryOrderLagrange{RefLine, 6}(),
-                    ArbitraryOrderLagrange{RefLine, 7}(),
-                    # ArbitraryOrderLagrange{RefLine, 8}(),
-                    # ArbitraryOrderLagrange{RefLine, 9}(),
-                    # ArbitraryOrderLagrange{RefLine, 10}(),
-                    # ArbitraryOrderLagrange{RefLine, 11}(),
-                    # ArbitraryOrderLagrange{RefLine, 12}(),
-                    # ArbitraryOrderLagrange{RefLine, 13}(),
-                    #   Lagrange{RefQuadrilateral, 1}(),
-                    #   Lagrange{RefQuadrilateral, 2}(),
-                    #   Lagrange{RefQuadrilateral, 3}(),
-                    #   Lagrange{RefQuadrilateral, 4}(), #fails dirac delta
-                    #   Lagrange{RefQuadrilateral, 5}(), #fails dirac delta
-                    #   Lagrange{RefQuadrilateral, 6}(), #fails dirac delta
-                    #   Lagrange{RefQuadrilateral, 7}(), #fails dirac delta
-                    #   Lagrange{RefTriangle, 1}(),
-                    #   Lagrange{RefTriangle, 2}(),
-                    #   Lagrange{RefTriangle, 3}(),
-                    #   Lagrange{RefTriangle, 4}(),
-                    #   Lagrange{RefTriangle, 5}(),
-                    #   Lagrange{RefTriangle, 6}(),
-                    # #   Lagrange{RefTriangle, 7}(), fails dirac delta
-                    #   Lagrange{RefTriangle, 8}(),
-                    #   Lagrange{RefHexahedron, 1}(),
-                    #   Lagrange{RefHexahedron, 2}(),
-                    #   Serendipity{RefQuadrilateral, 2}(),
-                    #   Serendipity{RefHexahedron, 2}(),
-                    #   Lagrange{RefTetrahedron, 1}(),
-                    #   Lagrange{RefTetrahedron, 2}(),
-                    #   Lagrange{RefPrism, 1}(),
-                    #   Lagrange{RefPrism, 2}(),
-                    #   Lagrange{RefPyramid, 1}(),
-                    #   Lagrange{RefPyramid, 2}(),
-                    #   #
-                    #   DiscontinuousLagrange{RefLine, 0}(),
-                    #   DiscontinuousLagrange{RefQuadrilateral, 0}(),
-                    #   DiscontinuousLagrange{RefHexahedron, 0}(),
-                    #   DiscontinuousLagrange{RefTriangle, 0}(),
-                    #   DiscontinuousLagrange{RefTetrahedron, 0}(),
-                    #   DiscontinuousLagrange{RefLine, 1}(),
-                    #   DiscontinuousLagrange{RefQuadrilateral, 1}(),
-                    #   DiscontinuousLagrange{RefHexahedron, 1}(),
-                    #   DiscontinuousLagrange{RefTriangle, 1}(),
-                    #   DiscontinuousLagrange{RefTetrahedron, 1}(),
-                    #   #
-                    #   BubbleEnrichedLagrange{RefTriangle, 1}(),
-                    #   #
-                    #   CrouzeixRaviart{RefTriangle, 1}(),
+@testset "$interpolation" for interpolation in (
+                      Lagrange{RefLine, 1}(),
+                      Lagrange{RefLine, 2}(),
+                      Lagrange{RefLine, 3}(),
+                      Lagrange{RefLine, 4}(),
+                      Lagrange{RefLine, 8}(),
+                      Lagrange{RefLine, 9}(),
+                      Lagrange{RefLine, 10}(),
+                      Lagrange{RefLine, 100}(),
+                      Lagrange{RefQuadrilateral, 1}(),
+                      Lagrange{RefQuadrilateral, 2}(),
+                      Lagrange{RefQuadrilateral, 3}(),
+                    #   Lagrange{RefQuadrilateral, 25}(), # type instable
+                      Lagrange{RefTriangle, 1}(),
+                      Lagrange{RefTriangle, 2}(),
+                      Lagrange{RefTriangle, 3}(),
+                      Lagrange{RefTriangle, 4}(),
+                      Lagrange{RefTriangle, 5}(),
+                      Lagrange{RefTriangle, 6}(),
+                    #   Lagrange{RefTriangle, 7}(), fails dirac delta
+                      Lagrange{RefTriangle, 8}(),
+                      Lagrange{RefHexahedron, 1}(),
+                      Lagrange{RefHexahedron, 2}(),
+                      Serendipity{RefQuadrilateral, 2}(),
+                      Serendipity{RefHexahedron, 2}(),
+                      Lagrange{RefTetrahedron, 1}(),
+                      Lagrange{RefTetrahedron, 2}(),
+                      Lagrange{RefPrism, 1}(),
+                      Lagrange{RefPrism, 2}(),
+                      Lagrange{RefPyramid, 1}(),
+                      Lagrange{RefPyramid, 2}(),
+                      #
+                      DiscontinuousLagrange{RefLine, 0}(),
+                      DiscontinuousLagrange{RefQuadrilateral, 0}(),
+                      DiscontinuousLagrange{RefHexahedron, 0}(),
+                      DiscontinuousLagrange{RefTriangle, 0}(),
+                      DiscontinuousLagrange{RefTetrahedron, 0}(),
+                      DiscontinuousLagrange{RefLine, 1}(),
+                      DiscontinuousLagrange{RefQuadrilateral, 1}(),
+                      DiscontinuousLagrange{RefHexahedron, 1}(),
+                      DiscontinuousLagrange{RefTriangle, 1}(),
+                      DiscontinuousLagrange{RefTetrahedron, 1}(),
+                      #
+                      BubbleEnrichedLagrange{RefTriangle, 1}(),
+                      #
+                      CrouzeixRaviart{RefTriangle, 1}(),
     )
 
         # Test of utility functions
@@ -131,7 +123,7 @@
 
         # Test that facedof_indices(...) return in counter clockwise order (viewing from the outside)
         if interpolation isa Lagrange
-            function __outward_normal(coords::Vector{<:Vec{1}}, nodes)
+            function __outward_normal(coords::Union{Vector{<:Vec{1}}, NTuple{N, <:Vec{1}}}, nodes) where N
                 n = coords[nodes[1]]
                 return n / norm(n)
             end
