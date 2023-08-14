@@ -103,9 +103,12 @@ function vertices(c::AbstractCell{RefLine})
     ns = get_node_ids(c)
     return (ns[1], ns[2]) # v1, v2
 end
-function faces(c::AbstractCell{RefLine})
+function edges(c::AbstractCell{RefLine})
     ns = get_node_ids(c)
-    return ((ns[1],), (ns[2],)) # f1, f2
+    return ((ns[1], ns[2]),)
+end
+function faces(c::AbstractCell{RefLine})
+    return () 
 end
 
 # RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
@@ -113,11 +116,15 @@ function vertices(c::AbstractCell{RefTriangle})
     ns = get_node_ids(c)
     return (ns[1], ns[2], ns[3]) # v1, v2, v3
 end
-function faces(c::AbstractCell{RefTriangle})
+function edges(c::AbstractCell{RefTriangle})
     ns = get_node_ids(c)
     return (
         (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # f1, f2, f3
     )
+end
+function faces(c::AbstractCell{RefTriangle})
+    ns = get_node_ids(c)
+    return ((ns[1], ns[2], ns[3]),) 
 end
 
 # RefQuadrilateral (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
@@ -125,12 +132,19 @@ function vertices(c::AbstractCell{RefQuadrilateral})
     ns = get_node_ids(c)
     return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
 end
-function faces(c::AbstractCell{RefQuadrilateral})
+function edges(c::AbstractCell{RefQuadrilateral})
     ns = get_node_ids(c)
     return (
         (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # f1, f2, f3, f4
     )
 end
+function faces(c::AbstractCell{RefQuadrilateral})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2], ns[3], ns[4]), 
+    )
+end
+
 
 # RefTetrahedron (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
 function vertices(c::AbstractCell{RefTetrahedron})
@@ -249,9 +263,6 @@ default_interpolation(::Type{Hexahedron})             = Lagrange{RefHexahedron, 
 default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron,    2}()
 default_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
 default_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,       1}()
-
-# TODO: Remove this, used for Quadrilateral3D
-edges(c::Quadrilateral#=3D=#) = faces(c)
 
 # Serendipity interpolation based cells
 struct SerendipityQuadraticQuadrilateral <: AbstractCell{RefQuadrilateral} nodes::NTuple{ 8, Int} end
@@ -443,6 +454,38 @@ Returns all vertex sets of the grid.
 @inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
 
 n_faces_per_cell(grid::Grid) = nfaces(getcelltype(grid))
+
+
+"""
+    getfacetset(grid::AbstractGrid, setname::String)
+
+Returns all facets in a `Set` of a given `setname`. 
+"""
+getfacetset(grid::AbstractGrid{sdim}, setname::String) where sdim = getfacetsets(grid)[setname]
+
+"""
+    getfacetsets(grid::AbstractGrid)
+
+Returns all facet sets of the grid.
+"""
+getfacetsets(grid::AbstractGrid{1}) = grid.vertexsets
+getfacetsets(grid::AbstractGrid{2}) = grid.edgesets
+getfacetsets(grid::AbstractGrid{3}) = grid.facesets
+
+#Backwards compat
+@inline getfacesets(grid::AbstractGrid{2}) = grid.edgesets
+@inline getfaceset(grid::AbstractGrid{2}, setname::String) = grid.edgesets[setname]
+@inline addfaceset!(grid::AbstractGrid{2}, name::String, f::Function; all::Bool=true) = addedgeset!(grid, name, f; all)
+@inline addfaceset!(grid::AbstractGrid{2}, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) = addedgeset!(grid, name, set)
+
+@inline getfacesets(grid::AbstractGrid{1}) = grid.vertexsets
+@inline getfaceset(grid::AbstractGrid{1}, setname::String) = grid.vertexsets[setname]
+@inline addfaceset!(grid::AbstractGrid{1}, name::String, f::Function; all::Bool=true) = addvertexset!(grid, name, f; all)
+@inline addfaceset!(grid::AbstractGrid{1}, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) = addvertexset!(grid, name, set)
+
+@inline facets(c::AbstractCell{<:AbstractRefShape{1}}) = vertices(c)
+@inline facets(c::AbstractCell{<:AbstractRefShape{2}}) = edges(c)
+@inline facets(c::AbstractCell{<:AbstractRefShape{3}}) = faces(c)
 
 # Transformations
 """
@@ -684,7 +727,7 @@ end
 end
 
 @inline get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = get_cell_coordinates!(x, grid, cell.idx)
-@inline get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, face::FaceIndex) where {dim, T} = get_cell_coordinates!(x, grid, face.idx[1])
+@inline get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, face::BoundaryIndex) where {dim, T} = get_cell_coordinates!(x, grid, face.idx[1])
 
 
 """

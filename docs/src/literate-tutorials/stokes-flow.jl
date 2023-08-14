@@ -146,6 +146,19 @@
 using Ferrite, FerriteGmsh, Gmsh, Tensors, LinearAlgebra, SparseArrays
 using Test #src
 
+# Temp fix for FerriteGmsh
+function FerriteGmsh.tofacesets(boundarydict::Dict{String,Vector}, elements::Vector{<:Ferrite.AbstractCell})
+    faces = Ferrite.facets.(elements)
+    facesets = Dict{String,Set{FaceIndex}}()
+    for (boundaryname, boundaryfaces) in boundarydict
+        facesettuple = Set{FaceIndex}()
+        for boundaryface in boundaryfaces
+            FerriteGmsh._add_to_facesettuple!(facesettuple, boundaryface, faces)
+        end
+        facesets[boundaryname] = facesettuple
+    end
+    return facesets
+end
 
 # ### Geometry and mesh generation with `Gmsh.jl`
 #
@@ -211,6 +224,14 @@ function setup_grid(h=0.05)
 
     ## Finalize the Gmsh library
     Gmsh.finalize()
+
+    # Temp fix for FerriteGmsh
+    for setname in ["Γ1", "Γ2", "Γ3", "Γ4"]
+        faceset = grid.facesets[setname]
+        edgeset = Set([EdgeIndex(f[1], f[2]) for f in faceset])
+        grid.edgesets[setname] = edgeset
+        delete!(grid.facesets, setname)
+    end
 
     return grid
 end

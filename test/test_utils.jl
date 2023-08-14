@@ -181,22 +181,22 @@ function calculate_volume(::Serendipity{RefQuadrilateral, 2}, x::Vector{Vec{2, T
     return vol
 end
 
-function calculate_face_area(ip::Lagrange{RefLine}, x::Vector{<:Vec}, faceindex::Int)
+function calculate_facet_area(ip::Lagrange{RefLine}, x::Vector{<:Vec}, faceindex::Int)
     return one(eltype(eltype(x)))
 end
-function calculate_face_area(ip::Lagrange{RefQuadrilateral, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(ip::Lagrange{RefQuadrilateral, order}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefLine, order}(), x)
 end
-function calculate_face_area(ip::Lagrange{RefTriangle, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(ip::Lagrange{RefTriangle, order}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefLine, order}(), x)
 end
-function calculate_face_area(ip::Lagrange{RefHexahedron, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(ip::Lagrange{RefHexahedron, order}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefQuadrilateral, order}(), x)
 end
-function calculate_face_area(ip::Serendipity{RefQuadrilateral, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(ip::Serendipity{RefQuadrilateral, order}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefLine, order}(), x)
 end
-function calculate_face_area(ip::Lagrange{RefTetrahedron, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_facet_area(ip::Lagrange{RefTetrahedron, order}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefTriangle, order}(), x)
 end
 
