@@ -1,18 +1,13 @@
 @testset "interpolations" begin
-
+using StaticArrays
 @testset "$interpolation" for interpolation in (
                       Lagrange{RefLine, 1}(),
                       Lagrange{RefLine, 2}(),
-                      Lagrange{RefLine, 3}(),
-                      Lagrange{RefLine, 4}(),
-                      Lagrange{RefLine, 8}(),
-                      Lagrange{RefLine, 9}(),
-                      Lagrange{RefLine, 10}(),
-                      Lagrange{RefLine, 100}(),
+                      ArbitraryOrderLagrange{RefLine, 20}(),
                       Lagrange{RefQuadrilateral, 1}(),
                       Lagrange{RefQuadrilateral, 2}(),
                       Lagrange{RefQuadrilateral, 3}(),
-                    #   Lagrange{RefQuadrilateral, 25}(), # type instable
+                      ArbitraryOrderLagrange{RefQuadrilateral, 20}(), 
                       Lagrange{RefTriangle, 1}(),
                       Lagrange{RefTriangle, 2}(),
                       Lagrange{RefTriangle, 3}(),
@@ -123,17 +118,17 @@
 
         # Test that facedof_indices(...) return in counter clockwise order (viewing from the outside)
         if interpolation isa Lagrange
-            function __outward_normal(coords::Union{Vector{<:Vec{1}}, NTuple{N, <:Vec{1}}}, nodes) where N
+            function __outward_normal(coords::Union{Vector{<:Vec{1}}, NTuple{N, <:Vec{1}}, SVector{N, <:Vec{1}}}, nodes) where N
                 n = coords[nodes[1]]
                 return n / norm(n)
             end
-            function __outward_normal(coords::Union{Vector{<:Vec{2}}, NTuple{N, <:Vec{2}}}, nodes) where N
+            function __outward_normal(coords::Union{Vector{<:Vec{2}}, NTuple{N, <:Vec{2}}, SVector{N, <:Vec{2}}}, nodes) where N
                 p1 = coords[nodes[1]]
                 p2 = coords[nodes[2]]
                 n = Vec{2}((p2[2] - p1[2], - p2[1] + p1[1]))
                 return n / norm(n)
             end
-            function __outward_normal(coords::Union{Vector{<:Vec{3}}, NTuple{N, <:Vec{3}}}, nodes) where N
+            function __outward_normal(coords::Union{Vector{<:Vec{3}}, NTuple{N, <:Vec{3}}, SVector{N, <:Vec{3}}}, nodes) where N
                 p1 = coords[nodes[1]]
                 p2 = coords[nodes[2]]
                 p3 = coords[nodes[3]]

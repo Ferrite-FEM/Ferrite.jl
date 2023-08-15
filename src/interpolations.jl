@@ -1252,30 +1252,47 @@ end
 ############################
 # Arbitrary Order Lagrange #
 ############################
+struct ArbitraryOrderLagrange{shape, order, prod_T, perm_T} <: ScalarInterpolation{shape, order}
+    product_of::prod_T
+    perm::perm_T
+    inv_perm::perm_T
+end
+vertexdof_indices(::ArbitraryOrderLagrange{shape,order}) where {shape, order} = vertexdof_indices(Lagrange{shape,order}())
 
 ####################################
 # Arbitrary Order Lagrange RefLine #
 ####################################
-# Passes tests until order 120
-getnbasefunctions(::Lagrange{RefLine,order}) where order = order + 1
-facedof_indices(::Lagrange{RefLine,order}) where order = ((1,), (2,))
-celldof_interior_indices(::Lagrange{RefLine,order}) where order = ntuple(i->i+2, order - 1)
-
-function reference_coordinates(::Lagrange{RefLine,order}) where order
-    vertices = SVector(Vec{1, Float64}((-1.0,)),
-        Vec{1, Float64}((1.0,)),)
-    interior = SVector{order - 1}(Vec((i-order/2)*2/order) for i in 1:order - 1)
-    return (vertices..., interior...)
+getPermLagrangeLine(order::Int) = SVector{order+1}((1, order+1, SVector{order-1}(i for i in 2:order)...))
+function ArbitraryOrderLagrange{RefLine, order}() where order
+    product_of = nothing
+    perm = getPermLagrangeLine(order)
+    inv_perm = sortperm(perm)
+    ArbitraryOrderLagrange{RefLine, order, typeof(product_of), typeof(perm)}(product_of, perm, inv_perm)
 end
 
-function shape_value(ip::Lagrange{RefLine, order}, ξ::Vec{1}, j::Int) where order
+getnbasefunctions(::ArbitraryOrderLagrange{RefLine,order}) where order = order + 1
+facedof_indices(::ArbitraryOrderLagrange{RefLine,order}) where order = ((1,), (2,))
+celldof_interior_indices(::ArbitraryOrderLagrange{RefLine,order}) where order = SVector{order-1}(i+2 for i in 1:order - 1)
+
+function reference_coordinates(ip::ArbitraryOrderLagrange{RefLine,order}) where order
+    v = SVector{order+1}(Vec((i-order/2)*2/order) for i in  0:order)
+    return v[ip.perm]
+end
+
+function reference_coordinate(ip::ArbitraryOrderLagrange{RefLine,order}, i::Int) where order
+    i = ip.perm[i]
+    return Vec((i-1-order/2)*2/order) 
+end
+
+function shape_value(ip::ArbitraryOrderLagrange{RefLine, order}, ξ::Vec{1}, j::Int) where order
     j > getnbasefunctions(ip) && throw(ArgumentError("no shape function $j for interpolation $ip"))
     ξ_x = ξ[1]
-    coords = reference_coordinates(ip)
     result = 1.0
-    for k in eachindex(coords)
+    j = ip.perm[j]
+    coeff = @view reference_coordinates(ip)[ip.inv_perm]
+    for k in 1:order+1
         k == j && continue
-        result *= (ξ_x - coords[k][1])/(coords[j][1]-coords[k][1])
+        result *= (ξ_x - coeff[k][1])/(coeff[j][1]-coeff[k][1])
     end
     return result
 end
@@ -1295,16 +1312,23 @@ function getPermLagrangeQ(order)
     return SVector((verts..., edge1..., edge2..., edge3..., edge4..., interior...))
 end
 
-getnbasefunctions(::Lagrange{RefQuadrilateral,order}) where order = (order + 1)^2
+function ArbitraryOrderLagrange{RefQuadrilateral, order}() where order
+    product_of = ArbitraryOrderLagrange{RefLine,order}()
+    perm = getPermLagrangeQ(order)
+    inv_perm = sortperm(perm)
+    ArbitraryOrderLagrange{RefQuadrilateral, order, typeof(product_of), typeof(perm)}(product_of, perm, inv_perm)
+end
 
-function facedof_interior_indices(::Lagrange{RefQuadrilateral,order}) where order
+getnbasefunctions(::ArbitraryOrderLagrange{RefQuadrilateral,order}) where order = (order + 1)^2
+
+function facedof_interior_indices(::ArbitraryOrderLagrange{RefQuadrilateral,order}) where order
     return (SVector{order-1}((i+4 for i in 1:order-1)),
         SVector{order-1}((i+order+3 for i in 1:order-1)),
         SVector{order-1}((i+2*order+2 for i in 1:order-1)),
         SVector{order-1}((i+3*order+1 for i in 1:order-1)))
 end
 
-function facedof_indices(ip::Lagrange{RefQuadrilateral,order}) where order
+function facedof_indices(ip::ArbitraryOrderLagrange{RefQuadrilateral,order}) where order
     interior = facedof_interior_indices(ip)
     face1 = SVector{order + 1}((i == 1 ? 1 : i == 2 ? 2 : interior[1][i-2] for i in 1:order+1))    
     face2 = SVector{order + 1}((i == 1 ? 2 : i == 2 ? 3 : interior[2][i-2] for i in 1:order+1))    
@@ -1313,35 +1337,27 @@ function facedof_indices(ip::Lagrange{RefQuadrilateral,order}) where order
     return (face1, face2, face3, face4)
 end
 
-function celldof_interior_indices(ip::Lagrange{RefQuadrilateral,order}) where order
+function celldof_interior_indices(ip::ArbitraryOrderLagrange{RefQuadrilateral,order}) where order
     ncellintdofs = (order - 1)^2
     totaldofs = getnbasefunctions(ip)
     return SVector{ncellintdofs}((totaldofs-ncellintdofs+i for i in 1:ncellintdofs))
 end
 
-function reference_coordinates(::Lagrange{RefQuadrilateral,order}) where order
-    vertices = SVector(Vec{2, Float64}((-1.0, -1.0)),
-        Vec{2, Float64}(( 1.0, -1.0)),
-        Vec{2, Float64}(( 1.0,  1.0)),
-        Vec{2, Float64}((-1.0,  1.0)))
-    face1 = SVector{order-1}(Vec((i*2-order)/order,-1.0) for i in 1:order-1)
-    face2 = SVector{order-1}(Vec(1.0,(i*2-order)/order) for i in 1:order-1)
-    face3 = SVector{order-1}(Vec((order - i*2)/order,1.0) for i in 1:order-1)
-    face4 = SVector{order-1}(Vec(-1.0,(order-i*2)/order) for i in 1:order-1)
-    interior = SVector{(order-1)^2}(Vec((i*2-order)/order,(j*2-order)/order) for i in 1:order-1, j in 1:order-1)
-    return (vertices..., face1..., face2..., face3..., face4..., interior...)
+function reference_coordinates(ip::ArbitraryOrderLagrange{RefQuadrilateral,order}) where order
+    v = SVector{(order + 1)^2}(Vec((i*2-order)/order, (j*2-order)/order) for i in 0:order, j in 0:order)
+    return v[ip.perm]
 end
 
-function shape_value(ip::Lagrange{RefQuadrilateral, order}, ξ::Vec{2}, i::Int) where order
+function shape_value(ip::ArbitraryOrderLagrange{RefQuadrilateral, order}, ξ::Vec{2}, i::Int) where order
     i > getnbasefunctions(ip) && throw(ArgumentError("no shape function $i for interpolation $ip"))
     ξ_x = ξ[1]
     ξ_y = ξ[2]
-    i2 = getPermLagrangeQ(order)[i] # Why type instable?
-    i_x = (i2-1)%(order+1) + 1
-    i_x != 1 && (i_x = i_x == order+1 ? 2 : i_x + 1 )
-    i_y = (i2-1)÷(order+1) + 1
-    i_y != 1 && (i_y = i_y == order+1 ? 2 : i_y + 1 )
-    ip2 = Lagrange{RefLine, order}()
+    i = ip.perm[i]
+    i_x = (i-1)%(order+1) + 1
+    i_y = (i-1)÷(order+1) + 1
+    ip2 = ip.product_of
+    i_x = ip2.inv_perm[i_x]
+    i_y = ip2.inv_perm[i_y]
     return shape_value(ip2,Vec(ξ_x),i_x) * shape_value(ip2,Vec(ξ_y),i_y)
 end
 
