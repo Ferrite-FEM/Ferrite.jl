@@ -20,6 +20,7 @@ using StaticArrays
                       Lagrange{RefHexahedron, 2}(),
                       Serendipity{RefQuadrilateral, 2}(),
                       Serendipity{RefHexahedron, 2}(),
+                        # ArbitraryOrderLagrange{RefHexahedron, 20}(), 
                       Lagrange{RefTetrahedron, 1}(),
                       Lagrange{RefTetrahedron, 2}(),
                       Lagrange{RefPrism, 1}(),

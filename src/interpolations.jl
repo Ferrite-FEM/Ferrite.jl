@@ -1252,12 +1252,81 @@ end
 ############################
 # Arbitrary Order Lagrange #
 ############################
-struct ArbitraryOrderLagrange{shape, order, prod_T, perm_T} <: ScalarInterpolation{shape, order}
+struct ArbitraryOrderLagrange{shape, order, prod_T, ref_T, perm_T} <: ScalarInterpolation{shape, order}
     product_of::prod_T
+    reference_coordinates::ref_T
     perm::perm_T
     inv_perm::perm_T
 end
 vertexdof_indices(::ArbitraryOrderLagrange{shape,order}) where {shape, order} = vertexdof_indices(Lagrange{shape,order}())
+function reference_coordinates(ip::ArbitraryOrderLagrange{_, order}) where {_, order}
+    return ip.reference_coordinates[ip.perm]
+end
+
+# From https://colab.research.google.com/github/caiociardelli/sphglltools/blob/main/doc/L3_Gauss_Lobatto_Legendre_quadrature.ipynb#scrollTo=4SJ15xMoBUuG
+function LegendrePolynomial(n::Int, ξ::T) where T
+    n == 0 && return one(T)    
+    n == 1 && return ξ
+    fP = one(T)
+    sP = copy(ξ) # Or deepcopy?
+    nP = zero(T)
+    for i in 2:n+1
+        nP = ((2 * i - 1) * ξ * sP - (i - 1) * fP) / i
+        fP = sP
+        sP = nP
+    end
+    return nP
+    # Recursion bad
+    # return ((2*n - 1)*ξ*LegendrePolynomial(n-1,ξ) - (n - 1)*LegendrePolynomial(n-2, ξ))/n 
+end
+
+function GLL(n::Int)
+    # n = 2 && error("TODO: write error")
+    ξ = zeros(Float64, n)
+    w = zeros(Float64, n)
+    ξ[1] = -1
+    ξ[n] = 1
+    w[1] = 2/n/(n-1)
+    w[n] = 2/n/(n-1)
+    for i in 2:n-1
+        ξ[i] = (1-3*(n-2)/(8*(n-1)^3)) * cospi((4*i - 3)/(4*(n - 1)+1))
+        Δξ = 1
+        while abs(Δξ) > eps(Float64) # Infinite loop?
+            # TODO: use autodiff?
+            d1 =  gradient(x->LegendrePolynomial(n-2,x), ξ[i])[1]
+            d2 =  hessian(x->LegendrePolynomial(n-2,x), ξ[i])[1]
+            d3 =  gradient(x->hessian(x->LegendrePolynomial(n-2,x)[1],x)[1],ξ[i])[1]
+            Δξ = 2*d1*d2/(2*d2^2-d1*d3)
+            ξ[i] -= Δξ
+        end
+        ξ[i] = -ξ[i]
+        w[i] = 2/(n*(n-1)*LegendrePolynomial(n-2,ξ[i])^2)
+    end
+    return ξ
+end
+
+function GL(n::Int)
+    # n <= 2 && error("TODO: write error")
+    ξ = zeros(Float64, n)
+    w = zeros(Float64, n)
+    for i in 1:n
+        ξ[i] = (1-3*(n-2)/(8*(n-1)^3)) * cospi((4*i - 3)/(4*(n - 1)+1))
+        Δξ = 1
+        while abs(Δξ) > eps(Float64) # Infinite loop?
+            # TODO: use autodiff?
+            d1 =  LegendrePolynomial(n-1,ξ[i])
+            d2 =  gradient(x->LegendrePolynomial(n-1,x), ξ[i])[1]
+            d3 =  hessian(x->LegendrePolynomial(n-1,x),ξ[i])[1]
+            Δξ = 2*d1*d2/(2*d2^2-d1*d3)
+            ξ[i] -= Δξ
+        end
+        ξ[i] = -ξ[i]
+        w[i] = 2*(1-ξ[i]^2)/((n+1)^2*LegendrePolynomial(n,ξ[i])^2)
+    end
+    return ξ
+end
+
+equidistant(order::Int) = SVector{order + 1}((i*2-order)/order for i in 0:order)
 
 ####################################
 # Arbitrary Order Lagrange RefLine #
@@ -1265,31 +1334,26 @@ vertexdof_indices(::ArbitraryOrderLagrange{shape,order}) where {shape, order} = 
 getPermLagrangeLine(order::Int) = SVector{order+1}((1, order+1, SVector{order-1}(i for i in 2:order)...))
 function ArbitraryOrderLagrange{RefLine, order}() where order
     product_of = nothing
+    points = GLL(order+1)
+    ref_coord = Array{Vec{1,Float64},1}(undef,order+1)
+    for i in 1:order+1
+        ref_coord[i] = Vec(points[i])
+    end
     perm = getPermLagrangeLine(order)
     inv_perm = sortperm(perm)
-    ArbitraryOrderLagrange{RefLine, order, typeof(product_of), typeof(perm)}(product_of, perm, inv_perm)
+    ArbitraryOrderLagrange{RefLine, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
 end
 
 getnbasefunctions(::ArbitraryOrderLagrange{RefLine,order}) where order = order + 1
 facedof_indices(::ArbitraryOrderLagrange{RefLine,order}) where order = ((1,), (2,))
 celldof_interior_indices(::ArbitraryOrderLagrange{RefLine,order}) where order = SVector{order-1}(i+2 for i in 1:order - 1)
 
-function reference_coordinates(ip::ArbitraryOrderLagrange{RefLine,order}) where order
-    v = SVector{order+1}(Vec((i-order/2)*2/order) for i in  0:order)
-    return v[ip.perm]
-end
-
-function reference_coordinate(ip::ArbitraryOrderLagrange{RefLine,order}, i::Int) where order
-    i = ip.perm[i]
-    return Vec((i-1-order/2)*2/order) 
-end
-
 function shape_value(ip::ArbitraryOrderLagrange{RefLine, order}, ξ::Vec{1}, j::Int) where order
     j > getnbasefunctions(ip) && throw(ArgumentError("no shape function $j for interpolation $ip"))
     ξ_x = ξ[1]
     result = 1.0
     j = ip.perm[j]
-    coeff = @view reference_coordinates(ip)[ip.inv_perm]
+    coeff = ip.reference_coordinates
     for k in 1:order+1
         k == j && continue
         result *= (ξ_x - coeff[k][1])/(coeff[j][1]-coeff[k][1])
@@ -1297,26 +1361,48 @@ function shape_value(ip::ArbitraryOrderLagrange{RefLine, order}, ξ::Vec{1}, j::
     return result
 end
 
-#######################################
+##############################
 # Lagrange RefQuadrilateral  #
-#######################################
+##############################
 
 # Permutation to switch numbering to Ferrite ordering
 function getPermLagrangeQ(order)
-    verts = SVector{4}(1, order + 1, (order + 1)^2, order * (order + 1) + 1)
-    edge1 = SVector{order-1}((i for i in 2:order))
-    edge2 = SVector{order-1}(((order+1)*i for i in 2:order))
-    edge3 = SVector{order-1}(((order+1)^2-i for i in 1:order-1))
-    edge4 = SVector{order-1}(((order+1)*i+1 for i in order-1:-1:1))
-    interior = SVector{(order - 1)^2}((j+1+(order+1)*i for j in 1:(order-1), i in 1:(order-1)))
-    return SVector((verts..., edge1..., edge2..., edge3..., edge4..., interior...))
+    result = Array{Int,1}(undef, (order+1)^2)
+    result[1:4] .= (1, order + 1, (order + 1)^2, order * (order + 1) + 1)
+    idx = 5
+    for i in 2:order
+        result[idx] = i
+        idx += 1
+    end
+    for i in 2:order
+        result[idx] = (order+1)*i
+        idx += 1
+    end
+    for i in 1:order-1
+        result[idx] = (order+1)^2-i
+        idx += 1
+    end
+    for i in order-1:-1:1
+        result[idx] = (order+1)*i+1
+        idx += 1
+    end
+    for j in 1:(order-1), i in 1:(order-1)
+        result[idx] = i+1+(order+1)*j
+        idx += 1
+    end
+    return result
 end
 
 function ArbitraryOrderLagrange{RefQuadrilateral, order}() where order
     product_of = ArbitraryOrderLagrange{RefLine,order}()
+    points = GLL(order+1)
+    ref_coord = Array{Vec{2,Float64},1}(undef,(order+1)^2)
+    for i in 1:order+1, j in 1:order+1
+        ref_coord[i+(j-1)*(order+1)] = Vec(points[i],points[j])
+    end
     perm = getPermLagrangeQ(order)
     inv_perm = sortperm(perm)
-    ArbitraryOrderLagrange{RefQuadrilateral, order, typeof(product_of), typeof(perm)}(product_of, perm, inv_perm)
+    ArbitraryOrderLagrange{RefQuadrilateral, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
 end
 
 getnbasefunctions(::ArbitraryOrderLagrange{RefQuadrilateral,order}) where order = (order + 1)^2
@@ -1343,11 +1429,6 @@ function celldof_interior_indices(ip::ArbitraryOrderLagrange{RefQuadrilateral,or
     return SVector{ncellintdofs}((totaldofs-ncellintdofs+i for i in 1:ncellintdofs))
 end
 
-function reference_coordinates(ip::ArbitraryOrderLagrange{RefQuadrilateral,order}) where order
-    v = SVector{(order + 1)^2}(Vec((i*2-order)/order, (j*2-order)/order) for i in 0:order, j in 0:order)
-    return v[ip.perm]
-end
-
 function shape_value(ip::ArbitraryOrderLagrange{RefQuadrilateral, order}, ξ::Vec{2}, i::Int) where order
     i > getnbasefunctions(ip) && throw(ArgumentError("no shape function $i for interpolation $ip"))
     ξ_x = ξ[1]
@@ -1360,6 +1441,121 @@ function shape_value(ip::ArbitraryOrderLagrange{RefQuadrilateral, order}, ξ::Ve
     i_y = ip2.inv_perm[i_y]
     return shape_value(ip2,Vec(ξ_x),i_x) * shape_value(ip2,Vec(ξ_y),i_y)
 end
+
+##########################
+# Lagrange RefHexahedron #
+##########################
+# Based on vtkTriQuadraticHexahedron (see https://kitware.github.io/vtk-examples/site/Cxx/GeometricObjects/IsoparametricCellsDemo/)
+# Permutation to switch numbering to Ferrite ordering
+function getPermLagrangeHex(order)
+    result = Array{Int,1}(undef, (order+1)^3)
+    # Vertices
+    result[1:4] .= (1, order + 1, (order + 1)^2, order * (order + 1) + 1)
+    result[5:8] .= order * (order + 1)^2 .+ (1, order + 1, (order + 1)^2, order * (order + 1) + 1)
+    idx = 9
+    # Edge 1, 2, 3, 4
+    for i in 2:order
+        result[idx] = i
+        idx += 1
+    end
+    for i in 2:order
+        result[idx] = (order+1)*i
+        idx += 1
+    end
+    for i in 1:order-1
+        result[idx] = (order+1)^2-i
+        idx += 1
+    end
+    for i in order-1:-1:1
+        result[idx] = (order+1)*i+1
+        idx += 1
+    end
+    # Edge 5, 6, 7, 8
+    for i in 2:order
+        result[idx] = (order+1)^2 * order + i
+        idx += 1
+    end
+    for i in 2:order
+        result[idx] = (order+1)^2 * order + (order+1)*i
+        idx += 1
+    end
+    for i in 1:order-1
+        result[idx] = (order+1)^2 * order + (order+1)^2-i
+        idx += 1
+    end
+    for i in order-1:-1:1
+        result[idx] = (order+1)^2 * order + (order+1)*i+1
+        idx += 1
+    end
+    # Edges 9, 10, 11, 12
+    for i in 1:order-1
+        result[idx] = (order+1)^2 * i + 1
+        idx += 1
+    end
+    for i in 1:order-1
+        result[idx] = (order+1)^2 * i + (order+1)
+        idx += 1
+    end
+    for i in :1:order-1
+        result[idx] = (order+1)^2 * (i+1)
+        idx += 1
+    end
+    for i in 1:order-1
+        result[idx] = (order+1)^2 * (i+1) - order
+        idx += 1
+    end
+    # Face 1
+    for j in 1:(order-1), i in 1:(order-1)
+        result[idx] = i+1+(order+1)*j
+        idx += 1
+    end
+    # Face 2
+    for k in 1:(order-1), i in 1:(order-1)
+        result[idx] = i+1+(order+1)^2*k
+        idx += 1
+    end
+    # Face 3
+    for k in 1:(order-1), j in 1:(order-1)
+        result[idx] = j*(order+1)+order+1+(order+1)^2*k
+        idx += 1
+    end
+    # Face 4
+    for k in 1:(order-1), i in (order-1):-1:1
+        result[idx] = i+(order)*(order+1)+1+(order+1)^2*k
+        idx += 1
+    end
+    # Face 5
+    for k in 1:(order-1), j in (order-1):-1:1
+        result[idx] = j*(order+1)+1+(order+1)^2*k
+        idx += 1
+    end
+    # Face 6
+    for j in 1:(order-1), i in 1:(order-1)
+        result[idx] = i+1+(order+1)*j + (order+1)^2 * order
+        idx += 1
+    end
+    # Interior
+    for k in 1:(order-1), j in 1:(order-1), i in 1:(order-1)
+        result[idx] = k+1+(order+1)*j + (order+1)^2*i
+        idx += 1
+    end
+    return result
+end
+
+function ArbitraryOrderLagrange{RefHexahedron, order}() where order
+    product_of = ArbitraryOrderLagrange{RefLine,order}()
+    points = GLL(order+1)
+    ref_coord = Array{Vec{3,Float64},1}(undef,(order+1)^3)
+    for i in 1:order+1, j in 1:order+1, k in 1:order+1
+        ref_coord[i+(j-1)*(order+1)+(k-1)*(order+1)^2] = Vec(points[i],points[j],points[k])
+    end
+    perm = getPermLagrangeHex(order)
+    inv_perm = sortperm(perm)
+    ArbitraryOrderLagrange{RefHexahedron, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
+end
+
+getnbasefunctions(::ArbitraryOrderLagrange{RefHexahedron, order}) where order = (order+1)^3
+
 
 ###############
 # Serendipity #
