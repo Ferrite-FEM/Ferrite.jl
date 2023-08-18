@@ -1556,6 +1556,86 @@ end
 
 getnbasefunctions(::ArbitraryOrderLagrange{RefHexahedron, order}) where order = (order+1)^3
 
+# This thing is just 9:(order-1)*12+9
+edgedof_interior_indices(ip::ArbitraryOrderLagrange{RefHexahedron, order}) where order = getindex.(Ref(ip.inv_perm),(
+    SVector{order-1}(i for i in 2:order),
+    SVector{order-1}((order+1)*i for i in 2:order),
+    SVector{order-1}((order+1)^2-i for i in 1:order-1),
+    SVector{order-1}((order+1)*i+1 for i in order-1:-1:1),
+    SVector{order-1}((order+1)^2 * order + i for i in 2:order),
+    SVector{order-1}((order+1)^2 * order + (order+1)*i for i in 2:order),
+    SVector{order-1}((order+1)^2 * order + (order+1)^2-i for i in 1:order-1),
+    SVector{order-1}((order+1)^2 * order + (order+1)*i+1 for i in order-1:-1:1),
+    SVector{order-1}((order+1)^2 * i + 1 for i in 1:order-1),
+    SVector{order-1}((order+1)^2 * i + (order+1) for i in 1:order-1),
+    SVector{order-1}((order+1)^2 * (i+1) for i in 1:order-1),
+    SVector{order-1}((order+1)^2 * (i+1) - order for i in 1:order-1),
+    ))
+
+# This thing is just (order-1)*12+10:(order-1)*12+9+(order-1)^2 * 6 
+facedof_interior_indices(ip::ArbitraryOrderLagrange{RefHexahedron, order}) where order = getindex.(Ref(ip.inv_perm),(
+    SVector{(order-1)^2}(i+1+(order+1)*j for j in 1:(order-1), i in 1:(order-1)),
+    SVector{(order-1)^2}(i+1+(order+1)^2*k for k in 1:(order-1), i in 1:(order-1)),
+    SVector{(order-1)^2}(j*(order+1)+order+1+(order+1)^2*k for k in 1:(order-1), j in 1:(order-1)),
+    SVector{(order-1)^2}(i+(order)*(order+1)+1+(order+1)^2*k for k in 1:(order-1), i in (order-1):-1:1),
+    SVector{(order-1)^2}(j*(order+1)+1+(order+1)^2*k for k in 1:(order-1), j in (order-1):-1:1),
+    SVector{(order-1)^2}(i+1+(order+1)*j + (order+1)^2 * order for j in 1:(order-1), i in 1:(order-1)),
+))
+
+function facedof_indices(ip::ArbitraryOrderLagrange{RefHexahedron, order}) where order
+    fdofi = facedof_interior_indices(ip)
+    edofi = edgedof_interior_indices(ip)
+    return(
+    (1,4,3,2,   reverse(edofi[4])...,reverse(edofi[3])...,reverse(edofi[2])...,reverse(edofi[1])..., fdofi[1]...),
+    (1,2,6,5,   edofi[1]...,        edofi[10]...,        reverse(edofi[5])...,reverse(edofi[9])..., fdofi[2]...),
+    (2,3,7,6,   edofi[2]...,        edofi[11]...,        reverse(edofi[6])...,reverse(edofi[10])..., fdofi[3]...),
+    (3,4,8,7,   edofi[3]...,        edofi[12]...,        reverse(edofi[7])...,reverse(edofi[11])..., fdofi[4]...),
+    (1,5,8,4,   edofi[9]...,        reverse(edofi[8])...,reverse(edofi[12])...,edofi[4]...,         fdofi[5]...),
+    (5,6,7,8,   edofi[5]...,        edofi[6]...,        edofi[7]...,           edofi[8]...,         fdofi[6]...),
+)
+
+end
+
+function edgedof_indices(ip::ArbitraryOrderLagrange{RefHexahedron, order}) where order 
+    edofi = edgedof_interior_indices(ip)
+    return (
+        (1,2, edofi[1]...),
+        (2,3, edofi[2]...),
+        (3,4, edofi[3]...),
+        (4,1, edofi[4]...),
+        (5,6, edofi[5]...),
+        (6,7, edofi[6]...),
+        (7,8, edofi[7]...),
+        (8,5, edofi[8]...),
+        (1,5, edofi[9]...),
+        (2,6, edofi[10]...),
+        (3,7, edofi[11]...),
+        (4,8, edofi[12]...),
+    )
+end
+
+
+function celldof_interior_indices(ip::ArbitraryOrderLagrange{RefHexahedron,order}) where order
+    ncellintdofs = (order - 1)^3
+    totaldofs = getnbasefunctions(ip)
+    return SVector{ncellintdofs}((totaldofs-ncellintdofs+i for i in 1:ncellintdofs))
+end
+
+function shape_value(ip::ArbitraryOrderLagrange{RefHexahedron, order}, ξ::Vec{3, T}, i::Int) where {T, order}
+    i > getnbasefunctions(ip) && throw(ArgumentError("no shape function $i for interpolation $ip"))
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    ξ_z = ξ[3]
+    i = ip.perm[i]
+    i_x = (i-1)%(order+1) + 1
+    i_y = ((i-1)%(order+1)^2)÷(order+1) + 1
+    i_z = (i-1)÷(order+1)^2 + 1
+    ip2 = ip.product_of
+    i_x = ip2.inv_perm[i_x]
+    i_y = ip2.inv_perm[i_y]
+    i_z = ip2.inv_perm[i_z]
+    return shape_value(ip2,Vec(ξ_x),i_x) * shape_value(ip2,Vec(ξ_y),i_y) * shape_value(ip2,Vec(ξ_z),i_z)
+end
 
 ###############
 # Serendipity #
