@@ -1273,6 +1273,10 @@ end
 
 vertexdof_indices(::ArbitraryOrderLagrange{shape,order}) where {shape, order} = vertexdof_indices(Lagrange{shape,order}())
 dirichlet_vertexdof_indices(::ArbitraryOrderDiscontinuousLagrange{shape,order}) where {shape, order} = vertexdof_indices(Lagrange{shape,order}())
+celldof_interior_indices(ip::ArbitraryOrderDiscontinuousLagrange{shape,order}) where {shape, order} = SVector{(order+1)^getdim(ip)}(1:(order+1)^getdim(ip))        
+
+facedof_interior_indices(ip::ArbitraryOrderLagrange) = _facedof_interior_indices(ip)
+edgedof_interior_indices(ip::ArbitraryOrderLagrange) = _edgedof_interior_indices(ip)
 
 adjust_dofs_during_distribution(::ArbitraryOrderLagrange) = true
 adjust_dofs_during_distribution(::ArbitraryOrderDiscontinuousLagrange) = false
@@ -1297,7 +1301,7 @@ for (name,  default_coords) in (
             end
             perm = getPermLagrangeLine(order)
             inv_perm = sortperm(perm)
-            ArbitraryOrderLagrange{RefLine, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
+            $(name){RefLine, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
         end
         getnbasefunctions(::$(name){RefLine,order}) where order = order + 1
     end
@@ -1309,23 +1313,22 @@ for (name,  facefunc) in (
     )
     @eval begin
         $(facefunc)(::$(name){RefLine,order}) where order = ((1,), (2,))
+        function shape_value(ip::$(name){RefLine, order}, ξ::Vec{1}, j::Int) where order
+            j > getnbasefunctions(ip) && throw(ArgumentError("no shape function $j for interpolation $ip"))
+            ξ_x = ξ[1]
+            result = 1.0
+            j = ip.perm[j]
+            coeff = ip.reference_coordinates
+            for k in 1:order+1
+                k == j && continue
+                result *= (ξ_x - coeff[k][1])/(coeff[j][1]-coeff[k][1])
+            end
+            return result
+        end
     end
 end
 
 celldof_interior_indices(::ArbitraryOrderLagrange{RefLine,order}) where order = SVector{order-1}(i+2 for i in 1:order - 1)        
-
-function shape_value(ip::ArbitraryOrderLagrange{RefLine, order}, ξ::Vec{1}, j::Int) where order
-    j > getnbasefunctions(ip) && throw(ArgumentError("no shape function $j for interpolation $ip"))
-    ξ_x = ξ[1]
-    result = 1.0
-    j = ip.perm[j]
-    coeff = ip.reference_coordinates
-    for k in 1:order+1
-        k == j && continue
-        result *= (ξ_x - coeff[k][1])/(coeff[j][1]-coeff[k][1])
-    end
-    return result
-end
 
 ##############################
 # Lagrange RefQuadrilateral  #
@@ -1366,14 +1369,14 @@ for (name,  default_coords) in (
     )
     @eval begin
         function $(name){RefQuadrilateral, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.$(default_coords))[1]) where order
-            product_of = ArbitraryOrderLagrange{RefLine,order}(points)
+            product_of = $(name){RefLine,order}(points)
             ref_coord = Array{Vec{2,Float64},1}(undef,(order+1)^2)
             for i in 1:order+1, j in 1:order+1
                 ref_coord[i+(j-1)*(order+1)] = Vec(points[i],points[j])
             end
             perm = getPermLagrangeQ(order)
             inv_perm = sortperm(perm)
-            ArbitraryOrderLagrange{RefQuadrilateral, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
+            $(name){RefQuadrilateral, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
         end
         getnbasefunctions(::$(name){RefQuadrilateral,order}) where order = (order + 1)^2
     end
@@ -1384,20 +1387,31 @@ for (name,  facefuncs) in (
     (:ArbitraryOrderDiscontinuousLagrange,  :dirichlet_facedof_indices)
     )
     @eval begin
-        function facedof_interior_indices(::$(name){RefQuadrilateral,order}) where order
+        function _facedof_interior_indices(::$(name){RefQuadrilateral,order}) where order
             return (SVector{order-1}((i+4 for i in 1:order-1)),
                 SVector{order-1}((i+order+3 for i in 1:order-1)),
                 SVector{order-1}((i+2*order+2 for i in 1:order-1)),
                 SVector{order-1}((i+3*order+1 for i in 1:order-1)))
         end
-
         function $(facefuncs)(ip::$(name){RefQuadrilateral,order}) where order
-            interior = facedof_interior_indices(ip)
+            interior = _facedof_interior_indices(ip)
             face1 = SVector{order + 1}((i == 1 ? 1 : i == 2 ? 2 : interior[1][i-2] for i in 1:order+1))    
             face2 = SVector{order + 1}((i == 1 ? 2 : i == 2 ? 3 : interior[2][i-2] for i in 1:order+1))    
             face3 = SVector{order + 1}((i == 1 ? 3 : i == 2 ? 4 : interior[3][i-2] for i in 1:order+1))    
             face4 = SVector{order + 1}((i == 1 ? 4 : i == 2 ? 1 : interior[4][i-2] for i in 1:order+1))    
             return (face1, face2, face3, face4)
+        end
+        function shape_value(ip::$(name){RefQuadrilateral, order}, ξ::Vec{2}, i::Int) where order
+            i > getnbasefunctions(ip) && throw(ArgumentError("no shape function $i for interpolation $ip"))
+            ξ_x = ξ[1]
+            ξ_y = ξ[2]
+            i = ip.perm[i]
+            i_x = (i-1)%(order+1) + 1
+            i_y = (i-1)÷(order+1) + 1
+            ip2 = ip.product_of
+            i_x = ip2.inv_perm[i_x]
+            i_y = ip2.inv_perm[i_y]
+            return shape_value(ip2,Vec(ξ_x),i_x) * shape_value(ip2,Vec(ξ_y),i_y)
         end
     end
 end
@@ -1406,19 +1420,6 @@ function celldof_interior_indices(ip::ArbitraryOrderLagrange{RefQuadrilateral,or
     ncellintdofs = (order - 1)^2
     totaldofs = getnbasefunctions(ip)
     return SVector{ncellintdofs}((totaldofs-ncellintdofs+i for i in 1:ncellintdofs))
-end
-
-function shape_value(ip::ArbitraryOrderLagrange{RefQuadrilateral, order}, ξ::Vec{2}, i::Int) where order
-    i > getnbasefunctions(ip) && throw(ArgumentError("no shape function $i for interpolation $ip"))
-    ξ_x = ξ[1]
-    ξ_y = ξ[2]
-    i = ip.perm[i]
-    i_x = (i-1)%(order+1) + 1
-    i_y = (i-1)÷(order+1) + 1
-    ip2 = ip.product_of
-    i_x = ip2.inv_perm[i_x]
-    i_y = ip2.inv_perm[i_y]
-    return shape_value(ip2,Vec(ξ_x),i_x) * shape_value(ip2,Vec(ξ_y),i_y)
 end
 
 ##########################
@@ -1527,14 +1528,14 @@ for (name,  default_coords) in (
     )
     @eval begin
         function $(name){RefHexahedron, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.$(default_coords))[1]) where order
-            product_of = ArbitraryOrderLagrange{RefLine,order}(points)
+            product_of = $(name){RefLine,order}(points)
             ref_coord = Array{Vec{3,Float64},1}(undef,(order+1)^3)
             for i in 1:order+1, j in 1:order+1, k in 1:order+1
                 ref_coord[i+(j-1)*(order+1)+(k-1)*(order+1)^2] = Vec(points[i],points[j],points[k])
             end
             perm = getPermLagrangeHex(order)
             inv_perm = sortperm(perm)
-            ArbitraryOrderLagrange{RefHexahedron, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
+            $(name){RefHexahedron, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
         end
         getnbasefunctions(::$(name){RefHexahedron, order}) where order = (order+1)^3
     end
@@ -1545,7 +1546,7 @@ for (name,  facefunc,  edgefunc) in (
     (:ArbitraryOrderDiscontinuousLagrange,  :dirichlet_facedof_indices, :dirichlet_edgedof_indices)
     )
     @eval begin
-        edgedof_interior_indices(::$(name){RefHexahedron, order}) where order = (
+        _edgedof_interior_indices(::$(name){RefHexahedron, order}) where order = (
             SVector{order-1}(9:8+1*(order-1)),
             SVector{order-1}(9+(order-1):8+2*(order-1)),
             SVector{order-1}(9+2*(order-1):8+3*(order-1)),
@@ -1560,7 +1561,7 @@ for (name,  facefunc,  edgefunc) in (
             SVector{order-1}(9+11*(order-1):8+12*(order-1)),
             )
 
-        facedof_interior_indices(::$(name){RefHexahedron, order}) where order = 
+        _facedof_interior_indices(::$(name){RefHexahedron, order}) where order = 
             (
                 SVector{(order-1)^2}((order-1)*12+9:(order-1)*12+8 + (order-1)^2),
                 SVector{(order-1)^2}((order-1)*12+9 + (order-1)^2:(order-1)*12+8 + 2*(order-1)^2),
@@ -1571,8 +1572,8 @@ for (name,  facefunc,  edgefunc) in (
             )
 
         function $(facefunc)(ip::$(name){RefHexahedron, order}) where order
-            fdofi = facedof_interior_indices(ip)
-            edofi = edgedof_interior_indices(ip)
+            fdofi = _facedof_interior_indices(ip)
+            edofi = _edgedof_interior_indices(ip)
             face1 = Array{Int,1}(undef,(order+1)^2)
             face2 = Array{Int,1}(undef,(order+1)^2)
             face3 = Array{Int,1}(undef,(order+1)^2)
@@ -1632,7 +1633,7 @@ for (name,  facefunc,  edgefunc) in (
         end
         
         function $(edgefunc)(ip::$(name){RefHexahedron, order}) where order 
-            edofi = edgedof_interior_indices(ip)
+            edofi = _edgedof_interior_indices(ip)
             return (
                 (1,2, edofi[1]...),
                 (2,3, edofi[2]...),
@@ -1648,6 +1649,21 @@ for (name,  facefunc,  edgefunc) in (
                 (4,8, edofi[12]...),
             )
         end
+        function shape_value(ip::$(name){RefHexahedron, order}, ξ::Vec{3, T}, i::Int) where {T, order}
+            i > getnbasefunctions(ip) && throw(ArgumentError("no shape function $i for interpolation $ip"))
+            ξ_x = ξ[1]
+            ξ_y = ξ[2]
+            ξ_z = ξ[3]
+            i = ip.perm[i]
+            i_x = (i-1)%(order+1) + 1
+            i_y = ((i-1)%(order+1)^2)÷(order+1) + 1
+            i_z = (i-1)÷(order+1)^2 + 1
+            ip2 = ip.product_of
+            i_x = ip2.inv_perm[i_x]
+            i_y = ip2.inv_perm[i_y]
+            i_z = ip2.inv_perm[i_z]
+            return shape_value(ip2,Vec(ξ_x),i_x) * shape_value(ip2,Vec(ξ_y),i_y) * shape_value(ip2,Vec(ξ_z),i_z)
+        end
     end
 end
 
@@ -1655,22 +1671,6 @@ function celldof_interior_indices(ip::ArbitraryOrderLagrange{RefHexahedron,order
     ncellintdofs = (order - 1)^3
     totaldofs = getnbasefunctions(ip)
     return SVector{ncellintdofs}((totaldofs-ncellintdofs+i for i in 1:ncellintdofs))
-end
-
-function shape_value(ip::ArbitraryOrderLagrange{RefHexahedron, order}, ξ::Vec{3, T}, i::Int) where {T, order}
-    i > getnbasefunctions(ip) && throw(ArgumentError("no shape function $i for interpolation $ip"))
-    ξ_x = ξ[1]
-    ξ_y = ξ[2]
-    ξ_z = ξ[3]
-    i = ip.perm[i]
-    i_x = (i-1)%(order+1) + 1
-    i_y = ((i-1)%(order+1)^2)÷(order+1) + 1
-    i_z = (i-1)÷(order+1)^2 + 1
-    ip2 = ip.product_of
-    i_x = ip2.inv_perm[i_x]
-    i_y = ip2.inv_perm[i_y]
-    i_z = ip2.inv_perm[i_z]
-    return shape_value(ip2,Vec(ξ_x),i_x) * shape_value(ip2,Vec(ξ_y),i_y) * shape_value(ip2,Vec(ξ_z),i_z)
 end
 
 ###############
