@@ -3,11 +3,13 @@ using StaticArrays
 @testset "$interpolation" for interpolation in (
                       Lagrange{RefLine, 1}(),
                       Lagrange{RefLine, 2}(),
-                      ArbitraryOrderLagrange{RefLine, 20}(),
+                      ArbitraryOrderLagrange{RefLine, 20}(), # GLL
+                      ArbitraryOrderLagrange{RefLine, 20}(Ferrite.equidistant(20)),
                       Lagrange{RefQuadrilateral, 1}(),
                       Lagrange{RefQuadrilateral, 2}(),
                       Lagrange{RefQuadrilateral, 3}(),
-                      ArbitraryOrderLagrange{RefQuadrilateral, 20}(), 
+                      ArbitraryOrderLagrange{RefQuadrilateral, 20}(), # GLL
+                      ArbitraryOrderLagrange{RefQuadrilateral, 20}(Ferrite.equidistant(20)), 
                       Lagrange{RefTriangle, 1}(),
                       Lagrange{RefTriangle, 2}(),
                       Lagrange{RefTriangle, 3}(),
@@ -18,7 +20,8 @@ using StaticArrays
                       Lagrange{RefTriangle, 8}(),
                       Lagrange{RefHexahedron, 1}(),
                       Lagrange{RefHexahedron, 2}(),
-                      ArbitraryOrderLagrange{RefHexahedron, 5}(), 
+                      ArbitraryOrderLagrange{RefHexahedron, 5}(),  # GLL
+                      ArbitraryOrderLagrange{RefHexahedron, 5}(Ferrite.equidistant(5)), 
                       Serendipity{RefQuadrilateral, 2}(),
                       Serendipity{RefHexahedron, 2}(),
                       Lagrange{RefTetrahedron, 1}(),

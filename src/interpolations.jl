@@ -1264,7 +1264,7 @@ function reference_coordinates(ip::ArbitraryOrderLagrange{_, order}) where {_, o
     return ip.reference_coordinates[ip.perm]
 end
 
-equidistant(order::Int) = SVector{order + 1}((i*2-order)/order for i in 0:order)
+equidistant(order::Int) = [(i*2-order)/order for i in 0:order]
 
 ####################################
 # Arbitrary Order Lagrange RefLine #
@@ -1331,7 +1331,7 @@ function getPermLagrangeQ(order)
 end
 
 function ArbitraryOrderLagrange{RefQuadrilateral, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.both)[1]) where order
-    product_of = ArbitraryOrderLagrange{RefLine,order}()
+    product_of = ArbitraryOrderLagrange{RefLine,order}(points)
     ref_coord = Array{Vec{2,Float64},1}(undef,(order+1)^2)
     for i in 1:order+1, j in 1:order+1
         ref_coord[i+(j-1)*(order+1)] = Vec(points[i],points[j])
@@ -1479,7 +1479,7 @@ function getPermLagrangeHex(order)
 end
 
 function ArbitraryOrderLagrange{RefHexahedron, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.both)[1]) where order
-    product_of = ArbitraryOrderLagrange{RefLine,order}()
+    product_of = ArbitraryOrderLagrange{RefLine,order}(points)
     ref_coord = Array{Vec{3,Float64},1}(undef,(order+1)^3)
     for i in 1:order+1, j in 1:order+1, k in 1:order+1
         ref_coord[i+(j-1)*(order+1)+(k-1)*(order+1)^2] = Vec(points[i],points[j],points[k])
