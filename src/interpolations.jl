@@ -1274,6 +1274,9 @@ end
 vertexdof_indices(::ArbitraryOrderLagrange{shape,order}) where {shape, order} = vertexdof_indices(Lagrange{shape,order}())
 dirichlet_vertexdof_indices(::ArbitraryOrderDiscontinuousLagrange{shape,order}) where {shape, order} = vertexdof_indices(Lagrange{shape,order}())
 
+adjust_dofs_during_distribution(::ArbitraryOrderLagrange) = true
+adjust_dofs_during_distribution(::ArbitraryOrderDiscontinuousLagrange) = false
+
 equidistant(order::Int) = [(i*2-order)/order for i in 0:order]
 
 ####################################
