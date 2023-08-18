@@ -703,6 +703,7 @@ function getPermLagrangeTri(order)
 end
 
 function facedof_interior_indices(::Lagrange{RefTriangle,order}) where order
+    order == 1 && return ((),(),()) # Workaround for nightly test, will see if it works
     return (SVector{order-1}((i+3 for i in 1:order-1)),
         SVector{order-1}((i+order+2 for i in 1:order-1)),
         SVector{order-1}((i+2*order+1 for i in 1:order-1)))
@@ -1556,44 +1557,92 @@ end
 
 getnbasefunctions(::ArbitraryOrderLagrange{RefHexahedron, order}) where order = (order+1)^3
 
-# This thing is just 9:(order-1)*12+9
-edgedof_interior_indices(ip::ArbitraryOrderLagrange{RefHexahedron, order}) where order = getindex.(Ref(ip.inv_perm),(
-    SVector{order-1}(i for i in 2:order),
-    SVector{order-1}((order+1)*i for i in 2:order),
-    SVector{order-1}((order+1)^2-i for i in 1:order-1),
-    SVector{order-1}((order+1)*i+1 for i in order-1:-1:1),
-    SVector{order-1}((order+1)^2 * order + i for i in 2:order),
-    SVector{order-1}((order+1)^2 * order + (order+1)*i for i in 2:order),
-    SVector{order-1}((order+1)^2 * order + (order+1)^2-i for i in 1:order-1),
-    SVector{order-1}((order+1)^2 * order + (order+1)*i+1 for i in order-1:-1:1),
-    SVector{order-1}((order+1)^2 * i + 1 for i in 1:order-1),
-    SVector{order-1}((order+1)^2 * i + (order+1) for i in 1:order-1),
-    SVector{order-1}((order+1)^2 * (i+1) for i in 1:order-1),
-    SVector{order-1}((order+1)^2 * (i+1) - order for i in 1:order-1),
-    ))
+# This looks ugly bet gives better performance for higher order (order 40 -> 1 alloc)
+edgedof_interior_indices(::ArbitraryOrderLagrange{RefHexahedron, order}) where order = (
+    SVector{order-1}(9:8+1*(order-1)),
+    SVector{order-1}(9+(order-1):8+2*(order-1)),
+    SVector{order-1}(9+2*(order-1):8+3*(order-1)),
+    SVector{order-1}(9+3*(order-1):8+4*(order-1)),
+    SVector{order-1}(9+4*(order-1):8+5*(order-1)),
+    SVector{order-1}(9+5*(order-1):8+6*(order-1)),
+    SVector{order-1}(9+6*(order-1):8+7*(order-1)),
+    SVector{order-1}(9+7*(order-1):8+8*(order-1)),
+    SVector{order-1}(9+8*(order-1):8+9*(order-1)),
+    SVector{order-1}(9+9*(order-1):8+10*(order-1)),
+    SVector{order-1}(9+10*(order-1):8+11*(order-1)),
+    SVector{order-1}(9+11*(order-1):8+12*(order-1)),
+    )
 
-# This thing is just (order-1)*12+10:(order-1)*12+9+(order-1)^2 * 6 
-facedof_interior_indices(ip::ArbitraryOrderLagrange{RefHexahedron, order}) where order = getindex.(Ref(ip.inv_perm),(
-    SVector{(order-1)^2}(i+1+(order+1)*j for j in 1:(order-1), i in 1:(order-1)),
-    SVector{(order-1)^2}(i+1+(order+1)^2*k for k in 1:(order-1), i in 1:(order-1)),
-    SVector{(order-1)^2}(j*(order+1)+order+1+(order+1)^2*k for k in 1:(order-1), j in 1:(order-1)),
-    SVector{(order-1)^2}(i+(order)*(order+1)+1+(order+1)^2*k for k in 1:(order-1), i in (order-1):-1:1),
-    SVector{(order-1)^2}(j*(order+1)+1+(order+1)^2*k for k in 1:(order-1), j in (order-1):-1:1),
-    SVector{(order-1)^2}(i+1+(order+1)*j + (order+1)^2 * order for j in 1:(order-1), i in 1:(order-1)),
-))
+facedof_interior_indices(::ArbitraryOrderLagrange{RefHexahedron, order}) where order = 
+    (
+        SVector{(order-1)^2}((order-1)*12+9:(order-1)*12+8 + (order-1)^2),
+        SVector{(order-1)^2}((order-1)*12+9 + (order-1)^2:(order-1)*12+8 + 2*(order-1)^2),
+        SVector{(order-1)^2}((order-1)*12+9 + 2*(order-1)^2:(order-1)*12+8 + 3*(order-1)^2),
+        SVector{(order-1)^2}((order-1)*12+9 + 3*(order-1)^2:(order-1)*12+8 + 4*(order-1)^2),
+        SVector{(order-1)^2}((order-1)*12+9 + 4*(order-1)^2:(order-1)*12+8 + 5*(order-1)^2),
+        SVector{(order-1)^2}((order-1)*12+9 + 5*(order-1)^2:(order-1)*12+8 + 6*(order-1)^2),     
+    )
 
+# TODO: there must be a way to do this better while having minimal allocations
 function facedof_indices(ip::ArbitraryOrderLagrange{RefHexahedron, order}) where order
     fdofi = facedof_interior_indices(ip)
     edofi = edgedof_interior_indices(ip)
-    return(
-    (1,4,3,2,   reverse(edofi[4])...,reverse(edofi[3])...,reverse(edofi[2])...,reverse(edofi[1])..., fdofi[1]...),
-    (1,2,6,5,   edofi[1]...,        edofi[10]...,        reverse(edofi[5])...,reverse(edofi[9])..., fdofi[2]...),
-    (2,3,7,6,   edofi[2]...,        edofi[11]...,        reverse(edofi[6])...,reverse(edofi[10])..., fdofi[3]...),
-    (3,4,8,7,   edofi[3]...,        edofi[12]...,        reverse(edofi[7])...,reverse(edofi[11])..., fdofi[4]...),
-    (1,5,8,4,   edofi[9]...,        reverse(edofi[8])...,reverse(edofi[12])...,edofi[4]...,         fdofi[5]...),
-    (5,6,7,8,   edofi[5]...,        edofi[6]...,        edofi[7]...,           edofi[8]...,         fdofi[6]...),
-)
+    face1 = Array{Int,1}(undef,(order+1)^2)
+    face2 = Array{Int,1}(undef,(order+1)^2)
+    face3 = Array{Int,1}(undef,(order+1)^2)
+    face4 = Array{Int,1}(undef,(order+1)^2)
+    face5 = Array{Int,1}(undef,(order+1)^2)
+    face6 = Array{Int,1}(undef,(order+1)^2)
 
+    # face 1
+    face1[1:4] .= (1,4,3,2)
+    face1[5:4+(order-1)*1] .= @view edofi[4][end:-1:1]
+    face1[5+(order-1)*1:4+(order-1)*2] .= @view edofi[3][end:-1:1]
+    face1[5+(order-1)*2:4+(order-1)*3] .= @view edofi[2][end:-1:1]
+    face1[5+(order-1)*3:4+(order-1)*4] .= @view edofi[1][end:-1:1]
+    face1[5+(order-1)*4:end] .= fdofi[1]
+
+    # face 2
+    face2[1:4] .= (1,2,6,5)
+    face2[5:4+(order-1)*1] .= edofi[1]
+    face2[5+(order-1)*1:4+(order-1)*2] .= edofi[10]
+    face2[5+(order-1)*2:4+(order-1)*3] .= @view edofi[5][end:-1:1]
+    face2[5+(order-1)*3:4+(order-1)*4] .= @view edofi[9][end:-1:1]
+    face2[5+(order-1)*4:end] .= fdofi[2]
+
+    # face 3
+    face3[1:4] .= (2,3,7,6)
+    face3[5:4+(order-1)*1] .= edofi[2]
+    face3[5+(order-1)*1:4+(order-1)*2] .= edofi[11]
+    face3[5+(order-1)*2:4+(order-1)*3] .= @view edofi[6][end:-1:1]
+    face3[5+(order-1)*3:4+(order-1)*4] .= @view edofi[10][end:-1:1]
+    face3[5+(order-1)*4:end] .= fdofi[3]
+
+    # face 4
+    face4[1:4] .= (3,4,8,7)
+    face4[5:4+(order-1)*1] .= edofi[3]
+    face4[5+(order-1)*1:4+(order-1)*2] .= edofi[12]
+    face4[5+(order-1)*2:4+(order-1)*3] .= @view edofi[7][end:-1:1]
+    face4[5+(order-1)*3:4+(order-1)*4] .= @view edofi[11][end:-1:1]
+    face4[5+(order-1)*4:end] .= fdofi[4]
+
+    # face 5
+    face5[1:4] .= (1,5,8,4)
+    face5[5:4+(order-1)*1] .= edofi[9]
+    face5[5+(order-1)*1:4+(order-1)*2] .= @view edofi[8][end:-1:1]
+    face5[5+(order-1)*2:4+(order-1)*3] .= @view edofi[12][end:-1:1]
+    face5[5+(order-1)*3:4+(order-1)*4] .= edofi[4]
+    face5[5+(order-1)*4:end] .= fdofi[5]
+
+    # face 6
+    face6[1:4] .= (5,6,7,8)
+    face6[5:4+(order-1)*1] .= edofi[5]
+    face6[5+(order-1)*1:4+(order-1)*2] .= edofi[6]
+    face6[5+(order-1)*2:4+(order-1)*3] .= edofi[7]
+    face6[5+(order-1)*3:4+(order-1)*4] .= edofi[8]
+    face6[5+(order-1)*4:end] .= fdofi[6]
+
+    return (face1, face2, face3, face4, face5, face6)
 end
 
 function edgedof_indices(ip::ArbitraryOrderLagrange{RefHexahedron, order}) where order 
@@ -1613,7 +1662,6 @@ function edgedof_indices(ip::ArbitraryOrderLagrange{RefHexahedron, order}) where
         (4,8, edofi[12]...),
     )
 end
-
 
 function celldof_interior_indices(ip::ArbitraryOrderLagrange{RefHexahedron,order}) where order
     ncellintdofs = (order - 1)^3
