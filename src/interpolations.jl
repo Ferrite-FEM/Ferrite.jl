@@ -1264,78 +1264,14 @@ function reference_coordinates(ip::ArbitraryOrderLagrange{_, order}) where {_, o
     return ip.reference_coordinates[ip.perm]
 end
 
-# From https://colab.research.google.com/github/caiociardelli/sphglltools/blob/main/doc/L3_Gauss_Lobatto_Legendre_quadrature.ipynb#scrollTo=4SJ15xMoBUuG
-function LegendrePolynomial(n::Int, ξ::T) where T
-    n == 0 && return one(T)    
-    n == 1 && return ξ
-    fP = one(T)
-    sP = copy(ξ) # Or deepcopy?
-    nP = zero(T)
-    for i in 2:n+1
-        nP = ((2 * i - 1) * ξ * sP - (i - 1) * fP) / i
-        fP = sP
-        sP = nP
-    end
-    return nP
-    # Recursion bad
-    # return ((2*n - 1)*ξ*LegendrePolynomial(n-1,ξ) - (n - 1)*LegendrePolynomial(n-2, ξ))/n 
-end
-
-function GLL(n::Int)
-    # n = 2 && error("TODO: write error")
-    ξ = zeros(Float64, n)
-    w = zeros(Float64, n)
-    ξ[1] = -1
-    ξ[n] = 1
-    w[1] = 2/n/(n-1)
-    w[n] = 2/n/(n-1)
-    for i in 2:n-1
-        ξ[i] = (1-3*(n-2)/(8*(n-1)^3)) * cospi((4*i - 3)/(4*(n - 1)+1))
-        Δξ = 1
-        while abs(Δξ) > eps(Float64) # Infinite loop?
-            # TODO: use autodiff?
-            d1 =  gradient(x->LegendrePolynomial(n-2,x), ξ[i])[1]
-            d2 =  hessian(x->LegendrePolynomial(n-2,x), ξ[i])[1]
-            d3 =  gradient(x->hessian(x->LegendrePolynomial(n-2,x)[1],x)[1],ξ[i])[1]
-            Δξ = 2*d1*d2/(2*d2^2-d1*d3)
-            ξ[i] -= Δξ
-        end
-        ξ[i] = -ξ[i]
-        w[i] = 2/(n*(n-1)*LegendrePolynomial(n-2,ξ[i])^2)
-    end
-    return ξ
-end
-
-function GL(n::Int)
-    # n <= 2 && error("TODO: write error")
-    ξ = zeros(Float64, n)
-    w = zeros(Float64, n)
-    for i in 1:n
-        ξ[i] = (1-3*(n-2)/(8*(n-1)^3)) * cospi((4*i - 3)/(4*(n - 1)+1))
-        Δξ = 1
-        while abs(Δξ) > eps(Float64) # Infinite loop?
-            # TODO: use autodiff?
-            d1 =  LegendrePolynomial(n-1,ξ[i])
-            d2 =  gradient(x->LegendrePolynomial(n-1,x), ξ[i])[1]
-            d3 =  hessian(x->LegendrePolynomial(n-1,x),ξ[i])[1]
-            Δξ = 2*d1*d2/(2*d2^2-d1*d3)
-            ξ[i] -= Δξ
-        end
-        ξ[i] = -ξ[i]
-        w[i] = 2*(1-ξ[i]^2)/((n+1)^2*LegendrePolynomial(n,ξ[i])^2)
-    end
-    return ξ
-end
-
 equidistant(order::Int) = SVector{order + 1}((i*2-order)/order for i in 0:order)
 
 ####################################
 # Arbitrary Order Lagrange RefLine #
 ####################################
 getPermLagrangeLine(order::Int) = SVector{order+1}((1, order+1, SVector{order-1}(i for i in 2:order)...))
-function ArbitraryOrderLagrange{RefLine, order}() where order
+function ArbitraryOrderLagrange{RefLine, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.both)[1]) where order
     product_of = nothing
-    points = GLL(order+1)
     ref_coord = Array{Vec{1,Float64},1}(undef,order+1)
     for i in 1:order+1
         ref_coord[i] = Vec(points[i])
@@ -1394,9 +1330,8 @@ function getPermLagrangeQ(order)
     return result
 end
 
-function ArbitraryOrderLagrange{RefQuadrilateral, order}() where order
+function ArbitraryOrderLagrange{RefQuadrilateral, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.both)[1]) where order
     product_of = ArbitraryOrderLagrange{RefLine,order}()
-    points = GLL(order+1)
     ref_coord = Array{Vec{2,Float64},1}(undef,(order+1)^2)
     for i in 1:order+1, j in 1:order+1
         ref_coord[i+(j-1)*(order+1)] = Vec(points[i],points[j])
@@ -1543,9 +1478,8 @@ function getPermLagrangeHex(order)
     return result
 end
 
-function ArbitraryOrderLagrange{RefHexahedron, order}() where order
+function ArbitraryOrderLagrange{RefHexahedron, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.both)[1]) where order
     product_of = ArbitraryOrderLagrange{RefLine,order}()
-    points = GLL(order+1)
     ref_coord = Array{Vec{3,Float64},1}(undef,(order+1)^3)
     for i in 1:order+1, j in 1:order+1, k in 1:order+1
         ref_coord[i+(j-1)*(order+1)+(k-1)*(order+1)^2] = Vec(points[i],points[j],points[k])
