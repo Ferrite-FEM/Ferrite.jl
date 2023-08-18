@@ -42,6 +42,13 @@ using StaticArrays
                       DiscontinuousLagrange{RefTriangle, 1}(),
                       DiscontinuousLagrange{RefTetrahedron, 1}(),
                       #
+                      ArbitraryOrderDiscontinuousLagrange{RefLine,10}(),
+                      ArbitraryOrderDiscontinuousLagrange{RefLine,10}(Ferrite.equidistant(10)),
+                      ArbitraryOrderDiscontinuousLagrange{RefQuadrilateral,10}(),
+                      ArbitraryOrderDiscontinuousLagrange{RefQuadrilateral,10}(Ferrite.equidistant(10)),
+                      ArbitraryOrderDiscontinuousLagrange{RefHexahedron,5}(),
+                      ArbitraryOrderDiscontinuousLagrange{RefHexahedron,5}(Ferrite.equidistant(5)),
+                      #
                       BubbleEnrichedLagrange{RefTriangle, 1}(),
                       #
                       CrouzeixRaviart{RefTriangle, 1}(),

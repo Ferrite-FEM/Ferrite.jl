@@ -1253,16 +1253,26 @@ end
 ############################
 # Arbitrary Order Lagrange #
 ############################
-struct ArbitraryOrderLagrange{shape, order, prod_T, ref_T, perm_T} <: ScalarInterpolation{shape, order}
-    product_of::prod_T
-    reference_coordinates::ref_T
-    perm::perm_T
-    inv_perm::perm_T
+
+for name in (
+    :ArbitraryOrderLagrange,
+    :ArbitraryOrderDiscontinuousLagrange
+    )
+    @eval begin
+        struct $(name){shape, order, prod_T, ref_T, perm_T} <: ScalarInterpolation{shape, order}
+            product_of::prod_T
+            reference_coordinates::ref_T
+            perm::perm_T
+            inv_perm::perm_T
+        end
+        function reference_coordinates(ip::$(name){_, order}) where {_, order}
+            return ip.reference_coordinates[ip.perm]
+        end
+    end
 end
+
 vertexdof_indices(::ArbitraryOrderLagrange{shape,order}) where {shape, order} = vertexdof_indices(Lagrange{shape,order}())
-function reference_coordinates(ip::ArbitraryOrderLagrange{_, order}) where {_, order}
-    return ip.reference_coordinates[ip.perm]
-end
+dirichlet_vertexdof_indices(::ArbitraryOrderDiscontinuousLagrange{shape,order}) where {shape, order} = vertexdof_indices(Lagrange{shape,order}())
 
 equidistant(order::Int) = [(i*2-order)/order for i in 0:order]
 
@@ -1270,20 +1280,36 @@ equidistant(order::Int) = [(i*2-order)/order for i in 0:order]
 # Arbitrary Order Lagrange RefLine #
 ####################################
 getPermLagrangeLine(order::Int) = SVector{order+1}((1, order+1, SVector{order-1}(i for i in 2:order)...))
-function ArbitraryOrderLagrange{RefLine, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.both)[1]) where order
-    product_of = nothing
-    ref_coord = Array{Vec{1,Float64},1}(undef,order+1)
-    for i in 1:order+1
-        ref_coord[i] = Vec(points[i])
+
+for (name,  default_coords) in (
+    (:ArbitraryOrderLagrange,               :both),
+    (:ArbitraryOrderDiscontinuousLagrange,  :neither)
+    )
+    @eval begin
+        function $(name){RefLine, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.$(default_coords))[1]) where order
+            product_of = nothing
+            ref_coord = Array{Vec{1,Float64},1}(undef,order+1)
+            for i in 1:order+1
+                ref_coord[i] = Vec(points[i])
+            end
+            perm = getPermLagrangeLine(order)
+            inv_perm = sortperm(perm)
+            ArbitraryOrderLagrange{RefLine, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
+        end
+        getnbasefunctions(::$(name){RefLine,order}) where order = order + 1
     end
-    perm = getPermLagrangeLine(order)
-    inv_perm = sortperm(perm)
-    ArbitraryOrderLagrange{RefLine, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
 end
 
-getnbasefunctions(::ArbitraryOrderLagrange{RefLine,order}) where order = order + 1
-facedof_indices(::ArbitraryOrderLagrange{RefLine,order}) where order = ((1,), (2,))
-celldof_interior_indices(::ArbitraryOrderLagrange{RefLine,order}) where order = SVector{order-1}(i+2 for i in 1:order - 1)
+for (name,  facefunc) in (
+    (:ArbitraryOrderLagrange,               :facedof_indices          ),
+    (:ArbitraryOrderDiscontinuousLagrange,  :dirichlet_facedof_indices)
+    )
+    @eval begin
+        $(facefunc)(::$(name){RefLine,order}) where order = ((1,), (2,))
+    end
+end
+
+celldof_interior_indices(::ArbitraryOrderLagrange{RefLine,order}) where order = SVector{order-1}(i+2 for i in 1:order - 1)        
 
 function shape_value(ip::ArbitraryOrderLagrange{RefLine, order}, ξ::Vec{1}, j::Int) where order
     j > getnbasefunctions(ip) && throw(ArgumentError("no shape function $j for interpolation $ip"))
@@ -1330,33 +1356,47 @@ function getPermLagrangeQ(order)
     return result
 end
 
-function ArbitraryOrderLagrange{RefQuadrilateral, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.both)[1]) where order
-    product_of = ArbitraryOrderLagrange{RefLine,order}(points)
-    ref_coord = Array{Vec{2,Float64},1}(undef,(order+1)^2)
-    for i in 1:order+1, j in 1:order+1
-        ref_coord[i+(j-1)*(order+1)] = Vec(points[i],points[j])
+
+for (name,  default_coords) in (
+    (:ArbitraryOrderLagrange,               :both),
+    (:ArbitraryOrderDiscontinuousLagrange,  :neither)
+    )
+    @eval begin
+        function $(name){RefQuadrilateral, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.$(default_coords))[1]) where order
+            product_of = ArbitraryOrderLagrange{RefLine,order}(points)
+            ref_coord = Array{Vec{2,Float64},1}(undef,(order+1)^2)
+            for i in 1:order+1, j in 1:order+1
+                ref_coord[i+(j-1)*(order+1)] = Vec(points[i],points[j])
+            end
+            perm = getPermLagrangeQ(order)
+            inv_perm = sortperm(perm)
+            ArbitraryOrderLagrange{RefQuadrilateral, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
+        end
+        getnbasefunctions(::$(name){RefQuadrilateral,order}) where order = (order + 1)^2
     end
-    perm = getPermLagrangeQ(order)
-    inv_perm = sortperm(perm)
-    ArbitraryOrderLagrange{RefQuadrilateral, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
 end
 
-getnbasefunctions(::ArbitraryOrderLagrange{RefQuadrilateral,order}) where order = (order + 1)^2
+for (name,  facefuncs) in (
+    (:ArbitraryOrderLagrange,               :facedof_indices),
+    (:ArbitraryOrderDiscontinuousLagrange,  :dirichlet_facedof_indices)
+    )
+    @eval begin
+        function facedof_interior_indices(::$(name){RefQuadrilateral,order}) where order
+            return (SVector{order-1}((i+4 for i in 1:order-1)),
+                SVector{order-1}((i+order+3 for i in 1:order-1)),
+                SVector{order-1}((i+2*order+2 for i in 1:order-1)),
+                SVector{order-1}((i+3*order+1 for i in 1:order-1)))
+        end
 
-function facedof_interior_indices(::ArbitraryOrderLagrange{RefQuadrilateral,order}) where order
-    return (SVector{order-1}((i+4 for i in 1:order-1)),
-        SVector{order-1}((i+order+3 for i in 1:order-1)),
-        SVector{order-1}((i+2*order+2 for i in 1:order-1)),
-        SVector{order-1}((i+3*order+1 for i in 1:order-1)))
-end
-
-function facedof_indices(ip::ArbitraryOrderLagrange{RefQuadrilateral,order}) where order
-    interior = facedof_interior_indices(ip)
-    face1 = SVector{order + 1}((i == 1 ? 1 : i == 2 ? 2 : interior[1][i-2] for i in 1:order+1))    
-    face2 = SVector{order + 1}((i == 1 ? 2 : i == 2 ? 3 : interior[2][i-2] for i in 1:order+1))    
-    face3 = SVector{order + 1}((i == 1 ? 3 : i == 2 ? 4 : interior[3][i-2] for i in 1:order+1))    
-    face4 = SVector{order + 1}((i == 1 ? 4 : i == 2 ? 1 : interior[4][i-2] for i in 1:order+1))    
-    return (face1, face2, face3, face4)
+        function $(facefuncs)(ip::$(name){RefQuadrilateral,order}) where order
+            interior = facedof_interior_indices(ip)
+            face1 = SVector{order + 1}((i == 1 ? 1 : i == 2 ? 2 : interior[1][i-2] for i in 1:order+1))    
+            face2 = SVector{order + 1}((i == 1 ? 2 : i == 2 ? 3 : interior[2][i-2] for i in 1:order+1))    
+            face3 = SVector{order + 1}((i == 1 ? 3 : i == 2 ? 4 : interior[3][i-2] for i in 1:order+1))    
+            face4 = SVector{order + 1}((i == 1 ? 4 : i == 2 ? 1 : interior[4][i-2] for i in 1:order+1))    
+            return (face1, face2, face3, face4)
+        end
+    end
 end
 
 function celldof_interior_indices(ip::ArbitraryOrderLagrange{RefQuadrilateral,order}) where order
@@ -1478,123 +1518,134 @@ function getPermLagrangeHex(order)
     return result
 end
 
-function ArbitraryOrderLagrange{RefHexahedron, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.both)[1]) where order
-    product_of = ArbitraryOrderLagrange{RefLine,order}(points)
-    ref_coord = Array{Vec{3,Float64},1}(undef,(order+1)^3)
-    for i in 1:order+1, j in 1:order+1, k in 1:order+1
-        ref_coord[i+(j-1)*(order+1)+(k-1)*(order+1)^2] = Vec(points[i],points[j],points[k])
+for (name,  default_coords) in (
+    (:ArbitraryOrderLagrange,               :both),
+    (:ArbitraryOrderDiscontinuousLagrange,  :neither)
+    )
+    @eval begin
+        function $(name){RefHexahedron, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.$(default_coords))[1]) where order
+            product_of = ArbitraryOrderLagrange{RefLine,order}(points)
+            ref_coord = Array{Vec{3,Float64},1}(undef,(order+1)^3)
+            for i in 1:order+1, j in 1:order+1, k in 1:order+1
+                ref_coord[i+(j-1)*(order+1)+(k-1)*(order+1)^2] = Vec(points[i],points[j],points[k])
+            end
+            perm = getPermLagrangeHex(order)
+            inv_perm = sortperm(perm)
+            ArbitraryOrderLagrange{RefHexahedron, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
+        end
+        getnbasefunctions(::$(name){RefHexahedron, order}) where order = (order+1)^3
     end
-    perm = getPermLagrangeHex(order)
-    inv_perm = sortperm(perm)
-    ArbitraryOrderLagrange{RefHexahedron, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
 end
 
-getnbasefunctions(::ArbitraryOrderLagrange{RefHexahedron, order}) where order = (order+1)^3
-
-# This looks ugly bet gives better performance for higher order (order 40 -> 1 alloc)
-edgedof_interior_indices(::ArbitraryOrderLagrange{RefHexahedron, order}) where order = (
-    SVector{order-1}(9:8+1*(order-1)),
-    SVector{order-1}(9+(order-1):8+2*(order-1)),
-    SVector{order-1}(9+2*(order-1):8+3*(order-1)),
-    SVector{order-1}(9+3*(order-1):8+4*(order-1)),
-    SVector{order-1}(9+4*(order-1):8+5*(order-1)),
-    SVector{order-1}(9+5*(order-1):8+6*(order-1)),
-    SVector{order-1}(9+6*(order-1):8+7*(order-1)),
-    SVector{order-1}(9+7*(order-1):8+8*(order-1)),
-    SVector{order-1}(9+8*(order-1):8+9*(order-1)),
-    SVector{order-1}(9+9*(order-1):8+10*(order-1)),
-    SVector{order-1}(9+10*(order-1):8+11*(order-1)),
-    SVector{order-1}(9+11*(order-1):8+12*(order-1)),
+for (name,  facefunc,  edgefunc) in (
+    (:ArbitraryOrderLagrange,               :facedof_indices,           :edgedof_indices),
+    (:ArbitraryOrderDiscontinuousLagrange,  :dirichlet_facedof_indices, :dirichlet_edgedof_indices)
     )
+    @eval begin
+        edgedof_interior_indices(::$(name){RefHexahedron, order}) where order = (
+            SVector{order-1}(9:8+1*(order-1)),
+            SVector{order-1}(9+(order-1):8+2*(order-1)),
+            SVector{order-1}(9+2*(order-1):8+3*(order-1)),
+            SVector{order-1}(9+3*(order-1):8+4*(order-1)),
+            SVector{order-1}(9+4*(order-1):8+5*(order-1)),
+            SVector{order-1}(9+5*(order-1):8+6*(order-1)),
+            SVector{order-1}(9+6*(order-1):8+7*(order-1)),
+            SVector{order-1}(9+7*(order-1):8+8*(order-1)),
+            SVector{order-1}(9+8*(order-1):8+9*(order-1)),
+            SVector{order-1}(9+9*(order-1):8+10*(order-1)),
+            SVector{order-1}(9+10*(order-1):8+11*(order-1)),
+            SVector{order-1}(9+11*(order-1):8+12*(order-1)),
+            )
 
-facedof_interior_indices(::ArbitraryOrderLagrange{RefHexahedron, order}) where order = 
-    (
-        SVector{(order-1)^2}((order-1)*12+9:(order-1)*12+8 + (order-1)^2),
-        SVector{(order-1)^2}((order-1)*12+9 + (order-1)^2:(order-1)*12+8 + 2*(order-1)^2),
-        SVector{(order-1)^2}((order-1)*12+9 + 2*(order-1)^2:(order-1)*12+8 + 3*(order-1)^2),
-        SVector{(order-1)^2}((order-1)*12+9 + 3*(order-1)^2:(order-1)*12+8 + 4*(order-1)^2),
-        SVector{(order-1)^2}((order-1)*12+9 + 4*(order-1)^2:(order-1)*12+8 + 5*(order-1)^2),
-        SVector{(order-1)^2}((order-1)*12+9 + 5*(order-1)^2:(order-1)*12+8 + 6*(order-1)^2),     
-    )
+        facedof_interior_indices(::$(name){RefHexahedron, order}) where order = 
+            (
+                SVector{(order-1)^2}((order-1)*12+9:(order-1)*12+8 + (order-1)^2),
+                SVector{(order-1)^2}((order-1)*12+9 + (order-1)^2:(order-1)*12+8 + 2*(order-1)^2),
+                SVector{(order-1)^2}((order-1)*12+9 + 2*(order-1)^2:(order-1)*12+8 + 3*(order-1)^2),
+                SVector{(order-1)^2}((order-1)*12+9 + 3*(order-1)^2:(order-1)*12+8 + 4*(order-1)^2),
+                SVector{(order-1)^2}((order-1)*12+9 + 4*(order-1)^2:(order-1)*12+8 + 5*(order-1)^2),
+                SVector{(order-1)^2}((order-1)*12+9 + 5*(order-1)^2:(order-1)*12+8 + 6*(order-1)^2),     
+            )
 
-# TODO: there must be a way to do this better while having minimal allocations
-function facedof_indices(ip::ArbitraryOrderLagrange{RefHexahedron, order}) where order
-    fdofi = facedof_interior_indices(ip)
-    edofi = edgedof_interior_indices(ip)
-    face1 = Array{Int,1}(undef,(order+1)^2)
-    face2 = Array{Int,1}(undef,(order+1)^2)
-    face3 = Array{Int,1}(undef,(order+1)^2)
-    face4 = Array{Int,1}(undef,(order+1)^2)
-    face5 = Array{Int,1}(undef,(order+1)^2)
-    face6 = Array{Int,1}(undef,(order+1)^2)
-
-    # face 1
-    face1[1:4] .= (1,4,3,2)
-    face1[5:4+(order-1)*1] .= @view edofi[4][end:-1:1]
-    face1[5+(order-1)*1:4+(order-1)*2] .= @view edofi[3][end:-1:1]
-    face1[5+(order-1)*2:4+(order-1)*3] .= @view edofi[2][end:-1:1]
-    face1[5+(order-1)*3:4+(order-1)*4] .= @view edofi[1][end:-1:1]
-    face1[5+(order-1)*4:end] .= fdofi[1]
-
-    # face 2
-    face2[1:4] .= (1,2,6,5)
-    face2[5:4+(order-1)*1] .= edofi[1]
-    face2[5+(order-1)*1:4+(order-1)*2] .= edofi[10]
-    face2[5+(order-1)*2:4+(order-1)*3] .= @view edofi[5][end:-1:1]
-    face2[5+(order-1)*3:4+(order-1)*4] .= @view edofi[9][end:-1:1]
-    face2[5+(order-1)*4:end] .= fdofi[2]
-
-    # face 3
-    face3[1:4] .= (2,3,7,6)
-    face3[5:4+(order-1)*1] .= edofi[2]
-    face3[5+(order-1)*1:4+(order-1)*2] .= edofi[11]
-    face3[5+(order-1)*2:4+(order-1)*3] .= @view edofi[6][end:-1:1]
-    face3[5+(order-1)*3:4+(order-1)*4] .= @view edofi[10][end:-1:1]
-    face3[5+(order-1)*4:end] .= fdofi[3]
-
-    # face 4
-    face4[1:4] .= (3,4,8,7)
-    face4[5:4+(order-1)*1] .= edofi[3]
-    face4[5+(order-1)*1:4+(order-1)*2] .= edofi[12]
-    face4[5+(order-1)*2:4+(order-1)*3] .= @view edofi[7][end:-1:1]
-    face4[5+(order-1)*3:4+(order-1)*4] .= @view edofi[11][end:-1:1]
-    face4[5+(order-1)*4:end] .= fdofi[4]
-
-    # face 5
-    face5[1:4] .= (1,5,8,4)
-    face5[5:4+(order-1)*1] .= edofi[9]
-    face5[5+(order-1)*1:4+(order-1)*2] .= @view edofi[8][end:-1:1]
-    face5[5+(order-1)*2:4+(order-1)*3] .= @view edofi[12][end:-1:1]
-    face5[5+(order-1)*3:4+(order-1)*4] .= edofi[4]
-    face5[5+(order-1)*4:end] .= fdofi[5]
-
-    # face 6
-    face6[1:4] .= (5,6,7,8)
-    face6[5:4+(order-1)*1] .= edofi[5]
-    face6[5+(order-1)*1:4+(order-1)*2] .= edofi[6]
-    face6[5+(order-1)*2:4+(order-1)*3] .= edofi[7]
-    face6[5+(order-1)*3:4+(order-1)*4] .= edofi[8]
-    face6[5+(order-1)*4:end] .= fdofi[6]
-
-    return (face1, face2, face3, face4, face5, face6)
-end
-
-function edgedof_indices(ip::ArbitraryOrderLagrange{RefHexahedron, order}) where order 
-    edofi = edgedof_interior_indices(ip)
-    return (
-        (1,2, edofi[1]...),
-        (2,3, edofi[2]...),
-        (3,4, edofi[3]...),
-        (4,1, edofi[4]...),
-        (5,6, edofi[5]...),
-        (6,7, edofi[6]...),
-        (7,8, edofi[7]...),
-        (8,5, edofi[8]...),
-        (1,5, edofi[9]...),
-        (2,6, edofi[10]...),
-        (3,7, edofi[11]...),
-        (4,8, edofi[12]...),
-    )
+        function $(facefunc)(ip::$(name){RefHexahedron, order}) where order
+            fdofi = facedof_interior_indices(ip)
+            edofi = edgedof_interior_indices(ip)
+            face1 = Array{Int,1}(undef,(order+1)^2)
+            face2 = Array{Int,1}(undef,(order+1)^2)
+            face3 = Array{Int,1}(undef,(order+1)^2)
+            face4 = Array{Int,1}(undef,(order+1)^2)
+            face5 = Array{Int,1}(undef,(order+1)^2)
+            face6 = Array{Int,1}(undef,(order+1)^2)
+        
+            # face 1
+            face1[1:4] .= (1,4,3,2)
+            face1[5:4+(order-1)*1] .= @view edofi[4][end:-1:1]
+            face1[5+(order-1)*1:4+(order-1)*2] .= @view edofi[3][end:-1:1]
+            face1[5+(order-1)*2:4+(order-1)*3] .= @view edofi[2][end:-1:1]
+            face1[5+(order-1)*3:4+(order-1)*4] .= @view edofi[1][end:-1:1]
+            face1[5+(order-1)*4:end] .= fdofi[1]
+        
+            # face 2
+            face2[1:4] .= (1,2,6,5)
+            face2[5:4+(order-1)*1] .= edofi[1]
+            face2[5+(order-1)*1:4+(order-1)*2] .= edofi[10]
+            face2[5+(order-1)*2:4+(order-1)*3] .= @view edofi[5][end:-1:1]
+            face2[5+(order-1)*3:4+(order-1)*4] .= @view edofi[9][end:-1:1]
+            face2[5+(order-1)*4:end] .= fdofi[2]
+        
+            # face 3
+            face3[1:4] .= (2,3,7,6)
+            face3[5:4+(order-1)*1] .= edofi[2]
+            face3[5+(order-1)*1:4+(order-1)*2] .= edofi[11]
+            face3[5+(order-1)*2:4+(order-1)*3] .= @view edofi[6][end:-1:1]
+            face3[5+(order-1)*3:4+(order-1)*4] .= @view edofi[10][end:-1:1]
+            face3[5+(order-1)*4:end] .= fdofi[3]
+        
+            # face 4
+            face4[1:4] .= (3,4,8,7)
+            face4[5:4+(order-1)*1] .= edofi[3]
+            face4[5+(order-1)*1:4+(order-1)*2] .= edofi[12]
+            face4[5+(order-1)*2:4+(order-1)*3] .= @view edofi[7][end:-1:1]
+            face4[5+(order-1)*3:4+(order-1)*4] .= @view edofi[11][end:-1:1]
+            face4[5+(order-1)*4:end] .= fdofi[4]
+        
+            # face 5
+            face5[1:4] .= (1,5,8,4)
+            face5[5:4+(order-1)*1] .= edofi[9]
+            face5[5+(order-1)*1:4+(order-1)*2] .= @view edofi[8][end:-1:1]
+            face5[5+(order-1)*2:4+(order-1)*3] .= @view edofi[12][end:-1:1]
+            face5[5+(order-1)*3:4+(order-1)*4] .= edofi[4]
+            face5[5+(order-1)*4:end] .= fdofi[5]
+        
+            # face 6
+            face6[1:4] .= (5,6,7,8)
+            face6[5:4+(order-1)*1] .= edofi[5]
+            face6[5+(order-1)*1:4+(order-1)*2] .= edofi[6]
+            face6[5+(order-1)*2:4+(order-1)*3] .= edofi[7]
+            face6[5+(order-1)*3:4+(order-1)*4] .= edofi[8]
+            face6[5+(order-1)*4:end] .= fdofi[6]
+        
+            return (face1, face2, face3, face4, face5, face6)
+        end
+        
+        function $(edgefunc)(ip::$(name){RefHexahedron, order}) where order 
+            edofi = edgedof_interior_indices(ip)
+            return (
+                (1,2, edofi[1]...),
+                (2,3, edofi[2]...),
+                (3,4, edofi[3]...),
+                (4,1, edofi[4]...),
+                (5,6, edofi[5]...),
+                (6,7, edofi[6]...),
+                (7,8, edofi[7]...),
+                (8,5, edofi[8]...),
+                (1,5, edofi[9]...),
+                (2,6, edofi[10]...),
+                (3,7, edofi[11]...),
+                (4,8, edofi[12]...),
+            )
+        end
+    end
 end
 
 function celldof_interior_indices(ip::ArbitraryOrderLagrange{RefHexahedron,order}) where order

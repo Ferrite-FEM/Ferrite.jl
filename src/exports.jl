@@ -16,6 +16,7 @@ export
     Lagrange,
     ArbitraryOrderLagrange,
     DiscontinuousLagrange,
+    ArbitraryOrderDiscontinuousLagrange,
     Serendipity,
     getnbasefunctions,
 
