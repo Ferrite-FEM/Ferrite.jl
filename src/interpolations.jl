@@ -692,14 +692,29 @@ function getnbasefunctions(::Lagrange{RefTriangle,N}) where N
 end
 
 # Permutation to switch numbering to Ferrite ordering
-function getPermLagrangeTri(order)
-    verts = SVector{3}(order + 1, (order + 1) * (order + 2) ÷ 2, 1)
-    edge1 = SVector{order-1}((sum(i:order+1) for i in order:-1:2))
-    edge2 = SVector{order-1}((sum(i:order+1)+1 for i in 3:(order+1)))
-    edge3 = SVector{order-1}((i for i in 2:order))
-    # TODO: fix this bottleneck, nested generators don't work so one has to use ...
-    interior = NTuple{(order - 2) * (order - 1) ÷ 2}((i for j in (order+1):-1:4 for i in sum(j:order+1)+2 : sum(j:order+1)+j-2))
-    return SVector((verts..., edge1..., edge2..., edge3..., interior...))
+function getPermLagrangeTri(order::Int)
+    result = Array{Int, 1}(undef, (order + 1) * (order + 2) ÷ 2)
+    result[1:3] .= (order + 1, (order + 1) * (order + 2) ÷ 2, 1)
+    idx = 4
+    for i in order:-1:2 # Face 1
+        result[idx] = sum(i:order+1)
+        idx += 1
+    end
+    for i in 3:(order+1) # Face 2
+        result[idx] = sum(i:order+1)+1
+        idx += 1
+    end
+    for i in 2:order # Face 3
+        result[idx] = i
+        idx += 1
+    end
+    for j in (order+1):-1:4 # Interior
+        for i in sum(j:order+1)+2 : sum(j:order+1)+j-2
+            result[idx] = i
+            idx += 1
+        end
+    end
+    return result
 end
 
 function facedof_interior_indices(::Lagrange{RefTriangle,order}) where order
