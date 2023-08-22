@@ -1309,6 +1309,8 @@ for (name,  default_coords) in (
     )
     @eval begin
         function $(name){RefLine, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.$(default_coords))[1]) where order
+            $(name) isa ArbitraryOrderLagrange && (points[1] ≉ -1.0 || points[end] ≉ 1.0) &&
+                error("Continuous nodal interpolations must have basis on the boundaries")
             product_of = nothing
             ref_coord = Array{Vec{1,Float64},1}(undef,order+1)
             for i in 1:order+1
@@ -1327,7 +1329,12 @@ for (name,  facefunc) in (
     (:ArbitraryOrderDiscontinuousLagrange,  :dirichlet_facedof_indices)
     )
     @eval begin
-        $(facefunc)(::$(name){RefLine,order}) where order = ((1,), (2,))
+        function $(facefunc)(ip::$(name){RefLine,order}) where order
+            $(name) isa ArbitraryOrderDiscontinuousLagrange &&
+                (ip.reference_coordinates[1] ≉ Vec(-1.0) || ip.reference_coordinates[end] ≉ Vec(1.0)) &&
+                error("$($facefunc) is not implemented for L2 elements with no basis on the boundaries")
+            return ((1,), (2,))
+        end
         function shape_value(ip::$(name){RefLine, order}, ξ::Vec{1}, j::Int) where order
             j > getnbasefunctions(ip) && throw(ArgumentError("no shape function $j for interpolation $ip"))
             ξ_x = ξ[1]
@@ -1384,6 +1391,8 @@ for (name,  default_coords) in (
     )
     @eval begin
         function $(name){RefQuadrilateral, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.$(default_coords))[1]) where order
+            $(name) isa ArbitraryOrderLagrange && (points[1] ≉ -1.0 || points[end] ≉ 1.0) &&
+                error("Continuous nodal interpolations must have basis on the boundaries")
             product_of = $(name){RefLine,order}(points)
             ref_coord = Array{Vec{2,Float64},1}(undef,(order+1)^2)
             for i in 1:order+1, j in 1:order+1
@@ -1397,7 +1406,7 @@ for (name,  default_coords) in (
     end
 end
 
-for (name,  facefuncs) in (
+for (name,  facefunc) in (
     (:ArbitraryOrderLagrange,               :facedof_indices),
     (:ArbitraryOrderDiscontinuousLagrange,  :dirichlet_facedof_indices)
     )
@@ -1408,7 +1417,10 @@ for (name,  facefuncs) in (
                 SVector{order-1}((i+2*order+2 for i in 1:order-1)),
                 SVector{order-1}((i+3*order+1 for i in 1:order-1)))
         end
-        function $(facefuncs)(ip::$(name){RefQuadrilateral,order}) where order
+        function $(facefunc)(ip::$(name){RefQuadrilateral,order}) where order
+            $(name) isa ArbitraryOrderDiscontinuousLagrange &&
+                (ip.reference_coordinates[1] ≉ Vec(-1.0,-1.0) || ip.reference_coordinates[end] ≉ Vec(1.0,1.0)) &&
+                error("$($facefunc) is not implemented for L2 elements with no basis on the boundaries")
             interior = _facedof_interior_indices(ip)
             face1 = SVector{order + 1}((i == 1 ? 1 : i == 2 ? 2 : interior[1][i-2] for i in 1:order+1))    
             face2 = SVector{order + 1}((i == 1 ? 2 : i == 2 ? 3 : interior[2][i-2] for i in 1:order+1))    
@@ -1543,6 +1555,8 @@ for (name,  default_coords) in (
     )
     @eval begin
         function $(name){RefHexahedron, order}(points::Vector{Float64} = GaussQuadrature.legendre(order+1, GaussQuadrature.$(default_coords))[1]) where order
+            $(name) isa ArbitraryOrderLagrange && (points[1] ≉ -1.0 || points[end] ≉ 1.0) &&
+                error("Continuous nodal interpolations must have basis on the boundaries")
             product_of = $(name){RefLine,order}(points)
             ref_coord = Array{Vec{3,Float64},1}(undef,(order+1)^3)
             for i in 1:order+1, j in 1:order+1, k in 1:order+1
@@ -1587,6 +1601,9 @@ for (name,  facefunc,  edgefunc) in (
             )
 
         function $(facefunc)(ip::$(name){RefHexahedron, order}) where order
+            $(name) isa ArbitraryOrderDiscontinuousLagrange &&
+                (ip.reference_coordinates[1] ≉ Vec(-1.0,-1.0,-1.0) || ip.reference_coordinates[end] ≉ Vec(1.0,1.0,1.0)) &&
+                error("$($facefunc) is not implemented for L2 elements with no basis on the boundaries")
             fdofi = _facedof_interior_indices(ip)
             edofi = _edgedof_interior_indices(ip)
             face1 = Array{Int,1}(undef,(order+1)^2)
@@ -1648,6 +1665,8 @@ for (name,  facefunc,  edgefunc) in (
         end
         
         function $(edgefunc)(ip::$(name){RefHexahedron, order}) where order 
+            (ip.reference_coordinates[1] ≉ Vec(-1.0,-1.0,-1.0) || ip.reference_coordinates[end] ≉ Vec(1.0,1.0,1.0)) &&
+                error("$($edgefunc) is not implemented for L2 elements with no basis on the boundaries")
             edofi = _edgedof_interior_indices(ip)
             return (
                 (1,2, edofi[1]...),
