@@ -7,7 +7,7 @@ Abstract type for interpolations defined on `ref_shape`
 The interpolation is used to define shape functions to interpolate
 a function between nodes.
 
-The following interpolations are implemented:
+The following interpolations are implemented with fixed order:
 
 * `Lagrange{RefLine,1}`
 * `Lagrange{RefLine,2}`
@@ -16,9 +16,6 @@ The following interpolations are implemented:
 * `Lagrange{RefQuadrilateral,3}`
 * `Lagrange{RefTriangle,1}`
 * `Lagrange{RefTriangle,2}`
-* `Lagrange{RefTriangle,3}`
-* `Lagrange{RefTriangle,4}`
-* `Lagrange{RefTriangle,5}`
 * `BubbleEnrichedLagrange{RefTriangle,1}`
 * `CrouzeixRaviart{RefTriangle, 1}`
 * `Lagrange{RefHexahedron,1}`
@@ -31,6 +28,17 @@ The following interpolations are implemented:
 * `Lagrange{RefPyramid,2}`
 * `Serendipity{RefQuadrilateral,2}`
 * `Serendipity{RefHexahedron,2}`
+
+The following interpolations are implemented with arbitrary order:
+
+* `Lagrange{RefTriangle,order}`
+* `ArbitraryOrderLagrange{RefHypercube,order}`
+* `ArbitraryOrderDiscontinuousLagrange{RefHypercube,order}`
+
+The following interpolations are implemented with arbitrary basis coordinates:
+
+* `ArbitraryOrderLagrange{RefHypercube,order}`
+* `ArbitraryOrderDiscontinuousLagrange{RefHypercube,order}`
 
 # Examples
 ```jldoctest
@@ -403,7 +411,11 @@ dirichlet_boundarydof_indices(::Type{VertexIndex}) = Ferrite.dirichlet_vertexdof
 #########################
 # TODO generalize to arbitrary basis positionings.
 """
-Piecewise discontinuous Lagrange basis via Gauss-Lobatto points.
+Piecewise discontinuous Lagrange interpolation using equidistant basis.
+
+To use arbitrary order and basis positionings consider using:
+* [`ArbitraryOrderDiscontinuousLagrange{refshape,order}(basis)`](@ref) for RefLine and RefHypercube
+* [`DiscontinuousLagrange{RefTriangle,order}`](@ref) for RefTriangle with equidistant basis positionings
 """
 struct DiscontinuousLagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
     function DiscontinuousLagrange{shape, order}() where {shape <: AbstractRefShape, order}
@@ -457,6 +469,13 @@ is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
 ############
 # Lagrange #
 ############
+"""
+Continuous Lagrange interpolation using equidistant basis.
+
+To use arbitrary order and basis positionings consider using:
+* [`ArbitraryOrderLagrange{refshape,order}(basis)`](@ref) for RefLine and RefHypercube
+* [`Lagrange{RefTriangle,order}`](@ref) for RefTriangle with equidistant basis positionings
+"""
 struct Lagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
     function Lagrange{shape, order}() where {shape <: AbstractRefShape, order}
         new{shape, order, Nothing}()
@@ -682,9 +701,9 @@ function shape_value(ip::Lagrange{RefTriangle, 2}, ξ::Vec{2}, i::Int)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
-######################################
-# Lagrange RefTriangle order #
-######################################
+########################################
+# Lagrange RefTriangle abritrary order #
+########################################
 # see https://getfem.readthedocs.io/en/latest/userdoc/appendixA.html
 
 function getnbasefunctions(::Lagrange{RefTriangle,N}) where N
@@ -1268,6 +1287,23 @@ end
 ############################
 # Arbitrary Order Lagrange #
 ############################
+"""
+Arbitrary order continuous Lagrange interpolation with arbitrary basis positionings for hypercubes.
+
+Basis positionings default to Gauss-Lobatto points
+
+To use arbitrary order with triangles consider using [`Lagrange{refshape,order}`](@ref) which in implemented for equidistant basis only
+"""
+ArbitraryOrderLagrange
+
+"""
+Arbitrary order discontinuous Lagrange interpolation with arbitrary basis positionings for hypercubes.
+
+Basis positionings default to Gauss-Legendre points
+
+To use arbitrary order with triangles consider using [`DiscontinuousLagrange{refshape,order}`](@ref) which in implemented for equidistant basis only
+"""
+ArbitraryOrderDiscontinuousLagrange
 
 for name in (
     :ArbitraryOrderLagrange,
