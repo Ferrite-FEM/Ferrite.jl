@@ -27,7 +27,7 @@ function create_face_quad_rule(::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, 
     n_points = length(w)
     face_quad_rule = QuadratureRule{RefShape, T, getdim(AbstractCell{RefShape})}[]
     for face in 1:nfaces(RefShape)
-        new_points = [face_to_element_transformation(N != 0 ? p[i] : Vec(zero(T)), RefShape, face) for i in 1:n_points] # ξ = 1-t-s, η = s, ζ = 0
+        new_points = [face_to_element_transformation(N != 0 ? p[i] : Vec(zero(T)), RefShape, face) for i in 1:n_points]
         push!(face_quad_rule, QuadratureRule{RefShape, T}(w, new_points))    
     end
     return FaceQuadratureRule(face_quad_rule)
