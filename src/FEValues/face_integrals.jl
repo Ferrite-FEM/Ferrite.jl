@@ -1,7 +1,7 @@
 """
     face_to_element_transformation(point::Vec{N, T}, cell_T::Type{<:AbstractRefShape}, face::Int) 
 
-Transform point from face's reference (N-1)D coordinates to ND coordinates on the cell's face.
+Transform quadrature point from face's reference (N-1)D coordinates to ND coordinates on the cell's face.
 """
 face_to_element_transformation
 
@@ -9,8 +9,8 @@ face_to_element_transformation
     weighted_normal(J::AbstractTensor, fv::FaceValues, face::Int)
     weighted_normal(J::AbstractTensor, cell_T::Type{<:AbstractRefShape}, face::Int)
 
-Compute the vector normal to the face weighted by the area ration between the face and the reference face.
-This is computed by taking cross product of the jacobian compenets that align to the face local axis.
+Compute the vector normal to the face weighted by the area ratio between the face and the reference face.
+This is computed by taking the cross product of the Jacobian components that align to the face local axis.
 """
 function weighted_normal(J::AbstractTensor, fv::FaceValues, face::Int)
     return weighted_normal(J, getrefshape(fv.func_interp), face)
@@ -23,27 +23,27 @@ end
 Creates ["FaceQuadratureRule"](@ref) with the given cell type, weights and points. If the cell has faces of different shapes
 (i.e. quadrilaterals and triangles) then each shape's faces indices, weights and points are passed separately.
 """
-function create_face_quad_rule(cell_T::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, T}}) where {N, T, RefShape <: AbstractRefShape}
+function create_face_quad_rule(::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, T}}) where {N, T, RefShape <: AbstractRefShape}
     n_points = length(w)
-    face_quad_rule = QuadratureRule{RefShape, T, getdim(AbstractCell{cell_T})}[]
-    for face in 1:nfaces(cell_T)
-        new_points = [face_to_element_transformation(N != 0 ? p[i] : Vec(zero(T)), cell_T, face) for i in 1:n_points] # ξ = 1-t-s, η = s, ζ = 0
+    face_quad_rule = QuadratureRule{RefShape, T, getdim(AbstractCell{RefShape})}[]
+    for face in 1:nfaces(RefShape)
+        new_points = [face_to_element_transformation(N != 0 ? p[i] : Vec(zero(T)), RefShape, face) for i in 1:n_points] # ξ = 1-t-s, η = s, ζ = 0
         push!(face_quad_rule, QuadratureRule{RefShape, T}(w, new_points))    
     end
     return FaceQuadratureRule(face_quad_rule)
 end
 
 # For cells with mixed faces
-function create_face_quad_rule(cell_T::Type{RefShape}, quad_faces::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}}, tri_faces::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}) where {N, T, RefShape <: Union{RefPrism, RefPyramid}}
+function create_face_quad_rule(::Type{RefShape}, quad_faces::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}}, tri_faces::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}) where {N, T, RefShape <: Union{RefPrism, RefPyramid}}
     n_points_quad = length(w_quad)
     n_points_tri = length(w_tri)
-    face_quad_rule = Array{QuadratureRule{RefShape, T, getdim(AbstractCell{cell_T})}}(undef, nfaces(cell_T))
+    face_quad_rule = Array{QuadratureRule{RefShape, T, getdim(AbstractCell{RefShape})}}(undef, nfaces(RefShape))
     for face in quad_faces
-        new_points = [face_to_element_transformation(N != 0 ? p_quad[i] : Vec(zero(T)), cell_T, face) for i in 1:n_points_quad]
+        new_points = [face_to_element_transformation(N != 0 ? p_quad[i] : Vec(zero(T)), RefShape, face) for i in 1:n_points_quad]
         face_quad_rule[face] = QuadratureRule{RefShape, T}(w_quad, new_points)
     end
     for face in tri_faces
-        new_points = [face_to_element_transformation(N != 0 ? p_tri[i] : T[], cell_T, face) for i in 1:n_points_tri]
+        new_points = [face_to_element_transformation(N != 0 ? p_tri[i] : T[], RefShape, face) for i in 1:n_points_tri]
         face_quad_rule[face] = QuadratureRule{RefShape, T}(w_tri, new_points)
     end
     return FaceQuadratureRule(face_quad_rule)
