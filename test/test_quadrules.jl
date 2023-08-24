@@ -53,19 +53,59 @@
     @test_throws ArgumentError QuadratureRule{RefTetrahedron}(:einstein, 2)
     @test_throws ArgumentError QuadratureRule{RefTetrahedron}(0)
 
-    @testset "$ref_shape unknown face error path" for ref_shape in (
-        RefLine,
-        RefQuadrilateral,
-        RefTriangle,
-        RefHexahedron,
-        RefTetrahedron,
-        RefPrism,
-        RefPyramid)
-        dim = ref_shape.super.parameters[1]
-        for face in (-1, 0, 100) 
-            err = ArgumentError("unknown face number")
-            @test_throws err Ferrite.weighted_normal(Tensor{2,dim}(zeros(dim^2)), ref_shape, face)
-            @test_throws err Ferrite.face_to_element_transformation(Vec{dim>1 ? dim-1 : 1}(zeros(dim>1 ? dim-1 : 1)), ref_shape, face)
+    @testset "Quadrature rules for $ref_cell" for ref_cell in (
+        Line,
+        Quadrilateral,
+        Triangle,
+        Hexahedron,
+        Tetrahedron,
+        Wedge,
+        Pyramid)
+
+        refshape = ref_cell.super.parameters[1]
+        dim = refshape.super.parameters[1]
+
+        dim > 1 && @testset "$refshape face-cell reference coordinates" begin
+            grid = generate_grid(ref_cell, ntuple(_->3, dim))
+            for cellid in 1:getncells(grid)
+                cell = grid.cells[cellid]
+                ccoords = get_cell_coordinates(grid, cellid)
+                Vec_t = Vec{dim,Float64}
+                Vec_face_t = Vec{dim-1,Float64}
+                for lfaceid in nfaces(refshape)
+                    facenodes = Ferrite.faces(cell)[lfaceid]
+                    fcoords = zeros(Vec_t, length(facenodes))
+                    for (i,nodeid) in enumerate(facenodes)
+                        x = grid.nodes[nodeid].x
+                        fcoords[i] = x
+                    end    
+                    ipcell = Lagrange{refshape,1}()
+                    ipface = Lagrange{getfacerefshape(cell,lfaceid),1}()
+
+                    ξface = rand(Vec_face_t)/4
+                    ξcell = Ferrite.face_to_element_transformation(ξface, refshape, lfaceid)
+
+                    xface = zero(Vec_t)
+                    for i in 1:getnbasefunctions(ipface)
+                        xface += Ferrite.shape_value(ipface, ξface, i) * fcoords[i]
+                    end
+
+                    xcell = zero(Vec_t)
+                    for i in 1:getnbasefunctions(ipcell)
+                        xcell += shape_value(ipcell, ξcell, i) * ccoords[i]
+                    end
+
+                    @test xcell ≈ xface
+                end
+            end
+        end
+
+        @testset "$ref_cell unknown face error path" begin
+            for face in (-1, 0, 100) 
+                err = ArgumentError("unknown face number")
+                @test_throws err Ferrite.weighted_normal(Tensor{2,dim}(zeros(dim^2)), refshape, face)
+                @test_throws err Ferrite.face_to_element_transformation(Vec{dim>1 ? dim-1 : 1}(zeros(dim>1 ? dim-1 : 1)), refshape, face)
+            end
         end
     end
 end

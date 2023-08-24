@@ -250,3 +250,12 @@ coords_on_faces(x, ::Serendipity{RefHexahedron, 2}) =
 
 check_equal_or_nan(a::Any, b::Any) = a==b || (isnan(a) && isnan(b))
 check_equal_or_nan(a::Union{Tensor, Array}, b::Union{Tensor, Array}) = all(check_equal_or_nan.(a, b))
+
+######################################################
+# Helpers for testing face_to_element_transformation #
+######################################################
+getfacerefshape(::Union{Quadrilateral, Triangle}, ::Int) = RefLine
+getfacerefshape(::Hexahedron, ::Int) = RefQuadrilateral
+getfacerefshape(::Tetrahedron, ::Int) = RefTriangle
+getfacerefshape(::Pyramid, face::Int) = face == 1 ? RefQuadrilateral : RefTriangle
+getfacerefshape(::Wedge, face::Int) = face ∈ (1,5) ? RefTriangle : RefQuadrilateral
