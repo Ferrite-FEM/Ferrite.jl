@@ -65,7 +65,7 @@
         refshape = ref_cell.super.parameters[1]
         dim = refshape.super.parameters[1]
 
-        dim > 1 && @testset "$refshape face-cell reference coordinates" begin
+        dim > 1 && @testset "$refshape face-cell spatial coordinates" begin
             grid = generate_grid(ref_cell, ntuple(_->3, dim))
             for cellid in 1:getncells(grid)
                 cell = grid.cells[cellid]
