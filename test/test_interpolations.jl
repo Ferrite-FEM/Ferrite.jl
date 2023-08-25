@@ -194,4 +194,21 @@ end
     @test Ferrite.is_discontinuous(ip_t) == false
     @test Ferrite.is_discontinuous(d_ip) == true
     @test Ferrite.is_discontinuous(d_ip_t) == true
+
+    @testset "Interpolation error paths" for RefShape in (
+        RefLine,
+        RefQuadrilateral,
+        RefHexahedron,
+        )
+        dim = RefShape.super.parameters[1]
+        @test_throws ArgumentError("Continuous nodal interpolations must have basis on the boundaries") ArbitraryOrderLagrange{RefShape,3}(Ferrite.GaussQuadrature.legendre(4)[1])
+        ip = ArbitraryOrderDiscontinuousLagrange{RefShape,3}(Ferrite.GaussQuadrature.legendre(4)[1])
+        for facefunc in (
+            Ferrite.dirichlet_facedof_indices,
+            Ferrite.dirichlet_edgedof_indices,
+        )
+            (dim < 3 && facefunc ==  Ferrite.dirichlet_edgedof_indices) ||
+                @test_throws "$facefunc is not implemented for L2 elements with no basis on the boundaries" facefunc(ip)
+        end
+    end
 end
