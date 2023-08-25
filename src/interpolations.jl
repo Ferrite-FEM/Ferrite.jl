@@ -32,13 +32,13 @@ The following interpolations are implemented with fixed order:
 The following interpolations are implemented with arbitrary order:
 
 * `Lagrange{RefTriangle,order}`
-* `ArbitraryOrderLagrange{RefHypercube,order}`
-* `ArbitraryOrderDiscontinuousLagrange{RefHypercube,order}`
+* `ArbitraryOrderLagrange{::Type{<:RefHypercube},order}`
+* `ArbitraryOrderDiscontinuousLagrange{::Type{<:RefHypercube},order}`
 
 The following interpolations are implemented with arbitrary basis coordinates:
 
-* `ArbitraryOrderLagrange{RefHypercube,order}`
-* `ArbitraryOrderDiscontinuousLagrange{RefHypercube,order}`
+* `ArbitraryOrderLagrange{::Type{<:RefHypercube},order}(basis::Vector{Float64})`
+* `ArbitraryOrderDiscontinuousLagrange{::Type{<:RefHypercube},order}(basis::Vector{Float64})`
 
 # Examples
 ```jldoctest

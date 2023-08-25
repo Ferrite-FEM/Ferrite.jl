@@ -55,6 +55,10 @@ grid = generate_grid(Quadrilateral, (20, 20));
 # based on the two-dimensional reference quadrilateral. We also define a quadrature rule based on
 # the same reference element. We combine the interpolation and the quadrature rule
 # to a `CellValues` object.
+#md # !!! tip
+#md #     Ferrite supports arbitrary order Lagrange interpolations with arbitrary basis positionings
+#md #     for hypercubes using [`ArbitraryOrderLagrange`](@ref reference-interpolation) and with equidistant basis 
+#md #     positionings for triangles using [`Lagrange`](@ref reference-interpolation)
 ip = Lagrange{RefQuadrilateral, 1}()
 qr = QuadratureRule{RefQuadrilateral}(2)
 cellvalues = CellValues(qr, ip);
