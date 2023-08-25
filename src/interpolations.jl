@@ -1292,7 +1292,7 @@ Arbitrary order continuous Lagrange interpolation with arbitrary basis positioni
 
 Basis positionings default to Gauss-Lobatto points
 
-To use arbitrary order with triangles consider using [`Lagrange{refshape,order}`](@ref) which in implemented for equidistant basis only
+To use arbitrary order with triangles consider using [`Lagrange{RefTriangle,order}`](@ref) which in implemented for equidistant basis only
 """
 ArbitraryOrderLagrange
 
@@ -1301,7 +1301,7 @@ Arbitrary order discontinuous Lagrange interpolation with arbitrary basis positi
 
 Basis positionings default to Gauss-Legendre points
 
-To use arbitrary order with triangles consider using [`DiscontinuousLagrange{refshape,order}`](@ref) which in implemented for equidistant basis only
+To use arbitrary order with triangles consider using [`DiscontinuousLagrange{RefTriangle,order}`](@ref) which in implemented for equidistant basis only
 """
 ArbitraryOrderDiscontinuousLagrange
 
