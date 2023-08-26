@@ -208,7 +208,7 @@ end
             Ferrite.dirichlet_edgedof_indices,
         )
             (dim < 3 && facefunc ==  Ferrite.dirichlet_edgedof_indices) ||
-                @test_throws "$facefunc is not implemented for L2 elements with no basis on the boundaries" facefunc(ip)
+                @test_throws ErrorException("$facefunc is not implemented for L2 elements with no basis on the boundaries") facefunc(ip)
         end
     end
 end
