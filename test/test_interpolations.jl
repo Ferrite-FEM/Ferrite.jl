@@ -12,12 +12,12 @@ using StaticArrays
                       ArbitraryOrderLagrange{RefQuadrilateral, 20}(Ferrite.equidistant(20)), 
                       Lagrange{RefTriangle, 1}(),
                       Lagrange{RefTriangle, 2}(),
-                      Lagrange{RefTriangle, 3}(),
-                      Lagrange{RefTriangle, 4}(),
-                      Lagrange{RefTriangle, 5}(),
-                      Lagrange{RefTriangle, 6}(),
+                      ArbitraryOrderLagrange{RefTriangle, 3}(),
+                      ArbitraryOrderLagrange{RefTriangle, 4}(),
+                      ArbitraryOrderLagrange{RefTriangle, 5}(),
+                      ArbitraryOrderLagrange{RefTriangle, 6}(),
                     #   Lagrange{RefTriangle, 7}(), fails dirac delta
-                      Lagrange{RefTriangle, 8}(),
+                      ArbitraryOrderLagrange{RefTriangle, 8}(),
                       Lagrange{RefHexahedron, 1}(),
                       Lagrange{RefHexahedron, 2}(),
                       ArbitraryOrderLagrange{RefHexahedron, 5}(),  # GLL

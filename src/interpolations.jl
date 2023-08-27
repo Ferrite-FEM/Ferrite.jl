@@ -31,7 +31,8 @@ The following interpolations are implemented with fixed order:
 
 The following interpolations are implemented with arbitrary order:
 
-* `Lagrange{RefTriangle,order}`
+* `ArbitraryOrderLagrange{RefTriangle,order}`
+* `ArbitraryOrderDiscontinuousLagrange{RefTriangle,order}`
 * `ArbitraryOrderLagrange{::Type{<:RefHypercube},order}`
 * `ArbitraryOrderDiscontinuousLagrange{::Type{<:RefHypercube},order}`
 
@@ -414,8 +415,10 @@ dirichlet_boundarydof_indices(::Type{VertexIndex}) = Ferrite.dirichlet_vertexdof
 Piecewise discontinuous Lagrange interpolation using equidistant basis.
 
 To use arbitrary order and basis positionings consider using:
-* [`ArbitraryOrderDiscontinuousLagrange{refshape,order}(basis)`](@ref) for RefLine and RefHypercube
-* [`DiscontinuousLagrange{RefTriangle,order}`](@ref) for RefTriangle with equidistant basis positionings
+* [`ArbitraryOrderDiscontinuousLagrange{refshape,order}(basis)`](@ref) for hypercubes and triangles
+
+!!! note
+     [`ArbitraryOrderDiscontinuousLagrange{RefTriangle,order}`](@ref) is implemented for equidistant basis only
 """
 struct DiscontinuousLagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
     function DiscontinuousLagrange{shape, order}() where {shape <: AbstractRefShape, order}
@@ -473,8 +476,10 @@ is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
 Continuous Lagrange interpolation using equidistant basis.
 
 To use arbitrary order and basis positionings consider using:
-* [`ArbitraryOrderLagrange{refshape,order}(basis)`](@ref) for RefLine and RefHypercube
-* [`Lagrange{RefTriangle,order}`](@ref) for RefTriangle with equidistant basis positionings
+* [`ArbitraryOrderLagrange{refshape,order}(basis)`](@ref) for hypercubes and triangles
+
+!!! note
+     [`ArbitraryOrderLagrange{RefTriangle,order}`](@ref) is implemented for equidistant basis only
 """
 struct Lagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
     function Lagrange{shape, order}() where {shape <: AbstractRefShape, order}
@@ -699,102 +704,6 @@ function shape_value(ip::Lagrange{RefTriangle, 2}, ξ::Vec{2}, i::Int)
     i == 5 && return 4ξ_y * γ
     i == 6 && return 4ξ_x * γ
     throw(ArgumentError("no shape function $i for interpolation $ip"))
-end
-
-########################################
-# Lagrange RefTriangle abritrary order #
-########################################
-# see https://getfem.readthedocs.io/en/latest/userdoc/appendixA.html
-
-function getnbasefunctions(::Lagrange{RefTriangle,N}) where N
-    return (N + 1) * (N + 2) ÷ 2
-end
-
-# Permutation to switch numbering to Ferrite ordering
-function getPermLagrangeTri(order::Int)
-    result = Array{Int, 1}(undef, (order + 1) * (order + 2) ÷ 2)
-    result[1:3] .= (order + 1, (order + 1) * (order + 2) ÷ 2, 1)
-    idx = 4
-    for i in order:-1:2 # Face 1
-        result[idx] = sum(i:order+1)
-        idx += 1
-    end
-    for i in 3:(order+1) # Face 2
-        result[idx] = sum(i:order+1)+1
-        idx += 1
-    end
-    for i in 2:order # Face 3
-        result[idx] = i
-        idx += 1
-    end
-    for j in (order+1):-1:4 # Interior
-        for i in sum(j:order+1)+2 : sum(j:order+1)+j-2
-            result[idx] = i
-            idx += 1
-        end
-    end
-    return result
-end
-
-function facedof_interior_indices(::Lagrange{RefTriangle,order}) where order
-    order == 1 && return ((),(),()) # Workaround for nightly test, will see if it works
-    return (SVector{order-1}((i+3 for i in 1:order-1)),
-        SVector{order-1}((i+order+2 for i in 1:order-1)),
-        SVector{order-1}((i+2*order+1 for i in 1:order-1)))
-end
-
-function facedof_indices(ip::Lagrange{RefTriangle,order}) where order
-    interior = facedof_interior_indices(ip)
-    face1 = SVector{order + 1}((i == 1 ? 1 : i == 2 ? 2 : interior[1][i-2] for i in 1:order+1))    
-    face2 = SVector{order + 1}((i == 1 ? 2 : i == 2 ? 3 : interior[2][i-2] for i in 1:order+1))    
-    face3 = SVector{order + 1}((i == 1 ? 3 : i == 2 ? 1 : interior[3][i-2] for i in 1:order+1))    
-    return (face1, face2, face3)
-end
-
-function celldof_interior_indices(ip::Lagrange{RefTriangle,order}) where order
-    ncellintdofs = (order - 2) * (order - 1) ÷ 2
-    totaldofs = getnbasefunctions(ip)
-    return SVector{ncellintdofs}((totaldofs-ncellintdofs+i for i in 1:ncellintdofs))
-end
-
-function reference_coordinates(::Lagrange{RefTriangle,order}) where order
-    coordpts = Vector{Vec{2, Float64}}()
-    for k = 0:order
-        for l = 0:(order - k)
-            push!(coordpts, Vec{2, Float64}((l / order, k / order)))
-        end
-    end
-    return permute!(coordpts, getPermLagrangeTri(order))
-end
-
-function shape_value(ip::Lagrange{RefTriangle,order}, ξ::Vec{2}, i::Int) where order
-    if !(0 < i <= getnbasefunctions(ip))
-        throw(ArgumentError("no shape function $i for interpolation $ip"))
-    end
-    i = getPermLagrangeTri(order)[i]
-    ξ_x = ξ[1]
-    ξ_y = ξ[2]
-    i1, i2, i3 = _numlin_basis2D(i, order)
-    val = one(ξ_y)
-    i1 ≥ 1 && (val *= prod((order - order * (ξ_x + ξ_y ) - j) / (j + 1) for j = 0:(i1 - 1)))
-    i2 ≥ 1 && (val *= prod((order * ξ_x - j) / (j + 1) for j = 0:(i2 - 1)))
-    i3 ≥ 1 && (val *= prod((order * ξ_y - j) / (j + 1) for j = 0:(i3 - 1)))
-    return val
-end
-
-function _numlin_basis2D(i, order)
-    c, j1, j2, j3 = 0, 0, 0, 0
-    for k = 0:order
-        if i <= c + (order + 1 - k)
-            j2 = i - c - 1
-            break
-        else
-            j3 += 1
-            c += order + 1 - k
-        end
-    end
-    j1 = order - j2 -j3
-    return j1, j2, j3
 end
 
 ###################################
@@ -1288,20 +1197,21 @@ end
 # Arbitrary Order Lagrange #
 ############################
 """
-Arbitrary order continuous Lagrange interpolation with arbitrary basis positionings for hypercubes.
+Arbitrary order continuous Lagrange interpolation with arbitrary basis positionings for hypercubes and triangles.
 
 Basis positionings default to Gauss-Lobatto points
 
-To use arbitrary order with triangles consider using [`Lagrange{RefTriangle,order}`](@ref) which in implemented for equidistant basis only
-"""
+!!! note
+     [`ArbitraryOrderLagrange{RefTriangle,order}`](@ref) is implemented for equidistant basis only"""
 ArbitraryOrderLagrange
 
 """
-Arbitrary order discontinuous Lagrange interpolation with arbitrary basis positionings for hypercubes.
+Arbitrary order discontinuous Lagrange interpolation with arbitrary basis positionings for hypercubes and triangles.
 
 Basis positionings default to Gauss-Legendre points
 
-To use arbitrary order with triangles consider using [`DiscontinuousLagrange{RefTriangle,order}`](@ref) which in implemented for equidistant basis only
+!!! note
+     [`ArbitraryOrderDiscontinuousLagrange{RefTriangle,order}`](@ref) is implemented for equidistant basis only
 """
 ArbitraryOrderDiscontinuousLagrange
 
@@ -1423,7 +1333,6 @@ function getPermLagrangeQ(order)
     end
     return result
 end
-
 
 for (name,  default_coords) in (
     (:ArbitraryOrderLagrange,               :both),
@@ -1745,6 +1654,117 @@ function celldof_interior_indices(ip::ArbitraryOrderLagrange{RefHexahedron,order
     ncellintdofs = (order - 1)^3
     totaldofs = getnbasefunctions(ip)
     return SVector{ncellintdofs}((totaldofs-ncellintdofs+i for i in 1:ncellintdofs))
+end
+
+########################################
+# Lagrange RefTriangle abritrary order #
+########################################
+# see https://getfem.readthedocs.io/en/latest/userdoc/appendixA.html
+
+# Permutation to switch numbering to Ferrite ordering
+function getPermLagrangeTri(order::Int)
+    result = Array{Int, 1}(undef, (order + 1) * (order + 2) ÷ 2)
+    result[1:3] .= (order + 1, (order + 1) * (order + 2) ÷ 2, 1)
+    idx = 4
+    for i in order:-1:2 # Face 1
+        result[idx] = sum(i:order+1)
+        idx += 1
+    end
+    for i in 3:(order+1) # Face 2
+        result[idx] = sum(i:order+1)+1
+        idx += 1
+    end
+    for i in 2:order # Face 3
+        result[idx] = i
+        idx += 1
+    end
+    for j in (order+1):-1:4 # Interior
+        for i in sum(j:order+1)+2 : sum(j:order+1)+j-2
+            result[idx] = i
+            idx += 1
+        end
+    end
+    return result
+end
+
+for (name,  default_coords) in (
+    (:ArbitraryOrderLagrange,               :both),
+    (:ArbitraryOrderDiscontinuousLagrange,  :neither)
+    )
+    @eval begin
+        function $(name){RefTriangle, order}() where order
+            points = equidistant(order)
+            product_of = $(name){RefLine,order}(points) # Or nothing?
+            ref_coord = Array{Vec{2,Float64},1}(undef,(order + 1) * (order + 2) ÷ 2)
+            idx = 1
+            for k = 0:order
+                for l = 0:(order - k)
+                    ref_coord[idx] = Vec{2, Float64}((l / order, k / order))
+                    idx += 1
+                end
+            end
+            perm = getPermLagrangeTri(order)
+            inv_perm = sortperm(perm)
+            $(name){RefTriangle, order, typeof(product_of), typeof(ref_coord), typeof(perm)}(product_of, ref_coord, perm, inv_perm)
+        end
+        getnbasefunctions(::$(name){RefTriangle,order}) where order = (order + 1) * (order + 2) ÷ 2
+    end
+end
+
+for (name,  facefunc) in (
+    (:ArbitraryOrderLagrange,               :facedof_indices),
+    (:ArbitraryOrderDiscontinuousLagrange,  :dirichlet_facedof_indices)
+    )
+    @eval begin
+        function _facedof_interior_indices(::$(name){RefTriangle,order}) where order
+            order == 1 && return ((),(),()) # Workaround for nightly test, will see if it works
+            return (SVector{order-1}((i+3 for i in 1:order-1)),
+                SVector{order-1}((i+order+2 for i in 1:order-1)),
+                SVector{order-1}((i+2*order+1 for i in 1:order-1)))
+        end
+        function $(facefunc)(ip::$(name){RefTriangle,order}) where order
+            interior = facedof_interior_indices(ip)
+            face1 = SVector{order + 1}((i == 1 ? 1 : i == 2 ? 2 : interior[1][i-2] for i in 1:order+1))    
+            face2 = SVector{order + 1}((i == 1 ? 2 : i == 2 ? 3 : interior[2][i-2] for i in 1:order+1))    
+            face3 = SVector{order + 1}((i == 1 ? 3 : i == 2 ? 1 : interior[3][i-2] for i in 1:order+1))    
+            return (face1, face2, face3)
+        end
+        function shape_value(ip::$(name){RefTriangle, order}, ξ::Vec{2}, i::Int) where order
+            if !(0 < i <= getnbasefunctions(ip))
+                throw(ArgumentError("no shape function $i for interpolation $ip"))
+            end
+            i = getPermLagrangeTri(order)[i]
+            ξ_x = ξ[1]
+            ξ_y = ξ[2]
+            i1, i2, i3 = _numlin_basis2D(i, order)
+            val = one(ξ_y)
+            i1 ≥ 1 && (val *= prod((order - order * (ξ_x + ξ_y ) - j) / (j + 1) for j = 0:(i1 - 1)))
+            i2 ≥ 1 && (val *= prod((order * ξ_x - j) / (j + 1) for j = 0:(i2 - 1)))
+            i3 ≥ 1 && (val *= prod((order * ξ_y - j) / (j + 1) for j = 0:(i3 - 1)))
+            return val
+        end
+    end
+end
+
+function celldof_interior_indices(ip::ArbitraryOrderLagrange{RefTriangle,order}) where order
+    ncellintdofs = (order - 2) * (order - 1) ÷ 2
+    totaldofs = getnbasefunctions(ip)
+    return SVector{ncellintdofs}((totaldofs-ncellintdofs+i for i in 1:ncellintdofs))
+end
+
+function _numlin_basis2D(i, order)
+    c, i0, i1, i2 = 0, 0, 0, 0
+    for k = 0:order
+        if i <= c + (order + 1 - k)
+            i1 = i - c - 1
+            break
+        else
+            i2 += 1
+            c += order + 1 - k
+        end
+    end
+    i0 = order - i1 - i2
+    return i0, i1, i2
 end
 
 ###############

@@ -33,7 +33,7 @@ function reference_normals(::Lagrange{RefQuadrilateral})
 end
 
 # Lagrange{2, RefTriangle}
-function reference_normals(::Lagrange{RefTriangle})
+function reference_normals(::Union{Lagrange{RefTriangle}, ArbitraryOrderLagrange{RefTriangle}})
     return [Vec{2, Float64}((1/√2, 1/√2)),
             Vec{2, Float64}((-1.0, 0.0)),
             Vec{2, Float64}((0.0, -1.0))]
@@ -152,7 +152,7 @@ function calculate_volume(::Lagrange{RefTriangle, 2}, x::Vector{Vec{dim, T}}) wh
 end
 
 # TODO: Only correct for linear sides
-function calculate_volume(::Lagrange{RefTriangle, O}, x::Vector{Vec{dim, T}}) where {T, dim, O}
+function calculate_volume(::ArbitraryOrderLagrange{RefTriangle, O}, x::Vector{Vec{dim, T}}) where {T, dim, O}
     vol = norm((x[1] - x[3]) × (x[2] - x[3])) * 0.5
     return vol
 end
@@ -187,7 +187,7 @@ end
 function calculate_face_area(ip::Lagrange{RefQuadrilateral, order}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefLine, order}(), x)
 end
-function calculate_face_area(ip::Lagrange{RefTriangle, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_face_area(ip::Union{Lagrange{RefTriangle, order},ArbitraryOrderLagrange{RefTriangle, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefLine, order}(), x)
 end
 function calculate_face_area(ip::Lagrange{RefHexahedron, order}, x::Vector{<:Vec}, faceindex::Int) where order

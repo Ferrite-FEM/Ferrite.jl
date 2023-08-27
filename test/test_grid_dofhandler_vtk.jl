@@ -540,7 +540,7 @@ end
     # 1-----2
     grid = generate_grid(Triangle, (1, 1))
 
-    ## Lagrange{RefTriangle,3}
+    ## ArbitraryOrderLagrange{RefTriangle,3}
     # Dofs per position per triangle
     # 3      3-14-15-11
     # | \     \      |
@@ -551,12 +551,12 @@ end
     # |      \     \ |
     # 1-4---5-2      2
     dh = DofHandler(grid)
-    add!(dh, :u, Lagrange{RefTriangle,3}())
+    add!(dh, :u, ArbitraryOrderLagrange{RefTriangle,3}())
     close!(dh)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 9, 8, 10]
     @test celldofs(dh, 2) == [2, 11, 3, 12, 13, 15, 14, 7, 6, 16]
 
-    ## Lagrange{RefTriangle,3}
+    ## ArbitraryOrderLagrange{RefTriangle,3}
     # First dof per position per triangle
     # 5      5-27-29-21
     # | \     \      |
@@ -567,7 +567,7 @@ end
     # |      \     \ |
     # 1-7---9-3      3
     dh = DofHandler(grid)
-    add!(dh, :u, Lagrange{RefTriangle,3}()^2)
+    add!(dh, :u, ArbitraryOrderLagrange{RefTriangle,3}()^2)
     close!(dh)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 15, 16, 19, 20]
     @test celldofs(dh, 2) == [3, 4, 21, 22, 5, 6, 23, 24, 25, 26, 29, 30, 27, 28, 13, 14, 11, 12, 31, 32]
