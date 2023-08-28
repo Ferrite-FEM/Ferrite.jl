@@ -732,6 +732,22 @@ end
 #################################
 #### Orientation of Entities ####
 #################################
+function face_sign(::AbstractCell{<:AbstractRefShape{1}}, facenr)
+    error("Not defined")
+end
+function face_sign(cell::AbstractCell{<:AbstractRefShape{2}}, facenr)
+    vertices = faces(cell)[facenr]
+    return vertices[1] < vertices[2] ? 1 : -1
+end
+function face_sign(::AbstractCell{<:AbstractRefShape{3}}, facenr)
+    error("Implement me")
+end
+
+function edge_sign(cell::AbstractCell, edgenr)
+    vertices = edges(cell)[edgenr]
+    return vertices[1] < vertices[2] ? 1 : -1
+end
+
 # @TODO merge this code with into the logic in `ConstraintHandler`.
 
 """
