@@ -66,8 +66,9 @@ struct ContravariantPiolaMapping end
 # struct DoubleCovariantPiolaMapping end 
 # struct DoubleContravariantPiolaMapping end 
 
-get_mapping_type(::FunctionValues{<:ScalarInterpolation}) = IdentityMapping()
-get_mapping_type(::FunctionValues{<:VectorizedInterpolation}) = IdentityMapping()
+get_mapping_type(fv::FunctionValues) = get_mapping_type(fv.ip)
+#get_mapping_type(::FunctionValues{<:ScalarInterpolation}) = IdentityMapping()
+#get_mapping_type(::FunctionValues{<:VectorizedInterpolation}) = IdentityMapping()
 #get_mapping_type(::FunctionValues{<:HdivIP}) = ContravariantPiolaMapping()
 #get_mapping_type(::FunctionValues{<:HcurlIP}) = CovariantPiolaMapping()
 

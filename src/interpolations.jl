@@ -1374,3 +1374,25 @@ function shape_gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, ξ:
 end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
+
+
+get_mapping_type(::Interpolation) = IdentityMapping()
+
+# https://defelement.com/elements/raviart-thomas.html
+# https://defelement.com/elements/qdiv.html
+struct RaviartThomas{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
+
+facedof_interior_indices(ip::RaviartThomas) = facedof_indices(ip)
+
+getnbasefunctions(::RaviartThomas{2,RefTriangle,1}) = 3
+facedof_indices(::RaviartThomas{2,RefTriangle,1}) = ((1,), (2,), (3,))
+adjust_dofs_during_distribution(::RaviartThomas) = false # Not sure how this works, but should be done for higher orders
+# https://defelement.com/elements/examples/triangle-N1div-1.html
+function shape_value(ip::RaviartThomas{2,RefTriangle,1}, ξ::Vec{2}, i::Int)
+    ξ_x, ξ_y = ξ
+    i == 1 && return -ξ
+    i == 2 && return Vec(ξ_x-1, ξ_y)
+    i == 3 && return Vec(-ξ_x, 1 - ξ_y)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
