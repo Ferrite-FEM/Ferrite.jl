@@ -195,7 +195,7 @@ end
 # For RefShapes with equal face-shapes: generate quad rule for the face shape
 # and expand to each face
 function FaceQuadratureRule{RefLine, T}(::Symbol, ::Int) where T
-    w, p = T[1], Vec{0, T}[]
+    w, p = T[1], Vec{0, T}[Vec{0, T}(())]
     return create_face_quad_rule(RefLine, w, p)
 end
 function FaceQuadratureRule{RefQuadrilateral, T}(quad_type::Symbol, order::Int) where T

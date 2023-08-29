@@ -46,7 +46,7 @@ getrefshape(::AbstractCell{refshape}) where refshape = refshape
 nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))
 nfaces(   c::AbstractCell) = length(faces(c))
-nfaces(   T::Type{<:AbstractRefShape}) = length(reference_faces(T))
+nfaces(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_faces(T))
 nnodes(   c::AbstractCell) = length(get_node_ids(c))
 
 """
@@ -95,6 +95,12 @@ nodes spanning such that the normal to the face is pointing outwards.
 Note that the vertices are sufficient to define a face uniquely.
 """
 faces(::AbstractCell)
+
+function faces(c::AbstractCell{refshape}) where refshape
+    ns = get_node_ids(c)
+    rfs = reference_faces(refshape)
+    return ntuple(i -> getindex.(Ref(ns), rfs[i]), nfaces(refshape))::typeof(rfs)
+end
 
 """
     Ferrite.default_interpolation(::AbstractCell)::Interpolation
@@ -203,9 +209,9 @@ function edges(c::AbstractCell{RefPrism})
 end
 function reference_faces(::Type{RefPrism})
     return (
-        (1, 3, 2),        (1, 2, 5, 4), # f1, f2
+        (1, 3, 2),    (1, 2, 5, 4), # f1, f2
         (3, 1, 4, 6), (2, 3, 6, 5), # f3, f4
-        (4, 5, 6),                                      # f5
+        (4, 5, 6),                  # f5
     )
 end
 
@@ -223,14 +229,10 @@ function edges(c::AbstractCell{RefPyramid})
 end
 function reference_faces(::Type{RefPyramid})
     return (
-        (1, 3, 4, 2), (1, 2, 5), 
-        (1, 5, 3), (2, 4, 5), 
-        (3, 5, 4),                                      
+        (1, 3, 4, 2), (1, 2, 5), # f1, f2
+        (1, 5, 3), (2, 4, 5),    # f3, f4
+        (3, 5, 4),               # f5
     )
-end
-function faces(c::AbstractCell{refshape}) where refshape
-    ns = get_node_ids(c)
-    return ntuple(i->getindex.(Ref(ns), reference_faces(refshape)[i]), nfaces(refshape))
 end
 
 ######################################################

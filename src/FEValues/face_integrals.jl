@@ -1,49 +1,57 @@
 """
-    face_to_element_transformation(point::Vec{N, T}, cell_T::Type{<:AbstractRefShape}, face::Int) 
+    face_to_element_transformation(point::Vec, ::Type{<:AbstractRefShape}, face::Int)
 
-Transform quadrature point from face's reference (N-1)D coordinates to ND coordinates on the cell's face.
+Transform quadrature point from face's reference (N-1)D coordinates to ND coordinates on the
+cell's face.
 """
 face_to_element_transformation
 
 """
     weighted_normal(J::AbstractTensor, fv::FaceValues, face::Int)
-    weighted_normal(J::AbstractTensor, cell_T::Type{<:AbstractRefShape}, face::Int)
+    weighted_normal(J::AbstractTensor, ::Type{<:AbstractRefShape}, face::Int)
 
-Compute the vector normal to the face weighted by the area ratio between the face and the reference face.
-This is computed by taking the cross product of the Jacobian components that align to the face local axis.
+Compute the vector normal to the face weighted by the area ratio between the face and the
+reference face. This is computed by taking the cross product of the Jacobian components that
+align to the face local axis.
 """
 function weighted_normal(J::AbstractTensor, fv::FaceValues, face::Int)
     return weighted_normal(J, getrefshape(fv.func_interp), face)
 end
 
 """
-    create_face_quad_rule(cell_T::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, T}}
-    create_face_quad_rule(cell_T::Type{RefShape}, quad_faces::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}}, tri_faces::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}) 
+    create_face_quad_rule(::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, T}})
+    create_face_quad_rule(
+        ::Type{RefShape},
+        quad_faces::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}},
+        tri_faces::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}
+    )
 
-Creates ["FaceQuadratureRule"](@ref) with the given cell type, weights and points. If the cell has faces of different shapes
-(i.e. quadrilaterals and triangles) then each shape's faces indices, weights and points are passed separately.
+Create a ["FaceQuadratureRule"](@ref) for the given cell type, weights and points. If the
+cell has faces of different shapes (i.e. quadrilaterals and triangles) then each shape's
+faces indices, weights and points are passed separately.
 """
 function create_face_quad_rule(::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, T}}) where {N, T, RefShape <: AbstractRefShape}
-    n_points = length(w)
     face_quad_rule = QuadratureRule{RefShape, T, getdim(AbstractCell{RefShape})}[]
     for face in 1:nfaces(RefShape)
-        new_points = [face_to_element_transformation(N != 0 ? p[i] : Vec(zero(T)), RefShape, face) for i in 1:n_points]
-        push!(face_quad_rule, QuadratureRule{RefShape, T}(w, new_points))    
+        new_points = [face_to_element_transformation(p[i], RefShape, face) for i in 1:length(w)]
+        push!(face_quad_rule, QuadratureRule{RefShape, T}(w, new_points))
     end
     return FaceQuadratureRule(face_quad_rule)
 end
 
 # For cells with mixed faces
-function create_face_quad_rule(::Type{RefShape}, quad_faces::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}}, tri_faces::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}) where {N, T, RefShape <: Union{RefPrism, RefPyramid}}
-    n_points_quad = length(w_quad)
-    n_points_tri = length(w_tri)
-    face_quad_rule = Array{QuadratureRule{RefShape, T, getdim(AbstractCell{RefShape})}}(undef, nfaces(RefShape))
+function create_face_quad_rule(
+    ::Type{RefShape},
+    quad_faces::Vector{Int}, w_quad::Vector{T}, p_quad::Vector{Vec{N, T}},
+    tri_faces::Vector{Int}, w_tri::Vector{T}, p_tri::Vector{Vec{N, T}}
+) where {N, T, RefShape <: Union{RefPrism, RefPyramid}}
+    face_quad_rule = Vector{QuadratureRule{RefShape, T, getdim(AbstractCell{RefShape})}}(undef, nfaces(RefShape))
     for face in quad_faces
-        new_points = [face_to_element_transformation(N != 0 ? p_quad[i] : Vec(zero(T)), RefShape, face) for i in 1:n_points_quad]
+        new_points = [face_to_element_transformation(p_quad[i], RefShape, face) for i in 1:length(w_quad)]
         face_quad_rule[face] = QuadratureRule{RefShape, T}(w_quad, new_points)
     end
     for face in tri_faces
-        new_points = [face_to_element_transformation(N != 0 ? p_tri[i] : T[], RefShape, face) for i in 1:n_points_tri]
+        new_points = [face_to_element_transformation(p_tri[i], RefShape, face) for i in 1:length(w_tri)]
         face_quad_rule[face] = QuadratureRule{RefShape, T}(w_tri, new_points)
     end
     return FaceQuadratureRule(face_quad_rule)
@@ -54,13 +62,13 @@ end
 ##################
 
 # Mapping from to 0D node to 1D line vertex.
-function face_to_element_transformation(::Vec{N, T}, cell_T::Type{RefLine}, face::Int) where {N, T}
+function face_to_element_transformation(::Vec{0, T}, ::Type{RefLine}, face::Int) where {T}
     face == 1 && return Vec{1, T}(( -one(T),))
     face == 2 && return Vec{1, T}((  one(T),))
     throw(ArgumentError("unknown face number"))
 end
 
-function weighted_normal(::Tensor{2,1,T}, cell_T::Type{RefLine}, face::Int) where {T}
+function weighted_normal(::Tensor{2,1,T}, ::Type{RefLine}, face::Int) where {T}
     face == 1 && return Vec{1,T}((-one(T),))
     face == 2 && return Vec{1,T}(( one(T),))
     throw(ArgumentError("unknown face number"))
@@ -71,8 +79,8 @@ end
 ###########################
 
 # Mapping from 1D line to 2D face of a quadrilateral.
-function face_to_element_transformation(point::Vec{1, T}, cell_T::Type{RefQuadrilateral}, face::Int) where T
-    x = point[]
+function face_to_element_transformation(point::Vec{1, T}, ::Type{RefQuadrilateral}, face::Int) where T
+    x = point[1]
     face == 1 && return Vec{2, T}(( x,          -one(T)))
     face == 2 && return Vec{2, T}(( one(T),     x))
     face == 3 && return Vec{2, T}(( -x,         one(T)))
@@ -80,7 +88,7 @@ function face_to_element_transformation(point::Vec{1, T}, cell_T::Type{RefQuadri
     throw(ArgumentError("unknown face number"))
 end
 
-function weighted_normal(J::Tensor{2,2}, cell_T::Type{RefQuadrilateral}, face::Int)
+function weighted_normal(J::Tensor{2,2}, ::Type{RefQuadrilateral}, face::Int)
     @inbounds begin
         face == 1 && return Vec{2}(( J[2,1], -J[1,1]))
         face == 2 && return Vec{2}(( J[2,2], -J[1,2]))
@@ -95,15 +103,15 @@ end
 ######################
 
 # Mapping from 1D line to 2D face of a triangle.
-function face_to_element_transformation(point::Vec{1, T},  cell_T::Type{RefTriangle}, face::Int) where T
-    x = (point[] + one(T)) / 2
+function face_to_element_transformation(point::Vec{1, T},  ::Type{RefTriangle}, face::Int) where T
+    x = (point[1] + one(T)) / 2
     face == 1 && return Vec{2, T}(( one(T) - x,     x ))
     face == 2 && return Vec{2, T}(( zero(T),        one(T) -x))
     face == 3 && return Vec{2, T}(( x,              zero(T)))
     throw(ArgumentError("unknown face number"))
 end
 
-function weighted_normal(J::Tensor{2,2}, cell_T::Type{RefTriangle}, face::Int)
+function weighted_normal(J::Tensor{2,2}, ::Type{RefTriangle}, face::Int)
     @inbounds begin
         face == 1 && return Vec{2}((-(J[2,1] - J[2,2]), J[1,1] - J[1,2]))
         face == 2 && return Vec{2}((-J[2,2], J[1,2]))
@@ -117,8 +125,8 @@ end
 ########################
 
 # Mapping from 2D quadrilateral to 3D face of a hexahedron.
-function face_to_element_transformation(point::Vec{2, T}, cell_T::Type{RefHexahedron}, face::Int) where T
-    x,y = point
+function face_to_element_transformation(point::Vec{2, T}, ::Type{RefHexahedron}, face::Int) where T
+    x, y = point
     face == 1 && return Vec{3, T}(( y,      x,          -one(T)))
     face == 2 && return Vec{3, T}(( x,      -one(T),    y))
     face == 3 && return Vec{3, T}(( one(T), x,          y))
@@ -128,7 +136,7 @@ function face_to_element_transformation(point::Vec{2, T}, cell_T::Type{RefHexahe
     throw(ArgumentError("unknown face number"))
 end
 
-function weighted_normal(J::Tensor{2,3}, cell_T::Type{RefHexahedron}, face::Int)
+function weighted_normal(J::Tensor{2,3}, ::Type{RefHexahedron}, face::Int)
     @inbounds begin
         face == 1 && return J[:,2] × J[:,1]
         face == 2 && return J[:,1] × J[:,3]
@@ -145,8 +153,8 @@ end
 #########################
 
 # Mapping from 2D triangle to 3D face of a tetrahedon.
-function face_to_element_transformation(point::Vec{2, T}, cell_T::Type{RefTetrahedron}, face::Int) where T
-    x,y = point
+function face_to_element_transformation(point::Vec{2, T}, ::Type{RefTetrahedron}, face::Int) where T
+    x, y = point
     face == 1 && return Vec{3, T}( (one(T)-x-y,     y,              zero(T)))
     face == 2 && return Vec{3, T}( (y,              zero(T),        one(T)-x-y))
     face == 3 && return Vec{3, T}( (x,              y,              one(T)-x-y))
@@ -154,7 +162,7 @@ function face_to_element_transformation(point::Vec{2, T}, cell_T::Type{RefTetrah
     throw(ArgumentError("unknown face number"))
 end
 
-function weighted_normal(J::Tensor{2,3}, cell_T::Type{RefTetrahedron}, face::Int)
+function weighted_normal(J::Tensor{2,3}, ::Type{RefTetrahedron}, face::Int)
     @inbounds begin
         face == 1 && return J[:,2] × J[:,1]
         face == 2 && return J[:,1] × J[:,3]
@@ -169,9 +177,9 @@ end
 ###################
 
 # Mapping from 2D quadrilateral/triangle to 3D face of a wedge.
-function face_to_element_transformation(point::Vec{2, T}, cell_T::Type{RefPrism}, face::Int) where T
+function face_to_element_transformation(point::Vec{2, T}, ::Type{RefPrism}, face::Int) where T
     # Note that for quadrilaterals the domain is [-1, 1]² but for triangles it is [0, 1]²
-    x,y = point
+    x, y = point
     face == 1 && return Vec{3, T}(( one(T)-x-y,             y,                      zero(T)))
     face == 2 && return Vec{3, T}(( (one(T)+x)/2,           zero(T),                (one(T)+y)/2))
     face == 3 && return Vec{3, T}(( zero(T),                one(T)-(one(T)+x)/2,    (one(T)+y)/2))
@@ -180,7 +188,7 @@ function face_to_element_transformation(point::Vec{2, T}, cell_T::Type{RefPrism}
     throw(ArgumentError("unknown face number"))
 end
 
-function weighted_normal(J::Tensor{2,3}, cell_T::Type{RefPrism}, face::Int)
+function weighted_normal(J::Tensor{2,3}, ::Type{RefPrism}, face::Int)
     @inbounds begin
         face == 1 && return J[:,2] × J[:,1]
         face == 2 && return J[:,1] × J[:,3]
@@ -196,8 +204,8 @@ end
 #####################
 
 # Mapping from 2D face to 3D face of a pyramid.
-function face_to_element_transformation(point::Vec{2, T}, cell_T::Type{RefPyramid}, face::Int) where T
-    x,y = point
+function face_to_element_transformation(point::Vec{2, T}, ::Type{RefPyramid}, face::Int) where T
+    x, y = point
     face == 1 && return Vec{3, T}(( (y+one(T))/2,   (x+one(T))/2,       zero(T)))
     face == 2 && return Vec{3, T}(( y,              zero(T),            one(T)-x-y))
     face == 3 && return Vec{3, T}(( zero(T),        one(T)-x-y,         y))
@@ -206,7 +214,7 @@ function face_to_element_transformation(point::Vec{2, T}, cell_T::Type{RefPyrami
     throw(ArgumentError("unknown face number"))
 end
 
-function weighted_normal(J::Tensor{2,3}, cell_T::Type{RefPyramid}, face::Int)
+function weighted_normal(J::Tensor{2,3}, ::Type{RefPyramid}, face::Int)
     @inbounds begin
         face == 1 && return J[:,2] × J[:,1]
         face == 2 && return J[:,1] × J[:,3]
@@ -216,4 +224,3 @@ function weighted_normal(J::Tensor{2,3}, cell_T::Type{RefPyramid}, face::Int)
     end
     throw(ArgumentError("unknown face number"))
 end
-
