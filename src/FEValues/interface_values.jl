@@ -356,15 +356,15 @@ function transform_interface_points!(dst::Vector{Vec{dim, Float64}}, iv::Interfa
             M = flipped ? rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) :  rotation_matrix_pi(θ) 
         end
         for (idx, point) in pairs(points)
-            point = transfer_point_cell_to_face(point, cell, face)
+            point = element_to_face_transformation(point, getrefshape(cell), face)
             result = M * Vec(point[1],point[2], 1.0)
-            dst[idx] = transfer_point_face_to_cell(Vec(result[1],result[2]), getcells(grid)[face_b[1]], iv.face_values_b.current_face[])
+            dst[idx] = face_to_element_transformation(Vec(result[1],result[2]), getrefshape(getcells(grid)[face_b[1]]), iv.face_values_b.current_face[])
         end
     else
         for (idx, point) in pairs(points)
-            point = transfer_point_cell_to_face(point, cell, face)
+            point = element_to_face_transformation(point, getrefshape(cell), face)
             dim == 2 && flipped && (point *= -1) 
-            dst[idx] = transfer_point_face_to_cell(point, getcells(grid)[face_b[1]], iv.face_values_b.current_face[])
+            dst[idx] = face_to_element_transformation(point, getrefshape(getcells(grid)[face_b[1]]), iv.face_values_b.current_face[])
         end
     end
     return nothing

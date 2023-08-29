@@ -141,8 +141,8 @@
         end
         @testset "error paths" begin
             cell = getcells(grid, 1)
-            @test_throws ErrorException("Face index 100 exceeds the number of faces for a cell of type $(typeof(cell))") Ferrite.transfer_point_cell_to_face([0.0 for _ in 1 : dim], cell, 100)
-            @test_throws ErrorException("Face index 100 exceeds the number of faces for a cell of type $(typeof(cell))") Ferrite.transfer_point_face_to_cell([0.0 for _ in 1 : (dim > 1 ? dim-1 : 1)], cell, 100)
+            @test_throws ArgumentError("unknown face number") Ferrite.element_to_face_transformation(Vec{dim,Float64}(ntuple(_->0.0, dim)), Ferrite.getrefshape(cell), 100)
+            @test_throws ArgumentError("unknown face number") Ferrite.face_to_element_transformation(Vec{dim-1,Float64}(ntuple(_->0.0, dim-1)), Ferrite.getrefshape(cell), 100)
         end
         for func_interpol in (scalar_interpol,#= VectorizedInterpolation(scalar_interpol)=#)
             test_interfacevalues(grid, scalar_interpol, quad_rule)
@@ -171,8 +171,8 @@
         end
         @testset "error paths" begin
             cell = getcells(grid, 1)
-            @test_throws ErrorException("Face index 100 exceeds the number of faces for a cell of type $(typeof(cell))") Ferrite.transfer_point_cell_to_face([0.0 for _ in 1 : dim], cell, 100)
-            @test_throws ErrorException("Face index 100 exceeds the number of faces for a cell of type $(typeof(cell))") Ferrite.transfer_point_face_to_cell([0.0 for _ in 1 : (dim > 1 ? dim-1 : 1)], cell, 100)
+            @test_throws ArgumentError("unknown face number") Ferrite.element_to_face_transformation(Vec{dim,Float64}(ntuple(_->0.0, dim)), Ferrite.getrefshape(cell), 100)
+            @test_throws ArgumentError("unknown face number") Ferrite.face_to_element_transformation(Vec{dim-1,Float64}(ntuple(_->0.0, dim-1)), Ferrite.getrefshape(cell), 100)
         end
         for func_interpol in (scalar_interpol,#= VectorizedInterpolation(scalar_interpol)=#)
             test_interfacevalues(grid, scalar_interpol, quad_rule)

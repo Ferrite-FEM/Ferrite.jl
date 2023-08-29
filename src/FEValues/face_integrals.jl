@@ -7,6 +7,14 @@ cell's face.
 face_to_element_transformation
 
 """
+    element_to_face_transformation(point::AbstractVector, cell::AbstractCell{AbstractRefShape}, face::Int)
+
+Transform quadrature point from ND coordinates on the cell's face to face's reference
+(N-1)D coordinates.
+"""
+element_to_face_transformation
+
+"""
     weighted_normal(J::AbstractTensor, fv::FaceValues, face::Int)
     weighted_normal(J::AbstractTensor, ::Type{<:AbstractRefShape}, face::Int)
 
@@ -62,9 +70,17 @@ end
 ##################
 
 # Mapping from to 0D node to 1D line vertex.
-function face_to_element_transformation(::Vec{0, T}, ::Type{RefLine}, face::Int) where {T}
+function face_to_element_transformation(::Union{Vec{0, T},Vec{1, T}}, ::Type{RefLine}, face::Int) where {T}
     face == 1 && return Vec{1, T}(( -one(T),))
     face == 2 && return Vec{1, T}((  one(T),))
+    throw(ArgumentError("unknown face number"))
+end
+
+# Mapping from 1D line to point.
+function element_to_face_transformation(point::Vec{1, T}, ::Type{RefLine}, face::Int) where T
+    x = point[]
+    face == 1 && return Vec(-x)
+    face == 2 && return Vec( x)
     throw(ArgumentError("unknown face number"))
 end
 
@@ -85,6 +101,16 @@ function face_to_element_transformation(point::Vec{1, T}, ::Type{RefQuadrilatera
     face == 2 && return Vec{2, T}(( one(T),     x))
     face == 3 && return Vec{2, T}(( -x,         one(T)))
     face == 4 && return Vec{2, T}(( -one(T),    -x))
+    throw(ArgumentError("unknown face number"))
+end
+
+# Mapping from 2D face of a quadrilateral to 1D line.
+function element_to_face_transformation(point::Vec{2, T}, ::Type{RefQuadrilateral}, face::Int) where T
+    x, y = point
+    face == 1 && return Vec( x)
+    face == 2 && return Vec( y)
+    face == 3 && return Vec( -x)
+    face == 4 && return Vec( -y)
     throw(ArgumentError("unknown face number"))
 end
 
@@ -111,6 +137,15 @@ function face_to_element_transformation(point::Vec{1, T},  ::Type{RefTriangle}, 
     throw(ArgumentError("unknown face number"))
 end
 
+# Mapping from 2D face of a triangle to 1D line.
+function element_to_face_transformation(point::Vec{2, T}, ::Type{RefTriangle}, face::Int) where T
+    x, y = point
+    face == 1 && return Vec( one(T) - x * 2)
+    face == 2 && return Vec( one(T) - y * 2 )
+    face == 3 && return Vec( x * 2 - one(T))
+    throw(ArgumentError("unknown face number"))
+end
+
 function weighted_normal(J::Tensor{2,2}, ::Type{RefTriangle}, face::Int)
     @inbounds begin
         face == 1 && return Vec{2}((-(J[2,1] - J[2,2]), J[1,1] - J[1,2]))
@@ -133,6 +168,18 @@ function face_to_element_transformation(point::Vec{2, T}, ::Type{RefHexahedron},
     face == 4 && return Vec{3, T}(( -x,     one(T),     y))
     face == 5 && return Vec{3, T}((-one(T), y,          x))
     face == 6 && return Vec{3, T}(( x,      y,          one(T)))
+    throw(ArgumentError("unknown face number"))
+end
+
+# Mapping from 3D face of a hexahedron to 2D quadrilateral.
+function element_to_face_transformation(point::Vec{3, T}, ::Type{RefHexahedron}, face::Int) where T
+    x, y, z = point
+    face == 1 && return Vec( y, x)
+    face == 2 && return Vec( x, z)
+    face == 3 && return Vec( y,  z)
+    face == 4 && return Vec( -x,  z)
+    face == 5 && return Vec( z,  y)
+    face == 6 && return Vec( x,  y)
     throw(ArgumentError("unknown face number"))
 end
 
@@ -162,6 +209,16 @@ function face_to_element_transformation(point::Vec{2, T}, ::Type{RefTetrahedron}
     throw(ArgumentError("unknown face number"))
 end
 
+# Mapping from 3D face of a tetrahedon to 2D triangle.
+function element_to_face_transformation(point::Vec{3, T}, ::Type{RefTetrahedron}, face::Int) where T
+    x, y, z = point
+    face == 1 && return Vec( one(T)-x-y,  y)
+    face == 2 && return Vec( one(T)-z-x,  x)
+    face == 3 && return Vec( x,  y)
+    face == 4 && return Vec( one(T)-y-z,  z)
+    throw(ArgumentError("unknown face number"))
+end
+
 function weighted_normal(J::Tensor{2,3}, ::Type{RefTetrahedron}, face::Int)
     @inbounds begin
         face == 1 && return J[:,2] × J[:,1]
@@ -188,6 +245,17 @@ function face_to_element_transformation(point::Vec{2, T}, ::Type{RefPrism}, face
     throw(ArgumentError("unknown face number"))
 end
 
+# Mapping from 3D face of a wedge to 2D triangle or 2D quadrilateral.
+function element_to_face_transformation(point::Vec{3, T}, ::Type{RefPrism}, face::Int) where T
+    x, y, z = point
+    face == 1 && return Vec( one(T)-x-y,  y)
+    face == 2 && return Vec( 2*x - one(T), 2*z - one(T) )
+    face == 3 && return Vec( 2*(one(T) - x) - one(T), 2*z - one(T) )
+    face == 4 && return Vec( 2*y - one(T), 2*z - one(T) )
+    face == 5 && return Vec( one(T) - 2*x,  x)
+    throw(ArgumentError("unknown face number"))
+end
+
 function weighted_normal(J::Tensor{2,3}, ::Type{RefPrism}, face::Int)
     @inbounds begin
         face == 1 && return J[:,2] × J[:,1]
@@ -211,6 +279,17 @@ function face_to_element_transformation(point::Vec{2, T}, ::Type{RefPyramid}, fa
     face == 3 && return Vec{3, T}(( zero(T),        one(T)-x-y,         y))
     face == 4 && return Vec{3, T}(( x+y,            y,                  one(T)-x-y))
     face == 5 && return Vec{3, T}(( one(T)-x-y,     one(T)-y,           y))
+    throw(ArgumentError("unknown face number"))
+end
+
+# Mapping from 3D face of a pyramid to 2D triangle or 2D quadrilateral.
+function element_to_face_transformation(point::Vec{3, T}, ::Type{RefPyramid}, face::Int) where T
+    x, y, z = point
+    face == 1 && return Vec( 2*y - one(T),  2*x - one(T))
+    face == 2 && return Vec( one(T) - z - x, x)
+    face == 3 && return Vec( one(T) - y - z, z)
+    face == 4 && return Vec( x + y, y)
+    face == 5 && return Vec( one(T) - x - z,  z)
     throw(ArgumentError("unknown face number"))
 end
 
