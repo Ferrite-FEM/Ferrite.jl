@@ -46,6 +46,7 @@ getrefshape(::AbstractCell{refshape}) where refshape = refshape
 nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))
 nfaces(   c::AbstractCell) = length(faces(c))
+nfaces(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_faces(T))
 nnodes(   c::AbstractCell) = length(get_node_ids(c))
 
 """
@@ -69,6 +70,19 @@ Note that the vertices are sufficient to define an edge uniquely.
 edges(::AbstractCell)
 
 """
+    reference_faces(::AbstractRefShape)
+
+Returns a tuple of n-tuples containing the ordered local node indices corresponding to
+the vertices that define an *oriented face*.
+
+An *oriented face* is a face with the first node having the local index and the other
+nodes spanning such that the normal to the face is pointing outwards.
+
+Note that the vertices are sufficient to define a face uniquely.
+"""
+reference_faces(::AbstractRefShape)
+
+"""
     Ferrite.faces(::AbstractCell)
     Ferrite.faces(::Type{AbstractRefShape})
 
@@ -76,9 +90,18 @@ Returns a tuple of n-tuples containing the ordered node indices (of the nodes in
 the vertices that define an *oriented face*. This function induces the 
 [`FaceIndex`](@ref), where the second index corresponds to the local index into this tuple.
 
+An *oriented face* is a face with the first node having the local index and the other
+nodes spanning such that the normal to the face is pointing outwards.
+
 Note that the vertices are sufficient to define a face uniquely.
 """
 faces(::AbstractCell)
+
+function faces(c::AbstractCell{refshape}) where refshape
+    ns = get_node_ids(c)
+    rfs = reference_faces(refshape)
+    return ntuple(i -> getindex.(Ref(ns), rfs[i]), nfaces(refshape))::typeof(rfs)
+end
 
 """
     Ferrite.default_interpolation(::AbstractCell)::Interpolation
@@ -104,9 +127,8 @@ function vertices(c::AbstractCell{RefLine})
     ns = get_node_ids(c)
     return (ns[1], ns[2]) # v1, v2
 end
-function faces(c::AbstractCell{RefLine})
-    ns = get_node_ids(c)
-    return ((ns[1],), (ns[2],)) # f1, f2
+function reference_faces(::Type{RefLine})
+    return ((1,), (2,)) # f1, f2
 end
 function faces(::Type{RefLine})
     return ((1,), (2,)) # f1, f2
@@ -117,10 +139,9 @@ function vertices(c::AbstractCell{RefTriangle})
     ns = get_node_ids(c)
     return (ns[1], ns[2], ns[3]) # v1, v2, v3
 end
-function faces(c::AbstractCell{RefTriangle})
-    ns = get_node_ids(c)
+function reference_faces(::Type{RefTriangle})
     return (
-        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # f1, f2, f3
+        (1, 2), (2, 3), (3, 1), # f1, f2, f3
     )
 end
 function faces(::Type{RefTriangle})
@@ -134,10 +155,9 @@ function vertices(c::AbstractCell{RefQuadrilateral})
     ns = get_node_ids(c)
     return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
 end
-function faces(c::AbstractCell{RefQuadrilateral})
-    ns = get_node_ids(c)
+function reference_faces(::Type{RefQuadrilateral})
     return (
-        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # f1, f2, f3, f4
+        (1, 2), (2, 3), (3, 4), (4, 1), # f1, f2, f3, f4
     )
 end
 function faces(::Type{RefQuadrilateral})
@@ -158,11 +178,10 @@ function edges(c::AbstractCell{RefTetrahedron})
         (ns[1], ns[4]), (ns[2], ns[4]), (ns[3], ns[4]), # e4, e5, e6
     )
 end
-function faces(c::AbstractCell{RefTetrahedron})
-    ns = get_node_ids(c)
+function reference_faces(::Type{RefTetrahedron})
     return (
-        (ns[1], ns[3], ns[2]), (ns[1], ns[2], ns[4]), # f1, f2
-        (ns[2], ns[3], ns[4]), (ns[1], ns[4], ns[3]), # f3, f4
+        (1, 3, 2), (1, 2, 4), # f1, f2
+        (2, 3, 4), (1, 4, 3), # f3, f4
     )
 end
 function faces(::Type{RefTetrahedron})
@@ -187,12 +206,11 @@ function edges(c::AbstractCell{RefHexahedron})
         (ns[1], ns[5]), (ns[2], ns[6]), (ns[3], ns[7]), (ns[4], ns[8]), # e9, e10, e11, e12
     )
 end
-function faces(c::AbstractCell{RefHexahedron})
-    ns = get_node_ids(c)
+function reference_faces(::Type{RefHexahedron})
     return (
-        (ns[1], ns[4], ns[3], ns[2]), (ns[1], ns[2], ns[6], ns[5]), # f1, f2
-        (ns[2], ns[3], ns[7], ns[6]), (ns[3], ns[4], ns[8], ns[7]), # f3, f4
-        (ns[1], ns[5], ns[8], ns[4]), (ns[5], ns[6], ns[7], ns[8]), # f5, f6
+        (1, 4, 3, 2), (1, 2, 6, 5), # f1, f2
+        (2, 3, 7, 6), (3, 4, 8, 7), # f3, f4
+        (1, 5, 8, 4), (5, 6, 7, 8), # f5, f6
     )
 end
 function faces(::Type{RefHexahedron})
@@ -216,12 +234,11 @@ function edges(c::AbstractCell{RefPrism})
         (ns[6], ns[5]),                                                 # e9
     )
 end
-function faces(c::AbstractCell{RefPrism})
-    ns = get_node_ids(c)
+function reference_faces(::Type{RefPrism})
     return (
-        (ns[1], ns[3], ns[2]),        (ns[1], ns[2], ns[5], ns[4]), # f1, f2
-        (ns[3], ns[1], ns[4], ns[6]), (ns[2], ns[3], ns[6], ns[5]), # f3, f4
-        (ns[4], ns[5], ns[6]),                                      # f5
+        (1, 3, 2),    (1, 2, 5, 4), # f1, f2
+        (3, 1, 4, 6), (2, 3, 6, 5), # f3, f4
+        (4, 5, 6),                  # f5
     )
 end
 function faces(::Type{RefPrism})
@@ -244,12 +261,11 @@ function edges(c::AbstractCell{RefPyramid})
         (ns[2], ns[5]), (ns[4], ns[3]), (ns[3], ns[5]), (ns[4], ns[5]), 
     )
 end
-function faces(c::AbstractCell{RefPyramid})
-    ns = get_node_ids(c)
+function reference_faces(::Type{RefPyramid})
     return (
-        (ns[1], ns[3], ns[4], ns[2]), (ns[1], ns[2], ns[5]), 
-        (ns[1], ns[5], ns[3]), (ns[2], ns[4], ns[5]), 
-        (ns[3], ns[5], ns[4]),                                      
+        (1, 3, 4, 2), (1, 2, 5), # f1, f2
+        (1, 5, 3), (2, 4, 5),    # f3, f4
+        (3, 5, 4),               # f5
     )
 end
 
@@ -485,7 +501,7 @@ n_faces_per_cell(grid::Grid) = nfaces(getcelltype(grid))
 Transform all nodes of the `grid` based on some transformation function `f`.
 """
 function transform_coordinates!(g::Grid, f::Function)
-    map!(n -> Node(f(get_node_coordinate(n))), g.nodes, g.nodes)
+    replace!(n -> Node(f(get_node_coordinate(n))), g.nodes)
     return g
 end
 

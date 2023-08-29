@@ -10,6 +10,8 @@ for (scalar_interpol, quad_rule) in (
                                     (Serendipity{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2)),
                                     (Lagrange{RefTetrahedron, 1}(), FaceQuadratureRule{RefTetrahedron}(2)),
                                     (Lagrange{RefTetrahedron, 2}(), FaceQuadratureRule{RefTetrahedron}(2)),
+                                    (Lagrange{RefPyramid, 2}(), FaceQuadratureRule{RefPyramid}(2)),
+                                    (Lagrange{RefPrism, 2}(), FaceQuadratureRule{RefPrism}(2)),
                                    )
   
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
@@ -102,7 +104,7 @@ for (scalar_interpol, quad_rule) in (
             if hasmethod(pointer, Tuple{typeof(v)})
                 @test pointer(v) != pointer(vc)
             end
-            @test v == vc
+            @test check_equal_or_nan(v, vc)
         end
     end
 end

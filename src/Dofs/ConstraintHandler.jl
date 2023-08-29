@@ -511,14 +511,16 @@ conditions specified in `ch` such that `K \\ rhs` gives the expected solution.
 
 !!! note
     `apply!(K, rhs, ch)` essentially calculates
+    ```julia
+    rhs[free] = rhs[free] - K[constrained, constrained] * a[constrained]
+    ```
+    where `a[constrained]` are the inhomogeneities. Consequently, the sign of `rhs` matters
+    (in contrast with `apply_zero!`).
 
-    `rhs[free_dofs] = rhs[free_dofs] - K[free_dofs, constrained_dofs] * a[constrained]`
-    
-    where `a[constrained]` are the inhomogeneities. 
-    Consequently, the sign of `rhs` matters (in contrast to for `apply_zero!`).
 
-
-    apply!(v::AbstractVector, ch::ConstraintHandler)
+```julia
+apply!(v::AbstractVector, ch::ConstraintHandler)
+```
 
 Apply Dirichlet boundary conditions and affine constraints, specified in `ch`, to the solution vector `v`.
 

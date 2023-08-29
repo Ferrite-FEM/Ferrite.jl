@@ -11,6 +11,7 @@ of faces `M`.
 ```@docs
 Ferrite.vertices(::Ferrite.AbstractCell)
 Ferrite.edges(::Ferrite.AbstractCell)
+Ferrite.reference_faces(::Ferrite.AbstractRefShape)
 Ferrite.faces(::Ferrite.AbstractCell)
 Ferrite.default_interpolation(::Ferrite.AbstractCell)
 ```
