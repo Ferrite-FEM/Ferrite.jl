@@ -32,6 +32,8 @@
                       DiscontinuousLagrange{RefHexahedron, 1}(),
                       DiscontinuousLagrange{RefTriangle, 1}(),
                       DiscontinuousLagrange{RefTetrahedron, 1}(),
+                      DiscontinuousLagrange{RefPrism, 1}(),
+                      DiscontinuousLagrange{RefPyramid, 1}(),
                       #
                       BubbleEnrichedLagrange{RefTriangle, 1}(),
                       #

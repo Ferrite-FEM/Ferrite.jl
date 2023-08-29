@@ -126,6 +126,8 @@
                                         # (QuadraticQuadrilateral, Serendipity{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2)),
                                         (Tetrahedron, DiscontinuousLagrange{RefTetrahedron, 1}(), FaceQuadratureRule{RefTetrahedron}(2)),
                                         # (QuadraticTetrahedron, Lagrange{RefTetrahedron, 2}(), FaceQuadratureRule{RefTetrahedron}(2)),
+                                        # (Wedge, DiscontinuousLagrange{RefPrism, 1}(), FaceQuadratureRule{RefPrism}(2)),
+                                        # (Pyramid, DiscontinuousLagrange{RefPyramid, 1}(), FaceQuadratureRule{RefPyramid}(2)),
                                        )
         dim = getcelltypedim(cell_shape)
         grid = generate_grid(cell_shape, ntuple(i -> 2, dim))
@@ -135,7 +137,7 @@
             cell = getcells(grid, 1)
             geom_ip_faces_indices = Ferrite.facedof_indices(ip)
             Ferrite.getdim(ip) > 1 && (geom_ip_faces_indices = Tuple([face[collect(face .∉ Ref(interior))] for (face, interior) in [(geom_ip_faces_indices[i], Ferrite.facedof_interior_indices(ip)[i]) for i in 1:nfaces(ip)]]))
-            faces_indicies = Ferrite.faces(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
+            faces_indicies = Ferrite.reference_faces(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
             @test getindex.(Ref(node_ids), collect.(faces_indicies)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
         end
@@ -165,7 +167,7 @@
             cell = getcells(grid, 1)
             geom_ip_faces_indices = Ferrite.facedof_indices(ip)
             Ferrite.getdim(ip) > 1 && (geom_ip_faces_indices = Tuple([face[collect(face .∉ Ref(interior))] for (face, interior) in [(geom_ip_faces_indices[i], Ferrite.facedof_interior_indices(ip)[i]) for i in 1:nfaces(ip)]]))
-            faces_indicies = Ferrite.faces(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
+            faces_indicies = Ferrite.reference_faces(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
             @test getindex.(Ref(node_ids), collect.(faces_indicies)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
         end

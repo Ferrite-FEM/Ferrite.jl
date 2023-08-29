@@ -130,9 +130,6 @@ end
 function reference_faces(::Type{RefLine})
     return ((1,), (2,)) # f1, f2
 end
-function faces(::Type{RefLine})
-    return ((1,), (2,)) # f1, f2
-end
 
 # RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
 function vertices(c::AbstractCell{RefTriangle})
@@ -144,11 +141,6 @@ function reference_faces(::Type{RefTriangle})
         (1, 2), (2, 3), (3, 1), # f1, f2, f3
     )
 end
-function faces(::Type{RefTriangle})
-    return (
-        (1, 2), (2, 3), (3, 1), # f1, f2, f3
-    )
-end
 
 # RefQuadrilateral (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
 function vertices(c::AbstractCell{RefQuadrilateral})
@@ -156,11 +148,6 @@ function vertices(c::AbstractCell{RefQuadrilateral})
     return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
 end
 function reference_faces(::Type{RefQuadrilateral})
-    return (
-        (1, 2), (2, 3), (3, 4), (4, 1), # f1, f2, f3, f4
-    )
-end
-function faces(::Type{RefQuadrilateral})
     return (
         (1, 2), (2, 3), (3, 4), (4, 1), # f1, f2, f3, f4
     )
@@ -179,12 +166,6 @@ function edges(c::AbstractCell{RefTetrahedron})
     )
 end
 function reference_faces(::Type{RefTetrahedron})
-    return (
-        (1, 3, 2), (1, 2, 4), # f1, f2
-        (2, 3, 4), (1, 4, 3), # f3, f4
-    )
-end
-function faces(::Type{RefTetrahedron})
     return (
         (1, 3, 2), (1, 2, 4), # f1, f2
         (2, 3, 4), (1, 4, 3), # f3, f4
@@ -213,13 +194,6 @@ function reference_faces(::Type{RefHexahedron})
         (1, 5, 8, 4), (5, 6, 7, 8), # f5, f6
     )
 end
-function faces(::Type{RefHexahedron})
-    return (
-        (1, 4, 3, 2), (1, 2, 6, 5), # f1, f2
-        (2, 3, 7, 6), (3, 4, 8, 7), # f3, f4
-        (1, 5, 8, 4), (5, 6, 7, 8), # f5, f6
-    )
-end
 
 # RefPrism (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
 function vertices(c::AbstractCell{RefPrism})
@@ -239,13 +213,6 @@ function reference_faces(::Type{RefPrism})
         (1, 3, 2),    (1, 2, 5, 4), # f1, f2
         (3, 1, 4, 6), (2, 3, 6, 5), # f3, f4
         (4, 5, 6),                  # f5
-    )
-end
-function faces(::Type{RefPrism})
-    return (
-        (1, 3, 2),        (1, 2, 5, 4), # f1, f2
-        (3, 1, 4, 6), (2, 3, 6, 5), # f3, f4
-        (4, 5, 6),                                      # f5
     )
 end
 
