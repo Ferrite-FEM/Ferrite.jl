@@ -126,8 +126,8 @@
                                         # (QuadraticQuadrilateral, Serendipity{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2)),
                                         (Tetrahedron, DiscontinuousLagrange{RefTetrahedron, 1}(), FaceQuadratureRule{RefTetrahedron}(2)),
                                         # (QuadraticTetrahedron, Lagrange{RefTetrahedron, 2}(), FaceQuadratureRule{RefTetrahedron}(2)),
-                                        # (Wedge, DiscontinuousLagrange{RefPrism, 1}(), FaceQuadratureRule{RefPrism}(2)),
-                                        # (Pyramid, DiscontinuousLagrange{RefPyramid, 1}(), FaceQuadratureRule{RefPyramid}(2)),
+                                        (Wedge, DiscontinuousLagrange{RefPrism, 1}(), FaceQuadratureRule{RefPrism}(2)),
+                                        (Pyramid, DiscontinuousLagrange{RefPyramid, 1}(), FaceQuadratureRule{RefPyramid}(2)),
                                        )
         dim = getcelltypedim(cell_shape)
         grid = generate_grid(cell_shape, ntuple(i -> 2, dim))

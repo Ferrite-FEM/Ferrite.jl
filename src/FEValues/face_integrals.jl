@@ -250,9 +250,9 @@ function element_to_face_transformation(point::Vec{3, T}, ::Type{RefPrism}, face
     x, y, z = point
     face == 1 && return Vec( one(T)-x-y,  y)
     face == 2 && return Vec( 2*x - one(T), 2*z - one(T) )
-    face == 3 && return Vec( 2*(one(T) - x) - one(T), 2*z - one(T) )
+    face == 3 && return Vec( 2*(one(T) - y) - one(T), 2*z - one(T) )
     face == 4 && return Vec( 2*y - one(T), 2*z - one(T) )
-    face == 5 && return Vec( one(T) - 2*x,  x)
+    face == 5 && return Vec( one(T) - x - y,  x)
     throw(ArgumentError("unknown face number"))
 end
 
@@ -288,7 +288,7 @@ function element_to_face_transformation(point::Vec{3, T}, ::Type{RefPyramid}, fa
     face == 1 && return Vec( 2*y - one(T),  2*x - one(T))
     face == 2 && return Vec( one(T) - z - x, x)
     face == 3 && return Vec( one(T) - y - z, z)
-    face == 4 && return Vec( x + y, y)
+    face == 4 && return Vec( x - y, y)
     face == 5 && return Vec( one(T) - x - z,  z)
     throw(ArgumentError("unknown face number"))
 end
