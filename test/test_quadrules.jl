@@ -78,7 +78,7 @@
                     for (i,nodeid) in enumerate(facenodes)
                         x = grid.nodes[nodeid].x
                         fcoords[i] = x
-                    end    
+                    end
                     ipcell = Lagrange{refshape,1}()
                     ipface = Lagrange{getfacerefshape(cell,lfaceid),1}()
 
@@ -101,10 +101,11 @@
         end
 
         @testset "$ref_cell unknown face error path" begin
-            for face in (-1, 0, 100) 
+            for face in (-1, 0, 100)
                 err = ArgumentError("unknown face number")
                 @test_throws err Ferrite.weighted_normal(Tensor{2,dim}(zeros(dim^2)), refshape, face)
-                @test_throws err Ferrite.face_to_element_transformation(Vec{dim>1 ? dim-1 : 1}(zeros(dim>1 ? dim-1 : 1)), refshape, face)
+                pt = Vec{dim-1, Float64}(ntuple(i -> 0.0, dim-1))
+                @test_throws err Ferrite.face_to_element_transformation(pt, refshape, face)
             end
         end
     end
