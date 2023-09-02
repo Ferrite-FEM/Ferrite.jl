@@ -11,10 +11,11 @@ and function on the interfaces of finite elements.
 * `quad_rule_b`: an instance of a [`FaceQuadratureRule`](@ref) for element B.
 * `func_interpol_a`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function for element A.
 * `func_interpol_b`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function for element B.
+  It defaults `func_interpol_a`.
 * `geom_interpol_a`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry for element A.
-  It uses the default interpolation of the respective [`RefShape`](@ref) by default.
+  It defaults `func_interpol_a`.
 * `geom_interpol_b`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry for element B.
-  It uses the default interpolation of the respective [`RefShape`](@ref) by default.
+  It defaults `func_interpol_b`.
  
 **associated methods:**
 
