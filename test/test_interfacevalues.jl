@@ -38,18 +38,18 @@
                         @test shapegrad ≈ shape_gradient(iv.face_values_b, qp, i - getnbasefunctions(iv.face_values_a))
                         @test geomvalue ≈ Ferrite.geometric_value(iv.face_values_b, qp, i - getnbasefunctions(iv.face_values_a))
 
-                        @test shape_jump ≈ -shapevalue
-                        @test shapegrad_jump ≈ -shapegrad
-                        @test geomvalue_jump ≈ -geomvalue
+                        @test shape_jump ≈ shapevalue
+                        @test shapegrad_jump ≈ shapegrad
+                        @test geomvalue_jump ≈ geomvalue
                     else
                         normal = getnormal(iv, qp)
                         @test shapevalue ≈ shape_value(iv.face_values_a, qp, i)
                         @test shapegrad ≈ shape_gradient(iv.face_values_a, qp, i)
                         @test geomvalue ≈ Ferrite.geometric_value(iv.face_values_a, qp, i)
 
-                        @test shape_jump ≈ shapevalue
-                        @test shapegrad_jump ≈ shapegrad
-                        @test geomvalue_jump ≈ geomvalue
+                        @test shape_jump ≈ -shapevalue
+                        @test shapegrad_jump ≈ -shapegrad
+                        @test geomvalue_jump ≈ -geomvalue
                     end
 
                     @test shape_avg ≈ 0.5 * shapevalue

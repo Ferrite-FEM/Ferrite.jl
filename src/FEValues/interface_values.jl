@@ -90,9 +90,9 @@ end
 Return the normal at the quadrature point `qp` on the interface. 
 
 For `InterfaceValues`, `use_elemet_a` determines which element to use for calculating divergence of the function.
-`true` uses the element A's face nomal vector, which is the default, while `false` uses element B's.
+`true` uses the element A's face nomal vector, while `false` uses element B's, which is the default.
 """
-getnormal(iv::InterfaceValues, qp::Int, use_element_a::Bool = true) = use_element_a ? iv.face_values_a.normals[qp] : iv.face_values_b.normals[qp]
+getnormal(iv::InterfaceValues, qp::Int, use_element_a::Bool = false) = use_element_a ? iv.face_values_a.normals[qp] : iv.face_values_b.normals[qp]
 
 """
     shape_value_average(iv::InterfaceValues, qp::Int, base_function::Int)
@@ -182,7 +182,7 @@ for (func,                      f_,                 ) in (
         function $(func)(iv::InterfaceValues, qp::Int, i::Int)
             f_value = $(f_)(iv, qp, i)
             nbf_a = getnbasefunctions(iv.face_values_a)
-            return i <= nbf_a ? f_value : -f_value
+            return i <= nbf_a ? -f_value : f_value
         end
     end
 end
@@ -256,13 +256,13 @@ for (func,                          f_,                 ) in (
         function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
             f_value_here = $(f_)(iv, qp, u_a, dof_range_a, use_element_a = true)
             f_value_there = $(f_)(iv, qp, u_b, dof_range_b, use_element_a = false)
-            return f_value_here - f_value_there 
+            return f_value_there - f_value_here 
         end
         # TODO: Deprecate this, nobody is using this in practice...
         function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector{<:Vec}, u_b::AbstractVector{<:Vec})
             f_value_here = $(f_)(iv, qp, u_a, use_element_a = true)
             f_value_there = $(f_)(iv, qp, u_b, use_element_a = false)
-            return f_value_here - f_value_there 
+            return f_value_there - f_value_here 
         end
     end
 end
