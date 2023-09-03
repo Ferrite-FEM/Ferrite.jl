@@ -13,7 +13,7 @@ for (scalar_interpol, quad_rule) in (
                                     (Lagrange{RefPyramid, 2}(), FaceQuadratureRule{RefPyramid}(2)),
                                     (Lagrange{RefPrism, 2}(), FaceQuadratureRule{RefPrism}(2)),
                                    )
-  
+
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)

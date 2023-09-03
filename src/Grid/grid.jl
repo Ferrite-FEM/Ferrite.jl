@@ -823,7 +823,7 @@ struct SurfaceOrientationInfo
 end
 
 
-"""
+@doc raw"""
     InterfaceTransformation
 
 Orientation information for 1D and 2D interfaces in 2D and 3D elements respectively. 
@@ -838,34 +838,34 @@ shift of the lowest vertex index which is used to reorient the face in
 case of flipping ["transform_interface_point!"](@ref).
 Take for example the faces
 ```
-2           3
-| \\         | \\
-|  \\        |  \\
-| A \\       | B \\ 
-|    \\      |    \\
-3-----1     1-----2  
+1           2
+| \         | \
+|  \        |  \
+| A \       | B \ 
+|    \      |    \
+2-----3     3-----1  
 ```
 which are rotated against each other by 240° after tranfroming to an
 equilateral triangle (shift index is 2) or the faces
 ```
-2           3
-| \\         | \\
-|  \\        |  \\
-| A \\       | B \\ 
-|    \\      |    \\
-1-----3     1-----2  
+2           2
+| \         | \
+|  \        |  \
+| A \       | B \ 
+|    \      |    \
+3-----1     3-----1  
 ```
 which are flipped against each other, note that face B has its reference node shifted by 2 indices
 so the face is tranformed into an equilateral triangle then rotated 120°, flipped about the x axis then
 rotated -120° and tranformed back to the reference triangle.Any combination of these can happen. 
 """
-struct InterfaceTransformation
-    flipped::ScalarWrapper{Bool}
-    shift_index::ScalarWrapper{Int}
-    lowest_node_shift_index::ScalarWrapper{Int}
+mutable struct InterfaceTransformation
+    flipped::Bool
+    shift_index::Int
+    lowest_node_shift_index::Int
 end
 
-InterfaceTransformation() = InterfaceTransformation(ScalarWrapper(false), ScalarWrapper(0), ScalarWrapper(0))
+InterfaceTransformation() = InterfaceTransformation(false, 0, 0)
 
 function Base.copy(it::InterfaceTransformation)
     return InterfaceTransformation(copy(it.flipped), copy(it.shift_index), copy(it.lowest_node_shift_index))
@@ -890,9 +890,9 @@ function update!(interface_transformation::InterfaceTransformation, grid::Abstra
     shift_index = min_idx_b - min_idx_a
     flipped = getdim(cell_a) == 2 ? shift_index != 0 : nodes_a[min_idx_a != 1 ? min_idx_a - 1 : end] != nodes_b[min_idx_b != 1 ? min_idx_b - 1 : end]
         
-    interface_transformation.flipped[] =  flipped  
-    interface_transformation.shift_index[] = shift_index
-    interface_transformation.lowest_node_shift_index[] = 1 - min_idx_b
+    interface_transformation.flipped =  flipped  
+    interface_transformation.shift_index = shift_index
+    interface_transformation.lowest_node_shift_index = 1 - min_idx_b
 
     return nothing
 end

@@ -1,16 +1,15 @@
 """
     face_to_element_transformation(point::Vec, ::Type{<:AbstractRefShape}, face::Int)
 
-Transform quadrature point from face's reference (N-1)D coordinates to ND coordinates on the
-cell's face.
+Transform quadrature point from face's reference coordinates to coordinates on the
+cell's face, increasing the number of dimensions by one.
 """
 face_to_element_transformation
 
 """
     element_to_face_transformation(point::AbstractVector, cell::AbstractCell{AbstractRefShape}, face::Int)
 
-Transform quadrature point from ND coordinates on the cell's face to face's reference
-(N-1)D coordinates.
+Transform quadrature point from cell's coordinates to the face's reference coordinates, decreasing the number of dimensions by one.
 """
 element_to_face_transformation
 

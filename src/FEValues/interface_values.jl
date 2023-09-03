@@ -11,11 +11,11 @@ and function on the interfaces of finite elements.
 * `quad_rule_b`: an instance of a [`FaceQuadratureRule`](@ref) for element B.
 * `func_interpol_a`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function for element A.
 * `func_interpol_b`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function for element B.
-  It defaults `func_interpol_a`.
+  It defaults to `func_interpol_a`.
 * `geom_interpol_a`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry for element A.
-  It defaults `func_interpol_a`.
+  It defaults to `func_interpol_a`.
 * `geom_interpol_b`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry for element B.
-  It defaults `func_interpol_b`.
+  It defaults to `func_interpol_b`.
  
 **associated methods:**
 
@@ -268,7 +268,7 @@ for (func,                          f_,                 ) in (
     end
 end
 
-"""
+@doc raw"""
     transform_interface_points!(dst::Vector{Vec{dim, Float64}}, iv::InterfaceValues, points::Vector{Vec{dim, Float64}}, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex)
 
 Transform the points from face A to face B using the orientation information of the interface and store it in the vecotr dst.
@@ -278,64 +278,64 @@ it's rotated back in the opposite direction after flipping).
 Take for example the interface
 ```
         2           3
-        | \\         | \\
-        |  \\        |  \\
-y       | A \\       | B \\ 
-↑       |    \\      |    \\
+        | \         | \
+        |  \        |  \
+y       | A \       | B \ 
+↑       |    \      |    \
 →  x    1-----3     1-----2  
 ```
 Transforming A to a equilateral triangle and translating it such that {0,0} is equidistant to all nodes
 ```
         3
         +
-       / \\         
-      /   \\
-     /  x  \\                          
-    /   ↑   \\                        
-   /  ←      \\                          
-  /  y        \\                            
+       / \         
+      /   \
+     /  x  \                          
+    /   ↑   \                        
+   /  ←      \                          
+  /  y        \                            
 2+-------------+1                     
 ```
 Rotating it -270° (or 120°) such that the reference node (the node with smallest index) is at index 1
 ```
         1
         +
-       / \\         
-      /   \\
-     /  x  \\                          
-    /   ↑   \\                        
-   /  ←      \\                          
-  /  y        \\                            
+       / \         
+      /   \
+     /  x  \                          
+    /   ↑   \                        
+   /  ←      \                          
+  /  y        \                            
 3+-------------+2                     
 ```
 Flipping about the x axis (such that the position of the reference node doesn't change) and rotating 270° (or -120°)
 ```
         2
         +
-       / \\         
-      /   \\
-     /  x  \\                          
-    /   ↑   \\                        
-   /  ←      \\                          
-  /  y        \\                            
+       / \         
+      /   \
+     /  x  \                          
+    /   ↑   \                        
+   /  ←      \                          
+  /  y        \                            
 3+-------------+1                     
 ```
-Transforming back to the reference trianle
+Transforming back to triangle B
 ```
        3           
-       | \\
-       |  \\
-y      |   \\ 
-↑      |    \\
+       | \
+       |  \
+y      |   \ 
+↑      |    \
 → x    1-----2  
 ```
 """
 function transform_interface_points!(dst::Vector{Vec{dim, Float64}}, iv::InterfaceValues, points::Vector{Vec{dim, Float64}}, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex) where {dim}
     cell = getcells(grid)[face_a[1]]
     face = iv.face_values_a.current_face[]
-    flipped = iv.interface_transformation.flipped[]
-    shift_index = iv.interface_transformation.shift_index[]
-    lowest_node_shift_index = iv.interface_transformation.lowest_node_shift_index[]
+    flipped = iv.interface_transformation.flipped
+    shift_index = iv.interface_transformation.shift_index
+    lowest_node_shift_index = iv.interface_transformation.lowest_node_shift_index
     if dim == 3
         if length(faces(cell)[face]) == 3
             θ = 2/3 * shift_index
