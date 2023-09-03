@@ -66,7 +66,7 @@ and mutating element B's quadrature points and its [`FaceValues`](@ref) `M, N, d
 function reinit!(iv::InterfaceValues, face_a::FaceIndex, face_b::FaceIndex, cell_a_coords::AbstractVector{Vec{dim, T}}, cell_b_coords::AbstractVector{Vec{dim, T}}, grid::AbstractGrid) where {dim, T}
     reinit!(iv.face_values_a, cell_a_coords, face_a[2])
     iv.face_values_b.current_face[] = face_b[2]
-    update!(iv.interface_transformation, grid, face_a, face_b)
+    update_interface_transformation!(iv.interface_transformation, grid, face_a, face_b)
     quad_points_a = getpoints(iv.face_values_a.qr, face_a[2])
     quad_points_b = getpoints(iv.face_values_b.qr, face_b[2])
     transform_interface_points!(quad_points_b, iv, quad_points_a, grid, face_a, face_b)

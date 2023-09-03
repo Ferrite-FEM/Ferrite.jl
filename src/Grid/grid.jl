@@ -872,11 +872,11 @@ function Base.copy(it::InterfaceTransformation)
 end
 
 """
-    update!(interface_transformation::InterfaceTransformation, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex)
+    update_interface_transformation!(interface_transformation::InterfaceTransformation, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex)
 
 Update the orientation info for the interface defined by face A and face B.
 """
-function update!(interface_transformation::InterfaceTransformation, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex)
+function update_interface_transformation!(interface_transformation::InterfaceTransformation, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex)
     cell_a = getcells(grid, face_a[1])
     getdim(cell_a) == 1 && return nothing # No need to transform
     cell_b = getcells(grid, face_b[1])
