@@ -11,9 +11,7 @@ import Base: push!
 # @deprecate add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet) add!(ch, dbc)
 
 @deprecate getcoordinates(node::Node) get_node_coordinate(node) true
-@deprecate getcoordinates(args...) get_cell_coordinates(args...) true
-@deprecate getcoordinates!(args...) get_cell_coordinates!(args...) true
-@deprecate cellcoords!(x::Vector, dh::DofHandler, args...) get_cell_coordinates!(x, dh.grid, args...) false
+@deprecate cellcoords!(x::Vector, dh::DofHandler, args...) getcoordinates!(x, dh.grid, args...) false
 
 struct Cell{refdim, nnodes, nfaces}
     function Cell{refdim, nnodes, nfaces}(nodes) where {refdim, nnodes, nfaces}

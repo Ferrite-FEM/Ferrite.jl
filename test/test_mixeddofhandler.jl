@@ -311,7 +311,7 @@ function test_2_element_heat_eq()
 
         for cellnum in cellset
             celldofs!(eldofs, dh, cellnum)
-            xe = get_cell_coordinates(dh.grid, cellnum)
+            xe = getcoordinates(dh.grid, cellnum)
             reinit!(cellvalues, xe)
             fill!(Ke, 0)
             fill!(fe, 0)

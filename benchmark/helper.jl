@@ -23,7 +23,7 @@ function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.Abstract
 
     Ke = zeros(n_basefuncs, n_basefuncs)
 
-    X = get_cell_coordinates(grid, 1)
+    X = getcoordinates(grid, 1)
     reinit!(cellvalues, X)
 
     for q_point in 1:getnquadpoints(cellvalues)
@@ -45,7 +45,7 @@ function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.Abstract
 
     f = zeros(n_basefuncs)
 
-    X = get_cell_coordinates(grid, 1)
+    X = getcoordinates(grid, 1)
     for face in 1:nfaces(getcells(grid)[1])
         reinit!(facevalues, X, face)
 
@@ -97,11 +97,11 @@ function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.Abstra
 
     #implicit assumption: Same geometry!
     X_shape = zeros(Vec{dim,Float64}, Ferrite.getngeobasefunctions(cellvalues_shape))
-    get_cell_coordinates!(X_shape, grid, 1)
+    getcoordinates!(X_shape, grid, 1)
     reinit!(cellvalues_shape, X_shape)
 
     X_test = zeros(Vec{dim,Float64}, Ferrite.getngeobasefunctions(cellvalues_test))
-    get_cell_coordinates!(X_test, grid, 1)
+    getcoordinates!(X_test, grid, 1)
     reinit!(cellvalues_test, X_test)
 
     for q_point in 1:getnquadpoints(cellvalues_test) #assume same quadrature rule
@@ -124,8 +124,8 @@ function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.Abstra
 
     f = zeros(n_basefuncs_test)
 
-    X_shape = get_cell_coordinates(grid, 1)
-    X_test = get_cell_coordinates(grid, 1)
+    X_shape = getcoordinates(grid, 1)
+    X_test = getcoordinates(grid, 1)
     for face in 1:nfaces(getcells(grid)[1])
         reinit!(facevalues_shape, X_shape, face)
         reinit!(facevalues_test, X_test, face)

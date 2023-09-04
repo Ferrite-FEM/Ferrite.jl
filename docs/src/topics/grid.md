@@ -169,12 +169,13 @@ Ferrite.getnodes(grid::SmallGrid) = grid.nodes_test
 Ferrite.getnodes(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.nodes_test[v]
 Ferrite.getnnodes(grid::SmallGrid) = length(grid.nodes_test)
 Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
+Ferrite.get_coordinate_type(::SmallGrid{dim}) where dim = Vec{dim,Float64}
 Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
 Ferrite.n_faces_per_cell(grid::SmallGrid) = nfaces(eltype(grid.cells_test))
 ```
 
 These definitions make many of `Ferrite`s functions work out of the box, e.g. you can now call 
-`get_cell_coordinates(grid, cellid)` on the `SmallGrid`. 
+`getcoordinates(grid, cellid)` on the `SmallGrid`. 
 
 Now, you would be able to assemble the heat equation example over the new custom `SmallGrid` type.
 Note that this particular subtype isn't able to handle boundary entity sets and so, you can't describe boundaries with it.
