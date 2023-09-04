@@ -302,7 +302,7 @@ function setup_mean_constraint(dh, fvp)
     ## Loop over all the boundaries
     for (ci, fi) in set
         Ce .= 0
-        get_cell_coordinates!(element_coords, dh.grid, ci)
+        getcoordinates!(element_coords, dh.grid, ci)
         reinit!(fvp, element_coords, fi)
         celldofs!(element_dofs, dh, ci)
         for qp in 1:getnquadpoints(fvp)
@@ -419,7 +419,7 @@ function assemble_system!(K, f, dh, cvu, cvp)
             end
             ## rhs
             for (i, I) in pairs(range_u)
-                x = spatial_coordinate(cvu, qp, get_cell_coordinates(cell))
+                x = spatial_coordinate(cvu, qp, getcoordinates(cell))
                 b = exp(-100 * norm(x - Vec{2}((0.75, 0.1)))^2)
                 bv = Vec{2}((b, 0.0))
                 fe[I] += (ϕᵤ[i] ⋅ bv) * dΩ

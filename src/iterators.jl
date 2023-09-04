@@ -31,7 +31,7 @@ cell. The cache is updated for a new cell by calling `reinit!(cache, cellid)` wh
  - `reinit!(cc, i)`: reinitialize the cache for cell `i`
  - `cellid(cc)`: get the cell id of the currently cached cell
  - `getnodes(cc)`: get the global node ids of the cell
- - `get_cell_coordinates(cc)`: get the coordinates of the cell
+ - `getcoordinates(cc)`: get the coordinates of the cell
  - `celldofs(cc)`: get the global dof ids of the cell
  - `reinit!(fev, cc)`: reinitialize [`CellValues`](@ref) or [`FaceValues`](@ref)
 
@@ -78,7 +78,7 @@ function reinit!(cc::CellCache, i::Int)
     end
     if cc.flags.coords
         resize!(cc.coords, nnodes_per_cell(cc.grid, i))
-        get_cell_coordinates!(cc.coords, cc.grid, i)
+        getcoordinates!(cc.coords, cc.grid, i)
     end
     if cc.dh !== nothing && cc.flags.dofs
         resize!(cc.dofs, ndofs_per_cell(cc.dh, i))
@@ -91,12 +91,12 @@ end
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
 # TODOL enable this after InterfaceValues are merges
-# reinit!(iv::InterfaceValues, ic::InterfaceCache) = reinit!(iv, FaceIndex(cellid(ic.face_a), ic.face_a.current_faceid[]), get_cell_coordinates(ic.face_a),
-#     FaceIndex(cellid(ic.face_b), ic.face_b.current_faceid[]), get_cell_coordinates(ic.face_b), ic.face_a.cc.grid)
+# reinit!(iv::InterfaceValues, ic::InterfaceCache) = reinit!(iv, FaceIndex(cellid(ic.face_a), ic.face_a.current_faceid[]), getcoordinates(ic.face_a),
+#     FaceIndex(cellid(ic.face_b), ic.face_b.current_faceid[]), getcoordinates(ic.face_b), ic.face_a.cc.grid)
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
 getnodes(cc::CellCache) = cc.nodes
-get_cell_coordinates(cc::CellCache) = cc.coords
+getcoordinates(cc::CellCache) = cc.coords
 celldofs(cc::CellCache) = cc.dofs
 cellid(cc::CellCache) = cc.cellid[]
 
@@ -124,7 +124,7 @@ calling `reinit!(cache, fi::FaceIndex)`.
  - `reinit!(fc, fi)`: reinitialize the cache for face `fi::FaceIndex`
  - `cellid(fc)`: get the current cellid (`faceindex(fc)[1]`)
  - `getnodes(fc)`: get the global node ids of the *cell*
- - `get_cell_coordinates(fc)`: get the coordinates of the *cell*
+ - `getcoordinates(fc)`: get the coordinates of the *cell*
  - `celldofs(fc)`: get the global dof ids of the *cell*
  - `reinit!(fv, fc)`: reinitialize [`FaceValues`](@ref)
 
@@ -148,7 +148,7 @@ function reinit!(fc::FaceCache, face::FaceIndex)
 end
 
 # Delegate methods to the cell cache
-for op = (:getnodes, :get_cell_coordinates, :cellid, :celldofs)
+for op = (:getnodes, :getcoordinates, :cellid, :celldofs)
     @eval begin
         function $op(fc::FaceCache, args...)
             return $op(fc.cc, args...)

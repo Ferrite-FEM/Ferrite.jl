@@ -69,7 +69,7 @@
             grid = generate_grid(ref_cell, ntuple(_->3, dim))
             for cellid in 1:getncells(grid)
                 cell = grid.cells[cellid]
-                ccoords = get_cell_coordinates(grid, cellid)
+                ccoords = getcoordinates(grid, cellid)
                 Vec_t = Vec{dim,Float64}
                 Vec_face_t = Vec{dim-1,Float64}
                 for lfaceid in nfaces(refshape)

@@ -344,7 +344,7 @@ end
 
 Get the datatype for a single point in the grid.
 """
-get_coordinate_type(grid::Grid{dim,C,T}) where {dim,C,T} = Vec{dim,T} # Node is baked into the mesh type.
+get_coordinate_type(::Grid{dim,C,T}) where {dim,C,T} = Vec{dim,T} # Node is baked into the mesh type.
 
 """
     toglobal(grid::AbstractGrid, vertexidx::VertexIndex) -> Int
@@ -389,7 +389,6 @@ to a Node.
 "Returns the number of nodes of the `i`-th cell."
 @inline nnodes_per_cell(grid::AbstractGrid, i::Int=1) = nnodes(grid.cells[i])
 
-get_node_coordinate(grid, nodeid) = get_node_coordinate(getnodes(grid, nodeid))
 "Return the number type of the nodal coordinates."
 @inline get_coordinate_eltype(grid::AbstractGrid) = get_coordinate_eltype(first(getnodes(grid)))
 
@@ -682,41 +681,45 @@ function addnodeset!(grid::AbstractGrid, name::String, f::Function)
 end
 
 """
-    get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::Int)
-    get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::AbstractCell)
-
-Fills the vector `x` with the coordinates of a cell defined by either its cellid or the cell object itself.
+    getcoordinates(grid::AbstractGrid, idx::Union{Int,CellIndex})
+    getcoordinates(cache::CellCache)
+    
+Get a vector with the coordinates of the cell corresponding to `idx` or `cache`
 """
-@inline function get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T} 
-    cell = getcells(grid, cellid)
-    get_cell_coordinates!(x, grid, cell)
+@inline function getcoordinates(grid::AbstractGrid, idx::Int)
+    CT = get_coordinate_type(grid)
+    cell = getcells(grid, idx)
+    N = nnodes(cell)
+    x = Vector{CT}(undef, N)
+    getcoordinates!(x, grid, cell)
 end
+@inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
 
-@inline function get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim,T}
+"""
+    getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, idx::Union{Int,CellIndex})
+    getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, cell::AbstractCell)
+    
+Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
+"""
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim,T}
+    node_ids = get_node_ids(cell)
     @inbounds for i in 1:length(x)
-        x[i] = get_node_coordinate(grid, cell.nodes[i])
+        x[i] = get_node_coordinate(grid, node_ids[i])
     end
     return x
 end
-
-@inline get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = get_cell_coordinates!(x, grid, cell.idx)
-@inline get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, face::FaceIndex) where {dim, T} = get_cell_coordinates!(x, grid, face.idx[1])
-
-
-"""
-    get_cell_coordinates(grid::AbstractGrid, cell)
-Return a vector with the coordinates of the vertices of cell number `cell`.
-"""
-@inline function get_cell_coordinates(grid::AbstractGrid, cell::Int)
-    dim = getdim(grid)
-    T = get_coordinate_eltype(grid)
-    _cell = getcells(grid, cell)
-    N = nnodes(_cell)
-    x = Vector{Vec{dim, T}}(undef, N)
-    get_cell_coordinates!(x, grid, _cell)
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T} 
+    cell = getcells(grid, cellid)
+    getcoordinates!(x, grid, cell)
 end
-@inline get_cell_coordinates(grid::AbstractGrid, cell::CellIndex) = get_cell_coordinates(grid, cell.idx)
-@inline get_cell_coordinates(grid::AbstractGrid, face::FaceIndex) = get_cell_coordinates(grid, face.idx[1])
+@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
+
+"""
+    get_node_coordinate(grid::AbstractGrid, n::Int)
+    
+Return the coordinate of the `n`th node in `grid`
+"""
+get_node_coordinate(grid, n) = get_node_coordinate(getnodes(grid, n))
 
 function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
     cell = getcells(grid, i)
