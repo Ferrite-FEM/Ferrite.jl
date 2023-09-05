@@ -83,7 +83,9 @@ get_sides_and_base_indices(::Type{Quadrilateral}, ::Type{QuadraticQuadrilateral}
 get_sides_and_base_indices(::Type{QuadraticQuadrilateral}, ::Type{QuadraticQuadrilateral}) = ((:here,1), (:here,2), (:here,3), (:here,4), (:there,1), (:there,2), (:there,3), (:there,4), (:here,5), (:here,6), (:here,7), (:here,8), (:there,5), (:there,6), (:there,7), (:there,8), (:here,9), (:there,9))
 
 function get_node_ids(c::InterfaceCell)
-    return  collect( getproperty(c, side).nodes[baseindex] for (side, baseindex) in get_sides_and_base_indices(c) )
+    sni = get_sides_and_base_indices(c)
+    return ntuple( i -> getproperty(c, sni[i][1]).nodes[sni[i][2]], length(sni))
+    #return  collect( getproperty(c, side).nodes[baseindex] for (side, baseindex) in get_sides_and_base_indices(c) )
 end
 
 function Base.getproperty(c::InterfaceCell, s::Symbol)

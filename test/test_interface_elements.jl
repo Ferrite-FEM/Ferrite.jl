@@ -26,7 +26,7 @@
         @test Ferrite.nfaces(cell) == 2
         @test Ferrite.nnodes(cell) == Ferrite.nnodes(here) + Ferrite.nnodes(there)
         
-        @test Ferrite.get_node_ids(cell) == collect(1:Ferrite.nnodes(cell))
+        @test Ferrite.get_node_ids(cell) == ntuple(i -> i, Ferrite.nnodes(cell))
         @test Ferrite.vertices(cell) == (Ferrite.vertices(here)..., Ferrite.vertices(there)...)
         @test Ferrite.faces(cell) == (Ferrite.vertices(here), Ferrite.vertices(there))
     end
