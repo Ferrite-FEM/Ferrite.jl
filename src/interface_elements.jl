@@ -85,7 +85,6 @@ get_sides_and_base_indices(::Type{QuadraticQuadrilateral}, ::Type{QuadraticQuadr
 function get_node_ids(c::InterfaceCell)
     sni = get_sides_and_base_indices(c)
     return ntuple( i -> getproperty(c, sni[i][1]).nodes[sni[i][2]], length(sni))
-    #return  collect( getproperty(c, side).nodes[baseindex] for (side, baseindex) in get_sides_and_base_indices(c) )
 end
 
 function Base.getproperty(c::InterfaceCell, s::Symbol)
@@ -393,7 +392,7 @@ function get_base_value(get_value::Function, cv::InterfaceCellValues, qp::Int, i
     elseif side == :there && ! here
         return get_value(cv.there, qp, baseindex)
     else
-        return 0
+        return nothing
     end
 end
 
@@ -403,7 +402,13 @@ end
 Return the value of shape function `i` evaluated in quadrature point `qp`
 on side `here`, where `true` means "here" and `false` means "there".
 """
-shape_value(cv::InterfaceCellValues, qp::Int, i::Int, here::Bool) = get_base_value(shape_value, cv, qp, i, here)
+function shape_value(cv::InterfaceCellValues, qp::Int, i::Int, here::Bool)
+    val = get_base_value(shape_value, cv, qp, i, here)
+    if isnothing(val)
+        return zero(shape_value_type(cv))
+    end
+    return val
+end
 
 """
     shape_gradient(cv::InterfaceCellValues, qp::Int, i::Int, here::Bool)
@@ -411,7 +416,13 @@ shape_value(cv::InterfaceCellValues, qp::Int, i::Int, here::Bool) = get_base_val
 Return the gradient of shape function `i` evaluated in quadrature point `qp`
 on side `here`, where `true` means "here" and `false` means "there".
 """
-shape_gradient(cv::InterfaceCellValues, qp::Int, i::Int, here::Bool) = get_base_value(shape_gradient, cv, qp, i, here)
+function shape_gradient(cv::InterfaceCellValues, qp::Int, i::Int, here::Bool)
+    grad = get_base_value(shape_gradient, cv, qp, i, here)
+    if isnothing(grad)
+        return zero(shape_gradient_type(cv))
+    end
+    return grad
+end
 
 """
     shape_value_average(cv::InterfaceCellValues, qp::Int, i::Int)
@@ -455,4 +466,81 @@ for computing the gradient jump on an interface.
 function shape_gradient_jump(cv::InterfaceCellValues, qp::Int, i::Int)
     side, baseindex = get_side_and_baseindex(cv, i)
     return side == :here ? -shape_gradient(cv.here, qp, baseindex) : shape_gradient(cv.there, qp, baseindex)
+end
+
+shape_value_type(::InterfaceCellValues{<:Any, <:Any, <:Any, N_t}) where N_t = N_t
+shape_gradient_type(::InterfaceCellValues{<:Any, <:Any, <:Any, <:Any, dNdx_t}) where dNdx_t = dNdx_t
+
+"""
+    function_value(cv::InterfaceCellValues, qp::Int, u::AbstractVector, here::Bool)
+
+Compute the value of the function in a quadrature point on side `here`,
+where `true` means "here" and `false` means "there".
+`u` is a vector with values for the degrees of freedom.
+"""
+function function_value(cv::InterfaceCellValues, qp::Int, u::AbstractVector, here::Bool, dof_range = eachindex(u))
+    nbf = getnbasefunctions(cv)
+    length(dof_range) == nbf || throw_incompatible_dof_length(length(dof_range), nbf)
+    @boundscheck checkbounds(u, dof_range)
+    @boundscheck checkquadpoint(cv, qp)
+    val = function_value_init(cv, u)
+    @inbounds for (i, j) in pairs(dof_range)
+        val += shape_value(cv, qp, i, here) * u[j]
+    end
+    return val
+end
+
+"""
+    function_gradient(cv::InterfaceCellValues, qp::Int, u::AbstractVector, here::Bool)
+
+Compute the gradient of the function in a quadrature point on side `here`,
+where `true` means "here" and `false` means "there".
+`u` is a vector with values for the degrees of freedom.
+"""
+function function_gradient(cv::InterfaceCellValues, qp::Int, u::AbstractVector, here::Bool, dof_range = eachindex(u))
+    nbf = getnbasefunctions(cv)
+    length(dof_range) == nbf || throw_incompatible_dof_length(length(dof_range), nbf)
+    @boundscheck checkbounds(u, dof_range)
+    @boundscheck checkquadpoint(cv, qp)
+    grad = function_gradient_init(cv, u)
+    @inbounds for (i, j) in pairs(dof_range)
+        grad += shape_gradient(cv, qp, i, here) * u[j]
+    end
+    return grad
+end
+
+"""
+    function_value_average(cv::InterfaceCellValues, qp::Int, u::AbstractVector)
+
+Compute the average value of the function in a quadrature point.
+"""
+function function_value_average(cv::InterfaceCellValues, qp::Int, u::AbstractVector)
+    return (function_value(cv, qp, u, true) + function_value(cv, qp, u, false))/2
+end
+
+"""
+    function_gradient_average(cv::InterfaceCellValues, qp::Int, u::AbstractVector)
+
+Compute the average gradient of the function in a quadrature point.
+"""
+function function_gradient_average(cv::InterfaceCellValues, qp::Int, u::AbstractVector)
+    return (function_gradient(cv, qp, u, true) + function_gradient(cv, qp, u, false))/2
+end
+
+"""
+    function_value_jump(cv::InterfaceCellValues, qp::Int, u::AbstractVector)
+
+Compute the jump of the function value in a quadrature point.
+"""
+function function_value_jump(cv::InterfaceCellValues, qp::Int, u::AbstractVector)
+    return function_value(cv, qp, u, false) - function_value(cv, qp, u, true)
+end
+
+"""
+    function_gradient_jump(cv::InterfaceCellValues, qp::Int, u::AbstractVector)
+
+Compute the jump of the function gradient in a quadrature point.
+"""
+function function_gradient_jump(cv::InterfaceCellValues, qp::Int, u::AbstractVector)
+    return function_gradient(cv, qp, u, false) - function_gradient(cv, qp, u, true)
 end

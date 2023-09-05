@@ -32,8 +32,6 @@
     end
 end
 
-
-
 @testset "InterfaceCellInterpolation" begin
     for (iphere, ipthere, sdim, rdim, shape, rshape) in (
             (Lagrange{RefTriangle, 1}(), Lagrange{RefTriangle, 1}(), 3, 2, RefPrism, RefTriangle), 
@@ -52,7 +50,6 @@ end
     end
 end
 
-
 @testset "InterfaceCellValues" begin
     qr = QuadratureRule{RefTriangle}(1)
     for (fip, gip) in ( (InterfaceCellInterpolation(Lagrange{RefTriangle, 1}()), InterfaceCellInterpolation(Lagrange{RefTriangle, 1}())),
@@ -67,6 +64,24 @@ end
         @test InterfaceCellValues(qr, fip, gip^3) isa InterfaceCellValues
         @test InterfaceCellValues(qr, fip^3, gip) isa InterfaceCellValues
         @test InterfaceCellValues(qr, fip^3, gip^3) isa InterfaceCellValues
+    end
+
+    ip = InterfaceCellInterpolation(Lagrange{RefTriangle, 1}())
+    cv = InterfaceCellValues(qr, ip)
+    x = repeat([rand(Vec{3}), rand(Vec{3}), rand(Vec{3})], 2)
+    reinit!(cv, x)
+    nbf = getnbasefunctions(cv)
+    here, there = rand(2)
+    u = vcat(ones(nbf÷2).*here, ones(nbf÷2).*there)
+    for qp in 1:getnquadpoints(cv)
+        @test function_value(cv, qp, u, true) ≈ here
+        @test function_value(cv, qp, u, false) ≈ there
+        @test all(abs.(function_gradient(cv, qp, u, true)) .≤ 1e-14)
+        @test all(abs.(function_gradient(cv, qp, u, false)) .≤ 1e-14)
+        @test function_value_average(cv, qp, u) ≈ (here+there)/2
+        @test function_value_jump(cv, qp, u) ≈ there-here
+        @test all(abs.(function_gradient_average(cv, qp, u)) .≤ 1e-14)
+        @test all(abs.(function_gradient_jump(cv, qp, u)) .≤ 1e-14)
     end
 end
 
@@ -237,8 +252,6 @@ end
     end
 end
 
-
-
 @testset "Test-example for vector field" begin
     @testset "ip-order=$order" for order in ((1,1), (2,2), (1,2))
         δ(i,j) = i == j ? 1.0 : 0.0
@@ -321,13 +334,13 @@ end
             side, bi = get_side_and_baseindex(icv, i)
             if side == :here
                 @test shape_value(icv, qp, i, true) == shape_value(icv.here, qp, bi)
-                @test shape_value(icv, qp, i, false) == 0
+                @test shape_value(icv, qp, i, false) == zero(Vec{3})
                 @test shape_value_average(icv, qp, i) == 0.5*shape_value(icv.here, qp, bi)
                 @test shape_gradient_average(icv, qp, i) == 0.5*shape_gradient(icv.here, qp, bi)
                 @test shape_value_jump(icv, qp, i) == -shape_value(icv.here, qp, bi)
                 @test shape_gradient_jump(icv, qp, i) == -shape_gradient(icv.here, qp, bi)
             else
-                @test shape_value(icv, qp, i, true) == 0
+                @test shape_value(icv, qp, i, true) == zero(Vec{3})
                 @test shape_value(icv, qp, i, false) == shape_value(icv.there, qp, bi)
                 @test shape_value_average(icv, qp, i) == 0.5*shape_value(icv.there, qp, bi)
                 @test shape_gradient_average(icv, qp, i) == 0.5*shape_gradient(icv.there, qp, bi)
