@@ -11,7 +11,7 @@ the wild".
 
 ---
 
-#### [Helmholtz equation](../helmholtz/)
+#### [Helmholtz equation](helmholtz.md)
 
 Solves the Helmholtz equation on the unit square using a combination of Dirichlet and
 Neumann boundary conditions and the method of manufactured solutions.
@@ -20,18 +20,18 @@ Neumann boundary conditions and the method of manufactured solutions.
 
 ---
 
-#### [Nearly incompressible hyperelasticity](../quasi_incompressible_hyperelasticity/)
+#### [Nearly incompressible hyperelasticity](quasi_incompressible_hyperelasticity.md)
 
 This program combines the ideas from [Tutorial 3: Incompressible
-elasticity](../../tutorials/incompressible_elasticity/) and [Tutorial 4:
-Hyperelasticity](../../tutorials/incompressible_elasticity/) to construct a mixed element
+elasticity](../tutorials/incompressible_elasticity.md) and [Tutorial 4:
+Hyperelasticity](../tutorials/incompressible_elasticity.md) to construct a mixed element
 solving three-dimensional displacement-pressure equations.
 
 *Contributed by*: Bhavesh Shrimali ([@bhaveshshrimali](https://github.com/bhaveshshrimali)).
 
 ---
 
-#### [Ginzburg-Landau model energy minimization](../landau/)
+#### [Ginzburg-Landau model energy minimization](landau.md)
 
 A basic Ginzburg-Landau model is solved.
 [ForwardDiff.jl](https://github.com/JuliaDiff/ForwardDiff.jl) is used to compute the
@@ -42,7 +42,7 @@ assembly procedure.
 
 ---
 
-#### [Topology optimization](../topology_optimization/)
+#### [Topology optimization](topology_optimization.md)
 
 Topology optimization is shown for the bending problem by using a SIMP material model. To
 avoid numerical instabilities, a regularization scheme requiring the calculation of the
