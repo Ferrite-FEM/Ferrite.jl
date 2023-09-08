@@ -47,42 +47,42 @@ InterfaceValues
 struct InterfaceValues{FVA, FVB} <: AbstractValues
     face_values_a::FVA
     face_values_b::FVB
-    interface_transformation::InterfaceTransformation
 end
 function InterfaceValues(quad_rule_a::FaceQuadratureRule, func_interpol_a::Interpolation,
     geom_interpol_a::Interpolation = func_interpol_a; quad_rule_b::FaceQuadratureRule = deepcopy(quad_rule_a),
     func_interpol_b::Interpolation = func_interpol_a, geom_interpol_b::Interpolation = func_interpol_b)
     face_values_a = FaceValues(quad_rule_a, func_interpol_a, geom_interpol_a)
     face_values_b = FaceValues(quad_rule_b, func_interpol_b, geom_interpol_b)
-    return InterfaceValues{typeof(face_values_a), typeof(face_values_b)}(face_values_a, face_values_b, InterfaceTransformation())
+    return InterfaceValues{typeof(face_values_a), typeof(face_values_b)}(face_values_a, face_values_b)
 end
 
 """
-    reinit!(iv::InterfaceValues, face_a::FaceIndex, face_b::FaceIndex, cell_a_coords::AbstractVector{Vec{dim, T}}, cell_b_coords::AbstractVector{Vec{dim, T}}, grid::AbstractGrid) where {dim, T}
+    reinit!(iv::InterfaceValues, face_a::Int, face_b::Int, cell_a_coords::AbstractVector{Vec{dim, T}}, cell_b_coords::AbstractVector{Vec{dim, T}}, cell_a::AbstractCell, cell_b::AbstractCell)
 
 Update the [`FaceValues`](@ref) in the interface (A and B) using their corresponding cell coordinates and [`FaceIndex`](@ref). This involved recalculating the transformation matrix [`transform_interface_point`](@ref)
 and mutating element B's quadrature points and its [`FaceValues`](@ref) `M, N, dMdξ, dNdξ`.
 """
-function reinit!(iv::InterfaceValues, face_a::FaceIndex, face_b::FaceIndex, cell_a_coords::AbstractVector{Vec{dim, T}}, cell_b_coords::AbstractVector{Vec{dim, T}}, grid::AbstractGrid) where {dim, T}
-    reinit!(iv.face_values_a, cell_a_coords, face_a[2])
-    iv.face_values_b.current_face[] = face_b[2]
-    update_interface_transformation!(iv.interface_transformation, grid, face_a, face_b)
-    quad_points_a = getpoints(iv.face_values_a.qr, face_a[2])
-    quad_points_b = getpoints(iv.face_values_b.qr, face_b[2])
-    transform_interface_points!(quad_points_b, iv, quad_points_a, grid, face_a, face_b)
-    @boundscheck checkface(iv.face_values_b, face_b[2])
+function reinit!(iv::InterfaceValues, face_a::Int, face_b::Int, cell_a_coords::AbstractVector{Vec{dim, T}}, cell_b_coords::AbstractVector{Vec{dim, T}}, cell_a::AbstractCell, cell_b::AbstractCell) where {dim, T}
+    reinit!(iv.face_values_a, cell_a_coords, face_a)
+    dim == 1 && return reinit!(iv.face_values_b, cell_b_coords, face_b) 
+    iv.face_values_b.current_face[] = face_b
+    interface_transformation = InterfaceTransformation(cell_a, cell_b, face_a, face_b)
+    quad_points_a = getpoints(iv.face_values_a.qr, face_a)
+    quad_points_b = getpoints(iv.face_values_b.qr, face_b)
+    transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
+    @boundscheck checkface(iv.face_values_b, face_b)
     # This is the bottleneck, cache it?
     for (idx, qp) in pairs(quad_points_b)
         gradients_and_values = shape_gradients_and_values(iv.face_values_b.func_interp, qp)
-        iv.face_values_b.dNdξ[:,idx, face_b[2]] .= getindex.(gradients_and_values,1)
-        iv.face_values_b.N[:, idx, face_b[2]] .= getindex.(gradients_and_values,2)
+        iv.face_values_b.dNdξ[:,idx, face_b] .= getindex.(gradients_and_values,1)
+        iv.face_values_b.N[:, idx, face_b] .= getindex.(gradients_and_values,2)
     end
     for (idx, qp) in pairs(quad_points_b)
         gradients_and_values = shape_gradients_and_values(iv.face_values_b.geo_interp, qp)
-        iv.face_values_b.dMdξ[:,idx, face_b[2]] .= getindex.(gradients_and_values,1)
-        iv.face_values_b.M[:, idx, face_b[2]] .= getindex.(gradients_and_values,2)
+        iv.face_values_b.dMdξ[:,idx, face_b] .= getindex.(gradients_and_values,1)
+        iv.face_values_b.M[:, idx, face_b] .= getindex.(gradients_and_values,2)
     end
-    reinit!(iv.face_values_b, cell_b_coords, face_b[2])
+    reinit!(iv.face_values_b, cell_b_coords, face_b)
 end
 
 """
@@ -249,8 +249,45 @@ for (func,                          f_,                 ) in (
     end
 end
 
+"""
+    get_transformation_matrix(interface_transformation::InterfaceTransformation)
+
+Returns the transformation matrix corresponding to the interface information stored in `InterfaceTransformation`.
+"""
+get_transformation_matrix
+
+function get_transformation_matrix(interface_transformation::InterfaceTransformation{4})
+    flipped = interface_transformation.flipped
+    shift_index = interface_transformation.shift_index
+    lowest_node_shift_index = interface_transformation.lowest_node_shift_index
+    θ = shift_index/2
+    θpre = lowest_node_shift_index/2
+    flipping = SMatrix{3,3}(0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+    M = flipped ? rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) :  rotation_matrix_pi(θ) 
+    return M
+end
+
+function get_transformation_matrix(interface_transformation::InterfaceTransformation{3})
+    flipped = interface_transformation.flipped
+    shift_index = interface_transformation.shift_index
+    lowest_node_shift_index = interface_transformation.lowest_node_shift_index
+    θ = 2/3 * shift_index
+    θpre = 2/3 * lowest_node_shift_index
+    
+    flipping = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0)
+
+    translate_1 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2/3)/3, -0.5, 1.0) 
+    stretch_1 = SMatrix{3,3}(sinpi(2/3), 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0) 
+
+    translate_2 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2/3)/3, 0.5, 1.0) 
+    stretch_2 = SMatrix{3,3}(1/sinpi(2/3), -1/2/sinpi(2/3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0) 
+
+    M = flipped ? stretch_2 * translate_2 * rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) * translate_1 * stretch_1 : stretch_2 * translate_2 * rotation_matrix_pi(θ) * translate_1 * stretch_1
+    return M
+end
+
 @doc raw"""
-    transform_interface_points!(dst::Vector{Vec{dim, Float64}}, iv::InterfaceValues, points::Vector{Vec{dim, Float64}}, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex)
+    transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceTransformation)
 
 Transform the points from face A to face B using the orientation information of the interface and store it in the vecotr dst.
 For 3D, the faces are transformed to regular polygons such that the rotation angle is the shift in reference node index × 2π ÷ number of edges in face.
@@ -311,43 +348,34 @@ y      |   \
 → x    1-----2  
 ```
 """
-function transform_interface_points!(dst::Vector{Vec{dim, Float64}}, iv::InterfaceValues, points::Vector{Vec{dim, Float64}}, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex) where {dim}
-    cell = getcells(grid)[face_a[1]]
-    face = iv.face_values_a.current_face[]
-    flipped = iv.interface_transformation.flipped
-    shift_index = iv.interface_transformation.shift_index
-    lowest_node_shift_index = iv.interface_transformation.lowest_node_shift_index
-    if dim == 3
-        if length(faces(cell)[face]) == 3
-            θ = 2/3 * shift_index
-            θpre = 2/3 * lowest_node_shift_index
-            
-            flipping = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0)
+transform_interface_points!
+
+function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceTransformation)
+    cell_a_refshape = interface_transformation.cell_a_refshape
+    cell_b_refshape = interface_transformation.cell_b_refshape
+    face_a = interface_transformation.face_a_index
+    face_b = interface_transformation.face_b_index
     
-            translate_1 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2/3)/3, -0.5, 1.0) 
-            stretch_1 = SMatrix{3,3}(sinpi(2/3), 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0) 
+    M = get_transformation_matrix(interface_transformation)
+    for (idx, point) in pairs(points)
+        point = element_to_face_transformation(point, cell_a_refshape, face_a)
+        result = M * Vec(point[1],point[2], 1.0)
+        dst[idx] = face_to_element_transformation(Vec(result[1],result[2]), cell_b_refshape, face_b)
+    end
+    return nothing
+end
+
+function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vector{Vec{2, Float64}}, interface_transformation::InterfaceTransformation{2})
+    flipped = interface_transformation.flipped
+    cell_a_refshape = interface_transformation.cell_a_refshape
+    cell_b_refshape = interface_transformation.cell_b_refshape
+    face_a = interface_transformation.face_a_index
+    face_b = interface_transformation.face_b_index
     
-            translate_2 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2/3)/3, 0.5, 1.0) 
-            stretch_2 = SMatrix{3,3}(1/sinpi(2/3), -1/2/sinpi(2/3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0) 
-    
-            M = flipped ? stretch_2 * translate_2 * rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) * translate_1 * stretch_1 : stretch_2 * translate_2 * rotation_matrix_pi(θ) * translate_1 * stretch_1
-        else # length(faces(cell)[face]) == 4
-            θ = shift_index/2
-            θpre = lowest_node_shift_index/2
-            flipping = SMatrix{3,3}(0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
-            M = flipped ? rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) :  rotation_matrix_pi(θ) 
-        end
-        for (idx, point) in pairs(points)
-            point = element_to_face_transformation(point, getrefshape(cell), face)
-            result = M * Vec(point[1],point[2], 1.0)
-            dst[idx] = face_to_element_transformation(Vec(result[1],result[2]), getrefshape(getcells(grid)[face_b[1]]), iv.face_values_b.current_face[])
-        end
-    else
-        for (idx, point) in pairs(points)
-            point = element_to_face_transformation(point, getrefshape(cell), face)
-            dim == 2 && flipped && (point *= -1) 
-            dst[idx] = face_to_element_transformation(point, getrefshape(getcells(grid)[face_b[1]]), iv.face_values_b.current_face[])
-        end
+    for (idx, point) in pairs(points)
+        point = element_to_face_transformation(point, cell_a_refshape, face_a)
+        flipped && (point *= -1) 
+        dst[idx] = face_to_element_transformation(point, cell_b_refshape, face_b)
     end
     return nothing
 end

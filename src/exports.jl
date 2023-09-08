@@ -134,7 +134,7 @@ export
     PeriodicFacePair,
     AffineConstraint,
     update!,
-    update_interface_transformation!,
+    InterfaceTransformation,
     apply!,
     apply_rhs!,
     get_rhs_data,

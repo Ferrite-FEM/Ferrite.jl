@@ -862,42 +862,35 @@ which are flipped against each other, note that face B has its reference node sh
 so the face is tranformed into an equilateral triangle then rotated 120°, flipped about the x axis then
 rotated -120° and tranformed back to the reference triangle.Any combination of these can happen. 
 """
-mutable struct InterfaceTransformation
+struct InterfaceTransformation{nfacenodes}
     flipped::Bool
     shift_index::Int
     lowest_node_shift_index::Int
-end
-
-InterfaceTransformation() = InterfaceTransformation(false, 0, 0)
-
-function Base.copy(it::InterfaceTransformation)
-    return InterfaceTransformation(copy(it.flipped), copy(it.shift_index), copy(it.lowest_node_shift_index))
+    # Used to dispatch the correct 2/3D -> 3/2D Transformations
+    cell_a_refshape::Type{<:AbstractRefShape}
+    face_a_index::Int
+    cell_b_refshape::Type{<:AbstractRefShape}
+    face_b_index::Int
 end
 
 """
-    update_interface_transformation!(interface_transformation::InterfaceTransformation, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex)
+    InterfaceTransformation(cell_a::AbstractCell, cell_b::AbstractCell, face_a::Int, face_b::Int)
 
-Update the orientation info for the interface defined by face A and face B.
+Return the orientation info for the interface defined by face A and face B.
 """
-function update_interface_transformation!(interface_transformation::InterfaceTransformation, grid::AbstractGrid, face_a::FaceIndex, face_b::FaceIndex)
-    cell_a = getcells(grid, face_a[1])
-    getdim(cell_a) == 1 && return nothing # No need to transform
-    cell_b = getcells(grid, face_b[1])
+function InterfaceTransformation(cell_a::AbstractCell, cell_b::AbstractCell, face_a::Int, face_b::Int)
+    getdim(cell_a) == 1 && return InterfaceTransformation{2}(false, 0, 0, getrefshape(cell_a), face_a, getrefshape(cell_b), face_b)
 
-    nodes_a = faces(cell_a)[face_a[2]]
-    nodes_b = faces(cell_b)[face_b[2]]
+    nodes_a = faces(cell_a)[face_a]
+    nodes_b = faces(cell_b)[face_b]
 
     min_idx_a = argmin(nodes_a)
     min_idx_b = argmin(nodes_b)
 
     shift_index = min_idx_b - min_idx_a
     flipped = getdim(cell_a) == 2 ? shift_index != 0 : nodes_a[min_idx_a != 1 ? min_idx_a - 1 : end] != nodes_b[min_idx_b != 1 ? min_idx_b - 1 : end]
-        
-    interface_transformation.flipped =  flipped  
-    interface_transformation.shift_index = shift_index
-    interface_transformation.lowest_node_shift_index = 1 - min_idx_b
 
-    return nothing
+    return InterfaceTransformation{length(nodes_a)}(flipped, shift_index, 1 - min_idx_b, getrefshape(cell_a), face_a, getrefshape(cell_b), face_b)
 end
 
 # This looks out of place, move it to Tensors.jl or use the one defined there with higher error? *Using sinpi and cospi makes tetrahedon custom quadrature points interface values test pass
