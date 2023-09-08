@@ -69,9 +69,6 @@ getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.face_values_a.qr, iv.fac
 Return the product between the determinant of the Jacobian and the quadrature
 point weight for the given quadrature point: ``\\det(J(\\mathbf{x})) w_q``.
 
-`here` determines which element to use for `detJdV`.
-`true` uses the element A's face of the interface, which is the default, and `false` uses element B's.
-
 This value is typically used when one integrates a function on a
 finite element cell or face as
 
@@ -100,10 +97,6 @@ quadrature point `q_point`.
 """
 @propagate_inbounds geometric_value(cv::CellValues, q_point::Int, base_func::Int) = cv.M[base_func, q_point]
 @propagate_inbounds geometric_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_face[]]
-@propagate_inbounds function geometric_value(iv::InterfaceValues, q_point::Int, base_func::Int) 
-    nbf_a = getngeobasefunctions(iv.face_values_a)
-    return base_func <= nbf_a ? geometric_value(iv.face_values_a, q_point, base_func) : geometric_value(iv.face_values_b, q_point, base_func - nbf_a)
-end
 
 """
     shape_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)

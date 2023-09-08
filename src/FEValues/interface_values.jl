@@ -132,29 +132,11 @@ This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- 
 """
 shape_gradient_jump
 
-"""
-    geometric_value_average(iv::InterfaceValues, qp::Int, base_function::Int)
-
-Compute the average of the geometric interpolation shape function value at the quadrature point on interface.
-"""
-geometric_value_average
-
-"""
-    geometric_value_jump(iv::InterfaceValues, qp::Int, base_function::Int)
-
-Compute the jump of the geometric interpolation shape function value at the quadrature point over the interface.
-
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+``. to obtain the form 
-``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- ⋅ \\vec{n}^- + \\vec{v}^+ ⋅ \\vec{n}^+``one can simple multiply by the normal of face A (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
-"""
-geometric_value_jump
-
 for (func,                      f_,                 multiplier, ) in (
     (:shape_value,              :shape_value,       :(1),       ),
     (:shape_value_average,      :shape_value,       :(0.5),     ),
     (:shape_gradient,           :shape_gradient,    :(1),       ),
     (:shape_gradient_average,   :shape_gradient,    :(0.5),     ),
-    (:geometric_value_average,  :geometric_value,   :(0.5),     ),
 )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, i::Int)
@@ -177,7 +159,6 @@ end
 for (func,                      f_,                 ) in (
     (:shape_value_jump,         :shape_value,       ),
     (:shape_gradient_jump,      :shape_gradient,    ),
-    (:geometric_value_jump,     :geometric_value,   ),
 )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, i::Int)
