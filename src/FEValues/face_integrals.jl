@@ -10,6 +10,7 @@ face_to_element_transformation
     element_to_face_transformation(point::AbstractVector, cell::AbstractCell{AbstractRefShape}, face::Int)
 
 Transform quadrature point from cell's coordinates to the face's reference coordinates, decreasing the number of dimensions by one.
+This is the inverse of `face_to_element_transformation`.
 """
 element_to_face_transformation
 
