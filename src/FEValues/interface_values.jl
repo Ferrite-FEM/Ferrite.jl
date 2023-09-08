@@ -72,17 +72,13 @@ function reinit!(iv::InterfaceValues, face_a::Int, face_b::Int, cell_a_coords::A
     transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
     @boundscheck checkface(iv.face_values_b, face_b)
     # This is the bottleneck, cache it?
-    for (idx, qp) in pairs(quad_points_b)
-        gradients_and_values = shape_gradients_and_values(iv.face_values_b.func_interp, qp)
-        iv.face_values_b.dNdξ[:,idx, face_b] .= getindex.(gradients_and_values,1)
-        iv.face_values_b.N[:, idx, face_b] .= getindex.(gradients_and_values,2)
+    for idx in eachindex(IndexCartesian(), @view iv.face_values_b.N[:, :, face_b[2]])
+        iv.face_values_b.dNdξ[idx, face_b[2]], iv.face_values_b.N[idx, face_b[2]] = shape_gradient_and_value(iv.face_values_b.func_interp, quad_points_b[idx[2]], idx[1])
     end
-    for (idx, qp) in pairs(quad_points_b)
-        gradients_and_values = shape_gradients_and_values(iv.face_values_b.geo_interp, qp)
-        iv.face_values_b.dMdξ[:,idx, face_b] .= getindex.(gradients_and_values,1)
-        iv.face_values_b.M[:, idx, face_b] .= getindex.(gradients_and_values,2)
-    end
-    reinit!(iv.face_values_b, cell_b_coords, face_b)
+    for idx in eachindex(IndexCartesian(), @view iv.face_values_b.M[:, :, face_b[2]])
+        iv.face_values_b.dMdξ[idx, face_b[2]], iv.face_values_b.M[idx, face_b[2]] = shape_gradient_and_value(iv.face_values_b.geo_interp, quad_points_b[idx[2]], idx[1])
+    end  
+    reinit!(iv.face_values_b, cell_b_coords, face_b[2])
 end
 
 """
