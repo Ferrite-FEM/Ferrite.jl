@@ -8,8 +8,8 @@
 
         for ic in InterfaceIterator(grid)
             reinit!(iv, ic)
-            cell_a_coords = get_cell_coordinates(ic.a.cc)
-            cell_b_coords = get_cell_coordinates(ic.b.cc)
+            cell_a_coords = getcoordinates(ic.a.cc)
+            cell_b_coords = getcoordinates(ic.b.cc)
             
             nqp = getnquadpoints(iv)
             # Should have same quadrature points

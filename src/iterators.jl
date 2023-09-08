@@ -205,7 +205,7 @@ function reinit!(cache::InterfaceCache, face_a::FaceIndex, face_b::FaceIndex)
 end
 
 reinit!(iv::InterfaceValues, ic::InterfaceCache) = reinit!(iv, FaceIndex(cellid(ic.a), ic.a.current_faceid[]),
-    FaceIndex(cellid(ic.b), ic.b.current_faceid[]), get_cell_coordinates(ic.a), get_cell_coordinates(ic.b), ic.a.cc.grid)
+    FaceIndex(cellid(ic.b), ic.b.current_faceid[]), getcoordinates(ic.a), getcoordinates(ic.b), ic.a.cc.grid)
 
 interfacedofs(ic::InterfaceCache) = ic.dofs
 
