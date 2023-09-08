@@ -64,7 +64,7 @@
             # Test function* copied from facevalues tests
             nbf_a = Ferrite.getngeobasefunctions(iv.face_values_a)
             nbf_b = Ferrite.getngeobasefunctions(iv.face_values_b)
-            for use_element_a in (true, false)
+            for here in (true, false)
                 u_a = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1: nbf_a]
                 u_b = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1: nbf_b]
                 u_scal_a = zeros(nbf_a)
@@ -81,24 +81,24 @@
                     u_b[i] = H ⋅ xs[i]
                     u_scal_b[i] = V ⋅ xs[i]
                 end
-                u = use_element_a ? u_a : u_b
-                u_scal = use_element_a ? u_scal_a : u_scal_b
+                u = here ? u_a : u_b
+                u_scal = here ? u_scal_a : u_scal_b
                 for i in 1:getnquadpoints(iv)
-                    @test function_gradient(iv, i, u, use_element_a = use_element_a) ≈ H
-                    @test function_symmetric_gradient(iv, i, u, use_element_a = use_element_a) ≈ 0.5(H + H')
-                    @test function_divergence(iv, i, u_scal, use_element_a = use_element_a) ≈ sum(V)
-                    @test function_divergence(iv, i, u, use_element_a = use_element_a) ≈ tr(H)
-                    @test function_gradient(iv, i, u_scal, use_element_a = use_element_a) ≈ V
-                    ndim == 3 && @test function_curl(iv, i, u, use_element_a = use_element_a) ≈ Ferrite.curl_from_gradient(H)
+                    @test function_gradient(iv, i, u, here = here) ≈ H
+                    @test function_symmetric_gradient(iv, i, u, here = here) ≈ 0.5(H + H')
+                    @test function_divergence(iv, i, u_scal, here = here) ≈ sum(V)
+                    @test function_divergence(iv, i, u, here = here) ≈ tr(H)
+                    @test function_gradient(iv, i, u_scal, here = here) ≈ V
+                    ndim == 3 && @test function_curl(iv, i, u, here = here) ≈ Ferrite.curl_from_gradient(H)
 
-                    @test function_value_average(iv, i, u_scal_a, u_scal_b) ≈ function_value(iv, i, u_scal, use_element_a = use_element_a)
+                    @test function_value_average(iv, i, u_scal_a, u_scal_b) ≈ function_value(iv, i, u_scal, here = here)
                     @test all(function_value_jump(iv, i, u_scal_a, u_scal_b) .<= 30 * eps(Float64))
-                    @test function_gradient_average(iv, i, u_scal_a, u_scal_b) ≈ function_gradient(iv, i, u_scal, use_element_a = use_element_a)
+                    @test function_gradient_average(iv, i, u_scal_a, u_scal_b) ≈ function_gradient(iv, i, u_scal, here = here)
                     @test all(function_gradient_jump(iv, i, u_scal_a, u_scal_b) .<= 30 * eps(Float64))
 
-                    @test function_value_average(iv, i, u_a, u_b) ≈ function_value(iv, i, u, use_element_a = use_element_a)
+                    @test function_value_average(iv, i, u_a, u_b) ≈ function_value(iv, i, u, here = here)
                     @test all(function_value_jump(iv, i, u_a, u_b) .<= 30 * eps(Float64))
-                    @test function_gradient_average(iv, i, u_a, u_b) ≈ function_gradient(iv, i, u, use_element_a = use_element_a)
+                    @test function_gradient_average(iv, i, u_a, u_b) ≈ function_gradient(iv, i, u, here = here)
                     @test all(function_gradient_jump(iv, i, u_a, u_b) .<= 30 * eps(Float64))
 
                 end
@@ -108,9 +108,9 @@
                     vol += getdetJdV(iv, i)
                 end
                 
-                xs = use_element_a ? cell_a_coords : cell_b_coords
-                x_face = xs[[Ferrite.dirichlet_facedof_indices(use_element_a ? ip_a : ip_b)[use_element_a ? Ferrite.getcurrentface(iv.face_values_a) : Ferrite.getcurrentface(iv.face_values_b)]...]]
-                @test vol ≈ calculate_face_area(use_element_a ? ip_a : ip_b, x_face, use_element_a ? Ferrite.getcurrentface(iv.face_values_a) : Ferrite.getcurrentface(iv.face_values_b))
+                xs = here ? cell_a_coords : cell_b_coords
+                x_face = xs[[Ferrite.dirichlet_facedof_indices(here ? ip_a : ip_b)[here ? Ferrite.getcurrentface(iv.face_values_a) : Ferrite.getcurrentface(iv.face_values_b)]...]]
+                @test vol ≈ calculate_face_area(here ? ip_a : ip_b, x_face, here ? Ferrite.getcurrentface(iv.face_values_a) : Ferrite.getcurrentface(iv.face_values_b))
             end
         end
     end

@@ -86,14 +86,14 @@ function reinit!(iv::InterfaceValues, face_a::FaceIndex, face_b::FaceIndex, cell
 end
 
 """
-    getnormal(iv::InterfaceValues, qp::Int, use_element_a::Bool = true)
+    getnormal(iv::InterfaceValues, qp::Int, here::Bool = true)
 
 Return the normal at the quadrature point `qp` on the interface. 
 
 For `InterfaceValues`, `use_elemet_a` determines which element to use for calculating divergence of the function.
 `true` uses the element A's face nomal vector, while `false` uses element B's, which is the default.
 """
-getnormal(iv::InterfaceValues, qp::Int, use_element_a::Bool = false) = use_element_a ? iv.face_values_a.normals[qp] : iv.face_values_b.normals[qp]
+getnormal(iv::InterfaceValues, qp::Int, here::Bool = false) = here ? iv.face_values_a.normals[qp] : iv.face_values_b.normals[qp]
 
 """
     shape_value_average(iv::InterfaceValues, qp::Int, base_function::Int)
@@ -228,8 +228,8 @@ for (func,                          f_,                 ) in (
 )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
-            f_value_here = $(f_)(iv, qp, u_a, dof_range_a, use_element_a = true)
-            f_value_there = $(f_)(iv, qp, u_b, dof_range_b, use_element_a = false)
+            f_value_here = $(f_)(iv, qp, u_a, dof_range_a, here = true)
+            f_value_there = $(f_)(iv, qp, u_b, dof_range_b, here = false)
             fv = iv.face_values_a
             result = 0.5 * f_value_here 
             fv = iv.face_values_b
@@ -238,8 +238,8 @@ for (func,                          f_,                 ) in (
         end
         # TODO: Deprecate this, nobody is using this in practice...
         function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector{<:Vec}, u_b::AbstractVector{<:Vec})
-            f_value_here = $(f_)(iv, qp, u_a, use_element_a = true)
-            f_value_there = $(f_)(iv, qp, u_b, use_element_a = false)
+            f_value_here = $(f_)(iv, qp, u_a, here = true)
+            f_value_there = $(f_)(iv, qp, u_b, here = false)
             fv = iv.face_values_a
             result = 0.5 * f_value_here
             fv = iv.face_values_b
@@ -255,14 +255,14 @@ for (func,                          f_,                 ) in (
 )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
-            f_value_here = $(f_)(iv, qp, u_a, dof_range_a, use_element_a = true)
-            f_value_there = $(f_)(iv, qp, u_b, dof_range_b, use_element_a = false)
+            f_value_here = $(f_)(iv, qp, u_a, dof_range_a, here = true)
+            f_value_there = $(f_)(iv, qp, u_b, dof_range_b, here = false)
             return f_value_there - f_value_here 
         end
         # TODO: Deprecate this, nobody is using this in practice...
         function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector{<:Vec}, u_b::AbstractVector{<:Vec})
-            f_value_here = $(f_)(iv, qp, u_a, use_element_a = true)
-            f_value_there = $(f_)(iv, qp, u_b, use_element_a = false)
+            f_value_here = $(f_)(iv, qp, u_a, here = true)
+            f_value_there = $(f_)(iv, qp, u_b, here = false)
             return f_value_there - f_value_here 
         end
     end
