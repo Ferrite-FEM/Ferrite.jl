@@ -517,6 +517,18 @@ function test_subparametric_triangle()
     @test celldofs(dh, 1) == [i for i in 1:12]
 end
 
+function test_celliterator_subdomain()
+    grid = generate_grid(Quadrilateral, (2,1)) # 2 cells
+    dh = DofHandler(grid)
+    sdh = SubDofHandler(dh, Set(2)) # only cell 2, cell 1 is not part of dh at all
+    add!(sdh, :u, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
+
+    ci = CellIterator(sdh)
+    reinit!(ci.cc, 2)
+    @test celldofs(ci.cc) == collect(1:4)
+end
+
 function test_separate_fields_on_separate_domains()
     # 5_______6
     # |\      | 
@@ -619,5 +631,6 @@ end
     test_mixed_grid_show()
     test_separate_fields_on_separate_domains();
     test_unique_cellsets()
+    test_celliterator_subdomain()
     test_show()
 end
