@@ -56,6 +56,19 @@ function InterfaceValues(quad_rule_a::FaceQuadratureRule, func_interpol_a::Inter
     return InterfaceValues{typeof(face_values_a), typeof(face_values_b)}(face_values_a, face_values_b)
 end
 
+getnbasefunctions(iv::InterfaceValues) = getnbasefunctions(iv.face_values_a) + getnbasefunctions(iv.face_values_b)
+getngeobasefunctions(iv::InterfaceValues) = getngeobasefunctions(iv.face_values_a) + getngeobasefunctions(iv.face_values_b)
+
+"""
+    getnquadpoints(iv::InterfaceValues)
+
+Return the number of quadrature points in `iv`s element A's [`FaceValues`](@ref)' quadrature for the current
+(most recently [`reinit!`](@ref)ed) interface.
+"""
+getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.face_values_a.qr, iv.face_values_a.current_face[])
+
+@propagate_inbounds getdetJdV(iv::InterfaceValues, q_point::Int) = getdetJdV(iv.face_values_a, q_point)
+
 """
     reinit!(iv::InterfaceValues, face_a::Int, face_b::Int, cell_a_coords::AbstractVector{Vec{dim, T}}, cell_b_coords::AbstractVector{Vec{dim, T}}, cell_a::AbstractCell, cell_b::AbstractCell)
 
@@ -92,6 +105,102 @@ For `InterfaceValues`, `use_elemet_a` determines which element to use for calcul
 `true` uses the element A's face nomal vector, while `false` uses element B's, which is the default.
 """
 getnormal(iv::InterfaceValues, qp::Int, here::Bool = false) = here ? iv.face_values_a.normals[qp] : iv.face_values_b.normals[qp]
+
+"""
+    function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
+
+Compute the value of the function in a quadrature point. `u` is a vector with values
+for the degrees of freedom. For a scalar valued function, `u` contains scalars.
+For a vector valued function, `u` can be a vector of scalars (for use of `VectorValues`)
+or `u` can be a vector of `Vec`s (for use with ScalarValues).
+
+`here` determines which element to use for calculating function value.
+`true` uses the element A's nodal values, which is the default, while `false` uses element B's.
+
+The value of a scalar valued function is computed as ``u(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) u_i``
+where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function the value is calculated as
+``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
+nodal values of ``\\mathbf{u}``.
+"""
+function function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true)
+    fv = here ? iv.face_values_a : iv.face_values_b
+    function_value(fv, q_point, u, dof_range)
+end
+
+shape_value_type(::InterfaceValues{<:FaceValues{<:Any, N_t}}) where N_t = N_t
+
+"""
+    function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
+
+Compute the gradient of the function in a quadrature point. `u` is a vector with values
+for the degrees of freedom. For a scalar valued function, `u` contains scalars.
+For a vector valued function, `u` can be a vector of scalars (for use of `VectorValues`)
+or `u` can be a vector of `Vec`s (for use with ScalarValues).
+
+`here` determines which element to use for calculating function gradient. 
+`true` uses the element A's nodal values for calculating the gradient, which is the default, while `false` uses element B's.
+
+The gradient of a scalar function or a vector valued function with use of `VectorValues` is computed as
+``\\mathbf{\\nabla} u(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x}) u_i`` or
+``\\mathbf{\\nabla} u(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} \\mathbf{N}_i (\\mathbf{x}) u_i`` respectively,
+where ``u_i`` are the nodal values of the function.
+For a vector valued function with use of `ScalarValues` the gradient is computed as
+``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{u}_i \\otimes \\mathbf{\\nabla} N_i (\\mathbf{x})``
+where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
+"""
+function function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true)
+    fv = here ? iv.face_values_a : iv.face_values_b
+    function_gradient(fv, q_point, u, dof_range)
+end
+
+"""
+    function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
+
+Compute the symmetric gradient of the function, see [`function_gradient`](@ref).
+Return a `SymmetricTensor`.
+
+For `InterfaceValues`, `here` determines which element to use for calculating function gradient.
+`true` uses the element A's nodal values for calculating the gradient, which is the default, while `false` uses element B's.
+
+The symmetric gradient of a scalar function is computed as
+``\\left[ \\mathbf{\\nabla}  \\mathbf{u}(\\mathbf{x_q}) \\right]^\\text{sym} =  \\sum\\limits_{i = 1}^n  \\frac{1}{2} \\left[ \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\otimes \\mathbf{u}_i + \\mathbf{u}_i  \\otimes  \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\right]``
+where ``\\mathbf{u}_i`` are the nodal values of the function.
+"""
+function function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true)
+    fv = here ? iv.face_values_a : iv.face_values_b
+    function_symmetric_gradient(fv, q_point, u, dof_range)
+end
+
+"""
+    function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
+
+Compute the divergence of the vector valued function in a quadrature point.
+
+`here` determines which element to use for calculating divergence of the function.
+`true` uses the element A's nodal values for calculating the divergence from gradient, which is the default, while `false` uses element B's.
+
+The divergence of a vector valued functions in the quadrature point ``\\mathbf{x}_q)`` is computed as
+``\\mathbf{\\nabla} \\cdot \\mathbf{u}(\\mathbf{x_q}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x_q}) \\cdot \\mathbf{u}_i``
+where ``\\mathbf{u}_i`` are the nodal values of the function.
+"""
+function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) =
+    divergence_from_gradient(function_gradient(iv, q_point, u, dof_range; here = here))
+
+"""
+    function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
+
+Compute the curl of the vector valued function in a quadrature point.
+
+`here` determines which element to use for calculating curl of the function.
+`true` uses the element A's nodal values for calculating the curl from gradient, which is the default, while `false` uses element B's.
+
+The curl of a vector valued functions in the quadrature point ``\\mathbf{x}_q)`` is computed as
+``\\mathbf{\\nabla} \\times \\mathbf{u}(\\mathbf{x_q}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i \\times (\\mathbf{x_q}) \\cdot \\mathbf{u}_i``
+where ``\\mathbf{u}_i`` are the nodal values of the function.
+"""
+function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) =
+    curl_from_gradient(function_gradient(iv, q_point, u, dof_range; here))
+
 
 """
     shape_value_average(iv::InterfaceValues, qp::Int, base_function::Int)
@@ -246,6 +355,9 @@ for (func,                          f_,                 ) in (
         end
     end
 end
+
+spatial_coordinate(iv::InterfaceValues, q_point::Int, x::AbstractVector{Vec{dim,T}}) where {dim,T} =
+    spatial_coordinate(iv.face_values_a, q_point, x)
 
 """
     get_transformation_matrix(interface_transformation::InterfaceTransformation)
