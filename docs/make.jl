@@ -23,7 +23,7 @@ create_documenter_changelog()
 
 bibtex_plugin = CitationBibliography(
     joinpath(@__DIR__, "src", "assets", "references.bib"),
-    style=:authoryear
+    style=:numeric
 )
 
 # Build documentation.
