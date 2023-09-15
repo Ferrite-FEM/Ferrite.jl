@@ -93,7 +93,7 @@
             Quadrilateral, QuadraticQuadrilateral,
             Tetrahedron, QuadraticTetrahedron,
             Hexahedron, # SerendipityQuadraticHexahedron,
-            Wedge,
+            Wedge, Pyramid,
         )
             for ip_order_u in 1:2
                 for ip_order_p in 1:2

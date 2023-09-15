@@ -46,6 +46,7 @@ getrefshape(::AbstractCell{refshape}) where refshape = refshape
 nvertices(c::AbstractCell) = length(vertices(c))
 nedges(   c::AbstractCell) = length(edges(c))
 nfaces(   c::AbstractCell) = length(faces(c))
+nfaces(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_faces(T))
 nnodes(   c::AbstractCell) = length(get_node_ids(c))
 
 """
@@ -69,15 +70,37 @@ Note that the vertices are sufficient to define an edge uniquely.
 edges(::AbstractCell)
 
 """
+    reference_faces(::AbstractRefShape)
+
+Returns a tuple of n-tuples containing the ordered local node indices corresponding to
+the vertices that define an *oriented face*.
+
+An *oriented face* is a face with the first node having the local index and the other
+nodes spanning such that the normal to the face is pointing outwards.
+
+Note that the vertices are sufficient to define a face uniquely.
+"""
+reference_faces(::AbstractRefShape)
+
+"""
     Ferrite.faces(::AbstractCell)
 
 Returns a tuple of n-tuples containing the ordered node indices (of the nodes in a grid) corresponding to
 the vertices that define an *oriented face*. This function induces the 
 [`FaceIndex`](@ref), where the second index corresponds to the local index into this tuple.
 
+An *oriented face* is a face with the first node having the local index and the other
+nodes spanning such that the normal to the face is pointing outwards.
+
 Note that the vertices are sufficient to define a face uniquely.
 """
 faces(::AbstractCell)
+
+function faces(c::AbstractCell{refshape}) where refshape
+    ns = get_node_ids(c)
+    rfs = reference_faces(refshape)
+    return ntuple(i -> getindex.(Ref(ns), rfs[i]), nfaces(refshape))::typeof(rfs)
+end
 
 """
     Ferrite.default_interpolation(::AbstractCell)::Interpolation
@@ -103,9 +126,8 @@ function vertices(c::AbstractCell{RefLine})
     ns = get_node_ids(c)
     return (ns[1], ns[2]) # v1, v2
 end
-function faces(c::AbstractCell{RefLine})
-    ns = get_node_ids(c)
-    return ((ns[1],), (ns[2],)) # f1, f2
+function reference_faces(::Type{RefLine})
+    return ((1,), (2,)) # f1, f2
 end
 
 # RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
@@ -113,10 +135,9 @@ function vertices(c::AbstractCell{RefTriangle})
     ns = get_node_ids(c)
     return (ns[1], ns[2], ns[3]) # v1, v2, v3
 end
-function faces(c::AbstractCell{RefTriangle})
-    ns = get_node_ids(c)
+function reference_faces(::Type{RefTriangle})
     return (
-        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # f1, f2, f3
+        (1, 2), (2, 3), (3, 1), # f1, f2, f3
     )
 end
 
@@ -125,10 +146,9 @@ function vertices(c::AbstractCell{RefQuadrilateral})
     ns = get_node_ids(c)
     return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
 end
-function faces(c::AbstractCell{RefQuadrilateral})
-    ns = get_node_ids(c)
+function reference_faces(::Type{RefQuadrilateral})
     return (
-        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # f1, f2, f3, f4
+        (1, 2), (2, 3), (3, 4), (4, 1), # f1, f2, f3, f4
     )
 end
 
@@ -144,11 +164,10 @@ function edges(c::AbstractCell{RefTetrahedron})
         (ns[1], ns[4]), (ns[2], ns[4]), (ns[3], ns[4]), # e4, e5, e6
     )
 end
-function faces(c::AbstractCell{RefTetrahedron})
-    ns = get_node_ids(c)
+function reference_faces(::Type{RefTetrahedron})
     return (
-        (ns[1], ns[3], ns[2]), (ns[1], ns[2], ns[4]), # f1, f2
-        (ns[2], ns[3], ns[4]), (ns[1], ns[4], ns[3]), # f3, f4
+        (1, 3, 2), (1, 2, 4), # f1, f2
+        (2, 3, 4), (1, 4, 3), # f3, f4
     )
 end
 
@@ -167,12 +186,11 @@ function edges(c::AbstractCell{RefHexahedron})
         (ns[1], ns[5]), (ns[2], ns[6]), (ns[3], ns[7]), (ns[4], ns[8]), # e9, e10, e11, e12
     )
 end
-function faces(c::AbstractCell{RefHexahedron})
-    ns = get_node_ids(c)
+function reference_faces(::Type{RefHexahedron})
     return (
-        (ns[1], ns[4], ns[3], ns[2]), (ns[1], ns[2], ns[6], ns[5]), # f1, f2
-        (ns[2], ns[3], ns[7], ns[6]), (ns[3], ns[4], ns[8], ns[7]), # f3, f4
-        (ns[1], ns[5], ns[8], ns[4]), (ns[5], ns[6], ns[7], ns[8]), # f5, f6
+        (1, 4, 3, 2), (1, 2, 6, 5), # f1, f2
+        (2, 3, 7, 6), (3, 4, 8, 7), # f3, f4
+        (1, 5, 8, 4), (5, 6, 7, 8), # f5, f6
     )
 end
 
@@ -189,15 +207,33 @@ function edges(c::AbstractCell{RefPrism})
         (ns[6], ns[5]),                                                 # e9
     )
 end
-function faces(c::AbstractCell{RefPrism})
-    ns = get_node_ids(c)
+function reference_faces(::Type{RefPrism})
     return (
-        (ns[1], ns[3], ns[2]),        (ns[1], ns[2], ns[5], ns[4]), # f1, f2
-        (ns[3], ns[1], ns[4], ns[6]), (ns[2], ns[3], ns[6], ns[5]), # f3, f4
-        (ns[4], ns[5], ns[6]),                                      # f5
+        (1, 3, 2),    (1, 2, 5, 4), # f1, f2
+        (3, 1, 4, 6), (2, 3, 6, 5), # f3, f4
+        (4, 5, 6),                  # f5
     )
 end
 
+# RefPyramid (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
+function vertices(c::AbstractCell{RefPyramid})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2], ns[3], ns[4], ns[5],) # v1, ..., v5
+end
+function edges(c::AbstractCell{RefPyramid})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2]), (ns[1], ns[3]), (ns[1], ns[5]), (ns[2], ns[4]), 
+        (ns[2], ns[5]), (ns[4], ns[3]), (ns[3], ns[5]), (ns[4], ns[5]), 
+    )
+end
+function reference_faces(::Type{RefPyramid})
+    return (
+        (1, 3, 4, 2), (1, 2, 5), # f1, f2
+        (1, 5, 3), (2, 4, 5),    # f3, f4
+        (3, 5, 4),               # f5
+    )
+end
 
 ######################################################
 # Concrete implementations of AbstractCell interface #
@@ -215,6 +251,7 @@ struct QuadraticTetrahedron   <: AbstractCell{RefTetrahedron}   nodes::NTuple{10
 struct Hexahedron             <: AbstractCell{RefHexahedron}    nodes::NTuple{ 8, Int} end
 struct QuadraticHexahedron    <: AbstractCell{RefHexahedron}    nodes::NTuple{27, Int} end
 struct Wedge                  <: AbstractCell{RefPrism}         nodes::NTuple{ 6, Int} end
+struct Pyramid                <: AbstractCell{RefPyramid}       nodes::NTuple{ 5, Int} end
 
 default_interpolation(::Type{Line})                   = Lagrange{RefLine,          1}()
 default_interpolation(::Type{QuadraticLine})          = Lagrange{RefLine,          2}()
@@ -227,6 +264,7 @@ default_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{RefTetrahedron,
 default_interpolation(::Type{Hexahedron})             = Lagrange{RefHexahedron,    1}()
 default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron,    2}()
 default_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
+default_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,       1}()
 
 # TODO: Remove this, used for Quadrilateral3D
 edges(c::Quadrilateral#=3D=#) = faces(c)
@@ -262,7 +300,7 @@ abstract type AbstractGrid{dim} end
 
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 There are multiple helper structures to apply boundary conditions or define subdomains. They are gathered in the `cellsets`, `nodesets`,
-`facesets`, `edgesets` and `vertexsets`. 
+`facesets`, `edgesets` and `vertexsets`.
 
 # Fields
 - `cells::Vector{C}`: stores all cells of the grid
@@ -270,7 +308,7 @@ There are multiple helper structures to apply boundary conditions or define subd
 - `cellsets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of cell ids
 - `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
 - `facesets::Dict{String,Set{FaceIndex}}`: maps a `String` to a `Set` of `Set{FaceIndex} (global_cell_id, local_face_id)`
-- `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id` 
+- `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id`
 - `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
 - `boundary_matrix::SparseMatrixCSC{Bool,Int}`: optional, only needed by `onboundary` to check if a cell is on the boundary, see, e.g. Helmholtz example
 """
@@ -280,9 +318,9 @@ mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     # Sets
     cellsets::Dict{String,Set{Int}}
     nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{FaceIndex}} 
-    edgesets::Dict{String,Set{EdgeIndex}} 
-    vertexsets::Dict{String,Set{VertexIndex}} 
+    facesets::Dict{String,Set{FaceIndex}}
+    edgesets::Dict{String,Set{EdgeIndex}}
+    vertexsets::Dict{String,Set{VertexIndex}}
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool,Int}
 end
@@ -306,7 +344,7 @@ end
 
 Get the datatype for a single point in the grid.
 """
-get_coordinate_type(grid::Grid{dim,C,T}) where {dim,C,T} = Vec{dim,T} # Node is baked into the mesh type.
+get_coordinate_type(::Grid{dim,C,T}) where {dim,C,T} = Vec{dim,T} # Node is baked into the mesh type.
 
 """
     toglobal(grid::AbstractGrid, vertexidx::VertexIndex) -> Int
@@ -318,8 +356,8 @@ toglobal(grid::AbstractGrid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((
 
 @inline getdim(::AbstractGrid{dim}) where {dim} = dim
 """
-    getcells(grid::AbstractGrid) 
-    getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}} 
+    getcells(grid::AbstractGrid)
+    getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}}
     getcells(grid::AbstractGrid, setname::String)
 
 Returns either all `cells::Collection{C<:AbstractCell}` of a `<:AbstractGrid` or a subset based on an `Int`, `Vector{Int}` or `String`.
@@ -335,7 +373,7 @@ Whereas the last option tries to call a `cellset` of the `grid`. `Collection` ca
 @inline getcelltype(grid::AbstractGrid, i::Int) = typeof(grid.cells[i])
 
 """
-    getnodes(grid::AbstractGrid) 
+    getnodes(grid::AbstractGrid)
     getnodes(grid::AbstractGrid, v::Union{Int,Vector{Int}}
     getnodes(grid::AbstractGrid, setname::String)
 
@@ -351,7 +389,6 @@ to a Node.
 "Returns the number of nodes of the `i`-th cell."
 @inline nnodes_per_cell(grid::AbstractGrid, i::Int=1) = nnodes(grid.cells[i])
 
-get_node_coordinate(grid, nodeid) = get_node_coordinate(getnodes(grid, nodeid))
 "Return the number type of the nodal coordinates."
 @inline get_coordinate_eltype(grid::AbstractGrid) = get_coordinate_eltype(first(getnodes(grid)))
 
@@ -429,7 +466,7 @@ n_faces_per_cell(grid::Grid) = nfaces(getcelltype(grid))
 Transform all nodes of the `grid` based on some transformation function `f`.
 """
 function transform_coordinates!(g::Grid, f::Function)
-    map!(n -> Node(f(get_node_coordinate(n))), g.nodes, g.nodes)
+    replace!(n -> Node(f(get_node_coordinate(n))), g.nodes)
     return g
 end
 
@@ -644,41 +681,45 @@ function addnodeset!(grid::AbstractGrid, name::String, f::Function)
 end
 
 """
-    get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::Int)
-    get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::AbstractCell)
-
-Fills the vector `x` with the coordinates of a cell defined by either its cellid or the cell object itself.
+    getcoordinates(grid::AbstractGrid, idx::Union{Int,CellIndex})
+    getcoordinates(cache::CellCache)
+    
+Get a vector with the coordinates of the cell corresponding to `idx` or `cache`
 """
-@inline function get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T} 
-    cell = getcells(grid, cellid)
-    get_cell_coordinates!(x, grid, cell)
+@inline function getcoordinates(grid::AbstractGrid, idx::Int)
+    CT = get_coordinate_type(grid)
+    cell = getcells(grid, idx)
+    N = nnodes(cell)
+    x = Vector{CT}(undef, N)
+    getcoordinates!(x, grid, cell)
 end
+@inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
 
-@inline function get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim,T}
+"""
+    getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, idx::Union{Int,CellIndex})
+    getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, cell::AbstractCell)
+    
+Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
+"""
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim,T}
+    node_ids = get_node_ids(cell)
     @inbounds for i in 1:length(x)
-        x[i] = get_node_coordinate(grid, cell.nodes[i])
+        x[i] = get_node_coordinate(grid, node_ids[i])
     end
     return x
 end
-
-@inline get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = get_cell_coordinates!(x, grid, cell.idx)
-@inline get_cell_coordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, face::FaceIndex) where {dim, T} = get_cell_coordinates!(x, grid, face.idx[1])
-
-
-"""
-    get_cell_coordinates(grid::AbstractGrid, cell)
-Return a vector with the coordinates of the vertices of cell number `cell`.
-"""
-@inline function get_cell_coordinates(grid::AbstractGrid, cell::Int)
-    dim = getdim(grid)
-    T = get_coordinate_eltype(grid)
-    _cell = getcells(grid, cell)
-    N = nnodes(_cell)
-    x = Vector{Vec{dim, T}}(undef, N)
-    get_cell_coordinates!(x, grid, _cell)
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T} 
+    cell = getcells(grid, cellid)
+    getcoordinates!(x, grid, cell)
 end
-@inline get_cell_coordinates(grid::AbstractGrid, cell::CellIndex) = get_cell_coordinates(grid, cell.idx)
-@inline get_cell_coordinates(grid::AbstractGrid, face::FaceIndex) = get_cell_coordinates(grid, face.idx[1])
+@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
+
+"""
+    get_node_coordinate(grid::AbstractGrid, n::Int)
+    
+Return the coordinate of the `n`th node in `grid`
+"""
+get_node_coordinate(grid, n) = get_node_coordinate(getnodes(grid, n))
 
 function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
     cell = getcells(grid, i)

@@ -12,7 +12,9 @@ for (scalar_interpol, quad_rule) in  (
                                     (Lagrange{RefHexahedron, 1}(), QuadratureRule{RefHexahedron}(2)),
                                     (Serendipity{RefQuadrilateral, 2}(), QuadratureRule{RefQuadrilateral}(2)),
                                     (Lagrange{RefTriangle, 1}(), QuadratureRule{RefTriangle}(2)),
-                                    (Lagrange{RefTetrahedron, 2}(), QuadratureRule{RefTetrahedron}(2))
+                                    (Lagrange{RefTetrahedron, 2}(), QuadratureRule{RefTetrahedron}(2)),
+                                    (Lagrange{RefPrism, 2}(), QuadratureRule{RefPrism}(2)),
+                                    (Lagrange{RefPyramid, 2}(), QuadratureRule{RefPyramid}(2)),
                                    )
 
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
@@ -306,6 +308,14 @@ end
             @test cv.gip == scalar_ip(geo_ip)
         end
     end
+end
+
+@testset "show" begin
+    # Just smoke test
+    cv_quad = CellValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}()^2)
+    cv_wedge = CellValues(QuadratureRule{RefPrism}(2), Lagrange{RefPrism,2}())
+    show(stdout, MIME"text/plain"(), cv_quad)
+    show(stdout, MIME"text/plain"(), cv_wedge)
 end
 
 end # of testset
