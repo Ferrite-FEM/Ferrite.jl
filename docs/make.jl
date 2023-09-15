@@ -33,7 +33,6 @@ bibtex_plugin = CitationBibliography(
         canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
         collapselevel = 1,
     ),
-    clean = true,
     sitename = "Ferrite.jl",
     doctest = false,
     warnonly = true,
