@@ -155,8 +155,8 @@ export
     write_solution,
     write_celldata,
     write_projection,
-    PVDFile,
-    addstep!,         
+    ParaviewCollection,
+    addstep!,
     
 # L2 Projection
     project,

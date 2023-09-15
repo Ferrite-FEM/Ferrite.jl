@@ -50,15 +50,15 @@ function Base.show(io::IO, ::MIME"text/plain", vtk::VTKFile)
 end
 
 """
-    PVDFile(name::String, grid::AbstractGrid)
+    ParaviewCollection(name::String, grid::AbstractGrid)
 
-Create a paraview collection file that can be used to 
+Create a paraview collection file (.pvd) that can be used to 
 save multiple vtk file. Example,
 ```
-pvd = PVDFile("test", grid)
+pvd = ParaviewCollection("test", grid)
 for t in range(0, 2, 4)
     # Solve the timestep to find u and σeff 
-    addstep!(pvd, t) do io 
+    addstep!(pvd, t) do io # io::VTKFile
         write_solution(io, dh, u)
         write_celldata(io, grid, σeff, "Effective stress")
     end
@@ -66,26 +66,23 @@ end
 close(pvd)
 ```
 """
-mutable struct PVDFile{P<:WriteVTK.CollectionFile,G<:AbstractGrid}
+mutable struct ParaviewCollection{P<:WriteVTK.CollectionFile,G<:AbstractGrid}
     pvd::P
     grid::G
     name::String
     step::Int
 end
-function PVDFile(name::String, grid::AbstractGrid)
+function ParaviewCollection(name::String, grid::AbstractGrid)
     pvd = WriteVTK.paraview_collection(name)
-    return PVDFile(pvd, grid, name, 0)
+    return ParaviewCollection(pvd, grid, name, 0)
 end
-Base.close(pvd::PVDFile) = WriteVTK.vtk_save(pvd.pvd)
+Base.close(pvd::ParaviewCollection) = WriteVTK.vtk_save(pvd.pvd)
 
-function addstep!(f::Function, pvd::PVDFile, t, grid=pvd.grid)
+function addstep!(f::Function, pvd::ParaviewCollection, t, grid=pvd.grid)
     pvd.step += 1
-    vtk = VTKFile(string(pvd.name, "_", pvd.step), grid)
-    try
+    VTKFile(string(pvd.name, "_", pvd.step), grid) do vtk
         f(vtk)
         pvd.pvd[t] = vtk.vtk # Add to collection
-    finally
-        close(vtk)
     end
 end
 

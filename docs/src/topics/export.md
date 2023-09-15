@@ -1,7 +1,7 @@
 ```@setup export
 using Ferrite
 grid = generate_grid(Triangle, (2, 2))
-dh = DofHandler(grid); add!(dh, :u, Lagrange{2,RefTetrahedron,1}()); close!(dh)
+dh = DofHandler(grid); add!(dh, :u, Lagrange{RefTriangle,1}()); close!(dh)
 u = rand(ndofs(dh)); σ = rand(getncells(grid))
 ```
 
@@ -42,17 +42,16 @@ close(vtk)
 
 The data written by `write_solution`, `write_celldata`, `Ferrite.write_nodedata`, and `write_projection` may be either scalar (`Vector{<:Number}`) or tensor (`Vector{<:AbstractTensor}`) data. 
 
-To save time-dependent data, `WriteVTK.jl`'s, `paraview_collection` may be used
+`ParaviewCollection` may be used to save time-dependent data
 
 ```@example pvdexport 
-pvd = paraview_collection("my_results.pvd");
-for i in 1:5
+pvd = ParaviewCollection("my_results", grid)
+for t in range(0, 1, 5)
     # Do calculations to update u
-    VTKFile("my_results_$i", grid) do vtk
+    addstep!(pvd, t) do vtk
         write_solution(vtk, dh, u)
-        pvd[i] = vtk
     end
 end
-vtk_save(pvd)
+close(pvd)
 ```
 See [Transient heat equation](@ref tutorial-transient-heat-equation) for an example

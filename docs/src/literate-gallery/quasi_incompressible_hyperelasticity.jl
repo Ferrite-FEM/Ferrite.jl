@@ -305,7 +305,7 @@ function solve(interpolation_u, interpolation_p)
     Δt = 0.1;
     NEWTON_TOL = 1e-8
 
-    pvd = paraview_collection("hyperelasticity_incomp_mixed.pvd");
+    pvd = ParaviewCollection("hyperelasticity_incomp_mixed.pvd", grid);
     for t ∈ 0.0:Δt:Tf
         ## Perform Newton iterations
         Ferrite.update!(dbc, t)
@@ -334,12 +334,11 @@ function solve(interpolation_u, interpolation_p)
         end;
 
         ## Save the solution fields
-        VTKFile("hyperelasticity_incomp_mixed_$t.vtu", grid) do vtk
-            write_solution(vtk, dh, w)
-            pvd[t] = vtk
+        addstep!(pvd, t) do io 
+            write_solution(io, dh, w)
         end
     end;
-    vtk_save(pvd);
+    close(pvd);
     vol_def = calculate_volume_deformed_mesh(w, dh, cellvalues_u);
     print("Deformed volume is $vol_def")
     return vol_def;
