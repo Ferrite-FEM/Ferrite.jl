@@ -155,9 +155,8 @@ export
     write_solution,
     write_celldata,
     write_projection,
-    # Reexports from WriteVTK.jl for collections
-    paraview_collection, 
-    vtk_save,           
+    PVDFile,
+    addstep!,         
     
 # L2 Projection
     project,

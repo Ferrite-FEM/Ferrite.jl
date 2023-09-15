@@ -1,6 +1,3 @@
-struct VTKFile{VTK<:WriteVTK.DatasetFile}
-    vtk::VTK
-end
 
 """
     VTKFile(filename::AbstractString, grid::AbstractGrid; kwargs...)
@@ -27,6 +24,9 @@ VTKFile(filename, grid) do vtk
     write_celldata(vtk, grid, celldata)
 end
 """
+struct VTKFile{VTK<:WriteVTK.DatasetFile}
+    vtk::VTK
+end
 function VTKFile(filename::String, grid::AbstractGrid; kwargs...)
     vtk = create_vtk_grid(filename, grid; kwargs...)
     return VTKFile(vtk)
@@ -49,12 +49,44 @@ function Base.show(io::IO, ::MIME"text/plain", vtk::VTKFile)
     print(io, "VTKFile for the $open_str file \"$(filename)\".")
 end
 
-# Support ParaviewCollection
-function Base.setindex!(pvd::WriteVTK.CollectionFile, vtk::VTKFile, time::Real)
-    WriteVTK.collection_add_timestep(pvd, vtk, time)
+"""
+    PVDFile(name::String, grid::AbstractGrid)
+
+Create a paraview collection file that can be used to 
+save multiple vtk file. Example,
+```
+pvd = PVDFile("test", grid)
+for t in range(0, 2, 4)
+    # Solve the timestep to find u and σeff 
+    addstep!(pvd, t) do io 
+        write_solution(io, dh, u)
+        write_celldata(io, grid, σeff, "Effective stress")
+    end
 end
-function WriteVTK.collection_add_timestep(pvd::WriteVTK.CollectionFile, vtk::VTKFile, time::Real)
-    WriteVTK.collection_add_timestep(pvd, vtk.vtk, time)
+close(pvd)
+```
+"""
+mutable struct PVDFile{P<:WriteVTK.CollectionFile,G<:AbstractGrid}
+    pvd::P
+    grid::G
+    name::String
+    step::Int
+end
+function PVDFile(name::String, grid::AbstractGrid)
+    pvd = WriteVTK.paraview_collection(name)
+    return PVDFile(pvd, grid, name, 0)
+end
+Base.close(pvd::PVDFile) = WriteVTK.vtk_save(pvd.pvd)
+
+function addstep!(f::Function, pvd::PVDFile, t, grid=pvd.grid)
+    pvd.step += 1
+    vtk = VTKFile(string(pvd.name, "_", pvd.step), grid)
+    try
+        f(vtk)
+        pvd.pvd[t] = vtk.vtk # Add to collection
+    finally
+        close(vtk)
+    end
 end
 
 cell_to_vtkcell(::Type{Line}) = VTKCellTypes.VTK_LINE
