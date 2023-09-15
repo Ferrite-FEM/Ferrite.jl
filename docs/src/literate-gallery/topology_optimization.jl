@@ -527,11 +527,10 @@ topopt(0.03, 0.5, 60, "large_radius"; output=:false);
 #
 # To prove mesh independence, the user could vary the mesh resolution and compare the results.
 
-
-```@bibliography
-Pages = ["topology_optimization.md"]
-Canonical = false
-```
+#md # ```@bibliography
+#md # Pages = ["gallery/topology_optimization.md"]
+#md # Canonical = false
+#md # ```
 
 #md # ## [Plain program](@id topology_optimization-plain-program)
 #md #
