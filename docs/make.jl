@@ -28,13 +28,11 @@ bibtex_plugin = CitationBibliography(
 
 # Build documentation.
 @timeit dto "makedocs" makedocs(
-    
     format = Documenter.HTML(
         assets = ["assets/custom.css", "assets/favicon.ico"],
         canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
         collapselevel = 1,
     ),
-    debug = true,
     clean = true,
     sitename = "Ferrite.jl",
     doctest = false,
