@@ -16,7 +16,9 @@ end
                             (QuadraticTriangle,      2),
                             (Hexahedron,             3),
                             (SerendipityQuadraticHexahedron, 3),
-                            (Tetrahedron,            3))
+                            (Tetrahedron,            3),
+                            (Wedge,                  3),
+                            (Pyramid,                3))
 
         # create test grid, do some operations on it and then test
         # the resulting sha1 of the stored vtk file
@@ -26,7 +28,7 @@ end
         left = -right
         grid = generate_grid(celltype, nels, left, right)
 
-        transform!(grid, x-> 2x)
+        transform_coordinates!(grid, x-> 2x)
 
         radius = 2*1.5
         addcellset!(grid, "cell-1", [1,])
@@ -157,7 +159,7 @@ end
     node_set = Set(1:getnnodes(grid))
     addnodeset!(grid, "node_set", node_set)
 
-    @test getnodesets(grid) == Dict("node_set" => node_set)
+    @test Ferrite.getnodesets(grid) == Dict("node_set" => node_set)
 
     @test getnodes(grid, [1]) == [getnodes(grid, 1)] # untested
 
@@ -173,7 +175,7 @@ end
     ci = CellIterator(grid)
     @test length(ci) == getncells(grid)
     for c in ci
-        get_cell_coordinates(c)
+        getcoordinates(c)
         getnodes(c)
         n += cellid(c)
     end
@@ -189,7 +191,7 @@ end
     @test cellid(fc) == cell_id
     # @test Ferrite.faceid(fc) == face_id
     @test getnodes(fc) == collect(getcells(grid, cell_id).nodes)
-    @test get_cell_coordinates(fc) == get_cell_coordinates(grid, cell_id)
+    @test getcoordinates(fc) == getcoordinates(grid, cell_id)
     @test length(celldofs(fc)) == 0 # Empty because no DofHandler given
 
     # FaceIterator, also tests `reinit!(fv::FaceValues, fc::FaceCache)`
@@ -215,6 +217,33 @@ end
         end
     end
 
+    # InterfaceCache
+    grid = generate_grid(Quadrilateral, (2,1))
+    ic = InterfaceCache(grid)
+    reinit!(ic, FaceIndex(1,2), FaceIndex(2,4))
+    @test interfacedofs(ic) == Int[] # Empty because no DofHandler given
+    ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
+    dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
+    ic = InterfaceCache(dh)
+    reinit!(ic, FaceIndex(1,2), FaceIndex(2,4))
+    @test interfacedofs(ic) == collect(1:8)
+    # Mixed Elements
+    dim = 2
+    nodes = [Node((-1.0, 0.0)), Node((0.0, 0.0)), Node((1.0, 0.0)), Node((-1.0, -1.0)), Node((0.0, 1.0))]
+    cells = [
+                Quadrilateral((1,2,5,4)),
+                Triangle((3,5,2)),
+            ]
+    grid = Grid(cells, nodes)
+    ip1 = DiscontinuousLagrange{RefQuadrilateral, 1}()
+    ip2 = DiscontinuousLagrange{RefTriangle, 1}()
+    dh = DofHandler(grid); 
+    sdh1 = SubDofHandler(dh, Set([1])); add!(sdh1, :u, ip1);
+    sdh2 = SubDofHandler(dh, Set([2])); add!(sdh2, :u, ip2);
+    close!(dh)
+    ic = InterfaceCache(dh)
+    reinit!(ic, FaceIndex(1,2), FaceIndex(2,3))
+    @test interfacedofs(ic) == collect(1:7)
     # Unit test of some utilities
     mixed_grid = Grid([Quadrilateral((1, 2, 3, 4)),Triangle((3, 2, 5))],
                       [Node(coord) for coord in zeros(Vec{2,Float64}, 5)])
@@ -439,11 +468,6 @@ end
 #                   |  1  |  2  |  3  |
 #                   +-----+-----+-----+
 # test application: integrate jump across element boundary 5
-    function reinit!(fv::FaceValues, cellid::Int, faceid::Int, grid)
-        coords = get_cell_coordinates(grid, cellid)
-        Ferrite.reinit!(fv, coords, faceid)
-    end
-    reinit!(fv::FaceValues, faceid::FaceIndex, grid) = reinit!(fv,faceid[1],faceid[2],grid) # wrapper for reinit!(fv,cellid,faceid,grid)
     ip = Lagrange{RefQuadrilateral, 1}()^2
     qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
     fv_ele = FaceValues(qr_face, ip)
@@ -452,19 +476,19 @@ end
     u_neighbors = [5.0 for _ in 1:8]
     jump_int = 0.
     jump_abs = 0.
-    for ele_faceid in 1:nfaces(quadgrid.cells[5])
-        reinit!(fv_ele, 5, ele_faceid, quadgrid)
+    # Test interface Iterator
+    for ic in InterfaceIterator(quadgrid)
+        any(cellid.([ic.a, ic.b]) .== 5) || continue
+        reinit!(fv_ele, ic.a.cc, ic.a.current_faceid[])
         for q_point in 1:getnquadpoints(fv_ele)
             dΩ = getdetJdV(fv_ele, q_point)
-            normal_5 = getnormal(fv_ele, q_point)
-            u_5_n = function_value(fv_ele, q_point, u_ele5) ⋅ normal_5
-            for neighbor_entity in getneighborhood(topology, quadgrid, FaceIndex(5, ele_faceid)) # only one entity can be changed to get rid of the for loop
-                reinit!(fv_neighbor, neighbor_entity, quadgrid)
-                normal_neighbor = getnormal(fv_neighbor, q_point)
-                u_neighbor = function_value(fv_neighbor, q_point, u_neighbors) ⋅ normal_neighbor
-                jump_int += (u_5_n + u_neighbor) * dΩ
-                jump_abs += abs(u_5_n + u_neighbor) * dΩ
-            end
+            normal_a = getnormal(fv_ele, q_point)
+            u_5_n = function_value(fv_ele, q_point, cellid(ic.a) == 5 ? u_ele5 : u_neighbors) ⋅ normal_a
+            reinit!(fv_neighbor, ic.b.cc, ic.b.current_faceid[])
+            normal_b = getnormal(fv_neighbor, q_point)
+            u_neighbor = function_value(fv_neighbor, q_point, cellid(ic.a) == 5 ? u_neighbors : u_ele5) ⋅ normal_b
+            jump_int += (u_5_n + u_neighbor) * dΩ
+            jump_abs += abs(u_5_n + u_neighbor) * dΩ
         end
     end
     @test isapprox(jump_abs, 2/3*2*4,atol=1e-6) # 2*4*0.66666, jump is always 2, 4 sides, length =0.66
