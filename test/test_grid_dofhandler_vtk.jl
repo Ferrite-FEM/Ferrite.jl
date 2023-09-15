@@ -16,7 +16,9 @@ end
                             (QuadraticTriangle,      2),
                             (Hexahedron,             3),
                             (SerendipityQuadraticHexahedron, 3),
-                            (Tetrahedron,            3))
+                            (Tetrahedron,            3),
+                            (Wedge,                  3),
+                            (Pyramid,                3))
 
         # create test grid, do some operations on it and then test
         # the resulting sha1 of the stored vtk file
@@ -173,7 +175,7 @@ end
     ci = CellIterator(grid)
     @test length(ci) == getncells(grid)
     for c in ci
-        get_cell_coordinates(c)
+        getcoordinates(c)
         getnodes(c)
         n += cellid(c)
     end
@@ -189,7 +191,7 @@ end
     @test cellid(fc) == cell_id
     # @test Ferrite.faceid(fc) == face_id
     @test getnodes(fc) == collect(getcells(grid, cell_id).nodes)
-    @test get_cell_coordinates(fc) == get_cell_coordinates(grid, cell_id)
+    @test getcoordinates(fc) == getcoordinates(grid, cell_id)
     @test length(celldofs(fc)) == 0 # Empty because no DofHandler given
 
     # FaceIterator, also tests `reinit!(fv::FaceValues, fc::FaceCache)`
