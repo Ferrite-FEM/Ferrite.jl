@@ -21,12 +21,14 @@ include("generate.jl")
 include("changelog.jl")
 create_documenter_changelog()
 
+bibtex_plugin = CitationBibliography(
+    joinpath(@__DIR__, "src", "assets", "references.bib"),
+    style=:authoryear
+)
+
 # Build documentation.
 @timeit dto "makedocs" makedocs(
-    CitationBibliography(
-        joinpath(@__DIR__, "src", "assets", "references.bib"),
-        style=:authoryear
-    ),
+    
     format = Documenter.HTML(
         assets = ["assets/custom.css", "assets/favicon.ico"],
         canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
@@ -36,8 +38,7 @@ create_documenter_changelog()
     clean = true,
     sitename = "Ferrite.jl",
     doctest = false,
-    # strict = VERSION.minor == 6 && sizeof(Int) == 8, # only strict mode on 0.6 and Int64
-    strict = false,
+    warnonly = true,
     draft = liveserver,
     pages = Any[
         "Home" => "index.md",
@@ -93,6 +94,9 @@ create_documenter_changelog()
         "devdocs/index.md",
         "bibliography.md",
         ],
+    plugins = [
+        bibtex_plugin,
+    ]
 )
 
 # make sure there are no *.vtu files left around from the build
