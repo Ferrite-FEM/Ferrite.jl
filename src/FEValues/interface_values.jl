@@ -122,9 +122,9 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
 nodal values of ``\\mathbf{u}``.
 """
-function function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true)
+function function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u); here::Bool = true) where T
     fv = here ? iv.face_values_a : iv.face_values_b
-    function_value(fv, q_point, u, dof_range)
+    T <: Vec ? function_value(fv, q_point, u) : function_value(fv, q_point, u, dof_range)
 end
 
 shape_value_type(::InterfaceValues{<:FaceValues{<:Any, N_t}}) where N_t = N_t
@@ -148,9 +148,9 @@ For a vector valued function with use of `ScalarValues` the gradient is computed
 ``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{u}_i \\otimes \\mathbf{\\nabla} N_i (\\mathbf{x})``
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
-function function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true)
+function function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u); here::Bool = true) where T
     fv = here ? iv.face_values_a : iv.face_values_b
-    function_gradient(fv, q_point, u, dof_range)
+    T <: Vec ? function_gradient(fv, q_point, u) : function_gradient(fv, q_point, u, dof_range)
 end
 
 """
@@ -166,9 +166,9 @@ The symmetric gradient of a scalar function is computed as
 ``\\left[ \\mathbf{\\nabla}  \\mathbf{u}(\\mathbf{x_q}) \\right]^\\text{sym} =  \\sum\\limits_{i = 1}^n  \\frac{1}{2} \\left[ \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\otimes \\mathbf{u}_i + \\mathbf{u}_i  \\otimes  \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\right]``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true)
+function function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{T}, dof_range = eachindex(u); here::Bool = true) where T
     fv = here ? iv.face_values_a : iv.face_values_b
-    function_symmetric_gradient(fv, q_point, u, dof_range)
+    T <: Vec ? function_symmetric_gradient(fv, q_point, u) : function_symmetric_gradient(fv, q_point, u, dof_range)
 end
 
 """
