@@ -115,9 +115,9 @@ close(csio)
 
     filename_3d = "test_vtk_3d"
     VTKFile(filename_3d, grid) do vtk
-        Ferrite.write_nodedata(vtk, grid, sym_tensor_data, "symmetric tensor")
-        Ferrite.write_nodedata(vtk, grid, tensor_data, "tensor")
-        Ferrite.write_nodedata(vtk, grid, vector_data, "vector")
+        Ferrite.write_nodedata(vtk, sym_tensor_data, "symmetric tensor")
+        Ferrite.write_nodedata(vtk, tensor_data, "tensor")
+        Ferrite.write_nodedata(vtk, vector_data, "vector")
     end
 
     # 2D grid
@@ -130,10 +130,10 @@ close(csio)
 
     filename_2d = "test_vtk_2d"
     VTKFile(filename_2d, grid) do vtk
-        Ferrite.write_nodedata(vtk, grid, sym_tensor_data, "symmetric tensor")
-        Ferrite.write_nodedata(vtk, grid, tensor_data, "tensor")
-        Ferrite.write_nodedata(vtk, grid, tensor_data_1D, "tensor_1d")
-        Ferrite.write_nodedata(vtk, grid, vector_data, "vector")
+        Ferrite.write_nodedata(vtk, sym_tensor_data, "symmetric tensor")
+        Ferrite.write_nodedata(vtk, tensor_data, "tensor")
+        Ferrite.write_nodedata(vtk, tensor_data_1D, "tensor_1d")
+        Ferrite.write_nodedata(vtk, vector_data, "vector")
     end
 
     # test the shas of the files

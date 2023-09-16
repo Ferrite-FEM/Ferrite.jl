@@ -346,8 +346,8 @@ function solve()
     end
     VTKFile("plasticity", dh) do vtk
         write_solution(vtk, dh, u) # displacement field
-        write_celldata(vtk, grid, mises_values, "von Mises [Pa]")
-        write_celldata(vtk, grid, κ_values, "Drag stress [Pa]")
+        write_celldata(vtk, mises_values, "von Mises [Pa]")
+        write_celldata(vtk, κ_values, "Drag stress [Pa]")
     end
 
     return u_max, traction_magnitude
