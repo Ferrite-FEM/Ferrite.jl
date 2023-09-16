@@ -10,27 +10,40 @@ if liveserver
     @timeit dto "Revise.revise()" Revise.revise()
 end
 
-using Documenter, Ferrite, FerriteGmsh, FerriteMeshParser
+using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser
 
 const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 
 # Generate tutorials and how-to guides
 include("generate.jl")
 
+# Changelog
+include("changelog.jl")
+create_documenter_changelog()
+
+bibtex_plugin = CitationBibliography(
+    joinpath(@__DIR__, "src", "assets", "references.bib"),
+    style=:numeric
+)
+
 # Build documentation.
 @timeit dto "makedocs" makedocs(
     format = Documenter.HTML(
-        assets = ["assets/custom.css", "assets/favicon.ico"],
+        assets = [
+            "assets/custom.css",
+            "assets/citations.css",
+            "assets/favicon.ico"
+        ],
         canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
         collapselevel = 1,
     ),
     sitename = "Ferrite.jl",
     doctest = false,
-    # strict = VERSION.minor == 6 && sizeof(Int) == 8, # only strict mode on 0.6 and Int64
-    strict = false,
+    warnonly = true,
     draft = liveserver,
     pages = Any[
         "Home" => "index.md",
+        # hide("Changelog" => "changelog.md"),
         "Tutorials" => [
             "Tutorials overview" => "tutorials/index.md",
             "tutorials/heat_equation.md",
@@ -80,7 +93,11 @@ include("generate.jl")
         #     "gallery/topology_optimization.md",
         # ],
         "devdocs/index.md",
+        "bibliography.md",
         ],
+    plugins = [
+        bibtex_plugin,
+    ]
 )
 
 # make sure there are no *.vtu files left around from the build

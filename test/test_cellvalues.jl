@@ -12,7 +12,9 @@ for (scalar_interpol, quad_rule) in  (
                                     (Lagrange{RefHexahedron, 1}(), QuadratureRule{RefHexahedron}(2)),
                                     (Serendipity{RefQuadrilateral, 2}(), QuadratureRule{RefQuadrilateral}(2)),
                                     (Lagrange{RefTriangle, 1}(), QuadratureRule{RefTriangle}(2)),
-                                    (Lagrange{RefTetrahedron, 2}(), QuadratureRule{RefTetrahedron}(2))
+                                    (Lagrange{RefTetrahedron, 2}(), QuadratureRule{RefTetrahedron}(2)),
+                                    (Lagrange{RefPrism, 2}(), QuadratureRule{RefPrism}(2)),
+                                    (Lagrange{RefPyramid, 2}(), QuadratureRule{RefPyramid}(2)),
                                    )
 
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
@@ -40,7 +42,7 @@ for (scalar_interpol, quad_rule) in  (
         end
         u_vector = reinterpret(Float64, u)
 
-        for i in 1:length(getpoints(quad_rule))
+        for i in 1:getnquadpoints(cv)
             if func_interpol isa Ferrite.ScalarInterpolation
                 @test function_gradient(cv, i, u) ≈ H
                 @test function_symmetric_gradient(cv, i, u) ≈ 0.5(H + H')
@@ -82,7 +84,7 @@ for (scalar_interpol, quad_rule) in  (
         @test vol ≈ reference_volume(func_interpol)
 
         # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
-        for (i, qp_x) in enumerate(getpoints(quad_rule))
+        for (i, qp_x) in pairs(Ferrite.getpoints(quad_rule))
             @test spatial_coordinate(cv, i, x) ≈ qp_x
         end
 
@@ -309,6 +311,14 @@ end
             @test _get_geo_ip(cv) == scalar_ip(geo_ip)
         end
     end
+end
+
+@testset "show" begin
+    # Just smoke test
+    cv_quad = CellValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}()^2)
+    cv_wedge = CellValues(QuadratureRule{RefPrism}(2), Lagrange{RefPrism,2}())
+    show(stdout, MIME"text/plain"(), cv_quad)
+    show(stdout, MIME"text/plain"(), cv_wedge)
 end
 
 end # of testset

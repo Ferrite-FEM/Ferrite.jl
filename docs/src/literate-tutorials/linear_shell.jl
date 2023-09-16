@@ -98,7 +98,7 @@ for cell in CellIterator(grid)
     fill!(ke, 0.0)
     reinit!(cv, cell)
     celldofs!(celldofs, dh, cellid(cell))
-    get_cell_coordinates!(cellcoords, grid, cellid(cell))
+    getcoordinates!(cellcoords, grid, cellid(cell))
     
     #Call the element routine
     integrate_shell!(ke, cv, qr_ooplane, cellcoords, data)

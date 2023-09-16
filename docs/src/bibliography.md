@@ -1,0 +1,6 @@
+# Bibliography
+
+## Cited Work
+
+```@bibliography
+```

@@ -242,3 +242,11 @@ function reinit!(cv::OldCellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVect
     end
     return nothing
 end
+
+function Base.show(io::IO, m::MIME"text/plain", cv::CellValues)
+    println(io, "CellValues with")
+    println(io, "- Quadrature rule with ", getnquadpoints(cv), " points")
+    print(io, "- Function interpolation: "); show(io, m, cv.ip)
+    println(io)
+    print(io, "- Geometric interpolation: "); show(io, m, cv.gip)
+end
