@@ -18,7 +18,8 @@ The following structure can be used to write various output to a vtk-file:
 ```@example export
 VTKFile("my_solution", grid) do vtk
     write_solution(vtk, dh, u)
-end;
+end
+rm("my_solution.vtk") # hide
 ```
 where `write_solution` is just one example of the following functions that can be used 
 
@@ -36,7 +37,8 @@ Instead of using the `do`-block, it is also possible to do
 vtk = VTKFile("my_solution", grid)
 write_solution(vtk, dh, u)
 # etc.
-close(vtk);
+close(vtk)
+rm("my_solution.vtk") # hide
 ```
 
 The data written by `write_solution`, `write_celldata`, `Ferrite.write_nodedata`, and `write_projection` may be either scalar (`Vector{<:Number}`) or tensor (`Vector{<:AbstractTensor}`) data. 
@@ -55,5 +57,7 @@ for t in range(0, 1, 5)
     end
 end
 close(pvd);
+rm.((string("my_results_", i, ".vtu") for i in 1:5)) #hide
+rm("my_results.pvd") #hide
 ```
 See [Transient heat equation](@ref tutorial-transient-heat-equation) for an example
