@@ -13,11 +13,11 @@
             
             nqp = getnquadpoints(iv)
             # Should have same quadrature points
-            @test nqp == getnquadpoints(iv.face_values_a) == getnquadpoints(iv.face_values_b)
+            @test nqp == getnquadpoints(iv.here) == getnquadpoints(iv.there)
             for qp in 1:nqp
                 # If correctly synced quadrature points coordinates should match
-                @test spatial_coordinate(iv, qp, cell_a_coords) ≈ spatial_coordinate(iv.face_values_a, qp, cell_a_coords) ≈
-                spatial_coordinate(iv.face_values_b, qp, cell_b_coords)
+                @test spatial_coordinate(iv, qp, cell_a_coords) ≈ spatial_coordinate(iv.here, qp, cell_a_coords) ≈
+                spatial_coordinate(iv.there, qp, cell_b_coords)
                 for i in 1:getnbasefunctions(iv)
                     shapevalue = shape_value(iv, qp, i)
                     shape_avg = shape_value_average(iv, qp, i)
@@ -29,16 +29,16 @@
 
                     normal = getnormal(iv, qp, false)
                     # Test values (May be removed as it mirrors implementation)
-                    if i > getnbasefunctions(iv.face_values_a)
-                        @test shapevalue ≈ shape_value(iv.face_values_b, qp, i - getnbasefunctions(iv.face_values_a))
-                        @test shapegrad ≈ shape_gradient(iv.face_values_b, qp, i - getnbasefunctions(iv.face_values_a))
+                    if i > getnbasefunctions(iv.here)
+                        @test shapevalue ≈ shape_value(iv.there, qp, i - getnbasefunctions(iv.here))
+                        @test shapegrad ≈ shape_gradient(iv.there, qp, i - getnbasefunctions(iv.here))
 
                         @test shape_jump ≈ shapevalue
                         @test shapegrad_jump ≈ shapegrad
                     else
                         normal = getnormal(iv, qp)
-                        @test shapevalue ≈ shape_value(iv.face_values_a, qp, i)
-                        @test shapegrad ≈ shape_gradient(iv.face_values_a, qp, i)
+                        @test shapevalue ≈ shape_value(iv.here, qp, i)
+                        @test shapegrad ≈ shape_gradient(iv.here, qp, i)
 
                         @test shape_jump ≈ -shapevalue
                         @test shapegrad_jump ≈ -shapegrad
@@ -53,8 +53,8 @@
             @test_throws ErrorException("Invalid base function $(n_basefuncs + 1). Interface has only $(n_basefuncs) base functions") shape_gradient_average(iv, 1, n_basefuncs + 1)
 
             # Test function* copied from facevalues tests
-            nbf_a = Ferrite.getngeobasefunctions(iv.face_values_a)
-            nbf_b = Ferrite.getngeobasefunctions(iv.face_values_b)
+            nbf_a = Ferrite.getngeobasefunctions(iv.here)
+            nbf_b = Ferrite.getngeobasefunctions(iv.there)
             for here in (true, false)
                 u_a = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1: nbf_a]
                 u_b = Vec{ndim, Float64}[zero(Tensor{1,ndim}) for i in 1: nbf_b]
@@ -100,8 +100,8 @@
                 end
                 
                 xs = here ? cell_a_coords : cell_b_coords
-                x_face = xs[[Ferrite.dirichlet_facedof_indices(here ? ip_a : ip_b)[here ? Ferrite.getcurrentface(iv.face_values_a) : Ferrite.getcurrentface(iv.face_values_b)]...]]
-                @test vol ≈ calculate_face_area(here ? ip_a : ip_b, x_face, here ? Ferrite.getcurrentface(iv.face_values_a) : Ferrite.getcurrentface(iv.face_values_b))
+                x_face = xs[[Ferrite.dirichlet_facedof_indices(here ? ip_a : ip_b)[here ? Ferrite.getcurrentface(iv.here) : Ferrite.getcurrentface(iv.there)]...]]
+                @test vol ≈ calculate_face_area(here ? ip_a : ip_b, x_face, here ? Ferrite.getcurrentface(iv.here) : Ferrite.getcurrentface(iv.there))
             end
         end
     end

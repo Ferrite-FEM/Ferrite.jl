@@ -45,19 +45,19 @@ and function on the interfaces of finite elements.
 InterfaceValues
 
 struct InterfaceValues{FVA, FVB} <: AbstractValues
-    face_values_a::FVA
-    face_values_b::FVB
+    here::FVA
+    there::FVB
 end
 function InterfaceValues(quad_rule_a::FaceQuadratureRule, func_interpol_a::Interpolation,
     geom_interpol_a::Interpolation = func_interpol_a; quad_rule_b::FaceQuadratureRule = deepcopy(quad_rule_a),
     func_interpol_b::Interpolation = func_interpol_a, geom_interpol_b::Interpolation = func_interpol_b)
-    face_values_a = FaceValues(quad_rule_a, func_interpol_a, geom_interpol_a)
-    face_values_b = FaceValues(quad_rule_b, func_interpol_b, geom_interpol_b)
-    return InterfaceValues{typeof(face_values_a), typeof(face_values_b)}(face_values_a, face_values_b)
+    here = FaceValues(quad_rule_a, func_interpol_a, geom_interpol_a)
+    there = FaceValues(quad_rule_b, func_interpol_b, geom_interpol_b)
+    return InterfaceValues{typeof(here), typeof(there)}(here, there)
 end
 
-getnbasefunctions(iv::InterfaceValues) = getnbasefunctions(iv.face_values_a) + getnbasefunctions(iv.face_values_b)
-getngeobasefunctions(iv::InterfaceValues) = getngeobasefunctions(iv.face_values_a) + getngeobasefunctions(iv.face_values_b)
+getnbasefunctions(iv::InterfaceValues) = getnbasefunctions(iv.here) + getnbasefunctions(iv.there)
+getngeobasefunctions(iv::InterfaceValues) = getngeobasefunctions(iv.here) + getngeobasefunctions(iv.there)
 
 """
     getnquadpoints(iv::InterfaceValues)
@@ -65,9 +65,9 @@ getngeobasefunctions(iv::InterfaceValues) = getngeobasefunctions(iv.face_values_
 Return the number of quadrature points in `iv`s element A's [`FaceValues`](@ref)' quadrature for the current
 (most recently [`reinit!`](@ref)ed) interface.
 """
-getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.face_values_a.qr, iv.face_values_a.current_face[])
+getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.here.qr, iv.here.current_face[])
 
-@propagate_inbounds getdetJdV(iv::InterfaceValues, q_point::Int) = getdetJdV(iv.face_values_a, q_point)
+@propagate_inbounds getdetJdV(iv::InterfaceValues, q_point::Int) = getdetJdV(iv.here, q_point)
 
 """
     reinit!(iv::InterfaceValues, face_a::Int, face_b::Int, cell_a_coords::AbstractVector{Vec{dim, T}}, cell_b_coords::AbstractVector{Vec{dim, T}}, cell_a::AbstractCell, cell_b::AbstractCell)
@@ -76,24 +76,24 @@ Update the [`FaceValues`](@ref) in the interface (A and B) using their correspon
 and mutating element B's quadrature points and its [`FaceValues`](@ref) `M, N, dMdξ, dNdξ`.
 """
 function reinit!(iv::InterfaceValues, face_a::Int, face_b::Int, cell_a_coords::AbstractVector{Vec{dim, T}}, cell_b_coords::AbstractVector{Vec{dim, T}}, cell_a::AbstractCell, cell_b::AbstractCell) where {dim, T}
-    reinit!(iv.face_values_a, cell_a_coords, face_a)
-    dim == 1 && return reinit!(iv.face_values_b, cell_b_coords, face_b) 
-    iv.face_values_b.current_face[] = face_b
+    reinit!(iv.here, cell_a_coords, face_a)
+    dim == 1 && return reinit!(iv.there, cell_b_coords, face_b) 
+    iv.there.current_face[] = face_b
     interface_transformation = InterfaceTransformation(cell_a, cell_b, face_a, face_b)
-    quad_points_a = getpoints(iv.face_values_a.qr, face_a)
-    quad_points_b = getpoints(iv.face_values_b.qr, face_b)
+    quad_points_a = getpoints(iv.here.qr, face_a)
+    quad_points_b = getpoints(iv.there.qr, face_b)
     transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
-    @boundscheck checkface(iv.face_values_b, face_b)
+    @boundscheck checkface(iv.there, face_b)
     # This is the bottleneck, cache it?
-    for idx in eachindex(IndexCartesian(), @view iv.face_values_b.N[:, :, face_b])
+    for idx in eachindex(IndexCartesian(), @view iv.there.N[:, :, face_b])
         @boundscheck idx[2] > length(quad_points_b) && continue
-        iv.face_values_b.dNdξ[idx, face_b], iv.face_values_b.N[idx, face_b] = shape_gradient_and_value(iv.face_values_b.func_interp, quad_points_b[idx[2]], idx[1])
+        iv.there.dNdξ[idx, face_b], iv.there.N[idx, face_b] = shape_gradient_and_value(iv.there.func_interp, quad_points_b[idx[2]], idx[1])
     end
-    for idx in eachindex(IndexCartesian(), @view iv.face_values_b.M[:, :, face_b])
+    for idx in eachindex(IndexCartesian(), @view iv.there.M[:, :, face_b])
         @boundscheck idx[2] > length(quad_points_b) && continue
-        iv.face_values_b.dMdξ[idx, face_b], iv.face_values_b.M[idx, face_b] = shape_gradient_and_value(iv.face_values_b.geo_interp, quad_points_b[idx[2]], idx[1])
+        iv.there.dMdξ[idx, face_b], iv.there.M[idx, face_b] = shape_gradient_and_value(iv.there.geo_interp, quad_points_b[idx[2]], idx[1])
     end  
-    reinit!(iv.face_values_b, cell_b_coords, face_b)
+    reinit!(iv.there, cell_b_coords, face_b)
 end
 
 """
@@ -104,7 +104,7 @@ Return the normal at the quadrature point `qp` on the interface.
 For `InterfaceValues`, `use_elemet_a` determines which element to use for calculating divergence of the function.
 `true` uses the element A's face nomal vector, while `false` uses element B's, which is the default.
 """
-getnormal(iv::InterfaceValues, qp::Int, here::Bool = false) = here ? iv.face_values_a.normals[qp] : iv.face_values_b.normals[qp]
+getnormal(iv::InterfaceValues, qp::Int, here::Bool = false) = here ? iv.here.normals[qp] : iv.there.normals[qp]
 
 """
     function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
@@ -123,7 +123,7 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 nodal values of ``\\mathbf{u}``.
 """
 function function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true)
-    fv = here ? iv.face_values_a : iv.face_values_b
+    fv = here ? iv.here : iv.there
     function_value(fv, q_point, u, dof_range)
 end
 
@@ -149,13 +149,13 @@ For a vector valued function with use of `ScalarValues` the gradient is computed
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
 function function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true)
-    fv = here ? iv.face_values_a : iv.face_values_b
+    fv = here ? iv.here : iv.there
     function_gradient(fv, q_point, u, dof_range)
 end
 
 # TODO: Deprecate this, nobody is using this in practice...
 function function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true)
-    fv = here ? iv.face_values_a : iv.face_values_b
+    fv = here ? iv.here : iv.there
     function_gradient(fv, q_point, u)
 end
 
@@ -173,13 +173,13 @@ The symmetric gradient of a scalar function is computed as
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
 function function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true)
-    fv = here ? iv.face_values_a : iv.face_values_b
+    fv = here ? iv.here : iv.there
     function_symmetric_gradient(fv, q_point, u, dof_range)
 end
 
 # TODO: Deprecate this, nobody is using this in practice...
 function function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true)
-    fv = here ? iv.face_values_a : iv.face_values_b
+    fv = here ? iv.here : iv.there
     function_symmetric_gradient(fv, q_point, u)
 end
 
@@ -200,7 +200,7 @@ function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_ra
 
 # TODO: Deprecate this, nobody is using this in practice...
 function function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true)
-    fv = here ? iv.face_values_a : iv.face_values_b
+    fv = here ? iv.here : iv.there
     function_divergence(fv, q_point, u)
 end
 
@@ -269,13 +269,13 @@ for (func,                      f_,                 multiplier, ) in (
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, i::Int)
             nbf = getnbasefunctions(iv)
-            nbf_a = getnbasefunctions(iv.face_values_a)
+            nbf_a = getnbasefunctions(iv.here)
             if i <= nbf_a
-                fv = iv.face_values_a
+                fv = iv.here
                 f_value = $(f_)(fv, qp, i)
                 return $(multiplier) * f_value
             elseif i <= nbf
-                fv = iv.face_values_b
+                fv = iv.there
                 f_value = $(f_)(fv, qp, i - nbf_a)
                 return $(multiplier) * f_value
             end
@@ -291,7 +291,7 @@ for (func,                      f_,                 ) in (
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, i::Int)
             f_value = $(f_)(iv, qp, i)
-            nbf_a = getnbasefunctions(iv.face_values_a)
+            nbf_a = getnbasefunctions(iv.here)
             return i <= nbf_a ? -f_value : f_value
         end
     end
@@ -339,9 +339,9 @@ for (func,                          f_,                 ) in (
         function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
             f_value_here = $(f_)(iv, qp, u_a, dof_range_a, here = true)
             f_value_there = $(f_)(iv, qp, u_b, dof_range_b, here = false)
-            fv = iv.face_values_a
+            fv = iv.here
             result = 0.5 * f_value_here 
-            fv = iv.face_values_b
+            fv = iv.there
             result += 0.5 * f_value_there
             return result
         end
@@ -349,9 +349,9 @@ for (func,                          f_,                 ) in (
         function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector{<:Vec}, u_b::AbstractVector{<:Vec})
             f_value_here = $(f_)(iv, qp, u_a, here = true)
             f_value_there = $(f_)(iv, qp, u_b, here = false)
-            fv = iv.face_values_a
+            fv = iv.here
             result = 0.5 * f_value_here
-            fv = iv.face_values_b
+            fv = iv.there
             result += 0.5 * f_value_there
             return result
         end
@@ -378,7 +378,7 @@ for (func,                          f_,                 ) in (
 end
 
 spatial_coordinate(iv::InterfaceValues, q_point::Int, x::AbstractVector{Vec{dim,T}}) where {dim,T} =
-    spatial_coordinate(iv.face_values_a, q_point, x)
+    spatial_coordinate(iv.here, q_point, x)
 
 """
     get_transformation_matrix(interface_transformation::InterfaceTransformation)
