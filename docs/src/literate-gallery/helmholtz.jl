@@ -162,7 +162,7 @@ K, f = doassemble(cellvalues, facevalues, K, dh);
 apply!(K, f, dbcs)
 u = Symmetric(K) \ f;
 
-vtk = VTKFile("helmholtz", grid)
+vtk = VTKFile("helmholtz", dh)
 write_solution(vtk, dh, u)
 close(vtk)
 using Test #src

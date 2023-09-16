@@ -518,7 +518,7 @@ round.(ev; digits=-8)
 
 uM = zeros(ndofs(dh))
 
-VTKFile("homogenization", grid) do vtk
+VTKFile("homogenization", dh) do vtk
     for i in 1:3
         ## Compute macroscopic solution
         apply_analytical!(uM, dh, :u, x -> εᴹ[i] ⋅ x)

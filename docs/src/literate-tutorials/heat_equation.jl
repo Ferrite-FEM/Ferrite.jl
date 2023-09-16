@@ -213,7 +213,7 @@ u = K \ f;
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
-VTKFile("heat_equation", grid) do vtk
+VTKFile("heat_equation", dh) do vtk
     write_solution(vtk, dh, u)
 end
 
