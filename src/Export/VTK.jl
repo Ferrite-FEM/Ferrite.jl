@@ -1,6 +1,7 @@
 
 """
     VTKFile(filename::AbstractString, grid::AbstractGrid; kwargs...)
+    VTKFile(filename::AbstractString, dh::DofHandler; kwargs...)
 
 Create a `VTKFile` that contains an unstructured VTK grid. 
 The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see 
@@ -27,6 +28,9 @@ end
 struct VTKFile{VTK<:WriteVTK.DatasetFile}
     vtk::VTK
 end
+function VTKFile(filename::String, dh::DofHandler; kwargs...)
+    return VTKFile(filename, get_grid(dh); kwargs...)
+end
 function VTKFile(filename::String, grid::AbstractGrid; kwargs...)
     vtk = create_vtk_grid(filename, grid; kwargs...)
     return VTKFile(vtk)
@@ -51,6 +55,7 @@ end
 
 """
     ParaviewCollection(name::String, grid::AbstractGrid)
+    ParaviewCollection(name::String, dh::DofHandler)
 
 Create a paraview collection file (.pvd) that can be used to 
 save multiple vtk file. Example,
@@ -66,19 +71,32 @@ end
 close(pvd)
 ```
 """
-mutable struct ParaviewCollection{P<:WriteVTK.CollectionFile,G<:AbstractGrid}
+mutable struct ParaviewCollection{P<:WriteVTK.CollectionFile,G_DH}
     pvd::P
-    grid::G
+    grid_or_dh::G_DH
     name::String
     step::Int
 end
-function ParaviewCollection(name::String, grid::AbstractGrid)
+function ParaviewCollection(name::String, grid_or_dh::Union{AbstractGrid,AbstractDofHandler})
     pvd = WriteVTK.paraview_collection(name)
-    return ParaviewCollection(pvd, grid, name, 0)
+    return ParaviewCollection(pvd, grid_or_dh, name, 0)
 end
 Base.close(pvd::ParaviewCollection) = WriteVTK.vtk_save(pvd.pvd)
 
-function addstep!(f::Function, pvd::ParaviewCollection, t, grid=pvd.grid)
+"""
+    addstep!(f::Function, pvd::ParaviewCollection, t::Real, [grid_or_dh])
+
+Add a step at time `t` by writing a `VTKFile` to `pvd`. 
+If required, a new grid can be used by supplying the grid or dofhandler as the last argument.
+Should be used in a do-block:
+```julia
+addstep!(pvd, t) do vtk 
+    write_solution(vtk, dh, u)
+end
+```
+See also [`ParaviewCollection`](@ref). 
+"""
+function addstep!(f::Function, pvd::ParaviewCollection, t, grid=pvd.grid_or_dh)
     pvd.step += 1
     VTKFile(string(pvd.name, "_", pvd.step), grid) do vtk
         f(vtk)
