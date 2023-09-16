@@ -153,6 +153,12 @@ function function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector,
     function_gradient(fv, q_point, u, dof_range)
 end
 
+# TODO: Deprecate this, nobody is using this in practice...
+function function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true)
+    fv = here ? iv.face_values_a : iv.face_values_b
+    function_gradient(fv, q_point, u)
+end
+
 """
     function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
 
@@ -171,6 +177,12 @@ function function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::Abstr
     function_symmetric_gradient(fv, q_point, u, dof_range)
 end
 
+# TODO: Deprecate this, nobody is using this in practice...
+function function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true)
+    fv = here ? iv.face_values_a : iv.face_values_b
+    function_symmetric_gradient(fv, q_point, u)
+end
+
 """
     function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
 
@@ -185,6 +197,12 @@ where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
 function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) =
     divergence_from_gradient(function_gradient(iv, q_point, u, dof_range; here = here))
+
+# TODO: Deprecate this, nobody is using this in practice...
+function function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true)
+    fv = here ? iv.face_values_a : iv.face_values_b
+    function_divergence(fv, q_point, u)
+end
 
 """
     function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
@@ -201,6 +219,9 @@ where ``\\mathbf{u}_i`` are the nodal values of the function.
 function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) =
     curl_from_gradient(function_gradient(iv, q_point, u, dof_range; here))
 
+# TODO: Deprecate this, nobody is using this in practice...
+function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true) =
+    curl_from_gradient(function_gradient(iv, q_point, u; here))
 
 """
     shape_value_average(iv::InterfaceValues, qp::Int, base_function::Int)
