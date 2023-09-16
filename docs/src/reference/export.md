@@ -24,9 +24,10 @@ evaluate_at_grid_nodes
 ```
 
 ## VTK Export
-
 ```@docs
 VTKFile
+ParaviewCollection
+addstep!
 write_solution
 write_projection
 write_celldata
