@@ -67,7 +67,8 @@ function CellCache(dh::DofHandler{dim}, flags::UpdateFlags=UpdateFlags()) where 
 end
 
 function CellCache(sdh::SubDofHandler, flags::UpdateFlags=UpdateFlags())
-    CellCache(flags, sdh.dh.grid, ScalarWrapper(-1), Int[], Vec{2,Float64}[], sdh, Int[])
+    dim = getdim(sdh.dh.grid)
+    CellCache(flags, sdh.dh.grid, ScalarWrapper(-1), Int[], Vec{dim,Float64}[], sdh, Int[])
 end
 
 function reinit!(cc::CellCache, i::Int)
