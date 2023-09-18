@@ -48,16 +48,24 @@ struct InterfaceValues{FVA, FVB} <: AbstractValues
     here::FVA
     there::FVB
 end
-function InterfaceValues(quad_rule_a::FaceQuadratureRule, func_interpol_a::Interpolation,
-    geom_interpol_a::Interpolation = func_interpol_a; quad_rule_b::FaceQuadratureRule = deepcopy(quad_rule_a),
-    func_interpol_b::Interpolation = func_interpol_a, geom_interpol_b::Interpolation = func_interpol_b)
-    here = FaceValues(quad_rule_a, func_interpol_a, geom_interpol_a)
-    there = FaceValues(quad_rule_b, func_interpol_b, geom_interpol_b)
+
+# Same interpolation on both sides
+function InterfaceValues(qr::FaceQuadratureRule, ip::Interpolation,
+        gip::Interpolation = default_geometric_interpolation(ip))
+    here = FaceValues(qr, ip, gip)
+    there = FaceValues(deepcopy(qr), ip, gip)
     return InterfaceValues{typeof(here), typeof(there)}(here, there)
 end
 
-getnbasefunctions(iv::InterfaceValues) = getnbasefunctions(iv.here) + getnbasefunctions(iv.there)
-getngeobasefunctions(iv::InterfaceValues) = getngeobasefunctions(iv.here) + getngeobasefunctions(iv.there)
+# Different interpolations on the two sides
+function InterfaceValues(qr::FaceQuadratureRule,
+        ip_here::Interpolation, ip_there::Interpolation,
+        gip_here::Interpolation = default_geometric_interpolation(ip_here),
+        gip_there::Interpolation = default_geometric_interpolation(ip_there))
+    here = FaceValues(qr, ip_here, gip_here)
+    there = FaceValues(deepcopy(qr), ip_there, gip_there)
+    return InterfaceValues{typeof(here), typeof(there)}(here, there)
+end
 
 """
     getnquadpoints(iv::InterfaceValues)
