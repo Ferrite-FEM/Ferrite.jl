@@ -13,7 +13,8 @@ struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCell
     qr::QR
 end
 function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation) where T 
-    geo_values = GeometryValues(T, ip_geo.ip, qr)
+    mapping_type = get_mapping_type(ip_fun)
+    geo_values = GeometryValues(T, ip_geo.ip, qr, RequiresHessian(requires_hessian(mapping_type)))
     fun_values = FunctionValues(T, ip_fun, qr, ip_geo)
     detJdV = fill(T(NaN), length(getweights(qr)))
     return CellValues(geo_values, detJdV, fun_values, qr)
@@ -42,18 +43,20 @@ end
 # Access quadrature rule values 
 getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 
-function reinit!(cv::CellValues, x::AbstractVector{<:Vec})
+function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
     geo_values = cv.geo_values
+    mapping_type = get_mapping_type(cv.fun_values)
+    map_req = RequiresHessian(requires_hessian(mapping_type))
     n_geom_basefuncs = getngeobasefunctions(geo_values)
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x)!=n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     end
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
-        mapping = calculate_mapping(geo_values, q_point, x)
+        mapping = calculate_mapping(map_req, geo_values, q_point, x)
         detJ = calculate_detJ(getjacobian(mapping))
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         @inbounds cv.detJdV[q_point] = detJ*w
-        apply_mapping!(cv.fun_values, q_point, mapping)
+        apply_mapping!(cv.fun_values, q_point, mapping, geo_values, cell)
     end
     return nothing
 end

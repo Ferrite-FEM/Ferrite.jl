@@ -23,7 +23,8 @@ typeof_dNdξ(::Type{T}, ::VInterpolationDims{dim,dim,dim}) where {T,dim} = Tenso
 typeof_dNdξ(::Type{T}, ::VInterpolationDims{rdim,<:Any,vdim}) where {T,rdim,vdim} = SMatrix{vdim,rdim,T} # If vdim=rdim!=sdim Tensor would be possible...
 
 struct FunctionValues{IP, N_t, dNdx_t, dNdξ_t}
-    N::Matrix{N_t} 
+    N_x::Matrix{N_t}
+    N_ξ::Matrix{N_t}
     dNdx::Matrix{dNdx_t}
     dNdξ::Matrix{dNdξ_t}
     ip::IP
@@ -36,10 +37,15 @@ function FunctionValues(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
     
-    N    = zeros(N_t,    n_shape, n_qpoints)
+    N_ξ  = zeros(N_t,    n_shape, n_qpoints)
+    if isa(get_mapping_type(ip), IdentityMapping)
+        N_x = N_ξ
+    else
+        N_x  = zeros(N_t,    n_shape, n_qpoints)
+    end
     dNdξ = zeros(dNdξ_t, n_shape, n_qpoints)
     dNdx = fill(zero(dNdx_t) * T(NaN), n_shape, n_qpoints)
-    fv = FunctionValues(N, dNdx, dNdξ, ip)
+    fv = FunctionValues(N_x, N_ξ, dNdx, dNdξ, ip)
     precompute_values!(fv, qr) # Precompute N and dNdξ
     return fv
 end
@@ -48,13 +54,13 @@ function precompute_values!(fv::FunctionValues, qr::QuadratureRule)
     n_shape = getnbasefunctions(fv.ip)
     for (qp, ξ) in pairs(getpoints(qr))
         for i in 1:n_shape
-            fv.dNdξ[i, qp], fv.N[i, qp] = shape_gradient_and_value(fv.ip, ξ, i)
+            fv.dNdξ[i, qp], fv.N_ξ[i, qp] = shape_gradient_and_value(fv.ip, ξ, i)
         end
     end
 end
 
-getnbasefunctions(funvals::FunctionValues) = size(funvals.N, 1)
-@propagate_inbounds shape_value(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.N[base_func, q_point]
+getnbasefunctions(funvals::FunctionValues) = size(funvals.N_x, 1)
+@propagate_inbounds shape_value(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.N_x[base_func, q_point]
 @propagate_inbounds shape_gradient(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.dNdx[base_func, q_point]
 @propagate_inbounds shape_symmetric_gradient(funvals::FunctionValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(funvals, q_point, base_func))
 
@@ -94,7 +100,7 @@ calculate_Jinv(J::SMatrix) = pinv(J)
     return apply_mapping!(funvals, get_mapping_type(funvals), args...)
 end
 
-@inline function apply_mapping!(funvals::FunctionValues, ::IdentityMapping, q_point::Int, mapping_values)
+@inline function apply_mapping!(funvals::FunctionValues, ::IdentityMapping, q_point::Int, mapping_values, args...)
     Jinv = calculate_Jinv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
         #funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Jinv # TODO via Tensors.jl
@@ -102,13 +108,19 @@ end
     end
     return nothing
 end
-#=
-@inline function apply_mapping!(funvals::FunctionValues, ::IdentityMapping, q_point::Int, mapping_values)
+
+@inline function apply_mapping!(funvals::FunctionValues, ::CovariantPiolaMapping, q_point::Int, mapping_values, geovals::GeometryValues, cell)
+    H = gethessian(mapping_values)
     Jinv = inv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
+        face_vertices = faces(cell)[j]
+        d = face_vertices[2] > face_vertices[1] ? 1 : -1
+        #d = 1
         #funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Jinv # TODO via Tensors.jl
-        funvals.dNdx[j, q_point] = dothelper(funvals.dNdξ[j, q_point], Jinv)
+        dNdξ = funvals.dNdξ[j, q_point]
+        N_ξ = funvals.N_ξ[j, q_point]
+        funvals.N_x[j, q_point] = d*(N_ξ ⋅ Jinv)
+        funvals.dNdx[j, q_point] = d*(Jinv' ⋅ dNdξ ⋅ Jinv - Jinv' ⋅ (N_ξ ⋅ Jinv ⋅ H ⋅ Jinv))
     end
     return nothing
 end
-=#

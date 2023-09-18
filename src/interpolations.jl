@@ -238,6 +238,16 @@ function shape_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
 end
 
 """
+    shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
+
+Optimized version combining the evaluation [`Ferrite.shape_value(::Interpolation)`](@ref),
+[`Ferrite.shape_gradient(::Interpolation)`](@ref), and the gradient of the latter. 
+"""
+function shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
+    return hessian(x -> shape_value(ip, x, i), ξ, :all)
+end
+
+"""
     reference_coordinates(ip::Interpolation)
 
 Returns a vector of coordinates with length [`getnbasefunctions(::Interpolation)`](@ref)
@@ -1504,8 +1514,7 @@ function shape_gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, ξ:
 end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
-
-
+is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
 get_mapping_type(::Interpolation) = IdentityMapping()
 
 # https://defelement.com/elements/raviart-thomas.html
@@ -1517,7 +1526,7 @@ facedof_interior_indices(ip::RaviartThomas) = facedof_indices(ip)
 getnbasefunctions(::RaviartThomas{2,RefTriangle,1}) = 3
 facedof_indices(::RaviartThomas{2,RefTriangle,1}) = ((1,), (2,), (3,))
 adjust_dofs_during_distribution(::RaviartThomas) = false # Not sure how this works, but should be done for higher orders
-# https://defelement.com/elements/examples/triangle-N1div-1.html
+# https://defelement.com/elements/examples/triangle-raviart-thomas-lagrange-1.html
 function shape_value(ip::RaviartThomas{2,RefTriangle,1}, ξ::Vec{2}, i::Int)
     ξ_x, ξ_y = ξ
     i == 1 && return -ξ
@@ -1526,4 +1535,21 @@ function shape_value(ip::RaviartThomas{2,RefTriangle,1}, ξ::Vec{2}, i::Int)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
-is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
+
+struct Nedelec{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
+# https://defelement.com/elements/examples/triangle-nedelec1-lagrange-1.html
+function shape_value(ip::Nedelec{2,RefTriangle,1}, ξ::Vec{2}, i::Int)
+    ξ_x, ξ_y = ξ
+    i == 1 && return Vec(  - ξ_y,     ξ_x)
+    i == 2 && return Vec(  - ξ_y, ξ_x - 1)
+    i == 3 && return Vec(1 - ξ_y,     ξ_x)
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+get_mapping_type(::Nedelec) = CovariantPiolaMapping()
+#facedof_interior_indices(ip::Nedelec) = facedof_indices(ip)
+
+getnbasefunctions(::Nedelec{2,RefTriangle,1}) = 3
+facedof_indices(::Nedelec{2,RefTriangle,1}) = ((), (), ())
+facedof_interior_indices(::Nedelec{2,RefTriangle,1}) = ((1,), (2,), (3,))
+adjust_dofs_during_distribution(::Nedelec) = false # Not sure how this works, but should be done for higher orders
