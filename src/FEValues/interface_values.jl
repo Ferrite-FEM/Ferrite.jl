@@ -398,7 +398,7 @@ Returns the transformation matrix corresponding to the interface information sto
 """
 get_transformation_matrix
 
-function get_transformation_matrix(interface_transformation::InterfaceTransformation{4})
+function get_transformation_matrix(interface_transformation::InterfaceTransformation, ::Type{RefQuadrilateral})
     flipped = interface_transformation.flipped
     shift_index = interface_transformation.shift_index
     lowest_node_shift_index = interface_transformation.lowest_node_shift_index
@@ -409,7 +409,7 @@ function get_transformation_matrix(interface_transformation::InterfaceTransforma
     return M
 end
 
-function get_transformation_matrix(interface_transformation::InterfaceTransformation{3})
+function get_transformation_matrix(interface_transformation::InterfaceTransformation, ::Type{RefTriangle})
     flipped = interface_transformation.flipped
     shift_index = interface_transformation.shift_index
     lowest_node_shift_index = interface_transformation.lowest_node_shift_index
@@ -492,32 +492,29 @@ y      |   \
 """
 transform_interface_points!
 
-function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceTransformation)
-    cell_a_refshape = interface_transformation.cell_a_refshape
-    cell_b_refshape = interface_transformation.cell_b_refshape
+function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceTransformation{RefShapeA, RefShapeB}) where {RefShapeA, RefShapeB}
     face_a = interface_transformation.face_a_index
     face_b = interface_transformation.face_b_index
-    
-    M = get_transformation_matrix(interface_transformation)
+    face_refshape = get_face_refshape(RefShapeA, face_a)
+
+    M = get_transformation_matrix(interface_transformation, face_refshape)
     for (idx, point) in pairs(points)
-        point = element_to_face_transformation(point, cell_a_refshape, face_a)
+        point = element_to_face_transformation(point, RefShapeA, face_a)
         result = M * Vec(point[1],point[2], 1.0)
-        dst[idx] = face_to_element_transformation(Vec(result[1],result[2]), cell_b_refshape, face_b)
+        dst[idx] = face_to_element_transformation(Vec(result[1],result[2]), RefShapeB, face_b)
     end
     return nothing
 end
 
-function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vector{Vec{2, Float64}}, interface_transformation::InterfaceTransformation{2})
+function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vector{Vec{2, Float64}}, interface_transformation::InterfaceTransformation{RefShapeA, RefShapeB}) where {RefShapeA, RefShapeB}
     flipped = interface_transformation.flipped
-    cell_a_refshape = interface_transformation.cell_a_refshape
-    cell_b_refshape = interface_transformation.cell_b_refshape
     face_a = interface_transformation.face_a_index
     face_b = interface_transformation.face_b_index
     
     for (idx, point) in pairs(points)
-        point = element_to_face_transformation(point, cell_a_refshape, face_a)
+        point = element_to_face_transformation(point, RefShapeA, face_a)
         flipped && (point *= -1) 
-        dst[idx] = face_to_element_transformation(point, cell_b_refshape, face_b)
+        dst[idx] = face_to_element_transformation(point, RefShapeB, face_b)
     end
     return nothing
 end

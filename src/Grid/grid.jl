@@ -862,14 +862,12 @@ which are flipped against each other, note that face B has its reference node sh
 so the face is tranformed into an equilateral triangle then rotated 120°, flipped about the x axis then
 rotated -120° and tranformed back to the reference triangle.Any combination of these can happen. 
 """
-struct InterfaceTransformation{nfacenodes}
+struct InterfaceTransformation{RefShapeA, RefShapeB}
     flipped::Bool
     shift_index::Int
     lowest_node_shift_index::Int
     # Used to dispatch the correct 2/3D -> 3/2D Transformations
-    cell_a_refshape::Type{<:AbstractRefShape}
     face_a_index::Int
-    cell_b_refshape::Type{<:AbstractRefShape}
     face_b_index::Int
 end
 
@@ -890,7 +888,7 @@ function InterfaceTransformation(cell_a::AbstractCell, cell_b::AbstractCell, fac
     shift_index = min_idx_b - min_idx_a
     flipped = getdim(cell_a) == 2 ? shift_index != 0 : nodes_a[min_idx_a != 1 ? min_idx_a - 1 : end] != nodes_b[min_idx_b != 1 ? min_idx_b - 1 : end]
 
-    return InterfaceTransformation{length(nodes_a)}(flipped, shift_index, 1 - min_idx_b, getrefshape(cell_a), face_a, getrefshape(cell_b), face_b)
+    return InterfaceTransformation{getrefshape(cell_a), getrefshape(cell_b)}(flipped, shift_index, 1 - min_idx_b, face_a, face_b)
 end
 
 # This looks out of place, move it to Tensors.jl or use the one defined there with higher error? *Using sinpi and cospi makes tetrahedon custom quadrature points interface values test pass
@@ -902,3 +900,13 @@ Construct thr 1D 3x3 rotation matrix for θ = xπ more accurately using sinpi an
 function rotation_matrix_pi(θ::Float64)
     return SMatrix{3,3}(cospi(θ), sinpi(θ), 0.0, -sinpi(θ), cospi(θ), 0.0, 0.0, 0.0, 1.0)
 end
+
+"""
+    get_face_refshape(cell_refshape::Type{<:AbstractRefShape}, face::Int)
+
+Return the reference shape of the face.
+"""
+get_face_refshape(::Type{RefTetrahedron}, ::Int) = RefTriangle
+get_face_refshape(::Type{RefHexahedron}, ::Int) = RefQuadrilateral
+get_face_refshape(::Type{RefPrism}, face::Int) = face ∈ (1,5) ? RefTriangle : RefQuadrilateral
+get_face_refshape(::Type{RefPyramid}, face::Int) = face == 1 ? RefQuadrilateral : RefTriangle
