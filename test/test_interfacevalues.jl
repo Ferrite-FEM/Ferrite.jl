@@ -1,6 +1,6 @@
 @testset "InterfaceValues" begin
-    function test_interfacevalues(grid, ip_a, qr_a, ip_b = ip_a, qr_b = deepcopy(qr_a))
-        iv = Ferrite.InterfaceValues(qr_a, ip_a; quad_rule_b = qr_b, func_interpol_b = ip_b)
+    function test_interfacevalues(grid, ip_a, qr_a, ip_b = ip_a)
+        iv = InterfaceValues(qr_a, ip_a, ip_a; ip_there = ip_b, geo_ip_there = ip_b)
         ndim = Ferrite.getdim(ip_a)
         n_basefuncs = getnbasefunctions(ip_a) + getnbasefunctions(ip_b)
 
@@ -27,7 +27,7 @@
                     shapegrad_avg = shape_gradient_average(iv, qp, i)
                     shapegrad_jump = shape_gradient_jump(iv, qp, i)
 
-                    normal = getnormal(iv, qp, false)
+                    normal = getnormal(iv, qp; here=false)
                     # Test values (May be removed as it mirrors implementation)
                     if i > getnbasefunctions(iv.here)
                         @test shapevalue ≈ shape_value(iv.there, qp, i - getnbasefunctions(iv.here))
@@ -203,7 +203,7 @@
         DiscontinuousLagrange{RefHexahedron, 1}(), FaceQuadratureRule{RefHexahedron}(2))
     end
     # Test copy
-    iv = Ferrite.InterfaceValues(FaceQuadratureRule{RefQuadrilateral}(2), DiscontinuousLagrange{RefQuadrilateral, 1}())
+    iv = InterfaceValues(FaceQuadratureRule{RefQuadrilateral}(2), DiscontinuousLagrange{RefQuadrilateral, 1}())
     ivc = copy(iv)
     @test typeof(iv) == typeof(ivc)
     for fname in fieldnames(typeof(iv))

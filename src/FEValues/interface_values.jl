@@ -1,31 +1,33 @@
 # Defines InterfaceValues and common methods
 """
-    InterfaceValues(grid::AbstractGrid, quad_rule::FaceQuadratureRule, func_interpol_a::Interpolation, [geom_interpol_a::Interpolation], [func_interpol_b::Interpolation], [geom_interpol_b::Interpolation])
+    InterfaceValues(quad_rule::FaceQuadratureRule, ip_here::Interpolation, [geo_ip_here::Interpolation]; kwargs...)
 
-An `InterfaceValues` object facilitates the process of evaluating values, averages, jumps and gradients of shape functions
-and function on the interfaces of finite elements.
+An `InterfaceValues` object facilitates the process of evaluating values, averages, jumps
+and gradients of shape functions and function on the interfaces between elements.
+
+The first element of the interface is denoted "here" and the second element "there".
 
 **Arguments:**
+* `quad_rule`: an instance of a [`FaceQuadratureRule`](@ref) used for the "here" element.
+  The quadrature points are translated to the "there" element during `reinit!`.
+* `ip_here`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated
+  function on the "here" element.
+* `geo_ip_here`: an optional instance of an [`Interpolation`](@ref) used to interpolate the
+  geometry for the "here" element. Defaults to linear Lagrange interpolation.
 
-* `quad_rule_a`: an instance of a [`FaceQuadratureRule`](@ref) for element A.
-* `quad_rule_b`: an instance of a [`FaceQuadratureRule`](@ref) for element B.
-* `func_interpol_a`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function for element A.
-* `func_interpol_b`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function for element B.
-  It defaults to `func_interpol_a`.
-* `geom_interpol_a`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry for element A.
-  It defaults to `func_interpol_a`.
-* `geom_interpol_b`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry for element B.
-  It defaults to `func_interpol_b`.
- 
-**associated methods:**
+**Keyword arguments:**
+* `ip_there`: an optional instance of an [`Interpolation`](@ref) used to interpolate the
+  approximated function on the "there" element. Defaults to `ip_here`.
+* `geo_ip_there`: an optional instance of an [`Interpolation`](@ref) used to interpolate the
+  geometry for the "there" element. Defaults to linear Lagrange interpolation.
 
+**Associated methods:**
 * [`shape_value_average`](@ref)
 * [`shape_value_jump`](@ref)
 * [`shape_gradient_average`](@ref)
 * [`shape_gradient_jump`](@ref)
 
 **Common methods:**
-
 * [`reinit!`](@ref)
 * [`getnquadpoints`](@ref)
 * [`getdetJdV`](@ref)
@@ -48,11 +50,12 @@ struct InterfaceValues{FVA, FVB} <: AbstractValues
     here::FVA
     there::FVB
 end
-function InterfaceValues(quad_rule_a::FaceQuadratureRule, func_interpol_a::Interpolation,
-    geom_interpol_a::Interpolation = func_interpol_a; quad_rule_b::FaceQuadratureRule = deepcopy(quad_rule_a),
-    func_interpol_b::Interpolation = func_interpol_a, geom_interpol_b::Interpolation = func_interpol_b)
-    here = FaceValues(quad_rule_a, func_interpol_a, geom_interpol_a)
-    there = FaceValues(quad_rule_b, func_interpol_b, geom_interpol_b)
+function InterfaceValues(quad_rule::FaceQuadratureRule, ip_here::Interpolation,
+        geo_ip_here::Interpolation = default_geometric_interpolation(ip_here);
+        ip_there::Interpolation = ip_here, geo_ip_there::Interpolation = default_geometric_interpolation(ip_there))
+    here = FaceValues(quad_rule, ip_here, geo_ip_here)
+    # TODO: Replace deepcopy
+    there = FaceValues(deepcopy(quad_rule), ip_there, geo_ip_there)
     return InterfaceValues{typeof(here), typeof(there)}(here, there)
 end
 
@@ -71,7 +74,9 @@ Return the number of quadrature points in `iv`s element A's [`FaceValues`](@ref)
 """
 getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.here.qr, iv.here.current_face[])
 
-@propagate_inbounds getdetJdV(iv::InterfaceValues, q_point::Int) = getdetJdV(iv.here, q_point)
+@propagate_inbounds function getdetJdV(iv::InterfaceValues, q_point::Int) 
+    return getdetJdV(iv.here, q_point)
+end
 
 """
     reinit!(iv::InterfaceValues, face_here::Int, face_there::Int, coords_here::AbstractVector{Vec{dim, T}}, coords_there::AbstractVector{Vec{dim, T}}, cell_here::AbstractCell, cell_there::AbstractCell)
@@ -102,14 +107,15 @@ function reinit!(iv::InterfaceValues, face_here::Int, face_there::Int, coords_he
 end
 
 """
-    getnormal(iv::InterfaceValues, qp::Int, here::Bool = true)
+    getnormal(iv::InterfaceValues, qp::Int; here::Bool = true)
 
-Return the normal at the quadrature point `qp` on the interface. 
-
-For `InterfaceValues`, `use_elemet_a` determines which element to use for calculating divergence of the function.
-`true` uses the element A's face nomal vector, while `false` uses element B's, which is the default.
+Return the normal vector in the quadrature point `qp` on the interface. If `here = true`
+(default) the normal to the "here" element is returned, otherwise the normal to the "there"
+element.
 """
-getnormal(iv::InterfaceValues, qp::Int, here::Bool = true) = here ? iv.here.normals[qp] : iv.there.normals[qp]
+function getnormal(iv::InterfaceValues, qp::Int; here::Bool=true)
+    return here ? iv.here.normals[qp] : iv.there.normals[qp]
+end
 
 """
     function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
