@@ -56,8 +56,12 @@ function InterfaceValues(quad_rule_a::FaceQuadratureRule, func_interpol_a::Inter
     return InterfaceValues{typeof(here), typeof(there)}(here, there)
 end
 
-getnbasefunctions(iv::InterfaceValues) = getnbasefunctions(iv.here) + getnbasefunctions(iv.there)
-getngeobasefunctions(iv::InterfaceValues) = getngeobasefunctions(iv.here) + getngeobasefunctions(iv.there)
+function getnbasefunctions(iv::InterfaceValues)
+    return getnbasefunctions(iv.here) + getnbasefunctions(iv.there)
+end
+function getngeobasefunctions(iv::InterfaceValues)
+    return getngeobasefunctions(iv.here) + getngeobasefunctions(iv.there)
+end
 
 """
     getnquadpoints(iv::InterfaceValues)
@@ -70,30 +74,31 @@ getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.here.qr, iv.here.current
 @propagate_inbounds getdetJdV(iv::InterfaceValues, q_point::Int) = getdetJdV(iv.here, q_point)
 
 """
-    reinit!(iv::InterfaceValues, face_a::Int, face_b::Int, cell_a_coords::AbstractVector{Vec{dim, T}}, cell_b_coords::AbstractVector{Vec{dim, T}}, cell_a::AbstractCell, cell_b::AbstractCell)
+    reinit!(iv::InterfaceValues, face_here::Int, face_there::Int, coords_here::AbstractVector{Vec{dim, T}}, coords_there::AbstractVector{Vec{dim, T}}, cell_here::AbstractCell, cell_there::AbstractCell)
 
 Update the [`FaceValues`](@ref) in the interface (A and B) using their corresponding cell coordinates and [`FaceIndex`](@ref). This involved recalculating the transformation matrix [`transform_interface_point`](@ref)
 and mutating element B's quadrature points and its [`FaceValues`](@ref) `M, N, dMdξ, dNdξ`.
 """
-function reinit!(iv::InterfaceValues, face_a::Int, face_b::Int, cell_a_coords::AbstractVector{Vec{dim, T}}, cell_b_coords::AbstractVector{Vec{dim, T}}, cell_a::AbstractCell, cell_b::AbstractCell) where {dim, T}
-    reinit!(iv.here, cell_a_coords, face_a)
-    dim == 1 && return reinit!(iv.there, cell_b_coords, face_b) 
-    iv.there.current_face[] = face_b
-    interface_transformation = InterfaceTransformation(cell_a, cell_b, face_a, face_b)
-    quad_points_a = getpoints(iv.here.qr, face_a)
-    quad_points_b = getpoints(iv.there.qr, face_b)
+function reinit!(iv::InterfaceValues, face_here::Int, face_there::Int, coords_here::AbstractVector{Vec{dim, T}}, coords_there::AbstractVector{Vec{dim, T}}, cell_here::AbstractCell, cell_there::AbstractCell) where {dim, T}
+
+    reinit!(iv.here, coords_here, face_here)
+    dim == 1 && return reinit!(iv.there, coords_there, face_there) 
+    iv.there.current_face[] = face_there
+    interface_transformation = InterfaceTransformation(cell_here, cell_there, face_here, face_there)
+    quad_points_a = getpoints(iv.here.qr, face_here)
+    quad_points_b = getpoints(iv.there.qr, face_there)
     transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
-    @boundscheck checkface(iv.there, face_b)
+    @boundscheck checkface(iv.there, face_there)
     # This is the bottleneck, cache it?
-    for idx in eachindex(IndexCartesian(), @view iv.there.N[:, :, face_b])
+    for idx in eachindex(IndexCartesian(), @view iv.there.N[:, :, face_there])
         @boundscheck idx[2] > length(quad_points_b) && continue
-        iv.there.dNdξ[idx, face_b], iv.there.N[idx, face_b] = shape_gradient_and_value(iv.there.func_interp, quad_points_b[idx[2]], idx[1])
+        iv.there.dNdξ[idx, face_there], iv.there.N[idx, face_there] = shape_gradient_and_value(iv.there.func_interp, quad_points_b[idx[2]], idx[1])
     end
-    for idx in eachindex(IndexCartesian(), @view iv.there.M[:, :, face_b])
+    for idx in eachindex(IndexCartesian(), @view iv.there.M[:, :, face_there])
         @boundscheck idx[2] > length(quad_points_b) && continue
-        iv.there.dMdξ[idx, face_b], iv.there.M[idx, face_b] = shape_gradient_and_value(iv.there.geo_interp, quad_points_b[idx[2]], idx[1])
+        iv.there.dMdξ[idx, face_there], iv.there.M[idx, face_there] = shape_gradient_and_value(iv.there.geo_interp, quad_points_b[idx[2]], idx[1])
     end  
-    reinit!(iv.there, cell_b_coords, face_b)
+    reinit!(iv.there, coords_there, face_there)
 end
 
 """
@@ -104,7 +109,7 @@ Return the normal at the quadrature point `qp` on the interface.
 For `InterfaceValues`, `use_elemet_a` determines which element to use for calculating divergence of the function.
 `true` uses the element A's face nomal vector, while `false` uses element B's, which is the default.
 """
-getnormal(iv::InterfaceValues, qp::Int, here::Bool = false) = here ? iv.here.normals[qp] : iv.there.normals[qp]
+getnormal(iv::InterfaceValues, qp::Int, here::Bool = true) = here ? iv.here.normals[qp] : iv.there.normals[qp]
 
 """
     function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
