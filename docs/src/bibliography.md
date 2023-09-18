@@ -1,6 +1,0 @@
-# Bibliography
-
-## Cited Work
-
-```@bibliography
-```

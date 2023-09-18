@@ -93,7 +93,7 @@ bibtex_plugin = CitationBibliography(
         #     "gallery/topology_optimization.md",
         # ],
         "devdocs/index.md",
-        "bibliography.md",
+        "references.md",
         ],
     plugins = [
         bibtex_plugin,

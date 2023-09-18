@@ -582,18 +582,15 @@ element B in the example.
 
 In addition, we also have to preverse the ordering at each dof location.
 
-For more details we refer to [1] as we follow the methodology described therein.
+For more details we refer to Scroggs et al. [Scroggs2022](@cite) as we follow the methodology
+described therein.
 
-[1] Scroggs, M. W., Dokken, J. S., Richardson, C. N., & Wells, G. N. (2022).
-    Construction of arbitrary order finite element degree-of-freedom maps on
-    polygonal and polyhedral cell meshes. ACM Transactions on Mathematical
-    Software (TOMS), 48(2), 1-23.
-
-    !!!TODO Citation via DocumenterCitations.jl.
-
-    !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
+# References
+ - [Scroggs2022](@cite) Scroggs et al. ACM Trans. Math. Softw. 48 (2022).
 """
 @inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::PathOrientationInfo, adjust_during_distribution::Bool)
+    # TODO Investigate if we can somehow pass the interpolation into this function in a
+    # typestable way.
     n_copies = step(dofs)
     @assert n_copies > 0
     if adjust_during_distribution && !orientation.regular
