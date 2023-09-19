@@ -398,34 +398,30 @@ Returns the transformation matrix corresponding to the interface information sto
 """
 get_transformation_matrix
 
-function get_transformation_matrix(interface_transformation::InterfaceTransformation, ::Type{RefQuadrilateral})
+function get_transformation_matrix(interface_transformation::InterfaceTransformation{RefShapeA}) where RefShapeA
     flipped = interface_transformation.flipped
     shift_index = interface_transformation.shift_index
     lowest_node_shift_index = interface_transformation.lowest_node_shift_index
-    θ = shift_index/2
-    θpre = lowest_node_shift_index/2
-    flipping = SMatrix{3,3}(0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
-    M = flipped ? rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) :  rotation_matrix_pi(θ) 
-    return M
-end
+    face_a = interface_transformation.face_a
+    nfacenodes = length(reference_faces(RefShapeA)[face_a])
+    θ = 2*shift_index/nfacenodes
+    θpre = 2*lowest_node_shift_index/nfacenodes
+    if nfacenodes == 3 # Triangle
+        flipping = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0)
 
-function get_transformation_matrix(interface_transformation::InterfaceTransformation, ::Type{RefTriangle})
-    flipped = interface_transformation.flipped
-    shift_index = interface_transformation.shift_index
-    lowest_node_shift_index = interface_transformation.lowest_node_shift_index
-    θ = 2/3 * shift_index
-    θpre = 2/3 * lowest_node_shift_index
+        translate_1 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2/3)/3, -0.5, 1.0) 
+        stretch_1 = SMatrix{3,3}(sinpi(2/3), 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0) 
+   
+        translate_2 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2/3)/3, 0.5, 1.0) 
+        stretch_2 = SMatrix{3,3}(1/sinpi(2/3), -1/2/sinpi(2/3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0) 
     
-    flipping = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0)
+        return flipped ? stretch_2 * translate_2 * rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) * translate_1 * stretch_1 : stretch_2 * translate_2 * rotation_matrix_pi(θ) * translate_1 * stretch_1
+    elseif nfacenodes == 4 # Quadrilateral
+        flipping = SMatrix{3,3}(0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+        return flipped ? rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) :  rotation_matrix_pi(θ)     
+    end
 
-    translate_1 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2/3)/3, -0.5, 1.0) 
-    stretch_1 = SMatrix{3,3}(sinpi(2/3), 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0) 
-
-    translate_2 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2/3)/3, 0.5, 1.0) 
-    stretch_2 = SMatrix{3,3}(1/sinpi(2/3), -1/2/sinpi(2/3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0) 
-
-    M = flipped ? stretch_2 * translate_2 * rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) * translate_1 * stretch_1 : stretch_2 * translate_2 * rotation_matrix_pi(θ) * translate_1 * stretch_1
-    return M
+    error("transformation is not implemented")
 end
 
 @doc raw"""
@@ -492,10 +488,11 @@ y      |   \
 """
 transform_interface_points!
 
-function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceTransformation{RefShapeA, RefShapeB, face_a, face_b}) where {RefShapeA, RefShapeB, face_a, face_b}
-    face_refshape = get_face_refshape(RefShapeA, face_a)
+function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceTransformation{RefShapeA, RefShapeB}) where {RefShapeA, RefShapeB}
+    face_a = interface_transformation.face_a
+    face_b = interface_transformation.face_b
 
-    M = get_transformation_matrix(interface_transformation, face_refshape)
+    M = get_transformation_matrix(interface_transformation)
     for (idx, point) in pairs(points)
         face_point = element_to_face_transformation(point, RefShapeA, face_a)
         result = M * Vec(face_point[1],face_point[2], 1.0)
@@ -504,7 +501,9 @@ function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vecto
     return nothing
 end
 
-function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vector{Vec{2, Float64}}, interface_transformation::InterfaceTransformation{RefShapeA, RefShapeB, face_a, face_b}) where {RefShapeA, RefShapeB, face_a, face_b}
+function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vector{Vec{2, Float64}}, interface_transformation::InterfaceTransformation{RefShapeA, RefShapeB}) where {RefShapeA, RefShapeB}
+    face_a = interface_transformation.face_a
+    face_b = interface_transformation.face_b
     flipped = interface_transformation.flipped
     
     for (idx, point) in pairs(points)
