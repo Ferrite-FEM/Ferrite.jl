@@ -492,29 +492,25 @@ y      |   \
 """
 transform_interface_points!
 
-function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceTransformation{RefShapeA, RefShapeB}) where {RefShapeA, RefShapeB}
-    face_a = interface_transformation.face_a_index
-    face_b = interface_transformation.face_b_index
+function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceTransformation{RefShapeA, RefShapeB, face_a, face_b}) where {RefShapeA, RefShapeB, face_a, face_b}
     face_refshape = get_face_refshape(RefShapeA, face_a)
 
     M = get_transformation_matrix(interface_transformation, face_refshape)
     for (idx, point) in pairs(points)
-        point = element_to_face_transformation(point, RefShapeA, face_a)
-        result = M * Vec(point[1],point[2], 1.0)
+        face_point = element_to_face_transformation(point, RefShapeA, face_a)
+        result = M * Vec(face_point[1],face_point[2], 1.0)
         dst[idx] = face_to_element_transformation(Vec(result[1],result[2]), RefShapeB, face_b)
     end
     return nothing
 end
 
-function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vector{Vec{2, Float64}}, interface_transformation::InterfaceTransformation{RefShapeA, RefShapeB}) where {RefShapeA, RefShapeB}
+function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vector{Vec{2, Float64}}, interface_transformation::InterfaceTransformation{RefShapeA, RefShapeB, face_a, face_b}) where {RefShapeA, RefShapeB, face_a, face_b}
     flipped = interface_transformation.flipped
-    face_a = interface_transformation.face_a_index
-    face_b = interface_transformation.face_b_index
     
     for (idx, point) in pairs(points)
-        point = element_to_face_transformation(point, RefShapeA, face_a)
-        flipped && (point *= -1) 
-        dst[idx] = face_to_element_transformation(point, RefShapeB, face_b)
+        face_point = element_to_face_transformation(point, RefShapeA, face_a)
+        flipped && (face_point *= -1) 
+        dst[idx] = face_to_element_transformation(face_point, RefShapeB, face_b)
     end
     return nothing
 end
