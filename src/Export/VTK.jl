@@ -54,11 +54,14 @@ function Base.show(io::IO, ::MIME"text/plain", vtk::VTKFile)
 end
 
 """
-    VTKFileCollection(name::String, grid::AbstractGrid)
-    VTKFileCollection(name::String, dh::DofHandler)
+    VTKFileCollection(name::String, grid::AbstractGrid; vtk_kwargs...)
+    VTKFileCollection(name::String, dh::DofHandler; vtk_kwargs...)
 
 Create a paraview data file (.pvd) that can be used to 
-save multiple vtk file along with a time stamp. Example,
+save multiple vtk file along with a time stamp. The keyword arguments 
+are forwarded to each `VTKFile` constructor, which again forwards them 
+to `WriteVTK.vtk_grid`. 
+Example,
 ```
 pvd = VTKFileCollection("test", grid)
 for t in range(0, 2, 4)
@@ -71,15 +74,16 @@ end
 close(pvd)
 ```
 """
-mutable struct VTKFileCollection{P<:WriteVTK.CollectionFile,G_DH}
+mutable struct VTKFileCollection{P<:WriteVTK.CollectionFile,G_DH,KW}
     pvd::P
     grid_or_dh::G_DH
     name::String
     step::Int
+    vtk_kwargs::KW
 end
-function VTKFileCollection(name::String, grid_or_dh::Union{AbstractGrid,AbstractDofHandler})
+function VTKFileCollection(name::String, grid_or_dh::Union{AbstractGrid,AbstractDofHandler}; vtk_kwargs...)
     pvd = WriteVTK.paraview_collection(name)
-    return VTKFileCollection(pvd, grid_or_dh, name, 0)
+    return VTKFileCollection(pvd, grid_or_dh, name, 0, vtk_kwargs)
 end
 Base.close(pvd::VTKFileCollection) = WriteVTK.vtk_save(pvd.pvd)
 
@@ -98,7 +102,7 @@ See also [`VTKFileCollection`](@ref).
 """
 function addstep!(f::Function, pvd::VTKFileCollection, t, grid=pvd.grid_or_dh)
     pvd.step += 1
-    VTKFile(string(pvd.name, "_", pvd.step), grid) do vtk
+    VTKFile(string(pvd.name, "_", pvd.step), grid; pvd.vtk_kwargs...) do vtk
         f(vtk)
         pvd.pvd[t] = vtk.vtk # Add to collection
     end

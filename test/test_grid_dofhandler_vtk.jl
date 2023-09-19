@@ -622,4 +622,21 @@ end
         close!(dh2)
         @test dh1.cell_dofs == dh2.cell_dofs
     end
+
+    @testset "VTKFileCollection" begin
+        grid = generate_grid(Quadrilateral, (10,10))
+        file_sizes = Int[]
+        fname = "test_collection_kwargs"
+        for compress in (true, false)
+            pvd = VTKFileCollection(fname, grid; compress)
+            addstep!(pvd, 0.0) do io
+                nothing
+            end
+            close(pvd)
+            push!(file_sizes, stat(string(fname, "_1.vtu")).size)
+            rm(string(fname, "_1.vtu"))
+        end
+        rm(string(fname, ".pvd"))
+        @test file_sizes[1] < file_sizes[2] # Check that compress=true gives smaller file size
+    end
 end
