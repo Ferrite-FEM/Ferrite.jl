@@ -155,7 +155,7 @@ export
     write_solution,
     write_celldata,
     write_projection,
-    ParaviewCollection,
+    VTKFileCollection,
     addstep!,
     
 # L2 Projection

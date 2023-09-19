@@ -18,8 +18,7 @@ The following structure can be used to write various output to a vtk-file:
 ```@example export
 VTKFile("my_solution", grid) do vtk
     write_solution(vtk, dh, u)
-end
-rm("my_solution.vtk") # hide
+end;
 ```
 where `write_solution` is just one example of the following functions that can be used 
 
@@ -37,19 +36,18 @@ Instead of using the `do`-block, it is also possible to do
 vtk = VTKFile("my_solution", grid)
 write_solution(vtk, dh, u)
 # etc.
-close(vtk)
-rm("my_solution.vtk") # hide
+close(vtk);
 ```
 
 The data written by `write_solution`, `write_celldata`, `Ferrite.write_nodedata`, and `write_projection` may be either scalar (`Vector{<:Number}`) or tensor (`Vector{<:AbstractTensor}`) data. 
 
-For simulations with multiple time steps, typically one `vtk` file is written 
+For simulations with multiple time steps, typically one `VTK` (`.vtu`) file is written 
 for each time step. In order to connect the actual time with each of these files,
-a `ParaviewCollection` can be used, which will write one paraview collection (.pvd)
-file and one `vtk` for each time step. 
+a `VTKFileCollection` can be used, which will write one paraview datafile (`.pvd`)
+file and one `VTKFile` (`.vtu`) for each time step. 
 
 ```@example pvdexport 
-pvd = ParaviewCollection("my_results", grid)
+pvd = VTKFileCollection("my_results", grid)
 for t in range(0, 1, 5)
     # Do calculations to update u
     addstep!(pvd, t) do vtk
@@ -57,7 +55,5 @@ for t in range(0, 1, 5)
     end
 end
 close(pvd);
-rm.((string("my_results_", i, ".vtu") for i in 1:5)) #hide
-rm("my_results.pvd") #hide
 ```
 See [Transient heat equation](@ref tutorial-transient-heat-equation) for an example

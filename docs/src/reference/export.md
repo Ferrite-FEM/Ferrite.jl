@@ -26,7 +26,7 @@ evaluate_at_grid_nodes
 ## VTK Export
 ```@docs
 VTKFile
-ParaviewCollection
+VTKFileCollection
 addstep!
 write_solution
 write_projection

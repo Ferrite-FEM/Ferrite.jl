@@ -431,7 +431,7 @@ integrator = init(
     progress=true, progress_steps=1,
     saveat=Δt_save);
 
-pvd = ParaviewCollection("vortex-street", grid);
+pvd = VTKFileCollection("vortex-street", grid);
 integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
 for (u_uc,t) in integrator
     # We ignored the Dirichlet constraints in the solution vector up to now,

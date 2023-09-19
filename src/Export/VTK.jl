@@ -54,13 +54,13 @@ function Base.show(io::IO, ::MIME"text/plain", vtk::VTKFile)
 end
 
 """
-    ParaviewCollection(name::String, grid::AbstractGrid)
-    ParaviewCollection(name::String, dh::DofHandler)
+    VTKFileCollection(name::String, grid::AbstractGrid)
+    VTKFileCollection(name::String, dh::DofHandler)
 
-Create a paraview collection file (.pvd) that can be used to 
-save multiple vtk file. Example,
+Create a paraview data file (.pvd) that can be used to 
+save multiple vtk file along with a time stamp. Example,
 ```
-pvd = ParaviewCollection("test", grid)
+pvd = VTKFileCollection("test", grid)
 for t in range(0, 2, 4)
     # Solve the timestep to find u and σeff 
     addstep!(pvd, t) do io # io::VTKFile
@@ -71,20 +71,20 @@ end
 close(pvd)
 ```
 """
-mutable struct ParaviewCollection{P<:WriteVTK.CollectionFile,G_DH}
+mutable struct VTKFileCollection{P<:WriteVTK.CollectionFile,G_DH}
     pvd::P
     grid_or_dh::G_DH
     name::String
     step::Int
 end
-function ParaviewCollection(name::String, grid_or_dh::Union{AbstractGrid,AbstractDofHandler})
+function VTKFileCollection(name::String, grid_or_dh::Union{AbstractGrid,AbstractDofHandler})
     pvd = WriteVTK.paraview_collection(name)
-    return ParaviewCollection(pvd, grid_or_dh, name, 0)
+    return VTKFileCollection(pvd, grid_or_dh, name, 0)
 end
-Base.close(pvd::ParaviewCollection) = WriteVTK.vtk_save(pvd.pvd)
+Base.close(pvd::VTKFileCollection) = WriteVTK.vtk_save(pvd.pvd)
 
 """
-    addstep!(f::Function, pvd::ParaviewCollection, t::Real, [grid_or_dh])
+    addstep!(f::Function, pvd::VTKFileCollection, t::Real, [grid_or_dh])
 
 Add a step at time `t` by writing a `VTKFile` to `pvd`. 
 If required, a new grid can be used by supplying the grid or dofhandler as the last argument.
@@ -94,9 +94,9 @@ addstep!(pvd, t) do vtk
     write_solution(vtk, dh, u)
 end
 ```
-See also [`ParaviewCollection`](@ref). 
+See also [`VTKFileCollection`](@ref). 
 """
-function addstep!(f::Function, pvd::ParaviewCollection, t, grid=pvd.grid_or_dh)
+function addstep!(f::Function, pvd::VTKFileCollection, t, grid=pvd.grid_or_dh)
     pvd.step += 1
     VTKFile(string(pvd.name, "_", pvd.step), grid) do vtk
         f(vtk)

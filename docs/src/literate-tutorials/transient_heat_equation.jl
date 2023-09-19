@@ -189,8 +189,8 @@ apply_analytical!(uₙ, dh, :u, x -> (x[1]^2 - 1) * (x[2]^2 - 1) * max_temp);
 # Here, we apply **once** the boundary conditions to the system matrix `A`.
 apply!(A, ch);
 
-# To store the solution, we initialize a `ParaviewCollection` (.pvd) file.
-pvd = ParaviewCollection("transient-heat", grid);
+# To store the solution, we initialize a `VTKFileCollection` (.pvd) file.
+pvd = VTKFileCollection("transient-heat", grid);
 t = 0
 addstep!(pvd, t) do io
     write_solution(io, dh, uₙ)

@@ -305,7 +305,7 @@ function solve(interpolation_u, interpolation_p)
     Δt = 0.1;
     NEWTON_TOL = 1e-8
 
-    pvd = ParaviewCollection("hyperelasticity_incomp_mixed", grid);
+    pvd = VTKFileCollection("hyperelasticity_incomp_mixed", grid);
     for t ∈ 0.0:Δt:Tf
         ## Perform Newton iterations
         Ferrite.update!(dbc, t)
