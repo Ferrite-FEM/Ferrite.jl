@@ -67,7 +67,8 @@ function CellCache(dh::DofHandler{dim}, flags::UpdateFlags=UpdateFlags()) where 
 end
 
 function CellCache(sdh::SubDofHandler, flags::UpdateFlags=UpdateFlags())
-    CellCache(flags, sdh.dh.grid, ScalarWrapper(-1), Int[], Vec{2,Float64}[], sdh, Int[])
+    dim = getdim(sdh.dh.grid)
+    CellCache(flags, sdh.dh.grid, ScalarWrapper(-1), Int[], Vec{dim,Float64}[], sdh, Int[])
 end
 
 function reinit!(cc::CellCache, i::Int)
@@ -266,7 +267,7 @@ function CellIterator(gridordh::Union{Grid,DofHandler}, flags::UpdateFlags)
     return CellIterator(gridordh, nothing, flags)
 end
 function CellIterator(sdh::SubDofHandler, flags::UpdateFlags=UpdateFlags())
-    CellIterator(sdh.dh, sdh.cellset, flags)
+    CellIterator(CellCache(sdh, flags), sdh.cellset)
 end
 
 @inline _getset(ci::CellIterator) = ci.set
