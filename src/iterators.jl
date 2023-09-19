@@ -406,3 +406,16 @@ function _check_same_celltype(grid::AbstractGrid, faceset::Set{FaceIndex})
         error("The cells in the faceset are not all of the same celltype.")
     end
 end
+
+
+mutable struct CellIterator2{CC,DH,IC}
+    cache::CC # const
+    dh::SDH   # const
+    cells::IC # const
+    current_cell::Int
+end
+mutable struct CellCache2{T,dim,CT}
+    const x::Vector{Vec{dim,T}}
+    const dofs::Vector{Int}
+    cell::CT 
+end

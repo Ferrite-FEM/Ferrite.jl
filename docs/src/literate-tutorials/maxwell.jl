@@ -55,6 +55,7 @@ for nr in 1:(ndofs(dh))
     M.arrows!(ax, coords..., vectors...; lengthscale=0.1)
     display(fig)
 end
+
 #=
 mutable struct NewCellCache{T,dim,CT}
     const x::Vector{Vec{dim,T}}
