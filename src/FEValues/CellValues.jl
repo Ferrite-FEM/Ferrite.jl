@@ -6,8 +6,8 @@ function default_geometric_interpolation(::Interpolation{shape}) where {dim, sha
     return VectorizedInterpolation{dim}(Lagrange{shape, 1}())
 end
 
-struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCellValues
-    geo_values::GeometryValues{dMdξ_t, GIP, T}
+struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP, d2Mdξ2_t} <: AbstractCellValues
+    geo_values::GeometryValues{dMdξ_t, GIP, T, d2Mdξ2_t}
     detJdV::Vector{T}
     fun_values::FunctionValues{IP, N_t, dNdx_t, dNdξ_t}
     qr::QR
@@ -46,13 +46,12 @@ getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
     geo_values = cv.geo_values
     fun_values = cv.fun_values
-    map_req = RequiresHessian(fun_values.ip, geo_values.ip)
     n_geom_basefuncs = getngeobasefunctions(geo_values)
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x)!=n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     end
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
-        mapping = calculate_mapping(map_req, geo_values, q_point, x)
+        mapping = calculate_mapping(geo_values, q_point, x)
         detJ = calculate_detJ(getjacobian(mapping))
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         @inbounds cv.detJdV[q_point] = detJ*w

@@ -1,5 +1,5 @@
-struct FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP} <: AbstractFaceValues
-    geo_values::Vector{GeometryValues{dMdξ_t, GIP, T}}
+struct FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP, d2Mdξ2_t} <: AbstractFaceValues
+    geo_values::Vector{GeometryValues{dMdξ_t, GIP, T, d2Mdξ2_t}}
     detJdV::Vector{T}
     normals::Vector{Normal_t}
     fun_values::Vector{FunctionValues{IP, N_t, dNdx_t, dNdξ_t}}
@@ -8,7 +8,7 @@ struct FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP} <: Ab
 end
 
 function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}=default_geometric_interpolation(ip_fun)) where {T,sdim} 
-    geo_values = [GeometryValues(T, ip_geo.ip, qr) for qr in fqr.face_rules]
+    geo_values = [GeometryValues(T, ip_geo.ip, qr, RequiresHessian(ip_fun, ip_geo)) for qr in fqr.face_rules]
     fun_values = [FunctionValues(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
     max_nquadpoints = maximum(qr->length(getweights(qr)), fqr.face_rules)
     detJdV = fill(T(NaN), max_nquadpoints)
@@ -63,7 +63,7 @@ function checkface(fv::FaceValues, face::Int)
     return nothing
 end
 
-function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int) where {dim, T}
+function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int, cell=nothing) where {dim, T}
     @boundscheck checkface(fv, face_nr)
     n_geom_basefuncs = getngeobasefunctions(fv)
     length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
@@ -80,7 +80,7 @@ function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int) wh
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         @inbounds fv.detJdV[q_point] = detJ*w
         @inbounds fv.normals[q_point] = weight_norm / norm(weight_norm)       
-        apply_mapping!(fun_values, q_point, mapping)
+        apply_mapping!(fun_values, q_point, mapping, cell)
     end
 end
 
