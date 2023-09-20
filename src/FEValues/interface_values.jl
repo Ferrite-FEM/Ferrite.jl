@@ -513,3 +513,12 @@ function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vecto
     end
     return nothing
 end
+
+function Base.show(io::IO, m::MIME"text/plain", iv::InterfaceValues)
+    println(io, "InterfaceValues with")
+    print(io, "{Here} ")
+    show(io,m,iv.here)
+    println(io)
+    print(io, "{There} ")
+    show(io,m,iv.there)
+end
