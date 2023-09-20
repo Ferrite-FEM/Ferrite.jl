@@ -69,8 +69,8 @@ end
 """
     getnquadpoints(iv::InterfaceValues)
 
-Return the number of quadrature points in `iv`s element A's [`FaceValues`](@ref)' quadrature for the current
-(most recently [`reinit!`](@ref)ed) interface.
+Return the number of quadrature points on the interface for the current (most recently
+[`reinit!`](@ref)ed) interface.
 """
 getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.here.qr, iv.here.current_face[])
 
@@ -79,12 +79,21 @@ getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.here.qr, iv.here.current
 end
 
 """
-    reinit!(iv::InterfaceValues, face_here::Int, face_there::Int, coords_here::AbstractVector{Vec{dim, T}}, coords_there::AbstractVector{Vec{dim, T}}, cell_here::AbstractCell, cell_there::AbstractCell)
+    reinit!(
+        iv::InterfaceValues,
+        cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, face_here::Int,
+        cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, face_there::Int
+    )
 
-Update the [`FaceValues`](@ref) in the interface (A and B) using their corresponding cell coordinates and [`FaceIndex`](@ref). This involved recalculating the transformation matrix [`transform_interface_point`](@ref)
-and mutating element B's quadrature points and its [`FaceValues`](@ref) `M, N, dMdξ, dNdξ`.
+Update the [`InterfaceValues`](@ref) for the interface between `cell_here` (with cell
+coordinates `coords_here`) and `cell_there` (with cell coordinates `coords_there`).
+`face_here` and `face_there` are the (local) face numbers for the respecive cell.
 """
-function reinit!(iv::InterfaceValues, face_here::Int, face_there::Int, coords_here::AbstractVector{Vec{dim, T}}, coords_there::AbstractVector{Vec{dim, T}}, cell_here::AbstractCell, cell_there::AbstractCell) where {dim, T}
+function reinit!(
+        iv::InterfaceValues,
+        cell_here::AbstractCell, coords_here::AbstractVector{Vec{dim, T}}, face_here::Int,
+        cell_there::AbstractCell, coords_there::AbstractVector{Vec{dim, T}}, face_there::Int
+    ) where {dim, T}
 
     # reinit! the here side as normal
     reinit!(iv.here, coords_here, face_here)
@@ -114,8 +123,8 @@ end
     getnormal(iv::InterfaceValues, qp::Int; here::Bool = true)
 
 Return the normal vector in the quadrature point `qp` on the interface. If `here = true`
-(default) the normal to the "here" element is returned, otherwise the normal to the "there"
-element.
+(default) the outward normal to the "here" element is returned, otherwise the outward normal
+to the "there" element.
 """
 function getnormal(iv::InterfaceValues, qp::Int; here::Bool=true)
     return here ? iv.here.normals[qp] : iv.there.normals[qp]
@@ -124,7 +133,7 @@ end
 """
     function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
 
-Compute the value of the function in a quadrature point. `u` is a vector with values
+Compute the value of the function in quadrature point `q_point`. `u` is a vector with values
 for the degrees of freedom. For a scalar valued function, `u` contains scalars.
 For a vector valued function, `u` can be a vector of scalars (for use of `VectorValues`)
 or `u` can be a vector of `Vec`s (for use with ScalarValues).
@@ -243,7 +252,7 @@ function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here:
 
 Compute the average of the shape function value at the quadrature point on interface.
 """
-shape_value_average
+function shape_value_average end
 
 """
     shape_value_jump(iv::InterfaceValues, qp::Int, base_function::Int)
@@ -256,14 +265,14 @@ Compute the jump of the shape function value at the quadrature point over the in
 !!! note
     If `normal_dotted == true` then the jump of scalar shape values is a vector.
 """
-shape_value_jump
+function shape_value_jump end
 
 """
     shape_gradient_average(iv::InterfaceValues, qp::Int, base_function::Int)
 
 Compute the average of the shape function gradient at the quadrature point on the interface.
 """
-shape_gradient_average
+function shape_gradient_average end
 
 """
     shape_gradient_jump(iv::InterfaceValues, qp::Int, base_function::Int)
@@ -273,7 +282,7 @@ Compute the jump of the shape function gradient at the quadrature point over the
 This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+``. to obtain the form
 ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- ⋅ \\vec{n}^- + \\vec{v}^+ ⋅ \\vec{n}^+``one can simple multiply by the normal of face A (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
-shape_gradient_jump
+function shape_gradient_jump end
 
 for (func,                      f_,                 multiplier, ) in (
     (:shape_value,              :shape_value,       :(1),       ),
@@ -317,7 +326,7 @@ end
 
 Compute the average of the function value at the quadrature point on interface.
 """
-function_value_average
+function function_value_average end
 
 """
     function_value_jump(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
@@ -327,14 +336,14 @@ Compute the jump of the function value at the quadrature point over the interfac
 This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+``. to obtain the form
 ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- ⋅ \\vec{n}^- + \\vec{v}^+ ⋅ \\vec{n}^+``one can simple multiply by the normal of face A (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
-function_value_jump
+function function_value_jump end
 
 """
     function_gradient_average(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
 
 Compute the average of the function gradient at the quadrature point on the interface.
 """
-function_gradient_average
+function function_gradient_average end
 
 """
     function_gradient_jump(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
@@ -344,7 +353,7 @@ Compute the jump of the function gradient at the quadrature point over the inter
 This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+``. to obtain the form
 ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- ⋅ \\vec{n}^- + \\vec{v}^+ ⋅ \\vec{n}^+``one can simple multiply by the normal of face A (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
-function_gradient_jump
+function function_gradient_jump end
 
 for (func,                          f_,                 ) in (
     (:function_value_average,       :function_value,    ),
