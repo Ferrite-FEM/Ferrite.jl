@@ -876,7 +876,7 @@ end
 Return the orientation info for the interface defined by face A and face B.
 """
 function InterfaceTransformation(cell_a::AbstractCell, cell_b::AbstractCell, face_a::Int, face_b::Int)
-    getdim(cell_a) == 1 && return InterfaceTransformation{2}(false, 0, 0, getrefshape(cell_a), face_a, getrefshape(cell_b), face_b)
+    getdim(cell_a) == 1 && return error("1D elements don't use transformations for interfaces.")
 
     nodes_a = faces(cell_a)[face_a]
     nodes_b = faces(cell_b)[face_b]
