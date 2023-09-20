@@ -62,9 +62,9 @@ end
 function getnbasefunctions(iv::InterfaceValues)
     return getnbasefunctions(iv.here) + getnbasefunctions(iv.there)
 end
-function getngeobasefunctions(iv::InterfaceValues)
-    return getngeobasefunctions(iv.here) + getngeobasefunctions(iv.there)
-end
+# function getngeobasefunctions(iv::InterfaceValues)
+#     return getngeobasefunctions(iv.here) + getngeobasefunctions(iv.there)
+# end
 
 """
     getnquadpoints(iv::InterfaceValues)
@@ -86,24 +86,28 @@ and mutating element B's quadrature points and its [`FaceValues`](@ref) `M, N, d
 """
 function reinit!(iv::InterfaceValues, face_here::Int, face_there::Int, coords_here::AbstractVector{Vec{dim, T}}, coords_there::AbstractVector{Vec{dim, T}}, cell_here::AbstractCell, cell_there::AbstractCell) where {dim, T}
 
+    # reinit! the here side as normal
     reinit!(iv.here, coords_here, face_here)
-    dim == 1 && return reinit!(iv.there, coords_there, face_there) 
+    dim == 1 && return reinit!(iv.there, coords_there, face_there)
+    # Transform the quadrature points from the here side to the there side
     iv.there.current_face[] = face_there
     interface_transformation = InterfaceTransformation(cell_here, cell_there, face_here, face_there)
     quad_points_a = getpoints(iv.here.qr, face_here)
     quad_points_b = getpoints(iv.there.qr, face_there)
     transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
     @boundscheck checkface(iv.there, face_there)
-    # This is the bottleneck, cache it?
-    for idx in eachindex(IndexCartesian(), @view iv.there.N[:, :, face_there])
-        @boundscheck idx[2] > length(quad_points_b) && continue
-        iv.there.dNdξ[idx, face_there], iv.there.N[idx, face_there] = shape_gradient_and_value(iv.there.func_interp, quad_points_b[idx[2]], idx[1])
+    # TODO: This is the bottleneck, cache it?
+    @assert length(quad_points_a) <= length(quad_points_b)
+    # Re-evalutate shape functions in the transformed quadrature points
+    for qp in 1:length(quad_points_a), i in 1:getnbasefunctions(iv.there)
+        iv.there.dNdξ[i, qp, face_there], iv.there.N[i, qp, face_there] = shape_gradient_and_value(iv.there.func_interp, quad_points_b[qp], i)
     end
-    for idx in eachindex(IndexCartesian(), @view iv.there.M[:, :, face_there])
-        @boundscheck idx[2] > length(quad_points_b) && continue
-        iv.there.dMdξ[idx, face_there], iv.there.M[idx, face_there] = shape_gradient_and_value(iv.there.geo_interp, quad_points_b[idx[2]], idx[1])
-    end  
+    for qp in 1:length(quad_points_a), i in 1:getngeobasefunctions(iv.there)
+        iv.there.dMdξ[i, qp, face_there], iv.there.M[i, qp, face_there] = shape_gradient_and_value(iv.there.geo_interp, quad_points_b[qp], i)
+    end
+    # reinit! the "there" side
     reinit!(iv.there, coords_there, face_there)
+    return iv
 end
 
 """
