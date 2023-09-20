@@ -74,7 +74,7 @@ Return the number of quadrature points in `iv`s element A's [`FaceValues`](@ref)
 """
 getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.here.qr, iv.here.current_face[])
 
-@propagate_inbounds function getdetJdV(iv::InterfaceValues, q_point::Int) 
+@propagate_inbounds function getdetJdV(iv::InterfaceValues, q_point::Int)
     return getdetJdV(iv.here, q_point)
 end
 
@@ -152,7 +152,7 @@ for the degrees of freedom. For a scalar valued function, `u` contains scalars.
 For a vector valued function, `u` can be a vector of scalars (for use of `VectorValues`)
 or `u` can be a vector of `Vec`s (for use with ScalarValues).
 
-`here` determines which element to use for calculating function gradient. 
+`here` determines which element to use for calculating function gradient.
 `true` uses the element A's nodal values for calculating the gradient, which is the default, while `false` uses element B's.
 
 The gradient of a scalar function or a vector valued function with use of `VectorValues` is computed as
@@ -270,7 +270,7 @@ shape_gradient_average
 
 Compute the jump of the shape function gradient at the quadrature point over the interface.
 
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+``. to obtain the form 
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+``. to obtain the form
 ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- ⋅ \\vec{n}^- + \\vec{v}^+ ⋅ \\vec{n}^+``one can simple multiply by the normal of face A (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 shape_gradient_jump
@@ -324,7 +324,7 @@ function_value_average
 
 Compute the jump of the function value at the quadrature point over the interface.
 
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+``. to obtain the form 
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+``. to obtain the form
 ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- ⋅ \\vec{n}^- + \\vec{v}^+ ⋅ \\vec{n}^+``one can simple multiply by the normal of face A (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function_value_jump
@@ -341,7 +341,7 @@ function_gradient_average
 
 Compute the jump of the function gradient at the quadrature point over the interface.
 
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+``. to obtain the form 
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+``. to obtain the form
 ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- ⋅ \\vec{n}^- + \\vec{v}^+ ⋅ \\vec{n}^+``one can simple multiply by the normal of face A (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function_gradient_jump
@@ -355,7 +355,7 @@ for (func,                          f_,                 ) in (
             f_value_here = $(f_)(iv, qp, u_a, dof_range_a, here = true)
             f_value_there = $(f_)(iv, qp, u_b, dof_range_b, here = false)
             fv = iv.here
-            result = 0.5 * f_value_here 
+            result = 0.5 * f_value_here
             fv = iv.there
             result += 0.5 * f_value_there
             return result
@@ -381,13 +381,13 @@ for (func,                          f_,                 ) in (
         function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
             f_value_here = $(f_)(iv, qp, u_a, dof_range_a, here = true)
             f_value_there = $(f_)(iv, qp, u_b, dof_range_b, here = false)
-            return f_value_there - f_value_here 
+            return f_value_there - f_value_here
         end
         # TODO: Deprecate this, nobody is using this in practice...
         function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector{<:Vec}, u_b::AbstractVector{<:Vec})
             f_value_here = $(f_)(iv, qp, u_a, here = true)
             f_value_there = $(f_)(iv, qp, u_b, here = false)
-            return f_value_there - f_value_here 
+            return f_value_there - f_value_here
         end
     end
 end
@@ -413,16 +413,16 @@ function get_transformation_matrix(interface_transformation::InterfaceTransforma
     if nfacenodes == 3 # Triangle
         flipping = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0)
 
-        translate_1 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2/3)/3, -0.5, 1.0) 
-        stretch_1 = SMatrix{3,3}(sinpi(2/3), 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0) 
-   
-        translate_2 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2/3)/3, 0.5, 1.0) 
-        stretch_2 = SMatrix{3,3}(1/sinpi(2/3), -1/2/sinpi(2/3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0) 
-    
+        translate_1 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2/3)/3, -0.5, 1.0)
+        stretch_1 = SMatrix{3,3}(sinpi(2/3), 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+
+        translate_2 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2/3)/3, 0.5, 1.0)
+        stretch_2 = SMatrix{3,3}(1/sinpi(2/3), -1/2/sinpi(2/3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+
         return flipped ? stretch_2 * translate_2 * rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) * translate_1 * stretch_1 : stretch_2 * translate_2 * rotation_matrix_pi(θ) * translate_1 * stretch_1
     elseif nfacenodes == 4 # Quadrilateral
         flipping = SMatrix{3,3}(0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
-        return flipped ? rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) :  rotation_matrix_pi(θ)     
+        return flipped ? rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) :  rotation_matrix_pi(θ)
     end
 
     error("transformation is not implemented")
@@ -440,54 +440,54 @@ Take for example the interface
         2           3
         | \         | \
         |  \        |  \
-y       | A \       | B \ 
+y       | A \       | B \
 ↑       |    \      |    \
-→  x    1-----3     1-----2  
+→  x    1-----3     1-----2
 ```
 Transforming A to a equilateral triangle and translating it such that {0,0} is equidistant to all nodes
 ```
         3
         +
-       / \         
+       / \
       /   \
-     /  x  \                          
-    /   ↑   \                        
-   /  ←      \                          
-  /  y        \                            
-2+-------------+1                     
+     /  x  \
+    /   ↑   \
+   /  ←      \
+  /  y        \
+2+-------------+1
 ```
 Rotating it -270° (or 120°) such that the reference node (the node with smallest index) is at index 1
 ```
         1
         +
-       / \         
+       / \
       /   \
-     /  x  \                          
-    /   ↑   \                        
-   /  ←      \                          
-  /  y        \                            
-3+-------------+2                     
+     /  x  \
+    /   ↑   \
+   /  ←      \
+  /  y        \
+3+-------------+2
 ```
 Flipping about the x axis (such that the position of the reference node doesn't change) and rotating 270° (or -120°)
 ```
         2
         +
-       / \         
+       / \
       /   \
-     /  x  \                          
-    /   ↑   \                        
-   /  ←      \                          
-  /  y        \                            
-3+-------------+1                     
+     /  x  \
+    /   ↑   \
+   /  ←      \
+  /  y        \
+3+-------------+1
 ```
 Transforming back to triangle B
 ```
-       3           
+       3
        | \
        |  \
-y      |   \ 
+y      |   \
 ↑      |    \
-→ x    1-----2  
+→ x    1-----2
 ```
 """
 transform_interface_points!
@@ -509,10 +509,10 @@ function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vecto
     face_a = interface_transformation.face_a
     face_b = interface_transformation.face_b
     flipped = interface_transformation.flipped
-    
+
     for (idx, point) in pairs(points)
         face_point = element_to_face_transformation(point, RefShapeA, face_a)
-        flipped && (face_point *= -1) 
+        flipped && (face_point *= -1)
         dst[idx] = face_to_element_transformation(face_point, RefShapeB, face_b)
     end
     return nothing
