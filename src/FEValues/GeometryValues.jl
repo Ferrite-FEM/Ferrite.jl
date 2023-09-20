@@ -6,7 +6,13 @@ end
 @inline gethessian(mv::MappingValues) = mv.H
 
 struct RequiresHessian{B} end
-RequiresHessian(B) = RequiresHessian{B}()
+RequiresHessian(B::Bool) = RequiresHessian{B}()
+function RequiresHessian(ip_fun::Interpolation, ip_geo::Interpolation)
+    # Leave ip_geo as input, because for later the hessian can also be avoided 
+    # for fully linear geometric elements (e.g. triangle and tetrahedron)
+    # This optimization is left out for now. 
+    RequiresHessian(requires_hessian(get_mapping_type(ip_fun)))
+end
 
 struct GeometryValues{dMdξ_t, GIP, T, d2Mdξ2_t}
     M::Matrix{T}                # value of geometric shape function

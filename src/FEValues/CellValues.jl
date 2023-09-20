@@ -45,8 +45,8 @@ getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 
 function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
     geo_values = cv.geo_values
-    mapping_type = get_mapping_type(cv.fun_values)
-    map_req = RequiresHessian(requires_hessian(mapping_type))
+    fun_values = cv.fun_values
+    map_req = RequiresHessian(fun_values.ip, geo_values.ip)
     n_geom_basefuncs = getngeobasefunctions(geo_values)
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x)!=n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
@@ -56,7 +56,7 @@ function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
         detJ = calculate_detJ(getjacobian(mapping))
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         @inbounds cv.detJdV[q_point] = detJ*w
-        apply_mapping!(cv.fun_values, q_point, mapping, geo_values, cell)
+        apply_mapping!(fun_values, q_point, mapping, cell)
     end
     return nothing
 end

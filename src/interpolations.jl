@@ -1515,7 +1515,10 @@ end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
 is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
-get_mapping_type(::Interpolation) = IdentityMapping()
+get_mapping_type(::ScalarInterpolation) = IdentityMapping()
+get_mapping_type(::VectorizedInterpolation) = IdentityMapping()
+
+#= Just notes for now for RaviartThomas. Nedelec below tbd first
 
 # https://defelement.com/elements/raviart-thomas.html
 # https://defelement.com/elements/qdiv.html
@@ -1534,22 +1537,108 @@ function shape_value(ip::RaviartThomas{2,RefTriangle,1}, ξ::Vec{2}, i::Int)
     i == 3 && return Vec(-ξ_x, 1 - ξ_y)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
+=#
 
 
+#####################################
+# Nedelec (1st kind), H(curl)       #
+#####################################
 struct Nedelec{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
+get_mapping_type(::Nedelec) = CovariantPiolaMapping()
+
+# RefTriangle, 1st order Lagrange
 # https://defelement.com/elements/examples/triangle-nedelec1-lagrange-1.html
 function shape_value(ip::Nedelec{2,RefTriangle,1}, ξ::Vec{2}, i::Int)
     ξ_x, ξ_y = ξ
     i == 1 && return Vec(  - ξ_y,     ξ_x)
-    i == 2 && return Vec(  - ξ_y, ξ_x - 1)
+    i == 2 && return Vec(  - ξ_y, ξ_x - 1) # Changed signed, follow Ferrite's sign convention
     i == 3 && return Vec(1 - ξ_y,     ξ_x)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
-get_mapping_type(::Nedelec) = CovariantPiolaMapping()
-#facedof_interior_indices(ip::Nedelec) = facedof_indices(ip)
-
 getnbasefunctions(::Nedelec{2,RefTriangle,1}) = 3
-facedof_indices(::Nedelec{2,RefTriangle,1}) = ((), (), ())
 facedof_interior_indices(::Nedelec{2,RefTriangle,1}) = ((1,), (2,), (3,))
-adjust_dofs_during_distribution(::Nedelec) = false # Not sure how this works, but should be done for higher orders
+adjust_dofs_during_distribution(::Nedelec{2,RefTriangle,1}) = false
+
+function get_direction(::Nedelec{2,RefTriangle,1}, j, cell)
+    face_vertices = faces(cell)[j]
+    return face_vertices[2] > face_vertices[1] ? 1 : -1
+end
+
+# RefTriangle, 2nd order Lagrange
+# https://defelement.com/elements/examples/triangle-nedelec1-lagrange-2.html
+function shape_value(ip::Nedelec{2,RefTriangle,2}, ξ::Vec{2}, i::Int)
+    ξ_x, ξ_y = ξ
+    # Face 1
+    i == 1 && return Vec( 2*ξ_y*(1 - 4*ξ_x), 
+                          4*ξ_x*(2*ξ_x - 1))
+    i == 2 && return Vec( 4*ξ_y*(1 - 2*ξ_y), 
+                          2*ξ_x*(4*ξ_y - 1))
+    # Face 2 (flip order and sign compared to defelement)
+    i == 3 && return Vec( 4*ξ_y*(1 - 2*ξ_y), 
+                          8*ξ_x*ξ_y - 2*ξ_x - 6*ξ_y + 2)
+    i == 4 && return Vec( 2*ξ_y*(4*ξ_x + 4*ξ_y - 3), 
+                         -8*ξ_x^2 - 8*ξ_x*ξ_y + 12*ξ_x + 6*ξ_y - 4)
+    # Face 3
+    i == 5 && return Vec( 8*ξ_x*ξ_y - 6*ξ_x + 8*ξ_y^2 - 12*ξ_y + 4, 
+                          2*ξ_x*(-4*ξ_x - 4*ξ_y + 3))
+    i == 6 && return Vec(-8*ξ_x*ξ_y + 6*ξ_x + 2*ξ_y - 2, 
+                          4*ξ_x*(2*ξ_x - 1))
+    # Cell
+    i == 7 && return Vec( 8*ξ_y*(-ξ_x - 2*ξ_y + 2), 
+                          8*ξ_x*( ξ_x + 2*ξ_y - 1))
+    i == 8 && return Vec( 8*ξ_y*( 2*ξ_x + ξ_y - 1), 
+                          8*ξ_x*(-2*ξ_x - ξ_y + 2))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::Nedelec{2,RefTriangle,2}) = 8
+facedof_interior_indices(::Nedelec{2,RefTriangle,2}) = ((1,2), (3,4), (5,6))
+celldof_interior_indices(::Nedelec{2,RefTriangle,2}) = (7,8)
+adjust_dofs_during_distribution(::Nedelec{2,RefTriangle,2}) = true
+
+function get_direction(::Nedelec{2,RefTriangle,2}, j, cell)
+    j>6 && return 1
+    facenr = (j+1)÷2
+    face_vertices = faces(cell)[facenr]
+    return face_vertices[2] > face_vertices[1] ? 1 : -1
+end
+
+# RefTetrahedron, 1st order Lagrange - 𝐍𝐎𝐓 𝐓𝐄𝐒𝐓𝐄𝐃  
+# https://defelement.com/elements/examples/tetrahedron-nedelec1-lagrange-1.html
+function shape_value(ip::Nedelec{2,RefTetrahedron,1}, ξ::Vec{3,T}, i::Int) where T
+    x, y, z = ξ
+    # Edge 1 (defelement 5, positive)
+    i == 1 && return Vec(- y - z + 1, x, x)
+    # Edge 2 (defelement 2, positive)
+    i == 2 && return Vec(-y, x, zero(T))
+    # Edge 3 (defelement 4, negative)
+    i == 3 && return Vec(-y, x + z - 1, -y)
+    # Edge 4 (defelement 3, positive)
+    i == 4 && return Vec(z, z, -x - y + 1)
+    # Edge 5 (defelement 1, positive)
+    i == 5 && return Vec(-z, zero(T), x)
+    # Edge 6 (defelement 0, positive)
+    i == 6 && return Vec(zero(T), -z, y)
+
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::Nedelec{2,RefTetrahedron,1}) = 6
+facedof_interior_indices(::Nedelec{2,RefTetrahedron,1}) = ntuple(i->(i,), 6)
+adjust_dofs_during_distribution(::Nedelec{2,RefTetrahedron,1}) = false
+
+function get_direction(::Nedelec{2,RefTetrahedron,1}, j, cell)
+    edge_vertices = edges(cell)[j]
+    return edge_vertices[2] > edge_vertices[1] ? 1 : -1
+end
+
+# RefTetrahedron, 2nd order Lagrange
+# https://defelement.com/elements/examples/tetrahedron-nedelec1-lagrange-2.html
+#= Notes
+The dofs belong to faces seem to require extra consideration, but not sure.
+Basically, we need to make sure they are aligned with the same edges that they refer to.
+It might be that this works automatically, following `adjust_dofs_during_distribution`,
+but test cases need to be developed first to make sure. 
+No point in implementing guesses that cannot be verified...
+=#

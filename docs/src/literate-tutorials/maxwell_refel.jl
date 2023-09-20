@@ -46,7 +46,7 @@ display(fig)
 fig2 = M.Figure(resolution=(1000,1000))
 cv = CellValues(qr, ip, ip_geo)
 ref_x[1] = Vec(4.0,0.0)
-reinit!(cv, ref_x)
+reinit!(cv, ref_x, Triangle((1,2,3)))
 x_vertices = [ref_x..., ref_x[1]]
 for i in 1:3
     ax=M.Axis(fig2[i,1]; aspect=M.DataAspect());

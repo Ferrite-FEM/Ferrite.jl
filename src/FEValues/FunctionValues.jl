@@ -109,14 +109,11 @@ end
     return nothing
 end
 
-@inline function apply_mapping!(funvals::FunctionValues, ::CovariantPiolaMapping, q_point::Int, mapping_values, geovals::GeometryValues, cell)
+@inline function apply_mapping!(funvals::FunctionValues, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
     H = gethessian(mapping_values)
     Jinv = inv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
-        face_vertices = faces(cell)[j]
-        d = face_vertices[2] > face_vertices[1] ? 1 : -1
-        #d = 1
-        #funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Jinv # TODO via Tensors.jl
+        d = get_direction(funvals.ip, j, cell)
         dNdξ = funvals.dNdξ[j, q_point]
         N_ξ = funvals.N_ξ[j, q_point]
         funvals.N_x[j, q_point] = d*(N_ξ ⋅ Jinv)

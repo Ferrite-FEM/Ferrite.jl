@@ -11,14 +11,20 @@
 using Ferrite 
 import Ferrite: Nedelec
 import CairoMakie as M
-ip = Nedelec{2,RefTriangle,1}()
-grid = generate_grid(Triangle, (2,2))
+ip = Nedelec{2,RefTriangle,2}()
+grid = generate_grid(Triangle, (1,2))
 dh = DofHandler(grid)
 add!(dh, :B, ip)
 close!(dh)
 
 ip_geo = Ferrite.default_interpolation(Triangle)
 qr = QuadratureRule{RefTriangle}(10)
+
+qr_points = Vec{2,Float64}[]; n=6
+append!(qr_points, [Vec((0.0, i/(n+1))) for i in 1:n])
+append!(qr_points, [Vec((i/(n+1), 0.0)) for i in 1:n])
+append!(qr_points, [Vec((i/(n+1), 1 - i/(n+1))) for i in 1:n])
+qr = QuadratureRule{RefTriangle}(zeros(length(qr_points)), qr_points)
 cv = CellValues(qr, ip, ip_geo)
 
 n_qp = getncells(grid)*getnquadpoints(cv)
@@ -56,10 +62,9 @@ for nr in 1:(ndofs(dh))
     display(fig)
 end
 
+
+# Remaining tasks 
 #=
-mutable struct NewCellCache{T,dim,CT}
-    const x::Vector{Vec{dim,T}}
-    const dofs::Vector{Int}
-    cell::CT 
-end
+✓ 2nd order Nedelec
+*  
 =#

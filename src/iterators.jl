@@ -374,7 +374,6 @@ function Base.iterate(ii::InterfaceIterator, state...)
     end
 end
 
-
 # Iterator interface for CellIterator/FaceIterator
 const GridIterators{C} = Union{CellIterator{C}, FaceIterator{C}, InterfaceIterator{C}}
 
@@ -407,15 +406,9 @@ function _check_same_celltype(grid::AbstractGrid, faceset::Set{FaceIndex})
     end
 end
 
-
-mutable struct CellIterator2{CC,DH,IC}
-    cache::CC # const
-    dh::SDH   # const
-    cells::IC # const
-    current_cell::Int
-end
-mutable struct CellCache2{T,dim,CT}
-    const x::Vector{Vec{dim,T}}
-    const dofs::Vector{Int}
-    cell::CT 
-end
+#= Remaining tasks 
+1) Test on quadrilateral
+2) Generalize to 2nd order case 
+3) Generalize to 3d-face 
+4) Consider RaviartThomas elements for 0-3 as well. 
+=#
