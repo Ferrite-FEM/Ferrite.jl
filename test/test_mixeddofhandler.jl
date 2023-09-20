@@ -517,6 +517,22 @@ function test_subparametric_triangle()
     @test celldofs(dh, 1) == [i for i in 1:12]
 end
 
+function test_celliterator_subdomain()
+    for celltype in (Line, Quadrilateral, Hexahedron)
+        ip = Ferrite.default_interpolation(celltype)
+        dim = Ferrite.getdim(ip)
+        grid = generate_grid(celltype, ntuple(i->i==1 ? 2 : 1, dim)) # 2 cells
+        dh = DofHandler(grid)
+        sdh = SubDofHandler(dh, Set(2)) # only cell 2, cell 1 is not part of dh
+        add!(sdh, :u, ip)
+        close!(dh)
+
+        ci = CellIterator(sdh)
+        reinit!(ci.cc, 2)
+        @test celldofs(ci.cc) == collect(1:length(ci.cc.dofs))
+    end
+end
+
 function test_separate_fields_on_separate_domains()
     # 5_______6
     # |\      | 
@@ -619,5 +635,6 @@ end
     test_mixed_grid_show()
     test_separate_fields_on_separate_domains();
     test_unique_cellsets()
+    test_celliterator_subdomain()
     test_show()
 end
