@@ -120,20 +120,29 @@ function reinit!(
 end
 
 """
-    getnormal(iv::InterfaceValues, qp::Int; here::Bool = true)
+    getnormal(iv::InterfaceValues, qp::Int; here::Bool=true)
 
 Return the normal vector in the quadrature point `qp` on the interface. If `here = true`
 (default) the outward normal to the "here" element is returned, otherwise the outward normal
 to the "there" element.
 """
 function getnormal(iv::InterfaceValues, qp::Int; here::Bool=true)
+    # TODO: Does it make sense to allow the kwarg here? You can juse negate the vector
+    #       yourself since getnormal(iv, qp; here=false) == -getnormal(iv, qp; here=true).
     return here ? iv.here.normals[qp] : iv.there.normals[qp]
 end
 
 """
-    function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
+    function_value(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
+    function_value(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, range_here, u_there::AbstractVector, range_there; here::Bool)
 
-Compute the value of the function in quadrature point `q_point`. `u` is a vector with values
+Compute the value of the function in quadrature point `q_point` on the "here" (`here=true`)
+or "there" (`here=false`) side of the interface. `u_here` and `u_there` are the values of
+the degrees of freedom for the respeciv element.
+
+
+TODO: Complete the docs here.
+is a vector with values
 for the degrees of freedom. For a scalar valued function, `u` contains scalars.
 For a vector valued function, `u` can be a vector of scalars (for use of `VectorValues`)
 or `u` can be a vector of `Vec`s (for use with ScalarValues).
@@ -146,15 +155,35 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
 nodal values of ``\\mathbf{u}``.
 """
-function function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true)
-    fv = here ? iv.here : iv.there
-    function_value(fv, q_point, u, dof_range)
+function_value(::InterfaceValues, ::Int, args...)
+
+function function_value(
+        iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector;
+        here::Bool
+    )
+    return function_value(iv, q_point, u_here, eachindex(u_here), u_there, eachindex(u_there); here=here)
+end
+function function_value(
+        iv::InterfaceValues, q_point::Int,
+        u_here::AbstractVector, dof_range_here::AbstractUnitRange{Int},
+        u_there::AbstractVector, dof_range_there::AbstractUnitRange{Int};
+        here::Bool
+    )
+    if here
+        return function_value(iv.here, q_point, u_here, dof_range_here)
+    else # there
+        return function_value(iv.there, q_point, u_there, dof_range_there)
+    end
 end
 
-shape_value_type(::InterfaceValues{<:FaceValues{<:Any, N_t}}) where N_t = N_t
+shape_value_type(::InterfaceValues{<:FaceValues{<:Any, N_t}}) where N_t = error() # N_t
 
 """
-    function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
+    function_gradient(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
+    function_gradient(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, range_here, u_there::AbstractVector, range_there; here::Bool)
+
+
+TODO: Update docs below.
 
 Compute the gradient of the function in a quadrature point. `u` is a vector with values
 for the degrees of freedom. For a scalar valued function, `u` contains scalars.
@@ -172,19 +201,34 @@ For a vector valued function with use of `ScalarValues` the gradient is computed
 ``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{u}_i \\otimes \\mathbf{\\nabla} N_i (\\mathbf{x})``
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
-function function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true)
-    fv = here ? iv.here : iv.there
-    function_gradient(fv, q_point, u, dof_range)
+function_gradient(::InterfaceValues, ::Int, args...; kwargs...)
+
+function function_gradient(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
+    return function_gradient(iv, q_point, u_here, eachindex(u_here), u_there, eachindex(u_there); here=here)
+end
+function function_gradient(
+        iv::InterfaceValues, q_point::Int,
+        u_here::AbstractVector, range_here::AbstractUnitRange{Int},
+        u_there::AbstractVector, range_there::AbstractUnitRange{Int};
+        here::Bool
+    )
+    if here
+        return function_gradient(iv.here, q_point, u_here, range_here)
+    else # there
+        return function_gradient(iv.there, q_point, u_there, range_there)
+    end
 end
 
-# TODO: Deprecate this, nobody is using this in practice...
 function function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true)
+    error("# TODO: Deprecate this, nobody is using this in practice...")
     fv = here ? iv.here : iv.there
     function_gradient(fv, q_point, u)
 end
 
 """
-    function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
+    function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool)
+
+TODO: Is this function useful?
 
 Compute the symmetric gradient of the function, see [`function_gradient`](@ref).
 Return a `SymmetricTensor`.
@@ -201,14 +245,16 @@ function function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::Abstr
     function_symmetric_gradient(fv, q_point, u, dof_range)
 end
 
-# TODO: Deprecate this, nobody is using this in practice...
 function function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true)
+    error("# TODO: Deprecate this, nobody is using this in practice...")
     fv = here ? iv.here : iv.there
     function_symmetric_gradient(fv, q_point, u)
 end
 
 """
     function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
+
+TODO: Is this function useful?
 
 Compute the divergence of the vector valued function in a quadrature point.
 
@@ -222,14 +268,16 @@ where ``\\mathbf{u}_i`` are the nodal values of the function.
 function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) =
     divergence_from_gradient(function_gradient(iv, q_point, u, dof_range; here = here))
 
-# TODO: Deprecate this, nobody is using this in practice...
 function function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true)
+    error("# TODO: Deprecate this, nobody is using this in practice...")
     fv = here ? iv.here : iv.there
     function_divergence(fv, q_point, u)
 end
 
 """
     function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
+
+TODO: Is this function useful?
 
 Compute the curl of the vector valued function in a quadrature point.
 
@@ -322,14 +370,16 @@ for (func,                      f_,                 ) in (
 end
 
 """
-    function_value_average(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
+    function_value_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
+    function_value_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, range_here, u_there::AbstractVector, range_there)
 
 Compute the average of the function value at the quadrature point on interface.
 """
 function function_value_average end
 
 """
-    function_value_jump(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
+    function_value_jump(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
+    function_value_jump(iv::InterfaceValues, qp::Int, u_here::AbstractVector, range_here, u_there::AbstractVector, range_there)
 
 Compute the jump of the function value at the quadrature point over the interface.
 
@@ -339,14 +389,16 @@ This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- 
 function function_value_jump end
 
 """
-    function_gradient_average(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
+    function_gradient_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
+    function_gradient_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, range_here, u_there::AbstractVector, range_there)
 
 Compute the average of the function gradient at the quadrature point on the interface.
 """
 function function_gradient_average end
 
 """
-    function_gradient_jump(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
+    function_gradient_jump(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
+    function_gradient_jump(iv::InterfaceValues, qp::Int, u_here::AbstractVector, range_here, u_there::AbstractVector, range_there)
 
 Compute the jump of the function gradient at the quadrature point over the interface.
 
@@ -360,25 +412,28 @@ for (func,                          f_,                 ) in (
     (:function_gradient_average,    :function_gradient, ),
 )
     @eval begin
-        function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
-            f_value_here = $(f_)(iv, qp, u_a, dof_range_a, here = true)
-            f_value_there = $(f_)(iv, qp, u_b, dof_range_b, here = false)
-            fv = iv.here
-            result = 0.5 * f_value_here
-            fv = iv.there
-            result += 0.5 * f_value_there
-            return result
+        function $(func)(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
+            return $(func)(iv, qp, u_here, eachindex(u_here), u_there, eachindex(u_there))
         end
-        # TODO: Deprecate this, nobody is using this in practice...
-        function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector{<:Vec}, u_b::AbstractVector{<:Vec})
-            f_value_here = $(f_)(iv, qp, u_a, here = true)
-            f_value_there = $(f_)(iv, qp, u_b, here = false)
-            fv = iv.here
-            result = 0.5 * f_value_here
-            fv = iv.there
-            result += 0.5 * f_value_there
-            return result
+        function $(func)(
+                iv::InterfaceValues, qp::Int,
+                u_here::AbstractVector, range_here::AbstractUnitRange{Int},
+                u_there::AbstractVector, range_there::AbstractUnitRange{Int},
+            )
+            f_here = $(f_)(iv.here, qp, u_here, range_here)
+            f_there = $(f_)(iv.there, qp, u_there, range_there)
+            return 0.5 * (f_here + f_there)
         end
+        # function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector{<:Vec}, u_b::AbstractVector{<:Vec})
+        #     error("# TODO: Deprecate this, nobody is using this in practice...")
+        #     f_value_here = $(f_)(iv, qp, u_a; here = true)
+        #     f_value_there = $(f_)(iv, qp, u_b; here = false)
+        #     fv = iv.here
+        #     result = 0.5 * f_value_here
+        #     fv = iv.there
+        #     result += 0.5 * f_value_there
+        #     return result
+        # end
     end
 end
 
@@ -387,22 +442,30 @@ for (func,                          f_,                 ) in (
     (:function_gradient_jump,       :function_gradient, ),
 )
     @eval begin
-        function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector, u_b::AbstractVector, dof_range_a = eachindex(u_a), dof_range_b = eachindex(u_b))
-            f_value_here = $(f_)(iv, qp, u_a, dof_range_a, here = true)
-            f_value_there = $(f_)(iv, qp, u_b, dof_range_b, here = false)
-            return f_value_there - f_value_here
+        function $(func)(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
+            return $(func)(iv, qp, u_here, eachindex(u_here), u_there, eachindex(u_there))
         end
-        # TODO: Deprecate this, nobody is using this in practice...
-        function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector{<:Vec}, u_b::AbstractVector{<:Vec})
-            f_value_here = $(f_)(iv, qp, u_a, here = true)
-            f_value_there = $(f_)(iv, qp, u_b, here = false)
-            return f_value_there - f_value_here
+        function $(func)(
+                iv::InterfaceValues, qp::Int,
+                u_here::AbstractVector, range_here::AbstractUnitRange{Int},
+                u_there::AbstractVector, range_there::AbstractUnitRange{Int},
+            )
+            f_here = $(f_)(iv.here, qp, u_here, range_here)
+            f_there = $(f_)(iv.there, qp, u_there, range_there)
+            return f_there - f_here
         end
+        # function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector{<:Vec}, u_b::AbstractVector{<:Vec})
+        #     error("# TODO: Deprecate this, nobody is using this in practice...")
+        #     f_value_here = $(f_)(iv, qp, u_a, here = true)
+        #     f_value_there = $(f_)(iv, qp, u_b, here = false)
+        #     return f_value_there - f_value_here
+        # end
     end
 end
 
-spatial_coordinate(iv::InterfaceValues, q_point::Int, x::AbstractVector{Vec{dim,T}}) where {dim,T} =
-    spatial_coordinate(iv.here, q_point, x)
+function spatial_coordinate(iv::InterfaceValues, q_point::Int, x_here::AbstractVector{<:Vec})
+    return spatial_coordinate(iv.here, q_point, x_here)
+end
 
 """
     get_transformation_matrix(interface_transformation::InterfaceTransformation)
