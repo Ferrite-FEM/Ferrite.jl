@@ -19,11 +19,12 @@
                 @test spatial_coordinate(iv, qp, cell_a_coords) ≈ spatial_coordinate(iv.here, qp, cell_a_coords) ≈
                 spatial_coordinate(iv.there, qp, cell_b_coords)
                 for i in 1:getnbasefunctions(iv)
-                    shapevalue = shape_value(iv, qp, i)
+                    here = i <= getnbasefunctions(iv.here)
+                    shapevalue = shape_value(iv, qp, i; here = here)
                     shape_avg = shape_value_average(iv, qp, i)
                     shape_jump = shape_value_jump(iv, qp, i)
                     
-                    shapegrad = shape_gradient(iv, qp, i)
+                    shapegrad = shape_gradient(iv, qp, i; here = here)
                     shapegrad_avg = shape_gradient_average(iv, qp, i)
                     shapegrad_jump = shape_gradient_jump(iv, qp, i)
 

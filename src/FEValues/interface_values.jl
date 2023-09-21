@@ -338,26 +338,39 @@ This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- 
 """
 function shape_gradient_jump end
 
-for (func,                      f_,                 multiplier, ) in (
-    (:shape_value,              :shape_value,       :(1),       ),
-    (:shape_value_average,      :shape_value,       :(0.5),     ),
-    (:shape_gradient,           :shape_gradient,    :(1),       ),
-    (:shape_gradient_average,   :shape_gradient,    :(0.5),     ),
+for (func,                      f_,              ) in (
+    (:shape_value,              :shape_value,    ),
+    (:shape_gradient,           :shape_gradient, ),
 )
     @eval begin
-        function $(func)(iv::InterfaceValues, qp::Int, i::Int)
+        function $(func)(iv::InterfaceValues, qp::Int, i::Int; here::Bool)
             nbf = getnbasefunctions(iv)
             nbf_a = getnbasefunctions(iv.here)
             if i <= nbf_a
                 fv = iv.here
+                here || return zero(typeof(fv).parameters[2])
                 f_value = $(f_)(fv, qp, i)
-                return $(multiplier) * f_value
+                return f_value
             elseif i <= nbf
                 fv = iv.there
+                here && return zero(typeof(fv).parameters[2])
                 f_value = $(f_)(fv, qp, i - nbf_a)
-                return $(multiplier) * f_value
+                return f_value
             end
             error("Invalid base function $i. Interface has only $(nbf) base functions")
+        end
+    end
+end
+
+for (func,                      f_,               ) in (
+    (:shape_value_average,      :shape_value,     ),
+    (:shape_gradient_average,   :shape_gradient,  ),
+)
+    @eval begin
+        function $(func)(iv::InterfaceValues, qp::Int, i::Int)
+            f_here = $(f_)(iv, qp, i; here = true)
+            f_there = $(f_)(iv, qp, i; here = false)
+            return (f_here .+ f_there)/2
         end
     end
 end
@@ -368,9 +381,9 @@ for (func,                      f_,                 ) in (
 )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, i::Int)
-            f_value = $(f_)(iv, qp, i)
-            nbf_a = getnbasefunctions(iv.here)
-            return i <= nbf_a ? -f_value : f_value
+            f_here = $(f_)(iv, qp, i; here = true)
+            f_there = $(f_)(iv, qp, i; here = false)
+            return f_there .- f_here
         end
     end
 end
