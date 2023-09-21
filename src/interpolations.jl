@@ -1518,26 +1518,34 @@ is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) whe
 get_mapping_type(::ScalarInterpolation) = IdentityMapping()
 get_mapping_type(::VectorizedInterpolation) = IdentityMapping()
 
-#= Just notes for now for RaviartThomas. Nedelec below tbd first
 
+#####################################
+# RaviartThomas (1st kind), H(div)       #
+#####################################
 # https://defelement.com/elements/raviart-thomas.html
 # https://defelement.com/elements/qdiv.html
 struct RaviartThomas{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
+get_mapping_type(::RaviartThomas) = ContravariantPiolaMapping()
 
-facedof_interior_indices(ip::RaviartThomas) = facedof_indices(ip)
-
-getnbasefunctions(::RaviartThomas{2,RefTriangle,1}) = 3
-facedof_indices(::RaviartThomas{2,RefTriangle,1}) = ((1,), (2,), (3,))
-adjust_dofs_during_distribution(::RaviartThomas) = false # Not sure how this works, but should be done for higher orders
+# RefTriangle, 1st order Lagrange
 # https://defelement.com/elements/examples/triangle-raviart-thomas-lagrange-1.html
+# Signs changed when needed to make positive direction outwards
 function shape_value(ip::RaviartThomas{2,RefTriangle,1}, ξ::Vec{2}, i::Int)
-    ξ_x, ξ_y = ξ
-    i == 1 && return -ξ
-    i == 2 && return Vec(ξ_x-1, ξ_y)
-    i == 3 && return Vec(-ξ_x, 1 - ξ_y)
+    x, y = ξ
+    i == 1 && return ξ                  # Flip sign
+    i == 2 && return Vec(x-1, y)        # Keep sign
+    i == 3 && return Vec(x, y - 1)      # Flip sign
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
-=#
+
+getnbasefunctions(::RaviartThomas{2,RefTriangle,1}) = 3
+facedof_interior_indices(::RaviartThomas{2,RefTriangle,1}) = ((1,), (2,), (3,))
+adjust_dofs_during_distribution(::RaviartThomas) = false
+
+function get_direction(::RaviartThomas{2,RefTriangle,1}, j, cell)
+    face_vertices = faces(cell)[j]
+    return face_vertices[2] > face_vertices[1] ? 1 : -1
+end
 
 
 #####################################
@@ -1549,10 +1557,10 @@ get_mapping_type(::Nedelec) = CovariantPiolaMapping()
 # RefTriangle, 1st order Lagrange
 # https://defelement.com/elements/examples/triangle-nedelec1-lagrange-1.html
 function shape_value(ip::Nedelec{2,RefTriangle,1}, ξ::Vec{2}, i::Int)
-    ξ_x, ξ_y = ξ
-    i == 1 && return Vec(  - ξ_y,     ξ_x)
-    i == 2 && return Vec(  - ξ_y, ξ_x - 1) # Changed signed, follow Ferrite's sign convention
-    i == 3 && return Vec(1 - ξ_y,     ξ_x)
+    x, y = ξ
+    i == 1 && return Vec(  - y,     x)
+    i == 2 && return Vec(  - y, x - 1) # Changed signed, follow Ferrite's sign convention
+    i == 3 && return Vec(1 - y,     x)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -1568,27 +1576,27 @@ end
 # RefTriangle, 2nd order Lagrange
 # https://defelement.com/elements/examples/triangle-nedelec1-lagrange-2.html
 function shape_value(ip::Nedelec{2,RefTriangle,2}, ξ::Vec{2}, i::Int)
-    ξ_x, ξ_y = ξ
+    x, y = ξ
     # Face 1
-    i == 1 && return Vec( 2*ξ_y*(1 - 4*ξ_x), 
-                          4*ξ_x*(2*ξ_x - 1))
-    i == 2 && return Vec( 4*ξ_y*(1 - 2*ξ_y), 
-                          2*ξ_x*(4*ξ_y - 1))
+    i == 1 && return Vec( 2*y*(1 - 4*x), 
+                          4*x*(2*x - 1))
+    i == 2 && return Vec( 4*y*(1 - 2*y), 
+                          2*x*(4*y - 1))
     # Face 2 (flip order and sign compared to defelement)
-    i == 3 && return Vec( 4*ξ_y*(1 - 2*ξ_y), 
-                          8*ξ_x*ξ_y - 2*ξ_x - 6*ξ_y + 2)
-    i == 4 && return Vec( 2*ξ_y*(4*ξ_x + 4*ξ_y - 3), 
-                         -8*ξ_x^2 - 8*ξ_x*ξ_y + 12*ξ_x + 6*ξ_y - 4)
+    i == 3 && return Vec( 4*y*(1 - 2*y), 
+                          8*x*y - 2*x - 6*y + 2)
+    i == 4 && return Vec( 2*y*(4*x + 4*y - 3), 
+                         -8*x^2 - 8*x*y + 12*x + 6*y - 4)
     # Face 3
-    i == 5 && return Vec( 8*ξ_x*ξ_y - 6*ξ_x + 8*ξ_y^2 - 12*ξ_y + 4, 
-                          2*ξ_x*(-4*ξ_x - 4*ξ_y + 3))
-    i == 6 && return Vec(-8*ξ_x*ξ_y + 6*ξ_x + 2*ξ_y - 2, 
-                          4*ξ_x*(2*ξ_x - 1))
+    i == 5 && return Vec( 8*x*y - 6*x + 8*y^2 - 12*y + 4, 
+                          2*x*(-4*x - 4*y + 3))
+    i == 6 && return Vec(-8*x*y + 6*x + 2*y - 2, 
+                          4*x*(2*x - 1))
     # Cell
-    i == 7 && return Vec( 8*ξ_y*(-ξ_x - 2*ξ_y + 2), 
-                          8*ξ_x*( ξ_x + 2*ξ_y - 1))
-    i == 8 && return Vec( 8*ξ_y*( 2*ξ_x + ξ_y - 1), 
-                          8*ξ_x*(-2*ξ_x - ξ_y + 2))
+    i == 7 && return Vec( 8*y*(-x - 2*y + 2), 
+                          8*x*( x + 2*y - 1))
+    i == 8 && return Vec( 8*y*( 2*x + y - 1), 
+                          8*x*(-2*x - y + 2))
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 

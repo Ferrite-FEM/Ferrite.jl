@@ -3,7 +3,10 @@ struct MappingValues{JT, HT<:Union{Nothing,AbstractTensor{3}}}
     H::HT # dJ/dξ # Hessian
 end
 @inline getjacobian(mv::MappingValues) = mv.J 
-@inline gethessian(mv::MappingValues) = mv.H
+@inline gethessian(mv::MappingValues{<:Any,<:AbstractTensor}) = mv.H
+
+@inline gethessian(::MappingValues{JT,Nothing}) where JT = _make_hessian(JT)
+@inline _make_hessian(::Type{Tensor{2,dim,T}}) where {dim,T} = zero(Tensor{3,dim,T})
 
 struct RequiresHessian{B} end
 RequiresHessian(B::Bool) = RequiresHessian{B}()

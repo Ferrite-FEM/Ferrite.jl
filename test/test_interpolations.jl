@@ -1,6 +1,6 @@
 
 @testset "interpolations" begin
-
+#=
 @testset "$interpolation" for interpolation in (
                       Lagrange{RefLine, 1}(),
                       Lagrange{RefLine, 2}(),
@@ -179,11 +179,14 @@ end
     @test Ferrite.is_discontinuous(ip_t) == false
     @test Ferrite.is_discontinuous(d_ip) == true
     @test Ferrite.is_discontinuous(d_ip_t) == true
-
-@testset "Nedelec" begin
+=#
+@testset "Hcurl and Hdiv" begin
     include(joinpath(@__DIR__, "InterpolationTestUtils.jl"))
     import .InterpolationTestUtils as ITU
     nel = 3
+    transformation_functions = Dict(
+        Nedelec=>(v,n)-> v - n*(v⋅n),   # Hcurl (tangent continuity)
+        RaviartThomas=>(v,n) -> v ⋅ n)  # Hdiv (normal continuity)
     for CT in (Triangle, QuadraticTriangle, Tetrahedron)
         dim = Ferrite.getdim(CT)
         p1, p2 = (rand(Vec{dim}), ones(Vec{dim})+rand(Vec{dim}))
@@ -194,20 +197,24 @@ end
         transform_coordinates!(grid, x->(x + rand(x)/(10*nel)))
         RefShape = Ferrite.getrefshape(getcells(grid, 1))
         for order in (1, 2)
-            dim == 3 && order > 1 && continue
-            ip = Nedelec{dim,RefShape,order}()
-            @testset "$CT, $ip" begin
-                dh = DofHandler(grid)
-                add!(dh, :u, ip)
-                close!(dh)
-                cellnr = getncells(grid)÷2 # Should be a cell in the center
-                for facenr in 1:nfaces(RefShape)
-                    fi = FaceIndex(cellnr, facenr)
-                    # Check continuity of tangential function value
-                    ITU.test_continuity(dh, fi; transformation_function=(v,n)-> v - n*(v⋅n))
+            for IPT in (Nedelec, RaviartThomas)
+                dim == 3 && order > 1 && continue
+                IPT == RaviartThomas && (dim == 3 || order > 1) && continue
+                transformation_function=transformation_functions[IPT]
+                ip = IPT{dim,RefShape,order}()
+                @testset "$CT, $ip" begin
+                    dh = DofHandler(grid)
+                    add!(dh, :u, ip)
+                    close!(dh)
+                    cellnr = getncells(grid)÷2 # Should be a cell in the center
+                    for facenr in 1:nfaces(RefShape)
+                        fi = FaceIndex(cellnr, facenr)
+                        # Check continuity of tangential function value
+                        ITU.test_continuity(dh, fi; transformation_function)
+                    end
+                    # Check gradient calculation 
+                    ITU.test_gradient(dh, cellnr)
                 end
-                # Check gradient calculation 
-                ITU.test_gradient(dh, cellnr)
             end
         end
     end

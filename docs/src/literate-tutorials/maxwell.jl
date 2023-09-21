@@ -12,9 +12,10 @@ import LinearAlgebra: normalize
 using StaticArrays
 using Test
 using Ferrite 
-import Ferrite: Nedelec
+import Ferrite: Nedelec, RaviartThomas
 import CairoMakie as M
 ip = Nedelec{2,RefTriangle,2}()
+ip = RaviartThomas{2,RefTriangle,1}()
 grid = generate_grid(Triangle, (1,2))
 dh = DofHandler(grid)
 add!(dh, :B, ip)
@@ -68,16 +69,4 @@ function plot_shapes(dh, cv)
     end
     return nothing
 end
-
-# plot_shapes(dh, cv)
-
-# Remaining tasks 
-#=
-✓ 2nd order Nedelec
-* Develop test cases for 
-  a) Continuity 
-  b) Gradient check 
-=#
-
-
-test_gradient(dh, 1)
+plot_shapes(dh, cv)

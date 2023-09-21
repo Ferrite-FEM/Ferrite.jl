@@ -73,15 +73,10 @@ struct ContravariantPiolaMapping end
 # struct DoubleContravariantPiolaMapping end 
 
 get_mapping_type(fv::FunctionValues) = get_mapping_type(fv.ip)
-#get_mapping_type(::FunctionValues{<:ScalarInterpolation}) = IdentityMapping()
-#get_mapping_type(::FunctionValues{<:VectorizedInterpolation}) = IdentityMapping()
-#get_mapping_type(::FunctionValues{<:HdivIP}) = ContravariantPiolaMapping()
-#get_mapping_type(::FunctionValues{<:HcurlIP}) = CovariantPiolaMapping()
 
 requires_hessian(::IdentityMapping) = false
 requires_hessian(::ContravariantPiolaMapping) = true
 requires_hessian(::CovariantPiolaMapping) = true
-
 
 calculate_Jinv(J::Tensor{2}) = inv(J)
 calculate_Jinv(J::SMatrix) = pinv(J)
@@ -118,6 +113,25 @@ end
         N_ξ = funvals.N_ξ[j, q_point]
         funvals.N_x[j, q_point] = d*(N_ξ ⋅ Jinv)
         funvals.dNdx[j, q_point] = d*(Jinv' ⋅ dNdξ ⋅ Jinv - Jinv' ⋅ (N_ξ ⋅ Jinv ⋅ H ⋅ Jinv))
+    end
+    return nothing
+end
+
+@inline function apply_mapping!(funvals::FunctionValues, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
+    H = gethessian(mapping_values)
+    J = getjacobian(mapping_values)
+    Jinv = inv(J)
+    detJ = det(J)
+    I2 = one(J)
+    H_Jinv = H⋅Jinv
+    A1 = (H_Jinv ⊡ (otimesl(I2,I2))) / detJ
+    A2 = (Jinv' ⊡ H_Jinv) / detJ
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        d = get_direction(funvals.ip, j, cell)
+        dNdξ = funvals.dNdξ[j, q_point]
+        N_ξ = funvals.N_ξ[j, q_point]
+        funvals.N_x[j, q_point] = d*(J ⋅ N_ξ)/detJ
+        funvals.dNdx[j, q_point] = d*(Jinv ⋅ dNdξ ⋅ Jinv/detJ + A1 ⋅ N_ξ - (J ⋅ N_ξ) ⊗ A2)
     end
     return nothing
 end

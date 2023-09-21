@@ -10,9 +10,10 @@
 # and we therefore use the Nedelec interpolation.  
 import CairoMakie as M
 using Ferrite
-import Ferrite: Nedelec
+import Ferrite: Nedelec, RaviartThomas
 import Ferrite: reference_coordinates
 ip = Nedelec{2,RefTriangle,1}()
+ip = RaviartThomas{2,RefTriangle,1}()
 ip_geo = Lagrange{RefTriangle,1}()
 ref_x = reference_coordinates(ip_geo)
 
@@ -52,7 +53,7 @@ for i in 1:3
     ax=M.Axis(fig2[i,1]; aspect=M.DataAspect());
     M.lines!(ax, first.(x_vertices), last.(x_vertices))
     x_qp = spatial_coordinate.((cv,), 1:length(x), (ref_x,))
-    @show x_qp ≈ x
+    @show x_qp ≈ x # should be false
     v = shape_value.((cv,), 1:length(x), i)
     M.scatter!(ax, first.(x_qp), last.(x_qp))
     M.arrows!(ax, first.(x_qp), last.(x_qp), first.(v), last.(v); lengthscale=0.25)
