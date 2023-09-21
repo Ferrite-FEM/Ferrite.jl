@@ -213,7 +213,7 @@ The symmetric gradient of a scalar function is computed as
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
 function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
-    grad = dof_range == eachindex(u) ? function_gradient(fe_v, q_point, u) : function_gradient(fe_v, q_point, u) # Workaround for calling deprecated method
+    grad = dof_range == eachindex(u) ? function_gradient(fe_v, q_point, u) : function_gradient(fe_v, q_point, u, dof_range) # Workaround for calling deprecated method
     return symmetric(grad)
 end
 
