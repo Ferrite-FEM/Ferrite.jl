@@ -1,3 +1,4 @@
+
 @testset "interpolations" begin
 
 @testset "$interpolation" for interpolation in (
@@ -178,4 +179,38 @@ end
     @test Ferrite.is_discontinuous(ip_t) == false
     @test Ferrite.is_discontinuous(d_ip) == true
     @test Ferrite.is_discontinuous(d_ip_t) == true
+
+@testset "Nedelec" begin
+    include(joinpath(@__DIR__, "InterpolationTestUtils.jl"))
+    import .InterpolationTestUtils as ITU
+    nel = 3
+    for CT in (Triangle, QuadraticTriangle, Tetrahedron)
+        dim = Ferrite.getdim(CT)
+        p1, p2 = (rand(Vec{dim}), ones(Vec{dim})+rand(Vec{dim}))
+        grid = generate_grid(CT, ntuple(_->nel, dim), p1, p2)
+        # Distort grid, important to properly test geometry mapping 
+        # for 2nd order elements. Make sure distortion is less than 
+        # a 10th of the element size. 
+        transform_coordinates!(grid, x->(x + rand(x)/(10*nel)))
+        RefShape = Ferrite.getrefshape(getcells(grid, 1))
+        for order in (1, 2)
+            dim == 3 && order > 1 && continue
+            ip = Nedelec{dim,RefShape,order}()
+            @testset "$CT, $ip" begin
+                dh = DofHandler(grid)
+                add!(dh, :u, ip)
+                close!(dh)
+                cellnr = getncells(grid)÷2 # Should be a cell in the center
+                for facenr in 1:nfaces(RefShape)
+                    fi = FaceIndex(cellnr, facenr)
+                    # Check continuity of tangential function value
+                    ITU.test_continuity(dh, fi; transformation_function=(v,n)-> v - n*(v⋅n))
+                end
+                # Check gradient calculation 
+                ITU.test_gradient(dh, cellnr)
+            end
+        end
+    end
 end
+end
+

@@ -1606,7 +1606,7 @@ end
 
 # RefTetrahedron, 1st order Lagrange - 𝐍𝐎𝐓 𝐓𝐄𝐒𝐓𝐄𝐃  
 # https://defelement.com/elements/examples/tetrahedron-nedelec1-lagrange-1.html
-function shape_value(ip::Nedelec{2,RefTetrahedron,1}, ξ::Vec{3,T}, i::Int) where T
+function shape_value(ip::Nedelec{3,RefTetrahedron,1}, ξ::Vec{3,T}, i::Int) where T
     x, y, z = ξ
     # Edge 1 (defelement 5, positive)
     i == 1 && return Vec(- y - z + 1, x, x)
@@ -1624,11 +1624,11 @@ function shape_value(ip::Nedelec{2,RefTetrahedron,1}, ξ::Vec{3,T}, i::Int) wher
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
-getnbasefunctions(::Nedelec{2,RefTetrahedron,1}) = 6
-facedof_interior_indices(::Nedelec{2,RefTetrahedron,1}) = ntuple(i->(i,), 6)
-adjust_dofs_during_distribution(::Nedelec{2,RefTetrahedron,1}) = false
+getnbasefunctions(::Nedelec{3,RefTetrahedron,1}) = 6
+edgedof_interior_indices(::Nedelec{3,RefTetrahedron,1}) = ntuple(i->(i,), 6)
+adjust_dofs_during_distribution(::Nedelec{3,RefTetrahedron,1}) = false
 
-function get_direction(::Nedelec{2,RefTetrahedron,1}, j, cell)
+function get_direction(::Nedelec{3,RefTetrahedron,1}, j, cell)
     edge_vertices = edges(cell)[j]
     return edge_vertices[2] > edge_vertices[1] ? 1 : -1
 end
