@@ -180,13 +180,14 @@ function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector
 end
 
 # TODO: Deprecate this, nobody is using this in practice...
-function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec})
+function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec}, dof_range = eachindex(u))
     n_base_funcs = getnbasefunctions(fe_v)
-    length(u) == n_base_funcs || throw_incompatible_dof_length(length(u), n_base_funcs)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
     @boundscheck checkquadpoint(fe_v, q_point)
     grad = function_gradient_init(fe_v, u)
-    @inbounds for i in 1:n_base_funcs
-        grad += u[i] ⊗ shape_gradient(fe_v, q_point, i)
+    @inbounds for (i, j) in pairs(dof_range)
+        grad += u[j] ⊗ shape_gradient(fe_v, q_point, i)
     end
     return grad
 end
@@ -212,13 +213,7 @@ The symmetric gradient of a scalar function is computed as
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
 function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
-    grad = function_gradient(fe_v, q_point, u, dof_range)
-    return symmetric(grad)
-end
-
-# TODO: Deprecate this, nobody is using this in practice...
-function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec})
-    grad = function_gradient(fe_v, q_point, u)
+    grad = dof_range == eachindex(u) ? function_gradient(fe_v, q_point, u) : function_gradient(fe_v, q_point, u) # Workaround for calling deprecated method
     return symmetric(grad)
 end
 
@@ -272,11 +267,11 @@ coordinates of the cell.
 The coordinate is computed, using the geometric interpolation, as
 ``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{x}) \\mathbf{\\hat{x}}_i``
 """
-function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVector{Vec{dim,T}}) where {dim,T}
+function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVector{<:Vec})
     n_base_funcs = getngeobasefunctions(fe_v)
     length(x) == n_base_funcs || throw_incompatible_coord_length(length(x), n_base_funcs)
     @boundscheck checkquadpoint(fe_v, q_point)
-    vec = zero(Vec{dim,T})
+    vec = zero(eltype(x))
     @inbounds for i in 1:n_base_funcs
         vec += geometric_value(fe_v, q_point, i) * x[i]
     end

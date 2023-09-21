@@ -219,12 +219,6 @@ function function_gradient(
     end
 end
 
-function function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true)
-    error("# TODO: Deprecate this, nobody is using this in practice...")
-    fv = here ? iv.here : iv.there
-    function_gradient(fv, q_point, u)
-end
-
 """
     function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool)
 
@@ -240,15 +234,19 @@ The symmetric gradient of a scalar function is computed as
 ``\\left[ \\mathbf{\\nabla}  \\mathbf{u}(\\mathbf{x_q}) \\right]^\\text{sym} =  \\sum\\limits_{i = 1}^n  \\frac{1}{2} \\left[ \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\otimes \\mathbf{u}_i + \\mathbf{u}_i  \\otimes  \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\right]``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true)
-    fv = here ? iv.here : iv.there
-    function_symmetric_gradient(fv, q_point, u, dof_range)
-end
 
-function function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true)
-    error("# TODO: Deprecate this, nobody is using this in practice...")
-    fv = here ? iv.here : iv.there
-    function_symmetric_gradient(fv, q_point, u)
+function function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
+    return function_symmetric_gradient(iv, q_point, u_here, eachindex(u_here), u_there, eachindex(u_there); here=here)
+end
+function function_symmetric_gradient(iv::InterfaceValues, q_point::Int,
+    u_here::AbstractVector, range_here::AbstractUnitRange{Int},
+    u_there::AbstractVector, range_there::AbstractUnitRange{Int};
+    here::Bool)
+    if here
+        return function_symmetric_gradient(iv.here, q_point, u_here, range_here)
+    else # there
+        return function_symmetric_gradient(iv.there, q_point, u_there, range_there)
+    end
 end
 
 """
@@ -265,13 +263,18 @@ The divergence of a vector valued functions in the quadrature point ``\\mathbf{x
 ``\\mathbf{\\nabla} \\cdot \\mathbf{u}(\\mathbf{x_q}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x_q}) \\cdot \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) =
-    divergence_from_gradient(function_gradient(iv, q_point, u, dof_range; here = here))
-
-function function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true)
-    error("# TODO: Deprecate this, nobody is using this in practice...")
-    fv = here ? iv.here : iv.there
-    function_divergence(fv, q_point, u)
+function function_divergence(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
+    return function_divergence(iv, q_point, u_here, eachindex(u_here), u_there, eachindex(u_there); here=here)
+end
+function function_divergence(iv::InterfaceValues, q_point::Int,
+    u_here::AbstractVector, range_here::AbstractUnitRange{Int},
+    u_there::AbstractVector, range_there::AbstractUnitRange{Int};
+    here::Bool)
+    if here
+        return function_divergence(iv.here, q_point, u_here, range_here)
+    else # there
+        return function_divergence(iv.there, q_point, u_there, range_there)
+    end
 end
 
 """
@@ -288,12 +291,15 @@ The curl of a vector valued functions in the quadrature point ``\\mathbf{x}_q)``
 ``\\mathbf{\\nabla} \\times \\mathbf{u}(\\mathbf{x_q}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i \\times (\\mathbf{x_q}) \\cdot \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u); here::Bool = true) =
-    curl_from_gradient(function_gradient(iv, q_point, u, dof_range; here))
-
-# TODO: Deprecate this, nobody is using this in practice...
-function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector{<:Vec}; here::Bool = true) =
-    curl_from_gradient(function_gradient(iv, q_point, u; here))
+function function_curl(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
+    return function_curl(iv, q_point, u_here, eachindex(u_here), u_there, eachindex(u_there); here=here)
+end
+function function_curl(iv::InterfaceValues, q_point::Int,
+    u_here::AbstractVector, range_here::AbstractUnitRange{Int},
+    u_there::AbstractVector, range_there::AbstractUnitRange{Int};
+    here::Bool)
+    return curl_from_gradient(function_gradient(iv, q_point, u_here, range_here,u_there, range_there; here))
+end
 
 """
     shape_value_average(iv::InterfaceValues, qp::Int, base_function::Int)
@@ -424,16 +430,6 @@ for (func,                          f_,                 ) in (
             f_there = $(f_)(iv.there, qp, u_there, range_there)
             return 0.5 * (f_here + f_there)
         end
-        # function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector{<:Vec}, u_b::AbstractVector{<:Vec})
-        #     error("# TODO: Deprecate this, nobody is using this in practice...")
-        #     f_value_here = $(f_)(iv, qp, u_a; here = true)
-        #     f_value_there = $(f_)(iv, qp, u_b; here = false)
-        #     fv = iv.here
-        #     result = 0.5 * f_value_here
-        #     fv = iv.there
-        #     result += 0.5 * f_value_there
-        #     return result
-        # end
     end
 end
 
@@ -454,12 +450,6 @@ for (func,                          f_,                 ) in (
             f_there = $(f_)(iv.there, qp, u_there, range_there)
             return f_there - f_here
         end
-        # function $(func)(iv::InterfaceValues, qp::Int, u_a::AbstractVector{<:Vec}, u_b::AbstractVector{<:Vec})
-        #     error("# TODO: Deprecate this, nobody is using this in practice...")
-        #     f_value_here = $(f_)(iv, qp, u_a, here = true)
-        #     f_value_there = $(f_)(iv, qp, u_b, here = false)
-        #     return f_value_there - f_value_here
-        # end
     end
 end
 
