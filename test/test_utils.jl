@@ -259,3 +259,13 @@ getfacerefshape(::Hexahedron, ::Int) = RefQuadrilateral
 getfacerefshape(::Tetrahedron, ::Int) = RefTriangle
 getfacerefshape(::Pyramid, face::Int) = face == 1 ? RefQuadrilateral : RefTriangle
 getfacerefshape(::Wedge, face::Int) = face ∈ (1,5) ? RefTriangle : RefQuadrilateral
+
+######################################################
+# Dummy RefShape to test get_transformation_matrix   #
+######################################################
+struct RefDodecahedron       <: Ferrite.AbstractRefShape{3} end
+function Ferrite.reference_faces(::Type{RefDodecahedron})
+    return (
+        (1, 5, 4, 3, 2), 
+    )
+end

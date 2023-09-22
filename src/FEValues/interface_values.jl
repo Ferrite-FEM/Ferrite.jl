@@ -176,8 +176,6 @@ function function_value(
     end
 end
 
-shape_value_type(::InterfaceValues{<:FaceValues{<:Any, N_t}}) where N_t = error() # N_t
-
 """
     function_gradient(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
     function_gradient(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, range_here, u_there::AbstractVector, range_there; here::Bool)
@@ -338,9 +336,9 @@ This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- 
 """
 function shape_gradient_jump end
 
-for (func,                      f_,              ) in (
-    (:shape_value,              :shape_value,    ),
-    (:shape_gradient,           :shape_gradient, ),
+for (func,                      f_,              f_type) in (
+    (:shape_value,              :shape_value,    :shape_value_type),
+    (:shape_gradient,           :shape_gradient, :shape_gradient_type),
 )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, i::Int; here::Bool)
@@ -348,12 +346,12 @@ for (func,                      f_,              ) in (
             nbf_a = getnbasefunctions(iv.here)
             if i <= nbf_a
                 fv = iv.here
-                here || return zero(typeof(fv).parameters[2])
+                here || return zero($(f_type)(fv))
                 f_value = $(f_)(fv, qp, i)
                 return f_value
             elseif i <= nbf
                 fv = iv.there
-                here && return zero(typeof(fv).parameters[2])
+                here && return zero($(f_type)(fv))
                 f_value = $(f_)(fv, qp, i - nbf_a)
                 return f_value
             end
@@ -500,7 +498,7 @@ function get_transformation_matrix(interface_transformation::InterfaceTransforma
         return flipped ? rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) :  rotation_matrix_pi(θ)
     end
 
-    error("transformation is not implemented")
+    throw(ArgumentError("transformation is not implemented"))
 end
 
 @doc raw"""

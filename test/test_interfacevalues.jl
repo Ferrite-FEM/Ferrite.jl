@@ -226,5 +226,14 @@
             @test v2 == vc2
         end
     end
+    @testset "undefined transformation matrix error path" begin
+        it = InterfaceTransformation{RefDodecahedron, RefDodecahedron}(false, 0, 0, 1, 1)
+        @test_throws ArgumentError("transformation is not implemented") Ferrite.get_transformation_matrix(it)
+    end
+    @testset "show" begin
+        # Just smoke test to make sure show doesn't error. 
+        iv = InterfaceValues(FaceQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
+        show(stdout, MIME"text/plain"(), iv)
+    end
 end # of testset
                                 
