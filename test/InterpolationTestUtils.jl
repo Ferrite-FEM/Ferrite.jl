@@ -27,7 +27,7 @@ module InterpolationTestUtils
         
         # Check validity of input
         @assert length(dh.subdofhandlers) == 1
-        @assert Ferrite.nfields(dh) == 1
+        @assert length(Ferrite.getfieldnames(dh)) == 1
     
         # Find the matching FaceIndex
         cellnr, facenr = face

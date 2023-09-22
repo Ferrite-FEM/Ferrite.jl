@@ -131,7 +131,7 @@ end
         dNdξ = funvals.dNdξ[j, q_point]
         N_ξ = funvals.N_ξ[j, q_point]
         funvals.N_x[j, q_point] = d*(J ⋅ N_ξ)/detJ
-        funvals.dNdx[j, q_point] = d*(Jinv ⋅ dNdξ ⋅ Jinv/detJ + A1 ⋅ N_ξ - (J ⋅ N_ξ) ⊗ A2)
+        funvals.dNdx[j, q_point] = d*(J ⋅ dNdξ ⋅ Jinv/detJ + A1 ⋅ N_ξ - (J ⋅ N_ξ) ⊗ A2)
     end
     return nothing
 end
