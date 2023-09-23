@@ -41,6 +41,7 @@
 # \int_{\partial\Omega}
 #   \boldsymbol{t}^\ast \cdot \delta \boldsymbol{u}
 # \, \mathrm{d}A
+# +
 # \int_\Omega
 #   \boldsymbol{b} \cdot \delta \boldsymbol{u}
 # \, \mathrm{d}V
@@ -50,6 +51,42 @@
 # $\mathbb{T}$ are suitable trial and test function sets, respectively.
 #-
 
+# First we load Ferrite, and some other packages we need
+using Ferrite, FerriteGmsh, SparseArrays
+# Like for the Heat Equation example, we will use a unit square - but here we'll load the grid of the Ferrite logo! This is done by `FerriteGmsh` here. 
+grid = togrid("logo.geo") # TODO: where to store correctly and how to refer to this?
+# By default the grid lacks the facesets for the boundaries, so we add them by Ferrite here.
+# Note that approximate comparison to 0.0 doesn't work well, so we use a tolerance instead.
+addfaceset!(grid, "right", x->x[1] ≈ 1.0)
+addfaceset!(grid, "top", x->x[2] ≈ 1.0)
+addfaceset!(grid, "left", x->x[1] < 1e-6) 
+addfaceset!(grid, "bottom", x->x[2] < 1e-6)
+
+# ### Trial and test functions
+# We use linear Lagrange functions as test and trial functions. The grid is composed of triangular elements, thus we need the Lagrange functions defined on `RefTriangle`. All currently available interpolations can be found under [`Interpolation`](@ref).
+# Since the displacement field $\boldsymbol{u}$ is a vector valued field, we vectorize the interpolation by the spatial dimension `dim`.
+dim = 2
+order = 1 # linear interpolation
+ip = Lagrange{RefTriangle, order}()^dim
+qr = QuadratureRule{RefQuadrilateral}(2) # 2 quadrature points per spatial dimension
+cellvalues = CellValues(qr, ip)
+
+# ### Degrees of freedom
+# For distributing degrees of freedom, we define a `DofHandler`. The `DofHandler` knows that `u` has two degrees of freedom per node because we vectorized the interpolation above.
+dh = DofHandler(grid)
+add!(dh, :u, ip)
+close!(dh);
+
+# ### Boundary conditions
+# Now, we add boundary conditions. We simply support the bottom and the left side and prescribe a displacement upwards on the top edge.
+# The last argument to `Dirichlet` determines which components of the field should be constrained.
+ch = ConstraintHandler(dh)
+add!(ch, Dirichlet(:u, getfaceset(grid, "bottom"), (x, t) -> 0.0, 2))
+add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 1))
+add!(ch, Dirichlet(:u, getfaceset(grid, "top"), (x, t) -> 0.1, 2))
+close!(ch)
+
+# ### Element routine
 function assemble_cell!(ke, re, cellvalues, cell, material, ue)
     fill!(ke, 0.0)
     fill!(re, 0.0)
@@ -64,15 +101,14 @@ function assemble_cell!(ke, re, cellvalues, cell, material, ue)
 
         dΩ = getdetJdV(cellvalues, q_point)
         for i in 1:n_basefuncs
-            Nᵢ∇ = shape_gradient(cellvalues, q_point, i)# shape_symmetric_gradient(cellvalues, q_point, i)
-            re[i] += σ ⊡ Nᵢ∇ * dΩ # add internal force to residual
-            for j in 1:i # loop only over lower half
+            ∇Nᵢ = shape_gradient(cellvalues, q_point, i)# shape_symmetric_gradient(cellvalues, q_point, i)
+            re[i] += σ ⊡ ∇Nᵢ * dΩ # add internal force to residual
+            for j in 1:n_basefuncs
                 ∇ˢʸᵐNⱼ = shape_symmetric_gradient(cellvalues, q_point, j)
-                ke[i, j] += Nᵢ∇ ⊡ ∂σ∂ε ⊡ ∇ˢʸᵐNⱼ * dΩ
+                ke[i, j] += ∇Nᵢ ⊡ ∂σ∂ε ⊡ ∇ˢʸᵐNⱼ * dΩ
             end
         end
     end
-    # symmetrize_lower!(ke) # needed? what does assembly in symmetric global matrix does?
 end
 
 
