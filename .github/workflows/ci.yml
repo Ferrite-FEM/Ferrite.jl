@@ -26,7 +26,13 @@ jobs:
       - uses: julia-actions/setup-julia@v1
         with:
           version: ${{ matrix.julia-version }}
-      - uses: julia-actions/julia-buildpkg@v1
+      #- uses: julia-actions/julia-buildpkg@v1
+      - run: |
+          julia --color=yes --project=. -e '
+            using Pkg
+            Pkg.add(url="https://github.com/KnutAM/Tensors.jl.git", rev="kam/3rd_order")
+            Pkg.instantiate()'
+        shell: bash
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
         with:

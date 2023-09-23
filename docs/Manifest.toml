@@ -2154,7 +2154,9 @@ version = "0.1.1"
 
 [[deps.Tensors]]
 deps = ["ForwardDiff", "LinearAlgebra", "PrecompileTools", "SIMD", "StaticArrays", "Statistics"]
-path = "C:\\Users\\meyer\\.julia\\dev\\Tensors"
+git-tree-sha1 = "09650779b3c5124b8742986904d6e69f854be0bd"
+repo-rev = "kam/3rd_order"
+repo-url = "https://github.com/KnutAM/Tensors.jl.git"
 uuid = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 version = "1.15.0"
 

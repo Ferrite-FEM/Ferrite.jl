@@ -1,6 +1,6 @@
 
 @testset "interpolations" begin
-#=
+
 @testset "$interpolation" for interpolation in (
                       Lagrange{RefLine, 1}(),
                       Lagrange{RefLine, 2}(),
@@ -179,7 +179,7 @@ end
     @test Ferrite.is_discontinuous(ip_t) == false
     @test Ferrite.is_discontinuous(d_ip) == true
     @test Ferrite.is_discontinuous(d_ip_t) == true
-=#
+
 @testset "Hcurl and Hdiv" begin
     include(joinpath(@__DIR__, "InterpolationTestUtils.jl"))
     import .InterpolationTestUtils as ITU
