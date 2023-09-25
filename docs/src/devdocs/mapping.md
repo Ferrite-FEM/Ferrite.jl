@@ -16,7 +16,7 @@ This mapping is given by the geometric shape functions, $\hat{N}_i^g(\boldsymbol
 ```
 where the defined $\boldsymbol{J}$ is the jacobian of the mapping, and in some cases we will also need the corresponding hessian, $\boldsymbol{\mathcal{H}}$ (3rd order tensor).
 
-We require that the mapping from reference coordinates to real coordinates is bijective, meaning that we can express $\boldsymbol{x} = \boldsymbol{x}(\boldsymbol{\xi}(\boldsymbol{x}))$, such that
+We require that the mapping from reference coordinates to real coordinates is [diffeomorphic](https://en.wikipedia.org/wiki/Diffeomorphism), meaning that we can express $\boldsymbol{x} = \boldsymbol{x}(\boldsymbol{\xi}(\boldsymbol{x}))$, such that
 ```math
 \begin{align*}
     \frac{\mathrm{d}\boldsymbol{x}}{\mathrm{d}\boldsymbol{x}} = \boldsymbol{I} &= \frac{\mathrm{d}\boldsymbol{x}}{\mathrm{d}\boldsymbol{\xi}} \cdot \frac{\mathrm{d}\boldsymbol{\xi}}{\mathrm{d}\boldsymbol{x}} 
