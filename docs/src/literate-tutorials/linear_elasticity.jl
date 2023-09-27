@@ -11,14 +11,14 @@
 #
 # ## Introduction
 #
-# The heat equation is the "Hello, world!" equation of finite elements.
-# Here we solve the equation on a unit square, with a uniform internal source.
-# The strong form of the (linear) heat equation is given by
+# The classical first finite element problem to solve in solid mechanics is a linear balance
+# of momentum problem. We will use this to introduce a vector valued field, as well as the
+# [`Tensors.jl`](https://github.com/Ferrite-FEM/Tensors.jl) toolbox.
 #
+# The strong form of the balance of momentum is given by
 # ```math
 #  -\boldsymbol{\sigma} \cdot \boldsymbol{\nabla} = \boldsymbol{b}  \quad \textbf{x} \in \Omega,
 # ```
-#
 # where $\boldsymbol{\sigma}$ is the stress tensor, $\boldsymbol{b}$ is the body force and
 # $\Omega$ the domain.
 #
