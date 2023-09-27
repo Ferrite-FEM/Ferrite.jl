@@ -46,7 +46,7 @@ bibtex_plugin = CitationBibliography(
         # hide("Changelog" => "changelog.md"),
         "Tutorials" => [
           #  "Tutorials overview" => "tutorials/index.md",
-            "tutorials/maxwell.md",
+            "tutorials/maxwell_eigenvalue.md",
           #=  "tutorials/heat_equation.md",
             "tutorials/linear_elasticity.md",
             "tutorials/incompressible_elasticity.md",

@@ -103,6 +103,7 @@ function shape_curl(cv::AbstractValues, q_point::Int, base_func::Int)
     return curl_from_gradient(shape_gradient(cv, q_point, base_func))
 end
 curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
+curl_from_gradient(∇v::SecondOrderTensor{2}) = Vec{1}((∇v[2,1] - ∇v[1,2],)) # Alternatively define as Vec{3}((0,0,v))
 
 """
     function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector)

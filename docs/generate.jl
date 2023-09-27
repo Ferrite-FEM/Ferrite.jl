@@ -22,7 +22,7 @@ include("download_resources.jl")
 # Run Literate on all examples
 @timeit dto "Literate." for (IN, OUT) in [(TUTORIALS_IN, TUTORIALS_OUT), (HOWTO_IN, HOWTO_OUT), (GALLERY_IN, GALLERY_OUT)], program in readdir(IN; join=true)
     name = basename(program)
-    if endswith(program, "maxwell.jl")
+    if endswith(program, "maxwell_eigenvalue.jl")
         if !liveserver
             script = @timeit dto "script()" @timeit dto name Literate.script(program, OUT)
             code = strip(read(script, String))

@@ -53,7 +53,6 @@ n_components(::ScalarInterpolation)                    = 1
 n_components(::VectorInterpolation{vdim}) where {vdim} = vdim
 # Number of components that are allowed to prescribe in e.g. Dirichlet BC
 n_dbc_components(ip::Interpolation) = n_components(ip)
-# n_dbc_components(::Union{RaviartThomas,Nedelec}) = 1
 
 # TODO: Remove: this is a hotfix to apply constraints to embedded elements.
 edges(ip::InterpolationByDim{2}) = faces(ip)
@@ -1526,6 +1525,7 @@ get_mapping_type(::VectorizedInterpolation) = IdentityMapping()
 # https://defelement.com/elements/qdiv.html
 struct RaviartThomas{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
 get_mapping_type(::RaviartThomas) = ContravariantPiolaMapping()
+n_dbc_components(::RaviartThomas) = 1
 
 # RefTriangle, 1st order Lagrange
 # https://defelement.com/elements/examples/triangle-raviart-thomas-lagrange-1.html
@@ -1553,7 +1553,9 @@ end
 #####################################
 struct Nedelec{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
 get_mapping_type(::Nedelec) = CovariantPiolaMapping()
-
+reference_coordinates(ip::Nedelec{vdim}) where vdim = fill(NaN*zero(Vec{vdim}), getnbasefunctions(ip))
+dirichlet_facedof_indices(ip::Nedelec) = facedof_interior_indices(ip)
+n_dbc_components(::Nedelec) = 1
 # RefTriangle, 1st order Lagrange
 # https://defelement.com/elements/examples/triangle-nedelec1-lagrange-1.html
 function shape_value(ip::Nedelec{2,RefTriangle,1}, ξ::Vec{2}, i::Int)
