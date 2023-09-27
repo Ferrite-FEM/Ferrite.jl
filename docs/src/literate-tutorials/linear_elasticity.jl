@@ -72,7 +72,7 @@ grid = togrid("src/literate-tutorials/logo.geo") # TODO: where to store correctl
 # Note that approximate comparison to 0.0 doesn't work well, so we use a tolerance instead.
 addfaceset!(grid, "top", x->x[2] ≈ 1.0)
 addfaceset!(grid, "left", x->x[1] < 1e-6) 
-addfaceset!(grid, "bottom", x->x[2] < 1e-6)
+addfaceset!(grid, "bottom", x->x[2] < 1e-6);
 
 # ### Trial and test functions
 # We use linear Lagrange functions as test and trial functions. The grid is composed of triangular elements, thus we need the Lagrange functions defined on `RefTriangle`. All currently available interpolations can be found under [`Interpolation`](@ref).
@@ -96,7 +96,7 @@ dim = 2
 order = 1 # linear interpolation
 ip = Lagrange{RefTriangle, order}()^dim # vector valued interpolation
 qr = QuadratureRule{RefTriangle}(1) # 1 quadrature point
-cellvalues = CellValues(qr, ip)
+cellvalues = CellValues(qr, ip);
 
 # ### Degrees of freedom
 # For distributing degrees of freedom, we define a `DofHandler`. The `DofHandler` knows that `u` has two degrees of freedom per node because we vectorized the interpolation above.
@@ -111,7 +111,7 @@ ch = ConstraintHandler(dh)
 add!(ch, Dirichlet(:u, getfaceset(grid, "bottom"), (x, t) -> 0.0, 2))
 add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 0.0, 1))
 add!(ch, Dirichlet(:u, getfaceset(grid, "top"), (x, t) -> 0.1, 2))
-close!(ch)
+close!(ch);
 
 # ### Material routine
 # For the sake of structuring the program, we introduce a material routine here.
@@ -135,7 +135,7 @@ end
 
 E = 200e3 # Young's modulus [MPa]
 ν = 0.3 # Poisson's ratio [-]
-material = Elasticity(E/2(1+ν), E/3(1-2ν))
+material = Elasticity(E/2(1+ν), E/3(1-2ν));
 
 # ### Element routine
 # The residual vector and stiffness matrix follow from the weak form such that
@@ -181,7 +181,7 @@ function assemble_cell!(ke, fe, cellvalues, material, ue)
         end
     end
 end
-
+#md nothing # hide
 
 # #### Global assembly
 # We define the function `assemble_global` to loop over the elements and do the global
