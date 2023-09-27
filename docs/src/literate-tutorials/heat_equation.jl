@@ -173,7 +173,9 @@ end
 #
 # !!! note "Notation"
 #     Comparing again with [Introduction to FEM](@ref), `f` and `u` correspond to
-#     $\underline{\hat{f}}$ and $\underline{\hat{u}}$, since they represent the discretized versions. However, through the code we use `f` and `u` instead to reflect the strong connection between the weak form and the Ferrite implementation.
+#     $\underline{\hat{f}}$ and $\underline{\hat{u}}$, since they represent the discretized
+#     versions. However, through the code we use `f` and `u` instead to reflect the strong
+#     connection between the weak form and the Ferrite implementation.
 
 function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler)
     ## Allocate the element stiffness matrix and element force vector
