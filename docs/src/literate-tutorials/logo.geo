@@ -41,3 +41,5 @@ Line Loop (5) = {-7,18,-15,-17};
 Plane Surface (5) = {5}; Physical Surface (5) = {5};
 Line Loop (6) = {-16,-18,-8,-4,-12};
 Plane Surface (6) = {6}; Physical Surface (6) = {6};
+
+ReverseMesh Surface{1,2,3,4,5,6};
