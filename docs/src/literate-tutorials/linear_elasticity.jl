@@ -66,8 +66,8 @@
 
 # First we load Ferrite, and some other packages we need.
 using Ferrite, FerriteGmsh, SparseArrays
-# Like for the Heat Equation example, we will use a unit square - but here we'll load the grid of the Ferrite logo! This is done by `FerriteGmsh` here. 
-grid = togrid("src/literate-tutorials/logo.geo") # TODO: where to store correctly and how to refer to this?
+# Like for the Heat Equation example, we will use a unit square - but here we'll load the grid of the Ferrite logo! This is done by loading [`logo.geo`](logo.geo) with [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) here.
+grid = togrid("logo.geo")
 # By default the grid lacks the facesets for the boundaries, so we add them by Ferrite here.
 # Note that approximate comparison to 0.0 doesn't work well, so we use a tolerance instead.
 addfaceset!(grid, "top", x->x[2] ≈ 1.0)
