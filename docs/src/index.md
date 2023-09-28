@@ -23,21 +23,22 @@ and iii) to keep mathematical abstractions.
 This high level view of the documentation structure will help you find what you are looking
 for. The document is organized as follows[^1]:
 
- - [**Tutorials**](tutorials/) are thoroughly documented examples which guides you through
-   the process of solving partial differential equations using Ferrite.
- - [**Topic guides**](topics/) contains more in-depth explanations and discussions about
-   finite element programming concepts and ideas, and specifically how these are realized in
-   Ferrite.
- - [**Reference**](reference/) contains the technical API reference of functions and methods
-   (e.g. the documentation strings).
- - [**How-to guides**](howto/) will guide you through the steps involved in addressing
-   common tasks and use-cases. These usually build on top of the tutorials and thus assume
-   basic knowledge of how Ferrite works.
+ - [**Tutorials**](tutorials/index.md) are thoroughly documented examples which guides you
+   through the process of solving partial differential equations using Ferrite.
+ - [**Topic guides**](topics/index.md) contains more in-depth explanations and discussions
+   about finite element programming concepts and ideas, and specifically how these are
+   realized in Ferrite.
+ - [**Reference**](reference/index.md) contains the technical API reference of functions and
+   methods (e.g. the documentation strings).
+ - [**How-to guides**](howto/index.md) will guide you through the steps involved in
+   addressing common tasks and use-cases. These usually build on top of the tutorials and
+   thus assume basic knowledge of how Ferrite works.
 
 [^1]: The organization of the document follows the [Diátaxis Framework](https://diataxis.fr).
 
-In addition there is a [**Code gallery**](gallery/), with user contributed example programs,
-and the [**Developer documentation**](devdocs/), for documentation of Ferrite internal code.
+In addition there is a [**Code gallery**](gallery/index.md), with user contributed example
+programs, and the [**Developer documentation**](devdocs/index.md), for documentation of
+Ferrite internal code.
 
 ## Getting started
 

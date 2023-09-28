@@ -195,7 +195,7 @@ end
 # For RefShapes with equal face-shapes: generate quad rule for the face shape
 # and expand to each face
 function FaceQuadratureRule{RefLine, T}(::Symbol, ::Int) where T
-    w, p = T[1], Vec{0, T}[]
+    w, p = T[1], Vec{0, T}[Vec{0, T}(())]
     return create_face_quad_rule(RefLine, w, p)
 end
 function FaceQuadratureRule{RefQuadrilateral, T}(quad_type::Symbol, order::Int) where T
@@ -208,22 +208,27 @@ function FaceQuadratureRule{RefHexahedron, T}(quad_type::Symbol, order::Int) whe
 end
 function FaceQuadratureRule{RefTriangle, T}(quad_type::Symbol, order::Int) where T
     qr = QuadratureRule{RefLine, T}(quad_type, order)
-    # Shift interval from (-1,1) to (0,1)
-    for i in eachindex(qr.weights, qr.points)
-        qr.weights[i] /= 2
-        qr.points[i] = (qr.points[i] + Vec{1,T}((1,))) / 2
-    end
-    return create_face_quad_rule(RefTriangle, qr.weights, qr.points)
+    # Interval scaled and shifted in face_to_element_transformation from (-1,1) to (0,1) -> half the length -> half quadrature weights
+    return create_face_quad_rule(RefTriangle, qr.weights/2, qr.points)
 end
 function FaceQuadratureRule{RefTetrahedron, T}(quad_type::Symbol, order::Int) where T
     qr = QuadratureRule{RefTriangle, T}(quad_type, order)
     return create_face_quad_rule(RefTetrahedron, qr.weights, qr.points)
 end
 function FaceQuadratureRule{RefPrism, T}(quad_type::Symbol, order::Int) where T
-    # TODO: Generate 2 RefTriangle, 3 RefQuadrilateral and transform them
-    error("FaceQuadratureRule for RefPrism not implemented")
+    qr_quad = QuadratureRule{RefQuadrilateral, T}(quad_type, order)
+    qr_tri = QuadratureRule{RefTriangle, T}(quad_type, order)
+    # Interval scaled and shifted in face_to_element_transformation for quadrilateral faces from (-1,1)² to (0,1)² -> quarter the area -> quarter the quadrature weights
+    return create_face_quad_rule(RefPrism, [2,3,4], qr_quad.weights/4, qr_quad.points,
+        [1,5], qr_tri.weights, qr_tri.points)
 end
-
+function FaceQuadratureRule{RefPyramid, T}(quad_type::Symbol, order::Int) where T
+    qr_quad = QuadratureRule{RefQuadrilateral, T}(quad_type, order)
+    qr_tri = QuadratureRule{RefTriangle, T}(quad_type, order)
+    # Interval scaled and shifted in face_to_element_transformation for quadrilateral faces from (-1,1)² to (0,1)² -> quarter the area -> quarter the quadrature weights
+    return create_face_quad_rule(RefPyramid, [1], qr_quad.weights/4, qr_quad.points,
+        [2,3,4,5], qr_tri.weights, qr_tri.points)
+end
 
 ##################
 # Common methods #

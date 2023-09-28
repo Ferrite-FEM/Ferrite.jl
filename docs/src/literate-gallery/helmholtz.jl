@@ -102,7 +102,7 @@ function doassemble(cellvalues::CellValues, facevalues::FaceValues,
     for (cellcount, cell) in enumerate(CellIterator(dh))
         fill!(Ke, 0)
         fill!(fe, 0)
-        coords = get_cell_coordinates(cell)
+        coords = getcoordinates(cell)
 
         reinit!(cellvalues, cell)
         # First we derive the non boundary part of the variation problem from the destined solution `u_ana`

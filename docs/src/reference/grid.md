@@ -30,8 +30,9 @@ getfaceset
 getedgeset
 getvertexset
 transform_coordinates!
-get_cell_coordinates
-get_cell_coordinates!
+getcoordinates
+getcoordinates!
+Ferrite.get_node_coordinate
 ```
 
 ### Topology
