@@ -894,10 +894,10 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         field_idx === nothing && continue
         # Set up CellValues with the local node coords as quadrature points
         CT = getcelltype(get_grid(dh), first(sdh.cellset))
+        ip = getfieldinterpolation(sdh, field_idx)
         ip_geo = default_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
         qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
-        ip = getfieldinterpolation(sdh, field_idx)
         if ip isa VectorizedInterpolation
             # TODO: Remove this hack when embedding works...
             cv = CellValues(qr, ip.ip, ip_geo)
