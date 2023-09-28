@@ -611,6 +611,36 @@ function test_show()
             repr(dh.subdofhandlers[1].field_interpolations[1]), "\n  Dofs per cell: 8\n")
 end
 
+function test_vtk_export()
+    nodes = Node.([Vec(0.0, 0.0),
+                   Vec(1.0, 0.0),
+                   Vec(1.0, 1.0),
+                   Vec(0.0, 1.0),
+                   Vec(2.0, 0.0),
+            ])
+    cells = [
+        Quadrilateral((1, 2, 3, 4)),
+        Triangle((3, 2, 5))
+        ]
+    grid = Grid(cells, nodes)
+    ip_tri = Lagrange{RefTriangle, 1}()
+    ip_quad = Lagrange{RefQuadrilateral, 1}()
+    dh = DofHandler(grid)
+    sdh_quad = SubDofHandler(dh, Set(1))
+    add!(sdh_quad, :u, ip_quad)
+    sdh_tri = SubDofHandler(dh, Set(2))
+    add!(sdh_tri, :u, ip_tri)
+    close!(dh)
+    u = collect(1:ndofs(dh))
+    filename = "mixed_2d_grid"
+    vtk_grid(filename, dh) do vtk
+        vtk_point_data(vtk, dh, u)
+    end
+    sha = bytes2hex(open(SHA.sha1, filename*".vtu"))
+    @test sha == "339ab8a8a613c2f38af684cccd695ae816671607"
+    rm(filename*".vtu") # clean up 
+end
+
 @testset "DofHandler" begin
     test_1d_bar_beam();
     test_2d_scalar();
@@ -637,4 +667,5 @@ end
     test_unique_cellsets()
     test_celliterator_subdomain()
     test_show()
+    test_vtk_export()
 end
