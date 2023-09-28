@@ -6,7 +6,7 @@
 #
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/examples/heat_equation.ipynb).
+#md #     [`linear_elasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/linear_elasticity.ipynb).
 #-
 #
 # ## Introduction
