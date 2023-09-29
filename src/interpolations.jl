@@ -451,7 +451,7 @@ function reference_coordinates(ip::DiscontinuousLagrange{RefTetrahedron,0,T}) wh
 end
 
 function shape_value(ip::DiscontinuousLagrange{shape, 0}, ::Vec{dim, T}, i::Int) where {dim, shape <: AbstractRefShape{dim}, T}
-    i > 1 && throw(ArgumentError("no shape function $i for interpolation $ip"))
+    i > 1 && throw(BoundsError(ip, i))
     return one(T)
 end
 
@@ -499,7 +499,7 @@ function shape_value(ip::Lagrange{RefLine, 1}, ξ::Vec{1, T}, i::Int) where T
     ξ_x = ξ[1]
     i == 1 && return (1 - ξ_x) / 2
     i == 2 && return (1 + ξ_x) / 2
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 ############################
@@ -521,7 +521,7 @@ function shape_value(ip::Lagrange{RefLine, 2}, ξ::Vec{1, T}, i::Int) where T
     i == 1 && return ξ_x * (ξ_x - 1) / 2
     i == 2 && return ξ_x * (ξ_x + 1) / 2
     i == 3 && return 1 - ξ_x^2
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 #####################################
@@ -545,7 +545,7 @@ function shape_value(ip::Lagrange{RefQuadrilateral, 1}, ξ::Vec{2, T}, i::Int) w
     i == 2 && return (1 + ξ_x) * (1 - ξ_y) / 4
     i == 3 && return (1 + ξ_x) * (1 + ξ_y) / 4
     i == 4 && return (1 - ξ_x) * (1 + ξ_y) / 4
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 #####################################
@@ -581,7 +581,7 @@ function shape_value(ip::Lagrange{RefQuadrilateral, 2}, ξ::Vec{2, T}, i::Int) w
     i == 7 && return (1 - ξ_x^2) * (ξ_y^2 + ξ_y) / 2
     i == 8 && return (ξ_x^2 - ξ_x) * (1 - ξ_y^2) / 2
     i == 9 && return (1 - ξ_x^2) * (1 - ξ_y^2)
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 #####################################
@@ -633,7 +633,7 @@ function shape_value(ip::Lagrange{RefQuadrilateral, 3}, ξ::Vec{2, T}, i::Int) w
     i == 14 && return (81*ξ_x*ξ_y*( - 9*ξ_x^2*ξ_y^2 + 15*ξ_x^2*ξ_y - 6*ξ_x^2 + 12*ξ_x*ξ_y^2 - 20*ξ_x*ξ_y + 8*ξ_x - 3*ξ_y^2 + 5*ξ_y - 2))/4
     i == 15 && return (81*ξ_x*ξ_y*( - 9*ξ_x^2*ξ_y^2 + 12*ξ_x^2*ξ_y - 3*ξ_x^2 + 15*ξ_x*ξ_y^2 - 20*ξ_x*ξ_y + 5*ξ_x - 6*ξ_y^2 + 8*ξ_y - 2))/4
     i == 16 && return (81*ξ_x*ξ_y*(9*ξ_x^2*ξ_y^2 - 12*ξ_x^2*ξ_y + 3*ξ_x^2 - 12*ξ_x*ξ_y^2 + 16*ξ_x*ξ_y - 4*ξ_x + 3*ξ_y^2 - 4*ξ_y + 1))/4
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 ################################
@@ -655,7 +655,7 @@ function shape_value(ip::Lagrange{RefTriangle, 1}, ξ::Vec{2, T}, i::Int) where 
     i == 1 && return ξ_x
     i == 2 && return ξ_y
     i == 3 && return 1 - ξ_x - ξ_y
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 ################################
@@ -685,7 +685,7 @@ function shape_value(ip::Lagrange{RefTriangle, 2}, ξ::Vec{2, T}, i::Int) where 
     i == 4 && return 4ξ_x * ξ_y
     i == 5 && return 4ξ_y * γ
     i == 6 && return 4ξ_x * γ
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 ######################################
@@ -757,7 +757,7 @@ end
 
 function shape_value(ip::Lagrange2Tri345, ξ::Vec{2, T}, i::Int) where {T}
     if !(0 < i <= getnbasefunctions(ip))
-        throw(ArgumentError("no shape function $i for interpolation $ip"))
+        throw(BoundsError(ip, i))
     end
     order = getorder(ip)
     i = permdof2DLagrange2Tri345[order][i]
@@ -809,7 +809,7 @@ function shape_value(ip::Lagrange{RefTetrahedron, 1}, ξ::Vec{3, T}, i::Int) whe
     i == 2 && return ξ_x
     i == 3 && return ξ_y
     i == 4 && return ξ_z
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 ###################################
@@ -850,7 +850,7 @@ function shape_value(ip::Lagrange{RefTetrahedron, 2}, ξ::Vec{3, T}, i::Int) whe
     i == 8  && return ξ_z * (-4 * ξ_x - 4 * ξ_y - 4 * ξ_z + 4)
     i == 9  && return 4 * ξ_x * ξ_z
     i == 10 && return 4 * ξ_y * ξ_z
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 ##################################
@@ -884,7 +884,7 @@ function shape_value(ip::Lagrange{RefHexahedron, 1}, ξ::Vec{3, T}, i::Int) wher
     i == 6 && return (1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z) / 8
     i == 7 && return (1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z) / 8
     i == 8 && return (1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z) / 8
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 
@@ -997,7 +997,7 @@ function shape_value(ip::Lagrange{RefHexahedron, 2}, ξ::Vec{3, T}, i::Int) wher
     i == 26 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₃(ξ_z)
     # interior
     i == 27 && return φ₂(ξ_x) * φ₂(ξ_y) * φ₂(ξ_z)
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 
@@ -1027,7 +1027,7 @@ function shape_value(ip::Lagrange{RefPrism,1}, ξ::Vec{3, T}, i::Int) where T
     i == 4 && return z*(1-x-y)
     i == 5 && return x*z
     i == 6 && return y*z
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 #############################
@@ -1122,7 +1122,7 @@ function shape_value(ip::Lagrange{RefPrism, 2}, ξ::Vec{3, T}, i::Int) where T
     i == 16 && return 16x*z*(x*z -x +y*z -y -z +1)
     i == 17 && return 16y*z*(x*z -x +y*z -y -z +1)
     i == 18 && return 16x*y*z*(1 -z)
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 
@@ -1149,7 +1149,7 @@ function shape_value(ip::Lagrange{RefPyramid,1}, ξ::Vec{3,T}, i::Int) where T
     i == 3 && return zzero ? zero(T) : y*(x+z-1)/(z-1)
     i == 4 && return zzero ? zero(T) : -x*y/(z-1)
     i == 5 && return z
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 #####################################
@@ -1231,7 +1231,7 @@ function shape_value(ip::Lagrange{RefPyramid,2}, ξ::Vec{3,T}, i::Int) where T
     i == 12 && return zzero ? zero(T) : 4y*z*(x + z - 1)/(z-1)
     i == 13 && return zzero ? zero(T) : -4x*y*z/(z-1)
     i == 14 && return zzero ? zero(T) : 16x*y*(x*y + x*z - x + y*z - y + z² - 2z + 1)/(z²-2z+1)
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 ###################
@@ -1273,7 +1273,7 @@ function shape_value(ip::BubbleEnrichedLagrange{RefTriangle, 1}, ξ::Vec{2, T}, 
     i == 2 && return ξ_y*(9ξ_x^2 + 9ξ_x*ξ_y - 9ξ_x + 1)
     i == 3 && return 9ξ_x^2*ξ_y + 9ξ_x*ξ_y^2 - 9ξ_x*ξ_y - ξ_x - ξ_y + 1
     i == 4 && return 27ξ_x*ξ_y*(1 - ξ_x - ξ_y)
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 ###############
@@ -1329,7 +1329,7 @@ function shape_value(ip::Serendipity{RefQuadrilateral,2}, ξ::Vec{2, T}, i::Int)
     i == 6 && return (1 + ξ_x) * (1 - ξ_y * ξ_y) / 2
     i == 7 && return (1 - ξ_x * ξ_x) * (1 + ξ_y) / 2
     i == 8 && return (1 - ξ_x) * (1 - ξ_y * ξ_y) / 2
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 #####################################
@@ -1389,7 +1389,7 @@ function reference_coordinates(::Serendipity{RefHexahedron,2,T}) where T
             Vec{3, T}((-1.0, 1.0, 0.0)),]
 end
 
-function shape_value(ip::Serendipity{RefHexahedron, 2}, ξ::Vec{3, T}, i::Int) where T
+@inline function shape_value(ip::Serendipity{RefHexahedron, 2, Tv}, ξ::Vec{3, T}, i::Int) where {Tv,T}
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
@@ -1413,7 +1413,7 @@ function shape_value(ip::Serendipity{RefHexahedron, 2}, ξ::Vec{3, T}, i::Int) w
     i == 18 && return (1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z^2) / 4
     i == 19 && return (1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z^2) / 4
     i == 20 && return (1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z^2) / 4
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 
@@ -1453,7 +1453,7 @@ function shape_value(ip::CrouzeixRaviart{RefTriangle, 1}, ξ::Vec{2, T}, i::Int)
     i == 1 && return 2*ξ_x + 2*ξ_y - 1
     i == 2 && return 1 - 2*ξ_x
     i == 3 && return 1 - 2*ξ_y
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+    throw(BoundsError(ip, i))
 end
 
 ##################################################
