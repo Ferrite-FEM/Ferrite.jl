@@ -4,15 +4,15 @@ struct Assembler{T}
     V::Vector{T}
 end
 
-function Assembler(N)
+function Assembler(N, T = Float64)
     I = Int[]
     J = Int[]
-    V = Float64[]
+    V = T[]
     sizehint!(I, N)
     sizehint!(J, N)
     sizehint!(V, N)
 
-    Assembler(I, J, V)
+    Assembler{T}(I, J, V)
 end
 
 """

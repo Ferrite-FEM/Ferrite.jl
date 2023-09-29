@@ -5,8 +5,7 @@ A `FaceValues` object facilitates the process of evaluating values of shape func
 values of nodal functions, gradients and divergences of nodal functions etc. on the faces of finite elements.
 
 **Arguments:**
-
-* `T`: an optional argument to determine the type the internal data is stored as.
+* `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
 * `quad_rule`: an instance of a [`FaceQuadratureRule`](@ref)
 * `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
 * `geom_interpol`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry.

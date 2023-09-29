@@ -90,11 +90,11 @@ struct ConstraintHandler{DH<:AbstractDofHandler,T}
     closed::ScalarWrapper{Bool}
 end
 
-function ConstraintHandler(dh::AbstractDofHandler)
+function ConstraintHandler(dh::AbstractDofHandler, T=Float64)
     @assert isclosed(dh)
     ConstraintHandler(
-        Dirichlet[], Int[], Int[], Float64[], Union{Nothing,Float64}[], Union{Nothing,DofCoefficients{Float64}}[],
-        Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false),
+        Dirichlet[], Int[], Int[], T[], Union{Nothing,T}[], Union{Nothing,DofCoefficients{T}}[],
+        Dict{Int,Int}(), BCValues{T}[], dh, ScalarWrapper(false),
     )
 end
 
@@ -407,7 +407,7 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
 end
 
 # for vertices, faces and edges
-function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where {T}
 
@@ -444,7 +444,7 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entiti
 end
 
 # for nodes
-function _update!(inhomogeneities::Vector{Float64}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+function _update!(inhomogeneities::Vector{T}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where T
     counter = 1
@@ -468,7 +468,7 @@ end
 
 # Saves the dirichlet boundary conditions to a vtkfile.
 # Values will have a 1 where bcs are active and 0 otherwise
-function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
+function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler{<: AbstractDofHandler,<: AbstractFloat})
     unique_fields = []
     for dbc in ch.dbcs
         push!(unique_fields, dbc.field_name)
@@ -913,13 +913,13 @@ coordinate axes.
 
 See the manual section on [Periodic boundary conditions](@ref) for more information.
 """
-struct PeriodicDirichlet
+struct PeriodicDirichlet{T}
     field_name::Symbol
     components::Vector{Int} # components of the field
     face_pairs::Vector{Pair{String,String}} # legacy that will populate face_map on add!
     face_map::Vector{PeriodicFacePair}
     func::Union{Function,Nothing}
-    rotation_matrix::Union{Matrix{Float64},Nothing}
+    rotation_matrix::Union{Matrix{T},Nothing}
 end
 
 # Default to no inhomogeneity function/rotation
@@ -930,14 +930,15 @@ PeriodicDirichlet(fn::Symbol, fp::Union{Vector{<:Pair},Vector{PeriodicFacePair}}
 # add!(::ConstraintHandler, ...) instead
 function PeriodicDirichlet(fn::Symbol, fp::Vector{<:Pair}, f::Union{Function,Nothing}, c=nothing)
     face_map = PeriodicFacePair[] # This will be populated in add!(::ConstraintHandler, ...) instead
-    return PeriodicDirichlet(fn, __to_components(c), fp, face_map, f, nothing)
+    return PeriodicDirichlet{Nothing}(fn, __to_components(c), fp, face_map, f, nothing)
 end
 
 function PeriodicDirichlet(fn::Symbol, fm::Vector{PeriodicFacePair}, f_or_r::Union{AbstractMatrix,Function,Nothing}, c=nothing)
     f = f_or_r isa Function ? f_or_r : nothing
     rotation_matrix = f_or_r isa AbstractMatrix ? f_or_r : nothing
+    T = f_or_r isa AbstractMatrix ? eltype(f_or_r) : Nothing
     components = __to_components(c)
-    return PeriodicDirichlet(fn, components, Pair{String,String}[], fm, f, rotation_matrix)
+    return PeriodicDirichlet{T}(fn, components, Pair{String,String}[], fm, f, rotation_matrix)
 end
 
 function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
@@ -984,7 +985,7 @@ function add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet)
     return ch
 end
 
-function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::Interpolation,
+function _add!(ch::ConstraintHandler{<:AbstractDofHandler, T}, pdbc::PeriodicDirichlet, interpolation::Interpolation,
                field_dim::Int, offset::Int, is_legacy::Bool, rotation_matrix::Union{Matrix{T},Nothing}, ::Type{dof_map_t}, iterator_f::F) where {T, dof_map_t, F <: Function}
     grid = get_grid(ch.dh)
     face_map = pdbc.face_map
@@ -1111,7 +1112,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
         # Call update! here since we need it to construct the affine constraints...
         # TODO: This doesn't allow for time dependent constraints...
         update!(chtmp2, 0.0)
-        inhomogeneity_map = Dict{Int, Float64}()
+        inhomogeneity_map = Dict{Int, T}()
         for (k, v) in dof_map
             g = chtmp2.inhomogeneities
             push!(inhomogeneity_map,
@@ -1284,7 +1285,7 @@ between a image-face and mirror-face, for them to be considered matched.
 
 See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
 """
-function collect_periodic_faces(grid::Grid, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
+function collect_periodic_faces(grid::Grid{dim, <: AbstractCell, T}, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing; tol::T=T(1e-12)) where {dim, T}
     return collect_periodic_faces!(PeriodicFacePair[], grid, mset, iset, transform; tol)
 end
 
@@ -1299,7 +1300,7 @@ have a neighbor) is used.
 
 See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
 """
-function collect_periodic_faces(grid::Grid, all_faces::Union{Set{FaceIndex},String,Nothing}=nothing; tol::Float64=1e-12)
+function collect_periodic_faces(grid::Grid{dim, <: AbstractCell, T}, all_faces::Union{Set{FaceIndex},String,Nothing}=nothing; tol::T=T(1e-12)) where {dim, T}
     return collect_periodic_faces!(PeriodicFacePair[], grid, all_faces; tol)
 end
 
@@ -1309,7 +1310,7 @@ end
 
 Same as [`collect_periodic_faces`](@ref) but adds all matches to the existing `face_map`.
 """
-function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
+function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid{dim, <: AbstractCell, T}, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing; tol::T=T(1e-12)) where {dim, T}
     mset = __to_faceset(grid, mset)
     iset = __to_faceset(grid, iset)
     if transform === nothing
@@ -1322,7 +1323,7 @@ function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid,
     return face_map
 end
 
-function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, faceset::Union{Set{FaceIndex},String,Nothing}; tol::Float64=1e-12)
+function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid{dim, <: AbstractCell, T}, faceset::Union{Set{FaceIndex},String,Nothing}; tol::T=T(1e-12)) where {dim, T}
     faceset = faceset === nothing ? __collect_boundary_faces(grid) : copy(__to_faceset(grid, faceset))
     if mod(length(faceset), 2) != 0
         error("uneven number of faces")
@@ -1347,7 +1348,7 @@ function __collect_boundary_faces(grid::Grid)
     return Set{FaceIndex}(values(candidates))
 end
 
-function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Vector{FaceIndex}, iset::Vector{FaceIndex}, transformation::F, tol::Float64) where F <: Function
+function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid::Grid{dim, <: AbstractCell, T}, mset::Vector{FaceIndex}, iset::Vector{FaceIndex}, transformation::F, tol::T) where {F <: Function, dim, T}
     if length(mset) != length(mset)
         error("different number of faces in mirror and image set")
     end
@@ -1389,7 +1390,7 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
 end
 
 # This method empties mset and iset
-function __collect_periodic_faces_bruteforce!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Set{FaceIndex}, iset::Set{FaceIndex}, known_order::Bool, tol::Float64)
+function __collect_periodic_faces_bruteforce!(face_map::Vector{PeriodicFacePair}, grid::Grid{dim, <: AbstractCell, T}, mset::Set{FaceIndex}, iset::Set{FaceIndex}, known_order::Bool, tol::T) where {dim, T}
     if length(mset) != length(iset)
         error("different faces in mirror and image")
     end
@@ -1461,7 +1462,7 @@ end
 
 # Check if two faces are periodic. This method assumes that the faces are mirrored and thus
 # have opposing normal vectors
-function __check_periodic_faces(grid::Grid, fi::FaceIndex, fj::FaceIndex, known_order::Bool, tol::Float64)
+function __check_periodic_faces(grid::Grid{dim, <: AbstractCell, T}, fi::FaceIndex, fj::FaceIndex, known_order::Bool, tol::T) where {dim, T}
     cii, fii = fi
     nodes_i = faces(grid.cells[cii])[fii]
     cij, fij = fj
@@ -1537,7 +1538,7 @@ end
 # a transformation function and we have then used the KDTree to find the matching pair of
 # faces. This function only need to i) check whether faces have aligned or opposite normal
 # vectors, and ii) compute the relative rotation.
-function __check_periodic_faces_f(grid::Grid, fi::FaceIndex, fj::FaceIndex, xmi, xmj, transformation::F, tol::Float64) where F
+function __check_periodic_faces_f(grid::Grid{dim, <: AbstractCell, T}, fi::FaceIndex, fj::FaceIndex, xmi, xmj, transformation::F, tol::T) where {F <: Function, dim, T}
     cii, fii = fi
     nodes_i = faces(grid.cells[cii])[fii]
     cij, fij = fj
