@@ -97,6 +97,13 @@ function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, sgip::Scal
     return CellValues(T, qr, ip, VectorizedInterpolation(sgip))
 end
 
+#################################################################
+# Note on dimensions:                                           #
+# sdim = spatial dimension (dimension of the grid nodes)        #
+# rdim = reference dimension (dimension in isoparametric space) #
+# vdim = vector dimension (dimension of the field)              #
+#################################################################
+
 # Entrypoint for `ScalarInterpolation`s (rdim == sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     dim, shape <: AbstractRefShape{dim}, T,
@@ -148,13 +155,35 @@ function CellValues(::Type{T}, qr::QR, ip::IP, vgip::VGIP) where {
     return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, vgip.ip)
 end
 
-# reinit! for regular (non-embedded) elements (rdim == sdim)
+# scalar interpolation
+function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{dim,T}}) where {
+    dim, T,
+    N_t    <: Number,
+    dNdx_t <: Vec{dim},
+    dNdξ_t <: Vec{dim},
+}
+    _reinit!(cv, x)
+end
+# vectorized interpolation with vdim == rdim == sdim
+function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{dim,T}}) where {
+    dim, T,
+    N_t    <: Vec{dim},
+    dNdx_t <: Tensor{2, dim},
+    dNdξ_t <: Tensor{2, dim},
+}
+    _reinit!(cv, x)
+end
+# vectorized interpolation with vdim != rdim
 function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{dim,T}}) where {
     dim, T, vdim,
-    N_t    <: Union{Number,   Vec{dim},       SVector{vdim}     },
-    dNdx_t <: Union{Vec{dim}, Tensor{2, dim}, SMatrix{vdim, dim}},
-    dNdξ_t <: Union{Vec{dim}, Tensor{2, dim}, SMatrix{vdim, dim}},
+    N_t    <: SVector{vdim},
+    dNdx_t <: SMatrix{vdim, dim},
+    dNdξ_t <: SMatrix{vdim, dim},
 }
+    _reinit!(cv, x)
+end
+# reinit! for regular (non-embedded) elements (rdim == sdim)
+function _reinit!(cv::CellValues, x::AbstractVector{Vec{dim,T}}) where {dim, T}
     n_geom_basefuncs = getngeobasefunctions(cv)
     n_func_basefuncs = getnbasefunctions(cv)
     length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
@@ -251,14 +280,26 @@ where ||∂x/∂ξ||₂ is "detJ" and t is "the unit tangent".
 See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
 """
 embedding_det(J::Union{SMatrix{2, 1}, SMatrix{3, 1}}) = norm(J)
-
-# reinit! for embedded elements, rdim < sdim
+# scalar interpolation with rdim < sdim
+function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{sdim,T}}) where {
+    rdim, sdim, T,
+    N_t    <: Number,
+    dNdx_t <: SVector{sdim, T},
+    dNdξ_t <: SVector{rdim, T},
+}
+    _reinit_embedded!(cv, x, Val{sdim}(), Val{rdim}())
+end
+# vector interpolation with vdim != rdim and rdim < sdim
 function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{sdim,T}}) where {
     rdim, sdim, vdim, T,
-    N_t    <: Union{Number,           SVector{vdim}},
-    dNdx_t <: Union{SVector{sdim, T}, SMatrix{vdim, sdim, T}},
-    dNdξ_t <: Union{SVector{rdim, T}, SMatrix{vdim, rdim, T}},
+    N_t    <: SVector{vdim},
+    dNdx_t <: SMatrix{vdim, sdim, T},
+    dNdξ_t <: SMatrix{vdim, rdim, T},
 }
+    _reinit_embedded!(cv, x, Val{sdim}(), Val{rdim}())
+end
+# reinit! for embedded elements, rdim < sdim
+function _reinit_embedded!(cv::CellValues, x::AbstractVector{Vec{sdim,T}}, ::Val{sdim}, ::Val{rdim}) where {sdim, rdim, T}
     @assert sdim > rdim "This reinit only works for embedded elements. Maybe you swapped the reference and spatial dimensions?"
     n_geom_basefuncs = getngeobasefunctions(cv)
     n_func_basefuncs = getnbasefunctions(cv)
