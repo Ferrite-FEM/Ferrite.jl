@@ -97,12 +97,12 @@ function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, sgip::Scal
     return CellValues(T, qr, ip, VectorizedInterpolation(sgip))
 end
 
-################################################################# 
+#################################################################
 # Note on dimensions:                                           #
-# sdim = spatial dimension (dimension of the grid)              # 
+# sdim = spatial dimension (dimension of the grid nodes)        #
 # rdim = reference dimension (dimension in isoparametric space) #
 # vdim = vector dimension (dimension of the field)              #
-################################################################# 
+#################################################################
 
 # Entrypoint for `ScalarInterpolation`s (rdim == sdim)
 function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
