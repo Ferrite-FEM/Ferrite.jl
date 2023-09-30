@@ -50,7 +50,7 @@ file and one `VTKFile` (`.vtu`) for each time step.
 pvd = VTKFileCollection("my_results", grid)
 for t in range(0, 1, 5)
     # Do calculations to update u
-    VTKFile(pvd, t) do vtk
+    addstep!(pvd, t) do vtk
         write_solution(vtk, dh, u)
     end
 end

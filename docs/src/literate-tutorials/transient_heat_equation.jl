@@ -192,7 +192,7 @@ apply!(A, ch);
 # To store the solution, we initialize a `VTKFileCollection` (.pvd) file.
 pvd = VTKFileCollection("transient-heat", grid);
 t = 0
-VTKFile(pvd, t) do io
+addstep!(pvd, t) do io
     write_solution(io, dh, uₙ)
 end
 
@@ -209,7 +209,7 @@ for t in Δt:Δt:T
     #Finally, we can solve the time step and save the solution afterwards.
     u = A \ b
 
-    VTKFile(pvd, t) do io
+    addstep!(pvd, t) do io
         write_solution(io, dh, u)
     end
     #At the end of the time loop, we set the previous solution to the current one and go to the next time step.
