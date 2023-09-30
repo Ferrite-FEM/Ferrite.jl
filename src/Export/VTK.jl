@@ -25,7 +25,7 @@ VTKFile(filename, grid) do vtk
     write_celldata(vtk, celldata)
 end
 """
-struct VTKFile{VTK<:WriteVTK.DatasetFile}
+struct VTKFile{VTK<:WriteVTK.VTKFile}
     vtk::VTK
 end
 function VTKFile(filename::String, dh::DofHandler; kwargs...)
