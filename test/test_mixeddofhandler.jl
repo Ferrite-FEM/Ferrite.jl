@@ -594,8 +594,8 @@ function test_show()
     add!(dh, :u, Lagrange{RefTriangle, 1}()^2)
     close!(dh)
     @test repr("text/plain", dh) == string(
-        repr(typeof(dh)), "\n  Fields:\n    :u, ",
-        repr(dh.subdofhandlers[1].field_interpolations[1]), "\n  Dofs per cell: 6\n  Total dofs: 8")
+        repr("text/plain", typeof(dh)), "\n  Fields:\n    :u, ",
+        repr("text/plain", dh.subdofhandlers[1].field_interpolations[1]), "\n  Dofs per cell: 6\n  Total dofs: 8")
 
     # multiple SubDofHandlers
     grid = get_2d_grid()
@@ -607,8 +607,8 @@ function test_show()
     close!(dh)
     @test repr("text/plain", dh) == repr(typeof(dh)) * "\n  Fields:\n    :u, dim: 2\n  Total dofs: 10"
     @test repr("text/plain", dh.subdofhandlers[1]) == string(
-        repr(typeof(dh.subdofhandlers[1])), "\n  Cell type: Quadrilateral\n  Fields:\n    :u, ",
-            repr(dh.subdofhandlers[1].field_interpolations[1]), "\n  Dofs per cell: 8\n")
+        repr("text/plain", typeof(dh.subdofhandlers[1])), "\n  Cell type: Quadrilateral\n  Fields:\n    :u, ",
+            repr("text/plain", dh.subdofhandlers[1].field_interpolations[1]), "\n  Dofs per cell: 8\n")
 end
 
 function test_vtk_export()

@@ -49,16 +49,16 @@ end
 # Shortcut
 @inline getcelltype(grid::AbstractGrid, sdh::SubDofHandler) = getcelltype(grid, first(sdh.cellset))
 
-function Base.show(io::IO, ::MIME"text/plain", sdh::SubDofHandler)
+function Base.show(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
     println(io, typeof(sdh))
     println(io, "  Cell type: ", getcelltype(sdh.dh.grid, first(sdh.cellset)))
-    _print_field_information(io, sdh)
+    _print_field_information(io, mime, sdh)
 end
 
-function _print_field_information(io::IO, sdh::SubDofHandler)
+function _print_field_information(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
     println(io, "  Fields:")
     for (i, fieldname) in pairs(sdh.field_names)
-        println(io, "    ", repr(fieldname), ", ", sdh.field_interpolations[i])
+        println(io, "    ", repr(mime, fieldname), ", ", repr(mime, sdh.field_interpolations[i]))
     end
     if !isclosed(sdh.dh)
         print(io, "  Not closed!")
@@ -93,10 +93,10 @@ function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
-function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
+function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
     println(io, typeof(dh))
     if length(dh.subdofhandlers) == 1
-        _print_field_information(io, dh.subdofhandlers[1])
+        _print_field_information(io, mime, dh.subdofhandlers[1])
     else
         println(io, "  Fields:")
         for fieldname in getfieldnames(dh)
