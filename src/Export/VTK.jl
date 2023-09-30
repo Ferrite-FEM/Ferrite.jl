@@ -66,7 +66,7 @@ Example,
 pvd = VTKFileCollection("test", grid)
 for t in range(0, 2, 4)
     # Solve the timestep to find u and σeff 
-    addstep!(pvd, t) do io # io::VTKFile
+    VTKFile(pvd, t) do io # io::VTKFile
         write_solution(io, dh, u)
         write_celldata(io, σeff, "Effective stress")
     end
@@ -88,19 +88,19 @@ end
 Base.close(pvd::VTKFileCollection) = WriteVTK.vtk_save(pvd.pvd)
 
 """
-    addstep!(f::Function, pvd::VTKFileCollection, t::Real, [grid_or_dh])
+    VTKFile(f::Function, pvd::VTKFileCollection, t::Real, [grid_or_dh])
 
 Add a step at time `t` by writing a `VTKFile` to `pvd`. 
 If required, a new grid can be used by supplying the grid or dofhandler as the last argument.
 Should be used in a do-block:
 ```julia
-addstep!(pvd, t) do vtk 
+VTKFile(pvd, t) do vtk 
     write_solution(vtk, dh, u)
 end
 ```
 See also [`VTKFileCollection`](@ref). 
 """
-function addstep!(f::Function, pvd::VTKFileCollection, t, grid=pvd.grid_or_dh)
+function VTKFile(f::Function, pvd::VTKFileCollection, t, grid=pvd.grid_or_dh)
     pvd.step += 1
     VTKFile(string(pvd.name, "_", pvd.step), grid; pvd.vtk_kwargs...) do vtk
         f(vtk)

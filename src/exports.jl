@@ -156,7 +156,6 @@ export
     write_celldata,
     write_projection,
     VTKFileCollection,
-    addstep!,
     
 # L2 Projection
     project,

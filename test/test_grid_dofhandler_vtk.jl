@@ -629,7 +629,7 @@ end
         fname = "test_collection_kwargs"
         for compress in (true, false)
             pvd = VTKFileCollection(fname, grid; compress)
-            addstep!(pvd, 0.0) do io
+            VTKFile(pvd, 0.0) do io
                 nothing
             end
             close(pvd)
