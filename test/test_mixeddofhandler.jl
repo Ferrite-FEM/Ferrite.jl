@@ -633,8 +633,8 @@ function test_vtk_export()
     close!(dh)
     u = collect(1:ndofs(dh))
     filename = "mixed_2d_grid"
-    vtk_grid(filename, dh) do vtk
-        vtk_point_data(vtk, dh, u)
+    VTKFile(filename, dh) do vtk
+        write_solution(vtk, dh, u)
     end
     sha = bytes2hex(open(SHA.sha1, filename*".vtu"))
     @test sha == "339ab8a8a613c2f38af684cccd695ae816671607"
