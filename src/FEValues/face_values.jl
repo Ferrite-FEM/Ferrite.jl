@@ -250,3 +250,16 @@ function checkface(fv::FaceValues, face::Int)
     0 < face <= nfaces(fv) || error("Face index out of range.")
     return nothing
 end
+
+function Base.show(io::IO, m::MIME"text/plain", fv::FaceValues)
+    println(io, "FaceValues with")
+    nqp = getnquadpoints.(fv.qr.face_rules)
+    if all(n==first(nqp) for n in nqp)
+        println(io, "- Quadrature rule with ", first(nqp), " points per face")
+    else
+        println(io, "- Quadrature rule with ", tuple(nqp...), " points on each face")
+    end
+    print(io, "- Function interpolation: "); show(io, m, fv.func_interp)
+    println(io)
+    print(io, "- Geometric interpolation: "); show(io, m, fv.geo_interp)
+end

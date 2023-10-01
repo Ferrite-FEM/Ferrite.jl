@@ -49,16 +49,16 @@ end
 # Shortcut
 @inline getcelltype(grid::AbstractGrid, sdh::SubDofHandler) = getcelltype(grid, first(sdh.cellset))
 
-function Base.show(io::IO, ::MIME"text/plain", sdh::SubDofHandler)
+function Base.show(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
     println(io, typeof(sdh))
     println(io, "  Cell type: ", getcelltype(sdh.dh.grid, first(sdh.cellset)))
-    _print_field_information(io, sdh)
+    _print_field_information(io, mime, sdh)
 end
 
-function _print_field_information(io::IO, sdh::SubDofHandler)
+function _print_field_information(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
     println(io, "  Fields:")
     for (i, fieldname) in pairs(sdh.field_names)
-        println(io, "    ", repr(fieldname), ", ", sdh.field_interpolations[i])
+        println(io, "    ", repr(mime, fieldname), ", ", repr(mime, sdh.field_interpolations[i]))
     end
     if !isclosed(sdh.dh)
         print(io, "  Not closed!")
@@ -93,10 +93,10 @@ function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
-function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
+function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
     println(io, typeof(dh))
     if length(dh.subdofhandlers) == 1
-        _print_field_information(io, dh.subdofhandlers[1])
+        _print_field_information(io, mime, dh.subdofhandlers[1])
     else
         println(io, "  Fields:")
         for fieldname in getfieldnames(dh)
@@ -132,6 +132,7 @@ function ndofs_per_cell(dh::DofHandler, cell::Int=1)
     return @inbounds ndofs_per_cell(dh.subdofhandlers[dh.cell_to_subdofhandler[cell]])
 end
 ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell[]
+ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell[] # for compatibility with DofHandler
 
 """
     celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
@@ -581,18 +582,15 @@ element B in the example.
 
 In addition, we also have to preverse the ordering at each dof location.
 
-For more details we refer to [1] as we follow the methodology described therein.
+For more details we refer to Scroggs et al. [Scroggs2022](@cite) as we follow the methodology
+described therein.
 
-[1] Scroggs, M. W., Dokken, J. S., Richardson, C. N., & Wells, G. N. (2022).
-    Construction of arbitrary order finite element degree-of-freedom maps on
-    polygonal and polyhedral cell meshes. ACM Transactions on Mathematical
-    Software (TOMS), 48(2), 1-23.
-
-    !!!TODO Citation via DocumenterCitations.jl.
-
-    !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
+# References
+ - [Scroggs2022](@cite) Scroggs et al. ACM Trans. Math. Softw. 48 (2022).
 """
 @inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::PathOrientationInfo, adjust_during_distribution::Bool)
+    # TODO Investigate if we can somehow pass the interpolation into this function in a
+    # typestable way.
     n_copies = step(dofs)
     @assert n_copies > 0
     if adjust_during_distribution && !orientation.regular
@@ -621,6 +619,17 @@ function sortedge(edge::Tuple{Int,Int})
 end
 
 """
+sortedge_fast(edge::Tuple{Int,Int})
+
+Returns the unique representation of an edge.
+Here the unique representation is the sorted node index tuple.
+"""
+function sortedge_fast(edge::Tuple{Int,Int})
+    a, b = edge
+    a < b ? (return edge) : (return (b, a))
+end
+
+"""
     sortface(face::Tuple{Int})
     sortface(face::Tuple{Int,Int})
     sortface(face::Tuple{Int,Int,Int})
@@ -632,6 +641,20 @@ Note that in 3D we only need indices to uniquely identify a face,
 so the unique representation is always a tuple length 3.
 """
 sortface(face::Tuple{Int,Int}) = sortedge(face) # Face in 2D is the same as edge in 3D.
+
+
+"""
+    sortface_fast(face::Tuple{Int})
+    sortface_fast(face::Tuple{Int,Int})
+    sortface_fast(face::Tuple{Int,Int,Int})
+    sortface_fast(face::Tuple{Int,Int,Int,Int})
+
+Returns the unique representation of a face.
+Here the unique representation is the sorted node index tuple.
+Note that in 3D we only need indices to uniquely identify a face,
+so the unique representation is always a tuple length 3.
+"""
+sortface_fast(face::Tuple{Int,Int}) = sortedge_fast(face) # Face in 2D is the same as edge in 3D.
 
 """
     !!!NOTE TODO implement me.
@@ -669,6 +692,16 @@ function sortface(face::Tuple{Int,Int,Int})
     return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
 end
 
+
+function sortface_fast(face::Tuple{Int,Int,Int})
+    a, b, c = face
+    b, c = minmax(b, c)
+    a, c = minmax(a, c)
+    a, b = minmax(a, b)
+    return (a, b, c)
+end
+
+
 function sortface(face::Tuple{Int,Int,Int,Int})
     a, b, c, d = face
     c, d = minmax(c, d)
@@ -680,7 +713,21 @@ function sortface(face::Tuple{Int,Int,Int,Int})
     return (a, b, c), SurfaceOrientationInfo() # TODO fill struct
 end
 
+
+function sortface_fast(face::Tuple{Int,Int,Int,Int})
+    a, b, c, d = face
+    c, d = minmax(c, d)
+    b, d = minmax(b, d)
+    a, d = minmax(a, d)
+    b, c = minmax(b, c)
+    a, c = minmax(a, c)
+    a, b = minmax(a, b)
+    return (a, b, c)
+end
+
+
 sortface(face::Tuple{Int}) = face, nothing
+sortface_fast(face::Tuple{Int}) = face
 
 """
     find_field(dh::DofHandler, field_name::Symbol)::NTuple{2,Int}
@@ -847,9 +894,9 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         field_idx === nothing && continue
         # Set up CellValues with the local node coords as quadrature points
         CT = getcelltype(get_grid(dh), first(sdh.cellset))
+        ip = getfieldinterpolation(sdh, field_idx)
         ip_geo = default_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
-        ip = getfieldinterpolation(sdh, field_idx)
         qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
         if ip isa VectorizedInterpolation
             # TODO: Remove this hack when embedding works...

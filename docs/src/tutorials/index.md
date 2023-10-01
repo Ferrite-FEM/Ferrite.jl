@@ -1,111 +1,145 @@
-```@meta
-DocTestSetup = :(using Ferrite)
-```
-
 # Tutorials
 
-On this page, you find an overview of Ferrite tutorials. The collection contains programs displaying different aspects and techniques of the `Ferrite` toolbox.
-The programs are sorted as
+On this page you find an overview of Ferrite tutorials. The tutorials explain and show how
+Ferrite can be used to solve a wide range of problems. See also the [Code
+gallery](../gallery/index.md) for more examples.
 
-* A complete list shortly summarizing the topic, what they teach and which keywords related to the task they contain
-* Grouped by topic
+The tutorials all follow roughly the same structure:
+ - **Introduction** introduces the problem to be solved and discusses the learning outcomes
+   of the tutorial.
+ - **Commented program** is the code for solving the problem with explanations and comments.
+ - **Plain program** is the raw source code of the program.
 
-## List of examples (sequential order)
-1. [Heat Equation](@ref tutorial-heat-equation)
+When studying the tutorials it is a good idea to obtain a local copy of the code and run it
+on your own machine as you read along. Some of the tutorials also include suggestions for
+tweaks to the program that you can try out on your own.
 
-   This example presents the easiest way to get started. The heat equation is solved on a unit square. For this purpose, a program is set up containing the core aspects of finite element computation: weak and strong forms, trial and test functions, degrees of freedom, boundary conditions, element routine, global assembly, solving the system and visualizing the results.
+### Tutorial index
 
-   Keywords: Fundamentals, heat equation, weak and strong form, Dirichlet boundary condition, assembly
+The tutorials are listed in roughly increasing order of complexity. However, since they
+focus on different aspects, and solve different problems, it is suggested to have a look at
+the brief descriptions below to get an idea about what you will learn from each tutorial.
 
-2. [Postprocessing](@ref tutorial-postprocessing)
+If you are new to Ferrite then Tutorial 1 - Tutorial 6 is the best place to start. These
+tutorials introduces and teaches most of the basic finite element techniques (e.g. linear
+and non-linear problems, scalar- and vector-valued problems, Dirichlet and Neumann boundary
+conditions, mixed finite elements, time integration, direct and iterative linear solvers,
+etc). In particular the very first tutorial is essential in order to be able to follow any
+of the other tutorials. The remaining tutorials discuss more advanced topics.
 
-   Based on example 1, visualization of the flux variable is done via the L2Projector. Additionally, the point evaluation along a line is shown.
+---
 
-   Keywords: Fundamentals, postprocessing, heat equation, flux, L2-projection, point evaluation
+##### [Tutorial 1: Heat equation](heat_equation.md)
 
-3. [Helmholtz Equation](@ref tutorial-helmholtz)
+This tutorial guides you through the process of solving the linear stationary heat equation
+(i.e. Poisson's equation) on a unit square with homogeneous Dirichlet boundary conditions.
+This tutorial introduces and teaches many important parts of Ferrite: problem setup, degree
+of freedom management, assembly procedure, boundary conditions, solving the linear system,
+visualization of the result). *Understanding this tutorial is essential to follow more
+complex tutorials.*
 
-   The Helmholtz equation is solved on a unit square. Dirichlet and Neumann boundary conditions are applied at different parts of the boundary. A known analytical solution is approximately reproduced to verify the finite element solution.
+**Keywords**: scalar-valued solution, Dirichlet boundary conditions.
 
-   Keywords: Fundamentals, Helmholtz equation, Dirichlet boundary condition, Neumann boundary condition, verification, boundary integrals
+---
 
-4. [Incompressible Elasticity](@ref tutorial-incompressible-elasticity)
+##### [Tutorial 2: Linear elasticity](linear_elasticity.md)
 
-   A mixed element for solving unidirectional displacement-pressure coupling is constructed. The solution for nearly incompressible materials is compared for different interpolations.
+TBW.
 
-   Keywords: Mixed elements, multiple fields, unidirectional coupling, displacement-pressure equation, incompressibility, stability
+**Keywords**: vector-valued solution, Dirichlet and Neumann boundary conditions.
 
-5. [Hyperelasticity](@ref tutorial-hyperelasticity)
+---
 
-   A hyperelastic material model is solved in a finite strain setting. Stress and material tangent are recovered by using automatic differentiation. Newton’s method is used to iteratively solve the resulting non-linear system.
+##### [Tutorial 3: Incompressible elasticity](incompressible_elasticity.md)
 
-   Keywords: Non-linear problem, hyperelasticity, finite strain, large deformations, Newton's method, conjugate gradient, automatic differentiation
+This tutorial focuses on a mixed formulation of linear elasticity, with (vector)
+displacement and (scalar) pressure as the two unknowns, suitable for incompressibility.
+Thus, this tutorial guides you through the process of solving a problem with two unknowns
+from two coupled weak forms. The problem that is studied is Cook's membrane in the
+incompressible limit.
 
-6. [Threaded Assembly](@ref tutorial-threaded-assembly)
+**Keywords**: mixed finite elements, Dirichlet and Neumann boundary conditions.
 
-   This example shows the threaded assembly of a finite element stiffness matrix, i.e. the calculation is speed up by using parallelization. Different colorings of two-dimensional meshes are shown to visualize the split of the mesh in such a way that no threads interfere with each other.
+---
 
-   Keywords: Parallelization, performance, threads, coloring
+#### [Tutorial 4: Hyperelasticity](hyperelasticity.md)
 
-7. [von Mises Plasticity](@ref tutorial-plasticity)
+In this tutorial you will learn how to solve a non-linear finite element problem. In
+particular, a hyperelastic material model, in a finite strain setting, is used to solve the
+rotation of a cube. Automatic differentiatio (AD) is used for the consitutive relations.
+Newton's method is used for the non-linear iteration, and a conjugate gradient (CG) solver
+is used for the linear solution of the increment.
 
-   A cantilever beam is solved applying a plasticity material model, requiring a constitutive driver. Handling of state, flux and internal variables within elements is shown. Newton’s method is used to iteratively solve the non-linear system.
+**Keywords**: non-linear finite element, finite strain, automatic differentiation (AD),
+Newton's method, conjugate gradient (CG).
 
-   Keywords: Plasticity, 3D, material modeling, material state, non-linear problem, Newton’s method,
+---
 
-8. [Time Dependent Problems](@ref tutorial-transient-heat-equation)
+#### [Tutorial 5: von Mises Plasticity](plasticity.md)
 
-   The transient heat equation is solved on a rectangular plate. The time discretization is done by using the implicit Euler scheme.
+This tutorial revisits the cantilever beam problem from [Tutorial 2: Linear
+elasticity](linear_elasticity.md), but instead of linear elasticity a plasticity model is
+used for the constitutive relation. You will learn how to solve a problem which require the
+solution of a local material problem, and the storage of material state, in each quadrature
+point. Newton's method is used both locally in the material routine, and globally on the
+finite element level.
 
-   Keywords: Time dependent problem, transient heat equation, implicit Euler scheme
+**Keywords**: non-linear finite element, plasticity, material modeling, state variables,
+Newton’s method.
 
-9. [Ginzburg-Landau model energy minimization](@ref tutorial-ginzburg-landau-minimizer)
+---
 
-   A basic Ginzburg-Landau model is solved by combining `Ferrite` with `ForwardDiff`. Using threads, the calculation time is optimized.
+#### [Tutorial 6: Transient heat equation](@ref tutorial-transient-heat-equation)
 
-   Keywords: Ginzburg-Landau, ForwardDiff.jl, parallelization, optimization, performance
+In this tutorial the transient heat equation is solved on the unit square. The problem to be
+solved is thus similar to the one solved in the first tutorial, [Heat
+equation](heat_equation.md), but with time-varying boundary conditions. In particular you
+will learn how to solve a time dependent problem with an implicit Euler scheme for the time
+integration.
 
-10. [Linear shell](@ref tutorial-linear-shell)
+**Keywords**: time dependent finite elements, implicit Euler time integration.
 
-   A program for the use of linear shell elements is set up. The theoretical background is introduced as well.
+---
 
-   Keywords: Shell elements, displacements, rotations, multiple fields, ForwardDiff.jl, reduced integration
+#### [Tutorial 7: Computational homogenization](computational_homogenization.md)
 
-11. [Nearly Incompressible Hyperelasticity](@ref tutorial-nearly-incompressible-hyperelasticity)
+This tutorial guides you through computational homogenization of an representative volume
+element (RVE) consisting of a soft matrix material with stiff inclusions. The computational
+mesh is read from an external mesh file generated with Gmsh. Dirichlet and periodic boundary
+conditions are used.
 
-   This program combines ideas from the examples Incompressible Elasticity and Hyperelasticity to construct a mixed element solving three-dimensional displacement-pressure equations.
+**Keywords**: Gmsh mesh reading, Dirichlet and periodic boundary conditions
 
-   Keywords: Non-linear problem, hyperelasticity, finite strain, large deformations, Newton's method, automatic differentiation, coupled problem, mixed elements, multiple fields, displacement-pressure equation, incompressibility
+---
 
-12. [Computational homogenization](@ref tutorial-computational-homogenization)
+#### [Tutorial 8: Stokes flow](stokes-flow.md)
 
-   A two-dimensional representative volume element (RVE) is loaded in shear. Dirichlet and periodic boundary conditions are applied and the results from the homogenization are compared to the Voigt and Reuss bounds.
+In this tutorial Stokes flow with (vector) velocity and (scalar) pressure is solved on on a
+quarter circle. Rotationally periodic boundary conditions is used for the inlet/outlet
+coupling. To obtain a unique solution, a mean value constraint is applied on the pressure
+using an affine constraint. The computational mesh is generated directly using the Gmsh API.
 
-   Keywords: homogenization, periodic boundary conditions, representative volume element (RVE), microscale, Voigt and Reuss bound
+**Keywords**: periodic boundary conditions, mean value constraint, mesh generation with
+Gmsh.
 
-13. [Stokes flow](@ref tutorial-stokes-flow)
+---
 
-   Stokes flow on a quarter circle is solved by applying periodic boundary conditions. The weak and strong form of the problem are discussed including constrains. Mesh generation is done directly via the Gmsh API.
+#### [Tutorial 9: Incompressible Navier-Stokes equations](ns_vs_diffeq.md)
 
-   Keywords: Periodic boundary conditions, multiple fields, mean value constraint, mesh generation with Gmsh, coupled problem, weak and strong form
+In this tutorial the incompressible Navier-Stokes equations are solved. The domain is
+discretized in space with Ferrite as usual, and then forumalated in a way to be compatible
+with the [OrdinaryDiffEq.jl](https://docs.sciml.ai/OrdinaryDiffEq/) package, which is used
+for the time-integration.
 
-14. [Topology Optimization](@ref tutorial-topology-optimization)
+**Keywords**: non-linear time dependent problem
 
-   Topology optimization is shown for the bending problem by using a SIMP material model. To avoid numerical instabilities, a regularization scheme requiring the calculation of the Laplacian is imposed, which is done by using the grid topology functionalities.
+---
 
-   Keywords: Topology optimization, weak and strong form, non-linear problem, Laplacian, grid topology
+#### [Tutorial 10: Linear shell](@ref tutorial-linear-shell)
 
-## Other examples
-1. [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](@ref tutorial-ins-ordinarydiffeq)
+In this tutorial a linear shell element formulation is set up as a two-dimensional domain
+embedded in three-dimensional space. This will teach, and perhaps inspire, you on how
+Ferrite can be used for non-standard things and how to add "hacks" that build on top of
+Ferrite.
 
-   The weak form of the semi-discretized incompressible Navier-Stokes equations are derived from the strong form and implemented in the finite element code. Then, the time-dependent solution is calculated by using the DifferentialEquations.jl package. For this purpose, the PDE is required in a specific form.
-
-   Keywords: Fluid dynamics, weak and strong form, solver, incompressibility, time-dependent problem
-
-## Grouped by topic
-* Fundamentals: [Heat Equation](@ref tutorial-heat-equation), [Postprocessing](@ref tutorial-postprocessing), [Helmholtz Equation](@ref tutorial-helmholtz), [Incompressible Elasticity](@ref tutorial-incompressible-elasticity)
-* Non-linear Problems: [Hyperelasticity](@ref tutorial-hyperelasticity), [von Mises Plasticity](@ref tutorial-plasticity), [Nearly Incompressible Hyperelasticity](@ref tutorial-nealy-incompressibly-hyperelasticity), [Computational homogenization](@ref tutorial-computational-homogenization), [Topology Optimization](@ref tutorial-topology-optimization)
-* Time dependent problems: [Time Dependent Problems](@ref tutorial-transient-heat-equation), [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](@ref tutorial-ins-ordinarydiffeq)
-* Multiple fields: [Incompressible Elasticity](@ref tutorial-incompressible-elasticity), [Linear shell](@ref tutorial-linear-shell), [Nearly Incompressible Hyperelasticity](tutorial-nearly-incompressible-hyperelasticity), [Stokes flow](@ref tutorial-stokes-flow)
-* Periodic problems: [Computational homogenization](@ref tutorial-computational-homogenization), [Stokes flow](@ref tutorial-stokes-flow)
-* Advanced: [Threaded Assembly](@ref tutorial-threaded-assembly), [Ginzburg-Landau model energy minimization](@ref tutorial-ginzburg-landau-minimizer)
+**Keywords**: embedding, automatic differentiation
