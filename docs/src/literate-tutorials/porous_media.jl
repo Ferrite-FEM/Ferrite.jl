@@ -220,8 +220,10 @@ function doassemble!(K, r, domains::Vector{<:FEDomain}, a, a_old, Δt)
 end;
 
 # For one domain (corresponding to a specific SubDofHandler),
-# we can then loop over all cells in its cellset. This ensures
-# that the calls to the `element_routine` are type stable.
+# we can then loop over all cells in its cellset. Doing this
+# in a separate function (instead of a nested loop), ensures
+# that the calls to the `element_routine` are type stable,
+# which can be important for good performance. 
 function doassemble!(assembler, domain::FEDomain, a, a_old, Δt)
     material = domain.material 
     cv = domain.cellvalues
@@ -326,7 +328,7 @@ function setup_problem(;t_rise=0.1, u_max=-0.1)
 end;
 
 # ### Solving
-# Given the `MixedDofHandler`, `ConstraintHandler`, and `CellValues`, 
+# Given the `DofHandler`, `ConstraintHandler`, and `CellValues`, 
 # we can solve the problem by stepping through the time history
 function solve(dh, ch, domains; Δt=0.025, t_total=1.0)
     K = create_sparsity_pattern(dh);
