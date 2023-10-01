@@ -155,26 +155,8 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
 nodal values of ``\\mathbf{u}``.
 """
-function_value(::InterfaceValues, ::Int, args...)
+function_value(::InterfaceValues, ::Int, args...; kwargs...)
 
-function function_value(
-        iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector;
-        here::Bool
-    )
-    return function_value(iv, q_point, u_here, eachindex(u_here), u_there, eachindex(u_there); here=here)
-end
-function function_value(
-        iv::InterfaceValues, q_point::Int,
-        u_here::AbstractVector, dof_range_here::AbstractUnitRange{Int},
-        u_there::AbstractVector, dof_range_there::AbstractUnitRange{Int};
-        here::Bool
-    )
-    if here
-        return function_value(iv.here, q_point, u_here, dof_range_here)
-    else # there
-        return function_value(iv.there, q_point, u_there, dof_range_there)
-    end
-end
 
 """
     function_gradient(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
@@ -201,22 +183,6 @@ where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
 function_gradient(::InterfaceValues, ::Int, args...; kwargs...)
 
-function function_gradient(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
-    return function_gradient(iv, q_point, u_here, eachindex(u_here), u_there, eachindex(u_there); here=here)
-end
-function function_gradient(
-        iv::InterfaceValues, q_point::Int,
-        u_here::AbstractVector, range_here::AbstractUnitRange{Int},
-        u_there::AbstractVector, range_there::AbstractUnitRange{Int};
-        here::Bool
-    )
-    if here
-        return function_gradient(iv.here, q_point, u_here, range_here)
-    else # there
-        return function_gradient(iv.there, q_point, u_there, range_there)
-    end
-end
-
 """
     function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool)
 
@@ -232,20 +198,7 @@ The symmetric gradient of a scalar function is computed as
 ``\\left[ \\mathbf{\\nabla}  \\mathbf{u}(\\mathbf{x_q}) \\right]^\\text{sym} =  \\sum\\limits_{i = 1}^n  \\frac{1}{2} \\left[ \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\otimes \\mathbf{u}_i + \\mathbf{u}_i  \\otimes  \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\right]``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-
-function function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
-    return function_symmetric_gradient(iv, q_point, u_here, eachindex(u_here), u_there, eachindex(u_there); here=here)
-end
-function function_symmetric_gradient(iv::InterfaceValues, q_point::Int,
-    u_here::AbstractVector, range_here::AbstractUnitRange{Int},
-    u_there::AbstractVector, range_there::AbstractUnitRange{Int};
-    here::Bool)
-    if here
-        return function_symmetric_gradient(iv.here, q_point, u_here, range_here)
-    else # there
-        return function_symmetric_gradient(iv.there, q_point, u_there, range_there)
-    end
-end
+function_symmetric_gradient(::InterfaceValues, ::Int, args...; kwargs...)
 
 """
     function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
@@ -261,19 +214,7 @@ The divergence of a vector valued functions in the quadrature point ``\\mathbf{x
 ``\\mathbf{\\nabla} \\cdot \\mathbf{u}(\\mathbf{x_q}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x_q}) \\cdot \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function function_divergence(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
-    return function_divergence(iv, q_point, u_here, eachindex(u_here), u_there, eachindex(u_there); here=here)
-end
-function function_divergence(iv::InterfaceValues, q_point::Int,
-    u_here::AbstractVector, range_here::AbstractUnitRange{Int},
-    u_there::AbstractVector, range_there::AbstractUnitRange{Int};
-    here::Bool)
-    if here
-        return function_divergence(iv.here, q_point, u_here, range_here)
-    else # there
-        return function_divergence(iv.there, q_point, u_there, range_there)
-    end
-end
+function_divergence(::InterfaceValues, ::Int, args...; kwargs...)
 
 """
     function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
@@ -293,10 +234,10 @@ function function_curl(iv::InterfaceValues, q_point::Int, u_here::AbstractVector
     return function_curl(iv, q_point, u_here, eachindex(u_here), u_there, eachindex(u_there); here=here)
 end
 function function_curl(iv::InterfaceValues, q_point::Int,
-    u_here::AbstractVector, range_here::AbstractUnitRange{Int},
-    u_there::AbstractVector, range_there::AbstractUnitRange{Int};
+    u_here::AbstractVector, dof_range_here::AbstractUnitRange{Int},
+    u_there::AbstractVector, dof_range_there::AbstractUnitRange{Int};
     here::Bool)
-    return curl_from_gradient(function_gradient(iv, q_point, u_here, range_here,u_there, range_there; here))
+    return curl_from_gradient(function_gradient(iv, q_point, u_here, dof_range_here,u_there, dof_range_there; here))
 end
 
 """
@@ -360,28 +301,18 @@ for (func,                      f_,              f_type) in (
     end
 end
 
-for (func,                      f_,               ) in (
-    (:shape_value_average,      :shape_value,     ),
-    (:shape_gradient_average,   :shape_gradient,  ),
+for (func,                      f_,               is_avg) in (
+    (:shape_value_average,      :shape_value,     true),
+    (:shape_gradient_average,   :shape_gradient,  true),
+    (:shape_value_jump,         :shape_value,     false),
+    (:shape_gradient_jump,      :shape_gradient,  false),
 )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, i::Int)
             f_here = $(f_)(iv, qp, i; here = true)
             f_there = $(f_)(iv, qp, i; here = false)
-            return (f_here .+ f_there)/2
-        end
-    end
-end
-
-for (func,                      f_,                 ) in (
-    (:shape_value_jump,         :shape_value,       ),
-    (:shape_gradient_jump,      :shape_gradient,    ),
-)
-    @eval begin
-        function $(func)(iv::InterfaceValues, qp::Int, i::Int)
-            f_here = $(f_)(iv, qp, i; here = true)
-            f_there = $(f_)(iv, qp, i; here = false)
-            return f_there .- f_here
+            $(is_avg) && return (f_here .+ f_there)/2
+            $(is_avg) || return f_there .- f_here
         end
     end
 end
@@ -424,29 +355,39 @@ This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- 
 """
 function function_gradient_jump end
 
-for (func,                          f_,                 ) in (
-    (:function_value_average,       :function_value,    ),
-    (:function_gradient_average,    :function_gradient, ),
+for (func,                          ) in (
+    (:function_value,               ),
+    (:function_gradient,            ),
+    (:function_divergence,          ),
+    (:function_symmetric_gradient,  ),
 )
     @eval begin
-        function $(func)(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
-            return $(func)(iv, qp, u_here, eachindex(u_here), u_there, eachindex(u_there))
+        function $(func)(
+                iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector;
+                here::Bool
+            )
+            return $(func)(iv, q_point, u_here, eachindex(u_here), u_there, eachindex(u_there); here=here)
         end
         function $(func)(
-                iv::InterfaceValues, qp::Int,
-                u_here::AbstractVector, range_here::AbstractUnitRange{Int},
-                u_there::AbstractVector, range_there::AbstractUnitRange{Int},
+                iv::InterfaceValues, q_point::Int,
+                u_here::AbstractVector, dof_range_here::AbstractUnitRange{Int},
+                u_there::AbstractVector, dof_range_there::AbstractUnitRange{Int};
+                here::Bool
             )
-            f_here = $(f_)(iv.here, qp, u_here, range_here)
-            f_there = $(f_)(iv.there, qp, u_there, range_there)
-            return 0.5 * (f_here + f_there)
+            if here
+                return $(func)(iv.here, q_point, u_here, dof_range_here)
+            else # there
+                return $(func)(iv.there, q_point, u_there, dof_range_there)
+            end
         end
     end
 end
 
-for (func,                          f_,                 ) in (
-    (:function_value_jump,          :function_value,    ),
-    (:function_gradient_jump,       :function_gradient, ),
+for (func,                          f_,                     is_avg) in (
+    (:function_value_average,       :function_value,        true ),
+    (:function_gradient_average,    :function_gradient,     true ),
+    (:function_value_jump,          :function_value,        false),
+    (:function_gradient_jump,       :function_gradient,     false),
 )
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
@@ -454,12 +395,13 @@ for (func,                          f_,                 ) in (
         end
         function $(func)(
                 iv::InterfaceValues, qp::Int,
-                u_here::AbstractVector, range_here::AbstractUnitRange{Int},
-                u_there::AbstractVector, range_there::AbstractUnitRange{Int},
+                u_here::AbstractVector, dof_range_here::AbstractUnitRange{Int},
+                u_there::AbstractVector, dof_range_there::AbstractUnitRange{Int},
             )
-            f_here = $(f_)(iv.here, qp, u_here, range_here)
-            f_there = $(f_)(iv.there, qp, u_there, range_there)
-            return f_there - f_here
+            f_here = $(f_)(iv.here, qp, u_here, dof_range_here)
+            f_there = $(f_)(iv.there, qp, u_there, dof_range_there)
+            $(is_avg) && return 0.5 * (f_here + f_there)
+            $(is_avg) || return f_there - f_here
         end
     end
 end
