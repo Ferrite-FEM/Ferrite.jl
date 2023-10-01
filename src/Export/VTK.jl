@@ -24,6 +24,7 @@ VTKFile(filename, grid) do vtk
     write_solution(vtk, dh, u)
     write_celldata(vtk, celldata)
 end
+```
 """
 struct VTKFile{VTK<:WriteVTK.VTKFile}
     vtk::VTK
