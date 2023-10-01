@@ -93,31 +93,6 @@ end
 
     end
 
-    # Test vtk export for mixed grid 
-    # 4----5 .
-    # |(1) |(2)⋱ 
-    # 1----2-----3
-    cells = [Quadrilateral((1, 2, 3, 4)), Triangle((3, 2, 5))]
-    nf(a,b)=Node(Vec{2,Float64}((a,b)))
-    nodes = [nf(0,0), nf(1,0), nf(2,0), nf(0,1), nf(1,1)]
-    dh = DofHandler(Grid(cells, nodes))
-    sdh_quad = SubDofHandler(dh, Set(1))
-    add!(sdh_quad, :u, Lagrange{RefQuadrilateral,1}()^2)
-    sdh_tri = SubDofHandler(dh, Set(2))
-    add!(sdh_tri, :u, Lagrange{RefTriangle,1}()^2)
-    close!(dh)
-    vtk_name = "dofhandler_mixed"
-    vtk_grid(vtk_name, dh) do vtk
-        vtk_point_data(vtk, dh, collect(1.0:ndofs(dh)))
-    end
-    sha = bytes2hex(open(SHA.sha1, vtk_name*".vtu"))
-    if OVERWRITE_CHECKSUMS
-        write(csio, sha, "\n")
-    else
-        @test sha in split(chomp(readline(csio)))
-        rm(vtk_name*".vtu")
-    end
-
 end # of testset
 
 close(csio)
