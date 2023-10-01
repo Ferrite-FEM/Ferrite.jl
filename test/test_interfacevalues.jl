@@ -73,25 +73,39 @@
                     u_b[i] = H ⋅ xs[i]
                     u_scal_b[i] = V ⋅ xs[i]
                 end
-                u = here ? u_a : u_b
-                u_scal = here ? u_scal_a : u_scal_b
+                u = vcat(u_a, u_b)
+                u_scal = vcat(u_scal_a, u_scal_b)
                 for i in 1:getnquadpoints(iv)
-                    @test function_gradient(iv, i, u_a, u_b, here = here) ≈ H
-                    @test function_symmetric_gradient(iv, i, u_a, u_b, here = here) ≈ 0.5(H + H')
-                    @test function_divergence(iv, i, u_scal_a, u_scal_b, here = here) ≈ sum(V)
-                    @test function_divergence(iv, i, u_a, u_b, here = here) ≈ tr(H)
-                    @test function_gradient(iv, i, u_scal_a, u_scal_b, here = here) ≈ V
-                    ndim == 3 && @test function_curl(iv, i, u_a, u_b, here = here) ≈ Ferrite.curl_from_gradient(H)
+                    @test function_gradient(iv, i, u_a, u_b, here = here) ≈
+                        function_gradient(iv, i, u, here = here) ≈ H
+                    @test function_symmetric_gradient(iv, i, u_a, u_b, here = here) ≈
+                        function_symmetric_gradient(iv, i, u, here = here) ≈ 0.5(H + H')
+                    @test function_divergence(iv, i, u_scal_a, u_scal_b, here = here) ≈
+                        function_divergence(iv, i, u_scal, here = here) ≈ sum(V)
+                    @test function_divergence(iv, i, u_a, u_b, here = here) ≈
+                        function_divergence(iv, i, u, here = here) ≈ tr(H)
+                    @test function_gradient(iv, i, u_scal_a, u_scal_b, here = here) ≈
+                        function_gradient(iv, i, u_scal, here = here) ≈ V
+                    ndim == 3 && @test function_curl(iv, i, u_a, u_b, here = here) ≈
+                        function_curl(iv, i, u, here = here) ≈ Ferrite.curl_from_gradient(H)
 
-                    @test function_value_average(iv, i, u_scal_a, u_scal_b) ≈ function_value(iv, i, u_scal_a, u_scal_b, here = here)
-                    @test all(function_value_jump(iv, i, u_scal_a, u_scal_b) .<= 30 * eps(Float64))
-                    @test function_gradient_average(iv, i, u_scal_a, u_scal_b) ≈ function_gradient(iv, i, u_scal_a, u_scal_b, here = here)
-                    @test all(function_gradient_jump(iv, i, u_scal_a, u_scal_b) .<= 30 * eps(Float64))
+                    @test function_value_average(iv, i, u_scal_a, u_scal_b) ≈
+                        function_value_average(iv, i, u_scal) ≈ function_value(iv, i, u_scal_a, u_scal_b, here = here)
+                    @test all(function_value_jump(iv, i, u_scal_a, u_scal_b) .<= 30 * eps(Float64)) &&
+                        all(function_value_jump(iv, i, u_scal) .<= 30 * eps(Float64))
+                    @test function_gradient_average(iv, i, u_scal_a, u_scal_b) ≈
+                        function_gradient_average(iv, i, u_scal) ≈ function_gradient(iv, i, u_scal_a, u_scal_b, here = here)
+                    @test all(function_gradient_jump(iv, i, u_scal_a, u_scal_b) .<= 30 * eps(Float64)) &&
+                        all(function_gradient_jump(iv, i, u_scal) .<= 30 * eps(Float64))
 
-                    @test function_value_average(iv, i, u_a, u_b) ≈ function_value(iv, i, u_a, u_b, here = here)
-                    @test all(function_value_jump(iv, i, u_a, u_b) .<= 30 * eps(Float64))
-                    @test function_gradient_average(iv, i, u_a, u_b) ≈ function_gradient(iv, i, u_a, u_b, here = here)
-                    @test all(function_gradient_jump(iv, i, u_a, u_b) .<= 30 * eps(Float64))
+                    @test function_value_average(iv, i, u_a, u_b) ≈
+                        function_value_average(iv, i, u) ≈ function_value(iv, i, u_a, u_b, here = here)
+                    @test all(function_value_jump(iv, i, u_a, u_b) .<= 30 * eps(Float64)) &&
+                        all(function_value_jump(iv, i, u) .<= 30 * eps(Float64))
+                    @test function_gradient_average(iv, i, u_a, u_b) ≈
+                        function_gradient_average(iv, i, u) ≈ function_gradient(iv, i, u_a, u_b, here = here)
+                    @test all(function_gradient_jump(iv, i, u_a, u_b) .<= 30 * eps(Float64)) &&
+                        all(function_gradient_jump(iv, i, u) .<= 30 * eps(Float64))
 
                 end
                 # Test of volume

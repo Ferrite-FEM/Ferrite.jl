@@ -485,10 +485,9 @@ end
         for q_point in 1:getnquadpoints(iv)
             dΩ = getdetJdV(iv, q_point)
             normal_a = getnormal(iv, q_point)
-            u_a = u[interfacedofs(ic)[1 : length(ic.a.dofs)]]
-            u_b = u[interfacedofs(ic)[1 + length(ic.a.dofs) : end]]
-            jump_int += function_value_jump(iv, q_point, u_a, u_b) ⋅ normal_a * dΩ
-            jump_abs += abs(function_value_jump(iv, q_point, u_a, u_b) ⋅ normal_a) * dΩ
+            u_interface = u[interfacedofs(ic)]
+            jump_int += function_value_jump(iv, q_point, u_interface) ⋅ normal_a * dΩ
+            jump_abs += abs(function_value_jump(iv, q_point, u_interface) ⋅ normal_a) * dΩ
         end
     end
     @test isapprox(jump_abs, 2/3*2*4,atol=1e-6) # 2*4*0.66666, jump is always 2, 4 sides, length =0.66

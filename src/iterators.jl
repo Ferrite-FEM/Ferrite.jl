@@ -216,6 +216,7 @@ function reinit!(iv::InterfaceValues, ic::InterfaceCache)
 end
 
 interfacedofs(ic::InterfaceCache) = ic.dofs
+dof_range(ic::InterfaceCache, field::Symbol) = (dof_range(ic.a.cc.dh, field), dof_range(ic.b.cc.dh, field) .+ length(celldofs(ic.a)))
 
 ####################
 ## Grid iterators ##

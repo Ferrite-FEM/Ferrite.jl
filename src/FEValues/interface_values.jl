@@ -239,6 +239,18 @@ function function_curl(iv::InterfaceValues, q_point::Int,
     here::Bool)
     return curl_from_gradient(function_gradient(iv, q_point, u_here, dof_range_here,u_there, dof_range_there; here))
 end
+# Single u dispatch
+function function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool)
+    dof_range_here = 1:getnbasefunctions(iv.here)
+    dof_range_there = dof_range_here .+ getnbasefunctions(iv.there)
+    return function_curl(iv, q_point, u, dof_range_here, dof_range_there; here=here)
+end
+function function_curl(iv::InterfaceValues, q_point::Int,
+    u::AbstractVector,
+    dof_range_here::AbstractUnitRange{Int}, dof_range_there::AbstractUnitRange{Int};
+    here::Bool)
+    return curl_from_gradient(function_gradient(iv, q_point, u, dof_range_here, dof_range_there; here))
+end
 
 """
     shape_value_average(iv::InterfaceValues, qp::Int, base_function::Int)
@@ -380,6 +392,27 @@ for (func,                          ) in (
                 return $(func)(iv.there, q_point, u_there, dof_range_there)
             end
         end
+        # Single u dispatch
+        function $(func)(
+                iv::InterfaceValues, q_point::Int, u::AbstractVector;
+                here::Bool
+            )
+            dof_range_here = 1:getnbasefunctions(iv.here)
+            dof_range_there = dof_range_here .+ getnbasefunctions(iv.there)
+            return $(func)(iv, q_point, u, dof_range_here, dof_range_there; here=here)
+        end
+        function $(func)(
+                iv::InterfaceValues, q_point::Int,
+                u::AbstractVector,
+                dof_range_here::AbstractUnitRange{Int}, dof_range_there::AbstractUnitRange{Int};
+                here::Bool
+            )
+            if here
+                return $(func)(iv.here, q_point, u, dof_range_here)
+            else # there
+                return $(func)(iv.there, q_point, u, dof_range_there)
+            end
+        end
     end
 end
 
@@ -400,6 +433,22 @@ for (func,                          f_,                     is_avg) in (
             )
             f_here = $(f_)(iv.here, qp, u_here, dof_range_here)
             f_there = $(f_)(iv.there, qp, u_there, dof_range_there)
+            $(is_avg) && return 0.5 * (f_here + f_there)
+            $(is_avg) || return f_there - f_here
+        end
+        # Single u dispatch
+        function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector)
+            dof_range_here = 1:getnbasefunctions(iv.here)
+            dof_range_there = dof_range_here .+ getnbasefunctions(iv.there)
+            return $(func)(iv, qp, u, dof_range_here, dof_range_there)
+        end
+        function $(func)(
+                iv::InterfaceValues, qp::Int,
+                u::AbstractVector, 
+                dof_range_here::AbstractUnitRange{Int}, dof_range_there::AbstractUnitRange{Int},
+            )
+            f_here = $(f_)(iv.here, qp, u, dof_range_here)
+            f_there = $(f_)(iv.there, qp, u, dof_range_there)
             $(is_avg) && return 0.5 * (f_here + f_there)
             $(is_avg) || return f_there - f_here
         end
