@@ -46,12 +46,11 @@ function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
     return sdh
 end
 
-# Shortcut
-@inline getcelltype(grid::AbstractGrid, sdh::SubDofHandler) = getcelltype(grid, first(sdh.cellset))
+getcelltype(sdh::SubDofHandler) = getcelltype(get_grid(sdh.dh), first(sdh.cellset))
 
 function Base.show(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
     println(io, typeof(sdh))
-    println(io, "  Cell type: ", getcelltype(sdh.dh.grid, first(sdh.cellset)))
+    println(io, "  Cell type: ", getcelltype(sdh))
     _print_field_information(io, mime, sdh)
 end
 
@@ -893,7 +892,7 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         field_idx = _find_field(sdh, fieldname)
         field_idx === nothing && continue
         # Set up CellValues with the local node coords as quadrature points
-        CT = getcelltype(get_grid(dh), first(sdh.cellset))
+        CT = getcelltype(sdh)
         ip = getfieldinterpolation(sdh, field_idx)
         ip_geo = default_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
