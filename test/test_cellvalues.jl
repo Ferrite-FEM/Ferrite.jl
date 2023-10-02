@@ -310,6 +310,70 @@ end
     end
 end
 
+@testset "ConvenienceConstructor" begin
+    function compare_values(va, vb; qr_identity=false)
+        for q_point in 1:getnquadpoints(va)
+            for i in 1:getnbasefunctions(va)
+                @test shape_value(va, q_point, i) ≈ shape_value(vb, q_point, i)
+                @test shape_gradient(va, q_point, i) ≈ shape_gradient(vb, q_point, i)
+            end
+        end
+        qr_identity && @test va.qr === vb.qr 
+    end
+    function compare_values(va::FV, vb::FV, x; kwargs...) where {FV<:FaceValues}
+        reinit!(va, x, 1)
+        reinit!(vb, x, 1)
+        return compare_values(va, vb; kwargs...)
+    end
+    function compare_values(va::CV, vb::CV, x; kwargs...) where {CV<:CellValues}
+        reinit!(va, x)
+        reinit!(vb, x)
+        return compare_values(va, vb; kwargs...)
+    end
+
+    ip_v = Lagrange{RefQuadrilateral,1}()^2
+    ip_s = Lagrange{RefQuadrilateral,2}()
+    ip_geo = Lagrange{RefQuadrilateral,1}()
+    order = 2
+    face_order = 3
+    qr = QuadratureRule{RefQuadrilateral}(order)
+    fqr = FaceQuadratureRule{RefQuadrilateral}(face_order)
+    
+    grid = generate_grid(Quadrilateral, (2,2))
+    dh = DofHandler(grid)
+    add!(dh, :v, ip_v)
+    add!(dh, :s, ip_s)
+    close!(dh)
+    x = getcoordinates(grid, 1)
+
+    cv_v_ref = CellValues(qr, ip_v, ip_geo)
+    cv_s_ref = CellValues(qr, ip_s, ip_geo)
+    fv_v_ref = FaceValues(fqr, ip_v, ip_geo)
+    fv_s_ref = FaceValues(fqr, ip_s, ip_geo)
+    
+    compare_values(cv_v_ref, CellValues(dh, :v; qr=2), x; qr_identity=false)
+    compare_values(cv_v_ref, CellValues(dh, :v; qr), x; qr_identity=true)
+    compare_values(cv_s_ref, CellValues(dh, :s; qr=2), x; qr_identity=false)
+    compare_values(cv_s_ref, CellValues(dh, :s; qr), x; qr_identity=true)
+
+    compare_values(fv_v_ref, FaceValues(dh, :v; qr=3), x; qr_identity=false)
+    compare_values(fv_v_ref, FaceValues(dh, :v; qr=fqr), x; qr_identity=true)
+    compare_values(fv_s_ref, FaceValues(dh, :s; qr=3), x; qr_identity=false)
+    compare_values(fv_s_ref, FaceValues(dh, :s; qr=fqr), x; qr_identity=true)
+    
+    # Mixed case, check error path 
+    dh = DofHandler(grid)
+    sdh1 = SubDofHandler(dh, Set(1:1))
+    add!(sdh1, :u, ip_v)
+    sdh2 = SubDofHandler(dh, Set(2:getncells(grid)))
+    add!(sdh2, :u, ip_v)
+    close!(dh)
+    @test_throws ArgumentError CellValues(dh, :u; qr=2)
+    @test_throws ArgumentError FaceValues(dh, :u; qr=3)
+    # And small check from user-side construction via SubDofHandler. 
+    compare_values(CellValues(sdh1, :u, qr=2), cv_v_ref, x, qr_identity=false)
+end
+
 @testset "show" begin
     # Just smoke test
     cv_quad = CellValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}()^2)

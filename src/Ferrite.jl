@@ -117,6 +117,7 @@ include("Export/VTK.jl")
 include("PointEval/PointEvalHandler.jl")
 
 # Other
+include("convenience_constructors.jl")
 include("deprecations.jl")
 include("docs.jl")
 
