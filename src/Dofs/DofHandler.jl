@@ -46,7 +46,7 @@ function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
     return sdh
 end
 
-getcelltype(sdh::SubDofHandler) = getcelltype(get_grid(sdh.dh), first(sdh.cellset))
+@inline getcelltype(sdh::SubDofHandler) = getcelltype(get_grid(sdh.dh), first(sdh.cellset))
 
 function Base.show(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
     println(io, typeof(sdh))
