@@ -52,7 +52,7 @@ function Ferrite.compute_renumber_permutation(
         else
             count(couplings[sdhi][i, j] for i in 1:n, j in 1:n if i != j)
         end
-        buffer_length += entries_per_cell * length(sdh.cellset)
+        buffer_length += entries_per_cell * length(getcellset(sdh))
     end
     I = Vector{idx_t}(undef, buffer_length)
     J = Vector{idx_t}(undef, buffer_length)
@@ -60,7 +60,7 @@ function Ferrite.compute_renumber_permutation(
 
     for (sdhi, sdh) in pairs(dh.subdofhandlers)
         coupling === nothing || (coupling_fh = couplings[sdhi])
-        for cc in CellIterator(dh, sdh.cellset)
+        for cc in CellIterator(dh, getcellset(sdh))
             dofs = celldofs(cc)
             for (j, dofj) in pairs(dofs), (i, dofi) in pairs(dofs)
                 dofi == dofj && continue # Metis doesn't want the diagonal

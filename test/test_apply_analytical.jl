@@ -68,7 +68,7 @@
         dofs = Set{Int}()
         for sdh in dh.subdofhandlers
             if !isnothing(Ferrite._find_field(sdh, field_name))
-                _global_dof_range!(dofs, sdh, field_name, sdh.cellset)
+                _global_dof_range!(dofs, sdh, field_name, getcellset(sdh))
             end
         end
         return sort!(collect(Int, dofs))

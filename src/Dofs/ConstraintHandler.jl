@@ -827,7 +827,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         dbc.field_name in sdh.field_names || continue
         # Compute the intersection between dbc.set and the cellset of this
         # SubDofHandler and skip if the set is empty
-        filtered_set = filter_dbc_set(get_grid(ch.dh), sdh.cellset, dbc.faces)
+        filtered_set = filter_dbc_set(get_grid(ch.dh), getcellset(sdh), dbc.faces)
         isempty(filtered_set) && continue
         # Fetch information about the field on this SubDofHandler
         field_idx = find_field(sdh, dbc.field_name)
@@ -855,7 +855,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
         _add!(
             ch, filtered_dbc, filtered_dbc.faces, interpolation, n_comp,
-            field_offset(sdh, field_idx), bcvalues, sdh.cellset,
+            field_offset(sdh, field_idx), bcvalues, getcellset(sdh),
         )
         dbc_added = true
     end

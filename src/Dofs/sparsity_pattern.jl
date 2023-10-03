@@ -179,7 +179,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     # of entries eliminated by constraints.
     max_buffer_length = ndofs(dh) # diagonal elements
     for (sdh_idx, sdh) in pairs(dh.subdofhandlers)
-        set = sdh.cellset
+        set = getcellset(sdh)
         n = ndofs_per_cell(sdh)
         entries_per_cell = if coupling === nothing
             sym ? div(n * (n + 1), 2) : n^2
@@ -197,7 +197,7 @@ function _create_sparsity_pattern(dh::AbstractDofHandler, ch#=::Union{Constraint
     for (sdh_idx, sdh) in pairs(dh.subdofhandlers)
         coupling === nothing || (coupling_sdh = couplings[sdh_idx])
         # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
-        set = BitSet(sdh.cellset)
+        set = BitSet(getcellset(sdh))
         n = ndofs_per_cell(sdh)
         resize!(global_dofs, n)
         @inbounds for element_id in set

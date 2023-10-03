@@ -38,10 +38,10 @@ function apply_analytical!(
         ip_fun = getfieldinterpolation(sdh, field_idx)
         field_dim = getfielddim(sdh, field_idx)
         celldofinds = dof_range(sdh, fieldname)
-        set_intersection = if length(cellset) == length(sdh.cellset) == getncells(get_grid(dh))
+        set_intersection = if length(cellset) == length(getcellset(sdh)) == getncells(get_grid(dh))
             BitSet(1:getncells(get_grid(dh)))
         else
-            intersect(BitSet(sdh.cellset), BitSet(cellset))
+            intersect(BitSet(getcellset(sdh)), BitSet(cellset))
         end
         _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, set_intersection)
     end
