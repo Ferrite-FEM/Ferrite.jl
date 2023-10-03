@@ -406,10 +406,3 @@ function _check_same_celltype(grid::AbstractGrid, faceset::Set{FaceIndex})
         error("The cells in the faceset are not all of the same celltype.")
     end
 end
-
-#= Remaining tasks 
-1) Test on quadrilateral
-2) Generalize to 2nd order case 
-3) Generalize to 3d-face 
-4) Consider RaviartThomas elements for 0-3 as well. 
-=#
