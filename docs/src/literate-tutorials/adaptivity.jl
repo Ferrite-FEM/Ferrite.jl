@@ -1,6 +1,6 @@
 using Ferrite, FerriteGmsh, SparseArrays
 grid = togrid("l.msh");
-grid  = ForestBWG(grid,7)
+grid  = ForestBWG(grid,5)
 
 struct Elasticity
     G::Float64
@@ -74,7 +74,6 @@ function solve(grid,hnodes)
     add!(ch, Dirichlet(:u, getfaceset(grid, "top"), (x, t) -> Vec{2}((0.0,0.0)), [1,2]))
     add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 0.05, 2))
     for (hdof,mdof) in hnodes
-        @show vdict[1][hdof], vdict[1][mdof[1]], vdict[1][mdof[2]]
         lc = AffineConstraint(vdict[1][hdof],[vdict[1][m] => 0.5 for m in mdof],0.0)
         add!(ch,lc)
     end
@@ -86,11 +85,12 @@ function solve(grid,hnodes)
     assemble_global!(K, f, a, dh, cellvalues, material);
     apply!(K, f, ch)
     u = K \ f;
+    apply!(u,ch)
     return u,dh,ch,cellvalues
 end
 
 function compute_fluxes(u,dh)
-    ip = Lagrange{RefQuadrilateral, 1}()^2 
+    ip = Lagrange{RefQuadrilateral, 1}()^2
     qr = QuadratureRule{RefQuadrilateral}(1)
     cellvalues_sc = CellValues(qr, ip);
     qr = QuadratureRule{RefQuadrilateral}(2)
@@ -105,12 +105,12 @@ function compute_fluxes(u,dh)
         for q_point in 1:getnquadpoints(cellvalues)
             ε = function_symmetric_gradient(cellvalues, q_point, ue)
             σ, ∂σ∂ε = material_routine(material, ε)
-            push!(σ_gp_loc, σ == NaN ? 1e6 : σ)
+            push!(σ_gp_loc, σ)
         end
         for q_point in 1:getnquadpoints(cellvalues_sc)
             ε = function_symmetric_gradient(cellvalues, q_point, ue)
             σ, ∂σ∂ε = material_routine(material, ε)
-            push!(σ_gp_sc_loc, σ == NaN ? 1e6 : σ)
+            push!(σ_gp_sc_loc, σ)
         end
         push!(σ_gp,copy(σ_gp_loc))
         push!(σ_gp_sc,copy(σ_gp_sc_loc))
@@ -127,7 +127,7 @@ function solve_adaptive(initial_grid)
     finished = false
     i = 1
     grid = initial_grid
-    while !finished && i<=3
+    while !finished && i<=8
         transfered_grid, hnodes = Ferrite.creategrid(grid)
         u,dh,ch,cv = solve(transfered_grid,hnodes)
         σ_gp, σ_gp_sc = compute_fluxes(u,dh)
@@ -139,13 +139,13 @@ function solve_adaptive(initial_grid)
         end
         cells_to_refine = Int[]
         for (cellid,cell) in enumerate(CellIterator(projector.dh))
-            reinit!(cellvalues, cell)
+            reinit!(cellvalues_tensorial, cell)
             @views σe = σ_dof[celldofs(cell)]
             error = 0.0
             for q_point in 1:getnquadpoints(cellvalues_tensorial)
                 σ_dof_at_sc = function_value(cellvalues_tensorial, q_point, σe)
                 error += norm((σ_gp_sc[cellid][1] - σ_dof_at_sc)/σ_dof_at_sc)
-            end 
+            end
             if error > 1.0
                 push!(cells_to_refine,cellid)
             end
