@@ -189,75 +189,6 @@ where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 function_gradient(::InterfaceValues, ::Int, args...; kwargs...)
 
 """
-    function_symmetric_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool)
-
-TODO: Is this function useful?
-
-Compute the symmetric gradient of the function, see [`function_gradient`](@ref).
-Return a `SymmetricTensor`.
-
-For `InterfaceValues`, `here` determines which element to use for calculating function gradient.
-`true` uses the element A's nodal values for calculating the gradient, which is the default, while `false` uses element B's.
-
-The symmetric gradient of a scalar function is computed as
-``\\left[ \\mathbf{\\nabla}  \\mathbf{u}(\\mathbf{x_q}) \\right]^\\text{sym} =  \\sum\\limits_{i = 1}^n  \\frac{1}{2} \\left[ \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\otimes \\mathbf{u}_i + \\mathbf{u}_i  \\otimes  \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\right]``
-where ``\\mathbf{u}_i`` are the nodal values of the function.
-"""
-function_symmetric_gradient(::InterfaceValues, ::Int, args...; kwargs...)
-
-"""
-    function_divergence(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
-
-TODO: Is this function useful?
-
-Compute the divergence of the vector valued function in a quadrature point.
-
-`here` determines which element to use for calculating divergence of the function.
-`true` uses the element A's nodal values for calculating the divergence from gradient, which is the default, while `false` uses element B's.
-
-The divergence of a vector valued functions in the quadrature point ``\\mathbf{x}_q)`` is computed as
-``\\mathbf{\\nabla} \\cdot \\mathbf{u}(\\mathbf{x_q}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x_q}) \\cdot \\mathbf{u}_i``
-where ``\\mathbf{u}_i`` are the nodal values of the function.
-"""
-function_divergence(::InterfaceValues, ::Int, args...; kwargs...)
-
-"""
-    function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool = true)
-
-TODO: Is this function useful?
-
-Compute the curl of the vector valued function in a quadrature point.
-
-`here` determines which element to use for calculating curl of the function.
-`true` uses the element A's nodal values for calculating the curl from gradient, which is the default, while `false` uses element B's.
-
-The curl of a vector valued functions in the quadrature point ``\\mathbf{x}_q)`` is computed as
-``\\mathbf{\\nabla} \\times \\mathbf{u}(\\mathbf{x_q}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i \\times (\\mathbf{x_q}) \\cdot \\mathbf{u}_i``
-where ``\\mathbf{u}_i`` are the nodal values of the function.
-"""
-function function_curl(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
-    return function_curl(iv, q_point, u_here, eachindex(u_here), u_there, eachindex(u_there); here=here)
-end
-function function_curl(iv::InterfaceValues, q_point::Int,
-    u_here::AbstractVector, dof_range_here::AbstractUnitRange{Int},
-    u_there::AbstractVector, dof_range_there::AbstractUnitRange{Int};
-    here::Bool)
-    return curl_from_gradient(function_gradient(iv, q_point, u_here, dof_range_here,u_there, dof_range_there; here))
-end
-# Single u dispatch
-function function_curl(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool)
-    dof_range_here = 1:getnbasefunctions(iv.here)
-    dof_range_there = dof_range_here .+ getnbasefunctions(iv.there)
-    return function_curl(iv, q_point, u, dof_range_here, dof_range_there; here=here)
-end
-function function_curl(iv::InterfaceValues, q_point::Int,
-    u::AbstractVector,
-    dof_range_here::AbstractUnitRange{Int}, dof_range_there::AbstractUnitRange{Int};
-    here::Bool)
-    return curl_from_gradient(function_gradient(iv, q_point, u, dof_range_here, dof_range_there; here))
-end
-
-"""
     shape_value_average(iv::InterfaceValues, qp::Int, base_function::Int)
 
 Compute the average of the shape function value at the quadrature point on interface.
@@ -375,8 +306,6 @@ function function_gradient_jump end
 for (func,                          ) in (
     (:function_value,               ),
     (:function_gradient,            ),
-    (:function_divergence,          ),
-    (:function_symmetric_gradient,  ),
 )
     @eval begin
         function $(func)(
