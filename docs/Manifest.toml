@@ -573,8 +573,8 @@ uuid = "fa42c844-2597-5d31-933b-ebd51ab2693f"
 version = "0.3.1"
 
 [[deps.Ferrite]]
-deps = ["EnumX", "LinearAlgebra", "NearestNeighbors", "Preferences", "Reexport", "SparseArrays", "Tensors", "WriteVTK"]
-git-tree-sha1 = "a31b9d4dd58e00686e5da175dab11667af3108b6"
+deps = ["EnumX", "LinearAlgebra", "NearestNeighbors", "Preferences", "Reexport", "SparseArrays", "StaticArrays", "Tensors", "WriteVTK"]
+path = ".."
 uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
 version = "0.3.14"
 
@@ -2178,7 +2178,9 @@ version = "0.1.1"
 
 [[deps.Tensors]]
 deps = ["ForwardDiff", "LinearAlgebra", "PrecompileTools", "SIMD", "StaticArrays", "Statistics"]
-git-tree-sha1 = "bcbb366323add300742c9e4a5447e584640aeff2"
+git-tree-sha1 = "09650779b3c5124b8742986904d6e69f854be0bd"
+repo-rev = "kam/3rd_order"
+repo-url = "https://github.com/KnutAM/Tensors.jl.git"
 uuid = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 version = "1.15.0"
 
