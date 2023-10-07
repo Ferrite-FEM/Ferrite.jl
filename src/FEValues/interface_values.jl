@@ -50,14 +50,19 @@ struct InterfaceValues{FVA, FVB} <: AbstractValues
     here::FVA
     there::FVB
 end
-function InterfaceValues(quad_rule::FaceQuadratureRule, ip_here::Interpolation,
+function InterfaceValues(quad_rule_here::FaceQuadratureRule, ip_here::Interpolation,
         geo_ip_here::Interpolation = default_geometric_interpolation(ip_here);
+        quad_rule_there::FaceQuadratureRule = deepcopy(quad_rule_here),
         ip_there::Interpolation = ip_here, geo_ip_there::Interpolation = default_geometric_interpolation(ip_there))
-    here = FaceValues(quad_rule, ip_here, geo_ip_here)
-    # TODO: Replace deepcopy
-    there = FaceValues(deepcopy(quad_rule), ip_there, geo_ip_there)
+    quad_rule_here == quad_rule_there && getrefshape(geo_ip_here) != getrefshape(geo_ip_there) &&
+        throw(ArgumentError("Constructing InterfaceValues with a single FaceQuadratureRule isn't valid for mixed grids, please consider passing quad_rule_there"))
+    here = FaceValues(quad_rule_here, ip_here, geo_ip_here)
+    there = FaceValues(quad_rule_there, ip_there, geo_ip_there)
     return InterfaceValues{typeof(here), typeof(there)}(here, there)
 end
+
+InterfaceValues(facevalues_here::FVA, facevalues_there::FVB) where {FVA <: FaceValues, FVB <: FaceValues} =
+    InterfaceValues{FVA,FVB}(facevalues_here, facevalues_there)
 
 function getnbasefunctions(iv::InterfaceValues)
     return getnbasefunctions(iv.here) + getnbasefunctions(iv.there)
