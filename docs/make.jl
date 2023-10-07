@@ -45,9 +45,10 @@ bibtex_plugin = CitationBibliography(
         "Home" => "index.md",
         # hide("Changelog" => "changelog.md"),
         "Tutorials" => [
-          #  "Tutorials overview" => "tutorials/index.md",
-            "tutorials/maxwell_eigenvalue.md",
-          #=  "tutorials/heat_equation.md",
+            "Tutorials overview" => "tutorials/index.md",
+            "tutorials/heat_equation.md",
+            "tutorials/heat_equation_rt.md",
+            "tutorials/heat_equation_triangle.md",
             "tutorials/linear_elasticity.md",
             "tutorials/incompressible_elasticity.md",
             "tutorials/hyperelasticity.md",
@@ -56,9 +57,9 @@ bibtex_plugin = CitationBibliography(
             "tutorials/computational_homogenization.md",
             "tutorials/stokes-flow.md",
             "tutorials/ns_vs_diffeq.md",
-            "tutorials/linear_shell.md",=#
+            "tutorials/linear_shell.md",
         ],
-#=        "Topic guides" => [
+        "Topic guides" => [
             "Topic guide overview" => "topics/index.md",
             "topics/fe_intro.md",
             "topics/degrees_of_freedom.md",
@@ -67,7 +68,7 @@ bibtex_plugin = CitationBibliography(
             "topics/constraints.md",
             "topics/grid.md",
             "topics/export.md"
-        ],=#
+        ],
         "Reference" => [
             "Reference overview" => "reference/index.md",
             "reference/quadrature.md",
@@ -80,11 +81,11 @@ bibtex_plugin = CitationBibliography(
             "reference/export.md",
             "reference/utils.md",
         ],
-    #=    "How-to guides" => [
+        "How-to guides" => [
             "How-to guide overview" => "howto/index.md",
             "howto/postprocessing.md",
             "howto/threaded_assembly.md",
-        ],=#
+        ],
         "gallery/index.md",
         # "Code gallery" => [
         #     "Code gallery overview" => "gallery/index.md",

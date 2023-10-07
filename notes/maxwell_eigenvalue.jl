@@ -23,6 +23,7 @@ using Ferrite
 import Ferrite: Nedelec, RaviartThomas
 import IterativeSolvers: lobpcg
 using LinearAlgebra
+import CairoMakie as M
 
 function assemble_cell!(Ae, Be, cv)
     n = getnbasefunctions(cv)
@@ -40,6 +41,49 @@ function assemble_cell!(Ae, Be, cv)
         end
     end
     return Ae, Be
+end
+
+function plot_shapes(dh, ip, a)
+    cv = CellValues(QuadratureRule{RefTriangle}(1), ip, Lagrange{RefTriangle,1}())
+    grid = dh.grid
+    n_cells = getncells(grid)
+    coords = (zeros(n_cells), zeros(n_cells))
+    vectors = (zeros(n_cells), zeros(n_cells))
+
+    for cell_nr in 1:getncells(grid)
+        x = getcoordinates(grid, cell_nr)
+        reinit!(cv, x, getcells(grid, cell_nr))
+        ue = a[celldofs(dh, cell_nr)]
+        for q_point in 1:getnquadpoints(cv)
+            #i = getnquadpoints(cv)*(cell_nr-1) + q_point
+            i = cell_nr
+            qp_x = spatial_coordinate(cv, q_point, x)
+            v = function_value(cv, q_point, ue)
+            sfac = norm(v) ≈ 0 ? NaN : 1.0 # Skip plotting zero-vector points
+            coords[1][i] = sfac*qp_x[1]
+            coords[2][i] = sfac*qp_x[2]
+            vectors[1][i] = v[1]
+            vectors[2][i] = v[2]
+        end
+    end
+    vtk_grid("tmp", dh.grid) do vtk
+        vtk_cell_data(vtk, vectors[1], "u1")
+        vtk_cell_data(vtk, vectors[2], "u2")
+    end
+    nothing, nothing
+    #=
+    fig = M.Figure()
+    for i in 1:2
+        ax = M.Axis(fig[i,1]; aspect=M.DataAspect())
+        #=for cellnr in 1:getncells(grid)
+            x = getcoordinates(grid, cellnr)
+            push!(x, x[1])
+            M.lines!(ax, first.(x), last.(x), color=:black)
+        end=#
+        M.scatter!(ax, coords..., vectors[i]; lengthscale=0.1)
+    end
+    return fig
+    =#
 end
 
 function doassemble(dh::DofHandler, cv::CellValues)
@@ -87,7 +131,7 @@ function get_matrices(ip::Interpolation; CT=Quadrilateral, nel=40, usebc=true)
         apply!(A, ch)
         apply!(B, ch)
     end
-    return A, B
+    return A, B, dh
 end
 
 function solve(ip; num_values, kwargs...)
@@ -97,7 +141,21 @@ function solve(ip; num_values, kwargs...)
     return r.λ
 end
 
+function solve_single(ip, λ=2; kwargs...)
+    A, B, dh = get_matrices(ip; kwargs...)
+    a = (A-λ*B)\zeros(size(A,1))
+    return dh, a
+end
+
 ip = Nedelec{2,RefTriangle,1}()
 #ip = Lagrange{RefTriangle,1}()^2
+dh, a = solve_single(ip, CT=Triangle)
+cv = CellValues(QuadratureRule{RefTriangle}(2), ip, Lagrange{RefTriangle,1}())
+fig = plot_shapes(dh, ip, a)
+#λ = solve(ip; CT=Triangle, num_values=10)
 
-λ = solve(ip; CT=Triangle, num_values=10)
+m, n = (1,1)
+λ=m^2+n^2
+u(x,y)=Vec((sin(m*x),sin(n*y)))
+a = zeros(ndofs)
+apply_analytical!()
