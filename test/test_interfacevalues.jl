@@ -1,6 +1,7 @@
 @testset "InterfaceValues" begin
     function test_interfacevalues(grid, ip_a, qr_a, ip_b = ip_a)
         iv = InterfaceValues(qr_a, ip_a, ip_a; ip_there = ip_b, geo_ip_there = ip_b)
+        @test iv == InterfaceValues(iv.here, iv.there)
         ndim = Ferrite.getdim(ip_a)
         n_basefuncs = getnbasefunctions(ip_a) + getnbasefunctions(ip_b)
 
