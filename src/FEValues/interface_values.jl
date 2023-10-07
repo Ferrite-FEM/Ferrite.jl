@@ -1,5 +1,6 @@
 # Defines InterfaceValues and common methods
 """
+    InterfaceValues(facevalues_here, [facevalues_there])
     InterfaceValues(quad_rule::FaceQuadratureRule, ip_here::Interpolation, [geo_ip_here::Interpolation]; kwargs...)
 
 An `InterfaceValues` object facilitates the process of evaluating values, averages, jumps
@@ -61,7 +62,7 @@ function InterfaceValues(quad_rule_here::FaceQuadratureRule, ip_here::Interpolat
     return InterfaceValues{typeof(here), typeof(there)}(here, there)
 end
 
-InterfaceValues(facevalues_here::FVA, facevalues_there::FVB) where {FVA <: FaceValues, FVB <: FaceValues} =
+InterfaceValues(facevalues_here::FVA, facevalues_there::FVB = deepcopy(facevalues_here)) where {FVA <: FaceValues, FVB <: FaceValues} =
     InterfaceValues{FVA,FVB}(facevalues_here, facevalues_there)
 
 function getnbasefunctions(iv::InterfaceValues)
