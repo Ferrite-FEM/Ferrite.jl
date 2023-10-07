@@ -45,7 +45,7 @@ using Ferrite, SparseArrays
 # We start by generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Triangle, (100, 100));
+grid = generate_grid(Triangle, (20, 20));
 
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
@@ -218,6 +218,34 @@ vtk_grid("heat_equation", dh) do vtk
 end
 
 @show norm(u)/length(u)
+
+function calculate_flux_lag(dh, dΩ, ip, a)
+    qr = FaceQuadratureRule{RefTriangle}(2)
+    fv = FaceValues(qr, ip, Lagrange{RefTriangle,1}())
+    grid = dh.grid
+    dofrange = dof_range(dh, :u)
+    flux = 0.0
+    dofs = celldofs(dh, 1)
+    ae = zeros(length(dofs))
+    x = getcoordinates(grid, 1)
+    for (cellnr, facenr) in dΩ
+        getcoordinates!(x, grid, cellnr)
+        cell = getcells(grid, cellnr)
+        celldofs!(dofs, dh, cellnr)
+        map!(i->a[i], ae, dofs)
+        reinit!(fv, x, facenr, cell)
+        for q_point in 1:getnquadpoints(fv)
+            dΓ = getdetJdV(fv, q_point)
+            n = getnormal(fv, q_point)
+            q = function_gradient(fv, q_point, ae, dofrange)
+            flux -= (q ⋅ n)*dΓ
+        end
+    end
+    return flux
+end
+
+flux = calculate_flux_lag(dh, ∂Ω, ip, u)
+@show flux
 
 #md # ## [Plain program](@id heat_equation-plain-program)
 #md #

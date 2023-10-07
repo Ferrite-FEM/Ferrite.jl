@@ -58,7 +58,7 @@ using Ferrite, SparseArrays
 # We start by generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Triangle, (100, 100));
+grid = generate_grid(Triangle, (20, 20));
 
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
@@ -154,7 +154,6 @@ function assemble_element!(Ke::Matrix, fe::Vector, cv::NamedTuple, dr::NamedTupl
     cvq = cv[:q]
     dru = dr[:u]
     drq = dr[:q]
-    n_basefuncs = getnbasefunctions(cvu)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(cvu)
         ## Get the quadrature weight
@@ -252,12 +251,71 @@ u = K \ f;
 # To visualize the result we export the grid and our field `u`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
 u_nodes = evaluate_at_grid_nodes(dh, u, :u)
+∂Ω_cells = zeros(Int, getncells(grid))
+for (cellnr, facenr) in ∂Ω
+    ∂Ω_cells[cellnr] = 1
+end
 vtk_grid("heat_equation_rt", dh) do vtk
     vtk_point_data(vtk, u_nodes, "u")
+    vtk_cell_data(vtk, ∂Ω_cells, "dO")
 end
 
 @show norm(u_nodes)/length(u_nodes)
 
+# ## Postprocess the total flux
+function calculate_flux(dh, dΩ, ip, a)
+    qr = FaceQuadratureRule{RefTriangle}(4)
+    fv = FaceValues(qr, ip, Lagrange{RefTriangle,1}())
+    grid = dh.grid
+    dofrange = dof_range(dh, :q)
+    flux = 0.0
+    dofs = celldofs(dh, 1)
+    ae = zeros(length(dofs))
+    x = getcoordinates(grid, 1)
+    for (cellnr, facenr) in dΩ
+        getcoordinates!(x, grid, cellnr)
+        cell = getcells(grid, cellnr)
+        celldofs!(dofs, dh, cellnr)
+        map!(i->a[i], ae, dofs)
+        reinit!(fv, x, facenr, cell)
+        for q_point in 1:getnquadpoints(fv)
+            dΓ = getdetJdV(fv, q_point)
+            n = getnormal(fv, q_point)
+            q = function_value(fv, q_point, ae, dofrange)
+            flux += (q ⋅ n)*dΓ
+        end
+    end
+    return flux
+end
+
+function calculate_flux_lag(dh, dΩ, ip, a)
+    qr = FaceQuadratureRule{RefTriangle}(4)
+    fv = FaceValues(qr, ip, Lagrange{RefTriangle,1}())
+    grid = dh.grid
+    dofrange = dof_range(dh, :u)
+    flux = 0.0
+    dofs = celldofs(dh, 1)
+    ae = zeros(length(dofs))
+    x = getcoordinates(grid, 1)
+    for (cellnr, facenr) in dΩ
+        getcoordinates!(x, grid, cellnr)
+        cell = getcells(grid, cellnr)
+        celldofs!(dofs, dh, cellnr)
+        map!(i->a[i], ae, dofs)
+        reinit!(fv, x, facenr, cell)
+        for q_point in 1:getnquadpoints(fv)
+            dΓ = getdetJdV(fv, q_point)
+            n = getnormal(fv, q_point)
+            q = function_gradient(fv, q_point, ae, dofrange)
+            flux -= (q ⋅ n)*dΓ
+        end
+    end
+    return flux
+end
+
+flux = calculate_flux(dh, ∂Ω, ipq, u)
+flux_lag = calculate_flux_lag(dh, ∂Ω, ipu, u)
+@show flux, flux_lag
 #md # ## [Plain program](@id heat_equation-plain-program)
 #md #
 #md # Here follows a version of the program without any comments.
