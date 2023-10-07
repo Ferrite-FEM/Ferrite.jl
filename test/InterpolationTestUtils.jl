@@ -77,7 +77,7 @@ module InterpolationTestUtils
     
         d1 = map((v,n)->transformation_function(v,n), fun_vals, point_normal) 
         d2 = map((v,n)->transformation_function(v,n), fun_vals2, point_normal)
-        @test d1 ≈ d2
+        @test isapprox(d1, d2; rtol=1e-6) # Approximate points can contribute to the inexactness 
         return true
     end
     

@@ -6,18 +6,18 @@ function default_geometric_interpolation(::Interpolation{shape}) where {dim, sha
     return VectorizedInterpolation{dim}(Lagrange{shape, 1}())
 end
 
-struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP, d2Mdξ2_t} <: AbstractCellValues
-    geo_values::GeometryValues{dMdξ_t, GIP, T, d2Mdξ2_t}
-    detJdV::Vector{T}
-    fun_values::FunctionValues{IP, N_t, dNdx_t, dNdξ_t}
-    qr::QR
+struct CellValues{FV, GV, QR, detT<:AbstractVector} <: AbstractCellValues
+    fun_values::FV # FunctionValues
+    geo_values::GV # GeometryValues
+    qr::QR         # QuadratureRule
+    detJdV::detT   # AbstractVector{<:Number}
 end
 function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation) where T 
     mapping_type = get_mapping_type(ip_fun)
     geo_values = GeometryValues(T, ip_geo.ip, qr, RequiresHessian(requires_hessian(mapping_type)))
     fun_values = FunctionValues(T, ip_fun, qr, ip_geo)
     detJdV = fill(T(NaN), length(getweights(qr)))
-    return CellValues(geo_values, detJdV, fun_values, qr)
+    return CellValues(fun_values, geo_values, qr, detJdV)
 end
 
 CellValues(qr::QuadratureRule, ip::Interpolation, args...) = CellValues(Float64, qr, ip, args...)
@@ -35,6 +35,11 @@ getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 
 # Accessors for function values 
 getnbasefunctions(cv::CellValues) = getnbasefunctions(cv.fun_values)
+get_function_interpolation(cv::CellValues) = get_function_interpolation(cv.fun_values)
+get_geometric_interpolation(cv::CellValues) = get_geometric_interpolation(cv.geo_values)
+shape_value_type(cv::CellValues) = shape_value_type(cv.fun_values)
+shape_gradient_type(cv::CellValues) = shape_gradient_type(cv.fun_values)
+
 for op = (:shape_value, :shape_gradient, :shape_symmetric_gradient)
     eval(quote
         @propagate_inbounds $op(cv::CellValues, i::Int, q_point::Int) = $op(cv.fun_values, i, q_point)

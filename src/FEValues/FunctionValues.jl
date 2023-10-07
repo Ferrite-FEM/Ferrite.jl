@@ -64,6 +64,11 @@ getnbasefunctions(funvals::FunctionValues) = size(funvals.N_x, 1)
 @propagate_inbounds shape_gradient(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.dNdx[base_func, q_point]
 @propagate_inbounds shape_symmetric_gradient(funvals::FunctionValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(funvals, q_point, base_func))
 
+get_function_interpolation(funvals::FunctionValues) = funvals.ip
+
+shape_value_type(funvals::FunctionValues) = eltype(funvals.N_x)
+shape_gradient_type(funvals::FunctionValues) = eltype(funvals.dNdx)
+
 # Mapping types 
 struct IdentityMapping end 
 struct CovariantPiolaMapping end 

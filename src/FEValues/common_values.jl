@@ -67,9 +67,16 @@ finite element cell or face as
 Return the value of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
+function shape_value end
 #@propagate_inbounds shape_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.N[base_func, q_point, bv.current_face[]]
 
-#@propagate_inbounds geometric_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_face[]]
+"""
+    geometric_value(fe_v::AbstractValues, q_point, base_function::Int)
+
+Return the value of the geometric shape function `base_function` evaluated in 
+quadrature point `q_point`.
+"""
+function geometric_value end
 
 """
     shape_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -77,7 +84,7 @@ quadrature point `q_point`.
 Return the gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-#@propagate_inbounds shape_gradient(bv::FaceValues, q_point::Int, base_func::Int) = bv.dNdx[base_func, q_point, bv.current_face[]]
+function shape_gradient end
 
 """
     shape_symmetric_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -132,7 +139,13 @@ end
 
 # TODO: Implement fallback or require this to be defined?
 #       Alt: shape_value_type(cv) = typeof(shape_value(cv, qp=1, i=1))
-shape_value_type(::Union{CellValues{<:Any, N_t}, FaceValues{<:Any, N_t}}) where N_t = N_t
+"""
+    shape_value_type(fe_v::AbstractValues)
+
+Return the type of `shape_value(fe_v, q_point, base_function)`
+"""
+function shape_value_type end
+
 function_value_init(cv::AbstractValues, ::AbstractVector{T}) where {T} = zero(shape_value_type(cv)) * zero(T)
 
 """
@@ -177,7 +190,13 @@ end
 
 # TODO: Implement fallback or require this to be defined?
 #       Alt: shape_gradient_type(cv) = typeof(shape_gradient(cv, qp=1, i=1))
-shape_gradient_type(::Union{CellValues{<:Any, <:Any, dNdx_t}, FaceValues{<:Any, <:Any, dNdx_t}}) where dNdx_t = dNdx_t
+"""
+    shape_gradient_type(fe_v::AbstractValues)
+
+Return the type of `shape_gradient(fe_v, q_point, base_function)`
+"""
+function shape_gradient_type end
+
 function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {T}
     return zero(shape_gradient_type(cv)) * zero(T)
 end

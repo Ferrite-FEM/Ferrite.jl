@@ -1,9 +1,9 @@
-struct FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP, d2Mdξ2_t} <: AbstractFaceValues
-    geo_values::Vector{GeometryValues{dMdξ_t, GIP, T, d2Mdξ2_t}}
-    detJdV::Vector{T}
-    normals::Vector{Normal_t}
-    fun_values::Vector{FunctionValues{IP, N_t, dNdx_t, dNdξ_t}}
-    qr::QR # FaceQuadratureRule
+struct FaceValues{FV, GV, QR, detT, nT, V_FV<:AbstractVector{FV}, V_GV<:AbstractVector{GV}} <: AbstractFaceValues
+    fun_values::V_FV # AbstractVector{FunctionValues}
+    geo_values::V_GV # AbstractVector{GeometryValues}
+    qr::QR           # FaceQuadratureRule
+    detJdV::detT     # AbstractVector{<:Number}
+    normals::nT      # AbstractVector{<:Vec}
     current_face::ScalarWrapper{Int}
 end
 
@@ -13,18 +13,22 @@ function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, i
     max_nquadpoints = maximum(qr->length(getweights(qr)), fqr.face_rules)
     detJdV = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim,T})*T(NaN), max_nquadpoints)
-    return FaceValues(geo_values, detJdV, normals, fun_values, fqr, ScalarWrapper(1))
+    return FaceValues(fun_values, geo_values, fqr, detJdV, normals, ScalarWrapper(1))
 end
 
 FaceValues(qr::FaceQuadratureRule, ip::Interpolation, args...) = FaceValues(Float64, qr, ip, args...)
 function FaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation) where T
     return FaceValues(T, qr, ip, VectorizedInterpolation(ip_geo))
 end
-
 getngeobasefunctions(fv::FaceValues) = getngeobasefunctions(get_geo_values(fv))
 getnbasefunctions(fv::FaceValues) = getnbasefunctions(get_fun_values(fv))
 getnquadpoints(fv::FaceValues) = getnquadpoints(fv.qr, getcurrentface(fv))
-getdetJdV(fv::FaceValues, q_point) = fv.detJdV[q_point] 
+getdetJdV(fv::FaceValues, q_point) = fv.detJdV[q_point]
+
+shape_value_type(fv::FaceValues) = shape_value_type(get_fun_values(fv))
+shape_gradient_type(fv::FaceValues) = shape_gradient_type(get_fun_values(fv))
+get_function_interpolation(fv::FaceValues) = get_function_interpolation(get_fun_values(fv))
+get_geometric_interpolation(fv::FaceValues) = get_geometric_interpolation(get_geo_values(fv))
 
 get_geo_values(fv::FaceValues) = @inbounds fv.geo_values[getcurrentface(fv)]
 for op = (:getngeobasefunctions, :geometric_value)

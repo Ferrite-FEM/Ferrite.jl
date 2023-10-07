@@ -51,6 +51,7 @@ RequiresHessian(::GeometryValues) = RequiresHessian(true)
 
 getngeobasefunctions(geovals::GeometryValues) = size(geovals.M, 1)
 @propagate_inbounds geometric_value(geovals::GeometryValues, q_point::Int, base_func::Int) = geovals.M[base_func, q_point]
+get_geometric_interpolation(geovals::GeometryValues) = geovals.ip
 
 @propagate_inbounds calculate_mapping(geovals::GeometryValues, args...) = calculate_mapping(RequiresHessian(geovals), geovals, args...)
 

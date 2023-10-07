@@ -66,17 +66,17 @@ function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.Abstract
 end
 
 # Minimal Petrov-Galerkin type local assembly loop. We assume that both function spaces share the same integration rule. Test is applied from the left.
-function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, cellvalues_shape::CellValues{<: Ferrite.InterpolationByDim{dim}}, f_shape, cellvalues_test::CellValues{<: Ferrite.InterpolationByDim{dim}}, f_test, op) where {dim}
+function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.AbstractGrid, cellvalues_shape::CellValues, f_shape, cellvalues_test::CellValues, f_test, op)
     n_basefuncs_shape = getnbasefunctions(cellvalues_shape)
     n_basefuncs_test = getnbasefunctions(cellvalues_test)
     Ke = zeros(n_basefuncs_test, n_basefuncs_shape)
 
     #implicit assumption: Same geometry!
-    X_shape = zeros(Vec{dim,Float64}, Ferrite.getngeobasefunctions(cellvalues_shape))
+    X_shape = zeros(get_coordinate_type(grid), Ferrite.getngeobasefunctions(cellvalues_shape))
     getcoordinates!(X_shape, grid, 1)
     reinit!(cellvalues_shape, X_shape)
 
-    X_test = zeros(Vec{dim,Float64}, Ferrite.getngeobasefunctions(cellvalues_test))
+    X_test = zeros(get_coordinate_type(grid), Ferrite.getngeobasefunctions(cellvalues_test))
     getcoordinates!(X_test, grid, 1)
     reinit!(cellvalues_test, X_test)
 
