@@ -13,8 +13,7 @@ struct CellValues{FV, GV, QR, detT<:AbstractVector} <: AbstractCellValues
     detJdV::detT   # AbstractVector{<:Number}
 end
 function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation) where T 
-    mapping_type = get_mapping_type(ip_fun)
-    geo_values = GeometryValues(T, ip_geo.ip, qr, RequiresHessian(requires_hessian(mapping_type)))
+    geo_values = GeometryValues(T, ip_geo.ip, qr, RequiresHessian(ip_fun, ip_geo))
     fun_values = FunctionValues(T, ip_fun, qr, ip_geo)
     detJdV = fill(T(NaN), length(getweights(qr)))
     return CellValues(fun_values, geo_values, qr, detJdV)

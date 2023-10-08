@@ -5,8 +5,10 @@ end
 @inline getjacobian(mv::MappingValues) = mv.J 
 @inline gethessian(mv::MappingValues{<:Any,<:AbstractTensor}) = mv.H
 
-@inline gethessian(::MappingValues{JT,Nothing}) where JT = _make_hessian(JT)
-@inline _make_hessian(::Type{Tensor{2,dim,T}}) where {dim,T} = zero(Tensor{3,dim,T})
+# This will be needed for optimizing away the hessian calculation/updates
+# for cases when this is known to be zero (due to the geometric interpolation)
+#@inline gethessian(::MappingValues{JT,Nothing}) where JT = _make_hessian(JT)
+#@inline _make_hessian(::Type{Tensor{2,dim,T}}) where {dim,T} = zero(Tensor{3,dim,T})
 
 struct RequiresHessian{B} end
 RequiresHessian(B::Bool) = RequiresHessian{B}()
@@ -22,6 +24,7 @@ struct GeometryValues{IP, M_t, dMdξ_t, d2Mdξ2_t}
     M::M_t             # ::AbstractVector{<:Number}     Values of geometric shape functions
     dMdξ::dMdξ_t       # ::AbstractVector{<:Vec}        Gradients of geometric shape functions in ref-domain
     d2Mdξ2::d2Mdξ2_t   # ::AbstractVector{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
+                       # ::Nothing                      When hessians are not required
 end
 function GeometryValues(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule, ::RequiresHessian{RH}) where {T,RH}
     n_shape = getnbasefunctions(ip)
