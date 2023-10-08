@@ -93,7 +93,7 @@ end
 
 Update the [`InterfaceValues`](@ref) for the interface between `cell_here` (with cell
 coordinates `coords_here`) and `cell_there` (with cell coordinates `coords_there`).
-`face_here` and `face_there` are the (local) face numbers for the respecive cell.
+`face_here` and `face_there` are the (local) face numbers for the respective cell.
 """
 function reinit!(
         iv::InterfaceValues,
@@ -140,21 +140,19 @@ end
 
 """
     function_value(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
-    function_value(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, range_here, u_there::AbstractVector, range_there; here::Bool)
-
+    function_value(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, dof_range_here, u_there::AbstractVector, dof_range_there; here::Bool)
+    function_value(iv::InterfaceValues, q_point::Int, u; here::Bool)
+    function_value(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there; here::Bool)
 Compute the value of the function in quadrature point `q_point` on the "here" (`here=true`)
 or "there" (`here=false`) side of the interface. `u_here` and `u_there` are the values of
 the degrees of freedom for the respeciv element.
 
-
-TODO: Complete the docs here.
-is a vector with values
-for the degrees of freedom. For a scalar valued function, `u` contains scalars.
-For a vector valued function, `u` can be a vector of scalars (for use of `VectorValues`)
-or `u` can be a vector of `Vec`s (for use with ScalarValues).
+`u` is a vector of scalar values for the degrees of freedom.
+This function can be used with a single `u` vector containing the dofs of both elements of the interface or
+two vectors (`u_here` and `u_there`) which contain the dofs of each cell of the interface respectively.
 
 `here` determines which element to use for calculating function value.
-`true` uses the element A's nodal values, which is the default, while `false` uses element B's.
+`true` uses the value on the first element's side of the interface, while `false` uses the value on the second element's side.
 
 The value of a scalar valued function is computed as ``u(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) u_i``
 where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function the value is calculated as
@@ -166,19 +164,17 @@ function_value(::InterfaceValues, ::Int, args...; kwargs...)
 
 """
     function_gradient(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
-    function_gradient(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, range_here, u_there::AbstractVector, range_there; here::Bool)
+    function_gradient(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, dof_range_here, u_there::AbstractVector, dof_range_there; here::Bool)
+    function_gradient(iv::InterfaceValues, q_point::Int, u; here::Bool)
+    function_gradient(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there; here::Bool)
 
+Compute the gradient of the function in a quadrature point. `u` is a vector of scalar values for the degrees of freedom.
+This function can be used with a single `u` vector containing the dofs of both elements of the interface or
+two vectors (`u_here` and `u_there`) which contain the dofs of each cell of the interface respectively.
 
-TODO: Update docs below.
-
-Compute the gradient of the function in a quadrature point. `u` is a vector with values
-for the degrees of freedom. For a scalar valued function, `u` contains scalars.
-For a vector valued function, `u` can be a vector of scalars (for use of `VectorValues`)
-or `u` can be a vector of `Vec`s (for use with ScalarValues).
-
-`here` determines which element to use for calculating function gradient.
-`true` uses the element A's nodal values for calculating the gradient, which is the default, while `false` uses element B's.
-
+`here` determines which element to use for calculating function value.
+`true` uses the value on the first element's side of the interface, while `false` uses the value on the second element's side.
+    
 The gradient of a scalar function or a vector valued function with use of `VectorValues` is computed as
 ``\\mathbf{\\nabla} u(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x}) u_i`` or
 ``\\mathbf{\\nabla} u(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} \\mathbf{N}_i (\\mathbf{x}) u_i`` respectively,
@@ -201,11 +197,10 @@ function shape_value_average end
 
 Compute the jump of the shape function value at the quadrature point over the interface.
 
-`normal_dotted::Bool` determines whether to use the definition ``\\llbracket v \\rrbracket=v^- -v^+`` if it's `false`, or
- the definition  ``\\llbracket v \\rrbracket=v^- ⋅ \\vec{n}^- + v^+ ⋅ \\vec{n}^+`` if it's `true`, which is the default.
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} -\\vec{v}^\\text{here}``. to obtain the form
+``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
+multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 
-!!! note
-    If `normal_dotted == true` then the jump of scalar shape values is a vector.
 """
 function shape_value_jump end
 
@@ -221,8 +216,9 @@ function shape_gradient_average end
 
 Compute the jump of the shape function gradient at the quadrature point over the interface.
 
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+``. to obtain the form
-``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- ⋅ \\vec{n}^- + \\vec{v}^+ ⋅ \\vec{n}^+``one can simple multiply by the normal of face A (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} -\\vec{v}^\\text{here}``. to obtain the form
+``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
+multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function shape_gradient_jump end
 
@@ -268,26 +264,33 @@ end
 
 """
     function_value_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
-    function_value_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, range_here, u_there::AbstractVector, range_there)
-
+    function_value_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, dof_range_here, u_there::AbstractVector, dof_range_there)
+    function_value_average(iv::InterfaceValues, q_point::Int, u)
+    function_value_average(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
+    
 Compute the average of the function value at the quadrature point on interface.
 """
 function function_value_average end
 
 """
     function_value_jump(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
-    function_value_jump(iv::InterfaceValues, qp::Int, u_here::AbstractVector, range_here, u_there::AbstractVector, range_there)
+    function_value_jump(iv::InterfaceValues, qp::Int, u_here::AbstractVector, dof_range_here, u_there::AbstractVector, dof_range_there)
+    function_value_jump(iv::InterfaceValues, q_point::Int, u)
+    function_value_jump(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
 Compute the jump of the function value at the quadrature point over the interface.
 
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+``. to obtain the form
-``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- ⋅ \\vec{n}^- + \\vec{v}^+ ⋅ \\vec{n}^+``one can simple multiply by the normal of face A (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} -\\vec{v}^\\text{here}``. to obtain the form
+``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
+multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function function_value_jump end
 
 """
     function_gradient_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
-    function_gradient_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, range_here, u_there::AbstractVector, range_there)
+    function_gradient_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, dof_range_here, u_there::AbstractVector, dof_range_there)
+    function_gradient_average(iv::InterfaceValues, q_point::Int, u)
+    function_gradient_average(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
 Compute the average of the function gradient at the quadrature point on the interface.
 """
@@ -295,12 +298,15 @@ function function_gradient_average end
 
 """
     function_gradient_jump(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
-    function_gradient_jump(iv::InterfaceValues, qp::Int, u_here::AbstractVector, range_here, u_there::AbstractVector, range_there)
+    function_gradient_jump(iv::InterfaceValues, qp::Int, u_here::AbstractVector, dof_range_here, u_there::AbstractVector, dof_range_there)
+    function_gradient_jump(iv::InterfaceValues, q_point::Int, u)
+    function_gradient_jump(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
 Compute the jump of the function gradient at the quadrature point over the interface.
 
-This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- -\\vec{v}^+``. to obtain the form
-``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^- ⋅ \\vec{n}^- + \\vec{v}^+ ⋅ \\vec{n}^+``one can simple multiply by the normal of face A (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
+This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} -\\vec{v}^\\text{here}``. to obtain the form
+``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\text{there} ⋅ \\vec{n}^\\text{there} + \\vec{v}^\\text{here} ⋅ \\vec{n}^\\text{here}``
+multiply by the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function function_gradient_jump end
 

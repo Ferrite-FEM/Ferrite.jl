@@ -122,7 +122,7 @@ end
 curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
 
 """
-    function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector)
+    function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
 Compute the value of the function in a quadrature point. `u` is a vector with values
 for the degrees of freedom. For a scalar valued function, `u` contains scalars.
@@ -152,7 +152,7 @@ shape_value_type(::Union{CellValues{<:Any, N_t}, FaceValues{<:Any, N_t}}) where 
 function_value_init(cv::AbstractValues, ::AbstractVector{T}) where {T} = zero(shape_value_type(cv)) * zero(T)
 
 """
-    function_gradient(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector)
+    function_gradient(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector, [dof_range])
 
 Compute the gradient of the function in a quadrature point. `u` is a vector with values
 for the degrees of freedom. For a scalar valued function, `u` contains scalars.
@@ -203,7 +203,7 @@ function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {
 end
 
 """
-    function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector)
+    function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
 Compute the symmetric gradient of the function, see [`function_gradient`](@ref).
 Return a `SymmetricTensor`.
@@ -218,7 +218,7 @@ function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::Abst
 end
 
 """
-    function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVector)
+    function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
 Compute the divergence of the vector valued function in a quadrature point.
 
@@ -243,7 +243,7 @@ function function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVect
 end
 
 """
-    function_curl(fe_v::AbstractValues, q_point::Int, u::AbstractVector)
+    function_curl(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
 Compute the curl of the vector valued function in a quadrature point.
 
