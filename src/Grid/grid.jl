@@ -39,7 +39,7 @@ get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 # AbstractCell interface #
 ##########################
 
-abstract type AbstractCell{refshape <: AbstractRefShape} end
+# abstract type AbstractCell{refshape <: AbstractRefShape} end
 
 getrefshape(::AbstractCell{refshape}) where refshape = refshape
 
