@@ -82,7 +82,6 @@ end
 @propagate_inbounds calculate_mapping(geovals::GeometryValues, args...) = calculate_mapping(RequiresHessian(geovals), geovals, args...)
 
 @inline function calculate_mapping(::RequiresHessian{false}, geo_values::GeometryValues, q_point, x)
-    #fecv_J = zero(Tensors.getreturntype(⊗, eltype(x), eltype(geo_values.dMdξ)))
     fecv_J = zero(otimes_returntype(eltype(x), eltype(geo_values.dMdξ)))
     @inbounds for j in 1:getngeobasefunctions(geo_values)
         #fecv_J += x[j] ⊗ geo_values.dMdξ[j, q_point]

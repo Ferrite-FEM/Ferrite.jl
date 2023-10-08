@@ -329,7 +329,9 @@ end
     cv_quad = CellValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}()^2)
     cv_wedge = CellValues(QuadratureRule{RefPrism}(2), Lagrange{RefPrism,2}())
     show(stdout, MIME"text/plain"(), cv_quad)
+    println(stdout)
     show(stdout, MIME"text/plain"(), cv_wedge)
+    println(stdout)
 end
 
 end # of testset

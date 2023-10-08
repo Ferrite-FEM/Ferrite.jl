@@ -81,6 +81,7 @@ end
 getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 
 function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
+    check_reinit_sdim_consistency(:CellValues, shape_gradient_type(cv), eltype(x))
     geo_values = cv.geo_values
     fun_values = cv.fun_values
     n_geom_basefuncs = getngeobasefunctions(geo_values)
@@ -98,12 +99,14 @@ function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
 end
 
 function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
-    rdim = getdim(cv.geo_values.ip)
+    ip_geo = get_geometric_interpolation(cv)
+    ip_fun = get_function_interpolation(cv)
+    rdim = getdim(ip_geo)
     vdim = isa(shape_value(cv, 1, 1), Vec) ? length(shape_value(cv, 1, 1)) : 0
     sdim = length(shape_gradient(cv, 1, 1)) ÷ length(shape_value(cv, 1, 1))
     vstr = vdim==0 ? "scalar" : "vdim=$vdim"
     print(io, "CellValues(", vstr, ", rdim=$rdim, and sdim=$sdim): ")
     print(io, getnquadpoints(cv), " quadrature points")
-    print(io, "\n Function interpolation: "); show(io, d, cv.fun_values.ip)
-    print(io, "\nGeometric interpolation: "); show(io, d, cv.geo_values.ip^sdim)
+    print(io, "\n Function interpolation: "); show(io, d, ip_fun)
+    print(io, "\nGeometric interpolation: "); show(io, d, ip_geo^sdim)
 end

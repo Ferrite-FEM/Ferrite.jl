@@ -131,9 +131,11 @@ end
     # Just smoke test to make sure show doesn't error. 
     fv = FaceValues(FaceQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
     show(stdout, MIME"text/plain"(), fv)
+    println(stdout)
     fv.qr.face_rules[1] = deepcopy(fv.qr.face_rules[1])
     push!(Ferrite.getweights(fv.qr.face_rules[1]), 1)
     show(stdout, MIME"text/plain"(), fv)
+    println(stdout)
 end
 
 end # of testset

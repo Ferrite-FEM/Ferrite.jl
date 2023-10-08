@@ -108,6 +108,7 @@ function checkface(fv::FaceValues, face::Int)
 end
 
 function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int, cell=nothing) where {dim, T}
+    check_reinit_sdim_consistency(:FaceValues, shape_gradient_type(fv), eltype(x))
     @boundscheck checkface(fv, face_nr)
     n_geom_basefuncs = getngeobasefunctions(fv)
     length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
