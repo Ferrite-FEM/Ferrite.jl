@@ -92,3 +92,8 @@ function reinit!(pv::PointValuesInternal{IP}, coord::Vec{dim}) where {dim, shape
     end
     return nothing
 end
+
+function Base.show(io::IO, d::MIME"text/plain", cv::PointValues)
+    println(io, "PointValues containing a")
+    show(io, d, cv.cv)
+end

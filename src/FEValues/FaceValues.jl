@@ -95,6 +95,23 @@ function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int, ce
     end
 end
 
+function Base.show(io::IO, d::MIME"text/plain", fv::FaceValues)
+    ip_geo = get_geometric_interpolation(fv)
+    rdim = getdim(ip_geo)
+    vdim = isa(shape_value(fv, 1, 1), Vec) ? length(shape_value(fv, 1, 1)) : 0
+    sdim = length(shape_gradient(fv, 1, 1)) ÷ length(shape_value(fv, 1, 1))
+    vstr = vdim==0 ? "scalar" : "vdim=$vdim"
+    print(io, "FaceValues(", vstr, ", rdim=$rdim, sdim=$sdim): ")
+    nqp = getnquadpoints.(fv.qr.face_rules)
+    if all(n==first(nqp) for n in nqp)
+        println(io, first(nqp), " quadrature points per face")
+    else
+        println(io, tuple(nqp...), " quadrature points on each face")
+    end
+    print(io, " Function interpolation: "); show(io, d, get_function_interpolation(fv))
+    print(io, "\nGeometric interpolation: "); show(io, d, ip_geo^sdim)
+end
+
 """
     BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}})
 
