@@ -1,3 +1,36 @@
+"""
+    FaceValues([::Type{T}], quad_rule::FaceQuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
+
+A `FaceValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
+values of nodal functions, gradients and divergences of nodal functions etc. on the faces of finite elements.
+
+**Arguments:**
+
+* `T`: an optional argument to determine the type the internal data is stored as.
+* `quad_rule`: an instance of a [`FaceQuadratureRule`](@ref)
+* `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
+* `geom_interpol`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry.
+  By default linear Lagrange interpolation is used.
+
+**Common methods:**
+
+* [`reinit!`](@ref)
+* [`getnquadpoints`](@ref)
+* [`getdetJdV`](@ref)
+
+* [`shape_value`](@ref)
+* [`shape_gradient`](@ref)
+* [`shape_symmetric_gradient`](@ref)
+* [`shape_divergence`](@ref)
+
+* [`function_value`](@ref)
+* [`function_gradient`](@ref)
+* [`function_symmetric_gradient`](@ref)
+* [`function_divergence`](@ref)
+* [`spatial_coordinate`](@ref)
+"""
+FaceValues
+
 struct FaceValues{FV, GV, QR, detT, nT, V_FV<:AbstractVector{FV}, V_GV<:AbstractVector{GV}} <: AbstractFaceValues
     fun_values::V_FV # AbstractVector{FunctionValues}
     geo_values::V_GV # AbstractVector{GeometryValues}
