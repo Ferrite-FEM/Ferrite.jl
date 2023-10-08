@@ -1,7 +1,3 @@
-
-include("GeometryValues.jl")
-include("FunctionValues.jl")
-
 function default_geometric_interpolation(::Interpolation{shape}) where {dim, shape <: AbstractRefShape{dim}}
     return VectorizedInterpolation{dim}(Lagrange{shape, 1}())
 end
