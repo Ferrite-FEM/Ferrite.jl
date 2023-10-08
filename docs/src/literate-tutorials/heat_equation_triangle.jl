@@ -213,6 +213,8 @@ end
 
 @show norm(u)/length(u)
 
+# ### Postprocessing the total flux
+
 function calculate_flux_lag(dh, dΩ, ip, a)
     qr = FaceQuadratureRule{RefTriangle}(2)
     fv = FaceValues(qr, ip, Lagrange{RefTriangle,1}())
