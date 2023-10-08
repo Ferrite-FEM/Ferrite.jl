@@ -49,11 +49,10 @@ function FunctionValues(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo
     precompute_values!(fv, qr) # Precompute N and dNdξ
     return fv
 end
-function Base.copy(funvals::FunctionValues)
-    (;ip, N_ξ, N_x, dNdξ, dNdx) = funvals
-    N_ξ_copy = copy(N_ξ)
-    N_x_copy = N_ξ === N_x ? N_ξ_copy : copy(N_x) # Preserve aliasing
-    return FunctionValues(copy(ip), N_x_copy, N_ξ_copy, copy(dNdx), copy(dNdξ))
+function Base.copy(v::FunctionValues)
+    N_ξ_copy = copy(v.N_ξ)
+    N_x_copy = v.N_ξ === v.N_x ? N_ξ_copy : copy(v.N_x) # Preserve aliasing
+    return FunctionValues(copy(v.ip), N_x_copy, N_ξ_copy, copy(v.dNdx), copy(v.dNdξ))
 end
 
 function precompute_values!(fv::FunctionValues, qr::QuadratureRule)

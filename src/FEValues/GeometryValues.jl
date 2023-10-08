@@ -49,10 +49,9 @@ function GeometryValues(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule, 
     end
     return GeometryValues(ip, M, dMdξ, dM2dξ2)
 end
-function Base.copy(geovals::GeometryValues)
-    (;ip, M, dMdξ, d2Mdξ2) = geovals
-    d2Mdξ2_copy = d2Mdξ2 === nothing ? nothing : copy(d2Mdξ2)
-    return GeometryValues(copy(ip), copy(M), copy(dMdξ), d2Mdξ2_copy)
+function Base.copy(v::GeometryValues)
+    d2Mdξ2_copy = v.d2Mdξ2 === nothing ? nothing : copy(v.d2Mdξ2)
+    return GeometryValues(copy(v.ip), copy(v.M), copy(v.dMdξ), d2Mdξ2_copy)
 end
 
 getngeobasefunctions(geovals::GeometryValues) = size(geovals.M, 1)
