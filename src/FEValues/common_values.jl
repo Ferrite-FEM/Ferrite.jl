@@ -30,11 +30,12 @@ end
 end
 
 """
-    reinit!(cv::CellValues, x::Vector)
-    reinit!(bv::FaceValues, x::Vector, face::Int)
+    reinit!(cv::CellValues, x::Vector, cell::Union{AbstractCell,Nothing}=nothing)
+    reinit!(bv::FaceValues, x::Vector, face::Int, cell::Union{AbstractCell,Nothing}=nothing)
 
 Update the `CellValues`/`FaceValues` object for a cell or face with coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
+For interpolations with non-identity mappings, the current `cell` is also required. 
 """
 reinit!
 
@@ -59,7 +60,7 @@ finite element cell or face as
 ``\\int\\limits_\\Gamma f(\\mathbf{x}) d \\Gamma \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 
 """
-#@propagate_inbounds getdetJdV(bv::FaceValues, q_point::Int) = bv.detJdV[q_point, bv.current_face[]]
+function getdetJdV end
 
 """
     shape_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -68,7 +69,6 @@ Return the value of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
 function shape_value end
-#@propagate_inbounds shape_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.N[base_func, q_point, bv.current_face[]]
 
 """
     geometric_value(fe_v::AbstractValues, q_point, base_function::Int)
