@@ -1,4 +1,3 @@
-
 @testset "interpolations" begin
 
 @testset "$interpolation" for interpolation in (
@@ -180,4 +179,3 @@ end
     @test Ferrite.is_discontinuous(d_ip) == true
     @test Ferrite.is_discontinuous(d_ip_t) == true
 end
-
