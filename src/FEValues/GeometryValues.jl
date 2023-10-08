@@ -49,6 +49,11 @@ function GeometryValues(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule, 
     end
     return GeometryValues(ip, M, dMdξ, dM2dξ2)
 end
+function Base.copy(geovals::GeometryValues)
+    (;ip, M, dMdξ, d2Mdξ2) = geovals
+    d2Mdξ2_copy = d2Mdξ2 === nothing ? nothing : copy(d2Mdξ2)
+    return GeometryValues(copy(ip), copy(M), copy(dMdξ), d2Mdξ2_copy)
+end
 
 getngeobasefunctions(geovals::GeometryValues) = size(geovals.M, 1)
 @propagate_inbounds geometric_value(geovals::GeometryValues, q_point::Int, base_func::Int) = geovals.M[base_func, q_point]

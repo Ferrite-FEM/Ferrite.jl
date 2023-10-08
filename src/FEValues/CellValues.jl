@@ -24,6 +24,10 @@ function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolatio
     return CellValues(T, qr, ip, VectorizedInterpolation(ip_geo))
 end
 
+function Base.copy(cv::CellValues)
+    return CellValues(copy(cv.fun_values), copy(cv.geo_values), copy(cv.qr), copy(cv.detJdV))
+end
+
 # Access geometry values
 for op = (:getngeobasefunctions, :geometric_value)
     eval(quote

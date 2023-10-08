@@ -88,19 +88,30 @@ for (scalar_interpol, quad_rule) in  (
             @test spatial_coordinate(cv, i, x) ≈ qp_x
         end
 
-        # test copy: Disable with new structure. TODO: Re-enable
-        #= 
-        cvc = copy(cv)
-        @test typeof(cv) == typeof(cvc)
-        for fname in fieldnames(typeof(cv))
-            v = getfield(cv, fname)
-            vc = getfield(cvc, fname)
-            if hasmethod(pointer, Tuple{typeof(v)})
-                @test pointer(getfield(cv, fname)) != pointer(getfield(cvc, fname))
+        @testset "copy(::CellValues)" begin
+            cvc = copy(cv)
+            @test typeof(cv) == typeof(cvc)
+
+            # Test that all mutable types in FunctionValues and GeometryValues have been copied
+            for key in (:fun_values, :geo_values)
+                val = getfield(cv, key)
+                valc = getfield(cvc, key)
+                for fname in fieldnames(typeof(val))
+                    v = getfield(val, fname)
+                    vc = getfield(valc, fname)
+                    isbits(v) || @test v !== vc
+                    @test v == vc
+                end
             end
-            @test v == vc
+            # Test that qr and detJdV is copied as expected. 
+            # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
+            for fname in (:qr, :detJdV)
+                v = getfield(cv, fname)
+                vc = getfield(cvc, fname)
+                fname === :qr || @test v !== vc
+                @test v == vc
+            end
         end
-        =# 
     end
 end
 

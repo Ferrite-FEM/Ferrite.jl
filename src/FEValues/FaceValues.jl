@@ -20,6 +20,13 @@ FaceValues(qr::FaceQuadratureRule, ip::Interpolation, args...) = FaceValues(Floa
 function FaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation) where T
     return FaceValues(T, qr, ip, VectorizedInterpolation(ip_geo))
 end
+
+function Base.copy(fv::FaceValues)
+    fun_values = map(copy, fv.fun_values)
+    geo_values = map(copy, fv.geo_values)
+    return FaceValues(fun_values, geo_values, copy(fv.qr), copy(fv.detJdV), copy(fv.normals), copy(fv.current_face))
+end
+
 getngeobasefunctions(fv::FaceValues) = getngeobasefunctions(get_geo_values(fv))
 getnbasefunctions(fv::FaceValues) = getnbasefunctions(get_fun_values(fv))
 getnquadpoints(fv::FaceValues) = getnquadpoints(fv.qr, getcurrentface(fv))

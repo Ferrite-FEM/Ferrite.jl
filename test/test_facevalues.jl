@@ -93,17 +93,36 @@ for (scalar_interpol, quad_rule) in (
 
         end
 
-        # test copy
-        fvc = copy(fv)
-        @test typeof(fv) == typeof(fvc)
-        for fname in fieldnames(typeof(fv))
-            v = getfield(fv, fname)
-            v isa Ferrite.ScalarWrapper && continue
-            vc = getfield(fvc, fname)
-            if hasmethod(pointer, Tuple{typeof(v)})
-                @test pointer(v) != pointer(vc)
+        @testset "copy(::FaceValues)" begin
+            fvc = copy(fv)
+            @test typeof(fv) == typeof(fvc)
+
+            # Test that all mutable types in FunctionValues and GeometryValues have been copied
+            for key in (:fun_values, :geo_values)
+                for i in eachindex(getfield(fv, key))
+                    val = getfield(fv, key)[i]
+                    valc = getfield(fvc, key)[i]
+                    for fname in fieldnames(typeof(val))
+                        v = getfield(val, fname)
+                        vc = getfield(valc, fname)
+                        isbits(v) || @test v !== vc
+                        @test v == vc
+                    end
+                end
             end
-            @test check_equal_or_nan(v, vc)
+            # Test that qr, detJdV, normals, and current_face are copied as expected. 
+            # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
+            # Make it easy to test scalar wrapper equality
+            _mock_isequal(a, b) = a == b
+            _mock_isequal(a::T, b::T) where {T<:Ferrite.ScalarWrapper} = a[] == b[]
+            for fname in (:qr, :detJdV, :normals, :current_face)
+                v = getfield(fv, fname)
+                vc = getfield(fvc, fname)
+                if fname !== :qr # Test unaliased
+                    @test v !== vc
+                end
+                @test _mock_isequal(v, vc)
+            end
         end
     end
 end
