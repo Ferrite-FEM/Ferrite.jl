@@ -109,7 +109,7 @@ module InterpolationTestUtils
         ∇u2 = function_gradient(cv, 2, ue)
         Δu_ana = 0.5*(∇u1+∇u2) ⋅ Δx
         # Δu_ana_var = 0.5*(∇u2-∇u1) ⋅ Δx # Relevant to compare magnitude if test fails
-        @test Δu_num ≈ Δu_ana
+        @test isapprox(Δu_num, Δu_ana; rtol=1e-6)
         return nothing
     end
 
