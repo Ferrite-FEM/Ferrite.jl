@@ -1513,6 +1513,8 @@ function shape_gradient_and_value(ipv::VectorizedInterpolation{vdim, shape}, ξ:
 end
 
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
+
 is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
+
 get_mapping_type(::ScalarInterpolation) = IdentityMapping()
 get_mapping_type(::VectorizedInterpolation) = IdentityMapping()

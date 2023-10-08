@@ -375,6 +375,7 @@ function Base.iterate(ii::InterfaceIterator, state...)
     end
 end
 
+
 # Iterator interface for CellIterator/FaceIterator
 const GridIterators{C} = Union{CellIterator{C}, FaceIterator{C}, InterfaceIterator{C}}
 
