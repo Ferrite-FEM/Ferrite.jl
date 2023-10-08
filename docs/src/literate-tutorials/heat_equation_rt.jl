@@ -1,17 +1,4 @@
-# # [Heat equation](@id tutorial-heat-equation)
-#
-# ![](heat_square.png)
-#
-# *Figure 1*: Temperature field on the unit square with an internal uniform heat source
-# solved with homogeneous Dirichlet boundary conditions on the boundary.
-#
-#-
-#md # !!! tip
-#md #     This example is also available as a Jupyter notebook:
-#md #     [`heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/examples/heat_equation.ipynb).
-#-
-#
-# ## Introduction
+# # [Heat equation (Mixed, RaviartThomas)](@id tutorial-heat-equation-rt)
 #
 # ## Strong form
 # ```math
