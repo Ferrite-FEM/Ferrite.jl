@@ -143,6 +143,7 @@ end
     function_value(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, dof_range_here, u_there::AbstractVector, dof_range_there; here::Bool)
     function_value(iv::InterfaceValues, q_point::Int, u; here::Bool)
     function_value(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there; here::Bool)
+
 Compute the value of the function in quadrature point `q_point` on the "here" (`here=true`)
 or "there" (`here=false`) side of the interface. `u_here` and `u_there` are the values of
 the degrees of freedom for the respeciv element.
@@ -174,7 +175,7 @@ two vectors (`u_here` and `u_there`) which contain the dofs of each cell of the 
 
 `here` determines which element to use for calculating function value.
 `true` uses the value on the first element's side of the interface, while `false` uses the value on the second element's side.
-    
+
 The gradient of a scalar function or a vector valued function with use of `VectorValues` is computed as
 ``\\mathbf{\\nabla} u(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x}) u_i`` or
 ``\\mathbf{\\nabla} u(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} \\mathbf{N}_i (\\mathbf{x}) u_i`` respectively,
@@ -267,7 +268,7 @@ end
     function_value_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, dof_range_here, u_there::AbstractVector, dof_range_there)
     function_value_average(iv::InterfaceValues, q_point::Int, u)
     function_value_average(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
-    
+
 Compute the average of the function value at the quadrature point on interface.
 """
 function function_value_average end
@@ -385,7 +386,7 @@ for (func,                          f_,                     is_avg) in (
         end
         function $(func)(
                 iv::InterfaceValues, qp::Int,
-                u::AbstractVector, 
+                u::AbstractVector,
                 dof_range_here::AbstractUnitRange{Int}, dof_range_there::AbstractUnitRange{Int},
             )
             f_here = $(f_)(iv.here, qp, u, dof_range_here)
@@ -406,12 +407,12 @@ end
 @doc raw"""
     InterfaceTransformation
 
-Orientation information for 1D and 2D interfaces in 2D and 3D elements respectively. 
+Orientation information for 1D and 2D interfaces in 2D and 3D elements respectively.
 This information is used to construct the transformation matrix to
 transform the quadrature points from face_a to face_b achieving synced
 spatial coordinates. Face B's orientation relative to Face A's can
 possibly flipped (i.e. the vertices indices order is reversed)
-and the vertices can be rotated against each other. 
+and the vertices can be rotated against each other.
 The reference orientation of face B is such that the first node
 has the lowest vertex index. Thus, this structure also stores the
 shift of the lowest vertex index which is used to reorient the face in
@@ -421,9 +422,9 @@ Take for example the faces
 1           2
 | \         | \
 |  \        |  \
-| A \       | B \ 
+| A \       | B \
 |    \      |    \
-2-----3     3-----1  
+2-----3     3-----1
 ```
 which are rotated against each other by 240° after tranfroming to an
 equilateral triangle (shift index is 2) or the faces
@@ -431,13 +432,13 @@ equilateral triangle (shift index is 2) or the faces
 2           2
 | \         | \
 |  \        |  \
-| A \       | B \ 
+| A \       | B \
 |    \      |    \
-3-----1     3-----1  
+3-----1     3-----1
 ```
 which are flipped against each other, note that face B has its reference node shifted by 2 indices
 so the face is tranformed into an equilateral triangle then rotated 120°, flipped about the x axis then
-rotated -120° and tranformed back to the reference triangle.Any combination of these can happen. 
+rotated -120° and tranformed back to the reference triangle.Any combination of these can happen.
 """
 struct InterfaceTransformation{RefShapeA, RefShapeB}
     flipped::Bool
