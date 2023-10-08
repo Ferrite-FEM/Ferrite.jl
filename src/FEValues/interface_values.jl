@@ -78,7 +78,7 @@ end
 Return the number of quadrature points on the interface for the current (most recently
 [`reinit!`](@ref)ed) interface.
 """
-getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.here.qr, iv.here.current_face[])
+getnquadpoints(iv::InterfaceValues) = getnquadpoints(iv.here)
 
 @propagate_inbounds function getdetJdV(iv::InterfaceValues, q_point::Int)
     return getdetJdV(iv.here, q_point)
@@ -135,7 +135,7 @@ to the "there" element.
 function getnormal(iv::InterfaceValues, qp::Int; here::Bool=true)
     # TODO: Does it make sense to allow the kwarg here? You can juse negate the vector
     #       yourself since getnormal(iv, qp; here=false) == -getnormal(iv, qp; here=true).
-    return here ? iv.here.normals[qp] : iv.there.normals[qp]
+    return getnormal(here ? iv.here : iv.there, qp)
 end
 
 """
