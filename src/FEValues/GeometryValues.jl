@@ -17,11 +17,11 @@ function RequiresHessian(ip_fun::Interpolation, ip_geo::Interpolation)
     RequiresHessian(requires_hessian(get_mapping_type(ip_fun)))
 end
 
-struct GeometryValues{dMdξ_t, GIP, T, d2Mdξ2_t}
-    M::Matrix{T}                # value of geometric shape function
-    dMdξ::Matrix{dMdξ_t}        # gradient of geometric shape function in ref-domain
-    d2Mdξ2::Matrix{d2Mdξ2_t}    # hessian of geometric shape function in ref-domain
-    ip::GIP                     # geometric interpolation 
+struct GeometryValues{IP, M_t, dMdξ_t, d2Mdξ2_t}
+    ip::IP             # ::Interpolation                Geometric interpolation 
+    M::M_t             # ::AbstractVector{<:Number}     Values of geometric shape functions
+    dMdξ::dMdξ_t       # ::AbstractVector{<:Vec}        Gradients of geometric shape functions in ref-domain
+    d2Mdξ2::d2Mdξ2_t   # ::AbstractVector{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
 end
 function GeometryValues(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule, ::RequiresHessian{RH}) where {T,RH}
     n_shape = getnbasefunctions(ip)
@@ -33,7 +33,7 @@ function GeometryValues(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule, 
         HT = Tensor{2,getdim(ip),T}
         dM2dξ2 = zeros(HT, n_shape, n_qpoints)
     else
-        dM2dξ2 = Matrix{Nothing}(undef,0,0)
+        dM2dξ2 = nothing
     end
     for (qp, ξ) in pairs(getpoints(qr))
         for i in 1:n_shape
@@ -44,28 +44,49 @@ function GeometryValues(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule, 
             end
         end
     end
-    return GeometryValues(M, dMdξ, dM2dξ2, ip)
+    return GeometryValues(ip, M, dMdξ, dM2dξ2)
 end
-RequiresHessian(::GeometryValues{<:Any,<:Any,<:Any,Nothing}) = RequiresHessian(false)
-RequiresHessian(::GeometryValues) = RequiresHessian(true)
 
 getngeobasefunctions(geovals::GeometryValues) = size(geovals.M, 1)
 @propagate_inbounds geometric_value(geovals::GeometryValues, q_point::Int, base_func::Int) = geovals.M[base_func, q_point]
 get_geometric_interpolation(geovals::GeometryValues) = geovals.ip
 
+RequiresHessian(geovals::GeometryValues) = RequiresHessian(geovals.d2Mdξ2 !== nothing)
+
+# Hot-fixes to support embedded elements before MixedTensors are available
+# See https://github.com/Ferrite-FEM/Tensors.jl/pull/188
+@inline otimes_helper(x::Vec{dim}, dMdξ::Vec{dim}) where dim = x ⊗ dMdξ
+@inline function otimes_helper(x::Vec{sdim}, dMdξ::Vec{rdim}) where {sdim, rdim}
+    SMatrix{sdim,rdim}((x[i]*dMdξ[j] for i in 1:sdim, j in 1:rdim)...)
+end
+# End of embedded hot-fixes
+
+# For creating initial value
+function otimes_returntype(#=typeof(x)=#::Type{<:Vec{sdim,Tx}}, #=typeof(dMdξ)=#::Type{<:Vec{rdim,TM}}) where {sdim,rdim,Tx,TM}
+    return SMatrix{sdim,rdim,promote_type(Tx,TM)}
+end
+function otimes_returntype(#=typeof(x)=#::Type{<:Vec{dim,Tx}}, #=typeof(dMdξ)=#::Type{<:Vec{dim,TM}}) where {dim, Tx, TM}
+    return Tensor{2,dim,promote_type(Tx,TM)}
+end
+function otimes_returntype(#=typeof(x)=#::Type{<:Vec{dim,Tx}}, #=typeof(d2Mdξ2)=#::Type{<:Tensor{2,dim,TM}}) where {dim, Tx, TM}
+    return Tensor{3,dim,promote_type(Tx,TM)}
+end
+
 @propagate_inbounds calculate_mapping(geovals::GeometryValues, args...) = calculate_mapping(RequiresHessian(geovals), geovals, args...)
 
-@inline function calculate_mapping(::RequiresHessian{false}, geo_values::GeometryValues{<:Vec{dim,T}}, q_point, x::AbstractVector{<:Vec{dim,T}}) where {dim,T}
-    fecv_J = zero(Tensor{2,dim,T}) # zero(Tensors.getreturntype(⊗, eltype(x), eltype(geo_values.dMdξ)))
+@inline function calculate_mapping(::RequiresHessian{false}, geo_values::GeometryValues, q_point, x)
+    #fecv_J = zero(Tensors.getreturntype(⊗, eltype(x), eltype(geo_values.dMdξ)))
+    fecv_J = zero(otimes_returntype(eltype(x), eltype(geo_values.dMdξ)))
     @inbounds for j in 1:getngeobasefunctions(geo_values)
-        fecv_J += x[j] ⊗ geo_values.dMdξ[j, q_point]
+        #fecv_J += x[j] ⊗ geo_values.dMdξ[j, q_point]
+        fecv_J += otimes_helper(x[j], geo_values.dMdξ[j, q_point])
     end
     return MappingValues(fecv_J, nothing)
 end
 
-@inline function calculate_mapping(::RequiresHessian{true}, geo_values::GeometryValues{<:Vec{dim,T}}, q_point, x::AbstractVector{<:Vec{dim,T}}) where {dim,T}
-    J = zero(Tensor{2,dim,T}) # zero(Tensors.getreturntype(⊗, eltype(x), eltype(geo_values.dMdξ)))
-    H = zero(Tensor{3,dim,T})
+@inline function calculate_mapping(::RequiresHessian{true}, geo_values::GeometryValues, q_point, x)
+    J = zero(otimes_returntype(eltype(x), eltype(geo_values.dMdξ)))
+    H = zero(otimes_returntype(eltype(x), eltype(geo_values.d2Mdξ2)))
     @inbounds for j in 1:getngeobasefunctions(geo_values)
         J += x[j] ⊗ geo_values.dMdξ[j, q_point]
         H += x[j] ⊗ geo_values.d2Mdξ2[j, q_point]
@@ -106,15 +127,3 @@ where ||∂x/∂ξ||₂ is "detJ" and t is "the unit tangent".
 See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
 """
 embedding_det(J::Union{SMatrix{2, 1}, SMatrix{3, 1}}) = norm(J)
-
-@inline function calculate_mapping(::RequiresHessian{false}, geo_values::GeometryValues{<:Vec{rdim,T}}, q_point, x::AbstractVector{<:Vec{sdim,T}}) where {rdim,sdim,T}
-    n_geom_basefuncs = getngeobasefunctions(geo_values)
-    fecv_J = zero(MMatrix{sdim, rdim, T}) # TODO replace with MixedTensor (see https://github.com/Ferrite-FEM/Tensors.jl/pull/188)
-    for j in 1:n_geom_basefuncs
-        #fecv_J += x[j] ⊗ geo_values.dMdξ[j, i] # TODO via Tensors.jl
-        for k in 1:sdim, l in 1:rdim
-            fecv_J[k, l] += x[j][k] * geo_values.dMdξ[j, q_point][l]
-        end
-    end
-    return MappingValues(SMatrix(fecv_J), nothing)
-end

@@ -191,10 +191,11 @@ end
         dim = Ferrite.getdim(CT)
         p1, p2 = (rand(Vec{dim}), ones(Vec{dim})+rand(Vec{dim}))
         grid = generate_grid(CT, ntuple(_->nel, dim), p1, p2)
-        # Distort grid, important to properly test geometry mapping 
-        # for 2nd order elements. Make sure distortion is less than 
-        # a 10th of the element size. 
-        transform_coordinates!(grid, x->(x + rand(x)/(10*nel)))
+        # Smoothly distort grid (to avoid spuriously badly deformed elements).
+        # A distorted grid is important to properly test the geometry mapping
+        # for 2nd order elements.
+        transfun(x) = typeof(x)(i->sinpi(x[mod(i, length(x))+1]+i/3))/10
+        transform_coordinates!(grid, x->(x + transfun(x)))
         RefShape = Ferrite.getrefshape(getcells(grid, 1))
         for order in (1, 2)
             for IPT in (Nedelec, RaviartThomas)

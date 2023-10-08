@@ -23,11 +23,11 @@ typeof_dNdξ(::Type{T}, ::VInterpolationDims{dim,dim,dim}) where {T,dim} = Tenso
 typeof_dNdξ(::Type{T}, ::VInterpolationDims{rdim,<:Any,vdim}) where {T,rdim,vdim} = SMatrix{vdim,rdim,T} # If vdim=rdim!=sdim Tensor would be possible...
 
 struct FunctionValues{IP, N_t, dNdx_t, dNdξ_t}
-    N_x::Matrix{N_t}
-    N_ξ::Matrix{N_t}
-    dNdx::Matrix{dNdx_t}
-    dNdξ::Matrix{dNdξ_t}
-    ip::IP
+    ip::IP          # ::Interpolation
+    N_x::N_t        # ::AbstractMatrix{Union{<:Tensor,<:Number}}
+    N_ξ::N_t        # ::AbstractMatrix{Union{<:Tensor,<:Number}}
+    dNdx::dNdx_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}}
+    dNdξ::dNdξ_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}}
 end
 function FunctionValues(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where T
     ip_dims = InterpolationDims(ip, ip_geo)
@@ -45,7 +45,7 @@ function FunctionValues(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo
     end
     dNdξ = zeros(dNdξ_t, n_shape, n_qpoints)
     dNdx = fill(zero(dNdx_t) * T(NaN), n_shape, n_qpoints)
-    fv = FunctionValues(N_x, N_ξ, dNdx, dNdξ, ip)
+    fv = FunctionValues(ip, N_x, N_ξ, dNdx, dNdξ)
     precompute_values!(fv, qr) # Precompute N and dNdξ
     return fv
 end
@@ -83,6 +83,7 @@ requires_hessian(::IdentityMapping) = false
 requires_hessian(::ContravariantPiolaMapping) = true
 requires_hessian(::CovariantPiolaMapping) = true
 
+# Support for embedded elements
 calculate_Jinv(J::Tensor{2}) = inv(J)
 calculate_Jinv(J::SMatrix) = pinv(J)
 
