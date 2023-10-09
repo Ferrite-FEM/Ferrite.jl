@@ -1,6 +1,6 @@
 using Ferrite, FerriteGmsh, SparseArrays
 grid = togrid("l.msh");
-grid  = ForestBWG(grid,5)
+grid  = ForestBWG(grid,10)
 
 struct Elasticity
     G::Float64
@@ -72,7 +72,7 @@ function solve(grid,hnodes)
 
     ch = ConstraintHandler(dh)
     add!(ch, Dirichlet(:u, getfaceset(grid, "top"), (x, t) -> Vec{2}((0.0,0.0)), [1,2]))
-    add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 0.05, 2))
+    add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 0.01, 2))
     for (hdof,mdof) in hnodes
         lc = AffineConstraint(vdict[1][hdof],[vdict[1][m] => 0.5 for m in mdof],0.0)
         add!(ch,lc)
@@ -86,7 +86,7 @@ function solve(grid,hnodes)
     apply!(K, f, ch)
     u = K \ f;
     apply!(u,ch)
-    return u,dh,ch,cellvalues
+    return u,dh,ch,cellvalues,vdict
 end
 
 function compute_fluxes(u,dh)
@@ -127,31 +127,39 @@ function solve_adaptive(initial_grid)
     finished = false
     i = 1
     grid = initial_grid
-    while !finished && i<=8
+    while !finished && i<=20
         transfered_grid, hnodes = Ferrite.creategrid(grid)
-        u,dh,ch,cv = solve(transfered_grid,hnodes)
+        u,dh,ch,cv,vdict = solve(transfered_grid,hnodes)
         σ_gp, σ_gp_sc = compute_fluxes(u,dh)
-        projector = L2Projector(Lagrange{RefQuadrilateral, 1}()^2, transfered_grid)
+        projector = L2Projector(Lagrange{RefQuadrilateral, 1}()^2, transfered_grid; hnodes=hnodes)
         σ_dof = project(projector, σ_gp, QuadratureRule{RefQuadrilateral}(2))
-        vtk_grid("linear_elasticity-$i", dh) do vtk
-            vtk_point_data(vtk, dh, u)
-            vtk_point_data(vtk, projector, σ_dof, "stress")
-        end
         cells_to_refine = Int[]
+        error_arr = Float64[]
         for (cellid,cell) in enumerate(CellIterator(projector.dh))
             reinit!(cellvalues_tensorial, cell)
             @views σe = σ_dof[celldofs(cell)]
             error = 0.0
             for q_point in 1:getnquadpoints(cellvalues_tensorial)
                 σ_dof_at_sc = function_value(cellvalues_tensorial, q_point, σe)
-                error += norm((σ_gp_sc[cellid][1] - σ_dof_at_sc)/σ_dof_at_sc)
+                #error += norm((σ_dof_at_sc - σ_gp_sc[cellid][1])/σ_gp_sc[cellid][1])
+                error += norm((σ_gp_sc[cellid][1] - σ_dof_at_sc ))
+                error *= getdetJdV(cellvalues_tensorial,q_point)
             end
-            if error > 1.0
+            if error > 0.01
                 push!(cells_to_refine,cellid)
             end
+            push!(error_arr,error)
+        end
+        vtk_grid("linear_elasticity-$i", dh) do vtk
+            vtk_point_data(vtk, dh, u)
+            vtk_point_data(vtk, projector, σ_dof, "stress")
+            vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "stress sc")
+            vtk_cell_data(vtk, error_arr, "error")
         end
         Ferrite.refine!(grid,cells_to_refine)
+        transfered_grid, hnodes = Ferrite.creategrid(grid)
         Ferrite.balanceforest!(grid)
+        transfered_grid, hnodes = Ferrite.creategrid(grid)
         i += 1
         if isempty(cells_to_refine)
             finished = true
