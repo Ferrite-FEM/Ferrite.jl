@@ -225,21 +225,17 @@ function _project(vars, proj::L2Projector, fe_values::AbstractValues, M::Integer
             f[dof, :] += fe[num, :]
         end
     end
-
-    #_copyM = copy(proj.M_cholesky)
-    #apply!(proj.M_cholesky,f[:,1],ch)
-    #apply!(_copyM,f[:,2],ch)
-    #apply!(_copyM,f[:,3],ch)
-    apply!(proj.M_cholesky,ch)
-    for col in eachcol(f)
-        apply_zero!(col,ch)
+    
+    # Correctly apply affine constraints
+    projected_vals = similar(f)
+    for (i,col) in enumerate(eachcol(f))
+        _M = deepcopy(proj.M_cholesky)
+        apply!(_M, col, ch)
+        u = _M \ col
+        apply!(u, ch)
+        projected_vals[:,i] = u
     end
-    # solve for the projected nodal values
-    projected_vals = proj.M_cholesky \ f
 
-    for col in eachcol(projected_vals)
-        apply!(col,ch)
-    end
     # Recast to original input type
     make_T(vals) = T <: AbstractTensor ? T(Tuple(vals)) : vals[1]
     return T[make_T(x) for x in eachrow(projected_vals)]
