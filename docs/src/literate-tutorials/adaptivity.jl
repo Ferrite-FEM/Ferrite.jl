@@ -1,6 +1,8 @@
 using Ferrite, FerriteGmsh, SparseArrays
 grid = togrid("l.msh");
-grid  = ForestBWG(grid,10)
+grid  = ForestBWG(grid,25)
+Ferrite.refine_all!(grid,1)
+Ferrite.refine_all!(grid,2)
 
 struct Elasticity
     G::Float64
@@ -15,7 +17,7 @@ function material_routine(material::Elasticity, ε::SymmetricTensor{2})
 end
 
 E = 200e3 # Young's modulus [MPa]
-ν = 0.3 # Poisson's ratio [-]
+ν = 0.2 # Poisson's ratio [-]
 material = Elasticity(E/2(1+ν), E/3(1-2ν));
 
 function assemble_cell!(ke, fe, cellvalues, material, ue)
@@ -131,10 +133,8 @@ function solve_adaptive(initial_grid)
     cellvalues_tensorial = CellValues(qr, ip);
     finished = false
     i = 1
-    grid = deepcopy(initial_grid)
-    pvd = paraview_collection("elasticity_amr.pvd");
-    while !finished && i<=20
-        @show i
+    grid = initial_grid
+    while !finished
         transfered_grid, hnodes = Ferrite.creategrid(grid)
         u,dh,ch,cv,vdict = solve(transfered_grid,hnodes)
         σ_gp, σ_gp_sc = compute_fluxes(u,dh)
@@ -148,8 +148,8 @@ function solve_adaptive(initial_grid)
             error = 0.0
             for q_point in 1:getnquadpoints(cellvalues_tensorial)
                 σ_dof_at_sc = function_value(cellvalues_tensorial, q_point, σe)
-                error += norm((σ_gp_sc[cellid][q_point] - σ_dof_at_sc ))
-                error *= getdetJdV(cellvalues_tensorial,q_point)
+                #error += norm((σ_dof_at_sc - σ_gp_sc[cellid][1])/σ_gp_sc[cellid][1])
+                error += norm((σ_gp_sc[cellid][1] - σ_dof_at_sc )) * getdetJdV(cellvalues_tensorial,q_point)
             end
             if error > 0.01
                 push!(cells_to_refine,cellid)
@@ -161,18 +161,20 @@ function solve_adaptive(initial_grid)
             vtk_point_data(vtk, projector, σ_dof, "stress")
             vtk_cell_data(vtk, getindex.(collect(Iterators.flatten(σ_gp_sc)),1), "stress sc")
             vtk_cell_data(vtk, error_arr, "error")
-            pvd[i] = vtk
         end
         Ferrite.refine!(grid,cells_to_refine)
         transfered_grid, hnodes = Ferrite.creategrid(grid)
+        vtk_grid("unbalanced.vtu", dh) do vtk
+        end
         Ferrite.balanceforest!(grid)
         transfered_grid, hnodes = Ferrite.creategrid(grid)
+        vtk_grid("balanced.vtu", dh) do vtk
+        end
         i += 1
         if isempty(cells_to_refine)
             finished = true
         end
     end
-    vtk_save(pvd);
 end
 
 solve_adaptive(grid)

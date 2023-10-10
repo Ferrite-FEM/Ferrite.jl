@@ -18,13 +18,13 @@ end
     OctantBWG(dim::Integer, l::Integer, b::Integer, m::Integer)
 Construct an `octant` based on dimension `dim`, level `l`, amount of levels `b` and morton index `m`
 """
-function OctantBWG(dim::Integer, l::T, m::T, b::T=_maxlevel[dim-1]) where T <: Integer
+function OctantBWG(dim::Integer, l::T1, m::T2, b::T1=_maxlevel[dim-1]) where {T1 <: Integer, T2 <: Integer}
     @assert l ≤ b #maximum refinement level exceeded
-    @assert m ≤ (one(T)+one(T))^(dim*l)
-    x,y,z = (zero(T),zero(T),zero(T))
+    @assert m ≤ (one(T1)+one(T1))^(dim*l)
+    x,y,z = (zero(T1),zero(T1),zero(T1))
     h = Int32(_compute_size(b,l))
-    _zero = zero(T)
-    _one = one(T)
+    _zero = zero(T1)
+    _one = one(T1)
     _two = _one + _one
     for i in _zero:l-_one
         x = x | (h*((m-_one) & _two^(dim*i))÷_two^((dim-_one)*i))
@@ -32,18 +32,23 @@ function OctantBWG(dim::Integer, l::T, m::T, b::T=_maxlevel[dim-1]) where T <: I
         z = z | (h*((m-_one) & _two^(dim*i+_two))÷_two^((dim-_one)*i+_two))
     end
     if dim < 3
-        OctantBWG{2,4,4,T}(l,(x,y))
+        OctantBWG{2,4,4,T1}(l,(x,y))
     else
-        OctantBWG{3,8,6,T}(l,(x,y,z))
+        OctantBWG{3,8,6,T1}(l,(x,y,z))
     end
 end
 
-OctantBWG(dim::Int,l::Int,m::Int,b::Int=_maxlevel[dim-1]) = OctantBWG(dim,Int32(l),Int32(m),Int32(b))
-OctantBWG(dim::Int,l::Int,m::Int,b::Int32) = OctantBWG(dim,Int32(l),Int32(m),b)
-OctantBWG(dim::Int,l::Int32,m::Int,b::Int32) = OctantBWG(dim,l,Int32(m),b)
-OctantBWG(level::Int,coords::NTuple) = OctantBWG(Int32(level),Int32.(coords))
-OctantBWG(level::Int32,coords::NTuple) = OctantBWG(level,Int32.(coords))
-OctantBWG(level::Int32, coords::NTuple{dim,Int32}) where dim = OctantBWG{dim,2^dim,2*dim,Int32}(level,coords)
+#OctantBWG(dim::Int,l::Int,m::Int,b::Int=_maxlevel[dim-1]) = OctantBWG(dim,l,m,b)
+#OctantBWG(dim::Int,l::Int,m::Int,b::Int32) = OctantBWG(dim,l,m,b)
+#OctantBWG(dim::Int,l::Int32,m::Int,b::Int32) = OctantBWG(dim,l,Int32(m),b)
+function OctantBWG(level::Int,coords::NTuple)
+    dim = length(coords)
+    nnodes = 2^dim
+    nfaces = 2*dim
+    OctantBWG{dim,nnodes,nfaces,eltype(coords)}(level,coords)
+end
+#OctantBWG(level::Int32,coords::NTuple) = OctantBWG(level,Int32.(coords))
+#OctantBWG(level::Int32, coords::NTuple{dim,Int32}) where dim = OctantBWG{dim,2^dim,2*dim,Int32}(level,coords)
 
 # From BWG 2011
 # > The octant coordinates are stored as integers of a fixed number b of bits,
@@ -76,6 +81,7 @@ morton(octant::OctantBWG{dim,N,M,T1},l::T2,b::T3) where {dim,N,M,T1<:Integer,T2<
 Base.zero(::Type{OctantBWG{3, 8, 6}}) = OctantBWG(3, 0, 1)
 Base.zero(::Type{OctantBWG{2, 4, 4}}) = OctantBWG(2, 0, 1)
 root(dim::T) where T<:Integer = zero(OctantBWG{dim,2^dim,2*dim})
+Base.eltype(::Type{OctantBWG{dim,N,M,T}}) where {dim,N,M,T} = T
 
 ncorners(::Type{OctantBWG{dim,N,M,T}}) where {dim,N,M,T} = N # TODO change to how many corners
 ncorners(o::OctantBWG) = ncorners(typeof(o))
@@ -302,12 +308,13 @@ function coarsen!(octree::OctreeBWG{dim,N,M,T}, o::OctantBWG{dim,N,M,T}) where {
     deleteat!(octree.leaves,leave_idx-shift+one(T):leave_idx-shift+window_length)
 end
 
-OctreeBWG{3,8,6}(nodes::NTuple,b=_maxlevel[2]) = OctreeBWG{3,8,6,Int32}([zero(OctantBWG{3,8,6})],Int32(b),nodes)
-OctreeBWG{2,4,4}(nodes::NTuple,b=_maxlevel[1]) = OctreeBWG{2,4,4,Int32}([zero(OctantBWG{2,4,4})],Int32(b),nodes)
+OctreeBWG{3,8,6}(nodes::NTuple,b=_maxlevel[2]) = OctreeBWG{3,8,6,Int64}([zero(OctantBWG{3,8,6})],Int64(b),nodes)
+OctreeBWG{2,4,4}(nodes::NTuple,b=_maxlevel[1]) = OctreeBWG{2,4,4,Int64}([zero(OctantBWG{2,4,4})],Int64(b),nodes)
 OctreeBWG(cell::Quadrilateral,b=_maxlevel[2]) = OctreeBWG{2,4,4}(cell.nodes,b)
 OctreeBWG(cell::Hexahedron,b=_maxlevel[1]) = OctreeBWG{3,8,6}(cell.nodes,b)
 
 Base.length(tree::OctreeBWG) = length(tree.leaves)
+Base.eltype(::Type{OctreeBWG{dim,N,M,T}}) where {dim,N,M,T} = T
 
 function inside(oct::OctantBWG{dim},b) where dim
     maxsize = _maximum_size(b)
@@ -474,11 +481,13 @@ function getncells(grid::ForestBWG)
     return numcells
 end
 
-function getcells(forest::ForestBWG{dim}) where dim
-    celltype = dim == 2 ? OctantBWG{2,4,4,Int32} : OctantBWG{3,8,6,Int32}
+function getcells(forest::ForestBWG{dim,C}) where {dim,C}
+    treetype = C
     ncells = getncells(forest)
-    cellvector = Vector{celltype}(undef,ncells)
-    o = one(Int32)
+    nnodes = 2^dim
+    nfaces = 2*dim
+    cellvector = Vector{OctantBWG{dim,nnodes,nfaces,eltype(C)}}(undef,ncells)
+    o = one(eltype(C))
     cellid = o
     for tree in forest.cells
         for leaf in tree.leaves
@@ -840,7 +849,7 @@ function isancestor(o1,o2,b)
 end
 
 # TODO verify and generalize
-function contains_face(mface::Tuple{Tuple{T,T},Tuple{T,T}},sface::Tuple{Tuple{T,T},Tuple{T,T}}) where T
+function contains_face(mface::Tuple{Tuple{T1,T1},Tuple{T1,T1}},sface::Tuple{Tuple{T2,T2},Tuple{T2,T2}}) where {T1<:Integer,T2<:Integer}
     if mface[1][1] == sface[1][1] && mface[2][1] == sface[2][1] # vertical
         return mface[1][2] ≤ sface[1][2] ≤ sface[2][2] ≤ mface[2][2]
     elseif mface[1][2] == sface[1][2] && mface[2][2] == sface[2][2] # horizontal

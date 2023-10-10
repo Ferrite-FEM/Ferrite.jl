@@ -142,6 +142,29 @@ end
 
 end # module ConvergenceTestHelper
 
+function compute_fluxes(cellvalues::CellValues{<:ScalarInterpolation}, dh::DofHandler, a::AbstractVector{T}) where T
+
+    n = getnbasefunctions(cellvalues)
+    cell_dofs = zeros(Int, n)
+    nqp = getnquadpoints(cellvalues)
+
+    # Allocate storage for the fluxes to store
+    q = [Vec{2,T}[] for _ in 1:getncells(dh.grid)]
+
+    for (cell_num, cell) in enumerate(CellIterator(dh))
+        q_cell = q[cell_num]
+        celldofs!(cell_dofs, dh, cell_num)
+        aᵉ = a[cell_dofs]
+        reinit!(cellvalues, cell)
+
+        for q_point in 1:nqp
+            q_qp = - function_gradient(cellvalues, q_point, aᵉ)
+            push!(q_cell, q_qp)
+        end
+    end
+    return q
+end
+
 @testset "convergence analysis" begin
     @testset "$interpolation" for interpolation in (
         Lagrange{RefQuadrilateral, 1}(),
@@ -163,9 +186,13 @@ end # module ConvergenceTestHelper
             grid_transfered, hnodes = Ferrite.creategrid(adaptive_grid)
             dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid_transfered, interpolation, interpolation_geo, qr, N, hnodes)
             u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
+            q_gp = compute_fluxes(cellvalues, dh, u);
+            projector = L2Projector(interpolation, grid_transfered);
+            q_projected = project(projector, q_gp, qr);
             L2norm, _ = ConvergenceTestHelper.check_and_compute_convergence(dh, u, cellvalues, 1e-2, adaptive_grid)
             vtk_grid("p4est_test$(i).vtu",dh) do vtk
                 vtk_point_data(vtk,dh,u)
+                vtk_point_data(vtk, projector, q_projected, "q")
             end
             i += 1
         end

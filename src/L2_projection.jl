@@ -225,13 +225,14 @@ function _project(vars, proj::L2Projector, fe_values::AbstractValues, M::Integer
             f[dof, :] += fe[num, :]
         end
     end
-    
+
     # Correctly apply affine constraints
     projected_vals = similar(f)
+    rhsdata = get_rhs_data(ch,proj.M_cholesky)
+    apply!(proj.M_cholesky,ch)
     for (i,col) in enumerate(eachcol(f))
-        _M = deepcopy(proj.M_cholesky)
-        apply!(_M, col, ch)
-        u = _M \ col
+        apply_rhs!(rhsdata, col, ch)
+        u = proj.M_cholesky \ col
         apply!(u, ch)
         projected_vals[:,i] = u
     end
