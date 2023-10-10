@@ -75,9 +75,13 @@ function solve(grid,hnodes)
     ch = ConstraintHandler(dh)
     add!(ch, Dirichlet(:u, getfaceset(grid, "top"), (x, t) -> Vec{2}((0.0,0.0)), [1,2]))
     add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 0.01, 2))
+    # One set of linear contraints per hanging node
     for (hdof,mdof) in hnodes
-        lc = AffineConstraint(vdict[1][hdof],[vdict[1][m] => 0.5 for m in mdof],0.0)
-        add!(ch,lc)
+        # One constraint per component
+        for d in 1:dim
+            lc = AffineConstraint(vdict[1][hdof]+d-1,[vdict[1][m]+d-1 => 0.5 for m in mdof],0.0)
+            add!(ch,lc)
+        end
     end
     close!(ch);
 
