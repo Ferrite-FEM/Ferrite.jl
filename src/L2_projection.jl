@@ -6,6 +6,7 @@ struct L2Projector <: AbstractProjector
     geom_ip::Interpolation
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::DofHandler
+    ch::ConstraintHandler
     set::Vector{Int}
 end
 
@@ -38,6 +39,7 @@ function L2Projector(
         qr_lhs::QuadratureRule = _mass_qr(func_ip),
         set = 1:getncells(grid),
         geom_ip::Interpolation = default_interpolation(getcelltype(grid, first(set))),
+        hnodes=nothing,
     )
 
     # TODO: Maybe this should not be allowed? We always assume to project scalar entries.
@@ -53,12 +55,20 @@ function L2Projector(
     dh = DofHandler(grid)
     sdh = SubDofHandler(dh, Set(set))
     add!(sdh, :_, func_ip) # we need to create the field, but the interpolation is not used here
-    close!(dh)
+    dh, vdict, _ = __close!(dh)
 
-    M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
-    M_cholesky = cholesky(M)
+    ch_hanging = ConstraintHandler(dh)
+    if hnodes !== nothing
+        for (hdof,mdof) in hnodes
+            lc = AffineConstraint(vdict[1][hdof],[vdict[1][m] => 0.5 for m in mdof],0.0)
+            add!(ch_hanging,lc)
+        end
+    end
+    close!(ch_hanging);
+    M = _assemble_L2_matrix(fe_values_mass, set, dh, ch_hanging)  # the "mass" matrix
+    #apply!(M,ch_hanging)
 
-    return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set))
+    return L2Projector(func_ip, geom_ip, M, dh, ch_hanging, collect(set))
 end
 
 # Quadrature sufficient for integrating a mass matrix
@@ -77,10 +87,10 @@ function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
     println(io, "  geometric interpolation: ", proj.geom_ip)
 end
 
-function _assemble_L2_matrix(fe_values, set, dh)
+function _assemble_L2_matrix(fe_values, set, dh, ch)
 
     n = Ferrite.getnbasefunctions(fe_values)
-    M = create_symmetric_sparsity_pattern(dh)
+    M = create_sparsity_pattern(dh, ch)
     assembler = start_assemble(M)
 
     Me = zeros(n, n)
@@ -189,6 +199,7 @@ function _project(vars, proj::L2Projector, fe_values::AbstractValues, M::Integer
 
     get_data(x::AbstractTensor, i) = x.data[i]
     get_data(x::Number, i) = x
+    ch = proj.ch
 
     ## Assemble contributions from each cell
     for (ic,cellnum) in enumerate(proj.set)
@@ -215,9 +226,20 @@ function _project(vars, proj::L2Projector, fe_values::AbstractValues, M::Integer
         end
     end
 
+    #_copyM = copy(proj.M_cholesky)
+    #apply!(proj.M_cholesky,f[:,1],ch)
+    #apply!(_copyM,f[:,2],ch)
+    #apply!(_copyM,f[:,3],ch)
+    apply!(proj.M_cholesky,ch)
+    for col in eachcol(f)
+        apply_zero!(col,ch)
+    end
     # solve for the projected nodal values
     projected_vals = proj.M_cholesky \ f
 
+    for col in eachcol(projected_vals)
+        apply!(col,ch)
+    end
     # Recast to original input type
     make_T(vals) = T <: AbstractTensor ? T(Tuple(vals)) : vals[1]
     return T[make_T(x) for x in eachrow(projected_vals)]
