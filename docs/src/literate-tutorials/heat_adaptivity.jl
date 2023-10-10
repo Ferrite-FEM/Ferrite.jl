@@ -2,7 +2,7 @@ using Ferrite, FerriteGmsh, SparseArrays
 grid = generate_grid(Quadrilateral, (4,4));
 grid  = ForestBWG(grid,10)
 
-analytical_solution(x) = prod(cos, x*π/2*10)
+analytical_solution(x) = atan(2*(norm(x)-0.5)/0.02)
 analytical_rhs(x) = -laplace(analytical_solution,x)
 
 function assemble_cell!(ke, fe, cellvalues, ue, coords)
