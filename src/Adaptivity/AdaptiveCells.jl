@@ -535,6 +535,8 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     sizehint!(nodes,getncells(forest)*2^dim)
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
+    node_map = dim < 3 ? node_map₂ : node_map₃
+    node_map_inv = dim < 3 ? node_map₂_inv : node_map₃_inv
     nodeids = Dict{Tuple{Int,NTuple{dim,Int32}},Int}()
     nodeowners = Dict{Tuple{Int,NTuple{dim,Int32}},Tuple{Int,NTuple{dim,Int32}}}()
     pivot_nodeid = 1
@@ -552,13 +554,13 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     for (k,tree) in enumerate(forest.cells)
         _vertices = vertices(root(dim),tree.b)
         for (vi,v) in enumerate(_vertices)
-            vertex_neighbor =  forest.topology.vertex_vertex_neighbor[k,vi]
+            vertex_neighbor =  forest.topology.vertex_vertex_neighbor[k,node_map[vi]]
             if length(vertex_neighbor) == 0
                 continue
             end
             if k < vertex_neighbor[1][1]
                 #delete!(nodes,(k,v))
-                new_v = vertex(root(dim),vertex_neighbor[1][2],tree.b)
+                new_v = vertex(root(dim),node_map[vertex_neighbor[1][2]],tree.b)
                 new_k = vertex_neighbor[1][1]
                 nodeids[(k,v)] = nodeids[(new_k,new_v)]
                 nodeowners[(k,v)] = (new_k,new_v)
@@ -604,7 +606,6 @@ function creategrid(forest::ForestBWG{dim,C,T}) where {dim,C,T}
     celltype = dim < 3 ? Quadrilateral : Hexahedron
     cells = celltype[]
     cellnodes = zeros(Int,2^dim)
-    node_map = dim < 3 ? node_map₂ : node_map₃
     for (k,tree) in enumerate(forest.cells)
         for leaf in tree.leaves
             _vertices = vertices(leaf,tree.b)
