@@ -1,6 +1,6 @@
 @testset "interpolations" begin
 
-@testset "Value Type $value_type" for value_type in ( Float32, )
+@testset "Value Type $value_type" for value_type in (Float32,Float64)
     @testset "$interpolation" for interpolation in (
                         Lagrange{RefLine, 1, value_type}(),
                         Lagrange{RefLine, 2, value_type}(),
