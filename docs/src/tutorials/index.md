@@ -124,7 +124,17 @@ Gmsh.
 
 ---
 
-#### [Tutorial 9: Incompressible Navier-Stokes equations](ns_vs_diffeq.md)
+#### [Tutorial 9: Porous media (SubDofHandler)](porous_media.md)
+
+This tutorial introduces how to solve a complex linear problem, where there are different 
+fields on different subdomains, and different cell types in the grid. This requires using
+the `SubDofHandler` interface. 
+
+**Keywords**: Mixed grids, multiple fields, porous media, `SubDofHandler`
+
+---
+
+#### [Tutorial 10: Incompressible Navier-Stokes equations](ns_vs_diffeq.md)
 
 In this tutorial the incompressible Navier-Stokes equations are solved. The domain is
 discretized in space with Ferrite as usual, and then forumalated in a way to be compatible
@@ -135,7 +145,7 @@ for the time-integration.
 
 ---
 
-#### [Tutorial 10: Linear shell](@ref tutorial-linear-shell)
+#### [Tutorial 11: Linear shell](@ref tutorial-linear-shell)
 
 In this tutorial a linear shell element formulation is set up as a two-dimensional domain
 embedded in three-dimensional space. This will teach, and perhaps inspire, you on how
