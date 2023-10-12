@@ -205,6 +205,39 @@ getnbasefunctions(::Interpolation)
 #   celldof: dof that is local to the element
 
 """
+    shape_values!(values::AbstractArray{T}, ip::Interpolation, ξ::Vec{T})
+
+Evaluate all shape functions of `ip` at once at the reference point `ξ` and store them in `values`.
+"""
+function shape_values!(values::AT, ip::IP, ξ::Vec{T}) where {T, AT <: AbstractArray{T}, IP <: Interpolation}
+    @inbounds for i in 1:getnbasefunctions(ip)
+        values[i] = shape_value(ip, ξ, i)
+    end
+end
+
+"""
+    shape_gradients!(values::AbstractArray{T}, ip::Interpolation, ξ::Vec{T})
+
+Evaluate all shape function gradients of `ip` at once at the reference point `ξ` and store them in `values`.
+"""
+function shape_gradients!(values::AT, ip::IP, ξ::Vec{T}) where {T, AT <: AbstractArray{T}, IP <: Interpolation}
+    @inbounds for i in 1:getnbasefunctions(ip)
+        values[i] = shape_gradient(ip, ξ, i)
+    end
+end
+
+"""
+    shape_gradients_and_values!(gradients::AbstractArray{T}, shapes::AbstractArray{T}, ip::Interpolation, ξ::Vec{T})
+
+Evaluate all shape functions and their gradients of `ip` at once at the reference point `ξ` and store them in `values`.
+"""
+function shape_gradients_and_values!(gradients::GAT, shapes::SAT, ip::IP, ξ::Vec {T}) where {T, IP <: Interpolation, SAT <: AbstractArray{T}, GAT <: AbstractArray{T}}
+    @inbounds for i in 1:getnbasefunctions(ip)
+        gradients[i], shapes[i] = shape_gradient_and_value(ip, ξ, basefunc)
+    end
+end
+
+"""
     shape_value(ip::Interpolation, ξ::Vec, i::Int)
 
 Evaluate the value of the `i`th shape function of the interpolation `ip`
