@@ -1,4 +1,5 @@
-@testset "CellValues" for (scalar_interpol, quad_rule) in  (
+@testset "CellValues" begin
+@testset "ip=$scalar_interpol quad_rule=$(typeof(quad_rule))" for (scalar_interpol, quad_rule) in  (
                                     (Lagrange{RefLine, 1}(), QuadratureRule{RefLine}(2)),
                                     (Lagrange{RefLine, 2}(), QuadratureRule{RefLine}(2)),
                                     (Lagrange{RefQuadrilateral, 1}(), QuadratureRule{RefQuadrilateral}(2)),
@@ -99,6 +100,7 @@
             @test v == vc
         end
     end
+end
 end
 
 @testset "#265: error message for incompatible geometric interpolation" begin
