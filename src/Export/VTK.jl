@@ -9,11 +9,43 @@ cell_to_vtkcell(::Type{SerendipityQuadraticQuadrilateral}) = VTKCellTypes.VTK_QU
 
 cell_to_vtkcell(::Type{Hexahedron}) = VTKCellTypes.VTK_HEXAHEDRON
 cell_to_vtkcell(::Type{SerendipityQuadraticHexahedron}) = VTKCellTypes.VTK_QUADRATIC_HEXAHEDRON
+cell_to_vtkcell(::Type{QuadraticHexahedron}) = VTKCellTypes.VTK_TRIQUADRATIC_HEXAHEDRON
 cell_to_vtkcell(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
 cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
+cell_to_vtkcell(::Type{Pyramid}) = VTKCellTypes.VTK_PYRAMID
 
 nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
+nodes_to_vtkorder(cell::Pyramid) = cell.nodes[[1,2,4,3,5]]
+nodes_to_vtkorder(cell::QuadraticHexahedron) = [
+    cell.nodes[1], # faces
+    cell.nodes[2],
+    cell.nodes[3],
+    cell.nodes[4],
+    cell.nodes[5],
+    cell.nodes[6],
+    cell.nodes[7],
+    cell.nodes[8],
+    cell.nodes[9], # edges
+    cell.nodes[10],
+    cell.nodes[11],
+    cell.nodes[12],
+    cell.nodes[13],
+    cell.nodes[14],
+    cell.nodes[15],
+    cell.nodes[16],
+    cell.nodes[17],
+    cell.nodes[18],
+    cell.nodes[19],
+    cell.nodes[20],
+    cell.nodes[25], # faces
+    cell.nodes[23],
+    cell.nodes[22],
+    cell.nodes[24],
+    cell.nodes[21],
+    cell.nodes[26],
+    cell.nodes[27], # interior
+]
 
 """
     vtk_grid(filename::AbstractString, grid::Grid; kwargs...)
@@ -27,7 +59,7 @@ The keyword arguments are forwarded to `WriteVTK.vtk_grid`, see
 """
 function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; kwargs...) where {dim,C,T}
     cls = MeshCell[]
-    for cell in grid.cells
+    for cell in getcells(grid)
         celltype = Ferrite.cell_to_vtkcell(typeof(cell))
         push!(cls, MeshCell(celltype, nodes_to_vtkorder(cell)))
     end
@@ -35,7 +67,7 @@ function WriteVTK.vtk_grid(filename::AbstractString, grid::Grid{dim,C,T}; kwargs
     return vtk_grid(filename, coords, cls; kwargs...)
 end
 function WriteVTK.vtk_grid(filename::AbstractString, dh::AbstractDofHandler; kwargs...)
-    vtk_grid(filename, dh.grid; kwargs...)
+    vtk_grid(filename, get_grid(dh); kwargs...)
 end
 
 function toparaview!(v, x::Vec{D}) where D

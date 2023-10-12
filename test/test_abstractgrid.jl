@@ -10,12 +10,13 @@
     Ferrite.getncells(grid::SmallGrid{dim,N}) where {dim,N} = N
     Ferrite.getcelltype(grid::SmallGrid) = eltype(grid.cells_test)
     Ferrite.getcelltype(grid::SmallGrid, i::Int) = typeof(grid.cells_test[i])
-    Ferrite.getcoordinates(x::NTuple{dim,Float64}) where dim = Vec{dim,Float64}(x)
+    Ferrite.get_node_coordinate(x::NTuple{dim,Float64}) where dim = Vec{dim,Float64}(x)
 
     Ferrite.getnodes(grid::SmallGrid) = grid.nodes_test
     Ferrite.getnodes(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.nodes_test[v]
     Ferrite.getnnodes(grid::SmallGrid) = length(grid.nodes_test)
     Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
+    Ferrite.get_coordinate_type(::SmallGrid{dim}) where dim = Vec{dim,Float64}
     Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
     Ferrite.n_faces_per_cell(grid::SmallGrid) = nfaces(eltype(grid.cells_test))
 
@@ -80,4 +81,12 @@
     @test Ferrite.celldofs(dhs[1],3) == Ferrite.celldofs(dhs[2],3)
     @test Ferrite.ndofs(dhs[1]) == Ferrite.ndofs(dhs[2])
     @test isapprox(u1,u2,atol=1e-8)
+
+    colors1 = Ferrite.create_coloring(subtype_grid, alg = ColoringAlgorithm.WorkStream)
+    colors2 = Ferrite.create_coloring(reference_grid, alg = ColoringAlgorithm.WorkStream)
+    @test all(colors1 .== colors2)
+
+    colors1 = Ferrite.create_coloring(subtype_grid, alg = ColoringAlgorithm.Greedy)
+    colors2 = Ferrite.create_coloring(reference_grid, alg = ColoringAlgorithm.Greedy)
+    @test all(colors1 .== colors2)
 end

@@ -30,8 +30,8 @@ function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_i
 end
 function PointValues(::Type{T}, ip::IP, ipg::GIP = default_geometric_interpolation(ip)) where {
     T, dim, shape <: AbstractRefShape{dim},
-    IP  <:       Interpolation{shape},
-    GIP <: ScalarInterpolation{shape}
+    IP  <: Interpolation{shape},
+    GIP <: Interpolation{shape}
 }
     qr = QuadratureRule{shape, T}([one(T)], [zero(Vec{dim, T})])
     cv = CellValues(T, qr, ip, ipg)
@@ -68,7 +68,7 @@ end
 
 # Optimized version of PointScalarValues which avoids i) recomputation of dNdξ and
 # ii) recomputation of dNdx. Only allows function evaluation (no gradients) which is
-# what is used in get_point_values.
+# what is used in evaluate_at_points.
 struct PointValuesInternal{IP, N_t} <: AbstractValues
     N::Vector{N_t}
     ip::IP

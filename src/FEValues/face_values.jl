@@ -84,18 +84,29 @@ function FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(qr:
     FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, qr, ScalarWrapper(0), ip, gip)
 end
 
-# Common entry point that just defaults the numeric type to Float64
+# Common entry point that fills in the numeric type and geometric interpolation
 function FaceValues(qr::FaceQuadratureRule, ip::Interpolation,
         gip::Interpolation = default_geometric_interpolation(ip))
     return FaceValues(Float64, qr, ip, gip)
 end
 
+# Common entry point that fills in the geometric interpolation
+function FaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation) where {T}
+    return FaceValues(T, qr, ip, default_geometric_interpolation(ip))
+end
+
+# Common entry point that vectorizes an input scalar geometric interpolation
+function FaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation, sgip::ScalarInterpolation) where {T}
+    return FaceValues(T, qr, ip, VectorizedInterpolation(sgip))
+end
+
 # Entrypoint for `ScalarInterpolation`s (rdim == sdim)
-function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
+function FaceValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     dim, shape <: AbstractRefShape{dim}, T,
     QR  <: FaceQuadratureRule{shape},
     IP  <: ScalarInterpolation{shape},
     GIP <: ScalarInterpolation{shape},
+    VGIP <: VectorizedInterpolation{dim, shape, <:Any, GIP},
 }
     # Normals
     Normal_t = Vec{dim, T}
@@ -105,15 +116,16 @@ function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{dim, T}
-    return FaceValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, Normal_t, GIP}(qr, ip, gip)
+    return FaceValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, Normal_t, GIP}(qr, ip, gip.ip)
 end
 
 # Entrypoint for `VectorInterpolation`s (vdim == rdim == sdim)
-function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_interpolation(ip)) where {
+function FaceValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
     dim, shape <: AbstractRefShape{dim}, T,
     QR  <: FaceQuadratureRule{shape},
     IP  <: VectorInterpolation{dim, shape},
-    GIP <: ScalarInterpolation{shape}
+    GIP <: ScalarInterpolation{shape},
+    VGIP <: VectorizedInterpolation{dim, shape, <:Any, GIP},
 }
     # Normals
     Normal_t = Vec{dim, T}
@@ -123,7 +135,7 @@ function FaceValues(::Type{T}, qr::QR, ip::IP, gip::GIP = default_geometric_inte
     # Geometry interpolation
     M_t    = T
     dMdξ_t = Vec{dim, T}
-    return FaceValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, Normal_t, GIP}(qr, ip, gip)
+    return FaceValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, Normal_t, GIP}(qr, ip, gip.ip)
 end
 
 function reinit!(fv::FaceValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T}}, face::Int) where {
@@ -195,7 +207,7 @@ function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interp
     interpolation_coords = reference_coordinates(func_interpol)
 
     qrs = QuadratureRule{refshape,T,dim}[]
-    for boundarydofs in boundarydof_indices(boundary_type)(func_interpol)
+    for boundarydofs in dirichlet_boundarydof_indices(boundary_type)(func_interpol)
         dofcoords = Vec{dim,T}[]
         for boundarydof in boundarydofs
             push!(dofcoords, interpolation_coords[boundarydof])
@@ -237,4 +249,17 @@ nfaces(fv::FaceValues) = size(fv.N, 3)
 function checkface(fv::FaceValues, face::Int)
     0 < face <= nfaces(fv) || error("Face index out of range.")
     return nothing
+end
+
+function Base.show(io::IO, m::MIME"text/plain", fv::FaceValues)
+    println(io, "FaceValues with")
+    nqp = getnquadpoints.(fv.qr.face_rules)
+    if all(n==first(nqp) for n in nqp)
+        println(io, "- Quadrature rule with ", first(nqp), " points per face")
+    else
+        println(io, "- Quadrature rule with ", tuple(nqp...), " points on each face")
+    end
+    print(io, "- Function interpolation: "); show(io, m, fv.func_interp)
+    println(io)
+    print(io, "- Geometric interpolation: "); show(io, m, fv.geo_interp)
 end

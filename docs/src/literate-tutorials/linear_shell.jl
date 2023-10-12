@@ -1,4 +1,4 @@
-# # Linear shell
+# # [Linear shell](@id tutorial-linear-shell)
 #
 # ![](linear_shell.png)
 #-
@@ -97,10 +97,9 @@ assembler = start_assemble(K, f)
 for cell in CellIterator(grid)
     fill!(ke, 0.0)
     reinit!(cv, cell)
-
     celldofs!(celldofs, dh, cellid(cell))
     getcoordinates!(cellcoords, grid, cellid(cell))
-
+    
     #Call the element routine
     integrate_shell!(ke, cv, qr_ooplane, cellcoords, data)
 

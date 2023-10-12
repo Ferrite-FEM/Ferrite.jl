@@ -12,7 +12,9 @@ for (scalar_interpol, quad_rule) in  (
                                     (Lagrange{RefHexahedron, 1}(), QuadratureRule{RefHexahedron}(2)),
                                     (Serendipity{RefQuadrilateral, 2}(), QuadratureRule{RefQuadrilateral}(2)),
                                     (Lagrange{RefTriangle, 1}(), QuadratureRule{RefTriangle}(2)),
-                                    (Lagrange{RefTetrahedron, 2}(), QuadratureRule{RefTetrahedron}(2))
+                                    (Lagrange{RefTetrahedron, 2}(), QuadratureRule{RefTetrahedron}(2)),
+                                    (Lagrange{RefPrism, 2}(), QuadratureRule{RefPrism}(2)),
+                                    (Lagrange{RefPyramid, 2}(), QuadratureRule{RefPyramid}(2)),
                                    )
 
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
@@ -40,7 +42,7 @@ for (scalar_interpol, quad_rule) in  (
         end
         u_vector = reinterpret(Float64, u)
 
-        for i in 1:length(getpoints(quad_rule))
+        for i in 1:getnquadpoints(cv)
             if func_interpol isa Ferrite.ScalarInterpolation
                 @test function_gradient(cv, i, u) ≈ H
                 @test function_symmetric_gradient(cv, i, u) ≈ 0.5(H + H')
@@ -82,7 +84,7 @@ for (scalar_interpol, quad_rule) in  (
         @test vol ≈ reference_volume(func_interpol)
 
         # Test spatial coordinate (after reinit with ref.coords we should get back the quad_points)
-        for (i, qp_x) in enumerate(getpoints(quad_rule))
+        for (i, qp_x) in pairs(Ferrite.getpoints(quad_rule))
             @test spatial_coordinate(cv, i, x) ≈ qp_x
         end
 
@@ -275,6 +277,45 @@ end
             @test                            zeros(vdim) == function_gradient(csv3, 1, ue)[:, 3]
         end
     end
+end
+
+@testset "CellValues constructor entry points" begin
+    qr = QuadratureRule{RefTriangle}(1)
+    for fun_ip in (Lagrange{RefTriangle, 1}(), Lagrange{RefTriangle, 2}()^2)
+        value_type(T) = fun_ip isa ScalarInterpolation ? T : Vec{2, T}
+        grad_type(T) = fun_ip isa ScalarInterpolation ? Vec{2, T} : Tensor{2, 2, T, 4}
+        # Quadrature + scalar function
+        cv = CellValues(qr, fun_ip)
+        @test Ferrite.shape_value_type(cv) == value_type(Float64)
+        @test Ferrite.shape_gradient_type(cv) == grad_type(Float64)
+        @test cv.gip == Lagrange{RefTriangle, 1}()
+        # Numeric type + quadrature + scalar function
+        cv = CellValues(Float32, qr, fun_ip)
+        @test Ferrite.shape_value_type(cv) == value_type(Float32)
+        @test Ferrite.shape_gradient_type(cv) == grad_type(Float32)
+        @test cv.gip == Lagrange{RefTriangle, 1}()
+        for geo_ip in (Lagrange{RefTriangle, 2}(), Lagrange{RefTriangle, 2}()^2)
+            scalar_ip(ip) = ip isa VectorizedInterpolation ? ip.ip : ip
+            # Quadrature + scalar function + geo
+            cv = CellValues(qr, fun_ip, geo_ip)
+            @test Ferrite.shape_value_type(cv) == value_type(Float64)
+            @test Ferrite.shape_gradient_type(cv) == grad_type(Float64)
+            @test cv.gip == scalar_ip(geo_ip)
+            # Numeric type + quadrature + scalar function + scalar geo
+            cv = CellValues(Float32, qr, fun_ip, geo_ip)
+            @test Ferrite.shape_value_type(cv) == value_type(Float32)
+            @test Ferrite.shape_gradient_type(cv) == grad_type(Float32)
+            @test cv.gip == scalar_ip(geo_ip)
+        end
+    end
+end
+
+@testset "show" begin
+    # Just smoke test
+    cv_quad = CellValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}()^2)
+    cv_wedge = CellValues(QuadratureRule{RefPrism}(2), Lagrange{RefPrism,2}())
+    show(stdout, MIME"text/plain"(), cv_quad)
+    show(stdout, MIME"text/plain"(), cv_wedge)
 end
 
 end # of testset

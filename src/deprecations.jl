@@ -8,9 +8,10 @@ import Base: push!
 @deprecate faces(ip::Interpolation) facedof_indices(ip) false
 @deprecate edges(ip::Interpolation) edgedof_indices(ip) false
 @deprecate nfields(dh::AbstractDofHandler) length(getfieldnames(dh)) false
+# @deprecate add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet) add!(ch, dbc)
 
-@deprecate add!(ch::ConstraintHandler, fh::FieldHandler, dbc::Dirichlet) add!(ch, dbc)
-
+@deprecate getcoordinates(node::Node) get_node_coordinate(node) true
+@deprecate cellcoords!(x::Vector, dh::DofHandler, args...) getcoordinates!(x, dh.grid, args...) false
 
 struct Cell{refdim, nnodes, nfaces}
     function Cell{refdim, nnodes, nfaces}(nodes) where {refdim, nnodes, nfaces}
@@ -329,3 +330,13 @@ end
 @deprecate value(ip::Interpolation, ξ::Vec) [shape_value(ip, ξ, i) for i in 1:getnbasefunctions(ip)] false
 @deprecate derivative(ip::Interpolation, ξ::Vec) [shape_gradient(ip, ξ, i) for i in 1:getnbasefunctions(ip)] false
 @deprecate value(ip::Interpolation, i::Int, ξ::Vec) shape_value(ip, ξ, i) false
+
+export MixedDofHandler
+function MixedDofHandler(::AbstractGrid)
+    error("MixedDofHandler is the standard DofHandler in Ferrite now and has been renamed to DofHandler.
+Use DofHandler even for mixed grids and fields on subdomains.")
+end
+
+@deprecate end_assemble finish_assemble
+@deprecate get_point_values evaluate_at_points
+@deprecate transform! transform_coordinates!

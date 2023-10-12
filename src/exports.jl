@@ -10,6 +10,7 @@ export
     RefTriangle,
     RefTetrahedron,
     RefPrism,
+    RefPyramid,
     BubbleEnrichedLagrange,
     CrouzeixRaviart,
     Lagrange,
@@ -22,8 +23,6 @@ export
     QuadratureRule,
     FaceQuadratureRule,
     getnquadpoints,
-    getweights,
-    getpoints,
 
 # FEValues
     AbstractCellValues,
@@ -61,8 +60,7 @@ export
     QuadraticHexahedron,
     SerendipityQuadraticHexahedron,
     Wedge,
-    getdim,
-    default_interpolation,
+    Pyramid,
     CellIndex,
     FaceIndex,
     EdgeIndex,
@@ -70,6 +68,8 @@ export
     ExclusiveTopology,
     getneighborhood,
     faceskeleton,
+    vertex_star_stencils,
+    getstencil,
     getcells,
     getncells,
     getnodes,
@@ -80,13 +80,9 @@ export
     getfaceset,
     getedgeset,
     getvertexset,
+    get_node_coordinate,
     getcoordinates,
     getcoordinates!,
-    getcellsets,
-    getnodesets,
-    getfacesets,
-    getedgesets,
-    getvertexsets,
     onboundary,
     nfaces,
     addnodeset!,
@@ -97,7 +93,7 @@ export
     addvertexset!,
     addboundaryvertexset!,
     addcellset!,
-    transform!,
+    transform_coordinates!,
     generate_grid,
 
 # Grid coloring
@@ -107,7 +103,7 @@ export
 
 # Dofs
     DofHandler,
-    MixedDofHandler, # only for getting an error message redirecting to DofHandler
+    SubDofHandler,
     close!,
     ndofs,
     ndofs_per_cell,
@@ -118,8 +114,6 @@ export
     dof_range,
     renumber!,
     DofOrder,
-    FieldHandler,
-    Field,
     evaluate_at_grid_nodes,
     apply_analytical!,
 
@@ -145,13 +139,18 @@ export
 # iterators
     CellCache,
     CellIterator,
+    FaceCache,
+    FaceIterator,
+    InterfaceCache,
+    InterfaceIterator,
     UpdateFlags,
     cellid,
+    interfacedofs,
 
 # assembly
     start_assemble,
     assemble!,
-    end_assemble,
+    finish_assemble,
 
 # VTK export
     vtk_grid,
@@ -167,7 +166,7 @@ export
 
 # Point Evaluation
     PointEvalHandler,
-    get_point_values,
+    evaluate_at_points,
     PointIterator,
     PointLocation,
     PointValues

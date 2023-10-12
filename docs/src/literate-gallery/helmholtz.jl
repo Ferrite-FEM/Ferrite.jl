@@ -1,4 +1,4 @@
-# # Helmholtz equation
+# # [Helmholtz equation](@id tutorial-helmholtz)
 #
 # In this example, we want to solve a (variant of) of the [Helmholtz equation](https://en.wikipedia.org/wiki/Helmholtz_equation).
 # The example is inspired by an [dealii step_7](https://www.dealii.org/8.4.1/doxygen/deal.II/step_7.html) on the standard square.
