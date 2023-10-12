@@ -77,7 +77,7 @@ function FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(qr:
 
         Mqp = @view M[:, qp]
         dMdξqp = @view dMdξ[:, qp]
-        shape_gradients_and_values!(dMdξqp, Mqp, ip, ξ)
+        shape_gradients_and_values!(dMdξqp, Mqp, gip, ξ)
     end
 
     detJdV = fill(T(NaN), max_n_qpoints, n_faces)
