@@ -120,7 +120,6 @@
                                        )
         dim = getcelltypedim(cell_shape)
         grid = generate_grid(cell_shape, ntuple(i -> 2, dim))
-        topology = ExclusiveTopology(grid)
         @testset "faces nodes indicies" begin
             ip = scalar_interpol isa DiscontinuousLagrange ? Lagrange{Ferrite.getrefshape(scalar_interpol), Ferrite.getorder(scalar_interpol)}() : scalar_interpol
             cell = getcells(grid, 1)
@@ -151,7 +150,6 @@
         quad_rule = Ferrite.create_face_quad_rule(RefTetrahedron, weights, points)
         dim = getcelltypedim(cell_shape)
         grid = generate_grid(cell_shape, ntuple(i -> 2, dim))
-        topology = ExclusiveTopology(grid)
         @testset "faces nodes indicies" begin
             ip = scalar_interpol isa DiscontinuousLagrange ? Lagrange{Ferrite.getrefshape(scalar_interpol), Ferrite.getorder(scalar_interpol)}() : scalar_interpol
             cell = getcells(grid, 1)
@@ -197,9 +195,22 @@
                 ]
 
         grid = Grid(cells, nodes)
-        topology = ExclusiveTopology(grid)
         test_interfacevalues(grid,
         DiscontinuousLagrange{RefHexahedron, 1}(), FaceQuadratureRule{RefHexahedron}(2))
+    end
+    @testset "Interface dof_range" begin
+        grid = generate_grid(Quadrilateral,(3,3))
+        ip_u = DiscontinuousLagrange{RefQuadrilateral, 1}()^2
+        ip_p = DiscontinuousLagrange{RefQuadrilateral, 1}()
+        qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
+        iv = InterfaceValues(qr_face, ip_p)
+        dh = DofHandler(grid)
+        add!(dh, :u, ip_u)
+        add!(dh, :p, ip_p)
+        add!(dh, :_p, ip_p)
+        close!(dh)
+        ic = first(InterfaceIterator(dh))
+        @test dof_range(ic, :p) == (9:12, 25:28)
     end
     # Test copy
     iv = InterfaceValues(FaceQuadratureRule{RefQuadrilateral}(2), DiscontinuousLagrange{RefQuadrilateral, 1}())
