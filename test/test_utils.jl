@@ -255,9 +255,9 @@ check_equal_or_nan(a::Union{Tensor, Array}, b::Union{Tensor, Array}) = all(check
 sample_random_point(::Type{Ferrite.RefHypercube{ref_dim}}) where {ref_dim} = Vec{ref_dim}(2.0 .* rand(Vec{ref_dim}) .- 1.0)
 # Dirichlet type sampling
 function sample_random_point(::Type{Ferrite.RefSimplex{ref_dim}}) where {ref_dim} 
-    ξ = rand(Vec{ref_dim})
+    ξ = rand(ref_dim+1)
     ξₜ = -log.(ξ)
-    return Vec{ref_dim}(ξₜ ./ sum(ξₜ))
+    return Vec{ref_dim}(ntuple(i->ξₜ[i], ref_dim) ./ sum(ξₜ))
 end
 # Wedge = Triangle ⊗ Line
 function sample_random_point(::Type{RefPrism})
