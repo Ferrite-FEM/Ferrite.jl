@@ -53,10 +53,17 @@
         # @testset let x = sample_random_point(ref_shape) # not compatible with Julia 1.6
         @testset "Random point test"
             x = sample_random_point(ref_shape)
-            # Check partition of unity at random point.
+            # Check gradient evaluation
             @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
                 reinterpret(Float64, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
-            @test sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
+            # Check partition of unity at random point.
+            ansatz_sum = sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs])
+            if ansatz_sum !≈ 1.0
+                # Show coordinate in case failure (see issue #811)
+                # Remove after 1.6 is removed from CI (see above)
+                println("Partition of unity test fails at $x for $interpolation !")
+                @test ansatz_sum ≈ 1.0
+            end
             # Check if the important functions are consistent
             @test length(coords) == n_basefuncs
             @test_throws ArgumentError shape_value(interpolation, x, n_basefuncs+1)
