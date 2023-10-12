@@ -309,7 +309,7 @@ for (func,                          ) in (
                 here::Bool
             )
             dof_range_here = 1:getnbasefunctions(iv.here)
-            dof_range_there = dof_range_here .+ getnbasefunctions(iv.there)
+            dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
             return $(func)(iv, q_point, u, dof_range_here, dof_range_there; here=here)
         end
         function $(func)(
@@ -336,7 +336,7 @@ for (func,                          f_,                     is_avg) in (
     @eval begin
         function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector)
             dof_range_here = 1:getnbasefunctions(iv.here)
-            dof_range_there = dof_range_here .+ getnbasefunctions(iv.there)
+            dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
             return $(func)(iv, qp, u, dof_range_here, dof_range_there)
         end
         function $(func)(
