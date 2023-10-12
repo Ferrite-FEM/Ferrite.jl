@@ -139,8 +139,6 @@ function getnormal(iv::InterfaceValues, qp::Int; here::Bool=true)
 end
 
 """
-    function_value(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
-    function_value(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, dof_range_here, u_there::AbstractVector, dof_range_there; here::Bool)
     function_value(iv::InterfaceValues, q_point::Int, u; here::Bool)
     function_value(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there; here::Bool)
 
@@ -164,8 +162,6 @@ function_value(::InterfaceValues, ::Int, args...; kwargs...)
 
 
 """
-    function_gradient(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector; here::Bool)
-    function_gradient(iv::InterfaceValues, q_point::Int, u_here::AbstractVector, dof_range_here, u_there::AbstractVector, dof_range_there; here::Bool)
     function_gradient(iv::InterfaceValues, q_point::Int, u; here::Bool)
     function_gradient(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there; here::Bool)
 
@@ -264,8 +260,6 @@ for (func,                      f_,               is_avg) in (
 end
 
 """
-    function_value_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
-    function_value_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, dof_range_here, u_there::AbstractVector, dof_range_there)
     function_value_average(iv::InterfaceValues, q_point::Int, u)
     function_value_average(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
@@ -274,8 +268,6 @@ Compute the average of the function value at the quadrature point on interface.
 function function_value_average end
 
 """
-    function_value_jump(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
-    function_value_jump(iv::InterfaceValues, qp::Int, u_here::AbstractVector, dof_range_here, u_there::AbstractVector, dof_range_there)
     function_value_jump(iv::InterfaceValues, q_point::Int, u)
     function_value_jump(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
@@ -288,8 +280,6 @@ multiply by the outward facing normal to the first element's side of the interfa
 function function_value_jump end
 
 """
-    function_gradient_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
-    function_gradient_average(iv::InterfaceValues, qp::Int, u_here::AbstractVector, dof_range_here, u_there::AbstractVector, dof_range_there)
     function_gradient_average(iv::InterfaceValues, q_point::Int, u)
     function_gradient_average(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
@@ -298,8 +288,6 @@ Compute the average of the function gradient at the quadrature point on the inte
 function function_gradient_average end
 
 """
-    function_gradient_jump(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
-    function_gradient_jump(iv::InterfaceValues, qp::Int, u_here::AbstractVector, dof_range_here, u_there::AbstractVector, dof_range_there)
     function_gradient_jump(iv::InterfaceValues, q_point::Int, u)
     function_gradient_jump(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
@@ -316,25 +304,6 @@ for (func,                          ) in (
     (:function_gradient,            ),
 )
     @eval begin
-        function $(func)(
-                iv::InterfaceValues, q_point::Int, u_here::AbstractVector, u_there::AbstractVector;
-                here::Bool
-            )
-            return $(func)(iv, q_point, u_here, eachindex(u_here), u_there, eachindex(u_there); here=here)
-        end
-        function $(func)(
-                iv::InterfaceValues, q_point::Int,
-                u_here::AbstractVector, dof_range_here::AbstractUnitRange{Int},
-                u_there::AbstractVector, dof_range_there::AbstractUnitRange{Int};
-                here::Bool
-            )
-            if here
-                return $(func)(iv.here, q_point, u_here, dof_range_here)
-            else # there
-                return $(func)(iv.there, q_point, u_there, dof_range_there)
-            end
-        end
-        # Single u dispatch
         function $(func)(
                 iv::InterfaceValues, q_point::Int, u::AbstractVector;
                 here::Bool
@@ -365,20 +334,6 @@ for (func,                          f_,                     is_avg) in (
     (:function_gradient_jump,       :function_gradient,     false),
 )
     @eval begin
-        function $(func)(iv::InterfaceValues, qp::Int, u_here::AbstractVector, u_there::AbstractVector)
-            return $(func)(iv, qp, u_here, eachindex(u_here), u_there, eachindex(u_there))
-        end
-        function $(func)(
-                iv::InterfaceValues, qp::Int,
-                u_here::AbstractVector, dof_range_here::AbstractUnitRange{Int},
-                u_there::AbstractVector, dof_range_there::AbstractUnitRange{Int},
-            )
-            f_here = $(f_)(iv.here, qp, u_here, dof_range_here)
-            f_there = $(f_)(iv.there, qp, u_there, dof_range_there)
-            $(is_avg) && return 0.5 * (f_here + f_there)
-            $(is_avg) || return f_there - f_here
-        end
-        # Single u dispatch
         function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector)
             dof_range_here = 1:getnbasefunctions(iv.here)
             dof_range_there = dof_range_here .+ getnbasefunctions(iv.there)

@@ -77,28 +77,18 @@
                 u = vcat(u_a, u_b)
                 u_scal = vcat(u_scal_a, u_scal_b)
                 for i in 1:getnquadpoints(iv)
-                    @test function_gradient(iv, i, u_a, u_b, here = here) ≈
-                        function_gradient(iv, i, u, here = here) ≈ H
-                    @test function_gradient(iv, i, u_scal_a, u_scal_b, here = here) ≈
-                        function_gradient(iv, i, u_scal, here = here) ≈ V
+                    @test function_gradient(iv, i, u, here = here) ≈ H
+                    @test function_gradient(iv, i, u_scal, here = here) ≈ V
 
-                    @test function_value_average(iv, i, u_scal_a, u_scal_b) ≈
-                        function_value_average(iv, i, u_scal) ≈ function_value(iv, i, u_scal_a, u_scal_b, here = here)
-                    @test all(function_value_jump(iv, i, u_scal_a, u_scal_b) .<= 30 * eps(Float64)) &&
-                        all(function_value_jump(iv, i, u_scal) .<= 30 * eps(Float64))
-                    @test function_gradient_average(iv, i, u_scal_a, u_scal_b) ≈
-                        function_gradient_average(iv, i, u_scal) ≈ function_gradient(iv, i, u_scal_a, u_scal_b, here = here)
-                    @test all(function_gradient_jump(iv, i, u_scal_a, u_scal_b) .<= 30 * eps(Float64)) &&
-                        all(function_gradient_jump(iv, i, u_scal) .<= 30 * eps(Float64))
+                    @test function_value_average(iv, i, u_scal) ≈ function_value(iv, i, u_scal, here = here)
+                    @test all(function_value_jump(iv, i, u_scal) .<= 30 * eps(Float64))
+                    @test function_gradient_average(iv, i, u_scal) ≈ function_gradient(iv, i, u_scal, here = here)
+                    @test all(function_gradient_jump(iv, i, u_scal) .<= 30 * eps(Float64))
 
-                    @test function_value_average(iv, i, u_a, u_b) ≈
-                        function_value_average(iv, i, u) ≈ function_value(iv, i, u_a, u_b, here = here)
-                    @test all(function_value_jump(iv, i, u_a, u_b) .<= 30 * eps(Float64)) &&
-                        all(function_value_jump(iv, i, u) .<= 30 * eps(Float64))
-                    @test function_gradient_average(iv, i, u_a, u_b) ≈
-                        function_gradient_average(iv, i, u) ≈ function_gradient(iv, i, u_a, u_b, here = here)
-                    @test all(function_gradient_jump(iv, i, u_a, u_b) .<= 30 * eps(Float64)) &&
-                        all(function_gradient_jump(iv, i, u) .<= 30 * eps(Float64))
+                    @test function_value_average(iv, i, u) ≈ function_value(iv, i, u, here = here)
+                    @test all(function_value_jump(iv, i, u) .<= 30 * eps(Float64))
+                    @test function_gradient_average(iv, i, u) ≈ function_gradient(iv, i, u, here = here)
+                    @test all(function_gradient_jump(iv, i, u) .<= 30 * eps(Float64))
 
                 end
                 # Test of volume
@@ -194,7 +184,7 @@
     #     DiscontinuousLagrange{RefQuadrilateral, 1}(), FaceQuadratureRule{RefQuadrilateral}(2),
     #     DiscontinuousLagrange{RefTriangle, 1}(), FaceQuadratureRule{RefTriangle}(2))
     # end
-    @testset "Unordered nodes 3D" begin # TODO: this shouldn't work because it should change the FaceValues object
+    @testset "Unordered nodes 3D" begin
         dim = 2
         nodes = [Node((-1.0, 0.0, 0.0)), Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)), 
                 Node((-1.0, 1.0, 0.0)), Node((0.0, 1.0, 0.0)), Node((1.0, 1.0, 0.0)), 
