@@ -76,7 +76,7 @@ end
 
 function PointValuesInternal(ξ::Vec{dim, T}, ip::IP) where {dim, T, shape <: AbstractRefShape{dim}, IP <: Interpolation{shape}}
     n_func_basefuncs = getnbasefunctions(ip)
-    N = [shape_value(ip, ξ, i) for i in 1:n_func_basefuncs]
+    N = @SVector [shape_value(ip, ξ, i) for i in 1:n_func_basefuncs]
     return PointValuesInternal{IP, eltype(N)}(N, ip)
 end
 
