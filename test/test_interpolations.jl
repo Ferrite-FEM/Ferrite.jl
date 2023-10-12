@@ -58,11 +58,11 @@
                 reinterpret(Float64, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
             # Check partition of unity at random point.
             ansatz_sum = sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs])
-            if ansatz_sum !≈ 1.0
+            if ansatz_sum ≉ 1.0
                 # Show coordinate in case failure (see issue #811)
                 # Remove after 1.6 is removed from CI (see above)
-                println("Partition of unity test fails at $x for $interpolation !")
-                @test ansatz_sum ≈ 1.0
+                println("Partition of unity test might fail at $x for $interpolation !")
+                @test ansatz_sum ≈ 1.0 atol=10*eps(Float64)
             end
             # Check if the important functions are consistent
             @test length(coords) == n_basefuncs
