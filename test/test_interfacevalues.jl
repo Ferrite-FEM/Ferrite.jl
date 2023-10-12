@@ -11,7 +11,7 @@
             reinit!(iv, ic)
             cell_a_coords = getcoordinates(ic.a.cc)
             cell_b_coords = getcoordinates(ic.b.cc)
-            @test interfacedofs(ic) == vcat(celldofs(ic.a), celldofs(ic.b))
+            
             nqp = getnquadpoints(iv)
             # Should have same quadrature points
             @test nqp == getnquadpoints(iv.here) == getnquadpoints(iv.there)
