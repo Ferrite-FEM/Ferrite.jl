@@ -405,12 +405,9 @@ dirichlet_boundarydof_indices(::Type{VertexIndex}) = Ferrite.dirichlet_vertexdof
 """
 Piecewise discontinuous Lagrange basis via Gauss-Lobatto points.
 """
-struct DiscontinuousLagrange{shape, order, value_type} <: ScalarInterpolation{shape, order}
+struct DiscontinuousLagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
     function DiscontinuousLagrange{shape, order}() where {shape <: AbstractRefShape, order}
-        new{shape, order, Float64}()
-    end
-    function DiscontinuousLagrange{shape, order, value_type}() where {shape <: AbstractRefShape, order, value_type}
-        new{shape, order, value_type}()
+        new{shape, order, nothing}()
     end
 end
 
@@ -430,24 +427,24 @@ dirichlet_edgedof_indices(ip::DiscontinuousLagrange{shape, order}) where {shape,
 dirichlet_vertexdof_indices(ip::DiscontinuousLagrange{shape, order}) where {shape, order} = dirichlet_vertexdof_indices(Lagrange{shape, order}())
 
 # Mirror the Lagrange element for now.
-function reference_coordinates(ip::DiscontinuousLagrange{shape, order, value_type}) where {shape, order, value_type}
-    return reference_coordinates(Lagrange{shape,order,value_type}())
+function reference_coordinates(ip::DiscontinuousLagrange{shape, order}) where {shape, order}
+    return reference_coordinates(Lagrange{shape,order}())
 end
-function shape_value(::DiscontinuousLagrange{shape, order, value_type}, ξ::Vec{dim}, i::Int) where {dim, shape <: AbstractRefShape{dim}, order, value_type}
-    return shape_value(Lagrange{shape, order, value_type}(), ξ, i)
+function shape_value(::DiscontinuousLagrange{shape, order}, ξ::Vec{dim}, i::Int) where {dim, shape <: AbstractRefShape{dim}, order}
+    return shape_value(Lagrange{shape, order}(), ξ, i)
 end
 
 # Excepting the L0 element.
-function reference_coordinates(ip::DiscontinuousLagrange{RefHypercube{dim},0,T}) where {dim, T}
-    return [Vec{dim, T}(ntuple(x->0.0, dim))]
+function reference_coordinates(ip::DiscontinuousLagrange{RefHypercube{dim},0}) where {dim}
+    return [Vec{dim, Float64}(ntuple(x->0.0, dim))]
 end
 
-function reference_coordinates(ip::DiscontinuousLagrange{RefTriangle,0,T}) where T
-    return [Vec{2,T}((1/3,1/3))]
+function reference_coordinates(ip::DiscontinuousLagrange{RefTriangle,0})
+    return [Vec{2, Float64}((1/3,1/3))]
 end
 
-function reference_coordinates(ip::DiscontinuousLagrange{RefTetrahedron,0,T}) where T
-   return [Vec{3,T}((1/4,1/4,1/4))]
+function reference_coordinates(ip::DiscontinuousLagrange{RefTetrahedron,0})
+   return [Vec{3, Float64}((1/4,1/4,1/4))]
 end
 
 function shape_value(ip::DiscontinuousLagrange{shape, 0}, ::Vec{dim, T}, i::Int) where {dim, shape <: AbstractRefShape{dim}, T}
@@ -460,12 +457,9 @@ is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
 ############
 # Lagrange #
 ############
-struct Lagrange{shape, order, value_type} <: ScalarInterpolation{shape, order}
+struct Lagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
     function Lagrange{shape, order}() where {shape <: AbstractRefShape, order}
-        new{shape, order, Float64}()
-    end
-    function Lagrange{shape, order,value_type}() where {shape <: AbstractRefShape, order, value_type}
-        new{shape, order, value_type}()
+        new{shape, order, nothing}()
     end
 end
 
@@ -490,9 +484,9 @@ getlowerorder(::Lagrange{shape,1}) where {shape} = DiscontinuousLagrange{shape,0
 ############################
 getnbasefunctions(::Lagrange{RefLine,1}) = 2
 
-function reference_coordinates(::Lagrange{RefLine, 1, T}) where T
-    return [Vec{1, T}((-1.0,)),
-            Vec{1, T}(( 1.0,))]
+function reference_coordinates(::Lagrange{RefLine,1})
+    return [Vec{1, Float64}((-1.0,)),
+            Vec{1, Float64}(( 1.0,))]
 end
 
 function shape_value(ip::Lagrange{RefLine, 1}, ξ::Vec{1, T}, i::Int) where T
@@ -510,10 +504,10 @@ getnbasefunctions(::Lagrange{RefLine,2}) = 3
 facedof_indices(::Lagrange{RefLine,2}) = ((1,), (2,))
 celldof_interior_indices(::Lagrange{RefLine,2}) = (3,)
 
-function reference_coordinates(::Lagrange{RefLine,2, T}) where T
-    return [Vec{1, T}((-1.0,)),
-            Vec{1, T}(( 1.0,)),
-            Vec{1, T}(( 0.0,))]
+function reference_coordinates(::Lagrange{RefLine,2})
+    return [Vec{1, Float64}((-1.0,)),
+            Vec{1, Float64}(( 1.0,)),
+            Vec{1, Float64}(( 0.0,))]
 end
 
 function shape_value(ip::Lagrange{RefLine, 2}, ξ::Vec{1, T}, i::Int) where T
@@ -531,11 +525,11 @@ getnbasefunctions(::Lagrange{RefQuadrilateral,1}) = 4
 
 facedof_indices(::Lagrange{RefQuadrilateral,1}) = ((1,2), (2,3), (3,4), (4,1))
 
-function reference_coordinates(::Lagrange{RefQuadrilateral,1,T}) where T
-    return [Vec{2, T}((-1.0, -1.0)),
-            Vec{2, T}(( 1.0, -1.0)),
-            Vec{2, T}(( 1.0,  1.0,)),
-            Vec{2, T}((-1.0,  1.0,))]
+function reference_coordinates(::Lagrange{RefQuadrilateral,1})
+    return [Vec{2, Float64}((-1.0, -1.0)),
+            Vec{2, Float64}(( 1.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  1.0,)),
+            Vec{2, Float64}((-1.0,  1.0,))]
 end
 
 function shape_value(ip::Lagrange{RefQuadrilateral, 1}, ξ::Vec{2, T}, i::Int) where T
@@ -557,16 +551,16 @@ facedof_indices(::Lagrange{RefQuadrilateral,2}) = ((1,2, 5), (2,3, 6), (3,4, 7),
 facedof_interior_indices(::Lagrange{RefQuadrilateral,2}) = ((5,), (6,), (7,), (8,))
 celldof_interior_indices(::Lagrange{RefQuadrilateral,2}) = (9,)
 
-function reference_coordinates(::Lagrange{RefQuadrilateral,2,T}) where T
-    return [Vec{2, T}((-1.0, -1.0)),
-            Vec{2, T}(( 1.0, -1.0)),
-            Vec{2, T}(( 1.0,  1.0)),
-            Vec{2, T}((-1.0,  1.0)),
-            Vec{2, T}(( 0.0, -1.0)),
-            Vec{2, T}(( 1.0,  0.0)),
-            Vec{2, T}(( 0.0,  1.0)),
-            Vec{2, T}((-1.0,  0.0)),
-            Vec{2, T}(( 0.0,  0.0))]
+function reference_coordinates(::Lagrange{RefQuadrilateral,2})
+    return [Vec{2, Float64}((-1.0, -1.0)),
+            Vec{2, Float64}(( 1.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  1.0)),
+            Vec{2, Float64}((-1.0,  1.0)),
+            Vec{2, Float64}(( 0.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  0.0)),
+            Vec{2, Float64}(( 0.0,  1.0)),
+            Vec{2, Float64}((-1.0,  0.0)),
+            Vec{2, Float64}(( 0.0,  0.0))]
 end
 
 function shape_value(ip::Lagrange{RefQuadrilateral, 2}, ξ::Vec{2, T}, i::Int) where T
@@ -593,23 +587,23 @@ facedof_indices(::Lagrange{RefQuadrilateral, 3}) = ((1,2, 5,6), (2,3, 7,8), (3,4
 facedof_interior_indices(::Lagrange{RefQuadrilateral, 3}) = ((5,6), (7,8), (9,10), (11,12))
 celldof_interior_indices(::Lagrange{RefQuadrilateral, 3}) = (13,14,15,16)
 
-function reference_coordinates(::Lagrange{RefQuadrilateral, 3, T}) where T
-    return [Vec{2, T}((-1.0, -1.0)),
-            Vec{2, T}(( 1.0, -1.0)),
-            Vec{2, T}(( 1.0,  1.0)),
-            Vec{2, T}((-1.0,  1.0)),
-            Vec{2, T}((-1/3, -1.0)),
-            Vec{2, T}(( 1/3, -1.0)),
-            Vec{2, T}(( 1.0, -1/3)),
-            Vec{2, T}(( 1.0,  1/3)),
-            Vec{2, T}(( 1/3,  1.0)),
-            Vec{2, T}((-1/3,  1.0)),
-            Vec{2, T}((-1.0,  1/3)),
-            Vec{2, T}((-1.0, -1/3)),
-            Vec{2, T}((-1/3, -1/3)),
-            Vec{2, T}(( 1/3, -1/3)),
-            Vec{2, T}((-1/3,  1/3)),
-            Vec{2, T}(( 1/3,  1/3))]
+function reference_coordinates(::Lagrange{RefQuadrilateral, 3})
+    return [Vec{2, Float64}((-1.0, -1.0)),
+            Vec{2, Float64}(( 1.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  1.0)),
+            Vec{2, Float64}((-1.0,  1.0)),
+            Vec{2, Float64}((-1/3, -1.0)),
+            Vec{2, Float64}(( 1/3, -1.0)),
+            Vec{2, Float64}(( 1.0, -1/3)),
+            Vec{2, Float64}(( 1.0,  1/3)),
+            Vec{2, Float64}(( 1/3,  1.0)),
+            Vec{2, Float64}((-1/3,  1.0)),
+            Vec{2, Float64}((-1.0,  1/3)),
+            Vec{2, Float64}((-1.0, -1/3)),
+            Vec{2, Float64}((-1/3, -1/3)),
+            Vec{2, Float64}(( 1/3, -1/3)),
+            Vec{2, Float64}((-1/3,  1/3)),
+            Vec{2, Float64}(( 1/3,  1/3))]
 end
 
 function shape_value(ip::Lagrange{RefQuadrilateral, 3}, ξ::Vec{2, T}, i::Int) where T
@@ -643,10 +637,10 @@ getnbasefunctions(::Lagrange{RefTriangle,1}) = 3
 
 facedof_indices(::Lagrange{RefTriangle,1}) = ((1,2), (2,3), (3,1))
 
-function reference_coordinates(::Lagrange{RefTriangle,1, T}) where T
-    return [Vec{2, T}((1.0, 0.0)),
-            Vec{2, T}((0.0, 1.0)),
-            Vec{2, T}((0.0, 0.0))]
+function reference_coordinates(::Lagrange{RefTriangle,1})
+    return [Vec{2, Float64}((1.0, 0.0)),
+            Vec{2, Float64}((0.0, 1.0)),
+            Vec{2, Float64}((0.0, 0.0))]
 end
 
 function shape_value(ip::Lagrange{RefTriangle, 1}, ξ::Vec{2, T}, i::Int) where T
@@ -666,13 +660,13 @@ getnbasefunctions(::Lagrange{RefTriangle,2}) = 6
 facedof_indices(::Lagrange{RefTriangle,2}) = ((1,2,4), (2,3,5), (3,1,6))
 facedof_interior_indices(::Lagrange{RefTriangle,2}) = ((4,), (5,), (6,))
 
-function reference_coordinates(::Lagrange{RefTriangle,2, T}) where T
-    return [Vec{2, T}((1.0, 0.0)),
-            Vec{2, T}((0.0, 1.0)),
-            Vec{2, T}((0.0, 0.0)),
-            Vec{2, T}((0.5, 0.5)),
-            Vec{2, T}((0.0, 0.5)),
-            Vec{2, T}((0.5, 0.0))]
+function reference_coordinates(::Lagrange{RefTriangle,2})
+    return [Vec{2, Float64}((1.0, 0.0)),
+            Vec{2, Float64}((0.0, 1.0)),
+            Vec{2, Float64}((0.0, 0.0)),
+            Vec{2, Float64}((0.5, 0.5)),
+            Vec{2, Float64}((0.0, 0.5)),
+            Vec{2, Float64}((0.5, 0.0))]
 end
 
 function shape_value(ip::Lagrange{RefTriangle, 2}, ξ::Vec{2, T}, i::Int) where T
@@ -694,12 +688,9 @@ end
 # see https://getfem.readthedocs.io/en/latest/userdoc/appendixA.html
 
 const Lagrange2Tri345 = Union{
-    Lagrange{RefTriangle,3,Float32},
-    Lagrange{RefTriangle,4,Float32},
-    Lagrange{RefTriangle,5,Float32},
-    Lagrange{RefTriangle,3,Float64},
-    Lagrange{RefTriangle,4,Float64},
-    Lagrange{RefTriangle,5,Float64},
+    Lagrange{RefTriangle,3},
+    Lagrange{RefTriangle,4},
+    Lagrange{RefTriangle,5},
 }
 
 function getnbasefunctions(ip::Lagrange2Tri345)
@@ -794,11 +785,11 @@ getnbasefunctions(::Lagrange{RefTetrahedron,1}) = 4
 facedof_indices(::Lagrange{RefTetrahedron,1}) = ((1,3,2), (1,2,4), (2,3,4), (1,4,3))
 edgedof_indices(::Lagrange{RefTetrahedron,1}) = ((1,2), (2,3), (3,1), (1,4), (2,4), (3,4))
 
-function reference_coordinates(::Lagrange{RefTetrahedron,1,T}) where T
-    return [Vec{3, T}((0.0, 0.0, 0.0)),
-            Vec{3, T}((1.0, 0.0, 0.0)),
-            Vec{3, T}((0.0, 1.0, 0.0)),
-            Vec{3, T}((0.0, 0.0, 1.0))]
+function reference_coordinates(::Lagrange{RefTetrahedron,1})
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0))]
 end
 
 function shape_value(ip::Lagrange{RefTetrahedron, 1}, ξ::Vec{3, T}, i::Int) where T
@@ -821,17 +812,17 @@ facedof_indices(::Lagrange{RefTetrahedron,2}) = ((1,3,2,7,6,5), (1,2,4,5,9,8), (
 edgedof_indices(::Lagrange{RefTetrahedron,2}) = ((1,2,5), (2,3,6), (3,1,7), (1,4,8), (2,4,9), (3,4,10))
 edgedof_interior_indices(::Lagrange{RefTetrahedron,2}) = ((5,), (6,), (7,), (8,), (9,), (10,))
 
-function reference_coordinates(::Lagrange{RefTetrahedron,2, T}) where T
-    return [Vec{3, T}((0.0, 0.0, 0.0)),
-            Vec{3, T}((1.0, 0.0, 0.0)),
-            Vec{3, T}((0.0, 1.0, 0.0)),
-            Vec{3, T}((0.0, 0.0, 1.0)),
-            Vec{3, T}((0.5, 0.0, 0.0)),
-            Vec{3, T}((0.5, 0.5, 0.0)),
-            Vec{3, T}((0.0, 0.5, 0.0)),
-            Vec{3, T}((0.0, 0.0, 0.5)),
-            Vec{3, T}((0.5, 0.0, 0.5)),
-            Vec{3, T}((0.0, 0.5, 0.5))]
+function reference_coordinates(::Lagrange{RefTetrahedron,2})
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0)),
+            Vec{3, Float64}((0.5, 0.0, 0.0)),
+            Vec{3, Float64}((0.5, 0.5, 0.0)),
+            Vec{3, Float64}((0.0, 0.5, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 0.5)),
+            Vec{3, Float64}((0.5, 0.0, 0.5)),
+            Vec{3, Float64}((0.0, 0.5, 0.5))]
 end
 
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch09.d/AFEM.Ch09.pdf
@@ -861,15 +852,15 @@ getnbasefunctions(::Lagrange{RefHexahedron,1}) = 8
 facedof_indices(::Lagrange{RefHexahedron,1}) = ((1,4,3,2), (1,2,6,5), (2,3,7,6), (3,4,8,7), (1,5,8,4), (5,6,7,8))
 edgedof_indices(::Lagrange{RefHexahedron,1}) = ((1,2), (2,3), (3,4), (4,1), (5,6), (6,7), (7,8), (8,5), (1,5), (2,6), (3,7), (4,8))
 
-function reference_coordinates(::Lagrange{RefHexahedron,1,T}) where T
-    return [Vec{3, T}((-1.0, -1.0, -1.0)),
-            Vec{3, T}(( 1.0, -1.0, -1.0)),
-            Vec{3, T}(( 1.0,  1.0, -1.0)),
-            Vec{3, T}((-1.0,  1.0, -1.0)),
-            Vec{3, T}((-1.0, -1.0,  1.0)),
-            Vec{3, T}(( 1.0, -1.0,  1.0)),
-            Vec{3, T}(( 1.0,  1.0,  1.0)),
-            Vec{3, T}((-1.0,  1.0,  1.0))]
+function reference_coordinates(::Lagrange{RefHexahedron,1})
+    return [Vec{3, Float64}((-1.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0,  1.0,  1.0)),
+            Vec{3, Float64}((-1.0,  1.0,  1.0))]
 end
 
 function shape_value(ip::Lagrange{RefHexahedron, 1}, ξ::Vec{3, T}, i::Int) where T
@@ -926,37 +917,37 @@ edgedof_interior_indices(::Lagrange{RefHexahedron,2}) = (
 
 celldof_interior_indices(::Lagrange{RefHexahedron,2}) = (27,)
 
-function reference_coordinates(::Lagrange{RefHexahedron,2,T}) where T
+function reference_coordinates(::Lagrange{RefHexahedron,2})
            # vertex
-    return [Vec{3, T}((-1.0, -1.0, -1.0)), #  1
-            Vec{3, T}(( 1.0, -1.0, -1.0)), #  2
-            Vec{3, T}(( 1.0,  1.0, -1.0)), #  3
-            Vec{3, T}((-1.0,  1.0, -1.0)), #  4
-            Vec{3, T}((-1.0, -1.0,  1.0)), #  5
-            Vec{3, T}(( 1.0, -1.0,  1.0)), #  6
-            Vec{3, T}(( 1.0,  1.0,  1.0)), #  7
-            Vec{3, T}((-1.0,  1.0,  1.0)), #  8
+    return [Vec{3, Float64}((-1.0, -1.0, -1.0)), #  1
+            Vec{3, Float64}(( 1.0, -1.0, -1.0)), #  2
+            Vec{3, Float64}(( 1.0,  1.0, -1.0)), #  3
+            Vec{3, Float64}((-1.0,  1.0, -1.0)), #  4
+            Vec{3, Float64}((-1.0, -1.0,  1.0)), #  5
+            Vec{3, Float64}(( 1.0, -1.0,  1.0)), #  6
+            Vec{3, Float64}(( 1.0,  1.0,  1.0)), #  7
+            Vec{3, Float64}((-1.0,  1.0,  1.0)), #  8
             # edge
-            Vec{3, T}(( 0.0, -1.0, -1.0)), #  9
-            Vec{3, T}(( 1.0,  0.0, -1.0)),
-            Vec{3, T}(( 0.0,  1.0, -1.0)),
-            Vec{3, T}((-1.0,  0.0, -1.0)),
-            Vec{3, T}(( 0.0, -1.0,  1.0)),
-            Vec{3, T}(( 1.0,  0.0,  1.0)),
-            Vec{3, T}(( 0.0,  1.0,  1.0)),
-            Vec{3, T}((-1.0,  0.0,  1.0)),
-            Vec{3, T}((-1.0, -1.0,  0.0)),
-            Vec{3, T}(( 1.0, -1.0,  0.0)),
-            Vec{3, T}(( 1.0,  1.0,  0.0)),
-            Vec{3, T}((-1.0,  1.0,  0.0)), # 20
-            Vec{3, T}(( 0.0,  0.0, -1.0)),
-            Vec{3, T}(( 0.0, -1.0,  0.0)),
-            Vec{3, T}(( 1.0,  0.0,  0.0)),
-            Vec{3, T}(( 0.0,  1.0,  0.0)),
-            Vec{3, T}((-1.0,  0.0,  0.0)),
-            Vec{3, T}(( 0.0,  0.0,  1.0)), # 26
+            Vec{3, Float64}(( 0.0, -1.0, -1.0)), #  9
+            Vec{3, Float64}(( 1.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0,  0.0,  1.0)),
+            Vec{3, Float64}(( 0.0,  1.0,  1.0)),
+            Vec{3, Float64}((-1.0,  0.0,  1.0)),
+            Vec{3, Float64}((-1.0, -1.0,  0.0)),
+            Vec{3, Float64}(( 1.0, -1.0,  0.0)),
+            Vec{3, Float64}(( 1.0,  1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  1.0,  0.0)), # 20
+            Vec{3, Float64}(( 0.0,  0.0, -1.0)),
+            Vec{3, Float64}(( 0.0, -1.0,  0.0)),
+            Vec{3, Float64}(( 1.0,  0.0,  0.0)),
+            Vec{3, Float64}(( 0.0,  1.0,  0.0)),
+            Vec{3, Float64}((-1.0,  0.0,  0.0)),
+            Vec{3, Float64}(( 0.0,  0.0,  1.0)), # 26
             # interior
-            Vec{3, T}((0.0, 0.0, 0.0)),    # 27
+            Vec{3, Float64}((0.0, 0.0, 0.0)),    # 27
             ]
 end
 
@@ -1010,13 +1001,13 @@ getnbasefunctions(::Lagrange{RefPrism,1}) = 6
 facedof_indices(::Lagrange{RefPrism,1}) = ((1,3,2), (1,2,5,4), (3,1,4,6), (2,3,6,5), (4,5,6))
 edgedof_indices(::Lagrange{RefPrism,1}) = ((2,1), (1,3), (1,4), (3,2), (2,5), (3,6), (4,5), (4,6), (6,5))
 
-function reference_coordinates(::Lagrange{RefPrism,1,T}) where T
-    return [Vec{3, T}((0.0, 0.0, 0.0)),
-            Vec{3, T}((1.0, 0.0, 0.0)),
-            Vec{3, T}((0.0, 1.0, 0.0)),
-            Vec{3, T}((0.0, 0.0, 1.0)),
-            Vec{3, T}((1.0, 0.0, 1.0)),
-            Vec{3, T}((0.0, 1.0, 1.0))]
+function reference_coordinates(::Lagrange{RefPrism,1})
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0)),
+            Vec{3, Float64}((1.0, 0.0, 1.0)),
+            Vec{3, Float64}((0.0, 1.0, 1.0))]
 end
 
 function shape_value(ip::Lagrange{RefPrism,1}, ξ::Vec{3, T}, i::Int) where T
@@ -1078,25 +1069,25 @@ edgedof_interior_indices(::Lagrange{RefPrism,2}) = (
     (15,),
 )
 
-function reference_coordinates(::Lagrange{RefPrism,2,T}) where T
-    return [Vec{3, T}((0.0, 0.0, 0.0)),
-            Vec{3, T}((1.0, 0.0, 0.0)),
-            Vec{3, T}((0.0, 1.0, 0.0)),
-            Vec{3, T}((0.0, 0.0, 1.0)),
-            Vec{3, T}((1.0, 0.0, 1.0)),
-            Vec{3, T}((0.0, 1.0, 1.0)),
-            Vec{3, T}((1/2, 0.0, 0.0)),
-            Vec{3, T}((0.0, 1/2, 0.0)),
-            Vec{3, T}((0.0, 0.0, 1/2)),
-            Vec{3, T}((1/2, 1/2, 0.0)),
-            Vec{3, T}((1.0, 0.0, 1/2)),
-            Vec{3, T}((0.0, 1.0, 1/2)),
-            Vec{3, T}((1/2, 0.0, 1.0)),
-            Vec{3, T}((0.0, 1/2, 1.0)),
-            Vec{3, T}((1/2, 1/2, 1.0)),
-            Vec{3, T}((1/2, 0.0, 1/2)),
-            Vec{3, T}((0.0, 1/2, 1/2)),
-            Vec{3, T}((1/2, 1/2, 1/2)),]
+function reference_coordinates(::Lagrange{RefPrism,2})
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0)),
+            Vec{3, Float64}((1.0, 0.0, 1.0)),
+            Vec{3, Float64}((0.0, 1.0, 1.0)),
+            Vec{3, Float64}((1/2, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1/2, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1/2)),
+            Vec{3, Float64}((1/2, 1/2, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 1/2)),
+            Vec{3, Float64}((0.0, 1.0, 1/2)),
+            Vec{3, Float64}((1/2, 0.0, 1.0)),
+            Vec{3, Float64}((0.0, 1/2, 1.0)),
+            Vec{3, Float64}((1/2, 1/2, 1.0)),
+            Vec{3, Float64}((1/2, 0.0, 1/2)),
+            Vec{3, Float64}((0.0, 1/2, 1/2)),
+            Vec{3, Float64}((1/2, 1/2, 1/2)),]
 end
 
 function shape_value(ip::Lagrange{RefPrism, 2}, ξ::Vec{3, T}, i::Int) where T
@@ -1133,12 +1124,12 @@ getnbasefunctions(::Lagrange{RefPyramid,1}) = 5
 facedof_indices(::Lagrange{RefPyramid,1}) = ((1,3,4,2), (1,2,5), (1,5,3), (2,4,5), (3,5,4), )
 edgedof_indices(::Lagrange{RefPyramid,1}) = ((1,2), (1,3), (1,5), (2,4), (2,5), (4,3), (3,5), (4,5))
  
-function reference_coordinates(::Lagrange{RefPyramid,1,T}) where T
-    return [Vec{3, T}((0.0, 0.0, 0.0)),
-            Vec{3, T}((1.0, 0.0, 0.0)),
-            Vec{3, T}((0.0, 1.0, 0.0)),
-            Vec{3, T}((1.0, 1.0, 0.0)),
-            Vec{3, T}((0.0, 0.0, 1.0))]
+function reference_coordinates(::Lagrange{RefPyramid,1})
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, 0.0)),
+            Vec{3, Float64}((1.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0))]
 end
 
 function shape_value(ip::Lagrange{RefPyramid,1}, ξ::Vec{3,T}, i::Int) where T
@@ -1192,23 +1183,23 @@ edgedof_interior_indices(::Lagrange{RefPyramid,2}) = (
     (12,),
     (13,),
 )
-function reference_coordinates(::Lagrange{RefPyramid,2,T}) where T
-    return [Vec{3, T}((0.0, 0.0, 0.0)),
-            Vec{3, T}((1.0, 0.0, 0.0)),
-            Vec{3, T}((0.0, 1.0, 0.0)),
-            Vec{3, T}((1.0, 1.0, 0.0)),
-            Vec{3, T}((0.0, 0.0, 1.0)),
+function reference_coordinates(::Lagrange{RefPyramid,2})
+    return [Vec{3, Float64}((0.0, 0.0, 0.0)),
+            Vec{3, Float64}((1.0, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 1.0, 0.0)),
+            Vec{3, Float64}((1.0, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 1.0)),
             # edges
-            Vec{3, T}((0.5, 0.0, 0.0)),
-            Vec{3, T}((0.0, 0.5, 0.0)),
-            Vec{3, T}((0.0, 0.0, 0.5)),
-            Vec{3, T}((1.0, 0.5, 0.0)),
-            Vec{3, T}((0.5, 0.0, 0.5)),
-            Vec{3, T}((0.5, 1.0, 0.0)),
-            Vec{3, T}((0.0, 0.5, 0.5)),
-            Vec{3, T}((0.5, 0.5, 0.5)),
+            Vec{3, Float64}((0.5, 0.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.5, 0.0)),
+            Vec{3, Float64}((0.0, 0.0, 0.5)),
+            Vec{3, Float64}((1.0, 0.5, 0.0)),
+            Vec{3, Float64}((0.5, 0.0, 0.5)),
+            Vec{3, Float64}((0.5, 1.0, 0.0)),
+            Vec{3, Float64}((0.0, 0.5, 0.5)),
+            Vec{3, Float64}((0.5, 0.5, 0.5)),
             # faces
-            Vec{3, T}((0.5, 0.5, 0.0))]
+            Vec{3, Float64}((0.5, 0.5, 0.0))]
 end
 
 function shape_value(ip::Lagrange{RefPyramid,2}, ξ::Vec{3,T}, i::Int) where T
@@ -1259,11 +1250,11 @@ vertexdof_indices(::BubbleEnrichedLagrange{RefTriangle,1}) = ((1,), (2,), (3,))
 facedof_indices(::BubbleEnrichedLagrange{RefTriangle,1}) = ((1,2), (2,3), (3,1))
 celldof_interior_indices(::BubbleEnrichedLagrange{RefTriangle,1}) = (4,)
 
-function reference_coordinates(::BubbleEnrichedLagrange{RefTriangle,1,T}) where T
-    return [Vec{2, T}((1.0, 0.0)),
-            Vec{2, T}((0.0, 1.0)),
-            Vec{2, T}((0.0, 0.0)),
-            Vec{2, T}((1/3, 1/3)),]
+function reference_coordinates(::BubbleEnrichedLagrange{RefTriangle,1})
+    return [Vec{2, Float64}((1.0, 0.0)),
+            Vec{2, Float64}((0.0, 1.0)),
+            Vec{2, Float64}((0.0, 0.0)),
+            Vec{2, Float64}((1/3, 1/3)),]
 end
 
 function shape_value(ip::BubbleEnrichedLagrange{RefTriangle, 1}, ξ::Vec{2, T}, i::Int) where T
@@ -1307,15 +1298,15 @@ getlowerorder(::Serendipity{RefQuadrilateral,2}) = Lagrange{RefQuadrilateral,1}(
 facedof_indices(::Serendipity{RefQuadrilateral,2}) = ((1,2,5), (2,3,6), (3,4,7), (4,1,8))
 facedof_interior_indices(::Serendipity{RefQuadrilateral,2}) = ((5,), (6,), (7,), (8,))
 
-function reference_coordinates(::Serendipity{RefQuadrilateral,2, T}) where T
-    return [Vec{2, T}((-1.0, -1.0)),
-            Vec{2, T}(( 1.0, -1.0)),
-            Vec{2, T}(( 1.0,  1.0)),
-            Vec{2, T}((-1.0,  1.0)),
-            Vec{2, T}(( 0.0, -1.0)),
-            Vec{2, T}(( 1.0,  0.0)),
-            Vec{2, T}(( 0.0,  1.0)),
-            Vec{2, T}((-1.0,  0.0))]
+function reference_coordinates(::Serendipity{RefQuadrilateral,2})
+    return [Vec{2, Float64}((-1.0, -1.0)),
+            Vec{2, Float64}(( 1.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  1.0)),
+            Vec{2, Float64}((-1.0,  1.0)),
+            Vec{2, Float64}(( 0.0, -1.0)),
+            Vec{2, Float64}(( 1.0,  0.0)),
+            Vec{2, Float64}(( 0.0,  1.0)),
+            Vec{2, Float64}((-1.0,  0.0))]
 end
 
 function shape_value(ip::Serendipity{RefQuadrilateral,2}, ξ::Vec{2, T}, i::Int) where T
@@ -1366,30 +1357,30 @@ edgedof_interior_indices(::Serendipity{RefHexahedron,2}) = (
     (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,)
 )
 
-function reference_coordinates(::Serendipity{RefHexahedron,2,T}) where T
-    return [Vec{3, T}((-1.0, -1.0, -1.0)),
-            Vec{3, T}(( 1.0, -1.0, -1.0)),
-            Vec{3, T}(( 1.0,  1.0, -1.0)),
-            Vec{3, T}((-1.0,  1.0, -1.0)),
-            Vec{3, T}((-1.0, -1.0,  1.0)),
-            Vec{3, T}(( 1.0, -1.0,  1.0)),
-            Vec{3, T}(( 1.0,  1.0,  1.0)),
-            Vec{3, T}((-1.0,  1.0,  1.0)),
-            Vec{3, T}((0.0, -1.0, -1.0)),
-            Vec{3, T}((1.0, 0.0, -1.0)),
-            Vec{3, T}((0.0, 1.0, -1.0)),
-            Vec{3, T}((-1.0, 0.0, -1.0)),
-            Vec{3, T}((0.0, -1.0, 1.0)),
-            Vec{3, T}((1.0, 0.0, 1.0)),
-            Vec{3, T}((0.0, 1.0, 1.0)),
-            Vec{3, T}((-1.0, 0.0, 1.0)),
-            Vec{3, T}((-1.0, -1.0, 0.0)),
-            Vec{3, T}((1.0, -1.0, 0.0)),
-            Vec{3, T}((1.0, 1.0, 0.0)),
-            Vec{3, T}((-1.0, 1.0, 0.0)),]
+function reference_coordinates(::Serendipity{RefHexahedron,2})
+    return [Vec{3, Float64}((-1.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0, -1.0, -1.0)),
+            Vec{3, Float64}(( 1.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0,  1.0, -1.0)),
+            Vec{3, Float64}((-1.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0, -1.0,  1.0)),
+            Vec{3, Float64}(( 1.0,  1.0,  1.0)),
+            Vec{3, Float64}((-1.0,  1.0,  1.0)),
+            Vec{3, Float64}((0.0, -1.0, -1.0)),
+            Vec{3, Float64}((1.0, 0.0, -1.0)),
+            Vec{3, Float64}((0.0, 1.0, -1.0)),
+            Vec{3, Float64}((-1.0, 0.0, -1.0)),
+            Vec{3, Float64}((0.0, -1.0, 1.0)),
+            Vec{3, Float64}((1.0, 0.0, 1.0)),
+            Vec{3, Float64}((0.0, 1.0, 1.0)),
+            Vec{3, Float64}((-1.0, 0.0, 1.0)),
+            Vec{3, Float64}((-1.0, -1.0, 0.0)),
+            Vec{3, Float64}((1.0, -1.0, 0.0)),
+            Vec{3, Float64}((1.0, 1.0, 0.0)),
+            Vec{3, Float64}((-1.0, 1.0, 0.0)),]
 end
 
-@inline function shape_value(ip::Serendipity{RefHexahedron, 2, Tv}, ξ::Vec{3, T}, i::Int) where {Tv,T}
+@inline function shape_value(ip::Serendipity{RefHexahedron, 2}, ξ::Vec{3, T}, i::Int) where T
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]

@@ -2,41 +2,41 @@
 
 @testset "Value Type $value_type" for value_type in (Float32,Float64)
     @testset "$interpolation" for interpolation in (
-                        Lagrange{RefLine, 1, value_type}(),
-                        Lagrange{RefLine, 2, value_type}(),
-                        Lagrange{RefQuadrilateral, 1, value_type}(),
-                        Lagrange{RefQuadrilateral, 2, value_type}(),
-                        Lagrange{RefQuadrilateral, 3, value_type}(),
-                        Lagrange{RefTriangle, 1, value_type}(),
-                        Lagrange{RefTriangle, 2, value_type}(),
-                        Lagrange{RefTriangle, 3, value_type}(),
-                        Lagrange{RefTriangle, 4, value_type}(),
-                        Lagrange{RefTriangle, 5, value_type}(),
-                        Lagrange{RefHexahedron, 1, value_type}(),
-                        Lagrange{RefHexahedron, 2, value_type}(),
-                        Serendipity{RefQuadrilateral, 2, value_type}(),
-                        Serendipity{RefHexahedron, 2, value_type}(),
-                        Lagrange{RefTetrahedron, 1, value_type}(),
-                        Lagrange{RefTetrahedron, 2, value_type}(),
-                        Lagrange{RefPrism, 1, value_type}(),
-                        Lagrange{RefPrism, 2, value_type}(),
-                        Lagrange{RefPyramid, 1, value_type}(),
-                        Lagrange{RefPyramid, 2, value_type}(),
+                        Lagrange{RefLine, 1}(),
+                        Lagrange{RefLine, 2}(),
+                        Lagrange{RefQuadrilateral, 1}(),
+                        Lagrange{RefQuadrilateral, 2}(),
+                        Lagrange{RefQuadrilateral, 3}(),
+                        Lagrange{RefTriangle, 1}(),
+                        Lagrange{RefTriangle, 2}(),
+                        Lagrange{RefTriangle, 3}(),
+                        Lagrange{RefTriangle, 4}(),
+                        Lagrange{RefTriangle, 5}(),
+                        Lagrange{RefHexahedron, 1}(),
+                        Lagrange{RefHexahedron, 2}(),
+                        Serendipity{RefQuadrilateral, 2}(),
+                        Serendipity{RefHexahedron, 2}(),
+                        Lagrange{RefTetrahedron, 1}(),
+                        Lagrange{RefTetrahedron, 2}(),
+                        Lagrange{RefPrism, 1}(),
+                        Lagrange{RefPrism, 2}(),
+                        Lagrange{RefPyramid, 1}(),
+                        Lagrange{RefPyramid, 2}(),
                         #
-                        DiscontinuousLagrange{RefLine, 0, value_type}(),
-                        DiscontinuousLagrange{RefQuadrilateral, 0, value_type}(),
-                        DiscontinuousLagrange{RefHexahedron, 0, value_type}(),
-                        DiscontinuousLagrange{RefTriangle, 0, value_type}(),
-                        DiscontinuousLagrange{RefTetrahedron, 0, value_type}(),
-                        DiscontinuousLagrange{RefLine, 1, value_type}(),
-                        DiscontinuousLagrange{RefQuadrilateral, 1, value_type}(),
-                        DiscontinuousLagrange{RefHexahedron, 1, value_type}(),
-                        DiscontinuousLagrange{RefTriangle, 1, value_type}(),
-                        DiscontinuousLagrange{RefTetrahedron, 1, value_type}(),
+                        DiscontinuousLagrange{RefLine, 0}(),
+                        DiscontinuousLagrange{RefQuadrilateral, 0}(),
+                        DiscontinuousLagrange{RefHexahedron, 0}(),
+                        DiscontinuousLagrange{RefTriangle, 0}(),
+                        DiscontinuousLagrange{RefTetrahedron, 0}(),
+                        DiscontinuousLagrange{RefLine, 1}(),
+                        DiscontinuousLagrange{RefQuadrilateral, 1}(),
+                        DiscontinuousLagrange{RefHexahedron, 1}(),
+                        DiscontinuousLagrange{RefTriangle, 1}(),
+                        DiscontinuousLagrange{RefTetrahedron, 1}(),
                         #
-                        BubbleEnrichedLagrange{RefTriangle, 1, value_type}(),
+                        BubbleEnrichedLagrange{RefTriangle, 1}(),
                         #
-                        CrouzeixRaviart{RefTriangle, 1, value_type}(),
+                        CrouzeixRaviart{RefTriangle, 1}(),
         )
 
         # Test of utility functions
@@ -176,17 +176,17 @@
         end
     end
 
-    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTriangle,0,value_type}()) ≈ [Vec{2,value_type}((1/3,1/3))]
-    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefQuadrilateral,0,value_type}()) ≈ [Vec{2,value_type}((0,0))]
-    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTetrahedron,0,value_type}()) ≈ [Vec{3,value_type}((1/4,1/4,1/4))]
-    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefHexahedron,0,value_type}()) ≈ [Vec{3,value_type}((0,0,0))]
+    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTriangle,0}()) ≈ [Vec{2}((1/3,1/3))]
+    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefQuadrilateral,0}()) ≈ [Vec{2}((0,0))]
+    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTetrahedron,0}()) ≈ [Vec{3}((1/4,1/4,1/4))]
+    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefHexahedron,0}()) ≈ [Vec{3}((0,0,0))]
 
     # Test discontinuous interpolations related functions
-    d_ip = DiscontinuousLagrange{RefQuadrilateral,1,value_type}()
-    d_ip_t = DiscontinuousLagrange{RefQuadrilateral,1,value_type}
+    d_ip = DiscontinuousLagrange{RefQuadrilateral,1}()
+    d_ip_t = DiscontinuousLagrange{RefQuadrilateral,1}
 
-    ip = Lagrange{RefQuadrilateral,1,value_type}()
-    ip_t = Lagrange{RefQuadrilateral,1,value_type}
+    ip = Lagrange{RefQuadrilateral,1}()
+    ip_t = Lagrange{RefQuadrilateral,1}
 
     @test Ferrite.is_discontinuous(ip) == false
     @test Ferrite.is_discontinuous(ip_t) == false
