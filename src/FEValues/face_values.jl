@@ -74,7 +74,7 @@ function FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(qr:
         Nqp = @view N[:, qp]
         dNdξqp = @view dNdξ[:, qp]
         shape_gradients_and_values!(dNdξqp, Nqp, ip, ξ)
-        
+
         Mqp = @view M[:, qp]
         dMdξqp = @view dMdξ[:, qp]
         shape_gradients_and_values!(dMdξqp, Mqp, ip, ξ)
@@ -223,7 +223,7 @@ function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interp
     M   = fill(zero(T) * T(NaN), n_geom_basefuncs, n_qpoints, n_boundary_entities)
     nqp = zeros(Int,n_boundary_entities)
 
-    for n_boundary_entity in 1:n_boundary_entities        
+    for n_boundary_entity in 1:n_boundary_entities
         for (qp, ξ) in enumerate(qrs[n_boundary_entity].points)
             Mqp = @view M[:, qp, n_boundary_entity]
             shape_values!(Mqp, geom_interpol, ξ)

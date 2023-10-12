@@ -71,7 +71,7 @@ function CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(qr::QR, ip::I
         Nqp = @view N[:, qp]
         dNdξqp = @view dNdξ[:, qp]
         shape_gradients_and_values!(dNdξqp, Nqp, ip, ξ)
-        
+
         Mqp = @view M[:, qp]
         dMdξqp = @view dMdξ[:, qp]
         shape_gradients_and_values!(dMdξqp, Mqp, ip, ξ)
