@@ -101,7 +101,6 @@
         end
     end
 end
-end
 
 @testset "#265: error message for incompatible geometric interpolation" begin
     dim = 1
