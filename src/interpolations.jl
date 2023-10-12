@@ -431,7 +431,7 @@ dirichlet_vertexdof_indices(ip::DiscontinuousLagrange{shape, order}) where {shap
 
 # Mirror the Lagrange element for now.
 function reference_coordinates(ip::DiscontinuousLagrange{shape, order, value_type}) where {shape, order, value_type}
-    return reference_coordinates(Lagrange{shape,order}())
+    return reference_coordinates(Lagrange{shape,order,value_type}())
 end
 function shape_value(::DiscontinuousLagrange{shape, order, value_type}, ξ::Vec{dim}, i::Int) where {dim, shape <: AbstractRefShape{dim}, order, value_type}
     return shape_value(Lagrange{shape, order, value_type}(), ξ, i)
