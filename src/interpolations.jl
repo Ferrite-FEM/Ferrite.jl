@@ -205,35 +205,35 @@ getnbasefunctions(::Interpolation)
 #   celldof: dof that is local to the element
 
 """
-    shape_values!(values::AbstractArray{T}, ip::Interpolation, ξ::Vec{T})
+    shape_values!(values::AbstractArray{T}, ip::Interpolation, ξ::Vec)
 
 Evaluate all shape functions of `ip` at once at the reference point `ξ` and store them in `values`.
 """
-function shape_values!(values::AT, ip::IP, ξ::Vec{T}) where {T, IP <: Interpolation, AT <: AbstractArray{T}}
+function shape_values!(values::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
     @inbounds for i in 1:getnbasefunctions(ip)
         values[i] = shape_value(ip, ξ, i)
     end
 end
 
 """
-    shape_gradients!(values::AbstractArray{T}, ip::Interpolation, ξ::Vec{T})
+    shape_gradients!(gradients::AbstractArray, ip::Interpolation, ξ::Vec)
 
 Evaluate all shape function gradients of `ip` at once at the reference point `ξ` and store them in `values`.
 """
-function shape_gradients!(values::AT, ip::IP, ξ::Vec{T}) where {T, IP <: Interpolation, AT <: AbstractArray{T}}
+function shape_gradients!(gradients::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
     @inbounds for i in 1:getnbasefunctions(ip)
         values[i] = shape_gradient(ip, ξ, i)
     end
 end
 
 """
-    shape_gradients_and_values!(gradients::AbstractArray{T}, shapes::AbstractArray{T}, ip::Interpolation, ξ::Vec{T})
+    shape_gradients_and_values!(gradients::AbstractArray, shapes::AbstractArray, ip::Interpolation, ξ::Vec)
 
 Evaluate all shape functions and their gradients of `ip` at once at the reference point `ξ` and store them in `values`.
 """
-function shape_gradients_and_values!(gradients::GAT, shapes::SAT, ip::IP, ξ::Vec{T}) where {T, IP <: Interpolation, SAT <: AbstractArray{T}, GAT <: AbstractArray{T}}
+function shape_gradients_and_values!(gradients::GAT, shapes::SAT, ip::IP, ξ::Vec) where {IP <: Interpolation, SAT <: AbstractArray, GAT <: AbstractArray}
     @inbounds for i in 1:getnbasefunctions(ip)
-        gradients[i], shapes[i] = shape_gradient_and_value(ip, ξ, basefunc)
+        gradients[i], shapes[i] = shape_gradient_and_value(ip, ξ, i)
     end
 end
 
@@ -503,7 +503,7 @@ is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
 # ...
 
 # Sum factorized eval for tensor product elements
-# function shape_values!(values::AT, ip::Lagrange{RefHypercube{2},order}, ξ::Vec{2,T}) where {T, AT <: AbstractArray{T}, order}
+# function shape_values!(values::AT, ip::Lagrange{RefHypercube{2},order}, ξ::Vec{2,T}) where {T, AT <: AbstractArray, order}
 #     # Auxillary 1D interpolation
 #     ip_1d = Lagrange{RefLine,order}()
 #     n_basefunctions_1d = getnbasefunctions(ip_1d)
@@ -518,7 +518,7 @@ is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
 #     TODO permutate values_2d
 # end
 
-# function shape_values!(gradients_2d::AT, ip::Lagrange{RefHypercube{2},order}, ξ::Vec{2,T}) where {T, AT <: AbstractArray{T}, order}
+# function shape_values!(gradients_2d::AT, ip::Lagrange{RefHypercube{2},order}, ξ::Vec{2,T}) where {T, AT <: AbstractArray, order}
 #     # Auxillary 1D interpolation
 #     ip_1d = Lagrange{RefLine,order}()
 #     n_basefunctions_1d = getnbasefunctions(ip_1d)
@@ -536,7 +536,7 @@ is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
 #     TODO permutate gradients_2d_2d
 # end
 
-# function shape_gradients_and_values!(gradients::GAT, shapes::SAT, ip::Lagrange{RefHypercube{2},order}, ξ::Vec {T}) where {T, SAT <: AbstractArray{T}, GAT <: AbstractArray{T}, dim, order}
+# function shape_gradients_and_values!(gradients::GAT, shapes::SAT, ip::Lagrange{RefHypercube{2},order}, ξ::Vec ) where {T, SAT <: AbstractArray, GAT <: AbstractArray, dim, order}
 #     # Auxillary 1D interpolation
 #     ip_1d = Lagrange{RefLine,order}()
 #     n_basefunctions_1d = getnbasefunctions(ip_1d)
