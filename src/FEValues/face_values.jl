@@ -71,12 +71,12 @@ function FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(qr:
     dMdξ = fill(zero(dMdξ_t) * T(NaN), n_geom_basefuncs, max_n_qpoints, n_faces)
 
     for face in 1:n_faces, (qp, ξ) in pairs(getpoints(qr, face))
-        Nqp = @view N[:, qp]
-        dNdξqp = @view dNdξ[:, qp]
+        Nqp = @view N[:, qp, face]
+        dNdξqp = @view dNdξ[:, qp, face]
         shape_gradients_and_values!(dNdξqp, Nqp, ip, ξ)
 
-        Mqp = @view M[:, qp]
-        dMdξqp = @view dMdξ[:, qp]
+        Mqp = @view M[:, qp, face]
+        dMdξqp = @view dMdξ[:, qp, face]
         shape_gradients_and_values!(dMdξqp, Mqp, gip, ξ)
     end
 
