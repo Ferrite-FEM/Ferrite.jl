@@ -28,6 +28,7 @@ for (scalar_interpol, quad_rule) in  (
 
         x, n = valid_coordinates_and_normals(func_interpol)
         reinit!(cv, x)
+        @test_call reinit!(cv, x)
 
         # We test this by applying a given deformation gradient on all the nodes.
         # Since this is a linear deformation we should get back the exact values
@@ -179,6 +180,7 @@ end
         ## sdim = 2, Consistency with 1D
         csv2 = CellValues(qr, ip, ip_base^2)
         reinit!(csv2, [Vec((0.0, 0.0)), Vec((1.0, 0.0))])
+        @test_call skip=true reinit!(csv2, [Vec((0.0, 0.0)), Vec((1.0, 0.0))]) # External error in pinv
         # Test spatial interpolation
         @test spatial_coordinate(csv2, 1, [Vec((0.0, 0.0)), Vec((1.0, 0.0))]) == Vec{2}((0.5, 0.0))
         # Test volume
@@ -199,6 +201,7 @@ end
         ## sdim = 3, Consistency with 1D
         csv3 = CellValues(qr, ip, ip_base^3)
         reinit!(csv3, [Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0))])
+        @test_call skip=true reinit!(csv3, [Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0))]) # External error in pinv
         # Test spatial interpolation
         @test spatial_coordinate(csv3, 1, [Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0))]) == Vec{3}((0.5, 0.0, 0.0))
         # Test volume
@@ -261,7 +264,9 @@ end
         csv2 = CellValues(qr, ip)
         csv3 = CellValues(qr, ip, ip_base^3)
         reinit!(csv2, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))])
+        @test_call skip=true reinit!(csv2, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))]) # External error in pinv
         reinit!(csv3, [Vec((-1.0,-1.0,0.0)), Vec((1.0,-1.0,0.0)), Vec((1.0,1.0,0.0)), Vec((-1.0,1.0,0.0))])
+        @test_call skip=true reinit!(csv3, [Vec((-1.0,-1.0,0.0)), Vec((1.0,-1.0,0.0)), Vec((1.0,1.0,0.0)), Vec((-1.0,1.0,0.0))]) # External error in pinv
         # Test spatial interpolation
         @test spatial_coordinate(csv2, 1, [Vec((-1.0,-1.0)), Vec((1.0,-1.0)), Vec((1.0,1.0)), Vec((-1.0,1.0))]) == Vec{2}((0.0, 0.0))
         @test spatial_coordinate(csv3, 1, [Vec((-1.0,-1.0,0.0)), Vec((1.0,-1.0,0.0)), Vec((1.0,1.0,0.0)), Vec((-1.0,1.0,0.0))]) == Vec{3}((0.0, 0.0, 0.0))
@@ -307,6 +312,8 @@ end
             @test Ferrite.shape_gradient_type(cv) == grad_type(Float32)
             @test cv.gip == scalar_ip(geo_ip)
         end
+        x = Ferrite.reference_coordinates(fun_ip)
+        @test_call reinit!(cv, x)
     end
 end
 

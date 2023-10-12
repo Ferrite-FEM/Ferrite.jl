@@ -17,6 +17,12 @@ if HAS_EXTENSIONS && MODULE_CAN_BE_TYPE_PARAMETER
     import Metis
 end
 
+const TEST_TYPE_STABILITY = VERSION >= v"1.9"
+
+if TEST_TYPE_STABILITY
+    using JET
+end
+
 include("test_utils.jl")
 include("test_interpolations.jl")
 include("test_cellvalues.jl")
