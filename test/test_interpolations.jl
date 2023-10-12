@@ -50,7 +50,9 @@
         n_basefuncs = getnbasefunctions(interpolation)
         coords = Ferrite.reference_coordinates(interpolation)
         f = (x) -> [shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
-        @testset let x = sample_random_point(ref_shape)
+        # @testset let x = sample_random_point(ref_shape) # not compatible with Julia 1.6
+        @testset "Random point test"
+            x = sample_random_point(ref_shape)
             # Check partition of unity at random point.
             @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
                 reinterpret(Float64, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
