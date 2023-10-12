@@ -1,4 +1,5 @@
 using Ferrite, Test
+import Ferrite: getdim, default_interpolation
 
 module ConvergenceTestHelper
 
@@ -15,15 +16,18 @@ get_geometry(::Ferrite.Interpolation{RefTetrahedron}) = Tetrahedron
 get_quadrature_order(::Lagrange{shape, order}) where {shape, order} = 2*order
 get_quadrature_order(::Serendipity{shape, order}) where {shape, order} = 2*order
 get_quadrature_order(::CrouzeixRaviart{shape, order}) where {shape, order} = 2*order+1
+get_quadrature_order(::BubbleEnrichedLagrange{shape, order}) where {shape, order} = 2*order
 
-get_N(::Ferrite.Interpolation{shape, 1}) where {shape} = 19
-get_N(::Ferrite.Interpolation{shape, 2}) where {shape} = 12
-get_N(::Ferrite.Interpolation{shape, 3}) where {shape} = 8
-get_N(::Ferrite.Interpolation{shape, 4}) where {shape} = 5
-get_N(::Ferrite.Interpolation{shape, 5}) where {shape} = 3
+get_num_elements(::Ferrite.Interpolation{shape, 1}) where {shape} = 21
+get_num_elements(::Ferrite.Interpolation{shape, 2}) where {shape} = 7
+get_num_elements(::Ferrite.Interpolation{RefHexahedron, 1}) = 11
+get_num_elements(::Ferrite.Interpolation{RefHexahedron, 2}) = 4
+get_num_elements(::Ferrite.Interpolation{shape, 3}) where {shape} = 8
+get_num_elements(::Ferrite.Interpolation{shape, 4}) where {shape} = 5
+get_num_elements(::Ferrite.Interpolation{shape, 5}) where {shape} = 3
 
 analytical_solution(x) = prod(cos, x*π/2)
-analytical_rhs(x) = -sum(diag(ForwardDiff.hessian(analytical_solution,x)))
+analytical_rhs(x) = -Tensors.laplace(analytical_solution,x)
 
 # Standard assembly copy pasta for Poisson problem
 function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues, coords)
@@ -50,7 +54,6 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues, coord
             end
         end
     end
-    @show norm(Ke), norm(fe)
     return Ke, fe
 end
 
@@ -114,14 +117,14 @@ function setup_poisson_problem(grid, interpolation, interpolation_geo, qr, N)
 
     ch = ConstraintHandler(dh);
     ∂Ω = union(
-        values(getfacesets(grid))...
+        values(grid.facesets)...
     );
     dbc = Dirichlet(:u, ∂Ω, (x, t) -> analytical_solution(x))
     add!(ch, dbc);
     close!(ch);
 
     cellvalues = CellValues(qr, interpolation, interpolation_geo);
-    
+
     return dh, ch, cellvalues
 end
 
@@ -155,7 +158,7 @@ end # module ConvergenceTestHelper
         # Generate a grid ...
         geometry = ConvergenceTestHelper.get_geometry(interpolation)
         interpolation_geo = default_interpolation(geometry)
-        N = ConvergenceTestHelper.get_N(interpolation)
+        N = ConvergenceTestHelper.get_num_elements(interpolation)
         grid = generate_grid(geometry, ntuple(x->N, getdim(geometry)));
         # ... a suitable quadrature rule ...
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
