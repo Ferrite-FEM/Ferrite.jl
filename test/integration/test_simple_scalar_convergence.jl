@@ -12,6 +12,7 @@ get_geometry(::Ferrite.Interpolation{RefTriangle}) = Triangle
 get_geometry(::Ferrite.Interpolation{RefPrism}) = Wedge
 get_geometry(::Ferrite.Interpolation{RefHexahedron}) = Hexahedron
 get_geometry(::Ferrite.Interpolation{RefTetrahedron}) = Tetrahedron
+get_geometry(::Ferrite.Interpolation{RefPyramid}) = Pyramid
 
 get_quadrature_order(::Lagrange{shape, order}) where {shape, order} = 2*order
 get_quadrature_order(::Serendipity{shape, order}) where {shape, order} = 2*order
@@ -80,9 +81,10 @@ function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHand
     return K, f
 end
 
-# Check L2 convergence
-function check_and_compute_convergence(dh, u, cellvalues, testatol)
+# Compute norms
+function check_and_compute_convergence_norms(dh, u, cellvalues, testatol)
     L2norm = 0.0
+    ∇L2norm = 0.0
     L∞norm = 0.0
     for cell in CellIterator(dh)
         reinit!(cellvalues, cell)
@@ -94,12 +96,18 @@ function check_and_compute_convergence(dh, u, cellvalues, testatol)
             x = spatial_coordinate(cellvalues, q_point, coords)
             uₐₙₐ    = prod(cos, x*π/2)
             uₐₚₚᵣₒₓ = function_value(cellvalues, q_point, uₑ)
-            L2norm += norm(uₐₙₐ-uₐₚₚᵣₒₓ)*dΩ
             L∞norm = max(L∞norm, norm(uₐₙₐ-uₐₚₚᵣₒₓ))
-            @test isapprox(uₐₙₐ, uₐₚₚᵣₒₓ; atol=testatol)
+            L2norm  += norm(uₐₙₐ-uₐₚₚᵣₒₓ)^2*dΩ
+
+            ∇uₐₙₐ    = gradient(x-> prod(cos, x*π/2), x)
+            ∇uₐₚₚᵣₒₓ = function_gradient(cellvalues, q_point, uₑ)
+            ∇L2norm += norm(∇uₐₙₐ-∇uₐₚₚᵣₒₓ)^2*dΩ
+            
+            # Pointwise convergence
+            @test uₐₙₐ ≈ uₐₚₚᵣₒₓ atol=testatol
         end
     end
-    L2norm, L∞norm
+    √(L2norm), √(∇L2norm), L∞norm
 end
 
 # Assemble and solve
@@ -109,7 +117,7 @@ function solve(dh, ch, cellvalues)
     u = K \ f;
 end
 
-function setup_poisson_problem(grid, interpolation, interpolation_geo, qr, N)
+function setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
     # Construct Ferrite stuff
     dh = DofHandler(grid)
     add!(dh, :u, interpolation)
@@ -130,26 +138,19 @@ end
 
 end # module ConvergenceTestHelper
 
+# These test only for convergence within margins
 @testset "convergence analysis" begin
     @testset "$interpolation" for interpolation in (
-        Lagrange{RefLine, 1}(),
-        Lagrange{RefLine, 2}(),
-        Lagrange{RefQuadrilateral, 1}(),
-        Lagrange{RefQuadrilateral, 2}(),
-        Lagrange{RefQuadrilateral, 3}(),
-        Lagrange{RefTriangle, 1}(),
-        Lagrange{RefTriangle, 2}(),
         Lagrange{RefTriangle, 3}(),
         Lagrange{RefTriangle, 4}(),
         Lagrange{RefTriangle, 5}(),
         Lagrange{RefHexahedron, 1}(),
-        Lagrange{RefHexahedron, 2}(),
+        Lagrange{RefTetrahedron, 1}(),
+        Lagrange{RefPrism, 1}(),
+        Lagrange{RefPyramid, 1}(),
+        #
         Serendipity{RefQuadrilateral, 2}(),
         Serendipity{RefHexahedron, 2}(),
-        Lagrange{RefTetrahedron, 1}(),
-        Lagrange{RefTetrahedron, 2}(),
-        Lagrange{RefPrism, 1}(),
-        Lagrange{RefPrism, 2}(),
         #
         BubbleEnrichedLagrange{RefTriangle, 1}(),
         #
@@ -164,8 +165,52 @@ end # module ConvergenceTestHelper
         qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
         qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
         # ... and then pray to the gods of convergence.
-        dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid, interpolation, interpolation_geo, qr, N)
+        dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
         u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
-        ConvergenceTestHelper.check_and_compute_convergence(dh, u, cellvalues, 1e-2)
+        ConvergenceTestHelper.check_and_compute_convergence_norms(dh, u, cellvalues, 1e-2)
+    end
+end
+
+# These test also for correct convergence rates
+@testset "convergence rate" begin
+    @testset "$interpolation" for interpolation in (
+        Lagrange{RefLine, 1}(),
+        Lagrange{RefLine, 2}(),
+        Lagrange{RefQuadrilateral, 1}(),
+        Lagrange{RefQuadrilateral, 2}(),
+        Lagrange{RefQuadrilateral, 3}(),
+        Lagrange{RefTriangle, 1}(),
+        Lagrange{RefTriangle, 2}(),
+        Lagrange{RefHexahedron, 2}(),
+        Lagrange{RefTetrahedron, 2}(),
+        Lagrange{RefPrism, 2}(),
+    )
+        # Generate a grid ...
+        geometry = ConvergenceTestHelper.get_geometry(interpolation)
+        interpolation_geo = default_interpolation(geometry)
+        # "Coarse case"
+        N₁ = ConvergenceTestHelper.get_num_elements(interpolation)
+        grid = generate_grid(geometry, ntuple(x->N₁, getdim(geometry)));
+        # ... a suitable quadrature rule ...
+        qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
+        qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
+        # ... and then pray to the gods of convergence.
+        dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
+        u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
+        L2₁, H1₁, _ = ConvergenceTestHelper.check_and_compute_convergence_norms(dh, u, cellvalues, 1e-2)
+        
+        # "Fine case"
+        N₂ = 2*N₁
+        grid = generate_grid(geometry, ntuple(x->N₂, getdim(geometry)));
+        # ... a suitable quadrature rule ...
+        qr_order = ConvergenceTestHelper.get_quadrature_order(interpolation)
+        qr = QuadratureRule{getrefshape(interpolation)}(qr_order)
+        # ... and then pray to the gods of convergence.
+        dh, ch, cellvalues = ConvergenceTestHelper.setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
+        u = ConvergenceTestHelper.solve(dh, ch, cellvalues)
+        L2₂, H1₂, _ = ConvergenceTestHelper.check_and_compute_convergence_norms(dh, u, cellvalues, 5e-3)
+
+        @test -(log(L2₂)-log(L2₁))/(log(N₂)-log(N₁)) ≈ Ferrite.getorder(interpolation)+1 atol=0.1
+        @test -(log(H1₂)-log(H1₁))/(log(N₂)-log(N₁)) ≈ Ferrite.getorder(interpolation) atol=0.1
     end
 end
