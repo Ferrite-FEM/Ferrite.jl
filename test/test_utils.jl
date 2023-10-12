@@ -267,7 +267,7 @@ function sample_random_point(::Type{RefPrism})
 end
 # TODO what to do here? The samplig is not uniform...
 function sample_random_point(::Type{RefPyramid})
-    ξ₃ = rand(Float64)
+    ξ₃ = (1-1e-3)*rand(Float64) # Derivative is discontinuous at the top
     # If we fix a z coordinate we get a Quad with extends (1-ξ₃)
     (ξ₁, ξ₂) = (1.0 - ξ₃) .* rand(Vec{2})
     return Vec{3}((ξ₁, ξ₂, ξ₃))
