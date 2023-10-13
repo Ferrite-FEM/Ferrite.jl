@@ -37,15 +37,15 @@ end
 
 struct CellValues{FV, GV, QR, detT<:AbstractVector} <: AbstractCellValues
     fun_values::FV # FunctionValues
-    geo_values::GV # GeometryValues
+    geo_mapping::GV # GeometryMapping
     qr::QR         # QuadratureRule
     detJdV::detT   # AbstractVector{<:Number}
 end
 function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation) where T 
-    geo_values = GeometryValues(T, ip_geo.ip, qr, RequiresHessian(ip_fun, ip_geo))
+    geo_mapping = GeometryMapping(T, ip_geo.ip, qr, RequiresHessian(ip_fun, ip_geo))
     fun_values = FunctionValues(T, ip_fun, qr, ip_geo)
     detJdV = fill(T(NaN), length(getweights(qr)))
-    return CellValues(fun_values, geo_values, qr, detJdV)
+    return CellValues(fun_values, geo_mapping, qr, detJdV)
 end
 
 CellValues(qr::QuadratureRule, ip::Interpolation, args...) = CellValues(Float64, qr, ip, args...)
@@ -54,13 +54,13 @@ function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolatio
 end
 
 function Base.copy(cv::CellValues)
-    return CellValues(copy(cv.fun_values), copy(cv.geo_values), copy(cv.qr), copy(cv.detJdV))
+    return CellValues(copy(cv.fun_values), copy(cv.geo_mapping), copy(cv.qr), copy(cv.detJdV))
 end
 
 # Access geometry values
 for op = (:getngeobasefunctions, :geometric_value)
     eval(quote
-        @propagate_inbounds $op(cv::CellValues, args...) = $op(cv.geo_values, args...)
+        @propagate_inbounds $op(cv::CellValues, args...) = $op(cv.geo_mapping, args...)
     end)
 end
 getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
@@ -68,7 +68,7 @@ getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 # Accessors for function values 
 getnbasefunctions(cv::CellValues) = getnbasefunctions(cv.fun_values)
 get_function_interpolation(cv::CellValues) = get_function_interpolation(cv.fun_values)
-get_geometric_interpolation(cv::CellValues) = get_geometric_interpolation(cv.geo_values)
+get_geometric_interpolation(cv::CellValues) = get_geometric_interpolation(cv.geo_mapping)
 shape_value_type(cv::CellValues) = shape_value_type(cv.fun_values)
 shape_gradient_type(cv::CellValues) = shape_gradient_type(cv.fun_values)
 
@@ -82,14 +82,14 @@ getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 
 function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
     check_reinit_sdim_consistency(:CellValues, shape_gradient_type(cv), eltype(x))
-    geo_values = cv.geo_values
+    geo_mapping = cv.geo_mapping
     fun_values = cv.fun_values
-    n_geom_basefuncs = getngeobasefunctions(geo_values)
+    n_geom_basefuncs = getngeobasefunctions(geo_mapping)
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x)!=n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     end
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
-        mapping = calculate_mapping(geo_values, q_point, x)
+        mapping = calculate_mapping(geo_mapping, q_point, x)
         detJ = calculate_detJ(getjacobian(mapping))
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         @inbounds cv.detJdV[q_point] = detJ*w
