@@ -62,7 +62,7 @@
                 # Show coordinate in case failure (see issue #811)
                 # Remove after 1.6 is removed from CI (see above)
                 println("Partition of unity test might fail at $x for $interpolation !")
-                @test ansatz_sum ≈ 1.0 atol=10*eps(Float64)
+                @test ansatz_sum ≈ 1.0
             end
             # Check if the important functions are consistent
             @test length(coords) == n_basefuncs
