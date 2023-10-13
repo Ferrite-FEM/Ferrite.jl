@@ -92,8 +92,8 @@ for (scalar_interpol, quad_rule) in  (
             cvc = copy(cv)
             @test typeof(cv) == typeof(cvc)
 
-            # Test that all mutable types in FunctionValues and GeometryValues have been copied
-            for key in (:fun_values, :geo_values)
+            # Test that all mutable types in FunctionValues and GeometryMapping have been copied
+            for key in (:fun_values, :geo_mapping)
                 val = getfield(cv, key)
                 valc = getfield(cvc, key)
                 for fname in fieldnames(typeof(val))
@@ -294,7 +294,7 @@ end
 
 @testset "CellValues constructor entry points" begin
     qr = QuadratureRule{RefTriangle}(1)
-    _get_geo_ip(cv::CellValues) = cv.geo_values.ip
+    _get_geo_ip(cv::CellValues) = cv.geo_mapping.ip
     for fun_ip in (Lagrange{RefTriangle, 1}(), Lagrange{RefTriangle, 2}()^2)
         value_type(T) = fun_ip isa ScalarInterpolation ? T : Vec{2, T}
         grad_type(T) = fun_ip isa ScalarInterpolation ? Vec{2, T} : Tensor{2, 2, T, 4}

@@ -24,7 +24,7 @@ struct PointValues{CV} <: AbstractValues
     PointValues{CV}(cv::CV) where {CV} = new{CV}(cv)
 end
 
-PointValues(cv::CellValues) = PointValues(eltype(shape_value(cv,1,1)), cv.fun_values.ip, cv.geo_values.ip)
+PointValues(cv::CellValues) = PointValues(eltype(shape_value(cv,1,1)), cv.fun_values.ip, cv.geo_mapping.ip)
 function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_interpolation(ip))
     return PointValues(Float64, ip, ipg)
 end

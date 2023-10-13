@@ -1,4 +1,7 @@
-# Mapping of finite elements
+# FEValues
+A key type of object in `Ferrite.jl` are the so-called `FEValues`, where the most common ones are `CellValues` and `FaceValues`. These objects are used inside the element routines and are used to query the integration weights, shape function values and gradients, and much more, see [`CellValues`](@ref) and [`FaceValues`](@ref). In order for these values to be correct, it is necessary to reinitialize these for the current cell by using the [`reinit!`](@ref) function. This maps the values from the reference cell to the actual cell, a process which is described in detail below, see [Mapping of finite elements](@ref mapping_theory). Thereafter, we show an implementation of a [`SimpleCellValues`](@ref SimpleCellValues) type for the most standard case, excluding the generalizations and optimization that complicates the code for e.g. `CellValues`.
+
+## [Mapping of finite elements](@id mapping_theory)
 The shape functions and gradients stored in an `FEValues` object, is reinitialized for each cell by calling the `reinit!` function. The main part of this calculation, considers how to map the functions described on the reference cell, to the actual cell.
 
 The geometric mapping of a finite element from the reference coordinates to the real coordinates is shown in the following illustration. 
@@ -8,8 +11,8 @@ The geometric mapping of a finite element from the reference coordinates to the 
 This mapping is given by the geometric shape functions, $\hat{N}_i^g(\boldsymbol{\xi})$, such that 
 ```math
 \begin{align*}
-    \boldsymbol{x}(\boldsymbol{\xi}) =& \sum_{i}^N \hat{\boldsymbol{x}}_i \hat{N}_i^g(\boldsymbol{\xi}) \\
-    \boldsymbol{J} :=& \frac{\mathrm{d}\boldsymbol{x}}{\mathrm{d}\boldsymbol{\xi}} = \sum_{i}^N \hat{\boldsymbol{x}}_i \otimes \frac{\mathrm{d} \hat{N}_i^g}{\mathrm{d}\boldsymbol{\xi}}\\
+    \boldsymbol{x}(\boldsymbol{\xi}) =& \sum_{\alpha=1}^N \hat{\boldsymbol{x}}_\alpha \hat{N}_\alpha^g(\boldsymbol{\xi}) \\
+    \boldsymbol{J} :=& \frac{\mathrm{d}\boldsymbol{x}}{\mathrm{d}\boldsymbol{\xi}} = \sum_{\alpha=1}^N \hat{\boldsymbol{x}}_\alpha \otimes \frac{\mathrm{d} \hat{N}_\alpha^g}{\mathrm{d}\boldsymbol{\xi}}\\
     \boldsymbol{\mathcal{H}} :=&
     \frac{\mathrm{d} \boldsymbol{J}}{\mathrm{d} \boldsymbol{\xi}} = \sum_{\alpha=1}^N \hat{\boldsymbol{x}}_\alpha \otimes \frac{\mathrm{d}^2 \hat{N}^g_\alpha}{\mathrm{d} \boldsymbol{\xi}^2}
 \end{align*}
@@ -26,7 +29,7 @@ We require that the mapping from reference coordinates to real coordinates is [d
 ```
 Depending on the function interpolation, we may want different types of mappings to conserve certain properties of the fields. This results in the different mapping types described below.
 
-## Identity mapping
+### Identity mapping
 `Ferrite.IdentityMapping`
 
 For scalar fields, we always use scalar base functions. For tensorial fields (non-scalar, e.g. vector-fields), the base functions can be constructed from scalar base functions, by using e.g. `VectorizedInterpolation`. From the perspective of the mapping, however, each component is mapped as an individual scalar base function. And for scalar base functions, we only require that the value of the base function is invariant to the element shape (real coordinate), and only depends on the reference coordinate, i.e. 
@@ -37,7 +40,7 @@ For scalar fields, we always use scalar base functions. For tensorial fields (no
 \end{align*}
 ```
 
-## Covariant Piola mapping, H(curl)
+### Covariant Piola mapping, H(curl)
 `Ferrite.CovariantPiolaMapping`
 
 The covariant Piola mapping of a vectorial base function preserves the tangential components. For the value, the mapping is defined as 
@@ -69,7 +72,7 @@ which yields the gradient,
     \end{align*}
     ```
 
-## Contravariant Piola mapping, H(div)
+### Contravariant Piola mapping, H(div)
 `Ferrite.ContravariantPiolaMapping`
 
 The covariant Piola mapping of a vectorial base function preserves the normal components. For the value, the mapping is defined as 
@@ -101,3 +104,26 @@ This gives the gradient
     \end{align*}
     ```
 
+## [Walkthrough: Creating `SimpleCellValues`](@id SimpleCellValues)
+In the following, we walk through how to create a `SimpleCellValues` type which 
+works similar to `Ferrite.jl`'s `CellValues`, but is not performance optimized and not as general. The main purpose is to explain how the `CellValues` works for the standard case of `IdentityMapping` described above. 
+Please note that several internal functions are used, and these may change without a major version increment. Please see the [Developer documentation](@ref) for their documentation. 
+
+```@eval
+# Include the example here, but modify the Literate output to suit being embedded
+using Literate, Markdown
+filename = "SimpleCellValues"
+Literate.markdown(filename*".jl"; execute=true)
+contents = read(filename*".md", String)
+Literate.script(filename*".jl"; name="SimpleCellValues")
+rm(filename*".jl")
+rm(filename*".md")
+header_end = last(findnext("```", contents, 4))+1
+Markdown.parse(replace(contents[header_end:end], 
+    "*This page was generated using [Literate.jl]"=>"*This example was generated using [Literate.jl]")
+    )
+```
+
+## Further reading
+* [defelement.com](https://defelement.com/ciarlet.html#Mapping+finite+elements)
+* Kirby (2017) [Kirby2017](@cite)

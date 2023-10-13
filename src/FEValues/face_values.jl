@@ -33,7 +33,7 @@ FaceValues
 
 struct FaceValues{FV, GV, QR, detT, nT, V_FV<:AbstractVector{FV}, V_GV<:AbstractVector{GV}} <: AbstractFaceValues
     fun_values::V_FV # AbstractVector{FunctionValues}
-    geo_values::V_GV # AbstractVector{GeometryValues}
+    geo_mapping::V_GV # AbstractVector{GeometryMapping}
     qr::QR           # FaceQuadratureRule
     detJdV::detT     # AbstractVector{<:Number}
     normals::nT      # AbstractVector{<:Vec}
@@ -41,12 +41,12 @@ struct FaceValues{FV, GV, QR, detT, nT, V_FV<:AbstractVector{FV}, V_GV<:Abstract
 end
 
 function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}=default_geometric_interpolation(ip_fun)) where {T,sdim} 
-    geo_values = [GeometryValues(T, ip_geo.ip, qr, RequiresHessian(ip_fun, ip_geo)) for qr in fqr.face_rules]
+    geo_mapping = [GeometryMapping(T, ip_geo.ip, qr, RequiresHessian(ip_fun, ip_geo)) for qr in fqr.face_rules]
     fun_values = [FunctionValues(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
     max_nquadpoints = maximum(qr->length(getweights(qr)), fqr.face_rules)
     detJdV = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim,T})*T(NaN), max_nquadpoints)
-    return FaceValues(fun_values, geo_values, fqr, detJdV, normals, ScalarWrapper(1))
+    return FaceValues(fun_values, geo_mapping, fqr, detJdV, normals, ScalarWrapper(1))
 end
 
 FaceValues(qr::FaceQuadratureRule, ip::Interpolation, args...) = FaceValues(Float64, qr, ip, args...)
@@ -56,11 +56,11 @@ end
 
 function Base.copy(fv::FaceValues)
     fun_values = map(copy, fv.fun_values)
-    geo_values = map(copy, fv.geo_values)
-    return FaceValues(fun_values, geo_values, copy(fv.qr), copy(fv.detJdV), copy(fv.normals), copy(fv.current_face))
+    geo_mapping = map(copy, fv.geo_mapping)
+    return FaceValues(fun_values, geo_mapping, copy(fv.qr), copy(fv.detJdV), copy(fv.normals), copy(fv.current_face))
 end
 
-getngeobasefunctions(fv::FaceValues) = getngeobasefunctions(get_geo_values(fv))
+getngeobasefunctions(fv::FaceValues) = getngeobasefunctions(get_geo_mapping(fv))
 getnbasefunctions(fv::FaceValues) = getnbasefunctions(get_fun_values(fv))
 getnquadpoints(fv::FaceValues) = getnquadpoints(fv.qr, getcurrentface(fv))
 getdetJdV(fv::FaceValues, q_point) = fv.detJdV[q_point]
@@ -68,12 +68,12 @@ getdetJdV(fv::FaceValues, q_point) = fv.detJdV[q_point]
 shape_value_type(fv::FaceValues) = shape_value_type(get_fun_values(fv))
 shape_gradient_type(fv::FaceValues) = shape_gradient_type(get_fun_values(fv))
 get_function_interpolation(fv::FaceValues) = get_function_interpolation(get_fun_values(fv))
-get_geometric_interpolation(fv::FaceValues) = get_geometric_interpolation(get_geo_values(fv))
+get_geometric_interpolation(fv::FaceValues) = get_geometric_interpolation(get_geo_mapping(fv))
 
-get_geo_values(fv::FaceValues) = @inbounds fv.geo_values[getcurrentface(fv)]
+get_geo_mapping(fv::FaceValues) = @inbounds fv.geo_mapping[getcurrentface(fv)]
 for op = (:getngeobasefunctions, :geometric_value)
     eval(quote
-        @propagate_inbounds $op(fv::FaceValues, args...) = $op(get_geo_values(fv), args...)
+        @propagate_inbounds $op(fv::FaceValues, args...) = $op(get_geo_mapping(fv), args...)
     end)
 end
 
@@ -100,7 +100,7 @@ Return the normal at the quadrature point `qp` for the active face of the
 """
 getnormal(fv::FaceValues, qp::Int) = fv.normals[qp]
 
-nfaces(fv::FaceValues) = length(fv.geo_values)
+nfaces(fv::FaceValues) = length(fv.geo_mapping)
 
 function checkface(fv::FaceValues, face::Int)
     0 < face <= nfaces(fv) || error("Face index out of range.")
@@ -109,18 +109,26 @@ end
 
 function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int, cell=nothing) where {dim, T}
     check_reinit_sdim_consistency(:FaceValues, shape_gradient_type(fv), eltype(x))
-    @boundscheck checkface(fv, face_nr)
-    n_geom_basefuncs = getngeobasefunctions(fv)
-    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
-    
+    checkface(fv, face_nr)
     fv.current_face[] = face_nr
-
-    geo_values = get_geo_values(fv)
+    
+    n_geom_basefuncs = getngeobasefunctions(fv)
+    if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x)!=n_geom_basefuncs
+        throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+    end
+    
+    # Must be done after setting current face, which should be done after checkface
+    geo_mapping = get_geo_mapping(fv)
     fun_values = get_fun_values(fv)
+
+    if cell === nothing && !isa(get_mapping_type(fun_values), IdentityMapping)
+        throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
+    end
+
     @inbounds for (q_point, w) in pairs(getweights(fv.qr, face_nr))
-        mapping = calculate_mapping(geo_values, q_point, x)
+        mapping = calculate_mapping(geo_mapping, q_point, x)
         J = getjacobian(mapping)
-        weight_norm = weighted_normal(J, getrefshape(geo_values.ip), face_nr)
+        weight_norm = weighted_normal(J, getrefshape(geo_mapping.ip), face_nr)
         detJ = norm(weight_norm)
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         @inbounds fv.detJdV[q_point] = detJ*w

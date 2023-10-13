@@ -19,14 +19,14 @@ function RequiresHessian(ip_fun::Interpolation, ip_geo::Interpolation)
     RequiresHessian(requires_hessian(get_mapping_type(ip_fun)))
 end
 
-struct GeometryValues{IP, M_t, dMdξ_t, d2Mdξ2_t}
+struct GeometryMapping{IP, M_t, dMdξ_t, d2Mdξ2_t}
     ip::IP             # ::Interpolation                Geometric interpolation 
     M::M_t             # ::AbstractVector{<:Number}     Values of geometric shape functions
     dMdξ::dMdξ_t       # ::AbstractVector{<:Vec}        Gradients of geometric shape functions in ref-domain
     d2Mdξ2::d2Mdξ2_t   # ::AbstractVector{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
                        # ::Nothing                      When hessians are not required
 end
-function GeometryValues(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule, ::RequiresHessian{RH}) where {T,RH}
+function GeometryMapping(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule, ::RequiresHessian{RH}) where {T,RH}
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
     VT   = Vec{getdim(ip),T}
@@ -47,18 +47,18 @@ function GeometryValues(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule, 
             end
         end
     end
-    return GeometryValues(ip, M, dMdξ, dM2dξ2)
+    return GeometryMapping(ip, M, dMdξ, dM2dξ2)
 end
-function Base.copy(v::GeometryValues)
+function Base.copy(v::GeometryMapping)
     d2Mdξ2_copy = v.d2Mdξ2 === nothing ? nothing : copy(v.d2Mdξ2)
-    return GeometryValues(copy(v.ip), copy(v.M), copy(v.dMdξ), d2Mdξ2_copy)
+    return GeometryMapping(copy(v.ip), copy(v.M), copy(v.dMdξ), d2Mdξ2_copy)
 end
 
-getngeobasefunctions(geovals::GeometryValues) = size(geovals.M, 1)
-@propagate_inbounds geometric_value(geovals::GeometryValues, q_point::Int, base_func::Int) = geovals.M[base_func, q_point]
-get_geometric_interpolation(geovals::GeometryValues) = geovals.ip
+getngeobasefunctions(geo_mapping::GeometryMapping) = size(geo_mapping.M, 1)
+@propagate_inbounds geometric_value(geo_mapping::GeometryMapping, q_point::Int, base_func::Int) = geo_mapping.M[base_func, q_point]
+get_geometric_interpolation(geo_mapping::GeometryMapping) = geo_mapping.ip
 
-RequiresHessian(geovals::GeometryValues) = RequiresHessian(geovals.d2Mdξ2 !== nothing)
+RequiresHessian(geo_mapping::GeometryMapping) = RequiresHessian(geo_mapping.d2Mdξ2 !== nothing)
 
 # Hot-fixes to support embedded elements before MixedTensors are available
 # See https://github.com/Ferrite-FEM/Tensors.jl/pull/188
@@ -79,23 +79,23 @@ function otimes_returntype(#=typeof(x)=#::Type{<:Vec{dim,Tx}}, #=typeof(d2Mdξ2)
     return Tensor{3,dim,promote_type(Tx,TM)}
 end
 
-@propagate_inbounds calculate_mapping(geovals::GeometryValues, args...) = calculate_mapping(RequiresHessian(geovals), geovals, args...)
+@propagate_inbounds calculate_mapping(geo_mapping::GeometryMapping, args...) = calculate_mapping(RequiresHessian(geo_mapping), geo_mapping, args...)
 
-@inline function calculate_mapping(::RequiresHessian{false}, geo_values::GeometryValues, q_point, x)
-    fecv_J = zero(otimes_returntype(eltype(x), eltype(geo_values.dMdξ)))
-    @inbounds for j in 1:getngeobasefunctions(geo_values)
-        #fecv_J += x[j] ⊗ geo_values.dMdξ[j, q_point]
-        fecv_J += otimes_helper(x[j], geo_values.dMdξ[j, q_point])
+@inline function calculate_mapping(::RequiresHessian{false}, geo_mapping::GeometryMapping, q_point, x)
+    fecv_J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
+    @inbounds for j in 1:getngeobasefunctions(geo_mapping)
+        #fecv_J += x[j] ⊗ geo_mapping.dMdξ[j, q_point]
+        fecv_J += otimes_helper(x[j], geo_mapping.dMdξ[j, q_point])
     end
     return MappingValues(fecv_J, nothing)
 end
 
-@inline function calculate_mapping(::RequiresHessian{true}, geo_values::GeometryValues, q_point, x)
-    J = zero(otimes_returntype(eltype(x), eltype(geo_values.dMdξ)))
-    H = zero(otimes_returntype(eltype(x), eltype(geo_values.d2Mdξ2)))
-    @inbounds for j in 1:getngeobasefunctions(geo_values)
-        J += x[j] ⊗ geo_values.dMdξ[j, q_point]
-        H += x[j] ⊗ geo_values.d2Mdξ2[j, q_point]
+@inline function calculate_mapping(::RequiresHessian{true}, geo_mapping::GeometryMapping, q_point, x)
+    J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
+    H = zero(otimes_returntype(eltype(x), eltype(geo_mapping.d2Mdξ2)))
+    @inbounds for j in 1:getngeobasefunctions(geo_mapping)
+        J += x[j] ⊗ geo_mapping.dMdξ[j, q_point]
+        H += x[j] ⊗ geo_mapping.d2Mdξ2[j, q_point]
     end
     return MappingValues(J, H)
 end

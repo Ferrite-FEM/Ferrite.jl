@@ -97,8 +97,8 @@ for (scalar_interpol, quad_rule) in (
             fvc = copy(fv)
             @test typeof(fv) == typeof(fvc)
 
-            # Test that all mutable types in FunctionValues and GeometryValues have been copied
-            for key in (:fun_values, :geo_values)
+            # Test that all mutable types in FunctionValues and GeometryMapping have been copied
+            for key in (:fun_values, :geo_mapping)
                 for i in eachindex(getfield(fv, key))
                     val = getfield(fv, key)[i]
                     valc = getfield(fvc, key)[i]
