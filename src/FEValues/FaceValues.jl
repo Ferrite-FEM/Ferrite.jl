@@ -132,6 +132,7 @@ function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int, ce
     @inbounds for (q_point, w) in pairs(getweights(fv.qr, face_nr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         J = getjacobian(mapping)
+        # See the `Ferrite.embedded_det` docstring for more background
         weight_norm = weighted_normal(J, getrefshape(geo_mapping.ip), face_nr)
         detJ = norm(weight_norm)
         detJ > 0.0 || throw_detJ_not_pos(detJ)
