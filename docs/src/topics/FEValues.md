@@ -112,7 +112,7 @@ Please note that several internal functions are used, and these may change witho
 ```@eval
 # Include the example here, but modify the Literate output to suit being embedded
 using Literate, Markdown
-filename = "SimpleCellValues"
+filename = "SimpleCellValues_literate"
 Literate.markdown(filename*".jl"; execute=true)
 contents = read(filename*".md", String)
 Literate.script(filename*".jl"; name="SimpleCellValues")

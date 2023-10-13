@@ -1,3 +1,13 @@
+"""
+    MappingValues(J, H)
+
+The mapping values are calculated based on a 
+`geometric_mapping::GeometryMapping` along with the cell coordinates,
+and the stored jacobian, `J`, and potentially hessian, `H`, are 
+used when mapping the `FunctionValues` to the current cell during `reinit!`.
+"""
+MappingValues
+
 struct MappingValues{JT, HT<:Union{Nothing,AbstractTensor{3}}}
     J::JT # dx/dξ # Jacobian
     H::HT # dJ/dξ # Hessian
@@ -18,6 +28,14 @@ function RequiresHessian(ip_fun::Interpolation, ip_geo::Interpolation)
     # This optimization is left out for now. 
     RequiresHessian(requires_hessian(get_mapping_type(ip_fun)))
 end
+
+"""
+    GeometryMapping(::Type{T}, ip_geo, qr::QuadratureRule, ::RequiresHessian{B})
+
+Create a `GeometryMapping` object which contains the geometric shape, gradients, and, 
+if `B==true`, the hessian values. `T<:AbstractFloat` gives the numeric type of the values.
+"""
+GeometryMapping
 
 struct GeometryMapping{IP, M_t, dMdξ_t, d2Mdξ2_t}
     ip::IP             # ::Interpolation                Geometric interpolation 

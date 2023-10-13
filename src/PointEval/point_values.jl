@@ -71,7 +71,7 @@ function reinit!(pv::PointValues, x::AbstractVector{<:Vec{D}}, ξ::Vec{D}) where
     return nothing
 end
 
-# Optimized version of PointScalarValues which avoids i) recomputation of dNdξ and
+# Optimized version of PointValues which avoids i) recomputation of dNdξ and
 # ii) recomputation of dNdx. Only allows function evaluation (no gradients) which is
 # what is used in evaluate_at_points.
 struct PointValuesInternal{IP, N_t} <: AbstractValues

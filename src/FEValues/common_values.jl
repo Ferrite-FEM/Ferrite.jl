@@ -137,14 +137,15 @@ function function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, d
     return val
 end
 
-# TODO: Implement fallback or require this to be defined?
-#       Alt: shape_value_type(cv) = typeof(shape_value(cv, qp=1, i=1))
 """
     shape_value_type(fe_v::AbstractValues)
 
 Return the type of `shape_value(fe_v, q_point, base_function)`
 """
-function shape_value_type end
+function shape_value_type(fe_v::AbstractValues)
+    # Default fallback
+    return typeof(shape_value(fe_v, 1, 1))
+end
 
 function_value_init(cv::AbstractValues, ::AbstractVector{T}) where {T} = zero(shape_value_type(cv)) * zero(T)
 
@@ -188,14 +189,15 @@ function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector
     return grad
 end
 
-# TODO: Implement fallback or require this to be defined?
-#       Alt: shape_gradient_type(cv) = typeof(shape_gradient(cv, qp=1, i=1))
 """
     shape_gradient_type(fe_v::AbstractValues)
 
 Return the type of `shape_gradient(fe_v, q_point, base_function)`
 """
-function shape_gradient_type end
+function shape_gradient_type(fe_v::AbstractValues)
+    # Default fallback
+    return typeof(shape_gradient(fe_v, 1, 1))
+end
 
 function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {T}
     return zero(shape_gradient_type(cv)) * zero(T)

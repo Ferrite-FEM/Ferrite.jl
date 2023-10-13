@@ -334,4 +334,8 @@ end
     println(stdout)
 end
 
+@testset "SimpleCellValues" begin
+    include(joinpath(@__DIR__, "../docs/src/topics/SimpleCellValues_literate.jl"))
+end
+
 end # of testset
