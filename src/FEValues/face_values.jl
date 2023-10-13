@@ -109,14 +109,22 @@ end
 
 function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int, cell=nothing) where {dim, T}
     check_reinit_sdim_consistency(:FaceValues, shape_gradient_type(fv), eltype(x))
-    @boundscheck checkface(fv, face_nr)
-    n_geom_basefuncs = getngeobasefunctions(fv)
-    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
-    
+    checkface(fv, face_nr)
     fv.current_face[] = face_nr
-
+    
+    n_geom_basefuncs = getngeobasefunctions(fv)
+    if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x)!=n_geom_basefuncs
+        throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+    end
+    
+    # Must be done after setting current face, which should be done after checkface
     geo_mapping = get_geo_mapping(fv)
     fun_values = get_fun_values(fv)
+
+    if cell === nothing && !isa(get_mapping_type(fun_values), IdentityMapping)
+        throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
+    end
+
     @inbounds for (q_point, w) in pairs(getweights(fv.qr, face_nr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         J = getjacobian(mapping)

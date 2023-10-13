@@ -81,10 +81,14 @@ end
 getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 
 function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
-    check_reinit_sdim_consistency(:CellValues, shape_gradient_type(cv), eltype(x))
     geo_mapping = cv.geo_mapping
     fun_values = cv.fun_values
     n_geom_basefuncs = getngeobasefunctions(geo_mapping)
+    
+    check_reinit_sdim_consistency(:CellValues, shape_gradient_type(cv), eltype(x))
+    if cell === nothing && !isa(get_mapping_type(fun_values), IdentityMapping)
+        throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
+    end
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x)!=n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     end
