@@ -31,9 +31,9 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 """
 FaceValues
 
-struct FaceValues{FV, GV, QR, detT, nT, V_FV<:AbstractVector{FV}, V_GV<:AbstractVector{GV}} <: AbstractFaceValues
+struct FaceValues{FV, GM, QR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:AbstractVector{GM}} <: AbstractFaceValues
     fun_values::V_FV # AbstractVector{FunctionValues}
-    geo_mapping::V_GV # AbstractVector{GeometryMapping}
+    geo_mapping::V_GM # AbstractVector{GeometryMapping}
     qr::QR           # FaceQuadratureRule
     detJdV::detT     # AbstractVector{<:Number}
     normals::nT      # AbstractVector{<:Vec}

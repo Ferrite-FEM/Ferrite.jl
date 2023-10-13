@@ -35,9 +35,9 @@ function default_geometric_interpolation(::Interpolation{shape}) where {dim, sha
     return VectorizedInterpolation{dim}(Lagrange{shape, 1}())
 end
 
-struct CellValues{FV, GV, QR, detT<:AbstractVector} <: AbstractCellValues
+struct CellValues{FV, GM, QR, detT<:AbstractVector} <: AbstractCellValues
     fun_values::FV # FunctionValues
-    geo_mapping::GV # GeometryMapping
+    geo_mapping::GM # GeometryMapping
     qr::QR         # QuadratureRule
     detJdV::detT   # AbstractVector{<:Number}
 end
