@@ -6,6 +6,7 @@ DocTestSetup = :(using Ferrite)
 Degrees of freedom (dofs) are distributed by the [`DofHandler`](@ref).
 ```@docs
 DofHandler
+SubDofHandler
 ```
 
 ## Adding fields to the DofHandlers
@@ -30,8 +31,12 @@ celldofs
 celldofs!
 ```
 
-# CellIterator
+# Grid iterators
 ```@docs
 CellCache
 CellIterator
+FaceCache
+FaceIterator
+InterfaceCache
+InterfaceIterator
 ```

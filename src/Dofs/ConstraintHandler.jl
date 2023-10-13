@@ -511,14 +511,16 @@ conditions specified in `ch` such that `K \\ rhs` gives the expected solution.
 
 !!! note
     `apply!(K, rhs, ch)` essentially calculates
+    ```julia
+    rhs[free] = rhs[free] - K[constrained, constrained] * a[constrained]
+    ```
+    where `a[constrained]` are the inhomogeneities. Consequently, the sign of `rhs` matters
+    (in contrast with `apply_zero!`).
 
-    `rhs[free_dofs] = rhs[free_dofs] - K[free_dofs, constrained_dofs] * a[constrained]`
-    
-    where `a[constrained]` are the inhomogeneities. 
-    Consequently, the sign of `rhs` matters (in contrast to for `apply_zero!`).
 
-
-    apply!(v::AbstractVector, ch::ConstraintHandler)
+```julia
+apply!(v::AbstractVector, ch::ConstraintHandler)
+```
 
 Apply Dirichlet boundary conditions and affine constraints, specified in `ch`, to the solution vector `v`.
 
@@ -579,6 +581,7 @@ apply_zero!(v::AbstractVector, ch::ConstraintHandler) = _apply_v(v, ch, true)
 apply!(     v::AbstractVector, ch::ConstraintHandler) = _apply_v(v, ch, false)
 
 function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
+    @assert isclosed(ch)
     @assert length(v) >= ndofs(ch.dh)
     v[ch.prescribed_dofs] .= apply_zero ? 0.0 : ch.inhomogeneities
     # Apply affine constraints, e.g u2 = s6*u6 + s3*u3 + h2
@@ -608,6 +611,7 @@ const APPLY_INPLACE = ApplyStrategy.Inplace
 
 function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false;
                 strategy::ApplyStrategy.T=ApplyStrategy.Transpose)
+    @assert isclosed(ch)
     sym = isa(KK, Symmetric)
     K = sym ? KK.data : KK
     @assert length(f) == 0 || length(f) == size(K, 1)
@@ -845,7 +849,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
             # BCValues are just dummy for nodesets so set to FaceIndex
             EntityType = FaceIndex
         end
-        CT = getcelltype(get_grid(ch.dh), first(sdh.cellset)) # Same celltype enforced in SubDofHandler constructor
+        CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
         bcvalues = BCValues(interpolation, default_interpolation(CT), EntityType)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
@@ -1618,6 +1622,7 @@ end
 function _apply_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
                        global_dofs::AbstractVector, ch::ConstraintHandler, apply_zero::Bool,
                        global_matrix, global_vector)
+    @assert isclosed(ch)
     # TODO: With apply_zero it shouldn't be required to pass the vector.
     length(global_dofs) == size(local_matrix, 1) == size(local_matrix, 2) == length(local_vector) || error("?")
     # First pass over the dofs check whether there are any constrained dofs at all

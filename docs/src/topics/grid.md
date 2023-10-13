@@ -31,7 +31,7 @@ In case only a part of the mesh is the domain, the domain can be specified by pr
 If you want to read another, not yet supported cell from gmsh, consider to open a PR at `FerriteGmsh` that extends the [`gmshtoferritecell` dict](https://github.com/Ferrite-FEM/FerriteGmsh.jl/blob/c9de4f64b3ad3c73fcb36758855a6e517c6d0d95/src/FerriteGmsh.jl#L6-L15)
 and if needed, reorder the element nodes by dispatching [`FerriteGmsh.translate_elements`](https://github.com/Ferrite-FEM/FerriteGmsh.jl/blob/c9de4f64b3ad3c73fcb36758855a6e517c6d0d95/src/FerriteGmsh.jl#L17-L63).
 The reordering of nodes is necessary if the Gmsh ordering doesn't match the one from Ferrite. Gmsh ordering is documented [here](https://gmsh.info/doc/texinfo/gmsh.html#Node-ordering).
-For an exemplary usage of `Gmsh.jl` and `FerriteGmsh.jl`, consider the [Stokes flow](@ref) and [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](@ref) example.
+For an exemplary usage of `Gmsh.jl` and `FerriteGmsh.jl`, consider the [Stokes flow](@ref tutorial-stokes-flow) and [Incompressible Navier-Stokes Equations via DifferentialEquations.jl](@ref tutorial-ins-ordinarydiffeq) example.
 
 ### FerriteMeshParser
 
@@ -169,12 +169,13 @@ Ferrite.getnodes(grid::SmallGrid) = grid.nodes_test
 Ferrite.getnodes(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.nodes_test[v]
 Ferrite.getnnodes(grid::SmallGrid) = length(grid.nodes_test)
 Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
+Ferrite.get_coordinate_type(::SmallGrid{dim}) where dim = Vec{dim,Float64}
 Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
 Ferrite.n_faces_per_cell(grid::SmallGrid) = nfaces(eltype(grid.cells_test))
 ```
 
 These definitions make many of `Ferrite`s functions work out of the box, e.g. you can now call 
-`get_cell_coordinates(grid, cellid)` on the `SmallGrid`. 
+`getcoordinates(grid, cellid)` on the `SmallGrid`. 
 
 Now, you would be able to assemble the heat equation example over the new custom `SmallGrid` type.
 Note that this particular subtype isn't able to handle boundary entity sets and so, you can't describe boundaries with it.
