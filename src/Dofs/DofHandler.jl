@@ -12,6 +12,14 @@ Access some grid representation for the dof handler.
 """
 get_grid(dh::AbstractDofHandler)
 
+"""
+    SubDofHandler(dh::AbstractDofHandler, cellset)
+
+Create an `sdh::SubDofHandler` for the cells in `cellset`. All cells in `cellset`
+must have the same type. Fields are added to the `sdh` by using [`add!`](@ref) the 
+same way as for the standard [`DofHandler`](@ref).
+"""
+SubDofHandler
 
 struct SubDofHandler{DH} <: AbstractDofHandler
     # From constructor
