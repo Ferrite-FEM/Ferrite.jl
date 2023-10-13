@@ -61,7 +61,7 @@ function reinit!(pv::PointValues, x::AbstractVector{<:Vec{D}}, ξ::Vec{D}) where
     # TODO: Does M need to be updated too?
     Nqp = @view pv.cv.N[:, qp]
     dNdξqp = @view pv.cv.dNdξ[:, qp]
-    shape_gradients_and_values!(dNdξqp, Nqp, ip, ξ)
+    shape_gradients_and_values!(dNdξqp, Nqp, pv.cv.ip, ξ)
     reinit!(pv.cv, x)
     return nothing
 end
@@ -77,7 +77,7 @@ end
 function PointValuesInternal(ξ::Vec{dim, T}, ip::IP) where {dim, T, shape <: AbstractRefShape{dim}, IP <: Interpolation{shape}}
     n_func_basefuncs = getnbasefunctions(ip)
     N = MVector(ntuple(i->shape_value(ip, ξ, i), n_func_basefuncs))
-    return PointValuesInternal{IP, eltype(N)}(N, ip)
+    return PointValuesInternal{IP, eltype(N), typeof(N)}(N, ip)
 end
 
 getnquadpoints(pv::PointValuesInternal) = 1
@@ -86,6 +86,6 @@ shape_value(pv::PointValuesInternal, qp::Int, i::Int) = (@assert qp == 1; pv.N[i
 
 # allow on-the-fly updating
 function reinit!(pv::PointValuesInternal{IP}, ξ::Vec{dim}) where {dim, shape <: AbstractRefShape{dim}, IP <: Interpolation{shape}}
-    shape_values!(pv.N, ip, ξ)
+    shape_values!(pv.N, pv.ip, ξ)
     return nothing
 end
