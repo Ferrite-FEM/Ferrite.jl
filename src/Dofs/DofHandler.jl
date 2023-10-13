@@ -18,6 +18,8 @@ get_grid(dh::AbstractDofHandler)
 Create an `sdh::SubDofHandler` for the cells in `cellset`. All cells in `cellset`
 must have the same type. Fields are added to the `sdh` by using [`add!`](@ref) the 
 same way as for the standard [`DofHandler`](@ref).
+Close when all `SubDofHandler`s have been created and fields are added by calling 
+[`close!`](@ref) on the parent dof handler, `dh`. 
 """
 SubDofHandler
 
