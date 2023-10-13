@@ -3,8 +3,8 @@
 
 <svg
    width="291.1499mm"
-   height="73.466125mm"
-   viewBox="0 0 291.1499 73.466125"
+   height="73.466133mm"
+   viewBox="0 0 291.1499 73.466133"
    version="1.1"
    id="svg5"
    sodipodi:docname="fe_mapping.svg"
@@ -26,7 +26,7 @@
      showgrid="false"
      inkscape:snap-object-midpoints="true"
      inkscape:zoom="1.3879489"
-     inkscape:cx="475.16157"
+     inkscape:cx="475.16159"
      inkscape:cy="179.04117"
      inkscape:window-width="2560"
      inkscape:window-height="1377"
@@ -303,6 +303,18 @@
       </g>
     </defs>
   </defs>
+  <g
+     inkscape:groupmode="layer"
+     id="layer2"
+     inkscape:label="Background">
+    <rect
+       style="fill:#ffffff;stroke:none;stroke-width:0.5;stroke-linecap:round;fill-opacity:1"
+       id="rect1647"
+       width="291.1499"
+       height="73.466133"
+       x="0"
+       y="-2.1732907e-14" />
+  </g>
   <g
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
