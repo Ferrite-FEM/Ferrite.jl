@@ -1,4 +1,4 @@
-# Common methods for all `Values` objects
+# Common methods for all `AbstractValues` objects
 
 using Base: @propagate_inbounds
 
@@ -31,7 +31,7 @@ end
 
 """
     reinit!(cv::CellValues, x::Vector, cell::Union{AbstractCell,Nothing}=nothing)
-    reinit!(bv::FaceValues, x::Vector, face::Int, cell::Union{AbstractCell,Nothing}=nothing)
+    reinit!(fv::FaceValues, x::Vector, face::Int, cell::Union{AbstractCell,Nothing}=nothing)
 
 Update the `CellValues`/`FaceValues` object for a cell or face with coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
@@ -40,10 +40,10 @@ For interpolations with non-identity mappings, the current `cell` is also requir
 reinit!
 
 """
-    getnquadpoints(fv::FaceValues)
+    getnquadpoints(fe_v::AbstractValues)
 
-Return the number of quadrature points in `fv`s quadrature for the current
-(most recently [`reinit!`](@ref)ed) face.
+Return the number of quadrature points. For `FaceValues`, 
+this is the number for the current face.
 """
 function getnquadpoints end
 
