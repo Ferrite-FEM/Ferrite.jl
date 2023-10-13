@@ -58,9 +58,11 @@ function_symmetric_gradient(pv::PointValues, u::AbstractVector, args...) =
 # and then call the regular reinit! for the wrapped CellValues to update dNdx
 function reinit!(pv::PointValues, x::AbstractVector{<:Vec{D}}, ξ::Vec{D}) where {D}
     qp = 1 # PointValues only have a single qp
-    # TODO: Does M need to be updated too?
     for i in 1:getnbasefunctions(pv.cv.ip)
         pv.cv.dNdξ[i, qp], pv.cv.N[i, qp] = shape_gradient_and_value(pv.cv.ip, ξ, i)
+    end
+    for i in 1:getnbasefunctions(pv.cv.gip)
+        pv.cv.dMdξ[i, qp], pv.cv.M[i, qp] = shape_gradient_and_value(pv.cv.gip, ξ, i)
     end
     reinit!(pv.cv, x)
     return nothing

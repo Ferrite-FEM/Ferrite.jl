@@ -45,13 +45,13 @@ function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
     end
 end
 
-function PointEvalHandler(grid::AbstractGrid, points::AbstractVector{Vec{dim,T}}; search_nneighbors=3, warn=true) where {dim, T}
+function PointEvalHandler(grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim,T}}; search_nneighbors=3, warn=true, num_retries=3) where {dim, T}
     node_cell_dicts = _get_node_cell_map(grid)
-    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn)
+    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn, num_retries)
     return PointEvalHandler(grid, cells, local_coords)
 end
 
-function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}, search_nneighbors, warn) where {dim, T<:Real, C}
+function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}, search_nneighbors, warn, num_retries) where {dim, T<:Real, C}
 
     # set up tree structure for finding nearest nodes to points
     kdtree = KDTree(reinterpret(Vec{dim,T}, getnodes(grid)))
@@ -70,12 +70,14 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
                 possible_cells === nothing && continue # if node is not part of the subdofhandler, try the next node
                 for cell in possible_cells
                     cell_coords = getcoordinates(grid, cell)
-                    is_in_cell, local_coord = point_in_cell(geom_interpol, cell_coords, points[point_idx])
-                    if is_in_cell
-                        cell_found = true
-                        cells[point_idx] = cell
-                        local_coords[point_idx] = local_coord
-                        break
+                    for retry in 1:num_retries
+                        is_in_cell, local_coord = point_in_cell(geom_interpol, cell_coords, points[point_idx])
+                        if is_in_cell
+                            cell_found = true
+                            cells[point_idx] = cell
+                            local_coords[point_idx] = local_coord
+                            break
+                        end
                     end
                 end
                 cell_found && break
@@ -103,26 +105,26 @@ end
 function _check_isoparametric_boundaries(::Type{RefHypercube{dim}}, x_local::Vec{dim, T}) where {dim, T}
     tol = sqrt(eps(T))
     # All in the range [-1, 1]
-    return all(x -> abs(x) - 1 < tol, x_local)
+    return all(x -> abs(x) - 1 ≤ tol, x_local)
 end
 
 # check if point is inside a cell based on isoparametric coordinate
 function _check_isoparametric_boundaries(::Type{RefSimplex{dim}}, x_local::Vec{dim, T}) where {dim, T}
     tol = sqrt(eps(T))
     # Positive and below the plane 1 - ξx - ξy - ξz
-    return all(x -> x > -tol, x_local) && sum(x_local) - 1 < tol
+    return all(x -> x ≥ -tol, x_local) && sum(x_local) - 1 < tol
 end
 
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
 # TODO: should we make iteration params optional keyword arguments?
-function find_local_coordinate(interpolation, cell_coordinates::Vector{V}, global_coordinate::V) where {dim, T, V <: Vec{dim, T}}
+function find_local_coordinate(interpolation::IP, cell_coordinates::Vector{V}, global_coordinate::V) where {dim, T, V <: Vec{dim, T}, ref_shape, IP <: Interpolation{ref_shape}}
     n_basefuncs = getnbasefunctions(interpolation)
     @assert length(cell_coordinates) == n_basefuncs
-    local_guess = zero(V)
+    local_guess = sample_random_point(ref_shape)
     max_iters = 10
-    tol_norm = 1e-10
+    tol_norm = 1e-12
     converged = false
-    for _ in 1:max_iters
+    for iter in 1:max_iters
         global_guess = zero(V)
         J = zero(Tensor{2, dim, T})
         for j in 1:n_basefuncs
