@@ -8,8 +8,8 @@ The geometric mapping of a finite element from the reference coordinates to the 
 This mapping is given by the geometric shape functions, $\hat{N}_i^g(\boldsymbol{\xi})$, such that 
 ```math
 \begin{align*}
-    \boldsymbol{x}(\boldsymbol{\xi}) =& \sum_{i}^N \hat{\boldsymbol{x}}_i \hat{N}_i^g(\boldsymbol{\xi}) \\
-    \boldsymbol{J} :=& \frac{\mathrm{d}\boldsymbol{x}}{\mathrm{d}\boldsymbol{\xi}} = \sum_{i}^N \hat{\boldsymbol{x}}_i \otimes \frac{\mathrm{d} \hat{N}_i^g}{\mathrm{d}\boldsymbol{\xi}}\\
+    \boldsymbol{x}(\boldsymbol{\xi}) =& \sum_{\alpha=1}^N \hat{\boldsymbol{x}}_\alpha \hat{N}_\alpha^g(\boldsymbol{\xi}) \\
+    \boldsymbol{J} :=& \frac{\mathrm{d}\boldsymbol{x}}{\mathrm{d}\boldsymbol{\xi}} = \sum_{\alpha=1}^N \hat{\boldsymbol{x}}_\alpha \otimes \frac{\mathrm{d} \hat{N}_\alpha^g}{\mathrm{d}\boldsymbol{\xi}}\\
     \boldsymbol{\mathcal{H}} :=&
     \frac{\mathrm{d} \boldsymbol{J}}{\mathrm{d} \boldsymbol{\xi}} = \sum_{\alpha=1}^N \hat{\boldsymbol{x}}_\alpha \otimes \frac{\mathrm{d}^2 \hat{N}^g_\alpha}{\mathrm{d} \boldsymbol{\xi}^2}
 \end{align*}
