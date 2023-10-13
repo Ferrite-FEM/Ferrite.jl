@@ -62,8 +62,8 @@ end
 
 getngeobasefunctions(fv::FaceValues) = getngeobasefunctions(get_geo_mapping(fv))
 getnbasefunctions(fv::FaceValues) = getnbasefunctions(get_fun_values(fv))
-getnquadpoints(fv::FaceValues) = getnquadpoints(fv.qr, getcurrentface(fv))
-getdetJdV(fv::FaceValues, q_point) = fv.detJdV[q_point]
+getnquadpoints(fv::FaceValues) = @inbounds getnquadpoints(fv.qr, getcurrentface(fv))
+@propagate_inbounds getdetJdV(fv::FaceValues, q_point) = fv.detJdV[q_point]
 
 shape_value_type(fv::FaceValues) = shape_value_type(get_fun_values(fv))
 shape_gradient_type(fv::FaceValues) = shape_gradient_type(get_fun_values(fv))
@@ -102,14 +102,17 @@ getnormal(fv::FaceValues, qp::Int) = fv.normals[qp]
 
 nfaces(fv::FaceValues) = length(fv.geo_mapping)
 
-function checkface(fv::FaceValues, face::Int)
-    0 < face <= nfaces(fv) || error("Face index out of range.")
+function boundscheck_face(fv::FaceValues, face_nr::Int)
+    checkbounds(Bool, 1:nfaces(fv), face_nr) || throw(ArgumentError("Face index out of range."))
     return nothing
 end
 
 function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int, cell=nothing) where {dim, T}
     check_reinit_sdim_consistency(:FaceValues, shape_gradient_type(fv), eltype(x))
-    checkface(fv, face_nr)
+    
+    # Checking face_nr before setting current_face allows us to use @inbounds 
+    # when indexing by getcurrentface(fv) in other places!
+    boundscheck_face(fv, face_nr) 
     fv.current_face[] = face_nr
     
     n_geom_basefuncs = getngeobasefunctions(fv)
@@ -117,7 +120,8 @@ function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int, ce
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     end
     
-    # Must be done after setting current face, which should be done after checkface
+    # Must be done after setting current face, 
+    # which should be done after boundscheck_face
     geo_mapping = get_geo_mapping(fv)
     fun_values = get_fun_values(fv)
 
