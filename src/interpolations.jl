@@ -1516,5 +1516,15 @@ reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip
 
 is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
 
+"""
+    get_mapping_type(ip::Interpolation)
+
+Get the type of mapping from the reference cell to the real cell for an
+interpolation `ip`. Subtypes of `ScalarInterpolation` and `VectorizedInterpolation`
+return `IdentityMapping()`, but other non-scalar interpolations may request different
+mapping types. 
+"""
+function get_mapping_type end
+
 get_mapping_type(::ScalarInterpolation) = IdentityMapping()
 get_mapping_type(::VectorizedInterpolation) = IdentityMapping()

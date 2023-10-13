@@ -74,10 +74,6 @@ end;
 Ferrite.shape_value(cv::SimpleCellValues, q_point::Int, i::Int) = cv.N[i, q_point]
 Ferrite.shape_gradient(cv::SimpleCellValues, q_point::Int, i::Int) = cv.dNdx[i, q_point]
 
-# Currently, we must also define the following functions (TODO in Ferrite.jl)
-Ferrite.shape_value_type(cv::SimpleCellValues) = typeof(shape_value(cv, 1, 1))
-Ferrite.shape_gradient_type(cv::SimpleCellValues) = typeof(shape_gradient(cv, 1, 1))
-
 # We are now ready to test, so let's create an instance of our new and the regular cell values
 qr = QuadratureRule{RefQuadrilateral}(2)
 ip = Lagrange{RefQuadrilateral,1}()

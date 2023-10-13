@@ -29,6 +29,14 @@ typeof_dNdξ(::Type{T}, ::SInterpolationDims{rdim}) where {T,rdim} = SVector{rdi
 typeof_dNdξ(::Type{T}, ::VInterpolationDims{dim,dim,dim}) where {T,dim} = Tensor{2,dim,T}
 typeof_dNdξ(::Type{T}, ::VInterpolationDims{rdim,<:Any,vdim}) where {T,rdim,vdim} = SMatrix{vdim,rdim,T} # If vdim=rdim!=sdim Tensor would be possible...
 
+"""
+    FunctionValues(::Type{T}, ip_fun, qr::QuadratureRule, ip_geo::VectorizedInterpolation)
+
+Create a `FunctionValues` object containing the shape values and gradients for both the reference 
+cell (precalculated) and the real cell (updated in `reinit!`). 
+"""
+FunctionValues
+
 struct FunctionValues{IP, N_t, dNdx_t, dNdξ_t}
     ip::IP          # ::Interpolation
     N_x::N_t        # ::AbstractMatrix{Union{<:Tensor,<:Number}}
@@ -108,6 +116,13 @@ struct ContravariantPiolaMapping end
 
 get_mapping_type(fv::FunctionValues) = get_mapping_type(fv.ip)
 
+"""
+    requires_hessian(mapping)
+
+Does the `mapping` type require the hessian, d²M/dx², 
+to map the function values and gradients from the reference cell 
+to the real cell geometry?
+"""
 requires_hessian(::IdentityMapping) = false
 requires_hessian(::ContravariantPiolaMapping) = true
 requires_hessian(::CovariantPiolaMapping) = true

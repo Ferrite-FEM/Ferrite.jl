@@ -5,12 +5,22 @@ DocTestSetup = :(using Ferrite)
 
 # FEValues
 
-## [CellValues](@id reference-cellvalues)
+## Main types
+[`CellValues`](@ref) and [`FaceValues`](@ref) are the most common 
+subtypes of `Ferrite.AbstractValues`.
 
 ```@docs
 CellValues
+FaceValues
+```
+
+## Applicable functions
+The following functions are applicable to both `CellValues`
+and `FaceValues`.
+
+```@docs
 reinit!
-getnquadpoints(::CellValues)
+getnquadpoints
 getdetJdV
 
 shape_value
@@ -25,13 +35,9 @@ function_divergence
 spatial_coordinate
 ```
 
-## [FaceValues](@id reference-facevalues)
-
-All of the methods for [`CellValues`](@ref) apply for `FaceValues` as well.
-In addition, there are some methods that are unique for `FaecValues`:
+In addition, there are some methods that are unique for `FaceValues`.
 
 ```@docs
-FaceValues
-getcurrentface
-getnquadpoints(::FaceValues)
+Ferrite.getcurrentface
+getnormal
 ```

@@ -24,7 +24,12 @@ struct PointValues{CV} <: AbstractValues
     PointValues{CV}(cv::CV) where {CV} = new{CV}(cv)
 end
 
-PointValues(cv::CellValues) = PointValues(eltype(shape_value(cv,1,1)), cv.fun_values.ip, cv.geo_mapping.ip)
+function PointValues(cv::CellValues)
+    T = typeof(getdetJdV(cv, 1))
+    ip_fun = get_function_interpolation(cv)
+    ip_geo = get_geometric_interpolation(cv)
+    return PointValues(T, ip_fun, ip_geo)
+end
 function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_interpolation(ip))
     return PointValues(Float64, ip, ipg)
 end
@@ -66,7 +71,7 @@ function reinit!(pv::PointValues, x::AbstractVector{<:Vec{D}}, ξ::Vec{D}) where
     return nothing
 end
 
-# Optimized version of PointScalarValues which avoids i) recomputation of dNdξ and
+# Optimized version of PointValues which avoids i) recomputation of dNdξ and
 # ii) recomputation of dNdx. Only allows function evaluation (no gradients) which is
 # what is used in evaluate_at_points.
 struct PointValuesInternal{IP, N_t} <: AbstractValues

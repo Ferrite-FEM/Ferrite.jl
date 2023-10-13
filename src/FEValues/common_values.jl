@@ -1,4 +1,4 @@
-# Common methods for all `Values` objects
+# Common methods for all `AbstractValues` objects
 
 using Base: @propagate_inbounds
 
@@ -31,7 +31,7 @@ end
 
 """
     reinit!(cv::CellValues, x::Vector, cell::Union{AbstractCell,Nothing}=nothing)
-    reinit!(bv::FaceValues, x::Vector, face::Int, cell::Union{AbstractCell,Nothing}=nothing)
+    reinit!(fv::FaceValues, x::Vector, face::Int, cell::Union{AbstractCell,Nothing}=nothing)
 
 Update the `CellValues`/`FaceValues` object for a cell or face with coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
@@ -40,10 +40,10 @@ For interpolations with non-identity mappings, the current `cell` is also requir
 reinit!
 
 """
-    getnquadpoints(fv::FaceValues)
+    getnquadpoints(fe_v::AbstractValues)
 
-Return the number of quadrature points in `fv`s quadrature for the current
-(most recently [`reinit!`](@ref)ed) face.
+Return the number of quadrature points. For `FaceValues`, 
+this is the number for the current face.
 """
 function getnquadpoints end
 
@@ -137,14 +137,15 @@ function function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, d
     return val
 end
 
-# TODO: Implement fallback or require this to be defined?
-#       Alt: shape_value_type(cv) = typeof(shape_value(cv, qp=1, i=1))
 """
     shape_value_type(fe_v::AbstractValues)
 
 Return the type of `shape_value(fe_v, q_point, base_function)`
 """
-function shape_value_type end
+function shape_value_type(fe_v::AbstractValues)
+    # Default fallback
+    return typeof(shape_value(fe_v, 1, 1))
+end
 
 function_value_init(cv::AbstractValues, ::AbstractVector{T}) where {T} = zero(shape_value_type(cv)) * zero(T)
 
@@ -188,14 +189,15 @@ function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector
     return grad
 end
 
-# TODO: Implement fallback or require this to be defined?
-#       Alt: shape_gradient_type(cv) = typeof(shape_gradient(cv, qp=1, i=1))
 """
     shape_gradient_type(fe_v::AbstractValues)
 
 Return the type of `shape_gradient(fe_v, q_point, base_function)`
 """
-function shape_gradient_type end
+function shape_gradient_type(fe_v::AbstractValues)
+    # Default fallback
+    return typeof(shape_gradient(fe_v, 1, 1))
+end
 
 function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {T}
     return zero(shape_gradient_type(cv)) * zero(T)
