@@ -12,17 +12,6 @@ Access some grid representation for the dof handler.
 """
 get_grid(dh::AbstractDofHandler)
 
-"""
-    SubDofHandler(dh::AbstractDofHandler, cellset)
-
-Create an `sdh::SubDofHandler` for the cells in `cellset`. All cells in `cellset`
-must have the same type. Fields are added to the `sdh` by using [`add!`](@ref) the 
-same way as for the standard [`DofHandler`](@ref).
-[`close!`](@ref) should be called on the parent dof handler, `dh`, after
-all `SubDofHandler`s have been created and their fields have been added. 
-"""
-SubDofHandler
-
 struct SubDofHandler{DH} <: AbstractDofHandler
     # From constructor
     dh::DH
@@ -36,6 +25,34 @@ struct SubDofHandler{DH} <: AbstractDofHandler
     # const dof_ranges::Vector{UnitRange{Int}} # TODO: Why not?
 end
 
+"""
+    SubDofHandler(dh::AbstractDofHandler, cellset::Set{Int})
+
+Create an `sdh::SubDofHandler` from the parent `dh`, pertaining to the 
+cells in `cellset`. This allows you to add fields to parts of the domain, or using 
+different interpolations or cell types (e.g. `Triangles` and `Quadrilaterals`). All 
+fields and cell types must be the same in one `SubDofHandler`.
+
+After construction any number of discrete fields can be added to the SubDofHandler using
+[`add!`](@ref). Construction is finalized by calling [`close!`](@ref) on the parent `dh`.
+
+# Examples
+We assume we have a `grid` containing "Triangle" and "Quadrilateral" cells, 
+including the cellsets "triangles" and "quadilaterals" for to these cells. 
+```julia
+dh = DofHandler(grid)
+
+sdh_tri = SubDofHandler(dh, getcellset(grid, "triangles"))
+ip_tri = Lagrange{RefTriangle, 2}()^2 # vector interpolation for a field u
+add!(sdh_tri, :u, ip_tri)
+
+sdh_quad = SubDofHandler(dh, getcellset(grid, "quadilaterals"))
+ip_quad = Lagrange{RefQuadrilateral, 2}()^2 # vector interpolation for a field u
+add!(sdh_quad, :u, ip_quad)
+
+close!(dh) # Finalize by closing the parent 
+```
+"""
 function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
     # TODO: Should be an inner constructor.
     isclosed(dh) && error("DofHandler already closed")
