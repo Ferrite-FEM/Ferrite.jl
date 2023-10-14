@@ -75,7 +75,8 @@ mutable struct VTKFileCollection{P<:WriteVTK.CollectionFile,G_DH,KW}
 end
 function VTKFileCollection(name::String, grid_or_dh::Union{AbstractGrid,AbstractDofHandler}; vtk_kwargs...)
     pvd = WriteVTK.paraview_collection(name)
-    return VTKFileCollection(pvd, grid_or_dh, name, 0, vtk_kwargs)
+    basename = endswith(name, ".pvd") ? string(first(split(name, ".pvd"))) : name
+    return VTKFileCollection(pvd, grid_or_dh, basename, 0, vtk_kwargs)
 end
 Base.close(pvd::VTKFileCollection) = WriteVTK.vtk_save(pvd.pvd)
 
