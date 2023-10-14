@@ -62,17 +62,8 @@ Create a paraview data file (.pvd) that can be used to
 save multiple vtk file along with a time stamp. The keyword arguments 
 are forwarded to each `VTKFile` constructor, which again forwards them 
 to `WriteVTK.vtk_grid`. 
-Example,
-```
-pvd = VTKFileCollection("test", grid)
-for t in range(0, 2, 4)
-    # Solve the timestep to find u and σeff 
-    addstep!(pvd, t) do io # io::VTKFile
-        write_solution(io, dh, u)
-        write_celldata(io, σeff, "Effective stress")
-    end
-end
-close(pvd)
+
+See [`addstep!`](@ref) for examples for how to use `VTKFileCollection`.
 ```
 """
 mutable struct VTKFileCollection{P<:WriteVTK.CollectionFile,G_DH,KW}
@@ -93,13 +84,19 @@ Base.close(pvd::VTKFileCollection) = WriteVTK.vtk_save(pvd.pvd)
 
 Add a step at time `t` by writing a `VTKFile` to `pvd`. 
 If required, a new grid can be used by supplying the grid or dofhandler as the last argument.
-Should be used in a do-block:
+Should be used in a do-block, e.g.
 ```julia
-addstep!(pvd, t) do vtk 
-    write_solution(vtk, dh, u)
+filename = "myoutput"
+pvd = VTKFileCollection(filename, grid)
+for (n, t) in pairs(timevector)
+    # Calculate, e.g., the solution `u` and the stress `σeff`
+    addstep!(pvd, t) do io 
+        write_celldata(io, σeff, "Effective stress")
+        write_solution(io, dh, u)
+    end
 end
+close(pvd)
 ```
-See also [`VTKFileCollection`](@ref). 
 """
 function addstep!(f::Function, pvd::VTKFileCollection, t, grid=pvd.grid_or_dh)
     pvd.step += 1
@@ -107,6 +104,30 @@ function addstep!(f::Function, pvd::VTKFileCollection, t, grid=pvd.grid_or_dh)
         f(vtk)
         pvd.pvd[t] = vtk.vtk # Add to collection
     end
+end
+
+"""
+    addstep!(pvd::VTKFileCollection, vtk::VTKFile, t)
+
+As an alternative to using the `addstep!(pvd, t) do` block, it is 
+also possible to add a specific `vtk` at time `t` to `pvd`. 
+Note that this will close the `vtk`. Example
+```julia
+filename = "myoutput"
+pvd = VTKFileCollection(filename, grid)
+for (n, t) in pairs(timevector)
+    # Calculate, e.g., the solution `u` and the stress `σeff`
+    vtk = VTKFile(string(filename, "_", n), dh)
+    write_celldata(vtk, σeff, "Effective stress")
+    write_solution(vtk, dh, u)
+    addstep!(pvd, vtk, t)
+end
+close(pvd)
+```
+"""
+function addstep!(pvd::VTKFileCollection, vtk::VTKFile, t)
+    pvd.step += 1
+    pvd.pvd[t] = vtk.vtk
 end
 
 cell_to_vtkcell(::Type{Line}) = VTKCellTypes.VTK_LINE
