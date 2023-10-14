@@ -813,7 +813,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
             # BCValues are just dummy for nodesets so set to FaceIndex
             EntityType = FaceIndex
         end
-        CT = getcelltype(get_grid(ch.dh), first(sdh.cellset)) # Same celltype enforced in SubDofHandler constructor
+        CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
         bcvalues = BCValues(interpolation, default_interpolation(CT), EntityType)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
