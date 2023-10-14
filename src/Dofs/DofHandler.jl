@@ -36,8 +36,8 @@ struct SubDofHandler{DH} <: AbstractDofHandler
     # const dof_ranges::Vector{UnitRange{Int}} # TODO: Why not?
 end
 
-# TODO: Should be an inner constructor.
 function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
+    # TODO: Should be an inner constructor.
     isclosed(dh) && error("DofHandler already closed")
     # Compute the celltype and make sure all elements have the same one
     CT = getcelltype(dh.grid, first(cellset))
@@ -76,13 +76,6 @@ function _print_field_information(io::IO, mime::MIME"text/plain", sdh::SubDofHan
     end
 end
 
-"""
-    DofHandler(grid::Grid)
-
-Construct a `DofHandler` based on `grid`. Supports:
-- `Grid`s with or without concrete element type (E.g. "mixed" grids with several different element types.)
-- One or several fields, which can live on the whole domain or on subsets of the `Grid`.
-"""
 struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     subdofhandlers::Vector{SubDofHandler{DofHandler{dim, G}}}
     field_names::Vector{Symbol}
@@ -96,6 +89,28 @@ struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     ndofs::ScalarWrapper{Int}
 end
 
+"""
+    DofHandler(grid::Grid)
+
+Construct a `DofHandler` based on the grid `grid`.
+
+After construction any number of discrete fields can be added to the DofHandler using
+[`add!`](@ref). Construction is finalized by calling [`close!`](@ref).
+
+By default fields are added to all elements of the grid. Refer to [`SubDofHandler`](@ref)
+for restricting fields to subdomains of the grid.
+
+# Examples
+
+```julia
+dh = DofHandler(grid)
+ip_u = Lagrange{RefTriangle, 2}()^2 # vector interpolation for a field u
+ip_p = Lagrange{RefTriangle, 1}()   # scalar interpolation for a field p
+add!(dh, :u, ip_u)
+add!(dh, :p, ip_p)
+close!(dh)
+```
+"""
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
