@@ -11,20 +11,20 @@
             reinit!(iv, ic)
             cell_a_coords = getcoordinates(ic.a.cc)
             cell_b_coords = getcoordinates(ic.b.cc)
-            
+
             nqp = getnquadpoints(iv)
             # Should have same quadrature points
             @test nqp == getnquadpoints(iv.here) == getnquadpoints(iv.there)
             for qp in 1:nqp
                 # If correctly synced quadrature points coordinates should match
                 @test spatial_coordinate(iv, qp, cell_a_coords) ≈ spatial_coordinate(iv.here, qp, cell_a_coords) ≈
-                spatial_coordinate(iv.there, qp, cell_b_coords)
+                      spatial_coordinate(iv.there, qp, cell_b_coords)
                 for i in 1:getnbasefunctions(iv)
                     here = i <= getnbasefunctions(iv.here)
                     shapevalue = shape_value(iv, qp, i; here = here)
                     shape_avg = shape_value_average(iv, qp, i)
                     shape_jump = shape_value_jump(iv, qp, i)
-                    
+
                     shapegrad = shape_gradient(iv, qp, i; here = here)
                     shapegrad_avg = shape_gradient_average(iv, qp, i)
                     shapegrad_jump = shape_gradient_jump(iv, qp, i)
@@ -96,7 +96,7 @@
                 for i in 1:getnquadpoints(iv)
                     vol += getdetJdV(iv, i)
                 end
-                
+
                 xs = here ? cell_a_coords : cell_b_coords
                 x_face = xs[[Ferrite.dirichlet_facedof_indices(here ? ip_a : ip_b)[here ? Ferrite.getcurrentface(iv.here) : Ferrite.getcurrentface(iv.there)]...]]
                 @test vol ≈ calculate_face_area(here ? ip_a : ip_b, x_face, here ? Ferrite.getcurrentface(iv.here) : Ferrite.getcurrentface(iv.there))
@@ -244,4 +244,3 @@
         show(stdout, MIME"text/plain"(), iv)
     end
 end # of testset
-                                

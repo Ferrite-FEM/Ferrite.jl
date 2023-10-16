@@ -51,6 +51,9 @@ struct InterfaceValues{FVA, FVB} <: AbstractValues
     here::FVA
     there::FVB
 end
+
+# TODO: Should the kwargs be removed? If you need different things on the two
+# sides, use two FaceValues?
 function InterfaceValues(quad_rule_here::FaceQuadratureRule, ip_here::Interpolation,
         geo_ip_here::Interpolation = default_geometric_interpolation(ip_here);
         quad_rule_there::FaceQuadratureRule = deepcopy(quad_rule_here),
@@ -253,8 +256,7 @@ for (func,                      f_,               is_avg) in (
         function $(func)(iv::InterfaceValues, qp::Int, i::Int)
             f_here = $(f_)(iv, qp, i; here = true)
             f_there = $(f_)(iv, qp, i; here = false)
-            $(is_avg) && return (f_here .+ f_there)/2
-            $(is_avg) || return f_here .- f_there
+            return $(is_avg ? :((f_here + f_there) / 2) : :(f_here - f_there))
         end
     end
 end
@@ -308,9 +310,13 @@ for (func,                          ) in (
                 iv::InterfaceValues, q_point::Int, u::AbstractVector;
                 here::Bool
             )
-            dof_range_here = 1:getnbasefunctions(iv.here)
-            dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
-            return $(func)(iv, q_point, u, dof_range_here, dof_range_there; here=here)
+            if here
+                dof_range_here = 1:getnbasefunctions(iv.here)
+                return $(func)(iv.here, q_point, @view(u[dof_range_here]))
+            else # there
+                dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
+                return $(func)(iv.there, q_point, @view(u[dof_range_there]))
+            end
         end
         function $(func)(
                 iv::InterfaceValues, q_point::Int,
@@ -337,7 +343,9 @@ for (func,                          f_,                     is_avg) in (
         function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector)
             dof_range_here = 1:getnbasefunctions(iv.here)
             dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
-            return $(func)(iv, qp, u, dof_range_here, dof_range_there)
+            f_here = $(f_)(iv.here, qp, @view(u[dof_range_here]))
+            f_there = $(f_)(iv.there, qp, @view(u[dof_range_there]))
+            return $(is_avg ? :((f_here + f_there) / 2) : :(f_here - f_there))
         end
         function $(func)(
                 iv::InterfaceValues, qp::Int,
@@ -346,12 +354,12 @@ for (func,                          f_,                     is_avg) in (
             )
             f_here = $(f_)(iv.here, qp, u, dof_range_here)
             f_there = $(f_)(iv.there, qp, u, dof_range_there)
-            $(is_avg) && return 0.5 * (f_here + f_there)
-            $(is_avg) || return f_here - f_there
+            return $(is_avg ? :((f_here + f_there) / 2) : :(f_here - f_there))
         end
     end
 end
 
+# TODO: Should this be [x_here, x_there], i.e. all coordinates?
 function spatial_coordinate(iv::InterfaceValues, q_point::Int, x_here::AbstractVector{<:Vec})
     return spatial_coordinate(iv.here, q_point, x_here)
 end

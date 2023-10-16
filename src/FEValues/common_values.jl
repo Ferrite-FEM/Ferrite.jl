@@ -180,14 +180,13 @@ function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector
 end
 
 # TODO: Deprecate this, nobody is using this in practice...
-function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec}, dof_range = eachindex(u))
+function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec})
     n_base_funcs = getnbasefunctions(fe_v)
-    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
-    @boundscheck checkbounds(u, dof_range)
+    length(u) == n_base_funcs || throw_incompatible_dof_length(length(u), n_base_funcs)
     @boundscheck checkquadpoint(fe_v, q_point)
     grad = function_gradient_init(fe_v, u)
-    @inbounds for (i, j) in pairs(dof_range)
-        grad += u[j] ⊗ shape_gradient(fe_v, q_point, i)
+    @inbounds for i in 1:n_base_funcs
+        grad += u[i] ⊗ shape_gradient(fe_v, q_point, i)
     end
     return grad
 end
@@ -213,7 +212,8 @@ The symmetric gradient of a scalar function is computed as
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
 function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
-    grad = dof_range == eachindex(u) ? function_gradient(fe_v, q_point, u) : function_gradient(fe_v, q_point, u, dof_range) # Workaround for calling deprecated method
+    # TODO: Workaround for calling deprecated method
+    grad = dof_range == eachindex(u) ? function_gradient(fe_v, q_point, u) : function_gradient(fe_v, q_point, u, dof_range)
     return symmetric(grad)
 end
 
