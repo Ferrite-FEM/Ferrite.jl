@@ -72,7 +72,7 @@ end
 
 function precompute_values!(fv::FunctionValues, qr::QuadratureRule)
     for (qp, ξ) in pairs(getpoints(qr))
-        shape_gradients_and_values!(@view(fv.dNdξ[:, qp]), @view(fv.N[:, qp]), fv.ip, ξ)
+        shape_gradients_and_values!(@view(fv.dNdξ[:, qp]), @view(fv.N_ξ[:, qp]), fv.ip, ξ)
     end
 end
 

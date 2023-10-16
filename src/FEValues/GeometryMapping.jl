@@ -53,11 +53,11 @@ function GeometryMapping(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule,
     
     # Hessian (if needed, else nothing)
     HT = Tensor{2,getdim(ip),T}
-    dM2dξ2 = RH ? zeros(HT, n_shape, n_qpoints) : nothing
+    d2Mdξ2 = RH ? zeros(HT, n_shape, n_qpoints) : nothing
 
-    geo_mapping = GeometryMapping(ip, M, dMdξ, dM2dξ2)
+    geo_mapping = GeometryMapping(ip, M, dMdξ, d2Mdξ2)
     precompute_values!(geo_mapping, qr)
-    return GeometryMapping(ip, M, dMdξ, dM2dξ2)
+    return geo_mapping
 end
 function Base.copy(v::GeometryMapping)
     d2Mdξ2_copy = v.d2Mdξ2 === nothing ? nothing : copy(v.d2Mdξ2)
@@ -77,7 +77,7 @@ function precompute_values!(gm::GeometryMapping, ::RequiresHessian{true}, qr::Qu
     ip = get_geometric_interpolation(gm)
     for (qp, ξ) in pairs(getpoints(qr))
         for i in 1:getngeobasefunctions(gm)
-            gm.dM2dξ2[i, qp], gm.dMdξ[i, qp], gm.M[i, qp] = shape_hessian_gradient_and_value(ip, ξ, i)
+            gm.d2Mdξ2[i, qp], gm.dMdξ[i, qp], gm.M[i, qp] = shape_hessian_gradient_and_value(ip, ξ, i)
         end
     end
 end
