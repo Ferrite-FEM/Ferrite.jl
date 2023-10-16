@@ -207,9 +207,11 @@ getnbasefunctions(::Interpolation)
 """
     shape_values!(values::AbstractArray{T}, ip::Interpolation, ξ::Vec)
 
-Evaluate all shape functions of `ip` at once at the reference point `ξ` and store them in `values`.
+Evaluate all shape functions of `ip` at once at the reference point `ξ` and store them in
+`values`.
 """
-function shape_values!(values::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
+@propagate_inbounds function shape_values!(values::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
+    @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
     @inbounds for i in 1:getnbasefunctions(ip)
         values[i] = shape_value(ip, ξ, i)
     end
@@ -218,22 +220,27 @@ end
 """
     shape_gradients!(gradients::AbstractArray, ip::Interpolation, ξ::Vec)
 
-Evaluate all shape function gradients of `ip` at once at the reference point `ξ` and store them in `values`.
+Evaluate all shape function gradients of `ip` at once at the reference point `ξ` and store
+them in `gradients`.
 """
 function shape_gradients!(gradients::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
+    @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
     @inbounds for i in 1:getnbasefunctions(ip)
-        values[i] = shape_gradient(ip, ξ, i)
+        gradients[i] = shape_gradient(ip, ξ, i)
     end
 end
 
 """
-    shape_gradients_and_values!(gradients::AbstractArray, shapes::AbstractArray, ip::Interpolation, ξ::Vec)
+    shape_gradients_and_values!(gradients::AbstractArray, values::AbstractArray, ip::Interpolation, ξ::Vec)
 
-Evaluate all shape functions and their gradients of `ip` at once at the reference point `ξ` and store them in `values`.
+Evaluate all shape function gradients and values of `ip` at once at the reference point `ξ`
+and store them in `values`.
 """
-function shape_gradients_and_values!(gradients::GAT, shapes::SAT, ip::IP, ξ::Vec) where {IP <: Interpolation, SAT <: AbstractArray, GAT <: AbstractArray}
+function shape_gradients_and_values!(gradients::GAT, values::SAT, ip::IP, ξ::Vec) where {IP <: Interpolation, SAT <: AbstractArray, GAT <: AbstractArray}
+    @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
+    @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
     @inbounds for i in 1:getnbasefunctions(ip)
-        gradients[i], shapes[i] = shape_gradient_and_value(ip, ξ, i)
+        gradients[i], values[i] = shape_gradient_and_value(ip, ξ, i)
     end
 end
 
@@ -490,75 +497,6 @@ is_discontinuous(::Type{<:DiscontinuousLagrange}) = true
 ############
 # Lagrange #
 ############
-# struct TensorProductLagrange{shape, order} <: ScalarInterpolation{shape, order}
-# end
-
-# adjust_dofs_during_distribution(::TensorProductLagrange) = true
-# adjust_dofs_during_distribution(::TensorProductLagrange{<:Any, 2}) = false
-# adjust_dofs_during_distribution(::TensorProductLagrange{<:Any, 1}) = false
-
-# TODO support these orderings in the dof handler close
-# vertexdof_indices(::TensorProductLagrange{RefLine,order}) where {order} = ((1,),(order+1,))
-# vertexdof_indices(::TensorProductLagrange{RefQuadrilateral,order}) where {order} = ((1,),(order+1,), (order*(order+1),), ((order+1)*(order+1),))
-# ...
-
-# Sum factorized eval for tensor product elements
-# function shape_values!(values::AT, ip::Lagrange{RefHypercube{2},order}, ξ::Vec{2,T}) where {T, AT <: AbstractArray, order}
-#     # Auxillary 1D interpolation
-#     ip_1d = Lagrange{RefLine,order}()
-#     n_basefunctions_1d = getnbasefunctions(ip_1d)
-#     # Evaluate 1D
-#     evals_x_1d = ntuple(i->shape_value(ip_1d, Vec{1,T}((ξ[1],)), i), order+1)
-#     evals_y_1d = ntuple(i->shape_value(ip_1d, Vec{1,T}((ξ[2],)), i), order+1)
-#     # Sum factorization
-#     values_2d = reshape(values, (n_basefunctions_1d, n_basefunctions_1d))
-#     for ix in 1:n_basefunctions_1d, iy in 1:n_basefunctions_1d
-#         values_2d[ix, iy] = evals_x_1d[ix] * evals_y_1d[iy]
-#     end
-#     TODO permutate values_2d
-# end
-
-# function shape_values!(gradients_2d::AT, ip::Lagrange{RefHypercube{2},order}, ξ::Vec{2,T}) where {T, AT <: AbstractArray, order}
-#     # Auxillary 1D interpolation
-#     ip_1d = Lagrange{RefLine,order}()
-#     n_basefunctions_1d = getnbasefunctions(ip_1d)
-#     # Evaluate 1D
-#     evals_x_1d = ntuple(i->shape_value(ip_1d, Vec{1,T}((ξ[1],)), i), order+1)
-#     evals_y_1d = ntuple(i->shape_value(ip_1d, Vec{1,T}((ξ[2],)), i), order+1)
-#     evals_dx_1d = ntuple(i->shape_gradient(ip_1d, Vec{1,T}((ξ[1],)), i), order+1)
-#     evals_dy_1d = ntuple(i->shape_gradient(ip_1d, Vec{1,T}((ξ[2],)), i), order+1)
-#     # Sum factorization
-#     gradients_2d_2d = reshape(gradients_2d, (n_basefunctions_1d, n_basefunctions_1d))
-#     for ix in 1:n_basefunctions_1d, iy in 1:n_basefunctions_1d
-#         gradients_2d_2d[ix, iy, 1] = ...
-#         gradients_2d_2d[ix, iy, 2] = ...
-#     end
-#     TODO permutate gradients_2d_2d
-# end
-
-# function shape_gradients_and_values!(gradients::GAT, shapes::SAT, ip::Lagrange{RefHypercube{2},order}, ξ::Vec ) where {T, SAT <: AbstractArray, GAT <: AbstractArray, dim, order}
-#     # Auxillary 1D interpolation
-#     ip_1d = Lagrange{RefLine,order}()
-#     n_basefunctions_1d = getnbasefunctions(ip_1d)
-#     # Evaluate 1D
-#     evals_x_1d = ntuple(i->shape_value(ip_1d, Vec{1,T}((ξ[1],)), i), order+1)
-#     evals_y_1d = ntuple(i->shape_value(ip_1d, Vec{1,T}((ξ[2],)), i), order+1)
-#     evals_dx_1d = ntuple(i->shape_gradient(ip_1d, Vec{1,T}((ξ[1],)), i), order+1)
-#     evals_dy_1d = ntuple(i->shape_gradient(ip_1d, Vec{1,T}((ξ[2],)), i), order+1)
-#     # Sum factorization
-#     values_2d    = reshape(values, (n_basefunctions_1d, n_basefunctions_1d))
-#     gradients_2d = reshape(gradients, (n_basefunctions_1d, n_basefunctions_1d))
-#     for ix in 1:n_basefunctions_1d, iy in 1:n_basefunctions_1d
-#         values_2d[ix, iy, 1] = ...
-#         values_2d[ix, iy, 2] = ...
-#     end
-#     TODO permutate values_2d
-#     TODO permutate gradients_2d_2d
-# end
-
-# TODO implement kernels above for 3D
-# TODO implement vectorized interpolation case
-
 struct Lagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
     function Lagrange{shape, order}() where {shape <: AbstractRefShape, order}
         new{shape, order, Nothing}()
