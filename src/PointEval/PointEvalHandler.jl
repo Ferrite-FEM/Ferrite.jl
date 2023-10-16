@@ -45,14 +45,13 @@ function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
     end
 end
 
-function PointEvalHandler(grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim,T}}; search_nneighbors=3, warn=true, num_retries=3) where {dim, T}
+function PointEvalHandler(grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim,T}}; search_nneighbors=3, warn=true) where {dim, T}
     node_cell_dicts = _get_node_cell_map(grid)
-    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn, num_retries)
+    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn)
     return PointEvalHandler(grid, cells, local_coords)
 end
 
-function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}, search_nneighbors, warn, num_retries) where {dim, T<:Real, C}
-
+function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}, search_nneighbors, warn) where {dim, T<:Real, C}
     # set up tree structure for finding nearest nodes to points
     kdtree = KDTree(reinterpret(Vec{dim,T}, getnodes(grid)))
     nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true) 
@@ -70,14 +69,12 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
                 possible_cells === nothing && continue # if node is not part of the subdofhandler, try the next node
                 for cell in possible_cells
                     cell_coords = getcoordinates(grid, cell)
-                    for retry in 1:num_retries
-                        is_in_cell, local_coord = point_in_cell(geom_interpol, cell_coords, points[point_idx])
-                        if is_in_cell
-                            cell_found = true
-                            cells[point_idx] = cell
-                            local_coords[point_idx] = local_coord
-                            break
-                        end
+                    is_in_cell, local_coord = point_in_cell(geom_interpol, cell_coords, points[point_idx], warn)
+                    if is_in_cell
+                        cell_found = true
+                        cells[point_idx] = cell
+                        local_coords[point_idx] = local_coord
+                        break
                     end
                 end
                 cell_found && break
@@ -92,52 +89,89 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
 end
 
 # check if point is inside a cell based on physical coordinate
-function point_in_cell(geom_interpol::Interpolation{shape}, cell_coordinates, global_coordinate) where {shape}
-    converged, x_local = find_local_coordinate(geom_interpol, cell_coordinates, global_coordinate)
-    if converged
-        return _check_isoparametric_boundaries(shape, x_local), x_local
-    else
-        return false, x_local
-    end
+# TODO linear case can be handled easier
+function point_in_cell(geom_interpol::Interpolation{shape}, cell_coordinates, global_coordinate, warn) where {shape}
+    return find_local_coordinate(geom_interpol, cell_coordinates, global_coordinate, warn)
 end
 
 # check if point is inside a cell based on isoparametric coordinate
-function _check_isoparametric_boundaries(::Type{RefHypercube{dim}}, x_local::Vec{dim, T}) where {dim, T}
-    tol = sqrt(eps(T))
+function _check_isoparametric_boundaries(::Type{RefHypercube{dim}}, x_local::Vec{dim, T}, tol::T) where {dim, T}
     # All in the range [-1, 1]
     return all(x -> abs(x) - 1 ≤ tol, x_local)
 end
 
 # check if point is inside a cell based on isoparametric coordinate
-function _check_isoparametric_boundaries(::Type{RefSimplex{dim}}, x_local::Vec{dim, T}) where {dim, T}
-    tol = sqrt(eps(T))
+function _check_isoparametric_boundaries(::Type{RefSimplex{dim}}, x_local::Vec{dim, T}, tol::T) where {dim, T}
     # Positive and below the plane 1 - ξx - ξy - ξz
     return all(x -> x ≥ -tol, x_local) && sum(x_local) - 1 < tol
 end
 
+cellcenter(::Type{<:RefHypercube{dim}}, _::Type{T}) where {dim, T} = zero(Vec{dim, T})
+cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec{dim, T}((ntuple(d->1/3, dim)))
+
+# TODO GeometryValues PR helper/Mapping?
+function compute_J_and_x(interpolation::IP, ξ::Vec{dim,T}, cell_coordinates::Vector{<:Vec{dim, T}}) where {IP, T, dim}
+    n_basefuncs = getnbasefunctions(interpolation)
+    J = zero(Tensor{2, dim, T, 2^dim})
+    x = zero(Vec{dim, T})
+    for j in 1:n_basefuncs
+        dNdξ, N = shape_gradient_and_value(interpolation, ξ, j)
+        x += N * cell_coordinates[j]
+        J += cell_coordinates[j] ⊗ dNdξ
+    end
+    return J, x
+end
+
+function compute_x(interpolation::IP, ξ::Vec{dim,T}, cell_coordinates::Vector{<:Vec{dim, T}}) where {IP, T, dim}
+    n_basefuncs = getnbasefunctions(interpolation)
+    x = zero(Vec{dim, T})
+    for j in 1:n_basefuncs
+        dNdξ, N = shape_gradient_and_value(interpolation, ξ, j)
+        x += N * cell_coordinates[j]
+    end
+    return x
+end
+
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
 # TODO: should we make iteration params optional keyword arguments?
-function find_local_coordinate(interpolation::IP, cell_coordinates::Vector{V}, global_coordinate::V) where {dim, T, V <: Vec{dim, T}, ref_shape, IP <: Interpolation{ref_shape}}
+function find_local_coordinate(interpolation::IP, cell_coordinates::Vector{V}, global_coordinate::V, warn::Bool, linsearch_max_substeps::Int = 4, max_iters::Int = 10, tol_norm::T = 1e-10) where {dim, T, V <: Vec{dim, T}, ref_shape, IP <: Interpolation{ref_shape}}
     n_basefuncs = getnbasefunctions(interpolation)
     @assert length(cell_coordinates) == n_basefuncs
-    local_guess = sample_random_point(ref_shape)
-    max_iters = 10
-    tol_norm = 1e-12
+    local_guess = cellcenter(ref_shape, T)
     converged = false
     for iter in 1:max_iters
-        global_guess = zero(V)
-        J = zero(Tensor{2, dim, T})
-        for j in 1:n_basefuncs
-            dNdξ, N = shape_gradient_and_value(interpolation, local_guess, j)
-            global_guess += N * cell_coordinates[j]
-            J += cell_coordinates[j] ⊗ dNdξ
-        end
+        # Check if still inside element
+        _check_isoparametric_boundaries(ref_shape, local_guess, sqrt(tol_norm)) || break
+        # Setup J(ξ) and x(ξ)
+        J, global_guess = compute_J_and_x(interpolation, local_guess, cell_coordinates)
+        # Check if converged
         residual = global_guess - global_coordinate
-        if norm(residual) <= tol_norm
+        best_residual_norm = norm(residual) # for line search below
+        if best_residual_norm ≤ tol_norm
             converged = true
             break
         end
-        local_guess -= inv(J) ⋅ residual
+        if det(J) ≤ 0.0
+            warn && @warn "det(J) negative! Aborting! $(det(J))" 
+            break
+        end
+        Δξ = inv(J) ⋅ residual
+        # Do line search if outside/on boundary
+        best_index = 1
+        new_local_guess = local_guess - Δξ
+        global_guess = compute_x(interpolation, new_local_guess, cell_coordinates)
+        !_check_isoparametric_boundaries(ref_shape, new_local_guess, sqrt(tol_norm)) && for next_index ∈ 2:linsearch_max_substeps
+            new_local_guess = local_guess - Δξ/next_index
+            global_guess = compute_x(interpolation, new_local_guess, cell_coordinates)
+            residual_norm = norm(global_guess - global_coordinate)
+            if residual_norm < best_residual_norm && _check_isoparametric_boundaries(ref_shape, new_local_guess, sqrt(tol_norm))
+                best_residual_norm = residual_norm
+                best_index = next_index
+            else
+                break
+            end
+        end
+        local_guess -= Δξ / best_index
     end
     return converged, local_guess
 end
