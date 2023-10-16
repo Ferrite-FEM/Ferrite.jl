@@ -1,5 +1,5 @@
 @testset "CellValues" begin
-for (scalar_interpol, quad_rule) in  (
+@testset "ip=$scalar_interpol quad_rule=$(typeof(quad_rule))" for (scalar_interpol, quad_rule) in  (
                                     (Lagrange{RefLine, 1}(), QuadratureRule{RefLine}(2)),
                                     (Lagrange{RefLine, 2}(), QuadratureRule{RefLine}(2)),
                                     (Lagrange{RefQuadrilateral, 1}(), QuadratureRule{RefQuadrilateral}(2)),
