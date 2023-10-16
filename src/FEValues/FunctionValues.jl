@@ -71,11 +71,8 @@ function Base.copy(v::FunctionValues)
 end
 
 function precompute_values!(fv::FunctionValues, qr::QuadratureRule)
-    n_shape = getnbasefunctions(fv.ip)
     for (qp, ξ) in pairs(getpoints(qr))
-        for i in 1:n_shape
-            fv.dNdξ[i, qp], fv.N_ξ[i, qp] = shape_gradient_and_value(fv.ip, ξ, i)
-        end
+        shape_gradients_and_values!(@view(fv.dNdξ[:, qp]), @view(fv.N[:, qp]), fv.ip, ξ)
     end
 end
 

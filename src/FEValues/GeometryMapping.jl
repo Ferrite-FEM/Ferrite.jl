@@ -50,26 +50,36 @@ function GeometryMapping(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule,
     VT   = Vec{getdim(ip),T}
     M    = zeros(T,  n_shape, n_qpoints)
     dMdξ = zeros(VT, n_shape, n_qpoints)
-    if RH
-        HT = Tensor{2,getdim(ip),T}
-        dM2dξ2 = zeros(HT, n_shape, n_qpoints)
-    else
-        dM2dξ2 = nothing
-    end
-    for (qp, ξ) in pairs(getpoints(qr))
-        for i in 1:n_shape
-            if RH
-                dM2dξ2[i, qp], dMdξ[i, qp], M[i, qp] = shape_hessian_gradient_and_value(ip, ξ, i)
-            else
-                dMdξ[i, qp], M[i, qp] = shape_gradient_and_value(ip, ξ, i)
-            end
-        end
-    end
+    
+    # Hessian (if needed, else nothing)
+    HT = Tensor{2,getdim(ip),T}
+    dM2dξ2 = RH ? zeros(HT, n_shape, n_qpoints) : nothing
+
+    geo_mapping = GeometryMapping(ip, M, dMdξ, dM2dξ2)
+    precompute_values!(geo_mapping, qr)
     return GeometryMapping(ip, M, dMdξ, dM2dξ2)
 end
 function Base.copy(v::GeometryMapping)
     d2Mdξ2_copy = v.d2Mdξ2 === nothing ? nothing : copy(v.d2Mdξ2)
     return GeometryMapping(copy(v.ip), copy(v.M), copy(v.dMdξ), d2Mdξ2_copy)
+end
+
+precompute_values!(gm::GeometryMapping, qr::QuadratureRule) = precompute_values!(gm, RequiresHessian(gm), qr)
+
+function precompute_values!(gm::GeometryMapping, ::RequiresHessian{false}, qr::QuadratureRule)
+    ip = get_geometric_interpolation(gm)
+    for (qp, ξ) in pairs(getpoints(qr))
+        shape_gradients_and_values!(@view(gm.dMdξ[:, qp]), @view(gm.M[:, qp]), ip, ξ)
+    end
+end
+
+function precompute_values!(gm::GeometryMapping, ::RequiresHessian{true}, qr::QuadratureRule)
+    ip = get_geometric_interpolation(gm)
+    for (qp, ξ) in pairs(getpoints(qr))
+        for i in 1:getngeobasefunctions(gm)
+            gm.dM2dξ2[i, qp], gm.dMdξ[i, qp], gm.M[i, qp] = shape_hessian_gradient_and_value(ip, ξ, i)
+        end
+    end
 end
 
 getngeobasefunctions(geo_mapping::GeometryMapping) = size(geo_mapping.M, 1)

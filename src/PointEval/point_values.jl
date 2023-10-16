@@ -91,10 +91,7 @@ shape_value(pv::PointValuesInternal, qp::Int, i::Int) = (@assert qp == 1; pv.N[i
 
 # allow on-the-fly updating
 function reinit!(pv::PointValuesInternal{IP}, coord::Vec{dim}) where {dim, shape <: AbstractRefShape{dim}, IP <: Interpolation{shape}}
-    n_func_basefuncs = getnbasefunctions(pv.ip)
-    for i in 1:n_func_basefuncs
-        pv.N[i] = shape_value(pv.ip, coord, i)
-    end
+    shape_values!(pv.N, pv.ip, coord)
     return nothing
 end
 
