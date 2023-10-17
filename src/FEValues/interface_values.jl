@@ -52,18 +52,27 @@ struct InterfaceValues{FVA, FVB} <: AbstractValues
     there::FVB
 end
 
-# TODO: Should the kwargs be removed? If you need different things on the two
-# sides, use two FaceValues?
-function InterfaceValues(quad_rule_here::FaceQuadratureRule, ip_here::Interpolation,
-        geo_ip_here::Interpolation = default_geometric_interpolation(ip_here);
-        quad_rule_there::FaceQuadratureRule = deepcopy(quad_rule_here),
-        ip_there::Interpolation = ip_here, geo_ip_there::Interpolation = default_geometric_interpolation(ip_there))
-    quad_rule_here == quad_rule_there && getrefshape(geo_ip_here) != getrefshape(geo_ip_there) &&
+function InterfaceValues(
+        qr_here::FaceQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation,
+        qr_there::FaceQuadratureRule, ip_there::Interpolation, ipg_there::Interpolation
+        )
+    qr_here == qr_there && getrefshape(ipg_here) != getrefshape(ipg_there) &&
         throw(ArgumentError("Constructing InterfaceValues with a single FaceQuadratureRule isn't valid for mixed grids, please consider passing quad_rule_there"))
-    here = FaceValues(quad_rule_here, ip_here, geo_ip_here)
-    there = FaceValues(quad_rule_there, ip_there, geo_ip_there)
+    here = FaceValues(qr_here, ip_here, ipg_here)
+    there = FaceValues(qr_there, ip_there, ipg_there)
     return InterfaceValues{typeof(here), typeof(there)}(here, there)
 end
+
+# Same on both sides, default geometric mapping
+InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation) =
+    InterfaceValues(qr_here, ip_here, deepcopy(qr_here), ip_here)
+# Same on both sides, given geometric mapping
+InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation) =
+    InterfaceValues(qr_here, ip_here, ipg_here, deepcopy(qr_here), ip_here, ipg_here)
+# Different on both sides, default geometric mapping
+InterfaceValues(qr_here::FaceQuadratureRule, ip_here::Interpolation, qr_there::FaceQuadratureRule, ip_there::Interpolation) =
+    InterfaceValues(qr_here, ip_here, default_geometric_interpolation(ip_here),
+        qr_there, ip_there, default_geometric_interpolation(ip_there))
 
 InterfaceValues(facevalues_here::FVA, facevalues_there::FVB = deepcopy(facevalues_here)) where {FVA <: FaceValues, FVB <: FaceValues} =
     InterfaceValues{FVA,FVB}(facevalues_here, facevalues_there)

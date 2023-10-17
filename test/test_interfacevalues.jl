@@ -1,9 +1,9 @@
 @testset "InterfaceValues" begin
-    function test_interfacevalues(grid, ip_a, qr_a, ip_b = ip_a)
-        iv = InterfaceValues(qr_a, ip_a, ip_a; ip_there = ip_b, geo_ip_there = ip_b)
-        @test iv == InterfaceValues(iv.here, iv.there)
-        ndim = Ferrite.getdim(ip_a)
-        n_basefuncs = getnbasefunctions(ip_a) + getnbasefunctions(ip_b)
+    function test_interfacevalues(grid::Ferrite.AbstractGrid, iv::InterfaceValues)
+        ip_here = iv.here.func_interp
+        ip_there = iv.there.func_interp
+        ndim = Ferrite.getdim(ip_here)
+        n_basefuncs = getnbasefunctions(ip_here) + getnbasefunctions(ip_there)
 
         @test getnbasefunctions(iv) == n_basefuncs
 
@@ -74,30 +74,41 @@
                 end
                 u = vcat(u_a, u_b)
                 u_scal = vcat(u_scal_a, u_scal_b)
+                u_vector = reinterpret(Float64, u)
                 for i in 1:getnquadpoints(iv)
-                    @test function_gradient(iv, i, u, here = here) ≈ H
-                    @test function_gradient(iv, i, u_scal, here = here) ≈ V
+                    if ip_here isa Ferrite.ScalarInterpolation
+                        @test function_gradient(iv, i, u, here = here) ≈ H
+                        @test function_gradient(iv, i, u_scal, here = here) ≈ V
 
-                    @test function_value_average(iv, i, u_scal) ≈ function_value(iv, i, u_scal, here = here)
-                    @test all(function_value_jump(iv, i, u_scal) .<= 30 * eps(Float64))
-                    @test function_gradient_average(iv, i, u_scal) ≈ function_gradient(iv, i, u_scal, here = here)
-                    @test all(function_gradient_jump(iv, i, u_scal) .<= 30 * eps(Float64))
+                        @test function_value_average(iv, i, u_scal) ≈ function_value(iv, i, u_scal, here = here)
+                        @test all(function_value_jump(iv, i, u_scal) .<= 30 * eps(Float64))
+                        @test function_gradient_average(iv, i, u_scal) ≈ function_gradient(iv, i, u_scal, here = here)
+                        @test all(function_gradient_jump(iv, i, u_scal) .<= 30 * eps(Float64))
 
-                    @test function_value_average(iv, i, u) ≈ function_value(iv, i, u, here = here)
-                    @test all(function_value_jump(iv, i, u) .<= 30 * eps(Float64))
-                    @test function_gradient_average(iv, i, u) ≈ function_gradient(iv, i, u, here = here)
-                    @test all(function_gradient_jump(iv, i, u) .<= 30 * eps(Float64))
-
+                        @test function_value_average(iv, i, u) ≈ function_value(iv, i, u, here = here)
+                        @test all(function_value_jump(iv, i, u) .<= 30 * eps(Float64))
+                        @test function_gradient_average(iv, i, u) ≈ function_gradient(iv, i, u, here = here)
+                        @test all(function_gradient_jump(iv, i, u) .<= 30 * eps(Float64))
+                    else # func_interpol isa Ferrite.VectorInterpolation
+                        @test function_gradient(iv, i, u_vector; here = here) ≈ H
+                        @test function_value_average(iv, i, u_vector) ≈ function_value(iv, i, u_vector, here = here)
+                        @test all(function_value_jump(iv, i, u_vector) .<= 30 * eps(Float64))
+                        @test function_gradient_average(iv, i, u_vector) ≈ function_gradient(iv, i, u_vector, here = here)
+                        @test all(function_gradient_jump(iv, i, u_vector) .<= 30 * eps(Float64))
+                    end
                 end
                 # Test of volume
                 vol = 0.0
                 for i in 1:getnquadpoints(iv)
                     vol += getdetJdV(iv, i)
                 end
-
                 xs = interface_coords[here ? 1 : 2]
-                x_face = xs[[Ferrite.dirichlet_facedof_indices(here ? ip_a : ip_b)[here ? Ferrite.getcurrentface(iv.here) : Ferrite.getcurrentface(iv.there)]...]]
-                @test vol ≈ calculate_face_area(here ? ip_a : ip_b, x_face, here ? Ferrite.getcurrentface(iv.here) : Ferrite.getcurrentface(iv.there))
+                face = here ? Ferrite.getcurrentface(iv.here) : Ferrite.getcurrentface(iv.there)
+                func_interpol = here ? ip_here : ip_there
+                let ip_base = func_interpol isa VectorizedInterpolation ? func_interpol.ip : func_interpol
+                    x_face = xs[[Ferrite.dirichlet_facedof_indices(ip_base)[face]...]]
+                    @test vol ≈ calculate_face_area(ip_base, x_face, face)
+                end
             end
         end
     end
@@ -118,8 +129,8 @@
                                        )
         dim = getcelltypedim(cell_shape)
         grid = generate_grid(cell_shape, ntuple(i -> 2, dim))
+        ip = scalar_interpol isa DiscontinuousLagrange ? Lagrange{Ferrite.getrefshape(scalar_interpol), Ferrite.getorder(scalar_interpol)}() : scalar_interpol
         @testset "faces nodes indicies" begin
-            ip = scalar_interpol isa DiscontinuousLagrange ? Lagrange{Ferrite.getrefshape(scalar_interpol), Ferrite.getorder(scalar_interpol)}() : scalar_interpol
             cell = getcells(grid, 1)
             geom_ip_faces_indices = Ferrite.facedof_indices(ip)
             Ferrite.getdim(ip) > 1 && (geom_ip_faces_indices = Tuple([face[collect(face .∉ Ref(interior))] for (face, interior) in [(geom_ip_faces_indices[i], Ferrite.facedof_interior_indices(ip)[i]) for i in 1:nfaces(ip)]]))
@@ -134,7 +145,9 @@
             @test_throws ArgumentError("unknown face number") Ferrite.face_to_element_transformation(Vec{dim-1,Float64}(ntuple(_->0.0, dim-1)), Ferrite.getrefshape(cell), 100)
         end
         for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
-            test_interfacevalues(grid, scalar_interpol, quad_rule)
+            iv = cell_shape ∈ (QuadraticLine, QuadraticQuadrilateral, QuadraticTriangle, QuadraticTetrahedron) ? 
+                InterfaceValues(quad_rule, func_interpol, ip) : InterfaceValues(quad_rule, func_interpol)
+            test_interfacevalues(grid, iv)
         end
     end
     # Custom quadrature
@@ -162,8 +175,9 @@
             @test_throws ArgumentError("unknown face number") Ferrite.element_to_face_transformation(Vec{dim,Float64}(ntuple(_->0.0, dim)), Ferrite.getrefshape(cell), 100)
             @test_throws ArgumentError("unknown face number") Ferrite.face_to_element_transformation(Vec{dim-1,Float64}(ntuple(_->0.0, dim-1)), Ferrite.getrefshape(cell), 100)
         end
-        for func_interpol in (scalar_interpol,#= VectorizedInterpolation(scalar_interpol)=#)
-            test_interfacevalues(grid, scalar_interpol, quad_rule)
+        for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
+            iv = InterfaceValues(quad_rule, func_interpol)
+            test_interfacevalues(grid, iv)
         end
     end
     # @testset "Mixed elements 2D grids" begin # TODO: this shouldn't work because it should change the FaceValues object
@@ -194,7 +208,7 @@
 
         grid = Grid(cells, nodes)
         test_interfacevalues(grid,
-        DiscontinuousLagrange{RefHexahedron, 1}(), FaceQuadratureRule{RefHexahedron}(2))
+            InterfaceValues(FaceQuadratureRule{RefHexahedron}(2), DiscontinuousLagrange{RefHexahedron, 1}()))
     end
     @testset "Interface dof_range" begin
         grid = generate_grid(Quadrilateral,(3,3))
@@ -202,6 +216,7 @@
         ip_p = DiscontinuousLagrange{RefQuadrilateral, 1}()
         qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
         iv = InterfaceValues(qr_face, ip_p)
+        @test iv == InterfaceValues(iv.here, iv.there)
         dh = DofHandler(grid)
         add!(dh, :u, ip_u)
         add!(dh, :p, ip_p)
