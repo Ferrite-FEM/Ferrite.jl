@@ -58,26 +58,56 @@ end
 function Adapt.adapt_structure(to, nodes::Vector{Node})
     CuArray(get_node_coordinate.(nodes))
 end
-### TODO Adapt dofhandler
+### TODO Adapt dofhandler?
 
 # TODO not sure how to do this automatically
 function unsafe_shape_value(ip::Lagrange{RefQuadrilateral, 1}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
-    i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25
-    i == 2 && return (1 + ξ_x) * (1 - ξ_y) * 0.25
-    i == 3 && return (1 + ξ_x) * (1 + ξ_y) * 0.25
-    i == 4 && return (1 - ξ_x) * (1 + ξ_y) * 0.25
+    i == 1 && return (1 - ξ_x) * (1 - ξ_y) / 4
+    i == 2 && return (1 + ξ_x) * (1 - ξ_y) / 4
+    i == 3 && return (1 + ξ_x) * (1 + ξ_y) / 4
+    i == 4 && return (1 - ξ_x) * (1 + ξ_y) / 4
+end
+
+function unsafe_shape_value(ip::Lagrange{RefHexahedron, 1}, ξ::Vec{3}, i::Int)
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    ξ_z = ξ[3]
+    i == 1 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z)
+    i == 2 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z)
+    i == 3 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z)
+    i == 4 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z)
+    i == 5 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z)
+    i == 6 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z)
+    i == 7 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z)
+    i == 8 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z)
 end
 
 function shape_values(ip::Lagrange{RefQuadrilateral, 1}, ξ::Vec{2})
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     return @SVector [
-        (1 - ξ_x) * (1 - ξ_y) * 0.25,
-        (1 + ξ_x) * (1 - ξ_y) * 0.25,
-        (1 + ξ_x) * (1 + ξ_y) * 0.25,
-        (1 - ξ_x) * (1 + ξ_y) * 0.25,
+        (1 - ξ_x) * (1 - ξ_y) / 4,
+        (1 + ξ_x) * (1 - ξ_y) / 4,
+        (1 + ξ_x) * (1 + ξ_y) / 4,
+        (1 - ξ_x) * (1 + ξ_y) / 4,
+    ]
+end
+
+function shape_values(ip::Lagrange{RefHexahedron, 1}, ξ::Vec{3})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    ξ_z = ξ[3]
+    return @SVector [
+        (1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z) / 8,
+        (1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z) / 8,
+        (1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z) / 8,
+        (1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z) / 8,
+        (1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z) / 8,
+        (1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z) / 8,
+        (1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z) / 8,
+        (1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z) / 8,
     ]
 end
 
@@ -85,10 +115,26 @@ function shape_gradients(ip::Lagrange{RefQuadrilateral, 1}, ξ::Vec{2})
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     return @SMatrix [
-        (0 - 1) * (1 - ξ_y) * 0.25    (1 - ξ_x) * (0 - 1) * 0.25;
-        (0 + 1) * (1 - ξ_y) * 0.25    (1 + ξ_x) * (0 - 1) * 0.25;
-        (0 + 1) * (1 + ξ_y) * 0.25    (1 + ξ_x) * (0 + 1) * 0.25;
-        (0 - 1) * (1 + ξ_y) * 0.25    (1 - ξ_x) * (0 + 1) * 0.25;
+        (0 - 1) * (1 - ξ_y) / 4    (1 - ξ_x) * (0 - 1) / 4;
+        (0 + 1) * (1 - ξ_y) / 4    (1 + ξ_x) * (0 - 1) / 4;
+        (0 + 1) * (1 + ξ_y) / 4    (1 + ξ_x) * (0 + 1) / 4;
+        (0 - 1) * (1 + ξ_y) / 4    (1 - ξ_x) * (0 + 1) / 4;
+    ]
+end
+
+function shape_gradients(ip::Lagrange{RefHexahedron, 1}, ξ::Vec{3})
+    ξ_x = ξ[1]
+    ξ_y = ξ[2]
+    ξ_z = ξ[3]
+    return @SMatrix [
+        (0 - 1) * (1 - ξ_y) * (1 - ξ_z) / 8    (1 - ξ_x) * (0 - 1) * (1 - ξ_z) / 8    (1 - ξ_x) * (1 - ξ_y) * (0 - 1) / 8;
+        (0 + 1) * (1 - ξ_y) * (1 - ξ_z) / 8    (1 + ξ_x) * (0 - 1) * (1 - ξ_z) / 8    (1 + ξ_x) * (1 - ξ_y) * (0 - 1) / 8;
+        (0 + 1) * (1 + ξ_y) * (1 - ξ_z) / 8    (1 + ξ_x) * (0 + 1) * (1 - ξ_z) / 8    (1 + ξ_x) * (1 + ξ_y) * (0 - 1) / 8;
+        (0 - 1) * (1 + ξ_y) * (1 - ξ_z) / 8    (1 - ξ_x) * (0 + 1) * (1 - ξ_z) / 8    (1 - ξ_x) * (1 + ξ_y) * (0 - 1) / 8;
+        (0 - 1) * (1 - ξ_y) * (1 + ξ_z) / 8    (1 - ξ_x) * (0 - 1) * (1 + ξ_z) / 8    (1 - ξ_x) * (1 - ξ_y) * (0 + 1) / 8;
+        (0 + 1) * (1 - ξ_y) * (1 + ξ_z) / 8    (1 + ξ_x) * (0 - 1) * (1 + ξ_z) / 8    (1 + ξ_x) * (1 - ξ_y) * (0 + 1) / 8;
+        (0 + 1) * (1 + ξ_y) * (1 + ξ_z) / 8    (1 + ξ_x) * (0 + 1) * (1 + ξ_z) / 8    (1 + ξ_x) * (1 + ξ_y) * (0 + 1) / 8;
+        (0 - 1) * (1 + ξ_y) * (1 + ξ_z) / 8    (1 - ξ_x) * (0 + 1) * (1 + ξ_z) / 8    (1 - ξ_x) * (1 + ξ_y) * (0 + 1) / 8;
     ]
 end
 
@@ -96,13 +142,15 @@ function unsafe_shape_gradient(ip::Interpolation, ξ::Vec, i::Int)
     return Tensors.gradient(x -> unsafe_shape_value(ip, x, i), ξ)
 end
 
+# ntuple fails...
 cellnodes(cell::Quadrilateral, nodes) = (nodes[cell.nodes[1]], nodes[cell.nodes[2]], nodes[cell.nodes[3]], nodes[cell.nodes[4]])
+cellnodes(cell::Hexahedron, nodes) = (nodes[cell.nodes[1]], nodes[cell.nodes[2]], nodes[cell.nodes[3]], nodes[cell.nodes[4]], nodes[cell.nodes[5]], nodes[cell.nodes[6]], nodes[cell.nodes[7]], nodes[cell.nodes[8]])
 
 # We start by generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Quadrilateral, (200, 200));
-colors = CuArray.(create_coloring(grid));
+grid = generate_grid(Hexahedron, (100, 100, 100));
+colors = CuArray.(create_coloring(grid)); # TODO add example without coloring, i.e. using Atomics instead
 
 # ### Trial and test functions
 # A `CellValues` facilitates the process of evaluating values and gradients of
@@ -112,8 +160,8 @@ colors = CuArray.(create_coloring(grid));
 # based on the two-dimensional reference quadrilateral. We also define a quadrature rule based on
 # the same reference element. We combine the interpolation and the quadrature rule
 # to a `CellValues` object.
-ip = Lagrange{RefQuadrilateral, 1}()
-qr = QuadratureRule{RefQuadrilateral}(2)
+ip = Lagrange{RefHexahedron, 1}()
+qr = QuadratureRule{RefHexahedron}(2)
 cellvalues = CellValues(qr, ip);
 
 # ### Degrees of freedom
@@ -276,36 +324,116 @@ Base.size(A::FerriteGPUMassOperator, d) = ndofs(dh) # Square operator
 
 A = FerriteGPUMassOperator(dh, colors, ip, ip, qr)
 
-function generate_rhs(dh)
-    rhs = zeros(ndofs(dh))
-    for cell in CellIterator(dh)
-        reinit!(cellvalues, cell)
-        coords = get_cell_coordinates(cell)
-        n_basefuncs = getnbasefunctions(cellvalues)
-        fe = zeros(n_basefuncs)
-        for q_point in 1:getnquadpoints(cellvalues)
-            ## Get the quadrature weight
-            dΩ = getdetJdV(cellvalues, q_point)
-            x = spatial_coordinate(cellvalues, q_point, coords)
-            ## Loop over test shape functions
-            for i in 1:n_basefuncs
-                δu  = shape_value(cellvalues, q_point, i)
-                ## Add contribution to fe
-                fe[i] += cos(x[1]/π)*cos(x[2]/π)*δu * dΩ
-            end
-        end
-        rhs[celldofs(cell)] .+= fe
-    end
-    return CuArray(rhs)
+struct FerriteGPURHS{CACELLS, CANODES, CACOLORS, CADOFS, CAOFFSETS, IP, GIP, QR}
+    # "GPUGrid"
+    gpu_cells::CACELLS
+    gpu_nodes::CANODES
+    colors::CACOLORS
+    # "GPUDofHandler"
+    all_cell_dofs::CADOFS
+    cell_dof_offsets::CAOFFSETS
+    # "GPUValues"
+    ip::IP
+    ip_geo::GIP
+    qr::QR
 end
-b = generate_rhs(dh)
+
+function FerriteGPURHS(dh, colors, ip, ip_geo, qr)
+    FerriteGPURHS(
+        CuArray(getcells(Ferrite.get_grid(dh))),
+        CuArray(get_node_coordinate.(getnodes(Ferrite.get_grid(dh)))),
+        colors,
+        CuArray(dh.cell_dofs),
+        CuArray(dh.cell_dofs_offset),
+        ip, ip_geo, qr
+    )
+end
+
+function generate_rhs(gpurhs::FerriteGPURHS)
+    rhs = CuArray(zeros(ndofs(dh)))
+    numthreads = 256
+    numblocks = 1 #fails...? ceil(Int, length(color)/numthreads)
+    dofs_per_cell  = ndofs_per_cell(dh, 1)
+    for color ∈ gpurhs.colors
+        # try
+        @cuda threads=numthreads blocks=numblocks gpu_rhs_kernel!(rhs, gpurhs.all_cell_dofs, gpurhs.cell_dof_offsets, gpurhs.qr, gpurhs.ip, gpurhs.ip_geo, color, gpurhs.gpu_cells, gpurhs.gpu_nodes, dofs_per_cell)
+        synchronize()
+        # catch err
+        #     code_typed(err; interactive = true)
+        # end
+    end
+
+    # for cell in CellIterator(dh)
+    #     reinit!(cellvalues, cell)
+    #     coords = getcoordinates(cell)
+    #     n_basefuncs = getnbasefunctions(cellvalues)
+    #     fe = zeros(n_basefuncs)
+    #     for q_point in 1:getnquadpoints(cellvalues)
+    #         ## Get the quadrature weight
+    #         dΩ = getdetJdV(cellvalues, q_point)
+    #         x = spatial_coordinate(cellvalues, q_point, coords)
+    #         ## Loop over test shape functions
+    #         for i in 1:n_basefuncs
+    #             δu  = shape_value(cellvalues, q_point, i)
+    #             ## Add contribution to fe
+    #             fe[i] += cos(x[1]/π)*cos(x[2]/π)*δu * dΩ
+    #         end
+    #     end
+    #     rhs[celldofs(cell)] .+= fe
+    # end
+    return rhs
+end
+
+Base.@propagate_inbounds function gpu_rhs_kernel!(rhs::RHS, all_cell_dofs::CD, cell_dof_offsets::DO, qr::QR, ip::FIP, ip_geo::GIP, cell_indices::GPUC, cells::CELLS, nodes::GPUN, dofs_per_cell::DOFSPC) where {RHS, CD, DO, QR, FIP, GIP, GPUC, CELLS, GPUN, DOFSPC}
+    index = threadIdx().x    # this example only requires linear indexing, so just use `x`
+    stride = blockDim().x
+    for i = index:stride:length(cell_indices)
+        ## Get index of the current cell
+        cell_index = cell_indices[i]
+        ## Grab the actual cell
+        cell = cells[cell_index]
+        ## Grab the dofs on the cell
+        cell_dof_range = cell_dof_offsets[cell_index]:(cell_dof_offsets[cell_index]+dofs_per_cell-1)
+        cell_dofs = @view all_cell_dofs[cell_dof_range]
+        ## Grab the buffers for the y and x
+        rhsₑ = @view rhs[cell_dofs]
+        ## Grab coordinate array
+        coords = cellnodes(cell, nodes)
+        ## Apply local action for y = Ax
+        gpu_rhs_kernel2!(rhsₑ, qr, ip, ip_geo, coords)
+    end
+end
+
+function gpu_rhs_kernel2!(rhsₑ, qr, ip, ip_geo, coords)    
+    n_basefuncs = getnbasefunctions(ip)
+    for q_point in 1:length(qr.weights) #getnquadpoints(cellvalues)
+        ξ = qr.points[q_point]
+        # TODO recover abstraction layer
+        J = getJ(ip_geo, coords, ξ)
+        dΩ = det(J)*qr.weights[q_point] #getdetJdV(cellvalues, q_point)
+        
+        # TODO spatial_coordinate
+        x = zero(Vec{3,Float64})
+        for i in 1:n_basefuncs
+            x += unsafe_shape_value(ip_geo, ξ, i)*coords[i] #geometric_value(fe_v, q_point, i) * x[i]
+        end
+
+        for i in 1:n_basefuncs
+            ϕᵢ = unsafe_shape_value(ip, ξ, i)
+            rhsₑ[i] += cos(x[1]/π)*cos(x[2]/π)*ϕᵢ * dΩ
+        end
+    end
+end
+
+
+b = generate_rhs(FerriteGPURHS(dh, colors, ip, ip, qr))
 u = CUDA.fill(0.0, ndofs(dh));
 cg!(u, A, b; verbose=true);
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
-vtk_grid("heat_equation", dh) do vtk
+vtk_grid("heat_equation", dh) do vtk # The cake is a lie
     vtk_point_data(vtk, dh, Array(u))
 end
 
