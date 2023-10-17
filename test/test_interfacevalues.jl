@@ -9,16 +9,14 @@
 
         for ic in InterfaceIterator(grid)
             reinit!(iv, ic)
-            cell_a_coords = getcoordinates(ic; here = true)
-            cell_b_coords = getcoordinates(ic; here = false)
-
+            interface_coords = getcoordinates(ic)
             nqp = getnquadpoints(iv)
             # Should have same quadrature points
             @test nqp == getnquadpoints(iv.here) == getnquadpoints(iv.there)
             for qp in 1:nqp
                 # If correctly synced quadrature points coordinates should match
-                @test spatial_coordinate(iv, qp, cell_a_coords; here = true) ≈
-                    spatial_coordinate(iv, qp, cell_b_coords; here = false)
+                @test spatial_coordinate(iv, qp, interface_coords; here = true) ≈
+                    spatial_coordinate(iv, qp, interface_coords; here = false)
                 for i in 1:getnbasefunctions(iv)
                     here = i <= getnbasefunctions(iv.here)
                     shapevalue = shape_value(iv, qp, i; here = here)
@@ -65,12 +63,12 @@
                 H = rand(Tensor{2, ndim})
                 V = rand(Tensor{1, ndim})
                 for i in 1:nbf_a
-                    xs = cell_a_coords
+                    xs = interface_coords[1]
                     u_a[i] = H ⋅ xs[i]
                     u_scal_a[i] = V ⋅ xs[i]
                 end
                 for i in 1:nbf_b
-                    xs = cell_b_coords
+                    xs = interface_coords[2]
                     u_b[i] = H ⋅ xs[i]
                     u_scal_b[i] = V ⋅ xs[i]
                 end
@@ -97,7 +95,7 @@
                     vol += getdetJdV(iv, i)
                 end
 
-                xs = here ? cell_a_coords : cell_b_coords
+                xs = interface_coords[here ? 1 : 2]
                 x_face = xs[[Ferrite.dirichlet_facedof_indices(here ? ip_a : ip_b)[here ? Ferrite.getcurrentface(iv.here) : Ferrite.getcurrentface(iv.there)]...]]
                 @test vol ≈ calculate_face_area(here ? ip_a : ip_b, x_face, here ? Ferrite.getcurrentface(iv.here) : Ferrite.getcurrentface(iv.there))
             end
