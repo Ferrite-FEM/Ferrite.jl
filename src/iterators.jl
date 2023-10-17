@@ -218,6 +218,7 @@ end
 
 interfacedofs(ic::InterfaceCache) = ic.dofs
 dof_range(ic::InterfaceCache, field::Symbol) = (dof_range(ic.a.cc.dh, field), dof_range(ic.b.cc.dh, field) .+ length(celldofs(ic.a)))
+getcoordinates(ic::InterfaceCache; here::Bool) = getcoordinates(here ? ic.a : ic.b)
 
 ####################
 ## Grid iterators ##

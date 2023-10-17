@@ -9,16 +9,16 @@
 
         for ic in InterfaceIterator(grid)
             reinit!(iv, ic)
-            cell_a_coords = getcoordinates(ic.a.cc)
-            cell_b_coords = getcoordinates(ic.b.cc)
+            cell_a_coords = getcoordinates(ic; here = true)
+            cell_b_coords = getcoordinates(ic; here = false)
 
             nqp = getnquadpoints(iv)
             # Should have same quadrature points
             @test nqp == getnquadpoints(iv.here) == getnquadpoints(iv.there)
             for qp in 1:nqp
                 # If correctly synced quadrature points coordinates should match
-                @test spatial_coordinate(iv, qp, cell_a_coords) ≈ spatial_coordinate(iv.here, qp, cell_a_coords) ≈
-                      spatial_coordinate(iv.there, qp, cell_b_coords)
+                @test spatial_coordinate(iv, qp, cell_a_coords; here = true) ≈
+                    spatial_coordinate(iv, qp, cell_b_coords; here = false)
                 for i in 1:getnbasefunctions(iv)
                     here = i <= getnbasefunctions(iv.here)
                     shapevalue = shape_value(iv, qp, i; here = here)

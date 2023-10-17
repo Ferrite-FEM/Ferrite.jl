@@ -359,9 +359,8 @@ for (func,                          f_,                     is_avg) in (
     end
 end
 
-# TODO: Should this be [x_here, x_there], i.e. all coordinates?
-function spatial_coordinate(iv::InterfaceValues, q_point::Int, x_here::AbstractVector{<:Vec})
-    return spatial_coordinate(iv.here, q_point, x_here)
+function spatial_coordinate(iv::InterfaceValues, q_point::Int, x::AbstractVector{<:Vec}; here::Bool)
+    return spatial_coordinate(here ? iv.here : iv.there, q_point, x)
 end
 
 
