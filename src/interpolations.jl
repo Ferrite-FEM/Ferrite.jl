@@ -205,6 +205,46 @@ getnbasefunctions(::Interpolation)
 #   celldof: dof that is local to the element
 
 """
+    shape_values!(values::AbstractArray{T}, ip::Interpolation, ξ::Vec)
+
+Evaluate all shape functions of `ip` at once at the reference point `ξ` and store them in
+`values`.
+"""
+@propagate_inbounds function shape_values!(values::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
+    @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
+    @inbounds for i in 1:getnbasefunctions(ip)
+        values[i] = shape_value(ip, ξ, i)
+    end
+end
+
+"""
+    shape_gradients!(gradients::AbstractArray, ip::Interpolation, ξ::Vec)
+
+Evaluate all shape function gradients of `ip` at once at the reference point `ξ` and store
+them in `gradients`.
+"""
+function shape_gradients!(gradients::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
+    @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
+    @inbounds for i in 1:getnbasefunctions(ip)
+        gradients[i] = shape_gradient(ip, ξ, i)
+    end
+end
+
+"""
+    shape_gradients_and_values!(gradients::AbstractArray, values::AbstractArray, ip::Interpolation, ξ::Vec)
+
+Evaluate all shape function gradients and values of `ip` at once at the reference point `ξ`
+and store them in `values`.
+"""
+function shape_gradients_and_values!(gradients::GAT, values::SAT, ip::IP, ξ::Vec) where {IP <: Interpolation, SAT <: AbstractArray, GAT <: AbstractArray}
+    @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
+    @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
+    @inbounds for i in 1:getnbasefunctions(ip)
+        gradients[i], values[i] = shape_gradient_and_value(ip, ξ, i)
+    end
+end
+
+"""
     shape_value(ip::Interpolation, ξ::Vec, i::Int)
 
 Evaluate the value of the `i`th shape function of the interpolation `ip`

@@ -126,7 +126,7 @@ function compute_x(interpolation::IP, ξ::Vec{dim,T}, cell_coordinates::Vector{<
     n_basefuncs = getnbasefunctions(interpolation)
     x = zero(Vec{dim, T})
     for j in 1:n_basefuncs
-        dNdξ, N = shape_gradient_and_value(interpolation, ξ, j)
+        N = shape_value(interpolation, ξ, j)
         x += N * cell_coordinates[j]
     end
     return x
