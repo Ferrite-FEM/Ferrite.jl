@@ -339,15 +339,15 @@ function __close!(dh::DofHandler{dim}) where {dim}
 
 end
 
-function subtract_dofs!(dst::Vector{Int}, shared_dofs::Vector{Int}, bshared_dofs::Vector{Int}, last_field_offset::Int)
+function subtract_dofs!(dst::Vector{Int}, shared_dofs::Tuple{Vector{Int},Vector{Int}}, last_field_offset::Int)
     for i in last_field_offset: length(dst)
-        dst[i] ∈ shared_dofs || (dst[i] -=  count(x -> dst[i] > x, bshared_dofs))
+        dst[i] ∈ shared_dofs[1] || (dst[i] -=  count(x -> dst[i] > x, shared_dofs[2]))
     end
 end
 
-function subtract_dofs!(dst::Vector{Int}, shared_dofs::Vector{Int}, bshared_dofs::Vector{Int}, dofs)
+function subtract_dofs!(dst::Vector{Int}, shared_dofs::Tuple{Vector{Int},Vector{Int}}, dofs)
     for i in dofs
-        dst[i] ∈ shared_dofs || (dst[i] -=  count(x -> dst[i] > x, bshared_dofs))
+        dst[i] ∈ shared_dofs[1] || (dst[i] -=  count(x -> dst[i] > x, shared_dofs[2]))
     end
 end
 
@@ -390,7 +390,7 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
     # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
     for ci in BitSet(sdh.cellset)
         @debug println("Creating dofs for cell #$ci")
-
+        last_field_offset = length(dh.cell_dofs) + 1
         # TODO: _check_cellset_intersections can be removed in favor of this assertion
         @assert dh.cell_to_subdofhandler[ci] == 0
         dh.cell_to_subdofhandler[ci] = sdh_index
@@ -416,9 +416,8 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
                 entity_dofs[lidx],
                 shared_dofs,
             )
-            subtract_dofs!(dh.cell_dofs, shared_dofs[1], shared_dofs[2], last_field_offset)
-            subtract_dofs!(vertexdicts[gidx], shared_dofs[1], shared_dofs[2], vertices(cell))
-            last_field_offset = nextdof
+            subtract_dofs!(dh.cell_dofs, shared_dofs, last_field_offset)
+            subtract_dofs!(vertexdicts[gidx], shared_dofs, vertices(cell))
         end
 
         if first_cell
@@ -521,26 +520,24 @@ end
 Returns the next global dof number and an array of dofs. If dofs have already been created
 for the object (vertex, face) then simply return those, otherwise create new dofs.
 """
-@inline function get_or_create_dofs!(dst::Vector{Int}, nextdof::Int, ndofs::Int, n_copies::Int, dict::Dict, key::Tuple, orientation::PathOrientationInfo, _entity_dofs, shared_dofs::Tuple{Vector{Int}, Vector{Int}}, n)
+@inline function get_or_create_dofs!(dst::Vector{Int}, nextdof::Int, ndofs::Int, n_copies::Int, dict::Dict, key::Tuple, orientation::PathOrientationInfo, entity_dofs, shared_dofs::Tuple{Vector{Int}, Vector{Int}}, n)
     token = Base.ht_keyindex2!(dict, key)
-    entity_dofs = orientation.regular ? _entity_dofs : reverse(_entity_dofs)
+    rng_entity = orientation.regular ? (1:length(entity_dofs)) : (length(entity_dofs):-1:1)
     if token > 0  # vertex, face etc. visited before
-        rng = dict.vals[token][1]
-        dofs = @view dst[rng]
-        rng = (length(dst)+1):(length(dst) + ndofs*n_copies)
-        for i in (orientation.regular ? (1:length(entity_dofs)) : (length(entity_dofs):-1:1)), d in 1:n_copies
+        dofs = @view dst[dict.vals[token][1]]
+        for i in rng_entity, d in 1:n_copies
             push!(dst, dofs[(i-1)*n_copies + d])
             push!(shared_dofs[1], dofs[(i-1)*n_copies + d])
         end
-        for dof in entity_dofs, d in 1:n_copies
-            push!(shared_dofs[2], n + (dof-1) * n_copies + d)
+        for i in rng_entity, d in 1:n_copies
+            push!(shared_dofs[2], n + (entity_dofs[i]-1) * n_copies + d)
         end
         @debug println("\t\t\tkey: $key dofs: $(dofs)  (reused dofs)")
     else  # create new dofs
         rng = (length(dst)+1):(length(dst) + ndofs*n_copies)
         Base._setindex!(dict, (rng, orientation), key, -token)
-        for dof in entity_dofs, d in 1:n_copies
-            push!(dst, n + (dof-1) * n_copies + d)
+        for i in rng_entity, d in 1:n_copies
+            push!(dst, n + (entity_dofs[i]-1) * n_copies + d)
         end
         @debug println("\t\t\tkey: $key dofs: $dofs")
         nextdof += ndofs*n_copies
