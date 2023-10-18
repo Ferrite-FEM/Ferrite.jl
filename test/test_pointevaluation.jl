@@ -77,7 +77,7 @@ function test_pe_embedded()
 
     # set up PointEvalHandler and retrieve values
     @test_throws MethodError ph = PointEvalHandler(mesh, points)
-    @test all(x -> x !== nothing, ph.cells) broken = true
+    @test_throws UndefVarError all(x -> x !== nothing, ph.cells)
 
     # vals = evaluate_at_points(ph, projector, projector_vals)
     # @test f.(points) ≈ vals atol = 1e-2
