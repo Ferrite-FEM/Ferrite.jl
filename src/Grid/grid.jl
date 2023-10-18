@@ -267,7 +267,7 @@ default_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,      
 default_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,       1}()
 
 # TODO: Remove this, used for Quadrilateral3D
-edges(c::Quadrilateral#=3D=#) = faces(c)
+edges(c::C) where {C <: AbstractCell{<:AbstractRefShape{2}}} = faces(c)
 
 # Serendipity interpolation based cells
 struct SerendipityQuadraticQuadrilateral <: AbstractCell{RefQuadrilateral} nodes::NTuple{ 8, Int} end

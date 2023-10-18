@@ -43,6 +43,46 @@ function test_pe_scalar_field()
     # @test f.(points) ≈ vals
 end
 
+function test_pe_embedded()
+    mesh = generate_grid(QuadraticQuadrilateral, (3, 3))
+    perturbate_standard_grid!(mesh, 1/10)
+    mesh = Grid(mesh.cells, map(x->Node(Vec((x.x[1], x.x[2], x.x[1]+x.x[2]))), mesh.nodes))
+    
+    f(x) = x[1]+x[2]
+
+    ip_f = Lagrange{RefQuadrilateral,2}() # function interpolation
+    ip_g = Lagrange{RefQuadrilateral,2}()^3 # geometry interpolation
+
+    # points where we want to retrieve field values
+    points = Vec{3,Float64}[]
+
+    # compute values in quadrature points
+    qr = QuadratureRule{RefQuadrilateral}(3) # exactly approximate quadratic field
+    cv = CellValues(qr, ip_f, ip_g)
+    qp_vals = [Vector{Float64}(undef, getnquadpoints(cv)) for _ in 1:getncells(mesh)]
+    for cellid in eachindex(mesh.cells)
+        xe = getcoordinates(mesh, cellid)
+        reinit!(cv, xe)
+        for qp in 1:getnquadpoints(cv)
+            x = spatial_coordinate(cv, qp, xe)
+            qp_vals[cellid][qp] = f(x)
+            push!(points, x)
+        end
+    end
+
+    # do a L2Projection for getting values in dofs
+    # @test_throws MethodError projector = L2Projector(ip_f, mesh; geom_ip=ip_g)
+    projector = L2Projector(ip_f, mesh; geom_ip=ip_g)
+    projector_vals = project(projector, qp_vals, qr)
+
+    # set up PointEvalHandler and retrieve values
+    @test_throws MethodError ph = PointEvalHandler(mesh, points)
+    @test all(x -> x !== nothing, ph.cells) broken = true
+
+    # vals = evaluate_at_points(ph, projector, projector_vals)
+    # @test f.(points) ≈ vals atol = 1e-2
+end
+
 function test_pe_vector_field()
     ## vector field
     # isoparametric approximation
@@ -51,7 +91,7 @@ function test_pe_vector_field()
     f(x) = Vec((x[1], x[2]))
     nodal_vals = [f(p.x) for p in mesh.nodes]
 
-    ip_f = Lagrange{RefQuadrilateral,2}() # function interpolation
+    ip_f = Lagrange{RefQuadrilateral,2}()^2 # function interpolation
     ip_g = Lagrange{RefQuadrilateral,2}() # geometry interpolation
 
     # compute values in quadrature points
@@ -358,6 +398,7 @@ end
 @testset "PointEvalHandler" begin
     @testset "scalar field" begin
         test_pe_scalar_field()
+        test_pe_embedded()
     end
 
     @testset "vector field" begin
