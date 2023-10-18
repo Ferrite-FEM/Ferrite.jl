@@ -8,6 +8,9 @@ The `PointEvalHandler` takes the following keyword arguments:
  - `search_nneighbors`: How many nodes should be found in the nearest neighbor search for each
    point. Usually there is no need to change this setting. Default value: `3`.
  - `warn`: Show a warning if a point is not found. Default value: `true`.
+ - `newton_max_iters`: Maximum number of inner Newton iterations. Default value: `10`.
+ - `newton_residual_tolerance`: Tolerance for the residual norm to indicate convergence in the
+   inner Newton solver. Default value: `1e-10`.
 
 The constructor takes a grid and a vector of coordinates for the points. The
 `PointEvalHandler` computes i) the corresponding cell, and ii) the (local) coordinate
@@ -45,13 +48,13 @@ function Base.show(io::IO, ::MIME"text/plain", ph::PointEvalHandler)
     end
 end
 
-function PointEvalHandler(grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim,T}}; search_nneighbors=3, warn=true) where {dim, T}
+function PointEvalHandler(grid::AbstractGrid{dim}, points::AbstractVector{Vec{dim,T}}; search_nneighbors=3, warn=true, max_iters = 10, tol_norm::T = 1e-10) where {dim, T}
     node_cell_dicts = _get_node_cell_map(grid)
-    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn)
+    cells, local_coords = _get_cellcoords(points, grid, node_cell_dicts, search_nneighbors, warn, #=linesearch_max_substeps=# 4, max_iters, tol_norm)
     return PointEvalHandler(grid, cells, local_coords)
 end
 
-function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}, search_nneighbors, warn) where {dim, T<:Real, C}
+function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid, node_cell_dicts::Dict{C,Dict{Int, Vector{Int}}}, search_nneighbors, warn, linesearch_max_substeps, max_iters, tol_norm) where {dim, T<:Real, C}
     # set up tree structure for finding nearest nodes to points
     kdtree = KDTree(reinterpret(Vec{dim,T}, getnodes(grid)))
     nearest_nodes, _ = knn(kdtree, points, search_nneighbors, true) 
@@ -69,7 +72,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
                 possible_cells === nothing && continue # if node is not part of the subdofhandler, try the next node
                 for cell in possible_cells
                     cell_coords = getcoordinates(grid, cell)
-                    is_in_cell, local_coord = point_in_cell(geom_interpol, cell_coords, points[point_idx], warn)
+                    is_in_cell, local_coord = point_in_cell(geom_interpol, cell_coords, points[point_idx], warn, linesearch_max_substeps, max_iters, tol_norm::T)
                     if is_in_cell
                         cell_found = true
                         cells[point_idx] = cell
@@ -90,8 +93,8 @@ end
 
 # check if point is inside a cell based on physical coordinate
 # TODO linear case can be handled easier
-function point_in_cell(geom_interpol::Interpolation{shape}, cell_coordinates, global_coordinate, warn) where {shape}
-    return find_local_coordinate(geom_interpol, cell_coordinates, global_coordinate, warn)
+function point_in_cell(geom_interpol::Interpolation{shape}, cell_coordinates, global_coordinate, warn,  linesearch_max_substeps, max_iters, tol_norm) where {shape}
+    return find_local_coordinate(geom_interpol, cell_coordinates, global_coordinate, warn, linesearch_max_substeps, max_iters, tol_norm)
 end
 
 # check if point is inside a cell based on isoparametric coordinate
@@ -133,8 +136,7 @@ function compute_x(interpolation::IP, ξ::Vec{dim,T}, cell_coordinates::Vector{<
 end
 
 # See https://discourse.julialang.org/t/finding-the-value-of-a-field-at-a-spatial-location-in-juafem/38975/2
-# TODO: should we make iteration params optional keyword arguments?
-function find_local_coordinate(interpolation::IP, cell_coordinates::Vector{V}, global_coordinate::V, warn::Bool, linsearch_max_substeps::Int = 4, max_iters::Int = 10, tol_norm::T = 1e-10) where {dim, T, V <: Vec{dim, T}, ref_shape, IP <: Interpolation{ref_shape}}
+function find_local_coordinate(interpolation::IP, cell_coordinates::Vector{V}, global_coordinate::V, warn::Bool, linesearch_max_substeps::Int , max_iters::Int, tol_norm::T) where {dim, T, V <: Vec{dim, T}, ref_shape, IP <: Interpolation{ref_shape}}
     n_basefuncs = getnbasefunctions(interpolation)
     @assert length(cell_coordinates) == n_basefuncs
     local_guess = cellcenter(ref_shape, T)
@@ -160,7 +162,7 @@ function find_local_coordinate(interpolation::IP, cell_coordinates::Vector{V}, g
         best_index = 1
         new_local_guess = local_guess - Δξ
         global_guess = compute_x(interpolation, new_local_guess, cell_coordinates)
-        !_check_isoparametric_boundaries(ref_shape, new_local_guess, sqrt(tol_norm)) && for next_index ∈ 2:linsearch_max_substeps
+        !_check_isoparametric_boundaries(ref_shape, new_local_guess, sqrt(tol_norm)) && for next_index ∈ 2:linesearch_max_substeps
             new_local_guess = local_guess - Δξ/next_index
             global_guess = compute_x(interpolation, new_local_guess, cell_coordinates)
             residual_norm = norm(global_guess - global_coordinate)
