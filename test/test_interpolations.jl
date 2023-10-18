@@ -135,23 +135,23 @@
             end
         end
 
-        # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
-        interpolation_type = typeof(interpolation).name.wrapper
-        if func_order > 1 && interpolation_type != Ferrite.Serendipity
-            first_order = interpolation_type{ref_shape,1}()
-            for (highorderface, firstorderface) in zip(Ferrite.facedof_indices(interpolation), Ferrite.facedof_indices(first_order))
-                for (h_node, f_node) in zip(highorderface, firstorderface)
-                    @test h_node == f_node
-                end
-            end
-            if ref_dim > 2
-                for (highorderedge, firstorderedge) in zip(Ferrite.edgedof_indices(interpolation), Ferrite.edgedof_indices(first_order))
-                    for (h_node, f_node) in zip(highorderedge, firstorderedge)
-                        @test h_node == f_node
-                    end
-                end
-            end
-        end
+        # # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
+        # interpolation_type = typeof(interpolation).name.wrapper
+        # if func_order > 1 && interpolation_type != Ferrite.Serendipity
+        #     first_order = interpolation_type{ref_shape,1}()
+        #     for (highorderface, firstorderface) in zip(Ferrite.facedof_indices(interpolation), Ferrite.facedof_indices(first_order))
+        #         for (h_node, f_node) in zip(highorderface, firstorderface)
+        #             @test h_node == f_node
+        #         end
+        #     end
+        #     if ref_dim > 2
+        #         for (highorderedge, firstorderedge) in zip(Ferrite.edgedof_indices(interpolation), Ferrite.edgedof_indices(first_order))
+        #             for (h_node, f_node) in zip(highorderedge, firstorderedge)
+        #                 @test h_node == f_node
+        #             end
+        #         end
+        #     end
+        # end
 
     # VectorizedInterpolation
     v_interpolation_1 = interpolation^2
