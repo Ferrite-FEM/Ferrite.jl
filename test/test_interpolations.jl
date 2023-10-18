@@ -60,7 +60,7 @@
         coords = Ferrite.reference_coordinates(interpolation)
         @test length(coords) == n_basefuncs
         @test shape_value(interpolation, x, n_basefuncs) == shape_value(interpolation, x, n_basefuncs)
-        @test_throws BoundsError shape_value(interpolation, x, n_basefuncs+1)
+        @test_throws ArgumentError shape_value(interpolation, x, n_basefuncs+1)
 
         # Test whether we have for each entity corresponding dof indices (possibly empty)
         @test length(Ferrite.vertexdof_indices(interpolation)) == Ferrite.nvertices(interpolation)
