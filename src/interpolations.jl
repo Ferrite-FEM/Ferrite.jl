@@ -912,7 +912,7 @@ edgedof_indices(::Lagrange{RefHexahedron,2}) = (
     (4,8, 20),
 )
 edgedof_interior_indices(::Lagrange{RefHexahedron,2}) = (
-    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,)
+    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17,), (18,), (19,), (20,)
 )
 
 celldof_interior_indices(::Lagrange{RefHexahedron,2}) = (27,)
@@ -1348,7 +1348,7 @@ edgedof_indices(::Serendipity{RefHexahedron,2}) = (
 )
 
 edgedof_interior_indices(::Serendipity{RefHexahedron,2}) = (
-    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17), (18,), (19,), (20,)
+    (9,), (10,), (11,), (12,), (13,), (14,), (15,), (16,), (17,), (18,), (19,), (20,)
 )
 
 function reference_coordinates(::Serendipity{RefHexahedron,2})
