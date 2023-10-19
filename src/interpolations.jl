@@ -45,8 +45,9 @@ abstract type Interpolation{shape #=<: AbstractRefShape=#, order, unused} end
 
 const InterpolationByDim{dim} = Interpolation{<:AbstractRefShape{dim}}
 
-abstract type ScalarInterpolation{      refshape, order} <: Interpolation{refshape, order, Nothing} end
-abstract type VectorInterpolation{vdim, refshape, order} <: Interpolation{refshape, order, Nothing} end
+abstract type ScalarInterpolation{              refshape, order} <: Interpolation{refshape, order, Nothing} end
+abstract type VectorInterpolation{vdim,         refshape, order} <: Interpolation{refshape, order, Nothing} end
+abstract type MatrixInterpolation{vdim1, vdim2, refshape, order} <: Interpolation{refshape, order, Nothing} end
 
 # Number of components for the interpolation.
 n_components(::ScalarInterpolation)                    = 1
@@ -1546,3 +1547,72 @@ end
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
 
 is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
+
+##################################################
+# MatrixizedInterpolation{<:ScalarInterpolation} #
+##################################################
+struct MatrixizedInterpolation{vdim1, vdim2, refshape, order, SI <: ScalarInterpolation{refshape, order}} <: MatrixInterpolation{vdim1, vdim2, refshape,order}
+    ip::SI
+    function MatrixizedInterpolation{vdim1, vdim2}(ip::SI) where {vdim1, vdim2, refshape, order, SI <: ScalarInterpolation{refshape, order}}
+        return new{vdim1, vdim2, refshape, order, SI}(ip)
+    end
+end
+
+adjust_dofs_during_distribution(ip::MatrixizedInterpolation) = adjust_dofs_during_distribution(ip.ip)
+
+# Vectorize to reference dimension by default
+function MatrixizedInterpolation(ip::ScalarInterpolation{shape}) where {refdim, shape <: AbstractRefShape{refdim}}
+    return MatrixizedInterpolation{refdim,refdim}(ip)
+end
+
+Base.:(^)(ip::VectorizedInterpolation{vdim1}, vdim2::Int) where {vdim1} = MatrixizedInterpolation{vdim1, vdim2}(ip)
+function Base.literal_pow(::typeof(^), ip::VectorizedInterpolation{vdim1}, ::Val{vdim2}) where {vdim1,vdim2}
+    return MatrixizedInterpolation{vdim1, vdim2}(ip)
+end
+
+function Base.show(io::IO, mime::MIME"text/plain", ip::MatrixizedInterpolation{vdim1, vim2}) where {vdim1, vdim2}
+    show(io, mime, ip.ip)
+    print(io, "^", vdim1 , "×", vdim2)
+end
+
+# Helper to get number of copies for DoF distribution
+get_n_copies(::MatrixizedInterpolation{vdim1, vdim2}) where {vdim1, vdim2} = vdim1*vdim2
+
+function getnbasefunctions(ipv::MatrixizedInterpolation{vdim1, vdim2}) where {vdim1, vdim2}
+    return vdim1 * vdim2 * getnbasefunctions(ipv.ip)
+end
+function shape_value(ipv::MatrixizedInterpolation{vdim, vdim, shape}, ξ::Vec{refdim, T}, I::Int) where {vdim, refdim, shape <: AbstractRefShape{refdim}, T}
+    i0, c0 = divrem(I - 1, vdim*vdim)
+    i = i0 + 1
+    c = c0 + 1
+    v = shape_value(ipv.ip, ξ, i)
+    return Tensor{vdim, T}(j -> j == c ? v : zero(v))
+end
+
+# vdim1 == vdim2 == refdim
+# function shape_gradient_and_value(ipv::MatrixizedInterpolation{dim, dim, shape}, ξ::Vec{dim}, I::Int) where {dim, shape <: AbstractRefShape{dim}}
+#     # TODO order 3 tensor
+#     return invoke(shape_gradient_and_value, Tuple{Interpolation, Vec, Int}, ipv, ξ, I)
+# end
+# vdim1 != vdim2 != refdim
+# function shape_gradient_and_value(ipv::MatrixizedInterpolation{vdim1, vdim2, shape}, ξ::V, I::Int) where {vdim1, vdim2, refdim, shape <: AbstractRefShape{refdim}, T, V <: Vec{refdim, T}}
+#     # Load with dual numbers and compute the value
+#     f = x -> shape_value(ipv, x, I)
+#     ξd = Tensors._load(ξ, Tensors.Tag(f, V))
+#     value_grad = f(ξd)
+#     # Extract the value and gradient
+#     val = Vec{vdim, T}(i -> Tensors.value(value_grad[i]))
+#     grad = zero(MMatrix{vdim, refdim, T})
+#     for (i, vi) in pairs(value_grad)
+#         p = Tensors.partials(vi)
+#         for (j, pj) in pairs(p)
+#             grad[i, j] = pj
+#         end
+#     end
+#     return SArray{Tuple{vdim1, vdim2, }(grad), val
+# end
+
+reference_coordinates(ip::MatrixizedInterpolation) = reference_coordinates(ip.ip)
+
+is_discontinuous(::Type{<:MatrixizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
+
