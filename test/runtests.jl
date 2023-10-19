@@ -23,7 +23,9 @@ if TEST_TYPE_STABILITY
     using JET
 else
     # Just eat the macro on incompatible versions
-    macro test_call(args...) = nothing
+    macro test_call(args...)
+        nothing
+    end
 end
 
 include("test_utils.jl")
