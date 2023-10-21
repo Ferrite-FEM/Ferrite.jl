@@ -278,3 +278,16 @@ function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVecto
     end
     return vec
 end
+
+
+function shape_gradients_and_values!(gradients::AbstractMatrix, values::AbstractMatrix, ip, qr::QuadratureRule)
+    for (qp, ξ) in pairs(getpoints(qr))
+        shape_gradients_and_values!(@view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
+    end
+end
+
+function shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr::QuadratureRule)
+    for (qp, ξ) in pairs(getpoints(qr))
+        shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
+    end
+end

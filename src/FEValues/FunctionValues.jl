@@ -46,34 +46,24 @@ struct FunctionValues{IP, N_t, dNdx_t, dNdξ_t}
 end
 function FunctionValues(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where T
     ip_dims = InterpolationDims(ip, ip_geo)
-    N_t = typeof_N(T, ip_dims)
-    dNdx_t = typeof_dNdx(T, ip_dims)
-    dNdξ_t = typeof_dNdξ(T, ip_dims)
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
     
-    N_ξ  = zeros(N_t,    n_shape, n_qpoints)
-    if isa(get_mapping_type(ip), IdentityMapping)
-        N_x = N_ξ
-    else
-        N_x  = zeros(N_t,    n_shape, n_qpoints)
-    end
-    dNdξ = zeros(dNdξ_t, n_shape, n_qpoints)
-    dNdx = fill(zero(dNdx_t) * T(NaN), n_shape, n_qpoints)
-    fv = FunctionValues(ip, N_x, N_ξ, dNdx, dNdξ)
-    precompute_values!(fv, qr) # Precompute N and dNdξ
-    return fv
+    N_ξ = zeros(typeof_N(T, ip_dims), n_shape, n_qpoints)
+    N_x = isa(get_mapping_type(ip), IdentityMapping) ? N_ξ : similar(N_ξ)
+    
+    dNdξ = zeros(typeof_dNdξ(T, ip_dims),               n_shape, n_qpoints)
+    dNdx = fill(zero(typeof_dNdx(T, ip_dims)) * T(NaN), n_shape, n_qpoints)
+    
+    shape_gradients_and_values!(dNdξ, N_ξ, ip, qr) # Compute N_ξ and dNdξ
+    
+    return FunctionValues(ip, N_x, N_ξ, dNdx, dNdξ)
 end
+
 function Base.copy(v::FunctionValues)
     N_ξ_copy = copy(v.N_ξ)
     N_x_copy = v.N_ξ === v.N_x ? N_ξ_copy : copy(v.N_x) # Preserve aliasing
     return FunctionValues(copy(v.ip), N_x_copy, N_ξ_copy, copy(v.dNdx), copy(v.dNdξ))
-end
-
-function precompute_values!(fv::FunctionValues, qr::QuadratureRule)
-    for (qp, ξ) in pairs(getpoints(qr))
-        shape_gradients_and_values!(@view(fv.dNdξ[:, qp]), @view(fv.N_ξ[:, qp]), fv.ip, ξ)
-    end
 end
 
 getnbasefunctions(funvals::FunctionValues) = size(funvals.N_x, 1)
