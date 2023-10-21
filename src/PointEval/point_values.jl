@@ -65,7 +65,8 @@ function reinit!(pv::PointValues, x::AbstractVector{<:Vec{D}}, ξ::Vec{D}) where
     # Update the quadrature point location
     qr_points = getpoints(pv.cv.qr)
     qr_points[1] = ξ
-    precompute_values!(pv.cv.fun_values, pv.cv.qr) # See Issue #763, should also update dMdξ!, but separate issue
+    # Precompute all values again to reflect the updated ξ coordinate
+    precompute_values!(pv.cv)
     # Regular reinit
     reinit!(pv.cv, x)
     return nothing

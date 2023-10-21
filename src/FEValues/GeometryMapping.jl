@@ -47,18 +47,22 @@ end
 function GeometryMapping(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule, ::RequiresHessian{RH}) where {T,RH}
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
+    
     M    = zeros(T,                 n_shape, n_qpoints)
     dMdξ = zeros(Vec{getdim(ip),T}, n_shape, n_qpoints)
-    
-    if RH # RequiresHessian
-        d2Mdξ2 = zeros(Tensor{2,getdim(ip),T}, n_shape, n_qpoints)
-        shape_hessians_gradients_and_values!(d2Mdξ2, dMdξ, M, ip, qr)
-    else
-        d2Mdξ2 = nothing
-        shape_gradients_and_values!(dMdξ, M, ip, qr)
-    end
+    d2Mdξ2 = RH ? zeros(Tensor{2,getdim(ip),T}, n_shape, n_qpoints) : nothing
 
-    return GeometryMapping(ip, M, dMdξ, d2Mdξ2)
+    gm = GeometryMapping(ip, M, dMdξ, d2Mdξ2)
+    precompute_values!(gm, qr) # Separate function for qr point update in PointValues
+    return gm
+end
+
+precompute_values!(gm::GeometryMapping, qr) = precompute_values!(gm, qr, RequiresHessian(gm))
+function precompute_values!(gm::GeometryMapping, qr, ::RequiresHessian{false})
+    shape_gradients_and_values!(gm.dMdξ, gm.M, gm.ip, qr)
+end
+function precompute_values!(gm::GeometryMapping, qr, ::RequiresHessian{true})
+    shape_hessians_gradients_and_values!(gm.d2Mdξ2, gm.dMdξ, gm.M, gm.ip, qr)
 end
 
 function Base.copy(v::GeometryMapping)

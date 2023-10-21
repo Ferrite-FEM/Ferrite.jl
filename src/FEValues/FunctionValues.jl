@@ -55,9 +55,13 @@ function FunctionValues(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo
     dNdξ = zeros(typeof_dNdξ(T, ip_dims),               n_shape, n_qpoints)
     dNdx = fill(zero(typeof_dNdx(T, ip_dims)) * T(NaN), n_shape, n_qpoints)
     
-    shape_gradients_and_values!(dNdξ, N_ξ, ip, qr) # Compute N_ξ and dNdξ
-    
-    return FunctionValues(ip, N_x, N_ξ, dNdx, dNdξ)
+    fv = FunctionValues(ip, N_x, N_ξ, dNdx, dNdξ)
+    precompute_values!(fv, qr) # Separate function for qr point update in PointValues
+    return fv
+end
+
+function precompute_values!(fv::FunctionValues, qr)
+    shape_gradients_and_values!(fv.dNdξ, fv.N_ξ, fv.ip, qr)
 end
 
 function Base.copy(v::FunctionValues)
