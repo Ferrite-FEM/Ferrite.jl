@@ -93,8 +93,7 @@ function check_reinit_sdim_consistency(valname, gradtype, ::Type{<:Vec{sdim}}) w
 end
 check_reinit_sdim_consistency(_, ::Val{sdim}, ::Val{sdim}) where sdim = nothing
 function check_reinit_sdim_consistency(valname, ::Val{sdim_val}, ::Val{sdim_x}) where {sdim_val, sdim_x}
-    error("""The $valname and coordinates have different spatial dimensions, $sdim_val and $sdim_x.
-        Could it be that you forgot to vectorize the geometric interpolation when constructing the $valname?""")
+    throw(ArgumentError("The $valname (sdim=$sdim_val) and coordinates (sdim=$sdim_x) have different spatial dimensions."))
 end
 
 # Mapping types 
