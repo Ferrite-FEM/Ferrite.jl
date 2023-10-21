@@ -7,16 +7,13 @@ cell's face.
 face_to_element_transformation
 
 """
-    weighted_normal(J::AbstractTensor, fv::FaceValues, face::Int)
     weighted_normal(J::AbstractTensor, ::Type{<:AbstractRefShape}, face::Int)
 
 Compute the vector normal to the face weighted by the area ratio between the face and the
 reference face. This is computed by taking the cross product of the Jacobian components that
 align to the face local axis.
 """
-function weighted_normal(J::AbstractTensor, fv::FaceValues, face::Int)
-    return weighted_normal(J, getrefshape(fv.func_interp), face)
-end
+function weighted_normal end
 
 """
     create_face_quad_rule(::Type{RefShape}, w::Vector{T}, p::Vector{Vec{N, T}})
