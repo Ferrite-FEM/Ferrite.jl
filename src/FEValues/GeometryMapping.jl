@@ -13,7 +13,7 @@ struct MappingValues{JT, HT<:Union{Nothing,AbstractTensor{3}}}
     H::HT # dJ/dξ # Hessian
 end
 @inline getjacobian(mv::MappingValues) = mv.J 
-@inline gethessian(mv::MappingValues{<:Any,<:AbstractTensor}) = mv.H
+# @inline gethessian(mv::MappingValues{<:Any,<:AbstractTensor}) = mv.H
 
 # This will be needed for optimizing away the hessian calculation/updates
 # for cases when this is known to be zero (due to the geometric interpolation)
@@ -61,9 +61,11 @@ precompute_values!(gm::GeometryMapping, qr) = precompute_values!(gm, qr, Require
 function precompute_values!(gm::GeometryMapping, qr, ::RequiresHessian{false})
     shape_gradients_and_values!(gm.dMdξ, gm.M, gm.ip, qr)
 end
+#=
 function precompute_values!(gm::GeometryMapping, qr, ::RequiresHessian{true})
     shape_hessians_gradients_and_values!(gm.d2Mdξ2, gm.dMdξ, gm.M, gm.ip, qr)
 end
+=#
 
 function Base.copy(v::GeometryMapping)
     d2Mdξ2_copy = v.d2Mdξ2 === nothing ? nothing : copy(v.d2Mdξ2)
@@ -91,9 +93,11 @@ end
 function otimes_returntype(#=typeof(x)=#::Type{<:Vec{dim,Tx}}, #=typeof(dMdξ)=#::Type{<:Vec{dim,TM}}) where {dim, Tx, TM}
     return Tensor{2,dim,promote_type(Tx,TM)}
 end
+#=
 function otimes_returntype(#=typeof(x)=#::Type{<:Vec{dim,Tx}}, #=typeof(d2Mdξ2)=#::Type{<:Tensor{2,dim,TM}}) where {dim, Tx, TM}
     return Tensor{3,dim,promote_type(Tx,TM)}
 end
+=#
 
 @propagate_inbounds calculate_mapping(geo_mapping::GeometryMapping, args...) = calculate_mapping(RequiresHessian(geo_mapping), geo_mapping, args...)
 
@@ -106,6 +110,7 @@ end
     return MappingValues(fecv_J, nothing)
 end
 
+#=
 @inline function calculate_mapping(::RequiresHessian{true}, geo_mapping::GeometryMapping, q_point, x)
     J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
     H = zero(otimes_returntype(eltype(x), eltype(geo_mapping.d2Mdξ2)))
@@ -115,6 +120,7 @@ end
     end
     return MappingValues(J, H)
 end
+=#
 
 calculate_detJ(J::Tensor{2}) = det(J)
 calculate_detJ(J::SMatrix) = embedding_det(J)
