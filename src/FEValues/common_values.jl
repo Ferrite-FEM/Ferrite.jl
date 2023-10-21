@@ -4,9 +4,6 @@ using Base: @propagate_inbounds
 
 @noinline throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
 
-getnbasefunctions(cv::AbstractValues) = size(cv.N, 1)
-getngeobasefunctions(cv::AbstractValues) = size(cv.M, 1)
-
 function checkquadpoint(cv::Union{CellValues, FaceValues, PointValues}, qp::Int)
     0 < qp <= getnquadpoints(cv) || error("quadrature point out of range")
     return nothing

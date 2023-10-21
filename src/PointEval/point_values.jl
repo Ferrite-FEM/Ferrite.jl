@@ -86,6 +86,7 @@ function PointValuesInternal(ξ::Vec{dim, T}, ip::IP) where {dim, T, shape <: Ab
     return PointValuesInternal{IP, eltype(N)}(N, ip)
 end
 
+getnbasefunctions(pv::PointValuesInternal) = size(pv.N, 1)
 getnquadpoints(pv::PointValuesInternal) = 1
 shape_value_type(::PointValuesInternal{<:Any, N_t}) where {N_t} = N_t
 shape_value(pv::PointValuesInternal, qp::Int, i::Int) = (@assert qp == 1; pv.N[i])
