@@ -70,17 +70,15 @@ function precompute_values!(cv::CellValues)
 end
 
 # Access geometry values
-for op = (:getngeobasefunctions, :geometric_value)
-    eval(quote
-        @propagate_inbounds $op(cv::CellValues, args...) = $op(cv.geo_mapping, args...)
-    end)
-end
+@propagate_inbounds getngeobasefunctions(cv::CellValues) = getngeobasefunctions(cv.geo_mapping)
+@propagate_inbounds geometric_value(cv::CellValues, args...) = geometric_value(cv.geo_mapping, args...)
+get_geometric_interpolation(cv::CellValues) = get_geometric_interpolation(cv.geo_mapping)
+
 getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 
 # Accessors for function values 
 getnbasefunctions(cv::CellValues) = getnbasefunctions(cv.fun_values)
 get_function_interpolation(cv::CellValues) = get_function_interpolation(cv.fun_values)
-get_geometric_interpolation(cv::CellValues) = get_geometric_interpolation(cv.geo_mapping)
 shape_value_type(cv::CellValues) = shape_value_type(cv.fun_values)
 shape_gradient_type(cv::CellValues) = shape_gradient_type(cv.fun_values)
 
@@ -89,6 +87,7 @@ for op = (:shape_value, :shape_gradient, :shape_symmetric_gradient)
         @propagate_inbounds $op(cv::CellValues, i::Int, q_point::Int) = $op(cv.fun_values, i, q_point)
     end)
 end
+
 # Access quadrature rule values 
 getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 
