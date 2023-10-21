@@ -211,12 +211,15 @@ The symmetric gradient of a scalar function is computed as
 ``\\left[ \\mathbf{\\nabla}  \\mathbf{u}(\\mathbf{x_q}) \\right]^\\text{sym} =  \\sum\\limits_{i = 1}^n  \\frac{1}{2} \\left[ \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\otimes \\mathbf{u}_i + \\mathbf{u}_i  \\otimes  \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\right]``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
-    # TODO: Workaround for calling deprecated method
-    grad = dof_range == eachindex(u) ? function_gradient(fe_v, q_point, u) : function_gradient(fe_v, q_point, u, dof_range)
+function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range)
+    grad = function_gradient(fe_v, q_point, u, dof_range)
     return symmetric(grad)
 end
 
+function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector)
+    grad = function_gradient(fe_v, q_point, u)
+    return symmetric(grad)
+end
 """
     function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 

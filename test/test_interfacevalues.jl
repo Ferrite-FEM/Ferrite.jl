@@ -1,5 +1,5 @@
 @testset "InterfaceValues" begin
-    function test_interfacevalues(grid::Ferrite.AbstractGrid, iv::InterfaceValues)
+    function test_interfacevalues(grid::Ferrite.AbstractGrid, iv::InterfaceValues; tol = 0)
         ip_here = iv.here.func_interp
         ip_there = iv.there.func_interp
         ndim = Ferrite.getdim(ip_here)
@@ -15,8 +15,8 @@
             @test nqp == getnquadpoints(iv.here) == getnquadpoints(iv.there)
             for qp in 1:nqp
                 # If correctly synced quadrature points coordinates should match
-                @test spatial_coordinate(iv, qp, interface_coords; here = true) ≈
-                    spatial_coordinate(iv, qp, interface_coords; here = false)
+                @test isapprox(spatial_coordinate(iv, qp, interface_coords; here = true),
+                    spatial_coordinate(iv, qp, interface_coords; here = false); atol = tol)
                 for i in 1:getnbasefunctions(iv)
                     here = i <= getnbasefunctions(iv.here)
                     shapevalue = shape_value(iv, qp, i; here = here)
@@ -80,20 +80,20 @@
                         @test function_gradient(iv, i, u, here = here) ≈ H
                         @test function_gradient(iv, i, u_scal, here = here) ≈ V
 
-                        @test function_value_average(iv, i, u_scal) ≈ function_value(iv, i, u_scal, here = here)
+                        @test isapprox(function_value_average(iv, i, u_scal), function_value(iv, i, u_scal, here = here); atol = tol)
                         @test all(function_value_jump(iv, i, u_scal) .<= 30 * eps(Float64))
-                        @test function_gradient_average(iv, i, u_scal) ≈ function_gradient(iv, i, u_scal, here = here)
+                        @test isapprox(function_gradient_average(iv, i, u_scal), function_gradient(iv, i, u_scal, here = here); atol = tol)
                         @test all(function_gradient_jump(iv, i, u_scal) .<= 30 * eps(Float64))
 
-                        @test function_value_average(iv, i, u) ≈ function_value(iv, i, u, here = here)
+                        @test isapprox(function_value_average(iv, i, u), function_value(iv, i, u, here = here); atol = tol)
                         @test all(function_value_jump(iv, i, u) .<= 30 * eps(Float64))
-                        @test function_gradient_average(iv, i, u) ≈ function_gradient(iv, i, u, here = here)
+                        @test isapprox(function_gradient_average(iv, i, u), function_gradient(iv, i, u, here = here); atol = tol)
                         @test all(function_gradient_jump(iv, i, u) .<= 30 * eps(Float64))
                     else # func_interpol isa Ferrite.VectorInterpolation
                         @test function_gradient(iv, i, u_vector; here = here) ≈ H
-                        @test function_value_average(iv, i, u_vector) ≈ function_value(iv, i, u_vector, here = here)
+                        @test isapprox(function_value_average(iv, i, u_vector), function_value(iv, i, u_vector, here = here); atol = tol)
                         @test all(function_value_jump(iv, i, u_vector) .<= 30 * eps(Float64))
-                        @test function_gradient_average(iv, i, u_vector) ≈ function_gradient(iv, i, u_vector, here = here)
+                        @test isapprox(function_gradient_average(iv, i, u_vector), function_gradient(iv, i, u_vector, here = here); atol = tol)
                         @test all(function_gradient_jump(iv, i, u_vector) .<= 30 * eps(Float64))
                     end
                 end
@@ -140,7 +140,7 @@
         end
         @testset "error paths" begin
             cell = getcells(grid, 1)
-            dim == 1 && @test_throws ErrorException("1D elements don't use transformations for interfaces.") Ferrite.InterfaceTransformation(cell,cell,1,1)
+            dim == 1 && @test_throws ErrorException("1D elements don't use transformations for interfaces.") InterfaceOrientationInfo(cell,cell,1,1)
             @test_throws ArgumentError("unknown face number") Ferrite.element_to_face_transformation(Vec{dim,Float64}(ntuple(_->0.0, dim)), Ferrite.getrefshape(cell), 100)
             @test_throws ArgumentError("unknown face number") Ferrite.face_to_element_transformation(Vec{dim-1,Float64}(ntuple(_->0.0, dim-1)), Ferrite.getrefshape(cell), 100)
         end
@@ -177,7 +177,7 @@
         end
         for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
             iv = InterfaceValues(quad_rule, func_interpol)
-            test_interfacevalues(grid, iv)
+            test_interfacevalues(grid, iv; tol = 5*eps(Float64))
         end
     end
     # @testset "Mixed elements 2D grids" begin # TODO: this shouldn't work because it should change the FaceValues object
@@ -248,7 +248,7 @@
         end
     end
     @testset "undefined transformation matrix error path" begin
-        it = InterfaceTransformation{RefDodecahedron, RefDodecahedron}(false, 0, 0, 1, 1)
+        it = InterfaceOrientationInfo{RefDodecahedron, RefDodecahedron}(false, 0, 0, 1, 1)
         @test_throws ArgumentError("transformation is not implemented") Ferrite.get_transformation_matrix(it)
     end
     @testset "show" begin

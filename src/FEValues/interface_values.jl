@@ -80,9 +80,6 @@ InterfaceValues(facevalues_here::FVA, facevalues_there::FVB = deepcopy(facevalue
 function getnbasefunctions(iv::InterfaceValues)
     return getnbasefunctions(iv.here) + getnbasefunctions(iv.there)
 end
-# function getngeobasefunctions(iv::InterfaceValues)
-#     return getngeobasefunctions(iv.here) + getngeobasefunctions(iv.there)
-# end
 
 """
     getnquadpoints(iv::InterfaceValues)
@@ -118,7 +115,7 @@ function reinit!(
     dim == 1 && return reinit!(iv.there, coords_there, face_there)
     # Transform the quadrature points from the here side to the there side
     iv.there.current_face[] = face_there
-    interface_transformation = InterfaceTransformation(cell_here, cell_there, face_here, face_there)
+    interface_transformation = InterfaceOrientationInfo(cell_here, cell_there, face_here, face_there)
     quad_points_a = getpoints(iv.here.qr, face_here)
     quad_points_b = getpoints(iv.there.qr, face_there)
     transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
@@ -145,8 +142,6 @@ Return the normal vector in the quadrature point `qp` on the interface. If `here
 to the "there" element.
 """
 function getnormal(iv::InterfaceValues, qp::Int; here::Bool=true)
-    # TODO: Does it make sense to allow the kwarg here? You can juse negate the vector
-    #       yourself since getnormal(iv, qp; here=false) == -getnormal(iv, qp; here=true).
     return getnormal(here ? iv.here : iv.there, qp)
 end
 
@@ -376,9 +371,9 @@ end
 # Transformation of quadrature points
 
 @doc raw"""
-    InterfaceTransformation
+    InterfaceOrientationInfo
 
-Orientation information for 1D and 2D interfaces in 2D and 3D elements respectively.
+Relative orientation information for 1D and 2D interfaces in 2D and 3D elements respectively.
 This information is used to construct the transformation matrix to
 transform the quadrature points from face_a to face_b achieving synced
 spatial coordinates. Face B's orientation relative to Face A's can
@@ -387,31 +382,9 @@ and the vertices can be rotated against each other.
 The reference orientation of face B is such that the first node
 has the lowest vertex index. Thus, this structure also stores the
 shift of the lowest vertex index which is used to reorient the face in
-case of flipping ["transform_interface_point!"](@ref).
-Take for example the faces
-```
-1           2
-| \         | \
-|  \        |  \
-| A \       | B \
-|    \      |    \
-2-----3     3-----1
-```
-which are rotated against each other by 240° after tranfroming to an
-equilateral triangle (shift index is 2) or the faces
-```
-2           2
-| \         | \
-|  \        |  \
-| A \       | B \
-|    \      |    \
-3-----1     3-----1
-```
-which are flipped against each other, note that face B has its reference node shifted by 2 indices
-so the face is tranformed into an equilateral triangle then rotated 120°, flipped about the x axis then
-rotated -120° and tranformed back to the reference triangle.Any combination of these can happen.
+case of flipping ["transform_interface_points!"](@ref).
 """
-struct InterfaceTransformation{RefShapeA, RefShapeB}
+struct InterfaceOrientationInfo{RefShapeA, RefShapeB}
     flipped::Bool
     shift_index::Int
     lowest_node_shift_index::Int
@@ -420,66 +393,73 @@ struct InterfaceTransformation{RefShapeA, RefShapeB}
 end
 
 """
-    InterfaceTransformation(cell_a::AbstractCell, cell_b::AbstractCell, face_a::Int, face_b::Int)
+    InterfaceOrientationInfo(cell_a::AbstractCell, cell_b::AbstractCell, face_a::Int, face_b::Int)
 
-Return the orientation info for the interface defined by face A and face B.
+Return the relative orientation info for face B with regards to face A.
+Relative orientation is computed using a [`OrientationInfo`](@ref) for each side of the interface.
 """
-function InterfaceTransformation(cell_a::AbstractCell, cell_b::AbstractCell, face_a::Int, face_b::Int)
-    getdim(cell_a) == 1 && return error("1D elements don't use transformations for interfaces.")
-
-    nodes_a = faces(cell_a)[face_a]
-    nodes_b = faces(cell_b)[face_b]
-
-    min_idx_a = argmin(nodes_a)
-    min_idx_b = argmin(nodes_b)
-
-    shift_index = min_idx_b - min_idx_a
-    flipped = getdim(cell_a) == 2 ? shift_index != 0 : nodes_a[min_idx_a != 1 ? min_idx_a - 1 : end] != nodes_b[min_idx_b != 1 ? min_idx_b - 1 : end]
-
-    return InterfaceTransformation{getrefshape(cell_a), getrefshape(cell_b)}(flipped, shift_index, 1 - min_idx_b, face_a, face_b)
+function InterfaceOrientationInfo(cell_a::AbstractCell{RefShapeA}, cell_b::AbstractCell{RefShapeB}, face_a::Int, face_b::Int) where {RefShapeA <: AbstractRefShape, RefShapeB <: AbstractRefShape}
+    OI_a = OrientationInfo(faces(cell_a)[face_a])
+    OI_b = OrientationInfo(faces(cell_b)[face_b])
+    flipped = OI_a.flipped != OI_b.flipped
+    shift_index = OI_b.shift_index - OI_a.shift_index
+    return InterfaceOrientationInfo{RefShapeA, RefShapeB}(flipped, shift_index, OI_b.shift_index, face_a, face_b)
 end
 
-# This looks out of place, move it to Tensors.jl or use the one defined there with higher error? *Using sinpi and cospi makes tetrahedon custom quadrature points interface values test pass
-"""
-    rotation_matrix_pi(x::Float64)
-
-Construct thr 1D 3x3 rotation matrix for θ = xπ more accurately using sinpi and cospi, especially for large x
-"""
-function rotation_matrix_pi(θ::Float64)
-    return SMatrix{3,3}(cospi(θ), sinpi(θ), 0.0, -sinpi(θ), cospi(θ), 0.0, 0.0, 0.0, 1.0)
+function InterfaceOrientationInfo(_::AbstractCell{RefShapeA}, _::AbstractCell{RefShapeB}, _::Int, _::Int) where {RefShapeA <: AbstractRefShape{1}, RefShapeB <: AbstractRefShape{1}}
+    (error("1D elements don't use transformations for interfaces."))
 end
 
 """
-    get_transformation_matrix(interface_transformation::InterfaceTransformation)
+    get_transformation_matrix(interface_transformation::InterfaceOrientationInfo)
 
-Returns the transformation matrix corresponding to the interface information stored in `InterfaceTransformation`.
+Returns the transformation matrix corresponding to the interface orientation information stored in `InterfaceOrientationInfo`.
+The transformation matrix is constructed using a combination of affine transformations defined for each interface reference shape.
+The transformation for a flipped face is a function of both relative orientation and the orientation of the second face.
+If the face is not flipped then the transfromation is a function of relative orientation only.
 """
 get_transformation_matrix
 
-function get_transformation_matrix(interface_transformation::InterfaceTransformation{RefShapeA}) where RefShapeA
+function get_transformation_matrix(interface_transformation::InterfaceOrientationInfo{RefShapeA}) where RefShapeA <: AbstractRefShape{3}
+    face_a = interface_transformation.face_a
+    facenodes = reference_faces(RefShapeA)[face_a]
+    _get_transformation_matrix(facenodes, interface_transformation)
+end
+
+@inline function _get_transformation_matrix(::NTuple{3,Int}, interface_transformation::InterfaceOrientationInfo)
     flipped = interface_transformation.flipped
     shift_index = interface_transformation.shift_index
     lowest_node_shift_index = interface_transformation.lowest_node_shift_index
-    face_a = interface_transformation.face_a
-    nfacenodes = length(reference_faces(RefShapeA)[face_a])
-    θ = 2*shift_index/nfacenodes
-    θpre = 2*lowest_node_shift_index/nfacenodes
-    if nfacenodes == 3 # Triangle
-        flipping = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0)
 
-        translate_1 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2/3)/3, -0.5, 1.0)
-        stretch_1 = SMatrix{3,3}(sinpi(2/3), 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    θ = 2*shift_index/3
+    θpre = 2*lowest_node_shift_index/3
 
-        translate_2 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2/3)/3, 0.5, 1.0)
-        stretch_2 = SMatrix{3,3}(1/sinpi(2/3), -1/2/sinpi(2/3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    flipping = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0)
 
-        return flipped ? stretch_2 * translate_2 * rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) * translate_1 * stretch_1 : stretch_2 * translate_2 * rotation_matrix_pi(θ) * translate_1 * stretch_1
-    elseif nfacenodes == 4 # Quadrilateral
-        flipping = SMatrix{3,3}(0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
-        return flipped ? rotation_matrix_pi(-θpre) * flipping * rotation_matrix_pi(θ + θpre) :  rotation_matrix_pi(θ)
-    end
+    translate_1 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -sinpi(2/3)/3, -0.5, 1.0)
+    stretch_1 = SMatrix{3,3}(sinpi(2/3), 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
 
-    throw(ArgumentError("transformation is not implemented"))
+    translate_2 = SMatrix{3,3}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, sinpi(2/3)/3, 0.5, 1.0)
+    stretch_2 = SMatrix{3,3}(1/sinpi(2/3), -1/2/sinpi(2/3), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+
+    return flipped ? stretch_2 * translate_2 * rotation_tensor(0,0,θpre*pi) * flipping * rotation_tensor(0,0,(θ - θpre)*pi) * translate_1 * stretch_1 :
+        stretch_2 * translate_2 * rotation_tensor(0,0,θ*pi) * translate_1 * stretch_1
+end
+
+@inline function _get_transformation_matrix(::NTuple{4,Int}, interface_transformation::InterfaceOrientationInfo)
+    flipped = interface_transformation.flipped
+    shift_index = interface_transformation.shift_index
+    lowest_node_shift_index = interface_transformation.lowest_node_shift_index
+
+    θ = 2*shift_index/4
+    θpre = 2*lowest_node_shift_index/4
+
+    flipping = SMatrix{3,3}(0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+    return flipped ? rotation_tensor(0,0,θpre*pi) * flipping * rotation_tensor(0,0,(θ - θpre)*pi) :  rotation_tensor(0,0,θ*pi)
+end
+
+@inline function _get_transformation_matrix(::NTuple{N,Int}, ::InterfaceOrientationInfo) where N
+    throw(ArgumentError("transformation is not implemented"))    
 end
 
 @doc raw"""
@@ -546,7 +526,7 @@ y      |   \
 """
 transform_interface_points!
 
-function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceTransformation{RefShapeA, RefShapeB}) where {RefShapeA, RefShapeB}
+function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceOrientationInfo{RefShapeA, RefShapeB}) where {RefShapeA <: AbstractRefShape{3}, RefShapeB <: AbstractRefShape{3}}
     face_a = interface_transformation.face_a
     face_b = interface_transformation.face_b
 
@@ -559,7 +539,7 @@ function transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vecto
     return nothing
 end
 
-function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vector{Vec{2, Float64}}, interface_transformation::InterfaceTransformation{RefShapeA, RefShapeB}) where {RefShapeA, RefShapeB}
+function transform_interface_points!(dst::Vector{Vec{2, Float64}}, points::Vector{Vec{2, Float64}}, interface_transformation::InterfaceOrientationInfo{RefShapeA, RefShapeB}) where {RefShapeA <: AbstractRefShape{2}, RefShapeB <: AbstractRefShape{2}}
     face_a = interface_transformation.face_a
     face_b = interface_transformation.face_b
     flipped = interface_transformation.flipped
