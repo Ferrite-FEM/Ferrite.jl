@@ -325,13 +325,15 @@ end
 end
 
 @testset "show" begin
-    # Just smoke test
     cv_quad = CellValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}()^2)
+    showstring = show_as_string(cv_quad)
+    @test startswith(showstring, "CellValues(vdim=2, rdim=2, and sdim=2): 4 quadrature points")
+    @test contains(showstring, "Lagrange{RefQuadrilateral, 2}()^2")
+
     cv_wedge = CellValues(QuadratureRule{RefPrism}(2), Lagrange{RefPrism,2}())
-    show(stdout, MIME"text/plain"(), cv_quad)
-    println(stdout)
-    show(stdout, MIME"text/plain"(), cv_wedge)
-    println(stdout)
+    showstring = show_as_string(cv_wedge)
+    @test startswith(showstring, "CellValues(scalar, rdim=3, and sdim=3): 5 quadrature points")
+    @test contains(showstring, "Lagrange{RefPrism, 2}()")
 end
 
 @testset "SimpleCellValues" begin
