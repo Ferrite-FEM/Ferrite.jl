@@ -55,35 +55,34 @@ function Base.show(io::IO, ::MIME"text/plain", vtk::VTKFile)
 end
 
 """
-    VTKFileCollection(name::String, grid::AbstractGrid; vtk_kwargs...)
-    VTKFileCollection(name::String, dh::DofHandler; vtk_kwargs...)
+    VTKFileCollection(name::String, grid::AbstractGrid; kwargs...)
+    VTKFileCollection(name::String, dh::DofHandler; kwargs...)
 
 Create a paraview data file (.pvd) that can be used to 
 save multiple vtk file along with a time stamp. The keyword arguments 
-are forwarded to each `VTKFile` constructor, which again forwards them 
-to `WriteVTK.vtk_grid`. 
+are forwarded to `WriteVTK.paraview_collection`.
 
 See [`addstep!`](@ref) for examples for how to use `VTKFileCollection`.
 ```
 """
-mutable struct VTKFileCollection{P<:WriteVTK.CollectionFile,G_DH,KW}
+mutable struct VTKFileCollection{P<:WriteVTK.CollectionFile,G_DH}
     pvd::P
     grid_or_dh::G_DH
     name::String
     step::Int
-    vtk_kwargs::KW
 end
-function VTKFileCollection(name::String, grid_or_dh::Union{AbstractGrid,AbstractDofHandler}; vtk_kwargs...)
-    pvd = WriteVTK.paraview_collection(name)
-    basename = endswith(name, ".pvd") ? string(first(split(name, ".pvd"))) : name
-    return VTKFileCollection(pvd, grid_or_dh, basename, 0, vtk_kwargs)
+function VTKFileCollection(name::String, grid_or_dh::Union{AbstractGrid,AbstractDofHandler}; kwargs...)
+    pvd = WriteVTK.paraview_collection(name; kwargs...)
+    basename = string(first(split(pvd.path, ".pvd")))
+    return VTKFileCollection(pvd, grid_or_dh, basename, 0)
 end
 Base.close(pvd::VTKFileCollection) = WriteVTK.vtk_save(pvd.pvd)
 
 """
-    addstep!(f::Function, pvd::VTKFileCollection, t::Real, [grid_or_dh])
+    addstep!(f::Function, pvd::VTKFileCollection, t::Real, [grid_or_dh]; kwargs...)
 
 Add a step at time `t` by writing a `VTKFile` to `pvd`. 
+The keyword arguments are forwarded to `WriteVTK.vtk_grid`.
 If required, a new grid can be used by supplying the grid or dofhandler as the last argument.
 Should be used in a do-block, e.g.
 ```julia
@@ -99,9 +98,9 @@ end
 close(pvd)
 ```
 """
-function addstep!(f::Function, pvd::VTKFileCollection, t, grid=pvd.grid_or_dh)
+function addstep!(f::Function, pvd::VTKFileCollection, t, grid=pvd.grid_or_dh; kwargs...)
     pvd.step += 1
-    VTKFile(string(pvd.name, "_", pvd.step), grid; pvd.vtk_kwargs...) do vtk
+    VTKFile(string(pvd.name, "_", pvd.step), grid; kwargs...) do vtk
         f(vtk)
         pvd.pvd[t] = vtk.vtk # Add to collection
     end

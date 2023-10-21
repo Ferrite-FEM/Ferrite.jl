@@ -24,7 +24,7 @@ where `write_solution` is just one example of the following functions that can b
 
 * [`write_solution`](@ref)
 * [`write_celldata`](@ref)
-* [`Ferrite.write_nodedata`](@ref)
+* [`write_nodedata`](@ref)
 * [`write_projection`](@ref)
 * [`Ferrite.write_cellset`](@ref)
 * [`Ferrite.write_nodeset`](@ref)
@@ -39,7 +39,7 @@ write_solution(vtk, dh, u)
 close(vtk);
 ```
 
-The data written by `write_solution`, `write_celldata`, `Ferrite.write_nodedata`, and `write_projection` may be either scalar (`Vector{<:Number}`) or tensor (`Vector{<:AbstractTensor}`) data. 
+The data written by `write_solution`, `write_celldata`, `write_nodedata`, and `write_projection` may be either scalar (`Vector{<:Number}`) or tensor (`Vector{<:AbstractTensor}`) data. 
 
 For simulations with multiple time steps, typically one `VTK` (`.vtu`) file is written 
 for each time step. In order to connect the actual time with each of these files,

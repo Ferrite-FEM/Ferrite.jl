@@ -650,6 +650,7 @@ end
                 @test sha_vtk1 == sha_vtk2
                 rm.((fname1, fname2))
             end
+            rm(string(fname, ".pvd"))
             # Solving https://github.com/Ferrite-FEM/Ferrite.jl/issues/397
             # would allow checking the pvd files as well. 
         end
@@ -658,8 +659,8 @@ end
             file_sizes = Int[]
             fname = "test_collection_kwargs"
             for compress in (true, false)
-                pvd = VTKFileCollection(fname, grid; compress)
-                addstep!(pvd, 0.0) do io
+                pvd = VTKFileCollection(fname, grid)
+                addstep!(pvd, 0.0; compress) do io
                     nothing
                 end
                 close(pvd)
