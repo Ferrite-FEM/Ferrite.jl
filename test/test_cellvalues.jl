@@ -350,6 +350,11 @@ end
     showstring = show_as_string(cv_wedge)
     @test startswith(showstring, "CellValues(scalar, rdim=3, and sdim=3): 5 quadrature points")
     @test contains(showstring, "Lagrange{RefPrism, 2}()")
+
+    pv = PointValues(cv_wedge)
+    pv_showstring = show_as_string(pv)
+    @test startswith(pv_showstring, "PointValues containing")
+    @test contains(pv_showstring, showstring)
 end
 
 @testset "SimpleCellValues" begin
