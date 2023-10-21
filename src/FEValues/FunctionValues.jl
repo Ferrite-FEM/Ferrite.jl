@@ -99,8 +99,8 @@ end
 # Mapping types 
 struct IdentityMapping end 
 # Not yet implemented:
-# struct CovariantPiolaMapping end 
-# struct ContravariantPiolaMapping end 
+# struct CovariantPiolaMapping end # PR798
+# struct ContravariantPiolaMapping end # PR798
 # struct DoubleCovariantPiolaMapping end 
 # struct DoubleContravariantPiolaMapping end 
 
@@ -114,8 +114,8 @@ to map the function values and gradients from the reference cell
 to the real cell geometry?
 """
 requires_hessian(::IdentityMapping) = false
-# requires_hessian(::ContravariantPiolaMapping) = true
-# requires_hessian(::CovariantPiolaMapping) = true
+# requires_hessian(::ContravariantPiolaMapping) = true # PR798
+# requires_hessian(::CovariantPiolaMapping) = true # PR798
 
 # Support for embedded elements
 calculate_Jinv(J::Tensor{2}) = inv(J)
@@ -144,7 +144,7 @@ end
     return nothing
 end
 
-#=
+#= PR798
 @inline function apply_mapping!(funvals::FunctionValues, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
     H = gethessian(mapping_values)
     Jinv = inv(getjacobian(mapping_values))
