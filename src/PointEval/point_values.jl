@@ -59,16 +59,14 @@ function_symmetric_gradient(pv::PointValues, u::AbstractVector, args...) =
 function reinit!(pv::PointValues, x::AbstractVector{<:Vec{D}}, ξ::Vec{D}) where {D}
     qp = 1 # PointValues only have a single qp
     # TODO: Does M need to be updated too?
-    for i in 1:getnbasefunctions(pv.cv.ip)
-        pv.cv.dNdξ[i, qp], pv.cv.N[i, qp] = shape_gradient_and_value(pv.cv.ip, ξ, i)
-    end
+    shape_gradients_and_values!(@view(pv.cv.dNdξ[:, qp]), @view(pv.cv.N[:, qp]), pv.cv.ip, ξ)
     reinit!(pv.cv, x)
     return nothing
 end
 
 # Optimized version of PointScalarValues which avoids i) recomputation of dNdξ and
 # ii) recomputation of dNdx. Only allows function evaluation (no gradients) which is
-# what is used in get_point_values.
+# what is used in evaluate_at_points.
 struct PointValuesInternal{IP, N_t} <: AbstractValues
     N::Vector{N_t}
     ip::IP
@@ -86,9 +84,6 @@ shape_value(pv::PointValuesInternal, qp::Int, i::Int) = (@assert qp == 1; pv.N[i
 
 # allow on-the-fly updating
 function reinit!(pv::PointValuesInternal{IP}, coord::Vec{dim}) where {dim, shape <: AbstractRefShape{dim}, IP <: Interpolation{shape}}
-    n_func_basefuncs = getnbasefunctions(pv.ip)
-    for i in 1:n_func_basefuncs
-        pv.N[i] = shape_value(pv.ip, coord, i)
-    end
+    shape_values!(pv.N, pv.ip, coord)
     return nothing
 end

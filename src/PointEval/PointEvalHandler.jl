@@ -20,7 +20,7 @@ within the cell, for each point. The fields of the `PointEvalHandler` are:
 
 There are two ways to use the `PointEvalHandler` to evaluate functions:
 
- - [`get_point_values`](@ref): can be used when the function is described by
+ - [`evaluate_at_points`](@ref): can be used when the function is described by
    i) a `dh::DofHandler` + `uh::Vector` (for example the FE-solution), or
    ii) a `p::L2Projector` + `ph::Vector` (for projected data).
  - Iteration with [`PointIterator`](@ref) + [`PointValues`](@ref): can be used for more
@@ -69,7 +69,7 @@ function _get_cellcoords(points::AbstractVector{Vec{dim,T}}, grid::AbstractGrid,
                 possible_cells = get(node_cell_dict, node, nothing)
                 possible_cells === nothing && continue # if node is not part of the subdofhandler, try the next node
                 for cell in possible_cells
-                    cell_coords = get_cell_coordinates(grid, cell)
+                    cell_coords = getcoordinates(grid, cell)
                     is_in_cell, local_coord = point_in_cell(geom_interpol, cell_coords, points[point_idx])
                     if is_in_cell
                         cell_found = true
@@ -125,6 +125,7 @@ function find_local_coordinate(interpolation, cell_coordinates::Vector{V}, globa
     for _ in 1:max_iters
         global_guess = zero(V)
         J = zero(Tensor{2, dim, T})
+        # TODO batched eval after 764 is merged.
         for j in 1:n_basefuncs
             dNdξ, N = shape_gradient_and_value(interpolation, local_guess, j)
             global_guess += N * cell_coordinates[j]
@@ -160,8 +161,8 @@ function _get_node_cell_map(grid::AbstractGrid)
 end
 
 """
-    get_point_values(ph::PointEvalHandler, dh::AbstractDofHandler, dof_values::Vector{T}, [fieldname::Symbol]) where T
-    get_point_values(ph::PointEvalHandler, proj::L2Projector, dof_values::Vector{T}) where T
+    evaluate_at_points(ph::PointEvalHandler, dh::AbstractDofHandler, dof_values::Vector{T}, [fieldname::Symbol]) where T
+    evaluate_at_points(ph::PointEvalHandler, proj::L2Projector, dof_values::Vector{T}) where T
 
 Return a `Vector{T}` (for a 1-dimensional field) or a `Vector{Vec{fielddim, T}}` (for a
 vector field) with the field values of field `fieldname` in the points of the
@@ -173,13 +174,13 @@ coordinates by the function interpolation of the corresponding `field` stored in
 Points that could not be found in the domain when constructing the `PointEvalHandler` will
 have `NaN`s for the corresponding entries in the output vector.
 """
-get_point_values
+evaluate_at_points
 
-function get_point_values(ph::PointEvalHandler, proj::L2Projector, dof_vals::AbstractVector)
-    get_point_values(ph, proj.dh, dof_vals)
+function evaluate_at_points(ph::PointEvalHandler, proj::L2Projector, dof_vals::AbstractVector)
+    evaluate_at_points(ph, proj.dh, dof_vals)
 end
 
-function get_point_values(ph::PointEvalHandler{<:Any, dim, T1}, dh::AbstractDofHandler, dof_vals::AbstractVector{T2},
+function evaluate_at_points(ph::PointEvalHandler{<:Any, dim, T1}, dh::AbstractDofHandler, dof_vals::AbstractVector{T2},
                            fname::Symbol=find_single_field(dh)) where {dim, T1, T2}
     npoints = length(ph.cells)
     # Figure out the value type by creating a dummy PointValuesInternal
@@ -190,7 +191,7 @@ function get_point_values(ph::PointEvalHandler{<:Any, dim, T1}, dh::AbstractDofH
     nanv = convert(typeof(zero_val), NaN * zero_val)
     out_vals = fill(nanv, npoints)
     func_interpolations = get_func_interpolations(dh, fname)
-    get_point_values!(out_vals, ph, dh, dof_vals, fname, func_interpolations)
+    evaluate_at_points!(out_vals, ph, dh, dof_vals, fname, func_interpolations)
     return out_vals
 end
 function find_single_field(dh)
@@ -202,7 +203,7 @@ function find_single_field(dh)
 end
 
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
-function get_point_values!(out_vals::Vector{T2},
+function evaluate_at_points!(out_vals::Vector{T2},
     ph::PointEvalHandler,
     dh::DofHandler,
     dof_vals::Vector{T},
@@ -218,14 +219,14 @@ function get_point_values!(out_vals::Vector{T2},
         if ip !== nothing
             dofrange = dof_range(sdh, fname)
             cellset = sdh.cellset
-            _get_point_values!(out_vals, dof_vals, ph, dh, ip, cellset, dofrange)
+            _evaluate_at_points!(out_vals, dof_vals, ph, dh, ip, cellset, dofrange)
         end
     end
     return out_vals
 end
 
 # function barrier with concrete type of interpolation
-function _get_point_values!(
+function _evaluate_at_points!(
     out_vals::Vector{T2},
     dof_vals::Vector{T},
     ph::PointEvalHandler,
@@ -297,9 +298,9 @@ end
 """
 PointIterator
 
-struct PointIterator{PH<:PointEvalHandler}
+struct PointIterator{PH<:PointEvalHandler, V <: Vec}
     ph::PH
-    coords::Vector{Vec{2,Float64}}
+    coords::Vector{V}
 end
 
 function PointIterator(ph::PointEvalHandler{G}) where {D,C,T,G<:Grid{D,C,T}}
@@ -332,7 +333,7 @@ function Base.iterate(p::PointIterator, state = 1)
         cid = (p.ph.cells[state])::Int
         local_coord = (p.ph.local_coords[state])::Vec
         n = nnodes_per_cell(p.ph.grid, cid)
-        get_cell_coordinates!(resize!(p.coords, n), p.ph.grid, cid)
+        getcoordinates!(resize!(p.coords, n), p.ph.grid, cid)
         point = PointLocation(cid, local_coord, p.coords)
         return (point, state + 1)
     end

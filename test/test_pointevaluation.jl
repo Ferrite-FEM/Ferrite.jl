@@ -11,7 +11,7 @@ function scalar_field()
     cv = CellValues(qr, ip_f, ip_g)
     qp_vals = [Vector{Float64}(undef, getnquadpoints(cv)) for _ in 1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
-        xe = get_cell_coordinates(mesh, cellid)
+        xe = getcoordinates(mesh, cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
             qp_vals[cellid][qp] = f(spatial_coordinate(cv, qp, xe))
@@ -27,11 +27,11 @@ function scalar_field()
 
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(mesh, points)
-    vals = get_point_values(ph, projector, projector_vals)
+    vals = evaluate_at_points(ph, projector, projector_vals)
     @test f.(points) ≈ vals
 
     # alternatively retrieve vals from nodal values TODO: make this work?
-    # vals = get_point_values(ph, nodal_vals)
+    # vals = evaluate_at_points(ph, nodal_vals)
     # @test f.(points) ≈ vals
 end
 
@@ -50,7 +50,7 @@ function vector_field()
     cv = CellValues(qr, ip_f, ip_g)
     qp_vals = [Vector{Vec{2,Float64}}(undef, getnquadpoints(cv)) for i=1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
-        xe = get_cell_coordinates(mesh, cellid)
+        xe = getcoordinates(mesh, cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
             qp_vals[cellid][qp] = f(spatial_coordinate(cv, qp, xe))
@@ -67,11 +67,11 @@ function vector_field()
 
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(mesh, points)
-    vals = get_point_values(ph, projector, projector_vals)
+    vals = evaluate_at_points(ph, projector, projector_vals)
     @test f.(points) ≈ vals
 
     # alternatively retrieve vals from nodal values# TODO
-    # vals = get_point_values(ph, nodal_vals)
+    # vals = evaluate_at_points(ph, nodal_vals)
     # @test f.(points) ≈ vals
 end
 
@@ -86,7 +86,7 @@ function superparametric()
     cv = CellValues(qr, ip_f)
     qp_vals = [Vector{Vec{2,Float64}}(undef, getnquadpoints(cv)) for i=1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
-        xe = get_cell_coordinates(mesh, cellid)
+        xe = getcoordinates(mesh, cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
             qp_vals[cellid][qp] = f(spatial_coordinate(cv, qp, xe))
@@ -102,7 +102,7 @@ function superparametric()
 
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(mesh, points)
-    vals = get_point_values(ph, projector, projector_vals)
+    vals = evaluate_at_points(ph, projector, projector_vals)
 
     # can recover a quadratic field by a quadratic approximation
     @test f.(points) ≈ vals
@@ -118,21 +118,35 @@ function dofhandler()
     close!(dh)
 
     ph = PointEvalHandler(mesh, points)
-    vals = get_point_values(ph, dh, dof_vals, :s)
+    vals = evaluate_at_points(ph, dh, dof_vals, :s)
     @test vals ≈ 1.0:9.0
 
     # TODO
-    # vals = get_point_values(ph, collect(1.0:9.0))
+    # vals = evaluate_at_points(ph, collect(1.0:9.0))
     # @test vals ≈ 1.0:9.0
 end
 
-function dofhandler2()
+function dofhandler2(;three_dimensional=true)
     # Computes the L2 projection of a quadratic field exactly
     # but not using L2Projector since we want the DofHandler dofs
-    mesh = generate_grid(Quadrilateral, (20, 20))
-    ip_f = Lagrange{RefQuadrilateral,2}()
-    ip_f_v = ip_f^2
-    qr = QuadratureRule{RefQuadrilateral}(3)
+    if (three_dimensional)
+        mesh = generate_grid(Hexahedron, (10, 10, 10))
+        f_s = x -> 1.0 + x[1] + x[2] + x[1] * x[2] + x[2] * x[3]
+        f_v = x ->  Vec{3}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2], 4.0 + x[1] - x[2] + x[3] - x[1] * x[3] - x[2] * x[3]))
+        points = [Vec((x, x, x)) for x in range(0; stop=1, length=100)]
+        ip_f = Lagrange{RefHexahedron,2}()
+        ip_f_v = ip_f^3
+        qr = QuadratureRule{RefHexahedron}(3)
+    else 
+        mesh = generate_grid(Quadrilateral, (20, 20))
+        f_s = x ->  1.0 + x[1] + x[2] + x[1] * x[2]
+        f_v = x -> Vec{2}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2]))
+        points = [Vec((x, x, )) for x in range(0; stop=1, length=100)]
+        ip_f = Lagrange{RefQuadrilateral,2}()
+        ip_f_v = ip_f^2
+        qr = QuadratureRule{RefQuadrilateral}(3)       
+    end
+   
     csv = CellValues(qr, ip_f)
     cvv = CellValues(qr, ip_f_v)
     dh = DofHandler(mesh);
@@ -146,8 +160,7 @@ function dofhandler2()
     fe = zeros(ndofs_per_cell(dh))
     s_dofs = dof_range(dh, :s)
     v_dofs = dof_range(dh, :v)
-    f_s(x) = 1.0 + x[1] + x[2] + x[1] * x[2]
-    f_v(x) = Vec{2}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2]))
+    
     for cell in CellIterator(dh)
         fill!(me, 0)
         fill!(fe, 0)
@@ -155,7 +168,7 @@ function dofhandler2()
         reinit!(cvv, cell)
         for qp in 1:getnquadpoints(csv)
             dΩ = getdetJdV(csv, qp)
-            x = spatial_coordinate(csv, qp, get_cell_coordinates(cell))
+            x = spatial_coordinate(csv, qp, getcoordinates(cell))
             for i in 1:getnbasefunctions(csv)
                 δui = shape_value(csv, qp, i)
                 fe[s_dofs[i]] += ( δui * f_s(x) ) * dΩ
@@ -177,7 +190,6 @@ function dofhandler2()
     end
     uh = M \ f
 
-    points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
     ph = PointEvalHandler(mesh, points)
     @test all(x -> x !== nothing, ph.cells)
     psv = PointValues(ip_f)
@@ -242,7 +254,7 @@ function mixed_grid()
     cv = CellValues(qr, ip_quad)
     qp_vals_quads = [Vector{Float64}(undef, getnquadpoints(cv)) for cell in getcellset(mesh, "quads")]
     for (local_cellid, global_cellid) in enumerate(getcellset(mesh, "quads"))
-        xe = get_cell_coordinates(mesh, global_cellid)
+        xe = getcoordinates(mesh, global_cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
             qp_vals_quads[local_cellid][qp] = f(spatial_coordinate(cv, qp, xe))
@@ -257,7 +269,7 @@ function mixed_grid()
     # first alternative: L2Projection to dofs
     projector_values = project(projector, qp_vals_quads, qr)
     ph = PointEvalHandler(mesh, points)
-    vals = get_point_values(ph, projector, projector_values)
+    vals = evaluate_at_points(ph, projector, projector_values)
     @test vals[1:5] ≈ f.(points[1:5])
     @test all(isnan, vals[6:end])
 
@@ -272,7 +284,7 @@ function mixed_grid()
     dof_vals = [1., 1., 2., 2., 4., 4., 3., 3., 6., 6., 5., 5.]
     points = [node.x for node in mesh.nodes]
     ph = PointEvalHandler(mesh, points)
-    vals = get_point_values(ph, dh, dof_vals, :v)
+    vals = evaluate_at_points(ph, dh, dof_vals, :v)
     @test vals == [Vec((i, i)) for i=1.0:6.0]
 end
 
@@ -289,7 +301,7 @@ function oneD()
     cv = CellValues(qr, ip_f)
     qp_vals = [Vector{Float64}(undef, getnquadpoints(cv)) for i=1:getncells(mesh)]
     for cellid in eachindex(mesh.cells)
-        xe = get_cell_coordinates(mesh, cellid)
+        xe = getcoordinates(mesh, cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
             qp_vals[cellid][qp] = f(spatial_coordinate(cv, qp, xe))
@@ -305,12 +317,12 @@ function oneD()
 
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(mesh, points)
-    vals = get_point_values(ph, projector, projector_values)
+    vals = evaluate_at_points(ph, projector, projector_values)
     @test f.(points) ≈ vals
 
     # alternatively retrieve vals from nodal values
     # TODO
-    # vals = get_point_values(ph, nodal_vals)
+    # vals = evaluate_at_points(ph, nodal_vals)
     # @test f.(points) ≈ vals
 end
 
@@ -327,7 +339,8 @@ end
     scalar_field()
     vector_field()
     dofhandler()
-    dofhandler2()
+    dofhandler2(;three_dimensional=false)
+    dofhandler2(;three_dimensional=true)
     superparametric()
     mixed_grid()
     oneD()
