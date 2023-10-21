@@ -71,11 +71,7 @@ get_function_interpolation(fv::FaceValues) = get_function_interpolation(get_fun_
 get_geometric_interpolation(fv::FaceValues) = get_geometric_interpolation(get_geo_mapping(fv))
 
 get_geo_mapping(fv::FaceValues) = @inbounds fv.geo_mapping[getcurrentface(fv)]
-for op = (:getngeobasefunctions, :geometric_value)
-    eval(quote
-        @propagate_inbounds $op(fv::FaceValues, args...) = $op(get_geo_mapping(fv), args...)
-    end)
-end
+@propagate_inbounds geometric_value(fv::FaceValues, args...) = geometric_value(get_geo_mapping(fv), args...)
 
 get_fun_values(fv::FaceValues) = @inbounds fv.fun_values[getcurrentface(fv)]
 for op = (:shape_value, :shape_gradient, :shape_symmetric_gradient, :shape_curl)
