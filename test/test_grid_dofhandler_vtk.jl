@@ -454,7 +454,7 @@ end
     grid = Grid(cells, nodes)
     topology = ExclusiveTopology(grid)
 
-    @test_throws ErrorException("Some elements of the 3D grid are not 3D") Ferrite.faceskeleton(topology, grid)
+    @test_throws AssertionError("Face skeleton construction requires all the elements to be of the same dimensionality") Ferrite.faceskeleton(topology, grid)
     # @test topology.face_face_neighbor[3,4] == Ferrite.EntityNeighborhood(EdgeIndex(1,2))
     # @test topology.edge_edge_neighbor[1,2] == Ferrite.EntityNeighborhood(FaceIndex(3,4))
     # # regression that it doesn't error for boundary faces, see https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
@@ -472,7 +472,7 @@ end
     nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 18)]
     grid = Grid(cells, nodes)
     topology = ExclusiveTopology(grid)
-    @test_throws ErrorException("Some elements of the 2D grid are not 2D") Ferrite.faceskeleton(topology, grid)
+    @test_throws AssertionError("Face skeleton construction requires all the elements to be of the same dimensionality") Ferrite.faceskeleton(topology, grid)
 
 #
 #                   +-----+-----+-----+

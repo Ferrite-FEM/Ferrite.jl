@@ -332,12 +332,13 @@ Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that 
 `FaceValues`.
 """
 function _faceskeleton(top::ExclusiveTopology, grid::Grid)
-    i = 1;
-    grid_dim = getdim(grid)
-    any(cell -> getdim(cell) != grid_dim, getcells(grid)) && error("Some elements of the $(grid_dim)D grid are not $(grid_dim)D")
-    neighborhood = grid_dim == 1 ? pairs(top.vertex_vertex_neighbor) : pairs(top.face_face_neighbor)
-    face_skeleton_local = Array{FaceIndex}(undef, count(pair -> isempty(pair[2]) || pair[2].neighbor_info[][1] > pair[1][1], neighborhood))
-    for (idx, face) in neighborhood
+    cells = getcells(grid)
+    cell_dim = getdim(first(cells))
+    @assert all(cell -> getdim(cell) == cell_dim, cells) "Face skeleton construction requires all the elements to be of the same dimensionality"
+    i = 1
+    neighborhood = cell_dim == 1 ? top.vertex_vertex_neighbor : top.face_face_neighbor
+    face_skeleton_local = Array{FaceIndex}(undef, length(neighborhood) - count(neighbors -> !isempty(neighbors) , neighborhood) ÷ 2)
+    for (idx, face) in pairs(neighborhood)
         isempty(face.neighbor_info) || face.neighbor_info[][1] > idx[1] || continue
         face_skeleton_local[i] = FaceIndex(idx[1], idx[2])
         i+=1
