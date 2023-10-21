@@ -244,6 +244,21 @@ function shape_gradients_and_values!(gradients::GAT, values::SAT, ip::IP, ξ::Ve
 end
 
 """
+    shape_hessians_gradients_and_values!(hessians::AbstractVector, gradients::AbstractVector, values::AbstractVector, ip::Interpolation, ξ::Vec)
+
+Evaluate all shape function hessians, gradients and values of `ip` at once at the reference point `ξ`
+and store them in `hessians`, `gradients`, and `values`.
+"""
+@propagate_inbounds function shape_hessians_gradients_and_values!(hessians::AbstractVector, gradients::AbstractVector, values::AbstractVector, ip::Interpolation, ξ::Vec)
+    @boundscheck checkbounds(hessians, 1:getnbasefunctions(ip))
+    @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
+    @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
+    @inbounds for i in 1:getnbasefunctions(ip)
+        hessians[i], gradients[i], values[i] = shape_hessian_gradient_and_value(ip, ξ, i)
+    end
+end
+
+"""
     shape_value(ip::Interpolation, ξ::Vec, i::Int)
 
 Evaluate the value of the `i`th shape function of the interpolation `ip`

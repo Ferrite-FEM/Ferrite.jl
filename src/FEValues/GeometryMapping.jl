@@ -47,39 +47,27 @@ end
 function GeometryMapping(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule, ::RequiresHessian{RH}) where {T,RH}
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
-    VT   = Vec{getdim(ip),T}
-    M    = zeros(T,  n_shape, n_qpoints)
-    dMdξ = zeros(VT, n_shape, n_qpoints)
     
-    # Hessian (if needed, else nothing)
-    HT = Tensor{2,getdim(ip),T}
-    d2Mdξ2 = RH ? zeros(HT, n_shape, n_qpoints) : nothing
+    M    = zeros(T,                 n_shape, n_qpoints)
+    dMdξ = zeros(Vec{getdim(ip),T}, n_shape, n_qpoints)
+    d2Mdξ2 = RH ? zeros(Tensor{2,getdim(ip),T}, n_shape, n_qpoints) : nothing
 
-    geo_mapping = GeometryMapping(ip, M, dMdξ, d2Mdξ2)
-    precompute_values!(geo_mapping, qr)
-    return geo_mapping
+    gm = GeometryMapping(ip, M, dMdξ, d2Mdξ2)
+    precompute_values!(gm, qr) # Separate function for qr point update in PointValues
+    return gm
 end
+
+precompute_values!(gm::GeometryMapping, qr) = precompute_values!(gm, qr, RequiresHessian(gm))
+function precompute_values!(gm::GeometryMapping, qr, ::RequiresHessian{false})
+    shape_gradients_and_values!(gm.dMdξ, gm.M, gm.ip, qr)
+end
+function precompute_values!(gm::GeometryMapping, qr, ::RequiresHessian{true})
+    shape_hessians_gradients_and_values!(gm.d2Mdξ2, gm.dMdξ, gm.M, gm.ip, qr)
+end
+
 function Base.copy(v::GeometryMapping)
     d2Mdξ2_copy = v.d2Mdξ2 === nothing ? nothing : copy(v.d2Mdξ2)
     return GeometryMapping(copy(v.ip), copy(v.M), copy(v.dMdξ), d2Mdξ2_copy)
-end
-
-precompute_values!(gm::GeometryMapping, qr::QuadratureRule) = precompute_values!(gm, RequiresHessian(gm), qr)
-
-function precompute_values!(gm::GeometryMapping, ::RequiresHessian{false}, qr::QuadratureRule)
-    ip = get_geometric_interpolation(gm)
-    for (qp, ξ) in pairs(getpoints(qr))
-        shape_gradients_and_values!(@view(gm.dMdξ[:, qp]), @view(gm.M[:, qp]), ip, ξ)
-    end
-end
-
-function precompute_values!(gm::GeometryMapping, ::RequiresHessian{true}, qr::QuadratureRule)
-    ip = get_geometric_interpolation(gm)
-    for (qp, ξ) in pairs(getpoints(qr))
-        for i in 1:getngeobasefunctions(gm)
-            gm.d2Mdξ2[i, qp], gm.dMdξ[i, qp], gm.M[i, qp] = shape_hessian_gradient_and_value(ip, ξ, i)
-        end
-    end
 end
 
 getngeobasefunctions(geo_mapping::GeometryMapping) = size(geo_mapping.M, 1)

@@ -130,12 +130,14 @@ end
 @testset "show" begin
     # Just smoke test to make sure show doesn't error. 
     fv = FaceValues(FaceQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
-    show(stdout, MIME"text/plain"(), fv)
-    println(stdout)
+    showstring = show_as_string(fv)
+    @test startswith(showstring, "FaceValues(scalar, rdim=2, sdim=2): 2 quadrature points per face")
+    @test contains(showstring, "Function interpolation: Lagrange{RefQuadrilateral, 2}()")
+    @test contains(showstring, "Geometric interpolation: Lagrange{RefQuadrilateral, 1}()^2")
     fv.qr.face_rules[1] = deepcopy(fv.qr.face_rules[1])
     push!(Ferrite.getweights(fv.qr.face_rules[1]), 1)
-    show(stdout, MIME"text/plain"(), fv)
-    println(stdout)
+    showstring = show_as_string(fv)
+    @test startswith(showstring, "FaceValues(scalar, rdim=2, sdim=2): (3, 2, 2, 2) quadrature points on each face")
 end
 
 end # of testset

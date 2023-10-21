@@ -6,7 +6,7 @@ The shape functions and gradients stored in an `FEValues` object, is reinitializ
 
 The geometric mapping of a finite element from the reference coordinates to the real coordinates is shown in the following illustration. 
 
-![mapping_figure](../assets/fe_mapping.svg)
+![mapping_figure](https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/fe_mapping.svg)
 
 This mapping is given by the geometric shape functions, $\hat{N}_i^g(\boldsymbol{\xi})$, such that 
 ```math
