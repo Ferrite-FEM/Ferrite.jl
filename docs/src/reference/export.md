@@ -31,7 +31,7 @@ addstep!
 write_solution
 write_projection
 write_celldata
-Ferrite.write_nodedata
+write_nodedata
 Ferrite.write_cellset
 Ferrite.write_nodeset
 Ferrite.write_dirichlet

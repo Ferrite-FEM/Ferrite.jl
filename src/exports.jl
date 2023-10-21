@@ -155,6 +155,7 @@ export
     write_solution,
     write_celldata,
     write_projection,
+    write_nodedata,
     VTKFileCollection,
     addstep!,
     
