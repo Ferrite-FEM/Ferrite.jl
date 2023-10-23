@@ -50,25 +50,24 @@
         coords = Ferrite.reference_coordinates(interpolation)
         @test length(coords) == n_basefuncs
         f(x) = [shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
+
+        #TODO prefer this test style after 1.6 is removed from CI
         # @testset let x = sample_random_point(ref_shape) # not compatible with Julia 1.6
         x = sample_random_point(ref_shape)
-        @testset "Random point test" begin
+        random_point_testset = @testset "Random point test" begin
             # Check gradient evaluation
             @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
                 reinterpret(Float64, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
             # Check partition of unity at random point.
-            ansatz_sum = sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs])
-            if ansatz_sum ≉ 1.0
-                # Show coordinate in case failure (see issue #811)
-                # Remove after 1.6 is removed from CI (see above)
-                println("Partition of unity test might fail at $x for $interpolation !")
-                @test ansatz_sum ≈ 1.0
-            end
+            @test sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
             # Check if the important functions are consistent
             @test_throws ArgumentError shape_value(interpolation, x, n_basefuncs+1)
             # Idempotency test
             @test shape_value(interpolation, x, n_basefuncs) == shape_value(interpolation, x, n_basefuncs)
         end
+        # Remove after 1.6 is removed from CI (see above)
+        # Show coordinate in case failure (see issue #811)
+        !isempty(random_point_testset.results) && println("^^^^^Random point test failed at $x for $interpolation !^^^^^")
 
         # Test whether we have for each entity corresponding dof indices (possibly empty)
         @test length(Ferrite.vertexdof_indices(interpolation)) == Ferrite.nvertices(interpolation)
