@@ -1,8 +1,10 @@
-# FEValues
-A key type of object in `Ferrite.jl` are the so-called `FEValues`, where the most common ones are `CellValues` and `FaceValues`. These objects are used inside the element routines and are used to query the integration weights, shape function values and gradients, and much more, see [`CellValues`](@ref) and [`FaceValues`](@ref). In order for these values to be correct, it is necessary to reinitialize these for the current cell by using the [`reinit!`](@ref) function. This maps the values from the reference cell to the actual cell, a process which is described in detail below, see [Mapping of finite elements](@ref mapping_theory). Thereafter, we show an implementation of a [`SimpleCellValues`](@ref SimpleCellValues) type for the most standard case, excluding the generalizations and optimization that complicates the code for e.g. `CellValues`.
+# [FEValues](@id fevalues_topicguide)
+A key type of object in `Ferrite.jl` is the so-called `FEValues`, where the most common ones are `CellValues` and `FaceValues`. These objects are used inside the element routines and are used to query the integration weights, shape function values and gradients, and much more; see [`CellValues`](@ref) and [`FaceValues`](@ref). For these values to be correct, it is necessary to reinitialize these for the current cell by using the [`reinit!`](@ref) function. This function maps the values from the reference cell to the actual cell, a process described in detail below, see [Mapping of finite elements](@ref mapping-theory). After that, we show an implementation of a [`SimpleCellValues`](@ref SimpleCellValues) type to illustrate how `CellValues` work for the most standard case, excluding the generalizations and optimization that complicates the actual code.
 
 ## [Mapping of finite elements](@id mapping_theory)
-The shape functions and gradients stored in an `FEValues` object, is reinitialized for each cell by calling the `reinit!` function. The main part of this calculation, considers how to map the functions described on the reference cell, to the actual cell.
+The shape functions and gradients stored in an `FEValues` object, are reinitialized for each cell by calling the `reinit!` function. 
+The main part of this calculation, considers how to map the values and derivatives of the shape functions, 
+defined on the reference cell, to the actual cell.
 
 The geometric mapping of a finite element from the reference coordinates to the real coordinates is shown in the following illustration. 
 
