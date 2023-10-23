@@ -489,7 +489,7 @@ function reference_coordinates(::Lagrange{RefLine,1})
             Vec{1, Float64}(( 1.0,))]
 end
 
-function shape_value(ip::Lagrange{RefLine, 1}, ξ::Vec{1, T}, i::Int) where T
+function shape_value(ip::Lagrange{RefLine, 1}, ξ::Vec{1}, i::Int)
     ξ_x = ξ[1]
     i == 1 && return (1 - ξ_x) / 2
     i == 2 && return (1 + ξ_x) / 2
@@ -510,7 +510,7 @@ function reference_coordinates(::Lagrange{RefLine,2})
             Vec{1, Float64}(( 0.0,))]
 end
 
-function shape_value(ip::Lagrange{RefLine, 2}, ξ::Vec{1, T}, i::Int) where T
+function shape_value(ip::Lagrange{RefLine, 2}, ξ::Vec{1}, i::Int)
     ξ_x = ξ[1]
     i == 1 && return ξ_x * (ξ_x - 1) / 2
     i == 2 && return ξ_x * (ξ_x + 1) / 2
@@ -792,7 +792,7 @@ function reference_coordinates(::Lagrange{RefTetrahedron,1})
             Vec{3, Float64}((0.0, 0.0, 1.0))]
 end
 
-function shape_value(ip::Lagrange{RefTetrahedron, 1}, ξ::Vec{3, T}, i::Int) where T
+function shape_value(ip::Lagrange{RefTetrahedron, 1}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
@@ -827,7 +827,7 @@ end
 
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch09.d/AFEM.Ch09.pdf
 # http://www.colorado.edu/engineering/CAS/courses.d/AFEM.d/AFEM.Ch10.d/AFEM.Ch10.pdf
-function shape_value(ip::Lagrange{RefTetrahedron, 2}, ξ::Vec{3, T}, i::Int) where T
+function shape_value(ip::Lagrange{RefTetrahedron, 2}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
@@ -863,7 +863,7 @@ function reference_coordinates(::Lagrange{RefHexahedron,1})
             Vec{3, Float64}((-1.0,  1.0,  1.0))]
 end
 
-function shape_value(ip::Lagrange{RefHexahedron, 1}, ξ::Vec{3, T}, i::Int) where T
+function shape_value(ip::Lagrange{RefHexahedron, 1}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
@@ -1010,7 +1010,7 @@ function reference_coordinates(::Lagrange{RefPrism,1})
             Vec{3, Float64}((0.0, 1.0, 1.0))]
 end
 
-function shape_value(ip::Lagrange{RefPrism,1}, ξ::Vec{3, T}, i::Int) where T
+function shape_value(ip::Lagrange{RefPrism,1}, ξ::Vec{3}, i::Int)
     (x,y,z) = ξ
     i == 1 && return 1-x-y -z*(1-x-y)
     i == 2 && return x*(1-z)
@@ -1090,7 +1090,7 @@ function reference_coordinates(::Lagrange{RefPrism,2})
             Vec{3, Float64}((1/2, 1/2, 1/2)),]
 end
 
-function shape_value(ip::Lagrange{RefPrism, 2}, ξ::Vec{3, T}, i::Int) where T
+function shape_value(ip::Lagrange{RefPrism, 2}, ξ::Vec{3}, i::Int)
     (x,y,z) = ξ
     x² = x*x
     y² = y*y
@@ -1375,7 +1375,7 @@ function reference_coordinates(::Serendipity{RefHexahedron,2})
 end
 
 # Inlined to resolve the recursion properly
-@inline function shape_value(ip::Serendipity{RefHexahedron, 2}, ξ::Vec{3, T}, i::Int) where T
+@inline function shape_value(ip::Serendipity{RefHexahedron, 2}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
