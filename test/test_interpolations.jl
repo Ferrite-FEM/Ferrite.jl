@@ -37,7 +37,6 @@
                       #
                       CrouzeixRaviart{RefTriangle, 1}(),
     )
-
         # Test of utility functions
         ref_dim = Ferrite.getdim(interpolation)
         ref_shape = Ferrite.getrefshape(interpolation)
@@ -49,10 +48,11 @@
 
         n_basefuncs = getnbasefunctions(interpolation)
         coords = Ferrite.reference_coordinates(interpolation)
+        @test length(coords) == n_basefuncs
         f(x) = [shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
         # @testset let x = sample_random_point(ref_shape) # not compatible with Julia 1.6
+        x = sample_random_point(ref_shape)
         @testset "Random point test" begin
-            x = sample_random_point(ref_shape)
             # Check gradient evaluation
             @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
                 reinterpret(Float64, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
@@ -65,7 +65,6 @@
                 @test ansatz_sum ≈ 1.0
             end
             # Check if the important functions are consistent
-            @test length(coords) == n_basefuncs
             @test_throws ArgumentError shape_value(interpolation, x, n_basefuncs+1)
             # Idempotency test
             @test shape_value(interpolation, x, n_basefuncs) == shape_value(interpolation, x, n_basefuncs)
