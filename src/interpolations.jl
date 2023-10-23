@@ -532,7 +532,7 @@ function reference_coordinates(::Lagrange{RefQuadrilateral,1})
             Vec{2, Float64}((-1.0,  1.0,))]
 end
 
-function shape_value(ip::Lagrange{RefQuadrilateral, 1}, ξ::Vec{2, T}, i::Int) where T
+function shape_value(ip::Lagrange{RefQuadrilateral, 1}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return (1 - ξ_x) * (1 - ξ_y) / 4
@@ -563,7 +563,7 @@ function reference_coordinates(::Lagrange{RefQuadrilateral,2})
             Vec{2, Float64}(( 0.0,  0.0))]
 end
 
-function shape_value(ip::Lagrange{RefQuadrilateral, 2}, ξ::Vec{2, T}, i::Int) where T
+function shape_value(ip::Lagrange{RefQuadrilateral, 2}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return (ξ_x^2 - ξ_x) * (ξ_y^2 - ξ_y) / 4
@@ -606,11 +606,11 @@ function reference_coordinates(::Lagrange{RefQuadrilateral, 3})
             Vec{2, Float64}(( 1/3,  1/3))]
 end
 
-function shape_value(ip::Lagrange{RefQuadrilateral, 3}, ξ::Vec{2, T}, i::Int) where T
+function shape_value(ip::Lagrange{RefQuadrilateral, 3}, ξ::Vec{2}, i::Int)
     # See https://defelement.com/elements/examples/quadrilateral-Q-3.html
     # Transform domain from [-1, 1] × [-1, 1] to [0, 1] × [0, 1]
-    ξ_x = ξ[1]/2 + T(1/2)
-    ξ_y = ξ[2]/2 + T(1/2)
+    ξ_x = (ξ[1]+1)/2
+    ξ_y = (ξ[2]+1)/2
     i ==  1 && return (81*ξ_x^3*ξ_y^3)/4 - (81*ξ_x^3*ξ_y^2)/2 + (99*ξ_x^3*ξ_y)/4 - (9*ξ_x^3)/2 - (81*ξ_x^2*ξ_y^3)/2 + (81*ξ_x^2*ξ_y^2) - (99*ξ_x^2*ξ_y)/2 + (9*ξ_x^2) + (99*ξ_x*ξ_y^3)/4 - (99*ξ_x*ξ_y^2)/2 + (121*ξ_x*ξ_y)/4 - (11*ξ_x)/2 - (9*ξ_y^3)/2 + 9*ξ_y^2 - (11*ξ_y)/2 + 1
     i ==  2 && return (ξ_x*( - 81*ξ_x^2*ξ_y^3 + 162*ξ_x^2*ξ_y^2 - 99*ξ_x^2*ξ_y + 18*ξ_x^2 + 81*ξ_x*ξ_y^3 - 162*ξ_x*ξ_y^2 + 99*ξ_x*ξ_y - 18*ξ_x - 18*ξ_y^3 + 36*ξ_y^2 - 22*ξ_y + 4))/4
     i ==  4 && return (ξ_y*( - 81*ξ_x^3*ξ_y^2 + 81*ξ_x^3*ξ_y - 18*ξ_x^3 + 162*ξ_x^2*ξ_y^2 - 162*ξ_x^2*ξ_y + 36*ξ_x^2 - 99*ξ_x*ξ_y^2 + 99*ξ_x*ξ_y - 22*ξ_x + 18*ξ_y^2 - 18*ξ_y + 4))/4
@@ -643,7 +643,7 @@ function reference_coordinates(::Lagrange{RefTriangle,1})
             Vec{2, Float64}((0.0, 0.0))]
 end
 
-function shape_value(ip::Lagrange{RefTriangle, 1}, ξ::Vec{2, T}, i::Int) where T
+function shape_value(ip::Lagrange{RefTriangle, 1}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return ξ_x
@@ -669,7 +669,7 @@ function reference_coordinates(::Lagrange{RefTriangle,2})
             Vec{2, Float64}((0.5, 0.0))]
 end
 
-function shape_value(ip::Lagrange{RefTriangle, 2}, ξ::Vec{2, T}, i::Int) where T
+function shape_value(ip::Lagrange{RefTriangle, 2}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     γ = 1 - ξ_x - ξ_y
@@ -746,7 +746,7 @@ function reference_coordinates(ip::Lagrange2Tri345)
     return permute!(coordpts, permdof2DLagrange2Tri345[order])
 end
 
-function shape_value(ip::Lagrange2Tri345, ξ::Vec{2, T}, i::Int) where {T}
+function shape_value(ip::Lagrange2Tri345, ξ::Vec{2}, i::Int)
     if !(0 < i <= getnbasefunctions(ip))
         throw(ArgumentError("no shape function $i for interpolation $ip"))
     end
@@ -759,7 +759,7 @@ function shape_value(ip::Lagrange2Tri345, ξ::Vec{2, T}, i::Int) where {T}
     i1 ≥ 1 && (val *= prod((order - order * (ξ_x + ξ_y ) - j) / (j + 1) for j = 0:(i1 - 1)))
     i2 ≥ 1 && (val *= prod((order * ξ_x - j) / (j + 1) for j = 0:(i2 - 1)))
     i3 ≥ 1 && (val *= prod((order * ξ_y - j) / (j + 1) for j = 0:(i3 - 1)))
-    return T(val) # FIXME :)
+    return val
 end
 
 function _numlin_basis2D(i, order)
@@ -1231,12 +1231,9 @@ end
 """
 Lagrange element with bubble stabilization.
 """
-struct BubbleEnrichedLagrange{shape, order, value_type} <: ScalarInterpolation{shape, order}
+struct BubbleEnrichedLagrange{shape, order, unused} <: ScalarInterpolation{shape, order}
     function BubbleEnrichedLagrange{shape, order}() where {shape <: AbstractRefShape, order}
-        new{shape, order, Float64}()
-    end
-    function BubbleEnrichedLagrange{shape, order, value_type}() where {shape <: AbstractRefShape, order, value_type}
-        new{shape, order, value_type}()
+        new{shape, order, Nothing}()
     end
 end
 
@@ -1257,7 +1254,7 @@ function reference_coordinates(::BubbleEnrichedLagrange{RefTriangle,1})
             Vec{2, Float64}((1/3, 1/3)),]
 end
 
-function shape_value(ip::BubbleEnrichedLagrange{RefTriangle, 1}, ξ::Vec{2, T}, i::Int) where T
+function shape_value(ip::BubbleEnrichedLagrange{RefTriangle, 1}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return ξ_x*(9ξ_y^2 + 9ξ_x*ξ_y - 9ξ_y + 1)
@@ -1272,10 +1269,7 @@ end
 ###############
 struct Serendipity{shape, order, unused} <: ScalarInterpolation{shape,order}
     function Serendipity{shape, order}() where {shape <: AbstractRefShape, order}
-        new{shape, order, Float64}()
-    end
-    function Serendipity{shape, order, value_type}() where {shape <: AbstractRefShape, order, value_type}
-        new{shape, order, value_type}()
+        new{shape, order, Nothing}()
     end
 end
 
@@ -1309,7 +1303,7 @@ function reference_coordinates(::Serendipity{RefQuadrilateral,2})
             Vec{2, Float64}((-1.0,  0.0))]
 end
 
-function shape_value(ip::Serendipity{RefQuadrilateral,2}, ξ::Vec{2, T}, i::Int) where T
+function shape_value(ip::Serendipity{RefQuadrilateral,2}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return (1 - ξ_x) * (1 - ξ_y) * (-ξ_x - ξ_y - 1) / 4
@@ -1380,6 +1374,7 @@ function reference_coordinates(::Serendipity{RefHexahedron,2})
             Vec{3, Float64}((-1.0, 1.0, 0.0)),]
 end
 
+# Inlined to resolve the recursion properly
 @inline function shape_value(ip::Serendipity{RefHexahedron, 2}, ξ::Vec{3, T}, i::Int) where T
     ξ_x = ξ[1]
     ξ_y = ξ[2]
@@ -1419,9 +1414,8 @@ M. Crouzeix and P. Raviart. "Conforming and nonconforming finite element
 methods for solving the stationary Stokes equations I." ESAIM: Mathematical Modelling 
 and Numerical Analysis-Modélisation Mathématique et Analyse Numérique 7.R3 (1973): 33-75.
 """
-struct CrouzeixRaviart{shape, order, value_type} <: ScalarInterpolation{shape, order}
-    CrouzeixRaviart{RefTriangle, 1}() = new{RefTriangle, 1, Float64}()
-    CrouzeixRaviart{RefTriangle, 1, value_type}() where value_type = new{RefTriangle, 1, value_type}()
+struct CrouzeixRaviart{shape, order, unused} <: ScalarInterpolation{shape, order}
+    CrouzeixRaviart{RefTriangle, 1}() = new{RefTriangle, 1, Nothing}()
 end
 
 adjust_dofs_during_distribution(::CrouzeixRaviart) = true
@@ -1438,7 +1432,7 @@ function reference_coordinates(::CrouzeixRaviart)
             Vec{2, Float64}((0.5, 0.0))]
 end
 
-function shape_value(ip::CrouzeixRaviart{RefTriangle, 1}, ξ::Vec{2, T}, i::Int) where T
+function shape_value(ip::CrouzeixRaviart{RefTriangle, 1}, ξ::Vec{2}, i::Int) 
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i == 1 && return 2*ξ_x + 2*ξ_y - 1

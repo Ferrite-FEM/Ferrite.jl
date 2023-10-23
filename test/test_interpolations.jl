@@ -83,7 +83,7 @@
             totaldofs += sum(length.(Ferrite.facedof_interior_indices(interpolation));init=0)
         end
         if ref_dim > 2
-            totaldofs += sum(length.(Ferrite.edgedof_interior_indices(interpolation));init=0) 
+            totaldofs += sum(length.(Ferrite.edgedof_interior_indices(interpolation));init=0)
         end
         totaldofs += length(Ferrite.celldof_interior_indices(interpolation))
         @test totaldofs == n_basefuncs
@@ -99,8 +99,8 @@
         end
         @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.celldof_interior_indices(interpolation)])
 
-        # Check for evaluation type stability of interpolation
-        @testset "type stability dof $dof" for dof in 1:n_basefuncs
+        # Check for evaluation type correctness of interpolation
+        @testset "return type correctness dof $dof" for dof in 1:n_basefuncs
             @test eltype(shape_value(interpolation, x, dof)) == value_type
             @test eltype(shape_gradient(interpolation, x, dof)) == value_type
         end
@@ -167,12 +167,12 @@
             getnbasefunctions(interpolation) * 2
         # pretty printing
         @test repr("text/plain", v_interpolation_1) == repr(v_interpolation_1.ip) * "^2"
-        
-        # Check for evaluation type stability of vectorized interpolation
+
+        # Check for evaluation type correctness of vectorized interpolation
         v_interpolation_3 = interpolation^ref_dim
-        @testset "vectorized case stability of dof $dof" for dof in 1:n_basefuncs
+        @testset "vectorized case of return type correctness of dof $dof" for dof in 1:n_basefuncs
             @test eltype(shape_value(v_interpolation_1, x, dof)) == value_type
-            @test eltype(shape_gradient(v_interpolation_3, x, dof)) == value_type # Gradient currently only works for 
+            @test eltype(shape_gradient(v_interpolation_3, x, dof)) == value_type # Gradient currently only works for
         end
     end
 
