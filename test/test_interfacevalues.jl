@@ -248,7 +248,7 @@
         end
     end
     @testset "undefined transformation matrix error path" begin
-        it = InterfaceOrientationInfo{RefDodecahedron, RefDodecahedron}(false, 0, 0, 1, 1)
+        it = InterfaceOrientationInfo{DummyRefShapes.RefDodecahedron, DummyRefShapes.RefDodecahedron}(false, 0, 0, 1, 1)
         @test_throws ArgumentError("transformation is not implemented") Ferrite.get_transformation_matrix(it)
     end
     @testset "show" begin
