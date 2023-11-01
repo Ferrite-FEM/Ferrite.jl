@@ -68,6 +68,8 @@
 # First we load Ferrite, and some other packages we need.
 using Ferrite, FerriteGmsh, SparseArrays
 # Like for the Heat Equation example, we will use a unit square - but here we'll load the grid of the Ferrite logo! This is done by loading [`logo.geo`](logo.geo) with [`FerriteGmsh.jl`](https://github.com/Ferrite-FEM/FerriteGmsh.jl) here.
+FerriteGmsh.Gmsh.initialize() # hide
+FerriteGmsh.Gmsh.gmsh.option.set_number("General.Verbosity", 2) #hide
 grid = togrid("logo.geo");
 #md nothing # hide
 # By default the grid lacks the facesets for the boundaries, so we add them by Ferrite here.
@@ -128,12 +130,13 @@ close!(ch);
 # mind that the plane stress stiffness tensor is defined differently.
 E = 200e3 # Young's modulus [MPa]
 ν = 0.3 # Poisson's ratio [-]
+#md nothing # hide
 
 λ = E*ν / ((1 + ν) * (1 - 2ν)) # 1st Lamé parameter
 μ = E / (2(1 + ν)) # 2nd Lamé parameter
 I = one(SymmetricTensor{2, dim}) # 2nd order unit tensor
 II = one(SymmetricTensor{4, dim}) # 4th order symmetric unit tensor
-∂σ∂ε = 2μ * II + λ * (I ⊗ I) # elastic stiffness tensor
+∂σ∂ε = 2μ * II + λ * (I ⊗ I); # elastic stiffness tensor
 
 # ### Element routine
 # The stiffness matrix follows from the weak form such that
