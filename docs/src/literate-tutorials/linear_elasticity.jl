@@ -73,8 +73,9 @@ FerriteGmsh.Gmsh.gmsh.option.set_number("General.Verbosity", 2) #hide
 grid = togrid("logo.geo");
 #md nothing # hide
 # By default the grid lacks the facesets for the boundaries, so we add them by Ferrite here.
+# [`addfaceset!`](@ref) allows to add facesets to the grid based on coordinates.
 # Note that approximate comparison to 0.0 doesn't work well, so we use a tolerance instead.
-addfaceset!(grid, "top", x->x[2] ≈ 1.0)
+addfaceset!(grid, "top", x->x[2] ≈ 1.0) # faces for which x[2] ≈ 1.0 for all nodes
 addfaceset!(grid, "left", x->x[1] < 1e-6) 
 addfaceset!(grid, "bottom", x->x[2] < 1e-6);
 
