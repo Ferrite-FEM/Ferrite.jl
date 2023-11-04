@@ -31,12 +31,12 @@ Ferrite.FunctionValues
 Custom FEValues, `fe_v`, should normally implement the `reinit!` method.
 Additionally, for normal functionality the `getnquadpoints` should be implemented.
 Note that asking for the `n`th quadrature point must be inside array bounds if 
-`1<=n<:getnquadpoints(fe_v)`
+`1 <= n <= getnquadpoints(fe_v)`
 (`checkquadpoint` can, alternatively, be dispatched to check that `n` is inbounds.)
 
 Supporting `function_value`, `function_gradient`, `function_symmetric_gradient`, `function_divergence`, and `function_curl`,
 requires implementing `getnbasefunctions`, `shape_value`, and `shape_gradient`. 
-Note that asking for the `i`th shape value or gradient must be inside array bounds if `1<=i<:getnbasefunctions(fe_v)`
+Note that asking for the `i`th shape value or gradient must be inside array bounds if `1 <= i <= getnbasefunctions(fe_v)`
 
 Supporting `spatial_coordinate` requires implementing `getngeobasefunctions` and `geometric_value`.
-Note that asking for the `i`th geometric value must be inside array bounds if `1<=i<:getngeobasefunctions(fe_v)`
+Note that asking for the `i`th geometric value must be inside array bounds if `1 <= i <= getngeobasefunctions(fe_v)`
