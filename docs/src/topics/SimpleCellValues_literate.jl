@@ -47,8 +47,9 @@ function SimpleCellValues(qr::QuadratureRule, ip_fun::Interpolation, ip_geo::Int
     SimpleCellValues(N, dNdξ, dNdx, M, dMdξ, weights, detJdV)
 end;
 
-# We first define the `getnbasefunctions`
+# We first define `getnbasefunctions` and `getnquadpoints`
 Ferrite.getnbasefunctions(cv::SimpleCellValues) = size(cv.N, 1);
+Ferrite.getnquadpoints(cv::SimpleCellValues) = size(cv.N, 2);
 
 # Before we define the `reinit!` function to calculate the cached 
 # values `dNdx` and `detJdV` for the current cell
