@@ -4,11 +4,10 @@ using Base: @propagate_inbounds
 
 @noinline throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
 
-function checkquadpoint(cv::Union{CellValues, FaceValues, PointValues}, qp::Int)
-    0 < qp <= getnquadpoints(cv) || error("quadrature point out of range")
+function checkquadpoint(fe_v::AbstractValues, qp::Int)
+    0 < qp <= getnquadpoints(fe_v) || error("quadrature point out of range")
     return nothing
 end
-checkquadpoint(_, _::Int) = nothing
 
 @noinline function throw_incompatible_dof_length(length_ue, n_base_funcs)
     throw(ArgumentError(
