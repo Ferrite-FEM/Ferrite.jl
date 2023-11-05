@@ -24,8 +24,8 @@ reinit!
 getnquadpoints
 getdetJdV
 
-shape_value
-shape_gradient
+shape_value(::Ferrite.AbstractValues, ::Int, ::Int)
+shape_gradient(::Ferrite.AbstractValues, ::Int, ::Int)
 shape_symmetric_gradient
 shape_divergence
 
