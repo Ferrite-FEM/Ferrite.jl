@@ -64,7 +64,7 @@ function getdetJdV end
 Return the value of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-function shape_value end
+shape_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
 
 """
     geometric_value(fe_v::AbstractValues, q_point, base_function::Int)
@@ -72,7 +72,7 @@ function shape_value end
 Return the value of the geometric shape function `base_function` evaluated in 
 quadrature point `q_point`.
 """
-function geometric_value end
+geometric_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
 
 """
     shape_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -80,7 +80,7 @@ function geometric_value end
 Return the gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-function shape_gradient end
+shape_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
 
 """
     shape_symmetric_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
