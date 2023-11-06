@@ -94,6 +94,10 @@ export
     addcellset!,
     transform_coordinates!,
     generate_grid,
+# AdaptiveGrid
+    ForestBWG,
+    OctreeBWG,
+    OctantBWG, 
 
 # Grid coloring
     create_coloring,

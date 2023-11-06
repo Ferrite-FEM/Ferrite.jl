@@ -1,3 +1,0 @@
-# # Linear elasticity
-#
-# TBW
