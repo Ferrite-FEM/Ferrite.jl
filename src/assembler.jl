@@ -154,30 +154,33 @@ end
 
 """
     assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
-    assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+    assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, [permutation, sorteddofs])
 
 Assemble the element stiffness matrix `Ke` (and optional force vector `fe`) into the global
 stiffness (and force) in `A`, given the element degrees of freedom `dofs`.
 
 This is equivalent to `K[dofs, dofs] += Ke` and `f[dofs] += fe`, where `K` is the global
 stiffness matrix and `f` the global force/residual vector, but more efficient.
+
+If the assembler is used in a multi-threaded assembly-loop, the arguments `permutation` and `sorteddofs` must be given to functions. 
+Both `permutation` and `sorteddofs` are vectors of integeres with the length `length(dofs)`.
 """
 assemble!(::AbstractSparseAssembler, ::AbstractVector{Int}, ::AbstractMatrix, ::AbstractVector)
 
-@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
-    assemble!(A, dofs, Ke, eltype(Ke)[])
+@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, permutation::Vector{Int}=A.permutation, sorteddofs::Vector{Int}=A.sorteddofs)
+    assemble!(A, dofs, Ke, eltype(Ke)[], permutation, sorteddofs)
 end
-@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, fe::AbstractVector, Ke::AbstractMatrix)
-    assemble!(A, dofs, Ke, fe)
+@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, fe::AbstractVector, Ke::AbstractMatrix, permutation::Vector{Int}=A.permutation, sorteddofs::Vector{Int}=A.sorteddofs)
+    assemble!(A, dofs, Ke, fe, permutation, sorteddofs)
 end
-@propagate_inbounds function assemble!(A::AssemblerSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
-    _assemble!(A, dofs, Ke, fe, false)
+@propagate_inbounds function assemble!(A::AssemblerSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, permutation::Vector{Int}=A.permutation, sorteddofs::Vector{Int}=A.sorteddofs)
+    _assemble!(A, dofs, Ke, fe, false, permutation, sorteddofs)
 end
-@propagate_inbounds function assemble!(A::AssemblerSymmetricSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
-    _assemble!(A, dofs, Ke, fe, true)
+@propagate_inbounds function assemble!(A::AssemblerSymmetricSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, permutation::Vector{Int}=A.permutation, sorteddofs::Vector{Int}=A.sorteddofs)
+    _assemble!(A, dofs, Ke, fe, true, permutation, sorteddofs)
 end
 
-@propagate_inbounds function _assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
+@propagate_inbounds function _assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool, permutation, sorteddofs)
     ld = length(dofs)
     @boundscheck checkbounds(Ke, keys(dofs), keys(dofs))
     if length(fe) != 0
@@ -187,8 +190,6 @@ end
     end
 
     K = matrix_handle(A)
-    permutation = A.permutation
-    sorteddofs = A.sorteddofs
     @boundscheck checkbounds(K, dofs, dofs)
     resize!(permutation, ld)
     resize!(sorteddofs, ld)
@@ -236,9 +237,11 @@ end
 end
 
 function _missing_sparsity_pattern_error(Krow::Int, Kcol::Int)
-    error("You are trying to assemble values in to K[$(Krow), $(Kcol)] += value, but K[$(Krow), $(Kcol)] 
+    error("You are trying to assemble values in to K[$(Krow), $(Kcol)], but K[$(Krow), $(Kcol)] 
            is missing in the sparsity pattern. Make sure you have called `K = create_sparsity_pattern(dh)`
-           or `K = create_sparsity_pattern(dh, ch)` if you have affine constraints.")
+           or `K = create_sparsity_pattern(dh, ch)` if you have affine constraints. This error might also 
+           happen if you are using `::AssemblerSparsityPattern` in a threaded assembly loop (you need to create
+           an `assembler::AssemblerSparsityPattern` for each task).")
 end
 
 ## assemble! with local condensation ##
