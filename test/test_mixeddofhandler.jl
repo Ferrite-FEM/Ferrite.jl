@@ -341,7 +341,7 @@ function test_2_element_heat_eq()
         qr = QuadratureRule{RefQuadrilateral}(2)
         interp = sdh.field_interpolations[1]
         cellvalues = CellValues(qr, interp)
-        doassemble(sdh.cellset, cellvalues, assembler, dh)
+        doassemble(getcellset(sdh), cellvalues, assembler, dh)
     end
 
     update!(ch, 0.0);

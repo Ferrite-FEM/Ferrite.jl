@@ -218,7 +218,7 @@ function evaluate_at_points!(out_vals::Vector{T2},
         ip = func_interpolations[sdh_idx]
         if ip !== nothing
             dofrange = dof_range(sdh, fname)
-            cellset = sdh.cellset
+            cellset = getcellset(sdh)
             _evaluate_at_points!(out_vals, dof_vals, ph, dh, ip, cellset, dofrange)
         end
     end

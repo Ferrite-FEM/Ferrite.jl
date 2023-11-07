@@ -196,7 +196,7 @@ function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.Compone
     for sdh in dh.subdofhandlers
         dof_ranges = [dof_range(sdh, f) for f in eachindex(sdh.field_names)]
         global_idxs = [findfirst(x -> x === f, dh.field_names) for f in sdh.field_names]
-        for cell in CellIterator(dh, sdh.cellset, flags)
+        for cell in CellIterator(dh, getcellset(sdh), flags)
             cdofs = celldofs(cell)
             for (local_idx, global_idx) in pairs(global_idxs)
                 rng = dof_ranges[local_idx]

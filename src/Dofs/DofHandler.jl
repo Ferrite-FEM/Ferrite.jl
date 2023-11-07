@@ -63,7 +63,7 @@ function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
     end
     # Make sure this set is disjoint with all other existing
     for sdh in dh.subdofhandlers
-        if !isdisjoint(cellset, sdh.cellset)
+        if !isdisjoint(cellset, getcellset(sdh))
             error("cellset not disjoint with sets in existing SubDofHandlers")
         end
     end
@@ -73,7 +73,8 @@ function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
     return sdh
 end
 
-@inline getcelltype(sdh::SubDofHandler) = getcelltype(get_grid(sdh.dh), first(sdh.cellset))
+@inline getcelltype(sdh::SubDofHandler) = getcelltype(get_grid(sdh.dh), first(getcellset(sdh)))
+@inline getcellset(sdh::SubDofHandler) = sdh.cellset
 
 function Base.show(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
     println(io, typeof(sdh))
@@ -189,7 +190,7 @@ function celldofs!(global_dofs::Vector{Int}, dh::DofHandler, i::Int)
     return global_dofs
 end
 function celldofs!(global_dofs::Vector{Int}, sdh::SubDofHandler, i::Int)
-    @assert i in sdh.cellset
+    @assert i in getcellset(sdh)
     return celldofs!(global_dofs, sdh.dh, i)
 end
 
@@ -266,7 +267,7 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
     end
     
     # Check that interpolation is compatible with cells it it added to
-    refshape_sdh = getrefshape(getcells(sdh.dh.grid, first(sdh.cellset)))
+    refshape_sdh = getrefshape(getcells(sdh.dh.grid, first(getcellset(sdh))))
     if refshape_sdh !== getrefshape(ip)
         error("The refshape of the interpolation $(getrefshape(ip)) is incompatible with the refshape $refshape_sdh of the cells.")
     end
@@ -296,7 +297,7 @@ function add!(dh::DofHandler, name::Symbol, ip::Interpolation)
     elseif length(dh.subdofhandlers) == 1
         # Add to existing SubDofHandler (if it covers all cells)
         sdh = dh.subdofhandlers[1]
-        if length(sdh.cellset) != getncells(get_grid(dh))
+        if length(getcellset(sdh)) != getncells(get_grid(dh))
             error("can not add field to DofHandler with a SubDofHandler for a subregion")
         end
     else # length(dh.subdofhandlers) > 1
@@ -437,7 +438,7 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
 
     # loop over all the cells, and distribute dofs for all the fields
     # TODO: Remove BitSet construction when SubDofHandler ensures sorted collections
-    for ci in BitSet(sdh.cellset)
+    for ci in BitSet(getcellset(sdh))
         @debug println("Creating dofs for cell #$ci")
 
         # TODO: _check_cellset_intersections can be removed in favor of this assertion
