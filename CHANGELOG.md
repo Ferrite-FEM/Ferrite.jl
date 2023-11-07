@@ -319,6 +319,10 @@ more discussion).
   **To upgrade** replace the quadrature rule passed to `FaceValues` with a
   `FaceQuadratureRule`.
 
+- Checking if a face `(ele_id, local_face_id) ∈ faceset` has been previously implemented
+  by type piracy. In order to be invariant to the underlying `Set` datatype as well as
+  omitting type piracy, ([#835][github-835]) implemented `isequal` and `hash` for `BoundaryIndex` datatypes.
+
 ### Deprecated
 
 - The rarely (if ever) used methods of `function_value`, `function_gradient`,
@@ -867,3 +871,4 @@ poking into Ferrite internals:
 [github-749]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/749
 [github-753]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/753
 [github-756]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/756
+[github-835]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/835
