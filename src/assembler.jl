@@ -154,33 +154,30 @@ end
 
 """
     assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
-    assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, [permutation, sorteddofs])
+    assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
 
 Assemble the element stiffness matrix `Ke` (and optional force vector `fe`) into the global
 stiffness (and force) in `A`, given the element degrees of freedom `dofs`.
 
 This is equivalent to `K[dofs, dofs] += Ke` and `f[dofs] += fe`, where `K` is the global
 stiffness matrix and `f` the global force/residual vector, but more efficient.
-
-If the assembler is used in a multi-threaded assembly-loop, the arguments `permutation` and `sorteddofs` must be given to functions. 
-Both `permutation` and `sorteddofs` are vectors of integeres with the length `length(dofs)`.
 """
 assemble!(::AbstractSparseAssembler, ::AbstractVector{Int}, ::AbstractMatrix, ::AbstractVector)
 
-@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, permutation::Vector{Int}=A.permutation, sorteddofs::Vector{Int}=A.sorteddofs)
-    assemble!(A, dofs, Ke, eltype(Ke)[], permutation, sorteddofs)
+@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix)
+    assemble!(A, dofs, Ke, eltype(Ke)[])
 end
-@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, fe::AbstractVector, Ke::AbstractMatrix, permutation::Vector{Int}=A.permutation, sorteddofs::Vector{Int}=A.sorteddofs)
-    assemble!(A, dofs, Ke, fe, permutation, sorteddofs)
+@propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, fe::AbstractVector, Ke::AbstractMatrix)
+    assemble!(A, dofs, Ke, fe)
 end
-@propagate_inbounds function assemble!(A::AssemblerSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, permutation::Vector{Int}=A.permutation, sorteddofs::Vector{Int}=A.sorteddofs)
-    _assemble!(A, dofs, Ke, fe, false, permutation, sorteddofs)
+@propagate_inbounds function assemble!(A::AssemblerSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+    _assemble!(A, dofs, Ke, fe, false)
 end
-@propagate_inbounds function assemble!(A::AssemblerSymmetricSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, permutation::Vector{Int}=A.permutation, sorteddofs::Vector{Int}=A.sorteddofs)
-    _assemble!(A, dofs, Ke, fe, true, permutation, sorteddofs)
+@propagate_inbounds function assemble!(A::AssemblerSymmetricSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+    _assemble!(A, dofs, Ke, fe, true)
 end
 
-@propagate_inbounds function _assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool, permutation, sorteddofs)
+@propagate_inbounds function _assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
     ld = length(dofs)
     @boundscheck checkbounds(Ke, keys(dofs), keys(dofs))
     if length(fe) != 0
@@ -190,6 +187,8 @@ end
     end
 
     K = matrix_handle(A)
+    permutation = A.permutation
+    sorteddofs = A.sorteddofs
     @boundscheck checkbounds(K, dofs, dofs)
     resize!(permutation, ld)
     resize!(sorteddofs, ld)
@@ -229,7 +228,7 @@ end
         # Make sure that remaining entries in this column of the local matrix are all zero
         for i in ri:maxlookups
             if !iszero(Ke[permutation[i], Kecol])
-                _missing_sparsity_pattern_error(sorteddofs[i],Kcol)
+                _missing_sparsity_pattern_error(sorteddofs[i], Kcol)
             end
         end
         current_col += 1
