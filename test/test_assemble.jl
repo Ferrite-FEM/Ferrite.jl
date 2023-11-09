@@ -139,11 +139,17 @@ end
     as = start_assemble(Symmetric(K))
     errr = ErrorException("some row indices were not found")
     ## Errors below diagonal
+    errr = ErrorException(Ferrite._missing_sparsity_pattern_message(2,1))
     @test_throws errr assemble!(a, [1, 2], [1.0 0.0; 3.0 4.0])
+    errr = ErrorException(Ferrite._missing_sparsity_pattern_message(2,1))
     @test_throws errr assemble!(a, [2, 1], [1.0 2.0; 0.0 4.0])
     ## Errors above diagonal
+    errr = ErrorException(Ferrite._missing_sparsity_pattern_message(2,2))
     @test_throws errr assemble!(a, [1, 2], [1.0 2.0; 0.0 4.0])
+    errr = ErrorException(Ferrite._missing_sparsity_pattern_message(2,2))
     @test_throws errr assemble!(as, [1, 2], [1.0 2.0; 0.0 4.0])
+    errr = ErrorException(Ferrite._missing_sparsity_pattern_message(2,2))
     @test_throws errr assemble!(a, [2, 1], [1.0 0.0; 3.0 4.0])
+    errr = ErrorException(Ferrite._missing_sparsity_pattern_message(2,2))
     @test_throws errr assemble!(as, [2, 1], [1.0 0.0; 3.0 4.0])
 end
