@@ -1,18 +1,27 @@
 @testset "interpolations" begin
-
+using StaticArrays
 @testset "$interpolation" for interpolation in (
                       Lagrange{RefLine, 1}(),
                       Lagrange{RefLine, 2}(),
+                      ArbitraryOrderLagrange{RefLine, 20}(), # GLL
+                      ArbitraryOrderLagrange{RefLine, 20}(Ferrite.equidistant(20)),
                       Lagrange{RefQuadrilateral, 1}(),
                       Lagrange{RefQuadrilateral, 2}(),
                       Lagrange{RefQuadrilateral, 3}(),
+                      ArbitraryOrderLagrange{RefQuadrilateral, 20}(), # GLL
+                      ArbitraryOrderLagrange{RefQuadrilateral, 20}(Ferrite.equidistant(20)), 
                       Lagrange{RefTriangle, 1}(),
                       Lagrange{RefTriangle, 2}(),
-                      Lagrange{RefTriangle, 3}(),
-                      Lagrange{RefTriangle, 4}(),
-                      Lagrange{RefTriangle, 5}(),
+                      ArbitraryOrderLagrange{RefTriangle, 3}(),
+                      ArbitraryOrderLagrange{RefTriangle, 4}(),
+                      ArbitraryOrderLagrange{RefTriangle, 5}(),
+                      ArbitraryOrderLagrange{RefTriangle, 6}(),
+                    #   Lagrange{RefTriangle, 7}(), fails dirac delta
+                      ArbitraryOrderLagrange{RefTriangle, 8}(),
                       Lagrange{RefHexahedron, 1}(),
                       Lagrange{RefHexahedron, 2}(),
+                      ArbitraryOrderLagrange{RefHexahedron, 5}(),  # GLL
+                      ArbitraryOrderLagrange{RefHexahedron, 5}(Ferrite.equidistant(5)), 
                       Serendipity{RefQuadrilateral, 2}(),
                       Serendipity{RefHexahedron, 2}(),
                       Lagrange{RefTetrahedron, 1}(),
@@ -32,6 +41,13 @@
                       DiscontinuousLagrange{RefHexahedron, 1}(),
                       DiscontinuousLagrange{RefTriangle, 1}(),
                       DiscontinuousLagrange{RefTetrahedron, 1}(),
+                      #
+                      ArbitraryOrderDiscontinuousLagrange{RefLine,10}(),
+                      ArbitraryOrderDiscontinuousLagrange{RefLine,10}(Ferrite.equidistant(10)),
+                      ArbitraryOrderDiscontinuousLagrange{RefQuadrilateral,10}(),
+                      ArbitraryOrderDiscontinuousLagrange{RefQuadrilateral,10}(Ferrite.equidistant(10)),
+                      ArbitraryOrderDiscontinuousLagrange{RefHexahedron,5}(),
+                      ArbitraryOrderDiscontinuousLagrange{RefHexahedron,5}(Ferrite.equidistant(5)),
                       #
                       BubbleEnrichedLagrange{RefTriangle, 1}(),
                       #
@@ -121,17 +137,17 @@
 
         # Test that facedof_indices(...) return in counter clockwise order (viewing from the outside)
         if interpolation isa Lagrange
-            function __outward_normal(coords::Vector{<:Vec{1}}, nodes)
+            function __outward_normal(coords::Union{Vector{<:Vec{1}}, NTuple{N, <:Vec{1}}, SVector{N, <:Vec{1}}}, nodes) where N
                 n = coords[nodes[1]]
                 return n / norm(n)
             end
-            function __outward_normal(coords::Vector{<:Vec{2}}, nodes)
+            function __outward_normal(coords::Union{Vector{<:Vec{2}}, NTuple{N, <:Vec{2}}, SVector{N, <:Vec{2}}}, nodes) where N
                 p1 = coords[nodes[1]]
                 p2 = coords[nodes[2]]
                 n = Vec{2}((p2[2] - p1[2], - p2[1] + p1[1]))
                 return n / norm(n)
             end
-            function __outward_normal(coords::Vector{<:Vec{3}}, nodes)
+            function __outward_normal(coords::Union{Vector{<:Vec{3}}, NTuple{N, <:Vec{3}}, SVector{N, <:Vec{3}}}, nodes) where N
                 p1 = coords[nodes[1]]
                 p2 = coords[nodes[2]]
                 p3 = coords[nodes[3]]
@@ -186,4 +202,21 @@ end
     @test Ferrite.is_discontinuous(ip_t) == false
     @test Ferrite.is_discontinuous(d_ip) == true
     @test Ferrite.is_discontinuous(d_ip_t) == true
+
+    @testset "Interpolation error paths" for RefShape in (
+        RefLine,
+        RefQuadrilateral,
+        RefHexahedron,
+        )
+        dim = RefShape.super.parameters[1]
+        @test_throws ArgumentError("Continuous nodal interpolations must have basis on the boundaries") ArbitraryOrderLagrange{RefShape,3}(Ferrite.GaussQuadrature.legendre(4)[1])
+        ip = ArbitraryOrderDiscontinuousLagrange{RefShape,3}(Ferrite.GaussQuadrature.legendre(4)[1])
+        for facefunc in (
+            Ferrite.dirichlet_facedof_indices,
+            Ferrite.dirichlet_edgedof_indices,
+        )
+            (dim < 3 && facefunc ==  Ferrite.dirichlet_edgedof_indices) ||
+                @test_throws ErrorException("$facefunc is not implemented for L2 elements with no basis on the boundaries") facefunc(ip)
+        end
+    end
 end
