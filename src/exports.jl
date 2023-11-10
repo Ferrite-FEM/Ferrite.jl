@@ -1,8 +1,16 @@
 export
 # Interpolations
     Interpolation,
-    RefCube,
+    VectorInterpolation,
+    ScalarInterpolation,
+    VectorizedInterpolation,
+    RefLine,
+    RefQuadrilateral,
+    RefHexahedron,
+    RefTriangle,
     RefTetrahedron,
+    RefPrism,
+    RefPyramid,
     BubbleEnrichedLagrange,
     CrouzeixRaviart,
     RannacherTurek,
@@ -10,19 +18,18 @@ export
     DiscontinuousLagrange,
     Serendipity,
     getnbasefunctions,
+    getrefshape,
 
 # Quadrature
     QuadratureRule,
-    getweights,
-    getpoints,
+    FaceQuadratureRule,
+    getnquadpoints,
 
 # FEValues
+    AbstractCellValues,
+    AbstractFaceValues,
     CellValues,
-    CellScalarValues,
-    CellVectorValues,
     FaceValues,
-    FaceScalarValues,
-    FaceVectorValues,
     reinit!,
     shape_value,
     shape_gradient,
@@ -37,25 +44,24 @@ export
     spatial_coordinate,
     getnormal,
     getdetJdV,
-    getnquadpoints,
 
 # Grid
     Grid,
     Node,
-    Cell,
     Line,
-    Line2D,
-    Line3D,
     QuadraticLine,
     Triangle,
     QuadraticTriangle,
     Quadrilateral,
-    Quadrilateral3D,
     QuadraticQuadrilateral,
+    SerendipityQuadraticQuadrilateral,
     Tetrahedron,
     QuadraticTetrahedron,
     Hexahedron,
-    #QuadraticHexahedron,
+    QuadraticHexahedron,
+    SerendipityQuadraticHexahedron,
+    Wedge,
+    Pyramid,
     CellIndex,
     FaceIndex,
     EdgeIndex,
@@ -63,6 +69,8 @@ export
     ExclusiveTopology,
     getneighborhood,
     faceskeleton,
+    vertex_star_stencils,
+    getstencil,
     getcells,
     getncells,
     getnodes,
@@ -73,23 +81,21 @@ export
     getfaceset,
     getedgeset,
     getvertexset,
+    get_node_coordinate,
     getcoordinates,
     getcoordinates!,
-    getcellsets,
-    getnodesets,
-    getfacesets,
-    getedgesets,
-    getvertexsets,
     onboundary,
     nfaces,
     addnodeset!,
     addfaceset!,
+    addboundaryfaceset!,
     addedgeset!,
+    addboundaryedgeset!,
     addvertexset!,
+    addboundaryvertexset!,
     addcellset!,
-    transform!,
+    transform_coordinates!,
     generate_grid,
-    compute_vertex_values,
 
 # Grid coloring
     create_coloring,
@@ -98,6 +104,7 @@ export
 
 # Dofs
     DofHandler,
+    SubDofHandler,
     close!,
     ndofs,
     ndofs_per_cell,
@@ -108,10 +115,7 @@ export
     dof_range,
     renumber!,
     DofOrder,
-    MixedDofHandler,
-    FieldHandler,
-    Field,
-    reshape_to_nodes,
+    evaluate_at_grid_nodes,
     apply_analytical!,
 
 # Constraints
@@ -136,13 +140,18 @@ export
 # iterators
     CellCache,
     CellIterator,
+    FaceCache,
+    FaceIterator,
+    InterfaceCache,
+    InterfaceIterator,
     UpdateFlags,
     cellid,
+    interfacedofs,
 
 # assembly
     start_assemble,
     assemble!,
-    end_assemble,
+    finish_assemble,
 
 # VTK export
     vtk_grid,
@@ -158,8 +167,7 @@ export
 
 # Point Evaluation
     PointEvalHandler,
-    get_point_values,
+    evaluate_at_points,
     PointIterator,
     PointLocation,
-    PointScalarValues,
-    PointVectorValues
+    PointValues

@@ -10,7 +10,7 @@ DocTestSetup = :(using Ferrite)
 ```@docs
 CellValues
 reinit!
-getnquadpoints
+getnquadpoints(::CellValues)
 getdetJdV
 
 shape_value
@@ -33,4 +33,5 @@ In addition, there are some methods that are unique for `FaecValues`:
 ```@docs
 FaceValues
 getcurrentface
+getnquadpoints(::FaceValues)
 ```

@@ -13,295 +13,294 @@ struct Node{dim,T}
     x::Vec{dim,T}
 end
 Node(x::NTuple{dim,T}) where {dim,T} = Node(Vec{dim,T}(x))
-getcoordinates(n::Node) = n.x
+
+"""
+    get_node_coordinate(::Node)
+    
+Get the value of the node coordinate.
+"""
+get_node_coordinate(n::Node) = n.x
+
+"""
+    get_coordinate_type(::Node)
+
+Get the data type of the the node coordinate.
+"""
+get_coordinate_type(::Node{dim,T}) where {dim,T}  = Vec{dim,T}
+
+"""
+    get_coordinate_eltype(::Node)
+
+Get the data type of the components of the nodes coordinate.
+"""
 get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 
-abstract type AbstractCell{dim,N,M} end
-"""
-    Cell{dim,N,M} <: AbstractCell{dim,N,M}
-A `Cell` is a sub-domain defined by a collection of `Node`s as it's vertices.
-However, a `cell` is not defined by the nodes but rather by the global node ids.
-The parameter `dim` refers here to the geometrical/ambient dimension, i.e. the dimension of the `nodes` in the grid and **not** the topological dimension of the cell.
-A `Cell` has `N` nodes and `M` faces.
+##########################
+# AbstractCell interface #
+##########################
 
-# Fields
-- `nodes::Ntuple{N,Int}`: N-tuple that stores the node ids. The ordering defines a cell's and its subentities' orientations.
-"""
-struct Cell{dim,N,M} <: AbstractCell{dim,N,M}
-    nodes::NTuple{N,Int}
-end
-nfaces(c::C) where {C<:AbstractCell} = nfaces(typeof(c))
-nfaces(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = M
-nnodes(c::C) where {C<:AbstractCell} = nnodes(typeof(c))
-nnodes(::Type{<:AbstractCell{dim,N,M}}) where {dim,N,M} = N
+abstract type AbstractCell{refshape <: AbstractRefShape} end
 
-# Typealias for commonly used cells
-const implemented_celltypes = (
-    (const Line  = Cell{1,2,2}),
-    (const Line2D = Cell{2,2,1}),
-    (const Line3D = Cell{3,2,0}),
-    (const QuadraticLine = Cell{1,3,2}),
-    
-    (const Triangle = Cell{2,3,3}),
-    (const QuadraticTriangle = Cell{2,6,3}),
-    
-    (const Quadrilateral = Cell{2,4,4}),
-    (const Quadrilateral3D = Cell{3,4,1}),
-    (const QuadraticQuadrilateral = Cell{2,9,4}),
-    
-    (const Tetrahedron = Cell{3,4,4}),
-    (const QuadraticTetrahedron = Cell{3,10,4}),
-    
-    (const Hexahedron = Cell{3,8,6}),
-    (Cell{2,20,6})
-)
+getrefshape(::AbstractCell{refshape}) where refshape = refshape
+
+nvertices(c::AbstractCell) = length(vertices(c))
+nedges(   c::AbstractCell) = length(edges(c))
+nfaces(   c::AbstractCell) = length(faces(c))
+nfaces(   ::Type{T}) where {T <: AbstractRefShape} = length(reference_faces(T))
+nnodes(   c::AbstractCell) = length(get_node_ids(c))
 
 """
-A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh
+    Ferrite.vertices(::AbstractCell)
+
+Returns a tuple with the node indices (of the nodes in a grid) for each vertex in a given cell.
+This function induces the [`VertexIndex`](@ref), where the second index 
+corresponds to the local index into this tuple.
 """
-struct CellIndex
-    idx::Int
-end
+vertices(::AbstractCell)
 
 """
-A `FaceIndex` wraps an (Int, Int) and defines a local face by pointing to a (cell, face).
-"""
-struct FaceIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
-end
+    Ferrite.edges(::AbstractCell)
 
+Returns a tuple of 2-tuples containing the ordered node indices (of the nodes in a grid) corresponding to
+the vertices that define an *oriented edge*. This function induces the 
+[`EdgeIndex`](@ref), where the second index corresponds to the local index into this tuple.
+
+Note that the vertices are sufficient to define an edge uniquely.
 """
-A `EdgeIndex` wraps an (Int, Int) and defines a local edge by pointing to a (cell, edge).
-"""
-struct EdgeIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
-end
+edges(::AbstractCell)
 
 """
-A `VertexIndex` wraps an (Int, Int) and defines a local vertex by pointing to a (cell, vert).
+    reference_faces(::AbstractRefShape)
+
+Returns a tuple of n-tuples containing the ordered local node indices corresponding to
+the vertices that define an *oriented face*.
+
+An *oriented face* is a face with the first node having the local index and the other
+nodes spanning such that the normal to the face is pointing outwards.
+
+Note that the vertices are sufficient to define a face uniquely.
 """
-struct VertexIndex <: BoundaryIndex
-    idx::Tuple{Int,Int} # cell and side
-end
+reference_faces(::AbstractRefShape)
 
-struct EntityNeighborhood{T<:Union{BoundaryIndex,CellIndex}}
-    neighbor_info::Vector{T}
-end
+"""
+    Ferrite.faces(::AbstractCell)
 
-EntityNeighborhood(info::T) where T <: BoundaryIndex = EntityNeighborhood([info])
-Base.zero(::Type{EntityNeighborhood{T}}) where T = EntityNeighborhood(T[])
-Base.zero(::Type{EntityNeighborhood}) = EntityNeighborhood(BoundaryIndex[])
-Base.length(n::EntityNeighborhood) = length(n.neighbor_info)
-Base.getindex(n::EntityNeighborhood,i) = getindex(n.neighbor_info,i)
-Base.firstindex(n::EntityNeighborhood) = 1
-Base.lastindex(n::EntityNeighborhood) = length(n.neighbor_info)
-Base.:(==)(n1::EntityNeighborhood, n2::EntityNeighborhood) = n1.neighbor_info == n2.neighbor_info
-Base.iterate(n::EntityNeighborhood, state=1) = iterate(n.neighbor_info,state)
+Returns a tuple of n-tuples containing the ordered node indices (of the nodes in a grid) corresponding to
+the vertices that define an *oriented face*. This function induces the 
+[`FaceIndex`](@ref), where the second index corresponds to the local index into this tuple.
 
-function Base.:+(n1::EntityNeighborhood, n2::EntityNeighborhood)
-    neighbor_info = [n1.neighbor_info; n2.neighbor_info]
-    return EntityNeighborhood(neighbor_info)
-end
+An *oriented face* is a face with the first node having the local index and the other
+nodes spanning such that the normal to the face is pointing outwards.
 
-function Base.show(io::IO, ::MIME"text/plain", n::EntityNeighborhood)
-    if length(n) == 0
-        println(io, "No EntityNeighborhood")
-    elseif length(n) == 1
-        println(io, "$(n.neighbor_info[1])")
-    else
-        println(io, "$(n.neighbor_info...)")
-    end
+Note that the vertices are sufficient to define a face uniquely.
+"""
+faces(::AbstractCell)
+
+function faces(c::AbstractCell{refshape}) where refshape
+    ns = get_node_ids(c)
+    rfs = reference_faces(refshape)
+    return ntuple(i -> getindex.(Ref(ns), rfs[i]), nfaces(refshape))::typeof(rfs)
 end
 
 """
-    face_npoints(::AbstractCell{dim,N,M)
-Specifies for each subtype of AbstractCell how many nodes form a face
-"""
-face_npoints(::Cell{2,N,M}) where {N,M} = 2
-face_npoints(::Cell{3,4,1}) = 4 #not sure how to handle embedded cells e.g. Quadrilateral3D
-"""
-    edge_npoints(::AbstractCell{dim,N,M)
-Specifies for each subtype of AbstractCell how many nodes form an edge
-"""
-edge_npoints(::Cell{3,4,1}) = 2 #not sure how to handle embedded cells e.g. Quadrilateral3D
-face_npoints(::Cell{3,N,6}) where N = 4
-face_npoints(::Cell{3,N,4}) where N = 3
-edge_npoints(::Cell{3,N,M}) where {N,M} = 2
+    Ferrite.default_interpolation(::AbstractCell)::Interpolation
 
-getdim(::Cell{dim}) where dim = dim
-
-abstract type AbstractTopology end
+Returns the interpolation which defines the geometry of a given cell.
+"""
+default_interpolation(::AbstractCell)
 
 """
-    ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
-`ExclusiveTopology` saves topological (connectivity) data of the grid. The constructor works with an `AbstractCell`
-vector for all cells that dispatch `vertices`, `faces` and in 3D `edges` as well as the utility functions
-`face_npoints` and `edge_npoints`.
-The struct saves the highest dimensional neighborhood, i.e. if something is connected by a face and an
- edge only the face neighborhood is saved. The lower dimensional neighborhood is recomputed, if needed.
+    Ferrite.get_node_ids(c::AbstractCell)
 
-# Fields
-- `vertex_to_cell::Dict{Int,Vector{Int}}`: global vertex id to all cells containing the vertex
-- `cell_neighbor::Vector{EntityNeighborhood{CellIndex}}`: cellid to all connected cells
-- `face_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: `face_neighbor[cellid,local_face_id]` -> neighboring face
-- `vertex_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: `vertex_neighbor[cellid,local_vertex_id]` -> neighboring vertex
-- `edge_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}`: `edge_neighbor[cellid_local_vertex_id]` -> neighboring edge
-- `vertex_vertex_neighbor::Dict{Int,EntityNeighborhood{VertexIndex}}`: global vertex id -> all connected vertices by edge or face
-- `face_skeleton::Vector{FaceIndex}`: list of unique faces in the grid 
+Return the node id's for cell `c` in the order determined by the cell's reference cell.
+
+Default implementation: `c.nodes`.
 """
-struct ExclusiveTopology <: AbstractTopology
-    # maps a global vertex id to all cells containing the vertex
-    vertex_to_cell::Dict{Int,Vector{Int}}
-    # index of the vector = cell id ->  all other connected cells
-    cell_neighbor::Vector{EntityNeighborhood{CellIndex}}
-    # face_neighbor[cellid,local_face_id] -> exclusive connected entities (not restricted to one entity)
-    face_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
-    # vertex_neighbor[cellid,local_vertex_id] -> exclusive connected entities to the given vertex
-    vertex_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
-    # edge_neighbor[cellid,local_edge_id] -> exclusive connected entities of the given edge
-    edge_neighbor::SparseMatrixCSC{EntityNeighborhood,Int}
-    # maps global vertex id to all directly (by edge or face) connected vertices (no diagonal connection considered)
-    vertex_vertex_neighbor::Dict{Int,EntityNeighborhood{VertexIndex}}
-    # list of unique faces in the grid given as FaceIndex
-    face_skeleton::Vector{FaceIndex}
+get_node_ids(c::AbstractCell) = c.nodes
+
+# Default implementations of vertices/edges/faces that work as long as get_node_ids is
+# correctly implemented for the cell.
+
+# RefLine (refdim = 1): vertices for vertexdofs, faces for BC
+function vertices(c::AbstractCell{RefLine})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2]) # v1, v2
+end
+function reference_faces(::Type{RefLine})
+    return ((1,), (2,)) # f1, f2
 end
 
-function ExclusiveTopology(cells::Vector{C}) where C <: AbstractCell
-    cell_vertices_table = vertices.(cells) #needs generic interface for <: AbstractCell
-    vertex_cell_table = Dict{Int,Vector{Int}}() 
-    
-    for (cellid, cell_nodes) in enumerate(cell_vertices_table)
-       for node in cell_nodes
-            if haskey(vertex_cell_table, node)
-                push!(vertex_cell_table[node], cellid)
-            else
-                vertex_cell_table[node] = [cellid]
-            end
-        end 
-    end
-
-    I_face = Int[]; J_face = Int[]; V_face = EntityNeighborhood[]
-    I_edge = Int[]; J_edge = Int[]; V_edge = EntityNeighborhood[]
-    I_vertex = Int[]; J_vertex = Int[]; V_vertex = EntityNeighborhood[]   
-    cell_neighbor_table = Vector{EntityNeighborhood{CellIndex}}(undef, length(cells)) 
-
-    for (cellid, cell) in enumerate(cells)    
-        #cell neighborhood
-        cell_neighbors = getindex.((vertex_cell_table,), cell_vertices_table[cellid]) # cell -> vertex -> cell
-        cell_neighbors = unique(reduce(vcat,cell_neighbors)) # non unique list initially 
-        filter!(x->x!=cellid, cell_neighbors) # get rid of self neighborhood
-        cell_neighbor_table[cellid] = EntityNeighborhood(CellIndex.(cell_neighbors)) 
-
-        for neighbor in cell_neighbors
-            neighbor_local_ids = findall(x->x in cell.nodes, cells[neighbor].nodes)
-            cell_local_ids = findall(x->x in cells[neighbor].nodes, cell.nodes)
-            # vertex neighbor
-            if length(cell_local_ids) == 1
-                _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
-            # face neighbor
-            elseif length(cell_local_ids) == face_npoints(cell)
-                _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor]) 
-            # edge neighbor
-            elseif getdim(cell) > 2 && length(cell_local_ids) == edge_npoints(cell)
-                _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor_local_ids, neighbor, cells[neighbor])
-            end
-        end       
-    end
-
-    face_neighbor = sparse(I_face,J_face,V_face)
-    vertex_neighbor = sparse(I_vertex,J_vertex,V_vertex) 
-    edge_neighbor = sparse(I_edge,J_edge,V_edge)
-
-    vertex_vertex_table = Dict{Int,EntityNeighborhood}()
-    vertex_vertex_global = Dict{Int,Vector{Int}}()
-    # Vertex Connectivity
-    for global_vertexid in keys(vertex_cell_table)
-        #Cellset that contains given vertex 
-        cellset = vertex_cell_table[global_vertexid]
-        vertex_neighbors_local = VertexIndex[]
-        vertex_neighbors_global = Int[]
-        for cell in cellset
-            neighbor_boundary = getdim(cells[cell]) == 2 ? [faces(cells[cell])...] : [edges(cells[cell])...] #get lowest dimension boundary
-            neighbor_connected_faces = neighbor_boundary[findall(x->global_vertexid in x, neighbor_boundary)]
-            neighbor_vertices_global = getindex.(neighbor_connected_faces, findfirst.(x->x!=global_vertexid,neighbor_connected_faces))
-            neighbor_vertices_local= [VertexIndex(cell,local_vertex) for local_vertex in findall(x->x in neighbor_vertices_global, vertices(cells[cell]))]
-            append!(vertex_neighbors_local, neighbor_vertices_local)
-            append!(vertex_neighbors_global, neighbor_vertices_global)
-        end
-        vertex_vertex_table[global_vertexid] =  EntityNeighborhood(vertex_neighbors_local)
-        vertex_vertex_global[global_vertexid] = vertex_neighbors_global
-    end 
-
-    # Face Skeleton
-    face_skeleton_global = Set{NTuple}()
-    face_skeleton_local = Vector{FaceIndex}()
-    fs_length = length(face_skeleton_global)
-    for (cellid,cell) in enumerate(cells)
-        for (local_face_id,face) in enumerate(faces(cell))
-            push!(face_skeleton_global, sortface(face))
-            fs_length_new = length(face_skeleton_global)
-            if fs_length != fs_length_new
-                push!(face_skeleton_local, FaceIndex(cellid,local_face_id)) 
-                fs_length = fs_length_new
-            end
-        end
-    end
-    return ExclusiveTopology(vertex_cell_table,cell_neighbor_table,face_neighbor,vertex_neighbor,edge_neighbor,vertex_vertex_table,face_skeleton_local)
+# RefTriangle (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
+function vertices(c::AbstractCell{RefTriangle})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2], ns[3]) # v1, v2, v3
+end
+function reference_faces(::Type{RefTriangle})
+    return (
+        (1, 2), (2, 3), (3, 1), # f1, f2, f3
+    )
 end
 
-function _vertex_neighbor!(V_vertex, I_vertex, J_vertex, cellid, cell, neighbor, neighborid, neighbor_cell)
-    vertex_neighbor = VertexIndex((neighborid, neighbor[1]))
-    cell_vertex_id = findfirst(x->x==neighbor_cell.nodes[neighbor[1]], cell.nodes)
-    push!(V_vertex,EntityNeighborhood(vertex_neighbor))
-    push!(I_vertex,cellid)
-    push!(J_vertex,cell_vertex_id)
+# RefQuadrilateral (refdim = 2): vertices for vertexdofs, faces for facedofs (edgedofs) and BC
+function vertices(c::AbstractCell{RefQuadrilateral})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
+end
+function reference_faces(::Type{RefQuadrilateral})
+    return (
+        (1, 2), (2, 3), (3, 4), (4, 1), # f1, f2, f3, f4
+    )
 end
 
-function _edge_neighbor!(V_edge, I_edge, J_edge, cellid, cell, neighbor, neighborid, neighbor_cell)
-    neighbor_edge = neighbor_cell.nodes[neighbor]
-    if getdim(neighbor_cell) < 3
-        neighbor_edge_id = findfirst(x->issubset(x,neighbor_edge), faces(neighbor_cell))
-        edge_neighbor = FaceIndex((neighborid, neighbor_edge_id))
-    else
-        neighbor_edge_id = findfirst(x->issubset(x,neighbor_edge), edges(neighbor_cell))
-        edge_neighbor = EdgeIndex((neighborid, neighbor_edge_id))
-    end
-    cell_edge_id = findfirst(x->issubset(x,neighbor_edge),edges(cell))
-    push!(V_edge, EntityNeighborhood(edge_neighbor))
-    push!(I_edge, cellid)
-    push!(J_edge, cell_edge_id)
+# RefTetrahedron (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
+function vertices(c::AbstractCell{RefTetrahedron})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2], ns[3], ns[4]) # v1, v2, v3, v4
+end
+function edges(c::AbstractCell{RefTetrahedron})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[1]), # e1, e2, e3
+        (ns[1], ns[4]), (ns[2], ns[4]), (ns[3], ns[4]), # e4, e5, e6
+    )
+end
+function reference_faces(::Type{RefTetrahedron})
+    return (
+        (1, 3, 2), (1, 2, 4), # f1, f2
+        (2, 3, 4), (1, 4, 3), # f3, f4
+    )
 end
 
-function _face_neighbor!(V_face, I_face, J_face, cellid, cell, neighbor, neighborid, neighbor_cell)
-    neighbor_face = neighbor_cell.nodes[neighbor]
-    if getdim(neighbor_cell) == getdim(cell)
-        neighbor_face_id = findfirst(x->issubset(x,neighbor_face), faces(neighbor_cell))
-        face_neighbor = FaceIndex((neighborid, neighbor_face_id))
-    else
-        neighbor_face_id = findfirst(x->issubset(x,neighbor_face), edges(neighbor_cell))
-        face_neighbor = EdgeIndex((neighborid, neighbor_face_id))
-    end
-    cell_face_id = findfirst(x->issubset(x,neighbor_face),faces(cell))
-    push!(V_face, EntityNeighborhood(face_neighbor))
-    push!(I_face, cellid)
-    push!(J_face, cell_face_id)
+# RefHexahedron (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
+function vertices(c::AbstractCell{RefHexahedron})
+    ns = get_node_ids(c)
+    return (
+        ns[1], ns[2], ns[3], ns[4], ns[5], ns[6], ns[7], ns[8], # v1, ..., v8
+    )
+end
+function edges(c::AbstractCell{RefHexahedron})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2]), (ns[2], ns[3]), (ns[3], ns[4]), (ns[4], ns[1]), # e1, e2, e3, e4
+        (ns[5], ns[6]), (ns[6], ns[7]), (ns[7], ns[8]), (ns[8], ns[5]), # e5, e6, e7, e8
+        (ns[1], ns[5]), (ns[2], ns[6]), (ns[3], ns[7]), (ns[4], ns[8]), # e9, e10, e11, e12
+    )
+end
+function reference_faces(::Type{RefHexahedron})
+    return (
+        (1, 4, 3, 2), (1, 2, 6, 5), # f1, f2
+        (2, 3, 7, 6), (3, 4, 8, 7), # f3, f4
+        (1, 5, 8, 4), (5, 6, 7, 8), # f5, f6
+    )
 end
 
-getcells(neighbor::EntityNeighborhood{T}) where T <: BoundaryIndex = first.(neighbor.neighbor_info)
-getcells(neighbor::EntityNeighborhood{CellIndex}) = getproperty.(neighbor.neighbor_info, :idx)
-getcells(neighbors::Vector{T}) where T <: EntityNeighborhood = reduce(vcat, getcells.(neighbors))
-getcells(neighbors::Vector{T}) where T <: BoundaryIndex = getindex.(neighbors,1)
+# RefPrism (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
+function vertices(c::AbstractCell{RefPrism})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2], ns[3], ns[4], ns[5], ns[6]) # v1, ..., v6
+end
+function edges(c::AbstractCell{RefPrism})
+    ns = get_node_ids(c)
+    return (
+        (ns[2], ns[1]), (ns[1], ns[3]), (ns[1], ns[4]), (ns[3], ns[2]), # e1, e2, e3, e4
+        (ns[2], ns[5]), (ns[3], ns[6]), (ns[4], ns[5]), (ns[4], ns[6]), # e5, e6, e7, e8
+        (ns[6], ns[5]),                                                 # e9
+    )
+end
+function reference_faces(::Type{RefPrism})
+    return (
+        (1, 3, 2),    (1, 2, 5, 4), # f1, f2
+        (3, 1, 4, 6), (2, 3, 6, 5), # f3, f4
+        (4, 5, 6),                  # f5
+    )
+end
 
+# RefPyramid (refdim = 3): vertices for vertexdofs, edges for edgedofs, faces for facedofs and BC
+function vertices(c::AbstractCell{RefPyramid})
+    ns = get_node_ids(c)
+    return (ns[1], ns[2], ns[3], ns[4], ns[5],) # v1, ..., v5
+end
+function edges(c::AbstractCell{RefPyramid})
+    ns = get_node_ids(c)
+    return (
+        (ns[1], ns[2]), (ns[1], ns[3]), (ns[1], ns[5]), (ns[2], ns[4]), 
+        (ns[2], ns[5]), (ns[4], ns[3]), (ns[3], ns[5]), (ns[4], ns[5]), 
+    )
+end
+function reference_faces(::Type{RefPyramid})
+    return (
+        (1, 3, 4, 2), (1, 2, 5), # f1, f2
+        (1, 5, 3), (2, 4, 5),    # f3, f4
+        (3, 5, 4),               # f5
+    )
+end
+
+######################################################
+# Concrete implementations of AbstractCell interface #
+######################################################
+
+# Lagrange interpolation based cells
+struct Line                   <: AbstractCell{RefLine}          nodes::NTuple{ 2, Int} end
+struct QuadraticLine          <: AbstractCell{RefLine}          nodes::NTuple{ 3, Int} end
+struct Triangle               <: AbstractCell{RefTriangle}      nodes::NTuple{ 3, Int} end
+struct QuadraticTriangle      <: AbstractCell{RefTriangle}      nodes::NTuple{ 6, Int} end
+struct Quadrilateral          <: AbstractCell{RefQuadrilateral} nodes::NTuple{ 4, Int} end
+struct QuadraticQuadrilateral <: AbstractCell{RefQuadrilateral} nodes::NTuple{ 9, Int} end
+struct Tetrahedron            <: AbstractCell{RefTetrahedron}   nodes::NTuple{ 4, Int} end
+struct QuadraticTetrahedron   <: AbstractCell{RefTetrahedron}   nodes::NTuple{10, Int} end
+struct Hexahedron             <: AbstractCell{RefHexahedron}    nodes::NTuple{ 8, Int} end
+struct QuadraticHexahedron    <: AbstractCell{RefHexahedron}    nodes::NTuple{27, Int} end
+struct Wedge                  <: AbstractCell{RefPrism}         nodes::NTuple{ 6, Int} end
+struct Pyramid                <: AbstractCell{RefPyramid}       nodes::NTuple{ 5, Int} end
+
+default_interpolation(::Type{Line})                   = Lagrange{RefLine,          1}()
+default_interpolation(::Type{QuadraticLine})          = Lagrange{RefLine,          2}()
+default_interpolation(::Type{Triangle})               = Lagrange{RefTriangle,      1}()
+default_interpolation(::Type{QuadraticTriangle})      = Lagrange{RefTriangle,      2}()
+default_interpolation(::Type{Quadrilateral})          = Lagrange{RefQuadrilateral, 1}()
+default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{RefQuadrilateral, 2}()
+default_interpolation(::Type{Tetrahedron})            = Lagrange{RefTetrahedron,   1}()
+default_interpolation(::Type{QuadraticTetrahedron})   = Lagrange{RefTetrahedron,   2}()
+default_interpolation(::Type{Hexahedron})             = Lagrange{RefHexahedron,    1}()
+default_interpolation(::Type{QuadraticHexahedron})    = Lagrange{RefHexahedron,    2}()
+default_interpolation(::Type{Wedge})                  = Lagrange{RefPrism,         1}()
+default_interpolation(::Type{Pyramid})                = Lagrange{RefPyramid,       1}()
+
+# TODO: Remove this, used for Quadrilateral3D
+edges(c::Quadrilateral#=3D=#) = faces(c)
+
+# Serendipity interpolation based cells
+struct SerendipityQuadraticQuadrilateral <: AbstractCell{RefQuadrilateral} nodes::NTuple{ 8, Int} end
+struct SerendipityQuadraticHexahedron    <: AbstractCell{RefHexahedron}    nodes::NTuple{20, Int} end
+
+default_interpolation(::Type{SerendipityQuadraticQuadrilateral}) = Serendipity{RefQuadrilateral, 2}()
+default_interpolation(::Type{SerendipityQuadraticHexahedron})    = Serendipity{RefHexahedron,    2}()
+
+"""
+    nvertices_on_face(cell::AbstractCell, local_face_index::Int)
+Specifies for each subtype of AbstractCell how many nodes form a face.
+"""
+nvertices_on_face(cell::AbstractCell, local_face_index::Int) = length(faces(cell)[local_face_index])
+"""
+    nvertices_on_edge(::AbstractCell, local_edge_index::Int)
+Specifies for each subtype of AbstractCell how many nodes form an edge.
+"""
+nvertices_on_edge(cell::AbstractCell, local_edge_index::Int) = length(edges(cell)[local_edge_index])
+
+getdim(::Union{AbstractCell{refshape},Type{<:AbstractCell{refshape}}}) where {refdim, refshape <: AbstractRefShape{refdim}} = refdim
+
+
+######################
+### Mesh interface ###
+######################
 abstract type AbstractGrid{dim} end
-
-ExclusiveTopology(grid::AbstractGrid) = ExclusiveTopology(getcells(grid))
 
 """
     Grid{dim, C<:AbstractCell, T<:Real} <: AbstractGrid}
 
 A `Grid` is a collection of `Cells` and `Node`s which covers the computational domain, together with Sets of cells, nodes and faces.
 There are multiple helper structures to apply boundary conditions or define subdomains. They are gathered in the `cellsets`, `nodesets`,
-`facesets`, `edgesets` and `vertexsets`. 
+`facesets`, `edgesets` and `vertexsets`.
 
 # Fields
 - `cells::Vector{C}`: stores all cells of the grid
@@ -309,7 +308,7 @@ There are multiple helper structures to apply boundary conditions or define subd
 - `cellsets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of cell ids
 - `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
 - `facesets::Dict{String,Set{FaceIndex}}`: maps a `String` to a `Set` of `Set{FaceIndex} (global_cell_id, local_face_id)`
-- `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id` 
+- `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id`
 - `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
 - `boundary_matrix::SparseMatrixCSC{Bool,Int}`: optional, only needed by `onboundary` to check if a cell is on the boundary, see, e.g. Helmholtz example
 """
@@ -319,9 +318,9 @@ mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     # Sets
     cellsets::Dict{String,Set{Int}}
     nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{FaceIndex}} 
-    edgesets::Dict{String,Set{EdgeIndex}} 
-    vertexsets::Dict{String,Set{VertexIndex}} 
+    facesets::Dict{String,Set{FaceIndex}}
+    edgesets::Dict{String,Set{EdgeIndex}}
+    vertexsets::Dict{String,Set{VertexIndex}}
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool,Int}
 end
@@ -341,68 +340,24 @@ end
 # Grid utility functions #
 ##########################
 """
-    getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, cellidx::CellIndex, include_self=false)
-    getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, faceidx::FaceIndex, include_self=false)
-    getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, vertexidx::VertexIndex, include_self=false)
-    getneighborhood(top::ExclusiveTopology, grid::Grid{dim,C,T}, edgeidx::EdgeIndex, include_self=false)
+    get_coordinate_type(::AbstractGrid)
 
-Returns all directly connected entities of the same type, i.e. calling the function with a `VertexIndex` will return
-a list of directly connected vertices (connected via face/edge). If `include_self` is true, the given `*Index` is included 
-in the returned list.
-
-!!! warning
-    This feature is highly experimental and very likely subjected to interface changes in the future.
+Get the datatype for a single point in the grid.
 """
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, cellidx::CellIndex, include_self=false)
-    patch = getcells(top.cell_neighbor[cellidx.idx])
-    if include_self
-        return [patch; cellidx.idx]
-    else 
-        return patch
-    end
-end
-
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, faceidx::FaceIndex, include_self=false)
-    if include_self 
-        return [top.face_neighbor[faceidx[1],faceidx[2]].neighbor_info; faceidx]
-    else
-        return top.face_neighbor[faceidx[1],faceidx[2]].neighbor_info
-    end
-end
-
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::VertexIndex, include_self=false)
-    cellid, local_vertexid = vertexidx[1], vertexidx[2]
-    cell_vertices = vertices(getcells(grid,cellid))
-    global_vertexid = cell_vertices[local_vertexid]
-    if include_self
-        return [top.vertex_vertex_neighbor[global_vertexid].neighbor_info; vertexidx]
-    else
-        return top.vertex_vertex_neighbor[global_vertexid].neighbor_info
-    end
-end
-
-function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx::EdgeIndex, include_self=false)
-    if include_self 
-        return [top.edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info; edgeidx]
-    else
-        return top.edge_neighbor[edgeidx[1],edgeidx[2]].neighbor_info
-    end
-end
+get_coordinate_type(::Grid{dim,C,T}) where {dim,C,T} = Vec{dim,T} # Node is baked into the mesh type.
 
 """
-    faceskeleton(grid) -> Vector{FaceIndex}
-Returns an iterateable face skeleton. The skeleton consists of `FaceIndex` that can be used to `reinit` 
-`FaceValues`.
+    toglobal(grid::AbstractGrid, vertexidx::VertexIndex) -> Int
+    toglobal(grid::AbstractGrid, vertexidx::Vector{VertexIndex}) -> Vector{Int}
+This function takes the local vertex representation (a `VertexIndex`) and looks up the unique global id (an `Int`).
 """
-faceskeleton(top::ExclusiveTopology, grid::AbstractGrid) =  top.face_skeleton
-
-toglobal(grid::Grid,vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1]))[vertexidx[2]]
-toglobal(grid::Grid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))
+toglobal(grid::AbstractGrid,vertexidx::VertexIndex) = vertices(getcells(grid,vertexidx[1]))[vertexidx[2]]
+toglobal(grid::AbstractGrid,vertexidx::Vector{VertexIndex}) = unique(toglobal.((grid,),vertexidx))
 
 @inline getdim(::AbstractGrid{dim}) where {dim} = dim
 """
-    getcells(grid::AbstractGrid) 
-    getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}} 
+    getcells(grid::AbstractGrid)
+    getcells(grid::AbstractGrid, v::Union{Int,Vector{Int}}
     getcells(grid::AbstractGrid, setname::String)
 
 Returns either all `cells::Collection{C<:AbstractCell}` of a `<:AbstractGrid` or a subset based on an `Int`, `Vector{Int}` or `String`.
@@ -418,7 +373,7 @@ Whereas the last option tries to call a `cellset` of the `grid`. `Collection` ca
 @inline getcelltype(grid::AbstractGrid, i::Int) = typeof(grid.cells[i])
 
 """
-    getnodes(grid::AbstractGrid) 
+    getnodes(grid::AbstractGrid)
     getnodes(grid::AbstractGrid, v::Union{Int,Vector{Int}}
     getnodes(grid::AbstractGrid, setname::String)
 
@@ -433,6 +388,7 @@ to a Node.
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
 "Returns the number of nodes of the `i`-th cell."
 @inline nnodes_per_cell(grid::AbstractGrid, i::Int=1) = nnodes(grid.cells[i])
+
 "Return the number type of the nodal coordinates."
 @inline get_coordinate_eltype(grid::AbstractGrid) = get_coordinate_eltype(first(getnodes(grid)))
 
@@ -501,53 +457,17 @@ Returns all vertex sets of the grid.
 """
 @inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
 
-n_faces_per_cell(grid::Grid) = nfaces(eltype(grid.cells))
-
-"""
-    function compute_vertex_values(grid::AbstractGrid, f::Function)
-    function compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function)    
-    function compute_vertex_values(grid::AbstractGrid, set::String, f::Function)
-
-Given a `grid` and some function `f`, `compute_vertex_values` computes all nodal values,
- i.e. values at the nodes,  of the function `f`. 
-The function implements two dispatches, where only a subset of the grid's node is used.
-
-```julia
-    compute_vertex_values(grid, x -> sin(x[1]) + cos([2]))
-    compute_vertex_values(grid, [9, 6, 3], x -> sin(x[1]) + cos([2])) #compute function values at nodes with id 9,6,3
-    compute_vertex_values(grid, "right", x -> sin(x[1]) + cos([2])) #compute function values at nodes belonging to nodeset right
-```
-
-"""
-@inline function compute_vertex_values(nodes::Vector{Node{dim,T}}, f::Function) where{dim,T}
-    map(n -> f(getcoordinates(n)), nodes)
-end
-
-@inline function compute_vertex_values(grid::AbstractGrid, f::Function)
-    compute_vertex_values(getnodes(grid), f::Function)
-end
-
-@inline function compute_vertex_values(grid::AbstractGrid, v::Vector{Int}, f::Function)
-    compute_vertex_values(getnodes(grid, v), f::Function)
-end
-
-@inline function compute_vertex_values(grid::AbstractGrid, set::String, f::Function)
-    compute_vertex_values(getnodes(grid, set), f::Function)
-end
+n_faces_per_cell(grid::Grid) = nfaces(getcelltype(grid))
 
 # Transformations
 """
-    transform!(grid::Abstractgrid, f::Function)
+    transform_coordinates!(grid::Abstractgrid, f::Function)
 
 Transform all nodes of the `grid` based on some transformation function `f`.
 """
-function transform!(g::AbstractGrid, f::Function)
-    c = similar(g.nodes)
-    for i in 1:length(c)
-        c[i] = Node(f(g.nodes[i].x))
-    end
-    copyto!(g.nodes, c)
-    g
+function transform_coordinates!(g::Grid, f::Function)
+    replace!(n -> Node(f(get_node_coordinate(n))), g.nodes)
+    return g
 end
 
 # Sets
@@ -561,7 +481,7 @@ _warn_emptyset(set, name) = length(set) == 0 && @warn("no entities added to the 
 
 Adds a cellset to the grid with key `name`.
 Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
-The `MixedDofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
+The `DofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
 `all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` in the cell if the cell
 should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 
@@ -606,15 +526,15 @@ Facesets are used to initialize `Dirichlet` structs, that are needed to specify 
 should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
 
 ```julia
-addfaceset!(gird, "right", Set(((2,2),(4,2))) #see grid manual example for reference
+addfaceset!(grid, "right", Set(((2,2),(4,2))) #see grid manual example for reference
 addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
 ```
 """
-addfaceset!(grid::Grid, name::String, set::Union{Set{FaceIndex},Vector{FaceIndex}}) = 
+addfaceset!(grid::AbstractGrid, name::String, set::Union{Set{FaceIndex},Vector{FaceIndex}}) = 
     _addset!(grid, name, set, grid.facesets)
-addedgeset!(grid::Grid, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) = 
+addedgeset!(grid::AbstractGrid, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) = 
     _addset!(grid, name, set, grid.edgesets)
-addvertexset!(grid::Grid, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) = 
+addvertexset!(grid::AbstractGrid, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) = 
     _addset!(grid, name, set, grid.vertexsets)
 function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
     _check_setname(dict, name)
@@ -648,6 +568,93 @@ function _addset!(grid::AbstractGrid, name::String, f::Function, _ftype::Functio
     grid
 end
 
+
+"""
+    getfaceedges(grid::AbstractGrid, face::FaceIndex)
+    getfaceedges(cell::AbstractCell, face::FaceIndex)
+
+Returns the edges represented as `Set{EdgeIndex}` in a given face represented as
+`FaceIndex`.
+
+```julia-repl
+julia> using Ferrite; using Ferrite: getfaceedges
+
+julia> grid = generate_grid(Tetrahedron, (2,1,1));
+
+julia> getfaceedges(grid, FaceIndex(4,2))
+Set{EdgeIndex} with 3 elements:
+  EdgeIndex((4, 4))
+  EdgeIndex((4, 5))
+  EdgeIndex((4, 1))
+```
+"""
+function getfaceedges end
+
+"""
+    getfacevertices(grid::AbstractGrid, face::FaceIndex)
+    getfacevertices(cell::AbstractCell, face::FaceIndex)
+
+Returns the vertices represented as `Set{VertexIndex}` in a given face represented as
+`FaceIndex`.
+
+```julia-repl
+julia> using Ferrite; using Ferrite: getfacevertices
+
+julia> grid = generate_grid(Tetrahedron, (2,1,1));
+
+julia> getfacevertices(grid, FaceIndex(4,2))
+Set{VertexIndex} with 3 elements:
+  VertexIndex((4, 2))
+  VertexIndex((4, 4))
+  VertexIndex((4, 1))
+```
+"""
+function getfacevertices end
+
+"""
+    getedgevertices(grid::AbstractGrid, edge::EdgeIndex)
+    getedgevertices(cell::AbstractCell, edge::EdgeIndex)
+
+Returns the vertices represented as `Set{VertexIndex}` in a given edge represented as
+`EdgeIndex`.
+
+```julia-repl
+julia> using Ferrite; using Ferrite: getedgevertices
+
+julia> grid = generate_grid(Tetrahedron, (2,1,1));
+
+julia> getedgevertices(grid, EdgeIndex(4,2))
+Set{EdgeIndex} with 2 elements:
+  VertexIndex((4, 2))
+  VertexIndex((4, 3))
+```
+"""
+function getedgevertices end
+
+for (func,             entity_f, subentity_f, entity_t,   subentity_t) in (
+    (:getfaceedges,    :faces,   :edges,      :FaceIndex, :EdgeIndex),
+    (:getfacevertices, :faces,   :vertices,   :FaceIndex, :VertexIndex),
+    (:getedgevertices, :edges,   :vertices,   :EdgeIndex, :VertexIndex),
+)
+    @eval begin
+        function $(func)(grid::AbstractGrid, entity_idx::$(entity_t))
+            cell = getcells(grid)[entity_idx[1]]
+            return $(func)(cell, entity_idx)
+        end
+        function $(func)(cell::AbstractCell, entity_idx::$(entity_t))
+            _set = Set{$(subentity_t)}()
+            subentities = $(subentity_f)(cell)
+            entity = $(entity_f)(cell)[entity_idx[2]]
+            for (subentity_idx, subentity) in pairs(subentities)
+                if all(x -> x in entity, subentity)
+                    push!(_set, $(subentity_t)((entity_idx[1], subentity_idx)))
+                end
+            end
+            return _set
+        end
+    end
+end
+
 """
     addnodeset!(grid::AbstractGrid, name::String, nodeid::Union{Vector{Int},Set{Int}})
     addnodeset!(grid::AbstractGrid, name::String, f::Function)    
@@ -674,86 +681,75 @@ function addnodeset!(grid::AbstractGrid, name::String, f::Function)
 end
 
 """
-    getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::Int)
-    getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::AbstractCell)
-
-Fills the vector `x` with the coordinates of a cell defined by either its cellid or the cell object itself.
+    getcoordinates(grid::AbstractGrid, idx::Union{Int,CellIndex})
+    getcoordinates(cache::CellCache)
+    
+Get a vector with the coordinates of the cell corresponding to `idx` or `cache`
 """
+@inline function getcoordinates(grid::AbstractGrid, idx::Int)
+    CT = get_coordinate_type(grid)
+    cell = getcells(grid, idx)
+    N = nnodes(cell)
+    x = Vector{CT}(undef, N)
+    getcoordinates!(x, grid, cell)
+end
+@inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
 
+"""
+    getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, idx::Union{Int,CellIndex})
+    getcoordinates!(x::Vector{<:Vec}, grid::AbstractGrid, cell::AbstractCell)
+    
+Mutate `x` to the coordinates of the cell corresponding to `idx` or `cell`.
+"""
+@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim,T}
+    node_ids = get_node_ids(cell)
+    @inbounds for i in 1:length(x)
+        x[i] = get_node_coordinate(grid, node_ids[i])
+    end
+    return x
+end
 @inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cellid::Int) where {dim,T} 
     cell = getcells(grid, cellid)
     getcoordinates!(x, grid, cell)
 end
-
-@inline function getcoordinates!(x::Vector{Vec{dim,T}}, grid::Ferrite.AbstractGrid, cell::Ferrite.AbstractCell) where {dim,T}
-    @inbounds for i in 1:length(x)
-        x[i] = getcoordinates(getnodes(grid, cell.nodes[i]))
-    end
-    return x
-end
-
 @inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, cell::CellIndex) where {dim, T} = getcoordinates!(x, grid, cell.idx)
-@inline getcoordinates!(x::Vector{Vec{dim,T}}, grid::AbstractGrid, face::FaceIndex) where {dim, T} = getcoordinates!(x, grid, face.idx[1])
-
-# TODO: Deprecate one of `cellcoords!` and `getcoordinates!`, as they do the same thing
-cellcoords!(global_coords::Vector{Vec{dim,T}}, grid::AbstractGrid{dim}, i::Int) where {dim,T} = getcoordinates!(global_coords, grid, i) 
 
 """
-    getcoordinates(grid::AbstractGrid, cell)
-Return a vector with the coordinates of the vertices of cell number `cell`.
+    get_node_coordinate(grid::AbstractGrid, n::Int)
+    
+Return the coordinate of the `n`th node in `grid`
 """
-@inline function getcoordinates(grid::AbstractGrid, cell::Int)
-    dim = getdim(grid)
-    T = get_coordinate_eltype(grid)
-    _cell = getcells(grid, cell)
-    N = nnodes(_cell)
-    x = Vector{Vec{dim, T}}(undef, N)
-    getcoordinates!(x, grid, _cell)
+get_node_coordinate(grid, n) = get_node_coordinate(getnodes(grid, n))
+
+function cellnodes!(global_nodes::Vector{Int}, grid::AbstractGrid, i::Int)
+    cell = getcells(grid, i)
+    _cellnodes!(global_nodes, cell)
 end
-@inline getcoordinates(grid::AbstractGrid, cell::CellIndex) = getcoordinates(grid, cell.idx)
-@inline getcoordinates(grid::AbstractGrid, face::FaceIndex) = getcoordinates(grid, face.idx[1])
+function _cellnodes!(global_nodes::Vector{Int}, cell::AbstractCell)
+    @assert length(global_nodes) == nnodes(cell)
+    @inbounds for i in 1:length(global_nodes)
+        global_nodes[i] = cell.nodes[i]
+    end
+    return global_nodes
+end
 
 function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) ")
-    typestrs = sort!(collect(Set(repr(typeof(x)) for x in grid.cells)))
+    if isconcretetype(eltype(grid.cells))
+        typestrs = [repr(eltype(grid.cells))]
+    else
+        typestrs = sort!(repr.(Set(typeof(x) for x in grid.cells)))
+    end
     join(io, typestrs, '/')
     print(io, " cells and $(getnnodes(grid)) nodes")
 end
 
-# Functions to uniquely identify vertices, edges and faces, used when distributing
-# dofs over a mesh. For this we can ignore the nodes on edged, faces and inside cells,
-# we only need to use the nodes that are vertices.
-# 1D: vertices
-faces(c::Union{Line,QuadraticLine}) = (c.nodes[1], c.nodes[2])
-vertices(c::Union{Line,Line2D,Line3D,QuadraticLine}) = (c.nodes[1], c.nodes[2])
-# 2D: vertices, faces
-faces(c::Line2D) = ((c.nodes[1],c.nodes[2]),)
-vertices(c::Union{Triangle,QuadraticTriangle}) = (c.nodes[1], c.nodes[2], c.nodes[3])
-faces(c::Union{Triangle,QuadraticTriangle}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]))
-vertices(c::Union{Quadrilateral,Quadrilateral3D,QuadraticQuadrilateral}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
-faces(c::Union{Quadrilateral,QuadraticQuadrilateral}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
-# 3D: vertices, edges, faces
-edges(c::Line3D) = ((c.nodes[1],c.nodes[2]),)
-vertices(c::Union{Tetrahedron,QuadraticTetrahedron}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4])
-edges(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[1]), (c.nodes[1],c.nodes[4]), (c.nodes[2],c.nodes[4]), (c.nodes[3],c.nodes[4]))
-faces(c::Union{Tetrahedron,QuadraticTetrahedron}) = ((c.nodes[1],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[4]), (c.nodes[2],c.nodes[3],c.nodes[4]), (c.nodes[1],c.nodes[4],c.nodes[3]))
-vertices(c::Union{Hexahedron,Cell{3,20,6}}) = (c.nodes[1], c.nodes[2], c.nodes[3], c.nodes[4], c.nodes[5], c.nodes[6], c.nodes[7], c.nodes[8])
-edges(c::Union{Hexahedron,Cell{3,20,6}}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]), (c.nodes[5],c.nodes[6]), (c.nodes[6],c.nodes[7]), (c.nodes[7],c.nodes[8]), (c.nodes[8],c.nodes[5]), (c.nodes[1],c.nodes[5]), (c.nodes[2],c.nodes[6]), (c.nodes[3],c.nodes[7]), (c.nodes[4],c.nodes[8]))
-faces(c::Union{Hexahedron,Cell{3,20,6}}) = ((c.nodes[1],c.nodes[4],c.nodes[3],c.nodes[2]), (c.nodes[1],c.nodes[2],c.nodes[6],c.nodes[5]), (c.nodes[2],c.nodes[3],c.nodes[7],c.nodes[6]), (c.nodes[3],c.nodes[4],c.nodes[8],c.nodes[7]), (c.nodes[1],c.nodes[5],c.nodes[8],c.nodes[4]), (c.nodes[5],c.nodes[6],c.nodes[7],c.nodes[8]))
-edges(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2]), (c.nodes[2],c.nodes[3]), (c.nodes[3],c.nodes[4]), (c.nodes[4],c.nodes[1]))
-faces(c::Union{Quadrilateral3D}) = ((c.nodes[1],c.nodes[2],c.nodes[3],c.nodes[4]),)
+"""
+    boundaryfunction(::Type{<:BoundaryIndex})
 
-# random stuff
-default_interpolation(::Union{Type{Line},Type{Line2D},Type{Line3D}}) = Lagrange{1,RefCube,1}()
-default_interpolation(::Type{QuadraticLine}) = Lagrange{1,RefCube,2}()
-default_interpolation(::Type{Triangle}) = Lagrange{2,RefTetrahedron,1}()
-default_interpolation(::Type{QuadraticTriangle}) = Lagrange{2,RefTetrahedron,2}()
-default_interpolation(::Union{Type{Quadrilateral},Type{Quadrilateral3D}}) = Lagrange{2,RefCube,1}()
-default_interpolation(::Type{QuadraticQuadrilateral}) = Lagrange{2,RefCube,2}()
-default_interpolation(::Type{Tetrahedron}) = Lagrange{3,RefTetrahedron,1}()
-default_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{3,RefTetrahedron,2}()
-default_interpolation(::Type{Hexahedron}) = Lagrange{3,RefCube,1}()
-default_interpolation(::Type{Cell{3,20,6}}) = Serendipity{3,RefCube,2}()
+Helper function to dispatch on the correct entity from a given boundary index.
+"""
+boundaryfunction(::Type{<:BoundaryIndex})
 
 boundaryfunction(::Type{FaceIndex}) = Ferrite.faces
 boundaryfunction(::Type{EdgeIndex}) = Ferrite.edges
@@ -769,7 +765,64 @@ for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
         #To be able to do a,b = faceidx
         Base.iterate(I::($INDEX), state::Int=1) = (state==3) ?  nothing : (I[state], state+1)
 
-        #For (cellid, faceidx) in faceset
-        Base.in(v::Tuple{Int, Int}, s::Set{$INDEX}) = in($INDEX(v), s)
+        # Necessary to check if, e.g. `(cellid, faceidx) in faceset`
+        Base.isequal(x::$INDEX, y::$INDEX) = x.idx == y.idx
+        Base.isequal(x::Tuple{Int, Int}, y::$INDEX) = x[1] == y.idx[1] && x[2] == y.idx[2]
+        Base.isequal(y::$INDEX, x::Tuple{Int, Int}) = x[1] == y.idx[1] && x[2] == y.idx[2]
+        Base.hash(x::$INDEX, h::UInt) = hash(x.idx, h)
     end
+end
+
+#################################
+#### Orientation of Entities ####
+#################################
+# @TODO merge this code with into the logic in `ConstraintHandler`.
+
+"""
+    PathOrientationInfo
+
+Orientation information for 1D entities.
+
+The orientation for 1D entities is defined by the indices of the grid nodes
+associated to the vertices. To give an example, the oriented path
+```
+1 ---> 2
+```
+is called *regular*, indicated by `regular=true`, while the oriented path
+```
+2 ---> 1
+```
+is called *inverted*, indicated by `regular=false`.
+"""
+struct PathOrientationInfo
+    regular::Bool # Indicator whether the orientation is regular or inverted.
+end
+
+"""
+    SurfaceOrientationInfo
+
+Orientation information for 2D entities. Such an entity can be 
+possibly flipped (i.e. the defining vertex order is reverse to the 
+spanning vertex order) and the vertices can be rotated against each other.
+Take for example the faces
+```
+1---2 2---3
+| A | | B |
+4---3 1---4
+```
+which are rotated against each other by 90° (shift index is 1) or the faces
+```
+1---2 2---1
+| A | | B |
+4---3 3---4
+```
+which are flipped against each other. Any combination of these can happen. 
+The combination to map this local face to the defining face is encoded with
+this data structure via ``rotate \\circ flip`` where the rotation is indiced by
+the shift index.
+    !!!NOTE TODO implement me.
+"""
+struct SurfaceOrientationInfo
+    #flipped::Bool
+    #shift_index::Int
 end

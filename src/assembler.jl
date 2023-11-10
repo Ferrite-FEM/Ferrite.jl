@@ -19,11 +19,11 @@ end
     start_assemble([N=0]) -> Assembler
 
 Create an `Assembler` object which can be used to assemble element contributions to the
-global sparse matrix. Use [`assemble!`](@ref) for each element, and [`end_assemble`](@ref),
+global sparse matrix. Use [`assemble!`](@ref) for each element, and [`finish_assemble`](@ref),
 to finalize the assembly and return the sparse matrix.
 
 Note that giving a sparse matrix as input can be more efficient. See below and 
-as described in the [manual](@ref assembly_in_manual).
+as described in the [manual](@ref man-assembly).
 
 !!! note
     When the same matrix pattern is used multiple times (for e.g. multiple time steps or
@@ -65,12 +65,12 @@ function assemble!(a::Ferrite.Assembler{T}, rowdofs::AbstractVector{Int}, coldof
 end
 
 """
-    end_assemble(a::Assembler) -> K
+    finish_assemble(a::Assembler) -> K
 
 Finalizes an assembly. Returns a sparse matrix with the
 assembled values. Note that this step is not necessary for `AbstractSparseAssembler`s.
 """
-function end_assemble(a::Assembler)
+function finish_assemble(a::Assembler)
     return sparse(a.I, a.J, a.V)
 end
 
@@ -81,8 +81,9 @@ Assembles the element residual `ge` into the global residual vector `g`.
 """
 @propagate_inbounds function assemble!(g::AbstractVector{T}, dofs::AbstractVector{Int}, ge::AbstractVector{T}) where {T}
     @boundscheck checkbounds(g, dofs)
-    @inbounds for i in 1:length(dofs)
-        addindex!(g, ge[i], dofs[i])
+    @boundscheck checkbounds(ge, keys(dofs))
+    @inbounds for (i, dof) in pairs(dofs)
+        addindex!(g, ge[i], dof)
     end
 end
 
@@ -109,6 +110,15 @@ struct AssemblerSymmetricSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
     sorteddofs::Vector{Int}
 end
 
+function Base.show(io::IO, ::MIME"text/plain", a::Union{AssemblerSparsityPattern,AssemblerSymmetricSparsityPattern})
+    print(io, typeof(a), " for assembling into:\n - ")
+    summary(io, a.K)
+    if !isempty(a.f)
+        print(io, "\n - ")
+        summary(io, a.f)
+    end
+end
+
 matrix_handle(a::AssemblerSparsityPattern) = a.K
 matrix_handle(a::AssemblerSymmetricSparsityPattern) = a.K.data
 vector_handle(a::Union{AssemblerSparsityPattern, AssemblerSymmetricSparsityPattern}) = a.f
@@ -133,7 +143,6 @@ out, but instead keep their current values.
 """
 start_assemble(K::Union{SparseMatrixCSC, Symmetric{<:Any,SparseMatrixCSC}}, f::Vector; fillzero::Bool)
 
-start_assemble(f::Vector, K::Union{SparseMatrixCSC, Symmetric}; fillzero::Bool=true) = start_assemble(K, f; fillzero=fillzero)
 function start_assemble(K::SparseMatrixCSC{T}, f::Vector=T[]; fillzero::Bool=true) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
     return AssemblerSparsityPattern(K, f, Int[], Int[])
@@ -170,10 +179,9 @@ end
 
 @propagate_inbounds function _assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
     ld = length(dofs)
-    @assert size(Ke, 1) == ld
-    @assert size(Ke, 2) == ld
+    @boundscheck checkbounds(Ke, keys(dofs), keys(dofs))
     if length(fe) != 0
-        @assert length(fe) == ld
+        @boundscheck checkbounds(fe, keys(dofs))
         @boundscheck checkbounds(A.f, dofs)
         @inbounds assemble!(A.f, dofs, fe)
     end
