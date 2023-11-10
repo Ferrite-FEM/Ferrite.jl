@@ -275,6 +275,11 @@ function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVecto
     return vec
 end
 
+function shape_gradients_and_values!(values::AbstractMatrix, ip, qr::QuadratureRule)
+    for (qp, ξ) in pairs(getpoints(qr))
+        shape_values!(@view(values[:, qp]), ip, ξ)
+    end
+end
 
 function shape_gradients_and_values!(gradients::AbstractMatrix, values::AbstractMatrix, ip, qr::QuadratureRule)
     for (qp, ξ) in pairs(getpoints(qr))

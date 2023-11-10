@@ -8,73 +8,99 @@ used when mapping the `FunctionValues` to the current cell during `reinit!`.
 """
 MappingValues
 
-struct MappingValues{JT, HT<:Union{Nothing,AbstractTensor{3}}}
+struct MappingValues{JT, HT}
     J::JT # dx/dξ # Jacobian
     H::HT # dJ/dξ # Hessian
 end
-@inline getjacobian(mv::MappingValues) = mv.J 
+@inline getjacobian(mv::MappingValues{<:Union{AbstractTensor, SMatrix}}) = mv.J 
 @inline gethessian(mv::MappingValues{<:Any,<:AbstractTensor}) = mv.H
 
-# This will be needed for optimizing away the hessian calculation/updates
-# for cases when this is known to be zero (due to the geometric interpolation)
-#@inline gethessian(::MappingValues{JT,Nothing}) where JT = _make_hessian(JT)
-#@inline _make_hessian(::Type{Tensor{2,dim,T}}) where {dim,T} = zero(Tensor{3,dim,T})
-
-struct RequiresHessian{B} end
-RequiresHessian(B::Bool) = RequiresHessian{B}()
-function RequiresHessian(ip_fun::Interpolation, ip_geo::Interpolation)
-    # Leave ip_geo as input, because for later the hessian can also be avoided 
-    # for fully linear geometric elements (e.g. triangle and tetrahedron)
-    # This optimization is left out for now. 
-    RequiresHessian(requires_hessian(get_mapping_type(ip_fun)))
-end
-
 """
-    GeometryMapping(::Type{T}, ip_geo, qr::QuadratureRule, ::RequiresHessian{B})
+    GeometryMapping{DiffOrder}(::Type{T}, ip_geo, qr::QuadratureRule)
 
-Create a `GeometryMapping` object which contains the geometric shape, gradients, and, 
-if `B==true`, the hessian values. `T<:AbstractFloat` gives the numeric type of the values.
+Create a `GeometryMapping` object which contains the geometric 
+
+* shape values
+* gradient values (if DiffOrder ≥ 1)
+* hessians values (if DiffOrder ≥ 2)
+
+`T<:AbstractFloat` gives the numeric type of the values.
 """
 GeometryMapping
 
-struct GeometryMapping{IP, M_t, dMdξ_t, d2Mdξ2_t}
+struct GeometryMapping{DiffOrder, IP, M_t, dMdξ_t, d2Mdξ2_t}
     ip::IP             # ::Interpolation                Geometric interpolation 
-    M::M_t             # ::AbstractVector{<:Number}     Values of geometric shape functions
-    dMdξ::dMdξ_t       # ::AbstractVector{<:Vec}        Gradients of geometric shape functions in ref-domain
-    d2Mdξ2::d2Mdξ2_t   # ::AbstractVector{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
-                       # ::Nothing                      When hessians are not required
+    M::M_t             # ::AbstractMatrix{<:Number}     Values of geometric shape functions
+    dMdξ::dMdξ_t       # ::AbstractMatrix{<:Vec}        Gradients of geometric shape functions in ref-domain
+    d2Mdξ2::d2Mdξ2_t   # ::AbstractMatrix{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
+                       # ::Nothing                      When not required
+    function GeometryMapping(
+        ip::IP, M::M_t, ::Nothing, ::Nothing
+        ) where {IP <: ScalarInterpolation, M_t<:AbstractMatrix{<:Number}}
+        return new{0, IP, M_t, Nothing, Nothing}(ip, M, nothing, nothing)
+    end
+    function GeometryMapping(
+        ip::IP, M::M_t, dMdξ::dMdξ_t, ::Nothing
+        ) where {IP <: ScalarInterpolation, M_t<:AbstractMatrix{<:Number}, dMdξ_t <: AbstractMatrix{<:Vec}}
+        return new{1, IP, M_t, dMdξ_t, Nothing}(ip, M, dMdξ, nothing)
+    end
+    function GeometryMapping(
+        ip::IP, M::M_t, dMdξ::dMdξ_t, d2Mdξ2::d2Mdξ2_t) where 
+        {IP <: ScalarInterpolation, M_t<:AbstractMatrix{<:Number}, 
+        dMdξ_t <: AbstractMatrix{<:Vec}, d2Mdξ2_t <: AbstractMatrix{<:Tensor{2}}}
+        return new{2, IP, M_t, dMdξ_t, d2Mdξ2_t}(ip, M, dMdξ, d2Mdξ2)
+    end
 end
-function GeometryMapping(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule, ::RequiresHessian{RH}) where {T,RH}
+function GeometryMapping{0}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule) where T
+    n_shape = getnbasefunctions(ip)
+    n_qpoints = getnquadpoints(qr)
+    gm = GeometryMapping(ip, zeros(T, n_shape, n_qpoints), nothing, nothing)
+    precompute_values!(gm, qr) # Separate function for qr point update in PointValues
+    return gm
+end
+function GeometryMapping{1}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule) where T
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
     
     M    = zeros(T,                 n_shape, n_qpoints)
     dMdξ = zeros(Vec{getdim(ip),T}, n_shape, n_qpoints)
-    d2Mdξ2 = RH ? zeros(Tensor{2,getdim(ip),T}, n_shape, n_qpoints) : nothing
+
+    gm = GeometryMapping(ip, M, dMdξ, nothing)
+    precompute_values!(gm, qr) # Separate function for qr point update in PointValues
+    return gm
+end
+function GeometryMapping{2}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule) where T
+    n_shape = getnbasefunctions(ip)
+    n_qpoints = getnquadpoints(qr)
+    
+    M      = zeros(T,                      n_shape, n_qpoints)
+    dMdξ   = zeros(Vec{getdim(ip),T},      n_shape, n_qpoints)
+    d2Mdξ2 = zeros(Tensor{2,getdim(ip),T}, n_shape, n_qpoints)
 
     gm = GeometryMapping(ip, M, dMdξ, d2Mdξ2)
     precompute_values!(gm, qr) # Separate function for qr point update in PointValues
     return gm
 end
 
-precompute_values!(gm::GeometryMapping, qr) = precompute_values!(gm, qr, RequiresHessian(gm))
-function precompute_values!(gm::GeometryMapping, qr, ::RequiresHessian{false})
+function precompute_values!(gm::GeometryMapping{0}, qr)
+    shape_values!(gm.M, gm.ip, qr)
+end
+function precompute_values!(gm::GeometryMapping{1}, qr)
     shape_gradients_and_values!(gm.dMdξ, gm.M, gm.ip, qr)
 end
-function precompute_values!(gm::GeometryMapping, qr, ::RequiresHessian{true})
+function precompute_values!(gm::GeometryMapping{2}, qr)
     shape_hessians_gradients_and_values!(gm.d2Mdξ2, gm.dMdξ, gm.M, gm.ip, qr)
 end
 
 function Base.copy(v::GeometryMapping)
-    d2Mdξ2_copy = v.d2Mdξ2 === nothing ? nothing : copy(v.d2Mdξ2)
-    return GeometryMapping(copy(v.ip), copy(v.M), copy(v.dMdξ), d2Mdξ2_copy)
+    copy_or_nothing(x) = copy(x)
+    copy_or_nothing(::Nothing) = nothing
+    return GeometryMapping(copy(v.ip), copy(v.M), copy_or_nothing(v.dMdξ), copy_or_nothing(v.d2Mdξ2))
 end
 
 getngeobasefunctions(geo_mapping::GeometryMapping) = size(geo_mapping.M, 1)
 @propagate_inbounds geometric_value(geo_mapping::GeometryMapping, q_point::Int, base_func::Int) = geo_mapping.M[base_func, q_point]
 get_geometric_interpolation(geo_mapping::GeometryMapping) = geo_mapping.ip
-
-RequiresHessian(geo_mapping::GeometryMapping) = RequiresHessian(geo_mapping.d2Mdξ2 !== nothing)
 
 # Hot-fixes to support embedded elements before MixedTensors are available
 # See https://github.com/Ferrite-FEM/Tensors.jl/pull/188
@@ -95,9 +121,11 @@ function otimes_returntype(#=typeof(x)=#::Type{<:Vec{dim,Tx}}, #=typeof(d2Mdξ2)
     return Tensor{3,dim,promote_type(Tx,TM)}
 end
 
-@propagate_inbounds calculate_mapping(geo_mapping::GeometryMapping, args...) = calculate_mapping(RequiresHessian(geo_mapping), geo_mapping, args...)
+@inline function calculate_mapping(::GeometryMapping{0}, q_point, x)
+    return MappingValues(nothing, nothing)
+end
 
-@inline function calculate_mapping(::RequiresHessian{false}, geo_mapping::GeometryMapping, q_point, x)
+@inline function calculate_mapping(geo_mapping::GeometryMapping{1}, q_point, x)
     fecv_J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
     @inbounds for j in 1:getngeobasefunctions(geo_mapping)
         #fecv_J += x[j] ⊗ geo_mapping.dMdξ[j, q_point]
@@ -106,7 +134,7 @@ end
     return MappingValues(fecv_J, nothing)
 end
 
-@inline function calculate_mapping(::RequiresHessian{true}, geo_mapping::GeometryMapping, q_point, x)
+@inline function calculate_mapping(geo_mapping::GeometryMapping{2}, q_point, x)
     J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
     H = zero(otimes_returntype(eltype(x), eltype(geo_mapping.d2Mdξ2)))
     @inbounds for j in 1:getngeobasefunctions(geo_mapping)

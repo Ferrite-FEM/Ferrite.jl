@@ -41,9 +41,13 @@ struct CellValues{FV, GM, QR, detT<:AbstractVector} <: AbstractCellValues
     qr::QR         # QuadratureRule
     detJdV::detT   # AbstractVector{<:Number}
 end
-function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation) where T 
-    geo_mapping = GeometryMapping(T, ip_geo.ip, qr, RequiresHessian(ip_fun, ip_geo))
-    fun_values = FunctionValues(T, ip_fun, qr, ip_geo)
+function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; difforder=Val(1)) where T 
+    _difforder(::Val{N}) where N = N
+    _difforder(N::Int) = N
+    GeoDiffOrder = increased_diff_order(get_mapping_type(ip_fun)) + _difforder(difforder)
+    FunDiffOrder = _difforder(difforder)
+    geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
+    fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
     detJdV = fill(T(NaN), length(getweights(qr)))
     return CellValues(fun_values, geo_mapping, qr, detJdV)
 end

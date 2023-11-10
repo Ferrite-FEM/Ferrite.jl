@@ -37,14 +37,35 @@ cell (precalculated) and the real cell (updated in `reinit!`).
 """
 FunctionValues
 
-struct FunctionValues{IP, N_t, dNdx_t, dNdξ_t}
+struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t}
     ip::IP          # ::Interpolation
     N_x::N_t        # ::AbstractMatrix{Union{<:Tensor,<:Number}}
     N_ξ::N_t        # ::AbstractMatrix{Union{<:Tensor,<:Number}}
-    dNdx::dNdx_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}}
-    dNdξ::dNdξ_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}}
+    dNdx::dNdx_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}} or Nothing
+    dNdξ::dNdξ_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}} or Nothing
+    function FunctionValues(ip::Interpolation, N_x::N_t, N_ξ::N_t, ::Nothing, ::Nothing) where {N_t<:AbstractMatrix}
+        return new{0, typeof(ip), N_t, Nothing, Nothing}(ip, N_x, N_ξ, nothing, nothing)
+    end
+    function FunctionValues(ip::Interpolation, N_x::N_t, N_ξ::N_t, dNdx::AbstractMatrix, dNdξ::AbstractMatrix) where {N_t<:AbstractMatrix}
+        return new{1, typeof(ip), N_t, typeof(dNdx), typeof(dNdξ)}(ip, N_x, N_ξ, dNdx, dNdξ)
+    end
 end
 function FunctionValues(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where T
+    return FunctionValues{1}(T, ip, qr, ip_geo)
+end
+function FunctionValues{0}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where T
+    ip_dims = InterpolationDims(ip, ip_geo)
+    n_shape = getnbasefunctions(ip)
+    n_qpoints = getnquadpoints(qr)
+    
+    N_ξ = zeros(typeof_N(T, ip_dims), n_shape, n_qpoints)
+    N_x = isa(get_mapping_type(ip), IdentityMapping) ? N_ξ : similar(N_ξ)
+        
+    fv = FunctionValues(ip, N_x, N_ξ, nothing, nothing)
+    precompute_values!(fv, qr) # Separate function for qr point update in PointValues
+    return fv
+end
+function FunctionValues{1}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where T
     ip_dims = InterpolationDims(ip, ip_geo)
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
@@ -60,14 +81,19 @@ function FunctionValues(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo
     return fv
 end
 
-function precompute_values!(fv::FunctionValues, qr)
+function precompute_values!(fv::FunctionValues{0}, qr)
+    shape_values!(fv.N_ξ, fv.ip, qr)
+end
+function precompute_values!(fv::FunctionValues{1}, qr)
     shape_gradients_and_values!(fv.dNdξ, fv.N_ξ, fv.ip, qr)
 end
 
 function Base.copy(v::FunctionValues)
     N_ξ_copy = copy(v.N_ξ)
     N_x_copy = v.N_ξ === v.N_x ? N_ξ_copy : copy(v.N_x) # Preserve aliasing
-    return FunctionValues(copy(v.ip), N_x_copy, N_ξ_copy, copy(v.dNdx), copy(v.dNdξ))
+    copy_or_nothing(x) = copy(x)
+    copy_or_nothing(::Nothing) = nothing
+    return FunctionValues(copy(v.ip), N_x_copy, N_ξ_copy, copy_or_nothing(v.dNdx), copy_or_nothing(v.dNdξ))
 end
 
 getnbasefunctions(funvals::FunctionValues) = size(funvals.N_x, 1)
@@ -107,15 +133,15 @@ struct ContravariantPiolaMapping end
 get_mapping_type(fv::FunctionValues) = get_mapping_type(fv.ip)
 
 """
-    requires_hessian(mapping)
+    increased_diff_order(mapping)
 
-Does the `mapping` type require the hessian, d²M/dx², 
+How many order higher geometric derivatives are required to  
 to map the function values and gradients from the reference cell 
 to the real cell geometry?
 """
-requires_hessian(::IdentityMapping) = false
-requires_hessian(::ContravariantPiolaMapping) = true
-requires_hessian(::CovariantPiolaMapping) = true
+increased_diff_order(::IdentityMapping) = 0
+increased_diff_order(::ContravariantPiolaMapping) = 1
+increased_diff_order(::CovariantPiolaMapping) = 1
 
 # Support for embedded elements
 calculate_Jinv(J::Tensor{2}) = inv(J)
@@ -131,11 +157,19 @@ calculate_Jinv(J::SMatrix) = pinv(J)
 # Vector interpolations with sdim > rdim
 @inline dothelper(B::SMatrix{vdim, rdim}, A::SMatrix{rdim, sdim}) where {vdim, rdim, sdim} = B * A
 
-@inline function apply_mapping!(funvals::FunctionValues, args...)
-    return apply_mapping!(funvals, get_mapping_type(funvals), args...)
+# =============
+# Apply mapping
+# =============
+@inline function apply_mapping!(funvals::FunctionValues, q_point::Int, args...)
+    return apply_mapping!(funvals, get_mapping_type(funvals), q_point, args...)
 end
 
-@inline function apply_mapping!(funvals::FunctionValues, ::IdentityMapping, q_point::Int, mapping_values, args...)
+# Identity mapping
+@inline function apply_mapping!(::FunctionValues{0}, ::IdentityMapping, ::Int, mapping_values, args...)
+    return nothing
+end
+
+@inline function apply_mapping!(funvals::FunctionValues{1}, ::IdentityMapping, q_point::Int, mapping_values, args...)
     Jinv = calculate_Jinv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
         #funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Jinv # TODO via Tensors.jl
@@ -144,7 +178,18 @@ end
     return nothing
 end
 
-@inline function apply_mapping!(funvals::FunctionValues, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
+# Covariant Piola Mapping
+@inline function apply_mapping!(funvals::FunctionValues{0}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
+    Jinv = inv(getjacobian(mapping_values))
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        d = get_direction(funvals.ip, j, cell)
+        N_ξ = funvals.N_ξ[j, q_point]
+        funvals.N_x[j, q_point] = d*(N_ξ ⋅ Jinv)
+    end
+    return nothing
+end
+
+@inline function apply_mapping!(funvals::FunctionValues{1}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
     H = gethessian(mapping_values)
     Jinv = inv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
@@ -157,7 +202,19 @@ end
     return nothing
 end
 
-@inline function apply_mapping!(funvals::FunctionValues, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
+# Contravariant Piola Mapping
+@inline function apply_mapping!(funvals::FunctionValues{0}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
+    J = getjacobian(mapping_values)
+    detJ = det(J)
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        d = get_direction(funvals.ip, j, cell)
+        N_ξ = funvals.N_ξ[j, q_point]
+        funvals.N_x[j, q_point] = d*(J ⋅ N_ξ)/detJ
+    end
+    return nothing
+end
+
+@inline function apply_mapping!(funvals::FunctionValues{1}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
     H = gethessian(mapping_values)
     J = getjacobian(mapping_values)
     Jinv = inv(J)
