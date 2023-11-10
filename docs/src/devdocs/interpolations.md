@@ -15,6 +15,9 @@ Ferrite.shape_gradient(::Interpolation, ::Vec, ::Int)
 Ferrite.shape_gradient_and_value
 Ferrite.boundarydof_indices
 Ferrite.dirichlet_boundarydof_indices
+Ferrite.shape_values!
+Ferrite.shape_gradients!
+Ferrite.shape_gradients_and_values!
 ```
 
 ### Required methods to implement for all subtypes of `Interpolation` to define a new finite element

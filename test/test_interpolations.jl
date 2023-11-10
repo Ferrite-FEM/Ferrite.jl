@@ -39,7 +39,6 @@
                       #
                       CrouzeixRaviart{RefTriangle, 1}(),
     )
-
         # Test of utility functions
         ref_dim = Ferrite.getdim(interpolation)
         ref_shape = Ferrite.getrefshape(interpolation)
@@ -69,19 +68,28 @@
                 end
             end
         end
-    # Check partition of unity at random point.
-    n_basefuncs = getnbasefunctions(interpolation)
-    x = rand(Tensor{1, ref_dim})
-    f = (x) -> [shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
-    @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
-        reinterpret(Float64, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
-    @test sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
+        n_basefuncs = getnbasefunctions(interpolation)
+        coords = Ferrite.reference_coordinates(interpolation)
+        @test length(coords) == n_basefuncs
+        f(x) = [shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
 
-    # Check if the important functions are consistent
-    coords = Ferrite.reference_coordinates(interpolation)
-    @test length(coords) == n_basefuncs
-    @test shape_value(interpolation, x, n_basefuncs) == shape_value(interpolation, x, n_basefuncs)
-    @test_throws ArgumentError shape_value(interpolation, x, n_basefuncs+1)
+        #TODO prefer this test style after 1.6 is removed from CI
+        # @testset let x = sample_random_point(ref_shape) # not compatible with Julia 1.6
+        x = sample_random_point(ref_shape)
+        random_point_testset = @testset "Random point test" begin
+            # Check gradient evaluation
+            @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
+                reinterpret(Float64, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
+            # Check partition of unity at random point.
+            @test sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
+            # Check if the important functions are consistent
+            @test_throws ArgumentError shape_value(interpolation, x, n_basefuncs+1)
+            # Idempotency test
+            @test shape_value(interpolation, x, n_basefuncs) == shape_value(interpolation, x, n_basefuncs)
+        end
+        # Remove after 1.6 is removed from CI (see above)
+        # Show coordinate in case failure (see issue #811)
+        !isempty(random_point_testset.results) && println("^^^^^Random point test failed at $x for $interpolation !^^^^^")
 
         # Test whether we have for each entity corresponding dof indices (possibly empty)
         @test length(Ferrite.vertexdof_indices(interpolation)) == Ferrite.nvertices(interpolation)
@@ -120,18 +128,18 @@
         end
         @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.celldof_interior_indices(interpolation)])
 
-    # Check for dirac delta property of interpolation
-    @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
-        for k in 1:n_basefuncs
-            N_dof = shape_value(interpolation, coords[dof], k)
-            if k == dof
-                @test N_dof ≈ 1.0
-            else
-                factor = interpolation isa Lagrange{RefQuadrilateral, 3} ? 200 : 4
-                @test N_dof ≈ 0.0 atol = factor * eps(Float64)
+        # Check for dirac delta property of interpolation
+        @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
+            for k in 1:n_basefuncs
+                N_dof = shape_value(interpolation, coords[dof], k)
+                if k == dof
+                    @test N_dof ≈ 1.0
+                else
+                    factor = interpolation isa Lagrange{RefQuadrilateral, 3} ? 200 : 4
+                    @test N_dof ≈ 0.0 atol = factor * eps(Float64)
+                end
             end
         end
-    end
 
         # Test that facedof_indices(...) return in counter clockwise order (viewing from the outside)
         if interpolation isa Lagrange

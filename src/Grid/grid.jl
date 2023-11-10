@@ -766,8 +766,11 @@ for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
         #To be able to do a,b = faceidx
         Base.iterate(I::($INDEX), state::Int=1) = (state==3) ?  nothing : (I[state], state+1)
 
-        #For (cellid, faceidx) in faceset
-        Base.in(v::Tuple{Int, Int}, s::Set{$INDEX}) = in($INDEX(v), s)
+        # Necessary to check if, e.g. `(cellid, faceidx) in faceset`
+        Base.isequal(x::$INDEX, y::$INDEX) = x.idx == y.idx
+        Base.isequal(x::Tuple{Int, Int}, y::$INDEX) = x[1] == y.idx[1] && x[2] == y.idx[2]
+        Base.isequal(y::$INDEX, x::Tuple{Int, Int}) = x[1] == y.idx[1] && x[2] == y.idx[2]
+        Base.hash(x::$INDEX, h::UInt) = hash(x.idx, h)
     end
 end
 

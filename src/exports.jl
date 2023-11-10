@@ -17,6 +17,7 @@ export
     DiscontinuousLagrange,
     Serendipity,
     getnbasefunctions,
+    getrefshape,
 
 # Quadrature
     QuadratureRule,
