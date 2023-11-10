@@ -1507,6 +1507,9 @@ Numerical Methods for Partial Differential Equations 8.2 (1992): 97-111.
 """
 struct RannacherTurek{shape,order} <: ScalarInterpolation{shape,order} end
 
+adjust_dofs_during_distribution(::RannacherTurek) = true
+adjust_dofs_during_distribution(::RannacherTurek{<:Any, 1}) = false
+
 #################################
 # Rannacher-Turek dim 2 order 1 #
 #################################
