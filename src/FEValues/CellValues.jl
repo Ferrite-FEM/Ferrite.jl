@@ -95,7 +95,7 @@ end
 # Access quadrature rule values 
 getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 
-@propagate_inbounds function _update_detJdV!(detJvec::AbstractVector, q_point::Int, w, mapping)
+@inline function _update_detJdV!(detJvec::AbstractVector, q_point::Int, w, mapping)
     detJ = calculate_detJ(getjacobian(mapping))
     detJ > 0.0 || throw_detJ_not_pos(detJ)
     @inbounds detJvec[q_point] = detJ*w
@@ -116,7 +116,7 @@ function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
     end
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
-        @inline _update_detJdV!(cv.detJdV, q_point, w, mapping)
+        _update_detJdV!(cv.detJdV, q_point, w, mapping)
         apply_mapping!(fun_values, q_point, mapping, cell)
     end
     return nothing

@@ -146,8 +146,8 @@ increased_diff_order(::ContravariantPiolaMapping) = 1
 increased_diff_order(::CovariantPiolaMapping) = 1
 
 # Support for embedded elements
-calculate_Jinv(J::Tensor{2}) = inv(J)
-calculate_Jinv(J::SMatrix) = pinv(J)
+@inline calculate_Jinv(J::Tensor{2}) = inv(J)
+@inline calculate_Jinv(J::SMatrix) = pinv(J)
 
 # Hotfix to get the dots right for embedded elements until mixed tensors are merged.
 # Scalar/Vector interpolations with sdim == rdim (== vdim)
