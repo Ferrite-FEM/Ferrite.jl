@@ -105,6 +105,7 @@ get_function_interpolation(funvals::FunctionValues) = funvals.ip
 
 shape_value_type(funvals::FunctionValues) = eltype(funvals.N_x)
 shape_gradient_type(funvals::FunctionValues) = eltype(funvals.dNdx)
+shape_gradient_type(::FunctionValues{0}) = nothing
 
 
 # Checks that the user provides the right dimension of coordinates to reinit! methods to ensure good error messages if not
@@ -114,9 +115,10 @@ sdim_from_gradtype(::Type{<:SMatrix{<:Any,sdim}}) where sdim = sdim
 
 # For performance, these must be fully inferrable for the compiler.
 # args: valname (:CellValues or :FaceValues), shape_gradient_type, eltype(x)
-function check_reinit_sdim_consistency(valname, gradtype, ::Type{<:Vec{sdim}}) where {sdim}
+function check_reinit_sdim_consistency(valname, gradtype::Type, ::Type{<:Vec{sdim}}) where {sdim}
     check_reinit_sdim_consistency(valname, Val(sdim_from_gradtype(gradtype)), Val(sdim))
 end
+check_reinit_sdim_consistency(_, ::Nothing, ::Type{<:Vec}) = nothing # gradient not stored, cannot check
 check_reinit_sdim_consistency(_, ::Val{sdim}, ::Val{sdim}) where sdim = nothing
 function check_reinit_sdim_consistency(valname, ::Val{sdim_val}, ::Val{sdim_x}) where {sdim_val, sdim_x}
     throw(ArgumentError("The $valname (sdim=$sdim_val) and coordinates (sdim=$sdim_x) have different spatial dimensions."))

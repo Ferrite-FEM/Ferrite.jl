@@ -35,26 +35,26 @@ function default_geometric_interpolation(::Interpolation{shape}) where {dim, sha
     return VectorizedInterpolation{dim}(Lagrange{shape, 1}())
 end
 
-struct CellValues{FV, GM, QR, detT<:AbstractVector} <: AbstractCellValues
+struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     fun_values::FV # FunctionValues
     geo_mapping::GM # GeometryMapping
     qr::QR         # QuadratureRule
     detJdV::detT   # AbstractVector{<:Number}
 end
-function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; difforder=Val(1)) where T 
+function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; difforder=Val(1), save_detJ=true) where T 
     _difforder(::Val{N}) where N = N
     _difforder(N::Int) = N
-    GeoDiffOrder = increased_diff_order(get_mapping_type(ip_fun)) + _difforder(difforder)
+    GeoDiffOrder = max(increased_diff_order(get_mapping_type(ip_fun)) + _difforder(difforder), save_detJ)
     FunDiffOrder = _difforder(difforder)
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
-    detJdV = fill(T(NaN), length(getweights(qr)))
+    detJdV = save_detJ ? fill(T(NaN), length(getweights(qr))) : nothing
     return CellValues(fun_values, geo_mapping, qr, detJdV)
 end
 
-CellValues(qr::QuadratureRule, ip::Interpolation, args...) = CellValues(Float64, qr, ip, args...)
-function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation=default_geometric_interpolation(ip)) where T
-    return CellValues(T, qr, ip, VectorizedInterpolation(ip_geo))
+CellValues(qr::QuadratureRule, ip::Interpolation, args...; kwargs...) = CellValues(Float64, qr, ip, args...; kwargs...)
+function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation=default_geometric_interpolation(ip); kwargs...) where T
+    return CellValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
 end
 
 function Base.copy(cv::CellValues)
@@ -95,6 +95,13 @@ end
 # Access quadrature rule values 
 getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 
+@propagate_inbounds function _update_detJdV!(detJvec::AbstractVector, q_point::Int, w, mapping)
+    detJ = calculate_detJ(getjacobian(mapping))
+    detJ > 0.0 || throw_detJ_not_pos(detJ)
+    @inbounds detJvec[q_point] = detJ*w
+end
+@inline _update_detJdV!(::Nothing, q_point, w, mapping) = nothing
+
 function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
     geo_mapping = cv.geo_mapping
     fun_values = cv.fun_values
@@ -109,9 +116,7 @@ function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
     end
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
-        detJ = calculate_detJ(getjacobian(mapping))
-        detJ > 0.0 || throw_detJ_not_pos(detJ)
-        @inbounds cv.detJdV[q_point] = detJ*w
+        @inline _update_detJdV!(cv.detJdV, q_point, w, mapping)
         apply_mapping!(fun_values, q_point, mapping, cell)
     end
     return nothing

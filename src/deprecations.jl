@@ -156,7 +156,7 @@ end
 
 # TODO: Are these needed to be deprecated - harder? with the new parameterization
 # (Cell|Face)Values with vector dofs
-const _VectorValues = Union{CellValues{<:FV}, FaceValues{<:FV}} where {FV <: FunctionValues{<:VectorInterpolation}}
+const _VectorValues = Union{CellValues{<:FV}, FaceValues{<:FV}} where {FV <: FunctionValues{<:Any,<:VectorInterpolation}}
 @deprecate      function_value(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}      function_value(fe_v, q_point, reinterpret(T, u))
 @deprecate   function_gradient(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T}   function_gradient(fe_v, q_point, reinterpret(T, u))
 @deprecate function_divergence(fe_v::_VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}}) where {dim,T} function_divergence(fe_v, q_point, reinterpret(T, u))
