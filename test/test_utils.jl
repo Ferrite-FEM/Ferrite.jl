@@ -251,6 +251,28 @@ coords_on_faces(x, ::Serendipity{RefHexahedron, 2}) =
 check_equal_or_nan(a::Any, b::Any) = a==b || (isnan(a) && isnan(b))
 check_equal_or_nan(a::Union{Tensor, Array}, b::Union{Tensor, Array}) = all(check_equal_or_nan.(a, b))
 
+# Hypercube is simply ⨂ᵈⁱᵐ Line :)
+sample_random_point(::Type{Ferrite.RefHypercube{ref_dim}}) where {ref_dim} = Vec{ref_dim}(2.0 .* rand(Vec{ref_dim}) .- 1.0)
+# Dirichlet type sampling
+function sample_random_point(::Type{Ferrite.RefSimplex{ref_dim}}) where {ref_dim} 
+    ξ = rand(ref_dim+1)
+    ξₜ = -log.(ξ)
+    return Vec{ref_dim}(ntuple(i->ξₜ[i], ref_dim) ./ sum(ξₜ))
+end
+# Wedge = Triangle ⊗ Line
+function sample_random_point(::Type{RefPrism})
+    (ξ₁, ξ₂) = sample_random_point(RefTriangle)
+    ξ₃ = rand(Float64)
+    return Vec{3}((ξ₁, ξ₂, ξ₃))
+end
+# TODO what to do here? The samplig is not uniform...
+function sample_random_point(::Type{RefPyramid})
+    ξ₃ = (1-1e-3)*rand(Float64) # Derivative is discontinuous at the top
+    # If we fix a z coordinate we get a Quad with extends (1-ξ₃)
+    (ξ₁, ξ₂) = (1.0 - ξ₃) .* rand(Vec{2})
+    return Vec{3}((ξ₁, ξ₂, ξ₃))
+end
+
 ######################################################
 # Helpers for testing face_to_element_transformation #
 ######################################################

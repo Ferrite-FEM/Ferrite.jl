@@ -260,17 +260,15 @@ function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid, vertexidx::
     cellid, local_vertexid = vertexidx[1], vertexidx[2]
     cell_vertices = vertices(getcells(grid,cellid))
     global_vertexid = cell_vertices[local_vertexid]
-    if include_self
-        vertex_to_cell = top.vertex_to_cell[global_vertexid]
-        self_reference_local = Vector{VertexIndex}(undef,length(vertex_to_cell))
-        for (i,cellid) in enumerate(vertex_to_cell)
-            local_vertex = VertexIndex(cellid,findfirst(x->x==global_vertexid,vertices(getcells(grid,cellid)))::Int)
-            self_reference_local[i] = local_vertex
-        end
-        return [top.vertex_vertex_neighbor[global_vertexid].neighbor_info; self_reference_local]
-    else
-        return top.vertex_vertex_neighbor[global_vertexid].neighbor_info
+    vertex_to_cell = top.vertex_to_cell[global_vertexid]
+    self_reference_local = Vector{VertexIndex}()
+    sizehint!(self_reference_local, length(vertex_to_cell))
+    for (i,cellid) in enumerate(vertex_to_cell)
+        local_vertex = VertexIndex(cellid,findfirst(x->x==global_vertexid,vertices(getcells(grid,cellid)))::Int)
+        !include_self && local_vertex == vertexidx && continue
+        push!(self_reference_local, local_vertex)
     end
+    return self_reference_local
 end
 
 function getneighborhood(top::ExclusiveTopology, grid::AbstractGrid{3}, edgeidx::EdgeIndex, include_self=false)
