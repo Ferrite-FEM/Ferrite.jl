@@ -30,13 +30,13 @@ _create_fqr_rule(qr::FaceQuadratureRule, args...) = qr
 _create_fqr_rule(order::Int, ::Interpolation{RefShape}) where {RefShape} = FaceQuadratureRule{RefShape}(order)
 
 """
-    CellValues(dh::DofHandler, fieldname::Symbol; qr::Union{Int,QuadratureRule})
-    CellValues(sdh::SubDofHandler, fieldname::Symbol; qr::Union{Int,QuadratureRule})
+    FaceValues(dh::DofHandler, fieldname::Symbol; qr::Union{Int,FaceQuadratureRule})
+    FaceValues(sdh::SubDofHandler, fieldname::Symbol; qr::Union{Int,FaceQuadratureRule})
 
-Create a `CellValues` object by using the interpolation of `fieldname` in `dh` 
+Create a `FaceValues` object by using the interpolation of `fieldname` in `dh` 
 or `sdh`, as well as the default geometric interpolation based on the cell type.
 A `DofHandler` input is only allowed with a single `SubDofHandler` in `dh`.
-The quadrature rule is created automatically as `QuadratureRule{dim,RefShape}(qr)`,
+The quadrature rule is created automatically as `FaceQuadratureRule{dim,RefShape}(qr)`,
 where `dim` and `RefShape` are taken from `dh` or `sdh`, if `qr::Int` is given.
 """
 function FaceValues(dh::DofHandler, fieldname::Symbol; kwargs...)
