@@ -286,9 +286,13 @@ end
     linegrid = generate_grid(Line,(3,))
     linetopo = ExclusiveTopology(linegrid)
     @test linetopo.vertex_vertex_neighbor[1,2] == Ferrite.EntityNeighborhood(VertexIndex(2,1))
+    @test getneighborhood(linetopo, linegrid, VertexIndex(1,2)) == [VertexIndex(2,1)]
     @test linetopo.vertex_vertex_neighbor[2,1] == Ferrite.EntityNeighborhood(VertexIndex(1,2))
+    @test getneighborhood(linetopo, linegrid, VertexIndex(2,1)) == [VertexIndex(1,2)]
     @test linetopo.vertex_vertex_neighbor[2,2] == Ferrite.EntityNeighborhood(VertexIndex(3,1))
+    @test getneighborhood(linetopo, linegrid, VertexIndex(2,2)) == [VertexIndex(3,1)]
     @test linetopo.vertex_vertex_neighbor[3,1] == Ferrite.EntityNeighborhood(VertexIndex(2,2))
+    @test getneighborhood(linetopo, linegrid, VertexIndex(3,1)) == [VertexIndex(2,2)]
     linefaceskeleton = Ferrite.faceskeleton(linetopo, linegrid)
     @test length(linefaceskeleton) == 4
 
@@ -306,31 +310,52 @@ end
     #test vertex neighbors maps cellid and local vertex id to neighbor id and neighbor local vertex id
     @test topology.vertex_vertex_neighbor[1,3] == Ferrite.EntityNeighborhood(VertexIndex(4,1))
     @test topology.vertex_vertex_neighbor[2,4] == Ferrite.EntityNeighborhood(VertexIndex(3,2))
+    @test Set(getneighborhood(topology, quadgrid, VertexIndex(2,4))) == Set([VertexIndex(1,3), VertexIndex(3,2), VertexIndex(4,1)])
     @test topology.vertex_vertex_neighbor[3,3] == Ferrite.EntityNeighborhood(VertexIndex(6,1))
     @test topology.vertex_vertex_neighbor[3,2] == Ferrite.EntityNeighborhood(VertexIndex(2,4))
     @test topology.vertex_vertex_neighbor[4,1] == Ferrite.EntityNeighborhood(VertexIndex(1,3))
     @test topology.vertex_vertex_neighbor[4,4] == Ferrite.EntityNeighborhood(VertexIndex(5,2))
     @test topology.vertex_vertex_neighbor[5,2] == Ferrite.EntityNeighborhood(VertexIndex(4,4))
     @test topology.vertex_vertex_neighbor[6,1] == Ferrite.EntityNeighborhood(VertexIndex(3,3))
+    @test isempty(getneighborhood(topology, quadgrid, VertexIndex(2,2)))
+    @test length(getneighborhood(topology, quadgrid, VertexIndex(2,4))) == 3
     #test face neighbor maps cellid and local face id to neighbor id and neighbor local face id
     @test topology.face_face_neighbor[1,2] == Ferrite.EntityNeighborhood(FaceIndex(2,4))
+    @test getneighborhood(topology, quadgrid, FaceIndex(1,2)) == [FaceIndex(2,4)]
     @test topology.face_face_neighbor[1,3] == Ferrite.EntityNeighborhood(FaceIndex(3,1))
+    @test getneighborhood(topology, quadgrid, FaceIndex(1,3)) == [FaceIndex(3,1)]
     @test topology.face_face_neighbor[2,3] == Ferrite.EntityNeighborhood(FaceIndex(4,1))
+    @test getneighborhood(topology, quadgrid, FaceIndex(2,3)) == [FaceIndex(4,1)]
     @test topology.face_face_neighbor[2,4] == Ferrite.EntityNeighborhood(FaceIndex(1,2))
+    @test getneighborhood(topology, quadgrid, FaceIndex(2,4)) == [FaceIndex(1,2)]
     @test topology.face_face_neighbor[3,1] == Ferrite.EntityNeighborhood(FaceIndex(1,3))
+    @test getneighborhood(topology, quadgrid, FaceIndex(3,1)) == [FaceIndex(1,3)]
     @test topology.face_face_neighbor[3,2] == Ferrite.EntityNeighborhood(FaceIndex(4,4))
+    @test getneighborhood(topology, quadgrid, FaceIndex(3,2)) == [FaceIndex(4,4)]
     @test topology.face_face_neighbor[3,3] == Ferrite.EntityNeighborhood(FaceIndex(5,1))
+    @test getneighborhood(topology, quadgrid, FaceIndex(3,3)) == [FaceIndex(5,1)]
     @test topology.face_face_neighbor[4,1] == Ferrite.EntityNeighborhood(FaceIndex(2,3))
+    @test getneighborhood(topology, quadgrid, FaceIndex(4,1)) == [FaceIndex(2,3)]
     @test topology.face_face_neighbor[4,3] == Ferrite.EntityNeighborhood(FaceIndex(6,1))
+    @test getneighborhood(topology, quadgrid, FaceIndex(4,3)) == [FaceIndex(6,1)]
     @test topology.face_face_neighbor[4,4] == Ferrite.EntityNeighborhood(FaceIndex(3,2))
+    @test getneighborhood(topology, quadgrid, FaceIndex(1,2)) == [FaceIndex(2,4)]
     @test topology.face_face_neighbor[5,1] == Ferrite.EntityNeighborhood(FaceIndex(3,3))
+    @test getneighborhood(topology, quadgrid, FaceIndex(5,1)) == [FaceIndex(3,3)]
     @test topology.face_face_neighbor[5,2] == Ferrite.EntityNeighborhood(FaceIndex(6,4))
+    @test getneighborhood(topology, quadgrid, FaceIndex(5,2)) == [FaceIndex(6,4)]
     @test topology.face_face_neighbor[5,3] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
+    @test getneighborhood(topology, quadgrid, FaceIndex(5,3)) == FaceIndex[]
     @test topology.face_face_neighbor[5,4] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
+    @test getneighborhood(topology, quadgrid, FaceIndex(5,4)) == FaceIndex[]
     @test topology.face_face_neighbor[6,1] == Ferrite.EntityNeighborhood(FaceIndex(4,3))
+    @test getneighborhood(topology, quadgrid, FaceIndex(6,1)) == [FaceIndex(4,3)]
     @test topology.face_face_neighbor[6,2] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
+    @test getneighborhood(topology, quadgrid, FaceIndex(6,2)) == FaceIndex[]
     @test topology.face_face_neighbor[6,3] == Ferrite.EntityNeighborhood(Ferrite.BoundaryIndex[])
+    @test getneighborhood(topology, quadgrid, FaceIndex(6,3)) == FaceIndex[]
     @test topology.face_face_neighbor[6,4] == Ferrite.EntityNeighborhood(FaceIndex(5,2))
+    @test getneighborhood(topology, quadgrid, FaceIndex(6,4)) == [FaceIndex(5,2)]
 #                         (8)
 #                (7) +-----+-----+(9)
 #                    |  3  |  4  |
@@ -349,8 +374,10 @@ end
     topology = ExclusiveTopology(hexgrid)
     @test topology.edge_edge_neighbor[1,11] == Ferrite.EntityNeighborhood(EdgeIndex(4,9))
     @test Set(getneighborhood(topology,hexgrid,EdgeIndex(1,11),true)) == Set([EdgeIndex(4,9),EdgeIndex(2,12),EdgeIndex(3,10),EdgeIndex(1,11)])
+    @test Set(getneighborhood(topology,hexgrid,EdgeIndex(1,11),false)) == Set([EdgeIndex(4,9),EdgeIndex(2,12),EdgeIndex(3,10)])
     @test topology.edge_edge_neighbor[2,12] == Ferrite.EntityNeighborhood(EdgeIndex(3,10))
     @test Set(getneighborhood(topology,hexgrid,EdgeIndex(2,12),true)) == Set([EdgeIndex(3,10),EdgeIndex(1,11),EdgeIndex(4,9),EdgeIndex(2,12)])
+    @test Set(getneighborhood(topology,hexgrid,EdgeIndex(2,12),false)) == Set([EdgeIndex(3,10),EdgeIndex(1,11),EdgeIndex(4,9)])
     @test topology.edge_edge_neighbor[3,10] == Ferrite.EntityNeighborhood(EdgeIndex(2,12))
     @test topology.edge_edge_neighbor[4,9] == Ferrite.EntityNeighborhood(EdgeIndex(1,11))
     @test getneighborhood(topology,hexgrid,FaceIndex((1,3))) == [FaceIndex((2,5))]
