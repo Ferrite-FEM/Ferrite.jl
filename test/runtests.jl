@@ -29,6 +29,8 @@ else
 end
 
 include("test_utils.jl")
+
+# Unit tests
 include("test_interpolations.jl")
 include("test_cellvalues.jl")
 include("test_facevalues.jl")
@@ -49,3 +51,6 @@ include("test_deprecations.jl")
 HAS_EXTENSIONS && include("blockarrays.jl")
 include("test_examples.jl")
 @test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined
+
+# Integration tests
+include("integration/test_simple_scalar_convergence.jl")

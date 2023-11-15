@@ -1,44 +1,43 @@
 @testset "interpolations" begin
 
 @testset "Value Type $value_type" for value_type in (Float32,Float64)
-    @testset "$interpolation" for interpolation in (
-                        Lagrange{RefLine, 1}(),
-                        Lagrange{RefLine, 2}(),
-                        Lagrange{RefQuadrilateral, 1}(),
-                        Lagrange{RefQuadrilateral, 2}(),
-                        Lagrange{RefQuadrilateral, 3}(),
-                        Lagrange{RefTriangle, 1}(),
-                        Lagrange{RefTriangle, 2}(),
-                        Lagrange{RefTriangle, 3}(),
-                        Lagrange{RefTriangle, 4}(),
-                        Lagrange{RefTriangle, 5}(),
-                        Lagrange{RefHexahedron, 1}(),
-                        Lagrange{RefHexahedron, 2}(),
-                        Serendipity{RefQuadrilateral, 2}(),
-                        Serendipity{RefHexahedron, 2}(),
-                        Lagrange{RefTetrahedron, 1}(),
-                        Lagrange{RefTetrahedron, 2}(),
-                        Lagrange{RefPrism, 1}(),
-                        Lagrange{RefPrism, 2}(),
-                        Lagrange{RefPyramid, 1}(),
-                        Lagrange{RefPyramid, 2}(),
-                        #
-                        DiscontinuousLagrange{RefLine, 0}(),
-                        DiscontinuousLagrange{RefQuadrilateral, 0}(),
-                        DiscontinuousLagrange{RefHexahedron, 0}(),
-                        DiscontinuousLagrange{RefTriangle, 0}(),
-                        DiscontinuousLagrange{RefTetrahedron, 0}(),
-                        DiscontinuousLagrange{RefLine, 1}(),
-                        DiscontinuousLagrange{RefQuadrilateral, 1}(),
-                        DiscontinuousLagrange{RefHexahedron, 1}(),
-                        DiscontinuousLagrange{RefTriangle, 1}(),
-                        DiscontinuousLagrange{RefTetrahedron, 1}(),
-                        #
-                        BubbleEnrichedLagrange{RefTriangle, 1}(),
-                        #
-                        CrouzeixRaviart{RefTriangle, 1}(),
-        )
-
+    @testset "Correctness of $interpolation" for interpolation in (
+                      Lagrange{RefLine, 1}(),
+                      Lagrange{RefLine, 2}(),
+                      Lagrange{RefQuadrilateral, 1}(),
+                      Lagrange{RefQuadrilateral, 2}(),
+                      Lagrange{RefQuadrilateral, 3}(),
+                      Lagrange{RefTriangle, 1}(),
+                      Lagrange{RefTriangle, 2}(),
+                      Lagrange{RefTriangle, 3}(),
+                      Lagrange{RefTriangle, 4}(),
+                      Lagrange{RefTriangle, 5}(),
+                      Lagrange{RefHexahedron, 1}(),
+                      Lagrange{RefHexahedron, 2}(),
+                      Serendipity{RefQuadrilateral, 2}(),
+                      Serendipity{RefHexahedron, 2}(),
+                      Lagrange{RefTetrahedron, 1}(),
+                      Lagrange{RefTetrahedron, 2}(),
+                      Lagrange{RefPrism, 1}(),
+                      Lagrange{RefPrism, 2}(),
+                      Lagrange{RefPyramid, 1}(),
+                      Lagrange{RefPyramid, 2}(),
+                      #
+                      DiscontinuousLagrange{RefLine, 0}(),
+                      DiscontinuousLagrange{RefQuadrilateral, 0}(),
+                      DiscontinuousLagrange{RefHexahedron, 0}(),
+                      DiscontinuousLagrange{RefTriangle, 0}(),
+                      DiscontinuousLagrange{RefTetrahedron, 0}(),
+                      DiscontinuousLagrange{RefLine, 1}(),
+                      DiscontinuousLagrange{RefQuadrilateral, 1}(),
+                      DiscontinuousLagrange{RefHexahedron, 1}(),
+                      DiscontinuousLagrange{RefTriangle, 1}(),
+                      DiscontinuousLagrange{RefTetrahedron, 1}(),
+                      #
+                      BubbleEnrichedLagrange{RefTriangle, 1}(),
+                      #
+                      CrouzeixRaviart{RefTriangle, 1}(),
+    )
         # Test of utility functions
         ref_dim = Ferrite.getdim(interpolation)
         ref_shape = Ferrite.getrefshape(interpolation)
@@ -48,19 +47,28 @@
         # Note that not every element formulation exists for every order and dimension.
         applicable(Ferrite.getlowerorder, interpolation) && @test typeof(Ferrite.getlowerorder(interpolation)) <: Interpolation{ref_shape,func_order-1}
 
-        # Check partition of unity at random point.
         n_basefuncs = getnbasefunctions(interpolation)
-        x = rand(Tensor{1, ref_dim, value_type, ref_dim})
-        f = (x) -> [shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
-        @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
-            reinterpret(value_type, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
-        @test sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ value_type(1.0)
-
-        # Check if the important functions are consistent
         coords = Ferrite.reference_coordinates(interpolation)
         @test length(coords) == n_basefuncs
-        @test shape_value(interpolation, x, n_basefuncs) == shape_value(interpolation, x, n_basefuncs)
-        @test_throws ArgumentError shape_value(interpolation, x, n_basefuncs+1)
+        f(x) = [shape_value(interpolation, Tensor{1, ref_dim}(x), i) for i in 1:n_basefuncs]
+
+        #TODO prefer this test style after 1.6 is removed from CI
+        # @testset let x = sample_random_point(ref_shape) # not compatible with Julia 1.6
+        x = Vec{ref_dim,value_type}(sample_random_point(ref_shape))
+        random_point_testset = @testset "Random point test" begin
+            # Check gradient evaluation
+            @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
+                reinterpret(value_type, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
+            # Check partition of unity at random point.
+            @test sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
+            # Check if the important functions are consistent
+            @test_throws ArgumentError shape_value(interpolation, x, n_basefuncs+1)
+            # Idempotency test
+            @test shape_value(interpolation, x, n_basefuncs) == shape_value(interpolation, x, n_basefuncs)
+        end
+        # Remove after 1.6 is removed from CI (see above)
+        # Show coordinate in case failure (see issue #811)
+        !isempty(random_point_testset.results) && println("^^^^^Random point test failed at $x for $interpolation !^^^^^")
 
         # Test whether we have for each entity corresponding dof indices (possibly empty)
         @test length(Ferrite.vertexdof_indices(interpolation)) == Ferrite.nvertices(interpolation)
@@ -112,7 +120,7 @@
                 if k == dof
                     @test N_dof ≈ 1.0
                 else
-                    factor = interpolation isa Lagrange{RefQuadrilateral, 3} ? 250 : 5
+                    factor = interpolation isa Lagrange{RefQuadrilateral, 3} ? 200 : 4
                     @test N_dof ≈ 0.0 atol = factor * eps(value_type)
                 end
             end
@@ -174,12 +182,12 @@
             @test eltype(shape_value(v_interpolation_1, x, dof)) == value_type
             @test eltype(shape_gradient(v_interpolation_3, x, dof)) == value_type # Gradient currently only works for
         end
-    end
+    end # correctness testset
 
-    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTriangle,0}()) ≈ [Vec{2}((1/3,1/3))]
-    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefQuadrilateral,0}()) ≈ [Vec{2}((0,0))]
-    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTetrahedron,0}()) ≈ [Vec{3}((1/4,1/4,1/4))]
-    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefHexahedron,0}()) ≈ [Vec{3}((0,0,0))]
+    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTriangle,0}()) ≈ [Vec{2,Float64}((1/3,1/3))]
+    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefQuadrilateral,0}()) ≈ [Vec{2,Float64}((0,0))]
+    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTetrahedron,0}()) ≈ [Vec{3,Float64}((1/4,1/4,1/4))]
+    @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefHexahedron,0}()) ≈ [Vec{3,Float64}((0,0,0))]
 
     # Test discontinuous interpolations related functions
     d_ip = DiscontinuousLagrange{RefQuadrilateral,1}()

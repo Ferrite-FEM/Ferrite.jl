@@ -68,12 +68,8 @@ function CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(qr::QR, ip::I
     dMdξ = fill(zero(dMdξ_t) * T(NaN), n_geom_basefuncs, n_qpoints)
 
     for (qp, ξ) in pairs(getpoints(qr))
-        for basefunc in 1:n_func_basefuncs
-            dNdξ[basefunc, qp], N[basefunc, qp] = shape_gradient_and_value(ip, ξ, basefunc)
-        end
-        for basefunc in 1:n_geom_basefuncs
-            dMdξ[basefunc, qp], M[basefunc, qp] = shape_gradient_and_value(gip, ξ, basefunc)
-        end
+        shape_gradients_and_values!(@view(dNdξ[:, qp]), @view(N[:, qp]), ip, ξ)
+        shape_gradients_and_values!(@view(dMdξ[:, qp]), @view(M[:, qp]), gip, ξ)
     end
 
     detJdV = fill(T(NaN), n_qpoints)

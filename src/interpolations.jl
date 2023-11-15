@@ -89,58 +89,44 @@ struct InterpolationInfo
     adjust_during_distribution::Bool
     n_copies::Int
     is_discontinuous::Bool
-    function InterpolationInfo(interpolation::InterpolationByDim{3})
-        n_copies = 1
-        if interpolation isa VectorizedInterpolation
-            n_copies = get_n_copies(interpolation)
-            interpolation = interpolation.ip
-        end
-        new(
-            [length(i) for i ∈ vertexdof_indices(interpolation)],
-            [length(i) for i ∈ edgedof_interior_indices(interpolation)],
-            [length(i) for i ∈ facedof_interior_indices(interpolation)],
-            length(celldof_interior_indices(interpolation)),
-            3,
-            adjust_dofs_during_distribution(interpolation),
-            n_copies,
-            is_discontinuous(interpolation)
-        )
-    end
-    function InterpolationInfo(interpolation::InterpolationByDim{2})
-        n_copies = 1
-        if interpolation isa VectorizedInterpolation
-            n_copies = get_n_copies(interpolation)
-            interpolation = interpolation.ip
-        end
-        new(
-            [length(i) for i ∈ vertexdof_indices(interpolation)],
-            Int[],
-            [length(i) for i ∈ facedof_interior_indices(interpolation)],
-            length(celldof_interior_indices(interpolation)),
-            2,
-            adjust_dofs_during_distribution(interpolation),
-            n_copies,
-            is_discontinuous(interpolation)
-        )
-    end
-    function InterpolationInfo(interpolation::InterpolationByDim{1})
-        n_copies = 1
-        if interpolation isa VectorizedInterpolation
-            n_copies = get_n_copies(interpolation)
-            interpolation = interpolation.ip
-        end
-        new(
-            [length(i) for i ∈ vertexdof_indices(interpolation)],
-            Int[],
-            Int[],
-            length(celldof_interior_indices(interpolation)),
-            1,
-            adjust_dofs_during_distribution(interpolation),
-            n_copies,
-            is_discontinuous(interpolation)
-        )
-    end
 end
+function InterpolationInfo(interpolation::InterpolationByDim{3}, n_copies)
+    InterpolationInfo(
+        [length(i) for i ∈ vertexdof_indices(interpolation)],
+        [length(i) for i ∈ edgedof_interior_indices(interpolation)],
+        [length(i) for i ∈ facedof_interior_indices(interpolation)],
+        length(celldof_interior_indices(interpolation)),
+        3,
+        adjust_dofs_during_distribution(interpolation),
+        n_copies,
+        is_discontinuous(interpolation)
+    )
+end
+function InterpolationInfo(interpolation::InterpolationByDim{2}, n_copies)
+    InterpolationInfo(
+        [length(i) for i ∈ vertexdof_indices(interpolation)],
+        Int[],
+        [length(i) for i ∈ facedof_interior_indices(interpolation)],
+        length(celldof_interior_indices(interpolation)),
+        2,
+        adjust_dofs_during_distribution(interpolation),
+        n_copies,
+        is_discontinuous(interpolation)
+    )
+end
+function InterpolationInfo(interpolation::InterpolationByDim{1}, n_copies)
+    InterpolationInfo(
+        [length(i) for i ∈ vertexdof_indices(interpolation)],
+        Int[],
+        Int[],
+        length(celldof_interior_indices(interpolation)),
+        1,
+        adjust_dofs_during_distribution(interpolation),
+        n_copies,
+        is_discontinuous(interpolation)
+    )
+end
+InterpolationInfo(interpolation::Interpolation) = InterpolationInfo(interpolation, 1)
 
 # Some redundant information about the geometry of the reference cells.
 nfaces(::Interpolation{RefHypercube{dim}}) where {dim} = 2*dim
@@ -203,6 +189,46 @@ getnbasefunctions(::Interpolation)
 #   facedof: dof in the dim-1 dimension (line in 2D, surface in 3D)
 #   edgedof: dof on a line between 2 vertices (i.e. "corners") (3D only)
 #   celldof: dof that is local to the element
+
+"""
+    shape_values!(values::AbstractArray{T}, ip::Interpolation, ξ::Vec)
+
+Evaluate all shape functions of `ip` at once at the reference point `ξ` and store them in
+`values`.
+"""
+@propagate_inbounds function shape_values!(values::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
+    @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
+    @inbounds for i in 1:getnbasefunctions(ip)
+        values[i] = shape_value(ip, ξ, i)
+    end
+end
+
+"""
+    shape_gradients!(gradients::AbstractArray, ip::Interpolation, ξ::Vec)
+
+Evaluate all shape function gradients of `ip` at once at the reference point `ξ` and store
+them in `gradients`.
+"""
+function shape_gradients!(gradients::AT, ip::IP, ξ::Vec) where {IP <: Interpolation, AT <: AbstractArray}
+    @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
+    @inbounds for i in 1:getnbasefunctions(ip)
+        gradients[i] = shape_gradient(ip, ξ, i)
+    end
+end
+
+"""
+    shape_gradients_and_values!(gradients::AbstractArray, values::AbstractArray, ip::Interpolation, ξ::Vec)
+
+Evaluate all shape function gradients and values of `ip` at once at the reference point `ξ`
+and store them in `values`.
+"""
+function shape_gradients_and_values!(gradients::GAT, values::SAT, ip::IP, ξ::Vec) where {IP <: Interpolation, SAT <: AbstractArray, GAT <: AbstractArray}
+    @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
+    @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
+    @inbounds for i in 1:getnbasefunctions(ip)
+        gradients[i], values[i] = shape_gradient_and_value(ip, ξ, i)
+    end
+end
 
 """
     shape_value(ip::Interpolation, ξ::Vec, i::Int)
@@ -1242,6 +1268,7 @@ end
 #######################################
 # Taken from https://defelement.com/elements/bubble-enriched-lagrange.html
 getnbasefunctions(::BubbleEnrichedLagrange{RefTriangle,1}) = 4
+adjust_dofs_during_distribution(::BubbleEnrichedLagrange{RefTriangle,1}) = false
 
 vertexdof_indices(::BubbleEnrichedLagrange{RefTriangle,1}) = ((1,), (2,), (3,))
 facedof_indices(::BubbleEnrichedLagrange{RefTriangle,1}) = ((1,2), (2,3), (3,1))
@@ -1470,6 +1497,7 @@ end
 
 # Helper to get number of copies for DoF distribution
 get_n_copies(::VectorizedInterpolation{vdim}) where vdim = vdim
+InterpolationInfo(ip::VectorizedInterpolation) = InterpolationInfo(ip.ip, get_n_copies(ip))
 
 function getnbasefunctions(ipv::VectorizedInterpolation{vdim}) where vdim
     return vdim * getnbasefunctions(ipv.ip)
