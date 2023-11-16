@@ -64,7 +64,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 # We shall use a neo-Hookean model, where the potential can be written as
 #
 # ```math
-# \Psi(\mathbf{C}) = \frac{\mu}{2} (I_1 - 3) - \mu \ln(J) + \frac{\lambda}{2} \ln(J)^2,
+# \Psi(\mathbf{C}) = \frac{\mu}{2} (I_1 - 3 - 2 \ln(J)) + \frac{\lambda}{2} (J - 1)^2,
 # ```
 #
 # where ``I_1 = \mathrm{tr}(\mathbf{C})`` is the first invariant, ``J = \sqrt{\det(\mathbf{C})}``
@@ -157,7 +157,7 @@ function Ψ(C, mp::NeoHooke)
     λ = mp.λ
     Ic = tr(C)
     J = sqrt(det(C))
-    return μ / 2 * (Ic - 3) - μ * log(J) + λ / 2 * log(J)^2
+    return μ / 2 * (Ic - 3 - 2 * log(J)) + λ / 2 * (J - 1)^2
 end
 
 function constitutive_driver(C, mp::NeoHooke)
