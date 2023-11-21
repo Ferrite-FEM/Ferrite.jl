@@ -32,19 +32,17 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 FaceValues
 
 struct FaceValues{FV, GM, QR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:AbstractVector{GM}} <: AbstractFaceValues
-    fun_values::V_FV # AbstractVector{FunctionValues}
+    fun_values::V_FV  # AbstractVector{FunctionValues}
     geo_mapping::V_GM # AbstractVector{GeometryMapping}
-    qr::QR           # FaceQuadratureRule
-    detJdV::detT     # AbstractVector{<:Number}
-    normals::nT      # AbstractVector{<:Vec}
+    qr::QR            # FaceQuadratureRule
+    detJdV::detT      # AbstractVector{<:Number}
+    normals::nT       # AbstractVector{<:Vec}
     current_face::ScalarWrapper{Int}
 end
 
 function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}=default_geometric_interpolation(ip_fun); difforder=Val(1)) where {T,sdim} 
-    _difforder(::Val{N}) where N = N
-    _difforder(N::Int) = N
-    GeoDiffOrder = increased_diff_order(get_mapping_type(ip_fun)) + _difforder(difforder)
-    FunDiffOrder = _difforder(difforder)
+    GeoDiffOrder = increased_diff_order(get_mapping_type(ip_fun)) + _extract_val(difforder)
+    FunDiffOrder = _extract_val(difforder)
     
     geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]
     fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]

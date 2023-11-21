@@ -30,10 +30,10 @@ typeof_dNdξ(::Type{T}, ::VInterpolationDims{dim,dim,dim}) where {T,dim} = Tenso
 typeof_dNdξ(::Type{T}, ::VInterpolationDims{rdim,<:Any,vdim}) where {T,rdim,vdim} = SMatrix{vdim,rdim,T} # If vdim=rdim!=sdim Tensor would be possible...
 
 """
-    FunctionValues(::Type{T}, ip_fun, qr::QuadratureRule, ip_geo::VectorizedInterpolation)
+    FunctionValues{DiffOrder}(::Type{T}, ip_fun, qr::QuadratureRule, ip_geo::VectorizedInterpolation)
 
-Create a `FunctionValues` object containing the shape values and gradients for both the reference 
-cell (precalculated) and the real cell (updated in `reinit!`). 
+Create a `FunctionValues` object containing the shape values and gradients (up to order `DiffOrder`) 
+for both the reference cell (precalculated) and the real cell (updated in `reinit!`). 
 """
 FunctionValues
 
@@ -49,9 +49,6 @@ struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t}
     function FunctionValues(ip::Interpolation, N_x::N_t, N_ξ::N_t, dNdx::AbstractMatrix, dNdξ::AbstractMatrix) where {N_t<:AbstractMatrix}
         return new{1, typeof(ip), N_t, typeof(dNdx), typeof(dNdξ)}(ip, N_x, N_ξ, dNdx, dNdξ)
     end
-end
-function FunctionValues(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where T
-    return FunctionValues{1}(T, ip, qr, ip_geo)
 end
 function FunctionValues{0}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where T
     ip_dims = InterpolationDims(ip, ip_geo)
@@ -91,9 +88,9 @@ end
 function Base.copy(v::FunctionValues)
     N_ξ_copy = copy(v.N_ξ)
     N_x_copy = v.N_ξ === v.N_x ? N_ξ_copy : copy(v.N_x) # Preserve aliasing
-    copy_or_nothing(x) = copy(x)
-    copy_or_nothing(::Nothing) = nothing
-    return FunctionValues(copy(v.ip), N_x_copy, N_ξ_copy, copy_or_nothing(v.dNdx), copy_or_nothing(v.dNdξ))
+    dNdx_copy = _copy_or_nothing(v.dNdx)
+    dNdξ_copy = _copy_or_nothing(v.dNdξ)
+    return FunctionValues(copy(v.ip), N_x_copy, N_ξ_copy, dNdx_copy, dNdξ_copy)
 end
 
 getnbasefunctions(funvals::FunctionValues) = size(funvals.N_x, 1)

@@ -93,9 +93,7 @@ function precompute_values!(gm::GeometryMapping{2}, qr)
 end
 
 function Base.copy(v::GeometryMapping)
-    copy_or_nothing(x) = copy(x)
-    copy_or_nothing(::Nothing) = nothing
-    return GeometryMapping(copy(v.ip), copy(v.M), copy_or_nothing(v.dMdξ), copy_or_nothing(v.d2Mdξ2))
+    return GeometryMapping(copy(v.ip), copy(v.M), _copy_or_nothing(v.dMdξ), _copy_or_nothing(v.d2Mdξ2))
 end
 
 getngeobasefunctions(geo_mapping::GeometryMapping) = size(geo_mapping.M, 1)
