@@ -71,6 +71,7 @@ getnquadpoints(fv::FaceValues) = @inbounds getnquadpoints(fv.qr, getcurrentface(
 shape_value_type(fv::FaceValues) = shape_value_type(get_fun_values(fv))
 shape_gradient_type(fv::FaceValues) = shape_gradient_type(get_fun_values(fv))
 get_function_interpolation(fv::FaceValues) = get_function_interpolation(get_fun_values(fv))
+get_function_difforder(fv::FaceValues) = get_function_difforder(get_fun_values(fv))
 get_geometric_interpolation(fv::FaceValues) = get_geometric_interpolation(get_geo_mapping(fv))
 
 get_geo_mapping(fv::FaceValues) = @inbounds fv.geo_mapping[getcurrentface(fv)]

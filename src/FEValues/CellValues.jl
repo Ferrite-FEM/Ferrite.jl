@@ -41,12 +41,12 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     qr::QR         # QuadratureRule
     detJdV::detT   # AbstractVector{<:Number}
 end
-function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; difforder=Val(1), save_detJ=true) where T 
-    GeoDiffOrder = max(increased_diff_order(get_mapping_type(ip_fun)) + _extract_val(difforder), save_detJ)
+function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; difforder=Val(1), save_detJ=Val(true)) where T 
+    GeoDiffOrder = max(increased_diff_order(get_mapping_type(ip_fun)) + _extract_val(difforder), _extract_val(save_detJ))
     FunDiffOrder = _extract_val(difforder)
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
-    detJdV = save_detJ ? fill(T(NaN), length(getweights(qr))) : nothing
+    detJdV = _extract_val(save_detJ) ? fill(T(NaN), length(getweights(qr))) : nothing
     return CellValues(fun_values, geo_mapping, qr, detJdV)
 end
 
@@ -81,6 +81,7 @@ getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 # Accessors for function values 
 getnbasefunctions(cv::CellValues) = getnbasefunctions(cv.fun_values)
 get_function_interpolation(cv::CellValues) = get_function_interpolation(cv.fun_values)
+get_function_difforder(cv::CellValues) = get_function_difforder(cv.fun_values)
 shape_value_type(cv::CellValues) = shape_value_type(cv.fun_values)
 shape_gradient_type(cv::CellValues) = shape_gradient_type(cv.fun_values)
 
@@ -125,10 +126,12 @@ function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     ip_fun = get_function_interpolation(cv)
     rdim = getdim(ip_geo)
     vdim = isa(shape_value(cv, 1, 1), Vec) ? length(shape_value(cv, 1, 1)) : 0
-    sdim = length(shape_gradient(cv, 1, 1)) ÷ length(shape_value(cv, 1, 1))
+    GradT = shape_gradient_type(cv)
+    sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
     vstr = vdim==0 ? "scalar" : "vdim=$vdim"
     print(io, "CellValues(", vstr, ", rdim=$rdim, and sdim=$sdim): ")
     print(io, getnquadpoints(cv), " quadrature points")
     print(io, "\n Function interpolation: "); show(io, d, ip_fun)
-    print(io, "\nGeometric interpolation: "); show(io, d, ip_geo^sdim)
+    print(io, "\nGeometric interpolation: "); 
+    sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
 end
