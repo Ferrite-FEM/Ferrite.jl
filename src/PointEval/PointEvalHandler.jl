@@ -241,11 +241,12 @@ function _evaluate_at_points!(
     # preallocate some stuff specific to this cellset
     idx = findfirst(!isnothing, local_coords)
     idx === nothing && return out_vals
-    pv = PointValues(local_coords[idx], ip; difforder=Val(0))
     first_cell = cellset === nothing ? 1 : first(cellset)
-    cell_dofs = Vector{Int}(undef, ndofs_per_cell(dh, first_cell))
-    u_e = Vector{T}(undef, ndofs_per_cell(dh, first_cell))
     grid = get_grid(dh)
+    ip_geo = default_interpolation(getcelltype(grid, first_cell))
+    pv = PointValues(eltype(local_coords[idx]), ip, ip_geo; difforder=Val(0))
+    cell_dofs = Vector{Int}(undef, ndofs_per_cell(dh, first_cell))
+    u_e = Vector{T}(undef, ndofs_per_cell(dh, first_cell))    
     x = getcoordinates(grid, first_cell)
     # compute point values
     for pointid in eachindex(ph.cells)
