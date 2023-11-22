@@ -357,8 +357,41 @@ end
     @test contains(pv_showstring, "Function interpolation: Lagrange{RefPrism, 2}()")
 end
 
-@testset "SimpleCellValues" begin
-    include(joinpath(@__DIR__, "../docs/src/topics/SimpleCellValues_literate.jl"))
+@testset "CustomCellValues" begin
+    
+    @testset "SimpleCellValues" begin
+        include(joinpath(@__DIR__, "../docs/src/topics/SimpleCellValues_literate.jl"))
+    end
+    
+    @testset "TestCustomCellValues" begin
+    
+        struct TestCustomCellValues{CV<:CellValues} <: Ferrite.AbstractValues
+            cv::CV
+        end
+        # Check that the list in devdocs/FEValues.md is true
+        # If changes are made that makes the following tests fails,
+        # the devdocs should be updated accordingly.
+        for op = (:shape_value, :shape_gradient, :getnquadpoints, :getnbasefunctions, :geometric_value, :getngeobasefunctions)
+            eval(quote
+                Ferrite.$op(cv::TestCustomCellValues, args...; kwargs...) = Ferrite.$op(cv.cv, args...; kwargs...)
+            end)
+        end
+        ip = Lagrange{RefQuadrilateral,1}()^2
+        qr = QuadratureRule{RefQuadrilateral}(2)
+        cv = CellValues(qr, ip)
+        grid = generate_grid(Quadrilateral, (1,1))
+        x = getcoordinates(grid, 1)
+        cell = getcells(grid, 1)
+        reinit!(cv, x, cell)
+        ae = rand(getnbasefunctions(cv))
+        q_point = rand(1:getnquadpoints(cv))
+        cv_custom = TestCustomCellValues(cv)
+        for fun in (function_value, function_gradient, 
+                        function_divergence, function_symmetric_gradient, function_curl)
+            @test fun(cv_custom, q_point, ae) == fun(cv, q_point, ae)
+        end
+        @test spatial_coordinate(cv_custom, q_point, x) == spatial_coordinate(cv, q_point, x)
+    end
 end
 
 end # of testset
