@@ -26,8 +26,10 @@ end
 end
 
 """
-    reinit!(cv::CellValues, x::Vector, cell::Union{AbstractCell,Nothing}=nothing)
-    reinit!(fv::FaceValues, x::Vector, face::Int, cell::Union{AbstractCell,Nothing}=nothing)
+    reinit!(cv::CellValues, x::Vector, cell::AbstractCell)
+    reinit!(cv::CellValues, x::Vector)
+    reinit!(fv::FaceValues, x::Vector, face::Int, cell::AbstractCell)
+    reinit!(fv::FaceValues, x::Vector, face::Int)
 
 Update the `CellValues`/`FaceValues` object for a cell or face with coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
