@@ -3,25 +3,32 @@
 using Ferrite, Test
 
 # Define a simple version of the cell values object, which only supports
-# identity mapping of scalar interpolations, without embedding. 
+# scalar interpolations using an identity mapping from reference to physical
+# elements. Here we assume that the element has the same dimension
+# as the physical space, which excludes for example surface elements.
 struct SimpleCellValues{T, dim} <: Ferrite.AbstractCellValues
-    N::Matrix{T}             # Precalculated shape values
-    dNdξ::Matrix{Vec{dim,T}} # Precalculated shape gradients in the reference domain
-    dNdx::Matrix{Vec{dim,T}} # Cache for shape gradients in the real domain
-    M::Matrix{T}             # Precalculated geometric shape values
-    dMdξ::Matrix{Vec{dim,T}} # Precalculated geometric shape gradients
-    weights::Vector{T}       # Given quadrature weights in the reference domain
-    detJdV::Vector{T}        # Cache for quadrature weights in the real domain
+    N::Matrix{T}             # Precalculated shape values, N[i, q_point] where i is the
+#                            # shape function number and q_point the integration point
+    dNdξ::Matrix{Vec{dim,T}} # Precalculated shape gradients in the reference domain, dNdξ[i, q_point]
+    dNdx::Matrix{Vec{dim,T}} # Cache for shape gradients in the physical domain, dNdx[i, q_point]
+    M::Matrix{T}             # Precalculated geometric shape values, M[j, q_point] where j is the 
+#                            # geometric shape function number
+    dMdξ::Matrix{Vec{dim,T}} # Precalculated geometric shape gradients, dMdξ[j, q_point]
+    weights::Vector{T}       # Given quadrature weights in the reference domain, weights[q_point]
+    detJdV::Vector{T}        # Cache for quadrature weights in the physical domain, detJdV[q_point], i.e.
+#                            # det(J)*weight[q_point], where J is the jacobian of the geometric mapping
+#                            # at the quadrature point, q_point.
 end;
 
-# To make it easier to initiate this struct, we create a constructor function
+# To make it easier to initialize this struct, we create a constructor function
 # with the same input as `CellValues`. However, we skip some consistency checking here. 
-function SimpleCellValues(qr::QuadratureRule, ip_fun::Interpolation, ip_geo::Interpolation, T=Float64)
+function SimpleCellValues(qr::QuadratureRule, ip_fun::Interpolation, ip_geo::Interpolation)
     dim = Ferrite.getdim(ip_fun)
     ## Quadrature weights and coordinates (in reference cell)
     weights = Ferrite.getweights(qr)
     n_qpoints = length(weights)
-
+    T = eltype(weights)
+    
     ## Function interpolation
     n_func_basefuncs = getnbasefunctions(ip_fun)
     N    = zeros(T,          n_func_basefuncs, n_qpoints)
@@ -47,12 +54,13 @@ function SimpleCellValues(qr::QuadratureRule, ip_fun::Interpolation, ip_geo::Int
     SimpleCellValues(N, dNdξ, dNdx, M, dMdξ, weights, detJdV)
 end;
 
-# We first define `getnbasefunctions` and `getnquadpoints`
+# We first create a dispatch of `getnbasefunctions` and `getnquadpoints` 
+# for our SimpleCellValues
 Ferrite.getnbasefunctions(cv::SimpleCellValues) = size(cv.N, 1);
 Ferrite.getnquadpoints(cv::SimpleCellValues) = size(cv.N, 2);
 
-# Before we define the `reinit!` function to calculate the cached 
-# values `dNdx` and `detJdV` for the current cell
+# Before we define the dispatch of `reinit!` function to calculate 
+# the cached values `dNdx` and `detJdV` for the current cell
 function Ferrite.reinit!(cv::SimpleCellValues, x::Vector{Vec{dim,T}}) where {dim,T}
     for (q_point, w) in pairs(cv.weights) # Loop over each quadrature point
         ## Calculate the jacobian, J
@@ -81,7 +89,8 @@ ip = Lagrange{RefQuadrilateral,1}()
 simple_cv = SimpleCellValues(qr, ip, ip)
 cv = CellValues(qr, ip, ip)
 
-# The first thing to try is to reinitialize the cell values to a given cell
+# The first thing to try is to reinitialize the cell 
+# values to a given cell, in this case cell nr. 2
 grid = generate_grid(Quadrilateral, (2,2))
 x = getcoordinates(grid, 2)
 reinit!(simple_cv, x)
