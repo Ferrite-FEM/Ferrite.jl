@@ -64,11 +64,23 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 # We shall use a neo-Hookean model, where the potential can be written as
 #
 # ```math
-# \Psi(\mathbf{C}) = \frac{\mu}{2} (I_1 - 3 - 2 \ln(J)) + \frac{\lambda}{2} (J - 1)^2,
+# \Psi(\mathbf{C}) = \underbrace{\frac{\mu}{2} (I_1 - 3)}_{W(C)} \underbrace{- {\mu} \ln(J) + \frac{\lambda}{2} (J - 1)^2}_{U(J)},
 # ```
 #
 # where ``I_1 = \mathrm{tr}(\mathbf{C})`` is the first invariant, ``J = \sqrt{\det(\mathbf{C})}``
 # and ``\mu`` and ``\lambda`` material parameters.
+# Note that we use here a compressible formulation of the original incompressible Neo Hooke model $W(F)$.
+# In order to compensate the compressible behavior, a volume penalty $U(J)$ is incorporated in $\psi$.
+# !!! note
+#    The Neo-Hooke model is only a well defined terminology in the incompressible case.
+#    Thus, only $W(C)$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
+#    In order to obtain a well-posed problem, it is crucial to choose a convex formulation of $U(J)$.
+#    Other examples for $U(J)$ can be found, e.g. in [Hol:2000:nsm; Eq. (6.138)]
+#    ```math
+#     \beta^{-2} (\beta \ln J + J^{-\beta} -1)
+#    ```
+#    where [SimMie:1992:act; Eq. (2.37)] published a non-generalized version with $\beta=-2$.
+#    This shows the possible variety of $U(J)$ while all of them refer to compressible neo-Hookean models.
 # From the potential we obtain the second Piola-Kirchoff stress ``\mathbf{S}`` as
 #
 # ```math
@@ -413,7 +425,7 @@ u = solve();
 
 ## test the result                #src
 using Test                        #src
-@test norm(u) ≈ 4.766569347736084 #src
+@test norm(u) ≈ 4.761404305083876 #src
 
 #md # ## Plain program
 #md #
