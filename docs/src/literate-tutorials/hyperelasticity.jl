@@ -75,11 +75,11 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 #    The Neo-Hooke model is only a well defined terminology in the incompressible case.
 #    Thus, only $W(C)$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
 #    In order to obtain a well-posed problem, it is crucial to choose a convex formulation of $U(J)$.
-#    Other examples for $U(J)$ can be found, e.g. in [Hol:2000:nsm; Eq. (6.138)]
+#    Other examples for $U(J)$ can be found, e.g. in [Hol:2000:nsm; Eq. (6.138)](@cite)
 #    ```math
 #     \beta^{-2} (\beta \ln J + J^{-\beta} -1)
 #    ```
-#    where [SimMie:1992:act; Eq. (2.37)] published a non-generalized version with $\beta=-2$.
+#    where [SimMie:1992:act; Eq. (2.37)](@cite) published a non-generalized version with $\beta=-2$.
 #    This shows the possible variety of $U(J)$ while all of them refer to compressible neo-Hookean models.
 # From the potential we obtain the second Piola-Kirchoff stress ``\mathbf{S}`` as
 #
@@ -223,7 +223,7 @@ end;
 #
 # A detailed derivation can be found in every continuum mechanics book, which has a
 # chapter about finite elasticity theory. We used "Nonlinear solid mechanics: a continuum
-# approach for engineering science." by Gerhard Holzapfel (chapter 8) as a reference.
+# approach for engineering science." by [Hol:2000:nsm; Chapter 8](@cite) as a reference.
 #
 # ## Finite element assembly
 #
