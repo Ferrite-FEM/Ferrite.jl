@@ -64,23 +64,25 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 # We shall use a neo-Hookean model, where the potential can be written as
 #
 # ```math
-# \Psi(\mathbf{C}) = \underbrace{\frac{\mu}{2} (I_1 - 3)}_{W(C)} \underbrace{- {\mu} \ln(J) + \frac{\lambda}{2} (J - 1)^2}_{U(J)},
+# \Psi(\mathbf{C}) = \underbrace{\frac{\mu}{2} (I_1 - 3)}_{W(\mathbf{C})} \underbrace{- {\mu} \ln(J) + \frac{\lambda}{2} (J - 1)^2}_{U(J)},
 # ```
 #
 # where ``I_1 = \mathrm{tr}(\mathbf{C})`` is the first invariant, ``J = \sqrt{\det(\mathbf{C})}``
 # and ``\mu`` and ``\lambda`` material parameters.
 # Note that we use here a compressible formulation of the original incompressible Neo Hooke model $W(F)$.
 # In order to compensate the compressible behavior, a volume penalty $U(J)$ is incorporated in $\psi$.
+# We use one possible, well-posed formulation from [Wikipedia](https://en.wikipedia.org/wiki/Neo-Hookean_solid)
 # !!! note
-#    The Neo-Hooke model is only a well defined terminology in the incompressible case.
-#    Thus, only $W(C)$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
-#    In order to obtain a well-posed problem, it is crucial to choose a convex formulation of $U(J)$.
-#    Other examples for $U(J)$ can be found, e.g. in [Hol:2000:nsm; Eq. (6.138)](@cite)
-#    ```math
-#     \beta^{-2} (\beta \ln J + J^{-\beta} -1)
-#    ```
-#    where [SimMie:1992:act; Eq. (2.37)](@cite) published a non-generalized version with $\beta=-2$.
-#    This shows the possible variety of $U(J)$ while all of them refer to compressible neo-Hookean models.
+#     The Neo-Hooke model is only a well defined terminology in the incompressible case.
+#     Thus, only $W(C)$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
+#     In order to obtain a well-posed problem, it is crucial to choose a convex formulation of $U(J)$.
+#     Other examples for $U(J)$ can be found, e.g. in [Hol:2000:nsm; Eq. (6.138)](@cite)
+#     ```math
+#      \beta^{-2} (\beta \ln J + J^{-\beta} -1)
+#     ```
+#     where [SimMie:1992:act; Eq. (2.37)](@cite) published a non-generalized version with $\beta=-2$.
+#     This shows the possible variety of $U(J)$ while all of them refer to compressible neo-Hookean models.
+#     Sometimes the modified first invariant $\overbar{I}_1=\frac{I_1}{I_3^{1/3}}$ is used in $W((\mathbf{C})$ instead of $I_1$.
 # From the potential we obtain the second Piola-Kirchoff stress ``\mathbf{S}`` as
 #
 # ```math
