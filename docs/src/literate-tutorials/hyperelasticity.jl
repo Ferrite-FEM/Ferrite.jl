@@ -74,7 +74,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 # We use one possible, well-posed formulation from [Wikipedia](https://en.wikipedia.org/wiki/Neo-Hookean_solid)
 # !!! note
 #     The Neo-Hooke model is only a well defined terminology in the incompressible case.
-#     Thus, only $W(C)$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
+#     Thus, only $W(\mathbf{C})$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
 #     In order to obtain a well-posed problem, it is crucial to choose a convex formulation of $U(J)$.
 #     Other examples for $U(J)$ can be found, e.g. in [Hol:2000:nsm; Eq. (6.138)](@cite)
 #     ```math
@@ -82,7 +82,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 #     ```
 #     where [SimMie:1992:act; Eq. (2.37)](@cite) published a non-generalized version with $\beta=-2$.
 #     This shows the possible variety of $U(J)$ while all of them refer to compressible neo-Hookean models.
-#     Sometimes the modified first invariant $\overbar{I}_1=\frac{I_1}{I_3^{1/3}}$ is used in $W((\mathbf{C})$ instead of $I_1$.
+#     Sometimes the modified first invariant $\overline{I}_1=\frac{I_1}{I_3^{1/3}}$ is used in $W(\mathbf{C})$ instead of $I_1$.
 # From the potential we obtain the second Piola-Kirchoff stress ``\mathbf{S}`` as
 #
 # ```math
