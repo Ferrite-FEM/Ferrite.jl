@@ -422,7 +422,7 @@ function test_field_on_subdomain()
     @test Ferrite.find_field(dh.subdofhandlers[1], :v) == 1
     @test Ferrite.find_field(dh.subdofhandlers[2], :v) == 1
     @test Ferrite.find_field(dh.subdofhandlers[2], :s) == 2
-    @test_throws ErrorException Ferrite.find_field(dh.subdofhandlers[1], :s)
+    @test Ferrite.find_field(dh.subdofhandlers[1], :s) === nothing
 end
 
 function test_evaluate_at_grid_nodes()

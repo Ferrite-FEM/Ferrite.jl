@@ -47,9 +47,10 @@ dh = DofHandler(grid)
 sdh = SubDofHandler(dh, Set(1:getncells(grid)))
 add!(sdh, :u, ip^2)
 add!(sdh, :c, ip)
+close!(dh)
 
-@test dof_range(sdh, Ferrite.find_field(sdh, :u)) == 1:6
-@test dof_range(sdh, Ferrite.find_field(sdh, :c)) == 7:9
+@test (@inferred dof_range(sdh, :u)) == 1:6
+@test (@inferred dof_range(sdh, :c)) == 7:9
 end # testset
 
 @testset "Dofs for Line2" begin
