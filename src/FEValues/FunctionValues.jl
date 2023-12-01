@@ -136,7 +136,7 @@ get_mapping_type(fv::FunctionValues) = get_mapping_type(fv.ip)
 
 How many order higher geometric derivatives are required to  
 to map the function values and gradients from the reference cell 
-to the real cell geometry?
+to the physical cell geometry?
 """
 increased_diff_order(::IdentityMapping) = 0
 increased_diff_order(::ContravariantPiolaMapping) = 1

@@ -276,12 +276,9 @@ function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVecto
 end
 
 
-# Utility functions used by GeometryMapping, FunctionValues, FaceValues, CellValues 
+# Utility functions used by GeometryMapping, FunctionValues 
 _copy_or_nothing(x) = copy(x)
 _copy_or_nothing(::Nothing) = nothing
-
-_extract_val(v) = v
-_extract_val(::Val{N}) where N = N
 
 function shape_values!(values::AbstractMatrix, ip, qr::QuadratureRule)
     for (qp, ξ) in pairs(getpoints(qr))

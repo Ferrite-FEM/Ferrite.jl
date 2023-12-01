@@ -40,10 +40,8 @@ struct FaceValues{FV, GM, QR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:Abstract
     current_face::ScalarWrapper{Int}
 end
 
-function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}=default_geometric_interpolation(ip_fun); difforder=Val(1)) where {T,sdim} 
-    GeoDiffOrder = increased_diff_order(get_mapping_type(ip_fun)) + _extract_val(difforder)
-    FunDiffOrder = _extract_val(difforder)
-    
+function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}=default_geometric_interpolation(ip_fun); FunDiffOrder=1) where {T,sdim} 
+    GeoDiffOrder = max(increased_diff_order(get_mapping_type(ip_fun)) + FunDiffOrder, 1)
     geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]
     fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
     max_nquadpoints = maximum(qr->length(getweights(qr)), fqr.face_rules)

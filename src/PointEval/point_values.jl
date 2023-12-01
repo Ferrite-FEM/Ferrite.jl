@@ -28,8 +28,7 @@ function PointValues(cv::CellValues)
     T = typeof(getdetJdV(cv, 1))
     ip_fun = get_function_interpolation(cv)
     ip_geo = get_geometric_interpolation(cv)
-    FunDiffOrder = get_function_difforder(cv)
-    return PointValues(T, ip_fun, ip_geo; difforder=Val(FunDiffOrder))
+    return PointValues(T, ip_fun, ip_geo; FunDiffOrder = get_function_difforder(cv))
 end
 function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_interpolation(ip); kwargs...)
     return PointValues(Float64, ip, ipg; kwargs...)
@@ -40,7 +39,7 @@ function PointValues(::Type{T}, ip::IP, ipg::GIP = default_geometric_interpolati
     GIP <: Interpolation{shape}
 }
     qr = QuadratureRule{shape, T}([one(T)], [zero(Vec{dim, T})])
-    cv = CellValues(T, qr, ip, ipg; save_detJ=Val(false), kwargs...)
+    cv = CellValues(T, qr, ip, ipg; save_detJ=false, kwargs...)
     return PointValues{typeof(cv)}(cv)
 end
 
