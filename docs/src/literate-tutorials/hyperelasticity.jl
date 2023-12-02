@@ -225,7 +225,7 @@ end;
 #
 # A detailed derivation can be found in every continuum mechanics book, which has a
 # chapter about finite elasticity theory. We used "Nonlinear solid mechanics: a continuum
-# approach for engineering science." by [Hol:2000:nsm; Chapter 8](@cite) as a reference.
+# approach for engineering science." by [Hol:2000:nsm; Chapter 8](@citet) as a reference.
 #
 # ## Finite element assembly
 #
