@@ -61,7 +61,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 # The stress can be derived from an energy potential, defined in
 # terms of the right Cauchy-Green tensor ``\mathbf{C} = \mathbf{F}^{\mathrm{T}} \cdot \mathbf{F}``,
 # where ``\mathbf{F} = \mathbf{I} + \nabla_{\mathbf{X}} \mathbf{u}`` is the deformation gradient.
-# We shall use a neo-Hookean model, where the potential can be written as
+# We shall use the compressible neo-Hookean model from [Wikipedia](https://en.wikipedia.org/wiki/Neo-Hookean_solid) with the potential
 #
 # ```math
 # \Psi(\mathbf{C}) = \underbrace{\frac{\mu}{2} (I_1 - 3)}_{W(\mathbf{C})} \underbrace{- {\mu} \ln(J) + \frac{\lambda}{2} (J - 1)^2}_{U(J)},
@@ -69,10 +69,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 #
 # where ``I_1 = \mathrm{tr}(\mathbf{C})`` is the first invariant, ``J = \sqrt{\det(\mathbf{C})}``
 # and ``\mu`` and ``\lambda`` material parameters.
-# Note that we use here a compressible formulation of the original incompressible Neo Hooke model $W(F)$.
-# In order to compensate the compressible behavior, a volume penalty $U(J)$ is incorporated in $\psi$.
-# We use one possible, well-posed formulation from [Wikipedia](https://en.wikipedia.org/wiki/Neo-Hookean_solid)
-# !!! note
+# !!! details "Expand for further details on compressible neo-Hookean formulations"
 #     The Neo-Hooke model is only a well defined terminology in the incompressible case.
 #     Thus, only $W(\mathbf{C})$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
 #     In order to obtain a well-posed problem, it is crucial to choose a convex formulation of $U(J)$.
