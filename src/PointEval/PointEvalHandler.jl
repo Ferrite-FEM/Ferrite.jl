@@ -183,9 +183,9 @@ end
 function evaluate_at_points(ph::PointEvalHandler{<:Any, dim, T1}, dh::AbstractDofHandler, dof_vals::AbstractVector{T2},
                            fname::Symbol=find_single_field(dh)) where {dim, T1, T2}
     npoints = length(ph.cells)
-    # Figure out the value type by creating a dummy PointValuesInternal
+    # Figure out the value type by creating a dummy PointValues
     ip = getfieldinterpolation(dh, find_field(dh, fname))
-    pv = PointValuesInternal(zero(Vec{dim, T1}), ip)
+    pv = PointValues(T1, ip; FunDiffOrder=0)
     zero_val = function_value_init(pv, dof_vals)
     # Allocate the output as NaNs
     nanv = convert(typeof(zero_val), NaN * zero_val)
@@ -241,11 +241,13 @@ function _evaluate_at_points!(
     # preallocate some stuff specific to this cellset
     idx = findfirst(!isnothing, local_coords)
     idx === nothing && return out_vals
-    pv = PointValuesInternal(local_coords[idx], ip)
     first_cell = cellset === nothing ? 1 : first(cellset)
+    grid = get_grid(dh)
+    ip_geo = default_interpolation(getcelltype(grid, first_cell))
+    pv = PointValues(eltype(local_coords[idx]), ip, ip_geo; FunDiffOrder=0)
     cell_dofs = Vector{Int}(undef, ndofs_per_cell(dh, first_cell))
-    u_e = Vector{T}(undef, ndofs_per_cell(dh, first_cell))
-
+    u_e = Vector{T}(undef, ndofs_per_cell(dh, first_cell))    
+    x = getcoordinates(grid, first_cell)
     # compute point values
     for pointid in eachindex(ph.cells)
         cellid = ph.cells[pointid]
@@ -255,7 +257,8 @@ function _evaluate_at_points!(
         for (i, I) in pairs(cell_dofs)
             u_e[i] = dof_vals[I]
         end
-        reinit!(pv, local_coords[pointid])
+        getcoordinates!(x, grid, cellid)
+        reinit!(pv, x, local_coords[pointid])
         out_vals[pointid] = function_value(pv, 1, u_e, dofrange)
     end
     return out_vals

@@ -35,38 +35,27 @@ function default_geometric_interpolation(::Interpolation{shape}) where {dim, sha
     return VectorizedInterpolation{dim}(Lagrange{shape, 1}())
 end
 
-struct CellValues{FV, GM, QR, detT<:AbstractVector} <: AbstractCellValues
+struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     fun_values::FV # FunctionValues
     geo_mapping::GM # GeometryMapping
     qr::QR         # QuadratureRule
     detJdV::detT   # AbstractVector{<:Number}
 end
-function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation) where T 
-    geo_mapping = GeometryMapping(T, ip_geo.ip, qr, RequiresHessian(ip_fun, ip_geo))
-    fun_values = FunctionValues(T, ip_fun, qr, ip_geo)
-    detJdV = fill(T(NaN), length(getweights(qr)))
+function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; FunDiffOrder=1, save_detJ=true) where T 
+    GeoDiffOrder = max(increased_diff_order(get_mapping_type(ip_fun)) + FunDiffOrder, save_detJ)
+    geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
+    fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
+    detJdV = save_detJ ? fill(T(NaN), length(getweights(qr))) : nothing
     return CellValues(fun_values, geo_mapping, qr, detJdV)
 end
 
-CellValues(qr::QuadratureRule, ip::Interpolation, args...) = CellValues(Float64, qr, ip, args...)
-function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation=default_geometric_interpolation(ip)) where T
-    return CellValues(T, qr, ip, VectorizedInterpolation(ip_geo))
+CellValues(qr::QuadratureRule, ip::Interpolation, args...; kwargs...) = CellValues(Float64, qr, ip, args...; kwargs...)
+function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation=default_geometric_interpolation(ip); kwargs...) where T
+    return CellValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
 end
 
 function Base.copy(cv::CellValues)
     return CellValues(copy(cv.fun_values), copy(cv.geo_mapping), copy(cv.qr), copy(cv.detJdV))
-end
-
-"""
-    precompute_values!(cv::CellValues)
-
-Precompute all values for the current quadrature rule in `cv`. This method allows you to modify
-the quadrature positions, and then update all relevant parts of `cv` accordingly. 
-Used by `PointValues`.
-"""
-function precompute_values!(cv::CellValues)
-    precompute_values!(cv.fun_values, cv.qr)
-    precompute_values!(cv.geo_mapping, cv.qr)
 end
 
 # Access geometry values
@@ -79,6 +68,7 @@ getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 # Accessors for function values 
 getnbasefunctions(cv::CellValues) = getnbasefunctions(cv.fun_values)
 get_function_interpolation(cv::CellValues) = get_function_interpolation(cv.fun_values)
+get_function_difforder(cv::CellValues) = get_function_difforder(cv.fun_values)
 shape_value_type(cv::CellValues) = shape_value_type(cv.fun_values)
 shape_gradient_type(cv::CellValues) = shape_gradient_type(cv.fun_values)
 
@@ -90,6 +80,13 @@ end
 
 # Access quadrature rule values 
 getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
+
+@inline function _update_detJdV!(detJvec::AbstractVector, q_point::Int, w, mapping)
+    detJ = calculate_detJ(getjacobian(mapping))
+    detJ > 0.0 || throw_detJ_not_pos(detJ)
+    @inbounds detJvec[q_point] = detJ*w
+end
+@inline _update_detJdV!(::Nothing, q_point, w, mapping) = nothing
 
 function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
     geo_mapping = cv.geo_mapping
@@ -105,9 +102,7 @@ function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
     end
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
-        detJ = calculate_detJ(getjacobian(mapping))
-        detJ > 0.0 || throw_detJ_not_pos(detJ)
-        @inbounds cv.detJdV[q_point] = detJ*w
+        _update_detJdV!(cv.detJdV, q_point, w, mapping)
         apply_mapping!(fun_values, q_point, mapping, cell)
     end
     return nothing
@@ -118,10 +113,12 @@ function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     ip_fun = get_function_interpolation(cv)
     rdim = getdim(ip_geo)
     vdim = isa(shape_value(cv, 1, 1), Vec) ? length(shape_value(cv, 1, 1)) : 0
-    sdim = length(shape_gradient(cv, 1, 1)) ÷ length(shape_value(cv, 1, 1))
+    GradT = shape_gradient_type(cv)
+    sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
     vstr = vdim==0 ? "scalar" : "vdim=$vdim"
     print(io, "CellValues(", vstr, ", rdim=$rdim, and sdim=$sdim): ")
     print(io, getnquadpoints(cv), " quadrature points")
     print(io, "\n Function interpolation: "); show(io, d, ip_fun)
-    print(io, "\nGeometric interpolation: "); show(io, d, ip_geo^sdim)
+    print(io, "\nGeometric interpolation: "); 
+    sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
 end

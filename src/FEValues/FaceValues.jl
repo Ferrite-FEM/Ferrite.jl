@@ -32,17 +32,18 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 FaceValues
 
 struct FaceValues{FV, GM, QR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:AbstractVector{GM}} <: AbstractFaceValues
-    fun_values::V_FV # AbstractVector{FunctionValues}
+    fun_values::V_FV  # AbstractVector{FunctionValues}
     geo_mapping::V_GM # AbstractVector{GeometryMapping}
-    qr::QR           # FaceQuadratureRule
-    detJdV::detT     # AbstractVector{<:Number}
-    normals::nT      # AbstractVector{<:Vec}
+    qr::QR            # FaceQuadratureRule
+    detJdV::detT      # AbstractVector{<:Number}
+    normals::nT       # AbstractVector{<:Vec}
     current_face::ScalarWrapper{Int}
 end
 
-function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}=default_geometric_interpolation(ip_fun)) where {T,sdim} 
-    geo_mapping = [GeometryMapping(T, ip_geo.ip, qr, RequiresHessian(ip_fun, ip_geo)) for qr in fqr.face_rules]
-    fun_values = [FunctionValues(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
+function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}=default_geometric_interpolation(ip_fun); FunDiffOrder=1) where {T,sdim} 
+    GeoDiffOrder = max(increased_diff_order(get_mapping_type(ip_fun)) + FunDiffOrder, 1)
+    geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]
+    fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
     max_nquadpoints = maximum(qr->length(getweights(qr)), fqr.face_rules)
     detJdV = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim,T})*T(NaN), max_nquadpoints)
@@ -68,6 +69,7 @@ getnquadpoints(fv::FaceValues) = @inbounds getnquadpoints(fv.qr, getcurrentface(
 shape_value_type(fv::FaceValues) = shape_value_type(get_fun_values(fv))
 shape_gradient_type(fv::FaceValues) = shape_gradient_type(get_fun_values(fv))
 get_function_interpolation(fv::FaceValues) = get_function_interpolation(get_fun_values(fv))
+get_function_difforder(fv::FaceValues) = get_function_difforder(get_fun_values(fv))
 get_geometric_interpolation(fv::FaceValues) = get_geometric_interpolation(get_geo_mapping(fv))
 
 get_geo_mapping(fv::FaceValues) = @inbounds fv.geo_mapping[getcurrentface(fv)]
@@ -98,18 +100,18 @@ getnormal(fv::FaceValues, qp::Int) = fv.normals[qp]
 
 nfaces(fv::FaceValues) = length(fv.geo_mapping)
 
-function boundscheck_face(fv::FaceValues, face_nr::Int)
+function set_current_face!(fv::FaceValues, face_nr::Int)
+    # Checking face_nr before setting current_face allows us to use @inbounds 
+    # when indexing by getcurrentface(fv) in other places!
     checkbounds(Bool, 1:nfaces(fv), face_nr) || throw(ArgumentError("Face index out of range."))
-    return nothing
+    fv.current_face[] = face_nr
 end
 
 function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int, cell=nothing) where {dim, T}
     check_reinit_sdim_consistency(:FaceValues, shape_gradient_type(fv), eltype(x))
     
-    # Checking face_nr before setting current_face allows us to use @inbounds 
-    # when indexing by getcurrentface(fv) in other places!
-    boundscheck_face(fv, face_nr) 
-    fv.current_face[] = face_nr
+    
+    set_current_face!(fv, face_nr)
     
     n_geom_basefuncs = getngeobasefunctions(fv)
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x)!=n_geom_basefuncs
