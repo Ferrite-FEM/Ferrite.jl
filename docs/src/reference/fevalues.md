@@ -35,3 +35,21 @@ FaceValues
 getcurrentface
 getnquadpoints(::FaceValues)
 ```
+
+## [InterfaceValues](@id reference-interfacevalues)
+
+All of the methods for [`FaceValues`](@ref) apply for `InterfaceValues` as well.
+In addition, there are some methods that are unique for `InterfaceValues`:
+
+```@docs
+InterfaceValues
+shape_value_average
+shape_value_jump
+shape_gradient_average
+shape_gradient_jump
+function_value_average
+function_value_jump
+function_gradient_average
+function_gradient_jump
+transform_interface_points!
+```

@@ -29,6 +29,7 @@ export
     AbstractFaceValues,
     CellValues,
     FaceValues,
+    InterfaceValues,
     reinit!,
     shape_value,
     shape_gradient,
@@ -43,6 +44,14 @@ export
     spatial_coordinate,
     getnormal,
     getdetJdV,
+    shape_value_average,
+    shape_value_jump,
+    shape_gradient_average,
+    shape_gradient_jump,
+    function_value_average,
+    function_value_jump,
+    function_gradient_average,
+    function_gradient_jump,
 
 # Grid
     Grid,

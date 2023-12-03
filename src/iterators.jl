@@ -91,9 +91,6 @@ end
 # reinit! FEValues with CellCache
 reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
-# TODOL enable this after InterfaceValues are merges
-# reinit!(iv::InterfaceValues, ic::InterfaceCache) = reinit!(iv, FaceIndex(cellid(ic.face_a), ic.face_a.current_faceid[]), getcoordinates(ic.face_a),
-#     FaceIndex(cellid(ic.face_b), ic.face_b.current_faceid[]), getcoordinates(ic.face_b), ic.face_a.cc.grid)
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)
 getnodes(cc::CellCache) = cc.nodes
@@ -208,7 +205,20 @@ function reinit!(cache::InterfaceCache, face_a::FaceIndex, face_b::FaceIndex)
     return cache
 end
 
+function reinit!(iv::InterfaceValues, ic::InterfaceCache)
+    return reinit!(iv,
+        getcells(ic.a.cc.grid, cellid(ic.a)),
+        getcoordinates(ic.a),
+        ic.a.current_faceid[],
+        getcells(ic.b.cc.grid, cellid(ic.b)),
+        getcoordinates(ic.b),
+        ic.b.current_faceid[],
+   )
+end
+
 interfacedofs(ic::InterfaceCache) = ic.dofs
+dof_range(ic::InterfaceCache, field::Symbol) = (dof_range(ic.a.cc.dh, field), dof_range(ic.b.cc.dh, field) .+ length(celldofs(ic.a)))
+getcoordinates(ic::InterfaceCache) = (getcoordinates(ic.a), getcoordinates(ic.b))
 
 ####################
 ## Grid iterators ##

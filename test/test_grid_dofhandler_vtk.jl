@@ -495,27 +495,26 @@ end
 #                   |  1  |  2  |  3  |
 #                   +-----+-----+-----+
 # test application: integrate jump across element boundary 5
-    ip = Lagrange{RefQuadrilateral, 1}()^2
+    ip = DiscontinuousLagrange{RefQuadrilateral, 1}()^2
     qr_face = FaceQuadratureRule{RefQuadrilateral}(2)
-    fv_ele = FaceValues(qr_face, ip)
-    fv_neighbor = FaceValues(qr_face, ip)
-    u_ele5 = [3.0 for _ in 1:8]
-    u_neighbors = [5.0 for _ in 1:8]
+    iv = InterfaceValues(qr_face, ip)
+    dh = DofHandler(quadgrid)
+    add!(dh, :u, ip)
+    close!(dh)
+    u = [5.0 for _ in 1:4*9*2]
+    u[4*4*2+1 : 5*4*2] .= 3.0
     jump_int = 0.
     jump_abs = 0.
     # Test interface Iterator
-    for ic in InterfaceIterator(quadgrid)
+    for ic in InterfaceIterator(dh)
         any(cellid.([ic.a, ic.b]) .== 5) || continue
-        reinit!(fv_ele, ic.a.cc, ic.a.current_faceid[])
-        for q_point in 1:getnquadpoints(fv_ele)
-            dΩ = getdetJdV(fv_ele, q_point)
-            normal_a = getnormal(fv_ele, q_point)
-            u_5_n = function_value(fv_ele, q_point, cellid(ic.a) == 5 ? u_ele5 : u_neighbors) ⋅ normal_a
-            reinit!(fv_neighbor, ic.b.cc, ic.b.current_faceid[])
-            normal_b = getnormal(fv_neighbor, q_point)
-            u_neighbor = function_value(fv_neighbor, q_point, cellid(ic.a) == 5 ? u_neighbors : u_ele5) ⋅ normal_b
-            jump_int += (u_5_n + u_neighbor) * dΩ
-            jump_abs += abs(u_5_n + u_neighbor) * dΩ
+        reinit!(iv, ic)
+        for q_point in 1:getnquadpoints(iv)
+            dΩ = getdetJdV(iv, q_point)
+            normal_a = getnormal(iv, q_point)
+            u_interface = u[interfacedofs(ic)]
+            jump_int += function_value_jump(iv, q_point, u_interface) ⋅ normal_a * dΩ
+            jump_abs += abs(function_value_jump(iv, q_point, u_interface) ⋅ normal_a) * dΩ
         end
     end
     @test isapprox(jump_abs, 2/3*2*4,atol=1e-6) # 2*4*0.66666, jump is always 2, 4 sides, length =0.66

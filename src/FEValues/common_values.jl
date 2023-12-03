@@ -57,7 +57,7 @@ getnquadpoints(fe::FaceValues) = getnquadpoints(fe.qr, fe.current_face[])
     getdetJdV(fe_v::AbstractValues, q_point::Int)
 
 Return the product between the determinant of the Jacobian and the quadrature
-point weight for the given quadrature point: ``\\det(J(\\mathbf{x})) w_q``
+point weight for the given quadrature point: ``\\det(J(\\mathbf{x})) w_q``.
 
 This value is typically used when one integrates a function on a
 finite element cell or face as
@@ -78,6 +78,12 @@ quadrature point `q_point`.
 @propagate_inbounds shape_value(cv::CellValues, q_point::Int, base_func::Int) = cv.N[base_func, q_point]
 @propagate_inbounds shape_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.N[base_func, q_point, bv.current_face[]]
 
+"""
+    geometric_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
+
+Return the value of shape function `base_function` used for geometric interpolation evaluated in
+quadrature point `q_point`.
+"""
 @propagate_inbounds geometric_value(cv::CellValues, q_point::Int, base_func::Int) = cv.M[base_func, q_point]
 @propagate_inbounds geometric_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_face[]]
 
@@ -116,7 +122,7 @@ end
 curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
 
 """
-    function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector)
+    function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
 Compute the value of the function in a quadrature point. `u` is a vector with values
 for the degrees of freedom. For a scalar valued function, `u` contains scalars.
@@ -146,7 +152,7 @@ shape_value_type(::Union{CellValues{<:Any, N_t}, FaceValues{<:Any, N_t}}) where 
 function_value_init(cv::AbstractValues, ::AbstractVector{T}) where {T} = zero(shape_value_type(cv)) * zero(T)
 
 """
-    function_gradient(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector)
+    function_gradient(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector, [dof_range])
 
 Compute the gradient of the function in a quadrature point. `u` is a vector with values
 for the degrees of freedom. For a scalar valued function, `u` contains scalars.
@@ -196,7 +202,7 @@ function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {
 end
 
 """
-    function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector)
+    function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
 Compute the symmetric gradient of the function, see [`function_gradient`](@ref).
 Return a `SymmetricTensor`.
@@ -205,19 +211,17 @@ The symmetric gradient of a scalar function is computed as
 ``\\left[ \\mathbf{\\nabla}  \\mathbf{u}(\\mathbf{x_q}) \\right]^\\text{sym} =  \\sum\\limits_{i = 1}^n  \\frac{1}{2} \\left[ \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\otimes \\mathbf{u}_i + \\mathbf{u}_i  \\otimes  \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\right]``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
+function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range)
     grad = function_gradient(fe_v, q_point, u, dof_range)
     return symmetric(grad)
 end
 
-# TODO: Deprecate this, nobody is using this in practice...
-function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec})
+function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector)
     grad = function_gradient(fe_v, q_point, u)
     return symmetric(grad)
 end
-
 """
-    function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVector)
+    function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
 Compute the divergence of the vector valued function in a quadrature point.
 
@@ -241,6 +245,15 @@ function function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVect
     return diverg
 end
 
+"""
+    function_curl(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
+
+Compute the curl of the vector valued function in a quadrature point.
+
+The curl of a vector valued functions in the quadrature point ``\\mathbf{x}_q)`` is computed as
+``\\mathbf{\\nabla} \\times \\mathbf{u}(\\mathbf{x_q}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i \\times (\\mathbf{x_q}) \\cdot \\mathbf{u}_i``
+where ``\\mathbf{u}_i`` are the nodal values of the function.
+"""
 function_curl(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u)) =
     curl_from_gradient(function_gradient(fe_v, q_point, u, dof_range))
 
@@ -257,11 +270,11 @@ coordinates of the cell.
 The coordinate is computed, using the geometric interpolation, as
 ``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{x}) \\mathbf{\\hat{x}}_i``
 """
-function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVector{Vec{dim,T}}) where {dim,T}
+function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVector{<:Vec})
     n_base_funcs = getngeobasefunctions(fe_v)
     length(x) == n_base_funcs || throw_incompatible_coord_length(length(x), n_base_funcs)
     @boundscheck checkquadpoint(fe_v, q_point)
-    vec = zero(Vec{dim,T})
+    vec = zero(eltype(x))
     @inbounds for i in 1:n_base_funcs
         vec += geometric_value(fe_v, q_point, i) * x[i]
     end
@@ -273,7 +286,7 @@ function Base.show(io::IO, ::MIME"text/plain", fe_v::AbstractValues)
 end
 
 # copy
-for ValueType in (CellValues, FaceValues)
+for ValueType in (CellValues, FaceValues, InterfaceValues)
     args = [:(copy(cv.$fname)) for fname in fieldnames(ValueType)]
     @eval begin
         function Base.copy(cv::$ValueType)

@@ -33,6 +33,8 @@ const RefTetrahedron   = RefSimplex{3}
 struct RefPrism         <: AbstractRefShape{3} end
 struct RefPyramid       <: AbstractRefShape{3} end
 
+abstract type AbstractCell{refshape <: AbstractRefShape} end
+
 abstract type AbstractValues end
 abstract type AbstractCellValues <: AbstractValues end
 abstract type AbstractFaceValues <: AbstractValues end
@@ -84,6 +86,7 @@ include("Quadrature/quadrature.jl")
 # FEValues
 include("FEValues/cell_values.jl")
 include("FEValues/face_values.jl")
+include("FEValues/interface_values.jl")
 include("PointEval/point_values.jl")
 include("FEValues/common_values.jl")
 include("FEValues/face_integrals.jl")

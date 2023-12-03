@@ -202,22 +202,22 @@ function calculate_volume(::Serendipity{RefQuadrilateral, 2}, x::Vector{Vec{2, T
     return vol
 end
 
-function calculate_face_area(ip::Lagrange{RefLine}, x::Vector{<:Vec}, faceindex::Int)
+function calculate_face_area(ip::Union{Lagrange{RefLine}, DiscontinuousLagrange{RefLine}}, x::Vector{<:Vec}, faceindex::Int)
     return one(eltype(eltype(x)))
 end
-function calculate_face_area(ip::Lagrange{RefQuadrilateral, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_face_area(ip::Union{Lagrange{RefQuadrilateral, order}, DiscontinuousLagrange{RefQuadrilateral, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefLine, order}(), x)
 end
-function calculate_face_area(ip::Lagrange{RefTriangle, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_face_area(ip::Union{Lagrange{RefTriangle, order}, DiscontinuousLagrange{RefTriangle, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefLine, order}(), x)
 end
-function calculate_face_area(ip::Lagrange{RefHexahedron, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_face_area(ip::Union{Lagrange{RefHexahedron, order}, DiscontinuousLagrange{RefHexahedron, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefQuadrilateral, order}(), x)
 end
 function calculate_face_area(ip::Serendipity{RefQuadrilateral, order}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefLine, order}(), x)
 end
-function calculate_face_area(ip::Lagrange{RefTetrahedron, order}, x::Vector{<:Vec}, faceindex::Int) where order
+function calculate_face_area(p::Union{Lagrange{RefTetrahedron, order}, DiscontinuousLagrange{RefTetrahedron, order}}, x::Vector{<:Vec}, faceindex::Int) where order
     return calculate_volume(Lagrange{RefTriangle, order}(), x)
 end
 function calculate_face_area(p::Union{Lagrange{RefPrism, order}, DiscontinuousLagrange{RefPrism, order}}, x::Vector{<:Vec}, faceindex::Int) where order
@@ -281,3 +281,16 @@ getfacerefshape(::Hexahedron, ::Int) = RefQuadrilateral
 getfacerefshape(::Tetrahedron, ::Int) = RefTriangle
 getfacerefshape(::Pyramid, face::Int) = face == 1 ? RefQuadrilateral : RefTriangle
 getfacerefshape(::Wedge, face::Int) = face ∈ (1,5) ? RefTriangle : RefQuadrilateral
+
+######################################################
+# Dummy RefShape to test get_transformation_matrix   #
+######################################################
+module DummyRefShapes
+    import Ferrite
+    struct RefDodecahedron  <: Ferrite.AbstractRefShape{3} end
+    function Ferrite.reference_faces(::Type{RefDodecahedron})
+        return (
+            (1, 5, 4, 3, 2), 
+        )
+    end
+end
