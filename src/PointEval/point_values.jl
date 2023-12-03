@@ -39,7 +39,7 @@ function PointValues(::Type{T}, ip::IP, ipg::GIP = default_geometric_interpolati
     GIP <: Interpolation{shape}
 }
     qr = QuadratureRule{shape, T}([one(T)], [zero(Vec{dim, T})])
-    cv = CellValues(T, qr, ip, ipg; save_detJ=false, kwargs...)
+    cv = CellValues(T, qr, ip, ipg; save_detJdV = false, kwargs...)
     return PointValues{typeof(cv)}(cv)
 end
 

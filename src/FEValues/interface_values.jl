@@ -129,8 +129,8 @@ function reinit!(
     # Transform the quadrature points from the here side to the there side
     set_current_face!(iv.there, face_there) # Includes boundscheck
     interface_transformation = InterfaceOrientationInfo(cell_here, cell_there, face_here, face_there)
-    quad_points_a = getpoints(iv.here.qr, face_here)
-    quad_points_b = getpoints(iv.there.qr, face_there)
+    quad_points_a = getpoints(iv.here.fqr, face_here)
+    quad_points_b = getpoints(iv.there.fqr, face_there)
     transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
     # TODO: This is the bottleneck, cache it?
     @assert length(quad_points_a) <= length(quad_points_b)

@@ -115,10 +115,10 @@ for (scalar_interpol, quad_rule) in (
             # Make it easy to test scalar wrapper equality
             _mock_isequal(a, b) = a == b
             _mock_isequal(a::T, b::T) where {T<:Ferrite.ScalarWrapper} = a[] == b[]
-            for fname in (:qr, :detJdV, :normals, :current_face)
+            for fname in (:fqr, :detJdV, :normals, :current_face)
                 v = getfield(fv, fname)
                 vc = getfield(fvc, fname)
-                if fname !== :qr # Test unaliased
+                if fname !== :fqr # Test unaliased
                     @test v !== vc
                 end
                 @test _mock_isequal(v, vc)
@@ -134,8 +134,8 @@ end
     @test startswith(showstring, "FaceValues(scalar, rdim=2, sdim=2): 2 quadrature points per face")
     @test contains(showstring, "Function interpolation: Lagrange{RefQuadrilateral, 2}()")
     @test contains(showstring, "Geometric interpolation: Lagrange{RefQuadrilateral, 1}()^2")
-    fv.qr.face_rules[1] = deepcopy(fv.qr.face_rules[1])
-    push!(Ferrite.getweights(fv.qr.face_rules[1]), 1)
+    fv.fqr.face_rules[1] = deepcopy(fv.fqr.face_rules[1])
+    push!(Ferrite.getweights(fv.fqr.face_rules[1]), 1)
     showstring = show_as_string(fv)
     @test startswith(showstring, "FaceValues(scalar, rdim=2, sdim=2): (3, 2, 2, 2) quadrature points on each face")
 end

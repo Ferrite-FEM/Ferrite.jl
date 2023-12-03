@@ -244,9 +244,9 @@ function _evaluate_at_points!(
     first_cell = cellset === nothing ? 1 : first(cellset)
     grid = get_grid(dh)
     ip_geo = default_interpolation(getcelltype(grid, first_cell))
-    pv = PointValues(eltype(local_coords[idx]), ip, ip_geo; FunDiffOrder=0)
+    pv = PointValues(eltype(local_coords[idx]), ip, ip_geo; FunDiffOrder = 0)
     cell_dofs = Vector{Int}(undef, ndofs_per_cell(dh, first_cell))
-    u_e = Vector{T}(undef, ndofs_per_cell(dh, first_cell))    
+    u_e = Vector{T}(undef, ndofs_per_cell(dh, first_cell))
     x = getcoordinates(grid, first_cell)
     # compute point values
     for pointid in eachindex(ph.cells)
