@@ -28,18 +28,18 @@ function PointValues(cv::CellValues)
     T = typeof(getdetJdV(cv, 1))
     ip_fun = get_function_interpolation(cv)
     ip_geo = get_geometric_interpolation(cv)
-    return PointValues(T, ip_fun, ip_geo)
+    return PointValues(T, ip_fun, ip_geo; FunDiffOrder = get_function_difforder(cv))
 end
-function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_interpolation(ip))
-    return PointValues(Float64, ip, ipg)
+function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_interpolation(ip); kwargs...)
+    return PointValues(Float64, ip, ipg; kwargs...)
 end
-function PointValues(::Type{T}, ip::IP, ipg::GIP = default_geometric_interpolation(ip)) where {
+function PointValues(::Type{T}, ip::IP, ipg::GIP = default_geometric_interpolation(ip); kwargs...) where {
     T, dim, shape <: AbstractRefShape{dim},
     IP  <: Interpolation{shape},
     GIP <: Interpolation{shape}
 }
     qr = QuadratureRule{shape, T}([one(T)], [zero(Vec{dim, T})])
-    cv = CellValues(T, qr, ip, ipg)
+    cv = CellValues(T, qr, ip, ipg; save_detJ=false, kwargs...)
     return PointValues{typeof(cv)}(cv)
 end
 
@@ -66,34 +66,10 @@ function reinit!(pv::PointValues, x::AbstractVector{<:Vec{D}}, ξ::Vec{D}) where
     qr_points = getpoints(pv.cv.qr)
     qr_points[1] = ξ
     # Precompute all values again to reflect the updated ξ coordinate
-    precompute_values!(pv.cv)
+    precompute_values!(pv.cv.fun_values, qr_points)
+    precompute_values!(pv.cv.geo_mapping, qr_points)
     # Regular reinit
     reinit!(pv.cv, x)
-    return nothing
-end
-
-# Optimized version of PointValues which avoids i) recomputation of dNdξ and
-# ii) recomputation of dNdx. Only allows function evaluation (no gradients) which is
-# what is used in evaluate_at_points.
-struct PointValuesInternal{IP, N_t} <: AbstractValues
-    N::Vector{N_t}
-    ip::IP
-end
-
-function PointValuesInternal(ξ::Vec{dim, T}, ip::IP) where {dim, T, shape <: AbstractRefShape{dim}, IP <: Interpolation{shape}}
-    n_func_basefuncs = getnbasefunctions(ip)
-    N = [shape_value(ip, ξ, i) for i in 1:n_func_basefuncs]
-    return PointValuesInternal{IP, eltype(N)}(N, ip)
-end
-
-getnbasefunctions(pv::PointValuesInternal) = size(pv.N, 1)
-getnquadpoints(pv::PointValuesInternal) = 1
-shape_value_type(::PointValuesInternal{<:Any, N_t}) where {N_t} = N_t
-shape_value(pv::PointValuesInternal, qp::Int, i::Int) = (@assert qp == 1; pv.N[i])
-
-# allow on-the-fly updating
-function reinit!(pv::PointValuesInternal{IP}, coord::Vec{dim}) where {dim, shape <: AbstractRefShape{dim}, IP <: Interpolation{shape}}
-    shape_values!(pv.N, pv.ip, coord)
     return nothing
 end
 
