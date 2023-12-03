@@ -31,17 +31,17 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 """
 FaceValues
 
-struct FaceValues{FV, GM, QR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:AbstractVector{GM}} <: AbstractFaceValues
+struct FaceValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:AbstractVector{GM}} <: AbstractFaceValues
     fun_values::V_FV  # AbstractVector{FunctionValues}
     geo_mapping::V_GM # AbstractVector{GeometryMapping}
-    qr::QR            # FaceQuadratureRule
+    fqr::FQR          # FaceQuadratureRule
     detJdV::detT      # AbstractVector{<:Number}
     normals::nT       # AbstractVector{<:Vec}
     current_face::ScalarWrapper{Int}
 end
 
 function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}=default_geometric_interpolation(ip_fun); FunDiffOrder=1) where {T,sdim} 
-    GeoDiffOrder = max(increased_diff_order(get_mapping_type(ip_fun)) + FunDiffOrder, 1)
+    GeoDiffOrder = max(required_geo_diff_order(get_mapping_type(ip_fun), FunDiffOrder), 1)
     geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]
     fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
     max_nquadpoints = maximum(qr->length(getweights(qr)), fqr.face_rules)
@@ -58,12 +58,12 @@ end
 function Base.copy(fv::FaceValues)
     fun_values = map(copy, fv.fun_values)
     geo_mapping = map(copy, fv.geo_mapping)
-    return FaceValues(fun_values, geo_mapping, copy(fv.qr), copy(fv.detJdV), copy(fv.normals), copy(fv.current_face))
+    return FaceValues(fun_values, geo_mapping, copy(fv.fqr), copy(fv.detJdV), copy(fv.normals), copy(fv.current_face))
 end
 
 getngeobasefunctions(fv::FaceValues) = getngeobasefunctions(get_geo_mapping(fv))
 getnbasefunctions(fv::FaceValues) = getnbasefunctions(get_fun_values(fv))
-getnquadpoints(fv::FaceValues) = @inbounds getnquadpoints(fv.qr, getcurrentface(fv))
+getnquadpoints(fv::FaceValues) = @inbounds getnquadpoints(fv.fqr, getcurrentface(fv))
 @propagate_inbounds getdetJdV(fv::FaceValues, q_point) = fv.detJdV[q_point]
 
 shape_value_type(fv::FaceValues) = shape_value_type(get_fun_values(fv))
@@ -86,7 +86,6 @@ end
     getcurrentface(fv::FaceValues)
 
 Return the current active face of the `FaceValues` object (from last `reinit!`).
-
 """
 getcurrentface(fv::FaceValues) = fv.current_face[]
 
@@ -127,7 +126,7 @@ function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int, ce
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
 
-    @inbounds for (q_point, w) in pairs(getweights(fv.qr, face_nr))
+    @inbounds for (q_point, w) in pairs(getweights(fv.fqr, face_nr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         J = getjacobian(mapping)
         # See the `Ferrite.embedded_det` docstring for more background
@@ -147,7 +146,7 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FaceValues)
     sdim = length(shape_gradient(fv, 1, 1)) ÷ length(shape_value(fv, 1, 1))
     vstr = vdim==0 ? "scalar" : "vdim=$vdim"
     print(io, "FaceValues(", vstr, ", rdim=$rdim, sdim=$sdim): ")
-    nqp = getnquadpoints.(fv.qr.face_rules)
+    nqp = getnquadpoints.(fv.fqr.face_rules)
     if all(n==first(nqp) for n in nqp)
         println(io, first(nqp), " quadrature points per face")
     else

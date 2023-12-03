@@ -39,13 +39,13 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     fun_values::FV # FunctionValues
     geo_mapping::GM # GeometryMapping
     qr::QR         # QuadratureRule
-    detJdV::detT   # AbstractVector{<:Number}
+    detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
-function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; FunDiffOrder=1, save_detJ=true) where T 
-    GeoDiffOrder = max(increased_diff_order(get_mapping_type(ip_fun)) + FunDiffOrder, save_detJ)
+function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; FunDiffOrder=1, save_detJdV=true) where T 
+    GeoDiffOrder = max(required_geo_diff_order(get_mapping_type(ip_fun), FunDiffOrder), save_detJdV)
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
-    detJdV = save_detJ ? fill(T(NaN), length(getweights(qr))) : nothing
+    detJdV = save_detJdV ? fill(T(NaN), length(getweights(qr))) : nothing
     return CellValues(fun_values, geo_mapping, qr, detJdV)
 end
 
@@ -55,7 +55,7 @@ function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolatio
 end
 
 function Base.copy(cv::CellValues)
-    return CellValues(copy(cv.fun_values), copy(cv.geo_mapping), copy(cv.qr), copy(cv.detJdV))
+    return CellValues(copy(cv.fun_values), copy(cv.geo_mapping), copy(cv.qr), _copy_or_nothing(cv.detJdV))
 end
 
 # Access geometry values
@@ -64,6 +64,7 @@ end
 get_geometric_interpolation(cv::CellValues) = get_geometric_interpolation(cv.geo_mapping)
 
 getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
+getdetJdV(::CellValues{<:Any, <:Any, <:Any, Nothing}, ::Int) = throw(ArgumentError("detJdV is not saved in CellValues"))
 
 # Accessors for function values 
 getnbasefunctions(cv::CellValues) = getnbasefunctions(cv.fun_values)

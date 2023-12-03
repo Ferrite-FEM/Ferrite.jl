@@ -132,15 +132,15 @@ struct ContravariantPiolaMapping end
 get_mapping_type(fv::FunctionValues) = get_mapping_type(fv.ip)
 
 """
-    increased_diff_order(mapping)
+    required_geo_diff_order(fun_mapping, fun_diff_order::Int)
 
-How many order higher geometric derivatives are required to  
-to map the function values and gradients from the reference cell 
-to the physical cell geometry?
+Return the required order of geometric derivatives to map 
+the function values and gradients from the reference cell 
+to the physical cell geometry.
 """
-increased_diff_order(::IdentityMapping) = 0
-increased_diff_order(::ContravariantPiolaMapping) = 1
-increased_diff_order(::CovariantPiolaMapping) = 1
+required_geo_diff_order(::IdentityMapping,           fun_diff_order::Int) = fun_diff_order
+required_geo_diff_order(::ContravariantPiolaMapping, fun_diff_order::Int) = 1 + fun_diff_order
+required_geo_diff_order(::CovariantPiolaMapping,     fun_diff_order::Int) = 1 + fun_diff_order
 
 # Support for embedded elements
 @inline calculate_Jinv(J::Tensor{2}) = inv(J)
