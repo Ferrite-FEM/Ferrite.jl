@@ -69,7 +69,7 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 #
 # where ``I_1 = \mathrm{tr}(\mathbf{C})`` is the first invariant, ``J = \sqrt{\det(\mathbf{C})}``
 # and ``\mu`` and ``\lambda`` material parameters.
-# !!! details "Expand for further details on compressible neo-Hookean formulations"
+# !!! details "Extra details on compressible neo-Hookean formulations"
 #     The Neo-Hooke model is only a well defined terminology in the incompressible case.
 #     Thus, only $W(\mathbf{C})$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
 #     In order to obtain a well-posed problem, it is crucial to choose a convex formulation of $U(J)$.
