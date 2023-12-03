@@ -137,7 +137,7 @@ end
     K = spdiagm(0 => zeros(2))
     a = start_assemble(K)
     as = start_assemble(Symmetric(K))
-    errr(i,j) = ErrorException(Ferrite._missing_sparsity_pattern_message(i,j))
+    errr(i,j) = try Ferrite._missing_sparsity_pattern_error(i, j) catch e e end
     ## Errors below diagonal
     @test_throws errr(2,1) assemble!(a, [1, 2], [1.0 0.0; 3.0 4.0])
     @test_throws errr(2,1) assemble!(a, [2, 1], [1.0 2.0; 0.0 4.0])
