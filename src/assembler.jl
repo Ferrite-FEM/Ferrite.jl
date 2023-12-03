@@ -220,7 +220,7 @@ end
             else # Krow > dofs[Kerow]
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
-                iszero(val) || error("some row indices were not found")
+                iszero(val) || _missing_sparsity_pattern_error(Krow, Kcol)
                 # Advance the local matrix row pointer
                 ri += 1
             end
@@ -228,13 +228,23 @@ end
         # Make sure that remaining entries in this column of the local matrix are all zero
         for i in ri:maxlookups
             if !iszero(Ke[permutation[i], Kecol])
-                error("some row indices were not found")
+                _missing_sparsity_pattern_error(sorteddofs[i], Kcol)
             end
         end
         current_col += 1
     end
 end
 
+function _missing_sparsity_pattern_error(Krow::Int, Kcol::Int)
+    throw(ErrorException(
+        "You are trying to assemble values in to K[$(Krow), $(Kcol)], but K[$(Krow), " *
+        "$(Kcol)] is missing in the sparsity pattern. Make sure you have called `K = " *
+        "create_sparsity_pattern(dh)` or `K = create_sparsity_pattern(dh, ch)` if you " *
+        "have affine constraints. This error might also happen if you are using " *
+        "`::AssemblerSparsityPattern` in a threaded assembly loop (you need to create an " *
+        "`assembler::AssemblerSparsityPattern` for each task)."
+    ))
+end
 
 ## assemble! with local condensation ##
 

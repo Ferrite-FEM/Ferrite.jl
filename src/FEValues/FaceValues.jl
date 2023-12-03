@@ -100,18 +100,18 @@ getnormal(fv::FaceValues, qp::Int) = fv.normals[qp]
 
 nfaces(fv::FaceValues) = length(fv.geo_mapping)
 
-function boundscheck_face(fv::FaceValues, face_nr::Int)
+function set_current_face!(fv::FaceValues, face_nr::Int)
+    # Checking face_nr before setting current_face allows us to use @inbounds 
+    # when indexing by getcurrentface(fv) in other places!
     checkbounds(Bool, 1:nfaces(fv), face_nr) || throw(ArgumentError("Face index out of range."))
-    return nothing
+    fv.current_face[] = face_nr
 end
 
 function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int, cell=nothing) where {dim, T}
     check_reinit_sdim_consistency(:FaceValues, shape_gradient_type(fv), eltype(x))
     
-    # Checking face_nr before setting current_face allows us to use @inbounds 
-    # when indexing by getcurrentface(fv) in other places!
-    boundscheck_face(fv, face_nr) 
-    fv.current_face[] = face_nr
+    
+    set_current_face!(fv, face_nr)
     
     n_geom_basefuncs = getngeobasefunctions(fv)
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x)!=n_geom_basefuncs
