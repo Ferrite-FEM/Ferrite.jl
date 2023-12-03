@@ -185,7 +185,7 @@ function evaluate_at_points(ph::PointEvalHandler{<:Any, dim, T1}, dh::AbstractDo
     npoints = length(ph.cells)
     # Figure out the value type by creating a dummy PointValues
     ip = getfieldinterpolation(dh, find_field(dh, fname))
-    pv = PointValues(T1, ip; difforder=Val(0))
+    pv = PointValues(T1, ip; FunDiffOrder=0)
     zero_val = function_value_init(pv, dof_vals)
     # Allocate the output as NaNs
     nanv = convert(typeof(zero_val), NaN * zero_val)
@@ -244,7 +244,7 @@ function _evaluate_at_points!(
     first_cell = cellset === nothing ? 1 : first(cellset)
     grid = get_grid(dh)
     ip_geo = default_interpolation(getcelltype(grid, first_cell))
-    pv = PointValues(eltype(local_coords[idx]), ip, ip_geo; difforder=Val(0))
+    pv = PointValues(eltype(local_coords[idx]), ip, ip_geo; FunDiffOrder=0)
     cell_dofs = Vector{Int}(undef, ndofs_per_cell(dh, first_cell))
     u_e = Vector{T}(undef, ndofs_per_cell(dh, first_cell))    
     x = getcoordinates(grid, first_cell)
