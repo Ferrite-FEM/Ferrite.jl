@@ -40,7 +40,6 @@ for (scalar_interpol, quad_rule) in (
                 u_scal[i] = V ⋅ xs[i]
             end
             u_vector = reinterpret(Float64, u)
-
             for i in 1:getnquadpoints(fv)
                 @test getnormal(fv, i) ≈ n[face]
                 if func_interpol isa Ferrite.ScalarInterpolation

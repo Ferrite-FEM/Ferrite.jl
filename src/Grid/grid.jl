@@ -39,7 +39,8 @@ get_coordinate_eltype(::Node{dim,T}) where {dim,T} = T
 # AbstractCell interface #
 ##########################
 
-abstract type AbstractCell{refshape <: AbstractRefShape} end
+# Defined in src/Ferrite.jl
+# abstract type AbstractCell{refshape <: AbstractRefShape} end
 
 getrefshape(::AbstractCell{refshape}) where refshape = refshape
 
@@ -84,9 +85,8 @@ reference_faces(::AbstractRefShape)
 
 """
     Ferrite.faces(::AbstractCell)
-    Ferrite.faces(::Type{AbstractRefShape})
 
-Returns a tuple of n-tuples containing the ordered node indices (of the nodes in a grid, or reference element if `AbstractRefShape` is passed) corresponding to
+Returns a tuple of n-tuples containing the ordered node indices (of the nodes in a grid) corresponding to
 the vertices that define an *oriented face*. This function induces the 
 [`FaceIndex`](@ref), where the second index corresponds to the local index into this tuple.
 

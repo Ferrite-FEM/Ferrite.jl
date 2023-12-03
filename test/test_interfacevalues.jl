@@ -9,14 +9,14 @@
 
         for ic in InterfaceIterator(grid)
             reinit!(iv, ic)
-            interface_coords = getcoordinates(ic)
+            coords_here, coords_there = getcoordinates(ic)
             nqp = getnquadpoints(iv)
             # Should have same quadrature points
             @test nqp == getnquadpoints(iv.here) == getnquadpoints(iv.there)
             for qp in 1:nqp
                 # If correctly synced quadrature points coordinates should match
-                @test isapprox(spatial_coordinate(iv, qp, interface_coords; here = true),
-                    spatial_coordinate(iv, qp, interface_coords; here = false); atol = tol)
+                @test isapprox(spatial_coordinate(iv, qp, coords_here, coords_there; here = true),
+                    spatial_coordinate(iv, qp, coords_here, coords_there; here = false); atol = tol)
                 for i in 1:getnbasefunctions(iv)
                     here = i <= getnbasefunctions(iv.here)
                     shapevalue = shape_value(iv, qp, i; here = here)
@@ -63,12 +63,12 @@
                 H = rand(Tensor{2, ndim})
                 V = rand(Tensor{1, ndim})
                 for i in 1:nbf_a
-                    xs = interface_coords[1]
+                    xs = coords_here
                     u_a[i] = H ⋅ xs[i]
                     u_scal_a[i] = V ⋅ xs[i]
                 end
                 for i in 1:nbf_b
-                    xs = interface_coords[2]
+                    xs = coords_there
                     u_b[i] = H ⋅ xs[i]
                     u_scal_b[i] = V ⋅ xs[i]
                 end
@@ -102,7 +102,7 @@
                 for i in 1:getnquadpoints(iv)
                     vol += getdetJdV(iv, i)
                 end
-                xs = interface_coords[here ? 1 : 2]
+                xs = here ? coords_here : coords_there
                 face = here ? Ferrite.getcurrentface(iv.here) : Ferrite.getcurrentface(iv.there)
                 func_interpol = here ? ip_here : ip_there
                 let ip_base = func_interpol isa VectorizedInterpolation ? func_interpol.ip : func_interpol
@@ -140,7 +140,7 @@
         end
         @testset "error paths" begin
             cell = getcells(grid, 1)
-            dim == 1 && @test_throws ErrorException("1D elements don't use transformations for interfaces.") InterfaceOrientationInfo(cell,cell,1,1)
+            dim == 1 && @test_throws ErrorException("1D elements don't use transformations for interfaces.") Ferrite.InterfaceOrientationInfo(cell,cell,1,1)
             @test_throws ArgumentError("unknown face number") Ferrite.element_to_face_transformation(Vec{dim,Float64}(ntuple(_->0.0, dim)), Ferrite.getrefshape(cell), 100)
             @test_throws ArgumentError("unknown face number") Ferrite.face_to_element_transformation(Vec{dim-1,Float64}(ntuple(_->0.0, dim-1)), Ferrite.getrefshape(cell), 100)
         end
@@ -248,7 +248,7 @@
         end
     end
     @testset "undefined transformation matrix error path" begin
-        it = InterfaceOrientationInfo{DummyRefShapes.RefDodecahedron, DummyRefShapes.RefDodecahedron}(false, 0, 0, 1, 1)
+        it = Ferrite.InterfaceOrientationInfo{DummyRefShapes.RefDodecahedron, DummyRefShapes.RefDodecahedron}(false, 0, 0, 1, 1)
         @test_throws ArgumentError("transformation is not implemented") Ferrite.get_transformation_matrix(it)
     end
     @testset "show" begin

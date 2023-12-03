@@ -135,7 +135,6 @@ export
     PeriodicFacePair,
     AffineConstraint,
     update!,
-    InterfaceOrientationInfo,
     apply!,
     apply_rhs!,
     get_rhs_data,
