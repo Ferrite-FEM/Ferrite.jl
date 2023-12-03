@@ -59,7 +59,7 @@ function FunctionValues{0}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_
     N_x = isa(get_mapping_type(ip), IdentityMapping) ? N_ξ : similar(N_ξ)
         
     fv = FunctionValues(ip, N_x, N_ξ, nothing, nothing)
-    precompute_values!(fv, qr) # Separate function for qr point update in PointValues
+    precompute_values!(fv, getpoints(qr)) # Separate function for qr point update in PointValues
     return fv
 end
 function FunctionValues{1}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where T
@@ -74,15 +74,15 @@ function FunctionValues{1}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_
     dNdx = fill(zero(typeof_dNdx(T, ip_dims)) * T(NaN), n_shape, n_qpoints)
     
     fv = FunctionValues(ip, N_x, N_ξ, dNdx, dNdξ)
-    precompute_values!(fv, qr) # Separate function for qr point update in PointValues
+    precompute_values!(fv, getpoints(qr)) # Separate function for qr point update in PointValues
     return fv
 end
 
-function precompute_values!(fv::FunctionValues{0}, qr)
-    shape_values!(fv.N_ξ, fv.ip, qr)
+function precompute_values!(fv::FunctionValues{0}, qr_points::Vector{<:Vec})
+    shape_values!(fv.N_ξ, fv.ip, qr_points)
 end
-function precompute_values!(fv::FunctionValues{1}, qr)
-    shape_gradients_and_values!(fv.dNdξ, fv.N_ξ, fv.ip, qr)
+function precompute_values!(fv::FunctionValues{1}, qr_points::Vector{<:Vec})
+    shape_gradients_and_values!(fv.dNdξ, fv.N_ξ, fv.ip, qr_points)
 end
 
 function Base.copy(v::FunctionValues)

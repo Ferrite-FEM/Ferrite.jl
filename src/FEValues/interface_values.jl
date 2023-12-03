@@ -127,18 +127,17 @@ function reinit!(
     reinit!(iv.here, coords_here, face_here)
     dim == 1 && return reinit!(iv.there, coords_there, face_there)
     # Transform the quadrature points from the here side to the there side
-    set_current_face!(iv.there, face_there)
+    set_current_face!(iv.there, face_there) # Includes boundscheck
     interface_transformation = InterfaceOrientationInfo(cell_here, cell_there, face_here, face_there)
     quad_points_a = getpoints(iv.here.qr, face_here)
     quad_points_b = getpoints(iv.there.qr, face_there)
     transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
-    @boundscheck checkface(iv.there, face_there)
     # TODO: This is the bottleneck, cache it?
     @assert length(quad_points_a) <= length(quad_points_b)
     
     # Re-evalutate shape functions in the transformed quadrature points
-    precompute_values!(iv.there.fun_values, quad_points_b)
-    precompute_values!(iv.there.geo_mapping, quad_points_b)
+    precompute_values!(get_fun_values(iv.there),  quad_points_b)
+    precompute_values!(get_geo_mapping(iv.there), quad_points_b)
     
     # reinit! the "there" side
     reinit!(iv.there, coords_there, face_there)

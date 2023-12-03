@@ -55,7 +55,7 @@ function GeometryMapping{0}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRu
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
     gm = GeometryMapping(ip, zeros(T, n_shape, n_qpoints), nothing, nothing)
-    precompute_values!(gm, qr) # Separate function for qr point update in PointValues
+    precompute_values!(gm, getpoints(qr))
     return gm
 end
 function GeometryMapping{1}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule) where T
@@ -66,7 +66,7 @@ function GeometryMapping{1}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRu
     dMdξ = zeros(Vec{getdim(ip),T}, n_shape, n_qpoints)
 
     gm = GeometryMapping(ip, M, dMdξ, nothing)
-    precompute_values!(gm, qr) # Separate function for qr point update in PointValues
+    precompute_values!(gm, getpoints(qr))
     return gm
 end
 function GeometryMapping{2}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRule) where T
@@ -78,18 +78,18 @@ function GeometryMapping{2}(::Type{T}, ip::ScalarInterpolation, qr::QuadratureRu
     d2Mdξ2 = zeros(Tensor{2,getdim(ip),T}, n_shape, n_qpoints)
 
     gm = GeometryMapping(ip, M, dMdξ, d2Mdξ2)
-    precompute_values!(gm, qr) # Separate function for qr point update in PointValues
+    precompute_values!(gm, getpoints(qr))
     return gm
 end
 
-function precompute_values!(gm::GeometryMapping{0}, qr)
-    shape_values!(gm.M, gm.ip, qr)
+function precompute_values!(gm::GeometryMapping{0}, qr_points::Vector{<:Vec})
+    shape_values!(gm.M, gm.ip, qr_points)
 end
-function precompute_values!(gm::GeometryMapping{1}, qr)
-    shape_gradients_and_values!(gm.dMdξ, gm.M, gm.ip, qr)
+function precompute_values!(gm::GeometryMapping{1}, qr_points::Vector{<:Vec})
+    shape_gradients_and_values!(gm.dMdξ, gm.M, gm.ip, qr_points)
 end
-function precompute_values!(gm::GeometryMapping{2}, qr)
-    shape_hessians_gradients_and_values!(gm.d2Mdξ2, gm.dMdξ, gm.M, gm.ip, qr)
+function precompute_values!(gm::GeometryMapping{2}, qr_points::Vector{<:Vec})
+    shape_hessians_gradients_and_values!(gm.d2Mdξ2, gm.dMdξ, gm.M, gm.ip, qr_points)
 end
 
 function Base.copy(v::GeometryMapping)

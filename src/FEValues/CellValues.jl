@@ -58,18 +58,6 @@ function Base.copy(cv::CellValues)
     return CellValues(copy(cv.fun_values), copy(cv.geo_mapping), copy(cv.qr), copy(cv.detJdV))
 end
 
-"""
-    precompute_values!(cv::CellValues)
-
-Precompute all values for the current quadrature rule in `cv`. This method allows you to modify
-the quadrature positions, and then update all relevant parts of `cv` accordingly. 
-Used by `PointValues`.
-"""
-function precompute_values!(cv::CellValues)
-    precompute_values!(cv.fun_values, cv.qr)
-    precompute_values!(cv.geo_mapping, cv.qr)
-end
-
 # Access geometry values
 @propagate_inbounds getngeobasefunctions(cv::CellValues) = getngeobasefunctions(cv.geo_mapping)
 @propagate_inbounds geometric_value(cv::CellValues, args...) = geometric_value(cv.geo_mapping, args...)

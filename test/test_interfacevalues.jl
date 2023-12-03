@@ -1,7 +1,7 @@
 @testset "InterfaceValues" begin
     function test_interfacevalues(grid::Ferrite.AbstractGrid, iv::InterfaceValues; tol = 0)
-        ip_here = iv.here.func_interp
-        ip_there = iv.there.func_interp
+        ip_here = Ferrite.get_function_interpolation(iv.here)
+        ip_there = Ferrite.get_function_interpolation(iv.there)
         ndim = Ferrite.getdim(ip_here)
         n_basefuncs = getnbasefunctions(ip_here) + getnbasefunctions(ip_there)
 
@@ -252,8 +252,8 @@
         @test_throws ArgumentError("transformation is not implemented") Ferrite.get_transformation_matrix(it)
     end
     @testset "show" begin
-        # Just smoke test to make sure show doesn't error. 
         iv = InterfaceValues(FaceQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
-        show(stdout, MIME"text/plain"(), iv)
+        showstring = show_as_string(iv)
+        @test contains(showstring, "InterfaceValues with")
     end
 end # of testset

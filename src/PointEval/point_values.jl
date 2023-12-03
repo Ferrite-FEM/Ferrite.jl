@@ -66,7 +66,8 @@ function reinit!(pv::PointValues, x::AbstractVector{<:Vec{D}}, ξ::Vec{D}) where
     qr_points = getpoints(pv.cv.qr)
     qr_points[1] = ξ
     # Precompute all values again to reflect the updated ξ coordinate
-    precompute_values!(pv.cv)
+    precompute_values!(pv.cv.fun_values, qr_points)
+    precompute_values!(pv.cv.geo_mapping, qr_points)
     # Regular reinit
     reinit!(pv.cv, x)
     return nothing
