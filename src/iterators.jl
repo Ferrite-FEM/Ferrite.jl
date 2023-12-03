@@ -365,6 +365,7 @@ function InterfaceIterator(gridordh::Union{Grid,AbstractDofHandler},
     return InterfaceIterator(InterfaceCache(gridordh), grid, topology)
 end
 
+
 # Iterator interface
 function Base.iterate(ii::InterfaceIterator, state...)
     grid_dim = getdim(ii.grid)

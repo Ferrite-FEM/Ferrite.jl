@@ -41,7 +41,7 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     qr::QR         # QuadratureRule
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
-function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; FunDiffOrder=1, save_detJdV=true) where T 
+function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; FunDiffOrder = 1, save_detJdV = true) where T 
     GeoDiffOrder = max(required_geo_diff_order(get_mapping_type(ip_fun), FunDiffOrder), save_detJdV)
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
@@ -85,7 +85,7 @@ getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 @inline function _update_detJdV!(detJvec::AbstractVector, q_point::Int, w, mapping)
     detJ = calculate_detJ(getjacobian(mapping))
     detJ > 0.0 || throw_detJ_not_pos(detJ)
-    @inbounds detJvec[q_point] = detJ*w
+    @inbounds detJvec[q_point] = detJ * w
 end
 @inline _update_detJdV!(::Nothing, q_point, w, mapping) = nothing
 
@@ -98,7 +98,7 @@ function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
     if cell === nothing && !isa(get_mapping_type(fun_values), IdentityMapping)
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
-    if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x)!=n_geom_basefuncs
+    if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     end
     @inbounds for (q_point, w) in enumerate(getweights(cv.qr))

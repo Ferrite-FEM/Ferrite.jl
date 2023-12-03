@@ -40,13 +40,13 @@ struct FaceValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:Abstrac
     current_face::ScalarWrapper{Int}
 end
 
-function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim}=default_geometric_interpolation(ip_fun); FunDiffOrder=1) where {T,sdim} 
+function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); FunDiffOrder = 1) where {T,sdim} 
     GeoDiffOrder = max(required_geo_diff_order(get_mapping_type(ip_fun), FunDiffOrder), 1)
     geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]
     fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
     max_nquadpoints = maximum(qr->length(getweights(qr)), fqr.face_rules)
-    detJdV = fill(T(NaN), max_nquadpoints)
-    normals = fill(zero(Vec{sdim,T})*T(NaN), max_nquadpoints)
+    detJdV  = fill(T(NaN), max_nquadpoints)
+    normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
     return FaceValues(fun_values, geo_mapping, fqr, detJdV, normals, ScalarWrapper(1))
 end
 
@@ -106,19 +106,14 @@ function set_current_face!(fv::FaceValues, face_nr::Int)
     fv.current_face[] = face_nr
 end
 
-function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int, cell=nothing) where {dim, T}
+function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim, T}}, face_nr::Int, cell = nothing) where {dim, T}
     check_reinit_sdim_consistency(:FaceValues, shape_gradient_type(fv), eltype(x))
-    
-    
     set_current_face!(fv, face_nr)
-    
     n_geom_basefuncs = getngeobasefunctions(fv)
-    if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x)!=n_geom_basefuncs
+    if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
         throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     end
     
-    # Must be done after setting current face, 
-    # which should be done after boundscheck_face
     geo_mapping = get_geo_mapping(fv)
     fun_values = get_fun_values(fv)
 
@@ -133,7 +128,7 @@ function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim,T}}, face_nr::Int, ce
         weight_norm = weighted_normal(J, getrefshape(geo_mapping.ip), face_nr)
         detJ = norm(weight_norm)
         detJ > 0.0 || throw_detJ_not_pos(detJ)
-        @inbounds fv.detJdV[q_point] = detJ*w
+        @inbounds fv.detJdV[q_point] = detJ * w
         @inbounds fv.normals[q_point] = weight_norm / norm(weight_norm)       
         apply_mapping!(fun_values, q_point, mapping, cell)
     end
