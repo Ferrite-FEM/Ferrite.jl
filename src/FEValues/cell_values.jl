@@ -87,7 +87,11 @@ getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
 end
 @inline _update_detJdV!(::Nothing, q_point, w, mapping) = nothing
 
-function reinit!(cv::CellValues, x::AbstractVector{<:Vec}, cell=nothing)
+@inline function reinit!(cv::CellValues, x::AbstractVector)
+    return reinit!(cv, nothing, x)
+end
+
+function reinit!(cv::CellValues, cell, x::AbstractVector{<:Vec})
     geo_mapping = cv.geo_mapping
     fun_values = cv.fun_values
     n_geom_basefuncs = getngeobasefunctions(geo_mapping)
