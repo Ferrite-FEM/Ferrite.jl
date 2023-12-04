@@ -50,30 +50,24 @@ struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t}
         return new{1, typeof(ip), N_t, typeof(dNdx), typeof(dNdξ)}(ip, N_x, N_ξ, dNdx, dNdξ)
     end
 end
-function FunctionValues{0}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where T
+function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder, T}
     ip_dims = InterpolationDims(ip, ip_geo)
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
     
     N_ξ = zeros(typeof_N(T, ip_dims), n_shape, n_qpoints)
     N_x = isa(get_mapping_type(ip), IdentityMapping) ? N_ξ : similar(N_ξ)
-        
-    fv = FunctionValues(ip, N_x, N_ξ, nothing, nothing)
-    precompute_values!(fv, getpoints(qr)) # Separate function for qr point update in PointValues
-    return fv
-end
-function FunctionValues{1}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where T
-    ip_dims = InterpolationDims(ip, ip_geo)
-    n_shape = getnbasefunctions(ip)
-    n_qpoints = getnquadpoints(qr)
-    
-    N_ξ = zeros(typeof_N(T, ip_dims), n_shape, n_qpoints)
-    N_x = isa(get_mapping_type(ip), IdentityMapping) ? N_ξ : similar(N_ξ)
-    
-    dNdξ = zeros(typeof_dNdξ(T, ip_dims),               n_shape, n_qpoints)
-    dNdx = fill(zero(typeof_dNdx(T, ip_dims)) * T(NaN), n_shape, n_qpoints)
-    
-    fv = FunctionValues(ip, N_x, N_ξ, dNdx, dNdξ)
+
+    if DiffOrder == 0
+        dNdξ = dNdx = nothing
+    elseif DiffOrder > 1
+        throw(ArgumentError("Currently only values and gradients can be updated in FunctionValues"))
+    else
+        dNdξ = zeros(typeof_dNdξ(T, ip_dims),               n_shape, n_qpoints)
+        dNdx = fill(zero(typeof_dNdx(T, ip_dims)) * T(NaN), n_shape, n_qpoints)
+    end
+
+    fv = FunctionValues(ip, N_x, N_ξ, dNdξ, dNdx)
     precompute_values!(fv, getpoints(qr)) # Separate function for qr point update in PointValues
     return fv
 end
