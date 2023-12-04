@@ -342,17 +342,17 @@ end
 
 @testset "show" begin
     cv_quad = CellValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}()^2)
-    showstring = show_as_string(cv_quad)
+    showstring = sprint(show, MIME"text/plain"(), cv_quad)
     @test startswith(showstring, "CellValues(vdim=2, rdim=2, and sdim=2): 4 quadrature points")
     @test contains(showstring, "Function interpolation: Lagrange{RefQuadrilateral, 2}()^2")
 
     cv_wedge = CellValues(QuadratureRule{RefPrism}(2), Lagrange{RefPrism,2}())
-    showstring = show_as_string(cv_wedge)
+    showstring = sprint(show, MIME"text/plain"(), cv_wedge)
     @test startswith(showstring, "CellValues(scalar, rdim=3, and sdim=3): 5 quadrature points")
     @test contains(showstring, "Function interpolation: Lagrange{RefPrism, 2}()")
 
     pv = PointValues(cv_wedge)
-    pv_showstring = show_as_string(pv)
+    pv_showstring = sprint(show, MIME"text/plain"(), pv)
     @test startswith(pv_showstring, "PointValues containing")
     @test contains(pv_showstring, "Function interpolation: Lagrange{RefPrism, 2}()")
 end

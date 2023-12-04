@@ -282,13 +282,6 @@ getfacerefshape(::Tetrahedron, ::Int) = RefTriangle
 getfacerefshape(::Pyramid, face::Int) = face == 1 ? RefQuadrilateral : RefTriangle
 getfacerefshape(::Wedge, face::Int) = face ∈ (1,5) ? RefTriangle : RefQuadrilateral
 
-# For testing of show of various types
-function show_as_string(value, mime=MIME"text/plain"())
-    io = IOBuffer()
-    show(IOContext(io), mime, value)
-    return String(take!(io))
-end
-
 ######################################################
 # Dummy RefShape to test get_transformation_matrix   #
 ######################################################
