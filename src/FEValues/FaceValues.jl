@@ -186,8 +186,8 @@ function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interp
     nqp = zeros(Int,n_boundary_entities)
 
     for n_boundary_entity in 1:n_boundary_entities
-        for (qp, ξ) in enumerate(qrs[n_boundary_entity].points), i in 1:n_geom_basefuncs
-            M[i, qp, n_boundary_entity] = shape_value(geom_interpol, ξ, i)
+        for (qp, ξ) in pairs(qrs[n_boundary_entity].points)
+            shape_values!(@view(M[:, qp, n_boundary_entity]), geom_interpol, ξ)
         end
         nqp[n_boundary_entity] = length(qrs[n_boundary_entity].points)
     end
