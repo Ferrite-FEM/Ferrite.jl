@@ -60,11 +60,11 @@ function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureR
 
     if DiffOrder == 0
         dNdξ = dNdx = nothing
-    elseif DiffOrder > 1
-        throw(ArgumentError("Currently only values and gradients can be updated in FunctionValues"))
-    else
+    elseif DiffOrder == 1
         dNdξ = zeros(typeof_dNdξ(T, ip_dims),               n_shape, n_qpoints)
         dNdx = fill(zero(typeof_dNdx(T, ip_dims)) * T(NaN), n_shape, n_qpoints)
+    else
+        throw(ArgumentError("Currently only values and gradients can be updated in FunctionValues"))
     end
 
     fv = FunctionValues(ip, N_x, N_ξ, dNdx, dNdξ)
