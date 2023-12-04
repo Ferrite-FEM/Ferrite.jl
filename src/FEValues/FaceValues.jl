@@ -77,9 +77,7 @@ get_geo_mapping(fv::FaceValues) = @inbounds fv.geo_mapping[getcurrentface(fv)]
 
 get_fun_values(fv::FaceValues) = @inbounds fv.fun_values[getcurrentface(fv)]
 for op = (:shape_value, :shape_gradient, :shape_symmetric_gradient, :shape_curl)
-    eval(quote
-        @propagate_inbounds $op(fv::FaceValues, i::Int, q_point::Int) = $op(get_fun_values(fv), i, q_point)
-    end)
+    @eval @propagate_inbounds $op(fv::FaceValues, i::Int, q_point::Int) = $op(get_fun_values(fv), i, q_point)
 end
 
 """

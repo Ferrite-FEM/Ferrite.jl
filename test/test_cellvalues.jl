@@ -372,9 +372,7 @@ end
         # If changes are made that makes the following tests fails,
         # the devdocs should be updated accordingly.
         for op = (:shape_value, :shape_gradient, :getnquadpoints, :getnbasefunctions, :geometric_value, :getngeobasefunctions)
-            eval(quote
-                Ferrite.$op(cv::TestCustomCellValues, args...; kwargs...) = Ferrite.$op(cv.cv, args...; kwargs...)
-            end)
+            @eval Ferrite.$op(cv::TestCustomCellValues, args...; kwargs...) = Ferrite.$op(cv.cv, args...; kwargs...)
         end
         ip = Lagrange{RefQuadrilateral,1}()^2
         qr = QuadratureRule{RefQuadrilateral}(2)
