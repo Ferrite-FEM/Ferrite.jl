@@ -88,7 +88,7 @@ end
 @inline _update_detJdV!(::Nothing, q_point, w, mapping) = nothing
 
 @inline function reinit!(cv::CellValues, x::AbstractVector)
-    return reinit!(cv::FaceValues, nothing, x::AbstractVector)
+    return reinit!(cv, nothing, x)
 end
 
 function reinit!(cv::CellValues, cell, x::AbstractVector{<:Vec})

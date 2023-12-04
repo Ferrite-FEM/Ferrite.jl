@@ -380,7 +380,7 @@ end
         grid = generate_grid(Quadrilateral, (1,1))
         x = getcoordinates(grid, 1)
         cell = getcells(grid, 1)
-        reinit!(cv, x, cell)
+        reinit!(cv, cell, x)
         ae = rand(getnbasefunctions(cv))
         q_point = rand(1:getnquadpoints(cv))
         cv_custom = TestCustomCellValues(cv)

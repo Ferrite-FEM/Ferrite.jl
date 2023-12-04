@@ -105,7 +105,7 @@ function set_current_face!(fv::FaceValues, face_nr::Int)
 end
 
 @inline function reinit!(fv::FaceValues, x::AbstractVector, face_nr::Int)
-    return reinit!(fv::FaceValues, nothing, x::AbstractVector, face_nr::Int)
+    return reinit!(fv, nothing, x, face_nr)
 end
 
 function reinit!(fv::FaceValues, cell, x::AbstractVector{Vec{dim, T}}, face_nr::Int) where {dim, T}
