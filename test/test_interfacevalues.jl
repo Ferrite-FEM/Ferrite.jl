@@ -253,7 +253,7 @@
     end
     @testset "show" begin
         iv = InterfaceValues(FaceQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
-        showstring = show_as_string(iv)
+        showstring = sprint(show, MIME"text/plain"(), iv)
         @test contains(showstring, "InterfaceValues with")
     end
 end # of testset

@@ -74,9 +74,7 @@ shape_value_type(cv::CellValues) = shape_value_type(cv.fun_values)
 shape_gradient_type(cv::CellValues) = shape_gradient_type(cv.fun_values)
 
 for op = (:shape_value, :shape_gradient, :shape_symmetric_gradient)
-    eval(quote
-        @propagate_inbounds $op(cv::CellValues, i::Int, q_point::Int) = $op(cv.fun_values, i, q_point)
-    end)
+    @eval @propagate_inbounds $op(cv::CellValues, i::Int, q_point::Int) = $op(cv.fun_values, i, q_point)
 end
 
 # Access quadrature rule values 
