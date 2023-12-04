@@ -67,7 +67,7 @@ function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureR
         dNdx = fill(zero(typeof_dNdx(T, ip_dims)) * T(NaN), n_shape, n_qpoints)
     end
 
-    fv = FunctionValues(ip, N_x, N_ξ, dNdξ, dNdx)
+    fv = FunctionValues(ip, N_x, N_ξ, dNdx, dNdξ)
     precompute_values!(fv, getpoints(qr)) # Separate function for qr point update in PointValues
     return fv
 end
