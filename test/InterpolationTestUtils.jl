@@ -51,7 +51,7 @@ module InterpolationTestUtils
         point_coords = zeros(eltype(cell_coords), length(inds))
         point_normal = similar(point_coords)
         fun_vals = zeros(typeof(shape_value(fv, 1, 1)), length(inds))
-        reinit!(fv, cell_coords, facenr, cell)
+        reinit!(fv, cell, cell_coords, facenr)
         ue = u[celldofs(dh, cellnr)]
         for (i, q_point) in enumerate(inds)
             point_coords[i] = spatial_coordinate(fv, q_point, cell_coords)
@@ -67,7 +67,7 @@ module InterpolationTestUtils
         ξs = collect(last.(local_coords)) # Extract the local coordinates
         qr = QuadratureRule{RefShape}(zeros(length(ξs)), ξs)
         cv = CellValues(qr, ip_fun, ip_geo)
-        reinit!(cv, cell_coords2, cell2)
+        reinit!(cv, cell2, cell_coords2)
         fun_vals2 = similar(fun_vals)
         ue2 = u[celldofs(dh, face2[1])]
         for q_point in 1:getnquadpoints(cv)
@@ -102,7 +102,7 @@ module InterpolationTestUtils
         ip_fun = Ferrite.getfieldinterpolation(dh, (1,1))
         qr = create_gradcheck_qr(ip_geo, ΔL)
         cv = CellValues(qr, ip_fun, ip_geo)
-        reinit!(cv, x, cell)
+        reinit!(cv, cell, x)
         Δu_num = function_value(cv, 2, ue) - function_value(cv, 1, ue)
         Δx = spatial_coordinate(cv, 2, x) - spatial_coordinate(cv, 1, x)
         ∇u1 = function_gradient(cv, 1, ue)

@@ -155,8 +155,8 @@ end
     reinit!(cvv, x)
     reinit!(fsv, x, 1)
     reinit!(fvv, x, 1)
-    reinit!(cv_nedelec, x, cell)
-    reinit!(fv_nedelec, x, 1, cell)
+    reinit!(cv_nedelec, cell, x)
+    reinit!(fv_nedelec, cell, x, 1)
 
     # Wrong number of coordinates
     xx = [x; x]

@@ -104,7 +104,11 @@ function set_current_face!(fv::FaceValues, face_nr::Int)
     fv.current_face[] = face_nr
 end
 
-function reinit!(fv::FaceValues, x::AbstractVector{Vec{dim, T}}, face_nr::Int, cell = nothing) where {dim, T}
+@inline function reinit!(fv::FaceValues, x::AbstractVector, face_nr::Int)
+    return reinit!(fv::FaceValues, nothing, x::AbstractVector, face_nr::Int)
+end
+
+function reinit!(fv::FaceValues, cell, x::AbstractVector{Vec{dim, T}}, face_nr::Int) where {dim, T}
     check_reinit_sdim_consistency(:FaceValues, shape_gradient_type(fv), eltype(x))
     set_current_face!(fv, face_nr)
     n_geom_basefuncs = getngeobasefunctions(fv)
