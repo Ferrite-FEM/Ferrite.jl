@@ -26,9 +26,9 @@ end
 end
 
 """
-    reinit!(cv::CellValues, x::Vector, cell::AbstractCell)
+    reinit!(cv::CellValues, cell::AbstractCell, x::Vector)
     reinit!(cv::CellValues, x::Vector)
-    reinit!(fv::FaceValues, x::Vector, face::Int, cell::AbstractCell)
+    reinit!(fv::FaceValues, cell::AbstractCell, x::Vector, face::Int)
     reinit!(fv::FaceValues, x::Vector, face::Int)
 
 Update the `CellValues`/`FaceValues` object for a cell or face with coordinates `x`.
