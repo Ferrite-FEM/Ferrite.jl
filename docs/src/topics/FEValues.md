@@ -113,10 +113,13 @@ Please note that several internal functions are used, and these may change witho
 
 ```@eval
 # Include the example here, but modify the Literate output to suit being embedded
-using Literate
-Literate.markdown("SimpleCellValues_literate.jl"; name = "SimpleCellValues", 
-    execute = true, credit = false)
-Literate.script("SimpleCellValues_literate.jl"; name="SimpleCellValues")
+using Literate, Markdown
+base_name = "SimpleCellValues_literate"
+Literate.markdown(string(base_name, ".jl"); name = base_name, execute = true, credit = false, documenter=false)
+content = read(string(base_name, ".md"), String)
+rm(string(base_name, ".md"))
+rm(string(base_name, ".jl"))
+Markdown.parse(content)
 ```
 
 ## Further reading
