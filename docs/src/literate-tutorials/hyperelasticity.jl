@@ -11,7 +11,7 @@
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
-#md #     [`hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/examples/hyperelasticity.ipynb).
+#md #     [`hyperelasticity.ipynb`](@__NBVIEWER_ROOT_URL__/tutorials/hyperelasticity.ipynb).
 #-
 # ## Introduction
 #
@@ -69,17 +69,19 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 #
 # where ``I_1 = \mathrm{tr}(\mathbf{C})`` is the first invariant, ``J = \sqrt{\det(\mathbf{C})}``
 # and ``\mu`` and ``\lambda`` material parameters.
-# !!! details "Extra details on compressible neo-Hookean formulations"
-#     The Neo-Hooke model is only a well defined terminology in the incompressible case.
-#     Thus, only $W(\mathbf{C})$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
-#     In order to obtain a well-posed problem, it is crucial to choose a convex formulation of $U(J)$.
-#     Other examples for $U(J)$ can be found, e.g. in [Hol:2000:nsm; Eq. (6.138)](@cite)
-#     ```math
-#      \beta^{-2} (\beta \ln J + J^{-\beta} -1)
-#     ```
-#     where [SimMie:1992:act; Eq. (2.37)](@cite) published a non-generalized version with $\beta=-2$.
-#     This shows the possible variety of $U(J)$ while all of them refer to compressible neo-Hookean models.
-#     Sometimes the modified first invariant $\overline{I}_1=\frac{I_1}{I_3^{1/3}}$ is used in $W(\mathbf{C})$ instead of $I_1$.
+
+#md # !!! details "Extra details on compressible neo-Hookean formulations"
+#md #     The Neo-Hooke model is only a well defined terminology in the incompressible case.
+#md #     Thus, only $W(\mathbf{C})$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
+#md #     In order to obtain a well-posed problem, it is crucial to choose a convex formulation of $U(J)$.
+#md #     Other examples for $U(J)$ can be found, e.g. in [Hol:2000:nsm; Eq. (6.138)](@cite)
+#md #     ```math
+#md #      \beta^{-2} (\beta \ln J + J^{-\beta} -1)
+#md #     ```
+#md #     where [SimMie:1992:act; Eq. (2.37)](@cite) published a non-generalized version with $\beta=-2$.
+#md #     This shows the possible variety of $U(J)$ while all of them refer to compressible neo-Hookean models.
+#md #     Sometimes the modified first invariant $\overline{I}_1=\frac{I_1}{I_3^{1/3}}$ is used in $W(\mathbf{C})$ instead of $I_1$.
+
 # From the potential we obtain the second Piola-Kirchoff stress ``\mathbf{S}`` as
 #
 # ```math
@@ -104,45 +106,45 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 # \end{align*}
 # ```
 
-# !!! details "Derivation of $\partial \mathbf{P} / \partial \mathbf{F}$"
-#     Using the product rule, the chain rule, and the relations ``\mathbf{P} = \mathbf{F} \cdot
-#     \mathbf{S}`` and ``\mathbf{C} = \mathbf{F}^\mathrm{T} \cdot \mathbf{F}``, we obtain the
-#     following:
-#     ```math
-#     \begin{aligned}
-#     \frac{\partial \mathbf{P}}{\partial \mathbf{F}} &=
-#     \frac{\partial P_{ij}}{\partial F_{kl}} \\ &=
-#     \frac{\partial (F_{im}S_{mj})}{\partial F_{kl}} \\ &=
-#     \frac{\partial F_{im}}{\partial F_{kl}}S_{mj} +
-#     F_{im}\frac{\partial S_{mj}}{\partial F_{kl}} \\ &=
-#     \delta_{ik}\delta_{ml} S_{mj} +
-#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}\frac{\partial C_{no}}{\partial F_{kl}} \\ &=
-#     \delta_{ik}S_{lj} +
-#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
-#     \frac{\partial (F^\mathrm{T}_{np}F_{po})}{\partial F_{kl}} \\ &=
-#     \delta_{ik}S^\mathrm{T}_{jl} +
-#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
-#     \left(
-#     \frac{\partial F^\mathrm{T}_{np}}{\partial F_{kl}}F_{po} +
-#     F^\mathrm{T}_{np}\frac{\partial F_{po}}{\partial F_{kl}}
-#     \right) \\ &=
-#     \delta_{ik}S_{jl} +
-#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
-#     (\delta_{nl} \delta_{pk} F_{po} + F^\mathrm{T}_{np}\delta_{pk} \delta_{ol}) \\ &=
-#     \delta_{ik}S_{lj} +
-#     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
-#     (F^\mathrm{T}_{ok} \delta_{nl} + F^\mathrm{T}_{nk} \delta_{ol}) \\ &=
-#     \delta_{ik}S_{jl} +
-#     2\, F_{im} \frac{\partial S_{mj}}{\partial C_{no}}
-#     F^\mathrm{T}_{nk} \delta_{ol} \\ &=
-#     \mathbf{I}\bar{\otimes}\mathbf{S} +
-#     2\, \mathbf{F} \cdot \frac{\partial \mathbf{S}}{\partial \mathbf{C}}
-#     : \mathbf{F}^\mathrm{T} \bar{\otimes} \mathbf{I},
-#     \end{aligned}
-#     ```
-#     where we used the fact that ``\mathbf{S}`` is symmetric (``S_{lj} = S_{jl}``) and that
-#     ``\frac{\partial \mathbf{S}}{\partial \mathbf{C}}`` is *minor* symmetric (``\frac{\partial
-#     S_{mj}}{\partial C_{no}} = \frac{\partial S_{mj}}{\partial C_{on}}``).
+#md # !!! details "Derivation of $\partial \mathbf{P} / \partial \mathbf{F}$"
+#md #     Using the product rule, the chain rule, and the relations ``\mathbf{P} = \mathbf{F} \cdot
+#md #     \mathbf{S}`` and ``\mathbf{C} = \mathbf{F}^\mathrm{T} \cdot \mathbf{F}``, we obtain the
+#md #     following:
+#md #     ```math
+#md #     \begin{aligned}
+#md #     \frac{\partial \mathbf{P}}{\partial \mathbf{F}} &=
+#md #     \frac{\partial P_{ij}}{\partial F_{kl}} \\ &=
+#md #     \frac{\partial (F_{im}S_{mj})}{\partial F_{kl}} \\ &=
+#md #     \frac{\partial F_{im}}{\partial F_{kl}}S_{mj} +
+#md #     F_{im}\frac{\partial S_{mj}}{\partial F_{kl}} \\ &=
+#md #     \delta_{ik}\delta_{ml} S_{mj} +
+#md #     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}\frac{\partial C_{no}}{\partial F_{kl}} \\ &=
+#md #     \delta_{ik}S_{lj} +
+#md #     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#md #     \frac{\partial (F^\mathrm{T}_{np}F_{po})}{\partial F_{kl}} \\ &=
+#md #     \delta_{ik}S^\mathrm{T}_{jl} +
+#md #     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#md #     \left(
+#md #     \frac{\partial F^\mathrm{T}_{np}}{\partial F_{kl}}F_{po} +
+#md #     F^\mathrm{T}_{np}\frac{\partial F_{po}}{\partial F_{kl}}
+#md #     \right) \\ &=
+#md #     \delta_{ik}S_{jl} +
+#md #     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#md #     (\delta_{nl} \delta_{pk} F_{po} + F^\mathrm{T}_{np}\delta_{pk} \delta_{ol}) \\ &=
+#md #     \delta_{ik}S_{lj} +
+#md #     F_{im}\frac{\partial S_{mj}}{\partial C_{no}}
+#md #     (F^\mathrm{T}_{ok} \delta_{nl} + F^\mathrm{T}_{nk} \delta_{ol}) \\ &=
+#md #     \delta_{ik}S_{jl} +
+#md #     2\, F_{im} \frac{\partial S_{mj}}{\partial C_{no}}
+#md #     F^\mathrm{T}_{nk} \delta_{ol} \\ &=
+#md #     \mathbf{I}\bar{\otimes}\mathbf{S} +
+#md #     2\, \mathbf{F} \cdot \frac{\partial \mathbf{S}}{\partial \mathbf{C}}
+#md #     : \mathbf{F}^\mathrm{T} \bar{\otimes} \mathbf{I},
+#md #     \end{aligned}
+#md #     ```
+#md #     where we used the fact that ``\mathbf{S}`` is symmetric (``S_{lj} = S_{jl}``) and that
+#md #     ``\frac{\partial \mathbf{S}}{\partial \mathbf{C}}`` is *minor* symmetric (``\frac{\partial
+#md #     S_{mj}}{\partial C_{no}} = \frac{\partial S_{mj}}{\partial C_{on}}``).
 
 
 # ### Implementation of material model using automatic differentiation
