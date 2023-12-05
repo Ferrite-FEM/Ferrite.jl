@@ -37,6 +37,6 @@ Ferrite.filteredges
 Ferrite.filtervertices
 Ferrite.element_to_face_transformation
 Ferrite.face_to_element_transformation
-Ferrite.InterfaceTransformation
+Ferrite.InterfaceOrientationInfo
 Ferrite.transform_interface_points!
 ```
