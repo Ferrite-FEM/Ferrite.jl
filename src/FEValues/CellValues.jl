@@ -76,9 +76,9 @@ get_function_difforder(cv::CellValues) = get_function_difforder(cv.fun_values)
 shape_value_type(cv::CellValues) = shape_value_type(cv.fun_values)
 shape_gradient_type(cv::CellValues) = shape_gradient_type(cv.fun_values)
 
-for op = (:shape_value, :shape_gradient, :shape_symmetric_gradient)
-    @eval @propagate_inbounds $op(cv::CellValues, i::Int, q_point::Int) = $op(cv.fun_values, i, q_point)
-end
+@propagate_inbounds shape_value(cv::CellValues, i::Int, q_point::Int) = shape_value(cv.fun_values, i, q_point)
+@propagate_inbounds shape_gradient(cv::CellValues, i::Int, q_point::Int) = shape_gradient(cv.fun_values, i, q_point)
+@propagate_inbounds shape_symmetric_gradient(cv::CellValues, i::Int, q_point::Int) = shape_symmetric_gradient(cv.fun_values, i, q_point)
 
 # Access quadrature rule values 
 getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
