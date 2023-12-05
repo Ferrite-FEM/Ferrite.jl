@@ -113,17 +113,10 @@ Please note that several internal functions are used, and these may change witho
 
 ```@eval
 # Include the example here, but modify the Literate output to suit being embedded
-using Literate, Markdown
-filename = "SimpleCellValues_literate"
-Literate.markdown(filename*".jl"; execute=true)
-contents = read(filename*".md", String)
-Literate.script(filename*".jl"; name="SimpleCellValues")
-rm(filename*".jl")
-rm(filename*".md")
-header_end = last(findnext("```", contents, 4))+1
-Markdown.parse(replace(contents[header_end:end], 
-    "*This page was generated using [Literate.jl]"=>"*This example was generated using [Literate.jl]")
-    )
+using Literate
+Literate.markdown("SimpleCellValues_literate.jl"; name = "SimpleCellValues", 
+    execute = true, credit = false)
+Literate.script("SimpleCellValues_literate.jl"; name="SimpleCellValues")
 ```
 
 ## Further reading
