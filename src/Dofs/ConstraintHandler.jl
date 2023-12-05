@@ -33,14 +33,14 @@ which applies the condition via [`apply!`](@ref) and/or [`apply_zero!`](@ref).
 """
 struct Dirichlet # <: Constraint
     f::Function # f(x) or f(x,t) -> value(s)
-    faces::Union{Set{Int},Set{FaceIndex},Set{EdgeIndex},Set{VertexIndex}}
+    entities::Union{OrderedSet{Int},OrderedSet{FaceIndex},OrderedSet{EdgeIndex},OrderedSet{VertexIndex}}
     field_name::Symbol
     components::Vector{Int} # components of the field
     local_face_dofs::Vector{Int}
     local_face_dofs_offset::Vector{Int}
 end
-function Dirichlet(field_name::Symbol, faces::Set, f::Function, components=nothing)
-    return Dirichlet(f, faces, field_name, __to_components(components), Int[], Int[])
+function Dirichlet(field_name::Symbol, entity_set, f::Function, components=nothing)
+    return Dirichlet(f, _maybe_convert_to_orderedset(entity_set), field_name, __to_components(components), Int[], Int[])
 end
 
 # components=nothing is default and means that all components should be constrained
@@ -273,7 +273,7 @@ function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Int, inhomo
 end
 
 # Dirichlet on (face|edge|vertex)set
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::Set{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, _) where {Index<:BoundaryIndex}
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfaces::VectorOrSetOfType{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, _) where {Index<:BoundaryIndex}
     local_face_dofs, local_face_dofs_offset =
         _local_face_dofs_for_bc(interpolation, field_dim, dbc.components, offset, dirichlet_boundarydof_indices(eltype(bcfaces)))
     copy!(dbc.local_face_dofs, local_face_dofs)
@@ -315,7 +315,7 @@ function _local_face_dofs_for_bc(interpolation, field_dim, components, offset, b
     return local_face_dofs, local_face_dofs_offset
 end
 
-function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::Set{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::Set{Int}=Set{Int}(1:getncells(get_grid(ch.dh))))
+function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcnodes::VectorOrSetOfType{Int}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, cellset::VectorOrSetOfType{Int}=OrderedSet{Int}(1:getncells(get_grid(ch.dh))))
     grid = get_grid(ch.dh)
     if interpolation !== default_interpolation(getcelltype(grid, first(cellset)))
         @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
@@ -381,7 +381,7 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
         # the function with two arguments internally.
         wrapper_f = hasmethod(dbc.f, Tuple{Any,Any}) ? dbc.f : (x, _) -> dbc.f(x)
         # Function barrier
-        _update!(ch.inhomogeneities, wrapper_f, dbc.faces, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
+        _update!(ch.inhomogeneities, wrapper_f, dbc.entities, dbc.field_name, dbc.local_face_dofs, dbc.local_face_dofs_offset,
                  dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time)
     end
     # Compute effective inhomogeneity for affine constraints with prescribed dofs in the
@@ -407,7 +407,7 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
 end
 
 # for vertices, faces and edges
-function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entities::VectorOrSetOfType{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where {T}
 
@@ -444,7 +444,7 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entiti
 end
 
 # for nodes
-function _update!(inhomogeneities::Vector{Float64}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+function _update!(inhomogeneities::Vector{Float64}, f::Function, ::VectorOrSetOfType{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where T
     counter = 1
@@ -480,9 +480,9 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
         data = zeros(Float64, nd, getnnodes(get_grid(ch.dh)))
         for dbc in ch.dbcs
             dbc.field_name != field && continue
-            if eltype(dbc.faces) <: BoundaryIndex
-                functype = boundaryfunction(eltype(dbc.faces))
-                for (cellidx, faceidx) in dbc.faces
+            if eltype(dbc.entities) <: BoundaryIndex
+                functype = boundaryfunction(eltype(dbc.entities))
+                for (cellidx, faceidx) in dbc.entities
                     for facenode in functype(getcells(get_grid(ch.dh), cellidx))[faceidx]
                         for component in dbc.components
                             data[component, facenode] = 1
@@ -490,7 +490,7 @@ function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
                     end
                 end
             else
-                for nodeidx in dbc.faces
+                for nodeidx in dbc.entities
                     for component in dbc.components
                         data[component, nodeidx] = 1
                     end
@@ -827,7 +827,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         dbc.field_name in sdh.field_names || continue
         # Compute the intersection between dbc.set and the cellset of this
         # SubDofHandler and skip if the set is empty
-        filtered_set = filter_dbc_set(get_grid(ch.dh), sdh.cellset, dbc.faces)
+        filtered_set = filter_dbc_set(get_grid(ch.dh), sdh.cellset, dbc.entities)
         isempty(filtered_set) && continue
         # Fetch information about the field on this SubDofHandler
         field_idx = find_field(sdh, dbc.field_name)
@@ -844,7 +844,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
             error("components $(components) not within range of field :$(dbc.field_name) ($(n_comp) dimension(s))")
         end
         # Create BCValues for coordinate evalutation at dof-locations
-        EntityType = eltype(dbc.faces) # (Face|Edge|Vertex)Index
+        EntityType = eltype(dbc.entities) # (Face|Edge|Vertex)Index
         if EntityType <: Integer
             # BCValues are just dummy for nodesets so set to FaceIndex
             EntityType = FaceIndex
@@ -854,7 +854,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
         _add!(
-            ch, filtered_dbc, filtered_dbc.faces, interpolation, n_comp,
+            ch, filtered_dbc, filtered_dbc.entities, interpolation, n_comp,
             field_offset(sdh, field_idx), bcvalues, sdh.cellset,
         )
         dbc_added = true
@@ -875,7 +875,7 @@ end
 
 function filter_dbc_set(grid::AbstractGrid, fhset::AbstractSet{Int}, dbcset::AbstractSet{Int})
     ret = empty(dbcset)
-    nodes_in_fhset = Set{Int}()
+    nodes_in_fhset = OrderedSet{Int}()
     for cc in CellIterator(grid, fhset, UpdateFlags(; nodes=true, coords=false))
         union!(nodes_in_fhset, cc.nodes)
     end
@@ -1058,7 +1058,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
                      "This will not be done automatically in the future. Instead add a " *
                      "Dirichlet boundary condition on the relevant nodeset.",
                      :PeriodicDirichlet)
-        all_node_idxs = Set{Int}()
+        all_node_idxs = OrderedSet{Int}()
         Tx = get_coordinate_type(grid)
         min_x = Tx(i -> typemax(eltype(Tx)))
         max_x = Tx(i -> typemin(eltype(Tx)))
@@ -1076,7 +1076,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
         points = construct_cornerish(min_x, max_x)
         tree = KDTree(Tx[get_node_coordinate(grid, i) for i in all_node_idxs_v])
         idxs, _ = NearestNeighbors.nn(tree, points)
-        corner_set = Set{Int}(all_node_idxs_v[i] for i in idxs)
+        corner_set = OrderedSet{Int}(all_node_idxs_v[i] for i in idxs)
 
         dbc = Dirichlet(pdbc.field_name, corner_set,
             pdbc.func === nothing ? (x, _) -> pdbc.components * eltype(x)(0) : pdbc.func,
@@ -1103,7 +1103,7 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
     if pdbc.func !== nothing
         # Create another temp constraint handler if we need to compute inhomogeneities
         chtmp2 = ConstraintHandler(ch.dh)
-        all_faces = Set{FaceIndex}()
+        all_faces = OrderedSet{FaceIndex}()
         union!(all_faces, (x.mirror for x in face_map))
         union!(all_faces, (x.image for x in face_map))
         dbc_all = Dirichlet(pdbc.field_name, all_faces, pdbc.func, pdbc.components)
@@ -1272,7 +1272,7 @@ dictionary which maps each mirror face to a image face. The result can then be p
 [`PeriodicDirichlet`](@ref).
 
 `mset` and `iset` can be given as a `String` (an existing face set in the grid) or as a
-`Set{FaceIndex}` directly.
+`AbstractSet{FaceIndex}` directly.
 
 By default this function looks for a matching face in the directions of the coordinate
 system. For other types of periodicities the `transform` function can be used. The
@@ -1284,12 +1284,12 @@ between a image-face and mirror-face, for them to be considered matched.
 
 See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
 """
-function collect_periodic_faces(grid::Grid, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
+function collect_periodic_faces(grid::Grid, mset::Union{AbstractSet{FaceIndex},String}, iset::Union{AbstractSet{FaceIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
     return collect_periodic_faces!(PeriodicFacePair[], grid, mset, iset, transform; tol)
 end
 
 """
-    collect_periodic_faces(grid::Grid, all_faces::Union{Set{FaceIndex},String,Nothing}=nothing; tol=1e-12)
+    collect_periodic_faces(grid::Grid, all_faces::Union{AbstractSet{FaceIndex},String,Nothing}=nothing; tol=1e-12)
 
 Split all faces in `all_faces` into image and mirror sets. For each matching pair, the face
 located further along the vector `(1, 1, 1)` becomes the image face.
@@ -1299,7 +1299,7 @@ have a neighbor) is used.
 
 See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
 """
-function collect_periodic_faces(grid::Grid, all_faces::Union{Set{FaceIndex},String,Nothing}=nothing; tol::Float64=1e-12)
+function collect_periodic_faces(grid::Grid, all_faces::Union{AbstractSet{FaceIndex},String,Nothing}=nothing; tol::Float64=1e-12)
     return collect_periodic_faces!(PeriodicFacePair[], grid, all_faces; tol)
 end
 
@@ -1309,7 +1309,7 @@ end
 
 Same as [`collect_periodic_faces`](@ref) but adds all matches to the existing `face_map`.
 """
-function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Union{Set{FaceIndex},String}, iset::Union{Set{FaceIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
+function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Union{AbstractSet{FaceIndex},String}, iset::Union{AbstractSet{FaceIndex},String}, transform::Union{Function,Nothing}=nothing; tol::Float64=1e-12)
     mset = __to_faceset(grid, mset)
     iset = __to_faceset(grid, iset)
     if transform === nothing
@@ -1322,7 +1322,7 @@ function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid,
     return face_map
 end
 
-function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, faceset::Union{Set{FaceIndex},String,Nothing}; tol::Float64=1e-12)
+function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid, faceset::Union{AbstractSet{FaceIndex},String,Nothing}; tol::Float64=1e-12)
     faceset = faceset === nothing ? __collect_boundary_faces(grid) : copy(__to_faceset(grid, faceset))
     if mod(length(faceset), 2) != 0
         error("uneven number of faces")
@@ -1330,7 +1330,7 @@ function collect_periodic_faces!(face_map::Vector{PeriodicFacePair}, grid::Grid,
     return __collect_periodic_faces_bruteforce!(face_map, grid, faceset, faceset, #=known_order=#false, tol)
 end
 
-__to_faceset(_, set::Set{FaceIndex}) = set
+__to_faceset(_, set::AbstractSet{FaceIndex}) = set
 __to_faceset(grid, set::String) = getfaceset(grid, set)
 function __collect_boundary_faces(grid::Grid)
     candidates = Dict{Tuple, FaceIndex}()
@@ -1344,7 +1344,7 @@ function __collect_boundary_faces(grid::Grid)
             end
         end
     end
-    return Set{FaceIndex}(values(candidates))
+    return OrderedSet{FaceIndex}(values(candidates))
 end
 
 function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Vector{FaceIndex}, iset::Vector{FaceIndex}, transformation::F, tol::Float64) where F <: Function
@@ -1389,7 +1389,7 @@ function __collect_periodic_faces_tree!(face_map::Vector{PeriodicFacePair}, grid
 end
 
 # This method empties mset and iset
-function __collect_periodic_faces_bruteforce!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::Set{FaceIndex}, iset::Set{FaceIndex}, known_order::Bool, tol::Float64)
+function __collect_periodic_faces_bruteforce!(face_map::Vector{PeriodicFacePair}, grid::Grid, mset::AbstractSet{FaceIndex}, iset::AbstractSet{FaceIndex}, known_order::Bool, tol::Float64)
     if length(mset) != length(iset)
         error("different faces in mirror and image")
     end

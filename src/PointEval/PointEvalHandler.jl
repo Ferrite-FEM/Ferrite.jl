@@ -232,7 +232,7 @@ function _evaluate_at_points!(
     ph::PointEvalHandler,
     dh::AbstractDofHandler,
     ip::Interpolation,
-    cellset::Union{Nothing, Set{Int}},
+    cellset::Union{Nothing, AbstractSet{Int}},
     dofrange::AbstractRange{Int},
     ) where {T2,T}
 

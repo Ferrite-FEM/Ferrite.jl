@@ -6,6 +6,7 @@ using Reexport
 using LinearAlgebra
 using SparseArrays
 using StaticArrays
+using OrderedCollections
 using Base: @propagate_inbounds
 using NearestNeighbors
 using EnumX
@@ -71,6 +72,9 @@ A `VertexIndex` wraps an (Int, Int) and defines a local vertex by pointing to a 
 struct VertexIndex <: BoundaryIndex
     idx::Tuple{Int,Int} # cell and side
 end
+
+const VectorOrSetOfType{T} = Union{AbstractSet{<:T}, AbstractVector{<:T}}
+const IntegerCollection = VectorOrSetOfType{Integer}
 
 include("utils.jl")
 

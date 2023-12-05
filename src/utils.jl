@@ -42,3 +42,9 @@ end
 @inline Base.getindex(s::ScalarWrapper) = s.x
 @inline Base.setindex!(s::ScalarWrapper, v) = s.x = v
 Base.copy(s::ScalarWrapper{T}) where {T} = ScalarWrapper{T}(copy(s.x))
+
+_maybe_convert_to_orderedset(set) = @error "Invalid set type '$(typeof(set))'."
+_maybe_convert_to_orderedset(set::Union{AbstractVector, AbstractSet}) = OrderedSet(set)
+_maybe_convert_to_orderedset(set::OrderedSet) = set
+_maybe_convert_to_orderedset(namedsets::Dict{String, <:Set}) = Dict([(A, OrderedSet(B)) for (A,B) ∈ namedsets])
+_maybe_convert_to_orderedset(namedsets::Dict{String, <:OrderedSet}) = namedsets

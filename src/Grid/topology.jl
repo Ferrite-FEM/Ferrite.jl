@@ -330,7 +330,7 @@ Creates an iterateable face skeleton. The skeleton consists of `FaceIndex` that 
 `FaceValues`.
 """
 function _faceskeleton(top::ExclusiveTopology, grid::Grid)
-    face_skeleton_global = Set{NTuple}()
+    face_skeleton_global = OrderedSet{NTuple}()
     face_skeleton_local = Vector{FaceIndex}()
     fs_length = length(face_skeleton_global)
     # TODO use topology to speed up :)

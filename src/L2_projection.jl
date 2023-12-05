@@ -6,7 +6,7 @@ struct L2Projector <: AbstractProjector
     geom_ip::Interpolation
     M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
     dh::DofHandler
-    set::Vector{Int}
+    set::OrderedSet{Int}
 end
 
 """
@@ -36,29 +36,29 @@ function L2Projector(
         func_ip::Interpolation,
         grid::AbstractGrid;
         qr_lhs::QuadratureRule = _mass_qr(func_ip),
-        set = 1:getncells(grid),
+        set = OrderedSet(1:getncells(grid)),
         geom_ip::Interpolation = default_interpolation(getcelltype(grid, first(set))),
     )
-
     # TODO: Maybe this should not be allowed? We always assume to project scalar entries.
     if func_ip isa VectorizedInterpolation
         func_ip = func_ip.ip
     end
 
     _check_same_celltype(grid, set)
+    _set = _maybe_convert_to_orderedset(set)
 
     fe_values_mass = CellValues(qr_lhs, func_ip, geom_ip)
 
     # Create an internal scalar valued field. This is enough since the projection is done on a component basis, hence a scalar field.
     dh = DofHandler(grid)
-    sdh = SubDofHandler(dh, Set(set))
+    sdh = SubDofHandler(dh, _set)
     add!(sdh, :_, func_ip) # we need to create the field, but the interpolation is not used here
     close!(dh)
 
-    M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
+    M = _assemble_L2_matrix(fe_values_mass, _set, dh)  # the "mass" matrix
     M_cholesky = cholesky(M)
 
-    return L2Projector(func_ip, geom_ip, M_cholesky, dh, collect(set))
+    return L2Projector(func_ip, geom_ip, M_cholesky, dh, _set)
 end
 
 # Quadrature sufficient for integrating a mass matrix

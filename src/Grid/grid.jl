@@ -306,35 +306,44 @@ There are multiple helper structures to apply boundary conditions or define subd
 # Fields
 - `cells::Vector{C}`: stores all cells of the grid
 - `nodes::Vector{Node{dim,T}}`: stores the `dim` dimensional nodes of the grid
-- `cellsets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of cell ids
-- `nodesets::Dict{String,Set{Int}}`: maps a `String` key to a `Set` of global node ids
-- `facesets::Dict{String,Set{FaceIndex}}`: maps a `String` to a `Set` of `Set{FaceIndex} (global_cell_id, local_face_id)`
-- `edgesets::Dict{String,Set{EdgeIndex}}`: maps a `String` to a `Set` of `Set{EdgeIndex} (global_cell_id, local_edge_id`
-- `vertexsets::Dict{String,Set{VertexIndex}}`: maps a `String` key to a `Set` of local vertex ids
+- `cellsets::Dict{String,OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of cell ids
+- `nodesets::Dict{String,OrderedSet{Int}}`: maps a `String` key to an `OrderedSet` of global node ids
+- `facesets::Dict{String,OrderedSet{FaceIndex}}`: maps a `String` to an `OrderedSet` of `FaceIndex (global_cell_id, local_face_id)`
+- `edgesets::Dict{String,OrderedSet{EdgeIndex}}`: maps a `String` to an `OrderedSet` of `EdgeIndex (global_cell_id, local_edge_id`
+- `vertexsets::Dict{String,OrderedSet{VertexIndex}}`: maps a `String` key to an `OrderedSet` of `VertexIndex (global_cell_id, local_vertex_id)`
 - `boundary_matrix::SparseMatrixCSC{Bool,Int}`: optional, only needed by `onboundary` to check if a cell is on the boundary, see, e.g. Helmholtz example
 """
 mutable struct Grid{dim,C<:AbstractCell,T<:Real} <: AbstractGrid{dim}
     cells::Vector{C}
     nodes::Vector{Node{dim,T}}
     # Sets
-    cellsets::Dict{String,Set{Int}}
-    nodesets::Dict{String,Set{Int}}
-    facesets::Dict{String,Set{FaceIndex}}
-    edgesets::Dict{String,Set{EdgeIndex}}
-    vertexsets::Dict{String,Set{VertexIndex}}
+    cellsets::Dict{String,OrderedSet{Int}}
+    nodesets::Dict{String,OrderedSet{Int}}
+    facesets::Dict{String,OrderedSet{FaceIndex}}
+    edgesets::Dict{String,OrderedSet{EdgeIndex}}
+    vertexsets::Dict{String,OrderedSet{VertexIndex}}
     # Boundary matrix (faces per cell × cell)
     boundary_matrix::SparseMatrixCSC{Bool,Int}
 end
 
 function Grid(cells::Vector{C},
               nodes::Vector{Node{dim,T}};
-              cellsets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
-              nodesets::Dict{String,Set{Int}}=Dict{String,Set{Int}}(),
-              facesets::Dict{String,Set{FaceIndex}}=Dict{String,Set{FaceIndex}}(),
-              edgesets::Dict{String,Set{EdgeIndex}}=Dict{String,Set{EdgeIndex}}(),
-              vertexsets::Dict{String,Set{VertexIndex}}=Dict{String,Set{VertexIndex}}(),
+              cellsets=Dict{String,OrderedSet{Int}}(),
+              nodesets=Dict{String,OrderedSet{Int}}(),
+              facesets=Dict{String,OrderedSet{FaceIndex}}(),
+              edgesets=Dict{String,OrderedSet{EdgeIndex}}(),
+              vertexsets=Dict{String,OrderedSet{VertexIndex}}(),
               boundary_matrix::SparseMatrixCSC{Bool,Int}=spzeros(Bool, 0, 0)) where {dim,C,T}
-    return Grid(cells, nodes, cellsets, nodesets, facesets, edgesets, vertexsets, boundary_matrix)
+    return Grid(
+        cells,
+        nodes,
+        _maybe_convert_to_orderedset(cellsets),
+        _maybe_convert_to_orderedset(nodesets),
+        _maybe_convert_to_orderedset(facesets),
+        _maybe_convert_to_orderedset(edgesets),
+        _maybe_convert_to_orderedset(vertexsets),
+        boundary_matrix
+    )
 end
 
 ##########################
@@ -396,7 +405,7 @@ to a Node.
 """
     getcellset(grid::AbstractGrid, setname::String)
 
-Returns all cells as cellid in a `Set` of a given `setname`.
+Returns all cells as cellid in the set with name `setname`.
 """
 @inline getcellset(grid::AbstractGrid, setname::String) = grid.cellsets[setname]
 """
@@ -409,7 +418,7 @@ Returns all cellsets of the `grid`.
 """
     getnodeset(grid::AbstractGrid, setname::String)
 
-Returns all nodes as nodeid in a `Set` of a given `setname`.
+Returns all nodes as nodeid in the set with name `setname`.
 """
 @inline getnodeset(grid::AbstractGrid, setname::String) = grid.nodesets[setname]
 """
@@ -422,7 +431,7 @@ Returns all nodesets of the `grid`.
 """
     getfaceset(grid::AbstractGrid, setname::String)
 
-Returns all faces as `FaceIndex` in a `Set` of a given `setname`.
+Returns all faces as `FaceIndex` in the set with name `setname`.
 """
 @inline getfaceset(grid::AbstractGrid, setname::String) = grid.facesets[setname]
 """
@@ -435,7 +444,7 @@ Returns all facesets of the `grid`.
 """
     getedgeset(grid::AbstractGrid, setname::String)
 
-Returns all edges as `EdgeIndex` in a `Set` of a given `setname`.
+Returns all edges as `EdgeIndex` in the set with name `setname`.
 """
 @inline getedgeset(grid::AbstractGrid, setname::String) = grid.edgesets[setname]
 """
@@ -446,9 +455,9 @@ Returns all edge sets of the grid.
 @inline getedgesets(grid::AbstractGrid) = grid.edgesets
 
 """
-    getedgeset(grid::AbstractGrid, setname::String)
+    getvertexset(grid::AbstractGrid, setname::String)
 
-Returns all vertices as `VertexIndex` in a `Set` of a given `setname`.
+Returns all vertices as `VertexIndex` in the set with name `setname`.
 """
 @inline getvertexset(grid::AbstractGrid, setname::String) = grid.vertexsets[setname]
 """
@@ -457,8 +466,6 @@ Returns all vertices as `VertexIndex` in a `Set` of a given `setname`.
 Returns all vertex sets of the grid.
 """
 @inline getvertexsets(grid::AbstractGrid) = grid.vertexsets
-
-n_faces_per_cell(grid::Grid) = nfaces(getcelltype(grid))
 
 # Transformations
 """
@@ -476,84 +483,17 @@ end
 _check_setname(dict, name) = haskey(dict, name) && throw(ArgumentError("there already exists a set with the name: $name"))
 _warn_emptyset(set, name) = length(set) == 0 && @warn("no entities added to the set with name: $name")
 
-"""
-    addcellset!(grid::AbstractGrid, name::String, cellid::Union{Set{Int}, Vector{Int}})
-    addcellset!(grid::AbstractGrid, name::String, f::function; all::Bool=true)
-
-Adds a cellset to the grid with key `name`.
-Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
-The `DofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
-`all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` in the cell if the cell
-should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
-
-```julia
-addcellset!(grid, "left", Set((1,3))) #add cells with id 1 and 3 to cellset left
-addcellset!(grid, "right", x -> norm(x[1]) < 2.0 ) #add cell to cellset right, if x[1] of each cell's node is smaller than 2.0
-```
-"""
-function addcellset!(grid::AbstractGrid, name::String, cellid::Union{Set{Int},Vector{Int}})
-    _check_setname(grid.cellsets,  name)
-    cells = Set(cellid)
-    _warn_emptyset(cells, name)
-    grid.cellsets[name] = cells
-    grid
-end
-
-function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true)
-    _check_setname(grid.cellsets, name)
-    cells = Set{Int}()
-    for (i, cell) in enumerate(getcells(grid))
-        pass = all
-        for node_idx in cell.nodes
-            node = grid.nodes[node_idx]
-            v = f(node.x)
-            all ? (!v && (pass = false; break)) : (v && (pass = true; break))
-        end
-        pass && push!(cells, i)
-    end
-    _warn_emptyset(cells, name)
-    grid.cellsets[name] = cells
-    grid
-end
-
-"""
-    addfaceset!(grid::AbstractGrid, name::String, faceid::Union{Set{FaceIndex},Vector{FaceIndex}})
-    addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) 
-
-Adds a faceset to the grid with key `name`.
-A faceset maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id, local_face_id)`.
-Facesets are used to initialize `Dirichlet` structs, that are needed to specify the boundary for the `ConstraintHandler`.
-`all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` on the face if the face
-should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
-
-```julia
-addfaceset!(grid, "right", Set(((2,2),(4,2))) #see grid manual example for reference
-addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
-```
-"""
-addfaceset!(grid::AbstractGrid, name::String, set::Union{Set{FaceIndex},Vector{FaceIndex}}) = 
-    _addset!(grid, name, set, grid.facesets)
-addedgeset!(grid::AbstractGrid, name::String, set::Union{Set{EdgeIndex},Vector{EdgeIndex}}) = 
-    _addset!(grid, name, set, grid.edgesets)
-addvertexset!(grid::AbstractGrid, name::String, set::Union{Set{VertexIndex},Vector{VertexIndex}}) = 
-    _addset!(grid, name, set, grid.vertexsets)
 function _addset!(grid::AbstractGrid, name::String, _set, dict::Dict)
     _check_setname(dict, name)
-    set = Set(_set)
+    set = _maybe_convert_to_orderedset(_set)
     _warn_emptyset(set, name)
     dict[name] = set
     grid
 end
 
-addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, Ferrite.faces, grid.facesets, FaceIndex; all=all)
-addedgeset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, Ferrite.edges, grid.edgesets, EdgeIndex; all=all)
-addvertexset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
-    _addset!(grid, name, f, Ferrite.vertices, grid.vertexsets, VertexIndex; all=all)
 function _addset!(grid::AbstractGrid, name::String, f::Function, _ftype::Function, dict::Dict, _indextype::Type; all::Bool=true)
     _check_setname(dict, name)
-    _set = Set{_indextype}()
+    _set = OrderedSet{_indextype}()
     for (cell_idx, cell) in enumerate(getcells(grid))
         for (face_idx, face) in enumerate(_ftype(cell))
             pass = all
@@ -569,12 +509,75 @@ function _addset!(grid::AbstractGrid, name::String, f::Function, _ftype::Functio
     grid
 end
 
+"""
+    addcellset!(grid::AbstractGrid, name::String, cells::VectorOrSetOfType{Int})
+    addcellset!(grid::AbstractGrid, name::String, f::function; all::Bool=true)
+
+Adds a cellset to the grid with key `name`.
+Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
+The `DofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
+`all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` in the cell if the cell
+should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
+
+```julia
+addcellset!(grid, "left", Set((1,3))) #add cells with id 1 and 3 to cellset left
+addcellset!(grid, "right", x -> norm(x[1]) < 2.0 ) #add cell to cellset right, if x[1] of each cell's node is smaller than 2.0
+```
+"""
+addcellset!(grid::AbstractGrid, name::String, set::VectorOrSetOfType{Int}) =
+    _addset!(grid, name, set, grid.cellsets)
+
+function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true)
+    _check_setname(grid.cellsets, name)
+    cells = OrderedSet{Int}()
+    for (i, cell) in enumerate(getcells(grid))
+        pass = all
+        for node_idx in cell.nodes
+            node = grid.nodes[node_idx]
+            v = f(node.x)
+            all ? (!v && (pass = false; break)) : (v && (pass = true; break))
+        end
+        pass && push!(cells, i)
+    end
+    _warn_emptyset(cells, name)
+    grid.cellsets[name] = cells
+    grid
+end
+
+"""
+    addfaceset!(grid::AbstractGrid, name::String, faces::VectorOrSetOfType{FaceIndex})
+    addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) 
+
+Adds a faceset to the grid with key `name`.
+Facesets are used to initialize `Dirichlet` structs, that are needed to specify the boundary for the `ConstraintHandler`.
+`all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` on the face if the face
+should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node. 
+
+```julia
+addfaceset!(grid, "right", Set(((2,2),(4,2))) #see grid manual example for reference
+addfaceset!(grid, "clamped", x -> norm(x[1]) ≈ 0.0) #see incompressible elasticity example for reference
+```
+"""
+addfaceset!(grid::AbstractGrid, name::String, set::VectorOrSetOfType{FaceIndex}) = 
+    _addset!(grid, name, set, grid.facesets)
+addfaceset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
+    _addset!(grid, name, f, Ferrite.faces, grid.facesets, FaceIndex; all=all)
+
+addedgeset!(grid::AbstractGrid, name::String, set::VectorOrSetOfType{EdgeIndex}) = 
+    _addset!(grid, name, set, grid.edgesets)
+addedgeset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
+    _addset!(grid, name, f, Ferrite.edges, grid.edgesets, EdgeIndex; all=all)
+
+addvertexset!(grid::AbstractGrid, name::String, set::VectorOrSetOfType{VertexIndex}) = 
+    _addset!(grid, name, set, grid.vertexsets)
+addvertexset!(grid::AbstractGrid, name::String, f::Function; all::Bool=true) = 
+    _addset!(grid, name, f, Ferrite.vertices, grid.vertexsets, VertexIndex; all=all)
 
 """
     getfaceedges(grid::AbstractGrid, face::FaceIndex)
     getfaceedges(cell::AbstractCell, face::FaceIndex)
 
-Returns the edges represented as `Set{EdgeIndex}` in a given face represented as
+Returns the edges represented as `OrderedSet{EdgeIndex}` in a given face represented as
 `FaceIndex`.
 
 ```julia-repl
@@ -583,7 +586,7 @@ julia> using Ferrite; using Ferrite: getfaceedges
 julia> grid = generate_grid(Tetrahedron, (2,1,1));
 
 julia> getfaceedges(grid, FaceIndex(4,2))
-Set{EdgeIndex} with 3 elements:
+OrderedSet{EdgeIndex} with 3 elements:
   EdgeIndex((4, 4))
   EdgeIndex((4, 5))
   EdgeIndex((4, 1))
@@ -595,7 +598,7 @@ function getfaceedges end
     getfacevertices(grid::AbstractGrid, face::FaceIndex)
     getfacevertices(cell::AbstractCell, face::FaceIndex)
 
-Returns the vertices represented as `Set{VertexIndex}` in a given face represented as
+Returns the vertices represented as `OrderedSet{VertexIndex}` in a given face represented as
 `FaceIndex`.
 
 ```julia-repl
@@ -604,7 +607,7 @@ julia> using Ferrite; using Ferrite: getfacevertices
 julia> grid = generate_grid(Tetrahedron, (2,1,1));
 
 julia> getfacevertices(grid, FaceIndex(4,2))
-Set{VertexIndex} with 3 elements:
+OrderedSet{VertexIndex} with 3 elements:
   VertexIndex((4, 2))
   VertexIndex((4, 4))
   VertexIndex((4, 1))
@@ -616,7 +619,7 @@ function getfacevertices end
     getedgevertices(grid::AbstractGrid, edge::EdgeIndex)
     getedgevertices(cell::AbstractCell, edge::EdgeIndex)
 
-Returns the vertices represented as `Set{VertexIndex}` in a given edge represented as
+Returns the vertices represented as `OrderedSet{VertexIndex}` in a given edge represented as
 `EdgeIndex`.
 
 ```julia-repl
@@ -625,7 +628,7 @@ julia> using Ferrite; using Ferrite: getedgevertices
 julia> grid = generate_grid(Tetrahedron, (2,1,1));
 
 julia> getedgevertices(grid, EdgeIndex(4,2))
-Set{EdgeIndex} with 2 elements:
+OrderedSet{EdgeIndex} with 2 elements:
   VertexIndex((4, 2))
   VertexIndex((4, 3))
 ```
@@ -643,7 +646,7 @@ for (func,             entity_f, subentity_f, entity_t,   subentity_t) in (
             return $(func)(cell, entity_idx)
         end
         function $(func)(cell::AbstractCell, entity_idx::$(entity_t))
-            _set = Set{$(subentity_t)}()
+            _set = OrderedSet{$(subentity_t)}()
             subentities = $(subentity_f)(cell)
             entity = $(entity_f)(cell)[entity_idx[2]]
             for (subentity_idx, subentity) in pairs(subentities)
@@ -657,22 +660,17 @@ for (func,             entity_f, subentity_f, entity_t,   subentity_t) in (
 end
 
 """
-    addnodeset!(grid::AbstractGrid, name::String, nodeid::Union{Vector{Int},Set{Int}})
-    addnodeset!(grid::AbstractGrid, name::String, f::Function)    
+    addnodeset!(grid::AbstractGrid, name::String, nodeset)
+    addnodeset!(grid::AbstractGrid, name::String, f::Function)
 
-Adds a `nodeset::Dict{String, Set{Int}}` to the `grid` with key `name`. Has the same interface as `addcellset`. 
+Adds a `nodeset` to the `grid` with key `name`. Has the same interface as `addcellset`. 
 However, instead of mapping a cell id to the `String` key, a set of node ids is returned.
 """
-function addnodeset!(grid::AbstractGrid, name::String, nodeid::Union{Vector{Int},Set{Int}})
-    _check_setname(grid.nodesets, name)
-    grid.nodesets[name] = Set(nodeid)
-    _warn_emptyset(grid.nodesets[name], name)
-    grid
-end
+addnodeset!(grid::AbstractGrid, name::String, set) = _addset!(grid, name, set, grid.nodesets)
 
 function addnodeset!(grid::AbstractGrid, name::String, f::Function)
     _check_setname(grid.nodesets, name)
-    nodes = Set{Int}()
+    nodes = OrderedSet{Int}()
     for (i, n) in enumerate(getnodes(grid))
         f(n.x) && push!(nodes, i)
     end
@@ -739,7 +737,7 @@ function Base.show(io::IO, ::MIME"text/plain", grid::Grid)
     if isconcretetype(eltype(grid.cells))
         typestrs = [repr(eltype(grid.cells))]
     else
-        typestrs = sort!(repr.(Set(typeof(x) for x in grid.cells)))
+        typestrs = sort!(repr.(OrderedSet(typeof(x) for x in grid.cells)))
     end
     join(io, typestrs, '/')
     print(io, " cells and $(getnnodes(grid)) nodes")
@@ -762,7 +760,7 @@ for INDEX in (:VertexIndex, :EdgeIndex, :FaceIndex)
         ($INDEX)(a::Int, b::Int) = ($INDEX)((a,b))
 
         Base.getindex(I::($INDEX), i::Int) = I.idx[i]
-        
+
         #To be able to do a,b = faceidx
         Base.iterate(I::($INDEX), state::Int=1) = (state==3) ?  nothing : (I[state], state+1)
 

@@ -97,9 +97,9 @@ end
 end
 
 """
-filterfaces(grid::AbstractGrid, faces::Set{FaceIndex}, f::Function; all::Bool=true)
+filterfaces(grid::AbstractGrid, faces::VectorOrSetOfType{FaceIndex}, f::Function; all::Bool=true)
 
-Returns the faces in `faces` that satisfy `f` as a `Set{FaceIndex}`.
+Returns the faces in `faces` that satisfy `f` as an `OrderedSet{FaceIndex}`.
 `all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` on the face
 if the face should be added to the set, otherwise it suffices that `f(x)` returns `true` for
 one node.
@@ -114,7 +114,7 @@ julia> topology = ExclusiveTopology(grid);
 julia> addboundaryfaceset!(grid, topology, "b", x -> true);
 
 julia> filterfaces(grid, grid.facesets["b"], x -> x[3] ≈ -1)
-Set{FaceIndex} with 8 elements:
+OrderedSet{FaceIndex} with 8 elements:
 FaceIndex((7, 1))
 FaceIndex((3, 1))
 FaceIndex((21, 1))
@@ -128,9 +128,9 @@ FaceIndex((9, 1))
 function filterfaces end
 
 """
-filteredges(grid::AbstractGrid, edges::Set{EdgeIndex}, f::Function; all::Bool=true)
+filteredges(grid::AbstractGrid, edges::VectorOrSetOfType{EdgeIndex}, f::Function; all::Bool=true)
 
-Returns the edges in `edges` that satisfy `f` as a `Set{EdgeIndex}`.
+Returns the edges in `edges` that satisfy `f` as an `OrderedSet{EdgeIndex}`.
 `all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` on the face
 if the face should be added to the set, otherwise it suffices that `f(x)` returns `true` for
 one node.
@@ -145,7 +145,7 @@ julia> topology = ExclusiveTopology(grid);
 julia> addboundaryedgeset!(grid, topology, "b", x -> true);
 
 julia> filteredges(grid, grid.edgesets["b"], x -> x[3] ≈ -1)
-Set{EdgeIndex} with 8 elements:
+OrderedSet{EdgeIndex} with 8 elements:
 EdgeIndex((1, 2))
 EdgeIndex((3, 2))
 EdgeIndex((4, 3))
@@ -159,9 +159,9 @@ EdgeIndex((2, 3))
 function filteredges end
 
 """
-filtervertices(grid::AbstractGrid, vertices::Set{VertexIndex}, f::Function; all::Bool=true)
+filtervertices(grid::AbstractGrid, vertices::VectorOrSetOfType{VertexIndex}, f::Function; all::Bool=true)
 
-Returns the vertices in `vertices` that satisfy `f` as a `Set{VertexIndex}`.
+Returns the vertices in `vertices` that satisfy `f` as an `OrderedSet{VertexIndex}`.
 `all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` on the face
 if the face should be added to the set, otherwise it suffices that `f(x)` returns `true` for
 one node.
@@ -176,7 +176,7 @@ julia> topology = ExclusiveTopology(grid);
 julia> addboundaryvertexset!(grid, topology, "b", x -> true);
 
 julia> filtervertices(grid, grid.vertexsets["b"], x -> x[3] ≈ -1)
-Set{VertexIndex} with 12 elements:
+OrderedSet{VertexIndex} with 12 elements:
 VertexIndex((2, 3))
 VertexIndex((4, 3))
 VertexIndex((4, 1))
@@ -199,8 +199,8 @@ for (func,            entity_f,  entity_t) in (
 (:filterfaces,    :faces,    :FaceIndex),
 )
 @eval begin
-    function $(func)(grid::AbstractGrid, set::Set{$(entity_t)}, f::Function; all::Bool=true)
-        _set = Set{$(entity_t)}()
+    function $(func)(grid::AbstractGrid, set::VectorOrSetOfType{$(entity_t)}, f::Function; all::Bool=true)
+        _set = OrderedSet{$(entity_t)}()
         cells = getcells(grid)
         for entity in set # entities can be edges/vertices in the face/edge
             cell = cells[entity[1]]
@@ -221,7 +221,7 @@ end
 addboundaryfaceset!(grid::AbstractGrid, topology::ExclusiveTopology, name::String, f::Function; all::Bool=true)
 
 Adds a boundary faceset to the grid with key `name`.
-A faceset maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id,
+A faceset maps a `String` key to an `OrderedSet` of tuples corresponding to `(global_cell_id,
 local_face_id)`. Facesets are used to initialize `Dirichlet` structs, that are needed to
 specify the boundary for the `ConstraintHandler`. `all=true` implies that `f(x)` must return
 `true` for all nodal coordinates `x` on the face if the face should be added to the set,
@@ -258,7 +258,7 @@ function addboundaryfaceset! end
 addboundaryedgeset!(grid::AbstractGrid, topology::ExclusiveTopology, name::String, f::Function; all::Bool=true)
 
 Adds a boundary edgeset to the grid with key `name`.
-An edgeset maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id,
+An edgeset maps a `String` key to an `OrderedSet` of tuples corresponding to `(global_cell_id,
 local_edge_id)`. `all=true` implies that `f(x)` must return `true` for all nodal coordinates
 `x` on the face if the face should be added to the set, otherwise it suffices that `f(x)`
 returns `true` for one node.
@@ -290,7 +290,7 @@ function addboundaryedgeset! end
 addboundaryvertexset!(grid::AbstractGrid, topology::ExclusiveTopology, name::String, f::Function; all::Bool=true)
 
 Adds a boundary vertexset to the grid with key `name`.
-A vertexset maps a `String` key to a `Set` of tuples corresponding to `(global_cell_id,
+A vertexset maps a `String` key to an `OrderedSet` of tuples corresponding to `(global_cell_id,
 local_vertex_id)`. `all=true` implies that `f(x)` must return `true` for all nodal
 coordinates `x` on the face if the face should be added to the set, otherwise it suffices
 that `f(x)` returns `true` for one node.
@@ -326,7 +326,7 @@ for (func,                   entity_f,            entity_t,     filter_f,       
 @eval begin
     function $(func)(grid::AbstractGrid, topology::ExclusiveTopology, name::String, f::Function; all::Bool=true)
         _check_setname($(destination), name)
-        _set = Set{$(entity_t)}()
+        _set = OrderedSet{$(entity_t)}()
         for (face_idx, neighborhood) in pairs(topology.face_face_neighbor)
             isempty(neighborhood) || continue # Skip any faces with neighbors (not on boundary)
             entities =  $(entity_f)(grid, FaceIndex((face_idx[1], face_idx[2])))

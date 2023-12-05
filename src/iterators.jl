@@ -225,9 +225,6 @@ getcoordinates(ic::InterfaceCache) = (getcoordinates(ic.a), getcoordinates(ic.b)
 ####################
 
 ## CellIterator ##
-
-const IntegerCollection = Union{Set{<:Integer}, AbstractVector{<:Integer}}
-
 """
     CellIterator(grid::Grid, cellset=1:getncells(grid))
     CellIterator(dh::AbstractDofHandler, cellset=1:getncells(dh))
@@ -288,7 +285,7 @@ end
 
 # Leaving flags undocumented as for CellIterator
 """
-    FaceIterator(gridordh::Union{Grid,AbstractDofHandler}, faceset::Set{FaceIndex})
+    FaceIterator(gridordh::Union{Grid,AbstractDofHandler}, faceset::VectorOrSetOfType{FaceIndex})
 
 Create a `FaceIterator` to conveniently iterate over the faces in `faceset`. The elements of
 the iterator are [`FaceCache`](@ref)s which are properly `reinit!`ialized. See
@@ -308,9 +305,9 @@ for faceindex in faceset
     # ...
 end
 """
-struct FaceIterator{FC<:FaceCache}
+struct FaceIterator{FC<:FaceCache,FS<:VectorOrSetOfType{FaceIndex}}
     fc::FC
-    set::Set{FaceIndex}
+    set::FS
 end
 
 function FaceIterator(gridordh::Union{Grid,AbstractDofHandler},
@@ -410,7 +407,7 @@ function _check_same_celltype(grid::AbstractGrid, cellset::IntegerCollection)
     end
 end
 
-function _check_same_celltype(grid::AbstractGrid, faceset::Set{FaceIndex})
+function _check_same_celltype(grid::AbstractGrid, faceset::VectorOrSetOfType{FaceIndex})
     isconcretetype(getcelltype(grid)) && return nothing # Short circuit check
     celltype = getcelltype(grid, first(faceset)[1])
     if !all(getcelltype(grid, face[1]) == celltype for face in faceset)
