@@ -161,7 +161,7 @@ end
 
 Compute the value of the function in quadrature point `q_point` on the "here" (`here=true`)
 or "there" (`here=false`) side of the interface. `u_here` and `u_there` are the values of
-the degrees of freedom for the respeciv element.
+the degrees of freedom for the respective element.
 
 `u` is a vector of scalar values for the degrees of freedom.
 This function can be used with a single `u` vector containing the dofs of both elements of the interface or
@@ -283,7 +283,7 @@ end
     function_value_average(iv::InterfaceValues, q_point::Int, u)
     function_value_average(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
 
-Compute the average of the function value at the quadrature point on interface.
+Compute the average of the function value at the quadrature point on the interface.
 """
 function function_value_average end
 
@@ -402,7 +402,7 @@ Relative orientation information for 1D and 2D interfaces in 2D and 3D elements 
 This information is used to construct the transformation matrix to
 transform the quadrature points from face_a to face_b achieving synced
 spatial coordinates. Face B's orientation relative to Face A's can
-possibly flipped (i.e. the vertices indices order is reversed)
+possibly be flipped (i.e. the vertices indices order is reversed)
 and the vertices can be rotated against each other.
 The reference orientation of face B is such that the first node
 has the lowest vertex index. Thus, this structure also stores the
@@ -441,7 +441,7 @@ end
 Returns the transformation matrix corresponding to the interface orientation information stored in `InterfaceOrientationInfo`.
 The transformation matrix is constructed using a combination of affine transformations defined for each interface reference shape.
 The transformation for a flipped face is a function of both relative orientation and the orientation of the second face.
-If the face is not flipped then the transfromation is a function of relative orientation only.
+If the face is not flipped then the transformation is a function of relative orientation only.
 """
 get_transformation_matrix
 
@@ -488,11 +488,11 @@ end
 end
 
 @doc raw"""
-    transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceTransformation)
+    transform_interface_points!(dst::Vector{Vec{3, Float64}}, points::Vector{Vec{3, Float64}}, interface_transformation::InterfaceOrientationInfo)
 
-Transform the points from face A to face B using the orientation information of the interface and store it in the vecotr dst.
-For 3D, the faces are transformed to regular polygons such that the rotation angle is the shift in reference node index × 2π ÷ number of edges in face.
-If the face is flipped then the flipping is about the axis that perserves the position of the first node (which is the reference node after being rotated to be in the first position,
+Transform the points from face A to face B using the orientation information of the interface and store it in the vector dst.
+For 3D, the faces are transformed into regular polygons such that the rotation angle is the shift in reference node index × 2π ÷ number of edges in face.
+If the face is flipped then the flipping is about the axis that preserves the position of the first node (which is the reference node after being rotated to be in the first position,
 it's rotated back in the opposite direction after flipping).
 Take for example the interface
 ```
@@ -503,7 +503,7 @@ y       | A \       | B \
 ↑       |    \      |    \
 →  x    1-----3     1-----2
 ```
-Transforming A to a equilateral triangle and translating it such that {0,0} is equidistant to all nodes
+Transforming A to an equilateral triangle and translating it such that {0,0} is equidistant to all nodes
 ```
         3
         +
@@ -515,7 +515,7 @@ Transforming A to a equilateral triangle and translating it such that {0,0} is e
   /  y        \
 2+-------------+1
 ```
-Rotating it -270° (or 120°) such that the reference node (the node with smallest index) is at index 1
+Rotating it -270° (or 120°) such that the reference node (the node with the smallest index) is at index 1
 ```
         1
         +
