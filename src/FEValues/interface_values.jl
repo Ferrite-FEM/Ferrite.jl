@@ -407,7 +407,7 @@ and the vertices can be rotated against each other.
 The reference orientation of face B is such that the first node
 has the lowest vertex index. Thus, this structure also stores the
 shift of the lowest vertex index which is used to reorient the face in
-case of flipping ["transform_interface_points!"](@ref).
+case of flipping [`transform_interface_points!`](@ref).
 """
 struct InterfaceOrientationInfo{RefShapeA, RefShapeB}
     flipped::Bool
