@@ -71,7 +71,7 @@ end
 """
     ConstraintHandler([T=Float64], dh::AbstractDofHandler)
 
-A collection of constraints with type `T` on a dof handler `dh`.
+A collection of constraints associated with the dof handler `dh`. `T` is the numeric type for stored values.
 """
 struct ConstraintHandler{DH<:AbstractDofHandler,T}
     dbcs::Vector{Dirichlet}
@@ -92,7 +92,7 @@ end
 
 ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, dh)
 
-function ConstraintHandler(T, dh::AbstractDofHandler)
+function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where T <: Number
     @assert isclosed(dh)
     ConstraintHandler(
         Dirichlet[], Int[], Int[], T[], Union{Nothing,T}[], Union{Nothing,DofCoefficients{T}}[],
@@ -1126,7 +1126,7 @@ function _add!(ch::ConstraintHandler{<:AbstractDofHandler, T}, pdbc::PeriodicDir
     # Any remaining mappings are added as homogeneous AffineConstraints
     for (k, v) in dof_map
         if dof_map_t === Int
-            ac = AffineConstraint(k, [v => T(1.0)], inhomogeneity_map === nothing ? T(0.0) : inhomogeneity_map[k])
+            ac = AffineConstraint(k, [v => one(T)], inhomogeneity_map === nothing ? zero(T) : inhomogeneity_map[k])
             add!(ch, ac)
         else
             @assert inhomogeneity_map === nothing
@@ -1134,7 +1134,7 @@ function _add!(ch::ConstraintHandler{<:AbstractDofHandler, T}, pdbc::PeriodicDir
             for (i, ki) in pairs(k)
                 # u_mirror = R ⋅ u_image
                 vs = Pair{Int,eltype(T)}[v[j] => rotation_matrix[i, j] for j in 1:length(v)]
-                ac = AffineConstraint(ki, vs, T(0.0))
+                ac = AffineConstraint(ki, vs, zero(T))
                 add!(ch, ac)
             end
         end

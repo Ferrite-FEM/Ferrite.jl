@@ -6,7 +6,7 @@ end
 
 Assembler(N) = Assembler(Float64, N)
 
-function Assembler(T, N)
+function Assembler(::Type{T}, N) where T
     I = Int[]
     J = Int[]
     V = T[]
