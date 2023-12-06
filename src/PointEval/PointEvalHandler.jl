@@ -204,12 +204,12 @@ end
 
 # values in dof-order. They must be obtained from the same DofHandler that was used for constructing the PointEvalHandler
 function evaluate_at_points!(out_vals::Vector{T2},
-    ph::PointEvalHandler,
+    ph::PointEvalHandler{<:Any, <:Any, T_ph},
     dh::DofHandler,
     dof_vals::Vector{T},
     fname::Symbol,
     func_interpolations
-    ) where {T2, T}
+    ) where {T2, T_ph, T}
 
     # TODO: I don't think this is correct??
     length(dof_vals) == ndofs(dh) || error("You must supply values for all $(ndofs(dh)) dofs.")
@@ -219,35 +219,38 @@ function evaluate_at_points!(out_vals::Vector{T2},
         if ip !== nothing
             dofrange = dof_range(sdh, fname)
             cellset = sdh.cellset
-            _evaluate_at_points!(out_vals, dof_vals, ph, dh, ip, cellset, dofrange)
+            ip_geo = default_interpolation(getcelltype(sdh))
+            pv = PointValues(T_ph, ip, ip_geo; update_gradients = false)
+            _evaluate_at_points!(out_vals, dof_vals, ph, dh, pv, cellset, dofrange)
         end
     end
     return out_vals
 end
 
-# function barrier with concrete type of interpolation
+# function barrier with concrete type of PointValues
 function _evaluate_at_points!(
     out_vals::Vector{T2},
     dof_vals::Vector{T},
     ph::PointEvalHandler,
     dh::AbstractDofHandler,
-    ip::Interpolation,
+    pv::PointValues,
     cellset::Union{Nothing, Set{Int}},
     dofrange::AbstractRange{Int},
     ) where {T2,T}
 
     # extract variables
     local_coords = ph.local_coords
+
     # preallocate some stuff specific to this cellset
     idx = findfirst(!isnothing, local_coords)
     idx === nothing && return out_vals
-    first_cell = cellset === nothing ? 1 : first(cellset)
+
     grid = get_grid(dh)
-    ip_geo = default_interpolation(getcelltype(grid, first_cell))
-    pv = PointValues(eltype(local_coords[idx]), ip, ip_geo; update_gradients = false)
+    first_cell = cellset === nothing ? 1 : first(cellset)
     cell_dofs = Vector{Int}(undef, ndofs_per_cell(dh, first_cell))
     u_e = Vector{T}(undef, ndofs_per_cell(dh, first_cell))
     x = getcoordinates(grid, first_cell)
+
     # compute point values
     for pointid in eachindex(ph.cells)
         cellid = ph.cells[pointid]
