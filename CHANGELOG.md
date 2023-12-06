@@ -192,6 +192,12 @@ more discussion).
 
 ### Added
 
+- `InterfaceValues` for computing jumps and averages over interfaces. ([#743][github-743])
+
+- `InterfaceIterator` and `InterfaceCache` for iterating over interfaces. ([#747][github-747])
+
+- `FaceQuadratureRule` implementation for `RefPrism` and `RefPyramid`. ([#770][github-770])
+
 - The `DofHandler` now support selectively adding fields on sub-domains (rather than the
   full domain). This new functionality is included with the new `SubDofHandler` struct,
   which, as the name suggest, is a `DofHandler` for a subdomain. ([#624][github-624],
@@ -257,6 +263,10 @@ more discussion).
 - VTK export now work with `QuadraticHexahedron` elements. ([#714][github-714])
 
 ### Changed
+
+- Benchmarks now work with master branch. ([#751][github-#751])
+
+- `create_sparsity_pattern` now supports corss-element dof coupling by passing kwarg `topology` along with an optional `cross_coupling` matrix that behaves similar to the `coupling` kwarg. ([#710][github-#710])
 
 - The `AbstractCell` interface has been reworked. This change should not affect user code,
   but may in some cases be relevant for code parsing external mesh files. In particular, the
