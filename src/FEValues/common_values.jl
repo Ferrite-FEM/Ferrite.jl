@@ -1,17 +1,13 @@
-# Common methods for all `Values` objects
+# Common methods for all `AbstractValues` objects
 
 using Base: @propagate_inbounds
 
 @noinline throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
 
-getnbasefunctions(cv::AbstractValues) = size(cv.N, 1)
-getngeobasefunctions(cv::AbstractValues) = size(cv.M, 1)
-
-function checkquadpoint(cv::Union{CellValues, FaceValues, PointValues}, qp::Int)
-    0 < qp <= getnquadpoints(cv) || error("quadrature point out of range")
+function checkquadpoint(fe_v::AbstractValues, qp::Int)
+    0 < qp <= getnquadpoints(fe_v) || error("quadrature point out of range")
     return nothing
 end
-checkquadpoint(_, _::Int) = nothing
 
 @noinline function throw_incompatible_dof_length(length_ue, n_base_funcs)
     throw(ArgumentError(
@@ -30,28 +26,24 @@ end
 end
 
 """
+    reinit!(cv::CellValues, cell::AbstractCell, x::Vector)
     reinit!(cv::CellValues, x::Vector)
-    reinit!(bv::FaceValues, x::Vector, face::Int)
+    reinit!(fv::FaceValues, cell::AbstractCell, x::Vector, face::Int)
+    reinit!(fv::FaceValues, x::Vector, face::Int)
 
 Update the `CellValues`/`FaceValues` object for a cell or face with coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
+For interpolations with non-identity mappings, the current `cell` is also required. 
 """
 reinit!
 
 """
-    getnquadpoints(cv::CellValues)
+    getnquadpoints(fe_v::AbstractValues)
 
-Return the number of quadrature points in `cv`'s quadrature rule.
+Return the number of quadrature points. For `FaceValues`, 
+this is the number for the current face.
 """
-getnquadpoints(fe::CellValues) = getnquadpoints(fe.qr)
-
-"""
-    getnquadpoints(fv::FaceValues)
-
-Return the number of quadrature points in `fv`s quadrature for the current
-(most recently [`reinit!`](@ref)ed) face.
-"""
-getnquadpoints(fe::FaceValues) = getnquadpoints(fe.qr, fe.current_face[])
+function getnquadpoints end
 
 """
     getdetJdV(fe_v::AbstractValues, q_point::Int)
@@ -66,8 +58,7 @@ finite element cell or face as
 ``\\int\\limits_\\Gamma f(\\mathbf{x}) d \\Gamma \\approx \\sum\\limits_{q = 1}^{n_q} f(\\mathbf{x}_q) \\det(J(\\mathbf{x})) w_q``
 
 """
-@propagate_inbounds getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
-@propagate_inbounds getdetJdV(bv::FaceValues, q_point::Int) = bv.detJdV[q_point, bv.current_face[]]
+function getdetJdV end
 
 """
     shape_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -75,17 +66,16 @@ finite element cell or face as
 Return the value of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-@propagate_inbounds shape_value(cv::CellValues, q_point::Int, base_func::Int) = cv.N[base_func, q_point]
-@propagate_inbounds shape_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.N[base_func, q_point, bv.current_face[]]
+shape_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
 
 """
-    geometric_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
+    geometric_value(fe_v::AbstractValues, q_point, base_function::Int)
 
-Return the value of shape function `base_function` used for geometric interpolation evaluated in
+Return the value of the geometric shape function `base_function` evaluated in 
 quadrature point `q_point`.
 """
-@propagate_inbounds geometric_value(cv::CellValues, q_point::Int, base_func::Int) = cv.M[base_func, q_point]
-@propagate_inbounds geometric_value(bv::FaceValues, q_point::Int, base_func::Int) = bv.M[base_func, q_point, bv.current_face[]]
+geometric_value(fe_v::AbstractValues, q_point::Int, base_function::Int)
+
 
 """
     shape_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -93,8 +83,7 @@ quadrature point `q_point`.
 Return the gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-@propagate_inbounds shape_gradient(cv::CellValues, q_point::Int, base_func::Int) = cv.dNdx[base_func, q_point]
-@propagate_inbounds shape_gradient(bv::FaceValues, q_point::Int, base_func::Int) = bv.dNdx[base_func, q_point, bv.current_face[]]
+shape_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
 
 """
     shape_symmetric_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -102,7 +91,7 @@ quadrature point `q_point`.
 Return the symmetric gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-@propagate_inbounds shape_symmetric_gradient(cv::CellValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(cv, q_point, base_func))
+function shape_symmetric_gradient end
 
 """
     shape_divergence(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -120,6 +109,7 @@ function shape_curl(cv::AbstractValues, q_point::Int, base_func::Int)
     return curl_from_gradient(shape_gradient(cv, q_point, base_func))
 end
 curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
+curl_from_gradient(∇v::SecondOrderTensor{2}) = Vec{1}((∇v[2,1] - ∇v[1,2],)) # Alternatively define as Vec{3}((0,0,v))
 
 """
     function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
@@ -146,9 +136,16 @@ function function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, d
     return val
 end
 
-# TODO: Implement fallback or require this to be defined?
-#       Alt: shape_value_type(cv) = typeof(shape_value(cv, qp=1, i=1))
-shape_value_type(::Union{CellValues{<:Any, N_t}, FaceValues{<:Any, N_t}}) where N_t = N_t
+"""
+    shape_value_type(fe_v::AbstractValues)
+
+Return the type of `shape_value(fe_v, q_point, base_function)`
+"""
+function shape_value_type(fe_v::AbstractValues)
+    # Default fallback
+    return typeof(shape_value(fe_v, 1, 1))
+end
+
 function_value_init(cv::AbstractValues, ::AbstractVector{T}) where {T} = zero(shape_value_type(cv)) * zero(T)
 
 """
@@ -191,9 +188,16 @@ function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector
     return grad
 end
 
-# TODO: Implement fallback or require this to be defined?
-#       Alt: shape_gradient_type(cv) = typeof(shape_gradient(cv, qp=1, i=1))
-shape_gradient_type(::Union{CellValues{<:Any, <:Any, dNdx_t}, FaceValues{<:Any, <:Any, dNdx_t}}) where dNdx_t = dNdx_t
+"""
+    shape_gradient_type(fe_v::AbstractValues)
+
+Return the type of `shape_gradient(fe_v, q_point, base_function)`
+"""
+function shape_gradient_type(fe_v::AbstractValues)
+    # Default fallback
+    return typeof(shape_gradient(fe_v, 1, 1))
+end
+
 function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {T}
     return zero(shape_gradient_type(cv)) * zero(T)
 end
@@ -281,16 +285,28 @@ function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVecto
     return vec
 end
 
-function Base.show(io::IO, ::MIME"text/plain", fe_v::AbstractValues)
-    print(io, "$(typeof(fe_v)) with $(getnbasefunctions(fe_v)) shape functions and $(getnquadpoints(fe_v)) quadrature points")
-end
 
-# copy
-for ValueType in (CellValues, FaceValues, InterfaceValues)
-    args = [:(copy(cv.$fname)) for fname in fieldnames(ValueType)]
-    @eval begin
-        function Base.copy(cv::$ValueType)
-            return typeof(cv)($(args...))
-        end
+# Utility functions used by GeometryMapping, FunctionValues 
+_copy_or_nothing(x) = copy(x)
+_copy_or_nothing(::Nothing) = nothing
+
+function shape_values!(values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+    for (qp, ξ) in pairs(qr_points)
+        shape_values!(@view(values[:, qp]), ip, ξ)
     end
 end
+
+function shape_gradients_and_values!(gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+    for (qp, ξ) in pairs(qr_points)
+        shape_gradients_and_values!(@view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
+    end
+end
+
+#= PR798
+function shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
+    for (qp, ξ) in pairs(qr_points)
+        shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
+    end
+end
+=#
+

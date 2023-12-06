@@ -35,298 +35,96 @@ function default_geometric_interpolation(::Interpolation{shape}) where {dim, sha
     return VectorizedInterpolation{dim}(Lagrange{shape, 1}())
 end
 
-struct CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP} <: AbstractCellValues
-    N::Matrix{N_t}
-    dNdx::Matrix{dNdx_t}
-    dNdξ::Matrix{dNdξ_t}
-    detJdV::Vector{T}
-    M::Matrix{T}
-    dMdξ::Matrix{dMdξ_t}
-    qr::QR
-    ip::IP
-    gip::GIP
+struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
+    fun_values::FV # FunctionValues
+    geo_mapping::GM # GeometryMapping
+    qr::QR         # QuadratureRule
+    detJdV::detT   # AbstractVector{<:Number} or Nothing
+end
+function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; 
+        update_gradients::Bool = true, update_detJdV::Bool = true) where T 
+    
+    FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
+    GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), update_detJdV)
+    geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
+    fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
+    detJdV = update_detJdV ? fill(T(NaN), length(getweights(qr))) : nothing
+    return CellValues(fun_values, geo_mapping, qr, detJdV)
 end
 
-# Common initializer code for constructing CellValues after the types have been determined
-function CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(qr::QR, ip::IP, gip::GIP) where {
-    IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP,
-}
-    @assert isconcretetype(IP)     && isconcretetype(N_t) && isconcretetype(dNdx_t) &&
-            isconcretetype(dNdξ_t) && isconcretetype(T)   && isconcretetype(dMdξ_t) &&
-            isconcretetype(QR)     && isconcretetype(GIP)
-    n_qpoints = getnquadpoints(qr)
+CellValues(qr::QuadratureRule, ip::Interpolation, args...; kwargs...) = CellValues(Float64, qr, ip, args...; kwargs...)
+function CellValues(::Type{T}, qr, ip::Interpolation, ip_geo::ScalarInterpolation=default_geometric_interpolation(ip); kwargs...) where T
+    return CellValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
+end
 
-    # Field interpolation
-    n_func_basefuncs = getnbasefunctions(ip)
-    N    = fill(zero(N_t)    * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdx = fill(zero(dNdx_t) * T(NaN), n_func_basefuncs, n_qpoints)
-    dNdξ = fill(zero(dNdξ_t) * T(NaN), n_func_basefuncs, n_qpoints)
+function Base.copy(cv::CellValues)
+    return CellValues(copy(cv.fun_values), copy(cv.geo_mapping), copy(cv.qr), _copy_or_nothing(cv.detJdV))
+end
 
-    # Geometry interpolation
-    n_geom_basefuncs = getnbasefunctions(gip)
-    M    = fill(zero(T)      * T(NaN), n_geom_basefuncs, n_qpoints)
-    dMdξ = fill(zero(dMdξ_t) * T(NaN), n_geom_basefuncs, n_qpoints)
+# Access geometry values
+@propagate_inbounds getngeobasefunctions(cv::CellValues) = getngeobasefunctions(cv.geo_mapping)
+@propagate_inbounds geometric_value(cv::CellValues, args...) = geometric_value(cv.geo_mapping, args...)
+geometric_interpolation(cv::CellValues) = geometric_interpolation(cv.geo_mapping)
 
-    for (qp, ξ) in pairs(getpoints(qr))
-        shape_gradients_and_values!(@view(dNdξ[:, qp]), @view(N[:, qp]), ip, ξ)
-        shape_gradients_and_values!(@view(dMdξ[:, qp]), @view(M[:, qp]), gip, ξ)
+getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
+getdetJdV(::CellValues{<:Any, <:Any, <:Any, Nothing}, ::Int) = throw(ArgumentError("detJdV is not saved in CellValues"))
+
+# Accessors for function values 
+getnbasefunctions(cv::CellValues) = getnbasefunctions(cv.fun_values)
+function_interpolation(cv::CellValues) = function_interpolation(cv.fun_values)
+function_difforder(cv::CellValues) = function_difforder(cv.fun_values)
+shape_value_type(cv::CellValues) = shape_value_type(cv.fun_values)
+shape_gradient_type(cv::CellValues) = shape_gradient_type(cv.fun_values)
+
+@propagate_inbounds shape_value(cv::CellValues, i::Int, q_point::Int) = shape_value(cv.fun_values, i, q_point)
+@propagate_inbounds shape_gradient(cv::CellValues, i::Int, q_point::Int) = shape_gradient(cv.fun_values, i, q_point)
+@propagate_inbounds shape_symmetric_gradient(cv::CellValues, i::Int, q_point::Int) = shape_symmetric_gradient(cv.fun_values, i, q_point)
+
+# Access quadrature rule values 
+getnquadpoints(cv::CellValues) = getnquadpoints(cv.qr)
+
+@inline function _update_detJdV!(detJvec::AbstractVector, q_point::Int, w, mapping)
+    detJ = calculate_detJ(getjacobian(mapping))
+    detJ > 0.0 || throw_detJ_not_pos(detJ)
+    @inbounds detJvec[q_point] = detJ * w
+end
+@inline _update_detJdV!(::Nothing, q_point, w, mapping) = nothing
+
+@inline function reinit!(cv::CellValues, x::AbstractVector)
+    return reinit!(cv, nothing, x)
+end
+
+function reinit!(cv::CellValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{<:Vec})
+    geo_mapping = cv.geo_mapping
+    fun_values = cv.fun_values
+    n_geom_basefuncs = getngeobasefunctions(geo_mapping)
+    
+    check_reinit_sdim_consistency(:CellValues, shape_gradient_type(cv), eltype(x))
+    if cell === nothing && !isa(mapping_type(fun_values), IdentityMapping)
+        throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
-
-    detJdV = fill(T(NaN), n_qpoints)
-
-    CellValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIP}(N, dNdx, dNdξ, detJdV, M, dMdξ, qr, ip, gip)
-end
-
-# Common entry point that fills in the numeric type and geometric interpolation
-function CellValues(qr::QuadratureRule, ip::Interpolation,
-        gip::Interpolation = default_geometric_interpolation(ip))
-    return CellValues(Float64, qr, ip, gip)
-end
-
-# Common entry point that fills in the geometric interpolation
-function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation) where {T}
-    return CellValues(T, qr, ip, default_geometric_interpolation(ip))
-end
-
-# Common entry point that vectorizes an input scalar geometric interpolation
-function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, sgip::ScalarInterpolation) where {T}
-    return CellValues(T, qr, ip, VectorizedInterpolation(sgip))
-end
-
-#################################################################
-# Note on dimensions:                                           #
-# sdim = spatial dimension (dimension of the grid nodes)        #
-# rdim = reference dimension (dimension in isoparametric space) #
-# vdim = vector dimension (dimension of the field)              #
-#################################################################
-
-# Entrypoint for `ScalarInterpolation`s (rdim == sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
-    dim, shape <: AbstractRefShape{dim}, T,
-    QR   <: QuadratureRule{shape},
-    IP   <: ScalarInterpolation{shape},
-    GIP  <: ScalarInterpolation{shape},
-    VGIP <: VectorizedInterpolation{dim, shape, <:Any, GIP},
-}
-    # Function interpolation
-    N_t    = T
-    dNdx_t = dNdξ_t = Vec{dim, T}
-    # Geometry interpolation
-    M_t    = T
-    dMdξ_t = Vec{dim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
-end
-
-# Entrypoint for `VectorInterpolation`s (vdim == rdim == sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
-    dim, shape <: AbstractRefShape{dim}, T,
-    QR  <: QuadratureRule{shape},
-    IP  <: VectorInterpolation{dim, shape},
-    GIP <: ScalarInterpolation{shape},
-    VGIP <: VectorizedInterpolation{dim, shape, <:Any, GIP},
-}
-    # Field interpolation
-    N_t    = Vec{dim, T}
-    dNdx_t = dNdξ_t = Tensor{2, dim, T, Tensors.n_components(Tensor{2,dim})}
-    # Geometry interpolation
-    M_t    = T
-    dMdξ_t = Vec{dim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
-end
-
-# Entrypoint for `VectorInterpolation`s (vdim != rdim == sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, vgip::VGIP) where {
-    vdim, dim, shape <: AbstractRefShape{dim}, T,
-    QR  <: QuadratureRule{shape},
-    IP  <: VectorInterpolation{vdim, shape},
-    GIP <: ScalarInterpolation{shape},
-    VGIP <: VectorizedInterpolation{dim, shape, <:Any, GIP},
-}
-    # Field interpolation
-    N_t    = SVector{vdim, T}
-    dNdx_t = dNdξ_t = SMatrix{vdim, dim, T, vdim*dim}
-    # Geometry interpolation
-    M_t    = T
-    dMdξ_t = Vec{dim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, vgip.ip)
-end
-
-# scalar interpolation
-function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{dim,T}}) where {
-    dim, T,
-    N_t    <: Number,
-    dNdx_t <: Vec{dim},
-    dNdξ_t <: Vec{dim},
-}
-    _reinit!(cv, x)
-end
-# vectorized interpolation with vdim == rdim == sdim
-function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{dim,T}}) where {
-    dim, T,
-    N_t    <: Vec{dim},
-    dNdx_t <: Tensor{2, dim},
-    dNdξ_t <: Tensor{2, dim},
-}
-    _reinit!(cv, x)
-end
-# vectorized interpolation with vdim != rdim
-function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{dim,T}}) where {
-    dim, T, vdim,
-    N_t    <: SVector{vdim},
-    dNdx_t <: SMatrix{vdim, dim},
-    dNdξ_t <: SMatrix{vdim, dim},
-}
-    _reinit!(cv, x)
-end
-# reinit! for regular (non-embedded) elements (rdim == sdim)
-function _reinit!(cv::CellValues, x::AbstractVector{Vec{dim,T}}) where {dim, T}
-    n_geom_basefuncs = getngeobasefunctions(cv)
-    n_func_basefuncs = getnbasefunctions(cv)
-    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
-
-    @inbounds for (i, w) in pairs(getweights(cv.qr))
-        fecv_J = zero(Tensor{2,dim,T})
-        for j in 1:n_geom_basefuncs
-            fecv_J += x[j] ⊗ cv.dMdξ[j, i]
-        end
-        detJ = det(fecv_J)
-        detJ > 0.0 || throw_detJ_not_pos(detJ)
-        cv.detJdV[i] = detJ * w
-        Jinv = inv(fecv_J)
-        for j in 1:n_func_basefuncs
-            # cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv
-            cv.dNdx[j, i] = dothelper(cv.dNdξ[j, i], Jinv)
-        end
+    if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
+        throw_incompatible_coord_length(length(x), n_geom_basefuncs)
     end
-end
-
-# Hotfix to get the dots right for embedded elements until mixed tensors are merged.
-# Scalar/Vector interpolations with sdim == rdim (== vdim)
-@inline dothelper(A, B) = A ⋅ B
-# Vector interpolations with sdim == rdim != vdim
-@inline dothelper(A::SMatrix{vdim, dim}, B::Tensor{2, dim}) where {vdim, dim} = A * SMatrix{dim, dim}(B)
-# Scalar interpolations with sdim > rdim
-@inline dothelper(A::SVector{rdim}, B::SMatrix{rdim, sdim}) where {rdim, sdim} = B' * A
-# Vector interpolations with sdim > rdim
-@inline dothelper(B::SMatrix{vdim, rdim}, A::SMatrix{rdim, sdim}) where {vdim, rdim, sdim} = B * A
-
-# Entrypoint for embedded `ScalarInterpolation`s (rdim < sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
-    sdim, rdim, shape <: AbstractRefShape{rdim}, T,
-    QR  <: QuadratureRule{shape},
-    IP  <: ScalarInterpolation{shape},
-    GIP <: ScalarInterpolation{shape},
-    VGIP <: VectorizedInterpolation{sdim, shape, <:Any, GIP},
-}
-    @assert sdim > rdim
-    # Function interpolation
-    N_t    = T
-    dNdx_t = SVector{sdim, T}
-    dNdξ_t = SVector{rdim, T}
-    # Geometry interpolation
-    M_t    = T
-    dMdξ_t = Vec{rdim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
-end
-
-# Entrypoint for embedded `VectorInterpolation`s (rdim < sdim)
-function CellValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
-    sdim, vdim, rdim, shape <: AbstractRefShape{rdim}, T,
-    QR  <: QuadratureRule{shape},
-    IP  <: VectorInterpolation{vdim, shape},
-    GIP <: ScalarInterpolation{shape},
-    VGIP <: VectorizedInterpolation{sdim, shape, <:Any, GIP},
-}
-    @assert sdim > rdim
-    # Function interpolation
-    N_t    = SVector{vdim, T}
-    dNdx_t = SMatrix{vdim, sdim, T, vdim*sdim}
-    dNdξ_t = SMatrix{vdim, rdim, T, vdim*rdim}
-    # Geometry interpolation
-    M_t    = T
-    dMdξ_t = Vec{rdim, T}
-    return CellValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, GIP}(qr, ip, gip.ip)
-end
-
-"""
-    embedding_det(J::SMatrix{3, 2})
-
-Embedding determinant for surfaces in 3D.
-
-TLDR: "det(J) =" ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂
-
-The transformation theorem for some function f on a 2D surface in 3D space leads to
-  ∫ f ⋅ dS = ∫ f ⋅ (∂x/∂ξ₁ × ∂x/∂ξ₂) dξ₁dξ₂ = ∫ f ⋅ n ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂ dξ₁dξ₂
-where ||∂x/∂ξ₁ × ∂x/∂ξ₂||₂ is "detJ" and n is the unit normal.
-See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
-For more details see e.g. the doctoral thesis by Mirza Cenanovic, Ch. 2 **Tangential Calculus** [Cenanovic2017](@cite).
-"""
-embedding_det(J::SMatrix{3,2}) = norm(J[:,1] × J[:,2])
-
-"""
-    embedding_det(J::Union{SMatrix{2, 1}, SMatrix{3, 1}})
-
-Embedding determinant for curves in 2D and 3D.
-
-TLDR: "det(J) =" ||∂x/∂ξ||₂
-
-The transformation theorem for some function f on a 1D curve in 2D and 3D space leads to
-  ∫ f ⋅ dE = ∫ f ⋅ ∂x/∂ξ dξ = ∫ f ⋅ t ||∂x/∂ξ||₂ dξ
-where ||∂x/∂ξ||₂ is "detJ" and t is "the unit tangent".
-See e.g. https://scicomp.stackexchange.com/questions/41741/integration-of-d-1-dimensional-functions-on-finite-element-surfaces for simple explanation.
-"""
-embedding_det(J::Union{SMatrix{2, 1}, SMatrix{3, 1}}) = norm(J)
-# scalar interpolation with rdim < sdim
-function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{sdim,T}}) where {
-    rdim, sdim, T,
-    N_t    <: Number,
-    dNdx_t <: SVector{sdim, T},
-    dNdξ_t <: SVector{rdim, T},
-}
-    _reinit_embedded!(cv, x, Val{sdim}(), Val{rdim}())
-end
-# vector interpolation with vdim != rdim and rdim < sdim
-function reinit!(cv::CellValues{<:Any, N_t, dNdx_t, dNdξ_t}, x::AbstractVector{Vec{sdim,T}}) where {
-    rdim, sdim, vdim, T,
-    N_t    <: SVector{vdim},
-    dNdx_t <: SMatrix{vdim, sdim, T},
-    dNdξ_t <: SMatrix{vdim, rdim, T},
-}
-    _reinit_embedded!(cv, x, Val{sdim}(), Val{rdim}())
-end
-# reinit! for embedded elements, rdim < sdim
-function _reinit_embedded!(cv::CellValues, x::AbstractVector{Vec{sdim,T}}, ::Val{sdim}, ::Val{rdim}) where {sdim, rdim, T}
-    @assert sdim > rdim "This reinit only works for embedded elements. Maybe you swapped the reference and spatial dimensions?"
-    n_geom_basefuncs = getngeobasefunctions(cv)
-    n_func_basefuncs = getnbasefunctions(cv)
-    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
-
-    @inbounds for (i, w) in pairs(getweights(cv.qr))
-        fecv_J = zero(MMatrix{sdim, rdim, T}) # TODO replace with MixedTensor (see https://github.com/Ferrite-FEM/Tensors.jl/pull/188)
-        for j in 1:n_geom_basefuncs
-            #fecv_J += x[j] ⊗ cv.dMdξ[j, i] # TODO via Tensors.jl
-            for k in 1:sdim, l in 1:rdim
-                fecv_J[k, l] += x[j][k] * cv.dMdξ[j, i][l]
-            end
-        end
-        fecv_J = SMatrix(fecv_J)
-        detJ = embedding_det(fecv_J)
-        detJ > 0.0 || throw_detJ_not_pos(detJ)
-        cv.detJdV[i] = detJ * w
-        # Compute "left inverse" of J
-        Jinv = pinv(fecv_J)
-        for j in 1:n_func_basefuncs
-            #cv.dNdx[j, i] = cv.dNdξ[j, i] ⋅ Jinv # TODO via Tensors.jl
-            cv.dNdx[j, i] = dothelper(cv.dNdξ[j, i], Jinv)
-        end
+    @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
+        mapping = calculate_mapping(geo_mapping, q_point, x)
+        _update_detJdV!(cv.detJdV, q_point, w, mapping)
+        apply_mapping!(fun_values, q_point, mapping, cell)
     end
     return nothing
 end
 
-function Base.show(io::IO, m::MIME"text/plain", cv::CellValues)
-    println(io, "CellValues with")
-    println(io, "- Quadrature rule with ", getnquadpoints(cv), " points")
-    print(io, "- Function interpolation: "); show(io, m, cv.ip)
-    println(io)
-    print(io, "- Geometric interpolation: "); show(io, m, cv.gip)
+function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
+    ip_geo = geometric_interpolation(cv)
+    ip_fun = function_interpolation(cv)
+    rdim = getdim(ip_geo)
+    vdim = isa(shape_value(cv, 1, 1), Vec) ? length(shape_value(cv, 1, 1)) : 0
+    GradT = shape_gradient_type(cv)
+    sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
+    vstr = vdim==0 ? "scalar" : "vdim=$vdim"
+    print(io, "CellValues(", vstr, ", rdim=$rdim, and sdim=$sdim): ")
+    print(io, getnquadpoints(cv), " quadrature points")
+    print(io, "\n Function interpolation: "); show(io, d, ip_fun)
+    print(io, "\nGeometric interpolation: "); 
+    sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
 end

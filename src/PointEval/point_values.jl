@@ -24,17 +24,23 @@ struct PointValues{CV} <: AbstractValues
     PointValues{CV}(cv::CV) where {CV} = new{CV}(cv)
 end
 
-PointValues(cv::CellValues) = PointValues(eltype(cv.M), cv.ip, cv.gip)
-function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_interpolation(ip))
-    return PointValues(Float64, ip, ipg)
+function PointValues(cv::CellValues)
+    T = typeof(getdetJdV(cv, 1))
+    ip_fun = function_interpolation(cv)
+    ip_geo = geometric_interpolation(cv)
+    update_gradients = function_difforder(cv) == 1
+    return PointValues(T, ip_fun, ip_geo; update_gradients)
 end
-function PointValues(::Type{T}, ip::IP, ipg::GIP = default_geometric_interpolation(ip)) where {
+function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_interpolation(ip); kwargs...)
+    return PointValues(Float64, ip, ipg; kwargs...)
+end
+function PointValues(::Type{T}, ip::IP, ipg::GIP = default_geometric_interpolation(ip); kwargs...) where {
     T, dim, shape <: AbstractRefShape{dim},
     IP  <: Interpolation{shape},
     GIP <: Interpolation{shape}
 }
     qr = QuadratureRule{shape, T}([one(T)], [zero(Vec{dim, T})])
-    cv = CellValues(T, qr, ip, ipg)
+    cv = CellValues(T, qr, ip, ipg; update_detJdV = false, kwargs...)
     return PointValues{typeof(cv)}(cv)
 end
 
@@ -57,33 +63,18 @@ function_symmetric_gradient(pv::PointValues, u::AbstractVector, args...) =
 # reinit! on PointValues must first update N and dNdξ for the new "quadrature point"
 # and then call the regular reinit! for the wrapped CellValues to update dNdx
 function reinit!(pv::PointValues, x::AbstractVector{<:Vec{D}}, ξ::Vec{D}) where {D}
-    qp = 1 # PointValues only have a single qp
-    # TODO: Does M need to be updated too?
-    shape_gradients_and_values!(@view(pv.cv.dNdξ[:, qp]), @view(pv.cv.N[:, qp]), pv.cv.ip, ξ)
+    # Update the quadrature point location
+    qr_points = getpoints(pv.cv.qr)
+    qr_points[1] = ξ
+    # Precompute all values again to reflect the updated ξ coordinate
+    precompute_values!(pv.cv.fun_values, qr_points)
+    precompute_values!(pv.cv.geo_mapping, qr_points)
+    # Regular reinit
     reinit!(pv.cv, x)
     return nothing
 end
 
-# Optimized version of PointScalarValues which avoids i) recomputation of dNdξ and
-# ii) recomputation of dNdx. Only allows function evaluation (no gradients) which is
-# what is used in evaluate_at_points.
-struct PointValuesInternal{IP, N_t} <: AbstractValues
-    N::Vector{N_t}
-    ip::IP
-end
-
-function PointValuesInternal(ξ::Vec{dim, T}, ip::IP) where {dim, T, shape <: AbstractRefShape{dim}, IP <: Interpolation{shape}}
-    n_func_basefuncs = getnbasefunctions(ip)
-    N = [shape_value(ip, ξ, i) for i in 1:n_func_basefuncs]
-    return PointValuesInternal{IP, eltype(N)}(N, ip)
-end
-
-getnquadpoints(pv::PointValuesInternal) = 1
-shape_value_type(::PointValuesInternal{<:Any, N_t}) where {N_t} = N_t
-shape_value(pv::PointValuesInternal, qp::Int, i::Int) = (@assert qp == 1; pv.N[i])
-
-# allow on-the-fly updating
-function reinit!(pv::PointValuesInternal{IP}, coord::Vec{dim}) where {dim, shape <: AbstractRefShape{dim}, IP <: Interpolation{shape}}
-    shape_values!(pv.N, pv.ip, coord)
-    return nothing
+function Base.show(io::IO, d::MIME"text/plain", cv::PointValues)
+    println(io, "PointValues containing a")
+    show(io, d, cv.cv)
 end

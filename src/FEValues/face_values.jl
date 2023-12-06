@@ -31,146 +31,63 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 """
 FaceValues
 
-struct FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP} <: AbstractFaceValues
-    N::Array{N_t, 3}
-    dNdx::Array{dNdx_t, 3}
-    dNdξ::Array{dNdξ_t, 3}
-    detJdV::Matrix{T}
-    normals::Vector{Normal_t}
-    M::Array{T, 3}
-    dMdξ::Array{dMdξ_t, 3}
-    qr::QR
+struct FaceValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:AbstractVector{GM}} <: AbstractFaceValues
+    fun_values::V_FV  # AbstractVector{FunctionValues}
+    geo_mapping::V_GM # AbstractVector{GeometryMapping}
+    fqr::FQR          # FaceQuadratureRule
+    detJdV::detT      # AbstractVector{<:Number}
+    normals::nT       # AbstractVector{<:Vec}
     current_face::ScalarWrapper{Int}
-    func_interp::IP
-    geo_interp::GIP
 end
 
-# Common initializer code for constructing FaceValues after the types have been determined
-function FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(qr::QR, ip::IP, gip::GIP) where {
-    IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP,
-}
-    @assert isconcretetype(IP)     && isconcretetype(N_t)      && isconcretetype(dNdx_t) &&
-            isconcretetype(dNdξ_t) && isconcretetype(T)        && isconcretetype(dMdξ_t) &&
-            isconcretetype(QR)     && isconcretetype(Normal_t) && isconcretetype(GIP)
-    # Quadrature
-    max_n_qpoints = maximum(getnquadpoints, qr.face_rules; init = 0)
-    n_faces = length(qr.face_rules)
-
-    # Normals
-    normals = zeros(Normal_t, max_n_qpoints)
-
-    # Field interpolation
-    n_func_basefuncs = getnbasefunctions(ip)
-    N    = fill(zero(N_t)    * T(NaN), n_func_basefuncs, max_n_qpoints, n_faces)
-    dNdx = fill(zero(dNdx_t) * T(NaN), n_func_basefuncs, max_n_qpoints, n_faces)
-    dNdξ = fill(zero(dNdξ_t) * T(NaN), n_func_basefuncs, max_n_qpoints, n_faces)
-
-    # Geometry interpolation
-    n_geom_basefuncs = getnbasefunctions(gip)
-    M    = fill(zero(T)      * T(NaN), n_geom_basefuncs, max_n_qpoints, n_faces)
-    dMdξ = fill(zero(dMdξ_t) * T(NaN), n_geom_basefuncs, max_n_qpoints, n_faces)
-
-    for face in 1:n_faces, (qp, ξ) in pairs(getpoints(qr, face))
-        shape_gradients_and_values!(@view(dNdξ[:, qp, face]), @view(N[:, qp, face]), ip, ξ)
-        shape_gradients_and_values!(@view(dMdξ[:, qp, face]), @view(M[:, qp, face]), gip, ξ)
-    end
-
-    detJdV = fill(T(NaN), max_n_qpoints, n_faces)
-
-    FaceValues{IP, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, Normal_t, GIP}(N, dNdx, dNdξ, detJdV, normals, M, dMdξ, qr, ScalarWrapper(0), ip, gip)
+function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
+        update_gradients::Bool = true) where {T,sdim} 
+    
+    FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
+    GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), 1)
+    geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]
+    fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
+    max_nquadpoints = maximum(qr->length(getweights(qr)), fqr.face_rules)
+    detJdV  = fill(T(NaN), max_nquadpoints)
+    normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
+    return FaceValues(fun_values, geo_mapping, fqr, detJdV, normals, ScalarWrapper(1))
 end
 
-# Common entry point that fills in the numeric type and geometric interpolation
-function FaceValues(qr::FaceQuadratureRule, ip::Interpolation,
-        gip::Interpolation = default_geometric_interpolation(ip))
-    return FaceValues(Float64, qr, ip, gip)
+FaceValues(qr::FaceQuadratureRule, ip::Interpolation, args...) = FaceValues(Float64, qr, ip, args...)
+function FaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation) where T
+    return FaceValues(T, qr, ip, VectorizedInterpolation(ip_geo))
 end
 
-# Common entry point that fills in the geometric interpolation
-function FaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation) where {T}
-    return FaceValues(T, qr, ip, default_geometric_interpolation(ip))
+function Base.copy(fv::FaceValues)
+    fun_values = map(copy, fv.fun_values)
+    geo_mapping = map(copy, fv.geo_mapping)
+    return FaceValues(fun_values, geo_mapping, copy(fv.fqr), copy(fv.detJdV), copy(fv.normals), copy(fv.current_face))
 end
 
-# Common entry point that vectorizes an input scalar geometric interpolation
-function FaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation, sgip::ScalarInterpolation) where {T}
-    return FaceValues(T, qr, ip, VectorizedInterpolation(sgip))
-end
+getngeobasefunctions(fv::FaceValues) = getngeobasefunctions(get_geo_mapping(fv))
+getnbasefunctions(fv::FaceValues) = getnbasefunctions(get_fun_values(fv))
+getnquadpoints(fv::FaceValues) = @inbounds getnquadpoints(fv.fqr, getcurrentface(fv))
+@propagate_inbounds getdetJdV(fv::FaceValues, q_point) = fv.detJdV[q_point]
 
-# Entrypoint for `ScalarInterpolation`s (rdim == sdim)
-function FaceValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
-    dim, shape <: AbstractRefShape{dim}, T,
-    QR  <: FaceQuadratureRule{shape},
-    IP  <: ScalarInterpolation{shape},
-    GIP <: ScalarInterpolation{shape},
-    VGIP <: VectorizedInterpolation{dim, shape, <:Any, GIP},
-}
-    # Normals
-    Normal_t = Vec{dim, T}
-    # Function interpolation
-    N_t = T
-    dNdx_t = dNdξ_t = Vec{dim, T}
-    # Geometry interpolation
-    M_t    = T
-    dMdξ_t = Vec{dim, T}
-    return FaceValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, Normal_t, GIP}(qr, ip, gip.ip)
-end
+shape_value_type(fv::FaceValues) = shape_value_type(get_fun_values(fv))
+shape_gradient_type(fv::FaceValues) = shape_gradient_type(get_fun_values(fv))
+function_interpolation(fv::FaceValues) = function_interpolation(get_fun_values(fv))
+function_difforder(fv::FaceValues) = function_difforder(get_fun_values(fv))
+geometric_interpolation(fv::FaceValues) = geometric_interpolation(get_geo_mapping(fv))
 
-# Entrypoint for `VectorInterpolation`s (vdim == rdim == sdim)
-function FaceValues(::Type{T}, qr::QR, ip::IP, gip::VGIP) where {
-    dim, shape <: AbstractRefShape{dim}, T,
-    QR  <: FaceQuadratureRule{shape},
-    IP  <: VectorInterpolation{dim, shape},
-    GIP <: ScalarInterpolation{shape},
-    VGIP <: VectorizedInterpolation{dim, shape, <:Any, GIP},
-}
-    # Normals
-    Normal_t = Vec{dim, T}
-    # Function interpolation
-    N_t    = Vec{dim, T}
-    dNdx_t = dNdξ_t = Tensor{2, dim, T, Tensors.n_components(Tensor{2,dim})}
-    # Geometry interpolation
-    M_t    = T
-    dMdξ_t = Vec{dim, T}
-    return FaceValues{IP, N_t, dNdx_t, dNdξ_t, M_t, dMdξ_t, QR, Normal_t, GIP}(qr, ip, gip.ip)
-end
+get_geo_mapping(fv::FaceValues) = @inbounds fv.geo_mapping[getcurrentface(fv)]
+@propagate_inbounds geometric_value(fv::FaceValues, args...) = geometric_value(get_geo_mapping(fv), args...)
 
-function reinit!(fv::FaceValues{<:Any, N_t, dNdx_t}, x::AbstractVector{Vec{dim,T}}, face::Int) where {
-    dim, T,
-    N_t    <: Union{Number,   Vec{dim}},
-    dNdx_t <: Union{Vec{dim}, Tensor{2,dim}}
-}
-    n_geom_basefuncs = getngeobasefunctions(fv)
-    n_func_basefuncs = getnbasefunctions(fv)
-    length(x) == n_geom_basefuncs || throw_incompatible_coord_length(length(x), n_geom_basefuncs)
-    @boundscheck checkface(fv, face)
+get_fun_values(fv::FaceValues) = @inbounds fv.fun_values[getcurrentface(fv)]
 
-    fv.current_face[] = face
-    cb = getcurrentface(fv)
-
-    @inbounds for (i, w) in pairs(getweights(fv.qr, cb))
-        fefv_J = zero(Tensor{2,dim})
-        for j in 1:n_geom_basefuncs
-            fefv_J += x[j] ⊗ fv.dMdξ[j, i, cb]
-        end
-        weight_norm = weighted_normal(fefv_J, fv, cb)
-        fv.normals[i] = weight_norm / norm(weight_norm)
-        detJ = norm(weight_norm)
-
-        detJ > 0.0 || throw_detJ_not_pos(detJ)
-        fv.detJdV[i, cb] = detJ * w
-        Jinv = inv(fefv_J)
-        for j in 1:n_func_basefuncs
-            fv.dNdx[j, i, cb] = fv.dNdξ[j, i, cb] ⋅ Jinv
-        end
-    end
-    return nothing
-end
+@propagate_inbounds shape_value(fv::FaceValues, i::Int, q_point::Int) = shape_value(get_fun_values(fv), i, q_point)
+@propagate_inbounds shape_gradient(fv::FaceValues, i::Int, q_point::Int) = shape_gradient(get_fun_values(fv), i, q_point)
+@propagate_inbounds shape_symmetric_gradient(fv::FaceValues, i::Int, q_point::Int) = shape_symmetric_gradient(get_fun_values(fv), i, q_point)
 
 """
     getcurrentface(fv::FaceValues)
 
 Return the current active face of the `FaceValues` object (from last `reinit!`).
-
 """
 getcurrentface(fv::FaceValues) = fv.current_face[]
 
@@ -181,6 +98,64 @@ Return the normal at the quadrature point `qp` for the active face of the
 `FaceValues` object(from last `reinit!`).
 """
 getnormal(fv::FaceValues, qp::Int) = fv.normals[qp]
+
+nfaces(fv::FaceValues) = length(fv.geo_mapping)
+
+function set_current_face!(fv::FaceValues, face_nr::Int)
+    # Checking face_nr before setting current_face allows us to use @inbounds 
+    # when indexing by getcurrentface(fv) in other places!
+    checkbounds(Bool, 1:nfaces(fv), face_nr) || throw(ArgumentError("Face index out of range."))
+    fv.current_face[] = face_nr
+end
+
+@inline function reinit!(fv::FaceValues, x::AbstractVector, face_nr::Int)
+    return reinit!(fv, nothing, x, face_nr)
+end
+
+function reinit!(fv::FaceValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{Vec{dim, T}}, face_nr::Int) where {dim, T}
+    check_reinit_sdim_consistency(:FaceValues, shape_gradient_type(fv), eltype(x))
+    set_current_face!(fv, face_nr)
+    n_geom_basefuncs = getngeobasefunctions(fv)
+    if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
+        throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+    end
+    
+    geo_mapping = get_geo_mapping(fv)
+    fun_values = get_fun_values(fv)
+
+    if cell === nothing && !isa(mapping_type(fun_values), IdentityMapping)
+        throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
+    end
+
+    @inbounds for (q_point, w) in pairs(getweights(fv.fqr, face_nr))
+        mapping = calculate_mapping(geo_mapping, q_point, x)
+        J = getjacobian(mapping)
+        # See the `Ferrite.embedded_det` docstring for more background
+        weight_norm = weighted_normal(J, getrefshape(geo_mapping.ip), face_nr)
+        detJ = norm(weight_norm)
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
+        @inbounds fv.detJdV[q_point] = detJ * w
+        @inbounds fv.normals[q_point] = weight_norm / norm(weight_norm)       
+        apply_mapping!(fun_values, q_point, mapping, cell)
+    end
+end
+
+function Base.show(io::IO, d::MIME"text/plain", fv::FaceValues)
+    ip_geo = geometric_interpolation(fv)
+    rdim = getdim(ip_geo)
+    vdim = isa(shape_value(fv, 1, 1), Vec) ? length(shape_value(fv, 1, 1)) : 0
+    sdim = length(shape_gradient(fv, 1, 1)) ÷ length(shape_value(fv, 1, 1))
+    vstr = vdim==0 ? "scalar" : "vdim=$vdim"
+    print(io, "FaceValues(", vstr, ", rdim=$rdim, sdim=$sdim): ")
+    nqp = getnquadpoints.(fv.fqr.face_rules)
+    if all(n==first(nqp) for n in nqp)
+        println(io, first(nqp), " quadrature points per face")
+    else
+        println(io, tuple(nqp...), " quadrature points on each face")
+    end
+    print(io, " Function interpolation: "); show(io, d, function_interpolation(fv))
+    print(io, "\nGeometric interpolation: "); show(io, d, ip_geo^sdim)
+end
 
 """
     BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}})
@@ -238,24 +213,4 @@ function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{
         x += bcv.M[i,q_point,face] * xh[i] # geometric_value(fe_v, q_point, i) * xh[i]
     end
     return x
-end
-
-nfaces(fv::FaceValues) = size(fv.N, 3)
-
-function checkface(fv::FaceValues, face::Int)
-    0 < face <= nfaces(fv) || error("Face index out of range.")
-    return nothing
-end
-
-function Base.show(io::IO, m::MIME"text/plain", fv::FaceValues)
-    println(io, "FaceValues with")
-    nqp = getnquadpoints.(fv.qr.face_rules)
-    if all(n==first(nqp) for n in nqp)
-        println(io, "- Quadrature rule with ", first(nqp), " points per face")
-    else
-        println(io, "- Quadrature rule with ", tuple(nqp...), " points on each face")
-    end
-    print(io, "- Function interpolation: "); show(io, m, fv.func_interp)
-    println(io)
-    print(io, "- Geometric interpolation: "); show(io, m, fv.geo_interp)
 end

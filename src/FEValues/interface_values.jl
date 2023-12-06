@@ -86,6 +86,10 @@ end
 InterfaceValues(facevalues_here::FVA, facevalues_there::FVB = deepcopy(facevalues_here)) where {FVA <: FaceValues, FVB <: FaceValues} =
     InterfaceValues{FVA,FVB}(facevalues_here, facevalues_there)
 
+function Base.copy(iv::InterfaceValues)
+    return InterfaceValues(copy(iv.here), copy(iv.there))
+end
+
 function getnbasefunctions(iv::InterfaceValues)
     return getnbasefunctions(iv.here) + getnbasefunctions(iv.there)
 end
@@ -120,26 +124,23 @@ function reinit!(
     ) where {dim, T}
 
     # reinit! the here side as normal
-    reinit!(iv.here, coords_here, face_here)
-    dim == 1 && return reinit!(iv.there, coords_there, face_there)
+    reinit!(iv.here, cell_here, coords_here, face_here)
+    dim == 1 && return reinit!(iv.there, cell_there, coords_there, face_there)
     # Transform the quadrature points from the here side to the there side
-    iv.there.current_face[] = face_there
+    set_current_face!(iv.there, face_there) # Includes boundscheck
     interface_transformation = InterfaceOrientationInfo(cell_here, cell_there, face_here, face_there)
-    quad_points_a = getpoints(iv.here.qr, face_here)
-    quad_points_b = getpoints(iv.there.qr, face_there)
+    quad_points_a = getpoints(iv.here.fqr, face_here)
+    quad_points_b = getpoints(iv.there.fqr, face_there)
     transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
-    @boundscheck checkface(iv.there, face_there)
     # TODO: This is the bottleneck, cache it?
     @assert length(quad_points_a) <= length(quad_points_b)
+    
     # Re-evalutate shape functions in the transformed quadrature points
-    for qp in 1:length(quad_points_a), i in 1:getnbasefunctions(iv.there)
-        iv.there.dNdξ[i, qp, face_there], iv.there.N[i, qp, face_there] = shape_gradient_and_value(iv.there.func_interp, quad_points_b[qp], i)
-    end
-    for qp in 1:length(quad_points_a), i in 1:getngeobasefunctions(iv.there)
-        iv.there.dMdξ[i, qp, face_there], iv.there.M[i, qp, face_there] = shape_gradient_and_value(iv.there.geo_interp, quad_points_b[qp], i)
-    end
+    precompute_values!(get_fun_values(iv.there),  quad_points_b)
+    precompute_values!(get_geo_mapping(iv.there), quad_points_b)
+    
     # reinit! the "there" side
-    reinit!(iv.there, coords_there, face_there)
+    reinit!(iv.there, cell_there, coords_there, face_there)
     return iv
 end
 
