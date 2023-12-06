@@ -229,6 +229,23 @@ function shape_gradients_and_values!(gradients::GAT, values::SAT, ip::IP, ξ::Ve
     end
 end
 
+#= PR798
+"""
+    shape_hessians_gradients_and_values!(hessians::AbstractVector, gradients::AbstractVector, values::AbstractVector, ip::Interpolation, ξ::Vec)
+
+Evaluate all shape function hessians, gradients and values of `ip` at once at the reference point `ξ`
+and store them in `hessians`, `gradients`, and `values`.
+"""
+@propagate_inbounds function shape_hessians_gradients_and_values!(hessians::AbstractVector, gradients::AbstractVector, values::AbstractVector, ip::Interpolation, ξ::Vec)
+    @boundscheck checkbounds(hessians, 1:getnbasefunctions(ip))
+    @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
+    @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
+    @inbounds for i in 1:getnbasefunctions(ip)
+        hessians[i], gradients[i], values[i] = shape_hessian_gradient_and_value(ip, ξ, i)
+    end
+end
+=#
+
 """
     shape_hessians_gradients_and_values!(hessians::AbstractVector, gradients::AbstractVector, values::AbstractVector, ip::Interpolation, ξ::Vec)
 
@@ -276,6 +293,18 @@ and [`Ferrite.shape_gradient(::Interpolation)`](@ref).
 function shape_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
     return gradient(x -> shape_value(ip, x, i), ξ, :all)
 end
+
+#= PR798
+"""
+    shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
+
+Optimized version combining the evaluation [`Ferrite.shape_value(::Interpolation)`](@ref),
+[`Ferrite.shape_gradient(::Interpolation)`](@ref), and the gradient of the latter. 
+"""
+function shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
+    return hessian(x -> shape_value(ip, x, i), ξ, :all)
+end
+=#
 
 """
     shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
