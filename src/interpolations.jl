@@ -1559,17 +1559,17 @@ reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip
 is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
 
 """
-    get_mapping_type(ip::Interpolation)
+    mapping_type(ip::Interpolation)
 
 Get the type of mapping from the reference cell to the real cell for an
 interpolation `ip`. Subtypes of `ScalarInterpolation` and `VectorizedInterpolation`
 return `IdentityMapping()`, but other non-scalar interpolations may request different
 mapping types. 
 """
-function get_mapping_type end
+function mapping_type end
 
-get_mapping_type(::ScalarInterpolation) = IdentityMapping()
-get_mapping_type(::VectorizedInterpolation) = IdentityMapping()
+mapping_type(::ScalarInterpolation) = IdentityMapping()
+mapping_type(::VectorizedInterpolation) = IdentityMapping()
 
 
 #####################################
@@ -1578,7 +1578,7 @@ get_mapping_type(::VectorizedInterpolation) = IdentityMapping()
 # https://defelement.com/elements/raviart-thomas.html
 # https://defelement.com/elements/qdiv.html
 struct RaviartThomas{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
-get_mapping_type(::RaviartThomas) = ContravariantPiolaMapping()
+mapping_type(::RaviartThomas) = ContravariantPiolaMapping()
 n_dbc_components(::RaviartThomas) = 1
 
 # RefTriangle, 1st order Lagrange
@@ -1606,7 +1606,7 @@ end
 # Nedelec (1st kind), H(curl)       #
 #####################################
 struct Nedelec{vdim, shape, order} <: VectorInterpolation{vdim, shape, order} end
-get_mapping_type(::Nedelec) = CovariantPiolaMapping()
+mapping_type(::Nedelec) = CovariantPiolaMapping()
 reference_coordinates(ip::Nedelec{vdim}) where vdim = fill(NaN*zero(Vec{vdim}), getnbasefunctions(ip))
 dirichlet_facedof_indices(ip::Nedelec) = facedof_interior_indices(ip)
 n_dbc_components(::Nedelec) = 1

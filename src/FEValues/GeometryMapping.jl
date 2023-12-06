@@ -98,7 +98,7 @@ end
 
 getngeobasefunctions(geo_mapping::GeometryMapping) = size(geo_mapping.M, 1)
 @propagate_inbounds geometric_value(geo_mapping::GeometryMapping, q_point::Int, base_func::Int) = geo_mapping.M[base_func, q_point]
-get_geometric_interpolation(geo_mapping::GeometryMapping) = geo_mapping.ip
+geometric_interpolation(geo_mapping::GeometryMapping) = geo_mapping.ip
 
 # Hot-fixes to support embedded elements before MixedTensors are available
 # See https://github.com/Ferrite-FEM/Tensors.jl/pull/188

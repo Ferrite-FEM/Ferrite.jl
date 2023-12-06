@@ -26,9 +26,9 @@ end
 
 function PointValues(cv::CellValues)
     T = typeof(getdetJdV(cv, 1))
-    ip_fun = get_function_interpolation(cv)
-    ip_geo = get_geometric_interpolation(cv)
-    update_gradients = get_function_difforder(cv) == 1
+    ip_fun = function_interpolation(cv)
+    ip_geo = geometric_interpolation(cv)
+    update_gradients = function_difforder(cv) == 1
     return PointValues(T, ip_fun, ip_geo; update_gradients)
 end
 function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_interpolation(ip); kwargs...)

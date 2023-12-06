@@ -41,10 +41,10 @@ struct FaceValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:Abstrac
 end
 
 function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
-        update_gradients = true) where {T,sdim} 
+        update_gradients::Bool = true) where {T,sdim} 
     
     FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
-    GeoDiffOrder = max(required_geo_diff_order(get_mapping_type(ip_fun), FunDiffOrder), 1)
+    GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), 1)
     geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]
     fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
     max_nquadpoints = maximum(qr->length(getweights(qr)), fqr.face_rules)
@@ -71,9 +71,9 @@ getnquadpoints(fv::FaceValues) = @inbounds getnquadpoints(fv.fqr, getcurrentface
 
 shape_value_type(fv::FaceValues) = shape_value_type(get_fun_values(fv))
 shape_gradient_type(fv::FaceValues) = shape_gradient_type(get_fun_values(fv))
-get_function_interpolation(fv::FaceValues) = get_function_interpolation(get_fun_values(fv))
-get_function_difforder(fv::FaceValues) = get_function_difforder(get_fun_values(fv))
-get_geometric_interpolation(fv::FaceValues) = get_geometric_interpolation(get_geo_mapping(fv))
+function_interpolation(fv::FaceValues) = function_interpolation(get_fun_values(fv))
+function_difforder(fv::FaceValues) = function_difforder(get_fun_values(fv))
+geometric_interpolation(fv::FaceValues) = geometric_interpolation(get_geo_mapping(fv))
 
 get_geo_mapping(fv::FaceValues) = @inbounds fv.geo_mapping[getcurrentface(fv)]
 @propagate_inbounds geometric_value(fv::FaceValues, args...) = geometric_value(get_geo_mapping(fv), args...)
@@ -112,7 +112,7 @@ end
     return reinit!(fv, nothing, x, face_nr)
 end
 
-function reinit!(fv::FaceValues, cell, x::AbstractVector{Vec{dim, T}}, face_nr::Int) where {dim, T}
+function reinit!(fv::FaceValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{Vec{dim, T}}, face_nr::Int) where {dim, T}
     check_reinit_sdim_consistency(:FaceValues, shape_gradient_type(fv), eltype(x))
     set_current_face!(fv, face_nr)
     n_geom_basefuncs = getngeobasefunctions(fv)
@@ -123,7 +123,7 @@ function reinit!(fv::FaceValues, cell, x::AbstractVector{Vec{dim, T}}, face_nr::
     geo_mapping = get_geo_mapping(fv)
     fun_values = get_fun_values(fv)
 
-    if cell === nothing && !isa(get_mapping_type(fun_values), IdentityMapping)
+    if cell === nothing && !isa(mapping_type(fun_values), IdentityMapping)
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
 
@@ -141,7 +141,7 @@ function reinit!(fv::FaceValues, cell, x::AbstractVector{Vec{dim, T}}, face_nr::
 end
 
 function Base.show(io::IO, d::MIME"text/plain", fv::FaceValues)
-    ip_geo = get_geometric_interpolation(fv)
+    ip_geo = geometric_interpolation(fv)
     rdim = getdim(ip_geo)
     vdim = isa(shape_value(fv, 1, 1), Vec) ? length(shape_value(fv, 1, 1)) : 0
     sdim = length(shape_gradient(fv, 1, 1)) ÷ length(shape_value(fv, 1, 1))
@@ -153,7 +153,7 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FaceValues)
     else
         println(io, tuple(nqp...), " quadrature points on each face")
     end
-    print(io, " Function interpolation: "); show(io, d, get_function_interpolation(fv))
+    print(io, " Function interpolation: "); show(io, d, function_interpolation(fv))
     print(io, "\nGeometric interpolation: "); show(io, d, ip_geo^sdim)
 end
 

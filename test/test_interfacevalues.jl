@@ -1,7 +1,7 @@
 @testset "InterfaceValues" begin
     function test_interfacevalues(grid::Ferrite.AbstractGrid, iv::InterfaceValues; tol = 0)
-        ip_here = Ferrite.get_function_interpolation(iv.here)
-        ip_there = Ferrite.get_function_interpolation(iv.there)
+        ip_here = Ferrite.function_interpolation(iv.here)
+        ip_there = Ferrite.function_interpolation(iv.there)
         ndim = Ferrite.getdim(ip_here)
         n_basefuncs = getnbasefunctions(ip_here) + getnbasefunctions(ip_there)
 
