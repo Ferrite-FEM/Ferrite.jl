@@ -145,30 +145,19 @@ end
     csv = CellValues(qr, ip)
     cvv = CellValues(qr, VectorizedInterpolation(ip))
     csv_embedded = CellValues(qr, ip, ip^3)
-<<<<<<< HEAD
     cv_nedelec = CellValues(qr, ip_nedelec, ip)
     fsv = FaceValues(qr_f, ip)
     fvv = FaceValues(qr_f, VectorizedInterpolation(ip))
     fsv_embedded = FaceValues(qr_f, ip, ip^3)
     fv_nedelec = FaceValues(qr_f, ip_nedelec, ip)
-=======
-    fsv = FaceValues(qr_f, ip)
-    fvv = FaceValues(qr_f, VectorizedInterpolation(ip))
-    fsv_embedded = FaceValues(qr_f, ip, ip^3)
-    
->>>>>>> master
     x, n = valid_coordinates_and_normals(ip)
     reinit!(csv, x)
     reinit!(cvv, x)
     reinit!(fsv, x, 1)
     reinit!(fvv, x, 1)
-<<<<<<< HEAD
     reinit!(cv_nedelec, cell, x)
     reinit!(fv_nedelec, cell, x, 1)
 
-=======
-    
->>>>>>> master
     # Wrong number of coordinates
     xx = [x; x]
     @test_throws ArgumentError reinit!(csv, xx)
@@ -185,13 +174,10 @@ end
     @test_throws ArgumentError reinit!(csv_embedded, x)
     @test_throws ArgumentError reinit!(fsv_embedded, x, 1)
 
-<<<<<<< HEAD
     # Missing cell input when required
     @test_throws ArgumentError reinit!(cv_nedelec, x)
     @test_throws ArgumentError reinit!(fv_nedelec, x, 1)
 
-=======
->>>>>>> master
     # Wrong number of (local) dofs
     # Scalar values, scalar dofs
     ue = rand(getnbasefunctions(csv) + 1)
