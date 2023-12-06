@@ -1573,5 +1573,5 @@ mapping types.
 """
 function mapping_type end
 
-get_mapping(::ScalarInterpolation) = IdentityMapping()
-get_mapping(::VectorizedInterpolation) = IdentityMapping()
+mapping_type(::ScalarInterpolation) = IdentityMapping()
+mapping_type(::VectorizedInterpolation) = IdentityMapping()
