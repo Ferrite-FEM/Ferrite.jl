@@ -309,24 +309,24 @@ end
         cv = CellValues(qr, fun_ip)
         @test Ferrite.shape_value_type(cv) == value_type(Float64)
         @test Ferrite.shape_gradient_type(cv) == grad_type(Float64)
-        @test Ferrite.get_geometric_interpolation(cv) == Lagrange{RefTriangle, 1}()
+        @test Ferrite.geometric_interpolation(cv) == Lagrange{RefTriangle, 1}()
         # Numeric type + quadrature + scalar function
         cv = CellValues(Float32, qr, fun_ip)
         @test Ferrite.shape_value_type(cv) == value_type(Float32)
         @test Ferrite.shape_gradient_type(cv) == grad_type(Float32)
-        @test Ferrite.get_geometric_interpolation(cv) == Lagrange{RefTriangle, 1}()
+        @test Ferrite.geometric_interpolation(cv) == Lagrange{RefTriangle, 1}()
         for geo_ip in (Lagrange{RefTriangle, 2}(), Lagrange{RefTriangle, 2}()^2)
             scalar_ip(ip) = ip isa VectorizedInterpolation ? ip.ip : ip
             # Quadrature + scalar function + geo
             cv = CellValues(qr, fun_ip, geo_ip)
             @test Ferrite.shape_value_type(cv) == value_type(Float64)
             @test Ferrite.shape_gradient_type(cv) == grad_type(Float64)
-            @test Ferrite.get_geometric_interpolation(cv) == scalar_ip(geo_ip)
+            @test Ferrite.geometric_interpolation(cv) == scalar_ip(geo_ip)
             # Numeric type + quadrature + scalar function + scalar geo
             cv = CellValues(Float32, qr, fun_ip, geo_ip)
             @test Ferrite.shape_value_type(cv) == value_type(Float32)
             @test Ferrite.shape_gradient_type(cv) == grad_type(Float32)
-            @test Ferrite.get_geometric_interpolation(cv) == scalar_ip(geo_ip)
+            @test Ferrite.geometric_interpolation(cv) == scalar_ip(geo_ip)
         end
     end
 end

@@ -39,7 +39,7 @@ Ferrite.getnbasefunctions(::Interpolation)
 Ferrite.reference_coordinates(::Interpolation)
 Ferrite.is_discontinuous(::Interpolation)
 Ferrite.adjust_dofs_during_distribution(::Interpolation)
-Ferrite.get_mapping_type
+Ferrite.mapping_type
 ```
 
 for all entities which exist on that reference element. The dof functions default to having no

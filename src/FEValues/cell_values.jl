@@ -42,10 +42,10 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
 function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; 
-        update_gradients = true, update_detJdV = true) where T 
+        update_gradients::Bool = true, update_detJdV::Bool = true) where T 
     
     FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
-    GeoDiffOrder = max(required_geo_diff_order(get_mapping_type(ip_fun), FunDiffOrder), update_detJdV)
+    GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), update_detJdV)
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
     detJdV = update_detJdV ? fill(T(NaN), length(getweights(qr))) : nothing
@@ -64,15 +64,15 @@ end
 # Access geometry values
 @propagate_inbounds getngeobasefunctions(cv::CellValues) = getngeobasefunctions(cv.geo_mapping)
 @propagate_inbounds geometric_value(cv::CellValues, args...) = geometric_value(cv.geo_mapping, args...)
-get_geometric_interpolation(cv::CellValues) = get_geometric_interpolation(cv.geo_mapping)
+geometric_interpolation(cv::CellValues) = geometric_interpolation(cv.geo_mapping)
 
 getdetJdV(cv::CellValues, q_point::Int) = cv.detJdV[q_point]
 getdetJdV(::CellValues{<:Any, <:Any, <:Any, Nothing}, ::Int) = throw(ArgumentError("detJdV is not saved in CellValues"))
 
 # Accessors for function values 
 getnbasefunctions(cv::CellValues) = getnbasefunctions(cv.fun_values)
-get_function_interpolation(cv::CellValues) = get_function_interpolation(cv.fun_values)
-get_function_difforder(cv::CellValues) = get_function_difforder(cv.fun_values)
+function_interpolation(cv::CellValues) = function_interpolation(cv.fun_values)
+function_difforder(cv::CellValues) = function_difforder(cv.fun_values)
 shape_value_type(cv::CellValues) = shape_value_type(cv.fun_values)
 shape_gradient_type(cv::CellValues) = shape_gradient_type(cv.fun_values)
 
@@ -94,13 +94,13 @@ end
     return reinit!(cv, nothing, x)
 end
 
-function reinit!(cv::CellValues, cell, x::AbstractVector{<:Vec})
+function reinit!(cv::CellValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{<:Vec})
     geo_mapping = cv.geo_mapping
     fun_values = cv.fun_values
     n_geom_basefuncs = getngeobasefunctions(geo_mapping)
     
     check_reinit_sdim_consistency(:CellValues, shape_gradient_type(cv), eltype(x))
-    if cell === nothing && !isa(get_mapping_type(fun_values), IdentityMapping)
+    if cell === nothing && !isa(mapping_type(fun_values), IdentityMapping)
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
@@ -115,8 +115,8 @@ function reinit!(cv::CellValues, cell, x::AbstractVector{<:Vec})
 end
 
 function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
-    ip_geo = get_geometric_interpolation(cv)
-    ip_fun = get_function_interpolation(cv)
+    ip_geo = geometric_interpolation(cv)
+    ip_fun = function_interpolation(cv)
     rdim = getdim(ip_geo)
     vdim = isa(shape_value(cv, 1, 1), Vec) ? length(shape_value(cv, 1, 1)) : 0
     GradT = shape_gradient_type(cv)

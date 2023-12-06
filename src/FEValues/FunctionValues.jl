@@ -39,15 +39,15 @@ FunctionValues
 
 struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t}
     ip::IP          # ::Interpolation
-    N_x::N_t        # ::AbstractMatrix{Union{<:Tensor,<:Number}}
-    N_ξ::N_t        # ::AbstractMatrix{Union{<:Tensor,<:Number}}
+    Nx::N_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
+    Nξ::N_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
     dNdx::dNdx_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}} or Nothing
     dNdξ::dNdξ_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}} or Nothing
-    function FunctionValues(ip::Interpolation, N_x::N_t, N_ξ::N_t, ::Nothing, ::Nothing) where {N_t<:AbstractMatrix}
-        return new{0, typeof(ip), N_t, Nothing, Nothing}(ip, N_x, N_ξ, nothing, nothing)
+    function FunctionValues(ip::Interpolation, Nx::N_t, Nξ::N_t, ::Nothing, ::Nothing) where {N_t<:AbstractMatrix}
+        return new{0, typeof(ip), N_t, Nothing, Nothing}(ip, Nx, Nξ, nothing, nothing)
     end
-    function FunctionValues(ip::Interpolation, N_x::N_t, N_ξ::N_t, dNdx::AbstractMatrix, dNdξ::AbstractMatrix) where {N_t<:AbstractMatrix}
-        return new{1, typeof(ip), N_t, typeof(dNdx), typeof(dNdξ)}(ip, N_x, N_ξ, dNdx, dNdξ)
+    function FunctionValues(ip::Interpolation, Nx::N_t, Nξ::N_t, dNdx::AbstractMatrix, dNdξ::AbstractMatrix) where {N_t<:AbstractMatrix}
+        return new{1, typeof(ip), N_t, typeof(dNdx), typeof(dNdξ)}(ip, Nx, Nξ, dNdx, dNdξ)
     end
 end
 function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder, T}
@@ -55,8 +55,8 @@ function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureR
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
     
-    N_ξ = zeros(typeof_N(T, ip_dims), n_shape, n_qpoints)
-    N_x = isa(get_mapping_type(ip), IdentityMapping) ? N_ξ : similar(N_ξ)
+    Nξ = zeros(typeof_N(T, ip_dims), n_shape, n_qpoints)
+    Nx = isa(mapping_type(ip), IdentityMapping) ? Nξ : similar(Nξ)
 
     if DiffOrder == 0
         dNdξ = dNdx = nothing
@@ -67,34 +67,34 @@ function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureR
         throw(ArgumentError("Currently only values and gradients can be updated in FunctionValues"))
     end
 
-    fv = FunctionValues(ip, N_x, N_ξ, dNdx, dNdξ)
+    fv = FunctionValues(ip, Nx, Nξ, dNdx, dNdξ)
     precompute_values!(fv, getpoints(qr)) # Separate function for qr point update in PointValues
     return fv
 end
 
 function precompute_values!(fv::FunctionValues{0}, qr_points::Vector{<:Vec})
-    shape_values!(fv.N_ξ, fv.ip, qr_points)
+    shape_values!(fv.Nξ, fv.ip, qr_points)
 end
 function precompute_values!(fv::FunctionValues{1}, qr_points::Vector{<:Vec})
-    shape_gradients_and_values!(fv.dNdξ, fv.N_ξ, fv.ip, qr_points)
+    shape_gradients_and_values!(fv.dNdξ, fv.Nξ, fv.ip, qr_points)
 end
 
 function Base.copy(v::FunctionValues)
-    N_ξ_copy = copy(v.N_ξ)
-    N_x_copy = v.N_ξ === v.N_x ? N_ξ_copy : copy(v.N_x) # Preserve aliasing
+    Nξ_copy = copy(v.Nξ)
+    Nx_copy = v.Nξ === v.Nx ? Nξ_copy : copy(v.Nx) # Preserve aliasing
     dNdx_copy = _copy_or_nothing(v.dNdx)
     dNdξ_copy = _copy_or_nothing(v.dNdξ)
-    return FunctionValues(copy(v.ip), N_x_copy, N_ξ_copy, dNdx_copy, dNdξ_copy)
+    return FunctionValues(copy(v.ip), Nx_copy, Nξ_copy, dNdx_copy, dNdξ_copy)
 end
 
-getnbasefunctions(funvals::FunctionValues) = size(funvals.N_x, 1)
-@propagate_inbounds shape_value(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.N_x[base_func, q_point]
+getnbasefunctions(funvals::FunctionValues) = size(funvals.Nx, 1)
+@propagate_inbounds shape_value(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.Nx[base_func, q_point]
 @propagate_inbounds shape_gradient(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.dNdx[base_func, q_point]
 @propagate_inbounds shape_symmetric_gradient(funvals::FunctionValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(funvals, q_point, base_func))
 
-get_function_interpolation(funvals::FunctionValues) = funvals.ip
-get_function_difforder(::FunctionValues{DiffOrder}) where DiffOrder = DiffOrder
-shape_value_type(funvals::FunctionValues) = eltype(funvals.N_x)
+function_interpolation(funvals::FunctionValues) = funvals.ip
+function_difforder(::FunctionValues{DiffOrder}) where DiffOrder = DiffOrder
+shape_value_type(funvals::FunctionValues) = eltype(funvals.Nx)
 shape_gradient_type(funvals::FunctionValues) = eltype(funvals.dNdx)
 shape_gradient_type(::FunctionValues{0}) = nothing
 
@@ -123,7 +123,7 @@ struct IdentityMapping end
 # struct DoubleCovariantPiolaMapping end 
 # struct DoubleContravariantPiolaMapping end 
 
-get_mapping_type(fv::FunctionValues) = get_mapping_type(fv.ip)
+mapping_type(fv::FunctionValues) = mapping_type(fv.ip)
 
 """
     required_geo_diff_order(fun_mapping, fun_diff_order::Int)
@@ -155,7 +155,7 @@ required_geo_diff_order(::IdentityMapping,           fun_diff_order::Int) = fun_
 # Apply mapping
 # =============
 @inline function apply_mapping!(funvals::FunctionValues, q_point::Int, args...)
-    return apply_mapping!(funvals, get_mapping_type(funvals), q_point, args...)
+    return apply_mapping!(funvals, mapping_type(funvals), q_point, args...)
 end
 
 # Identity mapping
