@@ -58,5 +58,4 @@ function_value_average
 function_value_jump
 function_gradient_average
 function_gradient_jump
-transform_interface_points!
 ```
