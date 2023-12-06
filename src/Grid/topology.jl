@@ -339,7 +339,7 @@ function _faceskeleton(top::ExclusiveTopology, grid::Grid)
     for (idx, face) in pairs(neighborhood)
         isempty(face.neighbor_info) || face.neighbor_info[][1] > idx[1] || continue
         face_skeleton_local[i] = FaceIndex(idx[1], idx[2])
-        i+=1
+        i += 1
     end
     return face_skeleton_local
 end
