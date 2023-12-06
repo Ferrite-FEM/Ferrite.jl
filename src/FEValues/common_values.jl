@@ -302,11 +302,8 @@ function shape_gradients_and_values!(gradients::AbstractMatrix, values::Abstract
     end
 end
 
-#= PR798
 function shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
         shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
 end
-=#
-

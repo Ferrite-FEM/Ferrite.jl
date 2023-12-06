@@ -117,9 +117,9 @@ end
 
 # Mapping types 
 struct IdentityMapping end 
+struct CovariantPiolaMapping end 
+struct ContravariantPiolaMapping end 
 # Not yet implemented:
-# struct CovariantPiolaMapping end # PR798
-# struct ContravariantPiolaMapping end # PR798
 # struct DoubleCovariantPiolaMapping end 
 # struct DoubleContravariantPiolaMapping end 
 
@@ -133,9 +133,8 @@ the function values and gradients from the reference cell
 to the physical cell geometry.
 """
 required_geo_diff_order(::IdentityMapping,           fun_diff_order::Int) = fun_diff_order
-#required_geo_diff_order(::ContravariantPiolaMapping, fun_diff_order::Int) = 1 + fun_diff_order # PR798
-#required_geo_diff_order(::CovariantPiolaMapping,     fun_diff_order::Int) = 1 + fun_diff_order # PR798
-
+required_geo_diff_order(::ContravariantPiolaMapping, fun_diff_order::Int) = 1 + fun_diff_order
+required_geo_diff_order(::CovariantPiolaMapping,     fun_diff_order::Int) = 1 + fun_diff_order
 
 # Support for embedded elements
 @inline calculate_Jinv(J::Tensor{2}) = inv(J)
@@ -172,6 +171,57 @@ end
     return nothing
 end
 
-# TODO in PR798, apply_mapping! for 
-# * CovariantPiolaMapping
-# * ContravariantPiolaMapping
+# Covariant Piola Mapping
+@inline function apply_mapping!(funvals::FunctionValues{0}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
+    Jinv = inv(getjacobian(mapping_values))
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        d = get_direction(funvals.ip, j, cell)
+        Nξ = funvals.Nξ[j, q_point]
+        funvals.Nx[j, q_point] = d*(Nξ ⋅ Jinv)
+    end
+    return nothing
+end
+
+@inline function apply_mapping!(funvals::FunctionValues{1}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
+    H = gethessian(mapping_values)
+    Jinv = inv(getjacobian(mapping_values))
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        d = get_direction(funvals.ip, j, cell)
+        dNdξ = funvals.dNdξ[j, q_point]
+        Nξ = funvals.Nξ[j, q_point]
+        funvals.Nx[j, q_point] = d*(Nξ ⋅ Jinv)
+        funvals.dNdx[j, q_point] = d*(Jinv' ⋅ dNdξ ⋅ Jinv - Jinv' ⋅ (Nξ ⋅ Jinv ⋅ H ⋅ Jinv))
+    end
+    return nothing
+end
+
+# Contravariant Piola Mapping
+@inline function apply_mapping!(funvals::FunctionValues{0}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
+    J = getjacobian(mapping_values)
+    detJ = det(J)
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        d = get_direction(funvals.ip, j, cell)
+        Nξ = funvals.Nξ[j, q_point]
+        funvals.Nx[j, q_point] = d*(J ⋅ Nξ)/detJ
+    end
+    return nothing
+end
+
+@inline function apply_mapping!(funvals::FunctionValues{1}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
+    H = gethessian(mapping_values)
+    J = getjacobian(mapping_values)
+    Jinv = inv(J)
+    detJ = det(J)
+    I2 = one(J)
+    H_Jinv = H⋅Jinv
+    A1 = (H_Jinv ⊡ (otimesl(I2,I2))) / detJ
+    A2 = (Jinv' ⊡ H_Jinv) / detJ
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        d = get_direction(funvals.ip, j, cell)
+        dNdξ = funvals.dNdξ[j, q_point]
+        Nξ = funvals.Nξ[j, q_point]
+        funvals.Nx[j, q_point] = d*(J ⋅ Nξ)/detJ
+        funvals.dNdx[j, q_point] = d*(J ⋅ dNdξ ⋅ Jinv/detJ + A1 ⋅ Nξ - (J ⋅ Nξ) ⊗ A2)
+    end
+    return nothing
+end
