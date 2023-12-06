@@ -65,9 +65,7 @@ function _generalized_ritz_galerkin_assemble_local_matrix(grid::Ferrite.Abstract
     f
 end
 
-function _generalized_ritz_galerkin_assemble_interfaces(dh::Ferrite.AbstractDofHandler,
-    interfacevalues::InterfaceValues{<: FaceValues{<: Ferrite.FunctionValues{_, <: Ferrite.InterpolationByDim{dim}}}},
-    f_shape, f_test, op) where {_, dim}
+function _generalized_ritz_galerkin_assemble_interfaces(dh::Ferrite.AbstractDofHandler, interfacevalues::InterfaceValues, f_shape, f_test, op)
     n_basefuncs = getnbasefunctions(interfacevalues)
 
     K = zeros(ndofs(dh), ndofs(dh))
@@ -148,9 +146,7 @@ function _generalized_petrov_galerkin_assemble_local_matrix(grid::Ferrite.Abstra
     f
 end
 
-function _generalized_petrov_galerkin_assemble_interfaces(dh::Ferrite.AbstractDofHandler,
-    interfacevalues_shape::InterfaceValues{<: FaceValues{<: Ferrite.FunctionValues{_, <: Ferrite.InterpolationByDim{dim}}}}, f_shape,
-    interfacevalues_test::InterfaceValues{<: FaceValues{<: Ferrite.FunctionValues{_, <: Ferrite.InterpolationByDim{dim}}}}, f_test, op) where {_, dim}
+function _generalized_petrov_galerkin_assemble_interfaces(dh::Ferrite.AbstractDofHandler, interfacevalues_shape::InterfaceValues, f_shape, interfacevalues_test::InterfaceValues, f_test, op)
     n_basefuncs_shape = getnbasefunctions(interfacevalues_shape)
     n_basefuncs_test = getnbasefunctions(interfacevalues_test)
 
