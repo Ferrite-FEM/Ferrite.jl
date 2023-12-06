@@ -124,8 +124,8 @@ function reinit!(
     ) where {dim, T}
 
     # reinit! the here side as normal
-    reinit!(iv.here, coords_here, face_here)
-    dim == 1 && return reinit!(iv.there, coords_there, face_there)
+    reinit!(iv.here, cell_here, coords_here, face_here)
+    dim == 1 && return reinit!(iv.there, cell_there, coords_there, face_there)
     # Transform the quadrature points from the here side to the there side
     set_current_face!(iv.there, face_there) # Includes boundscheck
     interface_transformation = InterfaceOrientationInfo(cell_here, cell_there, face_here, face_there)
@@ -140,7 +140,7 @@ function reinit!(
     precompute_values!(get_geo_mapping(iv.there), quad_points_b)
     
     # reinit! the "there" side
-    reinit!(iv.there, coords_there, face_there)
+    reinit!(iv.there, cell_there, coords_there, face_there)
     return iv
 end
 
