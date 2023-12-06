@@ -1601,6 +1601,59 @@ function get_direction(::RaviartThomas{2,RefTriangle,1}, j, cell)
     return face_vertices[2] > face_vertices[1] ? 1 : -1
 end
 
+# RefTriangle, 2st order Lagrange
+#=
+----------------+--------------------
+Vertex numbers: | Vertex coordinates:
+    2           |
+    | \         | v1: 𝛏 = (1.0, 0.0)
+    |   \       | v2: 𝛏 = (0.0, 1.0)
+ξ₂^ |     \     | v3: 𝛏 = (0.0, 0.0)
+  | 3-------1   |
+  +--> ξ₁       |
+----------------+--------------------
+Face numbers:   | Face identifiers:
+    +           |
+    | \         | f1: (v1, v2)
+    2   1       | f2: (v2, v3)
+    |     \     | f3: (v3, v1)
+    +---3---+   |
+----------------+--------------------
+```
+"""
+RefTriangle
+=#
+# https://defelement.com/elements/examples/triangle-raviart-thomas-lagrange-2.html
+# Signs changed when needed to make positive direction outwards
+function shape_value(ip::RaviartThomas{2,RefTriangle,2}, ξ::Vec{2}, i::Int)
+    x, y = ξ
+    # Face 1 (keep ordering, flip sign)
+    i == 1 && return Vec(4x*(2x-1), 2y*(4x-1))  
+    i == 2 && return Vec(2x*(4y-1), 4y*(2y-1))
+    # Face 2 (flip ordering, keep signs)
+    i == 3 && return Vec( 8x*y - 2x - 6y + 2, 4y*(2y - 1))      
+    i == 4 && return Vec(-8x^2 - 8x*y + 12x + 6y - 4, 2y*(-4x - 4y + 3))
+    # Face 3 (keep ordering, flip sign)
+    i == 5 && return Vec(2x*(3 - 4x - 4y), -8x*y + 6x - 8y^2 + 12y - 4)
+    i == 6 && return Vec(4x*(2x-1), 8x*y - 6x - 2y + 2)
+    # Cell
+    i == 7 && return Vec(8x*(-2x - y + 2), 8y*(-2x - y + 1))
+    i == 8 && return Vec(8x*(-2y - x + 1), 8y*(-2y - x + 2))
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+getnbasefunctions(::RaviartThomas{2,RefTriangle,2}) = 8
+facedof_interior_indices(::RaviartThomas{2,RefTriangle,2}) = ((1, 2), (3, 4), (5, 6))
+celldof_interior_indices(::RaviartThomas{2,RefTriangle,2}) = (7,8)
+adjust_dofs_during_distribution(::RaviartThomas{2,RefTriangle,2}) = true
+
+function get_direction(::RaviartThomas{2,RefTriangle,2}, j, cell)
+    j>6 && return 1
+    facenr = (j+1)÷2
+    face_vertices = faces(cell)[facenr]
+    return face_vertices[2] > face_vertices[1] ? 1 : -1
+end
+
 
 #####################################
 # Nedelec (1st kind), H(curl)       #
