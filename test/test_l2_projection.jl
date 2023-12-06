@@ -22,7 +22,7 @@ function test_projection(order, refshape)
         qp_values = []
         for cell in CellIterator(grid)
             reinit!(cv, cell)
-            r = [f(spatial_coordinate(cv, qp, get_cell_coordinates(cell))) for qp in 1:getnquadpoints(cv)]
+            r = [f(spatial_coordinate(cv, qp, getcoordinates(cell))) for qp in 1:getnquadpoints(cv)]
             push!(qp_values, r)
         end
         return identity.(qp_values) # Tighten the type
@@ -132,7 +132,7 @@ function test_projection_mixedgrid()
     # Create node values for the 1st cell
     # use a SymmetricTensor here for testing the symmetric version of project
     f(x) = SymmetricTensor{2,2,Float64}((1 + x[1]^2, 2x[2]^2, x[1]*x[2]))
-    xe = get_cell_coordinates(mesh, 1)
+    xe = getcoordinates(mesh, 1)
     
     # analytical values
     qp_values = [[f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]]
@@ -164,7 +164,7 @@ function test_projection_mixedgrid()
     qp_values_tria = [zeros(SymmetricTensor{2,2}, nqp) for _ in triaset]
     qp_values_matrix_tria = [zero(SymmetricTensor{2,2}) for _ in 1:nqp, _ in triaset]
     for (ic, cellid) in enumerate(triaset)
-        xe = get_cell_coordinates(mesh, cellid)
+        xe = getcoordinates(mesh, cellid)
         # analytical values
         qp_values = [f(spatial_coordinate(cv, qp, xe)) for qp in 1:getnquadpoints(cv)]
         qp_values_tria[ic] = qp_values
@@ -202,7 +202,7 @@ function test_export(;subset::Bool)
     end
     for cell in CellIterator(grid)
         reinit!(cv, cell)
-        xh = get_cell_coordinates(cell)
+        xh = getcoordinates(cell)
         for qp in 1:getnquadpoints(cv)
             x = spatial_coordinate(cv, qp, xh)
             qpdata_scalar[cellid(cell)][qp] = f(x)

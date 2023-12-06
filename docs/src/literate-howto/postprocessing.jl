@@ -3,7 +3,7 @@
 # ![](heat_square_fluxes.png)
 #
 # *Figure 1*: Heat flux computed from the solution to the heat equation on
-# the unit square, see previous example: [Heat equation](@id tutorial-heat-equation).
+# the unit square, see previous example: [Heat equation](@ref tutorial-heat-equation).
 #
 #-
 #md # !!! tip
@@ -46,7 +46,7 @@ include("../tutorials/heat_equation.jl");
 # Next we define a function that computes the heat flux for each integration point in the domain.
 # Fourier's law is adopted, where the conductivity tensor is assumed to be isotropic with unit
 # conductivity ``\lambda = 1 ⇒ q = - \nabla u``, where ``u`` is the temperature.
-function compute_heat_fluxes(cellvalues::CellValues{<:ScalarInterpolation}, dh::DofHandler, a::AbstractVector{T}) where T
+function compute_heat_fluxes(cellvalues::CellValues, dh::DofHandler, a::AbstractVector{T}) where T
 
     n = getnbasefunctions(cellvalues)
     cell_dofs = zeros(Int, n)

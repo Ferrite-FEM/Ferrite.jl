@@ -10,7 +10,7 @@ if liveserver
     @timeit dto "Revise.revise()" Revise.revise()
 end
 
-using Documenter, Ferrite, FerriteGmsh, FerriteMeshParser
+using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser
 
 const is_ci = haskey(ENV, "GITHUB_ACTIONS")
 
@@ -21,17 +21,25 @@ include("generate.jl")
 include("changelog.jl")
 create_documenter_changelog()
 
+bibtex_plugin = CitationBibliography(
+    joinpath(@__DIR__, "src", "assets", "references.bib"),
+    style=:numeric
+)
+
 # Build documentation.
 @timeit dto "makedocs" makedocs(
     format = Documenter.HTML(
-        assets = ["assets/custom.css", "assets/favicon.ico"],
+        assets = [
+            "assets/custom.css",
+            "assets/citations.css",
+            "assets/favicon.ico"
+        ],
         canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
         collapselevel = 1,
     ),
     sitename = "Ferrite.jl",
     doctest = false,
-    # strict = VERSION.minor == 6 && sizeof(Int) == 8, # only strict mode on 0.6 and Int64
-    strict = false,
+    warnonly = true,
     draft = liveserver,
     pages = Any[
         "Home" => "index.md",
@@ -46,6 +54,7 @@ create_documenter_changelog()
             "tutorials/transient_heat_equation.md",
             "tutorials/computational_homogenization.md",
             "tutorials/stokes-flow.md",
+            "tutorials/porous_media.md",
             "tutorials/ns_vs_diffeq.md",
             "tutorials/linear_shell.md",
             "tutorials/dg_heat_equation.md",
@@ -53,6 +62,7 @@ create_documenter_changelog()
         "Topic guides" => [
             "Topic guide overview" => "topics/index.md",
             "topics/fe_intro.md",
+            "topics/FEValues.md",
             "topics/degrees_of_freedom.md",
             "topics/assembly.md",
             "topics/boundary_conditions.md",
@@ -86,7 +96,11 @@ create_documenter_changelog()
         #     "gallery/topology_optimization.md",
         # ],
         "devdocs/index.md",
+        "references.md",
         ],
+    plugins = [
+        bibtex_plugin,
+    ]
 )
 
 # make sure there are no *.vtu files left around from the build

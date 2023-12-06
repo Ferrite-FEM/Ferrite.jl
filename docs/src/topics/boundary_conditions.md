@@ -314,7 +314,9 @@ apply_analytical!(u, dh, :p, x -> ρ * g * x[2])
 See also [Transient heat equation](@ref tutorial-transient-heat-equation) for one example.
 
 !!! note "Consistency"
-    `apply_analytical!` does not enforce consistency of the applied solution with the system of 
-    equations. Some problems, like for example differential-algebraic systems of equations (DAEs)
-    need extra care during initialization. We refer to the paper ["Consistent Initial Condition Calculation for Differential-Algebraic Systems"  by Brown et al.](dx.doi.org/10.1137/S1064827595289996) for more details on this matter.
+    `apply_analytical!` does not enforce consistency of the applied solution with the system
+    of equations. Some problems, like for example differential-algebraic systems of
+    equations (DAEs) need extra care during initialization. We refer to the paper
+    ["Consistent Initial Condition Calculation for Differential-Algebraic Systems" by Brown
+    et al.](https://dx.doi.org/10.1137/S1064827595289996) for more details on this matter.
 

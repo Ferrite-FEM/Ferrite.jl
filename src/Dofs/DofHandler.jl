@@ -12,7 +12,6 @@ Access some grid representation for the dof handler.
 """
 get_grid(dh::AbstractDofHandler)
 
-
 struct SubDofHandler{DH} <: AbstractDofHandler
     # From constructor
     dh::DH
@@ -26,8 +25,36 @@ struct SubDofHandler{DH} <: AbstractDofHandler
     # const dof_ranges::Vector{UnitRange{Int}} # TODO: Why not?
 end
 
-# TODO: Should be an inner constructor.
+"""
+    SubDofHandler(dh::AbstractDofHandler, cellset::Set{Int})
+
+Create an `sdh::SubDofHandler` from the parent `dh`, pertaining to the 
+cells in `cellset`. This allows you to add fields to parts of the domain, or using 
+different interpolations or cell types (e.g. `Triangles` and `Quadrilaterals`). All 
+fields and cell types must be the same in one `SubDofHandler`.
+
+After construction any number of discrete fields can be added to the SubDofHandler using
+[`add!`](@ref). Construction is finalized by calling [`close!`](@ref) on the parent `dh`.
+
+# Examples
+We assume we have a `grid` containing "Triangle" and "Quadrilateral" cells, 
+including the cellsets "triangles" and "quadilaterals" for to these cells. 
+```julia
+dh = DofHandler(grid)
+
+sdh_tri = SubDofHandler(dh, getcellset(grid, "triangles"))
+ip_tri = Lagrange{RefTriangle, 2}()^2 # vector interpolation for a field u
+add!(sdh_tri, :u, ip_tri)
+
+sdh_quad = SubDofHandler(dh, getcellset(grid, "quadilaterals"))
+ip_quad = Lagrange{RefQuadrilateral, 2}()^2 # vector interpolation for a field u
+add!(sdh_quad, :u, ip_quad)
+
+close!(dh) # Finalize by closing the parent 
+```
+"""
 function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
+    # TODO: Should be an inner constructor.
     isclosed(dh) && error("DofHandler already closed")
     # Compute the celltype and make sure all elements have the same one
     CT = getcelltype(dh.grid, first(cellset))
@@ -46,19 +73,18 @@ function SubDofHandler(dh::DH, cellset) where {DH <: AbstractDofHandler}
     return sdh
 end
 
-# Shortcut
-@inline getcelltype(grid::AbstractGrid, sdh::SubDofHandler) = getcelltype(grid, first(sdh.cellset))
+@inline getcelltype(sdh::SubDofHandler) = getcelltype(get_grid(sdh.dh), first(sdh.cellset))
 
-function Base.show(io::IO, ::MIME"text/plain", sdh::SubDofHandler)
+function Base.show(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
     println(io, typeof(sdh))
-    println(io, "  Cell type: ", getcelltype(sdh.dh.grid, first(sdh.cellset)))
-    _print_field_information(io, sdh)
+    println(io, "  Cell type: ", getcelltype(sdh))
+    _print_field_information(io, mime, sdh)
 end
 
-function _print_field_information(io::IO, sdh::SubDofHandler)
+function _print_field_information(io::IO, mime::MIME"text/plain", sdh::SubDofHandler)
     println(io, "  Fields:")
     for (i, fieldname) in pairs(sdh.field_names)
-        println(io, "    ", repr(fieldname), ", ", sdh.field_interpolations[i])
+        println(io, "    ", repr(mime, fieldname), ", ", repr(mime, sdh.field_interpolations[i]))
     end
     if !isclosed(sdh.dh)
         print(io, "  Not closed!")
@@ -67,13 +93,6 @@ function _print_field_information(io::IO, sdh::SubDofHandler)
     end
 end
 
-"""
-    DofHandler(grid::Grid)
-
-Construct a `DofHandler` based on `grid`. Supports:
-- `Grid`s with or without concrete element type (E.g. "mixed" grids with several different element types.)
-- One or several fields, which can live on the whole domain or on subsets of the `Grid`.
-"""
 struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     subdofhandlers::Vector{SubDofHandler{DofHandler{dim, G}}}
     field_names::Vector{Symbol}
@@ -87,16 +106,38 @@ struct DofHandler{dim,G<:AbstractGrid{dim}} <: AbstractDofHandler
     ndofs::ScalarWrapper{Int}
 end
 
+"""
+    DofHandler(grid::Grid)
+
+Construct a `DofHandler` based on the grid `grid`.
+
+After construction any number of discrete fields can be added to the DofHandler using
+[`add!`](@ref). Construction is finalized by calling [`close!`](@ref).
+
+By default fields are added to all elements of the grid. Refer to [`SubDofHandler`](@ref)
+for restricting fields to subdomains of the grid.
+
+# Examples
+
+```julia
+dh = DofHandler(grid)
+ip_u = Lagrange{RefTriangle, 2}()^2 # vector interpolation for a field u
+ip_p = Lagrange{RefTriangle, 1}()   # scalar interpolation for a field p
+add!(dh, :u, ip_u)
+add!(dh, :p, ip_p)
+close!(dh)
+```
+"""
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
     DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
-function Base.show(io::IO, ::MIME"text/plain", dh::DofHandler)
+function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
     println(io, typeof(dh))
     if length(dh.subdofhandlers) == 1
-        _print_field_information(io, dh.subdofhandlers[1])
+        _print_field_information(io, mime, dh.subdofhandlers[1])
     else
         println(io, "  Fields:")
         for fieldname in getfieldnames(dh)
@@ -132,6 +173,7 @@ function ndofs_per_cell(dh::DofHandler, cell::Int=1)
     return @inbounds ndofs_per_cell(dh.subdofhandlers[dh.cell_to_subdofhandler[cell]])
 end
 ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell[]
+ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell[] # for compatibility with DofHandler
 
 """
     celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
@@ -581,18 +623,15 @@ element B in the example.
 
 In addition, we also have to preverse the ordering at each dof location.
 
-For more details we refer to [1] as we follow the methodology described therein.
+For more details we refer to Scroggs et al. [Scroggs2022](@cite) as we follow the methodology
+described therein.
 
-[1] Scroggs, M. W., Dokken, J. S., Richardson, C. N., & Wells, G. N. (2022).
-    Construction of arbitrary order finite element degree-of-freedom maps on
-    polygonal and polyhedral cell meshes. ACM Transactions on Mathematical
-    Software (TOMS), 48(2), 1-23.
-
-    !!!TODO Citation via DocumenterCitations.jl.
-
-    !!!TODO Investigate if we can somehow pass the interpolation into this function in a typestable way.
+# References
+ - [Scroggs2022](@cite) Scroggs et al. ACM Trans. Math. Softw. 48 (2022).
 """
 @inline function permute_and_push!(cell_dofs::Vector{Int}, dofs::StepRange{Int,Int}, orientation::PathOrientationInfo, adjust_during_distribution::Bool)
+    # TODO Investigate if we can somehow pass the interpolation into this function in a
+    # typestable way.
     n_copies = step(dofs)
     @assert n_copies > 0
     if adjust_during_distribution && !orientation.regular
@@ -895,11 +934,11 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         field_idx = _find_field(sdh, fieldname)
         field_idx === nothing && continue
         # Set up CellValues with the local node coords as quadrature points
-        CT = getcelltype(get_grid(dh), first(sdh.cellset))
+        CT = getcelltype(sdh)
+        ip = getfieldinterpolation(sdh, field_idx)
         ip_geo = default_interpolation(CT)
         local_node_coords = reference_coordinates(ip_geo)
         qr = QuadratureRule{getrefshape(ip)}(zeros(length(local_node_coords)), local_node_coords)
-        ip = getfieldinterpolation(sdh, field_idx)
         if ip isa VectorizedInterpolation
             # TODO: Remove this hack when embedding works...
             cv = CellValues(qr, ip.ip, ip_geo)
@@ -918,7 +957,7 @@ function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, sdh::SubDofHandler
         u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}) where {T, RT}
     ue = zeros(T, length(drange))
     # TODO: Remove this hack when embedding works...
-    if RT <: Vec && cv isa CellValues{<:ScalarInterpolation}
+    if RT <: Vec && function_interpolation(cv) isa ScalarInterpolation
         uer = reinterpret(RT, ue)
     else
         uer = ue

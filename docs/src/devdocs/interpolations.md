@@ -15,6 +15,9 @@ Ferrite.shape_gradient(::Interpolation, ::Vec, ::Int)
 Ferrite.shape_gradient_and_value
 Ferrite.boundarydof_indices
 Ferrite.dirichlet_boundarydof_indices
+Ferrite.shape_values!
+Ferrite.shape_gradients!
+Ferrite.shape_gradients_and_values!
 ```
 
 ### Required methods to implement for all subtypes of `Interpolation` to define a new finite element
@@ -36,6 +39,7 @@ Ferrite.getnbasefunctions(::Interpolation)
 Ferrite.reference_coordinates(::Interpolation)
 Ferrite.is_discontinuous(::Interpolation)
 Ferrite.adjust_dofs_during_distribution(::Interpolation)
+Ferrite.mapping_type
 ```
 
 for all entities which exist on that reference element. The dof functions default to having no

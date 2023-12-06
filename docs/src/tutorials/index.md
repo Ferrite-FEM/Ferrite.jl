@@ -2,7 +2,7 @@
 
 On this page you find an overview of Ferrite tutorials. The tutorials explain and show how
 Ferrite can be used to solve a wide range of problems. See also the [Code
-gallery](../../gallery/) for more examples.
+gallery](../gallery/index.md) for more examples.
 
 The tutorials all follow roughly the same structure:
  - **Introduction** introduces the problem to be solved and discusses the learning outcomes
@@ -29,7 +29,7 @@ of the other tutorials. The remaining tutorials discuss more advanced topics.
 
 ---
 
-##### [Tutorial 1: Heat equation](../heat_equation/)
+##### [Tutorial 1: Heat equation](heat_equation.md)
 
 This tutorial guides you through the process of solving the linear stationary heat equation
 (i.e. Poisson's equation) on a unit square with homogeneous Dirichlet boundary conditions.
@@ -42,7 +42,7 @@ complex tutorials.*
 
 ---
 
-##### [Tutorial 2: Linear elasticity](../linear_elasticity/)
+##### [Tutorial 2: Linear elasticity](linear_elasticity.md)
 
 TBW.
 
@@ -50,7 +50,7 @@ TBW.
 
 ---
 
-##### [Tutorial 3: Incompressible elasticity](../incompressible_elasticity/)
+##### [Tutorial 3: Incompressible elasticity](incompressible_elasticity.md)
 
 This tutorial focuses on a mixed formulation of linear elasticity, with (vector)
 displacement and (scalar) pressure as the two unknowns, suitable for incompressibility.
@@ -62,7 +62,7 @@ incompressible limit.
 
 ---
 
-#### [Tutorial 4: Hyperelasticity](../hyperelasticity/)
+#### [Tutorial 4: Hyperelasticity](hyperelasticity.md)
 
 In this tutorial you will learn how to solve a non-linear finite element problem. In
 particular, a hyperelastic material model, in a finite strain setting, is used to solve the
@@ -75,13 +75,14 @@ Newton's method, conjugate gradient (CG).
 
 ---
 
-#### [Tutorial 5: von Mises Plasticity](../plasticity/)
+#### [Tutorial 5: von Mises Plasticity](plasticity.md)
 
-This tutorial revisits the cantilever beam problem from the [Linear elasticity]() tutorial,
-but instead of linear elasticity a plasticity model is used for the constitutive relation.
-You will learn how to solve a problem which require the solution of a local material
-problem, and the storage of material state, in each quadrature point. Newton's method is
-used both locally in the material routine, and globally on the finite element level.
+This tutorial revisits the cantilever beam problem from [Tutorial 2: Linear
+elasticity](linear_elasticity.md), but instead of linear elasticity a plasticity model is
+used for the constitutive relation. You will learn how to solve a problem which require the
+solution of a local material problem, and the storage of material state, in each quadrature
+point. Newton's method is used both locally in the material routine, and globally on the
+finite element level.
 
 **Keywords**: non-linear finite element, plasticity, material modeling, state variables,
 Newton’s method.
@@ -92,7 +93,7 @@ Newton’s method.
 
 In this tutorial the transient heat equation is solved on the unit square. The problem to be
 solved is thus similar to the one solved in the first tutorial, [Heat
-equation](../heat_equation/), but with time-varying boundary conditions. In particular you
+equation](heat_equation.md), but with time-varying boundary conditions. In particular you
 will learn how to solve a time dependent problem with an implicit Euler scheme for the time
 integration.
 
@@ -100,7 +101,7 @@ integration.
 
 ---
 
-#### [Tutorial 7: Computational homogenization](../computational_homogenization/)
+#### [Tutorial 7: Computational homogenization](computational_homogenization.md)
 
 This tutorial guides you through computational homogenization of an representative volume
 element (RVE) consisting of a soft matrix material with stiff inclusions. The computational
@@ -111,7 +112,7 @@ conditions are used.
 
 ---
 
-#### [Tutorial 8: Stokes flow](../stokes-flow/)
+#### [Tutorial 8: Stokes flow](stokes-flow.md)
 
 In this tutorial Stokes flow with (vector) velocity and (scalar) pressure is solved on on a
 quarter circle. Rotationally periodic boundary conditions is used for the inlet/outlet
@@ -123,7 +124,17 @@ Gmsh.
 
 ---
 
-#### [Tutorial 9: Incompressible Navier-Stokes equations](../ns_vs_diffeq/)
+#### [Tutorial 9: Porous media (SubDofHandler)](porous_media.md)
+
+This tutorial introduces how to solve a complex linear problem, where there are different 
+fields on different subdomains, and different cell types in the grid. This requires using
+the `SubDofHandler` interface. 
+
+**Keywords**: Mixed grids, multiple fields, porous media, `SubDofHandler`
+
+---
+
+#### [Tutorial 10: Incompressible Navier-Stokes equations](ns_vs_diffeq.md)
 
 In this tutorial the incompressible Navier-Stokes equations are solved. The domain is
 discretized in space with Ferrite as usual, and then forumalated in a way to be compatible
@@ -134,7 +145,7 @@ for the time-integration.
 
 ---
 
-#### [Tutorial 10: Linear shell](@ref tutorial-linear-shell)
+#### [Tutorial 11: Linear shell](@ref tutorial-linear-shell)
 
 In this tutorial a linear shell element formulation is set up as a two-dimensional domain
 embedded in three-dimensional space. This will teach, and perhaps inspire, you on how

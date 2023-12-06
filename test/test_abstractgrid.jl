@@ -16,6 +16,7 @@
     Ferrite.getnodes(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.nodes_test[v]
     Ferrite.getnnodes(grid::SmallGrid) = length(grid.nodes_test)
     Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
+    Ferrite.get_coordinate_type(::SmallGrid{dim}) where dim = Vec{dim,Float64}
     Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
     Ferrite.n_faces_per_cell(grid::SmallGrid) = nfaces(eltype(grid.cells_test))
 
@@ -43,7 +44,7 @@
         for cellid in 1:getncells(dh.grid)
             fill!(Ke, 0)
             fill!(fe, 0)
-            coords = get_cell_coordinates(dh.grid, cellid)
+            coords = getcoordinates(dh.grid, cellid)
             reinit!(cellvalues, coords)
             for q_point in 1:getnquadpoints(cellvalues)
                 dΩ = getdetJdV(cellvalues, q_point)
