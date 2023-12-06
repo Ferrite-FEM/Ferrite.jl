@@ -294,7 +294,15 @@ end
     @test linetopo.vertex_vertex_neighbor[3,1] == Ferrite.EntityNeighborhood(VertexIndex(2,2))
     @test getneighborhood(linetopo, linegrid, VertexIndex(3,1)) == [VertexIndex(2,2)]
     linefaceskeleton = Ferrite.faceskeleton(linetopo, linegrid)
-    @test length(linefaceskeleton) == 4
+    quadlinegrid = generate_grid(QuadraticLine,(3,))
+    quadlinetopo = ExclusiveTopology(quadlinegrid)
+    quadlinefaceskeleton = Ferrite.faceskeleton(quadlinetopo, quadlinegrid)
+    # Test faceskeleton
+    @test Set(linefaceskeleton) == Set(quadlinefaceskeleton) == Set([
+        FaceIndex(1,1), FaceIndex(1,2),
+                        FaceIndex(2,2),
+                        FaceIndex(3,2), 
+    ])
 
 #                           (11)
 #                   (10)+-----+-----+(12)
@@ -307,6 +315,7 @@ end
 #                            (2)
     quadgrid = generate_grid(Quadrilateral,(2,3))
     topology = ExclusiveTopology(quadgrid)
+    faceskeleton = Ferrite.faceskeleton(topology, quadgrid)
     #test vertex neighbors maps cellid and local vertex id to neighbor id and neighbor local vertex id
     @test topology.vertex_vertex_neighbor[1,3] == Ferrite.EntityNeighborhood(VertexIndex(4,1))
     @test topology.vertex_vertex_neighbor[2,4] == Ferrite.EntityNeighborhood(VertexIndex(3,2))
@@ -356,6 +365,20 @@ end
     @test getneighborhood(topology, quadgrid, FaceIndex(6,3)) == FaceIndex[]
     @test topology.face_face_neighbor[6,4] == Ferrite.EntityNeighborhood(FaceIndex(5,2))
     @test getneighborhood(topology, quadgrid, FaceIndex(6,4)) == [FaceIndex(5,2)]
+    
+    quadquadgrid = generate_grid(QuadraticQuadrilateral,(2,3))
+    quadtopology = ExclusiveTopology(quadquadgrid)
+    quadfaceskeleton = Ferrite.faceskeleton(quadtopology, quadquadgrid)
+    # Test faceskeleton
+    @test Set(faceskeleton) == Set(quadfaceskeleton) == Set([
+        FaceIndex(1,1), FaceIndex(1,2), FaceIndex(1,3), FaceIndex(1,4),
+        FaceIndex(2,1), FaceIndex(2,2), FaceIndex(2,3),
+                        FaceIndex(3,2), FaceIndex(3,3), FaceIndex(3,4), 
+                        FaceIndex(4,2), FaceIndex(4,3),
+                        FaceIndex(5,2), FaceIndex(5,3), FaceIndex(5,4), 
+                        FaceIndex(6,2), FaceIndex(6,3),
+    ])
+
 #                         (8)
 #                (7) +-----+-----+(9)
 #                    |  3  |  4  |
@@ -394,6 +417,15 @@ end
     stopology = ExclusiveTopology(serendipitygrid)
     @test all(stopology.face_face_neighbor .== topology.face_face_neighbor)
     @test all(stopology.vertex_vertex_neighbor .== topology.vertex_vertex_neighbor)
+    # Test faceskeleton
+    faceskeleton = Ferrite.faceskeleton(topology, hexgrid)
+    sfaceskeleton = Ferrite.faceskeleton(stopology, serendipitygrid)
+    @test Set(faceskeleton) == Set(sfaceskeleton) == Set([
+        FaceIndex(1,1), FaceIndex(1,2), FaceIndex(1,3), FaceIndex(1,4), FaceIndex(1,5), FaceIndex(1,6),
+        FaceIndex(2,1), FaceIndex(2,2), FaceIndex(2,3), FaceIndex(2,4),                 FaceIndex(2,6),
+        FaceIndex(3,1),                 FaceIndex(3,3), FaceIndex(3,4), FaceIndex(3,5), FaceIndex(3,6), 
+        FaceIndex(4,1),                 FaceIndex(4,3), FaceIndex(4,4),                 FaceIndex(4,6), 
+    ])
 
 #                   +-----+-----+
 #                   |\  6 |\  8 |
@@ -414,18 +446,43 @@ end
     # add more regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
     @test all(quadtopology.face_face_neighbor .== topology.face_face_neighbor)
     @test all(quadtopology.vertex_vertex_neighbor .== topology.vertex_vertex_neighbor)
-
+    # Test faceskeleton
+    trifaceskeleton = Ferrite.faceskeleton(topology, trigrid)
+    quadtrifaceskeleton = Ferrite.faceskeleton(quadtopology, quadtrigrid)
+    @test Set(trifaceskeleton) == Set(quadtrifaceskeleton) == Set([
+        FaceIndex(1,1), FaceIndex(1,2), FaceIndex(1,3),
+        FaceIndex(2,1), FaceIndex(2,2),
+        FaceIndex(3,1), FaceIndex(3,2),
+        FaceIndex(4,1), FaceIndex(4,2),
+                        FaceIndex(5,2), FaceIndex(5,3),
+        FaceIndex(6,1), FaceIndex(6,2),
+                        FaceIndex(7,2),
+        FaceIndex(8,1), FaceIndex(8,2),
+    ])
+# Test tetrahedron faceskeleton
+    tetgrid = generate_grid(Tetrahedron, (1,1,1))
+    topology = ExclusiveTopology(tetgrid)
+    tetfaceskeleton = Ferrite.faceskeleton(topology, tetgrid)
+    @test Set(tetfaceskeleton) == Set([
+        FaceIndex(1,1), FaceIndex(1,2), FaceIndex(1,3), FaceIndex(1,4),
+        FaceIndex(2,1), FaceIndex(2,2), FaceIndex(2,3),
+        FaceIndex(3,1), FaceIndex(3,2), FaceIndex(3,3),
+        FaceIndex(4,1), FaceIndex(4,2), FaceIndex(4,3),
+        FaceIndex(5,1),                 FaceIndex(5,3), FaceIndex(5,4),
+        FaceIndex(6,1),                 FaceIndex(6,3),
+    ])
 # test mixed grid
-    # cells = [
-    #     Hexahedron((1, 2, 3, 4, 5, 6, 7, 8)),
-    #     Hexahedron((11, 13, 14, 12, 15, 16, 17, 18)),
-    #     Quadrilateral((2, 9, 10, 3)),
-    #     Quadrilateral((9, 11, 12, 10)),
-    #     ]
-    # nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 18)]
-    # grid = Grid(cells, nodes)
-    # topology = ExclusiveTopology(grid)
+    cells = [
+        Hexahedron((1, 2, 3, 4, 5, 6, 7, 8)),
+        Hexahedron((11, 13, 14, 12, 15, 16, 17, 18)),
+        Quadrilateral((2, 9, 10, 3)),
+        Quadrilateral((9, 11, 12, 10)),
+        ]
+    nodes = [Node(coord) for coord in zeros(Vec{3,Float64}, 18)]
+    grid = Grid(cells, nodes)
+    topology = ExclusiveTopology(grid)
 
+    @test_throws AssertionError("Face skeleton construction requires all the elements to be of the same dimensionality") Ferrite.faceskeleton(topology, grid)
     # @test topology.face_face_neighbor[3,4] == Ferrite.EntityNeighborhood(EdgeIndex(1,2))
     # @test topology.edge_edge_neighbor[1,2] == Ferrite.EntityNeighborhood(FaceIndex(3,4))
     # # regression that it doesn't error for boundary faces, see https://github.com/Ferrite-FEM/Ferrite.jl/issues/518
@@ -433,6 +490,17 @@ end
     # @test topology.edge_edge_neighbor[1,1] == topology.edge_edge_neighbor[1,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
     # @test topology.face_face_neighbor[3,1] == topology.face_face_neighbor[3,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
     # @test topology.face_face_neighbor[4,1] == topology.face_face_neighbor[4,3] == zero(Ferrite.EntityNeighborhood{FaceIndex})
+
+    cells = [
+        Quadrilateral((1, 2, 6, 5)),
+        Quadrilateral((3, 4, 8, 7)),
+        Line((2, 3)),
+        Line((6, 7)),
+        ]
+    nodes = [Node(coord) for coord in zeros(Vec{2,Float64}, 18)]
+    grid = Grid(cells, nodes)
+    topology = ExclusiveTopology(grid)
+    @test_throws AssertionError("Face skeleton construction requires all the elements to be of the same dimensionality") Ferrite.faceskeleton(topology, grid)
 
 #
 #                   +-----+-----+-----+
