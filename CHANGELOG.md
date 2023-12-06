@@ -863,6 +863,7 @@ poking into Ferrite internals:
 [github-706]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/706
 [github-707]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/707
 [github-708]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/708
+[github-710]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/710
 [github-711]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/711
 [github-712]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/712
 [github-714]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/714
@@ -878,7 +879,11 @@ poking into Ferrite internals:
 [github-735]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/735
 [github-736]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/736
 [github-737]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/737
+[github-743]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/743
+[github-747]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/747
 [github-749]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/749
+[github-751]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/751
 [github-753]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/753
 [github-756]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/756
+[github-770]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/770
 [github-835]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/835
