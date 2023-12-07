@@ -264,7 +264,7 @@ more discussion).
 
 ### Changed
 
-- `create_sparsity_pattern` now supports corss-element dof coupling by passing kwarg
+- `create_sparsity_pattern` now supports cross-element dof coupling by passing kwarg
   `topology` along with an optional `cross_coupling` matrix that behaves similar to 
   the `coupling` kwarg. ([#710][github-#710])
 
