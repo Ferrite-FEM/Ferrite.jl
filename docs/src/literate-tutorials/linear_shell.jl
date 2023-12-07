@@ -264,6 +264,8 @@ end;
 # ##### Main element routine
 # Below is the main routine that calculates the stiffness matrix of the shell element. 
 # Since it is a so called degenerate shell element, the code is similar to that for an standard continuum element.
+shape_reference_gradient(cv::CellValues, q_point, i) = cv.fun_values.dNdξ[i, q_point]
+
 function integrate_shell!(ke, cv, qr_ooplane, X, data)
     nnodes = getnbasefunctions(cv)
     ndofs = nnodes*5
@@ -281,9 +283,9 @@ function integrate_shell!(ke, cv, qr_ooplane, X, data)
     ef1, ef2, ef3 = fiber_coordsys(p)
 
     for iqp in 1:getnquadpoints(cv)
-        N = cv.N[:,iqp]
-        dNdξ = cv.dNdξ[:,iqp]
-        dNdx = cv.dNdx[:,iqp]
+        N = [shape_value(cv, iqp, i) for i in 1:nnodes]
+        dNdξ = [shape_reference_gradient(cv, iqp, i) for i in 1:nnodes]
+        dNdx = [shape_gradient(cv, iqp, i) for i in 1:nnodes]
 
         for oqp in 1:length(qr_ooplane.weights)
             ζ = qr_ooplane.points[oqp][1]
