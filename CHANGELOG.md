@@ -264,9 +264,9 @@ more discussion).
 
 ### Changed
 
-- Benchmarks now work with master branch. ([#751][github-#751])
-
-- `create_sparsity_pattern` now supports corss-element dof coupling by passing kwarg `topology` along with an optional `cross_coupling` matrix that behaves similar to the `coupling` kwarg. ([#710][github-#710])
+- `create_sparsity_pattern` now supports corss-element dof coupling by passing kwarg
+  `topology` along with an optional `cross_coupling` matrix that behaves similar to 
+  the `coupling` kwarg. ([#710][github-#710])
 
 - The `AbstractCell` interface has been reworked. This change should not affect user code,
   but may in some cases be relevant for code parsing external mesh files. In particular, the
@@ -378,6 +378,8 @@ more discussion).
 
 ### Fixed
 
+- Benchmarks now work with master branch. ([#751][github-#751], [#855][github-#855])
+
 - Topology construction have been generalized to, in particular, fix construction for 1D and
   for wedge elements. ([#641][github-641], [#670][github-670], [#684][github-684])
 
@@ -395,7 +397,7 @@ more discussion).
     according to a function `f`) is now faster and allocates less. ([#675][github-675])
   - Slight performance improvement in construction of `PointEvalHandler` (faster reverse
     coordinate lookup). ([#719][github-719])
-  - Various performance improvements to topology construction. ([#753][github-753])
+  - Various performance improvements to topology construction. ([#753][github-753], [#759][github-759])
 
 - Internal improvements:
   - The dof distribution interface have been updated to support higher order elements
@@ -885,5 +887,7 @@ poking into Ferrite internals:
 [github-751]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/751
 [github-753]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/753
 [github-756]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/756
+[github-759]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/759
 [github-770]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/770
 [github-835]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/835
+[github-855]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/855
