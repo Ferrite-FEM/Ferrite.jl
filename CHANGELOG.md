@@ -196,7 +196,7 @@ more discussion).
 
 - `InterfaceIterator` and `InterfaceCache` for iterating over interfaces. ([#747][github-747])
 
-- `FaceQuadratureRule` implementation for `RefPrism` and `RefPyramid`. ([#770][github-770])
+- `FaceQuadratureRule` implementation for `RefPrism` and `RefPyramid`. ([#779][github-779])
 
 - The `DofHandler` now support selectively adding fields on sub-domains (rather than the
   full domain). This new functionality is included with the new `SubDofHandler` struct,
@@ -888,6 +888,6 @@ poking into Ferrite internals:
 [github-753]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/753
 [github-756]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/756
 [github-759]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/759
-[github-770]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/770
+[github-779]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/779
 [github-835]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/835
 [github-855]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/855
