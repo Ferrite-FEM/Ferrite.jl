@@ -69,8 +69,8 @@ for spatial_dim ∈ 1:3
                 LAGRANGE_SUITE["petrov-galerkin"]["face-flux"] = @benchmarkable FerriteAssemblyHelper._generalized_petrov_galerkin_assemble_local_matrix($grid, $fsv, shape_gradient, $fsv2, shape_value, *)
                 
                 ip = DiscontinuousLagrange{ref_type, order}()
-                isv = InterfaceValues(qr_face, ip, ip_geo; geom_interpol_b = ip_geo);
-                isv2 = InterfaceValues(qr_face, ip, ip_geo; geom_interpol_b = ip_geo);
+                isv = InterfaceValues(qr_face, ip, ip_geo);
+                isv2 = InterfaceValues(qr_face, ip, ip_geo);
                 dh = DofHandler(grid)
                 add!(dh, :u, ip)
                 close!(dh)
