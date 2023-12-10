@@ -17,10 +17,10 @@ if HAS_EXTENSIONS && MODULE_CAN_BE_TYPE_PARAMETER
     import Metis
 end
 
-const TEST_TYPE_STABILITY = VERSION >= v"1.9"
+const RUN_JET_TESTS = VERSION >= v"1.9"
 
-if TEST_TYPE_STABILITY
-    using JET
+if RUN_JET_TESTS
+    using JET: @test_call
 else
     # Just eat the macro on incompatible versions
     macro test_call(args...)
