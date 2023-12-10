@@ -71,7 +71,8 @@ end
 """
     ConstraintHandler([T=Float64], dh::AbstractDofHandler)
 
-A collection of constraints associated with the dof handler `dh`. `T` is the numeric type for stored values.
+A collection of constraints associated with the dof handler `dh`.
+`T` is the numeric type for stored values.
 """
 struct ConstraintHandler{DH<:AbstractDofHandler,T}
     dbcs::Vector{Dirichlet}
@@ -470,7 +471,7 @@ end
 
 # Saves the dirichlet boundary conditions to a vtkfile.
 # Values will have a 1 where bcs are active and 0 otherwise
-function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler{<: AbstractDofHandler,<: AbstractFloat})
+function WriteVTK.vtk_point_data(vtkfile, ch::ConstraintHandler)
     unique_fields = []
     for dbc in ch.dbcs
         push!(unique_fields, dbc.field_name)

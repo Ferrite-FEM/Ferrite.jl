@@ -489,16 +489,16 @@ function shape_value(::DiscontinuousLagrange{shape, order}, ξ::Vec{dim}, i::Int
 end
 
 # Excepting the L0 element.
-function reference_coordinates(ip::DiscontinuousLagrange{RefHypercube{dim},0}) where {dim}
+function reference_coordinates(ip::DiscontinuousLagrange{RefHypercube{dim},0}) where dim
     return [Vec{dim, Float64}(ntuple(x->0.0, dim))]
 end
 
 function reference_coordinates(ip::DiscontinuousLagrange{RefTriangle,0})
-    return [Vec{2, Float64}((1/3,1/3))]
+    return [Vec{2,Float64}((1/3,1/3))]
 end
 
 function reference_coordinates(ip::DiscontinuousLagrange{RefTetrahedron,0})
-   return [Vec{3, Float64}((1/4,1/4,1/4))]
+   return [Vec{3,Float64}((1/4,1/4,1/4))]
 end
 
 function shape_value(ip::DiscontinuousLagrange{shape, 0}, ::Vec{dim, T}, i::Int) where {dim, shape <: AbstractRefShape{dim}, T}
@@ -1005,7 +1005,7 @@ function reference_coordinates(::Lagrange{RefHexahedron,2})
             ]
 end
 
-function shape_value(ip::Lagrange{RefHexahedron, 2}, ξ::Vec{3, T}, i::Int) where T
+function shape_value(ip::Lagrange{RefHexahedron, 2}, ξ::Vec{3, T}, i::Int) where {T}
     # Some local helpers.
     @inline φ₁(x::T) = -x*(1-x)/2
     @inline φ₂(x::T) = (1+x)*(1-x)
