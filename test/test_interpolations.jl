@@ -1,6 +1,6 @@
 @testset "interpolations" begin
 
-@testset "Value Type $value_type" for value_type in (Float32,Float64)
+@testset "Value Type $value_type" for value_type in (Float32, Float64)
     @testset "Correctness of $interpolation" for interpolation in (
                       Lagrange{RefLine, 1}(),
                       Lagrange{RefLine, 2}(),
@@ -131,8 +131,8 @@
 
         # Check for evaluation type correctness of interpolation
         @testset "return type correctness dof $dof" for dof in 1:n_basefuncs
-            @test eltype(shape_value(interpolation, x, dof)) == value_type
-            @test eltype(shape_gradient(interpolation, x, dof)) == value_type
+            @test (@inferred shape_value(interpolation, x, dof)) isa value_type
+            @test (@inferred shape_gradient(interpolation, x, dof)) isa Vec{ref_dim, value_type}
         end
 
         # Check for dirac delta property of interpolation
@@ -193,16 +193,17 @@
         # VectorizedInterpolation
         v_interpolation_1 = interpolation^2
         v_interpolation_2 = (d = 2; interpolation^d)
-        @test getnbasefunctions(v_interpolation_1) == getnbasefunctions(v_interpolation_2) ==
-            getnbasefunctions(interpolation) * 2
+        @test getnbasefunctions(v_interpolation_1) ==
+              getnbasefunctions(v_interpolation_2) ==
+              getnbasefunctions(interpolation) * 2
         # pretty printing
         @test repr("text/plain", v_interpolation_1) == repr(v_interpolation_1.ip) * "^2"
 
         # Check for evaluation type correctness of vectorized interpolation
         v_interpolation_3 = interpolation^ref_dim
         @testset "vectorized case of return type correctness of dof $dof" for dof in 1:n_basefuncs
-            @test eltype(shape_value(v_interpolation_1, x, dof)) == value_type
-            @test eltype(shape_gradient(v_interpolation_3, x, dof)) == value_type # Gradient currently only works for
+            @test @inferred(shape_value(v_interpolation_1, x, dof)) isa Vec{2, value_type}
+            @test @inferred(shape_gradient(v_interpolation_3, x, dof)) isa Tensor{2, ref_dim, value_type}
         end
     end # correctness testset
 
