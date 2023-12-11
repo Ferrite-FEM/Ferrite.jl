@@ -69,9 +69,10 @@ struct AffineConstraint{T}
 end
 
 """
-    ConstraintHandler
+    ConstraintHandler([T=Float64], dh::AbstractDofHandler)
 
-Collection of constraints.
+A collection of constraints associated with the dof handler `dh`.
+`T` is the numeric type for stored values.
 """
 struct ConstraintHandler{DH<:AbstractDofHandler,T}
     dbcs::Vector{Dirichlet}
@@ -90,11 +91,13 @@ struct ConstraintHandler{DH<:AbstractDofHandler,T}
     closed::ScalarWrapper{Bool}
 end
 
-function ConstraintHandler(dh::AbstractDofHandler)
+ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, dh)
+
+function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where T <: Number
     @assert isclosed(dh)
     ConstraintHandler(
-        Dirichlet[], Int[], Int[], Float64[], Union{Nothing,Float64}[], Union{Nothing,DofCoefficients{Float64}}[],
-        Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false),
+        Dirichlet[], Int[], Int[], T[], Union{Nothing,T}[], Union{Nothing,DofCoefficients{T}}[],
+        Dict{Int,Int}(), BCValues{T}[], dh, ScalarWrapper(false),
     )
 end
 
@@ -407,7 +410,7 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
 end
 
 # for vertices, faces and edges
-function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where {T}
 
@@ -444,7 +447,7 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entiti
 end
 
 # for nodes
-function _update!(inhomogeneities::Vector{Float64}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+function _update!(inhomogeneities::Vector{T}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where T
     counter = 1

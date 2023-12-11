@@ -545,8 +545,8 @@ end
 
 function shape_value(ip::Lagrange{RefLine, 1}, ξ::Vec{1}, i::Int)
     ξ_x = ξ[1]
-    i == 1 && return (1 - ξ_x) * 0.5
-    i == 2 && return (1 + ξ_x) * 0.5
+    i == 1 && return (1 - ξ_x) / 2
+    i == 2 && return (1 + ξ_x) / 2
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -566,8 +566,8 @@ end
 
 function shape_value(ip::Lagrange{RefLine, 2}, ξ::Vec{1}, i::Int)
     ξ_x = ξ[1]
-    i == 1 && return ξ_x * (ξ_x - 1) * 0.5
-    i == 2 && return ξ_x * (ξ_x + 1) * 0.5
+    i == 1 && return ξ_x * (ξ_x - 1) / 2
+    i == 2 && return ξ_x * (ξ_x + 1) / 2
     i == 3 && return 1 - ξ_x^2
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
@@ -589,10 +589,10 @@ end
 function shape_value(ip::Lagrange{RefQuadrilateral, 1}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
-    i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25
-    i == 2 && return (1 + ξ_x) * (1 - ξ_y) * 0.25
-    i == 3 && return (1 + ξ_x) * (1 + ξ_y) * 0.25
-    i == 4 && return (1 - ξ_x) * (1 + ξ_y) * 0.25
+    i == 1 && return (1 - ξ_x) * (1 - ξ_y) / 4
+    i == 2 && return (1 + ξ_x) * (1 - ξ_y) / 4
+    i == 3 && return (1 + ξ_x) * (1 + ξ_y) / 4
+    i == 4 && return (1 - ξ_x) * (1 + ξ_y) / 4
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -620,14 +620,14 @@ end
 function shape_value(ip::Lagrange{RefQuadrilateral, 2}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
-    i == 1 && return (ξ_x^2 - ξ_x) * (ξ_y^2 - ξ_y) * 0.25
-    i == 2 && return (ξ_x^2 + ξ_x) * (ξ_y^2 - ξ_y) * 0.25
-    i == 3 && return (ξ_x^2 + ξ_x) * (ξ_y^2 + ξ_y) * 0.25
-    i == 4 && return (ξ_x^2 - ξ_x) * (ξ_y^2 + ξ_y) * 0.25
-    i == 5 && return (1 - ξ_x^2) * (ξ_y^2 - ξ_y) * 0.5
-    i == 6 && return (ξ_x^2 + ξ_x) * (1 - ξ_y^2) * 0.5
-    i == 7 && return (1 - ξ_x^2) * (ξ_y^2 + ξ_y) * 0.5
-    i == 8 && return (ξ_x^2 - ξ_x) * (1 - ξ_y^2) * 0.5
+    i == 1 && return (ξ_x^2 - ξ_x) * (ξ_y^2 - ξ_y) / 4
+    i == 2 && return (ξ_x^2 + ξ_x) * (ξ_y^2 - ξ_y) / 4
+    i == 3 && return (ξ_x^2 + ξ_x) * (ξ_y^2 + ξ_y) / 4
+    i == 4 && return (ξ_x^2 - ξ_x) * (ξ_y^2 + ξ_y) / 4
+    i == 5 && return (1 - ξ_x^2) * (ξ_y^2 - ξ_y) / 2
+    i == 6 && return (ξ_x^2 + ξ_x) * (1 - ξ_y^2) / 2
+    i == 7 && return (1 - ξ_x^2) * (ξ_y^2 + ξ_y) / 2
+    i == 8 && return (ξ_x^2 - ξ_x) * (1 - ξ_y^2) / 2
     i == 9 && return (1 - ξ_x^2) * (1 - ξ_y^2)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
@@ -663,8 +663,8 @@ end
 function shape_value(ip::Lagrange{RefQuadrilateral, 3}, ξ::Vec{2}, i::Int)
     # See https://defelement.com/elements/examples/quadrilateral-Q-3.html
     # Transform domain from [-1, 1] × [-1, 1] to [0, 1] × [0, 1]
-    ξ_x = ξ[1]*0.5 + 0.5
-    ξ_y = ξ[2]*0.5 + 0.5
+    ξ_x = (ξ[1]+1)/2
+    ξ_y = (ξ[2]+1)/2
     i ==  1 && return (81*ξ_x^3*ξ_y^3)/4 - (81*ξ_x^3*ξ_y^2)/2 + (99*ξ_x^3*ξ_y)/4 - (9*ξ_x^3)/2 - (81*ξ_x^2*ξ_y^3)/2 + (81*ξ_x^2*ξ_y^2) - (99*ξ_x^2*ξ_y)/2 + (9*ξ_x^2) + (99*ξ_x*ξ_y^3)/4 - (99*ξ_x*ξ_y^2)/2 + (121*ξ_x*ξ_y)/4 - (11*ξ_x)/2 - (9*ξ_y^3)/2 + 9*ξ_y^2 - (11*ξ_y)/2 + 1
     i ==  2 && return (ξ_x*( - 81*ξ_x^2*ξ_y^3 + 162*ξ_x^2*ξ_y^2 - 99*ξ_x^2*ξ_y + 18*ξ_x^2 + 81*ξ_x*ξ_y^3 - 162*ξ_x*ξ_y^2 + 99*ξ_x*ξ_y - 18*ξ_x - 18*ξ_y^3 + 36*ξ_y^2 - 22*ξ_y + 4))/4
     i ==  4 && return (ξ_y*( - 81*ξ_x^3*ξ_y^2 + 81*ξ_x^3*ξ_y - 18*ξ_x^3 + 162*ξ_x^2*ξ_y^2 - 162*ξ_x^2*ξ_y + 36*ξ_x^2 - 99*ξ_x*ξ_y^2 + 99*ξ_x*ξ_y - 22*ξ_x + 18*ξ_y^2 - 18*ξ_y + 4))/4
@@ -702,7 +702,7 @@ function shape_value(ip::Lagrange{RefTriangle, 1}, ξ::Vec{2}, i::Int)
     ξ_y = ξ[2]
     i == 1 && return ξ_x
     i == 2 && return ξ_y
-    i == 3 && return 1. - ξ_x - ξ_y
+    i == 3 && return 1 - ξ_x - ξ_y
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -726,7 +726,7 @@ end
 function shape_value(ip::Lagrange{RefTriangle, 2}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
-    γ = 1. - ξ_x - ξ_y
+    γ = 1 - ξ_x - ξ_y
     i == 1 && return ξ_x * (2ξ_x - 1)
     i == 2 && return ξ_y * (2ξ_y - 1)
     i == 3 && return γ * (2γ - 1)
@@ -850,7 +850,7 @@ function shape_value(ip::Lagrange{RefTetrahedron, 1}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
-    i == 1 && return 1.0 - ξ_x - ξ_y - ξ_z
+    i == 1 && return 1 - ξ_x - ξ_y - ξ_z
     i == 2 && return ξ_x
     i == 3 && return ξ_y
     i == 4 && return ξ_z
@@ -921,14 +921,14 @@ function shape_value(ip::Lagrange{RefHexahedron, 1}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
-    i == 1 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z)
-    i == 2 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z)
-    i == 3 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z)
-    i == 4 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z)
-    i == 5 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z)
-    i == 6 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z)
-    i == 7 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z)
-    i == 8 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z)
+    i == 1 && return (1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z) / 8
+    i == 2 && return (1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z) / 8
+    i == 3 && return (1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z) / 8
+    i == 4 && return (1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z) / 8
+    i == 5 && return (1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z) / 8
+    i == 6 && return (1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z) / 8
+    i == 7 && return (1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z) / 8
+    i == 8 && return (1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z) / 8
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -1007,9 +1007,9 @@ end
 
 function shape_value(ip::Lagrange{RefHexahedron, 2}, ξ::Vec{3, T}, i::Int) where {T}
     # Some local helpers.
-    @inline φ₁(x::T) = -0.5*x*(1-x)
+    @inline φ₁(x::T) = -x*(1-x)/2
     @inline φ₂(x::T) = (1+x)*(1-x)
-    @inline φ₃(x::T) = 0.5*x*(1+x)
+    @inline φ₃(x::T) = x*(1+x)/2
     (ξ_x, ξ_y, ξ_z) = ξ
     # vertices
     i == 1 && return φ₁(ξ_x) * φ₁(ξ_y) * φ₁(ξ_z)
@@ -1361,14 +1361,14 @@ end
 function shape_value(ip::Serendipity{RefQuadrilateral,2}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
-    i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25(-ξ_x - ξ_y - 1)
-    i == 2 && return (1 + ξ_x) * (1 - ξ_y) * 0.25( ξ_x - ξ_y - 1)
-    i == 3 && return (1 + ξ_x) * (1 + ξ_y) * 0.25( ξ_x + ξ_y - 1)
-    i == 4 && return (1 - ξ_x) * (1 + ξ_y) * 0.25(-ξ_x + ξ_y - 1)
-    i == 5 && return 0.5(1 - ξ_x * ξ_x) * (1 - ξ_y)
-    i == 6 && return 0.5(1 + ξ_x) * (1 - ξ_y * ξ_y)
-    i == 7 && return 0.5(1 - ξ_x * ξ_x) * (1 + ξ_y)
-    i == 8 && return 0.5(1 - ξ_x) * (1 - ξ_y * ξ_y)
+    i == 1 && return (1 - ξ_x) * (1 - ξ_y) * (-ξ_x - ξ_y - 1) / 4
+    i == 2 && return (1 + ξ_x) * (1 - ξ_y) * ( ξ_x - ξ_y - 1) / 4
+    i == 3 && return (1 + ξ_x) * (1 + ξ_y) * ( ξ_x + ξ_y - 1) / 4
+    i == 4 && return (1 - ξ_x) * (1 + ξ_y) * (-ξ_x + ξ_y - 1) / 4
+    i == 5 && return (1 - ξ_x * ξ_x) * (1 - ξ_y) / 2
+    i == 6 && return (1 + ξ_x) * (1 - ξ_y * ξ_y) / 2
+    i == 7 && return (1 - ξ_x * ξ_x) * (1 + ξ_y) / 2
+    i == 8 && return (1 - ξ_x) * (1 - ξ_y * ξ_y) / 2
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -1429,30 +1429,31 @@ function reference_coordinates(::Serendipity{RefHexahedron,2})
             Vec{3, Float64}((-1.0, 1.0, 0.0)),]
 end
 
-function shape_value(ip::Serendipity{RefHexahedron, 2}, ξ::Vec{3}, i::Int)
+# Inlined to resolve the recursion properly
+@inline function shape_value(ip::Serendipity{RefHexahedron, 2}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
-    i == 1 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z) - 0.5(shape_value(ip, ξ, 12) + shape_value(ip, ξ, 9) + shape_value(ip, ξ, 17))
-    i == 2 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z) - 0.5(shape_value(ip, ξ, 9) + shape_value(ip, ξ, 10) + shape_value(ip, ξ, 18))
-    i == 3 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z) - 0.5(shape_value(ip, ξ, 10) + shape_value(ip, ξ, 11) + shape_value(ip, ξ, 19))
-    i == 4 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z) - 0.5(shape_value(ip, ξ, 11) + shape_value(ip, ξ, 12) + shape_value(ip, ξ, 20))
-    i == 5 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z) - 0.5(shape_value(ip, ξ, 16) + shape_value(ip, ξ, 13) + shape_value(ip, ξ, 17))
-    i == 6 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z) - 0.5(shape_value(ip, ξ, 13) + shape_value(ip, ξ, 14) + shape_value(ip, ξ, 18))
-    i == 7 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z) - 0.5(shape_value(ip, ξ, 14) + shape_value(ip, ξ, 15) + shape_value(ip, ξ, 19))
-    i == 8 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z) - 0.5(shape_value(ip, ξ, 15) + shape_value(ip, ξ, 16) + shape_value(ip, ξ, 20))
-    i == 9 && return 0.25(1 - ξ_x^2) * (1 - ξ_y) * (1 - ξ_z)
-    i == 10 && return 0.25(1 + ξ_x) * (1 - ξ_y^2) * (1 - ξ_z)
-    i == 11 && return 0.25(1 - ξ_x^2) * (1 + ξ_y) * (1 - ξ_z)
-    i == 12 && return 0.25(1 - ξ_x) * (1 - ξ_y^2) * (1 - ξ_z)
-    i == 13 && return 0.25(1 - ξ_x^2) * (1 - ξ_y) * (1 + ξ_z)
-    i == 14 && return 0.25(1 + ξ_x) * (1 - ξ_y^2) * (1 + ξ_z)
-    i == 15 && return 0.25(1 - ξ_x^2) * (1 + ξ_y) * (1 + ξ_z)
-    i == 16 && return 0.25(1 - ξ_x) * (1 - ξ_y^2) * (1 + ξ_z)
-    i == 17 && return 0.25(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z^2)
-    i == 18 && return 0.25(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z^2)
-    i == 19 && return 0.25(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z^2)
-    i == 20 && return 0.25(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z^2)
+    i == 1 && return (1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z) / 8 - (shape_value(ip, ξ, 12) + shape_value(ip, ξ, 9) + shape_value(ip, ξ, 17)) / 2
+    i == 2 && return (1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z) / 8 - (shape_value(ip, ξ, 9) + shape_value(ip, ξ, 10) + shape_value(ip, ξ, 18)) / 2
+    i == 3 && return (1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z) / 8 - (shape_value(ip, ξ, 10) + shape_value(ip, ξ, 11) + shape_value(ip, ξ, 19)) / 2
+    i == 4 && return (1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z) / 8 - (shape_value(ip, ξ, 11) + shape_value(ip, ξ, 12) + shape_value(ip, ξ, 20)) / 2
+    i == 5 && return (1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z) / 8 - (shape_value(ip, ξ, 16) + shape_value(ip, ξ, 13) + shape_value(ip, ξ, 17)) / 2
+    i == 6 && return (1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z) / 8 - (shape_value(ip, ξ, 13) + shape_value(ip, ξ, 14) + shape_value(ip, ξ, 18)) / 2
+    i == 7 && return (1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z) / 8 - (shape_value(ip, ξ, 14) + shape_value(ip, ξ, 15) + shape_value(ip, ξ, 19)) / 2
+    i == 8 && return (1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z) / 8 - (shape_value(ip, ξ, 15) + shape_value(ip, ξ, 16) + shape_value(ip, ξ, 20)) / 2
+    i ==  9 && return (1 - ξ_x^2) * (1 - ξ_y) * (1 - ξ_z) / 4
+    i == 10 && return (1 + ξ_x) * (1 - ξ_y^2) * (1 - ξ_z) / 4
+    i == 11 && return (1 - ξ_x^2) * (1 + ξ_y) * (1 - ξ_z) / 4
+    i == 12 && return (1 - ξ_x) * (1 - ξ_y^2) * (1 - ξ_z) / 4
+    i == 13 && return (1 - ξ_x^2) * (1 - ξ_y) * (1 + ξ_z) / 4
+    i == 14 && return (1 + ξ_x) * (1 - ξ_y^2) * (1 + ξ_z) / 4
+    i == 15 && return (1 - ξ_x^2) * (1 + ξ_y) * (1 + ξ_z) / 4
+    i == 16 && return (1 - ξ_x) * (1 - ξ_y^2) * (1 + ξ_z) / 4
+    i == 17 && return (1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z^2) / 4
+    i == 18 && return (1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z^2) / 4
+    i == 19 && return (1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z^2) / 4
+    i == 20 && return (1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z^2) / 4
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -1486,12 +1487,12 @@ function reference_coordinates(::CrouzeixRaviart)
             Vec{2, Float64}((0.5, 0.0))]
 end
 
-function shape_value(ip::CrouzeixRaviart, ξ::Vec{2}, i::Int)
+function shape_value(ip::CrouzeixRaviart{RefTriangle, 1}, ξ::Vec{2}, i::Int) 
     ξ_x = ξ[1]
     ξ_y = ξ[2]
-    i == 1 && return 2*ξ_x + 2*ξ_y - 1.0
-    i == 2 && return 1.0 - 2*ξ_x
-    i == 3 && return 1.0 - 2*ξ_y
+    i == 1 && return 2*ξ_x + 2*ξ_y - 1
+    i == 2 && return 1 - 2*ξ_x
+    i == 3 && return 1 - 2*ξ_y
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 

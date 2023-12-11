@@ -1,6 +1,6 @@
 """
     PointValues(cv::CellValues)
-    PointValues(ip_f::Interpolation, ip_g::Interpolation=ip_f)
+    PointValues([::Type{T}], func_interpol::Interpolation, [geom_interpol::Interpolation])
 
 Similar to `CellValues` but with a single updateable
 "quadrature point". `PointValues` are used for evaluation of functions/gradients in
