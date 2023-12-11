@@ -177,6 +177,23 @@ isclosed(ch::ConstraintHandler) = ch.closed[]
 free_dofs(ch::ConstraintHandler) = ch.free_dofs
 prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
+# Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that 
+# `issorted(diff)` and that `1 ≤ diff[1] ≤ diff[end] ≤ n_entries`
+function _sorted_setdiff!(out::Vector{Int}, n_entries::Int, diff::Vector{Int})
+    n_diff = length(diff)
+    resize!(out, n_entries - n_diff)
+    diff_ind = out_ind = 1
+    for i in 1:n_entries
+        if diff_ind ≤ n_diff && i == diff[diff_ind]
+            diff_ind += 1
+        else
+            out[out_ind] = i
+            out_ind += 1
+        end
+    end
+    return out
+end
+
 """
     close!(ch::ConstraintHandler)
 
@@ -192,7 +209,7 @@ function close!(ch::ConstraintHandler)
     ch.affine_inhomogeneities .= ch.affine_inhomogeneities[I]
     ch.dofcoefficients .= ch.dofcoefficients[I]
 
-    copy!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
+    _sorted_setdiff!(ch.free_dofs, ndofs(ch.dh), ch.prescribed_dofs)
 
     for i in 1:length(ch.prescribed_dofs)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
