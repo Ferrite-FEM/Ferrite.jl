@@ -86,7 +86,7 @@ struct ConstraintHandler{DH<:AbstractDofHandler,T}
     dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}
     # global dof -> index into dofs and inhomogeneities and dofcoefficients
     dofmapping::Dict{Int,Int}
-    bcvalues::Vector{BCValues{T}}
+    bcvalues::Vector{<:BCValues}
     dh::DH
     closed::ScalarWrapper{Bool}
 end
@@ -97,7 +97,7 @@ function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where T <: Number
     @assert isclosed(dh)
     ConstraintHandler(
         Dirichlet[], Int[], Int[], T[], Union{Nothing,T}[], Union{Nothing,DofCoefficients{T}}[],
-        Dict{Int,Int}(), BCValues{T}[], dh, ScalarWrapper(false),
+        Dict{Int,Int}(), BCValues[], dh, ScalarWrapper(false),
     )
 end
 
@@ -419,8 +419,8 @@ function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::Se
         reinit!(cc, cellidx)
 
         # no need to reinit!, enough to update current_entity since we only need geometric shape functions M
-        boundaryvalues.current_entity[] = entityidx
-
+        set_current_face!(boundaryvalues, entityidx)
+        
         # local dof-range for this face
         r = local_face_dofs_offset[entityidx]:(local_face_dofs_offset[entityidx+1]-1)
         counter = 1

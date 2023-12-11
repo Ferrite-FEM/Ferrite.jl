@@ -158,15 +158,15 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FaceValues)
 end
 
 """
-    BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}})
+    BCValues([::Type{T},] func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Union{Type{<:BoundaryIndex}})
 
-`BCValues` stores the shape values at all faces/edges/vertices (depending on `boundary_type`) for the geomatric interpolation (`geom_interpol`),
-for each dof-position determined by the `func_interpol`. Used mainly by the `ConstrainHandler`.
+`BCValues` stores the shape values at all faces/edges/vertices (depending on `boundary_type`) for the geometric interpolation (`geom_interpol`),
+for each dof-position determined by the `func_interpol`. Used mainly by the `ConstraintHandler`.
 """
-struct BCValues{T}
-    M::Array{T,3}
-    nqp::Array{Int}
-    current_entity::ScalarWrapper{Int}
+struct BCValues{V_GM, FQR} <: AbstractFaceValues
+    geo_mapping::V_GM # AbstractVector{GeometryMapping}
+    fqr::FQR          # FaceQuadratureRule
+    current_face::ScalarWrapper{Int}
 end
 
 BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex} = Ferrite.FaceIndex) =
@@ -186,31 +186,22 @@ function BCValues(::Type{T}, func_interpol::Interpolation{refshape}, geom_interp
         qrf = QuadratureRule{refshape,T}(fill(T(NaN), length(dofcoords)), dofcoords) # weights will not be used
         push!(qrs, qrf)
     end
+    fqr = FaceQuadratureRule(qrs)
+    geo_mapping = [GeometryMapping{0}(T, geom_interpol, qr) for qr in qrs]
 
-    n_boundary_entities = length(qrs)
-    n_qpoints = n_boundary_entities == 0 ? 0 : maximum(qr->length(getweights(qr)), qrs) # Bound number of qps correctly.
-    n_geom_basefuncs = getnbasefunctions(geom_interpol)
-    M   = fill(zero(T) * T(NaN), n_geom_basefuncs, n_qpoints, n_boundary_entities)
-    nqp = zeros(Int,n_boundary_entities)
-
-    for n_boundary_entity in 1:n_boundary_entities
-        for (qp, ξ) in pairs(qrs[n_boundary_entity].points)
-            shape_values!(@view(M[:, qp, n_boundary_entity]), geom_interpol, ξ)
-        end
-        nqp[n_boundary_entity] = length(qrs[n_boundary_entity].points)
-    end
-
-    BCValues{T}(M, nqp, ScalarWrapper(0))
+    BCValues(geo_mapping, fqr, ScalarWrapper(1))
 end
 
-getnquadpoints(bcv::BCValues) = bcv.nqp[bcv.current_entity.x]
-function spatial_coordinate(bcv::BCValues, q_point::Int, xh::AbstractVector{Vec{dim,T}}) where {dim,T}
-    n_base_funcs = size(bcv.M, 1)
-    length(xh) == n_base_funcs || throw_incompatible_coord_length(length(xh), n_base_funcs)
-    x = zero(Vec{dim,T})
-    face = bcv.current_entity[]
-    @inbounds for i in 1:n_base_funcs
-        x += bcv.M[i,q_point,face] * xh[i] # geometric_value(fe_v, q_point, i) * xh[i]
-    end
-    return x
+@inline nfaces(bcv::BCValues) = length(bcv.geo_mapping)
+@inline getcurrentface(bcv) = bcv.current_face[]
+
+function set_current_face!(bcv::BCValues, face_nr::Int)
+    # Checking face_nr before setting current_face allows @inbounds in getcurrentface(fv)
+    checkbounds(Bool, 1:nfaces(bcv), face_nr) || throw(ArgumentError("Face index out of range."))
+    bcv.current_face[] = face_nr
 end
+
+@inline get_geo_mapping(bcv::BCValues) = @inbounds bcv.geo_mapping[getcurrentface(bcv)]
+@inline geometric_value(bcv::BCValues, q_point::Int, base_func::Int) = geometric_value(get_geo_mapping(bcv), q_point, base_func)
+@inline getngeobasefunctions(bcv::BCValues) = getngeobasefunctions(get_geo_mapping(bcv))
+@inline getnquadpoints(bcv::BCValues) = @inbounds getnquadpoints(bcv.fqr, getcurrentface(bcv))
