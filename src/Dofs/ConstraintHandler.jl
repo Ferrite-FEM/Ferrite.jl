@@ -192,7 +192,21 @@ function close!(ch::ConstraintHandler)
     ch.affine_inhomogeneities .= ch.affine_inhomogeneities[I]
     ch.dofcoefficients .= ch.dofcoefficients[I]
 
-    copy!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
+    # The following is equivalent to, 
+    # copy!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
+    # but much faster using that prescribed_dofs is sorted. 
+    n_prescribed_dofs = length(ch.prescribed_dofs)
+    resize!(ch.free_dofs, ndofs(ch.dh) - n_prescribed_dofs)
+    pind = find = 1
+    for dofnr in 1:ndofs(ch.dh)
+        if pind ≤ n_prescribed_dofs && dofnr == ch.prescribed_dofs[pind]
+            pind += 1
+        else
+            ch.free_dofs[find] = dofnr
+            find += 1
+        end
+    end
+    # End of optimized code for copy!
 
     for i in 1:length(ch.prescribed_dofs)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
