@@ -6,8 +6,9 @@
     * [`CellValues`](@ref)
   * `AbstractFaceValues`
     * [`FaceValues`](@ref)
+    * [`BCValues`](@ref)
   * [`PointValues`](@ref)
-  * `PointValuesInternal` (Optimized version of PointValues)
+  
 
 ## Internal types
 ```@docs
