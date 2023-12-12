@@ -15,6 +15,7 @@
 Ferrite.GeometryMapping
 Ferrite.MappingValues
 Ferrite.FunctionValues
+Ferrite.BCValues
 ```
 
 ## Custom FEValues
