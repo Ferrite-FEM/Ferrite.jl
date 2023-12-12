@@ -957,7 +957,7 @@ function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, sdh::SubDofHandler
         u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}) where {T, RT}
     ue = zeros(T, length(drange))
     # TODO: Remove this hack when embedding works...
-    if RT <: Vec && cv isa CellValues{<:ScalarInterpolation}
+    if RT <: Vec && function_interpolation(cv) isa ScalarInterpolation
         uer = reinterpret(RT, ue)
     else
         uer = ue

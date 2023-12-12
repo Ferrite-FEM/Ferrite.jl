@@ -432,6 +432,7 @@ end
 
     # Full coupling (default)
     K = create_sparsity_pattern(dh)
+    @test eltype(K) == Float64
     for j in 1:ndofs(dh), i in 1:ndofs(dh)
         @test is_stored(K, i, j)
     end

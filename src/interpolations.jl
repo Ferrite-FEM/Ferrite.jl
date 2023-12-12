@@ -53,7 +53,6 @@ n_components(::ScalarInterpolation)                    = 1
 n_components(::VectorInterpolation{vdim}) where {vdim} = vdim
 # Number of components that are allowed to prescribe in e.g. Dirichlet BC
 n_dbc_components(ip::Interpolation) = n_components(ip)
-# n_dbc_components(::Union{RaviartThomas,Nedelec}) = 1
 
 # TODO: Remove: this is a hotfix to apply constraints to embedded elements.
 edges(ip::InterpolationByDim{2}) = faces(ip)
@@ -89,58 +88,44 @@ struct InterpolationInfo
     adjust_during_distribution::Bool
     n_copies::Int
     is_discontinuous::Bool
-    function InterpolationInfo(interpolation::InterpolationByDim{3})
-        n_copies = 1
-        if interpolation isa VectorizedInterpolation
-            n_copies = get_n_copies(interpolation)
-            interpolation = interpolation.ip
-        end
-        new(
-            [length(i) for i ∈ vertexdof_indices(interpolation)],
-            [length(i) for i ∈ edgedof_interior_indices(interpolation)],
-            [length(i) for i ∈ facedof_interior_indices(interpolation)],
-            length(celldof_interior_indices(interpolation)),
-            3,
-            adjust_dofs_during_distribution(interpolation),
-            n_copies,
-            is_discontinuous(interpolation)
-        )
-    end
-    function InterpolationInfo(interpolation::InterpolationByDim{2})
-        n_copies = 1
-        if interpolation isa VectorizedInterpolation
-            n_copies = get_n_copies(interpolation)
-            interpolation = interpolation.ip
-        end
-        new(
-            [length(i) for i ∈ vertexdof_indices(interpolation)],
-            Int[],
-            [length(i) for i ∈ facedof_interior_indices(interpolation)],
-            length(celldof_interior_indices(interpolation)),
-            2,
-            adjust_dofs_during_distribution(interpolation),
-            n_copies,
-            is_discontinuous(interpolation)
-        )
-    end
-    function InterpolationInfo(interpolation::InterpolationByDim{1})
-        n_copies = 1
-        if interpolation isa VectorizedInterpolation
-            n_copies = get_n_copies(interpolation)
-            interpolation = interpolation.ip
-        end
-        new(
-            [length(i) for i ∈ vertexdof_indices(interpolation)],
-            Int[],
-            Int[],
-            length(celldof_interior_indices(interpolation)),
-            1,
-            adjust_dofs_during_distribution(interpolation),
-            n_copies,
-            is_discontinuous(interpolation)
-        )
-    end
 end
+function InterpolationInfo(interpolation::InterpolationByDim{3}, n_copies)
+    InterpolationInfo(
+        [length(i) for i ∈ vertexdof_indices(interpolation)],
+        [length(i) for i ∈ edgedof_interior_indices(interpolation)],
+        [length(i) for i ∈ facedof_interior_indices(interpolation)],
+        length(celldof_interior_indices(interpolation)),
+        3,
+        adjust_dofs_during_distribution(interpolation),
+        n_copies,
+        is_discontinuous(interpolation)
+    )
+end
+function InterpolationInfo(interpolation::InterpolationByDim{2}, n_copies)
+    InterpolationInfo(
+        [length(i) for i ∈ vertexdof_indices(interpolation)],
+        Int[],
+        [length(i) for i ∈ facedof_interior_indices(interpolation)],
+        length(celldof_interior_indices(interpolation)),
+        2,
+        adjust_dofs_during_distribution(interpolation),
+        n_copies,
+        is_discontinuous(interpolation)
+    )
+end
+function InterpolationInfo(interpolation::InterpolationByDim{1}, n_copies)
+    InterpolationInfo(
+        [length(i) for i ∈ vertexdof_indices(interpolation)],
+        Int[],
+        Int[],
+        length(celldof_interior_indices(interpolation)),
+        1,
+        adjust_dofs_during_distribution(interpolation),
+        n_copies,
+        is_discontinuous(interpolation)
+    )
+end
+InterpolationInfo(interpolation::Interpolation) = InterpolationInfo(interpolation, 1)
 
 # Some redundant information about the geometry of the reference cells.
 nfaces(::Interpolation{RefHypercube{dim}}) where {dim} = 2*dim
@@ -244,6 +229,23 @@ function shape_gradients_and_values!(gradients::GAT, values::SAT, ip::IP, ξ::Ve
     end
 end
 
+#= PR798
+"""
+    shape_hessians_gradients_and_values!(hessians::AbstractVector, gradients::AbstractVector, values::AbstractVector, ip::Interpolation, ξ::Vec)
+
+Evaluate all shape function hessians, gradients and values of `ip` at once at the reference point `ξ`
+and store them in `hessians`, `gradients`, and `values`.
+"""
+@propagate_inbounds function shape_hessians_gradients_and_values!(hessians::AbstractVector, gradients::AbstractVector, values::AbstractVector, ip::Interpolation, ξ::Vec)
+    @boundscheck checkbounds(hessians, 1:getnbasefunctions(ip))
+    @boundscheck checkbounds(gradients, 1:getnbasefunctions(ip))
+    @boundscheck checkbounds(values, 1:getnbasefunctions(ip))
+    @inbounds for i in 1:getnbasefunctions(ip)
+        hessians[i], gradients[i], values[i] = shape_hessian_gradient_and_value(ip, ξ, i)
+    end
+end
+=#
+
 """
     shape_value(ip::Interpolation, ξ::Vec, i::Int)
 
@@ -276,6 +278,18 @@ and [`Ferrite.shape_gradient(::Interpolation)`](@ref).
 function shape_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
     return gradient(x -> shape_value(ip, x, i), ξ, :all)
 end
+
+#= PR798
+"""
+    shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
+
+Optimized version combining the evaluation [`Ferrite.shape_value(::Interpolation)`](@ref),
+[`Ferrite.shape_gradient(::Interpolation)`](@ref), and the gradient of the latter. 
+"""
+function shape_hessian_gradient_and_value(ip::Interpolation, ξ::Vec, i::Int)
+    return hessian(x -> shape_value(ip, x, i), ξ, :all)
+end
+=#
 
 """
     reference_coordinates(ip::Interpolation)
@@ -531,8 +545,8 @@ end
 
 function shape_value(ip::Lagrange{RefLine, 1}, ξ::Vec{1}, i::Int)
     ξ_x = ξ[1]
-    i == 1 && return (1 - ξ_x) * 0.5
-    i == 2 && return (1 + ξ_x) * 0.5
+    i == 1 && return (1 - ξ_x) / 2
+    i == 2 && return (1 + ξ_x) / 2
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -552,8 +566,8 @@ end
 
 function shape_value(ip::Lagrange{RefLine, 2}, ξ::Vec{1}, i::Int)
     ξ_x = ξ[1]
-    i == 1 && return ξ_x * (ξ_x - 1) * 0.5
-    i == 2 && return ξ_x * (ξ_x + 1) * 0.5
+    i == 1 && return ξ_x * (ξ_x - 1) / 2
+    i == 2 && return ξ_x * (ξ_x + 1) / 2
     i == 3 && return 1 - ξ_x^2
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
@@ -575,10 +589,10 @@ end
 function shape_value(ip::Lagrange{RefQuadrilateral, 1}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
-    i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25
-    i == 2 && return (1 + ξ_x) * (1 - ξ_y) * 0.25
-    i == 3 && return (1 + ξ_x) * (1 + ξ_y) * 0.25
-    i == 4 && return (1 - ξ_x) * (1 + ξ_y) * 0.25
+    i == 1 && return (1 - ξ_x) * (1 - ξ_y) / 4
+    i == 2 && return (1 + ξ_x) * (1 - ξ_y) / 4
+    i == 3 && return (1 + ξ_x) * (1 + ξ_y) / 4
+    i == 4 && return (1 - ξ_x) * (1 + ξ_y) / 4
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -606,14 +620,14 @@ end
 function shape_value(ip::Lagrange{RefQuadrilateral, 2}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
-    i == 1 && return (ξ_x^2 - ξ_x) * (ξ_y^2 - ξ_y) * 0.25
-    i == 2 && return (ξ_x^2 + ξ_x) * (ξ_y^2 - ξ_y) * 0.25
-    i == 3 && return (ξ_x^2 + ξ_x) * (ξ_y^2 + ξ_y) * 0.25
-    i == 4 && return (ξ_x^2 - ξ_x) * (ξ_y^2 + ξ_y) * 0.25
-    i == 5 && return (1 - ξ_x^2) * (ξ_y^2 - ξ_y) * 0.5
-    i == 6 && return (ξ_x^2 + ξ_x) * (1 - ξ_y^2) * 0.5
-    i == 7 && return (1 - ξ_x^2) * (ξ_y^2 + ξ_y) * 0.5
-    i == 8 && return (ξ_x^2 - ξ_x) * (1 - ξ_y^2) * 0.5
+    i == 1 && return (ξ_x^2 - ξ_x) * (ξ_y^2 - ξ_y) / 4
+    i == 2 && return (ξ_x^2 + ξ_x) * (ξ_y^2 - ξ_y) / 4
+    i == 3 && return (ξ_x^2 + ξ_x) * (ξ_y^2 + ξ_y) / 4
+    i == 4 && return (ξ_x^2 - ξ_x) * (ξ_y^2 + ξ_y) / 4
+    i == 5 && return (1 - ξ_x^2) * (ξ_y^2 - ξ_y) / 2
+    i == 6 && return (ξ_x^2 + ξ_x) * (1 - ξ_y^2) / 2
+    i == 7 && return (1 - ξ_x^2) * (ξ_y^2 + ξ_y) / 2
+    i == 8 && return (ξ_x^2 - ξ_x) * (1 - ξ_y^2) / 2
     i == 9 && return (1 - ξ_x^2) * (1 - ξ_y^2)
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
@@ -649,8 +663,8 @@ end
 function shape_value(ip::Lagrange{RefQuadrilateral, 3}, ξ::Vec{2}, i::Int)
     # See https://defelement.com/elements/examples/quadrilateral-Q-3.html
     # Transform domain from [-1, 1] × [-1, 1] to [0, 1] × [0, 1]
-    ξ_x = ξ[1]*0.5 + 0.5
-    ξ_y = ξ[2]*0.5 + 0.5
+    ξ_x = (ξ[1]+1)/2
+    ξ_y = (ξ[2]+1)/2
     i ==  1 && return (81*ξ_x^3*ξ_y^3)/4 - (81*ξ_x^3*ξ_y^2)/2 + (99*ξ_x^3*ξ_y)/4 - (9*ξ_x^3)/2 - (81*ξ_x^2*ξ_y^3)/2 + (81*ξ_x^2*ξ_y^2) - (99*ξ_x^2*ξ_y)/2 + (9*ξ_x^2) + (99*ξ_x*ξ_y^3)/4 - (99*ξ_x*ξ_y^2)/2 + (121*ξ_x*ξ_y)/4 - (11*ξ_x)/2 - (9*ξ_y^3)/2 + 9*ξ_y^2 - (11*ξ_y)/2 + 1
     i ==  2 && return (ξ_x*( - 81*ξ_x^2*ξ_y^3 + 162*ξ_x^2*ξ_y^2 - 99*ξ_x^2*ξ_y + 18*ξ_x^2 + 81*ξ_x*ξ_y^3 - 162*ξ_x*ξ_y^2 + 99*ξ_x*ξ_y - 18*ξ_x - 18*ξ_y^3 + 36*ξ_y^2 - 22*ξ_y + 4))/4
     i ==  4 && return (ξ_y*( - 81*ξ_x^3*ξ_y^2 + 81*ξ_x^3*ξ_y - 18*ξ_x^3 + 162*ξ_x^2*ξ_y^2 - 162*ξ_x^2*ξ_y + 36*ξ_x^2 - 99*ξ_x*ξ_y^2 + 99*ξ_x*ξ_y - 22*ξ_x + 18*ξ_y^2 - 18*ξ_y + 4))/4
@@ -688,7 +702,7 @@ function shape_value(ip::Lagrange{RefTriangle, 1}, ξ::Vec{2}, i::Int)
     ξ_y = ξ[2]
     i == 1 && return ξ_x
     i == 2 && return ξ_y
-    i == 3 && return 1. - ξ_x - ξ_y
+    i == 3 && return 1 - ξ_x - ξ_y
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -712,7 +726,7 @@ end
 function shape_value(ip::Lagrange{RefTriangle, 2}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
-    γ = 1. - ξ_x - ξ_y
+    γ = 1 - ξ_x - ξ_y
     i == 1 && return ξ_x * (2ξ_x - 1)
     i == 2 && return ξ_y * (2ξ_y - 1)
     i == 3 && return γ * (2γ - 1)
@@ -836,7 +850,7 @@ function shape_value(ip::Lagrange{RefTetrahedron, 1}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
-    i == 1 && return 1.0 - ξ_x - ξ_y - ξ_z
+    i == 1 && return 1 - ξ_x - ξ_y - ξ_z
     i == 2 && return ξ_x
     i == 3 && return ξ_y
     i == 4 && return ξ_z
@@ -907,14 +921,14 @@ function shape_value(ip::Lagrange{RefHexahedron, 1}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
-    i == 1 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z)
-    i == 2 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z)
-    i == 3 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z)
-    i == 4 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z)
-    i == 5 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z)
-    i == 6 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z)
-    i == 7 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z)
-    i == 8 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z)
+    i == 1 && return (1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z) / 8
+    i == 2 && return (1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z) / 8
+    i == 3 && return (1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z) / 8
+    i == 4 && return (1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z) / 8
+    i == 5 && return (1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z) / 8
+    i == 6 && return (1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z) / 8
+    i == 7 && return (1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z) / 8
+    i == 8 && return (1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z) / 8
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -993,9 +1007,9 @@ end
 
 function shape_value(ip::Lagrange{RefHexahedron, 2}, ξ::Vec{3, T}, i::Int) where {T}
     # Some local helpers.
-    @inline φ₁(x::T) = -0.5*x*(1-x)
+    @inline φ₁(x::T) = -x*(1-x)/2
     @inline φ₂(x::T) = (1+x)*(1-x)
-    @inline φ₃(x::T) = 0.5*x*(1+x)
+    @inline φ₃(x::T) = x*(1+x)/2
     (ξ_x, ξ_y, ξ_z) = ξ
     # vertices
     i == 1 && return φ₁(ξ_x) * φ₁(ξ_y) * φ₁(ξ_z)
@@ -1282,6 +1296,7 @@ end
 #######################################
 # Taken from https://defelement.com/elements/bubble-enriched-lagrange.html
 getnbasefunctions(::BubbleEnrichedLagrange{RefTriangle,1}) = 4
+adjust_dofs_during_distribution(::BubbleEnrichedLagrange{RefTriangle,1}) = false
 
 vertexdof_indices(::BubbleEnrichedLagrange{RefTriangle,1}) = ((1,), (2,), (3,))
 facedof_indices(::BubbleEnrichedLagrange{RefTriangle,1}) = ((1,2), (2,3), (3,1))
@@ -1346,14 +1361,14 @@ end
 function shape_value(ip::Serendipity{RefQuadrilateral,2}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
-    i == 1 && return (1 - ξ_x) * (1 - ξ_y) * 0.25(-ξ_x - ξ_y - 1)
-    i == 2 && return (1 + ξ_x) * (1 - ξ_y) * 0.25( ξ_x - ξ_y - 1)
-    i == 3 && return (1 + ξ_x) * (1 + ξ_y) * 0.25( ξ_x + ξ_y - 1)
-    i == 4 && return (1 - ξ_x) * (1 + ξ_y) * 0.25(-ξ_x + ξ_y - 1)
-    i == 5 && return 0.5(1 - ξ_x * ξ_x) * (1 - ξ_y)
-    i == 6 && return 0.5(1 + ξ_x) * (1 - ξ_y * ξ_y)
-    i == 7 && return 0.5(1 - ξ_x * ξ_x) * (1 + ξ_y)
-    i == 8 && return 0.5(1 - ξ_x) * (1 - ξ_y * ξ_y)
+    i == 1 && return (1 - ξ_x) * (1 - ξ_y) * (-ξ_x - ξ_y - 1) / 4
+    i == 2 && return (1 + ξ_x) * (1 - ξ_y) * ( ξ_x - ξ_y - 1) / 4
+    i == 3 && return (1 + ξ_x) * (1 + ξ_y) * ( ξ_x + ξ_y - 1) / 4
+    i == 4 && return (1 - ξ_x) * (1 + ξ_y) * (-ξ_x + ξ_y - 1) / 4
+    i == 5 && return (1 - ξ_x * ξ_x) * (1 - ξ_y) / 2
+    i == 6 && return (1 + ξ_x) * (1 - ξ_y * ξ_y) / 2
+    i == 7 && return (1 - ξ_x * ξ_x) * (1 + ξ_y) / 2
+    i == 8 && return (1 - ξ_x) * (1 - ξ_y * ξ_y) / 2
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -1414,30 +1429,31 @@ function reference_coordinates(::Serendipity{RefHexahedron,2})
             Vec{3, Float64}((-1.0, 1.0, 0.0)),]
 end
 
-function shape_value(ip::Serendipity{RefHexahedron, 2}, ξ::Vec{3}, i::Int)
+# Inlined to resolve the recursion properly
+@inline function shape_value(ip::Serendipity{RefHexahedron, 2}, ξ::Vec{3}, i::Int)
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
-    i == 1 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z) - 0.5(shape_value(ip, ξ, 12) + shape_value(ip, ξ, 9) + shape_value(ip, ξ, 17))
-    i == 2 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z) - 0.5(shape_value(ip, ξ, 9) + shape_value(ip, ξ, 10) + shape_value(ip, ξ, 18))
-    i == 3 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z) - 0.5(shape_value(ip, ξ, 10) + shape_value(ip, ξ, 11) + shape_value(ip, ξ, 19))
-    i == 4 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z) - 0.5(shape_value(ip, ξ, 11) + shape_value(ip, ξ, 12) + shape_value(ip, ξ, 20))
-    i == 5 && return 0.125(1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z) - 0.5(shape_value(ip, ξ, 16) + shape_value(ip, ξ, 13) + shape_value(ip, ξ, 17))
-    i == 6 && return 0.125(1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z) - 0.5(shape_value(ip, ξ, 13) + shape_value(ip, ξ, 14) + shape_value(ip, ξ, 18))
-    i == 7 && return 0.125(1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z) - 0.5(shape_value(ip, ξ, 14) + shape_value(ip, ξ, 15) + shape_value(ip, ξ, 19))
-    i == 8 && return 0.125(1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z) - 0.5(shape_value(ip, ξ, 15) + shape_value(ip, ξ, 16) + shape_value(ip, ξ, 20))
-    i == 9 && return 0.25(1 - ξ_x^2) * (1 - ξ_y) * (1 - ξ_z)
-    i == 10 && return 0.25(1 + ξ_x) * (1 - ξ_y^2) * (1 - ξ_z)
-    i == 11 && return 0.25(1 - ξ_x^2) * (1 + ξ_y) * (1 - ξ_z)
-    i == 12 && return 0.25(1 - ξ_x) * (1 - ξ_y^2) * (1 - ξ_z)
-    i == 13 && return 0.25(1 - ξ_x^2) * (1 - ξ_y) * (1 + ξ_z)
-    i == 14 && return 0.25(1 + ξ_x) * (1 - ξ_y^2) * (1 + ξ_z)
-    i == 15 && return 0.25(1 - ξ_x^2) * (1 + ξ_y) * (1 + ξ_z)
-    i == 16 && return 0.25(1 - ξ_x) * (1 - ξ_y^2) * (1 + ξ_z)
-    i == 17 && return 0.25(1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z^2)
-    i == 18 && return 0.25(1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z^2)
-    i == 19 && return 0.25(1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z^2)
-    i == 20 && return 0.25(1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z^2)
+    i == 1 && return (1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z) / 8 - (shape_value(ip, ξ, 12) + shape_value(ip, ξ, 9) + shape_value(ip, ξ, 17)) / 2
+    i == 2 && return (1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z) / 8 - (shape_value(ip, ξ, 9) + shape_value(ip, ξ, 10) + shape_value(ip, ξ, 18)) / 2
+    i == 3 && return (1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z) / 8 - (shape_value(ip, ξ, 10) + shape_value(ip, ξ, 11) + shape_value(ip, ξ, 19)) / 2
+    i == 4 && return (1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z) / 8 - (shape_value(ip, ξ, 11) + shape_value(ip, ξ, 12) + shape_value(ip, ξ, 20)) / 2
+    i == 5 && return (1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z) / 8 - (shape_value(ip, ξ, 16) + shape_value(ip, ξ, 13) + shape_value(ip, ξ, 17)) / 2
+    i == 6 && return (1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z) / 8 - (shape_value(ip, ξ, 13) + shape_value(ip, ξ, 14) + shape_value(ip, ξ, 18)) / 2
+    i == 7 && return (1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z) / 8 - (shape_value(ip, ξ, 14) + shape_value(ip, ξ, 15) + shape_value(ip, ξ, 19)) / 2
+    i == 8 && return (1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z) / 8 - (shape_value(ip, ξ, 15) + shape_value(ip, ξ, 16) + shape_value(ip, ξ, 20)) / 2
+    i ==  9 && return (1 - ξ_x^2) * (1 - ξ_y) * (1 - ξ_z) / 4
+    i == 10 && return (1 + ξ_x) * (1 - ξ_y^2) * (1 - ξ_z) / 4
+    i == 11 && return (1 - ξ_x^2) * (1 + ξ_y) * (1 - ξ_z) / 4
+    i == 12 && return (1 - ξ_x) * (1 - ξ_y^2) * (1 - ξ_z) / 4
+    i == 13 && return (1 - ξ_x^2) * (1 - ξ_y) * (1 + ξ_z) / 4
+    i == 14 && return (1 + ξ_x) * (1 - ξ_y^2) * (1 + ξ_z) / 4
+    i == 15 && return (1 - ξ_x^2) * (1 + ξ_y) * (1 + ξ_z) / 4
+    i == 16 && return (1 - ξ_x) * (1 - ξ_y^2) * (1 + ξ_z) / 4
+    i == 17 && return (1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z^2) / 4
+    i == 18 && return (1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z^2) / 4
+    i == 19 && return (1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z^2) / 4
+    i == 20 && return (1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z^2) / 4
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -1471,12 +1487,12 @@ function reference_coordinates(::CrouzeixRaviart)
             Vec{2, Float64}((0.5, 0.0))]
 end
 
-function shape_value(ip::CrouzeixRaviart, ξ::Vec{2}, i::Int)
+function shape_value(ip::CrouzeixRaviart{RefTriangle, 1}, ξ::Vec{2}, i::Int) 
     ξ_x = ξ[1]
     ξ_y = ξ[2]
-    i == 1 && return 2*ξ_x + 2*ξ_y - 1.0
-    i == 2 && return 1.0 - 2*ξ_x
-    i == 3 && return 1.0 - 2*ξ_y
+    i == 1 && return 2*ξ_x + 2*ξ_y - 1
+    i == 2 && return 1 - 2*ξ_x
+    i == 3 && return 1 - 2*ξ_y
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
@@ -1509,6 +1525,7 @@ end
 
 # Helper to get number of copies for DoF distribution
 get_n_copies(::VectorizedInterpolation{vdim}) where vdim = vdim
+InterpolationInfo(ip::VectorizedInterpolation) = InterpolationInfo(ip.ip, get_n_copies(ip))
 
 function getnbasefunctions(ipv::VectorizedInterpolation{vdim}) where vdim
     return vdim * getnbasefunctions(ipv.ip)
@@ -1546,3 +1563,16 @@ end
 reference_coordinates(ip::VectorizedInterpolation) = reference_coordinates(ip.ip)
 
 is_discontinuous(::Type{<:VectorizedInterpolation{<:Any, <:Any, <:Any, ip}}) where {ip} = is_discontinuous(ip)
+
+"""
+    mapping_type(ip::Interpolation)
+
+Get the type of mapping from the reference cell to the real cell for an
+interpolation `ip`. Subtypes of `ScalarInterpolation` and `VectorizedInterpolation`
+return `IdentityMapping()`, but other non-scalar interpolations may request different
+mapping types. 
+"""
+function mapping_type end
+
+mapping_type(::ScalarInterpolation) = IdentityMapping()
+mapping_type(::VectorizedInterpolation) = IdentityMapping()
