@@ -53,10 +53,10 @@ struct GPUQuadratureRule{N,T,dim}
 end
 function Adapt.adapt_structure(to, qr::QuadratureRule{shape,T,dim}) where {shape,T,dim}
     N = length(qr.weights)
-    GPUQuadratureRule{N,T,dim}(SVector{N,T}(qr.weights), SVector{N,Vec{dim,T}}(qr.points))
+    GPUQuadratureRule{N,Float32,dim}(SVector{N,Float32}(qr.weights), SVector{N,Vec{dim,Float32}}(qr.points))
 end
-function Adapt.adapt_structure(to, nodes::Vector{Node})
-    CuArray(get_node_coordinate.(nodes))
+function Adapt.adapt_structure(to, nodes::Vector{Node{dim}}) where dim
+    CuArray(Vec{dim,Float32}.(get_node_coordinate.(grid.nodes)))
 end
 ### TODO Adapt dofhandler?
 
@@ -149,7 +149,7 @@ cellnodes(cell::Hexahedron, nodes) = (nodes[cell.nodes[1]], nodes[cell.nodes[2]]
 # We start by generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Hexahedron, (100, 100, 100));
+grid = generate_grid(Hexahedron, (20, 20, 20));
 colors = CuArray.(create_coloring(grid)); # TODO add example without coloring, i.e. using Atomics instead
 
 # ### Trial and test functions
@@ -202,27 +202,10 @@ close!(dh);
 # add!(ch, dbc);
 # close!(ch)
 
-function gpu_element_mass_action!(uₑout::V, uₑin::V, qr::GPUQuadratureRule{N,T,dim}, ip, ip_geo, xₑ) where {V,N,T,dim}
-    n_basefuncs = length(uₑin) #getnbasefunctions(cellvalues)
-    for q_point in 1:length(qr.weights) #getnquadpoints(cellvalues)
-        ξ = qr.points[q_point]
-        # TODO recover abstraction layer
-        J = getJ(ip_geo, xₑ, ξ)
-        dΩ = det(J)*qr.weights[q_point] #getdetJdV(cellvalues, q_point)
-        for i in 1:n_basefuncs
-            ϕᵢ = unsafe_shape_value(ip, ξ, i)
-            for j in 1:n_basefuncs
-                ϕⱼ = unsafe_shape_value(ip, ξ, j)
-                uₑout[i] += ϕᵢ*ϕⱼ*uₑin[j]*dΩ
-            end
-        end
-    end
-    return nothing
-end
-
 function gpu_element_mass_action2!(uₑout::V, uₑin::V, qr::GPUQuadratureRule{N,T,dim}, ip::IP, ip_geo::GIP, xₑ) where {V,N,T,dim,IP,GIP}
     n_basefuncs = length(uₑin) #getnbasefunctions(cellvalues)
-    for q_point in 1:length(qr.weights) #getnquadpoints(cellvalues)
+    # shapes = MVector{8,Float32}(undef)
+    @inbounds for q_point in 1:length(qr.weights) #getnquadpoints(cellvalues)
         ξ = qr.points[q_point]
         shapes = shape_values(ip, ξ)
         # TODO recover abstraction layer
@@ -240,10 +223,10 @@ function gpu_element_mass_action2!(uₑout::V, uₑin::V, qr::GPUQuadratureRule{
 end
 
 # Mass action on a single color
-Base.@propagate_inbounds function gpu_mass_action_kernel!(uout::V, uin::V, all_cell_dofs, cell_dof_offsets, cell_indices, qr::GPUQuadratureRule{N,T,dim}, ip::IP, ip_geo::GIP, cells::CuDeviceArray{CT}, nodes::CuDeviceArray{Vec{dim,T}}, dofs_per_cell)  where {V,N,T,dim,CT,IP,GIP}
+function gpu_mass_action_kernel!(uout::V, uin::V, all_cell_dofs, cell_dof_offsets, cell_indices, qr::GPUQuadratureRule{N,T,dim}, ip::IP, ip_geo::GIP, cells::CuDeviceArray{CT}, nodes::CuDeviceArray{Vec{dim,T}}, dofs_per_cell)  where {V,N,T,dim,CT,IP,GIP}
     index = threadIdx().x    # this example only requires linear indexing, so just use `x`
     stride = blockDim().x
-    for i = index:stride:length(cell_indices)
+    @inbounds for i = index:stride:length(cell_indices)
         ## Get index of the current cell
         cell_index = cell_indices[i]
         ## Grab the actual cell
@@ -265,7 +248,7 @@ end
 # Mass action of the full operator
 function gpu_mass_action!(uout::V, u::V, all_cell_dofs, cell_dof_offsets, qr::QR, ip::IP, ip_geo::GIP, colors, gpu_cells, gpu_nodes) where {V, QR, IP, GIP}
     # Initialize solution
-    fill!(uout, 0.0)
+    fill!(uout, 0.f0)
     synchronize()
 
     # Apply action one time
@@ -274,8 +257,9 @@ function gpu_mass_action!(uout::V, u::V, all_cell_dofs, cell_dof_offsets, qr::QR
         numthreads = 256
         numblocks = 1 #fails...? ceil(Int, length(color)/numthreads)
         # try
-            @cuda threads=numthreads blocks=numblocks gpu_mass_action_kernel!(uout, u, all_cell_dofs, cell_dof_offsets, color, qr, ip, ip_geo, gpu_cells, gpu_nodes, dofs_per_cell)
+            @show @device_code_warntype @cuda threads=numthreads blocks=numblocks gpu_mass_action_kernel!(uout, u, all_cell_dofs, cell_dof_offsets, color, qr, ip, ip_geo, gpu_cells, gpu_nodes, dofs_per_cell)
             synchronize()
+            break
             # catch err
         #     code_typed(err; interactive = true)
         # end
@@ -308,9 +292,10 @@ struct FerriteGPUMassOperator{CACELLS, CANODES, CACOLORS, CADOFS, CAOFFSETS, IP,
 end
 
 function FerriteGPUMassOperator(dh, colors, ip, ip_geo, qr)
+    grid = Ferrite.get_grid(dh)
     FerriteGPUMassOperator(
-        CuArray(getcells(Ferrite.get_grid(dh))),
-        CuArray(get_node_coordinate.(getnodes(Ferrite.get_grid(dh)))),
+        CuArray(getcells(grid)),
+        CuArray(Vec{Ferrite.getdim(grid),Float32}.(get_node_coordinate.(getnodes(grid)))),
         colors,
         CuArray(dh.cell_dofs),
         CuArray(dh.cell_dofs_offset),
@@ -339,9 +324,10 @@ struct FerriteGPURHS{CACELLS, CANODES, CACOLORS, CADOFS, CAOFFSETS, IP, GIP, QR}
 end
 
 function FerriteGPURHS(dh, colors, ip, ip_geo, qr)
+    grid = Ferrite.get_grid(dh)
     FerriteGPURHS(
-        CuArray(getcells(Ferrite.get_grid(dh))),
-        CuArray(get_node_coordinate.(getnodes(Ferrite.get_grid(dh)))),
+        CuArray(getcells(grid)),
+        CuArray(Vec{Ferrite.getdim(grid),Float32}.(get_node_coordinate.(getnodes(grid)))),
         colors,
         CuArray(dh.cell_dofs),
         CuArray(dh.cell_dofs_offset),
@@ -350,7 +336,7 @@ function FerriteGPURHS(dh, colors, ip, ip_geo, qr)
 end
 
 function generate_rhs(gpurhs::FerriteGPURHS)
-    rhs = CuArray(zeros(ndofs(dh)))
+    rhs = CuArray(zeros(Float32,ndofs(dh)))
     numthreads = 256
     numblocks = 1 #fails...? ceil(Int, length(color)/numthreads)
     dofs_per_cell  = ndofs_per_cell(dh, 1)
@@ -384,7 +370,7 @@ function generate_rhs(gpurhs::FerriteGPURHS)
     return rhs
 end
 
-Base.@propagate_inbounds function gpu_rhs_kernel!(rhs::RHS, all_cell_dofs::CD, cell_dof_offsets::DO, qr::QR, ip::FIP, ip_geo::GIP, cell_indices::GPUC, cells::CELLS, nodes::GPUN, dofs_per_cell::DOFSPC) where {RHS, CD, DO, QR, FIP, GIP, GPUC, CELLS, GPUN, DOFSPC}
+function gpu_rhs_kernel!(rhs::RHS, all_cell_dofs::CD, cell_dof_offsets::DO, qr::QR, ip::FIP, ip_geo::GIP, cell_indices::GPUC, cells::CELLS, nodes::GPUN, dofs_per_cell::DOFSPC) where {RHS, CD, DO, QR, FIP, GIP, GPUC, CELLS, GPUN, DOFSPC}
     index = threadIdx().x    # this example only requires linear indexing, so just use `x`
     stride = blockDim().x
     for i = index:stride:length(cell_indices)
@@ -427,15 +413,17 @@ end
 
 
 b = generate_rhs(FerriteGPURHS(dh, colors, ip, ip, qr))
-u = CUDA.fill(0.0, ndofs(dh));
-cg!(u, A, b; verbose=true);
+u = CUDA.fill(0.f0, ndofs(dh));
+# cg!(u, A, b; verbose=true);
+# @benchmark CUDA.@sync mul!($b,$A,$u)
+# CUDA.@profile mul!(b,A,u)
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
-vtk_grid("heat_equation", dh) do vtk # The cake is a lie
-    vtk_point_data(vtk, dh, Array(u))
-end
+# vtk_grid("heat_equation", dh) do vtk # The cake is a lie
+#     vtk_point_data(vtk, dh, Array(u))
+# end
 
 ## test the result                #src
 # using Test                        #src
