@@ -3,7 +3,7 @@
 # ![](dg_heat_equation.png)
 #
 # *Figure 1*: Temperature field on the unit square with an internal uniform heat source
-# solved with homogeneous Dirichlet boundary conditions on the boundary.
+# solved with inhomogeneous Dirichlet boundary conditions on the left and right boundaries and flux on the top and bottom boundaries.
 #
 #-
 #md # !!! tip
@@ -23,28 +23,43 @@
 #
 # where $u$ is the unknown temperature field, $k$ the heat conductivity,
 # $f$ the heat source and $\Omega$ the domain. For simplicity we set $f = 1$
-# and $k = 1$. We will consider homogeneous Dirichlet boundary conditions such that
+# and $k = 1$. We will consider inhomogeneous Dirichlet boundary conditions such that
 # ```math
-# u(\textbf{x}) = 0 \quad \textbf{x} \in \partial \Omega,
+# u(\textbf{x}) = 1 \quad \textbf{x} \in \partial \Omega_u^+, \\
+# u(\textbf{x}) = -1 \quad \textbf{x} \in \partial \Omega_u^-,
 # ```
-# where $\partial \Omega$ denotes the boundary of $\Omega$.
-# 
+# and Neumann boundary conditions such that
+# ```math
+# \nabla u(\textbf{x}) \cdot \vec{n} = 1 \quad \textbf{x} \in \partial \Omega_n^+, \\
+# \nabla u(\textbf{x}) \cdot \vec{n} = -1 \quad \textbf{x} \in \partial \Omega_n^-,
+# ```
+# where $\partial \Omega$ denotes the boundaries of $\Omega$ characterized by their normals directions
+# as the following:
+#
+# | Boundary              | Normal direction |
+# |-----------------------|------------------|
+# | $\partial \Omega_u^+$ | (1 , 0)          |
+# | $\partial \Omega_u^-$ | (-1 , 0)         |
+# | $\partial \Omega_n^+$ | (0 , 1)          |
+# | $\partial \Omega_n^-$ | (0 , -1)         |
+# Defining $\sigma$ as the gradient of the temperature field the equation can be expressed as
 # ```math
 #  \sigma = \nabla u,\\
-#  -\nabla \sigma = 1,
+#  -\nabla \cdot \sigma = 1,
 # ```
-# Multiplying by test functions $ \tau $ and $ \nu $ respectively and integrating
+# Multiplying by test functions $ \tau $ and $ \delta u $ respectively and integrating
 # over the domain,
 # ```math
 #  \int_\Omega \sigma \cdot \tau dΩ = \int_\Omega \nabla u \cdot \tau dΩ,\\
-#  -\int_\Omega \nabla \cdot \sigma \nu dΩ = \int_\Omega \nu dΩ,
+#  -\int_\Omega \nabla \cdot \sigma \delta u dΩ = \int_\Omega \delta u dΩ,
 # ```
-# Integratig by parts,
+# Integratig by parts and applying divergence theorem,
 # ```math
 #  \int_\Omega \sigma \cdot \tau dΩ = \int_\Omega u \nabla \cdot \tau dΩ + \int_\Gamma \hat{u} \tau \cdot n dΓ,\\
-#  \int_\Omega \sigma \cdot \nabla \nu dΩ = \int_\Omega \nu dΩ + \int_\Gamma \nu \hat{\sigma} \cdot n dΓ,
+#  \int_\Omega \sigma \cdot \nabla \delta u dΩ = \int_\Omega \delta u dΩ + \int_\Gamma \delta u \hat{\sigma} \cdot n dΓ,
 # ```
-# Where $n$ is the outwards pointing normal. Using the following definitions for the jumps and averages of numerical fluxes,
+# Where $n$ is the outwards pointing normal, and $\Gamma$ is the union of the elements' boundaries.
+# Using the following definitions for the jumps and averages of numerical fluxes,
 # ```math
 #  \{u\} = \frac{1}{2}(u^+ + u^-),\quad [[u]] = u^+ \cdot n^+ + u^- \cdot n^-\\
 # ```
@@ -52,32 +67,34 @@
 # ```math
 #  \int_\Gamma q \phi \cdot n dΓ = \int_\Gamma [[q]] \cdot \{\phi\} dΓ + \int_\Gamma \{q\} [[\phi]] dΓ,
 # ```
-# with the jumps and averages,
+# with the jumps and averages results in
 # ```math
 #  \int_\Omega \sigma \cdot \tau dΩ = \int_\Omega u \nabla \cdot \tau dΩ + \int_\Gamma [[\hat{u}]] \cdot \{\tau\} dΓ + \int_\Gamma \{\hat{u}\} [[\tau]] dΓ,\\
-#  \int_\Omega \sigma \cdot \nabla \nu dΩ = \int_\Omega \nu dΩ + \int_\Gamma [[\nu]] \cdot \{\hat{\sigma}\} dΓ + \int_\Gamma \{\nu\} [[\hat{\sigma}]] dΓ,
+#  \int_\Omega \sigma \cdot \nabla \delta u dΩ = \int_\Omega \delta u dΩ + \int_\Gamma [[\delta u]] \cdot \{\hat{\sigma}\} dΓ + \int_\Gamma \{\delta u\} [[\hat{\sigma}]] dΓ,
 # ```
-# To express $\sigma$ in terms of $u$ we integrate $ \int_\Omega u \nabla $ by parts without using numerical flux, then substitute in the equation.
+# Integrating $ \int_\Omega \nabla u \cdot \tau dΩ $ by parts and applying divergence theorem
+# without using numerical flux, then substitute in the equation to obtain a weak form.
 # ```math
 #  \int_\Omega \sigma \cdot \tau dΩ = \int_\Omega \nabla u \cdot \tau dΩ + \int_\Gamma [[\hat{u} - u]] \cdot \{\tau\} dΓ + \int_\Gamma \{\hat{u} - u\} [[\tau]] dΓ,\\
-#  \int_\Omega \sigma \cdot \nabla \nu dΩ = \int_\Omega \nu dΩ + \int_\Gamma [[\nu]] \cdot \{\hat{\sigma}\} dΓ + \int_\Gamma \{\nu\} [[\hat{\sigma}]] dΓ,
+#  \int_\Omega \sigma \cdot \nabla \delta u dΩ = \int_\Omega \delta u dΩ + \int_\Gamma [[\delta u]] \cdot \{\hat{\sigma}\} dΓ + \int_\Gamma \{\delta u\} [[\hat{\sigma}]] dΓ,
 # ```
 # Substituting
 # ```math
-#  \tau = \nabla \nu,\\
+#  \tau = \nabla \delta u,\\
 # ```
 # results in
 # ```math
-#  \int_\Omega \sigma \cdot \nabla \nu dΩ = \int_\Omega \nabla u \cdot \nabla \nu dΩ + \int_\Gamma [[\hat{u} - u]] \cdot \{\nabla \nu\} dΓ + \int_\Gamma \{\hat{u} - u\} [[\nabla \nu]] dΓ,\\
-#  \int_\Omega \sigma \cdot \nabla \nu dΩ = \int_\Omega \nu dΩ + \int_\Gamma [[\nu]] \cdot \{\hat{\sigma}\} dΓ + \int_\Gamma \{\nu\} [[\hat{\sigma}]] dΓ,
+#  \int_\Omega \sigma \cdot \nabla \delta u dΩ = \int_\Omega \nabla u \cdot \nabla \delta u dΩ + \int_\Gamma [[\hat{u} - u]] \cdot \{\nabla \delta u\} dΓ + \int_\Gamma \{\hat{u} - u\} [[\nabla \delta u]] dΓ,\\
+#  \int_\Omega \sigma \cdot \nabla \delta u dΩ = \int_\Omega \delta u dΩ + \int_\Gamma [[\delta u]] \cdot \{\hat{\sigma}\} dΓ + \int_\Gamma \{\delta u\} [[\hat{\sigma}]] dΓ,
 # ```
 # Combining the two equations,
 # ```math
-#  \int_\Omega \nabla u \cdot \nabla \nu dΩ + \int_\Gamma [[\hat{u} - u]] \cdot \{\nabla \nu\} dΓ + \int_\Gamma \{\hat{u} - u\} [[\nabla \nu]] dΓ - \int_\Gamma [[\nu]] \cdot \{\hat{\sigma}\} dΓ - \int_\Gamma \{\nu\} [[\hat{\sigma}]] dΓ = \int_\Omega \nu dΩ,\\
+#  \int_\Omega \nabla u \cdot \nabla \delta u dΩ + \int_\Gamma [[\hat{u} - u]] \cdot \{\nabla \delta u\} dΓ + \int_\Gamma \{\hat{u} - u\} [[\nabla \delta u]] dΓ - \int_\Gamma [[\delta u]] \cdot \{\hat{\sigma}\} dΓ - \int_\Gamma \{\delta u\} [[\hat{\sigma}]] dΓ = \int_\Omega \delta u dΩ,\\
 # ```
 # The numerical fluxes chosen for the interior penalty method are $\hat{u} = \{u\}$, $\hat{\sigma} = \{\nabla u\} - \alpha([[u]])$, such choice results in $[[\hat{u}]] = 0$, $\{\hat{u}\} = \{u\}$, $[[\hat{\sigma}]] = 0$, $\{\hat{\sigma}\} = \{\nabla u\} - \alpha([[u]])$
+# for the interfaces between elements $\Gamma^0 : \Gamma / \partial \Omega$. While $u$ is well defined on $\partial \Omega$ such that $\hat{u} = u$, $\hat{\sigma} = \nabla u$ resulting in
 # ```math
-#  \int_\Omega \nabla u \cdot \nabla \nu dΩ - \int_\Gamma [[u]] \cdot \{\nabla \nu\} dΓ - \int_\Gamma [[\nu]] \cdot \{\nabla u\} - [[\nu]] \cdot \alpha([[u]]) dΓ = \int_\Omega \nu dΩ,\\
+#  \int_\Omega \nabla u \cdot \nabla \delta u dΩ - \int_{\Gamma^0} [[u]] \cdot \{\nabla \delta u\} d\Gamma^0 - \int_{\Gamma^0} [[\delta u]] \cdot \{\nabla u\} - [[\delta u]] \cdot \alpha([[u]]) d\Gamma^0 - \int_{\partial \Omega} \nabla u \cdot \vec{n} \delta u d\partial \Omega = \int_\Omega \delta u dΩ,\\
 # ```
 # Where
 # ```math
@@ -86,9 +103,13 @@
 # with $\eta > 0$ and taken as $\eta = (order + 1)^{dim}$
 # The resulting weak form is given given as follows: Find ``u \in \mathbb{U}`` such that
 # ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u dΩ - \int_\Gamma [[u]] \cdot \{\nabla \delta u\} + [[\delta u]] \cdot \{\nabla u\} dΓ + \int_\Gamma \mu [[u]] ⋅ [[\delta u]] dΓ = \int_\Omega \delta u dΩ,\\
+#  \int_\Omega \nabla u \cdot \nabla \delta u dΩ - \int_{\Gamma^0} [[u]] \cdot \{\nabla \delta u\} + [[\delta u]] \cdot \{\nabla u\} d\Gamma^0 + \int_{\Gamma^0} \mu [[u]] ⋅ [[\delta u]] d\Gamma^0 - \int_{\partial \Omega} \nabla u \cdot \vec{n} \delta u d\partial \Omega = \int_\Omega \delta u dΩ,\\
 # ```
-# where $\delta u$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
+# Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} \nabla u \cdot \vec{n} \delta u d\partial \Omega$ can be expressed as an integral over $\partial \Omega_n$, where $\partial \Omega_n$ is the boundaries with only prescribed Neumann boundary condition,
+# ```math
+#  \int_\Omega \nabla u \cdot \nabla \delta u dΩ - \int_{\Gamma^0} [[u]] \cdot \{\nabla \delta u\} + [[\delta u]] \cdot \{\nabla u\} d\Gamma^0 + \int_{\Gamma^0} \mu [[u]] ⋅ [[\delta u]] d\Gamma^0 = \int_\Omega \delta u dΩ + \int_{\partial \Omega} (\nabla u \cdot \vec{n}) \delta u d\partial \Omega,\\
+# ```
+# where $\delta u \in \mathbb{T}$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
 # trial and test function sets, respectively.
 #-
 # ## Commented Program
@@ -101,7 +122,7 @@ using Ferrite, SparseArrays
 # We start by generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Hexahedron, (20, 20, 20));
+grid = generate_grid(Quadrilateral, (20, 20));
 # We construct the topology information which is used later for generating the sparsity pattern for stiffness matrix.
 topology = ExclusiveTopology(grid)
 
@@ -109,14 +130,14 @@ topology = ExclusiveTopology(grid)
 # `CellValues`, `FaceValues`, and `InterfaceValues` facilitate the process of evaluating values and gradients of
 # test and trial functions (among other things). To define
 # these we need to specify an interpolation space for the shape functions.
-# We use DiscontinuousLagrange functions
+# We use `DiscontinuousLagrange` functions
 # based on the two-dimensional reference quadrilateral. We also define a quadrature rule based on
 # the same reference element. We combine the interpolation and the quadrature rule
 # to `CellValues` and `InterfaceValues` object. Note that `InterfaceValues` object contains two `FaceValues` objects which can be used individually.
-ip = DiscontinuousLagrange{RefHexahedron, 1}()
-qr = QuadratureRule{RefHexahedron}(2)
+ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
+qr = QuadratureRule{RefQuadrilateral}(2)
 # For `FaceValues` and `InterfaceValues` we use `FaceQuadratureRule`
-face_qr = FaceQuadratureRule{RefHexahedron}(2)
+face_qr = FaceQuadratureRule{RefQuadrilateral}(2)
 cellvalues = CellValues(qr, ip);
 interfacevalues = InterfaceValues(face_qr, ip)
 # ### Degrees of freedom
@@ -133,7 +154,7 @@ close!(dh);
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `create_sparsity_pattern`. This function returns a sparse matrix
 # with the correct entries stored. We need to pass the topology and the cross-element coupling matrix when we're using
-# discontinuous interpolations such as in this case. The cross-element coupling matrix is of size [1,1] in this case as
+# discontinuous interpolations. The cross-element coupling matrix is of size [1,1] in this case as
 # we have only one field and one DofHandler.
 K = create_sparsity_pattern(dh, topology = topology, cross_coupling = trues(1,1))
 
@@ -143,27 +164,20 @@ K = create_sparsity_pattern(dh, topology = topology, cross_coupling = trues(1,1)
 ch = ConstraintHandler(dh);
 
 # Next we need to add constraints to `ch`. For this problem we define
-# homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
-# the `union` of all the face sets on the boundary.
-∂Ω = union(
-    getfaceset(grid, "left"),
-    getfaceset(grid, "right"),
+# inhomogeneous Dirichlet boundary conditions on the two boundaries.
+# We define ∂Ωₙ as the `union` of the face sets with Neumann boundary conditions.
+∂Ωₙ = union(
     getfaceset(grid, "top"),
     getfaceset(grid, "bottom"),
-    getfaceset(grid, "front"),
-    getfaceset(grid, "back"),
 );
 
 # Now we are set up to define our constraint. We specify which field
-# the condition is for, and our combined face set `∂Ω`. The last
+# the condition is for, and our face sets. The last
 # argument is a function of the form $f(\textbf{x})$ or $f(\textbf{x}, t)$,
 # where $\textbf{x}$ is the spatial coordinate and
-# $t$ the current time, and returns the prescribed value. Since the boundary condition in
-# this case do not depend on time we define our function as $f(\textbf{x}) = 0$, i.e.
-# no matter what $\textbf{x}$ we return $0$. When we have
-# specified our constraint we `add!` it to `ch`.
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
-add!(ch, dbc);
+# $t$ the current time, and returns the prescribed value.
+add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 1.0));
+add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> -1.0));
 
 # Finally we also need to `close!` our constraint handler. When we call `close!`
 # the dofs corresponding to our constraints are calculated and stored
@@ -178,8 +192,8 @@ close!(ch)
 # Now we have all the pieces needed to assemble the linear system, $K u = f$.
 # Assembling of the global system is done by looping over all the elements in order to
 # compute the element contributions ``K_e`` and ``f_e``, all the interfaces
-# to compute their contributions ``K_i``, and all the boundary faces to compute their
-# contributions ``K_e`` which are then assembled to the
+# to compute their contributions ``K_i``, and all the Neumann boundary faces to compute their
+# contributions ``f_e`` which are then assembled to the
 # appropriate place in the global ``K`` and ``f``.
 #
 # #### Element assembly
@@ -199,7 +213,7 @@ close!(ch)
 # * `interfacevalues`:
 #     * jump in test and trial functions values
 #     * average of test and trial functions gradients
-#     * trial function value ($u$) for boundary face integrals
+#     * test function value ($δu$) for boundary face integrals
 #
 # !!! note "Notation"
 #     Comparing with the brief finite element introduction in [Introduction to FEM](@ref),
@@ -235,7 +249,7 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     return Ke, fe
 end
 
-function assemble_interface!(Ki::Matrix, iv::InterfaceValues)
+function assemble_interface!(Ki::Matrix, iv::InterfaceValues, dim::Int, order::Int)
     ## Reset to 0
     fill!(Ki, 0)
     ## Loop over quadrature points
@@ -247,50 +261,38 @@ function assemble_interface!(Ki::Matrix, iv::InterfaceValues)
         ## Loop over test shape functions
         for i in 1:getnbasefunctions(iv)
             ## Multiply the jump by the normal, as the definition used in Ferrite doesn't include the normals.
-            test_jump = shape_value_jump(iv, q_point, i) * normal
-            test_grad_avg = shape_gradient_average(iv, q_point, i)
+            δu_jump = shape_value_jump(iv, q_point, i) * normal
+            ∇δu_avg = shape_gradient_average(iv, q_point, i)
             ## Loop over trial shape functions
             for j in 1:getnbasefunctions(iv)
                 ## Multiply the jump by the normal, as the definition used in Ferrite doesn't include the normals.
-                trial_jump = shape_value_jump(iv, q_point, j) * normal
-                trial_grad_avg = shape_gradient_average(iv, q_point, j)          
+                u_jump = shape_value_jump(iv, q_point, j) * normal
+                ∇u_avg = shape_gradient_average(iv, q_point, j)
                 ## Add contribution to Ki          
-                order = Ferrite.getorder(iv.face_values_a.func_interp)
-                dim = Ferrite.getdim(iv.face_values_a.func_interp)
-                Ki[i, j] += -(test_jump ⋅ trial_grad_avg + test_grad_avg ⋅ trial_jump) * dΓ + (1 + order)^dim * 20/2 * (test_jump ⋅ trial_jump) * dΓ
+                Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump)*dΓ + (1 + order)^dim * 20/2 * (δu_jump ⋅ u_jump)*dΓ
             end
         end
     end
     return Ki
 end
 
-function assemble_boundary!(Ke::Matrix, fv::FaceValues)
+function assemble_boundary!(fe::Vector, fv::FaceValues)
     ## Reset to 0
-    fill!(Ke, 0)
+    fill!(fe, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(fv)
         ## Get the normal to face A
         normal = getnormal(fv, q_point)
         ## Get the quadrature weight
-        dΓ = getdetJdV(fv, q_point)
+        ∂Ω = getdetJdV(fv, q_point)
         ## Loop over test shape functions
         for i in 1:getnbasefunctions(fv)
             ## Multiply the jump by the normal, as the definition used in Ferrite doesn't include the normals.
-            test_jump = shape_value(fv, q_point, i) * normal
-            test_grad_avg = shape_gradient(fv, q_point, i)
-            ## Loop over trial shape functions
-            for j in 1:getnbasefunctions(fv)
-                ## Multiply the jump by the normal, as the definition used in Ferrite doesn't include the normals.
-                trial_jump = shape_value(fv, q_point, j) * normal
-                trial_grad_avg = shape_gradient(fv, q_point, j) 
-                order = Ferrite.getorder(fv.func_interp)
-                dim = Ferrite.getdim(fv.func_interp)
-                ## Add contribution to Ki                             
-                Ke[i, j] += -(test_jump ⋅ trial_grad_avg + test_grad_avg ⋅ trial_jump) * dΓ + (1 + order)^dim * 20/2 * (test_jump ⋅ trial_jump) * dΓ
-            end
+            δu = shape_value(fv, q_point, i)
+            fe[i] = normal[2] * δu * ∂Ω
         end
     end
-    return Ke
+    return fe
 end
 #md nothing # hide
 
@@ -330,21 +332,27 @@ function assemble_global(cellvalues::CellValues, interfacevalues::InterfaceValue
         ## Assemble Ke and fe into K and f
         assemble!(assembler, celldofs(cell), Ke, fe)
     end
+    ## get interpolation dimensions and order to use in the penalty weight
+    ip = Ferrite.function_interpolation(interfacevalues.here)
+    order = Ferrite.getorder(ip)
+    dim = Ferrite.getdim(ip)
+    ## Loop over all interfaces
     for ic in InterfaceIterator(dh)
         ## Reinitialize interfacevalues for this interface
         reinit!(interfacevalues, ic)
         ## Compute interface surface integrals contribution
-        assemble_interface!(Ki, interfacevalues)
+        assemble_interface!(Ki, interfacevalues, dim, order)
         ## Assemble Ki into K
         assemble!(assembler, interfacedofs(ic), Ki)
     end
-    for fc in FaceIterator(dh, ∂Ω)
+    ## Loop over domain boundaries with Neumann boundary conditions
+    for fc in FaceIterator(dh, ∂Ωₙ)
         ## Reinitialize face_values_a for this boundary face
-        reinit!(interfacevalues.face_values_a, fc)
+        reinit!(interfacevalues.here, fc)
         ## Compute boundary face surface integrals contribution
-        assemble_boundary!(Ke, interfacevalues.face_values_a)
-        ## Assemble Ke into K
-        assemble!(assembler, celldofs(fc), Ke)
+        assemble_boundary!(fe, interfacevalues.here)
+        ## Assemble fe into f
+        assemble!(f, celldofs(fc), fe)
     end
     return K, f
 end
