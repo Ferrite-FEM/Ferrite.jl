@@ -11,6 +11,10 @@
 #md #     [`dg_heat_equation.ipynb`](@__NBVIEWER_ROOT_URL__/examples/dg_heat_equation.ipynb).
 #-
 #
+# This example was developed
+# as part of the Google summer of code funded project
+# ["Discontinuous Galerkin Infrastructure For the finite element toolbox Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5)
+#
 # ## Introduction
 #
 # The heat equation is the "Hello, world!" equation of finite elements.
