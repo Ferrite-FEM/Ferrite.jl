@@ -139,7 +139,8 @@ qr = QuadratureRule{RefQuadrilateral}(2)
 # For `FaceValues` and `InterfaceValues` we use `FaceQuadratureRule`
 face_qr = FaceQuadratureRule{RefQuadrilateral}(2)
 cellvalues = CellValues(qr, ip);
-interfacevalues = InterfaceValues(face_qr, ip)
+facevalues = FaceValues(face_qr, ip);
+interfacevalues = InterfaceValues(facevalues)
 # ### Degrees of freedom
 # Next we need to define a `DofHandler`, which will take care of numbering
 # and distribution of degrees of freedom for our approximated fields.
@@ -210,10 +211,11 @@ close!(ch)
 # * `cellvalues`:
 #     * test function value ($\delta u$)
 #     * test and trial functions gradient ($\nabla u$ and $\nabla \delta u$)
+# * `facevalues`:
+#     * test function value ($δu$)
 # * `interfacevalues`:
 #     * jump in test and trial functions values
 #     * average of test and trial functions gradients
-#     * test function value ($δu$) for boundary face integrals
 #
 # !!! note "Notation"
 #     Comparing with the brief finite element introduction in [Introduction to FEM](@ref),
@@ -313,7 +315,7 @@ end
 #     versions. However, through the code we use `f` and `u` instead to reflect the strong
 #     connection between the weak form and the Ferrite implementation.
 
-function assemble_global(cellvalues::CellValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler)
+function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler)
     ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -333,7 +335,7 @@ function assemble_global(cellvalues::CellValues, interfacevalues::InterfaceValue
         assemble!(assembler, celldofs(cell), Ke, fe)
     end
     ## get interpolation dimensions and order to use in the penalty weight
-    ip = Ferrite.function_interpolation(interfacevalues.here)
+    ip = Ferrite.function_interpolation(facevalues)
     order = Ferrite.getorder(ip)
     dim = Ferrite.getdim(ip)
     ## Loop over all interfaces
@@ -348,9 +350,9 @@ function assemble_global(cellvalues::CellValues, interfacevalues::InterfaceValue
     ## Loop over domain boundaries with Neumann boundary conditions
     for fc in FaceIterator(dh, ∂Ωₙ)
         ## Reinitialize face_values_a for this boundary face
-        reinit!(interfacevalues.here, fc)
+        reinit!(facevalues, fc)
         ## Compute boundary face surface integrals contribution
-        assemble_boundary!(fe, interfacevalues.here)
+        assemble_boundary!(fe, facevalues)
         ## Assemble fe into f
         assemble!(f, celldofs(fc), fe)
     end
@@ -361,7 +363,7 @@ end
 # ### Solution of the system
 # The last step is to solve the system. First we call `assemble_global`
 # to obtain the global stiffness matrix `K` and force vector `f`.
-K, f = assemble_global(cellvalues, interfacevalues, K, dh);
+K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh);
 
 # To account for the boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f` respectively, such that
