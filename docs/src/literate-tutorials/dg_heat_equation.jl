@@ -54,13 +54,13 @@
 # Multiplying by test functions $ \tau $ and $ \delta u $ respectively and integrating
 # over the domain,
 # ```math
-#  \int_\Omega \sigma \cdot \tau dΩ = \int_\Omega \nabla u \cdot \tau dΩ,\\
-#  -\int_\Omega \nabla \cdot \sigma \delta u dΩ = \int_\Omega \delta u dΩ,
+#  \int_\Omega \sigma \cdot \tau \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \tau \,\mathrm{d}\Omega,\\
+#  -\int_\Omega \nabla \cdot \sigma \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,
 # ```
 # Integratig by parts and applying divergence theorem,
 # ```math
-#  \int_\Omega \sigma \cdot \tau dΩ = \int_\Omega u \nabla \cdot \tau dΩ + \int_\Gamma \hat{u} \tau \cdot n dΓ,\\
-#  \int_\Omega \sigma \cdot \nabla \delta u dΩ = \int_\Omega \delta u dΩ + \int_\Gamma \delta u \hat{\sigma} \cdot n dΓ,
+#  \int_\Omega \sigma \cdot \tau \,\mathrm{d}\Omega = \int_\Omega u \nabla \cdot \tau \,\mathrm{d}\Omega + \int_\Gamma \hat{u} \tau \cdot n \,\mathrm{d}\Gamma,\\
+#  \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \delta u \hat{\sigma} \cdot n \,\mathrm{d}\Gamma,
 # ```
 # Where $n$ is the outwards pointing normal, and $\Gamma$ is the union of the elements' boundaries.
 # Using the following definitions for the jumps and averages of numerical fluxes,
@@ -69,18 +69,18 @@
 # ```
 # and substituting the integrals of form
 # ```math
-#  \int_\Gamma q \phi \cdot n dΓ = \int_\Gamma [[q]] \cdot \{\phi\} dΓ + \int_\Gamma \{q\} [[\phi]] dΓ,
+#  \int_\Gamma q \phi \cdot n \,\mathrm{d}\Gamma = \int_\Gamma [[q]] \cdot \{\phi\} \,\mathrm{d}\Gamma + \int_\Gamma \{q\} [[\phi]] \,\mathrm{d}\Gamma,
 # ```
 # with the jumps and averages results in
 # ```math
-#  \int_\Omega \sigma \cdot \tau dΩ = \int_\Omega u \nabla \cdot \tau dΩ + \int_\Gamma [[\hat{u}]] \cdot \{\tau\} dΓ + \int_\Gamma \{\hat{u}\} [[\tau]] dΓ,\\
-#  \int_\Omega \sigma \cdot \nabla \delta u dΩ = \int_\Omega \delta u dΩ + \int_\Gamma [[\delta u]] \cdot \{\hat{\sigma}\} dΓ + \int_\Gamma \{\delta u\} [[\hat{\sigma}]] dΓ,
+#  \int_\Omega \sigma \cdot \tau \,\mathrm{d}\Omega = \int_\Omega u \nabla \cdot \tau \,\mathrm{d}\Omega + \int_\Gamma [[\hat{u}]] \cdot \{\tau\} \,\mathrm{d}\Gamma + \int_\Gamma \{\hat{u}\} [[\tau]] \,\mathrm{d}\Gamma,\\
+#  \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma [[\delta u]] \cdot \{\hat{\sigma}\} \,\mathrm{d}\Gamma + \int_\Gamma \{\delta u\} [[\hat{\sigma}]] \,\mathrm{d}\Gamma,
 # ```
-# Integrating $ \int_\Omega \nabla u \cdot \tau dΩ $ by parts and applying divergence theorem
+# Integrating $ \int_\Omega \nabla u \cdot \tau \,\mathrm{d}\Omega $ by parts and applying divergence theorem
 # without using numerical flux, then substitute in the equation to obtain a weak form.
 # ```math
-#  \int_\Omega \sigma \cdot \tau dΩ = \int_\Omega \nabla u \cdot \tau dΩ + \int_\Gamma [[\hat{u} - u]] \cdot \{\tau\} dΓ + \int_\Gamma \{\hat{u} - u\} [[\tau]] dΓ,\\
-#  \int_\Omega \sigma \cdot \nabla \delta u dΩ = \int_\Omega \delta u dΩ + \int_\Gamma [[\delta u]] \cdot \{\hat{\sigma}\} dΓ + \int_\Gamma \{\delta u\} [[\hat{\sigma}]] dΓ,
+#  \int_\Omega \sigma \cdot \tau \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \tau \,\mathrm{d}\Omega + \int_\Gamma [[\hat{u} - u]] \cdot \{\tau\} \,\mathrm{d}\Gamma + \int_\Gamma \{\hat{u} - u\} [[\tau]] \,\mathrm{d}\Gamma,\\
+#  \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma [[\delta u]] \cdot \{\hat{\sigma}\} \,\mathrm{d}\Gamma + \int_\Gamma \{\delta u\} [[\hat{\sigma}]] \,\mathrm{d}\Gamma,
 # ```
 # Substituting
 # ```math
@@ -88,17 +88,17 @@
 # ```
 # results in
 # ```math
-#  \int_\Omega \sigma \cdot \nabla \delta u dΩ = \int_\Omega \nabla u \cdot \nabla \delta u dΩ + \int_\Gamma [[\hat{u} - u]] \cdot \{\nabla \delta u\} dΓ + \int_\Gamma \{\hat{u} - u\} [[\nabla \delta u]] dΓ,\\
-#  \int_\Omega \sigma \cdot \nabla \delta u dΩ = \int_\Omega \delta u dΩ + \int_\Gamma [[\delta u]] \cdot \{\hat{\sigma}\} dΓ + \int_\Gamma \{\delta u\} [[\hat{\sigma}]] dΓ,
+#  \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega + \int_\Gamma [[\hat{u} - u]] \cdot \{\nabla \delta u\} \,\mathrm{d}\Gamma + \int_\Gamma \{\hat{u} - u\} [[\nabla \delta u]] \,\mathrm{d}\Gamma,\\
+#  \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma [[\delta u]] \cdot \{\hat{\sigma}\} \,\mathrm{d}\Gamma + \int_\Gamma \{\delta u\} [[\hat{\sigma}]] \,\mathrm{d}\Gamma,
 # ```
 # Combining the two equations,
 # ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u dΩ + \int_\Gamma [[\hat{u} - u]] \cdot \{\nabla \delta u\} dΓ + \int_\Gamma \{\hat{u} - u\} [[\nabla \delta u]] dΓ - \int_\Gamma [[\delta u]] \cdot \{\hat{\sigma}\} dΓ - \int_\Gamma \{\delta u\} [[\hat{\sigma}]] dΓ = \int_\Omega \delta u dΩ,\\
+#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega + \int_\Gamma [[\hat{u} - u]] \cdot \{\nabla \delta u\} \,\mathrm{d}\Gamma + \int_\Gamma \{\hat{u} - u\} [[\nabla \delta u]] \,\mathrm{d}\Gamma - \int_\Gamma [[\delta u]] \cdot \{\hat{\sigma}\} \,\mathrm{d}\Gamma - \int_\Gamma \{\delta u\} [[\hat{\sigma}]] \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 # ```
 # The numerical fluxes chosen for the interior penalty method are $\hat{u} = \{u\}$, $\hat{\sigma} = \{\nabla u\} - \alpha([[u]])$, such choice results in $[[\hat{u}]] = 0$, $\{\hat{u}\} = \{u\}$, $[[\hat{\sigma}]] = 0$, $\{\hat{\sigma}\} = \{\nabla u\} - \alpha([[u]])$
-# for the interfaces between elements $\Gamma^0 : \Gamma / \partial \Omega$. While $u$ is well defined on $\partial \Omega$ such that $\hat{u} = u$, $\hat{\sigma} = \nabla u$ resulting in
+# for the interfaces between elements $\Gamma^0 : \Gamma \setminus \partial \Omega$. While $u$ is well defined on $\partial \Omega$ such that $\hat{u} = u$, $\hat{\sigma} = \nabla u$ resulting in
 # ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u dΩ - \int_{\Gamma^0} [[u]] \cdot \{\nabla \delta u\} d\Gamma^0 - \int_{\Gamma^0} [[\delta u]] \cdot \{\nabla u\} - [[\delta u]] \cdot \alpha([[u]]) d\Gamma^0 - \int_{\partial \Omega} \nabla u \cdot \vec{n} \delta u d\partial \Omega = \int_\Omega \delta u dΩ,\\
+#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} [[u]] \cdot \{\nabla \delta u\}  \,\mathrm{d}\Gamma^0 - \int_{\Gamma^0} [[\delta u]] \cdot \{\nabla u\} - [[\delta u]] \cdot \alpha([[u]])  \,\mathrm{d}\Gamma^0 - \int_{\partial \Omega} \nabla u \cdot \vec{n} \delta u \,\mathrm{d} \partial \Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 # ```
 # Where
 # ```math
@@ -107,11 +107,11 @@
 # with $\eta > 0$ and taken as $\eta = (order + 1)^{dim}$
 # The resulting weak form is given given as follows: Find ``u \in \mathbb{U}`` such that
 # ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u dΩ - \int_{\Gamma^0} [[u]] \cdot \{\nabla \delta u\} + [[\delta u]] \cdot \{\nabla u\} d\Gamma^0 + \int_{\Gamma^0} \mu [[u]] ⋅ [[\delta u]] d\Gamma^0 - \int_{\partial \Omega} \nabla u \cdot \vec{n} \delta u d\partial \Omega = \int_\Omega \delta u dΩ,\\
+#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} [[u]] \cdot \{\nabla \delta u\} + [[\delta u]] \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \mu [[u]] ⋅ [[\delta u]]  \,\mathrm{d}\Gamma^0 - \int_{\partial \Omega} \nabla u \cdot \vec{n} \delta u \,\mathrm{d} \partial \Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 # ```
-# Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} \nabla u \cdot \vec{n} \delta u d\partial \Omega$ can be expressed as an integral over $\partial \Omega_n$, where $\partial \Omega_n$ is the boundaries with only prescribed Neumann boundary condition,
+# Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} \nabla u \cdot \vec{n} \delta u \,\mathrm{d} \partial \Omega$ can be expressed as an integral over $\partial \Omega_n$, where $\partial \Omega_n$ is the boundaries with only prescribed Neumann boundary condition,
 # ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u dΩ - \int_{\Gamma^0} [[u]] \cdot \{\nabla \delta u\} + [[\delta u]] \cdot \{\nabla u\} d\Gamma^0 + \int_{\Gamma^0} \mu [[u]] ⋅ [[\delta u]] d\Gamma^0 = \int_\Omega \delta u dΩ + \int_{\partial \Omega} (\nabla u \cdot \vec{n}) \delta u d\partial \Omega,\\
+#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} [[u]] \cdot \{\nabla \delta u\} + [[\delta u]] \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \mu [[u]] ⋅ [[\delta u]]  \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega} (\nabla u \cdot \vec{n}) \delta u \,\mathrm{d} \partial \Omega,\\
 # ```
 # where $\delta u \in \mathbb{T}$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
 # trial and test function sets, respectively.
@@ -170,7 +170,7 @@ ch = ConstraintHandler(dh);
 
 # Next we need to add constraints to `ch`. For this problem we define
 # inhomogeneous Dirichlet boundary conditions on the two boundaries.
-# We define ∂Ωₙ as the `union` of the face sets with Neumann boundary conditions.
+# We define $\partial \Omega_n$ as the `union` of the face sets with Neumann boundary conditions.
 ∂Ωₙ = union(
     getfaceset(grid, "top"),
     getfaceset(grid, "bottom"),
