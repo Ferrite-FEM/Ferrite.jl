@@ -420,7 +420,6 @@ function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::Se
 
         # no need to reinit!, enough to update current_entity since we only need geometric shape functions M
         set_current_face!(boundaryvalues, entityidx)
-        
         # local dof-range for this face
         r = local_face_dofs_offset[entityidx]:(local_face_dofs_offset[entityidx+1]-1)
         counter = 1
