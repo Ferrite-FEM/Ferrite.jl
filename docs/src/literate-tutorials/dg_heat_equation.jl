@@ -34,8 +34,8 @@
 # ```
 # and Neumann boundary conditions such that
 # ```math
-# \nabla u(\textbf{x}) \cdot \vec{n} = 1 \quad \textbf{x} \in \partial \Omega_n^+, \\
-# \nabla u(\textbf{x}) \cdot \vec{n} = -1 \quad \textbf{x} \in \partial \Omega_n^-,
+# \nabla u(\textbf{x}) \cdot n = 1 \quad \textbf{x} \in \partial \Omega_n^+, \\
+# \nabla u(\textbf{x}) \cdot n = -1 \quad \textbf{x} \in \partial \Omega_n^-,
 # ```
 # where $\partial \Omega$ denotes the boundaries of $\Omega$ characterized by their normals directions
 # as the following:
@@ -98,7 +98,7 @@
 # The numerical fluxes chosen for the interior penalty method are $\hat{u} = \{u\}$, $\hat{\sigma} = \{\nabla u\} - \alpha(\llbracket u\rrbracket )$, such choice results in $\llbracket \hat{u}\rrbracket  = 0$, $\{\hat{u}\} = \{u\}$, $\llbracket \hat{\sigma}\rrbracket  = 0$, $\{\hat{\sigma}\} = \{\nabla u\} - \alpha(\llbracket u\rrbracket )$
 # for the interfaces between elements $\Gamma^0 : \Gamma \setminus \partial \Omega$. While $u$ is well defined on $\partial \Omega$ such that $\hat{u} = u$, $\hat{\sigma} = \nabla u$ resulting in
 # ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\}  \,\mathrm{d}\Gamma^0 - \int_{\Gamma^0} \llbracket \delta u\rrbracket  \cdot \{\nabla u\} - \llbracket \delta u\rrbracket  \cdot \alpha(\llbracket u\rrbracket )  \,\mathrm{d}\Gamma^0 - \int_{\partial \Omega} \nabla u \cdot \vec{n} \delta u \,\mathrm{d} \partial \Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
+#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\}  \,\mathrm{d}\Gamma^0 - \int_{\Gamma^0} \llbracket \delta u\rrbracket  \cdot \{\nabla u\} - \llbracket \delta u\rrbracket  \cdot \alpha(\llbracket u\rrbracket )  \,\mathrm{d}\Gamma^0 - \int_{\partial \Omega} \nabla u \cdot n \delta u \,\mathrm{d} \partial \Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 # ```
 # Where
 # ```math
@@ -107,11 +107,11 @@
 # with $\eta > 0$ and taken as $\eta = (order + 1)^{dim}$
 # The resulting weak form is given given as follows: Find ``u \in \mathbb{U}`` such that
 # ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \mu \llbracket u\rrbracket  ⋅ \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 - \int_{\partial \Omega} \nabla u \cdot \vec{n} \delta u \,\mathrm{d} \partial \Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
+#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \mu \llbracket u\rrbracket  ⋅ \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 - \int_{\partial \Omega} \nabla u \cdot n \delta u \,\mathrm{d} \partial \Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 # ```
-# Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} \nabla u \cdot \vec{n} \delta u \,\mathrm{d} \partial \Omega$ can be expressed as an integral over $\partial \Omega_n$, where $\partial \Omega_n$ is the boundaries with only prescribed Neumann boundary condition,
+# Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} \nabla u \cdot n \delta u \,\mathrm{d} \partial \Omega$ can be expressed as an integral over $\partial \Omega_n$, where $\partial \Omega_n$ is the boundaries with only prescribed Neumann boundary condition,
 # ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \mu \llbracket u\rrbracket  ⋅ \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega} (\nabla u \cdot \vec{n}) \delta u \,\mathrm{d} \partial \Omega,\\
+#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \mu \llbracket u\rrbracket  ⋅ \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega} (\nabla u \cdot n) \delta u \,\mathrm{d} \partial \Omega,\\
 # ```
 # where $\delta u \in \mathbb{T}$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
 # trial and test function sets, respectively.
