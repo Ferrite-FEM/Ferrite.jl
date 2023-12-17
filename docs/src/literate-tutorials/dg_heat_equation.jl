@@ -95,8 +95,8 @@
 # ```math
 #  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\nabla \delta u\} \,\mathrm{d}\Gamma + \int_\Gamma \{\hat{u} - u\} \llbracket \nabla \delta u\rrbracket  \,\mathrm{d}\Gamma - \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\sigma}\} \,\mathrm{d}\Gamma - \int_\Gamma \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 # ```
-# The numerical fluxes chosen for the interior penalty method are $\hat{u} = \{u\}$, $\hat{\sigma} = \{\nabla u\} - \alpha(\llbracket u\rrbracket )$, such choice results in $\llbracket \hat{u}\rrbracket  = 0$, $\{\hat{u}\} = \{u\}$, $\llbracket \hat{\sigma}\rrbracket  = 0$, $\{\hat{\sigma}\} = \{\nabla u\} - \alpha(\llbracket u\rrbracket )$
-# for the interfaces between elements $\Gamma^0 : \Gamma \setminus \partial \Omega$. While $u$ is well defined on $\partial \Omega$ such that $\hat{u} = u$, $\hat{\sigma} = \nabla u$ resulting in
+# The numerical fluxes chosen for the interior penalty method are $\hat{u} = \{u\}$, $\hat{\sigma} = \{\nabla u\} - \alpha(\llbracket u\rrbracket )$, for the interfaces between elements $\Gamma^0 : \Gamma \setminus \partial \Omega$, $\{\hat{\sigma}\} = \{\nabla u\} - \alpha(\llbracket u\rrbracket )$ 
+# over $\Gamma$, and $u$ is well defined on $\partial \Omega$ such that $\hat{u} = 0$,  such choice results in $\llbracket \hat{u}\rrbracket  = 0$, $\{\hat{u}\} = \{u\}$, $\llbracket \hat{\sigma}\rrbracket  = 0$ and the equation becomes
 # ```math
 #  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\}  \,\mathrm{d}\Gamma^0 - \int_{\Gamma^0} \llbracket \delta u\rrbracket  \cdot \{\nabla u\} - \llbracket \delta u\rrbracket  \cdot \alpha(\llbracket u\rrbracket )  \,\mathrm{d}\Gamma^0 - \int_{\partial \Omega} \nabla u \cdot n \delta u \,\mathrm{d} \partial \Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 # ```
@@ -104,7 +104,7 @@
 # ```math
 # \alpha(\llbracket u\rrbracket ) = \mu \llbracket u\rrbracket 
 # ```
-# with $\eta > 0$ and taken as $\eta = (order + 1)^{dim}$
+# Where $\mu = \eta h^{-1}$ with $\eta > 0$ and taken as $\eta = (order + 1)^{dim}$.
 # The resulting weak form is given given as follows: Find ``u \in \mathbb{U}`` such that
 # ```math
 #  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \mu \llbracket u\rrbracket  ⋅ \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 - \int_{\partial \Omega} \nabla u \cdot n \delta u \,\mathrm{d} \partial \Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
