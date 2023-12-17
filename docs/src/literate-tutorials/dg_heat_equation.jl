@@ -124,7 +124,7 @@
 # First we load Ferrite, and some other packages we need
 using Ferrite, SparseArrays
 # We start by generating a simple grid with 20x20 quadrilateral elements
-# using `generate_grid`. The generator defaults to the unit square,
+# using `generate_grid`. The generator defaults to the boundaries [-1, 1] in every dimension,
 # so we don't need to specify the corners of the domain.
 grid = generate_grid(Quadrilateral, (20, 20));
 # We construct the topology information which is used later for generating the sparsity pattern for stiffness matrix.
