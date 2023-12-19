@@ -33,7 +33,7 @@ for both the reference cell (precalculated) and the real cell (updated in `reini
 """
 FunctionValues
 
-struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t}
+struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t} <: AbstractValues
     ip::IP          # ::Interpolation
     Nx::N_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
     Nξ::N_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
@@ -93,6 +93,7 @@ shape_value_type(funvals::FunctionValues) = eltype(funvals.Nx)
 shape_gradient_type(funvals::FunctionValues) = eltype(funvals.dNdx)
 shape_gradient_type(::FunctionValues{0}) = nothing
 
+getnquadpoints(funvals::FunctionValues) = size(funvals.Nξ, 2)
 
 # Checks that the user provides the right dimension of coordinates to reinit! methods to ensure good error messages if not
 sdim_from_gradtype(::Type{<:AbstractTensor{<:Any,sdim}}) where sdim = sdim
