@@ -114,9 +114,11 @@
 # ```math
 #  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \frac{\eta}{h} \llbracket u\rrbracket  ⋅ \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega_n} (\nabla u \cdot n) \delta u \,\mathrm{d} \partial \Omega_n,\\
 # ```
-# where $h$ is the characteristic mesh size (the maximum diameter of the cells), and $\eta$ is a large enough positive number independent of $h$,
+# where $h$ is the characteristic mesh size (the maximum diameter of the cells), and $\eta$ is a large enough positive number independent of $h$ [Mu:2014:IP](@cite),
 # $\delta u \in \mathbb{T}$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
 # trial and test function sets, respectively.
+#
+# More details on DG formulations for elliptic problems can be found in [Cockburn:2002:unifiedanalysis](@cite)
 #-
 # ## Commented Program
 #
@@ -392,6 +394,12 @@ end
 ## test the result                #src
 #using Test                        #src
 #@test norm(u) ≈ 3.307743912641305 #src
+
+#md # ## References
+#md # ```@bibliography
+#md # Pages = ["tutorials/dg_heat_equation.md"]
+#md # Canonical = false
+#md # ```
 
 #md # ## [Plain program](@id heat_equation-DG-plain-program)
 #md #
