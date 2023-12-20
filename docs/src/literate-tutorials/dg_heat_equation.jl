@@ -46,74 +46,76 @@
 # | $\partial \Omega_u^-$ | (-1 , 0)         |
 # | $\partial \Omega_n^+$ | (0 , 1)          |
 # | $\partial \Omega_n^-$ | (0 , -1)         |
-# Defining $\sigma$ as the gradient of the temperature field the equation can be expressed as
-# ```math
-#  \sigma = \nabla u,\\
-#  -\nabla \cdot \sigma = 1,
-# ```
-# Multiplying by test functions $ \tau $ and $ \delta u $ respectively and integrating
-# over the domain,
-# ```math
-#  \int_\Omega \sigma \cdot \tau \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \tau \,\mathrm{d}\Omega,\\
-#  -\int_\Omega \nabla \cdot \sigma \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,
-# ```
-# Integratig by parts and applying divergence theorem,
-# ```math
-#  \int_\Omega \sigma \cdot \tau \,\mathrm{d}\Omega = \int_\Omega u \nabla \cdot \tau \,\mathrm{d}\Omega + \int_\Gamma \hat{u} \tau \cdot n \,\mathrm{d}\Gamma,\\
-#  \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \delta u \hat{\sigma} \cdot n \,\mathrm{d}\Gamma,
-# ```
-# Where $n$ is the outwards pointing normal, and $\Gamma$ is the union of the elements' boundaries.
-# Using the following definitions for the jumps and averages of numerical fluxes,
+# The definitions of jumps and averages used in this examples are
 # ```math
 #  \{u\} = \frac{1}{2}(u^+ + u^-),\quad \llbracket u\rrbracket  = u^+ \cdot n^+ + u^- \cdot n^-\\
 # ```
-# and substituting the integrals of form
-# ```math
-#  \int_\Gamma q \phi \cdot n \,\mathrm{d}\Gamma = \int_\Gamma \llbracket q\rrbracket  \cdot \{\phi\} \,\mathrm{d}\Gamma + \int_\Gamma \{q\} \llbracket \phi\rrbracket  \,\mathrm{d}\Gamma,
-# ```
-# with the jumps and averages results in
-# ```math
-#  \int_\Omega \sigma \cdot \tau \,\mathrm{d}\Omega = \int_\Omega u \nabla \cdot \tau \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u}\rrbracket  \cdot \{\tau\} \,\mathrm{d}\Gamma + \int_\Gamma \{\hat{u}\} \llbracket \tau\rrbracket  \,\mathrm{d}\Gamma,\\
-#  \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\sigma}\} \,\mathrm{d}\Gamma + \int_\Gamma \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma,
-# ```
-# Integrating $ \int_\Omega \nabla u \cdot \tau \,\mathrm{d}\Omega $ by parts and applying divergence theorem
-# without using numerical flux, then substitute in the equation to obtain a weak form.
-# ```math
-#  \int_\Omega \sigma \cdot \tau \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \tau \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\tau\} \,\mathrm{d}\Gamma + \int_\Gamma \{\hat{u} - u\} \llbracket \tau\rrbracket  \,\mathrm{d}\Gamma,\\
-#  \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\sigma}\} \,\mathrm{d}\Gamma + \int_\Gamma \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma,
-# ```
-# Substituting
-# ```math
-#  \tau = \nabla \delta u,\\
-# ```
-# results in
-# ```math
-#  \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\nabla \delta u\} \,\mathrm{d}\Gamma + \int_\Gamma \{\hat{u} - u\} \llbracket \nabla \delta u\rrbracket  \,\mathrm{d}\Gamma,\\
-#  \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\sigma}\} \,\mathrm{d}\Gamma + \int_\Gamma \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma,
-# ```
-# Combining the two equations,
-# ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\nabla \delta u\} \,\mathrm{d}\Gamma + \int_\Gamma \{\hat{u} - u\} \llbracket \nabla \delta u\rrbracket  \,\mathrm{d}\Gamma - \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\sigma}\} \,\mathrm{d}\Gamma - \int_\Gamma \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
-# ```
-# The numerical fluxes chosen for the interior penalty method are $\hat{u} = \{u\}$, $\hat{\sigma} = \{\nabla u\} - \alpha(\llbracket u\rrbracket )$, for the interfaces between elements $\Gamma^0 : \Gamma \setminus \partial \Omega$, $\{\hat{\sigma}\} = \{\nabla u\} - \alpha(\llbracket u\rrbracket )$ 
-# over $\Gamma$, and $u$ is well defined on $\partial \Omega$ such that $\hat{u} = 0$,  such choice results in $\llbracket \hat{u}\rrbracket  = 0$, $\{\hat{u}\} = \{u\}$, $\llbracket \hat{\sigma}\rrbracket  = 0$ and the equation becomes
-# ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\}  \,\mathrm{d}\Gamma^0 - \int_{\Gamma^0} \llbracket \delta u\rrbracket  \cdot \{\nabla u\} - \llbracket \delta u\rrbracket  \cdot \alpha(\llbracket u\rrbracket )  \,\mathrm{d}\Gamma^0 - \int_{\partial \Omega} \nabla u \cdot n \delta u \,\mathrm{d} \partial \Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
-# ```
-# Where
-# ```math
-# \alpha(\llbracket u\rrbracket ) = \mu \llbracket u\rrbracket 
-# ```
-# Where $\mu = \eta h^{-1}$ with $\eta > 0$ and taken as $\eta = (order + 1)^{dim}$.
-# The resulting weak form is given given as follows: Find ``u \in \mathbb{U}`` such that
-# ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \mu \llbracket u\rrbracket  ⋅ \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 - \int_{\partial \Omega} \nabla u \cdot n \delta u \,\mathrm{d} \partial \Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
-# ```
+# !!! details "Derivation of the weak form for homogeneous Dirichlet boundary condition"
+#     Defining $\sigma$ as the gradient of the temperature field the equation can be expressed as
+#     ```math
+#      \sigma = \nabla u,\\
+#      -\nabla \cdot \sigma = 1,
+#     ```
+#     Multiplying by test functions $ \tau $ and $ \delta u $ respectively and integrating
+#     over the domain,
+#     ```math
+#      \int_\Omega \sigma \cdot \tau \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \tau \,\mathrm{d}\Omega,\\
+#      -\int_\Omega \nabla \cdot \sigma \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,
+#     ```
+#     Integratig by parts and applying divergence theorem,
+#     ```math
+#      \int_\Omega \sigma \cdot \tau \,\mathrm{d}\Omega = \int_\Omega u \nabla \cdot \tau \,\mathrm{d}\Omega + \int_\Gamma \hat{u} \tau \cdot n \,\mathrm{d}\Gamma,\\
+#      \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \delta u \hat{\sigma} \cdot n \,\mathrm{d}\Gamma,
+#     ```
+#     Where $n$ is the outwards pointing normal, and $\Gamma$ is the union of the elements' boundaries.
+#     Substituting the integrals of form
+#     ```math
+#      \int_\Gamma q \phi \cdot n \,\mathrm{d}\Gamma = \int_\Gamma \llbracket q\rrbracket  \cdot \{\phi\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{q\} \llbracket \phi\rrbracket  \,\mathrm{d}\Gamma^0,
+#     ```
+#     with the jumps and averages results in
+#     ```math
+#      \int_\Omega \sigma \cdot \tau \,\mathrm{d}\Omega = \int_\Omega u \nabla \cdot \tau \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u}\rrbracket  \cdot \{\tau\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u}\} \llbracket \tau\rrbracket  \,\mathrm{d}\Gamma^0,\\
+#      \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\sigma}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma^0,
+#     ```
+#     Integrating $ \int_\Omega \nabla u \cdot \tau \,\mathrm{d}\Omega $ by parts and applying divergence theorem
+#     without using numerical flux, then substitute in the equation to obtain a weak form.
+#     ```math
+#      \int_\Omega \sigma \cdot \tau \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \tau \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\tau\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \tau\rrbracket  \,\mathrm{d}\Gamma^0,\\
+#      \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\sigma}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma^0,
+#     ```
+#     Substituting
+#     ```math
+#      \tau = \nabla \delta u,\\
+#     ```
+#     results in
+#     ```math
+#      \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\nabla \delta u\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \nabla \delta u\rrbracket  \,\mathrm{d}\Gamma^0,\\
+#      \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\sigma}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma^0,
+#     ```
+#     Combining the two equations,
+#     ```math
+#      \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\nabla \delta u\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \nabla \delta u\rrbracket  \,\mathrm{d}\Gamma^0 - \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\sigma}\} \,\mathrm{d}\Gamma - \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
+#     ```
+#     The numerical fluxes chosen for the interior penalty method are $\hat{\sigma} = \{\nabla u\} - \alpha(\llbracket u\rrbracket )$ on $\Gamma$, $\hat{u} = \{u\}$ on the interfaces between elements $\Gamma^0 : \Gamma \setminus \partial \Omega$, 
+#     and $\hat{u} = 0$ on $\partial \Omega$. Such choice results in $\{\hat{\sigma}\} = \{\nabla u\} - \alpha(\llbracket u\rrbracket )$, $\llbracket \hat{u}\rrbracket  = 0$, $\{\hat{u}\} = \{u\}$, $\llbracket \hat{\sigma}\rrbracket  = 0$ and the equation becomes
+#     ```math
+#      \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_\Gamma \llbracket u\rrbracket  \cdot \{\nabla \delta u\}  \,\mathrm{d}\Gamma - \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\nabla u\} - \llbracket \delta u\rrbracket  \cdot \alpha(\llbracket u\rrbracket )  \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
+#     ```
+#     Where
+#     ```math
+#     \alpha(\llbracket u\rrbracket ) = \mu \llbracket u\rrbracket 
+#     ```
+#     Where $\mu = \eta h^{-1}$, the weak form becomes
+#     ```math
+#      \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_\Gamma \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma + \int_\Gamma \frac{\eta}{h} \llbracket u\rrbracket  ⋅ \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
+#     ```
 # Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} \nabla u \cdot n \delta u \,\mathrm{d} \partial \Omega$ can be expressed as an integral over $\partial \Omega_n$, where $\partial \Omega_n$ is the boundaries with only prescribed Neumann boundary condition,
+# The resulting weak form is given given as follows: Find $u \in \mathbb{U}$ such that
 # ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \mu \llbracket u\rrbracket  ⋅ \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega} (\nabla u \cdot n) \delta u \,\mathrm{d} \partial \Omega,\\
+#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \frac{\eta}{h} \llbracket u\rrbracket  ⋅ \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega_n} (\nabla u \cdot n) \delta u \,\mathrm{d} \partial \Omega_n,\\
 # ```
-# where $\delta u \in \mathbb{T}$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
+# where $h$ is the characteristic mesh size (the maximum diameter of the cells), and $\eta$ is a large enough positive number independent of $h$,
+# $\delta u \in \mathbb{T}$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
 # trial and test function sets, respectively.
 #-
 # ## Commented Program
