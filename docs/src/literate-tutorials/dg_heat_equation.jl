@@ -129,6 +129,10 @@ using Ferrite, SparseArrays
 # using `generate_grid`. The generator defaults to the boundaries [-1, 1] in every dimension,
 # so we don't need to specify the corners of the domain.
 grid = generate_grid(Quadrilateral, (20, 20));
+# We calculate the parameter $h$ as the maximum cell diameter.
+getdistance(p1::Vec{N, T},p2::Vec{N, T}) where {N, T} = norm(p1-p2);
+getdiameter(cell_coords::Vector{Vec{N, T}}) where {N, T} = maximum(getdistance.(cell_coords, reshape(cell_coords, (1,:))))
+h = maximum(i -> getdiameter(getcoordinates(grid, i)), 1:getncells(grid))
 # We construct the topology information which is used later for generating the sparsity pattern for stiffness matrix.
 topology = ExclusiveTopology(grid)
 
@@ -257,7 +261,7 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     return Ke, fe
 end
 
-function assemble_interface!(Ki::Matrix, iv::InterfaceValues, dim::Int, order::Int)
+function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
     ## Reset to 0
     fill!(Ki, 0)
     ## Loop over quadrature points
@@ -277,7 +281,7 @@ function assemble_interface!(Ki::Matrix, iv::InterfaceValues, dim::Int, order::I
                 u_jump = shape_value_jump(iv, q_point, j) * normal
                 ∇u_avg = shape_gradient_average(iv, q_point, j)
                 ## Add contribution to Ki          
-                Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump)*dΓ + (1 + order)^dim * 20/2 * (δu_jump ⋅ u_jump)*dΓ
+                Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump)*dΓ +  μ * (δu_jump ⋅ u_jump) * dΓ
             end
         end
     end
@@ -321,7 +325,7 @@ end
 #     versions. However, through the code we use `f` and `u` instead to reflect the strong
 #     connection between the weak form and the Ferrite implementation.
 
-function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler)
+function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, h::Float64)
     ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -340,16 +344,17 @@ function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfa
         ## Assemble Ke and fe into K and f
         assemble!(assembler, celldofs(cell), Ke, fe)
     end
-    ## get interpolation dimensions and order to use in the penalty weight
+    ## get interpolation dimensions and order to use in the penalty weight, using the $(1 + order)^{dim}$ for $\eta$
     ip = Ferrite.function_interpolation(facevalues)
     order = Ferrite.getorder(ip)
     dim = Ferrite.getdim(ip)
+    μ = (1 + order)^dim / h
     ## Loop over all interfaces
     for ic in InterfaceIterator(dh)
         ## Reinitialize interfacevalues for this interface
         reinit!(interfacevalues, ic)
         ## Compute interface surface integrals contribution
-        assemble_interface!(Ki, interfacevalues, dim, order)
+        assemble_interface!(Ki, interfacevalues, μ)
         ## Assemble Ki into K
         assemble!(assembler, interfacedofs(ic), Ki)
     end
@@ -369,7 +374,7 @@ end
 # ### Solution of the system
 # The last step is to solve the system. First we call `assemble_global`
 # to obtain the global stiffness matrix `K` and force vector `f`.
-K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh);
+K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh, h);
 
 # To account for the boundary conditions we use the `apply!` function.
 # This modifies elements in `K` and `f` respectively, such that
