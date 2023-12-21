@@ -85,9 +85,9 @@ end
 # use a `PseudoBlockArray` from `BlockArrays.jl`.
 
 function doassemble(
-    cellvalues_u::CellValues{<:VectorInterpolation},
-    cellvalues_p::CellValues{<:ScalarInterpolation},
-    facevalues_u::FaceValues{<:VectorInterpolation},
+    cellvalues_u::CellValues,
+    cellvalues_p::CellValues,
+    facevalues_u::FaceValues,
     K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::LinearElasticity
 )
     f = zeros(ndofs(dh))

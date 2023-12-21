@@ -61,14 +61,25 @@ using Ferrite, Tensors, TimerOutputs, ProgressMeter, IterativeSolvers
 # The stress can be derived from an energy potential, defined in
 # terms of the right Cauchy-Green tensor ``\mathbf{C} = \mathbf{F}^{\mathrm{T}} \cdot \mathbf{F}``,
 # where ``\mathbf{F} = \mathbf{I} + \nabla_{\mathbf{X}} \mathbf{u}`` is the deformation gradient.
-# We shall use a neo-Hookean model, where the potential can be written as
+# We shall use the compressible neo-Hookean model from [Wikipedia](https://en.wikipedia.org/wiki/Neo-Hookean_solid) with the potential
 #
 # ```math
-# \Psi(\mathbf{C}) = \frac{\mu}{2} (I_1 - 3) - \mu \ln(J) + \frac{\lambda}{2} \ln(J)^2,
+# \Psi(\mathbf{C}) = \underbrace{\frac{\mu}{2} (I_1 - 3)}_{W(\mathbf{C})} \underbrace{- {\mu} \ln(J) + \frac{\lambda}{2} (J - 1)^2}_{U(J)},
 # ```
 #
 # where ``I_1 = \mathrm{tr}(\mathbf{C})`` is the first invariant, ``J = \sqrt{\det(\mathbf{C})}``
 # and ``\mu`` and ``\lambda`` material parameters.
+# !!! details "Extra details on compressible neo-Hookean formulations"
+#     The Neo-Hooke model is only a well defined terminology in the incompressible case.
+#     Thus, only $W(\mathbf{C})$ specifies the neo-Hookean behavior, the volume penalty $U(J)$ can vary in different formulations.
+#     In order to obtain a well-posed problem, it is crucial to choose a convex formulation of $U(J)$.
+#     Other examples for $U(J)$ can be found, e.g. in [Hol:2000:nsm; Eq. (6.138)](@cite)
+#     ```math
+#      \beta^{-2} (\beta \ln J + J^{-\beta} -1)
+#     ```
+#     where [SimMie:1992:act; Eq. (2.37)](@cite) published a non-generalized version with $\beta=-2$.
+#     This shows the possible variety of $U(J)$ while all of them refer to compressible neo-Hookean models.
+#     Sometimes the modified first invariant $\overline{I}_1=\frac{I_1}{I_3^{1/3}}$ is used in $W(\mathbf{C})$ instead of $I_1$.
 # From the potential we obtain the second Piola-Kirchoff stress ``\mathbf{S}`` as
 #
 # ```math
@@ -157,7 +168,7 @@ function Ψ(C, mp::NeoHooke)
     λ = mp.λ
     Ic = tr(C)
     J = sqrt(det(C))
-    return μ / 2 * (Ic - 3) - μ * log(J) + λ / 2 * log(J)^2
+    return μ / 2 * (Ic - 3 - 2 * log(J)) + λ / 2 * (J - 1)^2
 end
 
 function constitutive_driver(C, mp::NeoHooke)
@@ -211,7 +222,7 @@ end;
 #
 # A detailed derivation can be found in every continuum mechanics book, which has a
 # chapter about finite elasticity theory. We used "Nonlinear solid mechanics: a continuum
-# approach for engineering science." by Gerhard Holzapfel (chapter 8) as a reference.
+# approach for engineering science." by [Hol:2000:nsm; Chapter 8](@citet) as a reference.
 #
 # ## Finite element assembly
 #
@@ -413,7 +424,7 @@ u = solve();
 
 ## test the result                #src
 using Test                        #src
-@test norm(u) ≈ 4.766569347736084 #src
+@test norm(u) ≈ 4.761404305083876 #src
 
 #md # ## Plain program
 #md #
