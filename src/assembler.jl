@@ -89,7 +89,7 @@ Assembles the element residual `ge` into the global residual vector `g`.
     end
 end
 
-abstract type AbstractSparseAssembler end
+abstract type AbstractSparseAssembler{MT <: AbstractSparseMatrix} end
 
 """
     matrix_handle(a::AbstractSparseAssembler)
@@ -99,20 +99,14 @@ Return a reference to the underlying matrix/vector of the assembler.
 """
 matrix_handle, vector_handle
 
-struct AssemblerSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
-    K::SparseMatrixCSC{Tv,Ti}
-    f::Vector{Tv}
-    permutation::Vector{Int}
-    sorteddofs::Vector{Int}
-end
-struct AssemblerSymmetricSparsityPattern{Tv,Ti} <: AbstractSparseAssembler
-    K::Symmetric{Tv,SparseMatrixCSC{Tv,Ti}}
+struct AssemblerSparsityPattern{Tv, MT <: AbstractSparseMatrix{Tv}} <: AbstractSparseAssembler{MT}
+    K::MT
     f::Vector{Tv}
     permutation::Vector{Int}
     sorteddofs::Vector{Int}
 end
 
-function Base.show(io::IO, ::MIME"text/plain", a::Union{AssemblerSparsityPattern,AssemblerSymmetricSparsityPattern})
+function Base.show(io::IO, ::MIME"text/plain", a::Union{AssemblerSparsityPattern})
     print(io, typeof(a), " for assembling into:\n - ")
     summary(io, a.K)
     if !isempty(a.f)
@@ -121,37 +115,27 @@ function Base.show(io::IO, ::MIME"text/plain", a::Union{AssemblerSparsityPattern
     end
 end
 
-matrix_handle(a::AssemblerSparsityPattern) = a.K
-matrix_handle(a::AssemblerSymmetricSparsityPattern) = a.K.data
-vector_handle(a::Union{AssemblerSparsityPattern, AssemblerSymmetricSparsityPattern}) = a.f
+matrix_handle(a::AssemblerSparsityPattern{<:Any, <:SparseMatrixCSC}) = a.K
+matrix_handle(a::AssemblerSparsityPattern{<:Any, <:Symmetric}) = a.K.data
+vector_handle(a::AssemblerSparsityPattern) = a.f
 
 """
-    start_assemble(K::SparseMatrixCSC;            fillzero::Bool=true) -> AssemblerSparsityPattern
-    start_assemble(K::SparseMatrixCSC, f::Vector; fillzero::Bool=true) -> AssemblerSparsityPattern
+    start_assemble(K::AbstractSparseMatrix;            fillzero::Bool=true) -> AssemblerSparsityPattern
+    start_assemble(K::AbstractSparseMatrix, f::Vector; fillzero::Bool=true) -> AssemblerSparsityPattern
 
 Create a `AssemblerSparsityPattern` from the matrix `K` and optional vector `f`.
 
-    start_assemble(K::Symmetric{SparseMatrixCSC};                 fillzero::Bool=true) -> AssemblerSymmetricSparsityPattern
-    start_assemble(K::Symmetric{SparseMatrixCSC}, f::Vector=Td[]; fillzero::Bool=true) -> AssemblerSymmetricSparsityPattern
-
-Create a `AssemblerSymmetricSparsityPattern` from the matrix `K` and optional vector `f`.
-
-`AssemblerSparsityPattern` and `AssemblerSymmetricSparsityPattern` allocate workspace
-necessary for efficient matrix assembly. To assemble the contribution from an element, use
-[`assemble!`](@ref).
+`AssemblerSparsityPattern` allocate workspace necessary for efficient matrix assembly. To assemble 
+ the contribution from an element, use [`assemble!`](@ref).
 
 The keyword argument `fillzero` can be set to `false` if `K` and `f` should not be zeroed
 out, but instead keep their current values.
 """
-start_assemble(K::Union{SparseMatrixCSC, Symmetric{<:Any,SparseMatrixCSC}}, f::Vector; fillzero::Bool)
+start_assemble(K::AbstractSparseMatrix, f::Vector; fillzero::Bool)
 
-function start_assemble(K::SparseMatrixCSC{T}, f::Vector=T[]; fillzero::Bool=true) where {T}
+function start_assemble(K::Union{AbstractSparseMatrix{T}, Symmetric{T,<: AbstractSparseMatrix{T}}}, f::Vector=T[]; fillzero::Bool=true) where {T}
     fillzero && (fillzero!(K); fillzero!(f))
     return AssemblerSparsityPattern(K, f, Int[], Int[])
-end
-function start_assemble(K::Symmetric{T,<:SparseMatrixCSC}, f::Vector=T[]; fillzero::Bool=true) where T
-    fillzero && (fillzero!(K); fillzero!(f))
-    return AssemblerSymmetricSparsityPattern(K, f, Int[], Int[])
 end
 
 """
@@ -172,13 +156,14 @@ end
 @propagate_inbounds function assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, fe::AbstractVector, Ke::AbstractMatrix)
     assemble!(A, dofs, Ke, fe)
 end
-@propagate_inbounds function assemble!(A::AssemblerSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+@propagate_inbounds function assemble!(A::AssemblerSparsityPattern{<:Any, <:AbstractSparseMatrix}, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
     _assemble!(A, dofs, Ke, fe, false)
 end
-@propagate_inbounds function assemble!(A::AssemblerSymmetricSparsityPattern, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
+@propagate_inbounds function assemble!(A::AssemblerSparsityPattern{<:Any, <:Symmetric{<:Any,<:AbstractSparseMatrix}}, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector)
     _assemble!(A, dofs, Ke, fe, true)
 end
 
+# Main entry point for the CPU
 @propagate_inbounds function _assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
     ld = length(dofs)
     @boundscheck checkbounds(Ke, keys(dofs), keys(dofs))
@@ -197,7 +182,12 @@ end
     copyto!(sorteddofs, dofs)
     sortperm2!(sorteddofs, permutation)
 
+    _assemble_inner!(K, Ke, dofs, sorteddofs, permutation, sym)
+end
+
+@propagate_inbounds function _assemble_inner!(K::SparseMatrixCSC, Ke::AbstractMatrix, dofs::AbstractVector, sorteddofs::AbstractVector, permutation::AbstractVector, sym::Bool)
     current_col = 1
+    ld = length(dofs)
     @inbounds for Kcol in sorteddofs
         maxlookups = sym ? current_col : ld
         Kecol = permutation[current_col]
