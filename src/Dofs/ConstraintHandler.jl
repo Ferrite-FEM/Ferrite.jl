@@ -638,6 +638,8 @@ function apply!(KK::Union{AbstractSparseMatrix,Symmetric{<:Any,AbstractSparseMat
     @boundscheck checkbounds(K, ch.prescribed_dofs, ch.prescribed_dofs)
     @boundscheck length(f) == 0 || checkbounds(f, ch.prescribed_dofs)
 
+    m = meandiag(K) # Use the mean of the diagonal here to not ruin things for iterative solver
+
     # Add inhomogeneities to f: (f - K * ch.inhomogeneities)
     !applyzero && add_inhomogeneities!(K, f, ch.inhomogeneities, ch.prescribed_dofs, ch.dofmapping, sym)
 
@@ -649,7 +651,6 @@ function apply!(KK::Union{AbstractSparseMatrix,Symmetric{<:Any,AbstractSparseMat
     zero_out_rows!(K, ch)
 
     # Add meandiag to constraint dofs
-    m = meandiag(K) # Use the mean of the diagonal here to not ruin things for iterative solver
     @inbounds for i in 1:length(ch.inhomogeneities)
         d = ch.prescribed_dofs[i]
         K[d, d] = m
