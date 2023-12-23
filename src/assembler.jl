@@ -115,7 +115,7 @@ function Base.show(io::IO, ::MIME"text/plain", a::Union{AssemblerSparsityPattern
     end
 end
 
-matrix_handle(a::AssemblerSparsityPattern{<:Any, <:SparseMatrixCSC}) = a.K
+matrix_handle(a::AssemblerSparsityPattern{<:Any, <:AbstractSparseMatrix}) = a.K
 matrix_handle(a::AssemblerSparsityPattern{<:Any, <:Symmetric}) = a.K.data
 vector_handle(a::AssemblerSparsityPattern) = a.f
 
@@ -165,7 +165,6 @@ end
 
 # Main entry point for the CPU
 @propagate_inbounds function _assemble!(A::AbstractSparseAssembler, dofs::AbstractVector{Int}, Ke::AbstractMatrix, fe::AbstractVector, sym::Bool)
-    ld = length(dofs)
     @boundscheck checkbounds(Ke, keys(dofs), keys(dofs))
     if length(fe) != 0
         @boundscheck checkbounds(fe, keys(dofs))
@@ -177,6 +176,7 @@ end
     permutation = A.permutation
     sorteddofs = A.sorteddofs
     @boundscheck checkbounds(K, dofs, dofs)
+    ld = length(dofs)
     resize!(permutation, ld)
     resize!(sorteddofs, ld)
     copyto!(sorteddofs, dofs)

@@ -41,7 +41,7 @@
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-plain-program).
 #
 # First we load Ferrite, and some other packages we need
-using Ferrite, SparseArrays
+using Ferrite, SparseArrays, SparseMatricesCSR
 # We start by generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
@@ -73,7 +73,8 @@ close!(dh);
 # Now that we have distributed all our dofs we can create our tangent matrix,
 # using `create_sparsity_pattern`. This function returns a sparse matrix
 # with the correct entries stored.
-K = create_sparsity_pattern(dh)
+K = SparseMatrixCSR(transpose(create_sparsity_pattern(dh)))
+#K = create_sparsity_pattern(dh)
 
 # ### Boundary conditions
 # In Ferrite constraints like Dirichlet boundary conditions
@@ -98,7 +99,7 @@ ch = ConstraintHandler(dh);
 # this case do not depend on time we define our function as $f(\textbf{x}) = 0$, i.e.
 # no matter what $\textbf{x}$ we return $0$. When we have
 # specified our constraint we `add!` it to `ch`.
-dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
+dbc = Dirichlet(:u, ∂Ω, (x, t) -> 1.0)
 add!(ch, dbc);
 
 # Finally we also need to `close!` our constraint handler. When we call `close!`
@@ -177,7 +178,7 @@ end
 #     versions. However, through the code we use `f` and `u` instead to reflect the strong
 #     connection between the weak form and the Ferrite implementation.
 
-function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler)
+function assemble_global(cellvalues::CellValues, K::AbstractSparseMatrix, dh::DofHandler)
     ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -219,7 +220,7 @@ end
 
 ## test the result                #src
 using Test                        #src
-@test norm(u) ≈ 3.307743912641305 #src
+@test norm(u) ≈ 23.74835617035439 #src
 
 #md # ## [Plain program](@id heat_equation-plain-program)
 #md #

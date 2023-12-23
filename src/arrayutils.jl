@@ -77,11 +77,11 @@ function addindex!(A::SparseMatrixCSC{Tv}, v::Tv, i::Int, j::Int) where Tv
     end
 end
 
-function fillzero!(A::SparseMatrixCSC{T}) where T
+function fillzero!(A::AbstractSparseMatrix{T}) where T
     fill!(nonzeros(A), zero(T))
     return A
 end
-function fillzero!(A::Symmetric{T,<:SparseMatrixCSC}) where T
+function fillzero!(A::Symmetric{T,<:AbstractSparseMatrix}) where T
     fillzero!(A.data)
     return A
 end
