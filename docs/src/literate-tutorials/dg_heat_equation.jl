@@ -34,8 +34,8 @@
 # ```
 # and Neumann boundary conditions such that
 # ```math
-# \nabla u(\textbf{x}) \cdot n = 1 \quad \textbf{x} \in \partial \Omega_n^+, \\
-# \nabla u(\textbf{x}) \cdot n = -1 \quad \textbf{x} \in \partial \Omega_n^-,
+# \nabla u(\textbf{x}) \cdot \boldsymbol{n} = 1 \quad \textbf{x} \in \partial \Omega_n^+, \\
+# \nabla u(\textbf{x}) \cdot \boldsymbol{n} = -1 \quad \textbf{x} \in \partial \Omega_n^-,
 # ```
 # where $\partial \Omega$ denotes the boundaries of $\Omega$ characterized by their normals directions
 # as the following:
@@ -48,7 +48,7 @@
 # | $\partial \Omega_n^-$ | (0 , -1)         |
 # The definitions of jumps and averages used in this examples are
 # ```math
-#  \{u\} = \frac{1}{2}(u^+ + u^-),\quad \llbracket u\rrbracket  = u^+ \cdot n^+ + u^- \cdot n^-\\
+#  \{u\} = \frac{1}{2}(u^+ + u^-),\quad \llbracket u\rrbracket  = u^+ \boldsymbol{n}^+ + u^- \boldsymbol{n}^-\\
 # ```
 # !!! details "Derivation of the weak form for homogeneous Dirichlet boundary condition"
 #     Defining $\sigma$ as the gradient of the temperature field the equation can be expressed as
@@ -62,7 +62,7 @@
 #      \int_\Omega \sigma \cdot \tau \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \tau \,\mathrm{d}\Omega,\\
 #      -\int_\Omega \nabla \cdot \sigma \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega,
 #     ```
-#     Integratig by parts and applying divergence theorem,
+#     Integrating by parts and applying divergence theorem,
 #     ```math
 #      \int_\Omega \sigma \cdot \tau \,\mathrm{d}\Omega = \int_\Omega u \nabla \cdot \tau \,\mathrm{d}\Omega + \int_\Gamma \hat{u} \tau \cdot n \,\mathrm{d}\Gamma,\\
 #      \int_\Omega \sigma \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \delta u \hat{\sigma} \cdot n \,\mathrm{d}\Gamma,
@@ -147,7 +147,7 @@ topology = ExclusiveTopology(grid)
 # the same reference element. We combine the interpolation and the quadrature rule
 # to `CellValues` and `InterfaceValues` object. Note that `InterfaceValues` object contains two `FaceValues` objects which can be used individually.
 ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
-qr = QuadratureRule{RefQuadrilateral}(2)
+qr = QuadratureRule{RefQuadrilateral}(2);
 # For `FaceValues` and `InterfaceValues` we use `FaceQuadratureRule`
 face_qr = FaceQuadratureRule{RefQuadrilateral}(2)
 cellvalues = CellValues(qr, ip);
@@ -169,36 +169,22 @@ close!(dh);
 # with the correct entries stored. We need to pass the topology and the cross-element coupling matrix when we're using
 # discontinuous interpolations. The cross-element coupling matrix is of size [1,1] in this case as
 # we have only one field and one DofHandler.
-K = create_sparsity_pattern(dh, topology = topology, cross_coupling = trues(1,1))
+K = create_sparsity_pattern(dh, topology = topology, cross_coupling = trues(1,1));
 
 # ### Boundary conditions
-# In Ferrite constraints like Dirichlet boundary conditions
-# are handled by a `ConstraintHandler`.
-ch = ConstraintHandler(dh);
+# The Dirichlet boundary conditions are treated 
+# as usual by a `ConstraintHandler`.
+ch = ConstraintHandler(dh)
+add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 1.0))
+add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> -1.0))
+close!(ch);
 
-# Next we need to add constraints to `ch`. For this problem we define
-# inhomogeneous Dirichlet boundary conditions on the two boundaries.
-# We define $\partial \Omega_n$ as the `union` of the face sets with Neumann boundary conditions.
+# Furthermore, we define $\partial \Omega_n$ as the `union` of the face sets with Neumann boundary conditions for later use
 ∂Ωₙ = union(
     getfaceset(grid, "top"),
     getfaceset(grid, "bottom"),
 );
 
-# Now we are set up to define our constraint. We specify which field
-# the condition is for, and our face sets. The last
-# argument is a function of the form $f(\textbf{x})$ or $f(\textbf{x}, t)$,
-# where $\textbf{x}$ is the spatial coordinate and
-# $t$ the current time, and returns the prescribed value.
-add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 1.0));
-add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> -1.0));
-
-# Finally we also need to `close!` our constraint handler. When we call `close!`
-# the dofs corresponding to our constraints are calculated and stored
-# in our `ch` object.
-close!(ch)
-
-# Note that if one or more of the constraints are time dependent we would use
-# [`update!`](@ref) to recompute prescribed values in each new timestep.
 
 # ### Assembling the linear system
 #
@@ -211,9 +197,9 @@ close!(ch)
 #
 # #### Element assembly
 # We define the functions
-# * `assemble_element!` to compute the contribution of volume integrals over an element.
-# * `assemble_interface!` to compute the contribution of surface integrals over an interface.
-# * `assemble_boundary!` to compute the contribution of surface integrals over a boundary face.
+# * `assemble_element!` to compute the contributions ``K_e`` and ``f_e`` of volume integrals over an element using `cellvalues`.
+# * `assemble_interface!` to compute the contribution ``K_i`` of surface integrals over an interface using `interfacevalues`.
+# * `assemble_boundary!` to compute the contribution ``f_e`` of surface integrals over a boundary face using `facevalues`.
 #
 # The function takes pre-allocated `ke`, `ki`, and `fe` (they are allocated once and
 # then reused for all elements) so we first need to make sure that they are all zeroes at
