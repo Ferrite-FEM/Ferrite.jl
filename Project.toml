@@ -49,8 +49,9 @@ NBInclude = "0db19996-df87-5ea3-a455-e3a50d440464"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [targets]
-test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "IterativeSolvers", "JET", "Metis", "NBInclude", "ProgressMeter", "Random", "SHA", "Test", "TimerOutputs", "Logging"]
+test = ["BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "Gmsh", "IterativeSolvers", "JET", "Metis", "NBInclude", "ProgressMeter", "Random", "SHA", "SparseMatricesCSR", "Test", "TimerOutputs", "Logging"]

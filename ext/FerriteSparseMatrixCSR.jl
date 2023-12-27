@@ -2,7 +2,6 @@ module FerriteSparseMatrixCSR
 
 using Ferrite, SparseArrays, SparseMatricesCSR
 import Base: @propagate_inbounds
-import Ferrite: Symmetric
 
 @propagate_inbounds function Ferrite._assemble_inner!(K::SparseMatrixCSR, Ke::AbstractMatrix, dofs::AbstractVector, sorteddofs::AbstractVector, permutation::AbstractVector, sym::Bool)
     current_row = 1
@@ -43,37 +42,6 @@ import Ferrite: Symmetric
             end
         end
         current_row += 1
-    end
-end
-
-function Ferrite.add_inhomogeneities!(K::SparseMatrixCSR, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector, dofmapping, sym::Bool)
-    @inbounds for i in 1:length(inhomogeneities)
-        d = prescribed_dofs[i]
-        for j in nzrange(K, d)
-            c = K.colval[j]
-            sym && c > d && break # don't look below diagonal
-            if (i = get(dofmapping, c, 0); i != 0)
-                f[d] -= inhomogeneities[i] * K.nzval[j]
-            end
-        end
-    end
-    if sym
-        error("Symmetric inhomogeneities not supported for SparseMatrixCSR")
-        # In the symmetric case, for a constrained dof `d`, we handle the contribution
-        # from `K[1:d, d]` in the loop above, but we are still missing the contribution
-        # from `K[(d+1):size(K,1), d]`. These values are not stored, but since the
-        # matrix is symmetric we can instead use `K[d, (d+1):size(K,1)]`. Looping over
-        # rows is slow, so loop over all columns again, and check if the row is a
-        # constrained row.
-        # @inbounds for col in 1:size(K, 2)
-        #     for ri in nzrange(K, col)
-        #         row = K.rowval[ri]
-        #         row >= col && break
-        #         if (i = get(dofmapping, row, 0); i != 0)
-        #             f[col] -= inhomogeneities[i] * K.nzval[ri]
-        #         end
-        #     end
-        # end
     end
 end
 

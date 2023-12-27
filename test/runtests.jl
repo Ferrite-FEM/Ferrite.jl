@@ -50,6 +50,7 @@ include("test_apply_rhs.jl")
 include("test_apply_analytical.jl")
 include("test_deprecations.jl")
 HAS_EXTENSIONS && include("blockarrays.jl")
+HAS_EXTENSIONS && include("text_assembler_extensions.jl")
 include("test_examples.jl")
 @test all(x -> isdefined(Ferrite, x), names(Ferrite))  # Test that all exported symbols are defined
 

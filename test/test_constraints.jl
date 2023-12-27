@@ -430,6 +430,7 @@ end
         # Linear solution
         fill!(a, NaN) # (not used)
         doassemble!(K, r, dh, a, params)
+        KT = SparseMatrixCSR(transpose(copy(K)))
         f = zero(r); f[end] = params.f
         apply!(K, f, ch)
         a_linear = K\f
