@@ -99,7 +99,7 @@ Return a reference to the underlying matrix/vector of the assembler.
 """
 matrix_handle, vector_handle
 
-struct AssemblerSparsityPattern{Tv, MT <: AbstractSparseMatrix{Tv}} <: AbstractSparseAssembler{MT}
+struct AssemblerSparsityPattern{Tv, MT <: Union{AbstractSparseMatrix{Tv}, Symmetric{Tv,<:AbstractSparseMatrix{Tv}}} <: AbstractSparseAssembler{MT}
     K::MT
     f::Vector{Tv}
     permutation::Vector{Int}
