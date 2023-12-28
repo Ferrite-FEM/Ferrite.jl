@@ -70,4 +70,11 @@ function Ferrite.create_sparsity_pattern(::Type{<:SparseMatrixCSR}, dh, ch; kwar
     return SparseMatrixCSR(transpose(sparse(transpose(K)))) 
 end
 
+function Ferrite.create_sparsity_pattern(::Type{<:SparseMatrixCSR}, dh; kwargs...)
+    # create SparseMatrixCSC
+    K = create_sparsity_pattern(dh; kwargs...)
+    # transform to SparseMatrixCSR
+    return SparseMatrixCSR(transpose(sparse(transpose(K)))) 
+end
+
 end
