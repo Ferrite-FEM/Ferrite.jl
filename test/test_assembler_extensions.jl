@@ -74,6 +74,31 @@ end
     V = [4/3,0.0,0.0,-2.0,2.0,1.0,-1.0]
     @test K ≈ sparsecsr(I,J,V)
     @test f ≈ [4/3,2.0,1.0]
+
+
+    grid = generate_grid(Quadrilateral, (2,2))
+    ip = Lagrange{RefQuadrilateral,1}()
+    dh = DofHandler(grid)
+    add!(dh, :u, ip)
+    add!(dh, :v, ip)
+    close!(dh)
+    
+    Ke_zeros = zeros(ndofs_per_cell(dh,1), ndofs_per_cell(dh,1))
+    Ke_rand = rand(ndofs_per_cell(dh,1), ndofs_per_cell(dh,1))
+    dofs = celldofs(dh,1)
+    
+    for c1 ∈ [true, false], c2 ∈ [true, false], c3 ∈ [true, false], c4 ∈ [true, false]
+        coupling = [c1; c2;; c3; c4]
+        K = create_sparsity_pattern(SparseMatrixCSR, dh; coupling)
+        a = start_assemble(K)
+        assemble!(a, dofs, Ke_zeros)
+        if all(coupling)
+            assemble!(a, dofs, Ke_rand)
+            @test Ke_rand ≈ K[dofs,dofs]
+        else
+            @test_throws ErrorException assemble!(a, dofs, Ke_rand)
+        end
+    end
 end
 
 end

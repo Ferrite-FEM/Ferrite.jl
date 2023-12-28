@@ -30,7 +30,7 @@ import Base: @propagate_inbounds
             else # Kcol > dofs[Kecol]
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
-                iszero(val) || _missing_sparsity_pattern_error(Krow, Kcol)
+                iszero(val) || Ferrite._missing_sparsity_pattern_error(Krow, Kcol)
                 # Advance the local matrix row pointer
                 ci += 1
             end
@@ -38,7 +38,7 @@ import Base: @propagate_inbounds
         # Make sure that remaining entries in this column of the local matrix are all zero
         for i in ci:maxlookups
             if !iszero(Ke[Kerow, permutation[i]])
-                _missing_sparsity_pattern_error(Krow, sorteddofs[i])
+                Ferrite._missing_sparsity_pattern_error(Krow, sorteddofs[i])
             end
         end
         current_row += 1
