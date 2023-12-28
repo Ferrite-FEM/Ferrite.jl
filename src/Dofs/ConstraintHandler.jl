@@ -661,7 +661,12 @@ function apply!(KK::Union{AbstractSparseMatrix,Symmetric{<:Any,<:AbstractSparseM
     end
 end
 
-# Generic version to compute "f -= K*inhomogeneities"
+"""
+    add_inhomogeneities!(K, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping::Dict{Int,Int})
+
+Compute "f -= K*inhomogeneities".
+By default this is a generic version via SpMSpV kernel.
+"""
 function add_inhomogeneities!(K, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping)
     f .-= K*sparsevec(prescribed_dofs, inhomogeneities, size(K,2))
 end

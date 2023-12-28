@@ -8,7 +8,11 @@ Ferrite.zero_out_rows!
 Ferrite.zero_out_columns!
 ```
 
-and the `AbstractSparseMatrix` interface for their custom matrix type.
+and the `AbstractSparseMatrix` interface for their custom matrix type. Optional dispatches to speed up operations might be
+
+```@docs
+Ferrite.add_inhomogeneities!
+```
 
 ## Custom Assembler
 
