@@ -63,4 +63,11 @@ function Ferrite.zero_out_columns!(K::SparseMatrixCSR, ch::ConstraintHandler)
     end
 end
 
+function Ferrite.create_sparsity_pattern(::Type{<:SparseMatrixCSR}, dh, ch; kwargs...)
+    # create SparseMatrixCSC
+    K = create_sparsity_pattern(dh, ch; kwargs...)
+    # transform to SparseMatrixCSR
+    return SparseMatrixCSR(transpose(sparse(transpose(K)))) 
+end
+
 end

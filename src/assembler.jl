@@ -89,7 +89,7 @@ Assembles the element residual `ge` into the global residual vector `g`.
     end
 end
 
-abstract type AbstractSparseAssembler{MT <: AbstractSparseMatrix} end
+abstract type AbstractSparseAssembler end
 
 """
     matrix_handle(a::AbstractSparseAssembler)
@@ -99,7 +99,7 @@ Return a reference to the underlying matrix/vector of the assembler.
 """
 matrix_handle, vector_handle
 
-struct AssemblerSparsityPattern{Tv, MT <: Union{AbstractSparseMatrix{Tv}, Symmetric{Tv,<:AbstractSparseMatrix{Tv}}}} <: AbstractSparseAssembler{MT}
+struct AssemblerSparsityPattern{Tv, MT <: Union{AbstractSparseMatrix{Tv}, Symmetric{Tv,<:AbstractSparseMatrix{Tv}}}} <: AbstractSparseAssembler
     K::MT
     f::Vector{Tv}
     permutation::Vector{Int}
