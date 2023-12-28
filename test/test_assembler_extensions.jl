@@ -1,5 +1,7 @@
-import SparseMatricesCSR: SparseMatrixCSR
+import SparseMatricesCSR: SparseMatrixCSR, sparsecsr
 using SparseArrays, LinearAlgebra
+
+@testset "SparseMatricesCSR extension" begin
 
 @testset "apply!(::SparseMatrixCSR,...)" begin
     # Specifically this test that values below the diagonal of K2::Symmetric aren't touched
@@ -33,4 +35,45 @@ using SparseArrays, LinearAlgebra
     add!(ch, AffineConstraint(1, [3 => 1.0], 1.0))
     close!(ch)
     @test_throws ErrorException("condensation of ::SparseMatrixCSR{1, Float64, Int64} matrix not supported") apply!(K2, f2, ch)
+end
+
+@testset "assembly integration" begin
+    grid = generate_grid(Line, (2,))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefLine, 1}())
+    close!(dh)
+
+    K = create_sparsity_pattern(SparseMatrixCSR, dh)
+    I = [1,1,2,2,2,3,3]
+    J = [1,2,1,2,3,2,3]
+    V = zeros(7)
+    @test K == sparsecsr(I,J,V)
+    f = zeros(3)
+
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> 1))
+    close!(ch)
+    @test K == create_sparsity_pattern(SparseMatrixCSR, dh, ch)
+
+    assembler = start_assemble(K, f)
+    ke = [-1.0 1.0; 2.0 -1.0]
+    fe = [1.0,2.0]
+    assemble!(assembler, [1,2], ke,fe)
+    assemble!(assembler, [3,2], ke,fe)
+
+    I = [1,1,2,2,2,3,3]
+    J = [1,2,1,2,3,2,3]
+    V = [-1.0,1.0,2.0,-2.0,2.0,1.0,-1.0]
+    @test K ≈ sparsecsr(I,J,V)
+    @test f ≈ [1.0,4.0,1.0]
+
+    apply!(K,f,ch)
+
+    I = [1,1,2,2,2,3,3]
+    J = [1,2,1,2,3,2,3]
+    V = [4/3,0.0,0.0,-2.0,2.0,1.0,-1.0]
+    @test K ≈ sparsecsr(I,J,V)
+    @test f ≈ [4/3,2.0,1.0]
+end
+
 end
