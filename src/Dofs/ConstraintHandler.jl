@@ -668,7 +668,7 @@ end
 
 # Optimized version for SparseMatrixCSC
 add_inhomogeneities!(K::SparseMatrixCSC, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping) = add_inhomogeneities_csc!(K, f, inhomogeneities, prescribed_dofs, dofmapping, false)
-add_inhomogeneities!(K::Symmetric{<:Any,<:SparseMatrixCSC}, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping) = add_inhomogeneities_csc!(K, f, inhomogeneities, prescribed_dofs, dofmapping, true)
+add_inhomogeneities!(K::Symmetric{<:Any,<:SparseMatrixCSC}, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping) = add_inhomogeneities_csc!(K.data, f, inhomogeneities, prescribed_dofs, dofmapping, true)
 function add_inhomogeneities_csc!(K::SparseMatrixCSC, f::AbstractVector, inhomogeneities::AbstractVector, prescribed_dofs::AbstractVector{<:Integer}, dofmapping, sym::Bool)
     @inbounds for i in 1:length(inhomogeneities)
         d = prescribed_dofs[i]

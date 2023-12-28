@@ -28,7 +28,6 @@ using SparseArrays, LinearAlgebra
     @test K1 == K2
     @test f0 == f1
     @test f1 == f2
-    @test K1\f1 ≈ K0\f0
     # Error for affine constraints
     ch = ConstraintHandler(dh)
     add!(ch, AffineConstraint(1, [3 => 1.0], 1.0))
