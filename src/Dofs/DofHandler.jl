@@ -131,7 +131,7 @@ close!(dh)
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
+    DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells+1), zeros(Int, ncells), ScalarWrapper(false), grid, ScalarWrapper(-1))
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
@@ -264,7 +264,7 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
             # TODO: warn if interpolation type is not the same?
         end
     end
-    
+
     # Check that interpolation is compatible with cells it it added to
     refshape_sdh = getrefshape(getcells(sdh.dh.grid, first(sdh.cellset)))
     if refshape_sdh !== getrefshape(ip)
@@ -374,6 +374,7 @@ function __close!(dh::DofHandler{dim}) where {dim}
             facedicts,
         )
     end
+    dh.cell_dofs_offset[end] = length(dh.cell_dofs) + 1
     dh.ndofs[] = maximum(dh.cell_dofs; init=0)
     dh.closed[] = true
 
