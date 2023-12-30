@@ -195,25 +195,12 @@ close!(ch);
 # contributions ``f_e`` which are then assembled to the
 # appropriate place in the global ``K`` and ``f``.
 #
-# #### Element assembly
+# #### Local assembly
 # We define the functions
 # * `assemble_element!` to compute the contributions ``K_e`` and ``f_e`` of volume integrals over an element using `cellvalues`.
 # * `assemble_interface!` to compute the contribution ``K_i`` of surface integrals over an interface using `interfacevalues`.
 # * `assemble_boundary!` to compute the contribution ``f_e`` of surface integrals over a boundary face using `facevalues`.
 #
-# The function takes pre-allocated `ke`, `ki`, and `fe` (they are allocated once and
-# then reused for all elements) so we first need to make sure that they are all zeroes at
-# the start of the function by using `fill!`. Then we loop over all the quadrature points,
-# and for each quadrature point we loop over all the (local) shape functions. The *values
-# objects provide values needed to calculate contributions as follows:
-# * `cellvalues`:
-#     * test function value ($\delta u$)
-#     * test and trial functions gradient ($\nabla u$ and $\nabla \delta u$)
-# * `facevalues`:
-#     * test function value ($δu$)
-# * `interfacevalues`:
-#     * jump in test and trial functions values
-#     * average of test and trial functions gradients
 #
 # !!! note "Notation"
 #     Comparing with the brief finite element introduction in [Introduction to FEM](@ref),
@@ -287,9 +274,9 @@ function assemble_boundary!(fe::Vector, fv::FaceValues)
         ∂Ω = getdetJdV(fv, q_point)
         ## Loop over test shape functions
         for i in 1:getnbasefunctions(fv)
-            ## Multiply the jump by the normal, as the definition used in Ferrite doesn't include the normals.
             δu = shape_value(fv, q_point, i)
-            fe[i] = normal[2] * δu * ∂Ω
+            boundary_flux = normal[2]
+            fe[i] = boundary_flux * δu * ∂Ω
         end
     end
     return fe
@@ -297,21 +284,7 @@ end
 #md nothing # hide
 
 # #### Global assembly
-# We define the function `assemble_global` to loop over the elements and do the global
-# assembly. The function takes our `cellvalues`, `interfacevalues`, the sparse matrix `K`, and our DofHandler
-# as input arguments and returns the assembled global stiffness matrix, and the assembled
-# global force vector. We start by allocating `Ke`, `Ki`, `fe`, and the global force vector `f`.
-# We also create an assembler by using `start_assemble`. The assembler lets us assemble into
-# `K` and `f` efficiently. We then start the loop over all the elements. In each loop
-# iteration we reinitialize `cellvalues` (to update derivatives of shape functions etc.),
-# compute the element contribution with `assemble_element!`, and then assemble into the
-# global `K` and `f` with `assemble!`.
-#
-# !!! note "Notation"
-#     Comparing again with [Introduction to FEM](@ref), `f` and `u` correspond to
-#     $\underline{\hat{f}}$ and $\underline{\hat{u}}$, since they represent the discretized
-#     versions. However, through the code we use `f` and `u` instead to reflect the strong
-#     connection between the weak form and the Ferrite implementation.
+# We define the function `assemble_global` to loop over all elements and internal faces (interfaces), as well as the external faces involved in Neumann boundary conditions. 
 
 function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, h::Float64)
     ## Allocate the element stiffness matrix and element force vector
@@ -360,19 +333,11 @@ end
 #md nothing # hide
 
 # ### Solution of the system
-# The last step is to solve the system. First we call `assemble_global`
-# to obtain the global stiffness matrix `K` and force vector `f`.
-K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh, h);
+# The solution of the system is independent of the discontinuous discretization, and after assembling the application of constraints, linear solve, and exporting is done as usual.
 
-# To account for the boundary conditions we use the `apply!` function.
-# This modifies elements in `K` and `f` respectively, such that
-# we can get the correct solution vector `u` by using `\`.
+K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh, h);
 apply!(K, f, ch)
 u = K \ f;
-
-# ### Exporting to VTK
-# To visualize the result we export the grid and our field `u`
-# to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
 vtk_grid("dg_heat_equation", dh) do vtk
     vtk_point_data(vtk, dh, u)
 end
