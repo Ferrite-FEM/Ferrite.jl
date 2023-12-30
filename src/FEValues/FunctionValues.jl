@@ -167,6 +167,20 @@ end
     return nothing
 end
 
+struct QuadPointFunctionValues{N_t, dNdx_t}
+    Nx::N_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
+    dNdx::dNdx_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}} or Nothing
+end
+
+@inline function QuadPointFunctionValues(funvals::FunctionValues{1}, ::IdentityMapping, q_point::Int, mapping_values, args...)
+    Jinv = calculate_Jinv(getjacobian(mapping_values))
+    ip = function_interpolation(funvals)
+    nbase = getnbasefunctions(ip)
+    Nx = SVector{nbase}(ntuple(i-> (@inbounds funvals.Nx[i, q_point]), nbase))
+    dNdx = SVector{nbase}(ntuple(i -> (@inbounds dothelper(funvals.dNdξ[i, q_point], Jinv)), nbase))
+    return QuadPointFunctionValues(Nx, dNdx)
+end
+
 # TODO in PR798, apply_mapping! for 
 # * CovariantPiolaMapping
 # * ContravariantPiolaMapping

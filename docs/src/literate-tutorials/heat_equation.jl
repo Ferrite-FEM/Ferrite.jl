@@ -133,24 +133,25 @@ close!(ch)
 #     underline the strong parallel between the weak form and the implementation, this
 #     example uses the symbols appearing in the weak form.
 
-function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
+function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues, x::Vector)
     n_basefuncs = getnbasefunctions(cellvalues)
     ## Reset to 0
     fill!(Ke, 0)
     fill!(fe, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(cellvalues)
+        cv_qp = Ferrite.QuadPointCellValues(cellvalues, x, q_point)
         ## Get the quadrature weight
-        dΩ = getdetJdV(cellvalues, q_point)
+        dΩ = getdetJdV(cv_qp)
         ## Loop over test shape functions
         for i in 1:n_basefuncs
-            δu  = shape_value(cellvalues, q_point, i)
-            ∇δu = shape_gradient(cellvalues, q_point, i)
+            δu  = shape_value(cv_qp, i)
+            ∇δu = shape_gradient(cv_qp, i)
             ## Add contribution to fe
             fe[i] += δu * dΩ
             ## Loop over trial shape functions
             for j in 1:n_basefuncs
-                ∇u = shape_gradient(cellvalues, q_point, j)
+                ∇u = shape_gradient(cv_qp, j)
                 ## Add contribution to Ke
                 Ke[i, j] += (∇δu ⋅ ∇u) * dΩ
             end
@@ -188,10 +189,8 @@ function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHand
     assembler = start_assemble(K, f)
     ## Loop over all cels
     for cell in CellIterator(dh)
-        ## Reinitialize cellvalues for this cell
-        reinit!(cellvalues, cell)
         ## Compute element contribution
-        assemble_element!(Ke, fe, cellvalues)
+        assemble_element!(Ke, fe, cellvalues, getcoordinates(cell))
         ## Assemble Ke and fe into K and f
         assemble!(assembler, celldofs(cell), Ke, fe)
     end

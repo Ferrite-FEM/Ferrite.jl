@@ -128,3 +128,66 @@ function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     print(io, "\nGeometric interpolation: "); 
     sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
 end
+
+struct QuadPointCellValues{N_t, dNdx_t, T, M_t}
+    fun_values::QuadPointFunctionValues{N_t, dNdx_t}
+    detJdV::T
+    geo_values::M_t # StaticVector{n_geom_basefuncs}
+end
+
+QuadPointCellValues(cv::CellValues, x::AbstractVector{<:Vec}, q_point::Int) = QuadPointCellValues(cv, nothing, x, q_point)
+
+function QuadPointCellValues(cv::CellValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{<:Vec}, q_point::Int)
+    geo_mapping = cv.geo_mapping
+    fun_values = cv.fun_values
+    n_geom_basefuncs = getnbasefunctions(geometric_interpolation(cv))
+    
+    check_reinit_sdim_consistency(:CellValues, shape_gradient_type(cv), eltype(x))
+    if cell === nothing && !isa(mapping_type(fun_values), IdentityMapping)
+        throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
+    end
+    if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
+        throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+    end
+    checkbounds(getweights(cv.qr), q_point)
+
+    @inbounds qr_weight = getweights(cv.qr)[q_point]
+    @inbounds mapping = calculate_mapping(geo_mapping, q_point, x)
+    detJdV = if cv.detJdV === nothing
+        nothing
+    else
+        detJ = calculate_detJ(getjacobian(mapping))
+        detJ > 0.0 || throw_detJ_not_pos(detJ)
+        detJ * qr_weight
+    end
+    qp_funvals = QuadPointFunctionValues(fun_values, mapping_type(fun_values), q_point, mapping, cell)
+    geo_values = SVector{n_geom_basefuncs}(ntuple(i -> (@inbounds geo_mapping.M[i, q_point]), n_geom_basefuncs))
+    return QuadPointCellValues(qp_funvals, detJdV, geo_values)
+end
+
+@inline shape_value(cv::QuadPointCellValues, i::Int) = cv.fun_values.Nx[i]
+@inline shape_gradient(cv::QuadPointCellValues, i::Int) = cv.fun_values.dNdx[i]
+@inline getdetJdV(cv::QuadPointCellValues) = cv.detJdV
+getnbasefunctions(cv::QuadPointCellValues) = length(cv.fun_values.Nx)
+
+function function_value(fe_v::QuadPointCellValues, u::AbstractVector{T}, dof_range = eachindex(u)) where T
+    n_base_funcs = getnbasefunctions(fe_v)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
+    val = zero(typeof(shape_value(fe_v, 1))) * zero(T)
+    @inbounds for (i, j) in pairs(dof_range)
+        val += shape_value(fe_v, i) * u[j]
+    end
+    return val
+end
+
+function function_gradient(fe_v::QuadPointCellValues, u::AbstractVector{T}, dof_range = eachindex(u)) where T
+    n_base_funcs = getnbasefunctions(fe_v)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
+    grad = zero(typeof(shape_gradient(fe_v, 1))) * zero(T)
+    @inbounds for (i, j) in pairs(dof_range)
+        grad += shape_gradient(fe_v, i) * u[j]
+    end
+    return grad
+end
