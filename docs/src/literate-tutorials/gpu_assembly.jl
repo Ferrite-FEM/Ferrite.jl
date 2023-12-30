@@ -75,7 +75,6 @@ GPUGrid(grid::Grid{<:Any,<:Any,T}) where T = GPUGrid(T, grid)
 function GPUGrid(::Type{T}, grid::Grid) where T
     GPUGrid(
         CuArray(getcells(grid)),
-        # CuArray(Vec{Ferrite.getdim(grid),T}.(get_node_coordinate.(getnodes(grid))))
         CuArray(getnodes(grid))
     )
 end
@@ -109,11 +108,13 @@ Adapt.@adapt_structure GPUDofHandler
 function shape_values(ip::Lagrange{RefQuadrilateral, 1}, ξ::Vec{2})
     ξ_x = ξ[1]
     ξ_y = ξ[2]
+    Nx = ((1 - ξ_x), (1 + ξ_x))
+    Ny = ((1 - ξ_y), (1 + ξ_y))
     return @SVector [
-        (1 - ξ_x) * (1 - ξ_y) / 4,
-        (1 + ξ_x) * (1 - ξ_y) / 4,
-        (1 + ξ_x) * (1 + ξ_y) / 4,
-        (1 - ξ_x) * (1 + ξ_y) / 4,
+        Nx[1] * Ny[1] / 4,
+        Nx[2] * Ny[1] / 4,
+        Nx[2] * Ny[2] / 4,
+        Nx[1] * Ny[2] / 4,
     ]
 end
 
@@ -121,15 +122,18 @@ function shape_values(ip::Lagrange{RefHexahedron, 1}, ξ::Vec{3})
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     ξ_z = ξ[3]
+    Nx = ((1 - ξ_x), (1 + ξ_x))
+    Ny = ((1 - ξ_y), (1 + ξ_y))
+    Nz = ((1 - ξ_z), (1 + ξ_z))
     return @SVector [
-        (1 - ξ_x) * (1 - ξ_y) * (1 - ξ_z) / 8,
-        (1 + ξ_x) * (1 - ξ_y) * (1 - ξ_z) / 8,
-        (1 + ξ_x) * (1 + ξ_y) * (1 - ξ_z) / 8,
-        (1 - ξ_x) * (1 + ξ_y) * (1 - ξ_z) / 8,
-        (1 - ξ_x) * (1 - ξ_y) * (1 + ξ_z) / 8,
-        (1 + ξ_x) * (1 - ξ_y) * (1 + ξ_z) / 8,
-        (1 + ξ_x) * (1 + ξ_y) * (1 + ξ_z) / 8,
-        (1 - ξ_x) * (1 + ξ_y) * (1 + ξ_z) / 8,
+        Nx[1] * Ny[1] * Nz[1] / 8,
+        Nx[2] * Ny[1] * Nz[1] / 8,
+        Nx[2] * Ny[2] * Nz[1] / 8,
+        Nx[1] * Ny[2] * Nz[1] / 8,
+        Nx[1] * Ny[1] * Nz[2] / 8,
+        Nx[2] * Ny[1] * Nz[2] / 8,
+        Nx[2] * Ny[2] * Nz[2] / 8,
+        Nx[1] * Ny[2] * Nz[2] / 8,
     ]
 end
 
@@ -238,8 +242,8 @@ function gpu_element_mass_action2!(uₑout::V, uₑin::V, qr::SmallQuadratureRul
         for i in 1:n_basefuncs
             ϕᵢ = shapes[i]
             for j in 1:n_basefuncs
-                inner = shapes[j]*uₑin[j]
-                uₑout[i] += inner*ϕᵢ*dΩ
+                ϕⱼ = shapes[j]
+                uₑout[i] += ϕᵢ*ϕⱼ*uₑin[j]*dΩ
             end
         end
     end
@@ -250,10 +254,9 @@ end
 function gpu_full_mass_action_kernel!(uout::AbstractVector, uin::AbstractVector, gpudh::GPUDofHandler, cell_indices::AbstractVector, qr::SmallQuadratureRule, ip::Ferrite.Interpolation, ip_geo::Ferrite.Interpolation)
     index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
-    i = index
-    while i <= length(cell_indices)
+    while index <= length(cell_indices)
         ## Get index of the current cell
-        cell_index = cell_indices[i]
+        cell_index = cell_indices[index]
         ## Grab the actual cell
         cell = gpudh.grid.cells[cell_index]
         ## Grab the dofs on the cell
@@ -265,7 +268,7 @@ function gpu_full_mass_action_kernel!(uout::AbstractVector, uin::AbstractVector,
         xₑ = cellnodesvec(cell, gpudh.grid.nodes)
         ## Apply local action for y = Ax
         gpu_element_mass_action2!(uₑout, uₑin, qr, ip, ip_geo, xₑ)
-        i += stride
+        index += stride
     end
     return nothing
 end
@@ -278,12 +281,11 @@ function gpu_full_mass_action!(uout::AbstractVector, u::AbstractVector, dh::GPUD
 
     # Apply action one time
     for color ∈ colors
-        numthreads = 256
-        numblocks = 1 #fails...? ceil(Int, length(color)/numthreads)
+        #numthreads = 1
+        #numblocks = 1 #fails...? ceil(Int, length(color)/numthreads)
         # try
-            @cuda threads=numthreads blocks=numblocks gpu_full_mass_action_kernel!(uout, u, dh, color, qr, ip, ip_geo)
+            @cuda gpu_full_mass_action_kernel!(uout, u, dh, color, qr, ip, ip_geo)
             synchronize()
-            break
             # catch err
         #     code_typed(err; interactive = true)
         # end
@@ -355,10 +357,9 @@ end
 function gpu_rhs_kernel!(rhs::RHS, gpudh::GPUDH, qr::QR, ip::FIP, ip_geo::GIP, cell_indices::GPUC) where {RHS, GPUDH, QR, FIP, GIP, GPUC}
     index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
-    i = index
-    while i <= length(cell_indices)
+    while index <= length(cell_indices)
         ## Get index of the current cell
-        cell_index = cell_indices[i]
+        cell_index = cell_indices[index]
         ## Grab the actual cell
         cell = gpudh.grid.cells[cell_index]
         # ## Grab the dofs on the cell
@@ -368,7 +369,6 @@ function gpu_rhs_kernel!(rhs::RHS, gpudh::GPUDH, qr::QR, ip::FIP, ip_geo::GIP, c
         ## Grab coordinate array
         coords = cellnodesvec(cell, gpudh.grid.nodes)
         ## Apply local action for y = Ax
-        n_basefuncs = getnbasefunctions(ip)
         for q_point in 1:length(qr.weights) #getnquadpoints(cellvalues)
             ξ = qr.points[q_point]
             # TODO recover abstraction layer
@@ -378,27 +378,27 @@ function gpu_rhs_kernel!(rhs::RHS, gpudh::GPUDH, qr::QR, ip::FIP, ip_geo::GIP, c
             # # TODO spatial_coordinate
             x = zero(Vec{3,Float64})
             ϕᵍ = shape_values(ip_geo, ξ)
-            for i in 1:n_basefuncs
+            for i in 1:getnbasefunctions(ip_geo)
                 x += ϕᵍ[i]*coords[i] #geometric_value(fe_v, q_point, i) * x[i]
             end
 
             ϕᶠ = shape_values(ip, ξ)
-            @inbounds for i in 1:n_basefuncs
+            @inbounds for i in 1:getnbasefunctions(ip)
                 rhsₑ[i] += cos(x[1]/π)*cos(x[2]/π)*ϕᶠ[i]*dΩ
             end
         end
-        i += stride
+        index += stride
     end
 end
 
 
 function generate_rhs(gpurhs::FerriteRHS{<:GPUDofHandler})
     rhs = CuArray(zeros(Float64,ndofs(dh)))
-    numthreads = 256
-    numblocks = 1 #fails...? ceil(Int, length(color)/numthreads)
+    # numthreads = 1
+    # numblocks = 1 #fails...? ceil(Int, length(color)/numthreads)
     for color ∈ gpurhs.colors
         # try
-        @cuda threads=numthreads blocks=numblocks gpu_rhs_kernel!(rhs, gpurhs.dh, gpurhs.qr, gpurhs.ip, gpurhs.ip_geo, color)
+        @cuda gpu_rhs_kernel!(rhs, gpurhs.dh, gpurhs.qr, gpurhs.ip, gpurhs.ip_geo, color)
         synchronize()
         # catch err
         #     code_typed(err; interactive = true)
@@ -427,12 +427,12 @@ function generate_rhs(gpurhs::FerriteRHS{<:GPUDofHandler})
 end
 
 cudh = GPUDofHandler(dh)
-cucols = CuArray.(colors)
-Agpu = FerriteMFMassOperator(cudh, cucols, ip, ip, SmallQuadratureRule(qr))
-bgpu = generate_rhs(FerriteRHS(cudh, cucols, ip, ip, SmallQuadratureRule(qr)))
+cucolors = CuArray.(colors)
+Agpu = FerriteMFMassOperator(cudh, cucolors, ip, ip, SmallQuadratureRule(qr))
+bgpu = generate_rhs(FerriteRHS(cudh, cucolors, ip, ip, SmallQuadratureRule(qr)))
 u = CUDA.fill(0.0, ndofs(dh));
 cg!(u, Agpu, bgpu; verbose=true);
-# @benchmark CUDA.@sync mul!($u,$Agpu,$bgpu);
+# @benchmark CUDA.@sync mul!($u,$Agpu,$bgpu)
 # CUDA.@profile mul!(b,A,u)
 
 # ### Exporting to VTK
