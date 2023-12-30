@@ -60,6 +60,22 @@ function Adapt.adapt_structure(to, nodes::Vector{Node{dim}}) where dim
 end
 ### TODO Adapt dofhandler?
 
+struct CuGrid{sdim,C<:Ferrite.AbstractCell,T<:Real, CELA<:CUDA.Const{C,1}, NODA<:CUDA:Const{Vec{sdim,T},1}, COLA<:CUDA.Const{Int,1}} <: Ferrite.AbstractGrid{sdim}
+    cells::CELA
+    nodes::NODA
+    colors::COLA
+    # TODO subdomains
+end
+
+CuGrid(grid::Grid{<:Any,<:Any,T}) where T = CuGrid(T, grid)
+function CuGrid(::Type{T}, grid::Grid)
+    CuGrid(
+        Const(CuArray(getcells(grid))),
+        Const(CuArray(Vec{Ferrite.getdim(grid),Float32}.(get_node_coordinate.(getnodes(grid))))),
+        Const(CuArray(colors))
+    )
+end
+
 # TODO not sure how to do this automatically
 function unsafe_shape_value(ip::Lagrange{RefQuadrilateral, 1}, ξ::Vec{2}, i::Int)
     ξ_x = ξ[1]
@@ -223,7 +239,7 @@ function gpu_element_mass_action2!(uₑout::V, uₑin::V, qr::GPUQuadratureRule{
 end
 
 # Mass action on a single color
-function gpu_mass_action_kernel!(uout::V, uin::V, all_cell_dofs, cell_dof_offsets, cell_indices, qr::GPUQuadratureRule{N,T,dim}, ip::IP, ip_geo::GIP, cells::CuDeviceArray{CT}, nodes::CuDeviceArray{Vec{dim,T}}, dofs_per_cell)  where {V,N,T,dim,CT,IP,GIP}
+function gpu_full_mass_action_kernel!(uout::V, uin::V, all_cell_dofs, cell_dof_offsets, cell_indices, qr::GPUQuadratureRule{N,T,dim}, ip::IP, ip_geo::GIP, cells::CuDeviceArray{CT}, nodes::CuDeviceArray{Vec{dim,T}}, dofs_per_cell)  where {V,N,T,dim,CT,IP,GIP}
     index = threadIdx().x    # this example only requires linear indexing, so just use `x`
     stride = blockDim().x
     @inbounds for i = index:stride:length(cell_indices)
@@ -246,7 +262,7 @@ function gpu_mass_action_kernel!(uout::V, uin::V, all_cell_dofs, cell_dof_offset
 end
 
 # Mass action of the full operator
-function gpu_mass_action!(uout::V, u::V, all_cell_dofs, cell_dof_offsets, qr::QR, ip::IP, ip_geo::GIP, colors, gpu_cells, gpu_nodes) where {V, QR, IP, GIP}
+function gpu_full_mass_action!(uout::V, u::V, all_cell_dofs, cell_dof_offsets, qr::QR, ip::IP, ip_geo::GIP, colors, gpu_cells, gpu_nodes) where {V, QR, IP, GIP}
     # Initialize solution
     fill!(uout, 0.f0)
     synchronize()
@@ -257,7 +273,7 @@ function gpu_mass_action!(uout::V, u::V, all_cell_dofs, cell_dof_offsets, qr::QR
         numthreads = 256
         numblocks = 1 #fails...? ceil(Int, length(color)/numthreads)
         # try
-            @show @device_code_warntype @cuda threads=numthreads blocks=numblocks gpu_mass_action_kernel!(uout, u, all_cell_dofs, cell_dof_offsets, color, qr, ip, ip_geo, gpu_cells, gpu_nodes, dofs_per_cell)
+            @show @device_code_warntype @cuda threads=numthreads blocks=numblocks gpu_full_mass_action_kernel!(uout, u, all_cell_dofs, cell_dof_offsets, color, qr, ip, ip_geo, gpu_cells, gpu_nodes, dofs_per_cell)
             synchronize()
             break
             # catch err
@@ -277,11 +293,9 @@ end
 
 # 
 # Define the operator struct (https://iterativesolvers.julialinearalgebra.org/dev/getting_started/)
-struct FerriteGPUMassOperator{CACELLS, CANODES, CACOLORS, CADOFS, CAOFFSETS, IP, GIP, QR}
+struct FerriteGPUMassOperator{TGRID, CADOFS, CAOFFSETS, IP, GIP, QR}
     # "GPUGrid"
-    gpu_cells::CACELLS
-    gpu_nodes::CANODES
-    colors::CACOLORS
+    grid::TGRID
     # "GPUDofHandler"
     all_cell_dofs::CADOFS
     cell_dof_offsets::CAOFFSETS
@@ -303,11 +317,39 @@ function FerriteGPUMassOperator(dh, colors, ip, ip_geo, qr)
     )
 end
 
-LinearAlgebra.mul!(y, A::FerriteGPUMassOperator, x) = gpu_mass_action!(y, x, A.all_cell_dofs, A.cell_dof_offsets, A.qr, A.ip, A.ip_geo, A.colors, A.gpu_cells, A.gpu_nodes)
+LinearAlgebra.mul!(y, A::FerriteGPUMassOperator, x) = gpu_full_mass_action!(y, x, A.all_cell_dofs, A.cell_dof_offsets, A.qr, A.ip, A.ip_geo, A.colors, A.gpu_cells, A.gpu_nodes)
 Base.eltype(A::FerriteGPUMassOperator) = Float64
 Base.size(A::FerriteGPUMassOperator, d) = ndofs(dh) # Square operator
 
 A = FerriteGPUMassOperator(dh, colors, ip, ip, qr)
+
+struct FerriteEAGPUMassOperator{CACELLS, CANODES, CACOLORS, CADOFS, CAOFFSETS, IP, GIP, QR, EAMATS <: AbstractArray{3}}
+    # "GPUGrid"
+    gpu_cells::CACELLS
+    gpu_nodes::CANODES
+    colors::CACOLORS
+    # "GPUDofHandler"
+    all_cell_dofs::CADOFS
+    cell_dof_offsets::CAOFFSETS
+    # "GPUValues"
+    ip::IP
+    ip_geo::GIP
+    qr::QR
+    # 
+    element_matrices::EAMATS
+end
+
+function FerriteGPUMassOperator(dh, colors, ip, ip_geo, qr)
+    grid = Ferrite.get_grid(dh)
+    FerriteGPUMassOperator(
+        CuArray(getcells(grid)),
+        CuArray(Vec{Ferrite.getdim(grid),Float32}.(get_node_coordinate.(getnodes(grid)))),
+        colors,
+        CuArray(dh.cell_dofs),
+        CuArray(dh.cell_dofs_offset),
+        ip, ip_geo, qr
+    )
+end
 
 struct FerriteGPURHS{CACELLS, CANODES, CACOLORS, CADOFS, CAOFFSETS, IP, GIP, QR}
     # "GPUGrid"
