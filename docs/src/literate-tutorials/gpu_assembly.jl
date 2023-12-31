@@ -47,18 +47,6 @@ using IterativeSolvers, LinearAlgebra
 ### TODO Extension
 import Adapt
 using StaticArrays, SparseArrays
-struct SmallQuadratureRule{N,T,dim}
-    weights::SVector{N,T}
-    points::SVector{N,Vec{dim,T}}
-end
-SmallQuadratureRule(qr::QuadratureRule) = SmallQuadratureRule(SVector{length(qr.weights)}(qr.weights), SVector{length(qr.points)}(qr.points))
-function Adapt.adapt_structure(to, qr::QuadratureRule{shape,T,dim}) where {shape,T,dim}
-    N = length(qr.weights)
-    SmallQuadratureRule{N,T,dim}(SVector{N,T}(qr.weights), SVector{N,Vec{dim,T}}(qr.points))
-end
-function Adapt.adapt_structure(to, nodes::Vector{Node{dim,T}}) where {dim,T}
-    CuArray(Vec{dim,T}.(get_node_coordinate.(grid.nodes)))
-end
 
 struct GPUGrid{sdim,C<:Ferrite.AbstractCell,T<:Real, CELA<:AbstractArray{C,1}, NODA<:AbstractArray{Node{sdim,T},1}} <: Ferrite.AbstractGrid{sdim}
     cells::CELA
