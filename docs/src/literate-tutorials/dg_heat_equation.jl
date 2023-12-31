@@ -116,11 +116,8 @@
 # Now we solve the problem in Ferrite. What follows is a program spliced with comments.
 #md # The full program, without comments, can be found in the next [section](@ref heat_equation-DG-plain-program).
 #
-# First we load Ferrite, and some other packages we need
+# First we load Ferrite and other packages, and generate grid just like the [heat equation tutorial](heat_equation.md)
 using Ferrite, SparseArrays
-# We start by generating a simple grid with 20x20 quadrilateral elements
-# using `generate_grid`. The generator defaults to the boundaries [-1, 1] in every dimension,
-# so we don't need to specify the corners of the domain.
 grid = generate_grid(Quadrilateral, (20, 20));
 # We calculate the parameter $h$ as the maximum cell diameter.
 getdistance(p1::Vec{N, T},p2::Vec{N, T}) where {N, T} = norm(p1-p2);
@@ -145,19 +142,12 @@ cellvalues = CellValues(qr, ip);
 facevalues = FaceValues(face_qr, ip);
 interfacevalues = InterfaceValues(facevalues)
 # ### Degrees of freedom
-# Next we need to define a `DofHandler`, which will take care of numbering
-# and distribution of degrees of freedom for our approximated fields.
-# We create the `DofHandler` and then add a single scalar field called `:u` based on
-# our interpolation `ip` defined above.
-# Lastly we `close!` the `DofHandler`, it is now that the dofs are distributed
-# for all the elements.
+# Degrees of freedom distribution is handled using `DofHandler` as usual
 dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
 
-# Now that we have distributed all our dofs we can create our tangent matrix,
-# using `create_sparsity_pattern`. This function returns a sparse matrix
-# with the correct entries stored. We need to pass the topology and the cross-element coupling matrix when we're using
+# However, when generating the sparsity pattern we need to pass the topology and the cross-element coupling matrix when we're using
 # discontinuous interpolations. The cross-element coupling matrix is of size [1,1] in this case as
 # we have only one field and one DofHandler.
 K = create_sparsity_pattern(dh, topology = topology, cross_coupling = trues(1,1));
@@ -191,15 +181,6 @@ close!(ch);
 # * `assemble_element!` to compute the contributions ``K_e`` and ``f_e`` of volume integrals over an element using `cellvalues`.
 # * `assemble_interface!` to compute the contribution ``K_i`` of surface integrals over an interface using `interfacevalues`.
 # * `assemble_boundary!` to compute the contribution ``f_e`` of surface integrals over a boundary face using `facevalues`.
-#
-#
-# !!! note "Notation"
-#     Comparing with the brief finite element introduction in [Introduction to FEM](@ref),
-#     the variables `δu`, `∇δu` and `∇u` are actually $\phi_i(\textbf{x}_q)$, $\nabla
-#     \phi_i(\textbf{x}_q)$ and $\nabla \phi_j(\textbf{x}_q)$, i.e. the evaluation of the
-#     trial and test functions in the quadrature point ``\textbf{x}_q``. However, to
-#     underline the strong parallel between the weak form and the implementation, this
-#     example uses the symbols appearing in the weak form.
 
 function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
