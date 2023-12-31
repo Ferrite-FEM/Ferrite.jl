@@ -28,23 +28,15 @@
 # 
 # With the inhomogeneous Dirichlet boundary conditions
 # ```math
-# u(\textbf{x}) = 1 \quad \textbf{x} \in \partial \Omega_u^+, \\
-# u(\textbf{x}) = -1 \quad \textbf{x} \in \partial \Omega_u^-,
+# u(\textbf{x}) = 1 \quad \textbf{x} \in \partial \Omega_D^+ = \lbrace\textbf{x} : x_1 = 1.0\rbrace, \\
+# u(\textbf{x}) = -1 \quad \textbf{x} \in \partial \Omega_D^- = \lbrace\textbf{x} : x_1 = -1.0\rbrace,
 # ```
 # and Neumann boundary conditions
 # ```math
-# \nabla u(\textbf{x}) \cdot \boldsymbol{n} = 1 \quad \textbf{x} \in \partial \Omega_n^+, \\
-# \nabla u(\textbf{x}) \cdot \boldsymbol{n} = -1 \quad \textbf{x} \in \partial \Omega_n^-,
+# \nabla u(\textbf{x}) \cdot \boldsymbol{n} = 1 \quad \textbf{x} \in \partial \Omega_N^+ = \lbrace\textbf{x} : x_2 = 1.0\rbrace, \\
+# \nabla u(\textbf{x}) \cdot \boldsymbol{n} = -1 \quad \textbf{x} \in \partial \Omega_N^- = \lbrace\textbf{x} : x_2 = -1.0\rbrace,
 # ```
-# where $\partial \Omega$ denotes the boundaries of $\Omega$ characterized by their normals directions
-# as the following:
 #
-# | Boundary              | Normal direction |
-# |-----------------------|------------------|
-# | $\partial \Omega_u^+$ | (1 , 0)          |
-# | $\partial \Omega_u^-$ | (-1 , 0)         |
-# | $\partial \Omega_n^+$ | (0 , 1)          |
-# | $\partial \Omega_n^-$ | (0 , -1)         |
 # The definitions of jumps and averages used in this examples are
 # ```math
 #  \{u\} = \frac{1}{2}(u^+ + u^-),\quad \llbracket u\rrbracket  = u^+ \boldsymbol{n}^+ + u^- \boldsymbol{n}^-\\
@@ -108,10 +100,10 @@
 #     ```math
 #      \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_\Gamma \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma + \int_\Gamma \frac{\eta}{h} \llbracket u\rrbracket  ⋅ \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 #     ```
-# Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} \nabla u \cdot n \delta u \,\mathrm{d} \partial \Omega$ can be expressed as an integral over $\partial \Omega_n$, where $\partial \Omega_n$ is the boundaries with only prescribed Neumann boundary condition,
+# Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} \nabla u \cdot n \delta u \,\mathrm{d} \partial \Omega$ can be expressed as an integral over $\partial \Omega_N$, where $\partial \Omega_N$ is the boundaries with only prescribed Neumann boundary condition,
 # The resulting weak form is given given as follows: Find $u \in \mathbb{U}$ such that
 # ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \frac{\eta}{h} \llbracket u\rrbracket  ⋅ \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega_n} (\nabla u \cdot n) \delta u \,\mathrm{d} \partial \Omega_n,\\
+#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \frac{\eta}{h} \llbracket u\rrbracket  ⋅ \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega_N} (\nabla u \cdot n) \delta u \,\mathrm{d} \partial \Omega_N,\\
 # ```
 # where $h$ is the characteristic mesh size (the maximum diameter of the cells), and $\eta$ is a large enough positive number independent of $h$ [Mu:2014:IP](@cite),
 # $\delta u \in \mathbb{T}$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
@@ -178,7 +170,7 @@ add!(ch, Dirichlet(:u, getfaceset(grid, "right"), (x, t) -> 1.0))
 add!(ch, Dirichlet(:u, getfaceset(grid, "left"), (x, t) -> -1.0))
 close!(ch);
 
-# Furthermore, we define $\partial \Omega_n$ as the `union` of the face sets with Neumann boundary conditions for later use
+# Furthermore, we define $\partial \Omega_N$ as the `union` of the face sets with Neumann boundary conditions for later use
 ∂Ωₙ = union(
     getfaceset(grid, "top"),
     getfaceset(grid, "bottom"),
