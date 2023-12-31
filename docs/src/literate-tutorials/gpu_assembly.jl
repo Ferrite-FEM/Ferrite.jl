@@ -46,7 +46,7 @@ using IterativeSolvers, LinearAlgebra
 
 ### TODO Extension
 import Adapt
-using StaticArrays
+using StaticArrays, SparseArrays
 struct SmallQuadratureRule{N,T,dim}
     weights::SVector{N,T}
     points::SVector{N,Vec{dim,T}}
@@ -177,31 +177,80 @@ cellnodesvec(cell::Hexahedron, nodes) = (nodes[cell.nodes[1]].x, nodes[cell.node
 # We start by generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Hexahedron, (20, 20, 20), Vec{3}((-1.f0,-1.f0,-1.f0)), Vec{3}((1.f0,1.f0,1.f0)));
+# grid = generate_grid(Hexahedron, (2, 1, 1), Vec{3}((-1.f0,-1.f0,-1.f0)), Vec{3}((1.f0,1.f0,1.f0)));
+grid = generate_grid(Quadrilateral, (2, 1), Vec((-1.f0,-1.f0)), Vec((1.f0,1.f0)));
 colors = create_coloring(grid); # TODO add example without coloring, i.e. using Atomics instead
 
-# ### Trial and test functions
-# A `CellValues` facilitates the process of evaluating values and gradients of
-# test and trial functions (among other things). To define
-# this we need to specify an interpolation space for the shape functions.
-# We use Lagrange functions
-# based on the two-dimensional reference quadrilateral. We also define a quadrature rule based on
-# the same reference element. We combine the interpolation and the quadrature rule
-# to a `CellValues` object.
-ip = Lagrange{RefHexahedron, 1}()
-qr = QuadratureRule{RefHexahedron,Float32}(2)
+ip = Lagrange{RefQuadrilateral, 1}()
+qr = QuadratureRule{RefQuadrilateral,Float32}(2)
 cellvalues = CellValues(qr, ip);
 
-# ### Degrees of freedom
-# Next we need to define a `DofHandler`, which will take care of numbering
-# and distribution of degrees of freedom for our approximated fields.
-# We create the `DofHandler` and then add a single scalar field called `:u` based on
-# our interpolation `ip` defined above.
-# Lastly we `close!` the `DofHandler`, it is now that the dofs are distributed
-# for all the elements.
 dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
+
+function assemble_element!(Ke::AbstractMatrix, cellvalues::CellValues)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    fill!(Ke, 0)
+    for q_point in 1:getnquadpoints(cellvalues)
+        dΩ = getdetJdV(cellvalues, q_point)
+        for i in 1:n_basefuncs
+            δu  = shape_value(cellvalues, q_point, i)
+            for j in 1:n_basefuncs
+                u = shape_value(cellvalues, q_point, j)
+                Ke[i, j] += (δu ⋅ u) * dΩ
+            end
+        end
+    end
+    return Ke
+end
+
+function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    Ke = zeros(n_basefuncs, n_basefuncs)
+    assembler = start_assemble(K)
+    for cell in CellIterator(dh)
+        reinit!(cellvalues, cell)
+        assemble_element!(Ke, cellvalues)
+        assemble!(assembler, celldofs(cell), Ke)
+    end
+    return K
+end
+
+function assemble_global(cellvalues::CellValues, K::Array{<:Any,3}, dh::DofHandler)
+    for cell in CellIterator(dh)
+        ## Reinitialize cellvalues for this cell
+        reinit!(cellvalues, cell)
+        ## Compute element contribution
+        Ke = @view K[:,:,cellid(cell)]
+        assemble_element!(Ke, cellvalues)
+    end
+    return K
+end
+
+Kcpu = create_sparsity_pattern(dh)
+assemble_global(cellvalues, Kcpu, dh)
+
+Keacpu = zeros(Float32, ndofs_per_cell(dh,1),ndofs_per_cell(dh,1),length(dh.grid.cells))
+assemble_global(cellvalues, Keacpu, dh)
+
+function d2eop(dh::DofHandler)
+    I = Int32[]
+    J = Int32[]
+    next_edof_idx = 1
+    for ei ∈ 1:length(dh.grid.cells)
+        cell_dofs = celldofs(dh, ei)
+        for cell_dof ∈ cell_dofs
+            push!(I, Int32(next_edof_idx))
+            push!(J, Int32(cell_dof))
+            next_edof_idx += 1
+        end
+    end
+    V = ones(Bool, next_edof_idx-1)
+    return sparse(I,J,V)
+end
+
+d2e = d2eop(dh)
 
 # ### Boundary conditions
 # In Ferrite constraints like Dirichlet boundary conditions
@@ -280,11 +329,11 @@ function gpu_full_mass_action!(uout::AbstractVector, u::AbstractVector, dh::GPUD
     synchronize()
 
     # Apply action one time
+    numthreads = 128
     for color ∈ colors
-        #numthreads = 1
-        #numblocks = 1 #fails...? ceil(Int, length(color)/numthreads)
+        numblocks = ceil(Int, length(color)/numthreads)
         # try
-            @cuda gpu_full_mass_action_kernel!(uout, u, dh, color, qr, ip, ip_geo)
+            @cuda threads=numthreads blocks=numblocks  gpu_full_mass_action_kernel!(uout, u, dh, color, qr, ip, ip_geo)
             synchronize()
             # catch err
         #     code_typed(err; interactive = true)
@@ -317,33 +366,44 @@ Base.eltype(A::FerriteMFMassOperator{<:Grid{<:Any,<:Any,T}}) where T = T
 Base.eltype(A::FerriteMFMassOperator{<:GPUGrid{<:Any,<:Any,T}}) where T = T
 Base.size(A::FerriteMFMassOperator, d) = ndofs(dh) # Square operator
 
-# struct FerriteEAGPUMassOperator{CACELLS, CANODES, CACOLORS, CADOFS, CAOFFSETS, IP, GIP, QR, EAMATS <: AbstractArray{3}}
-#     # "GPUGrid"
-#     gpu_cells::CACELLS
-#     gpu_nodes::CANODES
-#     colors::CACOLORS
-#     # "GPUDofHandler"
-#     all_cell_dofs::CADOFS
-#     cell_dofs_offset::CAOFFSETS
-#     # "GPUValues"
-#     ip::IP
-#     ip_geo::GIP
-#     qr::QR
-#     # 
-#     element_matrices::EAMATS
-# end
+struct FerriteEAMassOperator{D2E, XE2, EAMATS <: AbstractArray{<:Any,3}}
+    d2e::D2E
+    xe2::XE2
+    element_matrices::EAMATS
+end
 
-# function FerriteGPUMassOperator(dh, colors, ip, ip_geo, qr)
-#     grid = Ferrite.get_grid(dh)
-#     FerriteGPUMassOperator(
-#         CuArray(getcells(grid)),
-#         CuArray(Vec{Ferrite.getdim(grid),Float32}.(get_node_coordinate.(getnodes(grid)))),
-#         colors,
-#         CuArray(dh.cell_dofs),
-#         CuArray(dh.cell_dofs_offset),
-#         ip, ip_geo, qr
-#     )
-# end
+function gemv_batched!(xe2::CuDeviceArray{T,2}, emats::CuDeviceArray{T,3}, xe::CuDeviceArray{T,2}) where T
+    cell_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
+    stride = gridDim().x * blockDim().x
+    while cell_index ≤ size(emats,3)
+        xei = @view xe[:,cell_index]
+        xe2i = @view xe2[:,cell_index]
+        emati = @view emats[:,:,cell_index]
+        # mul!(xe2i, emati, xei) # fails?
+        xe2i .= T(0.0)
+        for i ∈ 1:size(emats,1), j ∈ 1:size(emats,2)
+            xe2i[i] += emati[i,j]*xei[j]
+        end
+        cell_index += stride
+    end
+end
+
+function LinearAlgebra.mul!(y,A::FerriteEAMassOperator{<:Any,<:Any,<:CuArray},x)
+    xe = A.d2e*x
+    synchronize()
+    xev = reshape(xe, (size(A.element_matrices,2), size(A.element_matrices,3)))
+    xe2v = reshape(A.xe2, (size(A.element_matrices,2), size(A.element_matrices,3)))
+    synchronize()
+    # CUDA.CUBLAS.gemv_batched!(???)
+    numthreads = 128
+    numblocks = ceil(Int, size(A.element_matrices,3)/numthreads)
+    @cuda threads=numthreads blocks=numblocks gemv_batched!(xe2v, A.element_matrices, xev)
+    y .= transpose(A.d2e)*A.xe2
+    synchronize()
+end
+Base.eltype(A::FerriteEAMassOperator{<:Grid{<:Any,<:Any,T}}) where T = T
+Base.eltype(A::FerriteEAMassOperator{<:GPUGrid{<:Any,<:Any,T}}) where T = T
+Base.size(A::FerriteEAMassOperator, d) = ndofs(dh) # Square operator
 
 struct FerriteRHS{DH, COLS, IP, GIP, QR}
     dh::DH
@@ -354,7 +414,7 @@ struct FerriteRHS{DH, COLS, IP, GIP, QR}
     qr::QR
 end
 
-function gpu_rhs_kernel!(rhs::CuDeviceVector{T}, gpudh::GPUDofHandler{<:GPUGrid{<:Any,<:Any,T}}, qr::SmallQuadratureRule{<:Any,T}, ip::Ferrite.Interpolation, ip_geo::Ferrite.Interpolation, cell_indices::AbstractVector) where {T}
+function gpu_rhs_kernel!(rhs::CuDeviceVector{T}, gpudh::GPUDofHandler{<:GPUGrid{sdim,<:Any,T}}, qr::SmallQuadratureRule{<:Any,T}, ip::Ferrite.Interpolation, ip_geo::Ferrite.Interpolation, cell_indices::AbstractVector) where {sdim,T}
     index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
     while index <= length(cell_indices)
@@ -376,7 +436,7 @@ function gpu_rhs_kernel!(rhs::CuDeviceVector{T}, gpudh::GPUDofHandler{<:GPUGrid{
             dΩ = det(J)*qr.weights[q_point] #getdetJdV(cellvalues, q_point)
 
             # # TODO spatial_coordinate
-            x = zero(Vec{3,T})
+            x = zero(Vec{sdim,T})
             ϕᵍ = shape_values(ip_geo, ξ)
             for i in 1:getnbasefunctions(ip_geo)
                 x += ϕᵍ[i]*coords[i] #geometric_value(fe_v, q_point, i) * x[i]
@@ -394,11 +454,11 @@ end
 
 function generate_rhs(gpurhs::FerriteRHS{<:GPUDofHandler{<:GPUGrid{<:Any,<:Any,T}}}) where T
     rhs = CuArray(zeros(T,ndofs(dh)))
-    # numthreads = 1
-    # numblocks = 1 #fails...? ceil(Int, length(color)/numthreads)
+    numthreads = 128
     for color ∈ gpurhs.colors
+        numblocks = ceil(Int, length(color)/numthreads)
         # try
-        @cuda gpu_rhs_kernel!(rhs, gpurhs.dh, gpurhs.qr, gpurhs.ip, gpurhs.ip_geo, color)
+        @cuda threads=numthreads blocks=numblocks gpu_rhs_kernel!(rhs, gpurhs.dh, gpurhs.qr, gpurhs.ip, gpurhs.ip_geo, color)
         synchronize()
         # catch err
         #     code_typed(err; interactive = true)
@@ -432,9 +492,12 @@ Agpu = FerriteMFMassOperator(cudh, cucolors, ip, ip, SmallQuadratureRule(qr))
 rhsop = FerriteRHS(cudh, cucolors, ip, ip, SmallQuadratureRule(qr))
 bgpu = generate_rhs(rhsop)
 u = CUDA.fill(0.f0, ndofs(dh));
-cg!(u, Agpu, bgpu; verbose=true);
+# cg!(u, Agpu, bgpu; verbose=true);
 # @benchmark CUDA.@sync mul!($u,$Agpu,$bgpu)
 # CUDA.@profile mul!(b,A,u)
+
+Aeagpu = FerriteEAMassOperator(CUDA.CUSPARSE.CuSparseMatrixCSC(d2e), CuArray(zeros(Float32, size(d2e,1))), CuArray(Keacpu))
+# @benchmark CUDA.@sync mul!($u,$Aeagpu,$bgpu)
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
