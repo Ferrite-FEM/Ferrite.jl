@@ -177,12 +177,12 @@ cellnodesvec(cell::Hexahedron, nodes) = (nodes[cell.nodes[1]].x, nodes[cell.node
 # We start by generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-# grid = generate_grid(Hexahedron, (2, 1, 1), Vec{3}((-1.f0,-1.f0,-1.f0)), Vec{3}((1.f0,1.f0,1.f0)));
-grid = generate_grid(Quadrilateral, (2, 1), Vec((-1.f0,-1.f0)), Vec((1.f0,1.f0)));
+grid = generate_grid(Hexahedron, (100, 100, 100), Vec{3}((-1.f0,-1.f0,-1.f0)), Vec{3}((1.f0,1.f0,1.f0)));
+# grid = generate_grid(Quadrilateral, (2, 1), Vec((-1.f0,-1.f0)), Vec((1.f0,1.f0)));
 colors = create_coloring(grid); # TODO add example without coloring, i.e. using Atomics instead
 
-ip = Lagrange{RefQuadrilateral, 1}()
-qr = QuadratureRule{RefQuadrilateral,Float32}(2)
+ip = Lagrange{RefHexahedron, 1}()
+qr = QuadratureRule{RefHexahedron,Float32}(2)
 cellvalues = CellValues(qr, ip);
 
 dh = DofHandler(grid)
@@ -228,7 +228,7 @@ function assemble_global(cellvalues::CellValues, K::Array{<:Any,3}, dh::DofHandl
     return K
 end
 
-Kcpu = create_sparsity_pattern(dh)
+Kcpu = convert(SparseMatrixCSC{Float32, Int32}, create_sparsity_pattern(dh))
 assemble_global(cellvalues, Kcpu, dh)
 
 Keacpu = zeros(Float32, ndofs_per_cell(dh,1),ndofs_per_cell(dh,1),length(dh.grid.cells))
@@ -246,35 +246,20 @@ function d2eop(dh::DofHandler)
             next_edof_idx += 1
         end
     end
-    V = ones(Bool, next_edof_idx-1)
+    V = ones(Float32, next_edof_idx-1)
     return sparse(I,J,V)
 end
 
 d2e = d2eop(dh)
 
 # ### Boundary conditions
-# In Ferrite constraints like Dirichlet boundary conditions
-# are handled by a `ConstraintHandler`.
 # ch = ConstraintHandler(dh);
-
-# Next we need to add constraints to `ch`. For this problem we define
-# homogeneous Dirichlet boundary conditions on the whole boundary, i.e.
-# the `union` of all the face sets on the boundary.
 # ∂Ω = union(
 #     getfaceset(grid, "left"),
 #     getfaceset(grid, "right"),
 #     getfaceset(grid, "top"),
 #     getfaceset(grid, "bottom"),
 # );
-
-# Now we are set up to define our constraint. We specify which field
-# the condition is for, and our combined face set `∂Ω`. The last
-# argument is a function of the form $f(\textbf{x})$ or $f(\textbf{x}, t)$,
-# where $\textbf{x}$ is the spatial coordinate and
-# $t$ the current time, and returns the prescribed value. Since the boundary condition in
-# this case do not depend on time we define our function as $f(\textbf{x}) = 0$, i.e.
-# no matter what $\textbf{x}$ we return $0$. When we have
-# specified our constraint we `add!` it to `ch`.
 # dbc = Dirichlet(:u, ∂Ω, (x, t) -> 0)
 # add!(ch, dbc);
 # close!(ch)
@@ -373,6 +358,10 @@ struct FerriteEAMassOperator{D2E, XE2, EAMATS <: AbstractArray{<:Any,3}}
 end
 
 function gemv_batched!(xe2::CuDeviceArray{T,2}, emats::CuDeviceArray{T,3}, xe::CuDeviceArray{T,2}) where T
+    # base_cell_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
+    # stride = blockDim().x
+    # for cell_index ∈ base_cell_index:min(base_cell_index+stride,size(emats,3))
+
     cell_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
     while cell_index ≤ size(emats,3)
@@ -381,7 +370,7 @@ function gemv_batched!(xe2::CuDeviceArray{T,2}, emats::CuDeviceArray{T,3}, xe::C
         emati = @view emats[:,:,cell_index]
         # mul!(xe2i, emati, xei) # fails?
         xe2i .= T(0.0)
-        for i ∈ 1:size(emats,1), j ∈ 1:size(emats,2)
+        for j ∈ 1:size(emats,2), i ∈ 1:size(emats,1)
             xe2i[i] += emati[i,j]*xei[j]
         end
         cell_index += stride
@@ -398,7 +387,8 @@ function LinearAlgebra.mul!(y,A::FerriteEAMassOperator{<:Any,<:Any,<:CuArray},x)
     numthreads = 128
     numblocks = ceil(Int, size(A.element_matrices,3)/numthreads)
     @cuda threads=numthreads blocks=numblocks gemv_batched!(xe2v, A.element_matrices, xev)
-    y .= transpose(A.d2e)*A.xe2
+    synchronize()
+    mul!(y, transpose(A.d2e), A.xe2)
     synchronize()
 end
 Base.eltype(A::FerriteEAMassOperator{<:Grid{<:Any,<:Any,T}}) where T = T
@@ -491,13 +481,19 @@ cucolors = CuArray.(colors)
 Agpu = FerriteMFMassOperator(cudh, cucolors, ip, ip, SmallQuadratureRule(qr))
 rhsop = FerriteRHS(cudh, cucolors, ip, ip, SmallQuadratureRule(qr))
 bgpu = generate_rhs(rhsop)
-u = CUDA.fill(0.f0, ndofs(dh));
-# cg!(u, Agpu, bgpu; verbose=true);
+ugpu = CUDA.fill(0.f0, ndofs(dh));
+# cg!(ugpu, Agpu, bgpu; verbose=true);
 # @benchmark CUDA.@sync mul!($u,$Agpu,$bgpu)
-# CUDA.@profile mul!(b,A,u)
 
 Aeagpu = FerriteEAMassOperator(CUDA.CUSPARSE.CuSparseMatrixCSC(d2e), CuArray(zeros(Float32, size(d2e,1))), CuArray(Keacpu))
-# @benchmark CUDA.@sync mul!($u,$Aeagpu,$bgpu)
+# @benchmark CUDA.@sync mul!($ugpu,$Aeagpu,$bgpu)
+
+ucpu = copy(Array(ugpu))
+bcpu = copy(Array(bgpu))
+# @benchmark mul!($u,$Kcpu,$(Array(bgpu)))
+
+Kgpu = CUDA.CUSPARSE.CuSparseMatrixCSC(Kcpu)
+# @benchmark mul!($ugpu,$Kcpu,$bgpu)
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
