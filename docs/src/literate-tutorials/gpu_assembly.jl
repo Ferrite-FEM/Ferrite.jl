@@ -177,7 +177,7 @@ cellnodesvec(cell::Hexahedron, nodes) = (nodes[cell.nodes[1]].x, nodes[cell.node
 # We start by generating a simple grid with 20x20 quadrilateral elements
 # using `generate_grid`. The generator defaults to the unit square,
 # so we don't need to specify the corners of the domain.
-grid = generate_grid(Hexahedron, (20, 20, 20));
+grid = generate_grid(Hexahedron, (20, 20, 20), Vec{3}((-1.f0,-1.f0,-1.f0)), Vec{3}((1.f0,1.f0,1.f0)));
 colors = create_coloring(grid); # TODO add example without coloring, i.e. using Atomics instead
 
 # ### Trial and test functions
@@ -189,7 +189,7 @@ colors = create_coloring(grid); # TODO add example without coloring, i.e. using 
 # the same reference element. We combine the interpolation and the quadrature rule
 # to a `CellValues` object.
 ip = Lagrange{RefHexahedron, 1}()
-qr = QuadratureRule{RefHexahedron}(2)
+qr = QuadratureRule{RefHexahedron,Float32}(2)
 cellvalues = CellValues(qr, ip);
 
 # ### Degrees of freedom
@@ -354,7 +354,7 @@ struct FerriteRHS{DH, COLS, IP, GIP, QR}
     qr::QR
 end
 
-function gpu_rhs_kernel!(rhs::RHS, gpudh::GPUDH, qr::QR, ip::FIP, ip_geo::GIP, cell_indices::GPUC) where {RHS, GPUDH, QR, FIP, GIP, GPUC}
+function gpu_rhs_kernel!(rhs::CuDeviceVector{T}, gpudh::GPUDofHandler{<:GPUGrid{<:Any,<:Any,T}}, qr::SmallQuadratureRule{<:Any,T}, ip::Ferrite.Interpolation, ip_geo::Ferrite.Interpolation, cell_indices::AbstractVector) where {T}
     index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
     while index <= length(cell_indices)
@@ -376,7 +376,7 @@ function gpu_rhs_kernel!(rhs::RHS, gpudh::GPUDH, qr::QR, ip::FIP, ip_geo::GIP, c
             dΩ = det(J)*qr.weights[q_point] #getdetJdV(cellvalues, q_point)
 
             # # TODO spatial_coordinate
-            x = zero(Vec{3,Float64})
+            x = zero(Vec{3,T})
             ϕᵍ = shape_values(ip_geo, ξ)
             for i in 1:getnbasefunctions(ip_geo)
                 x += ϕᵍ[i]*coords[i] #geometric_value(fe_v, q_point, i) * x[i]
@@ -392,8 +392,8 @@ function gpu_rhs_kernel!(rhs::RHS, gpudh::GPUDH, qr::QR, ip::FIP, ip_geo::GIP, c
 end
 
 
-function generate_rhs(gpurhs::FerriteRHS{<:GPUDofHandler})
-    rhs = CuArray(zeros(Float64,ndofs(dh)))
+function generate_rhs(gpurhs::FerriteRHS{<:GPUDofHandler{<:GPUGrid{<:Any,<:Any,T}}}) where T
+    rhs = CuArray(zeros(T,ndofs(dh)))
     # numthreads = 1
     # numblocks = 1 #fails...? ceil(Int, length(color)/numthreads)
     for color ∈ gpurhs.colors
@@ -429,8 +429,9 @@ end
 cudh = GPUDofHandler(dh)
 cucolors = CuArray.(colors)
 Agpu = FerriteMFMassOperator(cudh, cucolors, ip, ip, SmallQuadratureRule(qr))
-bgpu = generate_rhs(FerriteRHS(cudh, cucolors, ip, ip, SmallQuadratureRule(qr)))
-u = CUDA.fill(0.0, ndofs(dh));
+rhsop = FerriteRHS(cudh, cucolors, ip, ip, SmallQuadratureRule(qr))
+bgpu = generate_rhs(rhsop)
+u = CUDA.fill(0.f0, ndofs(dh));
 cg!(u, Agpu, bgpu; verbose=true);
 # @benchmark CUDA.@sync mul!($u,$Agpu,$bgpu)
 # CUDA.@profile mul!(b,A,u)
