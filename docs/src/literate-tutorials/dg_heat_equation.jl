@@ -94,7 +94,7 @@
 #     ```
 #     Where
 #     ```math
-#     \alpha(\boldsymbol{\llbracket u\rrbracket}) = \mu \boldsymbol{\llbracket u\rrbracket}
+#      \alpha(\boldsymbol{\llbracket u\rrbracket}) = \mu \boldsymbol{\llbracket u\rrbracket}
 #     ```
 #     Where $\mu = \eta h^{-1}$, the weak form becomes
 #     ```math
@@ -315,8 +315,8 @@ vtk_grid("dg_heat_equation", dh) do vtk
 end
 
 ## test the result                #src
-#using Test                        #src
-#@test norm(u) ≈ 3.307743912641305 #src
+# using Test                        #src
+# @test norm(u) ≈ 27.88892990564881 #src
 
 #md # ## References
 #md # ```@bibliography
