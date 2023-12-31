@@ -17,22 +17,21 @@
 #
 # ## Introduction
 #
-# The heat equation is the "Hello, world!" equation of finite elements.
-# Here we solve the equation on a unit square with a uniform internal source, using the interior penalty formulation.
-# The strong form of the (linear) heat equation is given by
-#
+# This tutorial extends [tutorial 1: Heat equation](heat_equation.md) by using discontinuous Galerkin method.
+# The reader is expected to have gone throught [tutorial 1: Heat equation](heat_equation.md) before proceeding with this tutorial.
+# The main differences between the two tutorials are the interface integral terms in the weak form, the boundary conditions, and
+# some implementation differences explained in the commented program.
+# The strong form used in this tutorial is
 # ```math
-#  -\nabla \cdot (k \nabla u) = f  \quad \textbf{x} \in \Omega,
+#  -\nabla \cdot (\nabla u) = 1  \quad \textbf{x} \in \Omega,
 # ```
-#
-# where $u$ is the unknown temperature field, $k$ the heat conductivity,
-# $f$ the heat source and $\Omega$ the domain. For simplicity we set $f = 1$
-# and $k = 1$. We will consider inhomogeneous Dirichlet boundary conditions such that
+# 
+# With the inhomogeneous Dirichlet boundary conditions
 # ```math
 # u(\textbf{x}) = 1 \quad \textbf{x} \in \partial \Omega_u^+, \\
 # u(\textbf{x}) = -1 \quad \textbf{x} \in \partial \Omega_u^-,
 # ```
-# and Neumann boundary conditions such that
+# and Neumann boundary conditions
 # ```math
 # \nabla u(\textbf{x}) \cdot \boldsymbol{n} = 1 \quad \textbf{x} \in \partial \Omega_n^+, \\
 # \nabla u(\textbf{x}) \cdot \boldsymbol{n} = -1 \quad \textbf{x} \in \partial \Omega_n^-,
