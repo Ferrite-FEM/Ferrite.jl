@@ -83,7 +83,7 @@ function generate_grid(::Type{QuadraticLine}, nel::NTuple{1,Int}, left::Vec{1,T}
     return Grid(cells, nodes, facesets=facesets, boundary_matrix=boundary_matrix)
 end
 
-function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
+function _generate_2d_nodes!(nodes::AbstractVector{<:Node{2,T}}, nx, ny, LL, LR, UR, UL) where T
       for i in 0:ny-1
         ratio_bounds = i / (ny-1)
 
@@ -97,7 +97,7 @@ function _generate_2d_nodes!(nodes, nx, ny, LL, LR, UR, UL)
             ratio = j / (nx-1)
             x = x0 * (1 - ratio) + ratio * x1
             y = y0 * (1 - ratio) + ratio * y1
-            push!(nodes, Node((x, y)))
+            push!(nodes, Node((T(x), T(y))))
         end
     end
 end
