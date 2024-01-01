@@ -118,11 +118,8 @@
 #
 # First we load Ferrite and other packages, and generate grid just like the [heat equation tutorial](heat_equation.md)
 using Ferrite, SparseArrays
-grid = generate_grid(Quadrilateral, (20, 20));
-# We calculate the parameter $h$ as the maximum cell diameter.
-getdistance(p1::Vec{N, T},p2::Vec{N, T}) where {N, T} = norm(p1-p2);
-getdiameter(cell_coords::Vector{Vec{N, T}}) where {N, T} = maximum(getdistance.(cell_coords, reshape(cell_coords, (1,:))))
-h = maximum(i -> getdiameter(getcoordinates(grid, i)), 1:getncells(grid))
+dim = 2;
+grid = generate_grid(Quadrilateral, ntuple(_ -> 20, dim));
 # We construct the topology information which is used later for generating the sparsity pattern for stiffness matrix.
 topology = ExclusiveTopology(grid)
 
@@ -134,13 +131,21 @@ topology = ExclusiveTopology(grid)
 # based on the two-dimensional reference quadrilateral. We also define a quadrature rule based on
 # the same reference element. We combine the interpolation and the quadrature rule
 # to `CellValues` and `InterfaceValues` object. Note that `InterfaceValues` object contains two `FaceValues` objects which can be used individually.
-ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
+order = 1;
+ip = DiscontinuousLagrange{RefQuadrilateral, order}();
 qr = QuadratureRule{RefQuadrilateral}(2);
 # For `FaceValues` and `InterfaceValues` we use `FaceQuadratureRule`
-face_qr = FaceQuadratureRule{RefQuadrilateral}(2)
+face_qr = FaceQuadratureRule{RefQuadrilateral}(2);
 cellvalues = CellValues(qr, ip);
 facevalues = FaceValues(face_qr, ip);
-interfacevalues = InterfaceValues(facevalues)
+interfacevalues = InterfaceValues(facevalues);
+# ### Penalty term parameters
+# We calculate the parameter $h$ as the maximum cell diameter.
+getdistance(p1::Vec{N, T},p2::Vec{N, T}) where {N, T} = norm(p1-p2);
+getdiameter(cell_coords::Vector{Vec{N, T}}) where {N, T} = maximum(getdistance.(cell_coords, reshape(cell_coords, (1,:))));
+h = maximum(i -> getdiameter(getcoordinates(grid, i)), 1:getncells(grid));
+# Here $\mu$ is required to be a large enough positive number. We use the value $(1 + order)^{dim}$ for $\eta$ in this tutorial.
+μ = (1 + order)^dim / h
 # ### Degrees of freedom
 # Degrees of freedom distribution is handled using `DofHandler` as usual
 dh = DofHandler(grid)
@@ -258,7 +263,7 @@ end
 # #### Global assembly
 # We define the function `assemble_global` to loop over all elements and internal faces (interfaces), as well as the external faces involved in Neumann boundary conditions. 
 
-function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, h::Float64)
+function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, μ::Float64)
     ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -277,11 +282,6 @@ function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfa
         ## Assemble Ke and fe into K and f
         assemble!(assembler, celldofs(cell), Ke, fe)
     end
-    ## get interpolation dimensions and order to use in the penalty weight, using the $(1 + order)^{dim}$ for $\eta$
-    ip = Ferrite.function_interpolation(facevalues)
-    order = Ferrite.getorder(ip)
-    dim = Ferrite.getdim(ip)
-    μ = (1 + order)^dim / h
     ## Loop over all interfaces
     for ic in InterfaceIterator(dh)
         ## Reinitialize interfacevalues for this interface
@@ -302,7 +302,7 @@ function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfa
     end
     return K, f
 end
-K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh, h);
+K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh, μ);
 #md nothing # hide
 
 # ### Solution of the system
