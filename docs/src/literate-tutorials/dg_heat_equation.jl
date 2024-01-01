@@ -39,10 +39,10 @@
 #
 # The definitions of jumps and averages used in this examples are
 # ```math
-#  \{u\} = \frac{1}{2}(u^+ + u^-),\quad \boldsymbol{\llbracket u\rrbracket}  = u^+ \boldsymbol{n}^+ + u^- \boldsymbol{n}^-\\
+#  \{u\} = \frac{1}{2}(u^+ + u^-),\quad \llbracket u\rrbracket  = u^+ \boldsymbol{n}^+ + u^- \boldsymbol{n}^-\\
 # ```
 # !!! details "Derivation of the weak form for homogeneous Dirichlet boundary condition"
-#     Defining $\sigma$ as the gradient of the temperature field the equation can be expressed as
+#     Defining $\boldsymbol{\sigma}$ as the gradient of the temperature field the equation can be expressed as
 #     ```math
 #      \boldsymbol{\sigma} = \nabla u,\\
 #      -\nabla \cdot \boldsymbol{\sigma} = 1,
@@ -58,17 +58,17 @@
 #      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = \int_\Omega u \nabla \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega + \int_\Gamma \hat{u} \boldsymbol{\tau} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma,\\
 #      \int_\Omega \boldsymbol{\sigma} \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \delta u \boldsymbol{\hat{\sigma}} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma,
 #     ```
-#     Where $n$ is the outwards pointing normal, and $\Gamma$ is the union of the elements' boundaries.
+#     Where $\boldsymbol{n}$ is the outwards pointing normal, and $\Gamma$ is the union of the elements' boundaries.
 #     Substituting the integrals of form
 #     ```math
 #      \int_\Gamma q \boldsymbol{\phi} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma = \int_\Gamma \boldsymbol{\llbracket q\rrbracket}  \cdot \boldsymbol{\{\phi\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{q\} \llbracket \phi\rrbracket  \,\mathrm{d}\Gamma^0,
 #     ```
-#     with the jumps and averages results in
+#     where $\Gamma^0 : \Gamma \setminus \partial \Omega$, with the jumps and averages results in
 #     ```math
 #      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = \int_\Omega u \nabla \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega + \int_\Gamma \boldsymbol{\llbracket \hat{u}\rrbracket}  \cdot \boldsymbol{\{\tau\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u}\} \llbracket \tau\rrbracket  \,\mathrm{d}\Gamma^0,\\
 #      \int_\Omega \boldsymbol{\sigma} \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \boldsymbol{\llbracket \delta u\rrbracket}  \cdot \boldsymbol{\{\hat{\sigma}\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma^0,
 #     ```
-#     Integrating $ \int_\Omega \nabla u \cdot \tau \,\mathrm{d}\Omega $ by parts and applying divergence theorem
+#     Integrating $ \int_\Omega \nabla u \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega $ by parts and applying divergence theorem
 #     without using numerical flux, then substitute in the equation to obtain a weak form.
 #     ```math
 #      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega + \int_\Gamma \boldsymbol{\llbracket \hat{u} - u\rrbracket}  \cdot \boldsymbol{\{\tau\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \tau\rrbracket  \,\mathrm{d}\Gamma^0,\\
@@ -100,7 +100,7 @@
 #     ```math
 #      \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_\Gamma \boldsymbol{\llbracket u \rrbracket} \cdot \boldsymbol{\{\nabla \delta u\}} + \boldsymbol{\llbracket \delta u \rrbracket}  \cdot \boldsymbol{\{\nabla u\}}  \,\mathrm{d}\Gamma + \int_\Gamma \frac{\eta}{h} \boldsymbol{\llbracket u\rrbracket}  \cdot \boldsymbol{\llbracket \delta u\rrbracket}   \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 #     ```
-# Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} \nabla u \cdot n \delta u \,\mathrm{d} \partial \Omega$ can be expressed as an integral over $\partial \Omega_N$, where $\partial \Omega_N$ is the boundaries with only prescribed Neumann boundary condition,
+# Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} \nabla u \cdot \boldsymbol{n} \delta u \,\mathrm{d} \partial \Omega$ can be expressed as an integral over $\partial \Omega_N$, where $\partial \Omega_N$ is the boundaries with only prescribed Neumann boundary condition,
 # The resulting weak form is given given as follows: Find $u \in \mathbb{U}$ such that
 # ```math
 #  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \boldsymbol{\llbracket u\rrbracket}  \cdot \boldsymbol{\{\nabla \delta u\}} + \boldsymbol{\llbracket \delta u\rrbracket}  \cdot \boldsymbol{\{\nabla u\}}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \frac{\eta}{h} \boldsymbol{\llbracket u\rrbracket} \cdot \boldsymbol{\llbracket \delta u\rrbracket}   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega_N} (\nabla u \cdot \boldsymbol{n}) \delta u \,\mathrm{d} \partial \Omega_N,\\
@@ -302,12 +302,12 @@ function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfa
     end
     return K, f
 end
+K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh, h);
 #md nothing # hide
 
 # ### Solution of the system
-# The solution of the system is independent of the discontinuous discretization, and after assembling the application of constraints, linear solve, and exporting is done as usual.
+# The solution of the system is independent of the discontinuous discretization and the application of constraints, linear solve, and exporting is done as usual.
 
-K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh, h);
 apply!(K, f, ch)
 u = K \ f;
 vtk_grid("dg_heat_equation", dh) do vtk
