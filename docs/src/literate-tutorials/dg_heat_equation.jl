@@ -58,7 +58,7 @@
 #      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = -\int_\Omega u \nabla \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega + \int_\Gamma \hat{u} \boldsymbol{\tau} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma,\\
 #      \int_\Omega \boldsymbol{\sigma} \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \delta u \boldsymbol{\hat{\sigma}} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma,
 #     ```
-#     Where $\boldsymbol{n}$ is the outwards pointing normal, and $\Gamma$ is the union of the elements' boundaries.
+#     Where $\boldsymbol{n}$ is the outwards pointing normal, $\Gamma$ is the union of the elements' boundaries, and $\hat{u}, \, \hat{\sigma}$ are the numerical fluxes.
 #     Substituting the integrals of form
 #     ```math
 #      \int_\Gamma q \boldsymbol{\phi} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma = \int_\Gamma \llbracket q\rrbracket  \cdot \boldsymbol{\{\phi\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{q\} \llbracket \phi\rrbracket  \,\mathrm{d}\Gamma^0,
