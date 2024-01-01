@@ -55,7 +55,7 @@
 #     ```
 #     Integrating by parts and applying divergence theorem,
 #     ```math
-#      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = \int_\Omega u \nabla \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega + \int_\Gamma \hat{u} \boldsymbol{\tau} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma,\\
+#      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = -\int_\Omega u \nabla \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega + \int_\Gamma \hat{u} \boldsymbol{\tau} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma,\\
 #      \int_\Omega \boldsymbol{\sigma} \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \delta u \boldsymbol{\hat{\sigma}} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma,
 #     ```
 #     Where $\boldsymbol{n}$ is the outwards pointing normal, and $\Gamma$ is the union of the elements' boundaries.
@@ -65,7 +65,7 @@
 #     ```
 #     where $\Gamma^0 : \Gamma \setminus \partial \Omega$, with the jumps and averages results in
 #     ```math
-#      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = \int_\Omega u \nabla \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u}\rrbracket  \cdot \boldsymbol{\{\tau\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u}\} \llbracket \tau\rrbracket  \,\mathrm{d}\Gamma^0,\\
+#      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = -\int_\Omega u \nabla \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u}\rrbracket  \cdot \boldsymbol{\{\tau\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u}\} \llbracket \tau\rrbracket  \,\mathrm{d}\Gamma^0,\\
 #      \int_\Omega \boldsymbol{\sigma} \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \boldsymbol{\{\hat{\sigma}\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma^0,
 #     ```
 #     Integrating $ \int_\Omega \nabla u \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega $ by parts and applying divergence theorem
