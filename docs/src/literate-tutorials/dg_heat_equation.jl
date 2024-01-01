@@ -315,8 +315,8 @@ vtk_grid("dg_heat_equation", dh) do vtk
 end
 
 ## test the result                #src
-# using Test                        #src
-# @test norm(u) ≈ 27.88892990564881 #src
+using Test                        #src
+@test norm(u) ≈ 27.88892990564881 #src
 
 #md # ## References
 #md # ```@bibliography
