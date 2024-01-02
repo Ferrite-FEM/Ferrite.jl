@@ -1,7 +1,8 @@
 
 @testset "interpolations" begin
 
-@testset "$interpolation" for interpolation in (
+@testset "Value Type $value_type" for value_type in (Float32, Float64)
+    @testset "Correctness of $interpolation" for interpolation in (
                       Lagrange{RefLine, 1}(),
                       Lagrange{RefLine, 2}(),
                       Lagrange{RefQuadrilateral, 1}(),
@@ -76,11 +77,11 @@
 
         #TODO prefer this test style after 1.6 is removed from CI
         # @testset let x = sample_random_point(ref_shape) # not compatible with Julia 1.6
-        x = sample_random_point(ref_shape)
+        x = Vec{ref_dim,value_type}(sample_random_point(ref_shape))
         random_point_testset = @testset "Random point test" begin
             # Check gradient evaluation
             @test vec(ForwardDiff.jacobian(f, Array(x))') ≈
-                reinterpret(Float64, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
+                reinterpret(value_type, [shape_gradient(interpolation, x, i) for i in 1:n_basefuncs])
             # Check partition of unity at random point.
             @test sum([shape_value(interpolation, x, i) for i in 1:n_basefuncs]) ≈ 1.0
             # Check if the important functions are consistent
@@ -113,7 +114,7 @@
             totaldofs += sum(length.(Ferrite.facedof_interior_indices(interpolation));init=0)
         end
         if ref_dim > 2
-            totaldofs += sum(length.(Ferrite.edgedof_interior_indices(interpolation));init=0) 
+            totaldofs += sum(length.(Ferrite.edgedof_interior_indices(interpolation));init=0)
         end
         totaldofs += length(Ferrite.celldof_interior_indices(interpolation))
         @test totaldofs == n_basefuncs
@@ -129,6 +130,12 @@
         end
         @test all([all(0 .< i .<= n_basefuncs) for i ∈ Ferrite.celldof_interior_indices(interpolation)])
 
+        # Check for evaluation type correctness of interpolation
+        @testset "return type correctness dof $dof" for dof in 1:n_basefuncs
+            @test (@inferred shape_value(interpolation, x, dof)) isa value_type
+            @test (@inferred shape_gradient(interpolation, x, dof)) isa Vec{ref_dim, value_type}
+        end
+
         # Check for dirac delta property of interpolation
         @testset "dirac delta property of dof $dof" for dof in 1:n_basefuncs
             for k in 1:n_basefuncs
@@ -137,7 +144,7 @@
                     @test N_dof ≈ 1.0
                 else
                     factor = interpolation isa Lagrange{RefQuadrilateral, 3} ? 200 : 4
-                    @test N_dof ≈ 0.0 atol = factor * eps(Float64)
+                    @test N_dof ≈ 0.0 atol = factor * eps(value_type)
                 end
             end
         end
@@ -184,14 +191,22 @@
             end
         end
 
-    # VectorizedInterpolation
-    v_interpolation_1 = interpolation^2
-    v_interpolation_2 = (d = 2; interpolation^d)
-    @test getnbasefunctions(v_interpolation_1) == getnbasefunctions(v_interpolation_2) ==
-          getnbasefunctions(interpolation) * 2
-    # pretty printing
-    @test repr("text/plain", v_interpolation_1) == repr(v_interpolation_1.ip) * "^2"
-end
+        # VectorizedInterpolation
+        v_interpolation_1 = interpolation^2
+        v_interpolation_2 = (d = 2; interpolation^d)
+        @test getnbasefunctions(v_interpolation_1) ==
+              getnbasefunctions(v_interpolation_2) ==
+              getnbasefunctions(interpolation) * 2
+        # pretty printing
+        @test repr("text/plain", v_interpolation_1) == repr(v_interpolation_1.ip) * "^2"
+
+        # Check for evaluation type correctness of vectorized interpolation
+        v_interpolation_3 = interpolation^ref_dim
+        @testset "vectorized case of return type correctness of dof $dof" for dof in 1:n_basefuncs
+            @test @inferred(shape_value(v_interpolation_1, x, dof)) isa Vec{2, value_type}
+            @test @inferred(shape_gradient(v_interpolation_3, x, dof)) isa Tensor{2, ref_dim, value_type}
+        end
+    end # correctness testset
 
     @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefTriangle,0}()) ≈ [Vec{2,Float64}((1/3,1/3))]
     @test Ferrite.reference_coordinates(DiscontinuousLagrange{RefQuadrilateral,0}()) ≈ [Vec{2,Float64}((0,0))]
@@ -250,5 +265,5 @@ end
         end
     end
 end
-end
 
+end # testset
