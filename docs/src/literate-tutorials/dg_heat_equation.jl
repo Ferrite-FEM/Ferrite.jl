@@ -55,24 +55,24 @@
 #     ```
 #     Integrating by parts and applying divergence theorem,
 #     ```math
-#      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = -\int_\Omega u \nabla \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega + \int_\Gamma \hat{u} \boldsymbol{\tau} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma,\\
+#      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = -\int_\Omega u (\nabla \cdot \boldsymbol{\tau}) \,\mathrm{d}\Omega + \int_\Gamma \hat{u} \boldsymbol{\tau} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma,\\
 #      \int_\Omega \boldsymbol{\sigma} \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \delta u \boldsymbol{\hat{\sigma}} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma,
 #     ```
 #     Where $\boldsymbol{n}$ is the outwards pointing normal, $\Gamma$ is the union of the elements' boundaries, and $\hat{u}, \, \hat{\sigma}$ are the numerical fluxes.
 #     Substituting the integrals of form
 #     ```math
-#      \int_\Gamma q \boldsymbol{\phi} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma = \int_\Gamma \llbracket q\rrbracket  \cdot \boldsymbol{\{\phi\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{q\} \llbracket \phi\rrbracket  \,\mathrm{d}\Gamma^0,
+#      \int_\Gamma q \boldsymbol{\phi} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma = \int_\Gamma \llbracket q\rrbracket  \cdot \{\boldsymbol{\phi}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{q\} \llbracket \boldsymbol{\phi}\rrbracket  \,\mathrm{d}\Gamma^0,
 #     ```
 #     where $\Gamma^0 : \Gamma \setminus \partial \Omega$, with the jumps and averages results in
 #     ```math
-#      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = -\int_\Omega u \nabla \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u}\rrbracket  \cdot \boldsymbol{\{\tau\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u}\} \llbracket \tau\rrbracket  \,\mathrm{d}\Gamma^0,\\
-#      \int_\Omega \boldsymbol{\sigma} \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \boldsymbol{\{\hat{\sigma}\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma^0,
+#      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = -\int_\Omega u (\nabla \cdot \boldsymbol{\tau}) \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u}\rrbracket  \cdot \{\boldsymbol{\tau}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u}\} \llbracket \boldsymbol{\tau}\rrbracket  \,\mathrm{d}\Gamma^0,\\
+#      \int_\Omega \boldsymbol{\sigma} \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\boldsymbol{\sigma}}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\boldsymbol{\sigma}}\rrbracket  \,\mathrm{d}\Gamma^0,
 #     ```
 #     Integrating $ \int_\Omega \nabla u \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega $ by parts and applying divergence theorem
 #     without using numerical flux, then substitute in the equation to obtain a weak form.
 #     ```math
-#      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \boldsymbol{\{\tau\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \tau\rrbracket  \,\mathrm{d}\Gamma^0,\\
-#      \int_\Omega \boldsymbol{\sigma} \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \boldsymbol{\{\hat{\sigma}\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma^0,
+#      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\boldsymbol{\tau}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \boldsymbol{\tau}\rrbracket  \,\mathrm{d}\Gamma^0,\\
+#      \int_\Omega \boldsymbol{\sigma} \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\boldsymbol{\sigma}}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\boldsymbol{\sigma}}\rrbracket  \,\mathrm{d}\Gamma^0,
 #     ```
 #     Substituting
 #     ```math
@@ -80,17 +80,17 @@
 #     ```
 #     results in
 #     ```math
-#      \int_\Omega \boldsymbol{\sigma} \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \boldsymbol{\{\nabla \delta u\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \nabla \delta u\rrbracket  \,\mathrm{d}\Gamma^0,\\
-#      \int_\Omega \boldsymbol{\sigma} \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \boldsymbol{\{\hat{\sigma}\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma^0,
+#      \int_\Omega \boldsymbol{\sigma} \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\nabla \delta u\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \nabla \delta u\rrbracket  \,\mathrm{d}\Gamma^0,\\
+#      \int_\Omega \boldsymbol{\sigma} \cdot \nabla \delta u \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\boldsymbol{\sigma}}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\boldsymbol{\sigma}}\rrbracket  \,\mathrm{d}\Gamma^0,
 #     ```
 #     Combining the two equations,
 #     ```math
-#      \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \boldsymbol{\{\nabla \delta u\}} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \nabla \delta u\rrbracket  \,\mathrm{d}\Gamma^0 - \int_\Gamma \llbracket \delta u\rrbracket  \cdot \boldsymbol{\{\hat{\sigma}\}} \,\mathrm{d}\Gamma - \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\sigma}\rrbracket  \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
+#      \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u} - u\rrbracket  \cdot \{\nabla \delta u\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u} - u\} \llbracket \nabla \delta u\rrbracket  \,\mathrm{d}\Gamma^0 - \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\boldsymbol{\sigma}}\} \,\mathrm{d}\Gamma - \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\boldsymbol{\sigma}}\rrbracket  \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 #     ```
 #     The numerical fluxes chosen for the interior penalty method are $\boldsymbol{\hat{\sigma}} = \{\nabla u\} - \alpha(\llbracket u\rrbracket)$ on $\Gamma$, $\hat{u} = \{u\}$ on the interfaces between elements $\Gamma^0 : \Gamma \setminus \partial \Omega$, 
-#     and $\hat{u} = 0$ on $\partial \Omega$. Such choice results in $\boldsymbol{\{\hat{\sigma}\}} = \{\nabla u\} - \alpha(\llbracket u\rrbracket)$, $\llbracket \hat{u}\rrbracket  = 0$, $\{\hat{u}\} = \{u\}$, $\llbracket \boldsymbol{\hat{\sigma}}\rrbracket  = 0$ and the equation becomes
+#     and $\hat{u} = 0$ on $\partial \Omega$. Such choice results in $\{\hat{\boldsymbol{\sigma}}\} = \{\nabla u\} - \alpha(\llbracket u\rrbracket)$, $\llbracket \hat{u}\rrbracket  = 0$, $\{\hat{u}\} = \{u\}$, $\llbracket \hat{\boldsymbol{\sigma}}\rrbracket  = 0$ and the equation becomes
 #     ```math
-#      \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_\Gamma \llbracket u\rrbracket  \cdot \boldsymbol{\{\nabla \delta u\}}  \,\mathrm{d}\Gamma - \int_\Gamma \llbracket \delta u\rrbracket  \cdot \boldsymbol{\{\nabla u\}} - \llbracket \delta u\rrbracket  \cdot \alpha(\llbracket u\rrbracket)  \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
+#      \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_\Gamma \llbracket u\rrbracket  \cdot \{\nabla \delta u\}  \,\mathrm{d}\Gamma - \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\nabla u\} - \llbracket \delta u\rrbracket  \cdot \alpha(\llbracket u\rrbracket)  \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 #     ```
 #     Where
 #     ```math
@@ -98,12 +98,12 @@
 #     ```
 #     Where $\mu = \eta h^{-1}$, the weak form becomes
 #     ```math
-#      \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_\Gamma \llbracket u \rrbracket \cdot \boldsymbol{\{\nabla \delta u\}} + \llbracket \delta u \rrbracket  \cdot \boldsymbol{\{\nabla u\}}  \,\mathrm{d}\Gamma + \int_\Gamma \frac{\eta}{h} \llbracket u\rrbracket  \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
+#      \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_\Gamma \llbracket u \rrbracket \cdot \{\nabla \delta u\} + \llbracket \delta u \rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma + \int_\Gamma \frac{\eta}{h} \llbracket u\rrbracket  \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 #     ```
 # Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} \nabla u \cdot \boldsymbol{n} \delta u \,\mathrm{d} \partial \Omega$ can be expressed as an integral over $\partial \Omega_N$, where $\partial \Omega_N$ is the boundaries with only prescribed Neumann boundary condition,
 # The resulting weak form is given given as follows: Find $u \in \mathbb{U}$ such that
 # ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \boldsymbol{\{\nabla \delta u\}} + \llbracket \delta u\rrbracket  \cdot \boldsymbol{\{\nabla u\}}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \frac{\eta}{h} \llbracket u\rrbracket \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega_N} (\nabla u \cdot \boldsymbol{n}) \delta u \,\mathrm{d} \partial \Omega_N,\\
+#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \frac{\eta}{h} \llbracket u\rrbracket \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega_N} (\nabla u \cdot \boldsymbol{n}) \delta u \,\mathrm{d} \partial \Omega_N,\\
 # ```
 # where $h$ is the characteristic mesh size (the maximum diameter of the cells), and $\eta$ is a large enough positive number independent of $h$ [Mu:2014:IP](@cite),
 # $\delta u \in \mathbb{T}$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
@@ -121,7 +121,7 @@ using Ferrite, SparseArrays
 dim = 2;
 grid = generate_grid(Quadrilateral, ntuple(_ -> 20, dim));
 # We construct the topology information which is used later for generating the sparsity pattern for stiffness matrix.
-topology = ExclusiveTopology(grid)
+topology = ExclusiveTopology(grid);
 
 # ### Trial and test functions
 # `CellValues`, `FaceValues`, and `InterfaceValues` facilitate the process of evaluating values and gradients of
@@ -140,7 +140,7 @@ cellvalues = CellValues(qr, ip);
 facevalues = FaceValues(face_qr, ip);
 interfacevalues = InterfaceValues(facevalues);
 # ### Penalty term parameters
-# We calculate the parameter $h$ as the maximum cell diameter.
+# We calculate the characteristic size $h$ as the maximum face diameter.
 getdistance(p1::Vec{N, T},p2::Vec{N, T}) where {N, T} = norm(p1-p2);
 getdiameter(cell_coords::Vector{Vec{N, T}}) where {N, T} = maximum(getdistance.(cell_coords, reshape(cell_coords, (1,:))));
 h = maximum(i -> getdiameter(getcoordinates(grid, i)), 1:getncells(grid));
@@ -312,7 +312,7 @@ apply!(K, f, ch)
 u = K \ f;
 vtk_grid("dg_heat_equation", dh) do vtk
     vtk_point_data(vtk, dh, u)
-end
+end;
 
 ## test the result                #src
 using Test                        #src
