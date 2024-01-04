@@ -96,18 +96,19 @@
 #     ```math
 #      \alpha(\llbracket u\rrbracket) = \mu \llbracket u\rrbracket
 #     ```
-#     Where $\mu = \eta h^{-1}$, the weak form becomes
+#     Where $\mu = \eta h_e^{-1}$, the weak form becomes
 #     ```math
-#      \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_\Gamma \llbracket u \rrbracket \cdot \{\nabla \delta u\} + \llbracket \delta u \rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma + \int_\Gamma \frac{\eta}{h} \llbracket u\rrbracket  \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
+#      \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_\Gamma \llbracket u \rrbracket \cdot \{\nabla \delta u\} + \llbracket \delta u \rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma + \int_\Gamma \frac{\eta}{h_e} \llbracket u\rrbracket  \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 #     ```
 # Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} \nabla u \cdot \boldsymbol{n} \delta u \,\mathrm{d} \partial \Omega$ can be expressed as an integral over $\partial \Omega_N$, where $\partial \Omega_N$ is the boundaries with only prescribed Neumann boundary condition,
 # The resulting weak form is given given as follows: Find $u \in \mathbb{U}$ such that
 # ```math
-#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket  \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \frac{\eta}{h} \llbracket u\rrbracket \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega_N} (\nabla u \cdot \boldsymbol{n}) \delta u \,\mathrm{d} \partial \Omega_N,\\
+#  \int_\Omega \nabla u \cdot \nabla \delta u \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket \cdot \{\nabla \delta u\} + \llbracket \delta u\rrbracket  \cdot \{\nabla u\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \frac{\eta}{h_e} \llbracket u\rrbracket \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega_N} (\nabla u \cdot \boldsymbol{n}) \delta u \,\mathrm{d} \partial \Omega_N,\\
 # ```
-# where $h$ is the characteristic mesh size (the maximum diameter of the cells), and $\eta$ is a large enough positive number independent of $h$ [Mu:2014:IP](@cite),
+# where $h_e$ is the characteristic size (the diameter of the interface), and $\eta$ is a large enough positive number independent of $h_e$ [Mu:2014:IP](@cite),
 # $\delta u \in \mathbb{T}$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
 # trial and test function sets, respectively.
+# We use the value $(1 + order)^{dim}$ for $\eta$ in this tutorial.
 #
 # More details on DG formulations for elliptic problems can be found in [Cockburn:2002:unifiedanalysis](@cite)
 #-
@@ -140,12 +141,10 @@ cellvalues = CellValues(qr, ip);
 facevalues = FaceValues(face_qr, ip);
 interfacevalues = InterfaceValues(facevalues);
 # ### Penalty term parameters
-# We calculate the characteristic size $h$ as the maximum face diameter.
+# We define functions to calculate the diameter of a set of points, used to calculate the characteristic size $h_e$ in the assembly routine.
 getdistance(p1::Vec{N, T},p2::Vec{N, T}) where {N, T} = norm(p1-p2);
 getdiameter(cell_coords::Vector{Vec{N, T}}) where {N, T} = maximum(getdistance.(cell_coords, reshape(cell_coords, (1,:))));
-h = maximum(i -> getdiameter(getcoordinates(grid, i)), 1:getncells(grid));
-# Here $\mu$ is required to be a large enough positive number. We use the value $(1 + order)^{dim}$ for $\eta$ in this tutorial.
-μ = (1 + order)^dim / h
+
 # ### Degrees of freedom
 # Degrees of freedom distribution is handled using `DofHandler` as usual
 dh = DofHandler(grid)
@@ -263,7 +262,7 @@ end
 # #### Global assembly
 # We define the function `assemble_global` to loop over all elements and internal faces (interfaces), as well as the external faces involved in Neumann boundary conditions. 
 
-function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, μ::Float64)
+function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, order::Int, dim::Int)
     ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -286,6 +285,11 @@ function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfa
     for ic in InterfaceIterator(dh)
         ## Reinitialize interfacevalues for this interface
         reinit!(interfacevalues, ic)
+        ## Calculate the characteristic size $h_e$ as the face diameter
+        interfacecoords =  ∩(getcoordinates(ic)...)
+        hₑ = getdiameter(interfacecoords)
+        # Calculate $\mu$
+        μ = (1 + order)^dim / hₑ
         ## Compute interface surface integrals contribution
         assemble_interface!(Ki, interfacevalues, μ)
         ## Assemble Ki into K
@@ -302,7 +306,7 @@ function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfa
     end
     return K, f
 end
-K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh, μ);
+K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh, order, dim);
 #md nothing # hide
 
 # ### Solution of the system
@@ -316,7 +320,7 @@ end;
 
 ## test the result                #src
 using Test                        #src
-@test norm(u) ≈ 27.88892990564881 #src
+@test norm(u) ≈ 27.888811116291766 #src
 
 #md # ## References
 #md # ```@bibliography
