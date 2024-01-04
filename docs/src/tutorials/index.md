@@ -159,11 +159,12 @@ Ferrite.
 #### [Tutorial 11: Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation)
 
 This tutorial guides you through the process of solving the linear stationary heat equation
-(i.e. Poisson's equation) on a unit square with inhomogeneous Dirichlet and Neumann boundary conditions
-using the interior penalty discontinuous galerkin method. This tutorial follows the
-[heat equation tutorial](@ref tutorial-heat-equation), introducting face and interface iterators,
-jump and average operators, and corss-element coupling in sparsity patterns. This example was developed
-as part of the Google summer of code funded project
-["Discontinuous Galerkin Infrastructure For the finite element toolbox Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5)
+(i.e. Poisson's equation) on a unit square with inhomogeneous Dirichlet and Neumann boundary
+conditions using the interior penalty discontinuous Galerkin method. This tutorial follows
+the [heat equation tutorial](@ref tutorial-heat-equation), introducing face and interface
+iterators, jump and average operators, and cross-element coupling in sparsity patterns. This
+example was developed as part of the *Google Summer of Code* funded project ["Discontinuous
+Galerkin Infrastructure For the finite element toolbox
+Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5).
 
 **Keywords**: scalar-valued solution, Dirichlet boundary conditions, Discontinuous Galerkin, Interior penalty.

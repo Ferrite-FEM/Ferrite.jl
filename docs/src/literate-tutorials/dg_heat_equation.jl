@@ -1,9 +1,10 @@
-# # [Discontinuous Galerkin Heat equation](@id tutorial-dg-heat-equation)
+# # [Discontinuous Galerkin heat equation](@id tutorial-dg-heat-equation)
 #
 # ![](dg_heat_equation.png)
 #
 # *Figure 1*: Temperature field on the unit square with an internal uniform heat source
-# solved with inhomogeneous Dirichlet boundary conditions on the left and right boundaries and flux on the top and bottom boundaries.
+# solved with inhomogeneous Dirichlet boundary conditions on the left and right boundaries
+# and flux on the top and bottom boundaries.
 #
 #-
 #md # !!! tip
@@ -17,16 +18,19 @@
 #
 # ## Introduction
 #
-# This tutorial extends [tutorial 1: Heat equation](heat_equation.md) by using discontinuous Galerkin method.
-# The reader is expected to have gone throught [tutorial 1: Heat equation](heat_equation.md) before proceeding with this tutorial.
-# The main differences between the two tutorials are the interface integral terms in the weak form, the boundary conditions, and
-# some implementation differences explained in the commented program.
-# The strong form used in this tutorial is
+# This tutorial extends [Tutorial 1: Heat equation](heat_equation.md) by using the
+# discontinuous Galerkin method. The reader is expected to have gone through [Tutorial 1:
+# Heat equation](heat_equation.md) before proceeding with this tutorial. The main
+# differences between the two tutorials are the interface integral terms in the weak form,
+# the boundary conditions, and some implementation differences explained in the commented
+# program below.
+#
+# The strong form considered in this tutorial is given as follows
 # ```math
 #  -\boldsymbol{\nabla} \cdot [\boldsymbol{\nabla}(u)] = 1  \quad \textbf{x} \in \Omega,
 # ```
-# 
-# With the inhomogeneous Dirichlet boundary conditions
+#
+# with the inhomogeneous Dirichlet boundary conditions
 # ```math
 # u(\textbf{x}) = 1 \quad \textbf{x} \in \partial \Omega_D^+ = \lbrace\textbf{x} : x_1 = 1.0\rbrace, \\
 # u(\textbf{x}) = -1 \quad \textbf{x} \in \partial \Omega_D^- = \lbrace\textbf{x} : x_1 = -1.0\rbrace,
@@ -37,10 +41,14 @@
 # [\boldsymbol{\nabla} (u(\textbf{x}))] \cdot \boldsymbol{n} = -1 \quad \textbf{x} \in \partial \Omega_N^- = \lbrace\textbf{x} : x_2 = -1.0\rbrace,
 # ```
 #
-# The definitions of jumps and averages used in this examples are
+# The following definitions of average and jump on interfaces between elements are adopted
+# in this tutorial:
 # ```math
 #  \{u\} = \frac{1}{2}(u^+ + u^-),\quad \llbracket u\rrbracket  = u^+ \boldsymbol{n}^+ + u^- \boldsymbol{n}^-\\
 # ```
+# where ``u^+`` and ``u^-`` are the temperature on the two sides of the interface.
+#
+#
 # !!! details "Derivation of the weak form for homogeneous Dirichlet boundary condition"
 #     Defining $\boldsymbol{\sigma}$ as the gradient of the temperature field the equation can be expressed as
 #     ```math
@@ -104,7 +112,7 @@
 #     ```math
 #      \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla}] (\delta u) \,\mathrm{d}\Omega - \int_\Gamma \llbracket u \rrbracket \cdot \{\boldsymbol{\nabla} (\delta u)\} + \llbracket \delta u \rrbracket  \cdot \{\boldsymbol{\nabla} (u)\}  \,\mathrm{d}\Gamma + \int_\Gamma \frac{\eta}{h_e} \llbracket u\rrbracket  \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma = \int_\Omega \delta u \,\mathrm{d}\Omega,\\
 #     ```
-# Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} [\boldsymbol{\nabla} (u)] \cdot \boldsymbol{n} \delta u \,\mathrm{d} \partial \Omega$ can be expressed as an integral over $\partial \Omega_N$, where $\partial \Omega_N$ is the boundaries with only prescribed Neumann boundary condition,
+# Since $\partial \Omega$ is constrained with both Dirichlet and Neumann boundary conditions the term $\int_{\partial \Omega} [\boldsymbol{\nabla} (u)] \cdot \boldsymbol{n} \delta u \,\mathrm{d} \Omega$ can be expressed as an integral over $\partial \Omega_N$, where $\partial \Omega_N$ is the boundaries with only prescribed Neumann boundary condition,
 # The resulting weak form is given given as follows: Find $u \in \mathbb{U}$ such that
 # ```math
 #  \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket \cdot \{\boldsymbol{\nabla} (\delta u)\} + \llbracket \delta u\rrbracket  \cdot \{\boldsymbol{\nabla} (u)\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \frac{\eta}{h_e} \llbracket u\rrbracket \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega_N} ([\boldsymbol{\nabla} (u)] \cdot \boldsymbol{n}) \delta u \,\mathrm{d} \partial \Omega_N,\\
@@ -112,9 +120,10 @@
 # where $h_e$ is the characteristic size (the diameter of the interface), and $\eta$ is a large enough positive number independent of $h_e$ [Mu:2014:IP](@cite),
 # $\delta u \in \mathbb{T}$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
 # trial and test function sets, respectively.
-# We use the value $(1 + order)^{dim}$ for $\eta$ in this tutorial.
+# We use the value ``\eta = (1 + O)^{D}``, where ``O`` is the polynomial order and ``D`` the
+# dimension, in this tutorial.
 #
-# More details on DG formulations for elliptic problems can be found in [Cockburn:2002:unifiedanalysis](@cite)
+# More details on DG formulations for elliptic problems can be found in [Cockburn:2002:unifiedanalysis](@cite).
 #-
 # ## Commented Program
 #
@@ -143,7 +152,7 @@ qr = QuadratureRule{RefQuadrilateral}(2);
 face_qr = FaceQuadratureRule{RefQuadrilateral}(2);
 cellvalues = CellValues(qr, ip);
 facevalues = FaceValues(face_qr, ip);
-interfacevalues = InterfaceValues(facevalues);
+interfacevalues = InterfaceValues(face_qr, ip);
 # ### Penalty term parameters
 # We define functions to calculate the diameter of a set of points, used to calculate the characteristic size $h_e$ in the assembly routine.
 getdistance(p1::Vec{N, T},p2::Vec{N, T}) where {N, T} = norm(p1-p2);
@@ -177,18 +186,21 @@ close!(ch);
 
 # ### Assembling the linear system
 #
-# Now we have all the pieces needed to assemble the linear system, $K u = f$.
-# Assembling of the global system is done by looping over all the elements in order to
-# compute the element contributions ``K_e`` and ``f_e``, all the interfaces
-# to compute their contributions ``K_i``, and all the Neumann boundary faces to compute their
-# contributions ``f_e`` which are then assembled to the
+# Now we have all the pieces needed to assemble the linear system, $K u = f$. Assembling of
+# the global system is done by looping over i) all the elements in order to compute the
+# element contributions ``K_e`` and ``f_e``, ii) all the interfaces to compute their
+# contributions ``K_i``, and iii) all the Neumann boundary faces to compute their
+# contributions ``f_e``. All these local contributions are then assembled into the
 # appropriate place in the global ``K`` and ``f``.
 #
 # #### Local assembly
 # We define the functions
-# * `assemble_element!` to compute the contributions ``K_e`` and ``f_e`` of volume integrals over an element using `cellvalues`.
-# * `assemble_interface!` to compute the contribution ``K_i`` of surface integrals over an interface using `interfacevalues`.
-# * `assemble_boundary!` to compute the contribution ``f_e`` of surface integrals over a boundary face using `facevalues`.
+# * `assemble_element!` to compute the contributions ``K_e`` and ``f_e`` of volume integrals
+#   over an element using `cellvalues`.
+# * `assemble_interface!` to compute the contribution ``K_i`` of surface integrals over an
+#   interface using `interfacevalues`.
+# * `assemble_boundary!` to compute the contribution ``f_e`` of surface integrals over a
+#   boundary face using `facevalues`.
 
 function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
@@ -197,7 +209,7 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     fill!(fe, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(cellvalues)
-        ## Get the quadrature weight
+        ## Quadrature weight
         dΩ = getdetJdV(cellvalues, q_point)
         ## Loop over test shape functions
         for i in 1:n_basefuncs
@@ -235,7 +247,7 @@ function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
                 ## Multiply the jump by the normal, as the definition used in Ferrite doesn't include the normals.
                 u_jump = shape_value_jump(iv, q_point, j) * normal
                 ∇u_avg = shape_gradient_average(iv, q_point, j)
-                ## Add contribution to Ki          
+                ## Add contribution to Ki
                 Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump)*dΓ +  μ * (δu_jump ⋅ u_jump) * dΓ
             end
         end
@@ -264,7 +276,9 @@ end
 #md nothing # hide
 
 # #### Global assembly
-# We define the function `assemble_global` to loop over all elements and internal faces (interfaces), as well as the external faces involved in Neumann boundary conditions. 
+#
+# We define the function `assemble_global` to loop over all elements and internal faces
+# (interfaces), as well as the external faces involved in Neumann boundary conditions.
 
 function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, order::Int, dim::Int)
     ## Allocate the element stiffness matrix and element force vector
@@ -289,10 +303,10 @@ function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfa
     for ic in InterfaceIterator(dh)
         ## Reinitialize interfacevalues for this interface
         reinit!(interfacevalues, ic)
-        ## Calculate the characteristic size $h_e$ as the face diameter
+        ## Calculate the characteristic size hₑ as the face diameter
         interfacecoords =  ∩(getcoordinates(ic)...)
         hₑ = getdiameter(interfacecoords)
-        ## Calculate $\mu$
+        ## Calculate μ
         μ = (1 + order)^dim / hₑ
         ## Compute interface surface integrals contribution
         assemble_interface!(Ki, interfacevalues, μ)
@@ -314,7 +328,9 @@ K, f = assemble_global(cellvalues, facevalues, interfacevalues, K, dh, order, di
 #md nothing # hide
 
 # ### Solution of the system
-# The solution of the system is independent of the discontinuous discretization and the application of constraints, linear solve, and exporting is done as usual.
+#
+# The solution of the system is independent of the discontinuous discretization and the
+# application of constraints, linear solve, and exporting is done as usual.
 
 apply!(K, f, ch)
 u = K \ f;
