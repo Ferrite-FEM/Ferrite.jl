@@ -63,7 +63,11 @@
 #     ```math
 #      \int_\Gamma q \boldsymbol{\phi} \cdot \boldsymbol{n} \,\mathrm{d}\Gamma = \int_\Gamma \llbracket q\rrbracket  \cdot \{\boldsymbol{\phi}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{q\} \llbracket \boldsymbol{\phi}\rrbracket  \,\mathrm{d}\Gamma^0,
 #     ```
-#     where $\Gamma^0 : \Gamma \setminus \partial \Omega$, with the jumps and averages results in
+#     where $\Gamma^0 : \Gamma \setminus \partial \Omega$, and the jump of the vector-valued field $\boldsymbol{\phi}$ is defined as 
+#     ```math
+#      \llbracket \boldsymbol{\phi}\rrbracket  = \boldsymbol{\phi}^+ \cdot \boldsymbol{n}^+ + \boldsymbol{\phi}^- \cdot \boldsymbol{n}^-\\
+#     ```
+#     with the jumps and averages results in
 #     ```math
 #      \int_\Omega \boldsymbol{\sigma} \cdot \boldsymbol{\tau} \,\mathrm{d}\Omega = -\int_\Omega u (\boldsymbol{\nabla} \cdot \boldsymbol{\tau}) \,\mathrm{d}\Omega + \int_\Gamma \llbracket \hat{u}\rrbracket  \cdot \{\boldsymbol{\tau}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\hat{u}\} \llbracket \boldsymbol{\tau}\rrbracket  \,\mathrm{d}\Gamma^0,\\
 #      \int_\Omega \boldsymbol{\sigma} \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_\Gamma \llbracket \delta u\rrbracket  \cdot \{\hat{\boldsymbol{\sigma}}\} \,\mathrm{d}\Gamma + \int_{\Gamma^0} \{\delta u\} \llbracket \hat{\boldsymbol{\sigma}}\rrbracket  \,\mathrm{d}\Gamma^0,
