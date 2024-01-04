@@ -292,7 +292,7 @@ function assemble_global(cellvalues::CellValues, facevalues::FaceValues, interfa
         ## Calculate the characteristic size $h_e$ as the face diameter
         interfacecoords =  ∩(getcoordinates(ic)...)
         hₑ = getdiameter(interfacecoords)
-        # Calculate $\mu$
+        ## Calculate $\mu$
         μ = (1 + order)^dim / hₑ
         ## Compute interface surface integrals contribution
         assemble_interface!(Ki, interfacevalues, μ)
