@@ -5,3 +5,5 @@ extend-exclude = ["*.svg", "*.toml"]
 ue = "ue"
 ba = "ba"
 nd = "nd"
+Numer. = "Numer."
+Secrest = "Secrest"
