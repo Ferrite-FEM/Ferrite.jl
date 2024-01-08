@@ -827,7 +827,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         if !all(c -> 0 < c <= n_comp, components)
             error("components $(components) not within range of field :$(dbc.field_name) ($(n_comp) dimension(s))")
         end
-        # Create BCValues for coordinate evalutation at dof-locations
+        # Create BCValues for coordinate evaluation at dof-locations
         EntityType = eltype(dbc.faces) # (Face|Edge|Vertex)Index
         if EntityType <: Integer
             # BCValues are just dummy for nodesets so set to FaceIndex
@@ -1263,7 +1263,7 @@ system. For other types of periodicities the `transform` function can be used. T
 `transform` function is applied on the coordinates of the image face, and is expected to
 transform the coordinates to the matching locations in the mirror set.
 
-The keyword `tol` specifies the tolerence (i.e. distance and deviation in face-normals) 
+The keyword `tol` specifies the tolerance (i.e. distance and deviation in face-normals) 
 between a image-face and mirror-face, for them to be considered matched.
 
 See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
