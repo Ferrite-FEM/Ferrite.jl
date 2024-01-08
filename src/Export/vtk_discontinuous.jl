@@ -1,31 +1,26 @@
-
-
-
-function create_discontinuous_vtk_griddata(grid::Grid{dim,C,T}) where {dim,C,T}
+function create_discontinuous_vtk_griddata(grid::Grid{dim, C, T}) where {dim, C, T}
     cls = Vector{WriteVTK.MeshCell}(undef, getncells(grid))
+    cellnodes = Vector{UnitRange{Int}}(undef, getncells(grid))
     ncoords = sum(nnodes, getcells(grid))
     coords = zeros(T, dim, ncoords)
     icoord = 0
-    # Need to have one of the following solution
-    # 1) Save information cellid => node_rante::UnitRange
-    # 2) Have access to the DofHandler to create the griddata. 
-    #    (This also relies on CellIterator order being stable)
-    for sdh in CellIterator(grid)
+    for cell in CellIterator(grid)
         CT = getcelltype(grid, cellid(cell))
         vtk_celltype = Ferrite.cell_to_vtkcell(CT)
         cell_coords = getcoordinates(cell)
         n = length(cell_coords)
+        cellnodes[cellid(cell)] = (1:n) .+ icoord
         vtk_cellnodes = nodes_to_vtkorder(CT((ntuple(i->i+icoord, n))))
-        push!(cls, WriteVTK.MeshCell(vtk_celltype, vtk_cellnodes))
+        cls[cellid(cell)] = WriteVTK.MeshCell(vtk_celltype, vtk_cellnodes)
         for x in cell_coords
             icoord += 1
             coords[:, icoord] = x
         end
     end
-    return coords, cls
+    return coords, cls, cellnodes
 end
 
-function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler, u::Vector, fieldname::Symbol)
+function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol, cellnodes) where T
     # Make sure the field exists
     fieldname ∈ getfieldnames(dh) || error("Field $fieldname not found.")
     # Figure out the return type (scalar or vector)
@@ -34,17 +29,14 @@ function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler, u::Vector, fiel
     RT = ip isa ScalarInterpolation ? T : Vec{n_components(ip),T}
     n_c = n_components(ip)
     vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
-    data = fill(NaN * zero(T), vtk_dim, getnnodes(get_grid(dh)))
+    n_vtk_nodes = maximum(maximum, cellnodes)
+    data = fill(NaN * zero(T), vtk_dim, n_vtk_nodes)
     # Loop over the subdofhandlers
-    istart = 0
     for sdh in dh.subdofhandlers
         # Check if this sdh contains this field, otherwise continue to the next
         field_idx = _find_field(sdh, fieldname)
-        num_nodes = nnodes_per_cell(getcelltype(sdh))*length(sdh.cellset)
-        if field_idx === nothing
-            istart += num_nodes
-            continue
-        end
+        field_idx === nothing && continue
+
         # Set up CellValues with the local node coords as quadrature points
         CT = getcelltype(sdh)
         ip = getfieldinterpolation(sdh, field_idx)
@@ -59,15 +51,13 @@ function evaluate_at_discontinuous_vtkgrid_nodes(dh::DofHandler, u::Vector, fiel
         end
         drange = dof_range(sdh, field_idx)
         # Function barrier
-        data_view = view(data, :, (istart+1):(istart + num_nodes))
-        _evaluate_at_discontinuous_vtkgrid_nodes!(data_view, sdh, u, cv, drange, RT)
-        istart += num_nodes
+        _evaluate_at_discontinuous_vtkgrid_nodes!(data, sdh, u, cv, drange, RT, cellnodes)
     end
     return data
 end
 
-function _evaluate_at_discontinuous_vtkgrid_nodes!(data::SubArray, sdh::SubDofHandler,
-    u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}) where {T, RT}
+function _evaluate_at_discontinuous_vtkgrid_nodes!(data::Matrix, sdh::SubDofHandler,
+    u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}, cellnodes) where {T, RT}
     ue = zeros(T, length(drange))
     # TODO: Remove this hack when embedding works...
     if RT <: Vec && function_interpolation(cv) isa ScalarInterpolation
@@ -75,20 +65,17 @@ function _evaluate_at_discontinuous_vtkgrid_nodes!(data::SubArray, sdh::SubDofHa
     else
         uer = ue
     end
-    inode = 0
-    n = nnodes_per_cell(getcells(get_grid(sdh.dh)), first(sdh.cellset))
     for cell in CellIterator(sdh)
         # Note: We are only using the shape functions: no reinit!(cv, cell) necessary
         @assert getnquadpoints(cv) == length(cell.nodes)
         for (i, I) in pairs(drange)
             ue[i] = u[cell.dofs[I]]
         end
-        for (qp, nodeid) in pairs(1:n .+ inode)
+        for (qp, nodeid) in pairs(cellnodes[cellid(cell)])
             val = function_value(cv, qp, uer)
             data[1:length(val), nodeid] .= val
             data[(length(val)+1):end, nodeid] .= 0 # purge the NaN
         end
-        inode += n
     end
     return data
 end
