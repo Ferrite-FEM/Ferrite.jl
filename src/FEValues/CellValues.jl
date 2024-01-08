@@ -128,3 +128,29 @@ function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     print(io, "\nGeometric interpolation: "); 
     sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
 end
+
+struct MultiCellValues{FVS, GM, QR, detT, FVT} <: AbstractCellValues
+    fun_values::FVS         # FunctionValues collected in a named tuple (not necessarily unique)
+    fun_values_tuple::FVT   # FunctionValues collected in a tuple (each unique)
+    geo_mapping::GM         # GeometryMapping
+    qr::QR                  # QuadratureRule
+    detJdV::detT            # AbstractVector{<:Number} or Nothing
+end
+
+function MultiCellValues(::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation;
+    update_gradients::Bool = true, update_detJdV::Bool = true) where T 
+
+    FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
+    GeoDiffOrder = max(maximum(ip_fun -> required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), values(ip_funs)), update_detJdV)
+    geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
+    unique_ips = unique(values(ip_funs))
+    fun_values_tuple = tuple((FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for ip_fun in unique_ips)...)
+    fun_values = NamedTuple((key => fun_values_tuple[findfirst(unique_ip -> ip == unique_ip, unique_ips)] for (key, ip) in pairs(ip_funs)))
+    detJdV = update_detJdV ? fill(T(NaN), length(getweights(qr))) : nothing
+    return MultiCellValues(fun_values, fun_values_tuple, geo_mapping, qr, detJdV)
+end
+
+MultiCellValues(qr::QuadratureRule, ip_funs::NamedTuple, args...; kwargs...) = MultiCellValues(Float64, qr, ip_funs, args...; kwargs...)
+function MultiCellValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::ScalarInterpolation=default_geometric_interpolation(first(ip_funs)); kwargs...) where T
+    return MultiCellValues(T, qr, ip_funs, VectorizedInterpolation(ip_geo); kwargs...)
+end
