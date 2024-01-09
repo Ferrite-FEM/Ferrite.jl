@@ -55,8 +55,8 @@ function L2Projector(
     add!(sdh, :_, func_ip) # we need to create the field, but the interpolation is not used here
     close!(dh)
     # The dofhandler `dh` in the L2Project creates an "incomplete" dofhandler, i.e not all cells belongs to a subdofhandler
-    # This causes error in Ferrite.evaluate_at_grid_nodes(proj, point_vars) when createing an CellIterator, see PR###.
-    # HACK: To solve this, we need can make all cell points to the same subdofhandler.
+    # This causes an error when calling Ferrite.evaluate_at_grid_nodes(proj, point_vars) (when creating a CellIterator), see PR870.
+    # HACK: To solve this, we need can make all cells point to the same subdofhandler.
     for i in 1:length(dh.cell_to_subdofhandler)
         dh.cell_to_subdofhandler[i] = 1
     end
