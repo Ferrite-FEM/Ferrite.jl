@@ -268,8 +268,6 @@ function _evaluate_at_grid_nodes(
 end
 function _evaluate_at_grid_nodes!(data, cv, dh, set, u::AbstractVector{S}) where S
     ue = zeros(S, getnbasefunctions(cv))
-    @show dh.field_names
-    @show dh.cell_to_subdofhandler[1]
     for cell in CellIterator(dh, set)
         @assert getnquadpoints(cv) == length(cell.nodes)
         for (i, I) in pairs(cell.dofs)
