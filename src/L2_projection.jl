@@ -54,6 +54,13 @@ function L2Projector(
     sdh = SubDofHandler(dh, Set(set))
     add!(sdh, :_, func_ip) # we need to create the field, but the interpolation is not used here
     close!(dh)
+    # The dofhandler `dh` in the L2Project creates an "incomplete" dofhandler, i.e not all cells belongs to a subdofhandler
+    # This causes error in Ferrite.evaluate_at_grid_nodes(proj, point_vars) when createing an CellIterator, see PR###.
+    # HACK: To solve this, we need can make all cell points to the same subdofhandler.
+    for i in 1:length(dh.cell_to_subdofhandler)
+        dh.cell_to_subdofhandler[i] = 1
+    end
+    
 
     M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
     M_cholesky = cholesky(M)
@@ -261,6 +268,8 @@ function _evaluate_at_grid_nodes(
 end
 function _evaluate_at_grid_nodes!(data, cv, dh, set, u::AbstractVector{S}) where S
     ue = zeros(S, getnbasefunctions(cv))
+    @show dh.field_names
+    @show dh.cell_to_subdofhandler[1]
     for cell in CellIterator(dh, set)
         @assert getnquadpoints(cv) == length(cell.nodes)
         for (i, I) in pairs(cell.dofs)
