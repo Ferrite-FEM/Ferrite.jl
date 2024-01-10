@@ -184,7 +184,7 @@ end
 geometric_interpolation(cv::MultiCellValues) = geometric_interpolation(cv.geo_mapping)
 
 function getdetJdV(cv::MultiCellValues, q_point::Int)
-    cv.detJdV === nothing && throw(ArgumentError("detJdV is not saved in CellValues"))
+    cv.detJdV === nothing && throw(ArgumentError("detJdV calculation was not requested at construction"))
     return cv.detJdV[q_point]
 end
 
