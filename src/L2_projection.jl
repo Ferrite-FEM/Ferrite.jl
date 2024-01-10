@@ -53,7 +53,7 @@ function L2Projector(
     dh = DofHandler(grid)
     sdh = SubDofHandler(dh, Set(set))
     add!(sdh, :_, func_ip) # we need to create the field, but the interpolation is not used here
-    close!(dh)  
+    close!(dh)
 
     M = _assemble_L2_matrix(fe_values_mass, set, dh)  # the "mass" matrix
     M_cholesky = cholesky(M)
