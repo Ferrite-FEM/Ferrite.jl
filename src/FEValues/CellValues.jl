@@ -129,6 +129,23 @@ function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
     sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
 end
 
+"""
+    MultiCellValues([::Type{T},] quad_rule::QuadratureRule, func_interpols::NamedTuple, [geom_interpol::Interpolation])
+
+A `mcv::MultiCellValues` object generalizes the `CellValues` object to multiple fields. In general, functions applicable to 
+a `CellValues` associated with the function interpolation with `key` can be called on `mcv[key]`, while other functions 
+relating to geometric properties and quadrature rules are called directly on `mcv`. 
+
+**Arguments:**
+* `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
+* `quad_rule`: an instance of a [`QuadratureRule`](@ref)
+* `func_interpols`: A named tuple with entires of type ``Interpolation``, used to interpolate the approximated function identified by the key in `func_interpols`
+* `geom_interpol`: an optional instance of a [`Interpolation`](@ref) which is used to interpolate the geometry.
+  By default linear Lagrange interpolation is used. For embedded elements the geometric interpolations should
+  be vectorized to the spatial dimension.
+"""
+MultiCellValues
+
 struct MultiCellValues{FVS, GM, QR, detT, FVT} <: AbstractCellValues
     fun_values::FVS         # FunctionValues collected in a named tuple (not necessarily unique)
     fun_values_tuple::FVT   # FunctionValues collected in a tuple (each unique)
@@ -153,4 +170,67 @@ end
 MultiCellValues(qr::QuadratureRule, ip_funs::NamedTuple, args...; kwargs...) = MultiCellValues(Float64, qr, ip_funs, args...; kwargs...)
 function MultiCellValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::ScalarInterpolation=default_geometric_interpolation(first(ip_funs)); kwargs...) where T
     return MultiCellValues(T, qr, ip_funs, VectorizedInterpolation(ip_geo); kwargs...)
+end
+
+function Base.copy(cv::MultiCellValues)
+    fun_values_tuple = map(copy, cv.fun_values_tuple)
+    fun_values = NamedTuple((key => fun_values_tuple[findfirst(fv === named_fv for fv in cv.fun_values_tuple)] for (key, named_fv) in pairs(cv.fun_values)))
+    return MultiCellValues(fun_values, fun_values_tuple, copy(cv.geo_mapping), copy(cv.qr), _copy_or_nothing(cv.detJdV))
+end
+
+# Access geometry values
+@propagate_inbounds getngeobasefunctions(cv::MultiCellValues) = getngeobasefunctions(cv.geo_mapping)
+@propagate_inbounds geometric_value(cv::MultiCellValues, args...) = geometric_value(cv.geo_mapping, args...)
+geometric_interpolation(cv::MultiCellValues) = geometric_interpolation(cv.geo_mapping)
+
+function getdetJdV(cv::MultiCellValues, q_point::Int)
+    cv.detJdV === nothing && throw(ArgumentError("detJdV is not saved in CellValues"))
+    return cv.detJdV[q_point]
+end
+
+# No accessors for function values, just ability to get the stored `FunctionValues` which can be called directly. 
+@inline Base.getindex(cv::MultiCellValues, key::Symbol) = cv.fun_values[key]
+
+# Access quadrature rule values 
+getnquadpoints(cv::MultiCellValues) = getnquadpoints(cv.qr)
+
+@inline function reinit!(cv::MultiCellValues, x::AbstractVector)
+    return reinit!(cv, nothing, x)
+end
+
+function reinit!(cv::MultiCellValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{<:Vec})
+    geo_mapping = cv.geo_mapping
+    fun_values = cv.fun_values_tuple
+    n_geom_basefuncs = getngeobasefunctions(geo_mapping)
+    
+    map(fv -> check_reinit_sdim_consistency(:MultiCellValues, shape_gradient_type(fv), eltype(x)), fun_values)
+    if cell === nothing && !all(map(fv -> isa(mapping_type(fv), IdentityMapping), fun_values))
+        throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
+    end
+    if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
+        throw_incompatible_coord_length(length(x), n_geom_basefuncs)
+    end
+    
+    @inbounds for (q_point, w) in enumerate(getweights(cv.qr))
+        mapping = calculate_mapping(geo_mapping, q_point, x)
+        _update_detJdV!(cv.detJdV, q_point, w, mapping)
+        _apply_mappings!(fun_values, q_point, mapping, cell)
+    end
+    return nothing
+end
+
+@inline function _apply_mappings!(fun_values::Tuple, q_point, mapping, cell)
+    map(fv -> (@inbounds apply_mapping!(fv, q_point, mapping, cell)), fun_values)
+end
+
+# Slightly faster for unknown reason to write out each call, only worth it for a few unique function values. 
+@inline function _apply_mappings!(fun_values::NTuple{1, <:FunctionValues}, q_point, mapping, cell)
+    @inbounds apply_mapping!(fun_values[1], q_point, mapping, cell)
+end
+
+@inline function _apply_mappings!(fun_values::NTuple{2, <:FunctionValues}, q_point, mapping, cell)
+    @inbounds begin
+        apply_mapping!(fun_values[1], q_point, mapping, cell)
+        apply_mapping!(fun_values[2], q_point, mapping, cell)
+    end
 end
