@@ -4,7 +4,7 @@ using Base: @propagate_inbounds
 
 @noinline throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive: det(J) = $(detJ)"))
 
-function checkquadpoint(fe_v::Union{AbstractValues, FunctionValues}, qp::Int)
+function checkquadpoint(fe_v::AbstractValues, qp::Int)
     0 < qp <= getnquadpoints(fe_v) || error("quadrature point out of range")
     return nothing
 end
@@ -99,13 +99,13 @@ function shape_symmetric_gradient end
 Return the divergence of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
-@propagate_inbounds function shape_divergence(cv::Union{AbstractValues, FunctionValues}, q_point::Int, base_func::Int)
+@propagate_inbounds function shape_divergence(cv::AbstractValues, q_point::Int, base_func::Int)
     return divergence_from_gradient(shape_gradient(cv, q_point, base_func))
 end
 divergence_from_gradient(grad::Vec) = sum(grad)
 divergence_from_gradient(grad::Tensor{2}) = tr(grad)
 
-function shape_curl(cv::Union{AbstractValues, FunctionValues}, q_point::Int, base_func::Int)
+function shape_curl(cv::AbstractValues, q_point::Int, base_func::Int)
     return curl_from_gradient(shape_gradient(cv, q_point, base_func))
 end
 curl_from_gradient(∇v::SecondOrderTensor{3}) = Vec{3}((∇v[3,2] - ∇v[2,3], ∇v[1,3] - ∇v[3,1], ∇v[2,1] - ∇v[1,2]))
@@ -124,7 +124,7 @@ where ``u_i`` are the value of ``u`` in the nodes. For a vector valued function 
 ``\\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n N_i (\\mathbf{x}) \\mathbf{u}_i`` where ``\\mathbf{u}_i`` are the
 nodal values of ``\\mathbf{u}``.
 """
-function function_value(fe_v::Union{AbstractValues, FunctionValues}, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
+function function_value(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
     n_base_funcs = getnbasefunctions(fe_v)
     length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
     @boundscheck checkbounds(u, dof_range)
@@ -141,12 +141,12 @@ end
 
 Return the type of `shape_value(fe_v, q_point, base_function)`
 """
-function shape_value_type(fe_v::Union{AbstractValues, FunctionValues})
+function shape_value_type(fe_v::AbstractValues)
     # Default fallback
     return typeof(shape_value(fe_v, 1, 1))
 end
 
-function_value_init(cv::Union{AbstractValues, FunctionValues}, ::AbstractVector{T}) where {T} = zero(shape_value_type(cv)) * zero(T)
+function_value_init(cv::AbstractValues, ::AbstractVector{T}) where {T} = zero(shape_value_type(cv)) * zero(T)
 
 """
     function_gradient(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector, [dof_range])
@@ -164,7 +164,7 @@ For a vector valued function with use of `ScalarValues` the gradient is computed
 ``\\mathbf{\\nabla} \\mathbf{u}(\\mathbf{x}) = \\sum\\limits_{i = 1}^n \\mathbf{u}_i \\otimes \\mathbf{\\nabla} N_i (\\mathbf{x})``
 where ``\\mathbf{u}_i`` are the nodal values of ``\\mathbf{u}``.
 """
-function function_gradient(fe_v::Union{AbstractValues, FunctionValues}, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
+function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
     n_base_funcs = getnbasefunctions(fe_v)
     length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
     @boundscheck checkbounds(u, dof_range)
@@ -193,15 +193,15 @@ end
 
 Return the type of `shape_gradient(fe_v, q_point, base_function)`
 """
-function shape_gradient_type(fe_v::Union{AbstractValues, FunctionValues})
+function shape_gradient_type(fe_v::AbstractValues)
     # Default fallback
     return typeof(shape_gradient(fe_v, 1, 1))
 end
 
-function function_gradient_init(cv::Union{AbstractValues, FunctionValues}, ::AbstractVector{T}) where {T}
+function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {T}
     return zero(shape_gradient_type(cv)) * zero(T)
 end
-function function_gradient_init(cv::Union{AbstractValues, FunctionValues}, ::AbstractVector{T}) where {T <: AbstractVector}
+function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {T <: AbstractVector}
     return zero(T) ⊗ zero(shape_gradient_type(cv))
 end
 
@@ -215,12 +215,12 @@ The symmetric gradient of a scalar function is computed as
 ``\\left[ \\mathbf{\\nabla}  \\mathbf{u}(\\mathbf{x_q}) \\right]^\\text{sym} =  \\sum\\limits_{i = 1}^n  \\frac{1}{2} \\left[ \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\otimes \\mathbf{u}_i + \\mathbf{u}_i  \\otimes  \\mathbf{\\nabla} N_i (\\mathbf{x}_q) \\right]``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function function_symmetric_gradient(fe_v::Union{AbstractValues, FunctionValues}, q_point::Int, u::AbstractVector, dof_range)
+function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range)
     grad = function_gradient(fe_v, q_point, u, dof_range)
     return symmetric(grad)
 end
 
-function function_symmetric_gradient(fe_v::Union{AbstractValues, FunctionValues}, q_point::Int, u::AbstractVector)
+function function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector)
     grad = function_gradient(fe_v, q_point, u)
     return symmetric(grad)
 end
@@ -233,7 +233,7 @@ The divergence of a vector valued functions in the quadrature point ``\\mathbf{x
 ``\\mathbf{\\nabla} \\cdot \\mathbf{u}(\\mathbf{x_q}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i (\\mathbf{x_q}) \\cdot \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function function_divergence(fe_v::Union{AbstractValues, FunctionValues}, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
+function function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
     return divergence_from_gradient(function_gradient(fe_v, q_point, u, dof_range))
 end
 
@@ -258,7 +258,7 @@ The curl of a vector valued functions in the quadrature point ``\\mathbf{x}_q)``
 ``\\mathbf{\\nabla} \\times \\mathbf{u}(\\mathbf{x_q}) = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla} N_i \\times (\\mathbf{x_q}) \\cdot \\mathbf{u}_i``
 where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
-function_curl(fe_v::Union{AbstractValues, FunctionValues}, q_point::Int, u::AbstractVector, dof_range = eachindex(u)) =
+function_curl(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u)) =
     curl_from_gradient(function_gradient(fe_v, q_point, u, dof_range))
 
 # TODO: Deprecate this, nobody is using this in practice...

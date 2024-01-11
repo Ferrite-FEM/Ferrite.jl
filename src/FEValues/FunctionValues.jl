@@ -33,7 +33,7 @@ for both the reference cell (precalculated) and the real cell (updated in `reini
 """
 FunctionValues
 
-struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t}
+struct FunctionValues{DiffOrder, IP, N_t, dNdx_t, dNdξ_t} <: AbstractValues
     ip::IP          # ::Interpolation
     Nx::N_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
     Nξ::N_t         # ::AbstractMatrix{Union{<:Tensor,<:Number}}
