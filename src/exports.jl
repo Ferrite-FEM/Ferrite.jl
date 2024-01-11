@@ -28,6 +28,7 @@ export
     AbstractCellValues,
     AbstractFaceValues,
     CellValues,
+    MultiCellValues,
     FaceValues,
     InterfaceValues,
     reinit!,

@@ -83,6 +83,7 @@ function Base.copy(v::FunctionValues)
 end
 
 getnbasefunctions(funvals::FunctionValues) = size(funvals.Nx, 1)
+getnquadpoints(funvals::FunctionValues) = size(funvals.Nx, 2)
 @propagate_inbounds shape_value(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.Nx[base_func, q_point]
 @propagate_inbounds shape_gradient(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.dNdx[base_func, q_point]
 @propagate_inbounds shape_symmetric_gradient(funvals::FunctionValues, q_point::Int, base_func::Int) = symmetric(shape_gradient(funvals, q_point, base_func))
