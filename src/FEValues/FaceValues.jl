@@ -80,9 +80,9 @@ get_geo_mapping(fv::FaceValues) = @inbounds fv.geo_mapping[getcurrentface(fv)]
 
 get_fun_values(fv::FaceValues) = @inbounds fv.fun_values[getcurrentface(fv)]
 
-@propagate_inbounds shape_value(fv::FaceValues, i::Int, q_point::Int) = shape_value(get_fun_values(fv), i, q_point)
-@propagate_inbounds shape_gradient(fv::FaceValues, i::Int, q_point::Int) = shape_gradient(get_fun_values(fv), i, q_point)
-@propagate_inbounds shape_symmetric_gradient(fv::FaceValues, i::Int, q_point::Int) = shape_symmetric_gradient(get_fun_values(fv), i, q_point)
+@propagate_inbounds shape_value(fv::FaceValues, q_point::Int, i::Int) = shape_value(get_fun_values(fv), q_point, i)
+@propagate_inbounds shape_gradient(fv::FaceValues, q_point::Int, i::Int) = shape_gradient(get_fun_values(fv), q_point, i)
+@propagate_inbounds shape_symmetric_gradient(fv::FaceValues, q_point::Int, i::Int) = shape_symmetric_gradient(get_fun_values(fv), q_point, i)
 
 """
     getcurrentface(fv::FaceValues)
