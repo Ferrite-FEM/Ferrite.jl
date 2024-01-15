@@ -66,6 +66,8 @@ cellvalues = CellValues(qr, ip);
 # our interpolation `ip` defined above.
 # Lastly we `close!` the `DofHandler`, it is now that the dofs are distributed
 # for all the elements.
+#md # !!! note
+#md #     The dof numbering does not follow the node numbering of the grid.
 dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
