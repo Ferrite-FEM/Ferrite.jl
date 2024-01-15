@@ -132,7 +132,7 @@ Plots.plot(getindex.(points, 1), getindex.(q_points, 1), xlabel = "x (coordinate
 # *Figure 4*: ``x``-component of the flux along the cut line from *Figure 2*.
 
 #md # ## What next?
-#md # For more complicated visualization workflows we recomment either using our visualization tool [FerriteViz.jl](https://github.com/Ferrite-FEM/FerriteViz.jl)
+#md # For more complicated visualization workflows we recommend either using our visualization tool [FerriteViz.jl](https://github.com/Ferrite-FEM/FerriteViz.jl)
 #md # or users should export the solution into vtk files and use e.g. [ParaView](https://www.paraview.org/), [Mayavi](https://docs.enthought.com/mayavi/mayavi/), ... .
 #md # It should be noted that the ordering of the DofHandler and the numbering of the nodes does not match, hence we cannot directly use solution
 #md # vectors to assign colors to discretizations.
