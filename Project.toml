@@ -1,6 +1,6 @@
 name = "Ferrite"
 uuid = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
-version = "0.3.14"
+version = "1.0.0"
 
 [deps]
 EnumX = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
