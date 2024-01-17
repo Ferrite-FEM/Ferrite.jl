@@ -121,6 +121,7 @@ export
     create_sparsity_pattern,
     create_symmetric_sparsity_pattern,
     dof_range,
+    global_dof_range,
     renumber!,
     DofOrder,
     evaluate_at_grid_nodes,
