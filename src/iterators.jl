@@ -58,10 +58,7 @@ function CellCache(grid::Grid{dim,C,T}, flags::UpdateFlags=UpdateFlags()) where 
 end
 
 function CellCache(dh::DofHandler{dim}, flags::UpdateFlags=UpdateFlags()) where {dim}
-    n = 0 # celldofs will be resized in reinit!
-    if length(dh.subdofhandlers) == 1
-        n = ndofs_per_cell(dh)
-    end
+    n = ndofs_per_cell(dh.subdofhandlers[1]) # dofs and coords will be resized in `reinit!`
     N = nnodes_per_cell(get_grid(dh), 1)
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)

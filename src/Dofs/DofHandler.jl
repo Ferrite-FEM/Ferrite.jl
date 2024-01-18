@@ -176,7 +176,7 @@ function ndofs_per_cell(dh::DofHandler)
     return @inbounds ndofs_per_cell(dh.subdofhandlers[1])
 end
 function ndofs_per_cell(dh::DofHandler, cell::Int)
-    @boundscheck 1 <= cell <= getncells(get_grid(dh))
+    @boundscheck 1 <= cell <= getncells(get_grid(dh)) || throw(ArgumentError("cell = $cell ∉ 1:$(getncells(get_grid(dh)))"))
     return @inbounds ndofs_per_cell(dh.subdofhandlers[dh.cell_to_subdofhandler[cell]])
 end
 ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell[]
