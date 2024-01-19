@@ -126,4 +126,7 @@ include("PointEvalHandler.jl")
 include("deprecations.jl")
 include("docs.jl")
 
+# include("heap.jl")
+include("dsp.jl")
+
 end # module
