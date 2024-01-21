@@ -17,7 +17,7 @@ add!(dh, :p, Lagrange{RefHexahedron, 1}())
 close!(dh)
 
 function f(dh)
-    dsp = Ferrite.DSP(ndofs(dh), ndofs(dh); rows_per_chunk = 16, growth_factor = 1.5)
+    dsp = Ferrite.DSP(ndofs(dh), ndofs(dh); rows_per_chunk = 1, growth_factor = 1.5)
     create_sparsity_pattern!(dsp, dh)
     return dsp
 end

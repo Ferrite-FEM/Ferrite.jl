@@ -128,5 +128,6 @@ include("docs.jl")
 
 # include("heap.jl")
 include("dsp.jl")
+include("pooldsp.jl")
 
 end # module
