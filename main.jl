@@ -1,6 +1,6 @@
 #! /usr/bin/env julia
 
-using Ferrite, SparseArrays, Profile, ProfileView
+using Revise, Ferrite, SparseArrays, Profile, ProfileView
 
 const n = if length(ARGS) == 1
     parse(Int, ARGS[1])
@@ -28,6 +28,12 @@ function g(dh)
     return dsp
 end
 
+function h(dh)
+    dsp = Ferrite.MallocDSP(ndofs(dh), ndofs(dh))
+    create_sparsity_pattern!(dsp, dh)
+    return dsp
+end
+
 @timev f(dh);
 GC.gc()
 GC.gc()
@@ -47,6 +53,16 @@ GC.gc()
 GC.gc()
 GC.gc()
 @profview g(dh)
+
+@timev h(dh);
+GC.gc()
+GC.gc()
+GC.gc()
+sleep(2)
+GC.gc()
+GC.gc()
+GC.gc()
+@profview h(dh)
 
 # @time dsp = create_sparsity_pattern(dh)
 # @time K = create_matrix(dsp)

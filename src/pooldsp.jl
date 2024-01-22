@@ -243,7 +243,7 @@ n_cols(dsp::MallocDSP) = dsp.ncols
 
 function add_entry!(dsp::MallocDSP, row::Int, col::Int)
     @boundscheck (1 <= row <= n_rows(dsp) && 1 <= col <= n_cols(dsp)) || throw(BoundsError())
-    println("adding entry: $row, $col")
+    # println("adding entry: $row, $col")
     r = dsp.rows[row]
     rs = r.size
     rx = r.x
