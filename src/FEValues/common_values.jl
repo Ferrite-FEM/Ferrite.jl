@@ -272,7 +272,10 @@ Compute the spatial coordinate in a quadrature point. `x` contains the nodal
 coordinates of the cell.
 
 The coordinate is computed, using the geometric interpolation, as
-``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{x}) \\mathbf{\\hat{x}}_i``
+``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{\\xi}) \\mathbf{\\hat{x}}_i``.
+
+where ``\\xi``is the coordinate of the given quadrature point `q_point` of the associated
+quadrature rule.
 """
 function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVector{<:Vec})
     n_base_funcs = getngeobasefunctions(fe_v)
@@ -285,6 +288,25 @@ function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVecto
     return vec
 end
 
+"""
+    spatial_coordinate(ip::VectorizedInterpolation, ξ::Vec, cell_coordinates::Vector{<:Vec{dim, T}})
+
+Compute the spatial coordinate in a quadrature point. `cell_coordinates` contains the nodal coordinates of the cell.
+
+The coordinate is computed, using the geometric interpolation, as
+``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{\\xi}) \\mathbf{\\hat{x}}_i``
+"""
+spatial_coordinate(ip::VectorizedInterpolation, ξ::Vec{<:Any,T}, cell_coordinates::Vector{<:Vec{dim, T}}) where {T, dim} = spatial_coordinate(ip, ξ, cell_coordinates)
+
+function spatial_coordinate(interpolation::ScalarInterpolation, ξ::Vec{<:Any,T}, cell_coordinates::Vector{<:Vec{dim, T}}) where {T, dim}
+    n_basefuncs = getnbasefunctions(interpolation)
+    x = zero(Vec{dim, T})
+    for j in 1:n_basefuncs
+        M = shape_value(interpolation, ξ, j)
+        x += M * cell_coordinates[j]
+    end
+    return x
+end
 
 # Utility functions used by GeometryMapping, FunctionValues 
 _copy_or_nothing(x) = copy(x)

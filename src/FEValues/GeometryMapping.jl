@@ -121,15 +121,32 @@ end
     return Tensor{3,dim,promote_type(Tx,TM)}
 end =# # PR798
 
-@inline function calculate_mapping(::GeometryMapping{0}, q_point, x)
+@inline function calculate_mapping(gip::VectorizedInterpolation, ξ::Vec, cell_coordinates::AbstractVector{<:Vec})
+    return calculate_mapping(gip.ip, ξ, x)
+end
+
+@inline function calculate_mapping(gip::ScalarInterpolation, ξ::Vec, cell_coordinates::AbstractVector{<:Vec})
+    n_basefuncs = getnbasefunctions(gip)
+    @assert length(cell_coordinates) == n_basefuncs
+
+    fecv_J = zero(otimes_returntype(Vec{sdim,T}, Vec{rdim,T}))
+    @inbounds for j in 1:n_basefuncs
+        dMdξ = shape_gradient(gip, ξ, j)
+        #fecv_J += cell_coordinates[j] ⊗ dMdξ[j]
+        fecv_J += otimes_helper(cell_coordinates[j], dMdξ[j])
+    end
+    return MappingValues(fecv_J, nothing)
+end
+
+@inline function calculate_mapping(::GeometryMapping{0}, q_point::Int, x::AbstractVector{<:Vec})
     return MappingValues(nothing, nothing)
 end
 
-@inline function calculate_mapping(geo_mapping::GeometryMapping{1}, q_point, x)
-    fecv_J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
+@inline function calculate_mapping(geo_mapping::GeometryMapping{1}, q_point::Int, cell_coordinates::AbstractVector{<:Vec})
+    fecv_J = zero(otimes_returntype(eltype(cell_coordinates), eltype(geo_mapping.dMdξ)))
     @inbounds for j in 1:getngeobasefunctions(geo_mapping)
         #fecv_J += x[j] ⊗ geo_mapping.dMdξ[j, q_point]
-        fecv_J += otimes_helper(x[j], geo_mapping.dMdξ[j, q_point])
+        fecv_J += otimes_helper(cell_coordinates[j], geo_mapping.dMdξ[j, q_point])
     end
     return MappingValues(fecv_J, nothing)
 end
@@ -146,6 +163,25 @@ end =# # PR798
 
 calculate_detJ(J::Tensor{2}) = det(J)
 calculate_detJ(J::SMatrix) = embedding_det(J)
+
+function calculate_mapping_and_spatial_coordinate(gip::VectorizedInterpolation, ξ::Vec{rdim,T}, cell_coordinates::AbstractVector{<:Vec{sdim, T}}) where {T, rdim, sdim}
+    return calculate_mapping_and_spatial_coordinate(gip.ip, ξ, cell_coordinates)
+end
+
+function calculate_mapping_and_spatial_coordinate(gip::ScalarInterpolation, ξ::Vec{rdim,T}, cell_coordinates::AbstractVector{<:Vec{sdim, T}}) where {T, rdim, sdim}
+    n_basefuncs = getnbasefunctions(gip)
+    @assert length(cell_coordinates) == n_basefuncs
+
+    fecv_J = zero(otimes_returntype(Vec{sdim,T}, Vec{rdim,T}))
+    x = zero(Vec{sdim, T})
+    @inbounds for j in 1:n_basefuncs
+        dMdξ, M = shape_gradient_and_value(gip, ξ, j)
+        x += M * cell_coordinates[j]
+        fecv_J += otimes_helper(cell_coordinates[j], dMdξ)
+    end
+    return MappingValues(fecv_J, nothing), x
+end
+
 
 # Embedded
 
