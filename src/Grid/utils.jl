@@ -342,12 +342,22 @@ end
 end
 
 # Hypercube is simply ⨂ᵈⁱᵐ Line :)
-sample_random_point(::Type{Ferrite.RefHypercube{ref_dim}}) where {ref_dim} = Vec{ref_dim}(2.0 .* rand(Vec{ref_dim}) .- 1.0)
+sample_random_point(::Type{Ferrite.RefHypercube{ref_dim}}) where {ref_dim} = Vec{ref_dim}(ntuple(_ -> 2.0*rand()-1.0, ref_dim))
 
 # Dirichlet type sampling
-function sample_random_point(::Type{Ferrite.RefSimplex{ref_dim}}) where {ref_dim} 
-    ξ = rand(ref_dim+1)
-    ξₜ = -log.(ξ)
+#
+# The idea behind this sampling is that the d-Simplex (i.e. a generalized triangle in d dimensions)
+# is just a surface in d+1 dimensions, that can be characterized by two constraints:
+# 1. All coordinates are between 0 and 1
+# 2. The sum of all coordinates is exactly 1
+# This way we can just sample from the d+1 dimensional hypercube, transform the hypercube
+# logarithmically to get a "normal distribution" over our simplex and enforce that the coordinates
+# sum to 1. By dropping the last coordinate in this sample we finally obtain d numbers which lies in
+# the d-simplex.
+#
+# A nice geometric sketch of this process is given in this stackexchange post: https://stats.stackexchange.com/a/296779
+function sample_random_point(::Type{Ferrite.RefSimplex{ref_dim}}) where {ref_dim} # Note that "ref_dim = d" in the text above
+    ξₜ = ntuple(_ -> -log(rand()), ref_dim+1)
     return Vec{ref_dim}(ntuple(i->ξₜ[i], ref_dim) ./ sum(ξₜ))
 end
 
@@ -362,6 +372,6 @@ end
 function sample_random_point(::Type{RefPyramid})
     ξ₃ = (1-1e-3)*rand(Float64) # Derivative is discontinuous at the top
     # If we fix a z coordinate we get a Quad with extends (1-ξ₃)
-    (ξ₁, ξ₂) = (1.0 - ξ₃) .* rand(Vec{2})
+    (ξ₁, ξ₂) = (1.0 - ξ₃) .* Vec{2}(ntuple(_ -> rand(), 2))
     return Vec{3}((ξ₁, ξ₂, ξ₃))
 end
