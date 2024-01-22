@@ -127,7 +127,7 @@ end
 
 @inline function calculate_mapping(gip::ScalarInterpolation, ξ::Vec, cell_coordinates::AbstractVector{<:Vec})
     n_basefuncs = getnbasefunctions(gip)
-    @assert length(cell_coordinates) == n_basefuncs
+    @boundscheck checkbounds(cell_coordinates, Base.OneTo(n_basefuncs))
 
     fecv_J = zero(otimes_returntype(Vec{sdim,T}, Vec{rdim,T}))
     @inbounds for j in 1:n_basefuncs
