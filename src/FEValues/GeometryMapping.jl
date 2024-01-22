@@ -84,13 +84,13 @@ end
     return gm
 end =# # PR798
 
-function precompute_values!(gm::GeometryMapping{0}, qr_points::Vector{<:Vec})
+function precompute_values!(gm::GeometryMapping{0}, qr_points::AbstractVector{<:Vec})
     shape_values!(gm.M, gm.ip, qr_points)
 end
-function precompute_values!(gm::GeometryMapping{1}, qr_points::Vector{<:Vec})
+function precompute_values!(gm::GeometryMapping{1}, qr_points::AbstractVector{<:Vec})
     shape_gradients_and_values!(gm.dMdξ, gm.M, gm.ip, qr_points)
 end
-#= function precompute_values!(gm::GeometryMapping{2}, qr_points::Vector{<:Vec})
+#= function precompute_values!(gm::GeometryMapping{2}, qr_points::AbstractVector{<:Vec})
     shape_hessians_gradients_and_values!(gm.d2Mdξ2, gm.dMdξ, gm.M, gm.ip, qr_points)
 end =# # PR798
 
