@@ -57,10 +57,12 @@ bibtex_plugin = CitationBibliography(
             "tutorials/porous_media.md",
             "tutorials/ns_vs_diffeq.md",
             "tutorials/linear_shell.md",
+            "tutorials/dg_heat_equation.md",
         ],
         "Topic guides" => [
             "Topic guide overview" => "topics/index.md",
             "topics/fe_intro.md",
+            "topics/FEValues.md",
             "topics/degrees_of_freedom.md",
             "topics/assembly.md",
             "topics/boundary_conditions.md",

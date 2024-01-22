@@ -69,9 +69,10 @@ struct AffineConstraint{T}
 end
 
 """
-    ConstraintHandler
+    ConstraintHandler([T=Float64], dh::AbstractDofHandler)
 
-Collection of constraints.
+A collection of constraints associated with the dof handler `dh`.
+`T` is the numeric type for stored values.
 """
 struct ConstraintHandler{DH<:AbstractDofHandler,T}
     dbcs::Vector{Dirichlet}
@@ -90,11 +91,13 @@ struct ConstraintHandler{DH<:AbstractDofHandler,T}
     closed::ScalarWrapper{Bool}
 end
 
-function ConstraintHandler(dh::AbstractDofHandler)
+ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, dh)
+
+function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where T <: Number
     @assert isclosed(dh)
     ConstraintHandler(
-        Dirichlet[], Int[], Int[], Float64[], Union{Nothing,Float64}[], Union{Nothing,DofCoefficients{Float64}}[],
-        Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false),
+        Dirichlet[], Int[], Int[], T[], Union{Nothing,T}[], Union{Nothing,DofCoefficients{T}}[],
+        Dict{Int,Int}(), BCValues{T}[], dh, ScalarWrapper(false),
     )
 end
 
@@ -174,6 +177,23 @@ isclosed(ch::ConstraintHandler) = ch.closed[]
 free_dofs(ch::ConstraintHandler) = ch.free_dofs
 prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
+# Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that 
+# `issorted(diff)` and that `1 ≤ diff[1] ≤ diff[end] ≤ n_entries`
+function _sorted_setdiff!(out::Vector{Int}, n_entries::Int, diff::Vector{Int})
+    n_diff = length(diff)
+    resize!(out, n_entries - n_diff)
+    diff_ind = out_ind = 1
+    for i in 1:n_entries
+        if diff_ind ≤ n_diff && i == diff[diff_ind]
+            diff_ind += 1
+        else
+            out[out_ind] = i
+            out_ind += 1
+        end
+    end
+    return out
+end
+
 """
     close!(ch::ConstraintHandler)
 
@@ -189,7 +209,7 @@ function close!(ch::ConstraintHandler)
     ch.affine_inhomogeneities .= ch.affine_inhomogeneities[I]
     ch.dofcoefficients .= ch.dofcoefficients[I]
 
-    copy!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
+    _sorted_setdiff!(ch.free_dofs, ndofs(ch.dh), ch.prescribed_dofs)
 
     for i in 1:length(ch.prescribed_dofs)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
@@ -407,7 +427,7 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
 end
 
 # for vertices, faces and edges
-function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where {T}
 
@@ -444,7 +464,7 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entiti
 end
 
 # for nodes
-function _update!(inhomogeneities::Vector{Float64}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+function _update!(inhomogeneities::Vector{T}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where T
     counter = 1
@@ -843,7 +863,7 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         if !all(c -> 0 < c <= n_comp, components)
             error("components $(components) not within range of field :$(dbc.field_name) ($(n_comp) dimension(s))")
         end
-        # Create BCValues for coordinate evalutation at dof-locations
+        # Create BCValues for coordinate evaluation at dof-locations
         EntityType = eltype(dbc.faces) # (Face|Edge|Vertex)Index
         if EntityType <: Integer
             # BCValues are just dummy for nodesets so set to FaceIndex
@@ -1279,7 +1299,7 @@ system. For other types of periodicities the `transform` function can be used. T
 `transform` function is applied on the coordinates of the image face, and is expected to
 transform the coordinates to the matching locations in the mirror set.
 
-The keyword `tol` specifies the tolerence (i.e. distance and deviation in face-normals) 
+The keyword `tol` specifies the tolerance (i.e. distance and deviation in face-normals) 
 between a image-face and mirror-face, for them to be considered matched.
 
 See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).

@@ -621,7 +621,7 @@ For most scalar-valued interpolations we can simply compensate for this by rever
 numbering on all edges that do not match the global edge direction, i.e. for the edge on
 element B in the example.
 
-In addition, we also have to preverse the ordering at each dof location.
+In addition, we also have to preserve the ordering at each dof location.
 
 For more details we refer to Scroggs et al. [Scroggs2022](@cite) as we follow the methodology
 described therein.
@@ -778,7 +778,7 @@ Return the index of the field with name `field_name` in a `DofHandler`. The inde
 field was found and the 2nd entry is the index of the field within the `SubDofHandler`.
 
 !!! note
-    Always finds the 1st occurence of a field within `DofHandler`.
+    Always finds the 1st occurrence of a field within `DofHandler`.
 
 See also: [`find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref),
 [`_find_field(sdh::SubDofHandler, field_name::Symbol)`](@ref).
@@ -843,7 +843,7 @@ index, where `field_idx` represents the index of a field within a `SubDofHandler
     The `dof_range` of a field can vary between different `SubDofHandler`s. Therefore, it is
     advised to use the `field_idxs` or refer to a given `SubDofHandler` directly in case
     several `SubDofHandler`s exist. Using the `field_name` will always refer to the first
-    occurence of `field` within the `DofHandler`.
+    occurrence of `field` within the `DofHandler`.
 
 Example:
 ```jldoctest
@@ -903,7 +903,7 @@ getfieldinterpolation(sdh::SubDofHandler, field_name::Symbol) = getfieldinterpol
 Evaluate the approximated solution for field `fieldname` at the node
 coordinates of the grid given the Dof handler `dh` and the solution vector `u`.
 
-Return a vector of length `getnnodes(grid)` where entry `i` contains the evalutation of the
+Return a vector of length `getnnodes(grid)` where entry `i` contains the evaluation of the
 approximation in the coordinate of node `i`. If the field does not live on parts of the
 grid, the corresponding values for those nodes will be returned as `NaN`s.
 """
@@ -925,7 +925,7 @@ function _evaluate_at_grid_nodes(dh::DofHandler, u::Vector{T}, fieldname::Symbol
         vtk_dim = n_c == 2 ? 3 : n_c # VTK wants vectors padded to 3D
         data = fill(NaN * zero(T), vtk_dim, getnnodes(get_grid(dh)))
     else
-        # Just evalutation at grid nodes
+        # Just evaluation at grid nodes
         data = fill(NaN * zero(RT), getnnodes(get_grid(dh)))
     end
     # Loop over the subdofhandlers
@@ -957,7 +957,7 @@ function _evaluate_at_grid_nodes!(data::Union{Vector,Matrix}, sdh::SubDofHandler
         u::Vector{T}, cv::CellValues, drange::UnitRange, ::Type{RT}) where {T, RT}
     ue = zeros(T, length(drange))
     # TODO: Remove this hack when embedding works...
-    if RT <: Vec && cv isa CellValues{<:ScalarInterpolation}
+    if RT <: Vec && function_interpolation(cv) isa ScalarInterpolation
         uer = reinterpret(RT, ue)
     else
         uer = ue
