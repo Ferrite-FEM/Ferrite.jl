@@ -9,6 +9,7 @@ using StaticArrays
 using Base: @propagate_inbounds
 using NearestNeighbors
 using EnumX
+import ForwardDiff
 
 include("exports.jl")
 

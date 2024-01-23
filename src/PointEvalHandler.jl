@@ -109,6 +109,25 @@ cellcenter(::Type{<:RefSimplex{dim}}, _::Type{T}) where {dim, T} = Vec{dim, T}((
 _solve_helper(A::Tensor{2,dim}, b::Vec{dim}) where {dim} = inv(A) ⋅ b
 _solve_helper(A::SMatrix{idim, odim}, b::Vec{idim,T}) where {odim, idim, T} = Vec{odim,T}(pinv(A) * b)
 
+
+# Temporary solution until we have MixedTensors
+function _spatial_coordinate(interpolation::ScalarInterpolation, ξ::SVector, cell_coordinates::AbstractVector{<:Vec{sdim, Tx}}) where {sdim, Tx}
+    n_basefuncs = getnbasefunctions(interpolation)
+    @boundscheck checkbounds(cell_coordinates, Base.OneTo(n_basefuncs))
+
+    x = zero(SVector{sdim, promote_type(eltype(ξ), Tx)})
+    @inbounds for j in 1:n_basefuncs
+        M = shape_value(interpolation, Vec(ξ.data), j)
+        x += M * SVector(cell_coordinates[j].data)
+    end
+    return x
+end
+tensor_or_svec_gradient_value(f::F, ξ::Vec{dim}, ::Type{<:Vec{dim}}) where {F, dim} = gradient(f, ξ, :all)
+function tensor_or_svec_gradient_value(f::F, ξ::Vec{rdim}, ::Type{<:Vec{sdim}}) where {F, rdim, sdim}
+    sv = SVector(ξ.data)
+    return ForwardDiff.jacobian(f, sv), f(sv)
+end
+
 # find_local_coordinate(interpolation::IP, cell_coordinates::Vector{V}, global_coordinate::V, warn::Bool, linesearch_max_substeps::Int , max_iters::Int, tol_norm::T) where {dim, T, V <: Vec{dim, T}, ref_shape, IP <: Interpolation{ref_shape}}
 #
 # 
@@ -122,10 +141,12 @@ function find_local_coordinate(interpolation::IP, cell_coordinates::Vector{V}, g
     for iter in 1:max_iters
         # Check if still inside element
         check_isoparametric_boundaries(ref_shape, local_guess, sqrt(tol_norm)) || break
-        # Setup J(ξ) and r(ξ)
-        rf(ξ) = spatial_coordinate(interpolation, ξ, cell_coordinates) - global_coordinate
-        J, residual = gradient(rf, local_guess, :all)
+        # Setup J(ξ) and r(ξ) (special handling until MixedTensors)
+        rf(ξ::Vec{dim}) = spatial_coordinate(interpolation, ξ, cell_coordinates) - global_coordinate
+        rf(ξ::SVector) = _spatial_coordinate(interpolation, ξ, cell_coordinates) - SVector(global_coordinate.data)
+        J, residual_ = tensor_or_svec_gradient_value(rf, local_guess, V)
         
+        residual = Vec(residual_.data) # Convert to Vec if SVector
         # Check if converged
         best_residual_norm = norm(residual) # for line search below
         if best_residual_norm ≤ tol_norm
