@@ -170,7 +170,7 @@ end
 
 function calculate_mapping_and_spatial_coordinate(gip::ScalarInterpolation, ξ::Vec{rdim,T}, cell_coordinates::AbstractVector{<:Vec{sdim, T}}) where {T, rdim, sdim}
     n_basefuncs = getnbasefunctions(gip)
-    @assert length(cell_coordinates) == n_basefuncs
+    @boundscheck checkbounds(cell_coordinates, Base.OneTo(n_basefuncs))
 
     fecv_J = zero(otimes_returntype(Vec{sdim,T}, Vec{rdim,T}))
     x = zero(Vec{sdim, T})

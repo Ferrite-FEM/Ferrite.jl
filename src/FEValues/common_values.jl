@@ -300,7 +300,7 @@ spatial_coordinate(ip::VectorizedInterpolation, ξ::Vec{<:Any,T}, cell_coordinat
 
 function spatial_coordinate(interpolation::ScalarInterpolation, ξ::Vec{<:Any,T}, cell_coordinates::AbstractVector{<:Vec{sdim, T}}) where {T, sdim}
     n_basefuncs = getnbasefunctions(interpolation)
-    @assert length(cell_coordinates) == n_basefuncs
+    @boundscheck checkbounds(cell_coordinates, Base.OneTo(n_basefuncs))
 
     x = zero(Vec{sdim, T})
     @inbounds for j in 1:n_basefuncs
