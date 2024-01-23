@@ -124,8 +124,7 @@ function _spatial_coordinate(interpolation::ScalarInterpolation, ξ::SVector, ce
 end
 tensor_or_svec_gradient_value(f::F, ξ::Vec{dim}, ::Type{<:Vec{dim}}) where {F, dim} = gradient(f, ξ, :all)
 function tensor_or_svec_gradient_value(f::F, ξ::Vec{rdim}, ::Type{<:Vec{sdim}}) where {F, rdim, sdim}
-    sv = SVector(ξ.data)
-    return ForwardDiff.jacobian(f, sv), f(sv)
+    return ForwardDiff.jacobian(f, SVector(ξ.data)), f(ξ)
 end
 
 # find_local_coordinate(interpolation::IP, cell_coordinates::Vector{V}, global_coordinate::V, warn::Bool, linesearch_max_substeps::Int , max_iters::Int, tol_norm::T) where {dim, T, V <: Vec{dim, T}, ref_shape, IP <: Interpolation{ref_shape}}
@@ -142,11 +141,10 @@ function find_local_coordinate(interpolation::IP, cell_coordinates::Vector{V}, g
         # Check if still inside element
         check_isoparametric_boundaries(ref_shape, local_guess, sqrt(tol_norm)) || break
         # Setup J(ξ) and r(ξ) (special handling until MixedTensors)
-        rf(ξ::Vec{dim}) = spatial_coordinate(interpolation, ξ, cell_coordinates) - global_coordinate
+        rf(ξ::Vec) = spatial_coordinate(interpolation, ξ, cell_coordinates) - global_coordinate
         rf(ξ::SVector) = _spatial_coordinate(interpolation, ξ, cell_coordinates) - SVector(global_coordinate.data)
-        J, residual_ = tensor_or_svec_gradient_value(rf, local_guess, V)
+        J, residual = tensor_or_svec_gradient_value(rf, local_guess, V)
         
-        residual = Vec(residual_.data) # Convert to Vec if SVector
         # Check if converged
         best_residual_norm = norm(residual) # for line search below
         if best_residual_norm ≤ tol_norm
