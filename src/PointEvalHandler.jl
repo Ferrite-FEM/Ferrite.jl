@@ -122,11 +122,11 @@ function find_local_coordinate(interpolation::IP, cell_coordinates::Vector{V}, g
     for iter in 1:max_iters
         # Check if still inside element
         check_isoparametric_boundaries(ref_shape, local_guess, sqrt(tol_norm)) || break
-        # Setup J(ξ) and x(ξ)
-        mapping, global_guess = calculate_mapping_and_spatial_coordinate(interpolation, local_guess, cell_coordinates)
-        J = getjacobian(mapping)
+        # Setup J(ξ) and r(ξ)
+        rf(ξ) = spatial_coordinate(interpolation, ξ, cell_coordinates) - global_coordinate
+        J, residual = gradient(rf, local_guess, :all)
+        
         # Check if converged
-        residual = global_guess - global_coordinate
         best_residual_norm = norm(residual) # for line search below
         if best_residual_norm ≤ tol_norm
             converged = true

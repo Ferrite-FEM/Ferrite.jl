@@ -296,13 +296,13 @@ Compute the spatial coordinate in a given quadrature point. `cell_coordinates` c
 The coordinate is computed, using the geometric interpolation, as
 ``\\mathbf{x} = \\sum\\limits_{i = 1}^n M_i (\\mathbf{\\xi}) \\mathbf{\\hat{x}}_i``
 """
-spatial_coordinate(ip::VectorizedInterpolation, ξ::Vec{<:Any,T}, cell_coordinates::AbstractVector{<:Vec{sdim, T}}) where {T, sdim} = spatial_coordinate(ip, ξ, cell_coordinates)
+spatial_coordinate(ip::VectorizedInterpolation, ξ::Vec, cell_coordinates::AbstractVector{<:Vec}) = spatial_coordinate(ip, ξ, cell_coordinates)
 
-function spatial_coordinate(interpolation::ScalarInterpolation, ξ::Vec{<:Any,T}, cell_coordinates::AbstractVector{<:Vec{sdim, T}}) where {T, sdim}
+function spatial_coordinate(interpolation::ScalarInterpolation, ξ::Vec, cell_coordinates::AbstractVector{<:Vec{sdim, Tx}}) where {sdim, Tx}
     n_basefuncs = getnbasefunctions(interpolation)
     @boundscheck checkbounds(cell_coordinates, Base.OneTo(n_basefuncs))
 
-    x = zero(Vec{sdim, T})
+    x = zero(Vec{sdim, promote_type(eltype(ξ), Tx)})
     @inbounds for j in 1:n_basefuncs
         M = shape_value(interpolation, ξ, j)
         x += M * cell_coordinates[j]
