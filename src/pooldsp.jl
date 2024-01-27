@@ -1,4 +1,4 @@
-const PAGESIZE = Int(Sys.isunix() ? ccall(:jl_getpagesize, Clong, ()) : ccall(:jl_getallocationgranularity, Clong, ()))
+# const PAGESIZE = Int(Sys.isunix() ? ccall(:jl_getpagesize, Clong, ()) : ccall(:jl_getallocationgranularity, Clong, ()))
 
 
 # Fixed buffer size (1MiB)
@@ -36,50 +36,29 @@ function nextpow2(v::Int64)
     return v
 end
 
-
-# struct MemorySlab
-#     buf::Vector{Int}
-#     function MemorySlab(n)
-#         buf = zeros(Int, n)
-#     end
-# end
-
-# struct SizedMemoryPool
-#     slabs
-# end
-
-# using UnsafeArrays
-
-# struct ResizeableUnsafeVector{T}
-#     x::UnsafeArray{T, 1}
-#     slotsize::Int
-# end
-
-# function realloc(x::ResizeableUnsafeVector{T}, newsize::Int) where T
-#     if newsize <= x.slotsize
-#         return ResizeableUnsafeVector{T}(UnsafeArray(x.x.pointer, (newsize, )), x.slotsize)
-#     else
-#         error("what now")
-#     end
-# end
-
-struct MemoryBlock{T}
-    nslots::Int
-    slotsize::Int
-    ptr::Ptr{T}
-    freelist::BitVector
+mutable struct MemoryBlock{T}
+    const nslots::Int
+    const slotsize::Int
+    const ptr::Ptr{T}
+    const freelist::BitVector # TODO: Something better here?
+    n_avail::Int
     function MemoryBlock{T}(nslots::Int, slotsize::Int) where T
         ptr = convert(Ptr{T}, Libc.malloc(nslots * slotsize * sizeof(T)))
         freelist = trues(nslots)
-        return new{T}(nslots, slotsize, ptr, freelist)
+        return new{T}(nslots, slotsize, ptr, freelist, nslots)
     end
 end
 
 function malloc(memblock::MemoryBlock{T}, size::Int) where T
     nextpow2(size) === memblock.slotsize || error("!!")
+    memblock.n_avail > 0 || return Ptr{T}()
     idx = findfirst(memblock.freelist)
     idx === nothing && return Ptr{T}()
+    # idx = memblock.next
+    # idx > memblock.nslots && return Ptr{T}()
+    # memblock.next += 1
     memblock.freelist[idx] = false
+    memblock.n_avail -= 1
     ptr = memblock.ptr + (idx - 1) * memblock.slotsize * sizeof(T)
     return ptr
 end
@@ -97,6 +76,7 @@ function malloc(mempool::MemoryPool{T}, size::Int) where T
             return ptr
         end
     end
+    # @info "creating new block for size=$size"
     block = Ferrite.MemoryBlock{T}(mempool.nslots, mempool.slotsize)
     push!(mempool.blocks, block)
     ptr = Ferrite.malloc(block, size)
@@ -110,12 +90,18 @@ mutable struct ArenaAllocator{T}
     function ArenaAllocator{T}() where T
         arena = new{T}(MemoryPool{T}[])
         finalizer(arena) do a
+            # ccall(:jl_safe_printf, Cvoid, (Cstring, ), "Finalizing arena...")
+            # tstart = time()
+            # count = 0
             for i in 1:length(a.pools)
                 isassigned(a.pools, i) || continue
                 for block in a.pools[i].blocks
                     Libc.free(block.ptr)
+                    # count += 1
                 end
             end
+            # tend = time()
+            # ccall(:jl_safe_printf, Cvoid, (Cstring, Cint, Cfloat), " done: # free calls %i, total time %f\n", count, Float32(tend - tstart))
         end
 
         return arena
@@ -128,7 +114,7 @@ function malloc(arena::ArenaAllocator{T}, size::Int) where T
     length(arena.pools) < poolidx && resize!(arena.pools, poolidx)
     if !isassigned(arena.pools, poolidx)
         # TODO: Compute stuff here I guess
-        nslots = 1024
+        nslots = 1024 * 8
         pool = Ferrite.MemoryPool{T}(nslots, poolsize, Ferrite.MemoryBlock{T}[])
         arena.pools[poolidx] = pool
     else
@@ -138,6 +124,7 @@ function malloc(arena::ArenaAllocator{T}, size::Int) where T
 end
 
 function free(arena::ArenaAllocator{T}, ptr::Ptr{T}) where T
+    error()
     for poolidx in 1:length(arena.pools)
         if isassigned(arena.pools, poolidx)
             pool = arena.pools[poolidx]
@@ -150,6 +137,7 @@ function free(arena::ArenaAllocator{T}, ptr::Ptr{T}) where T
                     error("free: use after free")
                 end
                 block.freelist[idx] = true
+                block.n_avail += 1
                 return
             end
         end
@@ -158,13 +146,14 @@ function free(arena::ArenaAllocator{T}, ptr::Ptr{T}) where T
 end
 
 function realloc(arena::ArenaAllocator{T}, ptr::Ptr{T}, size::Int) where T
+    # Search for the pointer
     for poolidx in 1:length(arena.pools)
         isassigned(arena.pools, poolidx) || continue
         pool = arena.pools[poolidx]
         nslots = pool.nslots
         slotsize = pool.slotsize
         for block in pool.blocks
-            block.ptr <= ptr <= (block.ptr + nslots * slotsize * sizeof(T)) || continue
+            block.ptr <= ptr < (block.ptr + nslots * slotsize * sizeof(T)) || continue
             # TODO: XXX
             idx = (ptr - block.ptr) ÷ (slotsize * sizeof(T)) + 1
             if block.freelist[idx]
@@ -175,6 +164,13 @@ function realloc(arena::ArenaAllocator{T}, ptr::Ptr{T}, size::Int) where T
                 newptr = malloc(arena, size)
                 Libc.memcpy(newptr, ptr, slotsize * sizeof(T))
                 block.freelist[idx] = true
+                block.n_avail += 1
+                if block.n_avail == block.nslots
+                    # @info "theoretically destroying block for size=$slotsize"
+                    # @info "moving to size $size from slotsize $slotsize"
+                #     block.n_avail = 0
+                #     # Libc.free(block.ptr)
+                end
                 return newptr
             end
         end
@@ -259,9 +255,10 @@ function add_entry!(dsp::MallocDSP, row::Int, col::Int)
             # ptr = rx.pointer
         end
         rx = UnsafeArray(ptr, (length(rx) + 1, ))
-        dsp.rows[row] = UnsafeVector(rx, rs)
+        xxx = UnsafeVector(rx, rs)
+        dsp.rows[row] = xxx
         # Shift elements after the insertion point to the back
-        for i in (length(rx)-1):-1:k
+        @inbounds for i in (length(rx)-1):-1:k
             rx[i+1] = rx[i]
         end
         # Insert the new element
