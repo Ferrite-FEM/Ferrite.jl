@@ -69,9 +69,10 @@ struct AffineConstraint{T}
 end
 
 """
-    ConstraintHandler
+    ConstraintHandler([T=Float64], dh::AbstractDofHandler)
 
-Collection of constraints.
+A collection of constraints associated with the dof handler `dh`.
+`T` is the numeric type for stored values.
 """
 struct ConstraintHandler{DH<:AbstractDofHandler,T}
     dbcs::Vector{Dirichlet}
@@ -90,11 +91,13 @@ struct ConstraintHandler{DH<:AbstractDofHandler,T}
     closed::ScalarWrapper{Bool}
 end
 
-function ConstraintHandler(dh::AbstractDofHandler)
+ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, dh)
+
+function ConstraintHandler(::Type{T}, dh::AbstractDofHandler) where T <: Number
     @assert isclosed(dh)
     ConstraintHandler(
-        Dirichlet[], Int[], Int[], Float64[], Union{Nothing,Float64}[], Union{Nothing,DofCoefficients{Float64}}[],
-        Dict{Int,Int}(), BCValues{Float64}[], dh, ScalarWrapper(false),
+        Dirichlet[], Int[], Int[], T[], Union{Nothing,T}[], Union{Nothing,DofCoefficients{T}}[],
+        Dict{Int,Int}(), BCValues{T}[], dh, ScalarWrapper(false),
     )
 end
 
@@ -174,6 +177,23 @@ isclosed(ch::ConstraintHandler) = ch.closed[]
 free_dofs(ch::ConstraintHandler) = ch.free_dofs
 prescribed_dofs(ch::ConstraintHandler) = ch.prescribed_dofs
 
+# Equivalent to `copy!(out, setdiff(1:n_entries, diff))`, but requires that 
+# `issorted(diff)` and that `1 ≤ diff[1] ≤ diff[end] ≤ n_entries`
+function _sorted_setdiff!(out::Vector{Int}, n_entries::Int, diff::Vector{Int})
+    n_diff = length(diff)
+    resize!(out, n_entries - n_diff)
+    diff_ind = out_ind = 1
+    for i in 1:n_entries
+        if diff_ind ≤ n_diff && i == diff[diff_ind]
+            diff_ind += 1
+        else
+            out[out_ind] = i
+            out_ind += 1
+        end
+    end
+    return out
+end
+
 """
     close!(ch::ConstraintHandler)
 
@@ -189,7 +209,7 @@ function close!(ch::ConstraintHandler)
     ch.affine_inhomogeneities .= ch.affine_inhomogeneities[I]
     ch.dofcoefficients .= ch.dofcoefficients[I]
 
-    copy!(ch.free_dofs, setdiff(1:ndofs(ch.dh), ch.prescribed_dofs))
+    _sorted_setdiff!(ch.free_dofs, ndofs(ch.dh), ch.prescribed_dofs)
 
     for i in 1:length(ch.prescribed_dofs)
         ch.dofmapping[ch.prescribed_dofs[i]] = i
@@ -407,7 +427,7 @@ function update!(ch::ConstraintHandler, time::Real=0.0)
 end
 
 # for vertices, faces and edges
-function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
+function _update!(inhomogeneities::Vector{T}, f::Function, boundary_entities::Set{<:BoundaryIndex}, field::Symbol, local_face_dofs::Vector{Int}, local_face_dofs_offset::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, boundaryvalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where {T}
 
@@ -444,7 +464,7 @@ function _update!(inhomogeneities::Vector{Float64}, f::Function, boundary_entiti
 end
 
 # for nodes
-function _update!(inhomogeneities::Vector{Float64}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
+function _update!(inhomogeneities::Vector{T}, f::Function, ::Set{Int}, field::Symbol, nodeidxs::Vector{Int}, globaldofs::Vector{Int},
                   components::Vector{Int}, dh::AbstractDofHandler, facevalues::BCValues,
                   dofmapping::Dict{Int,Int}, dofcoefficients::Vector{Union{Nothing,DofCoefficients{T}}}, time::Real) where T
     counter = 1
@@ -511,14 +531,16 @@ conditions specified in `ch` such that `K \\ rhs` gives the expected solution.
 
 !!! note
     `apply!(K, rhs, ch)` essentially calculates
+    ```julia
+    rhs[free] = rhs[free] - K[constrained, constrained] * a[constrained]
+    ```
+    where `a[constrained]` are the inhomogeneities. Consequently, the sign of `rhs` matters
+    (in contrast with `apply_zero!`).
 
-    `rhs[free_dofs] = rhs[free_dofs] - K[free_dofs, constrained_dofs] * a[constrained]`
-    
-    where `a[constrained]` are the inhomogeneities. 
-    Consequently, the sign of `rhs` matters (in contrast to for `apply_zero!`).
 
-
-    apply!(v::AbstractVector, ch::ConstraintHandler)
+```julia
+apply!(v::AbstractVector, ch::ConstraintHandler)
+```
 
 Apply Dirichlet boundary conditions and affine constraints, specified in `ch`, to the solution vector `v`.
 
@@ -579,6 +601,7 @@ apply_zero!(v::AbstractVector, ch::ConstraintHandler) = _apply_v(v, ch, true)
 apply!(     v::AbstractVector, ch::ConstraintHandler) = _apply_v(v, ch, false)
 
 function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
+    @assert isclosed(ch)
     @assert length(v) >= ndofs(ch.dh)
     v[ch.prescribed_dofs] .= apply_zero ? 0.0 : ch.inhomogeneities
     # Apply affine constraints, e.g u2 = s6*u6 + s3*u3 + h2
@@ -608,6 +631,7 @@ const APPLY_INPLACE = ApplyStrategy.Inplace
 
 function apply!(KK::Union{SparseMatrixCSC,Symmetric}, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool=false;
                 strategy::ApplyStrategy.T=ApplyStrategy.Transpose)
+    @assert isclosed(ch)
     sym = isa(KK, Symmetric)
     K = sym ? KK.data : KK
     @assert length(f) == 0 || length(f) == size(K, 1)
@@ -839,13 +863,13 @@ function add!(ch::ConstraintHandler, dbc::Dirichlet)
         if !all(c -> 0 < c <= n_comp, components)
             error("components $(components) not within range of field :$(dbc.field_name) ($(n_comp) dimension(s))")
         end
-        # Create BCValues for coordinate evalutation at dof-locations
+        # Create BCValues for coordinate evaluation at dof-locations
         EntityType = eltype(dbc.faces) # (Face|Edge|Vertex)Index
         if EntityType <: Integer
             # BCValues are just dummy for nodesets so set to FaceIndex
             EntityType = FaceIndex
         end
-        CT = getcelltype(get_grid(ch.dh), first(sdh.cellset)) # Same celltype enforced in SubDofHandler constructor
+        CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
         bcvalues = BCValues(interpolation, default_interpolation(CT), EntityType)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
         filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
@@ -1275,7 +1299,7 @@ system. For other types of periodicities the `transform` function can be used. T
 `transform` function is applied on the coordinates of the image face, and is expected to
 transform the coordinates to the matching locations in the mirror set.
 
-The keyword `tol` specifies the tolerence (i.e. distance and deviation in face-normals) 
+The keyword `tol` specifies the tolerance (i.e. distance and deviation in face-normals) 
 between a image-face and mirror-face, for them to be considered matched.
 
 See also: [`collect_periodic_faces!`](@ref), [`PeriodicDirichlet`](@ref).
@@ -1618,6 +1642,7 @@ end
 function _apply_local!(local_matrix::AbstractMatrix, local_vector::AbstractVector,
                        global_dofs::AbstractVector, ch::ConstraintHandler, apply_zero::Bool,
                        global_matrix, global_vector)
+    @assert isclosed(ch)
     # TODO: With apply_zero it shouldn't be required to pass the vector.
     length(global_dofs) == size(local_matrix, 1) == size(local_matrix, 2) == length(local_vector) || error("?")
     # First pass over the dofs check whether there are any constrained dofs at all

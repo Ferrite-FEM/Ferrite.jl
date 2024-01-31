@@ -31,9 +31,14 @@ LiveServer.servedocs(;
     ],
     include_files = [
         joinpath(repo_root, "docs/generate.jl"),
+        joinpath(repo_root, "docs/changelog.jl"),
+        joinpath(repo_root, "CHANGELOG.md"),
         # Watch the index files in the skip_dirs folders
         joinpath(repo_root, "docs/src/tutorials/index.md"),
         joinpath(repo_root, "docs/src/howto/index.md"),
         joinpath(repo_root, "docs/src/gallery/index.md"),
+    ],
+    skip_files = [
+        joinpath(repo_root, "docs/src/changelog.md"),
     ],
 )

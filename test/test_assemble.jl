@@ -14,7 +14,7 @@
     a = start_assemble()
     Ke = rand(4, 4)
     assemble!(a, dofs, Ke)
-    K = end_assemble(a)
+    K = finish_assemble(a)
     @test K[1,1] == Ke[1,1]
     @test K[1,5] == Ke[1,3]
     @test K[5,1] == Ke[3,1]
@@ -25,7 +25,7 @@
     a = start_assemble()
     Ke = rand(length(rdofs), length(cdofs))
     assemble!(a, rdofs, cdofs, Ke)
-    K = end_assemble(a)
+    K = finish_assemble(a)
     @test (K[rdofs,cdofs] .== Ke) |> all
 
     # SparseMatrix assembler
@@ -137,13 +137,13 @@ end
     K = spdiagm(0 => zeros(2))
     a = start_assemble(K)
     as = start_assemble(Symmetric(K))
-    errr = ErrorException("some row indices were not found")
+    errr(i,j) = try Ferrite._missing_sparsity_pattern_error(i, j) catch e e end
     ## Errors below diagonal
-    @test_throws errr assemble!(a, [1, 2], [1.0 0.0; 3.0 4.0])
-    @test_throws errr assemble!(a, [2, 1], [1.0 2.0; 0.0 4.0])
+    @test_throws errr(2,1) assemble!(a, [1, 2], [1.0 0.0; 3.0 4.0])
+    @test_throws errr(2,1) assemble!(a, [2, 1], [1.0 2.0; 0.0 4.0])
     ## Errors above diagonal
-    @test_throws errr assemble!(a, [1, 2], [1.0 2.0; 0.0 4.0])
-    @test_throws errr assemble!(as, [1, 2], [1.0 2.0; 0.0 4.0])
-    @test_throws errr assemble!(a, [2, 1], [1.0 0.0; 3.0 4.0])
-    @test_throws errr assemble!(as, [2, 1], [1.0 0.0; 3.0 4.0])
+    @test_throws errr(2,2) assemble!(a, [1, 2], [1.0 2.0; 0.0 4.0])
+    @test_throws errr(2,2) assemble!(as, [1, 2], [1.0 2.0; 0.0 4.0])
+    @test_throws errr(2,2) assemble!(a, [2, 1], [1.0 0.0; 3.0 4.0])
+    @test_throws errr(2,2) assemble!(as, [2, 1], [1.0 0.0; 3.0 4.0])
 end

@@ -10,25 +10,26 @@ export
     RefTriangle,
     RefTetrahedron,
     RefPrism,
+    RefPyramid,
     BubbleEnrichedLagrange,
     CrouzeixRaviart,
     Lagrange,
     DiscontinuousLagrange,
     Serendipity,
     getnbasefunctions,
+    getrefshape,
 
 # Quadrature
     QuadratureRule,
     FaceQuadratureRule,
     getnquadpoints,
-    getweights,
-    getpoints,
 
 # FEValues
     AbstractCellValues,
     AbstractFaceValues,
     CellValues,
     FaceValues,
+    InterfaceValues,
     reinit!,
     shape_value,
     shape_gradient,
@@ -43,6 +44,14 @@ export
     spatial_coordinate,
     getnormal,
     getdetJdV,
+    shape_value_average,
+    shape_value_jump,
+    shape_gradient_average,
+    shape_gradient_jump,
+    function_value_average,
+    function_value_jump,
+    function_gradient_average,
+    function_gradient_jump,
 
 # Grid
     Grid,
@@ -60,6 +69,7 @@ export
     QuadraticHexahedron,
     SerendipityQuadraticHexahedron,
     Wedge,
+    Pyramid,
     CellIndex,
     FaceIndex,
     EdgeIndex,
@@ -67,6 +77,8 @@ export
     ExclusiveTopology,
     getneighborhood,
     faceskeleton,
+    vertex_star_stencils,
+    getstencil,
     getcells,
     getncells,
     getnodes,
@@ -78,13 +90,8 @@ export
     getedgeset,
     getvertexset,
     get_node_coordinate,
-    get_cell_coordinates,
-    get_cell_coordinates!,
-    getcellsets,
-    getnodesets,
-    getfacesets,
-    getedgesets,
-    getvertexsets,
+    getcoordinates,
+    getcoordinates!,
     onboundary,
     nfaces,
     addnodeset!,
@@ -95,7 +102,7 @@ export
     addvertexset!,
     addboundaryvertexset!,
     addcellset!,
-    transform!,
+    transform_coordinates!,
     generate_grid,
 
 # Grid coloring
@@ -141,13 +148,18 @@ export
 # iterators
     CellCache,
     CellIterator,
+    FaceCache,
+    FaceIterator,
+    InterfaceCache,
+    InterfaceIterator,
     UpdateFlags,
     cellid,
+    interfacedofs,
 
 # assembly
     start_assemble,
     assemble!,
-    end_assemble,
+    finish_assemble,
 
 # VTK export
     vtk_grid,
@@ -163,7 +175,7 @@ export
 
 # Point Evaluation
     PointEvalHandler,
-    get_point_values,
+    evaluate_at_points,
     PointIterator,
     PointLocation,
     PointValues

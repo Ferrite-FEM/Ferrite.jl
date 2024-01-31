@@ -165,7 +165,7 @@
         topology = ExclusiveTopology(grid);
         addfaceset!(grid, "all", x->true)
         addvertexset!(grid, "all", x->true)
-        @test ∪([Ferrite.getfaceinstances(grid, topology,face) for face in topology.face_skeleton]...)  == grid.facesets["all"]
+        @test ∪([Ferrite.getfaceinstances(grid, topology,face) for face in Ferrite.faceskeleton(topology, grid)]...)  == grid.facesets["all"]
     end
     @testset "addboundaryset" for cell_type in [
         # Line, # topology construction error

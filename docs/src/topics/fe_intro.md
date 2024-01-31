@@ -162,7 +162,7 @@ On an intuitive level, and to explain the notation used in the implementation, w
 being the chosen approximation when changing from the integral to the finite summation.
 
 For an example of the implementation to solve a heat problem with `Ferrite` check out [this
-thoroughly commented example](@ref Heat-Equation).
+thoroughly commented example](@ref tutorial-heat-equation).
 
 ## More details
 
