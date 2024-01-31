@@ -151,7 +151,7 @@ In this tutorial a reaction diffusion system on a sphere surface embedded in 3D 
 Ferrite is used to assemble the diffusion operators and the mass matrices. The problem is
 solved by using the usual first order reaction diffusion operator splitting.
 
-**Keywords**: embedded elements, operator splitting
+**Keywords**: embedded elements, operator splitting, gmsh
 
 ---
 
