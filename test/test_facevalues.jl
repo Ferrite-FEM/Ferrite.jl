@@ -15,6 +15,9 @@ for (scalar_interpol, quad_rule) in (
                                    )
 
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
+        # Ensure type-stable default constructor 
+        @test_call FaceValues(quad_rule, func_interpol)
+        
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
         fv = FaceValues(quad_rule, func_interpol, geom_interpol)
