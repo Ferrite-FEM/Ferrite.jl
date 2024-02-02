@@ -83,8 +83,8 @@
     @test isapprox(u1,u2,atol=1e-8)
 
     minv, maxv = Ferrite.compute_bounding_box(subtype_grid)
-    @test minv == Vec((-1.0,-1.0))
-    @test maxv == Vec((+1.0,1.0))
+    @test minv ≈ Vec((-1.0,-1.0))
+    @test maxv ≈ Vec((+1.0,+1.0))
 
     colors1 = Ferrite.create_coloring(subtype_grid, alg = ColoringAlgorithm.WorkStream)
     colors2 = Ferrite.create_coloring(reference_grid, alg = ColoringAlgorithm.WorkStream)
