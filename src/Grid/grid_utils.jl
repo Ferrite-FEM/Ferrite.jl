@@ -12,8 +12,10 @@ function compute_bounding_box(grid::AbstractGrid{dim}) where {dim}
     max_vertex = Vec{dim}(i->T(-Inf))
     for node in getnodes(grid)
         x = get_node_coordinate(node)
-        max_vertex = Vec{dim}(i -> max(x[i], max_vertex[i]))
-        min_vertex = Vec{dim}(i -> min(x[i], min_vertex[i]))
+        _max_tmp = max_vertex # avoid type instability
+        _min_tmp = min_vertex
+        max_vertex = Vec{dim}(i -> max(x[i], _max_tmp[i]))
+        min_vertex = Vec{dim}(i -> min(x[i], _min_tmp[i]))
     end
     return min_vertex, max_vertex
 end
