@@ -18,12 +18,9 @@
                                    )
 
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
-        # Ensure type-stable default constructor 
-        @test_call CellValues(quad_rule, func_interpol)
-        
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
-        cv = CellValues(quad_rule, func_interpol, geom_interpol)
+        cv = @inferred CellValues(quad_rule, func_interpol, geom_interpol)
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
