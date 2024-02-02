@@ -42,13 +42,14 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
 function CellValues(::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation; 
-        update_gradients::Bool = true, update_detJdV::Bool = true) where T 
+        update_gradients::Union{Bool,Nothing} = nothing, update_detJdV::Union{Bool,Nothing} = nothing) where T 
     
-    FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
-    GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), update_detJdV)
+    _update_detJdV = update_detJdV === nothing ? true : update_detJdV
+    FunDiffOrder = update_gradients === nothing ? 1 : convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
+    GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), _update_detJdV)
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
-    detJdV = update_detJdV ? fill(T(NaN), length(getweights(qr))) : nothing
+    detJdV = _update_detJdV ? fill(T(NaN), length(getweights(qr))) : nothing
     return CellValues(fun_values, geo_mapping, qr, detJdV)
 end
 

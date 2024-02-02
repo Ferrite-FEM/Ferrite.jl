@@ -41,9 +41,9 @@ struct FaceValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:Abstrac
 end
 
 function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
-        update_gradients::Bool = true) where {T,sdim} 
+        update_gradients::Union{Bool,Nothing} = nothing) where {T,sdim} 
     
-    FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
+    FunDiffOrder = update_gradients === nothing ? 1 : convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
     GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), 1)
     geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]
     fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
