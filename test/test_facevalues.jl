@@ -17,7 +17,11 @@ for (scalar_interpol, quad_rule) in (
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
-        fv = FaceValues(quad_rule, func_interpol, geom_interpol)
+        fv = if VERSION ≥ v"1.9"
+            @inferred FaceValues(quad_rule, func_interpol, geom_interpol)
+        else # Type unstable on 1.6, but works at least for 1.9 and later. PR882
+            FaceValues(quad_rule, func_interpol, geom_interpol)
+        end
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
