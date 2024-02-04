@@ -1,3 +1,4 @@
+
 # const PAGESIZE = Int(Sys.isunix() ? ccall(:jl_getpagesize, Clong, ()) : ccall(:jl_getallocationgranularity, Clong, ()))
 
 
@@ -23,39 +24,117 @@
 
 
 # A bit faster than nextpow(2, v) from Base (#premature-optimization),
-# https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
-function nextpow2(x::Union{Int64, UInt64})
-    v = x
-    v -= 1
-    v |= v >>> 1
-    v |= v >>> 2
-    v |= v >>> 4
-    v |= v >>> 8
-    v |= v >>> 16
-    v |= v >>> 32
-    v += 1
-    @assert v >= x && rem(v, 2) == 0
-    return v
-end
+# https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2 function nextpow2(v::Int64)
+#     v -= 1
+#     v |= v >>> 1
+#     v |= v >>> 2
+#     v |= v >>> 4
+#     v |= v >>> 8
+#     v |= v >>> 16
+#     v |= v >>> 32
+#     v += 1
+#     return v
+# end
+#
 
+const OS_MALLOC_SIZE  = (4 * 1024 * 1024) % Csize_t # 4MiB
+const CLASS_PAGE_SIZE = (      64 * 1024) % Csize_t # 64KiB
 
-malloc_calls = 0
-
-mutable struct MemoryBlock{T}
-    const nslots::Int
-    const slotsize::Int
+mutable struct MemoryPage{T}
+    # const nslots::Int
+    # const slotsize::Int
     const ptr::Ptr{T}
-    const freelist::BitVector # TODO: Something better here?
+    const freelist::BitVector
     n_avail::Int
-    function MemoryBlock{T}(nslots::Int, slotsize::Int) where T
-        global malloc_calls += 1
+    function MemoryBlock{T}() where T
         ptr = convert(Ptr{T}, Libc.malloc(nslots * slotsize * sizeof(T)))
         freelist = trues(nslots)
         return new{T}(nslots, slotsize, ptr, freelist, nslots)
     end
 end
 
-function malloc(memblock::MemoryBlock{T}, size::Int) where T
+struct MemPool{T}
+    # nslots::Int
+    # slotsize::Int
+    pages::Vector{MemoryPage{T}}
+end
+
+struct Heap{T}
+    size_classes::Vector{Int} # 8, 16, 32, 64, ...
+    class_pages::Vector{MemPool{T}}
+end
+
+
+struct SizedPtr{T}
+    ptr::Ptr{T}
+    size::Int
+end
+
+# Conversion SizedPtr{Cvoid} <-> SizedPtr{T}
+function SizedPtr{T}(ptr::SizedPtr{Cvoid}) where T
+    return SizedPtr{T}(convert(Ptr{T}, ptr.ptr), ptr.size ÷ sizeof(T))
+end
+function SizedPtr{Cvoid}(ptr::SizedPtr{T}) where T
+    return SizedPtr{Cvoid}(convert(Ptr{Cvoid}, ptr.ptr), ptr.size * sizeof(T))
+end
+
+struct MallocVector{T} <: AbstractVector{T}
+    ptr::SizedPtr{T}
+    length::Int
+end
+
+function size_class_bin_index(sz)
+    class = nextpow2(sz)
+    idx = 8 * sizeof(Int) - leading_zeros(class) - 3
+    idx > 0 || error()
+    return idx
+end
+
+function malloc(heap::Heap, size::Int)
+    idx = size_class_bin_index(size)
+    if length(heap.class_pages) < idx
+        resize!(heap.class_pages, idx)
+    end
+    if !isassigned(heap.class_pages, idx)
+        heap.class_pages[idx] = ;
+    end
+    # if size <= CLASS_PAGE_SIZE
+    #     return small_malloc(heap, size)
+    # else
+    #     return large_malloc(heap, size)
+    # end
+end
+
+
+
+struct PageHeader
+end
+
+struct Heap
+    segments::Vector
+    pages::Vector{Ptr{Cvoid}}
+    headers::Vector{PageHeader}
+end
+
+struct PageHeader
+    size::Int
+    slotsize::Int
+end
+
+mutable struct MemoryPage{T}
+    const nslots::Int
+    const slotsize::Int
+    const ptr::Ptr{T}
+    const freelist::BitVector # TODO: Something better here?
+    n_avail::Int
+    function MemoryPage{T}(nslots::Int, slotsize::Int) where T
+        ptr = convert(Ptr{T}, Libc.malloc(nslots * slotsize * sizeof(T)))
+        freelist = trues(nslots)
+        return new{T}(nslots, slotsize, ptr, freelist, nslots)
+    end
+end
+
+function malloc(memblock::MemoryPage{T}, size::Int) where T
     nextpow2(size) === memblock.slotsize || error("!!")
     memblock.n_avail > 0 || return Ptr{T}()
     idx = findfirst(memblock.freelist)
@@ -72,7 +151,7 @@ end
 struct MemoryPool{T}
     nslots::Int
     slotsize::Int
-    blocks::Vector{MemoryBlock{T}}
+    blocks::Vector{MemoryPage{T}}
 end
 
 function malloc(mempool::MemoryPool{T}, size::Int) where T
@@ -83,7 +162,7 @@ function malloc(mempool::MemoryPool{T}, size::Int) where T
         end
     end
     # @info "creating new block for size=$size"
-    block = Ferrite.MemoryBlock{T}(mempool.nslots, mempool.slotsize)
+    block = Ferrite.MemoryPage{T}(mempool.nslots, mempool.slotsize)
     push!(mempool.blocks, block)
     ptr = Ferrite.malloc(block, size)
     ptr == C_NULL && error("malloc: could not allocate in new block")
@@ -91,8 +170,8 @@ function malloc(mempool::MemoryPool{T}, size::Int) where T
 end
 
 # pools[i] contains slabs for size 2^i
-mutable struct ArenaAllocator{T}
-    pools::Vector{MemoryPool{T}} # 2, 4, 6, 8
+mutable struct Mallocator{T}
+    pools::Vector{MemoryPool{T}} # 8, 16, 32, 64, ...
     function ArenaAllocator{T}() where T
         arena = new{T}(MemoryPool{T}[])
         finalizer(arena) do a
@@ -121,7 +200,7 @@ function malloc(arena::ArenaAllocator{T}, size::Int) where T
     if !isassigned(arena.pools, poolidx)
         # TODO: Compute stuff here I guess
         nslots = 1024 * 8
-        pool = Ferrite.MemoryPool{T}(nslots, poolsize, Ferrite.MemoryBlock{T}[])
+        pool = Ferrite.MemoryPool{T}(nslots, poolsize, Ferrite.MemoryPage{T}[])
         arena.pools[poolidx] = pool
     else
         pool = arena.pools[poolidx]
@@ -251,7 +330,7 @@ function add_entry!(dsp::MallocDSP, row::Int, col::Int)
     rx = r.x
     ptr = rx.pointer
     k = searchsortedfirst(rx, col)
-    if k == lastindex(rx) + 1 || @inbounds(rx[k]) != col
+    if k == lastindex(rx) + 1 || rx[k] != col
         # TODO: This assumes we only grow by single entry every time
         if length(rx) == rs
             rs = Ferrite.nextpow2(rs + 1)

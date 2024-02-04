@@ -2,8 +2,8 @@ using mimalloc_jll: libmimalloc
 
 struct MallocVector{T} <: AbstractVector{T}
     ptr::Ptr{T}
-    length::Int
     allocated_length::Int # malloc'd bytes: allocated_length * sizeof(T)
+    length::Int
 end
 
 Base.size(mv::MallocVector) = (mv.length, )
@@ -17,18 +17,18 @@ Base.@propagate_inbounds function Base.setindex!(mv::MallocVector{T}, v::T, i::I
     return unsafe_store!(mv.ptr, v, i)
 end
 
-# function mi_malloc(size)
-#     # return @ccall libmimalloc.mi_malloc(size::Csize_t)::Ptr{Cvoid}
-#     return Libc.malloc(size)
-# end
-# function mi_realloc(p, newsize)
-#     # return @ccall libmimalloc.mi_realloc(p::Ptr{Cvoid}, newsize::Csize_t)::Ptr{Cvoid}
-#     return Libc.realloc(p, newsize)
-# end
-# function mi_free(p)
-#     # return @ccall libmimalloc.mi_free(p::Ptr{Cvoid})::Cvoid
-#     return Libc.free(p)
-# end
+function mi_malloc(size)
+    return @ccall libmimalloc.mi_malloc(size::Csize_t)::Ptr{Cvoid}
+    # return Libc.malloc(size)
+end
+function mi_realloc(p, newsize)
+    return @ccall libmimalloc.mi_realloc(p::Ptr{Cvoid}, newsize::Csize_t)::Ptr{Cvoid}
+    # return Libc.realloc(p, newsize)
+end
+function mi_free(p)
+    return @ccall libmimalloc.mi_free(p::Ptr{Cvoid})::Cvoid
+    # return Libc.free(p)
+end
 
 function mi_heap_new()
     return @ccall libmimalloc.mi_heap_new()::Ptr{Cvoid}
@@ -37,9 +37,11 @@ function mi_heap_destroy(heap)
     return @ccall libmimalloc.mi_heap_destroy(heap::Ptr{Cvoid})::Cvoid
 end
 function mi_heap_malloc(heap, size)
+    # return mi_malloc(size)
     return @ccall libmimalloc.mi_heap_malloc(heap::Ptr{Cvoid}, size::Csize_t)::Ptr{Cvoid}
 end
 function mi_heap_realloc(heap, p, newsize)
+    # return mi_realloc(p, newsize)
     return @ccall libmimalloc.mi_heap_realloc(heap::Ptr{Cvoid}, p::Ptr{Cvoid}, newsize::Csize_t)::Ptr{Cvoid}
 end
 
@@ -58,7 +60,7 @@ mutable struct MiMallocDSP <: AbstractSparsityPattern
         rows = Vector{MallocVector{Int}}(undef, nrows)
         for i in 1:nrows
             ptr = convert(Ptr{Int}, mi_heap_malloc(heap, nnz_per_row * sizeof(Int)))
-            rows[i] = MallocVector(ptr, 0, nnz_per_row)
+            rows[i] = MallocVector(ptr, nnz_per_row, 0)
         end
         dsp = new(nrows, ncols, growth_factor, rows, heap)
         finalizer(d -> mi_heap_destroy(d.heap), dsp)
@@ -115,7 +117,7 @@ function add_entry!(dsp::MiMallocDSP, row::Int, col::Int)
             # println("Increasing size from $len to either $c or $o, picking $allocated_length")
             ptr = convert(Ptr{Int}, mi_heap_realloc(dsp.heap, r.ptr, allocated_length * sizeof(Int)))
         end
-        r = MallocVector(ptr, len + 1, allocated_length)
+        r = MallocVector(ptr, allocated_length, len + 1)
         # Shift elements after the insertion point to the back
         @inbounds for i in len:-1:k
             r[i+1] = r[i]

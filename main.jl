@@ -1,11 +1,11 @@
 #! /usr/bin/env julia
 
-using Revise, Ferrite, SparseArrays
+using Revise, Ferrite, SparseArrays, ProfileView
 
 const n = if length(ARGS) == 1
     parse(Int, ARGS[1])
 elseif length(ARGS) == 0
-    40
+    20
 else
     error()
 end
@@ -28,15 +28,34 @@ function f(dh)
     return dsp
 end
 
+
+# mimalloc with n = 40: 21.8% of memory which is sys.maxrss 3.4G
+#
+#
+#
+#
+
 function h(dh)
     dsp = Ferrite.MallocDSP(ndofs(dh), ndofs(dh))
     create_sparsity_pattern!(dsp, dh)
     return dsp
 end
 
-function m(dh)
-    dsp = Ferrite.MiMallocDSP(ndofs(dh), ndofs(dh); growth_factor = 1.2)
+function hh(dh)
+    dsp = Ferrite.MallocDSP3(ndofs(dh), ndofs(dh))
     create_sparsity_pattern!(dsp, dh)
+    return dsp
+end
+
+function hhh(dh)
+    dsp = Ferrite.Europe.MallocDSP4(ndofs(dh), ndofs(dh))
+    create_sparsity_pattern!(dsp, dh)
+    return dsp
+end
+
+function m(dh)
+    dsp = Ferrite.MiMallocDSP(ndofs(dh), ndofs(dh); growth_factor = 2)
+    create_sparsity_pattern!(dsp, dh);
     # finalize(dsp)
     return dsp
 end
@@ -72,6 +91,14 @@ println("Creating DSP: MemoryBlock thing with free list (basically my own mimall
 GC.gc()
 GC.gc()
 GC.gc()
+@time hh(dh);
+GC.gc()
+GC.gc()
+GC.gc()
+@time hhh(dh);
+
+
+
 @time Ferrite.create_matrix(SparseMatrixCSC{Float64, Int}, h(dh));
 GC.gc()
 GC.gc()
