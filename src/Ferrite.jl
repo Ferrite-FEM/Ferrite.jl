@@ -99,7 +99,6 @@ include("Grid/topology.jl")
 include("Grid/utils.jl")
 include("Grid/grid_generators.jl")
 include("Grid/coloring.jl")
-include("Grid/grid_utils.jl")
 
 # Dofs
 include("Dofs/DofHandler.jl")
