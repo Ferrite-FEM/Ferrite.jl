@@ -45,51 +45,11 @@ mutable struct MemoryPage{T}
     n_avail::UInt
 end
 
-# malloc_calls_small = 0
-# malloc_calls_big = 0
-
-# function MemoryPage{T}(blocksize::Int) where T
-#     error()
-#     blocksizebytes = blocksize * sizeof(T)
-#     if blocksizebytes <= CLASS_PAGE_SIZE_BYTES
-#         # global malloc_calls_small += 1
-#         ptr = convert(Ptr{T}, Libc.malloc(CLASS_PAGE_SIZE_BYTES))
-#         nblocks = CLASS_PAGE_SIZE_BYTES ÷ blocksizebytes
-#         @assert rem(CLASS_PAGE_SIZE_BYTES, blocksizebytes) == 0
-#     else
-#         error()
-#         # global malloc_calls_big += 1
-#         ptr = convert(Ptr{T}, Libc.malloc(blocksizebytes))
-#         nblocks = 1
-#     end
-#     freelist = trues(nblocks)
-#     return MemoryPage{T}(blocksize, ptr, freelist, nblocks)
-# end
-
-function malloc(page::MemoryPage{T}, sz::Int) where T
-    error()
-    # sz === nextpow2(sz) === page.blocksize || error("malloc: size mismatch")
-    if page.n_avail == 0
-        return Ptr{T}()
-    end
-    idx = findfirst(page.freelist)
-    if idx === nothing
-        error("n_avail > 0 but no free idx")
-    end
-    page.freelist[idx] = false
-    page.n_avail -= 1
-    ptr = page.ptr + (idx - 1) * sz * sizeof(T)
-    return ptr
-end
-
 # Collection of pages for a fixed size
 struct MemPool{T}
     blocksize::UInt
     pages::Vector{MemoryPage{T}}
 end
-
-const USE_OS_PAGES = true
-
 
 # All allocations up to 64KiB end up in pools
 # A pool is aligned at 64KiB to find it faster
@@ -109,13 +69,6 @@ mutable struct ArenaAllocator4{T}
         arena = new{T}(pools, pages, available_64KiB)
         finalizer(arena) do a
             ccall(:jl_safe_printf, Cvoid, (Cstring, ), "Finalizing arena...")
-            # for i in 1:length(a.pools)
-            #     isassigned(a.pools, i) || continue
-            #     for page in a.pools[i].pages
-            #         Libc.free(page.ptr)
-            #         # count += 1
-            #     end
-            # end
             for page in arena.pages
                 Libc.free(page.ptr.ptr)
             end
@@ -158,39 +111,6 @@ function malloc(arena::ArenaAllocator4{T}, sz::Int) where T
     # Allocate in the pool
     ptr = malloc(arena, pool, blocksize)
     return ptr
-
-    # # OLD
-    # ptr = malloc(pool, blocksize)
-    # if ptr == C_NULL
-    #     # Pool needs a new page from the OS
-    #     pageidx = findfirst(p -> p.n_avail > 0, arena.pages)
-    #     if pageidx === nothing
-    #         # osptr = Libc.malloc(OS_MALLOC_SIZE_BYTES)
-    #         global aligned_allocs += 1
-    #         osptr = aligned_alloc(OS_MALLOC_SIZE_BYTES, OS_MALLOC_SIZE_BYTES)
-    #         n_avail = OS_MALLOC_SIZE_BYTES ÷ CLASS_PAGE_SIZE_BYTES
-    #         freelist = trues(n_avail)
-    #         page = MemoryPage{T}(CLASS_PAGE_SIZE_BYTES, osptr, freelist, n_avail)
-    #         push!(arena.pages, page)
-    #     else
-    #         page = arena.pages[pageidx]
-    #     end
-    #     # also need to create the subpage for the mempool
-    #     idx = findfirst(page.freelist)
-    #     idx === nothing && error("nope")
-    #     page.freelist[idx] = false
-    #     page.n_avail -= 1
-    #     pptr = page.ptr + (idx - 1) * CLASS_PAGE_SIZE_BYTES
-    #     let n_avail = CLASS_PAGE_SIZE_BYTES ÷ (blocksize * sizeof(T)),
-    #         freelist = trues(n_avail)
-    #         poolpage = MemoryPage{T}(blocksize, pptr, freelist, n_avail)
-    #         k = searchsortedfirst(pool.pages, poolpage; by = x -> x.ptr)
-    #         insert!(pool.pages, k, poolpage)
-    #     end
-    #     # Try again lol
-    #     ptr = malloc(pool, blocksize)
-    # end
-    # return SizedPtr{T}(ptr, sz)
 end
 
 @inline function assert_aligned(ptr::SizedPtr, alignment::Csize_t)
@@ -251,29 +171,6 @@ function malloc(arena::ArenaAllocator4, mempool::MemPool{T}, size::UInt) where T
     page.n_avail -= 1
     ptr = SizedPtr{T}(page.ptr.ptr + (block_idx - 1) * mempool.blocksize * sizeof(T), mempool.blocksize)
     return ptr
-end
-
-
-function free(arena::ArenaAllocator4{T}, ptr::Ptr{T}) where T
-    error()
-    for poolidx in 1:length(arena.pools)
-        if isassigned(arena.pools, poolidx)
-            pool = arena.pools[poolidx]
-            nslots = pool.nslots
-            slotsize = pool.slotsize
-            for block in pool.blocks
-                block.ptr <= ptr <= (block.ptr + nslots * slotsize * sizeof(T)) || continue
-                idx = (ptr - block.ptr) ÷ (slotsize * sizeof(T)) + 1
-                if block.freelist[idx]
-                    error("free: use after free")
-                end
-                block.freelist[idx] = true
-                block.n_avail += 1
-                return
-            end
-        end
-    end
-    error("invalid pointer: not malloc'd in this arena")
 end
 
 ptr_by(p::Ptr{T}) where {T} = p
@@ -341,22 +238,6 @@ function realloc(arena::ArenaAllocator4{T}, ptr::SizedPtr{T}, newsz::Int) where 
     # error("invalid pointer: not malloc'd in this arena")
 end
 
-# function calloc(allocator::ArenaAllocator4, count::Int, size::Int)
-# end
-
-# function realloc(allocator::ArenaAllocator4, size::Int)
-# end
-
-# const ROWS_PER_BUFFER = 1024
-# const BUFFER_GROWTH_FACTOR = 1.5
-
-# using UnsafeArrays
-
-# struct UnsafeVector
-#     x::UnsafeArray{Int, 1}
-#     size::Int # the malloc'd size
-# end
-
 
 using ..Ferrite: AbstractSparsityPattern
 
@@ -396,17 +277,6 @@ end
 Ferrite.n_rows(dsp::MallocDSP4) = dsp.nrows
 Ferrite.n_cols(dsp::MallocDSP4) = dsp.ncols
 
-# # hits::Int = 0
-# # misses::Int = 0
-# # buffer_growths::Int = 0
-
-
-
-# # Like mod1
-# # function divrem1(x::Int, y::Int)
-# #     a, b = divrem(x - 1, y)
-# #     return a + 1, b + 1
-# # end
 
 function check_arena(arena::ArenaAllocator4)
     bytes = UInt[]
@@ -475,80 +345,6 @@ function Ferrite.eachrow(dsp::MallocDSP4, row::Int)
     return dsp.rows[row]
 end
 
-# function add_entry!(dsp::MallocDSP4, row::Int, col::Int)
-#     @boundscheck (1 <= row <= n_rows(dsp) && 1 <= col <= n_cols(dsp)) || throw(BoundsError())
-#     # println("adding entry: $row, $col")
-#     r = dsp.rows[row]
-#     rs = r.size
-#     rx = r.x
-#     ptr = rx.pointer
-#     k = searchsortedfirst(rx, col)
-#     if k == lastindex(rx) + 1 || @inbounds(rx[k]) != col
-#         # TODO: This assumes we only grow by single entry every time
-#         if length(rx) == rs
-#             rs = Ferrite.nextpow2(rs + 1)
-#             ptr = Ferrite.realloc(dsp.arena, rx.pointer, rs)
-#         else
-#             # @assert length(rx) < rs
-#             # ptr = rx.pointer
-#         end
-#         rx = UnsafeArray(ptr, (length(rx) + 1, ))
-#         xxx = UnsafeVector(rx, rs)
-#         dsp.rows[row] = xxx
-#         # Shift elements after the insertion point to the back
-#         @inbounds for i in (length(rx)-1):-1:k
-#             rx[i+1] = rx[i]
-#         end
-#         # Insert the new element
-#         rx[k] = col
-#     else
-#         # global hits += 1
-#     end
-#     return
-# end
-
-# # struct RowIterator
-# #     colval::Vector{Int}
-# #     rowptr::Int
-# #     rowlength::Int
-# #     function RowIterator(dsp::MallocDSP, row::Int)
-# #         @assert 1 <= row <= n_rows(dsp)
-# #         chunkidx, idx = divrem(row-1, dsp.rows_per_chunk)
-# #         chunkidx += 1
-# #         idx      += 1
-# #         rowptr    = dsp.rowptr[chunkidx]
-# #         rowlength = dsp.rowlength[chunkidx]
-# #         colval    = dsp.colval[chunkidx]
-# #         # # Construct the colvalview for this row
-# #         # colvalview = view(colval, rowptr[idx]:rowptr[idx] + rowlength[idx] - 1)
-# #         return new(colval, rowptr[idx], rowlength[idx])
-# #     end
-# # end
-
-# # function Base.iterate(it::RowIterator, i = 1)
-# #     if i > it.rowlength || it.rowlength == 0
-# #         return nothing
-# #     else
-# #         return it.colval[it.rowptr + i - 1], i + 1
-# #     end
-# # end
-
-# # eachrow(dsp::MallocDSP) = (RowIterator(dsp, row) for row in 1:n_rows(dsp))
-# # eachrow(dsp::MallocDSP, row::Int) = RowIterator(dsp, row)
-
-# # View version
-# eachrow(dsp::MallocDSP) = (eachrow(dsp, row) for row in 1:n_rows(dsp))
-# function eachrow(dsp::MallocDSP, row::Int)
-#     return dsp.rows[row].x
-# end
-# # @inline function rowview(dsp::MallocDSP, row::Int)
-# #     chunkidx, idx = divrem1(row, dsp.rows_per_chunk)
-# #     rowptr    = dsp.rowptr[chunkidx]
-# #     rowlength = dsp.rowlength[chunkidx]
-# #     colval    = dsp.colval[chunkidx]
-# #     nzrange = rowptr[idx]:rowptr[idx] + rowlength[idx] - 1
-# #     return view(colval, nzrange)
-# # end
 end # module Europe
 
 using .Europe
