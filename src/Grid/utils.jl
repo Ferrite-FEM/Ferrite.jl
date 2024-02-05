@@ -351,8 +351,8 @@ Returns the minimum and maximum vertices of the bounding box.
 """
 function bounding_box(grid::AbstractGrid{dim}) where {dim}
     T = get_coordinate_eltype(grid)
-    min_vertex = Vec{dim}(i->typemin(T))
-    max_vertex = Vec{dim}(i->typemax(T))
+    min_vertex = Vec{dim}(i->typemax(T))
+    max_vertex = Vec{dim}(i->typemin(T))
     for node in getnodes(grid)
         x = get_node_coordinate(node)
         _max_tmp = max_vertex # avoid type instability
