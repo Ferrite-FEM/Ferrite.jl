@@ -13,6 +13,8 @@ struct SizedPtr{T}
     size::UInt
 end
 
+# Ptr{T}(ptr::SizedPtr) where {T} = Ptr{T}(ptr.ptr)
+
 # # Conversion SizedPtr{Cvoid} <-> SizedPtr{T}
 # function SizedPtr{T}(ptr::SizedPtr{Cvoid}) where T
 #     return SizedPtr{T}(convert(Ptr{T}, ptr.ptr), ptr.size ÷ sizeof(T))
@@ -129,8 +131,6 @@ function poolindex_from_blocksize(blocksize::UInt)
     return idx
 end
 
-aligned_allocs = 0
-
 function aligned_alloc(alignment::UInt, size::UInt)
     return @ccall aligned_alloc(alignment::Csize_t, size::Csize_t)::Ptr{Cvoid}
 end
@@ -201,6 +201,7 @@ function malloc(arena::ArenaAllocator4, mempool::MemPool{T}, size::UInt) where T
     size === mempool.blocksize || error("malloc: size mismatch")
     # Find a page with a free slot
     pageidx = findlast(x -> x.n_avail > 0, mempool.pages)
+    # pageidx = findfirst(x -> x.n_avail > 0, mempool.pages)
     if pageidx === nothing && length(arena.available_64KiB) > 0
         oldpage = pop!(arena.available_64KiB)
         # @show length(arena.available_64KiB)
@@ -208,7 +209,9 @@ function malloc(arena::ArenaAllocator4, mempool::MemPool{T}, size::UInt) where T
         flist = resize!(oldpage.freelist, n_avail)
         fill!(flist, true)
         page = MemoryPage(oldpage.ptr, mempool.blocksize, flist, n_avail)
-        push!(mempool.pages, page)
+        # push!(mempool.pages, page)
+        kk = searchsortedfirst(mempool.pages, page; by = x -> x.ptr.ptr)
+        insert!(mempool.pages, kk, page)
     elseif pageidx === nothing
         # Need to request a new page from the arena
         ospageidx = findlast(x -> x.n_avail > 0, arena.pages)
@@ -235,7 +238,9 @@ function malloc(arena::ArenaAllocator4, mempool::MemPool{T}, size::UInt) where T
         n_avail = 64KiB ÷ (mempool.blocksize * sizeof(T))
         freelist = trues(n_avail)
         page = MemoryPage(blockptr, mempool.blocksize, freelist, n_avail)
-        push!(mempool.pages, page)
+        # push!(mempool.pages, page)
+        kk = searchsortedfirst(mempool.pages, page; by = x -> x.ptr.ptr)
+        insert!(mempool.pages, kk, page)
     else
         # Use existing page
         page = mempool.pages[pageidx]
@@ -271,6 +276,9 @@ function free(arena::ArenaAllocator4{T}, ptr::Ptr{T}) where T
     error("invalid pointer: not malloc'd in this arena")
 end
 
+ptr_by(p::Ptr{T}) where {T} = p
+ptr_by(p::MemoryPage) = p.ptr.ptr
+
 function realloc(arena::ArenaAllocator4{T}, ptr::SizedPtr{T}, newsz::Int) where T
     # @info "realloc"
     @assert newsz >= 8
@@ -293,8 +301,10 @@ function realloc(arena::ArenaAllocator4{T}, ptr::SizedPtr{T}, newsz::Int) where 
     #     page.ptr <= ptr.ptr < (page.ptr + CLASS_PAGE_SIZE_BYTES)
     # end
     # Pool pointer are aligned at 64KiB
-    ptr_base = UInt(ptr.ptr) & ~(64KiB - 1)
-    k = findfirst(p -> UInt(p.ptr.ptr) == ptr_base, pool.pages)
+    ptr_base = Ptr{T}(UInt(ptr.ptr) & ~(64KiB - 1))
+    # k = findfirst(p -> UInt(p.ptr.ptr) == ptr_base, pool.pages)
+    k = searchsortedfirst(pool.pages, ptr_base; by = ptr_by)
+    @assert pool.pages[k].ptr.ptr == ptr_base
     if k === nothing
         error("realloc: pointer not malloc'd in this heap")
     end
