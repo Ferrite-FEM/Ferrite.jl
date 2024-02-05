@@ -98,11 +98,13 @@ const USE_OS_PAGES = true
 mutable struct ArenaAllocator4{T}
     const pools::Vector{MemPool{T}} # 8, 16, 32, ...
     const pages::Vector{MemoryPage{T}} # Libc.malloc'd chunks
+    const available_64KiB::Vector{MemoryPage{T}}
 
     function ArenaAllocator4{T}() where T
         pools = MemPool{T}[]
         pages = MemoryPage{T}[]
-        arena = new{T}(pools, pages)
+        available_64KiB = MemoryPage{T}[]
+        arena = new{T}(pools, pages, available_64KiB)
         finalizer(arena) do a
             ccall(:jl_safe_printf, Cvoid, (Cstring, ), "Finalizing arena...")
             # for i in 1:length(a.pools)
@@ -199,7 +201,15 @@ function malloc(arena::ArenaAllocator4, mempool::MemPool{T}, size::UInt) where T
     size === mempool.blocksize || error("malloc: size mismatch")
     # Find a page with a free slot
     pageidx = findlast(x -> x.n_avail > 0, mempool.pages)
-    if pageidx === nothing
+    if pageidx === nothing && length(arena.available_64KiB) > 0
+        oldpage = pop!(arena.available_64KiB)
+        # @show length(arena.available_64KiB)
+        n_avail = 64KiB ÷ (mempool.blocksize * sizeof(T))
+        flist = resize!(oldpage.freelist, n_avail)
+        fill!(flist, true)
+        page = MemoryPage(oldpage.ptr, mempool.blocksize, flist, n_avail)
+        push!(mempool.pages, page)
+    elseif pageidx === nothing
         # Need to request a new page from the arena
         ospageidx = findlast(x -> x.n_avail > 0, arena.pages)
         if ospageidx === nothing
@@ -226,18 +236,12 @@ function malloc(arena::ArenaAllocator4, mempool::MemPool{T}, size::UInt) where T
         freelist = trues(n_avail)
         page = MemoryPage(blockptr, mempool.blocksize, freelist, n_avail)
         push!(mempool.pages, page)
-        pageidx = lastindex(mempool.pages) # FOR LOGGING
     else
         # Use existing page
         page = mempool.pages[pageidx]
     end
     # Find available slot in the page
     block_idx = findfirst(page.freelist)
-    # if poolindex_from_blocksize(mempool.blocksize) == 4 &&
-    #     pageidx == 1 && block_idx == 8
-    #     @info "Allocating block: poolidx = $(poolindex_from_blocksize(mempool.blocksize)) pageidx = $(pageidx) blockidx = $(block_idx)"
-    # end
-    # @info "Allocating block for ints" pageidx block_idx Int(size)
     page.freelist[block_idx] = false
     page.n_avail -= 1
     ptr = SizedPtr{T}(page.ptr.ptr + (block_idx - 1) * mempool.blocksize * sizeof(T), mempool.blocksize)
@@ -311,13 +315,16 @@ function realloc(arena::ArenaAllocator4{T}, ptr::SizedPtr{T}, newsz::Int) where 
     # end
     page.n_avail += 1
     if page.n_avail == 64KiB ÷ blocksizebytes
-        let osbaseptr = Ptr{T}(UInt(page.ptr.ptr) & (~(4MiB - 1)))
-            ospage = findfirst(p -> p.ptr.ptr == osbaseptr, arena.pages)
-            freeidx = Int((page.ptr.ptr - osbaseptr) ÷ 64KiB) + 1
-            arena.pages[ospage].freelist[freeidx] = true
-            arena.pages[ospage].n_avail += 1
-            deleteat!(pool.pages, k)
-        end
+        # let osbaseptr = Ptr{T}(UInt(page.ptr.ptr) & (~(4MiB - 1)))
+        #     ospage = findfirst(p -> p.ptr.ptr == osbaseptr, arena.pages)
+        #     freeidx = Int((page.ptr.ptr - osbaseptr) ÷ 64KiB) + 1
+        #     arena.pages[ospage].freelist[freeidx] = true
+        #     arena.pages[ospage].n_avail += 1
+        #     deleteat!(pool.pages, k)
+        # end
+        # Cache the 64KiB block
+        push!(arena.available_64KiB, page)
+        deleteat!(pool.pages, k)
     end
     return newptr
     # end
