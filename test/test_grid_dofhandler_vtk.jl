@@ -91,7 +91,7 @@ end
             rm(dofhandlerfilename*".vtu")
         end
 
-        minv, maxv = Ferrite.compute_bounding_box(grid)
+        minv, maxv = Ferrite.bounding_box(grid)
         @test minv ≈ 2left
         @test maxv ≈ 2right
     

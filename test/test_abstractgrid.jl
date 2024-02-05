@@ -82,7 +82,7 @@
     @test Ferrite.ndofs(dhs[1]) == Ferrite.ndofs(dhs[2])
     @test isapprox(u1,u2,atol=1e-8)
 
-    minv, maxv = Ferrite.compute_bounding_box(subtype_grid)
+    minv, maxv = Ferrite.bounding_box(subtype_grid)
     @test minv ≈ Vec((-1.0,-1.0))
     @test maxv ≈ Vec((+1.0,+1.0))
 
