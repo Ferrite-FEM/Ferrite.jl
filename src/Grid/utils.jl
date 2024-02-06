@@ -346,8 +346,8 @@ end
 """
     bounding_box(grid::AbstractGrid)
 
-Computes the bounding box for a given grid, based on its node coordinates. 
-Returns the minimum and maximum vertices of the bounding box.
+Computes the axis-aligned bounding box for a given grid, based on its node coordinates. 
+Returns the minimum and maximum vertex coordinates of the bounding box.
 """
 function bounding_box(grid::AbstractGrid{dim}) where {dim}
     T = get_coordinate_eltype(grid)
