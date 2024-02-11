@@ -78,7 +78,27 @@ function hhhhh(dh)
     return dsp
 end
 
-@time hhhhh(dh);
+function hhhhhh(dh)
+    dsp = Ferrite.Final.SparsityPattern(ndofs(dh), ndofs(dh))
+    # dsp = Ferrite.SparsityPattern(ndofs(dh), ndofs(dh))
+    create_sparsity_pattern!(dsp, dh)
+    s = 0
+    for r in Ferrite.Final.eachrow(dsp)
+        for ri in r
+            s += ri
+        end
+    end
+    @time finalize(dsp.heap)
+    return s
+end
+
+
+function time_me(dh)
+    s = hhhhhh(dh)
+    return s
+end
+
+@time time_me(dh);
 
 function m(dh)
     dsp = Ferrite.MiMallocDSP(ndofs(dh), ndofs(dh); growth_factor = 2)

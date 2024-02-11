@@ -1,20 +1,10 @@
 module Final
 
-const ENABLE_ASSERT = false
-
-macro assert(cond)
-    if ENABLE_ASSERT
-        return :($(esc(cond)) || throw(AssertionError()))
-    else
-        return nothing
-    end
-end
-
 using ..Ferrite: Ferrite
 using ..Ferrite: add_entry!, n_rows, n_cols, AbstractSparsityPattern
 import ..Ferrite: add_entry!, n_rows, n_cols, eachrow
 
-const MALLOC_PAGE_SIZE = 4 * 1024 * 1024 % UInt
+const MALLOC_PAGE_SIZE = 4 * 1024 * 1024 % UInt # 4 MiB
 
 # Like Ptr{T} but also stores the number of bytes allocated
 struct SizedPtr{T}
@@ -23,22 +13,13 @@ struct SizedPtr{T}
 end
 Ptr{T}(ptr::SizedPtr) where {T} = Ptr{T}(ptr.ptr)
 
-struct NullPtr end
-const nullptr = NullPtr()
-
-function Base.:(==)(ptr::SizedPtr, ::NullPtr)
-    return ptr.ptr == C_NULL
-end
-function Base.:(==)(::NullPtr, ptr::SizedPtr)
-    return ptr == nullptr
-end
-
 # Minimal AbstractVector implementation on top of a raw pointer + a length
 struct PtrVector{T} <: AbstractVector{T}
     ptr::SizedPtr{T}
     length::Int
 end
 Base.size(mv::PtrVector) = (mv.length, )
+allocated_length(mv::PtrVector{T}) where T = mv.ptr.size ÷ sizeof(T)
 Base.IndexStyle(::Type{PtrVector}) = IndexLinear()
 Base.@propagate_inbounds function Base.getindex(mv::PtrVector, i::Int)
     @boundscheck checkbounds(mv, i)
@@ -49,42 +30,16 @@ Base.@propagate_inbounds function Base.setindex!(mv::PtrVector{T}, v::T, i::Int)
     return unsafe_store!(mv.ptr.ptr, v, i)
 end
 
+
 # Fixed buffer size (1MiB)
-# Rowsize  | size | # Rows | # pages x86_64 | # pages aarch64
-#       4  | 1MiB |  32768 |            256 |              64
-#       8  | 1MiB |  16384 |            256 |              64
-#      16  | 1MiB |   8192 |            256 |              64
-#      32  | 1MiB |   4096 |            256 |              64
-#      64  | 1MiB |   2048 |            256 |              64
-#     128  | 1MiB |   1024 |            256 |              64
-#     256  | 1MiB |    512 |            256 |              64
-
-# Fixed number of rows (1024)
-# Rowsize  |   size | # Rows | # pages x86_64 | # pages aarch64
-#       4  |  32KiB |   1024 |              8 |               2
-#       8  |  64KiB |   1024 |             16 |               4
-#      16  | 128KiB |   1024 |             32 |               8
-#      32  | 256KiB |   1024 |             64 |              16
-#      64  | 512KiB |   1024 |            128 |              32
-#     128  |   1MiB |   1024 |            256 |              64
-#     256  |   2MiB |   1024 |            512 |             128
-
-
-# A bit faster than nextpow(2, v) from Base (#premature-optimization),
-# https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
-function nextpow2(x::Union{Int64, UInt64})
-    v = x
-    v -= 1
-    v |= v >>> 1
-    v |= v >>> 2
-    v |= v >>> 4
-    v |= v >>> 8
-    v |= v >>> 16
-    v |= v >>> 32
-    v += 1
-    @assert v >= x && rem(v, 2) == 0
-    return v
-end
+# Rowsize  | size | # Rows |
+#       4  | 1MiB |  32768 |
+#       8  | 1MiB |  16384 |
+#      16  | 1MiB |   8192 |
+#      32  | 1MiB |   4096 |
+#      64  | 1MiB |   2048 |
+#     128  | 1MiB |   1024 |
+#     256  | 1MiB |    512 |
 
 # A page corresponds to a larger Libc.malloc call (MALLOC_PAGE_SIZE). Each page
 # is split into smaller blocks to minimize the number of Libc.malloc/Libc.free
@@ -116,12 +71,12 @@ function malloc(page::MemoryPage{T}, size::UInt) where T
     end
     # Return early with null if the page is full
     if page.n_free == 0
-        @assert page.free == nullptr
+        @assert page.free.ptr == C_NULL
         return SizedPtr{T}(Ptr{T}(), size)
     end
     # Read the pointer to be returned
     ret = page.free
-    @assert ret != nullptr
+    @assert ret.ptr != C_NULL
     # Look up and store the next free pointer
     page.free = SizedPtr{T}(unsafe_load(Ptr{Ptr{T}}(ret)), size)
     page.n_free -= 1
@@ -153,7 +108,7 @@ function malloc(mempool::MemoryPool{T}, size::UInt) where T
     # TODO: backwards is probably better since it is more likely there is room in the back?
     for page in mempool.pages
         ptr = malloc(page, size)
-        ptr == nullptr || return ptr
+        ptr.ptr == C_NULL || return ptr
     end
     # Allocate a new page
     mptr = SizedPtr{T}(Ptr{T}(Libc.malloc(MALLOC_PAGE_SIZE)), MALLOC_PAGE_SIZE)
@@ -161,23 +116,29 @@ function malloc(mempool::MemoryPool{T}, size::UInt) where T
     push!(mempool.pages, page)
     # Allocate block in the new page
     ptr = malloc(page, size)
-    @assert ptr != nullptr
+    @assert ptr.ptr != C_NULL
     return ptr
 end
 
-mutable struct ArenaAllocator{T}
+mutable struct MemoryHeap{T}
     const pools::Vector{MemoryPool{T}} # 2, 4, 6, 8, ...
-    function ArenaAllocator{T}() where T
-        arena = new{T}(MemoryPool{T}[])
-        finalizer(arena) do a
-            for i in 1:length(a.pools)
-                isassigned(a.pools, i) || continue
-                for page in a.pools[i].pages
+    function MemoryHeap{T}() where T
+        heap = new{T}(MemoryPool{T}[])
+        finalizer(heap) do h
+            t0 = time_ns()
+            n = 0
+            for i in 1:length(h.pools)
+                isassigned(h.pools, i) || continue
+                for page in h.pools[i].pages
+                    n += 1
                     Libc.free(page.ptr.ptr)
                 end
             end
+            tot = (time_ns() - t0) / 1000 / 1000 / 1000 # ns -> μs -> ms -> s
+            @async println("Finalized $n pointers in $tot ms\n")
+            return
         end
-        return arena
+        return heap
     end
 end
 
@@ -185,48 +146,48 @@ function poolindex_from_blocksize(blocksize::UInt)
     return (8 * sizeof(UInt) - leading_zeros(blocksize)) % Int
 end
 
-function malloc(arena::ArenaAllocator{T}, size::Integer) where T
-    blocksize = nextpow2(size % UInt)
+function malloc(heap::MemoryHeap{T}, size::Integer) where T
+    blocksize = nextpow(2, size % UInt)
     poolidx = poolindex_from_blocksize(blocksize)
-    if length(arena.pools) < poolidx
-        resize!(arena.pools, poolidx)
+    if length(heap.pools) < poolidx
+        resize!(heap.pools, poolidx)
     end
-    if !isassigned(arena.pools, poolidx)
+    if !isassigned(heap.pools, poolidx)
         pool = MemoryPool{T}(blocksize, MemoryPage{T}[])
-        arena.pools[poolidx] = pool
+        heap.pools[poolidx] = pool
     else
-        pool = arena.pools[poolidx]
+        pool = heap.pools[poolidx]
     end
     return malloc(pool, blocksize)
 end
 
-@inline function find_page(arena::ArenaAllocator{T}, ptr::SizedPtr{T}) where T
+@inline function find_page(heap::MemoryHeap{T}, ptr::SizedPtr{T}) where T
     poolidx = poolindex_from_blocksize(ptr.size)
-    if !isassigned(arena.pools, poolidx)
-        error("pointer not malloc'd in this arena")
+    if !isassigned(heap.pools, poolidx)
+        error("pointer not malloc'd in this heap")
     end
-    pool = arena.pools[poolidx]
+    pool = heap.pools[poolidx]
     # Search for the page containing the pointer
     # TODO: Insert pages in sorted order and use searchsortedfirst?
     # TODO: Align the pages and store the base pointer -> page index mapping in a dict?
     pageidx = findfirst(p -> p.ptr.ptr <= ptr.ptr < (p.ptr.ptr + p.ptr.size), pool.pages)
     if pageidx === nothing
-        error("pointer not malloc'd in this arena")
+        error("pointer not malloc'd in this heap")
     end
     return pool.pages[pageidx]
 end
 
-function free(arena::ArenaAllocator{T}, ptr::SizedPtr{T}) where T
-    free(find_page(arena, ptr), ptr)
+function free(heap::MemoryHeap{T}, ptr::SizedPtr{T}) where T
+    free(find_page(heap, ptr), ptr)
     return
 end
 
-function realloc(arena::ArenaAllocator{T}, ptr::SizedPtr{T}, newsize::UInt) where T
+function realloc(heap::MemoryHeap{T}, ptr::SizedPtr{T}, newsize::UInt) where T
     @assert newsize > ptr.size # TODO: Allow shrinkage?
-    # Find the page for the pointer to make sure it was allocated in this arena
-    page = find_page(arena, ptr)
+    # Find the page for the pointer to make sure it was allocated in this heap
+    page = find_page(heap, ptr)
     # Allocate the new pointer
-    newptr = malloc(arena, newsize)
+    newptr = malloc(heap, newsize)
     # Copy the data
     Libc.memcpy(newptr.ptr, ptr.ptr, ptr.size)
     # Free the old pointer and return
@@ -234,68 +195,48 @@ function realloc(arena::ArenaAllocator{T}, ptr::SizedPtr{T}, newsize::UInt) wher
     return newptr
 end
 
-struct MallocDSP{T} <: AbstractSparsityPattern
+struct SparsityPattern{T} <: AbstractSparsityPattern
     nrows::Int
     ncols::Int
-    arena::ArenaAllocator{T}
+    heap::MemoryHeap{T}
     rows::Vector{PtrVector{T}}
-    # rows_per_chunk::Int
-    # growth_factor::Float64
-    # rowptr::Vector{Vector{Int}}
-    # rowlength::Vector{Vector{Int}}
-    # colval::Vector{Vector{Int}}
-    function MallocDSP(
+    function SparsityPattern(
             nrows::Int, ncols::Int;
             nnz_per_row::Int = 8,
-            # rows_per_chunk::Int = 1024,
-            # growth_factor::Float64 = 1.5,
         )
         T = Int
-        arena = ArenaAllocator{T}()
+        heap = MemoryHeap{T}()
         rows = Vector{PtrVector{T}}(undef, nrows)
         for i in 1:nrows
-            ptr = malloc(arena, nnz_per_row * sizeof(T))
+            ptr = malloc(heap, nnz_per_row * sizeof(T))
             rows[i] = PtrVector{T}(ptr, 0)
         end
-        return new{T}(nrows, ncols, arena, rows)
+        return new{T}(nrows, ncols, heap, rows)
     end
 end
 
+n_rows(sp::SparsityPattern) = sp.nrows
+n_cols(sp::SparsityPattern) = sp.ncols
 
-n_rows(dsp::MallocDSP) = dsp.nrows
-n_cols(dsp::MallocDSP) = dsp.ncols
-
-# hits::Int = 0
-# misses::Int = 0
-# buffer_growths::Int = 0
-
-
-
-# Like mod1
-# function divrem1(x::Int, y::Int)
-#     a, b = divrem(x - 1, y)
-#     return a + 1, b + 1
-# end
-
-function add_entry!(dsp::MallocDSP{T}, row::Int, col::Int) where T
-    @boundscheck (1 <= row <= n_rows(dsp) && 1 <= col <= n_cols(dsp)) || throw(BoundsError())
+function add_entry!(sp::SparsityPattern{T}, row::Int, col::Int) where T
+    @boundscheck (1 <= row <= n_rows(sp) && 1 <= col <= n_cols(sp)) || throw(BoundsError())
     # println("adding entry: $row, $col")
-    r = @inbounds dsp.rows[row]
+    r = @inbounds sp.rows[row]
     rptr = r.ptr
     rlen = r.length
     # rx = r.x
     k = searchsortedfirst(r, col)
     if k == rlen + 1 || @inbounds(r[k]) != col
         # TODO: This assumes we only grow by single entry every time
-        if rlen == rptr.size ÷ sizeof(T) # % Int XXX
+        if rlen == allocated_length(r) # % Int XXX
             @assert ispow2(rptr.size)
-            rptr = realloc(dsp.arena, rptr, 2 * rptr.size)
+            rptr = realloc(sp.heap, rptr, 2 * rptr.size)
         else
             # @assert length(rx) < rs
             # ptr = rx.pointer
         end
         r = PtrVector{T}(rptr, rlen + 1)
-        @inbounds dsp.rows[row] = r
+        @inbounds sp.rows[row] = r
         # Shift elements after the insertion point to the back
         @inbounds for i in rlen:-1:k
             r[i+1] = r[i]
@@ -306,48 +247,31 @@ function add_entry!(dsp::MallocDSP{T}, row::Int, col::Int) where T
     return
 end
 
-# struct RowIterator
-#     colval::Vector{Int}
-#     rowptr::Int
-#     rowlength::Int
-#     function RowIterator(dsp::MallocDSP, row::Int)
-#         @assert 1 <= row <= n_rows(dsp)
-#         chunkidx, idx = divrem(row-1, dsp.rows_per_chunk)
-#         chunkidx += 1
-#         idx      += 1
-#         rowptr    = dsp.rowptr[chunkidx]
-#         rowlength = dsp.rowlength[chunkidx]
-#         colval    = dsp.colval[chunkidx]
-#         # # Construct the colvalview for this row
-#         # colvalview = view(colval, rowptr[idx]:rowptr[idx] + rowlength[idx] - 1)
-#         return new(colval, rowptr[idx], rowlength[idx])
-#     end
-# end
-
-# function Base.iterate(it::RowIterator, i = 1)
-#     if i > it.rowlength || it.rowlength == 0
-#         return nothing
-#     else
-#         return it.colval[it.rowptr + i - 1], i + 1
-#     end
-# end
-
-# eachrow(dsp::MallocDSP) = (RowIterator(dsp, row) for row in 1:n_rows(dsp))
-# eachrow(dsp::MallocDSP, row::Int) = RowIterator(dsp, row)
-
-# View version
-eachrow(dsp::MallocDSP) = (eachrow(dsp, row) for row in 1:n_rows(dsp))
-function eachrow(dsp::MallocDSP, row::Int)
-    return dsp.rows[row]
+# Auxiliary type that also wraps the heap to make sure the heap isn't freed
+# while the vector is in use
+struct RootedPtrVector{T} <: AbstractVector{T}
+    x::PtrVector{T}
+    heap::MemoryHeap{T}
 end
-# @inline function rowview(dsp::MallocDSP, row::Int)
-#     chunkidx, idx = divrem1(row, dsp.rows_per_chunk)
-#     rowptr    = dsp.rowptr[chunkidx]
-#     rowlength = dsp.rowlength[chunkidx]
-#     colval    = dsp.colval[chunkidx]
-#     nzrange = rowptr[idx]:rowptr[idx] + rowlength[idx] - 1
-#     return view(colval, nzrange)
-# end
+Base.size(mv::RootedPtrVector) = size(mv.x)
+Base.IndexStyle(::Type{RootedPtrVector}) = IndexLinear()
+Base.@propagate_inbounds function Base.getindex(mv::RootedPtrVector, i::Int)
+    return getindex(mv.x, i)
+end
 
+struct EachRow{T}
+    sp::SparsityPattern{T}
+end
+function Base.iterate(rows::EachRow, row::Int = 1)
+    row > length(rows) && return nothing
+    return eachrow(rows.sp, row), row + 1
+end
+Base.eltype(::Type{EachRow{T}}) where {T} = RootedPtrVector{T}
+Base.length(rows::EachRow) = n_rows(rows.sp)
+
+eachrow(sp::SparsityPattern) = EachRow(sp)
+function eachrow(sp::SparsityPattern, row::Int)
+    return RootedPtrVector(sp.rows[row], sp.heap)
+end
 
 end # module Final
