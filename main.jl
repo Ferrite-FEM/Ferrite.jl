@@ -2,6 +2,7 @@
 
 using Revise, Ferrite, SparseArrays, ProfileView
 
+# n = 3
 const n = if length(ARGS) == 1
     parse(Int, ARGS[1])
 elseif length(ARGS) == 0
@@ -15,6 +16,18 @@ const dh = DofHandler(grid)
 add!(dh, :u, Lagrange{RefHexahedron, 2}()^3)
 add!(dh, :p, Lagrange{RefHexahedron, 1}())
 close!(dh)
+# function hhhhh(dh)
+#     dsp = Ferrite.Final.MallocDSP(ndofs(dh), ndofs(dh))
+#     create_sparsity_pattern!(dsp, dh)
+#     return dsp
+# end
+# @time hhhhh(dh);
+
+# dsp = Ferrite.Europe2.MallocDSP4(ndofs(dh), ndofs(dh))
+
+# create_sparsity_pattern!(dsp, dh)
+
+
 
 function g(dh)
     dsp = Ferrite.SparsityPattern(ndofs(dh), ndofs(dh))
@@ -52,6 +65,20 @@ function hhh(dh)
     create_sparsity_pattern!(dsp, dh)
     return dsp
 end
+
+function hhhh(dh)
+    dsp = Ferrite.Europe2.MallocDSP4(ndofs(dh), ndofs(dh))
+    create_sparsity_pattern!(dsp, dh)
+    return dsp
+end
+
+function hhhhh(dh)
+    dsp = Ferrite.Final.MallocDSP(ndofs(dh), ndofs(dh))
+    create_sparsity_pattern!(dsp, dh)
+    return dsp
+end
+
+@time hhhhh(dh);
 
 function m(dh)
     dsp = Ferrite.MiMallocDSP(ndofs(dh), ndofs(dh); growth_factor = 2)
@@ -96,6 +123,19 @@ GC.gc()
 GC.gc()
 GC.gc()
 @time hhh(dh);
+GC.gc()
+GC.gc()
+GC.gc()
+# @profview hhhh(dh);
+@time hhhh(dh);
+GC.gc()
+GC.gc()
+GC.gc()
+@time hhhhh(dh);
+GC.gc()
+GC.gc()
+GC.gc()
+@profview hhhhh(dh)
 
 
 
