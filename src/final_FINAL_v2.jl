@@ -125,17 +125,17 @@ mutable struct MemoryHeap{T}
     function MemoryHeap{T}() where T
         heap = new{T}(MemoryPool{T}[])
         finalizer(heap) do h
-            t0 = time_ns()
-            n = 0
+            # t0 = time_ns()
+            # n = 0
             for i in 1:length(h.pools)
                 isassigned(h.pools, i) || continue
                 for page in h.pools[i].pages
-                    n += 1
+                    # n += 1
                     Libc.free(page.ptr.ptr)
                 end
             end
-            tot = (time_ns() - t0) / 1000 / 1000 / 1000 # ns -> μs -> ms -> s
-            @async println("Finalized $n pointers in $tot ms\n")
+            # tot = (time_ns() - t0) / 1000 / 1000 / 1000 # ns -> μs -> ms -> s
+            # @async println("Finalized $n pointers in $tot ms\n")
             return
         end
         return heap
