@@ -28,7 +28,7 @@ function profile_me(dh)
     dsp = Ferrite.Final.SparsityPattern(ndofs(dh), ndofs(dh))
     # dsp = Ferrite.SparsityPattern(ndofs(dh), ndofs(dh))
     create_sparsity_pattern!(dsp, dh)
-    condense_sparsity_pattern!(dsp, ch)
+    # condense_sparsity_pattern!(dsp, ch)
     return dsp
 end
 
@@ -36,7 +36,7 @@ function bench_me(dh)
     dsp = Ferrite.Final.SparsityPattern(ndofs(dh), ndofs(dh))
     # dsp = Ferrite.SparsityPattern(ndofs(dh), ndofs(dh))
     create_sparsity_pattern!(dsp, dh)
-    condense_sparsity_pattern!(dsp, ch)
+    # condense_sparsity_pattern!(dsp, ch)
     s = 0
     for r in Ferrite.eachrow(dsp)
         for ri in r
@@ -51,7 +51,7 @@ function hhhhhh(dh)
     dsp = @showtime Ferrite.Final.SparsityPattern(ndofs(dh), ndofs(dh))
     # dsp = Ferrite.SparsityPattern(ndofs(dh), ndofs(dh))
     @showtime create_sparsity_pattern!(dsp, dh)
-    @showtime condense_sparsity_pattern!(dsp, ch)
+    # @showtime condense_sparsity_pattern!(dsp, ch)
     s = 0
     for r in Ferrite.eachrow(dsp)
         for ri in r
