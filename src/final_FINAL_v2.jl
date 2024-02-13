@@ -13,23 +13,6 @@ struct SizedPtr{T}
 end
 Ptr{T}(ptr::SizedPtr) where {T} = Ptr{T}(ptr.ptr)
 
-# Minimal AbstractVector implementation on top of a raw pointer + a length
-struct PtrVector{T} <: AbstractVector{T}
-    ptr::SizedPtr{T}
-    length::Int
-end
-Base.size(mv::PtrVector) = (mv.length, )
-allocated_length(mv::PtrVector{T}) where T = mv.ptr.size ÷ sizeof(T)
-Base.IndexStyle(::Type{PtrVector}) = IndexLinear()
-Base.@propagate_inbounds function Base.getindex(mv::PtrVector, i::Int)
-    @boundscheck checkbounds(mv, i)
-    return unsafe_load(mv.ptr.ptr, i)
-end
-Base.@propagate_inbounds function Base.setindex!(mv::PtrVector{T}, v::T, i::Int) where T
-    @boundscheck checkbounds(mv, i)
-    return unsafe_store!(mv.ptr.ptr, v, i)
-end
-
 
 # Fixed buffer size (1MiB)
 # Rowsize  | size | # Rows |
@@ -195,6 +178,23 @@ function realloc(heap::MemoryHeap{T}, ptr::SizedPtr{T}, newsize::UInt) where T
     return newptr
 end
 
+# Minimal AbstractVector implementation on top of a raw pointer + a length
+struct PtrVector{T} <: AbstractVector{T}
+    ptr::SizedPtr{T}
+    length::Int
+end
+Base.size(mv::PtrVector) = (mv.length, )
+allocated_length(mv::PtrVector{T}) where T = mv.ptr.size ÷ sizeof(T)
+Base.IndexStyle(::Type{PtrVector}) = IndexLinear()
+Base.@propagate_inbounds function Base.getindex(mv::PtrVector, i::Int)
+    @boundscheck checkbounds(mv, i)
+    return unsafe_load(mv.ptr.ptr, i)
+end
+Base.@propagate_inbounds function Base.setindex!(mv::PtrVector{T}, v::T, i::Int) where T
+    @boundscheck checkbounds(mv, i)
+    return unsafe_store!(mv.ptr.ptr, v, i)
+end
+
 struct SparsityPattern{T} <: AbstractSparsityPattern
     nrows::Int
     ncols::Int
@@ -229,10 +229,18 @@ function Base.show(io::IO, ::MIME"text/plain", sp::SparsityPattern{T}) where T
         max_entries = max(max_entries, l)
         allocated_entries += allocated_length(r)
     end
+    ##
+    bytes_estimate = 0
+    bytes_estimate_used = 0
+    bytes_estimate      += n_rows(sp) * sizeof(eltype(sp.rows))
+    bytes_estimate_used += n_rows(sp) * sizeof(eltype(sp.rows))
+    bytes_estimate_used += stored_entries * sizeof(T)
+    ##
     bytes_malloced = 0
     for poolidx in 1:length(sp.heap.pools)
         isassigned(sp.heap.pools, poolidx) || continue
         bytes_malloced += length(sp.heap.pools[poolidx].pages) * Int(MALLOC_PAGE_SIZE)
+        bytes_estimate += length(sp.heap.pools[poolidx].pages) * Int(MALLOC_PAGE_SIZE)
     end
     sparsity = round(
         (n_rows(sp) * n_cols(sp) - stored_entries) / (n_rows(sp) * n_cols(sp)) * 100 * 100
@@ -243,7 +251,10 @@ function Base.show(io::IO, ::MIME"text/plain", sp::SparsityPattern{T}) where T
     bytes_used = Base.format_bytes(stored_entries * sizeof(T))
     bytes_allocated = Base.format_bytes(allocated_entries * sizeof(T))
     bytes_mallocated = Base.format_bytes(bytes_malloced)
-    print(iob,   " - Memory estimate: $(bytes_used) used, $(bytes_allocated) allocated, $(bytes_mallocated) malloc'd")
+    bytes_est = Base.format_bytes(bytes_estimate)
+    bytes_est_used = Base.format_bytes(bytes_estimate_used)
+    println(iob,   " - Memory: $(bytes_used) used, $(bytes_allocated) allocated, $(bytes_mallocated) malloc'd")
+    print(iob,   " - Memory estimate: $(bytes_est_used) used, $(bytes_est) allocated")
     write(io, seekstart(iob))
     return
 end
@@ -264,9 +275,6 @@ function add_entry!(sp::SparsityPattern{T}, row::Int, col::Int) where T
         if rlen == allocated_length(r) # % Int XXX
             @assert ispow2(rptr.size)
             rptr = realloc(sp.heap, rptr, 2 * rptr.size)
-        else
-            # @assert length(rx) < rs
-            # ptr = rx.pointer
         end
         r = PtrVector{T}(rptr, rlen + 1)
         @inbounds sp.rows[row] = r
@@ -307,5 +315,9 @@ eachrow(sp::SparsityPattern) = EachRow(sp)
 function eachrow(sp::SparsityPattern, row::Int)
     return RootedPtrVector(sp.rows[row], sp.heap)
 end
+# eachrow(sp::SparsityPattern) = sp.rows
+# function eachrow(sp::SparsityPattern, row::Int)
+#     return sp.rows[row]
+# end
 
 end # module Final
