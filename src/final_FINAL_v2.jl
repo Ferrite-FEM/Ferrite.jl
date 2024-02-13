@@ -215,6 +215,39 @@ struct SparsityPattern{T} <: AbstractSparsityPattern
     end
 end
 
+function Base.show(io::IO, ::MIME"text/plain", sp::SparsityPattern{T}) where T
+    iob = IOBuffer()
+    println(iob, "$(n_rows(sp))×$(n_cols(sp)) $(sprint(show, typeof(sp))):")
+    min_entries = typemax(Int)
+    max_entries = typemin(Int)
+    stored_entries = 0
+    allocated_entries = 0
+    for r in sp.rows
+        l = length(r)
+        stored_entries += l
+        min_entries = min(min_entries, l)
+        max_entries = max(max_entries, l)
+        allocated_entries += allocated_length(r)
+    end
+    bytes_malloced = 0
+    for poolidx in 1:length(sp.heap.pools)
+        isassigned(sp.heap.pools, poolidx) || continue
+        bytes_malloced += length(sp.heap.pools[poolidx].pages) * Int(MALLOC_PAGE_SIZE)
+    end
+    sparsity = round(
+        (n_rows(sp) * n_cols(sp) - stored_entries) / (n_rows(sp) * n_cols(sp)) * 100 * 100
+    ) / 100
+    println(iob, " - Sparsity: $(sparsity)% ($(stored_entries) stored entries)")
+    avg_entries = round(stored_entries / n_rows(sp) * 10) / 10
+    println(iob, " - Entries per row (min, max, avg): $(min_entries), $(max_entries), $(avg_entries)")
+    bytes_used = Base.format_bytes(stored_entries * sizeof(T))
+    bytes_allocated = Base.format_bytes(allocated_entries * sizeof(T))
+    bytes_mallocated = Base.format_bytes(bytes_malloced)
+    print(iob,   " - Memory estimate: $(bytes_used) used, $(bytes_allocated) allocated, $(bytes_mallocated) malloc'd")
+    write(io, seekstart(iob))
+    return
+end
+
 n_rows(sp::SparsityPattern) = sp.nrows
 n_cols(sp::SparsityPattern) = sp.ncols
 
@@ -268,6 +301,7 @@ function Base.iterate(rows::EachRow, row::Int = 1)
 end
 Base.eltype(::Type{EachRow{T}}) where {T} = RootedPtrVector{T}
 Base.length(rows::EachRow) = n_rows(rows.sp)
+Base.keys(rows::EachRow) = 1:n_rows(rows.sp)
 
 eachrow(sp::SparsityPattern) = EachRow(sp)
 function eachrow(sp::SparsityPattern, row::Int)
