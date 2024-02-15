@@ -41,9 +41,10 @@ struct FaceValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:Abstrac
 end
 
 function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
-        update_gradients::Bool = true) where {T,sdim} 
+        update_gradients::Bool = true, update_hessians::Bool = false) where {T,sdim} 
     
     FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
+    FunDiffOrder += convert(Int, update_hessians) # Logic must change when supporting update_hessian kwargs
     GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), 1)
     geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]
     fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
@@ -53,9 +54,9 @@ function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, i
     return FaceValues(fun_values, geo_mapping, fqr, detJdV, normals, ScalarWrapper(1))
 end
 
-FaceValues(qr::FaceQuadratureRule, ip::Interpolation, args...) = FaceValues(Float64, qr, ip, args...)
-function FaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation) where T
-    return FaceValues(T, qr, ip, VectorizedInterpolation(ip_geo))
+FaceValues(qr::FaceQuadratureRule, ip::Interpolation, args...; kwargs...) = FaceValues(Float64, qr, ip, args...; kwargs...)
+function FaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where T
+    return FaceValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
 end
 
 function Base.copy(fv::FaceValues)
@@ -82,6 +83,7 @@ get_fun_values(fv::FaceValues) = @inbounds fv.fun_values[getcurrentface(fv)]
 
 @propagate_inbounds shape_value(fv::FaceValues, q_point::Int, i::Int) = shape_value(get_fun_values(fv), q_point, i)
 @propagate_inbounds shape_gradient(fv::FaceValues, q_point::Int, i::Int) = shape_gradient(get_fun_values(fv), q_point, i)
+@propagate_inbounds shape_hessian(fv::FaceValues, q_point::Int, i::Int) = shape_hessian(get_fun_values(fv), q_point, i)
 @propagate_inbounds shape_symmetric_gradient(fv::FaceValues, q_point::Int, i::Int) = shape_symmetric_gradient(get_fun_values(fv), q_point, i)
 
 """

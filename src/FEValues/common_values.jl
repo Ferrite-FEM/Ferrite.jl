@@ -206,6 +206,38 @@ function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {
 end
 
 """
+    function_hessian(fe_v::AbstractValues{dim}, q_point::Int, u::AbstractVector, [dof_range])
+"""
+function function_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
+    n_base_funcs = getnbasefunctions(fe_v)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
+    @boundscheck checkquadpoint(fe_v, q_point)
+    grad = function_hessian_init(fe_v, u)
+    @inbounds for (i, j) in pairs(dof_range)
+        grad += shape_hessian(fe_v, q_point, i) * u[j]
+    end
+    return grad
+end
+
+"""
+    shape_hessian_type(fe_v::AbstractValues)
+
+Return the type of `shape_hessian(fe_v, q_point, base_function)`
+"""
+function shape_hessian_type(fe_v::AbstractValues)
+    # Default fallback
+    return typeof(shape_hessian(fe_v, 1, 1))
+end
+
+function function_hessian_init(cv::AbstractValues, ::AbstractVector{T}) where {T}
+    return zero(shape_hessian_type(cv)) * zero(T)
+end
+function function_hessian_init(cv::AbstractValues, ::AbstractVector{T}) where {T <: AbstractVector}
+    return zero(T) ⊗ zero(shape_hessian_type(cv))
+end
+
+"""
     function_symmetric_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
 Compute the symmetric gradient of the function, see [`function_gradient`](@ref).
@@ -302,11 +334,9 @@ function shape_gradients_and_values!(gradients::AbstractMatrix, values::Abstract
     end
 end
 
-#= PR798
 function shape_hessians_gradients_and_values!(hessians::AbstractMatrix, gradients::AbstractMatrix, values::AbstractMatrix, ip, qr_points::Vector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
         shape_hessians_gradients_and_values!(@view(hessians[:, qp]), @view(gradients[:, qp]), @view(values[:, qp]), ip, ξ)
     end
 end
-=#
 
