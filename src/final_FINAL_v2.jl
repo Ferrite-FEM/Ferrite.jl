@@ -94,6 +94,7 @@ function malloc(mempool::MemoryPool{T}, size::UInt) where T
         ptr.ptr == C_NULL || return ptr
     end
     # Allocate a new page
+    # TODO: Replace Libc.malloc with Memory in recent Julias?
     mptr = SizedPtr{T}(Ptr{T}(Libc.malloc(MALLOC_PAGE_SIZE)), MALLOC_PAGE_SIZE)
     page = MemoryPage(mptr, mempool.blocksize)
     push!(mempool.pages, page)
@@ -108,17 +109,12 @@ mutable struct MemoryHeap{T}
     function MemoryHeap{T}() where T
         heap = new{T}(MemoryPool{T}[])
         finalizer(heap) do h
-            # t0 = time_ns()
-            # n = 0
             for i in 1:length(h.pools)
                 isassigned(h.pools, i) || continue
                 for page in h.pools[i].pages
-                    # n += 1
                     Libc.free(page.ptr.ptr)
                 end
             end
-            # tot = (time_ns() - t0) / 1000 / 1000 / 1000 # ns -> μs -> ms -> s
-            # @async println("Finalized $n pointers in $tot ms\n")
             return
         end
         return heap

@@ -3,7 +3,7 @@ using Revise, Ferrite, SparseArrays, ProfileView, BenchmarkTools
 const n = if length(ARGS) == 1
     parse(Int, ARGS[1])
 elseif length(ARGS) == 0
-    20
+    30
 else
     error()
 end
