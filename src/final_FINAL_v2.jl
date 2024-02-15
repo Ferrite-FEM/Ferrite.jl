@@ -178,6 +178,7 @@ end
 struct PtrVector{T} <: AbstractVector{T}
     ptr::SizedPtr{T}
     length::Int
+    heap::MemoryHeap{T}
 end
 Base.size(mv::PtrVector) = (mv.length, )
 allocated_length(mv::PtrVector{T}) where T = mv.ptr.size ÷ sizeof(T)
@@ -205,7 +206,7 @@ struct SparsityPattern{T} <: AbstractSparsityPattern
         rows = Vector{PtrVector{T}}(undef, nrows)
         for i in 1:nrows
             ptr = malloc(heap, nnz_per_row * sizeof(T))
-            rows[i] = PtrVector{T}(ptr, 0)
+            rows[i] = PtrVector{T}(ptr, 0, heap)
         end
         return new{T}(nrows, ncols, heap, rows)
     end
@@ -272,7 +273,7 @@ function add_entry!(sp::SparsityPattern{T}, row::Int, col::Int) where T
             @assert ispow2(rptr.size)
             rptr = realloc(sp.heap, rptr, 2 * rptr.size)
         end
-        r = PtrVector{T}(rptr, rlen + 1)
+        r = PtrVector{T}(rptr, rlen + 1, sp.heap)
         @inbounds sp.rows[row] = r
         # Shift elements after the insertion point to the back
         @inbounds for i in rlen:-1:k
@@ -286,34 +287,34 @@ end
 
 # Auxiliary type that also wraps the heap to make sure the heap isn't freed
 # while the vector is in use
-struct RootedPtrVector{T} <: AbstractVector{T}
-    x::PtrVector{T}
-    heap::MemoryHeap{T}
-end
-Base.size(mv::RootedPtrVector) = size(mv.x)
-Base.IndexStyle(::Type{RootedPtrVector}) = IndexLinear()
-Base.@propagate_inbounds function Base.getindex(mv::RootedPtrVector, i::Int)
-    return getindex(mv.x, i)
-end
-
-struct EachRow{T}
-    sp::SparsityPattern{T}
-end
-function Base.iterate(rows::EachRow, row::Int = 1)
-    row > length(rows) && return nothing
-    return eachrow(rows.sp, row), row + 1
-end
-Base.eltype(::Type{EachRow{T}}) where {T} = RootedPtrVector{T}
-Base.length(rows::EachRow) = n_rows(rows.sp)
-Base.keys(rows::EachRow) = 1:n_rows(rows.sp)
-
-eachrow(sp::SparsityPattern) = EachRow(sp)
-function eachrow(sp::SparsityPattern, row::Int)
-    return RootedPtrVector(sp.rows[row], sp.heap)
-end
-# eachrow(sp::SparsityPattern) = sp.rows
-# function eachrow(sp::SparsityPattern, row::Int)
-#     return sp.rows[row]
+# struct RootedPtrVector{T} <: AbstractVector{T}
+#     x::PtrVector{T}
+#     heap::MemoryHeap{T}
 # end
+# Base.size(mv::RootedPtrVector) = size(mv.x)
+# Base.IndexStyle(::Type{RootedPtrVector}) = IndexLinear()
+# Base.@propagate_inbounds function Base.getindex(mv::RootedPtrVector, i::Int)
+#     return getindex(mv.x, i)
+# end
+
+# struct EachRow{T}
+#     sp::SparsityPattern{T}
+# end
+# function Base.iterate(rows::EachRow, row::Int = 1)
+#     row > length(rows) && return nothing
+#     return eachrow(rows.sp, row), row + 1
+# end
+# Base.eltype(::Type{EachRow{T}}) where {T} = RootedPtrVector{T}
+# Base.length(rows::EachRow) = n_rows(rows.sp)
+# Base.keys(rows::EachRow) = 1:n_rows(rows.sp)
+
+# eachrow(sp::SparsityPattern) = EachRow(sp)
+# function eachrow(sp::SparsityPattern, row::Int)
+#     return RootedPtrVector(sp.rows[row], sp.heap)
+# end
+eachrow(sp::SparsityPattern) = sp.rows
+function eachrow(sp::SparsityPattern, row::Int)
+    return sp.rows[row]
+end
 
 end # module Final
