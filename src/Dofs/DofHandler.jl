@@ -175,12 +175,14 @@ function ndofs_per_cell(dh::DofHandler)
     @assert length(dh.subdofhandlers) != 0
     return @inbounds ndofs_per_cell(dh.subdofhandlers[1])
 end
-function ndofs_per_cell(dh::DofHandler, cell::Int)
+@inline function ndofs_per_cell(dh::DofHandler, cell::Int)
     @boundscheck 1 <= cell <= getncells(get_grid(dh)) || throw(ArgumentError("cell = $cell ∉ 1:$(getncells(get_grid(dh)))"))
-    return @inbounds ndofs_per_cell(dh.subdofhandlers[dh.cell_to_subdofhandler[cell]])
+    sdh_idx = dh.cell_to_subdofhandler[cell]
+    @boundscheck 1 <= sdh_idx <= length(dh.subdofhandlers) || throw(ArgumentError("cell = $cell does no belong to any SubDofHandler"))
+    return @inbounds ndofs_per_cell(dh.subdofhandlers[sdh_idx])
 end
-ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell[]
-ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell[] # for compatibility with DofHandler
+@inline ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell[]
+@inline ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell[] # for compatibility with DofHandler
 
 """
     celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
