@@ -388,7 +388,7 @@ to a Node.
 "Returns the number of nodes in the grid."
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
 "Returns the number of nodes of the `i`-th cell."
-@inline function nnodes_per_cell(grid::AbstractGrid) 
+function nnodes_per_cell(grid::AbstractGrid) 
     if !isconcretetype(getcelltype(grid))
         error("There are different celltypes in the `grid`. Use `nnodes_per_cell(grid, cellid::Int)` instead")
     end

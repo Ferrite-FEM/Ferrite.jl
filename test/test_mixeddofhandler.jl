@@ -134,6 +134,7 @@ function test_2d_mixed_2_el()
     @test ndofs_per_cell(dh, 2) == 9
     @test ndofs_per_cell(dh.subdofhandlers[2]) == 9
     @test_throws ErrorException ndofs_per_cell(dh)
+    @test_throws ErrorException Ferrite.nnodes_per_cell(grid)
     @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     @test celldofs(dh, 2) == [5, 6, 3, 4, 13, 14, 11, 10, 15]
 end
