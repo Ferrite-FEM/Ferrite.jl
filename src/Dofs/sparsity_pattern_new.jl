@@ -386,6 +386,8 @@ function _create_sparsity_pattern!(
             for (i, row) in pairs(cc.dofs)
                 # a) check constraint for row
                 !keep_constrained && haskey(ch.dofmapping, row) && continue
+                # TODO: Extracting the row here and reinserting after the j-loop
+                #       should give some nice speedup
                 for (j, col) in pairs(cc.dofs)
                     # b) check coupling between (local) dofs i and j
                     coupling === nothing || coupling_sdh[i, j] || continue

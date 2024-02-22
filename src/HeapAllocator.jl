@@ -1,20 +1,5 @@
 module HeapAllocator
 
-# SizedPtr{UInt8}:
-#  - alloc(heap, n)
-#  - realloc(heap, ptr, n)
-#  - free(heap, ptr)
-#
-# SizedPtr{T}:
-#  - alloc(heap, T, n)
-#  - realloc(heap, ptr, n)
-#  - free(heap, ptr)
-#
-# HeapArray{T, N}:
-#  - alloc_array(heap, T, n...)
-#  - realloc(heap, x, n...)
-#  - free(heap, x)
-
 const MALLOC_PAGE_SIZE = 4 * 1024 * 1024 % UInt # 4 MiB
 
 # Like Ptr{T} but also stores the number of bytes allocated
@@ -22,20 +7,18 @@ struct SizedPtr{T}
     ptr::Ptr{T}
     size::UInt
 end
-Ptr{T}(ptr::SizedPtr) where {T} = Ptr{T}(ptr.ptr)
 
-# SizedPtr{T}(ptr::SizedPtr{T}) where {T} = ptr
 SizedPtr{T}(ptr::SizedPtr) where {T} = SizedPtr{T}(Ptr{T}(ptr.ptr), ptr.size)
-
+Ptr{T}(ptr::SizedPtr) where {T} = Ptr{T}(ptr.ptr)
 
 # A page corresponds to a larger Libc.malloc call (MALLOC_PAGE_SIZE). Each page
 # is split into smaller blocks to minimize the number of Libc.malloc/Libc.free
 # calls.
 mutable struct Page
     const ptr::SizedPtr{UInt8} # malloc'd pointer
-    const blocksize::UInt  # blocksize for this page
+    const blocksize::UInt      # blocksize for this page
     free::SizedPtr{UInt8}      # head of the free-list
-    n_free::UInt           # number of free blocks
+    n_free::UInt               # number of free blocks
 end
 
 function Page(ptr::SizedPtr{UInt8}, blocksize::UInt)
@@ -79,12 +62,12 @@ function _free(page::Page, ptr::SizedPtr{UInt8})
     # Store the just-freed pointer and increment the availability counter
     page.free = ptr
     page.n_free += 1
+    # TODO: If this page is completely unused it can be collected and reused.
     return
 end
 
 # Collection of pages for a specific size
 struct FixedSizeHeap
-    # nslots::Int
     blocksize::UInt
     pages::Vector{Page}
 end
@@ -92,7 +75,6 @@ end
 function _malloc(fheap::FixedSizeHeap, size::UInt)
     @assert fheap.blocksize == size
     # Try all existing pages
-    # TODO: backwards is probably better since it is more likely there is room in the back?
     for page in fheap.pages
         ptr = _malloc(page, size)
         ptr.ptr == C_NULL || return ptr
@@ -123,6 +105,23 @@ mutable struct Heap
         end
         return heap
     end
+end
+
+function Base.show(io::IO, ::MIME"text/plain", heap::Heap)
+    iob = IOBuffer()
+    println(iob, "HeapAllocator.Heap with blockheaps:")
+    for idx in 1:length(heap.size_heaps)
+        isassigned(heap.size_heaps, idx) || continue
+        h = heap.size_heaps[idx]
+        blocksize = h.blocksize
+        # @assert blocksize == 2^idx
+        npages = length(h.pages)
+        n_free = mapreduce(p -> p.n_free, +, h.pages; init=0)
+        n_tot = npages * MALLOC_PAGE_SIZE ÷ blocksize
+        println(iob, " - Blocksize: $(blocksize), npages: $(npages), usage: $(n_tot - n_free) / $(n_tot)")
+    end
+    write(io, seekstart(iob))
+    return
 end
 
 function heapindex_from_blocksize(blocksize::UInt)
@@ -217,7 +216,8 @@ Base.@propagate_inbounds function Base.getindex(mv::HeapArray, i::Int)
 end
 Base.@propagate_inbounds function Base.setindex!(mv::HeapArray{T}, v::T, i::Int) where T
     @boundscheck checkbounds(mv, i)
-    return unsafe_store!(mv.ptr.ptr, v, i)
+    unsafe_store!(mv.ptr.ptr, v, i)
+    return mv
 end
 
 function alloc_array(heap::Heap, ::Type{T}, size::NTuple{N, Int}) where {T, N}
@@ -242,12 +242,25 @@ end
 
 realloc(x::HeapVector, n::Int) = realloc(x.heap, x, n)
 
-function resize(x::HeapVector{T}, n::Int) where T
+@inline function resize(x::HeapVector{T}, n::Int) where T
     if n > allocated_length(x)
         return realloc(x, n)
     else
         return HeapVector{T}(x.ptr, (n, ), x.heap)
     end
+end
+
+@inline function insert(x::HeapVector{T}, k::Int, item::T) where T
+    lx = length(x)
+    # Make room
+    x = resize(x, lx + 1)
+    # Shift elements after the insertion point to the back
+    @inbounds for i in lx:-1:k
+        x[i + 1] = x[i]
+    end
+    # Insert the new element
+    @inbounds x[k] = item
+    return x
 end
 
 end # module HeapAllocator

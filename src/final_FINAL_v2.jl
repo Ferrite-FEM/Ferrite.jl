@@ -5,217 +5,25 @@ using ..Ferrite: add_entry!, n_rows, n_cols, AbstractSparsityPattern
 import ..Ferrite: add_entry!, n_rows, n_cols, eachrow
 
 include("HeapAllocator.jl")
-using .HeapAllocator: HeapAllocator, Heap, malloc, realloc, HeapVector, SizedPtr, allocated_length, MALLOC_PAGE_SIZE
-# const MALLOC_PAGE_SIZE = 4 * 1024 * 1024 % UInt # 4 MiB
-
-# # Like Ptr{T} but also stores the number of bytes allocated
-# struct SizedPtr{T}
-#     ptr::Ptr{T}
-#     size::UInt
-# end
-# Ptr{T}(ptr::SizedPtr) where {T} = Ptr{T}(ptr.ptr)
-
-# SizedPtr{T}(ptr::SizedPtr) where {T} = SizedPtr{T}(Ptr{T}(ptr.ptr), ptr.size)
-
-
-# # Fixed buffer size (1MiB)
-# # Rowsize  | size | # Rows |
-# #       4  | 1MiB |  32768 |
-# #       8  | 1MiB |  16384 |
-# #      16  | 1MiB |   8192 |
-# #      32  | 1MiB |   4096 |
-# #      64  | 1MiB |   2048 |
-# #     128  | 1MiB |   1024 |
-# #     256  | 1MiB |    512 |
-
-# # A page corresponds to a larger Libc.malloc call (MALLOC_PAGE_SIZE). Each page
-# # is split into smaller blocks to minimize the number of Libc.malloc/Libc.free
-# # calls.
-# mutable struct MemoryPage
-#     const ptr::SizedPtr{UInt8} # malloc'd pointer
-#     const blocksize::UInt  # blocksize for this page
-#     free::SizedPtr{UInt8}      # head of the free-list
-#     n_free::UInt           # number of free blocks
-# end
-
-# function MemoryPage(ptr::SizedPtr{UInt8}, blocksize::UInt)
-#     n_blocks, r = divrem(ptr.size, blocksize)
-#     @assert r == 0
-#     # The first free pointer is the first block
-#     free = SizedPtr(ptr.ptr, blocksize)
-#     # Set up the free list
-#     for i in 0:(n_blocks - 1)
-#         ptr_this = ptr.ptr + i * blocksize
-#         ptr_next = i == n_blocks - 1 ? Ptr{UInt8}() : ptr_this + blocksize
-#         unsafe_store!(Ptr{Ptr{UInt8}}(ptr_this), ptr_next)
-#     end
-#     return MemoryPage(ptr, blocksize, free, n_blocks)
-# end
-
-# function malloc(page::MemoryPage, size::UInt)
-#     if size != page.blocksize
-#         error("malloc: requested size does not match the blocksize")
-#     end
-#     # Return early with null if the page is full
-#     if page.n_free == 0
-#         @assert page.free.ptr == C_NULL
-#         return SizedPtr{UInt8}(Ptr{UInt8}(), size)
-#     end
-#     # Read the pointer to be returned
-#     ret = page.free
-#     @assert ret.ptr != C_NULL
-#     # Look up and store the next free pointer
-#     page.free = SizedPtr{UInt8}(unsafe_load(Ptr{Ptr{UInt8}}(ret)), size)
-#     page.n_free -= 1
-#     return ret
-# end
-
-# function free(page::MemoryPage, ptr::SizedPtr)
-#     if !(ptr.size == page.blocksize && page.ptr.ptr <= ptr.ptr < page.ptr.ptr + page.ptr.size)
-#         error("free: not allocated in this page")
-#     end
-#     # Write the current free pointer to the pointer to be freed
-#     unsafe_store!(Ptr{Ptr{UInt8}}(ptr), Ptr{UInt8}(page.free))
-#     # Store the just-freed pointer and increment the availability counter
-#     page.free = ptr
-#     page.n_free += 1
-#     return
-# end
-
-# # Collection of pages for a specific size
-# struct MemoryPool
-#     # nslots::Int
-#     blocksize::UInt
-#     pages::Vector{MemoryPage}
-# end
-
-# function malloc(mempool::MemoryPool, size::UInt)
-#     @assert mempool.blocksize == size
-#     # Try all existing pages
-#     # TODO: backwards is probably better since it is more likely there is room in the back?
-#     for page in mempool.pages
-#         ptr = malloc(page, size)
-#         ptr.ptr == C_NULL || return ptr
-#     end
-#     # Allocate a new page
-#     # TODO: Replace Libc.malloc with Memory in recent Julias?
-#     mptr = SizedPtr{UInt8}(Libc.malloc(MALLOC_PAGE_SIZE), MALLOC_PAGE_SIZE)
-#     page = MemoryPage(mptr, mempool.blocksize)
-#     push!(mempool.pages, page)
-#     # Allocate block in the new page
-#     ptr = malloc(page, size)
-#     @assert ptr.ptr != C_NULL
-#     return ptr
-# end
-
-# mutable struct MemoryHeap
-#     const pools::Vector{MemoryPool} # 2, 4, 6, 8, ...
-#     function MemoryHeap()
-#         heap = new(MemoryPool[])
-#         finalizer(heap) do h
-#             for i in 1:length(h.pools)
-#                 isassigned(h.pools, i) || continue
-#                 for page in h.pools[i].pages
-#                     Libc.free(page.ptr.ptr)
-#                 end
-#             end
-#             return
-#         end
-#         return heap
-#     end
-# end
-
-# function poolindex_from_blocksize(blocksize::UInt)
-#     return (8 * sizeof(UInt) - leading_zeros(blocksize)) % Int
-# end
-
-# function malloc(heap::MemoryHeap, size::Integer)
-#     blocksize = nextpow(2, size % UInt)
-#     poolidx = poolindex_from_blocksize(blocksize)
-#     if length(heap.pools) < poolidx
-#         resize!(heap.pools, poolidx)
-#     end
-#     if !isassigned(heap.pools, poolidx)
-#         pool = MemoryPool(blocksize, MemoryPage[])
-#         heap.pools[poolidx] = pool
-#     else
-#         pool = heap.pools[poolidx]
-#     end
-#     return malloc(pool, blocksize)
-# end
-
-# @inline function find_page(heap::MemoryHeap, ptr::SizedPtr)
-#     poolidx = poolindex_from_blocksize(ptr.size)
-#     if !isassigned(heap.pools, poolidx)
-#         error("pointer not malloc'd in this heap")
-#     end
-#     pool = heap.pools[poolidx]
-#     # Search for the page containing the pointer
-#     # TODO: Insert pages in sorted order and use searchsortedfirst?
-#     # TODO: Align the pages and store the base pointer -> page index mapping in a dict?
-#     pageidx = findfirst(p -> p.ptr.ptr <= ptr.ptr < (p.ptr.ptr + p.ptr.size), pool.pages)
-#     if pageidx === nothing
-#         error("pointer not malloc'd in this heap")
-#     end
-#     return pool.pages[pageidx]
-# end
-
-# function free(heap::MemoryHeap, ptr::SizedPtr{UInt8})
-#     error()
-#     free(find_page(heap, ptr), ptr)
-#     return
-# end
-
-# function realloc(heap::MemoryHeap, ptr::SizedPtr, newsize::UInt)
-#     @assert newsize > ptr.size # TODO: Allow shrinkage?
-#     # Find the page for the pointer to make sure it was allocated in this heap
-#     page = find_page(heap, ptr)
-#     # Allocate the new pointer
-#     newptr = malloc(heap, newsize)
-#     # Copy the data
-#     Libc.memcpy(newptr.ptr, ptr.ptr, ptr.size)
-#     # Free the old pointer and return
-#     free(page, ptr)
-#     return newptr
-# end
-
-# # Minimal AbstractVector implementation on top of a raw pointer + a length
-# struct PtrVector{T} <: AbstractVector{T}
-#     ptr::SizedPtr{T}
-#     length::Int
-#     heap::MemoryHeap
-# end
-# Base.size(mv::PtrVector) = (mv.length, )
-# allocated_length(mv::PtrVector{T}) where T = mv.ptr.size ÷ sizeof(T)
-# Base.IndexStyle(::Type{PtrVector}) = IndexLinear()
-# Base.@propagate_inbounds function Base.getindex(mv::PtrVector, i::Int)
-#     @boundscheck checkbounds(mv, i)
-#     return unsafe_load(mv.ptr.ptr, i)
-# end
-# Base.@propagate_inbounds function Base.setindex!(mv::PtrVector{T}, v::T, i::Int) where T
-#     @boundscheck checkbounds(mv, i)
-#     return unsafe_store!(mv.ptr.ptr, v, i)
-# end
+using .HeapAllocator: HeapAllocator
 
 struct SparsityPattern{T} <: AbstractSparsityPattern
     nrows::Int
     ncols::Int
-    heap::Heap
-    rows::Vector{HeapVector{T}}
-    function SparsityPattern(
-            nrows::Int, ncols::Int;
-            nnz_per_row::Int = 8,
-        )
-        T = Int
-        heap = Heap()
-        rows = Vector{HeapVector{T}}(undef, nrows)
+    heap::HeapAllocator.Heap
+    rows::Vector{HeapAllocator.HeapVector{T}}
+    function SparsityPattern{T}(nrows::Int, ncols::Int; nnz_per_row::Int = 8) where T <: Integer
+        heap = HeapAllocator.Heap()
+        rows = Vector{HeapAllocator.HeapVector{T}}(undef, nrows)
         for i in 1:nrows
-            # ptr = SizedPtr{T}(malloc(heap, nnz_per_row * sizeof(T)))
-            # rows[i] = HeapVector{T}(ptr, (0, ), heap)
             rows[i] = HeapAllocator.resize(HeapAllocator.alloc_array(heap, Int, nnz_per_row), 0)
         end
         return new{T}(nrows, ncols, heap, rows)
     end
+end
+
+function SparsityPattern(nrows::Int, ncols::Int; kwargs...)
+    return SparsityPattern{Int}(nrows, ncols; kwargs...)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", sp::SparsityPattern{T}) where T
@@ -230,7 +38,7 @@ function Base.show(io::IO, ::MIME"text/plain", sp::SparsityPattern{T}) where T
         stored_entries += l
         min_entries = min(min_entries, l)
         max_entries = max(max_entries, l)
-        allocated_entries += allocated_length(r)
+        allocated_entries += HeapAllocator.allocated_length(r)
     end
     ##
     bytes_estimate = 0
@@ -242,8 +50,8 @@ function Base.show(io::IO, ::MIME"text/plain", sp::SparsityPattern{T}) where T
     bytes_malloced = 0
     for heapidx in 1:length(sp.heap.size_heaps)
         isassigned(sp.heap.size_heaps, heapidx) || continue
-        bytes_malloced += length(sp.heap.size_heaps[heapidx].pages) * Int(MALLOC_PAGE_SIZE)
-        bytes_estimate += length(sp.heap.size_heaps[heapidx].pages) * Int(MALLOC_PAGE_SIZE)
+        bytes_malloced += length(sp.heap.size_heaps[heapidx].pages) * Int(HeapAllocator.MALLOC_PAGE_SIZE)
+        bytes_estimate += length(sp.heap.size_heaps[heapidx].pages) * Int(HeapAllocator.MALLOC_PAGE_SIZE)
     end
     sparsity = round(
         (n_rows(sp) * n_cols(sp) - stored_entries) / (n_rows(sp) * n_cols(sp)) * 100 * 100
@@ -265,63 +73,22 @@ end
 n_rows(sp::SparsityPattern) = sp.nrows
 n_cols(sp::SparsityPattern) = sp.ncols
 
-function add_entry!(sp::SparsityPattern{T}, row::Int, col::Int) where T
-    @boundscheck (1 <= row <= n_rows(sp) && 1 <= col <= n_cols(sp)) || throw(BoundsError())
-    # println("adding entry: $row, $col")
+@inline function add_entry!(sp::SparsityPattern, row::Int, col::Int)
+    @boundscheck 1 <= row <= n_rows(sp) && 1 <= col <= n_cols(sp)
     r = @inbounds sp.rows[row]
-    rptr = r.ptr
-    rlen = length(r)
-    # rx = r.x
-    k = searchsortedfirst(r, col)
-    if k == rlen + 1 || @inbounds(r[k]) != col
-        # TODO: This assumes we only grow by single entry every time
-        if false
-            if rlen == allocated_length(r) # % Int XXX
-                @assert ispow2(rptr.size)
-                rptr = realloc(sp.heap, rptr, 2 * rptr.size)
-            end
-            r = HeapVector{T}(rptr, (rlen + 1, ), sp.heap)
-        else
-            r = HeapAllocator.resize(r, rlen + 1)
-        end
-        @inbounds sp.rows[row] = r
-        # Shift elements after the insertion point to the back
-        @inbounds for i in rlen:-1:k
-            r[i+1] = r[i]
-        end
-        # Insert the new element
-        @inbounds r[k] = col
-    end
+    r = insert_sorted(r, col)
+    @inbounds sp.rows[row] = r
     return
 end
 
-# Auxiliary type that also wraps the heap to make sure the heap isn't freed
-# while the vector is in use
-# struct RootedPtrVector{T} <: AbstractVector{T}
-#     x::PtrVector{T}
-#     heap::MemoryHeap{T}
-# end
-# Base.size(mv::RootedPtrVector) = size(mv.x)
-# Base.IndexStyle(::Type{RootedPtrVector}) = IndexLinear()
-# Base.@propagate_inbounds function Base.getindex(mv::RootedPtrVector, i::Int)
-#     return getindex(mv.x, i)
-# end
+@inline function insert_sorted(x::HeapAllocator.HeapVector{Int}, item::Int)
+    k = searchsortedfirst(x, item)
+    if k == length(x) + 1 || @inbounds(x[k]) != item
+        x = HeapAllocator.insert(x, k, item)
+    end
+    return x
+end
 
-# struct EachRow{T}
-#     sp::SparsityPattern{T}
-# end
-# function Base.iterate(rows::EachRow, row::Int = 1)
-#     row > length(rows) && return nothing
-#     return eachrow(rows.sp, row), row + 1
-# end
-# Base.eltype(::Type{EachRow{T}}) where {T} = RootedPtrVector{T}
-# Base.length(rows::EachRow) = n_rows(rows.sp)
-# Base.keys(rows::EachRow) = 1:n_rows(rows.sp)
-
-# eachrow(sp::SparsityPattern) = EachRow(sp)
-# function eachrow(sp::SparsityPattern, row::Int)
-#     return RootedPtrVector(sp.rows[row], sp.heap)
-# end
 eachrow(sp::SparsityPattern) = sp.rows
 function eachrow(sp::SparsityPattern, row::Int)
     return sp.rows[row]
