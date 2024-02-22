@@ -420,7 +420,8 @@ function _condense_sparsity_pattern!(
 
     # New entries tracked separately and inserted after since it is not possible to modify
     # the datastructure while looping over it.
-    sp′ = Dict{Int, Vector{Int}}()
+    heap = Final.HeapAllocator.Heap()
+    sp′ = Dict{Int, Final.HeapAllocator.HeapVector{Int}}()
 
     for (row, colidxs) in pairs(eachrow(sp))
         row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
@@ -435,7 +436,15 @@ function _condense_sparsity_pattern!(
                 else
                     # ... this column _is_ constrained, distribute to columns.
                     for (col′, _) in col_coeffs
-                        insert_sorted!(get!(Vector{Int}, sp′, row), col′)
+                        # insert_sorted!(get!(Vector{Int}, sp′, row), col′)
+                        r = get(sp′, row) do
+                            Final.HeapAllocator.resize(
+                                Final.HeapAllocator.alloc_array(heap, Int, 8),
+                                0,
+                            )
+                        end
+                        r = Final.insert_sorted(r, col′)
+                        sp′[row] = r
                     end
                 end
             end
@@ -447,7 +456,15 @@ function _condense_sparsity_pattern!(
                     # ... this column is _not_ constrained, distribute to rows.
                     !keep_constrained && haskey(dofmapping, col) && continue
                     for (row′, _) in row_coeffs
-                        insert_sorted!(get!(Vector{Int}, sp′, row′), col)
+                        # insert_sorted!(get!(Vector{Int}, sp′, row′), col)
+                        r = get(sp′, row′) do
+                            Final.HeapAllocator.resize(
+                                Final.HeapAllocator.alloc_array(heap, Int, 8),
+                                0,
+                            )
+                        end
+                        r = Final.insert_sorted(r, col)
+                        sp′[row′] = r
                     end
                 else
                     # ... this column _is_ constrained, double-distribute to columns/rows.
@@ -455,7 +472,15 @@ function _condense_sparsity_pattern!(
                         !keep_constrained && haskey(dofmapping, row′) && continue
                         for (col′, _) in col_coeffs
                             !keep_constrained && haskey(dofmapping, col′) && continue
-                            insert_sorted!(get!(Vector{Int}, sp′, row′), col′)
+                            # insert_sorted!(get!(Vector{Int}, sp′, row′), col′)
+                            r = get(sp′, row′) do
+                                Final.HeapAllocator.resize(
+                                    Final.HeapAllocator.alloc_array(heap, Int, 8),
+                                    0,
+                                )
+                            end
+                            r = Final.insert_sorted(r, col′)
+                            sp′[row′] = r
                         end
                     end
                 end
@@ -469,6 +494,8 @@ function _condense_sparsity_pattern!(
             add_entry!(sp, row, col)
         end
     end
+
+    finalize(heap)
 
     return sp
 end
