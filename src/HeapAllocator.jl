@@ -17,6 +17,7 @@ Ptr{T}(ptr::SizedPtr) where {T} = Ptr{T}(ptr.ptr)
 mutable struct Page
     const ptr::SizedPtr{UInt8} # malloc'd pointer
     const blocksize::UInt      # blocksize for this page
+    const freelist::BitVector  # block is free/used
     free::SizedPtr{UInt8}      # head of the free-list
     n_free::UInt               # number of free blocks
 end
@@ -32,7 +33,7 @@ function Page(ptr::SizedPtr{UInt8}, blocksize::UInt)
         ptr_next = i == n_blocks - 1 ? Ptr{UInt8}() : ptr_this + blocksize
         unsafe_store!(Ptr{Ptr{UInt8}}(ptr_this), ptr_next)
     end
-    return Page(ptr, blocksize, free, n_blocks)
+    return Page(ptr, blocksize, trues(n_blocks), free, n_blocks)
 end
 
 function _malloc(page::Page, size::UInt)
@@ -47,6 +48,12 @@ function _malloc(page::Page, size::UInt)
     # Read the pointer to be returned
     ret = page.free
     @assert ret.ptr != C_NULL
+    # Make sure the pointer is not in use
+    blockindex = (ret.ptr - page.ptr.ptr) ÷ page.blocksize + 1
+    if !page.freelist[blockindex]
+        error("malloc: pointer already in use")
+    end
+    page.freelist[blockindex] = false
     # Look up and store the next free pointer
     page.free = SizedPtr{UInt8}(unsafe_load(Ptr{Ptr{UInt8}}(ret)), size)
     page.n_free -= 1
@@ -57,6 +64,11 @@ function _free(page::Page, ptr::SizedPtr{UInt8})
     if !(ptr.size == page.blocksize && page.ptr.ptr <= ptr.ptr < page.ptr.ptr + page.ptr.size)
         error("free: not allocated in this page")
     end
+    blockindex = (ptr.ptr - page.ptr.ptr) ÷ page.blocksize + 1
+    if page.freelist[blockindex]
+        error("free: double free")
+    end
+    page.freelist[blockindex] = true
     # Write the current free pointer to the pointer to be freed
     unsafe_store!(Ptr{Ptr{UInt8}}(ptr), Ptr{UInt8}(page.free))
     # Store the just-freed pointer and increment the availability counter
@@ -170,8 +182,7 @@ end
 end
 
 function free(heap::Heap, ptr::SizedPtr{UInt8})
-    error("TODO")
-    free(find_page(heap, ptr), ptr)
+    _free(find_page(heap, ptr), ptr)
     return
 end
 
