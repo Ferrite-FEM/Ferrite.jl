@@ -129,6 +129,7 @@ function heapindex_from_blocksize(blocksize::UInt)
 end
 
 function malloc(heap::Heap, size::UInt)
+    size = max(size, sizeof(Ptr{UInt8}))
     blocksize = nextpow(2, size)
     fheapidx = heapindex_from_blocksize(blocksize)
     if length(heap.size_heaps) < fheapidx
