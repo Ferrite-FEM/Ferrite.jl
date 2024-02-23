@@ -50,10 +50,10 @@ function _malloc(page::Page, size::UInt)
     @assert ret.ptr != C_NULL
     # Make sure the pointer is not in use
     blockindex = (ret.ptr - page.ptr.ptr) ÷ page.blocksize + 1
-    if !page.freelist[blockindex]
+    if !@inbounds(page.freelist[blockindex])
         error("malloc: pointer already in use")
     end
-    page.freelist[blockindex] = false
+    @inbounds page.freelist[blockindex] = false
     # Look up and store the next free pointer
     page.free = SizedPtr{UInt8}(unsafe_load(Ptr{Ptr{UInt8}}(ret)), size)
     page.n_free -= 1
@@ -65,10 +65,10 @@ function _free(page::Page, ptr::SizedPtr{UInt8})
         error("free: not allocated in this page")
     end
     blockindex = (ptr.ptr - page.ptr.ptr) ÷ page.blocksize + 1
-    if page.freelist[blockindex]
+    if @inbounds page.freelist[blockindex]
         error("free: double free")
     end
-    page.freelist[blockindex] = true
+    @inbounds page.freelist[blockindex] = true
     # Write the current free pointer to the pointer to be freed
     unsafe_store!(Ptr{Ptr{UInt8}}(ptr), Ptr{UInt8}(page.free))
     # Store the just-freed pointer and increment the availability counter
