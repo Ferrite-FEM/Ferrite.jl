@@ -133,10 +133,10 @@ end
 """
     CellMultiValues([::Type{T},] quad_rule::QuadratureRule, func_interpols::NamedTuple, [geom_interpol::Interpolation])
 
-A `mcv::CellMultiValues` object generalizes the `CellValues` object to multiple fields. 
+A `cmv::CellMultiValues` object generalizes the `CellValues` object to multiple fields. 
 In general, functions applicable to a `CellValues` associated with the function interpolation with `key` 
-can be called on `mcv[key]::FunctionValues`. 
-Other functions relating to geometric properties and quadrature rules are called directly on `mcv`. 
+can be called on `cmv[key]::FunctionValues`. 
+Other functions relating to geometric properties and quadrature rules are called directly on `cmv`. 
 
 **Arguments:**
 * `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
@@ -158,17 +158,17 @@ ip_geo = Lagrange{RefQuadrilateral,1}() # Optional
 ipu = Lagrange{RefQuadrilateral,2}()^2
 ipp = Lagrange{RefQuadrilateral,1}()
 ipT = Lagrange{RefQuadrilaterla,1}()
-mcv = CellMultiValues(qr, (u = ipu, p = ipp, T = ipT), ip_geo)
+cmv = CellMultiValues(qr, (u = ipu, p = ipp, T = ipT), ip_geo)
 ```
-After reinitialization, the `mcv` can be used as, e.g. 
+After reinitialization, the `cmv` can be used as, e.g. 
 ```
-dΩ = getdetJdV(mcv, q_point)
-Nu = shape_value(mcv[:u], q_point, base_function_nr)
-∇Np = shape_gradient(mcv[:p], q_point, base_function_nr)
+dΩ = getdetJdV(cmv, q_point)
+Nu = shape_value(cmv[:u], q_point, base_function_nr)
+∇Np = shape_gradient(cmv[:p], q_point, base_function_nr)
 ```
 
 **Common methods for `CellMultiValues`**
-I.e. applicable to `mcv`
+I.e. applicable to `cmv`
 
   * [`reinit!`](@ref)
   * [`getnquadpoints`](@ref)
@@ -176,8 +176,9 @@ I.e. applicable to `mcv`
   * [`spatial_coordinate`](@ref)
 
 **Common methods for `FunctionValues`**
-I.e. applicable to `mcv[key]`
+I.e. applicable to `cmv[key]`
 
+  * [`getnbasefunctions`](@ref)
   * [`shape_value`](@ref)
   * [`shape_gradient`](@ref)
   * [`shape_symmetric_gradient`](@ref)
