@@ -131,9 +131,9 @@ function Base.show(io::IO, d::MIME"text/plain", cv::CellValues)
 end
 
 """
-    MultiCellValues([::Type{T},] quad_rule::QuadratureRule, func_interpols::NamedTuple, [geom_interpol::Interpolation])
+    CellMultiValues([::Type{T},] quad_rule::QuadratureRule, func_interpols::NamedTuple, [geom_interpol::Interpolation])
 
-A `mcv::MultiCellValues` object generalizes the `CellValues` object to multiple fields. In general, functions applicable to 
+A `mcv::CellMultiValues` object generalizes the `CellValues` object to multiple fields. In general, functions applicable to 
 a `CellValues` associated with the function interpolation with `key` can be called on `mcv[key]`, while other functions 
 relating to geometric properties and quadrature rules are called directly on `mcv`. 
 
@@ -145,9 +145,9 @@ relating to geometric properties and quadrature rules are called directly on `mc
   By default linear Lagrange interpolation is used. For embedded elements the geometric interpolations should
   be vectorized to the spatial dimension.
 """
-MultiCellValues
+CellMultiValues
 
-struct MultiCellValues{FVS, GM, QR, detT, FVT} <: AbstractCellValues
+struct CellMultiValues{FVS, GM, QR, detT, FVT} <: AbstractCellValues
     fun_values::FVS         # FunctionValues collected in a named tuple (not necessarily unique)
     fun_values_tuple::FVT   # FunctionValues collected in a tuple (each unique)
     geo_mapping::GM         # GeometryMapping
@@ -155,7 +155,7 @@ struct MultiCellValues{FVS, GM, QR, detT, FVT} <: AbstractCellValues
     detJdV::detT            # AbstractVector{<:Number} or Nothing
 end
 
-function MultiCellValues(::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation;
+function CellMultiValues(::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation;
     update_gradients::Bool = true, update_detJdV::Bool = true) where T 
 
     FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
@@ -165,46 +165,46 @@ function MultiCellValues(::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_
     fun_values_tuple = tuple((FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for ip_fun in unique_ips)...)
     fun_values = NamedTuple((key => fun_values_tuple[findfirst(unique_ip -> ip == unique_ip, unique_ips)] for (key, ip) in pairs(ip_funs)))
     detJdV = update_detJdV ? fill(T(NaN), length(getweights(qr))) : nothing
-    return MultiCellValues(fun_values, fun_values_tuple, geo_mapping, qr, detJdV)
+    return CellMultiValues(fun_values, fun_values_tuple, geo_mapping, qr, detJdV)
 end
 
-MultiCellValues(qr::QuadratureRule, ip_funs::NamedTuple, args...; kwargs...) = MultiCellValues(Float64, qr, ip_funs, args...; kwargs...)
-function MultiCellValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::ScalarInterpolation=default_geometric_interpolation(first(ip_funs)); kwargs...) where T
-    return MultiCellValues(T, qr, ip_funs, VectorizedInterpolation(ip_geo); kwargs...)
+CellMultiValues(qr::QuadratureRule, ip_funs::NamedTuple, args...; kwargs...) = CellMultiValues(Float64, qr, ip_funs, args...; kwargs...)
+function CellMultiValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::ScalarInterpolation=default_geometric_interpolation(first(ip_funs)); kwargs...) where T
+    return CellMultiValues(T, qr, ip_funs, VectorizedInterpolation(ip_geo); kwargs...)
 end
 
-function Base.copy(cv::MultiCellValues)
+function Base.copy(cv::CellMultiValues)
     fun_values_tuple = map(copy, cv.fun_values_tuple)
     fun_values = NamedTuple((key => fun_values_tuple[findfirst(fv === named_fv for fv in cv.fun_values_tuple)] for (key, named_fv) in pairs(cv.fun_values)))
-    return MultiCellValues(fun_values, fun_values_tuple, copy(cv.geo_mapping), copy(cv.qr), _copy_or_nothing(cv.detJdV))
+    return CellMultiValues(fun_values, fun_values_tuple, copy(cv.geo_mapping), copy(cv.qr), _copy_or_nothing(cv.detJdV))
 end
 
 # Access geometry values
-@propagate_inbounds getngeobasefunctions(cv::MultiCellValues) = getngeobasefunctions(cv.geo_mapping)
-@propagate_inbounds geometric_value(cv::MultiCellValues, args...) = geometric_value(cv.geo_mapping, args...)
-geometric_interpolation(cv::MultiCellValues) = geometric_interpolation(cv.geo_mapping)
+@propagate_inbounds getngeobasefunctions(cv::CellMultiValues) = getngeobasefunctions(cv.geo_mapping)
+@propagate_inbounds geometric_value(cv::CellMultiValues, args...) = geometric_value(cv.geo_mapping, args...)
+geometric_interpolation(cv::CellMultiValues) = geometric_interpolation(cv.geo_mapping)
 
-function getdetJdV(cv::MultiCellValues, q_point::Int)
+function getdetJdV(cv::CellMultiValues, q_point::Int)
     cv.detJdV === nothing && throw(ArgumentError("detJdV calculation was not requested at construction"))
     return cv.detJdV[q_point]
 end
 
 # No accessors for function values, just ability to get the stored `FunctionValues` which can be called directly. 
-@inline Base.getindex(cv::MultiCellValues, key::Symbol) = cv.fun_values[key]
+@inline Base.getindex(cv::CellMultiValues, key::Symbol) = cv.fun_values[key]
 
 # Access quadrature rule values 
-getnquadpoints(cv::MultiCellValues) = getnquadpoints(cv.qr)
+getnquadpoints(cv::CellMultiValues) = getnquadpoints(cv.qr)
 
-@inline function reinit!(cv::MultiCellValues, x::AbstractVector)
+@inline function reinit!(cv::CellMultiValues, x::AbstractVector)
     return reinit!(cv, nothing, x)
 end
 
-function reinit!(cv::MultiCellValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{<:Vec})
+function reinit!(cv::CellMultiValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{<:Vec})
     geo_mapping = cv.geo_mapping
     fun_values = cv.fun_values_tuple
     n_geom_basefuncs = getngeobasefunctions(geo_mapping)
     
-    map(fv -> check_reinit_sdim_consistency(:MultiCellValues, shape_gradient_type(fv), eltype(x)), fun_values)
+    map(fv -> check_reinit_sdim_consistency(:CellMultiValues, shape_gradient_type(fv), eltype(x)), fun_values)
     if cell === nothing && !all(map(fv -> isa(mapping_type(fv), IdentityMapping), fun_values))
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
