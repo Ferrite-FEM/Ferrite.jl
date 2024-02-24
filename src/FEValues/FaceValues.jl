@@ -41,21 +41,23 @@ struct FaceValues{FV, GM, FQR, detT, nT, V_FV<:AbstractVector{FV}, V_GM<:Abstrac
 end
 
 function FaceValues(::Type{T}, fqr::FaceQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim} = default_geometric_interpolation(ip_fun); 
-        update_gradients::Bool = true) where {T,sdim} 
+        update_gradients::Union{Bool,Nothing} = nothing) where {T,sdim} 
     
-    FunDiffOrder = convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
+    FunDiffOrder = update_gradients === nothing ? 1 : convert(Int, update_gradients) # Logic must change when supporting update_hessian kwargs
     GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), 1)
-    geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]
-    fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]
+    # Not sure why the type-asserts are required here but not for CellValues, 
+    # but they solve the type-instability for FaceValues
+    geo_mapping = [GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr) for qr in fqr.face_rules]::Vector{<:GeometryMapping{GeoDiffOrder}}
+    fun_values = [FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for qr in fqr.face_rules]::Vector{<:FunctionValues{FunDiffOrder}}
     max_nquadpoints = maximum(qr->length(getweights(qr)), fqr.face_rules)
     detJdV  = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
     return FaceValues(fun_values, geo_mapping, fqr, detJdV, normals, ScalarWrapper(1))
 end
 
-FaceValues(qr::FaceQuadratureRule, ip::Interpolation, args...) = FaceValues(Float64, qr, ip, args...)
-function FaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation) where T
-    return FaceValues(T, qr, ip, VectorizedInterpolation(ip_geo))
+FaceValues(qr::FaceQuadratureRule, ip::Interpolation, args...; kwargs...) = FaceValues(Float64, qr, ip, args...; kwargs...)
+function FaceValues(::Type{T}, qr::FaceQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where T
+    return FaceValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
 end
 
 function Base.copy(fv::FaceValues)
@@ -80,9 +82,9 @@ get_geo_mapping(fv::FaceValues) = @inbounds fv.geo_mapping[getcurrentface(fv)]
 
 get_fun_values(fv::FaceValues) = @inbounds fv.fun_values[getcurrentface(fv)]
 
-@propagate_inbounds shape_value(fv::FaceValues, i::Int, q_point::Int) = shape_value(get_fun_values(fv), i, q_point)
-@propagate_inbounds shape_gradient(fv::FaceValues, i::Int, q_point::Int) = shape_gradient(get_fun_values(fv), i, q_point)
-@propagate_inbounds shape_symmetric_gradient(fv::FaceValues, i::Int, q_point::Int) = shape_symmetric_gradient(get_fun_values(fv), i, q_point)
+@propagate_inbounds shape_value(fv::FaceValues, q_point::Int, i::Int) = shape_value(get_fun_values(fv), q_point, i)
+@propagate_inbounds shape_gradient(fv::FaceValues, q_point::Int, i::Int) = shape_gradient(get_fun_values(fv), q_point, i)
+@propagate_inbounds shape_symmetric_gradient(fv::FaceValues, q_point::Int, i::Int) = shape_symmetric_gradient(get_fun_values(fv), q_point, i)
 
 """
     getcurrentface(fv::FaceValues)
