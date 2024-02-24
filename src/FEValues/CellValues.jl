@@ -272,11 +272,11 @@ end
 end
 
 # Slightly faster for unknown reason to write out each call, only worth it for a few unique function values. 
-@inline function _apply_mappings!(fun_values::NTuple{1, <:FunctionValues}, q_point, mapping, cell)
+@inline function _apply_mappings!(fun_values::Tuple{<:FunctionValues}, q_point, mapping, cell)
     @inbounds apply_mapping!(fun_values[1], q_point, mapping, cell)
 end
 
-@inline function _apply_mappings!(fun_values::NTuple{2, <:FunctionValues}, q_point, mapping, cell)
+@inline function _apply_mappings!(fun_values::Tuple{<:FunctionValues, <:FunctionValues}, q_point, mapping, cell)
     @inbounds begin
         apply_mapping!(fun_values[1], q_point, mapping, cell)
         apply_mapping!(fun_values[2], q_point, mapping, cell)
