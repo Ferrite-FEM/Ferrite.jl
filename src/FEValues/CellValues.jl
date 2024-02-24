@@ -133,9 +133,10 @@ end
 """
     CellMultiValues([::Type{T},] quad_rule::QuadratureRule, func_interpols::NamedTuple, [geom_interpol::Interpolation])
 
-A `mcv::CellMultiValues` object generalizes the `CellValues` object to multiple fields. In general, functions applicable to 
-a `CellValues` associated with the function interpolation with `key` can be called on `mcv[key]`, while other functions 
-relating to geometric properties and quadrature rules are called directly on `mcv`. 
+A `mcv::CellMultiValues` object generalizes the `CellValues` object to multiple fields. 
+In general, functions applicable to a `CellValues` associated with the function interpolation with `key` 
+can be called on `mcv[key]::FunctionValues`. 
+Other functions relating to geometric properties and quadrature rules are called directly on `mcv`. 
 
 **Arguments:**
 * `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
@@ -144,6 +145,48 @@ relating to geometric properties and quadrature rules are called directly on `mc
 * `geom_interpol`: an optional instance of a [`Interpolation`](@ref) which is used to interpolate the geometry.
   By default linear Lagrange interpolation is used. For embedded elements the geometric interpolations should
   be vectorized to the spatial dimension.
+
+In general, no performance penalty for using two equal function interpolations compared to a 
+single function interpolation should be expected as their `FunctionValues` are aliased.
+
+**Examples**
+Constructing a `CellMultiValues` for three fields, 2nd order interpolation for displacements, `u`,
+and 1st order interpolations for the pressure, `p`, and temperature, `T`.
+```
+qr = QuadratureRule{RefQuadrilateral}(2)
+ip_geo = Lagrange{RefQuadrilateral,1}() # Optional
+ipu = Lagrange{RefQuadrilateral,2}()^2
+ipp = Lagrange{RefQuadrilateral,1}()
+ipT = Lagrange{RefQuadrilaterla,1}()
+mcv = CellMultiValues(qr, (u = ipu, p = ipp, T = ipT), ip_geo)
+```
+After reinitialization, the `mcv` can be used as, e.g. 
+```
+dΩ = getdetJdV(mcv, q_point)
+Nu = shape_value(mcv[:u], q_point, base_function_nr)
+∇Np = shape_gradient(mcv[:p], q_point, base_function_nr)
+```
+
+**Common methods for `CellMultiValues`**
+I.e. applicable to `mcv`
+
+  * [`reinit!`](@ref)
+  * [`getnquadpoints`](@ref)
+  * [`getdetJdV`](@ref)
+  * [`spatial_coordinate`](@ref)
+
+**Common methods for `FunctionValues`**
+I.e. applicable to `mcv[key]`
+
+  * [`shape_value`](@ref)
+  * [`shape_gradient`](@ref)
+  * [`shape_symmetric_gradient`](@ref)
+  * [`shape_divergence`](@ref)
+  
+  * [`function_value`](@ref)
+  * [`function_gradient`](@ref)
+  * [`function_symmetric_gradient`](@ref)
+  * [`function_divergence`](@ref)
 """
 CellMultiValues
 
