@@ -126,6 +126,8 @@ end
     cvu = CellValues(qr, ipu)
     cvp = CellValues(qr, ipp)
     cmv = CellMultiValues(qr, (u = ipu, p = ipp, T = ipT))
+    cmv_u = CellMultiValues(qr, (u = ipu,)) # Case with a single interpolation 
+    cmv3 = CellMultiValues(qr, (u = ipu, T = Lagrange{RefQuadrilateral,2}(), p = ipp)) # Case with 3 unique IPs
     
     @test cmv[:p] === cmv[:T] # Correct aliasing for identical interpolations
     # Correctly inferred geometric interpolation:
@@ -142,19 +144,29 @@ end
     # Reinitialization
     ref_coords = Ferrite.reference_coordinates(Ferrite.geometric_interpolation(cmv))
     x = map(xref -> xref + rand(typeof(xref))/5, ref_coords) # Random pertubation 
-    reinit!.((cvu, cvp, cmv), (x,))
+    reinit!.((cvu, cvp, cmv, cmv_u, cmv3), (x,))
 
     @test_call reinit!(cmv, x) # JET testing (e.g. type stability)
+    @test_call reinit!(cmv_u, x) # JET testing (e.g. type stability)
+    @test_call reinit!(cmv3, x) # JET testing (e.g. type stability)
     
     # Test output values when used in an element routine
     ue = rand(getnbasefunctions(cmv[:u]) + getnbasefunctions(cmv[:p]))
     dru = 1:getnbasefunctions(cmv[:u])
     drp = (1:getnbasefunctions(cmv[:p])) .+ getnbasefunctions(cmv[:u])
     for q_point in 1:getnquadpoints(cmv)
-        @test getdetJdV(cvu, q_point) ≈ getdetJdV(cmv, q_point)
-        @test spatial_coordinate(cvu, q_point, x) ≈ spatial_coordinate(cmv, q_point, x)
+        for cmv_test in (cmv, cmv_u, cmv3)    
+            @test getdetJdV(cvu, q_point) ≈ getdetJdV(cmv, q_point)
+            @test spatial_coordinate(cvu, q_point, x) ≈ spatial_coordinate(cmv, q_point, x)
+        end
 
-        for (cv, fv, dr) in ((cvu, cmv[:u], dru), (cvp, cmv[:p], drp))
+        for (cv, fv, dr) in (
+                (cvu, cmv[:u], dru), 
+                (cvu, cmv_u[:u], dru),
+                (cvu, cmv3[:u], dru),
+                (cvp, cmv[:p], drp),
+                (cvp, cmv3[:p], drp),
+                )
             value = function_value(cv, q_point, ue, dr)
             gradient = function_gradient(cv, q_point, ue, dr)
             @test function_value(fv, q_point, ue[dr]) ≈ value
