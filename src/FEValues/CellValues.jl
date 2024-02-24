@@ -220,10 +220,10 @@ function CellMultiValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::ScalarInter
     return CellMultiValues(T, qr, ip_funs, VectorizedInterpolation(ip_geo); kwargs...)
 end
 
-function Base.copy(cv::CellMultiValues)
+function Base.copy(cv::CMV) where {CMV <: CellMultiValues}
     fun_values_tuple = map(copy, cv.fun_values_tuple)
-    fun_values = NamedTuple((key => fun_values_tuple[findfirst(fv === named_fv for fv in cv.fun_values_tuple)] for (key, named_fv) in pairs(cv.fun_values)))
-    return CellMultiValues(fun_values, fun_values_tuple, copy(cv.geo_mapping), copy(cv.qr), _copy_or_nothing(cv.detJdV))
+    fun_values = NamedTuple((key => fun_values_tuple[findfirst(fv -> fv === named_fv, cv.fun_values_tuple)] for (key, named_fv) in pairs(cv.fun_values)))
+    return CMV(fun_values, fun_values_tuple, copy(cv.geo_mapping), copy(cv.qr), _copy_or_nothing(cv.detJdV))
 end
 
 # Access geometry values
