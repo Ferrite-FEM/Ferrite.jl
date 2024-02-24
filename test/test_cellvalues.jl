@@ -1,3 +1,14 @@
+# Test that all values in the struct are equal,
+# but that bits-types are not aliased to eachother.
+function test_equal_but_unaliased(a::T, b::T) where T
+    for fname in fieldnames(T)
+        a_val = getfield(a, fname)
+        b_val = getfield(b, fname)
+        isbits(a_val) || @test a_val !== b_val
+        @test a_val == b_val
+    end
+end
+    
 @testset "CellValues" begin
 @testset "ip=$scalar_interpol quad_rule=$(typeof(quad_rule))" for (scalar_interpol, quad_rule) in  (
                                     (Lagrange{RefLine, 1}(), QuadratureRule{RefLine}(2)),
@@ -93,25 +104,13 @@
             cvc = copy(cv)
             @test typeof(cv) == typeof(cvc)
 
-            # Test that all mutable types in FunctionValues and GeometryMapping have been copied
-            for key in (:fun_values, :geo_mapping)
-                val = getfield(cv, key)
-                valc = getfield(cvc, key)
-                for fname in fieldnames(typeof(val))
-                    v = getfield(val, fname)
-                    vc = getfield(valc, fname)
-                    isbits(v) || @test v !== vc
-                    @test v == vc
-                end
-            end
-            # Test that qr and detJdV is copied as expected. 
-            # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
-            for fname in (:qr, :detJdV)
-                v = getfield(cv, fname)
-                vc = getfield(cvc, fname)
-                fname === :qr || @test v !== vc
-                @test v == vc
-            end
+            test_equal_but_unaliased(cv.fun_values, cvc.fun_values)
+            test_equal_but_unaliased(cv.geo_mapping, cvc.geo_mapping)
+            # qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
+            @test cvc.qr === cv.qr
+            # While detJdV is copied
+            @test cvc.detJdV !== cv.detJdV
+            @test cvc.detJdV == cv.detJdV
         end
     end
 end
@@ -188,6 +187,26 @@ end
                 end
             end
         end
+    end
+    @testset "copy(::CellMultiValues)" begin
+        cmv_copy = copy(cmv)
+        @test typeof(cmv_copy) == typeof(cmv)
+
+        # Test that all mutable types in FunctionValues and GeometryMapping have been copied
+        for (fv, fvc) in zip(cmv.fun_values_tuple, cmv_copy.fun_values_tuple)
+            test_equal_but_unaliased(fv, fvc)
+        end
+        test_equal_but_unaliased(cmv.geo_mapping, cmv_copy.geo_mapping)
+
+        # Test that aliasing is preserved between equal interpolations 
+        @test cmv_copy[:p] === cmv_copy[:T]
+
+        # qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
+        @test cmv_copy.qr === cmv.qr
+        # While detJdV is copied
+        @test cmv_copy.detJdV !== cmv.detJdV
+        @test cmv_copy.detJdV == cmv.detJdV
+        
     end
 end
 
