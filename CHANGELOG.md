@@ -262,6 +262,10 @@ more discussion).
 
 - VTK export now work with `QuadraticHexahedron` elements. ([#714][github-714])
 
+- The function `bounding_box(::AbstractGrid)` has been added. It computes the bounding box for 
+  a given grid (based on its node coordinates), and returns the minimum and maximum vertices 
+  of the bounding box. ([#880][github-880])
+
 ### Changed
 
 - `create_sparsity_pattern` now supports cross-element dof coupling by passing kwarg
@@ -891,3 +895,5 @@ poking into Ferrite internals:
 [github-779]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/779
 [github-835]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/835
 [github-855]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/855
+[github-880]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/880
+
