@@ -1,4 +1,5 @@
-struct QuadratureValuesIterator{VT<:AbstractValues}
+# QuadratureValuesIterator
+struct QuadratureValuesIterator{VT}
     v::VT
 end
 
@@ -10,8 +11,62 @@ end
 Base.IteratorEltype(::Type{<:QuadratureValuesIterator}) = Base.EltypeUnknown()
 Base.length(iterator::QuadratureValuesIterator) = getnquadpoints(iterator.v)
 
+# AbstractQuadratureValues
+abstract type AbstractQuadratureValues end
 
-struct QuadratureValues{VT<:AbstractValues}
+function function_value(qp_v::AbstractQuadratureValues, u::AbstractVector, dof_range = eachindex(u))
+    n_base_funcs = getnbasefunctions(qp_v)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
+    val = function_value_init(qp_v, u)
+    @inbounds for (i, j) in pairs(dof_range)
+        val += shape_value(qp_v, i) * u[j]
+    end
+    return val
+end
+
+function function_gradient(qp_v::AbstractQuadratureValues, u::AbstractVector, dof_range = eachindex(u))
+    n_base_funcs = getnbasefunctions(qp_v)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
+    grad = function_gradient_init(qp_v, u)
+    @inbounds for (i, j) in pairs(dof_range)
+        grad += shape_gradient(qp_v, i) * u[j]
+    end
+    return grad
+end
+
+function function_symmetric_gradient(qp_v::AbstractQuadratureValues, u::AbstractVector, dof_range)
+    grad = function_gradient(qp_v, u, dof_range)
+    return symmetric(grad)
+end
+
+function function_symmetric_gradient(qp_v::AbstractQuadratureValues, u::AbstractVector)
+    grad = function_gradient(qp_v, u)
+    return symmetric(grad)
+end
+
+function function_divergence(qp_v::AbstractQuadratureValues, u::AbstractVector, dof_range = eachindex(u))
+    return divergence_from_gradient(function_gradient(qp_v, u, dof_range))
+end
+
+function function_curl(qp_v::AbstractQuadratureValues, u::AbstractVector, dof_range = eachindex(u))
+    return curl_from_gradient(function_gradient(qp_v, u, dof_range))
+end
+
+function spatial_coordinate(qp_v::AbstractQuadratureValues, x::AbstractVector{<:Vec})
+    n_base_funcs = getngeobasefunctions(qp_v)
+    length(x) == n_base_funcs || throw_incompatible_coord_length(length(x), n_base_funcs)
+    vec = zero(eltype(x))
+    @inbounds for i in 1:n_base_funcs
+        vec += geometric_value(qp_v, i) * x[i]
+    end
+    return vec
+end
+
+# Specific design for QuadratureValues <: AbstractQuadratureValues
+# which contains standard AbstractValues
+struct QuadratureValues{VT<:AbstractValues} <: AbstractQuadratureValues
     v::VT
     q_point::Int
     Base.@propagate_inbounds function QuadratureValues(v::AbstractValues, q_point::Int)
@@ -39,16 +94,6 @@ shape_gradient_type(qv::QuadratureValues) = shape_gradient_type(qv.v)
 @propagate_inbounds shape_gradient(qv::QuadratureValues, i::Int) = shape_gradient(qv.v, qv.q_point, i)
 @propagate_inbounds shape_symmetric_gradient(qv::QuadratureValues, i::Int) = shape_symmetric_gradient(qv.v, qv.q_point, i)
 
-# function_<something> overloads without q_point input
-@inline function_value(qv::QuadratureValues, args...) = function_value(qv.v, qv.q_point, args...)
-@inline function_gradient(qv::QuadratureValues, args...) = function_gradient(qv.v, qv.q_point, args...)
-@inline function_symmetric_gradient(qv::QuadratureValues, args...) = function_symmetric_gradient(qv.v, qv.q_point, args...)
-@inline function_divergence(qv::QuadratureValues, args...) = function_divergence(qv.v, qv.q_point, args...)
-@inline function_curl(qv::QuadratureValues, args...) = function_curl(qv.v, qv.q_point, args...)
-
-# TODO: Interface things not included yet
-
-@inline spatial_coordinate(qv::QuadratureValues, x) = spatial_coordinate(qv.v, qv.q_point, x)
 
 
 #= Proposed syntax, for heatflow in general 
