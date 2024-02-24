@@ -135,13 +135,13 @@ end
 
 A `cmv::CellMultiValues` object generalizes the `CellValues` object to multiple fields. 
 In general, functions applicable to a `CellValues` associated with the function interpolation with `key` 
-can be called on `cmv[key]::FunctionValues`. 
+can be called on `cmv[key]`, as `cmv[key] isa FunctionValues`. 
 Other functions relating to geometric properties and quadrature rules are called directly on `cmv`. 
 
 **Arguments:**
 * `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
 * `quad_rule`: an instance of a [`QuadratureRule`](@ref)
-* `func_interpols`: A named tuple with entires of type ``Interpolation``, used to interpolate the approximated function identified by the key in `func_interpols`
+* `func_interpols`: A named tuple with entires of type `Interpolation`, used to interpolate the approximated function identified by the key in `func_interpols`
 * `geom_interpol`: an optional instance of a [`Interpolation`](@ref) which is used to interpolate the geometry.
   By default linear Lagrange interpolation is used. For embedded elements the geometric interpolations should
   be vectorized to the spatial dimension.
@@ -150,6 +150,7 @@ In general, no performance penalty for using two equal function interpolations c
 single function interpolation should be expected as their `FunctionValues` are aliased.
 
 **Examples**
+
 Constructing a `CellMultiValues` for three fields, 2nd order interpolation for displacements, `u`,
 and 1st order interpolations for the pressure, `p`, and temperature, `T`.
 ```
@@ -168,7 +169,8 @@ Nu = shape_value(cmv[:u], q_point, base_function_nr)
 ```
 
 **Common methods for `CellMultiValues`**
-I.e. applicable to `cmv`
+
+Applicable to `cmv` above
 
   * [`reinit!`](@ref)
   * [`getnquadpoints`](@ref)
@@ -176,7 +178,8 @@ I.e. applicable to `cmv`
   * [`spatial_coordinate`](@ref)
 
 **Common methods for `FunctionValues`**
-I.e. applicable to `cmv[key]`
+
+E.g. applicable to `cmv[:u]` above
 
   * [`getnbasefunctions`](@ref)
   * [`shape_value`](@ref)
