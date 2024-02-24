@@ -116,6 +116,69 @@
     end
 end
 
+@testset "CellMultiValues" begin
+    # Here we test that CellMultiValues give the same output as CellValues, 
+    # as that output is thoroughly tested above
+    ipu = Lagrange{RefQuadrilateral,2}()^2
+    ipp = Lagrange{RefQuadrilateral,1}()
+    ipT = ipp
+    qr = QuadratureRule{RefQuadrilateral}(2)
+    cvu = CellValues(qr, ipu)
+    cvp = CellValues(qr, ipp)
+    cmv = CellMultiValues(qr, (u = ipu, p = ipp, T = ipT))
+    
+    @test cmv[:p] === cmv[:T] # Correct aliasing for identical interpolations
+    # Correctly inferred geometric interpolation:
+    @test Ferrite.geometric_interpolation(cmv) == Ferrite.geometric_interpolation(cvu)
+    # Expected function interpolation
+    @test Ferrite.function_interpolation(cmv[:u]) == ipu
+    @test Ferrite.function_interpolation(cmv[:p]) == ipp
+
+    # Correct number outputs 
+    @test getnquadpoints(cmv) == getnquadpoints(cvu)
+    @test getnbasefunctions(cmv[:u]) == getnbasefunctions(cvu)
+    @test getnbasefunctions(cmv[:p]) == getnbasefunctions(cvp)
+
+    # Reinitialization
+    ref_coords = Ferrite.reference_coordinates(Ferrite.geometric_interpolation(cmv))
+    x = map(xref -> xref + rand(typeof(xref))/5, ref_coords) # Random pertubation 
+    reinit!.((cvu, cvp, cmv), (x,))
+
+    @test_call reinit!(cmv, x) # JET testing (e.g. type stability)
+    
+    # Test output values when used in an element routine
+    ue = rand(getnbasefunctions(cmv[:u]) + getnbasefunctions(cmv[:p]))
+    dru = 1:getnbasefunctions(cmv[:u])
+    drp = (1:getnbasefunctions(cmv[:p])) .+ getnbasefunctions(cmv[:u])
+    for q_point in 1:getnquadpoints(cmv)
+        @test getdetJdV(cvu, q_point) ≈ getdetJdV(cmv, q_point)
+        @test spatial_coordinate(cvu, q_point, x) ≈ spatial_coordinate(cmv, q_point, x)
+
+        for (cv, fv, dr) in ((cvu, cmv[:u], dru), (cvp, cmv[:p], drp))
+            value = function_value(cv, q_point, ue, dr)
+            gradient = function_gradient(cv, q_point, ue, dr)
+            @test function_value(fv, q_point, ue[dr]) ≈ value
+            @test function_value(fv, q_point, ue, dr) ≈ value
+            @test function_gradient(fv, q_point, ue[dr]) ≈ gradient
+            @test function_gradient(fv, q_point, ue, dr) ≈ gradient
+            if value isa Vec 
+                @test function_symmetric_gradient(cmv[:u], q_point, ue, dr) ≈ symmetric(gradient)
+                @test function_divergence(cmv[:u], q_point, ue, dr) ≈ tr(gradient)
+            end
+            for i in 1:getnbasefunctions(fv)
+                Ni = shape_value(cv, q_point, i)
+                ∇Ni = shape_gradient(cv, q_point, i)
+                @test shape_value(fv, q_point, i) ≈ Ni
+                @test shape_gradient(fv, q_point, i) ≈ ∇Ni
+                if Ni isa Vec
+                    @test shape_symmetric_gradient(fv, q_point, i) ≈ symmetric(∇Ni)
+                    @test shape_divergence(fv, q_point, i) ≈ tr(∇Ni)
+                end
+            end
+        end
+    end
+end
+
 @testset "#265: error message for incompatible geometric interpolation" begin
     dim = 1
     deg = 1
@@ -144,6 +207,7 @@ end
     csv = CellValues(qr, ip)
     cvv = CellValues(qr, VectorizedInterpolation(ip))
     csv_embedded = CellValues(qr, ip, ip^3)
+    cmv = CellMultiValues(qr, (s = ip, v = VectorizedInterpolation(ip)))
     fsv = FaceValues(qr_f, ip)
     fvv = FaceValues(qr_f, VectorizedInterpolation(ip))
     fsv_embedded = FaceValues(qr_f, ip, ip^3)
@@ -151,6 +215,7 @@ end
     x, n = valid_coordinates_and_normals(ip)
     reinit!(csv, x)
     reinit!(cvv, x)
+    reinit!(cmv, x)
     reinit!(fsv, x, 1)
     reinit!(fvv, x, 1)
     
@@ -158,11 +223,13 @@ end
     xx = [x; x]
     @test_throws ArgumentError reinit!(csv, xx)
     @test_throws ArgumentError reinit!(cvv, xx)
+    @test_throws ArgumentError reinit!(cmv, xx)
     @test_throws ArgumentError reinit!(fsv, xx, 1)
     @test_throws ArgumentError reinit!(fvv, xx, 1)
 
     @test_throws ArgumentError spatial_coordinate(csv, qp, xx)
     @test_throws ArgumentError spatial_coordinate(cvv, qp, xx)
+    @test_throws ArgumentError spatial_coordinate(cmv, qp, xx)
     @test_throws ArgumentError spatial_coordinate(fsv, qp, xx)
     @test_throws ArgumentError spatial_coordinate(fvv, qp, xx)
 
@@ -171,20 +238,26 @@ end
     @test_throws ArgumentError reinit!(fsv_embedded, x, 1)
 
     # Wrong number of (local) dofs
-    # Scalar values, scalar dofs
+    # Scalar values
     ue = rand(getnbasefunctions(csv) + 1)
-    @test_throws ArgumentError function_value(csv, qp, ue)
-    @test_throws ArgumentError function_gradient(csv, qp, ue)
+    ue_vec = [rand(Vec{dim}) for _ in 1:(getnbasefunctions(csv) + 1)]
+    for test_values in (csv, cmv[:s])
+        # Scalar dofs
+        @test_throws ArgumentError function_value(test_values, qp, ue)
+        @test_throws ArgumentError function_gradient(test_values, qp, ue)
+        # Vector dofs
+        @test_throws ArgumentError function_value(test_values, qp, ue)
+        @test_throws ArgumentError function_gradient(test_values, qp, ue)
+        @test_throws ArgumentError function_divergence(test_values, qp, ue)
+    end
+
     # Vector values, scalar dofs
     ue = rand(getnbasefunctions(cvv) + 1)
-    @test_throws ArgumentError function_value(cvv, qp, ue)
-    @test_throws ArgumentError function_gradient(cvv, qp, ue)
-    @test_throws ArgumentError function_divergence(cvv, qp, ue)
-    # Scalar values, vector dofs
-    ue = [rand(Vec{dim}) for _ in 1:(getnbasefunctions(csv) + 1)]
-    @test_throws ArgumentError function_value(csv, qp, ue)
-    @test_throws ArgumentError function_gradient(csv, qp, ue)
-    @test_throws ArgumentError function_divergence(csv, qp, ue)
+    for test_values in (cvv, cmv[:v])
+        @test_throws ArgumentError function_value(test_values, qp, ue)
+        @test_throws ArgumentError function_gradient(test_values, qp, ue)
+        @test_throws ArgumentError function_divergence(test_values, qp, ue)
+    end
 end
 
 @testset "Embedded elements" begin
