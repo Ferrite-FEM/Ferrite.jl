@@ -133,9 +133,11 @@ end
 """
     CellMultiValues([::Type{T},] quad_rule::QuadratureRule, func_interpols::NamedTuple, [geom_interpol::Interpolation])
 
-A `cmv::CellMultiValues` object generalizes the `CellValues` object to multiple fields. 
-In general, functions applicable to a `CellValues` associated with the function interpolation with `key::Symbol` 
-can be called on `cmv[key]`, as `cmv[key] isa FunctionValues`. 
+A `cmv::CellMultiValues` is similar to a `CellValues` object, but includes values associated with multiple 
+interpolations while sharing the same quadrature points and geometrical interpolation.
+
+In general, functions applicable to a `CellValues` associated with the function interpolation 
+in `func_interpols` with `key::Symbol` can be called on `cmv[key]`, as `cmv[key] isa FunctionValues`. 
 Other functions relating to geometric properties and quadrature rules are called directly on `cmv`. 
 
 **Arguments:**
