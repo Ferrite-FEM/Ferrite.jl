@@ -495,7 +495,8 @@ function _condense_sparsity_pattern!(
         end
     end
 
-    finalize(heap)
+    # Release the memory in the temporary heap
+    Final.HeapAllocator.free(heap)
 
     return sp
 end

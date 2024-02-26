@@ -106,17 +106,20 @@ mutable struct Heap
     const size_heaps::Vector{FixedSizeHeap} # 2, 4, 6, 8, ...
     function Heap()
         heap = new(FixedSizeHeap[])
-        finalizer(heap) do h
-            for i in 1:length(h.size_heaps)
-                isassigned(h.size_heaps, i) || continue
-                for page in h.size_heaps[i].pages
-                    Libc.free(page.ptr.ptr)
-                end
-            end
-            return
-        end
+        finalizer(free, heap)
         return heap
     end
+end
+
+function free(heap::Heap)
+    for i in 1:length(heap.size_heaps)
+        isassigned(heap.size_heaps, i) || continue
+        for page in heap.size_heaps[i].pages
+            Libc.free(page.ptr.ptr)
+        end
+    end
+    resize!(heap.size_heaps, 0)
+    return
 end
 
 function Base.show(io::IO, ::MIME"text/plain", heap::Heap)
