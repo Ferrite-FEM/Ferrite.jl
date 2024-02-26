@@ -189,8 +189,8 @@ end
         end
     end
     @testset "copy(::CellMultiValues)" begin
-        cmv_copy = copy(cmv)
-        @test typeof(cmv_copy) == typeof(cmv)
+        cmv_copy = @inferred copy(cmv)
+        @test cmv_copy isa typeof(cmv)
 
         # Test that all mutable types in FunctionValues and GeometryMapping have been copied
         for (fv, fvc) in zip(cmv.fun_values_tuple, cmv_copy.fun_values_tuple)
