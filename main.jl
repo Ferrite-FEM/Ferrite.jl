@@ -73,7 +73,7 @@ function hhhh(dh)
 end
 
 function hhhhh(dh)
-    dsp = Ferrite.Final.MallocDSP(ndofs(dh), ndofs(dh))
+    dsp = Ferrite.Final.SparsityPattern(ndofs(dh), ndofs(dh))
     create_sparsity_pattern!(dsp, dh)
     return dsp
 end
