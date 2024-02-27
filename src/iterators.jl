@@ -51,17 +51,17 @@ struct CellCache{X,G<:AbstractGrid,DH<:Union{AbstractDofHandler,Nothing}}
 end
 
 function CellCache(grid::Grid{dim,C,T}, flags::UpdateFlags=UpdateFlags()) where {dim,C,T}
-    N = nnodes_per_cell(grid)
+    N = nnodes_per_cell(grid, 1) # nodes and coords will be resized in `reinit!`
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim,T}, N)
     return CellCache(flags, grid, ScalarWrapper(-1), nodes, coords, nothing, Int[])
 end
 
 function CellCache(dh::DofHandler{dim}, flags::UpdateFlags=UpdateFlags()) where {dim}
-    N = nnodes_per_cell(get_grid(dh))
+    n = ndofs_per_cell(dh.subdofhandlers[1]) # dofs and coords will be resized in `reinit!`
+    N = nnodes_per_cell(get_grid(dh), 1)
     nodes = zeros(Int, N)
     coords = zeros(Vec{dim, get_coordinate_eltype(get_grid(dh))}, N)
-    n = ndofs_per_cell(dh)
     celldofs = zeros(Int, n)
     return CellCache(flags, get_grid(dh), ScalarWrapper(-1), nodes, coords, dh, celldofs)
 end

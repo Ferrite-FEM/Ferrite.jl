@@ -168,9 +168,15 @@ Return the number of degrees of freedom for the cell with index `cell`.
 
 See also [`ndofs`](@ref).
 """
-function ndofs_per_cell(dh::DofHandler, cell::Int=1)
-    @boundscheck 1 <= cell <= getncells(get_grid(dh))
-    return @inbounds ndofs_per_cell(dh.subdofhandlers[dh.cell_to_subdofhandler[cell]])
+function ndofs_per_cell(dh::DofHandler)
+    if length(dh.subdofhandlers) > 1
+        error("There are more than one subdofhandler. Use `ndofs_per_cell(dh, cellid::Int)` instead.")
+    end
+    @assert length(dh.subdofhandlers) != 0
+    return @inbounds ndofs_per_cell(dh.subdofhandlers[1])
+end
+function ndofs_per_cell(dh::DofHandler, cell::Int)
+    return ndofs_per_cell(dh.subdofhandlers[dh.cell_to_subdofhandler[cell]])
 end
 ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell[]
 ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell[] # for compatibility with DofHandler
