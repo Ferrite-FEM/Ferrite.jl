@@ -67,7 +67,7 @@ function GPUGrid(::Type{T}, grid::Grid) where T
     )
 end
 
-struct GPUDofHandler{GRID <: GPUGrid, CADOFS <: AbstractArray{Int,1}, CAOFFSETS <: AbstractArray{Int,1}}
+struct GPUDofHandler{GRID <: GPUGrid, CADOFS <: AbstractArray{Int,1}, CAOFFSETS <: AbstractArray{Int,1}} <: Ferrite.AbstractDofHandler
     cell_dofs::CADOFS
     cell_dofs_offset::CAOFFSETS
     grid::GRID
@@ -92,6 +92,11 @@ function Ferrite.celldofs(dh::GPUDofHandler, cell_index::Int)
     return @view dh.cell_dofs[cell_dof_range]
 end
 Adapt.@adapt_structure GPUDofHandler
+
+function Ferrite.celldofs(dh::DofHandler, cell_index::Int) 
+    cell_dof_range = dh.cell_dofs_offset[cell_index]:(dh.cell_dofs_offset[cell_index+1]-1)
+    return @view dh.cell_dofs[cell_dof_range]
+end
 
 function shape_values(ip::Lagrange{RefQuadrilateral, 1}, ξ::Vec{2})
     ξ_x = ξ[1]
@@ -302,7 +307,7 @@ function gpu_full_mass_action!(uout::AbstractVector, u::AbstractVector, dh::GPUD
     synchronize()
 
     # Apply action one time
-    numthreads = 128
+    numthreads = 8
     for color ∈ colors
         numblocks = ceil(Int, length(color)/numthreads)
         # try
@@ -341,24 +346,22 @@ Base.size(A::FerriteMFMassOperator, d) = ndofs(dh) # Square operator
 
 struct FerriteEAMassOperator{D2E, XE2, EAMATS <: AbstractArray{<:Any,3}}
     d2e::D2E
+    e2d::D2E
+    xe::XE2
     xe2::XE2
     element_matrices::EAMATS
 end
 
 function gemv_batched!(xe2::CuDeviceArray{T,2}, emats::CuDeviceArray{T,3}, xe::CuDeviceArray{T,2}) where T
-    # base_cell_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
-    # stride = blockDim().x
-    # for cell_index ∈ base_cell_index:min(base_cell_index+stride,size(emats,3))
-
     cell_index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
     while cell_index ≤ size(emats,3)
         xei = @view xe[:,cell_index]
         xe2i = @view xe2[:,cell_index]
         emati = @view emats[:,:,cell_index]
-        # mul!(xe2i, emati, xei) # fails?
         xe2i .= T(0.0)
-        for j ∈ 1:size(emats,2), i ∈ 1:size(emats,1)
+        # mul!(xe2i, emati, xei) # fails?
+        for j ∈ 1:size(emati,2), i ∈ 1:size(emati,1)
             xe2i[i] += emati[i,j]*xei[j]
         end
         cell_index += stride
@@ -366,17 +369,17 @@ function gemv_batched!(xe2::CuDeviceArray{T,2}, emats::CuDeviceArray{T,3}, xe::C
 end
 
 function LinearAlgebra.mul!(y,A::FerriteEAMassOperator{<:Any,<:Any,<:CuArray},x)
-    xe = A.d2e*x
+    mul!(A.xe, A.d2e, x)
     synchronize()
-    xev = reshape(xe, (size(A.element_matrices,2), size(A.element_matrices,3)))
+    xev = reshape(A.xe, (size(A.element_matrices,2), size(A.element_matrices,3)))
     xe2v = reshape(A.xe2, (size(A.element_matrices,2), size(A.element_matrices,3)))
-    synchronize()
+    # synchronize()
     # CUDA.CUBLAS.gemv_batched!(???)
-    numthreads = 128
+    numthreads = 8
     numblocks = ceil(Int, size(A.element_matrices,3)/numthreads)
     @cuda threads=numthreads blocks=numblocks gemv_batched!(xe2v, A.element_matrices, xev)
     synchronize()
-    mul!(y, transpose(A.d2e), A.xe2)
+    mul!(y, A.e2d, A.xe2)
     synchronize()
 end
 Base.eltype(A::FerriteEAMassOperator{<:Grid{<:Any,<:Any,T}}) where T = T
@@ -392,47 +395,66 @@ struct FerriteRHS{DH, COLS, IP, GIP, QR}
     qr::QR
 end
 
+function rhs_kernel_inner!(rhs::AbstractVector{T}, dh::Union{DofHandler{<:Any,<:Grid{sdim,<:Any,T}}, GPUDofHandler{<:GPUGrid{sdim,<:Any,T}}}, qr::SmallQuadratureRule{<:Any,T}, ip::Ferrite.Interpolation, ip_geo::Ferrite.Interpolation, cell_index::Int) where {sdim,T}
+    ## Grab the actual cell
+    cell = dh.grid.cells[cell_index]
+    # ## Grab the dofs on the cell
+    cell_dofs = celldofs(dh, cell_index)
+    ## Grab the buffers for the y and x
+    rhsₑ = @view rhs[cell_dofs]
+    ## Grab coordinate array
+    coords = cellnodesvec(cell, dh.grid.nodes)
+    ## Apply local action for y = Ax
+    for q_point in 1:length(qr.weights) #getnquadpoints(cellvalues)
+        ξ = qr.points[q_point]
+        # TODO recover abstraction layer
+        J = getJ(ip_geo, coords, ξ)
+        dΩ = det(J)*qr.weights[q_point] #getdetJdV(cellvalues, q_point)
+
+        # # TODO spatial_coordinate
+        x = zero(Vec{sdim,T})
+        ϕᵍ = shape_values(ip_geo, ξ)
+        for i in 1:getnbasefunctions(ip_geo)
+            x += ϕᵍ[i]*coords[i] #geometric_value(fe_v, q_point, i) * x[i]
+        end
+
+        ϕᶠ = shape_values(ip, ξ)
+        @inbounds for i in 1:getnbasefunctions(ip)
+            rhsₑ[i] += cos(x[1]/π)*cos(x[2]/π)*ϕᶠ[i]*dΩ
+        end
+    end
+end
+
 function gpu_rhs_kernel!(rhs::CuDeviceVector{T}, gpudh::GPUDofHandler{<:GPUGrid{sdim,<:Any,T}}, qr::SmallQuadratureRule{<:Any,T}, ip::Ferrite.Interpolation, ip_geo::Ferrite.Interpolation, cell_indices::AbstractVector) where {sdim,T}
     index = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
     while index <= length(cell_indices)
         ## Get index of the current cell
         cell_index = cell_indices[index]
-        ## Grab the actual cell
-        cell = gpudh.grid.cells[cell_index]
-        # ## Grab the dofs on the cell
-        cell_dofs = celldofs(gpudh, cell_index)
-        ## Grab the buffers for the y and x
-        rhsₑ = @view rhs[cell_dofs]
-        ## Grab coordinate array
-        coords = cellnodesvec(cell, gpudh.grid.nodes)
-        ## Apply local action for y = Ax
-        for q_point in 1:length(qr.weights) #getnquadpoints(cellvalues)
-            ξ = qr.points[q_point]
-            # TODO recover abstraction layer
-            J = getJ(ip_geo, coords, ξ)
-            dΩ = det(J)*qr.weights[q_point] #getdetJdV(cellvalues, q_point)
-
-            # # TODO spatial_coordinate
-            x = zero(Vec{sdim,T})
-            ϕᵍ = shape_values(ip_geo, ξ)
-            for i in 1:getnbasefunctions(ip_geo)
-                x += ϕᵍ[i]*coords[i] #geometric_value(fe_v, q_point, i) * x[i]
-            end
-
-            ϕᶠ = shape_values(ip, ξ)
-            @inbounds for i in 1:getnbasefunctions(ip)
-                rhsₑ[i] += cos(x[1]/π)*cos(x[2]/π)*ϕᶠ[i]*dΩ
-            end
-        end
+        ## Launch assembly kernel
+        rhs_kernel_inner!(rhs, gpudh, qr, ip, ip_geo, cell_index)
+        ## Shift index up
         index += stride
     end
 end
 
+function generate_rhs(cpurhs::FerriteRHS{<:DofHandler{<:Any, <:Grid{<:Any,<:Any,T}}}) where T
+    rhs = zeros(T,ndofs(dh))
+    for color ∈ cpurhs.colors
+        # try
+        for cell_index ∈ color
+            # rhs_kernel_inner!(rhs, cpurhs.dh, cpurhs.qr, cpurhs.ip, cpurhs.ip_geo, cell_index)
+            # return @benchmark rhs_kernel_inner!($rhs, $(cpurhs.dh), $(cpurhs.qr), $cpurhs.ip, $cpurhs.ip_geo, $cell_index)
+        end
+        # catch err
+        #     code_typed(err; interactive = true)
+        # end
+    end
+    return rhs
+end
 
-function generate_rhs(gpurhs::FerriteRHS{<:GPUDofHandler{<:GPUGrid{<:Any,<:Any,T}}}) where T
+function generate_rhs(gpurhs::FerriteRHS{<:GPUDofHandler{<:GPUGrid{<:Any,<:Any,T}}}, numthreads) where T
     rhs = CuArray(zeros(T,ndofs(dh)))
-    numthreads = 128
     for color ∈ gpurhs.colors
         numblocks = ceil(Int, length(color)/numthreads)
         # try
@@ -464,24 +486,27 @@ function generate_rhs(gpurhs::FerriteRHS{<:GPUDofHandler{<:GPUGrid{<:Any,<:Any,T
     return rhs
 end
 
+cpurhsop = FerriteRHS(dh, colors, ip, ip, SmallQuadratureRule(qr))
+bcpu = generate_rhs(cpurhsop)
+@benchmark generate_rhs($cpurhsop)
+
 cudh = GPUDofHandler(dh)
 cucolors = CuArray.(colors)
 Agpu = FerriteMFMassOperator(cudh, cucolors, ip, ip, SmallQuadratureRule(qr))
-rhsop = FerriteRHS(cudh, cucolors, ip, ip, SmallQuadratureRule(qr))
-bgpu = generate_rhs(rhsop)
+gpurhsop = FerriteRHS(cudh, cucolors, ip, ip, SmallQuadratureRule(qr))
+bgpu = generate_rhs(gpurhsop, 16)
+@benchmark generate_rhs($gpurhsop, 16)
 ugpu = CUDA.fill(0.f0, ndofs(dh));
 # cg!(ugpu, Agpu, bgpu; verbose=true);
-# @benchmark CUDA.@sync mul!($u,$Agpu,$bgpu)
 
-Aeagpu = FerriteEAMassOperator(CUDA.CUSPARSE.CuSparseMatrixCSC(d2e), CuArray(zeros(Float32, size(d2e,1))), CuArray(Keacpu))
+Aeagpu = FerriteEAMassOperator(CUDA.CUSPARSE.CuSparseMatrixCSR(d2e), CUDA.CUSPARSE.CuSparseMatrixCSR(transpose(d2e)), CuArray(zeros(Float32, size(d2e,1))), CuArray(zeros(Float32, size(d2e,1))), CuArray(Keacpu))
 # @benchmark CUDA.@sync mul!($ugpu,$Aeagpu,$bgpu)
 
-ucpu = copy(Array(ugpu))
-bcpu = copy(Array(bgpu))
-# @benchmark mul!($u,$Kcpu,$(Array(bgpu)))
+ucpu = fill(0.f0, ndofs(dh));
+# @benchmark mul!($ucpu,$Kcpu,$(Array(bcpu)))
 
-Kgpu = CUDA.CUSPARSE.CuSparseMatrixCSC(Kcpu)
-# @benchmark mul!($ugpu,$Kcpu,$bgpu)
+Kgpu = CUDA.CUSPARSE.CuSparseMatrixCSR(Kcpu)
+# @benchmark CUDA.@sync mul!($ugpu,$Kgpu,$bgpu)
 
 # ### Exporting to VTK
 # To visualize the result we export the grid and our field `u`
