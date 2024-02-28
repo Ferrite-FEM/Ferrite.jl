@@ -135,7 +135,7 @@ function reinit!(
     # TODO: This is the bottleneck, cache it?
     @assert length(quad_points_a) <= length(quad_points_b)
     
-    # Re-evalutate shape functions in the transformed quadrature points
+    # Re-evaluate shape functions in the transformed quadrature points
     precompute_values!(get_fun_values(iv.there),  quad_points_b)
     precompute_values!(get_geo_mapping(iv.there), quad_points_b)
     

@@ -130,13 +130,13 @@
         dim = getcelltypedim(cell_shape)
         grid = generate_grid(cell_shape, ntuple(i -> 2, dim))
         ip = scalar_interpol isa DiscontinuousLagrange ? Lagrange{Ferrite.getrefshape(scalar_interpol), Ferrite.getorder(scalar_interpol)}() : scalar_interpol
-        @testset "faces nodes indicies" begin
+        @testset "faces nodes indices" begin
             cell = getcells(grid, 1)
             geom_ip_faces_indices = Ferrite.facedof_indices(ip)
             Ferrite.getdim(ip) > 1 && (geom_ip_faces_indices = Tuple([face[collect(face .∉ Ref(interior))] for (face, interior) in [(geom_ip_faces_indices[i], Ferrite.facedof_interior_indices(ip)[i]) for i in 1:nfaces(ip)]]))
-            faces_indicies = Ferrite.reference_faces(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
+            faces_indices = Ferrite.reference_faces(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
-            @test getindex.(Ref(node_ids), collect.(faces_indicies)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
+            @test getindex.(Ref(node_ids), collect.(faces_indices)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
         end
         @testset "error paths" begin
             cell = getcells(grid, 1)
@@ -161,14 +161,14 @@
         quad_rule = Ferrite.create_face_quad_rule(RefTetrahedron, weights, points)
         dim = getcelltypedim(cell_shape)
         grid = generate_grid(cell_shape, ntuple(i -> 2, dim))
-        @testset "faces nodes indicies" begin
+        @testset "faces nodes indices" begin
             ip = scalar_interpol isa DiscontinuousLagrange ? Lagrange{Ferrite.getrefshape(scalar_interpol), Ferrite.getorder(scalar_interpol)}() : scalar_interpol
             cell = getcells(grid, 1)
             geom_ip_faces_indices = Ferrite.facedof_indices(ip)
             Ferrite.getdim(ip) > 1 && (geom_ip_faces_indices = Tuple([face[collect(face .∉ Ref(interior))] for (face, interior) in [(geom_ip_faces_indices[i], Ferrite.facedof_interior_indices(ip)[i]) for i in 1:nfaces(ip)]]))
-            faces_indicies = Ferrite.reference_faces(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
+            faces_indices = Ferrite.reference_faces(Ferrite.getrefshape(Ferrite.default_interpolation(typeof(cell))))
             node_ids = Ferrite.get_node_ids(cell)
-            @test getindex.(Ref(node_ids), collect.(faces_indicies)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
+            @test getindex.(Ref(node_ids), collect.(faces_indices)) == Ferrite.faces(cell) == getindex.(Ref(node_ids), collect.(geom_ip_faces_indices))
         end
         @testset "error paths" begin
             cell = getcells(grid, 1)
