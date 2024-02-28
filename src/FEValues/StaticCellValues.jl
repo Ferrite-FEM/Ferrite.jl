@@ -77,14 +77,14 @@ end
 struct StaticCellValues{FV, GM, Tx, Nqp, T}
     fv::FV # StaticInterpolationValues
     gm::GM # StaticInterpolationValues
-    x::Vector{Tx}
+    x::Tx  # AbstractVector{<:Vec} or Nothing
     weights::NTuple{Nqp, T}
 end
-function StaticCellValues(cv::CellValues)
+function StaticCellValues(cv::CellValues, ::Val{SaveCoords}=Val(true)) where SaveCoords
     fv = StaticInterpolationValues(cv.fun_values)
     gm = StaticInterpolationValues(cv.geo_mapping)
     sdim = sdim_from_gradtype(shape_gradient_type(cv))
-    x = fill(zero(Vec{sdim}), getngeobasefunctions(cv))
+    x = SaveCoords ? fill(zero(Vec{sdim}), getngeobasefunctions(cv)) : nothing
     weights = ntuple(i -> getweights(cv.qr)[i], getnquadpoints(cv))
     return StaticCellValues(fv, gm, x, weights)
 end
@@ -93,15 +93,25 @@ getnquadpoints(cv::StaticCellValues) = length(cv.weights)
 getnbasefunctions(cv::StaticCellValues) = getnbasefunctions(cv.fv)
 getngeobasefunctions(cv::StaticCellValues) = getnbasefunctions(cv.gm)
 
-function reinit!(cv::StaticCellValues, cell_coords::AbstractVector)
+@inline function reinit!(cv::StaticCellValues{<:Any, <:Any, <:AbstractVector}, cell_coords::AbstractVector)
     copyto!(cv.x, cell_coords)
     #TODO: Also allow the cell::AbstracCell to be given and updated
 end
+@inline function reinit!(::StaticCellValues{<:Any, <:Any, Nothing}, ::AbstractVector)
+    nothing # Nothing to do on reinit if x is not saved.
+end
 
-function quadrature_point_values(fe_v::StaticCellValues, q_point::Int)
+@inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any, <:AbstractVector}, q_point::Int)
+    return _quadrature_point_values(fe_v, q_point, fe_v.x)
+end
+@inline function quadrature_point_values(fe_v::StaticCellValues{<:Any, <:Any, Nothing}, q_point::Int, cell_coords::AbstractVector)
+    return _quadrature_point_values(fe_v, q_point, cell_coords)
+end
+
+function _quadrature_point_values(fe_v::StaticCellValues, q_point::Int, cell_coords::AbstractVector)
     #q_point bounds checked, ok to use @inbounds
     @inbounds begin
-        mapping = calculate_mapping(fe_v.gm, q_point, fe_v.x)
+        mapping = calculate_mapping(fe_v.gm, q_point, cell_coords)
 
         detJ = calculate_detJ(getjacobian(mapping))
         detJ > 0.0 || throw_detJ_not_pos(detJ)

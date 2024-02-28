@@ -48,19 +48,47 @@ function assemble_element_qpiter!(Ke::Matrix, fe::Vector, cellvalues)
     return Ke, fe
 end
 
+function assemble_element_qpiter!(Ke::Matrix, fe::Vector, cellvalues, cell_coords::AbstractVector)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    ## Loop over quadrature points
+    for qv in Ferrite.QuadratureValuesIterator(cellvalues, cell_coords)
+        ## Get the quadrature weight
+        dΩ = getdetJdV(qv)
+        ## Loop over test shape functions
+        for i in 1:n_basefuncs
+            δu  = shape_value(qv, i)
+            ∇δu = shape_gradient(qv, i)
+            ## Add contribution to fe
+            fe[i] += δu * dΩ
+            ## Loop over trial shape functions
+            for j in 1:n_basefuncs
+                ∇u = shape_gradient(qv, j)
+                ## Add contribution to Ke
+                Ke[i, j] += (∇δu ⋅ ∇u) * dΩ
+            end
+        end
+    end
+    return Ke, fe
+end
+
 function assemble_global(cellvalues, dh; kwargs...)
     assemble_global!(create_buffers(cellvalues, dh), cellvalues, dh; kwargs...)
 end
 
-function assemble_global!(buffer, cellvalues, dh::DofHandler; qp_iter::Val{QPiter}) where QPiter
+function assemble_global!(buffer, cellvalues, dh::DofHandler; qp_iter::Val{QPiter}, reinit::Val{ReInit}) where {QPiter, ReInit}
     (;f, K, assembler, Ke, fe) = buffer
     for cell in CellIterator(dh)
-        reinit!(cellvalues, getcoordinates(cell))
         fill!(Ke, 0)
         fill!(fe, 0)
         if QPiter
-            assemble_element_qpiter!(Ke, fe, cellvalues)
+            if ReInit
+                reinit!(cellvalues, getcoordinates(cell))
+                assemble_element_qpiter!(Ke, fe, cellvalues)
+            else
+                assemble_element_qpiter!(Ke, fe, cellvalues, getcoordinates(cell))
+            end
         else
+            reinit!(cellvalues, getcoordinates(cell))
             assemble_element_std!(Ke, fe, cellvalues)
         end
         assemble!(assembler, celldofs(cell), Ke, fe)
@@ -91,39 +119,55 @@ close!(dh);
 cellvalues = CellValues(qr, ip);
 static_cellvalues = Ferrite.StaticCellValues(cellvalues)
 
-Kstd, fstd = assemble_global(cellvalues, dh; qp_iter=Val(false));
-K_qp, f_qp = assemble_global(cellvalues, dh; qp_iter=Val(true));
-K_static, f_static = assemble_global(static_cellvalues, dh; qp_iter=Val(true));
+stdassy(buffer, cv, dh) = assemble_global!(buffer, cv, dh; qp_iter=Val(false), reinit=Val(false))
+qp_outside(buffer, cv, dh) = assemble_global!(buffer, cv, dh; qp_iter=Val(true), reinit=Val(true))
+qp_inside(buffer, cv, dh) = assemble_global!(buffer, cv, dh; qp_iter=Val(true), reinit=Val(false))
+
+Kstd, fstd = stdassy(create_buffers(cellvalues, dh), cellvalues, dh);
+K_qp_o, f_qp_o = qp_outside(create_buffers(cellvalues, dh), cellvalues, dh);
+K_qp_i, f_qp_i = qp_inside(create_buffers(cellvalues, dh), cellvalues, dh);
+
+cvs_o = Ferrite.StaticCellValues(cellvalues, Val(true)) # Save cell_coords in cvs_o
+Ks_o, fs_o = qp_outside(create_buffers(cvs_o, dh), cvs_o, dh);
+
+cvs_i = Ferrite.StaticCellValues(cellvalues, Val(false)) # Don't save cell_coords in cvs_o
+Ks_i, fs_i = qp_inside(create_buffers(cvs_i, dh), cvs_i, dh);
 
 using Test
 @testset "check outputs" begin
-    @test K_qp ≈ Kstd
-    @test f_qp ≈ fstd
-
-    @test K_static ≈ Kstd
-    @test f_static ≈ fstd
+    for (k, K, f) in (("qpo", K_qp_o, f_qp_o), ("qpi", K_qp_i, f_qp_i), ("so", Ks_o, fs_o), ("si", Ks_i, fs_i))
+        @testset "$k" begin
+          @test K ≈ Kstd
+          @test f ≈ fstd    
+        end
+    end
 end
 
 # Benchmarking 
 using BenchmarkTools
 if n ≤ 100
     print("Standard: ")
-    @btime assemble_global!(buffer, $cellvalues, $dh; qp_iter=Val(false)) setup=(buffer=create_buffers(cellvalues, dh));
-    print("Std qpoint: ")
-    @btime assemble_global!(buffer, $cellvalues, $dh; qp_iter=Val(true)) setup=(buffer=create_buffers(cellvalues, dh));
-    print("Static qpoint: ")
-    @btime assemble_global!(buffer, $static_cellvalues, $dh; qp_iter=Val(true)) setup=(buffer=create_buffers(static_cellvalues, dh));
+    @btime stdassy(buffer, $cellvalues, $dh) setup=(buffer=create_buffers(cellvalues, dh));
+    print("Std qpoint outside: ")
+    @btime qp_outside(buffer, $cellvalues, $dh) setup=(buffer=create_buffers(cellvalues, dh));
+    print("Std qpoint inside: ")
+    @btime qp_inside(buffer, $cellvalues, $dh) setup=(buffer=create_buffers(cellvalues, dh));
+    print("Static outside: ")
+    @btime qp_outside(buffer, $cvs_o, $dh) setup=(buffer=create_buffers(cvs_o, dh));
+    print("Static inside: ")
+    @btime qp_inside(buffer, $cvs_i, $dh) setup=(buffer=create_buffers(cvs_i, dh));
 else
     buffer = create_buffers(cellvalues, dh)
     print("Standard: ")
-    assemble_global!(buffer, cellvalues, dh; qp_iter=Val(false))
-    @time assemble_global!(buffer, cellvalues, dh; qp_iter=Val(false))
-    print("Std qpoint: ")
-    assemble_global!(buffer, cellvalues, dh; qp_iter=Val(true))
-    @time assemble_global!(buffer, cellvalues, dh; qp_iter=Val(true))
-    print("Static qpoint: ")
-    assemble_global!(buffer, static_cellvalues, dh; qp_iter=Val(true))
-    @time assemble_global!(buffer, static_cellvalues, dh; qp_iter=Val(true))
+    @time stdassy(buffer, cellvalues, dh)
+    print("Std qpoint outside: ")
+    @time qp_outside(buffer, cellvalues, dh)
+    print("Std qpoint inside: ")
+    @time qp_inside(buffer, cellvalues, dh)
+    print("Static outside: ")
+    @time qp_outside(buffer, cvs_o, dh)
+    print("Static inside: ")
+    @time qp_inside(buffer, cvs_i, dh)
 end
 nothing
 

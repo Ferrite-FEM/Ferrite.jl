@@ -1,11 +1,24 @@
 # QuadratureValuesIterator
-struct QuadratureValuesIterator{VT}
+struct QuadratureValuesIterator{VT,XT}
     v::VT
+    cell_coords::XT # Union{AbstractArray{<:Vec}, Nothing}
+    function QuadratureValuesIterator(v::V) where V
+        return new{V, Nothing}(v, nothing)
+    end
+    function QuadratureValuesIterator(v::V, cell_coords::VT) where {V, VT <: AbstractArray}
+        reinit!(v, cell_coords)
+        return new{V, VT}(v, cell_coords)
+    end
 end
 
-function Base.iterate(iterator::QuadratureValuesIterator, q_point=1)
+function Base.iterate(iterator::QuadratureValuesIterator{<:Any, Nothing}, q_point=1)
     checkbounds(Bool, 1:getnquadpoints(iterator.v), q_point) || return nothing
     qp_v = @inbounds quadrature_point_values(iterator.v, q_point)
+    return (qp_v, q_point+1)
+end
+function Base.iterate(iterator::QuadratureValuesIterator{<:Any, <:AbstractVector}, q_point=1)
+    checkbounds(Bool, 1:getnquadpoints(iterator.v), q_point) || return nothing
+    qp_v = @inbounds quadrature_point_values(iterator.v, q_point, iterator.cell_coords)
     return (qp_v, q_point+1)
 end
 Base.IteratorEltype(::Type{<:QuadratureValuesIterator}) = Base.EltypeUnknown()
@@ -75,7 +88,7 @@ struct QuadratureValues{VT<:AbstractValues} <: AbstractQuadratureValues
     end
 end
 
-@inline quadrature_point_values(fe_v::AbstractValues, q_point) = QuadratureValues(fe_v, q_point)
+@inline quadrature_point_values(fe_v::AbstractValues, q_point, args...) = QuadratureValues(fe_v, q_point)
 
 @propagate_inbounds getngeobasefunctions(qv::QuadratureValues) = getngeobasefunctions(qv.v)
 @propagate_inbounds geometric_value(qv::QuadratureValues, i) = geometric_value(qv.v, qv.q_point, i)
