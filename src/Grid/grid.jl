@@ -388,7 +388,13 @@ to a Node.
 "Returns the number of nodes in the grid."
 @inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
 "Returns the number of nodes of the `i`-th cell."
-@inline nnodes_per_cell(grid::AbstractGrid, i::Int=1) = nnodes(grid.cells[i])
+function nnodes_per_cell(grid::AbstractGrid) 
+    if !isconcretetype(getcelltype(grid))
+        error("There are different celltypes in the `grid`. Use `nnodes_per_cell(grid, cellid::Int)` instead")
+    end
+    return nnodes(first(grid.cells))
+end
+@inline nnodes_per_cell(grid::AbstractGrid, i::Int) = nnodes(grid.cells[i])
 
 "Return the number type of the nodal coordinates."
 @inline get_coordinate_eltype(grid::AbstractGrid) = get_coordinate_eltype(first(getnodes(grid)))

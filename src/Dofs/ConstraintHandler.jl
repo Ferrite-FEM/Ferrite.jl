@@ -983,8 +983,9 @@ function _add!(ch::ConstraintHandler, pdbc::PeriodicDirichlet, interpolation::In
     # Dof map for mirror dof => image dof
     dof_map = Dict{dof_map_t,dof_map_t}()
 
-    mirror_dofs = zeros(Int, ndofs_per_cell(ch.dh))
-     image_dofs = zeros(Int, ndofs_per_cell(ch.dh))
+    n = ndofs_per_cell(ch.dh, first(face_map).mirror[1])
+    mirror_dofs = zeros(Int, n)
+    image_dofs  = zeros(Int, n)
     for face_pair in face_map
         m = face_pair.mirror
         i = face_pair.image
