@@ -1,11 +1,12 @@
 # QuadratureValuesIterator
-struct QuadratureValuesIterator{VT}
+struct QuadratureValuesIterator{VT, XT <: AbstractVector}
     v::VT
+    cell_coords::XT
 end
 
 function Base.iterate(iterator::QuadratureValuesIterator, q_point=1)
     checkbounds(Bool, 1:getnquadpoints(iterator.v), q_point) || return nothing
-    qp_v = @inbounds quadrature_point_values(iterator.v, q_point)
+    qp_v = @inbounds quadrature_point_values(iterator.v, q_point, iterator.cell_coords)
     return (qp_v, q_point+1)
 end
 Base.IteratorEltype(::Type{<:QuadratureValuesIterator}) = Base.EltypeUnknown()

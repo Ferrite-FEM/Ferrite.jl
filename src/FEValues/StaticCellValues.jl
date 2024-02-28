@@ -93,15 +93,15 @@ getnquadpoints(cv::StaticCellValues) = length(cv.weights)
 getnbasefunctions(cv::StaticCellValues) = getnbasefunctions(cv.fv)
 getngeobasefunctions(cv::StaticCellValues) = getnbasefunctions(cv.gm)
 
-function reinit!(cv::StaticCellValues, cell_coords::AbstractVector)
-    copyto!(cv.x, cell_coords)
-    #TODO: Also allow the cell::AbstracCell to be given and updated
-end
+# function reinit!(cv::StaticCellValues, cell_coords::AbstractVector)
+#     copyto!(cv.x, cell_coords)
+#     #TODO: Also allow the cell::AbstracCell to be given and updated
+# end
 
-function quadrature_point_values(fe_v::StaticCellValues, q_point::Int)
+function quadrature_point_values(fe_v::StaticCellValues, q_point::Int, cell_coords::AbstractVector)
     #q_point bounds checked, ok to use @inbounds
     @inbounds begin
-        mapping = calculate_mapping(fe_v.gm, q_point, fe_v.x)
+        mapping = calculate_mapping(fe_v.gm, q_point, cell_coords)
 
         detJ = calculate_detJ(getjacobian(mapping))
         detJ > 0.0 || throw_detJ_not_pos(detJ)
