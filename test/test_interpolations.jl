@@ -224,6 +224,7 @@
     @test Ferrite.is_discontinuous(ip_t) == false
     @test Ferrite.is_discontinuous(d_ip) == true
     @test Ferrite.is_discontinuous(d_ip_t) == true
+end
 
 @testset "Hcurl and Hdiv" begin
     include(joinpath(@__DIR__, "InterpolationTestUtils.jl"))
