@@ -121,6 +121,9 @@ include("Export/VTK.jl")
 # Point Evaluation
 include("PointEvalHandler.jl")
 
+# Interface elements
+include("interface_elements.jl")
+
 # Other
 include("deprecations.jl")
 include("docs.jl")
