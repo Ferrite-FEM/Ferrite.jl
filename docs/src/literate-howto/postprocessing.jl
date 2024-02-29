@@ -3,7 +3,7 @@
 # ![](heat_square_fluxes.png)
 #
 # *Figure 1*: Heat flux computed from the solution to the heat equation on
-# the unit square, see previous example: [Heat Equation](@ref).
+# the unit square, see previous example: [Heat equation](@ref tutorial-heat-equation).
 #
 #-
 #md # !!! tip
@@ -46,7 +46,7 @@ include("../tutorials/heat_equation.jl");
 # Next we define a function that computes the heat flux for each integration point in the domain.
 # Fourier's law is adopted, where the conductivity tensor is assumed to be isotropic with unit
 # conductivity ``\lambda = 1 ⇒ q = - \nabla u``, where ``u`` is the temperature.
-function compute_heat_fluxes(cellvalues::CellValues{<:ScalarInterpolation}, dh::DofHandler, a::AbstractVector{T}) where T
+function compute_heat_fluxes(cellvalues::CellValues, dh::DofHandler, a::AbstractVector{T}) where T
 
     n = getnbasefunctions(cellvalues)
     cell_dofs = zeros(Int, n)
@@ -108,14 +108,14 @@ ph = PointEvalHandler(grid, points);
 # After the L2-Projection, the heat fluxes `q_projected` are stored in the DoF-ordering
 # determined by the projector's internal DoFHandler, so to evaluate the flux `q` at our points
 # we give the `PointEvalHandler`, the `L2Projector` and the values `q_projected`.
-q_points = get_point_values(ph, projector, q_projected);
+q_points = evaluate_at_points(ph, projector, q_projected);
 
 # We can also extract the field values, here the temperature, right away from the result
 # vector of the simulation, that is stored in `u`. These values are stored in the order of
 # our initial DofHandler so the input is not the `PointEvalHandler`, the original `DofHandler`,
 # the dof-vector `u`, and (optionally for single-field problems) the name of the field.
 # From the `L2Projection`, the values are stored in the order of the degrees of freedom.
-u_points = Ferrite.get_point_values(ph, dh, u, :u);
+u_points = evaluate_at_points(ph, dh, u, :u);
 
 # Now, we can plot the temperature and flux values with the help of any plotting library, e.g. Plots.jl.
 # To do this, we need to import the package:

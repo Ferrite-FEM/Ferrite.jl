@@ -432,6 +432,7 @@ end
 
     # Full coupling (default)
     K = create_sparsity_pattern(dh)
+    @test eltype(K) == Float64
     for j in 1:ndofs(dh), i in 1:ndofs(dh)
         @test is_stored(K, i, j)
     end
@@ -534,4 +535,147 @@ end
         @test is_stored(K, i, j)
         @test is_stored(KS, i, j) == (i <= j)
     end
+end
+
+@testset "dof cross-coupling" begin
+    couplings = [
+        # Field couplings
+        # reshape.(Iterators.product(fill([true, false], 9)...) |> collect |> vec .|> collect, Ref((3,3))),
+        [
+            true  true  true
+            true  true  true 
+            true  true  true 
+        ],
+        [
+            true   false  false
+            false  true  false 
+            false  false  true 
+        ],
+        [
+            true   true  false
+            true  true  true 
+            false  true  true 
+        ],
+
+        # Component coupling
+        [
+            true    true    true    true
+            true    true    true    true 
+            true    true    true    true
+            true    true    true    true 
+        ],
+        [
+            true     false    false    false
+            false    true     false    false 
+            false    false    true     false
+            false    false    false    true 
+        ],
+        [
+            true    true    true    false
+            true    true    true    true 
+            true    true    true    true
+            false    true    true    true 
+        ],
+    ]
+    function is_stored(A, i, j)
+        A = A isa Symmetric ? A.data : A
+        for m in nzrange(A, j)
+            A.rowval[m] == i && return true
+        end
+        return false
+    end
+    function _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, neighbors, is_cross_element)
+        for field1_idx in eachindex(sdh.field_names)
+            i_dofs = dof_range(sdh, field1_idx)
+            ip1 = sdh.field_interpolations[field1_idx]
+            vdim[1] = typeof(ip1) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip1) : 1
+            for dim1 in 1:vdim[1] 
+                for cell2_idx in neighbors
+                    sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[cell2_idx]]
+                    coupling_idx[2] = 1
+                    for field2_idx in eachindex(sdh2.field_names)
+                        j_dofs = dof_range(sdh2, field2_idx)
+                        ip2 = sdh2.field_interpolations[field2_idx]
+                        vdim[2] = typeof(ip2) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip2) : 1
+                        # is_cross_element && !all(Ferrite.is_discontinuous.([ip1, ip2])) && continue
+                        for  dim2 in 1:vdim[2]
+                            i_dofs_v = i_dofs[dim1:vdim[1]:end]
+                            j_dofs_v = j_dofs[dim2:vdim[2]:end]
+                            for i_idx in i_dofs_v, j_idx in j_dofs_v
+                                i = celldofs(dh,cell_idx)[i_idx]
+                                j = celldofs(dh,cell2_idx)[j_idx]
+                                is_cross_element && (i ∈ celldofs(dh,cell2_idx) || j ∈ celldofs(dh,cell_idx)) && continue
+                                @test is_stored(K, i, j) == coupling[coupling_idx...]
+                            end
+                            coupling_idx[2] += 1
+                        end
+                    end
+                end
+                coupling_idx[1] += 1
+            end
+        end
+    end
+    function check_coupling(dh, topology, K, coupling, cross_coupling)
+        for cell_idx in eachindex(getcells(dh.grid))
+            sdh = dh.subdofhandlers[dh.cell_to_subdofhandler[cell_idx]]
+            coupling_idx = [1,1]
+            cross_coupling_idx = [1,1]
+            vdim = [1,1]
+            # test inner coupling
+            _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, [cell_idx], false)
+            # test cross-element coupling
+            neighborhood = Ferrite.getdim(dh.grid.cells[1]) > 1 ? topology.face_face_neighbor : topology.vertex_vertex_neighbor
+            neighbors = neighborhood[cell_idx, :]
+            _check_dofs(K, dh, sdh, cell_idx, cross_coupling, cross_coupling_idx, vdim, [i[1][1] for i in  neighbors[.!isempty.(neighbors)]], true)
+        end
+    end
+    grid = generate_grid(Quadrilateral, (2, 2))
+    topology = ExclusiveTopology(grid)
+    dh = DofHandler(grid)
+    add!(dh, :u, DiscontinuousLagrange{RefQuadrilateral,1}()^2)
+    add!(dh, :p, DiscontinuousLagrange{RefQuadrilateral,1}())
+    add!(dh, :w, Lagrange{RefQuadrilateral,1}())
+    close!(dh)
+    for coupling in couplings, cross_coupling in couplings
+        K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = cross_coupling)
+        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, cross_coupling = cross_coupling) 
+        check_coupling(dh, topology, K, coupling, cross_coupling)
+    end
+
+    # Error paths
+    @test_throws ErrorException("coupling not square") create_sparsity_pattern(dh; coupling=[true true])
+    @test_throws ErrorException("coupling not symmetric") create_symmetric_sparsity_pattern(dh; coupling=[true true; false true])
+    @test_throws ErrorException("could not create coupling") create_symmetric_sparsity_pattern(dh; coupling=falses(100, 100))
+ 
+    # Test coupling with subdomains
+    # Note: `check_coupling` works for this case only because the second domain has dofs from the first domain in order. Otherwise tests like in continuous ip are required.
+    grid = generate_grid(Quadrilateral, (2, 1))
+    topology = ExclusiveTopology(grid)
+
+    dh = DofHandler(grid)
+    sdh1 = SubDofHandler(dh, Set(1))
+    add!(sdh1, :u, DiscontinuousLagrange{RefQuadrilateral,1}()^2)
+    add!(sdh1, :y, DiscontinuousLagrange{RefQuadrilateral,1}())
+    add!(sdh1, :p, Lagrange{RefQuadrilateral,1}())
+    sdh2 = SubDofHandler(dh, Set(2))
+    add!(sdh2, :u, DiscontinuousLagrange{RefQuadrilateral,1}()^2)
+    close!(dh)
+
+    for coupling in couplings, cross_coupling in couplings
+        K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = cross_coupling)
+        all(coupling) && @test K == create_sparsity_pattern(dh, topology = topology, cross_coupling = cross_coupling)
+        check_coupling(dh, topology, K, coupling, cross_coupling)
+    end
+
+    # Testing Crouzeix-Raviart coupling
+    grid = generate_grid(Triangle, (2, 1))
+    topology = ExclusiveTopology(grid)
+    dh = DofHandler(grid)
+    add!(dh, :u, CrouzeixRaviart{RefTriangle,1}())
+    close!(dh)
+    coupling = trues(3,3)
+    K = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = coupling)
+    K_cont = create_sparsity_pattern(dh; coupling=coupling, topology = topology, cross_coupling = falses(3,3))
+    K_default = create_sparsity_pattern(dh)
+    @test K == K_cont == K_default
 end

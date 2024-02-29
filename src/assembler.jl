@@ -4,10 +4,12 @@ struct Assembler{T}
     V::Vector{T}
 end
 
-function Assembler(N)
+Assembler(N) = Assembler(Float64, N)
+
+function Assembler(::Type{T}, N) where T
     I = Int[]
     J = Int[]
-    V = Float64[]
+    V = T[]
     sizehint!(I, N)
     sizehint!(J, N)
     sizehint!(V, N)
@@ -19,7 +21,7 @@ end
     start_assemble([N=0]) -> Assembler
 
 Create an `Assembler` object which can be used to assemble element contributions to the
-global sparse matrix. Use [`assemble!`](@ref) for each element, and [`end_assemble`](@ref),
+global sparse matrix. Use [`assemble!`](@ref) for each element, and [`finish_assemble`](@ref),
 to finalize the assembly and return the sparse matrix.
 
 Note that giving a sparse matrix as input can be more efficient. See below and 
@@ -65,12 +67,12 @@ function assemble!(a::Ferrite.Assembler{T}, rowdofs::AbstractVector{Int}, coldof
 end
 
 """
-    end_assemble(a::Assembler) -> K
+    finish_assemble(a::Assembler) -> K
 
 Finalizes an assembly. Returns a sparse matrix with the
 assembled values. Note that this step is not necessary for `AbstractSparseAssembler`s.
 """
-function end_assemble(a::Assembler)
+function finish_assemble(a::Assembler)
     return sparse(a.I, a.J, a.V)
 end
 
@@ -220,7 +222,7 @@ end
             else # Krow > dofs[Kerow]
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
-                iszero(val) || error("some row indices were not found")
+                iszero(val) || _missing_sparsity_pattern_error(Krow, Kcol)
                 # Advance the local matrix row pointer
                 ri += 1
             end
@@ -228,13 +230,23 @@ end
         # Make sure that remaining entries in this column of the local matrix are all zero
         for i in ri:maxlookups
             if !iszero(Ke[permutation[i], Kecol])
-                error("some row indices were not found")
+                _missing_sparsity_pattern_error(sorteddofs[i], Kcol)
             end
         end
         current_col += 1
     end
 end
 
+function _missing_sparsity_pattern_error(Krow::Int, Kcol::Int)
+    throw(ErrorException(
+        "You are trying to assemble values in to K[$(Krow), $(Kcol)], but K[$(Krow), " *
+        "$(Kcol)] is missing in the sparsity pattern. Make sure you have called `K = " *
+        "create_sparsity_pattern(dh)` or `K = create_sparsity_pattern(dh, ch)` if you " *
+        "have affine constraints. This error might also happen if you are using " *
+        "`::AssemblerSparsityPattern` in a threaded assembly loop (you need to create an " *
+        "`assembler::AssemblerSparsityPattern` for each task)."
+    ))
+end
 
 ## assemble! with local condensation ##
 

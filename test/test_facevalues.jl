@@ -10,12 +10,18 @@ for (scalar_interpol, quad_rule) in (
                                     (Serendipity{RefQuadrilateral, 2}(), FaceQuadratureRule{RefQuadrilateral}(2)),
                                     (Lagrange{RefTetrahedron, 1}(), FaceQuadratureRule{RefTetrahedron}(2)),
                                     (Lagrange{RefTetrahedron, 2}(), FaceQuadratureRule{RefTetrahedron}(2)),
+                                    (Lagrange{RefPyramid, 2}(), FaceQuadratureRule{RefPyramid}(2)),
+                                    (Lagrange{RefPrism, 2}(), FaceQuadratureRule{RefPrism}(2)),
                                    )
 
     for func_interpol in (scalar_interpol, VectorizedInterpolation(scalar_interpol))
         geom_interpol = scalar_interpol # Tests below assume this
         n_basefunc_base = getnbasefunctions(scalar_interpol)
-        fv = FaceValues(quad_rule, func_interpol, geom_interpol)
+        fv = if VERSION ≥ v"1.9"
+            @inferred FaceValues(quad_rule, func_interpol, geom_interpol)
+        else # Type unstable on 1.6, but works at least for 1.9 and later. PR882
+            FaceValues(quad_rule, func_interpol, geom_interpol)
+        end
         ndim = Ferrite.getdim(func_interpol)
         n_basefuncs = getnbasefunctions(func_interpol)
 
@@ -38,8 +44,7 @@ for (scalar_interpol, quad_rule) in (
                 u_scal[i] = V ⋅ xs[i]
             end
             u_vector = reinterpret(Float64, u)
-
-            for i in 1:length(getnquadpoints(fv))
+            for i in 1:getnquadpoints(fv)
                 @test getnormal(fv, i) ≈ n[face]
                 if func_interpol isa Ferrite.ScalarInterpolation
                     @test function_gradient(fv, i, u) ≈ H
@@ -92,19 +97,51 @@ for (scalar_interpol, quad_rule) in (
 
         end
 
-        # test copy
-        fvc = copy(fv)
-        @test typeof(fv) == typeof(fvc)
-        for fname in fieldnames(typeof(fv))
-            v = getfield(fv, fname)
-            v isa Ferrite.ScalarWrapper && continue
-            vc = getfield(fvc, fname)
-            if hasmethod(pointer, Tuple{typeof(v)})
-                @test pointer(v) != pointer(vc)
+        @testset "copy(::FaceValues)" begin
+            fvc = copy(fv)
+            @test typeof(fv) == typeof(fvc)
+
+            # Test that all mutable types in FunctionValues and GeometryMapping have been copied
+            for key in (:fun_values, :geo_mapping)
+                for i in eachindex(getfield(fv, key))
+                    val = getfield(fv, key)[i]
+                    valc = getfield(fvc, key)[i]
+                    for fname in fieldnames(typeof(val))
+                        v = getfield(val, fname)
+                        vc = getfield(valc, fname)
+                        isbits(v) || @test v !== vc
+                        @test v == vc
+                    end
+                end
             end
-            @test v == vc
+            # Test that qr, detJdV, normals, and current_face are copied as expected. 
+            # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
+            # Make it easy to test scalar wrapper equality
+            _mock_isequal(a, b) = a == b
+            _mock_isequal(a::T, b::T) where {T<:Ferrite.ScalarWrapper} = a[] == b[]
+            for fname in (:fqr, :detJdV, :normals, :current_face)
+                v = getfield(fv, fname)
+                vc = getfield(fvc, fname)
+                if fname !== :fqr # Test unaliased
+                    @test v !== vc
+                end
+                @test _mock_isequal(v, vc)
+            end
         end
     end
+end
+
+@testset "show" begin
+    # Just smoke test to make sure show doesn't error. 
+    fv = FaceValues(FaceQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral,2}())
+    showstring = sprint(show, MIME"text/plain"(), fv)
+    @test startswith(showstring, "FaceValues(scalar, rdim=2, sdim=2): 2 quadrature points per face")
+    @test contains(showstring, "Function interpolation: Lagrange{RefQuadrilateral, 2}()")
+    @test contains(showstring, "Geometric interpolation: Lagrange{RefQuadrilateral, 1}()^2")
+    fv.fqr.face_rules[1] = deepcopy(fv.fqr.face_rules[1])
+    push!(Ferrite.getweights(fv.fqr.face_rules[1]), 1)
+    showstring = sprint(show, MIME"text/plain"(), fv)
+    @test startswith(showstring, "FaceValues(scalar, rdim=2, sdim=2): (3, 2, 2, 2) quadrature points on each face")
 end
 
 end # of testset

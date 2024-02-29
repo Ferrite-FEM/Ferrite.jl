@@ -16,6 +16,7 @@
     Ferrite.getnodes(grid::SmallGrid, v::Union{Int, Vector{Int}}) = grid.nodes_test[v]
     Ferrite.getnnodes(grid::SmallGrid) = length(grid.nodes_test)
     Ferrite.get_coordinate_eltype(::SmallGrid) = Float64
+    Ferrite.get_coordinate_type(::SmallGrid{dim}) where dim = Vec{dim,Float64}
     Ferrite.nnodes_per_cell(grid::SmallGrid, i::Int=1) = Ferrite.nnodes(grid.cells_test[i])
     Ferrite.n_faces_per_cell(grid::SmallGrid) = nfaces(eltype(grid.cells_test))
 
@@ -43,7 +44,7 @@
         for cellid in 1:getncells(dh.grid)
             fill!(Ke, 0)
             fill!(fe, 0)
-            coords = get_cell_coordinates(dh.grid, cellid)
+            coords = getcoordinates(dh.grid, cellid)
             reinit!(cellvalues, coords)
             for q_point in 1:getnquadpoints(cellvalues)
                 dΩ = getdetJdV(cellvalues, q_point)
@@ -80,6 +81,10 @@
     @test Ferrite.celldofs(dhs[1],3) == Ferrite.celldofs(dhs[2],3)
     @test Ferrite.ndofs(dhs[1]) == Ferrite.ndofs(dhs[2])
     @test isapprox(u1,u2,atol=1e-8)
+
+    minv, maxv = Ferrite.bounding_box(subtype_grid)
+    @test minv ≈ Vec((-1.0,-1.0))
+    @test maxv ≈ Vec((+1.0,+1.0))
 
     colors1 = Ferrite.create_coloring(subtype_grid, alg = ColoringAlgorithm.WorkStream)
     colors2 = Ferrite.create_coloring(reference_grid, alg = ColoringAlgorithm.WorkStream)

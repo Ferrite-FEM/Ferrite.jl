@@ -174,8 +174,7 @@ ret = [
 
 Two different algorithms are available, specified with the `alg` keyword argument:
  - `alg = ColoringAlgorithm.WorkStream` (default): Three step algorithm from
-   [*WorkStream*](https://www.math.colostate.edu/%7Ebangerth/publications/2013-pattern.pdf)
-   , albeit with a greedy coloring in the second step. Generally results in more colors than
+   Turcksin et al. [Turcksin2016](@cite), albeit with a greedy coloring in the second step. Generally results in more colors than
    `ColoringAlgorithm.Greedy`, however the cells are more equally distributed among the colors.
  - `alg = ColoringAlgorithm.Greedy`: greedy algorithm that works well for structured quadrilateral grids such as
    e.g. quadrilateral grids from `generate_grid`.
@@ -192,6 +191,9 @@ The resulting colors can be visualized using [`vtk_cell_data_colors`](@ref).
         cellid => color for (color, cellids) in enumerate(final_colors) for cellid in cellids
     )
     ```
+
+# References
+ - [Turcksin2016](@cite) Turcksin et al. ACM Trans. Math. Softw. 43 (2016).
 """
 function create_coloring(g::AbstractGrid, cellset=1:getncells(g); alg::ColoringAlgorithm.T=ColoringAlgorithm.WorkStream)
     incidence_matrix = create_incidence_matrix(g, cellset)
