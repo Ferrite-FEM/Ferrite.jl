@@ -154,6 +154,17 @@ function QuadratureRule{RefPyramid, T}(quad_type::Symbol, order::Int) where T
     QuadratureRule{RefPyramid,T}(weights, points)
 end
 
+#######################
+# SmallQuadratureRule #
+#######################
+struct SmallQuadratureRule{N,T,dim}
+    weights::SVector{N,T}
+    points::SVector{N,Vec{dim,T}}
+end
+SmallQuadratureRule(qr::QuadratureRule) = SmallQuadratureRule(SVector{length(qr.weights)}(qr.weights), SVector{length(qr.points)}(qr.points))
+SmallQuadratureRule{refshape,T}(quad_type::Symbol, order::Int) where {refshape,T} = SmallQuadratureRule(QuadratureRule{refshape,T}(quad_type, order))
+SmallQuadratureRule{refshape,T}(order::Int) where {refshape,T} = SmallQuadratureRule(QuadratureRule{refshape,T}(order))
+
 ######################
 # FaceQuadratureRule #
 ######################
@@ -229,6 +240,17 @@ function FaceQuadratureRule{RefPyramid, T}(quad_type::Symbol, order::Int) where 
     return create_face_quad_rule(RefPyramid, [1], qr_quad.weights/4, qr_quad.points,
         [2,3,4,5], qr_tri.weights, qr_tri.points)
 end
+
+
+###########################
+# SmallFaceQuadratureRule #
+###########################
+struct SmallFaceQuadratureRule{N,T,dim,M}
+    face_rules::SVector{M,SmallQuadratureRule{N, T, dim}}
+end
+SmallFaceQuadratureRule(fqr::FaceQuadratureRule{shape}) where shape = SmallFaceQuadratureRule(SVector{nfaces(shape)}(SmallQuadratureRule.(fqr.face_rules)))
+SmallFaceQuadratureRule{refshape,T}(quad_type::Symbol, order::Int) where {refshape,T} = SmallFaceQuadratureRule(FaceQuadratureRule{refshape,T}(quad_type, order))
+SmallFaceQuadratureRule{refshape,T}(order::Int) where {refshape,T} = SmallFaceQuadratureRule(FaceQuadratureRule{refshape,T}(order))
 
 ##################
 # Common methods #
