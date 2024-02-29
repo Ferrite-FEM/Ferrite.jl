@@ -28,11 +28,14 @@ shape_value(::Ferrite.AbstractValues, ::Int, ::Int)
 shape_gradient(::Ferrite.AbstractValues, ::Int, ::Int)
 shape_symmetric_gradient
 shape_divergence
+shape_curl
+geometric_value
 
 function_value
 function_gradient
 function_symmetric_gradient
 function_divergence
+function_curl
 spatial_coordinate
 ```
 
