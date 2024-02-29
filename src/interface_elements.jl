@@ -265,20 +265,18 @@ An `InterfaceCellValues` wraps two `CellValues`, one for each face of an `Interf
 - `basefunctionshere::Vector{Int}`: base function indices on face "here"
 - `basefunctionsthere::Vector{Int}`: base function indices on face "there"
 """
-struct InterfaceCellValues{IP, IPhere, IPthere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPhere, GIPthere} <: AbstractCellValues
+struct InterfaceCellValues{IP, CVhere<:CellValues, CVthere<:CellValues} <: AbstractCellValues
     ip::IP
-    here::CellValues{IPhere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPhere}
-    there::CellValues{IPthere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPthere}
+    here::CVhere
+    there::CVthere
     basefunctionshere::Vector{Int}
     basefunctionsthere::Vector{Int}
 
-    function InterfaceCellValues(ip::IP, here::CVhere, there::CVthere) where {IP, IPhere, IPthere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPhere, GIPthere, 
-            CVhere<:CellValues{IPhere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPhere},
-            CVthere<:CellValues{IPthere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPthere}}
-        ip isa VectorizedInterpolation ? sip = ip.ip : sip = ip
+    function InterfaceCellValues(ip::IP, here::CVhere, there::CVthere) where {IP<:Interpolation, CVhere, CVthere}
+        sip = ip isa VectorizedInterpolation ? ip.ip : ip
         basefunctionshere = collect( get_interface_index(sip, :here, i) for i in 1:getnbasefunctions(sip.here))
         basefunctionsthere = collect( get_interface_index(sip, :there, i) for i in 1:getnbasefunctions(sip.there))
-        return new{IP, IPhere, IPthere, N_t, dNdx_t, dNdξ_t, T, dMdξ_t, QR, GIPhere, GIPthere}(ip, here, there, basefunctionshere, basefunctionsthere)
+        return new{IP, CVhere, CVthere}(ip, here, there, basefunctionshere, basefunctionsthere)
     end
 end
 
@@ -343,9 +341,9 @@ function reinit!(cv::InterfaceCellValues, x::AbstractVector{Vec{sdim,T}}) where 
     return nothing
 end
 
-getnbasefunctions(cv::InterfaceCellValues) = size(cv.here.N, 1) + size(cv.there.N, 1)
+getnbasefunctions(cv::InterfaceCellValues) = getnbasefunctions(cv.here) + getnbasefunctions(cv.there)
 
-getngeobasefunctions(cv::InterfaceCellValues) = size(cv.here.M, 1) + size(cv.there.N, 1)
+getngeobasefunctions(cv::InterfaceCellValues) = getngeobasefunctions(cv.here) + getngeobasefunctions(cv.there)
 
 getnquadpoints(cv::InterfaceCellValues) = getnquadpoints(cv.here)
 
@@ -468,8 +466,8 @@ function shape_gradient_jump(cv::InterfaceCellValues, qp::Int, i::Int)
     return side == :here ? -shape_gradient(cv.here, qp, baseindex) : shape_gradient(cv.there, qp, baseindex)
 end
 
-shape_value_type(::InterfaceCellValues{<:Any, <:Any, <:Any, N_t}) where N_t = N_t
-shape_gradient_type(::InterfaceCellValues{<:Any, <:Any, <:Any, <:Any, dNdx_t}) where dNdx_t = dNdx_t
+shape_value_type(cv::InterfaceCellValues) = shape_value_type(cv.here)
+shape_gradient_type(cv::InterfaceCellValues) = shape_gradient_type(cv.here)
 
 """
     function_value(cv::InterfaceCellValues, qp::Int, u::AbstractVector, here::Bool)
