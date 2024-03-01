@@ -46,7 +46,7 @@ for each time step. In order to connect the actual time with each of these files
 a `VTKFileCollection` can be used, which will write one paraview datafile (`.pvd`)
 file and one `VTKFile` (`.vtu`) for each time step. 
 
-```@example pvdexport 
+```@example export 
 pvd = VTKFileCollection("my_results", grid)
 for t in range(0, 1, 5)
     # Do calculations to update u
