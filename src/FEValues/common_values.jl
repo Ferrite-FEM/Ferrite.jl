@@ -26,8 +26,8 @@ end
 end
 
 """
-    reinit!(cv::CellValues, cell::AbstractCell, x::Vector)
-    reinit!(cv::CellValues, x::Vector)
+    reinit!(cv::Union{CellValues, CellMultiValues}, cell::AbstractCell, x::Vector)
+    reinit!(cv::Union{CellValues, CellMultiValues}, x::Vector)
     reinit!(fv::FaceValues, cell::AbstractCell, x::Vector, face::Int)
     reinit!(fv::FaceValues, x::Vector, face::Int)
 

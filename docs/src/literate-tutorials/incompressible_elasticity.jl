@@ -23,7 +23,7 @@
 #md # The full program, without comments, can be found in the next
 #md # [section](@ref incompressible_elasticity-plain-program).
 using Ferrite, Tensors
-using BlockArrays, SparseArrays, LinearAlgebra
+using SparseArrays, LinearAlgebra
 
 # First we generate a simple grid, specifying the 4 corners of Cooks membrane.
 function create_cook_grid(nx, ny)
@@ -40,18 +40,17 @@ end;
 
 # Next we define a function to set up our cell- and facevalues.
 function create_values(interpolation_u, interpolation_p)
-    ## quadrature rules
+    ## Quadrature rules
     qr      = QuadratureRule{RefTriangle}(3)
     face_qr = FaceQuadratureRule{RefTriangle}(3)
 
-    ## cell and facevalues for u
-    cellvalues_u = CellValues(qr, interpolation_u)
+    ## Cell values, for both fields
+    cellvalues = CellMultiValues(qr, (u=interpolation_u, p=interpolation_p))    
+    
+    ## Face values (only for the displacement, u)
     facevalues_u = FaceValues(face_qr, interpolation_u)
 
-    ## cellvalues for p
-    cellvalues_p = CellValues(qr, interpolation_p)
-
-    return cellvalues_u, cellvalues_p, facevalues_u
+    return cellvalues, facevalues_u
 end;
 
 
@@ -85,28 +84,30 @@ end
 # use a `PseudoBlockArray` from `BlockArrays.jl`.
 
 function doassemble(
-    cellvalues_u::CellValues,
-    cellvalues_p::CellValues,
-    facevalues_u::FaceValues,
-    K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::LinearElasticity
-)
+        cellvalues::CellMultiValues, facevalues_u::FaceValues,
+        K::SparseMatrixCSC, grid::Grid, dh::DofHandler, mp::LinearElasticity
+        )
+
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
-    nu = getnbasefunctions(cellvalues_u)
-    np = getnbasefunctions(cellvalues_p)
 
-    fe = PseudoBlockArray(zeros(nu + np), [nu, np]) # local force vector
-    ke = PseudoBlockArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
+    n = ndofs_per_cell(dh)
+    fe = zeros(n)    # local force vector
+    ke = zeros(n, n) # local stiffness matrix
 
     ## traction vector
     t = Vec{2}((0.0, 1 / 16))
     ## cache ɛdev outside the element routine to avoid some unnecessary allocations
-    ɛdev = [zero(SymmetricTensor{2, 2}) for i in 1:getnbasefunctions(cellvalues_u)]
+    ɛdev = [zero(SymmetricTensor{2, 2}) for i in 1:getnbasefunctions(cellvalues[:u])]
+
+    ## local dof ranges for each field
+    dofrange_u = dof_range(dh, :u)
+    dofrange_p = dof_range(dh, :p)
 
     for cell in CellIterator(dh)
         fill!(ke, 0)
         fill!(fe, 0)
-        assemble_up!(ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, grid, mp, ɛdev, t)
+        assemble_up!(ke, fe, cell, cellvalues, facevalues_u, grid, mp, ɛdev, t, dofrange_u, dofrange_p)
         assemble!(assembler, celldofs(cell), fe, ke)
     end
 
@@ -116,37 +117,29 @@ end;
 # The element routine integrates the local stiffness and force vector for all elements.
 # Since the problem results in a symmetric matrix we choose to only assemble the lower part,
 # and then symmetrize it after the loop over the quadrature points.
-function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, grid, mp, ɛdev, t)
-
-    n_basefuncs_u = getnbasefunctions(cellvalues_u)
-    n_basefuncs_p = getnbasefunctions(cellvalues_p)
-    u▄, p▄ = 1, 2
-    reinit!(cellvalues_u, cell)
-    reinit!(cellvalues_p, cell)
-
+function assemble_up!(Ke, fe, cell, cellvalues, facevalues_u, grid, mp, ɛdev, t, dofrange_u, dofrange_p)
+    reinit!(cellvalues, cell)
     ## We only assemble lower half triangle of the stiffness matrix and then symmetrize it.
-    for q_point in 1:getnquadpoints(cellvalues_u)
-        for i in 1:n_basefuncs_u
-            ɛdev[i] = dev(symmetric(shape_gradient(cellvalues_u, q_point, i)))
+    for q_point in 1:getnquadpoints(cellvalues)
+        for i in keys(dofrange_u)
+            ɛdev[i] = dev(symmetric(shape_gradient(cellvalues[:u], q_point, i)))
         end
-        dΩ = getdetJdV(cellvalues_u, q_point)
-        for i in 1:n_basefuncs_u
-            divδu = shape_divergence(cellvalues_u, q_point, i)
-            δu = shape_value(cellvalues_u, q_point, i)
-            for j in 1:i
-                Ke[BlockIndex((u▄, u▄), (i, j))] += 2 * mp.G * ɛdev[i] ⊡ ɛdev[j] * dΩ
+        dΩ = getdetJdV(cellvalues, q_point)
+        for (iᵤ, Iᵤ) in pairs(dofrange_u)
+            for (jᵤ, Jᵤ) in pairs(dofrange_u[1:iᵤ])
+                Ke[Iᵤ, Jᵤ] += 2 * mp.G * ɛdev[iᵤ] ⊡ ɛdev[jᵤ] * dΩ
             end
         end
 
-        for i in 1:n_basefuncs_p
-            δp = shape_value(cellvalues_p, q_point, i)
-            for j in 1:n_basefuncs_u
-                divδu = shape_divergence(cellvalues_u, q_point, j)
-                Ke[BlockIndex((p▄, u▄), (i, j))] += -δp * divδu * dΩ
+        for (iₚ, Iₚ) in pairs(dofrange_p)
+            δp = shape_value(cellvalues[:p], q_point, iₚ)
+            for (jᵤ, Jᵤ) in pairs(dofrange_u)
+                divδu = shape_divergence(cellvalues[:u], q_point, jᵤ)
+                Ke[Iₚ, Jᵤ] += -δp * divδu * dΩ
             end
-            for j in 1:i
-                p = shape_value(cellvalues_p, q_point, j)
-                Ke[BlockIndex((p▄, p▄), (i, j))] += - 1 / mp.K * δp * p * dΩ
+            for (jₚ, Jₚ) in pairs(dofrange_p[1:iₚ])
+                p = shape_value(cellvalues[:p], q_point, jₚ)
+                Ke[Iₚ, Jₚ] += - 1 / mp.K * δp * p * dΩ
             end
 
         end
@@ -158,13 +151,13 @@ function assemble_up!(Ke, fe, cell, cellvalues_u, cellvalues_p, facevalues_u, gr
     ## We loop over all the faces in the cell, then check if the face
     ## is in our `"traction"` faceset.
     for face in 1:nfaces(cell)
-        if onboundary(cell, face) && (cellid(cell), face) ∈ getfaceset(grid, "traction")
+        if (cellid(cell), face) ∈ getfaceset(grid, "traction")
             reinit!(facevalues_u, cell, face)
             for q_point in 1:getnquadpoints(facevalues_u)
                 dΓ = getdetJdV(facevalues_u, q_point)
-                for i in 1:n_basefuncs_u
-                    δu = shape_value(facevalues_u, q_point, i)
-                    fe[i] += (δu ⋅ t) * dΓ
+                for (iᵤ, Iᵤ) in pairs(dofrange_u)
+                    δu = shape_value(facevalues_u, q_point, iᵤ)
+                    fe[Iᵤ] += (δu ⋅ t) * dΓ
                 end
             end
         end
@@ -201,8 +194,7 @@ end;
 # this formulation. Therefore we expand the strain to a 3D tensor, and then compute the (3D)
 # stress tensor.
 
-function compute_stresses(cellvalues_u::CellValues, cellvalues_p::CellValues,
-                          dh::DofHandler, mp::LinearElasticity, a::Vector)
+function compute_stresses(cellvalues::CellMultiValues, dh::DofHandler, mp::LinearElasticity, a::Vector)
     ae = zeros(ndofs_per_cell(dh)) # local solution vector
     u_range = dof_range(dh, :u)    # local range of dofs corresponding to u
     p_range = dof_range(dh, :p)    # local range of dofs corresponding to p
@@ -211,8 +203,7 @@ function compute_stresses(cellvalues_u::CellValues, cellvalues_p::CellValues,
     ## Loop over the cells and compute the cell-average stress
     for cc in CellIterator(dh)
         ## Update cellvalues
-        reinit!(cellvalues_u, cc)
-        reinit!(cellvalues_p, cc)
+        reinit!(cellvalues, cc)
         ## Extract the cell local part of the solution
         for (i, I) in pairs(cc.dofs)
             ae[i] = a[I]
@@ -220,11 +211,11 @@ function compute_stresses(cellvalues_u::CellValues, cellvalues_p::CellValues,
         ## Loop over the quadrature points
         σΩi = zero(SymmetricTensor{2, 3}) # stress integrated over the cell
         Ωi = 0.0                          # cell volume (area)
-        for qp in 1:getnquadpoints(cellvalues_u)
-            dΩ = getdetJdV(cellvalues_u, qp)
+        for qp in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, qp)
             ## Evaluate the strain and the pressure
-            ε = function_symmetric_gradient(cellvalues_u, qp, ae, u_range)
-            p = function_value(cellvalues_p, qp, ae, p_range)
+            ε = function_symmetric_gradient(cellvalues[:u], qp, ae, u_range)
+            p = function_value(cellvalues[:p], qp, ae, p_range)
             ## Expand strain to 3D
             ε3D = SymmetricTensor{2, 3}((i, j) -> i < 3 && j < 3 ? ε[i, j] : 0.0)
             ## Compute the stress in this quadrature point
@@ -255,16 +246,16 @@ function solve(ν, interpolation_u, interpolation_p)
     dbc = create_bc(dh)
 
     ## CellValues
-    cellvalues_u, cellvalues_p, facevalues_u = create_values(interpolation_u, interpolation_p)
+    cellvalues, facevalues_u = create_values(interpolation_u, interpolation_p)
 
     ## Assembly and solve
     K = create_sparsity_pattern(dh)
-    K, f = doassemble(cellvalues_u, cellvalues_p, facevalues_u, K, grid, dh, mp)
+    K, f = doassemble(cellvalues, facevalues_u, K, grid, dh, mp)
     apply!(K, f, dbc)
     u = K \ f
 
     ## Compute the stress
-    σ = compute_stresses(cellvalues_u, cellvalues_p, dh, mp, u)
+    σ = compute_stresses(cellvalues, dh, mp, u)
     σvM = map(x -> √(3/2 * dev(x) ⊡ dev(x)), σ) # von Mise effective stress
 
     ## Export the solution and the stress
@@ -276,7 +267,7 @@ function solve(ν, interpolation_u, interpolation_p)
             σij = [x[i, j] for x in σ]
             vtk_cell_data(vtkfile, σij, "sigma_$(i)$(j)")
         end
-        vtk_cell_data(vtkfile, σvM, "sigma von Mise")
+        vtk_cell_data(vtkfile, σvM, "sigma von Mises")
     end
     return u
 end

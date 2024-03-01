@@ -89,7 +89,7 @@ function reinit!(cc::CellCache, i::Int)
 end
 
 # reinit! FEValues with CellCache
-reinit!(cv::CellValues, cc::CellCache) = reinit!(cv, cc.coords)
+reinit!(cv::Union{CellValues, CellMultiValues}, cc::CellCache) = reinit!(cv, cc.coords)
 reinit!(fv::FaceValues, cc::CellCache, f::Int) = reinit!(fv, cc.coords, f) # TODO: Deprecate?
 
 # Accessor functions (TODO: Deprecate? We are so inconsistent with `getxx` vs `xx`...)

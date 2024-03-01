@@ -1,3 +1,14 @@
+# Test that all values in the struct are equal,
+# but that bits-types are not aliased to eachother.
+function test_equal_but_unaliased(a::T, b::T) where T
+    for fname in fieldnames(T)
+        a_val = getfield(a, fname)
+        b_val = getfield(b, fname)
+        isbits(a_val) || @test a_val !== b_val
+        @test a_val == b_val
+    end
+end
+    
 @testset "CellValues" begin
 @testset "ip=$scalar_interpol quad_rule=$(typeof(quad_rule))" for (scalar_interpol, quad_rule) in  (
                                     (Lagrange{RefLine, 1}(), QuadratureRule{RefLine}(2)),
@@ -93,26 +104,114 @@
             cvc = copy(cv)
             @test typeof(cv) == typeof(cvc)
 
-            # Test that all mutable types in FunctionValues and GeometryMapping have been copied
-            for key in (:fun_values, :geo_mapping)
-                val = getfield(cv, key)
-                valc = getfield(cvc, key)
-                for fname in fieldnames(typeof(val))
-                    v = getfield(val, fname)
-                    vc = getfield(valc, fname)
-                    isbits(v) || @test v !== vc
-                    @test v == vc
+            test_equal_but_unaliased(cv.fun_values, cvc.fun_values)
+            test_equal_but_unaliased(cv.geo_mapping, cvc.geo_mapping)
+            # qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
+            @test cvc.qr === cv.qr
+            # While detJdV is copied
+            @test cvc.detJdV !== cv.detJdV
+            @test cvc.detJdV == cv.detJdV
+        end
+    end
+end
+
+@testset "CellMultiValues" begin
+    # Here we test that CellMultiValues give the same output as CellValues, 
+    # as that output is thoroughly tested above
+    ipu = Lagrange{RefQuadrilateral,2}()^2
+    ipp = Lagrange{RefQuadrilateral,1}()
+    ipT = ipp
+    qr = QuadratureRule{RefQuadrilateral}(2)
+    cvu = CellValues(qr, ipu)
+    cvp = CellValues(qr, ipp)
+    cmv = CellMultiValues(qr, (u = ipu, p = ipp, T = ipT))
+    cmv_u = CellMultiValues(qr, (u = ipu,)) # Case with a single interpolation 
+    cmv3 = CellMultiValues(qr, (u = ipu, T = Lagrange{RefQuadrilateral,2}(), p = ipp)) # Case with 3 unique IPs
+    
+    @test cmv[:p] === cmv[:T] # Correct aliasing for identical interpolations
+    # Correctly inferred geometric interpolation:
+    @test Ferrite.geometric_interpolation(cmv) == Ferrite.geometric_interpolation(cvu)
+    # Expected function interpolation
+    @test Ferrite.function_interpolation(cmv[:u]) == ipu
+    @test Ferrite.function_interpolation(cmv[:p]) == ipp
+
+    # Correct number outputs 
+    @test getnquadpoints(cmv) == getnquadpoints(cvu)
+    @test getnbasefunctions(cmv[:u]) == getnbasefunctions(cvu)
+    @test getnbasefunctions(cmv[:p]) == getnbasefunctions(cvp)
+
+    # Reinitialization
+    ref_coords = Ferrite.reference_coordinates(Ferrite.geometric_interpolation(cmv))
+    x = map(xref -> xref + rand(typeof(xref))/5, ref_coords) # Random pertubation 
+    reinit!.((cvu, cvp, cmv, cmv_u, cmv3), (x,))
+
+    @test_call reinit!(cmv, x) # JET testing (e.g. type stability)
+    @test_call reinit!(cmv_u, x) # JET testing (e.g. type stability)
+    @test_call reinit!(cmv3, x) # JET testing (e.g. type stability)
+
+    # Test type-stable access by hard-coded key (relies on constant propagation)
+    _getufield(x) = x[:u]
+    @inferred _getufield(cmv)
+    @inferred _getufield(cmv3)
+    
+    # Test output values when used in an element routine
+    ue = rand(getnbasefunctions(cmv[:u]) + getnbasefunctions(cmv[:p]))
+    dru = 1:getnbasefunctions(cmv[:u])
+    drp = (1:getnbasefunctions(cmv[:p])) .+ getnbasefunctions(cmv[:u])
+    for q_point in 1:getnquadpoints(cmv)
+        for cmv_test in (cmv, cmv_u, cmv3)    
+            @test getdetJdV(cvu, q_point) ≈ getdetJdV(cmv, q_point)
+            @test spatial_coordinate(cvu, q_point, x) ≈ spatial_coordinate(cmv, q_point, x)
+        end
+
+        for (cv, fv, dr) in (
+                (cvu, cmv[:u], dru), 
+                (cvu, cmv_u[:u], dru),
+                (cvu, cmv3[:u], dru),
+                (cvp, cmv[:p], drp),
+                (cvp, cmv3[:p], drp),
+                )
+            value = function_value(cv, q_point, ue, dr)
+            gradient = function_gradient(cv, q_point, ue, dr)
+            @test function_value(fv, q_point, ue[dr]) ≈ value
+            @test function_value(fv, q_point, ue, dr) ≈ value
+            @test function_gradient(fv, q_point, ue[dr]) ≈ gradient
+            @test function_gradient(fv, q_point, ue, dr) ≈ gradient
+            if value isa Vec 
+                @test function_symmetric_gradient(cmv[:u], q_point, ue, dr) ≈ symmetric(gradient)
+                @test function_divergence(cmv[:u], q_point, ue, dr) ≈ tr(gradient)
+            end
+            for i in 1:getnbasefunctions(fv)
+                Ni = shape_value(cv, q_point, i)
+                ∇Ni = shape_gradient(cv, q_point, i)
+                @test shape_value(fv, q_point, i) ≈ Ni
+                @test shape_gradient(fv, q_point, i) ≈ ∇Ni
+                if Ni isa Vec
+                    @test shape_symmetric_gradient(fv, q_point, i) ≈ symmetric(∇Ni)
+                    @test shape_divergence(fv, q_point, i) ≈ tr(∇Ni)
                 end
             end
-            # Test that qr and detJdV is copied as expected. 
-            # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
-            for fname in (:qr, :detJdV)
-                v = getfield(cv, fname)
-                vc = getfield(cvc, fname)
-                fname === :qr || @test v !== vc
-                @test v == vc
-            end
         end
+    end
+    @testset "copy(::CellMultiValues)" begin
+        cmv_copy = @inferred copy(cmv)
+        @test cmv_copy isa typeof(cmv)
+
+        # Test that all mutable types in FunctionValues and GeometryMapping have been copied
+        for (fv, fvc) in zip(cmv.fun_values_tuple, cmv_copy.fun_values_tuple)
+            test_equal_but_unaliased(fv, fvc)
+        end
+        test_equal_but_unaliased(cmv.geo_mapping, cmv_copy.geo_mapping)
+
+        # Test that aliasing is preserved between equal interpolations 
+        @test cmv_copy[:p] === cmv_copy[:T]
+
+        # qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
+        @test cmv_copy.qr === cmv.qr
+        # While detJdV is copied
+        @test cmv_copy.detJdV !== cmv.detJdV
+        @test cmv_copy.detJdV == cmv.detJdV
+        
     end
 end
 
@@ -144,6 +243,7 @@ end
     csv = CellValues(qr, ip)
     cvv = CellValues(qr, VectorizedInterpolation(ip))
     csv_embedded = CellValues(qr, ip, ip^3)
+    cmv = CellMultiValues(qr, (s = ip, v = VectorizedInterpolation(ip)))
     fsv = FaceValues(qr_f, ip)
     fvv = FaceValues(qr_f, VectorizedInterpolation(ip))
     fsv_embedded = FaceValues(qr_f, ip, ip^3)
@@ -151,6 +251,7 @@ end
     x, n = valid_coordinates_and_normals(ip)
     reinit!(csv, x)
     reinit!(cvv, x)
+    reinit!(cmv, x)
     reinit!(fsv, x, 1)
     reinit!(fvv, x, 1)
     
@@ -158,11 +259,13 @@ end
     xx = [x; x]
     @test_throws ArgumentError reinit!(csv, xx)
     @test_throws ArgumentError reinit!(cvv, xx)
+    @test_throws ArgumentError reinit!(cmv, xx)
     @test_throws ArgumentError reinit!(fsv, xx, 1)
     @test_throws ArgumentError reinit!(fvv, xx, 1)
 
     @test_throws ArgumentError spatial_coordinate(csv, qp, xx)
     @test_throws ArgumentError spatial_coordinate(cvv, qp, xx)
+    @test_throws ArgumentError spatial_coordinate(cmv, qp, xx)
     @test_throws ArgumentError spatial_coordinate(fsv, qp, xx)
     @test_throws ArgumentError spatial_coordinate(fvv, qp, xx)
 
@@ -171,20 +274,26 @@ end
     @test_throws ArgumentError reinit!(fsv_embedded, x, 1)
 
     # Wrong number of (local) dofs
-    # Scalar values, scalar dofs
+    # Scalar values
     ue = rand(getnbasefunctions(csv) + 1)
-    @test_throws ArgumentError function_value(csv, qp, ue)
-    @test_throws ArgumentError function_gradient(csv, qp, ue)
+    ue_vec = [rand(Vec{dim}) for _ in 1:(getnbasefunctions(csv) + 1)]
+    for test_values in (csv, cmv[:s])
+        # Scalar dofs
+        @test_throws ArgumentError function_value(test_values, qp, ue)
+        @test_throws ArgumentError function_gradient(test_values, qp, ue)
+        # Vector dofs
+        @test_throws ArgumentError function_value(test_values, qp, ue)
+        @test_throws ArgumentError function_gradient(test_values, qp, ue)
+        @test_throws ArgumentError function_divergence(test_values, qp, ue)
+    end
+
     # Vector values, scalar dofs
     ue = rand(getnbasefunctions(cvv) + 1)
-    @test_throws ArgumentError function_value(cvv, qp, ue)
-    @test_throws ArgumentError function_gradient(cvv, qp, ue)
-    @test_throws ArgumentError function_divergence(cvv, qp, ue)
-    # Scalar values, vector dofs
-    ue = [rand(Vec{dim}) for _ in 1:(getnbasefunctions(csv) + 1)]
-    @test_throws ArgumentError function_value(csv, qp, ue)
-    @test_throws ArgumentError function_gradient(csv, qp, ue)
-    @test_throws ArgumentError function_divergence(csv, qp, ue)
+    for test_values in (cvv, cmv[:v])
+        @test_throws ArgumentError function_value(test_values, qp, ue)
+        @test_throws ArgumentError function_gradient(test_values, qp, ue)
+        @test_throws ArgumentError function_divergence(test_values, qp, ue)
+    end
 end
 
 @testset "Embedded elements" begin
