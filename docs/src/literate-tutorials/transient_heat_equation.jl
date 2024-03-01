@@ -189,13 +189,11 @@ apply_analytical!(uₙ, dh, :u, x -> (x[1]^2 - 1) * (x[2]^2 - 1) * max_temp);
 # Here, we apply **once** the boundary conditions to the system matrix `A`.
 apply!(A, ch);
 
-# To store the solution, we initialize a `paraview_collection` (.pvd) file.
-pvd = paraview_collection("transient-heat.pvd");
+# To store the solution, we initialize a `VTKFileCollection` (.pvd) file.
+pvd = VTKFileCollection("transient-heat", grid);
 t = 0
-vtk_grid("transient-heat-$t", dh) do vtk
-    vtk_point_data(vtk, dh, uₙ)
-    vtk_save(vtk)
-    pvd[t] = vtk
+addstep!(pvd, t) do io
+    write_solution(io, dh, uₙ)
 end
 
 # At this point everything is set up and we can finally approach the time loop.
@@ -211,16 +209,14 @@ for t in Δt:Δt:T
     #Finally, we can solve the time step and save the solution afterwards.
     u = A \ b
 
-    vtk_grid("transient-heat-$t", dh) do vtk
-        vtk_point_data(vtk, dh, u)
-        vtk_save(vtk)
-        pvd[t] = vtk
+    addstep!(pvd, t) do io
+        write_solution(io, dh, u)
     end
     #At the end of the time loop, we set the previous solution to the current one and go to the next time step.
     uₙ .= u
 end
 # In order to use the .pvd file we need to store it to the disk, which is done by:
-vtk_save(pvd);
+close(pvd);
 
 #md # ## [Plain program](@id transient_heat_equation-plain-program)
 #md #
