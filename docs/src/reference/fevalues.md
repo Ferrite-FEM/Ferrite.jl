@@ -25,7 +25,7 @@ reinit!
 getnquadpoints
 getdetJdV
 spatial_coordinate
-getnbasefunctions
+geometric_value
 ```
 
 Furthermore, the following functions are applicable to 
@@ -36,7 +36,7 @@ shape_gradient(::Ferrite.AbstractValues, ::Int, ::Int)
 shape_symmetric_gradient
 shape_divergence
 shape_curl
-geometric_value
+getnbasefunctions
 
 function_value
 function_gradient
