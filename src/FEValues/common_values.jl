@@ -105,6 +105,12 @@ end
 divergence_from_gradient(grad::Vec) = sum(grad)
 divergence_from_gradient(grad::Tensor{2}) = tr(grad)
 
+"""
+    shape_curl(fe_v::AbstractValues, q_point::Int, base_function::Int)
+
+Return the curl of shape function `base_function` evaluated in
+quadrature point `q_point`.
+"""
 function shape_curl(cv::AbstractValues, q_point::Int, base_func::Int)
     return curl_from_gradient(shape_gradient(cv, q_point, base_func))
 end
