@@ -13,6 +13,7 @@ export
     RefPyramid,
     BubbleEnrichedLagrange,
     CrouzeixRaviart,
+    RannacherTurek,
     Lagrange,
     DiscontinuousLagrange,
     Serendipity,

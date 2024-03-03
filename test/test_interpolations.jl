@@ -38,7 +38,10 @@
                       #
                       BubbleEnrichedLagrange{RefTriangle, 1}(),
                       #
-                      CrouzeixRaviart{RefTriangle, 1}(),
+                      CrouzeixRaviart{RefTriangle,1}(),
+                      CrouzeixRaviart{RefTetrahedron,1}(),
+                      RannacherTurek{RefQuadrilateral,1}(),
+                      RannacherTurek{RefHexahedron,1}(),
     )
         # Test of utility functions
         ref_dim = Ferrite.getdim(interpolation)
