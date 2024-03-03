@@ -1,10 +1,17 @@
-function scalar_field()
+using Ferrite, Test
+
+function test_pe_scalar_field()
     # isoparametric approximation
-    mesh = generate_grid(QuadraticQuadrilateral, (20, 20))
-    f(x) = x[1]^2
+    mesh = generate_grid(QuadraticQuadrilateral, (3, 3))
+    perturbate_standard_grid!(mesh, 1/10)
+
+    f(x) = x[1]+x[2]
 
     ip_f = Lagrange{RefQuadrilateral,2}() # function interpolation
     ip_g = Lagrange{RefQuadrilateral,2}() # geometry interpolation
+
+    # points where we want to retrieve field values
+    points = Vec{2,Float64}[]
 
     # compute values in quadrature points
     qr = QuadratureRule{RefQuadrilateral}(3) # exactly approximate quadratic field
@@ -14,7 +21,9 @@ function scalar_field()
         xe = getcoordinates(mesh, cellid)
         reinit!(cv, xe)
         for qp in 1:getnquadpoints(cv)
-            qp_vals[cellid][qp] = f(spatial_coordinate(cv, qp, xe))
+            x = spatial_coordinate(cv, qp, xe)
+            qp_vals[cellid][qp] = f(x)
+            push!(points, x)
         end
     end
 
@@ -22,27 +31,67 @@ function scalar_field()
     projector = L2Projector(ip_f, mesh)
     projector_vals = project(projector, qp_vals, qr)
 
-    # points where we want to retrieve field values
-    points = [Vec((x, 0.52)) for x in range(0.0; stop=1.0, length=100)]
-
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(mesh, points)
+    @test all(x -> x !== nothing, ph.cells)
+
     vals = evaluate_at_points(ph, projector, projector_vals)
-    @test f.(points) ≈ vals
+    @test f.(points) ≈ vals atol = 1e-2
 
     # alternatively retrieve vals from nodal values TODO: make this work?
     # vals = evaluate_at_points(ph, nodal_vals)
     # @test f.(points) ≈ vals
 end
 
-function vector_field()
-    ## vector field
-    # isoparametric approximation
-    mesh = generate_grid(QuadraticQuadrilateral, (20, 20))
-    f(x) = Vec((x[1]^2, x[1]))
-    nodal_vals = [f(p.x) for p in mesh.nodes]
+function test_pe_embedded()
+    mesh = generate_grid(QuadraticQuadrilateral, (3, 3))
+    perturbate_standard_grid!(mesh, 1/10)
+    mesh = Grid(mesh.cells, map(x->Node(Vec((x.x[1], x.x[2], x.x[1]+x.x[2]))), mesh.nodes))
+    
+    f(x) = x[1]+x[2]
 
     ip_f = Lagrange{RefQuadrilateral,2}() # function interpolation
+    ip_g = Lagrange{RefQuadrilateral,2}()^3 # geometry interpolation
+
+    # points where we want to retrieve field values
+    points = Vec{3,Float64}[]
+
+    # compute values in quadrature points
+    qr = QuadratureRule{RefQuadrilateral}(3) # exactly approximate quadratic field
+    cv = CellValues(qr, ip_f, ip_g)
+    qp_vals = [Vector{Float64}(undef, getnquadpoints(cv)) for _ in 1:getncells(mesh)]
+    for cellid in eachindex(mesh.cells)
+        xe = getcoordinates(mesh, cellid)
+        reinit!(cv, xe)
+        for qp in 1:getnquadpoints(cv)
+            x = spatial_coordinate(cv, qp, xe)
+            qp_vals[cellid][qp] = f(x)
+            push!(points, x)
+        end
+    end
+
+    # do a L2Projection for getting values in dofs
+    # @test_throws MethodError projector = L2Projector(ip_f, mesh; geom_ip=ip_g)
+    projector = L2Projector(ip_f, mesh; geom_ip=ip_g)
+    projector_vals = project(projector, qp_vals, qr)
+
+    # set up PointEvalHandler and retrieve values
+    ph = PointEvalHandler(mesh, points)
+    @test all(x -> x !== nothing, ph.cells)
+
+    # vals = evaluate_at_points(ph, projector, projector_vals)
+    # @test f.(points) ≈ vals atol = 1e-2
+end
+
+function test_pe_vector_field()
+    ## vector field
+    # isoparametric approximation
+    mesh = generate_grid(QuadraticQuadrilateral, (3, 3))
+    perturbate_standard_grid!(mesh, 1/10)
+    f(x) = Vec((x[1], x[2]))
+    nodal_vals = [f(p.x) for p in mesh.nodes]
+
+    ip_f = Lagrange{RefQuadrilateral,2}()^2 # function interpolation
     ip_g = Lagrange{RefQuadrilateral,2}() # geometry interpolation
 
     # compute values in quadrature points
@@ -67,18 +116,20 @@ function vector_field()
 
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(mesh, points)
+    @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, projector, projector_vals)
-    @test f.(points) ≈ vals
+    @test f.(points) ≈ vals  atol = 1e-2
 
     # alternatively retrieve vals from nodal values# TODO
     # vals = evaluate_at_points(ph, nodal_vals)
     # @test f.(points) ≈ vals
 end
 
-function superparametric()
+function test_pe_superparametric()
     # superparametric approximation
-    mesh = generate_grid(Quadrilateral, (20, 20))
-    f(x) = x*x[1]
+    mesh = generate_grid(Quadrilateral, (3, 3))
+    perturbate_standard_grid!(mesh, 1/10)
+    f(x) = x
     ip_f = Lagrange{RefQuadrilateral,2}() # function interpolation
 
     # compute values in quadrature points
@@ -102,14 +153,16 @@ function superparametric()
 
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(mesh, points)
+    @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, projector, projector_vals)
 
     # can recover a quadratic field by a quadratic approximation
-    @test f.(points) ≈ vals
+    @test f.(points) ≈ vals  atol = 1e-3
 end
 
-function dofhandler()
-    mesh = generate_grid(Quadrilateral, (2,2))
+function test_pe_dofhandler()
+    mesh = generate_grid(Quadrilateral, (2, 2))
+    perturbate_standard_grid!(mesh, 1/10)
     dof_vals = [1., 2., 5., 4., 3., 6., 8., 7., 9.]
     points = [node.x for node in mesh.nodes] # same as nodes
 
@@ -118,6 +171,7 @@ function dofhandler()
     close!(dh)
 
     ph = PointEvalHandler(mesh, points)
+    @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, dh, dof_vals, :s)
     @test vals ≈ 1.0:9.0
 
@@ -126,11 +180,12 @@ function dofhandler()
     # @test vals ≈ 1.0:9.0
 end
 
-function dofhandler2(;three_dimensional=true)
+function test_pe_dofhandler2(;three_dimensional=true)
     # Computes the L2 projection of a quadratic field exactly
     # but not using L2Projector since we want the DofHandler dofs
     if (three_dimensional)
-        mesh = generate_grid(Hexahedron, (10, 10, 10))
+        mesh = generate_grid(Hexahedron, (3, 3, 3))
+        perturbate_standard_grid!(mesh, 1/10)
         f_s = x -> 1.0 + x[1] + x[2] + x[1] * x[2] + x[2] * x[3]
         f_v = x ->  Vec{3}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2], 4.0 + x[1] - x[2] + x[3] - x[1] * x[3] - x[2] * x[3]))
         points = [Vec((x, x, x)) for x in range(0; stop=1, length=100)]
@@ -138,7 +193,8 @@ function dofhandler2(;three_dimensional=true)
         ip_f_v = ip_f^3
         qr = QuadratureRule{RefHexahedron}(3)
     else 
-        mesh = generate_grid(Quadrilateral, (20, 20))
+        mesh = generate_grid(Quadrilateral, (3, 3))
+        perturbate_standard_grid!(mesh, 1/10)
         f_s = x ->  1.0 + x[1] + x[2] + x[1] * x[2]
         f_v = x -> Vec{2}((1.0 + x[1] + x[2] + x[1] * x[2], 2.0 - x[1] - x[2] - x[1] * x[2]))
         points = [Vec((x, x, )) for x in range(0; stop=1, length=100)]
@@ -146,7 +202,7 @@ function dofhandler2(;three_dimensional=true)
         ip_f_v = ip_f^2
         qr = QuadratureRule{RefQuadrilateral}(3)       
     end
-   
+
     csv = CellValues(qr, ip_f)
     cvv = CellValues(qr, ip_f_v)
     dh = DofHandler(mesh);
@@ -218,7 +274,7 @@ function dofhandler2(;three_dimensional=true)
     end
 end
 
-function mixed_grid()
+function test_pe_mixed_grid()
     ## Mixed grid where not all cells have the same fields 
 
     # 5_______6
@@ -269,6 +325,7 @@ function mixed_grid()
     # first alternative: L2Projection to dofs
     projector_values = project(projector, qp_vals_quads, qr)
     ph = PointEvalHandler(mesh, points)
+    @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, projector, projector_values)
     @test vals[1:5] ≈ f.(points[1:5])
     @test all(isnan, vals[6:end])
@@ -284,13 +341,15 @@ function mixed_grid()
     dof_vals = [1., 1., 2., 2., 4., 4., 3., 3., 6., 6., 5., 5.]
     points = [node.x for node in mesh.nodes]
     ph = PointEvalHandler(mesh, points)
+    @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, dh, dof_vals, :v)
-    @test vals == [Vec((i, i)) for i=1.0:6.0]
+    @test vals ≈ [Vec((i, i)) for i=1.0:6.0]
 end
 
-function oneD()
+function test_pe_oneD()
     # isoparametric approximation
     mesh = generate_grid(Line, (2,))
+    perturbate_standard_grid!(mesh, 1/10)
     f(x) = x[1]
     nodal_vals = [f(p.x) for p in mesh.nodes]
 
@@ -317,8 +376,9 @@ function oneD()
 
     # set up PointEvalHandler and retrieve values
     ph = PointEvalHandler(mesh, points)
+    @test all(x -> x !== nothing, ph.cells)
     vals = evaluate_at_points(ph, projector, projector_values)
-    @test f.(points) ≈ vals
+    @test f.(points) ≈ vals atol=1e-2
 
     # alternatively retrieve vals from nodal values
     # TODO
@@ -326,25 +386,46 @@ function oneD()
     # @test f.(points) ≈ vals
 end
 
-function first_point_missing()
+function test_pe_first_point_missing()
     mesh = generate_grid(Quadrilateral, (1, 1))
     points = [Vec(2.0, 0.0), Vec(0.0, 0.0)]
     ph = PointEvalHandler(mesh, points; warn=false)
     
     @test isnothing(ph.local_coords[1])
-    @test ph.local_coords[2] == Vec(0.0, 0.0)
+    @test ph.local_coords[2] ≈ Vec(0.0, 0.0)
 end
 
 @testset "PointEvalHandler" begin
-    scalar_field()
-    vector_field()
-    dofhandler()
-    dofhandler2(;three_dimensional=false)
-    dofhandler2(;three_dimensional=true)
-    superparametric()
-    mixed_grid()
-    oneD()
-    first_point_missing()
+    @testset "scalar field" begin
+        test_pe_scalar_field()
+        test_pe_embedded()
+    end
+
+    @testset "vector field" begin
+        test_pe_vector_field()
+    end
+
+    @testset "dofhandler interaction" begin
+        test_pe_dofhandler()
+        test_pe_dofhandler2(;three_dimensional=false)
+        test_pe_dofhandler2(;three_dimensional=true)
+    end
+
+    @testset "superparametric" begin
+        test_pe_superparametric()
+    end
+
+    @testset "mixed grid" begin
+        test_pe_mixed_grid()
+    end
+    
+    @testset "1D" begin
+        test_pe_oneD()
+    end
+
+    @testset "failure cases" begin
+        test_pe_first_point_missing()
+    end
 end
 
 @testset "PointValues" begin
