@@ -1,0 +1,9 @@
+[files]
+extend-exclude = ["*.svg", "*.toml"]
+
+[default.extend-words]
+ue = "ue"
+ba = "ba"
+nd = "nd"
+Numer = "Numer"
+Secrest = "Secrest"
