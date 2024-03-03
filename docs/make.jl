@@ -56,6 +56,7 @@ bibtex_plugin = CitationBibliography(
             "tutorials/stokes-flow.md",
             "tutorials/porous_media.md",
             "tutorials/ns_vs_diffeq.md",
+            "tutorials/reactive_surface.md",
             "tutorials/linear_shell.md",
             "tutorials/dg_heat_equation.md",
         ],
