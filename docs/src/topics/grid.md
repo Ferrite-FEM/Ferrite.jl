@@ -86,7 +86,7 @@ In this space a local numbering of nodes and faces exists, i.e.
 The example shows a local face ID ordering, defined as:
 
 ```julia
-faces(::Lagrange{RefQuadrilateral,1}) = ((1,2), (2,3), (3,4), (4,1))
+Ferrite.faces(::Lagrange{RefQuadrilateral, 1}) = ((1,2), (2,3), (3,4), (4,1))
 ```
 
 Other face ID definitions [can be found in the src files](https://github.com/Ferrite-FEM/Ferrite.jl/blob/8224282ab4d67cb523ef342e4a6ceb1716764ada/src/interpolations.jl#L154) in the corresponding `faces` dispatch.
